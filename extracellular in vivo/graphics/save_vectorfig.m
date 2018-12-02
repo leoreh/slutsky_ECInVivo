@@ -1,4 +1,4 @@
-function saveVectorFig(filename, filepath, f)
+function save_vectorfig(filename, filepath, f)
 
 % saves figure as pdf with full vector data.
 % file saved in basePath/Graphics. if /Graphics does not exit, creates it.

@@ -1,8 +1,8 @@
-function plotCluster(spikes, varargin)
+function plotcluster(spikes, varargin)
 
 % INPUT
 % required:
-%   spikes      struct in bz format including recduration
+%   spikes      struct in bz format including rec duration
 % optional:
 %   graphics    plot figure {1}.
 %   win         time window for calculation {all}.
