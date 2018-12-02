@@ -1,4 +1,4 @@
-function save_vectorfig(filename, filepath, f)
+function savePdf(filename, filepath, f)
 
 % saves figure as pdf with full vector data.
 % file saved in basePath/Graphics. if /Graphics does not exit, creates it.
@@ -19,7 +19,6 @@ if ~exist(fullpath, 'dir')
     mkdir('graphics')
 end
 
-% f.PaperType = 'a2';
 orient(f, 'landscape')
 print(f, filename, '-dpdf', '-bestfit', '-painters')
 

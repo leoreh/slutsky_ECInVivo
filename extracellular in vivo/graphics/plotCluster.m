@@ -1,4 +1,4 @@
-function plotcluster(spikes, varargin)
+function plotCluster(spikes, varargin)
 
 % INPUT
 % required:
