@@ -4,6 +4,7 @@ function CatStruct = catstruct(varargin)
 %
 % goes through all folders and subfolders in parentdir, loads
 % *structname*.mat if exists and concatenates the struct fields.
+% for example, can be used to concatenate spikes from multiple sessions.
 %
 % INPUT:
 %   parentdir       path to recording folder {pwd}.

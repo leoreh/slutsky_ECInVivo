@@ -1,4 +1,4 @@
-function spikes = GetSpikes(varargin)
+function spikes = getSpikes(varargin)
 % bz_getSpikes - Get spike timestamps.
 %
 % USAGE
@@ -86,7 +86,7 @@ saveMat = p.Results.saveMat;
 noPrompts = p.Results.noPrompts;
 
 
-[sessionInfo] = lh_getSessionInfo(basepath, 'noPrompts', noPrompts);
+[sessionInfo] = getSessionInfo(basepath, 'noPrompts', noPrompts);
 
 
 spikes.samplingRate = sessionInfo.rates.wideband;

@@ -27,7 +27,7 @@ noPrompts = false;
 forceReload = true;
 % sessionInfo = lh_getSessionInfo(basepath);
 
-spikes = getspikes('basePath', basepath, 'noPrompts', noPrompts, 'forceReload', forceReload);
+spikes = getSpikes('basePath', basepath, 'noPrompts', noPrompts, 'forceReload', forceReload);
 
 lfp = lh_GetLFP(sessionInfo.channels, 'basePath', basepath);
 

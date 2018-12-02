@@ -1,7 +1,7 @@
-function savePdf(filename, filepath, f)
+function savepdf(filename, basepath, f)
 
 % saves figure as pdf with full vector data.
-% file saved in basePath/Graphics. if /Graphics does not exit, creates it.
+% file saved in basepath/graphics. if /graphics does not exit, creates it.
 %
 % INPUT
 %   filename        name of figure
@@ -10,12 +10,12 @@ function savePdf(filename, filepath, f)
 %
 % 24 nov 18 LH
 
-fullpath = [filepath, '\Graphics'];
+fullpath = [basepath, '\graphics'];
 strdate = date;
 filename = fullfile(fullpath, [filename, '_', strdate]);
 
 if ~exist(fullpath, 'dir')
-    sprintf('Creating Graphics folder in %s', filepath)
+    sprintf('Creating Graphics folder in %s', basepath)
     mkdir('graphics')
 end
 
