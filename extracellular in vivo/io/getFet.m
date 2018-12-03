@@ -7,11 +7,14 @@ function fet = getFet(basepath)
 %   saveMat     save output in basepath
 %
 % OUTPUT:
-%   fet         cell array of k x n x m, where k is the number of spike
+%   fet         cell array of k x n x m + 1, where k is the number of spike
 %               groups (e.g. tetrodes), n is the number of spikes and m is
-%               the number of features
-%
+%               the number of features. The last column is the clu ID
+%               
 % 03 dec 18 LH
+% 
+% to do list:
+%   divide last fet by fs
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -25,36 +28,55 @@ if nargs < 2 || isempty(saveMat)
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% get .fet filenames
+% get filenames
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 cd(basepath)
+% .fet files
 fetfiles = dir([basepath '\' '*.fet*']);
-filenames = {fetfiles.name};
-nfiles = length(filenames);
-if isempty(filenames)
-    error('no .ddt files in %s.', basepath)
+fetfilenames = {fetfiles.name};
+nfetfiles = length(fetfilenames);
+if isempty(fetfilenames)
+    error('no .fet files in %s.', basepath)
 end
 
-fprintf(1, '\nFound %d .fet files\n', nfiles);
+% .clu files
+clufiles = dir([basepath '\' '*.clu*']);
+clufilenames = {clufiles.name};
+nclufiles = length(clufilenames);
+if isempty(clufilenames)
+    error('no .fet files in %s.', basepath)
+end
+
+if length(nfetfiles) ~= length(nclufiles)
+    error('different number of .fet (%d) and clu (%d) files.',...
+        length(nfetfiles), length(nclufiles))
+end
+
+fprintf(1, '\nFound %d .fet & .clu files\n', nclufiles);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% load fet
+% load fet and clu
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-for i = 1 : nfiles
+for i = 1 : nclufiles
     
-    fprintf(1, 'Working on file %s\n', filenames{i});
-    [~, basename] = fileparts(filenames{i});
-    newname = [basename '.dat'];
+    fprintf(1, 'Working on file %s\n', fetfilenames{i});
     
-    fid = fopen(filenames{i}, 'r');
+    fid = fopen(fetfilenames{i}, 'r');
     if(fid == -1);
         error('cannot open file');
     end
-    
     nfet = fscanf(fid, '%d', 1);
     fet{i} = fscanf(fid, '%f', [nfet, inf])';
     fclose(fid);
-    
+      
+    fid = fopen(clufilenames{i}, 'r');
+    if(fid == -1);
+        error('cannot open file');
+    end
+    nclu = fscanf(fid, '%d', 1);
+    fet{i}(:, end+1) = fscanf(fid, '%f')';
+    fclose(fid);
+
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

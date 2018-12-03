@@ -97,14 +97,14 @@ nChannels = sessionInfo.nChannels;
 if exist([basepath filesep sessionInfo.FileName '.spikes.cellinfo.mat'],'file') && forceReload == false
     disp('loading spikes from cellinfo file..')
     load([basepath filesep sessionInfo.FileName '.spikes.cellinfo.mat'])
-    %Check that the spikes structure fits cellinfo requirements
-    [iscellinfo] = bz_isCellInfo(spikes);
-    switch iscellinfo
-        case false
-            warning(['The spikes structure in baseName.spikes.cellinfo.mat ',...
-                'does not fit buzcode standards. Sad.'])
-    end
-    
+%     %Check that the spikes structure fits cellinfo requirements
+%     [iscellinfo] = bz_isCellInfo(spikes);
+%     switch iscellinfo
+%         case false
+%             warning(['The spikes structure in baseName.spikes.cellinfo.mat ',...
+%                 'does not fit buzcode standards. Sad.'])
+%     end
+%     
 else % do the below then filter by inputs... (Load from clu/res/fet)
     
     if ~noPrompts & saveMat == 0 %Inform the user that they should save a file for later
