@@ -6,7 +6,7 @@ function preprocWrapper()
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'D:\VBshare\chr2_Teri_6_6bl1_mrg';
+basepath = 'D:\VBshare\chr7_Teri_Day1_7_8_18_bl1_mrg';
 basename = 'chr7_Teri_Day1_7_8_18_bl1_mrg';
 
 class = cellclass(basename);

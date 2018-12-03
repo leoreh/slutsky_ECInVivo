@@ -31,7 +31,9 @@ mapch = p.Results.mapch;
 rmvch = p.Results.rmvch;
 basepath = p.Results.basepath;
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % get .ddt filenames
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
 cd(basepath)
 ddtfiles = dir([basepath '\' '*.ddt']);
 filenames = {ddtfiles.name};
@@ -42,16 +44,15 @@ end
 
 fprintf(1, '\nFound %d .ddt files\n', nfiles);
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% open files and extract info
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 for i = 1 : nfiles
     
     fprintf(1, 'Working on file %s\n', filenames{i});    
     [~, basename] = fileparts(filenames{i});
     newname = [basename '.dat'];
-    
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    % open files and extract info
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    
+      
     fid = fopen(filenames{i}, 'r');
     fout = fopen(newname, 'w');  
     if(fid == -1);
