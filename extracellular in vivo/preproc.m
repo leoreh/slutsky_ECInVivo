@@ -7,9 +7,6 @@ function preproc()
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 basepath = 'D:\VBshare\chr7_Teri_Day1_7_8_18_bl1_mrg';
-% basename = 'chr7_Teri_Day1_7_8_18_bl1_mrg';
-
-class = cellclass(basename);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 1: ddt to dat
@@ -27,7 +24,7 @@ noPrompts = false;
 forceReload = false;
 sessionInfo = getSessionInfo(basepath);
 
-spikes = getSpikes();
+spikes = getSpikes('basepath', basepath);
 
 lfp = lh_GetLFP(sessionInfo.channels, 'basePath', basepath);
 
@@ -41,9 +38,6 @@ fet = getFet(basepath);
 saveFig = true;
 graphics = true; 
 spikes = cluValid(basepath, spikes, 12, graphics, saveFig);
-
-
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 4: concatenates spikes from different sessions
@@ -62,15 +56,9 @@ spikes = catstruct(parentdir, structname);
 [CellClass] = cellclass(parentdir, spikes);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% STEP 4: calculate mean firing rate
+% STEP 7: calculate mean firing rate
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
 
 spkcount = spkcount(spikes);
 
-f = fieldnames(spikes);
- for i = 1:length(f)
-    spikes.(f{i}) = spikes2.(f{i})
- end
 
