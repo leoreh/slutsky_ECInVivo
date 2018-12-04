@@ -1,4 +1,4 @@
-function fet = getFet(basepath)
+function fet = getFet(basepath, saveMat, forceReload)
 
 % load features from all .fet files in folder.
 %
@@ -25,6 +25,17 @@ if nargs < 1 || isempty(basepath)
 end
 if nargs < 2 || isempty(saveMat)
     saveMat = 1;
+end
+if nargs < 3 || isempty(forceReload)
+    forceReload = 0;
+end
+
+[~, filename, ~] = fileparts(basepath);
+filename = [fullfile(basepath, filename) '.fet.mat'];
+if exist(filename, 'file')  && ~forceReload
+    load(filename);
+    warning('fet.mat already exists. loading %s', filename)
+    return
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -83,8 +94,7 @@ end
 % save fet
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if saveMat
-    [~, filename, ~] = fileparts(basepath);
-    save([fullfile(basepath, filename) '.fet.mat'], 'fet')
+    save(filename, 'fet')
 end
 
 end

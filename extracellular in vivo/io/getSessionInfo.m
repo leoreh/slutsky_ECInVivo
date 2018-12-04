@@ -18,6 +18,9 @@ function [sessionInfo] = getSessionInfo(basePath,varargin)
 % OUTPUT
 %   sessionInfo         metadata structure
 %
+% CALLS
+%   LoadParameters      Originally from FMAToolbox, edited in buzlab
+% 
 % 2017 DLevenstein and DTingley
 % 
 % UPDATES
@@ -55,7 +58,7 @@ if exist(filename,'file')
 else
    warning(['could not find file ',baseName,'.sessionInfo.mat ',...
        'running LoadParameters instead..']) 
-   sessionInfo = LoadParameters(basePath);
+   sessionInfo = LoadParameters(baseName);
    SIexist = false; 
 end
 
