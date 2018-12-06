@@ -18,19 +18,19 @@ function [L, iDist] = cluDist(fet, cluidx, m)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-nspks = size(fet, 1);
+nspk = size(fet, 1);
 ncluspk = length(cluidx);
-df = size(fet,2);
+df = size(fet, 2);
 if ncluspk < df
     L = nan;
     iDist = NaN;
-    warning('more features then spikes in cluster, L-Ratio and iDist is NaN')
+    warning('more features then spikes. L-Ratio and iDist is NaN')
     return
 end
 
 % mark spikes which are not cluster members
-noiseSpk = setdiff(1:nspks, cluidx);
-cluSpk = ismember(1:nspks, cluidx);
+noiseSpk = setdiff(1:nspk, cluidx);
+cluSpk = ismember(1:nspk, cluidx);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % mahalanobis distances
@@ -50,7 +50,7 @@ L = sum(1 - chi2cdf(mNoise, df)) / length(cluidx);
 % Isolation distance
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % calculate point where mD of other spikes = n of this cell
-if ncluspk < nspks / 2  
+if ncluspk < nspk / 2  
 	[sorted, ~] = sort(mNoise);
 	iDist = sorted(ncluspk);
 else

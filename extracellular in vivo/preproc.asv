@@ -13,12 +13,14 @@ basepath = 'D:\Data\Refaela\Chr5_Pnu2_DMSOChr2_Pnu1_10_7_18';
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 store = 'Raw1';
 blocks = [1 2 4 5];
-chunksize = [];
-mapch = [1, 3, 5, 7, 2, 4, 6, 8, 9, 11, 13, 15, 10, 12, 14, 16];
-rmvch = [10];
-clip{1} = [0, 20];
 
-tdt2dat(basepath, store, blocks, chunksize, mapch, rmvch, clip)
+mapch = [1, 3, 5, 7, 2, 4, 6, 8, 9, 11, 13, 15, 10, 12, 14, 16];
+rmvch = [13];
+chunksize = 60;
+    clip = [10, 50; 500 601; 1111 1800; 2000 2020; 2050 2052; 2080 2111];
+
+
+tdt2dat(basepath, store, blocks, chunksize, mapch, rmvch)
 
 % or convert .ddt to .dat
 % ddt2dat(basepath, mapch, rmvch)

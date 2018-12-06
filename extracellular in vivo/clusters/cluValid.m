@@ -26,6 +26,9 @@ function spikes = cluValid(basepath, spikes, npca, graphics, saveFig)
 %   getFet          PCA feature array
 %   cluDist         L ratio and iDist
 %   plotCluster     plot waveform and ISI histogram
+% 
+% TO DO LIST:
+%   currently UID must be from 
 %
 % 03 dec 18 LH
 
@@ -52,16 +55,25 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % calculate cluster separation
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 fet = getFet(basepath);
 
 for i = 1 : length(fet)
-    nclu = unique(fet{i}(:, end));
-    nclu = length(nclu(nclu > 1));
-    L{i} = zeros(nclu, 1);
-    iDist{i} = zeros(nclu ,1);
-    for j = 1 : nclu
-        cluidx = find(fet{i}(:, end) == spikes.cluID(j));
+    
+    % disgard noise and artifact spikes
+    idx = find(fet{i}(:, end) <= 1);
+    fet{i}(idx, :) = [];
+    
+%     fet{i}(fet{i}(:, end) == 6) = 7;
+%     fet{i}(fet{i}(:, end) == 7) = 11;
+    
+    % initialize and send to L and iDist calculation
+    clu = unique(fet{i}(:, end));
+    clu = clu(clu > 1);
+    L{i} = zeros(length(clu), 1);
+    iDist{i} = zeros(length(clu) ,1);
+    for j = 1 : length(clu)
+        cluidx = find(fet{i}(:, end) == clu(j));
         [L{i}(j), iDist{i}(j)] = cluDist(fet{i}(:, 1 : npca), cluidx);
     end
 end
@@ -90,7 +102,6 @@ ISIrmv = sum((spikes.ISIratio < 0.1));
 Lrmv = sum((spikes.L < 0.05));
 iDrmv = sum((spikes.iDist > 20));
 iDLrmv = sum((spikes.iDist > 20 & spikes.L < 0.05));
-LniD = sum((spikes.iDist > 20 & spikes.L < 0.05));
 ISILiD = sum(spikes.L < 0.05 & spikes.iDist > 20 & spikes.ISIratio < 0.1);
 ISIid = sum(spikes.iDist > 20 & spikes.ISIratio < 0.1);
 

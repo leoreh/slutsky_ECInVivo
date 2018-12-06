@@ -3,13 +3,15 @@ function fet = getFet(basepath, saveMat, forceReload)
 % load features from all .fet files in folder.
 %
 % INPUT:
-%   basepath    path to recording folder {pwd}.
-%   saveMat     save output in basepath
+%   basepath        path to recording folder {pwd}.
+%   saveMat         save output in basepath
+%   forceReload     reload fet even if .mat exists
 %
 % OUTPUT:
 %   fet         cell array of k x n x m + 1, where k is the number of spike
 %               groups (e.g. tetrodes), n is the number of spikes and m is
-%               the number of features. The last column is the clu ID
+%               the number of features. Last column is the clu ID
+%               array includes noise (clu1) and artifact (clu0) spikes
 %               
 % 03 dec 18 LH
 % 

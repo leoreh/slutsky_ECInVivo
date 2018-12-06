@@ -89,7 +89,14 @@ for i = 1 : length(clu)
     suptitle(txt)
     
     if saveFig
-        figname = fullfile(basepath, ['\graphics\clu' int2str(i)]);
+        fullpath = [basepath, '\graphics'];
+        strdate = date;
+        figname = fullfile(fullpath, ['clu', int2str(i), '_', strdate]);
+        
+        if ~exist(fullpath, 'dir')
+            sprintf('Creating Graphics folder in %s', basepath)
+            mkdir('graphics')
+        end
         saveas(f, figname, 'png')
     end
     
