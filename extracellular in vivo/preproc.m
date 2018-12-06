@@ -4,12 +4,12 @@ function preproc()
 % contains calls for various functions.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% arguments
+% basepath to recording folder
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 basepath = 'D:\Data\Refaela\Chr5_Pnu2_DMSOChr2_Pnu1_10_7_18';
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% STEP 1: Tank to dat
+% STEP 1a: Tank to dat
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 store = 'Raw1';
 blocks = [1 2 4 5];
@@ -20,29 +20,24 @@ clip{1} = [0, 20];
 
 tdt2dat(basepath, store, blocks, chunksize, mapch, rmvch, clip)
 
-% or convert .ddt to .dat
-% ddt2dat(basepath, mapch, rmvch)
-
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% STEP 1a: ddt to dat
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ddt2dat(basepath, mapch, rmvch)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% STEP 2: load spikes and LFP
+% STEP 2: load spikes
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-noPrompts = false;
-forceReload = false;
-sessionInfo = getSessionInfo(basepath);
 
 spikes = getSpikes('basepath', basepath);
 
-lfp = lh_GetLFP(sessionInfo.channels, 'basePath', basepath);
-
-spikes.sessionDur = lfp.duration;
+% sessionInfo = getSessionInfo(basepath);
+% lfp = lh_GetLFP(sessionInfo.channels, 'basePath', basepath);
+% spikes.sessionDur = lfp.duration;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 3: review clusters
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-saveFig = true;
-graphics = true; 
 spikes = cluValid(basepath, spikes);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -59,12 +54,11 @@ spikes = catstruct(parentdir, structname);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 6: cell classification based on waveform
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-[CellClass] = cellclass(parentdir, spikes);
+CellClass = cellclass(parentdir, spikes);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 7: calculate mean firing rate
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 spkcount = spkcount(spikes);
 
 

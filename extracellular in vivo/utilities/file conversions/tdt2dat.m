@@ -1,12 +1,12 @@
 function tdt2dat(basepath, store, blocks, chunksize, mapch, rmvch, clip)
 
-% converts tank (TDT) to dat (neurosuite). Concatenates blocks. 
+% converts tank (TDT) to dat (neurosuite). Concatenates blocks.
 % performs basic preprocessing.
 %
 % INPUT:
 %   basepath    path to recording folder {pwd}.
 %   store       stream. typically {'Raw1'} or 'Raw2'
-%   blocks      which blocks to convert {all}.
+%   blocks      blocks to convert {all}.
 %   chunksize   load data in chunks {60} s. if empty will load entire block.
 %   mapch       new order of channels {[]}.
 %   rmvch       channels to remove (according to original order) {[]}
@@ -17,7 +17,7 @@ function tdt2dat(basepath, store, blocks, chunksize, mapch, rmvch, clip)
 %
 % CALLS:
 %   TDTbin2mat
-% 
+%
 % TO DO LIST:
 %   handle chunks better (e.g. linspace)
 %
@@ -61,7 +61,6 @@ scalef = 1e6;   % scale factor for int16 conversion [uV]
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % rearrange mapch according to rmvch
-% allows removing channels before remapping
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if ~isempty(mapch)
     mapch = mapch(~ismember(mapch, rmvch));
@@ -109,56 +108,56 @@ for i = 1 : nblocks
     
     heads = TDTbin2mat(blockpath, 'TYPE', {'streams'}, 'STORE', store, 'HEADERS', 1);
     nsec(i) = heads.stores.Raw1.ts(end);
-      
+    
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % partition into chunks
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    
-
-        if isempty(chunksize)       % if load entire block
-            nchunks = 1;
-            chunks = [0 0];
-        else                        % if load block in chunks                        
-            nchunks = ceil(nsec(i) / chunksize);
-            chunks = [0 : chunksize : chunksize * (nchunks - 1); chunksize : chunksize : chunksize * nchunks]';
-            chunks(nchunks, 2) = 0;
-            chunks(1, 1) = 0;
-        end
-        
-        % clip unwanted times
-        clipblk = clip{blocks(i)};
-        if ~isempty(clipblk)
-            if isempty(chunksize)
-                if size(clipblk, 1) == 1 && clipblk(1) == 0
-                    chunks(1, 1) = clipblk(1, 2);
-                elseif size(clipblk, 1) == 1 && clipblk(2) == Inf
-                    chunks(1, 2) = clipblk(1, 1);
-                else
-                    for j = 1 : size(clipblk, 1) - 1
-                        chunks = [chunks; clipblk(j, 2) clipblk(j + 1, 1)];
-                    end
-                end
-                if clipblk(1, 1) > 0
-                    chunks = [0 clipblk(1, 1); chunks];
-                end
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    
+    if isempty(chunksize)       % load entire block
+        nchunks = 1;
+        chunks = [0 0];
+    else                        % load block in chunks
+        nchunks = ceil(nsec(i) / chunksize);
+        chunks = [0 : chunksize : chunksize * (nchunks - 1); chunksize : chunksize : chunksize * nchunks]';
+        chunks(nchunks, 2) = 0;
+        chunks(1, 1) = 0;
+    end
+    
+    % clip unwanted times
+    clipblk = clip{blocks(i)};
+    if ~isempty(clipblk)
+        if isempty(chunksize)
+            if size(clipblk, 1) == 1 && clipblk(1) == 0
+                chunks(1, 1) = clipblk(1, 2);
+            elseif size(clipblk, 1) == 1 && clipblk(2) == Inf
+                chunks(1, 2) = clipblk(1, 1);
             else
-                idx = zeros(1, 2);
-                for j = 1 : size(clipblk, 1)
-                    idx(1) = find(chunks(:, 2) > clipblk(j, 1), 1, 'first');
-                    chunks(idx(1), 2) = clipblk(j, 1);
-                    if clipblk(j, 2) ~= Inf
-                        idx(2) = find(chunks(:, 1) > clipblk(j, 2), 1, 'first');
-                        chunks(idx(2), 1) = clipblk(j, 2);
-                        rmblk = idx(1) + 1 : idx(2) - 1;
-                    else
-                        rmblk = idx(1) + 1 : size(chunks, 1);
-                    end
-                    if ~isempty(rmblk)
-                        chunks(rmblk, :) = [];
-                    end
+                for j = 1 : size(clipblk, 1) - 1
+                    chunks = [chunks; clipblk(j, 2) clipblk(j + 1, 1)];
                 end
             end
-            chunks = chunks(any(chunks, 2), :);
-        end    
+            if clipblk(1, 1) > 0
+                chunks = [0 clipblk(1, 1); chunks];
+            end
+        else
+            idx = zeros(1, 2);
+            for j = 1 : size(clipblk, 1)
+                idx(1) = find(chunks(:, 2) > clipblk(j, 1), 1, 'first');
+                chunks(idx(1), 2) = clipblk(j, 1);
+                if clipblk(j, 2) ~= Inf
+                    idx(2) = find(chunks(:, 1) > clipblk(j, 2), 1, 'first');
+                    chunks(idx(2), 1) = clipblk(j, 2);
+                    rmblk = idx(1) + 1 : idx(2) - 1;
+                else
+                    rmblk = idx(1) + 1 : size(chunks, 1);
+                end
+                if ~isempty(rmblk)
+                    chunks(rmblk, :) = [];
+                end
+            end
+        end
+        chunks = chunks(any(chunks, 2), :);
+    end
     
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % go over chunks, remap, remove and write
@@ -178,7 +177,7 @@ for i = 1 : nblocks
         fwrite(fout, data(:), 'int16');         % write data
         
         clear data
-    end   
+    end
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

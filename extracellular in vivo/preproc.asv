@@ -4,40 +4,35 @@ function preproc()
 % contains calls for various functions.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% arguments
+% basepath to recording folder
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 basepath = 'D:\Data\Refaela\Chr5_Pnu2_DMSOChr2_Pnu1_10_7_18';
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% STEP 1: Tank to dat
+% STEP 1a: Tank to dat
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 store = 'Raw1';
 blocks = [1 2 4 5];
-
+chunksize = [];
 mapch = [1, 3, 5, 7, 2, 4, 6, 8, 9, 11, 13, 15, 10, 12, 14, 16];
-rmvch = [13];
-chunksize = 60;
-    clip = [10, 50; 500 601; 1111 1800; 2000 2020; 2050 2052; 2080 2111];
+rmvch = [10];
+clip{1} = [0, 20];
 
-
-tdt2dat(basepath, store, blocks, chunksize, mapch, rmvch)
-
-% or convert .ddt to .dat
-% ddt2dat(basepath, mapch, rmvch)
-
+tdt2dat(basepath, store, blocks, chunksize, mapch, rmvch, clip)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% STEP 2: load spikes and LFP
+% STEP 1a: ddt to dat
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ddt2dat(basepath, mapch, rmvch)
 
-noPrompts = false;
-forceReload = false;
-sessionInfo = getSessionInfo(basepath);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% STEP 2: load spikes
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 spikes = getSpikes('basepath', basepath);
 
+sessionInfo = getSessionInfo(basepath);
 lfp = lh_GetLFP(sessionInfo.channels, 'basePath', basepath);
-
 spikes.sessionDur = lfp.duration;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
