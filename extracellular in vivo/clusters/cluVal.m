@@ -1,4 +1,4 @@
-function spikes = cluValid(basepath, spikes, npca, graphics, saveFig)
+function spikes = cluVal(basepath, spikes, npca, graphics, saveFig)
 
 % wrapper for inspecting and validating clusters
 % computes:
