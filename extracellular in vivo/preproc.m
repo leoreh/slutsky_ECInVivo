@@ -1,5 +1,3 @@
-function preproc()
-
 % this is a wrapper for preprocessing extracellular data.
 % contains calls for various functions.
 
