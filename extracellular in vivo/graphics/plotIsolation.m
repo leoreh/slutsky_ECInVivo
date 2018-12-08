@@ -46,15 +46,15 @@ function plotIsolation(basepath, spikes, saveFig)
 grpcolor = ['k', 'b', 'r', 'm', 'g', 'y'];
 Lval = log10([0 0.05]);
 iDistval = log10([20 300]);
-ISIval = ([0 0.1]);
+ISIval = log10([0 1]);
 
 f = figure;
 subplot(2, 3, 1)
-plot((spikes.ISIratio), log10(spikes.L), '*')
+plot(log(spikes.ISIratio), log10(spikes.L), '*')
 ax = gca;
 line(([ISIval(2) ISIval(2)]), ax.YLim)
 line(ax.XLim, ([Lval(2) Lval(2)]))
-xlabel('ISI ratio')
+xlabel('log(ISI ratio)')
 ylabel('log(L ratio)')
 axis tight
 ax.TickLength = [0 0];
@@ -63,11 +63,11 @@ p = patch([ax.XLim(1) ISIval(2) ISIval(2) ax.XLim(1)], [ax.YLim(1) ax.YLim(1) Lv
 p.FaceAlpha = 0.1;
 
 subplot(2, 3, 2)
-plot((spikes.ISIratio), log10(spikes.iDist), '*')
+plot(log10(spikes.ISIratio), log10(spikes.iDist), '*')
 ax = gca;
 line(([ISIval(2) ISIval(2)]), ax.YLim)
 line(ax.XLim, ([iDistval(1) iDistval(1)]))
-xlabel('ISI ratio')
+xlabel('log(ISI ratio)')
 ylabel('log(Isolation Distance)')
 axis tight
 ax.TickLength = [0 0];
@@ -91,10 +91,10 @@ ylabel('log(Isolation Distance)')
 %%
 subplot(2, 3, [4 : 6])
 ax = gca;
-scatter3(log10(spikes.L), log10(spikes.iDist), spikes.ISIratio, '*')
+scatter3(log10(spikes.L), log10(spikes.iDist), log10(spikes.ISIratio), '*')
 xlabel('log(L ratio)')
 ylabel('log(Isolation Distance)')
-zlabel('ISI ratio')
+zlabel('log(ISI ratio)')
 hold on
 ax = gca;
 v = [Lval(2), iDistval(1), ax.ZLim(1); ax.XLim(1) iDistval(1) ax.ZLim(1); ax.XLim(1) ax.YLim(2) ax.ZLim(1); Lval(2) ax.YLim(2) ax.ZLim(1);...

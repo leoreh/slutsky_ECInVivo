@@ -16,9 +16,8 @@ function CatStruct = catStruct(varargin)
 % 01 dec 18 LH. Updates:
 % 08 dec 17 -       handling different field classes 
 % 
-% TO DO LIST:
-%   fix cat of mats. currently creates cell within cell (e.g. spindices)
-%   add field indicating origins (i.e. unit x came from file y)
+% to do list:
+% add field indicating origins (i.e. unit x came from file y)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -66,7 +65,7 @@ for i = 1 : length(sfields)
         elseif isrow(s{j}.(sparent).(sfields{i}))
             CatStruct.(sfields{i}) = horzcat(CatStruct.(sfields{i}), s{j}.(sparent).(sfields{i}));
         else
-            CatStruct.(sfields{i}) = vertcat(CatStruct.(sfields{i}), s{j}.(sparent).(sfields{i}));
+            CatStruct.(sfields{i}) = horzcat(CatStruct.(sfields{i}), s{j}.(sparent).(sfields{i}));
         end
     end 
 end

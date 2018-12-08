@@ -1,8 +1,6 @@
 function spkcount = spkCount(spikes, varargin)
 
-% for each unit calculates firing frequency in Hz, defined as spike count
-% per binsize divided by binsize {default 1 min}. Also calculates average
-% and std of normailzed firing frequency
+% 
 % 
 % INPUT
 % required:

@@ -1,4 +1,4 @@
-function fet = getFet(basepath, saveMat, forceReload)
+function fet = getFet(basepath, saveVar, forceReload)
 
 % load features from all .fet files in folder.
 %
@@ -23,10 +23,10 @@ function fet = getFet(basepath, saveMat, forceReload)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 nargs = nargin;
 if nargs < 1 || isempty(basepath)
-    basepath = pws;
+    basepath = pwd;
 end
-if nargs < 2 || isempty(saveMat)
-    saveMat = 1;
+if nargs < 2 || isempty(saveVar)
+    saveVar = 1;
 end
 if nargs < 3 || isempty(forceReload)
     forceReload = 0;
@@ -95,7 +95,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % save fet
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-if saveMat
+if saveVar
     save(filename, 'fet')
 end
 

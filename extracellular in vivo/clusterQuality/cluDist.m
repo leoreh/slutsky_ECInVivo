@@ -1,4 +1,4 @@
-function [L, iDist] = cluDist(fet, cluidx, m)
+function [L, iDist, mDist] = cluDist(fet, cluidx, mDist)
 
 % compute cluster isolation ditance via:
 % (1) L ratio (Schmitzer-Torbert and Redish, 2004)
@@ -36,10 +36,10 @@ cluSpk = ismember(1:nspk, cluidx);
 % mahalanobis distances
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if nargin < 3 
-	m = mahal(fet, fet(cluidx, :));
+	mDist = mahal(fet, fet(cluidx, :));
 end
-mCluster = m(cluidx); % mahal dist of spikes in cluster
-mNoise = m(noiseSpk); % mahal dist of all other spikes
+mCluster = mDist(cluidx); % mahal dist of spikes in cluster
+mNoise = mDist(noiseSpk); % mahal dist of all other spikes
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % L ratio
@@ -48,8 +48,8 @@ L = sum(1 - chi2cdf(mNoise, df)) / length(cluidx);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Isolation distance
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % calculate point where mD of other spikes = n of this cell
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if ncluspk < nspk / 2  
 	[sorted, ~] = sort(mNoise);
 	iDist = sorted(ncluspk);

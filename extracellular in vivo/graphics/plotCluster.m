@@ -132,7 +132,7 @@ if length(clu) == nunits
     end
     
     if saveFig
-        savepdf('clusters', basepath, f)
+        savePdf('clusters', basepath, f)
     end
 end
 
