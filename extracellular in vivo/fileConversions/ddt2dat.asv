@@ -12,6 +12,7 @@ function ddt2dat(varargin)
 %
 % 22 nov 18 LH. updates:
 % 30 nov 18 - handle multiple files
+% 10 dec 18 - choose specific file
 % 
 % to do list:
 % convert directly from TTank 
