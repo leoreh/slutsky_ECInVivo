@@ -6,7 +6,7 @@ function tdt2dat(basepath, store, blocks, chunksize, mapch, rmvch, clip)
 % INPUT:
 %   basepath    path to recording folder {pwd}.
 %   store       stream. typically {'Raw1'} or 'Raw2'
-%   blocks      blocks to convert {all}.
+%   blocks      vector. blocks to convert {all}. e.g. [1 2 4 5];
 %   chunksize   load data in chunks {60} s. if empty will load entire block.
 %   mapch       new order of channels {[]}.
 %   rmvch       channels to remove (according to original order) {[]}
