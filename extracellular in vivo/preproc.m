@@ -4,7 +4,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % basepath to recording folder
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'D:\VBshare\chr2_Teri_6_6bl1_mrg';
+basepath = 'C:\TDT\OpenEx\Browser\New Folder';
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 1: file conversion
@@ -13,14 +13,15 @@ store = 'Raw1';
 blocks = [1 2 4 5];
 chunksize = [];
 mapch = [1, 3, 5, 7, 2, 4, 6, 8, 9, 11, 13, 15, 10, 12, 14, 16];
-rmvch = [10];
+rmvch = [];
 clip{1} = [0, 20];
 
 % tank to dat
 tdt2dat(basepath, store, blocks, chunksize, mapch, rmvch, clip)
 
 % ddt to dat
-ddt2dat(basepath, mapch, rmvch)
+filenames{1} = 'chr2_DMSO_16_5_18_bl1_mrg.ddt';
+ddt2dat(basepath, mapch, rmvch, 'filenames', filenames)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 2: load spikes

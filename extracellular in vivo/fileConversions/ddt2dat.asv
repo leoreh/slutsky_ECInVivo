@@ -8,6 +8,7 @@ function ddt2dat(varargin)
 %   basepath    path to recording folder {pwd}.
 %   mapch       new order of channels {[]}.
 %   rmvch       channels to remove (according to original order) {[]}
+%   filenames   array of files to convert (including suffix .ddt)
 %
 % 22 nov 18 LH. updates:
 % 30 nov 18 - handle multiple files
