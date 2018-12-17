@@ -205,7 +205,7 @@ info.rmvch = rmvch;
 info.mapch = mapch;
 info.fs = heads.stores.(store).fs;
 
-save([basename, '.info.mat'], 'info');
+save([basename, '.tdtInfo.mat'], 'info');
 
 end
 
