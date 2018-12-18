@@ -18,7 +18,8 @@ function spkcount = spkCount(spikes, varargin)
 % spkcount      struct with fields strd, norm, avg, std, bins, binsize
 %
 % 24 nov 18 LH
-
+% 18 dec 18 RA : changed the normelized spikescount strd (line 73); Now normelized
+% by the highest value of the unit in the first 120 min of the basline.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments and initialization
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -70,7 +71,7 @@ end
 % normalize spike count
 for i = 1 : nunits
     for j = 1 : nmints
-        spkcount.norm(i, j) = spkcount.strd(i, j) / max(spkcount.strd(i, :));
+        spkcount.norm(i, j) = spkcount.strd(i, j) / max(spkcount.strd(i, 1:120));
     end
 end
 

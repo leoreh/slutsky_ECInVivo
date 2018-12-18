@@ -107,7 +107,7 @@ for i = 1 : nblocks
     fprintf(1, 'Working on %s\n', blocknames{i});
     
     heads = TDTbin2mat(blockpath, 'TYPE', {'streams'}, 'STORE', store, 'HEADERS', 1);
-    nsec(i) = heads.stores.Raw1.ts(end);
+    nsec(i) = heads.stores.(store).ts(end);
     
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % partition into chunks
@@ -203,9 +203,9 @@ info.blockduration = nsec;
 info.clip = clip;
 info.rmvch = rmvch;
 info.mapch = mapch;
-info.fs = heads.stores.Raw1.fs;
+info.fs = heads.stores.(store).fs;
 
-save([basename, '.info.mat'], 'info');
+save([basename, '.tdtInfo.mat'], 'info');
 
 end
 

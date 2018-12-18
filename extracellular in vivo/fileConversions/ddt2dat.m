@@ -8,9 +8,11 @@ function ddt2dat(varargin)
 %   basepath    path to recording folder {pwd}.
 %   mapch       new order of channels {[]}.
 %   rmvch       channels to remove (according to original order) {[]}
+%   filenames   array of files to convert (including suffix .ddt)
 %
 % 22 nov 18 LH. updates:
 % 30 nov 18 - handle multiple files
+% 10 dec 18 - choose specific file
 % 
 % to do list:
 % convert directly from TTank 
@@ -84,16 +86,17 @@ for i = 1 : nfiles
     % allows removing channels before remapping
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
-    if ~isempty(mapch)
-        mapch = mapch(~ismember(mapch, rmvch));
-        nch = length(mapch);
-        if sum(mapch > nch)
-            mat = [unique(mapch); (1 : nch)]';
-            for j = 1 : nch
-                mapch(j) = mat(mat(:, 1) == mapch(j), 2);
-            end
-        end
-    end
+%     nchOrig = length(mapch);
+%     if ~isempty(mapch)
+%         mapch = mapch(~ismember(mapch, rmvch));
+%         nch = length(mapch);
+%         if sum(mapch > nch)
+%             mat = [unique(mapch); (1 : nch)]';
+%             for j = 1 : nch
+%                 mapch(j) = mat(mat(:, 1) == mapch(j), 2);
+%             end
+%         end
+%     end
     
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % partition into blocks
@@ -119,13 +122,13 @@ for i = 1 : nfiles
         bsize = (diff(blocks(j, :)) + 1);
         m = memmapfile(filenames{i}, 'Format', 'int16', 'Offset', boff, 'Repeat', bsize * nch, 'writable', true);
         data = reshape(m.data, [nch bsize]);
-        
-        if ~isempty(rmvch)                      % remove channels
-            data(rmvch, :) = [];
-        end
-        
+               
         if ~isempty(mapch)                      % remap channels
             data = data(mapch, :);
+        end
+        
+        if ~isempty(rmvch)                      % remove channels
+            data(mapch(rmvch), :) = [];
         end
         
         fwrite(fout, data(:), 'int16');         % write data

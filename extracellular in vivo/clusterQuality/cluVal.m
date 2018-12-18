@@ -75,7 +75,7 @@ for i = 1 : length(fet)
     iDist{i} = zeros(length(clu) ,1);
     for j = 1 : length(clu)
         cluidx = find(fet{i}(:, end) == clu(j));
-        [L{i}(1, j), iDist{i}(1, j), mDist{i}{j}] = cluDist(fet{i}(:, 1 : npca), cluidx);
+        [L{i}(j, 1), iDist{i}(j, 1), mDist{i}{j}] = cluDist(fet{i}(:, 1 : npca), cluidx);
     end
 end
 
