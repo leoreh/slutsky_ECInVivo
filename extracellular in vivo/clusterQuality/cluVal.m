@@ -59,54 +59,43 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 fet = getFet(basepath);
 
-for i = 1 : length(fet)
-    
-    % disgard noise and artifact spikes
-    idx = find(fet{i}(:, end) <= 1);
-    fet{i}(idx, :) = [];
-    
-%     fet{i}(fet{i}(:, end) == 6) = 7;
-%     fet{i}(fet{i}(:, end) == 7) = 11;
-    
-    % initialize and send to L and iDist calculation
-    clu = unique(fet{i}(:, end));
-    clu = clu(clu > 1);
-    L{i} = zeros(length(clu), 1);
-    iDist{i} = zeros(length(clu) ,1);
-    for j = 1 : length(clu)
-        cluidx = find(fet{i}(:, end) == clu(j));
-        [L{i}(j, 1), iDist{i}(j, 1), mDist{i}{j}] = cluDist(fet{i}(:, 1 : npca), cluidx);
+if all(isfield(spikes, {'mDist', 'iDist', 'L'}))
+    warning('separation matrices already calculated. Skipping cluDist');
+else
+    for i = 1 : length(fet)
+        
+        % disgard noise and artifact spikes
+        idx = find(fet{i}(:, end) <= 1);
+        fet{i}(idx, :) = [];
+        
+        % calculate separation matrices
+        clu = unique(fet{i}(:, end));
+        clu = clu(clu > 1);
+        L{i} = zeros(length(clu), 1);
+        iDist{i} = zeros(length(clu) ,1);
+        for j = 1 : length(clu)
+            cluidx = find(fet{i}(:, end) == clu(j));
+            [L{i}(j, 1), iDist{i}(j, 1), mDist{i}{j}] = cluDist(fet{i}(:, 1 : npca), cluidx);
+        end
     end
+    
+    % concatenate cell
+    spikes.L = cat(1, L{:});
+    spikes.iDist = cat(1, iDist{:});
+    spikes.mDist = mDist;  
 end
-
-% concatenate cell
-spikes.L = cat(1, L{:});
-spikes.iDist = cat(1, iDist{:});
-spikes.mDist = mDist;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % calculate cluster separation
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 spikes.ISIratio = zeros(length(spikes.UID), 1);
 for i = 1 : length(spikes.UID)
-    spikes.ISIratio(1, i) = sum(diff(spikes.times{i}) < 0.003) / length(spikes.times{i}) * 100;
+    spikes.ISIratio(i, 1) = sum(diff(spikes.times{i}) < 0.003) / length(spikes.times{i}) * 100;
 end
-
-% for i = 1 : length(spikes.UID)
-%     spikes.ISIratio(i) = histcounts(diff(spikes.times{i}), [0 0.002]) /...
-%         histcounts(diff(spikes.times{i}), [0 0.02]) * 100;
-% end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % estimate SU or MU
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-ISIrmv = sum((spikes.ISIratio < 0.1));
-Lrmv = sum((spikes.L < 0.05));
-iDrmv = sum((spikes.iDist > 20));
-iDLrmv = sum((spikes.iDist > 20 & spikes.L < 0.05));
-ISILiD = sum(spikes.L < 0.05 & spikes.iDist > 20 & spikes.ISIratio < 0.1);
-ISIid = sum(spikes.iDist > 20 & spikes.ISIratio < 0.1);
-
 spikes.su = spikes.iDist > 20 & spikes.ISIratio < 1;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -120,10 +109,8 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-if graphics
-    
-    plotCluster(basepath, spikes, [], saveFig)  
-   
+if graphics  
+    plotCluster(basepath, spikes, [], saveFig)     
 end
 
 end
