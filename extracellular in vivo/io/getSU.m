@@ -1,4 +1,4 @@
-function spikeSU = getSU(basepath, spikes)
+function SU = getSU(basepath, spikes)
 
 % receives spikes struct and returns same struct but only SU
 %
