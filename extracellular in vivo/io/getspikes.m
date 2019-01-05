@@ -261,7 +261,7 @@ end
 
 %% save to buzcode format (before exclusions)
 if saveMat
-    save([basepath filesep sessionInfo.FileName '.spikes.cellinfo.mat'],'spikes')
+    save([basepath filesep sessionInfo.FileName '.spikes.mat'],'spikes')
 end
 
 
