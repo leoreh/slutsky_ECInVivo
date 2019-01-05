@@ -13,7 +13,7 @@ function catstruct = catStruct(varargin)
 % OUTPUT:
 %   catstruct       concatenated structure 
 %
-% 01 dec 18 LH. Updates:
+% 01 dec 18 LH.     Updates:
 % 08 dec 17 -       handling different field classes 
 % 
 % TO DO LIST:
