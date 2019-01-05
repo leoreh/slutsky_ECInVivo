@@ -62,6 +62,7 @@ fet = getFet(basepath);
 if all(isfield(spikes, {'mDist', 'iDist', 'lRat'}))
     warning('separation matrices already calculated. Skipping cluDist');
 else
+    sprintf('\ncalculating separation matrices\n\n');
     for i = 1 : length(fet)
         
         % disgard noise and artifact spikes
