@@ -33,14 +33,14 @@ end
 if nargs < 4 || isempty(saveFig)
     saveFig = true;
 end
-if ~isfield(spikes, 'lRat')
-    spikes.lRat = nan(nunits, 1);
+if ~isfield(spikes, 'L')
+    spikes.L = nan(nunits, 1);
 end
 if ~isfield(spikes, 'iDist')
     spikes.iDist = nan(nunits, 1);
 end
-if ~isfield(spikes, 'isi')
-    spikes.isi = nan(nunits, 1);
+if ~isfield(spikes, 'ISIratio')
+    spikes.ISIratio = nan(nunits, 1);
 end
 if ~isfield(spikes, 'su')
     spikes.su = nan(nunits, 1);
@@ -62,23 +62,17 @@ for i = 1 : length(clu)
     
     % ISI histogram
     subplot(2, 2, 2)
-    binsize = 0.0001;
-    bins = [0 : binsize : 0.05];
-    h = histogram([diff(spikes.times{clu(i)})], bins);
+    binsize = 0.005;
+    bins = [0 : binsize : 0.02];
+    h = histogram([diff(spikes.times{clu(i)}) diff(spikes.times{clu(i)}) * -1], bins);
     h.EdgeColor = 'none';
     h.FaceColor = unitcolor;
-    xticks([0 0.05])
-    box off
-    axis tight
-    ax = gca;
-    ax.YTick = []; ax.YColor = 'none';
-    line([0.003 0.003], ax.YLim, 'color', 'k', 'LineWidth', 1)
+    axis off
     
     % raster
     subplot(2, 2, [3 4])
     y = ones(length(spikes.times{i}) ,1);
     plot(spikes.times{clu(i)} / 60 / 60, y, '.k', 'markerSize', 0.1)
-    axis tight
     axis off
     title(sprintf('nSpks = %d', length(spikes.times{clu(i)})), 'FontSize', 14, 'FontWeight', 'norma');
     
@@ -91,7 +85,7 @@ for i = 1 : length(clu)
         su = 'NaN';
     end
     txt = sprintf('%d - %s; L = %.2f; iDist = %.2f; ISI = %.2f',...
-        clu(i), su, spikes.lRat(clu(i)), spikes.iDist(clu(i)), spikes.isi(clu(i)));
+        clu(i), su, spikes.L(clu(i)), spikes.iDist(clu(i)), spikes.ISIratio(clu(i)));
     suptitle(txt)
     
     if saveFig

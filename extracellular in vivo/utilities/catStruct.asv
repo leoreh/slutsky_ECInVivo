@@ -76,10 +76,7 @@ end
 % concatenate
 for i = 1 : length(sfields)
     for j = 2 : nfiles
-        if all(size(s{j}.(sparent).(sfields{i})) > 1) || ischar(s{j}.(sparent).(sfields{i}))
-            if j == 2
-                catstruct.(sfields{i}) = {catstruct.(sfields{i})};
-            end
+        if all(size(s{j}.(sparent).(sfields{i})) > 1)
             catstruct.(sfields{i}) = cat(1, catstruct.(sfields{i}), {s{j}.(sparent).(sfields{i})});
         elseif isrow(s{j}.(sparent).(sfields{i}))
             catstruct.(sfields{i}) = horzcat(catstruct.(sfields{i}), s{j}.(sparent).(sfields{i}));

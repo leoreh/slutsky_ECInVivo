@@ -10,6 +10,7 @@ function savepdf(filename, basepath, f)
 %
 % 24 nov 18 LH
 
+cd(basepath)
 fullpath = [basepath, '\graphics'];
 strdate = date;
 filename = fullfile(fullpath, [filename, '_', strdate]);

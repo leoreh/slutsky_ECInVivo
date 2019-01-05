@@ -18,9 +18,9 @@ function spikes = cluVal(basepath, spikes, npca, graphics, saveFig, saveVar)
 %
 % OUTPUT:           additional fields to struct (all 1 x nunits):
 %   su              SU (1) or MU (0)
-%   L
-%   iDist
-%   ISIratio
+%   L                         
+%   iDist            
+%   ISIratio                 
 %
 % CALLS:
 %   getSpikes       optional (if not given as input)
@@ -59,7 +59,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 fet = getFet(basepath);
 
-if all(isfield(spikes, {'mDist', 'iDist', 'lRat'}))
+if all(isfield(spikes, {'mDist', 'iDist', 'L'}))
     warning('separation matrices already calculated. Skipping cluDist');
 else
     for i = 1 : length(fet)
@@ -71,7 +71,7 @@ else
         % calculate separation matrices
         clu = unique(fet{i}(:, end));
         clu = clu(clu > 1);
-        lRat{i} = zeros(length(clu), 1);
+        L{i} = zeros(length(clu), 1);
         iDist{i} = zeros(length(clu) ,1);
         for j = 1 : length(clu)
             cluidx = find(fet{i}(:, end) == clu(j));
@@ -82,7 +82,7 @@ else
     % concatenate cell
     spikes.lRat = cat(1, lRat{:});
     spikes.iDist = cat(1, iDist{:});
-    spikes.mDist = mDist;
+    spikes.mDist = mDist;  
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -109,8 +109,8 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-if graphics
-    plotCluster(basepath, spikes, [], saveFig)
+if graphics  
+    plotCluster(basepath, spikes, [], saveFig)     
 end
 
 end

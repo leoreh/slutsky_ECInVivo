@@ -2,32 +2,31 @@ function spkcount = spkCount(spikes, varargin)
 
 % for each unit calculates firing frequency in Hz, defined as spike count
 % per binsize divided by binsize {default 1 min}. Also calculates average
-% and std of normailzed firing frequency. Normalization is according to
-% average or maximum FR within a specified window.
+% and std of normailzed firing frequency
 % 
 % INPUT
 % required:
 %   spikes      struct (see getSpikes)
 % optional:
 %   graphics    plot figure {1}.
-%   win         time window for calculation {[1 Inf]}. specified in min.
+%   win         time window for calculation {[0 Inf]}. specified in seconds.
 %   binsize     size in s of bins {60}.
 %   saveFig     save figure {1}.
 %   basePath    recording session path {pwd}
 %   normMethod  normalize to 'max' or 'avg' FR within normWin {'avg'}.
-%   normWin     window to calculate avg or max FR when normalizing {[1 Inf]}.
-%               specified in min.
+%   normWin     window to calculate avg or max FR when normalizing {[0 Inf]}.
+%               specified in minutes.
 % 
 % examples:     spkCount(spikes, 'normMethod', 'avg', 'normWin', [90 Inf]);
 %               will normalize FR according to the average FR between 90
 %               min and the end of the recording.
 %
 % OUTPUT
-% spkcount      struct with fields strd, norm, avg, std, bins, binsize,
-%               normMethod, normWin
+% spkcount      struct with fields strd, norm, avg, std, bins, binsize
 %
-% 24 nov 18 LH. updates:
-% 05 jan 18 LH  added normMethod and normWin
+% 24 nov 18 LH
+% 18 dec 18 RA : changed the normelized spikescount strd (line 73); Now normelized
+% by the highest value of the unit in the first 120 min of the basline.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments and initialization
@@ -38,30 +37,26 @@ validate_win = @(win) assert(isnumeric(win) && length(win) == 2,...
 p = inputParser;
 addOptional(p, 'binsize', 60, @isscalar);
 addOptional(p, 'graphics', 1, @islogical);
-addOptional(p, 'win', [1 Inf], validate_win);
+addOptional(p, 'win', [0 max(spikes.spindices)], validate_win);
 addOptional(p, 'saveFig', 1, @islogical);
 addOptional(p, 'basepath', pwd);
 addOptional(p, 'saveVar', true, @islogical);
 addOptional(p, 'normMethod', 'avg', @ischar);
-addOptional(p, 'normWin', [1 Inf], validate_win);
+addOptional(p, 'normWin', [0 Inf], validate_win);
 
 parse(p,varargin{:})
 graphics = p.Results.graphics;
-binsize = p.Results.binsize;
+spkcount.binsize = p.Results.binsize;
 win = p.Results.win;
+win = win / 60;
 saveFig = p.Results.saveFig;
 basepath = p.Results.basepath;
 saveVar = p.Results.saveVar;
 normMethod = p.Results.normMethod;
 normWin = p.Results.normWin;
+if normWin(2) == Inf; normWin(2) = max(spikes.spindices); end
 
-% validate windows
-recDur = ceil(max(spikes.spindices(:, 1)) / 60);    % [min]
-if win(1) == 0; win(1) = 1; end
-if win(2) == Inf; win(2) = recDur; end
-if normWin(1) == 0; normWin(1) = 1; end
-if normWin(2) == Inf; normWin(2) = recDur; end
-
+% nbins = ceil(diff(win) / spkcount.binsize);
 nunits = length(spikes.UID);
 nmints = ceil(win(2)) - win(1);
 
@@ -76,6 +71,7 @@ spkcount.std = zeros(1, nmints);
 
 % calculate spike count
 for i = 1 : nunits
+    binsize = 60;
     for j = 1 : nmints
         % correct for last minute
         if j > win(2)
@@ -93,7 +89,7 @@ for i = 1 : nunits
         case 'avg'
             bline = mean(spkcount.strd(normWin(1) : normWin(2)));
     end
-    spkcount.norm(i, :) = spkcount.strd(i, :) / bline;
+            spkcount.norm(i, :) = spkcount.strd(i, :) / bline;
 end
 
 % calculate mean and std of norm spike count
@@ -106,10 +102,6 @@ errbounds = [abs(spkcount.avg) + abs(spkcount.std);...
 % save
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if saveVar
-    spkcount.binsize = binsize;
-    spkcount.normMethod = normMethod;
-    spkcount.normWin = normWin;
-    
     [~, filename] = fileparts(basepath);
     save([basepath, '\', filename, '.spkcount.mat'], 'spkcount')
 end
@@ -157,11 +149,11 @@ if graphics
     ylabel('Norm. Frequency')
     title('Norm. Spike Count')
     
-    if saveFig
-        filename = 'spikeCount';
-        savePdf(filename, basepath, f)
-    end
+end
 
+if saveFig
+    filename = 'spikeCount';
+    savePdf(filename, basepath, f)
 end
 
 end
