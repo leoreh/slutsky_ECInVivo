@@ -91,7 +91,7 @@ for i = 1 : length(clu)
         su = 'NaN';
     end
     txt = sprintf('%d - %s; L = %.2f; iDist = %.2f; ISI = %.2f',...
-        clu(i), su, spikes.lRat(clu(i)), spikes.iDist(clu(i)), spikes.isi(clu(i)));
+        spikes.cluID(i), su, spikes.lRat(clu(i)), spikes.iDist(clu(i)), spikes.isi(clu(i)));
     suptitle(txt)
     
     if saveFig
@@ -124,7 +124,7 @@ if length(clu) == nunits
         subplot(plotidx(1), plotidx(2), wvidx(i))
         unitcolor = grpcolor(spikes.shankID(i));
         plotWaveform(spikes.avgWaveform{i}, spikes.stdWaveform{i}, unitcolor)
-        title(int2str(i))
+        title(int2str(spikes.cluID(i)))
         
         % ISI histogram
         subplot(plotidx(1), plotidx(2), histidx(i))

@@ -26,13 +26,11 @@ function catstruct = catStruct(varargin)
 
 p = inputParser;
 addOptional(p, 'parentdir', pwd, @ischar);
-addOptional(p, 'structname', 'spikes', @ischar);
-addOptional(p, 'saveVar', '1', @islogical);
+addOptional(p, 'structname', 'spikes.cellinfo', @ischar);
 
 parse(p, varargin{:});
 parentdir = p.Results.parentdir;
 structname = p.Results.structname;
-saveVar = p.Results.saveVar;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % get struct files
@@ -95,8 +93,8 @@ end
 % save spikes
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if saveVar
-    cd(parentdir)
-    save('catstruct', 'catstruct')
+    [~, filename] = fileparts(basepath);
+    save([filename '.spikes.mat'], 'spikes')
 end
 
 end

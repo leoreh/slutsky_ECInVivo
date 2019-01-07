@@ -4,7 +4,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % basepath to recording folder
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'H:\data\DMSO\Walter3_pNu1_chr6_pnu2_4_11_18';
+basepath = 'H:\data\DMSO\chr8_06_09_18';
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 1: file conversion
@@ -56,12 +56,12 @@ spkcount = spkCount(spikes, 'basepath', basepath, 'saveVar', true);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 7: concatenate spikes from different sessions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-parentdir = 'H:\data\TERI';
+parentdir = 'H:\data\DMSO';
 basepath = parentdir;
 structname = 'spikes';
 spikes = catStruct(parentdir, structname);
 
+
 spkcount = spkCount(spikes, 'basepath', basepath, 'saveVar', true,...
     'win', [10 360], 'normWin', [10 70], 'disqualify', true);
 
-% su = getSU(basepath, spikes, false)

@@ -94,9 +94,9 @@ nChannels = sessionInfo.nChannels;
 
 
 %% if the cellinfo file exist and we don't want to re-load files
-if exist([basepath filesep sessionInfo.FileName '.spikes.cellinfo.mat'],'file') && forceReload == false
+if exist([basepath filesep sessionInfo.FileName '.spikes.mat'],'file') && forceReload == false
     disp('loading spikes from cellinfo file..')
-    load([basepath filesep sessionInfo.FileName '.spikes.cellinfo.mat'])
+    load([basepath filesep sessionInfo.FileName '.spikes.mat'])
 %     %Check that the spikes structure fits cellinfo requirements
 %     [iscellinfo] = bz_isCellInfo(spikes);
 %     switch iscellinfo

@@ -104,7 +104,7 @@ spikes.su = spikes.iDist > 20 & spikes.isi < 1;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if saveVar
     [~, filename] = fileparts(basepath);
-    save([filename '.spikes.cellinfo.mat'], 'spikes')
+    save([filename '.spikes.mat'], 'spikes')
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

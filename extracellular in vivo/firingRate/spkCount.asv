@@ -60,7 +60,7 @@ disqualify = p.Results.disqualify;
 % validate windows
 if win(1) == 0; win(1) = 1; end
 if win(2) == Inf 
-    recDur = floor(max(spikes.spindices(:, 1)) / 60);    % [min]
+    recDur = ceil(max(spikes.spindices(:, 1)) / 60);    % [min]
     win(2) = recDur; 
 end
 if normWin(1) == 0; normWin(1) = 1; end
@@ -71,7 +71,7 @@ win = win(1) : win(2);
 % calculations
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 nunits = length(spikes.UID);
-nmints = ceil(win(end) - win(1) + 1);
+nmints = ceil(win(end) - win(1));
 
 % calculate spike count
 spkcount.strd = zeros(nunits, nmints);
@@ -127,7 +127,6 @@ ax.XTick = [1 2];
 ax.XTickLabel = {'Pre Injection' 'Post Injection'};
 xlabel('Treatment')
 ylabel('Norm. Firing Rate')
-ylim([0 5])
 
 % calculate mean and std of norm spike count
 spkcount.avg = mean(spkcount.norm, 1);

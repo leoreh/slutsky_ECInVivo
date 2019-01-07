@@ -51,7 +51,7 @@ for i = 1 : length(fieldSpikes)
             if isa(spikes.(f), 'double')
                 SU.(f)(j) = -999;
             elseif isa(spikes.(f), 'cell')
-                SU.s(f){j} = -999;
+                SU.(f){j} = -999;
             end
             k = k + 1;
         end

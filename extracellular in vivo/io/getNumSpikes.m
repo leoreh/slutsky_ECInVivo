@@ -85,13 +85,16 @@ if exist([basepath, '\auto'], 'dir')
     end
 end
 
+numSpikes.su = [numSpikes.su sum(numSpikes.su)];
+numSpikes.ClustersPostCuration = [numSpikes.ClustersPostCuration sum(numSpikes.ClustersPostCuration)];
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % saveVar
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if saveVar
     cd(basepath)
     [~, basename] = fileparts(basepath);
-    save([basename, '.numSpikes.mat'], 'clu');
+    save([basename, '.numSpikes.mat'], 'numSpikes');
 end
 
 end

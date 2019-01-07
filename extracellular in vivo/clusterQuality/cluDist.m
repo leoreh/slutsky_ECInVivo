@@ -14,6 +14,9 @@ function [lRat, iDist, mDist] = cluDist(fet, cluidx, mDist)
 %   iDist       isolation distance for cluster
 % 
 % 03 dec 18 LH
+% 
+% TO DO LIST:
+%   add option to remove known MU from analysis 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
