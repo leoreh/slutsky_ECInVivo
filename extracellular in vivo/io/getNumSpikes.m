@@ -8,7 +8,7 @@ function numSpikes = getNumSpikes(basepath, spikes, saveVar)
 %   saveVar         save variables
 %
 % OUTPUT:
-%   numSpikes   struct
+%   numSpikes       struct
 %
 % 07 dec 18 LH
 
@@ -45,7 +45,7 @@ for i = 1 : nfiles
     filename = fullfile(basepath, filenames{i});
     
     fid = fopen(filenames{i}, 'r');
-    if(fid == -1);
+    if(fid == -1)
         error('cannot open file');
     end
     nclu = fscanf(fid, '%d', 1);
