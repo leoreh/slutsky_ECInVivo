@@ -13,12 +13,12 @@ function spkcount = spkCount(spikes, varargin)
 %   win         time window for calculation {[1 Inf]}. specified in min.
 %   binsize     size in s of bins {60}.
 %   saveFig     save figure {1}.
-%   basePath    recording session path {pwd}
+%   basepath    recording session path {pwd}
 %   normMethod  normalize to 'max' or 'avg' FR within normWin {'avg'}.
 %   normWin     window to calculate avg or max FR when normalizing {[1 Inf]}.
 %               specified in min.
 % 
-% examples:     spkCount(spikes, 'normMethod', 'avg', 'normWin', [90 Inf]);
+% EXAMPLES:     spkCount(spikes, 'normMethod', 'avg', 'normWin', [90 Inf]);
 %               will normalize FR according to the average FR between 90
 %               min and the end of the recording.
 %
@@ -28,6 +28,7 @@ function spkcount = spkCount(spikes, varargin)
 %
 % 24 nov 18 LH. updates:
 % 05 jan 18 LH  added normMethod and normWin
+% 07 jan 18 LH  added disqualify units and debugging
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -112,23 +113,6 @@ for i = 1 : nunits
     spkcount.norm(i, :) = spkcount.strd(i, :) / bline;
 end
 
-% calculate change in norm FR
-for i = 1 : nunits
-    spkcount.change(i, 1) = mean(spkcount.norm(i, win(1) : win(2)));
-    spkcount.change(i, 2) = mean(spkcount.norm(i, 240 : 300));
-end
-figure; 
-line([1 2], [spkcount.change(:, 1) spkcount.change(:, 2)], 'Color', [0.5 0.5 0.5])
-hold on
-line([1 2], [mean(spkcount.change(:, 1)) mean(spkcount.change(:, 2))], 'Color', 'k', 'LineWidth', 5)
-xlim([0.8 2.2])
-ax = gca;
-ax.XTick = [1 2];
-ax.XTickLabel = {'Pre Injection' 'Post Injection'};
-xlabel('Treatment')
-ylabel('Norm. Firing Rate')
-ylim([0 5])
-
 % calculate mean and std of norm spike count
 spkcount.avg = mean(spkcount.norm, 1);
 spkcount.std = std(spkcount.norm, 0, 1);
@@ -144,15 +128,15 @@ if graphics
     x = ([1 : nmints] / 60);
     
     % raster plot of units
-%     subplot(3, 1, 1)
-%     hold on
-%     for i = 1 : nunits
-%         y = ones(length(spikes.times{i}) ,1) * i;
-%         plot(spikes.times{i} / 60 / 60, y, '.k', 'markerSize', 0.1)
-%     end
-%     axis tight
-%     ylabel('Unit #')
-%     title('Raster Plot')
+    subplot(3, 1, 1)
+    hold on
+    for i = 1 : nunits
+        y = ones(length(spikes.times{i}) ,1) * i;
+        plot(spikes.times{i} / 60 / 60, y, '.k', 'markerSize', 0.1)
+    end
+    axis tight
+    ylabel('Unit #')
+    title('Raster Plot')
     
     % firing rate across time
     subplot(3, 1, 2)
