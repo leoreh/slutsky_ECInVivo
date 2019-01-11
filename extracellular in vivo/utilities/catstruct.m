@@ -96,7 +96,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if saveVar
     cd(parentdir)
-    save('catstruct', 'catstruct')
+    save(structname, 'catstruct')
 end
 
 end

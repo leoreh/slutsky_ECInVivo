@@ -1,10 +1,10 @@
 function spkcount = diffFR(spkcount, varargin)
 
-% for each unit calculates the mean FR during a window
+% for each unit calculates the mean FR within one or more windows
 
 % INPUT
 % required:
-%   fr          struct (see calcFR)
+%   spkcount    struct (see spkCount)
 % optional:
 %   graphics    plot figure {1}.
 %   win         time window for calculation {[1 Inf]}. specified in min.

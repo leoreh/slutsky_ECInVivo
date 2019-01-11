@@ -1,4 +1,4 @@
-function spkcount = spkCount(spikes, varargin)
+function fr = calcFR(spikes, varargin)
 
 % for each unit calculates firing frequency in Hz, defined as spike count
 % per binsize divided by binsize {default 1 min}. Also calculates average
@@ -18,12 +18,12 @@ function spkcount = spkCount(spikes, varargin)
 %   normWin     window to calculate avg or max FR when normalizing {[1 Inf]}.
 %               specified in min.
 % 
-% EXAMPLES:     spkCount(spikes, 'normMethod', 'avg', 'normWin', [90 Inf]);
+% EXAMPLES:     calcFR(spikes, 'normMethod', 'avg', 'normWin', [90 Inf]);
 %               will normalize FR according to the average FR between 90
 %               min and the end of the recording.
 %
 % OUTPUT
-% spkcount      struct with fields strd, norm, avg, std, bins, binsize,
+% fr            struct with fields strd, norm, avg, std, bins, binsize,
 %               normMethod, normWin
 %
 % 24 nov 18 LH. updates:
@@ -74,50 +74,52 @@ win = win(1) : win(2);
 nunits = length(spikes.UID);
 nmints = ceil(win(end) - win(1) + 1);
 
-% calculate spike count
-spkcount.strd = zeros(nunits, nmints);
+% calculate firing rate
+fr.strd = zeros(nunits, nmints);
 for i = 1 : nunits
     for j = 1 : nmints
         % correct for last minute
         if j > win(end)
             binsize = mod(win(2), 60) * 60;
         end
-        spkcount.strd(i, j) = sum(ceil(spikes.times{i} / 60) == win(j)) / binsize;
+        fr.strd(i, j) = sum(ceil(spikes.times{i} / 60) == win(j)) / binsize;
     end
 end
+
+bl = avgFR(fr, 'method', normMethod, 'win', [30 60]);
 
 % disqualify units that were mute during the baseline
 if disqualify
     j = 1;
     for i = 1 : nunits
-        mute = sum(~any(spkcount.strd(i, normWin(1) : normWin(2)), 1));
-        if mute > diff(normWin) * 0.5 || ...
-                mean(spkcount.strd(i, normWin(1) : normWin(2))) < 0.1
+        mute = sum(~any(fr.strd(i, normWin(1) : normWin(2)), 1));
+        if mute > diff(normWin) * 0.5 || bl(i) < 0.1
             idx(j) = i;
             j = j + 1;
         end
     end
-    spkcount.strd(idx, :) = [];
-    nunits = size(spkcount.strd, 1);
+    fr.strd(idx, :) = [];
+    nunits = size(fr.strd, 1);
 end
 
 % normalize spike count
-spkcount.norm = zeros(nunits, nmints);
+fr.norm = zeros(nunits, nmints);
+
 for i = 1 : nunits
     switch normMethod
         case 'max'
-            bline = max(spkcount.strd(i, normWin(1) : normWin(2)));
+            bline = max(fr.strd(i, normWin(1) : normWin(2)));
         case 'avg'
-            bline = mean(spkcount.strd(i, normWin(1) : normWin(2)));
+            bline = mean(fr.strd(i, normWin(1) : normWin(2)));
     end
-    spkcount.norm(i, :) = spkcount.strd(i, :) / bline;
+    fr.norm(i, :) = fr.strd(i, :) / bline;
 end
 
 % calculate mean and std of norm spike count
-spkcount.avg = mean(spkcount.norm, 1);
-spkcount.std = std(spkcount.norm, 0, 1);
-errbounds = [abs(spkcount.avg) + abs(spkcount.std);...
-    abs(spkcount.avg) - abs(spkcount.std)];
+fr.avg = mean(fr.norm, 1);
+fr.std = std(fr.norm, 0, 1);
+errbounds = [abs(fr.avg) + abs(fr.std);...
+    abs(fr.avg) - abs(fr.std)];
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % plot
@@ -142,7 +144,7 @@ if graphics
     subplot(3, 1, 2)
     hold on
     for i = 1 : nunits
-        plot(x, spkcount.strd(i, :))
+        plot(x, fr.strd(i, :))
     end
     axis tight
     ylabel('Frequency [Hz]')
@@ -152,16 +154,15 @@ if graphics
     subplot(3, 1, 3)
     hold on
     for i = 1 : nunits
-        plot(x, spkcount.norm(i, :))
+        plot(x, fr.norm(i, :))
     end
     p = patch([x, x(end : -1 : 1)], [errbounds(1 ,:), errbounds(2, end : -1 : 1)], [.5 .5 .5]);
     p.EdgeColor = 'none';
-    plot(x, spkcount.avg, 'lineWidth', 3, 'Color', 'k')
+    plot(x, fr.avg, 'lineWidth', 3, 'Color', 'k')
     axis tight
     xlabel('Time [h]')
     ylabel('Norm. Frequency')
     title('Norm. Spike Count')
-%     ylim([0 2])
     
     if saveFig
         filename = 'spikeCount';
@@ -174,10 +175,10 @@ end
 % save
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if saveVar
-    spkcount.win = [win(1) win(end)];
-    spkcount.binsize = binsize;
-    spkcount.normMethod = normMethod;
-    spkcount.normWin = normWin;
+    fr.win = [win(1) win(end)];
+    fr.binsize = binsize;
+    fr.normMethod = normMethod;
+    fr.normWin = normWin;
     
     [~, filename] = fileparts(basepath);
     save([basepath, '\', filename, '.spkcount.mat'], 'spkcount')
