@@ -4,7 +4,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % basepath to recording folder
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'H:\data\DMSO\Walter3_pNu1_chr6_pnu2_4_11_18';
+basepath = 'H:\data\DMSO\Chr5_Pnu2_DMSOChr2_Pnu1_10_7_18';
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 1: file conversion
@@ -51,17 +51,17 @@ CellClass = cellclass(parentdir, spikes);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 6: calculate mean firing rate
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-spkcount = spkCount(spikes, 'basepath', basepath, 'saveVar', true);
+fr = calcFR(spikes, 'basepath', basepath, 'saveVar', true);
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 7: concatenate spikes from different sessions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-parentdir = 'H:\data\DMSO';
+parentdir = 'H:\data\TERI';
 basepath = parentdir;
 structname = 'spikes';
 spikes = catStruct(parentdir, structname);
 
-spkcount = spkCount(spikes, 'basepath', basepath, 'saveVar', true,...
-    'win', [10 360], 'normWin', [10 70], 'disqualify', true);
+fr = calcFR(spikes, 'basepath', basepath, 'winCalc', [0 360], 'winBL', [30 90], 'disqualify', true);
 
 % su = getSU(basepath, spikes, false)

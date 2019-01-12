@@ -1,10 +1,11 @@
-function avgfr = avgFR(spkcount, varargin)
+function avgfr = avgFR(fr, varargin)
 
 % for each unit calculates the mean / max FR within a window
 %
 % INPUT
 % required:
-%   fr          struct (see calcFR)
+%   fr          matrix of units (rows) x firing rate in time bins (columns)
+%               for example, fr.strd from calcFR is a valid input.
 % optional:
 %   win         time window for calculation {[1 Inf]}. specified in min.
 %   method      calculate 'max' or 'avg' FR within win {'avg'}.
@@ -28,21 +29,19 @@ parse(p,varargin{:})
 win = p.Results.win;
 method = p.Results.method;
 
+[nunits, nmints] = size(fr);
 if win(1) == 0; win(1) = 1; end
-if win(2) == Inf; win(2) = size(spkcount.strd, 2); end
-
-nunits = size(spkcount.strd, 1);
+if win(2) == Inf; win(2) = nmints; end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % calculation
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 avgfr = zeros(nunits, 1);
 switch method
     case 'max'
-        avgfr = max(spkcount.strd(:, win(1) : win(2)), [], 2);
+        avgfr = max(fr(:, win(1) : win(2)), [], 2);
     case 'avg'
-        avgfr = mean(spkcount.strd(:, win(1) : win(2)), 2);
+        avgfr = mean(fr(:, win(1) : win(2)), 2);
 end
 
 end

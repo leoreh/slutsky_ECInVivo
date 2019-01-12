@@ -18,7 +18,7 @@ function fr = calcFR(spikes, varargin)
 %   winBL       window to calculate baseline FR {[1 Inf]}.
 %               specified in min.
 % 
-% EXAMPLES      calcFR(spikes, 'metBL', 'avg', 'winBL', [90 Inf]);
+% EXAMPLES:     calcFR(spikes, 'metBL', 'avg', 'winBL', [90 Inf]);
 %               will normalize FR according to the average FR between 90
 %               min and the end of the recording.
 %
@@ -30,10 +30,6 @@ function fr = calcFR(spikes, varargin)
 % 05 jan 18 LH  added normMethod and normWin
 % 07 jan 18 LH  added disqualify units and debugging
 % 11 jan 19 LH  split to various functions
-% 
-% TO DO LIST
-%               save which clusters pass the firing threshold and compare
-%               with SU
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments

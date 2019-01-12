@@ -17,7 +17,7 @@ p = inputParser;
 addOptional(p, 'saveFig', false, @islogical);
 addOptional(p, 'basepath', pwd);
 
-parse(p, varargin{:})
+parse(p,varargin{:})
 saveFig = p.Results.saveFig;
 basepath = p.Results.basepath;
 
@@ -35,7 +35,6 @@ box off
 axis tight
 xlabel('Firing Rate [Hz]')
 ylabel('Number of Units')
-xlim([0 10])
 
 % log
 subplot(1, 2, 2)
