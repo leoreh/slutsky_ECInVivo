@@ -102,7 +102,7 @@ fr.norm = fr.strd(stable, :) ./ bl(stable);
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if graphics
-    plotFRtime('fr', fr.norm, 'spktime', spikes.times, 'units', true, 'avg', true, 'saveFig', false)  
+    plotFRtime('fr', fr.norm, 'spktime', spikes.times, 'units', true, 'avg', true, 'saveFig', saveFig)  
     plotFRdistribution(bl, 'saveFig', saveFig) 
 end
 
@@ -110,7 +110,8 @@ end
 % save
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if saveVar
-    fr.win = [winCalc(1) winCalc(end)];
+    fr.winCalc = [winCalc(1) winCalc(end)];
+    fr.winBL = winBL;
     fr.binsize = binsize;
     
     [~, filename] = fileparts(basepath);

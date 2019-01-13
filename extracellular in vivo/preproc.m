@@ -62,6 +62,6 @@ basepath = parentdir;
 structname = 'spikes';
 spikes = catStruct(parentdir, structname);
 
-fr = calcFR(spikes, 'basepath', basepath, 'winCalc', [0 360], 'winBL', [30 90], 'disqualify', true);
+fr = calcFR(spikes, 'basepath', basepath, 'winCalc', [0 360], 'winBL', [30 90]);
 
 % su = getSU(basepath, spikes, false)
