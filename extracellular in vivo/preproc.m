@@ -4,7 +4,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % basepath to recording folder
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'H:\data\DMSO\Chr5_Pnu2_DMSOChr2_Pnu1_10_7_18';
+basepath = 'F:\data\TERI\4_6_18_Pnu1_Chr4';
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 1: file conversion
@@ -26,7 +26,7 @@ ddt2dat(basepath, mapch, rmvch, 'filenames', filenames)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 2: load spikes
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-spikes = getSpikes('basepath', basepath, 'saveMat', true, 'noPrompts', true);
+spikes = getspikes('basepath', basepath, 'saveMat', true, 'noPrompts', true);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 3: review clusters

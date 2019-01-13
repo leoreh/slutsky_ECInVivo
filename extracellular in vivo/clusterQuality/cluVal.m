@@ -111,7 +111,7 @@ end
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if graphics
-    plotCluster(basepath, spikes, [], saveFig)
+    plotCluster('basepath', basepath, 'spikes', spikes, 'saveFig', saveFig)
 end
 
 end
