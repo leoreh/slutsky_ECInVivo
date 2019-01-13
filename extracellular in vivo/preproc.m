@@ -4,7 +4,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % basepath to recording folder
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'F:\data\TERI\4_6_18_Pnu1_Chr4';
+basepath = 'F:\data\TERI\chr2_Teri_6_6bl1_mrg';
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 1: file conversion
@@ -57,11 +57,13 @@ fr = calcFR(spikes, 'basepath', basepath, 'saveVar', true);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 7: concatenate spikes from different sessions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-parentdir = 'H:\data\TERI';
+parentdir = 'F:\data\TERI';
 basepath = parentdir;
 structname = 'spikes';
 spikes = catStruct(parentdir, structname);
 
-fr = calcFR(spikes, 'basepath', basepath, 'winCalc', [0 360], 'winBL', [30 90]);
+fr = calcFR(spikes, 'basepath', basepath, 'winCalc', [0 Inf], 'winBL', [1800 5400], 'binsize', 60);
 
 % su = getSU(basepath, spikes, false)
+onlySUstrd=fr.strdTH(spikes.su==1,:);
+save onlySUstrd.mat

@@ -10,13 +10,13 @@ function fr = calcFR(spikes, varargin)
 %   spikes      struct (see getSpikes)
 % optional:
 %   graphics    plot figure {1}.
-%   winCalc     time window for calculation {[1 Inf]}. specified in min.
+%   winCalc     time window for calculation {[1 Inf]}. specified in s.
 %   binsize     size in s of bins {60}.
 %   saveFig     save figure {1}.
 %   basepath    recording session path {pwd}
 %   metBL       calculate baseline as 'max' or {'avg'}.
 %   winBL       window to calculate baseline FR {[1 Inf]}.
-%               specified in min.
+%               specified in s.
 % 
 % EXAMPLES      calcFR(spikes, 'metBL', 'avg', 'winBL', [90 Inf]);
 %               will normalize FR according to the average FR between 90
@@ -54,8 +54,8 @@ addOptional(p, 'disqualify', false, @islogical);
 
 parse(p, varargin{:})
 binsize = p.Results.binsize;
-winCalc = p.Results.winCalc;
-winBL = p.Results.winBL;
+winCalc = p.Results.winCalc / binsize;
+winBL = p.Results.winBL / binsize;
 metBL = p.Results.metBL;
 disqualify = p.Results.disqualify;
 basepath = p.Results.basepath;
@@ -66,8 +66,10 @@ saveFig = p.Results.saveFig;
 % validate windows
 if winCalc(1) == 0; winCalc(1) = 1; end
 if winCalc(2) == Inf 
-    recDur = floor(max(spikes.spindices(:, 1)) / 60);    % [min]
-    winCalc(2) = recDur; 
+    for i = 1 : length(spikes.spindices)
+        recDur(i) = max(spikes.spindices{i}(:, 1));
+    end
+    winCalc(2) = max(recDur) / binsize;
 end
 if winBL(1) == 0; winBL(1) = 1; end
 if winBL(2) == Inf; winBL(2) = recDur; end
@@ -77,26 +79,31 @@ winCalc = winCalc(1) : winCalc(2);
 % calculations
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 nunits = length(spikes.UID);
-nmints = ceil(winCalc(end) - winCalc(1) + 1);
+nbins = ceil(winCalc(end) - winCalc(1) + 1);
 
 % count number of spikes in bins
-fr.strd = zeros(nunits, nmints);
+fr.strd = zeros(nunits, nbins);
 for i = 1 : nunits
-    for j = 1 : nmints
+    for j = 1 : nbins
         % correct for last minute
         if j > winCalc(end)
-            binsize = mod(winCalc(2), 60) * 60;
+            binsize = mod(winCalc(2), binsize) * binsize;
         end
-        fr.strd(i, j) = sum(ceil(spikes.times{i} / 60) == winCalc(j)) / binsize;
+        fr.strd(i, j) = sum(ceil(spikes.times{i} / binsize) == winCalc(j)) / binsize;
     end
 end
 
 % select only units who fired above thr during baseline window
 bl = avgFR(fr.strd, 'method', metBL, 'win', winBL);
 stable = bl > 0.05;
-
+fr.stable =stable;
 % normalize
 fr.norm = fr.strd(stable, :) ./ bl(stable);
+%strd above threshold
+fr.strdTH=fr.strd(stable, :);
+%strd above threshold and SU
+fr.strdTHsu=fr.strd(stable & spikes.su, :);
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
