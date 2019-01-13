@@ -65,9 +65,13 @@ saveFig = p.Results.saveFig;
 
 % validate windows
 if winCalc(1) == 0; winCalc(1) = 1; end
-if winCalc(2) == Inf 
-    for i = 1 : length(spikes.spindices)
-        recDur(i) = max(spikes.spindices{i}(:, 1));
+if winCalc(2) == Inf
+    if length(spikes.spindices) > 1
+        for i = 1 : length(spikes.spindices)
+            recDur(i) = max(spikes.spindices{i}(:, 1));
+        end
+    else
+        recDur = max(spikes.spindices(:, 1));
     end
     winCalc(2) = max(recDur) / binsize;
 end
