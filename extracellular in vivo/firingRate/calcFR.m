@@ -66,7 +66,7 @@ saveFig = p.Results.saveFig;
 % validate windows
 if winCalc(1) == 0; winCalc(1) = 1; end
 if winCalc(2) == Inf
-    if length(spikes.spindices) > 1
+    if iscell(spikes.spindices)
         for i = 1 : length(spikes.spindices)
             recDur(i) = max(spikes.spindices{i}(:, 1));
         end
