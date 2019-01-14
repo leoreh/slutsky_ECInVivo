@@ -57,12 +57,12 @@ fr = calcFR(spikes, 'basepath', basepath, 'saveVar', true);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 7: concatenate spikes from different sessions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-parentdir = 'H:\data\DMSO';
+parentdir = 'H:\data\TERI';
 basepath = parentdir;
 structname = 'spikes';
 spikes = catStruct(parentdir, structname);
 
-fr = calcFR(spikes, 'basepath', basepath, 'winCalc', [0 Inf], 'winBL', [1800 5400], 'binsize', 1200);
+fr = calcFR(spikes, 'basepath', basepath, 'winCalc', [0 Inf], 'winBL', [18000 21600], 'binsize', 60);
 
 % su = getSU(basepath, spikes, false)
 onlySUstrd=fr.strdTH(spikes.su==1,:);

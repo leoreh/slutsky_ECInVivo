@@ -17,6 +17,10 @@ function fr = calcFR(spikes, varargin)
 %   metBL       calculate baseline as 'max' or {'avg'}.
 %   winBL       window to calculate baseline FR {[1 Inf]}.
 %               specified in s.
+%   select      cell array with strings expressing method to select units.
+%               'thr' - units with fr > 0.05 during baseline
+%               'stable' - units with std of fr < avg of fr during
+%               baseline.
 % 
 % EXAMPLES      calcFR(spikes, 'metBL', 'avg', 'winBL', [90 Inf]);
 %               will normalize FR according to the average FR between 90
@@ -30,6 +34,7 @@ function fr = calcFR(spikes, varargin)
 % 05 jan 18 LH  added normMethod and normWin
 % 07 jan 18 LH  added disqualify units and debugging
 % 11 jan 19 LH  split to various functions
+% 14 jan 19 LH  added selection methods
 % 
 % TO DO LIST
 %               save which clusters pass the firing threshold and compare
@@ -50,14 +55,14 @@ addOptional(p, 'basepath', pwd);
 addOptional(p, 'saveVar', true, @islogical);
 addOptional(p, 'metBL', 'avg', @ischar);
 addOptional(p, 'winBL', [1 Inf], validate_win);
-addOptional(p, 'disqualify', false, @islogical);
+addOptional(p, 'select', {'thr', 'stable'}, @iscell);
 
 parse(p, varargin{:})
 binsize = p.Results.binsize;
 winCalc = p.Results.winCalc / binsize;
 winBL = p.Results.winBL / binsize;
 metBL = p.Results.metBL;
-disqualify = p.Results.disqualify;
+select = p.Results.select;
 basepath = p.Results.basepath;
 graphics = p.Results.graphics;
 saveVar = p.Results.saveVar;
@@ -80,7 +85,7 @@ if winBL(2) == Inf; winBL(2) = recDur; end
 winCalc = winCalc(1) : winCalc(2);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% calculations
+% calculate firing rate
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 nunits = length(spikes.UID);
 nbins = ceil(winCalc(end) - winCalc(1) + 1);
@@ -97,24 +102,36 @@ for i = 1 : nunits
     end
 end
 
-% select only units who fired above thr during baseline window
-bl = avgFR(fr.strd, 'method', metBL, 'win', winBL);
-stable = bl > 0.05;
-
-bl = mean(fr.strd(:, 1:6), 2);
-idx = max(diff(fr.strd(:, 1 : 6)'))' < bl;
-stable = bl > 0.05;
-x = stable | idx
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% normalize to baseline
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+if ~isempty(select)
+    bl_avg = avgFR(fr.strd, 'method', metBL, 'win', winBL);
+end
+% select units who fired above thr during baseline
+if any(strcmp(select, 'thr'))
+    idx_thr = bl_avg > 0.05;
+else
+    idx_thr = ones(nbins);
+end
+% select units with low variability during baseline
+if any(strcmp(select, 'stable'))
+    bl_std = std(fr.strd(:, winBL(1) : winBL(2)), [], 2);
+    idx_stable = bl_std < bl_avg;
+else
+    idx_stable = ones(nbins);
+end
+idx = idx_stable & idx_thr;
 
 % normalize
-fr.norm = fr.strd(stable, :) ./ bl(stable);
+fr.norm = fr.strd(idx, :) ./ bl_avg(idx);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if graphics
     plotFRtime('fr', fr.norm, 'spktime', spikes.times, 'units', true, 'avg', true, 'saveFig', saveFig)  
-    plotFRdistribution(bl, 'saveFig', saveFig) 
+    plotFRdistribution(bl_avg, 'saveFig', saveFig) 
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -124,6 +141,12 @@ if saveVar
     fr.winCalc = [winCalc(1) winCalc(end)];
     fr.winBL = winBL;
     fr.binsize = binsize;
+    if any(strcmp(select, 'thr'))
+        fr.idx_thr = idx_thr;
+    end
+    if any(strcmp(select, 'stable'))
+        fr.idx_stable = idx_stable;
+    end
     
     [~, filename] = fileparts(basepath);
     save([basepath, '\', filename, '.fr.mat'], 'fr')
