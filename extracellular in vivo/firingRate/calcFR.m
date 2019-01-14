@@ -100,14 +100,14 @@ end
 % select only units who fired above thr during baseline window
 bl = avgFR(fr.strd, 'method', metBL, 'win', winBL);
 stable = bl > 0.05;
-fr.stable =stable;
+
+bl = mean(fr.strd(:, 1:6), 2);
+idx = max(diff(fr.strd(:, 1 : 6)'))' < bl;
+stable = bl > 0.05;
+x = stable | idx
+
 % normalize
 fr.norm = fr.strd(stable, :) ./ bl(stable);
-%strd above threshold
-fr.strdTH=fr.strd(stable, :);
-%strd above threshold and SU
-fr.strdTHsu=fr.strd(stable & spikes.su, :);
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
