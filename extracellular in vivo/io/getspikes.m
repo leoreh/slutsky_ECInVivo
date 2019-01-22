@@ -85,7 +85,8 @@ forceReload = p.Results.forceReload;
 saveMat = p.Results.saveMat;
 noPrompts = p.Results.noPrompts;
 
-
+% [~, filename] = fileparts(basepath);
+% filename = [basepath, '\', filename, '.xml'];
 [sessionInfo] = getSessionInfo(basepath, 'noPrompts', noPrompts);
 
 

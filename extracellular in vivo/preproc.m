@@ -26,7 +26,7 @@ ddt2dat(basepath, mapch, rmvch, 'filenames', filenames)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 2: load spikes
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-spikes = getspikes('basepath', basepath, 'saveMat', true, 'noPrompts', true);
+spikes = getSpikes('basepath', basepath, 'saveMat', true, 'noPrompts', true);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 3: review clusters
