@@ -1,4 +1,4 @@
-function catstruct = catStruct(varargin)
+function catstruct = catStruct(parentdir, varargin)
 
 % catstruct = catstruct(varargin)
 %
@@ -25,12 +25,10 @@ function catstruct = catStruct(varargin)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 p = inputParser;
-addOptional(p, 'parentdir', pwd, @ischar);
 addOptional(p, 'structname', 'spikes', @ischar);
-addOptional(p, 'saveVar', '1', @islogical);
+addOptional(p, 'saveVar', true);
 
 parse(p, varargin{:});
-parentdir = p.Results.parentdir;
 structname = p.Results.structname;
 saveVar = p.Results.saveVar;
 

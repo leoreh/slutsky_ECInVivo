@@ -59,7 +59,7 @@ addOptional(p, 'select', {'thr', 'stable'}, @iscell);
 
 parse(p, varargin{:})
 binsize = p.Results.binsize;
-winCalc = p.Results.winCalc;
+winCalc = p.Results.winCalc ;
 winBL = p.Results.winBL / binsize;
 metBL = p.Results.metBL;
 select = p.Results.select;
