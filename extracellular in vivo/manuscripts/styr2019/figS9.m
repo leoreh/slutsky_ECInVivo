@@ -8,9 +8,10 @@ c = ['g', 'b', 'r'];
 f = figure;
 
 % feature space
-subplot(3, 5, [1, 2, 6, 7, 11, 12])
+% subplot(3, 5, [1r, 2, 6, 7, 11, 12])
 plotFet(fet{tet}, 'saveFig', false, 'clu', clu, 'fet', [4 7], 'newFig', false, 'c', c)
-ylabel('PC2')
+ylabel('PC1ch3')
+xlabel('PC1ch2')
 axis tight
 ax = gca;
 ax.XTick = [];
