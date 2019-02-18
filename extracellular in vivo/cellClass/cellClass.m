@@ -60,6 +60,7 @@ FORCERELOAD = p.Results.forceReload;
 noPrompts = p.Results.noPrompts;
 keepKnown = p.Results.keepKnown;
 %%
+fs = 24414;
 OneMs = round(fs / 1000);
 
 baseName = bz_BasenameFromBasepath(basePath);
@@ -92,7 +93,7 @@ fs = 24414;
 % maximum unique values is 16 (since the peak is aligned to the middle).
 % This is opposed to data presented in Stark 2013
 for i = 1 : nunits
-    w = interp(MaxWaves(:, i), 1);
+    w = interp1([1 : 32], MaxWaves(:, i), [1 : 0.1: 32], 'spline');
     [minval, minpos] = min(w);
     [maxval, maxpos] = max(w(1 : minpos - 1));   
     [maxvalpost, maxpost] = max(w(minpos + 1 : end));    % Stark et al., 2013; Bartho et al., 2004
