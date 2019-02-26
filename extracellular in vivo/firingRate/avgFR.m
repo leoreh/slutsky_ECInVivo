@@ -5,15 +5,15 @@ function avgfr = avgFR(fr, varargin)
 % INPUT
 % required:
 %   fr          matrix of units (rows) x firing rate in time bins (columns)
-%               for example, fr.strd from calcFR is a valid input.
 % optional:
-%   win         time window for calculation {[1 Inf]}. specified in min.
+%   win         time window for calculation {[]}. index to fr.
 %   method      calculate 'max' or 'avg' FR within win {'avg'}.
 %
 % OUTPUT
-% avgfr         vector with mean / max FR across units (rows)
+%   avgfr       vector with mean / max FR across units (rows)
 %
-% 11 jan 19 LH.
+%   11 jan 19 LH. updats:
+%   26 feb 19 LH. changed win to index
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -29,9 +29,8 @@ parse(p,varargin{:})
 win = p.Results.win;
 method = p.Results.method;
 
-[nunits, nmints] = size(fr);
-if win(1) == 0; win(1) = 1; end
-if win(2) == Inf; win(2) = nmints; end
+[nunits, nbins] = size(fr);
+if isempty(win); win = [1 nbins]; end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % calculation

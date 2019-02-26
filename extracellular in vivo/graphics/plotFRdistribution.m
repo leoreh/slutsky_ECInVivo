@@ -1,10 +1,10 @@
 function plotFRdistribution(avgfr, varargin)
 
-% plot the distribution of FR in linear and normal scale.
+% plot the distribution of FR in linear and log scale.
 % tests if the distribution is lognormal via the lillietest.
 %
 % INPUT
-%   avgFR       column vector of FR for each unit (row)
+%   avgFR       column vector of average FR for each unit
 %   saveFig     save figure {1} or not (0)
 %   basepath    recording session path {pwd}
 %

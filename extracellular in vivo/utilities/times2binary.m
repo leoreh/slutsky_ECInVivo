@@ -1,5 +1,6 @@
 function mat = times2binary(timestamps, varargin)
 
+% OBSOLETE! replaced by calcFR (w/ small binsize)
 % converts a vector of timestamps to a continuous binary vector.
 %
 % INPUT
@@ -8,6 +9,9 @@ function mat = times2binary(timestamps, varargin)
 %   win         only spikes within the window will be used.
 %
 % 14 jan 19 LH.
+% 
+% TO DO LIST
+%   answer for cases where multiple spikes fall in the same bin
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -23,12 +27,8 @@ win = p.Results.win;
 
 % adjust window
 if win(2) == Inf
-    if iscell(timestamps)
-        for i = 1 : length(timestamps)
-            recDur(i) = max(spikes.spindices{i}(:, 1));
-        end
-    else
-        recDur = max(spikes.spindices(:, 1));
+    for i = 1 : length(timestamps)
+        recDur(i) = max(timestamps{i}(:, 1));
     end
     win(2) = max(recDur);
 end
@@ -52,11 +52,15 @@ for i = 1 : nunits
         warning(' clu%d: %d spikes fall in the same timebin', i, length(timestamps{i}) - length(unique(stamps)))
     end
     idx = stamps(stamps > win(1) & stamps < win(end)) - win(1);
-    mat(i, idx) = i;  
+    for j = 1 : length(idx)
+        x(j) = sum(stamps == idx(j))
+    end
+    mat(i, idx) = 1;   
+    % mat(i, idx) = i; % useful for raster plot in prism 
 end
 
 % add time vector
-mat = [0 : 1 / rfactor : diff(win) / rfactor - 1 / rfactor; mat];
+mat = [0 : 1 / rfactor : diff(win) / rfactor - 1 / rfactor; mat]';
 
 end
 
