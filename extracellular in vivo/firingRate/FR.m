@@ -90,7 +90,7 @@ end
 if graphics
     plotFRtime('fr', fr.norm, 'spktimes', spktimes, 'units', true, 'avg', true, 'raster', true, 'saveFig', saveFig)  
     
-    bl = avgFR(fr.norm, 'method', metBL, 'win', winBL);
+    bl = blFR(fr.norm, 'method', metBL, 'win', winBL);
     plotFRdistribution(bl, 'saveFig', saveFig) 
 end
 

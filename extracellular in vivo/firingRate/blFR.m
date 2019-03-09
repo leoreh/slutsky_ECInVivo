@@ -1,4 +1,4 @@
-function avgfr = avgFR(fr, varargin)
+function blfr = blFR(fr, varargin)
 
 % for each unit calculates the mean / max FR within a window
 %
@@ -10,7 +10,7 @@ function avgfr = avgFR(fr, varargin)
 %   method      calculate 'max' or 'avg' FR within win {'avg'}.
 %
 % OUTPUT
-%   avgfr       vector with mean / max FR across units (rows)
+%   blfr       vector with mean / max FR across units (rows)
 %
 %   11 jan 19 LH. updats:
 %   26 feb 19 LH. changed win to index
@@ -35,12 +35,12 @@ if isempty(win); win = [1 nbins]; end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % calculation
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-avgfr = zeros(nunits, 1);
+blfr = zeros(nunits, 1);
 switch method
     case 'max'
-        avgfr = max(fr(:, win(1) : win(2)), [], 2);
+        blfr = max(fr(:, win(1) : win(2)), [], 2);
     case 'avg'
-        avgfr = mean(fr(:, win(1) : win(2)), 2);
+        blfr = mean(fr(:, win(1) : win(2)), 2);
 end
 
 end

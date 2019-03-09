@@ -95,8 +95,8 @@ if avg
     plot(x, fravg, 'lineWidth', 3, 'Color', 'k')
     axis tight
     xlabel('Time [h]')
-    ylabel('Norm. Frequency')
-    title('Norm. Firing Rate')
+    ylabel('Frequency')
+    title('Mean +- STD')
 end
 
 if saveFig

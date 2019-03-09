@@ -46,7 +46,7 @@ if isempty(win); win = [1 nbins]; end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % calculate baseline
-bl = avgFR(fr, 'method', metBL, 'win', win);
+bl = blFR(fr, 'method', metBL, 'win', win);
 
 % select units who fired above thr
 if any(strcmp(select, 'thr'))
