@@ -1,51 +1,27 @@
-% this is a wrapper for fEPSP
+
+% this is a wrapper for fEPSP analysis
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% import data
+% arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-data = import_wcp();
-
-% parameters
-fs = 1 / diff(data.T(1:2));
-
-% plot data and examine manually that all traces are OK
-figure
-plot(data.T, data.S)
-axis tight
-box off
-xlabel('Time [s]')
-ylabel('Voltage [mV]')
-title('Traces')
-
-data.S = rmDC(data.S, fs);
+basepath = 'D:\Data\fEPSP\Ortal\Acute12';
+graphics = true;
+saveFig = false;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% find peak amplitude
+% stability
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% amplitude relative to baseline. index can be used to validate response
-% position
-p = min(data.S(art + 0.002 * data.fs : end, :));
-
-% time axis in minutes
-dt = 15;
-x = [1 : dt : length(p) * dt] / 60;
-
-figure
-plot(x, p, '*')
-axis tight
-box off
-xlabel('Time [m]')
-ylabel('Amplitude [mV]')
-title('Amplitude')
+nsessions = 1;
+amp = stability('nsessions', nsessions, 'basepath', basepath,...
+    'graphics', graphics, 'saveFig', saveFig);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% IO protocol
+% IO
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% load traces. make sure order of filename is according to stimulus intensity
+% arrange data to load.
+% make sure order of files is according to stimulus intensity
 intensity = [0.2 : 0.1 : 0.8, 1];
-basepath = 'E:\Data\fEPSP\Ortal\Acute12';
 filename{1} = 'IO_1AP_0.06Hz_0.5msduration_0.2mA';
 filename{2} = 'IO_1AP_0.06Hz_0.5msduration_0.3mA';
 filename{3} = 'IO_1AP_0.06Hz_0.5msduration_0.4mA';
@@ -59,7 +35,7 @@ filename{8} = 'IO_1AP_0.06Hz_0.5msduration_1mA';
 for i = 1 : length(filename)
     data = import_wcp(fullfile(basepath, [filename{i} '.wcp']));
     
-    % find artifact onset from derirative. For each protocol the artifact is at
+    % find artifact onset from derirative For each protocol the artifact is at
     % the same location, hence only calculated for the 1st trace
     [~, art] = max(diff(data.S(:, 1)));
     

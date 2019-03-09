@@ -25,10 +25,11 @@ function out=import_wcp(fn, varargin)
 %  OUT=IMPORT_WCP(...,'debug') output additional parameters for debugging
 %
 %  See also plot_wcp
-% Author: David J?ckel / jaeckeld@bsse.ethz.ch
+%  Author: David J?ckel / jaeckeld@bsse.ethz.ch
 % 
 % 09 mar 19 LH      changed fread array size
 %                   changed out.S from cell to mat
+%                   added sampling frequency to output
 
 if nargin < 1 || strcmp(fn,'')
     [FileName,PathName,FilterIndex] = uigetfile('*.wcp');
@@ -177,6 +178,7 @@ for i=1:length(recordings)
     end
 end
 %% output signal
+out.fs = 1 / diff(T(1:2));
 out.S=cell2mat(S);
 out.T=T;
 out.time=wcp.ctime;
