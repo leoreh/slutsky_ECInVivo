@@ -6,7 +6,22 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 basepath = 'E:\data\fEPSP\Ortal';
 graphics = true;
-saveFig = false;
+saveFig = true;
+saveVar = false;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% EXAMPLE: load file via GUI, remove DC, and plot specific traces
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+data = import_wcp();
+
+% find artifact onset from derirative and remove DC
+[~, art] = max(diff(data.S(:, 1)));
+data.S = rmDC(data.S, [1, art - 0.003 * data.fs]);
+
+trace_select = [1 : 5];
+
+[~, ~] = rmTraces(data.S(:, trace_select), 'x', data.T');
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % stability
