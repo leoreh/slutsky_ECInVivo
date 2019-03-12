@@ -11,6 +11,7 @@ function amp = stability(varargin)
 %   basepath    recording session path {pwd} to save figure and variables
 %   graphics    logical. plot graphics {1} or not.
 %   saveFig     logical. saveFig to current path {1} or not (0).
+%   saveVar     logical. save output to current path {1} or not (0).
 % 
 % OUTPUT
 %   amp         vector of amplitude (min - baseline) for each trace  
@@ -26,6 +27,7 @@ addOptional(p, 'inspect', true, @islogical);
 addOptional(p, 'basepath', pwd);
 addOptional(p, 'graphics', true, @islogical);
 addOptional(p, 'saveFig', false, @islogical);
+addOptional(p, 'saveVar', false, @islogical);
 
 parse(p,varargin{:})
 nsessions = p.Results.nsessions;
@@ -33,6 +35,7 @@ inspect = p.Results.inspect;
 basepath = p.Results.basepath;
 graphics = p.Results.graphics;
 saveFig = p.Results.saveFig;
+saveVar = p.Results.saveVar;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % get and analyse data
@@ -82,4 +85,11 @@ if graphics
         filename = 'Stability';
         savePdf(filename, basepath, f)
     end   
+end
+
+if saveVar
+    cd(basepath)
+    save(pk_io, pk);
+end
+
 end

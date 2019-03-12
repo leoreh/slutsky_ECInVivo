@@ -14,6 +14,7 @@ function pk = stp(varargin)
 %   basepath    recording session path {pwd} to save figure and variables
 %   graphics    logical. plot graphics {1} or not.
 %   saveFig     logical. saveFig to current path {1} or not (0).
+%   saveVar     logical. save output to current path {1} or not (0).
 %
 % OUTPUT
 %   pk          mat. mean response for stimulus (colomn) across intensities
@@ -32,6 +33,7 @@ addOptional(p, 'nstim', 5);
 addOptional(p, 'basepath', pwd);
 addOptional(p, 'graphics', true, @islogical);
 addOptional(p, 'saveFig', false, @islogical);
+addOptional(p, 'saveVar', false, @islogical);
 
 parse(p,varargin{:})
 filename = p.Results.filename;
@@ -41,6 +43,7 @@ nstim = p.Results.nstim;
 basepath = p.Results.basepath;
 graphics = p.Results.graphics;
 saveFig = p.Results.saveFig;
+saveVar = p.Results.saveVar;
 
 if length(intensity) ~= length(filename)
     if isempty(filename)
@@ -137,6 +140,11 @@ if graphics
         filename = 'Stability';
         savePdf(filename, basepath, f)
     end
+end
+
+if saveVar
+    cd(basepath)
+    save(pk_io, pk);
 end
 
 end
