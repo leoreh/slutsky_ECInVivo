@@ -41,7 +41,6 @@ end
 
 rm_idx = nan;
 while ~isempty(rm_idx)
-    close all
 
     f = figure;
     plot(x, mat)
@@ -65,6 +64,10 @@ while ~isempty(rm_idx)
     prompt = sprintf('\nWhich traces would you like to remove? type as vector, then press return.\n\n');
     rm_idx = input(prompt);
     mat(:, rm_idx) = [];
+    
+    if ~isempty(rm_idx)
+        close
+    end
 
 end
 

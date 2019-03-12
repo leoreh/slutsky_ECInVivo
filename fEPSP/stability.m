@@ -13,8 +13,7 @@ function amp = stability(varargin)
 %   saveFig     logical. saveFig to current path {1} or not (0).
 % 
 % OUTPUT
-%   mat         same as input without unwanted traces   
-%   rm_idx      index of removed channels
+%   amp         vector of amplitude (min - baseline) for each trace  
 % 
 % 09 mar 19 LH
 

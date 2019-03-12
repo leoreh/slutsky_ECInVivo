@@ -16,7 +16,7 @@ function pk = stp(varargin)
 %   saveFig     logical. saveFig to current path {1} or not (0).
 %
 % OUTPUT
-%   pk          vector with peak amplitude for each intensity
+%   pk          mat. mean response for stimulus (colomn) across intensities  amplitude for each intensity
 %
 % 09 mar 19 LH
 
@@ -63,7 +63,8 @@ lg = cell(1, nfiles);
 
 for i = 1 : nfiles
     data = import_wcp(fullfile(basepath, [filename{i} '.wcp']));
-    
+    art_t = 0.003 * data.fs;
+
     % find artifact onset\s from derirative
     [~, idx] = sort(diff(data.S(:, 1)));
     didx = nan;
@@ -81,16 +82,20 @@ for i = 1 : nfiles
     art = sort(art);
     
     % remove DC
-    data.S = rmDC(data.S, [1, art(1) - 0.003 * data.fs]);
+    data.S = rmDC(data.S, [1, art(1) - art_t]);
     
     % manually inspect and remove unwanted traces
     if inspect
         [data.S, data.rm_idx] = rmTraces(data.S);
     end
     
-    pk(i, 1) = mean(abs(min(data.S(art(1) + 0.004 * data.fs : end, :))));
+    bl = mean(abs(min(data.S(art(1) + art_t : art(2) - art_t, :))));
     for j = 1 : nstim
-        pk(i, j) = mean(abs(min(data.S(art(j) + 0.004 * data.fs : end, :))));
+        if j == nstim
+            pk(i, j) = mean(abs(min(data.S(art(j) + art_t : end, :)))) / bl;
+        else
+            pk(i, j) = mean(abs(min(data.S(art(j) + art_t : art(j + 1) - art_t, :)))) / bl;
+        end
     end
     
     tr(i, :) = mean(data.S, 2);
@@ -112,8 +117,13 @@ if graphics
     title('STP')   
     axis tight
     box off
-    set(gca,'TickLength',[0, 0])
+    set(gca,'TickLength',[0, 0])   
     
+    for i = 1 : nfiles
+        lg{i} = sprintf('%.2f mA', intensity(i));
+    end
+
+    legend([lg])
     subplot(2, 1, 2)
     plot(data.T, tr)
     xlabel('Time [s]')
@@ -121,11 +131,6 @@ if graphics
     axis tight
     box off
     set(gca,'TickLength',[0, 0])
-    
-    for i = 1 : nfiles
-        lg{i} = sprintf('%.2f mA', intensity(i));
-    end
-    legend([lg])
     
     if saveFig
         filename = 'Stability';

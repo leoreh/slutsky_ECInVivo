@@ -4,15 +4,15 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'E:\Data\fEPSP\Ortal\Acute12';
+basepath = 'E:\data\fEPSP\Ortal';
 graphics = true;
 saveFig = false;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % stability
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-nsessions = 1;
-amp = stability('nsessions', nsessions, 'inspect', false, 'basepath', basepath,...
+nsessions = 2;
+amp = stability('nsessions', nsessions, 'inspect', true, 'basepath', basepath,...
     'graphics', graphics, 'saveFig', saveFig);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -31,7 +31,7 @@ filename{6} = 'IO_1AP_0.06Hz_0.5msduration_0.7mA';
 filename{7} = 'IO_1AP_0.06Hz_0.5msduration_0.8mA';
 filename{8} = 'IO_1AP_0.06Hz_0.5msduration_1mA';
 
-pk = io('filename', {}, 'intensity', intensity, 'inspect', false,...
+pk_io = io('filename', filename, 'intensity', intensity, 'inspect', false,...
  'basepath', basepath, 'graphics', graphics, 'saveFig', saveFig);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -42,5 +42,5 @@ clear filename
 filename{1} = 'STP2_5AP_50Hz_0.5msduration_0.4mA';
 filename{2} = 'STP2_5AP_50Hz_0.5msduration_0.8mA';
 
-pk = stp('filename', filename, 'intensity', intensity, 'inspect', false,...
+pk_stp = stp('filename', filename, 'intensity', intensity, 'inspect', false,...
  'basepath', basepath, 'graphics', graphics, 'nstim', 5, 'saveFig', saveFig);

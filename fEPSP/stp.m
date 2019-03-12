@@ -16,7 +16,8 @@ function pk = stp(varargin)
 %   saveFig     logical. saveFig to current path {1} or not (0).
 %
 % OUTPUT
-%   pk          vector with peak amplitude for each intensity
+%   pk          mat. mean response for stimulus (colomn) across intensities
+%               (rows)
 %
 % 09 mar 19 LH
 
