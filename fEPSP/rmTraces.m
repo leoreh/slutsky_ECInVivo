@@ -1,4 +1,4 @@
-function [mat rm_idx] = inspectTraces(mat, varargin)
+function [mat, rm_idx] = rmTraces(mat, varargin)
 
 % plots data and allows the user to remove unwanted traces
 % 
@@ -11,6 +11,9 @@ function [mat rm_idx] = inspectTraces(mat, varargin)
 % OUTPUT
 %   mat         same as input without unwanted traces   
 %   rm_idx      index of removed channels
+% 
+% TO DO LIST
+%   replace while loop with interactive (linked) plot
 % 
 % 09 mar 19 LH
 
@@ -36,28 +39,34 @@ end
 % plot data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-f = figure;
-plot(x, mat)
-axis tight
-box off
-xlabel('Time [s]')
-ylabel('Voltage [mV]')
-title('Traces')
-legend(string([1 : size(mat, 2)]))
-legend('off')
-set(gca,'TickLength',[0, 0])
+rm_idx = nan;
+while ~isempty(rm_idx)
+    close all
 
-datacursormode on;
-dcm = datacursormode(gcf);
-set(dcm, 'UpdateFcn', @curserLegend)
+    f = figure;
+    plot(x, mat)
+    axis tight
+    box off
+    xlabel('Time [s]')
+    ylabel('Voltage [mV]')
+    title('Traces')
+    legend(string([1 : size(mat, 2)]))
+    legend('off')
+    set(gca,'TickLength',[0, 0])
+    
+    datacursormode on;
+    dcm = datacursormode(gcf);
+    set(dcm, 'UpdateFcn', @curserLegend)
+    
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % get traces to remove
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    
+    prompt = sprintf('\nWhich traces would you like to remove? type as vector, then press return.\n\n');
+    rm_idx = input(prompt);
+    mat(:, rm_idx) = [];
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% get traces to remove
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-prompt = sprintf('\nWhich traces would you like to remove? type as vector, then press return.\n\n');
-rm_idx = input(prompt);
-mat(:, rm_idx) = [];
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % save figure

@@ -37,10 +37,8 @@ pk = io('filename', {}, 'intensity', intensity, 'inspect', false,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STP
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-intensity = [0.4 0.8];
 clear filename
+intensity = [0.4 0.8];
 filename{1} = 'STP2_5AP_50Hz_0.5msduration_0.4mA';
 filename{2} = 'STP2_5AP_50Hz_0.5msduration_0.8mA';
 
-pk = stp('filename', filename, 'intensity', intensity, 'inspect', false,...
- 'basepath', basepath, 'graphics', graphics, 'nstim', 5, 'saveFig', saveFig);

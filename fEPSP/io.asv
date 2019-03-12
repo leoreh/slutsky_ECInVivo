@@ -1,45 +1,52 @@
-function amp = stability(varargin)
+function pk = io(varargin)
 
-% loads data through GUI
-% allows user to remove unwanted traces
-% plots amplitude as a function of time
+% loads data specified in filename. Each file should contain traces with
+% the same stimulus intensity. allows user to remove unwanted traces.
+% plots amplitude as a function of stimulus intensity.
 % repeats for specified number of sessions
-% 
+%
 % INPUT
-%   nsessions   number of stability sessions to concatenate
+%   filename    cell array of strings describing filename number of stability sessions to concatenate
 %   inspect     logical. inspect traces {1} or not (0).
 %   basepath    recording session path {pwd} to save figure and variables
 %   graphics    logical. plot graphics {1} or not.
 %   saveFig     logical. saveFig to current path {1} or not (0).
-% 
+%
 % OUTPUT
-%   mat         same as input without unwanted traces   
+%   mat         same as input without unwanted traces
 %   rm_idx      index of removed channels
-% 
+%
 % 09 mar 19 LH
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 p = inputParser;
-addOptional(p, 'nsessions', 1);
+addOptional(p, 'filename', {}, @iscell);
+addOptional(p, 'intensity', [0.1 : 0.1 : 1]);
 addOptional(p, 'inspect', true, @islogical);
 addOptional(p, 'basepath', pwd);
 addOptional(p, 'graphics', true, @islogical);
 addOptional(p, 'saveFig', false, @islogical);
 
 parse(p,varargin{:})
-nsessions = p.Results.nsessions;
+filename = p.Results.filename;
 inspect = p.Results.inspect;
+intensity = p.Results.intensity;
 basepath = p.Results.basepath;
 graphics = p.Results.graphics;
 saveFig = p.Results.saveFig;
 
+if length(intensity) ~= length(filename)
+    error('intensity and filename must be of equal length')
+end
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % get and analyse data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-for i = 1 : nsessions
-    data = import_wcp();
+
+for i = 1 : length(filename)
+    data = import_wcp(fullfile(basepath, [filename{i} '.wcp']));
     
     % find artifact onset from derirative
     [~, art] = max(diff(data.S(:, 1)));
@@ -52,20 +59,46 @@ for i = 1 : nsessions
         [data.S, data.rm_idx] = rmTraces(data.S);
     end
     
-    % find amplitude
-    a{i} = abs(min(data.S(art + 0.003 * data.fs : end, :)));
+    pk(i) = mean(abs(min(data.S(art + 0.004 * data.fs : end, :))));
+    tr(i, :) = mean(data.S, 2);
 end
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-if graphics    
-    amp = [a{:}];
+if graphics
+    
+    f = figure;
+    title('Input-Output')
 
+    subplot(2, 1, 1)
+    plot(intensity, pk, '*')
+    xlabel('Intensity [mA]')
+    ylabel('Amplitude [mV]')
+    axis tight
+    box off
+    set(gca,'TickLength',[0, 0])
+    
+    subplot(2, 1, 2)
+    plot(data.T, tr)
+    xlabel('Time [s]')
+    ylabel('Amplitude [mV]')
+    axis tight
+    box off
+    set(gca,'TickLength',[0, 0])
+    
+    for i = 1 : length(filename)
+        lg{i} = sprintf('%d mA', intensity(i));
+    end
+    legend([lg{:}])
+    
+    
+    
+    amp = [a{:}];
+    
     dt = 15;                                    % inter-trace interval [s]
     x = [1 : dt : length(amp) * dt] / 60;       % time axis in minutes
-
+    
     f = figure;
     plot(x, amp, '*')
     axis tight
@@ -75,12 +108,11 @@ if graphics
     title('Stability')
     set(gca,'TickLength',[0, 0])
     
-    for i = 1 : length(a) - 1
-        breakxaxis([x(length(a{i})), x(length(a{i})) + 1])
-    end
     
     if saveFig
         filename = 'Stability';
         savePdf(filename, basepath, f)
-    end   
+    end
+end
+
 end
