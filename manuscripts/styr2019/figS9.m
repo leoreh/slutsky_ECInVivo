@@ -1,4 +1,4 @@
-basepath = 'H:\data\TERI\wal3_060918';
+basepath = 'E:\Data\Styr2019\TERI\wal3_060918';
 [~, filename] = fileparts(basepath);
 filename = [basepath '\' filename '.spk.4'];
 clu = [5 10 13];
@@ -8,7 +8,7 @@ c = ['g', 'b', 'r'];
 f = figure;
 
 % feature space
-% subplot(3, 5, [1r, 2, 6, 7, 11, 12])
+subplot(3, 5, [1, 2, 6, 7, 11, 12])
 plotFet(fet{tet}, 'saveFig', false, 'clu', clu, 'fet', [4 7], 'newFig', false, 'c', c)
 ylabel('PC1ch3')
 xlabel('PC1ch2')
@@ -50,11 +50,13 @@ for i = 1 : length(clu)
     binsize = 0.001;
     bins = [0 : binsize : 0.05];
     subplot(3, 5, 12 + i)
-    h = histogram([diff(spikes.times{idx})], bins);
+    [counts, edges] = histcounts([diff(spikes.times{idx})], bins);
+    h = histogram('BinEdges', edges, 'BinCounts', counts / length(spikes.times{idx}));
     h.EdgeColor = 'none';
     h.FaceColor = c(i);
     box off
     axis tight
+    ylim([0 0.025])
     ax = gca;
     ax.XTick = [];
     ax.YTick = []; ax.YColor = 'none';
@@ -62,6 +64,8 @@ for i = 1 : length(clu)
     if i == 1
         xticks([0 0.05])
         xlabel('ISI [ms]')
+        yticks([0 2.5])
+        ylabel('Percent')
     end
 end
 
