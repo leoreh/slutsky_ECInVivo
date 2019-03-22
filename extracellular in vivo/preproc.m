@@ -65,4 +65,4 @@ spikes = catStruct(parentdir, structname);
 % STEP 8: get video projection from ToxTrack file
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 filename = 'TestProject';
-vid = getVid(filename, basepath, 'graphics', true, 'saveFig', false, 'saveVar', false)
+vid = getVid(filename, 'basepath', basepath, 'graphics', true, 'saveFig', false, 'saveVar', false);

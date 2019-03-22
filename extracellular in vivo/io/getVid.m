@@ -89,7 +89,6 @@ end
 
 if graphics
     figure
-    subplot(1, 2, 1)
     plot(vid.x, vid.y, 'Color', 'k', 'LineWidth', 1.5)
     xlim([0 vid.res(1)])
     ylim([0 vid.res(2)])
