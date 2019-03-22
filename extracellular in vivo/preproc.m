@@ -4,7 +4,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % basepath to recording folder
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'E:\Data\Styr2019\TERI\wal3_060918';
+basepath = 'C:\Users\LeoreHeim\Google Drive\PhD\Slutsky\Data analysis\Video Tracking\Ethovision Demo from Daniel\4.9.18';
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 1: file conversion
@@ -61,8 +61,8 @@ basepath = parentdir;
 structname = 'spikes';
 spikes = catStruct(parentdir, structname);
 
-fr = calcFR(spikes, 'basepath', basepath, 'winCalc', [0 Inf], 'winBL', [18000 21600], 'binsize', 60);
-
-% su = getSU(basepath, spikes, false)
-onlySUstrd=fr.strdTH(spikes.su==1,:);
-save onlySUstrd.mat
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% STEP 8: get video projection from ToxTrack file
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+filename = 'TestProject';
+vid = getVid(filename, basepath, 'graphics', true, 'saveFig', false, 'saveVar', false)
