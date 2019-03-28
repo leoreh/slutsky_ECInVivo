@@ -27,8 +27,8 @@ trace_select = [1 : 5];
 % stability
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 nsessions = 4;
-amp = stability('nsessions', nsessions, 'inspect', false, 'basepath', basepath,...
-    'graphics', graphics, 'saveFig', saveFig, 'pkMet', 'avgMin');
+amp = stability('nsessions', nsessions, 'inspect', true, 'basepath', basepath,...
+    'graphics', graphics, 'saveFig', saveFig);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % IO
@@ -39,14 +39,10 @@ amp = stability('nsessions', nsessions, 'inspect', false, 'basepath', basepath,.
 intensity = [0.4 : 0.1 : 0.8, 1, 1.2, 1.5 : 0.5 : 3];
 
 % alt 1 to arrange filename if named sequentially
-firstfile = 5; 
+firstfile = 18; 
 prefix = '230319';
 for i =  1 : length(intensity)
-    if firstfile - 1 + i < 10
-        filename{i} = sprintf('%s_00%d', prefix, firstfile - 1 + i);
-    else
-        filename{i} = sprintf('%s_0%d', prefix, firstfile - 1 + i);
-    end
+    filename{i} = sprintf('%s_00%d', prefix, firstfile - 1 + i);
 end
 % alt 2 to arrange filename manually
 % filename{1} = '230319_005';

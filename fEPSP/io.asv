@@ -59,9 +59,8 @@ for i = 1 : length(filename)
     data = import_wcp(fullfile(basepath, [filename{i} '.wcp']));
     
     % find artifact onset from derirative
-    [~, art] = max(diff(data.S(:, 1)));
-    % set minimum artifact if derirative fails
-    art = max(art, 0.01 * data.fs);
+    [~, art] = max(diff(data.S(:, i)))
+    art = min(art, 
     
     % remove DC
     data.S = rmDC(data.S, [1, art - 0.003 * data.fs]);

@@ -12,11 +12,19 @@ function amp = stability(varargin)
 %   graphics    logical. plot graphics {1} or not.
 %   saveFig     logical. saveFig to current path {1} or not (0).
 %   saveVar     logical. save output to current path {1} or not (0).
+%   pkMet       method to calculate peak amplitude
+%               'absMin'    for each trace finds absolute minimum
+%               'avgMin'    calculates peak of all traces at the same
+%                           position, determined by the average minimum 
+%                           excluding outliers
+%               timestamp   calculates peak of all traces at the number
+%                           specified (in sec)
 % 
 % OUTPUT
 %   amp         vector of amplitude (min - baseline) for each trace  
 % 
-% 09 mar 19 LH
+% 09 mar 19 LH  updates:
+% 24 mar 19 LH  added pkMet
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -28,6 +36,7 @@ addOptional(p, 'basepath', pwd);
 addOptional(p, 'graphics', true, @islogical);
 addOptional(p, 'saveFig', false, @islogical);
 addOptional(p, 'saveVar', false, @islogical);
+addOptional(p, 'pkMet', 'avgMin');
 
 parse(p,varargin{:})
 nsessions = p.Results.nsessions;
@@ -36,6 +45,7 @@ basepath = p.Results.basepath;
 graphics = p.Results.graphics;
 saveFig = p.Results.saveFig;
 saveVar = p.Results.saveVar;
+pkMet = p.Results.pkMet;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % get and analyse data
@@ -55,9 +65,19 @@ for i = 1 : nsessions
     end
     
     % find amplitude
-    a{i} = abs(min(data.S(art + 0.003 * data.fs : end, :)));
+    if strcmp(pkMet, 'absMin')
+        a{i} = abs(min(data.S(art + 0.003 * data.fs : end, :)));
+    elseif strcmp(pkMet, 'avgMin')
+        [~, idx] = min(data.S(art + 0.003 * data.fs : end, :));
+        idx = round(trimmean(idx, 5));
+        a{i} = abs(data.S(idx, :));
+    elseif isnumeric(pkMet)
+        idx = find(pkMet == data.T);
+        a{i} = abs(data.S(idx, :));
+    else
+        error('pkMet unrecognized')
+    end
 end
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
@@ -77,8 +97,12 @@ if graphics
     title('Stability')
     set(gca,'TickLength',[0, 0])
     
+    ntraces = 0;
     for i = 1 : length(a) - 1
-        breakxaxis([x(length(a{i})), x(length(a{i})) + 1])
+        ntraces = ntraces + length(a{i});
+        line([x(ntraces) x(ntraces)], get(gca, 'YLim'), 'Color', 'k', 'LineStyle', '--')
+        % breakxaxis([x(ntraces), x(ntraces + 1)]); % works only for 2
+        % sessions
     end
     
     if saveFig
