@@ -24,6 +24,14 @@ filenames{1} = 'chr6_DMSO_4_11_18_bl1_mrg_no_ch_1.ddt';
 ddt2dat(basepath, mapch, rmvch, 'filenames', filenames)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% STEP 2: load LFP
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+chavg = {1 : 4; 5 : 7; 8 : 11; 12 : 15};
+lfp = getLFP('basepath', basepath, 'chans', [1 : 15], 'chavg', chavg, 'fs', 1250,...
+    'interval', [10 30], 'savevar', false);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 2: load spikes
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 spikes = getSpikes('basepath', basepath, 'saveMat', true, 'noPrompts', true);
