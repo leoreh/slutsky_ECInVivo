@@ -42,7 +42,7 @@ addOptional(p, 'winCalc', [1 Inf], validate_win);
 addOptional(p, 'winBL', [], validate_win);
 addOptional(p, 'metBL', 'avg', @ischar);
 addOptional(p, 'select', {'thr'}, @iscell);
-addOptional(p, 'smet', 'avg', @ischar);
+addOptional(p, 'smet', 'MA', @ischar);
 addOptional(p, 'graphics', true, @islogical);
 addOptional(p, 'saveFig', true, @islogical);
 addOptional(p, 'saveVar', true, @islogical);
