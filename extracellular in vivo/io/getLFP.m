@@ -1,7 +1,7 @@
 function lfp = getLFP(varargin)
 
 % gets lfp from lfp file for each channel. can specify channels and
-% intervals
+% intervals. can also average across channels.
 %  
 % INPUT
 %   filename    string. filename of lfp file
@@ -93,7 +93,7 @@ lfp.fs = fs;
 
 % save variable
 if saveVar   
-    save([basepath, '\', filename, '.mat'], 'lfp')
+    save([basepath, filesep, filename, '.mat'], 'lfp')
 end
 
 

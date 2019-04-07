@@ -4,20 +4,21 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % basepath to recording folder
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'C:\Users\LeoreHeim\Google Drive\PhD\Slutsky\Data analysis\Video Tracking\Ethovision Demo from Daniel\4.9.18';
+basepath = '/home/leore/data//LH1/100319';
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 1: file conversion
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 store = 'Raw1';
-blocks = [1:3,5:6];
+blocks = [1:3];
 chunksize = [];
 mapch = [1, 3, 5, 7, 2, 4, 6, 8, 9, 11, 13, 15, 10, 12, 14, 16];
+mapch = [];
 rmvch = [];
 clip = [];
 
 % tank to dat
-tdt2dat(basepath, store, blocks, chunksize, mapch, rmvch, clip)
+info = tdt2dat(basepath, store, blocks, chunksize, mapch, rmvch, clip);
 
 % ddt to dat
 filenames{1} = 'chr6_DMSO_4_11_18_bl1_mrg_no_ch_1.ddt';
@@ -28,8 +29,9 @@ ddt2dat(basepath, mapch, rmvch, 'filenames', filenames)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 chavg = {1 : 4; 5 : 7; 8 : 11; 12 : 15};
-lfp = getLFP('basepath', basepath, 'chans', [1 : 15], 'chavg', chavg, 'fs', 1250,...
-    'interval', [10 30], 'savevar', false);
+chavg = {};
+lfp = getLFP('basepath', basepath, 'chans', [1 : 11], 'chavg', chavg, 'fs', 1250,...
+    'interval', [10 30], 'savevar', true);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 2: load spikes

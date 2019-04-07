@@ -1,4 +1,4 @@
-function tdt2dat(basepath, store, blocks, chunksize, mapch, rmvch, clip)
+function info = tdt2dat(basepath, store, blocks, chunksize, mapch, rmvch, clip)
 
 % converts tank (TDT) to dat (neurosuite). Concatenates blocks.
 % performs basic preprocessing.
@@ -77,7 +77,7 @@ end
 % get tank blocks
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 cd(basepath)
-blockfiles = dir('Block*');
+blockfiles = dir('block*');
 blocknames = {blockfiles.name};
 fprintf(1, '\nFound %d blocks in %s\n\n', length(blocknames), basepath);
 
