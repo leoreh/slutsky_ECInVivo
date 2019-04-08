@@ -294,7 +294,7 @@ if graphics
     
     % add colorbar
     h = colorbar;
-    subplot( h )
+%     subplot( h )
     barylbls=rats(2.^(get(h,'ytick')'));
     %barylbls([1 end],:)=' ';
     barylbls(:,all(barylbls==' ',1))=[];
@@ -302,7 +302,7 @@ if graphics
     title( scalename )
     set( h, 'box', 'off', 'tickdir', 'out' )
 
-    colormap( h1, myjet ) 
+%     colormap( h1, myjet ) 
 
     if 1
         figure, %h2 = subplot( 2, 1, 2 );
@@ -326,10 +326,10 @@ if graphics
                 hold off
                 
                 h = colorbar;
-                subplot( h )
+%                 subplot( h )
                 title( 'Phase (rad)' )
                 set( h, 'box', 'off', 'tickdir', 'out' )
-                colormap( colormaps( myjet ) )
+%                 colormap( colormaps( myjet ) )
 
             case 2
                 % also plot coherence (without phase arrows)

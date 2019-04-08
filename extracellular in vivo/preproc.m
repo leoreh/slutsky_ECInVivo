@@ -4,7 +4,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % basepath to recording folder
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = '/home/leore/data//LH1/100319';
+basepath = 'E:\Data\Styr2019\TERI';
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 1: file conversion
@@ -31,7 +31,7 @@ ddt2dat(basepath, mapch, rmvch, 'filenames', filenames)
 chavg = {1 : 4; 5 : 7; 8 : 11; 12 : 15};
 chavg = {};
 lfp = getLFP('basepath', basepath, 'chans', [1 : 11], 'chavg', chavg, 'fs', 1250,...
-    'interval', [10 30], 'savevar', true);
+    'interval', [0 inf], 'savevar', true);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 2: load spikes
@@ -56,7 +56,7 @@ plotIsolation(basepath, spikes, false)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 5: cell classification based on waveform
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-CellClass = cellclass(parentdir, spikes); 
+CellClass = cellClass(basepath, spikes); 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 6: calculate mean firing rate

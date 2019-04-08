@@ -51,6 +51,9 @@ if isempty(filename)
     [~, filename] = fileparts(basepath);
     filename = [filename '.lfp'];
 end
+if isempty(interval)
+    interval = [0 inf];
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % load data

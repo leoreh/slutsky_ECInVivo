@@ -1,0 +1,73 @@
+function [inb, b] = selectCluster(data, varargin)
+
+% plots data and allows user to select points by drawing borders around the
+% cluster
+% 
+% INPUT
+%   data        2D matrix to plot
+%   sep         2 element vector used to plot linear separatix. for example:
+%               [-2 2.5] will plot y = -2 * data(:, 1) + 2.5
+%   newplot     logical. plot data or use current figure
+%   basepath    recording session path {pwd}
+%   saveFig     save figure {1}.
+%   saveVar     save variable {1}.
+% 
+% OUTPUT
+%   inb         logical vector where 1 = in border and 0 = outside border
+%   b           border coordinates
+% 
+% DEPENDENCIES
+%   PointInput      
+%
+% 08 apr 19 LH. 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% arguments
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+figure;
+hold on
+plot(data(1, :), data(2, :), 'k.');
+xlim([0 max([data(:,1) + 0.1; 2])])
+ylim([0 max([data(:,2) + 0.1; 2])])
+xb = get(gca, 'XLim');
+yb = get(gca, 'YLim');
+plot(xb, [m * xb(1) + b, m * xb(2) + b])
+xlim(xb)
+ylim(yb)
+
+linepos = 1;
+b = [];    % matrix of polyline coords
+h_lastline = [];
+
+zoomoff = 1;
+while 1
+    [x, y, button]= PointInput(1);
+    res = button * zoomoff;
+    title({'Select PYRs',...
+        'left click to draw boundary',...
+        'right click to complete',...
+        'middle click to end'});
+    
+    switch res
+        case 1 % left button
+            b(linepos, :)=[x y];
+            if linepos > 1
+                h_lastline(end+1) = line([b(linepos-1,1),b(linepos,1)],[b(linepos-1,2),b(linepos,2)]);
+                set(h_lastline(end), 'Color', 'k');
+            end
+            linepos = linepos + 1;
+        case 2  % middle button
+            break
+        case 3  % right button
+            if linepos > 2
+                b(linepos, :) = b(1, :);
+                h_lastline(end + 1) = line([b(linepos-1,1),b(linepos,1)],[b(linepos-1,2),b(linepos,2)]);
+                set(h_lastline(end),'Color','k');
+            end            
+    end
+end
+inb = inpolygon(data(1, :), data(2, :), b(:, 1),b(:, 2));
+
+end
+

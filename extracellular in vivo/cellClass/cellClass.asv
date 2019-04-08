@@ -98,6 +98,7 @@ if graphics
     xlabel('trough-to-peak [ms]')
     ylabel('spike width [ms]')
     hold on
+    line(
 end
 
 
@@ -117,8 +118,6 @@ fprintf('\nDiscriminate pyr and int (select Pyramidal)');
 xlabel('Trough-To-Peak Time (ms)')
 ylabel('Wave width (via inverse frequency) (ms)')
 [ELike,PyrBoundary] = ClusterPointsBoundaryOutBW([tp spkw],m,b);
-
-selectCluster([tp; spkw])
 
 if keepKnown
     ELike(knownEidx) = 1;
