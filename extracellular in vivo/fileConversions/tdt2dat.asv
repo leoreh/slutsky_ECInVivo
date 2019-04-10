@@ -26,7 +26,6 @@ function [info, data] = tdt2dat(basepath, store, blocks, chunksize, mapch, rmvch
 %   handle arguments
 %
 % 06 dec 18 LH.
-% 10 apr 19 LH. added EMG
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -185,7 +184,7 @@ if contains(store, 'Raw')
             end
             
             fwrite(fout, data(:), 'int16');         % write data
-            data = [];
+clear data
         end
     end
     
@@ -201,8 +200,8 @@ if contains(store, 'Raw')
     fprintf(1, '\nCreated %s. \nFile size = %.2f MB\n', newname, info.bytes / 1e6);
     fprintf(1, '\nElapsed time = %.2f seconds\n', toc)
     
-elseif contains(store, 'EMG')
     data = [];
+elseif contains(store, 'EMG')
     for i = 1 : nblocks
         blockpath = fullfile(basepath, blocknames{i});
         fprintf(1, 'Working on %s\n', blocknames{i});
@@ -212,7 +211,7 @@ elseif contains(store, 'EMG')
         
         temp = TDTbin2mat(blockpath, 'TYPE', {'streams'}, 'STORE', store,...
             'T1', 0, 'T2', 0);
-        temp = temp.streams.(store).data;
+        temp = data.streams.(store).data;
         data = [data, temp];
     end
     
@@ -220,7 +219,7 @@ elseif contains(store, 'EMG')
         data(rmvch, :) = [];
     end
     
-    save([basename, '.' store, '.mat'], 'data');
+    save([basename, '.' store, '.mat'], 'info');
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
