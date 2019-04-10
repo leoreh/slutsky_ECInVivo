@@ -94,16 +94,19 @@ if ~isempty(blocks)
 end
 nblocks = length(blocknames);
 
-% open dat file
-[~, basename] = fileparts(basepath);
-newname = [basename '.dat'];
-fout = fopen(newname, 'w');
-if(fout == -1)
-    error('cannot open file');
-end
-
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Raw
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if contains(store, 'Raw')
-    
+  
+    % open dat file
+    [~, basename] = fileparts(basepath);
+    newname = [basename '.dat'];
+    fout = fopen(newname, 'w');
+    if(fout == -1)
+        error('cannot open file');
+    end
+
     % go over blocks
     for i = 1 : nblocks
         
@@ -200,7 +203,10 @@ if contains(store, 'Raw')
     info = dir(newname);
     fprintf(1, '\nCreated %s. \nFile size = %.2f MB\n', newname, info.bytes / 1e6);
     fprintf(1, '\nElapsed time = %.2f seconds\n', toc)
-    
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % EMG
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 elseif contains(store, 'EMG')
     data = [];
     for i = 1 : nblocks

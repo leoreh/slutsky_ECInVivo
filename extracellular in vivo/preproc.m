@@ -10,7 +10,7 @@ basepath = 'E:\Data\Styr2019\TERI';
 % STEP 1: file conversion
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 store = 'Raw1';
-blocks = [1:3];
+blocks = [1:2];
 chunksize = [];
 mapch = [1, 3, 5, 7, 2, 4, 6, 8, 9, 11, 13, 15, 10, 12, 14, 16];
 mapch = [];
@@ -18,7 +18,8 @@ rmvch = [];
 clip = [];
 
 % tank to dat
-info = tdt2dat(basepath, store, blocks, chunksize, mapch, rmvch, clip);
+[info, data] = tdt2dat(basepath, 'Raw1', blocks, chunksize, mapch, rmvch, clip);
+[info, data] = tdt2dat(basepath, 'EMG1', blocks, chunksize, mapch, [4:16], clip);
 
 % ddt to dat
 filenames{1} = 'chr6_DMSO_4_11_18_bl1_mrg_no_ch_1.ddt';

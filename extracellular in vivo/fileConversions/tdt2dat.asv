@@ -26,6 +26,7 @@ function [info, data] = tdt2dat(basepath, store, blocks, chunksize, mapch, rmvch
 %   handle arguments
 %
 % 06 dec 18 LH.
+% 10 apr 19 LH. added EMG
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -101,8 +102,8 @@ if(fout == -1)
     error('cannot open file');
 end
 
-if contains(store, 'Raw')
-    
+% go over stores
+for k = 1 : length(store)
     % go over blocks
     for i = 1 : nblocks
         
@@ -115,7 +116,8 @@ if contains(store, 'Raw')
         heads = TDTbin2mat(blockpath, 'TYPE', {'streams'}, 'STORE', store, 'HEADERS', 1);
         nsec(i) = heads.stores.(store).ts(end);
         
-        
+        if contains(store{k}, 'Raw')
+
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         % partition into chunks
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -184,7 +186,7 @@ if contains(store, 'Raw')
             end
             
             fwrite(fout, data(:), 'int16');         % write data
-clear data
+            data = [];
         end
     end
     
@@ -200,8 +202,8 @@ clear data
     fprintf(1, '\nCreated %s. \nFile size = %.2f MB\n', newname, info.bytes / 1e6);
     fprintf(1, '\nElapsed time = %.2f seconds\n', toc)
     
-    data = [];
 elseif contains(store, 'EMG')
+    data = [];
     for i = 1 : nblocks
         blockpath = fullfile(basepath, blocknames{i});
         fprintf(1, 'Working on %s\n', blocknames{i});
@@ -211,7 +213,7 @@ elseif contains(store, 'EMG')
         
         temp = TDTbin2mat(blockpath, 'TYPE', {'streams'}, 'STORE', store,...
             'T1', 0, 'T2', 0);
-        temp = data.streams.(store).data;
+        temp = temp.streams.(store).data;
         data = [data, temp];
     end
     
@@ -219,7 +221,7 @@ elseif contains(store, 'EMG')
         data(rmvch, :) = [];
     end
     
-    save([basename, '.' store, '.mat'], 'info');
+    save([basename, '.' store, '.mat'], 'data');
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
