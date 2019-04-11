@@ -20,31 +20,46 @@ function [inb, b] = selectCluster(data, varargin)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+p = inputParser;
+addOptional(p, 'sep', [], @isnumeric);
+addOptional(p, 'h', [], @ishandle);
 
-figure;
-hold on
-plot(data(1, :), data(2, :), 'k.');
-xlim([0 max([data(:,1) + 0.1; 2])])
-ylim([0 max([data(:,2) + 0.1; 2])])
-xb = get(gca, 'XLim');
-yb = get(gca, 'YLim');
-plot(xb, [m * xb(1) + b, m * xb(2) + b])
-xlim(xb)
-ylim(yb)
+parse(p, varargin{:})
+sep = p.Results.sep;
+h = p.Results.h;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% plot
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+if isempty(h)
+    figure;
+    hold on
+    plot(data(1, :), data(2, :), 'k.');
+end
+
+if ~isempty(sep)
+    xlim([0, max(data(1, :)) + 0.1])
+    ylim([0, max(data(2, :)) + 0.1])
+    xb = get(gca, 'XLim');
+    yb = get(gca, 'YLim');
+    plot(xb, [sep(1) * xb(1) + sep(2), sep(1) * xb(2) + sep(2)])
+end
 
 linepos = 1;
 b = [];    % matrix of polyline coords
 h_lastline = [];
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% user selection
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 zoomoff = 1;
 while 1
     [x, y, button]= PointInput(1);
     res = button * zoomoff;
-    title({'Select PYRs',...
+    title({'Select cluster',...
         'left click to draw boundary',...
         'right click to complete',...
-        'middle click to end'});
-    
+        'middle click to end'});    
     switch res
         case 1 % left button
             b(linepos, :) = [x y];
