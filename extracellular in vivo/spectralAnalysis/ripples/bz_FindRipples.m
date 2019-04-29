@@ -67,7 +67,7 @@ function [ripples] = bz_FindRipples(varargin)
 % Copyright (C) 2004-2011 by Michaël Zugaro, initial algorithm by Hajime Hirase
 % edited by David Tingley, 2017
 %
-% This program is free software; you can redistribute it and/or modify
+% This program is free so ftware; you can redistribute it and/or modify
 % it under the terms of the GNU General Public License as published by
 % the Free Software Foundation; either version 3 of the License, or
 % (at your option) any later version.
@@ -325,7 +325,8 @@ if strcmp(show,'on')
 		end
     end
   elseif plotType == 2
-      lfpPlot = bz_Filter(double(lfp.data),'filter','butter','passband',[50 300],'order', 3);
+        % LH 24 apr 19 - changed double(lfp.data) to signal
+      lfpPlot = bz_Filter(signal,'filter','butter','passband',[50 300],'order', 3);
      
 		plot(timestamps,lfpPlot);hold on;
   		yLim = ylim;

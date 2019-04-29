@@ -1,4 +1,4 @@
-function [info, data] = tdt2dat(basepath, store, blocks, chunksize, mapch, rmvch, clip)
+function info = tdt2dat(basepath, store, blocks, chunksize, mapch, rmvch, clip)
 
 % converts tank (TDT) to dat (neurosuite). Concatenates blocks.
 % performs basic preprocessing.
@@ -17,7 +17,7 @@ function [info, data] = tdt2dat(basepath, store, blocks, chunksize, mapch, rmvch
 %
 % OUTPUT
 %   info        struct with fields describing tdt params
-% 
+%
 % CALLS:
 %   TDTbin2mat
 %
@@ -61,6 +61,8 @@ else
     end
 end
 
+[~, basename] = fileparts(basepath);
+
 % constants
 scalef = 1e6;   % scale factor for int16 conversion [uV]
 
@@ -97,137 +99,110 @@ nblocks = length(blocknames);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Raw
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-if contains(store, 'Raw')
-  
-    % open dat file
-    [~, basename] = fileparts(basepath);
-    newname = [basename '.dat'];
-    fout = fopen(newname, 'w');
-    if(fout == -1)
-        error('cannot open file');
-    end
 
-    % go over blocks
-    for i = 1 : nblocks
-        
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        % extract info
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        blockpath = fullfile(basepath, blocknames{i});
-        fprintf(1, 'Working on %s\n', blocknames{i});
-        
-        heads = TDTbin2mat(blockpath, 'TYPE', {'streams'}, 'STORE', store, 'HEADERS', 1);
-        nsec(i) = heads.stores.(store).ts(end);
-        
-        
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        % partition into chunks
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        
-        if isempty(chunksize)       % load entire block
-            nchunks = 1;
-            chunks = [0 0];
-        else                        % load block in chunks
-            nchunks = ceil(nsec(i) / chunksize);
-            chunks = [0 : chunksize : chunksize * (nchunks - 1);...
-                chunksize : chunksize : chunksize * nchunks]';
-            chunks(nchunks, 2) = 0;
-            chunks(1, 1) = 0;
-        end
-        
-        % clip unwanted times
-        clipblk = clip{blocks(i)};
-        if ~isempty(clipblk)
-            if isempty(chunksize)
-                if size(clipblk, 1) == 1 && clipblk(1) == 0
-                    chunks(1, 1) = clipblk(1, 2);
-                elseif size(clipblk, 1) == 1 && clipblk(2) == Inf
-                    chunks(1, 2) = clipblk(1, 1);
-                else
-                    for j = 1 : size(clipblk, 1) - 1
-                        chunks = [chunks; clipblk(j, 2) clipblk(j + 1, 1)];
-                    end
-                end
-                if clipblk(1, 1) > 0
-                    chunks = [0 clipblk(1, 1); chunks];
-                end
-            else
-                idx = zeros(1, 2);
-                for j = 1 : size(clipblk, 1)
-                    idx(1) = find(chunks(:, 2) > clipblk(j, 1), 1, 'first');
-                    chunks(idx(1), 2) = clipblk(j, 1);
-                    if clipblk(j, 2) ~= Inf
-                        idx(2) = find(chunks(:, 1) > clipblk(j, 2), 1, 'first');
-                        chunks(idx(2), 1) = clipblk(j, 2);
-                        rmblk = idx(1) + 1 : idx(2) - 1;
-                    else
-                        rmblk = idx(1) + 1 : size(chunks, 1);
-                    end
-                    if ~isempty(rmblk)
-                        chunks(rmblk, :) = [];
-                    end
-                end
-            end
-            chunks = chunks(any(chunks, 2), :);
-        end
-        
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        % go over chunks, remap, remove and write
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        for j = 1 : nchunks
-            data = TDTbin2mat(blockpath, 'TYPE', {'streams'}, 'STORE', store,...
-                'T1', chunks(j, 1), 'T2', chunks(j, 2));
-            data = data.streams.(store).data;
-            
-            if ~isempty(rmvch)                      % remove channels
-                data(rmvch, :) = [];
-            end
-            
-            if ~isempty(mapch)                      % remap channels
-                data = data(mapch, :);
-            end
-            
-            fwrite(fout, data(:), 'int16');         % write data
-            data = [];
-        end
-    end
-    
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    % close file
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    rc = fclose(fout);
-    if rc == -1
-        error('cannot save new file');
-    end
-    
-    info = dir(newname);
-    fprintf(1, '\nCreated %s. \nFile size = %.2f MB\n', newname, info.bytes / 1e6);
-    fprintf(1, '\nElapsed time = %.2f seconds\n', toc)
-
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    % EMG
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-elseif contains(store, 'EMG')
-    data = [];
-    for i = 1 : nblocks
-        blockpath = fullfile(basepath, blocknames{i});
-        fprintf(1, 'Working on %s\n', blocknames{i});
-        
-        heads = TDTbin2mat(blockpath, 'TYPE', {'streams'}, 'STORE', store, 'HEADERS', 1);
-        nsec(i) = heads.stores.(store).ts(end);
-        
-        temp = TDTbin2mat(blockpath, 'TYPE', {'streams'}, 'STORE', store,...
-            'T1', 0, 'T2', 0);
-        temp = temp.streams.(store).data;
-        data = [data, temp];
-    end
-    
-    if ~isempty(rmvch)                      
-        data(rmvch, :) = [];
-    end
-    
-    save([basename, '.' store, '.mat'], 'data');
+% open dat file
+newname = [basename '.dat'];
+fout = fopen(newname, 'w');
+if(fout == -1)
+    error('cannot open file');
 end
+
+% go over blocks
+for i = 1 : nblocks
+    
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % extract info
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    blockpath = fullfile(basepath, blocknames{i});
+    fprintf(1, 'Working on %s\n', blocknames{i});
+    
+    heads = TDTbin2mat(blockpath, 'TYPE', {'streams'}, 'STORE', store, 'HEADERS', 1);
+    nsec(i) = heads.stores.(store).ts(end);
+    
+    
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % partition into chunks
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    
+    if isempty(chunksize)       % load entire block
+        nchunks = 1;
+        chunks = [0 0];
+    else                        % load block in chunks
+        nchunks = ceil(nsec(i) / chunksize);
+        chunks = [0 : chunksize : chunksize * (nchunks - 1);...
+            chunksize : chunksize : chunksize * nchunks]';
+        chunks(nchunks, 2) = 0;
+        chunks(1, 1) = 0;
+    end
+    
+    % clip unwanted times
+    clipblk = clip{blocks(i)};
+    if ~isempty(clipblk)
+        if isempty(chunksize)
+            if size(clipblk, 1) == 1 && clipblk(1) == 0
+                chunks(1, 1) = clipblk(1, 2);
+            elseif size(clipblk, 1) == 1 && clipblk(2) == Inf
+                chunks(1, 2) = clipblk(1, 1);
+            else
+                for j = 1 : size(clipblk, 1) - 1
+                    chunks = [chunks; clipblk(j, 2) clipblk(j + 1, 1)];
+                end
+            end
+            if clipblk(1, 1) > 0
+                chunks = [0 clipblk(1, 1); chunks];
+            end
+        else
+            idx = zeros(1, 2);
+            for j = 1 : size(clipblk, 1)
+                idx(1) = find(chunks(:, 2) > clipblk(j, 1), 1, 'first');
+                chunks(idx(1), 2) = clipblk(j, 1);
+                if clipblk(j, 2) ~= Inf
+                    idx(2) = find(chunks(:, 1) > clipblk(j, 2), 1, 'first');
+                    chunks(idx(2), 1) = clipblk(j, 2);
+                    rmblk = idx(1) + 1 : idx(2) - 1;
+                else
+                    rmblk = idx(1) + 1 : size(chunks, 1);
+                end
+                if ~isempty(rmblk)
+                    chunks(rmblk, :) = [];
+                end
+            end
+        end
+        chunks = chunks(any(chunks, 2), :);
+    end
+    
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % go over chunks, remap, remove and write
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    for j = 1 : nchunks
+        data = TDTbin2mat(blockpath, 'TYPE', {'streams'}, 'STORE', store,...
+            'T1', chunks(j, 1), 'T2', chunks(j, 2));
+        data = data.streams.(store).data;
+        
+        if ~isempty(rmvch)                      % remove channels
+            data(rmvch, :) = [];
+        end
+        
+        if ~isempty(mapch)                      % remap channels
+            data = data(mapch, :);
+        end
+        
+        fwrite(fout, data(:), 'int16');         % write data
+        data = [];
+    end
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% close file
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+rc = fclose(fout);
+if rc == -1
+    error('cannot save new file');
+end
+
+info = dir(newname);
+fprintf(1, '\nCreated %s. \nFile size = %.2f MB\n', newname, info.bytes / 1e6);
+fprintf(1, '\nElapsed time = %.2f seconds\n', toc)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % save info

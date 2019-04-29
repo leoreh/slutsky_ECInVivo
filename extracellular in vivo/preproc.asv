@@ -19,6 +19,7 @@ clip = [];
 
 % tank to dat
 [info, Raw1] = tdt2dat(basepath, 'Raw1', blocks, chunksize, mapch, rmvch, clip);
+[info, EMG1] = tdt2dat(basepath, 'EMG1', blocks, chunksize, mapch, rmvch, clip);
 
 % ddt to dat
 filenames{1} = 'chr6_DMSO_4_11_18_bl1_mrg_no_ch_1.ddt';
@@ -34,16 +35,40 @@ lfp = getLFP('basepath', basepath, 'chans', [1 : 14], 'chavg', chavg, 'fs', 1250
     'interval', [0 inf], 'savevar', true);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% STEP 3: load EMG
+% STEP 9: get emg from lfp
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% option 1:
-blocks = [4];
-rmvch = [];
-emg = getEMG(basepath, 'EMG1', blocks, rmvch);
-
-% option 2:
 chans = [1 5 9 12];
 emg = getEMGfromLFP(double(lfp.data(:, chans)), 'emgFs', 2);
+
+EMG2 = EMG1(1, :);
+
+% bandpass filter
+EMG = filterLFP(double(EMG2'), 'fs', info.fs, 'type', 'butter', 'passband', [10 500],...
+    'graphics', false);
+
+% rectify
+EMG = abs(EMG - mean(EMG));
+
+% low-pass filter
+win = round(0.03 * info.fs);    % 30 ms moving average
+EMG = movmean(EMG, win);
+
+% normalize
+EMG3 = EMG / max(EMG);
+
+EMG = envelope(double(EMG2);
+
+idx_emg = 1 : 8202;
+idx = idx_emg / emg.fs;
+idx_emg1 = round(idx * info.fs);
+
+figure
+p1 = plot((1 : length(EMG3)) / info.fs, EMG3);
+hold on
+p2 = plot(idx, emg.data(idx_emg));
+legend('real', 'lfp')
+xlim([500 2000])
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 2: load spikes

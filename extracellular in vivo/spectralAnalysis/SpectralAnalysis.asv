@@ -24,10 +24,11 @@ end
 % find ripples
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+
 filtered = filterLFP(double(lfp.data(:, 1)), 'passband', [100 200]);
 
-ripples = bz_FindRipples(lfp.data(:, 1), lfp.timestamps, 'EMGThres', 0.9, 'plottype', 1, 'show', 'on');
-[maps,data,stats] = bz_RippleStats(filtered.data(:, 1),lfp.timestamps, ripples);
+ripples = bz_FindRipples(lfp.data(:, 1), lfp.timestamps, 'EMGThres', 0);
+[maps,data,stats] = bz_RippleStats(filtered.data(:, 1),lfp.timestamps, ripples)
 bz_PlotRippleStats(maps, data, stats)
 
 

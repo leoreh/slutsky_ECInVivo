@@ -75,6 +75,7 @@ chunksize = 20;
 
 filtered = filterLFP(lfp, 'fs', 1250, 'type', 'butter', 'passband', [300 600],...
     'graphics', false);
+filt_sig = filtered.data;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % correlation coefficients
@@ -90,7 +91,7 @@ data = zeros(nbins, 1);
 for j = 1 : nchans
     for k = (j + 1) : nchans
         
-        msg = sprintf('calculating correlations between channels %d and %d', j, k);
+        msg = sprintf('calculating correlations between channels %d and %d\n', j, k);
         disp(msg);
         
         c1 = [];
@@ -99,8 +100,8 @@ for j = 1 : nchans
         bstart = 1;
         for i = timestamps
             bidx = bidx + 1;
-            s1 = filtered(i + win_idx, j);
-            s2 = filtered(i + win_idx, k);
+            s1 = filt_sig(i + win_idx, j);
+            s2 = filt_sig(i + win_idx, k);
             c1 = cat(2, c1, s1);
             c2 = cat(2, c2, s2);
             if size(c1, 2) == chunksize || i == timestamps(end)
@@ -130,7 +131,7 @@ if graphics
     [~, idx] = max(emg.data);
     lfpidx = idx / emg.fs * fs;
     idx = idx - 3 * emg.fs : idx + 3 * emg.fs;
-    lfpidx = round(lfpidx - 3 * fs : lfpidx + 3 * fs); 
+    lfpidx = lfpidx - 3 * fs : lfpidx + 3 * fs; 
     yfactor = max(lfp(lfpidx, 1)) - min(lfp(lfpidx, 1));
     
     figure
