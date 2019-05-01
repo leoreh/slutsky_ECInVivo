@@ -3,7 +3,8 @@ function  filtered = filterLFP(raw, varargin)
 % applies filtfilt using different parameters
 % 
 % INPUT
-%   raw         matrix of samples (rows) x channels (columns)
+%   raw         matrix of samples (rows) x channels (columns). must be
+%               double
 %   fs          sampling frequency
 %   passband    pass frequency range. [0 X] for low-pass, [X inf] for highpass
 %   stopband    stop frequency range

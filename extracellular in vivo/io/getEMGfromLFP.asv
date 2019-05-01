@@ -75,7 +75,6 @@ chunksize = 20;
 
 filtered = filterLFP(lfp, 'fs', 1250, 'type', 'butter', 'passband', [300 600],...
     'graphics', false);
-filt_sig = filtered.data;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % correlation coefficients
@@ -91,7 +90,7 @@ data = zeros(nbins, 1);
 for j = 1 : nchans
     for k = (j + 1) : nchans
         
-        msg = sprintf('calculating correlations between channels %d and %d\n', j, k);
+        msg = sprintf('calculating correlations between channels %d and %d', j, k);
         disp(msg);
         
         c1 = [];
@@ -100,8 +99,8 @@ for j = 1 : nchans
         bstart = 1;
         for i = timestamps
             bidx = bidx + 1;
-            s1 = filt_sig(i + win_idx, j);
-            s2 = filt_sig(i + win_idx, k);
+            s1 = filtered(i + win_idx, j);
+            s2 = filtered(i + win_idx, k);
             c1 = cat(2, c1, s1);
             c2 = cat(2, c2, s2);
             if size(c1, 2) == chunksize || i == timestamps(end)
@@ -127,14 +126,18 @@ emg.fs = emgFs;
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% plots maximum and minimum EMG activity 
 if graphics
+    figure
+    interval = 1.5;
+    
+    subplot(1, 2, 1)
     [~, idx] = max(emg.data);
     lfpidx = idx / emg.fs * fs;
-    idx = idx - 3 * emg.fs : idx + 3 * emg.fs;
-    lfpidx = lfpidx - 3 * fs : lfpidx + 3 * fs; 
+    idx = idx - interval * emg.fs : idx + interval * emg.fs;
+    lfpidx = round(lfpidx - interval * fs : lfpidx + interval * fs); 
     yfactor = max(lfp(lfpidx, 1)) - min(lfp(lfpidx, 1));
-    
-    figure
+        
     yyaxis left
     plot(idx / emg.fs / 60, emg.data(idx), 'LineWidth', 3)
     ylabel('EMG (mean pairwise correlation)')
@@ -143,10 +146,33 @@ if graphics
     for i = 1 : nchans
         plot(lfpidx / fs / 60, lfp(lfpidx, i) + i * yfactor, '-k')
     end
-    ylabel('LFP raw')
+    ylabel('LFP raw', 'Color', 'k')
     set(gca,'YTick',[])
     xlabel('Time [m]')
-    title('EMG from LFP')
+    title('maximum correlation')
+    axis tight
+    
+    subplot(1, 2, 2)
+    [~, idx] = min(emg.data);
+    lfpidx = idx / emg.fs * fs;
+    idx = idx - interval * emg.fs : idx + interval * emg.fs;
+    lfpidx = round(lfpidx - interval * fs : lfpidx + interval * fs); 
+    yfactor = max(lfp(lfpidx, 1)) - min(lfp(lfpidx, 1));
+        
+    yyaxis left
+    plot(idx / emg.fs / 60, emg.data(idx), 'LineWidth', 3)
+    ylabel('EMG (mean pairwise correlation)')
+    hold on
+    yyaxis right
+    for i = 1 : nchans
+        plot(lfpidx / fs / 60, lfp(lfpidx, i) + i * yfactor, '-k')
+    end
+    ylabel('LFP raw', 'Color', 'k')
+    set(gca,'YTick',[])
+    xlabel('Time [m]')
+    axis tight
+    title('minimum correlation')
+    suptitle('EMG from LFP')
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

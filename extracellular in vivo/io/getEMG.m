@@ -1,22 +1,19 @@
-function emg = getEMG(basepath, store, blocks, rmvch)
+function emg = getEMG(basepath, store, blocks, rmvch, graphics)
 
-% loads EMG from tank (TDT) and finds linear envelope. 
+% loads EMG from tank (TDT) and finds linear envelope.
 %
 % INPUT:
 %   basepath    path to recording folder {pwd}.
 %   store       stream. typically {'Raw1'} or 'Raw2'
 %   blocks      vector. blocks to convert {all}. e.g. [1 2 4 5];
-%   chunksize   load data in chunks {60} s. if empty will load entire block.
-%   mapch       new order of channels {[]}.
 %   rmvch       channels to remove (according to original order) {[]}
-%   clip        array of mats indicating times to diregard from recording.
-%               each cell corresponds to a block. for example:
-%               clip{3} = [0 50; 700 Inf] will remove the first 50 s of
-%               Block-3 and the time between 700 s and the end of Block-3
 %
 % OUTPUT
-%   emg        struct with fields describing tdt params
-% 
+%   emg         struct with fields:
+%       raw         raw EMG
+%       data        linear envelope
+%       <params>    as in input + tdt params
+%
 % CALLS:
 %   TDTbin2mat
 %
@@ -41,6 +38,9 @@ end
 if nargin < 4 || isempty(rmvch)
     rmvch = [];
 end
+if nargin < 5 || isempty(graphics)
+    graphics = true;
+end
 
 [~, basename] = fileparts(basepath);
 
@@ -48,7 +48,7 @@ end
 % get tank blocks
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 cd(basepath)
-blockfiles = dir('block*');
+blockfiles = dir('Test*');
 blocknames = {blockfiles.name};
 fprintf(1, '\nFound %d blocks in %s\n\n', length(blocknames), basepath);
 
@@ -64,7 +64,6 @@ nblocks = length(blocknames);
 % load EMG
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-data = [];
 for i = 1 : nblocks
     blockpath = fullfile(basepath, blocknames{i});
     fprintf(1, 'Working on %s\n', blocknames{i});
@@ -86,10 +85,10 @@ end
 % find linear envelope
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% OPTION 1:
+%%% OPTION 1:
 % [EMG, ~] = envelope(double(EMG2), win, 'rms');
 
-% OPTION 2:
+%%% OPTION 2:
 % bandpass filter
 data = filterLFP(double(raw'), 'fs', fs,...
     'type', 'butter', 'passband', [10 500], 'graphics', false);
@@ -102,17 +101,37 @@ win = round(0.5 * fs);    % 500 ms moving average
 data = movmean(data, win);
 
 % normalize
-data = data / max(data);
+data = data ./ max(data);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+if graphics
+    nchans = size(data, 2);
+    t = (1 : size(data, 1)) / fs / 60;
+    
+    figure
+    for i = 1 : nchans
+        subplot(nchans, 1, i)
+        plot(t, data(:, i))
+        yticks([0 1])
+        set(gca,'TickLength',[0 0])
+        box off
+        axis tight
+        ylim([0 1])
+        if i == 1
+            title('EMG')
+        end
+    end
+    xlabel('time [m]')
+end
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % save var
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 emg.data = data;
-emg.raw = raw;
+emg.raw = raw';
 emg.filename = basename;
 emg.blocks = blocks;
 emg.blockduration = nsec;

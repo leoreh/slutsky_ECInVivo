@@ -2,7 +2,7 @@ function  emg = getEMGfromLFP(lfp, varargin)
 
 % based on Schomburg et al., 2014 and bz_EMGFromLFP. main differences are
 % (1) independence from session info and xml file and (2) uses filtfilt
-% instead of costume-designed. filteres lfp in the 300-600 Hz band. bins
+% instead of custom-designed. filteres lfp in the 300-600 Hz band. bins
 % the data according to the requested EMG sampling rate over sliding
 % windows. window duration is determined by the ratio LFP / EMG sampling
 % rate. Pearson's correlation coefficients is calculated at each bin for
@@ -23,6 +23,9 @@ function  emg = getEMGfromLFP(lfp, varargin)
 %       data        EMG data (mean pairwise correlations)
 %       timestamps  center of bin (window)
 %       fs          EMG sampling frequency
+% 
+% TO DO LIST:
+%   if emgFs < 1 then problem with graphics
 % 
 % 29 apr 19 LH. 
 
@@ -54,9 +57,9 @@ chunksize = 20;
 % filter data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%%% option 1 (original)
 % filter design. originally used by Schomberg. replaced with Matlab
 % filtfilt because it is 10-times faster.
-
 % tic
 % maxf = floor(max([625 fs / 2]));       % adjust upper stopband to nyquist
 % fband = [275, 300, maxf - 25, maxf];
@@ -73,6 +76,7 @@ chunksize = 20;
 % end
 % toc
 
+%%% option 2
 filtered = filterLFP(lfp, 'fs', 1250, 'type', 'butter', 'passband', [300 600],...
     'graphics', false);
 
@@ -126,14 +130,18 @@ emg.fs = emgFs;
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% plots maximum and minimum EMG activity 
 if graphics
+    figure
+    interval = 1.5;
+    
+    subplot(1, 2, 1)
     [~, idx] = max(emg.data);
     lfpidx = idx / emg.fs * fs;
-    idx = idx - 3 * emg.fs : idx + 3 * emg.fs;
-    lfpidx = round(lfpidx - 3 * fs : lfpidx + 3 * fs); 
+    idx = idx - interval * emg.fs : idx + interval * emg.fs;
+    lfpidx = round(lfpidx - interval * fs : lfpidx + interval * fs); 
     yfactor = max(lfp(lfpidx, 1)) - min(lfp(lfpidx, 1));
-    
-    figure
+        
     yyaxis left
     plot(idx / emg.fs / 60, emg.data(idx), 'LineWidth', 3)
     ylabel('EMG (mean pairwise correlation)')
@@ -142,10 +150,33 @@ if graphics
     for i = 1 : nchans
         plot(lfpidx / fs / 60, lfp(lfpidx, i) + i * yfactor, '-k')
     end
-    ylabel('LFP raw')
+    ylabel('LFP raw', 'Color', 'k')
     set(gca,'YTick',[])
     xlabel('Time [m]')
-    title('EMG from LFP')
+    title('maximum correlation')
+    axis tight
+    
+    subplot(1, 2, 2)
+    [~, idx] = min(emg.data);
+    lfpidx = idx / emg.fs * fs;
+    idx = idx - interval * emg.fs : idx + interval * emg.fs;
+    lfpidx = round(lfpidx - interval * fs : lfpidx + interval * fs); 
+    yfactor = max(lfp(lfpidx, 1)) - min(lfp(lfpidx, 1));
+        
+    yyaxis left
+    plot(idx / emg.fs / 60, emg.data(idx), 'LineWidth', 3)
+    ylabel('EMG (mean pairwise correlation)')
+    hold on
+    yyaxis right
+    for i = 1 : nchans
+        plot(lfpidx / fs / 60, lfp(lfpidx, i) + i * yfactor, '-k')
+    end
+    ylabel('LFP raw', 'Color', 'k')
+    set(gca,'YTick',[])
+    xlabel('Time [m]')
+    axis tight
+    title('minimum correlation')
+    suptitle('EMG from LFP')
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

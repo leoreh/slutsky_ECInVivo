@@ -43,7 +43,7 @@ emg = getEMG(basepath, 'EMG1', blocks, rmvch);
 
 % option 2:
 chans = [1 5 9 12];
-emg = getEMGfromLFP(double(lfp.data(:, chans)), 'emgFs', 2);
+emgflp = getEMGfromLFP(double(lfp.data(:, chans)), 'emgFs', 2, 'saveVar', true);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 2: load spikes

@@ -388,7 +388,6 @@ if p.Results.saveMat
     save(fullfile(basepath, [basename '.ripples.events.mat']),'ripples')
 end
 
-
 function y = Filter0(b,x)
 
 if size(x,1) == 1
