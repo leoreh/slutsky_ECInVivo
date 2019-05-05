@@ -4,7 +4,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'E:\Data\fEPSP\230319_CamKII-Gi';
+basepath = 'E:\Data\fEPSP\Ortal\Acute12';
 graphics = true;
 saveFig = false;
 saveVar = false;
@@ -36,26 +36,26 @@ amp = stability('nsessions', nsessions, 'inspect', false, 'basepath', basepath,.
 
 % arrange data to load.
 % make sure order of files is according to stimulus intensity
-intensity = [0.4 : 0.1 : 0.8, 1, 1.2, 1.5 : 0.5 : 3];
+intensity = [0.2 : 0.1 : 0.8];
 
 % alt 1 to arrange filename if named sequentially
-firstfile = 5; 
-prefix = '230319';
-for i =  1 : length(intensity)
-    if firstfile - 1 + i < 10
-        filename{i} = sprintf('%s_00%d', prefix, firstfile - 1 + i);
-    else
-        filename{i} = sprintf('%s_0%d', prefix, firstfile - 1 + i);
-    end
-end
+% firstfile = 5; 
+% prefix = '230319';
+% for i =  1 : length(intensity)
+    % if firstfile - 1 + i < 10
+      %   filename{i} = sprintf('%s_00%d', prefix, firstfile - 1 + i);
+    % else
+      %   filename{i} = sprintf('%s_0%d', prefix, firstfile - 1 + i);
+    % end
+% end
 % alt 2 to arrange filename manually
-% filename{1} = '230319_005';
-% filename{2} = '230319_006';
-% filename{3} = '230319_007';
-% filename{4} = '230319_008';
-% filename{5} = '230319_009';
-% filename{6} = '230319_010';
-% filename{7} = '230319_011';
+filename{1} = 'IO_1AP_0.06Hz_0.5msduration_0.2mA';
+filename{2} = 'IO_1AP_0.06Hz_0.5msduration_0.3mA';
+filename{3} = 'IO_1AP_0.06Hz_0.5msduration_0.4mA';
+filename{4} = 'IO_1AP_0.06Hz_0.5msduration_0.5mA';
+filename{5} = 'IO_1AP_0.06Hz_0.5msduration_0.6mA';
+filename{6} = 'IO_1AP_0.06Hz_0.5msduration_0.7mA';
+filename{7} = 'IO_1AP_0.06Hz_0.5msduration_0.8mA';
 % filename{8} = '230319_012';
 % filename{9} = '230319_013';
 % filename{10} = '230319_014';
@@ -63,6 +63,8 @@ end
 
 pk_io = io('filename', filename, 'intensity', intensity, 'inspect', false,...
  'basepath', basepath, 'graphics', graphics, 'saveFig', saveFig);
+
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STP
