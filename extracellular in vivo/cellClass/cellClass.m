@@ -63,8 +63,10 @@ for i = 1 : nunits
     if ~isempty(maxpost)
         % trough-to-peak - Stark et al., 2013; Bartho et al., 2004
         tp(i) = maxpost;
-        % asymmetry - Sirota et al., 2008
-        asym(i) = (maxvalpost - maxval) / (maxvalpost + maxval);    
+        if ~isempty(maxval)
+            % asymmetry - Sirota et al., 2008
+            asym(i) = (maxvalpost - maxval) / (maxvalpost + maxval);
+        end
     else
         warning('waveform may be corrupted')
         tp(i) = NaN;

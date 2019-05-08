@@ -16,10 +16,7 @@ function ripples = findRipples(varargin)
 %   saveVar     save variable {1}.
 % 
 % OUTPUT
-%   emg         struct with fields:
-%       data        EMG data (mean pairwise correlations)
-%       timestamps  center of bin (window)
-%       fs          EMG sampling frequency
+%   ripples         struct with fields:
 % 
 % TO DO LIST:
 %   compare with original script on various data
@@ -288,11 +285,13 @@ end
 % arrange struct output
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-ripples.timestamps = [thirdPass(:, 1), peakPos, thirdPass(:, 2)] / lfp.fs;
+ripples.timestamps = [lfp.timestamps(thirdPass(:, 1)), lfp.timestamps(thirdPass(:, 2))];
+ripples.peaks = lfp.timestamps(peakPos);
 ripples.power = peakPower;
 ripples.noise = bad;
 ripples.interval = interval;
 ripples.ch = ch;
+ripples.fs = lfp.fs;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % save
@@ -331,8 +330,8 @@ if graphics
     hold on
     for i = 1 : length(ripples.timestamps)
         plot([ripples.timestamps(i, 1) ripples.timestamps(i, 1)], Ylim, 'g')
-        plot([ripples.timestamps(i, 2) ripples.timestamps(i, 2)], Ylim, 'k')
-        plot([ripples.timestamps(i, 3) ripples.timestamps(i, 3)], Ylim, 'r')
+        plot([ripples.peaks(i) ripples.peaks(i)], Ylim, 'k')
+        plot([ripples.timestamps(i, 2) ripples.timestamps(i, 2)], Ylim, 'r')
     end
     [~, x] = max(ripples.power);
     x = ripples.timestamps(x, 2);

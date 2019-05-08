@@ -33,9 +33,6 @@ chavg = {};
 lfp = getLFP('basepath', basepath, 'chans', [1 : 11], 'chavg', chavg, 'fs', 1250,...
     'interval', [0 inf], 'savevar', true);
 
-%%% ripples
-ripples = findRipples(lfp);
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 3: load EMG
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

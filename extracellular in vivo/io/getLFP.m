@@ -7,7 +7,7 @@ function lfp = getLFP(varargin)
 %   filename    string. filename of lfp file
 %   basepath    string. path to load filename and save output {pwd}
 %   fs          numeric. sampling frequency {1250}
-%   interval    numeric mat. list of intervals to read from lfp file
+%   interval    numeric mat. list of intervals to read from lfp file [s]
 %   chans       vec. channels to load
 %   saveVar     save variable {1}.
 %   chavg       cell. each row contain the lfp channels you want to average

@@ -35,10 +35,8 @@ ripples = findRipples(lfp);
 [maps,data,stats] = bz_RippleStatsLH(sigfilt(:, 5), lfp.timestamps, ripples);
 bz_PlotRippleStats(maps, data, stats)
 
-[wt,f] = cwt(double(lfp.data([1 : 100000, 5])), lfp.fs);
-idx(1) = find(lfp.timestamps == ripples.timestamps(1, 1));
-idx(2) = find(lfp.timestamps == ripples.timestamps(1, 2));
-figure, plot(lfp.data(idx(1) : idx(2), 5))
+[wt,f] = cwt(double(lfp.data(idx, 5)), lfp.fs);
+idx = ripples.timestamps(1, :);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % calculate and plot spectrogram
