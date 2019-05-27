@@ -226,7 +226,8 @@ if emgThr
     elseif exist([basename '.EMGfromLFP.mat'])
         load([basename '.EMGfromLFP.mat'])
     else
-        warning('EMG file not found. Skipping this step')
+        warning('EMG file not found. Calculating EMG from LFP')
+        emg = getEMGfromLFP(double(lfp.data(:, [1 4 7 10])), 'fs', lfp.fs, 'graphics', false, 'emgFs', 2);
     end
     
     % find artifacts

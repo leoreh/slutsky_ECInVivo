@@ -10,7 +10,7 @@ function f = plotCluster(varargin)
 % CALLS
 %   plotWaveform
 %
-% 24 nov 18 LH. updates:
+% 24 nov 18 LH. 
 % 04 dec 18. added individual units.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -55,7 +55,7 @@ for i = 1 : length(clu)
     % waveform
     subplot(2, 2, 1)
     unitcolor = grpcolor(spikes.shankID(clu(i)));
-    plotWaveform(spikes.avgWaveform{clu(i)}, spikes.stdWaveform{clu(i)}, unitcolor)
+    plotWaveform(spikes.avgWaveform{clu(i)}, spikes.stdWaveform{clu(i)}, unitcolor, 'vert', spikes.samplingRate)
     
     % ISI histogram
     subplot(2, 2, 2)

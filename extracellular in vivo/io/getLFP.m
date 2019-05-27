@@ -46,11 +46,6 @@ chavg = p.Results.chavg;
 
 nchans = length(chans);
 
-cd(basepath)
-if isempty(filename)
-    [~, filename] = fileparts(basepath);
-    filename = [filename '.lfp'];
-end
 if isempty(interval)
     interval = [0 inf];
 end
@@ -60,8 +55,16 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % check if file exists
+cd(basepath)
+if isempty(filename)
+    [~, basename] = fileparts(basepath);
+    filename = [basename '.lfp'];
+end
 if ~exist(filename)
-    error('file %s does not exist', filename)
+    filename = [basename '.eeg'];
+    if ~exist(filename)
+        error('file %s does not exist', filename)
+    end
 end
 
 lfp.data = bz_LoadBinary(filename, 'duration', diff(interval),...

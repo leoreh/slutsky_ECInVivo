@@ -1,4 +1,4 @@
-function plotWaveform(avgwv, stdwv, c, orient)
+function plotWaveform(avgwv, stdwv, c, orient, fs)
 
 % plots mean +- std waveform of all channels horizontal (concatenated) or
 % vertical
@@ -14,6 +14,7 @@ function plotWaveform(avgwv, stdwv, c, orient)
 % 
 % 04 dec 18 LH. updates:
 % 22 jan 19 LH  horizontal plot
+% 08 may 19 LH  offset according to trace
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -31,6 +32,9 @@ if nargs < 3 || isempty(c)
 end
 if nargs < 4 || isempty(orient)
     orient = 'horz';
+end
+if nargs < 5 || isempty(fs)
+    fs = 24414.14;
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -56,7 +60,7 @@ if strcmp(orient, 'horz')
         ylim([-200 200])
 else
     for j = 1 : nchans
-        offset = j * 100;
+        offset = j * (max(avgwv(j, :)) - min(avgwv(j, :)));
         if ~isempty(stdwv)
             errbounds = [avgwv(j, :) + stdwv(j, :);...
                 avgwv(j, :) - stdwv(j, :)];
@@ -83,7 +87,6 @@ axis off
 % bit = maxv / nbits;         % one bit [V]
 % sigv = double(x) * bit * 10 ^ 6
 
-fs = 24414;
 line([0 0], [0 100], 'Color', 'k')
 line([0 fs / 10 ^ 3], [0 0], 'Color', 'k') 
 

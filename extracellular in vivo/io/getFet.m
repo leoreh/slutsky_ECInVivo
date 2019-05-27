@@ -61,7 +61,7 @@ if isempty(clufilenames)
     error('no .fet files in %s.', basepath)
 end
 
-if length(nfetfiles) ~= length(nclufiles)
+if nfetfiles ~= nclufiles
     error('different number of .fet (%d) and clu (%d) files.',...
         length(nfetfiles), length(nclufiles))
 end
