@@ -353,9 +353,9 @@ title('Combined')
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 mice = 1 : 4;
 x = tmaze.correct(tmaze.day == 10, mice);
-delay1.times = sort([30 50 20]);
-delay1.avg = [nanmean(x(31 : end, :));...
-    nanmean(x(1 : 9, :)); nanmean(x(22 : 30, :))] ./ nanmean(x(10 : 21, :));
+delay1.times = sort([30 10 50 20]);
+delay1.avg = [nanmean(x(10 : 21, :)); nanmean(x(31 : end, :));...
+    nanmean(x(1 : 9, :)); nanmean(x(22 : 30, :));];
 
 f = figure;
 subplot(2, 2, 1)
@@ -365,19 +365,19 @@ errorbar(nanmean(delay1.avg, 2), std(delay1.avg, [], 2, 'omitnan'), 'k', 'LineWi
 xticks([1 : length(delay1.times)])
 xticklabels(num2cell(delay1.times))
 x = xlim;
+plot(x, [0.5 0.5], '--k')
 ylim([0 1])
-yticks([0 1])
-yticklabels(num2cell([0 1]));
+yticks([0 0.5 0.75 1])
+yticklabels(num2cell([0 0.5 0.75 1]));
 box off
 set(gca, 'TickLength', [0 0])
-ylabel('Change from 10-s delay [%]')
+ylabel('Success Rate [%]')
 xlabel('Delay [s]')
-txt = 'Performance vs. Delay, change';
+txt = 'Performance vs. Delay';
 title('Day 1')
-legend(tmaze.mice{10}(mice), 'Location', 'South East')
 
 x = tmaze.correct(tmaze.day == 11, mice);
-delay2.times = sort([30 50]);
+delay2.times = sort([30 10 50]);
 delay2.avg = zeros(3, 4);
 delay2.avg(1, :) = [nanmean(x(21 : end, 1)); nanmean(x(1 : 9, 2));...
     nanmean(x(10 : 20, 3)); nanmean(x(21 : end, 4))];
@@ -385,8 +385,6 @@ delay2.avg(2, :) = [nanmean(x(10 : 20, 1)); nanmean(x(10 : 20, 2));...
     nanmean(x(1 : 9, 3)); nanmean(x(1 : 9, 4))];
 delay2.avg(3, :) = [nanmean(x(1 : 9, 1)); nanmean(x(21 : end, 2));...
     nanmean(x(21 : end, 3)); nanmean(x(10 : 20, 4))];
-delay2.avg = delay2.avg ./ delay2.avg(1, :);
-delay2.avg(1, : ) = [];
 
 subplot(2, 2, 2)
 plot(delay2.avg, 'LineWidth', 2)
@@ -395,45 +393,48 @@ errorbar(nanmean(delay2.avg, 2), std(delay2.avg, [], 2, 'omitnan'), 'k', 'LineWi
 xticks([1 : length(delay2.times)])
 xticklabels(num2cell(delay2.times))
 x = xlim;
+plot(x, [0.5 0.5], '--k')
 ylim([0 1])
-yticks([0 1])
-yticklabels(num2cell([0 1]));
+yticks([0 0.5 0.75 1])
+yticklabels(num2cell([0 0.5 0.75 1]));
 box off
 set(gca, 'TickLength', [0 0])
 xlabel('Delay [s]')
 title('Day 2')
 
 x = tmaze.correct(tmaze.day == 12, mice);
-delay3.times = sort([120]);
-delay3.avg = zeros(1, 4);
+delay3.times = sort([10 120]);
+delay3.avg = zeros(2, 4);
 delay3.avg(1, :) = [nanmean(x(11 : end, 1)); nanmean(x(1 : 9, 2));...
     nanmean(x(11 : end, 3)); nanmean(x(1 : 9, 4))];
 delay3.avg(2, :) = [nanmean(x(1 : 9, 1)); nanmean(x(11 : end, 2));...
     nanmean(x(1 : 9, 3)); nanmean(x(11 : end, 4))];
-delay3.avg = delay3.avg ./ delay3.avg(1, :);
-delay3.avg(1, : ) = [];
 
 subplot(2, 2, 3)
-plot([1 1 1 1], delay3.avg, '*', 'LineWidth', 2)
+plot(delay3.avg, 'LineWidth', 2)
 hold on
-errorbar(nanmean(delay3.avg), std(delay3.avg, 'omitnan'), 'k', 'LineWidth', 4)
+errorbar(nanmean(delay3.avg, 2), std(delay3.avg, [], 2, 'omitnan'), 'k', 'LineWidth', 4)
 xticks([1 : length(delay3.times)])
 xticklabels(num2cell(delay3.times))
 x = xlim;
+plot(x, [0.5 0.5], '--k')
 ylim([0 1])
-yticks([0 1])
-yticklabels(num2cell([0 1]));
+yticks([0 0.5 0.75 1])
+yticklabels(num2cell([0 0.5 0.75 1]));
 box off
 set(gca, 'TickLength', [0 0])
 xlabel('Delay [s]')
 title('Day 3')
+legend(tmaze.mice{10}(mice), 'Location', 'South East')
 
-delay.times = sort([20 30 50 120]);
+delay.times = sort([10 20 30 50 120]);
 delay.avg = nan(5, 12);
-delay.avg(2, 1 : 4) = delay1.avg(1, :);
-delay.avg(3, 1 : 8) = [delay1.avg(2, :), delay2.avg(1, :)];
-delay.avg(4, 1 : 8) = [delay1.avg(3, :), delay2.avg(2, :)];
-delay.avg(5, 1 : 4) = delay3.avg(1, :);
+delay.avg(1, :) = [delay1.avg(1, :), delay2.avg(1, :),...
+    delay3.avg(1, :)];
+delay.avg(2, 1 : 4) = delay1.avg(2, :);
+delay.avg(3, 1 : 8) = [delay1.avg(3, :), delay2.avg(2, :)];
+delay.avg(4, 1 : 8) = [delay1.avg(4, :), delay2.avg(3, :)];
+delay.avg(5, 1 : 4) = delay3.avg(2, :);
 
 
 subplot(2, 2, 4)
@@ -443,9 +444,10 @@ errorbar(nanmean(delay.avg, 2), std(delay.avg, [], 2, 'omitnan'), 'k', 'LineWidt
 xticks([1 : length(delay.times)])
 xticklabels(num2cell(delay.times))
 x = xlim;
+plot(x, [0.5 0.5], '--k')
 ylim([0 1])
-yticks([0 1])
-yticklabels(num2cell([0 1]));
+yticks([0 0.5 0.75 1])
+yticklabels(num2cell([0 0.5 0.75 1]));
 box off
 set(gca, 'TickLength', [0 0])
 xlabel('Delay [s]')
