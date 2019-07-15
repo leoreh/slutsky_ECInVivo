@@ -1,29 +1,51 @@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% load data
+% params
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-filename = 'C:\Users\LeoreHeim\AppData\Local\Temp\OneNote\16.0\Exported\{C8EE26DD-F273-47B7-9A9D-A200AD56D2AC}\NT\1\Cohort12.xlsx';
-ndays = 12;
 
-% initialize
-tmaze.duration = [];
-tmaze.correct = [];
-tmaze.trials = [];
-tmaze.day = [];
-tmaze.delay = [];
-for i = 1 : ndays   
-    sheet = sprintf('Sheet%d', i);
+basepath = 'C:\Users\LeoreHeim\Google Drive\PhD\Slutsky\Equipment\Behavioral Task\Results\29jun19';
+filename = 'Cohort2_s2.xlsx';
+filename = fullfile(basepath, filename);
+
+nmice = 5;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% load and arrange data
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+for i = 1 : nmice
+    sheet = ['m', num2str(i)];
     [num, ~, raw] = xlsread(filename, sheet);
+    m{i}.date = num(1, 2 : 2 : end);
+    m{i}.time = num(2, 2 : 2 : end);
+    m{i}.weight = num(3, 2 : 2 : end);
+    m{i}.dur = num(4 : end, 2 : 2 : end);
     
-    tmaze.date{i} = raw{1, 1};
-    tmaze.mice{i} = raw(3, ~isnan(num(1, :))); 
-    tmaze.weight(i, :) =  num(2, 3 : 2 : end);
-    tmaze.duration = [tmaze.duration; num(4 : end, 3 : 2 : end)];
-    tmaze.delay = [tmaze.delay; num(4 : end, 2)];
-    tmaze.correct = [tmaze.correct; num(4 : end, 4 : 2 : end)];
-    tmaze.success(i, :) = nanmean(num(4 : end, 4 : 2 : end));
-    tmaze.trials = [tmaze.trials; [1 : length(num(4 : end, 1))]'];
-    tmaze.day = [tmaze.day; ones(length(num(4 : end, 1)), 1) * i];
+    % arrange direction
+    [maxtrials nsessions] = size(m{i}.dur);
+    m{i}.dir = char(zeros(size(m{i}.dur)))
+    k = 3;
+    for j = 1 : nsessions
+        m{i}.dir(:, j) = char(raw{5 : 5 + maxtrials - 1, k});
+        k = k + 2;
+    end
+    
+end
+
+% arrange correct trials
+for j = 1 : nsessions
+    x = strtrim(m{i}.dir(:, j))';
+    for k = 1 : maxtrials - 1
+        if x(k) == 'R' && x(k + 1) == 'L' || ...
+                x(k) == 'L' && x(k + 1) == 'R'
+        m{i}.correct(k, j) = 1;
+        elseif x(k) == 'R' && x(k + 1) == 'R' || ...
+                x(k) == 'L' && x(k + 1) == 'L'
+                    m{i}.correct(k, j) = 0;
+        else
+            m{i}.correct(k, j) = nan;
+        end
+    end
 end
 
 

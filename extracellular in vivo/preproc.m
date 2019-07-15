@@ -1,27 +1,26 @@
-% this is a wrapper for preprocessing extracellular data.
+% this is :a wrapper for preprocessing extracellular data.
 % contains calls to various functions.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % basepath to recording folder
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'E:\Data\Others\Buzsaki\Mouse17-130129';
+basepath = 'F:\Refaela\RA\DataTanks\Bruce\290519_1D';
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 1: file conversion
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 store = 'Raw1';
 blocks = [1];
-chunksize = [];
-mapch = [1, 3, 5, 7, 2, 4, 6, 8, 9, 11, 13, 15, 10, 12, 14, 16];
-mapch = [];
-rmvch = [];
-clip = [];
+chunksize = 60;
+mapch = [1, 2, 5, 6, 3, 4, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+rmvch = [9, 10, 11, 12, 13, 14, 15, 16];
+clip{1} = [60 * 0.1 * 60 Inf];
 
 % tank to dat
 [info] = tdt2dat(basepath, 'Raw1', blocks, chunksize, mapch, rmvch, clip);
 
 % ddt to dat
-filenames{1} = 'chr6_DMSO_4_11_18_bl1_mrg_no_ch_1.ddt';
+filenames{3} = 'block2_ddt_edit12H';
 ddt2dat(basepath, mapch, rmvch, 'filenames', filenames)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -41,8 +40,8 @@ ripples = findRipples(lfp);
 % STEP 3: load EMG
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % option 1:
-blocks = [4];
-rmvch = [];
+blocks = [2];
+rmvch = [2:4];
 emg = getEMG(basepath, 'EMG1', blocks, rmvch);
 
 % option 2:
@@ -77,6 +76,8 @@ CellClass = cellClass(cat(1, spikes.rawWaveform{:})', 'fs', 20000);
 % STEP 6: calculate mean firing rate
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 fr = FR(spikes.times, 'basepath', basepath, 'graphics', true, 'saveFig', false, 'saveVar', false);
+fr = FR(spikes.times, 'basepath', basepath, 'graphics', true, 'saveFig', false, 'saveVar', false,...
+    'winCalc', [0 25200]);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 7: concatenate spikes from different sessions

@@ -24,6 +24,7 @@ function info = tdt2dat(basepath, store, blocks, chunksize, mapch, rmvch, clip)
 % TO DO LIST:
 %   handle chunks better (e.g. linspace)
 %   handle arguments
+%   add time limit to split files
 %
 % 06 dec 18 LH.
 % 10 apr 19 LH. added EMG
@@ -169,6 +170,7 @@ for i = 1 : nblocks
             end
         end
         chunks = chunks(any(chunks, 2), :);
+        nchunks = size(chunks, 1);
     end
     
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -176,19 +178,21 @@ for i = 1 : nblocks
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     for j = 1 : nchunks
         data = TDTbin2mat(blockpath, 'TYPE', {'streams'}, 'STORE', store,...
-            'T1', chunks(j, 1), 'T2', chunks(j, 2));
+            'T1', chunks(j , 1) , 'T2' ,chunks(j , 2) );
         data = data.streams.(store).data;
         
-        if ~isempty(rmvch)                      % remove channels
-            data(rmvch, :) = [];
+        if ~isempty(data)
+            if ~isempty(rmvch)                     % remove channels
+                data(rmvch, :) = [];
+            end
+            
+            if ~isempty(mapch)                     % remap channels
+                data = data(mapch, :);
+            end
+            
+            fwrite(fout, data(:), 'int16');        % write data
+            data = [];
         end
-        
-        if ~isempty(mapch)                      % remap channels
-            data = data(mapch, :);
-        end
-        
-        fwrite(fout, data(:), 'int16');         % write data
-        data = [];
     end
 end
 
