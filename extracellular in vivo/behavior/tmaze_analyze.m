@@ -1,51 +1,29 @@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% params
+% load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+filename = 'C:\Users\LeoreHeim\AppData\Local\Temp\OneNote\16.0\Exported\{3C513F84-D014-4DB4-A7F8-B3DA52774D63}\NT\17\Cohort2_s12.xlsx';
+ndays = 12;
 
-basepath = 'C:\Users\LeoreHeim\Google Drive\PhD\Slutsky\Equipment\Behavioral Task\Results\29jun19';
-filename = 'Cohort2_s2.xlsx';
-filename = fullfile(basepath, filename);
-
-nmice = 5;
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% load and arrange data
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-for i = 1 : nmice
-    sheet = ['m', num2str(i)];
+% initialize
+tmaze.duration = [];
+tmaze.correct = [];
+tmaze.trials = [];
+tmaze.day = [];
+tmaze.delay = [];
+for i = 1 : ndays   
+    sheet = sprintf('Sheet%d', i);
     [num, ~, raw] = xlsread(filename, sheet);
-    m{i}.date = num(1, 2 : 2 : end);
-    m{i}.time = num(2, 2 : 2 : end);
-    m{i}.weight = num(3, 2 : 2 : end);
-    m{i}.dur = num(4 : end, 2 : 2 : end);
     
-    % arrange direction
-    [maxtrials nsessions] = size(m{i}.dur);
-    m{i}.dir = char(zeros(size(m{i}.dur)))
-    k = 3;
-    for j = 1 : nsessions
-        m{i}.dir(:, j) = char(raw{5 : 5 + maxtrials - 1, k});
-        k = k + 2;
-    end
-    
-end
-
-% arrange correct trials
-for j = 1 : nsessions
-    x = strtrim(m{i}.dir(:, j))';
-    for k = 1 : maxtrials - 1
-        if x(k) == 'R' && x(k + 1) == 'L' || ...
-                x(k) == 'L' && x(k + 1) == 'R'
-        m{i}.correct(k, j) = 1;
-        elseif x(k) == 'R' && x(k + 1) == 'R' || ...
-                x(k) == 'L' && x(k + 1) == 'L'
-                    m{i}.correct(k, j) = 0;
-        else
-            m{i}.correct(k, j) = nan;
-        end
-    end
+    tmaze.date{i} = raw{1, 1};
+    tmaze.mice{i} = raw(3, ~isnan(num(1, :))); 
+    tmaze.weight(i, :) =  num(2, 3 : 2 : end);
+    tmaze.duration = [tmaze.duration; num(4 : end, 3 : 2 : end)];
+    tmaze.delay = [tmaze.delay; num(4 : end, 2)];
+    tmaze.correct = [tmaze.correct; num(4 : end, 4 : 2 : end)];
+    tmaze.success(i, :) = nanmean(num(4 : end, 4 : 2 : end));
+    tmaze.trials = [tmaze.trials; [1 : length(num(4 : end, 1))]'];
+    tmaze.day = [tmaze.day; ones(length(num(4 : end, 1)), 1) * i];
 end
 
 
@@ -472,3 +450,45 @@ box off
 set(gca, 'TickLength', [0 0])
 xlabel('Delay [s]')
 title('Combined')
+
+%%% prelimanary results 19-aug-19 %%%
+f = figure;
+% mean success across sessions
+mice = 5 : 9;
+days = 1 : 10;
+ndays = length(days);
+f = figure;
+subplot(1, 3, 1:2)
+x = tmaze.success(days, mice);
+plot(x, 'LineWidth', 2)
+hold on
+errorbar(nanmean(x, 2), std(x, [], 2, 'omitnan'), 'k', 'LineWidth', 4)
+xlim([1, ndays])
+x = xlim;
+plot(x, [0.5 0.5], '--k')
+xticks(1 : ndays)
+xticklabels(num2cell([1 : ndays]));
+ylim([0 1])
+yticks([0 0.5 0.75 1])
+yticklabels(num2cell([0 0.5 0.75 1]));
+box off
+set(gca, 'TickLength', [0 0])
+ylabel('Success Rate [%]')
+xlabel('Time [Days]')
+legend(tmaze.mice{10}(mice), 'Location', 'South East')
+
+subplot(1, 3, 3)
+plot(delay.avg, '*b', 'LineWidth', 2)
+hold on
+errorbar(nanmean(delay.avg, 2), std(delay.avg, [], 2, 'omitnan'), 'k', 'LineWidth', 4)
+xticks([1 : length(delay.times)])
+xticklabels(num2cell(delay.times))
+xlim([1, 5])
+x = xlim;
+plot(x, [0.5 0.5], '--k')
+ylim([0 1])
+yticks([0 0.5 0.75 1])
+yticklabels(num2cell([0 0.5 0.75 1]));
+box off
+set(gca, 'TickLength', [0 0])
+xlabel('Delay [s]')
