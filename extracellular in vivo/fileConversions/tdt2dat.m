@@ -20,6 +20,7 @@ function info = tdt2dat(basepath, store, blocks, chunksize, mapch, rmvch, clip)
 %
 % CALLS:
 %   TDTbin2mat
+%   natsort
 %
 % TO DO LIST:
 %   handle chunks better (e.g. linspace)
@@ -87,6 +88,7 @@ end
 cd(basepath)
 blockfiles = dir('block*');
 blocknames = {blockfiles.name};
+blocknames = natsort(blocknames);
 fprintf(1, '\nFound %d blocks in %s\n\n', length(blocknames), basepath);
 
 if isempty(blocknames)
@@ -214,7 +216,7 @@ fprintf(1, '\nElapsed time = %.2f seconds\n', toc)
 clear info
 info.filename = basename;
 info.store = store;
-info.blocks = blocks;
+info.blocks = blocknames;
 info.blockduration = nsec;
 info.clip = clip;
 info.rmvch = rmvch;
