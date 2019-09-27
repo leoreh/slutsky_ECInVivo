@@ -315,7 +315,7 @@ if graphics
     
     % standerd power and threshold
     subplot(2, 1, 1)
-    plot(lfp.timestamps / 60, signorm);
+    plot(lfp.timestamps, signorm);
     hold on
     axis tight
 %     ylim([0 thr(2) * 3]);
@@ -340,7 +340,8 @@ if graphics
     [~, x] = max(bs.power);
     x = bs.timestamps(x, 2);
 %     xlim([x - 0.25, x + 0.25])
-    xlabel('Time [s]')
+axis tight
+xlabel('Time [s]')
     box off
     set(gca, 'TickLength', [0 0])   
 end
