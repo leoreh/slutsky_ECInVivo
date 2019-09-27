@@ -21,7 +21,7 @@ function fr = FR(spktimes, varargin)
 %               'stable' - units with std of fr < avg of fr during
 %               baseline. default = none.
 %   smet        method for smoothing firing rate: moving average (MA) or
-%               Gaussian kernel (GK) impleneted by multiple-pass MA.
+%               Gaussian kernel (GK) impleneted by multiple-pass MA. {[]}.
 % 
 % OUTPUT
 % fr            struct with fields strd, norm, bins, binsize,
@@ -42,7 +42,7 @@ addOptional(p, 'winCalc', [1 Inf], validate_win);
 addOptional(p, 'winBL', [], validate_win);
 addOptional(p, 'metBL', 'avg', @ischar);
 addOptional(p, 'select', {'thr'}, @iscell);
-addOptional(p, 'smet', 'MA', @ischar);
+addOptional(p, 'smet', 'none', @ischar);
 addOptional(p, 'graphics', true, @islogical);
 addOptional(p, 'saveFig', true, @islogical);
 addOptional(p, 'saveVar', true, @islogical);
@@ -73,7 +73,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % calculate spike counts
-[fr.strd, fr.tstamps] = calcFR(spktimes, 'binsize', 60, 'winCalc', winCalc, 'smet', smet);
+[fr.strd, fr.tstamps] = calcFR(spktimes, 'binsize', binsize, 'winCalc', winCalc, 'smet', smet);
 
 % convert spike counts to firing rate in Hz
 fr.strd = fr.strd / binsize; 
@@ -88,10 +88,11 @@ end
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if graphics
-    plotFRtime('fr', fr.norm, 'spktimes', spktimes, 'units', true, 'avg', true, 'raster', true, 'saveFig', saveFig)  
+    plotFRtime('fr', fr.norm, 'spktimes', spktimes, 'units', true,...
+        'binsize', binsize, 'avg', true, 'raster', true, 'saveFig', saveFig)  
     
-    bl = blFR(fr.norm, 'method', metBL, 'win', winBL);
-    plotFRdistribution(bl, 'saveFig', saveFig) 
+%     bl = blFR(fr.norm, 'method', metBL, 'win', winBL);
+%     plotFRdistribution(bl, 'saveFig', saveFig) 
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

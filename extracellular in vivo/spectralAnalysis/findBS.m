@@ -1,4 +1,4 @@
-function ripples = findRipples(varargin)
+function bs = findBS(varargin)
 
 % detects ripples from LFP signal. based on bz_FindRipples. main
 % differences are (1) moving average implemented via movmean, (2) detects
@@ -33,7 +33,7 @@ function ripples = findRipples(varargin)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 p = inputParser;
-addRequired(p, 'lfp', @isstruct)
+addParameter(p, 'lfp', @isstruct)
 addParameter(p, 'ch', [], @isnumeric)
 addParameter(p, 'noise', [], @isnumeric)
 addParameter(p, 'emgThr', 0.9, @isnumeric);
@@ -63,21 +63,21 @@ end
 inter = inter(1) : inter(2);
 
 % prepare output
-ripples = [];
+bs = [];
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % params
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
  
-passband = [130 200];           % [Hz]
+passband = [2 100];           % [Hz]
 order = 3; 
 type = 'butter';
 winLength = 11;                 % [samples]    
 
-interRipple = 0.03 * lfp.fs;    % minimum between ripple events [ms]
-thr = [2 5];                    % low and high thresholding value [z-score]
-maxDur = 0.1;                   % maximum ripple duration [ms]
-minDur = 0.02;                  % minimum ripple duration [ms]
+interRipple = 0.2 * lfp.fs;    % minimum between ripple events [s]
+thr = [0.5 1];                    % low and high thresholding value [z-score]
+maxDur = 4000;                   % maximum ripple duration [ms]
+minDur = 0.0001;                  % minimum ripple duration [ms]
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % prepare signal
@@ -289,13 +289,13 @@ end
 % arrange struct output
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-ripples.timestamps = [lfp.timestamps(thirdPass(:, 1)), lfp.timestamps(thirdPass(:, 2))];
-ripples.peaks = lfp.timestamps(peakPos);
-ripples.power = peakPower;
-ripples.noise = bad;
-ripples.interval = interval;
-ripples.ch = ch;
-ripples.fs = lfp.fs;
+bs.timestamps = [lfp.timestamps(thirdPass(:, 1)), lfp.timestamps(thirdPass(:, 2))];
+bs.peaks = lfp.timestamps(peakPos);
+bs.power = peakPower;
+bs.noise = bad;
+bs.interval = interval;
+bs.ch = ch;
+bs.fs = lfp.fs;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % save
@@ -318,7 +318,7 @@ if graphics
     plot(lfp.timestamps / 60, signorm);
     hold on
     axis tight
-    ylim([0 thr(2) * 2]);
+%     ylim([0 thr(2) * 3]);
     Xlim = xlim;
     plot(Xlim, [thr(2) thr(2)])
     xlabel('Time [m]')
@@ -328,18 +328,18 @@ if graphics
     
     % example of detected ripple
     subplot(2, 1, 2)
-    plot(lfp.timestamps, sigfilt(:, ch));
-    ylim([-200 200])
+    plot(lfp.timestamps, lfp.data(:, ch));
+%     ylim([-200 200])
     Ylim = ylim;
     hold on
-    for i = 1 : length(ripples.timestamps)
-        plot([ripples.timestamps(i, 1) ripples.timestamps(i, 1)], Ylim, 'g')
-        plot([ripples.peaks(i) ripples.peaks(i)], Ylim, 'k')
-        plot([ripples.timestamps(i, 2) ripples.timestamps(i, 2)], Ylim, 'r')
+    for i = 1 : length(bs.timestamps)
+        plot([bs.timestamps(i, 1) bs.timestamps(i, 1)], Ylim, 'g')
+        plot([bs.peaks(i) bs.peaks(i)], Ylim, 'k')
+        plot([bs.timestamps(i, 2) bs.timestamps(i, 2)], Ylim, 'r')
     end
-    [~, x] = max(ripples.power);
-    x = ripples.timestamps(x, 2);
-    xlim([x - 0.25, x + 0.25])
+    [~, x] = max(bs.power);
+    x = bs.timestamps(x, 2);
+%     xlim([x - 0.25, x + 0.25])
     xlabel('Time [s]')
     box off
     set(gca, 'TickLength', [0 0])   

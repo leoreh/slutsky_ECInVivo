@@ -48,7 +48,7 @@ end
 % get tank blocks
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 cd(basepath)
-blockfiles = dir('Test*');
+blockfiles = dir('block*');
 blocknames = {blockfiles.name};
 fprintf(1, '\nFound %d blocks in %s\n\n', length(blocknames), basepath);
 
@@ -90,18 +90,19 @@ end
 
 %%% OPTION 2:
 % bandpass filter
-data = filterLFP(double(raw'), 'fs', fs,...
-    'type', 'butter', 'passband', [10 500], 'graphics', false);
-
-% rectify
-data = abs(data - mean(data));
-
-% low-pass filter
-win = round(0.5 * fs);    % 500 ms moving average
-data = movmean(data, win);
-
-% normalize
-data = data ./ max(data);
+% data = filterLFP(double(raw'), 'fs', fs,...
+%     'type', 'butter', 'passband', [10 500], 'graphics', false);
+% 
+% % rectify
+% data = abs(data - mean(data));
+% 
+% % low-pass filter
+% win = round(0.5 * fs);    % 500 ms moving average
+% data = movmean(data, win);
+% 
+% % normalize
+% data = data ./ max(data);
+data = double(raw');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
