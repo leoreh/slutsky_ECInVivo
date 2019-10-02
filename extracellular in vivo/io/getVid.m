@@ -38,7 +38,7 @@ addOptional(p, 'graphics', true, @islogical);
 addOptional(p, 'saveFig', false, @islogical);
 addOptional(p, 'saveVar', true, @islogical);
 
-parse(p,varargin{:})
+parse(p, varargin{:})
 basepath = p.Results.basepath;
 sheet = p.Results.sheet;
 graphics = p.Results.graphics;

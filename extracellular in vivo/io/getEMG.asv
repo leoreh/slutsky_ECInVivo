@@ -31,12 +31,12 @@ function emg = getEMG(varargin)
 p = inputParser;
 addOptional(p, 'basepath', pwd);
 addOptional(p, 'store', 'EMG1', @ischar);
-addOptional(p, 'blocks', [], @isnumeric);
+addOptional(p, 'blocks', 1, @isvector);
 addOptional(p, 'ch', 1, @isnumeric);
 addOptional(p, 'graphics', true, @islogical);
 addOptional(p, 'saveVar', true, @islogical);
 
-parse(p, varargin{:})
+parse(p,varargin{:})
 basepath = p.Results.basepath;
 store = p.Results.store;
 blocks = p.Results.blocks;
@@ -140,7 +140,7 @@ if saveVar
     emg.filename = basename;
     emg.blocks = blocks;
     emg.blockduration = nsec;
-    emg.ch = ch;
+    emg.rmvch = ch;
     emg.fs = heads.stores.(store).fs;
     
     save([basename, '.emg.mat'], 'emg');

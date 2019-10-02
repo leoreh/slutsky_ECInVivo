@@ -1,4 +1,4 @@
-function info = tdt2dat(basepath, store, blocks, chunksize, mapch, rmvch, clip)
+function info = tdt2dat(varargin)
 
 % converts tank (TDT) to dat (neurosuite). Concatenates blocks.
 % performs basic preprocessing.
@@ -23,36 +23,36 @@ function info = tdt2dat(basepath, store, blocks, chunksize, mapch, rmvch, clip)
 %
 % TO DO LIST:
 %   handle chunks better (e.g. linspace)
-%   handle arguments
 %   add time limit to split files
+%   separate chunks to standalone function
 %
 % 06 dec 18 LH.
-% 10 apr 19 LH. added EMG
+% 18 sep 19 LH handle arguments
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 tic;
 
-if nargin < 1 || isempty(basepath)
-    basepath = pwd;
-end
-if nargin < 2 || isempty(store)
-    store = 'Raw1';
-end
-if nargin < 3 || isempty(blocks)
-    blocks = [];
-end
-if nargin < 4
-    chunksize = 60;
-end
-if nargin < 5 || isempty(mapch)
-    mapch = [];
-end
-if nargin < 6 || isempty(rmvch)
-    rmvch = [];
-end
-if nargin < 6 || isempty(clip)
+p = inputParser;
+addOptional(p, 'basepath', pwd);
+addOptional(p, 'store', 'Raw1', @ischar);
+addOptional(p, 'blocks', [], @isnumeric);
+addOptional(p, 'chunksize', 60, @isnumeric);
+addOptional(p, 'mapch', [], @isnumeric);
+addOptional(p, 'rmvch', [], @isnumeric);
+addOptional(p, 'clip', {}, @iscell);
+
+parse(p, varargin{:})
+basepath = p.Results.basepath;
+store = p.Results.store;
+blocks = p.Results.blocks;
+chunksize = p.Results.chunksize;
+mapch = p.Results.mapch;
+rmvch = p.Results.rmvch;
+clip = p.Results.clip;
+
+if isempty(clip)
     clip{max(blocks)} = [];
 else
     if length(clip) < max(blocks)
