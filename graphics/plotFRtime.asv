@@ -35,7 +35,6 @@ fr = p.Results.fr;
 raster = p.Results.raster;
 units = p.Results.units;
 avg = p.Results.avg;
-binsize = p.Results.binsize;
 saveFig = p.Results.saveFig;
 basepath = p.Results.basepath;
 
@@ -49,7 +48,7 @@ end
 [nunits, nbins] = size(fr);
 nplots = sum([raster, units, avg]);
 
-x = ([1 : nbins] / (60 / binsize) / 60);
+x = ([1 : nbins] / 60);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % plot

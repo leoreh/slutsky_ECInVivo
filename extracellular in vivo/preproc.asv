@@ -90,7 +90,7 @@ CellClass = cellClass(cat(1, spikes.rawWaveform{:})', 'fs', fs);
 % STEP 6: calculate mean firing rate
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 fr = FR(spikes.times, 'basepath', basepath, 'graphics', true, 'saveFig', true,...
-    'binsize', 0.5, 'saveVar', true, 'smet', 'MA');
+    'binsize', 1, 'saveVar', true, 'smet', 'none');
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
