@@ -25,6 +25,7 @@ function [sessionInfo] = getSessionInfo(basePath,varargin)
 % 
 % UPDATES
 % 23 nov 18 LH - input basePath not include baseName
+% 06 oct 19 LH - send baseName to LoadParameters
 % 
 
 %% inputs and defaults
@@ -58,7 +59,7 @@ if exist(filename,'file')
 else
    warning(['could not find file ',baseName,'.sessionInfo.mat ',...
        'running LoadParameters instead..']) 
-   sessionInfo = LoadParameters(basePath);
+   sessionInfo = LoadParameters([baseName '.xml']);
    SIexist = false; 
 end
 
