@@ -4,14 +4,14 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % basepath to recording folder
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'D:\Data\SU\LHa5_25sep19';
+basepath = '/home/leore/data/LHa7/LHa7';
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 1: file conversion
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 store = 'Raw1';
 fs = 24414.0125;
-blocks = [2];
+blocks = [4 : 14];
 chunksize = 60;
 mapch = [1, 2, 5, 6, 3, 4, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
 rmvch = [9, 10, 11, 12, 13, 14, 15, 16];
@@ -23,7 +23,8 @@ mapch = [1 : 16];
 rmvch = [];
 
 % tank to dat
-[info] = tdt2dat(basepath, 'Raw1', blocks, chunksize, mapch, rmvch, clip);
+[info] = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
+    'chunksize', chunksize, 'mapch', mapch, 'rmvch', rmvch, 'clip', clip);
 
 % ddt to dat
 filenames{3} = 'block2_ddt_edit12H';
