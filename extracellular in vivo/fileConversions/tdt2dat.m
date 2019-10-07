@@ -12,8 +12,8 @@ function info = tdt2dat(varargin)
 %   rmvch       channels to remove (according to original order) {[]}
 %   clip        array of mats indicating times to diregard from recording.
 %               each cell corresponds to a block. for example:
-%               clip{3} = [0 50; 700 Inf] will remove the first 50 s of
-%               Block-3 and the time between 700 s and the end of Block-3
+%               clip{3} = [0 50; 700 Inf] will remove the first 50 s from
+%               block-3 and the time between 700 s and the end of Block-3
 %
 % OUTPUT
 %   info        struct with fields describing tdt params

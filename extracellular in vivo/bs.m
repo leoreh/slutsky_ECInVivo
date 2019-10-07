@@ -1,5 +1,8 @@
 ch = 16;
 fs = 1250;
+type = 'butter';
+order = 3; 
+winLength = 11;                 % [samples]    
 
 % filter    
 passband = [1 100];
@@ -43,17 +46,35 @@ ylabel('|P1(f)|')
 
 
 %%% detect BS
-passband = [80 200];
+passband = [2 100];
 x = filterLFP(double(lfp.data(:, 16)), 'order', 3, 'type', 'butter',...
     'passband', passband, 'graphics', false);
-t = [1 : length(x)] / fs / 60;
+
+% x = double(lfp.data(:, 16));
+t = [1 : length(x)] / fs;
+winLength = 30;
+
+% rectify
+y = x .^ 2;
+% moving average
+y = movmean(y, winLength);
+% standerdize
+y = (y - mean(y(:))) / std(y(:));
+
+% y = fastrms(x);
+% y = (y - mean(y(:))) / std(y(:));
+
 figure;
 plot(t, x)
-axis tight
-% xlim([2 4])
+hold on
+yyaxis right
+p = plot(t, y);
+p.Color(4) = 0.3;
+% axis tight
+xlim([1800 2200])
 
 idx = 25*60 * fs : 50*60 * fs;
 figure; spectrogram(x(idx), 10000, [], [0 : 10 : 200], fs, 'yaxis')
 figure; cwt(x(idx), 'morse', fs, 'FrequencyLimits', [1 500])
 
-bs = findBS('lfp', lfp, 'emgThr', 0, 'basepath', basepath);
+bs = findBS('lfp', lfp, 'emgThr', 0, 'basepath', basepath, 'ch', 16);

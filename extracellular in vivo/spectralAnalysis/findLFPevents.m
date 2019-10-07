@@ -1,13 +1,14 @@
 function bs = findBS(varargin)
 
-% detects ripples from LFP signal. based on bz_FindRipples. main
-% differences are (1) moving average implemented via movmean, (2) detects
-% negative peak after elimination, (3) selects best channel automatically.
-% more information is availble in PreProcessing.docx
+% detects events from LFP signal. designed for burst-suppression and
+% ripples. based on bz_FindRipples. main differences are (1) moving average
+% implemented via movmean, (2) detects peak after elimination, (3) selects
+% best channel automatically, (4) uses only single threshold. more
+% information is availble in PreProcessing.docx
 % 
 % INPUT
 %   lfp         struct (see getLFP.m)
-%   ch          channel to detect ripples. if empty will select by RMS
+%   ch          channel to detect events. if empty will select by RMS
 %   noise       channel to remove artifacts {[]}
 %   emgThr      threshold for EMG exclusion {0.9}
 %   interval    interval used for standadization {[0 Inf]}
@@ -26,7 +27,9 @@ function bs = findBS(varargin)
 %   track and save exclusions
 %   add raw lfp to graphics
 % 
-% 01 may 19 LH. 
+% 01 may 19 LH. updates:
+% 07 oct 19 LH  adapted for BS
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -62,6 +65,11 @@ if inter(1) == 0
 end
 inter = inter(1) : inter(2);
 
+% prepare ch
+if isempty(ch)
+    ch = 1 : size(lfp.data, 2);
+end
+
 % prepare output
 bs = [];
 
@@ -69,37 +77,41 @@ bs = [];
 % params
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
  
-passband = [2 100];           % [Hz]
-order = 3; 
+passband = [2 250];                 % [Hz]
+order = 4; 
 type = 'butter';
-winLength = 11;                 % [samples]    
+winLength = 30;                     % [samples]    
 
-interRipple = 0.2 * lfp.fs;    % minimum between ripple events [s]
-thr = [0.5 1];                    % low and high thresholding value [z-score]
-maxDur = 4000;                   % maximum ripple duration [ms]
-minDur = 0.0001;                  % minimum ripple duration [ms]
+interRipple = 0.2 * lfp.fs;         % minimum between events [s]
+thr = [0.01 1];                      % low and high thresholding value [z-score]
+maxDur = 4000;                      % maximum event duration [ms]
+minDur = 0.05;                     % minimum event duration [ms]
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % prepare signal
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % filter    
-sigfilt = filterLFP(double(lfp.data), 'type', type,...
+sigfilt = filterLFP(double(lfp.data(:, ch)), 'type', type,...
     'passband', passband, 'order', order, 'graphics', false);
     
-% find lfp channel with highest SNR for ripples
-if isempty(ch)    
+% find lfp channel with highest SNR for events
+if length(ch) > 1    
     pow = fastrms(sigfilt, 15);
-    mRipple = mean(pow);
-    meRipple = median(pow);
-    mmRippleRatio = mRipple ./ meRipple;   
-    mmRippleRatio(mRipple < 1) = 0;
-    mmRippleRatio(meRipple < 1) = 0;   
-    [~, ch] = max(mmRippleRatio);
+    mEvent = mean(pow);
+    meEvent = median(pow);
+    mmEventRatio = mEvent ./ meEvent;   
+    mmEventRatio(mEvent < 1) = 0;
+    mmEventRatio(meEvent < 1) = 0;   
+    [~, ch] = max(mmEventRatio);
 end
 
 % rectify
-signorm = sigfilt(:, ch) .^ 2;
+if size(sigfilt, 2) > 1
+    signorm = sigfilt(:, ch) .^ 2;
+else
+    signorm = sigfilt .^ 2;
+end
 % moving average
 signorm = movmean(signorm, winLength);
 % standerdize
@@ -113,7 +125,7 @@ if ~isempty(noise)
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% detect ripples by thresholding
+% detect events by thresholding
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 thresholded = signorm > thr(1);
@@ -135,28 +147,23 @@ if start(1) > stop(1)
 end
 
 firstPass = [start, stop];
-nRippels = length(firstPass);
+nEvents = length(firstPass);
 
 if isempty(firstPass)
 	disp('Detection by thresholding failed');
 	return
 else
-	disp(['After detection by thresholding: ' num2str(nRippels) ' events.']);
+	disp(['After thresholding: ' num2str(nEvents) ' events.']);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% merge ripples if inter-ripple period is too short
+% merge events if inter-event period is too short
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%%% option 1
-% idx = find(firstPass(2 : end, 1) - firstPass(1 : end - 1, 2) >= interRipple);
-% secondPass = [firstPass(1, :); firstPass(idx + 1, 1), firstPass(idx + 1, 2)];
-
-%%% option 2 (original)
 secondPass = [];
 ripple = firstPass(1, :);
-for i = 2 : nRippels
-	if firstPass(i,1) - ripple(2) < interRipple
+for i = 2 : nEvents
+	if firstPass(i, 1) - ripple(2) < interRipple
 		ripple = [ripple(1) firstPass(i, 2)];
 	else
 		secondPass = [secondPass; ripple];
@@ -164,13 +171,13 @@ for i = 2 : nRippels
 	end
 end
 secondPass = [secondPass; ripple];
-nRippels = length(secondPass);
+nEvents = length(secondPass);
 
 if isempty(secondPass)
 	disp('Ripple merge failed');
 	return
 else
-	disp(['After ripple merge: ' num2str(nRippels) ' events.']);
+	disp(['After merging: ' num2str(nEvents) ' events.']);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -183,13 +190,13 @@ idxMax = dur > maxDur * lfp.fs;
 idxMin = dur < minDur * lfp.fs;
 idx = idxMax | idxMin;
 thirdPass(idx, :) = [];
-nRippels = length(thirdPass);
+nEvents = length(thirdPass);
 
 if isempty(thirdPass)
 	disp('duration test failed.');
 	return
 else
-	disp(['After duration test: ' num2str(nRippels) ' events.']);
+	disp(['After testing duration: ' num2str(nEvents) ' events.']);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -198,22 +205,22 @@ end
 
 bad = [];
 if ~isempty(noise)           
-	excluded = zeros(nRippels, 1);
+	excluded = zeros(nEvents, 1);
 	previous = 1;
-	for i = 1 : nRippels
+	for i = 1 : nEvents
 		if any(noise(thirdPass(i, 1) : thirdPass(i, 2)) > thr(2))
 			excluded(i) = 1;
         end
 	end
 	bad = thirdPass(logical(excluded), 1);
 	thirdPass = thirdPass(~logical(excluded), :);
-    nRippels = length(thirdPass);
+    nEvents = length(thirdPass);
 
     if isempty(thirdPass)
         disp('noisy channel test failed.');
         return
     else
-        disp(['After noisy channel test: ' num2str(nRippels) ' events.']);
+        disp(['After noisy channel test: ' num2str(nEvents) ' events.']);
     end
 end
 
@@ -234,8 +241,8 @@ if emgThr
     end
     
     % find artifacts
-    excluded = zeros(nRippels, 1);
-    for i = 1 : nRippels
+    excluded = zeros(nEvents, 1);
+    for i = 1 : nEvents
         [~, idx] = min(abs(emg.timestamps - (thirdPass(i, 1) / lfp.fs)));
        if emg.data(idx) > emgThr
            excluded(i) = 1;           
@@ -243,52 +250,35 @@ if emgThr
     end
     bad = sortrows([bad; thirdPass(logical(excluded), 1)]);
     thirdPass = thirdPass(~logical(excluded), :);
-    nRippels = length(thirdPass);
+    nEvents = length(thirdPass);
     
     if isempty(thirdPass)
         disp('EMG noise removal failed.');
         return
     else
-        disp(['After EMG noise removal: ' num2str(nRippels) ' events.']);
+        disp(['After EMG noise removal: ' num2str(nEvents) ' events.']);
     end
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% discard ripples with low peak power
+% find peak power for each event
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-thirdPass = [];
-peakPower = [];
-for i = 1 : nRippels
-	[val] = max(signorm([secondPass(i, 1) : secondPass(i, 2)]));
-	if val > thr(2)
-		thirdPass = [thirdPass; secondPass(i, :)];
-		peakPower = [peakPower; val];
-    end
-end
-nRippels = length(thirdPass);
-
-if isempty(thirdPass)
-	disp('Peak thresholding failed.');
-	return
-else
-	disp(['After peak thresholding: ' num2str(nRippels) ' events.']);
-end
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% detect negative peak position for each ripple
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-peakPos = zeros(nRippels, 1);
-for i = 1 : nRippels
-	[~, idx] = min(sigfilt(thirdPass(i, 1) : thirdPass(i, 2)));
-	peakPos(i) = idx + thirdPass(i, 1) - 1;
+peakPower = zeros(nEvents, 1);
+peakPos = zeros(nEvents, 1);
+for i = 1 : nEvents
+	[peakPower(i), peakPos(i)] = max(abs(signorm([thirdPass(i, 1) : thirdPass(i, 2)])));
+    peakPos(i) = peakPos(i) + thirdPass(i, 1) - 1;
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arrange struct output
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+bs.binary = zeros(size(lfp.timestamps));
+for i = 1 : nEvents
+    bs.binary(thirdPass(i, 1) : thirdPass(i, 2)) = 1;
+end
 bs.timestamps = [lfp.timestamps(thirdPass(:, 1)), lfp.timestamps(thirdPass(:, 2))];
 bs.peaks = lfp.timestamps(peakPos);
 bs.power = peakPower;
@@ -318,7 +308,6 @@ if graphics
     plot(lfp.timestamps, signorm);
     hold on
     axis tight
-%     ylim([0 thr(2) * 3]);
     Xlim = xlim;
     plot(Xlim, [thr(2) thr(2)])
     xlabel('Time [m]')
@@ -329,7 +318,6 @@ if graphics
     % example of detected ripple
     subplot(2, 1, 2)
     plot(lfp.timestamps, lfp.data(:, ch));
-%     ylim([-200 200])
     Ylim = ylim;
     hold on
     for i = 1 : length(bs.timestamps)
@@ -337,13 +325,13 @@ if graphics
         plot([bs.peaks(i) bs.peaks(i)], Ylim, 'k')
         plot([bs.timestamps(i, 2) bs.timestamps(i, 2)], Ylim, 'r')
     end
-    [~, x] = max(bs.power);
-    x = bs.timestamps(x, 2);
-%     xlim([x - 0.25, x + 0.25])
-axis tight
-xlabel('Time [s]')
+    [~, idx] = min(abs(bs.power - median(bs.power)));
+    idx = bs.peaks(idx);
+    axis tight
+    xlim([idx - 3, idx + 3])
+    xlabel('Time [s]')
     box off
-    set(gca, 'TickLength', [0 0])   
+    set(gca, 'TickLength', [0 0])
 end
 
 end
