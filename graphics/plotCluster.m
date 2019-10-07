@@ -53,12 +53,13 @@ for i = 1 : length(clu)
     f = figure;
     
     % waveform
-    subplot(2, 2, 1)
+    subplot(1, 2, 1)
     unitcolor = grpcolor(spikes.shankID(clu(i)));
-    plotWaveform(spikes.avgWaveform{clu(i)}, spikes.stdWaveform{clu(i)}, unitcolor, 'vert', spikes.samplingRate)
+    plotWaveform('avgwv', spikes.avgWaveform{clu(i)}, 'stdwv', spikes.stdWaveform{clu(i)},...
+        'c', unitcolor, 'orient', 'vert', 'fs', spikes.samplingRate, 'sbar', false)
     
     % ISI histogram
-    subplot(2, 2, 2)
+    subplot(1, 2, 2)
     binsize = 0.001;
     bins = [0 : binsize : 0.05];
     h = histogram([diff(spikes.times{clu(i)})], bins);
@@ -72,12 +73,12 @@ for i = 1 : length(clu)
     line([0.003 0.003], ax.YLim, 'color', 'k', 'LineWidth', 1)
     
     % raster
-    subplot(2, 2, [3 4])
-    y = ones(length(spikes.times{clu(i)}) ,1);
-    plot(spikes.times{clu(i)} / 60 / 60, y, '.k', 'markerSize', 0.1)
-    axis tight
-    axis off
-    title(sprintf('nSpks = %d', length(spikes.times{clu(i)})), 'FontSize', 14, 'FontWeight', 'norma');
+%     subplot(2, 2, [3 4])
+%     y = ones(length(spikes.times{clu(i)}) ,1);
+%     plot(spikes.times{clu(i)} / 60 / 60, y, '.k', 'markerSize', 0.1)
+%     axis tight
+%     axis off
+%     title(sprintf('nSpks = %d', length(spikes.times{clu(i)})), 'FontSize', 14, 'FontWeight', 'norma');
     
     % discriptives
     if spikes.su(clu(i)) == 1
@@ -87,8 +88,9 @@ for i = 1 : length(clu)
     else
         su = 'NaN';
     end
-    txt = sprintf('%d - %s; L = %.2f; iDist = %.2f; ISI = %.2f',...
-        clu(i), su, spikes.lRat(clu(i)), spikes.iDist(clu(i)), spikes.isi(clu(i)));
+    txt = sprintf('%d - %s; L = %.2f; iDist = %.2f; ISI = %.2f; nSpks = %.0f',...
+        clu(i), su, spikes.lRat(clu(i)), spikes.iDist(clu(i)),...
+        spikes.isi(clu(i)), length(spikes.times{clu(i)}));
     suptitle(txt)
     
     if saveFig
@@ -115,23 +117,28 @@ if length(clu) == nunits
     histidx = 2 : 2 : nunits * 2;
     
     f = figure;
-    for i = 1 : nunits
-        
+    for i = 1 : nunits      
         % waveform
         subplot(plotidx(1), plotidx(2), wvidx(i))
         unitcolor = grpcolor(spikes.shankID(i));
-        plotWaveform(spikes.avgWaveform{i}, spikes.stdWaveform{i}, unitcolor)
+        plotWaveform('avgwv', spikes.avgWaveform{i}, 'stdwv', spikes.stdWaveform{i},...
+            'c', unitcolor, 'orient', 'vert', 'fs', spikes.samplingRate, 'sbar', false)
         title(int2str(spikes.cluID(i)))
         
         % ISI histogram
-        subplot(plotidx(1), plotidx(2), histidx(i))
-        binsize = 0.0005;
-        bins = [-0.15 : binsize : 0.15];
-        h = histogram([diff(spikes.times{i}) diff(spikes.times{i}) * -1], bins);
+        subplot(plotidx(1), plotidx(2), histidx(i))   
+        binsize = 0.001;
+        bins = [0 : binsize : 0.05];
+        h = histogram([diff(spikes.times{i})], bins);
         h.EdgeColor = 'none';
         h.FaceColor = unitcolor;
-        axis off
-        
+        xticks([0 0.05])
+        box off
+        axis tight
+        ax = gca;
+        ax.XTickLabel = [];
+        ax.YTick = []; ax.YColor = 'none';
+        line([0.003 0.003], ax.YLim, 'color', 'k', 'LineWidth', 1)            
     end
     
     if saveFig

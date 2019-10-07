@@ -1,4 +1,4 @@
-function savepdf(filename, basepath, f)
+function savePdf(filename, basepath, f)
 
 % saves figure as pdf with full vector data.
 % file saved in basepath/graphics. if /graphics does not exit, creates it.

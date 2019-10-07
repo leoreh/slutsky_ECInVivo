@@ -1,4 +1,4 @@
-function plotFRtime(varargin)
+function f = plotFRtime(varargin)
 
 % plot firing rate with or without mean +- std of firing rate across time
 % and/or raster plot of spikes per unit.
