@@ -1,4 +1,4 @@
-function bs = findBS(varargin)
+function events = findLFPevents(varargin)
 
 % detects events from LFP signal. designed for burst-suppression and
 % ripples. based on bz_FindRipples. main differences are (1) moving average
@@ -8,7 +8,14 @@ function bs = findBS(varargin)
 % 
 % INPUT
 %   lfp         struct (see getLFP.m)
-%   ch          channel to detect events. if empty will select by RMS
+%   preset      predefined events {ripples} or (bs)
+%   passband    to filter LFP. if empty will use raw LFP
+%   winLength   for moving mean 
+%   minDur      minimum event duration [ms]
+%   maxDur      maximum event duration [ms]
+%   interDur    minimum time between events [ms]
+%   ch          channel to detect events. if empty will select by RMS, 
+%               if > 1 will average signal across specified channels
 %   noise       channel to remove artifacts {[]}
 %   emgThr      threshold for EMG exclusion {0.9}
 %   interval    interval used for standadization {[0 Inf]}
@@ -17,7 +24,7 @@ function bs = findBS(varargin)
 %   saveVar     save variable {1}.
 % 
 % OUTPUT
-%   ripples         struct with fields:
+%   events         struct with fields:
 % 
 % CALLS
 %   fastrms
@@ -29,6 +36,7 @@ function bs = findBS(varargin)
 % 
 % 01 may 19 LH. updates:
 % 07 oct 19 LH  adapted for BS
+% 10 oct 19 LH  combined BS and ripples
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -37,16 +45,28 @@ function bs = findBS(varargin)
 
 p = inputParser;
 addParameter(p, 'lfp', @isstruct)
+addParameter(p, 'preset', '', @ischar)
+addParameter(p, 'passband', [], @isnumeric)
+addParameter(p, 'winLength', [], @isnumeric)
+addParameter(p, 'minDur', [], @isnumeric)
+addParameter(p, 'maxDur', [], @isnumeric)
+addParameter(p, 'interDur', [], @isnumeric)
 addParameter(p, 'ch', [], @isnumeric)
 addParameter(p, 'noise', [], @isnumeric)
 addParameter(p, 'emgThr', 0.9, @isnumeric);
 addParameter(p, 'interval', [0 Inf], @isnumeric)
 addParameter(p, 'basepath', pwd, @isstr);
 addParameter(p, 'graphics', true, @islogical)
-addParameter(p, 'saveVar', false, @islogical);
+addParameter(p, 'saveVar', true, @islogical);
 
 parse(p, varargin{:})
 lfp = p.Results.lfp;
+preset = p.Results.preset;
+passband = p.Results.passband;
+winLength = p.Results.winLength;
+minDur = p.Results.minDur;
+maxDur = p.Results.maxDur;
+interDur = p.Results.interDur;
 ch = p.Results.ch;
 noise = p.Results.noise;
 emgThr = p.Results.emgThr;
@@ -71,55 +91,84 @@ if isempty(ch)
 end
 
 % prepare output
-bs = [];
+events = [];
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % params
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
  
-passband = [2 250];                 % [Hz]
-order = 4; 
-type = 'butter';
-winLength = 30;                     % [samples]    
+switch preset
+    case 'ripples'
+        passband = [130 200];           % [Hz]
+        order = 4;
+        type = 'butter';
+        winLength = 11;                 % [samples]
+        
+        thr = [2 5];                    % low and high thresholding value [z-score]
+        minDur = 0.02;                  % minimum event duration [ms]
+        maxDur = 0.1;                   % maximum event duration [ms]
+        interDur = 0.03 * lfp.fs;       % minimum time between events [ms]
 
-interRipple = 0.2 * lfp.fs;         % minimum between events [s]
-thr = [0.01 1];                      % low and high thresholding value [z-score]
-maxDur = 4000;                      % maximum event duration [ms]
-minDur = 0.05;                     % minimum event duration [ms]
-
+    case 'bs'
+        passband = [2 250];                 
+        order = 4;
+        type = 'butter';
+        winLength = 30;                     
+        
+        minDur = 0.05;   
+        maxDur = 4000;                     
+        interDur = 0.2 * lfp.fs;         
+        thr = [0.01 1];                      
+end
+        
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % prepare signal
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % filter    
-sigfilt = filterLFP(double(lfp.data(:, ch)), 'type', type,...
-    'passband', passband, 'order', order, 'graphics', false);
+if ~isempty(passband)
+    sig = filterLFP(double(lfp.data(:, ch)), 'type', type,...
+        'passband', passband, 'order', order, 'graphics', false);
+else
+    sig = double(lfp.data(:, ch));
+end
     
-% find lfp channel with highest SNR for events
-if length(ch) > 1    
-    pow = fastrms(sigfilt, 15);
-    mEvent = mean(pow);
-    meEvent = median(pow);
-    mmEventRatio = mEvent ./ meEvent;   
-    mmEventRatio(mEvent < 1) = 0;
-    mmEventRatio(meEvent < 1) = 0;   
-    [~, ch] = max(mmEventRatio);
+if length(ch) > 1
+    if length(ch) == size(lfp.data, 2)
+        % find lfp channel with highest SNR for events
+        pow = fastrms(sig, 15);
+        mEvent = mean(pow);
+        meEvent = median(pow);
+        mmEventRatio = mEvent ./ meEvent;
+        mmEventRatio(mEvent < 1) = 0;
+        mmEventRatio(meEvent < 1) = 0;
+        [~, ch] = max(mmEventRatio);
+    else
+        % average signal across channels
+        sig = mean(sig, 2);
+    end
 end
 
 % rectify
-if size(sigfilt, 2) > 1
-    signorm = sigfilt(:, ch) .^ 2;
+if size(sig, 2) > 1
+    sig = sig(:, ch) .^ 2;
 else
-    signorm = sigfilt .^ 2;
+    sig = sig .^ 2;
 end
 % moving average
-signorm = movmean(signorm, winLength);
+sig = movmean(sig, winLength);
 % standerdize
-signorm = (signorm - mean(signorm(inter))) / std(signorm(inter));
+sig = (sig - mean(sig(inter))) / std(sig(inter));
 
 % prepare noise
 if ~isempty(noise)
-    noise = sigfilt(:, noise) .^ 2;
+    if ~isempty(passband)
+        noise = filterLFP(double(lfp.data(:, noise)), 'type', type,...
+            'passband', passband, 'order', order, 'graphics', false);
+    else
+        noise = double(lfp.data(:, noise));
+    end
+    noise = noise .^ 2;
     noise = movmean(noise, winLength);
     noise = (noise - mean(noise(inter))) / std(noise(inter));
 end
@@ -128,28 +177,28 @@ end
 % detect events by thresholding
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-thresholded = signorm > thr(1);
+thresholded = sig > thr(1);
 start = find(diff(thresholded) > 0);
 stop = find(diff(thresholded) < 0);
 
-% exclude last ripple if it is incomplete
+% exclude last event if it is incomplete
 if length(stop) == length(start) - 1
 	start = start(1 : end - 1);
 end
-% exclude first ripple if it is incomplete
+% exclude first event if it is incomplete
 if length(stop) - 1 == length(start)
     stop = stop(2 : end);
 end
-% correct special case when both first and last ripples are incomplete
+% correct special case when both first and last events are incomplete
 if start(1) > stop(1)
 	stop(1) = [];
 	start(end) = [];
 end
 
-firstPass = [start, stop];
-nEvents = length(firstPass);
+temp = [start, stop];
+nEvents = length(temp);
 
-if isempty(firstPass)
+if isempty(temp)
 	disp('Detection by thresholding failed');
 	return
 else
@@ -160,39 +209,38 @@ end
 % merge events if inter-event period is too short
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-secondPass = [];
-ripple = firstPass(1, :);
+temp2 = [];
+event = temp(1, :);
 for i = 2 : nEvents
-	if firstPass(i, 1) - ripple(2) < interRipple
-		ripple = [ripple(1) firstPass(i, 2)];
+	if temp(i, 1) - event(2) < interDur
+		event = [event(1) temp(i, 2)];
 	else
-		secondPass = [secondPass; ripple];
-		ripple = firstPass(i, :);
+		temp2 = [temp2; event];
+		event = temp(i, :);
 	end
 end
-secondPass = [secondPass; ripple];
-nEvents = length(secondPass);
+temp2 = [temp2; event];
+nEvents = length(temp2);
 
-if isempty(secondPass)
-	disp('Ripple merge failed');
+if isempty(temp2)
+	disp('Event merge failed');
 	return
 else
 	disp(['After merging: ' num2str(nEvents) ' events.']);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% discard ripples by duration
+% discard events by duration
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-thirdPass = secondPass;
-dur = thirdPass(:, 2) - thirdPass(:, 1);
+dur = temp2(:, 2) - temp2(:, 1);
 idxMax = dur > maxDur * lfp.fs;
 idxMin = dur < minDur * lfp.fs;
 idx = idxMax | idxMin;
-thirdPass(idx, :) = [];
-nEvents = length(thirdPass);
+temp2(idx, :) = [];
+nEvents = length(temp2);
 
-if isempty(thirdPass)
+if isempty(temp2)
 	disp('duration test failed.');
 	return
 else
@@ -200,7 +248,7 @@ else
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% exclude ripple-like events that appear on noise channel
+% exclude events that appear on noise channel
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 bad = [];
@@ -208,15 +256,15 @@ if ~isempty(noise)
 	excluded = zeros(nEvents, 1);
 	previous = 1;
 	for i = 1 : nEvents
-		if any(noise(thirdPass(i, 1) : thirdPass(i, 2)) > thr(2))
+		if any(noise(temp2(i, 1) : temp2(i, 2)) > thr(2))
 			excluded(i) = 1;
         end
 	end
-	bad = thirdPass(logical(excluded), 1);
-	thirdPass = thirdPass(~logical(excluded), :);
-    nEvents = length(thirdPass);
+	bad = temp2(logical(excluded), 1);
+	temp2 = temp2(~logical(excluded), :);
+    nEvents = length(temp2);
 
-    if isempty(thirdPass)
+    if isempty(temp2)
         disp('noisy channel test failed.');
         return
     else
@@ -243,16 +291,16 @@ if emgThr
     % find artifacts
     excluded = zeros(nEvents, 1);
     for i = 1 : nEvents
-        [~, idx] = min(abs(emg.timestamps - (thirdPass(i, 1) / lfp.fs)));
+        [~, idx] = min(abs(emg.timestamps - (temp2(i, 1) / lfp.fs)));
        if emg.data(idx) > emgThr
            excluded(i) = 1;           
        end
     end
-    bad = sortrows([bad; thirdPass(logical(excluded), 1)]);
-    thirdPass = thirdPass(~logical(excluded), :);
-    nEvents = length(thirdPass);
+    bad = sortrows([bad; temp2(logical(excluded), 1)]);
+    temp2 = temp2(~logical(excluded), :);
+    nEvents = length(temp2);
     
-    if isempty(thirdPass)
+    if isempty(temp2)
         disp('EMG noise removal failed.');
         return
     else
@@ -267,25 +315,26 @@ end
 peakPower = zeros(nEvents, 1);
 peakPos = zeros(nEvents, 1);
 for i = 1 : nEvents
-	[peakPower(i), peakPos(i)] = max(abs(signorm([thirdPass(i, 1) : thirdPass(i, 2)])));
-    peakPos(i) = peakPos(i) + thirdPass(i, 1) - 1;
+	[peakPower(i), peakPos(i)] = max(abs(sig([temp2(i, 1) : temp2(i, 2)])));
+    peakPos(i) = peakPos(i) + temp2(i, 1) - 1;
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arrange struct output
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-bs.binary = zeros(size(lfp.timestamps));
+events.preset = preset;
+events.timestamps = [lfp.timestamps(temp2(:, 1)), lfp.timestamps(temp2(:, 2))];
+events.peaks = lfp.timestamps(peakPos);
+events.power = peakPower;
+events.noise = bad;
+events.interval = interval;
+events.ch = ch;
+events.fs = lfp.fs;
+events.binary = zeros(size(lfp.timestamps));
 for i = 1 : nEvents
-    bs.binary(thirdPass(i, 1) : thirdPass(i, 2)) = 1;
+    events.binary(temp2(i, 1) : temp2(i, 2)) = 1;
 end
-bs.timestamps = [lfp.timestamps(thirdPass(:, 1)), lfp.timestamps(thirdPass(:, 2))];
-bs.peaks = lfp.timestamps(peakPos);
-bs.power = peakPower;
-bs.noise = bad;
-bs.interval = interval;
-bs.ch = ch;
-bs.fs = lfp.fs;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % save
@@ -293,7 +342,7 @@ bs.fs = lfp.fs;
 
 if saveVar   
     [~, filename] = fileparts(basepath);
-    save([basepath, '\', filename, '.ripples.mat'], 'ripples')
+    save([basepath, '\', filename, '.LFPevents.mat'], 'events')
 end
       
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -305,13 +354,13 @@ if graphics
     
     % standerd power and threshold
     subplot(2, 1, 1)
-    plot(lfp.timestamps, signorm);
+    plot(lfp.timestamps, sig);
     hold on
     axis tight
     Xlim = xlim;
     plot(Xlim, [thr(2) thr(2)])
     xlabel('Time [m]')
-    ylabel('Standerdized ripple power')
+    ylabel('Standerdized power')
     box off
     set(gca, 'TickLength', [0 0])
     
@@ -320,15 +369,15 @@ if graphics
     plot(lfp.timestamps, lfp.data(:, ch));
     Ylim = ylim;
     hold on
-    for i = 1 : length(bs.timestamps)
-        plot([bs.timestamps(i, 1) bs.timestamps(i, 1)], Ylim, 'g')
-        plot([bs.peaks(i) bs.peaks(i)], Ylim, 'k')
-        plot([bs.timestamps(i, 2) bs.timestamps(i, 2)], Ylim, 'r')
+    for i = 1 : length(events.timestamps)
+        plot([events.timestamps(i, 1) events.timestamps(i, 1)], Ylim, 'g')
+        plot([events.peaks(i) events.peaks(i)], Ylim, 'k')
+        plot([events.timestamps(i, 2) events.timestamps(i, 2)], Ylim, 'r')
     end
-    [~, idx] = min(abs(bs.power - median(bs.power)));
-    idx = bs.peaks(idx);
+    [~, idx] = min(abs(events.power - mean(events.power)));
+    idx = events.peaks(idx);
     axis tight
-    xlim([idx - 3, idx + 3])
+    xlim([idx - 2, idx + 2])
     xlabel('Time [s]')
     box off
     set(gca, 'TickLength', [0 0])
