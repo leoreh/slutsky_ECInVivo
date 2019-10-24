@@ -25,6 +25,12 @@ function events = findLFPevents(varargin)
 % 
 % OUTPUT
 %   events         struct with fields:
+%       stamps      n x 2 mat where n is the number of events and the
+%                   columns represent the start and end of each event [samps]
+%       peaks       the timestamp for each peak [samps] 
+%       peakPower   the voltage at each peak [uV]
+%       noise       events execluded based on noise channel
+%       <params>    as in input
 % 
 % CALLS
 %   fastrms
@@ -37,6 +43,7 @@ function events = findLFPevents(varargin)
 % 01 may 19 LH. updates:
 % 07 oct 19 LH  adapted for BS
 % 10 oct 19 LH  combined BS and ripples
+% 16 oct 19 LH  changed output to samples instead of s
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -324,17 +331,17 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 events.preset = preset;
-events.timestamps = [lfp.timestamps(temp2(:, 1)), lfp.timestamps(temp2(:, 2))];
-events.peaks = lfp.timestamps(peakPos);
+events.stamps = temp2;
+events.peaks = peakPos;
 events.power = peakPower;
 events.noise = bad;
 events.interval = interval;
 events.ch = ch;
 events.fs = lfp.fs;
-events.binary = zeros(size(lfp.timestamps));
-for i = 1 : nEvents
-    events.binary(temp2(i, 1) : temp2(i, 2)) = 1;
-end
+% events.binary = zeros(size(lfp.timestamps));
+% for i = 1 : nEvents
+%     events.binary(temp2(i, 1) : temp2(i, 2)) = 1;
+% end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % save
@@ -369,15 +376,15 @@ if graphics
     plot(lfp.timestamps, lfp.data(:, ch));
     Ylim = ylim;
     hold on
-    for i = 1 : length(events.timestamps)
-        plot([events.timestamps(i, 1) events.timestamps(i, 1)], Ylim, 'g')
-        plot([events.peaks(i) events.peaks(i)], Ylim, 'k')
-        plot([events.timestamps(i, 2) events.timestamps(i, 2)], Ylim, 'r')
+    for i = 1 : length(events.stamps)
+        plot([events.stamps(i, 1) / lfp.fs, events.stamps(i, 1) / lfp.fs], Ylim, 'g')
+        plot([events.peaks(i) / lfp.fs, events.peaks(i) / lfp.fs], Ylim, 'k')
+        plot([events.stamps(i, 2) / lfp.fs, events.stamps(i, 2) / lfp.fs], Ylim, 'r')
     end
     [~, idx] = min(abs(events.power - mean(events.power)));
     idx = events.peaks(idx);
     axis tight
-    xlim([idx - 2, idx + 2])
+    xlim([idx / lfp.fs - 2, idx / lfp.fs + 2])
     xlabel('Time [s]')
     box off
     set(gca, 'TickLength', [0 0])

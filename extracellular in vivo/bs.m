@@ -1,27 +1,137 @@
 
-idx = [1 : 201];
+nEvents = length(events.peaks);
 fs = lfp.fs;
+marg = 0.1 * fs;
 
-clear q
-for i = idx
-%     figure
-    x = events.peaks(i) * fs;
-    xidx = x - 0.2 * fs : x + 0.2 * fs;
-    xidx = round(events.timestamps(i, 1) * fs : events.timestamps(i, 2) * fs);
-    y = double(lfp.data(round(xidx), 16));
+% find baseline
+[~, idx1] = min(abs(events.peaks / fs - info.blockduration(1)));
+idx1 = 1 : idx1 - 1;    % remove one event to be sure
+
+% find gabazine
+[~, idx2] = min(abs(events.peaks / fs - sum(info.blockduration(1:3))));
+[~, idx3] = min(abs(events.peaks / fs - sum(info.blockduration(1:2))));
+idx2 = idx3 + 500 : idx2 - 1;
+
+% go over events and calc params
+for i = 1 : nEvents
     
-%     subplot(2, 1, 1)
-%     plot(xidx / fs, y)
-%     axis tight
-%     ylim([-500 300])
-%     subplot(2, n1, 2)
-%     pwelch(y, [], [], 1 : 1 : 50, fs)
-%     ylim([0 60])
-q(i) = trapz(y);
+    x = events.peaks(i);
+    xidx = (x - marg) : (x + marg);
+    y(i, :) = double(lfp.data(xidx, 16));
+    
+    auc(i) = trapz(abs(y(i, :)));
+    p2p(i) = abs(max(y(i, :)) - min(y(i, :)));
+    % calc psd at f frequencies and normalize to total power  
+    f = 1  : 250;
+    p(i, :) = pwelch(y(i, :), [], [], f, fs);
+    p(i, :) = p(i, :) / sum(p(i, :));
+
+end
+
+
+% plot population characteristics
+nbins = 40;
+figure;
+subplot(1, 3, 1)
+h = histogram(log10(p2p(idx1)), nbins, 'Normalization', 'probability');
+h.EdgeColor = 'none';
+h.FaceColor = 'k';
+hold on
+h = histogram(log10(p2p(idx2)), nbins, 'Normalization', 'probability');
+h.EdgeColor = 'none';
+h.FaceColor = 'c';
+legend('Baseline', 'Gabazine')
+box off
+xlabel('Peak to peak [log(V)]')
+ylabel('Probability')
+set(gca,'TickLength',[0 0])
+
+subplot(1, 3, 2)
+h = histogram(log10(auc(idx1)), nbins, 'Normalization', 'probability');
+h.EdgeColor = 'none';
+h.FaceColor = 'k';
+hold on
+h = histogram(log10(auc(idx2)), nbins, 'Normalization', 'probability');
+h.EdgeColor = 'none';
+h.FaceColor = 'c';
+box off
+xlabel('AUC [log(V)]')
+ylabel('Probability')
+set(gca,'TickLength',[0 0])
+
+pp = sum(p(:, 70 : 250), 2);
+subplot(1, 3, 3)
+h = histogram(log10(pp(idx1)), nbins, 'Normalization', 'probability');
+h.EdgeColor = 'none';
+h.FaceColor = 'k';
+hold on
+h = histogram(log10(pp(idx2)), nbins, 'Normalization', 'probability');
+h.EdgeColor = 'none';
+h.FaceColor = 'c';
+box off
+xlabel('PSD 50:250Hz [log(V)]')
+ylabel('Probability')
+set(gca,'TickLength',[0 0])
+
+% plot individual bursts
+close all
+idx = [idx1(1 : 2) idx2(1 : 2)];
+for i = idx    
+    figure
+    subplot(2, 1, 1)
+    plot(xidx / fs, y(i, :))
+    axis tight
+    ylim([-4000 1000])
+    subplot(2, 1, 2)
+    pwelch(y(i, :), [], [], f, fs)
+    ylim([0 60])
+end
+
+% separate bursts and iis
+iis = auc > 10^4.9 & p2p > 10^3.1;
+bs = find(~iis);
+iis = find(iis);
+
+t = 1;
+for i = 1 : 50
+    figure
+    subplot(2, 1, 1)
+    plot(xidx / fs, y(bs(t), :))
+    axis tight
+    ylim([-4000 1000])
+    subplot(2, 1, 2)
+    plot(xidx / fs, y(iis(t), :))
+    axis tight
+    ylim([-4000 1000])
+    t = t + 1;
 end
 
 figure
-hist(q, 50)
+plot(y(iis(1), :))
+
+
+
+
+% pwelch
+[p] = pwelch(y(i, :), [], [], [50 100], fs);
+
+% fft
+L = size(y, 2);
+n = 2 ^ nextpow2(L);
+ft = fft(y(i, :), n, 2);
+p2 = abs(ft / L);
+p1 = p2(1 : L / 2 + 1);
+p1(2 : end - 1) = 2 * p1(2 : end - 1);
+f = fs * (0 : (L / 2)) / L;
+plot(f, p1) 
+title('Single-Sided Amplitude Spectrum of X(t)')
+xlabel('f (Hz)')
+ylabel('|p1(f)|')
+
+
+
+
+
 
 
 
