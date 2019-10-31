@@ -84,12 +84,16 @@ if isempty(winBL)
 end
 [fr.norm, fr.ithr, fr.istable] = normFR(fr.strd, 'metBL', 'avg', 'win', winBL, 'select', select);
 
+% add params
+fr.winBL = winBL;
+fr.binsize = binsize;
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if graphics
-    plotFRtime('fr', fr.norm, 'spktimes', spktimes, 'units', true,...
-        'binsize', binsize, 'avg', true, 'raster', true, 'saveFig', saveFig)  
+    plotFRtime('fr', fr, 'spktimes', spktimes, 'units', true,...
+        'avg', true, 'raster', true, 'saveFig', saveFig)  
     
 %     bl = blFR(fr.norm, 'method', metBL, 'win', winBL);
 %     plotFRdistribution(bl, 'saveFig', saveFig) 
@@ -98,10 +102,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % save
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-if saveVar
-    fr.winBL = winBL;
-    fr.binsize = binsize;
-    
+if saveVar  
     [~, filename] = fileparts(basepath);
     save([basepath, '\', filename, '.fr.mat'], 'fr')
 end

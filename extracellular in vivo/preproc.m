@@ -4,14 +4,14 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % basepath to recording folder
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'E:\Data\Data Tanks\LH\DataTanks\LHa8\LHa8';
+basepath = 'E:\Data\Dat\LHa9\p1\LHa9';
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 1: file conversion
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 store = 'Raw1';
 fs = 24414.0125;
-blocks = [15 : 17, 24 : 25, 34 : 35];
+blocks = [9 : 14, 17 : 22, 25 : 32, 35 : 40];
 chunksize = 60;
 mapch = [1 : 16];
 rmvch = [];
@@ -88,8 +88,20 @@ CellClass = cellClass(cat(1, spikes.rawWaveform{:})', 'fs', fs);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 6: calculate mean firing rate
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-fr = FR(spikes.times, 'basepath', basepath, 'graphics', true, 'saveFig', true,...
-    'binsize', 60, 'saveVar', true, 'smet', 'MA');
+fr = FR(spikes.times, 'basepath', basepath, 'graphics', false, 'saveFig', false,...
+    'binsize', 20, 'saveVar', true, 'smet', 'MA');
+
+
+select = [1 : 3, 5, 7];
+info.labels = {'Baseline', 'uPSEM 3 mg/kg', 'uPSEM 3 mg/kg', '', 'CNO 3 mg/kg', '', 'CNO 3 mg/kg'};
+lns = cumsum(info.blockduration / 60 / 60);
+lns = [1e-6, lns([select])];
+lns(end) = [];
+save('LHa9.Raw1.Info.mat', 'info');
+
+f = plotFRtime('fr', fr, 'units', true,...
+    'avg', true, 'lns', lns, 'lbs', info.labels(select),...
+    'raster', false, 'saveFig', false);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 7: concatenate spikes from different sessions
