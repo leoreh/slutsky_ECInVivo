@@ -369,3 +369,4 @@ end
 if isempty(spikes.times) | spikes.numcells == 0
     spikes = [];
 end
+

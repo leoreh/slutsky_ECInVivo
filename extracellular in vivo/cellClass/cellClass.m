@@ -1,12 +1,16 @@
-function  [CellClass] = cellClass (waves, varargin)
+function  [CellClass] = cellClass(varargin)
 
 % classifies clusters to PYR \ INT according to waveform parameters
 % (trough-to-peak and spike width, also calculates asymmetry).
+% can work with matrix (waves) or spikes (getSpikes).
 % 
 % INPUT
 %   waves       matrix of sampels (rows) x units (columns). for example:
 %               waves = cat(1, spikes.rawWaveform{spikes.su})'
 %               waves = cat(1, spikes.rawWaveform{:})'
+%   spikes      struct. see getSpikes.m
+%   u           vector of indices or logical according to spikes.UID
+%   mfr         mean firing rate for each unit
 %   man         logical. manual selection or automatic via known values
 %   fs          sampling frequency
 %   basepath    recording session path {pwd}
@@ -26,20 +30,29 @@ function  [CellClass] = cellClass (waves, varargin)
 %   fft_upsample    from Kamran Diba
 %
 % 08 apr 19 LH. 
+% 21 nov 19 LH      added spikes and FR in scatter
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 p = inputParser;
+addOptional(p, 'spikes', struct);
+addOptional(p, 'waves', []);
+addOptional(p, 'u', []);
+addOptional(p, 'mfr', @isnumeric);
 addOptional(p, 'basepath', pwd);
-addOptional(p, 'man', false, @isnumeric);
+addOptional(p, 'man', false, @islogical);
 addOptional(p, 'fs', 24414.14, @isnumeric);
 addOptional(p, 'graphics', true, @islogical);
 addOptional(p, 'saveFig', false, @islogical);
 addOptional(p, 'saveVar', false, @islogical);
 
 parse(p, varargin{:})
+spikes = p.Results.spikes;
+waves = p.Results.waves;
+u = p.Results.u;
+mfr = p.Results.mfr;
 basepath = p.Results.basepath;
 man = p.Results.man;
 fs = p.Results.fs;
@@ -48,6 +61,16 @@ saveFig = p.Results.saveFig;
 saveVar = p.Results.saveVar;
 
 % params
+if isempty(waves)
+    u = spikes.UID;
+    waves = cat(1, spikes.rawWaveform{u})';
+end
+if isempty(mfr)
+    mfr = ones(1, size(waves, 2)) * 20;
+else
+    mfr = rescale(mfr, 10, 50);
+end
+
 nunits = size(waves, 2);
 upsamp = 4;
 
@@ -81,9 +104,9 @@ tp = tp / fs * 1000 / upsamp;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 for i = 1 : nunits
     w = waves(:, i);
-%     w = fft_upsample(waves(:, i), upsamp);
+%     w = fft_upsample(w, upsamp);
     w = [w(1) * ones(1000, 1); w; w(end) * ones(1000, 1)];
-    [wave f t] = getWavelet(w, fs, 500, 3000, 128);
+    [wave, f, t] = getWavelet(w, fs, 500, 3000, 128);
     % wt = cwt(w, fs, 'amor', 'FrequencyLimits', [500 3000]);
     wave = wave(:, int16(length(t) / 4) : 3 * int16(length(t) / 4));
     
@@ -97,14 +120,21 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-if graphics
-    h = figure;
-    scatter(tp, spkw)
+% Generate separatrix according to known values 
+xx = [0 0.8];
+yy = [2.4 0.4];
+m = diff(yy) / diff(xx);
+b = yy(1) - m * xx(1);  % y = ax + b
+sep = [m b];
+
+if graphics  
+    s = scatter(tp, spkw, mfr, 'filled');
+    hold on
     xlabel('trough-to-peak [ms]')
     ylabel('spike width [ms]')
-    xlim([0 max(tp) + 0.1])
-    ylim([0 max(spkw) + 0.1])
-    hold on
+    xb = get(gca, 'XLim');
+    yb = get(gca, 'YLim');
+    plot(xb, [sep(1) * xb(1) + sep(2), sep(1) * xb(2) + sep(2)])
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -43,7 +43,8 @@ function events = findLFPevents(varargin)
 % 01 may 19 LH. updates:
 % 07 oct 19 LH  adapted for BS
 % 10 oct 19 LH  combined BS and ripples
-% 16 oct 19 LH  changed output to samples instead of s
+% 16 oct 19 LH  changed output to samples instead of 
+% 18 nov 19 LH  adapted for IIS
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -115,17 +116,28 @@ switch preset
         minDur = 0.02;                  % minimum event duration [ms]
         maxDur = 0.1;                   % maximum event duration [ms]
         interDur = 0.03 * lfp.fs;       % minimum time between events [ms]
-
+        
     case 'bs'
-        passband = [2 250];                 
+        passband = [5 250];
         order = 4;
         type = 'butter';
-        winLength = 30;                     
+        winLength = 30;
         
-        minDur = 0.05;   
-        maxDur = 4000;                     
-        interDur = 0.2 * lfp.fs;         
-        thr = [0.01 1];                      
+        minDur = 0.05;
+        maxDur = 4000;
+        interDur = 0.2 * lfp.fs;
+        thr = [0.01 1];
+        
+    case 'iis'
+        passband = [1 Inf];
+        order = 4;
+        type = 'cheby2';
+        winLength = 30;
+        
+        minDur = 0.004;
+        maxDur = 4000;
+        interDur = 0.2 * lfp.fs;
+        thr = [2 1];
 end
         
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -134,7 +146,7 @@ end
 
 % filter    
 if ~isempty(passband)
-    sig = filterLFP(double(lfp.data(:, ch)), 'type', type,...
+    sig = filterLFP(double(lfp.data(:, ch)), 'type', type, 'fs', lfp.fs,...
         'passband', passband, 'order', order, 'graphics', false);
 else
     sig = double(lfp.data(:, ch));
@@ -179,6 +191,16 @@ if ~isempty(noise)
     noise = movmean(noise, winLength);
     noise = (noise - mean(noise(inter))) / std(noise(inter));
 end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% DEBUGGING; check signal
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% idx = round(60 * 60 * lfp.fs) : round(65 * 60 * lfp.fs);
+% figure
+% plot(lfp.data(idx))
+% hold on
+% plot(sig(idx));
+% xlim([1 500000])
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % detect events by thresholding
@@ -331,6 +353,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 events.preset = preset;
+events.env = sig;
 events.stamps = temp2;
 events.peaks = peakPos;
 events.power = peakPower;

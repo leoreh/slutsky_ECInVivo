@@ -28,6 +28,7 @@ function fr = FR(spktimes, varargin)
 %               normMethod, normWin
 %
 % 26 feb 19 LH. 
+% 21 nov 19 LH  added active periods and mFR accordingly
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -78,9 +79,24 @@ end
 % convert spike counts to firing rate in Hz
 fr.strd = fr.strd / binsize; 
 
+% active periods and mFR
+% threshold for active periods is determined according to the bimodel
+% distribution of fr values. DOES NOT WORK FOR FR
+% thr = sepBimodel('x', fr.strd(:), 'lognorm', true, 'graphics', true);
+thr = 0.5;
+act = fr.strd > thr;
+act = logical(round(movmedian(act, 3)));
+for i = 1 : size(fr.strd, 1)
+    fr.mfr(i) = mean(fr.strd(i, act(i, :)));
+end
+
 % normalize firing rate
 if isempty(winBL)
     winBL = [1 size(fr.strd, 2)];
+else
+    winBL = winBL / binsize;
+    if winBL(1) < 1; winBL(1) = 1; end
+    if winBL(2) == Inf; winBL(2) = size(fr.strd, 2); end
 end
 [fr.norm, fr.ithr, fr.istable] = normFR(fr.strd, 'metBL', 'avg', 'win', winBL, 'select', select);
 

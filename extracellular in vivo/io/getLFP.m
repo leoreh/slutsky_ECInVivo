@@ -6,6 +6,7 @@ function lfp = getLFP(varargin)
 % INPUT
 %   filename    string. filename of lfp file
 %   basepath    string. path to load filename and save output {pwd}
+%   force       logical. force reload {false}.
 %   fs          numeric. sampling frequency {1250}
 %   interval    numeric mat. list of intervals to read from lfp file [s]
 %   chans       vec. channels to load
@@ -13,15 +14,16 @@ function lfp = getLFP(varargin)
 %   chavg       cell. each row contain the lfp channels you want to average
 %   
 % OUTPUT
-%       lfp         structure with the following fields:
-%       fs          
-%       interval    
-%       duration    
-%       chans
-%       timestamps 
-%       data  
+%   lfp         structure with the following fields:
+%   fs          
+%   interval    
+%   duration    
+%   chans
+%   timestamps 
+%   data  
 % 
 % 01 apr 19 LH & RA
+% 19 nov 19 LH          load mat if exists  
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -29,6 +31,7 @@ function lfp = getLFP(varargin)
 p = inputParser;
 addOptional(p, 'basepath', pwd);
 addOptional(p, 'filename', '');
+addOptional(p, 'force', false, @islogical);
 addOptional(p, 'fs', 1250, @isnumeric);
 addOptional(p, 'interval', [0 inf], @isnumeric);
 addOptional(p, 'chans', [1 : 16], @isnumeric);
@@ -38,6 +41,7 @@ addOptional(p, 'chavg', {}, @iscell);
 parse(p,varargin{:})
 basepath = p.Results.basepath;
 filename = p.Results.filename;
+force = p.Results.force;
 fs = p.Results.fs;
 interval = p.Results.interval;
 chans = p.Results.chans;
@@ -65,6 +69,10 @@ if ~exist(filename)
     if ~exist(filename)
         error('file %s does not exist', filename)
     end
+end
+if exist(fullfile(basepath, [filename '.mat']), 'file') && ~force
+    load(fullfile(basepath, [filename '.mat']))
+    return
 end
 
 lfp.data = bz_LoadBinary(filename, 'duration', diff(interval),...

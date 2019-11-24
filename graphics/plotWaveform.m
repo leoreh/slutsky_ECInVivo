@@ -63,7 +63,7 @@ if strcmp(orient, 'horz')
 else
     for j = 1 : nchans
         % offset = j * (max(avgwv(j, :)) - min(avgwv(j, :)));
-        offset = 130 * (j - 1);
+        offset = 50 * (j - 1);
         if ~isempty(stdwv)
             errbounds = [avgwv(j, :) + stdwv(j, :);...
                 avgwv(j, :) - stdwv(j, :)];

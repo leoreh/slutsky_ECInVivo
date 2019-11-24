@@ -27,7 +27,8 @@ df = size(fet, 2);
 if ncluspk < df
     lRat = NaN;
     iDist = NaN;
-    warning('more features then spikes. L-Ratio and iDist is NaN')
+    mDist = NaN;
+    warning('more features then spikes. All params are NaN')
     return
 end
 

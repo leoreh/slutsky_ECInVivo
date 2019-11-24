@@ -88,8 +88,8 @@ binSize = 0.001;
 dur = 0.2; 
 [ccg t] = CCG({spikes.times{:}}, [], 'duration', dur, 'binSize', binSize);
 % high res
-binSize = 0.0001; 
-dur = 0.02;
+binSize = 0.00005;
+dur = 0.01;
 [ccg t] = CCG({spikes.times{:}}, [], 'duration', dur, 'binSize', binSize);
 
 for i = 1 : nunits
@@ -98,8 +98,6 @@ end
 
 u = spikes.UID(nspikes > 6300);
 u(1) = [];
-
-u = sort([22 4 20 21 19 16 13 27 17]);
 plotCCG('ccg', ccg(:, u, u), 't', t, 'basepath', basepath,...
     'saveFig', false, 'c', {'k'}, 'u', spikes.UID(u));
 

@@ -30,6 +30,9 @@ function out=import_wcp(fn, varargin)
 % 09 mar 19 LH      changed fread array size
 %                   changed out.S from cell to mat
 %                   added sampling frequency to output
+% 18 nov 19 LH      changed fread array size according to nChans
+%                   restored out.S to cell
+%                   fixed case where last trial incomplete
 
 if nargin < 1 || strcmp(fn,'')
     [FileName,PathName,FilterIndex] = uigetfile('*.wcp');
@@ -161,7 +164,8 @@ for i=1:length(recordings)
     
     % Data Block
     % changed size of array (LH 09-mar-19)
-    DB=fread(fid,[wcp.nc,wcp.nbd*256],'*int16');
+    DB=fread(fid,[wcp.nc,wcp.nbd*256/wcp.nc],'*int16');
+%     DB=fread(fid,[wcp.nc,wcp.nbd*256],'*int16');
     DAB{i}=double(DB);
     
 end
@@ -174,12 +178,14 @@ clear S1 S2
 S=cell(1,wcp.nc);
 for i=1:length(recordings)
     for j=1:wcp.nc
+        if length(DAB{i}(j,:)) == length(DAB{1}(j, :))
         S{j}(:,i)=(RAB{i}.max_pos_voltage(j)/(wcp.adcmax*wcp.channel_info{j}.yg))*DAB{i}(j,:);
+        end
     end
 end
 %% output signal
 out.fs = 1 / diff(T(1:2));
-out.S=cell2mat(S);
+out.S=S;
 out.T=T;
 out.time=wcp.ctime;
 out.rec_index=rec_index;

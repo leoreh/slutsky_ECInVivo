@@ -108,12 +108,12 @@ if avg
     % calculate mean and std of norm spike count
     fravg = mean(fr.norm, 1);
     frstd = nanstd(fr.norm, 0, 1);
-    errbounds = [(fravg) + (frstd);...
-        (fravg) - (frstd)];   
+    frstd = -frstd;
+    errbounds = [abs(fravg) + abs(frstd);...
+        abs(fravg) - abs(frstd)];   
     hold on
     p = patch([x, x(end : -1 : 1)], [errbounds(1 ,:), errbounds(2, end : -1 : 1)], [.5 .5 .5]);
     p.EdgeColor = 'none';
-    p.FaceAlpha = 0.5;
     plot(x, fravg, 'lineWidth', 3, 'Color', 'k')
     axis tight
     xlabel('Time [h]')

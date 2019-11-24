@@ -1,4 +1,4 @@
-function spikes = cluVal(basepath, spikes, npca, graphics, saveFig, saveVar)
+function spikes = cluVal(spikes, varargin)
 
 % wrapper for inspecting and validating clusters
 % computes:
@@ -12,9 +12,13 @@ function spikes = cluVal(basepath, spikes, npca, graphics, saveFig, saveVar)
 %   spikes          struct (see getSpikes)
 %   npca            no. PCA features for mahal dist {12}.
 %                   If sorted with neurosuite should be #spk group * 3
+%   mu              vector of predetermined multi units. spikes from these
+%                   units will be discarded from distance calculations.
+%                   numbering should correspond to spikes.UID
+%   force           logical. force recalculation of distance.
 %   graphics        logical. plot graphics {true} or not (false)
-%   saveFig         save figure {1} or not (0)
-%   saveVar         save variables (update spikes and save su)
+%   saveFig         logical. save figure {1} or not (0)
+%   saveVar         logical. save variables (update spikes and save su)
 %
 % OUTPUT:           additional fields to struct (all 1 x nunits):
 %   su              SU (1) or MU (0)
@@ -27,51 +31,63 @@ function spikes = cluVal(basepath, spikes, npca, graphics, saveFig, saveVar)
 %   getFet          PCA feature array
 %   cluDist         L ratio and iDist
 %   plotCluster     plot waveform and ISI histogram
+%   ISI             calc isi contamination
 %
-% 03 dec 18 LH
+% 03 dec 18 LH      UPDATS: 
+% 15 nov 19 LH      separated ISI to standalone function
+%                   added predetermined mu
+%                   adjusted i\o params
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-nargs = nargin;
-if nargs < 1 || isempty(basepath)
-    basepath = pwd;
-end
-if nargs < 2 || isempty(spikes)
-    warning('spikes will be loaded from %s', basepath)
-    spikes = getSpikes('basepath', basepath);
-end
-if nargs < 3 || isempty(npca)
-    npca = 12;
-end
-if nargs < 4 || isempty(graphics)
-    graphics = 1;
-end
-if nargs < 5 || isempty(saveFig)
-    saveFig = true;
-end
-if nargs < 6 || isempty(saveVar)
-    saveVar = true;
-end
+p = inputParser;
+addOptional(p, 'basepath', pwd);
+addOptional(p, 'npca', 12, @isscalar);
+addOptional(p, 'mu', [], @isnumeric);
+addOptional(p, 'force', false, @islogical);
+addOptional(p, 'graphics', true, @islogical);
+addOptional(p, 'saveFig', true, @islogical);
+addOptional(p, 'saveVar', true, @islogical);
+
+parse(p, varargin{:})
+basepath = p.Results.basepath;
+npca = p.Results.npca;
+mu = p.Results.mu;
+force = p.Results.force;
+graphics = p.Results.graphics;
+saveFig = p.Results.saveFig;
+saveVar = p.Results.saveVar;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % calculate cluster separation
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 fet = getFet(basepath);
 
-if all(isfield(spikes, {'mDist', 'iDist', 'lRat'}))
+if all(isfield(spikes, {'mDist', 'iDist', 'lRat'})) && ~force
     warning('separation matrices already calculated. Skipping cluDist');
 else
     sprintf('\ncalculating separation matrices\n\n');
+    j = 1;
     for i = 1 : length(fet)
         
         % disgard noise and artifact spikes
         idx = find(fet{i}(:, end) <= 1);
         fet{i}(idx, :) = [];
+              
+        % disgard spikes that belong to predetermined mu
+        if ~isempty(mu)  
+            u = spikes.cluID(sort(mu));
+            [~, idx] = maxk(u, length(fet));
+            idx = sort(idx);
+            for j = j : idx(i)
+                idx = find(fet{i}(:, end) == u(j));
+                fet{i}(idx, :) = [];
+            end
+        end
         
         % calculate separation matrices
-        clu = unique(fet{i}(:, end));
-        clu = clu(clu > 1);
+        clu = spikes.cluID(spikes.shankID == i);
         lRat{i} = zeros(length(clu), 1);
         iDist{i} = zeros(length(clu) ,1);
         for j = 1 : length(clu)
@@ -89,10 +105,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % calculate ISI contamination
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-spikes.isi = zeros(length(spikes.UID), 1);
-for i = 1 : length(spikes.UID)
-    spikes.isi(i, 1) = sum(diff(spikes.times{i}) < 0.003) / (length(spikes.times{i}) - 1) * 100;
-end
+spikes.isi = ISI(spikes, 'graphics', graphics);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % estimate SU or MU
