@@ -3,7 +3,7 @@
 % script that launches automatically upon startup and whenever called upon
 % 
 % place this file in userpath, e.g:
-% D:\Program Files\Matlab\R2018b\toolbox\local\userpath.m)
+% D:\Program Files\Matlab\R2018b\toolbox\local\userpath.m
 % 
 % 18 nov 19 LH
 
