@@ -3,18 +3,18 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 force = false;
-u = sort([22, 26]);
+u = ([20, 27]);
 %%% CCH
 
-% high res
-binSize = 0.0001; % [s]
-dur = 0.01;
-[ccg2, t2] = CCG({spikes.times{u}}, [], 'duration', dur, 'binSize', binSize);
-
-% low res
-binSize = 0.001; % [s]
-dur = 0.06;
-[ccg1, t1] = CCG({spikes.times{u}}, [], 'duration', dur, 'binSize', binSize);
+    % high res
+% binSize = 0.0001; % [s]
+% dur = 0.01;
+% [ccg2, t2] = CCG({spikes.times{u}}, [], 'duration', dur, 'binSize', binSize);
+% 
+% % low res
+% binSize = 0.001; % [s]
+% dur = 0.06;
+% [ccg1, t1] = CCG({spikes.times{u}}, [], 'duration', dur, 'binSize', binSize);
 
 
 if force
@@ -68,6 +68,16 @@ if force
         'man', false, 'fs', spikes.samplingRate, 'mfr', fr.mfr(:),...
         'saveVar', false, 'graphics', false);
     
+    % high res
+binSize = 0.0002; % [s]
+dur = 0.01;
+[ccg2, t2] = CCG({spikes.times{u}}, [], 'duration', dur, 'binSize', binSize);
+
+% low res
+binSize = 0.001; % [s]
+dur = 0.06;
+[ccg1, t1] = CCG({spikes.times{u}}, [], 'duration', dur, 'binSize', binSize);
+    
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -105,7 +115,7 @@ plotWaveform('avgwv', spikes.avgWaveform{u(2)}, 'stdwv', spikes.stdWaveform{u(2)
 title(sprintf('u%d', u(2)))
 
 % ACC u1
-subplot(4, 4, 4)
+subplot(4, 4, 3)
 plotCCG('ccg', ccg1(:, 1, 1), 't', t1, 'basepath', basepath,...
     'saveFig', false, 'c', {c{1}});
 xlabel('')
@@ -120,10 +130,9 @@ plotCCG('ccg', ccg1(:, 2, 2), 't', t1, 'basepath', basepath,...
 xticks([-30 0 30])
 
 % ccg
-subplot(4, 4, 3)
+subplot(4, 4, 4)
 plotCCG('ccg', ccg2(:, 1, 2), 't', t2, 'basepath', basepath,...
     'saveFig', false, 'c', {'k'});
-xlabel('')
 
 % INT vs. PYR
 subplot(4, 4, 8)
@@ -208,7 +217,7 @@ subplot(4, 4, 16)
 FRcontrol = mean(fr.norm(:, idxControl), 2);
 FRpsam = mean(fr.norm(:, idxPsam), 2);
 FRreturn = mean(fr.norm(:, idxReturn), 2);
-plotFRchange(([FRcontrol FRpsam FRreturn]), 'avg', true, 'labels', {'Ctrl', 'uPSEM', 'wo'});
+plotFRchange(([FRcontrol FRpsam FRreturn]), 'avg', true, 'labels', {'BL', 'uPSEM', 'WO'});
 xlabel('')
 ylim([0 2])
 
@@ -218,16 +227,16 @@ FRcontrol = mean(fr.strd(:, idxControl), 2);
 FRpsam = mean(fr.strd(:, idxPsam), 2);
 FRreturn = mean(fr.strd(:, idxReturn), 2);
 h = histogram(log10(FRcontrol), 5);
-h.EdgeColor = 'none';
+h.EdgeColor = 'g';
 h.FaceColor = 'g';
 h.FaceAlpha = 0.3;
 hold on
 h = histogram(log10(FRpsam), 5);
-h.EdgeColor = 'none';
+h.EdgeColor = 'm';
 h.FaceColor = 'm';
 h.FaceAlpha = 0.3;
 h = histogram(log10(FRreturn), 5);
-h.EdgeColor = 'none';
+h.EdgeColor = 'y';
 h.FaceColor = 'y';
 h.FaceAlpha = 0.3;
 box off

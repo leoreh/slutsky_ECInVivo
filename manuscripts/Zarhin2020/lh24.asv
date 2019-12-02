@@ -2,18 +2,18 @@
 % load and arrange data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-force = false;
+force = true;
 u = sort([22, 26]);
 %%% CCH
 
-% high res
+    % high res
 binSize = 0.0001; % [s]
 dur = 0.01;
 [ccg2, t2] = CCG({spikes.times{u}}, [], 'duration', dur, 'binSize', binSize);
 
 % low res
 binSize = 0.001; % [s]
-dur = 0.1;
+dur = 0.06;
 [ccg1, t1] = CCG({spikes.times{u}}, [], 'duration', dur, 'binSize', binSize);
 
 
@@ -46,8 +46,7 @@ if force
     %         'saveFig', true, 'force', true, 'mu', mu, 'graphics', false);
     %
     
-    
-    
+       
     %%% firing rate
     fr = FR(spikes.times, 'basepath', basepath, 'graphics', false, 'saveFig', false,...
         'binsize', 300, 'saveVar', true, 'smet', 'MA', 'winBL', [1, 30 * 60]);
@@ -58,16 +57,26 @@ if force
     idxPsam = [find(tFR * 60 > 45, 1) : find(tFR * 60 > 75, 1)];
     idxReturn = [find(tFR * 60 > 240, 1) : find(tFR * 60 > 270, 1)];
     
-    select = [2, 4];
+    select = [2];
     lns = cumsum(info.blockduration / 60 / 60);
     lns = [lns([select - 1])];
-    lbs = {'uPSEM', 'CNO'};
+    lbs = {'uPSEM'};
     
     %%% INT vs PYR
     % units = [1 : 5, 9 : 13, 15 : 17, 19 : 22, 24 : 27];
     CellClass = cellClass('waves', cat(1, spikes.rawWaveform{:})', 'u', u,...
         'man', false, 'fs', spikes.samplingRate, 'mfr', fr.mfr(:),...
         'saveVar', false, 'graphics', false);
+    
+    % high res
+binSize = 0.0001; % [s]
+dur = 0.01;
+[ccg2, t2] = CCG({spikes.times{u}}, [], 'duration', dur, 'binSize', binSize);
+
+% low res
+binSize = 0.001; % [s]
+dur = 0.06;
+[ccg1, t1] = CCG({spikes.times{u}}, [], 'duration', dur, 'binSize', binSize);
     
 end
 
@@ -106,7 +115,7 @@ plotWaveform('avgwv', spikes.avgWaveform{u(2)}, 'stdwv', spikes.stdWaveform{u(2)
 title(sprintf('u%d', u(2)))
 
 % ACC u1
-subplot(4, 4, 4)
+subplot(4, 4, 3)
 plotCCG('ccg', ccg1(:, 1, 1), 't', t1, 'basepath', basepath,...
     'saveFig', false, 'c', {c{1}});
 xlabel('')
@@ -118,11 +127,13 @@ xticks([])
 subplot(4, 4, 7)
 plotCCG('ccg', ccg1(:, 2, 2), 't', t1, 'basepath', basepath,...
     'saveFig', false, 'c', {c{2}});
+xticks([-30 0 30])
 
 % ccg
-subplot(4, 4, 3)
+subplot(4, 4, 4)
 plotCCG('ccg', ccg2(:, 1, 2), 't', t2, 'basepath', basepath,...
     'saveFig', false, 'c', {'k'});
+xlabel('')
 
 % INT vs. PYR
 subplot(4, 4, 8)
@@ -133,6 +144,7 @@ scatter(CellClass.tp(u(1)), CellClass.spkw(u(1)), mfr(u(1)), 'filled', c{1})
 scatter(CellClass.tp(u(2)), CellClass.spkw(u(2)), mfr(u(2)), 'filled', c{2})
 xlabel('trough-to-peak [ms]')
 ylabel('spike width [ms]')
+set(gca, 'TickLength', [0 0])
 
 % FR units
 subplot(4, 4, 9 : 11)
@@ -170,6 +182,13 @@ z = idxPsam * fr.binsize / 60 / 60;
 p = patch([z(1) z(end) z(end) z(1)], [y(1) y(1) y(2) y(2)], 'm');
 p.FaceAlpha = 0.2;
 p.EdgeColor = 'none';
+z = idxReturn * fr.binsize / 60 / 60;
+p = patch([z(1) z(end) z(end) z(1)], [y(1) y(1) y(2) y(2)], 'y');
+p.FaceAlpha = 0.2;
+p.EdgeColor = 'none';
+xlim([0 5])
+xticks([0 : 5])
+set(gca, 'TickLength', [0 0])
 
 % FR avg
 subplot(4, 4, 13 : 15)
@@ -190,20 +209,24 @@ z = idxReturn * fr.binsize / 60 / 60;
 p = patch([z(1) z(end) z(end) z(1)], [y(1) y(1) y(2) y(2)], 'y');
 p.FaceAlpha = 0.2;
 p.EdgeColor = 'none';
+xlim([0 5])
+xticks([0 : 5])
+set(gca, 'TickLength', [0 0])
 
 % change in norm. fr
 subplot(4, 4, 16)
 FRcontrol = mean(fr.norm(:, idxControl), 2);
 FRpsam = mean(fr.norm(:, idxPsam), 2);
-FRreturn = mean(fr.norm(:, idxPsam), 2);
-
-plotFRchange([FRcontrol FRpsam], 'avg', true, 'labels', {'Conrol', 'uPSEM'});
+FRreturn = mean(fr.norm(:, idxReturn), 2);
+plotFRchange(([FRcontrol FRpsam FRreturn]), 'avg', true, 'labels', {'Ctrl', 'uPSEM', 'wo'});
 xlabel('')
+ylim([0 2])
 
 % FR distribution (Hz, not norm)
 subplot(4, 4, 12)
 FRcontrol = mean(fr.strd(:, idxControl), 2);
 FRpsam = mean(fr.strd(:, idxPsam), 2);
+FRreturn = mean(fr.strd(:, idxReturn), 2);
 h = histogram(log10(FRcontrol), 5);
 h.EdgeColor = 'none';
 h.FaceColor = 'g';
@@ -213,50 +236,18 @@ h = histogram(log10(FRpsam), 5);
 h.EdgeColor = 'none';
 h.FaceColor = 'm';
 h.FaceAlpha = 0.3;
+h = histogram(log10(FRreturn), 5);
+h.EdgeColor = 'none';
+h.FaceColor = 'y';
+h.FaceAlpha = 0.3;
 box off
 axis tight
 xlabel('Firing Rate [log(Hz)]')
 ylabel('Number of Units')
+set(gca, 'TickLength', [0 0])
 
-
-
-
-
-
-
-% % feature space
-% subplot(4, 4, 4)
-% plotFet(fet{1}, 'clu', u, 'c', [c{:}], 'saveFig', false, 'newFig', false)
-% axis tight
-% title('')
-
-% % ISI distribution u1
-% subplot(4, 4, 3)
-% binsize = 0.0005;
-% bins = [0 : binsize : 0.05];
-% h = histogram([diff(spikes.times{u(1)})], bins);
-% h.EdgeColor = 'none';
-% h.FaceColor = c{1};
-% xticks([0 0.05])
-% box off
-% axis tight
-% ax = gca;
-% ax.YTick = []; ax.YColor = 'none';
-% line([0.003 0.003], ax.YLim, 'color', 'k', 'LineWidth', 1)
-%
-% % ISI distribution u2
-% subplot(4, 4, 7)
-% binsize = 0.0005;
-% bins = [0 : binsize : 0.05];
-% h = histogram([diff(spikes.times{u(2)})], bins);
-% h.EdgeColor = 'none';
-% h.FaceColor = c{2};
-% xticks([0 0.05])
-% box off
-% axis tight
-% ax = gca;
-% ax.YTick = []; ax.YColor = 'none';
-% line([0.003 0.003], ax.YLim, 'color', 'k', 'LineWidth', 1)
-
+%%% save
+filename = 'lh24';
+savePdf(filename, basepath, f)
 
 

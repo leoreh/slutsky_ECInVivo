@@ -84,8 +84,8 @@ plotIsolation(basepath, spikes, false)
 
 % use buzcode CCG
 % low res
-binSize = 0.001; 
-dur = 0.2; 
+binSize = 0.001; % [s]
+dur = 0.05;
 [ccg t] = CCG({spikes.times{:}}, [], 'duration', dur, 'binSize', binSize);
 % high res
 binSize = 0.0001; 
@@ -99,7 +99,7 @@ end
 u = spikes.UID(nspikes > 6300);
 u(1) = [];
 
-u = sort([22 4 20 21 19 16 13 27 17]);
+u = sort([20 27]);
 plotCCG('ccg', ccg(:, u, u), 't', t, 'basepath', basepath,...
     'saveFig', false, 'c', {'k'}, 'u', spikes.UID(u));
 
