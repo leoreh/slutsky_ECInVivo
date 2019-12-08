@@ -1,4 +1,4 @@
-% this is :a wrapper for preprocessing extracellular data.
+% this is a wrapper for preprocessing extracellular data.
 % contains calls to various functions.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
