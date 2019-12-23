@@ -67,17 +67,18 @@ x = ([1 : nbins] / (60 / fr.binsize) / 60);
 % plot
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+f = gcf;
+
 % raster plot
 if raster
     hold on
     for i = 1 : nunits
         y = ones(length(spktimes{i}), 1) * i;
-        scatter(spktimes{i} / 60 / 60, y, 2, 'k', 'filled')
+        scatter(spktimes{i} / 60 / 60, y, 0.1, 'k', 'filled')
     end
     axis tight
     ylabel('Unit #')
     title('Raster Plot')
-    addLns('lns', lns, 'lbs', lbs, 'ax', 'x')
 end
 
 % FR of each unit
@@ -88,8 +89,18 @@ if units
     end
     axis tight
     ylabel('Frequency [Hz]')
-    title('Firing Rate') 
-    addLns('lns', lns, 'lbs', lbs, 'ax', 'x')
+    title('Firing Rate')
+    
+    if ~isempty(lns)
+        nlines = length(lns);
+        l = repmat(lns, 2, 1);
+        y = repmat(ylim, nlines, 1);
+        plot(l, y' ,'--k')
+        if ~isempty(lbs)
+            text(l(1, :), y(1, 2)*ones(nlines, 1), lbs)
+        end
+    end
+    
 end
 
 % mean +- std

@@ -122,7 +122,7 @@ fr = FR(spikes.times, 'basepath', basepath, 'graphics', false, 'saveFig', false,
 [~, filename] = fileparts(basepath);
 filename = [filename '.Raw1.Info.mat'];
 load(filename);
-select = [1, 2, 4];
+select = [1, 2 3];
 info.labels = {'Baseline', 'uPSEM 5 mg/kg', '', 'CNO 5 mg/kg'};
 lns = cumsum(info.blockduration / 60 / 60);
 lns = [1e-6, lns];
