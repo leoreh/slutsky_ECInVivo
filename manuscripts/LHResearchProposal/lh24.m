@@ -19,6 +19,7 @@ u = ([20, 27]);
 
 if force
     basepath = 'E:\Data\Dat\lh24';
+    cd(basepath)
     load('lh24.Raw1.Info.mat')
     load('lh24.fet.mat')
     
@@ -49,7 +50,7 @@ if force
        
     %%% firing rate
     fr = FR(spikes.times, 'basepath', basepath, 'graphics', false, 'saveFig', false,...
-        'binsize', 300, 'saveVar', true, 'smet', 'MA', 'winBL', [1, 30 * 60]);
+        'binsize', 300, 'saveVar', true, 'smet', 'MA', 'winBL', [1, 30 * 60], 'select', {'thr'});
     [nunits, nbins] = size(fr.strd);
     tFR = ([1 : nbins] / (60 / fr.binsize) / 60);
     
@@ -119,8 +120,8 @@ subplot(4, 4, 3)
 plotCCG('ccg', ccg1(:, 1, 1), 't', t1, 'basepath', basepath,...
     'saveFig', false, 'c', {c{1}});
 xlabel('')
-ylabel('')
-yticks([])
+% ylabel('')
+% yticks([])
 xticks([])
 
 % ACC u2
@@ -217,9 +218,21 @@ subplot(4, 4, 16)
 FRcontrol = mean(fr.norm(:, idxControl), 2);
 FRpsam = mean(fr.norm(:, idxPsam), 2);
 FRreturn = mean(fr.norm(:, idxReturn), 2);
-plotFRchange(([FRcontrol FRpsam FRreturn]), 'avg', true, 'labels', {'BL', 'uPSEM', 'WO'});
+mat = [FRcontrol FRpsam FRreturn];
+xpoints = 1 : 3;
+line(xpoints, mat, 'Color', [0.5 0.5 0.5])
+hold on
+line(1 : 3, mat(15, :), 'Color', c{1}, 'LineWidth', 3)
+line(1 : 3, mat(22, :), 'Color', c{2}, 'LineWidth', 3)
+line(xpoints, [mean(mat)], 'Color', 'k', 'LineWidth', 5)
+axis tight
+xlim([xpoints(1) - 0.2, xpoints(end) + 0.2])
+ylabel('Norm. Firing Rate')
+ax = gca;
+ax.XTick = xpoints;
+ax.XTickLabel = {'BL', 'uPSEM', 'WO'};
 xlabel('')
-ylim([0 2])
+% ylim([0 2])
 
 % FR distribution (Hz, not norm)
 subplot(4, 4, 12)
@@ -227,16 +240,16 @@ FRcontrol = mean(fr.strd(:, idxControl), 2);
 FRpsam = mean(fr.strd(:, idxPsam), 2);
 FRreturn = mean(fr.strd(:, idxReturn), 2);
 h = histogram(log10(FRcontrol), 5);
-h.EdgeColor = 'g';
+h.EdgeColor = 'none';
 h.FaceColor = 'g';
 h.FaceAlpha = 0.3;
 hold on
 h = histogram(log10(FRpsam), 5);
-h.EdgeColor = 'm';
+h.EdgeColor = 'none';
 h.FaceColor = 'm';
 h.FaceAlpha = 0.3;
 h = histogram(log10(FRreturn), 5);
-h.EdgeColor = 'y';
+h.EdgeColor = 'none';
 h.FaceColor = 'y';
 h.FaceAlpha = 0.3;
 box off
@@ -245,8 +258,12 @@ xlabel('Firing Rate [log(Hz)]')
 ylabel('Number of Units')
 set(gca, 'TickLength', [0 0])
 
+
+
+
 %%% save
-filename = 'lh24';
-savePdf(filename, basepath, f)
+% filename = 'lh24';
+% savePdf(filename, basepath, f)
+
 
 
