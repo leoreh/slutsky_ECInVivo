@@ -46,9 +46,9 @@ winmax = 0.8 * fs;      % window for moving max
 binw = 0.15 * fs;       % bin width for std calculation
 dist = 0.2 * fs;        % distance for removing adjacent peaks
 thr = 1;                % threshold of detection
-minDur = 0.3;          % minimum event duration [s]
-maxDur = 10;            % maximum event duration [s]
-interDur = 1 * fs;    % minimum time between events [s]
+minDur = 0.02;          % minimum event duration [s]
+maxDur = 10000;         % maximum event duration [ms]
+interDur = 0.3 * fs;    % minimum time between events [ms]
         
 % prepare output
 bs = [];
@@ -67,17 +67,24 @@ thr = sepBimodel('x', x, 'lognorm', true, 'graphics', false);
 % detection
 b = x > thr;
 
-% find start
 start = find(diff(b) > 0);
-% start = movmax(x, [winmax, 0]);
-% start = find(diff(start) > thr)';
-% start = remNear('x', start, 'dist', dist, 'flip', false);
+stop = find(diff(b) < 0);
+
+% figure
+% plot(lfp.timestamps(idx), x)
+% hold on 
+% plot(lfp.timestamps(idx), y)
+% bar(b, 1)
+
+% find start
+start = movmax(x, [winmax, 0]);
+start = find(diff(start) > thr)';
+start = remNear('x', start, 'dist', dist, 'flip', false);
 
 % find end
-stop = find(diff(b) < 0);
-% stop = movmax(x, [0, winmax]);
-% stop = find(diff(stop) < thr)';
-% stop = remNear('x', stop, 'dist', dist, 'flip', true);
+stop = movmax(x, [0, winmax]);
+stop = find(diff(stop) < thr)';
+stop = remNear('x', stop, 'dist', dist, 'flip', true);
 
 % exclude last event if it is incomplete
 if length(stop) == length(start) - 1
@@ -133,8 +140,8 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 dur = temp2(:, 2) - temp2(:, 1);
-idxMax = dur > maxDur * fs;
-idxMin = dur < minDur * fs;
+idxMax = dur > maxDur * lfp.fs;
+idxMin = dur < minDur * lfp.fs;
 idx = idxMax | idxMin;
 temp2(idx, :) = [];
 nEvents = length(temp2);
@@ -165,10 +172,6 @@ bs.stamps = temp2;
 bs.peaks = peakPos;
 bs.power = peakPower;
 bs.fs = fs;
-bs.binary = zeros(length(b), 1);
-for i = 1 : size(bs.stamps, 1)
-    bs.binary(bs.stamps(i, 1) : bs.stamps(i, 2)) = 1;
-end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % save

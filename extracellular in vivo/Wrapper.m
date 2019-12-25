@@ -4,7 +4,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % basepath to recording folder
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'E:\Data\Dat\lh37';
+basepath = 'E:\Data\Dat\lh43';
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 1: file conversion
@@ -122,8 +122,8 @@ fr = FR(spikes.times, 'basepath', basepath, 'graphics', false, 'saveFig', false,
 [~, filename] = fileparts(basepath);
 filename = [filename '.Raw1.Info.mat'];
 load(filename);
-select = [1 : 6];
-info.labels = {'Baseline', 'uPSEM 5 mg/kg', '', 'CNO 5 mg/kg'};
+select = [1 : 4];
+info.labels = {'Baseline', 'CNO 5 mg/kg', 'uPSEM 5 mg/kg', 'uPSEM 5 mg/kg'};
 lns = cumsum(info.blockduration / 60 / 60);
 lns = [1e-6, lns];
 lns(end) = [];

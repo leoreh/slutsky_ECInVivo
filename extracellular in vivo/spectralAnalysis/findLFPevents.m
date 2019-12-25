@@ -113,9 +113,9 @@ switch preset
         winLength = 11;                 % [samples]
         
         thr = [2 5];                    % low and high thresholding value [z-score]
-        minDur = 0.02;                  % minimum event duration [ms]
-        maxDur = 0.1;                   % maximum event duration [ms]
-        interDur = 0.03 * lfp.fs;       % minimum time between events [ms]
+        minDur = 0.02;                  % minimum event duration [s]
+        maxDur = 0.1;                   % maximum event duration [s]
+        interDur = 0.03 * lfp.fs;       % minimum time between events [s]
         
     case 'bs'
         passband = [5 250];

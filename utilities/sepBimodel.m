@@ -46,14 +46,14 @@ end
 
 [h, e] = histcounts(x, nbins, 'Normalization', 'probability');
 e = e(1 : end - 1) + mean(diff(e)) / 2;
-h = movmean(h, 20);
+% h = movmean(h, 20);
 [~, i] = findpeaks(-h);
 
 if lognorm
     sep = 10 ^ mean(e(i));
     % test for normality
     [~, p] = lillietest(x);
-    txt = sprintf('thr = %.2f, p(~normality) = %.2f', sep, p);
+    txt = sprintf('thr = %.2f, p(~normality) = %.3f', sep, p);
 else
     sep = mean(e(i));
     txt = sprintf('thr = %.2f', sep);
