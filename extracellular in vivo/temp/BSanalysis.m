@@ -1,39 +1,68 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % data 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% tetrodes
 ch = 5;
 basepath = 'E:\Data\Dat\lh43';
 [~, filename] = fileparts(basepath);
 cd(basepath)
-force = false;
-
-if force
-    load([filename '.lfp.mat'])
-end
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% inspect lfp 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+load([filename '.lfp.mat'])
 fs = lfp.fs;
-idx = 1 : 60 * fs;
-x = lfp.data(idx, ch);
-figure
-plot(lfp.timestamps(idx), x)
-xlim([idx(1), idx(1) + 10])
+idx = 1 : 6000 * fs;
+x = double(lfp.data(idx, ch));
 
-% for sleep-state analysis it is probably preferable to calculate the power
-% spectrum (dB) rather than PSD (dB / Hz) because it is independent of
-% other frequencies. however, when tested no differences were found.
-
-win = 0.5 * fs;
-freq = [0 : 100];
-
-figure
-[s, f, t, p] = spectrogram(x, win, round(win / 4), freq, fs, 'yaxis', 'power', 'onesided');
+% field
+basepath = 'E:\Data\Others\DZ\Field\Acute recordings\Long recordings\WT\WT2';
+cd(basepath)
+filename = dir('*abf');
+filename = filename.name;
+[d, si, h] = abfload(filename, 'start', 0, 'stop', 'e', 'channels', 'a');
+    
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% bimodal separation 
+% delta power 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% filter in spectrum. no need to filter if spectrogram. 
+% passband = [0 6];
+% order = 6;
+% type = 'butter';
+% sig = filterLFP(x, 'type', type, 'fs', fs,...
+%     'passband', passband, 'order', order, 'graphics', false);
+
+% broad-band spectrogram
+freq = logspace(0, 2, 100);
+win = hann(2 ^ nextpow2(0.5 * fs));
+[s, f, t, p] = spectrogram(x, win, length(win) / 2, freq, fs,...
+    'yaxis', 'psd');
+
+% integrate power over the delta band 
+deltaf = [0.5 4];
+[~, deltaidx] = min(abs(f - deltaf));
+deltap = sum(p(deltaidx(1) : deltaidx(2), :), 1);
+
+% z-score. this is a great way of comparing changes within a signal
+deltaz = zscore(deltap);
+
+figure
+subplot(2, 1, 1)
+surf(t, f, 10*log10(abs(p)), 'EdgeColor', 'none');
+axis xy; 
+axis tight; 
+colormap(jet); 
+view(0,90);
+xlabel('Time (secs)');
+colorbar;
+ylabel('Frequency [Hz]');
+set(gca, 'YScale', 'log')
+subplot(2, 1, 2)
+plot(t, deltaz)
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% burst suppression
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % params
 winmax = 0.8 * fs;      % window for moving max        

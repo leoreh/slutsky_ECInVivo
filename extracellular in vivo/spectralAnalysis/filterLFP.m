@@ -29,6 +29,7 @@ function  filtered = filterLFP(raw, varargin)
 % 
 % 24 apr 19 LH. 
 %       29 apr 19       added dataOnly
+%       26 dec 19       added types for butter
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -96,7 +97,13 @@ switch(type)
         end
     case 'butter'
         if ~isempty(passband)
-            [b a] = butter(order, [passband(1) / nyquist passband(2) / nyquist], 'bandpass');
+            if passband(1) == 0
+                [b a] = butter(order, passband(2) / nyquist, 'low');
+            elseif passband(2) == inf
+                [b a] = butter(order, passband(1) / nyquist, 'high');
+            else
+                [b a] = butter(order, [passband(1) / nyquist passband(2) / nyquist], 'bandpass');
+            end
         else
             [b a] = butter(order, stopband(1) / nyquist, 'stop');
         end

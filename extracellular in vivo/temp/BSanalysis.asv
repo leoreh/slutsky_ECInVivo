@@ -14,25 +14,54 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % inspect lfp 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% tetr
 fs = lfp.fs;
-idx = 1 : 60 * fs;
-x = lfp.data(idx, ch);
-figure
-plot(lfp.timestamps(idx), x)
-xlim([idx(1), idx(1) + 10])
-
-% for sleep-state analysis it is probably preferable to calculate the power
-% spectrum rather than PSD because it is independent of other frequencies.
-
-win = 0.5 * fs;
-freq = [0 : 100];
-figure
-spectrogram(double(x), win, round(win / 4), freq, fs, 'yaxis', 'psd');
-
-y = x + sin(2 * pi * 50 )
+idx = 1 : 6000 * fs;
+x = double(lfp.data(idx, ch));
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% bimodal separation 
+% delta power 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% filter in spectrum. no need to filter if spectrogram. 
+% passband = [0 6];
+% order = 6;
+% type = 'butter';
+% sig = filterLFP(x, 'type', type, 'fs', fs,...
+%     'passband', passband, 'order', order, 'graphics', false);
+
+% broad-band spectrogram
+freq = logspace(0, 2, 100);
+win = hann(2 ^ nextpow2(0.5 * fs));
+[s, f, t, p] = spectrogram(x, win, length(win) / 2, freq, fs,...
+    'yaxis', 'psd');
+
+% integrate power over the delta band 
+deltaf = [0.5 4];
+[~, deltaidx] = min(abs(f - deltaf));
+deltap = sum(p(deltaidx(1) : deltaidx(2), :), 1);
+
+% z-score. this is a great way of comparing changes within a signal
+deltaz = zscore(deltap);
+
+figure
+subplot(2, 1, 1)
+surf(t, f, 10*log10(abs(p)), 'EdgeColor', 'none');
+axis xy; 
+axis tight; 
+colormap(jet); 
+view(0,90);
+xlabel('Time (secs)');
+colorbar;
+ylabel('Frequency [Hz]');
+set(gca, 'YScale', 'log')
+subplot(2, 1, 2)
+plot(t, deltaz)
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% burst suppression
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % params
 winmax = 0.8 * fs;      % window for moving max        

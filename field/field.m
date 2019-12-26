@@ -4,7 +4,8 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'E:\Data\fEPSP\Daniel\18nov19';
+basepath = 'E:\Data\Others\DZ\Field\Acute recordings\Long recordings\WT\WT1';
+cd(basepath)
 graphics = true;
 saveFig = false;
 saveVar = false;
