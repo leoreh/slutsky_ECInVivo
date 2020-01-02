@@ -105,7 +105,7 @@ switch(type)
                 [b a] = butter(order, [passband(1) / nyquist passband(2) / nyquist], 'bandpass');
             end
         else
-            [b a] = butter(order, stopband(1) / nyquist, 'stop');
+            [b a] = butter(order, stopband / nyquist, 'stop');
         end
 end
 

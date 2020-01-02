@@ -254,16 +254,17 @@ h.FaceColor = 'y';
 h.FaceAlpha = 0.3;
 box off
 axis tight
+set(gca, 'TickLength', [0 0])
 xlabel('Firing Rate [log(Hz)]')
 ylabel('Number of Units')
-set(gca, 'TickLength', [0 0])
+
 
 
 
 
 %%% save
-% filename = 'lh24';
-% savePdf(filename, basepath, f)
+filename = 'lh24';
+savePdf(filename, basepath, f)
 
 
 

@@ -4,7 +4,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % basepath to recording folder
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'E:\Data\Dat\lh43';
+basepath = 'E:\Data\Dat\lh39';
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 1: file conversion
@@ -117,13 +117,13 @@ CellClass = cellClass(cat(1, spikes.rawWaveform{:})', 'fs', spikes.samplingRate,
 % STEP 6: calculate mean firing rate
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 fr = FR(spikes.times, 'basepath', basepath, 'graphics', false, 'saveFig', false,...
-    'binsize', 120, 'saveVar', true, 'smet', 'MA');
+    'binsize', 20, 'saveVar', true, 'smet', 'MA');
 
 [~, filename] = fileparts(basepath);
 filename = [filename '.Raw1.Info.mat'];
 load(filename);
-select = [1 : 4];
-info.labels = {'Baseline', 'CNO 5 mg/kg', 'uPSEM 5 mg/kg', 'uPSEM 5 mg/kg'};
+select = [1 : 3];
+info.labels = {'Baseline', 'uPSEM 3 mg/kg', 'uPSEM 3 mg/kg'};
 lns = cumsum(info.blockduration / 60 / 60);
 lns = [1e-6, lns];
 lns(end) = [];

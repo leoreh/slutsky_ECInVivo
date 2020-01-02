@@ -7,7 +7,7 @@ function [lRat, iDist, mDist] = cluDist(fet, cluidx, mDist)
 % INPUT:
 %   fet         n (spikes) x d (dimensions) array of feature vectors
 %   cluidx      index into fet which lists spikes from the cell whose quality is to be evaluated.
-%   m           squared mahalanobis distances, default is to calculate them directly
+%   mDist       squared mahalanobis distances, default is to calculate them directly
 % 
 % OUTPUT:
 %   L           L ratio for cluster

@@ -12,19 +12,34 @@ idx = 1 : 6000 * fs;
 x = double(lfp.data(idx, ch));
 
 % field
-basepath = 'E:\Data\Others\DZ\Field\Acute recordings\Long recordings\WT\WT2';
+basepath = 'E:\Data\Others\DZ\Field\Acute recordings\2h-3h\WT\Wt6_light_iso';
 cd(basepath)
 filename = dir('*abf');
 filename = filename.name;
-[d, si, h] = abfload(filename, 'start', 0, 'stop', 'e', 'channels', 'a');
-    
+[data, metadata] = abf2load(filename);
+f = metadata.fADCSequenceInterval;
+fs_orig = 1 / (f / 1000000);
+fs = 1250;
+
+x = resample(data, fs, round(fs_orig));
+x = x(1 : 4000000);
+
+% remove line
+linet = lineDetect('x', x, 'fs', fs, 'graphics', false);
+[x] = lineRemove(x, linet, [], [], 0, 1);
+
+tidx = (1 : round(fs / 1));    % 100 ms
+idx = round(fs / 2) + tidx;     % starting from 500 ms
+t = idx / fs;
+lidx = find(linet > idx(1) & linet < idx(end));
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % delta power 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% filter in spectrum. no need to filter if spectrogram. 
+% no need to filter if spectrogram. 
 % passband = [0 6];
 % order = 6;
 % type = 'butter';
@@ -33,7 +48,8 @@ filename = filename.name;
 
 % broad-band spectrogram
 freq = logspace(0, 2, 100);
-win = hann(2 ^ nextpow2(0.5 * fs));
+winl = 2;       % win length [s]
+win = hann(2 ^ nextpow2(winl * fs));
 [s, f, t, p] = spectrogram(x, win, length(win) / 2, freq, fs,...
     'yaxis', 'psd');
 
@@ -55,7 +71,7 @@ view(0,90);
 xlabel('Time (secs)');
 colorbar;
 ylabel('Frequency [Hz]');
-set(gca, 'YScale', 'log')
+% set(gca, 'YScale', 'log')
 subplot(2, 1, 2)
 plot(t, deltaz)
 
