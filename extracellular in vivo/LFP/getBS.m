@@ -29,6 +29,7 @@ function [bs] = getBS(varargin)
 %       # GMM clusters such that grp #1 has higher values (= bursts).
 %       # check rubostness binsize and interDur. Currently
 %       interDur must be greater than binsize because of merge.
+%       # replace changepts with https://www.mathworks.com/help/wavelet/ug/wavelet-changepoint-detection.html
 %
 % CALLS
 %       cluDist     for cluster separation
@@ -347,22 +348,25 @@ if graphics
     axis tight
     Y = ylim;
     fill([bs.stamps fliplr(bs.stamps)] / fs / 60, [Y(1) Y(1) Y(2) Y(2)],...
-        'k', 'FaceAlpha', 0.3,  'EdgeAlpha', 0);
+        'k', 'FaceAlpha', 0.4,  'EdgeAlpha', 0);
     ylabel('Voltage [mV]')
     set(gca, 'TickLength', [0 0])
     box off
     title('Raw and BS')
     
     % raw and BS - 1 min
+    midsig = round(length(sig) / 2 / fs / 60);
+    ylimsig = sig(midsig * fs * 60 : (midsig + 1) * fs * 60);
     axes('Position',[.13 .875 .15 .05])
     box on
     plot((1 : length(sig)) / fs / 60, sig)
     hold on
     axis tight
+    ylim([min(ylimsig) max(ylimsig)])
     Y = ylim;
     fill([bs.stamps fliplr(bs.stamps)] / fs / 60, [Y(1) Y(1) Y(2) Y(2)],...
-        'k', 'FaceAlpha', 0.3,  'EdgeAlpha', 0);
-    xlim([10 11])
+        'k', 'FaceAlpha', 0.4,  'EdgeAlpha', 0);
+    xlim([midsig midsig + 1])
     set(gca, 'TickLength', [0 0])
     set(gca, 'YTickLabel', [])
     set(gca, 'XTickLabel', [])

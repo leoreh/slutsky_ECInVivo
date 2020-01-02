@@ -30,7 +30,7 @@ function  filtered = filterLFP(raw, varargin)
 % 24 apr 19 LH. 
 %       29 apr 19       added dataOnly
 %       26 dec 19       added types for butter
-%       02 jan 19       adjusted for any input matrix shape
+%       02 jan
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
