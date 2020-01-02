@@ -16,6 +16,7 @@ function [bs] = getBS(varargin)
 %   graphics    logical. plot figure {1}
 %   saveVar     logical. save variable {1}
 %   saveFig     logical. save figure {1}
+%   forceA      logical {false}. force analysis even if .mat exists
 %
 % OUTPUT
 %   events         struct with fields:
@@ -33,6 +34,7 @@ function [bs] = getBS(varargin)
 %
 % CALLS
 %       cluDist     for cluster separation
+%       calcFR
 % 
 % EXAMPLE
 %               bs = getBS('sig', sig, 'fs', fs, 'basepath', basepath,...
@@ -58,7 +60,7 @@ addParameter(p, 'basename', [], @isstr);
 addParameter(p, 'graphics', true, @islogical)
 addParameter(p, 'saveVar', true, @islogical);
 addParameter(p, 'saveFig', true, @islogical);
-addParameter(p, 'forceAnalyze', false, @islogical);
+addParameter(p, 'forceA', false, @islogical);
 
 parse(p, varargin{:})
 sig = p.Results.sig;
@@ -72,12 +74,12 @@ basename = p.Results.basename;
 graphics = p.Results.graphics;
 saveVar = p.Results.saveVar;
 saveFig = p.Results.saveFig;
-forceAnalyze = p.Results.forceAnalyze;
+forceA = p.Results.forceAnalyze;
 
 % params
 minDur = 1;                         % minimum event duration [s]
 maxDur = 300;                       % maximum event duration [s]
-interDur = 2;                       % minimum time between events [bins]
+interDur = 1;                       % minimum time between events [bins]
 binsize = binsize * fs;             % [s] * [fs] = [samples]
 nclust = 2;                         % two clusters: burst and suppression
 
@@ -92,7 +94,7 @@ if isempty(basename)
     [~, basename] = fileparts(basepath);
 end
 filename = [basepath, '\', basename, '.bs.mat'];
-if ~forceAnalyze
+if ~forceA
     if exist(filename)
         load(filename)
         fprintf('\n loading %s \n\n', filename)
