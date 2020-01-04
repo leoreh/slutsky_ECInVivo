@@ -16,7 +16,6 @@ function [bs] = getBS(varargin)
 %   graphics    logical. plot figure {1}
 %   saveVar     logical. save variable {1}
 %   saveFig     logical. save figure {1}
-%   forceA      logical {false}. force analysis even if .mat exists
 %
 % OUTPUT
 %   events         struct with fields:
@@ -30,11 +29,9 @@ function [bs] = getBS(varargin)
 %       # GMM clusters such that grp #1 has higher values (= bursts).
 %       # check rubostness binsize and interDur. Currently
 %       interDur must be greater than binsize because of merge.
-%       # replace changepts with https://www.mathworks.com/help/wavelet/ug/wavelet-changepoint-detection.html
 %
 % CALLS
 %       cluDist     for cluster separation
-%       calcFR
 % 
 % EXAMPLE
 %               bs = getBS('sig', sig, 'fs', fs, 'basepath', basepath,...
@@ -60,7 +57,7 @@ addParameter(p, 'basename', [], @isstr);
 addParameter(p, 'graphics', true, @islogical)
 addParameter(p, 'saveVar', true, @islogical);
 addParameter(p, 'saveFig', true, @islogical);
-addParameter(p, 'forceA', false, @islogical);
+addParameter(p, 'forceAnalyze', false, @islogical);
 
 parse(p, varargin{:})
 sig = p.Results.sig;
@@ -74,12 +71,12 @@ basename = p.Results.basename;
 graphics = p.Results.graphics;
 saveVar = p.Results.saveVar;
 saveFig = p.Results.saveFig;
-forceA = p.Results.forceAnalyze;
+forceAnalyze = p.Results.forceAnalyze;
 
 % params
 minDur = 1;                         % minimum event duration [s]
 maxDur = 300;                       % maximum event duration [s]
-interDur = 1;                       % minimum time between events [bins]
+interDur = 2;                       % minimum time between events [bins]
 binsize = binsize * fs;             % [s] * [fs] = [samples]
 nclust = 2;                         % two clusters: burst and suppression
 
@@ -94,7 +91,7 @@ if isempty(basename)
     [~, basename] = fileparts(basepath);
 end
 filename = [basepath, '\', basename, '.bs.mat'];
-if ~forceA
+if ~forceAnalyze
     if exist(filename)
         load(filename)
         fprintf('\n loading %s \n\n', filename)
@@ -350,32 +347,29 @@ if graphics
     axis tight
     Y = ylim;
     fill([bs.stamps fliplr(bs.stamps)] / fs / 60, [Y(1) Y(1) Y(2) Y(2)],...
-        'k', 'FaceAlpha', 0.4,  'EdgeAlpha', 0);
+        'k', 'FaceAlpha', 0.3,  'EdgeAlpha', 0);
     ylabel('Voltage [mV]')
     set(gca, 'TickLength', [0 0])
     box off
     title('Raw and BS')
     
     % raw and BS - 1 min
-    midsig = round(length(sig) / 2 / fs / 60);
-    ylimsig = sig(midsig * fs * 60 : (midsig + 1) * fs * 60);
-    axes('Position',[.13 .875 .15 .05])
+    axes('Position',[.13 .83 .2 .1])
     box on
     plot((1 : length(sig)) / fs / 60, sig)
     hold on
     axis tight
-    ylim([min(ylimsig) max(ylimsig)])
     Y = ylim;
     fill([bs.stamps fliplr(bs.stamps)] / fs / 60, [Y(1) Y(1) Y(2) Y(2)],...
-        'k', 'FaceAlpha', 0.4,  'EdgeAlpha', 0);
-    xlim([midsig midsig + 1])
+        'k', 'FaceAlpha', 0.3,  'EdgeAlpha', 0);
+    xlim([10 11])
     set(gca, 'TickLength', [0 0])
     set(gca, 'YTickLabel', [])
     set(gca, 'XTickLabel', [])
     box off
     
     % burst suppression ratio
-    subplot(3, 4, [5 : 6])
+    subplot(3, 4, [9 : 10])
     plot(bs.cents / fs / 60, bs.bsr, 'k', 'LineWidth', 3)
     ylabel('BSR [% / m]')
     xlabel('time [m]')
@@ -444,8 +438,7 @@ if graphics
     xlabel('Time [m]')
     set(gca, 'TickLength', [0 0])
     box off
-    title('Parms vs. Time')
-
+    
     % duration and power vs inter-burst interval
     subplot(3, 4, 12)
     s1 = scatter((bs.iinterval) / fs, bs.dur(2 : end) / fs, 2, 'k', 'filled');

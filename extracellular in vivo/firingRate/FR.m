@@ -74,7 +74,8 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % calculate spike counts
-[fr.strd, fr.tstamps] = calcFR(spktimes, 'binsize', binsize, 'winCalc', winCalc, 'smet', smet);
+[fr.strd, fr.tstamps] = calcFR(spktimes, 'binsize', binsize,...
+    'winCalc', winCalc, 'smet', smet);
 
 % convert spike counts to firing rate in Hz
 fr.strd = fr.strd / binsize; 
