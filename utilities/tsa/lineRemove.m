@@ -185,12 +185,12 @@ end
 [n m]         = size(xmat);
 
 %% clean first cycle %%
-if LINE(1) > 1
-    t1              = 1;
-    t2              = LINE(1) - 1;
-    idx             = length(tsa) + [(1 - t2) : 0];
-    X(t1 : t2)      = X(t1 : t2) - tsa(idx);
-end
+% if LINE(1) > 1
+%     t1              = 1;
+%     t2              = LINE(1) - 1;
+%     idx             = length(tsa) + [(1 - t2) : 0];
+%     X(t1 : t2)      = X(t1 : t2) - tsa(idx);
+% end
 
 %% adaptive subtraction %%
 for i = 1 : length( LINE ) - 1

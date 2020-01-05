@@ -74,7 +74,7 @@ basename = p.Results.basename;
 graphics = p.Results.graphics;
 saveVar = p.Results.saveVar;
 saveFig = p.Results.saveFig;
-forceA = p.Results.forceAnalyze;
+forceA = p.Results.forceA;
 
 % params
 minDur = 1;                         % minimum event duration [s]
@@ -175,7 +175,7 @@ switch clustmet
 end
 
 % temporary fix for the arbiturary arrangment of components by gmm. assumes
-% that burst has higher values for all varaibles and work for two
+% that bursts have higher values for all varaibles. works for two
 % components only
 if mode(bs.gm.mu(1, :) > bs.gm.mu(2, :))
     gi(gi == 2) = 0;
@@ -255,11 +255,11 @@ stamps = zeros(size(temp));
 
 for i = 1 : nevents
     % start
-    x = sig(ibins(temp(i, 1)) : ibins(temp(i, 1) + 2));
+    x = sig(ibins(temp(i, 1)) : ibins(temp(i, 1) + 1));
     [ipt(i, 1), res(i, 1)] = findchangepts(x, 'Statistic', 'std');
     temp(i, 1) = ibins(temp(i, 1)) + ipt(i, 1);
     % stop
-    x = sig(ibins(temp(i, 2)) : ibins(temp(i, 2) + 2));
+    x = sig(ibins(temp(i, 2)) : ibins(temp(i, 2) + 1));
     [ipt(i, 2), res(i, 2)] = findchangepts(x, 'Statistic', 'std');
     temp(i, 2) = ibins(temp(i, 2)) + ipt(i, 2);
 end
@@ -450,6 +450,7 @@ if graphics
     subplot(3, 4, 12)
     s1 = scatter((bs.iinterval) / fs, bs.dur(2 : end) / fs, 2, 'k', 'filled');
     l1 = lsline;
+    ylabel('Duration [s]')
     yyaxis right
     s2 = scatter(bs.iinterval / fs, bs.peakPower(2 : end), 2, 'b', 'filled');
     l2 = lsline;
@@ -461,7 +462,7 @@ if graphics
     box off
     axis tight
     xlim([0 30])
-    ylabel('Duration [s]')
+    ylabel('Peak Voltage [uV]')
     xlabel('Interval [s]')
     title('Inter-burst interval')
     
@@ -470,7 +471,7 @@ if graphics
     h = histogram(log10(bs.dur / fs), 30, 'Normalization', 'Probability');
     h.EdgeColor = 'none';
     h.FaceColor = 'k';
-    h.FaceAlpha = 0.5;
+    h.FaceAlpha = 1;
     hold on
     plot(log10([minDur minDur]), ylim, '--k')
     xlabel('Time [log(s)]')
@@ -484,7 +485,7 @@ if graphics
     h = histogram(log10(bs.peakPower), 50, 'Normalization', 'Probability');
     h.EdgeColor = 'none';
     h.FaceColor = 'k';
-    h.FaceAlpha = 0.5;
+    h.FaceAlpha = 1;
     xlabel('Peak voltage [log(uV)]')
     ylabel('Probability [%]')
     set(gca, 'TickLength', [0 0])
