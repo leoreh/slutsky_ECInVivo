@@ -1,13 +1,13 @@
 
-basepath = 'E:\Data\Others\DZ\Field\Acute recordings\2h-3h\WT';
+basepath = 'E:\Data\Dat\lh39';
 cd(basepath)
 filename = dir('*.abf');
 files = {filename.name};
-nfiles = 18;     % address specific files
+nfiles = 1;     % address specific files
 
 forceLoad = true;
 saveFig = true;
-tetrodes = false;
+tetrodes = true;
 
 for i = nfiles
     
@@ -77,16 +77,16 @@ for i = nfiles
 %     plot(tstamps / 60, x)
 %     xlim([120 121])
     
-%     iis = getIIS('sig', sig, 'fs', fs, 'basepath', basepath,...
-%         'graphics', true, 'saveVar', true, 'binsize', 300,...
-%         'marg', [], 'basename', basename, 'thr', 20,...
-%         'saveFig', saveFig, 'forceA', true);
+    iis = getIIS('sig', sig, 'fs', fs, 'basepath', basepath,...
+        'graphics', true, 'saveVar', true, 'binsize', 300,...
+        'marg', [], 'basename', basename, 'thr', 20,...
+        'saveFig', saveFig, 'forceA', true);
     
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % burst suppression
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
-    vars = {'std', 'sum', 'max', 'energy'};
+    vars = {'std', 'sum', 'max'};
     bs = getBS('sig', sig, 'fs', fs, 'basepath', basepath,...
         'graphics', true, 'saveVar', true, 'binsize', 1,...
         'clustmet', 'gmm', 'vars', vars, 'basename', basename,...

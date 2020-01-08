@@ -9,7 +9,7 @@ function [bs] = getBS(varargin)
 %   clustmet    string. cluster method. {'gmm'} or 'kmeans'
 %   vars        cell of strings. one string per variable to use for
 %               clustering. possible variables are 'std', 'rms', 'max',
-%               'sum', 'p', 'energy'
+%               'sum', 'p'
 %   lognorm     logical {true}. log10 variables
 %   basepath    recording session path {pwd}
 %   basename    string. if empty extracted from basepath
@@ -77,7 +77,7 @@ saveFig = p.Results.saveFig;
 forceA = p.Results.forceA;
 
 % params
-minDur = 0.15;                      % minimum event duration [s]
+minDur = 1;                         % minimum event duration [s]
 maxDur = 300000;                    % maximum event duration [s]
 interDur = 2;                       % minimum time between events [bins]
 binsize = binsize * fs;             % [s] * [fs] = [samples]
@@ -107,7 +107,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % index stamps for bins
-ibins = [1 : binsize : length(sig)];
+ibins = [1 : binsize : length(sig) + (mod(length(sig), binsize))];
 ibins(end) = length(sig);
 
 % divide signal to bins
@@ -146,6 +146,8 @@ if any(strcmp(vars, 'energy'))
     end
 else; evec = []; end
 
+plotmatrix([sumvec stdvec pvec], evec)
+
 % moving
 % vecwin = round(2 * fs);
 % stdvec = movstd(sig, vecwin);
@@ -153,7 +155,7 @@ else; evec = []; end
 % maxvec = movmax(abs(sig), vecwin);
 
 % concatenate and lognorm
-varsmat = [stdvec; maxvec; sumvec; rmsvec; pvec; evec];
+varsmat = [stdvec; maxvec; sumvec; rmsvec; pvec];
 if size(varsmat, 1) < size (varsmat, 2)
     varsmat = varsmat';
 end

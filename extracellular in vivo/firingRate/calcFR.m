@@ -64,7 +64,7 @@ c2r = p.Results.c2r;
 smet = p.Results.smet;
 
 % arrange in cell
-if isvector(spktimes)
+if ~iscell(spktimes)
     spktimes = {spktimes};
 end
 

@@ -118,7 +118,7 @@ x = zscore((x / prctile(x, 99)) .^ 2);
 % detect spikes
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-iie = find(diff(x > thr(1)) > 0);
+iie = find([0 diff(x > thr(1)) > 0] & abs(sig) > 1);
 
 % return if no IIS are detected
 nspks = length(iie);
