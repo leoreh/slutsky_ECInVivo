@@ -19,28 +19,37 @@ function [bs] = getBS(varargin)
 %   forceA      logical {false}. force analysis even if .mat exists
 %
 % OUTPUT
-%   events         struct with fields:
+%   bs              struct with fields:
 %       stamps      n x 2 mat where n is the number of events and the
 %                   columns represent the start and end of each event [samps]
-%       peaks       the timestamp for each peak [samps]
+%       peaksPos    the timestamp for each peak [samps]
 %       peakPower   the voltage at each peak [uV]
+%       edges       of bins for bsr
+%       cents       of bins for bsr
+%       lRat        L-ratio of clusters separation
+%       iDist       isolation distance between clusters
+%       bsr         burst suppression ratio
+%       dur         burst duration [samples]
+%       iinterval   inter-burst interval [samples]
+%       gm          gaussian mixture model used for separation
+%       binary      binary vector where 1 = burst and 0 = suppression
 %       <params>    as in input
 %
 % TO DO LIST
 %       # GMM clusters such that grp #1 has higher values (= bursts).
-%       # check rubostness binsize and interDur. Currently
-%       interDur must be greater than binsize because of merge.
+%       # adapt binary2epochs and account for robustness to minDur / interDur
 %       # replace changepts with https://www.mathworks.com/help/wavelet/ug/wavelet-changepoint-detection.html
 %
 % CALLS
-%       cluDist     for cluster separation
-%       calcFR
+%       cluDist     cluster separation
+%       calcFR      BSR 
+%       specBand    delta band
 % 
 % EXAMPLE
-%               bs = getBS('sig', sig, 'fs', fs, 'basepath', basepath,...
-%               'graphics', true, 'saveVar', false, 'binsize', 1,...
-%               'clustmet', 'gmm', 'vars', {'std', 'sum', 'max'}),...
-%               'saveFig', false;
+%        bs = getBS('sig', sig, 'fs', fs, 'basepath', basepath,...
+%             'graphics', true, 'saveVar', true, 'binsize', 0.5,...
+%             'clustmet', 'gmm', 'vars', vars, 'basename', basename,...
+%             'saveFig', saveFig, 'forceA', forceA);
 %
 % 31 dec 19 LH.
 
@@ -84,7 +93,10 @@ binsize = binsize * fs;             % [s] * [fs] = [samples]
 nclust = 2;                         % two clusters: burst and suppression
 
 % initialize output
-bs = [];
+bs.bsr = []; bs.edges = []; bs.cents = []; bs.cents = []; bs.stamps = [];
+bs.peakPos = []; bs.peakPower = []; bs.dur = []; bs.iinterval = [];
+bs.fs = fs; bs.binsize = binsize; bs.lRat = []; bs.iDist = []; 
+bs.vars = vars;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % check if mat already exists
@@ -97,7 +109,7 @@ filename = [basepath, '\', basename, '.bs.mat'];
 if ~forceA
     if exist(filename)
         load(filename)
-        fprintf('\n loading %s \n\n', filename)
+        fprintf('\n loading %s \n', filename)
         return
     end
 end
@@ -109,6 +121,13 @@ end
 % index stamps for bins
 ibins = [1 : binsize : length(sig)];
 ibins(end) = length(sig);
+
+% enhance SNR.
+% x = abs(sig);
+% x = smooth(x, fs);
+% x = x / prctile(x, 90);
+% x = x .^ 4;
+% x = smooth(x, fs / 4);
 
 % divide signal to bins
 sigre = sig(1 : end - (mod(length(sig), binsize) + binsize));
@@ -142,45 +161,34 @@ if any(strcmp(vars, 'p'))
 else; pvec = []; end
 if any(strcmp(vars, 'energy'))
     for i = 1 : length(ibins) - 1
-        evec(i) = sum(energyop(sig(ibins(i) : ibins(i + 1)), false));
+        evec(i) = sum(abs(energyop(sig(ibins(i) : ibins(i + 1)), false)));
     end
 else; evec = []; end
 
-% moving
-% vecwin = round(2 * fs);
-% stdvec = movstd(sig, vecwin);
-% sumvec = movsum(abs(sig), vecwin);
-% maxvec = movmax(abs(sig), vecwin);
-
 % concatenate and lognorm
-varsmat = [stdvec; maxvec; sumvec; rmsvec; pvec; evec];
-if size(varsmat, 1) < size (varsmat, 2)
-    varsmat = varsmat';
+varmat = [stdvec; maxvec; sumvec; rmsvec; pvec; evec];
+if size(varmat, 1) < size (varmat, 2)
+    varmat = varmat';
 end
 if lognorm
-    varsmat = log10(varsmat);
+    varmat = log10(varmat);
 end
-
-% smooth
-% for i = 1 : size(varsmat, 1)
-%     varsmat(i, :) = smooth(varsmat(i, :), 3);
-% end
 
 switch clustmet
     case 'gmm'
         % fit distribution
         options = statset('MaxIter', 500);
-        bs.gm = fitgmdist(varsmat, nclust,...
+        bs.gm = fitgmdist(varmat, nclust,...
             'options', options, 'Start', 'plus', 'Replicates', 50);
         % cluster
-        [gi, ~, ~, ~, mDist] = cluster(bs.gm, varsmat);
+        [gi, ~, ~, ~, mDist] = cluster(bs.gm, varmat);
         % cluster separation
         for i = 1 : nclust
-            [lRat(i), iDist(i)] = cluDist(varsmat, find(gi == i), mDist(:, i));
+            [lRat(i), iDist(i)] = cluDist(varmat, find(gi == i), mDist(:, i));
         end
         
     case 'kmeans'
-        [gi, cent] = kmeans(varsmat(:, varidx), 2, 'Replicates', 50, 'MaxIter', 1000);
+        [gi, cent] = kmeans(varmat(:, varidx), 2, 'Replicates', 50, 'MaxIter', 1000);
 end
 
 % temporary fix for the arbiturary arrangment of components by gmm. assumes
@@ -202,6 +210,16 @@ start = ibins(start)';
 stop = find([0; diff(gi)] < 0);
 stop = ibins(stop)';
 
+if isempty(start) || isempty(stop)
+    fprintf('\n\nDetection by clustering failed\n\n');
+    if saveVar
+        save(filename, 'bs')
+    end
+    return
+else
+    fprintf('\n\nAfter clustering: %d events\n\n', length(start));
+end
+
 % exclude last event if it is incomplete
 if length(stop) == length(start) - 1
     start = start(1 : end - 1);
@@ -217,14 +235,7 @@ if start(1) > stop(1)
 end
 
 stamps = [start, stop];
-nevents = length(stamps);
-
-if isempty(stamps)
-    disp('Detection by clustering failed');
-    return
-else
-    disp(['After clustering: ' num2str(nevents) ' events.']);
-end
+nevents = size(stamps, 1);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % find precise sample of transition
@@ -275,16 +286,17 @@ for i = 1 : nevents
 % %             stamps(i, :) = [0 0];
 % %         end
 % %     end   
+
 end
 stamps(any(stamps' == 0), :) = [];
 res(any(stamps' == 0), :) = [];
 
-nevents = length(stamps);
+nevents = size(stamps, 1);
 if isempty(stamps)
-    disp('Localization failed');
+    fprintf('Localization failed');
     return
 else
-    disp(['After localization: ' num2str(nevents) ' events.']);
+    fprintf('After localization: %d events\n', nevents);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -308,8 +320,8 @@ while min(iei) < interDur * fs
     iei = stamps(2 : end, 1) - stamps(1 : end - 1, 2);
 end
 
-nevents = length(temp);
-if isempty(temp)
+nevents = size(stamps, 1);
+if isempty(stamps)
     disp('Event merge failed');
     return
 else
@@ -327,12 +339,12 @@ idx = idxMax | idxMin;
 stamps(idx, :) = [];
 res(idx, :) = [];
 
-nevents = length(stamps);
+nevents = size(stamps, 1);
 if isempty(stamps)
     disp('duration test failed.');
     return
 else
-    disp(['After testing duration: ' num2str(nevents) ' events.']);
+    fprintf('After duration: %d events\n', nevents);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -343,7 +355,7 @@ end
 peakPower = zeros(nevents, 1);
 peakPos = zeros(nevents, 1);
 for i = 1 : nevents
-    [peakPower(i), peakPos(i)] = max(abs(sig([stamps(i, 1) : stamps(i, 2)])));
+    [peakPower(i), peakPos(i)] = max(abs(sig(stamps(i, 1) : stamps(i, 2))));
     peakPos(i) = peakPos(i) + stamps(i, 1) - 1;
 end
 
@@ -357,9 +369,10 @@ for i = 1 : size(stamps, 1)
     bs.binary(stamps(i, 1) : stamps(i, 2)) = 1;
 end
 btimes = (find(~bs.binary));
-bsrbinsize = 60 * fs;    % binsize for bsr calc [samples]
+bsrbinsize = 16384;      % fit spectrogram w/ 10 s window and 0% overlap
 [bs.bsr, bs.edges, bs.cents] = calcFR(btimes, 'winCalc', [1, length(bs.binary)],...
-    'binsize', bsrbinsize, 'smet', 'MA');
+    'binsize', bsrbinsize, 'smet', 'none', 'c2r', true);
+bs.bsr = movmean(bs.bsr, 10);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arrange struct output
@@ -370,12 +383,8 @@ bs.peakPos = peakPos;
 bs.peakPower = peakPower;
 bs.dur = dur;
 bs.iinterval = iinterval;
-bs.fs = fs;
-bs.binsize = binsize;
-bs.vars = vars;
 bs.lRat = lRat;
 bs.iDist = iDist;
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % save
@@ -395,7 +404,7 @@ if graphics
     suptitle(basename)
     
     % raw and BS - entire recording
-    subplot(3, 4, [1 : 2])
+    sb1 = subplot(3, 4, [1 : 2]);
     plot((1 : length(sig)) / fs / 60, sig)
     hold on
     axis tight
@@ -406,7 +415,7 @@ if graphics
     set(gca, 'TickLength', [0 0])
     box off
     title('Raw and BS')
-    
+
     % raw and BS - 1 min
     midsig = round(length(sig) / 2 / fs / 60);
     ylimsig = sig(midsig * fs * 60 : (midsig + 1) * fs * 60);
@@ -425,23 +434,32 @@ if graphics
     set(gca, 'XTickLabel', [])
     box off
     
-    % burst suppression ratio
-    subplot(3, 4, [5 : 6])
-    plot(bs.cents / fs / 60, bs.bsr, 'k', 'LineWidth', 3)
-    ylabel('BSR [% / m]')
-    xlabel('time [m]')
+    % burst suppression ratio, delta
+    sb2 = subplot(3, 4, [5 : 6]);
+    plot(bs.cents / fs / 60, bs.bsr, 'k', 'LineWidth', 2)
+    hold on
+    % delta band power
+    [dband, tband] = specBand('sig', sig, 'graphics', false, 'band', [1 4]);
+    plot(tband / 60, dband, 'r', 'LineWidth', 2)
+    legend({'BSR', '[1-4 Hz]'})
+    ylabel('[a.u]')
+    xlabel('Time [m]')
     axis tight
     ylim([0 1])
     set(gca, 'TickLength', [0 0])
     box off
-    title('Burst Suppression Ratio')
+    title('Delta power and BSR')
+    
+    % spectrogram
+    sb3 = subplot(3, 4, [9 : 10]);
+    specBand('sig', sig, 'band', [], 'graphics', true);
     
     % clustering - first two variables
     options = statset('MaxIter', 50);
-    gm = fitgmdist(varsmat(:, [1, 2]), 2,...
+    gm = fitgmdist(varmat(:, [1, 2]), 2,...
         'options', options, 'Start', 'plus', 'Replicates', 1);
     subplot(3, 4, 3)
-    gscatter(varsmat(:, 1), varsmat(:, 2), gi, 'rk', '.', 1);
+    gscatter(varmat(:, 1), varmat(:, 2), gi, 'rk', '.', 1);
     axis tight
     hold on
     if strcmp(clustmet, 'gmm')
@@ -459,9 +477,9 @@ if graphics
     % clustering - second two variables
     if length(vars) > 2
         subplot(3, 4, 4)
-        gm = fitgmdist(varsmat(:, [2, 3]), 2,...
+        gm = fitgmdist(varmat(:, [2, 3]), 2,...
             'options', options, 'Start', 'plus', 'Replicates', 1);
-        gscatter(varsmat(:, 2), varsmat(:, 3), gi, 'rk', '.', 1);
+        gscatter(varmat(:, 2), varmat(:, 3), gi, 'rk', '.', 1);
         axis tight
         hold on
         if strcmp(clustmet, 'gmm')
@@ -542,6 +560,8 @@ if graphics
     set(gca, 'TickLength', [0 0])
     box off
     title('Burst amplitude')
+    
+    linkaxes([sb1, sb2, sb3], 'x');
     
     if saveFig
         figname = [basename '_BS'];

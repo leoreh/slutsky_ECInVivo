@@ -124,6 +124,11 @@ switch smet
         end
 end
 
+% validate orientation
+if isvector(fr)
+    fr = fr(:);
+end
+
 end
 
 % EOF

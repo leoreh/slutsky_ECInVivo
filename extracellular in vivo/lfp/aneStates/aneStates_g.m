@@ -1,11 +1,69 @@
+function anestates_g = aneStates_g(varargin)
 
-basepath = 'E:\Data\Others\DZ\Field\Acute recordings\2h-3h\WT';
+% analyze anesthesia states of one group (e.g. WT)
+%
+% INPUT
+%   ch          vector. channel/s to analyze.
+%   basepath    string. recording session path {pwd}
+%   basename    string. mouse basename. if empty extracted from basepath
+%   graphics    logical. plot figure {1}
+%   saveVar     logical. save variable {1}
+%   saveFig     logical. save figure {1}
+%   forceA      logical {0}. force analysis even if .mat exists
+%
+% OUTPUT
+%   bs          struct (see getBS.m)
+%   iis         struct (see getIIS.m)
+%   spec        struct with fields:
+%       dband   normalized power in the delta band (1-4 Hz)
+%       sband   normalized power in the sigma band (12-20 Hz)
+%       tband   timestamps for normalized power
+%
+% TO DO LIST
+%       #
+%
+% CALLS
+%       getBS
+%       getIIS
+%       specBand
+%
+% EXAMPLE
+%
+% 21 jan 20 LH
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% arguments
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+p = inputParser;
+addParameter(p, 'ch', 1, @isvector);
+addParameter(p, 'basepath', pwd, @isstr);
+addParameter(p, 'basename', [], @isstr);
+addParameter(p, 'graphics', true, @islogical)
+addParameter(p, 'saveVar', true, @islogical);
+addParameter(p, 'saveFig', true, @islogical);
+addParameter(p, 'forceA', false, @islogical);
+
+parse(p, varargin{:})
+ch = p.Results.ch;
+basepath = p.Results.basepath;
+basename = p.Results.basename;
+graphics = p.Results.graphics;
+saveVar = p.Results.saveVar;
+saveFig = p.Results.saveFig;
+forceA = p.Results.forceA;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% data
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+basepath = 'E:\Data\Others\DZ\Field\Acute recordings\2h-3h\APPPS1';
 cd(basepath)
 filename = dir('*.abf');
 files = {filename.name};
 nfiles = 1 : length(files);     % address specific files
 
-forceA = true;
+forceA = false;
 forceload = false;
 saveFig = false;
 tetrodes = false;
@@ -21,90 +79,22 @@ maxidx = 10;         % longest recording
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-for i = nfiles
+if exist('pop.mat')
+    load('pop.mat')
+else
+    for i = nfiles       
+        [~, basename] = fileparts(files{i});       
+        
+        [bs, iis, anestates] = aneStates_m('ch', 1, 'basepath', basepath,...
+            'basename', basename, 'graphics', true, 'saveVar', saveVar,...
+            'saveFig', saveFig, 'forceA', forceA);
+        
     
-    if tetrodes
-        ch = 5;
-        [~, basename] = fileparts(basepath);
-    else
-        ch = 1;
-        [~, basename] = fileparts(files{i});
-    end
-    
-    lfp = getLFP('basepath', basepath, 'chans', ch, 'chavg', {},...
-        'fs', 1250, 'interval', [0 inf], 'extension', 'abf', 'pli', true,...
-        'savevar', true, 'force', forceload, 'basename', basename);
-    
-    sig = double(lfp.data(:, ch));
-    fs = lfp.fs;
-    
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    % burst suppression
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    vars = {'std', 'max', 'sum'};
-    bs = getBS('sig', sig, 'fs', fs, 'basepath', basepath,...
-        'graphics', true, 'saveVar', true, 'binsize', 0.5,...
-        'clustmet', 'gmm', 'vars', vars, 'basename', basename,...
-        'saveFig', false, 'forceA', forceA);
-    
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    % iis
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    % thr during suppression
-    thr(1) = 0;
-    thr(2) = mean(sig(~bs.binary)) + 15 * std(sig(~bs.binary));
-    
-    iis = getIIS('sig', sig, 'fs', fs, 'basepath', basepath,...
-        'graphics', true, 'saveVar', saveVar, 'binsize', 300,...
-        'marg', [], 'basename', basename, 'thr', thr,...
-        'saveFig', false, 'forceA', forceA);
-    
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    % burst suppression after IIS filteration
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    if isfield(iis, 'filtered') && size(iis.wv, 1) > 50
-        bs = getBS('sig', iis.filtered, 'fs', fs, 'basepath', basepath,...
-            'graphics', false, 'saveVar', true, 'binsize', 1,...
-            'clustmet', 'gmm', 'vars', vars, 'basename', basename,...
-            'saveFig', false, 'forceA', forceA);    
-    end  
-    
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    % anesthesia state epochs
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    % calc dband
-    [dband, tband] = specBand('sig', sig, 'graphics', false, 'band', [1 4]);
-    
-    % find epochs
-    limbs = [0 0.5];
-    limd = [0.5 1];
-    vec = bs.bsr' > limbs(1) & bs.bsr' < limbs(2) &...
-        dband' > limd(1) & dband' < limd(2);
-    
-    % binsize of bsr and delta power is 10 s. minimum duration is 1 min [6
-    % bins] and minimum time between epochs of deep anesthesia is 1 minutes
-    % [6 bins]
-    epochs = binary2epochs('vec', vec, 'minDur', 6, 'interDur', 6);
-    
-    % epoch bins to sample idx
-    epochs = bs.cents(epochs);
-    
-    % find IIS within anesthesia epochs
-    idx = [];
-    for j = 1 : size(epochs, 1)
-        idx = [idx; find(iis.peakPos > epochs(j, 1) &...
-            iis.peakPos < epochs(j, 2))];
-    end
-    wv = iis.wv(idx, :);
-    marg = round(0.1 * fs);
-    wvstamps = -marg / fs * 1000 : 1 / fs * 1000 : marg / fs * 1000;
     
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % arrange population data
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    
-    if exist('pop.mat')
-        load('pop.mat')
-    else
+
         pop.recDur(i) = length(sig);
         pop.iis{i} = iis.rate;
         

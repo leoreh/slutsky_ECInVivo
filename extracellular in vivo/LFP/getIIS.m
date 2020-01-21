@@ -7,13 +7,17 @@ function [iis] = getIIS(varargin)
 %   fs          sampling frequency
 %   binsize     scalar {60} in [s]. for rate calculation
 %   marg        scalar {0.1} in [s]. time margin for clipping spikes 
-%   thr         scalar {15} in [z scores]. used for detection 
+%   thr         vector of two elements. first is thr in [z-scores] and
+%               second is thr in [mV]. if one specified than the other is
+%               merely calculated. if both specificed than both used for
+%               detection.
 %   basepath    recording session path {pwd}
 %   basename    string. if empty extracted from basepath
 %   graphics    logical {true}. plot figure
 %   saveVar     logical {true}. save variable
 %   saveFig     logical {true}. save figure
 %   forceA      logical {false}. force analysis even if .mat exists
+%   filtspk     logical {true}. filter spikes or not.
 %
 % OUTPUT
 %   iis         struct with fields:
@@ -21,6 +25,9 @@ function [iis] = getIIS(varargin)
 %                   columns represent the start and end of each event [samps]
 %       peaks       the timestamp for each peak [samps]
 %       peakPower   the voltage at each peak [uV]
+%       thr         10 z-scores in [mV]
+%       edges       of bins for bsr
+%       cents       of bins for bsr
 %       <params>    as in input
 %
 % TO DO LIST
@@ -31,7 +38,9 @@ function [iis] = getIIS(varargin)
 % CALLS
 %       calcFR     
 %
-% 02 jan 20 LH.
+% 02 jan 20 LH      UPDATES:
+% 13 jan 20 LH      filtspk
+% 19 jan 20 LH      thr in mV and z-scores
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -42,13 +51,14 @@ addParameter(p, 'sig', [], @isnumeric)
 addParameter(p, 'fs', 1250, @isnumeric)
 addParameter(p, 'binsize', 300, @isnumeric)
 addParameter(p, 'marg', [], @isnumeric)
-addParameter(p, 'thr', 15, @isnumeric)
+addParameter(p, 'thr', [10 0], @isnumeric)
 addParameter(p, 'basepath', pwd, @isstr);
 addParameter(p, 'basename', [], @isstr);
 addParameter(p, 'graphics', true, @islogical)
 addParameter(p, 'saveVar', true, @islogical);
 addParameter(p, 'saveFig', true, @islogical);
 addParameter(p, 'forceA', false, @islogical);
+addParameter(p, 'filtspk', true, @islogical);
 
 parse(p, varargin{:})
 sig = p.Results.sig;
@@ -62,18 +72,21 @@ graphics = p.Results.graphics;
 saveVar = p.Results.saveVar;
 saveFig = p.Results.saveFig;
 forceA = p.Results.forceA;
+filtspk = p.Results.filtspk;
 
 if isempty(marg)
     marg = round(0.1 * fs);
 end
 
 wvstamps = -marg / fs * 1000 : 1 / fs * 1000 : marg / fs * 1000;
-tstamps = [1 : length(sig)] / fs;
+tstamps = [1 : length(sig)]' / fs;
 
 binsize = binsize * fs;     % because sig to calcFR is in samples
 
 % initialize output
-iis = [];
+iis.edges = []; iis.cents = []; iis. stamps = [];
+iis.peakPos = []; iis.peakPower = []; iis.wv = []; iis.rate = [];
+iis.filtered = []; iis.fs = fs; iis.binsize = binsize;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % check if mat already exists
@@ -86,63 +99,70 @@ filename = [basepath, '\', basename, '.iis.mat'];
 if ~forceA
     if exist(filename)
         load(filename)
-        fprintf('\n loading %s \n\n', filename)
+        fprintf('\n loading %s \n', filename)
         return
     end
 end
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% prep signal
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-x = sig * 1000;         % so most values are above 1
-x = zscore((x / prctile(x, 99)) .^ 2);
-
-% investigate threshold
-% j = 1;
-% idx = 5 : 0.5 : floor(max(x));
-% nevents = zeros(1, length(idx));
-% for i = 1 : length(idx)
-%     nevents(i) = sum(x > idx(i));
-% end
-% figure
-% plot(idx, cumsum(nevents))
-% yyaxis right
-% plot(idx, cumsum(log10(nevents)))
-% axis tight
-% 
-% histogram((nevents), 50, 'Normalization', 'cdf')
-
         
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % detect spikes
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-iie = find([0 diff(x > thr(1)) > 0] & abs(sig) > 1);
+% threshold
+if thr(1) == 0
+    thresholded = sig > thr(2);
+    % find thr in z scores
+    thr(1) = (thr(2) - mean(sig)) / std(sig);
+elseif thr(2) == 0
+    thresholded = zscore(sig) > thr(1);
+    % find thr in mV
+    thr(2) = mean(sig) + thr(1) * std(sig);
+else
+    thresholded = zscore(sig) > thr(1) & sig > thr(2);
+end
+iis.thr = thr;
+iie = find([0; diff(thresholded) > 0]);
 
 % return if no IIS are detected
 nspks = length(iie);
 if isempty(iie)
-    disp('\nno inter-ictal spikes found\n');
+    fprintf('\nno inter-ictal spikes found\n');
+    iis.rate = zeros(1, floor(length(sig) / binsize));
+    if saveVar
+        save(filename, 'iis')
+    end
     return
-else
-    disp(sprintf('\n%d inter-ictal spikes \n', nspks));
 end
 
-% thr in mV
-[~, idx] = min(abs(x - thr(1)));
-thr(2) = sig(idx);
+% remove iis 
 
-% select local maximum and clip spikes
+
+% select local maximum, clip spikes and remove duplicates
 peak = zeros(length(iie), 1);
 pos = zeros(length(iie), 1);
 seg = zeros(length(iie), marg * 2 + 1);
-for i = 1 : length(iie)
+rmidx = [];
+i = 1;
+while i <= length(iie)
+    % correct case if last iis is incomplete
+    if iie(i) + marg > length(sig)
+        rmidx = [rmidx, i];
+        i = i + 1;
+        continue
+    end
     seg(i, :) = sig(iie(i) - marg : iie(i) + marg);
-    [peak(i), pos(i)] = max(abs(seg(i, :)));
+    [peak(i), pos(i)] = max(seg(i, :));
     pos(i) = iie(i) - marg + pos(i);
     seg(i, :) = sig(pos(i) - marg : pos(i) + marg);
+    i = i + 1;
 end
+rmidx = [rmidx'; find(diff(pos) < fs * 0.025)];
+seg(rmidx, :) = [];
+peak(rmidx) = [];
+pos(rmidx) = [];
+
+nspks = length(pos);
+fprintf('\n%d inter-ictal spikes \n', nspks);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % power spectrum via wavelet
@@ -154,31 +174,32 @@ fb = cwtfilterbank('SignalLength', size(seg, 2), 'VoicesPerOctave', 32,...
 
 % average wavelet coefficients for each spike. note this produces very
 % similar results to the coefficients obtained from the average spike
-% waveform but is still carried out since the wavelet of each spike is
-% already calculated for measureing width
-for i = 1 : size(seg, 1)
-    [cfs(i, :, :), f, coi] = cwt(seg(i, :), 'FilterBank', fb);
-
-    % spike width by inverse of max wavelet
-    [mp, ifreq] = max(abs(squeeze(cfs(i, :, :))), [], 1);
-    [~, ip] = max(mp);
-    ifreq = ifreq(ip);
-    iis.maxf(i) = f(ifreq);
-    iis.spkw(i) = 1000 / iis.maxf(i);
-    
-    % spike width at half maximum
-    % [~, ~, w(i)] = findpeaks(-seg(i, :), fs, 'NPeaks', 1,...
-    %    'WidthReference', 'halfheight', 'MinPeakHeight', abs(thr(2)));    
-end
-cfs = squeeze(mean(abs(cfs), 1));
+% waveform. individual coefficients may still be carried out if the width
+% of each spike is to be calculated 
+mwv = mean(seg, 1)';
+[cfs, f, coi] = cwt(mwv, 'FilterBank', fb);
+% for i = 1 : size(seg, 1) 
+%     % ALT 1: spike width by inverse of max wavelet
+%     [cfs(i, :, :), f, coi] = cwt(seg(i, :), 'FilterBank', fb);
+%     [mp, ifreq] = max(abs(squeeze(cfs(i, :, :))), [], 1);
+%     [~, ip] = max(mp);
+%     ifreq = ifreq(ip);
+%     iis.maxf(i) = f(ifreq);
+%     iis.spkw(i) = 1000 / iis.maxf(i);
+%     
+%     % ALT 2: spike width at half maximum
+%     [~, ~, w(i)] = findpeaks(-seg(i, :), fs, 'NPeaks', 1,...
+%        'WidthReference', 'halfheight', 'MinPeakHeight', abs(thr(2)));    
+% end
+% cfs = squeeze(mean(abs(cfs), 1));
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % rate 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 [iis.rate, iis.edges, iis.cents] = calcFR(pos, 'winCalc', [1, length(sig)],...
-    'binsize', binsize, 'smet', 'MA', 'c2r', false);
-iis.rate = iis.rate / fs * 60;      % convert to minutes
+    'binsize', binsize, 'smet', 'none', 'c2r', true);
+iis.rate = iis.rate * fs * 60;      % convert from samples to minutes
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ACG 
@@ -188,13 +209,25 @@ iis.rate = iis.rate / fs * 60;      % convert to minutes
     'binSize', 0.1);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% filter spikes  
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+filtered = sig;
+if filtspk
+    for i = 1 : size(seg, 1)
+        idx = [pos(i) - marg : pos(i) + marg];
+        filtered(idx) = filtered(idx) - mwv;
+    end
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arrange struct output
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+iis.wv = seg;
+iis.filtered = filtered; 
 iis.peakPos = pos;
 iis.peakPower = peak;
-iis.fs = fs;
-iis.binsize = binsize;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % save
@@ -216,10 +249,10 @@ if graphics
     % raw and iis
     subplot(3, 4, 1 : 2)
     plot([pos pos] / fs / 60, [min(sig), max(sig)], '--g', 'LineWidth', 0.1)
+    axis tight
     hold on
     plot(tstamps / 60, sig)
-    hold on
-    axis tight
+    plot(xlim, [thr(2) thr(2)], '--r')
     ylabel('Voltage [mV]')
     set(gca, 'TickLength', [0 0])
     box off
@@ -227,7 +260,7 @@ if graphics
     
     % detection
     subplot(3, 4, 5 : 6)
-    plot(tstamps / 60, x, 'k')
+    plot(tstamps / 60, zscore(sig), 'k')
     hold on
     axis tight
     plot(xlim, [thr(1) thr(1)], '--r')
@@ -265,6 +298,7 @@ if graphics
     axis tight
     set(gca, 'TickLength', [0 0], 'YTickLabel', [], 'XTickLabel', [],...
         'XColor', 'none', 'YColor', 'none', 'Color', 'none')
+    title(sprintf('n = %d', size(seg, 1)));
     box off
     
     % iis cwt
@@ -288,17 +322,19 @@ if graphics
     box off
     title('Average Scalogram')
       
-    % amplitude histogram
-    subplot(3, 4, 7)
-    h = histogram(log10(iis.spkw), 20, 'Normalization', 'Probability');
-    h.EdgeColor = 'none';
-    h.FaceColor = 'k';
-    h.FaceAlpha = 1;
-    xlabel('Spike Width [ms]')
-    ylabel('Probability [%]')
-    set(gca, 'TickLength', [0 0])
-    box off
-    title('IIS width')
+    % weidth histogram
+    if isfield(iis, 'spkw')
+        subplot(3, 4, 7)
+        h = histogram(log10(iis.spkw), 20, 'Normalization', 'Probability');
+        h.EdgeColor = 'none';
+        h.FaceColor = 'k';
+        h.FaceAlpha = 1;
+        xlabel('Spike Width [ms]')
+        ylabel('Probability [%]')
+        set(gca, 'TickLength', [0 0])
+        box off
+        title('IIS width')
+    end
     
     % amplitude histogram
     subplot(3, 4, 8)
@@ -314,18 +350,19 @@ if graphics
         
     % max frequency and amplitude vs. time
     subplot(3, 4, 11)
-    s1 = scatter(iis.peakPos / fs / 60, iis.maxf, 2, 'k', 'filled');
-    l1 = lsline;
-    ylabel('Frequency [Hz]')
-    set(l1, 'color', 'k')
-    l1.LineWidth = 3;
-    yyaxis right
-    s2 = scatter(iis.peakPos / fs / 60, iis.peakPower, 2, 'b', 'filled');
+    scatter(iis.peakPos / fs / 60, iis.peakPower, 2, 'b', 'filled');
     l2 = lsline;
     ylabel('Amplitude [mV]')
     set(l2, 'color', 'b')
     l2.LineWidth = 3;
-    yyaxis right
+    if isfield(iis, 'maxf')
+        yyaxis right
+        scatter(iis.peakPos / fs / 60, iis.maxf, 2, 'k', 'filled');
+        l1 = lsline;
+        ylabel('Frequency [Hz]')
+        set(l1, 'color', 'k')
+        l1.LineWidth = 3;
+    end
     axis tight
     xlabel('Time [m]')
     set(gca, 'TickLength', [0 0])

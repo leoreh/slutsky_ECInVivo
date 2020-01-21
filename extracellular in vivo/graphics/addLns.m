@@ -37,13 +37,13 @@ l = repmat(lns, 2, 1);
 
 if strcmp('x', ax)
     b = repmat(ylim, nlines, 1);
-    plot(l, b' ,'--k')
+    plot(l, b' ,'--k', 'HandleVisibility','off')
     if ~isempty(lbs)
         text(l(1, :), b(1, 2)*ones(nlines, 1), lbs)
     end
 elseif strcmp('y', ax)
     b = repmat(xlim, nlines, 1);
-    plot(b', l ,'--k')
+    plot(b', l ,'--k', 'HandleVisibility','off')
     if ~isempty(lbs)
         text(b(1, 2)*ones(nlines, 1), l(1, :), lbs)
     end
