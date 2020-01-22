@@ -352,7 +352,7 @@ if graphics
         fh = figure('Visible', 'off');
     end
     set(gcf, 'units','normalized','outerposition',[0 0 1 1]);
-    suptitle(basename)
+    title(basename)
 
     % raw and BS - entire recording
     sb1 = subplot(3, 4, [1 : 2]);

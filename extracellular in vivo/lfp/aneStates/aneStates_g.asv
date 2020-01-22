@@ -60,7 +60,7 @@ filename = dir('*.abf');
 files = natsort({filename.name});
 nfiles = 1 : length(files);
 nfiles(rm) = [];
-if exist([grpname '_as.mat']) 
+if exist([grpname '_as.mat']) && ~forceA
     load([grpname '_as.mat'])
 else
     for i = 1 : length(nfiles)
@@ -243,7 +243,7 @@ if graphics
     h.FaceColor = 'k';
     h.FaceAlpha = 0.4;
     hold on
-    h = histogram(as.nspksEp, nbins, 'Normalization', 'count');
+        h = histogram(as.nspksEp / fs / 60, nbins, 'Normalization', 'count');
     h.EdgeColor = 'none';
     h.FaceColor = 'b';
     h.FaceAlpha = 0.4;
@@ -265,7 +265,7 @@ if graphics
     h.EdgeColor = 'none';
     h.FaceColor = 'b';
     h.FaceAlpha = 0.4;
-    legend({'All', 'BS'})
+    legend({'All', 'in BS'})
     xlabel('Duration [m)]')
     ylabel('Mice [#]')
     set(gca, 'TickLength', [0 0])
@@ -287,7 +287,8 @@ if graphics
     linkaxes([sp1, sp2, sp3], 'x');
     
     if saveFig
-        export_fig(grpname, '-tif', '-transparent')
+        figname = [grpname '_Summary'];
+        export_fig(figname, '-tif', '-transparent')
     end
 end
 end

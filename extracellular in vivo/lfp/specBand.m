@@ -8,7 +8,7 @@ function [zband, tband] = specBand(varargin)
 %   sig         signal for detection
 %   fs          sampling frequency
 %   band        vector. e.g. {[1 4]} for delta. 
-%   winsize     scalar {10}. in [s]
+%   binsize     scalar {10}. in [samples]
 %   smf         smooth factor {winsize}. empty means no smoothing.
 %   graphics    logical. plot figure {1}
 %
@@ -31,7 +31,7 @@ p = inputParser;
 addParameter(p, 'sig', [], @isnumeric)
 addParameter(p, 'fs', 1250, @isnumeric)
 addParameter(p, 'band', [1 4], @isnumeric)
-addParameter(p, 'winsize', 10, @isnumeric)
+addParameter(p, 'binsize', 10, @isnumeric)
 addParameter(p, 'smf', 0, @isnumeric)
 addParameter(p, 'graphics', false, @islogical)
 
@@ -39,7 +39,7 @@ parse(p, varargin{:})
 sig = p.Results.sig;
 fs = p.Results.fs;
 band = p.Results.band;
-winsize = p.Results.winsize;
+binsize = p.Results.binsize;
 smf = p.Results.smf;
 graphics = p.Results.graphics;
 
@@ -50,7 +50,7 @@ else
     freq = linspace(band(1), band(2), 40);
 end
 if smf == 0
-    smf = winsize;
+    smf = binsize;
 end
 zband = [];
 
@@ -58,10 +58,10 @@ zband = [];
 % calc
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-win = hann(2 ^ nextpow2(winsize * fs));
+win = hann(2 ^ nextpow2(binsize));
 
 % instead of 10 s window w/ 1 s overlap, 0 overlap and smooth with 10
-% points this is so that bs and p are congruent
+% points. this is so that bs and p are congruent
 [~, f, tband, pband] = spectrogram(sig, win, 0, freq, fs, 'yaxis', 'psd');
 
 % psd
@@ -70,10 +70,12 @@ pband = 10 * log10(abs(pband));
 % smooth and z-score
 if ~isempty(band)
     zband = sum(pband, 1);
-    zband = bz_NormToRange(zscore(movmean(zband, smf)), [0 1]);
+    zband = movmean(zband, smf);
+    zband = bz_NormToRange(zscore(zband), [0 1]);
 else
     zband = pband;
 end
+zband = zband(:);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics

@@ -1,6 +1,6 @@
 function [bs] = getBS(varargin)
 
-% detects burst events in LFP.
+% detects burst events from LFP.
 % 
 % INPUT
 %   sig         signal for detection
@@ -19,7 +19,6 @@ function [bs] = getBS(varargin)
 %   graphics    logical. plot figure {1}
 %   saveVar     logical. save variable {1}
 %   saveFig     logical. save figure {1}
-%   vis         logical. figure visible {1} or not
 %   forceA      logical {false}. force analysis even if .mat exists
 %
 % OUTPUT
@@ -41,15 +40,13 @@ function [bs] = getBS(varargin)
 %
 % TO DO LIST
 %       # GMM clusters such that grp #1 has higher values (= bursts).
-%       # account for robustness to minDur / interDur. 
-%         Currently the smallest minDur is binsize
+%       # adapt binary2epochs and account for robustness to minDur / interDur
 %       # replace changepts with https://www.mathworks.com/help/wavelet/ug/wavelet-changepoint-detection.html
 %
 % CALLS
-%       cluDist             cluster separation
-%       calcFR              BSR 
-%       specBand            delta band
-%       binary2epochs       start/stop times
+%       cluDist     cluster separation
+%       calcFR      BSR 
+%       specBand    delta band
 % 
 % EXAMPLE
 %        bs = getBS('sig', sig, 'fs', fs, 'basepath', basepath,...
@@ -77,7 +74,6 @@ addParameter(p, 'basename', [], @isstr);
 addParameter(p, 'graphics', true, @islogical)
 addParameter(p, 'saveVar', true, @islogical);
 addParameter(p, 'saveFig', true, @islogical);
-addParameter(p, 'vis', true, @islogical);
 addParameter(p, 'forceA', false, @islogical);
 
 parse(p, varargin{:})
@@ -94,7 +90,6 @@ basename = p.Results.basename;
 graphics = p.Results.graphics;
 saveVar = p.Results.saveVar;
 saveFig = p.Results.saveFig;
-vis = p.Results.vis;
 forceA = p.Results.forceA;
 
 % params
@@ -217,11 +212,12 @@ end
 % find start\stop times
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-stamps = binary2epochs('vec', gi, 'minDur', 1, 'interDur', 4);
-stamps = ibins(stamps);
-nevents = size(stamps, 1);
+start = find([0; diff(gi)] > 0);
+start = ibins(start)';
+stop = find([0; diff(gi)] < 0);
+stop = ibins(stop)';
 
-if nevents == 0
+if isempty(start) || isempty(stop)
     fprintf('\n\nDetection by clustering failed\n\n');
     bs.bsr = zeros(1, floor(length(sig) / binsize));
     bs.cents = zeros(1, floor(length(sig) / binsize));
@@ -230,70 +226,135 @@ if nevents == 0
     end
     return
 else
-    fprintf('\n\nAfter clustering: %d events\n\n', nevents);
+    fprintf('\n\nAfter clustering: %d events\n\n', length(start));
 end
+
+% exclude last event if it is incomplete
+if length(stop) == length(start) - 1
+    start = start(1 : end - 1);
+end
+% exclude first event if it is incomplete
+if length(stop) - 1 == length(start)
+    stop = stop(2 : end);
+end
+% correct special case when both first and last events are incomplete
+if start(1) > stop(1)
+    stop(1) = [];
+    start(end) = [];
+end
+
+stamps = [start, stop];
+nevents = size(stamps, 1);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % find precise sample of transition
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% res = zeros(size(stamps, 1), 1);
-% for i = 1 : nevents
-%     % OPTION 1: find one change point for start and stop separately
-%     marg = binsize * 2;
-%     % start
-%     idx = max([stamps(i, 1) - marg, 1]);
-%     x = sig(idx : idx + 2 * marg);
-%     [ipt, res(i, 1)] = findchangepts(x, 'Statistic', 'rms');
-%     if ~isempty(ipt)
-%         stamps(i, 1) = idx + ipt;
-%         % correct intances where findchangepts detected decreases in std
+res = zeros(size(stamps, 1), 1);
+for i = 1 : nevents
+    % OPTION 1: find one change point for start and stop separately
+    marg = binsize * 2;
+    % start
+    idx = max([stamps(i, 1) - marg, 1]);
+    x = sig(idx : idx + 2 * marg);
+    [ipt, res(i, 1)] = findchangepts(x, 'Statistic', 'rms');
+    if ~isempty(ipt)
+        stamps(i, 1) = idx + ipt;
+        % correct intances where findchangepts detected decreases in std
 %         if rms(x(1 : ipt)) > rms(x(ipt + 1 : end))
 %             stamps(i, 1) = 0;
 %         end
-%     end
-%     % stop
-%     idx = min([stamps(i, 2) + marg, length(sig)]);
-%     x = sig(stamps(i, 2) - marg : idx);
-%     [ipt, res(i, 2)] = findchangepts(x, 'Statistic', 'rms');
-%     if ~isempty(ipt)
-%         stamps(i, 2) = stamps(i, 2) - marg + ipt;
-%         % correct intances where findchangepts detected increases in std
+    end
+    % stop
+    idx = min([stamps(i, 2) + marg, length(sig)]);
+    x = sig(stamps(i, 2) - marg : idx);
+    [ipt, res(i, 2)] = findchangepts(x, 'Statistic', 'rms');
+    if ~isempty(ipt)
+        stamps(i, 2) = stamps(i, 2) - marg + ipt;
+        % correct intances where findchangepts detected increases in std
 %         if rms(x(i : ipt)) < rms(x(ipt + 1 : end))
 %             stamps(i, 2) = 0;
 %         end
-%     end
-%     
-% % %     % OPTION 2: find two change points per burst. very slow
-% % %     marg = binsize * 2;
-% % %     idx(1) = max([stamps(i, 1) - marg, 1]);
-% % %     idx(2) = min([stamps(i, 2) + marg, length(sig)]);
-% % %     x = sig(idx(1) : idx(2));
-% % % 
-% % %     [ipt, res(i)] = findchangepts(x, 'Statistic', 'std',...
-% % %         'MaxNumChanges', 2, 'MinDistance', minDur * fs);  
-% % % 
-% % %     % remove bursts with < 2 change points.
-% % %     if length(ipt) == 2
-% % %         stamps(i, 1) = ibins(temp(i, 1) - 1) + ipt(1);
-% % %         stamps(i, 2) = ibins(temp(i, 1) - 1) + ipt(2);
-% % %         % correct intances where findchangepts detected decreases in std
-% % %         if std(sig(stamps(i, 1) : stamps(i, 2))) < std(x)
-% % %             stamps(i, :) = [0 0];
-% % %         end
-% % %     end   
-% 
-% end
-% stamps(any(stamps' == 0), :) = [];
-% res(any(stamps' == 0), :) = [];
-% 
-% nevents = size(stamps, 1);
-% if isempty(stamps)
-%     fprintf('Localization failed');
-%     return
-% else
-%     fprintf('After localization: %d events\n', nevents);
-% end
+    end
+    
+% %     % OPTION 2: find two change points per burst. very slow
+% %     marg = binsize * 2;
+% %     idx(1) = max([stamps(i, 1) - marg, 1]);
+% %     idx(2) = min([stamps(i, 2) + marg, length(sig)]);
+% %     x = sig(idx(1) : idx(2));
+% % 
+% %     [ipt, res(i)] = findchangepts(x, 'Statistic', 'std',...
+% %         'MaxNumChanges', 2, 'MinDistance', minDur * fs);  
+% % 
+% %     % remove bursts with < 2 change points.
+% %     if length(ipt) == 2
+% %         stamps(i, 1) = ibins(temp(i, 1) - 1) + ipt(1);
+% %         stamps(i, 2) = ibins(temp(i, 1) - 1) + ipt(2);
+% %         % correct intances where findchangepts detected decreases in std
+% %         if std(sig(stamps(i, 1) : stamps(i, 2))) < std(x)
+% %             stamps(i, :) = [0 0];
+% %         end
+% %     end   
+
+end
+stamps(any(stamps' == 0), :) = [];
+res(any(stamps' == 0), :) = [];
+
+nevents = size(stamps, 1);
+if isempty(stamps)
+    fprintf('Localization failed');
+    return
+else
+    fprintf('After localization: %d events\n', nevents);
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% merge events if inter-event period is too short
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+iei = stamps(2 : end, 1) - stamps(1 : end - 1, 2);      % inter-event interval
+while min(iei) < interDur * fs
+    temp = [];
+    event = stamps(1, :);
+    for i = 2 : nevents
+        if stamps(i, 1) - event(2) < interDur * fs
+            event = [event(1) stamps(i, 2)];
+        else
+            temp = [temp; event];
+            event = stamps(i, :);
+        end
+    end
+    temp = [temp; event];
+    stamps = temp;
+    iei = stamps(2 : end, 1) - stamps(1 : end - 1, 2);
+end
+
+nevents = size(stamps, 1);
+if isempty(stamps)
+    disp('Event merge failed');
+    return
+else
+    disp(['After merging: ' num2str(nevents) ' events.']);
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% discard events by duration
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+dur = stamps(:, 2) - stamps(:, 1);
+idxMax = dur > maxDur * fs;
+idxMin = dur < minDur * fs;
+idx = idxMax | idxMin;
+stamps(idx, :) = [];
+res(idx, :) = [];
+
+nevents = size(stamps, 1);
+if isempty(stamps)
+    disp('duration test failed.');
+    return
+else
+    fprintf('After duration: %d events\n', nevents);
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % params
@@ -346,14 +407,10 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if graphics
-    if vis
-        fh = figure;
-    else
-        fh = figure('Visible', 'off');
-    end
+    f = figure;
     set(gcf, 'units','normalized','outerposition',[0 0 1 1]);
     suptitle(basename)
-
+    
     % raw and BS - entire recording
     sb1 = subplot(3, 4, [1 : 2]);
     plot((1 : length(sig)) / fs / 60, sig)
@@ -483,6 +540,7 @@ if graphics
     set(gca, 'TickLength', [0 0])
     box off
     axis tight
+    xlim([0 30])
     ylabel('Peak Voltage [uV]')
     xlabel('Interval [s]')
     title('Inter-burst interval')

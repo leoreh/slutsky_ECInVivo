@@ -19,41 +19,32 @@ for i = 1 : length(basepath)
         
         lfp = getLFP('basepath', basepath{i}, 'ch', 1, 'chavg', {},...
             'fs', 1250, 'interval', [0 inf], 'extension', 'abf', 'pli', true,...
-            'savevar', true, 'force', true, 'basename', basename);
-        
-        thr = [0 mean(lfp.data) + 5 * std(lfp.data)];
-        iis.out = 0;
-        z = 1;
-        while ~isempty(iis.out)  && z < 5
-            iis = getIIS('sig', lfp.data, 'fs', 1250, 'basepath', basepath{i},...
-                'graphics', true, 'saveVar', false, 'binsize', binsize,...
-                'marg', 0.1, 'basename', basename, 'thr', thr, 'smf', 6,...
-                'saveFig', false, 'forceA', true, 'spkw', true);
-            
-            idx = cell(1, length(iis.out));
-            for k = 1 : length(iis.out)
-                if iis.peakPos(iis.out(k)) + marg > length(lfp.data)
-                    idx{k} = iis.peakPos(iis.out(k)) - marg : length(lfp.data);
-                else
-                    idx{k} = iis.peakPos(iis.out(k)) - marg : iis.peakPos(iis.out(k)) + marg;
+            'savevar', true, 'force', false, 'basename', basename);
+                
+        if length(bs.binary) == length(lfp.data)
+            thr(1) = 0;
+            thr(2) = mean(lfp.data + 15 * std(lfp.data);
+            iis.out = 0;
+            z = 1;
+            while ~isempty(iis.out)  && z < 4
+                iis = getIIS('sig', lfp.data, 'fs', 1250, 'basepath', basepath{i},...
+                    'graphics', false, 'saveVar', false, 'binsize', binsize,...
+                    'marg', 0.1, 'basename', basename, 'thr', thr, 'smf', 6,...
+                    'saveFig', false, 'forceA', true, 'spkw', true);
+                
+                idx = cell(1, length(iis.out));
+                for k = 1 : length(iis.out)
+                    if iis.peakPos(iis.out(k)) + marg > length(lfp.data)
+                        idx{k} = iis.peakPos(iis.out(k)) - marg : length(lfp.data);
+                    else
+                        idx{k} = iis.peakPos(iis.out(k)) - marg : iis.peakPos(iis.out(k)) + marg;
+                    end
                 end
+                lfp.data([idx{:}]) = [];
+                z = z + 1;
             end
-            lfp.data([idx{:}]) = [];
-            z = z + 1;
         end
         
-        % remove first x minutes
-        if i == 3
-            if j == 4
-                lfp.data(1 : fs * 60 * 21) = [];
-            elseif j == 9
-                lfp.data(1 : fs * 60 * 10) = [];
-            end
-        end
-
-        % remove last x minutes
-        lfp.data(end : -1 : end - x * 60 * lfp.fs) = [];
-
         % correct timestamps
         lfp.timestamps = [1 : length(lfp.data)] / fs;
         

@@ -6,6 +6,7 @@ function epochs = binary2epochs(varargin)
 % 
 % INPUT
 %       vec         binary vector 
+%       exclude     logical. exclude incomplete events (1) or not {0}.
 %       minDur      minimum duration of epoch
 %       maxDur      maximum duration of epoch
 %       interDur    maximum inter-epoch interval
@@ -13,11 +14,11 @@ function epochs = binary2epochs(varargin)
 % OUTPUT
 %       stamps      n x 2 mat where n is the number of events and the
 %                   columns represent the start and end of each event [samps]
-%
+%     
 % EXAMPLE
-%       see aneStates.m
-%
-% 14 jan 19 LH
+%       see aneStates_m.m or getBS.m
+% 
+% 14 jan 19 LH. 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -25,12 +26,14 @@ function epochs = binary2epochs(varargin)
 
 p = inputParser;
 addParameter(p, 'vec', [])
+addParameter(p, 'exclude', 0, @isnumeric)
 addParameter(p, 'minDur', [], @isnumeric)
 addParameter(p, 'maxDur', [], @isnumeric)
 addParameter(p, 'interDur', [], @isnumeric)
 
 parse(p, varargin{:})
 vec = p.Results.vec;
+exclude = p.Results.exclude;
 minDur = p.Results.minDur;
 maxDur = p.Results.maxDur;
 interDur = p.Results.interDur;
@@ -54,19 +57,32 @@ end
 
 % exclude last event if it is incomplete
 if length(stop) == length(start) - 1
-    start = start(1 : end - 1);
+    if exclude
+        start = start(1 : end - 1);
+    else
+        stop = [stop; length(vec)];
+    end
 end
-% exclude first event if it is incomplete
+% complete first event if it is incomplete
 if length(stop) - 1 == length(start)
-    stop = stop(2 : end);
+    if exclude
+        stop = stop(2 : end);
+    else
+        start = [1; start];
+    end
 end
 % correct special case when both first and last events are incomplete
 if start(1) > stop(1)
-    stop(1) = [];
-    start(end) = [];
+    if exclude
+        stop(1) = [];
+        start(end) = [];
+    else
+        start = [1; start];
+        stop = [stop; length(vec)];
+    end
 end
 
-epochs = [start, stop];
+epochs = [start(:), stop(:)];
 nevents = length(epochs);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
