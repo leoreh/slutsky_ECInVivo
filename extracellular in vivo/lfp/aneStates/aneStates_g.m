@@ -60,59 +60,61 @@ filename = dir('*.abf');
 files = natsort({filename.name});
 nfiles = 1 : length(files);
 nfiles(rm) = [];
-if exist([grpname '_as.mat']) 
+if exist([grpname '_as.mat']) & ~forceA
     load([grpname '_as.mat'])
+%     return
 else
-    for i = 1 : length(nfiles)
-        [~, basename] = fileparts(files{nfiles(i)});
+for i = 1 : length(nfiles)
+    [~, basename] = fileparts(files{nfiles(i)});
+    % load individual data  
+    [bs, iis, ep] = aneStates_m('ch', 1, 'basepath', basepath,...
+        'basename', basename, 'graphics', graphics, 'saveVar', saveVar,...
+        'saveFig', saveFig, 'forceA', forceA, 'binsize', 30, 'smf', 6);
+    
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % arrange population data
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    as.grp = grpname;
+    as.mouse{i} = basename;
+    as.recDur(i) = ep.recDur;
+    as.bsDur(i) = ep.bsDur;
+    as.bDur(i) = ep.bDur;
+    as.iis{i} = iis.rate;
+    as.bsr{i} = bs.bsr;
+    as.dband{i} = ep.dband;
+    as.t{i} = bs.cents;
+    as.nspks(i) = size(iis.wv, 1);
+    as.nspksBS(i) = ep.bs_nspks;
+    as.nspksB(i) = ep.b_nspks;
+    as.thr(i) = iis.thr(2);
+    
+    % after last recording is loaded, arrange in mat and save
+    if nfiles(i) == nfiles(end)
         
-        % load individual data
-        [bs, iis, ep] = aneStates_m('ch', 1, 'basepath', basepath,...
-            'basename', basename, 'graphics', graphics, 'saveVar', saveVar,...
-            'saveFig', saveFig, 'forceA', forceA, 'binsize', 30, 'smf', 6);
-
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        % arrange population data
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%        
-        as.grp = grpname;
-        as.mouse{i} = basename;
-        as.recDur(i) = ep.recDur;
-        as.epDur(i) = ep.epDur;
-        as.iis{i} = iis.rate;
-        as.bsr{i} = bs.bsr;
-        as.dband{i} = ep.dband;
-        as.t{i} = bs.cents;
-        as.nspks(i) = size(iis.wv, 1);
-        as.nspksEp(i) = ep.nspks;
-        as.thr(i) = iis.thr(2);
-          
-        % after last recording is loaded, arrange in mat and save
-        if nfiles(i) == nfiles(end)
-            
-            [~, idx] = max(as.recDur);      % index to longest recording
-            maxdur = length(as.bsr{idx});
-            
-            % bsr, iis and delta
-            mat = cellfun(@(x)[x(:); NaN(maxdur-length(x), 1)], as.bsr,...
-                'UniformOutput', false);
-            as.bsr = cell2mat(mat)';
-            mat = cellfun(@(x)[x(:); NaN(maxdur-length(x), 1)], as.iis,...
-                'UniformOutput', false);
-            as.iis = cell2mat(mat)';
-            mat = cellfun(@(x)[x(:); NaN(maxdur-length(x), 1)], as.dband,...
-                'UniformOutput', false);
-            as.dband = cell2mat(mat)';
-            % timestamps
-            mat = cellfun(@(x)[x(:); NaN(maxdur-length(x), 1)], as.t,...
-                'UniformOutput', false);
-            as.t = cell2mat(mat)';
-            as.t = as.t(idx, :);
-            
-            if saveVar
-                save([grpname '_as.mat'], 'as')
-            end
+        [~, idx] = max(as.recDur);      % index to longest recording
+        maxdur = length(as.bsr{idx});
+        
+        % bsr, iis and delta
+        mat = cellfun(@(x)[x(:); NaN(maxdur-length(x), 1)], as.bsr,...
+            'UniformOutput', false);
+        as.bsr = cell2mat(mat)';
+        mat = cellfun(@(x)[x(:); NaN(maxdur-length(x), 1)], as.iis,...
+            'UniformOutput', false);
+        as.iis = cell2mat(mat)';
+        mat = cellfun(@(x)[x(:); NaN(maxdur-length(x), 1)], as.dband,...
+            'UniformOutput', false);
+        as.dband = cell2mat(mat)';
+        % timestamps
+        mat = cellfun(@(x)[x(:); NaN(maxdur-length(x), 1)], as.t,...
+            'UniformOutput', false);
+        as.t = cell2mat(mat)';
+        as.t = as.t(idx, :);
+        
+        if saveVar
+            save([grpname '_as.mat'], 'as')
         end
     end
+end
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -243,7 +245,7 @@ if graphics
     h.FaceColor = 'k';
     h.FaceAlpha = 0.4;
     hold on
-    h = histogram(as.nspksEp, nbins, 'Normalization', 'count');
+    h = histogram(as.nspksBS, nbins, 'Normalization', 'count');
     h.EdgeColor = 'none';
     h.FaceColor = 'b';
     h.FaceAlpha = 0.4;
@@ -261,7 +263,7 @@ if graphics
     h.FaceColor = 'k';
     h.FaceAlpha = 0.4;
     hold on
-    h = histogram(as.epDur / fs / 60, nbins, 'Normalization', 'count');
+    h = histogram(as.bsDur / fs / 60, nbins, 'Normalization', 'count');
     h.EdgeColor = 'none';
     h.FaceColor = 'b';
     h.FaceAlpha = 0.4;

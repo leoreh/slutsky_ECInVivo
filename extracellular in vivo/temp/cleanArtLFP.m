@@ -1,14 +1,14 @@
 % remove last minutes from recording
 
-basepath{1} = 'E:\Data\Others\DZ\Field\Acute recordings\2h-3h\APPPS1';
-basepath{2} = 'E:\Data\Others\DZ\Field\Acute recordings\Long recordings\APPPS1';
-basepath{3} = 'E:\Data\Others\DZ\Field\Acute recordings\Long recordings\WT';
-basepath{4} = 'E:\Data\Others\DZ\Field\Acute recordings\2h-3h\WT';
+basepath{1} = 'E:\Data\Others\DZ\Field\Data\APPPS1_short';
+basepath{2} = 'E:\Data\Others\DZ\Field\Data\APPPS1_long';
+basepath{3} = 'E:\Data\Others\DZ\Field\Data\WT_long';
+basepath{4} = 'E:\Data\Others\DZ\Field\Data\WT_short';
 
 binsize = (2 ^ nextpow2(30 * 1250));
 marg = round(fs * 0.05);
 
-for i = 1 : length(basepath)
+for i = 2 : length(basepath)
     cd(basepath{i})
     filename = dir('*.abf');
     files = natsort({filename.name});
@@ -19,40 +19,48 @@ for i = 1 : length(basepath)
         
         lfp = getLFP('basepath', basepath{i}, 'ch', 1, 'chavg', {},...
             'fs', 1250, 'interval', [0 inf], 'extension', 'abf', 'pli', true,...
-            'savevar', true, 'force', true, 'basename', basename);
+            'savevar', true, 'force', false, 'basename', basename);
         
         thr = [0 mean(lfp.data) + 5 * std(lfp.data)];
         iis.out = 0;
-        z = 1;
-        while ~isempty(iis.out)  && z < 5
-            iis = getIIS('sig', lfp.data, 'fs', 1250, 'basepath', basepath{i},...
-                'graphics', true, 'saveVar', false, 'binsize', binsize,...
-                'marg', 0.1, 'basename', basename, 'thr', thr, 'smf', 6,...
-                'saveFig', false, 'forceA', true, 'spkw', true);
-            
-            idx = cell(1, length(iis.out));
-            for k = 1 : length(iis.out)
-                if iis.peakPos(iis.out(k)) + marg > length(lfp.data)
-                    idx{k} = iis.peakPos(iis.out(k)) - marg : length(lfp.data);
-                else
-                    idx{k} = iis.peakPos(iis.out(k)) - marg : iis.peakPos(iis.out(k)) + marg;
-                end
+        iis = getIIS('sig', lfp.data, 'fs', 1250, 'basepath', basepath{i},...
+            'graphics', false, 'saveVar', false, 'binsize', binsize,...
+            'marg', 0.1, 'basename', basename, 'thr', thr, 'smf', 6,...
+            'saveFig', false, 'forceA', true, 'spkw', true);
+        
+        art(i, j) = length(iis.out);
+        idx = cell(1, length(iis.out));
+        for k = 1 : length(iis.out)
+            if iis.peakPos(iis.out(k)) + marg > length(lfp.data)
+                idx{k} = iis.peakPos(iis.out(k)) - marg : length(lfp.data);
+            else
+                idx{k} = iis.peakPos(iis.out(k)) - marg : iis.peakPos(iis.out(k)) + marg;
             end
-            lfp.data([idx{:}]) = [];
-            z = z + 1;
         end
+        lfp.data([idx{:}]) = [];
         
         % remove first x minutes
         if i == 3
             if j == 4
                 lfp.data(1 : fs * 60 * 21) = [];
             elseif j == 9
-                lfp.data(1 : fs * 60 * 10) = [];
+                lfp.data(1 : fs * 60 * 5) = [];
+            end
+        elseif i == 1
+            if j == 4
+                lfp.data(1 : fs * 60 * 1) = [];
             end
         end
+        
+        % inspect data
+        figure; plot(lfp.timestamps, lfp.data)
+        
+        % remove max artifacts
+        [~, x] = min(lfp.data);
+        lfp.data(x - marg : x + marg) = [];
 
-        % remove last x minutes
-        lfp.data(end : -1 : end - x * 60 * lfp.fs) = [];
+        % remove last 2 minutes
+        lfp.data(end : -1 : end - 2 * 60 * lfp.fs) = [];
 
         % correct timestamps
         lfp.timestamps = [1 : length(lfp.data)] / fs;

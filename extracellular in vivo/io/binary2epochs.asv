@@ -48,13 +48,13 @@ epochs = [];
 start = find([0; diff(vec)] > 0);
 stop = find([0; diff(vec)] < 0);
 
-if isempty(start) && isempty(stop)
+if isempty(start) || isempty(stop)
     if unique(vec) == 1
         epochs = [1 length(vec)];
     else
-    fprintf('\nNo epochs detected\n');
-    end
+    fprintf('\nInitial detection failed\n');
     return
+    end
 else
     fprintf('\nAfter initial detection: %d events\n', length(start));
 end

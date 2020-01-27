@@ -86,33 +86,32 @@ binsize = (2 ^ nextpow2(binsize * fs));
 % burst suppression
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 vars = {'std', 'max', 'sum'};
-bs = getBS('sig', sig, 'fs', fs, 'basepath', basepath, 'graphics', false,...
-    'saveVar', true, 'binsize', 0.5, 'BSRbinsize', binsize, 'smf', smf,...
+bs = getBS('sig', sig, 'fs', fs, 'basepath', basepath, 'graphics', graphics,...
+    'saveVar', saveVar, 'binsize', 1.5, 'BSRbinsize', binsize, 'smf', smf,...
     'clustmet', 'gmm', 'vars', vars, 'basename', basename,...
-    'saveFig', saveFig, 'forceA', forceA);
+    'saveFig', saveFig, 'forceA', forceA, 'vis', true);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % iis
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % thr during suppression
-thr(1) = 0;
-thr(2) = mean(sig(~bs.binary)) + 15 * std(sig(~bs.binary));
-
+thr = [0 mean(sig(~bs.binary(1 : 15 * fs * 60)))...
+    + 15 * std(sig(~bs.binary(1 : 15 * fs * 60)))];
 marg = 0.1;
 iis = getIIS('sig', sig, 'fs', fs, 'basepath', basepath,...
     'graphics', graphics, 'saveVar', saveVar, 'binsize', binsize,...
     'marg', marg, 'basename', basename, 'thr', thr, 'smf', smf,...
-    'saveFig', saveFig, 'forceA', forceA);
+    'saveFig', saveFig, 'forceA', forceA, 'spkw', false, 'vis', false);
 wvstamps = -marg * 1000 : 1 / fs * 1000 : marg * 1000;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % burst suppression after IIS filteration
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if isfield(iis, 'filtered') && size(iis.wv, 1) > 50
-bs = getBS('sig', iis.filtered, 'fs', fs, 'basepath', basepath, 'graphics', graphics,...
-    'saveVar', true, 'binsize', 0.5, 'BSRbinsize', binsize, 'smf', smf,...
-    'clustmet', 'gmm', 'vars', vars, 'basename', basename,...
-    'saveFig', saveFig, 'forceA', forceA);
+    bs = getBS('sig', iis.filtered, 'fs', fs, 'basepath', basepath, 'graphics', graphics,...
+        'saveVar', saveVar, 'binsize', 0.5, 'BSRbinsize', binsize, 'smf', smf,...
+        'clustmet', 'gmm', 'vars', vars, 'basename', basename,...
+        'saveFig', saveFig, 'forceA', forceA, 'vis', false);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -128,24 +127,50 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % IIS in anesthesia states
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% find episodes of BS. note min- and inter-Dur are in bins
-limbs = [0.3 0.8];
-vec = bs.bsr > limbs(1) & bs.bsr < limbs(2);
-ep.stamps = binary2epochs('vec', vec, 'minDur', 1, 'interDur', 1);
-% convert epoch bins to sample idx
-ep.stamps = bs.cents(ep.stamps);
-
-% find IIS within anesthesia epochs
-idx = [];
-for j = 1 : size(ep.stamps, 1)
-    idx = [idx; find(iis.peakPos > ep.stamps(j, 1) &...
-        iis.peakPos < ep.stamps(j, 2))];
+% episodes of BS
+ep.bs_stamps = binary2epochs('vec', bs.bsr > 0.3 & bs.bsr < 0.8,...
+    'minDur', 1, 'interDur', 1);
+% bins to samples
+ep.bs_stamps = bs.cents(ep.bs_stamps);
+if ~isempty(ep.bs_stamps)
+    if ep.bs_stamps(1) == bs.cents(1)
+        ep.bs_stamps(1) = 1;
+    end
+    if ep.bs_stamps(end) == bs.cents(end)
+        ep.bs_stamps(end) = length(sig);
+    end
 end
-ep.nspks = length(idx);
+% iis within epochs
+idx = [];
+for j = 1 : size(ep.bs_stamps, 1)
+    idx = [idx; find(iis.peakPos > ep.bs_stamps(j, 1) &...
+        iis.peakPos < ep.bs_stamps(j, 2))];
+end
+ep.bs_nspks = length(idx);
 wv = iis.wv(idx, :);
 
+% episodes of B
+ep.b_stamps = binary2epochs('vec', bs.bsr < 0.3,...
+    'minDur', 1, 'interDur', 1);
+ep.b_stamps = bs.cents(ep.b_stamps);
+if ~isempty(ep.b_stamps)
+    if ep.b_stamps(1) == bs.cents(1)
+        ep.b_stamps(1) = 1;
+    end
+    if ep.b_stamps(end) == bs.cents(end)
+        ep.b_stamps(end) = length(sig);
+    end
+end
+idx = [];
+for j = 1 : size(ep.b_stamps, 1)
+    idx = [idx; find(iis.peakPos > ep.b_stamps(j, 1) &...
+        iis.peakPos < ep.b_stamps(j, 2))];
+end
+ep.b_nspks = length(idx);
+
 % episode and recording duration
-ep.epDur = sum(diff(ep.stamps, [], 2));
+ep.bDur = sum(diff(ep.b_stamps, [], 2));
+ep.bsDur = sum(diff(ep.bs_stamps, [], 2));
 ep.recDur = length(sig);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -185,16 +210,20 @@ if graphics
     plot(tband / 60, ep.gband, 'g', 'LineWidth', 2)
     legend({'BSR', 'Delta', 'Sigma', 'Gamma'})
     Y = ylim;
-    if ~isempty(ep.stamps)
-        fill([ep.stamps fliplr(ep.stamps)]' / fs / 60, [Y(1) Y(1) Y(2) Y(2)],...
+    if ~isempty(ep.bs_stamps)
+        fill([ep.bs_stamps fliplr(ep.bs_stamps)]' / fs / 60, [Y(1) Y(1) Y(2) Y(2)],...
             'b', 'FaceAlpha', 0.2,  'EdgeAlpha', 0, 'HandleVisibility', 'off');
+    end
+    if ~isempty(ep.b_stamps)
+        fill([ep.b_stamps fliplr(ep.b_stamps)]' / fs / 60, [Y(1) Y(1) Y(2) Y(2)],...
+            'g', 'FaceAlpha', 0.2,  'EdgeAlpha', 0, 'HandleVisibility', 'off');
     end
     xlabel('Time [m]')
     ylabel('[a.u.]')
     axis tight
     set(gca, 'TickLength', [0 0])
     box off
-    title('Surgical Anesthesia')
+    title('Anesthesia States')
     
     % bs
     subplot(3, 2, 5);

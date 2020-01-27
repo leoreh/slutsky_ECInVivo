@@ -196,6 +196,7 @@ if spkw
         %    'WidthReference', 'halfheight', 'MinPeakHeight', abs(thr(2)));
     end
     cfs = squeeze(mean(abs(cfs), 1));
+    
     % idx to suspecious spikes
     % iis.out = find(isoutlier(iis.spkw, 'ThresholdFactor', 2));
     iis.out = find(iis.spkw < 5);
