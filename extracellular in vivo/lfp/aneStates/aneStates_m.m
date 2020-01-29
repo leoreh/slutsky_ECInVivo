@@ -72,8 +72,6 @@ if isempty(basename)
     [~, basename] = fileparts(basepath);
 end
 
-graphics = false
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % lfp data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -99,12 +97,12 @@ bs = getBS('sig', sig, 'fs', fs, 'basepath', basepath, 'graphics', graphics,...
 % thr during suppression
 thr = [0 mean(sig(~bs.binary(1 : 15 * fs * 60)))...
     + 15 * std(sig(~bs.binary(1 : 15 * fs * 60)))];
-marg = 0.1;
+marg = 0.05;
 iis = getIIS('sig', sig, 'fs', fs, 'basepath', basepath,...
     'graphics', graphics, 'saveVar', saveVar, 'binsize', binsize,...
-    'marg', marg, 'basename', basename, 'thr', thr, 'smf', smf,...
+    'marg', marg, 'basename', basename, 'thr', thr, 'smf', 7,...
     'saveFig', saveFig, 'forceA', forceA, 'spkw', false, 'vis', false);
-wvstamps = -marg * 1000 : 1 / fs * 1000 : marg * 1000;
+wvstamps = linspace(-marg, marg, floor(marg * fs) * 2 + 1);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % burst suppression after IIS filteration
@@ -179,13 +177,14 @@ ep.recDur = length(sig);
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if graphics    
-    f = figure;
+    fh = figure('Visible', 'off');
     set(gcf, 'units','normalized','outerposition',[0 0 1 1]);
     suptitle(basename)
+    tstamps = (1 : length(sig)) / fs / 60;
     
     % raw
     sb1 = subplot(3, 2, 1 : 2);
-    plot((1 : length(sig)) / fs / 60, sig, 'k')
+    plot(tstamps, sig, 'k')
     axis tight
     ylim([-1 2])
     hold on
@@ -197,7 +196,7 @@ if graphics
         p1.Color(4) = 0.3;
     end
     ylim([0 1])
-    ylabel('Rate [IIS / min]')
+    ylabel('Rate [spikes / bin]')
     legend({'Raw', 'IIS thr', 'IIS rate'}, 'Location', 'northwest')
     axis tight
     set(gca, 'TickLength', [0 0])
@@ -227,27 +226,36 @@ if graphics
     box off
     title('Anesthesia States')
     
-    % bs
+    % zoom in raw, bs, and iis
     subplot(3, 2, 5);
-    midsig = round(length(sig) / 2 / fs / 60);
-    ylimsig = sig(midsig * fs * 60 : (midsig + 2) * fs * 60);
-    plot((1 : length(sig)) / fs / 60, sig)
-    hold on
+    minmarg = 1.5;
+    midsig = round(length(sig) / 2);
+    idx = round(midsig - minmarg * fs * 60 : midsig + minmarg * fs * 60);
+    idx2 = iis.peakPos > idx(1) & iis.peakPos < idx(end);
+    plot(tstamps(idx), sig(idx), 'k')
     axis tight
-    ylim([min(ylimsig) max(ylimsig)])
+    hold on
+    x = xlim;
+    plot(x, [iis.thr(2) iis.thr(2)], '--r')
+    scatter(iis.peakPos(idx2) / fs / 60,...
+        iis.peakPower(idx2), '*');
+    bsstamps = RestrictInts(bs.stamps, [idx(1) idx(end)]);
     Y = ylim;
-    fill([bs.stamps fliplr(bs.stamps)] / fs / 60, [Y(1) Y(1) Y(2) Y(2)],...
-        'k', 'FaceAlpha', 0.4,  'EdgeAlpha', 0);
-    xlim([midsig midsig + 2])
+    if ~isempty(bsstamps)
+        fill([bsstamps fliplr(bsstamps)] / fs / 60, [Y(1) Y(1) Y(2) Y(2)],...
+            'k', 'FaceAlpha', 0.25,  'EdgeAlpha', 0);
+    end
     ylabel('Voltage [mV]')
+    xlabel('Time [m]')
+    xticks([ceil(midsig / fs / 60 - minmarg), floor(midsig / fs / 60 + minmarg)])
     set(gca, 'TickLength', [0 0])
     box off
-    title('BS')
+    title('IIS')    
     
     % iis waveforms
     if ~isempty(iis.wv)
         subplot(3, 2, 6)
-        plot(wvstamps, iis.wv)
+        plot(wvstamps * 1000, iis.wv)
         ylabel('Voltage [mV]')
         xlabel('Time [ms]')
         axis tight

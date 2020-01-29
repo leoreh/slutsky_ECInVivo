@@ -5,10 +5,10 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath{1} = 'E:\Data\Others\DZ\Field\Data\Tg_short';
-basepath{2} = 'E:\Data\Others\DZ\Field\Data\Tg_long';
+basepath{1} = 'E:\Data\Others\DZ\Field\Data\WT_short';
+basepath{2} = 'E:\Data\Others\DZ\Field\Data\Tg_short';
 basepath{3} = 'E:\Data\Others\DZ\Field\Data\WT_long';
-basepath{4} = 'E:\Data\Others\DZ\Field\Data\WT_short';
+basepath{4} = 'E:\Data\Others\DZ\Field\Data\Tg_long';
 rm = cell(4, 1);
 
 forceA = false;
@@ -59,11 +59,11 @@ if graphics
     % short recordings
     subplot(3, 4, 1 : 2)
     hold on
-    for i = [1, 4]
-        stdshade(as{i}.iis, 0.5, c2(i), as{i}.t / fs / 60)
+    for i = [1, 2]
+        stdshade(as{i}.iis, 0.1, c2(i), as{i}.t / fs / 60)
     end
     axis tight
-    ylabel('Rate [IIS / min]')
+    ylabel('IIS Rate [spikes / bin]')
     xlim([1 50])
     box off
     set(gca, 'TickLength', [0 0])
@@ -72,11 +72,11 @@ if graphics
     % long recordings
     subplot(3, 4, 5 : 6)
     hold on
-    for i = [2, 3]
-        stdshade(as{i}.iis, 0.5, c2(i), as{i}.t / fs / 60)
+    for i = [3, 4]
+        stdshade(as{i}.iis, 0.1, c2(i), as{i}.t / fs / 60)
     end
     axis tight
-    ylabel('Rate [IIS / min]')
+    ylabel('IIS Rate [spikes / bin]')
     xlabel('Time [m]')
     xlim([1 100])
     box off
@@ -91,7 +91,7 @@ if graphics
     gscatter(gidx, [nspks{:}] ./ ([recDur{:}] / fs / 60), gidx, c2)
     legend off
     xlabel('')
-    ylabel('IIS rate [1 / m]')
+    ylabel('IIS Rate [spikes / bin]')
     xticklabels(grp)
     title('IIS total')
     box off
@@ -105,7 +105,7 @@ if graphics
     gscatter(gidx, [nspksBS{:}] ./ ([bsDur{:}] / fs / 60), gidx, c2)
     legend off
     xlabel('')
-    ylabel('IIS rate [1 / m]')
+    ylabel('IIS Rate [spikes / bin]')
     xticklabels(grp)
     title('IIS in BS')
     box off
@@ -119,7 +119,7 @@ if graphics
     gscatter(gidx, [nspksB{:}] ./ ([bDur{:}] / fs / 60), gidx, c2)
     legend off
     xlabel('')
-    ylabel('IIS rate [1 / m]')
+    ylabel('IIS Rate [spikes / bin]')
     xticklabels(grp)
     title('IIS in B')
     box off
@@ -141,13 +141,13 @@ if graphics
     
     % Duration BS
     subplot(3, 4, 8)
-    boxplot([bsDur{:}] / fs / 60, gidx,...
+    boxplot(([bsDur{:}] / fs / 60) ./ ([recDur{:}] / fs / 60), gidx,...
         'BoxStyle', 'outline', 'Color', c2, 'notch', 'off')
     hold on
-    gscatter(gidx, [bsDur{:}] / fs / 60, gidx, c2)
+    gscatter(gidx, ([bsDur{:}] / fs / 60) ./ ([recDur{:}] / fs / 60), gidx, c2)
     legend off
     xlabel('')
-    ylabel('Duration [m]')
+    ylabel('BS / total')
     xticklabels(grp)
     title('Duration of BS')
     box off
@@ -155,13 +155,13 @@ if graphics
     
     % Duration B
     subplot(3, 4, 12)
-    boxplot([bDur{:}] / fs / 60, gidx,...
+    boxplot(([bDur{:}] / fs / 60) ./ ([recDur{:}] / fs / 60), gidx,...
         'BoxStyle', 'outline', 'Color', c2, 'notch', 'off')
     hold on
-    gscatter(gidx, [bDur{:}] / fs / 60, gidx, c2)
+    gscatter(gidx, ([bDur{:}] / fs / 60) ./ ([recDur{:}] / fs / 60), gidx, c2)
     legend off
     xlabel('')
-    ylabel('Duration [m]')
+    ylabel('B / total')
     xticklabels(grp)
     title('Duration of B')
     box off
@@ -210,9 +210,9 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arrange to excel
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+xx = [nspksB{:}] ./ ([bDur{:}] / fs / 60)
 
-mat = [nspks{:}] ./ ([recDur{:}] / fs / 60)
-
-mat = cellfun(@(x)[x(:); NaN(18-length(x), 1)], nspksB,...
+mat = cellfun(@(x)[x(:); NaN(18-length(x), 1)], thr,...
     'UniformOutput', false);
-mat = cell2mat(mat)' / fs / 60;
+mat = cell2mat(mat);
+

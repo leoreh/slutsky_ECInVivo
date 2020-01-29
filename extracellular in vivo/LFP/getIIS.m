@@ -34,9 +34,12 @@ function [iis] = getIIS(varargin)
 %       <params>    as in input
 %
 % TO DO LIST
-%       # investigate thr
-%       # filter IIS by removing average waveform
-%       # find width via wavelet and after hyperpolirazation
+%       # investigate thr (done)
+%       # filter IIS by removing average waveform (done)
+%       # find width via wavelet and after hyperpolirazation (done)
+%       # manage bidirectional thresholding
+%       # remove spikes with more than one peak in window to produce a
+%       clean mean waveform
 %
 % CALLS
 %       calcFR
@@ -45,6 +48,8 @@ function [iis] = getIIS(varargin)
 % 13 jan 20 LH      filtspk
 % 19 jan 20 LH      thr in mV and z-scores
 % 22 jan 20 LH      max frequency at peakPos rather than throught spike
+% 27 jan 20 LH      trough between peaks instead of refractory period
+% 28 jan 20 LH      changed iis.rate to counts / bin instead of spikes / m
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -55,7 +60,7 @@ addParameter(p, 'sig', [], @isnumeric)
 addParameter(p, 'fs', 1250, @isnumeric)
 addParameter(p, 'smf', 6, @isnumeric)
 addParameter(p, 'binsize', 300, @isnumeric)
-addParameter(p, 'marg', 0.1, @isnumeric)
+addParameter(p, 'marg', 0.05, @isnumeric)
 addParameter(p, 'thr', [10 0], @isnumeric)
 addParameter(p, 'spkw', false, @islogical)
 addParameter(p, 'basepath', pwd, @isstr);
@@ -84,9 +89,12 @@ vis = p.Results.vis;
 forceA = p.Results.forceA;
 filtspk = p.Results.filtspk;
 
-wvstamps = -marg * 1000 : 1 / fs * 1000 : marg * 1000;
-marg = round(marg * fs);
+% params
+margs = floor(marg * fs);           % margs [samples]; marg [ms]
+wvstamps = linspace(-marg, marg, margs * 2 + 1);
 tstamps = [1 : length(sig)]' / fs;
+interDur = round(fs * 0.025);       % samples
+lowthr = 0.2;                       % mV
 
 % initialize output
 iis.edges = []; iis.cents = []; iis.peakPos = []; iis.peakPower = [];
@@ -140,30 +148,44 @@ if isempty(iie)
     return
 end
 
-% select local maximum, clip spikes and remove duplicates
+% remove crossings that are too close together. this effectively limits the
+% maximum IIS burst frequency to 1 / interDur. the division of interDur is
+% so that the search for max later on extends beyond the deleted
+% crossings
+ii = find(diff(iie) < interDur / 2);
+while ~isempty(ii)
+    iie(ii + 1) = [];
+    ii = find(diff(iie) < interDur / 2);
+end
+
+% select local maximum and clip spikes 
 peak = zeros(length(iie), 1);
 pos = zeros(length(iie), 1);
 seg = zeros(length(iie), length(wvstamps));
 rmidx = [];
-i = 1;
-while i <= length(iie)
-    % correct case if last / first iis is incomplete
-    if iie(i) + marg > length(sig)
+for i = 1 : length(iie)
+    % remove last / first iis if incomplete
+    if iie(i) + margs > length(sig)
         rmidx = [rmidx, i];
-        i = i + 1;
         continue
-    elseif iie(i) - marg < 1
+    elseif iie(i) - margs < 1
         rmidx = [rmidx, i];
-        i = i + 1;
         continue
     end
-    seg(i, :) = sig(iie(i) - marg : iie(i) + marg);
-    [peak(i), pos(i)] = max(seg(i, :));
-    pos(i) = iie(i) - marg + pos(i);
-    seg(i, :) = sig(pos(i) - marg : pos(i) + marg);
-    i = i + 1;
+    % adjust crossing to local maximum and then clip
+    localseg = sig(iie(i) - interDur : iie(i) + interDur);
+    [peak(i), pos(i)] = max(localseg);
+    pos(i) = iie(i) - interDur + pos(i);
+    seg(i, :) = sig(pos(i) - margs : pos(i) + margs);
 end
-rmidx = [rmidx'; find(diff(pos) < fs * 0.025)];
+% if there is no trough between peaks select highest peak. this is
+% instead of demanding for a refractory period via interDur
+for i = 1 : length(pos) - 1
+    low = min(sig(pos(i) : pos(i + 1)));
+    if low > lowthr
+        rmidx = [rmidx; i + (peak(i) > peak(i + 1))];
+    end
+end
 seg(rmidx, :) = [];
 peak(rmidx) = [];
 pos(rmidx) = [];
@@ -209,8 +231,10 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 [iis.rate, iis.edges, iis.cents] = calcFR(pos, 'winCalc', [1, length(sig)],...
-    'binsize', binsize, 'smet', 'none', 'c2r', true);
-iis.rate = iis.rate * fs * 60;      % convert from samples to minutes
+    'binsize', binsize, 'smet', 'none', 'c2r', false);
+% this is super dangerous because if binsize < 1 min than the rate will
+% effectively be greater than the number of counts
+% iis.rate = iis.rate * fs * 60;      % convert counts in bins to 1 / min
 iis.rate = movmean(iis.rate, smf);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -229,7 +253,7 @@ iis.rate = movmean(iis.rate, smf);
 filtered = sig;
 if filtspk
     for i = 1 : size(seg, 1)
-        idx = [pos(i) - marg : pos(i) + marg];
+        idx = [pos(i) - margs : pos(i) + margs];
         filtered(idx) = filtered(idx) - mwv;
     end
 end
@@ -266,15 +290,17 @@ if graphics
     
     % raw and iis
     subplot(3, 4, 1 : 2)
-    plot([pos pos] / fs / 60, [min(sig), max(sig)], '--g', 'LineWidth', 0.1)
+    plot(tstamps / 60, sig ,'k')
     axis tight
     hold on
-    plot(tstamps / 60, sig)
-    plot(xlim, [thr(2) thr(2)], '--r')
+    plot(xlim, [thr(2) thr(2)], '--r')    
     ylabel('Voltage [mV]')
+    yyaxis right
+    plot(iis.cents / fs / 60, iis.rate, 'b', 'LineWidth', 3)
+    ylabel('Rate [spikes / bin]')
     set(gca, 'TickLength', [0 0])
     box off
-    title('Raw signal')
+    title('Raw signal and IIS rate')
     
     % detection
     subplot(3, 4, 5 : 6)
@@ -283,32 +309,40 @@ if graphics
     axis tight
     plot(xlim, [thr(1) thr(1)], '--r')
     plot([pos pos] / fs / 60, [-10 -1], '--g', 'LineWidth', 2)
+    xlabel('Time [m]')
     ylabel('Z-score')
     set(gca, 'TickLength', [0 0])
     box off
     title('IIS detection')
     
-    % iis rate
+    % zoom in
     subplot(3, 4, 9 : 10)
-    plot(iis.cents / fs / 60, iis.rate, 'k', 'LineWidth', 3)
-    ylabel('Rate [spikes / min]')
-    xlabel('Time [m]')
+    midsig = round(length(sig) / 2);
+    idx = round(midsig - 2 * fs * 60 : midsig + 2 * fs * 60);
+    idx2 = iis.peakPos > idx(1) & iis.peakPos < idx(end);
+    plot(tstamps(idx) / 60, sig(idx), 'k')
     axis tight
+    hold on
+    scatter(iis.peakPos(idx2) / fs / 60,...
+    iis.peakPower(idx2), '*');
+    ylabel('Voltage [mV]')
+    xlabel('Time [m]')
+    xticks(round([midsig / fs / 60 - 2, midsig / fs / 60 + 2]))
     set(gca, 'TickLength', [0 0])
     box off
-    title('IIS rate')
+    title('IIS')
     
     % iis waveforms
     subplot(3, 4, 3)
-    plot(wvstamps, seg')
+    plot(wvstamps * 1000, seg')
     ylabel('Voltage [mV]')
     xlabel('Time [ms]')
     axis tight
-    xticks([-marg, 0, marg] / fs * 1000);
+    xticks([-marg, 0, marg] * 1000);
     set(gca, 'TickLength', [0 0])
     box off
     title('Spike waveform')
-    
+       
     % mean + std waveform
     axes('Position',[.542 .71 .09 .07])
     box on
@@ -369,10 +403,13 @@ if graphics
     % max frequency and amplitude vs. time
     subplot(3, 4, 7)
     scatter(iis.peakPos / fs / 60, iis.peakPower, 2, 'b', 'filled');
+    axis tight
+    x = xlim;
     l2 = lsline;
-    ylabel('Amplitude [mV]')
     set(l2, 'color', 'b')
     l2.LineWidth = 3;
+    xlim(x);
+    ylabel('Amplitude [mV]')
     if ~isempty(iis.maxf)
         yyaxis right
         scatter(iis.peakPos / fs / 60, iis.maxf, 2, 'k', 'filled');

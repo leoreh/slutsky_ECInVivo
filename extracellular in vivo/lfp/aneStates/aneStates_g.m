@@ -144,7 +144,7 @@ if graphics
     axis tight
     x = xlim;
     xlim([x(1) xt])
-    ylabel('Rate [IIS / min]')
+    ylabel('IIS rate [spikes / bin]')
     set(gca, 'TickLength', [0 0])
     box off
     title('IIS rate')

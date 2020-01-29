@@ -105,7 +105,7 @@ for i = 1 : nunits
     end
 end
 
-% divide by binsize
+% divide by binsize to produce rate
 if c2r
     fr(:, 1 : end - 1) = fr(:, 1 : end - 1) / binsize;
     fr(:, end) = fr(:, end) / (binedges(end) - binedges(end - 1));
