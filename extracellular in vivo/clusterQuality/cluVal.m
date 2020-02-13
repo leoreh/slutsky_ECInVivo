@@ -10,7 +10,7 @@ function spikes = cluVal(spikes, varargin)
 % INPUT:
 %   basepath        path to recording
 %   spikes          struct (see getSpikes)
-%   npca            no. PCA features for mahal dist {12}.
+%   npca            #PCA features for mahal dist {12}.
 %                   If sorted with neurosuite should be #spk group * 3
 %   mu              vector of predetermined multi units. spikes from these
 %                   units will be discarded from distance calculations.
@@ -43,7 +43,7 @@ function spikes = cluVal(spikes, varargin)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 p = inputParser;
 addOptional(p, 'basepath', pwd);
-addOptional(p, 'npca', 12, @isscalar);
+addOptional(p, 'npca', 3, @isscalar);
 addOptional(p, 'mu', [], @isnumeric);
 addOptional(p, 'force', false, @islogical);
 addOptional(p, 'graphics', true, @islogical);
@@ -62,13 +62,23 @@ saveVar = p.Results.saveVar;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % calculate cluster separation
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-fet = getFet(basepath);
+fet = getFet(basepath, true, false);
 
 if all(isfield(spikes, {'mDist', 'iDist', 'lRat'})) && ~force
     warning('separation matrices already calculated. Skipping cluDist');
 else
     sprintf('\ncalculating separation matrices\n\n');
-    j = 1;
+    
+    % arrange predetermined mu
+    rmmu = cell(1, 4);
+    if ~isempty(mu)
+        u = spikes.cluID(sort(mu));
+        for i = 1 : length(fet)
+            rmmu{i} = u(spikes.shankID(mu) == i);
+        end
+    end
+    
+    % go over each spike group, clean and calc separation
     for i = 1 : length(fet)
         
         % disgard noise and artifact spikes
@@ -76,23 +86,19 @@ else
         fet{i}(idx, :) = [];
               
         % disgard spikes that belong to predetermined mu
-        if ~isempty(mu)  
-            u = spikes.cluID(sort(mu));
-            [~, idx] = maxk(u, length(fet));
-            idx = sort(idx);
-            for j = j : idx(i)
-                idx = find(fet{i}(:, end) == u(j));
-                fet{i}(idx, :) = [];
-            end
+        for j = 1 : length(rmmu{i})
+            idx = find(fet{i}(:, end) == rmmu{i}(j));
+            fet{i}(idx, :) = [];
         end
         
         % calculate separation matrices
         clu = spikes.cluID(spikes.shankID == i);
         lRat{i} = zeros(length(clu), 1);
         iDist{i} = zeros(length(clu) ,1);
+        ncol = npca * size([spikes.avgWaveform{spikes.shankID == i}], 1);
         for j = 1 : length(clu)
             cluidx = find(fet{i}(:, end) == clu(j));
-            [lRat{i}(j, 1), iDist{i}(j, 1), mDist{i}{j}] = cluDist(fet{i}(:, 1 : npca), cluidx);
+            [lRat{i}(j, 1), iDist{i}(j, 1), mDist{i}{j}] = cluDist(fet{i}(:, 1 : ncol), cluidx);
         end
     end
     

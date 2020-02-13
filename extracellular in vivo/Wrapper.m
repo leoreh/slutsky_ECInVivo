@@ -4,14 +4,14 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % basepath to recording folder
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'E:\Data\Dat\lh41';
+basepath = 'E:\Data\Dat\lh44\lh44_200208';
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 1: file conversion
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 store = 'Raw1';
 fs = 24414.0125;
-blocks = [9 : 14, 17 : 22, 25 : 32, 35 : 40];
+blocks = [1 : 5];
 chunksize = 60;
 mapch = [1 : 16];
 rmvch = [];
@@ -36,19 +36,43 @@ mat = bz_LoadBinary([filename '.dat'], 'frequency', fs, 'start', start,...
     'duration', duration, 'nChannels', nChannels);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% STEP 2: load LFP
+% STEP 2: LFP
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-ch = [1:16];
+% load
+ch = [1 : 13];
 chavg = {1 : 4; 5 : 7; 8 : 11; 12 : 15};
 chavg = {};
 lfp = getLFP('basepath', basepath, 'ch', ch, 'chavg', chavg,...
     'fs', 1250, 'interval', [0 inf], 'extension', 'lfp',...
-    'savevar', true, 'forceload', false, 'basename', '');
+    'savevar', true, 'forceL', true, 'basename', '');
 
-%%% LFP events
-events = findLFPevents('lfp', lfp, 'emgThr', 0, 'basepath', basepath,...
-    'ch', [16], 'preset', 'bs');
+
+binsize = (2 ^ nextpow2(30 * lfp.fs));
+ch = 1;
+smf = 7;
+
+% inter ictal spikes
+thr = [5 0];
+marg = 0.05;
+iis = getIIS('sig', double(lfp.data(:, ch)), 'fs', lfp.fs, 'basepath', basepath,...
+    'graphics', true, 'saveVar', true, 'binsize', binsize,...
+    'marg', marg, 'basename', '', 'thr', thr, 'smf', 7,...
+    'saveFig', false, 'forceA', true, 'spkw', false, 'vis', true);
+
+% burst suppression
+vars = {'std', 'max', 'sum'};
+bs = getBS('sig', double(lfp.data(:, ch)), 'fs', lfp.fs,...
+    'basepath', basepath, 'graphics', true,...
+    'saveVar', true, 'binsize', 1, 'BSRbinsize', binsize, 'smf', smf,...
+    'clustmet', 'gmm', 'vars', vars, 'basename', '',...
+    'saveFig', false, 'forceA', true, 'vis', true);
+
+% anesthesia states
+[bs, iis, ep] = aneStates_m('ch', 1, 'basepath', basepath,...
+    'basename', '', 'graphics', true, 'saveVar', true,...
+    'saveFig', false, 'forceA', false, 'binsize', 30, 'smf', 7);
+    
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 3: load EMG
@@ -62,13 +86,14 @@ emg = getEMG(basepath, 'Stim', blocks, rmvch);
 emglfp = getEMGfromLFP(double(lfp.data(:, chans)), 'emgFs', 10, 'saveVar', true);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% STEP 4: load spikes
+% STEP 4: spikes
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-spikes = getSpikes('basepath', basepath, 'saveMat', true, 'noPrompts', true);
+% load
+spikes = getSpikes('basepath', basepath, 'saveMat', true,...
+    'noPrompts', true, 'forceL', false);
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% STEP 3: review clusters
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% review clusters
+mu = [3, 17, 25, 27];
 mu = [];
 spikes = cluVal(spikes, 'basepath', basepath, 'saveVar', true,...
     'saveFig', true, 'force', true, 'mu', mu, 'graphics', true);
@@ -76,7 +101,7 @@ spikes = cluVal(spikes, 'basepath', basepath, 'saveVar', true,...
 % compare number of spikes and clusters from clustering to curation
 numSpikes = getNumSpikes(basepath, spikes);
 
-% plot separation of SU and MU
+% separation of SU and MU
 plotIsolation(basepath, spikes, false)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -117,32 +142,31 @@ CellClass = cellClass(cat(1, spikes.rawWaveform{:})', 'fs', spikes.samplingRate,
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 6: calculate mean firing rate
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-fr = FR(spikes.times, 'basepath', basepath, 'graphics', false, 'saveFig', false,...
+binsize = (2 ^ nextpow2(30 * spikes.samplingRate));
+fr = FR(spikes.times, 'basepath', basepath, 'graphics', true, 'saveFig', false,...
     'binsize', 20, 'saveVar', true, 'smet', 'MA');
 
 [~, filename] = fileparts(basepath);
 filename = [filename '.Raw1.Info.mat'];
 load(filename);
-select = [1 : 4];
-info.labels = {'Baseline', 'uPSEM', 'uPSEM', 'CNO'};
-lns = cumsum(info.blockduration / 60 / 60);
-lns = [1e-6, lns];
-lns(end) = [];
-lns = lns(select);
+info.labels = {'CNO', 'PSAM', 'PSAM'};
+lns = cumsum(info.blockduration / 60);
+info.lns = lns(1 : 3);
 save(filename, 'info');
+
 
 f = figure;
 subplot(3, 1, 1)
 plotFRtime('fr', fr, 'units', false, 'spktime', spikes.times,...
-    'avg', false, 'lns', lns, 'lbs', info.labels(select),...
-    'raster', true, 'saveFig', false);
+    'avg', false, 'lns', info.lns, 'lbs', info.labels,...
+    'raster', true, 'saveFig', false, 'tunits', 'm');
 subplot(3, 1, 2)
 plotFRtime('fr', fr, 'units', true, 'spktime', spikes.times,...
-    'avg', false, 'lns', lns, 'lbs', info.labels(select),...
+    'avg', false, 'lns', info.lns, 'lbs', info.labels,...
     'raster', false, 'saveFig', false);
 subplot(3, 1, 3)
 plotFRtime('fr', fr, 'units', false, 'spktime', spikes.times,...
-    'avg', true, 'lns', lns, 'lbs', info.labels(select),...
+    'avg', true, 'lns', info.lns, 'lbs', info.labels,...
     'raster', false, 'saveFig', false);
 
 [nunits, nbins] = size(fr.strd);

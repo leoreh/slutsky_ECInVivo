@@ -1,5 +1,7 @@
 function pk = stp(varargin)
 
+% replace by getStimAmp
+% 
 % loads data specified in filename. Each file should contain traces with
 % the same stimulus intensity. allows user to remove unwanted traces.
 % plots amplitude as a function of stimulus intensity and superimposed
@@ -66,7 +68,7 @@ lg = cell(1, nfiles);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 for i = 1 : nfiles
-    data = import_wcp(fullfile(basepath, [filename{i} '.wcp']));
+    data = import_wcp(fullfile(basepath, filename{i}));
     art_t = 0.003 * data.fs;
 
     % find artifact onset\s from derirative

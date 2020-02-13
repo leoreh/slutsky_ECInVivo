@@ -6,7 +6,7 @@ function [sig, dc] = rmDC(sig, varargin)
 %   sig         numeric array. if matrix, baseline is calculated separatly
 %               for each column
 %   winCalc     time window for calculating DC {[1 Inf]}. specified as
-%               index to vec.
+%               index to mat rows.
 % 
 % OUTPUT
 %   sig         input singal without DC component   

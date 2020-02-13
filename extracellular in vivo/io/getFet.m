@@ -1,23 +1,25 @@
-function fet = getFet(basepath, saveVar, forceReload)
+function fet = getFet(basepath, saveVar, forceL)
 
 % load features from all .fet files in folder.
 %
 % INPUT:
 %   basepath        path to recording folder {pwd}.
 %   saveVar         save output in basepath
-%   forceReload     reload fet even if .mat exists
+%   forceL          reload fet even if .mat exists
 %
 % OUTPUT:
 %   fet         array of k cells where k is the number of spike groups
-%               (e.g. tetrodes). each cell is a matrix n x m + 1, where n
-%               is the number of spikes and m is the number of features.
-%               Last column is the clu ID array including noise (clu1) and
-%               artifact (clu0) spikes
+%               (e.g. tetrodes). each cell is a matrix n x m + #elec + 1,
+%               where n is the number of spikes and m is the number of
+%               features. for each electrode there is one more column. Last
+%               column is the clu ID array including noise (clu1) and
+%               artifact (clu0) spikes.
 %               
 % 03 dec 18 LH
 % 
 % to do list:
 %   divide last fet by fs
+%   correct case were mat exists and forceL
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -29,13 +31,13 @@ end
 if nargs < 2 || isempty(saveVar)
     saveVar = 1;
 end
-if nargs < 3 || isempty(forceReload)
-    forceReload = 0;
+if nargs < 3 || isempty(forceL)
+    forceL = 0;
 end
 
 [~, filename, ~] = fileparts(basepath);
 filename = [fullfile(basepath, filename) '.fet.mat'];
-if exist(filename, 'file')  && ~forceReload
+if exist(filename, 'file')  && ~forceL
     load(filename);
     warning('fet.mat already exists. loading %s', filename)
     return
@@ -88,7 +90,7 @@ for i = 1 : nclufiles
         error('cannot open file');
     end
     nclu = fscanf(fid, '%d', 1);
-    fet{i}(:, end+1) = fscanf(fid, '%f')';
+    fet{i}(:, end + 1) = fscanf(fid, '%f')';
     fclose(fid);
 
 end

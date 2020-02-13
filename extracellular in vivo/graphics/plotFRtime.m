@@ -9,6 +9,7 @@ function f = plotFRtime(varargin)
 %   fr          struct. See FR.m.
 %   raster      plot raster {1} or not (0).
 %   units       plot FR of each unit {1} or not (0).
+%   tunits      char. time axis units {'m'} or ('h').
 %   avg         plot mean +- std {1} or not (0).
 %   lns         timestamps [hr] for adding lines to norm graph {[]}.
 %   lbs         labels to add near lines.
@@ -32,6 +33,7 @@ addOptional(p, 'spktimes', []);
 addOptional(p, 'fr', []);
 addOptional(p, 'raster', false, @islogical);
 addOptional(p, 'units', false, @islogical);
+addOptional(p, 'tunits', 'm', @ischar);
 addOptional(p, 'avg', false, @islogical);
 addOptional(p, 'lns', [], @isnumeric);
 addOptional(p, 'lbs', {}, @iscell);
@@ -43,6 +45,7 @@ spktimes = p.Results.spktimes;
 fr = p.Results.fr;
 raster = p.Results.raster;
 units = p.Results.units;
+tunits = p.Results.tunits;
 avg = p.Results.avg;
 lns = p.Results.lns;
 lbs = p.Results.lbs;
@@ -61,7 +64,11 @@ end
 
 [nunits, nbins] = size(fr.strd);
 
-x = ([1 : nbins] / (60 / fr.binsize) / 60);
+if strcmp(tunits, 'm')
+    x = ([1 : nbins] / (60 / fr.binsize));
+elseif strcmp('tunits', 'h')
+    x = ([1 : nbins] / (60 / fr.binsize) / 60);
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % plot
@@ -72,7 +79,11 @@ if raster
     hold on
     for i = 1 : nunits
         y = ones(length(spktimes{i}), 1) * i;
-        scatter(spktimes{i} / 60 / 60, y, 2, 'k', 'filled')
+        if strcmp(tunits, 'm')
+            scatter(spktimes{i} / 60, y, 2, 'k', 'filled')
+        elseif strcmp('tunits', 'h')
+            scatter(spktimes{i} / 60 / 60, y, 2, 'k', 'filled')
+        end
     end
     axis tight
     ylabel('Unit #')

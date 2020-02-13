@@ -13,7 +13,7 @@ function spikes = getSpikes(varargin)
 %    UID             -vector subset of UID's to load 
 %    basepath        -path to recording (where .dat/.clu/etc files are)
 %    getWaveforms    -logical (default=true) to load mean of raw waveform data
-%    forceReload     -logical (default=false) to force loading from
+%    forceL          -logical (default=false) to force loading from
 %                     res/clu/spk files
 %    saveMat         -logical (default=false) to save in buzcode format
 %    noPrompts       -logical (default=false) to supress any user prompts
@@ -58,7 +58,9 @@ function spikes = getSpikes(varargin)
 %
 %
 % written by David Tingley, 2017
+% 
 % 23 nov 18 LH - added avg and std waveform fields
+% 07 feb 20 LH - fixed orientation given one electrode
 
 %% Deal With Inputs 
 spikeGroupsValidation = @(x) assert(isnumeric(x) || strcmp(x,'all'),...
@@ -70,7 +72,7 @@ addParameter(p,'region','',@isstr); % won't work without sessionInfodata
 addParameter(p,'UID',[],@isvector);
 addParameter(p,'basepath',pwd,@isstr);
 addParameter(p,'getWaveforms',true,@islogical)
-addParameter(p,'forceReload',false,@islogical);
+addParameter(p,'forceL',false,@islogical);
 addParameter(p,'saveMat',false,@islogical);
 addParameter(p,'noPrompts',false,@islogical);
 
@@ -81,7 +83,7 @@ region = p.Results.region;
 UID = p.Results.UID;
 basepath = p.Results.basepath;
 getWaveforms = p.Results.getWaveforms;
-forceReload = p.Results.forceReload;
+forceL = p.Results.forceL;
 saveMat = p.Results.saveMat;
 noPrompts = p.Results.noPrompts;
 
@@ -95,7 +97,7 @@ nChannels = sessionInfo.nChannels;
 
 
 %% if the cellinfo file exist and we don't want to re-load files
-if exist([basepath filesep sessionInfo.FileName '.spikes.mat'],'file') && forceReload == false
+if exist([basepath filesep sessionInfo.FileName '.spikes.mat'],'file') && forceL == false
     disp('loading spikes from cellinfo file..')
     load([basepath filesep sessionInfo.FileName '.spikes.mat'])
 %     %Check that the spikes structure fits cellinfo requirements
@@ -219,10 +221,11 @@ for i=1:length(cluFiles)
        if getWaveforms
            wvforms = squeeze(mean(wav(ind,:,:)))-mean(mean(mean(wav(ind,:,:)))); % mean subtract to account for slower (theta) trends
            
-            % added 24 nov 18 LH
+            % 24 nov 18 LH      added avg and std
+            % 07 feb 20 LH      reshape for cases with one electrode        
             wvvar = squeeze(std(double((wav(ind, :, :)))));
-            spikes.avgWaveform{count} = wvforms;
-            spikes.stdWaveform{count} = wvvar;
+            spikes.avgWaveform{count} = reshape(wvforms, sort(size(wvforms)));
+            spikes.stdWaveform{count} = reshape(wvvar, sort(size(wvvar)));
            
            if prod(size(wvforms))==length(wvforms)%in single-channel groups wvforms will squeeze too much and will have amplitude on D1 rather than D2
                wvforms = wvforms';%fix here

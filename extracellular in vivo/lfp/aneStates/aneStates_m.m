@@ -128,8 +128,9 @@ end
 % IIS in anesthesia states
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % episodes of BS
-ep.bs_stamps = binary2epochs('vec', bs.bsr > 0.3 & bs.bsr < 0.8,...
-    'minDur', 1, 'interDur', 1);
+vec = [bs.bsr > 0.3 & bs.bsr < 0.8 & ep.dband > 0.5];
+ep.bs_stamps = binary2epochs('vec', vec, 'minDur', 1, 'interDur', 1);
+
 % bins to samples
 ep.bs_stamps = bs.cents(ep.bs_stamps);
 if ~isempty(ep.bs_stamps)
@@ -140,13 +141,19 @@ if ~isempty(ep.bs_stamps)
         ep.bs_stamps(end) = length(sig);
     end
 end
-% iis within epochs
+
 idx = [];
+idx2 = [];
 for j = 1 : size(ep.bs_stamps, 1)
+    % iis within epochs
     idx = [idx; find(iis.peakPos > ep.bs_stamps(j, 1) &...
         iis.peakPos < ep.bs_stamps(j, 2))];
+    % mean delta within epochs
+    idx2 = [idx2, find(iis.cents >= ep.bs_stamps(j, 1) &...
+        iis.cents <= ep.bs_stamps(j, 2))];
 end
 ep.bs_nspks = length(idx);
+ep.bs_delta = mean(ep.dband(idx2));
 wv = iis.wv(idx, :);
 
 % episodes of B
@@ -162,10 +169,14 @@ if ~isempty(ep.b_stamps)
     end
 end
 idx = [];
+idx2 = [];
 for j = 1 : size(ep.b_stamps, 1)
     idx = [idx; find(iis.peakPos > ep.b_stamps(j, 1) &...
-        iis.peakPos < ep.b_stamps(j, 2))];
+        iis.peakPos < ep.b_stamps(j, 2))];   
+    idx2 = [idx2, find(iis.cents >= ep.b_stamps(j, 1) &...
+        iis.cents <= ep.b_stamps(j, 2))];
 end
+ep.b_delta = mean(ep.dband(idx2));
 ep.b_nspks = length(idx);
 
 % episode and recording duration
@@ -177,7 +188,7 @@ ep.recDur = length(sig);
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if graphics    
-    fh = figure('Visible', 'off');
+    fh = figure('Visible', 'on');
     set(gcf, 'units','normalized','outerposition',[0 0 1 1]);
     suptitle(basename)
     tstamps = (1 : length(sig)) / fs / 60;
@@ -186,7 +197,7 @@ if graphics
     sb1 = subplot(3, 2, 1 : 2);
     plot(tstamps, sig, 'k')
     axis tight
-    ylim([-1 2])
+%     ylim([-1 2])
     hold on
     plot(xlim, [iis.thr(2) iis.thr(2)], '--r')
     ylabel('Voltage [mV]')

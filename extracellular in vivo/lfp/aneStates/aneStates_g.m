@@ -12,12 +12,7 @@ function as = aneStates_g(varargin)
 %   forceA      logical {0}. force analysis even if .mat exists
 %
 % OUTPUT
-%   bs          struct (see getBS.m)
-%   iis         struct (see getIIS.m)
-%   spec        struct with fields:
-%       dband   normalized power in the delta band (1-4 Hz)
-%       sband   normalized power in the sigma band (12-20 Hz)
-%       tband   timestamps for normalized power
+%   as          struct
 %
 % TO DO LIST
 %       #
@@ -60,7 +55,7 @@ filename = dir('*.abf');
 files = natsort({filename.name});
 nfiles = 1 : length(files);
 nfiles(rm) = [];
-if exist([grpname '_as.mat']) & ~forceA
+if exist([grpname '_as.mat']) && ~forceA
     load([grpname '_as.mat'])
 %     return
 else
@@ -87,6 +82,8 @@ for i = 1 : length(nfiles)
     as.nspksBS(i) = ep.bs_nspks;
     as.nspksB(i) = ep.b_nspks;
     as.thr(i) = iis.thr(2);
+    as.bDelta(i) = ep.b_delta;
+    as.bsDelta(i) = ep.bs_delta;
     
     % after last recording is loaded, arrange in mat and save
     if nfiles(i) == nfiles(end)
@@ -178,7 +175,7 @@ if graphics
     stdshade(as.dband, 0.5, 'k', as.t / fs / 60)
     axis tight
     x = xlim;
-    ylim([0 1])
+%     ylim([0 1])
     xlim([x(1) xt])
     ylabel('norm. delta power')
     xlabel('Time [m]')

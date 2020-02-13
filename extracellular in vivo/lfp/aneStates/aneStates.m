@@ -13,11 +13,11 @@ rm = cell(4, 1);
 
 forceA = false;
 forceL = false;
-saveFig = true;
-graphics = true;
+saveFig = false;
+graphics = false;
 saveVar = false;
 ch = 1;
-smf = 6;
+smf = 7;
 fs = 1250;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -210,9 +210,10 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arrange to excel
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-xx = [nspksB{:}] ./ ([bDur{:}] / fs / 60)
+xx = [nspksBS{:}] ./ ([bsDur{:}] / fs / 60)
 
 mat = cellfun(@(x)[x(:); NaN(18-length(x), 1)], thr,...
     'UniformOutput', false);
 mat = cell2mat(mat);
 
+[bsDur{:}] ./ [recDur{:}]

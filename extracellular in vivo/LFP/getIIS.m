@@ -178,6 +178,9 @@ for i = 1 : length(iie)
     pos(i) = iie(i) - interDur + pos(i);
     seg(i, :) = sig(pos(i) - margs : pos(i) + margs);
 end
+seg(rmidx, :) = [];
+peak(rmidx) = [];
+pos(rmidx) = [];
 % if there is no trough between peaks select highest peak. this is
 % instead of demanding for a refractory period via interDur
 for i = 1 : length(pos) - 1

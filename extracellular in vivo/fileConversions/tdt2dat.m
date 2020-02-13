@@ -26,6 +26,7 @@ function info = tdt2dat(varargin)
 %   handle chunks better (e.g. linspace)
 %   add time limit to split files
 %   separate chunks to standalone function
+%   currently blockduration does not include clip
 %
 % 06 dec 18 LH.
 % 18 sep 19 LH handle arguments

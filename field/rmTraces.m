@@ -1,21 +1,23 @@
-function [mat, rm_idx] = rmTraces(mat, varargin)
+function [mat, rm] = rmTraces(mat, varargin)
 
 % plots data and allows the user to remove unwanted traces
 % 
 % INPUT
-%   mat         matrix of traces (columns) x samples (rows)
+%   mat         matrix of samples (rows) x traces (columns 
 %   x           vector for x-axis, can be empty
 %   basepath    recording session path {pwd} to save figure
 %   saveFig     logical. saveFig to current path or not.
 % 
 % OUTPUT
-%   mat         same as input without unwanted traces   
-%   rm_idx      index of removed channels
+%   mat         same as input but unwanted traces are nan
+%   rm_idx      index of removed traces
 % 
 % TO DO LIST
 %   replace while loop with interactive (linked) plot
 % 
-% 09 mar 19 LH
+% 09 mar 19 LH  updates:
+% 12 feb 20 LH  nan instead of removing traces
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -39,10 +41,11 @@ end
 % plot data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-rm_idx = nan;
-while ~isempty(rm_idx)
+rm = nan;
+while ~isempty(rm)
 
     f = figure;
+    set(gcf, 'units', 'normalized', 'outerposition', [0 0 1 1]);
     plot(x, mat)
     axis tight
     box off
@@ -62,10 +65,10 @@ while ~isempty(rm_idx)
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
     prompt = sprintf('\nWhich traces would you like to remove? type as vector, then press return.\n\n');
-    rm_idx = input(prompt);
-    mat(:, rm_idx) = [];
+    rm = input(prompt);
+    mat(:, rm) = nan;
     
-    if ~isempty(rm_idx)
+    if ~isempty(rm)
         close
     end
 

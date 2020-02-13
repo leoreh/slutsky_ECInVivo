@@ -33,8 +33,8 @@ function plotIsolation(basepath, spikes, saveFig)
 % if ~isfield(spikes, 'iDist')
 %     spikes.iDist = nan(nunits, 1);
 % end
-% if ~isfield(spikes, 'ISIratio')
-%     spikes.ISIratio = nan(nunits, 1);
+% if ~isfield(spikes, 'isi')
+%     spikes.isi = nan(nunits, 1);
 % end
 % if ~isfield(spikes, 'su')
 %     spikes.su = nan(nunits, 1);
@@ -50,7 +50,7 @@ ISIval = log10([0 1]);
 
 f = figure;
 subplot(2, 3, 1)
-plot(log(spikes.ISIratio), log10(spikes.L), '*')
+plot(log(spikes.isi), log10(spikes.lRat), '*')
 ax = gca;
 line(([ISIval(2) ISIval(2)]), ax.YLim)
 line(ax.XLim, ([Lval(2) Lval(2)]))
@@ -63,7 +63,7 @@ p = patch([ax.XLim(1) ISIval(2) ISIval(2) ax.XLim(1)], [ax.YLim(1) ax.YLim(1) Lv
 p.FaceAlpha = 0.1;
 
 subplot(2, 3, 2)
-plot(log10(spikes.ISIratio), log10(spikes.iDist), '*')
+plot(log10(spikes.isi), log10(spikes.iDist), '*')
 ax = gca;
 line(([ISIval(2) ISIval(2)]), ax.YLim)
 line(ax.XLim, ([iDistval(1) iDistval(1)]))
@@ -76,7 +76,7 @@ p = patch([ax.XLim(1) ISIval(2) ISIval(2) ax.XLim(1)], [iDistval(1) iDistval(1) 
 p.FaceAlpha = 0.1;
 
 subplot(2, 3, 3)
-plot(log10(spikes.L), log10(spikes.iDist), '*')
+plot(log10(spikes.lRat), log10(spikes.iDist), '*')
 ax = gca;
 line(([Lval(2) Lval(2)]), ax.YLim)
 line(ax.XLim, ([iDistval(1) iDistval(1)]))
@@ -91,7 +91,7 @@ ylabel('log(Isolation Distance)')
 %%
 subplot(2, 3, [4 : 6])
 ax = gca;
-scatter3(log10(spikes.L), log10(spikes.iDist), log10(spikes.ISIratio), '*')
+scatter3(log10(spikes.lRat), log10(spikes.iDist), log10(spikes.isi), '*')
 xlabel('log(L ratio)')
 ylabel('log(Isolation Distance)')
 zlabel('log(ISI ratio)')
@@ -130,9 +130,9 @@ ax.Box = 0;
 title('Isolation Distanace')
 
 subplot(1, 3, 2)
-plot(log10(nspikes), log10(spikes.L), '*')
+plot(log10(nspikes), log10(spikes.lRat), '*')
 hold on
-p = polyfit(log10(nspikes), log10(spikes.L), 1);
+p = polyfit(log10(nspikes), log10(spikes.lRat), 1);
 plot(log10(nspikes), polyval(p, log10(nspikes)), 'k', 'lineWidth', 2)
 xlabel('log(nspikes)')
 ylabel('log(L ratio)')
@@ -142,9 +142,9 @@ ax.Box = 0;
 title('L ratio')
 
 subplot(1, 3, 3)
-plot(log10(nspikes), spikes.ISIratio, '*')
+plot(log10(nspikes), spikes.isi, '*')
 hold on
-p = polyfit(log10(nspikes), spikes.ISIratio, 1);
+p = polyfit(log10(nspikes), spikes.isi, 1);
 plot(log10(nspikes), polyval(p, log10(nspikes)), 'k', 'lineWidth', 2)
 xlabel('log(nspikes)')
 ylabel('ISI ratio')

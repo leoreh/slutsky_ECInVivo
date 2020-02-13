@@ -7,9 +7,10 @@ function [zband, tband] = specBand(varargin)
 % INPUT
 %   sig         signal for detection
 %   fs          sampling frequency
-%   band        vector. e.g. {[1 4]} for delta. 
+%   band        vector. e.g. {[1 4]} for delta 
 %   binsize     scalar {10}. in [samples]
-%   smf         smooth factor {winsize}. empty means no smoothing.
+%   smf         smooth factor {winsize}. empty means no smoothing
+%   znorm       logical. normalize z-score (1) or not {0}
 %   graphics    logical. plot figure {1}
 %
 % OUTPUT
@@ -33,6 +34,7 @@ addParameter(p, 'fs', 1250, @isnumeric)
 addParameter(p, 'band', [1 4], @isnumeric)
 addParameter(p, 'binsize', 10, @isnumeric)
 addParameter(p, 'smf', 0, @isnumeric)
+addParameter(p, 'znorm', true, @islogical)
 addParameter(p, 'graphics', false, @islogical)
 
 parse(p, varargin{:})
@@ -41,6 +43,7 @@ fs = p.Results.fs;
 band = p.Results.band;
 binsize = p.Results.binsize;
 smf = p.Results.smf;
+znorm = p.Results.znorm;
 graphics = p.Results.graphics;
 
 % params
@@ -71,7 +74,9 @@ pband = 10 * log10(abs(pband));
 if ~isempty(band)
     zband = sum(pband, 1);
     zband = movmean(zband, smf);
-    zband = bz_NormToRange(zscore(zband), [0 1]);
+    if znorm
+        zband = bz_NormToRange(zscore(zband), [0 1]);
+    end
 else
     zband = pband;
 end
