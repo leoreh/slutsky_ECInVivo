@@ -100,7 +100,7 @@ else
     for i = 1 : nstim
         win = start(i) : start(i) + t2max;
         [~, idx(i)] = max(avgsig(win));
-        start(i) = win(1) + idx(i);
+        start(i) = start(i) + idx(i);
     end
 end
 
@@ -108,6 +108,7 @@ end
 if isempty(stop) 
     for i = 1 : nstim
         win = start(i) + marg : round(start(i) + t2res);
+%         amp(i, :) = abs(min(sig(win, :))) - abs(sig(start(i), :));
         [~, idx(i)] = min(avgsig(win, :));
         stop(i) = win(1) + idx(i);
     end
@@ -119,6 +120,7 @@ end
 for i = 1 : nstim
     amp(i, :) = sig(start(i), :) - (sig(stop(i), :));
 end
+
 
 if saveVar
     save(filename, 'amp')

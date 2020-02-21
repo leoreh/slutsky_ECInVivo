@@ -5,12 +5,13 @@
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 basepath = 'E:\Data\Field\lh47_200212';
-files = [20];
+basepath = 'E:\Data\19.02.20';
+files = [25 26];
 
 cd(basepath)
 filename = dir('*.wcp');
 filename = natsort({filename.name});
-ch = [1, 3];
+ch = [1];
 
 % typical params for stp
 start = [0.01 : 0.02 : 0.09];
@@ -35,8 +36,12 @@ for i = files
     % arrange and save
     data.t = raw.T;
     data.fs = raw.fs;
-    save(basename, 'data')
+    save([basename '.mat'], 'data')
 end
+
+
+% norm stp
+data.amp{1}(:, :) ./ data.amp{1}(1, :)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % stability
@@ -47,7 +52,7 @@ amp = cell(ch);
 k = 1;
 for i = files
     [~, basename] = fileparts(filename{i});
-    load(basename)
+    load([basename '.mat'])
     for j = ch
         amp{j} = [amp{j} data.amp{j}];
         trace{k, j} = data.sig{j};
@@ -166,25 +171,30 @@ savePdf('io_stimL', basepath, fh)
 % IO
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% vector of intensities (mA). The order must correspond to the order of
-% files.
-intensity = [0.2 : 0.1 : 0.4];
-files = [2 : 4];
+% vector of intensities (mA)
+% The order must correspond to the order of files.
+intensity = [0.3 : 0.2 : 1.1];
+files = [4 : 8];
 
 % arrange data
 k = 1;
+maxtraces = 1;
 for i = files
     [~, basename] = fileparts(filename{i});
-    load(basename)
+    load([basename '.mat'])
     for j = ch
         amp{k, j} = (data.amp{j});
         trace{j}(k, :) = mean(data.sig{j}');
+        maxtraces = max([maxtraces length(data.amp{j})]);
     end
     k = k + 1;
 end
 
-% graphics
+ampmat = cellfun(@(x)[x(:); NaN(maxtraces-length(x), 1)], amp',...
+    'UniformOutput', false);
+ampmat = cell2mat(ampmat);
 
+% graphics
 fh = figure;
 set(gcf, 'units','normalized','outerposition',[0 0 1 1]);
 
