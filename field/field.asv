@@ -5,11 +5,7 @@
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 basepath = 'E:\Data\Field\lh47_200212';
-<<<<<<< HEAD
-files = [1];
-=======
-files = [20];
->>>>>>> parent of 6b59bba... field
+files = [7 15 16 18 19];
 
 cd(basepath)
 filename = dir('*.wcp');
