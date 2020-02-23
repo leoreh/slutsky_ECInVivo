@@ -5,7 +5,12 @@
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 basepath = 'E:\Data\Field\lh47_200212';
+<<<<<<< HEAD
 files = [20];
+=======
+basepath = 'E:\Data\19.02.20';
+files = [25 26];
+>>>>>>> parent of cd38659... Update field.m
 
 cd(basepath)
 filename = dir('*.wcp');
