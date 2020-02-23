@@ -55,16 +55,16 @@ filename = dir('*.abf');
 files = natsort({filename.name});
 nfiles = 1 : length(files);
 nfiles(rm) = [];
-% if exist([grpname '_as.mat']) && ~forceA
-%     load([grpname '_as.mat'])
+if exist([grpname '_as.mat']) && ~forceA
+    load([grpname '_as.mat'])
 %     return
-% end
+else
 for i = 1 : length(nfiles)
     [~, basename] = fileparts(files{nfiles(i)});
     % load individual data  
     [bs, iis, ep] = aneStates_m('ch', 1, 'basepath', basepath,...
         'basename', basename, 'graphics', graphics, 'saveVar', saveVar,...
-        'saveFig', saveFig, 'forceA', false, 'binsize', 30, 'smf', 7);
+        'saveFig', saveFig, 'forceA', forceA, 'binsize', 30, 'smf', 6);
     
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % arrange population data
@@ -72,18 +72,18 @@ for i = 1 : length(nfiles)
     as.grp = grpname;
     as.mouse{i} = basename;
     as.recDur(i) = ep.recDur;
-    as.deepDur(i) = ep.deepDur;
-    as.surDur(i) = ep.surDur;
+    as.bsDur(i) = ep.bsDur;
+    as.bDur(i) = ep.bDur;
     as.iis{i} = iis.rate;
     as.bsr{i} = bs.bsr;
     as.dband{i} = ep.dband;
-    as.t{i} = bs.cents / fs / 60;
-    as.nspks(i) = ep.nspks;
-    as.deep_nspks(i) = ep.deep_nspks;
-    as.sur_nspks(i) = ep.sur_nspks;
+    as.t{i} = bs.cents;
+    as.nspks(i) = size(iis.wv, 1);
+    as.nspksBS(i) = ep.bs_nspks;
+    as.nspksB(i) = ep.b_nspks;
     as.thr(i) = iis.thr(2);
-    as.sur_delta(i) = ep.sur_delta;
-    as.deep_delta(i) = ep.deep_delta;
+    as.bDelta(i) = ep.b_delta;
+    as.bsDelta(i) = ep.bs_delta;
     
     % after last recording is loaded, arrange in mat and save
     if nfiles(i) == nfiles(end)
@@ -112,12 +112,11 @@ for i = 1 : length(nfiles)
         end
     end
 end
-
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-graphics = false;
 if graphics
     
     % data for correlation
@@ -261,7 +260,7 @@ if graphics
     h.FaceColor = 'k';
     h.FaceAlpha = 0.4;
     hold on
-    h = histogram(as.deepDur / fs / 60, nbins, 'Normalization', 'count');
+    h = histogram(as.bsDur / fs / 60, nbins, 'Normalization', 'count');
     h.EdgeColor = 'none';
     h.FaceColor = 'b';
     h.FaceAlpha = 0.4;

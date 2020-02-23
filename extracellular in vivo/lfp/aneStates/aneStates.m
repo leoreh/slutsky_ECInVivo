@@ -5,17 +5,17 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath{1} = 'E:\Data\Others\DZ\IIS\WT';
-basepath{2} = 'E:\Data\Others\DZ\IIS\APPPS1';
-basepath{3} = 'E:\Data\Others\DZ\IIS\APPKi';
-basepath{4} = 'E:\Data\Others\DZ\IIS\FADx5';
+basepath{1} = 'E:\Data\Others\DZ\Field\Data\WT_short';
+basepath{2} = 'E:\Data\Others\DZ\Field\Data\Tg_short';
+basepath{3} = 'E:\Data\Others\DZ\Field\Data\WT_long';
+basepath{4} = 'E:\Data\Others\DZ\Field\Data\Tg_long';
 rm = cell(4, 1);
 
 forceA = false;
 forceL = false;
-saveFig = true;
-graphics = true;
-saveVar = true;
+saveFig = false;
+graphics = false;
+saveVar = false;
 ch = 1;
 smf = 7;
 fs = 1250;
@@ -30,60 +30,22 @@ for i = 1 : length(basepath)
         'saveFig', saveFig, 'forceA', forceA);
     
     nspks{i} = as{i}.nspks;
-    deep_nspks{i} = as{i}.deep_nspks;
-    sur_nspks{i} = as{i}.sur_nspks;
+    nspksBS{i} = as{i}.nspksBS;
+    nspksB{i} = as{i}.nspksB;
     recDur{i} = as{i}.recDur;
-    deepDur{i} = as{i}.deepDur;
-    surDur{i} = as{i}.surDur;
+    bsDur{i} = as{i}.bsDur;
+    bDur{i} = as{i}.bDur;
     thr{i} = as{i}.thr;
     grp{i} = as{i}.grp;
 end
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% arrange to prism
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-maxmice = 27;
-mat = cellfun(@(x)[x(:); NaN(maxmice-length(x), 1)], deep_nspks,...
-    'UniformOutput', false);
-deep_nspks = cell2mat(mat);
-
-mat = cellfun(@(x)[x(:); NaN(maxmice-length(x), 1)], sur_nspks,...
-    'UniformOutput', false);
-sur_nspks = cell2mat(mat);
-
-mat = cellfun(@(x)[x(:); NaN(maxmice-length(x), 1)], nspks,...
-    'UniformOutput', false);
-nspks = cell2mat(mat);
-
-mat = cellfun(@(x)[x(:); NaN(maxmice-length(x), 1)], recDur,...
-    'UniformOutput', false);
-recDur = cell2mat(mat);
-recDur = recDur / fs / 60;
-
-mat = cellfun(@(x)[x(:); NaN(maxmice-length(x), 1)], deepDur,...
-    'UniformOutput', false);
-deepDur = cell2mat(mat);
-deepDur = deepDur / fs / 60;
-
-mat = cellfun(@(x)[x(:); NaN(maxmice-length(x), 1)], surDur,...
-    'UniformOutput', false);
-surDur = cell2mat(mat);
-surDur = surDur / fs / 60;
-
-surFraction = surDur ./ recDur;
-deepFraction = deepDur ./ recDur;
-
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% graphics
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 recmean = cellfun(@mean, recDur);
 bsmean = cellfun(@mean, bsDur);
 bmean = cellfun(@mean, bDur);
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% graphics
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 c = [1 0 0; 1 0 1; 0 0 1; 0 1 1];
 c2 = 'rmbc';
 gidx = [ones(1, length(bsDur{1})), ones(1, length(bsDur{2})) * 2,...
@@ -245,4 +207,13 @@ if graphics
 end
 
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% arrange to excel
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+xx = [nspksBS{:}] ./ ([bsDur{:}] / fs / 60)
 
+mat = cellfun(@(x)[x(:); NaN(18-length(x), 1)], thr,...
+    'UniformOutput', false);
+mat = cell2mat(mat);
+
+[bsDur{:}] ./ [recDur{:}]

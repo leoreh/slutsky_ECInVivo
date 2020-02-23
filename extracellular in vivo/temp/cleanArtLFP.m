@@ -1,9 +1,9 @@
 % remove last minutes from recording
 
-basepath{1} = 'E:\Data\Others\DZ\IIS\WT';
-basepath{2} = 'E:\Data\Others\DZ\IIS\APPPS1';
-basepath{3} = 'E:\Data\Others\DZ\IIS\APPKi';
-basepath{4} = 'E:\Data\Others\DZ\IIS\FADx5';
+basepath{1} = 'E:\Data\Others\DZ\Field\Data\APPPS1_short';
+basepath{2} = 'E:\Data\Others\DZ\Field\Data\APPPS1_long';
+basepath{3} = 'E:\Data\Others\DZ\Field\Data\WT_long';
+basepath{4} = 'E:\Data\Others\DZ\Field\Data\WT_short';
 
 binsize = (2 ^ nextpow2(30 * 1250));
 marg = round(fs * 0.05);
@@ -39,18 +39,28 @@ for i = 2 : length(basepath)
         end
         lfp.data([idx{:}]) = [];
         
+        % remove first x minutes
+        if i == 3
+            if j == 4
+                lfp.data(1 : fs * 60 * 21) = [];
+            elseif j == 9
+                lfp.data(1 : fs * 60 * 5) = [];
+            end
+        elseif i == 1
+            if j == 4
+                lfp.data(1 : fs * 60 * 1) = [];
+            end
+        end
+        
         % inspect data
         figure; plot(lfp.timestamps, lfp.data)
         
-        % remove first x minutes
-        lfp.data(1 : fs * 60 * 21) = [];
-        
         % remove max artifacts
-        [~, x] = max(lfp.data);
+        [~, x] = min(lfp.data);
         lfp.data(x - marg : x + marg) = [];
 
         % remove last 2 minutes
-        lfp.data(end : -1 : end - 10 * 60 * lfp.fs) = [];
+        lfp.data(end : -1 : end - 2 * 60 * lfp.fs) = [];
 
         % correct timestamps
         lfp.timestamps = [1 : length(lfp.data)] / fs;

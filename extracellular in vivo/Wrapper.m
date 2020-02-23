@@ -10,8 +10,8 @@ basepath = 'E:\Data\Dat\lh44\lh44_200208';
 % STEP 1: file conversion
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 store = 'Raw1';
-fs = 24414.06;
-blocks = [1 : 2];
+fs = 24414.0125;
+blocks = [1 : 5];
 chunksize = 60;
 mapch = [1 : 16];
 rmvch = [];
@@ -40,7 +40,7 @@ mat = bz_LoadBinary([filename '.dat'], 'frequency', fs, 'start', start,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % load
-ch = [1 : 16];
+ch = [1 : 13];
 chavg = {1 : 4; 5 : 7; 8 : 11; 12 : 15};
 chavg = {};
 lfp = getLFP('basepath', basepath, 'ch', ch, 'chavg', chavg,...
@@ -143,35 +143,32 @@ CellClass = cellClass(cat(1, spikes.rawWaveform{:})', 'fs', spikes.samplingRate,
 % STEP 6: calculate mean firing rate
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 binsize = (2 ^ nextpow2(30 * spikes.samplingRate));
-fr = FR(spikes.times, 'basepath', basepath, 'graphics', false, 'saveFig', false,...
+fr = FR(spikes.times, 'basepath', basepath, 'graphics', true, 'saveFig', false,...
     'binsize', 20, 'saveVar', true, 'smet', 'MA');
 
 [~, filename] = fileparts(basepath);
 filename = [filename '.Raw1.Info.mat'];
 load(filename);
-info.labels = {'HC', '', 'PSAM', '', ''};
+info.labels = {'CNO', 'PSAM', 'PSAM'};
 lns = cumsum(info.blockduration / 60);
-lns = [1e-6 lns];
-info.lns = lns(1 : 5);
+info.lns = lns(1 : 3);
 save(filename, 'info');
 
 
 f = figure;
-subplot(2, 1, 1)
+subplot(3, 1, 1)
+plotFRtime('fr', fr, 'units', false, 'spktime', spikes.times,...
+    'avg', false, 'lns', info.lns, 'lbs', info.labels,...
+    'raster', true, 'saveFig', false, 'tunits', 'm');
+subplot(3, 1, 2)
 plotFRtime('fr', fr, 'units', true, 'spktime', spikes.times,...
     'avg', false, 'lns', info.lns, 'lbs', info.labels,...
     'raster', false, 'saveFig', false);
-title('')
-xlabel('')
-subplot(2, 1, 2)
+subplot(3, 1, 3)
 plotFRtime('fr', fr, 'units', false, 'spktime', spikes.times,...
     'avg', true, 'lns', info.lns, 'lbs', info.labels,...
     'raster', false, 'saveFig', false);
-xlabel('Time [m]')
-title('')
-figname = 'Firing Rate';
-export_fig(figname, '-tif', '-transparent')
-        
+
 [nunits, nbins] = size(fr.strd);
 tFR = ([1 : nbins] / (60 / fr.binsize) / 60);
 p = plot(tFR, log10(fr.strd));

@@ -98,9 +98,9 @@ vis = p.Results.vis;
 forceA = p.Results.forceA;
 
 % params
-minDur = 2;                         % minimum event duration [s]
-maxDur = 3000000;                   % maximum event duration [s]
-interDur = 4;                       % minimum time between events [bins]
+minDur = 0.15;                      % minimum event duration [s]
+maxDur = 300000;                    % maximum event duration [s]
+interDur = 2;                       % minimum time between events [bins]
 binsize = binsize * fs;             % [s] * [fs] = [samples]
 nclust = 2;                         % two clusters: burst and suppression
 
@@ -409,8 +409,8 @@ if graphics
     
     % clustering - first two variables
     options = statset('MaxIter', 50);
-    gm = fitgmdist(varmat(:, [1, 2]), nclust,...
-        'options', options, 'Start', 'plus', 'Replicates', 50);
+    gm = fitgmdist(varmat(:, [1, 2]), 2,...
+        'options', options, 'Start', 'plus', 'Replicates', 1);
     subplot(3, 4, 3)
     gscatter(varmat(:, 1), varmat(:, 2), gi, 'rk', '.', 1);
     axis tight

@@ -46,7 +46,7 @@ function [bs, iis, ep] = aneStates_m(varargin)
 
 p = inputParser;
 addParameter(p, 'ch', 1, @isvector);
-addParameter(p, 'binsize', 30, @isnumeric);
+addParameter(p, 'binsize', 60, @isnumeric);
 addParameter(p, 'smf', 6, @isnumeric);
 addParameter(p, 'basepath', pwd, @isstr);
 addParameter(p, 'basename', [], @isstr);
@@ -86,7 +86,7 @@ binsize = (2 ^ nextpow2(binsize * fs));
 % burst suppression
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 vars = {'std', 'max', 'sum'};
-bs = getBS('sig', sig, 'fs', fs, 'basepath', basepath, 'graphics', false,...
+bs = getBS('sig', sig, 'fs', fs, 'basepath', basepath, 'graphics', graphics,...
     'saveVar', saveVar, 'binsize', 0.5, 'BSRbinsize', binsize, 'smf', smf,...
     'clustmet', 'gmm', 'vars', vars, 'basename', basename,...
     'saveFig', saveFig, 'forceA', forceA, 'vis', false);
@@ -97,12 +97,9 @@ bs = getBS('sig', sig, 'fs', fs, 'basepath', basepath, 'graphics', false,...
 % thr during suppression
 thr = [0 mean(sig(~bs.binary(1 : 15 * fs * 60)))...
     + 15 * std(sig(~bs.binary(1 : 15 * fs * 60)))];
-if isnan(thr(2))
-    thr(2) = 0.5;
-end
 marg = 0.05;
 iis = getIIS('sig', sig, 'fs', fs, 'basepath', basepath,...
-    'graphics', false, 'saveVar', saveVar, 'binsize', binsize,...
+    'graphics', graphics, 'saveVar', saveVar, 'binsize', binsize,...
     'marg', marg, 'basename', basename, 'thr', thr, 'smf', 7,...
     'saveFig', saveFig, 'forceA', forceA, 'spkw', false, 'vis', false);
 wvstamps = linspace(-marg, marg, floor(marg * fs) * 2 + 1);
@@ -111,82 +108,81 @@ wvstamps = linspace(-marg, marg, floor(marg * fs) * 2 + 1);
 % burst suppression after IIS filteration
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if isfield(iis, 'filtered') && size(iis.wv, 1) > 50
-    bs = getBS('sig', iis.filtered, 'fs', fs, 'basepath', basepath, 'graphics', false,...
+    bs = getBS('sig', iis.filtered, 'fs', fs, 'basepath', basepath, 'graphics', graphics,...
         'saveVar', saveVar, 'binsize', 0.5, 'BSRbinsize', binsize, 'smf', smf,...
         'clustmet', 'gmm', 'vars', vars, 'basename', basename,...
         'saveFig', saveFig, 'forceA', forceA, 'vis', false);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% anesthesia states
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % spectrum power bands
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 [ep.dband, tband] = specBand('sig', sig, 'graphics', false,...
-    'band', [1 4], 'binsize', binsize, 'smf', smf, 'normband', true);
+    'band', [1 4], 'binsize', binsize, 'smf', smf);
+[ep.sband, ~] = specBand('sig', sig, 'graphics', false,...
+    'band', [12 20], 'binsize', binsize, 'smf', smf);
+[ep.gband, ~] = specBand('sig', sig, 'graphics', false,...
+    'band', [30 80], 'binsize', binsize, 'smf', smf);
 
-% episodes of deep anesthesia
-vec = [bs.bsr > 0.3 & bs.bsr < 0.8];
-ep.deep_stamps = binary2epochs('vec', vec, 'minDur', 1, 'interDur', 1);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% IIS in anesthesia states
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% episodes of BS
+vec = [bs.bsr > 0.3 & bs.bsr < 0.8 & ep.dband > 0.5];
+ep.bs_stamps = binary2epochs('vec', vec, 'minDur', 1, 'interDur', 1);
 
 % bins to samples
-ep.deep_stamps = bs.cents(ep.deep_stamps);
-if ~isempty(ep.deep_stamps)
-    if ep.deep_stamps(1) == bs.cents(1)
-        ep.deep_stamps(1) = 1;
+ep.bs_stamps = bs.cents(ep.bs_stamps);
+if ~isempty(ep.bs_stamps)
+    if ep.bs_stamps(1) == bs.cents(1)
+        ep.bs_stamps(1) = 1;
     end
-    if ep.deep_stamps(end) == bs.cents(end)
-        ep.deep_stamps(end) = length(sig);
+    if ep.bs_stamps(end) == bs.cents(end)
+        ep.bs_stamps(end) = length(sig);
     end
 end
 
 idx = [];
 idx2 = [];
-for j = 1 : size(ep.deep_stamps, 1)
+for j = 1 : size(ep.bs_stamps, 1)
     % iis within epochs
-    idx = [idx; find(iis.peakPos > ep.deep_stamps(j, 1) &...
-        iis.peakPos < ep.deep_stamps(j, 2))];
+    idx = [idx; find(iis.peakPos > ep.bs_stamps(j, 1) &...
+        iis.peakPos < ep.bs_stamps(j, 2))];
     % mean delta within epochs
-    idx2 = [idx2, find(iis.cents >= ep.deep_stamps(j, 1) &...
-        iis.cents <= ep.deep_stamps(j, 2))];
+    idx2 = [idx2, find(iis.cents >= ep.bs_stamps(j, 1) &...
+        iis.cents <= ep.bs_stamps(j, 2))];
 end
-ep.deep_nspks = length(idx);
-ep.deep_delta = mean(ep.dband(idx2));
+ep.bs_nspks = length(idx);
+ep.bs_delta = mean(ep.dband(idx2));
 wv = iis.wv(idx, :);
 
-% episodes of surgical anesthesia
-vec = [bs.bsr < 0.3 & ep.dband > 0.5];
-ep.sur_stamps = binary2epochs('vec', vec, 'minDur', 1, 'interDur', 1);
-ep.sur_stamps = bs.cents(ep.sur_stamps);
-if ~isempty(ep.sur_stamps)
-    if ep.sur_stamps(1) == bs.cents(1)
-        ep.sur_stamps(1) = 1;
+% episodes of B
+ep.b_stamps = binary2epochs('vec', bs.bsr < 0.3,...
+    'minDur', 1, 'interDur', 1);
+ep.b_stamps = bs.cents(ep.b_stamps);
+if ~isempty(ep.b_stamps)
+    if ep.b_stamps(1) == bs.cents(1)
+        ep.b_stamps(1) = 1;
     end
-    if ep.sur_stamps(end) == bs.cents(end)
-        ep.sur_stamps(end) = length(sig);
+    if ep.b_stamps(end) == bs.cents(end)
+        ep.b_stamps(end) = length(sig);
     end
 end
 idx = [];
 idx2 = [];
-for j = 1 : size(ep.sur_stamps, 1)
-    idx = [idx; find(iis.peakPos > ep.sur_stamps(j, 1) &...
-        iis.peakPos < ep.sur_stamps(j, 2))];   
-    idx2 = [idx2, find(iis.cents >= ep.sur_stamps(j, 1) &...
-        iis.cents <= ep.sur_stamps(j, 2))];
+for j = 1 : size(ep.b_stamps, 1)
+    idx = [idx; find(iis.peakPos > ep.b_stamps(j, 1) &...
+        iis.peakPos < ep.b_stamps(j, 2))];   
+    idx2 = [idx2, find(iis.cents >= ep.b_stamps(j, 1) &...
+        iis.cents <= ep.b_stamps(j, 2))];
 end
-ep.sur_delta = mean(ep.dband(idx2));
-ep.sur_nspks = length(idx);
+ep.b_delta = mean(ep.dband(idx2));
+ep.b_nspks = length(idx);
 
 % episode and recording duration
-ep.surDur = sum(diff(ep.sur_stamps, [], 2));
-ep.deepDur = sum(diff(ep.deep_stamps, [], 2));
+ep.bDur = sum(diff(ep.b_stamps, [], 2));
+ep.bsDur = sum(diff(ep.bs_stamps, [], 2));
 ep.recDur = length(sig);
-
-% normalize nspks to duration
-ep.sur_nspks = ep.sur_nspks / (ep.surDur / fs / 60);
-ep.deep_nspks = ep.deep_nspks / (ep.deepDur / fs / 60);
-ep.nspks = size(iis.wv, 1) / (ep.recDur / fs / 60);
-
-save([basename '.ep.mat'], 'ep')
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
@@ -222,15 +218,16 @@ if graphics
     plot(bs.cents / fs / 60, bs.bsr, 'k', 'LineWidth', 2)
     hold on
     plot(tband / 60, ep.dband, 'b', 'LineWidth', 2)
-    legend({'BSR', 'Delta'})
-    ylim([0 1])
+    plot(tband / 60, ep.sband, 'r', 'LineWidth', 2)
+    plot(tband / 60, ep.gband, 'g', 'LineWidth', 2)
+    legend({'BSR', 'Delta', 'Sigma', 'Gamma'})
     Y = ylim;
-    if ~isempty(ep.deep_stamps)
-        fill([ep.deep_stamps fliplr(ep.deep_stamps)]' / fs / 60, [Y(1) Y(1) Y(2) Y(2)],...
+    if ~isempty(ep.bs_stamps)
+        fill([ep.bs_stamps fliplr(ep.bs_stamps)]' / fs / 60, [Y(1) Y(1) Y(2) Y(2)],...
             'b', 'FaceAlpha', 0.2,  'EdgeAlpha', 0, 'HandleVisibility', 'off');
     end
-    if ~isempty(ep.sur_stamps)
-        fill([ep.sur_stamps fliplr(ep.sur_stamps)]' / fs / 60, [Y(1) Y(1) Y(2) Y(2)],...
+    if ~isempty(ep.b_stamps)
+        fill([ep.b_stamps fliplr(ep.b_stamps)]' / fs / 60, [Y(1) Y(1) Y(2) Y(2)],...
             'g', 'FaceAlpha', 0.2,  'EdgeAlpha', 0, 'HandleVisibility', 'off');
     end
     xlabel('Time [m]')
