@@ -66,7 +66,7 @@ function [bs] = getBS(varargin)
 p = inputParser;
 addParameter(p, 'sig', [], @isnumeric)
 addParameter(p, 'fs', 1250, @isnumeric)
-addParameter(p, 'smf', 6, @isnumeric)
+addParameter(p, 'smf', 7, @isnumeric)
 addParameter(p, 'binsize', 2, @isnumeric)
 addParameter(p, 'BSRbinsize', 2, @isnumeric)
 addParameter(p, 'clustmet', 'gmm', @isstr)

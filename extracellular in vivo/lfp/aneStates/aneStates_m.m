@@ -47,7 +47,7 @@ function [bs, iis, ep] = aneStates_m(varargin)
 p = inputParser;
 addParameter(p, 'ch', 1, @isvector);
 addParameter(p, 'binsize', 30, @isnumeric);
-addParameter(p, 'smf', 6, @isnumeric);
+addParameter(p, 'smf', 7, @isnumeric);
 addParameter(p, 'basepath', pwd, @isstr);
 addParameter(p, 'basename', [], @isstr);
 addParameter(p, 'graphics', true, @islogical)
@@ -191,40 +191,36 @@ save([basename '.ep.mat'], 'ep')
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% idx for zoomin 
+minmarg = 1.5;
+midsig = 10;
+idx = round((midsig - minmarg) * fs * 60 : (midsig + minmarg) * fs * 60);
+
 if graphics    
-    fh = figure('Visible', 'on');
+    fh = figure('Visible', 'off');
     set(gcf, 'units','normalized','outerposition',[0 0 1 1]);
     suptitle(basename)
-    tstamps = (1 : length(sig)) / fs / 60;
     
-    % raw
-    sb1 = subplot(3, 2, 1 : 2);
-    plot(tstamps, sig, 'k')
-    axis tight
-%     ylim([-1 2])
-    hold on
-    plot(xlim, [iis.thr(2) iis.thr(2)], '--r')
-    ylabel('Voltage [mV]')
-    yyaxis right
-    p1 = plot(iis.cents / fs / 60, iis.rate, 'r', 'LineWidth', 3);
-    if ~isempty(p1)
-        p1.Color(4) = 0.3;
-    end
-    ylim([0 1])
-    ylabel('Rate [spikes / bin]')
-    legend({'Raw', 'IIS thr', 'IIS rate'}, 'Location', 'northwest')
-    axis tight
-    set(gca, 'TickLength', [0 0])
-    box off
+    % spectrogram
+    sb1 = subplot(4, 2, 1 : 2);
+    specBand('sig', sig, 'graphics', true, 'binsize',...,
+        (2 ^ nextpow2(5 * fs)), 'smf', smf, 'normband', true);
+    set(gca, 'TickLength', [0 0], 'XTickLabel', [],...
+        'Color', 'none', 'XColor', 'none')
+    ylim([0 100])
+    title('')
     
-    % bsr and delta
-    sb2 = subplot(3, 2, 3 : 4);
-    plot(bs.cents / fs / 60, bs.bsr, 'k', 'LineWidth', 2)
+    % bsr
+    sb2 = subplot(4, 2, 3 : 4);
+    plot(bs.cents / fs / 60, bs.bsr, 'k', 'LineWidth', 1)
     hold on
-    plot(tband / 60, ep.dband, 'b', 'LineWidth', 2)
-    legend({'BSR', 'Delta'})
+    plot(bs.cents / fs / 60, ep.dband, 'b', 'LineWidth', 1)
     ylim([0 1])
     Y = ylim;
+    set(gca, 'TickLength', [0 0], 'YTickLabel', [], 'XTickLabel', [],...
+        'Color', 'none', 'XColor', 'none', 'YColor', 'none')
+    box off
+    legend({'BSR', 'Delta'})
     if ~isempty(ep.deep_stamps)
         fill([ep.deep_stamps fliplr(ep.deep_stamps)]' / fs / 60, [Y(1) Y(1) Y(2) Y(2)],...
             'b', 'FaceAlpha', 0.2,  'EdgeAlpha', 0, 'HandleVisibility', 'off');
@@ -233,20 +229,27 @@ if graphics
         fill([ep.sur_stamps fliplr(ep.sur_stamps)]' / fs / 60, [Y(1) Y(1) Y(2) Y(2)],...
             'g', 'FaceAlpha', 0.2,  'EdgeAlpha', 0, 'HandleVisibility', 'off');
     end
-    xlabel('Time [m]')
-    ylabel('[a.u.]')
     axis tight
-    set(gca, 'TickLength', [0 0])
+
+    % raw
+    sb3 = subplot(4, 2, 5 : 6);
+    plot(lfp.timestamps / 60, sig, 'k', 'LineWidth', 1)
+    hold on
+    set(gca, 'TickLength', [0 0], 'YTickLabel', [],...
+        'Color', 'none')
     box off
-    title('Anesthesia States')
+    ylabel('LFP [mV]')
+    Y = ylim;
+    idx3 = [idx(1) idx(end)] / fs / 60;
+    fill([idx3 fliplr(idx3)]', [Y(1) Y(1) Y(2) Y(2)],...
+        'r', 'FaceAlpha', 0.2,  'EdgeAlpha', 0, 'HandleVisibility', 'off');
+        axis tight
+    xlabel('Time [m]')
     
-    % zoom in raw, bs, and iis
-    subplot(3, 2, 5);
-    minmarg = 1.5;
-    midsig = round(length(sig) / 2);
-    idx = round(midsig - minmarg * fs * 60 : midsig + minmarg * fs * 60);
+    % zoom in
+    subplot(4, 2, 8);
     idx2 = iis.peakPos > idx(1) & iis.peakPos < idx(end);
-    plot(tstamps(idx), sig(idx), 'k')
+    plot(lfp.timestamps(idx) / 60, sig(idx), 'k')
     axis tight
     hold on
     x = xlim;
@@ -261,41 +264,42 @@ if graphics
     end
     ylabel('Voltage [mV]')
     xlabel('Time [m]')
-    xticks([ceil(midsig / fs / 60 - minmarg), floor(midsig / fs / 60 + minmarg)])
+    xticks(idx3)
     set(gca, 'TickLength', [0 0])
     box off
     title('IIS')    
     
     % iis waveforms
     if ~isempty(iis.wv)
-        subplot(3, 2, 6)
-        plot(wvstamps * 1000, iis.wv)
-        ylabel('Voltage [mV]')
-        xlabel('Time [ms]')
-        axis tight
-        xticks([-marg, 0, marg] * 1000);
-        set(gca, 'TickLength', [0 0])
-        box off
-        title('IIS waveform')       
-        
-        % mean + std waveform
-        axes('Position',[.571 .11 .15 .1])
-        box on
-        stdshade(iis.wv, 0.5, 'k', wvstamps)
-        axis tight
-        set(gca, 'TickLength', [0 0], 'YTickLabel', [], 'XTickLabel', [],...
-            'XColor', 'none', 'YColor', 'none', 'Color', 'none')
-        title(sprintf('n = %d', size(iis.wv, 1)));
-        box off
+    subplot(4, 2, 7)
+    plot(wvstamps * 1000, iis.wv)
+    ylabel('Voltage [mV]')
+    xlabel('Time [ms]')
+    axis tight
+    xticks([-marg, 0, marg] * 1000);
+    set(gca, 'TickLength', [0 0])
+    box off
+    title('IIS waveform')
+    
+    % mean + std waveform
+    axes('Position',[.1315 .11 .13 .08])
+    box on
+    stdshade(iis.wv, 0.5, 'k', wvstamps)
+    axis tight
+    set(gca, 'TickLength', [0 0], 'YTickLabel', [], 'XTickLabel', [],...
+        'XColor', 'none', 'YColor', 'none', 'Color', 'none')
+    title(sprintf('n = %d', size(iis.wv, 1)));
+    box off
     end
     
-    linkaxes([sb1, sb2], 'x');
-    
+    linkaxes([sb1, sb2, sb3], 'x');
+
     if saveFig
         figname = [basename];
         export_fig(figname, '-tif', '-transparent')
         % savePdf(figname, basepath, ff)
-    end  
-end
+    end
+    
+end   
 end
 

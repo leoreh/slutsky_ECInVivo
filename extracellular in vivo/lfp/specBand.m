@@ -65,9 +65,9 @@ zband = [];
 % instead of 10 s window w/ 1 s overlap, 0 overlap and smooth with 10
 % points. this is so that p is congruent with bsr / iis rate
 win = hann(2 ^ nextpow2(binsize));
-[pband, f, t, ~] = spectrogram(sig, win, 0, freq, fs, 'yaxis', 'psd');
+[~, f, t, pband] = spectrogram(sig, win, 0, freq, fs, 'yaxis', 'psd');
 
-% psd
+% psd in dB
 pband = 10 * log10(abs(pband));
 
 % normalize to broadband
