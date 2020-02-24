@@ -11,7 +11,7 @@ function [amp, rm] = getFieldAmp(varargin)
 %   nstim       number of stimulations in one trace.
 %   start       start times of stimulations [s]. if empty extracted from
 %               artifacts. must be equal in length to nstim.
-%   stop        times of maximum response. if empty extracted from min
+%   stop        times of maximum response [s]. if empty extracted from min
 %               within window. must be equal in length to nstim
 %   inspect     logical. inspect traces {1} or not (0).
 %   basepath    recording session path {pwd} to save figure and variables
@@ -23,7 +23,7 @@ function [amp, rm] = getFieldAmp(varargin)
 % OUTPUT
 %   amp         mat of amp responses for each stim (rows) x trace (column)
 %   rm          index of traces that were removed after inspection
-% 
+%
 % TO DO LIST
 %   # find start times from max(diff) or corr
 %
@@ -60,7 +60,8 @@ saveVar = p.Results.saveVar;
 
 % constants
 marg = round(0.002 * fs);
-t2max = round(0.015 * fs);
+t2res = round(0.015 * fs);
+t2max = round(0.005 * fs);
 tstamps = [1 : size(sig, 1)] / fs;
 
 % output
@@ -70,6 +71,8 @@ amp = nan(nstim, size(sig, 2));
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % prepare data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+avgsig = mean(sig, 2);
 
 % remove DC calculated on mean of all traces concatenated
 sz = size(sig);
@@ -81,7 +84,7 @@ if inspect
     [sig, rm] = rmTraces(sig, tstamps);
 end
 
-% find stim start times from artifacts
+% find stim start times [in samples]
 if isempty(start)
     % ALT 1 - use pairwise correlations between traces
     %     artcor = getEMGfromLFP(sig, 'emgFs', fs / 100, 'fs', fs,...
@@ -92,20 +95,32 @@ if isempty(start)
     %     diag(x)
     % ALT 2 - use max(diff).
 else
+    % find start from max value in win after artifact
     start = round(start * fs + marg);
+    for i = 1 : nstim
+        win = start(i) : start(i) + t2max;
+        [~, idx(i)] = max(avgsig(win));
+        start(i) = start(i) + idx(i);
+    end
 end
 
-% find peak response according to min value in win after artifact
-if isempty(stop) 
+% find stop times [in samples] according to min value in win after artifact
+if isempty(stop)
     for i = 1 : nstim
-        win = start(i) + marg : round(start(i) + t2max);
-        amp(i, :) = abs(min(sig(win, :))) - abs(sig(start(i), :));
+        win = start(i) + marg : round(start(i) + t2res);
+%         amp(i, :) = abs(min(sig(win, :))) - abs(sig(start(i), :));
+        [~, idx(i)] = min(avgsig(win, :));
+        stop(i) = win(1) + idx(i);
     end
 else
-    for i = 1 : nstim
-        amp(i, :) = abs(sig(start(i), :)) - abs(sig(stop(i), :))
-    end
+    stop = stop * fs;
 end
+
+% find amp response according to diff between start and stop
+for i = 1 : nstim
+    amp(i, :) = sig(start(i), :) - (sig(stop(i), :));
+end
+
 
 if saveVar
     save(filename, 'amp')
@@ -116,7 +131,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if graphics
-    
+   
     fh = figure;
     subplot(2, 2, 1)
     plot(tstamps, sig)
@@ -125,7 +140,7 @@ if graphics
     box off
     axis tight
     title('Traces')
-    
+   
     subplot(2, 2, 3)
     stdshade(sig', 0.5, 'k', tstamps)
     ylabel('Voltage [mV]')
@@ -133,8 +148,8 @@ if graphics
     set(gca, 'TickLength', [0 0])
     box off
     axis tight
-    
-    subplot(2, 2, 2)   
+   
+    subplot(2, 2, 2)  
     boxplot(amp', 'BoxStyle', 'outline', 'Color', 'k', 'notch', 'off')
     hold on
     for i = 1 : nstim
@@ -145,7 +160,7 @@ if graphics
     set(gca, 'TickLength', [0 0])
     box off
     title('Amplitude')
-    
+   
     subplot(2, 2, 4)
     plot(mean(amp, 2) / mean(amp(1, :)))
     ylabel('Norm. Amplitude')
@@ -153,7 +168,7 @@ if graphics
     xticks([1 : nstim])
     set(gca, 'TickLength', [0 0])
     box off
-    
+   
     if saveFig
         savePdf(filename, basepath, fh)
     end

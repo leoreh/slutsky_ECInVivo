@@ -5,7 +5,7 @@
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 basepath = 'E:\Data\Field\lh47_200212';
-files = [20];
+files = [1];
 
 cd(basepath)
 filename = dir('*.wcp');
@@ -28,7 +28,7 @@ for i = files
         [data.amp{j}, data.rm{j}] = getFieldAmp('sig', raw.S{j},...
             'fs', raw.fs, 'start', start, 'stop', [], 'inspect', false,...
             'basepath', basepath, 'nstim', nstim,...
-            'graphics', false, 'saveVar', false, 'saveFig', true,...
+            'graphics', true, 'saveVar', false, 'saveFig', true,...
             'filename', basename);
         data.sig{j} = raw.S{j};
     end   
