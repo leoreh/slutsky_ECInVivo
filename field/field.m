@@ -5,7 +5,7 @@
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 basepath = 'E:\Data\Field\lh47_200212';
-files = [20];
+files = [1];
 
 cd(basepath)
 filename = dir('*.wcp');
