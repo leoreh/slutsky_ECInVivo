@@ -98,12 +98,12 @@ vis = p.Results.vis;
 forceA = p.Results.forceA;
 
 % params
-minDur = 4;                             % minimum event duration [s]
-maxDur = 3000000;                       % maximum event duration [s]
-interDur = 4;                           % minimum time between events [bins]
-% binsize = binsize * fs;               % [s] * [fs] = [samples]
-binsize = 2 ^ nextpow2(binsize * fs);   % for pc1
-nclust = 2;                             % 2 clu: burst and suppression
+minDur = 2;                         % minimum event duration [s]
+maxDur = 3000000;                   % maximum event duration [s]
+interDur = 4;                       % minimum time between events [bins]
+% binsize = binsize * fs;             % [s] * [fs] = [samples]
+binsize = 2^nextpow2(binsize * fs); % for pc1
+nclust = 2;                         % two clusters: burst and suppression
 
 % initialize output
 bs.bsr = []; bs.edges = []; bs.cents = []; bs.cents = []; bs.stamps = [];
@@ -185,6 +185,7 @@ if any(strcmp(vars, 'pc1'))
     [~, pc1] = pca(pband', 'NumComponents', 1);
 else; evec = []; end
 
+
 % concatenate and lognorm
 varmat = [stdvec; maxvec; sumvec; rmsvec; pvec; evec];
 if size(varmat, 1) < size (varmat, 2)
@@ -193,7 +194,7 @@ end
 if lognorm
     varmat = log10(varmat);
 end
-varmat = [varmat, pc1];
+varmat = [varmat; pc1];
 
 switch clustmet
     case 'gmm'

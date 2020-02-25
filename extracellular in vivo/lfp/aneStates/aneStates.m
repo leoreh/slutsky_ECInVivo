@@ -23,7 +23,7 @@ fs = 1250;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % group data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-for i = 2 : length(basepath)
+for i = 3 : length(basepath)
        
     as{i} = aneStates_g('basepath', basepath{i}, 'rm', rm{i},...
         'graphics', graphics, 'saveVar', saveVar,...

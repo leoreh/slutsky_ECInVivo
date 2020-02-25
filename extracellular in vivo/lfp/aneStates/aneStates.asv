@@ -11,7 +11,7 @@ basepath{3} = 'E:\Data\Others\DZ\IIS\APPKi';
 basepath{4} = 'E:\Data\Others\DZ\IIS\FADx5';
 rm = cell(4, 1);
 
-forceA = false;
+forceA = true;
 forceL = false;
 saveFig = true;
 graphics = true;
@@ -23,7 +23,7 @@ fs = 1250;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % group data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-for i = 2 : length(basepath)
+for i = 3 : length(basepath)
        
     as{i} = aneStates_g('basepath', basepath{i}, 'rm', rm{i},...
         'graphics', graphics, 'saveVar', saveVar,...

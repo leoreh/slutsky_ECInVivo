@@ -64,7 +64,7 @@ for i = 1 : length(nfiles)
     % load individual data  
     [bs, iis, ep] = aneStates_m('ch', 1, 'basepath', basepath,...
         'basename', basename, 'graphics', graphics, 'saveVar', saveVar,...
-        'saveFig', saveFig, 'forceA', false, 'binsize', 30, 'smf', 7);
+        'saveFig', saveFig, 'forceA', forceA, 'binsize', 30, 'smf', 7);
     
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % arrange population data
