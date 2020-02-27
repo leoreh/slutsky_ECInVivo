@@ -197,7 +197,7 @@ midsig = 10;
 idx = round((midsig - minmarg) * fs * 60 : (midsig + minmarg) * fs * 60);
 
 if graphics    
-    fh = figure('Visible', 'on');
+    fh = figure('Visible', 'off');
     set(gcf, 'units','normalized','outerposition',[0 0 1 1]);
     suptitle(basename)
     

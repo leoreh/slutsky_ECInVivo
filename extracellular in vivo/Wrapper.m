@@ -4,7 +4,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % basepath to recording folder
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'E:\Data\Dat\lh44\lh44_200208';
+basepath = 'E:\Data\Dat\lh46\lh46_200227';
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 1: file conversion
@@ -12,12 +12,12 @@ basepath = 'E:\Data\Dat\lh44\lh44_200208';
 store = 'Raw1';
 fs = 24414.06;
 blocks = [1 : 2];
-chunksize = 60;
+chunksize = 300;
 mapch = [1 : 16];
 rmvch = [];
-clip{28} = [0 1550];
-clear clip
-clip{1} = [];
+clip{1} = [0 6960];
+clip{2} = [3600 Inf]; 
+% clear clip
 
 % tank to dat
 [info] = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
