@@ -155,10 +155,7 @@ lns = [1e-6 lns];
 info.lns = lns(1 : 5);
 save(filename, 'info');
 
-info.lns = [0 : 60 : 360];
-info.lns(1) = 1e-6;
-info.lns(end) = [];
-info.labels = {'BL day 1', 'Conditioning', 'BL day 2', 'Recall A', 'BL day 3', 'Recall B'};
+
 
 f = figure;
 subplot(2, 1, 1)
