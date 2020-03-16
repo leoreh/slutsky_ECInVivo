@@ -4,20 +4,22 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % basepath to recording folder
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'E:\Data\Dat\lh46\lh46_200225-27';
+basepath = 'E:\Data\Dat\lh47\lh47_200307';
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 1: file conversion
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-store = 'Raw1';
+store = 'Stim';
 fs = 24414.06;
-blocks = [1 : 2];
+blocks = [17];
 chunksize = 300;
 mapch = [1 : 16];
+mapch = [];
+% mapch = [1 : 2 : 7, 2 : 2 : 8, 9 : 2 : 15, 10 : 2 : 16];
 rmvch = [];
-clip{1} = [0 6960];
-clip{2} = [3600 Inf]; 
-% clear clip
+clip{1} = [0 1500];
+clip{2} = [1800 Inf]; 
+clip = cell(1, 1);
 
 % tank to dat
 [info] = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
@@ -31,9 +33,14 @@ ddt2dat(basepath, mapch, rmvch, 'filenames', filenames)
 [~, filename] = fileparts(basepath);
 start = 0;      % s
 duration = Inf; % s
-nChannels = 16;
-mat = bz_LoadBinary([filename '.dat'], 'frequency', fs, 'start', start,...
+nChannels = 1;
+mat = bz_LoadBinary([filename '.dat'], 'frequency', info.fs, 'start', start,...
     'duration', duration, 'nChannels', nChannels);
+save([filename '_stp.mat'], 'data')
+
+y = resample(double(mat), 1250, round(info.fs));
+x = resample(double(stim), 1250, round(info.fs));
+x = interp1(linspace(0, 1, length(x)), x, linspace(0, 1, length(y)))';
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 2: LFP
@@ -149,10 +156,10 @@ fr = FR(spikes.times, 'basepath', basepath, 'graphics', false, 'saveFig', false,
 [~, filename] = fileparts(basepath);
 filename = [filename '.Raw1.Info.mat'];
 load(filename);
-info.labels = {'HC', '', 'PSAM', '', ''};
+info.labels = {'HC', '', 'PSAM'};
 lns = cumsum(info.blockduration / 60);
 lns = [1e-6 lns];
-info.lns = lns(1 : 5);
+info.lns = lns(1 : 3);
 save(filename, 'info');
 
 info.lns = [0 : 60 : 360];
