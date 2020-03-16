@@ -57,7 +57,7 @@ end
 
 % initialize output
 zband = [];
-
+idx = zeros(1, 2);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % calc
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -71,10 +71,10 @@ win = hann(2 ^ nextpow2(binsize));
 pband = 10 * log10(abs(pband));
 
 % normalize to broadband
-    broad = sum(pband, 1);
-    [~, idx(1)] = min(abs(f - band(1)));
-    [~, idx(2)] = min(abs(f - band(2)));
-    narrow = sum(pband(idx(1) : idx(2), :), 1);
+broad = sum(pband, 1);
+[~, idx(1)] = min(abs(f - band(1)));
+[~, idx(2)] = min(abs(f - band(2)));
+narrow = sum(pband(idx(1) : idx(2), :), 1);
 if normband
     zband = bz_NormToRange(zscore(narrow ./ broad), [0 1]);
 %     zband = narrow ./ broad;

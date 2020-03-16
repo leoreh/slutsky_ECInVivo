@@ -12,7 +12,7 @@ function [bs] = getBS(varargin)
 %   clustmet    string. cluster method. {'gmm'} or 'kmeans'
 %   vars        cell of strings. one string per variable to use for
 %               clustering. possible variables are 'std', 'rms', 'max',
-%               'sum', 'p', 'energy'
+%               'sum', 'p', 'energy', 'pc1'
 %   lognorm     logical {true}. log10 variables
 %   basepath    recording session path {pwd}
 %   basename    string. if empty extracted from basepath
@@ -412,9 +412,9 @@ if graphics
     title('Delta power and BSR')
     
     % spectrogram
-    sb3 = subplot(3, 4, [9 : 10]);
-    specBand('sig', sig, 'band', [], 'graphics', true,...
-        'binsize', BSRbinsize, 'smf', smf);
+%     sb3 = subplot(3, 4, [9 : 10]);
+%     specBand('sig', sig, 'band', [], 'graphics', true,...
+%         'binsize', BSRbinsize, 'smf', smf);
     
     % clustering - first two variables
     options = statset('MaxIter', 50);
@@ -522,7 +522,7 @@ if graphics
     box off
     title('Burst amplitude')
     
-    linkaxes([sb1, sb2, sb3], 'x');
+%     linkaxes([sb1, sb2, sb3], 'x');
     
     if saveFig
         figname = [basename '_BS'];

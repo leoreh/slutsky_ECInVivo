@@ -6,8 +6,7 @@ function lfp = getLFP(varargin)
 %  
 % INPUT
 %   basename    string. filename of lfp file. if empty retrieved from
-%               basepath. if .lfp should not include extension, if .wcp
-%               should include extension
+%               basepath. should not include extension
 %   basepath    string. path to load filename and save output {pwd}
 %   extension   load from {'lfp'} (neurosuite), 'abf', or 'wcp'.
 %   forceL      logical. force reload {false}.
@@ -93,7 +92,7 @@ switch extension
         [lfp.data, info] = abf2load(loadname);
         fs_orig = 1 / (info.fADCSequenceInterval / 1000000); 
     case 'wcp'
-        data = import_wcp(basename);
+        data = import_wcp( basename);
         data.S = data.S{ch};
         if interval(2) ~= Inf
             data.S = data.S(:, interval(1) : interval(2));

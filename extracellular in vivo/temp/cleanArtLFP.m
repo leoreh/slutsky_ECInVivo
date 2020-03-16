@@ -42,22 +42,25 @@ for i = 2 : length(basepath)
         % inspect data
         figure; plot(lfp.timestamps, lfp.data)
         
+        % invert
+        lfp.data = -lfp.data;
+        
         % remove first x minutes
-        lfp.data(1 : fs * 60 * 21) = [];
+        lfp.data(1 : fs * 60 * 2) = [];
         
         % remove max artifacts
         [~, x] = max(lfp.data);
         lfp.data(x - marg : x + marg) = [];
 
-        % remove last 2 minutes
-        lfp.data(end : -1 : end - 10 * 60 * lfp.fs) = [];
+        % remove last x minutes
+        lfp.data(end : -1 : end - 3 * 60 * lfp.fs) = [];
 
         % correct timestamps
         lfp.timestamps = [1 : length(lfp.data)] / fs;
         
         % save
         filename = [basename '.lfp.mat'];
-        save([basepath{i}, filesep, filename], 'lfp')
+        save([basepath, filesep, filename], 'lfp')
     end
     
 end
