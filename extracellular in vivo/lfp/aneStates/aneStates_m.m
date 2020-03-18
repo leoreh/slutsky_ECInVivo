@@ -75,7 +75,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % lfp data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-interval = [1 57];
+interval = [1 189];
 lfp = getLFP('basepath', basepath, 'ch', ch, 'chavg', {},...
     'fs', 1250, 'interval', interval, 'extension', 'wcp', 'pli', true,...
     'savevar', true, 'force', forceL, 'basename', basename);
@@ -83,40 +83,35 @@ sig = double(lfp.data(:, ch));
 fs = lfp.fs;
 binsize = (2 ^ nextpow2(binsize * fs));
 
+% rmDC
+[sig, ~] = rmDC(sig);
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % burst suppression
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 vars = {'std', 'max', 'pc1'};
-bs = getBS('sig', sig, 'fs', fs, 'basepath', basepath, 'graphics', true,...
+bs = getBS('sig', sig, 'fs', fs, 'basepath', basepath, 'graphics', false,...
     'saveVar', saveVar, 'binsize', 0.5, 'BSRbinsize', binsize, 'smf', smf,...
     'clustmet', 'gmm', 'vars', vars, 'basename', basename,...
-    'saveFig', saveFig, 'forceA', forceA, 'vis', true);
+    'saveFig', false, 'forceA', forceA, 'vis', true);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % iis
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % thr during suppression
-thr = [0 mean(sig(~bs.binary(1 : 15 * fs * 60)))...
-    + 15 * std(sig(~bs.binary(1 : 15 * fs * 60)))];
+thr = [0 mean(sig(~bs.binary(1 : 17 * fs * 60)))...
+    + 15 * std(sig(~bs.binary(1 : 17 * fs * 60)))];
 if isnan(thr(2))
     thr(2) = 0.5;
 end
+% override
+% thr = [0 0.5];
 marg = 0.05;
 iis = getIIS('sig', sig, 'fs', fs, 'basepath', basepath,...
-    'graphics', true, 'saveVar', saveVar, 'binsize', binsize,...
+    'graphics', false, 'saveVar', saveVar, 'binsize', binsize,...
     'marg', marg, 'basename', basename, 'thr', thr, 'smf', 7,...
-    'saveFig', saveFig, 'forceA', forceA, 'spkw', false, 'vis', true);
+    'saveFig', false, 'forceA', true, 'spkw', false, 'vis', true);
 wvstamps = linspace(-marg, marg, floor(marg * fs) * 2 + 1);
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% burst suppression after IIS filteration
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% if isfield(iis, 'filtered') && size(iis.wv, 1) > 50
-%     bs = getBS('sig', iis.filtered, 'fs', fs, 'basepath', basepath, 'graphics', false,...
-%         'saveVar', saveVar, 'binsize', 0.5, 'BSRbinsize', binsize, 'smf', smf,...
-%         'clustmet', 'gmm', 'vars', vars, 'basename', basename,...
-%         'saveFig', saveFig, 'forceA', forceA, 'vis', false);
-% end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % anesthesia states
@@ -198,7 +193,7 @@ midsig = 10;
 idx = round((midsig - minmarg) * fs * 60 : (midsig + minmarg) * fs * 60);
 
 if graphics    
-    fh = figure('Visible', 'off');
+    fh = figure('Visible', 'on');
     set(gcf, 'units','normalized','outerposition',[0 0 1 1]);
     suptitle(basename)
     

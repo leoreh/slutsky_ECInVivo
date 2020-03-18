@@ -4,13 +4,13 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'E:\Data\Field\lh47_200212';
-files = [1];
+basepath = 'C:\Users\LeoreHeim\Downloads\Data-20200317T100406Z-001\Data\hDlx-Gq\after CNO';
+files = [2  : 5];
 
 cd(basepath)
 filename = dir('*.wcp');
 filename = natsort({filename.name});
-ch = [1, 3];
+ch = [1];
 
 % typical params for stp
 start = [0.01 : 0.02 : 0.09];
@@ -35,7 +35,7 @@ for i = files
     % arrange and save
     data.t = raw.T;
     data.fs = raw.fs;
-    save(basename, 'data')
+    save([basename '.mat'], 'data')
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

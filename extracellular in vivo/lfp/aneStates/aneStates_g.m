@@ -51,7 +51,7 @@ forceA = p.Results.forceA;
 fs = 1250;
 [~, grpname] = fileparts(basepath);
 cd(basepath)
-filename = dir('*.abf');
+filename = dir('*.lfp.*');
 files = natsort({filename.name});
 nfiles = 1 : length(files);
 nfiles(rm) = [];
@@ -61,6 +61,7 @@ nfiles(rm) = [];
 % end
 for i = 1 : length(nfiles)
     [~, basename] = fileparts(files{nfiles(i)});
+    [~, basename] = fileparts(basename);
     % load individual data  
     [bs, iis, ep] = aneStates_m('ch', 1, 'basepath', basepath,...
         'basename', basename, 'graphics', graphics, 'saveVar', saveVar,...

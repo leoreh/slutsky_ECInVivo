@@ -1,6 +1,6 @@
 % remove last minutes from recording
 
-basepath{1} = 'E:\Data\Others\DZ\IIS\WT';
+basepath{1} = 'E:\Data\Others\DZ\IIS\Bckp\APPKi\app-ki freerun for lior';
 basepath{2} = 'E:\Data\Others\DZ\IIS\APPPS1';
 basepath{3} = 'E:\Data\Others\DZ\IIS\APPKi';
 basepath{4} = 'E:\Data\Others\DZ\IIS\FADx5';
@@ -40,13 +40,13 @@ for i = 2 : length(basepath)
         lfp.data([idx{:}]) = [];
         
         % inspect data
-        figure; plot(lfp.timestamps, lfp.data)
+        figure; plot(lfp.timestamps / 60, lfp.data)
         
         % invert
         lfp.data = -lfp.data;
         
         % remove first x minutes
-        lfp.data(1 : fs * 60 * 2) = [];
+        lfp.data(1 : fs * 60 * 300) = [];
         
         % remove max artifacts
         [~, x] = max(lfp.data);
@@ -60,7 +60,7 @@ for i = 2 : length(basepath)
         
         % save
         filename = [basename '.lfp.mat'];
-        save([basepath, filesep, filename], 'lfp')
+        save([basepath{i}, filesep, filename], 'lfp')
     end
     
 end
