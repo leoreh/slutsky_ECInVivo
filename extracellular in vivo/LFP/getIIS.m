@@ -207,7 +207,7 @@ fprintf('\n%d inter-ictal spikes \n', nspks);
 
 % filter bank
 fb = cwtfilterbank('SignalLength', size(seg, 2), 'VoicesPerOctave', 32,...
-    'SamplingFrequency', fs, 'FrequencyLimits', [1 625]);
+    'SamplingFrequency', fs, 'FrequencyLimits', [1 fs / 4]);
 if spkw
     for i = 1 : size(seg, 1)
         % ALT 1: spike width by inverse of max wavelet
@@ -444,7 +444,7 @@ if graphics
     if saveFig
         figname = [basename '_IIS'];
         export_fig(figname, '-tif', '-transparent')
-        % savePdf(figname, basepath, ff)
+%         savePdf(figname, basepath, fh)
     end
 end
 end

@@ -1,24 +1,19 @@
 % this is a wrapper for preprocessing extracellular data.
 % contains calls to various functions.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% basepath to recording folder
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'E:\Data\Dat\lh47\lh47_200307';
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 1: file conversion
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-store = 'Stim';
+basepath = 'E:\Data\Dat\lh49\lh49_200320';
+store = 'Raw1';
 fs = 24414.06;
-blocks = [17];
+blocks = [1];
 chunksize = 300;
-mapch = [1 : 16];
-mapch = [];
-% mapch = [1 : 2 : 7, 2 : 2 : 8, 9 : 2 : 15, 10 : 2 : 16];
+% mapch = [1 : 16];
+% mapch = [];
+mapch = [1 : 2 : 7, 2 : 2 : 8, 9 : 2 : 15, 10 : 2 : 16];
 rmvch = [];
-clip{1} = [0 1500];
-clip{2} = [1800 Inf]; 
 clip = cell(1, 1);
 
 % tank to dat
@@ -29,24 +24,12 @@ clip = cell(1, 1);
 filenames{3} = 'block2_ddt_edit12H';
 ddt2dat(basepath, mapch, rmvch, 'filenames', filenames)
 
-% dat to mat
-[~, filename] = fileparts(basepath);
-start = 0;      % s
-duration = Inf; % s
-nChannels = 1;
-mat = bz_LoadBinary([filename '.dat'], 'frequency', info.fs, 'start', start,...
-    'duration', duration, 'nChannels', nChannels);
-save([filename '_stp.mat'], 'data')
-
-y = resample(double(mat), 1250, round(info.fs));
-x = resample(double(stim), 1250, round(info.fs));
-x = interp1(linspace(0, 1, length(x)), x, linspace(0, 1, length(y)))';
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 2: LFP
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% load
+% load lfp
 ch = [1 : 16];
 chavg = {1 : 4; 5 : 7; 8 : 11; 12 : 15};
 chavg = {};
@@ -54,14 +37,16 @@ lfp = getLFP('basepath', basepath, 'ch', ch, 'chavg', chavg,...
     'fs', 1250, 'interval', [0 inf], 'extension', 'lfp',...
     'savevar', true, 'forceL', true, 'basename', '');
 
-
-binsize = (2 ^ nextpow2(30 * lfp.fs));
-ch = 1;
-smf = 7;
+% load with stim (tdt)
+lfp = getStim('basepath', basepath, 'andname', 'stability', 'blocks', blocks,...
+    'mapch', mapch, 'rmvch', rmvch, 'clip', clip, 'saveVar', true);
 
 % inter ictal spikes
 thr = [5 0];
 marg = 0.05;
+binsize = (2 ^ nextpow2(30 * lfp.fs));
+ch = 1;
+smf = 7;
 iis = getIIS('sig', double(lfp.data(:, ch)), 'fs', lfp.fs, 'basepath', basepath,...
     'graphics', true, 'saveVar', true, 'binsize', binsize,...
     'marg', marg, 'basename', '', 'thr', thr, 'smf', 7,...
