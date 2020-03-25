@@ -31,6 +31,7 @@ function [iis] = getIIS(varargin)
 %       thr         10 z-scores in [mV]
 %       edges       of bins for bsr
 %       cents       of bins for bsr
+%       art         iis that are suspected artifacts due to width
 %       <params>    as in input
 %
 % TO DO LIST
@@ -39,7 +40,7 @@ function [iis] = getIIS(varargin)
 %       # find width via wavelet and after hyperpolirazation (done)
 %       # manage bidirectional thresholding
 %       # remove spikes with more than one peak in window to produce a
-%       clean mean waveform
+%       clean avg waveform
 %
 % CALLS
 %       calcFR
@@ -99,7 +100,7 @@ lowthr = 0.2;                       % mV
 % initialize output
 iis.edges = []; iis.cents = []; iis.peakPos = []; iis.peakPower = [];
 iis.wv = []; iis.rate = []; iis.filtered = []; iis.fs = fs;
-iis.binsize = binsize; iis.spkw = []; iis.maxf = []; iis.out = [];
+iis.binsize = binsize; iis.spkw = []; iis.maxf = []; iis.art = [];
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % check if mat already exists
@@ -223,8 +224,8 @@ if spkw
     cfs = squeeze(mean(abs(cfs), 1));
     
     % idx to suspecious spikes
-    % iis.out = find(isoutlier(iis.spkw, 'ThresholdFactor', 2));
-    iis.out = find(iis.spkw < 5);
+    iis.art = find(isoutlier(iis.spkw, 'ThresholdFactor', 2));
+    % iis.art = find(iis.spkw < 5);
 else
     [cfs, f, coi] = cwt(mwv, 'FilterBank', fb);
 end
@@ -427,14 +428,14 @@ if graphics
     box off
     title('Amplitude. vs. Time')
     
-    % CCH 5s
+    % ACH 5s
     subplot(3, 4, 11)
     plotCCG('ccg', ccg, 't', tccg / 1000, 'basepath', basepath,...
         'saveFig', false, 'c', {'k'});
     xlabel('Time [s]')
     title('Autocorrelogram')
     
-    % CCH 10s
+    % ACH 10s
     subplot(3, 4, 12)
     plotCCG('ccg', ccg2, 't', tccg2 / 1000, 'basepath', basepath,...
         'saveFig', false, 'c', {'k'});

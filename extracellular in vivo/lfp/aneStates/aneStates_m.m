@@ -97,9 +97,10 @@ bs = getBS('sig', sig, 'fs', fs, 'basepath', basepath, 'graphics', false,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % iis
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% threhold for detection
-z = 15;     % no. of z-scores above mean to place thr
-mv = 0.5;   % thr in mV. if 0 than thr will be based on z-score only
+%%% threhold
+z = 15;         % no. of z-scores above mean to place thr
+mv = 0.5;       % thr in mV. if 0 than thr will be based on z-score only
+sig_thr = [];   % initialize
 
 % ALT 1:    calculate thr based on periods of suppression throughout the
 %           recording
@@ -107,8 +108,10 @@ sig_thr = sig(~bs.binary);
 
 % ALT 2:    calculate thr based on periods of suppression within a given
 %           time window 
-win = [30 50];
-sig_thr = sig(~bs.binary(win(1) * fs : win(2) * fs));
+ep = markEp(lfp.timestamps / 60, sig);
+for i = 1 : size(ep, 1)
+    sig_thr = [sig_thr; sig(~bs.binary(ep(i, 1) : ep(i, 2)))];
+end
 
 % ALT 3:    calculate thr based on periods of suppression when BSR is
 %           between 0.4 and 0.6
@@ -118,16 +121,15 @@ for i = 1 : length(idx)
     sig_thr = [sig_thr; sig(bs.edges(idx(i)) + 1 : bs.edges(idx(i + 1)))];
 end
 
-% do the thr calculation
+% calc thr
 thr = [0 mean(sig_thr) + z * std(sig_thr)];
 
 % set thr as the larger value between 0.5 and 15 z-scores
 thr(2) = max([thr(2), mv]);
 
-marg = 0.05;
 iis = getIIS('sig', sig, 'fs', fs, 'basepath', basepath,...
     'graphics', true, 'saveVar', saveVar, 'binsize', binsize,...
-    'marg', marg, 'basename', basename, 'thr', thr, 'smf', 7,...
+    'marg', 0.05, 'basename', basename, 'thr', thr, 'smf', 7,...
     'saveFig', false, 'forceA', true, 'spkw', false, 'vis', true);
 wvstamps = linspace(-marg, marg, floor(marg * fs) * 2 + 1);
 
