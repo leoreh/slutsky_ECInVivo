@@ -75,9 +75,8 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % lfp data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-interval = [1 189];
 lfp = getLFP('basepath', basepath, 'ch', ch, 'chavg', {},...
-    'fs', 1250, 'interval', interval, 'extension', 'wcp', 'pli', true,...
+    'fs', 1250, 'interval', [], 'extension', 'wcp', 'pli', true,...
     'savevar', true, 'force', forceL, 'basename', basename);
 sig = double(lfp.data(:, ch));
 fs = lfp.fs;
@@ -98,23 +97,33 @@ bs = getBS('sig', sig, 'fs', fs, 'basepath', basepath, 'graphics', false,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % iis
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% thr during suppression
-% ALT 1: calculate thr based on periods of suppression within a given time window 
+% threhold for detection
+z = 15;     % no. of z-scores above mean to place thr
+mv = 0.5;   % thr in mV. if 0 than thr will be based on z-score only
+
+% ALT 1:    calculate thr based on periods of suppression throughout the
+%           recording
+sig_thr = sig(~bs.binary);
+
+% ALT 2:    calculate thr based on periods of suppression within a given
+%           time window 
 win = [30 50];
-sig_thr = sig(~bs.binary(win * fs));
-thr = [0 mean(sig_thr) + 15 * std(sig_thr)];
+sig_thr = sig(~bs.binary(win(1) * fs : win(2) * fs));
 
-% ALT 2: calculate thr based on periods of suppression when BSR is
-% between 0.4 and 0.6
-
-
-thr = [0 mean(sig(~bs.binary))...
-    + 15 * std(sig(~bs.binary))];
-if isnan(thr(2))
-    thr(2) = 0.5;
+% ALT 3:    calculate thr based on periods of suppression when BSR is
+%           between 0.4 and 0.6
+idx = find(bs.bsr < 0.6 & bs.bsr > 0.4);
+sig_thr = [];
+for i = 1 : length(idx)
+    sig_thr = [sig_thr; sig(bs.edges(idx(i)) + 1 : bs.edges(idx(i + 1)))];
 end
-% override
-% thr = [0 0.5];
+
+% do the thr calculation
+thr = [0 mean(sig_thr) + z * std(sig_thr)];
+
+% set thr as the larger value between 0.5 and 15 z-scores
+thr(2) = max([thr(2), mv]);
+
 marg = 0.05;
 iis = getIIS('sig', sig, 'fs', fs, 'basepath', basepath,...
     'graphics', true, 'saveVar', saveVar, 'binsize', binsize,...

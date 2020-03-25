@@ -5,7 +5,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath{1} = 'E:\Data\Others\DZ\IIS\WT';
+basepath{1} = 'E:\Data\Field\IIS\APPPS1';
 basepath{2} = 'E:\Data\Others\DZ\IIS\APPPS1';
 basepath{3} = 'E:\Data\Others\DZ\IIS\APPKi';
 basepath{4} = 'E:\Data\Others\DZ\IIS\FADx5';
