@@ -101,12 +101,9 @@ bs = getBS('sig', sig, 'fs', fs, 'basepath', basepath, 'graphics', false,...
 % thr during suppression
 % ALT 1: calculate thr based on periods of suppression within a given time window 
 win = [30 50];
-sig_thr = sig(~bs.binary(win * fs));
-thr = [0 mean(sig_thr) + 15 * std(sig_thr)];
-
+sig4t
 % ALT 2: calculate thr based on periods of suppression when BSR is
 % between 0.4 and 0.6
-
 
 thr = [0 mean(sig(~bs.binary))...
     + 15 * std(sig(~bs.binary))];

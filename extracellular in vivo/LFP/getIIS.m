@@ -10,7 +10,7 @@ function [iis] = getIIS(varargin)
 %   marg        scalar {0.1} in [s]. time margin for clipping spikes
 %   thr         vector of two elements. first is thr in [z-scores] and
 %               second is thr in [mV]. if one specified than the other is
-%               merely calculated. if both specificed than both used for
+%               merely calculated. if both specified than both used for
 %               detection.
 %   spkw        logical {false}. calculate max frequency for each spike.
 %   basepath    recording session path {pwd}
