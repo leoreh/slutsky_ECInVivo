@@ -5,10 +5,10 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 1: file conversion
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'E:\Data\Dat\lh49\lh49_200320';
+basepath = 'E:\Data\Dat\lh49\lh49_200322';
 store = 'Raw1';
 fs = 24414.06;
-blocks = [1];
+blocks = [5];
 chunksize = 300;
 % mapch = [1 : 16];
 % mapch = [];
@@ -37,9 +37,10 @@ lfp = getLFP('basepath', basepath, 'ch', ch, 'chavg', chavg,...
     'fs', 1250, 'interval', [0 inf], 'extension', 'lfp',...
     'savevar', true, 'forceL', true, 'basename', '');
 
-% load with stim (tdt)
-lfp = getStim('basepath', basepath, 'andname', 'stability', 'blocks', blocks,...
-    'mapch', mapch, 'rmvch', rmvch, 'clip', clip, 'saveVar', true);
+% load with stim (tdt). DONT FORGET TO CHANGE NAME
+lfp = getfEPSPfromTDT('basepath', basepath, 'andname', 'stability',...
+    'blocks', blocks, 'mapch', mapch, 'ch', ch, 'clip', clip,...
+    'saveVar', true, 'fdur', 0.1, 'concat', true);
 
 % inter ictal spikes
 thr = [5 0];
