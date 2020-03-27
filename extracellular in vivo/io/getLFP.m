@@ -159,6 +159,4 @@ if saveVar
     save([basepath, filesep, filename], 'lfp')
 end
 
-
-
 end
