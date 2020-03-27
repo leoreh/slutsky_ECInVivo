@@ -19,7 +19,9 @@ function lfp = getfEPSPfromTDT(varargin)
 %               clip{3} = [0 50; 700 Inf] will remove the first 50 s from
 %               block-3 and the time between 700 s and the end of Block-3
 %   fdur        duration of fepsp waveform after stim {0.2} [s]
-%   saveVar     save variable {1}. 
+%   concat      logical. concatenate blocks (true) or not {false}. 
+%               used for e.g stability.
+%   saveVar     logical. save variable {1}. 
 
 %   
 % OUTPUT
@@ -53,6 +55,7 @@ addOptional(p, 'ch', [1 : 16], @isnumeric);
 addOptional(p, 'clip', {}, @iscell);
 addOptional(p, 'fdur', 0.2, @isnumeric);
 addOptional(p, 'fs', 1250, @isnumeric);
+addOptional(p, 'concat', false, @islogical);
 addOptional(p, 'saveVar', true, @islogical);
 
 parse(p,varargin{:})
@@ -64,21 +67,22 @@ ch = p.Results.ch;
 clip = p.Results.clip;
 fdur = p.Results.fdur;
 fs = p.Results.fs;
+concat = p.Results.concat;
 saveVar = p.Results.saveVar;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% % load stim
-% [info, stim] = tdt2dat('basepath', basepath, 'store', 'Stim',...
-%     'blocks', blocks, 'chunksize', [], 'mapch', [], 'rmvch', [],...
-%     'clip', clip, 'saveVar', false);
-% 
-% load lfp
-[info, raw] = tdt2dat('basepath', basepath, 'store', 'Raw1',...
-    'blocks', blocks, 'chunksize', [], 'mapch', mapch, 'rmvch', [],...
+% load stim
+[info, stim] = tdt2dat('basepath', basepath, 'store', 'Stim',...
+    'blocks', blocks, 'chunksize', [], 'mapch', [], 'rmvch', [],...
     'clip', clip, 'saveVar', false);
+
+% load lfp
+% [info, raw] = tdt2dat('basepath', basepath, 'store', 'Raw1',...
+%     'blocks', blocks, 'chunksize', [], 'mapch', mapch, 'rmvch', [],...
+%     'clip', clip, 'saveVar', false);
 
 % workaround for f***ing tdt
 blockfiles = dir('block*');
@@ -111,55 +115,66 @@ for i = 1 : length(blocks)
 end
 
 % find stim onset from diff
-stim = find(diff(stim) > max(diff(stim)) / 2);
+stimidx = find(diff(stim) > max(diff(stim)) / 2);
 % convert stim onset times to new fs
-stim = round(stim / info.fs * fs);
+stimidx = round(stimidx / info.fs * fs);
 
 % resample
 [p, q] = rat(fs / info.fs);
 n = 5; beta = 20;
-raw = [resample(double(raw)', p, q, n, beta)]';
+for i = 1 : size(raw, 1)        % only way to handle large arrays
+    draw(i, :) = [resample(double(raw(i, :))', p, q, n, beta)]';
+end
+clear raw
 
 % remove dc, average and convert to mV
-raw = [rmDC(raw')]';
-raw = mean(raw(ch, :)) / 1000;
+draw = [rmDC(draw')]';
+draw = mean(draw(ch, :)) / 1000;
 
 % clip fepsp
-for i = 1 : length(stim)
-    fepsp(i, :) = raw(stim(i) : stim(i) + fdur * fs);
+for i = 1 : length(stimidx)
+    fepsp(i, :) = draw(stimidx(i) : stimidx(i) + fdur * fs);
 end
 
 % calc amp and arrange in matrix according to blocks
-stimidx = stim / fs;
+stimidx = stimidx / fs;
 cumdur = [0 cumsum(info.blockduration)];
 maxstim = 1;
 for i = 1 : length(blocks)
-    idx{i} = find(stimidx > cumdur(i) & stimidx < cumdur(i + 1));
-    maxstim = max([maxstim, length(idx{i})]);
+    blockidx{i} = find(stimidx > cumdur(i) & stimidx < cumdur(i + 1));
+    maxstim = max([maxstim, length(blockidx{i})]);
 end
 for i = 1 : length(blocks)
-    wv{i} = fepsp(idx{i}, :);
+    wv{i} = fepsp(blockidx{i}, :);
     wvavg(i, :) = [mean(wv{i})]';
-    amp{i} = abs(min(wv{i}, [], 2) - max(wv{i}, [], 2));
-    stimcell{i} = stim(idx{i});
+    ampcell{i} = abs(min(wv{i}, [], 2) - max(wv{i}, [], 2));
+    stimcell{i} = stimidx(blockidx{i});
 end
-mat = cellfun(@(x)[x(:); NaN(maxstim - length(x), 1)], amp,...
-    'UniformOutput', false);
-amp = cell2mat(mat);
-mat = cellfun(@(x)[x(:); NaN(maxstim - length(x), 1)], stimcell,...
-    'UniformOutput', false);
-stim = cell2mat(mat);
+if concat
+    amp = [];
+    for i = 1 : length(blocks)
+        amp = [amp; ampcell{i}];
+    end
+else
+    mat = cellfun(@(x)[x(:); NaN(maxstim - length(x), 1)], ampcell,...
+        'UniformOutput', false);
+    amp = cell2mat(mat);
+    mat = cellfun(@(x)[x(:); NaN(maxstim - length(x), 1)], stimcell,...
+        'UniformOutput', false);
+    stimidx = cell2mat(mat);
+end
 
 % arrange struct
 lfp.wv = wv;
 lfp.wvavg = wvavg';
-lfp.stim = stim;
+lfp.stim = stimidx;
 lfp.t = 0 : 1 / fs : fdur;
 lfp.amp = amp;
 lfp.fs = fs;
 lfp.fs_orig = info.fs;
 lfp.blocks = blocks;
 lfp.blockduration = info.blockduration;
+lfp.blockidx = blockidx;
 lfp.mapch = mapch;
 lfp.ch = ch;
 lfp.clip = clip;
