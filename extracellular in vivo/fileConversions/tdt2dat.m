@@ -1,7 +1,8 @@
-function info = tdt2dat(varargin)
+function [info, data] = tdt2dat(varargin)
 
 % converts tank (TDT) to dat (neurosuite). Concatenates blocks.
-% performs basic preprocessing.
+% performs basic preprocessing. if data (second output) is requested than
+% will output a matrix of data instead of a .dat file
 %
 % INPUT:
 %   basepath    path to recording folder {pwd}.
@@ -14,9 +15,11 @@ function info = tdt2dat(varargin)
 %               each cell corresponds to a block. for example:
 %               clip{3} = [0 50; 700 Inf] will remove the first 50 s from
 %               block-3 and the time between 700 s and the end of Block-3
+%   saveVar     logical. save variable {true} or not (false).
 %
 % OUTPUT
 %   info        struct with fields describing tdt params
+%   data        mat (channels x samples). only if requested
 %
 % CALLS:
 %   TDTbin2mat
@@ -26,10 +29,11 @@ function info = tdt2dat(varargin)
 %   handle chunks better (e.g. linspace)
 %   add time limit to split files
 %   separate chunks to standalone function
-%   currently blockduration does not include clip
+%   include clip within blockduration
 %
-% 06 dec 18 LH.
-% 18 sep 19 LH handle arguments
+% 06 dec 18 LH      updates:
+% 18 sep 19 LH      handle arguments
+% 27 amr 20 LH      allow output mat instead of dat file
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -44,6 +48,7 @@ addOptional(p, 'chunksize', 60, @isnumeric);
 addOptional(p, 'mapch', [], @isnumeric);
 addOptional(p, 'rmvch', [], @isnumeric);
 addOptional(p, 'clip', {}, @iscell);
+addOptional(p, 'saveVar', true, @islogical);
 
 parse(p, varargin{:})
 basepath = p.Results.basepath;
@@ -53,6 +58,7 @@ chunksize = p.Results.chunksize;
 mapch = p.Results.mapch;
 rmvch = p.Results.rmvch;
 clip = p.Results.clip;
+saveVar = p.Results.saveVar;
 
 if isempty(clip)
     clip{max(blocks)} = [];
@@ -68,6 +74,9 @@ end
 
 % constants
 scalef = 1e6;   % scale factor for int16 conversion [uV]
+
+% initialize
+data = [];
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % rearrange mapch according to rmvch
@@ -105,10 +114,12 @@ nblocks = length(blocknames);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % open dat file
-newname = [basename '.dat'];
-fout = fopen(newname, 'w');
-if(fout == -1)
-    error('cannot open file');
+if nargout == 1
+    newname = [basename '.dat'];
+    fout = fopen(newname, 'w');
+    if(fout == -1)
+        error('cannot open file');
+    end
 end
 
 % go over blocks
@@ -180,21 +191,25 @@ for i = 1 : nblocks
     % go over chunks, remap, remove and write
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     for j = 1 : nchunks
-        data = TDTbin2mat(blockpath, 'TYPE', {'streams'}, 'STORE', store,...
+        dat = TDTbin2mat(blockpath, 'TYPE', {'streams'}, 'STORE', store,...
             'T1', chunks(j , 1) , 'T2' ,chunks(j , 2) );
-        data = data.streams.(store).data;
+        dat = dat.streams.(store).data;
         
-        if ~isempty(data)
+        if ~isempty(dat)
             if ~isempty(rmvch)                     % remove channels
-                data(rmvch, :) = [];
+                dat(rmvch, :) = [];
             end
             
             if ~isempty(mapch)                     % remap channels
-                data = data(mapch, :);
+                dat = dat(mapch, :);
             end
             
-            fwrite(fout, data(:), 'int16');        % write data
-            data = [];
+            
+            if nargout == 1  
+                fwrite(fout, dat(:), 'int16');     % write data
+            elseif nargout == 2
+                data = [data, dat];                % output data
+            end
         end
     end
 end
@@ -202,13 +217,14 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % close file
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-rc = fclose(fout);
-if rc == -1
-    error('cannot save new file');
-end
-
+if nargout == 1
+    rc = fclose(fout);
+    if rc == -1
+        error('cannot save new file');
+    end
 info = dir(newname);
 fprintf(1, '\nCreated %s. \nFile size = %.2f MB\n', newname, info.bytes / 1e6);
+end
 fprintf(1, '\nElapsed time = %.2f seconds\n', toc)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -224,8 +240,12 @@ info.rmvch = rmvch;
 info.mapch = mapch;
 info.fs = heads.stores.(store).fs;
 
-save([basename, '.' store, '.Info.mat'], 'info');
-
+if saveVar
+    save([basename, '.' store, '.Info.mat'], 'info');
+    if nargout == 2
+        save([basename, '.' store, '.data.mat'], 'data');
+    end
+end
 end
 
 % EOF
