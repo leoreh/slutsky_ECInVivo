@@ -20,7 +20,7 @@ marg = round(fs * 0.05);        % rm 50 ms arround an artifact
 % load lfp
 lfp = getLFP('basepath', basepath, 'ch', 1, 'chavg', {},...
     'fs', 1250, 'interval', [0 inf], 'extension', 'abf', 'pli', true,...
-    'savevar', true, 'force', false, 'basename', basename);
+    'dc', true, 'savevar', true, 'force', false, 'basename', basename);
                    
 % find and remove bad episodes
 ep = markEp(lfp.timestamps / 60, lfp.data);

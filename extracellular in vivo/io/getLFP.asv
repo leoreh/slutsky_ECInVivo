@@ -16,7 +16,6 @@ function lfp = getLFP(varargin)
 %               can also be an interval of traces from wcp
 %   ch          vec. channels to load
 %   pli         logical. filter power line interferance (1) or not {0}
-%   dc          logical. remove DC component (1) or not {0}
 %   saveVar     save variable {1}.
 %   chavg       cell. each row contain the lfp channels you want to average
 %   
@@ -47,7 +46,6 @@ addOptional(p, 'fs', 1250, @isnumeric);
 addOptional(p, 'interval', [0 inf], @isnumeric);
 addOptional(p, 'ch', [1 : 16], @isnumeric);
 addOptional(p, 'pli', false, @islogical);
-addOptional(p, 'dc', false, @islogical);
 addOptional(p, 'saveVar', true, @islogical);
 addOptional(p, 'chavg', {}, @iscell);
 
@@ -60,7 +58,6 @@ fs = p.Results.fs;
 interval = p.Results.interval;
 ch = p.Results.ch;
 pli = p.Results.pli;
-dc = p.Results.dc;
 saveVar = p.Results.saveVar;
 chavg = p.Results.chavg;
 
@@ -109,10 +106,13 @@ end
 % messaround
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+
 % resmaple
-if isempty(fs) % do not resample if new sampling frequency not specified 
+% do not resample if new sampling frequency not specified 
+if isempty(fs)
     fs = fs_orig;
-elseif fs ~= fs_orig
+end
+if fs ~= fs_orig
     [p, q] = rat(fs / fs_orig);
     n = 5; beta = 20;
     for i = 1 : size(lfp.data, 1)        % only way to handle large arrays
@@ -121,29 +121,20 @@ elseif fs ~= fs_orig
     lfp.data = draw;    
     fprintf('\n resampling from %.1f to %.1f\n\n', fs_orig, fs)
 end
-
 % invert
 if ~strcmp(extension, 'lfp') && abs(min(lfp.data)) > max(lfp.data)
     lfp.data = -lfp.data;
     fprintf('\n inverting data \n\n')
 end
-
 % filter
 if pli
     linet = lineDetect('x', lfp.data, 'fs', fs, 'graphics', false);
     lfp.data = lineRemove(lfp.data, linet, [], [], 0, 1);
 end
-
 % flip such that samples x channels
 if size(lfp.data, 1) < size(lfp.data, 2)
     lfp.data = lfp.data';
 end
-
-% remove DC component
-if dc
-    lfp.data = rmDC(lfp.data);
-end
-
 % signal average
 if ~isempty(chavg)
     mlfp = zeros(size(chavg, 1), length(lfp.data));
