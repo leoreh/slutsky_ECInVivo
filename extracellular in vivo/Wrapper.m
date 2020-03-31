@@ -5,10 +5,10 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 1: file conversion
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'E:\Data\Dat\lh49\lh49_200322';
+basepath = 'E:\Data\Dat\lh49\lh49_200331';
 store = 'Raw1';
 fs = 24414.06;
-blocks = [5];
+blocks = [5, 10];
 chunksize = 300;
 % mapch = [1 : 16];
 % mapch = [];
@@ -38,7 +38,7 @@ lfp = getLFP('basepath', basepath, 'ch', ch, 'chavg', chavg,...
     'savevar', true, 'forceL', true, 'basename', '');
 
 % load with stim (tdt). DONT FORGET TO CHANGE NAME
-lfp = getfEPSPfromTDT('basepath', basepath, 'andname', 'stability',...
+lfp = getfEPSPfromTDT('basepath', basepath, 'andname', 'stability2',...
     'blocks', blocks, 'mapch', mapch, 'ch', ch, 'clip', clip,...
     'saveVar', true, 'fdur', 0.1, 'concat', true);
 
