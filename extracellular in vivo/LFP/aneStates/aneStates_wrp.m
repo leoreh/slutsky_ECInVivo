@@ -11,22 +11,22 @@ clear all
 % select mouse
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % group number refers to the order in the grppath cell.
-grp = [1 : 4];
+grp = [1];
 % if mouse empty will load all mice in group
-mouse = [1 : 2];
+mouse = [1];
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % path to data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-grppath{1} = 'E:\Data\Field\IIS\WT';
-grppath{2} = 'E:\Data\Field\IIS\APPPS1';
-grppath{3} = 'E:\Data\Field\IIS\APPKi';
-grppath{4} = 'E:\Data\Field\IIS\FADx5';
+grppath{1} = 'E:\Data\Others\DZ\IIS\WT';
+grppath{2} = 'E:\Data\Others\DZ\IIS\APPPS1';
+grppath{3} = 'E:\Data\Others\DZ\IIS\APPKi';
+grppath{4} = 'E:\Data\Others\DZ\IIS\FADx5';
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-forceA = false;
+forceA = true;
 forceL = false;
 saveFig = false;
 graphics = false;
