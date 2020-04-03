@@ -226,7 +226,7 @@ end
 % find start\stop times
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-stamps = binary2epochs('vec', gi, 'minDur', 1, 'interDur', 4);
+stamps = binary2epochs('vec', gi, 'minDur', minDur, 'interDur', 4);
 stamps = ibins(stamps);
 nevents = size(stamps, 1);
 

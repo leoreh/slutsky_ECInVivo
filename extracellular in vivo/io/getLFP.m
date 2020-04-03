@@ -115,8 +115,8 @@ if isempty(fs) % do not resample if new sampling frequency not specified
 elseif fs ~= fs_orig
     [p, q] = rat(fs / fs_orig);
     n = 5; beta = 20;
-    for i = 1 : size(lfp.data, 1)        % only way to handle large arrays
-        draw(i, :) = [resample(double(lfp.data(i, :))', p, q, n, beta)]';
+    for i = 1 : size(lfp.data, 2)        % only way to handle large arrays
+        draw(:, i) = [resample(double(lfp.data(:, i))', p, q, n, beta)]';
     end
     lfp.data = draw;    
     fprintf('\n resampling from %.1f to %.1f\n\n', fs_orig, fs)
