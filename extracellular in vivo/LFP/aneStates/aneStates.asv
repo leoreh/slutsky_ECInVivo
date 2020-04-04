@@ -135,6 +135,7 @@ switch thrMet
 end
 % calc thr
 thr = [0 mean(sig_thr) + z * std(sig_thr)];
+thr = [0 0.4]; % override
 
 % set thr as the larger value between 0.5 and 15 z-scores
 % thr(2) = max([thr(2), mv]);
@@ -142,14 +143,13 @@ marg = 0.05;
 iis = getIIS('sig', sig, 'fs', fs, 'basepath', basepath,...
     'graphics', false, 'saveVar', saveVar, 'binsize', binsize,...
     'marg', marg, 'basename', basename, 'thr', thr, 'smf', 7,...
-    'saveFig', false, 'forceA', forceA, 'spkw', false, 'vis', true,...
+    'saveFig', false, 'forceA', false, 'spkw', false, 'vis', true,...
     'mancur', false, 'thrDir', 'both');
 iis.epThr = epThr;
 wvstamps = linspace(-marg, marg, floor(marg * fs) * 2 + 1);
 
 % mark iis within bursts and bursts with iis
-[ep.IISinBursts, b, ~] = InIntervals(iis.peakPos, bs.stamps);
-ep.BurstsWithIIS = unique(b);
+% [a, b, c] = InIntervals(iis.peakPos, bs.stamps);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % anesthesia states

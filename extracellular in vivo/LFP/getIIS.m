@@ -174,7 +174,6 @@ switch thrDir
                 (zscore(sig) < -thr(1) & sig < -thr(2));
         end
 end
-           
 iis.thr = thr;
 iie = find([0; diff(thresholded) > 0]);
 
@@ -224,8 +223,10 @@ end
 seg(rmidx, :) = [];
 peak(rmidx) = [];
 pos(rmidx) = [];
+
 % if there is no trough between peaks select highest peak. this is
 % instead of demanding for a refractory period via interDur
+rmidx = [];
 for i = 1 : length(pos) - 1
     low = min(sig(pos(i) : pos(i + 1)));
     if low > lowthr
@@ -246,8 +247,8 @@ baseline = mean(sig) + 1 * std(sig);
 for i = 1 : nspks
     
     % check that peak-to-peak in narrow window is greater than thr in mV
-    win = sig(pos(i) - round(0.01 * fs) : pos(i) + round(0.01 * fs));
-    amp(i) = abs(min(win)) + max(win);
+    win = sig(pos(i) - round(0.015 * fs) : pos(i) + round(0.015 * fs));
+    amp(i) = peak2peak(win);
     if  amp(i) < thr(2)
         rmidx = [rmidx, i];
     end
@@ -264,6 +265,10 @@ peak(rmidx) = [];
 pos(rmidx) = [];
 nspks = length(pos);
 fprintf('after template matching: %d IIS\n', nspks);
+if nspks == 0
+    fprintf('no spikes detected\n');
+    return
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % manual curation

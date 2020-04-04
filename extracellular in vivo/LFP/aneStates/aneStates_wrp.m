@@ -11,26 +11,26 @@ clear all
 % select mouse
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % group number refers to the order in the grppath cell.
-grp = [1];
+grp = [1 : 4];
 % if mouse empty will load all mice in group
-mouse = [3];
+mouse = [];
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % path to data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-grppath{1} = 'E:\Data\Field\IIS\WT';
-grppath{2} = 'E:\Data\Field\IIS\APPPS1';
-grppath{3} = 'E:\Data\Field\IIS\APPKi';
-grppath{4} = 'E:\Data\Field\IIS\FADx5';
+grppath{1} = 'F:\Data\Field\IIS\WT';
+grppath{2} = 'F:\Data\Field\IIS\APPPS1';
+grppath{3} = 'F:\Data\Field\IIS\APPKi';
+grppath{4} = 'F:\Data\Field\IIS\FADx5';
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 forceA = true;
 forceL = false;
-saveFig = false;
-graphics = true;
-saveVar = false;
+saveFig = true;
+graphics = false;
+saveVar = true;
 ch = 1;
 smf = 7;        % smooth factor
 fs = 1250;      % sampling frequency
@@ -43,6 +43,10 @@ maxmice = [];   % initialize
 % go over each grp
 for j = grp
     
+    % initialize vars
+    clear iisRate; clear bsr; clear dband; clear t;
+    
+    % files
     basepath = grppath{j};
     cd(basepath)
     [~, grpname] = fileparts(basepath);
@@ -53,11 +57,13 @@ for j = grp
     maxmice = max([maxmice, nfiles]);
     
     if isempty(mouse)
-        mouse = 1 : nfiles;
+        m = nfiles;
+    else
+        m = mouse;
     end
     
     % go over each mouse
-    for i = mouse
+    for i = m
         
         [~, basename] = fileparts(files{nfiles(i)});
         [~, basename] = fileparts(basename);
@@ -85,7 +91,7 @@ for j = grp
         t{i} = bs.cents / fs / 60;
         
         % after last recording is loaded, arrange in mat and save
-        if i == mouse(end)
+        if i == m(end)
             
             [~, idx] = max(recDur{j});      % index to longest recording
             maxdur = length(bsr{idx});

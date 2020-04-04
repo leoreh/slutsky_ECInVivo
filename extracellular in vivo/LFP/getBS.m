@@ -98,8 +98,8 @@ vis = p.Results.vis;
 forceA = p.Results.forceA;
 
 % params
-minDur = 2;                             % minimum event duration [s]
-maxDur = 3000000;                       % maximum event duration [s]
+minDur = 2;                             % minimum event duration [bins]
+maxDur = 3000000;                       % maximum event duration [bins]
 interDur = 4;                           % minimum time between events [bins]
 % binsize = binsize * fs;               % [s] * [fs] = [samples]
 binsize = 2 ^ nextpow2(binsize * fs);   % for pc1
