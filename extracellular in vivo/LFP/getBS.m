@@ -98,7 +98,7 @@ vis = p.Results.vis;
 forceA = p.Results.forceA;
 
 % params
-minDur = 4;                             % minimum event duration [s]
+minDur = 2;                             % minimum event duration [s]
 maxDur = 3000000;                       % maximum event duration [s]
 interDur = 4;                           % minimum time between events [bins]
 % binsize = binsize * fs;               % [s] * [fs] = [samples]
@@ -226,7 +226,8 @@ end
 % find start\stop times
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-stamps = binary2epochs('vec', gi, 'minDur', minDur, 'interDur', 4);
+stamps = binary2epochs('vec', gi, 'minDur', minDur, 'maxDur', maxDur,...
+    'interDur', interDur);
 stamps = ibins(stamps);
 nevents = size(stamps, 1);
 

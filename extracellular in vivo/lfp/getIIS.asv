@@ -5,13 +5,16 @@ function [iis] = getIIS(varargin)
 % INPUT
 %   sig         signal for detection
 %   fs          sampling frequency
-%   smf         smooth factor for rate [bins] {6}.
+%   smf         smooth factor for rate [bins] {7}.
 %   binsize     scalar {60} in [s]. for rate calculation
 %   marg        scalar {0.1} in [s]. time margin for clipping spikes
 %   thr         vector of two elements. first is thr in [z-scores] and
 %               second is thr in [mV]. if one specified than the other is
 %               merely calculated. if both specified than both used for
-%               detection.
+%               detection. values should be positive even if thrDir is
+%               negative
+%   thrDir      string. direction of threshold ditection. can be
+%               {'positive'}, 'negative', or 'both
 %   spkw        logical {false}. calculate max frequency for each spike.
 %   basepath    recording session path {pwd}
 %   basename    string. if empty extracted from basepath
@@ -33,16 +36,17 @@ function [iis] = getIIS(varargin)
 %       edges       of bins for bsr
 %       cents       of bins for bsr
 %       art         iis that are suspected artifacts due to width
-%       mancur      logical vector indicating accepted iis (true)
+%       accepted    logical vector indicating accepted iis (true)
 %       <params>    as in input
 %
 % TO DO LIST
 %       # investigate thr (done)
 %       # filter IIS by removing average waveform (done)
 %       # find width via wavelet and after hyperpolirazation (done)
-%       # manage bidirectional thresholding
+%       # manage bidirectional thresholding (done)
 %       # remove spikes with more than one peak in window to produce a
 %       clean avg waveform
+%       # template matching
 %
 % CALLS
 %       calcFR
@@ -53,7 +57,7 @@ function [iis] = getIIS(varargin)
 % 22 jan 20 LH      max frequency at peakPos rather than throught spike
 % 27 jan 20 LH      trough between peaks instead of refractory period
 % 28 jan 20 LH      changed iis.rate to counts / bin instead of spikes / m
-% 03 apr 20 LH      manual curation added
+% 03 apr 20 LH      manual curation and bi-directional detection added
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -62,10 +66,11 @@ function [iis] = getIIS(varargin)
 p = inputParser;
 addParameter(p, 'sig', [], @isnumeric)
 addParameter(p, 'fs', 1250, @isnumeric)
-addParameter(p, 'smf', 6, @isnumeric)
+addParameter(p, 'smf', 7, @isnumeric)
 addParameter(p, 'binsize', 300, @isnumeric)
 addParameter(p, 'marg', 0.05, @isnumeric)
 addParameter(p, 'thr', [10 0], @isnumeric)
+addParameter(p, 'thrDir', 'positive', @isstr)
 addParameter(p, 'spkw', false, @islogical)
 addParameter(p, 'basepath', pwd, @isstr);
 addParameter(p, 'basename', [], @isstr);
@@ -83,6 +88,7 @@ fs = p.Results.fs;
 smf = p.Results.smf;
 marg = p.Results.marg;
 thr = p.Results.thr;
+thrDir = p.Results.thrDir;
 spkw = p.Results.spkw;
 binsize = p.Results.binsize;
 basepath = p.Results.basepath;
@@ -106,7 +112,7 @@ lowthr = 0.2;                       % mV
 iis.edges = []; iis.cents = []; iis.peakPos = []; iis.peakPower = [];
 iis.wv = []; iis.rate = []; iis.filtered = []; iis.fs = fs;
 iis.binsize = binsize; iis.spkw = []; iis.maxf = []; iis.art = []; 
-iis.mancur = [];
+iis.accepted = []; iis.thrDir = thrDir;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % check if mat already exists
@@ -129,24 +135,53 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % threshold
-if thr(1) == 0
-    thresholded = sig > thr(2);
-    % find thr in z scores
-    thr(1) = (thr(2) - mean(sig)) / std(sig);
-elseif thr(2) == 0
-    thresholded = zscore(sig) > thr(1);
-    % find thr in mV
-    thr(2) = mean(sig) + thr(1) * std(sig);
-else
-    thresholded = zscore(sig) > thr(1) & sig > thr(2);
+switch thrDir
+    case 'positive'
+        if thr(1) == 0
+            thresholded = sig > thr(2);
+            % find thr in z scores
+            thr(1) = (thr(2) - mean(sig)) / std(sig);
+        elseif thr(2) == 0
+            thresholded = zscore(sig) > thr(1);
+            % find thr in mV
+            thr(2) = mean(sig) + thr(1) * std(sig);
+        else
+            thresholded = zscore(sig) > thr(1) & sig > thr(2);
+        end
+    case 'negative'
+        if thr(1) == 0
+            thresholded = sig < -thr(2);
+            % find thr in z scores
+            thr(1) = -(thr(2) - mean(sig)) / std(sig);
+        elseif thr(2) == 0
+            thresholded = zscore(sig) < -thr(1);
+            % find thr in mV
+            thr(2) = -(mean(sig) + thr(1) * std(sig));
+        else
+            thresholded = zscore(sig) < -thr(1) & sig < -thr(2);
+        end
+    case 'both'
+        if thr(1) == 0
+            thresholded = sig > thr(2) | sig < -thr(2);
+            % find thr in z scores
+            thr(1) = thr(2) - mean(sig) / std(sig);
+        elseif thr(2) == 0
+            thresholded = zscore(sig) > thr(1) | zscore(sig) < -thr(1);
+            % find thr in mV
+            thr(2) = mean(sig) + thr(1) * std(sig);
+        else
+            thresholded = (zscore(sig) > thr(1) & sig > thr(2)) |...
+                (zscore(sig) < -thr(1) & sig < -thr(2));
+        end
 end
+           
 iis.thr = thr;
 iie = find([0; diff(thresholded) > 0]);
 
 % return if no IIS are detected
 nspks = length(iie);
 if isempty(iie)
-    fprintf('\nno inter-ictal spikes found\n');
+    fprintf('\nno inter-ictal spikes detected\n');
     iis.rate = zeros(1, floor(length(sig) / binsize));
     iis.cents = zeros(1, floor(length(sig) / binsize));
     if saveVar
@@ -172,16 +207,17 @@ seg = zeros(length(iie), length(wvstamps));
 rmidx = [];
 for i = 1 : length(iie)
     % remove last / first iis if incomplete
-    if iie(i) + margs > length(sig)
-        rmidx = [rmidx, i];
-        continue
-    elseif iie(i) - margs < 1
+    if iie(i) + margs > length(sig) || iie(i) - margs < 1
         rmidx = [rmidx, i];
         continue
     end
-    % adjust crossing to local maximum and then clip
+    % adjust crossing to local max / min and then clip
     localseg = sig(iie(i) - interDur : iie(i) + interDur);
-    [peak(i), pos(i)] = max(localseg);
+    if abs(max(localseg)) > abs(min(localseg))
+        [peak(i), pos(i)] = max(localseg);
+    else
+        [peak(i), pos(i)] = min(localseg);
+    end
     pos(i) = iie(i) - interDur + pos(i);
     seg(i, :) = sig(pos(i) - margs : pos(i) + margs);
 end
@@ -199,77 +235,101 @@ end
 seg(rmidx, :) = [];
 peak(rmidx) = [];
 pos(rmidx) = [];
-
-mwv = mean(seg, 1)';
 nspks = length(pos);
-fprintf('\n%d inter-ictal spikes \n', nspks);
+fprintf('\nafter detection: %d IIS\n', nspks);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% template matching
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+rmidx = [];
+baseline = mean(sig) + 1 * std(sig);
+for i = 1 : nspks
+    
+    % check that peak-to-peak is greater than threshold in mV
+    amp(i) = abs(min(seg(i, :))) + abs(max(seg(i, :)));
+    if amp(i) < thr(2)
+        rmidx = [rmidx, i];
+    end
+    
+    % check that signal returns to baseline before and after peak
+%     half1 = sig(pos(i) : -1 : pos(i) - round(0.02 * fs));
+%     half2 = sig(pos(i) : pos(i) + round(0.02 * fs));
+%     if min(half1) > baseline || min(half2) > baseline
+%         rmidx = [rmidx, i];
+%     end
+end
+seg(rmidx, :) = [];
+peak(rmidx) = [];
+pos(rmidx) = [];
+nspks = length(pos);
+fprintf('after template matching: %d IIS\n', nspks);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % manual curation
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if mancur
-    figure
+    fh = figure;
+    suptitle({'Select IIS',...
+        'left = accept; right = decline; middle = previous'...
+        'Wait for curser before pressing'});
+    sp1 = subplot(2, 1, 1);
     plot(tstamps, sig ,'k')
     axis tight
     hold on
     plot(xlim, [thr(2) thr(2)], '--r')
-    scatter(pos / fs,...
-        peak, '*');
+    scatter(pos / fs, peak, '*');
     ylabel('Voltage [mV]')
     set(gca, 'TickLength', [0 0])
     box off
-    title('Raw signal and IIS rate')
-    
-    prevButton = [];
-    while i <= 80
-        [x, ~, button] = ginput(1);
-        if button == 1         
-            if prevButton == 1
-%                 ch = get(gca, 'children');
-%                 delete(ch(1))
+    sp2 = subplot(2, 1, 2);
+    plot(tstamps, sig ,'k')
+    axis tight
+    hold on
+    plot(xlim, [thr(2) thr(2)], '--r')
+    scatter(pos / fs, peak, '*');
+    ylabel('Voltage [mV]')
+    set(gca, 'TickLength', [0 0])
+    box off
+    i = 1;
+    marg1 = fs * 5;
+    marg2 = fs * 0.5;
+    while i <= nspks
+        idx1(1) = max([1 pos(i) - marg1]);
+        idx1(2) = min([length(sig) pos(i) + marg1]);
+        idx2(1) = max([1 pos(i) - marg2]);
+        idx2(2) = min([length(sig) pos(i) + marg2]);
+        xlim(sp1, idx1 / fs)
+        xlim(sp2, idx2 / fs)
+        title(sprintf('spk %d/%d', i, nspks))
+        while 1
+            [~, ~, button] = ginput(1);
+            if button == 1
+                iis.accepted(i) = 1;
+                break
+            elseif button == 3
+                iis.accepted(i) = 0;
+                break
+            elseif button == 2
+                i = i - 2;
+                break
             end
-%             line([x ,x], Y);
-%             temp(1) = x;
-        elseif button == 3
-%             temp(2) = x;
-            if prevButton == 3
-%                 ch = get(gca, 'children');
-%                 delete(ch(1))
-            else
-%                 ep = [ep; temp];
-            end
-%             fill([temp fliplr(temp)], [Y(1) Y(1) Y(2) Y(2)]',...
-%                 'k', 'FaceAlpha', 0.3,  'EdgeAlpha', 0);
-        elseif button == 2
-            break
+            prevButton = button;
         end
-        prevButton = button;
         i = i + 1;
     end
-    
-    
-    
-    
-    
-    c1 = uicontrol('Style', 'pushbutton', 'Position', [20 60 60 20],...
-        'String', 'yes');
-    c1.Callback = {@winCenter, c1};
-    c2 = uicontrol('Style', 'pushbutton', 'Position', [20 20 60 20],...
-        'String', 'no');
-    c2.Callback = {@(val)winCenter, c2};
-    val
-    
-    marg2 = fs * 5;
-    for i = 1 : 10
-        idx(1) = max([1 pos(i) - marg2]);
-        idx(2) = min([length(sig) pos(i) + marg2]);
-        xlim(idx / fs)
-        while ~get(c1, 'Value')
-            %             c1.Callback = {@winCenter, c1};
-%             pause(0.1)
-        end
-    end
+    close(fh)
+        
+    seg(~iis.accepted, :) = [];
+    peak(~iis.accepted) = [];
+    pos(~iis.accepted) = [];
+    nspks = length(pos);
+    fprintf('after manual curation: %d IIS\n', nspks);    
+    if nspks == 0
+        fprintf('no spikes detected\n');
+        return
+    end   
 end
+mwv = mean(seg, 1)';
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % power spectrum via wavelet
@@ -467,7 +527,7 @@ if graphics
     
     % amplitude histogram
     subplot(3, 4, 8)
-    h = histogram(log10(iis.peakPower), 30, 'Normalization', 'Probability');
+    h = histogram(log10(abs(iis.peakPower)), 30, 'Normalization', 'Probability');
     h.EdgeColor = 'none';
     h.FaceColor = 'k';
     h.FaceAlpha = 1;
