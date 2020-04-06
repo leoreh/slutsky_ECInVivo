@@ -48,7 +48,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 cd(basepath)
 % .fet files
-fetfiles = dir([basepath '\' '*.fet*']);
+fetfiles = dir([basepath filesep '*.fet*']);
 fetfilenames = {fetfiles.name};
 nfetfiles = length(fetfilenames);
 if isempty(fetfilenames)
@@ -56,7 +56,7 @@ if isempty(fetfilenames)
 end
 
 % .clu files
-clufiles = dir([basepath '\' '*.clu*']);
+clufiles = dir([basepath filesep '*.clu*']);
 clufilenames = {clufiles.name};
 nclufiles = length(clufilenames);
 if isempty(clufilenames)

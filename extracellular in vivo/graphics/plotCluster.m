@@ -94,7 +94,7 @@ for i = 1 : length(clu)
     suptitle(txt)
     
     if saveFig
-        fullpath = [basepath, '\graphics'];
+        fullpath = [basepath, filesep 'graphics'];
         strdate = date;
         figname = fullfile(fullpath, ['clu', int2str(i), '_', strdate]);
         

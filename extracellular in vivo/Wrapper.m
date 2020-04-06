@@ -5,7 +5,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 1: file conversion
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'E:\Data\Dat\lh49\lh49_200331';
+basepath = '/media/leore/Samsung_T5/Data/Dat/lh49/lh49_200320/';
 store = 'Raw1';
 fs = 24414.06;
 blocks = [5, 10];
@@ -86,7 +86,7 @@ spikes = getSpikes('basepath', basepath, 'saveMat', true,...
     'noPrompts', true, 'forceL', false);
 
 % review clusters
-mu = [3, 17, 25, 27];
+mu = find(spikes.isi > 1);
 mu = [];
 spikes = cluVal(spikes, 'basepath', basepath, 'saveVar', true,...
     'saveFig', true, 'force', true, 'mu', mu, 'graphics', true);
@@ -136,22 +136,17 @@ CellClass = cellClass(cat(1, spikes.rawWaveform{:})', 'fs', spikes.samplingRate,
 % STEP 6: calculate mean firing rate
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 binsize = (2 ^ nextpow2(30 * spikes.samplingRate));
-fr = FR(spikes.times, 'basepath', basepath, 'graphics', false, 'saveFig', false,...
+fr = FR(spikes.times(spikes.su), 'basepath', basepath, 'graphics', false, 'saveFig', false,...
     'binsize', 20, 'saveVar', true, 'smet', 'MA');
 
-[~, filename] = fileparts(basepath);
+filename = bz_BasenameFromBasepath(basepath);
 filename = [filename '.Raw1.Info.mat'];
 load(filename);
-info.labels = {'HC', '', 'PSAM'};
+info.labels = {''};
 lns = cumsum(info.blockduration / 60);
 lns = [1e-6 lns];
-info.lns = lns(1 : 3);
+info.lns = lns(1);
 save(filename, 'info');
-
-info.lns = [0 : 60 : 360];
-info.lns(1) = 1e-6;
-info.lns(end) = [];
-info.labels = {'BL day 1', 'Conditioning', 'BL day 2', 'Recall A', 'BL day 3', 'Recall B'};
 
 f = figure;
 subplot(2, 1, 1)

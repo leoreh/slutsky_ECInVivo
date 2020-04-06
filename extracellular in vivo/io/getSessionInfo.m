@@ -39,8 +39,11 @@ editGUI = p.Results.editGUI;
 if ~exist('basePath','var')
     basePath = pwd;
 end
-[~, baseName] = fileparts(basePath);
-% baseName = bz_BasenameFromBasepath(basePath);
+if ispc
+    [~, baseName] = fileparts(basePath);
+else
+    baseName = bz_BasenameFromBasepath(basePath);
+end
 filename = fullfile(basePath,[baseName,'.sessionInfo.mat']);
 
 %% Load the stuff
