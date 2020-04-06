@@ -5,6 +5,7 @@ function f = plotCluster(varargin)
 %   spikes      struct (see getSpikes)
 %   clu         units to plot. if == nunits than a figure with all units
 %               will be plotted in addition to figures of individual units
+%   vis         string. show figure {'on'} or not {'off'}
 %   saveFig     save figure {true} or not (false)
 %
 % CALLS
@@ -12,6 +13,7 @@ function f = plotCluster(varargin)
 %
 % 24 nov 18 LH. 
 % 04 dec 18. added individual units.
+% 06 apr 20. added vis
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -20,11 +22,13 @@ p = inputParser;
 addOptional(p, 'spikes', []);
 addOptional(p, 'basepath', pwd);
 addOptional(p, 'clu', []);
+addOptional(p, 'vis', 'on', @ischar);
 addOptional(p, 'saveFig', false, @islogical);
 
 parse(p,varargin{:})
 spikes = p.Results.spikes;
 clu = p.Results.clu;
+vis = p.Results.vis;
 basepath = p.Results.basepath;
 saveFig = p.Results.saveFig;
 
@@ -50,7 +54,7 @@ grpcolor = ['k', 'b', 'r', 'm', 'g', 'y'];
 
 % plot individual units
 for i = 1 : length(clu)
-    f = figure;
+    f = figure('visible', vis);
     
     % waveform
     subplot(1, 2, 1)
@@ -94,7 +98,7 @@ for i = 1 : length(clu)
     suptitle(txt)
     
     if saveFig
-        fullpath = [basepath, '\graphics'];
+        fullpath = [basepath, filesep 'graphics'];
         strdate = date;
         figname = fullfile(fullpath, ['clu', int2str(i), '_', strdate]);
         

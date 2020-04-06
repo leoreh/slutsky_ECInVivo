@@ -87,12 +87,11 @@ spikes = getSpikes('basepath', basepath, 'saveMat', true,...
 
 % review clusters
 mu = find(spikes.isi > 1);
-mu = sort([mu', 2, 4, 19, 22, 26, 42, 44, 46, 48, 50, 52, 55, 59, 64, 67, 69, 75]);
+mu = [];
 spikes = cluVal(spikes, 'basepath', basepath, 'saveVar', true,...
-    'saveFig', true, 'force', true, 'mu', mu, 'graphics', true,...
-    'vis', 'off');
+    'saveFig', true, 'force', true, 'mu', mu, 'graphics', true);
 
-% compare number of spikes and clusters from clustering to curation 
+% compare number of spikes and clusters from clustering to curation
 numSpikes = getNumSpikes(basepath, spikes);
 
 % separation of SU and MU
@@ -136,9 +135,10 @@ CellClass = cellClass(cat(1, spikes.rawWaveform{:})', 'fs', spikes.samplingRate,
 %%%%%%%%%%%%%%%/home/leore/code/buzcode/externalPackages/chronux_2_12/spectral_analysis/pointtimes/binspikes.m%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 6: calculate mean firing rate
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-winBL = [info.lns(1) info.lns(3)] * spikes.samplingRate * 60;
+binsize = (2 ^ nextpow2(30 * spikes.samplingRate));
+
 fr = FR(spikes.times(spikes.su), 'basepath', basepath, 'graphics', false, 'saveFig', false,...
-    'binsize', 60, 'saveVar', true, 'smet', 'MA');
+    'binsize', 20, 'saveVar', true, 'smet', 'MA');
 
 filename = bz_BasenameFromBasepath(basepath);
 filename = [filename '.Raw1.Info.mat'];

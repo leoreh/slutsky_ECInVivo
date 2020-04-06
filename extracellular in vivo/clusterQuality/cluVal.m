@@ -17,6 +17,7 @@ function spikes = cluVal(spikes, varargin)
 %                   numbering should correspond to spikes.UID
 %   force           logical. force recalculation of distance.
 %   graphics        logical. plot graphics {true} or not (false)
+%   vis             string. show figure {'on'} or not {'off'}
 %   saveFig         logical. save figure {1} or not (0)
 %   saveVar         logical. save variables (update spikes and save su)
 %
@@ -47,6 +48,7 @@ addOptional(p, 'npca', 3, @isscalar);
 addOptional(p, 'mu', [], @isnumeric);
 addOptional(p, 'force', false, @islogical);
 addOptional(p, 'graphics', true, @islogical);
+addOptional(p, 'vis', 'on', @ischar);
 addOptional(p, 'saveFig', true, @islogical);
 addOptional(p, 'saveVar', true, @islogical);
 
@@ -56,6 +58,7 @@ npca = p.Results.npca;
 mu = p.Results.mu;
 force = p.Results.force;
 graphics = p.Results.graphics;
+vis = p.Results.vis;
 saveFig = p.Results.saveFig;
 saveVar = p.Results.saveVar;
 
@@ -130,7 +133,8 @@ end
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if graphics
-    plotCluster('basepath', basepath, 'spikes', spikes, 'saveFig', saveFig)
+    plotCluster('basepath', basepath, 'spikes', spikes,...
+        'vis', vis, 'saveFig', saveFig)
 end
 
 end

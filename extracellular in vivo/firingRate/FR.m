@@ -121,7 +121,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if saveVar  
     [~, filename] = fileparts(basepath);
-    save([basepath, '\', filename, '.fr.mat'], 'fr')
+    save([basepath, filesep, filename, '.fr.mat'], 'fr')
 end
 
 end
