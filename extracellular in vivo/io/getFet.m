@@ -35,7 +35,7 @@ if nargs < 3 || isempty(forceL)
     forceL = 0;
 end
 
-[~, filename, ~] = fileparts(basepath);
+filename = bz_BasenameFromBasepath(basepath);
 filename = [fullfile(basepath, filename) '.fet.mat'];
 if exist(filename, 'file')  && ~forceL
     load(filename);
