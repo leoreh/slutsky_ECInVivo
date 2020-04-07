@@ -24,6 +24,17 @@ clip = cell(1, 1);
 filenames{3} = 'block2_ddt_edit12H';
 ddt2dat(basepath, mapch, rmvch, 'filenames', filenames)
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% STEP 1: open ephys
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+jsonFile = '/media/leore/Samsung_T5/Data/Dat/lh50/2020-04-02_17-11-26/experiment2/recording1/structure.oebin';
+type = 'continuous';
+type = 'events';
+index = 1;
+l = list_open_ephys_binary(jsonFile, type);
+d = load_open_ephys_binary(jsonFile, type, index, 'mmap');
+d = load_open_ephys_binary(jsonFile, type, index);
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 2: LFP
