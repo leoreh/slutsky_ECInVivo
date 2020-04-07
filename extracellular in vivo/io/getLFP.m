@@ -128,6 +128,9 @@ if ~strcmp(extension, 'lfp') && abs(min(lfp.data)) > max(lfp.data)
     fprintf('\n inverting data \n\n')
 end
 
+% convert to double
+lfp.data = double(lfp.data);
+
 % filter
 if pli
     linet = lineDetect('x', lfp.data, 'fs', fs, 'graphics', false);
