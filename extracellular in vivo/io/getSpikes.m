@@ -89,12 +89,12 @@ noPrompts = p.Results.noPrompts;
 
 % [~, filename] = fileparts(basepath);
 % filename = [basepath, '\', filename, '.xml'];
+cd(basepath)
 [sessionInfo] = getSessionInfo(basepath, 'noPrompts', noPrompts);
 
 
 spikes.samplingRate = sessionInfo.rates.wideband;
 nChannels = sessionInfo.nChannels;
-
 
 %% if the cellinfo file exist and we don't want to re-load files
 if exist([basepath filesep sessionInfo.FileName '.spikes.mat'],'file') && forceL == false

@@ -93,7 +93,7 @@ end
 
 % normalize firing rate
 if isempty(winBL)
-    winBL = [1 size(fr.strd, 2)];
+    winBL = [1 size(fr.strd, 1)];
 else
     winBL = winBL / binsize;
     if winBL(1) < 1; winBL(1) = 1; end
