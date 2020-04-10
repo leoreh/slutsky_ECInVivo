@@ -1,6 +1,5 @@
-% this is a wrapper for preprocessing extracellular data.
+% this is a wrapper for processing extracellular data.
 % contains calls to various functions.
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 1: file conversion
@@ -20,14 +19,14 @@ clip = cell(1, 1);
 [info] = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
     'chunksize', chunksize, 'mapch', mapch, 'rmvch', rmvch, 'clip', clip);
 
-% ddt to dat
-filenames{3} = 'block2_ddt_edit12H';
-ddt2dat(basepath, mapch, rmvch, 'filenames', filenames)
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% STEP 1: open ephys
+% STEP 1b: open ephys
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+basepath = 'E:\Data\Dat\lh50\2020-04-02_17-11-26';
 preprocOE('basepath', basepath, 'exp', [2])
+
+% snip stim
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 2: LFP
