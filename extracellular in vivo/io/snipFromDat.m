@@ -9,7 +9,7 @@ function snips = snipFromDat(varargin)
 %   datpath     string. path to .dat file (not including dat file itself)
 %               {pwd}.
 %   fname       string. name of dat file. can be empty if only one dat file
-%               exists or fname can be extracted from datpath
+%               exists in datpath or if fname can be extracted from datpath
 %   stamps      vec. pointers to dat files from which snipping will occur
 %               [samples].
 %   win         vec.  
@@ -17,7 +17,7 @@ function snips = snipFromDat(varargin)
 %   precision   char. sample precision of dat file {'int16'}
 %   ch          vec. channels to load from dat file {[]}. if empty than all will
 %               be loaded
-%   detrend     logical. detrend and L2 normalize snippets {false}.
+%   dtrend      logical. detrend and L2 normalize snippets {false}.
 %   saveVar     logical. save snips {true} or not (false).
 %
 % OUTPUT
@@ -117,12 +117,13 @@ for i = 1 : length(stamps) / 4
     v = m.Data.mapped(ch, idx : idx + win(end));
 
     % L2 norm (euclidean distance)
-    for j = 1 : length(ch)
-        nv = double(v(j, :));
-        nv = nv / norm(nv);
-        snips(j, :, i) = detrend(nv);
+    if dtrend
+        for j = 1 : length(ch)
+            nv = double(v(j, :));
+            nv = nv / norm(nv);
+            snips(j, :, i) = detrend(nv);
+        end
     end
-    
 %     figure
 %     plot(snip(j, :, i))
 %     yyaxis right
