@@ -1,9 +1,9 @@
-function datInfo = preprocDat(varargin)
+function datInfo = getSnippetsFromDat(varargin)
 
-% pre-process dat files. copies or concatenates to new destination. if no
-% new desitation specified than creates backup and works on the new file.
-% removes dc, removes pli, remaps and/or removes channels, handles
-% acceleration, creates info file based on xml.
+% maps dat file to memory and snips segments sorrounding specific
+% samples. user defines the window length sorrounding each snippet (does
+% not have to be semitrical) and can arrange the output according to
+% channel groups
 %
 % INPUT:
 %   datpath     string. path to .dat file (not including dat file itself)
