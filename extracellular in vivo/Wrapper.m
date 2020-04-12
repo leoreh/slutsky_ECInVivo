@@ -4,7 +4,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 1: file conversion
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = '/media/leore/Samsung_T5/Data/Dat/lh49/lh49_200325/';
+basepath = 'E:\Data\Dat\lh50\2020-04-02_17-11-26';
 store = 'Raw1';
 fs = 24414.06;
 blocks = [5, 10];
@@ -23,7 +23,10 @@ clip = cell(1, 1);
 % STEP 1b: open ephys
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 basepath = 'E:\Data\Dat\lh50\2020-04-02_17-11-26';
-preprocOE('basepath', basepath, 'exp', [2])
+rmvch = [18 : 21];
+mapch = [25 26 27 28 30 1 2 29 3 : 14 31 0 15 16 17 : 24 32 33 34] + 1;
+preprocOE('basepath', basepath, 'exp', [2], 'rmvch', rmvch,...
+    'mapch', mapch, 'concat', true, 'nchans', 35)
 
 % snip stim
 

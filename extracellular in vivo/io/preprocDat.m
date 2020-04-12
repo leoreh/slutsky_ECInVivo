@@ -14,8 +14,9 @@ function datInfo = preprocDat(varargin)
 %               for 35 channels in int16, 5e6 samples = 350 MB.
 %   bkup        logical. save original file (true) or not {false}
 %   nchans      numeric. original number of channels in dat file {35}.
-%   mapch       vec. new order of channels {[]}.
-%   rmvch       vec. channels to remove (according to original order) {[]}
+%   mapch       vec. new order of channels {[]}. 1-based.
+%   rmvch       vec. channels to remove (according to original order) {[]}.
+%               1-based.
 %   pli         numeric. channel from which to extract line crossings.
 %               if 0 will not remove pli. 
 %   precision   char. sample precision {'int16'} 

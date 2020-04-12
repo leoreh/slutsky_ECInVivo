@@ -63,67 +63,50 @@ saveVar = p.Results.saveVar;
 % data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% load stim
-[info, stim] = tdt2dat('basepath', basepath, 'store', 'Stim',...
-    'blocks', blocks, 'chunksize', [], 'mapch', [], 'rmvch', [],...
-    'clip', clip, 'saveVar', false);
+datpath = 'E:\Data\Dat\lh50\lh50_200402\190448_e2r1-7';
 
-% load lfp
-% [info, raw] = tdt2dat('basepath', basepath, 'store', 'Raw1',...
-%     'blocks', blocks, 'chunksize', [], 'mapch', mapch, 'rmvch', [],...
-%     'clip', clip, 'saveVar', false);
-
-% workaround for f***ing tdt
-blockfiles = dir('block*');
-blocknames = {blockfiles.name};
-blocknames = natsort(blocknames);
-stim = [];
-raw = [];
-for i = 1 : length(blocks)
-    blockpath = fullfile(basepath, blocknames{blocks(i)});
-    store = 'Raw1';
-    dat = TDTbin2mat(blockpath, 'TYPE', {'streams'}, 'STORE', store,...
-        'T1', 0, 'T2', 0);
-    dat = dat.streams.(store).data;
-    store = 'Stim';
-    s = TDTbin2mat(blockpath, 'TYPE', {'streams'}, 'STORE', store,...
-        'T1', 0, 'T2', 0);
-    s = s.streams.(store).data;
-    
-    d = length(s) - length(dat);
-    if d ~= 0
-        warning('length stim and raw not equal')
-        if d > 0
-            s(end : -1 : end - d + 1) = [];
-        else
-            dat(:, end : -1 : end - abs(d) + 1) = [];
+% make sure dat and stim files exist
+datfiles = dir([datpath filesep '**' filesep '*dat']);
+if isempty(datfiles)
+    error('no .dat files found in %s', datpath)
+end
+if isempty(datName)
+    if length(datfiles) == 1
+        datname = datfiles.name;
+    else
+        datname = [bz_BasenameFromBasepath(datpath) '.dat'];
+        if ~contains({datfiles.name}, datname)
+            error('please specify which dat file to process')
         end
     end
-    stim = [stim, s];
-    raw = [raw, dat];
+end
+[~, basename, ~] = fileparts(datname);
+stimname = [basename '.din.mat'];
+
+if exist(stimname) 
+    fprintf('\n loading %s \n', stimname)
+    load(stimname)
+else
+    error('%s not found', stimname)
 end
 
-% find stim onset from diff
-stimidx = find(diff(stim) > max(diff(stim)) / 2);
-% convert stim onset times to new fs
-stimidx = round(stimidx / info.fs * fs);
+stamps = din.data;
+nchans = 31;
+ch = 21 : 23;
+win = [-4000 3999];
 
-% resample
-[p, q] = rat(fs / info.fs);
-n = 5; beta = 20;
-for i = 1 : size(raw, 1)        % only way to handle large arrays
-    draw(i, :) = [resample(double(raw(i, :))', p, q, n, beta)]';
+snips = snipFromDat('datpath', datpath, 'fname', datname,...
+    'stamps', stamps, 'win', win, 'nchans', nchans, 'ch', ch,...
+    'dtrend', false, 'saveVar', false);
+
+for i = 1 : size(snips, 3)
+    figure
+    plot(snips(1, :, i))
 end
-clear raw
 
-% remove dc, average and convert to mV
-draw = [rmDC(draw')]';
-draw = mean(draw(ch, :)) / 1000;
-
-% clip fepsp
-for i = 1 : length(stimidx)
-    fepsp(i, :) = draw(stimidx(i) : stimidx(i) + fdur * fs);
-end
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% calc
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % calc amp and arrange in matrix according to blocks
 stimidx = stimidx / fs;

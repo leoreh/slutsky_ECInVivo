@@ -91,6 +91,12 @@ for i = 1 : length(jsonFiles)
     % play with data
     data = [data; mDin.Timestamps(mDin.Data > 0)];
     
+%     for i = 1 : length(data)
+%     idx = find(mDat.Timestamps == data(i));
+%     v = mDat.Data.Data.mapped(14, idx - 4000 : idx + 4000);
+%     figure; plot(v)
+%     end
+%     
     % get nsamps of recording from corresponding .dat file
     nsamps(i) = datFiles(i).bytes / nbytes / nchans; 
     nsamps(i) = mDat.Timestamps(end);

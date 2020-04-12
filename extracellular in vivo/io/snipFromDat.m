@@ -12,11 +12,15 @@ function snips = snipFromDat(varargin)
 %               exists in datpath or if fname can be extracted from datpath
 %   stamps      vec. pointers to dat files from which snipping will occur
 %               [samples].
-%   win         vec.  
+%   win         vec of 2 elements. determines length of snip. for example,
+%               win = [5 405] than each snip will be 401 samples, starting
+%               5 samples after the corresponding stamp and ending 405
+%               samples after stamp. if win = [-16 16] than snip will be of
+%               33 samples symmetrically centered around stamp.
 %   nchans      numeric. number of channels in dat file {35}
-%   precision   char. sample precision of dat file {'int16'}
 %   ch          vec. channels to load from dat file {[]}. if empty than all will
 %               be loaded
+%   precision   char. sample precision of dat file {'int16'}
 %   dtrend      logical. detrend and L2 normalize snippets {false}.
 %   saveVar     logical. save snips {true} or not (false).
 %
@@ -24,42 +28,38 @@ function snips = snipFromDat(varargin)
 %   snips       matrix of ch x sampels x stamps. if detrend is false than
 %               will be same precision as dat file. if true than will be
 %               double. 
-%
+% 
 % CALLS:
 %   class2bytes
 %
 % TO DO LIST:
-%   re
+%   understand the porpuse of L2 normalization
 %
 % 10 apr 20 LH
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-tic;
-
 p = inputParser;
 addOptional(p, 'datpath', pwd);
 addOptional(p, 'fname', '', @ischar);
-addOptional(p, 'chunksize', 5e6, @isnumeric);
-addOptional(p, 'precision', 'int16', @ischar);
+addOptional(p, 'stamps', [], @isnumeric);
+addOptional(p, 'win', [-16 16], @isnumeric);
 addOptional(p, 'nchans', 35, @isnumeric);
-addOptional(p, 'mapch', [], @isnumeric);
-addOptional(p, 'rmvch', [], @isnumeric);
-addOptional(p, 'pli', 0, @isnumeric);
-addOptional(p, 'bkup', false, @islogical);
+addOptional(p, 'ch', [], @isnumeric);
+addOptional(p, 'precision', 'int16', @ischar);
+addOptional(p, 'dtrend', false, @islogical);
 addOptional(p, 'saveVar', true, @islogical);
 
 parse(p, varargin{:})
 datpath = p.Results.datpath;
 fname = p.Results.fname;
-chunksize = p.Results.chunksize;
-precision = p.Results.precision;
+stamps = p.Results.stamps;
+win = p.Results.win;
 nchans = p.Results.nchans;
-mapch = p.Results.mapch;
-rmvch = p.Results.rmvch;
-pli = p.Results.pli;
-bkup = p.Results.bkup;
+ch = p.Results.ch;
+precision = p.Results.precision;
+dtrend = p.Results.dtrend;
 saveVar = p.Results.saveVar;
 
 % size of one data point in bytes
@@ -85,55 +85,40 @@ if isempty(fname)
         end
     end
 end
-[~, basename, ~] = fileparts(fname);
-
-info = dir(fname);
-nsamps = info.bytes / nbytes / nchans;
-
-datpath = 'E:\Data\Dat\lh50\lh50_200402\190448_e2r1-7';
-nchans = 35;
-ch = 1 : 4;
-stamps = din.data
-win = [1 : 0.002 * 20000];
-
-nsamps = length(win) + 1;
-nsnips = length(stamps);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % snip
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % memory map to dat file
+info = dir(fname);
+nsamps = info.bytes / nbytes / nchans;
 m = memmapfile(fname, 'Format', {precision, [nchans, nsamps] 'mapped'});
 
-idx = stamps(i) + 3020;
+% initialize
+sniplength = diff(win) + 1;
+nsnips = length(stamps);
+snips = zeros(length(ch), sniplength, nsnips);
 
 % go over stamps and snip data
-snips = zeros(length(ch), nsamps, nsnips);
-for i = 1 : length(stamps) / 4
-    v = m.Data.mapped(ch, stamps(i) : stamps(i) + win(end));
-    
-    
-    v = m.Data.mapped(ch, idx : idx + win(end));
-
-    % L2 norm (euclidean distance)
-    if dtrend
-        for j = 1 : length(ch)
-            nv = double(v(j, :));
-            nv = nv / norm(nv);
-            snips(j, :, i) = detrend(nv);
-        end
+for i = 1 : length(stamps)
+    if stamps(i) + win(1) < 1 || stamps(i) + win(2) > nsamps
+        warning('skipping stamp %d because snip incomplete', i)
+        snips(:, :, i) = nan(length(ch), sniplength);
+        continue
     end
-%     figure
-%     plot(snip(j, :, i))
-%     yyaxis right
-%     plot(v(j, :))
-%     legend('detrend', 'raw')
+    v = m.Data.mapped(ch, stamps(i) + win(1) : stamps(i) + win(2));
+     
+    % L2 normalize and detrend
+    if dtrend
+        v = double(v) ./ vecnorm(double(v), 2, 2);
+        v = [detrend(v')]';
+    end
+    snips(:, :, i) = v;
 end
 
 clear m
 
 end
-
 
 % EOF
