@@ -6,9 +6,9 @@ function datInfo = preprocDat(varargin)
 % acceleration, creates info file based on xml.
 %
 % INPUT:
-%   datpath     string. path to .dat file (not including dat file itself)
+%   basepath    string. path to .dat file (not including dat file itself)
 %   fname       string. name of dat file. if empty and more than one dat in
-%               path, will be extracted from datpath
+%               path, will be extracted from basepath
 %   chunksize   size of data to load at once [samples]{5e6}. 
 %               if empty will load entire file (be careful!).
 %               for 35 channels in int16, 5e6 samples = 350 MB.
@@ -45,7 +45,7 @@ function datInfo = preprocDat(varargin)
 tic;
 
 p = inputParser;
-addOptional(p, 'datpath', pwd);
+addOptional(p, 'basepath', pwd);
 addOptional(p, 'fname', '', @ischar);
 addOptional(p, 'chunksize', 5e6, @isnumeric);
 addOptional(p, 'precision', 'int16', @ischar);
@@ -57,7 +57,7 @@ addOptional(p, 'bkup', false, @islogical);
 addOptional(p, 'saveVar', true, @islogical);
 
 parse(p, varargin{:})
-datpath = p.Results.datpath;
+basepath = p.Results.basepath;
 fname = p.Results.fname;
 chunksize = p.Results.chunksize;
 precision = p.Results.precision;
@@ -76,16 +76,16 @@ nbytes = class2bytes(precision);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % handle dat file
-cd(datpath)
-datFiles = dir([datpath filesep '**' filesep '*dat']);
+cd(basepath)
+datFiles = dir([basepath filesep '**' filesep '*dat']);
 if isempty(datFiles)
-    error('no .dat files found in %s', datpath)
+    error('no .dat files found in %s', basepath)
 end
 if isempty(fname)
     if length(datFiles) == 1
         fname = datFiles.name;
     else
-        fname = [bz_BasenameFromBasepath(datpath) '.dat'];
+        fname = [bz_BasenameFromBasepath(basepath) '.dat'];
         if ~contains({datFiles.name}, fname)
             error('please specify which dat file to process')
         end
@@ -95,7 +95,7 @@ end
 tempname = [basename '.tmp.dat'];
 
 % rearrange mapch according to rmvch
-datInfo.origCh = mapch;
+datInfo.mapch = mapch;
 if ~isempty(mapch)
     mapch = mapch(~ismember(mapch, rmvch));
     nch = length(mapch);
@@ -193,14 +193,20 @@ fprintf('\nfinished processing %s. \nFile size = %.2f MB\n', fname, info.bytes /
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arrange datInfo and save
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+infoname = fullfile(basepath, [basename, '.datInfo.mat']);
+if exist(infoname, 'file')
+    load(infoname)
+end
+
+datInfo.rmvCh = rmvch;
+datInfo.pli = pli;
 datInfo.dc = mean(dc, 1);
+
 if saveVar
-    save(fullfile(newpath, 'datInfo.mat', 'datInfo'));
+    save(infoname, 'datInfo');
 end
 
 toc
 end
-% info = dir(newname);
-
 
 % EOF

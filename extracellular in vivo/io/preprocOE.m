@@ -102,25 +102,25 @@ for i = exp
         mkdir(expPathNew)        
         fprintf('created %s\n', expPathNew)
         
-        catDat('datpath', expPath, 'newpath', expPathNew,...
-            'concat', true, 'nchans', 35, 'saveVar', false);       
-        preprocDat('datpath', expPathNew, 'fname', '', 'mapch', mapch,...
-            'rmvch', rmvch, 'nchans', 35, 'saveVar', false,...
-            'chunksize', 5e6, 'precision', 'int16', 'bkup', true);
+        catDat('basepath', expPath, 'newpath', expPathNew,...
+            'concat', true, 'nchans', 35, 'saveVar', true);       
+        preprocDat('basepath', expPathNew, 'fname', '', 'mapch', mapch,...
+            'rmvch', rmvch, 'nchans', 35, 'saveVar', true,...
+            'chunksize', 5e6, 'precision', 'int16', 'bkup', false);
         getDinOE('datpath', expPath, 'newpath', expPathNew,...
             'concat', true, 'nchans', 35, 'nbytes', 2,...
             'saveVar', true);
     else
-        for j = 1 : length(recFolders)
-            % make new dir
-            expName = sprintf(' %s_e%s_r%s', expTime, expIdx, recIdx(j));
-            expPathNew = fullfile(newpath, expName);
-            mkdir(expPathNew)
-            % get dat
-            recPath = fullfile(recFolders(j).folder, recFolders(j).name);
-            preprocDat('basepath', recPath, 'newpath', expPathNew, 'concat', false)
-            % Din
-        end
+%         for j = 1 : length(recFolders)
+%             % make new dir
+%             expName = sprintf(' %s_e%s_r%s', expTime, expIdx, recIdx(j));
+%             expPathNew = fullfile(newpath, expName);
+%             mkdir(expPathNew)
+%             % get dat
+%             recPath = fullfile(recFolders(j).folder, recFolders(j).name);
+%             preprocDat('basepath', recPath, 'newpath', expPathNew, 'concat', false)
+%             % Din
+%         end
     end
 end
 

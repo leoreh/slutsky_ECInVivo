@@ -1,13 +1,15 @@
 function datInfo = catDat(varargin)
 
-% concatenates all .dat files in basepath. can also be used to copy a
-% datfile from basepath to newpath.
+% concatenates all .dat files in basepath via system commands (copy for
+% windows). can also be used to copy a dat file from basepath to newpath.
+% also concatenates timestamps.npy files (open ephys; assuming there is one
+% file in each dat folder) and saves them within datInfo
 %
 % INPUT:
-%   datpath     string. path to .dat files {pwd}. 
+%   basepath    string. path to .dat files {pwd}. 
 %               if multiple dat files exist than concat must be true
 %   newpath     string. path where new file should be save. if empty than
-%               new file will be save in datpath
+%               new file will be save in basepath
 %   newname     string. name of new file. if empty will be extracted from
 %               newpath. in newpath not specified will be named as original
 %               file with the extension '_new'
@@ -25,10 +27,9 @@ function datInfo = catDat(varargin)
 %   datInfo
 %
 % TO DO LIST:
-%   handle multiple dats with copy only (no concatenate)
-%   remove abbarent samples if exist
-%   check if works on linux
-%   conversion ot mV
+%   # handle multiple dats with copy only (no concatenate)
+%   # remove abbarent samples if exist
+%   # adapt for linux
 %
 % 09 apr 20 LH      
 
@@ -39,7 +40,7 @@ function datInfo = catDat(varargin)
 tic;
 
 p = inputParser;
-addOptional(p, 'datpath', pwd);
+addOptional(p, 'basepath', pwd);
 addOptional(p, 'newpath', '', @ischar);
 addOptional(p, 'newname', '', @ischar);
 addOptional(p, 'concat', true, @islogical);
@@ -48,7 +49,7 @@ addOptional(p, 'nchans', 35, @isnumeric);
 addOptional(p, 'saveVar', true, @islogical);
 
 parse(p, varargin{:})
-datpath = p.Results.datpath;
+basepath = p.Results.basepath;
 newpath = p.Results.newpath;
 newname = p.Results.newname;
 concat = p.Results.concat;
@@ -63,11 +64,11 @@ nbytes = class2bytes(precision);
 % arrange files and concatenate
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% get .dat files in datpath and check their integrity
-datFiles = dir([datpath filesep '**' filesep '*dat']);
+% get .dat files in basepath and check their integrity
+datFiles = dir([basepath filesep '**' filesep '*dat']);
 if length(datFiles) > 1 && ~concat
     error(['multiple dat files found in %s\n',...
-        'function cannot handle multiple files without concatination'], datPath)
+        'function cannot handle multiple files without concatination'], basepath)
 end
 for i = 1 : length(datFiles)
     source{i} = fullfile(datFiles(i).folder, datFiles(i).name);
@@ -79,20 +80,22 @@ end
 
 % handle names for new path and new file
 if isempty(newpath)
-    newpath = datpath;
+    newpath = basepath;
 end
 if isempty(newname)
     if ~isempty(newpath)
-        newname = [bz_BasenameFromBasepath(newpath) '.dat'];
+        basename = bz_BasenameFromBasepath(newpath);
+        newname = [basename '.dat'];
     else
-        [~, newname] = fileparts(datFiles(1).name);
-        newname = [newname 'new.dat'];
+        [~, basename] = fileparts(datFiles(1).name);
+        newname = [basename '.new.dat'];
     end
 else
     if ~contains(newname, '.dat')
         newname = [newname '.dat'];
     end
 end
+
 destination = fullfile(newpath, newname);
  
 % do the copy / concat
@@ -109,10 +112,41 @@ end
 fprintf('\ncreated %s. \nFile size = %.2f MB\n', newname, info.bytes / 1e6);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% concat timestamps
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+tFiles = dir([basepath filesep '**' filesep '*timestamps.npy']);
+tstamps = [];
+for i = 1 : length(datFiles)
+    idx = find(strcmp({tFiles.folder}, datFiles(i).folder));
+    if length(idx) > 1
+        warning(['more than one timestamps.npy found in %s\n',...
+            'skipping tstamps concatination'], basepath)
+        break
+    elseif length(idx) < 1
+        warning(['timestamps.npy not found in %s\n',...
+            'skipping tstamps concatination'], basepath)
+        break
+    else
+        tstamps = [tstamps;...
+            readNPY(fullfile(tFiles(idx).folder, tFiles(idx).name))];
+        datInfo.tstamps = tstamps; 
+    end
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arrange datInfo and save
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+infoname = fullfile(newpath, [basename, '.datInfo.mat']);
+if exist(infoname, 'file')
+    load(infoname)
+end
+
+datInfo.origFile = source;
+datInfo.origSizeInSamps = nsamps;
+
 if saveVar
-    save(fullfile(newpath, 'datInfo.mat', 'datInfo'));
+    save(infoname, 'datInfo');
 end
 
 end

@@ -70,7 +70,7 @@ datfiles = dir([datpath filesep '**' filesep '*dat']);
 if isempty(datfiles)
     error('no .dat files found in %s', datpath)
 end
-if isempty(datName)
+if isempty(datname)
     if length(datfiles) == 1
         datname = datfiles.name;
     else
