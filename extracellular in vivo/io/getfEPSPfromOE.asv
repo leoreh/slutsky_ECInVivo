@@ -53,11 +53,12 @@ basepath = p.Results.basepath;
 fname = p.Results.fname;
 nchans = p.Results.nchans;
 ch = p.Results.ch;
-win = p.Results.win;
 precision = p.Results.precision;
-fs = p.Results.fs;
-force = p.Results.force;
-concat = p.Results.concat;
+clip = p.Results.clip;
+mapch = p.Results.mapch;
+rmvch = p.Results.rmvch;
+pli = p.Results.pli;
+bkup = p.Results.bkup;
 saveVar = p.Results.saveVar;
 
 
@@ -76,17 +77,17 @@ datfiles = dir([basepath filesep '**' filesep '*dat']);
 if isempty(datfiles)
     error('no .dat files found in %s', basepath)
 end
-if isempty(fname)
+if isempty(datname)
     if length(datfiles) == 1
-        fname= datfiles.name;
+        datname = datfiles.name;
     else
-        fname= [bz_BasenameFromBasepath(basepath) '.dat'];
-        if ~contains({datfiles.name}, fname)
+        datname = [bz_BasenameFromBasepath(basepath) '.dat'];
+        if ~contains({datfiles.name}, datname)
             error('please specify which dat file to process')
         end
     end
 end
-[~, basename, ~] = fileparts(fname);
+[~, basename, ~] = fileparts(datname);
 
 % load digital input
 stimname = fullfile(basepath, [basename, '.din.mat']);
@@ -114,11 +115,11 @@ for i = 1 : length(din.data)
 end
 
 % snip
-snips = snipFromDat('basepath', basepath, 'fname', fname,...
+snips = snipFromDat('basepath', basepath, 'fname', datname,...
     'stamps', stamps, 'win', win, 'nchans', nchans, 'ch', ch,...
-    'dtrend', false, 'saveVar', false, 'precision', precision);
+    'dtrend', false, 'saveVar', false);
 
-nfiles = length(datInfo.origFile);
+nfiles = length(datInfo.nsamps);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % calc
@@ -142,29 +143,34 @@ for i = 1 : nfiles
     stimcell{i} = stamps(stimidx{i});
 end
 
-% if concat
-%     amp = [];
-%     for i = 1 : length(blocks)
-%         amp = [amp; ampcell{i}];
-%     end
-% else
-%     mat = cellfun(@(x)[x(:); NaN(maxstim - length(x), 1)], ampcell,...
-%         'UniformOutput', false);
-%     amp = cell2mat(mat);
-%     mat = cellfun(@(x)[x(:); NaN(maxstim - length(x), 1)], stimcell,...
-%         'UniformOutput', false);
-%     stimidx = cell2mat(mat);
-% end
+if concat
+    amp = [];
+    for i = 1 : length(blocks)
+        amp = [amp; ampcell{i}];
+    end
+else
+    mat = cellfun(@(x)[x(:); NaN(maxstim - length(x), 1)], ampcell,...
+        'UniformOutput', false);
+    amp = cell2mat(mat);
+    mat = cellfun(@(x)[x(:); NaN(maxstim - length(x), 1)], stimcell,...
+        'UniformOutput', false);
+    stimidx = cell2mat(mat);
+end
 
 % arrange struct
 fepsp.wv = wv;
-fepsp.wvavg = wvavg;
+fepsp.wvavg = wvavg';
 fepsp.stim = stimidx;
-% fepsp.t = 0 : 1 / fs : fdur;
-% fepsp.amp = amp;
-% fepsp.fs = fs;
-% fepsp.fs_orig = info.fs;
+fepsp.t = 0 : 1 / fs : fdur;
+fepsp.amp = amp;
+fepsp.fs = fs;
+fepsp.fs_orig = info.fs;
+fepsp.blocks = blocks;
+fepsp.blockduration = info.blockduration;
+fepsp.blockidx = stimidx;
+fepsp.mapch = mapch;
 fepsp.ch = ch;
+fepsp.clip = clip;
 
 % save variable
 savename = fullfile(basepath, [basename, '.fepsp.mat']);

@@ -67,7 +67,7 @@ nbytes = class2bytes(precision);
 tstamps = [];
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% arrange files and concatenate
+% arrange files
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % get .dat and .npy files in basepath
@@ -97,17 +97,15 @@ for i = 1 : length(datFiles)
         break
     else
         t = readNPY(fullfile(tFiles(idx).folder, tFiles(idx).name));        
-        tstamps = [tstamps; t];
+        datInfo.tstamps = [tstamps; t];
         
-        % fix bug in OE binary format
-        if length(t) < nsamps(i)
-            warning(['more samples than timestamps in %s\n'...
-                'initializing valTstampsOE'], source{i}) 
-            valTstampsOE('basepath', tFiles(idx).folder, 'precision', precision,...
-                'chunksize', 1e6, 'bkup', true, 'saveVar', true,...
-                'nchans', nchans)
+        if length(t) < nsamps(i))
+            warning('more samples than timestamps, initializing valTstampsOE') 
+            valTstampsOE('basepath', basepath, 'precision', precision,...
+                'chunksize', 1e6, 'bkup', true, 'saveV
             nsamps(i) = length(t);
         end
+
     end
 end
 
@@ -129,6 +127,7 @@ else
         newname = [newname '.dat'];
     end
 end
+
 destination = fullfile(newpath, newname);
 
 % do the copy / concat
@@ -145,6 +144,28 @@ end
 fprintf('\ncreated %s. \nFile size = %.2f MB\n', newname, info.bytes / 1e6);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% concat timestamps
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+tFiles = dir([basepath filesep '**' filesep '*timestamps.npy']);
+tstamps = [];
+for i = 1 : length(datFiles)
+    idx = find(strcmp({tFiles.folder}, datFiles(i).folder));
+    if length(idx) > 1
+        warning(['more than one timestamps.npy found in %s\n',...
+            'skipping tstamps concatination'], basepath)
+        break
+    elseif length(idx) < 1
+        warning(['timestamps.npy not found in %s\n',...
+            'skipping tstamps concatination'], basepath)
+        break
+    else
+        t = readNPY(fullfile(tFiles(idx).folder, tFiles(idx).name));
+        datInfo.tstamps = [tstamps; t];
+    end
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arrange datInfo and save
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 infoname = fullfile(newpath, [basename, '.datInfo.mat']);
@@ -152,9 +173,8 @@ if exist(infoname, 'file')
     load(infoname)
 end
 
-datInfo.tstamps = tstamps;
 datInfo.origFile = source;
-datInfo.nsamps = nsamps;
+datInfo.origSizeInSamps = nsamps;
 
 if saveVar
     save(infoname, 'datInfo');

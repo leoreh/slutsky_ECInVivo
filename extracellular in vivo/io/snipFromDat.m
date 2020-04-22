@@ -6,10 +6,10 @@ function snips = snipFromDat(varargin)
 % channel groups
 %
 % INPUT:
-%   datpath     string. path to .dat file (not including dat file itself)
+%   basepath    string. path to .dat file (not including dat file itself)
 %               {pwd}.
 %   fname       string. name of dat file. can be empty if only one dat file
-%               exists in datpath or if fname can be extracted from datpath
+%               exists in basepath or if fname can be extracted from basepath
 %   stamps      vec. pointers to dat files from which snipping will occur
 %               [samples].
 %   win         vec of 2 elements. determines length of snip. for example,
@@ -22,7 +22,6 @@ function snips = snipFromDat(varargin)
 %               be loaded
 %   precision   char. sample precision of dat file {'int16'}
 %   dtrend      logical. detrend and L2 normalize snippets {false}.
-%   saveVar     logical. save snips {true} or not (false).
 %
 % OUTPUT
 %   snips       matrix of ch x sampels x stamps. if detrend is false than
@@ -33,7 +32,6 @@ function snips = snipFromDat(varargin)
 %   class2bytes
 %
 % TO DO LIST:
-%   understand the porpuse of L2 normalization
 %
 % 10 apr 20 LH
 
@@ -41,7 +39,7 @@ function snips = snipFromDat(varargin)
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 p = inputParser;
-addOptional(p, 'datpath', pwd);
+addOptional(p, 'basepath', pwd);
 addOptional(p, 'fname', '', @ischar);
 addOptional(p, 'stamps', [], @isnumeric);
 addOptional(p, 'win', [-16 16], @isnumeric);
@@ -52,7 +50,7 @@ addOptional(p, 'dtrend', false, @islogical);
 addOptional(p, 'saveVar', true, @islogical);
 
 parse(p, varargin{:})
-datpath = p.Results.datpath;
+basepath = p.Results.basepath;
 fname = p.Results.fname;
 stamps = p.Results.stamps;
 win = p.Results.win;
@@ -60,7 +58,10 @@ nchans = p.Results.nchans;
 ch = p.Results.ch;
 precision = p.Results.precision;
 dtrend = p.Results.dtrend;
-saveVar = p.Results.saveVar;
+
+if isempty(ch)
+    ch = 1 : nchans;
+end
 
 % size of one data point in bytes
 nbytes = class2bytes(precision);
@@ -70,16 +71,16 @@ nbytes = class2bytes(precision);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % handle dat file
-cd(datpath)
-datFiles = dir([datpath filesep '**' filesep '*dat']);
+cd(basepath)
+datFiles = dir([basepath filesep '**' filesep '*dat']);
 if isempty(datFiles)
-    error('no .dat files found in %s', datpath)
+    error('no .dat files found in %s', basepath)
 end
 if isempty(fname)
     if length(datFiles) == 1
         fname = datFiles.name;
     else
-        fname = [bz_BasenameFromBasepath(datpath) '.dat'];
+        fname = [bz_BasenameFromBasepath(basepath) '.dat'];
         if ~contains({datFiles.name}, fname)
             error('please specify which dat file to process')
         end

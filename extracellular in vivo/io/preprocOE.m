@@ -18,6 +18,7 @@ function preprocOE(varargin)
 %
 % TO DO LIST:
 %   enable concatenation of experiments (not only recordings)
+%   add option to select specific recordings in experiments
 %
 % 09 apr 20 LH      
 
@@ -74,7 +75,7 @@ for i = exp
     fprintf('working on experiment %d\n', i)
     
     % exp path and number
-    expPath = fullfile(expFolders(i).folder, expFolders(i).name);
+    exPath = fullfile(expFolders(i).folder, expFolders(i).name);
     expIdx = char(regexp(expFolders(i).name, [filesep 'd*'], 'Match'));
     
     % get time from xml file
@@ -88,7 +89,7 @@ for i = exp
     
     % get recording folders in each experiment 
     recFolders = files(contains({files.name}, 'recording') &...
-        strcmp({files.folder}, expPath));
+        strcmp({files.folder}, exPath));
     recIdx = [];
     for j = 1 : length(recFolders)
             recIdx(j) = str2num(char((regexp(recFolders(j).name, [filesep 'd*'], 'Match'))));
@@ -98,27 +99,27 @@ for i = exp
     
     if concat
         expName = sprintf('%s_e%sr%d-%d', expTime, expIdx, recIdx(1), recIdx(end));
-        expPathNew = fullfile(newpath, expName);
-        mkdir(expPathNew)        
-        fprintf('created %s\n', expPathNew)
+        exPathNew = fullfile(newpath, expName);
+        mkdir(exPathNew)        
+        fprintf('created %s\n', exPathNew)
         
-        catDat('basepath', expPath, 'newpath', expPathNew,...
+        catDat('basepath', exPath, 'newpath', exPathNew,...
             'concat', true, 'nchans', 35, 'saveVar', true);       
-        preprocDat('basepath', expPathNew, 'fname', '', 'mapch', mapch,...
+        preprocDat('basepath', exPathNew, 'fname', '', 'mapch', mapch,...
             'rmvch', rmvch, 'nchans', 35, 'saveVar', true,...
             'chunksize', 5e6, 'precision', 'int16', 'bkup', false);
-        getDinOE('datpath', expPath, 'newpath', expPathNew,...
+        getDinOE('datpath', exPath, 'newpath', exPathNew,...
             'concat', true, 'nchans', 35, 'nbytes', 2,...
             'saveVar', true);
     else
 %         for j = 1 : length(recFolders)
 %             % make new dir
 %             expName = sprintf(' %s_e%s_r%s', expTime, expIdx, recIdx(j));
-%             expPathNew = fullfile(newpath, expName);
-%             mkdir(expPathNew)
+%             exPathNew = fullfile(newpath, expName);
+%             mkdir(exPathNew)
 %             % get dat
 %             recPath = fullfile(recFolders(j).folder, recFolders(j).name);
-%             preprocDat('basepath', recPath, 'newpath', expPathNew, 'concat', false)
+%             preprocDat('basepath', recPath, 'newpath', exPathNew, 'concat', false)
 %             % Din
 %         end
     end

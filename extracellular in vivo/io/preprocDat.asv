@@ -3,7 +3,7 @@ function datInfo = preprocDat(varargin)
 % pre-process dat files. copies or concatenates to new destination. if no
 % new desitation specified than creates backup and works on the new file.
 % removes dc, removes pli, remaps and/or removes channels, handles
-% acceleration, removes specified samples, creates info file.
+% acceleration, creates info file based on xml.
 %
 % INPUT:
 %   basepath    string. path to .dat file (not including dat file itself)
@@ -13,9 +13,6 @@ function datInfo = preprocDat(varargin)
 %               if empty will load entire file (be careful!).
 %               for 35 channels in int16, 5e6 samples = 350 MB.
 %   bkup        logical. save original file (true) or not {false}
-%   clip        mat n x 2 indicating samples to diregard from chunks.
-%               for example: clip = [0 50; 700 Inf] will remove the first
-%               50 samples and all samples between 700 and n
 %   nchans      numeric. original number of channels in dat file {35}.
 %   mapch       vec. new order of channels {[]}. 1-based.
 %   rmvch       vec. channels to remove (according to original order) {[]}.
@@ -31,9 +28,9 @@ function datInfo = preprocDat(varargin)
 % CALLS:
 %   bz_BasenameFromBasepath
 %   class2bytes
-%   n2chunks
 %
 % TO DO LIST:
+%   remove abbarent samples if exist
 %   check if works on linux
 %   conversion ot mV
 %   handle xml
@@ -53,7 +50,6 @@ addOptional(p, 'fname', '', @ischar);
 addOptional(p, 'chunksize', 5e6, @isnumeric);
 addOptional(p, 'precision', 'int16', @ischar);
 addOptional(p, 'nchans', 35, @isnumeric);
-addOptional(p, 'clip', [], @isnumeric);
 addOptional(p, 'mapch', [], @isnumeric);
 addOptional(p, 'rmvch', [], @isnumeric);
 addOptional(p, 'pli', 0, @isnumeric);
@@ -66,7 +62,6 @@ fname = p.Results.fname;
 chunksize = p.Results.chunksize;
 precision = p.Results.precision;
 nchans = p.Results.nchans;
-clip = p.Results.clip;
 mapch = p.Results.mapch;
 rmvch = p.Results.rmvch;
 pli = p.Results.pli;
@@ -115,14 +110,22 @@ end
 % partition into chunks
 info = dir(fname);
 nsamps = info.bytes / nbytes / nchans;
-chunks = n2chunks('n', nsamps, 'chunksize', chunksize, 'clip', clip);
+if isempty(chunksize)       % load entire file
+    nchunks = 1;
+    chunks = [1 nsamps * nchans];
+else                        % load file in chunks
+    nchunks = ceil(nsamps / (chunksize / nchans));
+    chunks = [1 : chunksize : chunksize * nchunks;...
+        chunksize : chunksize : chunksize * nchunks]';
+    chunks(nchunks, 2) = nsamps * nchans;
+end
+
+chunks = numel2chunks('n', n, 'chunksize', chunksize, 'clip', clip);
 nchunks = size(chunks, 1);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % go over chunks and process
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-fprintf('\n\npreprocessing %s\n', fname)
 
 % open bkup dat file
 fid = fopen(tempname, 'w');
@@ -131,12 +134,13 @@ if(fid == -1)
 end
 
 % memory map to original file
-m = memmapfile(fname, 'Format', {'int16' [nchans nsamps] 'mapped'});
+m = memmapfile(fname, 'Format', precision);
 
 % go over chunks
 for i = 1 : nchunks
     fprintf('working on chunk %d / %d\n', i, nchunks)
-    d = m.data.mapped(:, chunks(i, 1) : chunks(i, 2));
+    bsize = (diff(chunks(i, :)) + 1) / nchans;
+    d = reshape(m.data(chunks(i, 1) : chunks(i, 2)), [nchans bsize]);
        
     % remove channels
     if ~isempty(rmvch)                     
@@ -171,7 +175,7 @@ end
 % close file and map
 clear m
 rc = fclose(fid);
-fclose('all');
+fclose('all')
 if rc == -1
     error('cannot save new file');
 end

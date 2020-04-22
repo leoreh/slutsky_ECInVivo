@@ -1,9 +1,16 @@
-function datInfo = preprocDat(varargin)
+function datInfo = valTstampsOE(varargin)
 
-% pre-process dat files. copies or concatenates to new destination. if no
-% new desitation specified than creates backup and works on the new file.
-% removes dc, removes pli, remaps and/or removes channels, handles
-% acceleration, removes specified samples, creates info file.
+% fix for bug in open ephys binary format. description of problem: the
+% first recording in most (but not all) experiments have more data points
+% than timestamps. This is true for continuous but not event streams. The
+% excess data points appear on all channels (including auxiliary) and their
+% value is zero. Thus, it looks as if the data is zero-padded. The number
+% of zeros varies between experiments, from 241 to 139249, and they always
+% occur within the first second of the recording (zeroPaddingData.pdf). To
+% clarify, as far as I could tell this only occurs after I start
+% acquisition (press play) but not between recordings. solution: find
+% inconsistencies in timestamps and remove corresponding samples from dat
+% file. 
 %
 % INPUT:
 %   basepath    string. path to .dat file (not including dat file itself)
@@ -12,16 +19,8 @@ function datInfo = preprocDat(varargin)
 %   chunksize   size of data to load at once [samples]{5e6}. 
 %               if empty will load entire file (be careful!).
 %               for 35 channels in int16, 5e6 samples = 350 MB.
-%   bkup        logical. save original file (true) or not {false}
-%   clip        mat n x 2 indicating samples to diregard from chunks.
-%               for example: clip = [0 50; 700 Inf] will remove the first
-%               50 samples and all samples between 700 and n
+%   bkup        logical. keep original file (true) or not {false}
 %   nchans      numeric. original number of channels in dat file {35}.
-%   mapch       vec. new order of channels {[]}. 1-based.
-%   rmvch       vec. channels to remove (according to original order) {[]}.
-%               1-based.
-%   pli         numeric. channel from which to extract line crossings.
-%               if 0 will not remove pli. 
 %   precision   char. sample precision {'int16'} 
 %   saveVar     logical. save datInfo {true} or not (false).
 %
@@ -33,19 +32,12 @@ function datInfo = preprocDat(varargin)
 %   class2bytes
 %   n2chunks
 %
-% TO DO LIST:
-%   check if works on linux
-%   conversion ot mV
-%   handle xml
-%   datInfo
-%
-% 09 apr 20 LH      
+% 22 apr 20 LH      
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-tic;
 
 p = inputParser;
 addOptional(p, 'basepath', pwd);
@@ -53,7 +45,6 @@ addOptional(p, 'fname', '', @ischar);
 addOptional(p, 'chunksize', 5e6, @isnumeric);
 addOptional(p, 'precision', 'int16', @ischar);
 addOptional(p, 'nchans', 35, @isnumeric);
-addOptional(p, 'clip', [], @isnumeric);
 addOptional(p, 'mapch', [], @isnumeric);
 addOptional(p, 'rmvch', [], @isnumeric);
 addOptional(p, 'pli', 0, @isnumeric);
@@ -66,10 +57,6 @@ fname = p.Results.fname;
 chunksize = p.Results.chunksize;
 precision = p.Results.precision;
 nchans = p.Results.nchans;
-clip = p.Results.clip;
-mapch = p.Results.mapch;
-rmvch = p.Results.rmvch;
-pli = p.Results.pli;
 bkup = p.Results.bkup;
 saveVar = p.Results.saveVar;
 
@@ -98,73 +85,54 @@ if isempty(fname)
 end
 [~, basename, ~] = fileparts(fname);
 tempname = [basename '.tmp.dat'];
-
-% rearrange mapch according to rmvch
-datInfo.mapch = mapch;
-if ~isempty(mapch)
-    mapch = mapch(~ismember(mapch, rmvch));
-    nch = length(mapch);
-    if sum(mapch > nch)
-        mat = [unique(mapch); (1 : nch)]';
-        for j = 1 : nch
-            mapch(j) = mat(mat(:, 1) == mapch(j), 2);
-        end
+    
+% load timestamps
+tFiles = dir([basepath filesep '**' filesep '*timestamps.npy']);
+for i = 1 : length(datFiles)
+    idx = find(strcmp({tFiles.folder}, datFiles(i).folder));
+    if length(idx) > 1
+        warning(['more than one timestamps.npy found in %s\n',...
+            'skipping tstamps concatination'], basepath)
+        break
+    elseif length(idx) < 1
+        warning(['timestamps.npy not found in %s\n',...
+            'skipping tstamps concatination'], basepath)
+        break
+    else
+        tstamps = readNPY(fullfile(tFiles(idx).folder, tFiles(idx).name));
     end
 end
-    
-% partition into chunks
+
+% find inconsistencies in timestamps and arrange chunks accordingly
+idx = find(diff(tstamps) > 1);
+if isempty(idx)
+    return
+end
+clip = zeros(length(idx), 2);
+for i = 1 : length(idx)
+    clip(i, :) = [tstamps(idx), tstamps(idx + 1)];
+end
 info = dir(fname);
 nsamps = info.bytes / nbytes / nchans;
 chunks = n2chunks('n', nsamps, 'chunksize', chunksize, 'clip', clip);
 nchunks = size(chunks, 1);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% go over chunks and process
+% write dat without clip
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-fprintf('\n\npreprocessing %s\n', fname)
-
-% open bkup dat file
+% open temp dat file
 fid = fopen(tempname, 'w');
 if(fid == -1)
     error('cannot open file');
 end
 
-% memory map to original file
 m = memmapfile(fname, 'Format', {'int16' [nchans nsamps] 'mapped'});
 
 % go over chunks
 for i = 1 : nchunks
     fprintf('working on chunk %d / %d\n', i, nchunks)
     d = m.data.mapped(:, chunks(i, 1) : chunks(i, 2));
-       
-    % remove channels
-    if ~isempty(rmvch)                     
-        % save channel used for line crossing detection
-        if pli
-            dpli = d(pli, :);
-        end
-        d(rmvch, :) = [];
-    end
-    
-    % remap channels
-    if ~isempty(mapch)                    
-        d = d(mapch, :);
-    end
-          
-    % remove dc
-    [d, dc(i, :)] = rmDC(d, 'dim', 2);
-    
-    % remove pli
-    if pli                                 
-        linet = lineDetect('x', d(pli, :), 'fs', fs, 'graphics', false);
-        for j = 1 : size(d, 1)
-            d(j, :) = lineRemove(d(j, :), linet, [], [], 0, 1);
-        end
-    end
-    
-    % acceleration
-    
     fwrite(fid, d(:), precision);
 end
 
@@ -183,12 +151,6 @@ if ~bkup
     delete([basename '_orig.dat'])
 end
 
-% check new file
-info = dir(fname);
-nsampsNew = info.bytes / nbytes / (nchans - length(rmvch));
-if ~isequal(nsampsNew, nsamps)
-    error('processing failed, dats are of different length')
-end
 fprintf('\nfinished processing %s. \nFile size = %.2f MB\n', fname, info.bytes / 1e6);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -199,15 +161,13 @@ if exist(infoname, 'file')
     load(infoname)
 end
 
-datInfo.rmvCh = rmvch;
-datInfo.pli = pli;
-datInfo.dc = mean(dc, 1);
+datInfo.clip = clip;
 
 if saveVar
     save(infoname, 'datInfo');
 end
 
-toc
+
 end
 
 % EOF
