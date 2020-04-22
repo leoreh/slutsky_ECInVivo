@@ -122,7 +122,7 @@ nchunks = size(chunks, 1);
 % go over chunks and process
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-fprintf('\n\npreprocessing %s\n', fname)
+fprintf('\npre-processing %s\n\n', fname)
 
 % open bkup dat file
 fid = fopen(tempname, 'w');

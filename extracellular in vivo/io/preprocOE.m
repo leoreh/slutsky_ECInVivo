@@ -1,4 +1,4 @@
-function preprocOE(varargin)
+function datInfo = preprocOE(varargin)
 
 % pre-process open ephys. 
 %
@@ -19,6 +19,7 @@ function preprocOE(varargin)
 % TO DO LIST:
 %   enable concatenation of experiments (not only recordings)
 %   add option to select specific recordings in experiments
+%   fix exp idx
 %
 % 09 apr 20 LH      
 
@@ -47,6 +48,7 @@ rmvch = p.Results.rmvch;
 % get files and folders
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+fprintf('\npre-processing %s\n\n', basepath)
 cd(basepath)
 
 % create new basefolder
@@ -71,7 +73,6 @@ fprintf('\nfound %d experiments\n', length(expFolders))
 % edit
 for i = exp
     
-    % print to 
     fprintf('working on experiment %d\n', i)
     
     % exp path and number
@@ -105,7 +106,7 @@ for i = exp
         
         catDat('basepath', exPath, 'newpath', exPathNew,...
             'concat', true, 'nchans', 35, 'saveVar', true);       
-        preprocDat('basepath', exPathNew, 'fname', '', 'mapch', mapch,...
+        datInfo = preprocDat('basepath', exPathNew, 'fname', '', 'mapch', mapch,...
             'rmvch', rmvch, 'nchans', 35, 'saveVar', true,...
             'chunksize', 5e6, 'precision', 'int16', 'bkup', false);
         getDinOE('datpath', exPath, 'newpath', exPathNew,...

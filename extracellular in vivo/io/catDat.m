@@ -70,13 +70,36 @@ tstamps = [];
 % arrange files and concatenate
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% handle names for new path and new file
+if isempty(newpath)
+    newpath = basepath;
+end
+if isempty(newname)
+    if ~isempty(newpath)
+        basename = bz_BasenameFromBasepath(newpath);
+        newname = [basename '.dat'];
+    else
+        [~, basename] = fileparts(datFiles(1).name);
+        newname = [basename '.new.dat'];
+    end
+else
+    if ~contains(newname, '.dat')
+        newname = [newname '.dat'];
+    end
+end
+destination = fullfile(newpath, newname);
+
 % get .dat and .npy files in basepath
+% here I should allow user to input several paths to specific files (e.g.
+% recordings). this can be done by allowing basepath to be a cell of
+% strings. 
 datFiles = dir([basepath filesep '**' filesep '*dat']);
 tFiles = dir([basepath filesep '**' filesep '*timestamps.npy']);
 if length(datFiles) > 1 && ~concat
     error(['multiple dat files found in %s\n',...
         'function cannot handle multiple files without concatination'], basepath)
 end
+
 % check .dat files integrity
 for i = 1 : length(datFiles)
     source{i} = fullfile(datFiles(i).folder, datFiles(i).name);
@@ -104,32 +127,12 @@ for i = 1 : length(datFiles)
             warning(['more samples than timestamps in %s\n'...
                 'initializing valTstampsOE'], source{i}) 
             valTstampsOE('basepath', tFiles(idx).folder, 'precision', precision,...
-                'chunksize', 1e6, 'bkup', true, 'saveVar', true,...
+                'chunksize', 5e6, 'bkup', true, 'saveVar', true,...
                 'nchans', nchans)
             nsamps(i) = length(t);
         end
     end
 end
-
-
-% handle names for new path and new file
-if isempty(newpath)
-    newpath = basepath;
-end
-if isempty(newname)
-    if ~isempty(newpath)
-        basename = bz_BasenameFromBasepath(newpath);
-        newname = [basename '.dat'];
-    else
-        [~, basename] = fileparts(datFiles(1).name);
-        newname = [basename '.new.dat'];
-    end
-else
-    if ~contains(newname, '.dat')
-        newname = [newname '.dat'];
-    end
-end
-destination = fullfile(newpath, newname);
 
 % do the copy / concat
 fprintf('creating %s from files\n', newname)
@@ -142,7 +145,7 @@ nsampsNew = info.bytes / nbytes / nchans;
 if ~isequal(nsampsNew, sum(nsamps))
     error('copying failed, dats are of different length')
 end
-fprintf('\ncreated %s. \nFile size = %.2f MB\n', newname, info.bytes / 1e6);
+fprintf('file size = %.2f MB\n', newname, info.bytes / 1e6);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arrange datInfo and save
@@ -154,11 +157,14 @@ end
 
 datInfo.tstamps = tstamps;
 datInfo.origFile = source;
+datInfo.newFile = destination;
 datInfo.nsamps = nsamps;
 
 if saveVar
     save(infoname, 'datInfo');
 end
+
+fprintf('\nthat took %d seconds\n', toc)
 
 end
 

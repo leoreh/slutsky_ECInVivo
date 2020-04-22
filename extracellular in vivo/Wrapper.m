@@ -22,13 +22,13 @@ clip = cell(1, 1);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 1b: open ephys
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'E:\Data\Dat\lh50\2020-04-11_09-27-50';
+basepath = 'E:\Data\Dat\lh50\2020-04-21_12-05-16';
 rmvch = [18 : 21];
 mapch = [25 26 27 28 30 1 2 29 3 : 14 31 0 15 16 17 : 24 32 33 34] + 1;
-preprocOE('basepath', basepath, 'exp', [1], 'rmvch', rmvch,...
-    'mapch', mapch, 'concat', true, 'nchans', 35)
+datInfo = preprocOE('basepath', basepath, 'exp', [2], 'rmvch', rmvch,...
+    'mapch', mapch, 'concat', true, 'nchans', 35);
 
-preprocDat('basepath', basepath, 'fname', '', 'mapch', mapch,...
+datInfo = preprocDat('basepath', basepath, 'fname', '', 'mapch', mapch,...
     'rmvch', rmvch, 'nchans', 35, 'saveVar', true,...
     'chunksize', 5e5, 'precision', 'int16', 'bkup', true);
 

@@ -71,7 +71,8 @@ destination = [newpath, filesep, newname, '.din.mat'];
 jsonFiles = dir([datpath filesep '**' filesep '*oebin']);
 datFiles = dir([datpath filesep '**' filesep '*dat']);
 if length(jsonFiles) ~= length(datFiles)
-    error('number of .oebin and .dat files not equal')
+    warning('number of .oebin and .dat files not equal')
+    return
 end
 if length(jsonFiles) > 1 && ~concat
     error(['multiple .oebin files found in %s\n',...
