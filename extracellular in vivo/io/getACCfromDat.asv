@@ -27,8 +27,6 @@ function din = getACCfromDat(varargin)
 %   gbias       3x1 vec. zero-g bias data to acceleration in x,
 %               y. order must correspond to ch.
 %   force       logical. reload data even if .mat file exists {false}
-%   fs          numeric. requested sampling frequency {1250}
-%   fs_orig     numeric. original sampling frequency {20000}
 %
 % OUTPUT
 %   din
@@ -56,8 +54,6 @@ addOptional(p, 'ch', [33 34 35], @isnumeric);
 addOptional(p, 'sensitivity', [0.3468; 0.3468; 0.3468], @isnumeric);
 addOptional(p, 'gbias', [1.775; 1.775; 1.775], @isnumeric);
 addOptional(p, 'force', false, @islogical);
-addOptional(p, 'fs', 1250, @isnumeric);
-addOptional(p, 'fs_orig', 20000, @isnumeric);
 
 parse(p, varargin{:})
 basepath = p.Results.basepath;
@@ -77,16 +73,6 @@ nbytes = class2bytes(precision);
 ch = [29 30 31];
 sensitivity = [0.3468; 0.3468; 0.3468]; % [V/g]
 gbias = [1.775; 1.775; 1.775]; % V
-fs = 1250;
-fs_orig = 20000;
-
-if isempty(fs) % do not resample if new sampling frequency not specified
-    fs = fs_orig;
-elseif fs ~= fs_orig
-    [p, q] = rat(fs / fs_orig);
-    n = 5; beta = 20;
-    fprintf('accelaration will be resampled from %.1f to %.1f\n\n', fs_orig, fs)
-end
 
 % handle dat file
 cd(basepath)
@@ -121,21 +107,26 @@ nchunks = size(chunks, 1);
 % memory map to dat file
 m = memmapfile(fname, 'Format', {precision, [nchans, nsamps] 'mapped'});
 
-% load timestamps
-
 % go over chunks
 for i = 1 : nchunks
     fprintf('working on chunk %d / %d\n', i, nchunks)
+    d = double(m.data.mapped(:, chunks(i, 1) : chunks(i, 2)));
     
     % load data
-    d = double(m.data.mapped(ch, chunks(i, 1) : chunks(i, 2)));
-       
-    % resmaple 
-    if fs ~= fs_orig
-        dd = [resample(d', p, q, n, beta)]';
-    end
-   
+    acc = double(m.Data.mapped(ch, :));
     
+    % resmaple
+    if isempty(fs) % do not resample if new sampling frequency not specified
+        fs = fs_orig;
+    elseif fs ~= fs_orig
+        [p, q] = rat(fs / fs_orig);
+        n = 5; beta = 20;
+        for i = 1 : size(lfp.data, 2)        % only way to handle large arrays
+            draw(:, i) = [resample(double(lfp.data(:, i))', p, q, n, beta)]';
+        end
+        lfp.data = draw;
+        fprintf('\n resampling from %.1f to %.1f\n\n', fs_orig, fs)
+    end
     
     % convert g to V
     acc = (acc - gbias) ./ sensitivity;
