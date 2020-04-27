@@ -9,7 +9,7 @@ function [sig, dc] = rmDC(sig, varargin)
 %               for each column (dim = 1) or row {dim = 2}
 %   winCalc     time window for calculating DC {[1 Inf]}. specified as
 %               index to mat rows.
-%   dim         numeric. dimension on which to calculate mean {2}/
+%   dim         numeric. dimension on which to calculate mean {2}.
 % 
 % OUTPUT
 %   sig         input singal without DC component   

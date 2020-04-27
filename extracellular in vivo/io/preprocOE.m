@@ -104,14 +104,27 @@ for i = exp
         mkdir(exPathNew)        
         fprintf('created %s\n', exPathNew)
         
+        % concatenate and pre-process dat
         catDat('basepath', exPath, 'newpath', exPathNew,...
-            'concat', true, 'nchans', 35, 'saveVar', true);       
+            'concat', concat, 'nchans', nchans, 'saveVar', true);       
         datInfo = preprocDat('basepath', exPathNew, 'fname', '', 'mapch', mapch,...
-            'rmvch', rmvch, 'nchans', 35, 'saveVar', true,...
+            'rmvch', rmvch, 'nchans', nchans, 'saveVar', true,...
             'chunksize', 5e6, 'precision', 'int16', 'bkup', false);
+        
+        % arrange digital input
         getDinOE('datpath', exPath, 'newpath', exPathNew,...
-            'concat', true, 'nchans', 35, 'nbytes', 2,...
+            'concat', true, 'nchans', nchans, 'nbytes', 2,...
             'saveVar', true);
+        
+        % process acceleration
+        newch = length(mapch) - length(rmvch);
+        if isempty(chAcc)
+            chAcc = [newch : -1 : newch - 2];
+        end
+        getAccFromDat('basepath', exPathNew, 'fname', '',...
+            'nchans', newch, 'ch', chAcc, 'force', false, 'saveVar', true,...
+            'graphics', false, 'fs', 1250);
+    
     else
 %         for j = 1 : length(recFolders)
 %             % make new dir

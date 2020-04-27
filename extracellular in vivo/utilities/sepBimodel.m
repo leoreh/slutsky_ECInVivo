@@ -8,11 +8,13 @@ function [sep, h, e] = sepBimodel(varargin)
 %   x           vector to be modled  
 %   lognorm     logical. log {1} or linear [0] distribution
 %   nbins       scalar {100}. number of bins for histcounts
-%   smfactor    scalar {20}. smoothing factor
+%   smf         scalar {20}. smoothing factor
 %   graphics    logical. plot figure {1}.
 % 
 % OUTPUT
 %   sep         trough between distribution
+%   h           histogram counts
+%   e           histogram edges
 % 
 % 22 nov 19 LH
 % 30 dec 19 LH  smoothing factor
@@ -28,14 +30,14 @@ p = inputParser;
 addOptional(p, 'x', []);
 addOptional(p, 'lognorm', true, @islogical);
 addOptional(p, 'nbins', 100, @isnumeric);
-addOptional(p, 'smfactor', 20, @isnumeric);
+addOptional(p, 'smf', 20, @isnumeric);
 addOptional(p, 'graphics', true, @islogical);
 
 parse(p, varargin{:})
 x = p.Results.x;
 lognorm = p.Results.lognorm;
 nbins = p.Results.nbins;
-smfactor = p.Results.smfactor;
+smf = p.Results.smf;
 graphics = p.Results.graphics;
 
 x = x(:);   % make sure column vec
@@ -65,7 +67,7 @@ end
 % OPTION 2: via histogram and findpeaks
 [h, e] = histcounts(x, nbins, 'Normalization', 'probability');
 e = e(1 : end - 1) + mean(diff(e)) / 2;
-h = movmean(h, smfactor);
+h = movmean(h, smf);
 [p, i] = findpeaks(-h, 'MinPeakDistance', 1);
 [~, ii] = min(p); 
 i = i(ii);

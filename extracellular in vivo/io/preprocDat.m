@@ -163,8 +163,6 @@ for i = 1 : nchunks
         end
     end
     
-    % acceleration
-    
     fwrite(fid, d(:), precision);
 end
 

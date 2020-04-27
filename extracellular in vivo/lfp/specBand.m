@@ -6,7 +6,7 @@ function [zband, t] = specBand(varargin)
 % 
 % INPUT
 %   sig         signal for detection
-%   fs          sampling frequency
+%   fs          sampling frequency {1250}.
 %   band        vector. e.g. {[1 4]} for delta 
 %   binsize     scalar {10}. in [samples]
 %   smf         smooth factor {winsize}. empty means no smoothing. zero
@@ -16,6 +16,7 @@ function [zband, t] = specBand(varargin)
 %
 % OUTPUT
 %   zband       power spectra in band
+%   t           bin centers over which zband is calculated
 %
 % TO DO LIST
 %       # make compatible with band as matrix (multiple bands)

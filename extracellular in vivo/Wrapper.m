@@ -37,6 +37,15 @@ basepath = 'E:\Data\Dat\lh50\lh50_220411\090450_e1r1-9';
 getfEPSPfromOE('basepath', basepath, 'fname', '', 'nchans', 35,...
     'ch', [], 'fs', [], 'concat', false, 'saveVar', true);
 
+
+% acceleration
+basepath = 'E:\Data\Dat\lh50\lh50_200421\130443_e3r1-1';
+ch = [29 30 31];
+nchans = 31;
+acc = getAccFromDat('basepath', basepath, 'fname', '', 'nchans', nchans,...
+    'ch', ch, 'force', true, 'saveVar', true, 'graphics', true,...
+    'fs', 1250);
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 2: LFP
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
