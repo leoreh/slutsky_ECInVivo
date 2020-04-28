@@ -164,7 +164,7 @@ if saveVar
     save(infoname, 'datInfo');
 end
 
-fprintf('\nthat took %d seconds\n', toc)
+fprintf('\nthat took %d minutes\n', toc / 60)
 
 end
 

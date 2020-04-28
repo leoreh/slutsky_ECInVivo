@@ -22,10 +22,10 @@ clip = cell(1, 1);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 1b: open ephys
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'E:\Data\Dat\lh50\2020-04-21_12-05-16';
+basepath = 'D:\dataTemp\lh50\2020-04-27_08-46-48';
 rmvch = [18 : 21];
 mapch = [25 26 27 28 30 1 2 29 3 : 14 31 0 15 16 17 : 24 32 33 34] + 1;
-datInfo = preprocOE('basepath', basepath, 'exp', [2], 'rmvch', rmvch,...
+datInfo = preprocOE('basepath', basepath, 'exp', [3], 'rmvch', rmvch,...
     'mapch', mapch, 'concat', true, 'nchans', 35);
 
 datInfo = preprocDat('basepath', basepath, 'fname', '', 'mapch', mapch,...
@@ -37,9 +37,8 @@ basepath = 'E:\Data\Dat\lh50\lh50_220411\090450_e1r1-9';
 getfEPSPfromOE('basepath', basepath, 'fname', '', 'nchans', 35,...
     'ch', [], 'fs', [], 'concat', false, 'saveVar', true);
 
-
 % acceleration
-basepath = 'E:\Data\Dat\lh50\lh50_200421\130443_e3r1-1';
+basepath = 'D:\dataTemp\lh50\lh50_240426\080458_e3r1-1';
 ch = [29 30 31];
 nchans = 31;
 acc = getAccFromDat('basepath', basepath, 'fname', '', 'nchans', nchans,...

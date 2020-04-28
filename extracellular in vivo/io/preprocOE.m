@@ -1,10 +1,13 @@
 function datInfo = preprocOE(varargin)
 
-% pre-process open ephys. 
+% pre-process open ephys.
 %
 % INPUT:
 %   basepath    string. path to recording folder {pwd}
 %   exp         numeric. experiments to organize. if empty will process all
+%               refers to exp name and not number of folders (i.e. if only
+%               exp 1 and 3 exist in basepath, than exp should be [1 3] and
+%               not [1 2].
 %   concat      logical. concatenate dat files in experiments {true}
 %   mapch       vec. new order of channels {[]}
 %   rmvch       vec. channels to remove (according to original order) {[]}
@@ -17,11 +20,14 @@ function datInfo = preprocOE(varargin)
 %   getDinOE
 %
 % TO DO LIST:
-%   enable concatenation of experiments (not only recordings)
-%   add option to select specific recordings in experiments
-%   fix exp idx
+%   # enable concatenation of experiments (not only recordings)
+%   # add option to select specific recordings in experiments
+%   # fix exp idx (done)
+%   # fix datenum (year sometimes wrong)
 %
-% 09 apr 20 LH      
+% 09 apr 20 LH  updates
+% 28 apr 20 LH  find exp by name and not number of folders
+%               allowed user to select specific recordings
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -58,9 +64,8 @@ dn = datenum(baseTime, 'yyyy-MM-dd_hh-mm-ss');
 newpath = fullfile(newpath, [basename '_' datestr(dn, 'yyMMdd')]);
 mkdir(newpath)
 
-% get files
+% find experiments
 files = dir(['**' filesep '*.*']);
-datFiles = files(contains({files.name}, '.dat'));
 expFolders = files(contains({files.name}, 'experiment'));
 if isempty(exp)
     exp = 1 : length(expFolders);
@@ -71,13 +76,15 @@ fprintf('\nfound %d experiments\n', length(expFolders))
 % file per experiment named 'setting*'. the xml provides the datetime of
 % creation (i.e. recording) whereas file.date gets the datetime of last
 % edit
-for i = exp
+for i = 1 : length(exp)
     
-    fprintf('working on experiment %d\n', i)
+    fprintf('working on experiment %d\n', exp(i))
     
-    % exp path and number
-    exPath = fullfile(expFolders(i).folder, expFolders(i).name);
-    expIdx = char(regexp(expFolders(i).name, [filesep 'd*'], 'Match'));
+    % exp path
+    expNames = {expFolders.name};
+    expIdx = find(strcmp(expNames, ['experiment' num2str(exp(i))]));
+    exPath = fullfile(expFolders(expIdx).folder, expFolders(expIdx).name);
+    expIdx = char(regexp(expFolders(expIdx).name, [filesep 'd*'], 'Match'));
     
     % get time from xml file
     if strcmp(expIdx, '1')
@@ -88,57 +95,43 @@ for i = exp
     t = convert(xmltree(xmlname));
     expTime = datestr(t.INFO.DATE, 'hhmmss');
     
-    % get recording folders in each experiment 
+    % get recording folders in each experiment
     recFolders = files(contains({files.name}, 'recording') &...
         strcmp({files.folder}, exPath));
     recIdx = [];
     for j = 1 : length(recFolders)
-            recIdx(j) = str2num(char((regexp(recFolders(j).name, [filesep 'd*'], 'Match'))));
+        recIdx(j) = str2num(char((regexp(recFolders(j).name, [filesep 'd*'], 'Match'))));
     end
     
     fprintf('%d recordings found\n', length(recIdx))
     
-    if concat
-        expName = sprintf('%s_e%sr%d-%d', expTime, expIdx, recIdx(1), recIdx(end));
-        exPathNew = fullfile(newpath, expName);
-        mkdir(exPathNew)        
-        fprintf('created %s\n', exPathNew)
-        
-        % concatenate and pre-process dat
-        catDat('basepath', exPath, 'newpath', exPathNew,...
-            'concat', concat, 'nchans', nchans, 'saveVar', true);       
-        datInfo = preprocDat('basepath', exPathNew, 'fname', '', 'mapch', mapch,...
-            'rmvch', rmvch, 'nchans', nchans, 'saveVar', true,...
-            'chunksize', 5e6, 'precision', 'int16', 'bkup', false);
-        
-        % arrange digital input
-        getDinOE('datpath', exPath, 'newpath', exPathNew,...
-            'concat', true, 'nchans', nchans, 'nbytes', 2,...
-            'saveVar', true);
-        
-        % process acceleration
-        newch = length(mapch) - length(rmvch);
-        if isempty(chAcc)
-            chAcc = [newch : -1 : newch - 2];
-        end
-        getAccFromDat('basepath', exPathNew, 'fname', '',...
-            'nchans', newch, 'ch', chAcc, 'force', false, 'saveVar', true,...
-            'graphics', false, 'fs', 1250);
+    expName = sprintf('%s_e%sr%d-%d', expTime, expIdx, recIdx(1), recIdx(end));
+    exPathNew = fullfile(newpath, expName);
+    mkdir(exPathNew)
+    fprintf('created %s\n', exPathNew)
     
-    else
-%         for j = 1 : length(recFolders)
-%             % make new dir
-%             expName = sprintf(' %s_e%s_r%s', expTime, expIdx, recIdx(j));
-%             exPathNew = fullfile(newpath, expName);
-%             mkdir(exPathNew)
-%             % get dat
-%             recPath = fullfile(recFolders(j).folder, recFolders(j).name);
-%             preprocDat('basepath', recPath, 'newpath', exPathNew, 'concat', false)
-%             % Din
-%         end
-    end
+    % move / concatenate dat
+    catDat('basepath', exPath, 'newpath', exPathNew,...
+        'concat', concat, 'nchans', nchans, 'saveVar', true);
+    
+    % pre-process dat
+    datInfo = preprocDat('basepath', exPathNew, 'fname', '', 'mapch', mapch,...
+        'rmvch', rmvch, 'nchans', nchans, 'saveVar', true,...
+        'chunksize', 5e6, 'precision', 'int16', 'bkup', false);
+    
+    % get digital input
+    getDinOE('datpath', exPath, 'newpath', exPathNew,...
+        'concat', true, 'nchans', nchans, 'nbytes', 2,...
+        'saveVar', true);
+    
+    % get acceleration
+    newch = length(mapch) - length(rmvch);
+    chAcc = [newch : -1 : newch - 2];
+    getAccFromDat('basepath', exPathNew, 'fname', '',...
+        'nchans', newch, 'ch', chAcc, 'force', false, 'saveVar', true,...
+        'graphics', false, 'fs', 1250);    
 end
 
-end 
-    
+end
+
 % EOF

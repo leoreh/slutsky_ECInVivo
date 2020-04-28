@@ -54,6 +54,7 @@ function acc = getAccFromDat(varargin)
 % TO DO LIST:
 %   # compare with emgFromLfp
 %   # linear envelop (smoothing and filtering)
+%   # use pc1 of spectrogram instead of power in 2-5 Hz band (getBS)
 %
 % 09 apr 20 LH
 
