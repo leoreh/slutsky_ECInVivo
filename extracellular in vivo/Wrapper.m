@@ -32,10 +32,14 @@ datInfo = preprocDat('basepath', basepath, 'fname', '', 'mapch', mapch,...
     'rmvch', rmvch, 'nchans', 35, 'saveVar', true,...
     'chunksize', 5e5, 'precision', 'int16', 'bkup', true);
 
-% snip stim
+% get fEPSP
 basepath = fileparts(datInfo.newFile);
-getfEPSPfromOE('basepath', basepath, 'fname', '', 'nchans', 35,...
-    'ch', [], 'fs', [], 'concat', false, 'saveVar', true);
+basepath = 'H:\Data\Dat\lh50\lh50_200426\100442_e6r1-4';
+tet = [1 : 4; 5 : 8; 9 : 12; 13 : 16; 17 : 20; 21 : 24; 25 : 28];
+tet = num2cell(tet, 2);
+intens = [20 40 60 80];
+getfEPSPfromOE('basepath', basepath, 'fname', '', 'nchans', 31,...
+    'tet', tet, 'intens', intens, 'fs', [], 'concat', false, 'saveVar', true);
 
 % acceleration
 basepath = 'D:\dataTemp\lh50\lh50_240426\080458_e3r1-1';

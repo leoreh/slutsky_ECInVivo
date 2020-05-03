@@ -96,7 +96,6 @@ saveVar = p.Results.saveVar;
 
 fprintf('\nloading accelaration from %s\n', basepath)
 
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preparations 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -130,7 +129,7 @@ if isempty(fname)
 end
 [~, basename, ~] = fileparts(fname);
 
-% load acceleration of already exists
+% load acceleration if already exists
 accname = [basename '.acceleration.mat'];
 if exist(accname, 'file') && ~force
     fprintf('\n loading %s \n', accname)

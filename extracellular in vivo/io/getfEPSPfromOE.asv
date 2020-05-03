@@ -94,6 +94,14 @@ if isempty(fname)
 end
 [~, basename, ~] = fileparts(fname);
 
+% load acceleration if already exists
+fepspname = [basename '.acceleration.mat'];
+if exist(fepspname, 'file') && ~force
+    fprintf('\n loading %s \n', fepspname)
+    load(fepspname)
+    return
+end
+
 % load digital input
 stimname = fullfile(basepath, [basename, '.din.mat']);
 if exist(stimname) 
@@ -111,14 +119,6 @@ if exist(infoname, 'file')
 end
 nfiles = length(datInfo.origFile);  % number of intensities 
 
-% load fepsp if already exists
-fepspname = [basename '.fepsp.mat'];
-if exist(fepspname, 'file') && ~force
-    fprintf('\n loading %s \n', fepspname)
-    load(fepspname)
-    return
-end
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % snip data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -130,7 +130,7 @@ end
 
 % snip
 snips = snipFromDat('basepath', basepath, 'fname', fname,...
-    'stamps', stamps, 'win', win, 'nchans', nchans, 'ch', [],...
+    'stamps', stamps, 'win', win, 'nchans', nchans, 'ch', ch,...
     'dtrend', false, 'precision', precision);
 snips = snips / 1000;   % uV to mV
 
@@ -201,9 +201,6 @@ end
 %     stimidx = cell2mat(mat);
 % end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% arrange struct and save
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arrange struct
 fepsp.wv = wv;
 fepsp.wvavg = wvavg;
@@ -212,10 +209,13 @@ fepsp.stim = stimidx;
 % fepsp.amp = amp;
 % fepsp.fs = fs;
 % fepsp.fs_orig = info.fs;
-% fepsp.ch = ch;
+fepsp.ch = ch;
 
-if saveVar
-    save(fepspname, 'fepsp');
+% save variable
+savename = fullfile(basepath, [basename, '.fepsp.mat']);
+
+if saveVar   
+    save(savename, 'fepsp')
 end
 
 end
