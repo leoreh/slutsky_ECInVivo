@@ -22,10 +22,10 @@ clip = cell(1, 1);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 1b: open ephys
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'E:\Data\Dat\lh50\2020-04-26_08-50-58';
+basepath = 'E:\Data\Dat\lh50\2020-04-28_08-21-22';
 rmvch = [18 : 21];
 mapch = [25 26 27 28 30 1 2 29 3 : 14 31 0 15 16 17 : 24 32 33 34] + 1;
-datInfo = preprocOE('basepath', basepath, 'exp', [6], 'rmvch', rmvch,...
+datInfo = preprocOE('basepath', basepath, 'exp', [4], 'rmvch', rmvch,...
     'mapch', mapch, 'concat', true, 'nchans', 35);
 
 datInfo = preprocDat('basepath', basepath, 'fname', '', 'mapch', mapch,...
@@ -33,13 +33,13 @@ datInfo = preprocDat('basepath', basepath, 'fname', '', 'mapch', mapch,...
     'chunksize', 5e5, 'precision', 'int16', 'bkup', true);
 
 % get fEPSP
-basepath = fileparts(datInfo.newFile);
-basepath = 'H:\Data\Dat\lh50\lh50_200426\100442_e6r1-4';
+basepath = 'E:\Data\Dat\lh50\lh50_200428\100405_e4r1-5';
 tet = [1 : 4; 5 : 8; 9 : 12; 13 : 16; 17 : 20; 21 : 24; 25 : 28];
 tet = num2cell(tet, 2);
-intens = [20 40 60 80];
-getfEPSPfromOE('basepath', basepath, 'fname', '', 'nchans', 31,...
-    'tet', tet, 'intens', intens, 'fs', [], 'concat', false, 'saveVar', true);
+intens = [20 40 60 80 100];
+fepsp = getfEPSPfromOE('basepath', basepath, 'fname', '', 'nchans', 31,...
+    'tet', tet, 'intens', intens, 'concat', false, 'saveVar', true,...
+    'force', true);
 
 % acceleration
 basepath = 'D:\dataTemp\lh50\lh50_240426\080458_e3r1-1';

@@ -19,12 +19,11 @@ function fepsp = getfEPSPfromOE(varargin)
 %               samples after stamp. if win = [-16 16] than snip will be of
 %               33 samples symmetrically centered around stamp.
 %   precision   char. sample precision of dat file {'int16'}
-%   fs          numeric. requested sampling frequency {1250} for
-%               resampling. if empty no resampling will occur.
 %   force       logical. force reload {false}.
 %   concat      logical. concatenate blocks (true) or not {false}. 
 %               used for e.g stability.
 %   saveVar     logical. save variable {1}. 
+%   graphics    logical. plot graphics {1}. 
 %   
 % CALLS
 %   snipFromDat
@@ -35,6 +34,8 @@ function fepsp = getfEPSPfromOE(varargin)
 % TO DO LIST
 %   # code more efficient way to convert tstamps to idx
 %   # add concatenation option for stability
+%   # improve graphics
+%   # add option to resample (see getAcc)
 % 
 % 22 apr 20 LH          
 
@@ -49,10 +50,10 @@ addOptional(p, 'tet', {}, @iscell);
 addOptional(p, 'intens', [], @isnumeric);
 addOptional(p, 'win', [1 2000], @isnumeric);
 addOptional(p, 'precision', 'int16', @ischar);
-addOptional(p, 'fs', 1250, @isnumeric);
 addOptional(p, 'force', false, @islogical);
 addOptional(p, 'concat', false, @islogical);
 addOptional(p, 'saveVar', true, @islogical);
+addOptional(p, 'graphics', true, @islogical);
 
 parse(p, varargin{:})
 basepath = p.Results.basepath;
@@ -62,10 +63,10 @@ tet = p.Results.tet;
 intens = p.Results.intens;
 win = p.Results.win;
 precision = p.Results.precision;
-fs = p.Results.fs;
 force = p.Results.force;
 concat = p.Results.concat;
 saveVar = p.Results.saveVar;
+graphics = p.Results.graphics;
 
 % params
 if isempty(tet)
@@ -145,7 +146,7 @@ stimidx = cell(nfiles, 1);
 for i = 1 : nfiles
     stimidx{i} = find(stamps > csamps(i) &...
         stamps <  csamps(i + 1));
-    maxstim = max([maxstim, length(stimidx{i})]);
+    maxstim = max([maxstim, length(stimidx{i})]);   % used for cell2mat
 end
 
 % rearrange snips according to intensities and tetrodes
@@ -156,50 +157,54 @@ for j = 1 : ntet
         wvavg(j, i, :) = mean(mean(wv{j, i}, 3), 1);
         ampcell{j, i} = mean(squeeze(abs(min(wv{j, i}, [], 2) - max(wv{j, i}, [], 2))), 1);
         amp(j, i) = mean(ampcell{j, i});
-%         wv{
-%         
-%         ampcell(j, i) = squeeze(mean(mean(abs(min(wv{i}, [], 2) - max(wv{i}, [], 2)), 1)));
-%         stimcell{i} = stamps(stimidx{i});
+        stimcell{i} = stamps(stimidx{i});
     end
+end
+
+if concat 
+    for i = 1 : length(blocks)
+        amp = [amp; ampcell{i}];
+    end
+else
+    mat = cellfun(@(x)[x(:); NaN(maxstim - length(x), 1)], stimcell,...
+        'UniformOutput', false);
+    stimidx = cell2mat(mat);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-fh = figure;
-k = 1;
-for j = 1 : ntet
-    for i = 1 : nfiles
-        subplot(ntet, nfiles, k) 
-        plot(squeeze(wvavg(j, i, :)))
-        k = k + 1;
-        ylim([min(wvavg(:)) max(wvavg(:))])
+if graphics
+    fh = figure;
+    k = 1;
+    for j = 1 : ntet
+        for i = 1 : nfiles
+            subplot(ntet, nfiles, k)
+            plot(squeeze(wvavg(j, i, :)))
+            ylim([min(wvavg(:)) max(wvavg(:))])
+            set(gca, 'TickLength', [0 0], 'YTickLabel', [], 'XTickLabel', [],...
+                'Color', 'none')
+            if j == ntet
+                xlabel([num2str(intens(i)) ' uA'])
+            end
+            if i == 1
+                set(gca, 'YTickLabel', [ceil(min(wvavg(:))), floor(max(wvavg(:)))])
+                ylabel(['T' num2str(j)])
+            end
+            k = k + 1;
+        end
     end
-end 
-
-fh = figure;
-k = 1;
-for j = 1 : ntet
-    subplot(ntet, 1, k)
-    plot(amp(j, :))
-    k = k + 1;
-    ylim([min(amp(:)) max(amp(:))])
+    
+    fh = figure;
+    k = 1;
+    for j = 1 : ntet
+        subplot(ntet, 1, k)
+        plot(amp(j, :))
+        k = k + 1;
+        ylim([min(amp(:)) max(amp(:))])
+    end
 end
-
-
-% if concat 
-%     for i = 1 : length(blocks)
-%         amp = [amp; ampcell{i}];
-%     end
-% else
-%     mat = cellfun(@(x)[x(:); NaN(maxstim - length(x), 1)], ampcell,...
-%         'UniformOutput', false);
-%     amp = cell2mat(mat);
-%     mat = cellfun(@(x)[x(:); NaN(maxstim - length(x), 1)], stimcell,...
-%         'UniformOutput', false);
-%     stimidx = cell2mat(mat);
-% end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arrange struct and save
@@ -207,12 +212,12 @@ end
 % arrange struct
 fepsp.wv = wv;
 fepsp.wvavg = wvavg;
+fepsp.ampcell = ampcell;
+fepsp.amp = amp;
 fepsp.stim = stimidx;
-% fepsp.t = 0 : 1 / fs : fdur;
-% fepsp.amp = amp;
-% fepsp.fs = fs;
-% fepsp.fs_orig = info.fs;
-% fepsp.ch = ch;
+fepsp.intens = intens;
+fepsp.t = win(1) : win(2);
+fepsp.tet = tet;
 
 if saveVar
     save(fepspname, 'fepsp');

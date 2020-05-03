@@ -24,6 +24,7 @@ function datInfo = preprocOE(varargin)
 %   # add option to select specific recordings in experiments
 %   # fix exp idx (done)
 %   # fix datenum (year sometimes wrong) (done 02 may 20)
+%   # fix datenum in experiment name
 %
 % 09 apr 20 LH  updates
 % 28 apr 20 LH  find exp by name and not number of folders
@@ -94,7 +95,8 @@ for i = 1 : length(exp)
         xmlname = ['settings_' expIdx '.xml'];
     end
     t = convert(xmltree(xmlname));
-    expTime = datestr(t.INFO.DATE, 'hhmmss');
+    dn = datenum(t.INFO.DATE, 'dd mmm yyyy HH:MM:SS');
+    expTime = datestr(dn, 'hhmmss');
     
     % get recording folders in each experiment
     recFolders = files(contains({files.name}, 'recording') &...
