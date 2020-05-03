@@ -23,7 +23,7 @@ function datInfo = preprocOE(varargin)
 %   # enable concatenation of experiments (not only recordings)
 %   # add option to select specific recordings in experiments
 %   # fix exp idx (done)
-%   # fix datenum (year sometimes wrong)
+%   # fix datenum (year sometimes wrong) (done 02 may 20)
 %
 % 09 apr 20 LH  updates
 % 28 apr 20 LH  find exp by name and not number of folders
@@ -60,7 +60,8 @@ cd(basepath)
 % create new basefolder
 [newpath, baseTime] = fileparts(basepath);
 basename = bz_BasenameFromBasepath(newpath);
-dn = datenum(baseTime, 'yyyy-MM-dd_hh-mm-ss');
+dn = datenum(baseTime, 'yyyy-MM-dd');
+
 newpath = fullfile(newpath, [basename '_' datestr(dn, 'yyMMdd')]);
 mkdir(newpath)
 

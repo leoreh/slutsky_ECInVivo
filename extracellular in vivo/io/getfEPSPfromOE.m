@@ -20,7 +20,7 @@ function fepsp = getfEPSPfromOE(varargin)
 %   fs          numeric. requested sampling frequency {1250} for
 %               resampling. if empty no resampling will occur.
 %   force       logical. force reload {false}.
-%   concat      logical. concatenate different files (true) or not {false}. 
+%   concat      logical. concatenate blocks (true) or not {false}. 
 %               used for e.g stability.
 %   saveVar     logical. save variable {1}. 
 %   
@@ -66,6 +66,10 @@ basepath = 'E:\Data\Dat\lh50\lh50_220411\090450_e1r1-9';
 nchans = 31;
 ch = [];
 win = [1 2000];
+tet = [1 : 4; 5 : 8; 9 : 12; 13 : 16; 17 : 20; 21 : 24; 25 : 28];
+tet = num2cell(tet, 2);
+tet{3} = 9 : 11;
+ntet = size(tet, 1);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % handle data
@@ -103,6 +107,7 @@ if exist(infoname, 'file')
     fprintf('\n loading %s \n', infoname)
     load(infoname)
 end
+nfiles = length(datInfo.origFile);  % number of intensities 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % snip data
@@ -116,9 +121,8 @@ end
 % snip
 snips = snipFromDat('basepath', basepath, 'fname', fname,...
     'stamps', stamps, 'win', win, 'nchans', nchans, 'ch', ch,...
-    'dtrend', false, 'saveVar', false, 'precision', precision);
-
-nfiles = length(datInfo.origFile);
+    'dtrend', false, 'precision', precision);
+snips = snips / 1000;   % uV to mV
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % calc
@@ -134,16 +138,47 @@ for i = 1 : nfiles
     maxstim = max([maxstim, length(stimidx{i})]);
 end
 
-% rearrange snips and extract amplitude
-for i = 1 : nfiles
-    wv{i} = snips(:, stimidx{i}, :);
-    wvavg(i, :, :) = squeeze(mean(wv{i}, 2));
-    ampcell{i} = abs(min(wv{i}, [], 3) - max(wv{i}, [], 3));
-    stimcell{i} = stamps(stimidx{i});
+% rearrange snips according to intensities and tetrodes
+% extract amplitude and waveform
+for j = 1 : ntet
+    for i = 1 : nfiles
+        wv{j, i} = snips(tet{j}, :, stimidx{i});
+        wvavg(j, i, :) = mean(mean(wv{j, i}, 3), 1);
+        ampcell{j, i} = mean(squeeze(abs(min(wv{j, i}, [], 2) - max(wv{j, i}, [], 2))), 1);
+        amp(j, i) = mean(ampcell{j, i});
+%         wv{
+%         
+%         ampcell(j, i) = squeeze(mean(mean(abs(min(wv{i}, [], 2) - max(wv{i}, [], 2)), 1)));
+%         stimcell{i} = stamps(stimidx{i});
+    end
 end
 
-% if concat
-%     amp = [];
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% graphics
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+fh = figure;
+k = 1;
+for j = 1 : ntet
+    for i = 1 : nfiles
+        subplot(ntet, nfiles, k) 
+        plot(squeeze(wvavg(j, i, :)))
+        k = k + 1;
+        ylim([min(wvavg(:)) max(wvavg(:))])
+    end
+end 
+
+fh = figure;
+k = 1;
+for j = 1 : ntet
+    subplot(ntet, 1, k)
+    plot(amp(j, :))
+    k = k + 1;
+    ylim([min(amp(:)) max(amp(:))])
+end
+
+
+% if concat 
 %     for i = 1 : length(blocks)
 %         amp = [amp; ampcell{i}];
 %     end

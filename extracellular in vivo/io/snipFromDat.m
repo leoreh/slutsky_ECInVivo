@@ -21,12 +21,13 @@ function snips = snipFromDat(varargin)
 %   ch          vec. channels to load from dat file {[]}. if empty than all will
 %               be loaded
 %   precision   char. sample precision of dat file {'int16'}
+%   b2uv        numeric. conversion of bits to uV {0.195}
 %   dtrend      logical. detrend and L2 normalize snippets {false}.
 %
 % OUTPUT
-%   snips       matrix of ch x sampels x stamps. if detrend is false than
-%               will be same precision as dat file. if true than will be
-%               double. 
+%   snips       matrix of ch x sampels x stamps. if detrend is false and
+%               b2uv not specified than snips will be same precision as dat
+%               file, else than snips will be double.
 % 
 % CALLS:
 %   class2bytes
@@ -46,8 +47,8 @@ addOptional(p, 'win', [-16 16], @isnumeric);
 addOptional(p, 'nchans', 35, @isnumeric);
 addOptional(p, 'ch', [], @isnumeric);
 addOptional(p, 'precision', 'int16', @ischar);
+addOptional(p, 'b2uv', 0.195, @isnumeric);
 addOptional(p, 'dtrend', false, @islogical);
-addOptional(p, 'saveVar', true, @islogical);
 
 parse(p, varargin{:})
 basepath = p.Results.basepath;
@@ -58,6 +59,7 @@ nchans = p.Results.nchans;
 ch = p.Results.ch;
 precision = p.Results.precision;
 dtrend = p.Results.dtrend;
+b2uv = p.Results.b2uv;
 
 if isempty(ch)
     ch = 1 : nchans;
@@ -109,7 +111,12 @@ for i = 1 : length(stamps)
         continue
     end
     v = m.Data.mapped(ch, stamps(i) + win(1) : stamps(i) + win(2));
-     
+    
+    % convert bits to uV
+    if b2uv
+        v = double(v) * b2uv;
+    end
+    
     % L2 normalize and detrend
     if dtrend
         v = double(v) ./ vecnorm(double(v), 2, 2);
