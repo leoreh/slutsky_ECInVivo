@@ -73,7 +73,7 @@ else
     sprintf('\ncalculating separation matrices\n\n');
     
     % arrange predetermined mu
-    rmmu = cell(1, 4);
+    rmmu = cell(1, length(unique(spikes.shankID)));
     if ~isempty(mu)
         u = spikes.cluID(sort(mu));
         for i = 1 : length(fet)

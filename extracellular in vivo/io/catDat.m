@@ -32,6 +32,7 @@ function datInfo = catDat(varargin)
 % TO DO LIST:
 %   # handle multiple dats with copy only (no concatenate)
 %   # adapt for linux
+%   # change tstamps to binary file (supposed to be much faster read/write)
 %
 % 09 apr 20 LH
 % 22 apr 20 LH      valTstampsOE
@@ -161,7 +162,7 @@ datInfo.newFile = destination;
 datInfo.nsamps = nsamps;
 
 if saveVar
-    save(infoname, 'datInfo');
+    save(infoname, 'datInfo', '-v7.3');
 end
 
 fprintf('\nthat took %d minutes\n', toc / 60)

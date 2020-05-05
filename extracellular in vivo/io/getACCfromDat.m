@@ -50,11 +50,13 @@ function acc = getAccFromDat(varargin)
 %   class2bytes
 %   specBand
 %   binary2epochs
+%   sepBimodel
 %
 % TO DO LIST:
 %   # compare with emgFromLfp
 %   # linear envelop (smoothing and filtering)
 %   # use pc1 of spectrogram instead of power in 2-5 Hz band (getBS)
+%   # fix sepBimodel
 %
 % 09 apr 20 LH
 
@@ -209,10 +211,11 @@ smf = 7;
 % find immobility threshold 
 thr = sepBimodel('x', pband, 'lognorm', false, 'nbins', 100,...
     'smf', 20, 'graphics', false);
+thr = 1400;
 
 % define episodes of sleep
 vec = [pband < thr];
-sleep = binary2epochs('vec', vec, 'minDur', 1, 'interDur', 1);
+sleep = binary2epochs('vec', vec, 'minDur', 10, 'interDur', 1);
 sleep = tband(sleep); % bins to samples
 if sleep == tband(1) % correct edges
     sleep(1) = 1;
@@ -259,7 +262,7 @@ if graphics
     box off
     hold on
     Y = ylim;
-    fill([acc.sleep fliplr(acc.sleep)] / 60, [Y(1) Y(1) Y(2) Y(2)],...
+    fill([acc.sleep fliplr(acc.sleep)]' / 60, [Y(1) Y(1) Y(2) Y(2)],...
         'k', 'FaceAlpha', 0.25,  'EdgeAlpha', 0);
 end
 
