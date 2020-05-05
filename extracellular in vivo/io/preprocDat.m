@@ -100,7 +100,7 @@ end
 tempname = [basename '.tmp.dat'];
 
 % rearrange mapch according to rmvch
-datInfo.mapch = mapch;
+orig_mapch = mapch;
 if ~isempty(mapch)
     mapch = mapch(~ismember(mapch, rmvch));
     nch = length(mapch);
@@ -197,15 +197,17 @@ if exist(infoname, 'file')
     load(infoname)
 end
 
+datInfo.mapCh = orig_mapch;
 datInfo.rmvCh = rmvch;
 datInfo.pli = pli;
 datInfo.dc = mean(dc, 1);
 
 if saveVar
-    save(infoname, 'datInfo');
+    save(infoname, 'datInfo', '-v7.3');
 end
 
-toc
+fprintf('\nthat took %d minutes\n', toc / 60)
+
 end
 
 % EOF
