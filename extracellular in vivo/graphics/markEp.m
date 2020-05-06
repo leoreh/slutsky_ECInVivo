@@ -20,7 +20,8 @@ function ep = markEp(xdata, ydata, varargin)
 %       # xlim size on a log scale
 %       # add subplot of entire recording (zoom marked)
 %
-% 25 mar 20 LH 
+% 25 mar 20 LH  updates
+% 06 may 20 LH      sort(ep)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -99,6 +100,8 @@ while 1
 end
 close(fh)
 
+ep = sort(ep);
+
     % callback function
     function winCenter(src, effect)
         cen = xdata(round(c.Value * l));
@@ -106,5 +109,6 @@ close(fh)
         xlim([cen - siz cen + siz])
     end
 end
+
 
 % EOF

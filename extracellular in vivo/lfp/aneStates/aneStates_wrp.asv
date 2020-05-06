@@ -34,8 +34,7 @@ smf = 7;        % smooth factor
 fs = 1250;      % sampling frequency
 binsize = 30;   % for BSR and delta [s]
 maxmice = [];   % initialize
-thrMet = 1;     % method for iis threshold
-
+thrMet
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % send selected files to anestats
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

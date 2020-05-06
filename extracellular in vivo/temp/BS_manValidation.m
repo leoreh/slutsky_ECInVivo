@@ -1,5 +1,5 @@
 %%% user input
-basepath = 'E:\Data\Field\IIS\WT';
+basepath = 'E:\Data\Others\DZ\IIS\WT';
 mouse = 2;
 
 %%% load data
@@ -11,8 +11,10 @@ files = natsort({filename.name});
 load([basename '.lfp.mat'])
 load([basename '.bs.mat'])
 
+sig = lfp.data;
+
 %%% manually marks burst-suppresion
-ep = markEp(lfp.timestamps / 60, sig);
+ep = markEp(lfp.timestamps / 60, lfp.data(:, 1));
 
 %%% convert episodes of burst to binary vector
 x = floor(ep * fs) * 60;

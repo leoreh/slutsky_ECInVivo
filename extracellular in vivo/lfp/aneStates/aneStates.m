@@ -87,7 +87,7 @@ fs = lfp.fs;
 binsize = (2 ^ nextpow2(binsize * fs));
 
 % rmDC
-[sig, ~] = rmDC(sig);
+[sig, ~] = rmDC(sig, 'dim', 1);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % burst suppression
@@ -96,15 +96,15 @@ vars = {'std', 'max', 'pc1'};
 bs = getBS('sig', sig, 'fs', fs, 'basepath', basepath, 'graphics', false,...
     'saveVar', saveVar, 'binsize', 0.5, 'BSRbinsize', binsize, 'smf', smf,...
     'clustmet', 'gmm', 'vars', vars, 'basename', basename,...
-    'saveFig', false, 'forceA', false, 'vis', false);
+    'saveFig', false, 'forceA', false, 'vis', false, 'mancur', true);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % iis
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% threhold
-z = 15;         % no. of z-scores above mean to place thr
-mv = 0.5;       % thr in mV. if 0 than thr will be based on z-score only
-sig_thr = [];   % initialize
+z = 15;       % no. of z-scores above mean to place thr
+mv = 0;       % thr in mV. if 0 than thr will be based on z-score only
+sig_thr = []; % initialize
 epThr = [];
 
 switch thrMet
@@ -143,7 +143,7 @@ iis = getIIS('sig', sig, 'fs', fs, 'basepath', basepath,...
     'graphics', false, 'saveVar', saveVar, 'binsize', binsize,...
     'marg', marg, 'basename', basename, 'thr', thr, 'smf', 7,...
     'saveFig', false, 'forceA', forceA, 'spkw', false, 'vis', true,...
-    'mancur', false, 'thrDir', 'both');
+    'mancur', true, 'thrDir', 'both');
 iis.epThr = epThr;
 wvstamps = linspace(-marg, marg, floor(marg * fs) * 2 + 1);
 

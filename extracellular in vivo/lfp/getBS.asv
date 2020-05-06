@@ -83,7 +83,7 @@ addParameter(p, 'saveVar', true, @islogical);
 addParameter(p, 'saveFig', true, @islogical);
 addParameter(p, 'vis', true, @islogical);
 addParameter(p, 'forceA', false, @islogical);
-addParameter(p, 'mancur', false, @islogical);
+addParameter(p, 'forceA', false, @islogical);
 
 parse(p, varargin{:})
 sig = p.Results.sig;
@@ -101,7 +101,6 @@ saveVar = p.Results.saveVar;
 saveFig = p.Results.saveFig;
 vis = p.Results.vis;
 forceA = p.Results.forceA;
-mancur = p.Results.mancur;
 
 % params
 minDur = 2;                             % minimum event duration [bins]
