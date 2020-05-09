@@ -27,7 +27,7 @@ addOptional(p, 'avgwv', []);
 addOptional(p, 'stdwv', []);
 addOptional(p, 'c', 'k', @ischar);
 addOptional(p, 'orient', 'horz', @ischar);
-addOptional(p, 'fs', 24414.125, @isnumeric);
+addOptional(p, 'fs', 24414.06, @isnumeric);
 addOptional(p, 'sbar', true, @islogical);
 
 parse(p,varargin{:})
@@ -59,7 +59,7 @@ if strcmp(orient, 'horz')
         end
         hold on
         l = plot(avgwv, 'lineWidth', 2, 'Color', c);
-        ylim([-200 200])
+%         ylim([-200 200])
 else
     for j = 1 : nchans
         % offset = j * (max(avgwv(j, :)) - min(avgwv(j, :)));
