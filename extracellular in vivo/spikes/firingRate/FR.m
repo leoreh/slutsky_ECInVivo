@@ -29,6 +29,7 @@ function fr = FR(spktimes, varargin)
 %
 % 26 feb 19 LH. 
 % 21 nov 19 LH  added active periods and mFR accordingly
+% 09 may 20 LH  fixed c2r issues with calcFR
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -74,11 +75,8 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % calculate spike counts
-[fr.strd, fr.tstamps] = calcFR(spktimes, 'binsize', binsize,...
-    'winCalc', winCalc, 'smet', smet);
-
-% convert spike counts to firing rate in Hz
-fr.strd = fr.strd / binsize; 
+[fr.strd, ~, fr.tstamps] = calcFR(spktimes, 'binsize', binsize,...
+    'winCalc', winCalc, 'smet', smet, 'c2r', true);
 
 % active periods and mFR
 % threshold for active periods is determined according to the bimodel
