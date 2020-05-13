@@ -4,7 +4,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 1: file conversion
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'H:\Data\Dat\lh46\lh46_200225a';
+basepath = 'H:\Data\Dat\lh46\lh46_200227b';
 store = 'Raw1';
 fs = 24414.06;
 blocks = [5, 10];
@@ -111,12 +111,12 @@ spikes = getSpikes('basepath', basepath, 'saveMat', true,...
     'noPrompts', true, 'forceL', false);
 
 % review clusters
-mu = [];
 mu = find(spikes.isi > 1);
 mu = sort([mu', 2, 4, 19, 22, 26, 42, 44, 46, 48, 50, 52, 55, 59, 64, 67, 69, 75]);
+mu = [];
 spikes = cluVal(spikes, 'basepath', basepath, 'saveVar', true,...
     'saveFig', true, 'force', true, 'mu', mu, 'graphics', true,...
-    'vis', 'on');
+    'vis', 'off');
 
 % compare number of spikes and clusters from clustering to curation 
 numSpikes = getNumSpikes(basepath, spikes);
