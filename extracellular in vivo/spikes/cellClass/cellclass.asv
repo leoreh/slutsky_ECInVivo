@@ -100,14 +100,14 @@ tp = tp / fs * 1000 / upsamp;
 % fb = cwtfilterbank('SignalLength', size(waves, 1), 'VoicesPerOctave', 32,...
 %     'SamplingFrequency', fs, 'FrequencyLimits', [1 fs / 4]);
 fb = cwtfilterbank('SignalLength', 2040, 'VoicesPerOctave', 32,...
-    'SamplingFrequency', fs, 'FrequencyLimits', [1 fs / 4]);
+    'SamplingFrequency', fs, 'FrequencyLimits', [500 3000]);
 tic
 for i = 1 : nunits
+%     % ALT 1: ES getWavelet
     w = waves(:, i);
     w = [w(1) * ones(1000, 1); w; w(end) * ones(1000, 1)];
-    % ALT 1: ES getWavelet
     [wave, f, t] = getWavelet(w, fs, 500, 3000, 128);
-    % wt = cwt(w, fs, 'amor', 'FrequencyLimits', [500 3000]);
+%     wt = cwt(w, fs, 'amor', 'FrequencyLimits', [500 3000]);
     wave = wave(:, int16(length(t) / 4) : 3 * int16(length(t) / 4));
     
     % find maximum
@@ -117,6 +117,7 @@ for i = 1 : nunits
     spkw(i) = 1000 / f(ix);
     
     % ALT 2: MATLAB cwt
+%     w = waves(:, i);
     [cfs, f, ~] = cwt(w, 'FilterBank', fb);
     [~, ifreq] = max(abs(squeeze(cfs)), [], 1);
     maxf = f(ifreq(round(length(w) / 2)));

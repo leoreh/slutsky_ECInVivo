@@ -157,7 +157,12 @@ plotCCG('ccg', ccg(:, uu, uu), 't', t, 'basepath', basepath,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 5: cell classification based on waveform
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-CellClass = cellClass(cat(1, spikes.rawWaveform{:})', 'fs', spikes.samplingRate, 'man', true); 
+waves = [];
+for i = 1 : length(path)
+    waves = [waves, cat(1, s{i}.rawWaveform{:})'];
+end
+cc = cellclass('waves', waves,...
+    'fs', spikes.samplingRate, 'man', false, 'spikes', spikes); 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 6: firing rate
@@ -165,7 +170,6 @@ CellClass = cellClass(cat(1, spikes.rawWaveform{:})', 'fs', spikes.samplingRate,
 winBL = [info.lns(1) info.lns(3)] * spikes.samplingRate * 60;
 fr = FR(x, 'basepath', basepath, 'graphics', false, 'saveFig', false,...
     'binsize', 60, 'saveVar', true, 'smet', 'MA');
-
 
 % unite all units
 x = {sort(vertcat(spikes.times{:}))};
