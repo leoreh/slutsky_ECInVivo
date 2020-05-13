@@ -19,7 +19,7 @@ function spikes = getSPKfromDat(varargin)
 % depends on the waveform length, the matrices (w, r, c) are calculated
 % once in this function and used for all spikes. this significantly
 % decreased computation time. Note I did not thoroughly understand the
-% mathematics here but rather "stole" the lines from matlab detrend.m
+% mathematics here but "stole" the lines from matlab detrend.m
 % -------------------------------------------------------------------------
 % 13 may 20 - compared detrending each spike and averaging vs. detrending
 % the average waveform. for 10 units, detrending each spike took 240 s vs
@@ -181,7 +181,7 @@ for j = 11 : 25
             v = v ./ vecnorm(v, 2, 2);
         end
         
-        % remove best fit
+        % Remove best fit
         if dtrend
             v = [v' - W*(R\Q'*v')]';
         end
