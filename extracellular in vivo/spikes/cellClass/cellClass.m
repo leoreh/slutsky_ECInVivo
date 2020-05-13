@@ -104,6 +104,7 @@ fb = cwtfilterbank('SignalLength', 2040, 'VoicesPerOctave', 32,...
 tic
 for i = 1 : nunits
     w = waves(:, i);
+%     boundary value replication (symmetrization)
     w = [w(1) * ones(1000, 1); w; w(end) * ones(1000, 1)];
     % ALT 1: ES getWavelet
     [wave, f, t] = getWavelet(w, fs, 500, 3000, 128);
