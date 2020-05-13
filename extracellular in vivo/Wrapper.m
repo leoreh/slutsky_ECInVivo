@@ -4,7 +4,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 1: file conversion
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'H:\Data\Dat\lh46\lh46_200227b';
+basepath = 'H:\Data\Dat\lh46\lh46_200225a';
 store = 'Raw1';
 fs = 24414.06;
 blocks = [5, 10];
@@ -157,10 +157,20 @@ plotCCG('ccg', ccg(:, uu, uu), 't', t, 'basepath', basepath,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 5: cell classification based on waveform
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ch{1} = 1 : 4;
+ch{2} = 5 : 8;
+ch{3} = 9 : 12;
+ch{4} = 13 : 16;
+spikes = getSPKfromDat('basepath', basepath, 'fname', '',...
+    'win', [-20 19], 'spktimes', spikes.times, 'grp', spikes.shankID,...
+    'ch', ch, 'dtrend', true), 'nchans', 16;
+
 waves = [];
 for i = 1 : length(path)
     waves = [waves, cat(1, s{i}.rawWaveform{:})'];
 end
+waves = cat(1, spikes.rawWaveform{:})';
+waves = spikes.maxwv';
 cc = cellclass('waves', waves,...
     'fs', spikes.samplingRate, 'man', false, 'spikes', spikes); 
 

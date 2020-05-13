@@ -22,19 +22,19 @@ function snips = snipFromDat(varargin)
 %               be loaded
 %   precision   char. sample precision of dat file {'int16'}
 %   b2uv        numeric. conversion of bits to uV {0.195}
-%   dtrend      logical. detrend and L2 normalize snippets {false}.
+%   dtrend      logical. detrend snippets {false}.
+%   l2norm      logical. L2 normalize snippets {false}.
 %
 % OUTPUT
-%   snips       matrix of ch x sampels x stamps. if detrend is false and
-%               b2uv not specified than snips will be same precision as dat
-%               file, else than snips will be double.
+%   snips       matrix of ch x sampels x stamps. class double
 % 
 % CALLS:
 %   class2bytes
 %
 % TO DO LIST:
 %
-% 10 apr 20 LH
+% 10 apr 20 LH  updates:
+% 13 may 20 LH      separate detrend and normalize
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -49,6 +49,7 @@ addOptional(p, 'ch', [], @isnumeric);
 addOptional(p, 'precision', 'int16', @ischar);
 addOptional(p, 'b2uv', 0.195, @isnumeric);
 addOptional(p, 'dtrend', false, @islogical);
+addOptional(p, 'l2norm', false, @islogical);
 
 parse(p, varargin{:})
 basepath = p.Results.basepath;
@@ -58,8 +59,9 @@ win = p.Results.win;
 nchans = p.Results.nchans;
 ch = p.Results.ch;
 precision = p.Results.precision;
-dtrend = p.Results.dtrend;
 b2uv = p.Results.b2uv;
+dtrend = p.Results.dtrend;
+l2norm = p.Results.l2norm;
 
 if isempty(ch)
     ch = 1 : nchans;
@@ -101,7 +103,7 @@ m = memmapfile(fname, 'Format', {precision, [nchans, nsamps] 'mapped'});
 % initialize
 sniplength = diff(win) + 1;
 nsnips = length(stamps);
-snips = zeros(length(ch), sniplength, nsnips);
+snips = int16(zeros(length(ch), sniplength, nsnips));
 
 % go over stamps and snip data
 for i = 1 : length(stamps)
@@ -110,18 +112,23 @@ for i = 1 : length(stamps)
         snips(:, :, i) = nan(length(ch), sniplength);
         continue
     end
-    v = m.Data.mapped(ch, stamps(i) + win(1) : stamps(i) + win(2));
+    v = double(m.Data.mapped(ch, stamps(i) + win(1) : stamps(i) + win(2)));
     
     % convert bits to uV
     if b2uv
-        v = double(v) * b2uv;
+        v = v * b2uv;
     end
     
-    % L2 normalize and detrend
+    % L2 normalize 
+    if l2norm
+        v = v ./ vecnorm(v, 2, 2);
+    end
+    
+    % detrend
     if dtrend
-        v = double(v) ./ vecnorm(double(v), 2, 2);
         v = [detrend(v')]';
     end
+    
     snips(:, :, i) = v;
 end
 
