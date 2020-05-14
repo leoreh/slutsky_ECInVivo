@@ -1,6 +1,7 @@
 function  cc = cellclass(varargin)
 
-% classifies clusters to PYR \ INT according to waveform parameters.
+% classifies clusters to PYR \ INT according to waveform parameters
+% (trough-to-peak and spike width, also calculates asymmetry).
 % 
 % INPUT
 %   waves       matrix of sampels (rows) x units (columns). for example:
@@ -19,7 +20,7 @@ function  cc = cellclass(varargin)
 % OUTPUT
 %   CellClass   struct with fields:
 %       pyr         logical vector where 1 = PYR and 0 = INT
-%       tp          trough-to-peak times (bartho et al., 2004)
+%       tp          trough-to-peak times (
 %       spkd        spike width (stark et al., 2013)
 %       asym        asymmetry (Sirota et al., 2008)
 % 

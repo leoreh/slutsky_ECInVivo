@@ -157,7 +157,7 @@ plotCCG('ccg', ccg(:, uu, uu), 't', t, 'basepath', basepath,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 5: cell classification based on waveform
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'H:\Data\Dat\lh46\lh46_200225a';
+basepath = 'H:\Data\Dat\lh49\lh49_200319';
 spikes = getSpikes('basepath', basepath, 'saveMat', false,...
     'noPrompts', true, 'forceL', false);
 ch{1} = 1 : 4;

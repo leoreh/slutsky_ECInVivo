@@ -63,7 +63,10 @@ function spikes = getSPKfromDat(varargin)
 %   class2bytes
 %
 % TO DO LIST:   
-%       fix output for cases where each group has a different number of channels
+%       # fix output for when each group has a different number of channels
+%       (done)
+%       # calculate trend based on x samples before and after the spike
+%       (not including the waveform)
 %
 % 13 may 20 LH  
 
@@ -154,7 +157,7 @@ W = [reshape(W, N, []), ones(N,1)];
 % get waveforms 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-for j = 11 : 25
+for j = 1 : nunits
     
     stamps = round(spktimes{j} * fs);
        
@@ -191,12 +194,12 @@ for j = 11 : 25
         snips(:, :, i) = v;
     end
 
-    avgwv(j, :, :) = mean(snips, 3);    
-    stdwv(j, :, :) = std(snips, [], 3);    
-    x = squeeze(avgwv(j, :, :));
+    avgwv{j} = mean(snips, 3);    
+    stdwv{j} = std(snips, [], 3);    
+    x = squeeze(avgwv{j});
     [~, maxi] = max(abs(min(x, [], 2) - max(x, [], 2)));
     maxch(j) = ch{grp(j)}(maxi);
-    maxwv(j, :) = avgwv(j, maxi, :);
+    maxwv(j, :) = avgwv{j}(maxi, :);
     
 end
 
