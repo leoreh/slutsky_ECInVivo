@@ -157,21 +157,21 @@ plotCCG('ccg', ccg(:, uu, uu), 't', t, 'basepath', basepath,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 5: cell classification based on waveform
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'H:\Data\Dat\lh46\lh46_200225a';
+basepath = 'H:\Data\Dat\lh45\lh45_200209';
 spikes = getSpikes('basepath', basepath, 'saveMat', false,...
     'noPrompts', true, 'forceL', false);
 ch{1} = 1 : 4;
 ch{2} = 5 : 8;
 ch{3} = 9 : 12;
 ch{4} = 13 : 16;
-% ch{1} = 1 : 4;
-% ch{2} = 5 : 6;
-% ch{3} = 7 : 10;
-% ch{4} = 11 : 13;
+ch{1} = 1 : 4;
+ch{2} = 5 : 7;
+ch{3} = 8 : 10;
+ch{4} = 11 : 13;
 
 spikes = getSPKfromDat('basepath', basepath, 'fname', '',...
     'win', [-20 19], 'spktimes', spikes.times, 'grp', spikes.shankID,...
-    'ch', ch, 'dtrend', true, 'nchans', 16, 'fs', spikes.samplingRate,...
+    'ch', ch, 'dtrend', true, 'nchans', 13, 'fs', spikes.samplingRate,...
     'b2uv', []);
 
 waves = [];

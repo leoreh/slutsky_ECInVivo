@@ -1,4 +1,4 @@
-function  cc = cellclass(varargin)
+function cc = cellclass(varargin)
 
 % classifies clusters to PYR \ INT according to waveform parameters.
 % 
@@ -19,16 +19,18 @@ function  cc = cellclass(varargin)
 % OUTPUT
 %   CellClass   struct with fields:
 %       pyr         logical vector where 1 = PYR and 0 = INT
-%       tp          trough-to-peak times (bartho et al., 2004)
-%       spkd        spike width (stark et al., 2013)
+%       tp          trough-to-peak [ms] (bartho et al., 2004)
+%       spkw        spike width [ms] (stark et al., 2013)
 %       asym        asymmetry (Sirota et al., 2008)
+%       hpk         half-peak width [ms] (Medrihan et al., 2017)
 % 
 % DEPENDENCIES
 %   getWavelet      from buzcode
 %   fft_upsample    from Kamran Diba
 %
-% 08 apr 19 LH. 
+% 08 apr 19 LH      updates: 
 % 21 nov 19 LH      added spikes and FR in scatter
+% 14 may 20 LH      added upsampling by fft
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -66,19 +68,79 @@ else
 end
 
 nunits = size(waves, 2);
-upsamp = 4;
+upsamp = 10;
+nsamp = 10 * size(waves, 1);
+nfs = fs * upsamp;
+
+% for ALT 2 of spkw
+fb = cwtfilterbank('SignalLength', nsamp, 'VoicesPerOctave', 32,...
+    'SamplingFrequency', nfs, 'FrequencyLimits', [1 fs / 4]);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % trough-to-peak time [ms]
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+fprintf('\ncalculating waveform parameters\n\n')
+tic
+
 for i = 1 : nunits
-    w = fft_upsample(waves(:, i), upsamp);
+    
+    w = waves(:, i);
+    % upsample in the frequency domain
+    w = interpft(w, nsamp);
+    
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % exclude positive or distorted spikes
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    bline = 0;
+    % since waveforms were detrended in getSPKfromDat, there mean is close
+    % to 0 and thus the baseline does not need to be calculated. An
+    % alternative is to calculate the mean of the waveform before the
+    % spike. 
+    [~, abspk] = max(abs(w));
+    if w(abspk) > bline || abspk > length(w) * 0.75
+        fprintf('\nclu %d exhibits positive spike, skipping\n', i)
+        tp(i) = NaN;
+        spkw(i) = NaN;
+        hpk(i) = NaN;
+        continue
+    end
+  
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % trough-to-peak time [ms]
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    
+%     %Peak to valley, in ms
+%     [~,minPos] = min(w);
+%     try
+%         [maxVal,maxPos] = max(w(minPos+1:minPos+200));
+%     catch
+%         keyboard
+%     end
+%     p2v = 1000*maxPos/Fq;
+%     
+%     
+%     wu = wu/maxVal;
+%     th1 = find(wu(minPos:maxPos+minPos)<0.5);
+%     if any(th1)
+%         th1 = maxPos-th1(end);
+%         th2 = find(wu(maxPos+minPos:end)<0.5);
+%         if any(th2)
+%             th2 = th2(1);
+%         else
+%             th2 = th1;
+%         end
+%     else
+%         th1 = NaN;
+%         th2 = NaN;
+%     end
+%     hPk = 1000*(th1+th2)/Fq;
+    
     [~, minpos] = min(w);
     [maxval, ~] = max(w(1 : minpos - 1));   
-    [maxvalpost, maxpost] = max(w(minpos : end));               
+    [maxvalpost, maxpost] = max(w(minpos + 1 : end));               
     if ~isempty(maxpost)
-        % trough-to-peak - Stark et al., 2013; Bartho et al., 2004
+        % trough-to-peak - Bartho et al., 2004
         tp(i) = maxpost;
         if ~isempty(maxval)
             % asymmetry - Sirota et al., 2008
@@ -89,46 +151,58 @@ for i = 1 : nunits
         tp(i) = NaN;
         asym(i) = NaN;
     end
-end
-% samples to ms
-tp = tp / fs * 1000 / upsamp;
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% spike width by inverse of max frequency in spectrum
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% fb = cwtfilterbank('SignalLength', size(waves, 1), 'VoicesPerOctave', 32,...
-%     'SamplingFrequency', fs, 'FrequencyLimits', [1 fs / 4]);
-fb = cwtfilterbank('SignalLength', 2040, 'VoicesPerOctave', 32,...
-    'SamplingFrequency', fs, 'FrequencyLimits', [1 fs / 4]);
-tic
-for i = 1 : nunits
-    w = waves(:, i);
-%     boundary value replication (symmetrization)
-    w = [w(1) * ones(1000, 1); w; w(end) * ones(1000, 1)];
-    % ALT 1: ES getWavelet
-    [wave, f, t] = getWavelet(w, fs, 500, 3000, 128);
-    % wt = cwt(w, fs, 'amor', 'FrequencyLimits', [500 3000]);
-    wave = wave(:, int16(length(t) / 4) : 3 * int16(length(t) / 4));
     
-    % find maximum
-    [maxPow, ix] = max(wave);
+    % half peak width
+    wu = w / maxvalpost;
+    th1 = find(wu(minpos : maxpost + minpos) < 0.5);
+    if any(th1)
+        th1 = maxpost - th1(end);
+        th2 = find(wu(maxpost + minpos : end) < 0.5);        
+        if any(th2)
+            th2 = th2(1);
+        else
+            th2 = th1;
+        end
+    else
+        th1 = NaN;
+        th2 = NaN;
+    end
+    hpk(i) = (th1 + th2) * 1000 / nfs;
+    
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %  spike width by inverse of max frequency in spectrum
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+    % ALT 1: getWavelet
+    %       boundary value replication (symmetrization)
+    %       w = [w(1) * ones(1000, 1); w; w(end) * ones(1000, 1)];
+    [cfs, f, ~] = getWavelet(w, nfs, 400, 3000, 128);    
+    [maxPow, ix] = max(cfs);
     [~, mix] = max(maxPow);
     ix = ix(mix);
     spkw(i) = 1000 / f(ix);
     
     % ALT 2: MATLAB cwt
-    [cfs, f, ~] = cwt(w, 'FilterBank', fb);
-    [~, ifreq] = max(abs(squeeze(cfs)), [], 1);
-    maxf = f(ifreq(round(length(w) / 2)));
-    spkwnew(i) = 1000 / maxf;    
+    %     [cfs, f, ~] = cwt(w, 'FilterBank', fb);
+    %     [~, ifreq] = max(abs(squeeze(cfs)), [], 1);
+    %     maxf = f(ifreq(round(length(w) / 2)));
+    %     spkwnew(i) = 1000 / maxf;
 end
-toc
+
+% samples to ms
+tp = tp * 1000 / nfs;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 figure
-subplot(1, 2, 1)
-histogram(spkwnew, 60)
-subplot(1, 2, 2)
+subplot(2, 2, 2)
 histogram(spkw, 60)
+subplot(2, 2, 3)
+histogram(tp, 60)
+subplot(2, 2, 4)
+histogram(hpk, 60)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
@@ -171,6 +245,7 @@ cc.pyr = pyr;
 cc.tp = tp;
 cc.spkw = spkw;
 cc.asym = asym;
+cc.hpk = hpk;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % save
@@ -180,6 +255,13 @@ if saveVar
     save([basepath, '\', filename, '.cellClass.mat'], 'CellClass')
 end
 
+fprintf('\nthat took %.1f minutes\n', toc / 60)
+
 end
 
 % EOF
+
+% -------------------------------------------------------------------------
+% upsampling: Peyrache uses resample followed by a gaussian filter.
+% fft_upsample (by Stark) and interpft (Matlab) produce the same result
+% with minimum edge effects.

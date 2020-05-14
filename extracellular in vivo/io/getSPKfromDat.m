@@ -164,7 +164,7 @@ for j = 1 : nunits
     % initialize
     sniplength = diff(win) + 1;
     nsnips = length(stamps);
-    snips = zeros(length(ch), sniplength, nsnips);
+    snips = zeros(length(ch{grp(j)}), sniplength, nsnips);
     
     % go over stamps and snip data
     for i = 1 : length(stamps)
