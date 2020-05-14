@@ -14,18 +14,20 @@ function spikes = getSPKfromDat(varargin)
 % originally, the intention was to use snipFromDat.m. However, this
 % recreates a memory map for each unit. Thus, for 69 units and 2608583
 % spikes this took 24.5 minutes w/ snipFromDat and 42.5 min with one time
-% memmap. Thus, memmap was embedded within this function. Further, since
-% detrend is essentialy matrix multiplication with a regressor that only
-% depends on the waveform length, the matrices (w, r, c) are calculated
-% once in this function and used for all spikes. this significantly
-% decreased computation time. Note I did not thoroughly understand the
-% mathematics here but rather "stole" the lines from matlab detrend.m
+% memmap. Thus, memmap was embedded within this function.
 % -------------------------------------------------------------------------
-% 13 may 20 - compared detrending each spike and averaging vs. detrending
-% the average waveform. for 10 units, detrending each spike took 240 s vs
-% 78 s for detrending the average. The maximum difference was ~1e-13.
-% Still, it seems to me risky to detrend the average thus the default will
-% be to detrend each spike separately.
+% since detrend is essentialy matrix multiplication with a regressor that
+% only depends on the waveform length, the matrices (w, r, c) are
+% calculated once in this function and used for all spikes. this
+% significantly decreased computation time. Note I did not thoroughly
+% understand the mathematics here but rather "stole" the lines from matlab
+% detrend.m
+% -------------------------------------------------------------------------
+% compared detrending each spike and averaging vs. detrending the average
+% waveform. for 10 units, detrending each spike took 240 s vs 78 s for
+% detrending the average. The maximum difference was ~1e-13. Still, it
+% seems to me risky to detrend the average thus the default will be to
+% detrend each spike separately.
 % -------------------------------------------------------------------------
 %
 % INPUT:
