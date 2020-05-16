@@ -1,9 +1,9 @@
-path{1} = 'H:\Data\Dat\lh44\lh44_200208';
-path{2} = 'H:\Data\Dat\lh46\lh46_200225a';
-path{3} = 'H:\Data\Dat\lh46\lh46_200227a';
-path{4} = 'H:\Data\Dat\lh49\lh49_200319';
-path{5} = 'H:\Data\Dat\lh46\lh46_200225b';
-path{6} = 'H:\Data\Dat\lh45\lh45_200209';
+path{1} = 'E:\Data\Dat\lh44\lh44_200208';
+path{2} = 'E:\Data\Dat\lh46\lh46_200225a';
+path{3} = 'E:\Data\Dat\lh46\lh46_200227a';
+path{4} = 'E:\Data\Dat\lh49\lh49_200319';
+path{5} = 'E:\Data\Dat\lh46\lh46_200225b';
+path{6} = 'E:\Data\Dat\lh45\lh45_200209';
 
 force = true;
 nsessions = length(path);

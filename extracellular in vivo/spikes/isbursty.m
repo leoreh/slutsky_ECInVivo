@@ -40,9 +40,28 @@ binsize = 0.05;     % binsize for iis distribution [log10(ms)].
 isiwin = [-1 : binsize : 4];   % win for calc isi distribution [ms]
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% calculate
+% ALT 1: ratio in ACG ((Senzai and Buzsáki, 2017))
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% binSize = 0.001; % [s]
+% dur = 0.01;
+% [ccg1, t1] = CCG(spktimes, [], 'duration', dur, 'binSize', binSize);
+% binSize = 0.1; % [s]
+% dur = 0.6;
+% tic
+% [ccg2, t1] = CCG(spktimes, [], 'duration', dur, 'binSize', binSize);
+% toc
+% 
+% sum(ccg1(11 : -1 : 9, i, i))    
+% sum(ccg2(7 : -1 : 6, i, i))    
+% 
+% plotCCG('ccg', ccg2(:, i, i), 't', t1, 'basepath', basepath,...
+%         'saveFig', false, 'c', {c{b(i)}});
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% ALT 2: peak in ISI distribution (Medrihan et al., 2017)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    
 % initialize
 bpeak = nan(nunits, 1);
 bursty = zeros(nunits, 1);
