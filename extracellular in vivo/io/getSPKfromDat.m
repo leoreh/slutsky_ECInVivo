@@ -51,6 +51,8 @@ function spikes = getSPKfromDat(varargin)
 %   b2uv        numeric. conversion of bits to uV {0.195}
 %   dtrend      logical. detrend snippets {false}.
 %   l2norm      logical. L2 normalize snippets {false}.
+%   graphics    plot figure {1}.
+%   saveVar     save variable {1}.
 %
 % OUTPUT
 %   spikes      same struct as getSpikes with the following fields:
@@ -78,7 +80,7 @@ addOptional(p, 'basepath', pwd);
 addOptional(p, 'fname', '', @ischar);
 addOptional(p, 'fs', 20000, @isnumeric);
 addOptional(p, 'spktimes', {}, @iscell);
-addOptional(p, 'win', [-20 19], @isnumeric);
+addOptional(p, 'win', [-18 21], @isnumeric);
 addOptional(p, 'nchans', 35, @isnumeric);
 addOptional(p, 'grp', [], @isnumeric);
 addOptional(p, 'ch', {}, @iscell);
@@ -86,6 +88,8 @@ addOptional(p, 'precision', 'int16', @ischar);
 addOptional(p, 'b2uv', 0.195, @isnumeric);
 addOptional(p, 'dtrend', false, @islogical);
 addOptional(p, 'l2norm', false, @islogical);
+addOptional(p, 'saveVar', true, @islogical);
+addOptional(p, 'graphics', false, @islogical);
 
 parse(p, varargin{:})
 basepath = p.Results.basepath;
@@ -100,6 +104,8 @@ precision = p.Results.precision;
 b2uv = p.Results.b2uv;
 dtrend = p.Results.dtrend;
 l2norm = p.Results.l2norm;
+saveVar = p.Results.saveVar;
+graphics = p.Results.graphics;
 
 % size of one data point in bytes
 nbytes = class2bytes(precision);
@@ -134,7 +140,7 @@ if isempty(fname)
         end
     end
 end
-fprintf('\nextracting waveforms from %s\n\n', fname)
+fprintf('\nextracting waveforms from %s\n', fname)
 
 % memory map to dat file
 info = dir(fname);
@@ -160,7 +166,9 @@ W = [reshape(W, N, []), ones(N,1)];
 for j = 1 : nunits
     
     stamps = round(spktimes{j} * fs);
-       
+    
+    fprintf('working on cluster %d: %d spikes\n', j, length(stamps))
+    
     % initialize
     sniplength = diff(win) + 1;
     nsnips = length(stamps);
@@ -207,17 +215,35 @@ end
 % arrange struct and save
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-spkname = [basename '.spikes.mat'];
-load(spkname);
+if saveVar
+    spkname = [basename '.spikes.mat'];
+    load(spkname);
+    
+    spikes.avgwv = avgwv;
+    spikes.stdwv = stdwv;
+    spikes.maxwv = maxwv;
+    spikes.maxch = maxch;
+    
+    save([basepath filesep spkname], 'spikes')
+    
+    fprintf('\nthat took %.1f minutes\n', toc / 60)
+    
+    if graphics
+        for i = 1 : nunits
+            figure
+            plot(spikes.rawWaveform{i})
+            hold on
+            plot(spikes.maxwv(i, :))
+            legend({'Filtered', 'Detrended'})
+            set(gca, 'TickLength', [0 0], 'XTickLabel', [],...
+                'Color', 'none', 'XColor', 'none')
+                box off
+            txt = sprintf('clu %d from %s', i, fname);
+            title(txt, 'interpreter', 'none')
+        end
+    end
+end
 
-spikes.avgwv = avgwv;
-spikes.stdwv = stdwv;
-spikes.maxwv = maxwv;
-spikes.maxch = maxch;
-
-save([basepath filesep spkname], 'spikes')
-
-fprintf('\nthat took %.1f minutes\n', toc / 60)
 
 end
 

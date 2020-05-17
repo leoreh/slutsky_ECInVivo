@@ -1,4 +1,4 @@
-function [bursty] = isbursty(varargin)
+function [bursty, bpeak] = isbursty(varargin)
 
 % this function defines a cell as bursty if (1) there is a local maximum in
 % the isi log distribution between blim {[1.5 8]} and (2) if the ratio
@@ -16,7 +16,7 @@ function [bursty] = isbursty(varargin)
 %
 % TO DO LIST
 %   # implement Buzsaki ACG critirion
-%   # use prominance of peak
+%   # use prominance of peak instead ratio to baseline
 % 
 % 14 may 20 LH      
 
@@ -40,23 +40,25 @@ binsize = 0.05;     % binsize for iis distribution [log10(ms)].
 isiwin = [-1 : binsize : 4];   % win for calc isi distribution [ms]
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% ALT 1: ratio in ACG ((Senzai and Buzsáki, 2017))
+% ALT 1: ratio in ACG (Senzai and Buzsáki, 2017; Royer et al., 2012)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% binSize = 0.001; % [s]
-% dur = 0.01;
-% [ccg1, t1] = CCG(spktimes, [], 'duration', dur, 'binSize', binSize);
-% binSize = 0.1; % [s]
-% dur = 0.6;
-% tic
-% [ccg2, t1] = CCG(spktimes, [], 'duration', dur, 'binSize', binSize);
-% toc
-% 
-% sum(ccg1(11 : -1 : 9, i, i))    
-% sum(ccg2(7 : -1 : 6, i, i))    
-% 
-% plotCCG('ccg', ccg2(:, i, i), 't', t1, 'basepath', basepath,...
-%         'saveFig', false, 'c', {c{b(i)}});
+binSize = 0.001; % [s]
+dur = 0.1;
+[ccg, t] = CCG(spktimes, [], 'duration', dur, 'binSize', binSize);
+for i = 1 : nunits
+    acg = squeeze(ccg(:, i, i));
+    a = max(acg(51 : 60));      % acg peak in 0-10 ms
+    b = mean(acg(91 : 101));     % acg mean in 40-50 ms
+    if a > b
+        bi(i) = abs((a - b)) / a;
+    else
+        bi(i) = (a - b) / b;
+    end 
+end
+
+% plotCCG('ccg', ccg(:, i, i), 't', t, 'basepath', basepath,...
+%         'saveFig', false, 'c', {'k'});
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ALT 2: peak in ISI distribution (Medrihan et al., 2017)
