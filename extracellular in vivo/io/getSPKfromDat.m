@@ -21,7 +21,10 @@ function spikes = getSPKfromDat(varargin)
 % calculated once in this function and used for all spikes. this
 % significantly decreased computation time. Note I did not thoroughly
 % understand the mathematics here but rather "stole" the lines from matlab
-% detrend.m
+% detrend.m. in loadSpikes (CellExplorer by Buzsaki) they detrend the
+% average waveform after removing from it the mean value for each channel:
+% detrend(wf2 - mean(wf2,2)) where wf2 is a matrix ch x sample of the
+% average waveform. Also, they only work on 600 spikes.
 % -------------------------------------------------------------------------
 % compared detrending each spike and averaging vs. detrending the average
 % waveform. for 10 units, detrending each spike took 240 s vs 78 s for

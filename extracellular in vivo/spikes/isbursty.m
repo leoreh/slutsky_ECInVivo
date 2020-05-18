@@ -1,4 +1,4 @@
-function [bursty, bpeak] = isbursty(varargin)
+function [bursty, bpeak, bi] = isbursty(varargin)
 
 % this function defines a cell as bursty if (1) there is a local maximum in
 % the isi log distribution between blim {[1.5 8]} and (2) if the ratio

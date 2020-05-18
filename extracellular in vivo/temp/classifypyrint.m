@@ -1,13 +1,14 @@
-path{1} = 'H:\Data\Dat\lh44\lh44_200208';
-path{2} = 'H:\Data\Dat\lh46\lh46_200225a';
-path{3} = 'H:\Data\Dat\lh46\lh46_200227a';
-path{4} = 'H:\Data\Dat\lh49\lh49_200319';
-path{5} = 'H:\Data\Dat\lh46\lh46_200225b';
-path{6} = 'H:\Data\Dat\lh45\lh45_200209';
-path{7} = 'H:\Data\Dat\Refaela\120520_Bsl';
+path{1} = 'E:\Data\Dat\lh44\lh44_200208';
+path{2} = 'E:\Data\Dat\lh46\lh46_200225a';
+path{3} = 'E:\Data\Dat\lh46\lh46_200227a';
+path{4} = 'E:\Data\Dat\lh49\lh49_200319';
+path{5} = 'E:\Data\Dat\lh46\lh46_200225b';
+path{6} = 'E:\Data\Dat\lh45\lh45_200209';
+path{7} = 'E:\Data\Dat\Refaela\120520_Bsl';
 
 force = true;
 nsessions = length(path);
+su = [];
 
 if force
     waves = [];
@@ -22,6 +23,8 @@ if force
             'noPrompts', true, 'forceL', false);
         spktimes = [spktimes{:}, s{i}.times];
         nu(i) = length(s{i}.UID);
+        
+        su = [su, s{i}.su];
         
         waves = [waves, cat(1, s{i}.maxwv)'];
         
@@ -38,7 +41,7 @@ cc = cellclass('waves', waves, 'saveVar', false,...
     'fs', s{1}.samplingRate, 'man', false); 
 
 % burstiness
-[b, bidx] = isbursty('spktimes', spktimes);
+[b, bidx, bi] = isbursty('spktimes', spktimes);
 b(b == 0) = 2;
 c = {'k', 'r'};
 
