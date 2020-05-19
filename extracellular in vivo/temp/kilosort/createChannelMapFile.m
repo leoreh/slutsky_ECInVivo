@@ -1,10 +1,6 @@
  
-%  path = 'D:\dataTemp\lh46\lh46_200225b'
-%  create a channel map file
-
 Nchannels = 16;
-connected = ones(Nchannels, 1);
-% connected = [true(32, 1);false(7,1)];
+connected = true(Nchannels, 1);
 chanMap   = [(1:16)'];
 chanMap0ind = chanMap - 1;
 xcoords   = ones(Nchannels,1);

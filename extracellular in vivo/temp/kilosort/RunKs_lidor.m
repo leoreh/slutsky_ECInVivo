@@ -1,5 +1,4 @@
-function rez = runKS(path)
-
+function rez=RunKs(path)
 ops.chanMap             = [path 'chanMap.mat'];
 % ops.chanMap = 1:ops.Nchan; % treated as linear probe if no chanMap file
 
@@ -7,12 +6,10 @@ ops.chanMap             = [path 'chanMap.mat'];
 ops.fs = 24414.06;  
 
 % frequency for high pass filtering (150)
-% ops.fshigh = 250;   
-ops.fshigh = 150;   
+ops.fshigh = 250;   
 
 % minimum firing rate on a "good" channel (0 to skip)
-% ops.minfr_goodchannels = 0.1; 
-ops.minfr_goodchannels = 0; 
+ops.minfr_goodchannels = 0.1; 
 
 % threshold on projections (like in Kilosort1, can be different for last pass like [10 4])
 ops.Th = [10 4];  
@@ -24,8 +21,7 @@ ops.lam = 10;
 ops.AUCsplit = 0.9; 
 
 % minimum spike rate (Hz), if a cluster falls below this for too long it gets removed
-ops.minFR = 1/100; 
-% ops.minFR = 1/300; 
+ops.minFR = 1/300; 
 
 % number of samples to average over (annealed from first to second value) 
 ops.momentum = [20 400]; 
