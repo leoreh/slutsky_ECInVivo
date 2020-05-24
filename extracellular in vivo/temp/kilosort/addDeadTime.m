@@ -46,3 +46,4 @@ for i = 1 : length(spikes.ts)
     
 end
 
+isi = ISI(spikes)

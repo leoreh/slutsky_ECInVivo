@@ -15,7 +15,6 @@ function rez = runKS(varargin)
 %   nchans      numeric. number of channels in dat file.
 %   badch       numeric. bad or non-ephy channel (e.g accelerometer)
 %   ngrp        numeric. number of spiking groups. 
-%   trange      numeric. time range to sort [s]{[0 Inf]}
 %   saveFinal   logical. save final rez file {false}
 %   viaGui      logical. run ks via gui (true) or script {false}
 %   cleanDir    logical. delete temp_wh and move output to ks folder.
@@ -40,13 +39,12 @@ function rez = runKS(varargin)
 tic;
 
 p = inputParser;
-addOptional(p, 'basepath', pwd);
-addOptional(p, 'procpath', '');
+addOptional(p, 'basepath', pwd, @isstr);
+addOptional(p, 'procpath', '', @isstr);
 addOptional(p, 'fs', 20000, @isnumeric);
 addOptional(p, 'nchans', 35, @isnumeric);
 addOptional(p, 'badch', 33 : 35, @isnumeric);
 addOptional(p, 'ngrp', 8, @isnumeric);
-addOptional(p, 'trange', [0 Inf], @isnumeric);
 addOptional(p, 'saveFinal', false, @islogical);
 addOptional(p, 'viaGui', false, @islogical);
 addOptional(p, 'cleanDir', false, @islogical);
@@ -55,10 +53,9 @@ parse(p, varargin{:})
 basepath    = p.Results.basepath;
 procpath    = p.Results.procpath;
 fs          = p.Results.fs;
-nchans      = p.Results.nchans;
-badch       = p.Results.badch;
-ngrp        = p.Results.ngrp;
-trange      = p.Results.trange;
+nchans          = p.Results.fs;
+badch          = p.Results.fs;
+fs          = p.Results.fs;
 saveFinal   = p.Results.saveFinal;
 viaGui      = p.Results.viaGui;
 cleanDir    = p.Results.cleanDir;
@@ -105,6 +102,8 @@ save(fullfile(basepath, 'chanMap.mat'),...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ks parameters
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+ops.trange = [0 Inf]; % time range to sort
 
 % Thresholds on spike detection used during the optimization Th(1) or
 % during the final pass Th(2). These thresholds are applied to the template
@@ -169,7 +168,6 @@ ops.whiteningRange  = sum(connected);
 ops.chanMap         = fullfile(basepath, 'chanMap.mat');
 ops.fs              = fs;  % sampling rate
 ops.NchanTOT        = nchans; % total number of channels in your recording
-ops.trange          = trange; % time range to sort [s]
 
 datfile             = dir(fullfile(basepath, '*.dat')); % find the binary file
 ops.fbinary         = fullfile(basepath, datfile(1).name);
