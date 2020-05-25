@@ -164,7 +164,6 @@ if concat
         copyfile(xmlfile, exPathNew)
         movefile([exPathNew, filesep, xmlfiles.name], xmlnew);
     end
-    
 else
     for i = 1 : length(recPath)
        % 

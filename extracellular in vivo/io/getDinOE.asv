@@ -24,7 +24,6 @@ function din = getDinOE(varargin)
 % CALLS:
 %   bz_BasenameFromBasepath
 %   load_open_ephys_binary
-%   class2bytes
 %
 % TO DO LIST:
 %   handle multiple channels (e.g. vid and stim)
@@ -32,7 +31,6 @@ function din = getDinOE(varargin)
 %   compare .npy and .dat timestamps
 %
 % 09 apr 20 LH      
-% 20 may 20 LH      input multiple paths
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -43,7 +41,7 @@ addOptional(p, 'basepath', pwd);
 addOptional(p, 'newpath', '', @ischar);
 addOptional(p, 'newname', '', @ischar);
 addOptional(p, 'concat', true, @islogical);
-addOptional(p, 'precision', 'int16', @isstr);
+addOptional(p, 'nbytes', 2, @isnumeric);
 addOptional(p, 'nchans', 35, @isnumeric);
 addOptional(p, 'saveVar', true, @islogical);
 
@@ -52,18 +50,9 @@ basepath = p.Results.basepath;
 newpath = p.Results.newpath;
 newname = p.Results.newname;
 concat = p.Results.concat;
-precision = p.Results.precision;
+nbytes = p.Results.nbytes;
 nchans = p.Results.nchans;
 saveVar = p.Results.saveVar;
-
-% size of one data point in bytes
-nbytes = class2bytes(precision);
-
-% initialize
-datFiles = [];
-jsonFiles = [];
-nsamps = 0;
-data = [];
 
 % set basepath to cell
 basepath = cellstr(basepath);
@@ -86,11 +75,8 @@ end
 destination = [newpath, filesep, newname, '.din.mat'];
 
 % find corresponding .dat and din.npy files
-for i = 1 : length(basepath)
-    datFiles = dir([basepath{i} filesep '**' filesep '*dat']);
-    jsonFiles = dir([basepath{i} filesep '**' filesep '*oebin']);
-end
-
+jsonFiles = dir([basepath filesep '**' filesep '*oebin']);
+datFiles = dir([basepath filesep '**' filesep '*dat']);
 if length(jsonFiles) ~= length(datFiles)
     warning('number of .oebin and .dat files not equal')
     return
@@ -100,10 +86,9 @@ if length(jsonFiles) > 1 && ~concat
         'function cannot handle multiple files without concatination'], basepath)
 end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% process
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
+% go over files, load and arrange
+nsamps = 0;
+data = [];
 for i = 1 : length(jsonFiles)
     
     % create file maps
@@ -113,23 +98,27 @@ for i = 1 : length(jsonFiles)
 
     % play with data
     data = [data; mDin.Timestamps(mDin.Data > 0)];
-     
+    
+%     for i = 1 : length(data)
+%     idx = find(mDat.Timestamps == data(i));
+%     v = mDat.Data.Data.mapped(14, idx - 4000 : idx + 4000);
+%     figure; plot(v)
+%     end
+%     
     % get nsamps of recording from corresponding .dat file
     nsamps(i) = datFiles(i).bytes / nbytes / nchans; 
     nsamps(i) = mDat.Timestamps(end);
     totsamps = cumsum(nsamps);
-    
-    if data(end) > totsamps(end)
-        txt = sprintf(['digital input longer than recording duration\n',...
-            'check if argument nchans is correct']);
-        error(txt)
-    end
+%     if data(end) > totsamps(end)
+%         txt = sprintf(['digital input longer than recording duration\n',...
+%             'check if argument nchans is correct']);
+%         error(txt)
+%     end
 end
 
 % arrange struct output and save
 din.data = data;
 din.origDir = {jsonFiles.folder};
-
 if saveVar
     save(destination, 'din');
 end

@@ -9,7 +9,7 @@ function spikes = getSPKfromDat(varargin)
 % of squares of each waveform is one. This effectively neglects the
 % amplitude and allows, e.g., for spikes in a burst to be classified
 % together. However, since this function is designed to extract spikes
-% after sorting I do not see any reason to implement this.
+% after sorting I do not see any reason to use this.
 % -------------------------------------------------------------------------
 % originally, the intention was to use snipFromDat.m. However, this
 % recreates a memory map for each unit. Thus, for 69 units and 2608583

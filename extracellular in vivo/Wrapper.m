@@ -4,14 +4,14 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 1: file conversion
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'H:\Data\Dat\lh46\lh46_200225a';
+basepath = 'D:\tempData\LHa8\LHa8';
 store = 'Raw1';
 fs = 24414.06;
-blocks = [5, 10];
+blocks = [15, 16, 23, 24, 33, 34];
 chunksize = 300;
-% mapch = [1 : 16];
+mapch = [1 : 16];
 % mapch = [];
-mapch = [1 : 2 : 7, 2 : 2 : 8, 9 : 2 : 15, 10 : 2 : 16];
+% mapch = [1 : 2 : 7, 2 : 2 : 8, 9 : 2 : 15, 10 : 2 : 16];
 rmvch = [];
 clip = cell(1, 1);
 
@@ -22,11 +22,13 @@ clip = cell(1, 1);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 1b: open ephys
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'H:\Data\Dat\lh50\2020-04-23_09-32-05';
+basepath = 'D:\tempData\lh50\2020-04-23_09-32-05';
 rmvch = [18 : 21];
 mapch = [25 26 27 28 30 1 2 29 3 : 14 31 0 15 16 17 : 24 32 33 34] + 1;
-datInfo = preprocOE('basepath', basepath, 'exp', [2], 'rmvch', rmvch,...
-    'mapch', mapch, 'concat', true, 'nchans', 35);
+exp = [];
+rec = {};
+datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
+    'rmvch', rmvch, 'mapch', mapch, 'concat', true, 'nchans', 35);
 
 basepath = 'H:\Data\Dat\lh50\lh50_200423\090405_e1r1-1';
 datInfo = preprocDat('basepath', basepath, 'fname', '', 'mapch', mapch,...
