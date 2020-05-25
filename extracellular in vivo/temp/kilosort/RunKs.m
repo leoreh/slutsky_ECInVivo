@@ -1,120 +1,237 @@
-function rez = runKS(path)
+function rez = runKS(varargin)
 
-ops.chanMap             = [path 'chanMap.mat'];
-% ops.chanMap = 1:ops.Nchan; % treated as linear probe if no chanMap file
+% wrapper for running kilosort. based on configFile384.m and
+% make_eMouseChannelMap.m. first creates channel map and channel_shanks
+% file. designed for tetrodes. handles ks parameters arranged here
+% according to those that should be played with. alas runs the algorithm
+% and arranges the output.
+% 
+% INPUT:
+%   basepath    string. path to recording folder {pwd}. if multiple dat
+%               files exist only the first will be processed
+%   procpath    string. path to where processing will occur.
+%               should be a fast ssd
+%   fs          numeric. sampling frequency [hz]{20000}
+%   nchans      numeric. number of channels in dat file.
+%   badch       numeric. bad or non-ephy channel (e.g accelerometer)
+%   ngrp        numeric. number of spiking groups. 
+%   trange      numeric. time range to sort [s]{[0 Inf]}
+%   saveFinal   logical. save final rez file {false}
+%   viaGui      logical. run ks via gui (true) or script {false}
+%   cleanDir    logical. delete temp_wh and move output to ks folder.
+%               note that (1) without the dat file phy cannot display the
+%               trace view or raw waveform (only template), and (2)
+%               cellExplorer requires the xml within the ks folder. this is
+%               redundant given cleanKSdir.m
+%
+% DEPENDENCIES
+%   npy-matlab
+%   kilosort 2
+%
+% TO DO LIST:
+%   # currently, only the gui can be used in cases where one channel of a
+%   tetrode is bad
+% 
+% 22 may 20 LH
 
-% sample rate
-ops.fs = 24414.06;  
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% arguments
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+tic;
 
-% frequency for high pass filtering (150)
-% ops.fshigh = 250;   
-ops.fshigh = 150;   
+p = inputParser;
+addOptional(p, 'basepath', pwd);
+addOptional(p, 'procpath', '');
+addOptional(p, 'fs', 20000, @isnumeric);
+addOptional(p, 'nchans', 35, @isnumeric);
+addOptional(p, 'badch', 33 : 35, @isnumeric);
+addOptional(p, 'ngrp', 8, @isnumeric);
+addOptional(p, 'trange', [0 Inf], @isnumeric);
+addOptional(p, 'saveFinal', false, @islogical);
+addOptional(p, 'viaGui', false, @islogical);
+addOptional(p, 'cleanDir', false, @islogical);
 
-% minimum firing rate on a "good" channel (0 to skip)
-% ops.minfr_goodchannels = 0.1; 
-ops.minfr_goodchannels = 0; 
+parse(p, varargin{:})
+basepath    = p.Results.basepath;
+procpath    = p.Results.procpath;
+fs          = p.Results.fs;
+nchans      = p.Results.nchans;
+badch       = p.Results.badch;
+ngrp        = p.Results.ngrp;
+trange      = p.Results.trange;
+saveFinal   = p.Results.saveFinal;
+viaGui      = p.Results.viaGui;
+cleanDir    = p.Results.cleanDir;
 
-% threshold on projections (like in Kilosort1, can be different for last pass like [10 4])
-ops.Th = [10 4];  
+if isempty(procpath)
+    procpath = basepath;
+end
 
-% how important is the amplitude penalty (like in Kilosort1, 0 means not used, 10 is average, 50 is a lot) 
-ops.lam = 10;  
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% channel map
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% splitting a cluster at the end requires at least this much isolation for each sub-cluster (max = 1)
-ops.AUCsplit = 0.9; 
+% list of channel indices (including dead \ non-ephys channels)
+chanMap = [1 : nchans];
+chanMap0ind = chanMap - 1;
+% the first thing Kilosort does is reorder the data with data = data(chanMap, :).
+% Now we declare which channels are "connected" in this normal ordering,
+% meaning not dead or used for non-ephys data
+connected = true(nchans, 1);
+connected(badch) = false; % e.g. acceleration
+% now we define the horizontal (x) and vertical (y) coordinates of these
+% channels. For dead or nonephys channels the values won't matter. Again
+% I will take this information from the specifications of the probe. These
+% are in um here, but the absolute scaling doesn't really matter in the
+% algorithm.
+xcoords = repmat([20 40 60 80], 1, ngrp);
+xcoords(badch) = NaN;
+ycoords = sort(repmat([20 : 20 : ngrp * 20], 1, 4));
+ycoords(badch) = NaN;
+% Often, multi-shank probes or tetrodes will be organized into groups of
+% channels that cannot possibly share spikes with the rest of the probe. This helps
+% the algorithm discard noisy templates shared across groups. In
+% this case, we set kcoords to indicate which group the channel belongs to.
+kcoords = [1 1 1 1 2 2 2 2 3 3 3 3 4 4 4 4 5 5 5 5 6 6 6 6 7 7 7 7];
+kcoords(29 : 31) = NaN;
+% at this point in Kilosort we do data = data(connected, :), ycoords =
+% ycoords(connected), xcoords = xcoords(connected) and kcoords =
+% kcoords(connected) and no more channel map information is needed (in particular
+% no "adjacency graphs" like in KlustaKwik).
+% Now we can save our channel map and also a channel_shanks file for phy.
+save(fullfile(basepath, 'chanMap.mat'),...
+    'chanMap', 'chanMap0ind', 'connected', 'xcoords', 'ycoords', 'kcoords', 'fs')
 
-% minimum spike rate (Hz), if a cluster falls below this for too long it gets removed
-ops.minFR = 1/100; 
-% ops.minFR = 1/300; 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% ks parameters
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% number of samples to average over (annealed from first to second value) 
-ops.momentum = [20 400]; 
+% Thresholds on spike detection used during the optimization Th(1) or
+% during the final pass Th(2). These thresholds are applied to the template
+% projections, not to the voltage. Typically, Th(1) is high enough that the
+% algorithm only picks up sortable units, while Th(2) is low enough that it
+% can pick all of the spikes of these units. It doesn't matter if the final
+% pass also collects noise: an additional per neuron threshold is set
+% afterwards, and a splitting step ensures clusters with multiple units get
+% split. {[10 4]}
+ops.Th = [10 2];
+
+% how important is the amplitude penalty {10}. The individual spike
+% amplitudes are biased towards the mean of the cluster by this factor; 50
+% is a lot, 0 is no bias.
+ops.lam = 10;
+
+% Threshold on the area under the curve (AUC) criterion for performing a
+% split in the final step. If the AUC of the split is higher than this,
+% that split is considered good. However, a good split only goes through
+% if, additionally, the cross-correlogram of the split units does not
+% contain a big dip at time 0. splitting a cluster at the end requires at
+% least this much isolation for each sub-cluster (max = 1){0.9}.
+ops.AUCsplit = 0.9;
+
+% frequency for high pass filtering {150}
+ops.fshigh = 300;
+
+% minimum firing rate on a "good" channel (0 to skip){0.1}
+ops.minfr_goodchannels = 0;
+
+% minimum spike rate (Hz), if a cluster falls below this for too long it
+% gets removed {1/50}.
+ops.minFR = 1/100;
+
+% number of samples to average over (annealed from first to second value)
+ops.momentum = [20 400];
 
 % spatial constant in um for computing residual variance of spike
-ops.sigmaMask = 30; 
+ops.sigmaMask = 30;
 
 % threshold crossings for pre-clustering (in PCA projection space)
-ops.ThPre = 8; 
-%% danger, changing these settings can lead to fatal errors
-% options for determining PCs
-ops.spkTh           = -4.5;      % spike threshold in standard deviations (-6)
-ops.reorder         = 1;       % whether to reorder batches for drift correction. 
-ops.nskip           = 25;  % how many batches to skip for determining spike PCs
+ops.ThPre = 8;
 
-ops.GPU                 = 1; % has to be 1, no CPU version yet, sorry
-% ops.Nfilt               = 1024; % max number of clusters
-ops.nfilt_factor        = 4; % max number of clusters per good channel (even temporary ones)
-ops.ntbuff              = 64;    % samples of symmetrical buffer for whitening and spike detection
-ops.NT                  = 64*1024+ ops.ntbuff; % must be multiple of 32 + ntbuff. This is the batch size (try decreasing if out of memory). 
-ops.whiteningRange      = 16; % number of channels to use for whitening each channel
-ops.nSkipCov            = 25; % compute whitening matrix from every N-th batch
-ops.scaleproc           = 200;   % int16 scaling of whitened data
-ops.nPCs                = 3; % how many PCs to project the spikes into
-ops.useRAM              = 0; % not yet available
+ops.spkTh           = -4.5;     % spike threshold in standard deviations {-6}
+ops.reorder         = 1;        % whether to reorder batches for drift correction.
+ops.nskip           = 25;       % how many batches to skip for determining spike PCs
+% ops.Nfilt         = 1024;     % max number of clusters
+ops.nfilt_factor    = 4;        % max number of clusters per good channel (even temporary ones)
+ops.ntbuff          = 64;       % samples of symmetrical buffer for whitening and spike detection
+ops.nSkipCov        = 25;       % compute whitening matrix from every N-th batch
+ops.scaleproc       = 200;      % int16 scaling of whitened data
+ops.nPCs            = 3;        % how many PCs to project the spikes into
+ops.GPU             = 1;        % has to be 1, no CPU version yet, sorry
+ops.useRAM          = 0;        % not yet available
 
-%%
+% batch size (try decreasing if out of memory). must be multiple of 32 + ntbuff.
+ops.NT              = 64 * 1024 + ops.ntbuff;
 
+% number of channels to use for whitening each channel
+ops.whiteningRange  = sum(connected);
 
-rootH = path;
-ops.fproc       = fullfile(rootH, 'temp_wh.dat'); % proc file on a fast SSD
-ops.chanMap = fullfile(path, 'ChanMap.mat');
+ops.chanMap         = fullfile(basepath, 'chanMap.mat');
+ops.fs              = fs;  % sampling rate
+ops.NchanTOT        = nchans; % total number of channels in your recording
+ops.trange          = trange; % time range to sort [s]
 
-ops.trange = [0 Inf]; % time range to sort
-ops.NchanTOT    = 16; % total number of channels in your recording
+datfile             = dir(fullfile(basepath, '*.dat')); % find the binary file
+ops.fbinary         = fullfile(basepath, datfile(1).name);
+ops.fproc           = fullfile(procpath, 'temp_wh.dat'); % path to processing file
 
-% the binary file is in this folder
-rootZ = path;
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% run ks
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% this block runs all the steps of the algorithm
-fprintf('Looking for data inside %s \n', rootZ)
+fprintf('Looking for data inside %s \n', basepath)
 
-% is there a channel map file in this folder?
-fs = dir(fullfile(rootZ, 'chan*.mat'));
-if ~isempty(fs)
-    ops.chanMap = fullfile(rootZ, fs(1).name);
+if viaGui
+    kilosort
+else
+    % preprocess data to create temp_wh.dat
+    rez = preprocessDataSub(ops);
+    
+    % time-reordering as a function of drift
+    rez = clusterSingleBatches(rez);
+    
+    % saving here is a good idea, because the rest can be resumed after loading rez
+    save(fullfile(basepath, 'rez.mat'), 'rez', '-v7.3');
+    
+    % main tracking and template matching algorithm
+    rez = learnAndSolve8b(rez);
+    
+    % final merges
+    rez = find_merges(rez, 1);
+    
+    % final splits by SVD
+    rez = splitAllClusters(rez, 1);
+    
+    % final splits by amplitudes
+    rez = splitAllClusters(rez, 0);
+    
+    % decide on cutoff
+    rez = set_cutoff(rez);
+    
+    fprintf('found %d good units \n', sum(rez.good > 0))
+    
+    % write to phy
+    fprintf('Saving results to Phy \n')
+    if cleanDir
+        fprintf('removing temp files \n')
+        savepath = fullfile(basepath, 'ks');
+        mkdir(savepath)
+        delete(fullfile(basepath, 'temp_wh.dat'))
+        movefile(fullfile(basepath, 'chanMap.mat'), savepath)
+        xmlfiles = dir('*.xml');
+        copyfile(xmlfiles.name, savepath)
+    else
+        savepath = basepath;
+    end
+    rezToPhy(rez, savepath); % note this function delets all .npy in path
 end
 
-% find the binary file
-fs          = [dir(fullfile(rootZ, '*.bin')) dir(fullfile(rootZ, '*.dat'))];
-ops.fbinary = fullfile(rootZ, fs(1).name);
+% save channel_shanks file 
+writeNPY(kcoords(~isnan(kcoords)), fullfile(savepath, 'channel_shanks.npy'));
 
-% preprocess data to create temp_wh.dat
-rez = preprocessDataSub(ops);
-
-% time-reordering as a function of drift
-rez = clusterSingleBatches(rez);
-save(fullfile(rootZ, 'rez.mat'), 'rez', '-v7.3');
-
-% main tracking and template matching algorithm
-rez = learnAndSolve8b(rez);
-
-% final merges
-rez = find_merges(rez, 1);
-
-% final splits by SVD
-rez = splitAllClusters(rez, 1);
-
-% final splits by amplitudes
-rez = splitAllClusters(rez, 0);
-
-% decide on cutoff
-rez = set_cutoff(rez);
-
-fprintf('found %d good units \n', sum(rez.good>0))
-
-% write to Phy
-fprintf('Saving results to Phy  \n')
-rezToPhy(rez, rootZ);
-
-%% if you want to save the results to a Matlab file... 
-
-% discard features in final rez file (too slow to save)
-% rez.cProj = [];
-% rez.cProjPC = [];
-
-% save final results as rez2
-fprintf('Saving final results in rez2  \n')
-fname = fullfile(rootZ, 'rez2.mat');
-save(fname, 'rez', '-v7.3');
-
+% save final results 
+if saveFinal
+    fprintf('saving final results \n')
+    save(fullfile(basepath, 'rez.mat'), 'rez', '-v7.3');
 end
+

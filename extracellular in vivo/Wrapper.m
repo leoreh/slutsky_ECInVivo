@@ -190,7 +190,7 @@ cc = cellclass('waves', waves,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 winBL = [info.lns(1) info.lns(3)] * spikes.samplingRate * 60;
 fr = FR(x, 'basepath', basepath, 'graphics', false, 'saveFig', false,...
-    'binsize', 60, 'saveVar', true, 'smet', 'MA');
+    'binsize', 60, 'saveVar', false, 'smet', 'MA');
 
 % unite all units
 x = {sort(vertcat(spikes.times{:}))};
