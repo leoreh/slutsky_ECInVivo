@@ -93,12 +93,20 @@ ycoords(badch) = NaN;
 % the algorithm discard noisy templates shared across groups. In
 % this case, we set kcoords to indicate which group the channel belongs to.
 kcoords = [1 1 1 1 2 2 2 2 3 3 3 3 4 4 4 4 5 5 5 5 6 6 6 6 7 7 7 7];
-kcoords(29 : 31) = NaN;
+kcoords(badch) = NaN;
 % at this point in Kilosort we do data = data(connected, :), ycoords =
 % ycoords(connected), xcoords = xcoords(connected) and kcoords =
 % kcoords(connected) and no more channel map information is needed (in particular
 % no "adjacency graphs" like in KlustaKwik).
 % Now we can save our channel map and also a channel_shanks file for phy.
+
+kcoords = [1 1 1 1 2 2 2 2 3 3 3 3 4 4 4 5 5 6 6 7 7 7 8 8];
+xcoords = [20 40 60 80 20 40 60 80 20 40 60 80 20 40 60 20 40 20 40 20 40 60 20 40];
+ycoords = [20 20 20 20 40 40 40 40 60 60 60 60 80 80 80 100 100 120 120 140 140 140 180 180];
+xcoords(badch) = NaN;
+ycoords(badch) = NaN;
+kcoords(badch) = NaN;
+
 save(fullfile(basepath, 'chanMap.mat'),...
     'chanMap', 'chanMap0ind', 'connected', 'xcoords', 'ycoords', 'kcoords', 'fs')
 

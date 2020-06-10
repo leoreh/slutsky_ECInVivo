@@ -1,4 +1,4 @@
-function acc = getAccFromDat(varargin)
+function acc = getACCfromDat(varargin)
 
 % get 3-axis accelerometer signal from dat file and return the acceleration
 % amplitude. based on

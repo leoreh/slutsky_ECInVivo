@@ -22,11 +22,12 @@ clip = cell(1, 1);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 1b: open ephys
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'D:\tempData\lh50\2020-04-23_09-32-05';
-rmvch = [18 : 21];
+basepath = 'F:\Data\Dat\lh52\2020-06-09_09-05-32';
+rmvch = [10, 12, 13, 16, 17, 21, 23, 24];
 mapch = [25 26 27 28 30 1 2 29 3 : 14 31 0 15 16 17 : 24 32 33 34] + 1;
-exp = [];
-rec = {};
+exp = [10];
+rec = cell(max(exp), 1);
+% rec{exp} = 1 : 4;
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
     'rmvch', rmvch, 'mapch', mapch, 'concat', true, 'nchans', 35);
 
@@ -45,12 +46,12 @@ fepsp = getfEPSPfromOE('basepath', basepath, 'fname', '', 'nchans', 31,...
     'force', true);  
 
 % acceleration
-basepath = 'H:\Data\Dat\lh50\lh50_200428\090410_e3r1-1';
-ch = [29 30 31];
-nchans = 31;
-acc = getAccFromDat('basepath', basepath, 'fname', '', 'nchans', nchans,...
-    'ch', ch, 'force', true, 'saveVar', true, 'graphics', true,...
-    'fs', 1250);
+newch = length(mapch) - length(rmvch);
+chAcc = [newch : -1 : newch - 2];
+newpath = fileparts(datInfo.newFile);
+getACCfromDat('basepath', newpath, 'fname', '',...
+    'nchans', newch, 'ch', chAcc, 'force', false, 'saveVar', true,...
+    'graphics', false, 'fs', 1250);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 2: LFP

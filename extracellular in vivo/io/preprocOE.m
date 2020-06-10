@@ -8,12 +8,12 @@ function datInfo = preprocOE(varargin)
 %               all. refers to exp name and not number of folders (i.e. if
 %               only exp 1 and 3 exist in basepath, than exp should be [1
 %               3] and not [1 2].
-%   rec         cell with n arrays where n = length(exp). each cell
+%   rec         cell with n arrays where n = max(exp). each cell
 %               contains indices to the relavent recordings of that
 %               experiment. also corresponds to name and not number of
 %               folders.
 %   concat      logical. concatenate dat files in experiments {true}
-%   mapch       vec. new order of channels {[]}
+%   mapch       vec. new order of channels {[]}. 1-based. 
 %   rmvch       vec. channels to remove (according to original order) {[]}
 %   nchans      numeric. number of channels in dat file {35}.
 %
@@ -76,7 +76,7 @@ mkdir(newpath)
 % find paths to relavent experiments
 files = dir(['**' filesep '*.*']);
 expFolders = files(contains({files.name}, 'experiment'));
-expNames = {expFolders.name};
+expNames = natsort({expFolders.name});
 if isempty(exp)      
     for i = 1 : length(expNames)
     exp(i) = str2num(char(regexp(expFolders(i).name, [filesep 'd*'], 'Match')));
@@ -91,9 +91,9 @@ fprintf('\nfound %d experiments\n', length(expFolders))
 k = 1;
 for i = 1 : length(exp)
     expIdx(i) = find(strcmp(expNames, ['experiment' num2str(exp(i))]));
-    exPath{i} = fullfile(expFolders(expIdx(i)).folder, expFolders(expIdx(i)).name);
+    exPath{i} = fullfile(expFolders(expIdx(i)).folder, expNames(expIdx(i)));
     % get time from xml file
-    if isequal(exp(expIdx(i)), 1)
+    if isequal(expIdx(i), 1)
         xmlname = ['settings.xml'];
     else
         xmlname = ['settings_' num2str(expIdx(i)) '.xml'];
@@ -105,10 +105,10 @@ for i = 1 : length(exp)
     % get recording folders in each experiment
     recFolders = files(contains({files.name}, 'recording') &...
         strcmp({files.folder}, exPath{i}));
-    recNames = {recFolders.name};
+    recNames = natsort({recFolders.name});
     if isempty(rec{exp(i)})
         for iii = 1 : length(recNames)
-            rec{exp(i)}(iii) = str2num(char(regexp(expFolders(iii).name, [filesep 'd*'], 'Match')));
+            rec{exp(i)}(iii) = str2num(char(regexp(expNames{iii}, [filesep 'd*'], 'Match')));
         end
     end
     for ii = 1 : length(rec{exp(i)})
@@ -148,7 +148,7 @@ if concat
     % get acceleration
     newch = length(mapch) - length(rmvch);
     chAcc = [newch : -1 : newch - 2];
-    getAccFromDat('basepath', exPathNew, 'fname', '',...
+    getACCfromDat('basepath', exPathNew, 'fname', '',...
         'nchans', newch, 'ch', chAcc, 'force', false, 'saveVar', true,...
         'graphics', false, 'fs', 1250);
     

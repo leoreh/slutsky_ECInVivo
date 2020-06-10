@@ -110,7 +110,7 @@ for i = 1 : length(jsonFiles)
     jsonName = fullfile(jsonFiles(i).folder, jsonFiles(i).name);
     mDin = load_open_ephys_binary(jsonName, 'events', 1, 'mmap');
     mDat = load_open_ephys_binary(jsonName, 'continuous', 1, 'mmap');
-
+       
     % play with data
     data = [data; mDin.Timestamps(mDin.Data > 0)];
      
@@ -118,6 +118,12 @@ for i = 1 : length(jsonFiles)
     nsamps(i) = datFiles(i).bytes / nbytes / nchans; 
     nsamps(i) = mDat.Timestamps(end);
     totsamps = cumsum(nsamps);
+    
+    % return if there are no events
+    if isempty(data)
+        warning('no events found, skipping Din')
+        return
+    end
     
     if data(end) > totsamps(end)
         txt = sprintf(['digital input longer than recording duration\n',...
