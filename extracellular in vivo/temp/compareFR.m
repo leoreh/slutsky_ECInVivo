@@ -106,7 +106,7 @@ for i = 2 : nsessions
     ylim([0 20])
     hold on
     % yyaxis right
-    % plot(a{i}.tstamps / a{i}.fs_orig / 60, a{i}.mag)
+    % plot(a{i}.tstamps / a{i}.fs_orig / 60, a{i}.mag)  
     Y = ylim;
     plot([di{i}.nsamps(1) / fs / 60 di{i}.nsamps(1) / fs / 60], Y)
     fill([a{i}.sleep fliplr(a{i}.sleep)]' / 60, [Y(1) Y(1) Y(2) Y(2)],...

@@ -94,21 +94,19 @@ msleep = cell2nanmat(cellsleep);
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-cm{2}.refractoryPeriodViolation < 4
-
-units = 
-
 % fr of each unit during entire recording
 figure
-for i = 1 : nsessions
+for i = 2 : nsessions
+    units = cm{i}.refractoryPeriodViolation < 5;
+    
     subplot(1, nsessions, i)
-    stdshade(fr{i}.strd, 0.5, 'k')
+    stdshade(fr{i}.strd(units, :), 0.5, 'k')
     
 %     plot(fr{i}.tstamps / 60, fr{i}.strd)
     ylim([0 20])
     hold on
     % yyaxis right
-    % plot(a{i}.tstamps / a{i}.fs_orig / 60, a{i}.mag)
+    % plot(a{i}.tstamps / a{i}.fs_orig / 60, a{i}.mag) 
     Y = ylim;
     plot([di{i}.nsamps(1) / fs / 60 di{i}.nsamps(1) / fs / 60], Y)
     fill([a{i}.sleep fliplr(a{i}.sleep)]' / 60, [Y(1) Y(1) Y(2) Y(2)],...
