@@ -15,6 +15,9 @@ function rez = runKS(varargin)
 %   nchans      numeric. number of channels in dat file.
 %   badch       numeric. bad or non-ephy channel (e.g accelerometer)
 %   ngrp        numeric. number of spiking groups. 
+%   kc          numeric. electrode groups. see in arguments section.
+%   yc          numeric. x coordinates. see in arguments section.
+%   xc          numeric. y coordinates. see in arguments section.
 %   trange      numeric. time range to sort [s]{[0 Inf]}
 %   saveFinal   logical. save final rez file {false}
 %   viaGui      logical. run ks via gui (true) or script {false}
@@ -30,7 +33,7 @@ function rez = runKS(varargin)
 %
 % TO DO LIST:
 %   # currently, only the gui can be used in cases where one channel of a
-%   tetrode is bad
+%   tetrode is bad (done - 11 jun 20)
 % 
 % 22 may 20 LH
 
@@ -46,6 +49,9 @@ addOptional(p, 'fs', 20000, @isnumeric);
 addOptional(p, 'nchans', 35, @isnumeric);
 addOptional(p, 'badch', 33 : 35, @isnumeric);
 addOptional(p, 'ngrp', 8, @isnumeric);
+addOptional(p, 'kc', [], @isnumeric);
+addOptional(p, 'yc', [], @isnumeric);
+addOptional(p, 'xc', [], @isnumeric);
 addOptional(p, 'trange', [0 Inf], @isnumeric);
 addOptional(p, 'saveFinal', false, @islogical);
 addOptional(p, 'viaGui', false, @islogical);
@@ -84,31 +90,31 @@ connected(badch) = false; % e.g. acceleration
 % I will take this information from the specifications of the probe. These
 % are in um here, but the absolute scaling doesn't really matter in the
 % algorithm.
-xcoords = repmat([20 40 60 80], 1, ngrp);
-xcoords(badch) = NaN;
-ycoords = sort(repmat([20 : 20 : ngrp * 20], 1, 4));
-ycoords(badch) = NaN;
+if isempty(xc)
+    xc = repmat([20 40 60 80], 1, ngrp);
+    xc(badch) = NaN;
+end
+if isempty(yc)
+    yc = sort(repmat([20 : 20 : ngrp * 20], 1, 4));
+    yc(badch) = NaN;
+end
 % Often, multi-shank probes or tetrodes will be organized into groups of
 % channels that cannot possibly share spikes with the rest of the probe. This helps
 % the algorithm discard noisy templates shared across groups. In
-% this case, we set kcoords to indicate which group the channel belongs to.
-kcoords = [1 1 1 1 2 2 2 2 3 3 3 3 4 4 4 4 5 5 5 5 6 6 6 6 7 7 7 7];
-kcoords(badch) = NaN;
-% at this point in Kilosort we do data = data(connected, :), ycoords =
-% ycoords(connected), xcoords = xcoords(connected) and kcoords =
-% kcoords(connected) and no more channel map information is needed (in particular
+% this case, we set kc to indicate which group the channel belongs to.
+if isempty(kc)
+    for i = 1 : ngrp
+        kcoords = [kcoords, ones(1, 4) * i];
+    end
+    kc(badch) = NaN;
+end
+% at this point in Kilosort we do data = data(connected, :), yc =
+% yc(connected), xc = xc(connected) and kc =
+% kc(connected) and no more channel map information is needed (in particular
 % no "adjacency graphs" like in KlustaKwik).
 % Now we can save our channel map and also a channel_shanks file for phy.
-
-kcoords = [1 1 1 1 2 2 2 2 3 3 3 3 4 4 4 5 5 6 6 7 7 7 8 8];
-xcoords = [20 40 60 80 20 40 60 80 20 40 60 80 20 40 60 20 40 20 40 20 40 60 20 40];
-ycoords = [20 20 20 20 40 40 40 40 60 60 60 60 80 80 80 100 100 120 120 140 140 140 180 180];
-xcoords(badch) = NaN;
-ycoords(badch) = NaN;
-kcoords(badch) = NaN;
-
 save(fullfile(basepath, 'chanMap.mat'),...
-    'chanMap', 'chanMap0ind', 'connected', 'xcoords', 'ycoords', 'kcoords', 'fs')
+    'chanMap', 'chanMap0ind', 'connected', 'xc', 'yc', 'kc', 'fs')
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ks parameters
@@ -235,7 +241,7 @@ else
 end
 
 % save channel_shanks file 
-writeNPY(kcoords(~isnan(kcoords)), fullfile(savepath, 'channel_shanks.npy'));
+writeNPY(kc(~isnan(kc)), fullfile(savepath, 'channel_shanks.npy'));
 
 % save final results 
 if saveFinal

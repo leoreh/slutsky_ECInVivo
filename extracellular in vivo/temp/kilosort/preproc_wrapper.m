@@ -1,51 +1,57 @@
 % preproc_wrapper
 
-basepath = 'F:\Data\Dat\lh52\lh52_200609\100642';
+basepath = 'E:\Data\Dat\lh52\lh52_200609\100610';
 cd(basepath)
+session = sessionTemplate(pwd, 'showGUI', true);
 
-fs = 20000;
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% ks
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-kcoords = [1 1 1 1 2 2 2 2 3 3 3 3 4 4 4 5 5 6 6 7 7 7 8 8];
-kcoords_full = sort(repmat(1 : ngrp, 1, 4));
-nchans = 27;
-ngrp = 8;
+% params from session (cell explorer format)
+nchans = session.extracellular.nChannels;
+ngrp = session.extracellular.nSpikeGroups;
 badch = nchans : -1 : nchans - 2;
+fs = session.extracellular.sr;
 
-% list of channel indices (including dead \ non-ephys channels)
-chanMap = [1 : nchans];
-chanMap0ind = chanMap - 1;
-% the first thing Kilosort does is reorder the data with data = data(chanMap, :).
-% Now we declare which channels are "connected" in this normal ordering,
-% meaning not dead or used for non-ephys data
-connected = true(nchans, 1);
-connected(badch) = false; % e.g. acceleration
-% now we define the horizontal (x) and vertical (y) coordinates of these
-% channels. For dead or nonephys channels the values won't matter. Again
-% I will take this information from the specifications of the probe. These
-% are in um here, but the absolute scaling doesn't really matter in the
-% algorithm.
-xcoords = repmat([20 40 60 80], 1, ngrp);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% open ephys
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+basepath = 'E:\Data\Dat\lh52\2020-06-09_09-05-32';
+rmvch = [10, 12, 13, 16, 17, 21, 23, 24];
+mapch = [25 26 27 28 30 1 2 29 3 : 14 31 0 15 16 17 : 24 32 33 34] + 1;
+exp = [3];
+rec = cell(max(exp), 1);
+datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
+    'rmvch', rmvch, 'mapch', mapch, 'concat', true, 'nchans', 35);
+
+basepath = fileparts(datInfo.newFile);
+spkgrp = session.extracellular.spikeGroups.channels;
+intens = [4 6 8 10 12 15 20];
+fepsp = getfEPSPfromOE('basepath', basepath, 'fname', '', 'nchans', nchans,...
+    'spkgrp', spkgrp, 'intens', intens, 'concat', false, 'saveVar', true,...
+    'force', true);  
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% kilosort
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+% prepare channel map
+kcoords = [];
+ycoords = [];
+xcoords = [];
+xrep = [20 40 60 80];
+for i = 1 : ngrp
+    l = length(spkgrp{i});
+    kcoords = [kcoords, ones(1, l) * i];
+    xcoords = [xcoords, xrep(1 : l)];
+    ycoords = [ycoords, ones(1, l) * i * 20];
+end
 xcoords(badch) = NaN;
-ycoords = sort(repmat([20 : 20 : ngrp * 20], 1, 4));
 ycoords(badch) = NaN;
-% Often, multi-shank probes or tetrodes will be organized into groups of
-% channels that cannot possibly share spikes with the rest of the probe. This helps
-% the algorithm discard noisy templates shared across groups. In
-% this case, we set kcoords to indicate which group the channel belongs to.
-kcoords = [1 1 1 1 2 2 2 2 3 3 3 3 4 4 4 4 5 5 5 5 6 6 6 6 7 7 7 7];
-kcoords(29 : 31) = NaN;
-% at this point in Kilosort we do data = data(connected, :), ycoords =
-% ycoords(connected), xcoords = xcoords(connected) and kcoords =
-% kcoords(connected) and no more channel map information is needed (in particular
-% no "adjacency graphs" like in KlustaKwik).
-% Now we can save our channel map and also a channel_shanks file for phy.
+kcoords(badch) = NaN;
 
 rez = runKS('basepath', basepath, 'fs', fs, 'nchans', nchans,...
-    'badch', badch, 'ngrp', ngrp, 'saveFinal', false, 'viaGui', false,...
-    'cleanDir', false, 'trange', [0 Inf]);
+    'badch', badch, 'ngrp', ngrp, 'kc', kc, 'yc', yc, 'xc', xc,...
+    'saveFinal', false, 'viaGui', false, 'cleanDir', false, 'trange', [0 Inf]);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % cell explorer

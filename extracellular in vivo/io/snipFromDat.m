@@ -103,7 +103,7 @@ m = memmapfile(fname, 'Format', {precision, [nchans, nsamps] 'mapped'});
 % initialize
 sniplength = diff(win) + 1;
 nsnips = length(stamps);
-snips = int16(zeros(length(ch), sniplength, nsnips));
+snips = zeros(length(ch), sniplength, nsnips);
 
 % go over stamps and snip data
 for i = 1 : length(stamps)

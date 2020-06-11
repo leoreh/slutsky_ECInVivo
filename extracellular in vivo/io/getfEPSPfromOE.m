@@ -9,8 +9,8 @@ function fepsp = getfEPSPfromOE(varargin)
 %   fname       string. name of dat file. if empty and more than one dat in
 %               path, will be extracted from basepath
 %   nchans      numeric. original number of channels in dat file {35}.
-%   tet         cell array. each cell represents a tetrode and contains 
-%               the channels in that tetrode
+%   spkgrp         cell array. each cell represents a spkgrprode and contains 
+%               the channels in that spkgrprode
 %   intens      vec describing stimulus intensity [uA]. must be equal in
 %               length to number of recording files in experiment. 
 %   win         vec of 2 elements. determines length of snip. for example,
@@ -46,7 +46,7 @@ p = inputParser;
 addOptional(p, 'basepath', pwd);
 addOptional(p, 'fname', '', @ischar);
 addOptional(p, 'nchans', 35, @isnumeric);
-addOptional(p, 'tet', {}, @iscell);
+addOptional(p, 'spkgrp', {}, @iscell);
 addOptional(p, 'intens', [], @isnumeric);
 addOptional(p, 'win', [1 2000], @isnumeric);
 addOptional(p, 'precision', 'int16', @ischar);
@@ -59,7 +59,7 @@ parse(p, varargin{:})
 basepath = p.Results.basepath;
 fname = p.Results.fname;
 nchans = p.Results.nchans;
-tet = p.Results.tet;
+spkgrp = p.Results.spkgrp;
 intens = p.Results.intens;
 win = p.Results.win;
 precision = p.Results.precision;
@@ -69,10 +69,10 @@ saveVar = p.Results.saveVar;
 graphics = p.Results.graphics;
 
 % params
-if isempty(tet)
-    tet = num2cell(1 : nchans, 2);
+if isempty(spkgrp)
+    spkgrp = num2cell(1 : nchans, 2);
 end
-ntet = size(tet, 1);
+nspkgrp = size(spkgrp, 1);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % handle data
@@ -95,6 +95,14 @@ if isempty(fname)
 end
 [~, basename, ~] = fileparts(fname);
 
+% load fepsp if already exists
+fepspname = [basename '.fepsp.mat'];
+if exist(fepspname, 'file') && ~force
+    fprintf('\n loading %s \n', fepspname)
+    load(fepspname)
+    return
+end
+
 % load digital input
 stimname = fullfile(basepath, [basename, '.din.mat']);
 if exist(stimname) 
@@ -111,14 +119,6 @@ if exist(infoname, 'file')
     load(infoname)
 end
 nfiles = length(datInfo.origFile);  % number of intensities 
-
-% load fepsp if already exists
-fepspname = [basename '.fepsp.mat'];
-if exist(fepspname, 'file') && ~force
-    fprintf('\n loading %s \n', fepspname)
-    load(fepspname)
-    return
-end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % snip data
@@ -149,11 +149,11 @@ for i = 1 : nfiles
     maxstim = max([maxstim, length(stimidx{i})]);   % used for cell2mat
 end
 
-% rearrange snips according to intensities and tetrodes
+% rearrange snips according to intensities and spkgrprodes
 % extract amplitude and waveform
-for j = 1 : ntet
+for j = 1 : nspkgrp
     for i = 1 : nfiles
-        wv{j, i} = snips(tet{j}, :, stimidx{i});
+        wv{j, i} = snips(spkgrp{j}, :, stimidx{i});
         wvavg(j, i, :) = mean(mean(wv{j, i}, 3), 1);
         ampcell{j, i} = mean(squeeze(abs(min(wv{j, i}, [], 2) - max(wv{j, i}, [], 2))), 1);
         amp(j, i) = mean(ampcell{j, i});
@@ -178,14 +178,14 @@ end
 if graphics
     fh = figure;
     k = 1;
-    for j = 1 : ntet
+    for j = 1 : nspkgrp
         for i = 1 : nfiles
-            subplot(ntet, nfiles, k)
+            subplot(nspkgrp, nfiles, k)
             plot(squeeze(wvavg(j, i, :)))
             ylim([min(wvavg(:)) max(wvavg(:))])
             set(gca, 'TickLength', [0 0], 'YTickLabel', [], 'XTickLabel', [],...
                 'Color', 'none')
-            if j == ntet
+            if j == nspkgrp
                 xlabel([num2str(intens(i)) ' uA'])
             end
             if i == 1
@@ -198,8 +198,8 @@ if graphics
     
     fh = figure;
     k = 1;
-    for j = 1 : ntet
-        subplot(ntet, 1, k)
+    for j = 1 : nspkgrp
+        subplot(nspkgrp, 1, k)
         plot(amp(j, :))
         k = k + 1;
         ylim([min(amp(:)) max(amp(:))])
@@ -217,7 +217,7 @@ fepsp.amp = amp;
 fepsp.stim = stimidx;
 fepsp.intens = intens;
 fepsp.t = win(1) : win(2);
-fepsp.tet = tet;
+fepsp.spkgrp = spkgrp;
 
 if saveVar
     save(fepspname, 'fepsp');

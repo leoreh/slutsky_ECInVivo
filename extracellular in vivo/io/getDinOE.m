@@ -60,8 +60,6 @@ saveVar = p.Results.saveVar;
 nbytes = class2bytes(precision);
 
 % initialize
-datFiles = [];
-jsonFiles = [];
 nsamps = 0;
 data = [];
 
@@ -87,8 +85,8 @@ destination = [newpath, filesep, newname, '.din.mat'];
 
 % find corresponding .dat and din.npy files
 for i = 1 : length(basepath)
-    datFiles = dir([basepath{i} filesep '**' filesep '*dat']);
-    jsonFiles = dir([basepath{i} filesep '**' filesep '*oebin']);
+    datFiles(i) = dir([basepath{i} filesep '**' filesep '*dat']);
+    jsonFiles(i) = dir([basepath{i} filesep '**' filesep '*oebin']);
 end
 
 if length(jsonFiles) ~= length(datFiles)

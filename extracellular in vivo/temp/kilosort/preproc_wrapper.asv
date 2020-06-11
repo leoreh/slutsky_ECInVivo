@@ -1,15 +1,35 @@
 % preproc_wrapper
 
-basepath = 'F:\Data\Dat\lh52\lh52_200609\100642';
+basepath = 'E:\Data\Dat\lh52\lh52_200609\100610';
 cd(basepath)
+session = sessionTemplate(pwd, 'showGUI', true);
+
 
 fs = 20000;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ks
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-rez = runKS('basepath', basepath, 'fs', fs, 'nchans', 31,...
-    'badch', 29 : 31, 'ngrp', 8, 'saveFinal', false, 'viaGui', false,...
+
+nchans = session.extracellular.nChannels;
+ngrp = session.extracellular.nSpikeGroups;
+badch = nchans : -1 : nchans - 2;
+
+% prepare channel map
+kcoords = [];
+ycoords = [];
+xcoords = [];
+xrep = [20 40 60 80];
+spkch = session.extracellular.spikeGroups.channels;
+for i = 1 : ngrp
+    l = length(spkch{i});
+    kcoords = [kcoords, ones(1, l) * i];
+    xcoords = [xcoords, xrep(1 : l)];
+    ycoords = [ycoords, ones(1, l) * i * 20];
+end
+
+rez = runKS('basepath', basepath, 'fs', fs, 'nchans', nchans,...
+    'badch', badch, 'ngrp', ngrp, 'kcoords', 'saveFinal', false, 'viaGui', false,...
     'cleanDir', false, 'trange', [0 Inf]);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
