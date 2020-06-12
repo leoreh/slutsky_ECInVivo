@@ -152,7 +152,7 @@ nsampsNew = info.bytes / nbytes / nchans;
 if ~isequal(nsampsNew, sum(nsamps))
     error('copying failed, dats are of different length')
 end
-fprintf('file size = %.2f MB\n', newname, info.bytes / 1e6);
+fprintf('new file size = %.2f MB\n', info.bytes / 1e6);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arrange datInfo and save
@@ -171,7 +171,7 @@ if saveVar
     save(infoname, 'datInfo', '-v7.3');
 end
 
-fprintf('\nthat took %d minutes\n', toc / 60)
+fprintf('\nthat took %.2f minutes\n', toc / 60)
 
 end
 

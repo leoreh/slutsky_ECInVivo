@@ -2,7 +2,7 @@
 % contains calls to various functions.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% STEP 1: file conversion
+% file conversions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 basepath = 'D:\tempData\LHa8\LHa8';
 store = 'Raw1';
