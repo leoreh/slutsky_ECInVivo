@@ -15,9 +15,9 @@ function rez = runKS(varargin)
 %   nchans      numeric. number of channels in dat file.
 %   badch       numeric. bad or non-ephy channel (e.g accelerometer)
 %   ngrp        numeric. number of spiking groups. 
-%   kc          numeric. electrode groups. see in arguments section.
-%   yc          numeric. x coordinates. see in arguments section.
-%   xc          numeric. y coordinates. see in arguments section.
+%   kcoords          numeric. electrode groups. see in arguments section.
+%   ycoords          numeric. x coordinates. see in arguments section.
+%   xcoords          numeric. y coordinates. see in arguments section.
 %   trange      numeric. time range to sort [s]{[0 Inf]}
 %   saveFinal   logical. save final rez file {false}
 %   viaGui      logical. run ks via gui (true) or script {false}
@@ -49,9 +49,9 @@ addOptional(p, 'fs', 20000, @isnumeric);
 addOptional(p, 'nchans', 35, @isnumeric);
 addOptional(p, 'badch', 33 : 35, @isnumeric);
 addOptional(p, 'ngrp', 8, @isnumeric);
-addOptional(p, 'kc', [], @isnumeric);
-addOptional(p, 'yc', [], @isnumeric);
-addOptional(p, 'xc', [], @isnumeric);
+addOptional(p, 'kcoords', [], @isnumeric);
+addOptional(p, 'ycoords', [], @isnumeric);
+addOptional(p, 'xcoords', [], @isnumeric);
 addOptional(p, 'trange', [0 Inf], @isnumeric);
 addOptional(p, 'saveFinal', false, @islogical);
 addOptional(p, 'viaGui', false, @islogical);
@@ -64,6 +64,9 @@ fs          = p.Results.fs;
 nchans      = p.Results.nchans;
 badch       = p.Results.badch;
 ngrp        = p.Results.ngrp;
+kcoords     = p.Results.kcoords;
+ycoords     = p.Results.ycoords;
+xcoords     = p.Results.xcoords;
 trange      = p.Results.trange;
 saveFinal   = p.Results.saveFinal;
 viaGui      = p.Results.viaGui;
@@ -90,31 +93,31 @@ connected(badch) = false; % e.g. acceleration
 % I will take this information from the specifications of the probe. These
 % are in um here, but the absolute scaling doesn't really matter in the
 % algorithm.
-if isempty(xc)
-    xc = repmat([20 40 60 80], 1, ngrp);
-    xc(badch) = NaN;
+if isempty(xcoords)
+    xcoords = repmat([20 40 60 80], 1, ngrp);
+    xcoords(badch) = NaN;
 end
-if isempty(yc)
-    yc = sort(repmat([20 : 20 : ngrp * 20], 1, 4));
-    yc(badch) = NaN;
+if isempty(ycoords)
+    ycoords = sort(repmat([20 : 20 : ngrp * 20], 1, 4));
+    ycoords(badch) = NaN;
 end
 % Often, multi-shank probes or tetrodes will be organized into groups of
 % channels that cannot possibly share spikes with the rest of the probe. This helps
 % the algorithm discard noisy templates shared across groups. In
-% this case, we set kc to indicate which group the channel belongs to.
-if isempty(kc)
+% this case, we set kcoords to indicate which group the channel belongs to.
+if isempty(kcoords)
     for i = 1 : ngrp
         kcoords = [kcoords, ones(1, 4) * i];
     end
-    kc(badch) = NaN;
+    kcoords(badch) = NaN;
 end
-% at this point in Kilosort we do data = data(connected, :), yc =
-% yc(connected), xc = xc(connected) and kc =
-% kc(connected) and no more channel map information is needed (in particular
+% at this point in Kilosort we do data = data(connected, :), ycoords =
+% ycoords(connected), xcoords = xcoords(connected) and kcoords =
+% kcoords(connected) and no more channel map information is needed (in particular
 % no "adjacency graphs" like in KlustaKwik).
 % Now we can save our channel map and also a channel_shanks file for phy.
 save(fullfile(basepath, 'chanMap.mat'),...
-    'chanMap', 'chanMap0ind', 'connected', 'xc', 'yc', 'kc', 'fs')
+    'chanMap', 'chanMap0ind', 'connected', 'xcoords', 'ycoords', 'kcoords', 'fs')
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ks parameters
@@ -165,7 +168,7 @@ ops.ThPre = 8;
 ops.spkTh           = -4.5;     % spike threshold in standard deviations {-6}
 ops.reorder         = 1;        % whether to reorder batches for drift correction.
 ops.nskip           = 25;       % how many batches to skip for determining spike PCs
-% ops.Nfilt         = 1024;     % max number of clusters
+ops.Nfilt         = 1024;       % max number of clusters
 ops.nfilt_factor    = 4;        % max number of clusters per good channel (even temporary ones)
 ops.ntbuff          = 64;       % samples of symmetrical buffer for whitening and spike detection
 ops.nSkipCov        = 25;       % compute whitening matrix from every N-th batch
@@ -204,7 +207,7 @@ else
     % time-reordering as a function of drift
     rez = clusterSingleBatches(rez);
     
-    % saving here is a good idea, because the rest can be resumed after loading rez
+    % intermediate saving because the rest can be resumed after loading rez
     save(fullfile(basepath, 'rez.mat'), 'rez', '-v7.3');
     
     % main tracking and template matching algorithm
@@ -241,7 +244,7 @@ else
 end
 
 % save channel_shanks file 
-writeNPY(kc(~isnan(kc)), fullfile(savepath, 'channel_shanks.npy'));
+writeNPY(kcoords(~isnan(kcoords)), fullfile(savepath, 'channel_shanks.npy'));
 
 % save final results 
 if saveFinal

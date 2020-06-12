@@ -25,11 +25,13 @@ basename = rez.ops.basename;
 Nchan = rez.ops.Nchan;
 samples = rez.ops.nt0;
 
-templates = zeros(Nchan, size(rez.W,1), rez.ops.Nfilt, 'single');
-for iNN = 1:rez.ops.Nfilt
+% templates = gpuArray(zeros(Nchan, size(rez.W,1), rez.ops.Nfilt, 'single'));
+templates = gpuArray(zeros(Nchan, size(rez.W,1), size(rez.U, 2), 'single'));
+% for iNN = 1:rez.ops.Nfilt
+for iNN = 1:size(rez.U, 2)
     templates(:,:,iNN) = squeeze(rez.U(:,iNN,:)) * squeeze(rez.W(:,iNN,:))';
 end
-amplitude_max_channel = [];
+% amplitude_max_channel = [];
 for i = 1:size(templates,3)
     [~,amplitude_max_channel(i)] = max(range(templates(:,:,i)'));
 end
@@ -266,13 +268,13 @@ fprintf('\nComplete!')
             for i = 1:length(kcoords2)
                 kcoords3 = kcoords2(i);
 %                 ch_subset = 1:length(chanMapConn);
-                temp = find(ismember(spikeTimes(ia{i}), [ops.nt0/2+1:size(DATA,1)-ops.nt0/2] + dat_offset));
+                temp = find(ismember(spikeTimes(ia{i}), round([ops.nt0/2+1:size(DATA,1)-ops.nt0/2]) + dat_offset));
                 temp2 = spikeTimes(ia{i}(temp))-dat_offset;
                 
                 startIndicies = temp2-ops.nt0/2+1;
                 stopIndicies = temp2+ops.nt0/2;
                 X = cumsum(accumarray(cumsum([1;stopIndicies(:)-startIndicies(:)+1]),[startIndicies(:);0]-[0;stopIndicies(:)]-1)+1);
-                X = X(1:end-1);
+                X = round(X(1:end-1));
                 waveforms_all{i}(:,:,temp) = reshape(DATA(X,indicesTokeep{i})',size(indicesTokeep{i},1),ops.nt0,[]);
             end
         end

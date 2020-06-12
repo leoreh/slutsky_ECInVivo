@@ -162,13 +162,13 @@ if exist(infoname, 'file')
     load(infoname)
 end
 
-datInfo.tstamps = tstamps;
 datInfo.origFile = source;
 datInfo.newFile = destination;
 datInfo.nsamps = nsamps;
 
 if saveVar
     save(infoname, 'datInfo', '-v7.3');
+    save(fullfile(newpath, [basename, '.tstamps.mat']))
 end
 
 fprintf('\nthat took %.2f minutes\n', toc / 60)

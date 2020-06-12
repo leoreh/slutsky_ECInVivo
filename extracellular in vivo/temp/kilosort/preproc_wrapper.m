@@ -1,14 +1,14 @@
 % preproc_wrapper
-
+basepath = 'H:\Data\Dat\lh53\lh53_200609';
+cd(basepath)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % open ephys
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'H:\Data\Dat\lh52\2020-06-11_08-58-30';
-cd(basepath)
+basepath = 'H:\Data\Dat\lh52\2020-06-09_09-05-32';
 rmvch = [10, 12, 13, 16, 17, 21, 23, 24];
 mapch = [25 26 27 28 30 1 2 29 3 : 14 31 0 15 16 17 : 24 32 33 34] + 1;
-exp = [3, 4];
+exp = [10];
 rec = cell(max(exp), 1);
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
     'rmvch', rmvch, 'mapch', mapch, 'concat', true, 'nchans', 35);
@@ -19,48 +19,62 @@ datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
 session = sessionTemplate(pwd, 'showGUI', true);
 
 % session params
-basepath = fileparts(datInfo.newFile);
+basepath = session.general.basePath;
 nchans = session.extracellular.nChannels;
 ngrp = session.extracellular.nSpikeGroups;
-badch = nchans : -1 : nchans - 2;
+% badch = nchans : -1 : nchans - 2;
+badch = [];
 fs = session.extracellular.sr;
 spkgrp = session.extracellular.spikeGroups.channels;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % field
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-intens = [4 6 8 10 12 15 20];
+intens = [4 6 8 10];
 fepsp = getfEPSPfromOE('basepath', basepath, 'fname', '', 'nchans', nchans,...
     'spkgrp', spkgrp, 'intens', intens, 'concat', false, 'saveVar', true,...
     'force', true);  
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % kilosort
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % prepare channel map
-kc = [];
-yc = [];
-xc = [];
+kcoords = [];
+ycoords = [];
+xcoords = [];
 xrep = [20 40 60 80];
 for i = 1 : ngrp
     l = length(spkgrp{i});
-    kc = [kc, ones(1, l) * i];
-    xc = [xc, xrep(1 : l)];
-    yc = [yc, ones(1, l) * i * 20];
+    kcoords = [kcoords, ones(1, l) * i];
+    xcoords = [xcoords, xrep(1 : l)];
+    ycoords = [ycoords, ones(1, l) * i * 20];
 end
-xc(badch) = NaN;
-yc(badch) = NaN;
-kc(badch) = NaN;
+xcoords(badch) = NaN;
+ycoords(badch) = NaN;
+kcoords(badch) = NaN;
 
 rez = runKS('basepath', basepath, 'fs', fs, 'nchans', nchans,...
-    'badch', badch, 'ngrp', ngrp, 'kc', kc, 'yc', yc, 'xc', xc,...
+    'badch', badch, 'ngrp', ngrp, 'kcoords', kcoords, 'ycoords', ycoords, 'xcoords', xcoords,...
     'saveFinal', false, 'viaGui', false, 'cleanDir', false, 'trange', [0 Inf]);
+
+load('chanMap.mat')
+[~, rez.ops.basename] = fileparts(basepath);
+rez.ops.root = basepath;
+rez.ops.savepath = basepath;
+rez.ops.basepath = basepath;
+rez.xcoords = xcoords;
+rez.ycoords = ycoords;
+rez.connected = connected;
+rez.ops.ForceMaxRAMforDat = 10000000000;
+rez.ops.parfor = true;
+% ConvertKilosort2Neurosuite_KSW(rez)
+Kilosort2Neurosuite(rez)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % cell explorer
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% session info
 session = sessionTemplate(pwd, 'showGUI', true);
 % calculate
 cell_metrics = ProcessCellMetrics('session', session);
@@ -81,3 +95,23 @@ cell_metrics_idxs2 = LoadCellMetrics('cell_metrics',cell_metrics,'tags',...
 % clean folder
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 clearKSdir(basepath)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% firing rate
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+binsize = 60;
+fr = FR(spikes.times, 'basepath', basepath, 'graphics', false, 'saveFig', false,...
+    'binsize', binsize, 'saveVar', false, 'smet', 'MA', 'winBL', [0 50 * 60]);
+
+% unite all units
+x = {sort(vertcat(spikes.times{:}))};
+[fr.strd, ~, fr.tstamps] = calcFR(x, 'binsize', 60,...
+    'winCalc', [1 Inf], 'smet', 'none');
+
+stdshade(fr.norm, 0.3, 'k', fr.tstamps / 60, 3)
+lbs = {'BL', '2', '3', '4'};
+info.lns = lns(1);
+hold on
+addLns('lns', lns, 'lbs', lbs, 'ax', 'x')
+
+

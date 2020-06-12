@@ -9,7 +9,7 @@ function fepsp = getfEPSPfromOE(varargin)
 %   fname       string. name of dat file. if empty and more than one dat in
 %               path, will be extracted from basepath
 %   nchans      numeric. original number of channels in dat file {35}.
-%   spkgrp         cell array. each cell represents a spkgrprode and contains 
+%   spkgrp      cell array. each cell represents a spkgrprode and contains 
 %               the channels in that spkgrprode
 %   intens      vec describing stimulus intensity [uA]. must be equal in
 %               length to number of recording files in experiment. 
@@ -72,7 +72,7 @@ graphics = p.Results.graphics;
 if isempty(spkgrp)
     spkgrp = num2cell(1 : nchans, 2);
 end
-nspkgrp = size(spkgrp, 1);
+nspkgrp = length(spkgrp);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % handle data
@@ -120,13 +120,16 @@ if exist(infoname, 'file')
 end
 nfiles = length(datInfo.origFile);  % number of intensities 
 
+% load timestamps
+load(fullfile(basepath, [basename, '.tstamps.mat']));
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % snip data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % convert tstamps to idx of samples 
 for i = 1 : length(din.data)
-    stamps(i) = find(datInfo.tstamps == din.data(i));
+    stamps(i) = find(tstamps == din.data(i));
 end
 
 % snip
