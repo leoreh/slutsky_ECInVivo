@@ -9,7 +9,7 @@
 % select mouse
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % group number refers to the order in the grppath cell.
-grp = [1 : 4];
+grp = [4];
 % if mouse empty will load all mice in group
 mouse = [];
 
