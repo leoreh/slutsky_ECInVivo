@@ -92,7 +92,7 @@ for i = 1 : ngrps
     fprintf(fid, '%d\n', stamps{i});
     rc = fclose(fid);
     if rc == 0
-        fprintf('\nCreated %s', resname)
+        fprintf('\nCreated \t%s', resname)
     else
         fprintf('\nFailed to create %s!', resname)
     end
@@ -106,7 +106,7 @@ for i = 1 : ngrps
     fprintf(fid, '%d\n', clugrp);
     rc = fclose(fid);
     if rc == 0
-        fprintf('\nCreated %s', cluname)
+        fprintf('\nCreated \t%s', cluname)
     else
         fprintf('\nFailed to create %s!', cluname)
     end
@@ -114,7 +114,7 @@ for i = 1 : ngrps
     % ---------------------------------------------------------------------
     % spk file (binary, nsamples around each spike)
     spkname = fullfile([basename '.spk.' num2str(grp)]);
-    fprintf('\nCreating %s. ', spkname)
+    fprintf('\nCreating \t%s. ', spkname)
     spk = zeros(length(chans), sniplength, nspks(i));   
     for ii = 1 : nspks(i)
         % print progress
@@ -147,13 +147,13 @@ for i = 1 : ngrps
     if rc == 0
         fprintf('. done')
     else
-        fprintf('Failed to create %s!', spkname)
+        fprintf('. Failed to create %s!', spkname)
     end
     
     % ---------------------------------------------------------------------
     % fet file    
     fetname = fullfile([basename '.fet.' num2str(grp)]);
-    fprintf('\nCreating %s. Computing PCAs...', fetname)
+    fprintf('\nCreating \t%s. \tComputing PCAs...', fetname)
     nFeatures = length(chans) * 3 + length(chans) + 1;
     fetMat = zeros(nspks(i), nFeatures);
     enrgIdx = length(chans) * 3;
