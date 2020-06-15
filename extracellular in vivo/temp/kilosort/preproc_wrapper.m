@@ -1,5 +1,5 @@
 % preproc_wrapper
-basepath = 'D:\tempData\lh46_200226a';
+basepath = 'D:\Data\lh49_200325';
 cd(basepath)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -69,7 +69,7 @@ rez = runKS('basepath', basepath, 'fs', fs, 'nchans', nchans,...
 % rez.ops.ForceMaxRAMforDat = 10000000000;
 % rez.ops.parfor = true;
 % ConvertKilosort2Neurosuite_KSW(rez)
-% Kilosort2Neurosuite(rez)
+% Kilosort2Neurosui te(rez)
 ks2ns(rez)
 
 % Phy2Neurosuite(basepath,basepath,'neurosuite')
