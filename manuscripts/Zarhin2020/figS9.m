@@ -2,6 +2,7 @@
 
 close all
 force = false;
+saveFig = true;
 
 basepath{1} = 'F:\Daniel IIS 11.6.20\IIS\WT\New analyis';
 basepath{2} = 'F:\Daniel IIS 11.6.20\IIS\APPPS1\New analysis';
@@ -44,12 +45,12 @@ if force
         'saveVar', false, 'saveFig', false, 'forceA', false,...
         'binsize', 30, 'smf', 7, 'thrMet', 1);
     load([fullfile(basepath{2}, basename) '.lfp.mat'])
-
+    
     
     % bs classification
     fs = lfp.fs;
     binsize = 2 ^ nextpow2(0.5 * fs);   % for pc1
-
+    
     ibins = [1 : binsize : length(lfpwt.data)];
     ibins(end) = length(lfpwt.data);
     
@@ -115,7 +116,7 @@ minmarg = 1;
 idx1 = 5 * fs * 60 : 25 * fs * 60;
 
 % idx for zoomin in samples
-midsig = 23.5;
+midsig = 19.5;
 idx2 = round((midsig - minmarg) * fs * 60 : (midsig + minmarg) * fs * 60);
 
 % raw
@@ -142,6 +143,7 @@ specBand('sig', lfpwt.data(idx1), 'graphics', true, 'binsize', binsize,...
 set(gca, 'TickLength', [0 0], 'XTickLabel', [],...
     'Color', 'none', 'XColor', 'none')
 ylim([0 100])
+set(gca, 'YScale', 'log')
 title('')
 colorbar('off');
 
@@ -186,7 +188,7 @@ ylabel('Voltage [mV]')
 xlabel('Time [m]')
 xlim(idx3)
 xticks(idx3)
-xticklabels([17.5 19.5])
+xticklabels([0 2])
 set(gca, 'TickLength', [0 0])
 box off
 
@@ -224,6 +226,7 @@ specBand('sig', lfp.data(idx1), 'graphics', true, 'binsize', binsize,...
 set(gca, 'TickLength', [0 0], 'XTickLabel', [],...
     'Color', 'none', 'XColor', 'none', 'YColor', 'none')
 ylim([0 100])
+set(gca, 'YScale', 'log')
 title('')
 
 % bsr
@@ -264,7 +267,7 @@ end
 % ylabel('Voltage [mV]')
 xlabel('Time [m]')
 xticks(idx3)
-xticklabels([17.5 19.5])
+xticklabels([0 2])
 xlim(idx3)
 set(gca, 'TickLength', [0 0], 'YColor', 'none')
 box off
@@ -288,6 +291,8 @@ box off
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % aneStats
+
+% % all grps
 gidx = [ones(1, 30), ones(1, 30) * 2,...
     ones(1, 30) * 3, ones(1, 30) * 4];
 c = [1 0 0; 1 0 1; 0 0 1; 0 1 1];
@@ -304,9 +309,32 @@ xticklabels({'WT', 'APPPS1', 'APPKi', 'FADx5'})
 ylabel('Deep anesthesia duration [% total]')
 box off
 set(gca, 'TickLength', [0 0])
-sigstar({[1, 3], [1, 4], [2, 4], [2, 3]}, [0.05, 0.01, 0.01, 0.05], 1);
+% sigstar({[1, 3], [1, 4], [2, 4], [2, 3]}, [0.05, 0.01, 0.01, 0.05], 1);
 
-figname = fullfile('F:\Daniel IIS 11.6.20\IIS\graphics', 'figS9');
-export_fig(figname, '-tif', '-transparent', '-r300')
-savePdf('figS9', 'F:\Daniel IIS 11.6.20\IIS', fh)
+
+% WT and APPPS1 only
+% gidx = [ones(1, 30), ones(1, 30) * 2];
+% c = [1 0 0; 1 0 1; 0 0 1; 0 1 1];
+% c2 = 'kmbr';
+% 
+% x = as.deepFraction(:, 1:2);
+% subplot(6, 2, [10, 12])
+% boxplot(as.deepFraction(:, 1 : 2), gidx, 'PlotStyle', 'traditional',...
+%     'BoxStyle', 'outline', 'Color', c2, 'notch', 'off')
+% hold on
+% gscatter(gidx, [x(:)], gidx, c2)
+% legend off
+% xlabel('')
+% xticklabels({'WT', 'APPPS1', 'APPKi', 'FADx5'})
+% ylabel('Deep anesthesia duration [% total]')
+% box off
+% set(gca, 'TickLength', [0 0])
+% % sigstar({[1, 3], [1, 4], [2, 4], [2, 3]}, [0.05, 0.01, 0.01, 0.05], 1);
+
+
+if saveFig
+    figname = fullfile('F:\Daniel IIS 11.6.20\IIS\graphics', 'figS9');
+    export_fig(figname, '-tif', '-transparent', '-r300')
+    savePdf('figS9', 'F:\Daniel IIS 11.6.20\IIS', fh)
+end
 

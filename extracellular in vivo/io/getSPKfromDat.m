@@ -13,7 +13,7 @@ function spikes = getSPKfromDat(varargin)
 % -------------------------------------------------------------------------
 % originally, the intention was to use snipFromDat.m. However, this
 % recreates a memory map for each unit. Thus, for 69 units and 2608583
-% spikes this took 24.5 minutes w/ snipFromDat and 42.5 min with one time
+% spikes this took 42.5 minutes w/ snipFromDat and 24.5 min with one time
 % memmap. Thus, memmap was embedded within this function.
 % -------------------------------------------------------------------------
 % since detrend is essentialy matrix multiplication with a regressor that

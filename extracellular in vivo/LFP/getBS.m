@@ -350,9 +350,18 @@ if mancur
     for i = 1 : size(x, 1)
         epbin(x(i, 1) : x(i, 2)) = 1;
     end
+    % correct special case where user marked beyond end of recording. this
+    % is a very laze fix because only applies for end of recording but not
+    % beginning
+    epbin(length(bs.binary) + 1 : length(epbin)) = [];
     
-    % calculate percent accuracy
-    bs.accuracy = 1 - sum(abs(bs.binary - epbin)) / length(sig);
+    % sensitivity (TPR)
+    tpr = sum(~bs.binary & ~epbin) / sum(~epbin);
+    % specificity (TNR)
+    tnr = sum(bs.binary & epbin) / sum(epbin);
+    
+    % accuracy
+    bs.accuracy = (sum(bs.binary & epbin) + sum(~bs.binary & ~epbin)) / length(sig);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

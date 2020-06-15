@@ -1,10 +1,10 @@
 function rez = runKS(varargin)
 
-% wrapper for running kilosort. based on configFile384.m and
-% make_eMouseChannelMap.m. first creates channel map and channel_shanks
-% file. designed for tetrodes. handles ks parameters arranged here
-% according to those that should be played with. alas runs the algorithm
-% and arranges the output.
+% wrapper for running kilosort. based on configFile384.m,
+% make_eMouseChannelMap.m, and KilosortConfiguration (kilosortWrapper).
+% creates channel map and channel_shanks file. designed for tetrodes.
+% handles ks parameters arranged here according to those that should be
+% played with. alas runs the algorithm and arranges the output.
 % 
 % INPUT:
 %   basepath    string. path to recording folder {pwd}. if multiple dat
@@ -76,6 +76,11 @@ if isempty(procpath)
     procpath = basepath;
 end
 
+% arguments
+ops.fs              = fs;  % sampling rate
+ops.NchanTOT        = nchans; % total number of channels in your recording
+ops.trange          = trange; % time range to sort [s]
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % channel map
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -116,8 +121,10 @@ end
 % kcoords(connected) and no more channel map information is needed (in particular
 % no "adjacency graphs" like in KlustaKwik).
 % Now we can save our channel map and also a channel_shanks file for phy.
-save(fullfile(basepath, 'chanMap.mat'),...
-    'chanMap', 'chanMap0ind', 'connected', 'xcoords', 'ycoords', 'kcoords', 'fs')
+ops.kcoords = kcoords;
+ops.chanMap = fullfile(basepath, 'chanMap.mat');
+save(ops.chanMap, 'chanMap', 'chanMap0ind', 'connected',...
+    'xcoords', 'ycoords', 'kcoords', 'fs')
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ks parameters
@@ -136,7 +143,7 @@ ops.Th = [10 2];
 % how important is the amplitude penalty {10}. The individual spike
 % amplitudes are biased towards the mean of the cluster by this factor; 50
 % is a lot, 0 is no bias.
-ops.lam = 10;
+ops.lam = 12;
 
 % Threshold on the area under the curve (AUC) criterion for performing a
 % split in the final step. If the AUC of the split is higher than this,
@@ -147,7 +154,7 @@ ops.lam = 10;
 ops.AUCsplit = 0.9;
 
 % frequency for high pass filtering {150}
-ops.fshigh = 300;
+ops.fshigh = 500;
 
 % minimum firing rate on a "good" channel (0 to skip){0.1}
 ops.minfr_goodchannels = 0;
@@ -157,7 +164,8 @@ ops.minfr_goodchannels = 0;
 ops.minFR = 1/100;
 
 % number of samples to average over (annealed from first to second value)
-ops.momentum = [20 400];
+% {20 400}
+ops.momentum = [20 800];
 
 % spatial constant in um for computing residual variance of spike
 ops.sigmaMask = 30;
@@ -165,11 +173,12 @@ ops.sigmaMask = 30;
 % threshold crossings for pre-clustering (in PCA projection space)
 ops.ThPre = 8;
 
-ops.spkTh           = -4.5;     % spike threshold in standard deviations {-6}
+ops.nt0             = 40;       % window width in samples. 2 ms for 20 kH {61}
+ops.spkTh           = -4;       % spike threshold in standard deviations {-6}
 ops.reorder         = 1;        % whether to reorder batches for drift correction.
 ops.nskip           = 25;       % how many batches to skip for determining spike PCs
-ops.Nfilt         = 1024;       % max number of clusters
-ops.nfilt_factor    = 4;        % max number of clusters per good channel (even temporary ones)
+ops.Nfilt           = 256;      % number of filters to use (2-4 times more than Nchan, should be a multiple of 32)
+ops.nfilt_factor    = 8;        % max number of clusters per good channel (even temporary ones)
 ops.ntbuff          = 64;       % samples of symmetrical buffer for whitening and spike detection
 ops.nSkipCov        = 25;       % compute whitening matrix from every N-th batch
 ops.scaleproc       = 200;      % int16 scaling of whitened data
@@ -178,15 +187,10 @@ ops.GPU             = 1;        % has to be 1, no CPU version yet, sorry
 ops.useRAM          = 0;        % not yet available
 
 % batch size (try decreasing if out of memory). must be multiple of 32 + ntbuff.
-ops.NT              = 64 * 1024 + ops.ntbuff;
+ops.NT              = 32 * 1024 + ops.ntbuff;
 
-% number of channels to use for whitening each channel
-ops.whiteningRange  = sum(connected);
-
-ops.chanMap         = fullfile(basepath, 'chanMap.mat');
-ops.fs              = fs;  % sampling rate
-ops.NchanTOT        = nchans; % total number of channels in your recording
-ops.trange          = trange; % time range to sort [s]
+% how many channels to whiten together (Inf for whole probe whitening)
+ops.whiteningRange  = min([64 sum(connected)]); 
 
 datfile             = dir(fullfile(basepath, '*.dat')); % find the binary file
 ops.fbinary         = fullfile(basepath, datfile(1).name);

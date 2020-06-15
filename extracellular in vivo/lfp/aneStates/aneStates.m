@@ -148,8 +148,8 @@ iis.epThr = epThr;
 wvstamps = linspace(-marg, marg, floor(marg * fs) * 2 + 1);
 
 % mark iis within bursts and bursts with iis
-[ep.IISinBursts, b, ~] = InIntervals(iis.peakPos, bs.stamps);
-ep.BurstsWithIIS = unique(b);
+% [ep.IISinBursts, b, ~] = InIntervals(iis.peakPos, bs.stamps);
+% ep.BurstsWithIIS = unique(b);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % anesthesia states
