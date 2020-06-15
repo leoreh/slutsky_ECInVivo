@@ -175,7 +175,7 @@ for i = 1 : ngrps
     fprintf(fid, formatstring, fet);
     rc = fclose(fid);
     if rc == 0
-        fprintf(' done.')
+        fprintf(' done')
     else
         fprintf(' Failed to create %s!', fetname)
     end
