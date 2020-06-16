@@ -153,7 +153,7 @@ for i = 1 : ngrps
     % ---------------------------------------------------------------------
     % fet file    
     fetname = fullfile([basename '.fet.' num2str(grp)]);
-    fprintf('\nCreating \t%s. \tComputing PCAs...', fetname)
+    fprintf('\nCreating \t%s. Computing PCAs...', fetname)
     nFeatures = length(chans) * 3 + length(chans) + 1;
     fetMat = zeros(nspks(i), nFeatures);
     enrgIdx = length(chans) * 3;
@@ -175,9 +175,9 @@ for i = 1 : ngrps
     fprintf(fid, formatstring, fet);
     rc = fclose(fid);
     if rc == 0
-        fprintf(' done')
+        fprintf(' done\n')
     else
-        fprintf(' Failed to create %s!', fetname)
+        fprintf(' Failed to create %s\n!', fetname)
     end
 end
      

@@ -102,9 +102,9 @@ end
 fh = figure('Visible', 'on');
 set(gcf, 'units','normalized','outerposition',[0 0 1 1]);
 
-Y = [-1 2]; % ylim for raw
-YY = [-0.5 1]; % ylim for zoom
-binsize = (2 ^ nextpow2(fs * 2));
+Y = sort([1 -1]); % ylim for raw
+YY = sort([0.5 -1]); % ylim for zoom
+binsize = (2 ^ nextpow2(fs * 1));
 smf = 15;
 marg = 0.05;
 minmarg = 1;
@@ -113,10 +113,14 @@ minmarg = 1;
 % wt mouse
 
 % idx for total recording
-idx1 = 5 * fs * 60 : 25 * fs * 60;
+idx1 = 15 * fs * 60 : 25 * fs * 60;
+lfpwt.data(idx1) = lfpwt.data(idx1) - mean(lfpwt.data(idx1));
+if min(lfpwt.data(idx1)) < max(abs(lfpwt.data(idx1)))
+    lfpwt.data(idx1) = -lfpwt.data(idx1);
+end
 
 % idx for zoomin in samples
-midsig = 19.5;
+midsig = 23;
 idx2 = round((midsig - minmarg) * fs * 60 : (midsig + minmarg) * fs * 60);
 
 % raw
@@ -151,7 +155,7 @@ colorbar('off');
 subplot(6, 2, 5);
 [~, bsidx] = min(abs(bswt.cents - idx1(1)));
 [~, bsidx(2)] = min(abs(bswt.cents - idx1(end)));
-bsidx = bsidx(1) : bsidx(2);
+bsidx = bsidx(1) - 1 : bsidx(2) + 1;
 plot(bswt.cents(bsidx) / fs / 60, bswt.bsr(bsidx), 'k', 'LineWidth', 1)
 hold on
 plot(bswt.cents(bsidx) / fs / 60, epwt.dband(bsidx), 'b', 'LineWidth', 1)
@@ -174,9 +178,10 @@ plot(lfpwt.timestamps(idx2) / 60, lfpwt.data(idx2), 'k')
 axis tight
 hold on
 x = xlim;
-plot(x, [iiswt.thr(2) iiswt.thr(2)], '--r')
+iiswt.thr(2) = iiswt.thr(2) - dc;
+plot(x, -[iiswt.thr(2) iiswt.thr(2)], '--r')
 scatter(iiswt.peakPos(idx5) / fs / 60,...
-    iiswt.peakPower(idx5), '*');
+    -iiswt.peakPower(idx5), '*');
 bsstamps = RestrictInts(bswt.stamps, [idx2(1) - fs * 20 idx2(end) + 20 * fs]);
 ylim(YY)
 yticks(YY)
@@ -196,10 +201,15 @@ box off
 % app mouse
 
 % idx for total recording
-idx1 = 15 * fs * 60 : 35 * fs * 60;
+idx1 = 25 * fs * 60 : 35 * fs * 60;
+dc = mean(lfp.data(idx1));
+lfp.data(idx1) = lfp.data(idx1) - dc;
+if min(lfp.data(idx1)) < max(abs(lfp.data(idx1)))
+    lfp.data(idx1) = -lfp.data(idx1);
+end
 
 % idx for zoomin in samples
-midsig = 33.5;
+midsig = 32.7;
 idx2 = round((midsig - minmarg) * fs * 60 : (midsig + minmarg) * fs * 60);
 
 % raw
@@ -254,9 +264,10 @@ plot(lfp.timestamps(idx2) / 60, lfp.data(idx2), 'k')
 axis tight
 hold on
 x = xlim;
-plot(x, [iis.thr(2) iis.thr(2)], '--r')
+iis.thr(2) = iis.thr(2) - dc;
+plot(x, -[iis.thr(2) iis.thr(2)], '--r')
 scatter(iis.peakPos(idx5) / fs / 60,...
-    iis.peakPower(idx5), '*');
+    -iis.peakPower(idx5), '*');
 bsstamps = RestrictInts(bs.stamps, [idx2(1) - 20 * fs idx2(end) + 20 * fs]);
 ylim(YY);
 % yticks(Y);
@@ -276,18 +287,56 @@ box off
 % bs identification
 
 subplot(6, 2, [9, 11])
-gscatter(varmat(:, 1), varmat(:, 3), gi, 'rk', '.', 1);
+gscatter(varmat(:, 1), varmat(:, 3), gi, 'rk', '.', 4);
 axis tight
 hold on
 gmPDF = @(x1, x2)reshape(pdf(gm, [x1(:) x2(:)]), size(x1));
 ax = gca;
 fcontour(gmPDF, [ax.XLim ax.YLim], 'HandleVisibility', 'off')
-xlabel(['std log10(\sigma)]'])
-ylabel('PC1')
+xlabel(['std [log10(\sigma)]'])
+ylabel('PC1 [a.u.]')
 legend({'Burst', 'Suppression'}, 'Location', 'northwest')
 set(gca, 'TickLength', [0 0])
 box off
 
+% std histogram
+axes('Position',[.412 .11 .05 .05])
+box on
+h = histogram(varmat(:, 1), 30, 'Normalization', 'Probability');
+h.EdgeColor = 'none';
+h.FaceColor = 'k';
+h.FaceAlpha = 1;
+title(['std'])
+axis tight
+set(gca, 'TickLength', [0 0], 'YTickLabel', [], 'XTickLabel', [],...
+    'YColor', 'none', 'Color', 'none')
+box off
+
+% max histogram
+axes('Position',[.412 .18 .05 .05])
+box on
+h = histogram(varmat(:, 2), 30, 'Normalization', 'Probability');
+h.EdgeColor = 'none';
+h.FaceColor = 'k';
+h.FaceAlpha = 1;
+title(['max'])
+axis tight
+set(gca, 'TickLength', [0 0], 'YTickLabel', [], 'XTickLabel', [],...
+    'YColor', 'none', 'Color', 'none')
+box off
+
+% PC1 histogram
+axes('Position',[.362 .11 .05 .05])
+box on
+h = histogram(varmat(:, 3), 30, 'Normalization', 'Probability');
+h.EdgeColor = 'none';
+h.FaceColor = 'k';
+h.FaceAlpha = 1;
+title(['PC1'])
+axis tight
+set(gca, 'TickLength', [0 0], 'YTickLabel', [], 'XTickLabel', [],...
+    'YColor', 'none', 'Color', 'none')
+box off
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % aneStats

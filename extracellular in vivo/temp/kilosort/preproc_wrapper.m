@@ -1,5 +1,5 @@
 % preproc_wrapper
-basepath = 'D:\Data\lh49_200325';
+basepath = 'D:\tempData\lh46_200226a';
 cd(basepath)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -23,7 +23,7 @@ basepath = session.general.basePath;
 nchans = session.extracellular.nChannels;
 ngrp = session.extracellular.nSpikeGroups;
 badch = nchans : -1 : nchans - 2;
-badch = [];
+% badch = [];
 fs = session.extracellular.sr;
 spkgrp = session.extracellular.spikeGroups.channels;
 
