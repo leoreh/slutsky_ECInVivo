@@ -155,8 +155,11 @@ if concat
     % copy xml
     basefiles = dir(fileparts(newpath));
     xmlfiles = basefiles(contains({basefiles.name}, 'xml'));
-    if length(xmlfiles) ~= 1
-        fprintf('\nmore than one .xml file in %s. skipping...\n',...
+    if length(xmlfiles) > 1
+        fprintf('\nNore than one xml file in %s. skipping...\n',...
+            fileparts(newpath))
+    elseif isempty(xmlfiles)
+         fprintf('\nNo xml file in %s. skipping...\n',...
             fileparts(newpath))
     else
         xmlfile = fullfile(xmlfiles.folder, xmlfiles.name);

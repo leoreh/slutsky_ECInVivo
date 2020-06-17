@@ -168,7 +168,7 @@ datInfo.nsamps = nsamps;
 
 if saveVar
     save(infoname, 'datInfo', '-v7.3');
-    save(fullfile(newpath, [basename, '.tstamps.mat']))
+    save(fullfile(newpath, [basename, '.tstamps.mat']), 'tstamps', '-v7.3')
 end
 
 fprintf('\nthat took %.2f minutes\n', toc / 60)

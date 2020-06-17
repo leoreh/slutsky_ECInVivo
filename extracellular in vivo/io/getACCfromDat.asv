@@ -153,16 +153,16 @@ nchunks = size(chunks, 1);
 m = memmapfile(fname, 'Format', {precision, [nchans, nsamps] 'mapped'});
 
 % load timestamps
-tname = fullfile(basepath, [basename, '.tstamps.mat']);
-if exist(tname, 'file')
-    load(tname)
+infoname = fullfile(basepath, [basename, '.datInfo.mat']);
+if exist(infoname, 'file')
+    load(infoname)
 else
-    tstamps = 1 : size(m.data.mapped, 2);
+    datInfo.tstamps = 1 : size(m.data.mapped, 2);
 end
 
 % go over chunks
 a = [];
-tstampsACC = [];
+tstamps = [];
 for i = 1 : nchunks
     fprintf('working on chunk %d / %d\n', i, nchunks)
     
@@ -193,7 +193,7 @@ for i = 1 : nchunks
         'order', 4, 'dataOnly', true, 'graphics', false, 'saveVar', false); 
     
     a = [a; mag];
-    tstampsACC = [tstampsACC, t];
+    tstamps = [tstamps, t];
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -228,7 +228,7 @@ end
 % arrange struct and save
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 acc.mag = a;
-acc.tstamps = tstampsACC; 
+acc.tstamps = tstamps; 
 acc.pband = pband;
 acc.tband = tband;
 acc.sleep = sleep;
