@@ -1,5 +1,5 @@
 % preproc_wrapper
-basepath = 'D:\tempData\lh46_200226a';
+basepath = '\\slutsky\Leore\Data\Raw\lh52\lh52_200615';
 cd(basepath)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -17,13 +17,8 @@ datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
 % session info (cell explorer foramt)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 session = sessionTemplate(pwd, 'showGUI', true);
-
-% session params
 basepath = session.general.basePath;
 nchans = session.extracellular.nChannels;
-ngrp = session.extracellular.nSpikeGroups;
-badch = nchans : -1 : nchans - 2;
-% badch = [];
 fs = session.extracellular.sr;
 spkgrp = session.extracellular.spikeGroups.channels;
 
@@ -38,41 +33,9 @@ fepsp = getfEPSPfromOE('basepath', basepath, 'fname', '', 'nchans', nchans,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % kilosort
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% prepare channel map
-kcoords = [];
-ycoords = [];
-xcoords = [];
-xrep = [20 40 60 80];
-for i = 1 : ngrp
-    l = length(spkgrp{i});
-    kcoords = [kcoords, ones(1, l) * i];
-    xcoords = [xcoords, xrep(1 : l)];
-    ycoords = [ycoords, ones(1, l) * i * 20];
-end
-xcoords(badch) = NaN;
-ycoords(badch) = NaN;
-kcoords(badch) = NaN;
-
 rez = runKS('basepath', basepath, 'fs', fs, 'nchans', nchans,...
-    'badch', badch, 'ngrp', ngrp, 'kcoords', kcoords, 'ycoords', ycoords, 'xcoords', xcoords,...
-    'saveFinal', true, 'viaGui', false, 'cleanDir', false, 'trange', [0 Inf]);
-
-% load('chanMap.mat')
-% [~, rez.ops.basename] = fileparts(basepath);
-% rez.ops.root = basepath;
-% rez.ops.savepath = basepath;
-% rez.ops.basepath = basepath;
-% rez.xcoords = xcoords;
-% rez.ycoords = ycoords;
-% rez.connected = connected;
-% rez.ops.ForceMaxRAMforDat = 10000000000;
-% rez.ops.parfor = true;
-% ConvertKilosort2Neurosuite_KSW(rez)
-% Kilosort2Neurosui te(rez)
-ks2ns(rez)
-
-% Phy2Neurosuite(basepath,basepath,'neurosuite')
+    'spkgrp', spkgrp, 'saveFinal', true, 'viaGui', false,...
+    'cleanDir', false, 'trange', [0 Inf], 'outFormat', 'ns');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % cell explorer

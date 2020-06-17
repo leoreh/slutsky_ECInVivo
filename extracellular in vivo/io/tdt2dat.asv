@@ -241,11 +241,8 @@ datInfo.mapch = mapch;
 datInfo.fs = heads.stores.(store).fs;
 
 if saveVar
-    if strcmp(store, 'Raw1')
-        infoname = [basename, '.datInfo.mat'];
-    else
-        infoname = [basename, '.' store, '.datInfo.mat'];
-    end
+    i
+    infoname = [basename, '.' store, '.datInfo.mat'];
     save([basename, '.' store, '.datInfo.mat'], 'datInfo');
     if nargout == 2
         save([basename, '.' store, '.data.mat'], 'data');

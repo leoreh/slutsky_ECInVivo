@@ -2,10 +2,9 @@ function rez = runKS(varargin)
 
 % wrapper for running kilosort. based on configFile384.m,
 % make_eMouseChannelMap.m, and KilosortConfiguration (kilosortWrapper).
-% creates channel map file according to spike groups (designed for
-% tetrodes). handles ks parameters arranged here according to those that
-% should be played with. alas runs the algorithm and arranges the output in
-% phy or neurosuite format.
+% creates channel map and channel_shanks file. designed for tetrodes.
+% handles ks parameters arranged here according to those that should be
+% played with. alas runs the algorithm and arranges the output.
 % 
 % INPUT:
 %   basepath    string. path to recording folder {pwd}. if multiple dat
@@ -18,19 +17,21 @@ function rez = runKS(varargin)
 %   trange      numeric. time range to sort [s]{[0 Inf]}
 %   saveFinal   logical. save final rez file {false}
 %   viaGui      logical. run ks via gui (true) or script {false}
-%   outFormat   string. output results to 'phy' or neurosuite {'ns'} format
+%   cleanDir    logical. delete temp_wh and move output to ks folder.
+%               note that (1) without the dat file phy cannot display the
+%               trace view or raw waveform (only template), and (2)
+%               cellExplorer requires the xml within the ks folder. this is
+%               redundant given cleanKSdir.m
 %
 % DEPENDENCIES
 %   npy-matlab
 %   kilosort 2
-%   ks2ns
 %
 % TO DO LIST:
 %   # currently, only the gui can be used in cases where one channel of a
 %   tetrode is bad (done - 11 jun 20)
 % 
-% 22 may 20 LH  updates:
-% 16 jun 20 LH      outFormat
+% 22 may 20 LH
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -47,7 +48,6 @@ addOptional(p, 'trange', [0 Inf], @isnumeric);
 addOptional(p, 'saveFinal', false, @islogical);
 addOptional(p, 'viaGui', false, @islogical);
 addOptional(p, 'cleanDir', false, @islogical);
-addOptional(p, 'outFormat', 'ns', @ischar);
 
 parse(p, varargin{:})
 basepath    = p.Results.basepath;
@@ -58,7 +58,7 @@ spkgrp      = p.Results.spkgrp;
 trange      = p.Results.trange;
 saveFinal   = p.Results.saveFinal;
 viaGui      = p.Results.viaGui;
-outFormat   = p.Results.outFormat;
+cleanDir    = p.Results.cleanDir;
 
 if isempty(procpath)
     procpath = basepath;

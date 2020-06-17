@@ -1,5 +1,5 @@
 % preproc_wrapper
-basepath = 'D:\tempData\lh46_200226b';
+basepath = 'H:\Data\Dat\lh46\lh46_200225';
 cd(basepath)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -26,6 +26,7 @@ badch = nchans : -1 : nchans - 2;
 % badch = [];
 fs = session.extracellular.sr;
 spkgrp = session.extracellular.spikeGroups.channels;
+elecgrp = session.extracellular.electrodeGroups.channels;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % field
@@ -69,7 +70,7 @@ rez = runKS('basepath', basepath, 'fs', fs, 'nchans', nchans,...
 % rez.ops.ForceMaxRAMforDat = 10000000000;
 % rez.ops.parfor = true;
 % ConvertKilosort2Neurosuite_KSW(rez)
-% Kilosort2Neurosuite(rez)
+% Kilosort2Neurosui te(rez)
 ks2ns(rez)
 
 % Phy2Neurosuite(basepath,basepath,'neurosuite')

@@ -39,10 +39,10 @@ rez.st3 = rez.st3(isort, :);
 spktimes = uint64(rez.st3(:, 1));
 
 % spike templates
-rez.W = gather(single(rez.Wphy));
-rez.U = gather(single(rez.U));
 nt0 = size(rez.W, 1);
 Nfilt = size(rez.W, 2);
+rez.W = gather(single(rez.Wphy));
+rez.U = gather(single(rez.U));
 templates = zeros(nchans, nt0, Nfilt, 'single');
 for iNN = 1:size(templates, 3)
    templates(:, :, iNN) = squeeze(rez.U(:, iNN, :)) *...
