@@ -171,7 +171,7 @@ if saveVar
     save(fullfile(newpath, [basename, '.tstamps.mat']), 'tstamps', '-v7.3')
 end
 
-fprintf('\nthat took %.2f minutes\n', toc / 60)
+fprintf('that took %.2f minutes\n', toc / 60)
 
 end
 

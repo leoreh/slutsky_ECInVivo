@@ -63,7 +63,7 @@ rmvch = p.Results.rmvch;
 % get files and folders
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-fprintf('\nprocessing %s\n\n', basepath)
+fprintf('\npre-processing %s\n\n', basepath)
 cd(basepath)
 
 % create new basefolder
@@ -92,10 +92,10 @@ for i = 1 : length(exp)
     expIdx(i) = find(strcmp(expNames, ['experiment' num2str(exp(i))]));
     exPath{i} = fullfile(expFolders(expIdx(i)).folder, expNames(expIdx(i)));
     % get time from xml file
-    if isequal(exp(i), 1)
+    if isequal(expIdx(i), 1)
         xmlname = ['settings.xml'];
     else
-        xmlname = ['settings_' num2str(exp(i)) '.xml'];
+        xmlname = ['settings_' num2str(expIdx(i)) '.xml'];
     end
     t = convert(xmltree(xmlname));
     dn = datenum(t.INFO.DATE, 'dd mmm yyyy HH:MM:SS');

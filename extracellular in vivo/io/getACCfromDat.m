@@ -96,7 +96,7 @@ fs_orig = p.Results.fs_orig;
 graphics = p.Results.graphics;
 saveVar = p.Results.saveVar;
 
-fprintf('\nloading accelaration from %s\n', basepath)
+fprintf('\nextracting accelaration from %s\n', basepath)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preparations 
@@ -110,7 +110,7 @@ if isempty(fs) % do not resample if new sampling frequency not specified
 elseif fs ~= fs_orig
     [p, q] = rat(fs / fs_orig);
     n = 5; beta = 20;
-    fprintf('accelaration will be resampled from %.1f to %.1f\n\n', fs_orig, fs)
+    fprintf('accelaration will be resampled from %.1f to %.1f\n', fs_orig, fs)
 end
 
 % handle dat file
@@ -164,7 +164,12 @@ end
 a = [];
 tstampsACC = [];
 for i = 1 : nchunks
-    fprintf('working on chunk %d / %d\n', i, nchunks)
+    % print progress
+    if i ~= 1
+        fprintf(repmat('\b', 1, length(txt)))
+    end
+    txt = sprintf('working on chunk %d / %d', i, nchunks);
+    fprintf(txt)
     
     % load data
     d = double(m.data.mapped(ch, chunks(i, 1) : chunks(i, 2)));    
@@ -220,8 +225,10 @@ sleep = tband(sleep); % bins to samples
 if sleep == tband(1) % correct edges
     sleep(1) = 1;
 end
-if sleep(end) == tband(end)
-    sleep(end) = tband(length(pband));
+if ~isempty(sleep)
+    if sleep(end) == tband(end)
+        sleep(end) = tband(length(pband));
+    end
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

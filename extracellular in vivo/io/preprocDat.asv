@@ -136,13 +136,12 @@ m = memmapfile(fname, 'Format', {'int16' [nchans nsamps] 'mapped'});
 % go over chunks
 for i = 1 : nchunks
     % print progress
-    if i ~= 1
+    if ii ~= 1
         fprintf(repmat('\b', 1, length(txt)))
     end
-    txt = sprintf('working on chunk %d / %d', i, nchunks);
-    fprintf(txt)
-    
-    % load chunk
+    txt = ['Extracted ', num2str(ii), ' / ', num2str(nspks(i)), ' spks'];
+    fprintf('%s', txt)
+    fprintf('working on chunk %d / %d\n', i, nchunks)
     d = m.data.mapped(:, chunks(i, 1) : chunks(i, 2));
        
     % remove channels
@@ -213,7 +212,7 @@ if saveVar
     save(infoname, 'datInfo', '-v7.3');
 end
 
-fprintf('that took %.2f minutes\n', toc / 60)
+fprintf('\nthat took %d minutes\n', toc / 60)
 
 end
 
