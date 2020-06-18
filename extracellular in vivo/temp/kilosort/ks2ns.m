@@ -3,7 +3,8 @@ function ks2ns(rez)
 % converts KiloSort output (.rez structure) to neurosuite files (fet, res,
 % clu, and spk). based in part on Kilosort2Neurosuite (Peterson). extracts
 % and detrends waveforms from the dat file (see getSPKfromDat for
-% more information).
+% more information). IMPROTANT: XML FILE MUST BE UPDATED TO THE PARAMS USED
+% HERE (E.G. SAMPLES PER WAVEFORM)
 %
 % DEPENDENCIES
 %   class2bytes
@@ -85,6 +86,8 @@ datname = rez.ops.fbinary;
 info = dir(datname);
 nsamps = info.bytes / nbytes / nchansTot;
 m = memmapfile(datname, 'Format', {precision, [nchansTot, nsamps] 'mapped'});
+raw = m.Data;
+clear m rez isort spikeTemplates templates  % for memory
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % go over groups and save file
@@ -145,12 +148,11 @@ for i = 1 : ngrps
         % not work because must update clu and res file.
         if stamps{i}(ii) + win(1) < 1 || stamps{i}(ii) + win(2) > nsamps
             warning('\nskipping stamp %d because waveform incomplete', ii)
-            spk(:, :, i) = nan(length(chans), sniplength);
+            spk(:, :, ii) = nan(length(chans), sniplength);
             continue
         end        
         % get waveform and remove best fit
-        v = double(m.Data.mapped(chans,...
-            stamps{i}(ii) + win(1) : stamps{i}(ii) + win(2)));
+        v = double(raw.mapped(chans, stamps{i}(ii) + win(1) : stamps{i}(ii) + win(2)));
         v = [v' - W * (R \ Q' * v')]';
         spk(:, :, ii) = v;
     end
@@ -172,8 +174,7 @@ for i = 1 : ngrps
     fetMat = zeros(nspks(i), nFeatures);
     enrgIdx = length(chans) * 3;
     for ii = 1 : length(chans)
-       [~, pcFeat] = pca(permute(spk(ii, :, :), [3, 2, 1]),...
-           'NumComponents', 3);
+       [~, pcFeat] = pca(permute(spk(ii, :, :), [3, 2, 1]));
        chEnrgy = sum(abs(permute(spk(ii, :, :), [3, 2, 1])), 2);
        fetMat(:, ii * 3 - 2 : ii * 3) = (pcFeat(:, 1 : 3));
        fetMat(:, enrgIdx + ii) = (chEnrgy);

@@ -218,6 +218,15 @@ else
     
     fprintf('found %d good units \n', sum(rez.good > 0))
     
+    % save final results
+    if saveFinal
+        rez = rmfield(rez, 'st2');
+        rez = rmfield(rez, 'cProjPC');
+        rez = rmfield(rez, 'cProj');
+        fprintf('\nsaving final rez file\n')
+        save(fullfile(basepath, 'rez.mat'), 'rez', '-v7.3');
+    end
+    
     % write for manual curation
     switch outFormat
         case 'phy'
@@ -232,9 +241,5 @@ else
     end
 end
 
-% save final results 
-if saveFinal
-    fprintf('\nsaving final rez file\n')
-    save(fullfile(basepath, 'rez.mat'), 'rez', '-v7.3');
-end
+
 
