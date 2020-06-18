@@ -21,7 +21,7 @@ t1 = tic;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % constants   
 sniplength = ceil(1.6 * 10^-3 * rez.ops.fs);
-win = [floor(sniplength / 2) - 1 floor(sniplength / 2)];
+win = [floor(sniplength / 2) - 1
     
 win = [-19 20]; % win for snipping spk    
 precision = 'int16'; % for dat file. size of one data point in bytes

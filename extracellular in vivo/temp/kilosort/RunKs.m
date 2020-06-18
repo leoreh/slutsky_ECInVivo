@@ -160,7 +160,7 @@ ops.sigmaMask = 30;
 % threshold crossings for pre-clustering (in PCA projection space)
 ops.ThPre = 8;
 
-ops.nt0             = 40;       % window width in samples. 2 ms for 20 kH {61}
+ops.nt0             = 61;       % window width in samples. 2 ms for 20 kH {61}
 ops.spkTh           = -4;       % spike threshold in standard deviations {-6}
 ops.reorder         = 1;        % whether to reorder batches for drift correction.
 ops.nskip           = 25;       % how many batches to skip for determining spike PCs
