@@ -174,7 +174,7 @@ ops.GPU             = 1;        % has to be 1, no CPU version yet, sorry
 ops.useRAM          = 0;        % not yet available
 
 % batch size (try decreasing if out of memory). must be multiple of 32 + ntbuff.
-ops.NT              = 32 * 1024 + ops.ntbuff;
+ops.NT              = 64 * 1024 + ops.ntbuff;
 
 % how many channels to whiten together (Inf for whole probe whitening)
 ops.whiteningRange  = min([64 sum(connected)]); 

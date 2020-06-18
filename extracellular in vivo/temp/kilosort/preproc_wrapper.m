@@ -1,5 +1,5 @@
 % preproc_wrapper
-basepath = '\\slutsky\Leore\Data\Raw\lh52\lh52_200615';
+basepath = 'D:\tempData\lh52_200616\080606';
 cd(basepath)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -43,19 +43,12 @@ rez = runKS('basepath', basepath, 'fs', fs, 'nchans', nchans,...
 % session info
 session = sessionTemplate(pwd, 'showGUI', true);
 % calculate
+spikes = loadSpikes('session', session, 'useNeurosuiteWaveforms', true,...
+    'forceReload', true);
 cell_metrics = ProcessCellMetrics('session', session);
 % gui
 cell_metrics = CellExplorer('metrics',cell_metrics); 
-% multiples sessions
-basepaths = {'/Volumes/buzsakilab/Buzsakilabspace/Datasets/GirardeauG/Rat08/Rat08-20130708',...
-    '/Volumes/buzsakilab/Buzsakilabspace/Datasets/GirardeauG/Rat08/Rat08-20130709'};
 
-cell_metrics = LoadCellMetricsBatch('basepaths',basepaths);
-cell_metrics = CellExplorer('metrics',cell_metrics);
-% load a subset of units fullfilling multiple of criterium
-% Get cells that are have a tag 'InverseSpike' or 'Good' and are assigned as 'Interneuron'
-cell_metrics_idxs2 = LoadCellMetrics('cell_metrics',cell_metrics,'tags',...
-    {'InverseSpike','Good'},'putativeCellType',{'Interneuron'});
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % clean folder

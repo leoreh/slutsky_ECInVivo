@@ -159,7 +159,7 @@ for i = 1 : ngrps
     fwrite(fid, spk(:), 'int16');
     rc = fclose(fid);
     if rc == 0
-        fprintf('done')
+        fprintf('. done')
     else
         fprintf('. Failed to create %s!', spkname)
     end
