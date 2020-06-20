@@ -68,11 +68,6 @@ ycoords = [];
 xcoords = [];
 xrep = [20 40 60 80];
 
-% arguments
-ops.fs              = fs;  % sampling rate
-ops.NchanTOT        = nchans; % total number of channels in your recording
-ops.trange          = trange; % time range to sort [s]
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % channel map
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -108,7 +103,6 @@ connected(badch) = false; % e.g. acceleration
 % kcoords(connected) and no more channel map information is needed (in particular
 % no "adjacency graphs" like in KlustaKwik).
 % Now we can save our channel map and also a channel_shanks file for phy.
-ops.kcoords = kcoords;
 ops.chanMap = fullfile(basepath, 'chanMap.mat');
 save(ops.chanMap, 'chanMap', 'chanMap0ind', 'connected',...
     'xcoords', 'ycoords', 'kcoords', 'fs')
@@ -116,6 +110,12 @@ save(ops.chanMap, 'chanMap', 'chanMap0ind', 'connected',...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ks parameters
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% arguments
+ops.kcoords         = kcoords;
+ops.fs              = fs;       % sampling rate
+ops.NchanTOT        = nchans;   % total number of channels in your recording
+ops.trange          = trange;   % time range to sort [s]
 
 % Thresholds on spike detection used during the optimization Th(1) or
 % during the final pass Th(2). These thresholds are applied to the template
@@ -138,7 +138,7 @@ ops.lam = 12;
 % if, additionally, the cross-correlogram of the split units does not
 % contain a big dip at time 0. splitting a cluster at the end requires at
 % least this much isolation for each sub-cluster (max = 1){0.9}.
-ops.AUCsplit = 0.9;
+ops.AUCsplit = 0.88;
 
 % frequency for high pass filtering {150}
 ops.fshigh = 500;
