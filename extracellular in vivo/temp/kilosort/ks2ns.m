@@ -87,7 +87,7 @@ info = dir(datname);
 nsamps = info.bytes / nbytes / nchansTot;
 m = memmapfile(datname, 'Format', {precision, [nchansTot, nsamps] 'mapped'});
 raw = m.Data;
-clear m rez isort spikeTemplates templates  % for memory
+clear rez isort spikeTemplates templates  % for memory
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % go over groups and save file
