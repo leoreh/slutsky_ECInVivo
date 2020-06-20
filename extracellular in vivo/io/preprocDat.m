@@ -132,6 +132,7 @@ end
 
 % memory map to original file
 m = memmapfile(fname, 'Format', {'int16' [nchans nsamps] 'mapped'});
+raw = m.data;
 
 % go over chunks
 for i = 1 : nchunks
@@ -143,7 +144,7 @@ for i = 1 : nchunks
     fprintf(txt)
     
     % load chunk
-    d = m.data.mapped(:, chunks(i, 1) : chunks(i, 2));
+    d = raw.mapped(:, chunks(i, 1) : chunks(i, 2));
        
     % remove channels
     if ~isempty(rmvch)                     
