@@ -68,11 +68,6 @@ ycoords = [];
 xcoords = [];
 xrep = [20 40 60 80];
 
-% arguments
-ops.fs              = fs;  % sampling rate
-ops.NchanTOT        = nchans; % total number of channels in your recording
-ops.trange          = trange; % time range to sort [s]
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % channel map
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -108,7 +103,6 @@ connected(badch) = false; % e.g. acceleration
 % kcoords(connected) and no more channel map information is needed (in particular
 % no "adjacency graphs" like in KlustaKwik).
 % Now we can save our channel map and also a channel_shanks file for phy.
-ops.kcoords = kcoords;
 ops.chanMap = fullfile(basepath, 'chanMap.mat');
 save(ops.chanMap, 'chanMap', 'chanMap0ind', 'connected',...
     'xcoords', 'ycoords', 'kcoords', 'fs')
@@ -116,6 +110,12 @@ save(ops.chanMap, 'chanMap', 'chanMap0ind', 'connected',...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ks parameters
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% arguments
+ops.kcoords         = kcoords;
+ops.fs              = fs;       % sampling rate
+ops.NchanTOT        = nchans;   % total number of channels in your recording
+ops.trange          = trange;   % time range to sort [s]
 
 % Thresholds on spike detection used during the optimization Th(1) or
 % during the final pass Th(2). These thresholds are applied to the template
@@ -138,7 +138,7 @@ ops.lam = 12;
 % if, additionally, the cross-correlogram of the split units does not
 % contain a big dip at time 0. splitting a cluster at the end requires at
 % least this much isolation for each sub-cluster (max = 1){0.9}.
-ops.AUCsplit = 0.9;
+ops.AUCsplit = 0.88;
 
 % frequency for high pass filtering {150}
 ops.fshigh = 500;
@@ -218,23 +218,28 @@ else
     
     fprintf('found %d good units \n', sum(rez.good > 0))
     
+    % save final results
+    if saveFinal
+        rez = rmfield(rez, 'st2');
+        rez = rmfield(rez, 'cProjPC');
+        rez = rmfield(rez, 'cProj');
+        fprintf('\nsaving final rez file\n')
+        save(fullfile(basepath, 'rez.mat'), 'rez', '-v7.3');
+    end
+    
     % write for manual curation
     switch outFormat
         case 'phy'
-            fprintf('Saving results to Phy \n')
+            fprintf('\nSaving results to Phy \n')
             % note this function delets all .npy in path
             rezToPhy(rez, basepath); 
             % save channel_shanks file
             writeNPY(kcoords(~isnan(kcoords)), fullfile(basepath, 'channel_shanks.npy'));
         case 'ns'
-            fprintf('Saving results to Neurosuite format \n')
+            fprintf('\nSaving results to Neurosuite format \n')
             ks2ns(rez)
     end
 end
 
-% save final results 
-if saveFinal
-    fprintf('saving final results \n')
-    save(fullfile(basepath, 'rez.mat'), 'rez', '-v7.3');
-end
+
 

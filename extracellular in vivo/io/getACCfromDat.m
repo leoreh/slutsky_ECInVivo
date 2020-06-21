@@ -63,6 +63,7 @@ function acc = getACCfromDat(varargin)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+tic;
 
 p = inputParser;
 addOptional(p, 'basepath', pwd);
@@ -151,6 +152,7 @@ nchunks = size(chunks, 1);
 
 % memory map to dat file
 m = memmapfile(fname, 'Format', {precision, [nchans, nsamps] 'mapped'});
+raw = m.data;
 
 % load timestamps
 tname = fullfile(basepath, [basename, '.tstamps.mat']);
@@ -172,7 +174,7 @@ for i = 1 : nchunks
     fprintf(txt)
     
     % load data
-    d = double(m.data.mapped(ch, chunks(i, 1) : chunks(i, 2)));    
+    d = double(raw.mapped(ch, chunks(i, 1) : chunks(i, 2)));    
     t = double(tstamps(chunks(i, 1) : chunks(i, 2)))';
     
     % convert g to V
@@ -272,6 +274,8 @@ if graphics
     fill([acc.sleep fliplr(acc.sleep)]' / 60, [Y(1) Y(1) Y(2) Y(2)],...
         'k', 'FaceAlpha', 0.25,  'EdgeAlpha', 0);
 end
+
+fprintf('that took %.2f minutes\n', toc / 60)
 
 end
 
