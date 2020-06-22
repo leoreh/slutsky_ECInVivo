@@ -2,22 +2,21 @@ function fixSpkAndRes(varargin)
 
 % processes neurosuite files after manual curation. answers two issues: (1)
 % re-aligns individual waveforms according to their peak / trough
-% (depending on the greater value in the mean waveform). (2) enforces a
+% (according to the peak orientation in the mean waveform). (2) enforces a
 % dead time on spike times (res) that typically occurs when kilosort tries
-% to find spikes that occur simultaneously. re-alignment must occur first
-% because it influences spike times. usually re-alignment also
-% significantly improves the refractory period as seen in the ccg even
-% without enforcing a dead time (increases confidance this is the right
-% thing to do). alas recalculates pca. if backup is flagged then will copy
+% to find spikes that occur simultaneously. re-alignment occurs first
+% because it changes spike times. usually re-alignment also significantly
+% improves the refractory period as seen in the ccg even without enforcing
+% a dead time. alas recalculates pca. if backup is flagged then will copy
 % the original files to a separate directory.
 % -------------------------------------------------------------------------
 % since the waveforms were detrended in ks2ns, we can assume the beginning
 % and end of a wave are equal to zero and thus circhshift is used to
 % recenter the peak / trough.
 % -------------------------------------------------------------------------
-% one persistant problem is that if a waveform includes two spikes, the
-% larger one will always be centered even if the cluster originally
-% referred to the smaller one.
+% one problem that persists is that if a waveform includes two spikes, the
+% larger spike will always be centered even if the cluster originally
+% referred to the smaller spikes.
 % -------------------------------------------------------------------------
 % 
 % INPUT:
@@ -79,7 +78,7 @@ graphics    = p.Results.graphics;
 bkup        = p.Results.bkup;
 saveFiles   = p.Results.saveFiles;
 
-% try to load params from session info (cell explorer)
+% try to load params from session info (cell explorer format)
 [~, basename] = fileparts(basepath);
 infoname = fullfile(basepath, [basename '.session.mat']);
 if exist(infoname, 'file')
@@ -146,7 +145,7 @@ for i = grp
     
     % load data
     fprintf('Loading group %d / %d ', i, ngrp)
-      
+    
     cluname = fullfile(clufiles(i).folder, clufiles(i).name);
     fid = fopen(cluname, 'r');
     nclu = fscanf(fid, '%d', 1);
@@ -327,6 +326,3 @@ fprintf('that took %.2f minutes\n', toc / 60)
 end
 
 % EOF
-
-
-
