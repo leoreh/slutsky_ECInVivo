@@ -35,7 +35,8 @@ function fixSpkAndRes(varargin)
 %   psamp       numeric. peak / trough sample {16}. if empty will be
 %               set to half nsamps.
 %   stdFactor   numeric. re-alignment will occur only if std @ peak is
-%               greater than the std @ begining * stdFactor {1.1}.
+%               greater than std @ begining * stdFactor {1.1}. if empty
+%               then all clusters will undergo re-alignment. 
 %   graphics    logical. plot the before / after of each cluster {false}.
 %   bkup        logical. create backup of files in basepath/ns/bkup {true}.
 %   saveFiles   logical. save ns files after processing {true}. mainly for
@@ -196,9 +197,11 @@ for i = grp
         
         % re-align waveforms only if std at peak greater than at edges
         spkStd = std(spkGrp(ampMaxCh, :, :), [], 3);
-        if spkStd(psamp) < spkStd(1) * stdFactor &&...
-                spkStd(psamp) < spkStd(end) * stdFactor
-            continue
+        if ~isempty(stdFactor)
+            if spkStd(psamp) < spkStd(1) * stdFactor &&...
+                    spkStd(psamp) < spkStd(end) * stdFactor
+                continue
+            end
         end
         
         % find wave polarity to decide if align to min or max
