@@ -29,7 +29,7 @@ function rez = runKS(varargin)
 %   # currently, only the gui can be used in cases where one channel of a
 %   tetrode is bad (done - 11 jun 20)
 % 
-% 22 may 20 LH  updates:
+% 22 may 20 LH      updates:
 % 16 jun 20 LH      outFormat
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -239,6 +239,9 @@ else
             fprintf('\nSaving results to Neurosuite format \n')
             ks2ns(rez)
     end
+    
+    % clean temp_wh file
+    delete(fullfile(basepath, 'temp_wh.dat'))
 end
 
 
