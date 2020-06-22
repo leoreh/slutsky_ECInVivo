@@ -92,7 +92,7 @@ if isempty(fs)
     fs = session.extracellular.sr;
 end
 if isempty(nsamps)
-    nsamps = ceil(1.6 * 10^-3 * fs);
+    nsamps = ceil(1.6 * 10^-3 * fs);        % 1.6 ms in samples
 end
 if isempty(psamp)
     psamp = nsamps / 2;
@@ -278,7 +278,7 @@ for i = grp
     end
     
     % recalculate PCA
-    fprintf('Calculating PCAs... \t')
+    fprintf('Calculating PCA... \t')
     nFeatures = nchans * 3 + nchans + 1;
     fetMat = zeros(nspks, nFeatures);
     enrgIdx = nchans * 3;
