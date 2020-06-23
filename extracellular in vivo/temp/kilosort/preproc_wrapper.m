@@ -1,14 +1,14 @@
 % preproc_wrapper
-basepath = 'D:\tempData\lh52_200615\170633';
+basepath = 'D:\dataTemp\080634';
 cd(basepath)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % open ephys
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'D:\tempData\2020-06-14_08-42-15';
+basepath = 'E:\Leore\lh52\2020-06-21_09-07-33';
 rmvch = [10, 12, 13, 16, 17, 21, 23, 24];
 mapch = [25 26 27 28 30 1 2 29 3 : 14 31 0 15 16 17 : 24 32 33 34] + 1;
-exp = [8];
+exp = [6];
 rec = cell(max(exp), 1);
 % rec{3} = 3;
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
@@ -26,10 +26,10 @@ spkgrp = session.extracellular.spikeGroups.channels;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % field
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% intens = [4 6 8 10];
-% fepsp = getfEPSPfromOE('basepath', basepath, 'fname', '', 'nchans', nchans,...
-%     'spkgrp', spkgrp, 'intens', intens, 'concat', false, 'saveVar', true,...
-%     'force', true);  
+intens = [50 100 150 200 250 300];
+fepsp = getfEPSPfromOE('basepath', basepath, 'fname', '', 'nchans', nchans,...
+    'spkgrp', spkgrp, 'intens', intens, 'concat', false, 'saveVar', true,...
+    'force', true);  
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % kilosort
