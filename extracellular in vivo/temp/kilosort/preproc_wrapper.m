@@ -1,5 +1,5 @@
 % preproc_wrapper
-basepath = 'D:\dataTemp\080634';
+basepath = 'D:\VMs\shared\lh52_200614\170611';
 cd(basepath)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
