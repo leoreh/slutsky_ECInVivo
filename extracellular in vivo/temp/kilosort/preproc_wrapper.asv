@@ -16,8 +16,6 @@ datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
     'rmvch', rmvch, 'mapch', mapch, 'concat', true, 'nchans', 35,...
     'intens', intens);
 
-ce_LFPfromDat(session)
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % session info (cell explorer foramt)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -54,9 +52,7 @@ fixSpkAndRes;
 % spikes = loadSpikes('session', session, 'useNeurosuiteWaveforms', true,...
 %     'forceReload', true);
 cell_metrics = ProcessCellMetrics('session', session,...
-    'manualAdjustMonoSyn', false, 'summaryFigures', false,...
-    'debugMode', true, 'transferFilesFromClusterpath', false,...
-    'submitToDatabase', false);
+    'manualAdjustMonoSyn', false, 'summaryFigures', false, 'debugMode);
 cell_metrics = CellExplorer('metrics',cell_metrics); 
 
 
@@ -73,11 +69,6 @@ mu = find(isi < 10);
 spikes = cluVal(spikes, 'basepath', basepath, 'saveVar', false,...
     'saveFig', false, 'force', true, 'mu', mu, 'graphics', false,...
     'vis', 'on', 'spkgrp', spkgrp);
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% sleep states
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-SleepScoreMaster(basepath)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % firing rate

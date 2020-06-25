@@ -120,7 +120,6 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % process
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-if concat 
     % create new folder named according to time in xml file. assumes there
     % is one xml file per experiment named 'setting*'. the xml provides the
     % datetime of creation (i.e. recording) whereas file.date gets the
@@ -172,70 +171,8 @@ if concat
         copyfile(xmlfile, exPathNew)
         movefile([exPathNew, filesep, xmlfiles.name], xmlnew);
     end
-    
-else
-    for i = 1 : length(recPath)
-       % 
-% 
-% for i = 1 : length(exp)
-%     
-%     fprintf('working on experiment %d\n', exp(i))
-%     
-%     % exp path
-%     expNames = {expFolders.name};
-%     expIdx = find(strcmp(expNames, ['experiment' num2str(exp(i))]));
-%     exPath = fullfile(expFolders(expIdx).folder, expFolders(expIdx).name);
-%     expIdx = char(regexp(expFolders(expIdx).name, [filesep 'd*'], 'Match'));
-%     
-%     % get time from xml file
-%     if strcmp(expIdx, '1')
-%         xmlname = ['settings.xml'];
-%     else
-%         xmlname = ['settings_' expIdx '.xml'];
-%     end
-%     t = convert(xmltree(xmlname));
-%     dn = datenum(t.INFO.DATE, 'dd mmm yyyy HH:MM:SS');
-%     expTime = datestr(dn, 'hhmmss');
-%     
-%     % get recording folders in each experiment
-%     recFolders = files(contains({files.name}, 'recording') &...
-%         strcmp({files.folder}, exPath));
-%     recIdx = [];
-%     for i = 1 : length(recFolders)
-%         recIdx(i) = str2num(char((regexp(recFolders(i).name, [filesep 'd*'], 'Match'))));
-%     end
-%     
-%     fprintf('%d recordings found\n', length(recIdx))
-%     
-%     expName = sprintf('%s_e%sr%d-%d', expTime, expIdx, recIdx(1), recIdx(end));
-%     exPathNew = fullfile(newpath, expName);
-%     mkdir(exPathNew)
-%     fprintf('created %s\n', exPathNew)
-%     
-%     % move / concatenate dat
-%     catDat('basepath', exPath, 'newpath', exPathNew,...
-%         'concat', concat, 'nchans', nchans, 'saveVar', true);
-%     
-%     % pre-process dat
-%     datInfo = preprocDat('basepath', exPathNew, 'fname', '', 'mapch', mapch,...
-%         'rmvch', rmvch, 'nchans', nchans, 'saveVar', true,...
-%         'chunksize', 5e6, 'precision', 'int16', 'bkup', false);
-%     
-%     % get digital input
-%     getDinOE('datpath', exPath, 'newpath', exPathNew,...
-%         'concat', true, 'nchans', nchans, 'nbytes', 2,...
-%         'saveVar', true);
-%     
-%     % get acceleration
-%     newch = length(mapch) - length(rmvch);
-%     chAcc = [newch : -1 : newch - 2];
-%     getAccFromDat('basepath', exPathNew, 'fname', '',...
-%         'nchans', newch, 'ch', chAcc, 'force', false, 'saveVar', true,...
-%         'graphics', false, 'fs', 1250);    
-% end        
-    end
+ 
 end
 
-end
 
 % EOF

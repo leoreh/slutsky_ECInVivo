@@ -12,7 +12,6 @@ function spikes = cluVal(spikes, varargin)
 %   spikes          struct (see getSpikes)
 %   npca            #PCA features for mahal dist {12}.
 %                   If sorted with neurosuite should be #spk group * 3
-%   spkgrp          array where each cell is the electrodes for a spike group. 
 %   mu              vector of predetermined multi units. spikes from these
 %                   units will be discarded from distance calculations.
 %                   numbering should correspond to spikes.UID
@@ -28,21 +27,17 @@ function spikes = cluVal(spikes, varargin)
 %   iDist
 %   ISIratio
 %
-% DEPENDENCIES:
+% CALLS:
 %   getSpikes       optional (if not given as input)
 %   getFet          PCA feature array
 %   cluDist         L ratio and iDist
 %   plotCluster     plot waveform and ISI histogram
 %   ISI             calc isi contamination
 %
-% TO DO LIST:
-%   # adapt plotCluster to cell explorer
-%
 % 03 dec 18 LH      UPDATS: 
 % 15 nov 19 LH      separated ISI to standalone function
 %                   added predetermined mu
 %                   adjusted i\o params
-% 25 jun 20 LH      spkgrp and adaptation to cell explorer format
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -61,7 +56,7 @@ addOptional(p, 'saveVar', true, @islogical);
 parse(p, varargin{:})
 basepath = p.Results.basepath;
 npca = p.Results.npca;
-spkgrp = p.Results.spkgrp;
+spkgrp = p.Results.v;
 mu = p.Results.mu;
 force = p.Results.force;
 graphics = p.Results.graphics;
@@ -105,7 +100,7 @@ else
         clu = spikes.cluID(spikes.shankID == i);
         lRat{i} = zeros(length(clu), 1);
         iDist{i} = zeros(length(clu) ,1);
-        ncol = npca * length(spkgrp{i});
+        ncol = npca * size([spikes.times{spikes.shankID == i}], 1);
         for j = 1 : length(clu)
             cluidx = find(fet{i}(:, end) == clu(j));
             [lRat{i}(j, 1), iDist{i}(j, 1), mDist{i}{j}] = cluDist(fet{i}(:, 1 : ncol), cluidx);
