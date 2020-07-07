@@ -1,4 +1,4 @@
-function [zband, t] = specBand(varargin)
+function [zband, t, pband] = specBand(varargin)
 
 % calculates power spectra in specified band. can be normalized to power in
 % broadband (0-100 Hz). if band is empty then simply calculates and plots

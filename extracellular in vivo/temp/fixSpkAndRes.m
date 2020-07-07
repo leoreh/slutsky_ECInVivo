@@ -2,26 +2,23 @@ function fixSpkAndRes(varargin)
 
 % processes neurosuite files after manual curation. answers two issues: (1)
 % re-aligns individual waveforms according to their peak / trough
-% (according to the peak orientation in the mean waveform). (2) enforces a
-% dead time on spike times (res) that typically occurs when kilosort tries
-% to find spikes that occur simultaneously. re-alignment occurs first
-% because it changes spike times. usually re-alignment also significantly
-% improves the refractory period as seen in the ccg even without enforcing
-% a dead time. alas recalculates pca. if backup is flagged then will copy
-% the original files to a separate directory.
+% (depending on orientation of the mean waveform). (2) enforces a dead time
+% on spike times (res) that typically occurs when kilosort tries to find
+% spikes that occur simultaneously. re-alignment occurs first because it
+% changes spike times. alas recalculates pca. if backup is flagged
+% then copies the original files to a separate directory.
 % -------------------------------------------------------------------------
-% since the waveforms were detrended in ks2ns, we can assume the beginning
-% and end of a wave are equal to zero and thus circhshift is used to
-% recenter the peak / trough.
+% since waveforms were detrended in ks2ns, the beginning and end of a spike
+% are equal to zero and thus circhshift can be used to recenter the peak /
+% trough.
 % -------------------------------------------------------------------------
 % one problem that persists is that if a waveform includes two spikes, the
 % larger spike will always be centered even if the cluster originally
-% referred to the smaller spikes.
+% referred to the smaller spike.
 % -------------------------------------------------------------------------
 % 
 % INPUT:
-%   basepath    string. path to recording folder {pwd}. if multiple dat
-%               files exist only the first will be processed
+%   basepath    string. path to recording folder {pwd}.
 %   spkgrp      array where each cell is the electrodes for a spike group.
 %               if empty will be loaded from session info file (cell
 %               explorer format)
@@ -38,8 +35,7 @@ function fixSpkAndRes(varargin)
 %               then all clusters will undergo re-alignment. 
 %   graphics    logical. plot the before / after of each cluster {false}.
 %   bkup        logical. create backup of files in basepath/ns/bkup {true}.
-%   saveFiles   logical. save ns files after processing {true}. mainly for
-%               debugging this code
+%   saveFiles   logical. save ns files after processing {true}. 
 %
 % DEPENDENCIES
 %   plotCCG
@@ -106,7 +102,7 @@ dur = 0.01;
 binsize = 0.0001;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% arrange files and backup
+% arrange files
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 clufiles = dir([basepath filesep '*.clu*']);
@@ -123,7 +119,7 @@ if length(resfiles) ~= length(clufiles) ||...
     error('different number of res / clu / spk / fet files')
 end
 
-% create backup
+% backup
 if bkup
     bkpath = fullfile(basepath, 'ns', 'bkup');
     fprintf('Saving backup in %s\n', bkpath)
@@ -144,7 +140,7 @@ for i = grp
     nchans = length(spkgrp{i});
     
     % load data
-    fprintf('Loading group %d / %d ', i, ngrp)
+    fprintf('Loading group %d / %d. ', i, ngrp)
     
     cluname = fullfile(clufiles(i).folder, clufiles(i).name);
     fid = fopen(cluname, 'r');
@@ -182,7 +178,7 @@ for i = grp
 
         % print progress
         fprintf(repmat('\b', 1, length(txt)))
-        txt = sprintf('Working on cluster %d / %d \t', ii, nclu);
+        txt = sprintf('Working on cluster %d / %d. \t', ii, nclu);
         fprintf('%s', txt)
         
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -17,6 +17,9 @@ function [SleepScoreMetrics,StatePlotMaterials] = ClusterStates_GetMetrics(...
 %
 %Last Updated: 1/31/16
 %DLevenstein
+
+% 29 jun 20 LH allow for acceleration input istead of EMG 
+
 %% Params
 p = inputParser;
 addParameter(p,'onSticky',false)
@@ -220,19 +223,23 @@ broadbandSlowWave = bz_NormToRange(broadbandSlowWave,[0 1]);
 thratio = bz_NormToRange(thratio,[0 1]);
  
 %% EMG
-dtEMG = 1/EMG.samplingFrequency;
-EMG.smoothed = smooth(EMG.data,smoothfact/dtEMG,'moving');
+if isfield(EMG, 'tstamps')
+    EMG.smoothed = EMG.data;
+    EMG.timestamps = EMG.tstamps;
+else
+    dtEMG = 1/EMG.samplingFrequency;
+    EMG.smoothed = smooth(EMG.data,smoothfact/dtEMG,'moving');
+end
 
-%remove any t_clus before/after t_emg
-prEMGtime = t_clus<EMG.timestamps(1) | t_clus>EMG.timestamps(end);
-broadbandSlowWave(prEMGtime) = []; thratio(prEMGtime) = []; t_clus(prEMGtime) = [];
-
-%interpolate to FFT time points;
-EMG = interp1(EMG.timestamps,EMG.smoothed,t_clus,'nearest');
-
-%Min/Max Normalize
-EMG = bz_NormToRange(EMG,[0 1]);
-
+    %remove any t_clus before/after t_emg
+    prEMGtime = t_clus<EMG.timestamps(1) | t_clus>EMG.timestamps(end);
+    broadbandSlowWave(prEMGtime) = []; thratio(prEMGtime) = []; t_clus(prEMGtime) = [];
+    
+    %interpolate to FFT time points;
+    EMG = interp1(EMG.timestamps,EMG.smoothed,t_clus,'nearest');
+    
+    %Min/Max Normalize
+    EMG = bz_NormToRange(EMG,[0 1]);
 
 %% BELOW IS GETTING HISTOGRAMS AND THRESHOLDS FOR SCORING IN         %%
 %  CLUSTERSTATES_DetermineStates and visualization in TheStateEditor %%\

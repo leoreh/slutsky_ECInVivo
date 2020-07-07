@@ -25,10 +25,11 @@ function datInfo = preprocOE(varargin)
 %
 % TO DO LIST:
 %   # enable concatenation of experiments (done)
-%   # add option to select specific recordings in experiments
+%   # add option to select specific recordings in experiments (done)
 %   # fix exp idx (done)
 %   # fix datenum (year sometimes wrong) (done 02 may 20)
 %   # fix datenum in experiment name
+%   # instead of saving OE tstamps, convert them to samples (Din)
 %
 % 09 apr 20 LH  updates
 % 28 apr 20 LH  find exp by name and not number of folders
@@ -146,9 +147,9 @@ end
     % get acceleration
     newch = length(mapch) - length(rmvch);
     chAcc = [newch : -1 : newch - 2];
-    getACCfromDat('basepath', exPathNew, 'fname', '',...
+    EMGfromACC('basepath', exPathNew, 'fname', '',...
         'nchans', newch, 'ch', chAcc, 'force', false, 'saveVar', true,...
-        'graphics', false, 'fs', 1250);
+        'graphics', false, 'fsOut', 1250);
     
     % copy xml
     basefiles = dir(fileparts(newpath));

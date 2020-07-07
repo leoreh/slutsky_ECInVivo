@@ -20,4 +20,8 @@ close all
 clear all
 clc
 
+% Get rid of warning about directory already existing:
+% "Warning: Directory already exists."
+warning('off', 'MATLAB:MKDIR:DirectoryExists');
+
 % EOF

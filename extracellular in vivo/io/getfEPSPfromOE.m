@@ -18,12 +18,16 @@ function fepsp = getfEPSPfromOE(varargin)
 %               5 samples after the corresponding stamp and ending 405
 %               samples after stamp. if win = [-16 16] than snip will be of
 %               33 samples symmetrically centered around stamp.
+%   dt          numeric. dead time for calculating amplitude. 
+%               important for exclusion of stim artifact. {40}[samples]
 %   precision   char. sample precision of dat file {'int16'}
 %   force       logical. force reload {false}.
 %   concat      logical. concatenate blocks (true) or not {false}. 
 %               used for e.g stability.
 %   saveVar     logical. save variable {1}. 
+%   saveFig     logical. save graphics {1}. 
 %   graphics    logical. plot graphics {1}. 
+%   vis         char. figure visible {'on'} or not ('off')
 %   
 % CALLS
 %   snipFromDat
@@ -32,12 +36,15 @@ function fepsp = getfEPSPfromOE(varargin)
 %   fepsp       struct
 % 
 % TO DO LIST
-%   # code more efficient way to convert tstamps to idx
+%   # more efficient way to convert tstamps to idx
 %   # add concatenation option for stability
 %   # improve graphics
 %   # add option to resample (see getAcc)
+%   # sort mats according to intensity
 % 
-% 22 apr 20 LH          
+% 22 apr 20 LH   UPDATES:
+% 28 jun 20 LH      first average electrodes and then calculate range
+%                   dead time to exclude stim artifact
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -49,11 +56,14 @@ addOptional(p, 'nchans', 35, @isnumeric);
 addOptional(p, 'spkgrp', {}, @iscell);
 addOptional(p, 'intens', [], @isnumeric);
 addOptional(p, 'win', [1 2000], @isnumeric);
+addOptional(p, 'dt', 40, @isnumeric);
 addOptional(p, 'precision', 'int16', @ischar);
 addOptional(p, 'force', false, @islogical);
 addOptional(p, 'concat', false, @islogical);
 addOptional(p, 'saveVar', true, @islogical);
+addOptional(p, 'saveFig', true, @islogical);
 addOptional(p, 'graphics', true, @islogical);
+addOptional(p, 'vis', 'on', @ischar);
 
 parse(p, varargin{:})
 basepath = p.Results.basepath;
@@ -62,11 +72,14 @@ nchans = p.Results.nchans;
 spkgrp = p.Results.spkgrp;
 intens = p.Results.intens;
 win = p.Results.win;
+dt = p.Results.dt;
 precision = p.Results.precision;
 force = p.Results.force;
 concat = p.Results.concat;
 saveVar = p.Results.saveVar;
+saveFig = p.Results.saveFig;
 graphics = p.Results.graphics;
+vis = p.Results.vis;
 
 % params
 if isempty(spkgrp)
@@ -106,7 +119,7 @@ end
 % load digital input
 stimname = fullfile(basepath, [basename, '.din.mat']);
 if exist(stimname) 
-    fprintf('\n loading %s \n', stimname)
+    fprintf('\nloading %s \n', stimname)
     load(stimname)
 else
     error('%s not found', stimname)
@@ -115,7 +128,7 @@ end
 % load dat info
 infoname = fullfile(basepath, [basename, '.datInfo.mat']);
 if exist(infoname, 'file')
-    fprintf('\n loading %s \n', infoname)
+    fprintf('loading %s \n', infoname)
     load(infoname)
 end
 nfiles = length(datInfo.origFile);  % number of intensities 
@@ -128,6 +141,7 @@ load(fullfile(basepath, [basename, '.tstamps.mat']));
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % convert tstamps to idx of samples 
+stamps = zeros(1, length(din.data));
 for i = 1 : length(din.data)
     stamps(i) = find(tstamps == din.data(i));
 end
@@ -142,7 +156,7 @@ snips = snips / 1000;   % uV to mV
 % calc
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% find indices according to intesities (different files)
+% rearrange indices according to intesities (files)
 csamps = [0 cumsum(datInfo.nsamps)];
 maxstim = 1;
 stimidx = cell(nfiles, 1);
@@ -152,13 +166,14 @@ for i = 1 : nfiles
     maxstim = max([maxstim, length(stimidx{i})]);   % used for cell2mat
 end
 
-% rearrange snips according to intensities and spkgrprodes
-% extract amplitude and waveform
+% rearrange snips according to intensities and tetrodes. extract amplitude
+% and waveform.
 for j = 1 : nspkgrp
     for i = 1 : nfiles
         wv{j, i} = snips(spkgrp{j}, :, stimidx{i});
         wvavg(j, i, :) = mean(mean(wv{j, i}, 3), 1);
-        ampcell{j, i} = mean(squeeze(abs(min(wv{j, i}, [], 2) - max(wv{j, i}, [], 2))), 1);
+        wvamp = mean(wv{j, i}(:, dt : end, :), 1);
+        ampcell{j, i} = squeeze(range(wvamp));
         amp(j, i) = mean(ampcell{j, i});
         stimcell{i} = stamps(stimidx{i});
     end
@@ -175,55 +190,65 @@ else
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% graphics
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-if graphics
-    fh = figure;
-    k = 1;
-    for j = 1 : nspkgrp
-        for i = 1 : nfiles
-            subplot(nspkgrp, nfiles, k)
-            plot(squeeze(wvavg(j, i, :)))
-            ylim([min(wvavg(:)) max(wvavg(:))])
-            set(gca, 'TickLength', [0 0], 'YTickLabel', [], 'XTickLabel', [],...
-                'Color', 'none')
-            if j == nspkgrp
-                xlabel([num2str(intens(i)) ' uA'])
-            end
-            if i == 1
-                set(gca, 'YTickLabel', [ceil(min(wvavg(:))), floor(max(wvavg(:)))])
-                ylabel(['T' num2str(j)])
-            end
-            k = k + 1;
-        end
-    end
-    
-    fh = figure;
-    k = 1;
-    for j = 1 : nspkgrp
-        subplot(nspkgrp, 1, k)
-        plot(amp(j, :))
-        k = k + 1;
-        ylim([min(amp(:)) max(amp(:))])
-    end
-end
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arrange struct and save
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+[intens, ia] = sort(intens);
+
 % arrange struct
-fepsp.wv = wv;
-fepsp.wvavg = wvavg;
-fepsp.ampcell = ampcell;
-fepsp.amp = amp;
-fepsp.stim = stimidx;
+fepsp.wv = wv(:, ia);
+fepsp.wvavg = wvavg(:, ia, :);
+fepsp.ampcell = ampcell(:, ia);
+fepsp.amp = amp(:, ia);
+fepsp.stim = stimidx(:, ia);
 fepsp.intens = intens;
 fepsp.t = win(1) : win(2);
 fepsp.spkgrp = spkgrp;
+fepsp.dt = dt;
 
 if saveVar
     save(fepspname, 'fepsp');
 end
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% graphics
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+if graphics
+    if saveFig
+        figpath = fullfile(basepath, 'graphics');
+        mkdir(figpath)
+    end
+    for i = 1 : nspkgrp
+        fh = figure('Visible', vis);
+        suptitle(sprintf('T#%d', i))
+        subplot(1, 2, 1)
+        plot(squeeze(fepsp.wvavg(i, :, :))')
+        axis tight
+        y = [min([fepsp.wvavg(:)]) max([fepsp.wvavg(:)])];
+        hold on
+        plot([dt dt], y, '--r')
+        ylim(y)
+        xlabel('Time [samples]')
+        ylabel('Voltage [mV]')
+        legend(split(num2str(intens)))
+        box off
+        
+        subplot(1, 2, 2)
+        ampmat = cell2nanmat(fepsp.ampcell(i, :));
+        boxplot(ampmat, 'PlotStyle', 'traditional')
+        ylim([min(vertcat(fepsp.ampcell{:})) max(vertcat(fepsp.ampcell{:}))])
+        xticklabels(split(num2str(intens)))
+        xlabel('Intensity [uA]')
+        ylabel('Amplidute [mV]')
+        box off
+        
+        if saveFig
+            figname = [figpath '\fepsp_t' num2str(i)];
+            export_fig(figname, '-tif', '-r300', '-transparent')
+        end
+    end
 end
+
+end
+
+% EOF

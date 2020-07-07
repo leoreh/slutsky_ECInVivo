@@ -1,5 +1,5 @@
 % preproc_wrapper
-basepath = 'H:\Data\Processed\lh52\lh52_200617\080636';
+basepath = 'D:\VMs\shared\lh52_200625\170630';
 cd(basepath)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -16,7 +16,6 @@ datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
     'rmvch', rmvch, 'mapch', mapch, 'concat', true, 'nchans', 35,...
     'intens', intens);
 
-ce_LFPfromDat(session)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % session info (cell explorer foramt)
@@ -45,7 +44,7 @@ rez = runKS('basepath', basepath, 'fs', fs, 'nchans', nchans,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % fix manual curation
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-fixSpkAndRes;
+fixSpkAndRes('grp', 6);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % cell explorer
@@ -77,7 +76,17 @@ spikes = cluVal(spikes, 'basepath', basepath, 'saveVar', false,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % sleep states
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-SleepScoreMaster(basepath)
+badch = setdiff([session.extracellular.electrodeGroups.channels{:}],...
+    [session.extracellular.spikeGroups.channels{:}]);
+SleepScoreMaster(basepath, 'rejectChannels', badch)
+TheStateEditor
+
+ce_LFPfromDat(session)
+bz_LFPfromDat(filepath)
+
+EMGFromLFP = bz_EMGFromLFP(basepath, 'overwrite', false,...
+    'rejectChannels', [25 : 27], 'noPrompts', false,...
+    'saveMat', true);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % firing rate

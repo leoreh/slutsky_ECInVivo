@@ -1,15 +1,14 @@
 function lfp = getLFP(varargin)
 
-% gets lfp from lfp file for each channel. can specify channels and
-% intervals, average across channels, and resample. if field recordings
-% than inverted.
+% loads lfp data. can specify channels, intervals, average across channels,
+% resample, invert and more.
 %  
 % INPUT
 %   basename    string. filename of lfp file. if empty retrieved from
 %               basepath. if .lfp should not include extension, if .wcp
 %               should include extension
 %   basepath    string. path to load filename and save output {pwd}
-%   extension   load from {'lfp'} (neurosuite), 'abf', or 'wcp'.
+%   extension   load from {'lfp'} (neurosuite), 'abf', 'wcp', or 'dat'.
 %   forceL      logical. force reload {false}.
 %   fs          numeric. requested sampling frequency {1250}
 %   interval    numeric mat. list of intervals to read from lfp file [s]
@@ -20,6 +19,9 @@ function lfp = getLFP(varargin)
 %   saveVar     save variable {1}.
 %   chavg       cell. each row contain the lfp channels you want to average
 %   
+% DEPENDENCIES
+%   ce_LFPfromDat (if extension = 'dat')
+% 
 % OUTPUT
 %   lfp         structure with the following fields:
 %   fs
@@ -33,7 +35,12 @@ function lfp = getLFP(varargin)
 % 
 % 01 apr 19 LH & RA
 % 19 nov 19 LH          load mat if exists  
-% 14 jan 19 LH          adapted for wcp and abf and resampling
+% 14 jan 19 LH          adapted for wcp and abf 
+%                       resampling
+%
+% TO DO LIST
+%       # lfp from dat
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -103,6 +110,8 @@ switch extension
         end
         lfp.data = data.S(:);
         fs_orig = data.fs;
+    case 'dat'
+        error('not ready yet')
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -124,8 +133,8 @@ end
 
 % invert
 if ~strcmp(extension, 'lfp') && abs(min(lfp.data)) > max(lfp.data)
-    lfp.data = -lfp.data;
     fprintf('\n inverting data \n\n')
+    lfp.data = -lfp.data;
 end
 
 % convert to double

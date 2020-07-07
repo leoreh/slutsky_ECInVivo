@@ -1,13 +1,15 @@
-function acc = getACCfromDat(varargin)
+function acc = EMGfromACC(varargin)
 
 % get 3-axis accelerometer signal from dat file and return the acceleration
 % amplitude. based on
-% http://intantech.com/files/Intan_RHD2000_accelerometer_calibration.pdf
-% and Dhawale et al., eLife, 2017. Conversion from g to volts is done by
-% substracting the zero-g bias [V] and dividing with the accelerometer
-% sensitivity [V / g]. these parameters are based on measurments done
-% 27.04.20. After conversion to Volts, the 3-axis acceleration data is L2
-% normalized to yeild a magnitude heuristic.
+% http://intantech.com/files/Intan_RHD2000_accelerometer_calibration.pdf,
+% Dhawale et al., eLife, 2017, and bz_EMGFromLFP. Conversion from g to
+% volts is done by substracting the zero-g bias [V] and dividing with the
+% accelerometer sensitivity [V / g]. these parameters are based on
+% measurments done 27.04.20. After conversion to Volts, the 3-axis
+% acceleration data is L2 normalized to yeild a magnitude heuristic. The
+% broadband spectrogram of the magnitude is calculated and the pc1 (smoothed and
+% normalized 0-1) is taken as the output (EMG equivalent).
 %
 % INPUT:
 %   basepath    string. path to .dat and .npy files {pwd}.
@@ -29,20 +31,17 @@ function acc = getACCfromDat(varargin)
 %               y. order must correspond to ch.
 %   gbias       3x1 vec. zero-g bias data to acceleration in x,
 %               y. order must correspond to ch.
+%   smf         numeric. 
 %   force       logical. reload data even if .mat file exists {false}
-%   fs          numeric. requested sampling frequency {1250}
-%   fs_orig     numeric. original sampling frequency {20000}
+%   fsOut       numeric. requested sampling frequency {1250}
+%   fsIn        numeric. original sampling frequency {20000}
 %   graphics    logical. plot figure {1}
 %   saveVar     logical. save variable {1}
 %
 % OUTPUT
 %   acc             struct with the following fields
-%       mag         L2 magnitude of acceleration
-%       tstamps     time stamps for magnitude [samples]
-%       pband       power of magnitude in 2-5 Hz band
-%       tband       timestmamps for pband [s]
-%       sleep       episodes of inactivity [s]
-%       thr         threshold for separation of inactive / active
+%       tstamps     time stamps for pc1 [seconds]
+%       data        pc1 of spectrogram 
 %       fs          sampling frequency
 %       fs_orig     original sampling frequency
 %
@@ -51,18 +50,25 @@ function acc = getACCfromDat(varargin)
 %   specBand
 %   binary2epochs
 %   sepBimodel
+%   bz_BasenameFromBasepath
+%   n2chunks
+%   bz_NormToRange
 %
 % TO DO LIST:
-%   # compare with emgFromLfp
-%   # linear envelop (smoothing and filtering)
-%   # use pc1 of spectrogram instead of power in 2-5 Hz band (getBS)
-%   # fix sepBimodel
+%   # compare with emgFromLfp (done)
+%   # linear envelop (smoothing and filtering) (not needed)
+%   # use pc1 of spectrogram instead of power in 2-5 Hz band (done)
+%   # fix sepBimodel (see ClusterStates_GetMetrics for good example)
+%   # get data from lfp instead of downsampling dat
+%   # update graphics
 %
-% 09 apr 20 LH
+% 09 apr 20 LH  UPDATES:
+% 29 jun 20 LH  changed according to EMGFromLFP
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+tic;
 
 p = inputParser;
 addOptional(p, 'basepath', pwd);
@@ -75,8 +81,8 @@ addOptional(p, 'ch', [33 34 35], @isnumeric);
 addOptional(p, 'sensitivity', [0.03573; 0.03551; 0.03455], @isnumeric);
 addOptional(p, 'gbias', [0.49445; 0.48464; 0.51740], @isnumeric);
 addOptional(p, 'force', false, @islogical);
-addOptional(p, 'fs', 1250, @isnumeric);
-addOptional(p, 'fs_orig', 20000, @isnumeric);
+addOptional(p, 'fsOut', 1250, @isnumeric);
+addOptional(p, 'fsIn', 20000, @isnumeric);
 addOptional(p, 'graphics', true, @islogical)
 addOptional(p, 'saveVar', true, @islogical);
 
@@ -91,12 +97,12 @@ ch = p.Results.ch;
 sensitivity = p.Results.sensitivity;
 gbias = p.Results.gbias;
 force = p.Results.force;
-fs = p.Results.fs;
-fs_orig = p.Results.fs_orig;
+fsOut = p.Results.fsOut;
+fsIn = p.Results.fsIn;
 graphics = p.Results.graphics;
 saveVar = p.Results.saveVar;
 
-fprintf('\nloading accelaration from %s\n', basepath)
+fprintf('\nextracting accelaration from %s\n', basepath)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preparations 
@@ -105,12 +111,12 @@ fprintf('\nloading accelaration from %s\n', basepath)
 % size of one data point in bytes
 nbytes = class2bytes(precision);
 
-if isempty(fs) % do not resample if new sampling frequency not specified
-    fs = fs_orig;
-elseif fs ~= fs_orig
-    [p, q] = rat(fs / fs_orig);
+if isempty(fsOut) % do not resample if new sampling frequency not specified
+    fsOut = fsIn;
+elseif fsOut ~= fsIn
+    [p, q] = rat(fsOut / fsIn);
     n = 5; beta = 20;
-    fprintf('accelaration will be resampled from %.1f to %.1f\n\n', fs_orig, fs)
+    fprintf('accelaration will be resampled from %.1f to %.1f\n', fsIn, fsOut)
 end
 
 % handle dat file
@@ -151,23 +157,29 @@ nchunks = size(chunks, 1);
 
 % memory map to dat file
 m = memmapfile(fname, 'Format', {precision, [nchans, nsamps] 'mapped'});
+raw = m.data;
 
 % load timestamps
-infoname = fullfile(basepath, [basename, '.datInfo.mat']);
-if exist(infoname, 'file')
-    load(infoname)
+tname = fullfile(basepath, [basename, '.tstamps.mat']);
+if exist(tname, 'file')
+    load(tname)
 else
-    datInfo.tstamps = 1 : size(m.data.mapped, 2);
+    tstamps = 1 : size(m.data.mapped, 2);
 end
 
 % go over chunks
 a = [];
-tstamps = [];
+tstampsACC = [];
 for i = 1 : nchunks
-    fprintf('working on chunk %d / %d\n', i, nchunks)
+    % print progress
+    if i ~= 1
+        fprintf(repmat('\b', 1, length(txt)))
+    end
+    txt = sprintf('working on chunk %d / %d', i, nchunks);
+    fprintf(txt)
     
     % load data
-    d = double(m.data.mapped(ch, chunks(i, 1) : chunks(i, 2)));    
+    d = double(raw.mapped(ch, chunks(i, 1) : chunks(i, 2)));    
     t = double(tstamps(chunks(i, 1) : chunks(i, 2)))';
     
     % convert g to V
@@ -178,9 +190,9 @@ for i = 1 : nchunks
     % signal).
     [d] = rmDC(d, 'dim', 2);
     
-    % resmaple. tstamps does not require filtering and thus the downsample
-    % is preferred.
-    if fs ~= fs_orig
+    % resmaple. tstamps does not require filtering and thus downsample is
+    % preferred.
+    if fsOut ~= fsIn
         d = [resample(d', p, q, n, beta)]';
         t = downsample(t, q / p);
     end
@@ -189,52 +201,64 @@ for i = 1 : nchunks
     mag = vecnorm(d, 2);
     
     % filter
-    mag = filterLFP(mag, 'fs', fs, 'passband', [0.5 150], 'type', 'butter',...
+    mag = filterLFP(mag, 'fs', fsOut, 'passband', [0.5 150], 'type', 'butter',...
         'order', 4, 'dataOnly', true, 'graphics', false, 'saveVar', false); 
     
     a = [a; mag];
-    tstamps = [tstamps, t];
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% calculate power and find episodes of sleep
+% calculate power
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-fprintf('\nfinding episodes of sleep')
-
-% magnitude power in 2-5 Hz freq band
-binsize = (2 ^ nextpow2(1 * fs));
+% binsize chosen according to FFT in ClusterStates_GetMetrics
+binsize = (2 ^ nextpow2(0.5 * fsOut)); 
 smf = 7;
-[pband, tband] = specBand('sig', a, 'graphics', false, 'fs', fs,...
-    'band', [2 5], 'binsize', binsize, 'smf', smf, 'normband', false);
 
-% find immobility threshold 
-thr = sepBimodel('x', pband, 'lognorm', false, 'nbins', 100,...
-    'smf', 20, 'graphics', false);
-thr = 1400;
+% ALT 1: magnitude in 2-5 Hz band (Dhawale et al., eLife, 2017)
+% [pband, tband] = specBand('sig', a, 'graphics', false, 'fs', fs,...
+%     'band', [2 5], 'binsize', binsize, 'smf', smf, 'normband', false);
+% data = bz_NormToRange(pband, [0 1]);
 
-% define episodes of sleep
-vec = [pband < thr];
-sleep = binary2epochs('vec', vec, 'minDur', 10, 'interDur', 1);
-sleep = tband(sleep); % bins to samples
-if sleep == tband(1) % correct edges
-    sleep(1) = 1;
-end
-if sleep(end) == tband(end)
-    sleep(end) = tband(length(pband));
-end
+% ALT 2: PC1 of power in broadband
+freq = logspace(0, 2, 100);
+win = hann(binsize);
+[~, ~, tband, pband] = spectrogram(a, win, 0, freq, fsOut, 'yaxis', 'psd');
+pband = 10 * log10(abs(pband));
+[~, pc1] = pca(pband', 'NumComponents', 1);
+data = smooth(pc1, smf);
+data = bz_NormToRange(data, [0 1]);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% find episodes of sleep
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% fprintf('\nfinding episodes of sleep')
+% 
+% % find immobility threshold 
+% thr = sepBimodel('x', pband, 'lognorm', false, 'nbins', 100,...
+%     'smf', 20, 'graphics', false);
+% thr = 1400;
+% 
+% % define episodes of sleep
+% vec = [pband < thr];
+% sleep = binary2epochs('vec', vec, 'minDur', 10, 'interDur', 1);
+% sleep = tband(sleep); % bins to samples
+% if sleep == tband(1) % correct edges
+%     sleep(1) = 1;
+% end
+% if ~isempty(sleep)
+%     if sleep(end) == tband(end)
+%         sleep(end) = tband(length(pband));
+%     end
+% end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arrange struct and save
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-acc.mag = a;
-acc.tstamps = tstamps; 
-acc.pband = pband;
-acc.tband = tband;
-acc.sleep = sleep;
-acc.thr = thr;
-acc.fs = fs;
-acc.fs_orig = fs_orig;
+acc.data = data;
+acc.tstamps = tband;
+acc.fs = fsOut;
+acc.fs_orig = fsIn;
 
 if saveVar
     save(accname, 'acc');
@@ -265,6 +289,8 @@ if graphics
     fill([acc.sleep fliplr(acc.sleep)]' / 60, [Y(1) Y(1) Y(2) Y(2)],...
         'k', 'FaceAlpha', 0.25,  'EdgeAlpha', 0);
 end
+
+fprintf('\nthat took %.2f minutes\n', toc / 60)
 
 end
 

@@ -79,6 +79,9 @@ function SleepState = SleepScoreMaster(basePath,varargin)
 %   
 %
 % DLevenstein and BWatson 2015/16
+% 
+% 29 jun LH allow for acc load
+% 
 %% Recording Selection
 %if recname is 'select' or something
 %use uigetfile to pick and get list of filenames
@@ -224,9 +227,17 @@ end
 % Load/Calculate EMG based on cross-shank correlations 
 % (high frequency correlation signal = high EMG).  
 % Schomburg E.W. Neuron 84, 470?485. 2014)
-EMGFromLFP = bz_EMGFromLFP(basePath,'overwrite',overwrite,...
+[~, basename] = fileparts(basePath);
+accname = [basename '.acceleration.mat'];
+if exist(accname, 'file')
+    fprintf('\nloading acceleration')
+    load(accname);
+    EMGFromLFP = acc;
+else
+    EMGFromLFP = bz_EMGFromLFP(basePath,'overwrite',overwrite,...
                                      'rejectChannels',rejectChannels,'noPrompts',noPrompts,...
                                      'saveMat',savebool);
+end
 
 %% DETERMINE BEST SLOW WAVE AND THETA CHANNELS
 %Determine the best channels for Slow Wave and Theta separation.

@@ -16,7 +16,7 @@ function epochs = binary2epochs(varargin)
 %                   columns represent the start and end of each event [samps]
 %     
 % EXAMPLE
-%       see aneStates_m.m or getBS.m
+%       see aneStates.m or getBS.m
 % 
 % 14 jan 19 LH. 
 
