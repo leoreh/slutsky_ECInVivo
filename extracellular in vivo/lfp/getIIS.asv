@@ -276,7 +276,8 @@ end
 if mancur
     fh = figure;
     set(fh, 'units','normalized','outerposition',[0 0 1 1]);
-    suptitle({'Inspect IIS: left = accept; right = decline; middle = previous'...
+    suptitle({'Select IIS',...
+        'left = accept; right = decline; middle = previous'...
         'Wait for curser before pressing'});
     sp1 = subplot(2, 1, 1);
     ylabel('Voltage [mV]')
@@ -317,7 +318,71 @@ if mancur
         xlabel(sp2, 'Time [s]')
         set(sp2, 'TickLength', [0 0])
         box off
-        title(sp2, sprintf('spk %d/%d', i, nspks))
+        title(sprintf('spk %d/%d', i, nspks))
+        while 1
+            [~, ~, button] = ginput(1);
+            if button == 1
+                iis.accepted(i) = 1;
+                break
+            elseif button == 3
+                iis.accepted(i) = 0;
+                break
+            elseif button == 2
+                i = i - 2;
+                break
+            end
+            prevButton = button;
+        end
+        i = i + 1;
+    end
+    close(fh)
+        
+    seg(~iis.accepted, :) = [];
+    peak(~iis.accepted) = [];
+    pos(~iis.accepted) = [];
+    nspks = length(pos);
+    fprintf('after manual curation: %d IIS\n', nspks);    
+    if nspks == 0
+        fprintf('no spikes detected\n');
+        return
+    end   
+end
+
+
+if mancur
+    fh = figure;
+    suptitle({'Select IIS',...
+        'left = accept; right = decline; middle = previous'...
+        'Wait for curser before pressing'});
+    sp1 = subplot(2, 1, 1);
+    plot(tstamps, sig ,'k')
+    axis tight
+    hold on
+    plot(xlim, [thr(2) thr(2)], '--r')
+    scatter(pos / fs, peak, '*');
+    ylabel('Voltage [mV]')
+    set(gca, 'TickLength', [0 0])
+    box off
+    sp2 = subplot(2, 1, 2);
+    plot(tstamps, sig ,'k')
+    axis tight
+    hold on
+    plot(xlim, [thr(2) thr(2)], '--r')
+    scatter(pos / fs, peak, '*');
+    ylabel('Voltage [mV]')
+    set(gca, 'TickLength', [0 0])
+    box off
+    i = 1;
+    marg1 = fs * 5;
+    marg2 = fs * 0.5;
+    while i <= nspks
+        idx1(1) = max([1 pos(i) - marg1]);
+        idx1(2) = min([length(sig) pos(i) + marg1]);
+        idx2(1) = max([1 pos(i) - marg2]);
+        idx2(2) = min([length(sig) pos(i) + marg2]);
+        xlim(sp1, idx1 / fs)
+        xlim(sp2, idx2 / fs)
+        title(sprintf('spk %d/%d', i, nspks))
         while 1
             [~, ~, button] = ginput(1);
             if button == 1
