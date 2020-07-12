@@ -84,9 +84,7 @@ TheStateEditor
 ce_LFPfromDat(session)
 bz_LFPfromDat(filepath)
 
-EMGFromLFP = bz_EMGFromLFP(basepath, 'overwrite', false,...
-    'rejectChannels', [25 : 27], 'noPrompts', false,...
-    'saveMat', true);
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % firing rate

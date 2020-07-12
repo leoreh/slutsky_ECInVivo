@@ -116,7 +116,7 @@ fetnames = {fetfiles.name};
 if length(resfiles) ~= length(clufiles) ||...
         length(clufiles) ~= length(spkfiles) ||...
         length(spkfiles) ~= length(fetfiles)
-    error('different number of res / clu / spk / fet files')
+    warning('different number of res / clu / spk / fet files')
 end
 
 % backup

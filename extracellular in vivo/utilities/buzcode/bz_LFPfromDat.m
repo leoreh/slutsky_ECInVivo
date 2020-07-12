@@ -42,6 +42,10 @@ function bz_LFPfromDat(basepath,varargin)
 %Dependency: iosr tool box https://github.com/IoSR-Surrey/MatlabToolbox
 %
 %SMckenzie, BWatson, DLevenstein 2018
+% 
+% 07 jul 19 LH      Removed gpu array option
+%                   if exists than return (no overwrite)
+
 %% Input handling
 if ~exist('basepath','var')
     basepath = pwd;
@@ -77,6 +81,9 @@ flfp = fullfile(basepath,[basename,'.lfp']);
 
 %If there's already a .lfp file, make sure the user wants to overwrite it
 if exist(flfp,'file')
+    return
+    
+    
     overwrite = input([basename,'.lfp already exists. Overwrite? [Y/N] '],'s');
     switch overwrite
         case {'y','Y'}

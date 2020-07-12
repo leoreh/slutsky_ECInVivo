@@ -11,7 +11,8 @@ colName = 'Session';                    % column name in xls sheet where dirname
 vars = ["cell_metrics.cellinfo";...
     "spikes.cellinfo"];      % string array of variables to load
 cond = ["manCur"];                      % column name of logical values for each session. only if true than session will be loaded. can be a string array and than all conditions must be met.
-basepath = 'H:\Data\Processed\lh52';
+% cond = [];
+basepath = 'E:\Data\Processed\lh52';
 sessionlist = 'sessionList.xlsx';       % must include extension
 fs = 20000;                             % can also be loaded from datInfo
 
@@ -28,6 +29,7 @@ elseif ischar(sessionlist) && contains(sessionlist, 'xlsx')
     icol = strcmp(sessionInfo.Properties.VariableNames, colName);
     dirnames = string(table2cell(sessionInfo(:, icol)));
     % check dirnames meet conditions
+    clear irow iicol
     for i = 1 : length(cond)
         iicol(i) = find(strcmp(sessionInfo.Properties.VariableNames, char(cond(i))));
         irow{i} = find(sessionInfo{:, iicol(i)} == 1);
@@ -37,6 +39,7 @@ elseif ischar(sessionlist) && contains(sessionlist, 'xlsx')
     else
         dirnames = dirnames(irow{1});
     end
+    dirnames(strlength(dirnames) < 1) = [];
 end
 
 nsessions = length(dirnames);
@@ -72,31 +75,45 @@ end
 % analyze data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-fr = cell(1, nsessions);
 if forceA
-    for i = 1 : nsessions
+    for i = 1 : nsessions       
+        close all
+        
+        % file
         filepath = char(fullfile(basepath, dirnames(i)));
         cd(filepath)
         [~, basename] = fileparts(filepath);
         
+        % session
+        session = CE_sessionTemplate(pwd, 'viaGUI', false,...
+            'force', true, 'saveVar', true);       
         
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        % session info (cell explorer foramt)
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        session = sessionTemplate(pwd, 'showGUI', false);
+        % lfp
+%         bz_LFPfromDat(filepath, 'noPrompts', true)
+        
+        % acceleration
+%         accch = setdiff([session.extracellular.electrodeGroups.channels{:}],...
+%             [session.extracellular.spikeGroups.channels{:}]);
+%         EMGfromACC('basepath', filepath, 'fname', '',...
+%             'nchans', 27, 'ch', accch, 'force', true, 'saveVar', true,...
+%             'graphics', false, 'fsOut', 1250);
+       
+%         % states
+%         SleepScoreMaster(filepath, 'rejectChannels', accch)
+        
+        % fix spk
+%         fixSpkAndRes;
+%         
+%         % spikes and cell metrics
         cell_metrics = ProcessCellMetrics('session', session,...
             'manualAdjustMonoSyn', false, 'summaryFigures', false,...
             'debugMode', true, 'transferFilesFromClusterpath', false,...
-            'submitToDatabase', false);
-        
-        
-        if ~isempty(d{i, 2})
-            spikes = d{i, 2}.spikes;
-            fr{i} = FR(spikes.times, 'basepath', filepath, 'graphics', false, 'saveFig', false,...
-                'binsize', 60, 'saveVar', false, 'smet', 'MA', 'winBL', [1 Inf]);
-        end
-        
-        
+            'submitToDatabase', false);        
+%         
+%         % firing rate
+%         load([basename '.spikes.cellinfo.mat'])
+%         fr = FR(spikes.times, 'basepath', filepath, 'graphics', false, 'saveFig', false,...
+%             'binsize', 60, 'saveVar', true, 'smet', 'MA', 'winBL', [1 Inf]);                
     end
 end
 

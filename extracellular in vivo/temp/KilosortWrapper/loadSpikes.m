@@ -365,7 +365,7 @@ showWaveforms = true;
 badChannels = [];
 
 % Removing channels marked as Bad in session struct
-if ~isempty(session) && isfield(session.channelTags,'Bad')
+if ~isempty(session) && isfield(session.channelTags, 'Bad')
     badChannels = session.channelTags.Bad.channels;
 %     if ~isempty(session.channelTags.Bad.spikeGroups)
 %         badChannels = [badChannels,session.extracellular.electrodeGroups(session.channelTags.Bad.spikeGroups)];
