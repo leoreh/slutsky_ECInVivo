@@ -19,7 +19,7 @@ vars = ["session.mat";...
 pcond = ["manCur"];                      
 % same but imposes a negative condition)
 ncond = ["fix"];                      
-ncond = [];
+% cond = [];
 basepath = 'E:\Data\Processed\lh52';
 sessionlist = 'sessionList.xlsx';       % must include extension
 fs = 20000;                             % can also be loaded from datInfo
@@ -45,9 +45,10 @@ elseif ischar(sessionlist) && contains(sessionlist, 'xlsx')
     end
     for i = 1 : length(ncond)
         iicol(i) = find(strcmp(sessionInfo.Properties.VariableNames, char(ncond(i))));
-        irow = irow & sessionInfo{:, iicol(i)} ~= 1;
+        irow = irow & sessionInfo{:, iicol(i)} == 1;
     end
     dirnames = dirnames(irow);
+
     dirnames(strlength(dirnames) < 1) = [];
 end
 
@@ -114,13 +115,11 @@ if forceA
 %         fixSpkAndRes;
 %         
 %         % spikes and cell metrics
-%         cell_metrics = ProcessCellMetrics('session', session,...
-%             'manualAdjustMonoSyn', false, 'summaryFigures', false,...
-%             'debugMode', true, 'transferFilesFromClusterpath', false,...
-%             'submitToDatabase', false);        
+        cell_metrics = ProcessCellMetrics('session', session,...
+            'manualAdjustMonoSyn', false, 'summaryFigures', false,...
+            'debugMode', true, 'transferFilesFromClusterpath', false,...
+            'submitToDatabase', false);        
        
-
-
 %         % firing rate
 %         load([basename '.spikes.cellinfo.mat'])
 %         fr = FR(spikes.times, 'basepath', filepath, 'graphics', false, 'saveFig', false,...
@@ -129,7 +128,7 @@ if forceA
 end
 
 % second analysis (depends on first run)
-for i = 4 : nsessions
+for i = 1 : nsessions
     % file
     filepath = char(fullfile(basepath, dirnames(i)));
     cd(filepath)
@@ -139,12 +138,12 @@ for i = 4 : nsessions
     session = d{i, 1}.session;
     cm = d{i, 2}.cell_metrics;
     
-
     
-%     spikes2 = getSpikes('basepath', filepath, 'saveMat', false,...
-%     'noPrompts', true, 'forceL', true);
-%     
-%         isi = cell_metrics.refractoryPeriodViolation; % percent isi < 2 ms
+    
+    spikes2 = getSpikes('basepath', filepath, 'saveMat', false,...
+    'noPrompts', true, 'forceL', true);
+    
+        isi = cell_metrics.refractoryPeriodViolation; % percent isi < 2 ms
     % mu = find(isi < 10);
 %     spikes = cluVal(spikes, 'basepath', basepath, 'saveVar', false,...
 %         'saveFig', false, 'force', true, 'mu', mu, 'graphics', false,...
@@ -154,7 +153,7 @@ for i = 4 : nsessions
 % fr{i} = FR(spikes.times, 'basepath', filepath, 'graphics', false, 'saveFig', false,...
 %     'binsize', binsize, 'saveVar', true, 'smet', 'MA', 'winBL', [20 50 * 60]);
 
-        cell_metrics = CellExplorer('metrics', cm); 
+%         cell_metrics = CellExplorer('metrics', cm); 
 
 
 
@@ -163,7 +162,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % rearrange data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-grp = [1, 4, 7]; 
+grp = [1 4 6]; 
 for i = 1 : nsessions
     % session data
     filepath = char(fullfile(basepath, dirnames(i)));
@@ -191,7 +190,7 @@ for i = 1 : nsessions
     % cell class
     pyr = strcmp(cm.putativeCellType, 'Pyramidal Cell');
     int = strcmp(cm.putativeCellType, 'Narrow Interneuron');
-%     int = ~pyr;
+    int = ~pyr;
     
     % fr
     for ii = 1 : length(states)
@@ -199,22 +198,17 @@ for i = 1 : nsessions
         intFr{i, ii} = mean(fr{i}.strd(int & grpidx, tStates{i, ii}), 2);
     end
     
-%     % fr for pyr / int together
-%     pyrtimes = sort(vertcat(spikes.times{pyr}));
-%     inttimes = sort(vertcat(spikes.times{int}));
-%     pyrtemp = calcFR(pyrtimes, 'binsize', 60,...
-%         'winCalc', [1 Inf], 'smet', 'none', 'c2r', true);
-%     inttemp = calcFR(inttimes, 'binsize', 60,...
-%         'winCalc', [1 Inf], 'smet', 'none', 'c2r', true);
-%     for ii = 1 : length(states)
-%         pyrFr(i, ii) = mean(pyrtemp(tStates{i, ii}));
-%         intFr(i, ii) = mean(inttemp(tStates{i, ii}));
-%     end
+%     plot(fr{i}.tstamps, waket)
+%     hold on
+%             plot(states{1}',-1*ones(size(states{1}))','k','LineWidth',8)
+%         plot(states{2}',-2*ones(size(states{2}))','b','LineWidth',8)
+%         plot(states{3}',-3*ones(size(states{3}))','r','LineWidth',8)
+    
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 set(groot,'defaultAxesTickLabelInterpreter','none');  
 set(groot,'defaulttextinterpreter','latex');
 set(groot,'defaultLegendInterpreter','latex');
