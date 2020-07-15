@@ -1,4 +1,4 @@
-% fEPSP_Sessions
+% fEPSP_sessions
 
 % organizes and plots fepsp from multiple sessions. gets structs and
 % transforms them to matrices of vars (e.g. amp and wv) vs. time

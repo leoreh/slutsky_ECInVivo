@@ -292,7 +292,7 @@ if exist(fullfile(basepath,[session.general.name,'.MergePoints.events.mat']),'fi
 end
 
 % Importing time series from intan metadatafile info.rhd
-session = loadIntanMetadata(session);
+% session = loadIntanMetadata(session);
 
 % % Importing Neuroscope xml parameters (skipped channels, dead channels, notes and experimenters)
 % if importCh && exist(xmlName, 'file')

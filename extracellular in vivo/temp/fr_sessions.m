@@ -16,10 +16,11 @@ vars = ["session.mat";...
 % column name of logical values for each session. only if true than session
 % will be loaded. can be a string array and than all conditions must be
 % met.
-pcond = ["manCur"];                      
+pcond = ["manCur"];     
+% pcond = [];
 % same but imposes a negative condition)
 ncond = ["fix"];                      
-ncond = [];
+ncond = ["fEPSP"];
 basepath = 'E:\Data\Processed\lh52';
 sessionlist = 'sessionList.xlsx';       % must include extension
 fs = 20000;                             % can also be loaded from datInfo
@@ -98,7 +99,7 @@ if forceA
             'force', true, 'saveVar', true);       
         
         % lfp
-%         bz_LFPfromDat(filepath, 'noPrompts', true)
+        bz_LFPfromDat(filepath, 'noPrompts', true)
         
         % acceleration
 %         accch = setdiff([session.extracellular.electrodeGroups.channels{:}],...
@@ -111,25 +112,25 @@ if forceA
 %         SleepScoreMaster(filepath, 'rejectChannels', accch)
         
         % fix spk
-%         fixSpkAndRes;
+        fixSpkAndRes;
 %         
 %         % spikes and cell metrics
-%         cell_metrics = ProcessCellMetrics('session', session,...
-%             'manualAdjustMonoSyn', false, 'summaryFigures', false,...
-%             'debugMode', true, 'transferFilesFromClusterpath', false,...
-%             'submitToDatabase', false);        
+        cell_metrics = ProcessCellMetrics('session', session,...
+            'manualAdjustMonoSyn', false, 'summaryFigures', false,...
+            'debugMode', true, 'transferFilesFromClusterpath', false,...
+            'submitToDatabase', false);        
        
 
 
 %         % firing rate
-%         load([basename '.spikes.cellinfo.mat'])
-%         fr = FR(spikes.times, 'basepath', filepath, 'graphics', false, 'saveFig', false,...
-%             'binsize', 60, 'saveVar', true, 'smet', 'MA', 'winBL', [1 Inf]);                
+        load([basename '.spikes.cellinfo.mat'])
+        fr = FR(spikes.times, 'basepath', filepath, 'graphics', false, 'saveFig', false,...
+            'binsize', 60, 'saveVar', true, 'smet', 'MA', 'winBL', [1 Inf]);                
     end
 end
 
 % second analysis (depends on first run)
-for i = 4 : nsessions
+for i = 1 : nsessions
     % file
     filepath = char(fullfile(basepath, dirnames(i)));
     cd(filepath)
@@ -150,11 +151,11 @@ for i = 4 : nsessions
 %         'saveFig', false, 'force', true, 'mu', mu, 'graphics', false,...
 %         'vis', 'on', 'spkgrp', spkgrp);
 
-% binsize = 60;
-% fr{i} = FR(spikes.times, 'basepath', filepath, 'graphics', false, 'saveFig', false,...
-%     'binsize', binsize, 'saveVar', true, 'smet', 'MA', 'winBL', [20 50 * 60]);
+binsize = 60;
+fr{i} = FR(spikes.times, 'basepath', filepath, 'graphics', false, 'saveFig', false,...
+    'binsize', binsize, 'saveVar', true, 'smet', 'MA', 'winBL', [20 50 * 60]);
 
-        cell_metrics = CellExplorer('metrics', cm); 
+%         cell_metrics = CellExplorer('metrics', cm); 
 
 
 
@@ -163,13 +164,13 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % rearrange data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-grp = [1, 4, 7]; 
+grp = [1 : 8];
 for i = 1 : nsessions
     % session data
     filepath = char(fullfile(basepath, dirnames(i)));
     cd(filepath)
     [datename, basename] = fileparts(filepath);
-    [~, datename] = fileparts(datename);   
+    [~, datename] = fileparts(datename);
     session = d{i, 1}.session;
     cm = d{i, 2}.cell_metrics;
     spikes = d{i, 3}.spikes;
@@ -188,27 +189,39 @@ for i = 1 : nsessions
         grpidx = grpidx | spikes.shankID == grp(ii);
     end
     
+    % su
+    su = cm.refractoryPeriodViolation < 2000;
+    
     % cell class
     pyr = strcmp(cm.putativeCellType, 'Pyramidal Cell');
     int = strcmp(cm.putativeCellType, 'Narrow Interneuron');
-%     int = ~pyr;
+    int = ~pyr;
     
     % fr
     for ii = 1 : length(states)
-        pyrFr{i, ii} = mean(fr{i}.strd(pyr & grpidx, tStates{i, ii}), 2);
-        intFr{i, ii} = mean(fr{i}.strd(int & grpidx, tStates{i, ii}), 2);
+        pyrFr{i, ii} = mean(fr{i}.strd(pyr & grpidx & su, tStates{i, ii}), 2);
+        intFr{i, ii} = mean(fr{i}.strd(int & grpidx & su, tStates{i, ii}), 2);
+        allFr{i, ii} = mean(fr{i}.strd(grpidx & su, tStates{i, ii}), 2);
     end
     
 %     % fr for pyr / int together
+%     alltimes = sort(vertcat(spikes.times{:}));
 %     pyrtimes = sort(vertcat(spikes.times{pyr}));
 %     inttimes = sort(vertcat(spikes.times{int}));
-%     pyrtemp = calcFR(pyrtimes, 'binsize', 60,...
-%         'winCalc', [1 Inf], 'smet', 'none', 'c2r', true);
-%     inttemp = calcFR(inttimes, 'binsize', 60,...
-%         'winCalc', [1 Inf], 'smet', 'none', 'c2r', true);
+%     binsize = 60;
+%     edges = [0 : binsize : session.general.duration];
+%     edges(end) = session.general.duration;
+%     pyrtemp = histcounts(pyrtimes, edges, 'normalization', 'countdensity');
+%     inttemp = histcounts(inttimes, edges, 'normalization', 'countdensity');
+%     alltemp = histcounts(alltimes, edges, 'normalization', 'countdensity');
+%     %     pyrtemp = calcFR(pyrtimes, 'binsize', 60,...
+%     %         'winCalc', [1 Inf], 'smet', 'none', 'c2r', true);
+%     %     inttemp = calcFR(inttimes, 'binsize', 60,...
+%     %         'winCalc', [1 Inf], 'smet', 'none', 'c2r', true);
 %     for ii = 1 : length(states)
-%         pyrFr(i, ii) = mean(pyrtemp(tStates{i, ii}));
-%         intFr(i, ii) = mean(inttemp(tStates{i, ii}));
+%         pyrFr{i, ii} = mean(pyrtemp(tStates{i, ii}));
+%         intFr{i, ii} = mean(inttemp(tStates{i, ii}));
+%         allFr{i, ii} = mean(alltemp(tStates{i, ii}));
 %     end
 end
 
@@ -220,6 +233,17 @@ set(groot,'defaulttextinterpreter','latex');
 set(groot,'defaultLegendInterpreter','latex');
 
 close all
+
+% % spike count for pyr and Int during selected state
+% si = 2;
+% figure
+% plot([1 : nsessions], cell2mat(pyrFr(:, si)))
+% hold on
+% plot([1 : nsessions], cell2mat(intFr(:, si)))
+% plot([1 : nsessions], cell2mat(allFr(:, si)))
+% xticks([1 : nsessions])
+% xticklabels(dirnames)
+% xtickangle(45)
 
 % fr all sessions during selected state for pyr and int separatly (rows)
 figure
@@ -233,8 +257,6 @@ for ii = 1 : length(si)
     er = errorbar(xvals, nanmean(mat), nanstd(mat));
     er.Color = [0 0 0];
     er.LineStyle = 'none';
-    % boxplot(mat, 'PlotStyle', 'traditional',...
-    %     'BoxStyle', 'outline', 'Color', 'k', 'notch', 'off')
     box off
     set(gca, 'TickLength', [0 0])
     ylim([0 15])
@@ -244,7 +266,8 @@ for ii = 1 : length(si)
     hold on
     er = errorbar(xvals, nanmean(mat), nanstd(mat));
     er.Color = [0 0 0];
-    er.LineStyle = 'none';    box off
+    er.LineStyle = 'none';   
+    box off
     set(gca, 'TickLength', [0 0])
     xticks(xvals)
     xticklabels(dirnames)
@@ -253,39 +276,39 @@ for ii = 1 : length(si)
 end
 
 
-% fr per session
-for i = 1 : nsessions
-    filepath = char(fullfile(basepath, dirnames(i)));
-    cd(filepath)
-    [datename, basename] = fileparts(filepath);
-    [~, datename] = fileparts(datename);
-    
-    figure
-    stdshade(fr{i}.strd(:, :), 0.3, 'k', fr{i}.tstamps / 60, 3)
-    title([datename '_' basename], 'Interpreter', 'none')
-end
-
-% fr
-figure
-for i = 1 : nsessions
-    subplot(1, nsessions, i)
-    if ~isempty(fr{i})
-stdshade(fr{i}.strd(:, :), 0.3, 'k', fr{i}.tstamps / 60, 3)
-ylim([0 20])
-        %         plot(fr{i}.norm')
-    end
-end
-
-% states
-load([basename '.SleepState.states.mat'])
-wake = SleepState.ints.WAKEstate;
-figure
-plot(acc.tstamps, acc.data)
-hold on
-axis tight
-y = ylim;
-plot([wake(:, 1) wake(:, 1)], y, 'k')
-plot([wake(:, 2) wake(:, 2)], y, 'r')
+% % fr per session
+% for i = 1 : nsessions
+%     filepath = char(fullfile(basepath, dirnames(i)));
+%     cd(filepath)
+%     [datename, basename] = fileparts(filepath);
+%     [~, datename] = fileparts(datename);
+%     
+%     figure
+%     stdshade(fr{i}.strd(:, :), 0.3, 'k', fr{i}.tstamps / 60, 3)
+%     title([datename '_' basename], 'Interpreter', 'none')
+% end
+% 
+% % fr
+% figure
+% for i = 1 : nsessions
+%     subplot(1, nsessions, i)
+%     if ~isempty(fr{i})
+% stdshade(fr{i}.strd(:, :), 0.3, 'k', fr{i}.tstamps / 60, 3)
+% ylim([0 20])
+%         %         plot(fr{i}.norm')
+%     end
+% end
+% 
+% % states
+% load([basename '.SleepState.states.mat'])
+% wake = SleepState.ints.WAKEstate;
+% figure
+% plot(acc.tstamps, acc.data)
+% hold on
+% axis tight
+% y = ylim;
+% plot([wake(:, 1) wake(:, 1)], y, 'k')
+% plot([wake(:, 2) wake(:, 2)], y, 'r')
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

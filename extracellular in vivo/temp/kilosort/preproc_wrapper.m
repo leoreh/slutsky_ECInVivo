@@ -11,7 +11,6 @@ mapch = [25 26 27 28 30 1 2 29 3 : 14 31 0 15 16 17 : 24 32 33 34] + 1;
 exp = [6];
 rec = cell(max(exp), 1);
 % rec{3} = 3;
-intens = 
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
     'rmvch', rmvch, 'mapch', mapch, 'concat', true, 'nchans', 35,...
     'intens', intens);
