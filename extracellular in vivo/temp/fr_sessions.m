@@ -80,11 +80,7 @@ if forceL
     end
 end
 
-% params
-% spkgrp = f{1}.spkgrp;
-% ngrp = length(spkgrp);
-% nsessions = length(f);
-    spkgrp = session.extracellular.electrodeGroups.channels;
+spkgrp = session.extracellular.electrodeGroups.channels;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % analyze data
