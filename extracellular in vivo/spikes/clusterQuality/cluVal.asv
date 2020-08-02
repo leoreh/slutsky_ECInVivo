@@ -88,11 +88,11 @@ end
 
 % params
 ngrp = length(unique(spikes.shankID));  % only tetrodes with units
-nunits = length(spikes.times);
+nunits = length(clu);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % calculate cluster separation
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 fet = getFet(basepath, true, false);
 
 if all(isfield(spikes, {'mDist', 'iDist', 'lRat'})) && ~force

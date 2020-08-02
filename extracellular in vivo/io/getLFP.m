@@ -20,6 +20,7 @@ function lfp = getLFP(varargin)
 %   chavg       cell. each row contain the lfp channels you want to average
 %   
 % DEPENDENCIES
+%   import_wcp
 %   ce_LFPfromDat (if extension = 'dat')
 % 
 % OUTPUT

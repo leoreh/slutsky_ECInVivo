@@ -1,25 +1,26 @@
 % preproc_wrapper
-basepath = 'D:\VMs\shared\lh52_200625\170630';
+basepath = 'D:\tempData\lh50\2020-04-21_12-05-16';
 cd(basepath)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % open ephys
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'E:\Leore\lh52\2020-06-21_09-07-33';
-rmvch = [10, 12, 13, 16, 17, 21, 23, 24];
+basepath = 'D:\tempData\lh50\2020-04-23_09-32-05';
+rmvch = [18 : 21];
 mapch = [25 26 27 28 30 1 2 29 3 : 14 31 0 15 16 17 : 24 32 33 34] + 1;
-exp = [6];
+exp = [1 2];
 rec = cell(max(exp), 1);
+intens = [];
 % rec{3} = 3;
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
-    'rmvch', rmvch, 'mapch', mapch, 'concat', true, 'nchans', 35,...
-    'intens', intens);
+    'rmvch', rmvch, 'mapch', mapch, 'concat', true, 'nchans', 35);
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % session info (cell explorer foramt)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-session = sessionTemplate(pwd, 'showGUI', true);
+session = CE_sessionTemplate(pwd, 'viaGUI', true,...
+    'force', true, 'saveVar', true);      
 basepath = session.general.basePath;
 nchans = session.extracellular.nChannels;
 fs = session.extracellular.sr;
@@ -43,12 +44,12 @@ rez = runKS('basepath', basepath, 'fs', fs, 'nchans', nchans,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % fix manual curation
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-fixSpkAndRes('grp', 6);
+fixSpkAndRes('grp', [], 'fs', fs);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % cell explorer
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% load waveforms from spk files
+
 % spikes = loadSpikes('session', session, 'useNeurosuiteWaveforms', true,...
 %     'forceReload', true);
 cell_metrics = ProcessCellMetrics('session', session,...
@@ -57,6 +58,27 @@ cell_metrics = ProcessCellMetrics('session', session,...
     'submitToDatabase', false);
 cell_metrics = CellExplorer('metrics', cell_metrics); 
 
+load([session.general.name '.spikes.cellInfo.mat'])
+
+% fix cell explorer struct
+xx = getSpikes('basepath', basepath, 'saveMat', false,...
+    'noPrompts', true, 'forceL', false);
+
+spikes.rawWaveform = xx.rawWaveform;
+spikes.filtWaveform = xx.rawWaveform;
+cell_metrics.waveforms.raw = xx.rawWaveform;
+cell_metrics.waveforms.filt = xx.rawWaveform;
+
+% CCG
+binSize = 0.001; dur = 0.12; % low res
+binSize = 0.0001; dur = 0.02; % high res
+[ccg, t] = CCG({xx.times{:}}, [], 'duration', dur, 'binSize', binSize);
+u = 20;
+plotCCG('ccg', ccg(:, u, u), 't', t, 'basepath', basepath,...
+    'saveFig', false, 'c', {'k'}, 'u', spikes.UID(u));
+
+x = xx.times{20}
+x = unique(x);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % clean folder

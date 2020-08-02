@@ -20,6 +20,7 @@ function fet = getFet(basepath, saveVar, forceL)
 % to do list:
 %   divide last fet by fs
 %   correct case were mat exists and forceL
+%   add option to calculate fet (see ks2ns.m)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
