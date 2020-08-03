@@ -1,4 +1,4 @@
-function spikes = cluVal(spikes, varargin)
+function spikes = cluVal(varargin)
 
 % wrapper for inspecting and validating clusters
 % computes:
@@ -48,7 +48,8 @@ function spikes = cluVal(spikes, varargin)
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 p = inputParser;
-addOptional(p, 'basepath', pwd);
+addOptional(p, 'spikes', []);
+addOptional(p, 'basepath', pwd, @ischar);
 addOptional(p, 'npca', 3, @isscalar);
 addOptional(p, 'spkgrp', {}, @iscell);
 addOptional(p, 'mu', [], @isnumeric);
@@ -59,6 +60,7 @@ addOptional(p, 'saveFig', true, @islogical);
 addOptional(p, 'saveVar', true, @islogical);
 
 parse(p, varargin{:})
+spikes = p.Results.spikes;
 basepath = p.Results.basepath;
 npca = p.Results.npca;
 spkgrp = p.Results.spkgrp;
@@ -69,9 +71,44 @@ vis = p.Results.vis;
 saveFig = p.Results.saveFig;
 saveVar = p.Results.saveVar;
 
+% load spikes if empty
+if isempty(spikes)
+    [~, filename] = fileparts(basepath);
+    spkname = [filename '.spikes.cellinfo.mat'];
+    if exist(spkname, 'file')
+        load(spkname)
+    else
+        error('%s not found', spkname)
+    end
+end
+% make sure spikes has required fields
+if ~all(isfield(spikes, {'shankID', 'cluID', 'times'}))
+    error('spikes missing required fields')
+end
+
+% params
+ngrp = length(unique(spikes.shankID));  % only tetrodes with units
+nunits = length(spikes.times);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% ISI contamination
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SU = 1% of ISIs < 0.002
+ref = 0.002;
+thr = 1;
+spikes.isi = zeros(nunits, 1);
+for i = 1 : nunits
+    nspks(i, 1) = length(spikes.times{i});
+    spikes.isi(i, 1) = sum(diff(spikes.times{i}) < ref) / nspks(i, 1) * 100;
+end
+
+% arrange pre-determined multiunits
+mu = mu(:);
+mu = sort(unique([mu, find(spikes.isi > 1)]));
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % calculate cluster separation
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 fet = getFet(basepath, true, false);
 
 if all(isfield(spikes, {'mDist', 'iDist', 'lRat'})) && ~force
@@ -80,9 +117,9 @@ else
     sprintf('\ncalculating separation matrices\n\n');
     
     % arrange predetermined mu
-    rmmu = cell(1, length(unique(spikes.shankID)));
+    rmmu = cell(1, length(fet));
     if ~isempty(mu)
-        u = spikes.cluID(sort(mu));
+        u = spikes.cluID(mu);
         for i = 1 : length(fet)
             rmmu{i} = u(spikes.shankID(mu) == i);
         end
@@ -119,21 +156,16 @@ else
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% calculate ISI contamination
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-spikes.isi = ISI(spikes, 'graphics', graphics);
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % estimate SU or MU
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-spikes.su = spikes.iDist > 20 & spikes.isi < 1;
+spikes.su = spikes.iDist > 15 & spikes.isi < 1;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % save spikes
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if saveVar
     [~, filename] = fileparts(basepath);
-    save([filename '.spikes.mat'], 'spikes')
+    save([filename '.spikes.cellinfo.mat'], 'spikes')
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

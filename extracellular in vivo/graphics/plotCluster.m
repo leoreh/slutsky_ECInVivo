@@ -51,6 +51,7 @@ if ~isfield(spikes, 'su'); spikes.su = nan(nunits, 1); end
 % plot
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 grpcolor = ['k', 'b', 'r', 'm', 'g', 'y', 'c', [0.5 0.5 0.5]];
+fs = 20000;
 
 % plot individual units
 for i = 1 : length(clu)
@@ -59,8 +60,10 @@ for i = 1 : length(clu)
     % waveform
     subplot(1, 2, 1)
     unitcolor = grpcolor(spikes.shankID(clu(i)));
-    plotWaveform('avgwv', spikes.avgWaveform{clu(i)}, 'stdwv', spikes.stdWaveform{clu(i)},...
-        'c', unitcolor, 'orient', 'vert', 'fs', spikes.samplingRate, 'sbar', false)
+    avgwv = spikes.rawWaveform_all{i};
+    stdwv = spikes.rawWaveform_std_all{i};
+    plotWaveform('avgwv', avgwv, 'stdwv', stdwv,...
+        'c', unitcolor, 'orient', 'vert', 'fs', fs, 'sbar', false)
     
     % ISI histogram
     subplot(1, 2, 2)
@@ -125,8 +128,8 @@ if length(clu) == nunits
         % waveform
         subplot(plotidx(1), plotidx(2), wvidx(i))
         unitcolor = grpcolor(spikes.shankID(i));
-        plotWaveform('avgwv', spikes.avgWaveform{i}, 'stdwv', spikes.stdWaveform{i},...
-            'c', unitcolor, 'orient', 'vert', 'fs', spikes.samplingRate, 'sbar', false)
+        plotWaveform('avgwv', avgwv, 'stdwv', stdwv,...
+            'c', unitcolor, 'orient', 'vert', 'fs', fs, 'sbar', false)
         title(int2str(spikes.cluID(i)))
         
         % ISI histogram
@@ -145,9 +148,9 @@ if length(clu) == nunits
         line([0.003 0.003], ax.YLim, 'color', 'k', 'LineWidth', 1)            
     end
     
-    if saveFig
-        savePdf('clusters', basepath, f)
-    end
+%     if saveFig
+%         savePdf('clusters', basepath, f)
+%     end
 end
 
 end

@@ -16,10 +16,12 @@ function lfp = getLFP(varargin)
 %   ch          vec. channels to load
 %   pli         logical. filter power line interferance (1) or not {0}
 %   dc          logical. remove DC component (1) or not {0}
+%   invertSig   logical. invert signal s.t. max is positive
 %   saveVar     save variable {1}.
 %   chavg       cell. each row contain the lfp channels you want to average
 %   
 % DEPENDENCIES
+%   import_wcp
 %   ce_LFPfromDat (if extension = 'dat')
 % 
 % OUTPUT
@@ -55,6 +57,7 @@ addOptional(p, 'interval', [0 inf], @isnumeric);
 addOptional(p, 'ch', [1 : 16], @isnumeric);
 addOptional(p, 'pli', false, @islogical);
 addOptional(p, 'dc', false, @islogical);
+addOptional(p, 'invertSig', false, @islogical);
 addOptional(p, 'saveVar', true, @islogical);
 addOptional(p, 'chavg', {}, @iscell);
 
@@ -68,6 +71,7 @@ interval = p.Results.interval;
 ch = p.Results.ch;
 pli = p.Results.pli;
 dc = p.Results.dc;
+invertSig = p.Results.invertSig;
 saveVar = p.Results.saveVar;
 chavg = p.Results.chavg;
 
@@ -104,11 +108,11 @@ switch extension
         fs_orig = 1 / (info.fADCSequenceInterval / 1000000); 
     case 'wcp'
         data = import_wcp(basename);
-        data.S = data.S{ch};
+        data.S = [data.S{ch}];
         if interval(2) ~= Inf
             data.S = data.S(:, interval(1) : interval(2));
         end
-        lfp.data = data.S(:);
+        lfp.data = data.S;
         fs_orig = data.fs;
     case 'dat'
         error('not ready yet')
@@ -132,9 +136,11 @@ elseif fs ~= fs_orig
 end
 
 % invert
-if ~strcmp(extension, 'lfp') && abs(min(lfp.data)) > max(lfp.data)
-    fprintf('\n inverting data \n\n')
-    lfp.data = -lfp.data;
+if invertSig
+    if ~strcmp(extension, 'lfp') && abs(min(lfp.data(:))) > max(lfp.data(:))
+        fprintf('\n inverting data \n\n')
+        lfp.data = -lfp.data;
+    end
 end
 
 % convert to double

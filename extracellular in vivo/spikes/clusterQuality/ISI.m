@@ -39,11 +39,12 @@ nunits = length(spikes.UID);
 % calc
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% isi
+% isi contamination (percent spikes < 0.002)
+ref = 0.002;
 isi = zeros(nunits, 1);
 for i = 1 : nunits
-    sz(i, 1) = length(spikes.times{i});
-    isi(i, 1) = sum(diff(spikes.times{i}) < ref) / sz(i, 1) * 100;
+    nspks(i, 1) = length(spikes.times{i});
+    isi(i, 1) = sum(diff(spikes.times{i}) < ref) / nspks(i, 1) * 100;
 end
 
 % su / mu
@@ -57,7 +58,7 @@ if graphics
     f = figure;
     % scatter plot
     subplot(1, 2, 1)
-    scatter(sort(isi), [1 : nunits] / nunits * 100, rescale(sz, 20, 100), 'k', 'filled')
+    scatter(sort(isi), [1 : nunits] / nunits * 100, rescale(nspks, 20, 100), 'k', 'filled')
     hold on
     axis tight
     ax = gca;

@@ -1,4 +1,4 @@
-function [fr, binedges, bincents] = calcFR(spktimes, varargin)
+function [fr, binedges, bincents] = times2rate(spktimes, varargin)
 
 % for each unit counts spikes in bins. can smooth result by a moving
 % average (MA) or Gaussian kernel (GK) impleneted by multiple-pass MA.
@@ -25,7 +25,7 @@ function [fr, binedges, bincents] = calcFR(spktimes, varargin)
 %               Gaussian kernel (GK) impleneted by multiple-pass MA.
 % 
 % OUTPUT
-%   fr          matrix of units (rows) x firing rate in time bins (columns)
+%   fr          matrix of units (rows) x rate in time bins (columns)
 %   binedegs    used for calculation
 %   bincents    center of bins
 %
@@ -41,6 +41,7 @@ function [fr, binedges, bincents] = calcFR(spktimes, varargin)
 %               better handling of bins
 %               option to divide with binsize to obtain rate
 %               handle vectors
+% 02 aug 20 LH  converted calcFR to times2rate. implemented histcounts
 % 
 % TO DO LIST
 
@@ -53,7 +54,7 @@ validate_win = @(win) assert(isnumeric(win) && length(win) == 2,...
 
 p = inputParser;
 addOptional(p, 'binsize', 60, @isscalar);
-addOptional(p, 'winCalc', [1 Inf], validate_win);
+addOptional(p, 'winCalc', [0 Inf], validate_win);
 addParameter(p, 'c2r', true, @islogical);
 addOptional(p, 'smet', 'MA', @ischar);
 
@@ -71,14 +72,10 @@ end
 nunits = length(spktimes);
 
 % validate window
-recDur = zeros(1, nunits);
-if winCalc(1) < 1; winCalc(1) = 1; end
 if winCalc(2) == Inf
-    for i = 1 : length(spktimes)
-        recDur(i) = max(spktimes{i}(:, 1));
-    end
-    winCalc(2) = max(recDur);
+    winCalc(2) = max(vertcat(spktimes{:}));
 end
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arrange bins
@@ -89,6 +86,9 @@ binedges = winCalc(1) : binsize : winCalc(2);
 binmod = mod(winCalc(2), binsize);
 binedges(end) = binedges(end) + binmod - 1;
 nbins = length(binedges);
+for i = 1 : nbins - 1
+    bincents(i) = binedges(i) + ceil(diff(binedges(i : i + 1)) / 2);
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % count spikes
@@ -96,19 +96,14 @@ nbins = length(binedges);
 
 % count number of spikes in bins
 fr = zeros(nunits, nbins - 1);
-bincents = zeros(1, nbins - 1);
 for i = 1 : nunits
-    for j = 1 : nbins - 1
-        fr(i, j) = sum(spktimes{i} > binedges(j) &...
-            spktimes{i} < binedges(j + 1));
-        bincents(j) = binedges(j) + ceil(diff(binedges(j : j + 1)) / 2);
+    if c2r
+        fr(i, :) = histcounts(spktimes{i}, binedges,...
+            'Normalization', 'countdensity');
+    else
+        fr(i, :) = histcounts(spktimes{i}, binedges,...
+            'Normalization', 'count');
     end
-end
-
-% divide by binsize to produce rate
-if c2r
-    fr(:, 1 : end - 1) = fr(:, 1 : end - 1) / binsize;
-    fr(:, end) = fr(:, end) / (binedges(end) - binedges(end - 1));
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

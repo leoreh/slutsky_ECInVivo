@@ -49,7 +49,7 @@ function [iis] = getIIS(varargin)
 %       # template matching
 %
 % CALLS
-%       calcFR
+%       times2rate
 %
 % 02 jan 20 LH      UPDATES:
 % 13 jan 20 LH      filtspk
@@ -58,6 +58,7 @@ function [iis] = getIIS(varargin)
 % 27 jan 20 LH      trough between peaks instead of refractory period
 % 28 jan 20 LH      changed iis.rate to counts / bin instead of spikes / m
 % 03 apr 20 LH      manual curation and bi-directional detection added
+% 03 aug 20 LH      times2rate instead of calcFR
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -384,8 +385,8 @@ end
 % rate
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-[iis.rate, iis.edges, iis.cents] = calcFR(pos, 'winCalc', [1, length(sig)],...
-    'binsize', binsize, 'smet', 'none', 'c2r', false);
+[iis.rate, iis.edges, iis.cents] = times2rate(pos, 'winCalc', [1, length(sig)],...
+    'binsize', binsize, 'c2r', false);
 % this is super dangerous because if binsize < 1 min than the rate will
 % effectively be greater than the number of counts
 % iis.rate = iis.rate * fs * 60;      % convert counts in bins to 1 / min

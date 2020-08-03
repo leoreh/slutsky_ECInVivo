@@ -97,14 +97,14 @@ for i = 1 : nunits
     % to 0 and thus the baseline does not need to be calculated. An
     % alternative is to calculate the mean of the waveform before the
     % spike. 
-    [~, abspk] = max(abs(w));
-    if w(abspk) > bline || abspk > length(w) * 0.75
-        fprintf('\nclu %d exhibits positive spike, skipping\n', i)
-        tp(i) = NaN;
-        spkw(i) = NaN;
-        hpk(i) = NaN;
-        continue
-    end
+%     [~, abspk] = max(abs(w));
+%     if w(abspk) > bline || abspk > length(w) * 0.75
+%         fprintf('\nclu %d exhibits positive spike, skipping\n', i)
+%         tp(i) = NaN;
+%         spkw(i) = NaN;
+%         hpk(i) = NaN;
+%         continue
+%     end
   
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % trough-to-peak time [ms]

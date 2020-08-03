@@ -3,8 +3,8 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-forceL = false;
-forceA = false;
+forceL = true;
+forceA = true;
 
 % should allow user to input varName or columnn index
 colName = 'Session';                    % column name in xls sheet where dirnames exist
@@ -12,7 +12,8 @@ colName = 'Session';                    % column name in xls sheet where dirname
 vars = ["session.mat";...
     "cell_metrics.cellinfo";...
     "spikes.cellinfo";...
-    "SleepState.states"];      
+    "SleepState.states";....
+    "fr"];      
 % column name of logical values for each session. only if true than session
 % will be loaded. can be a string array and than all conditions must be
 % met.
@@ -21,9 +22,11 @@ pcond = ["manCur"];
 % same but imposes a negative condition)
 ncond = ["fix"];                      
 ncond = ["fEPSP"];
-basepath = 'E:\Data\Processed\lh52';
 sessionlist = 'sessionList.xlsx';       % must include extension
 fs = 20000;                             % can also be loaded from datInfo
+
+basepath = 'D:\VMs\shared\lh50';
+% dirnames = ["lh49_200324"; "lh49_200325"; "lh49_200326"; "lh49_200331"];
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % load data
@@ -76,17 +79,14 @@ if forceL
     end
 end
 
-% params
-% spkgrp = f{1}.spkgrp;
-% ngrp = length(spkgrp);
-% nsessions = length(f);
+spkgrp = session.extracellular.electrodeGroups.channels;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % analyze data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if forceA
-    for i = 1 : nsessions       
+    for i = 1 : nsessions
         close all
         
         % file
@@ -94,42 +94,53 @@ if forceA
         cd(filepath)
         [~, basename] = fileparts(filepath);
         
-        % session
+        % session info
         session = CE_sessionTemplate(pwd, 'viaGUI', false,...
-            'force', true, 'saveVar', true);       
+            'force', true, 'saveVar', true);
+        nchans = session.extracellular.nChannels;
+        fs = session.extracellular.sr;
+        spkgrp = session.extracellular.spikeGroups.channels;
         
-        % lfp
-        bz_LFPfromDat(filepath, 'noPrompts', true)
+        %         % spike sorting
+        %         rez = runKS('basepath', basepath, 'fs', fs, 'nchans', nchans,...
+        %             'spkgrp', spkgrp, 'saveFinal', true, 'viaGui', false,...
+        %             'cleanDir', false, 'trange', [0 Inf], 'outFormat', 'ns');
+        %         fixSpkAndRes('grp', [], 'fs', fs);
+        %
+        %         % lfp and states
+        %         bz_LFPfromDat(basepath, 'noPrompts', true)
+        %         SleepScoreMaster(basepath, 'noPrompts', true)
+        %
+        %         % acceleration
+        %         %         accch = setdiff([session.extracellular.electrodeGroups.channels{:}],...
+        %         %             [session.extracellular.spikeGroups.channels{:}]);
+        %         %         EMGfromACC('basepath', filepath, 'fname', '',...
+        %         %             'nchans', 27, 'ch', accch, 'force', true, 'saveVar', true,...
+        %         %             'graphics', false, 'fsOut', 1250);
         
-        % acceleration
-%         accch = setdiff([session.extracellular.electrodeGroups.channels{:}],...
-%             [session.extracellular.spikeGroups.channels{:}]);
-%         EMGfromACC('basepath', filepath, 'fname', '',...
-%             'nchans', 27, 'ch', accch, 'force', true, 'saveVar', true,...
-%             'graphics', false, 'fsOut', 1250);
-       
-%         % states
-%         SleepScoreMaster(filepath, 'rejectChannels', accch)
-        
-        % fix spk
-        fixSpkAndRes;
-%         
-%         % spikes and cell metrics
-        cell_metrics = ProcessCellMetrics('session', session,...
+        % spikes and cell metrics
+        fixSpkAndRes('grp', [], 'fs', fs);
+        spikes = loadSpikes('session', session);
+        spikes = fixCEspikes('basepath', filepath, 'saveVar', false,...
+            'force', true);
+        cm = ProcessCellMetrics('session', session,...
             'manualAdjustMonoSyn', false, 'summaryFigures', false,...
             'debugMode', true, 'transferFilesFromClusterpath', false,...
-            'submitToDatabase', false);        
-       
-
-
-%         % firing rate
-        load([basename '.spikes.cellinfo.mat'])
-        fr = FR(spikes.times, 'basepath', filepath, 'graphics', false, 'saveFig', false,...
-            'binsize', 60, 'saveVar', true, 'smet', 'MA', 'winBL', [1 Inf]);                
+            'submitToDatabase', false);
+        
+       % cluster validation
+        mu = [];
+        spikes = cluVal('spikes', spikes, 'basepath', filepath, 'saveVar', true,...
+            'saveFig', false, 'force', true, 'mu', mu, 'graphics', true,...
+            'vis', 'on', 'spkgrp', spkgrp);
+        
+        % firing rate
+        fr = firingRate(spikes.times, 'basepath', filepath, 'graphics', false, 'saveFig', false,...
+            'binsize', 60, 'saveVar', true, 'smet', 'MA');
     end
 end
 
-% second analysis (depends on first run)
+% second analysis (depends on first run and load data)
 for i = 1 : nsessions
     % file
     filepath = char(fullfile(basepath, dirnames(i)));
@@ -139,32 +150,21 @@ for i = 1 : nsessions
     spikes = d{i, 3}.spikes;
     session = d{i, 1}.session;
     cm = d{i, 2}.cell_metrics;
+
+    cm = CellExplorer('metrics', cm); 
+   
+    d{i, 3}.spikes = spikes;
     
-
-    
-%     spikes2 = getSpikes('basepath', filepath, 'saveMat', false,...
-%     'noPrompts', true, 'forceL', true);
-%     
-%         isi = cell_metrics.refractoryPeriodViolation; % percent isi < 2 ms
-    % mu = find(isi < 10);
-%     spikes = cluVal(spikes, 'basepath', basepath, 'saveVar', false,...
-%         'saveFig', false, 'force', true, 'mu', mu, 'graphics', false,...
-%         'vis', 'on', 'spkgrp', spkgrp);
-
-binsize = 60;
-fr{i} = FR(spikes.times, 'basepath', filepath, 'graphics', false, 'saveFig', false,...
-    'binsize', binsize, 'saveVar', true, 'smet', 'MA', 'winBL', [20 50 * 60]);
-
-%         cell_metrics = CellExplorer('metrics', cm); 
-
-
+    % firing rate
+    fr = firingRate(spikes.times, 'basepath', filepath, 'graphics', false, 'saveFig', false,...
+        'binsize', 60, 'saveVar', true, 'smet', 'MA');
 
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % rearrange data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-grp = [1 : 8];
+grp = [2, 5 : 7];
 for i = 1 : nsessions
     % session data
     filepath = char(fullfile(basepath, dirnames(i)));
@@ -175,12 +175,14 @@ for i = 1 : nsessions
     cm = d{i, 2}.cell_metrics;
     spikes = d{i, 3}.spikes;
     ss = d{i, 4}.SleepState;
+    fr = d{i, 5}.fr;
+    nunits = spikes.numcells;
     
     % states
     states = {ss.ints.WAKEstate, ss.ints.NREMstate, ss.ints.REMstate};
     for ii = 1 : length(states)
-        tStates{i, ii} = InIntervals(fr{i}.tstamps, states{ii});
-        frStates{i, ii} = mean(fr{i}.strd(:, tStates{i, ii}), 2);
+        tStates{i, ii} = InIntervals(fr.tstamps, states{ii});
+        frStates{i, ii} = mean(fr.strd(:, tStates{i, ii}), 2);
     end
     
     % specific grp
@@ -191,17 +193,19 @@ for i = 1 : nsessions
     
     % su
     su = cm.refractoryPeriodViolation < 2000;
+    su = spikes.su';
+    su = ones(1, nunits);
     
     % cell class
     pyr = strcmp(cm.putativeCellType, 'Pyramidal Cell');
     int = strcmp(cm.putativeCellType, 'Narrow Interneuron');
-    int = ~pyr;
+%     int = ~pyr;
     
     % fr
     for ii = 1 : length(states)
-        pyrFr{i, ii} = mean(fr{i}.strd(pyr & grpidx & su, tStates{i, ii}), 2);
-        intFr{i, ii} = mean(fr{i}.strd(int & grpidx & su, tStates{i, ii}), 2);
-        allFr{i, ii} = mean(fr{i}.strd(grpidx & su, tStates{i, ii}), 2);
+        pyrFr{i, ii} = mean(fr.strd(pyr & grpidx & su, tStates{i, ii}), 2);
+        intFr{i, ii} = mean(fr.strd(int & grpidx & su, tStates{i, ii}), 2);
+        allFr{i, ii} = mean(fr.strd(grpidx & su, tStates{i, ii}), 2);
     end
     
 %     % fr for pyr / int together
@@ -234,32 +238,32 @@ set(groot,'defaultLegendInterpreter','latex');
 
 close all
 
-% % spike count for pyr and Int during selected state
-% si = 2;
-% figure
-% plot([1 : nsessions], cell2mat(pyrFr(:, si)))
-% hold on
-% plot([1 : nsessions], cell2mat(intFr(:, si)))
-% plot([1 : nsessions], cell2mat(allFr(:, si)))
-% xticks([1 : nsessions])
-% xticklabels(dirnames)
-% xtickangle(45)
+% spike count for pyr and Int during selected state
+si = 2;
+figure
+plot([1 : nsessions], cell2mat(pyrFr(:, si)))
+hold on
+plot([1 : nsessions], cell2mat(intFr(:, si)))
+plot([1 : nsessions], cell2mat(allFr(:, si)))
+xticks([1 : nsessions])
+xticklabels(dirnames)
+xtickangle(45)
 
 % fr all sessions during selected state for pyr and int separatly (rows)
 figure
 xvals = [1 : nsessions];
 si = [1 2];     % selected state
 for ii = 1 : length(si)
-    subplot(2, length(si), ii)
-    mat = cell2nanmat({pyrFr{:, ii}});
-    bar(nanmean(mat))
-    hold on
-    er = errorbar(xvals, nanmean(mat), nanstd(mat));
-    er.Color = [0 0 0];
-    er.LineStyle = 'none';
-    box off
-    set(gca, 'TickLength', [0 0])
-    ylim([0 15])
+%     subplot(2, length(si), ii)
+%     mat = cell2nanmat({pyrFr{:, ii}});
+%     bar(nanmean(mat))
+%     hold on
+%     er = errorbar(xvals, nanmean(mat), nanstd(mat));
+%     er.Color = [0 0 0];
+%     er.LineStyle = 'none';
+%     box off
+%     set(gca, 'TickLength', [0 0])
+%     ylim([0 15])
     subplot(2, length(si), ii + length(si))
     mat = cell2nanmat({intFr{:, ii}});
     bar(nanmean(mat))
@@ -276,17 +280,25 @@ for ii = 1 : length(si)
 end
 
 
-% % fr per session
-% for i = 1 : nsessions
-%     filepath = char(fullfile(basepath, dirnames(i)));
-%     cd(filepath)
-%     [datename, basename] = fileparts(filepath);
-%     [~, datename] = fileparts(datename);
-%     
-%     figure
-%     stdshade(fr{i}.strd(:, :), 0.3, 'k', fr{i}.tstamps / 60, 3)
-%     title([datename '_' basename], 'Interpreter', 'none')
-% end
+% fr per session
+figure
+for i = 1 : nsessions
+    filepath = char(fullfile(basepath, dirnames(i)));
+    cd(filepath)
+    [datename, basename] = fileparts(filepath);
+    [~, datename] = fileparts(datename);
+    
+    spikes = d{i, 3}.spikes;
+    sum(spikes.su);
+    
+    subplot(1, nsessions, i)
+%     plot(fr{i}.strd(spikes.su, :)')
+%     plot(fr{i}.strd(:, :)')
+    stdshade(fr{i}.strd(spikes.su, :), 0.3, 'k', fr{i}.tstamps / 60, 3)
+    title([datename '_' basename], 'Interpreter', 'none')
+    axis tight
+    ylim([0 50])
+end
 % 
 % % fr
 % figure
