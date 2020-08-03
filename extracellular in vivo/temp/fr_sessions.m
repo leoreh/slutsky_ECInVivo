@@ -25,7 +25,6 @@ ncond = ["fEPSP"];
 sessionlist = 'sessionList.xlsx';       % must include extension
 fs = 20000;                             % can also be loaded from datInfo
 
-
 basepath = 'D:\VMs\shared\lh50';
 % dirnames = ["lh49_200324"; "lh49_200325"; "lh49_200326"; "lh49_200331"];
 
@@ -102,24 +101,25 @@ if forceA
         fs = session.extracellular.sr;
         spkgrp = session.extracellular.spikeGroups.channels;
         
-        % spike sorting
-        rez = runKS('basepath', basepath, 'fs', fs, 'nchans', nchans,...
-            'spkgrp', spkgrp, 'saveFinal', true, 'viaGui', false,...
-            'cleanDir', false, 'trange', [0 Inf], 'outFormat', 'ns');
-        fixSpkAndRes('grp', [], 'fs', fs);
-        
-        % lfp and states
-        bz_LFPfromDat(basepath, 'noPrompts', true)
-        SleepScoreMaster(basepath, 'noPrompts', true)
-        
-        % acceleration
-        %         accch = setdiff([session.extracellular.electrodeGroups.channels{:}],...
-        %             [session.extracellular.spikeGroups.channels{:}]);
-        %         EMGfromACC('basepath', filepath, 'fname', '',...
-        %             'nchans', 27, 'ch', accch, 'force', true, 'saveVar', true,...
-        %             'graphics', false, 'fsOut', 1250);
+        %         % spike sorting
+        %         rez = runKS('basepath', basepath, 'fs', fs, 'nchans', nchans,...
+        %             'spkgrp', spkgrp, 'saveFinal', true, 'viaGui', false,...
+        %             'cleanDir', false, 'trange', [0 Inf], 'outFormat', 'ns');
+        %         fixSpkAndRes('grp', [], 'fs', fs);
+        %
+        %         % lfp and states
+        %         bz_LFPfromDat(basepath, 'noPrompts', true)
+        %         SleepScoreMaster(basepath, 'noPrompts', true)
+        %
+        %         % acceleration
+        %         %         accch = setdiff([session.extracellular.electrodeGroups.channels{:}],...
+        %         %             [session.extracellular.spikeGroups.channels{:}]);
+        %         %         EMGfromACC('basepath', filepath, 'fname', '',...
+        %         %             'nchans', 27, 'ch', accch, 'force', true, 'saveVar', true,...
+        %         %             'graphics', false, 'fsOut', 1250);
         
         % spikes and cell metrics
+        fixSpkAndRes('grp', [], 'fs', fs);
         spikes = loadSpikes('session', session);
         spikes = fixCEspikes('basepath', filepath, 'saveVar', false,...
             'force', true);
@@ -127,17 +127,16 @@ if forceA
             'manualAdjustMonoSyn', false, 'summaryFigures', false,...
             'debugMode', true, 'transferFilesFromClusterpath', false,...
             'submitToDatabase', false);
-
-        % cluster validation
+        
+       % cluster validation
         mu = [];
-        spikes = cluVal('spikes', spikes, 'basepath', filepath, 'saveVar', false,...
+        spikes = cluVal('spikes', spikes, 'basepath', filepath, 'saveVar', true,...
             'saveFig', false, 'force', true, 'mu', mu, 'graphics', true,...
             'vis', 'on', 'spkgrp', spkgrp);
-    
+        
         % firing rate
-        load([basename '.spikes.cellinfo.mat'])
-        fr = FR(spikes.times, 'basepath', filepath, 'graphics', false, 'saveFig', false,...
-            'binsize', 60, 'saveVar', true, 'smet', 'MA', 'winBL', [1 Inf]);
+        fr = firingRate(spikes.times, 'basepath', filepath, 'graphics', false, 'saveFig', false,...
+            'binsize', 60, 'saveVar', true, 'smet', 'MA');
     end
 end
 
@@ -153,34 +152,19 @@ for i = 1 : nsessions
     cm = d{i, 2}.cell_metrics;
 
     cm = CellExplorer('metrics', cm); 
-
-    
-    
-    xxx = getSpikesFromSPK('basepath', filepath, 'saveMat', false,...
-    'noPrompts', true, 'forceL', true);
-%     
-%         isi = cell_metrics.refractoryPeriodViolation; % percent isi < 2 ms
-    % mu = find(isi < 10);
-    mu = [];
-    spikes = cluVal(spikes, 'basepath', filepath, 'saveVar', false,...
-        'saveFig', false, 'force', true, 'mu', mu, 'graphics', false,...
-        'vis', 'off', 'spkgrp', spkgrp);
-    
+   
     d{i, 3}.spikes = spikes;
     
-% binsize = 60;
-% fr{i} = FR(spikes.times, 'basepath', filepath, 'graphics', false, 'saveFig', false,...
-%     'binsize', binsize, 'saveVar', true, 'smet', 'MA', 'winBL', [20 50 * 60]);
-
-
-
+    % firing rate
+    fr = firingRate(spikes.times, 'basepath', filepath, 'graphics', false, 'saveFig', false,...
+        'binsize', 60, 'saveVar', true, 'smet', 'MA');
 
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % rearrange data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-grp = [1 : 4];
+grp = [2, 5 : 7];
 for i = 1 : nsessions
     % session data
     filepath = char(fullfile(basepath, dirnames(i)));
@@ -191,12 +175,14 @@ for i = 1 : nsessions
     cm = d{i, 2}.cell_metrics;
     spikes = d{i, 3}.spikes;
     ss = d{i, 4}.SleepState;
+    fr = d{i, 5}.fr;
+    nunits = spikes.numcells;
     
     % states
     states = {ss.ints.WAKEstate, ss.ints.NREMstate, ss.ints.REMstate};
     for ii = 1 : length(states)
-        tStates{i, ii} = InIntervals(fr{i}.tstamps, states{ii});
-        frStates{i, ii} = mean(fr{i}.strd(:, tStates{i, ii}), 2);
+        tStates{i, ii} = InIntervals(fr.tstamps, states{ii});
+        frStates{i, ii} = mean(fr.strd(:, tStates{i, ii}), 2);
     end
     
     % specific grp
@@ -207,17 +193,19 @@ for i = 1 : nsessions
     
     % su
     su = cm.refractoryPeriodViolation < 2000;
+    su = spikes.su';
+    su = ones(1, nunits);
     
     % cell class
     pyr = strcmp(cm.putativeCellType, 'Pyramidal Cell');
     int = strcmp(cm.putativeCellType, 'Narrow Interneuron');
-    int = ~pyr;
+%     int = ~pyr;
     
     % fr
     for ii = 1 : length(states)
-        pyrFr{i, ii} = mean(fr{i}.strd(pyr & grpidx & su, tStates{i, ii}), 2);
-        intFr{i, ii} = mean(fr{i}.strd(int & grpidx & su, tStates{i, ii}), 2);
-        allFr{i, ii} = mean(fr{i}.strd(grpidx & su, tStates{i, ii}), 2);
+        pyrFr{i, ii} = mean(fr.strd(pyr & grpidx & su, tStates{i, ii}), 2);
+        intFr{i, ii} = mean(fr.strd(int & grpidx & su, tStates{i, ii}), 2);
+        allFr{i, ii} = mean(fr.strd(grpidx & su, tStates{i, ii}), 2);
     end
     
 %     % fr for pyr / int together
@@ -250,16 +238,16 @@ set(groot,'defaultLegendInterpreter','latex');
 
 close all
 
-% % spike count for pyr and Int during selected state
-% si = 2;
-% figure
-% plot([1 : nsessions], cell2mat(pyrFr(:, si)))
-% hold on
-% plot([1 : nsessions], cell2mat(intFr(:, si)))
-% plot([1 : nsessions], cell2mat(allFr(:, si)))
-% xticks([1 : nsessions])
-% xticklabels(dirnames)
-% xtickangle(45)
+% spike count for pyr and Int during selected state
+si = 2;
+figure
+plot([1 : nsessions], cell2mat(pyrFr(:, si)))
+hold on
+plot([1 : nsessions], cell2mat(intFr(:, si)))
+plot([1 : nsessions], cell2mat(allFr(:, si)))
+xticks([1 : nsessions])
+xticklabels(dirnames)
+xtickangle(45)
 
 % fr all sessions during selected state for pyr and int separatly (rows)
 figure

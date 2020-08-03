@@ -1,12 +1,15 @@
-function fr = FR(spktimes, varargin)
+function fr = firingRate(spktimes, varargin)
 
-% wrapper for firing rate functions
+% wrapper for firing rate functions. calculates firing rate based on spike
+% times and smoothes result by a moving average (MA) or Gaussian kernel
+% (GK) impleneted by multiple-pass MA. Default is to calculate firing rate
+% in sliding 1-min windows of 20 s steps (Miyawaki et al., Sci. Rep.,
+% 2019). In practice this is done by setting binsize to 60 s and smoothing
+% w/ moving average of 3 points.
 % 
 % INPUT
-% required:
 %   spktimes    a cell array of vectors. each vector (unit) contains the
 %               timestamps of spikes. for example {spikes.times{1:4}}
-% optional:
 %   basepath    recording session path {pwd}
 %   graphics    plot figure {1}.
 %   saveFig     save figure {1}.
@@ -61,32 +64,32 @@ graphics = p.Results.graphics;
 saveFig = p.Results.saveFig;
 saveVar = p.Results.saveVar;
 
-% validate windows
-if winCalc(1) < 1; winCalc(1) = 1; end
+% validate window
 if winCalc(2) == Inf
-    for i = 1 : length(spktimes)
-        recDur(i) = max(spktimes{i}(:, 1));
-    end
-    winCalc(2) = max(recDur);
+    winCalc(2) = max(vertcat(spktimes{:}));
 end
+
+smfactor = 9;    % smooth factor
+nunits = length(spktimes);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % calculations
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% calculate spike counts
-[fr.strd, ~, fr.tstamps] = calcFR(spktimes, 'binsize', binsize,...
-    'winCalc', winCalc, 'smet', smet, 'c2r', true);
+% calculate firing rate
+[fr.strd, ~, fr.tstamps] = times2rate(spktimes, 'binsize', binsize,...
+    'winCalc', winCalc, 'c2r', true);
 
-% active periods and mFR
-% threshold for active periods is determined according to the bimodel
-% distribution of fr values. DOES NOT WORK FOR FR
-% thr = sepBimodel('x', fr.strd(:), 'lognorm', true, 'graphics', true);
-thr = 0.5;
-act = fr.strd > thr;
-act = logical(round(movmedian(act, 3)));
-for i = 1 : size(fr.strd, 1)
-    fr.mfr(i) = mean(fr.strd(i, act(i, :)));
+% smooth
+switch smet
+    case 'MA'
+        fr.strd = movmean(fr.strd, smfactor, 2);
+    case 'GK'
+        gk = gausswin(smfactor);
+        gk = gk / sum(gk);
+        for i = 1 : nunits
+            x(i, :) = conv(fr.strd(i, :), gk, 'same');
+        end
 end
 
 % normalize firing rate
@@ -94,10 +97,14 @@ if isempty(winBL)
     winBL = [1 size(fr.strd, 1)];
 else
     winBL = winBL / binsize;
-    if winBL(1) < 1; winBL(1) = 1; end
-    if winBL(2) == Inf; winBL(2) = size(fr.strd, 2); end
+    if winBL(1) < 1
+        winBL(1) = 1;
+    end
+    if winBL(2) == Inf
+        winBL(2) = size(fr.strd, 2);
+    end
 end
-[fr.norm, fr.ithr, fr.istable] = normFR(fr.strd, 'metBL', 'avg', 'win', winBL, 'select', select);
+[fr.norm, ~, ~] = normFR(fr.strd, 'metBL', metBL, 'win', winBL, 'select', select);
 
 % add params
 fr.winBL = winBL;

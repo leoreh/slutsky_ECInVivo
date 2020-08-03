@@ -148,9 +148,9 @@ if length(clu) == nunits
         line([0.003 0.003], ax.YLim, 'color', 'k', 'LineWidth', 1)            
     end
     
-    if saveFig
-        savePdf('clusters', basepath, f)
-    end
+%     if saveFig
+%         savePdf('clusters', basepath, f)
+%     end
 end
 
 end

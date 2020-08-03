@@ -91,6 +91,22 @@ ngrp = length(unique(spikes.shankID));  % only tetrodes with units
 nunits = length(spikes.times);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% ISI contamination
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SU = 1% of ISIs < 0.002
+ref = 0.002;
+thr = 1;
+spikes.isi = zeros(nunits, 1);
+for i = 1 : nunits
+    nspks(i, 1) = length(spikes.times{i});
+    spikes.isi(i, 1) = sum(diff(spikes.times{i}) < ref) / nspks(i, 1) * 100;
+end
+
+% arrange pre-determined multiunits
+mu = mu(:);
+mu = sort(unique([mu, find(spikes.isi > 1)]));
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % calculate cluster separation
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 fet = getFet(basepath, true, false);
@@ -103,7 +119,7 @@ else
     % arrange predetermined mu
     rmmu = cell(1, length(fet));
     if ~isempty(mu)
-        u = spikes.cluID(sort(mu));
+        u = spikes.cluID(mu);
         for i = 1 : length(fet)
             rmmu{i} = u(spikes.shankID(mu) == i);
         end
@@ -137,18 +153,6 @@ else
     spikes.lRat = cat(1, lRat{:});
     spikes.iDist = cat(1, iDist{:});
     spikes.mDist = mDist;
-end
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% ISI contamination
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% SU = 1% of ISIs < 0.002
-ref = 0.002;
-thr = 1;
-spikes.isi = zeros(nunits, 1);
-for i = 1 : nunits
-    nspks(i, 1) = length(spikes.times{i});
-    spikes.isi(i, 1) = sum(diff(spikes.times{i}) < ref) / nspks(i, 1) * 100;
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -50,7 +50,7 @@ function [bs] = getBS(varargin)
 %
 % CALLS
 %       cluDist             cluster separation
-%       calcFR              BSR 
+%       times2rate          BSR 
 %       specBand            delta band
 %       binary2epochs       start/stop times
 % 
@@ -62,6 +62,7 @@ function [bs] = getBS(varargin)
 %
 % 31 dec 19 LH  updates
 % 06 may 20 LH      manual selection of bursts
+% 03 aug 20 LH      times2rate instead of calcFR
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -333,8 +334,8 @@ for i = 1 : size(stamps, 1)
     bs.binary(stamps(i, 1) : stamps(i, 2)) = 1;
 end
 btimes = (find(~bs.binary));
-[bs.bsr, bs.edges, bs.cents] = calcFR(btimes, 'winCalc', [1, length(bs.binary)],...
-    'binsize', BSRbinsize, 'smet', 'none', 'c2r', true);
+[bs.bsr, bs.edges, bs.cents] = times2rate(btimes, 'winCalc',...
+    [1, length(bs.binary)], 'binsize', BSRbinsize, 'c2r', true);
 bs.bsr = movmean(bs.bsr, smf);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
