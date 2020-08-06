@@ -171,11 +171,13 @@ for i = 1 : nsessions
     cd(filepath)
     [datename, basename] = fileparts(filepath);
     [~, datename] = fileparts(datename);
+    
     session = d{i, 1}.session;
     cm = d{i, 2}.cell_metrics;
     spikes = d{i, 3}.spikes;
     ss = d{i, 4}.SleepState;
     fr = d{i, 5}.fr;
+    
     nunits = spikes.numcells;
     
     % states
@@ -237,6 +239,59 @@ set(groot,'defaulttextinterpreter','latex');
 set(groot,'defaultLegendInterpreter','latex');
 
 close all
+% basic figure of firing rate for each session
+figure
+grp = [2, 4 : 7];
+for i = 1 : nsessions
+    
+    session = d{i, 1}.session;
+    cm = d{i, 2}.cell_metrics;
+    spikes = d{i, 3}.spikes;
+    ss = d{i, 4}.SleepState;
+    fr = d{i, 5}.fr;
+       
+    % cell class
+    pyr = strcmp(cm.putativeCellType, 'Pyramidal Cell');
+    int = strcmp(cm.putativeCellType, 'Narrow Interneuron');
+    
+    % specific grp
+    grpidx = zeros(1, length(spikes.shankID));
+    for ii = 1 : length(grp)
+        grpidx = grpidx | spikes.shankID == grp(ii);
+    end
+    
+    nunits = spikes.numcells;
+    su = spikes.su';
+    % plot pyrs
+    units = pyr & grpidx;
+    
+    subplot(2, nsessions, i)
+    plot(fr.tstamps / 60 / 60, fr.strd(units, :)')
+    hold on
+    stdshade(fr.strd(units, :), 0.4, 'k', fr.tstamps / 60 / 60, 3)
+    axis tight
+    ylim([0 30]) 
+        ylabel('Firing Rate [Hz]')
+    xlabel('Time [h]')
+    box off
+    set(gca, 'TickLength', [0 0])
+    title('Pyramidal cells')
+    
+    % plot ints
+    units = int & grpidx;
+    
+    subplot(2, nsessions, i + 3)
+    plot(fr.tstamps / 60 / 60, fr.strd(units, :)')
+    hold on
+    stdshade(fr.strd(units, :), 0.4, 'k', fr.tstamps / 60 / 60, 3)
+    axis tight
+    ylim([0 30]) 
+    ylabel('Firing Rate [Hz]')
+    xlabel('Time [h]')
+    box off
+    set(gca, 'TickLength', [0 0])
+    title('Interneurons')
+end
 
 % spike count for pyr and Int during selected state
 si = 2;
