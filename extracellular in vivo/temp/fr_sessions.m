@@ -95,17 +95,17 @@ if forceA
         [~, basename] = fileparts(filepath);
         
         % session info
-        session = CE_sessionTemplate(pwd, 'viaGUI', false,...
+        session = CE_sessionTemplate(pwd, 'viaGUI', true,...
             'force', true, 'saveVar', true);
         nchans = session.extracellular.nChannels;
         fs = session.extracellular.sr;
         spkgrp = session.extracellular.spikeGroups.channels;
         
         %         % spike sorting
-        %         rez = runKS('basepath', basepath, 'fs', fs, 'nchans', nchans,...
-        %             'spkgrp', spkgrp, 'saveFinal', true, 'viaGui', false,...
-        %             'cleanDir', false, 'trange', [0 Inf], 'outFormat', 'ns');
-        %         fixSpkAndRes('grp', [], 'fs', fs);
+                rez = runKS('basepath', basepath, 'fs', fs, 'nchans', nchans,...
+                    'spkgrp', spkgrp, 'saveFinal', true, 'viaGui', false,...
+                    'cleanDir', false, 'trange', [0 Inf], 'outFormat', 'ns');
+                fixSpkAndRes('grp', [], 'fs', fs);
         %
         %         % lfp and states
         %         bz_LFPfromDat(basepath, 'noPrompts', true)
