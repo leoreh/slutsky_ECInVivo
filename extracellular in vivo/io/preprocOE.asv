@@ -123,11 +123,14 @@ end
     basename = bz_BasenameFromBasepath(newpath);
     dn = datenum(baseTime, 'yyyy-MM-dd');
     newpath = fullfile(newpath, [basename '_' datestr(dn, 'yyMMdd')]);
+    
     expName = expTime{1};
     exPathNew = [newpath, '_', expName];
     mkdir(exPathNew)
     fprintf('created %s\n', exPathNew)
-       
+    
+    
+    
     % move / concatenate dat
     catDat('basepath', recPath, 'newpath', exPathNew,...
         'concat', concat, 'nchans', nchans, 'saveVar', true);
