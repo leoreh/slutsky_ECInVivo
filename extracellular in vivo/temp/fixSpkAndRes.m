@@ -275,11 +275,13 @@ for i = grp
     nFeatures = nchans * 3 + nchans + 1;
     fetMat = zeros(nspks, nFeatures);
     enrgIdx = nchans * 3;
-    for ii = 1 : nchans
-        [~, pcFeat] = pca(permute(spk(ii, :, :), [3, 2, 1]));
-        chEnrgy = sum(abs(permute(spk(ii, :, :), [3, 2, 1])), 2);
-        fetMat(:, ii * 3 - 2 : ii * 3) = (pcFeat(:, 1 : 3));
-        fetMat(:, enrgIdx + ii) = (chEnrgy);
+    if ~isempty(spk)
+        for ii = 1 : nchans
+            [~, pcFeat] = pca(permute(spk(ii, :, :), [3, 2, 1]));
+            chEnrgy = sum(abs(permute(spk(ii, :, :), [3, 2, 1])), 2);
+            fetMat(:, ii * 3 - 2 : ii * 3) = (pcFeat(:, 1 : 3));
+            fetMat(:, enrgIdx + ii) = (chEnrgy);
+        end
     end
     fetMat(:, end) = res;
     fet = int32(fetMat');

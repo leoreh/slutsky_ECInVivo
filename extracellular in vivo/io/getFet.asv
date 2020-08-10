@@ -94,6 +94,8 @@ for i = 1 : nclufiles
     if nclu > 0
         fet{i}(:, end + 1) = fscanf(fid, '%f')';
         fclose(fid);
+    else
+%         fet(i) = [];
     end
 
 end

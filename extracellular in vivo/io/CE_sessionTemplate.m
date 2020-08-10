@@ -227,7 +227,9 @@ end
 
 if (~isfield(session.general, 'date') ||...
         isempty(session.general.date)) && isfield(sessionInfo, 'Date') || force
-    session.general.date = sessionInfo.Date;
+    if ~isempty(sessionInfo)
+        session.general.date = sessionInfo.Date;
+    end
 end
 if isfield(session,'extracellular') &&...
         isfield(session.extracellular,'nChannels') || force

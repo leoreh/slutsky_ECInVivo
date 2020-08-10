@@ -128,7 +128,7 @@ if forceA
             'debugMode', true, 'transferFilesFromClusterpath', false,...
             'submitToDatabase', false);
         
-%         cell_metrics = CellExplorer('metrics', cell_metrics);
+        cell_metrics = CellExplorer('metrics', cell_metrics);
 
         
        % cluster validation
@@ -140,7 +140,6 @@ if forceA
         % firing rate
         fr = firingRate(spikes.times, 'basepath', filepath, 'graphics', false, 'saveFig', false,...
             'binsize', 60, 'saveVar', true, 'smet', 'MA');
-        
     end
 end
 
@@ -162,7 +161,13 @@ for i = 1 : nsessions
     % firing rate
     fr = firingRate(spikes.times, 'basepath', filepath, 'graphics', false, 'saveFig', false,...
         'binsize', 60, 'saveVar', true, 'smet', 'MA');
-   
+    
+    figure
+    plot(fr.tstamps / 60 / 60, fr.strd)
+    
+    figure
+    stdshade(fr.strd(spikes.su, :), 0.3, 'k', fr.tstamps / 60 / 60)
+    
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
