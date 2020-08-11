@@ -91,8 +91,10 @@ for i = 1 : nclufiles
         error('cannot open file');
     end
     nclu = fscanf(fid, '%d', 1);
-    fet{i}(:, end + 1) = fscanf(fid, '%f')';
-    fclose(fid);
+    if nclu > 0
+        fet{i}(:, end + 1) = fscanf(fid, '%f')';
+        fclose(fid);
+    end
 
 end
 

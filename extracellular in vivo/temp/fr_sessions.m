@@ -95,17 +95,17 @@ if forceA
         [~, basename] = fileparts(filepath);
         
         % session info
-        session = CE_sessionTemplate(pwd, 'viaGUI', false,...
+        session = CE_sessionTemplate(pwd, 'viaGUI', true,...
             'force', true, 'saveVar', true);
         nchans = session.extracellular.nChannels;
         fs = session.extracellular.sr;
         spkgrp = session.extracellular.spikeGroups.channels;
         
         %         % spike sorting
-        %         rez = runKS('basepath', basepath, 'fs', fs, 'nchans', nchans,...
-        %             'spkgrp', spkgrp, 'saveFinal', true, 'viaGui', false,...
-        %             'cleanDir', false, 'trange', [0 Inf], 'outFormat', 'ns');
-        %         fixSpkAndRes('grp', [], 'fs', fs);
+                rez = runKS('basepath', basepath, 'fs', fs, 'nchans', nchans,...
+                    'spkgrp', spkgrp, 'saveFinal', true, 'viaGui', false,...
+                    'cleanDir', false, 'trange', [0 Inf], 'outFormat', 'ns');
+                fixSpkAndRes('grp', [], 'fs', fs);
         %
         %         % lfp and states
         %         bz_LFPfromDat(basepath, 'noPrompts', true)
@@ -128,6 +128,9 @@ if forceA
             'debugMode', true, 'transferFilesFromClusterpath', false,...
             'submitToDatabase', false);
         
+        cell_metrics = CellExplorer('metrics', cm);
+
+        
        % cluster validation
         mu = [];
         spikes = cluVal('spikes', spikes, 'basepath', filepath, 'saveVar', true,...
@@ -137,6 +140,7 @@ if forceA
         % firing rate
         fr = firingRate(spikes.times, 'basepath', filepath, 'graphics', false, 'saveFig', false,...
             'binsize', 60, 'saveVar', true, 'smet', 'MA');
+        
     end
 end
 
@@ -158,7 +162,7 @@ for i = 1 : nsessions
     % firing rate
     fr = firingRate(spikes.times, 'basepath', filepath, 'graphics', false, 'saveFig', false,...
         'binsize', 60, 'saveVar', true, 'smet', 'MA');
-
+   
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -171,11 +175,13 @@ for i = 1 : nsessions
     cd(filepath)
     [datename, basename] = fileparts(filepath);
     [~, datename] = fileparts(datename);
+    
     session = d{i, 1}.session;
     cm = d{i, 2}.cell_metrics;
     spikes = d{i, 3}.spikes;
     ss = d{i, 4}.SleepState;
     fr = d{i, 5}.fr;
+    
     nunits = spikes.numcells;
     
     % states
@@ -237,6 +243,59 @@ set(groot,'defaulttextinterpreter','latex');
 set(groot,'defaultLegendInterpreter','latex');
 
 close all
+% basic figure of firing rate for each session
+figure
+grp = [2, 4 : 7];
+for i = 1 : nsessions
+    
+    session = d{i, 1}.session;
+    cm = d{i, 2}.cell_metrics;
+    spikes = d{i, 3}.spikes;
+    ss = d{i, 4}.SleepState;
+    fr = d{i, 5}.fr;
+       
+    % cell class
+    pyr = strcmp(cm.putativeCellType, 'Pyramidal Cell');
+    int = strcmp(cm.putativeCellType, 'Narrow Interneuron');
+    
+    % specific grp
+    grpidx = zeros(1, length(spikes.shankID));
+    for ii = 1 : length(grp)
+        grpidx = grpidx | spikes.shankID == grp(ii);
+    end
+    
+    nunits = spikes.numcells;
+    su = spikes.su';
+    % plot pyrs
+    units = pyr & grpidx;
+    
+    subplot(2, nsessions, i)
+    plot(fr.tstamps / 60 / 60, fr.strd(units, :)')
+    hold on
+    stdshade(fr.strd(units, :), 0.4, 'k', fr.tstamps / 60 / 60, 3)
+    axis tight
+    ylim([0 30]) 
+        ylabel('Firing Rate [Hz]')
+    xlabel('Time [h]')
+    box off
+    set(gca, 'TickLength', [0 0])
+    title('Pyramidal cells')
+    
+    % plot ints
+    units = int & grpidx;
+    
+    subplot(2, nsessions, i + 3)
+    plot(fr.tstamps / 60 / 60, fr.strd(units, :)')
+    hold on
+    stdshade(fr.strd(units, :), 0.4, 'k', fr.tstamps / 60 / 60, 3)
+    axis tight
+    ylim([0 30]) 
+    ylabel('Firing Rate [Hz]')
+    xlabel('Time [h]')
+    box off
+    set(gca, 'TickLength', [0 0])
+    title('Interneurons')
+end
 
 % spike count for pyr and Int during selected state
 si = 2;

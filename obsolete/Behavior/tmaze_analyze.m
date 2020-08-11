@@ -5,7 +5,7 @@ if force
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % load data
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    filename = 'C:\Users\heiml\AppData\Local\Temp\OneNote\16.0\Exported\{46DB0164-023F-4175-B436-E0C76B451EC2}\NT\2\Cohort2_s13.xlsx';
+    filename = 'C:\Users\LeoreHeim\Downloads\batch2s1.xlsx';
     ndays = 12;
     
     % initialize
