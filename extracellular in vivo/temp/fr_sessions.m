@@ -119,7 +119,7 @@ if forceA
         %         %             'graphics', false, 'fsOut', 1250);
         
         % spikes and cell metrics
-        fixSpkAndRes('grp', 7, 'fs', fs);
+        fixSpkAndRes('grp', [], 'fs', fs);
         spikes = loadSpikes('session', session);
         spikes = fixCEspikes('basepath', filepath, 'saveVar', false,...
             'force', true);
@@ -128,7 +128,7 @@ if forceA
             'debugMode', true, 'transferFilesFromClusterpath', false,...
             'submitToDatabase', false);
         
-%         cell_metrics = CellExplorer('metrics', cell_metrics);
+        cell_metrics = CellExplorer('metrics', cm);
 
         
        % cluster validation
