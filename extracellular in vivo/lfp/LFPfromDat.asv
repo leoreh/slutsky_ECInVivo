@@ -9,12 +9,8 @@ function LFPfromDat(varargin)
 % however, this is not possible for many inputs (including 24414.06). do
 % not see a way around this inaccuracy.
 % 
-% difference from bz_LFPfromDat: (1) bz handles the remainder separately
-% s.t. there is a continuity problem at the last chunk, (2) no annoying
-% waitbar, (3) feeds sincFilter all channels at once (not much difference
-% because sincFilter loops through channels), (4) handles data more
-% efficiently (180 vs 230 s for 90 m recording), (5) documentation and
-% arguments.
+% difference from bz_LFPfromDat: (1) handles the remainder separately s.t. there is a continuity
+% problem at the last chunk
 % 
 % 
 % INPUT
@@ -95,6 +91,7 @@ chavg = p.Results.chavg;
 
 fsOut = 1250;
 fsIn = 24414.06;
+fsIn = 20000;
 force = true;
 cf = [0 450];
 nchans = 16; 
