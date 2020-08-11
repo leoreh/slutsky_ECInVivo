@@ -1,17 +1,22 @@
 function LFPfromDat(varargin)
 
-
-% creates lfp
+% performs lowpass sinc filter on wideband data (basename.dat file),
+% subsamples the filtered data and saves as a new flat binary. based on
+% bz_LFPdromDat with the following differences: (1) no dependencies on
+% sessionInfo, (2) bz handles the remainder separately s.t. there is a
+% continuity problem at the last chunk, (3) feeds sincFilter all channels
+% at once (not much difference because sincFilter loops through channels
+% anyway), (4) slightly faster (180 vs 230 s for 90 m recording), (5) no
+% annoying waitbar.
 %  
 % because the way downsampling occurs, the final duration may not be
 % accurate if the input fs is not a round number. one way arround
 % this is to define the output fs s.t. the ratio output/input is round.
 % however, this is not possible for many inputs (including 24414.06). do
-% not see a way around this inaccuracy.
+% not see a way around this inaccuracy (~50 ms for 90 m recording). 
 % 
-% difference from bz_LFPfromDat: (1) handles the remainder separately s.t. there is a continuity
-% problem at the last chunk
-% 
+% despite the description in IOSR.DSP.SINCFILTER, the output is a little
+% bit different if the cutoff frequency is [
 % 
 % INPUT
 %   basename    string. filename of lfp file. if empty retrieved from
@@ -22,22 +27,15 @@ function LFPfromDat(varargin)
 %   clip        mat n x 2 indicating samples to diregard from chunks.
 %               for example: clip = [0 50; 700 Inf] will remove the first
 %               50 samples and all samples between 700 and n
-
-%   extension   load from {'lfp'} (neurosuite), 'abf', 'wcp', or 'dat'.
-%   forceL      logical. force reload {false}.
-%   fs          numeric. requested sampling frequency {1250}
-%   interval    numeric mat. list of intervals to read from lfp file [s]
-%               can also be an interval of traces from wcp
-%   ch          vec. channels to load
-%   pli         logical. filter power line interferance (1) or not {0}
-%   dc          logical. remove DC component (1) or not {0}
-%   invertSig   logical. invert signal s.t. max is positive
+%   fsIn        numeric [Hz]. sampling frequency of dat file {20000}
+%   fsOut       numeric [Hz]. sampling frequency of lfp file {1250}
+%   nchans      numeric. number of channels in dat file {16}
+%   cf          numeric. cutoff frequencies {[0 450]}.
 %   saveVar     save variable {1}.
-%   chavg       cell. each row contain the lfp channels you want to average
 %   
 % DEPENDENCIES
-%   import_wcp
-%   ce_LFPfromDat (if extension = 'dat')
+%   IOSR.DSP.SINCFILTER
+%   class2bytes
 % 
 % OUTPUT
 %   lfp         structure with the following fields:
@@ -50,13 +48,11 @@ function LFPfromDat(varargin)
 %   timestamps 
 %   data  
 % 
-% 01 apr 19 LH & RA
-% 19 nov 19 LH          load mat if exists  
-% 14 jan 19 LH          adapted for wcp and abf 
-%                       resampling
+% % 11 aug 20 LH
 %
 % TO DO LIST
-%       # lfp from dat
+%       
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -91,8 +87,6 @@ chavg = p.Results.chavg;
 
 fsOut = 1250;
 fsIn = 24414.06;
-fsIn = 20000;
-force = true;
 cf = [0 450];
 nchans = 16; 
 clip = [];
@@ -100,6 +94,7 @@ precision = 'int16';
 
 chunksize = 1e5; % 
 
+tic
 
 [~, basename] = fileparts(basepath);
 % size of one data point in bytes
@@ -122,7 +117,6 @@ if cf(2) > fsOut / 2
     warning('low pass cutoff beyond nyquist')
 end
 
-
 import iosr.dsp.*
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -144,7 +138,7 @@ if exist(flfp, 'file') && ~force
   fprintf('%s exists, returning...', flfp)
 end
 
-% Set chunk and buffer size at even multiple of fsRatio
+% Set chunk and buffer size as even multiple of fsRatio
 if mod(chunksize, fsRatio) ~= 0
     chunksize = round(chunksize + fsRatio - mod(chunksize, fsRatio));
 end
@@ -163,7 +157,7 @@ nchunks = size(chunks, 1);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % processing
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-tic
+
 % memory map to original file
 m = memmapfile(fdat, 'Format', {precision [nchans nsamps] 'mapped'});
 raw = m.data;

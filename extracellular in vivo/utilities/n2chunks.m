@@ -25,7 +25,8 @@ function [chunks] = n2chunks(varargin)
 % TO DO LIST:
 %   # add an option to restrict minimum chunk size
 %
-% 22 apr 20 LH      
+% 22 apr 20 LH  updates:
+% 11 aug 20 LH  overlap
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
