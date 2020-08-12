@@ -123,8 +123,9 @@ end
     basename = bz_BasenameFromBasepath(newpath);
     dn = datenum(baseTime, 'yyyy-MM-dd');
     newpath = fullfile(newpath, [basename '_' datestr(dn, 'yyMMdd')]);
-    expName = expTime{1};
+    expName = expTime{1};   
     exPathNew = [newpath, '_', expName];
+    [~, expName] = fileparts(exPathNew);
     mkdir(exPathNew)
     fprintf('created %s\n', exPathNew)
        
@@ -148,6 +149,14 @@ end
     EMGfromACC('basepath', exPathNew, 'fname', '',...
         'nchans', newch, 'ch', chAcc, 'force', false, 'saveVar', true,...
         'graphics', false, 'fsOut', 1250);
+    
+    % lfp and states
+    session = CE_sessionTemplate(exPathNew, 'viaGUI', false,...
+    'force', true, 'saveVar', true); 
+    ce_LFPfromDat(session)   
+    badch = setdiff([session.extracellular.electrodeGroups.channels{:}],...
+        [session.extracellular.spikeGroups.channels{:}]);
+    SleepScoreMaster(basepath, 'rejectChannels', badch)
     
     % copy xml
     basefiles = dir(fileparts(newpath));
