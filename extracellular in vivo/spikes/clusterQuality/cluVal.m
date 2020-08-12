@@ -129,8 +129,10 @@ else
     for i = 1 : length(fet)
         
         % disgard noise and artifact spikes
-        idx = find(fet{i}(:, end) <= 1);
-        fet{i}(idx, :) = [];
+        if ~isempty(fet{i})
+            idx = find(fet{i}(:, end) <= 1);
+            fet{i}(idx, :) = [];
+        end
               
         % disgard spikes that belong to predetermined mu
         for j = 1 : length(rmmu{i})

@@ -13,7 +13,8 @@ function ks2ns(rez)
 %   # find trend based on larger segment without spike
 %   # fix clipped spike at end / beginning of recording
 %
-% 15 june 20 LH
+% 15 jun 20 LH.     updates:
+% 07 aug 20 LH      fix case where no spikes in grp
 
 t1 = tic;
 
@@ -173,11 +174,13 @@ for i = 1 : ngrps
     nFeatures = length(chans) * 3 + length(chans) + 1;
     fetMat = zeros(nspks(i), nFeatures);
     enrgIdx = length(chans) * 3;
-    for ii = 1 : length(chans)
-       [~, pcFeat] = pca(permute(spk(ii, :, :), [3, 2, 1]));
-       chEnrgy = sum(abs(permute(spk(ii, :, :), [3, 2, 1])), 2);
-       fetMat(:, ii * 3 - 2 : ii * 3) = (pcFeat(:, 1 : 3));
-       fetMat(:, enrgIdx + ii) = (chEnrgy);
+    if ~isempty(spk)
+        for ii = 1 : length(chans)
+            [~, pcFeat] = pca(permute(spk(ii, :, :), [3, 2, 1]));
+            chEnrgy = sum(abs(permute(spk(ii, :, :), [3, 2, 1])), 2);
+            fetMat(:, ii * 3 - 2 : ii * 3) = (pcFeat(:, 1 : 3));
+            fetMat(:, enrgIdx + ii) = (chEnrgy);
+        end
     end
     fetMat(:, end) = double(stamps{i});
     fet = int32(fetMat');

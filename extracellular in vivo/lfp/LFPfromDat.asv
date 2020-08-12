@@ -1,14 +1,13 @@
 function LFPfromDat(varargin)
 
-% performs lowpass filter on wideband data (basename.dat file), subsamples
-% the filtered data and saves as a new flat binary. filtering is performed
-% by FFT-based convolution with the sinc kernel (IOSR.DSP.SINCFILTER).
-% based on bz_LFPdromDat with the following differences: (1) no
-% dependencies on sessionInfo, (2) bz handles the remainder separately s.t.
-% there is a continuity problem at the last chunk, (3) feeds sincFilter all
-% channels at once (not much difference because sincFilter loops through
-% channels anyway), (4) slightly faster (180 vs 230 s for 90 m recording),
-% (5) no annoying waitbar.
+% performs lowpass sinc filter on wideband data (basename.dat file),
+% subsamples the filtered data and saves as a new flat binary. based on
+% bz_LFPdromDat with the following differences: (1) no dependencies on
+% sessionInfo, (2) bz handles the remainder separately s.t. there is a
+% continuity problem at the last chunk, (3) feeds sincFilter all channels
+% at once (not much difference because sincFilter loops through channels
+% anyway), (4) slightly faster (180 vs 230 s for 90 m recording), (5) no
+% annoying waitbar.
 %  
 % because the way downsampling occurs, the final duration may not be
 % accurate if the input fs is not a round number. one way arround
@@ -16,8 +15,8 @@ function LFPfromDat(varargin)
 % however, this is not possible for many inputs (including 24414.06). do
 % not see a way around this inaccuracy (~50 ms for 90 m recording). 
 % 
-% despite the description in IOSR.DSP.SINCFILTER, the output is slightly
-% different if the cutoff frequency is [0 450] instead of [450].
+% despite the description in IOSR.DSP.SINCFILTER, the output is a little
+% bit different if the cutoff frequency is [
 % 
 % INPUT
 %   basename    string. filename of lfp file. if empty retrieved from

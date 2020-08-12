@@ -3,8 +3,8 @@
 % params
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-basepath = 'C:\Users\LeoreHeim\AppData\Local\Temp\OneNote\16.0\Exported\{BC291184-82E7-44B8-A7D1-097C4F4132D6}\NT\0';
-filename = 'Cohort2_s21.xlsx';
+basepath = 'C:\Users\LeoreHeim\Downloads';
+filename = 'batch2s1.xlsx';
 filename = fullfile(basepath, filename);
 
 nmice = 5;

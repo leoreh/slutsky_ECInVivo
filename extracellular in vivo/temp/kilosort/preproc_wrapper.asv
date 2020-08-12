@@ -80,6 +80,53 @@ winBL = [1 Inf];
 fr = firingRate(spikes.times, 'basepath', filepath, 'graphics', false, 'saveFig', false,...
     'binsize', binsize, 'saveVar', true, 'smet', 'MA', 'winBL', winBL);
 
+% select units
+pyr = strcmp(cell_metrics.putativeCellType, 'Pyramidal Cell');
+int = strcmp(cell_metrics.putativeCellType, 'Narrow Interneuron');
+su = spikes.su';
+su = ones(1, length(spikes.su));
+% pyr = ones(1, length(spikes.su));
+grp = [1 : 8];
+grpidx = zeros(1, length(spikes.shankID));
+for ii = 1 : length(grp)
+    grpidx = grpidx | spikes.shankID == grp(ii);
+end
+
+figure
+subplot(2, 1, 1)
+units = pyr & su & grpidx;
+stdshade(log10(fr.strd(units, :)), 0.3, 'k', fr.tstamps / 60 / 60, 3)
+hold on
+plot([datInfo.nsamps(1) datInfo.nsamps(1)] / 20000 / 60 / 60, ylim, '--k')
+axis tight
+
+
+
+
+figure
+plot(fr.tstamps / 60 / 60, log10(fr.strd(units, :))')
+set(gca,'yscale','log')
+hold on
+plot(fr.tstamps/ 60 / 60, mean(fr.strd(units, :), 1), 'k', 'LineWidth', 3)
+plot([datInfo.nsamps(1) datInfo.nsamps(1)] / 20000 / 60 / 60, ylim, '--k')
+axis tight
+Y = ylim;
+fill([states{2} fliplr(states{2})]' / 60 / 60, [Y(1) Y(1) Y(2) Y(2)],...
+    'b', 'FaceAlpha', 0.15,  'EdgeAlpha', 0);
+
+
+subplot(2, 1, 2)
+units = int & su & grpidx;
+stdshade(fr.norm(units, :), 0.3, 'k', fr.tstamps / 60 / 60, 3)
+axis tight
+hold on
+plot([datInfo.nsamps(1) datInfo.nsamps(1)] / 20000 / 60 / 60, ylim, '--k')
+
+
+
+
+
+
 % CCG
 binSize = 0.001; dur = 0.12; % low res
 binSize = 0.0001; dur = 0.02; % high res

@@ -1,18 +1,11 @@
 function [chunks] = n2chunks(varargin)
 
 % gets a number of elements and divides it to chunks of chunksize. handles
-% start/end points. allows clipping of certain elements and overlap between
-% chunks.
+% start/end points and allows clipping of certain elements 
 %
 % INPUT:
 %   n           numeric. number of elements to split
 %   chunksize   numeric. number of elements in a chunk {1e6}. 
-%   overlap     2-element vector defining the overlap between chunks. 
-%               first element is reduced from chunk start and second
-%               element is added to chunk end. if single value is specified
-%               than the overlap will be symmetrical start to end. for
-%               example, overlap = [100 150] than for chunksize = 1000
-%               chunks may be [1 1150; 900 2150]. 
 %   clip        mat n x 2 indicating samples to diregard from chunks.
 %               for example: clip = [0 50; 700 Inf] will remove the first
 %               50 samples and all samples between 700 and n
@@ -25,8 +18,7 @@ function [chunks] = n2chunks(varargin)
 % TO DO LIST:
 %   # add an option to restrict minimum chunk size
 %
-% 22 apr 20 LH  updates:
-% 11 aug 20 LH  overlap
+% 22 apr 20 LH      
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -36,20 +28,16 @@ function [chunks] = n2chunks(varargin)
 p = inputParser;
 addOptional(p, 'n', [], @isnumeric);
 addOptional(p, 'chunksize', [], @isnumeric);
-addOptional(p, 'overlap', [0 0], @isnumeric);
 addOptional(p, 'clip', [], @isnumeric);
 
 parse(p, varargin{:})
 n = p.Results.n;
 chunksize = p.Results.chunksize;
-overlap = p.Results.overlap;
 clip = p.Results.clip;
 
 if numel(overlap) == 1
-    overlap = [overlap overlap];
+    overlap = [overlap overlapt];
 elseif numel(overlap) > 2
-    error('overlap must be a 2-element vector')
-end
 
 % validate
 % if max(clip(:)) > n

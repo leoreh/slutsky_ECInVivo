@@ -46,7 +46,7 @@ addOptional(p, 'binsize', 60, @isscalar);
 addOptional(p, 'winCalc', [1 Inf], validate_win);
 addOptional(p, 'winBL', [], validate_win);
 addOptional(p, 'metBL', 'avg', @ischar);
-addOptional(p, 'select', {'thr'}, @iscell);
+addOptional(p, 'select', {''}, @iscell);
 addOptional(p, 'smet', 'none', @ischar);
 addOptional(p, 'graphics', true, @islogical);
 addOptional(p, 'saveFig', true, @islogical);
@@ -94,7 +94,7 @@ end
 
 % normalize firing rate
 if isempty(winBL)
-    winBL = [1 size(fr.strd, 1)];
+    winBL = [1 size(fr.strd, 2)];
 else
     winBL = winBL / binsize;
     if winBL(1) < 1
@@ -104,7 +104,22 @@ else
         winBL(2) = size(fr.strd, 2);
     end
 end
-[fr.norm, ~, ~] = normFR(fr.strd, 'metBL', metBL, 'win', winBL, 'select', select);
+fr.norm = fr.strd ./ mean(fr.strd(:, winBL(1) : winBL(2)), 2);
+
+% select units who fired above thr
+if any(strcmp(select, 'thr'))
+    ithr = bl > 0.05;
+else
+    ithr = ones(nunits, 1);
+end
+% select units with low variability
+if any(strcmp(select, 'stable'))
+    bl_std = std(fr(:, win(1) : win(2)), [], 2);
+    istable = bl_std < bl;
+else
+    istable = ones(nunits, 1);
+end
+idx = istable & ithr;
 
 % add params
 fr.winBL = winBL;
