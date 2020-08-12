@@ -5,17 +5,14 @@ cd(basepath)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % open ephys
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'D:\VMs\shared\2020-08-10_08-37-06';
+basepath = 'E:\Leore\lh56\2020-08-11_09-42-03';
 rmvch = [13 16 23 24] + 1;
 mapch = [25 26 27 28 30 1 2 29 3 : 14 31 0 15 16 17 : 24 32 33 34] + 1;
-exp = [1];
+exp = [2];
 rec = cell(max(exp), 1);
-rec{1} = [1 2];
-intens = [];
-% rec{3} = 3;
+% rec{1} = [1 2];
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
     'rmvch', rmvch, 'mapch', mapch, 'concat', true, 'nchans', 35);
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % session info (cell explorer foramt)
