@@ -156,7 +156,7 @@ end
     ce_LFPfromDat(session)   
     badch = setdiff([session.extracellular.electrodeGroups.channels{:}],...
         [session.extracellular.spikeGroups.channels{:}]);
-    SleepScoreMaster(basepath, 'rejectChannels', badch)
+    SleepScoreMaster(exPathNew, 'rejectChannels', badch)
     
     % copy xml
     basefiles = dir(fileparts(newpath));
