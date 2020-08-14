@@ -143,20 +143,16 @@ end
         'concat', true, 'nchans', nchans, 'precision', 'int16',...
         'saveVar', true);
     
+    % create lfp file
+    LFPfromDat('basepath', exPathNew, 'cf', 450, 'chunksize', 5e6,...
+        'nchans', length(mapch) - length(rmvch), 'fsOut', 1250)
+    
     % get acceleration
     newch = length(mapch) - length(rmvch);
     chAcc = [newch : -1 : newch - 2];
     EMGfromACC('basepath', exPathNew, 'fname', '',...
         'nchans', newch, 'ch', chAcc, 'force', false, 'saveVar', true,...
         'graphics', false, 'fsOut', 1250);
-    
-    % lfp and states
-    session = CE_sessionTemplate(exPathNew, 'viaGUI', false,...
-    'force', true, 'saveVar', true); 
-    ce_LFPfromDat(session)   
-    badch = setdiff([session.extracellular.electrodeGroups.channels{:}],...
-        [session.extracellular.spikeGroups.channels{:}]);
-    SleepScoreMaster(exPathNew, 'rejectChannels', badch)
     
     % copy xml
     basefiles = dir(fileparts(newpath));
@@ -179,6 +175,9 @@ end
         copyfile(xmlfile, exPathNew)
         movefile([exPathNew, filesep, xmlfiles.name], xmlnew);
     end
+
+    % states (depends on xml file)
+    SleepScoreMaster(exPathNew, 'rejectChannels', chAcc)
  
 end
 

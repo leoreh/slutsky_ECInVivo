@@ -61,6 +61,7 @@ function acc = EMGfromACC(varargin)
 %   # fix sepBimodel (see ClusterStates_GetMetrics for good example)
 %   # get data from lfp instead of downsampling dat
 %   # update graphics
+%   # get signal from LFP file
 %
 % 09 apr 20 LH  UPDATES:
 % 29 jun 20 LH  changed according to EMGFromLFP
