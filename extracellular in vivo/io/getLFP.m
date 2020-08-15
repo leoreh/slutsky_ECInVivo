@@ -14,10 +14,10 @@ function lfp = getLFP(varargin)
 %   interval    numeric mat. list of intervals to read from lfp file [s]
 %               can also be an interval of traces from wcp
 %   ch          vec. channels to load
-%   pli         logical. filter power line interferance (1) or not {0}
-%   dc          logical. remove DC component (1) or not {0}
-%   invertSig   logical. invert signal s.t. max is positive
-%   saveVar     save variable {1}.
+%   pli         logical. filter power line interferance {0}
+%   dc          logical. remove DC component {0}
+%   invertSig   logical. invert signal s.t. max is positive {0}
+%   saveVar     logical. save variable {1}.
 %   chavg       cell. each row contain the lfp channels you want to average
 %   
 % DEPENDENCIES
@@ -42,6 +42,8 @@ function lfp = getLFP(varargin)
 %
 % TO DO LIST
 %       # lfp from dat
+%       # filter before resampling
+%       # load in chunks
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

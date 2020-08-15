@@ -33,21 +33,11 @@ function LFPfromDat(varargin)
 %   chunksize   size of data to load at once [samples]{5e6}. 
 %               if empty will load entire file (be careful!).
 %               for 35 channels in int16, 5e6 samples = 350 MB.
+%   force       logical. force load even if file exists {false}
 %   
 % DEPENDENCIES
 %   IOSR.DSP.SINCFILTER
 %   class2bytes
-% 
-% OUTPUT
-%   lfp         structure with the following fields:
-%   fs
-%   fs_orig
-%   extension
-%   interval    
-%   duration    
-%   chans
-%   timestamps 
-%   data  
 % 
 % 11 aug 20 LH
 %
@@ -69,16 +59,18 @@ addOptional(p, 'fsIn', 20000, @isnumeric);
 addOptional(p, 'fsOut', 1250, @isnumeric);
 addOptional(p, 'cf', 450, @isnumeric);
 addOptional(p, 'chunksize', 5e6, @isnumeric);
+addOptional(p, 'force', false, @islogical);
 
 parse(p, varargin{:})
 basepath = p.Results.basepath;
 precision = p.Results.precision;
 nchans = p.Results.nchans;
 clip = p.Results.clip;
-fsIn = p.Results.fsOut;
+fsIn = p.Results.fsIn;
 fsOut = p.Results.fsOut;
 cf = p.Results.cf;
 chunksize = p.Results.chunksize;
+force = p.Results.force;
 
 import iosr.dsp.*
 
@@ -136,6 +128,8 @@ nchunks = size(chunks, 1);
 % processing
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+fprintf('creating %s\n', flfp)
+
 % memory map to original file
 m = memmapfile(fdat, 'Format', {precision [nchans nsamps] 'mapped'});
 raw = m.data;
@@ -173,7 +167,7 @@ end
 fclose(fid);
 fclose(fidOut);
 
-fprintf('LFP file created. that took %.2f minutes\n', toc / 60)
+fprintf('\nLFP file created. that took %.2f minutes\n', toc / 60)
 
 end
 

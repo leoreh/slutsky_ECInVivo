@@ -145,7 +145,8 @@ end
     
     % create lfp file
     LFPfromDat('basepath', exPathNew, 'cf', 450, 'chunksize', 5e6,...
-        'nchans', length(mapch) - length(rmvch), 'fsOut', 1250)
+        'nchans', length(mapch) - length(rmvch), 'fsOut', 1250,...
+        'fsIn', 20000)
     
     % get acceleration
     newch = length(mapch) - length(rmvch);

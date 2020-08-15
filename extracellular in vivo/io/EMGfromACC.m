@@ -170,7 +170,6 @@ end
 
 % go over chunks
 a = [];
-tstampsACC = [];
 for i = 1 : nchunks
     % print progress
     if i ~= 1
