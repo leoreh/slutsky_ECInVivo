@@ -12,10 +12,10 @@ saveVar = false;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % IO
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'D:\Data\lh49_200319';
+basepath = 'D:\VMs\shared\lh49\lh49_200319';
 store = 'Raw1';
 fs = 24414.06;
-blocks = [2];
+blocks = [11, 13, 18];
 chunksize = 300;
 mapch = [1 : 16];
 % mapch = [1 : 2 : 7, 2 : 2 : 8, 9 : 2 : 15, 10 : 2 : 16];
@@ -61,6 +61,11 @@ EMGfromACC('basepath', exPathNew, 'fname', '',...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % LFP
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% create lfp file
+LFPfromDat('basepath', basepath, 'cf', 450, 'chunksize', 5e6,...
+    'nchans', 31, 'fsOut', 1250,...
+    'fsIn', 20000)    
 
 % load lfp
 lfp = getLFP('basepath', basepath, 'ch', [spkpgrp{:}], 'chavg', {},...

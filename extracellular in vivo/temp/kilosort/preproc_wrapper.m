@@ -1,14 +1,14 @@
 % preproc_wrapper
-basepath = 'D:\tempData\lh50\2020-04-21_12-05-16';
+basepath = 'D:\VMs\shared\lh50\lh50_200426_080458';
 cd(basepath)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % open ephys
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'E:\Leore\lh56\2020-08-14_09-17-27';
-rmvch = [13 16] + 1;
+basepath = 'D:\VMs\shared\lh50\2020-04-28_08-21-22';
+rmvch = [17 : 20] + 1;
 mapch = [25 26 27 28 30 1 2 29 3 : 14 31 0 15 16 17 : 24 32 33 34] + 1;
-exp = [1, 2];
+exp = [1, 3];
 rec = cell(max(exp), 1);
 % rec{1} = [1 2];
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
@@ -51,7 +51,7 @@ fixSpkAndRes('grp', [], 'fs', fs);
 % spikes and cell metrics
 fixSpkAndRes('grp', [], 'fs', fs);
 spikes = loadSpikes('session', session);
-spikes = fixCEspikes('basepath', filepath, 'saveVar', false,...
+spikes = fixCEspikes('basepath', basepath, 'saveVar', false,...
     'force', true);
 cell_metrics = ProcessCellMetrics('session', session,...
     'manualAdjustMonoSyn', false, 'summaryFigures', false,...
@@ -66,15 +66,15 @@ cell_metrics = CellExplorer('metrics', cell_metrics);
 
 % cluster validation
 mu = [];
-spikes = cluVal('spikes', spikes, 'basepath', filepath, 'saveVar', true,...
+spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
     'saveFig', false, 'force', true, 'mu', mu, 'graphics', true,...
     'vis', 'on', 'spkgrp', spkgrp);
 
 % firing rate
 binsize = 60;
-winBL = [5 * 60 60 * 60 * 3];
+winBL = [5 * 60 60 * 40];
 winBL = [1 Inf];
-fr = firingRate(spikes.times, 'basepath', filepath, 'graphics', false, 'saveFig', false,...
+fr = firingRate(spikes.times, 'basepath', basepath, 'graphics', false, 'saveFig', false,...
     'binsize', binsize, 'saveVar', true, 'smet', 'MA', 'winBL', winBL);
 
 % CCG
@@ -89,17 +89,21 @@ plotCCG('ccg', ccg(:, u, u), 't', t, 'basepath', basepath,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % sleep states
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-bz_LFPfromDat(basepath, 'noPrompts', true)
+% create lfp
+LFPfromDat('basepath', basepath, 'cf', 450, 'chunksize', 5e6,...
+    'nchans', 16, 'fsOut', 1250,...
+    'fsIn', 24414.1)   
+
+% load lfp
+lfp = getLFP('basepath', basepath, 'ch', [spkgrp{:}], 'chavg', {},...
+    'fs', 1250, 'interval', [0 inf], 'extension', 'lfp',...
+    'savevar', true, 'forceL', true, 'basename', '');
 
 badch = setdiff([session.extracellular.electrodeGroups.channels{:}],...
     [session.extracellular.spikeGroups.channels{:}]);
 SleepScoreMaster(basepath, 'noPrompts', true, 'rejectChannels', badch)
 
 TheStateEditor
-
-ce_LFPfromDat(session)
-bz_LFPfromDat(filepath)
-
 
 % states
 states = {SleepState.ints.WAKEstate, SleepState.ints.NREMstate, SleepState.ints.REMstate};
@@ -108,5 +112,4 @@ for ii = 1 : length(states)
     t{ii} = fr.tstamps(tStates{ii});
     frStates{ii} = mean(fr.strd(:, tStates{ii}), 2);
 end
-
 

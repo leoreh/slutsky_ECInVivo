@@ -122,7 +122,7 @@ end
 % backup
 if bkup
     bkpath = fullfile(basepath, 'ns', 'bkup');
-    fprintf('Saving backup in %s\n', bkpath)
+    fprintf('\nSaving backup in %s\n', bkpath)
     mkdir(bkpath)
     for i = grp
         copyfile(fullfile(clufiles(i).folder, clunames{i}), bkpath)

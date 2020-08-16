@@ -1,18 +1,24 @@
 % preproc_wrapper
-basepath = 'D:\tempData\lh50\2020-04-21_12-05-16';
+basepath = 'D:\VMs\shared\lh50\lh50_200426_080458';
 cd(basepath)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % open ephys
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'E:\Leore\lh56\2020-08-14_09-17-27';
-rmvch = [13 16] + 1;
+basepath = 'D:\VMs\shared\lh50\2020-04-28_08-21-22';
+rmvch = [17 : 20] + 1;
 mapch = [25 26 27 28 30 1 2 29 3 : 14 31 0 15 16 17 : 24 32 33 34] + 1;
-exp = [1, 2];
+exp = [1, 3];
 rec = cell(max(exp), 1);
 % rec{1} = [1 2];
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
     'rmvch', rmvch, 'mapch', mapch, 'concat', true, 'nchans', 35);
+
+
+% load lfp
+lfp = getLFP('basepath', basepath, 'ch', [spkpgrp{:}], 'chavg', {},...
+    'fs', 1250, 'interval', [0 inf], 'extension', 'lfp',...
+    'savevar', true, 'forceL', true, 'basename', '');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % session info (cell explorer foramt)
