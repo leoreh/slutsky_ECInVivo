@@ -110,7 +110,7 @@ if isempty(idx)
 end
 clip = zeros(length(idx), 2);
 for i = 1 : length(idx)
-    clip(i, :) = [tstamps(idx), tstamps(idx + 1)];
+    clip(i, :) = [tstamps(idx(i)), tstamps(idx(i) + 1)];
 end
 info = dir(fname);
 nsamps = info.bytes / nbytes / nchans;

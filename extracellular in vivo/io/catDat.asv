@@ -39,7 +39,6 @@ function datInfo = catDat(varargin)
 % 09 apr 20 LH
 % 22 apr 20 LH      valTstampsOE
 % 20 may 20 LH      input multiple paths
-% 19 aug 20 LH      map to tstamps instead of direct readNPY
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -129,24 +128,27 @@ for i = 1 : length(datFiles)
         break
     else
         
-        % memory map to tstamps file
-        tname = fullfile(tFiles(idx).folder, tFiles(idx).name);
-        [arrayShape, dataType, fortranOrder, ~, totalHeaderLength, ~] =...
-            readNPYheader(tname);
-        tmap = memmapfile(tname, 'Format', {dataType, arrayShape(end:-1:1), 'd'},...
-            'Offset', totalHeaderLength); 
-                
+        [arrayShape, dataType, fortranOrder, littleEndian, totalHeaderLength, npyVersion] = readNPYheader(fullfile(tFiles(idx).folder, tFiles(idx).name));
+   
+        f = memmapfile(filename, 'Format', {dataType, arrayShape(end:-1:1), 'd'}, 'Offset', totalHeaderLength);
+    
+    tmp = f.Data.d;
+    img = permute(tmp, length(arrayShape):-1:1); % note here you have to reverse the dimensions. 
+    image(img./255)
+    
+    
+        t = readNPY(fullfile(tFiles(idx).folder, tFiles(idx).name));
+        tstamps = [tstamps; t];
+        
         % fix bug in OE binary format
-        if length(tmap.Data.d) < nsamps(i)
+        if length(t) < nsamps(i)
             warning(['more samples than timestamps in %s\n'...
                 'initializing valTstampsOE'], source{i}) 
             valTstampsOE('basepath', tFiles(idx).folder, 'precision', precision,...
                 'chunksize', 5e6, 'bkup', false, 'saveVar', true,...
                 'nchans', nchans)
             nsamps(i) = length(t);
-        end       
-        tstamps = [tstamps; tmap.Data.d];
-        
+        end
     end
 end
 
