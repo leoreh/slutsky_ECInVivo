@@ -70,12 +70,11 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % standard params
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Assumes file structure: animal/experiment/recording
+% Assumes file structure: animal/experiment/
 pathPieces = regexp(basepath, filesep, 'split');
 
 % General metadata
 session.general.basePath =  basepath; % Full path
-
 
 session.general.name = pathPieces{end}; % Session name / basename
 session.general.version = 5; % Metadata version
@@ -83,7 +82,7 @@ session.general.sessionType = 'Chronic'; % Type of recording: Chronic, Acute
 
 % limited animal metadata
 if ~isfield(session, 'animal') || force
-    session.animal.name = pathPieces{end - 2};
+    session.animal.name = pathPieces{end - 1};
     session.animal.sex = 'Male';
     session.animal.species = 'Mouse';
     session.animal.strain = 'C57BL';

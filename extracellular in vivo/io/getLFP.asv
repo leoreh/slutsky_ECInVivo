@@ -138,6 +138,8 @@ elseif fs ~= fs_orig
 end
 lfp.timestamps = (interval(1) : 1 / fs : interval(1) + (length(lfp.data) - 1) / fs)';
 
+
+
 % invert
 if invertSig
     if ~strcmp(extension, 'lfp') && abs(min(lfp.data(:))) > max(lfp.data(:))
@@ -193,10 +195,10 @@ if saveVar
     save([basepath, filesep, filename], 'lfp')
 end
 
-return
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% sanity checks and testing
+% sanity checks (for debugging purposes)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 for trace = 1 : size(lfp.data, 2)
@@ -207,7 +209,7 @@ for trace = 1 : size(lfp.data, 2)
 end
 
 % conclusion from below: no difference if downsample average or avergae the
-% downsampled signal
+% downsampled 
 figure
 plot(lfp.timestamps, mean(lfp.data, 2))
 hold on
@@ -215,15 +217,3 @@ plot(data.T, mean(data.S, 2))
 dsamp = resample(mean(data.S, 2), p, q, n, beta);
 plot(lfp.timestamps, dsamp)
 legend
-
-% filter
-% cf = 450;
-% filtRatio = cf / (fs_orig / 2);
-% filtered = [iosr.dsp.sincFilter(data.S, filtRatio)];
-% 
-% for trace = 2 : size(lfp.data, 2)
-%     figure
-%     plot(data.T, filtered(:, trace))
-%     hold on
-%     plot(data.T, data.S(:, trace))
-% end

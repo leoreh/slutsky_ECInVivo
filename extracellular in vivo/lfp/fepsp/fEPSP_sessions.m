@@ -2,7 +2,7 @@
 
 % organizes and plots fepsp from multiple sessions. gets structs and
 % transforms them to matrices of vars (e.g. amp and wv) vs. time
-% (sessions).rubust to missing sessions (replaced by nan) and allows for
+% (sessions). rubust to missing sessions (replaced by nan) and allows for
 % different stim intensities between sessions. compensates if arrays are
 % not sorted (though fEPSPfromOE should sort by intensity)
 
