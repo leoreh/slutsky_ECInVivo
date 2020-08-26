@@ -143,7 +143,7 @@ for i = 1 : length(datFiles)
             valTstampsOE('basepath', tFiles(idx).folder, 'precision', precision,...
                 'chunksize', 5e6, 'bkup', false, 'saveVar', true,...
                 'nchans', nchans)
-            nsamps(i) = length(t);
+            nsamps(i) = length(tmap.Data.d);
         end       
         tstamps = [tstamps; tmap.Data.d];
         
