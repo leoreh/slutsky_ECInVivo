@@ -178,8 +178,10 @@ end
     end
 
     % states (depends on xml file)
-    SleepScoreMaster(exPathNew, 'rejectChannels', chAcc)
- 
+    if ~isempty(xmlfiles)
+        SleepScoreMaster(exPathNew, 'rejectChannels', chAcc)
+    end
+    
 end
 
 

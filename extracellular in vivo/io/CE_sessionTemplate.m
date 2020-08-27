@@ -224,12 +224,12 @@ else
     sessionInfo = [];
 end
 
-if (~isfield(session.general, 'date') ||...
-        isempty(session.general.date)) && isfield(sessionInfo, 'Date') || force
-    if ~isempty(sessionInfo)
-        session.general.date = sessionInfo.Date;
-    end
-end
+% if (~isfield(session.general, 'date') ||...
+%         isempty(session.general.date)) && isfield(sessionInfo, 'Date') || force
+%     if ~isempty(sessionInfo)
+%         session.general.date = sessionInfo.Date;
+%     end
+% end
 if isfield(session,'extracellular') &&...
         isfield(session.extracellular,'nChannels') || force
     fullpath = fullfile(session.general.basePath,[session.general.name,'.dat']);

@@ -128,7 +128,7 @@ nchunks = size(chunks, 1);
 % processing
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-fprintf('creating %s\n', flfp)
+fprintf('\ncreating %s\n', flfp)
 
 % memory map to original file
 m = memmapfile(fdat, 'Format', {precision [nchans nsamps] 'mapped'});
