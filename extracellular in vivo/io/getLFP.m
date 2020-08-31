@@ -7,9 +7,8 @@ function lfp = getLFP(varargin)
 % and removing dc.
 %  
 % INPUT
-%   basename    string. filename of lfp file. if empty retrieved from
-%               basepath. if .lfp should not include extension, if .wcp
-%               should include extension
+%   basename    string. filename of data file. if empty retrieved from
+%               basepath. should not include extension.
 %   basepath    string. path to load filename and save output {pwd}
 %   extension   load from {'lfp'} (neurosuite), 'abf', 'wcp', or 'dat'.
 %   forceL      logical. force reload {false}.
@@ -109,8 +108,8 @@ if exist(filename) && ~forceL
     return
 end
 
-fprintf('\nworking on %s\n', basename)
 loadname = [basename '.' extension];
+fprintf('\nworking on %s\n', loadname)
 switch extension
     case 'lfp'
         fs_orig = 1250;
@@ -123,7 +122,7 @@ switch extension
         [sig, info] = abf2load(loadname);
         fs_orig = 1 / (info.fADCSequenceInterval / 1000000); 
     case 'wcp'
-        data = import_wcp(basename);
+        data = import_wcp(loadname);
         data.S = [data.S{ch}];
         if interval(2) ~= Inf
             data.S = data.S(:, interval(1) : interval(2));
@@ -186,7 +185,7 @@ end
 % convert to double
 lfp.data = double(lfp.data);
 
-% filter
+% filter power line interference
 if pli
     linet = lineDetect('x', lfp.data, 'fs', fs, 'graphics', false);
     lfp.data = lineRemove(lfp.data, linet, [], [], 0, 1);
@@ -218,7 +217,7 @@ lfp.duration = length(lfp.data) / fs;
 lfp.chans = ch;
 lfp.fs = fs;
 lfp.fs_orig = fs_orig;
-lfp.extension = extension;
+lfp.origFile = extension;
 
 % save variable
 if saveVar   

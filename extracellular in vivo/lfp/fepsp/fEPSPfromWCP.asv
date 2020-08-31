@@ -44,8 +44,8 @@ for i = 1 : length(sfiles)
     
     % load data
     filename = files(sfiles(i)).name;
-    [~, basename] = fileparts(filename);
-    lfp = getLFP('basepath', basepath, 'basename', basename,...
+    basebane = fileparts(filename);
+    lfp = getLFP('basepath', basepath, 'basename', filename,...
         'extension', 'wcp', 'forceL', true, 'fs', 1250, 'saveVar', false,...
         'ch', 1, 'cf', 450, 'concat', true, 'dc', true);
     
