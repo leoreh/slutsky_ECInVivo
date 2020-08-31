@@ -81,7 +81,7 @@ filtRatio = cf / (fsIn / 2);
 %  from SINCFILTER: If cf is a scalar, then cf specifies the low-pass
 %  cutoff frequency. If cf is a two-element vector, then cf specifies the
 %  band-pass interval. cf must be 0.0 < cf < 1.0, with 1.0 corresponding to
-%  half the sample rate. HERE only cutoff
+%  half the sample rate. 
 
 fsRatio = (fsIn / fsOut);
 if cf > fsOut / 2

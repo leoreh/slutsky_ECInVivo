@@ -49,17 +49,42 @@ for i = 1 : length(sfiles)
     % load data
     filename = files(sfiles(i)).name;
     lfp = getLFP('basepath', basepath, 'basename', filename,...
-        'extension', 'wcp', 'forceL', true, 'fs', 1250, 'saveVar', false,...
-        'ch', 1, 'cf', 450, 'concat', true, 'dc', true);
+        'extension', 'wcp', 'forceL', true, 'fs', [], 'saveVar', false,...
+        'ch', 1);
+    sig = double(lfp.data);
     
     % manually inspect and remove unwanted traces
     if inspect
-        [lfp.data, rm] = rmTraces(lfp.data, lfp.timestamps);
+        [sig, rm] = rmTraces(sig, lfp.timestamps);
     end
     
+    % low-pass filter and remove DC, performed on all traces concatenated
+    sz = size(sig);
+    sig = iosr.dsp.sincFilter(sig(:), filtRatio);
+    [sig, dc] = rmDC(sig(:), 'dim', 1);
+    sig = reshape(sig, sz);
+    
+    % resample. both alternatives below produce similar results, alt 2 is
+    % faster
+    % ALT 1: matlab resmpale with antialiasing filter
+%     [p, q] = rat(fs / lfp.fs_orig);
+%     n = 5; beta = 20;
+%     sig = resample(sig, p, q, n, beta);
+    
+    % ALT 2: downsample by subsampling
+    fsRatio = lfp.fs_orig / fs;
+    sig = sig(1 : fsRatio : length(sig), :);
+    t = 0 : 1 / fs : ((length(sig2) - 1) / fs);
+
+    % sanity check
+    figure
+    plot(lfp.timestamps, mean(lfp.data, 2))
+    hold on
+    plot(t, mean(sig, 2))
+    
     % arrange data
-    wv{i} = lfp.data;
-    wvavg(i, :) = mean(lfp.data, 2);
+    wv{i} = sig;
+    wvavg(i, :) = mean(sig, 2);
     amp(i) = range(wvavg(i, stimidx : end));
     
 end

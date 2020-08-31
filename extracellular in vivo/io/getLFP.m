@@ -1,7 +1,10 @@
 function lfp = getLFP(varargin)
 
 % loads lfp data. can specify channels, intervals, average across channels,
-% resample, invert and more.
+% resample, invert. can perform low-pass filter before resampling (see also
+% LFPfromDat) and remove DC component. for short repetative signals (e.g.
+% stimulation traces) it is best to concatenate signals before filtering
+% and removing dc.
 %  
 % INPUT
 %   basename    string. filename of lfp file. if empty retrieved from
@@ -19,10 +22,14 @@ function lfp = getLFP(varargin)
 %   invertSig   logical. invert signal s.t. max is positive {0}
 %   saveVar     logical. save variable {1}.
 %   chavg       cell. each row contain the lfp channels you want to average
+%   concat      logical. concat traces before removing dc or filtering {1}
+%   cf          scalar. cutoff frequency {[450]}.
 %   
 % DEPENDENCIES
 %   import_wcp
-%   ce_LFPfromDat (if extension = 'dat')
+%   bz_LoadBinary
+%   IOSR.DSP.SINCFILTER
+%   LFPfromDat (if extension = 'dat')
 % 
 % OUTPUT
 %   lfp         structure with the following fields:
@@ -36,14 +43,16 @@ function lfp = getLFP(varargin)
 %   data  
 % 
 % 01 apr 19 LH & RA
-% 19 nov 19 LH          load mat if exists  
-% 14 jan 19 LH          adapted for wcp and abf 
-%                       resampling
+% 19 nov 19     load mat if exists  
+% 14 jan 19     adapted for wcp and abf 
+%               resampling
+% 31 aug 20     filter and concat
 %
 % TO DO LIST
 %       # lfp from dat
-%       # filter before resampling
+%       # filter before resampling (done)
 %       # load in chunks
+%       # downsample by subsampling
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -62,6 +71,8 @@ addOptional(p, 'dc', false, @islogical);
 addOptional(p, 'invertSig', false, @islogical);
 addOptional(p, 'saveVar', true, @islogical);
 addOptional(p, 'chavg', {}, @iscell);
+addOptional(p, 'concat', false, @islogical);
+addOptional(p, 'cf', 450, @isnumeric);
 
 parse(p,varargin{:})
 basepath = p.Results.basepath;
@@ -76,6 +87,8 @@ dc = p.Results.dc;
 invertSig = p.Results.invertSig;
 saveVar = p.Results.saveVar;
 chavg = p.Results.chavg;
+concat = p.Results.concat;
+cf = p.Results.cf;
 
 nchans = length(ch);
 
@@ -96,17 +109,18 @@ if exist(filename) && ~forceL
     return
 end
 
+fprintf('\nworking on %s\n', basename)
 loadname = [basename '.' extension];
 switch extension
     case 'lfp'
         fs_orig = 1250;
-        lfp.data = bz_LoadBinary(loadname, 'duration', diff(interval),...
+        sig = bz_LoadBinary(loadname, 'duration', diff(interval),...
             'frequency', fs_orig, 'nchannels', nchans, 'start', interval(1),...
             'channels', ch, 'downsample', 1);
     case 'abf'
         % note abf2load cannot handles spaces in loadname
         % note abf2load requires Abf2Tmp.exe and ABFFIO.dll in basepath         
-        [lfp.data, info] = abf2load(loadname);
+        [sig, info] = abf2load(loadname);
         fs_orig = 1 / (info.fADCSequenceInterval / 1000000); 
     case 'wcp'
         data = import_wcp(basename);
@@ -114,7 +128,7 @@ switch extension
         if interval(2) ~= Inf
             data.S = data.S(:, interval(1) : interval(2));
         end
-        lfp.data = data.S;
+        sig = data.S;
         fs_orig = data.fs;
     case 'dat'
         error('not ready yet')
@@ -124,11 +138,34 @@ end
 % messaround
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+if concat
+    sz = size(sig);
+    sig = sig(:);
+end
+
+% low-pass filter
+if cf
+    fprintf('low-pass filtering, cutoff = %d Hz\n', cf)
+    import iosr.dsp.*
+    filtRatio = cf / (fs_orig / 2);
+    sig = iosr.dsp.sincFilter(sig(:), filtRatio);
+end
+
+% remove DC component
+if dc
+    fprintf('removing dc component\n')
+    sig = rmDC(sig, 'dim', 1);
+end
+
+if concat
+    lfp.data = reshape(sig, sz);
+end
+
 % resmaple
 if isempty(fs) % do not resample if new sampling frequency not specified 
     fs = fs_orig;
-elseif fs ~= fs_orig
-    fprintf('\n resampling from %.1f to %.1f\n\n', fs_orig, fs)
+elseif round(fs) ~= round(fs_orig)
+    fprintf('resampling from %.1f to %.1f Hz\n', fs_orig, fs)
     [p, q] = rat(fs / fs_orig);
     n = 5; beta = 20;
     for i = 1 : size(lfp.data, 2)        % only way to handle large arrays
@@ -158,11 +195,6 @@ end
 % flip such that samples x channels
 if size(lfp.data, 1) < size(lfp.data, 2)
     lfp.data = lfp.data';
-end
-
-% remove DC component
-if dc
-    lfp.data = rmDC(lfp.data);
 end
 
 % signal average
