@@ -238,7 +238,7 @@ for trace = 1 : size(lfp.data, 2)
     plot(data.T, data.S(:, trace))  
 end
 
-% conclusion from below: no difference if downsample average or avergae the
+% conclusion from below: no difference if downsample average or average the
 % downsampled signal
 figure
 plot(lfp.timestamps, mean(lfp.data, 2))
@@ -259,3 +259,15 @@ legend
 %     hold on
 %     plot(data.T, data.S(:, trace))
 % end
+
+% resample. both alternatives below produce similar results, alt 2 is
+% faster
+% ALT 1: matlab resmpale with antialiasing filter
+[p, q] = rat(fs / lfp.fs_orig);
+n = 5; beta = 20;
+sig = resample(sig, p, q, n, beta);
+
+% ALT 2: downsample by subsampling
+fsRatio = lfp.fs_orig / fs;
+sig = sig(1 : fsRatio : length(sig), :);
+t = 0 : 1 / fs : ((length(sig2) - 1) / fs);

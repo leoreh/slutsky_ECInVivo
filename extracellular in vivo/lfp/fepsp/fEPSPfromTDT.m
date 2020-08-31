@@ -1,4 +1,4 @@
-function lfp = getfEPSPfromTDT(varargin)
+function lfp = fEPSPfromTDT(varargin)
 
 % this is a wrapper to get lfp signals and stim from tdt
 %  

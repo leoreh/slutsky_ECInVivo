@@ -1,4 +1,4 @@
-function fepsp = getfEPSPfromOE(varargin)
+function fepsp = fEPSPfromOE(varargin)
 
 % this is a wrapper to get fEPSP signals from OE. Assumes preprocOE has
 % been called beforehand and that basepath contains both the raw .dat file

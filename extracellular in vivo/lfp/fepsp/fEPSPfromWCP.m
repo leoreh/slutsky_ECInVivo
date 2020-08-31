@@ -10,13 +10,9 @@ fs = 1250;
 inspect = false;
 force = true;
 
-%   fs          numeric. requested sampling frequency {1250}
+%   fs           numeric. requested sampling frequency {1250}
 
 
-% filter params
-import iosr.dsp.*
-cf = 450;
-filtRatio = cf / (lfp.fs / 2);
 
 basepath = 'D:\Google Drive\Data\B3\lh61\200826';
 cd(basepath)
