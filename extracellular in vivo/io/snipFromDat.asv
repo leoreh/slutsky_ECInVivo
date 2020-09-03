@@ -88,7 +88,7 @@ if isempty(fname)
     if length(datFiles) == 1
         fname = datFiles.name;
     else
-        fname = [bz_BasenameFromBasepath(basepath) '.' extension];
+        fname = [bz_BasenameFromBasepath(basepath) '.dat'];
         if ~contains({datFiles.name}, fname)
             error('please specify which dat file to process')
         end

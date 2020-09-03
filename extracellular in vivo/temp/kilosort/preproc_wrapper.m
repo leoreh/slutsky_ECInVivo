@@ -5,20 +5,20 @@ cd(basepath)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % open ephys
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'I:\Data\Processed\lh58\2020-08-27_08-08-33';
+basepath = 'E:\Leore\lh58\2020-08-28_09-38-39';
 rmvch = [13 16] + 1;
 rmvch = [];
 mapch = [25 26 27 28 30 1 2 29 3 : 14 31 0 15 16 17 : 24 32 33 34] + 1;
-exp = [5];
+exp = [2];
 rec = cell(max(exp), 1);
-% rec{1} = [1 2 4 5];
+rec{2} = [1 : 10];
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
     'rmvch', rmvch, 'mapch', mapch, 'concat', true, 'nchans', 35);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % session info (cell explorer foramt)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-session = CE_sessionTemplate(pwd, 'viaGUI', true,...
+session = CE_sessionTemplate(pwd, 'viaGUI', false,...
     'force', true, 'saveVar', true);      
 basepath = session.general.basePath;
 nchans = session.extracellular.nChannels;
@@ -28,10 +28,10 @@ spkgrp = session.extracellular.spikeGroups.channels;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % field
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-intens = [50 100 70 80];
+intens = [50 70 90 100 110 150 200 300 120 500];
 fepsp = fEPSPfromOE('basepath', basepath, 'fname', '', 'nchans', nchans,...
     'spkgrp', spkgrp, 'intens', intens, 'concat', false, 'saveVar', true,...
-    'force', true);  
+    'force', true, 'extension', 'dat', 'dur', 0.15);  
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % kilosort

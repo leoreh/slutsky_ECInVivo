@@ -105,8 +105,8 @@ for i = 1 : length(exp)
         end
     end
     for ii = 1 : length(rec{exp(i)})
-        recIdx = find(strcmp(recNames, ['recording' num2str(rec{exp(i)}(ii))]));
-        recPath{k} = fullfile(recFolders(recIdx).folder, recNames{recIdx});
+        recIdx(i) = find(strcmp(recNames, ['recording' num2str(rec{exp(i)}(ii))]));
+        recPath{k} = fullfile(recFolders(recIdx(i)).folder, recNames{recIdx(i)});
         k = k + 1;
     end
 end

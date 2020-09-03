@@ -13,7 +13,11 @@ function fepsp = fEPSPfromOE(varargin)
 %               the channels in that spkgrprode
 %   intens      vec describing stimulus intensity [uA]. must be equal in
 %               length to number of recording files in experiment. 
-%   dur         numeric. duration of snip {0.15}[s]
+%   win         vec of 2 elements. determines length of snip. for example,
+%               win = [5 405] than each snip will be 401 samples, starting
+%               5 samples after the corresponding stamp and ending 405
+%               samples after stamp. if win = [-16 16] than snip will be of
+%               33 samples symmetrically centered around stamp.
 %   dt          numeric. dead time for calculating amplitude. 
 %               important for exclusion of stim artifact. {2}[ms]
 %   precision   char. sample precision of dat file {'int16'}
@@ -53,7 +57,7 @@ addOptional(p, 'fname', '', @ischar);
 addOptional(p, 'nchans', 35, @isnumeric);
 addOptional(p, 'spkgrp', {}, @iscell);
 addOptional(p, 'intens', [], @isnumeric);
-addOptional(p, 'dur', 0.15, @isnumeric);
+addOptional(p, 'win', [], @isnumeric);
 addOptional(p, 'dt', 2, @isnumeric);
 addOptional(p, 'precision', 'int16', @ischar);
 addOptional(p, 'extension', 'lfp', @ischar);
@@ -70,7 +74,7 @@ fname = p.Results.fname;
 nchans = p.Results.nchans;
 spkgrp = p.Results.spkgrp;
 intens = p.Results.intens;
-dur = p.Results.dur;
+win = p.Results.win;
 dt = p.Results.dt;
 precision = p.Results.precision;
 extension = p.Results.extension;
@@ -89,13 +93,15 @@ nspkgrp = length(spkgrp);
 
 % set window of snip (150 ms as in wcp). 
 % assumes dat recorded at 20 kHz and lfp at 1.25 kHz.
-if strcmp(extension, 'lfp')
-    fs = 1250;
-else
-    fs = 20000;
+if isempty(win)
+    if strcmp(extension, 'lfp')
+        win = round([1 0.15 * 1250]);
+    else
+        win = round([1 0.15 * 20000]);
+    end
 end
-win = round([1 dur * fs]);
-dt = dt / 1000 * fs;
+
+dt = dt / 1000 * 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % handle data
