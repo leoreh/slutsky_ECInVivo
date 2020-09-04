@@ -94,6 +94,13 @@ if isempty(spkgrp)
 end
 nspkgrp = length(spkgrp);
 
+switch recSystem
+    case 'oe'
+        b2uv = 0.195;
+    case 'tdt'
+        b2uv = [];
+end
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % handle files
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -217,7 +224,8 @@ dt = round(dt / 1000 * fsOut);
 % snip
 snips = snipFromDat('basepath', basepath, 'fname', fname,...
     'stamps', stamps, 'win', win, 'nchans', nchans, 'ch', [],...
-    'dtrend', false, 'precision', precision, 'extension', extension);
+    'dtrend', false, 'precision', precision, 'extension', extension,...
+    'b2uv', b2uv);
 snips = snips / 1000;   % uV to mV
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
