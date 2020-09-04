@@ -30,6 +30,7 @@ function datInfo = preprocOE(varargin)
 %   # fix datenum (year sometimes wrong) (done 02 may 20)
 %   # fix datenum in experiment name
 %   # instead of saving OE tstamps, convert them to samples (Din)
+%   # add fs
 %
 % 09 apr 20 LH  updates
 % 28 apr 20 LH  find exp by name and not number of folders

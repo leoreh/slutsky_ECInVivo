@@ -1,44 +1,47 @@
-function fepsp = fEPSPfromOE(varargin)
+function fepsp = fEPSPfromDat(varargin)
 
-% this is a wrapper to get fEPSP signals from OE. Assumes preprocOE has
-% been called beforehand and that basepath contains both the raw .dat file
-% and din.mat.
-%  
+% this is a wrapper to get fEPSP signals snipped from .dat or .lfp files
+% based on stim indices. works for both OE and TDT. if OE, assumes
+% preprocOE has been called beforehand. and that basepath conatins din.mat.
+% if TDT, assumes tdt2dat was called beforehand and that basepath is data
+% tank with all relavent blocks.
+%
 % INPUT
 %   basepath    string. path to .dat file (not including dat file itself)
 %   fname       string. name of dat file. if empty and more than one dat in
 %               path, will be extracted from basepath
 %   nchans      numeric. original number of channels in dat file {35}.
-%   spkgrp      cell array. each cell represents a spkgrprode and contains 
+%   spkgrp      cell array. each cell represents a spkgrprode and contains
 %               the channels in that spkgrprode
 %   intens      vec describing stimulus intensity [uA]. must be equal in
-%               length to number of recording files in experiment. 
+%               length to number of recording files in experiment.
 %   dur         numeric. duration of snip {0.15}[s]
-%   dt          numeric. dead time for calculating amplitude. 
+%   dt          numeric. dead time for calculating amplitude.
 %               important for exclusion of stim artifact. {2}[ms]
 %   precision   char. sample precision of dat file {'int16'}
-%   extension   string. load from {'dat'} or 'lfp' file.
+%   extension   string. load from 'dat' or {'lfp'} file
+%   recSystem   string. data from 'tdt' or {'oe'}
 %   force       logical. force reload {false}.
-%   concat      logical. concatenate blocks (true) or not {false}. 
+%   concat      logical. concatenate blocks (true) or not {false}.
 %               used for e.g stability.
-%   saveVar     logical. save variable {1}. 
-%   saveFig     logical. save graphics {1}. 
-%   graphics    logical. plot graphics {1}. 
+%   saveVar     logical. save variable {1}.
+%   saveFig     logical. save graphics {1}.
+%   graphics    logical. plot graphics {1}.
 %   vis         char. figure visible {'on'} or not ('off')
-%   
+%
 % CALLS
 %   snipFromDat
-%   
+%
 % OUTPUT
 %   fepsp       struct
-% 
+%
 % TO DO LIST
 %   # more efficient way to convert tstamps to idx
 %   # add concatenation option for stability
 %   # improve graphics
 %   # add option to resample (see getAcc)
 %   # sort mats according to intensity (done)
-% 
+%
 % 22 apr 20 LH   UPDATES:
 % 28 jun 20 LH      first average electrodes and then calculate range
 %                   dead time to exclude stim artifact
@@ -57,6 +60,7 @@ addOptional(p, 'dur', 0.15, @isnumeric);
 addOptional(p, 'dt', 2, @isnumeric);
 addOptional(p, 'precision', 'int16', @ischar);
 addOptional(p, 'extension', 'lfp', @ischar);
+addOptional(p, 'recSystem', 'oe', @ischar);
 addOptional(p, 'force', false, @islogical);
 addOptional(p, 'concat', false, @islogical);
 addOptional(p, 'saveVar', true, @islogical);
@@ -74,6 +78,7 @@ dur = p.Results.dur;
 dt = p.Results.dt;
 precision = p.Results.precision;
 extension = p.Results.extension;
+recSystem = p.Results.recSystem;
 force = p.Results.force;
 concat = p.Results.concat;
 saveVar = p.Results.saveVar;
@@ -87,21 +92,11 @@ if isempty(spkgrp)
 end
 nspkgrp = length(spkgrp);
 
-% set window of snip (150 ms as in wcp). 
-% assumes dat recorded at 20 kHz and lfp at 1.25 kHz.
-if strcmp(extension, 'lfp')
-    fs = 1250;
-else
-    fs = 20000;
-end
-win = round([1 dur * fs]);
-dt = dt / 1000 * fs;
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% handle data
+% handle files
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% make sure dat and stim files exist
+% make sure dat file exist
 datfiles = dir([basepath filesep '**' filesep '*' extension]);
 if isempty(datfiles)
     error('no .dat files found in %s', basepath)
@@ -126,39 +121,96 @@ if exist(fepspname, 'file') && ~force
     return
 end
 
-% load digital input
-stimname = fullfile(basepath, [basename, '.din.mat']);
-if exist(stimname) 
-    fprintf('\nloading %s \n', stimname)
-    load(stimname)
-else
-    error('%s not found', stimname)
-end
-
 % load dat info
+dir(*datInfo*)
 infoname = fullfile(basepath, [basename, '.datInfo.mat']);
 if exist(infoname, 'file')
     fprintf('loading %s \n', infoname)
     load(infoname)
 end
-nfiles = length(datInfo.origFile);  % number of intensities 
+nfiles = length(datInfo.origFile);  % number of intensities
 
-% load timestamps and subsample if lfp
-load(fullfile(basepath, [basename, '.tstamps.mat']));
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% get stim indices
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+switch recSystem
+    case 'oe'
+        fsIn = 20000;
+        
+        % load digital input
+        stimname = fullfile(basepath, [basename, '.din.mat']);
+        if exist(stimname)
+            fprintf('\nloading %s \n', stimname)
+            load(stimname)
+        else
+            error('%s not found', stimname)
+        end
+        
+        % load timestamps
+        load(fullfile(basepath, [basename, '.tstamps.mat']));
+        
+        % convert tstamps to idx of samples
+        stamps = zeros(1, length(din.data));
+        for i = 1 : length(din.data)
+            stamps(i) = find(tstamps == din.data(i));
+        end
+        
+    case 'tdt'
+        % for some blocks the length of two stores (e.g. Raw1 and stim) defer even
+        % if they were sampled at the same frequency. this appears random (i.e.
+        % does not depend on block duration and can go either way. the workaround
+        % here is to shorten / elongate stim according to Raw1. this assumes the
+        % missing / additional samples are at the end of the block and are not
+        % important (so far has proven to be true)
+        fsIn = 24414.0625;
+        blockfiles = dir('block*');
+        blocknames = natsort({blockfiles.name});
+        stim = [];
+        for i = 1 : length(datInfo.blocks)
+            blockpath = fullfile(basepath, blocknames{datInfo.blocks(i)});
+            store = datInfo.store;
+            dat = TDTbin2mat(blockpath, 'TYPE', {'streams'},...
+                'STORE', store, 'T1', 0, 'T2', 0);
+            dat = dat.streams.(store).data;
+            store = 'Stim';
+            s = TDTbin2mat(blockpath, 'TYPE', {'streams'},...
+                'STORE', store, 'T1', 0, 'T2', 0);
+            s = s.streams.(store).data;
+            
+            d = length(s) - length(dat);
+            if d ~= 0
+                warning('length stim and raw not equal')
+                if d > 0
+                    s(end : -1 : end - d + 1) = [];
+                else
+                    s(length(s) : length(dat)) = 0;
+                end
+            end
+            stim = [stim, s];
+        end   
+        % stim onset from diff
+        stamps = find(diff(stim) > max(diff(stim)) / 2);
+end
+
+if strcmp(extension, 'lfp')
+    fsRatio = fsIn / 1250;     % dat / lfp
+    stamps = round(stamps / fsRatio);
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % snip data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% convert tstamps to idx of samples
-stamps = zeros(1, length(din.data));
-for i = 1 : length(din.data)
-    stamps(i) = find(tstamps == din.data(i));
-end
+% set window of snip (150 ms as in wcp).
+% assumes dat recorded at 20 kHz and lfp at 1.25 kHz.
 if strcmp(extension, 'lfp')
-    fsRatio = 20000 / 1250;     % dat / lfp
-    stamps = round(stamps / fsRatio);
+    fsOut = 1250;
+else
+    fsOut = fsIn;
 end
+win = round([1 dur * fsOut]);
+dt = round(dt / 1000 * fsOut);
 
 % snip
 snips = snipFromDat('basepath', basepath, 'fname', fname,...
@@ -166,13 +218,17 @@ snips = snipFromDat('basepath', basepath, 'fname', fname,...
     'dtrend', false, 'precision', precision, 'extension', extension);
 snips = snips / 1000;   % uV to mV
 
-% % sanity check
-% electrode = 5;
-% trace = 5;
+% sanity check
+% electrode = 6;
+% trace = 10;
 % figure
 % plot(0 : 1 / 20000 : 0.15 - 1 / 20000, x(electrode, :, trace))
 % hold on
-% plot(0 : 1 / 1250 : 0.15, snips(electrode, :, trace))
+%
+% for i = 1 : size(snips, 3)
+% figure
+%     plot(0 : 1 / 1250 : 0.15, snips(electrode, :, i))
+% end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % calc
@@ -207,7 +263,7 @@ for j = 1 : nspkgrp
     end
 end
 
-if concat 
+if concat
     for i = 1 : length(blocks)
         amp = [amp; ampcell{i}];
     end

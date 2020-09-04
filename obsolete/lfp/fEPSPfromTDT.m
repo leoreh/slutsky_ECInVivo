@@ -84,7 +84,12 @@ saveVar = p.Results.saveVar;
 %     'blocks', blocks, 'chunksize', [], 'mapch', mapch, 'rmvch', [],...
 %     'clip', clip, 'saveVar', false);
 
-% workaround for f***ing tdt
+% for some blocks the length of two stores (e.g. Raw1 and stim) defer even
+% if they were sampled at the same frequency. this appears random (i.e.
+% does not depend on block duration and can go either way. the workaround
+% here is to shorten / elongate stim according to Raw1. this assumes the
+% missing / additional samples are at the end of the block and are not
+% important (so far has proven to be true)
 blockfiles = dir('block*');
 blocknames = {blockfiles.name};
 blocknames = natsort(blocknames);
@@ -107,7 +112,7 @@ for i = 1 : length(blocks)
         if d > 0
             s(end : -1 : end - d + 1) = [];
         else
-            dat(:, end : -1 : end - abs(d) + 1) = [];
+            s(length(s) : length(dat)) = 0;
         end
     end
     stim = [stim, s];
@@ -115,9 +120,13 @@ for i = 1 : length(blocks)
 end
 
 % find stim onset from diff
-stimidx = find(diff(stim) > max(diff(stim)) / 2);
+stamps = find(diff(stim) > max(diff(stim)) / 2);
 % convert stim onset times to new fs
-stimidx = round(stimidx / info.fs * fs);
+% stamps = round(stamps / info.fs * fs);
+if strcmp(extension, 'lfp')
+    fsRatio = 24414.0625 / 1250;     % dat / lfp
+    stamps = round(stamps / fsRatio);
+end
 
 % resample
 [p, q] = rat(fs / info.fs);

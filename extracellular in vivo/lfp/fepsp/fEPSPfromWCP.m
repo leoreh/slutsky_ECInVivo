@@ -3,7 +3,9 @@ function fepsp = fEPSPfromWCP(varargin)
 % wrapper to get fEPSP signals recorded via winWCP. assumes folder
 % (basepath) contains several homogenous files (i.e. each file consists of
 % only one type of stimulus). files are analyzed according to stimulus
-% protocol (e.g. io or stp). user is asked to select specific files
+% protocol (e.g. io or stp). user is asked to input / select specific
+% files. data is loaded via getLFP such that traces are concatenated,
+% low-pass filtered and downsampled. 
 %  
 % INPUT
 %   basepath    string. path to .dat file (not including dat file itself)
@@ -137,11 +139,8 @@ for i = 1 : length(filenames)
     else
         rm = [];
     end
-    
-    % invert signal if necassary
-%     lfp.data = -lfp.data;
-    
-    % analyze data
+
+    % analyze data; this is your part lior :)
     wv{i} = lfp.data;
     wvavg(i, :) = mean(lfp.data, 2);
     

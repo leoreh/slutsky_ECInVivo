@@ -124,8 +124,6 @@ if nargout == 1
 end
 
 % go over blocks
-nsec = zeros(1, nblocks);
-nsamps = zeros(1, nblocks);
 for i = 1 : nblocks
     
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -211,13 +209,13 @@ for i = 1 : nblocks
                 data = [data, dat];                % output data
             end
         end
-        nsamps(i) = [nsamps(i) + size(dat, 2)];
     end
+    nsamps(i) = size(data, 2);
 end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % close file
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if nargout == 1
     rc = fclose(fout);
     if rc == -1
@@ -241,7 +239,6 @@ datInfo.rmvch = rmvch;
 datInfo.mapch = mapch;
 datInfo.fs = heads.stores.(store).fs;
 datInfo.nsamps = nsamps; 
-datInfo.nsec = nsec; 
 
 if saveVar
     if strcmp(store, 'Raw1')
@@ -254,18 +251,6 @@ if saveVar
         save([basename, '.' store, '.data.mat'], 'data');
     end
 end
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% more processing
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% create lfp file
-if contains(store, 'Raw')
-    LFPfromDat('basepath', basepath, 'cf', 450, 'chunksize', 5e6,...
-        'nchans', length(mapch) - length(rmvch), 'fsOut', 1250,...
-        'fsIn', heads.stores.(store).fs)
-end
-
 end
 
 % EOF

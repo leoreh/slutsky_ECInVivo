@@ -13,11 +13,7 @@ function fepsp = fEPSPfromOE(varargin)
 %               the channels in that spkgrprode
 %   intens      vec describing stimulus intensity [uA]. must be equal in
 %               length to number of recording files in experiment. 
-%   win         vec of 2 elements. determines length of snip. for example,
-%               win = [5 405] than each snip will be 401 samples, starting
-%               5 samples after the corresponding stamp and ending 405
-%               samples after stamp. if win = [-16 16] than snip will be of
-%               33 samples symmetrically centered around stamp.
+%   dur         numeric. duration of snip {0.15}[s]
 %   dt          numeric. dead time for calculating amplitude. 
 %               important for exclusion of stim artifact. {2}[ms]
 %   precision   char. sample precision of dat file {'int16'}
@@ -57,7 +53,7 @@ addOptional(p, 'fname', '', @ischar);
 addOptional(p, 'nchans', 35, @isnumeric);
 addOptional(p, 'spkgrp', {}, @iscell);
 addOptional(p, 'intens', [], @isnumeric);
-addOptional(p, 'win', [], @isnumeric);
+addOptional(p, 'dur', 0.15, @isnumeric);
 addOptional(p, 'dt', 2, @isnumeric);
 addOptional(p, 'precision', 'int16', @ischar);
 addOptional(p, 'extension', 'lfp', @ischar);
@@ -74,7 +70,7 @@ fname = p.Results.fname;
 nchans = p.Results.nchans;
 spkgrp = p.Results.spkgrp;
 intens = p.Results.intens;
-win = p.Results.win;
+dur = p.Results.dur;
 dt = p.Results.dt;
 precision = p.Results.precision;
 extension = p.Results.extension;
@@ -93,21 +89,19 @@ nspkgrp = length(spkgrp);
 
 % set window of snip (150 ms as in wcp). 
 % assumes dat recorded at 20 kHz and lfp at 1.25 kHz.
-if isempty(win)
-    if strcmp(extension, 'lfp')
-        win = round([1 0.15 * 1250]);
-    else
-        win = round([1 0.15 * 20000]);
-    end
+if strcmp(extension, 'lfp')
+    fs = 1250;
+else
+    fs = 20000;
 end
-
-dt = dt / 1000 * 
+win = round([1 dur * fs]);
+dt = round(dt / 1000 * fs);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% handle data
+% handle files
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% make sure dat and stim files exist
+% make sure dat file exist
 datfiles = dir([basepath filesep '**' filesep '*' extension]);
 if isempty(datfiles)
     error('no .dat files found in %s', basepath)
@@ -132,6 +126,14 @@ if exist(fepspname, 'file') && ~force
     return
 end
 
+% load dat info
+infoname = fullfile(basepath, [basename, '.datInfo.mat']);
+if exist(infoname, 'file')
+    fprintf('loading %s \n', infoname)
+    load(infoname)
+end
+nfiles = length(datInfo.origFile);  % number of intensities 
+
 % load digital input
 stimname = fullfile(basepath, [basename, '.din.mat']);
 if exist(stimname) 
@@ -141,15 +143,7 @@ else
     error('%s not found', stimname)
 end
 
-% load dat info
-infoname = fullfile(basepath, [basename, '.datInfo.mat']);
-if exist(infoname, 'file')
-    fprintf('loading %s \n', infoname)
-    load(infoname)
-end
-nfiles = length(datInfo.origFile);  % number of intensities 
-
-% load timestamps and subsample if lfp
+% load timestamps 
 load(fullfile(basepath, [basename, '.tstamps.mat']));
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -172,13 +166,17 @@ snips = snipFromDat('basepath', basepath, 'fname', fname,...
     'dtrend', false, 'precision', precision, 'extension', extension);
 snips = snips / 1000;   % uV to mV
 
-% % sanity check
-% electrode = 5;
-% trace = 5;
+% sanity check
+% electrode = 6;
+% trace = 10;
 % figure
 % plot(0 : 1 / 20000 : 0.15 - 1 / 20000, x(electrode, :, trace))
 % hold on
-% plot(0 : 1 / 1250 : 0.15, snips(electrode, :, trace))
+% 
+% for i = 1 : size(snips, 3)
+% figure
+%     plot(0 : 1 / 1250 : 0.15, snips(electrode, :, i))
+% end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % calc

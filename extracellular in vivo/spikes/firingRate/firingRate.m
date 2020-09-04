@@ -144,6 +144,168 @@ if saveVar
     save([basepath, filesep, filename, '.fr.mat'], 'fr')
 end
 
-end
+return
 
 % EOF
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% messaround with figuress
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+fs = 20000;
+fs = 24414.1;
+binsize = 60;
+
+% select units
+pyr = strcmp(cell_metrics.putativeCellType, 'Pyramidal Cell');
+int = strcmp(cell_metrics.putativeCellType, 'Narrow Interneuron');
+su = spikes.su';
+grp = [1 : 4];
+grpidx = zeros(1, length(spikes.shankID));
+for ii = 1 : length(grp)
+    grpidx = grpidx | spikes.shankID == grp(ii);
+end
+
+% override 
+su = ones(1, length(spikes.ts));
+pyr = ones(1, length(spikes.su));
+
+% states
+states = {SleepState.ints.WAKEstate, SleepState.ints.NREMstate, SleepState.ints.REMstate};
+for ii = 1 : length(states)
+    tStates{ii} = InIntervals(fr.tstamps, states{ii});
+    t{ii} = fr.tstamps(tStates{ii});
+    frStates{ii} = mean(fr.strd(:, tStates{ii}), 2);
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% compare two time periods
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+units = pyr & su & grpidx;
+
+win = floor([1, datInfo.nsamps(1) / fs; datInfo.nsamps(1) / fs sum(datInfo.nsamps) / fs]);
+win(1) = 1;
+win(2) = win(2) + 1;
+
+wint1 = InIntervals(fr.tstamps, win(1, :));
+wint2 = InIntervals(fr.tstamps, win(2, :));
+
+idx1 = wint1 & tStates{1};
+idx2 = wint2 & tStates{1};
+
+avg1 = mean(fr.strd(units, idx1), 2);
+avg2 = mean(fr.strd(units, idx2), 2);
+
+% all units
+avg1 = mean(fr.strd(:, :), 2);
+avg2 = mean(fr.strd(:, :), 2);
+
+
+c = repmat([0 0 1], length(spikes.su), 1);
+c(int, :) = repmat([1 0 0], sum(int), 1);
+scatter(avg1, avg2, 50, c, 'filled')
+hold on
+% set(gca,'yscale','log')
+% set(gca,'xscale','log')
+X = xlim;
+Y = ylim;
+plot([0 X(2)], [0 Y(2)], '--k')
+
+% figure
+% histogram(avg1(units), 12)
+% hold on
+% histogram(avg2(units), 12)
+
+figure
+plot([1 2], [avg1 avg2])
+hold on
+plot([1 2], [mean(avg1) mean(avg2)], 'k', 'LineWidth', 4)
+set(gca,'yscale','log')
+xlim([0.5 2.5])
+
+units = int & su & grpidx;
+
+figure
+subplot(2, 1, 1)
+stdshade(log10(fr.strd(units, :)), 0.3, 'k', fr.tstamps / 60 / 60, 3)
+hold on
+plot([datInfo.nsamps(3) datInfo.nsamps(3)] / 20000 / 60 / 60, ylim, '--k')
+axis tight
+
+
+
+
+nsamps = cumsum(datInfo.blockduration * fs);
+nsamps = cumsum(datInfo.nsamps);
+
+% strd firing rate for pyr and int
+units = find(int & su & grpidx);
+figure
+data = fr.norm;
+subplot(2, 1, 1)
+plot(fr.tstamps / 60, (data(units, :))')
+hold on
+ydata = median((data(units, :)), 1);
+plot(fr.tstamps / 60, ydata, 'k', 'LineWidth', 5)
+% stdshade(data(units, :), 0.3, 'k', fr.tstamps / 60)
+for i = 1 : length(nsamps) - 1
+    plot([nsamps(i) nsamps(i)] / fs / 60, ylim, '--k')
+end
+axis tight
+% ylim([0 5])
+Y = ylim;
+fill([states{2} fliplr(states{2})]' / 60, [Y(1) Y(1) Y(2) Y(2)],...
+    'b', 'FaceAlpha', 0.15,  'EdgeAlpha', 0);
+% title('PYR')
+ylabel('norm MFR')
+
+subplot(2, 1, 2)
+data = fr.strd;
+% units = find(su & grpidx);
+plot(fr.tstamps / 60, (data(units, :))')
+hold on
+ydata = mean((data(units, :)), 1);
+stdshade(data(units, :), 0.3, 'k', fr.tstamps / 60)
+for i = 1 : length(nsamps) - 1
+    plot([nsamps(i) nsamps(i)] / fs / 60, ylim, '--k')
+end
+axis tight
+% set(gca, 'yscale', 'log')
+Y = ylim;
+fill([states{2} fliplr(states{2})]' / 60, [Y(1) Y(1) Y(2) Y(2)],...
+    'b', 'FaceAlpha', 0.15,  'EdgeAlpha', 0);
+% title('INT')
+ylabel('MFR [Hz]')
+
+
+
+
+
+
+
+
+
+
+
+subplot(2, 1, 2)
+units = int & su & grpidx;
+plot(fr.tstamps / 60 / 60, (fr.strd(units, :))')
+hold on
+ydata = mean((fr.strd(units, :)), 1);
+plot(fr.tstamps / 60 / 60, ydata, 'k', 'LineWidth', 4)
+set(gca, 'yscale', 'log')
+plot([datInfo.nsamps(1) datInfo.nsamps(1)] / 20000 / 60 / 60, ylim, '--k')
+axis tight
+
+
+% mean + std of normalized fr
+units = pyr & su & grpidx;
+figure
+stdshade(fr.strd(units, :), 0.3, 'k', fr.tstamps / 60, 3)
+axis tight
+hold on
+nsamps = cumsum(datInfo.nsamps);
+for i = 1 : length(nsamps) - 1
+    plot([nsamps(i) nsamps(i)] / fs / 60, ylim, '--k')
+end
