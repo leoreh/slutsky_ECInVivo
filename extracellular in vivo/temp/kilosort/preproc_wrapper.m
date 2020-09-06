@@ -1,5 +1,5 @@
 % preproc_wrapper
-basepath = 'D:\VMs\shared\lh57-lh69\lh69_200903';
+basepath = 'D:\VMs\shared\lh58\lh58_200901_080917';
 cd(basepath)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -19,12 +19,12 @@ datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
 % tdt
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 basepath = 'D:\VMs\shared\lh57-lh69\lh57-lh69_200904';
-store = 'Raw2';
-blocks = [1];
+store = 'Raw1';
+blocks = [2 : 6];
 chunksize = 300;
 mapch = [1 : 16];
 % mapch = [1 : 2 : 7, 2 : 2 : 8, 9 : 2 : 15, 10 : 2 : 16];
-rmvch = [];
+rmvch = [4];
 clip = cell(1, 1);
 datInfo = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
     'chunksize', chunksize, 'mapch', mapch, 'rmvch', rmvch, 'clip', clip);
@@ -32,7 +32,7 @@ datInfo = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % session info (cell explorer foramt)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-session = CE_sessionTemplate(pwd, 'viaGUI', true,...
+session = CE_sessionTemplate(pwd, 'viaGUI', false,...
     'force', true, 'saveVar', true);      
 basepath = session.general.basePath;
 nchans = session.extracellular.nChannels;
