@@ -72,6 +72,8 @@ saveFig = p.Results.saveFig;
 graphics = p.Results.graphics;
 inspect = p.Results.inspect;
 
+ylimit = [-1.5 1.5];
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % params
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -132,14 +134,15 @@ for i = 1 : length(filenames)
     % load data
     [~, basename] = fileparts(filenames{i});
     lfp = getLFP('basepath', basepath, 'basename', basename,...
-        'extension', 'wcp', 'forceL', true, 'fs', 1250, 'saveVar', false,...
+        'extension', 'wcp', 'forceL', true, 'fs', fs, 'saveVar', false,...
         'ch', 1, 'cf', 450, 'concat', true, 'dc', true);
     
     lfp.data = -lfp.data;
     
     % manually inspect and remove unwanted traces
     if inspect
-        [lfp.data, rm] = rmTraces(lfp.data, lfp.timestamps);
+        [lfp.data, rm] = rmTraces(lfp.data, 'x', lfp.timestamps,...
+            'ylim', ylimit);
         lfp.data(:, rm) = [];
     else
         rm = [];
@@ -200,7 +203,8 @@ if graphics
     xlabel('Time [ms]')
     ylabel('Voltage [mV]')
     box off
-    
+    ylim(ylimit)
+
     subplot(1, 2, 2)    % amplitude
     switch protocol
         case 'io'
