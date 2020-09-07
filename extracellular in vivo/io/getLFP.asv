@@ -138,25 +138,27 @@ end
 % messaround
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+if concat
+    sz = size(sig);
+    sig = sig(:);
+end
+
 % low-pass filter
 if cf
     fprintf('low-pass filtering, cutoff = %d Hz\n', cf)
     import iosr.dsp.*
     filtRatio = cf / (fs_orig / 2);
-    if concat
-        sz = size(sig);
-        sig = sig(:);
-    end
-    sig = iosr.dsp.sincFilter(sig, filtRatio);
-    if concat
-        lfp.data = reshape(sig, sz);
-    end
+    sig = iosr.dsp.sincFilter(sig(:), filtRatio);
 end
 
 % remove DC component
 if dc
     fprintf('removing dc component\n')
-    lfp.data = rmDC(lfp.data, 'dim', 1);
+    sig = rmDC(sig, 'dim', 1);
+end
+
+if concat
+    lfp.data = reshape(sig, sz);
 end
 
 % resmaple

@@ -1,4 +1,4 @@
-function [mat, rm] = rmTraces(mat, varargin)
+function [mat, rm_idx] = rmTraces(mat, varargin)
 
 % plots data and allows the user to remove unwanted traces
 % 
@@ -42,6 +42,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 rm = nan;
+rm_idx = [];
 while ~isempty(rm)
 
     f = figure;
@@ -71,7 +72,9 @@ while ~isempty(rm)
     if ~isempty(rm)
         close
     end
-
+    
+    rm_idx = [rm_idx; rm];
+    
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

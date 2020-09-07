@@ -79,10 +79,11 @@ fepsp = fEPSPfromDat('basepath', char(filepath), 'fname', '', 'nchans', 27,...
     'force', true, 'vis', 'off', 'recSystem', 'tdt');
 
 % fEPSP from WCP
-basepath = 'D:\Google Drive\Data\B3';
+basepath = 'C:\Users\LeoreHeim\Downloads\fEPSP';
+intens = [50 70 100 60 30];
 fepsp = fEPSPfromWCP('basepath', basepath, 'sfiles', [],...
     'sufx', 'io1', 'force', true, 'protocol', 'io',...
-    'intens', [30 50 100]);
+    'intens', intens, 'inspect', true);
 
 % anesthesia states (see also aneStates_wrp)
 [bs, iis, ep] = aneStates('ch', 1, 'basepath', basepath,...

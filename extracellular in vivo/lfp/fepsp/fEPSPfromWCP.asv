@@ -135,8 +135,6 @@ for i = 1 : length(filenames)
         'extension', 'wcp', 'forceL', true, 'fs', 1250, 'saveVar', false,...
         'ch', 1, 'cf', 450, 'concat', true, 'dc', true);
     
-    lfp.data = -lfp.data;
-    
     % manually inspect and remove unwanted traces
     if inspect
         [lfp.data, rm] = rmTraces(lfp.data, lfp.timestamps);

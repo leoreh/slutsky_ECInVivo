@@ -125,12 +125,12 @@ ops.trange          = trange;   % time range to sort [s]
 % pass also collects noise: an additional per neuron threshold is set
 % afterwards, and a splitting step ensures clusters with multiple units get
 % split. {[10 4]}
-ops.Th = [10 2];
+ops.Th = [8 4];
 
 % how important is the amplitude penalty {10}. The individual spike
 % amplitudes are biased towards the mean of the cluster by this factor; 50
 % is a lot, 0 is no bias.
-ops.lam = 12;
+ops.lam = 25;
 
 % Threshold on the area under the curve (AUC) criterion for performing a
 % split in the final step. If the AUC of the split is higher than this,
@@ -138,7 +138,7 @@ ops.lam = 12;
 % if, additionally, the cross-correlogram of the split units does not
 % contain a big dip at time 0. splitting a cluster at the end requires at
 % least this much isolation for each sub-cluster (max = 1){0.9}.
-ops.AUCsplit = 0.88;
+ops.AUCsplit = 0.86;
 
 % frequency for high pass filtering {150}
 ops.fshigh = 500;
@@ -165,7 +165,7 @@ ops.spkTh           = -4;       % spike threshold in standard deviations {-6}
 ops.reorder         = 1;        % whether to reorder batches for drift correction.
 ops.nskip           = 25;       % how many batches to skip for determining spike PCs
 ops.Nfilt           = 256;      % number of filters to use (2-4 times more than Nchan, should be a multiple of 32)
-ops.nfilt_factor    = 8;        % max number of clusters per good channel (even temporary ones)
+ops.nfilt_factor    = 20;       % max number of clusters per good channel (even temporary ones)
 ops.ntbuff          = 64;       % samples of symmetrical buffer for whitening and spike detection
 ops.nSkipCov        = 25;       % compute whitening matrix from every N-th batch
 ops.scaleproc       = 200;      % int16 scaling of whitened data
@@ -241,7 +241,7 @@ else
     end
     
     % clean temp_wh file
-    delete(fullfile(basepath, 'temp_wh.dat'))
+%     delete(fullfile(basepath, 'temp_wh.dat'))
 end
 
 
