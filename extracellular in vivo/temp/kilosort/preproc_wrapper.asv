@@ -20,11 +20,11 @@ datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 basepath = 'I:\Data\Processed\lh57-lh69_200908';
 store = 'Raw1';
-blocks = [1, 2, 8, 11, 17, 18];
+blocks = [1, 2];
 chunksize = 300;
 mapch = [1 : 16];
 % mapch = [1 : 2 : 7, 2 : 2 : 8, 9 : 2 : 15, 10 : 2 : 16];
-rmvch = [];
+rmvch = [4];
 clip = cell(1, 1);
 datInfo = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
     'chunksize', chunksize, 'mapch', mapch, 'rmvch', rmvch, 'clip', clip);
