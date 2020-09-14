@@ -46,7 +46,6 @@ addOptional(p, 'spkgrp', {}, @iscell);
 addOptional(p, 'trange', [0 Inf], @isnumeric);
 addOptional(p, 'saveFinal', false, @islogical);
 addOptional(p, 'viaGui', false, @islogical);
-addOptional(p, 'cleanDir', false, @islogical);
 addOptional(p, 'outFormat', 'ns', @ischar);
 
 parse(p, varargin{:})
@@ -125,7 +124,7 @@ ops.trange          = trange;   % time range to sort [s]
 % pass also collects noise: an additional per neuron threshold is set
 % afterwards, and a splitting step ensures clusters with multiple units get
 % split. {[10 4]}
-ops.Th = [10 2];
+ops.Th = [7 2];
 
 % how important is the amplitude penalty {10}. The individual spike
 % amplitudes are biased towards the mean of the cluster by this factor; 50
@@ -138,7 +137,7 @@ ops.lam = 25;
 % if, additionally, the cross-correlogram of the split units does not
 % contain a big dip at time 0. splitting a cluster at the end requires at
 % least this much isolation for each sub-cluster (max = 1){0.9}.
-ops.AUCsplit = 0.86;
+ops.AUCsplit = 0.88;
 
 % frequency for high pass filtering {150}
 ops.fshigh = 500;
@@ -241,7 +240,7 @@ else
     end
     
     % clean temp_wh file
-%     delete(fullfile(basepath, 'temp_wh.dat'))
+    delete(fullfile(basepath, 'temp_wh.dat'))
 end
 
 

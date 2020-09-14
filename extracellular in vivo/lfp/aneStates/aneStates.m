@@ -96,7 +96,7 @@ vars = {'std', 'max', 'pc1'};
 bs = getBS('sig', sig, 'fs', fs, 'basepath', basepath, 'graphics', false,...
     'saveVar', saveVar, 'binsize', 0.5, 'BSRbinsize', binsize, 'smf', smf,...
     'clustmet', 'gmm', 'vars', vars, 'basename', basename,...
-    'saveFig', false, 'forceA', forceA, 'vis', false, 'mancur', true);
+    'saveFig', false, 'forceA', false, 'vis', false, 'mancur', true);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % iis
@@ -142,8 +142,8 @@ marg = 0.05;
 iis = getIIS('sig', sig, 'fs', fs, 'basepath', basepath,...
     'graphics', false, 'saveVar', saveVar, 'binsize', binsize,...
     'marg', marg, 'basename', basename, 'thr', thr, 'smf', 7,...
-    'saveFig', false, 'forceA', forceA, 'spkw', false, 'vis', true,...
-    'mancur', true, 'thrDir', 'both');
+    'saveFig', false, 'forceA', false, 'spkw', false, 'vis', false,...
+    'mancur', false, 'thrDir', 'both');
 iis.epThr = epThr;
 wvstamps = linspace(-marg, marg, floor(marg * fs) * 2 + 1);
 
@@ -156,6 +156,7 @@ wvstamps = linspace(-marg, marg, floor(marg * fs) * 2 + 1);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % check if file exists and load
 filename = [basepath, '\', basename, '.ep.mat'];
+forceA = true;
 if exist(filename) && ~forceA
     load(filename)
     fprintf('\n loading %s \n', filename)
@@ -226,6 +227,12 @@ else
     ep.deep_nspks = ep.deep_nspks / (ep.deepDur / fs / 60);
     ep.nspks = size(iis.wv, 1) / (ep.recDur / fs / 60);
     
+    % average BSR in deep / sur
+    bsridx = InIntervals(bs.cents, ep.deep_stamps);
+    ep.bsrDeep = bs.bsr(bsridx);
+    bsridx = InIntervals(bs.cents, ep.sur_stamps);
+    ep.bsrSur = bs.bsr(bsridx);    
+    
     if saveVar
         save(filename, 'ep')
     end
@@ -239,7 +246,7 @@ minmarg = 1.5;
 midsig = 10;
 idx = round((midsig - minmarg) * fs * 60 : (midsig + minmarg) * fs * 60);
 
-if graphics    
+% if graphics    
     fh = figure('visible', 'off');
     set(gcf, 'units','normalized','outerposition',[0 0 1 1]);
     suptitle(basename)
@@ -338,12 +345,12 @@ if graphics
     
     linkaxes([sb1, sb2, sb3], 'x');
 
-    if saveFig
+%     if saveFig
         figname = [basename];
         export_fig(figname, '-tif', '-transparent')
         % savePdf(figname, basepath, ff)
-    end
+%     end
     
-end   
+% end   
 end
 

@@ -16,10 +16,10 @@ mouse = [];
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % path to data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-grppath{1} = 'F:\Daniel IIS 11.6.20\IIS\WT\New analyis';
-grppath{2} = 'F:\Daniel IIS 11.6.20\IIS\APPPS1\New analysis';
-grppath{3} = 'F:\Daniel IIS 11.6.20\IIS\APPKi\New analysis';
-grppath{4} = 'F:\Daniel IIS 11.6.20\IIS\FADx5\New analysis';
+grppath{1} = 'G:\Data\Processed\Manuscripts\Zarhin2020\IIS\WT\New analyis';
+grppath{2} = 'G:\Data\Processed\Manuscripts\Zarhin2020\IIS\APPPS1\New analysis';
+grppath{3} = 'G:\Data\Processed\Manuscripts\Zarhin2020\IIS\APPKi\New analysis';
+grppath{4} = 'G:\Data\Processed\Manuscripts\Zarhin2020\IIS\FADx5\New analysis';
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -68,10 +68,20 @@ for j = grp
         [~, basename] = fileparts(basename);
         
         % send to anestats
-        [bs, iis, ep] = aneStates('ch', ch, 'basepath', basepath,...
-            'basename', basename, 'graphics', graphics,...
-            'saveVar', saveVar, 'saveFig', saveFig, 'forceA', forceA,...
-            'binsize', binsize, 'smf', smf, 'thrMet', thrMet);
+%         [bs, iis, ep] = aneStates('ch', ch, 'basepath', basepath,...
+%             'basename', basename, 'graphics', graphics,...
+%             'saveVar', saveVar, 'saveFig', saveFig, 'forceA', forceA,...
+%             'binsize', binsize, 'smf', smf, 'thrMet', thrMet);
+        
+        
+        % average BSR in deep / sur
+        load(fullfile(basepath, [basename '.bs.mat']))
+        load(fullfile(basepath, [basename '.ep.mat']))
+        bsridx = InIntervals(bs.cents, ep.deep_stamps);
+        ep.bsrDeep = bs.bsr(bsridx);
+        bsridx = InIntervals(bs.cents, ep.sur_stamps);
+        ep.bsrSur = bs.bsr(bsridx);
+            
         
         % arrange group data
         as.mouse{j}{i} = basename;
@@ -88,7 +98,9 @@ for j = grp
         bsr{i} = bs.bsr;
         dband{i} = ep.dband;
         t{i} = bs.cents / fs / 60;
-        
+        as.bsrDeep{j}(i) = mean(ep.bsrDeep);
+        as.bsrSur{j}(i) = mean(ep.bsrSur);
+
         % after last recording is loaded, arrange in mat and save
         if i == m(end)
             

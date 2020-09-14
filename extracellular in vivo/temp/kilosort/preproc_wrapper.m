@@ -5,7 +5,7 @@ cd(basepath)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % open ephys
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'E:\Leore\lh58\2020-08-28_09-38-39';
+basepath = 'D:\VMs\shared\lh69\lh69_200908_2';
 rmvch = [13 16] + 1;
 rmvch = [];
 mapch = [25 26 27 28 30 1 2 29 3 : 14 31 0 15 16 17 : 24 32 33 34] + 1;
@@ -18,14 +18,15 @@ datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % tdt
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'I:\Data\Processed\lh57-lh69_200908';
+basepath = 'I:\Data\Processed\lh57-lh69_200910';
 store = 'Raw1';
-blocks = [1, 2, 8, 11, 17, 18];
+blocks = [2 : 4, 9];
 chunksize = 300;
 mapch = [1 : 16];
 % mapch = [1 : 2 : 7, 2 : 2 : 8, 9 : 2 : 15, 10 : 2 : 16];
 rmvch = [];
 clip = cell(1, 1);
+% clip{39} = [480 * 60 Inf];
 datInfo = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
     'chunksize', chunksize, 'mapch', mapch, 'rmvch', rmvch, 'clip', clip);
 
@@ -52,12 +53,12 @@ fepsp = fEPSPfromDat('basepath', basepath, 'fname', '', 'nchans', nchans,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 rez = runKS('basepath', basepath, 'fs', fs, 'nchans', nchans,...
     'spkgrp', spkgrp, 'saveFinal', true, 'viaGui', false,...
-    'cleanDir', false, 'trange', [0 Inf], 'outFormat', 'ns');
+    'trange', [0 Inf], 'outFormat', 'ns');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % fix manual curation
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-fixSpkAndRes('grp', [], 'fs', fs);
+fixSpkAndRes('grp', [1], 'fs', fs);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % cell explorer
@@ -73,7 +74,7 @@ cell_metrics = ProcessCellMetrics('session', session,...
     'debugMode', true, 'transferFilesFromClusterpath', false,...
     'submitToDatabase', false);
 
-cell_metrics = CellExplorer('metrics', cell_metrics);
+% cell_metrics = CellExplorer('metrics', cell_metrics);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % spikes
@@ -87,8 +88,8 @@ spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
 
 % firing rate
 binsize = 60;
-winBL = [5 * 60 60 * 120];
-winBL = [1 Inf];
+winBL = [5 * 60 20 * 60];
+% winBL = [1 Inf];
 fr = firingRate(spikes.times, 'basepath', basepath, 'graphics', false, 'saveFig', false,...
     'binsize', binsize, 'saveVar', true, 'smet', 'MA', 'winBL', winBL);
 
@@ -121,8 +122,8 @@ plotCCG('ccg', ccg(:, u, u), 't', t, 'basepath', basepath,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % create lfp
 LFPfromDat('basepath', basepath, 'cf', 450, 'chunksize', 5e6,...
-    'nchans', 16, 'fsOut', 1250,...
-    'fsIn', 24414.1)   
+    'nchans', nchans, 'fsOut', 1250,...
+    'fsIn', fs)   
 
 % load lfp
 lfp = getLFP('basepath', basepath, 'ch', [spkgrp{:}], 'chavg', {},...

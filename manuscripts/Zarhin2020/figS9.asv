@@ -2,7 +2,7 @@
 
 close all
 force = false;
-saveFig = true;
+saveFig = false;
 
 grppath{1} = 'G:\Data\Processed\Manuscripts\Zarhin2020\IIS\WT\New analyis';
 grppath{2} = 'G:\Data\Processed\Manuscripts\Zarhin2020\IIS\APPPS1\New analysis';
@@ -273,6 +273,7 @@ xticklabels({'0', '5', '10', '15', '20'})
 % zoom in
 subplot(6, 2, 8);
 idx5 = iis.peakPos > idx2(1) & iis.peakPos < idx2(end);
+idx =
 plot(lfp.timestamps(idx2) / 60, lfp.data(idx2), 'k')
 axis tight
 hold on
@@ -288,7 +289,7 @@ end
 plot(x, [thr thr], '--r')
 scatter(iis.peakPos(idx5) / fs / 60,...
     power, '*');
-bsstamps = RestrictInts(bs.stamps, [idx2(1) - 60 * fs idx2(end) + 60 * fs]);
+bsstamps = RestrictInts(bs.stamps, [idx2(1) - 20 * fs idx2(end) + 20 * fs]);
 ylim(YY);
 % yticks(Y);
 if ~isempty(bsstamps)
