@@ -9,26 +9,26 @@ basepath = 'E:\Leore\lh58\2020-09-17_09-12-38';
 rmvch = [13 16] + 1;
 rmvch = [];
 mapch = [25 26 27 28 30 1 2 29 3 : 14 31 0 15 16 17 : 24 32 33 34] + 1;
-exp = [2];
+exp = [4];
 rec = cell(max(exp), 1);
-rec{2} = [2 : 8];
+rec{4} = [1 : 6];
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
     'rmvch', rmvch, 'mapch', mapch, 'concat', true, 'nchans', 35);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % tdt
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'I:\Data\Processed\lh57-lh69_200910';
-store = 'Raw1';
-blocks = [2 : 4, 9];
-chunksize = 300;
-mapch = [1 : 16];
-% mapch = [1 : 2 : 7, 2 : 2 : 8, 9 : 2 : 15, 10 : 2 : 16];
-rmvch = [];
-clip = cell(1, 1);
-% clip{39} = [480 * 60 Inf];
-datInfo = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
-    'chunksize', chunksize, 'mapch', mapch, 'rmvch', rmvch, 'clip', clip);
+% basepath = 'I:\Data\Processed\lh57-lh69_200910';
+% store = 'Raw1';
+% blocks = [2 : 4, 9];
+% chunksize = 300;
+% mapch = [1 : 16];
+% % mapch = [1 : 2 : 7, 2 : 2 : 8, 9 : 2 : 15, 10 : 2 : 16];
+% rmvch = [];
+% clip = cell(1, 1);
+% % clip{39} = [480 * 60 Inf];
+% datInfo = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
+%     'chunksize', chunksize, 'mapch', mapch, 'rmvch', rmvch, 'clip', clip);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % session info (cell explorer foramt)
@@ -43,7 +43,7 @@ spkgrp = session.extracellular.spikeGroups.channels;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % field
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-intens = [20 25 30 40 60 80];
+intens = [20 25 30 40 70 35];
 fepsp = fEPSPfromDat('basepath', basepath, 'fname', '', 'nchans', nchans,...
     'spkgrp', spkgrp, 'intens', intens, 'concat', false, 'saveVar', true,...
     'force', true, 'extension', 'lfp', 'recSystem', 'oe',...
