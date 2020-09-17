@@ -15,6 +15,9 @@ function fepsp = fEPSPfromDat(varargin)
 %               the channels in that spkgrprode
 %   intens      vec describing stimulus intensity [uA]. must be equal in
 %               length to number of recording files in experiment.
+%   protocol    stimulus protocol. can be a string ('io' or 'stp') or a
+%               numeric vector describing the times [ms] of stimulations
+%               for each trace (currently not implemented)
 %   dur         numeric. duration of snip {0.15}[s]
 %   dt          numeric. dead time for calculating amplitude.
 %               important for exclusion of stim artifact. {2}[ms]
@@ -58,6 +61,7 @@ addOptional(p, 'fname', '', @ischar);
 addOptional(p, 'nchans', 35, @isnumeric);
 addOptional(p, 'spkgrp', {}, @iscell);
 addOptional(p, 'intens', [], @isnumeric);
+addOptional(p, 'protocol', 'io', @ischar);
 addOptional(p, 'dur', 0.15, @isnumeric);
 addOptional(p, 'dt', 2, @isnumeric);
 addOptional(p, 'precision', 'int16', @ischar);
@@ -76,6 +80,7 @@ fname = p.Results.fname;
 nchans = p.Results.nchans;
 spkgrp = p.Results.spkgrp;
 intens = p.Results.intens;
+protocol = p.Results.protocol;
 dur = p.Results.dur;
 dt = p.Results.dt;
 precision = p.Results.precision;

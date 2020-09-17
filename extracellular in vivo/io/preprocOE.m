@@ -137,7 +137,7 @@ end
     % pre-process dat
     datInfo = preprocDat('basepath', exPathNew, 'fname', '', 'mapch', mapch,...
         'rmvch', rmvch, 'nchans', nchans, 'saveVar', true,...
-        'chunksize', 5e6, 'precision', 'int16', 'bkup', false);
+        'chunksize', 5e6, 'precision', 'int16', 'bkup', false);  
     
     % get digital input
     getDinOE('basepath', recPath, 'newpath', exPathNew,...
@@ -184,6 +184,5 @@ end
     end
     
 end
-
 
 % EOF

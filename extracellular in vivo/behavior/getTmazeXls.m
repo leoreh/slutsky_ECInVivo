@@ -16,23 +16,14 @@ mnames = [60 61 62 63 66 67];
 
 for i = 1 : nmice
     
-%     t = readtable(filename, 'Sheet', 2);
-    
-%     t.Properties
-    
-% m{i}.date = t{1, 2 : 2 : end}
-% m{i}.time = t{2, 2 : 2 : end};
-% m{i}.weight = t{3, 2 : 2 : end};
-% m{i}.dur = t{4 : end, 2 : 2 : end};
-
     micenames{i} = ['m', num2str(mnames(i))];
     [num, ~, raw] = xlsread(filename, micenames{i});
+    m{i}.name = micenames{i};
     m{i}.date = num(1, 2 : 2 : end);
     m{i}.time = num(2, 2 : 2 : end);
     m{i}.weight = num(3, 2 : 2 : end);
     m{i}.delay = num(4, 2 : 2 : end);
     m{i}.dur = num(5 : end, 2 : 2 : end);
-    m{i}.dur = m{i}.dur(~isnan(m{i}.dur(:, 1)), :);
     
     % arrange direction
     [maxtrials, nsessions] = size(m{i}.dur);
@@ -64,21 +55,72 @@ end
 [num, ~, raw] = xlsread(filename, 'Weight');
 BLweight = num(1, 2 : end);
 
+%%% state metrics per session 
+for i = 1 : nmice
+    correct(:, i) = nanmean(m{i}.correct, 1);
+    dur(:, i) = nanmean(m{i}.dur, 1);
+    weight(:, i) = m{i}.weight / BLweight(i);
+end
+
+% select specific data
+mice = 1 : nmice; 
+delay = 30;
+sidx = m{i}.delay == delay;
+date = 9.9;
+didx = m{i}.date == date;
+idx = didx & sidx;
+
+data = correct(sidx, mice)'; 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 mice = 1 : nmice; 
-night = m{1}.time(1:21) > 1600;
-c = 'rbgmky';
+c = 'kkkkkr';
+delay = 10;
 
-%%% combine mice to matrix
-for i = mice
-    correct(:, i) = nanmean(m{i}.correct, 1);
-    dur(:, i) = nanmean(m{i}.dur, 1);
-%     weight(:, i) = m{i}.weight / BLweight(i);
+sidx = find(m{i}.delay == delay);
+data = weight(sidx, mice); 
+subplot(2, 1, 1)
+hp = plot(data);
+for i = 1 : length(mice)
+    hp(i).Color = c(i);
 end
+hold on
+stdshade(data', 0.3, 'k');
+% errorbar(nanmean(data, 2), std(data, [], 2, 'omitnan'), 'k', 'LineWidth', 2)
+ylim([0 1])
+x = xlim;
+xlim([1 x(2)])
+plot(x, [0.5 0.5], '--k', 'LineWidth', 1)
+yticks([0 0.5 0.75 1])
+xticks([])
+box off
+set(gca, 'TickLength', [0 0])
+ylabel('Success Rate [%]')
+
+data = dur(sidx, mice); 
+subplot(2, 1, 2)
+hp = plot(data);
+for i = 1 : length(mice)
+    hp(i).Color = c(i);
+end
+hold on
+stdshade(data', 0.3, 'k');
+y = ylim;
+ylim([0 y(2)]);
+box off
+set(gca, 'TickLength', [0 0])
+ylabel('Trial Duration [s]')
+xlabel('Time [d]')
+
+
+
+
+
+
+
 
 %%% success and duration across sessions %%%
 idx = 1 : nsessions;
