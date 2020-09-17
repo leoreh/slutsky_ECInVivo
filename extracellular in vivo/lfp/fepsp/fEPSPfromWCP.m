@@ -8,7 +8,8 @@ function fepsp = fEPSPfromWCP(varargin)
 % low-pass filtered and downsampled. 
 %  
 % INPUT
-%   basepath    string. path to .dat file (not including dat file itself)
+%   basepath    string. path to data files. if sfiles is specified than
+%               basepath needs be to to the folder with wcp files
 %   sufx        string to add to filename (e.g. 'io1') {''}
 %   intens      vec describing stimulus intensity [uA]. must be in the same
 %               order as the recording files
@@ -71,6 +72,8 @@ saveFig = p.Results.saveFig;
 graphics = p.Results.graphics;
 inspect = p.Results.inspect;
 
+ylimit = [-1.5 1.5];
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % params
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -106,6 +109,7 @@ if exist(fepspname, 'file') && ~force
     return
 end
 
+% get timing of stimulus in samples
 switch protocol
     case 'io'
         % single pulse of 500 us after 30 ms. recording length 150 ms.
@@ -130,16 +134,20 @@ for i = 1 : length(filenames)
     % load data
     [~, basename] = fileparts(filenames{i});
     lfp = getLFP('basepath', basepath, 'basename', basename,...
-        'extension', 'wcp', 'forceL', true, 'fs', 1250, 'saveVar', false,...
+        'extension', 'wcp', 'forceL', true, 'fs', fs, 'saveVar', false,...
         'ch', 1, 'cf', 450, 'concat', true, 'dc', true);
+    
+    lfp.data = -lfp.data;
     
     % manually inspect and remove unwanted traces
     if inspect
-        [lfp.data, rm] = rmTraces(lfp.data, lfp.timestamps);
+        [lfp.data, rm] = rmTraces(lfp.data, 'x', lfp.timestamps,...
+            'ylim', ylimit);
+        lfp.data(:, rm) = [];
     else
         rm = [];
     end
-
+    
     % analyze data; this is your part lior :)
     wv{i} = lfp.data;
     wvavg(i, :) = mean(lfp.data, 2);
@@ -173,6 +181,7 @@ fepsp.ampmat = cell2nanmat(ampcell(ia));
 fepsp.intens = intens;
 fepsp.rm = rm;
 fepsp.stimidx = stimidx;
+fepsp.fs = lfp.fs;
 
 if saveVar
     save(fepspname, 'fepsp');
@@ -194,7 +203,8 @@ if graphics
     xlabel('Time [ms]')
     ylabel('Voltage [mV]')
     box off
-    
+    ylim(ylimit)
+
     subplot(1, 2, 2)    % amplitude
     switch protocol
         case 'io'

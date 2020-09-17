@@ -12,14 +12,14 @@ saveVar = false;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % IO
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'D:\VMs\shared\lh57-lh69\lh57-lh69_200903';
+basepath = 'D:\VMs\shared\lh57-lh69\lh57-lh69_200904';
 store = 'Raw1';
 fs = 24414.06;
 blocks = [2 : 8];
 chunksize = 300;
 mapch = [1 : 16];
 % mapch = [1 : 2 : 7, 2 : 2 : 8, 9 : 2 : 15, 10 : 2 : 16];
-rmvch = [];
+rmvch = [4];
 clip = cell(1, 1);
 
 % tank to dat
@@ -40,8 +40,9 @@ getDinOE('basepath', recPath, 'newpath', exPathNew,...
 
 % pre-process dat (remove channels, reorder, etc.)
 datInfo = preprocDat('basepath', basepath, 'fname', '', 'mapch', mapch,...
-    'rmvch', rmvch, 'nchans', 35, 'saveVar', true,...
-    'chunksize', 5e5, 'precision', 'int16', 'bkup', true);
+    'rmvch', rmvch, 'nchans', nchans, 'saveVar', true,...
+    'chunksize', 1e7, 'precision', 'int16', 'bkup', true,...
+    'clip', [808593667 Inf]);
 
 % session info (cell explorer)
 session = CE_sessionTemplate(pwd, 'viaGUI', false,...
@@ -79,10 +80,11 @@ fepsp = fEPSPfromDat('basepath', char(filepath), 'fname', '', 'nchans', 27,...
     'force', true, 'vis', 'off', 'recSystem', 'tdt');
 
 % fEPSP from WCP
-basepath = 'D:\Google Drive\Data\B3';
+basepath = 'C:\Users\LeoreHeim\Downloads\fEPSP';
+intens = [40 30 50 60 70 100];
 fepsp = fEPSPfromWCP('basepath', basepath, 'sfiles', [],...
     'sufx', 'io1', 'force', true, 'protocol', 'io',...
-    'intens', [30 50 100]);
+    'intens', intens, 'inspect', true, 'fs', 10000);
 
 % anesthesia states (see also aneStates_wrp)
 [bs, iis, ep] = aneStates('ch', 1, 'basepath', basepath,...

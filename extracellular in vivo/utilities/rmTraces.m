@@ -1,10 +1,11 @@
-function [mat, rm] = rmTraces(mat, varargin)
+function [mat, rm_idx] = rmTraces(mat, varargin)
 
 % plots data and allows the user to remove unwanted traces
 % 
 % INPUT
 %   mat         matrix of samples (rows) x traces (columns 
 %   x           vector for x-axis, can be empty
+%   ylimit      vector describing ylim of plot
 %   basepath    recording session path {pwd} to save figure
 %   saveFig     logical. saveFig to current path or not.
 % 
@@ -25,11 +26,13 @@ function [mat, rm] = rmTraces(mat, varargin)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 p = inputParser;
 addOptional(p, 'x', []);
+addOptional(p, 'ylimit', []);
 addOptional(p, 'basepath', pwd);
 addOptional(p, 'saveFig', false, @islogical);
 
 parse(p,varargin{:})
 x = p.Results.x;
+ylimit = p.Results.ylimit;
 basepath = p.Results.basepath;
 saveFig = p.Results.saveFig;
 
@@ -42,6 +45,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 rm = nan;
+rm_idx = [];
 while ~isempty(rm)
 
     f = figure;
@@ -55,6 +59,9 @@ while ~isempty(rm)
     legend(string([1 : size(mat, 2)]))
     legend('off')
     set(gca,'TickLength',[0, 0])
+    if ~isempty(ylimit)
+        ylim(ylimit)
+    end
     
     datacursormode on;
     dcm = datacursormode(gcf);
@@ -71,7 +78,9 @@ while ~isempty(rm)
     if ~isempty(rm)
         close
     end
-
+    
+    rm_idx = [rm_idx, rm];
+    
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

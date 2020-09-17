@@ -29,6 +29,7 @@ function lfp = getLFP(varargin)
 %   bz_LoadBinary
 %   IOSR.DSP.SINCFILTER
 %   LFPfromDat (if extension = 'dat')
+%   rmDC
 % 
 % OUTPUT
 %   lfp         structure with the following fields:
@@ -137,27 +138,25 @@ end
 % messaround
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-if concat
-    sz = size(sig);
-    sig = sig(:);
-end
-
 % low-pass filter
 if cf
     fprintf('low-pass filtering, cutoff = %d Hz\n', cf)
     import iosr.dsp.*
     filtRatio = cf / (fs_orig / 2);
-    sig = iosr.dsp.sincFilter(sig(:), filtRatio);
+    if concat
+        sz = size(sig);
+        sig = sig(:);
+    end
+    sig = iosr.dsp.sincFilter(sig, filtRatio);
+    if concat
+        lfp.data = reshape(sig, sz);
+    end
 end
 
 % remove DC component
 if dc
     fprintf('removing dc component\n')
-    sig = rmDC(sig, 'dim', 1);
-end
-
-if concat
-    lfp.data = reshape(sig, sz);
+    lfp.data = rmDC(lfp.data, 'dim', 1);
 end
 
 % resmaple

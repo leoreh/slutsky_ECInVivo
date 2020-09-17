@@ -193,7 +193,7 @@ end
 info = dir(fname);
 nsampsNew = info.bytes / nbytes / (nchans - length(rmvch));
 if ~isequal(nsampsNew, nsamps)
-    error('processing failed, dats are of different length')
+    warning('processing failed, dats are of different length')
 end
 fprintf('\nfinished processing %s. \nFile size = %.2f MB\n', fname, info.bytes / 1e6);
 
