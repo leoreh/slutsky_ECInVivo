@@ -23,8 +23,7 @@ dirnames = ["lh58_200915_100905";...
     "lh58_200915_170935";...
     "lh58_200916_100928";...
     "lh58_200916_120928";...
-    "lh58_200916_160953";...
-    "lh58_200917_100922"];
+    "lh58_200916_160953"];
 
 % should allow user to input varName or columnn index
 colName = 'Session';                    % column name in xls sheet where dirnames exist
@@ -40,7 +39,7 @@ pcond = ["fepsp"];
 ncond = ["fix"];                      
 ncond = [""];
 sessionlist = 'sessionList.xlsx';       % must include extension
-fs = 1250;                             % can also be loaded from datInfo
+fs = 20000;                             % can also be loaded from datInfo
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % load data
@@ -93,14 +92,6 @@ if forceL
     end
 end
 
-% session info
-session = CE_sessionTemplate(pwd, 'viaGUI', false,...
-    'force', true, 'saveVar', true);
-nchans = session.extracellular.nChannels;
-fs = session.extracellular.sr;
-spkgrp = session.extracellular.spikeGroups.channels;
-ngrp = length(spkgrp);
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % analyze data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -112,7 +103,14 @@ if forceA
         filepath = char(fullfile(basepath, dirnames(i)));
         cd(filepath)
         [~, basename] = fileparts(filepath);
-               
+        
+        % session info
+        session = CE_sessionTemplate(pwd, 'viaGUI', false,...
+            'force', true, 'saveVar', true);
+        nchans = session.extracellular.nChannels;
+        fs = session.extracellular.sr;
+        spkgrp = session.extracellular.spikeGroups.channels;
+        
         % fepsp
         intens = [20 25 30 40 60 80 100];
         fepsp = fEPSPfromDat('basepath', filepath, 'fname', '', 'nchans', nchans,...
@@ -125,6 +123,9 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % rearrange data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+spkgrp = session.extracellular.electrodeGroups.channels;
+ngrp = length(spkgrp);
 
 % intensities throughout sessions
 intens = [];
@@ -160,6 +161,20 @@ for i = 1 : nsessions
     end
 end
 
+% samp: 2d mat for selected tetrode and intensity; rep x session
+sg = 1;         % selected group
+si = 250;       % selected intensity
+clear samp
+for i = 1 : nsessions
+    if isempty(f{i})
+        continue
+    end
+    sintens = f{i}.intens;
+    [~, ib] = intersect(sintens, si);
+    samp(i) = f{i}.ampcell(sg, ib);
+end
+samp = cell2nanmat(samp);
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -189,12 +204,9 @@ p = 1;
 if p
     figure
     subplot(1, 2, 1)
-    tstamps = [1 : size(wvmat, 3)] / fs * 1000;
-    plot(tstamps, squeeze(wvmat(grp, :, :)))
-    xlabel('Time [ms]')
-    ylabel('Voltage [V]')
-    legend(dirnames)
-    box off
+    tstamps = [1 : size(swv, 3)] / fs * 1000;
+    plot([1 : size(swv
+    
     
     subplot(1, 2, 2)
     ampmat = cell2nanmat(ampcell);
@@ -203,8 +215,6 @@ if p
     xlabel('Session')
     ylabel('Amplidute [mV]')
     box off
-    
-    suptitle(['T#' num2str(grp) ' @ ' num2str(si) 'uA'])
 end
 
 % io across sessions, one figure per tetrode
@@ -244,22 +254,22 @@ if p
     end
 end
 
-% % waveform across sessions
-% p = 1;
-% ss = [4, 8, 16, 24];    % selected sessions
-% sg = [1, 7];
-% if p
-%     for i = sg
-%         figure
-%         plot(tstamps, squeeze(wvmat(i, ss, :))')
-%         axis tight
-%         xlabel('Time [ms]')
-%         ylabel('Amplitude [mV]')
-%         title(sprintf('T%d', i))
-%         box off
-%         legend(split(dirnames(ss)), 'Interpreter', 'none');
-%     end
-% end
+% waveform across sessions
+p = 1;
+ss = [4, 8, 16, 24];    % selected sessions
+sg = [1, 7];
+if p
+    for i = sg
+        figure
+        plot(tstamps, squeeze(wvmat(i, ss, :))')
+        axis tight
+        xlabel('Time [ms]')
+        ylabel('Amplitude [mV]')
+        title(sprintf('T%d', i))
+        box off
+        legend(split(dirnames(ss)), 'Interpreter', 'none');
+    end
+end
 
 % waveform across time within session
 p = 0;
