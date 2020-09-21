@@ -17,7 +17,7 @@
 forceL = true;
 forceA = false;
 
-basepath = 'F:\Data\Processed\lh58\fepsp';
+basepath = 'I:\Data\Processed\lh58\fepsp';
 dirnames = ["lh58_200915_100905";...
     "lh58_200915_110952";...
     "lh58_200915_170935";...
@@ -26,6 +26,7 @@ dirnames = ["lh58_200915_100905";...
     "lh58_200916_160953";...
     "lh58_200917_100922";...
     "lh58_200917_170931"];
+clear dirnames
 
 % should allow user to input varName or columnn index
 colName = 'Session';                    % column name in xls sheet where dirnames exist
@@ -35,11 +36,10 @@ vars = ["session.mat";...
 % column name of logical values for each session. only if true than session
 % will be loaded. can be a string array and than all conditions must be
 % met.
-pcond = ["fepsp"];     
+pcond = ["fepsp"; "tempFlag"];     
 % pcond = [];
 % same but imposes a negative condition)
-ncond = ["fix"];                      
-ncond = [""];
+ncond = ["manCur"];                      
 sessionlist = 'sessionList.xlsx';       % must include extension
 fs = 1250;                             % can also be loaded from datInfo
 
@@ -115,7 +115,7 @@ if forceA
         [~, basename] = fileparts(filepath);
                
         % fepsp
-        intens = [20 25 30 40 60 80 100];
+        intens = [40 60 80 100 150 200];
         fepsp = fEPSPfromDat('basepath', filepath, 'fname', '', 'nchans', nchans,...
             'spkgrp', spkgrp, 'intens', intens, 'concat', false, 'saveVar', true,...
             'force', true, 'extension', 'lfp', 'recSystem', 'oe',...
@@ -145,19 +145,18 @@ end
 ampmat = nan(ngrp, length(intens), nsessions);
 wvmat = nan(ngrp, nsessions, size(fepsp.wvsnip, 3));
 ampcell = cell(1, nsessions);
-si = 40;        % selected intensity [uA]
+si = 80;        % selected intensity [uA]
 grp = 4;        % selected tetrode
 for i = 1 : nsessions
     fepsp = d{i, 2}.fepsp;
-    samp = fepsp.amp;
     swv = fepsp.wvsnip;
     sintens = sort(fepsp.intens);
     [~, ia] = intersect(intens, sintens);
-    [~, ib] = intersect(sintens, si);
-    ampcell{i} = fepsp.ampcell{grp, ib};
+%     [~, ib] = intersect(sintens, si);
+%     ampcell{i} = fepsp.ampcell{grp, ib};
     for ii = 1 : ngrp
-        ampmat(ii, ia, i) = samp(ii, :);
-        wvmat(ii, i, :) = swv(ii, ib, :);
+        ampmat(ii, ia, i) = fepsp.amp(ii, :);
+%         wvmat(ii, i, :) = swv(ii, ib, :);
     end
 end
 

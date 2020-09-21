@@ -270,12 +270,19 @@ for j = 1 : nspkgrp
         wv{j, i} = snips(spkgrp{j}, :, stimidx{i});
         wvavg(j, i, :) = mean(mean(wv{j, i}, 3), 1);
         ampsnip = squeeze(mean(wv{j, i}(:, wvwin(1) : wvwin(2), :), 1));
+        if size(ampsnip, 2) > size(ampsnip, 1)  % correction if only one trace
+            ampsnip = ampsnip';
+        end
         wvsnip(j, i, :) = mean(ampsnip, 2);
         ampcell{j, i} = range(ampsnip, 1);
         amp(j, i) = mean(ampcell{j, i});
         stimcell{i} = stamps(stimidx{i});
     end
 end
+
+% combine files if belong to same intensity
+% [~, ind] = unique(intens)
+% setdiff(ind, [1 : nfiles])
 
 if concat
     for i = 1 : length(blocks)
