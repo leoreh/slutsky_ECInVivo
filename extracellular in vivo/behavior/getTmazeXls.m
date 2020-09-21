@@ -63,9 +63,6 @@ for i = 1 : nmice
 end
 
 % select specific data
-mice = 1 : nmice; 
-delay = 30;
-sidx = m{i}.delay == delay;
 date = 9.9;
 didx = m{i}.date == date;
 idx = didx & sidx;
@@ -76,20 +73,24 @@ data = correct(sidx, mice)';
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mice = 1 : nmice; 
+mice = [1 : 6]; 
 c = 'kkkkkr';
 delay = 10;
+clear data
+for i = mice
+    idx = find(m{i}.delay == delay);
+    data(:, i) = correct(idx, i);
+end
+mean(data, 2)
 
-sidx = find(m{i}.delay == delay);
-data = weight(sidx, mice); 
+figure
 subplot(2, 1, 1)
 hp = plot(data);
-for i = 1 : length(mice)
-    hp(i).Color = c(i);
-end
+% for i = 1 : length(mice)
+%     hp(i).Color = c(i);
+% end
 hold on
 stdshade(data', 0.3, 'k');
-% errorbar(nanmean(data, 2), std(data, [], 2, 'omitnan'), 'k', 'LineWidth', 2)
 ylim([0 1])
 x = xlim;
 xlim([1 x(2)])
@@ -115,70 +116,11 @@ set(gca, 'TickLength', [0 0])
 ylabel('Trial Duration [s]')
 xlabel('Time [d]')
 
+mean(data(end - 1, :))
 
 
 
 
-
-
-
-%%% success and duration across sessions %%%
-idx = 1 : nsessions;
-plotMazeStats(correct, dur, [], idx)
-% title('All')
-plotMazeStats(correct, dur, [], night)
-title('Night')
-plotMazeStats(correct, dur, [], ~night)
-title('Day')
-
-%%% night vs. day
-figure
-subplot(3, 1, 1)
-x(1, :) = nanmean(correct(~night, :));    % mean of last three days
-x(2, :) = nanmean(correct(night, :));   % mean of last three nights
-plot(x)
-hold on
-errorbar(nanmean(x, 2), std(x, [], 2, 'omitnan'), 'k', 'LineWidth', 2)
-box off
-set(gca, 'TickLength', [0 0])
-xlim([0.8 2.2])
-ylabel('Success Rate [%]')
-xticks([])
-[~, p, ~, stats] = ttest(x(1, :), x(2, :));
-txt = sprintf('t = %.2g; p = %.2g', stats.tstat, p);
-title(txt)
-
-subplot(3, 1, 2)
-x(1, :) = nanmean(dur(~night, :));    % mean of last three days
-x(2, :) = nanmean(dur(night, :));   % mean of last three nights
-plot(x)
-hold on
-errorbar(nanmean(x, 2), std(x, [], 2, 'omitnan'), 'k', 'LineWidth', 2)
-box off
-set(gca, 'TickLength', [0 0])
-xlim([0.8 2.2])
-ylabel('Running Duration [s]')
-xticks([])
-[~, p, ~, stats] = ttest(x(1, :), x(2, :));
-txt = sprintf('t = %.2g; p = %.2g', stats.tstat, p);
-title(txt)
-
-subplot(3, 1, 3)
-x(1, :) = nanmean(weight(~night, :));    % mean of last three days
-x(2, :) = nanmean(weight(night, :));   % mean of last three nights
-plot(x)
-hold on
-errorbar(nanmean(x, 2), std(x, [], 2, 'omitnan'), 'k', 'LineWidth', 2)
-box off
-set(gca, 'TickLength', [0 0])
-xlim([0.8 2.2])
-ylabel('Norm. Weight')
-xticks([1 2])
-xticklabels({'Day', 'Night'})
-[~, p, ~, stats] = ttest(x(1, :), x(2, :));
-txt = sprintf('t = %.2g; p = %.2g', stats.tstat, p);
-title(txt)
-sgtitle('Day vs. Night')
 
 %%% correlation running duration and weight %%%
 figure
@@ -236,6 +178,11 @@ ylabel('Correct [%]')
 txt = sprintf('all; r = %.2g; p = %.2g', rho(2, 1), pval(2, 1));
 title(txt)
 
+
+
+
+
+
 %%% weight across sessions %%%
 clear weight
 clear weightRaw
@@ -286,93 +233,3 @@ yticks([0.8 0.85 1])
 xticks(sticks)
 xticklabels(num2str([1 : 13]'))
 
-%%% pre-post osmotic pump
-clear x
-post = 22 : 24;
-pre = 19 : 21;
-
-figure
-subplot(3, 1, 1)
-x(1, :) = nanmean(correct(pre, :));    
-x(2, :) = nanmean(correct(post, :));   
-plot(x)
-hold on
-errorbar(nanmean(x, 2), std(x, [], 2, 'omitnan'), 'k', 'LineWidth', 2)
-box off
-set(gca, 'TickLength', [0 0])
-xlim([0.8 2.2])
-ylabel('Success Rate [%]')
-xticks([])
-[~, p, ~, stats] = ttest(x(1, :), x(2, :));
-txt = sprintf('t = %.2g; p = %.2g', stats.tstat, p);
-title(txt)
-
-subplot(3, 1, 2)
-x(1, :) = nanmean(dur(pre, :));    % mean of last three days
-x(2, :) = nanmean(dur(post, :));   % mean of last three nights
-plot(x)
-hold on
-errorbar(nanmean(x, 2), std(x, [], 2, 'omitnan'), 'k', 'LineWidth', 2)
-box off
-set(gca, 'TickLength', [0 0])
-xlim([0.8 2.2])
-ylabel('Running Duration [s]')
-xticks([])
-[~, p, ~, stats] = ttest(x(1, :), x(2, :));
-txt = sprintf('t = %.2g; p = %.2g', stats.tstat, p);
-title(txt)
-
-subplot(3, 1, 3)
-x(1, :) = nanmean(weight(pre, :));    % mean of last three days
-x(2, :) = nanmean(weight(post, :));   % mean of last three nights
-plot(x)
-hold on
-errorbar(nanmean(x, 2), std(x, [], 2, 'omitnan'), 'k', 'LineWidth', 2)
-box off
-set(gca, 'TickLength', [0 0])
-xlim([0.8 2.2])
-ylabel('Norm. Weight')
-xticks([1 2])
-xticklabels({'Pre', 'Post'})
-[~, p, ~, stats] = ttest(x(1, :), x(2, :));
-txt = sprintf('t = %.2g; p = %.2g', stats.tstat, p);
-title(txt)
-sgtitle('Pre- vs. Post-Surgery')
-
-
-%%% w/ w/o EtOH
-clear x
-post = 25;
-pre = 20 : 1 : 24;
-
-figure
-subplot(2, 1, 1)
-x(1, :) = nanmean(correct(pre, :));    
-x(2, :) = correct(post, :);   
-plot(x)
-hold on
-errorbar(nanmean(x, 2), std(x, [], 2, 'omitnan'), 'k', 'LineWidth', 2)
-box off
-set(gca, 'TickLength', [0 0])
-xlim([0.8 2.2])
-ylabel('Success Rate [%]')
-xticks([])
-[~, p, ~, stats] = ttest(x(1, :), x(2, :));
-txt = sprintf('t = %.2g; p = %.2g', stats.tstat, p);
-title(txt)
-
-subplot(2, 1, 2)
-x(1, :) = nanmean(dur(pre, :));    % mean of last three days
-x(2, :) = dur(post, :);   % mean of last three nights
-plot(x)
-hold on
-errorbar(nanmean(x, 2), std(x, [], 2, 'omitnan'), 'k', 'LineWidth', 2)
-box off
-set(gca, 'TickLength', [0 0])
-xlim([0.8 2.2])
-ylabel('Running Duration [s]')
-xticks([])
-[~, p, ~, stats] = ttest(x(1, :), x(2, :));
-txt = sprintf('t = %.2g; p = %.2g', stats.tstat, p);
-title(txt)
-sgtitle('EtOH')
