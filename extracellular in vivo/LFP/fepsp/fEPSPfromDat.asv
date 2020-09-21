@@ -129,10 +129,14 @@ end
 
 % load fepsp if already exists
 fepspname = [basename '.fepsp.mat'];
-if exist(fepspname, 'file') && ~force
-    fprintf('\n loading %s \n', fepspname)
+if exist(fepspname, 'file')
+    fprintf('\nloading %s \n', fepspname)
     load(fepspname)
-    return
+    if ~force
+        return
+    else
+        intens = fepsp.intens;
+    end
 end
 
 % load dat info
@@ -266,12 +270,19 @@ for j = 1 : nspkgrp
         wv{j, i} = snips(spkgrp{j}, :, stimidx{i});
         wvavg(j, i, :) = mean(mean(wv{j, i}, 3), 1);
         ampsnip = squeeze(mean(wv{j, i}(:, wvwin(1) : wvwin(2), :), 1));
+        if size(ampsnip, 2) > size(ampsnip, 1)  % correction if only one trace
+            ampsnip = ampsnip';
+        end
         wvsnip(j, i, :) = mean(ampsnip, 2);
         ampcell{j, i} = range(ampsnip, 1);
         amp(j, i) = mean(ampcell{j, i});
         stimcell{i} = stamps(stimidx{i});
     end
 end
+
+% combine files if belong to same intensity
+[~, ind] = unique(intens)
+setdiff(ind, [1 : nfiles])
 
 if concat
     for i = 1 : length(blocks)
@@ -286,7 +297,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arrange struct and save
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-[intens, ia] = sort(intens);
+[~, ia] = sort(intens);
 
 % arrange struct
 fepsp.wv = wv(:, ia);
@@ -317,22 +328,20 @@ if graphics
         fh = figure('Visible', vis);
         suptitle(sprintf('T#%d', i))
         subplot(1, 2, 1)
-        plot(squeeze(fepsp.wvavg(i, :, :))')
+        plot(fepsp.t(wvwin(1) : wvwin(2)), squeeze(fepsp.wvsnip(i, :, :))')
         axis tight
-        y = [min([fepsp.wvavg(:)]) max([fepsp.wvavg(:)])];
-        hold on
-        plot([dt dt], y, '--r')
+        y = [min([fepsp.wvsnip(:)]) max([fepsp.wvsnip(:)])];
         ylim(y)
-        xlabel('Time [samples]')
+        xlabel('Time [ms]')
         ylabel('Voltage [mV]')
-        legend(split(num2str(intens)))
+        legend(split(num2str(sort(intens))))
         box off
         
         subplot(1, 2, 2)
         ampmat = cell2nanmat(fepsp.ampcell(i, :));
         boxplot(ampmat, 'PlotStyle', 'traditional')
-        ylim([min(vertcat(fepsp.ampcell{:})) max(vertcat(fepsp.ampcell{:}))])
-        xticklabels(split(num2str(intens)))
+        ylim([min(horzcat(fepsp.ampcell{:})) max(horzcat(fepsp.ampcell{:}))])
+        xticklabels(split(num2str(sort(intens))))
         xlabel('Intensity [uA]')
         ylabel('Amplidute [mV]')
         box off

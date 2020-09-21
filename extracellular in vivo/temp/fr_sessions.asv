@@ -22,7 +22,7 @@ pcond = ["manCur"];
 % pcond = [];
 % same but imposes a negative condition)
 ncond = ["fix"];
-ncond = ["fepsp"];
+ncond = ["fEPSP"];
 sessionlist = 'sessionList.xlsx';       % must include extension
 fs = 20000;                             % can also be loaded from datInfo
 
@@ -228,7 +228,7 @@ for i = 1 : nsessions
     else
         pyr = ones(1, length(spikes.ts));     % override
     end
-    
+        
     switch FRdata
         case 'norm'
             data = fr.norm;
@@ -263,13 +263,8 @@ for i = 1 : nsessions
     
     % mfr in selected state across sessions (mean +- std)
     if p2
-        if i == 1
-            fh = figure;
-        end
-        ax = gca;
-        i
-        bar(ax, i, mean(frStates{state}))
-        hold on
+        fh = figure;
+        bar(
     end
 end
 

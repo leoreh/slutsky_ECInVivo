@@ -202,8 +202,9 @@ end
 
 % fr vs. time -------------------------------------------------------------
 % select units
+grp = [1 : 8];
 units = pyr & su & grpidx;
-data = fr.norm;
+data = fr.strd;
 tstamps = fr.tstamps / 60;     
 nsamps = cumsum(datInfo.nsamps);
 state = 2;      % 1 - awake; 2 - NREM
@@ -221,7 +222,6 @@ axis tight
 Y = ylim;
 fill([states{state} fliplr(states{state})]' / 60, [Y(1) Y(1) Y(2) Y(2)],...
     'b', 'FaceAlpha', 0.15,  'EdgeAlpha', 0);
-ylim([0 3])
 ylabel('norm MFR')
 
 % fr between two time periods----------------------------------------------
