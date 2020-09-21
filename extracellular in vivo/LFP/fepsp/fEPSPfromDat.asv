@@ -135,7 +135,11 @@ if exist(fepspname, 'file')
     if ~force
         return
     else
-        intens = fepsp.intens;
+        if isfield(fepsp, 'origIntens')
+            intens = fepsp.origIntens;
+        elseif isfield(fepsp, 'intens')
+            intens = fepsp.intens;
+        end
     end
 end
 
@@ -263,6 +267,17 @@ for i = 1 : nfiles
     maxstim = max([maxstim, length(stimidx{i})]);   % used for cell2mat
 end
 
+% combine files if belong to same intensity
+[~, ind] = unique(intens);
+ind = setdiff([1 : nfiles], ind);
+if ~isempty(ind)
+    for i = 1 : length(ind)
+        stimidx{ind(i) - 1} = [stimidx{ind(i) - 1 : ind(i)}];
+    end
+    stimidx(ind) = [];
+    nfiles = length(stimidx);
+end
+
 % rearrange snips according to intensities and tetrodes. extract amplitude
 % and waveform.
 for j = 1 : nspkgrp
@@ -280,10 +295,6 @@ for j = 1 : nspkgrp
     end
 end
 
-% combine files if belong to same intensity
-[~, ind] = unique(intens)
-setdiff(ind, [1 : nfiles])
-
 if concat
     for i = 1 : length(blocks)
         amp = [amp; ampcell{i}];
@@ -297,7 +308,8 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arrange struct and save
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-[~, ia] = sort(intens);
+origIntens = intens;
+[intens, ia] = (unique(intens));
 
 % arrange struct
 fepsp.wv = wv(:, ia);
@@ -307,6 +319,7 @@ fepsp.ampcell = ampcell(:, ia);
 fepsp.amp = amp(:, ia);
 fepsp.stim = stimidx(:, ia);
 fepsp.intens = intens;
+fepsp.origIntens = origIntens;
 fepsp.t = t;                % [ms]
 fepsp.spkgrp = spkgrp;
 fepsp.dt = dt;

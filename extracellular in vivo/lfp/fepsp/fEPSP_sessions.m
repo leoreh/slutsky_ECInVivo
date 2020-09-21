@@ -17,7 +17,7 @@
 forceL = true;
 forceA = false;
 
-basepath = 'I:\Data\Processed\lh58\fepsp';
+basepath = 'G:\Data\Processed\lh58\fepsp';
 dirnames = ["lh58_200915_100905";...
     "lh58_200915_110952";...
     "lh58_200915_170935";...
@@ -118,7 +118,7 @@ if forceA
         intens = [40 60 80 100 150 200];
         fepsp = fEPSPfromDat('basepath', filepath, 'fname', '', 'nchans', nchans,...
             'spkgrp', spkgrp, 'intens', intens, 'concat', false, 'saveVar', true,...
-            'force', true, 'extension', 'lfp', 'recSystem', 'oe',...
+            'force', true, 'extension', 'dat', 'recSystem', 'oe',...
             'protocol', 'io', 'graphics', false);        
     end
 end
@@ -137,26 +137,31 @@ for i = 1 : nsessions
     intens = sort(unique([intens, fepsp.intens]));
 end
 
-% ampmat: 3d mat of amplitudes; tetrode x intensity x session
-% wvmat: 3d mat of average waveforms; tetrode x session x sample
-% (for 1 selected intensity)
-% ampcell: array of sessions for selected intensity and group. each cell
-% contains amps of all traces
+% ampmat    3d mat of amplitudes; tetrode x intensity x session. data will
+%           be extrapolated to intensities not recorded in session.
+% wvmat     3d mat of average waveforms; tetrode x session x sample
+%           for 1 selected intensity. 
+% ampcell   array of amplitudes for selected intensity. each cell
+%           contains amps of all traces. if itensity not recorded will be
+%           extrapolated.
 ampmat = nan(ngrp, length(intens), nsessions);
 wvmat = nan(ngrp, nsessions, size(fepsp.wvsnip, 3));
 ampcell = cell(1, nsessions);
-si = 80;        % selected intensity [uA]
-grp = 4;        % selected tetrode
+si = 150;        % selected intensity [uA]
+grp = 3;        % selected tetrode
 for i = 1 : nsessions
     fepsp = d{i, 2}.fepsp;
-    swv = fepsp.wvsnip;
     sintens = sort(fepsp.intens);
-    [~, ia] = intersect(intens, sintens);
-%     [~, ib] = intersect(sintens, si);
-%     ampcell{i} = fepsp.ampcell{grp, ib};
-    for ii = 1 : ngrp
-        ampmat(ii, ia, i) = fepsp.amp(ii, :);
-%         wvmat(ii, i, :) = swv(ii, ib, :);
+    [~, ia] = intersect(sintens, si);
+    [~, ib] = intersect(intens, si);
+    ampmat(:, :, i) = [interp1(sintens, fepsp.amp(:, :)', intens, 'linear', 'extrap')]';
+    if ~isempty(ia)
+        for ii = 1 : ngrp
+            wvmat(ii, i, :) = fepsp.wvsnip(ii, ia, :);
+            ampcell{i} = fepsp.ampcell{grp, ia};
+        end
+    else
+        ampcell{i} = ampmat(grp, ib, i);
     end
 end
 
@@ -168,8 +173,12 @@ set(groot,'defaultAxesTickLabelInterpreter','none');
 set(groot,'defaulttextinterpreter','latex');
 set(groot,'defaultLegendInterpreter','latex');
 
+pathPieces = regexp(dirnames(:), '_', 'split'); % Assumes file structure: animal/session/
+sessionDate = [pathPieces{:}];
+sessionDate = sessionDate(2 : 3 : end);
+
 % one figure per intensity across sessions
-p = 1;
+p = 0;
 if p
     for i = 1 : length(intens)
         figure
@@ -179,6 +188,8 @@ if p
         title(sprintf('Stim Intensity %d uA', intens(i)))
         legend(strsplit(num2str(1 : ngrp)))
         xticks(1 : nsessions)
+        xticklabels(sessionDate)
+        xtickangle(45)
         box off
     end
 end
@@ -188,18 +199,20 @@ end
 p = 1;
 if p
     figure
-    subplot(1, 2, 1)
+    subplot(2, 1, 1)
     tstamps = [1 : size(wvmat, 3)] / fs * 1000;
     plot(tstamps, squeeze(wvmat(grp, :, :)))
     xlabel('Time [ms]')
     ylabel('Voltage [V]')
-    legend(dirnames)
+    legend(sessionDate)
     box off
     
-    subplot(1, 2, 2)
+    subplot(2, 1, 2)
     ampmat = cell2nanmat(ampcell);
     boxplot(ampmat, 'PlotStyle', 'traditional')
     xticks(1 : nsessions)
+    xticklabels(sessionDate)
+    xtickangle(45)
     xlabel('Session')
     ylabel('Amplidute [mV]')
     box off
@@ -209,8 +222,9 @@ end
 
 % io across sessions, one figure per tetrode
 p = 1;
+grp = 3;
 if p
-    for i = 1 : ngrp
+    for i = grp
         figure
         for ii = 1 : nsessions
             fepsp = d{ii, 2}.fepsp;
@@ -221,7 +235,7 @@ if p
         xlabel('Intensity [uA]')
         ylabel('Amplitude [mV]')
         title(sprintf('T%d', i))
-        legend(dirnames)
+        legend(sessionDate)
         box off
     end
 end
