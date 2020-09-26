@@ -1,7 +1,7 @@
 % figS9 in Zarhin et al., 2020
 
 close all
-force = false;
+force = true;
 saveFig = true;
 
 grppath{1} = 'G:\Data\Processed\Manuscripts\Zarhin2020\IIS\WT\New analyis';
@@ -140,7 +140,8 @@ end
 
 % general params
 fh = figure('Visible', 'on');
-set(gcf, 'units','normalized','outerposition',[0 0 1 1]);
+set(gcf, 'units', 'normalize', 'outerposition', [0.165 0.05 0.67 0.95]);
+set(groot, 'DefaultAxesFontName', 'Arial')
 
 Y = sort([1 -1]); % ylim for raw
 YY = sort([0.5 -1]); % ylim for zoom
@@ -148,6 +149,8 @@ binsize = (2 ^ nextpow2(fs * 1));
 smf = 15;
 marg = 0.05;
 minmarg = 1;
+verticalSpacing = 0.08;
+horizontalSpacing = 0.1;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % wt mouse deep
@@ -186,7 +189,8 @@ plotColumn(idx1, midsig, lfp4, bs4, iis4, ep4, c, ncol, 'APP/PS1 - surgical')
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % bs identification
 
-subplot(5, 4, [13, 14, 17, 18])
+sh = subaxis(5, 4, [13, 14, 17, 18],...
+    'spacingVert', verticalSpacing, 'spacingHoriz', horizontalSpacing);
 gscatter(varmat(:, 1), varmat(:, 3), gi, 'rk', '.', 5);
 axis tight
 hold on
@@ -202,7 +206,7 @@ box off
 histbins = 40;
 % std histograg
 % axes('Position', [.627 .11 .07 .07])
-axes('Position',[.442 .11 .05 .05])
+axes('Position',[.422 .11 .05 .05])
 box on
 h = histogram(varmat(:, 1), histbins, 'Normalization', 'Probability');
 h.EdgeColor = 'none';
@@ -215,7 +219,7 @@ set(gca, 'TickLength', [0 0], 'YTickLabel', [], 'XTickLabel', [],...
 box off
 
 % max histogram
-axes('Position',[.442 .18 .05 .05])
+axes('Position',[.422 .18 .05 .05])
 % axes('Position',[.627 .2 .07 .07])
 box on
 h = histogram(varmat(:, 2), histbins, 'Normalization', 'Probability');
@@ -229,7 +233,7 @@ set(gca, 'TickLength', [0 0], 'YTickLabel', [], 'XTickLabel', [],...
 box off
 
 % PC1 histogram
-axes('Position',[.389 .11 .05 .05])
+axes('Position',[.369 .11 .05 .05])
 % axes('Position',[.549 .11 .07 .07])
 box on
 h = histogram(varmat(:, 3), histbins, 'Normalization', 'Probability');
@@ -257,7 +261,8 @@ gidx = [ones(1, 30), ones(1, 30) * 2];
 data = cell2nanmat(as.bsrDeep(:, 1 : 2));
 % data = as.bsr
 
-subplot(5, 4, [15, 16, 19, 20])
+sh = subaxis(5, 4, [15, 16, 19, 20],...
+    'spacingVert', verticalSpacing, 'spacingHoriz', horizontalSpacing);
 boxplot(data, gidx, 'PlotStyle', 'traditional',...
     'BoxStyle', 'outline', 'Color', c2, 'notch', 'off')
 hold on
@@ -271,17 +276,151 @@ ylim([0 1])
 box off
 set(gca, 'TickLength', [0 0])
 [h, p] = ttest2(data(:, 1), data(:, 2));
+[p, h] = ranksum(data(:, 1), data(:, 2));
 sigstar({[1, 2]}, p, 1);
 % sigstar({[1, 3], [1, 4], [2, 4], [2, 3]}, [0.05, 0.01, 0.01, 0.05], 1);
+title({'';''})
 
 if saveFig
     figname = fullfile(basepath, 'figS9');
 %     export_fig(figname, '-tif', '-transparent', '-r300')
 %     export_fig(figname, '-pdf')
 %     savePdf('figS9', basepath, fh)
- print(fh, figname, '-dpdf', '-bestfit'); 
+ print(fh, figname, '-dpdf', '-bestfit', '-painters'); 
 end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% plot column
+% set(findall(fh, '-property', 'FontSize'), 'FontSize', 12)
+
+function plotColumn(idx, midsig, lfp, bs,  iis, ep, c, ncol, tit)
+
+% constants
+fs = 1250;
+Y = sort([0.5 -2]); % ylim for raw
+YY = sort([0.5 -2]); % ylim for zoom
+binsize = (2 ^ nextpow2(fs * 1));
+smf = 15;
+marg = 0.05;
+minmarg = 0.5;
+verticalSpacing = 0.08;
+horizontalSpacing = 0.1;
+
+% prepare data
+dc = mean(lfp.data(idx));
+lfp.data(idx) = lfp.data(idx) - dc;
+if abs(min(lfp.data(idx))) < max((lfp.data(idx)))
+    lfp.data(idx) = -lfp.data(idx);
+end
+
+% idx for zoomin in samples
+idx2 = round((midsig - minmarg) * fs * 60 : (midsig + minmarg) * fs * 60);
+
+% raw
+subaxis(5, ncol, c, 'spacingVert', verticalSpacing,...
+    'spacingHoriz', horizontalSpacing);
+plot(lfp.timestamps(idx) / 60, lfp.data(idx), 'k', 'LineWidth', 1)
+hold on
+box off
+axis tight
+ylim(Y)
+idx3 = [idx2(1) idx2(end)] / fs / 60;
+fill([idx3 fliplr(idx3)]', [Y(1) Y(1) Y(2) Y(2)],...
+    'r', 'FaceAlpha', 0.2,  'EdgeAlpha', 0, 'HandleVisibility', 'off');
+xlim([idx(1) idx(end)] / fs / 60)
+xlabel('Time [m]')
+title(tit, 'Interpreter', 'none')
+if c == 1
+    ylabel('LFP [mV]')
+    yticks(Y)
+    set(gca, 'TickLength', [0 0], 'XTickLabel', [], 'XColor', 'none',...
+        'Color', 'none')
+else
+    set(gca, 'TickLength', [0 0], 'XTickLabel', [], 'XColor', 'none',...
+        'Color', 'none', 'YColor', 'none')
+end
+
+% spectrogram
+sh = subaxis(5, ncol, c + ncol, 'spacingVert', verticalSpacing,...
+    'spacingHoriz', horizontalSpacing);
+specBand('sig', lfp.data(idx), 'graphics', true, 'binsize', binsize,...
+    'smf', smf, 'normband', true);
+set(gca, 'TickLength', [0 0])
+if c ~=1
+    set(gca, 'YColor', 'none')
+    set(colorbar, 'visible', 'off')
+end
+xlabel('Time [m]')
+xticks([0.05 4.95])
+xticklabels([0 5])
+ylim([0 100])
+set(gca, 'YScale', 'log')
+title('')
+
+% pos1 = get(sh, 'position');
+% pos1(2) = pos1(2) - verticalSpacing;
+% set(sh, 'position', pos1)
+
+% bsr
+% subplot(6, ncol, c + ncol * 2);
+% [~, bsidx] = min(abs(bs.cents - idx(1)));
+% [~, bsidx(2)] = min(abs(bs.cents - idx(end)));
+% bsidx = bsidx(1) : bsidx(2);
+% plot(bs.cents(:) / fs / 60, bs.bsr(:), 'k', 'LineWidth', 1)
+% hold on
+% plot(bs.cents(:) / fs / 60, ep.dband(:), 'b', 'LineWidth', 1)
+% set(gca, 'TickLength', [0 0], 'Color', 'none')
+% if c ~=1
+%     set(gca, 'YColor', 'none', 'YTickLabel', [])
+% end
+% box off
+% axis tight
+% ylim([0 1])
+% xlim([idx(1) idx(end)] / fs / 60)
+% xlabel('Time [m]')
+% xticks(idx(1) / 60 / fs : 5 : idx(end) / 60 / fs)
+% xticklabels({'0', '5', '10', '15', '20'})
+% if c == 4
+%     legend("BSR", "delta power")
+% end
+
+% zoom in
+sh = subaxis(5, ncol, c + ncol * 2, 'spacingVert', verticalSpacing,...
+    'spacingHoriz', horizontalSpacing);
+idx5 = iis.peakPos > idx2(1) & iis.peakPos < idx2(end);
+plot(lfp.timestamps(idx2) / 60, lfp.data(idx2), 'k')
+axis tight
+hold on
+x = xlim;
+iis.thr(2) = iis.thr(2) - dc;
+if iis.thr(2) > 0
+    thr = -iis.thr(2);
+    power = -iis.peakPower(idx5);
+else
+    thr = iis.thr(2);
+    power = iis.peakPower(idx5);
+end
+% plot(x, [thr thr], '--r')
+% scatter(iis.peakPos(idx5) / fs / 60,...
+%     power, '*');
+bsstamps = RestrictInts(bs.stamps, [idx2(1) - 600 * fs idx2(end) + 600 * fs]);
+bsstamps = [bsstamps(1 : end - 1, 2) bsstamps(2 : end, 1)];
+ylim(YY);
+if ~isempty(bsstamps)
+    fill([bsstamps fliplr(bsstamps)] / fs / 60, [YY(1) YY(1) YY(2) YY(2)],...
+        'k', 'FaceAlpha', 0.25,  'EdgeAlpha', 0);
+end
+if c == 1
+    yticks(YY);
+    ylabel('Voltage [mV]')
+    set(gca, 'TickLength', [0 0])
+else
+    set(gca, 'TickLength', [0 0], 'YColor', 'none')
+end
+xlabel('Time [m]')
+xticks(idx3)
+xticklabels([0 minmarg * 2])
+xlim(idx3)
+box off
+
+end
+
 

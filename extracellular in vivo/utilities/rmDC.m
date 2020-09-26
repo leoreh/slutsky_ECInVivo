@@ -7,7 +7,7 @@ function [sig, dc] = rmDC(sig, varargin)
 % INPUT
 %   sig         numeric array. if matrix, baseline is calculated separatly
 %               for each column (dim = 1) or row {dim = 2}
-%   winCalc     time window for calculating DC {[1 Inf]}. specified as
+%   win         time window for calculating DC {[1 Inf]}. specified as
 %               index to mat rows.
 %   dim         numeric. dimension on which to calculate mean {2}.
 % 

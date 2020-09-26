@@ -14,19 +14,10 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-forceL = true;
+forceL = false;
 forceA = false;
 
 basepath = 'G:\Data\Processed\lh58\fepsp';
-dirnames = ["lh58_200915_100905";...
-    "lh58_200915_110952";...
-    "lh58_200915_170935";...
-    "lh58_200916_100928";...
-    "lh58_200916_120928";...
-    "lh58_200916_160953";...
-    "lh58_200917_100922";...
-    "lh58_200917_170931"];
-clear dirnames
 
 % should allow user to input varName or columnn index
 colName = 'Session';                    % column name in xls sheet where dirnames exist
@@ -41,7 +32,6 @@ pcond = ["fepsp"; "tempFlag"];
 % same but imposes a negative condition)
 ncond = ["manCur"];                      
 sessionlist = 'sessionList.xlsx';       % must include extension
-fs = 1250;                             % can also be loaded from datInfo
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % load data
@@ -73,7 +63,7 @@ end
 nsessions = length(dirnames);
 
 % load files
-if forceL   
+if forceL || ~exist('d', 'var')
     d = cell(length(dirnames), length(vars));
     for i = 1 : nsessions
         filepath = char(fullfile(basepath, dirnames(i)));
@@ -106,19 +96,18 @@ ngrp = length(spkgrp);
 % analyze data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if forceA
-    for i = 10 : nsessions
+    for i = 1 : nsessions
         close all        
         
         % file
         filepath = char(fullfile(basepath, dirnames(i)));
         cd(filepath)
-        [~, basename] = fileparts(filepath);
                
         % fepsp
-        intens = [40 60 80 100 150 200];
+        intens = [40 80 100 150 200];
         fepsp = fEPSPfromDat('basepath', filepath, 'fname', '', 'nchans', nchans,...
             'spkgrp', spkgrp, 'intens', intens, 'concat', false, 'saveVar', true,...
-            'force', true, 'extension', 'lfp', 'recSystem', 'oe',...
+            'force', true, 'extension', 'dat', 'recSystem', 'oe',...
             'protocol', 'io', 'graphics', true);        
     end
 end
@@ -147,12 +136,13 @@ end
 ampmat = nan(ngrp, length(intens), nsessions);
 wvmat = nan(ngrp, nsessions, size(fepsp.wvsnip, 3));
 ampcell = cell(1, nsessions);
-si = 60;        % selected intensity [uA]
-grp = 2;        % selected tetrode
+si = 100;        % selected intensity [uA]
+grp = 3;        % selected tetrode
 for i = 1 : nsessions
     fepsp = d{i, 2}.fepsp;
     sintens = sort(fepsp.intens);
     [~, ia] = intersect(sintens, si);
+    [~, ib] = intersect(intens, si);
     ampmat(:, :, i) = [interp1(sintens, fepsp.amp(:, :)', intens, 'linear', 'extrap')]';
     if ~isempty(ia)
         for ii = 1 : ngrp
@@ -160,7 +150,7 @@ for i = 1 : nsessions
             ampcell{i} = fepsp.ampcell{grp, ia};
         end
     else
-        ampcell{i} = ampmat(grp, ia, i)
+        ampcell{i} = ampmat(grp, ib, i);
     end
 end
 
@@ -168,17 +158,13 @@ end
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 close all
-set(groot,'defaultAxesTickLabelInterpreter','none');  
-set(groot,'defaulttextinterpreter','latex');
-set(groot,'defaultLegendInterpreter','latex');
 
-sessionDate = 
-pathPieces = regexp(dirnames(:), '_', 'split'); % Assumes file structure: animal/session/
+pathPieces = regexp(dirnames(:), '_', 'split'); % assumes filename structure: animal_date_time
 sessionDate = [pathPieces{:}];
 sessionDate = sessionDate(2 : 3 : end);
 
 % one figure per intensity across sessions
-p = 1;
+p = 0;
 if p
     for i = 1 : length(intens)
         figure
@@ -188,6 +174,8 @@ if p
         title(sprintf('Stim Intensity %d uA', intens(i)))
         legend(strsplit(num2str(1 : ngrp)))
         xticks(1 : nsessions)
+        xticklabels(sessionDate)
+        xtickangle(45)
         box off
     end
 end
@@ -218,10 +206,11 @@ if p
     suptitle(['T#' num2str(grp) ' @ ' num2str(si) 'uA'])
 end
 
-% io across sessions, one figure per tetrode
-p = 1;
+% io across sessions, one figure per selected grp
+p = 0;
+grp = 3;
 if p
-    for i = 1 : ngrp
+    for i = grp
         figure
         for ii = 1 : nsessions
             fepsp = d{ii, 2}.fepsp;
@@ -232,13 +221,13 @@ if p
         xlabel('Intensity [uA]')
         ylabel('Amplitude [mV]')
         title(sprintf('T%d', i))
-        legend(dirnames)
+        legend(sessionDate)
         box off
     end
 end
 
 % one figure per tetrode
-p = 1;
+p = 0;
 if p
     for i = 1 : ngrp
         figure
@@ -307,7 +296,7 @@ end
 % comparison night and day
 % amp during night (even) devided by values in day (odd).
 % tetrodes x intensities x days. 
-p = 1;
+p = 0;
 sg = [1, 4 : 8];    % excluded tetrodes not in ca1. 
 si = [200, 250, 300];    % reliable intensities
 [~, ib] = intersect(intens, si);
@@ -328,31 +317,31 @@ si = [200, 250, 300];    % reliable intensities
 % day = mean(day(:, :, [12 : 13]), 3);
 % night ./ day
 
-ndmat = ampmat(sg, ib, 2 : 2 : end) ./  ampmat(sg, ib, 1 : 2 : end);
-if p
-    figure
-    [~, ib] = intersect(intens, si);
-    plot(squeeze(mean(ndmat(:, :, :), 2))', 'LineWidth', 2)
-    hold on
-    plot([1 size(ndmat, 3)], [1 1], '--k')
-    axis tight
-    y = ylim;
-    ylim([0 y(2)])
-    xlabel('Time [days]')
-    ylabel('Ratio night / day')
-    legend(split(num2str(sg)))
-    title(sprintf('night / day @%d uA', intens(ib)))
-end
+% ndmat = ampmat(sg, ib, 2 : 2 : end) ./  ampmat(sg, ib, 1 : 2 : end);
+% if p
+%     figure
+%     [~, ib] = intersect(intens, si);
+%     plot(squeeze(mean(ndmat(:, :, :), 2))', 'LineWidth', 2)
+%     hold on
+%     plot([1 size(ndmat, 3)], [1 1], '--k')
+%     axis tight
+%     y = ylim;
+%     ylim([0 y(2)])
+%     xlabel('Time [days]')
+%     ylabel('Ratio night / day')
+%     legend(split(num2str(sg)))
+%     title(sprintf('night / day @%d uA', intens(ib)))
+% end
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % to prism
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-squeeze(ampmat(7, :, :));
-squeeze(wvmat(7, :, :));
-
-squeeze(mean(mean(ndmat(:, :, 1 : 3), 2), 1))
-squeeze(mean(mean(ndmat(:, :, 5 : 10), 2), 1))
-squeeze(mean(mean(ndmat(:, :, 12 : 13), 2), 1))
-
-plot(squeeze(mean(ampmat([1, 4 : 8], [2 : 6], :), 1))')
+% squeeze(ampmat(7, :, :));
+% squeeze(wvmat(7, :, :));
+% 
+% squeeze(mean(mean(ndmat(:, :, 1 : 3), 2), 1))
+% squeeze(mean(mean(ndmat(:, :, 5 : 10), 2), 1))
+% squeeze(mean(mean(ndmat(:, :, 12 : 13), 2), 1))
+% 
+% plot(squeeze(mean(ampmat([1, 4 : 8], [2 : 6], :), 1))')

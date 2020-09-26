@@ -5,13 +5,13 @@ cd(basepath)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % open ephys
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'F:\Data\lh58\2020-08-28_09-38-39';
+basepath = 'F:\Data\lh58\2020-09-07_08-21-27';
 rmvch = [13 16] + 1;
 rmvch = [];
 mapch = [25 26 27 28 30 1 2 29 3 : 14 31 0 15 16 17 : 24 32 33 34] + 1;
 exp = [2];
 rec = cell(max(exp), 1);
-rec{2} = [1 : 10];
+rec{2} = [1 : 5];
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
     'rmvch', rmvch, 'mapch', mapch, 'concat', true, 'nchans', 35);
 
@@ -43,10 +43,10 @@ spkgrp = session.extracellular.spikeGroups.channels;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % field
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-intens = [50 70 90 110 100 150 200 300 120 500];
+intens = [40 80 100 150 200];
 fepsp = fEPSPfromDat('basepath', basepath, 'fname', '', 'nchans', nchans,...
     'spkgrp', spkgrp, 'intens', intens, 'concat', false, 'saveVar', true,...
-    'force', true, 'extension', 'lfp', 'recSystem', 'oe',...
+    'force', true, 'extension', 'dat', 'recSystem', 'oe',...
     'protocol', 'io');  
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -59,7 +59,7 @@ rez = runKS('basepath', basepath, 'fs', fs, 'nchans', nchans,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % fix manual curation
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-fixSpkAndRes('grp', [1], 'fs', fs);
+fixSpkAndRes('grp', [], 'fs', fs);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % cell explorer
@@ -84,7 +84,7 @@ cell_metrics = ProcessCellMetrics('session', session,...
 % cluster validation
 mu = [];
 spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
-    'saveFig', false, 'force', true, 'mu', mu, 'graphics', true,...
+    'saveFig', false, 'force', true, 'mu', mu, 'graphics', false,...
     'vis', 'on', 'spkgrp', spkgrp);
 
 % firing rate

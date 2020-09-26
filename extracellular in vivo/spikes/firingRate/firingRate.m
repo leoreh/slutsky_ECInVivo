@@ -152,8 +152,6 @@ return
 % messaround with figures
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-grp = [1 : 8];
-
 % session params
 session = CE_sessionTemplate(pwd, 'viaGUI', false,...
     'force', false, 'saveVar', false);      
@@ -164,7 +162,7 @@ spkgrp = session.extracellular.spikeGroups.channels;
 
 % recalculate firing rate
 binsize = 60;
-winBL = [10 * 60 30 * 60];
+winBL = [1 * 60 120 * 60];
 % winBL = [1 Inf];
 fr = firingRate(spikes.times, 'basepath', basepath, 'graphics', false, 'saveFig', false,...
     'binsize', binsize, 'saveVar', true, 'smet', 'MA', 'winBL', winBL);
@@ -187,6 +185,7 @@ for ii = 1 : length(states)
     frStates{ii} = mean(fr.strd(:, tStates{ii}), 2);
 end
 
+grp = [1 : 4];
 pyr = strcmp(cell_metrics.putativeCellType, 'Pyramidal Cell');
 int = strcmp(cell_metrics.putativeCellType, 'Narrow Interneuron');
 % pyr = ones(1, length(spikes.ts)); % override 
@@ -203,7 +202,7 @@ end
 % fr vs. time -------------------------------------------------------------
 % select units
 units = pyr & su & grpidx;
-data = fr.norm;
+data = fr.strd;
 tstamps = fr.tstamps / 60;     
 nsamps = cumsum(datInfo.nsamps);
 state = 2;      % 1 - awake; 2 - NREM
@@ -221,7 +220,7 @@ axis tight
 Y = ylim;
 fill([states{state} fliplr(states{state})]' / 60, [Y(1) Y(1) Y(2) Y(2)],...
     'b', 'FaceAlpha', 0.15,  'EdgeAlpha', 0);
-ylim([0 3])
+% ylim([0 3])
 ylabel('norm MFR')
 
 % fr between two time periods----------------------------------------------

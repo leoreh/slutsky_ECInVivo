@@ -14,34 +14,27 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-forceL = true;
+forceL = false;
 forceA = false;
 
 basepath = 'G:\Data\Processed\lh58\fepsp';
-dirnames = ["lh58_200915_100905";...
-    "lh58_200915_110952";...
-    "lh58_200915_170935";...
-    "lh58_200916_100928";...
-    "lh58_200916_120928";...
-    "lh58_200916_160953";...
-    "lh58_200917_100922";...
-    "lh58_200917_170931"];
-clear dirnames
+% name of xls file with list of sessions. must include extension.
+sessionlist = 'sessionList.xlsx';       
 
 % should allow user to input varName or columnn index
 colName = 'Session';                    % column name in xls sheet where dirnames exist
 % string array of variables to load
 vars = ["session.mat";...
     "fepsp"];      
+
 % column name of logical values for each session. only if true than session
 % will be loaded. can be a string array and than all conditions must be
 % met.
 pcond = ["fepsp"; "tempFlag"];     
 % pcond = [];
-% same but imposes a negative condition)
+
+% same as pcond but imposes a negative condition.
 ncond = ["manCur"];                      
-sessionlist = 'sessionList.xlsx';       % must include extension
-fs = 1250;                             % can also be loaded from datInfo
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % load data
@@ -73,7 +66,7 @@ end
 nsessions = length(dirnames);
 
 % load files
-if forceL   
+if forceL || ~exist('d', 'var')
     d = cell(length(dirnames), length(vars));
     for i = 1 : nsessions
         filepath = char(fullfile(basepath, dirnames(i)));
@@ -112,14 +105,13 @@ if forceA
         % file
         filepath = char(fullfile(basepath, dirnames(i)));
         cd(filepath)
-        [~, basename] = fileparts(filepath);
                
         % fepsp
-        intens = [40 60 80 100 150 200];
+        intens = [40 80 100 150 200];
         fepsp = fEPSPfromDat('basepath', filepath, 'fname', '', 'nchans', nchans,...
             'spkgrp', spkgrp, 'intens', intens, 'concat', false, 'saveVar', true,...
             'force', true, 'extension', 'dat', 'recSystem', 'oe',...
-            'protocol', 'io', 'graphics', false);        
+            'protocol', 'io', 'graphics', true);        
     end
 end
 
@@ -147,8 +139,8 @@ end
 ampmat = nan(ngrp, length(intens), nsessions);
 wvmat = nan(ngrp, nsessions, size(fepsp.wvsnip, 3));
 ampcell = cell(1, nsessions);
-si = 150;        % selected intensity [uA]
-grp = 3;        % selected tetrode
+si = 100;        % selected intensity [uA]
+grp = 2;        % selected tetrode
 for i = 1 : nsessions
     fepsp = d{i, 2}.fepsp;
     sintens = sort(fepsp.intens);
@@ -169,11 +161,8 @@ end
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 close all
-set(groot,'defaultAxesTickLabelInterpreter','none');  
-set(groot,'defaulttextinterpreter','latex');
-set(groot,'defaultLegendInterpreter','latex');
 
-pathPieces = regexp(dirnames(:), '_', 'split'); % Assumes file structure: animal/session/
+pathPieces = regexp(dirnames(:), '_', 'split'); % assumes filename structure: animal_date_time
 sessionDate = [pathPieces{:}];
 sessionDate = sessionDate(2 : 3 : end);
 
@@ -220,8 +209,8 @@ if p
     suptitle(['T#' num2str(grp) ' @ ' num2str(si) 'uA'])
 end
 
-% io across sessions, one figure per tetrode
-p = 1;
+% io across sessions, one figure per selected grp
+p = 0;
 grp = 3;
 if p
     for i = grp
@@ -241,7 +230,7 @@ if p
 end
 
 % one figure per tetrode
-p = 1;
+p = 0;
 if p
     for i = 1 : ngrp
         figure
@@ -310,7 +299,7 @@ end
 % comparison night and day
 % amp during night (even) devided by values in day (odd).
 % tetrodes x intensities x days. 
-p = 1;
+p = 0;
 sg = [1, 4 : 8];    % excluded tetrodes not in ca1. 
 si = [200, 250, 300];    % reliable intensities
 [~, ib] = intersect(intens, si);
@@ -331,31 +320,31 @@ si = [200, 250, 300];    % reliable intensities
 % day = mean(day(:, :, [12 : 13]), 3);
 % night ./ day
 
-ndmat = ampmat(sg, ib, 2 : 2 : end) ./  ampmat(sg, ib, 1 : 2 : end);
-if p
-    figure
-    [~, ib] = intersect(intens, si);
-    plot(squeeze(mean(ndmat(:, :, :), 2))', 'LineWidth', 2)
-    hold on
-    plot([1 size(ndmat, 3)], [1 1], '--k')
-    axis tight
-    y = ylim;
-    ylim([0 y(2)])
-    xlabel('Time [days]')
-    ylabel('Ratio night / day')
-    legend(split(num2str(sg)))
-    title(sprintf('night / day @%d uA', intens(ib)))
-end
+% ndmat = ampmat(sg, ib, 2 : 2 : end) ./  ampmat(sg, ib, 1 : 2 : end);
+% if p
+%     figure
+%     [~, ib] = intersect(intens, si);
+%     plot(squeeze(mean(ndmat(:, :, :), 2))', 'LineWidth', 2)
+%     hold on
+%     plot([1 size(ndmat, 3)], [1 1], '--k')
+%     axis tight
+%     y = ylim;
+%     ylim([0 y(2)])
+%     xlabel('Time [days]')
+%     ylabel('Ratio night / day')
+%     legend(split(num2str(sg)))
+%     title(sprintf('night / day @%d uA', intens(ib)))
+% end
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % to prism
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-squeeze(ampmat(7, :, :));
-squeeze(wvmat(7, :, :));
-
-squeeze(mean(mean(ndmat(:, :, 1 : 3), 2), 1))
-squeeze(mean(mean(ndmat(:, :, 5 : 10), 2), 1))
-squeeze(mean(mean(ndmat(:, :, 12 : 13), 2), 1))
-
-plot(squeeze(mean(ampmat([1, 4 : 8], [2 : 6], :), 1))')
+% squeeze(ampmat(7, :, :));
+% squeeze(wvmat(7, :, :));
+% 
+% squeeze(mean(mean(ndmat(:, :, 1 : 3), 2), 1))
+% squeeze(mean(mean(ndmat(:, :, 5 : 10), 2), 1))
+% squeeze(mean(mean(ndmat(:, :, 12 : 13), 2), 1))
+% 
+% plot(squeeze(mean(ampmat([1, 4 : 8], [2 : 6], :), 1))')

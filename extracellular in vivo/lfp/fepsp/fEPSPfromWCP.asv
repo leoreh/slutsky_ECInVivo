@@ -35,15 +35,13 @@ function fepsp = fEPSPfromWCP(varargin)
 % OUTPUT
 %   fepsp           struct with fields:
 %       tstamps     timestamps for clipped response [ms]
-%       trace       full recorded trace (150 ms for io)
-%       wv          clipped trace 
+%       
 % 
 % TO DO LIST
 %   # implement arbitrary stim protocols
 %   # analyse more parameters than amp
 % 
 % 02 sep 20 LH   UPDATES:
-% 26 sep 20 LH      adaptations according to clampfit
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
