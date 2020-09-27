@@ -34,14 +34,24 @@ function fepsp = fEPSPfromWCP(varargin)
 %   
 % OUTPUT
 %   fepsp           struct with fields:
+%       origFiles   cell with raw data file names
+%       intens      vec of intensities (one per file)
+%       fs          sampling frequency
 %       tstamps     timestamps for clipped response [ms]
-%       
+%       trace       array of recorded trace (150 ms for io). one cell
+%                   per file, each cell is mat of samples x traces
+%       traceavg    mat of average trace (files x samples)
+%       wv          array of clipped trace (40 ms for io). one cell per
+%                   file, each cell is mat of samples x traces
+%       wvavg       mat of average clipped trace (files x samples)
+%       amp         vec of amplitudes 
 % 
 % TO DO LIST
 %   # implement arbitrary stim protocols
 %   # analyse more parameters than amp
 % 
 % 02 sep 20 LH   UPDATES:
+% 26 sep 20 LH      adaptations according to clampfit
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -183,15 +193,15 @@ end
 
 % arrange struct
 fepsp.origFiles = filenames;
+fepsp.intens = intens;
 fepsp.fs = lfp.fs;
-fepsp.tstamps = lfp.timestamps(wvidx) * 1000 - 30;       
 fepsp.trace = trace(:, ia);
 fepsp.traceavg = traceavg(ia, :);
 fepsp.wv = wv(:, ia);
 fepsp.wvavg = wvavg(ia, :);
+fepsp.tstamps = lfp.timestamps(wvidx) * 1000 - 30;       
 fepsp.amp = amp(ia);
 fepsp.ampmat = cell2nanmat(ampcell(ia));
-fepsp.intens = intens;
 fepsp.rm = rm;
 fepsp.stimidx = stimidx;
 fepsp.ampidx = ampidx;

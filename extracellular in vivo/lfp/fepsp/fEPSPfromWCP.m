@@ -4,7 +4,7 @@ function fepsp = fEPSPfromWCP(varargin)
 % (basepath) contains several homogenous files (i.e. each file consists of
 % only one type of stimulus). files are analyzed according to stimulus
 % protocol (e.g. io or stp). user is asked to input / select specific
-% files. data is loaded via getLFP such that traces are concatenated,
+% files. data is loaded via getLFP such that traces may be concatenated,
 % low-pass filtered and downsampled. 
 %  
 % INPUT
@@ -34,13 +34,26 @@ function fepsp = fEPSPfromWCP(varargin)
 %   
 % OUTPUT
 %   fepsp           struct with fields:
+%       origFiles   cell with raw data file names
+%       intens      vec of intensities (one per file)
+%       fs          sampling frequency
 %       tstamps     timestamps for clipped response [ms]
-%       trace       full recorded trace (150 ms for io)
-%       wv          clipped trace 
+%       trace       array of recorded trace (150 ms for io). one cell
+%                   per file, each cell is mat of samples x traces
+%       traceavg    mat of average trace (files x samples)
+%       wv          array of clipped trace (40 ms for io). one cell per
+%                   file, each cell is mat of samples x traces
+%       wvavg       mat of average clipped trace (files x samples)
+%       amp         vec of average amplitudes (one per file)
+%       ampmat      mat of amplitudes (trace x file)
+%       rm          array of traces removed from recording
+%       stimidx     index of stimulus [samples]
+%       ampidx      range of indices for amplitude calculation
+%       wvidx       range of indices for clipping trace
 % 
 % TO DO LIST
 %   # implement arbitrary stim protocols
-%   # analyse more parameters than amp
+%   # analyse additional parameters (slope, pSpike)
 % 
 % 02 sep 20 LH   UPDATES:
 % 26 sep 20 LH      adaptations according to clampfit
@@ -151,11 +164,11 @@ for i = 1 : length(filenames)
     
     % manually inspect and remove unwanted traces
     if inspect
-        [lfp.data, rm] = rmTraces(lfp.data, 'x', lfp.timestamps,...
+        [lfp.data, rm{i}] = rmTraces(lfp.data, 'x', lfp.timestamps,...
             'ylim', ylimit);
-        lfp.data(:, rm) = [];
+        lfp.data(:, rm{i}) = [];
     else
-        rm = [];
+        rm{i} = [];
     end
     
     % analyze data; this is your part lior :)
@@ -167,7 +180,7 @@ for i = 1 : length(filenames)
     switch protocol
         case 'io'
             amp(i) = range(traceavg(i, ampidx));
-            ampcell{i} = range(trace{i}(ampidx));
+            ampcell{i} = range(trace{i}(ampidx, :));
         case 'stp'
             for ii = 1 : nstim
                 s1 = stimidx(ii) + dt;
@@ -185,19 +198,19 @@ end
 
 % arrange struct
 fepsp.origFiles = filenames;
+fepsp.intens = intens;
 fepsp.fs = lfp.fs;
-fepsp.tstamps = lfp.timestamps(wvidx) * 1000 - 30;       
 fepsp.trace = trace(:, ia);
 fepsp.traceavg = traceavg(ia, :);
 fepsp.wv = wv(:, ia);
 fepsp.wvavg = wvavg(ia, :);
+fepsp.tstamps = lfp.timestamps(wvidx) * 1000 - 30;       
 fepsp.amp = amp(ia);
 fepsp.ampmat = cell2nanmat(ampcell(ia));
-fepsp.intens = intens;
 fepsp.rm = rm;
 fepsp.stimidx = stimidx;
 fepsp.ampidx = ampidx;
-fepsp.traceidx = wvidx;
+fepsp.wvidx = wvidx;
 
 if saveVar
     save(fepspname, 'fepsp');
