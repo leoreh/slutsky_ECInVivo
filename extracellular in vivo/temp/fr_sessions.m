@@ -235,7 +235,7 @@ if p2
     if i == 1
         fh = figure;
     end
-    scatter([1 : nsessions], cell2nanmat(mfr))
+    plot([1 : nsessions], cell2nanmat(mfr), 'ko', 'LineStyle', 'none',)
     %     bar([1 : nsessions], mfr)
 %     hold on
 %     errorbar([1 : nsessions], mfr, sfr, 'vertical')
