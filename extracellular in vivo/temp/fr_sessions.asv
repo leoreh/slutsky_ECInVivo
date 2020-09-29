@@ -20,13 +20,13 @@ vars = ["session.mat";...
 % met.
 pcond = ["tempFlag"];
 % pcond = [];
-% same but imposes a negative condition
+% same but imposes a negative condition)
 ncond = ["fix"];
 ncond = ["fepsp"];
 sessionlist = 'sessionList.xlsx';       % must include extension
 fs = 20000;                             % can also be loaded from datInfo
 
-basepath = 'G:\Data\Processed\lh58';
+basepath = 'D:\VMs\shared\lh58';
 % dirnames = ["lh58_200831_080808";...
 %     "lh58_200901_080917";...
 %     "lh58_200903_080936";...
@@ -93,48 +93,45 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if forceA
+ 
+end
+
+% second analysis (depends on first run and load data)
+if forceA
     for i = 1 : nsessions
-        
         % file
         filepath = char(fullfile(basepath, dirnames(i)));
         cd(filepath)
         
-        % vars
-        session = d{i, 1}.session;
-        cm = d{i, 2}.cell_metrics;
-        spikes = d{i, 3}.spikes;
-        ss = d{i, 4}.SleepState;
-        fr = d{i, 5}.fr;
-        datInfo = d{i, 6}.datInfo;
-        
-        % params
+        session = CE_sessionTemplate(pwd, 'viaGUI', false,...
+            'force', true, 'saveVar', true);
+%         basepath = session.general.basePath;
         nchans = session.extracellular.nChannels;
         fs = session.extracellular.sr;
         spkgrp = session.extracellular.spikeGroups.channels;
+        fixSpkAndRes('grp', [], 'fs', fs);
+        spikes = loadSpikes('session', session);
+        spikes = fixCEspikes('basepath', filepath, 'saveVar', false,...
+            'force', true);
+        cell_metrics = ProcessCellMetrics('session', session,...
+            'manualAdjustMonoSyn', false, 'summaryFigures', false,...
+            'debugMode', true, 'transferFilesFromClusterpath', false,...
+            'submitToDatabase', false);
         
-        % spikes
-%         fixSpkAndRes('grp', [], 'fs', fs);
-%         spikes = loadSpikes('session', session);
-%         spikes = fixCEspikes('basepath', filepath, 'saveVar', false,...
-%             'force', true);
-%         cell_metrics = ProcessCellMetrics('session', session,...
-%             'manualAdjustMonoSyn', false, 'summaryFigures', false,...
-%             'debugMode', true, 'transferFilesFromClusterpath', false,...
-%             'submitToDatabase', false);
-            
-        % su vs mu
-        mu = [];
-        spikes = cluVal('spikes', spikes, 'basepath', filepath, 'saveVar', true,...
-            'saveFig', false, 'force', true, 'mu', mu, 'graphics', false,...
-            'vis', 'on', 'spkgrp', spkgrp);
-
+        %         [datename, basename] = fileparts(filepath);
+        %         [~, datename] = fileparts(datename);
+        %         spikes = d{i, 3}.spikes;
+        %         session = d{i, 1}.session;
+        %         cm = d{i, 2}.cell_metrics;
+        %         cm = CellExplorer('metrics', cm);
+        
         % firing rate
-%         binsize = 300;
-%         winBL = [10 * 60 30 * 60];
-%         fr = firingRate(spikes.times, 'basepath', filepath,...
-%             'graphics', false, 'saveFig', false,...
-%             'binsize', binsize, 'saveVar', true, 'smet', 'MA',...
-%             'winBL', winBL);
+        binsize = 300;
+        winBL = [10 * 60 30 * 60];
+        fr = firingRate(spikes.times, 'basepath', filepath,...
+            'graphics', false, 'saveFig', false,...
+            'binsize', binsize, 'saveVar', true, 'smet', 'MA',...
+            'winBL', winBL);
     end
 end
 
@@ -144,10 +141,10 @@ end
 
 close all
 grp = [1 : 8];          % which tetrodes to plot
-state = [];              % [] - all; 1 - awake; 2 - NREM
+state = 1;              % 1 - awake; 2 - NREM
 FRdata = 'strd';        % plot absolute fr or normalized
-unitClass = 'pyr';      % plot 'int', 'pyr', or 'all'
-suFlag = true;         % plot only su or all units
+unitClass = 'all';      % plot 'int', 'pyr', or 'all'
+suFlag = false;         % plot only su or all units
 minfr = 0;              % include only units with fr greater than
 p1 = false;             % firing rate vs. time, one fig per session
 p2 = true;              % mfr across sessions, one fig
@@ -215,7 +212,7 @@ for i = 1 : nsessions
         end
         axis tight
         Y = ylim;
-        fill([states{2} fliplr(states{2})]' / 60, [Y(1) Y(1) Y(2) Y(2)],...
+        fill([states{state} fliplr(states{state})]' / 60, [Y(1) Y(1) Y(2) Y(2)],...
             'b', 'FaceAlpha', 0.15,  'EdgeAlpha', 0);
         ylim([0 3])
         ylabel(ytxt)
@@ -223,33 +220,26 @@ for i = 1 : nsessions
     end
     
     % mfr in selected state across sessions (mean +- std)
-    if ~isempty(state)
-        mfr{i} = mean(frStates{state});
-        sfr(i) = std(frStates{state});
-    else
-        mfr{i} = mean(data(find(units), :), 2);
-        sfr{i} = std(data(find(units), :), [], 2);
-    end
+    mfr(i) = mean(frStates{state});
+    sfr(i) = std(frStates{state});
 end
 if p2
     if i == 1
         fh = figure;
     end
-    scatter([1 : nsessions], cell2nanmat(mfr))
-    %     bar([1 : nsessions], mfr)
-%     hold on
-%     errorbar([1 : nsessions], mfr, sfr, 'vertical')
-%     xticks(1 : nsessions)
-%     xticklabels(sessionDate)
-%     box off
-%     title(sprintf('MFR of %s units', unitClass))
+    bar([1 : nsessions], mfr)
+    hold on
+    errorbar([1 : nsessions], mfr, sfr, 'vertical')
+    xticks(1 : nsessions)
+    xticklabels(sessionDate)
+    box off
+    title(sprintf('MFR of %s units', unitClass))
 end
 
 % number of SU and MU (top - pyr; bottom - int) from selected tetrodes
 p2 = 0;
 grp = [1 : 8];
 if p2
-    clear units
     for i = 1 : nsessions
         cm = d{i, 2}.cell_metrics;
         spikes = d{i, 3}.spikes;

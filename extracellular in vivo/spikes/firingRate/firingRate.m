@@ -124,6 +124,7 @@ idx = istable & ithr;
 % add params
 fr.winBL = winBL;
 fr.binsize = binsize;
+fr.mfr = mean(fr.strd, 2);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
