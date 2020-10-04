@@ -18,6 +18,7 @@ dbstop if error
 diary('off')
 close all
 clear all
+close('all')
 clc
 
 % Get rid of warning about directory already existing:

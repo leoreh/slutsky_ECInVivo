@@ -5,6 +5,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 forceL = false;
 forceA = false;
+saveFig = false;
 
 % should allow user to input varName or columnn index
 colName = 'Session';                    % column name in xls sheet where dirnames exist
@@ -21,12 +22,11 @@ vars = ["session.mat";...
 pcond = ["tempFlag"];
 % pcond = [];
 % same but imposes a negative condition
-ncond = ["fix"];
 ncond = ["fepsp"];
 sessionlist = 'sessionList.xlsx';       % must include extension
 fs = 20000;                             % can also be loaded from datInfo
 
-basepath = 'G:\Data\Processed\lh58';
+basepath = 'D:\VMs\shared\lh69';
 % dirnames = ["lh58_200831_080808";...
 %     "lh58_200901_080917";...
 %     "lh58_200903_080936";...
@@ -99,6 +99,13 @@ if forceA
         filepath = char(fullfile(basepath, dirnames(i)));
         cd(filepath)
         
+        % params
+        session = CE_sessionTemplate(pwd, 'viaGUI', false,...
+            'force', true, 'saveVar', true);
+        nchans = session.extracellular.nChannels;
+        fs = session.extracellular.sr;
+        spkgrp = session.extracellular.spikeGroups.channels;
+        
         % vars
         session = d{i, 1}.session;
         cm = d{i, 2}.cell_metrics;
@@ -106,35 +113,34 @@ if forceA
         ss = d{i, 4}.SleepState;
         fr = d{i, 5}.fr;
         datInfo = d{i, 6}.datInfo;
+%         
+%         rez = runKS('basepath', filepath, 'fs', fs, 'nchans', nchans,...
+%             'spkgrp', spkgrp, 'saveFinal', true, 'viaGui', false,...
+%             'trange', [0 Inf], 'outFormat', 'ns');
         
-        % params
-        nchans = session.extracellular.nChannels;
-        fs = session.extracellular.sr;
-        spkgrp = session.extracellular.spikeGroups.channels;
-        
-        % spikes
-%         fixSpkAndRes('grp', [], 'fs', fs);
-%         spikes = loadSpikes('session', session);
-%         spikes = fixCEspikes('basepath', filepath, 'saveVar', false,...
-%             'force', true);
-%         cell_metrics = ProcessCellMetrics('session', session,...
-%             'manualAdjustMonoSyn', false, 'summaryFigures', false,...
-%             'debugMode', true, 'transferFilesFromClusterpath', false,...
-%             'submitToDatabase', false);
-            
-        % su vs mu
+%         % spikes
+        fixSpkAndRes('grp', [], 'fs', fs);
+        spikes = loadSpikes('session', session);
+        spikes = fixCEspikes('basepath', filepath, 'saveVar', false,...
+            'force', true);
+        cell_metrics = ProcessCellMetrics('session', session,...
+            'manualAdjustMonoSyn', false, 'summaryFigures', false,...
+            'debugMode', true, 'transferFilesFromClusterpath', false,...
+            'submitToDatabase', false);
+%             
+%         % su vs mu
         mu = [];
         spikes = cluVal('spikes', spikes, 'basepath', filepath, 'saveVar', true,...
             'saveFig', false, 'force', true, 'mu', mu, 'graphics', false,...
             'vis', 'on', 'spkgrp', spkgrp);
 
         % firing rate
-%         binsize = 300;
-%         winBL = [10 * 60 30 * 60];
-%         fr = firingRate(spikes.times, 'basepath', filepath,...
-%             'graphics', false, 'saveFig', false,...
-%             'binsize', binsize, 'saveVar', true, 'smet', 'MA',...
-%             'winBL', winBL);
+        binsize = 60;
+        winBL = [10 * 60 30 * 60];
+        fr = firingRate(spikes.times, 'basepath', filepath,...
+            'graphics', false, 'saveFig', false,...
+            'binsize', binsize, 'saveVar', true, 'smet', 'MA',...
+            'winBL', winBL);
     end
 end
 
@@ -143,14 +149,16 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 close all
-grp = [1 : 8];          % which tetrodes to plot
-state = [];              % [] - all; 1 - awake; 2 - NREM
+grp = [1 : 8];       % which tetrodes to plot
+state = [2];            % [] - all; 1 - awake; 2 - NREM
 FRdata = 'strd';        % plot absolute fr or normalized
 unitClass = 'pyr';      % plot 'int', 'pyr', or 'all'
-suFlag = true;         % plot only su or all units
+suFlag = 1;             % plot only su or all units
 minfr = 0;              % include only units with fr greater than
-p1 = false;             % firing rate vs. time, one fig per session
-p2 = true;              % mfr across sessions, one fig
+maxfr = 1000;           % include only untis with fr lower than
+Y = [0 8];              % ylim
+p1 = 1;                 % firing rate vs. time, one fig per session
+p2 = 0;                 % mfr across sessions, one fig
 
 for i = 1 : nsessions
     
@@ -160,7 +168,8 @@ for i = 1 : nsessions
     ss = d{i, 4}.SleepState;
     fr = d{i, 5}.fr;
     datInfo = d{i, 6}.datInfo;
-       
+    fs = session.extracellular.sr;
+   
     % cell class
     pyr = strcmp(cm.putativeCellType, 'Pyramidal Cell');
     int = strcmp(cm.putativeCellType, 'Narrow Interneuron');
@@ -174,7 +183,7 @@ for i = 1 : nsessions
     for ii = 1 : length(grp)
         grpidx = grpidx | spikes.shankID == grp(ii);
     end
-    mfrunits = fr.mfr > minfr;
+    mfrunits = fr.mfr > minfr & fr.mfr < maxfr;
     
     if strcmp(unitClass, 'pyr')
         units = pyr & su & grpidx & mfrunits';
@@ -182,6 +191,9 @@ for i = 1 : nsessions
         units = int & su & grpidx & mfrunits';
     else
         units = su & grpidx & mfrunits';     % override
+    end
+    if ~any(units)
+        break
     end
     
     switch FRdata
@@ -201,6 +213,13 @@ for i = 1 : nsessions
         tStates{ii} = InIntervals(fr.tstamps, states{ii});
         frStates{ii} = mean(data(find(units), find(tStates{ii})), 2);
     end
+    % mfr in selected state across sessions (mean +- std)
+    if ~isempty(state)
+        mfr{i} = frStates{state};
+    else
+        mfr{i} = mean(data(find(units), :), 2);
+    end
+    totalspk(i) = length(vertcat(spikes.ts{units})) / nsamps(end) * fs;
     
     % firing rate vs. time. 1 fig per session
     if p1
@@ -214,35 +233,33 @@ for i = 1 : nsessions
             plot([nsamps(ii) nsamps(ii)] / fs / 60, ylim, '--k')
         end
         axis tight
-        Y = ylim;
         fill([states{2} fliplr(states{2})]' / 60, [Y(1) Y(1) Y(2) Y(2)],...
             'b', 'FaceAlpha', 0.15,  'EdgeAlpha', 0);
-        ylim([0 3])
+        ylim(Y)
         ylabel(ytxt)
+        xlabel('Time [m]')
         suptitle(dirnames{i})
-    end
-    
-    % mfr in selected state across sessions (mean +- std)
-    if ~isempty(state)
-        mfr{i} = mean(frStates{state});
-        sfr(i) = std(frStates{state});
-    else
-        mfr{i} = mean(data(find(units), :), 2);
-        sfr{i} = std(data(find(units), :), [], 2);
+        if saveFig
+            figname = sprintf('%s_FRvsTime', sessionDate{i})
+            figname = fullfile(basepath, figname);
+            % print(fh, figname, '-dpdf', '-bestfit', '-painters');
+            export_fig(figname, '-tif', '-transparent', '-r300')
+        end
     end
 end
 if p2
     if i == 1
         fh = figure;
-    end
-    plot([1 : nsessions], cell2nanmat(mfr), 'ko', 'LineStyle', 'none',)
-    %     bar([1 : nsessions], mfr)
-%     hold on
-%     errorbar([1 : nsessions], mfr, sfr, 'vertical')
-%     xticks(1 : nsessions)
-%     xticklabels(sessionDate)
-%     box off
-%     title(sprintf('MFR of %s units', unitClass))
+    end   
+    plot([1 : nsessions], cell2nanmat(mfr), 'ko',...
+        'LineStyle', 'none', 'MarkerFaceColor', 'k', 'MarkerSize', 4)
+    hold on
+    bar([1 : nsessions], nanmean(cell2nanmat(mfr)), 'EdgeColor', 'k',...
+        'FaceColor', 'none')
+    xticks(1 : nsessions)
+    xticklabels(sessionDate)
+    box off
+    title(sprintf('MFR of %s units', unitClass))
 end
 
 % number of SU and MU (top - pyr; bottom - int) from selected tetrodes
@@ -265,7 +282,7 @@ if p2
         units(i, 4) = sum(spikes.su' & int & grpidx);
         units(i, 5) = sum(grpidx) - sum(units(i, 1 : 4));
     end
-    figure
+    fh = figure;
     bar(units, 'stacked')
     legend({"pyr mu"; "pyr su"; "int mu"; "int su"; "others"})
     xticks(1 : nsessions)
@@ -274,4 +291,9 @@ if p2
     xlabel('Session')
     ylabel('No. units')
     box off
+    if saveFig
+        figname = fullfile(basepath, 'UnitsDetected');
+        % print(fh, figname, '-dpdf', '-bestfit', '-painters');
+        export_fig(figname, '-tif', '-transparent', '-r300')
+    end
 end

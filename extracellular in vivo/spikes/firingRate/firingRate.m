@@ -202,7 +202,7 @@ end
 
 % fr vs. time -------------------------------------------------------------
 % select units
-units = pyr & su & grpidx;
+units = int & su & grpidx;
 data = fr.strd;
 tstamps = fr.tstamps / 60;     
 nsamps = cumsum(datInfo.nsamps);

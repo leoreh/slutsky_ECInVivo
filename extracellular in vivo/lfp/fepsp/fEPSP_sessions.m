@@ -16,8 +16,9 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 forceL = false;
 forceA = false;
+saveFig = false; 
 
-basepath = 'G:\Data\Processed\lh58\fepsp';
+basepath = 'G:\Data\Processed\lh50\fepsp';
 % name of xls file with list of sessions. must include extension.
 sessionlist = 'sessionList.xlsx';       
 
@@ -107,11 +108,11 @@ if forceA
         cd(filepath)
                
         % fepsp
-        intens = [40 80 100 150 200];
+        intens = [];
         fepsp = fEPSPfromDat('basepath', filepath, 'fname', '', 'nchans', nchans,...
             'spkgrp', spkgrp, 'intens', intens, 'concat', false, 'saveVar', true,...
             'force', true, 'extension', 'dat', 'recSystem', 'oe',...
-            'protocol', 'io', 'graphics', true);        
+            'protocol', 'io', 'graphics', false);        
     end
 end
 
@@ -139,7 +140,7 @@ end
 ampmat = nan(ngrp, length(intens), nsessions);
 wvmat = nan(ngrp, nsessions, size(fepsp.wvsnip, 3));
 ampcell = cell(1, nsessions);
-si = 100;        % selected intensity [uA]
+si = 80;        % selected intensity [uA]
 grp = 2;        % selected tetrode
 for i = 1 : nsessions
     fepsp = d{i, 2}.fepsp;
@@ -184,29 +185,60 @@ if p
 end
 
 % waveform and box plot of amplitudes across sessions for selected
-% intensity and tetrode
+% intensity and tetrode. can select specific sessions for waveform
+% ss = [1, 4, 6, 9, 11];
+ss = [1 : nsessions];
 p = 1;
+clr = ['krrrrrr'];        % must be sorted (i.e. g before k before r)
 if p
-    figure
+    fh = figure;
     subplot(2, 1, 1)
     tstamps = [1 : size(wvmat, 3)] / fs * 1000;
-    plot(tstamps, squeeze(wvmat(grp, :, :)))
+    ph = plot(tstamps, squeeze(wvmat(grp, ss, :)), 'LineWidth', 2);
+    if length(ph) == length(clr)
+        clrRep = histc(clr, unique(clr));
+        clear alphaIdx
+        for i = 1 : length(clrRep)
+                alphaIdx{i} = [1 : -1/clrRep(i) : 0.1];
+        end
+        alphaIdx = [alphaIdx{:}];
+        for i = 1 : length(ph)
+            ph(i).Color = clr(ss(i));
+            ph(i).Color(4) = alphaIdx(i);
+        end
+    end
     xlabel('Time [ms]')
     ylabel('Voltage [V]')
-    legend(sessionDate)
+    legend(sessionDate(ss))
     box off
     
     subplot(2, 1, 2)
     ampmat = cell2nanmat(ampcell);
-    boxplot(ampmat, 'PlotStyle', 'traditional')
+    boxplot(ampmat, 'PlotStyle', 'traditional');
+    bh = findobj(gca, 'Tag', 'Box');
+    if length(bh) == length(clr)
+        clr = fliplr(clr);
+        alphaIdx = fliplr(alphaIdx);
+        for i = 1 : length(bh)
+            patch(get(bh(i), 'XData'), get(bh(i), 'YData'),...
+                clr(ss(i)), 'FaceAlpha', alphaIdx(i))
+        end
+    end
+    y = ylim;
+    ylim([0 y(2)]);   
     xticks(1 : nsessions)
     xticklabels(sessionDate)
     xtickangle(45)
     xlabel('Session')
     ylabel('Amplidute [mV]')
     box off
-    
     suptitle(['T#' num2str(grp) ' @ ' num2str(si) 'uA'])
+    
+    if saveFig
+        figname = fullfile(basepath, 'fepspSessions');
+        % print(fh, figname, '-dpdf', '-bestfit', '-painters');
+        export_fig(figname, '-tif', '-transparent', '-r300')
+    end
 end
 
 % io across sessions, one figure per selected grp
@@ -247,29 +279,12 @@ if p
     end
 end
 
-% % waveform across sessions
-% p = 1;
-% ss = [4, 8, 16, 24];    % selected sessions
-% sg = [1, 7];
-% if p
-%     for i = sg
-%         figure
-%         plot(tstamps, squeeze(wvmat(i, ss, :))')
-%         axis tight
-%         xlabel('Time [ms]')
-%         ylabel('Amplitude [mV]')
-%         title(sprintf('T%d', i))
-%         box off
-%         legend(split(dirnames(ss)), 'Interpreter', 'none');
-%     end
-% end
-
 % waveform across time within session
 p = 0;
-sg = 7;         % selected group
-si = 250;       % selected intensity
-ss = 1;         % selected session
 if p
+    sg = 7;         % selected group
+    si = 250;       % selected intensity
+    ss = 1;         % selected session
     for i = sg
         figure
         suptitle(sprintf('T%d @ %s', i, dirnames(ss)))

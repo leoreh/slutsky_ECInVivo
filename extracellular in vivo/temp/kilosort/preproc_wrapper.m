@@ -5,30 +5,30 @@ cd(basepath)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % open ephys
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'F:\Data\lh58\2020-09-07_08-21-27';
-rmvch = [13 16] + 1;
-rmvch = [];
+basepath = 'E:\Data\lh50\2020-04-28_08-21-22';
+rmvch = [18 19 20 21];
+% rmvch = [];
 mapch = [25 26 27 28 30 1 2 29 3 : 14 31 0 15 16 17 : 24 32 33 34] + 1;
-exp = [2];
+exp = [4];
 rec = cell(max(exp), 1);
-rec{2} = [1 : 5];
+% rec{2} = [1 : 4];
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
     'rmvch', rmvch, 'mapch', mapch, 'concat', true, 'nchans', 35);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % tdt
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% basepath = 'I:\Data\Processed\lh57-lh69_200910';
-% store = 'Raw1';
-% blocks = [2 : 4, 9];
-% chunksize = 300;
-% mapch = [1 : 16];
-% % mapch = [1 : 2 : 7, 2 : 2 : 8, 9 : 2 : 15, 10 : 2 : 16];
-% rmvch = [];
-% clip = cell(1, 1);
-% % clip{39} = [480 * 60 Inf];
-% datInfo = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
-%     'chunksize', chunksize, 'mapch', mapch, 'rmvch', rmvch, 'clip', clip);
+basepath = 'D:\VMs\shared\lh70\lh70_201004';
+store = 'Raw1';
+blocks = [7, 8, 13, 18];
+chunksize = 300;
+mapch = [1 : 16];
+% mapch = [1 : 2 : 7, 2 : 2 : 8, 9 : 2 : 15, 10 : 2 : 16];
+rmvch = [8];
+clip = cell(1, 1);
+% clip{39} = [480 * 60 Inf];
+datInfo = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
+    'chunksize', chunksize, 'mapch', mapch, 'rmvch', rmvch, 'clip', clip);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % session info (cell explorer foramt)
@@ -43,7 +43,7 @@ spkgrp = session.extracellular.spikeGroups.channels;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % field
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-intens = [40 80 100 150 200];
+intens = [20 40 60 80 100];
 fepsp = fEPSPfromDat('basepath', basepath, 'fname', '', 'nchans', nchans,...
     'spkgrp', spkgrp, 'intens', intens, 'concat', false, 'saveVar', true,...
     'force', true, 'extension', 'dat', 'recSystem', 'oe',...

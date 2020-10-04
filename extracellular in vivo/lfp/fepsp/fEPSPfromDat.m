@@ -236,7 +236,7 @@ switch protocol
     case 'io'
         snipwin = round([-0.03 * fsOut 0.12 * fsOut]);
         t = [snipwin(1) : snipwin(2)] / fsOut * 1000;
-        wvwin = [find(t == 0) + dt, find(t == 40)];
+        wvwin = [find(t == 0) + dt, find(t == 30)];
     case 'stp'
 end
 
