@@ -82,6 +82,7 @@ for i = mice
     data(:, i) = correct(idx, i);
 end
 mean(data, 2)
+mean(data(end : -1 : end - 3, :)
 
 figure
 subplot(2, 1, 1)

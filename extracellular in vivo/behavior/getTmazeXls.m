@@ -63,11 +63,11 @@ for i = 1 : nmice
 end
 
 % select specific data
-date = 9.9;
+date = 10.9;
 didx = m{i}.date == date;
 idx = didx & sidx;
 
-data = correct(sidx, mice)'; 
+data = correct(didx, mice)'; 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
@@ -75,13 +75,14 @@ data = correct(sidx, mice)';
 
 mice = [1 : 6]; 
 c = 'kkkkkr';
-delay = 10;
+delay = 00;
 clear data
 for i = mice
     idx = find(m{i}.delay == delay);
     data(:, i) = correct(idx, i);
 end
 mean(data, 2)
+mean(data(end : -1 : end - 2, :), 1)
 
 figure
 subplot(2, 1, 1)
