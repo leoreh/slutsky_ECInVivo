@@ -115,15 +115,15 @@ if forceA
         %             'protocol', 'io', 'graphics', false);
         
         [~, basename] = fileparts(filepath);
-        load([basename '.fepsp.mat'])
-        dt = round(2 / 1000 * 1250);
+        load([basename '.fepsp'
+        dt = round(2 / 1000 * 20000);
         [~, midx1] = min(abs(fepsp.t - 0));
         [~, midx2] = min(abs(fepsp.t - 30));
-        wvwin = [midx1 + dt, midx2];
-        fepsp.wvsnip = fepsp.wvavg(:, :, wvwin(1) : wvwin(2));
-        save([basename '.fepsp.mat'], 'fepsp');
+        wvwin = [midx1 + dt, wvwin];
+        fepsp.wvsnip = fepsp.wvavg(:, :, wvwin);
+        save([basename '.fepsp'], 'fepsp);
     end
-end
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % rearrange data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -148,7 +148,7 @@ end
 ampmat = nan(ngrp, length(intens), nsessions);
 wvmat = nan(ngrp, nsessions, size(fepsp.wvsnip, 3));
 ampcell = cell(1, nsessions);
-si = 30;        % selected intensity [uA]
+si = 100;        % selected intensity [uA]
 grp = 2;        % selected tetrode
 for i = 1 : nsessions
     fepsp = d{i, 2}.fepsp;
@@ -194,16 +194,15 @@ end
 
 % waveform and box plot of amplitudes across sessions for selected
 % intensity and tetrode. can select specific sessions for waveform
-% ss = [1, 4, 6, 9, 11];
-ss = [1 : nsessions];
+ss = [1, 4, 6, 9, 11];
+% ss = [1 : nsessions];
 p = 1;
-clr = ['kkkrrrr'];        % must be sorted (i.e. g before k before r)
-fs = 1250;
+clr = ['bbbkkkkkkrrrrr'];        % must be sorted (i.e. g before k before r)
 if p
     fh = figure;
     subplot(2, 1, 1)
     tstamps = [1 : size(wvmat, 3)] / fs * 1000;
-    ph = plot(tstamps, -squeeze(wvmat(grp, ss, :)), 'LineWidth', 2);
+    ph = plot(tstamps, squeeze(wvmat(grp, ss, :)), 'LineWidth', 2);
     clrRep = histc(clr, unique(clr));
     clear alphaIdx
     for i = 1 : length(clrRep)

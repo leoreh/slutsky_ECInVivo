@@ -5,7 +5,6 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 forceL = false;
 forceA = false;
-saveFig = false;
 
 % should allow user to input varName or columnn index
 colName = 'Session';                    % column name in xls sheet where dirnames exist
@@ -63,8 +62,12 @@ end
 
 nsessions = length(dirnames);
 pathPieces = regexp(dirnames(:), '_', 'split'); % assumes filename structure: animal_date_time
-sessionDate = [pathPieces{:}];
-sessionDate = sessionDate(2 : 3 : end);
+if nsessions > 1
+    sessionDate = [pathPieces{:}];
+    sessionDate = sessionDate(2 : 3 : end);
+else
+    sessionDate = pathPieces(2 : 3);
+end
 
 % load files
 if forceL || ~exist('d', 'var')
@@ -147,20 +150,21 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+saveFig = true;
 
 close all
-grp = [1 : 8];       % which tetrodes to plot
+grp = [1 : 4];          % which tetrodes to plot
 state = [2];            % [] - all; 1 - awake; 2 - NREM
 FRdata = 'strd';        % plot absolute fr or normalized
 unitClass = 'pyr';      % plot 'int', 'pyr', or 'all'
 suFlag = 1;             % plot only su or all units
 minfr = 0;              % include only units with fr greater than
-maxfr = 1000;           % include only untis with fr lower than
-Y = [0 8];              % ylim
+maxfr = 100;           % include only untis with fr lower than
+Y = [0 5];              % ylim
 p1 = 1;                 % firing rate vs. time, one fig per session
 p2 = 0;                 % mfr across sessions, one fig
 
-for i = 1 : nsessions
+for i = 1 : nsessions - 1
     
     session = d{i, 1}.session;
     cm = d{i, 2}.cell_metrics;
@@ -177,6 +181,9 @@ for i = 1 : nsessions
     su = ones(1, length(spikes.ts));    % override
     if isfield(spikes, 'su') && suFlag
         su = spikes.su';
+        suTxt = 'SU';
+    else
+        suTxt = 'MU';
     end    
     % specific grp
     grpidx = zeros(1, length(spikes.shankID));
@@ -192,9 +199,9 @@ for i = 1 : nsessions
     else
         units = su & grpidx & mfrunits';     % override
     end
-    if ~any(units)
-        break
-    end
+%     if ~any(units)
+%         break
+%     end
     
     switch FRdata
         case 'norm'
@@ -230,7 +237,8 @@ for i = 1 : nsessions
         % plot(tstamps, medata, 'k', 'LineWidth', 5)
         stdshade(data(units, :), 0.3, 'k', tstamps)
         for ii = 1 : length(nsamps) - 1
-            plot([nsamps(ii) nsamps(ii)] / fs / 60, ylim, '--k')
+            plot([nsamps(ii) nsamps(ii)] / fs / 60, ylim, '--k',...
+                'LineWidth', 2)
         end
         axis tight
         fill([states{2} fliplr(states{2})]' / 60, [Y(1) Y(1) Y(2) Y(2)],...
@@ -247,19 +255,42 @@ for i = 1 : nsessions
         end
     end
 end
+clr = ['bbbkkkkkkrrr'];
 if p2
-    if i == 1
-        fh = figure;
-    end   
-    plot([1 : nsessions], cell2nanmat(mfr), 'ko',...
-        'LineStyle', 'none', 'MarkerFaceColor', 'k', 'MarkerSize', 4)
-    hold on
-    bar([1 : nsessions], nanmean(cell2nanmat(mfr)), 'EdgeColor', 'k',...
-        'FaceColor', 'none')
+    fh = figure;
+    mfrmat = cell2nanmat(mfr);
+    %     plot([1 : nsessions], cell2nanmat(mfr), 'ko',...
+    %         'LineStyle', 'none', 'MarkerFaceColor', 'k', 'MarkerSize', 4)
+    %     errorbar([1 : nsessions], nanmean(mfrmat), nanstd(mfrmat, 1),...
+    %         'k', 'LineWidth', 2)
+    %     hold on
+    %     bh = bar([1 : nsessions], nanmean(mfrmat), 'EdgeColor', 'none');
+    boxplot(mfrmat, 'PlotStyle', 'traditional');
+    bh = findobj(gca, 'Tag', 'Box');
+    if length(bh) == length(clr)
+        clrRep = histc(clr, unique(clr));
+        clear alphaIdx
+        for i = 1 : length(clrRep)
+            alphaIdx{i} = linspace(1, 0.3, clrRep(i));
+        end
+        alphaIdx = [alphaIdx{:}];
+        for i = 1 : length(bh)
+              patch(get(bh(i), 'XData'), get(bh(i), 'YData'),...
+                clr(i), 'FaceAlpha', alphaIdx(i))
+        end
+    end
+    ylabel(ytxt)
+    xlabel('Session')
     xticks(1 : nsessions)
     xticklabels(sessionDate)
     box off
-    title(sprintf('MFR of %s units', unitClass))
+    title(sprintf('MFR of %s %s', unitClass, suTxt))
+    if saveFig
+        figname = sprintf('mfr_%s_%s', unitClass, suTxt);
+        figname = fullfile(basepath, figname);
+        % print(fh, figname, '-dpdf', '-bestfit', '-painters');
+        export_fig(figname, '-tif', '-transparent', '-r300')
+    end
 end
 
 % number of SU and MU (top - pyr; bottom - int) from selected tetrodes
