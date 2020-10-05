@@ -81,9 +81,10 @@ fepsp = fEPSPfromDat('basepath', filepath, 'fname', '', 'nchans', nchans,...
     'protocol', 'io', 'graphics', true);
 
 % fEPSP from WCP
-basepath = 'F:\Data\fEPSP\B3\lh62';
-intens = [100 200];
-fepsp = fEPSPfromWCP('basepath', basepath, 'sfiles', [6 7],...
+basepath = 'C:\Users\heiml\Downloads\fEPSP\fEPSP\lh60';
+intens = [30 : 10 : 60];
+sfiles = [];
+fepsp = fEPSPfromWCP('basepath', basepath, 'sfiles', [],...
     'sufx', 'io1', 'force', true, 'protocol', 'io',...
     'intens', intens, 'inspect', true, 'fs', 20000);
 

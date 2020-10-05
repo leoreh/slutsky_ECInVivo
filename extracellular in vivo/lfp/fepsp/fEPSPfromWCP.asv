@@ -223,11 +223,8 @@ if graphics
     figure
     suptitle(expName)
     subplot(2, 1, 1)    % waveform
-    ph = plot(fepsp.tstamps, fepsp.wvavg, 'k');
-    alphaIdx = [0.3 : 0.5 / length(ph) : 0.8];
-    for i = 1 : length(ph)
-        ph(i).Color(4) = alphaIdx(i);
-    end
+    ph = plot(fepsp.tstamps, fepsp.wvavg);
+    alphaIdx = [1 : -1/length(ph) : 0];
     legend(split(num2str(fepsp.intens)))
     xlabel('Time [ms]')
     ylabel('Voltage [mV]')
@@ -238,12 +235,6 @@ if graphics
     switch protocol
         case 'io'
             boxplot(fepsp.ampmat, 'PlotStyle', 'traditional')
-            bh = findobj(gca, 'Tag', 'Box');
-            alphaIdx = fliplr(alphaIdx);
-            for i = 1 : length(bh)
-                patch(get(bh(i), 'XData'), get(bh(i), 'YData'),...
-                    'k', 'FaceAlpha', alphaIdx(i))
-            end
             xticklabels(split(num2str(fepsp.intens)))
             xlabel('Intensity [uA]')
         case 'stp'
