@@ -25,7 +25,7 @@ ncond = ["fepsp"];
 sessionlist = 'sessionList.xlsx';       % must include extension
 fs = 20000;                             % can also be loaded from datInfo
 
-basepath = 'D:\VMs\shared\lh69';
+basepath = 'D:\VMs\shared\lh70\lh70_201004\lh70_201004';
 % dirnames = ["lh58_200831_080808";...
 %     "lh58_200901_080917";...
 %     "lh58_200903_080936";...
@@ -37,37 +37,37 @@ basepath = 'D:\VMs\shared\lh69';
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % get directory paths
-if exist('dirnames', 'var') && isstring(dirnames)
-    % ALT 1: user input dirnames
-    dirnames = dirnames;
-elseif ischar(sessionlist) && contains(sessionlist, 'xlsx')
-    % ALT 2: get dirnames from xlsx file
-    sessionInfo = readtable(fullfile(basepath, sessionlist));
-    icol = strcmp(sessionInfo.Properties.VariableNames, colName);
-    dirnames = string(table2cell(sessionInfo(:, icol)));
-    % check dirnames meet conditions
-    clear irow iicol
-    irow = ones(length(dirnames), 1);
-    for i = 1 : length(pcond)
-        iicol(i) = find(strcmp(sessionInfo.Properties.VariableNames, char(pcond(i))));
-        irow = irow & sessionInfo{:, iicol(i)} == 1;
-    end
-    for i = 1 : length(ncond)
-        iicol(i) = find(strcmp(sessionInfo.Properties.VariableNames, char(ncond(i))));
-        irow = irow & sessionInfo{:, iicol(i)} ~= 1;
-    end
-    dirnames = dirnames(irow);
-    dirnames(strlength(dirnames) < 1) = [];
-end
-
-nsessions = length(dirnames);
-pathPieces = regexp(dirnames(:), '_', 'split'); % assumes filename structure: animal_date_time
-if nsessions > 1
-    sessionDate = [pathPieces{:}];
-    sessionDate = sessionDate(2 : 3 : end);
-else
-    sessionDate = pathPieces(2 : 3);
-end
+% if exist('dirnames', 'var') && isstring(dirnames)
+%     % ALT 1: user input dirnames
+%     dirnames = dirnames;
+% elseif ischar(sessionlist) && contains(sessionlist, 'xlsx')
+%     % ALT 2: get dirnames from xlsx file
+%     sessionInfo = readtable(fullfile(basepath, sessionlist));
+%     icol = strcmp(sessionInfo.Properties.VariableNames, colName);
+%     dirnames = string(table2cell(sessionInfo(:, icol)));
+%     % check dirnames meet conditions
+%     clear irow iicol
+%     irow = ones(length(dirnames), 1);
+%     for i = 1 : length(pcond)
+%         iicol(i) = find(strcmp(sessionInfo.Properties.VariableNames, char(pcond(i))));
+%         irow = irow & sessionInfo{:, iicol(i)} == 1;
+%     end
+%     for i = 1 : length(ncond)
+%         iicol(i) = find(strcmp(sessionInfo.Properties.VariableNames, char(ncond(i))));
+%         irow = irow & sessionInfo{:, iicol(i)} ~= 1;
+%     end
+%     dirnames = dirnames(irow);
+%     dirnames(strlength(dirnames) < 1) = [];
+% end
+% 
+% nsessions = length(dirnames);
+% pathPieces = regexp(dirnames(:), '_', 'split'); % assumes filename structure: animal_date_time
+% if nsessions > 1
+%     sessionDate = [pathPieces{:}];
+%     sessionDate = sessionDate(2 : 3 : end);
+% else
+%     sessionDate = pathPieces(2 : 3);
+% end
 
 % load files
 if forceL || ~exist('d', 'var')
@@ -150,21 +150,21 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-saveFig = true;
+saveFig = false;
 
 close all
 grp = [1 : 4];          % which tetrodes to plot
 state = [2];            % [] - all; 1 - awake; 2 - NREM
 FRdata = 'strd';        % plot absolute fr or normalized
-unitClass = 'pyr';      % plot 'int', 'pyr', or 'all'
+unitClass = 'int';      % plot 'int', 'pyr', or 'all'
 suFlag = 1;             % plot only su or all units
 minfr = 0;              % include only units with fr greater than
 maxfr = 100;           % include only untis with fr lower than
-Y = [0 5];              % ylim
+Y = [0 50];              % ylim
 p1 = 1;                 % firing rate vs. time, one fig per session
 p2 = 0;                 % mfr across sessions, one fig
 
-for i = 1 : nsessions - 1
+for i = 1 : nsessions
     
     session = d{i, 1}.session;
     cm = d{i, 2}.cell_metrics;
