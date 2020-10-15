@@ -207,7 +207,7 @@ if p
     clrRep = histc(clr, unique(clr));
     clear alphaIdx
     for i = 1 : length(clrRep)
-        alphaIdx{i} = linspace(1, 0.3, clrRep(i));;
+        alphaIdx{i} = linspace(1, 0.3, clrRep(i));
     end
     alphaIdx = [alphaIdx{:}];
     for i = 1 : length(ph)
