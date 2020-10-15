@@ -248,7 +248,7 @@ switch protocol
         stamps = stamps(1 : 5 : end);
         snipwin = round([-0.01 * fsOut 0.19 * fsOut]);
         t = [snipwin(1) : snipwin(2)] / fsOut * 1000;
-        wvwin = [10 30; 30 50; 50 70; 70 90; 90 110] * fsOut / 1000;
+        wvwin = [10 30; 30 50; 50 70; 90 110; 110 130] * fsOut / 1000;
         wvwin(:, 1) = wvwin(:, 1) + dt;
         wvwin(:, 2) = wvwin(:, 2) - dt;
 end
@@ -382,18 +382,11 @@ if graphics
         box off
         
         subplot(1, 2, 2)
-        switch protocol
-            case 'io'
-                ampmat = cell2nanmat(fepsp.ampcell(i, :));
-                boxplot(ampmat, 'PlotStyle', 'traditional')
-                ylim([min(horzcat(fepsp.ampcell{:})) max(horzcat(fepsp.ampcell{:}))])
-                xticklabels(split(num2str(sort(intens))))
-                xlabel('Intensity [uA]')
-            case 'stp'
-                plot([1 : nstim], squeeze(ampNorm(i, :, :)))
-                xticks([1 : nstim])
-                xlabel('Stim No.')
-        end
+        ampmat = cell2nanmat(fepsp.ampcell(i, :));
+        boxplot(ampmat, 'PlotStyle', 'traditional')
+        ylim([min(horzcat(fepsp.ampcell{:})) max(horzcat(fepsp.ampcell{:}))])
+        xticklabels(split(num2str(sort(intens))))
+        xlabel('Intensity [uA]')
         ylabel('Amplidute [mV]')
         box off
         
