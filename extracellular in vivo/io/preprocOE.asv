@@ -95,7 +95,7 @@ for i = 1 : length(exp)
         xmlname = ['settings_' num2str(exp(i)) '.xml'];
     end
     t = convert(xmltree(xmlname));
-    expTime{i} = datetime(t.INFO.DATE, 'InputFormat', 'dd MMM yyyy HH:mm:ss');
+    expTime{i} = datetime(t.INFO.DATE, 'InputFormat', 'dd MMM yyyy HH:MM:SS');
     
     % get recording folders in each experiment
     recFolders = files(contains({files.name}, 'recording') &...

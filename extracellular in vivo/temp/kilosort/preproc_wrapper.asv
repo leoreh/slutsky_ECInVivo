@@ -5,15 +5,15 @@ cd(basepath)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % open ephys
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'E:\Leore\lh58\2020-09-18_15-43-07';
+basepath = 'E:\Leore\lh58\2020-09-15_08-45-16';
 % rmvch = [18 19 20 21];
-rmvch = [8];
+% rmvch = [8];
 rmvch = [];
-% mapch = [25 26 27 28 30 1 2 29 3 : 14 31 0 15 16 17 : 24 32 33 34] + 1;
-mapch = [1 : 19];
+mapch = [25 26 27 28 30 1 2 29 3 : 14 31 0 15 16 17 : 24 32 33 34] + 1;
+% mapch = [1 : 19];
 exp = [2];
 rec = cell(max(exp), 1);
-rec{2} = [7];
+rec{2} = [1];
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
     'rmvch', rmvch, 'mapch', mapch, 'concat', true, 'nchans', length(mapch));
 
