@@ -37,7 +37,7 @@ addOptional(p, 'dt', 2, @isnumeric);
 addOptional(p, 'force', false, @islogical);
 addOptional(p, 'saveVar', true, @islogical);
 addOptional(p, 'saveFig', true, @islogical);
-addOptional(p, 'graphics', true);
+addOptional(p, 'graphics', 1000);
 addOptional(p, 'vis', 'on', @ischar);
 
 parse(p, varargin{:})

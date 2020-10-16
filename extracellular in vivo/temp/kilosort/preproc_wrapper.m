@@ -5,15 +5,15 @@ cd(basepath)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % open ephys
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'E:\Data\lh58\2020-09-06_09-30-23';
+basepath = 'E:\Leore\lh70\2020-10-16_09-31-11';
 % rmvch = [18 19 20 21];
-% rmvch = [8];
-rmvch = [];
-mapch = [25 26 27 28 30 1 2 29 3 : 14 31 0 15 16 17 : 24 32 33 34] + 1;
-% mapch = [1 : 19];
-exp = [4];
+rmvch = [4];
+% rmvch = [];
+% mapch = [25 26 27 28 30 1 2 29 3 : 14 31 0 15 16 17 : 24 32 33 34] + 1;
+mapch = [1 : 19];
+exp = [1];
 rec = cell(max(exp), 1);
-rec{4} = [1];
+% rec{2} = [1 : 4];
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
     'rmvch', rmvch, 'mapch', mapch, 'concat', true, 'nchans', length(mapch));
 
@@ -45,11 +45,11 @@ spkgrp = session.extracellular.spikeGroups.channels;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % field
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-intens = [];
+intens = [40 60 80 70];
 fepsp = fEPSPfromDat('basepath', basepath, 'fname', '', 'nchans', nchans,...
     'spkgrp', spkgrp, 'intens', intens, 'saveVar', true,...
     'force', true, 'extension', 'dat', 'recSystem', 'oe',...
-    'protocol', 'stp', 'graphics', true);  
+    'protocol', 'io', 'anaflag', true, 'inspect', true);  
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % kilosort
