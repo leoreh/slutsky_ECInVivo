@@ -1,10 +1,10 @@
 function fepsp = fEPSPfromDat(varargin)
 
-% this is a wrapper to get fEPSP signals snipped from .dat or .lfp files
-% based on stim indices. compatible for both OE and TDT. if OE, assumes
-% preprocOE has been called beforehand and that basepath conatins din.mat.
-% if TDT, assumes tdt2dat was called beforehand and basepath is the data
-% tank with all relavent blocks.
+% gets fEPSP signals snipped from .dat or .lfp files based on stim indices.
+% compatible for both OE and TDT. if OE, assumes preprocOE has been called
+% beforehand and that basepath conatins din.mat. if TDT, assumes tdt2dat
+% was called beforehand and basepath is the data tank with all relavent
+% blocks.
 %
 % INPUT
 %   basepath    string. path to .dat file (not including dat file itself)
@@ -18,23 +18,20 @@ function fepsp = fEPSPfromDat(varargin)
 %   protocol    stimulus protocol. can be a string ('io' or 'stp') or a
 %               numeric vector describing the times [ms] of stimulations
 %               for each trace (currently not implemented)
-%   dur         numeric. duration of snip {0.15}[s]
-%   dt          numeric. dead time for calculating amplitude.
-%               important for exclusion of stim artifact. {2}[ms]
+%   dc          logical. remove DC component {1}
+%   cf          numeric. cut-off frequency for low-pass filter {450}
 %   precision   char. sample precision of dat file {'int16'}
 %   extension   string. load from 'dat' or {'lfp'} file
 %   recSystem   string. data from 'tdt' or {'oe'}
-%   force       logical. force reload {false}.
-%   concat      logical. concatenate blocks (true) or not {false}.
-%               used for e.g stability.
-%   saveVar     logical. save variable {1}.
-%   saveFig     logical. save graphics {1}.
-%   graphics    logical. plot graphics {1}.
-%   vis         char. figure visible {'on'} or not ('off')
+%   force       logical. force reload {false}
+%   saveVar     logical. save variable {1}
+%   inspect     logical. inspect traces {0}
+%   anaflag     logical. send to analysis {1}
 %
 % CALLS
 %   snipFromDat
 %   tdtbin2mat
+%   fepsp_analysis
 %
 % OUTPUT
 %   fepsp       struct
@@ -42,15 +39,18 @@ function fepsp = fEPSPfromDat(varargin)
 % TO DO LIST
 %   # more efficient way to convert tstamps to idx
 %   # add concatenation option for stability
-%   # improve graphics
+%   # improve graphics (done)
 %   # add option to resample (see getAcc) (done)
 %   # sort mats according to intensity (done)
 %
 % 22 apr 20 LH   UPDATES:
-% 28 jun 20 LH      first average electrodes and then calculate range
-%                   dead time to exclude stim artifact
-% 03 sep 20 LH      snip from lfp
-% 04 sep 20 LH      tdt and oe
+% 28 jun 20        first average electrodes and then calculate range
+%                  dead time to exclude stim artifact
+% 03 sep 20        snip from lfp
+% 04 sep 20        tdt and oe
+% 16 oct 20        added inspect, dc, and cf
+%                  compatible with wcp
+%                  separated analysis
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -62,36 +62,32 @@ addOptional(p, 'nchans', 35, @isnumeric);
 addOptional(p, 'spkgrp', {}, @iscell);
 addOptional(p, 'intens', [], @isnumeric);
 addOptional(p, 'protocol', 'io', @ischar);
-addOptional(p, 'dur', 0.15, @isnumeric);
-addOptional(p, 'dt', 2, @isnumeric);
 addOptional(p, 'precision', 'int16', @ischar);
 addOptional(p, 'extension', 'lfp', @ischar);
 addOptional(p, 'recSystem', 'oe', @ischar);
+addOptional(p, 'cf', 450, @isnumeric);
+addOptional(p, 'dc', true, @islogical);
 addOptional(p, 'force', false, @islogical);
-addOptional(p, 'concat', false, @islogical);
 addOptional(p, 'saveVar', true, @islogical);
-addOptional(p, 'saveFig', true, @islogical);
-addOptional(p, 'graphics', true, @islogical);
-addOptional(p, 'vis', 'on', @ischar);
+addOptional(p, 'anaflag', true, @islogical);
+addOptional(p, 'inspect', false, @islogical);
 
 parse(p, varargin{:})
-basepath = p.Results.basepath;
-fname = p.Results.fname;
-nchans = p.Results.nchans;
-spkgrp = p.Results.spkgrp;
-intens = p.Results.intens;
-protocol = p.Results.protocol;
-dur = p.Results.dur;
-dt = p.Results.dt;
-precision = p.Results.precision;
-extension = p.Results.extension;
-recSystem = p.Results.recSystem;
-force = p.Results.force;
-concat = p.Results.concat;
-saveVar = p.Results.saveVar;
-saveFig = p.Results.saveFig;
-graphics = p.Results.graphics;
-vis = p.Results.vis;
+basepath    = p.Results.basepath;
+fname       = p.Results.fname;
+nchans      = p.Results.nchans;
+spkgrp      = p.Results.spkgrp;
+intens      = p.Results.intens;
+protocol    = p.Results.protocol;
+dc          = p.Results.dc;
+cf          = p.Results.cf;
+precision   = p.Results.precision;
+extension   = p.Results.extension;
+recSystem   = p.Results.recSystem;
+inspect     = p.Results.inspect;
+force       = p.Results.force;
+saveVar     = p.Results.saveVar;
+anaflag     = p.Results.anaflag;
 
 % params
 if isempty(spkgrp)
@@ -99,18 +95,11 @@ if isempty(spkgrp)
 end
 nspkgrp = length(spkgrp);
 
-switch recSystem
-    case 'oe'
-        b2uv = 0.195;
-    case 'tdt'
-        b2uv = [];
-end
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % handle files
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% make sure dat file exist
+% make sure dat / lfp file exists
 datfiles = dir([basepath filesep '**' filesep '*' extension]);
 if isempty(datfiles)
     error('no .dat files found in %s', basepath)
@@ -159,7 +148,8 @@ nfiles = length(datInfo.nsamps);  % number of intensities
 switch recSystem
     case 'oe'
         fsIn = 20000;
-        
+        b2uv = 0.195;
+
         % load digital input
         stimname = fullfile(basepath, [basename, '.din.mat']);
         if exist(stimname)
@@ -186,6 +176,8 @@ switch recSystem
         % missing / additional samples are at the end of the block and are not
         % important (so far has proven to be true)
         fsIn = 24414.0625;
+        b2uv = [];
+
         blockfiles = dir('block*');
         blocknames = natsort({blockfiles.name});
         stim = [];
@@ -229,28 +221,25 @@ else
     fsOut = fsIn;
 end
 
-dt = round(dt / 1000 * fsOut);
 switch protocol
     case 'io'
         % single pulse of 500 us. recording length 150 ms.
         % repeated once every 15 s. negative peak of response typically
         % 10 ms after stim.
         nstim = 1;
+        baseline = [1 floor(29 * fsOut / 1000)];        % samples of baseline period
         snipwin = round([-0.03 * fsOut 0.12 * fsOut]);
-        t = [snipwin(1) : snipwin(2)] / fsOut * 1000;
-        [~, wvwin(1)] = min(abs(t - 0));
-        [~, wvwin(2)] = min(abs(t - 30));
-        wvwin(1) = wvwin(1) + dt;
+        tstamps = [snipwin(1) : snipwin(2)] / fsOut * 1000;
+        ts = [];
     case 'stp'
         % 5 pulses of 500 us at 50 Hz. recording length 200 ms. repeated
         % once every 30 s.
         nstim = 5;
-        stamps = stamps(1 : 5 : end);
+        baseline = [1 floor(9 * fsOut / 1000)];        % samples of baseline period
         snipwin = round([-0.01 * fsOut 0.19 * fsOut]);
-        t = [snipwin(1) : snipwin(2)] / fsOut * 1000;
-        wvwin = [10 30; 30 50; 50 70; 70 90; 90 110] * fsOut / 1000;
-        wvwin(:, 1) = wvwin(:, 1) + dt;
-        wvwin(:, 2) = wvwin(:, 2) - dt;
+        tstamps = [snipwin(1) : snipwin(2)] / fsOut * 1000;
+        ts = diff(stamps);
+        stamps = stamps(1 : 5 : end);
 end
 
 % snip
@@ -260,11 +249,29 @@ snips = snipFromDat('basepath', basepath, 'fname', fname,...
     'b2uv', b2uv);
 snips = snips / 1000;   % uV to mV
 
+% clean snips - remove DC componenet and low pass filter
+import iosr.dsp.*
+filtRatio = cf / (fsOut / 2);
+for i = 1 : size(snips, 1)
+    x = squeeze(snips(i, :, :));
+    if dc
+        x = rmDC(x, 'dim', 1, 'win', baseline);
+    end
+    
+    if cf && ~strcmp(extension, 'lfp')
+        sz = size(x);
+        x = x(:);
+        x = iosr.dsp.sincFilter(x, filtRatio);
+        x = reshape(x, sz);
+    end
+    snips(i, :, :) = x;
+end
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% calc
+% arrange traces
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% rearrange indices according to intesities (files)
+% rearrange stim indices according to intesities (files)
 switch extension
     case 'lfp'
         nsamps = datInfo.nsamps / fsRatio;
@@ -291,119 +298,75 @@ if ~isempty(ind)
     nfiles = length(stimidx);
 end
 
-% rearrange snips according to intensities and tetrodes. extract amplitude
-% and waveform.
-ampNorm = ones(nspkgrp, nfiles, nstim);
-facilitation = ones(nspkgrp, nfiles);
-ampcell = cell(nspkgrp, nfiles);
+% rearrange snips according to intensities and tetrodes (spkgrp). averages
+% across electrodes from the same spkgrp.
+traces = cell(nspkgrp, nfiles);
 for j = 1 : nspkgrp
     for i = 1 : nfiles
-        wv{j, i} = snips(spkgrp{j}, :, stimidx{i});
-        wvavg(j, i, :) = mean(mean(wv{j, i}, 3), 1);
+        traces{j, i} = squeeze(mean(snips(spkgrp{j}, :, stimidx{i}), 1));
         stimcell{i} = stamps(stimidx{i});
-        switch protocol
-            case 'io'
-                ampsnip = squeeze(mean(wv{j, i}(:, wvwin(1) : wvwin(2), :), 1));
-                if size(ampsnip, 2) > size(ampsnip, 1)  % correction if only one trace
-                    ampsnip = ampsnip';
-                end
-                wvsnip(j, i, :) = mean(ampsnip, 2);
-                ampcell{j, i} = range(ampsnip, 1);
-                amp(j, i) = mean(ampcell{j, i});
-            case 'stp'
-                for ii = 1 : nstim
-                    amp(j, i, ii) = range(wvavg(j, i, wvwin(ii, 1) :  wvwin(ii, 2)));
-                end
-                ampNorm(j, i, :) = amp(j, i, :) ./ amp(j, i, 1);    
-                facilitation(j, i) = max(ampNorm(j, i, :));
-                wvsnip(j, i, :) = wvavg(j, i, :);
+    end
+end
+stimidx = cell2nanmat(stimcell);
+
+% correct orientation if only one trace
+for i = 1 : nfiles
+    for j = 1 : nspkgrp
+        if size(traces{j, i}, 1) < size(traces{j, i}, 2)
+            traces{j, i} = traces{j, i}';
         end
     end
 end
 
-if concat  % for stability. currently not implemented
-    for i = 1 : length(blocks)
-        amp = [amp; ampcell{i}];
+% manually inspect and remove unwanted traces
+sg = 1;                 % selected tetrode 
+rm = cell(nfiles);
+if inspect
+    for i = 1 : nfiles
+        [~, rm{i}] = rmTraces(traces{sg, i});
+        for j = 1 : nspkgrp
+            traces{j, i}(:, rm{i}) = [];
+        end
     end
-else
-    stimidx = cell2nanmat(stimcell);
 end
+close all
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% arrange struct and save
+% create struct and save
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-origIntens = intens;
+% sort according to intensity
+intensOrig = intens;
 [intens, ia] = unique(intens);
 
-% arrange struct
-fepsp.wv = wv(:, ia);
-fepsp.wvavg = wvavg(:, ia, :);
-fepsp.wvsnip = wvsnip(:, ia, :);
-fepsp.ampcell = ampcell(:, ia);
-fepsp.amp = amp(:, ia);
-fepsp.ampNorm = ampNorm(:, ia, :);
-fepsp.facilitation = facilitation(:, ia, :);
-fepsp.stim = stimidx(:, ia);
+clear fepsp
+fepsp.info.basename = basename;
+fepsp.info.recSystem = recSystem;
+fepsp.info.protocol = protocol;
+fepsp.info.fsOrig = fsIn;
+fepsp.info.fs = fsOut;
+fepsp.info.spkgrp = spkgrp;
+fepsp.info.stimIdx = stimidx(:, ia);
+fepsp.info.stimTs = ts;                 % for stp
+fepsp.info.stamps = stamps;             % to recover tdt
+fepsp.info.intensOrig = intensOrig;
+fepsp.info.rm = rm;
+fepsp.info.lowPass = cf;
+fepsp.info.inspect = logical(inspect);
 fepsp.intens = intens;
-fepsp.origIntens = origIntens;
-fepsp.t = t;                % [ms]
-fepsp.spkgrp = spkgrp;
-fepsp.dt = dt;
+fepsp.tstamps = tstamps;
+fepsp.traces = traces(:, ia);
 
 if saveVar
     save(fepspname, 'fepsp');
 end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% graphics
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-if graphics
-    if saveFig
-        figpath = fullfile(basepath, 'graphics');
-        mkdir(figpath)
-    end
-    for i = 1 : nspkgrp
-        fh = figure('Visible', vis);
-        suptitle(sprintf('T#%d', i))
-        subplot(1, 2, 1)
-        switch protocol
-            case 'io'
-                plot(fepsp.t(wvwin(1) : wvwin(2)), squeeze(fepsp.wvsnip(i, :, :))')
-            case 'stp'
-                plot(fepsp.t, squeeze(fepsp.wvsnip(i, :, :))')
-        end
-        axis tight
-        y = [min([fepsp.wvsnip(:)]) max([fepsp.wvsnip(:)])];
-        ylim(y)
-        xlabel('Time [ms]')
-        ylabel('Voltage [mV]')
-        legend(split(num2str(sort(intens))))
-        box off
-        
-        subplot(1, 2, 2)
-        switch protocol
-            case 'io'
-                ampmat = cell2nanmat(fepsp.ampcell(i, :));
-                boxplot(ampmat, 'PlotStyle', 'traditional')
-                ylim([min(horzcat(fepsp.ampcell{:})) max(horzcat(fepsp.ampcell{:}))])
-                xticklabels(split(num2str(sort(intens))))
-                xlabel('Intensity [uA]')
-            case 'stp'
-                plot([1 : nstim], squeeze(ampNorm(i, :, :)))
-                xticks([1 : nstim])
-                xlabel('Stim No.')
-        end
-        ylabel('Amplidute [mV]')
-        box off
-        
-        if saveFig
-            figname = [figpath '\fepsp_t' num2str(i)];
-            export_fig(figname, '-tif', '-r300', '-transparent')
-        end
-    end
+% send to analysis
+if anaflag
+    fEPSP_analysis('fepsp', fepsp);
 end
 
-end
+return
+
+% EOF
 
 % EOF

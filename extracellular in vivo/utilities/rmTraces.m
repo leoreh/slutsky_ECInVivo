@@ -3,7 +3,7 @@ function [mat, rm_idx] = rmTraces(mat, varargin)
 % plots data and allows the user to remove unwanted traces
 % 
 % INPUT
-%   mat         matrix of samples (rows) x traces (columns 
+%   mat         matrix of samples (rows) x traces (columns) 
 %   x           vector for x-axis, can be empty
 %   ylimit      vector describing ylim of plot
 %   basepath    recording session path {pwd} to save figure
