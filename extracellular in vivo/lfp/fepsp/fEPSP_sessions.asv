@@ -18,7 +18,7 @@ forceL = false;
 forceA = false;
 saveFig = false; 
 
-basepath = 'G:\Data\Processed\lh58\fepsp';
+basepath = 'E:\Leore\lh70';
 % name of xls file with list of sessions. must include extension.
 sessionlist = 'sessionList.xlsx';       
 
@@ -31,7 +31,7 @@ vars = ["session.mat";...
 % column name of logical values for each session. only if true than session
 % will be loaded. can be a string array and than all conditions must be
 % met.
-pcond = ["stp"; "tempFlag"];     
+pcond = ["fepsp"; "tempFlag"];     
 % pcond = [];
 
 % same as pcond but imposes a negative condition.
@@ -192,7 +192,7 @@ sessionDate = sessionDate(2 : 3 : end);
  
 % waveform and box plot of amplitudes across sessions for selected
 % intensity and tetrode. can select specific sessions for waveform
-ss = [3, 4, 6, 9, 11];
+ss = [1, 4, 10];
 % ss = [1 : nsessions];
 p = 1;
 clr = ['kkkrrrrr'];        % must be sorted (i.e. g before k before r)

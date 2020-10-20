@@ -18,7 +18,7 @@ forceL = false;
 forceA = false;
 saveFig = false; 
 
-basepath = 'G:\Data\Processed\lh58\fepsp';
+basepath = 'E:\Leore\lh70';
 % name of xls file with list of sessions. must include extension.
 sessionlist = 'sessionList.xlsx';       
 
@@ -31,7 +31,7 @@ vars = ["session.mat";...
 % column name of logical values for each session. only if true than session
 % will be loaded. can be a string array and than all conditions must be
 % met.
-pcond = ["stp"; "tempFlag"];     
+pcond = ["fepsp"; "tempflag"];     
 % pcond = [];
 
 % same as pcond but imposes a negative condition.
@@ -123,8 +123,6 @@ end
 % rearrange data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-protocol = fepsp.info.protocol;
-
 % intensities throughout sessions
 intens = [];
 for i = 1 : nsessions
@@ -135,6 +133,7 @@ for i = 1 : nsessions
     intens = sort(unique([intens, fepsp.intens]));
 end
 
+protocol = fepsp.info.protocol;
 switch protocol
     case 'io'
         % ampmat    3d mat of amplitudes; tetrode x intensity x session. data will
@@ -147,7 +146,7 @@ switch protocol
         ampmat = nan(ngrp, length(intens), nsessions);
         wvmat = nan(ngrp, nsessions, size(fepsp.wavesAvg, 3));
         ampcell = cell(1, nsessions);
-        si = 100;        % selected intensity [uA]
+        si = 80;        % selected intensity [uA]
         grp = 2;        % selected tetrode
         for i = 1 : nsessions
             fepsp = d{i, 2}.fepsp;
@@ -193,7 +192,7 @@ sessionDate = sessionDate(2 : 3 : end);
 % waveform and box plot of amplitudes across sessions for selected
 % intensity and tetrode. can select specific sessions for waveform
 ss = [1, 4, 10];
-% ss = [1 : nsessions];
+ss = [1 : nsessions];
 p = 1;
 clr = ['kkkrrrrr'];        % must be sorted (i.e. g before k before r)
 grp = 1;
