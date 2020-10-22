@@ -283,6 +283,7 @@ if p2
     xlabel('Session')
     xticks(1 : nsessions)
     xticklabels(sessionDate)
+    xtickangle(45)
     box off
     title(sprintf('MFR of %s %s', unitClass, suTxt))
     if saveFig

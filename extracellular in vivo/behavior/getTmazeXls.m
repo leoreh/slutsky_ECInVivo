@@ -83,12 +83,12 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics - params vs. session
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-mice = [1: 6];
+mice = [1 : 6];
 % mice = [2, 6];
-delay = 300;
+delay = 10;
 dates = [];
 % dates = [2.9 : 9.9];
-% dates = [2.9, 3.9, 4.9, 5.9, 6.9, 7.9, 8.9, 9.9, 10.9, 11.9];
+dates = [2.1 : 14.1];
 shadeIdx = [5 10];
 shaedIdx = [];
 % shadeIdx = [8.5 9.5];
@@ -116,10 +116,6 @@ waterIdx = zeros(length(waterDate), 1);
 for i = 1 : length(dates)
     waterIdx = waterIdx | dates(i) == waterDate;
 end
-
-    data = dur(idx, mice);
-xxx = nanmean(data, 1)
-
 
 close all
 % -------------------------------------------------------------------------
