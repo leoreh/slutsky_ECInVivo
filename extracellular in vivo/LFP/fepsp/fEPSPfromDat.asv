@@ -50,7 +50,7 @@ function fepsp = fEPSPfromDat(varargin)
 %           stimIdx     double, the indexes of the stimuli in the long dat
 %                       file, dims electrode X intensities.
 %           stimTs      double, the index of the stimuli in the TS of the
-%                       long dat file.
+%                       long dat file (need to double check meaning).
 %           stamps      double, the index of the start and end of each
 %                       trace in the long dat file (need to double check meaning for orginization).
 %           intensOrig  double, the intensities as user inputed them, without 

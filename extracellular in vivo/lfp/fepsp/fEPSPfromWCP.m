@@ -40,8 +40,8 @@ function fepsp = fEPSPfromWCP(varargin)
 %       Info        struct, info about the recourding, with fields:
 %           basename    cell, the name of the file/ files that the traces were
 %                       exstracted from.
-%           recSystem   char, type of recourding system (Field/oe/tdt), in
-%                       this function always 'Field'.
+%           recSystem   char, type of recourding system (wcp/oe/tdt), in
+%                       this function always 'wcp'.
 %           protocol    stimulus protocol. can be a string ('io' or 'stp') or a
 %                       numeric vector describing the times [ms] of stimulations
 %                       for each trace (numeric currently not implemented)
@@ -248,7 +248,7 @@ intensOrig = intens;
 
 % arrange struct - new (to Match with fEPSPfromDat)
 fepsp.info.basename = filenames;
-fepsp.info.recSystem = 'Field';
+fepsp.info.recSystem = 'wcp';
 fepsp.info.protocol = protocol;
 fepsp.info.fsOrig = lfp.fs_orig;
 fepsp.info.fs = fs;
