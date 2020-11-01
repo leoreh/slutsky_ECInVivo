@@ -30,7 +30,8 @@ function rez = runKS(varargin)
 %   tetrode is bad (done - 11 jun 20)
 % 
 % 22 may 20 LH      updates:
-% 16 jun 20 LH      outFormat
+% 16 jun 20             outFormat
+% 31 oct 20             updated to KS2.5
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -91,7 +92,7 @@ for i = 1 : length(spkgrp)
     l = length(spkgrp{i});
     kcoords = [kcoords, ones(1, l) * i];
     xcoords = [xcoords, xrep(1 : l)];
-    ycoords = [ycoords, ones(1, l) * i * 20];
+    ycoords = [ycoords, ones(1, l) * i * 200];
 end
 xcoords(badch) = NaN;
 ycoords(badch) = NaN;
@@ -115,6 +116,17 @@ ops.kcoords         = kcoords;
 ops.fs              = fs;       % sampling rate
 ops.NchanTOT        = nchans;   % total number of channels in your recording
 ops.trange          = trange;   % time range to sort [s]
+
+% kcoords is used to forcefully restrict templates to channels in the same
+% channel group. criterionNoiseChannels can be set to allow a fraction of
+% all templates to span more channel groups, so that they can capture
+% shared noise across all channels. if this number is less than 1, it will
+% be treated as a fraction of the total number of clusters. if this number
+% is larger than 1, it will be treated as the "effective number" of channel
+% groups at which to set the threshold. So if a template occupies more than
+% this many channel groups, it will not be restricted to a single channel
+% group {0.2}.
+ops.criterionNoiseChannels = 0.2; 
 
 % Thresholds on spike detection used during the optimization Th(1) or
 % during the final pass Th(2). These thresholds are applied to the template
@@ -140,10 +152,13 @@ ops.lam = 25;
 ops.AUCsplit = 0.86;
 
 % frequency for high pass filtering {150}
-ops.fshigh = 500;
+ops.fshigh = 300;
+
+% frequency for low (band) pass filtering {none}
+% ops.fslow = 300;
 
 % minimum firing rate on a "good" channel (0 to skip){0.1}
-ops.minfr_goodchannels = 0;
+ops.minfr_goodchannels = 0.05;
 
 % minimum spike rate (Hz), if a cluster falls below this for too long it
 % gets removed {1/50}.
@@ -156,27 +171,44 @@ ops.momentum = [20 800];
 % spatial constant in um for computing residual variance of spike
 ops.sigmaMask = 30;
 
+% spatial scale for datashift kernel (new in v2.5)
+ops.sig = 20;
+
+% type of data shifting (0 = none, 1 = rigid, 2 = nonrigid)
+ops.nblocks = 5;
+
 % threshold crossings for pre-clustering (in PCA projection space)
 ops.ThPre = 8;
 
-ops.nt0             = 61;       % window width in samples. 2 ms for 20 kH {61}
+% number of time samples for the templates (has to be <=81 due to GPU
+% shared memory). {61}. 
+ops.nt0             = 61;       
+
+% time sample where the negative peak should be aligned {2} 
+ops.nt0min  = ceil(20 * ops.nt0 / 61); 
+
 ops.spkTh           = -4;       % spike threshold in standard deviations {-6}
 ops.reorder         = 1;        % whether to reorder batches for drift correction.
 ops.nskip           = 25;       % how many batches to skip for determining spike PCs
 ops.Nfilt           = 256;      % number of filters to use (2-4 times more than Nchan, should be a multiple of 32)
-ops.nfilt_factor    = 32;       % max number of clusters per good channel (even temporary ones)
+ops.nfilt_factor    = 8;        % max number of clusters per good channel (even temporary ones) {4}
 ops.ntbuff          = 64;       % samples of symmetrical buffer for whitening and spike detection
-ops.nSkipCov        = 25;       % compute whitening matrix from every N-th batch
+ops.nSkipCov        = 25;       % skip n batches when computing whitening matrix 
 ops.scaleproc       = 200;      % int16 scaling of whitened data
 ops.nPCs            = 3;        % how many PCs to project the spikes into
 ops.GPU             = 1;        % has to be 1, no CPU version yet, sorry
 ops.useRAM          = 0;        % not yet available
+ops.fig             = 1;        % plot figures
 
-% batch size (try decreasing if out of memory). must be multiple of 32 + ntbuff.
+% nomber of time points per batch (try decreasing if out of memory). must
+% be multiple of 32 + ntbuff.
 ops.NT              = 128 * 1024 + ops.ntbuff;
 
 % how many channels to whiten together (Inf for whole probe whitening)
 ops.whiteningRange  = min([64 sum(connected)]); 
+
+% perform common average referencing by median {1}.
+ops.CAR = 1;
 
 datfile             = dir(fullfile(basepath, '*.dat')); % find the binary file
 ops.fbinary         = fullfile(basepath, datfile(1).name);
@@ -194,6 +226,9 @@ else
     % preprocess data to create temp_wh.dat
     rez = preprocessDataSub(ops);
     
+    % NEW STEP TO DO DATA REGISTRATION
+    rez = datashift2(rez, 1); % last input is for shifting data
+    
     % time-reordering as a function of drift
     rez = clusterSingleBatches(rez);
     
@@ -201,7 +236,12 @@ else
     save(fullfile(basepath, 'rez.mat'), 'rez', '-v7.3');
     
     % main tracking and template matching algorithm
-    rez = learnAndSolve8b(rez);
+    iseed = 1; % ORDER OF BATCHES IS NOW RANDOM, controlled by random number generator
+    rez = learnAndSolve8b(rez, iseed);
+    
+    % OPTIONAL: remove double-counted spikes - solves issue in which individual spikes are assigned to multiple templates.
+    % See issue 29: https://github.com/MouseLand/Kilosort/issues/29
+    rez = remove_ks2_duplicate_spikes(rez);
     
     % final merges
     rez = find_merges(rez, 1);
@@ -209,19 +249,35 @@ else
     % final splits by SVD
     rez = splitAllClusters(rez, 1);
     
-    % final splits by amplitudes
-    rez = splitAllClusters(rez, 0);
+    % final splits by amplitudes (from v2.0)
+    % rez = splitAllClusters(rez, 0);
     
     % decide on cutoff
     rez = set_cutoff(rez);
-    
+    % eliminate widely spread waveforms (likely noise)
+    rez.good = get_good_units(rez);
+       
     fprintf('found %d good units \n', sum(rez.good > 0))
     
     % save final results
     if saveFinal
-        rez = rmfield(rez, 'st2');
-        rez = rmfield(rez, 'cProjPC');
-        rez = rmfield(rez, 'cProj');
+        % discard features in final rez file (too slow to save)
+        rez.cProj = [];
+        rez.cProjPC = [];
+        rez.st2 = [];
+
+        % final time sorting of spikes, for apps that use st3 directly
+        [~, isort]   = sortrows(rez.st3);
+        rez.st3      = rez.st3(isort, :);
+        
+        % Ensure all GPU arrays are transferred to CPU side before saving to .mat
+        rez_fields = fieldnames(rez);
+        for i = 1:numel(rez_fields)
+            field_name = rez_fields{i};
+            if(isa(rez.(field_name), 'gpuArray'))
+                rez.(field_name) = gather(rez.(field_name));
+            end
+        end  
         fprintf('\nsaving final rez file\n')
         save(fullfile(basepath, 'rez.mat'), 'rez', '-v7.3');
     end

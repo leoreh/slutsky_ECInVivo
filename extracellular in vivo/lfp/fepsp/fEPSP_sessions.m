@@ -14,7 +14,8 @@ saveFig = false;
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-basepath = 'F:\Data\Processed\lh58\fepsp';
+basepath = 'F:\Data\Processed\lh70\fepsp';
+
 vars = ["session.mat";...
     "fepsp"];      
 pcond = ["fepsp"; "tempFlag"];     
@@ -91,7 +92,7 @@ switch protocol
         wvmat = nan(ngrp, nsessions, size(fepsp.wavesAvg, 3));
         ampcell = cell(1, nsessions);
         si = 100;        % selected intensity [uA]
-        grp = 3;        % selected tetrode
+        grp = 1;        % selected tetrode
         for i = 1 : nsessions
             fepsp = varArray{i, 2}.fepsp;  
             sintens = sort(fepsp.intens);
@@ -135,16 +136,16 @@ sessionDate = sessionDate(2 : 3 : end);
  
 % waveform and box plot of amplitudes across sessions for selected
 % intensity and tetrode. can select specific sessions for waveform
-% ss = [3, 4, 6, 10, 12];
+% ss = [1, 2, 3, 4, 8, 12];
 ss = [1 : nsessions];
 p = 1;
 clr = ['kkkrrrrr'];        % must be sorted (i.e. g before k before r)
-grp = 3;
+grp = 4;
 if p
     fh = figure;
     subplot(2, 1, 1)
     tstamps = [1 : size(wvmat, 3)] / fs * 1000;
-    ph = plot(tstamps, squeeze(wvmat(grp, ss, :)), 'LineWidth', 2);
+    ph = plot(tstamps, -squeeze(wvmat(grp, ss, :)), 'LineWidth', 2);
     clrRep = histc(clr, unique(clr));
     clear alphaIdx
     for i = 1 : length(clrRep)

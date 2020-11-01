@@ -37,6 +37,7 @@ addOptional(p, 'vars', "session", @isstring);
 addOptional(p, 'pcond', "tempFlag", @isstring);
 addOptional(p, 'ncond', "", @isstring);
 addOptional(p, 'sortDir', true, @islogical);
+addOptional(p, 'dirnames', []);
 
 parse(p, varargin{:})
 basepath        = p.Results.basepath;
@@ -46,6 +47,7 @@ vars            = p.Results.vars;
 pcond           = p.Results.pcond;
 ncond           = p.Results.ncond;
 sortDir         = p.Results.sortDir;
+dirnames         = p.Results.dirnames;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Get directory paths

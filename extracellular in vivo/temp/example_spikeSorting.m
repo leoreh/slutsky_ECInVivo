@@ -1,7 +1,7 @@
 % demonstrate spike sorting
 
 b2uv = 0.195;
-dur = 0.25;
+dur = 0.3;
 saveFig = false;
 
 basepath = 'D:\VMs\shared\lh70\lh70_201015_0951';
@@ -24,44 +24,40 @@ tstamps = 1 / fs : 1 / fs : dur;
 hpsig = filterLFP(sig, 'fs', 20000, 'passband', [800 Inf],...
     'order', 50, 'type', 'fir1', 'dataOnly', true, 'graphics', false);
 
-thr = -(mean(hpsig) + 6 * std(hpsig));
+thr = mean(hpsig) + 5 * std(hpsig);
 
+clear stamps
 for i = 1 : size(sig, 2)
-    s = find(hpsig(:, i) < thr(i));
+    s = find(hpsig(:, i) < -thr(i) | hpsig(:, i) > thr(i));
     s(diff(s) < fs * 0.001) = [];
     stamps{i} = s;
 end
-stamps = vertcat(stamps{:});
+stamps = sort(vertcat(stamps{:}));
 nspks = length(stamps);
-spk = zeros(4, 32, nspks);
+snips = zeros(4, 32, nspks);
 
 for i = 1 : nspks
     spkidx(i, :) = [stamps(i) - 15, stamps(i) + 16];
-    spk(:, :, i) = sig(spkidx(i, 1) : spkidx(i, 2), :)';
+    snips(:, :, i) = sig(spkidx(i, 1) : spkidx(i, 2), :)';
 end
 
-
-
+% compute PCA
 nFeatures = 4 * 3;
 fetMat = zeros(nspks, nFeatures);
-if ~isempty(spk)
+if ~isempty(snips)
     for ii = 1 : 4
-        [~, pcFeat] = pca(permute(spk(ii, :, :), [3, 2, 1]));
+        [~, pcFeat] = pca(permute(snips(ii, :, :), [3, 2, 1]));
         fetMat(:, ii * 3 - 2 : ii * 3) = (pcFeat(:, 1 : 3));
     end
 end
 fetMat(:, 13) = double(stamps);
+dim = [2, 12];
 
 % select specific spikes
-spk(1) = stamps{4}(2);
-spk(2) = stamps{4}(5);
-spk(3) = stamps{1}(2);
-
-figure
-plot
-
-
-
+clear spk
+spk(1) = 12;
+spk(2) = 12;
+spk(2) = 14;
 
 close all
 fh = figure;
@@ -70,44 +66,44 @@ clr = 'bgr';
 subplot(3, 3, [1 : 3])
 yOffset = max(range(sig));
 for i = 1 : size(sig, 2)
-    plot(tstamps, sig(:, i) + yOffset * i, 'k', 'LineWidth', 1)
+    plot(tstamps, sig(:, i) + (yOffset / 2) * i, 'k', 'LineWidth', 1)
     hold on
 end
 yLimit = ylim;
 for i = 1 : length(spk)
-    fill([spkidx(i, :) fliplr(spkidx(i, :))]' / fs, sort([yLimit yLimit]), clr(i),...
+    fill([spkidx(spk(i), :) fliplr(spkidx(spk(i), :))]' / fs, sort([yLimit yLimit]), clr(i),...
         'FaceAlpha', 0.2, 'EdgeAlpha', 0)
 end
 ylabel('Amplitude [uV]')
-yticks()
+yticks([])
 yticklabels('')
 
 subplot(3, 3, [4 : 6])
 yOffset = max(range(hpsig));
 for i = 1 : size(sig, 2)
-    plot(tstamps, hpsig(:, i) + yOffset * i, 'k', 'LineWidth', 1)
+    plot(tstamps, hpsig(:, i) + (yOffset / 1.2) * i, 'k', 'LineWidth', 1)
     hold on
-    plot(xlim, [thr(i) thr(i)] + yOffset * i, '--r', 'LineWidth', 1)
+    plot(xlim, -[thr(i) thr(i)] + (yOffset / 1.2) * i, '--r', 'LineWidth', 1)
 end
 yLimit = ylim;
-ylim([yLimit(1) - yOffset / 2, yLimit(2) + yOffset / 2])
+ylim([yLimit(1), yLimit(2)])
 yLimit = ylim;
 for i = 1 : length(spk)
-    fill([spkidx(i, :) fliplr(spkidx(i, :))]' / fs, sort([yLimit yLimit]), clr(i),...
+   fill([spkidx(spk(i), :) fliplr(spkidx(spk(i), :))]' / fs, sort([yLimit yLimit]), clr(i),...
         'FaceAlpha', 0.2, 'EdgeAlpha', 0)
 end
 xlabel('Time [s]')
 ylabel('Amplitude [uV]')
-xticks([0 dur])
+xticks([0 dur]) 
 ylabel('Amplitude [uV]')
-yticks()
+yticks([]);
 yticklabels('')
 set(gca, 'TickLength', [0 0])
 
 for ii = 1 : length(spk)
     subplot(3, 3, 6 + ii)
-    for i = 1 : size(spk{ii}, 2)
-        plot([-15 : 16] / fs * 1000, spk{ii}(:, i) + yOffset * i,...
+    for i = 1 : 4
+        plot([-15 : 16] / fs * 1000, snips(i, :, spk(ii)) + yOffset * i,...
             clr(ii), 'LineWidth', 2)
         hold on
     end
@@ -116,10 +112,23 @@ for ii = 1 : length(spk)
     ylim([yLimit(1) - yOffset, yLimit(2) + yOffset])
     xlabel('Time [ms]')
     ylabel('Amplitude [uV]')
-    yticks()
+    yticks([])
     yticklabels('')
     xlabel('Time [ms]')
 end
+
+subplot(3, 3, 9)
+scatter(fetMat(:, dim(1)), fetMat(:, dim(2)), 10, 'k', 'filled')
+hold on
+for i = 1 : length(spk)
+    scatter(fetMat(spk(i), dim(1)), fetMat(spk(i), dim(2)), 30, clr(i), 'filled')
+end
+xlabel(['E' num2str(ceil(dim(1) / 3)) '; PC' num2str(mod(dim(1), 3))])
+ylabel(['E' num2str(ceil(dim(2) / 3)) '; PC1'])
+yticks([])
+yticklabels('')
+xticks([])
+xticklabels('')
 
 if saveFig
     figpath = fullfile(basepath, 'graphics');
