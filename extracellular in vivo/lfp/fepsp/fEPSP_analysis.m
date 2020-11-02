@@ -26,6 +26,9 @@ function fepsp = fEPSP_analysis(varargin)
 %   # Lior Da Marcas take over
 %
 % 16 oct 20 LH   UPDATES
+% 02 Nov 20 LD  Change analysis from range on relevant window to
+%               amplitude as 1st peak on waveArg, Change graphic to work
+%               with that
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -133,31 +136,24 @@ fepsp.ampNorm   = nan(nspkgrp, nfiles, nstim);
 fepsp.facilitation = nan(nspkgrp, nfiles);
 
 fepsp = rmfield(fepsp, 'ampNorm');
-
+TheMin = cell(nspkgrp,nfiles);
+TheMax = cell(nspkgrp,nfiles);
 for j = 1 : nspkgrp
     for i = 1 : nfiles
         fepsp.traceAvg(j, i, :) = mean(fepsp.traces{j, i}, 2);
         switch protocol
             case 'io'
-%                 Generated bad results
-%                 if abs(min(fepsp.traces{j, i}(:))) > max(fepsp.traces{j, i}(:))
-%                     % I took this method from getLFP line 178, however
-%                     % changed the direction as it seemed weird the
-%                     % opposite. However, the syncronus/ asyncronus/
-%                     % inhibitory responce might affect this, and maybe with
-%                     % fepsp in PYR layer we would expect opposite direction.
-%                     % this will affect calculation because of the diff sensetivity of
-%                     % 1st local max and 1st local min, so we need to invert.
-%                     fprintf('Inverting traces in cell (%d,%d)\n',j,i)
-%                     fepsp.traces{j, i} = -fepsp.traces{j, i};
-%                 end
                 fepsp.waves{j, i} = fepsp.traces{j, i}(wvwin(1) : wvwin(2), :);
                 % find first local minima & maxima in window. since we
                 % expect the minima to be relativly big, ignore any minima
                 % with small Prominence (<0.3). if the responce is smaller
                 % then that, it is practicly 0.
-                [ValueCheckMax,PerTrace1Max] = max(islocalmax(fepsp.waves{j, i},1),[],1);
-                [ValueCheckMin,PerTrace1Min] = max(islocalmin(fepsp.waves{j, i},1,'MinProminence',0.3),[],1);
+                FullTraceAvrg = mean(fepsp.traces{j, i}, 2);
+                BaseLineAmp = std(FullTraceAvrg(fepsp.tstamps < -2)); 
+                %Noise local min/max == changes in amplitude = on avrg, aprox 2*std.
+                % I'll take 5 time this std as real signal
+                [ValueCheckMax,PerTrace1Max] = max(islocalmax(fepsp.waves{j, i},1,'MinProminence',5*BaseLineAmp),[],1);
+                [ValueCheckMin,PerTrace1Min] = max(islocalmin(fepsp.waves{j, i},1,'MinProminence',5*BaseLineAmp),[],1);
                 PerTrace1Max(ValueCheckMax == 0) = 1; 
                 %if no local maxima with any Prominence, take the 1st sample in window
                 PerTrace1Min(ValueCheckMin == 0) = round((fs/1000)*10-2*(fs/1000));
@@ -226,7 +222,7 @@ if graphics
                 ylim(yLimit)
                 xlabel('Time [ms]')
                 ylabel('Voltage [mV]')
-                legend([split(num2str(sort(fepsp.intens)));{'Amp measure point 1_s_t min'};{'Amp measure point 1_s_t max'}])
+                legend([split(num2str(sort(fepsp.intens)));{'Amp measure point 1st min'};{'Amp measure point 1st max'}],'Location','best')
                 box off
                 
                 subplot(1, 2, 2)
