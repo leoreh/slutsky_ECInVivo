@@ -23,73 +23,21 @@ pcond = ["tempFlag"];
 % same but imposes a negative condition
 ncond = ["fepsp"];
 sessionlist = 'sessionList.xlsx';       % must include extension
-fs = 20000;                             % can also be loaded from datInfo
 
-basepath = 'D:\VMs\shared\lh70\lh70_201004\lh70_201004';
-% dirnames = ["lh58_200831_080808";...
-%     "lh58_200901_080917";...
-%     "lh58_200903_080936";...
-%     "lh58_200905_080948";...
-%     "lh58_200906_090914"];
-% clear dirnames
+% basepath = 'D:\VMs\shared\lh58';
+basepath = 'F:\Data\Processed\lh58';
+
+% dirnames = ["lh58_200830_1000"; "lh58_200831_1000";...
+%     "lh58_200830_090851"; "lh58_200831_080808"];
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% get directory paths
-% if exist('dirnames', 'var') && isstring(dirnames)
-%     % ALT 1: user input dirnames
-%     dirnames = dirnames;
-% elseif ischar(sessionlist) && contains(sessionlist, 'xlsx')
-%     % ALT 2: get dirnames from xlsx file
-%     sessionInfo = readtable(fullfile(basepath, sessionlist));
-%     icol = strcmp(sessionInfo.Properties.VariableNames, colName);
-%     dirnames = string(table2cell(sessionInfo(:, icol)));
-%     % check dirnames meet conditions
-%     clear irow iicol
-%     irow = ones(length(dirnames), 1);
-%     for i = 1 : length(pcond)
-%         iicol(i) = find(strcmp(sessionInfo.Properties.VariableNames, char(pcond(i))));
-%         irow = irow & sessionInfo{:, iicol(i)} == 1;
-%     end
-%     for i = 1 : length(ncond)
-%         iicol(i) = find(strcmp(sessionInfo.Properties.VariableNames, char(ncond(i))));
-%         irow = irow & sessionInfo{:, iicol(i)} ~= 1;
-%     end
-%     dirnames = dirnames(irow);
-%     dirnames(strlength(dirnames) < 1) = [];
-% end
-% 
-% nsessions = length(dirnames);
-% pathPieces = regexp(dirnames(:), '_', 'split'); % assumes filename structure: animal_date_time
-% if nsessions > 1
-%     sessionDate = [pathPieces{:}];
-%     sessionDate = sessionDate(2 : 3 : end);
-% else
-%     sessionDate = pathPieces(2 : 3);
-% end
-
-% load files
-if forceL || ~exist('d', 'var')
-    d = cell(length(dirnames), length(vars));
-    for i = 1 : nsessions
-        filepath = char(fullfile(basepath, dirnames(i)));
-        if ~exist(filepath, 'dir')
-            warning('%s does not exist, skipping...', filepath)
-            continue
-        end
-        cd(filepath)
-        
-        for ii = 1 : length(vars)
-            filename = dir(['*', vars{ii}, '*']);
-            if length(filename) == 1
-                d{i, ii} = load(filename.name);
-            else
-                warning('no %s file in %s, skipping', vars{ii}, filepath)
-            end
-        end
-    end
+if ~exist('varArray', 'var') && ~forceL
+    [varArray, dirnames] = getSessionVars('basepath', basepath, 'vars', vars,...
+        'pcond', pcond, 'ncond', ncond, 'sortDir', false, 'dirnames', []);
 end
+nsessions = length(dirnames);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % analyze data
@@ -99,7 +47,7 @@ if forceA
     for i = 1 : nsessions
         
         % file
-        filepath = char(fullfile(basepath, dirnames(i)));
+        filepath = char(fullfile(basepath, dirnames{i}));
         cd(filepath)
         
         % params
@@ -110,18 +58,18 @@ if forceA
         spkgrp = session.extracellular.spikeGroups.channels;
         
         % vars
-        session = d{i, 1}.session;
-        cm = d{i, 2}.cell_metrics;
-        spikes = d{i, 3}.spikes;
-        ss = d{i, 4}.SleepState;
-        fr = d{i, 5}.fr;
-        datInfo = d{i, 6}.datInfo;
-%         
-%         rez = runKS('basepath', filepath, 'fs', fs, 'nchans', nchans,...
-%             'spkgrp', spkgrp, 'saveFinal', true, 'viaGui', false,...
-%             'trange', [0 Inf], 'outFormat', 'ns');
+        %         session = varArray{i, 1}.session;
+                cm = varArray{i, 2}.cell_metrics;
+        %         spikes = varArray{i, 3}.spikes;
+        %         ss = varArray{i, 4}.SleepState;
+        %         fr = varArray{i, 5}.fr;
+        %         datInfo = varArray{i, 6}.datInfo;
+        %
+        %         rez = RunKs('basepath', filepath, 'fs', fs, 'nchans', nchans,...
+        %             'spkgrp', spkgrp, 'saveFinal', true, 'viaGui', false,...
+        %             'trange', [0 Inf], 'outFormat', 'ns');
         
-%         % spikes
+        % spikes
         fixSpkAndRes('grp', [], 'fs', fs);
         spikes = loadSpikes('session', session);
         spikes = fixCEspikes('basepath', filepath, 'saveVar', false,...
@@ -130,52 +78,68 @@ if forceA
             'manualAdjustMonoSyn', false, 'summaryFigures', false,...
             'debugMode', true, 'transferFilesFromClusterpath', false,...
             'submitToDatabase', false);
-%             
-%         % su vs mu
-        mu = [];
-        spikes = cluVal('spikes', spikes, 'basepath', filepath, 'saveVar', true,...
-            'saveFig', false, 'force', true, 'mu', mu, 'graphics', false,...
-            'vis', 'on', 'spkgrp', spkgrp);
 
-        % firing rate
-        binsize = 60;
-        winBL = [10 * 60 30 * 60];
-        fr = firingRate(spikes.times, 'basepath', filepath,...
-            'graphics', false, 'saveFig', false,...
-            'binsize', binsize, 'saveVar', true, 'smet', 'MA',...
-            'winBL', winBL);
+        cell_metrics = CellExplorer('session', session, 'basepath', filepath, 'metrics', cm);
+
+%         % su vs mu
+%         mu = [];
+%         spikes = cluVal('spikes', spikes, 'basepath', filepath, 'saveVar', true,...
+%             'saveFig', false, 'force', true, 'mu', mu, 'graphics', false,...
+%             'vis', 'on', 'spkgrp', spkgrp);
+%         
+%         % firing rate
+%         binsize = 60;
+%         winBL = [10 * 60 30 * 60];
+%         fr = firingRate(spikes.times, 'basepath', filepath,...
+%             'graphics', false, 'saveFig', false,...
+%             'binsize', binsize, 'saveVar', true, 'smet', 'MA',...
+%             'winBL', winBL);
     end
 end
+
+% params
+session = varArray{1, 1}.session;
+session = CE_sessionTemplate(pwd, 'viaGUI', false,...
+    'force', true, 'saveVar', true);
+nchans = session.extracellular.nChannels;
+fs = session.extracellular.sr;
+spkgrp = session.extracellular.spikeGroups.channels;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 saveFig = false;
-
+pathPieces = regexp(dirnames(:), '_', 'split'); % assumes filename structure: animal_date_time
+sessionDate = [pathPieces{:}];
+sessionDate = sessionDate(2 : 3 : end);
+ 
 close all
-grp = [1 : 4];          % which tetrodes to plot
+grp = [1 , 4: 8];          % which tetrodes to plot
 state = [2];            % [] - all; 1 - awake; 2 - NREM
 FRdata = 'strd';        % plot absolute fr or normalized
-unitClass = 'int';      % plot 'int', 'pyr', or 'all'
-suFlag = 1;             % plot only su or all units
+unitClass = 'pyr';      % plot 'int', 'pyr', or 'all'
+suFlag = 0;             % plot only su or all units
 minfr = 0;              % include only units with fr greater than
-maxfr = 100;           % include only untis with fr lower than
-Y = [0 50];              % ylim
-p1 = 1;                 % firing rate vs. time, one fig per session
+maxfr = 1000;           % include only untis with fr lower than
+Y = [0 10];             % ylim
+p1 = 0;                 % firing rate vs. time, one fig per session
 p2 = 0;                 % mfr across sessions, one fig
+p3 = 1;                 % firing rate vs. time, one fig for all sessions. not rubust 
 
 for i = 1 : nsessions
     
-    session = d{i, 1}.session;
-    cm = d{i, 2}.cell_metrics;
-    spikes = d{i, 3}.spikes;
-    ss = d{i, 4}.SleepState;
-    fr = d{i, 5}.fr;
-    datInfo = d{i, 6}.datInfo;
+    session = varArray{i, 1}.session;
+    cm = varArray{i, 2}.cell_metrics;
+    spikes = varArray{i, 3}.spikes;
+    ss = varArray{i, 4}.SleepState;
+    fr = varArray{i, 5}.fr;
+    datInfo = varArray{i, 6}.datInfo;
     fs = session.extracellular.sr;
-   
+    
     % cell class
     pyr = strcmp(cm.putativeCellType, 'Pyramidal Cell');
+    wide = strcmp(cm.putativeCellType, 'Wide Interneuron');
+%     pyr = pyr | wide;
     int = strcmp(cm.putativeCellType, 'Narrow Interneuron');
     
     su = ones(1, length(spikes.ts));    % override
@@ -184,7 +148,7 @@ for i = 1 : nsessions
         suTxt = 'SU';
     else
         suTxt = 'MU';
-    end    
+    end
     % specific grp
     grpidx = zeros(1, length(spikes.shankID));
     for ii = 1 : length(grp)
@@ -199,9 +163,9 @@ for i = 1 : nsessions
     else
         units = su & grpidx & mfrunits';     % override
     end
-%     if ~any(units)
-%         break
-%     end
+    %     if ~any(units)
+    %         break
+    %     end
     
     switch FRdata
         case 'norm'
@@ -212,8 +176,12 @@ for i = 1 : nsessions
             ytxt = 'MFR [Hz]';
     end
     tstamps = fr.tstamps / 60;
-    nsamps = cumsum(datInfo.nsamps);
-
+    if isfield(datInfo, 'nsamps')
+        nsamps = cumsum(datInfo.nsamps);
+    else
+        nsamps = 120 * 60 * fs;
+    end
+    
     % states
     states = {ss.ints.WAKEstate, ss.ints.NREMstate, ss.ints.REMstate};
     for ii = 1 : length(states)
@@ -254,6 +222,35 @@ for i = 1 : nsessions
             export_fig(figname, '-tif', '-transparent', '-r300')
         end
     end
+    
+    % fr vs. time; one figure for all sessoins
+    k = [1, 2, 3, 4]';
+%     titletxt = ["lh69_200907_morning"; "lh69_200908_morning";...
+%          "lh69_200908_evening"];
+    if p3
+        subplot(2, 2, k(i))
+        plot(tstamps / 60, mean(data(units, :)), 'k', 'LineWidth', 2)
+        hold on
+        if i == 3
+        for ii = 2
+            plot([nsamps(ii) nsamps(ii)] / fs / 60 / 60, Y, '--k',...
+                'LineWidth', 2)
+        end
+        end
+        axis tight
+        fill([states{2} fliplr(states{2})]' / 60 / 60, [Y(1) Y(1) Y(2) Y(2)],...
+            'b', 'FaceAlpha', 0.15,  'EdgeAlpha', 0);
+        ylim(Y)
+        ylabel(ytxt)
+        xlabel('Time [h]')
+        title(dirnames{i})
+        if saveFig
+            figname = sprintf('LTP')
+            figname = fullfile(basepath, figname);
+            % print(fh, figname, '-dpdf', '-bestfit', '-painters');
+            export_fig(figname, '-tif', '-transparent', '-r300')
+        end
+    end
 end
 clr = ['bbbkkkkkkrrr'];
 if p2
@@ -265,7 +262,10 @@ if p2
     %         'k', 'LineWidth', 2)
     %     hold on
     %     bh = bar([1 : nsessions], nanmean(mfrmat), 'EdgeColor', 'none');
-    boxplot(mfrmat, 'PlotStyle', 'traditional');
+%     boxplot(mfrmat, 'PlotStyle', 'traditional');
+    bar(nanmean(mfrmat))
+    hold on
+    errorbar(1 : nsessions, nanmean(mfrmat), nanstd(mfrmat))
     bh = findobj(gca, 'Tag', 'Box');
     if length(bh) == length(clr)
         clrRep = histc(clr, unique(clr));
@@ -275,7 +275,7 @@ if p2
         end
         alphaIdx = [alphaIdx{:}];
         for i = 1 : length(bh)
-              patch(get(bh(i), 'XData'), get(bh(i), 'YData'),...
+            patch(get(bh(i), 'XData'), get(bh(i), 'YData'),...
                 clr(i), 'FaceAlpha', alphaIdx(i))
         end
     end
@@ -296,13 +296,15 @@ end
 
 % number of SU and MU (top - pyr; bottom - int) from selected tetrodes
 p2 = 0;
-grp = [1 : 8];
+% grp = [1 : 8];
 if p2
     clear units
     for i = 1 : nsessions
-        cm = d{i, 2}.cell_metrics;
-        spikes = d{i, 3}.spikes;
+        cm = varArray{i, 2}.cell_metrics;
+        spikes = varArray{i, 3}.spikes;
         pyr = strcmp(cm.putativeCellType, 'Pyramidal Cell');
+        wide = strcmp(cm.putativeCellType, 'Wide Interneuron');
+        pyr = pyr | wide;
         int = strcmp(cm.putativeCellType, 'Narrow Interneuron');
         grpidx = zeros(1, length(spikes.shankID));
         for ii = 1 : length(grp)
@@ -312,7 +314,7 @@ if p2
         units(i, 2) = sum(spikes.su' & pyr & grpidx);
         units(i, 3) = sum(~spikes.su' & int & grpidx);
         units(i, 4) = sum(spikes.su' & int & grpidx);
-        units(i, 5) = sum(grpidx) - sum(units(i, 1 : 4));
+        %         units(i, 5) = sum(grpidx) - sum(units(i, 1 : 4));
     end
     fh = figure;
     bar(units, 'stacked')

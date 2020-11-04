@@ -54,14 +54,14 @@ fepsp = fEPSPfromDat('basepath', basepath, 'fname', '', 'nchans', nchans,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % kilosort
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-rez = runKS('basepath', basepath, 'fs', fs, 'nchans', nchans,...
+rez = RunKs('basepath', basepath, 'fs', fs, 'nchans', nchans,...
     'spkgrp', spkgrp, 'saveFinal', true, 'viaGui', false,...
     'trange', [0 Inf], 'outFormat', 'ns');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % fix manual curation
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-fixSpkAndRes('grp', [], 'fs', fs);
+fixSpkAndRes('grp', 2, 'fs', fs);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % cell explorer
@@ -77,7 +77,7 @@ cell_metrics = ProcessCellMetrics('session', session,...
     'debugMode', true, 'transferFilesFromClusterpath', false,...
     'submitToDatabase', false);
 
-% cell_metrics = CellExplorer('metrics', cell_metrics);
+cell_metrics = CellExplorer('metrics', cell_metrics);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % spikes
