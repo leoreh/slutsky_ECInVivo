@@ -54,7 +54,7 @@ fepsp = fEPSPfromDat('basepath', basepath, 'fname', '', 'nchans', nchans,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % kilosort
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-rez = RunKs('basepath', basepath, 'fs', fs, 'nchans', nchans,...
+rez = runKS('basepath', basepath, 'fs', fs, 'nchans', nchans,...
     'spkgrp', spkgrp, 'saveFinal', true, 'viaGui', false,...
     'trange', [0 Inf], 'outFormat', 'ns');
 
@@ -146,4 +146,14 @@ for ii = 1 : length(states)
     t{ii} = fr.tstamps(tStates{ii});
     frStates{ii} = mean(fr.strd(:, tStates{ii}), 2);
 end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% spike detection
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% create wh.dat
+ops = opsKS('basepath', basepath, 'fs', fs, 'nchans', nchans,...
+    'spkgrp', spkgrp, 'trange', [0 Inf]);
+preprocessDataSub(ops);
+
 
