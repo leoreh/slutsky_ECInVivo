@@ -1,38 +1,63 @@
-function spktimes2ks(rez)
+function spktimes2ks(varargin)
 
-% converts KiloSort output (.rez structure) to neurosuite files (fet, res,
-% clu, and spk). based in part on Kilosort2Neurosuite (Peterson). extracts
-% and detrends waveforms from the dat file (see getSPKfromDat for
-% more information). IMPROTANT: XML FILE MUST BE UPDATED TO THE PARAMS USED
-% HERE (E.G. SAMPLES PER WAVEFORM)
+% creates ns files (spk, res, fet, and clu) from spktimes. can clip
+% spktimes according to requested start time and/or duration. 
 %
+% INPUT:
+%   basepath    string. path to recording folder {pwd}.
+%   spkgrp      array where each cell is the electrodes for a spike group.
+%               if empty will be loaded from session info file (cell
+%               explorer format)
+%   grp         numeric. groups (tetrodes) to work on
+%   fs          numeric. sampling frequency [hz]{20000}
+%   psamp       numeric. peak / trough sample {16}. if empty will be
+%               set to half nsamps.
+%   nchans      numeric. number of channels in dat file.
+%   dur         numeric. duration of trim period [min]
+%   t           string. start time of trim period. if empty than will take
+%               dur minuted from end of recording. can be in the format
+%               'HHmmss' or 'HHmm'.
+%   mkClu       logical. create also clu file for inspection w/ ns {false}
+% 
 % DEPENDENCIES
 %   class2bytes
 %
 % TO DO LIST:
-%   # find trend based on larger segment without spike
-%   # fix clipped spike at end / beginning of recording
 %
-% 15 jun 20 LH.     updates:
-% 07 aug 20 LH      fix case where no spikes in grp
+% 09 nov 20 LH      
 
-tic
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% arguments
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+tic;
+
+p = inputParser;
+addOptional(p, 'basepath', pwd);
+addOptional(p, 'spkgrp', {}, @iscell);
+addOptional(p, 'grp', [], @isnumeric);
+addOptional(p, 'fs', 20000, @isnumeric);
+addOptional(p, 'psamp', [], @isnumeric);
+addOptional(p, 'nchans', [], @isnumeric);
+addOptional(p, 'dur', [], @isnumeric);
+addOptional(p, 't', [], @ischar);
+addOptional(p, 'mkClu', false, @islogical);
+
+parse(p, varargin{:})
+basepath    = p.Results.basepath;
+spkgrp      = p.Results.spkgrp;
+grp         = p.Results.grp;
+fs          = p.Results.fs;
+psamp       = p.Results.psamp;
+nchans      = p.Results.nchans;
+dur         = p.Results.dur;
+t           = p.Results.t;
+mkClu   	= p.Results.mkClu;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preparations
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-fs = 20000;
-peakSamp = [];
-grps = [1 : 3];
-basepath = pwd;
-nchans = 35;
-
-% constants   
-sniplength = ceil(1.6 * 10^-3 * fs);
-win = [-(floor(sniplength / 2) - 1) floor(sniplength / 2)];   
-precision = 'int16'; % for dat file. size of one data point in bytes
-nbytes = class2bytes(precision); 
+dur = dur * 60 * fs;
 
 if isempty(peakSamp)
     peakSamp = round(sniplength / 2);
@@ -41,6 +66,11 @@ if isempty(grps)
     grps = 1 : length(spkgrp);
 end
 ngrps = length(grps);
+
+sniplength = ceil(1.6 * 10^-3 * fs);
+win = [-(floor(sniplength / 2) - 1) floor(sniplength / 2)];   
+precision = 'int16'; % for dat file. size of one data point in bytes
+nbytes = class2bytes(precision); 
 
 % build regressor for detrending
 s = 0 : sniplength - 1;
@@ -52,7 +82,6 @@ W = [reshape(W, sniplength, []), ones(sniplength,1)];
 [Q, R] = qr(W,0);
 
 % memory map to dat file
-% get file
 cd(basepath)
 [~, basename] = fileparts(basepath);
 fraw = dir([basename '.dat']);
@@ -61,15 +90,70 @@ m = memmapfile(fraw.name, 'Format', {precision, [nchans, nsamps] 'mapped'});
 raw = m.Data;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% trim spktimes
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% find boundry samples
+if ~isempty(t)
+    recStart = split(basename, '_');
+    recStart = recStart{end};
+    if numel(recStart) == 6
+        tformat = 'HHmmss';
+    elseif numel(recStart) == 4
+        tformat = 'HHMM';
+    end
+    recStart = datetime(recStart, 'InputFormat', tformat);
+    t = datetime(t, 'InputFormat', tformat);
+    if t <= recStart
+        error('requested time must be greater than recording start time')
+    end
+    s = seconds(t - recStart) * fs;
+    if ~isempty(dur)
+        trimEdges = [s s + dur];
+    else
+        trimEdges = [s nsamps];
+    end
+else
+    if ~isempty(dur)
+        trimEdges = [nsamps - dur nsamps];
+    else
+        trimEdges = [1 nsamps];
+    end
+end
+if trimEdges(1) < 1
+    warning('Requested time beyond recording duration')
+    trimEdges(1) = 1;
+elseif trimEdges(2) > nsamps
+    warning('Requested time beyond recording duration')
+    trimEdges(2) = nsamps;
+end
+
+% trim spktimes
+load([basename '.spktimes.mat'])
+for i = 1 : ngrps
+    spktimes{i} = spktimes{i}(spktimes{i} > trimEdges(1)...
+        & spktimes{i} < trimEdges(2));
+end
+
+% save trim info 
+infoname = fullfile(basepath, [basename, '.datInfo.mat']);
+if exist(infoname, 'file')
+    load(infoname)
+    datInfo.trim.dur = dur / fs / 60;
+    datInfo.trim.edges = trimEdges;
+    datInfo.trim.recStart = recStart;
+    datInfo.trim.t = t;
+    save(infoname, 'datInfo', '-v7.3');
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % go over groups and save file
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-k = 1;
 for i = 1 : ngrps
 
     grp = grps(i);
-    stamps{i} = spktimes{i}(:, 1);
-    nspks(i) = length(stamps{i});
+    nspks(i) = length(spktimes{i});
     grpchans = spkgrp{i};
     
     % ---------------------------------------------------------------------
@@ -87,16 +171,16 @@ for i = 1 : ngrps
             fprintf('%s', txt)     
         end       
         % fix special case where spike is at end / begining of recording
-        if stamps{i}(ii) + win(1) < 1 || stamps{i}(ii) + win(2) > nsamps
+        if spktimes{i}(ii) + win(1) < 1 || spktimes{i}(ii) + win(2) > nsamps
             warning('\nskipping stamp %d because waveform incomplete', ii)
             spk(:, :, ii) = [];
-            stamps{i}(ii) = [];
+            spktimes{i}(ii) = [];
             nspks(i) = nspks(i) - 1;
             continue
         end        
         % get waveform and remove best fit
-        v = double(raw.mapped(grpchans, stamps{i}(ii) + win(1) :...
-            stamps{i}(ii) + win(2)));
+        v = double(raw.mapped(grpchans, spktimes{i}(ii) + win(1) :...
+            spktimes{i}(ii) + win(2)));
         v = [v' - W * (R \ Q' * v')]';
 
         % realign according to minimum
@@ -105,10 +189,9 @@ for i = 1 : ngrps
         peak = ia(ib);
         ishift = peak - peakSamp;
         if ishift ~= 0 
-            k = k + 1;
-            stamps{i}(ii) = stamps{i}(ii) + ishift;
-                v = double(raw.mapped(grpchans, stamps{i}(ii) + win(1) :...
-                    stamps{i}(ii) + win(2)));
+            spktimes{i}(ii) = spktimes{i}(ii) + ishift;
+                v = double(raw.mapped(grpchans, spktimes{i}(ii) + win(1) :...
+                    spktimes{i}(ii) + win(2)));
                 v = [v' - W * (R \ Q' * v')]';
         end
         spk(:, :, ii) = v;        
@@ -127,7 +210,7 @@ for i = 1 : ngrps
     % res 
     resname = fullfile([basename '.res.' num2str(grp)]);
     fid = fopen(resname, 'w');
-    fprintf(fid, '%d\n', stamps{i});
+    fprintf(fid, '%d\n', spktimes{i});
     rc = fclose(fid);
     if rc == 0
         fprintf('\nCreated \t%s', resname)
@@ -137,17 +220,19 @@ for i = 1 : ngrps
 
     % ---------------------------------------------------------------------
     % clu (temporary, for visualization w/ neuroscope)
-    nclu = 1;
-    clugrp = ones(1, nspks(i));
-    cluname = fullfile([basename '.clu.' num2str(grp)]);
-    fid = fopen(cluname, 'w');
-    fprintf(fid, '%d\n', nclu);
-    fprintf(fid, '%d\n', clugrp);
-    rc = fclose(fid);
-    if rc == 0
-        fprintf('\nCreated \t%s', cluname)
-    else
-        fprintf('\nFailed to create %s!', cluname)
+    if mkClu
+        nclu = 1;
+        clugrp = ones(1, nspks(i));
+        cluname = fullfile([basename '.clu.' num2str(grp)]);
+        fid = fopen(cluname, 'w');
+        fprintf(fid, '%d\n', nclu);
+        fprintf(fid, '%d\n', clugrp);
+        rc = fclose(fid);
+        if rc == 0
+            fprintf('\nCreated \t%s', cluname)
+        else
+            fprintf('\nFailed to create %s!', cluname)
+        end
     end
     
     % ---------------------------------------------------------------------
@@ -165,7 +250,7 @@ for i = 1 : ngrps
             fetMat(:, enrgIdx + ii) = (chEnrgy);
         end
     end
-    fetMat(:, end) = double(stamps{i});
+    fetMat(:, end) = double(spktimes{i});
     fet = int32(fetMat');
     fid = fopen(fetname, 'w');
     formatstring = '%d';

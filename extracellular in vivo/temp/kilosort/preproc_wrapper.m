@@ -148,7 +148,7 @@ for ii = 1 : length(states)
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% spike detection
+% spike detection routine
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % create wh.dat
@@ -156,4 +156,24 @@ ops = opsKS('basepath', basepath, 'fs', fs, 'nchans', nchans,...
     'spkgrp', spkgrp, 'trange', [0 Inf]);
 preprocessDataSub(ops);
 
+% detect spikes
+[spktimes, spkch] = spktimesWh('basepath', basepath, 'fs', fs, 'nchans', nchans,...
+    'spkgrp', spkgrp, 'saveVar', true, 'chunksize', 2048 ^ 2 + 64,...
+    'graphics', false);
 
+% create ns files for kk sorting
+% spktimes2ks
+
+% firing rate per tetrode. note that using times2rate requires special care
+% becasue spktimes is given in samples and not seconds
+binsize = 60 * fs;
+winCalc = [0 Inf];
+[sr.strd, sr.edges, sr.tstamps] = times2rate(spktimes, 'binsize', binsize,...
+    'winCalc', winCalc, 'c2r', false);
+% convert counts to rate
+sr.strd = sr.strd ./ (diff(sr.edges) / fs);
+% fix tstamps
+sr.tstamps = sr.tstamps / binsize;
+
+figure, plot(sr.tstamps, sr.strd)
+legend

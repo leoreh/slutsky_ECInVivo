@@ -25,8 +25,6 @@ function fixSpkAndRes(varargin)
 %   grp         numeric. groups (tetrodes) to work on. refers to filename
 %               and not order. e.g. grp = 3 will load clu.3
 %   fs          numeric. sampling frequency [hz]{20000}
-%   dt          numeric. dead time to enforce between spikes [samples]{8}.
-%               as in ndm_manager
 %   nsamps      numeric. length of waveform in spk file {32}. if empty will
 %               be calculated according to fs as 1.6 ms 
 %   psamp       numeric. peak / trough sample {16}. if empty will be

@@ -1,4 +1,4 @@
-function getSpkTimesWh(varargin)
+function [spktimes, spkch] = spktimesWh(varargin)
 
 % detects spikes from whitened data. based on ks functions, specifically
 % isloated_peaks_new.
@@ -8,12 +8,20 @@ function getSpkTimesWh(varargin)
 %   fs          numeric. sampling frequency [hz]{20000}
 %   nchans      numeric. number of channels in dat file.
 %   spkgrp      array where each cell is the electrodes for a spike group. 
+%   chunksize   numeric. size of chunk to load [samples]. note data 
+%               is loaded and processed in batces of spkgrps
+%   cleanWh     logical. remove temp_wh.dat file after detection {true} 
 %   saveVar     logical. save output {true}
+%   graphics    logical {false}
 %
 % DEPENDENCIES
+%   get_whitening_matrix (ks)
+%   my_min (ks)
+%   loadChanMap (ks)
+%   get_file_size (ks)
+%   class2bytes
 %
 % TO DO LIST:
-%   # there is a ~500 ms delay between the file ns and as plotted here
 % 
 % 01 nov 20 LH      
 
@@ -27,18 +35,25 @@ addOptional(p, 'basepath', pwd);
 addOptional(p, 'fs', 20000, @isnumeric);
 addOptional(p, 'nchans', 35, @isnumeric);
 addOptional(p, 'spkgrp', {}, @iscell);
+addOptional(p, 'chunksize', 2048 ^ 2 + 64, @isnumeric);
+addOptional(p, 'saveWh', true, @islogical);
 addOptional(p, 'saveVar', true, @islogical);
+addOptional(p, 'graphics', false, @islogical);
 
 parse(p, varargin{:})
 basepath    = p.Results.basepath;
 fs          = p.Results.fs;
 nchans      = p.Results.nchans;
 spkgrp      = p.Results.spkgrp;
+chunksize   = p.Results.chunksize;
+saveWh      = p.Results.cleanWh;
 saveVar     = p.Results.saveVar;
+graphics    = p.Results.graphics;
 
-chunksize = 2048 ^ 2 + 64;      % from runKS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% params
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 nchansWh = length([spkgrp{:}]);
-saveVar = true;
 
 % constants
 loc_range = [6 max(size(cell2nanmat(spkgrp), 1))];  % for running minimum (dim 1 - sample; dim 2 - channel] 
@@ -46,54 +61,104 @@ scaleproc = 200;    % conversion back from unit variance to voltage
 thr = -4;           % spike threshold in standard deviations {-6}
 dt = 8;             % dead time between spikes [samples]
 
+% whitening params from ks
+ops = opsKS('basepath', basepath, 'fs', fs, 'nchans', nchans,...
+    'spkgrp', spkgrp, 'trange', [0 Inf]);
+NT              = ops.NT;
+NT              = 1024 ^ 2 + 64;        % override
+ops.NT          = NT;
+NchanTOT        = ops.NchanTOT; 
+bytes           = get_file_size(ops.fbinary); 
+nTimepoints     = floor(bytes/NchanTOT/2); 
+ops.tstart      = ceil(ops.trange(1) * ops.fs); 
+ops.tend        = min(nTimepoints, ceil(ops.trange(2) * ops.fs)); 
+ops.sampsToRead = ops.tend-ops.tstart; 
+ops.twind       = ops.tstart * NchanTOT*2; 
+Nbatch          = ceil(ops.sampsToRead / NT); 
+ops.Nbatch      = Nbatch;
+[chanMap, xc, yc, kcoords, ~] = loadChanMap(ops.chanMap);
+ops.igood       = true(size(chanMap));
+ops.Nchan       = numel(chanMap); 
+ops.Nfilt       = getOr(ops, 'nfilt_factor', 4) * ops.Nchan; 
+rez.ops         = ops; 
+rez.xc          = xc; % for historical reasons, make all these copies of the channel coordinates
+rez.yc          = yc;
+rez.xcoords     = xc;
+rez.ycoords     = yc;
+rez.ops.chanMap = chanMap;
+rez.ops.kcoords = kcoords;
+NTbuff          = NT + 3*ops.ntbuff; % we need buffers on both sides for filtering
+rez.ops.NTbuff  = NTbuff;
+rez.ops.chanMap = chanMap;
+
+% weights to combine batches at the edge
+w_edge          = linspace(0, 1, ops.ntbuff)';
+ntb             = ops.ntbuff;
+datr_prev       = gpuArray.zeros(ntb, ops.Nchan, 'single');
+
+% get a rotation matrix (Nchan by Nchan) which whitens the zero-timelag
+% covariance of the data
+Wrot = get_whitening_matrix(rez); 
+
+fid = fopen(ops.fbinary, 'r'); % open for reading raw data
+if saveWh
+    fidW = fopen(ops.fproc,   'w+'); % open for writing processed data
+end
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % detection
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-tic
-
-% get file
-cd(basepath)
-[~, basename] = fileparts(basepath);
-fraw = dir([basename '.dat']);
-fwh = dir('*temp_wh.dat');
-
-% arrange batches
-nbytes = class2bytes('int16');          % size of one data point in bytes
-nsamps = fraw.bytes / nbytes / nchans;  % length of raw dat [samples]
-chunks = n2chunks('n', nsamps, 'chunksize', chunksize, 'clip', []);
-nchunks = size(chunks, 1);
-
-% memory map to temp_wh.dat
-m = memmapfile(fwh.name, 'Format', {'int16' [nchansWh nsamps] 'mapped'});
-d = m.data;
 
 % initialize
 spktimes = cell(1, length(spkgrp));
-for i = 1 : nchunks          
-    
+spkch = cell(1, length(spkgrp));
+for i = 1 : Nbatch          
+     
     % print progress
     if i ~= 1
         fprintf(repmat('\b', 1, length(txt)))
     end
-    txt = sprintf('working on chunk %d / %d', i, nchunks);
+    txt = sprintf('working on chunk %d / %d', i, Nbatch);
     fprintf(txt)
-        
+    
+    % create whitening matrix
+    offset = max(0, ops.twind + 2*NchanTOT*(NT * (i - 1) - ntb)); 
+    fseek(fid, offset, 'bof'); 
+    buff = fread(fid, [NchanTOT NTbuff], '*int16'); 
+    nsampcurr = size(buff,2); 
+    if nsampcurr<NTbuff
+        buff(:, nsampcurr+1:NTbuff) = repmat(buff(:,nsampcurr), 1, NTbuff-nsampcurr); 
+    end
+    if offset==0
+        bpad = repmat(buff(:,1), 1, ntb);
+        buff = cat(2, bpad, buff(:, 1:NTbuff-ntb)); 
+    end    
+    wh    = gpufilter(buff, ops, chanMap);    
+    wh(ntb + [1:ntb], :) = w_edge .* wh(ntb + [1:ntb], :) +...
+        (1 - w_edge) .* datr_prev;
+    datr_prev = wh(ntb +NT + [1:ops.ntbuff], :);
+    wh    = wh(ntb + (1:NT),:);   
+    wh    = wh * Wrot; % whiten the data and scale by 200 for int16 range    
+    if saveWh
+        datcpu  = gather(int16(wh')); % convert to int16, and gather on the CPU side
+        fwrite(fidW, datcpu, 'int16'); % write this batch to binary file
+    end      
+    wh = wh / scaleproc;   
+    
+    % find spikes on each tetrode 
     for ii = 1 : length(spkgrp)
-        % load data, move to GPU and scale back to unit variance
-        wh = d.mapped(spkgrp{ii}, chunks(i, 1) : chunks(i, 2));        
-        wh = gpuArray(wh');
-        wh = single(wh);
-        wh = wh / scaleproc;
-        
+
         % moving minimum across channels and samples 
-        smin = my_min(wh, loc_range, [1, 2]);
+        smin = my_min(wh(:, spkgrp{ii}), loc_range, [1, 2]);
         
         % peaks are samples that achieve this local minimum AND have
         % negativities less than a preset threshold
-        crossings = wh < smin + 1e-5 & wh < thr;
+        crossings = wh(:, spkgrp{ii}) < smin + 1e-5 &...
+            wh(:, spkgrp{ii}) < thr;
         
-        [samp, ch, amp] = find(crossings .* wh); % find the non-zero peaks, and take their amplitudes 
-        [samp, ia] = sort(gather(samp + chunks(i, 1) - 1));
+        % find the non-zero peaks, and take their amplitudes 
+        [samp, ch, amp] = find(crossings .* wh(:, spkgrp{ii})); 
+        [samp, ia] = sort(gather(samp + offset));
         ch = gather(ch(ia));
         amp = gather(amp(ia));
                 
@@ -108,16 +173,18 @@ for i = 1 : nchunks
             samp(idx3) = [];
             ch(idx3) = [];
         end        
-        spktimes{ii} = [spktimes{ii}; [samp spkgrp{ii}(ch)']];       
+        spktimes{ii} = [spktimes{ii}; samp]; 
+        spkch{ii} = [spkch{ii}; spkgrp{ii}(ch)'];
     end
 end
 
-fprintf('\nthat took %.2f minutes\n', toc / 60)
-
 % save variable
 if saveVar
-    save(fullfile(basepath, [basename '.spktimes.mat']), 'spktimes')
+    save(fullfile(basepath, [basename '.spktimes.mat']),...
+        'spktimes', 'spkch')
 end
+
+fprintf('\nthat took %.2f minutes\n', toc / 60)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
@@ -189,7 +256,7 @@ if graphics
     yOffset = gather(max(range(smin)));
     hold on
     for i = length(spkgrp{grp}) : -1 : 1
-        plot(chunk2plot / fs, smin(:, i)...
+        plot(smin(:, i)...
             + yOffset * (i - 1), clr(i))
     end
     set(gca, 'TickLength', [0 0])
@@ -206,4 +273,12 @@ if graphics
     xlabel('ISI [samples]')
     ylabel('Counts')
     
+end
+
+% close files
+fclose(fid);
+if saveWh
+    fclose(fidW);
+end
+
 end
