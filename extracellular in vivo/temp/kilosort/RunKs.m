@@ -1,11 +1,7 @@
 function rez = runKS(varargin)
 
-% wrapper for running kilosort. based on configFile384.m,
-% make_eMouseChannelMap.m, and KilosortConfiguration (kilosortWrapper).
-% creates channel map file according to spike groups (designed for
-% tetrodes). handles ks parameters arranged here according to those that
-% should be played with. alas runs the algorithm and arranges the output in
-% phy or neurosuite format.
+% wrapper for running kilosort. loads configuration, runs the algorithm and
+% arranges the output in phy or neurosuite format.
 % 
 % INPUT:
 %   basepath    string. path to recording folder {pwd}. if multiple dat
@@ -23,6 +19,7 @@ function rez = runKS(varargin)
 % DEPENDENCIES
 %   npy-matlab
 %   kilosort 2
+%   opsKS
 %   ks2ns
 %
 % TO DO LIST:
@@ -30,7 +27,9 @@ function rez = runKS(varargin)
 %   tetrode is bad (done - 11 jun 20)
 % 
 % 22 may 20 LH      updates:
-% 16 jun 20 LH      outFormat
+% 16 jun 20             outFormat
+% 31 oct 20             updated to KS2.5
+% 08 nov 20             split opsKS
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -59,128 +58,12 @@ saveFinal   = p.Results.saveFinal;
 viaGui      = p.Results.viaGui;
 outFormat   = p.Results.outFormat;
 
-if isempty(procpath)
-    procpath = basepath;
-end
-kcoords = []; 
-ycoords = []; 
-xcoords = [];
-xrep = [20 40 60 80];
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% channel map
+% load configuration
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% list of channel indices (including dead \ non-ephys channels)
-chanMap = [1 : nchans];
-chanMap0ind = chanMap - 1;
-% the first thing Kilosort does is reorder the data with data = data(chanMap, :).
-% Now we declare which channels are "connected" in this normal ordering,
-% meaning not dead or used for non-ephys data
-connected = true(nchans, 1);
-% now we define the horizontal (xcoords) and vertical (ycoords) coordinates
-% of these channels. For dead or nonephys channels the values won't matter.
-% These are in um here, but the absolute scaling doesn't really matter in
-% the algorithm. In addition, often multi-shank probes or tetrodes will be
-% organized into groups of channels that cannot possibly share spikes with
-% the rest of the probe. This helps the algorithm discard noisy templates
-% shared across groups. In this case, we set kcoords to indicate which
-% group the channel belongs to.
-badch = setdiff(chanMap, sort([spkgrp{:}]));
-for i = 1 : length(spkgrp)
-    l = length(spkgrp{i});
-    kcoords = [kcoords, ones(1, l) * i];
-    xcoords = [xcoords, xrep(1 : l)];
-    ycoords = [ycoords, ones(1, l) * i * 20];
-end
-xcoords(badch) = NaN;
-ycoords(badch) = NaN;
-kcoords(badch) = NaN;
-connected(badch) = false; % e.g. acceleration
-% at this point in Kilosort we do data = data(connected, :), ycoords =
-% ycoords(connected), xcoords = xcoords(connected) and kcoords =
-% kcoords(connected) and no more channel map information is needed (in particular
-% no "adjacency graphs" like in KlustaKwik).
-% Now we can save our channel map and also a channel_shanks file for phy.
-ops.chanMap = fullfile(basepath, 'chanMap.mat');
-save(ops.chanMap, 'chanMap', 'chanMap0ind', 'connected',...
-    'xcoords', 'ycoords', 'kcoords', 'fs')
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% ks parameters
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% arguments
-ops.kcoords         = kcoords;
-ops.fs              = fs;       % sampling rate
-ops.NchanTOT        = nchans;   % total number of channels in your recording
-ops.trange          = trange;   % time range to sort [s]
-
-% Thresholds on spike detection used during the optimization Th(1) or
-% during the final pass Th(2). These thresholds are applied to the template
-% projections, not to the voltage. Typically, Th(1) is high enough that the
-% algorithm only picks up sortable units, while Th(2) is low enough that it
-% can pick all of the spikes of these units. It doesn't matter if the final
-% pass also collects noise: an additional per neuron threshold is set
-% afterwards, and a splitting step ensures clusters with multiple units get
-% split. {[10 4]}
-ops.Th = [8 4];
-
-% how important is the amplitude penalty {10}. The individual spike
-% amplitudes are biased towards the mean of the cluster by this factor; 50
-% is a lot, 0 is no bias.
-ops.lam = 25;
-
-% Threshold on the area under the curve (AUC) criterion for performing a
-% split in the final step. If the AUC of the split is higher than this,
-% that split is considered good. However, a good split only goes through
-% if, additionally, the cross-correlogram of the split units does not
-% contain a big dip at time 0. splitting a cluster at the end requires at
-% least this much isolation for each sub-cluster (max = 1){0.9}.
-ops.AUCsplit = 0.86;
-
-% frequency for high pass filtering {150}
-ops.fshigh = 500;
-
-% minimum firing rate on a "good" channel (0 to skip){0.1}
-ops.minfr_goodchannels = 0;
-
-% minimum spike rate (Hz), if a cluster falls below this for too long it
-% gets removed {1/50}.
-ops.minFR = 1/100;
-
-% number of samples to average over (annealed from first to second value)
-% {20 400}
-ops.momentum = [20 800];
-
-% spatial constant in um for computing residual variance of spike
-ops.sigmaMask = 30;
-
-% threshold crossings for pre-clustering (in PCA projection space)
-ops.ThPre = 8;
-
-ops.nt0             = 61;       % window width in samples. 2 ms for 20 kH {61}
-ops.spkTh           = -4;       % spike threshold in standard deviations {-6}
-ops.reorder         = 1;        % whether to reorder batches for drift correction.
-ops.nskip           = 25;       % how many batches to skip for determining spike PCs
-ops.Nfilt           = 256;      % number of filters to use (2-4 times more than Nchan, should be a multiple of 32)
-ops.nfilt_factor    = 32;       % max number of clusters per good channel (even temporary ones)
-ops.ntbuff          = 64;       % samples of symmetrical buffer for whitening and spike detection
-ops.nSkipCov        = 25;       % compute whitening matrix from every N-th batch
-ops.scaleproc       = 200;      % int16 scaling of whitened data
-ops.nPCs            = 3;        % how many PCs to project the spikes into
-ops.GPU             = 1;        % has to be 1, no CPU version yet, sorry
-ops.useRAM          = 0;        % not yet available
-
-% batch size (try decreasing if out of memory). must be multiple of 32 + ntbuff.
-ops.NT              = 128 * 1024 + ops.ntbuff;
-
-% how many channels to whiten together (Inf for whole probe whitening)
-ops.whiteningRange  = min([64 sum(connected)]); 
-
-datfile             = dir(fullfile(basepath, '*.dat')); % find the binary file
-ops.fbinary         = fullfile(basepath, datfile(1).name);
-ops.fproc           = fullfile(procpath, 'temp_wh.dat'); % path to processing file
+ops = opsKS('basepath', basepath, 'fs', fs, 'nchans', nchans,...
+    'spkgrp', spkgrp, 'trange', [0 Inf]);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % run ks
@@ -194,6 +77,9 @@ else
     % preprocess data to create temp_wh.dat
     rez = preprocessDataSub(ops);
     
+    % NEW STEP TO DO DATA REGISTRATION
+    rez = datashift2(rez, 1); % last input is for shifting data
+    
     % time-reordering as a function of drift
     rez = clusterSingleBatches(rez);
     
@@ -201,7 +87,12 @@ else
     save(fullfile(basepath, 'rez.mat'), 'rez', '-v7.3');
     
     % main tracking and template matching algorithm
-    rez = learnAndSolve8b(rez);
+    iseed = 1; % ORDER OF BATCHES IS NOW RANDOM, controlled by random number generator
+    rez = learnAndSolve8b(rez, iseed);
+    
+    % OPTIONAL: remove double-counted spikes - solves issue in which individual spikes are assigned to multiple templates.
+    % See issue 29: https://github.com/MouseLand/Kilosort/issues/29
+    rez = remove_ks2_duplicate_spikes(rez);
     
     % final merges
     rez = find_merges(rez, 1);
@@ -209,19 +100,35 @@ else
     % final splits by SVD
     rez = splitAllClusters(rez, 1);
     
-    % final splits by amplitudes
-    rez = splitAllClusters(rez, 0);
+    % final splits by amplitudes (from v2.0)
+    % rez = splitAllClusters(rez, 0);
     
     % decide on cutoff
     rez = set_cutoff(rez);
-    
+    % eliminate widely spread waveforms (likely noise)
+    rez.good = get_good_units(rez);
+       
     fprintf('found %d good units \n', sum(rez.good > 0))
     
     % save final results
     if saveFinal
-        rez = rmfield(rez, 'st2');
-        rez = rmfield(rez, 'cProjPC');
-        rez = rmfield(rez, 'cProj');
+        % discard features in final rez file (too slow to save)
+        rez.cProj = [];
+        rez.cProjPC = [];
+        rez.st2 = [];
+
+        % final time sorting of spikes, for apps that use st3 directly
+        [~, isort]   = sortrows(rez.st3);
+        rez.st3      = rez.st3(isort, :);
+        
+        % Ensure all GPU arrays are transferred to CPU side before saving to .mat
+        rez_fields = fieldnames(rez);
+        for i = 1:numel(rez_fields)
+            field_name = rez_fields{i};
+            if(isa(rez.(field_name), 'gpuArray'))
+                rez.(field_name) = gather(rez.(field_name));
+            end
+        end  
         fprintf('\nsaving final rez file\n')
         save(fullfile(basepath, 'rez.mat'), 'rez', '-v7.3');
     end

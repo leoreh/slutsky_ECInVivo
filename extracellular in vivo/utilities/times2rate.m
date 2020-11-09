@@ -15,7 +15,9 @@ function [r, binedges, bincents] = times2rate(itimes, varargin)
 %               Second elemet should be recording duration (e.g.
 %               lfp.duration). if Inf will be the last spike.
 %   binsize     size of bins {60}. can be of any units so long corresponse
-%               to sampling rate of spktimes
+%               to spktimes. for example, spktimes from Wh (per tetrode) is
+%               given in samples whereas spktimes from ce (per units) is
+%               given in seconds
 %   c2r         convert counts to rate by dividing with binsize 
 % 
 % OUTPUT

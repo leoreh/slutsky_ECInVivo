@@ -34,7 +34,35 @@ function fepsp = fEPSPfromDat(varargin)
 %   fepsp_analysis
 %
 % OUTPUT
-%   fepsp       struct
+%   fepsp           struct with fields:
+%       Info        struct, info about the recourding, with fields:
+%           basename    cell, the name of the file/ files that the traces were
+%                       exstracted from.
+%           recSystem   char, type of recourding system (wcp/oe/tdt), in
+%                       this function oe/tdt.
+%           protocol    stimulus protocol. can be a string ('io' or 'stp') or a
+%                       numeric vector describing the times [ms] of stimulations
+%                       for each trace (numeric currently not implemented)
+%           fsOrig      double, original sampling frequency of file.
+%           fs          double, sampling frequency after downsampling
+%           spkgrp      cell,  which channles are realated to which
+%                       electrode. Each column == diffrent electrode.
+%           stimIdx     double, the indexes of the stimuli in the long dat
+%                       file, dims electrode X intensities.
+%           stimTs      double, the index of the stimuli in the TS of the
+%                       long dat file.
+%           stamps      double, the index of the start and end of each
+%                       trace in the long dat file (need to double check meaning for orginization).
+%           intensOrig  double, the intensities as user inputed them, without 
+%                       any sorting and merging.
+%           rm          cell, for each intensity the number of the traces
+%                       user removed. Column order matching intensOrig.
+%           lowPass     double, the cut off frequency for the low pass filter used.
+%           inspect     logical, true if user inspected the traces in each
+%                       intensity in order to remove unwanted ones.
+%       intens      double the intensities in this file after sorting and merging.
+%       tstamps     the time stamps for all traces. 0 is the first stimulus.
+%       traces      cell, all the traces extracted, dims electrode X intensities.
 %
 % TO DO LIST
 %   # more efficient way to convert tstamps to idx
@@ -51,6 +79,8 @@ function fepsp = fEPSPfromDat(varargin)
 % 16 oct 20        added inspect, dc, and cf
 %                  compatible with wcp
 %                  separated analysis
+% 01 Nov 20 LD     change fepsp.info.basename to cell for compatiblity with
+%                  wcp, and add description of base output
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -339,7 +369,7 @@ intensOrig = intens;
 [intens, ia] = unique(intens);
 
 clear fepsp
-fepsp.info.basename = basename;
+fepsp.info.basename = {basename};
 fepsp.info.recSystem = recSystem;
 fepsp.info.protocol = protocol;
 fepsp.info.fsOrig = fsIn;

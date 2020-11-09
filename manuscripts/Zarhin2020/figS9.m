@@ -1,11 +1,11 @@
 % figS9 in Zarhin et al., 2020
 
 close all
-force = true;
-saveFig = true;
+force = false;
+saveFig = false;
 
-grppath{1} = 'G:\Data\Processed\Manuscripts\Zarhin2020\IIS\WT\New analyis';
-grppath{2} = 'G:\Data\Processed\Manuscripts\Zarhin2020\IIS\APPPS1\New analysis';
+grppath{1} = 'F:\Data\Manuscripts\Zarhin2020\IIS\WT\New analyis';
+grppath{2} = 'F:\Data\Manuscripts\Zarhin2020\IIS\APPPS1\New analysis';
 
 % select mouse (according to file order in path)
 i_wt1 = 7;
@@ -17,6 +17,11 @@ i_app2 = 5;
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if force
+    
+    
+    % load DZ IIS data
+    load(fullfile('F:\Data\Manuscripts\Zarhin2020\IIS', '3.lfp.mat'))
+    dzlfp = lfp;
     
     % load wt1 data (deep)
     cd(grppath{1})
@@ -149,8 +154,10 @@ binsize = (2 ^ nextpow2(fs * 1));
 smf = 15;
 marg = 0.05;
 minmarg = 1;
-verticalSpacing = 0.08;
-horizontalSpacing = 0.1;
+verticalSpacing = 0.05;
+horizontalSpacing = 0.05;
+nrow = 7;
+ncol = 4;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % wt mouse deep
@@ -158,7 +165,6 @@ horizontalSpacing = 0.1;
 midsig = 23;
 idx1 = 19 * fs * 60 : 24 * fs * 60;
 c = 2;
-ncol = 4;
 plotColumn(idx1, midsig, lfp1, bs1, iis1, ep1, c, ncol, 'WT - deep')
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -167,15 +173,13 @@ plotColumn(idx1, midsig, lfp1, bs1, iis1, ep1, c, ncol, 'WT - deep')
 midsig = 24.8;
 idx1 = 24 * fs * 60 : 29 * fs * 60;
 c = 1;
-ncol = 4;
-plotColumn(idx1, midsig, lfp2, bs2, iis2, ep2, c, ncol, 'WT - surgical')
+plotColumn(idx1, midsig, lfp2, bs2, iis2, ep2, c, ncol, 'WT - moderate')
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % app mouse deep
 midsig = 33.5;
 idx1 = 29 * fs * 60 : 34 * fs * 60;
 c = 4;
-ncol = 4;
 plotColumn(idx1, midsig, lfp3, bs3, iis3, ep3, c, ncol, 'APP/PS1 - deep')
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -183,13 +187,12 @@ plotColumn(idx1, midsig, lfp3, bs3, iis3, ep3, c, ncol, 'APP/PS1 - deep')
 midsig = 67;
 idx1 = 66 * fs * 60 : 71 * fs * 60;
 c = 3;
-ncol = 4;
-plotColumn(idx1, midsig, lfp4, bs4, iis4, ep4, c, ncol, 'APP/PS1 - surgical')
+plotColumn(idx1, midsig, lfp4, bs4, iis4, ep4, c, ncol, 'APP/PS1 - moderate')
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % bs identification
 
-sh = subaxis(5, 4, [13, 14, 17, 18],...
+sh = subaxis(nrow, 4, [13, 14, 17, 18],...
     'spacingVert', verticalSpacing, 'spacingHoriz', horizontalSpacing);
 gscatter(varmat(:, 1), varmat(:, 3), gi, 'rk', '.', 5);
 axis tight
@@ -206,7 +209,7 @@ box off
 histbins = 40;
 % std histograg
 % axes('Position', [.627 .11 .07 .07])
-axes('Position',[.422 .11 .05 .05])
+axes('Position',[.625 .355 .05 .05])
 box on
 h = histogram(varmat(:, 1), histbins, 'Normalization', 'Probability');
 h.EdgeColor = 'none';
@@ -219,7 +222,7 @@ set(gca, 'TickLength', [0 0], 'YTickLabel', [], 'XTickLabel', [],...
 box off
 
 % max histogram
-axes('Position',[.422 .18 .05 .05])
+axes('Position',[.625 .432 .05 .05])
 % axes('Position',[.627 .2 .07 .07])
 box on
 h = histogram(varmat(:, 2), histbins, 'Normalization', 'Probability');
@@ -233,7 +236,7 @@ set(gca, 'TickLength', [0 0], 'YTickLabel', [], 'XTickLabel', [],...
 box off
 
 % PC1 histogram
-axes('Position',[.369 .11 .05 .05])
+axes('Position',[.575 .355 .05 .05])
 % axes('Position',[.549 .11 .07 .07])
 box on
 h = histogram(varmat(:, 3), histbins, 'Normalization', 'Probability');
@@ -261,7 +264,7 @@ gidx = [ones(1, 30), ones(1, 30) * 2];
 data = cell2nanmat(as.bsrDeep(:, 1 : 2));
 % data = as.bsr
 
-sh = subaxis(5, 4, [15, 16, 19, 20],...
+sh = subaxis(nrow, 4, [16, 20],...
     'spacingVert', verticalSpacing, 'spacingHoriz', horizontalSpacing);
 boxplot(data, gidx, 'PlotStyle', 'traditional',...
     'BoxStyle', 'outline', 'Color', c2, 'notch', 'off')
@@ -281,19 +284,98 @@ sigstar({[1, 2]}, p, 1);
 % sigstar({[1, 3], [1, 4], [2, 4], [2, 3]}, [0.05, 0.01, 0.01, 0.05], 1);
 title({'';''})
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% iis full trace
+yLimit = [-1.5 5];
+
+subaxis(nrow, ncol, [21, 22, 25, 26], 'spacingVert', verticalSpacing,...
+    'spacingHoriz', horizontalSpacing);
+plot(dzlfp.timestamps / 60, dzlfp.data, 'k', 'LineWidth', 1)
+hold on
+ylim(yLimit);
+xlim([0 20]);
+ylabel('Amplitude [mV]')
+xlabel('Time [m]') 
+yline(1, '--', 'LineWidth', 1, 'Color', 'r');
+rectangle('Position',[11 -1 5 4],'Curvature',0.2,'EdgeColor','b','LineWidth',1);
+box off
+yticks(yLimit)
+xticks([0 10 20])
+set(gca, 'TickLength', [0 0], 'Color', 'none');
+
+% zoom in 1
+subaxis(nrow, ncol, [23, 24], 'spacingVert', verticalSpacing / 5,...
+    'spacingHoriz', horizontalSpacing);
+plot(dzlfp.timestamps / 60, dzlfp.data, 'k', 'LineWidth', 0.4)
+hold on
+yline(1, '--', 'LineWidth', 1, 'Color', 'r');
+ylim(yLimit);
+xlim([11 16]);
+box off
+set(gca, 'xtick', [], 'ytick', [])
+h = gca;
+h.XAxis.Visible = 'off';
+h.YAxis.Visible = 'off';
+% rectangle('Position', [11 -1 5 4], 'Curvature', 0, 'EdgeColor', 'b',...
+%     'LineWidth', 0.5);
+rectangle('Position', [13.05 -1.5 0.18 5],'Curvature', 0, 'EdgeColor',...
+    'none', 'LineWidth', 1,'LineStyle', '--', 'FaceColor', [0 0 0,0.2]);
+obj = scalebar;
+obj.YLen = 1;             
+obj.YUnit = [];
+obj.XLen = 1;             
+obj.XUnit = [];
+obj.Position = [11.05, -1.4];
+set(gca, 'TickLength', [0 0], 'XTickLabel', [], 'XColor', 'none',...
+    'Color', 'none')
+    
+% zoom in 2
+subaxis(nrow, ncol, [27, 28], 'spacingVert', verticalSpacing / 5,...
+    'spacingHoriz', horizontalSpacing);
+plot(dzlfp.timestamps / 60, dzlfp.data, 'k', 'LineWidth', 0.4)
+hold on
+yline(1, '--', 'LineWidth', 1, 'Color', 'r');
+ylim(yLimit);
+xlim([13.05 (13.05+0.18)]);
+box off
+set(gca, 'xtick', [], 'ytick', [])
+h = gca;
+h.XAxis.Visible = 'off';
+h.YAxis.Visible = 'off';
+obj = scalebar;
+obj.YLen = 1;             
+obj.YUnit = [];
+obj.XLen = 2/60;             
+obj.XUnit = [];
+obj.Position = [13.055, -1.4];
+set(gca, 'TickLength', [0 0], 'XTickLabel', [], 'XColor', 'none',...
+    'Color', 'none')
+% text(13.1,1.752,'\leftarrow ','Color',[0 .5 .5],'FontSize',30)
+% text(13.147,1.569,'\leftarrow ','Color',[0 .5 .5],'FontSize',30)
+% text(13.194,1.623,'\leftarrow ','Color',[0 .5 .5],'FontSize',30)
+rectangle('Position',[13.05 -0.8 0.18 3],'Curvature',0.2,'EdgeColor','none','LineWidth',1,'LineStyle','--','FaceColor',[0 0 0,0.1]);
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% save fig
+
 if saveFig
     figname = fullfile(basepath, 'figS9');
-%     export_fig(figname, '-tif', '-transparent', '-r300')
-%     export_fig(figname, '-pdf')
-%     savePdf('figS9', basepath, fh)
- print(fh, figname, '-dpdf', '-bestfit', '-painters'); 
+    %     export_fig(figname, '-tif', '-transparent', '-r300')
+    %     export_fig(figname, '-pdf')
+    %     savePdf('figS9', basepath, fh)
+    print(fh, figname, '-dpdf', '-bestfit', '-painters');
 end
 
-% set(findall(fh, '-property', 'FontSize'), 'FontSize', 12)
+set(findall(fh, '-property', 'FontSize'), 'FontSize', 12)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% subfunction - plotColumn
 
 function plotColumn(idx, midsig, lfp, bs,  iis, ep, c, ncol, tit)
 
 % constants
+nrow = 7;
 fs = 1250;
 Y = sort([0.5 -2]); % ylim for raw
 YY = sort([0.5 -2]); % ylim for zoom
@@ -301,8 +383,8 @@ binsize = (2 ^ nextpow2(fs * 1));
 smf = 15;
 marg = 0.05;
 minmarg = 0.5;
-verticalSpacing = 0.08;
-horizontalSpacing = 0.1;
+verticalSpacing = 0.05;
+horizontalSpacing = 0.05;
 
 % prepare data
 dc = mean(lfp.data(idx));
@@ -315,7 +397,7 @@ end
 idx2 = round((midsig - minmarg) * fs * 60 : (midsig + minmarg) * fs * 60);
 
 % raw
-subaxis(5, ncol, c, 'spacingVert', verticalSpacing,...
+subaxis(nrow, ncol, c, 'spacingVert', verticalSpacing,...
     'spacingHoriz', horizontalSpacing);
 plot(lfp.timestamps(idx) / 60, lfp.data(idx), 'k', 'LineWidth', 1)
 hold on
@@ -329,7 +411,7 @@ xlim([idx(1) idx(end)] / fs / 60)
 xlabel('Time [m]')
 title(tit, 'Interpreter', 'none')
 if c == 1
-    ylabel('LFP [mV]')
+    ylabel('Amplidute [mV]')
     yticks(Y)
     set(gca, 'TickLength', [0 0], 'XTickLabel', [], 'XColor', 'none',...
         'Color', 'none')
@@ -339,13 +421,15 @@ else
 end
 
 % spectrogram
-sh = subaxis(5, ncol, c + ncol, 'spacingVert', verticalSpacing,...
+sh = subaxis(nrow, ncol, c + ncol, 'spacingVert', verticalSpacing,...
     'spacingHoriz', horizontalSpacing);
 specBand('sig', lfp.data(idx), 'graphics', true, 'binsize', binsize,...
     'smf', smf, 'normband', true);
 set(gca, 'TickLength', [0 0])
 if c ~=1
     set(gca, 'YColor', 'none')
+end
+if c ~=4
     set(colorbar, 'visible', 'off')
 end
 xlabel('Time [m]')
@@ -383,7 +467,7 @@ title('')
 % end
 
 % zoom in
-sh = subaxis(5, ncol, c + ncol * 2, 'spacingVert', verticalSpacing,...
+sh = subaxis(nrow, ncol, c + ncol * 2, 'spacingVert', verticalSpacing,...
     'spacingHoriz', horizontalSpacing);
 idx5 = iis.peakPos > idx2(1) & iis.peakPos < idx2(end);
 plot(lfp.timestamps(idx2) / 60, lfp.data(idx2), 'k')
@@ -410,7 +494,7 @@ if ~isempty(bsstamps)
 end
 if c == 1
     yticks(YY);
-    ylabel('Voltage [mV]')
+    ylabel('Amplidute [mV]')
     set(gca, 'TickLength', [0 0])
 else
     set(gca, 'TickLength', [0 0], 'YColor', 'none')

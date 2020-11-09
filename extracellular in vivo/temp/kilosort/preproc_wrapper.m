@@ -5,15 +5,15 @@ cd(basepath)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % open ephys
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'E:\Leore\lh70\2020-10-17_08-33-13';
+basepath = 'E:\Data\lh58\2020-09-02_08-22-13';
 % rmvch = [18 19 20 21];
-rmvch = [4];
+rmvch = [];
 % rmvch = [];
-% mapch = [25 26 27 28 30 1 2 29 3 : 14 31 0 15 16 17 : 24 32 33 34] + 1;
-mapch = [1 : 19];
-exp = [1];
+mapch = [25 26 27 28 30 1 2 29 3 : 14 31 0 15 16 17 : 24 32 33 34] + 1;
+% mapch = [1 : 19];
+exp = [4];
 rec = cell(max(exp), 1);
-% rec{2} = [5 : 7];
+rec{4} = [2];
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
     'rmvch', rmvch, 'mapch', mapch, 'concat', true, 'nchans', length(mapch));
 
@@ -61,7 +61,7 @@ rez = runKS('basepath', basepath, 'fs', fs, 'nchans', nchans,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % fix manual curation
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-fixSpkAndRes('grp', [], 'fs', fs);
+fixSpkAndRes('grp', 2, 'fs', fs);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % cell explorer
@@ -77,7 +77,7 @@ cell_metrics = ProcessCellMetrics('session', session,...
     'debugMode', true, 'transferFilesFromClusterpath', false,...
     'submitToDatabase', false);
 
-% cell_metrics = CellExplorer('metrics', cell_metrics);
+cell_metrics = CellExplorer('metrics', cell_metrics);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % spikes
@@ -147,3 +147,33 @@ for ii = 1 : length(states)
     frStates{ii} = mean(fr.strd(:, tStates{ii}), 2);
 end
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% spike detection routine
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% create wh.dat
+ops = opsKS('basepath', basepath, 'fs', fs, 'nchans', nchans,...
+    'spkgrp', spkgrp, 'trange', [0 Inf]);
+preprocessDataSub(ops);
+
+% detect spikes
+[spktimes, spkch] = spktimesWh('basepath', basepath, 'fs', fs, 'nchans', nchans,...
+    'spkgrp', spkgrp, 'saveVar', true, 'chunksize', 2048 ^ 2 + 64,...
+    'graphics', false);
+
+% create ns files for kk sorting
+% spktimes2ks
+
+% firing rate per tetrode. note that using times2rate requires special care
+% becasue spktimes is given in samples and not seconds
+binsize = 60 * fs;
+winCalc = [0 Inf];
+[sr.strd, sr.edges, sr.tstamps] = times2rate(spktimes, 'binsize', binsize,...
+    'winCalc', winCalc, 'c2r', false);
+% convert counts to rate
+sr.strd = sr.strd ./ (diff(sr.edges) / fs);
+% fix tstamps
+sr.tstamps = sr.tstamps / binsize;
+
+figure, plot(sr.tstamps, sr.strd)
+legend

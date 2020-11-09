@@ -3,13 +3,13 @@
 % params
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-basepath = 'E:\Leore';
+basepath = 'D:\Google Drive\PhD\Slutsky\Data Summaries';
 filename = 'b3.xlsx';
 filename = fullfile(basepath, filename);
 mnames = [60 61 62 63 66 67];
 
 forceL = false;
-
+saveFig = false;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % load and arrange data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -83,16 +83,18 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics - params vs. session
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-mice = [1, 2, 3, 4, 6];
+mice = [1 : 6];
 % mice = [2, 6];
 delay = 10;
-dates = [2.1, 3.1, 4.1, 5.1, 6.1, 7.1, 8.1, 9.1, 10.1, 11.1];
-% dates = [2.9, 3.9, 4.9, 5.9, 6.9, 7.9, 8.9, 9.9, 10.9, 11.9];
+dates = [];
+% dates = [2.9 : 9.9];
+dates = [2.1 : 14.1];
 shadeIdx = [5 10];
+shaedIdx = [];
 % shadeIdx = [8.5 9.5];
-mClr = 'nrnnr';
-pflag = [1 1 1 0];      % (1) success, (2) duration, (3) weight, (4) water
-avgFlag = [1, 3, 4];
+mClr = 'nnn';
+pflag = [1 1 1 1];      % (1) success, (2) duration, (3) weight, (4) water
+avgFlag = [1];
 % avgFlag = 1;
 cump = cumsum(pflag);
 
@@ -102,6 +104,9 @@ for i = mice
     nsessions = length(m{i}.date);
     delayIdx = m{i}.delay == delay;
     dateIdx = zeros(1, nsessions);
+    if isempty(dates)
+        dates = unique(m{1}.date);
+    end
     for ii = 1 : length(dates)
         dateIdx = dateIdx | m{i}.date == dates(ii);
     end
@@ -113,10 +118,10 @@ for i = 1 : length(dates)
 end
 
 close all
-figure
 % -------------------------------------------------------------------------
 % success
 if pflag(1)
+    fh = figure;
     data = correct(idx, mice);
     yLimit = [0 1];
     subplot(sum(pflag), 1, cump(1))
@@ -158,10 +163,16 @@ if pflag(4)
     ylabel('Water Intake [ml]')
 end
 
-xlabel('Time [d]')
-legend('best', micenames(mice))
+xlabel('Time [date]')
+% legend('best', micenames(mice))
 xticks([1 : length(dates)])
 xticklabels(split(num2str(dates)))
+
+if saveFig
+    figname = fullfile(basepath, 't-maze');
+    print(fh, figname, '-dpdf', '-bestfit', '-painters');
+    export_fig(figname, '-tif', '-transparent', '-r300')
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % success vs. delay
@@ -207,7 +218,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 function paramsVsSession(data, yLimit, mClr, shadeIdx, avgFlag,...
-    dates, mice)
+    ~, mice)
 if avgFlag
     if length(avgFlag) > 1
         [~, ia] = intersect(mice, avgFlag);

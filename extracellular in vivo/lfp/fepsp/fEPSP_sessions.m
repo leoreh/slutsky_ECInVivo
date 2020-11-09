@@ -6,87 +6,29 @@
 % different stim intensities between sessions. compensates if arrays are
 % not sorted (though fEPSPfromOE should sort by intensity)
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% arguments
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% fr_sessions
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% arguments
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-forceL = false;
 forceA = false;
-saveFig = false; 
-
-basepath = 'E:\Leore\lh70';
-% name of xls file with list of sessions. must include extension.
-sessionlist = 'sessionList.xlsx';       
-
-% should allow user to input varName or columnn index
-colName = 'Session';                    % column name in xls sheet where dirnames exist
-% string array of variables to load
-vars = ["session.mat";...
-    "fepsp"];      
-
-% column name of logical values for each session. only if true than session
-% will be loaded. can be a string array and than all conditions must be
-% met.
-pcond = ["fepsp"; "tempflag"];     
-% pcond = [];
-
-% same as pcond but imposes a negative condition.
-ncond = ["manCur"];                      
+forceL = false;
+saveFig = false;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% get directory paths
-if exist('dirnames', 'var') && isstring(dirnames)
-    % ALT 1: user input dirnames
-    dirnames = dirnames;
-elseif ischar(sessionlist) && contains(sessionlist, 'xlsx')
-    % ALT 2: get dirnames from xlsx file
-    sessionInfo = readtable(fullfile(basepath, sessionlist));
-    icol = strcmp(sessionInfo.Properties.VariableNames, colName);
-    dirnames = string(table2cell(sessionInfo(:, icol)));
-    % check dirnames meet conditions
-    clear irow iicol
-    irow = ones(length(dirnames), 1);
-    for i = 1 : length(pcond)
-        iicol(i) = find(strcmp(sessionInfo.Properties.VariableNames, char(pcond(i))));
-        irow = irow & sessionInfo{:, iicol(i)} == 1;
-    end
-    for i = 1 : length(ncond)
-        iicol(i) = find(strcmp(sessionInfo.Properties.VariableNames, char(ncond(i))));
-        irow = irow & sessionInfo{:, iicol(i)} ~= 1;
-    end
-    dirnames = dirnames(irow);
-    dirnames(strlength(dirnames) < 1) = [];
-end
 
+basepath = 'F:\Data\Processed\lh70\fepsp';
+
+vars = ["session.mat";...
+    "fepsp"];      
+pcond = ["fepsp"; "tempFlag"];     
+ncond = [""];                      
+
+if ~exist('varArray', 'var') && ~forceL
+    [varArray, dirnames] = getSessionVars('basepath', basepath, 'vars', vars,...
+        'pcond', pcond, 'ncond', ncond, 'sortDir', true);
+end
 nsessions = length(dirnames);
 
-% load files
-if forceL || ~exist('d', 'var')
-    d = cell(length(dirnames), length(vars));
-    for i = 1 : nsessions
-        filepath = char(fullfile(basepath, dirnames(i)));
-        if ~exist(filepath, 'dir')
-            warning('%s does not exist, skipping...', filepath)
-            continue
-        end
-        cd(filepath)
-        
-        for ii = 1 : length(vars)           
-            filename = dir(['*', vars{ii}, '*']);
-            if length(filename) == 1
-                d{i, ii} = load(filename.name);
-            else
-                warning('no %s file in %s, skipping', vars{ii}, filepath)
-            end
-        end
-    end
-end
+session = varArray{1, 1}.session;
+fepsp = varArray{1, 2}.fepsp;
 
 % session info
 session = CE_sessionTemplate(pwd, 'viaGUI', false,...
@@ -107,14 +49,16 @@ if forceA
         filepath = char(fullfile(basepath, dirnames(i)));
         cd(filepath)
         
+        fepsp = varArray{i, 2}.fepsp;
+
         % fepsp
         intens = [];
         fepsp = fEPSPfromDat('basepath', filepath, 'fname', '', 'nchans', nchans,...
-            'spkgrp', spkgrp, 'intens', intens, 'saveVar', true,...
-            'force', false, 'extension', 'dat', 'recSystem', 'oe',...
-            'protocol', 'stp', 'inspect', true, 'anaflag', false);
+            'spkgrp', spkgrp, 'intens', intens, 'saveVar', false,...
+            'force', true, 'extension', 'dat', 'recSystem', 'oe',...
+            'protocol', 'io', 'inspect', true, 'anaflag', false);
         
-        fepsp = fEPSP_analysis('fepsp', fepsp, 'graphics', [1],...
+        fepsp = fEPSP_analysis('fepsp', fepsp, 'graphics', [2],...
             'force', true, 'saveVar', true);
         
     end
@@ -126,14 +70,15 @@ end
 % intensities throughout sessions
 intens = [];
 for i = 1 : nsessions
-    if isempty(d{i, 2})
+    if isempty(varArray{i, 2})
         continue
     end
-    fepsp = d{i, 2}.fepsp;
+    fepsp = varArray{i, 2}.fepsp;
     intens = sort(unique([intens, fepsp.intens]));
 end
 
-protocol = fepsp.info.protocol;
+% protocol = fepsp.info.protocol;
+protocol = 'io';
 switch protocol
     case 'io'
         % ampmat    3d mat of amplitudes; tetrode x intensity x session. data will
@@ -146,10 +91,10 @@ switch protocol
         ampmat = nan(ngrp, length(intens), nsessions);
         wvmat = nan(ngrp, nsessions, size(fepsp.wavesAvg, 3));
         ampcell = cell(1, nsessions);
-        si = 80;        % selected intensity [uA]
-        grp = 2;        % selected tetrode
+        si = 100;        % selected intensity [uA]
+        grp = 1;        % selected tetrode
         for i = 1 : nsessions
-            fepsp = d{i, 2}.fepsp;
+            fepsp = varArray{i, 2}.fepsp;  
             sintens = sort(fepsp.intens);
             [~, ia] = intersect(sintens, si);
             [~, ib] = intersect(intens, si);
@@ -170,7 +115,7 @@ switch protocol
         wvmat = nan(ngrp, nsessions, size(fepsp.traceAvg, 3));
         facilitation = nan(ngrp, nsessions);
         for i = 1 : nsessions
-            fepsp = d{i, 2}.fepsp;
+            fepsp = varArray{i, 2}.fepsp;
             if isempty(si)
                 [~, si] = max(fepsp.facilitation, [], 2);
                 si = round(median(si));
@@ -191,11 +136,11 @@ sessionDate = sessionDate(2 : 3 : end);
  
 % waveform and box plot of amplitudes across sessions for selected
 % intensity and tetrode. can select specific sessions for waveform
-ss = [1, 4, 10];
+% ss = [1, 2, 3, 4, 8, 12];
 ss = [1 : nsessions];
 p = 1;
 clr = ['kkkrrrrr'];        % must be sorted (i.e. g before k before r)
-grp = 1;
+grp = 4;
 if p
     fh = figure;
     subplot(2, 1, 1)
@@ -276,7 +221,7 @@ if p
     for i = grp
         figure
         for ii = 1 : nsessions
-            fepsp = d{ii, 2}.fepsp;
+            fepsp = varArray{ii, 2}.fepsp;
             plot(sort(fepsp.intens), fepsp.amp(i, :))
             hold on
         end

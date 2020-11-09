@@ -54,6 +54,9 @@ if numel(overlap) == 1
 elseif numel(overlap) > 2
     error('overlap must be a 2-element vector')
 end
+if isempty(overlap)
+    overlap = [0 0];
+end
 
 % validate
 % if max(clip(:)) > n

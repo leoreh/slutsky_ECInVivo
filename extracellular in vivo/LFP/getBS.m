@@ -105,7 +105,7 @@ forceA = p.Results.forceA;
 mancur = p.Results.mancur;
 
 % params
-minDur = 2;                             % minimum event duration [bins]
+minDur = 1;                             % minimum event duration [bins]
 maxDur = 3000000;                       % maximum event duration [bins]
 interDur = 4;                           % minimum time between events [bins]
 % binsize = binsize * fs;               % [s] * [fs] = [samples]
@@ -351,12 +351,11 @@ if mancur
     for i = 1 : size(x, 1)
         epbin(x(i, 1) : x(i, 2)) = 1;
     end
-    % correct special case where user marked beyond end of recording. this
-    % is a very laze fix because only applies for end of recording but not
-    % beginning
+    % correct special case where user marked beyond end of recording. very
+    % laze fix
     epbin(length(bs.binary) + 1 : length(epbin)) = [];
     
-    % sensitivity (TPR)
+    % sensitivity (TPR) 
     tpr = sum(~bs.binary & ~epbin) / sum(~epbin);
     % specificity (TNR)
     tnr = sum(bs.binary & epbin) / sum(epbin);
