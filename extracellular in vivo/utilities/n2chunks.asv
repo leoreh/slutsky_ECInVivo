@@ -15,7 +15,7 @@ function [chunks] = n2chunks(varargin)
 %               first element is reduced from chunk start and second
 %               element is added to chunk end. if single value is specified
 %               than the overlap will be symmetrical start to end. for
-%               example, overlap = [100 150] for chunksize = 1000
+%               example, overlap = [100 150] than for chunksize = 1000
 %               chunks may be [1 1150; 900 2150]. 
 %   clip        mat n x 2 indicating samples to diregard from chunks.
 %               for example: clip = [0 50; 700 Inf] will remove the first
