@@ -6,6 +6,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 forceL = false;
 forceA = false;
+basepath = 'D:\VMs\shared\lh70';
 
 % should allow user to input varName or columnn index
 colName = 'Session';                    % column name in xls sheet where dirnames exist
@@ -17,17 +18,11 @@ vars = ["session.mat";...
 % column name of logical values for each session. only if true than session
 % will be loaded. can be a string array and than all conditions must be
 % met.
-pcond = ["tempFlag"];
+pcond = ["tempflag"];
 % pcond = [];
 % same but imposes a negative condition
 ncond = ["fepsp"];
 sessionlist = 'sessionList.xlsx';       % must include extension
-
-% basepath = 'D:\VMs\shared\lh58';
-basepath = 'G:\Data\Processed\lh58';
-
-% dirnames = ["lh58_200830_1000"; "lh58_200831_1000";...
-%     "lh58_200830_090851"; "lh58_200831_080808"];
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % load data
@@ -47,6 +42,7 @@ if forceA
         
         % file
         filepath = char(fullfile(basepath, dirnames{i}));
+        [~, basename] = fileparts(filepath);
         cd(filepath)
         
         % params
@@ -56,35 +52,28 @@ if forceA
         fs = session.extracellular.sr;
         spkgrp = session.extracellular.spikeGroups.channels;
                 
-        ops = opsKS('basepath', filepath, 'fs', fs, 'nchans', nchans,...
-            'spkgrp', spkgrp, 'trange', [0 Inf]);
-        preprocessDataSub(ops);
-        
         % detect spikes
-        [spktimes, spkch] = spktimesWh('basepath', filepath, 'fs', fs, 'nchans', nchans,...
-            'spkgrp', spkgrp, 'saveVar', true, 'chunksize', 2048 ^ 2 + 64,...
-            'graphics', false, 'clean', false);
+        spktimesWh('basepath', filepath, 'fs', fs, 'nchans', nchans,...
+            'spkgrp', spkgrp, 'saveVar', true, 'saveWh', false,...
+            'graphics', false)
         
-        % create ns files for kk sorting
-        % spktimes2ks
+        % create ns files for sorting
+        spktimes2ks('basepath', filepath, 'fs', fs,...
+            'nchans', nchans, 'spkgrp', spkgrp, 'mkClu', true,...
+            'dur', 240, 't', '0200', 'psamp', [], 'grps', [1 : length(spkgrp)]);
         
         % firing rate per tetrode. note that using times2rate requires special care
         % becasue spktimes is given in samples and not seconds
         binsize = 60 * fs;
         winCalc = [0 Inf];
+        load([basename '.spktimes.mat'])
         [sr.strd, sr.edges, sr.tstamps] = times2rate(spktimes, 'binsize', binsize,...
             'winCalc', winCalc, 'c2r', false);
         % convert counts to rate
         sr.strd = sr.strd ./ (diff(sr.edges) / fs);
         % fix tstamps
-        sr.tstamps = sr.tstamps / binsize;
-        
-        [~, basename] = fileparts(filepath);
+        sr.tstamps = sr.tstamps / binsize;        
         save(fullfile(filepath, [basename '.sr.mat']), 'sr')
-        
-%         figure, plot(sr.tstamps, sr.strd)
-%         legend
-
     end
 end
 
@@ -104,10 +93,10 @@ pathPieces = regexp(dirnames(:), '_', 'split'); % assumes filename structure: an
 sessionDate = [pathPieces{:}];
 sessionDate = sessionDate(2 : 3 : end);
  
-close all
-grp = [1 : 8];          % which tetrodes to plot
+% close all
+grp = [1 : 4];          % which tetrodes to plot
 state = [2];            % [] - all; 1 - awake; 2 - NREM
-Y = [0 150];             % ylim
+Y = [0 200];             % ylim
 p1 = 1;                 % firing rate vs. time, one fig per session
 p2 = 0;                 % mfr across sessions, one fig
 p3 = 0;                 % firing rate vs. time, one fig for all sessions. not rubust 

@@ -8,7 +8,7 @@ function spktimes2ks(varargin)
 %   spkgrp      array where each cell is the electrodes for a spike group.
 %               if empty will be loaded from session info file (cell
 %               explorer format)
-%   grp         numeric. groups (tetrodes) to work on
+%   grps        numeric. groups (tetrodes) to work on
 %   fs          numeric. sampling frequency [hz]{20000}
 %   psamp       numeric. peak / trough sample {16}. if empty will be
 %               set to half nsamps.
@@ -22,7 +22,8 @@ function spktimes2ks(varargin)
 % DEPENDENCIES
 %   class2bytes
 %
-% TO DO LIST:
+% TO DO LIST
+%   # replace memmap w/ fread 
 %
 % 09 nov 20 LH      
 
@@ -34,18 +35,18 @@ tic;
 p = inputParser;
 addOptional(p, 'basepath', pwd);
 addOptional(p, 'spkgrp', {}, @iscell);
-addOptional(p, 'grp', [], @isnumeric);
+addOptional(p, 'grps', [], @isnumeric);
 addOptional(p, 'fs', 20000, @isnumeric);
 addOptional(p, 'psamp', [], @isnumeric);
 addOptional(p, 'nchans', [], @isnumeric);
 addOptional(p, 'dur', [], @isnumeric);
-addOptional(p, 't', [], @ischar);
+addOptional(p, 't', []);
 addOptional(p, 'mkClu', false, @islogical);
 
 parse(p, varargin{:})
 basepath    = p.Results.basepath;
 spkgrp      = p.Results.spkgrp;
-grp         = p.Results.grp;
+grps        = p.Results.grps;
 fs          = p.Results.fs;
 psamp       = p.Results.psamp;
 nchans      = p.Results.nchans;
@@ -59,18 +60,18 @@ mkClu   	= p.Results.mkClu;
 
 dur = dur * 60 * fs;
 
-if isempty(peakSamp)
-    peakSamp = round(sniplength / 2);
+sniplength = ceil(1.6 * 10^-3 * fs);
+win = [-(floor(sniplength / 2) - 1) floor(sniplength / 2)];   
+precision = 'int16'; % for dat file. size of one data point in bytes
+nbytes = class2bytes(precision); 
+
+if isempty(psamp)
+    psamp = round(sniplength / 2);
 end
 if isempty(grps)
     grps = 1 : length(spkgrp);
 end
 ngrps = length(grps);
-
-sniplength = ceil(1.6 * 10^-3 * fs);
-win = [-(floor(sniplength / 2) - 1) floor(sniplength / 2)];   
-precision = 'int16'; % for dat file. size of one data point in bytes
-nbytes = class2bytes(precision); 
 
 % build regressor for detrending
 s = 0 : sniplength - 1;
@@ -94,18 +95,19 @@ raw = m.Data;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % find boundry samples
-if ~isempty(t)
+recStart = '';
+if ischar(t)
     recStart = split(basename, '_');
     recStart = recStart{end};
     if numel(recStart) == 6
         tformat = 'HHmmss';
     elseif numel(recStart) == 4
-        tformat = 'HHMM';
+        tformat = 'HHmm';
     end
     recStart = datetime(recStart, 'InputFormat', tformat);
     t = datetime(t, 'InputFormat', tformat);
     if t <= recStart
-        error('requested time must be greater than recording start time')
+        t = t + hours(24);
     end
     s = seconds(t - recStart) * fs;
     if ~isempty(dur)
@@ -183,17 +185,17 @@ for i = 1 : ngrps
             spktimes{i}(ii) + win(2)));
         v = [v' - W * (R \ Q' * v')]';
 
-        % realign according to minimum
-        [~, ib] = max(range(v'));   % this can be replaced by spktimes 2nd column, will be faster
-        [~, ia] = min(v, [], 2);       
-        peak = ia(ib);
-        ishift = peak - peakSamp;
-        if ishift ~= 0 
-            spktimes{i}(ii) = spktimes{i}(ii) + ishift;
-                v = double(raw.mapped(grpchans, spktimes{i}(ii) + win(1) :...
-                    spktimes{i}(ii) + win(2)));
-                v = [v' - W * (R \ Q' * v')]';
-        end
+%         % realign according to minimum
+%         [~, ib] = max(range(v'));   % this can be replaced by spktimes 2nd column, will be faster
+%         [~, ia] = min(v, [], 2);       
+%         peak = ia(ib);
+%         ishift = peak - psamp;
+%         if ishift ~= 0 
+%             spktimes{i}(ii) = spktimes{i}(ii) + ishift;
+%                 v = double(raw.mapped(grpchans, spktimes{i}(ii) + win(1) :...
+%                     spktimes{i}(ii) + win(2)));
+%                 v = [v' - W * (R \ Q' * v')]';
+%         end
         spk(:, :, ii) = v;        
     end
     % save to spk file

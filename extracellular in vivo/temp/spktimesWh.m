@@ -10,7 +10,7 @@ function [spktimes, spkch] = spktimesWh(varargin)
 %   spkgrp      array where each cell is the electrodes for a spike group. 
 %   chunksize   numeric. size of chunk to load [samples]. note data 
 %               is loaded and processed in batces of spkgrps
-%   cleanWh     logical. remove temp_wh.dat file after detection {true} 
+%   saveWh      logical. save temp_wh.mat {false}
 %   saveVar     logical. save output {true}
 %   graphics    logical {false}
 %
@@ -46,7 +46,7 @@ fs          = p.Results.fs;
 nchans      = p.Results.nchans;
 spkgrp      = p.Results.spkgrp;
 chunksize   = p.Results.chunksize;
-saveWh      = p.Results.cleanWh;
+saveWh      = p.Results.saveWh;
 saveVar     = p.Results.saveVar;
 graphics    = p.Results.graphics;
 
@@ -112,6 +112,7 @@ end
 % initialize
 spktimes = cell(1, length(spkgrp));
 spkch = cell(1, length(spkgrp));
+spkamp = cell(1, length(spkgrp));
 for i = 1 : Nbatch          
      
     % print progress
@@ -121,7 +122,7 @@ for i = 1 : Nbatch
     txt = sprintf('working on chunk %d / %d', i, Nbatch);
     fprintf(txt)
     
-    % create whitening matrix
+    % create whitened data
     offset = max(0, ops.twind + 2*NchanTOT*(NT * (i - 1) - ntb)); 
     fseek(fid, offset, 'bof'); 
     buff = fread(fid, [NchanTOT NTbuff], '*int16'); 
@@ -156,9 +157,9 @@ for i = 1 : Nbatch
         crossings = wh(:, spkgrp{ii}) < smin + 1e-5 &...
             wh(:, spkgrp{ii}) < thr;
         
-        % find the non-zero peaks, and take their amplitudes 
+        % find the non-zero peaks, and take their amplitudes.
         [samp, ch, amp] = find(crossings .* wh(:, spkgrp{ii})); 
-        [samp, ia] = sort(gather(samp + offset));
+        [samp, ia] = sort(gather(samp + NT * (i - 1)));
         ch = gather(ch(ia));
         amp = gather(amp(ia));
                 
@@ -175,11 +176,15 @@ for i = 1 : Nbatch
         end        
         spktimes{ii} = [spktimes{ii}; samp]; 
         spkch{ii} = [spkch{ii}; spkgrp{ii}(ch)'];
+        if graphics
+            spkamp{ii} = [spkamp{ii}; amp];
+        end
     end
 end
 
 % save variable
 if saveVar
+    [~, basename] = fileparts(basepath);
     save(fullfile(basepath, [basename '.spktimes.mat']),...
         'spktimes', 'spkch')
 end
@@ -192,47 +197,23 @@ fprintf('\nthat took %.2f minutes\n', toc / 60)
 if graphics
    
     % ---------------------------------------------------------------------
-    % inspect detection
-    
-    % memory map to raw data
-    mraw = memmapfile(fraw.name, 'Format', {'int16' [nchans nsamps] 'mapped'});
-    draw = mraw.data;
-    
+    % inspect detection 
+       
+    % raw
+    buff = single(buff');
+    buff = buff(ntb + (1:NT),:);   
+     
     % params
-    chunk2plot = [1 : 10 * fs];
+    xLimit = [1 : length(buff)]';
     clr = ['kbgroym'];
     grp = 3;            % selected grp        
     
-    % load raw
-    raw = [draw.mapped(spkgrp{grp}, chunk2plot)]';
-    
-    % repeat detection for selected grp
-    wh = d.mapped(spkgrp{grp}, chunk2plot);
-    wh = gpuArray(wh');
-    wh = single(wh);
-    wh = wh / scaleproc;   
-    smin = my_min(wh, loc_range, [1, 2]);
-    crossings = wh < smin + 1e-5 & wh < thr;
-    [samp, ch, amp] = find(crossings .* wh); 
-    [samp, ia] = sort(gather(samp));
-    ch = gather(ch(ia));
-    amp = gather(amp(ia));
-    while any(diff(samp) < dt)
-        idx = find(diff(samp) <= dt);
-        idx2 = amp(idx) > amp(idx + 1);
-        idx3 = sort([idx(idx2); idx(~idx2) + 1]);
-        amp(idx3) = [];
-        samp(idx3) = [];
-        ch(idx3) = [];
-    end
-    
-    % raw
     figure
     ax1 = subplot(3, 1, 1);
-    yOffset = gather(min(range(raw)));
+    yOffset = gather(median(range(buff)));
     hold on
     for i = length(spkgrp{grp}) : -1 : 1
-        plot(chunk2plot / fs, raw(:, i)...
+        plot(xLimit / fs, buff(:, spkgrp{grp}(i))...
             + yOffset * (i - 1), clr(i))
     end
     set(gca, 'TickLength', [0 0])
@@ -243,20 +224,23 @@ if graphics
     yOffset = gather(max(range(wh)));
     hold on
     for i = length(spkgrp{grp}) : -1 : 1
-        plot(chunk2plot / fs, wh(:, i)...
+        plot(xLimit / fs, wh(:, spkgrp{grp}(i))...
             + yOffset * (i - 1), clr(i))
-        scatter(samp(ch == i) / fs, amp(ch == i) + yOffset * (i - 1), '*')
+        scatter((spktimes{grp}(spkch{grp} == spkgrp{grp}(i)) - NT * (i - 1)) / fs,...
+            spkamp{grp}(spkch{grp} == spkgrp{grp}(i))...
+            + yOffset * (i - 1), '*')
         yline(thr + yOffset * (i - 1), '--r');
     end
     set(gca, 'TickLength', [0 0])
     title('Whitened')
     
     % min
+    smin = my_min(wh(:, spkgrp{grp}), loc_range, [1, 2]);
     ax3 = subplot(3, 1, 3);
     yOffset = gather(max(range(smin)));
     hold on
     for i = length(spkgrp{grp}) : -1 : 1
-        plot(smin(:, i)...
+        plot(xLimit / fs, smin(:, i)...
             + yOffset * (i - 1), clr(i))
     end
     set(gca, 'TickLength', [0 0])
@@ -271,8 +255,7 @@ if graphics
     histogram(diff(samp), binEdges, 'EdgeColor', 'none', 'FaceColor', 'k')
     xlim([binEdges(1) binEdges(end)])
     xlabel('ISI [samples]')
-    ylabel('Counts')
-    
+    ylabel('Counts')    
 end
 
 % close files
