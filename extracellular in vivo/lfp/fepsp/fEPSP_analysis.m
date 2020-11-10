@@ -23,7 +23,7 @@ function fepsp = fEPSP_analysis(varargin)
 %   fepsp       struct with fields described below
 %
 % TO DO LIST
-%   # Lior Da Marcas take over
+%   # Lior Da Marcas take over (done)
 %
 % 16 oct 20 LH   UPDATES
 % 02 Nov 20 LD  Change analysis from range on relevant window to

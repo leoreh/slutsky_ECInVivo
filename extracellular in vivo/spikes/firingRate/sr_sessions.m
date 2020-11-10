@@ -14,7 +14,8 @@ colName = 'Session';                    % column name in xls sheet where dirname
 vars = ["session.mat";...
     "SleepState.states";....
     "datInfo";
-    ".sr.mat"];
+    ".sr.mat";
+    "spktimes.mat"];
 % column name of logical values for each session. only if true than session
 % will be loaded. can be a string array and than all conditions must be
 % met.
@@ -95,8 +96,8 @@ sessionDate = sessionDate(2 : 3 : end);
  
 % close all
 grp = [1 : 4];          % which tetrodes to plot
-state = [2];            % [] - all; 1 - awake; 2 - NREM
-Y = [0 200];             % ylim
+state = [1];            % [] - all; 1 - awake; 2 - NREM
+Y = [0 300];             % ylim
 p1 = 1;                 % firing rate vs. time, one fig per session
 p2 = 0;                 % mfr across sessions, one fig
 p3 = 0;                 % firing rate vs. time, one fig for all sessions. not rubust 
@@ -155,37 +156,9 @@ for i = 1 : nsessions
             export_fig(figname, '-tif', '-transparent', '-r300')
         end
     end
-    
-    % fr vs. time; one figure for all sessoins
-    k = [1, 2, 3, 4]';
-%     titletxt = ["lh69_200907_morning"; "lh69_200908_morning";...
-%          "lh69_200908_evening"];
-    if p3
-        subplot(2, 2, k(i))
-        plot(tstamps / 60, mean(data(units, :)), 'k', 'LineWidth', 2)
-        hold on
-        if i == 3
-        for ii = 2
-            plot([nsamps(ii) nsamps(ii)] / fs / 60 / 60, Y, '--k',...
-                'LineWidth', 2)
-        end
-        end
-        axis tight
-        fill([states{2} fliplr(states{2})]' / 60 / 60, [Y(1) Y(1) Y(2) Y(2)],...
-            'b', 'FaceAlpha', 0.15,  'EdgeAlpha', 0);
-        ylim(Y)
-        ylabel(ytxt)
-        xlabel('Time [h]')
-        title(dirnames{i})
-        if saveFig
-            figname = sprintf('LTP')
-            figname = fullfile(basepath, figname);
-            % print(fh, figname, '-dpdf', '-bestfit', '-painters');
-            export_fig(figname, '-tif', '-transparent', '-r300')
-        end
-    end
 end
-clr = ['bbbkkkkkkrrr'];
+
+clr = ['bbbkkkkkkkkrrrrrr'];
 if p2
     fh = figure;
     mfrmat = cell2nanmat(mfr);
@@ -195,11 +168,12 @@ if p2
     %         'k', 'LineWidth', 2)
     %     hold on
     %     bh = bar([1 : nsessions], nanmean(mfrmat), 'EdgeColor', 'none');
-%     boxplot(mfrmat, 'PlotStyle', 'traditional');
-    bar(nanmean(mfrmat))
+    boxplot(mfrmat, 'PlotStyle', 'traditional');
+%     bar(nanmean(mfrmat))
     hold on
-    errorbar(1 : nsessions, nanmean(mfrmat), nanstd(mfrmat))
+%     errorbar(1 : nsessions, nanmean(mfrmat), nanstd(mfrmat))
     bh = findobj(gca, 'Tag', 'Box');
+    bh = flipud(bh);
     if length(bh) == length(clr)
         clrRep = histc(clr, unique(clr));
         clear alphaIdx
@@ -227,40 +201,30 @@ if p2
     end
 end
 
-% number of SU and MU (top - pyr; bottom - int) from selected tetrodes
-p2 = 0;
-% grp = [1 : 8];
-if p2
-    clear units
+% firing rate vs. time across all sessions (1 fig)
+% recalculates msr to new bins
+if p3
+    
+    grp = 4;
+    msr = [];
+    tsr = [];
     for i = 1 : nsessions
-        cm = varArray{i, 2}.cell_metrics;
-        spikes = varArray{i, 3}.spikes;
-        pyr = strcmp(cm.putativeCellType, 'Pyramidal Cell');
-        wide = strcmp(cm.putativeCellType, 'Wide Interneuron');
-        pyr = pyr | wide;
-        int = strcmp(cm.putativeCellType, 'Narrow Interneuron');
-        grpidx = zeros(1, length(spikes.shankID));
-        for ii = 1 : length(grp)
-            grpidx = grpidx | spikes.shankID == grp(ii);
-        end
-        units(i, 1) = sum(~spikes.su' & pyr & grpidx);
-        units(i, 2) = sum(spikes.su' & pyr & grpidx);
-        units(i, 3) = sum(~spikes.su' & int & grpidx);
-        units(i, 4) = sum(spikes.su' & int & grpidx);
-        %         units(i, 5) = sum(grpidx) - sum(units(i, 1 : 4));
+        session = varArray{i, 1}.session;
+        ss = varArray{i, 2}.SleepState;
+        datInfo = varArray{i, 3}.datInfo;
+        sr = varArray{i, 4}.sr;
+        st = varArray{i, 5}.spktimes;
+        
+        binsize = 600 * fs;
+        [sr.strd, sr.edges, sr.tstamps] = times2rate(st, 'binsize', binsize,...
+            'winCalc', [0 Inf], 'c2r', false);
+        sr.strd = sr.strd ./ (diff(sr.edges) / fs);
+        sr.tstamps = sr.tstamps / binsize;
+        msr = [msr, sr.strd];
+        tsr = [tsr, sr.tstamps];
     end
+    
     fh = figure;
-    bar(units, 'stacked')
-    legend({"pyr mu"; "pyr su"; "int mu"; "int su"; "others"})
-    xticks(1 : nsessions)
-    xticklabels(sessionDate)
-    title('Number of Units')
-    xlabel('Session')
-    ylabel('No. units')
-    box off
-    if saveFig
-        figname = fullfile(basepath, 'UnitsDetected');
-        % print(fh, figname, '-dpdf', '-bestfit', '-painters');
-        export_fig(figname, '-tif', '-transparent', '-r300')
-    end
+    plot(msr(grp, :)')
+    
 end
