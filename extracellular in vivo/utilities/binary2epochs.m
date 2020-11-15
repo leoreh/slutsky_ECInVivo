@@ -26,7 +26,7 @@ function epochs = binary2epochs(varargin)
 
 p = inputParser;
 addParameter(p, 'vec', [])
-addParameter(p, 'exclude', 0, @isnumeric)
+addParameter(p, 'exclude', 0, @islogical)
 addParameter(p, 'minDur', [], @isnumeric)
 addParameter(p, 'maxDur', [], @isnumeric)
 addParameter(p, 'interDur', [], @isnumeric)

@@ -57,15 +57,15 @@ if forceA
         badch = setdiff([session.extracellular.electrodeGroups.channels{:}],...
             [session.extracellular.spikeGroups.channels{:}]);
         SleepScoreMaster(filepath, 'noPrompts', true,...
-            'rejectChannels', badch, 'overwrite', true,...
-            'NotchTheta', true, 'ignoretime', badstamps)
+            'rejectChannels', badch, 'overwrite', false,...
+            'NotchTheta', true)
         TheStateEditor(fullfile(filepath, basename))
+
         % find bad times from sw spect    
-        badtimes = SleepState.detectorinfo.StatePlotMaterials.swFFTspec(1, :) > 0.6e4;
-        figure, plot(SleepState.detectorinfo.StatePlotMaterials.swFFTspec(1, :))
-        badstamps = binary2epochs('vec', badtimes', 'minDur', 2, 'maxDur', 200000000,...
-            'interDur', 10, 'exclude', false);
-        
+        badtimes = SleepState.detectorinfo.StatePlotMaterials.swFFTspec(1, :) > 2e4;
+        badstamps = binary2epochs('vec', badtimes', 'minDur', 2, 'maxDur', 200000,...
+            'interDur', 30, 'exclude', false);
+              
         % detect spikes
         spktimesWh('basepath', filepath, 'fs', fs, 'nchans', nchans,...
             'spkgrp', spkgrp, 'saveVar', true, 'saveWh', false,...
@@ -111,8 +111,8 @@ sessionDate = sessionDate(2 : 3 : end);
 grp = [1 : 4];          % which tetrodes to plot
 state = [1];            % [] - all; 1 - awake; 2 - NREM
 Y = [0 300];             % ylim
-p1 = 0;                 % firing rate vs. time, one fig per session
-p2 = 1;                 % mfr across sessions, one fig
+p1 = 1;                 % firing rate vs. time, one fig per session
+p2 = 0;                 % mfr across sessions, one fig
 p3 = 0;                 % firing rate vs. time, one fig for all sessions. not rubust 
 
 for i = 1 : nsessions
