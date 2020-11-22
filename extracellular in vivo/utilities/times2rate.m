@@ -1,19 +1,21 @@
-function [r, binedges, bincents] = times2rate(itimes, varargin)
+function [r, binedges, bincents] = times2rate(spktimes, varargin)
 
 % for each unit counts spikes in bins. output may be given as spike count
 % and thus to convert to Hz the output must be divided by the binsize. This
 % is so that times2rate can replace times2binary (i.e. output a binary
-% matrix if the binsize is small). spktimes and binsize must be the same
-% units (e.g. seconds or samples).
+% matrix if the binsize is small). spktimes, binsize and winCalc must be
+% the same units (e.g. seconds or samples).
 % 
 % INPUT
 % required:
-%   itimes      a cell array of vectors where each vector (unit) contains the
-%               timestamps of spikes. for example {spikes.times{1:4}}
+%   spktimes    a cell array of vectors where each vector (unit) contains the
+%               timestamps of spikes. for example {spikes.times{1:4}}. can
+%               also be a single vector
 % optional:
 %   winCalc     time window for calculation {[1 Inf]}. 
-%               Second elemet should be recording duration (e.g.
-%               lfp.duration). if Inf will be the last spike.
+%               last elemet should be recording duration (e.g.
+%               lfp.duration). if Inf will be the last spike. can also be
+%               an n x 2 matrix.
 %   binsize     size of bins {60}. can be of any units so long corresponse
 %               to spktimes. for example, spktimes from Wh (per tetrode) is
 %               given in samples whereas spktimes from ce (per units) is
@@ -38,20 +40,18 @@ function [r, binedges, bincents] = times2rate(itimes, varargin)
 %               option to divide with binsize to obtain rate
 %               handle vectors
 % 02 aug 20 LH  converted calcFR to times2rate. implemented histcounts
+% 19 nov 20 LH  winClac can be matrix (e.g. for states)
 % 
 % TO DO LIST
-%               update description
-
+%   # documentation
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-validate_win = @(win) assert(isnumeric(win) && length(win) == 2,...
-    'time window must be in the format [start end]');
 
 p = inputParser;
 addOptional(p, 'binsize', 60, @isscalar);
-addOptional(p, 'winCalc', [0 Inf], validate_win);
+addOptional(p, 'winCalc', [0 Inf], @isnumeric);
 addOptional(p, 'c2r', true, @islogical);
 
 parse(p, varargin{:})
@@ -60,46 +60,60 @@ winCalc     = p.Results.winCalc;
 c2r         = p.Results.c2r;
 
 % arrange in cell
-if ~iscell(itimes)
-    itimes = {itimes};
+if ~iscell(spktimes)
+    spktimes = {spktimes};
 end
 
-nunits = length(itimes);
+nunits = length(spktimes);
 
 % validate window
-if winCalc(2) == Inf
-    winCalc(2) = max(vertcat(itimes{:}));
+if isempty(winCalc)
+    winCalc = [1 max(vertcat(spktimes{:}))];
 end
+if winCalc(end) == Inf
+    winCalc(end) = max(vertcat(spktimes{:}));
+end
+nwin = size(winCalc, 1);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arrange bins
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-binedges = winCalc(1) : binsize : winCalc(2);
-% correct last bin
-binmod = mod(winCalc(2), binsize);
-binedges(end) = binedges(end) + binmod - 1;
-nbins = length(binedges);
-bincents = zeros(1, nbins - 1);
-for i = 1 : nbins - 1
-    bincents(i) = binedges(i) + ceil(diff(binedges(i : i + 1)) / 2);
+k = 1;
+for i = 1 : nwin
+    if winCalc(i, 2) - winCalc(i, 1) <= binsize
+        binedges{i} = winCalc(i, :);
+    else
+        binedges{i} = winCalc(i, 1) : binsize : winCalc(i, 2);
+        binmod = mod(winCalc(i, 2), binsize);         % correct last bin
+        binedges{i}(end) = binedges{i}(end) + binmod - 1;
+    end
+    
+    % count spikes
+    nbins = length(binedges{i}) - 1;
+    for ii = 1 : nunits
+        if c2r
+            r(ii, k : k + nbins - 1) = histcounts(spktimes{ii}, binedges{i},...
+                'Normalization', 'countdensity');
+        else
+            r(ii, k : k + nbins - 1) = histcounts(spktimes{ii}, binedges{i},...
+                'Normalization', 'count');
+        end
+    end    
+        
+    % find bin centers
+    for ii = 1 : nbins
+        bincents(k) = binedges{i}(ii) + ceil(diff(binedges{i}(ii : ii + 1)) / 2);
+        k = k + 1;
+    end
 end
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % count spikes
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% count number of spikes in bins
-r = zeros(nunits, nbins - 1);
-for i = 1 : nunits
-    if c2r
-        r(i, :) = histcounts(itimes{i}, binedges,...
-            'Normalization', 'countdensity');
-    else
-        r(i, :) = histcounts(itimes{i}, binedges,...
-            'Normalization', 'count');
-    end
-end
+
 
 % validate orientation
 if isvector(r)

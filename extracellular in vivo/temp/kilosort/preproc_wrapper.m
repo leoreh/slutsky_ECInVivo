@@ -5,15 +5,15 @@ cd(basepath)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % open ephys
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'E:\Data\lh58\2020-09-02_08-22-13';
+basepath = 'J:\lh70\2020-10-08_08-25-22';
 % rmvch = [18 19 20 21];
-rmvch = [];
+rmvch = [4];
 % rmvch = [];
-mapch = [25 26 27 28 30 1 2 29 3 : 14 31 0 15 16 17 : 24 32 33 34] + 1;
-% mapch = [1 : 19];
-exp = [4];
+% mapch = [25 26 27 28 30 1 2 29 3 : 14 31 0 15 16 17 : 24 32 33 34] + 1;
+mapch = [1 : 19];
+exp = [1, 3];
 rec = cell(max(exp), 1);
-rec{4} = [2];
+% rec{4} = [2];
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
     'rmvch', rmvch, 'mapch', mapch, 'concat', true, 'nchans', length(mapch));
 
@@ -52,11 +52,22 @@ fepsp = fEPSPfromDat('basepath', basepath, 'fname', '', 'nchans', nchans,...
     'protocol', 'stp', 'anaflag', true, 'inspect', true);  
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% kilosort
+% spike sorting
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% ks
 rez = runKS('basepath', basepath, 'fs', fs, 'nchans', nchans,...
     'spkgrp', spkgrp, 'saveFinal', true, 'viaGui', false,...
     'trange', [0 Inf], 'outFormat', 'ns');
+
+% kk
+[spktimes, ~] = spktimesWh('basepath', basepath, 'fs', fs, 'nchans', nchans,...
+    'spkgrp', spkgrp, 'saveVar', true, 'saveWh', false,...
+    'graphics', false);
+        
+% create ns files for sorting
+spktimes2ks('basepath', basepath, 'fs', fs,...
+    'nchans', nchans, 'spkgrp', spkgrp, 'mkClu', true,...
+    'dur', 240, 't', [], 'psamp', [], 'grps', [1 : length(spkgrp)]);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % fix manual curation

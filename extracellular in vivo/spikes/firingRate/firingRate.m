@@ -8,12 +8,14 @@ function fr = firingRate(spktimes, varargin)
 % w/ moving average of 3 points.
 % 
 % INPUT
-%   spktimes    a cell array of vectors. each vector (unit) contains the
-%               timestamps of spikes. for example {spikes.times{1:4}}
+%   spktimes    a cell array of vectors. each vector (unit / tetrode)
+%               contains the timestamps of spikes. for example
+%               {spikes.times{1:4}}
 %   basepath    recording session path {pwd}
 %   graphics    plot figure {1}.
 %   saveFig     save figure {1}.
-%   saveVar     save variable {1}.
+%   saveVar     logical / char. save variable {true}. if char than variable
+%               will be named saveVar.mat
 %   winCalc     time window for calculation {[1 Inf]}. specified in s.
 %   binsize     size bins {60}. specified in s.
 %   metBL       calculate baseline as 'max' or {'avg'}.
@@ -50,7 +52,7 @@ addOptional(p, 'select', {''}, @iscell);
 addOptional(p, 'smet', 'none', @ischar);
 addOptional(p, 'graphics', true, @islogical);
 addOptional(p, 'saveFig', true, @islogical);
-addOptional(p, 'saveVar', true, @islogical);
+addOptional(p, 'saveVar', true);
 
 parse(p, varargin{:})
 basepath = p.Results.basepath;
@@ -65,20 +67,37 @@ saveFig = p.Results.saveFig;
 saveVar = p.Results.saveVar;
 
 % validate window
-if winCalc(2) == Inf
-    winCalc(2) = max(vertcat(spktimes{:}));
+if winCalc(end) == Inf
+    winCalc(end) = max(vertcat(spktimes{:}));
 end
 
-smfactor = 9;    % smooth factor
+smfactor = 7;    % smooth factor
 nunits = length(spktimes);
+[~, basename] = fileparts(basepath);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % calculations
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% calculate firing rate
+% calc fr across entire session
 [fr.strd, ~, fr.tstamps] = times2rate(spktimes, 'binsize', binsize,...
     'winCalc', winCalc, 'c2r', true);
+
+% calc fr according to states. note states are in s 
+binedges = [];
+if exist(fullfile(basepath, [basename '.SleepState.states.mat']))
+    load(fullfile(basepath, [basename '.SleepState.states.mat']))
+    
+    fr.states.statenames = {'WAKE', 'NREM', 'REM'};
+    ss = struct2cell(SleepState.ints);
+    nstates = length(ss);
+    for i = 1 : nstates
+        statetimes = ss{i};
+        [fr.states.fr{i}, ~, fr.states.tstamps{i}] = times2rate(spktimes, 'binsize', binsize,...
+            'winCalc', statetimes, 'c2r', true);
+    end
+end
+    
 
 % smooth
 switch smet
@@ -88,7 +107,7 @@ switch smet
         gk = gausswin(smfactor);
         gk = gk / sum(gk);
         for i = 1 : nunits
-            x(i, :) = conv(fr.strd(i, :), gk, 'same');
+            fr.strd(i, :) = conv(fr.strd(i, :), gk, 'same');
         end
 end
 
@@ -141,8 +160,11 @@ end
 % save
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if saveVar  
-    [~, filename] = fileparts(basepath);
-    save([basepath, filesep, filename, '.fr.mat'], 'fr')
+    if ischar(saveVar)
+        save([basepath, filesep, basename, '.' saveVar '.mat'], 'fr')
+    else
+        save([basepath, filesep, basename, '.fr.mat'], 'fr')
+    end
 end
 
 return

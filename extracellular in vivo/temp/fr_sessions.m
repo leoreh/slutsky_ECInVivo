@@ -18,14 +18,13 @@ vars = ["session.mat";...
 % column name of logical values for each session. only if true than session
 % will be loaded. can be a string array and than all conditions must be
 % met.
-pcond = ["tempFlag"];
+pcond = ["mancur"];
 % pcond = [];
 % same but imposes a negative condition
 ncond = ["fepsp"];
 sessionlist = 'sessionList.xlsx';       % must include extension
 
-% basepath = 'D:\VMs\shared\lh58';
-basepath = 'F:\Data\Processed\lh58';
+basepath = 'D:\VMs\shared\lh70';
 
 % dirnames = ["lh58_200830_1000"; "lh58_200831_1000";...
 %     "lh58_200830_090851"; "lh58_200831_080808"];
@@ -48,6 +47,7 @@ if forceA
         
         % file
         filepath = char(fullfile(basepath, dirnames{i}));
+        basepaths{i} = fullfile(basepath, dirnames{i});
         cd(filepath)
         
         % params
@@ -59,43 +59,43 @@ if forceA
         
         % vars
         %         session = varArray{i, 1}.session;
-                cm = varArray{i, 2}.cell_metrics;
+        %         cm = varArray{i, 2}.cell_metrics;
         %         spikes = varArray{i, 3}.spikes;
         %         ss = varArray{i, 4}.SleepState;
         %         fr = varArray{i, 5}.fr;
         %         datInfo = varArray{i, 6}.datInfo;
-        %
-        %         rez = RunKs('basepath', filepath, 'fs', fs, 'nchans', nchans,...
-        %             'spkgrp', spkgrp, 'saveFinal', true, 'viaGui', false,...
-        %             'trange', [0 Inf], 'outFormat', 'ns');
         
         % spikes
         fixSpkAndRes('grp', [], 'fs', fs);
         spikes = loadSpikes('session', session);
         spikes = fixCEspikes('basepath', filepath, 'saveVar', false,...
             'force', true);
+        
+        spikes = cluVal('spikes', spikes, 'basepath', filepath, 'saveVar', true,...
+            'saveFig', false, 'force', true, 'mu', [], 'graphics', false,...
+            'vis', 'on', 'spkgrp', spkgrp);
+        
         cell_metrics = ProcessCellMetrics('session', session,...
             'manualAdjustMonoSyn', false, 'summaryFigures', false,...
             'debugMode', true, 'transferFilesFromClusterpath', false,...
-            'submitToDatabase', false);
-
-        cell_metrics = CellExplorer('session', session, 'basepath', filepath, 'metrics', cm);
-
-%         % su vs mu
-%         mu = [];
-%         spikes = cluVal('spikes', spikes, 'basepath', filepath, 'saveVar', true,...
-%             'saveFig', false, 'force', true, 'mu', mu, 'graphics', false,...
-%             'vis', 'on', 'spkgrp', spkgrp);
-%         
-%         % firing rate
-%         binsize = 60;
-%         winBL = [10 * 60 30 * 60];
-%         fr = firingRate(spikes.times, 'basepath', filepath,...
-%             'graphics', false, 'saveFig', false,...
-%             'binsize', binsize, 'saveVar', true, 'smet', 'MA',...
-%             'winBL', winBL);
+            'submitToDatabase', false, 'spikes', spikes);
+        % cell_metrics = CellExplorer('basepath', filepath);
+        
+        cc = cellclass('basepath', filepath,...
+            'waves', cat(1, spikes.rawWaveform{:})', 'saveVar', true,...
+            'graphics', false);
+        
+        % firing rate
+        binsize = 60;
+        winBL = [10 * 60 30 * 60];
+        fr = firingRate(spikes.times, 'basepath', filepath,...
+            'graphics', false, 'saveFig', false,...
+            'binsize', binsize, 'saveVar', true, 'smet', 'MA',...
+            'winBL', winBL);
     end
 end
+
+% cell_metrics = CellExplorer('basepaths', basepaths);
 
 % params
 session = varArray{1, 1}.session;
@@ -112,19 +112,22 @@ saveFig = false;
 pathPieces = regexp(dirnames(:), '_', 'split'); % assumes filename structure: animal_date_time
 sessionDate = [pathPieces{:}];
 sessionDate = sessionDate(2 : 3 : end);
- 
-close all
-grp = [1 , 4: 8];          % which tetrodes to plot
-state = [2];            % [] - all; 1 - awake; 2 - NREM
+
+% close all
+grp = [1 : 4];          % which tetrodes to plot
+state = [2];             % [] - all; 1 - awake; 2 - NREM
 FRdata = 'strd';        % plot absolute fr or normalized
 unitClass = 'pyr';      % plot 'int', 'pyr', or 'all'
-suFlag = 0;             % plot only su or all units
-minfr = 0;              % include only units with fr greater than
-maxfr = 1000;           % include only untis with fr lower than
-Y = [0 10];             % ylim
+suFlag = 1;             % plot only su or all units
+minfr = 0;            % include only units with fr greater than
+maxfr = 3;              % include only untis with fr lower than
+Y = [0 6];             % ylim
 p1 = 0;                 % firing rate vs. time, one fig per session
-p2 = 0;                 % mfr across sessions, one fig
-p3 = 1;                 % firing rate vs. time, one fig for all sessions. not rubust 
+p2 = 1;                 % mfr across sessions, one fig
+p3 = 0;                 % firing rate vs. time, one fig for all sessions. not rubust
+p4 = 0;                 % number of cells per session, one fig
+plotStyle = 'bar';      % for p2. can by 'bar' or 'box'
+clr = ['bbkkkkr'];
 
 for i = 1 : nsessions
     
@@ -139,10 +142,10 @@ for i = 1 : nsessions
     % cell class
     pyr = strcmp(cm.putativeCellType, 'Pyramidal Cell');
     wide = strcmp(cm.putativeCellType, 'Wide Interneuron');
-%     pyr = pyr | wide;
+    %     pyr = pyr | wide;
     int = strcmp(cm.putativeCellType, 'Narrow Interneuron');
     
-    su = ones(1, length(spikes.ts));    % override
+    su = ones(length(spikes.ts), 1);    % override
     if isfield(spikes, 'su') && suFlag
         su = spikes.su';
         suTxt = 'SU';
@@ -157,53 +160,45 @@ for i = 1 : nsessions
     mfrunits = fr.mfr > minfr & fr.mfr < maxfr;
     
     if strcmp(unitClass, 'pyr')
-        units = pyr & su & grpidx & mfrunits';
+        units = pyr & su' & grpidx & mfrunits';
     elseif strcmp(unitClass, 'int')
-        units = int & su & grpidx & mfrunits';
+        units = int & su' & grpidx & mfrunits';
     else
-        units = su & grpidx & mfrunits';     % override
+        units = su' & grpidx & mfrunits';     % override
     end
-    %     if ~any(units)
-    %         break
-    %     end
+    if ~any(units)
+        error('no units match criteria')
+    end
     
-    switch FRdata
-        case 'norm'
-            data = fr.norm;
-            ytxt = 'norm. MFR';
-        case 'strd'
-            data = fr.strd;
-            ytxt = 'MFR [Hz]';
+    if ~isempty(state) && state > 0
+        data = fr.states.fr{state}(units, :);
+        tstamps = fr.states.tstamps{state};
+        txt = sprintf('MSR of %s %s in %s', unitClass, suTxt, fr.states.statenames{state});
+    else
+        data = fr.strd(units, :);
+        tstamps = fr.tstamps / 60;
+        txt = sprintf('MSR of %s %s', unitClass, suTxt);
     end
-    tstamps = fr.tstamps / 60;
+    mfr{i} = mean(data, 2);
+    
+    %%%
+%     mfr{i} = cm.burstIndex_NREMstate(units);
+    %%%
+    
     if isfield(datInfo, 'nsamps')
         nsamps = cumsum(datInfo.nsamps);
     else
         nsamps = 120 * 60 * fs;
     end
     
-    % states
-    states = {ss.ints.WAKEstate, ss.ints.NREMstate, ss.ints.REMstate};
-    for ii = 1 : length(states)
-        tStates{ii} = InIntervals(fr.tstamps, states{ii});
-        frStates{ii} = mean(data(find(units), find(tStates{ii})), 2);
-    end
-    % mfr in selected state across sessions (mean +- std)
-    if ~isempty(state)
-        mfr{i} = frStates{state};
-    else
-        mfr{i} = mean(data(find(units), :), 2);
-    end
-    totalspk(i) = length(vertcat(spikes.ts{units})) / nsamps(end) * fs;
-    
     % firing rate vs. time. 1 fig per session
     if p1
         figure
-        plot(tstamps, (data(units, :))')
+        plot(tstamps, (data'))
         hold on
-        medata = median((data(units, :)), 1);
+        medata = median((data), 1);
         % plot(tstamps, medata, 'k', 'LineWidth', 5)
-        stdshade(data(units, :), 0.3, 'k', tstamps)
+        stdshade(data, 0.3, 'k', tstamps)
         for ii = 1 : length(nsamps) - 1
             plot([nsamps(ii) nsamps(ii)] / fs / 60, ylim, '--k',...
                 'LineWidth', 2)
@@ -221,21 +216,26 @@ for i = 1 : nsessions
             % print(fh, figname, '-dpdf', '-bestfit', '-painters');
             export_fig(figname, '-tif', '-transparent', '-r300')
         end
+        
+        % fr histogram 
+%         fh = figure;
+%         subplot(2, 3, 1)
+%         histogram(log10(mean(fr.states.fr{1}, 2)), 20)
     end
     
     % fr vs. time; one figure for all sessoins
     k = [1, 2, 3, 4]';
-%     titletxt = ["lh69_200907_morning"; "lh69_200908_morning";...
-%          "lh69_200908_evening"];
+    %     titletxt = ["lh69_200907_morning"; "lh69_200908_morning";...
+    %          "lh69_200908_evening"];
     if p3
         subplot(2, 2, k(i))
         plot(tstamps / 60, mean(data(units, :)), 'k', 'LineWidth', 2)
         hold on
         if i == 3
-        for ii = 2
-            plot([nsamps(ii) nsamps(ii)] / fs / 60 / 60, Y, '--k',...
-                'LineWidth', 2)
-        end
+            for ii = 2
+                plot([nsamps(ii) nsamps(ii)] / fs / 60 / 60, Y, '--k',...
+                    'LineWidth', 2)
+            end
         end
         axis tight
         fill([states{2} fliplr(states{2})]' / 60 / 60, [Y(1) Y(1) Y(2) Y(2)],...
@@ -252,52 +252,99 @@ for i = 1 : nsessions
         end
     end
 end
-clr = ['bbbkkkkkkrrr'];
+
 if p2
     fh = figure;
     mfrmat = cell2nanmat(mfr);
-    %     plot([1 : nsessions], cell2nanmat(mfr), 'ko',...
-    %         'LineStyle', 'none', 'MarkerFaceColor', 'k', 'MarkerSize', 4)
-    %     errorbar([1 : nsessions], nanmean(mfrmat), nanstd(mfrmat, 1),...
-    %         'k', 'LineWidth', 2)
-    %     hold on
-    %     bh = bar([1 : nsessions], nanmean(mfrmat), 'EdgeColor', 'none');
-%     boxplot(mfrmat, 'PlotStyle', 'traditional');
-    bar(nanmean(mfrmat))
-    hold on
-    errorbar(1 : nsessions, nanmean(mfrmat), nanstd(mfrmat))
-    bh = findobj(gca, 'Tag', 'Box');
-    if length(bh) == length(clr)
-        clrRep = histc(clr, unique(clr));
-        clear alphaIdx
-        for i = 1 : length(clrRep)
-            alphaIdx{i} = linspace(1, 0.3, clrRep(i));
-        end
-        alphaIdx = [alphaIdx{:}];
-        for i = 1 : length(bh)
-            patch(get(bh(i), 'XData'), get(bh(i), 'YData'),...
-                clr(i), 'FaceAlpha', alphaIdx(i))
-        end
+    switch plotStyle
+        case 'bar'
+%             plot([1 : nsessions], mfrmat)
+            hold on
+            bh = bar(nanmean(mfrmat), 'FaceAlpha', 0.1, 'FaceColor', 'k');
+            hold on
+            % errorbar(1 : nsessions, nanmean(mfrmat), nanstd(mfrmat), 'k')
+            idx = [find(clr == 'k', 1) find(clr == 'r', 1)] - 0.5;
+            yLimit = ylim;
+            patch([idx idx(2) idx(1)],...
+                [yLimit(1) yLimit(1) yLimit(2) yLimit(2)],...
+                'b', 'FaceAlpha', 0.1)
+        case 'box'
+            boxplot(mfrmat, 'PlotStyle', 'traditional',...
+                'DataLim', [minfr maxfr]);
+            bh = findobj(gca, 'Tag', 'Box');
+            bh = flipud(bh);
+            if length(bh) == length(clr)
+                clrRep = histc(clr, unique(clr));
+                clear alphaIdx
+                for i = 1 : length(clrRep)
+                    alphaIdx{i} = linspace(0.8, 0.3, clrRep(i));
+                end
+                alphaIdx = [alphaIdx{:}];
+                for i = 1 : length(bh)
+                    patch(get(bh(i), 'XData'), get(bh(i), 'YData'),...
+                        clr(i), 'FaceAlpha', alphaIdx(i))
+                end
+            end
     end
-    ylabel(ytxt)
+    ylim(Y)
+    ylabel('Spike Rate [Hz]')
     xlabel('Session')
     xticks(1 : nsessions)
     xticklabels(sessionDate)
     xtickangle(45)
     box off
-    title(sprintf('MFR of %s %s', unitClass, suTxt))
+    title(txt)
     if saveFig
-        figname = sprintf('mfr_%s_%s', unitClass, suTxt);
+        figname = sprintf('MSR of Tetrode #%s', num2str(grp));
         figname = fullfile(basepath, figname);
         % print(fh, figname, '-dpdf', '-bestfit', '-painters');
         export_fig(figname, '-tif', '-transparent', '-r300')
     end
 end
+% 
+% if p2
+%     fh = figure;
+%     mfrmat = cell2nanmat(mfr);
+%     %     plot([1 : nsessions], cell2nanmat(mfr), 'ko',...
+%     %         'LineStyle', 'none', 'MarkerFaceColor', 'k', 'MarkerSize', 4)
+%     %     errorbar([1 : nsessions], nanmean(mfrmat), nanstd(mfrmat, 1),...
+%     %         'k', 'LineWidth', 2)
+%     %     hold on
+%     %     bh = bar([1 : nsessions], nanmean(mfrmat), 'EdgeColor', 'none');
+%     %     boxplot(mfrmat, 'PlotStyle', 'traditional');
+%     bar(nanmean(mfrmat))
+%     hold on
+%     errorbar(1 : nsessions, nanmean(mfrmat), nanstd(mfrmat))
+%     bh = findobj(gca, 'Tag', 'Box');
+%     if length(bh) == length(clr)
+%         clrRep = histc(clr, unique(clr));
+%         clear alphaIdx
+%         for i = 1 : length(clrRep)
+%             alphaIdx{i} = linspace(1, 0.3, clrRep(i));
+%         end
+%         alphaIdx = [alphaIdx{:}];
+%         for i = 1 : length(bh)
+%             patch(get(bh(i), 'XData'), get(bh(i), 'YData'),...
+%                 clr(i), 'FaceAlpha', alphaIdx(i))
+%         end
+%     end
+%     ylabel(ytxt)
+%     xlabel('Session')
+%     xticks(1 : nsessions)
+%     xticklabels(sessionDate)
+%     xtickangle(45)
+%     box off
+%     title(sprintf('MFR of %s %s', unitClass, suTxt))
+%     if saveFig
+%         figname = sprintf('mfr_%s_%s', unitClass, suTxt);
+%         figname = fullfile(basepath, figname);
+%         % print(fh, figname, '-dpdf', '-bestfit', '-painters');
+%         export_fig(figname, '-tif', '-transparent', '-r300')
+%     end
+% end
 
 % number of SU and MU (top - pyr; bottom - int) from selected tetrodes
-p2 = 0;
-% grp = [1 : 8];
-if p2
+if p4
     clear units
     for i = 1 : nsessions
         cm = varArray{i, 2}.cell_metrics;
@@ -310,21 +357,31 @@ if p2
         for ii = 1 : length(grp)
             grpidx = grpidx | spikes.shankID == grp(ii);
         end
-        units(i, 1) = sum(~spikes.su' & pyr & grpidx);
-        units(i, 2) = sum(spikes.su' & pyr & grpidx);
-        units(i, 3) = sum(~spikes.su' & int & grpidx);
-        units(i, 4) = sum(spikes.su' & int & grpidx);
+        units(i, 1) = sum(~spikes.su & pyr & grpidx);
+        units(i, 2) = sum(spikes.su & pyr & grpidx);
+        units(i, 3) = sum(~spikes.su & int & grpidx);
+        units(i, 4) = sum(spikes.su & int & grpidx);
         %         units(i, 5) = sum(grpidx) - sum(units(i, 1 : 4));
     end
     fh = figure;
     bar(units, 'stacked')
-    legend({"pyr mu"; "pyr su"; "int mu"; "int su"; "others"})
+    hold on    
+    if nsessions == length(clr)
+        idx = [find(clr == 'k', 1) find(clr == 'r', 1)] - 0.5;
+        yLimit = ylim;
+        patch([idx idx(2) idx(1)],...
+            [yLimit(1) yLimit(1) yLimit(2) yLimit(2)],...
+            'b', 'FaceAlpha', 0.1)
+    end
+    
+    legend({"pyr mu"; "pyr su"; "int mu"; "int su"; "CNO"})
     xticks(1 : nsessions)
     xticklabels(sessionDate)
     title('Number of Units')
     xlabel('Session')
     ylabel('No. units')
     box off
+    
     if saveFig
         figname = fullfile(basepath, 'UnitsDetected');
         % print(fh, figname, '-dpdf', '-bestfit', '-painters');

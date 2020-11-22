@@ -54,40 +54,39 @@ if forceA
         spkgrp = session.extracellular.spikeGroups.channels;
         
         % sleep states
-        badch = setdiff([session.extracellular.electrodeGroups.channels{:}],...
-            [session.extracellular.spikeGroups.channels{:}]);
-        SleepScoreMaster(filepath, 'noPrompts', true,...
-            'rejectChannels', badch, 'overwrite', true,...
-            'NotchTheta', true, 'ignoretime', badstamps)
-        TheStateEditor(fullfile(filepath, basename))
-        % find bad times from sw spect    
-        badtimes = SleepState.detectorinfo.StatePlotMaterials.swFFTspec(1, :) > 0.6e4;
-        figure, plot(SleepState.detectorinfo.StatePlotMaterials.swFFTspec(1, :))
-        badstamps = binary2epochs('vec', badtimes', 'minDur', 2, 'maxDur', 200000000,...
-            'interDur', 10, 'exclude', false);
+%         badch = setdiff([session.extracellular.electrodeGroups.channels{:}],...
+%             [session.extracellular.spikeGroups.channels{:}]);
+%         SleepScoreMaster(filepath, 'noPrompts', true,...
+%             'rejectChannels', badch, 'overwrite', true,...
+%             'NotchTheta', true, 'ignoretime', badstamps)
+%         TheStateEditor(fullfile(filepath, basename))
+%         % find bad times from sw spect    
+%         badtimes = SleepState.detectorinfo.StatePlotMaterials.swFFTspec(1, :) > 0.6e4;
+%         figure, plot(SleepState.detectorinfo.StatePlotMaterials.swFFTspec(1, :))
+%         badstamps = binary2epochs('vec', badtimes', 'minDur', 2, 'maxDur', 200000000,...
+%             'interDur', 10, 'exclude', false);
         
         % detect spikes
-        spktimesWh('basepath', filepath, 'fs', fs, 'nchans', nchans,...
-            'spkgrp', spkgrp, 'saveVar', true, 'saveWh', false,...
-            'graphics', false)
+%         [spktimes, ~] = spktimesWh('basepath', filepath, 'fs', fs, 'nchans', nchans,...
+%             'spkgrp', spkgrp, 'saveVar', true, 'saveWh', false,...
+%             'graphics', false);
         
         % create ns files for sorting
         spktimes2ks('basepath', filepath, 'fs', fs,...
             'nchans', nchans, 'spkgrp', spkgrp, 'mkClu', true,...
-            'dur', 240, 't', '0200', 'psamp', [], 'grps', [1 : length(spkgrp)]);
+            'dur', 240, 't', '020000', 'psamp', [], 'grps', [1 : length(spkgrp)]);
         
-        % firing rate per tetrode. note that using times2rate requires special care
-        % becasue spktimes is given in samples and not seconds
-        binsize = 60 * fs;
-        winCalc = [0 Inf];
-        load([basename '.spktimes.mat'])
-        [sr.strd, sr.edges, sr.tstamps] = times2rate(spktimes, 'binsize', binsize,...
-            'winCalc', winCalc, 'c2r', false);
-        % convert counts to rate
-        sr.strd = sr.strd ./ (diff(sr.edges) / fs);
-        % fix tstamps
-        sr.tstamps = sr.tstamps / binsize;        
-        save(fullfile(filepath, [basename '.sr.mat']), 'sr')
+        % spike rate per tetrode. note that using firingRate requires
+        % special care becasue spktimes is given in samples and not seconds
+        load(fullfile(filepath, [basename '.spktimes.mat']))
+        for ii = 1 : length(spkgrp)
+            spktimes{ii} = spktimes{ii} / fs;
+        end
+        binsize = 60;
+        sr = firingRate(spktimes, 'basepath', filepath,...
+            'graphics', false, 'saveFig', false,...
+            'binsize', binsize, 'saveVar', 'sr', 'smet', 'none',...
+            'winBL', [0 Inf]);     
     end
 end
 
@@ -108,49 +107,52 @@ sessionDate = [pathPieces{:}];
 sessionDate = sessionDate(2 : 3 : end);
  
 % close all
-grp = [1 : 4];          % which tetrodes to plot
-state = [1];            % [] - all; 1 - awake; 2 - NREM
-Y = [0 300];             % ylim
+grp = [1 : 4];     % which tetrodes to plot
+state = [2];            % [] - all; 1 - awake; 2 - NREM; 3 - REM
+Y = [0 300];            % ylim
 p1 = 0;                 % firing rate vs. time, one fig per session
 p2 = 1;                 % mfr across sessions, one fig
-p3 = 0;                 % firing rate vs. time, one fig for all sessions. not rubust 
+p3 = 0;                 % spike rate vs. time, one fig for all sessions
+plotStyle = 'bar';      % for p2. can by 'bar' or 'box'
+clr = ['bbbbbkkkkkkkkrrrrrrrr'];        % color sessions
 
 for i = 1 : nsessions
     
     session = varArray{i, 1}.session;
     ss = varArray{i, 2}.SleepState;
     datInfo = varArray{i, 3}.datInfo;
-    sr = varArray{i, 4}.sr;
+    sr = varArray{i, 4}.fr;
    
-    data = sr.strd;
     tstamps = sr.tstamps;
     if isfield(datInfo, 'nsamps')
         nsamps = cumsum(datInfo.nsamps);
     else
         nsamps = 120 * 60 * fs;
     end
-    
-    % states
-    states = {ss.ints.WAKEstate, ss.ints.NREMstate, ss.ints.REMstate};
-    for ii = 1 : length(states)
-        tStates{ii} = InIntervals(sr.tstamps * 60, states{ii});
-        frStates{ii} = mean(data(grp, find(tStates{ii})), 2);
-    end
+      
     % mfr in selected state across sessions (mean +- std)
     if ~isempty(state)
-        mfr{i} = frStates{state};
+        mfr{i} = mean(sr.states.fr{state}(grp, :), 2);
+                
+%         mfr{i} = std(sr.states.fr{state}(grp, :), [], 2);
+
+        txt = sprintf('MSR of T#%s in %s', num2str(grp), sr.states.statenames{state});
     else
-        mfr{i} = mean(data(grp, :), 2);
+        mfr{i} = mean(sr.strd(grp, :), 2);
+        
+%         mfr{i} = std(sr.strd(grp, :), [], 2);
+
+        txt = sprintf('MSR of T#%s', num2str(grp));
     end
     
     % firing rate vs. time. 1 fig per session
     if p1
         figure
-        plot(tstamps, (data(grp, :))')
+        plot(sr.tstamps, (sr.strd(grp, :))')
         hold on
         % medata = median((data(grp, :)), 1);
         % plot(tstamps, medata, 'k', 'LineWidth', 5)
-        stdshade(data(grp, :), 0.3, 'k', tstamps)
+        stdshade(sr.strd(grp, :), 0.3, 'k', tstamps)
         for ii = 1 : length(nsamps) - 1
             plot([nsamps(ii) nsamps(ii)] / fs / 60, ylim, '--k',...
                 'LineWidth', 2)
@@ -171,33 +173,38 @@ for i = 1 : nsessions
     end
 end
 
-clr = ['bbbkkkkkkkkrrrrrr'];
 if p2
     fh = figure;
     mfrmat = cell2nanmat(mfr);
-    %     plot([1 : nsessions], cell2nanmat(mfr), 'ko',...
-    %         'LineStyle', 'none', 'MarkerFaceColor', 'k', 'MarkerSize', 4)
-    %     errorbar([1 : nsessions], nanmean(mfrmat), nanstd(mfrmat, 1),...
-    %         'k', 'LineWidth', 2)
-    %     hold on
-    %     bh = bar([1 : nsessions], nanmean(mfrmat), 'EdgeColor', 'none');
-    boxplot(mfrmat, 'PlotStyle', 'traditional');
-%     bar(nanmean(mfrmat))
-    hold on
-%     errorbar(1 : nsessions, nanmean(mfrmat), nanstd(mfrmat))
-    bh = findobj(gca, 'Tag', 'Box');
-    bh = flipud(bh);
-    if length(bh) == length(clr)
-        clrRep = histc(clr, unique(clr));
-        clear alphaIdx
-        for i = 1 : length(clrRep)
-            alphaIdx{i} = linspace(1, 0.3, clrRep(i));
-        end
-        alphaIdx = [alphaIdx{:}];
-        for i = 1 : length(bh)
-            patch(get(bh(i), 'XData'), get(bh(i), 'YData'),...
-                clr(i), 'FaceAlpha', alphaIdx(i))
-        end
+    switch plotStyle
+        case 'bar'
+            plot([1 : nsessions], mfrmat)
+            hold on
+            bh = bar(nanmean(mfrmat), 'FaceAlpha', 0.1, 'FaceColor', 'k');
+            hold on
+            % errorbar(1 : nsessions, nanmean(mfrmat), nanstd(mfrmat), 'k')
+            idx = [find(clr == 'k', 1) find(clr == 'r', 1)] - 0.5;
+            yLimit = ylim;
+            patch([idx idx(2) idx(1)],...
+                [yLimit(1) yLimit(1) yLimit(2) yLimit(2)],...
+                'b', 'FaceAlpha', 0.1)
+            legend(split(num2str(grp)))
+        case 'box'
+            boxplot(mfrmat, 'PlotStyle', 'traditional');
+            bh = findobj(gca, 'Tag', 'Box');
+            bh = flipud(bh);
+            if length(bh) == length(clr)
+                clrRep = histc(clr, unique(clr));
+                clear alphaIdx
+                for i = 1 : length(clrRep)
+                    alphaIdx{i} = linspace(0.8, 0.3, clrRep(i));
+                end
+                alphaIdx = [alphaIdx{:}];
+                for i = 1 : length(bh)
+                    patch(get(bh(i), 'XData'), get(bh(i), 'YData'),...
+                        clr(i), 'FaceAlpha', alphaIdx(i))
+                end
+            end
     end
     ylabel('Spike Rate [Hz]')
     xlabel('Session')
@@ -205,7 +212,7 @@ if p2
     xticklabels(sessionDate)
     xtickangle(45)
     box off
-    title(sprintf('MSR of Tetrode #%s', num2str(grp)))
+    title(txt)
     if saveFig
         figname = sprintf('MSR of Tetrode #%s', num2str(grp));
         figname = fullfile(basepath, figname);
@@ -214,30 +221,97 @@ if p2
     end
 end
 
-% firing rate vs. time across all sessions (1 fig)
-% recalculates msr to new bins
-if p3
-    
-    grp = 4;
+% spike rate vs. time across all sessions (1 fig)
+% state = [];            
+if p3  
     msr = [];
     tsr = [];
+    NREMstates = [];
+    prev_t = 0;
     for i = 1 : nsessions
         session = varArray{i, 1}.session;
         ss = varArray{i, 2}.SleepState;
         datInfo = varArray{i, 3}.datInfo;
-        sr = varArray{i, 4}.sr;
+        sr = varArray{i, 4}.fr;
         st = varArray{i, 5}.spktimes;
+        filepath = char(fullfile(basepath, dirnames{i}));
+        [~, basename] = fileparts(filepath);
         
-        binsize = 600 * fs;
-        [sr.strd, sr.edges, sr.tstamps] = times2rate(st, 'binsize', binsize,...
-            'winCalc', [0 Inf], 'c2r', false);
-        sr.strd = sr.strd ./ (diff(sr.edges) / fs);
-        sr.tstamps = sr.tstamps / binsize;
-        msr = [msr, sr.strd];
-        tsr = [tsr, sr.tstamps];
+        if ~isempty(state)
+            data = sr.states.fr{state};
+            tstamps = sr.states.tstamps{state};
+        else
+            data = sr.strd;
+            tstamps = sr.tstamps;
+        end
+        
+        % find idx of CNO on/off
+        onSession = 'lh70_201015_1815';
+        offSession = 'lh70_201019_1831'; 
+        if strcmp(basename, onSession)
+            CNOidx(1) = length(msr);
+        elseif strcmp(basename, offSession)
+            CNOidx(2) = length(msr);
+        else
+            CNOidx = [0 0];
+        end       
+        
+        % arrange time indices
+        recStart = split(basename, '_');
+        recStart = recStart{end};
+        if numel(recStart) == 6
+            tformat = 'HHmmss';
+        elseif numel(recStart) == 4
+            tformat = 'HHmm';
+        end
+        recStart = datetime(recStart, 'InputFormat', tformat);
+        t = '120000';
+        t = datetime(t, 'InputFormat', tformat);
+        if t <= recStart
+            t = t + hours(12);
+        end
+        s = seconds(t - recStart);
+        [~, idx] = min(abs(s - tstamps));
+        xidx(i) = idx + length(msr);      
+        xname{i} = [char(sessionDate(i)) '_' datestr(t, 'HHMM')];
+        xname{i} = datestr(t, 'HHMM');
+        
+        msr = [msr, data];
+    end
+    
+    % smooth data
+    gk = gausswin(600);
+    gk = gk / sum(gk);
+    for i = 1 : size(msr, 1)
+        msr(i, :) = conv(msr(i, :), gk, 'same');
     end
     
     fh = figure;
-    plot(msr(grp, :)')
+    stdshade(msr(grp, :), '0.3', 'k')
+    hold on
+    yLimit = ylim;
+    patch([CNOidx CNOidx(2) CNOidx(1)],...
+        [yLimit(1) yLimit(1) yLimit(2) yLimit(2)],...
+        'b', 'FaceAlpha', 0.1)
+    xticks(xidx)
+    xticklabels(xname)
+    xtickangle(45)
+    axis tight
+    ylabel('mean SR [Hz]')
+    xlabel('Time [hhmm]')
+    title(txt)
     
+%     fh = figure;
+%     stdshade(movstd(msr', 199)', 0.3, 'k')
+%     hold on
+%     yLimit = ylim;
+%     patch([CNOidx CNOidx(2) CNOidx(1)],...
+%         [yLimit(1) yLimit(1) yLimit(2) yLimit(2)],...
+%         'b', 'FaceAlpha', 0.1)
+%     xticks(xidx)
+%     xticklabels(xname)
+%     xtickangle(45)
+%     axis tight
+%     ylabel('STD')
+%     xlabel('Time [hhmm]')
 end

@@ -12,11 +12,12 @@ function [lRat, iDist, mDist] = cluDist(fet, cluidx, mDist)
 % OUTPUT:
 %   L           L ratio for cluster
 %   iDist       isolation distance for cluster
+%   mDist       mahalanobis distances
 % 
 % 03 dec 18 LH
 % 
 % TO DO LIST:
-%   add option to remove known MU from analysis 
+%   add option to remove known MU from analysis (done in cluVal) 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments

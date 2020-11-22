@@ -33,10 +33,11 @@ function spikes = cluVal(varargin)
 %   getFet          PCA feature array
 %   cluDist         L ratio and iDist
 %   plotCluster     plot waveform and ISI histogram
-%   ISI             calc isi contamination
 %
 % TO DO LIST:
-%   # adapt plotCluster to cell explorer
+%   # adapt to cell explorer (done)
+%   # recalculate pca if fet files don't exist
+%   # adapt UMS2K for cleaning clusters
 %
 % 03 dec 18 LH      UPDATS: 
 % 15 nov 19 LH      separated ISI to standalone function
@@ -96,15 +97,15 @@ nunits = length(spikes.times);
 % SU = 1% of ISIs < 0.002
 ref = 0.002;
 thr = 1;
-spikes.isi = zeros(nunits, 1);
+spikes.isiViolation = zeros(1, nunits);
 for i = 1 : nunits
     nspks(i, 1) = length(spikes.times{i});
-    spikes.isi(i, 1) = sum(diff(spikes.times{i}) < ref) / nspks(i, 1) * 100;
+    spikes.isiViolation(1, i) = sum(diff(spikes.times{i}) < ref) / nspks(i, 1) * 100;
 end
 
 % arrange pre-determined multiunits
 mu = mu(:);
-mu = sort(unique([mu, find(spikes.isi > 1)]));
+mu = sort(unique([mu, find(spikes.isiViolation > 1)]));
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % calculate cluster separation
@@ -130,14 +131,16 @@ else
         
         % disgard noise and artifact spikes
         if ~isempty(fet{i})
-            idx = find(fet{i}(:, end) <= 1);
-            fet{i}(idx, :) = [];
+            rmidx = find(fet{i}(:, end) <= 1);
+            totSpks(i) = size(fet{i}, 1);
+            nonClusteredSpks(i) = length(rmidx);
+            fet{i}(rmidx, :) = [];
         end
               
         % disgard spikes that belong to predetermined mu
         for j = 1 : length(rmmu{i})
-            idx = find(fet{i}(:, end) == rmmu{i}(j));
-            fet{i}(idx, :) = [];
+            rmidx = find(fet{i}(:, end) == rmmu{i}(j));
+            fet{i}(rmidx, :) = [];
         end
         
         % calculate separation matrices
@@ -147,27 +150,71 @@ else
         ncol = npca * length(spkgrp{i});
         for j = 1 : length(clu)
             cluidx = find(fet{i}(:, end) == clu(j));
-            [lRat{i}(j, 1), iDist{i}(j, 1), mDist{i}{j}] = cluDist(fet{i}(:, 1 : ncol), cluidx);
+            
+            if length(cluidx) < ncol
+                lRat{i}(j, 1) = NaN;
+                iDist{i}(j, 1) = NaN;
+                mDist{i}{j} = NaN;
+            else
+                [lRat{i}(j, 1), iDist{i}(j, 1), mDist{i}{j}] = cluDist(fet{i}(:, 1 : ncol), cluidx);
+            end         
         end
     end
     
     % concatenate cell
-    spikes.lRat = cat(1, lRat{:});
-    spikes.iDist = cat(1, iDist{:});
+    spikes.lRat = cat(1, lRat{:})';
+    spikes.iDist = cat(1, iDist{:})';
     spikes.mDist = mDist;
 end
+
+% -------------------------------------------------------------------------
+% clean cluster by mDist
+% mDist = [spikes.mDist{:}];
+% for i = 1 : nunits
+%     nspks(i, 1) = length(spikes.times{i});
+%     which = find(diff(spikes.times{i}) < ref);
+%     which = unique([which which + 1]);
+%     
+%     figure
+%     histogram(mDist{i})
+%     hold on
+% 
+%     sh = scatter(mDist{i}(which), mean(get(gca, 'YLim')) *...
+%         ones(size(mDist{i}(which))), 'k' );
+%     set(sh, 'Marker', 'x')
+% 
+% end
+% 
+% xx = ss_default_params(Fs);
+% spikes.params = xx.params;
+% spikes.waveforms = spikes.rawWaveform
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % estimate SU or MU
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-spikes.su = spikes.iDist > 15 & spikes.isi < 1;
+spikes.su = spikes.iDist > 10 & spikes.isiViolation < 1;
+spikes.nonClusteredSpks = nonClusteredSpks ./ totSpks;
+spikes.muSpks = 1 - length(vertcat(spikes.ts{spikes.su})) / sum(totSpks);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% save spikes
+% save vars
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if saveVar
-    [~, filename] = fileparts(basepath);
-    save([filename '.spikes.cellinfo.mat'], 'spikes')
+    [~, basename] = fileparts(basepath);
+    % spikes
+    save([basename '.spikes.cellinfo.mat'], 'spikes')
+    
+    % cell metrics
+    cmName = [basename, '.cell_metrics.cellinfo.mat'];
+    if exist(cmName, 'file')
+        load(cmName)
+        cell_metrics.su = split(num2str(spikes.su))';
+        cell_metrics.iDist = spikes.iDist;
+        cell_metrics.lRat = spikes.lRat;
+        cell_metrics.isiViolation = spikes.isiViolation;       
+        save(cmName, 'cell_metrics')
+    end
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

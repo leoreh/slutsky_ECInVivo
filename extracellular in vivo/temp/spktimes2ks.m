@@ -153,7 +153,6 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 for i = 1 : ngrps
-
     grp = grps(i);
     nspks(i) = length(spktimes{i});
     grpchans = spkgrp{i};
@@ -223,9 +222,10 @@ for i = 1 : ngrps
     % ---------------------------------------------------------------------
     % clu (temporary, for visualization w/ neuroscope)
     if mkClu
+        mkdir(['kk' filesep 'preSorting']) 
         nclu = 1;
         clugrp = ones(1, nspks(i));
-        cluname = fullfile([basename '.clu.' num2str(grp)]);
+        cluname = fullfile(['kk' filesep 'preSorting'], [basename '.clu.' num2str(grp)]);
         fid = fopen(cluname, 'w');
         fprintf(fid, '%d\n', nclu);
         fprintf(fid, '%d\n', clugrp);
