@@ -59,7 +59,9 @@ if exist('dirnames', 'var') && isstring(dirnames)
     
     % ALT 2: get dirnames from xlsx file
 elseif ischar(xlsname) && contains(xlsname, 'xlsx')
-    sessionInfo = readtable(fullfile(basepath, xlsname));
+    xlsfile = dir([basepath filesep '*' xlsname]);
+    xlsfile = xlsfile(1);   % lazy fix to when file is open
+    sessionInfo = readtable(fullfile(xlsfile.folder, xlsfile.name));
     icol = strcmp(sessionInfo.Properties.VariableNames, dirColumn);
     dirnames = string(table2cell(sessionInfo(:, icol)));
     

@@ -18,23 +18,23 @@ vars = ["session.mat";...
 % column name of logical values for each session. only if true than session
 % will be loaded. can be a string array and than all conditions must be
 % met.
-pcond = ["mancur"];
-% pcond = [];
+pcond = ["tempflag"; "mancur"];
+pcond = "";
 % same but imposes a negative condition
 ncond = ["fepsp"];
 sessionlist = 'sessionList.xlsx';       % must include extension
 
 basepath = 'D:\VMs\shared\lh70';
 
-% dirnames = ["lh58_200830_1000"; "lh58_200831_1000";...
-%     "lh58_200830_090851"; "lh58_200831_080808"];
+dirnames = [];
+dirnames = ["lh70_201008_0825"];
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if ~exist('varArray', 'var') && ~forceL
     [varArray, dirnames] = getSessionVars('basepath', basepath, 'vars', vars,...
-        'pcond', pcond, 'ncond', ncond, 'sortDir', false, 'dirnames', []);
+        'pcond', pcond, 'ncond', ncond, 'sortDir', false, 'dirnames', dirnames);
 end
 nsessions = length(dirnames);
 
@@ -66,7 +66,7 @@ if forceA
         %         datInfo = varArray{i, 6}.datInfo;
         
         % spikes
-        fixSpkAndRes('grp', [], 'fs', fs);
+        fixSpkAndRes('grp', [1], 'fs', fs);
         spikes = loadSpikes('session', session);
         spikes = fixCEspikes('basepath', filepath, 'saveVar', false,...
             'force', true);
@@ -113,38 +113,34 @@ pathPieces = regexp(dirnames(:), '_', 'split'); % assumes filename structure: an
 sessionDate = [pathPieces{:}];
 sessionDate = sessionDate(2 : 3 : end);
 
-% close all
+close all
 grp = [1 : 4];          % which tetrodes to plot
 state = [2];             % [] - all; 1 - awake; 2 - NREM
 FRdata = 'strd';        % plot absolute fr or normalized
 unitClass = 'pyr';      % plot 'int', 'pyr', or 'all'
 suFlag = 1;             % plot only su or all units
 minfr = 0;            % include only units with fr greater than
-maxfr = 3;              % include only untis with fr lower than
-Y = [0 6];             % ylim
-p1 = 0;                 % firing rate vs. time, one fig per session
-p2 = 1;                 % mfr across sessions, one fig
+maxfr = 30;              % include only untis with fr lower than
+Y = [0 25];             % ylim
+p1 = 1;                 % firing rate vs. time, one fig per session
+p2 = 0;                 % mfr across sessions, one fig
 p3 = 0;                 % firing rate vs. time, one fig for all sessions. not rubust
 p4 = 0;                 % number of cells per session, one fig
-plotStyle = 'bar';      % for p2. can by 'bar' or 'box'
-clr = ['bbkkkkr'];
+plotStyle = 'box';      % for p2. can by 'bar' or 'box'
+clr = ['bbbkkkkrrr'];
 
 for i = 1 : nsessions
     
+    % vars
     session = varArray{i, 1}.session;
     cm = varArray{i, 2}.cell_metrics;
     spikes = varArray{i, 3}.spikes;
     ss = varArray{i, 4}.SleepState;
     fr = varArray{i, 5}.fr;
     datInfo = varArray{i, 6}.datInfo;
-    fs = session.extracellular.sr;
-    
-    % cell class
-    pyr = strcmp(cm.putativeCellType, 'Pyramidal Cell');
-    wide = strcmp(cm.putativeCellType, 'Wide Interneuron');
-    %     pyr = pyr | wide;
-    int = strcmp(cm.putativeCellType, 'Narrow Interneuron');
-    
+    fs = session.extracellular.sr;   
+       
+    % su vs mu
     su = ones(length(spikes.ts), 1);    % override
     if isfield(spikes, 'su') && suFlag
         su = spikes.su';
@@ -152,13 +148,18 @@ for i = 1 : nsessions
     else
         suTxt = 'MU';
     end
-    % specific grp
+    
+    % tetrode
     grpidx = zeros(1, length(spikes.shankID));
     for ii = 1 : length(grp)
         grpidx = grpidx | spikes.shankID == grp(ii);
     end
     mfrunits = fr.mfr > minfr & fr.mfr < maxfr;
     
+    % cell class
+    pyr = strcmp(cm.putativeCellType, 'Pyramidal Cell');
+    wide = strcmp(cm.putativeCellType, 'Wide Interneuron');
+    int = strcmp(cm.putativeCellType, 'Narrow Interneuron');
     if strcmp(unitClass, 'pyr')
         units = pyr & su' & grpidx & mfrunits';
     elseif strcmp(unitClass, 'int')
@@ -170,19 +171,21 @@ for i = 1 : nsessions
         error('no units match criteria')
     end
     
+    % states
+    states = {ss.ints.WAKEstate, ss.ints.NREMstate, ss.ints.REMstate};
     if ~isempty(state) && state > 0
         data = fr.states.fr{state}(units, :);
         tstamps = fr.states.tstamps{state};
-        txt = sprintf('MSR of %s %s in %s', unitClass, suTxt, fr.states.statenames{state});
+        txt = sprintf('mFR of %s %s in %s', unitClass, suTxt, fr.states.statenames{state});
     else
         data = fr.strd(units, :);
-        tstamps = fr.tstamps / 60;
-        txt = sprintf('MSR of %s %s', unitClass, suTxt);
+        tstamps = fr.tstamps;
+        txt = sprintf('mFR of %s %s', unitClass, suTxt);
     end
     mfr{i} = mean(data, 2);
     
     %%%
-%     mfr{i} = cm.burstIndex_NREMstate(units);
+    mfr{i} = cm.burstIndex_NREMstate(units);
     %%%
     
     if isfield(datInfo, 'nsamps')
@@ -194,11 +197,11 @@ for i = 1 : nsessions
     % firing rate vs. time. 1 fig per session
     if p1
         figure
-        plot(tstamps, (data'))
+        plot(tstamps / 60, (data'), 'LineWidth', 1)
         hold on
-        medata = median((data), 1);
-        % plot(tstamps, medata, 'k', 'LineWidth', 5)
-        stdshade(data, 0.3, 'k', tstamps)
+        medata = mean((data), 1);
+        plot(tstamps / 60, medata, 'k', 'LineWidth', 4)
+%         stdshade(data, 0.3, 'k', tstamps / 60)
         for ii = 1 : length(nsamps) - 1
             plot([nsamps(ii) nsamps(ii)] / fs / 60, ylim, '--k',...
                 'LineWidth', 2)
@@ -207,11 +210,19 @@ for i = 1 : nsessions
         fill([states{2} fliplr(states{2})]' / 60, [Y(1) Y(1) Y(2) Y(2)],...
             'b', 'FaceAlpha', 0.15,  'EdgeAlpha', 0);
         ylim(Y)
-        ylabel(ytxt)
+        ylabel('Firing Rate [Hz]')
         xlabel('Time [m]')
+        if isfield(datInfo, 'spktrim')
+            xlim(datInfo.spktrim.edges / fs / 60)
+        end
         suptitle(dirnames{i})
         if saveFig
-            figname = sprintf('%s_FRvsTime', sessionDate{i})
+            if nsessions == 1
+                clear sessionDate
+                sessionDate{1} = pathPieces{2};
+            end
+            figname = sprintf('%s_%s_FRvsTime', sessionDate{i}, unitClass)
+            suptitle(figname)
             figname = fullfile(basepath, figname);
             % print(fh, figname, '-dpdf', '-bestfit', '-painters');
             export_fig(figname, '-tif', '-transparent', '-r300')
@@ -301,47 +312,6 @@ if p2
         export_fig(figname, '-tif', '-transparent', '-r300')
     end
 end
-% 
-% if p2
-%     fh = figure;
-%     mfrmat = cell2nanmat(mfr);
-%     %     plot([1 : nsessions], cell2nanmat(mfr), 'ko',...
-%     %         'LineStyle', 'none', 'MarkerFaceColor', 'k', 'MarkerSize', 4)
-%     %     errorbar([1 : nsessions], nanmean(mfrmat), nanstd(mfrmat, 1),...
-%     %         'k', 'LineWidth', 2)
-%     %     hold on
-%     %     bh = bar([1 : nsessions], nanmean(mfrmat), 'EdgeColor', 'none');
-%     %     boxplot(mfrmat, 'PlotStyle', 'traditional');
-%     bar(nanmean(mfrmat))
-%     hold on
-%     errorbar(1 : nsessions, nanmean(mfrmat), nanstd(mfrmat))
-%     bh = findobj(gca, 'Tag', 'Box');
-%     if length(bh) == length(clr)
-%         clrRep = histc(clr, unique(clr));
-%         clear alphaIdx
-%         for i = 1 : length(clrRep)
-%             alphaIdx{i} = linspace(1, 0.3, clrRep(i));
-%         end
-%         alphaIdx = [alphaIdx{:}];
-%         for i = 1 : length(bh)
-%             patch(get(bh(i), 'XData'), get(bh(i), 'YData'),...
-%                 clr(i), 'FaceAlpha', alphaIdx(i))
-%         end
-%     end
-%     ylabel(ytxt)
-%     xlabel('Session')
-%     xticks(1 : nsessions)
-%     xticklabels(sessionDate)
-%     xtickangle(45)
-%     box off
-%     title(sprintf('MFR of %s %s', unitClass, suTxt))
-%     if saveFig
-%         figname = sprintf('mfr_%s_%s', unitClass, suTxt);
-%         figname = fullfile(basepath, figname);
-%         % print(fh, figname, '-dpdf', '-bestfit', '-painters');
-%         export_fig(figname, '-tif', '-transparent', '-r300')
-%     end
-% end
 
 % number of SU and MU (top - pyr; bottom - int) from selected tetrodes
 if p4
