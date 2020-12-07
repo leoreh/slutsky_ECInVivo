@@ -24,8 +24,8 @@ function fepsp = fEPSPfromWCP(varargin)
 %   inspect     logical. inspect traces {0}.
 %   saveVar     logical. save variable {1}.
 %   saveFig     logical. save graphics {1}. Only relevant If anaflag is
-%                   true
-%   graphics     Removed - logical. plot graphics {1}.
+%               true
+%   graphics    REMOVED! - logical. plot graphics {1}.
 %   force       logical. force reload {0}.
 %   anaflag     logical. send to analysis {1}
 % 
@@ -79,6 +79,8 @@ function fepsp = fEPSPfromWCP(varargin)
 % 26 sep 20 LH      adaptations according to clampfit
 % 31 oct 20 LD      match output epsp format to the output from
 %                       fEPSPfromDat, and transfer analyse to fEPSP_analysis
+% 05 dec 20 LD      When anaflag is true, fepsp output + saved will be the
+%                   output of fEPSP_analysis
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -147,7 +149,7 @@ if exist(fepspname, 'file') && ~force
     fprintf('\n loading %s \n', fepspname)
     load(fepspname)
     if anaflag
-        fEPSP_analysis('fepsp', fepsp,'saveFig',saveFig,'graphics',1);
+        fepsp = fEPSP_analysis('fepsp', fepsp,'saveFig',saveFig,'saveVar',saveVar,'savename',fepspname);
     end
     return
 end
@@ -265,7 +267,7 @@ fepsp.intens = intens;
 fepsp.tstamps = tstamps;
 fepsp.traces = trace(:, ia);
 
-if saveVar
+if saveVar && ~anaflag
     save(fepspname, 'fepsp');
 end
 
@@ -316,7 +318,7 @@ end
 %     end
 
 if anaflag
-    fEPSP_analysis('fepsp', fepsp,'saveFig',saveFig,'saveVar',saveVar);
+    fepsp = fEPSP_analysis('fepsp', fepsp,'saveFig',saveFig,'saveVar',saveVar,'savename',fepspname);
 end
 
 end

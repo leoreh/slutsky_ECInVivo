@@ -2,7 +2,7 @@ function fepsp = fEPSP_analysis(varargin)
 
 % gets a fepsp struct and analyzes the traces according to protocol
 % (currently io or stp, in the future maybe more). assumes fEPSPfromDat or
-% WCP has been called beforehand. 
+% WCP has been called beforehand.
 %
 % INPUT
 %   fepsp       struct. see fEPSPfromDat or fEPSPfromWCP
@@ -13,8 +13,10 @@ function fepsp = fEPSP_analysis(varargin)
 %   saveFig     logical. save graphics {1}.
 %   graphics    numeric. if 0 will not plot grpahics. if greater than
 %               nspkgrp will plot all grps, else will plot only
-%               selected grp {1}.
+%               selected grp {1000}.
 %   vis         char. figure visible {'on'} or not ('off')
+%   savename    char. name to save the variable by. By default will be
+%               folder name from 'basepath' + .fepsp {[]}.
 %
 % CALLS
 %   none
@@ -24,11 +26,19 @@ function fepsp = fEPSP_analysis(varargin)
 %
 % TO DO LIST
 %   # Lior Da Marcas take over (done)
+%   # Better warning msg to "Polynomial is not unique; degree >=number of data points"
+%   # Add ablity to cheack diffrent time using LineChooseWin before saving?
+%   # Add option to remove traces using LineChooseWin?
+%   # Add option to re-analyse only some tetrodes?
 %
 % 16 oct 20 LH   UPDATES
 % 02 Nov 20 LD  Change analysis from range on relevant window to
 %               amplitude as 1st peak on waveArg, Change graphic to work
 %               with that
+% 05 Dec 20 LD  Change analysis from auto to user define Points via mini
+%               GUI, add slope analysis, minor change graphics to comply
+%               with this changes and to export maximazed view of graph.
+%               Give option to caller to determine file name at saving
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -42,6 +52,7 @@ addOptional(p, 'saveVar', true, @islogical);
 addOptional(p, 'saveFig', true, @islogical);
 addOptional(p, 'graphics', 1000);
 addOptional(p, 'vis', 'on', @ischar);
+addOptional(p, 'savename', [], @ischar);
 
 parse(p, varargin{:})
 fepsp = p.Results.fepsp;
@@ -52,14 +63,19 @@ saveVar = p.Results.saveVar;
 saveFig = p.Results.saveFig;
 graphics = p.Results.graphics;
 vis = p.Results.vis;
+savename = p.Results.savename;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % get params from fepsp struct
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 [~, basename] = fileparts(basepath);
-fepspname = [basename '.fepsp.mat'];
-    
+if isempty(savename)
+    fepspname = [basename '.fepsp.mat'];
+else
+    fepspname = savename;
+end
+
 % try to load file if not in input
 if isempty(fepsp)
     if exist(fepspname, 'file')
@@ -103,7 +119,7 @@ switch protocol
                 ts = mean(ts(ts < 500)) / fs * 1000;
             case 'wcp'
                 ts = 20;
-        end     
+        end
         wvwin = round([10 : ts : 5 * ts; 30 : ts : 5 * ts + 10]' * fs / 1000);
         wvwin(:, 1) = wvwin(:, 1) + dt;
         wvwin(:, 2) = wvwin(:, 2) - dt;
@@ -116,17 +132,34 @@ end
 % traceAvg      3d mat (tetrode x intensity x sample) of entire trace
 fepsp.traceAvg  = nan(nspkgrp, nfiles, length(fepsp.tstamps));
 % waves         2d cell (tetrode x intensity) where each cell contains the
-%               waves (zoom in view of traces) 
+%               waves (zoom in view of traces)
 fepsp.waves     = cell(nspkgrp, nfiles);
 % wavesAvg      3d mat (tetrode x intensity x sample) of waves (zoom in
-%               view of trace), averages across traces. for io only             
+%               view of trace), averages across traces. for io only
 fepsp.wavesAvg  = nan(nspkgrp, nfiles, length(wvwin(1) : wvwin(2)));
-% ampcell       2d array (tetrode x intensity) where each cell contains the
+% info.AnalysedTimePoints   2d mat (tetrode x intensity), The time points user
+%               choose for each stim. For each 2 columns, the first is the
+%               start and the secound is the end of the area to analyse.
+%               Time is from fepsp.tstamps.
+fepsp.info.AnalysedTimePoints = nan(nspkgrp,2*nstim);
+% ampcell       2d array (tetrode x stim) where each cell contains the
 %               amplitude/s for each trace
 fepsp.ampcell   = cell(nspkgrp, nfiles);
+% slopecell_10_50   2d array (tetrode x intensity) where each cell contains
+%               the slope/s of 10% to 50% for each trace
+fepsp.slopecell_10_50 = cell(nspkgrp, nfiles);
+% slopecell_20_90   2d array (tetrode x intensity) where each cell contains
+%               the slope/s of 20% to 90% for each trace
+fepsp.slopecell_20_90 = cell(nspkgrp, nfiles);
 % amp           2d (io) or 3d (stp) mat (tetrode x intensity x stim) of
 %               amplitude averaged across traces
 fepsp.amp   = nan(nspkgrp, nfiles, nstim);
+% slope_10_50   2d (io) or 3d (stp) mat (tetrode x intensity x stim) of
+%               slope 10% to 50% averaged across traces (STP not implanted!)
+fepsp.slope_10_50 = nan(nspkgrp, nfiles, nstim);
+% slope_20_90    2d (io) or 3d (stp) mat (tetrode x intensity x stim) of
+%               slope 20% to 90% averaged across traces (STP not implanted!)
+fepsp.slope_20_90 = nan(nspkgrp, nfiles, nstim);
 % ampNorm       2d array of normalized amplitudes. for each trace the
 %               responses are normalized to first response. these
 %               normalized amplitudes. for
@@ -136,47 +169,74 @@ fepsp.ampNorm   = nan(nspkgrp, nfiles, nstim);
 fepsp.facilitation = nan(nspkgrp, nfiles);
 
 fepsp = rmfield(fepsp, 'ampNorm');
-TheMin = cell(nspkgrp,nfiles);
-TheMax = cell(nspkgrp,nfiles);
+The_10_50_20_90 = cell(nspkgrp,nfiles); %Slope ind for average waveforms (See later)
+TimeFrameWindow = fepsp.tstamps(wvwin(1) : wvwin(2)); %Timeframe or responce 
 for j = 1 : nspkgrp
+    
+    % User choose timePoints for analyse by mini GUI, While all tet's traces are Presented
+    AllTraces = cell2mat(fepsp.traces(j,:));
+    ChoosenTime = LineChooseWin(TimeFrameWindow,AllTraces(wvwin(1) : wvwin(2), :),nstim,j);
+    
+    % Calculate the closest Point that actually exist in data
+    TimeFrameWindowMat = repmat(TimeFrameWindow,1,nstim);
+    [~,StartStimTimeIND] = min(abs(TimeFrameWindowMat - ChoosenTime(1:2:end)),[],1);
+    [~,EndStimTimeIND] = min(abs(TimeFrameWindowMat - ChoosenTime(2:2:end)),[],1);
+    fepsp.info.AnalysedTimePoints(j,1:2:end) = TimeFrameWindow(StartStimTimeIND);
+    fepsp.info.AnalysedTimePoints(j,2:2:end) = TimeFrameWindow(EndStimTimeIND);
+    
+    % Calculate by protocol
     for i = 1 : nfiles
         fepsp.traceAvg(j, i, :) = mean(fepsp.traces{j, i}, 2);
         switch protocol
             case 'io'
                 fepsp.waves{j, i} = fepsp.traces{j, i}(wvwin(1) : wvwin(2), :);
-                % find first local minima & maxima in window. since we
-                % expect the minima to be relativly big, ignore any minima
-                % with small Prominence (<0.3). if the responce is smaller
-                % then that, it is practicly 0.
-                FullTraceAvrg = mean(fepsp.traces{j, i}, 2);
-                BaseLineAmp = std(FullTraceAvrg(fepsp.tstamps < -2)); 
-                %Noise local min/max == changes in amplitude = on avrg, aprox 2*std.
-                % I'll take 5 time this std as real signal
-                [ValueCheckMax,PerTrace1Max] = max(islocalmax(fepsp.waves{j, i},1,'MinProminence',5*BaseLineAmp),[],1);
-                [ValueCheckMin,PerTrace1Min] = max(islocalmin(fepsp.waves{j, i},1,'MinProminence',5*BaseLineAmp),[],1);
-                PerTrace1Max(ValueCheckMax == 0) = 1; 
-                %if no local maxima with any Prominence, take the 1st sample in window
-                PerTrace1Min(ValueCheckMin == 0) = round((fs/1000)*10-2*(fs/1000));
-                %if no local minima with minimal Prominence, take the sample corresponding to 10ms (expected responce pos)
-                PerTrace1MinIND = sub2ind(size(fepsp.waves{j, i}),PerTrace1Min,1:size(fepsp.waves{j, i},2));
-                PerTrace1MaxIND = sub2ind(size(fepsp.waves{j, i}),PerTrace1Max,1:size(fepsp.waves{j, i},2));
-                fepsp.ampcell{j, i} = abs(fepsp.waves{j, i}(PerTrace1MaxIND) - fepsp.waves{j, i}(PerTrace1MinIND));
+                % Amp is simply absolute Start point - End point
+                fepsp.ampcell{j, i} = abs(fepsp.waves{j, i}(StartStimTimeIND,:) - fepsp.waves{j, i}(EndStimTimeIND,:));
+                
+                % Calculate  Each trace slopes
+                for kk = length(fepsp.ampcell{j, i}):-1:1
+                    % Find for each trace the closest points that define about 10%-50% & 20%-90% of the calculated amp.
+                    % Can be vectorize relatively simply using 3d array if run time too slow (Unexpected).
+                    AllPointsAmp = abs(fepsp.waves{j, i}(StartStimTimeIND:EndStimTimeIND,kk) - fepsp.waves{j, i}(StartStimTimeIND,kk));
+                    MinusMat = fepsp.ampcell{j, i}(kk)*[0.1 0.5 0.2 0.9];
+                    [~,Trace_10_50_20_90] = min(abs(AllPointsAmp-MinusMat),[],1);
+                    % If there are both a significant biphasic between StartStim & EndStim, the lower precentage might be found after
+                    % the higher one. Will break colon operator later. in this case, just flip them.
+                    if Trace_10_50_20_90(1) > Trace_10_50_20_90(2)
+                        Trace_10_50_20_90(1:2) = Trace_10_50_20_90(2:-1:1);
+                    end
+                    if Trace_10_50_20_90(3) > Trace_10_50_20_90(4)
+                        Trace_10_50_20_90(3:4) = Trace_10_50_20_90(4:-1:3);
+                    end
+                    Trace_10_50_20_90 = Trace_10_50_20_90+StartStimTimeIND-1; %Match the indicies from small StartStim:EndStim window back to TimeFrameWindow.
+                    
+                    % Calculate Slope by fitting a line. Cannot be vectorize simply.
+                    FitParams = polyfit(TimeFrameWindow(Trace_10_50_20_90(1):Trace_10_50_20_90(2)),fepsp.waves{j, i}(Trace_10_50_20_90(1):Trace_10_50_20_90(2),kk),1);
+                    fepsp.slopecell_10_50{j, i}(kk) = FitParams(1);
+                    FitParams = polyfit(TimeFrameWindow(Trace_10_50_20_90(3):Trace_10_50_20_90(4)),fepsp.waves{j, i}(Trace_10_50_20_90(3):Trace_10_50_20_90(4),kk),1);
+                    fepsp.slopecell_20_90{j, i}(kk) = FitParams(1);
+                end
+                
+                %Redo on mean wave. Save closest points that define about 10%-50% & 20%-90% to avoid recalcuating for graphics
                 fepsp.wavesAvg(j, i, :) = mean(fepsp.waves{j, i}, 2);
-                %fepsp.ampcell{j, i} = range(fepsp.waves{j, i});
-                %fepsp.amp(j, i) = mean(fepsp.ampcell{j, i});
+                fepsp.amp(j, i) = abs(fepsp.wavesAvg(j, i, StartStimTimeIND) - fepsp.wavesAvg(j, i,EndStimTimeIND));
                 
-                %Redo on mean wave
-                TheMin{j,i} = find(islocalmin(squeeze(fepsp.wavesAvg(j, i, :)),'MinProminence',0.3),1);
-                TheMax{j,i} = find(islocalmax(squeeze(fepsp.wavesAvg(j, i, :))),1);
-                if isempty(TheMin{j,i})
-                    TheMin{j,i} = round((fs/1000)*10-2*(fs/1000)); 
-                    %if no local minima with minimal Prominence, take the sample corresponding to 10ms (expected responce pos)
+                AllPointsAmp = squeeze(abs(fepsp.wavesAvg(j, i, StartStimTimeIND:EndStimTimeIND) - fepsp.wavesAvg(j, i, StartStimTimeIND)));
+                MinusMat = fepsp.amp(j, i)*[0.1 0.5 0.2 0.9];
+                [~,The_10_50_20_90{j,i}] = min(abs(AllPointsAmp-MinusMat),[],1);
+                if The_10_50_20_90{j,i}(1) > The_10_50_20_90{j,i}(2)
+                        The_10_50_20_90{j,i}(1:2) = The_10_50_20_90{j,i}(2:-1:1);
                 end
-                if isempty(TheMax{j,i})
-                    TheMax{j,i} = 1; %if no local maxima with any Prominence, take the 1st sample in window
+                if The_10_50_20_90{j,i}(3) > The_10_50_20_90{j,i}(4)
+                        The_10_50_20_90{j,i}(3:4) = The_10_50_20_90{j,i}(4:-1:3);
                 end
-                fepsp.amp(j, i) = abs(fepsp.wavesAvg(j, i, TheMax{j,i}) - fepsp.wavesAvg(j, i, TheMin{j,i}));
-                
+                The_10_50_20_90{j,i} = The_10_50_20_90{j,i}+StartStimTimeIND-1;
+                FitParams = polyfit(TimeFrameWindow(The_10_50_20_90{j,i}(1):The_10_50_20_90{j,i}(2)),...
+                    squeeze(fepsp.wavesAvg(j, i, The_10_50_20_90{j,i}(1):The_10_50_20_90{j,i}(2))),1);
+                fepsp.slope_10_50(j, i) = FitParams(1);
+                FitParams = polyfit(TimeFrameWindow(The_10_50_20_90{j,i}(3):The_10_50_20_90{j,i}(4)),...
+                    squeeze(fepsp.wavesAvg(j, i, The_10_50_20_90{j,i}(3):The_10_50_20_90{j,i}(4))),1);
+                fepsp.slope_20_90(j, i) = FitParams(1);
             case 'stp'
                 % note; after reviewing the data it seems that specifically
                 % for stp maximum absolute value may be better than range
@@ -200,7 +260,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if graphics
-    if graphics > nspkgrp 
+    if graphics > nspkgrp
         grp = 1 : nspkgrp;
     else
         grp = graphics;
@@ -208,24 +268,41 @@ if graphics
     for i = grp
         switch protocol
             case 'io'
-                fh = figure('Visible', vis);
-                suptitle(sprintf('T#%d', i))
-                subplot(1, 2, 1)
-                plot(fepsp.tstamps(wvwin(1) : wvwin(2)), squeeze(fepsp.wavesAvg(i, :, :))')
+                fh = figure('Visible', vis,'WindowState','maximized'); %Max window for better looking export
+                suptitle(sprintf('T#%d', i)) 
+                subplot(3, 1, 1) %Avarge Waveforms Marked
+                plot(TimeFrameWindow, squeeze(fepsp.wavesAvg(i, :, :))','LineWidth',1)
                 hold on
-                SmallTSwindow = fepsp.tstamps(wvwin(1) : wvwin(2));
-                wavesAvgPos = sub2ind(size(fepsp.wavesAvg),ones(1,length([TheMin{i,:} TheMax{i,:}]))*i,repmat(1:size(fepsp.wavesAvg,2),1,2),[TheMin{i,:} TheMax{i,:}]);
-                plot(SmallTSwindow([TheMin{i,:}]),squeeze(fepsp.wavesAvg(wavesAvgPos(1:(end/2)))'),'*')
-                plot(SmallTSwindow([TheMax{i,:}]),squeeze(fepsp.wavesAvg(wavesAvgPos((end/2+1):end))'),'O')
+                % Mark on each waveform Start & End of analysed area
+                plot(repmat(fepsp.info.AnalysedTimePoints(i,1:2:end),1,size(fepsp.wavesAvg,2)),...
+                    squeeze(fepsp.wavesAvg(i,:,ismember(TimeFrameWindow,fepsp.info.AnalysedTimePoints(i,1:2:end)))),'*')
+                plot(repmat(fepsp.info.AnalysedTimePoints(i,2:2:end),1,size(fepsp.wavesAvg,2)),...
+                    squeeze(fepsp.wavesAvg(i,:,ismember(TimeFrameWindow,fepsp.info.AnalysedTimePoints(i,2:2:end)))),'O')
+                % Marker area in which slope was analysed
+                for jj = 1:length(The_10_50_20_90(i,:))
+                    P_10_50 = plot(TimeFrameWindow(The_10_50_20_90{i,jj}(1):The_10_50_20_90{i,jj}(2)),...
+                        squeeze(fepsp.wavesAvg(i,jj,The_10_50_20_90{i,jj}(1):The_10_50_20_90{i,jj}(2))),'b','LineWidth',3);
+                    P_10_50.Color(4) = 0.5;
+                    P_10_50.Annotation.LegendInformation.IconDisplayStyle = 'off';
+                    P_20_90 = plot(TimeFrameWindow(The_10_50_20_90{i,jj}(3):The_10_50_20_90{i,jj}(4)),...
+                        squeeze(fepsp.wavesAvg(i,jj,The_10_50_20_90{i,jj}(3):The_10_50_20_90{i,jj}(4))),'y','LineWidth',3);
+                    P_20_90.Color(4) = 0.5;
+                    P_20_90.Annotation.LegendInformation.IconDisplayStyle = 'off';
+                end
                 axis tight
-                yLimit = [min([fepsp.wavesAvg(:)]) max([fepsp.wavesAvg(:)])];
-                ylim(yLimit)
+                ylim(ylim()*1.05)
+%                 yLimit = [min([fepsp.wavesAvg(:)]) max([fepsp.wavesAvg(:)])];
+%                 ylim(yLimit)
                 xlabel('Time [ms]')
                 ylabel('Voltage [mV]')
-                legend([split(num2str(sort(fepsp.intens)));{'Amp measure point 1st min'};{'Amp measure point 1st max'}],'Location','best')
+                legend([split(num2str(sort(fepsp.intens)));{'Amp measure point Stim Start'};{'Amp measure point Stim End'}],'Location','best','NumColumns',2)
                 box off
+                P_10_50.Annotation.LegendInformation.IconDisplayStyle = 'on';
+                P_10_50.DisplayName = 'Slope Area 10%-50%';
+                P_20_90.Annotation.LegendInformation.IconDisplayStyle = 'on';
+                P_20_90.DisplayName = 'Slope Area 20%-90%';
                 
-                subplot(1, 2, 2)
+                subplot(3, 1, 2) %Amplitude across ints (on avarge waveforms)
                 %ampmat = cell2nanmat(fepsp.ampcell(i, :));
                 %boxplot(ampmat, 'PlotStyle', 'traditional')
                 bar(fepsp.amp(i,:))
@@ -233,6 +310,14 @@ if graphics
                 xticklabels(split(num2str(sort(fepsp.intens))))
                 xlabel('Intensity [uA]')
                 ylabel('Amplidute [mV]')
+                box off
+                
+                subplot(3, 1, 3) %Slope across ints (on avarge waveforms)
+                bar([fepsp.slope_10_50(i,:);fepsp.slope_20_90(i,:)])
+                xticklabels({'From 10% to 50%' 'From 20% to 90%'})
+                xlabel('Measure area')
+                ylabel('Slope [mV/mS]')
+                legend([split(num2str(sort(fepsp.intens)))])
                 box off
                 
             case 'stp'
@@ -272,5 +357,74 @@ if graphics
 end
 
 end
+
+%% Helper LineChooseWin function
+function [LineXPos] = LineChooseWin(Data2PlotX,Data2PlotY,nstim,TetNum)
+%[LineXPos] = LineChooseWin(Data2PlotX,Data2PlotY,nstim,TetNum)
+%Helper function to fEPSP_analysis, Plot data and choose stimuli time
+%   Will plot the inserted data and let you choose start & and time for
+%   each stimuli by moving lines ob the plot.
+%   Inputs:
+%       Data2PlotX - numeric, data for x axis (usally double time). See "plot" for limits.
+%       Data2PlotY - numeric, data for y axis. See "plot" for limits.
+%       nstim      - numeric scalar, number of stimuli to choose there time.
+%       TetNum     - numeric scalar, the number of tetrode corrently working on,
+%                    just for title.
+%   Outputs:
+%       LineXPos   - numeric vector, lenght 2*nstim. the x position of each
+%                    line in refernce to Data2PlotX. The Vector is ordered
+%                    StartStim1 EndStim1 StartStim2 EndStim2 and so on.
+
+% Main Graph
+ChooseWin = figure('WindowState','maximized');
+plot(Data2PlotX,Data2PlotY);
+xlabel('Time [mS]')
+ylabel('Amp [mV]')
+title({sprintf('T%d',TetNum) 'Move Green lines to Start of each Responce' 'Move Red lines to End of each Responce'...
+ 'Press "Finished", close fig or press "Enter\return" when done'})
+axis tight
+
+% Creating the Lines
+XLims = xlim();
+ylim(ylim()*1.1);
+LineStartPos = linspace(XLims(1),XLims(2),2*nstim);
+Colors = {'g','r'};
+Pos = {'S','E'};
+for ii = length(LineStartPos):-1:1
+    ColorIND = mod(ii,2);
+    ColorIND(ColorIND == 0) = 2;
+    d(ii) = drawline('Position',[repmat(LineStartPos(ii),2,1) ylim()'],'InteractionsAllowed','translate','Color',Colors{ColorIND},...
+        'Label',sprintf('%d%s t=%.1f',ceil(ii/2),Pos{ColorIND},LineStartPos(ii)));
+end
+Lis = addlistener(d,'MovingROI',@WriteLoc); %Listener for showing the time in lines lable
+
+%Waiting to user to place lines, and making comfy close options, all simply
+%continue the function, to prevent closing before saving lines pos 
+uicontrol(ChooseWin,'Style','pushbutton','String','Finished','Callback',@(~,~) uiresume)
+ChooseWin.CloseRequestFcn = @(~,~) uiresume; %Normal close will not return pos, so just use the uiresume when closing
+ChooseWin.KeyReleaseFcn = @ResumeIfEnter;
+uiwait(ChooseWin);
+
+%Saving lines Xpos then close the figure
+LinePos = [d.Position];
+LineXPos = LinePos(1,1:2:end);
+delete(Lis)
+delete(ChooseWin)
+
+    function WriteLoc(obj,evt)
+        %Callback function to the listner, just change the tie written in
+        %line lable when moving it
+        CurrXPos = evt.CurrentPosition(1);
+        obj.Label = [obj.Label(1:(find(obj.Label == '='))), sprintf('%.1f',CurrXPos)];
+    end
+    function ResumeIfEnter(~,evt)
+        %Figure KeyReleaseFcn, just make pressing "enter"\"return" resume
+        %the function (therefore saving lines XPos and closing figure)
+        if evt.Character == 13
+            uiresume
+        end
+    end
+end
+
 
 % EOF

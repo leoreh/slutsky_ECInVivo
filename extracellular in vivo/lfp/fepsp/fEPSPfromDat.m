@@ -27,7 +27,8 @@ function fepsp = fEPSPfromDat(varargin)
 %   saveVar     logical. save variable {1}
 %   inspect     logical. inspect traces {0}
 %   anaflag     logical. send to analysis {1}
-%
+%   saveFig     logical. save graphics {1}. Only relevant If anaflag is
+%               true
 % CALLS
 %   snipFromDat
 %   tdtbin2mat
@@ -81,6 +82,14 @@ function fepsp = fEPSPfromDat(varargin)
 %                  separated analysis
 % 01 Nov 20 LD     change fepsp.info.basename to cell for compatiblity with
 %                  wcp, and add description of base output
+% 05 Dec 20 LD     Fliped tstamps vector on fepsp struct to match WCP
+%                  Now passing saveVar & saveFig to fEPSP_analysis
+%                  When anaflag is true, fepsp output + savedVar will be the
+%                  output of fEPSP_analysis
+%                  Comment taking intens from Old type existing fepsp file
+%                  while force is true
+%                  Addif force is false check for analysis before returning
+%                  (and send to analyse if needed)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -101,6 +110,8 @@ addOptional(p, 'force', false, @islogical);
 addOptional(p, 'saveVar', true, @islogical);
 addOptional(p, 'anaflag', true, @islogical);
 addOptional(p, 'inspect', false, @islogical);
+addOptional(p, 'saveFig', true, @islogical);
+
 
 parse(p, varargin{:})
 basepath    = p.Results.basepath;
@@ -118,6 +129,7 @@ inspect     = p.Results.inspect;
 force       = p.Results.force;
 saveVar     = p.Results.saveVar;
 anaflag     = p.Results.anaflag;
+saveFig     = p.Results.saveFig;
 
 % params
 if isempty(spkgrp)
@@ -151,14 +163,21 @@ fepspname = [basename '.fepsp.mat'];
 if exist(fepspname, 'file')
     fprintf('\nloading %s \n', fepspname)
     load(fepspname)
-    if ~force
+    if ~force && ~anaflag
         return
-    else
-        if isfield(fepsp, 'origIntens')
-            intens = fepsp.origIntens;
-        elseif isfield(fepsp, 'intens')
-            intens = fepsp.intens;
+    elseif ~force && anaflag
+        if isfield(fepsp,'amp')
+            return
+        else
+            fprintf('Loaded File isn''t analysed, analaysing...\n')
+            fepsp = fEPSP_analysis('fepsp', fepsp,'saveFig',saveFig,'saveVar',saveVar,'savename',fepspname);
         end
+    else
+%         if isfield(fepsp, 'origIntens')
+            intens = fepsp.info.intensOrig;
+%         elseif isfield(fepsp, 'intens')
+%             intens = fepsp.intens;
+%         end
     end
 end
 
@@ -383,16 +402,16 @@ fepsp.info.rm = rm;
 fepsp.info.lowPass = cf;
 fepsp.info.inspect = logical(inspect);
 fepsp.intens = intens;
-fepsp.tstamps = tstamps;
+fepsp.tstamps = tstamps';
 fepsp.traces = traces(:, ia);
 
-if saveVar
+if saveVar && ~anaflag
     save(fepspname, 'fepsp');
 end
 
 % send to analysis
 if anaflag
-    fEPSP_analysis('fepsp', fepsp);
+    fepsp = fEPSP_analysis('fepsp', fepsp,'saveFig',saveFig,'saveVar',saveVar,'savename',fepspname);
 end
 
 return
