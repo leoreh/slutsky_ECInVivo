@@ -1,4 +1,4 @@
-function [varArray, dirnames] = getSessionVars(varargin)
+function [varArray, dirnames, basepath] = getSessionVars(varargin)
 
 % loads specific matlab variables from specified directories and organizes
 % them in a cell array. the directories can be specified directly as input
@@ -6,7 +6,8 @@ function [varArray, dirnames] = getSessionVars(varargin)
 % variables in each dir are named "dirname.varname.mat".
 
 % INPUT:
-%   basepath    string. path to mouse folder with all sessions {pwd}.
+%   basepath    string. path to mouse folder with all sessions {pwd}. if
+%               empty will be retreived from xls
 %   xlsname     string. name of xls file with list of sessions. must
 %               include extension {'sessionList.xlsx'}
 %   dirColumn 	string. column name in xls sheet where dirnames exist
@@ -32,6 +33,7 @@ function [varArray, dirnames] = getSessionVars(varargin)
 p = inputParser;
 addOptional(p, 'basepath', pwd);
 addOptional(p, 'xlsname', 'sessionList.xlsx', @ischar);
+addOptional(p, 'mname', '', @ischar);
 addOptional(p, 'dirColumn', "Session", @isstring);
 addOptional(p, 'vars', "session", @isstring);
 addOptional(p, 'pcond', "tempFlag", @isstring);
@@ -42,12 +44,13 @@ addOptional(p, 'dirnames', []);
 parse(p, varargin{:})
 basepath        = p.Results.basepath;
 xlsname         = p.Results.xlsname;
+mname           = p.Results.mname;
 dirColumn       = p.Results.dirColumn;
 vars            = p.Results.vars;
 pcond           = p.Results.pcond;
 ncond           = p.Results.ncond;
 sortDir         = p.Results.sortDir;
-dirnames         = p.Results.dirnames;
+dirnames        = p.Results.dirnames;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Get directory paths
@@ -59,11 +62,13 @@ if exist('dirnames', 'var') && isstring(dirnames)
     
     % ALT 2: get dirnames from xlsx file
 elseif ischar(xlsname) && contains(xlsname, 'xlsx')
-    xlsfile = dir([basepath filesep '*' xlsname]);
-    xlsfile = xlsfile(1);   % lazy fix to when file is open
-    sessionInfo = readtable(fullfile(xlsfile.folder, xlsfile.name));
+    xlsfile = dir(xlsname);
+    sessionInfo = readtable(fullfile(xlsfile.folder, xlsfile.name),...
+        'sheet', mname);
     icol = strcmp(sessionInfo.Properties.VariableNames, dirColumn);
     dirnames = string(table2cell(sessionInfo(:, icol)));
+    basepaths = string(table2cell(sessionInfo(:, 1)));
+    basepath_default = basepaths{1};
     
     % check dirnames meet conditions
     clear irow icol
@@ -82,6 +87,7 @@ elseif ischar(xlsname) && contains(xlsname, 'xlsx')
     end
     dirnames = dirnames(irow);
     dirnames(strlength(dirnames) < 1) = [];
+    basepaths = basepaths(irow);
 end
 
 if sortDir
@@ -92,6 +98,13 @@ ndirs = length(dirnames);
 % load files
 varArray = cell(length(dirnames), length(vars));
 for i = 1 : ndirs
+    % handle cases where not all sessions are in the same basepath
+    if ~isempty(basepaths{1})
+        basepath = basepaths{1};
+    else
+        basepath = basepath_default;
+    end  
+    
     filepath = char(fullfile(basepath, dirnames(i)));
     if ~exist(filepath, 'dir')
         warning('%s does not exist, skipping...', filepath)

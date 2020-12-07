@@ -105,7 +105,8 @@ datinfo = dir(fdat);
 
 % check if basename.lfp exists
 if exist(flfp, 'file') && ~force
-  fprintf('%s exists, returning...', flfp)
+  fprintf('%s exists, returning...\n\n', flfp)
+  return
 end
 
 % Set chunk and buffer size as even multiple of fsRatio

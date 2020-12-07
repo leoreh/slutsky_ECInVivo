@@ -38,7 +38,7 @@ function fepsp = fEPSPfromDat(varargin)
 %       Info        struct, info about the recourding, with fields:
 %           basename    cell, the name of the file/ files that the traces were
 %                       exstracted from.
-%           recSystem   char, type of recourding system (wcp/oe/tdt), in
+%           recSystem   char, type of recording system (wcp/oe/tdt), in
 %                       this function oe/tdt.
 %           protocol    stimulus protocol. can be a string ('io' or 'stp') or a
 %                       numeric vector describing the times [ms] of stimulations
@@ -159,6 +159,9 @@ if exist(fepspname, 'file')
         elseif isfield(fepsp, 'intens')
             intens = fepsp.intens;
         end
+%         if isfield(fepsp.info, 'stamps')
+%             stamps = fepsp.info.stamps;
+%         end
     end
 end
 
@@ -205,36 +208,46 @@ switch recSystem
         % here is to shorten / elongate stim according to Raw1. this assumes the
         % missing / additional samples are at the end of the block and are not
         % important (so far has proven to be true)
-        fsIn = 24414.0625;
         b2uv = [];
 
-        blockfiles = dir('block*');
-        blocknames = natsort({blockfiles.name});
-        stim = [];
-        for i = 1 : length(datInfo.blocks)
-            blockpath = fullfile(basepath, datInfo.blocks{i});
-            store = datInfo.store;
-            dat = TDTbin2mat(blockpath, 'TYPE', {'streams'},...
-                'STORE', store, 'T1', 0, 'T2', 0);
-            dat = dat.streams.(store).data;
-            store = 'Stim';
-            s = TDTbin2mat(blockpath, 'TYPE', {'streams'},...
-                'STORE', store, 'T1', 0, 'T2', 0);
-            s = s.streams.(store).data;
-            
-            d = length(s) - length(dat);
-            if d ~= 0
-                warning('length stim and raw not equal')
-                if d > 0
-                    s(end : -1 : end - d + 1) = [];
-                else
-                    s(length(s) : length(dat)) = 0;
+        if ~exist('stamps', 'var')
+            blockfiles = dir('block*');
+            blocknames = natsort({blockfiles.name});
+            stim = [];
+            for i = 1 : length(datInfo.blocks)
+                blockpath = fullfile(basepath, datInfo.blocks{i});
+                store = datInfo.store;
+                dat = TDTbin2mat(blockpath, 'TYPE', {'streams'},...
+                    'STORE',store , 'T1', 0, 'T2', 0);
+                fsIn = dat.streams.(store).fs;
+                dat = dat.streams.(store).data;
+                
+                store = 'Stim';
+                s = TDTbin2mat(blockpath, 'TYPE', {'streams'},...
+                    'STORE', store, 'T1', 0, 'T2', 0);
+                fsStim = s.streams.(store).fs;
+                s = s.streams.(store).data;
+                
+                % lazy fix for cases where stim is sampled faster than data
+                if fsIn ~= fsStim
+                    s = interp1([1 : length(s)]', single(s)',...
+                        [1 : round(fsStim / fsIn) : length(s)], 'linear');                 
                 end
+                
+                d = length(s) - length(dat);
+                if d ~= 0
+                    warning('length stim and raw not equal')
+                    if d > 0
+                        s(end : -1 : end - d + 1) = [];
+                    else
+                        s(length(s) : length(dat)) = 0;
+                    end
+                end
+                stim = [stim, s];
             end
-            stim = [stim, s];
-        end   
-        % stim onset from diff
-        stamps = find(diff(stim) > max(diff(stim)) / 2);
+            % stim onset from diff
+            stamps = find(diff(stim) > max(diff(stim)) / 2);
+        end
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -366,7 +379,7 @@ close all
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % sort according to intensity
 intensOrig = intens;
-[intens, ia] = unique(intens);
+[intens, ia] = unique(intensOrig);
 
 clear fepsp
 fepsp.info.basename = {basename};

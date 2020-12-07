@@ -60,7 +60,7 @@ if exist(varname) && ~force
     return
 end
 
-fprintf('/ndetecting spikes in %s', basename)
+fprintf('/n/ndetecting spikes in %s/n', basename)
 tic;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -1,15 +1,15 @@
 function acc = EMGfromACC(varargin)
 
-% get 3-axis accelerometer signal from dat file and return the acceleration
-% amplitude. based on
+% gets 3-axis accelerometer signal from dat / lfp file and returns the
+% acceleration amplitude. based on
 % http://intantech.com/files/Intan_RHD2000_accelerometer_calibration.pdf,
 % Dhawale et al., eLife, 2017, and bz_EMGFromLFP. Conversion from g to
 % volts is done by substracting the zero-g bias [V] and dividing with the
 % accelerometer sensitivity [V / g]. these parameters are based on
 % measurments done 27.04.20. After conversion to Volts, the 3-axis
 % acceleration data is L2 normalized to yeild a magnitude heuristic. The
-% broadband spectrogram of the magnitude is calculated and the pc1 (smoothed and
-% normalized 0-1) is taken as the output (EMG equivalent).
+% broadband spectrogram of the magnitude is calculated and the pc1
+% (smoothed and normalized 0-1) is taken as the output (EMG equivalent).
 %
 % INPUT:
 %   basepath    string. path to .dat and .npy files {pwd}.
@@ -64,7 +64,8 @@ function acc = EMGfromACC(varargin)
 %   # get signal from LFP file
 %
 % 09 apr 20 LH  UPDATES:
-% 29 jun 20 LH  changed according to EMGFromLFP
+% 29 jun 20     changed according to EMGFromLFP
+% 01 dec 20     get from lfp file if exists
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -120,19 +121,25 @@ elseif fsOut ~= fsIn
     fprintf('accelaration will be resampled from %.1f to %.1f\n', fsIn, fsOut)
 end
 
-% handle dat file
+% handle dat / lfp files
 cd(basepath)
-datfiles = dir([basepath filesep '**' filesep '*dat']);
-if isempty(datfiles)
-    error('no .dat files found in %s', datpath)
-end
-if isempty(fname)
-    if length(datfiles) == 1
-        fname = datfiles.name;
-    else
-        fname = [bz_BasenameFromBasepath(basepath) '.dat'];
-        if ~contains({datfiles.name}, fname)
-            error('please specify which dat file to process')
+datfiles = dir([basepath filesep '**' filesep '*.dat']);
+lfpfiles = dir([basepath filesep '**' filesep '*.lfp']);
+if ~isempty(lfpfiles) && isempty(fname)
+    fname = lfpfiles.name;
+    fsIn = 1250;
+else
+    if isempty(datfiles)
+        error('no .dat file found in %s', datpath)
+    end
+    if isempty(fname)
+        if length(datfiles) == 1
+            fname = datfiles.name;
+        else
+            fname = [bz_BasenameFromBasepath(basepath) '.dat'];
+            if ~contains({datfiles.name}, fname)
+                error('please specify which dat file to process')
+            end
         end
     end
 end
@@ -160,14 +167,6 @@ nchunks = size(chunks, 1);
 m = memmapfile(fname, 'Format', {precision, [nchans, nsamps] 'mapped'});
 raw = m.data;
 
-% load timestamps
-tname = fullfile(basepath, [basename, '.tstamps.mat']);
-if exist(tname, 'file')
-    load(tname)
-else
-    tstamps = 1 : size(m.data.mapped, 2);
-end
-
 % go over chunks
 a = [];
 for i = 1 : nchunks
@@ -180,7 +179,6 @@ for i = 1 : nchunks
     
     % load data
     d = double(raw.mapped(ch, chunks(i, 1) : chunks(i, 2)));    
-    t = double(tstamps(chunks(i, 1) : chunks(i, 2)))';
     
     % convert g to V
     d = (d - gbias) ./ sensitivity;
@@ -188,13 +186,12 @@ for i = 1 : nchunks
     % remove dc. this is done mainly to diminish edge effects due to the
     % filter embedded within resample (assumes zeros before and after the
     % signal).
-    [d] = rmDC(d, 'dim', 2);
+    % [d] = rmDC(d, 'dim', 2);
     
     % resmaple. tstamps does not require filtering and thus downsample is
     % preferred.
     if fsOut ~= fsIn
         d = [resample(d', p, q, n, beta)]';
-        t = downsample(t, q / p);
     end
    
     % calc magnitude (L2 norm)

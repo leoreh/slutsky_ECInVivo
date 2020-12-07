@@ -96,13 +96,13 @@ switch protocol
         % 5 pulses of 500 us at 50 Hz. starts after 10 ms. recording length
         % 200 ms. repeated once every 30 s
         nstim = 5;
-        switch fepsp.info.recSystem
-            case 'oe'
-                % correct stim frequency
+        
+        % correct stim frequency
+        if strcmp(fepsp.info.recSystem, 'oe') || strcmp(fepsp.info.recSystem, 'tdt')
                 ts = fepsp.info.stimTs;
                 ts = mean(ts(ts < 500)) / fs * 1000;
-            case 'wcp'
-                ts = 20;
+        elseif strcmp(fepsp.info.recSystem, 'wcp')
+                ts = 20;               
         end     
         wvwin = round([10 : ts : 5 * ts; 30 : ts : 5 * ts + 10]' * fs / 1000);
         wvwin(:, 1) = wvwin(:, 1) + dt;

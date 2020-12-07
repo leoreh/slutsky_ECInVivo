@@ -10,27 +10,38 @@ forceA = false;
 forceL = false;
 saveFig = false;
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% full path and name to xls file with session metadata
+xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
+mname = 'lh70';     % mouse name
+
+% column name in xls sheet where dirnames exist
+colName = 'Session';                    
+
+% string array of variables to load
+vars = ["session.mat";...
+    "fepsp"];    
+
+% column name of logical values for each session. only if true than session
+% will be loaded. can be a string array and than all conditions must be
+% met.
+pcond = ["fepsp"];
+
+% same but imposes a negative condition
+ncond = ["spktimes"];
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% %%%%%%%%%%%%%%%%%
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-basepath = 'F:\Data\Processed\lh70\fepsp';
-
-vars = ["session.mat";...
-    "fepsp"];      
-pcond = ["fepsp"; "tempFlag"];     
-ncond = [""];                      
-
 if ~exist('varArray', 'var') && ~forceL
-    [varArray, dirnames] = getSessionVars('basepath', basepath, 'vars', vars,...
-        'pcond', pcond, 'ncond', ncond, 'sortDir', true);
+    [varArray, dirnames, basepath] = getSessionVars('vars', vars,...
+        'pcond', pcond, 'ncond', ncond, 'sortDir', false, 'dirnames', [],...
+        'xlsname', xlsname, 'mname', mname);
 end
 nsessions = length(dirnames);
 
-session = varArray{1, 1}.session;
-fepsp = varArray{1, 2}.fepsp;
-
 % session info
+filepath = char(fullfile(basepath, dirnames(1)));
+cd(filepath)
 session = CE_sessionTemplate(pwd, 'viaGUI', false,...
     'force', true, 'saveVar', true);
 nchans = session.extracellular.nChannels;
@@ -91,7 +102,7 @@ switch protocol
         ampmat = nan(ngrp, length(intens), nsessions);
         wvmat = nan(ngrp, nsessions, size(fepsp.wavesAvg, 3));
         ampcell = cell(1, nsessions);
-        si = 100;        % selected intensity [uA]
+        si = 1600;        % selected intensity [uA]
         grp = 1;        % selected tetrode
         for i = 1 : nsessions
             fepsp = varArray{i, 2}.fepsp;  
@@ -128,7 +139,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-close all
+% close all
 
 pathPieces = regexp(dirnames(:), '_', 'split'); % assumes filename structure: animal_date_time
 sessionDate = [pathPieces{:}];
@@ -139,13 +150,13 @@ sessionDate = sessionDate(2 : 3 : end);
 % ss = [1, 2, 3, 4, 8, 12];
 ss = [1 : nsessions];
 p = 1;
-clr = ['kkkrrrrr'];        % must be sorted (i.e. g before k before r)
-grp = 4;
+clr = ['kgggrrryyy'];        % must be sorted (i.e. g before k before r)
+grp = 1;
 if p
     fh = figure;
     subplot(2, 1, 1)
     tstamps = [1 : size(wvmat, 3)] / fs * 1000;
-    ph = plot(tstamps, -squeeze(wvmat(grp, ss, :)), 'LineWidth', 2);
+    ph = plot(tstamps, squeeze(wvmat(grp, ss, :)), 'LineWidth', 2);
     clrRep = histc(clr, unique(clr));
     clear alphaIdx
     for i = 1 : length(clrRep)

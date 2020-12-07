@@ -6,8 +6,13 @@
 forceL = false;
 forceA = false;
 
-% should allow user to input varName or columnn index
-colName = 'Session';                    % column name in xls sheet where dirnames exist
+% full path and name to xls file with session metadata
+xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
+mname = 'lh69';
+
+% column name in xls sheet where dirnames exist
+colName = 'Session';                    
+
 % string array of variables to load
 vars = ["session.mat";...
     "cell_metrics.cellinfo";...
@@ -15,19 +20,24 @@ vars = ["session.mat";...
     "SleepState.states";....
     "fr.mat";...
     "datInfo"];
+
 % column name of logical values for each session. only if true than session
 % will be loaded. can be a string array and than all conditions must be
 % met.
-pcond = ["tempflag"; "mancur"];
-pcond = "";
+pcond = ["tempflag"];
+
 % same but imposes a negative condition
-ncond = ["fepsp"];
-sessionlist = 'sessionList.xlsx';       % must include extension
+ncond = ["fepsp"; "spktimes"];
 
-basepath = 'D:\VMs\shared\lh70';
-
-dirnames = [];
-dirnames = ["lh70_201008_0825"];
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% load data
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+if ~exist('varArray', 'var') && ~forceL
+    [varArray, dirnames, basepath] = getSessionVars('vars', vars,...
+        'pcond', pcond, 'ncond', ncond, 'sortDir', false, 'dirnames', [],...
+        'xlsname', xlsname, 'mname', 'lh69');
+end
+nsessions = length(dirnames);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % load data
