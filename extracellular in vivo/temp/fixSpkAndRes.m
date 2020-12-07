@@ -74,6 +74,7 @@ bkup        = p.Results.bkup;
 saveFiles   = p.Results.saveFiles;
 
 % try to load params from session info (cell explorer format)
+cd(basepath)
 [~, basename] = fileparts(basepath);
 infoname = fullfile(basepath, [basename '.session.mat']);
 if exist(infoname, 'file')
@@ -120,7 +121,7 @@ end
 
 % backup
 if bkup
-    bkpath = fullfile(basepath, 'ns', 'bkup');
+    bkpath = fullfile(basepath, 'kk', 'bkupFix');
     fprintf('\nSaving backup in %s\n', bkpath)
     mkdir(bkpath)
     for i = grp
@@ -136,7 +137,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 for i = grp
-    nchans = length(spkgrp{i});
+    nchansGrp = length(spkgrp{i});
     
     % load data
     fprintf('Loading group %d / %d. ', i, ngrp)
@@ -161,7 +162,7 @@ for i = grp
     spkname = fullfile(spkfiles(i).folder, spkfiles(i).name);
     fid = fopen(spkname, 'r');
     spk = fread(fid, Inf, 'int16');
-    spk = reshape(spk, nchans, nsamps, nspks);
+    spk = reshape(spk, nchansGrp, nsamps, nspks);
     fclose(fid);
                 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -271,11 +272,11 @@ for i = grp
     
     % recalculate PCA
     fprintf('Calculating PCA... \t')
-    nFeatures = nchans * 3 + nchans + 1;
+    nFeatures = nchansGrp * 3 + nchansGrp + 1;
     fetMat = zeros(nspks, nFeatures);
-    enrgIdx = nchans * 3;
+    enrgIdx = nchansGrp * 3;
     if ~isempty(spk)
-        for ii = 1 : nchans
+        for ii = 1 : nchansGrp
             [~, pcFeat] = pca(permute(spk(ii, :, :), [3, 2, 1]));
             chEnrgy = sum(abs(permute(spk(ii, :, :), [3, 2, 1])), 2);
             fetMat(:, ii * 3 - 2 : ii * 3) = (pcFeat(:, 1 : 3));

@@ -136,7 +136,7 @@ end
     basename = bz_BasenameFromBasepath(newpath);
     dn = datenum(baseTime, 'yyyy-MM-dd');
     newpath = fullfile(newpath, [basename '_' datestr(dn, 'yyMMdd')]);
-    expName = datestr(expTime{1} + seconds(recStart(1)), 'HHMM');
+    expName = datestr(expTime{1} + seconds(recStart(1)), 'HHMMss');
     exPathNew = [newpath, '_', expName];
     [~, expName] = fileparts(exPathNew);
     mkdir(exPathNew)

@@ -18,6 +18,7 @@ function spktimes2ks(varargin)
 %               dur minuted from end of recording. can be in the format
 %               'HHmmss' or 'HHmm'.
 %   mkClu       logical. create also clu file for inspection w/ ns {false}
+%   spkFile     string. clip spike waveforms from {'dat'} or 'temp_wh'
 % 
 % DEPENDENCIES
 %   class2bytes
@@ -42,6 +43,7 @@ addOptional(p, 'nchans', [], @isnumeric);
 addOptional(p, 'dur', [], @isnumeric);
 addOptional(p, 't', []);
 addOptional(p, 'mkClu', false, @islogical);
+addOptional(p, 'spkFile', 'dat', @ischar);
 
 parse(p, varargin{:})
 basepath    = p.Results.basepath;
@@ -53,6 +55,7 @@ nchans      = p.Results.nchans;
 dur         = p.Results.dur;
 t           = p.Results.t;
 mkClu   	= p.Results.mkClu;
+spkFile   	= p.Results.spkFile;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preparations
@@ -86,8 +89,16 @@ W = [reshape(W, sniplength, []), ones(sniplength,1)];
 cd(basepath)
 [~, basename] = fileparts(basepath);
 fraw = dir([basename '.dat']);
+fwh = dir('temp_wh.dat');
 nsamps = fraw.bytes / nbytes / nchans;
-m = memmapfile(fraw.name, 'Format', {precision, [nchans, nsamps] 'mapped'});
+switch spkFile
+    case 'dat'
+        m = memmapfile(fraw.name, 'Format', {precision, [nchans, nsamps] 'mapped'});
+    case 'temp_wh'
+        nchansWh = length([spkgrp{:}]);
+        nsampsWh = fwh.bytes / nbytes / nchansWh;
+        m = memmapfile(fwh.name, 'Format', {precision, [nchansWh, nsampsWh] 'mapped'});
+end       
 raw = m.Data;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -182,7 +193,9 @@ for i = 1 : ngrps
         % get waveform and remove best fit
         v = double(raw.mapped(grpchans, spktimes{i}(ii) + win(1) :...
             spktimes{i}(ii) + win(2)));
-        v = [v' - W * (R \ Q' * v')]';
+        if strcmp(spkFile, 'dat')
+            v = [v' - W * (R \ Q' * v')]';
+        end
 
 %         % realign according to minimum
 %         [~, ib] = max(range(v'));   % this can be replaced by spktimes 2nd column, will be faster
@@ -195,7 +208,8 @@ for i = 1 : ngrps
 %                     spktimes{i}(ii) + win(2)));
 %                 v = [v' - W * (R \ Q' * v')]';
 %         end
-        spk(:, :, ii) = v;        
+        spk(:, :, ii) = v;       
+
     end
     % save to spk file
     fid = fopen(spkname, 'w');

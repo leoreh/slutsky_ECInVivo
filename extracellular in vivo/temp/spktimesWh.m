@@ -10,9 +10,10 @@ function [spktimes, spkch] = spktimesWh(varargin)
 %   spkgrp      array where each cell is the electrodes for a spike group. 
 %   chunksize   numeric. size of chunk to load [samples]. note data 
 %               is loaded and processed in batces of spkgrps
-%   saveWh      logical. save temp_wh.mat {false}
+%   saveWh      logical. save temp_wh.dat {false}
 %   saveVar     logical. save output {true}
-%   graphics    logical {false}
+%   graphics    logical. plot graphics {false}
+%   force       logical. perform detection even if spktimes exists {false}
 %
 % DEPENDENCIES
 %   get_whitening_matrix (ks)
@@ -28,7 +29,6 @@ function [spktimes, spkch] = spktimesWh(varargin)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-tic;
 
 p = inputParser;
 addOptional(p, 'basepath', pwd);
@@ -39,6 +39,7 @@ addOptional(p, 'chunksize', 2048 ^ 2 + 64, @isnumeric);
 addOptional(p, 'saveWh', true, @islogical);
 addOptional(p, 'saveVar', true, @islogical);
 addOptional(p, 'graphics', false, @islogical);
+addOptional(p, 'force', false, @islogical);
 
 parse(p, varargin{:})
 basepath    = p.Results.basepath;
@@ -49,10 +50,23 @@ chunksize   = p.Results.chunksize;
 saveWh      = p.Results.saveWh;
 saveVar     = p.Results.saveVar;
 graphics    = p.Results.graphics;
+force       = p.Results.force;
+
+% check if spktimes already exists
+[~, basename] = fileparts(basepath);
+varname = fullfile(basepath, [basename '.spktimes.mat']);
+if exist(varname) && ~force
+    load(varname)
+    return
+end
+
+fprintf('/n/ndetecting spikes in %s/n', basename)
+tic;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % params
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 nchansWh = length([spkgrp{:}]);
 
 % constants
@@ -102,7 +116,7 @@ Wrot = get_whitening_matrix(rez);
 
 fid = fopen(ops.fbinary, 'r'); % open for reading raw data
 if saveWh
-    fidW = fopen(ops.fproc,   'w+'); % open for writing processed data
+    fidW = fopen(ops.fproc, 'w+'); % open for writing processed data
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -184,12 +198,8 @@ end
 
 % save variable
 if saveVar
-    [~, basename] = fileparts(basepath);
-    save(fullfile(basepath, [basename '.spktimes.mat']),...
-        'spktimes', 'spkch')
+    save(varname, 'spktimes', 'spkch')
 end
-
-fprintf('\nthat took %.2f minutes\n', toc / 60)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
@@ -264,4 +274,8 @@ if saveWh
     fclose(fidW);
 end
 
+fprintf('\nthat took %.2f minutes\n', toc / 60)
+
 end
+
+% EOF
