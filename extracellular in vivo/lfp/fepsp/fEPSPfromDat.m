@@ -90,7 +90,7 @@ function fepsp = fEPSPfromDat(varargin)
 %                  while force is true
 %                  Addif force is false check for analysis before returning
 %                  (and send to analyse if needed)
-
+% 09 Dec 20 LD     Fix XAxis during inspect in samples instead of time
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -384,7 +384,7 @@ sg = 1;                 % selected tetrode
 rm = cell(nfiles);
 if inspect
     for i = 1 : nfiles
-        [~, rm{i}] = rmTraces(traces{sg, i});
+        [~, rm{i}] = rmTraces(traces{sg, i},'x',tstamps/1000);
         for j = 1 : nspkgrp
             traces{j, i}(:, rm{i}) = [];
         end
