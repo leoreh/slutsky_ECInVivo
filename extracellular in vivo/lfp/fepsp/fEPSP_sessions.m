@@ -12,7 +12,7 @@ saveFig = false;
 
 % full path and name to xls file with session metadata
 xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
-mname = 'lh70';     % mouse name
+mname = 'lh52';     % mouse name
 
 % column name in xls sheet where dirnames exist
 colName = 'Session';                    
@@ -35,7 +35,7 @@ ncond = ["spktimes"];
 if ~exist('varArray', 'var') && ~forceL
     [varArray, dirnames, basepath] = getSessionVars('vars', vars,...
         'pcond', pcond, 'ncond', ncond, 'sortDir', false, 'dirnames', [],...
-        'xlsname', xlsname, 'mname', mname);
+        'xlsname', xlsname, 'mname', mname, 'basepath', []);
 end
 nsessions = length(dirnames);
 
@@ -69,8 +69,9 @@ if forceA
 %             'force', true, 'extension', 'dat', 'recSystem', 'oe',...
 %             'protocol', 'io', 'inspect', true, 'anaflag', true);
                
-        fepsp = fEPSP_analysis('fepsp', fepsp, 'graphics', [5],...
-            'force', true, 'saveVar', true);
+        fepsp = fEPSP_analysis('fepsp', fepsp, 'graphics', [9],...
+            'force', true, 'saveVar', true, 'MainTets', [1, 6],...
+            'vis', 'off');
         
     end
 end

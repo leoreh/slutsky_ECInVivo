@@ -35,7 +35,7 @@ function fepsp = fEPSP_analysis(varargin)
 %   # Add option to remove traces using LineChooseWin?
 %   # Add option to re-analyse only some tetrodes?
 %
-% 16 oct 20 LH  UPDATES
+% 16 oct 20 LH   UPDATES
 % 02 Nov 20 LD  Change analysis from range on relevant window to
 %               amplitude as 1st peak on waveArg, Change graphic to work
 %               with that
@@ -45,7 +45,6 @@ function fepsp = fEPSP_analysis(varargin)
 %               Give option to caller to determine file name at saving
 % 09 Dec 20 LD  Added MainTets, and now user choose waveform edge points
 %               for each intensity per tetrode
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -72,6 +71,7 @@ graphics = p.Results.graphics;
 vis = p.Results.vis;
 savename = p.Results.savename;
 MainTets = p.Results.MainTets;
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % get params from fepsp struct
@@ -150,7 +150,6 @@ fepsp.wavesAvg  = nan(nspkgrp, nfiles, length(wvwin(1) : wvwin(2)));
 %               start and the secound is the end of the area to analyse.
 %               Time is from fepsp.tstamps.
 fepsp.info.AnalysedTimePoints = nan(nspkgrp,nfiles,2*nstim);
-fepsp.info.MainTets = MainTets;
 % ampcell       2d array (tetrode x stim) where each cell contains the
 %               amplitude/s for each trace
 fepsp.ampcell   = cell(nspkgrp, nfiles);
@@ -267,13 +266,10 @@ for j = 1 : nspkgrp
                 The_10_50_20_90{j,i} = The_10_50_20_90{j,i}+StartStimTimeIND(j,i)-1;
                 FitParams = polyfit(TimeFrameWindow(The_10_50_20_90{j,i}(1) :...
                     The_10_50_20_90{j,i}(2)),...
-                    squeeze(fepsp.wavesAvg(j, i, The_10_50_20_90{j, i}(1) :...
-                    The_10_50_20_90{j,i}(2)))', 1);
+                    squeeze(fepsp.wavesAvg(j, i, The_10_50_20_90{j,i}(1):The_10_50_20_90{j,i}(2))),1);
                 fepsp.slope_10_50(j, i) = FitParams(1);
-                FitParams = polyfit(TimeFrameWindow(The_10_50_20_90{j,i}(3) :...
-                    The_10_50_20_90{j,i}(4)),...
-                    squeeze(fepsp.wavesAvg(j, i, The_10_50_20_90{j, i}(3) :...
-                    The_10_50_20_90{j,i}(4)))',1);
+                FitParams = polyfit(TimeFrameWindow(The_10_50_20_90{j,i}(3):The_10_50_20_90{j,i}(4)),...
+                    squeeze(fepsp.wavesAvg(j, i, The_10_50_20_90{j,i}(3):The_10_50_20_90{j,i}(4))),1);
                 fepsp.slope_20_90(j, i) = FitParams(1);
             case 'stp'
                 % note; after reviewing the data it seems that specifically

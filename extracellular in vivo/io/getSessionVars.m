@@ -99,8 +99,8 @@ ndirs = length(dirnames);
 varArray = cell(length(dirnames), length(vars));
 for i = 1 : ndirs
     % handle cases where not all sessions are in the same basepath
-    if ~isempty(basepaths{1})
-        basepath = basepaths{1};
+    if ~isempty(basepaths{i})
+        basepath = basepaths{i};
     else
         basepath = basepath_default;
     end  
