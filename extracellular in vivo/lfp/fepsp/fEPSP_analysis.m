@@ -90,17 +90,19 @@ if isempty(fepsp)
         load(fepspname)
     end
 end
-if isfield('fepsp', 'amp') && ~force
+if isfield(fepsp, 'slope_10_50') && ~force
     load(fepspname)
     return
 end
 
 fs = fepsp.info.fs;
-tstamps = fepsp.tstamps;
 spkgrp = fepsp.info.spkgrp;
 nspkgrp = length(spkgrp);
 nfiles = length(fepsp.intens);
 protocol = fepsp.info.protocol;
+% make sure tstamps column vector
+fepsp.tstamps = fepsp.tstamps(:);
+tstamps = fepsp.tstamps;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % prepare for analysis
@@ -199,8 +201,8 @@ for j = MainTets
         
         % Calculate the closest Point that actually exist in data
         TimeFrameWindowMat = repmat(TimeFrameWindow, 1, nstim);
-        [~,StartStimTimeIND(j, i)] = min(abs(TimeFrameWindowMat - ChoosenTime(1:2:end)), [], 2);
-        [~,EndStimTimeIND(j, i)] = min(abs(TimeFrameWindowMat - ChoosenTime(2:2:end)), [], 2);
+        [~,StartStimTimeIND(j, i)] = min(abs(TimeFrameWindowMat - ChoosenTime(1:2:end)), [], 1);
+        [~,EndStimTimeIND(j, i)] = min(abs(TimeFrameWindowMat - ChoosenTime(2:2:end)), [], 1);
 %         fepsp.info.AnalysedTimePoints(j,1:2:end) = TimeFrameWindow(StartStimTimeIND(j,i));
 %         fepsp.info.AnalysedTimePoints(j,2:2:end) = TimeFrameWindow(EndStimTimeIND(j,i));
     end
@@ -242,12 +244,12 @@ for j = 1 : nspkgrp
                     FitParams = polyfit(TimeFrameWindow(Trace_10_50_20_90(1) :...
                         Trace_10_50_20_90(2)),...
                         fepsp.waves{j, i}(Trace_10_50_20_90(1) :...
-                        Trace_10_50_20_90(2), kk)', 1);
+                        Trace_10_50_20_90(2), kk), 1);
                     fepsp.slopecell_10_50{j, i}(kk) = FitParams(1);
                     FitParams = polyfit(TimeFrameWindow(Trace_10_50_20_90(3) :...
                         Trace_10_50_20_90(4)),...
                         fepsp.waves{j, i}(Trace_10_50_20_90(3) :...
-                        Trace_10_50_20_90(4), kk)', 1);
+                        Trace_10_50_20_90(4), kk), 1);
                     fepsp.slopecell_20_90{j, i}(kk) = FitParams(1);
                 end
                 
@@ -268,12 +270,12 @@ for j = 1 : nspkgrp
                 FitParams = polyfit(TimeFrameWindow(The_10_50_20_90{j,i}(1) :...
                     The_10_50_20_90{j,i}(2)),...
                     squeeze(fepsp.wavesAvg(j, i, The_10_50_20_90{j, i}(1) :...
-                    The_10_50_20_90{j,i}(2)))', 1);
+                    The_10_50_20_90{j,i}(2))), 1);
                 fepsp.slope_10_50(j, i) = FitParams(1);
                 FitParams = polyfit(TimeFrameWindow(The_10_50_20_90{j,i}(3) :...
                     The_10_50_20_90{j,i}(4)),...
                     squeeze(fepsp.wavesAvg(j, i, The_10_50_20_90{j, i}(3) :...
-                    The_10_50_20_90{j,i}(4)))',1);
+                    The_10_50_20_90{j,i}(4))),1);
                 fepsp.slope_20_90(j, i) = FitParams(1);
             case 'stp'
                 % note; after reviewing the data it seems that specifically
@@ -388,7 +390,7 @@ if graphics
         if saveFig
             figpath = fullfile(basepath, 'graphics');
             mkdir(figpath)
-            figname = [figpath '\fepsp_t' num2str(i)];
+            figname = [figpath '\' basename '_fepsp_t' num2str(i)];
             export_fig(figname, '-tif', '-r300', '-transparent')
         end
     end
@@ -416,10 +418,11 @@ function [LineXPos] = LineChooseWin(Data2PlotX,Data2PlotY,nstim,TetNum,Intens,yL
 % Main Graph
 ChooseWin = figure('WindowState','maximized');
 plot(Data2PlotX,Data2PlotY);
-xlabel('Time [mS]')
+xlabel('Time [ms]')
 ylabel('Amp [mV]')
-title({sprintf('T%d-%d',TetNum,Intens) 'Move Green lines to Start of each Responce' 'Move Red lines to End of each Responce'...
- 'Press "Finished", close fig or press "Enter\return" when done'})
+title({sprintf('T%d - %d uA', TetNum, Intens)...
+    'Move green / red lines to start / end of each response'...
+ 'Press "Enter\return" when done'})
 axis tight
 
 % Creating the Lines
@@ -464,6 +467,5 @@ delete(ChooseWin)
         end
     end
 end
-
 
 % EOF

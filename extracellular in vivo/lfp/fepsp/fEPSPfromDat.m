@@ -172,7 +172,7 @@ if exist(fepspname, 'file')
             fprintf('Loaded File isn''t analysed, analaysing...\n')
             fepsp = fEPSP_analysis('fepsp', fepsp,'saveFig',saveFig,'saveVar',saveVar,'savename',fepspname);
         end
-%     else
+    else
 %         if isfield(fepsp, 'origIntens')
 %             intens = fepsp.info.intensOrig;
 %         elseif isfield(fepsp, 'intens')

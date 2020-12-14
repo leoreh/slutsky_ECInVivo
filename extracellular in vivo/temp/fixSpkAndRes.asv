@@ -122,13 +122,13 @@ binsize = 0.0001;
 % arrange files
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-clufiles = dir([basepath filesep '*.clu.*']);
+clufiles = dir([basepath filesep '*.clu*']);
 clunames = {clufiles.name};
-resfiles = dir([basepath filesep '*.res.*']);
+resfiles = dir([basepath filesep '*.res*']);
 resnames = {resfiles.name};
-spkfiles = dir([basepath filesep '*.spk.*']);
+spkfiles = dir([basepath filesep '*.spk*']);
 spknames = {spkfiles.name};
-fetfiles = dir([basepath filesep '*.fet.*']);
+fetfiles = dir([basepath filesep '*.fet*']);
 fetnames = {fetfiles.name};
 if length(resfiles) ~= length(clufiles) ||...
         length(clufiles) ~= length(spkfiles) ||...
@@ -234,15 +234,15 @@ for i = grp
         end
         
         % go over each spike and align to min / max
-        ishift = zeros(nspksGrp, 1);
+        iShift = zeros(nspksGrp, 1);
         for iii = 1 : nspksGrp
             spkidx = res(cluIdx(iii));
             
             % fix special case where spike is at end / begining of recording
             if spkidx + win(1) < 1 || spkidx + win(2) > nsampsRaw
                 warning('\nskipping stamp %d because waveform incomplete', ii)
-                spkGrp(:, :, iii) = [];
-                res(cluIdx(iii)) = [];
+                spk(:, :, ii) = [];
+                spktimes{i}(ii) = [];
                 nspks(i) = nspks(i) - 1;
                 continue
             end
@@ -250,22 +250,24 @@ for i = grp
             % get waveform and remove best fit
             v = double(raw.mapped(grpchans, spkidx + win(1) :...
                 spkidx + win(2)));
-            v = [v' - W * (R \ Q' * v')]';
+            spkGrp(:, :, iii) = [v' - W * (R \ Q' * v')]';
 
             % realign according to minimum
-            [~, ia] = min(v, [], 2);
-            peak = ia(ampMaxCh);
-            ishift(iii) = peak - psamp;
-            if ishift(iii) ~= 0
-                spkidx = spkidx + ishift(iii);
-                v = double(raw.mapped(grpchans, spkidx + win(1) :...
-                    spkidx + win(2)));
-                v = [v' - W * (R \ Q' * v')]';
-            end
-            spkGrp(:, :, iii) = v;
+            %             [~, ia] = min(v, [], 2);
+            %             peak = ia(ampMaxCh);
+            %             ishift(iii) = peak - psamp;
+            %             if ishift(iii) ~= 0
+            %                 spktimes{i}(ii) = spktimes{i}(ii) + ishift;
+            %                 v = double(raw.mapped(grpchans, spktimes{i}(ii) + win(1) :...
+            %                     spktimes{i}(ii) + win(2)));
+            %                 v = [v' - W * (R \ Q' * v')]';
+            %             end
+            %             spk(:, :, iii) = v;
+            %             iShift(iii) = psamp - ia;
+            %             spkGrp(:, :, iii) = circshift(spkGrp(:, :, iii), iShift(iii), 2);
         end
         spk(:, :, cluIdx) = spkGrp;
-        res(cluIdx) = res(cluIdx) + ishift;
+        % res(cluIdx) = res(cluIdx) + iShift;
         
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         % enforce dead time on spike detection
