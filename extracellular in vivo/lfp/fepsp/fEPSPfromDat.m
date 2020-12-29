@@ -173,13 +173,13 @@ if exist(fepspname, 'file')
             fepsp = fEPSP_analysis('fepsp', fepsp,'saveFig',saveFig,'saveVar',saveVar,'savename',fepspname);
         end
     else
-%         if isfield(fepsp, 'origIntens')
-%             intens = fepsp.info.intensOrig;
-%         elseif isfield(fepsp, 'intens')
-%             intens = fepsp.intens;
+        if isfield(fepsp.info, 'intensOrig')
+            intens = fepsp.info.intensOrig;
+        elseif isfield(fepsp, 'intens')
+            intens = fepsp.intens;
 %         if isfield(fepsp.info, 'stamps')
 %             stamps = fepsp.info.stamps;
-%         end
+        end
     end
 end
 

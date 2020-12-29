@@ -54,7 +54,7 @@ ngrp = length(spkgrp);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if forceA
     close all
-    for i = 1 : nsessions
+    for i = 3 : nsessions
         
         % file
         filepath = char(fullfile(basepath, dirnames(i)));
@@ -63,18 +63,19 @@ if forceA
         fepsp = varArray{i, 2}.fepsp;
         
         % fepsp
-        intens = [50 100 150 200 300];
+        intens = [];
         fepsp = fEPSPfromDat('basepath', filepath, 'fname', '', 'nchans', nchans,...
             'spkgrp', spkgrp, 'intens', intens, 'saveVar', true,...
-            'force', false, 'extension', 'dat', 'recSystem', 'oe',...
-            'protocol', 'io', 'inspect', true, 'anaflag', false);
-        
+            'force', true, 'extension', 'dat', 'recSystem', 'oe',...
+            'protocol', 'io', 'inspect', true, 'anaflag', false, 'cf', 1250);
+  
         fepsp = fEPSP_analysis('fepsp', fepsp, 'graphics', [9],...
-            'force', false, 'saveVar', true, 'MainTets', [1],...
+            'force', true, 'saveVar', true, 'MainTets', [1, 2, 5 : 7],...
             'vis', 'off');
         
     end
 end
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % rearrange data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
