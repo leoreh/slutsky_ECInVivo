@@ -59,35 +59,35 @@ if forceA
         spkgrp = session.extracellular.spikeGroups.channels;
         
         % vars
-        %         session = varArray{i, 1}.session;
-        %         cm = varArray{i, 2}.cell_metrics;
-        %         spikes = varArray{i, 3}.spikes;
-        %         ss = varArray{i, 4}.SleepState;
-        %         fr = varArray{i, 5}.fr;
-        %         datInfo = varArray{i, 6}.datInfo;
+                session = varArray{i, 1}.session;
+                cm = varArray{i, 2}.cell_metrics;
+                spikes = varArray{i, 3}.spikes;
+                ss = varArray{i, 4}.SleepState;
+                fr = varArray{i, 5}.fr;
+                datInfo = varArray{i, 6}.datInfo;
         
         % spikes
-        fixSpkAndRes('grp', [], 'fs', fs, 'stdFactor', 0, 'nchans', nchans);
-        spikes = loadSpikes('session', session);
-        spikes = fixCEspikes('basepath', filepath, 'saveVar', false,...
-            'force', true);
-        
-        spikes = cluVal('spikes', spikes, 'basepath', filepath, 'saveVar', true,...
-            'saveFig', false, 'force', true, 'mu', [], 'graphics', false,...
-            'vis', 'on', 'spkgrp', spkgrp);
-        
-        cell_metrics = ProcessCellMetrics('session', session,...
-            'manualAdjustMonoSyn', false, 'summaryFigures', false,...
-            'debugMode', true, 'transferFilesFromClusterpath', false,...
-            'submitToDatabase', false, 'spikes', spikes);
+%         fixSpkAndRes('grp', [], 'fs', fs, 'stdFactor', 0, 'nchans', nchans);
+%         spikes = loadSpikes('session', session);
+%         spikes = fixCEspikes('basepath', filepath, 'saveVar', false,...
+%             'force', true);
+%         
+%         spikes = cluVal('spikes', spikes, 'basepath', filepath, 'saveVar', true,...
+%             'saveFig', false, 'force', true, 'mu', [], 'graphics', false,...
+%             'vis', 'on', 'spkgrp', spkgrp);
+%         
+%         cell_metrics = ProcessCellMetrics('session', session,...
+%             'manualAdjustMonoSyn', false, 'summaryFigures', false,...
+%             'debugMode', true, 'transferFilesFromClusterpath', false,...
+%             'submitToDatabase', false, 'spikes', spikes);
         % cell_metrics = CellExplorer('basepath', filepath);
         
-        cc = cellclass('basepath', filepath,...
-            'waves', cat(1, spikes.rawWaveform{:})', 'saveVar', true,...
-            'graphics', false);
+%         cc = cellclass('basepath', filepath,...
+%             'waves', cat(1, spikes.rawWaveform{:})', 'saveVar', true,...
+%             'graphics', false);
         
         % firing rate
-        binsize = 60;
+        binsize = 30;
         winBL = [10 * 60 30 * 60];
         fr = firingRate(spikes.times, 'basepath', filepath,...
             'graphics', false, 'saveFig', false,...
@@ -121,10 +121,10 @@ FRdata = 'strd';        % plot absolute fr or normalized
 unitClass = 'pyr';      % plot 'int', 'pyr', or 'all'
 suFlag = 1;             % plot only su or all units
 minfr = 0;              % include only units with fr greater than
-maxfr = 3000;              % include only untis with fr lower than
-Y = [0 6];             % ylim
+maxfr = 3000;           % include only units with fr lower than
+Y = [0 10];             % ylim
 p1 = 1;                 % firing rate vs. time, one fig per session
-p2 = 1;                 % mfr across sessions, one fig
+p2 = 0;                 % mfr across sessions, one fig
 p3 = 0;                 % firing rate vs. time, one fig for all sessions. not rubust
 p4 = 0;                 % number of cells per session, one fig
 plotStyle = 'box';      % for p2. can by 'bar' or 'box'
@@ -186,7 +186,7 @@ for i = 1 : nsessions
     mfr{i} = mean(data, 2);
     
     %%%
-    mfr{i} = cm.burstIndex_NREMstate(units);
+    % mfr{i} = cm.burstIndex_NREMstate(units);
     %%%
     
     if isfield(datInfo, 'nsamps')
@@ -281,8 +281,9 @@ if p2
                 [yLimit(1) yLimit(1) yLimit(2) yLimit(2)],...
                 'b', 'FaceAlpha', 0.1)
         case 'box'
-            boxplot(mfrmat, 'PlotStyle', 'traditional',...
-                'DataLim', [minfr maxfr]);
+            boxplot(mfrmat, 'PlotStyle', 'traditional');
+%             boxplot(mfrmat, 'PlotStyle', 'traditional',...
+%                 'DataLim', [5 10], 'ExtremeMode', 'compress');
             bh = findobj(gca, 'Tag', 'Box');
             bh = flipud(bh);
             if length(bh) == length(clr)
