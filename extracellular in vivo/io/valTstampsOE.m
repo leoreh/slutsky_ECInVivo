@@ -87,7 +87,7 @@ end
 tempname = [basename '.tmp.dat'];
     
 % load timestamps
-tFiles = dir([basepath filesep '**' filesep '*timestamps.npy']);
+tFiles = dir([basepath filesep '**' filesep 'timestamps.npy']);
 for i = 1 : length(datFiles)
     idx = find(strcmp({tFiles.folder}, datFiles(i).folder));
     if length(idx) > 1

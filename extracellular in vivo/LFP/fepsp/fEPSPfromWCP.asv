@@ -21,7 +21,7 @@ function fepsp = fEPSPfromWCP(varargin)
 %   sfiles      vec of file indices to analyse. if empty a prompt will ask
 %               user to select files
 %   fs          numeric. requested sampling frequency {1250}
-%   inspect     logical. inspect traces {0}. obsolete after Lilu's gui
+%   inspect     logical. inspect traces {0}.
 %   saveVar     logical. save variable {1}.
 %   saveFig     logical. save graphics {1}. Only relevant If anaflag is
 %               true
