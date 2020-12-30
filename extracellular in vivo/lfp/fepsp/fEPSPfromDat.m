@@ -198,8 +198,10 @@ nfiles = length(datInfo.nsamps);  % number of intensities
 
 switch recSystem
     case 'oe'
-        fsIn = 20000;
-        b2uv = 0.195;
+        fsIn = 20000; % this should not be a fixed value
+        % note this is true for rhd2000 only. if using analog input the
+        % value is 0.00015. see structure.oebin
+        b2uv = 0.195;   
 
         % load digital input
         stimname = fullfile(basepath, [basename, '.din.mat']);
