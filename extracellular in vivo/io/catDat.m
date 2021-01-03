@@ -102,7 +102,7 @@ destination = fullfile(newpath, newname);
 % get .dat and .npy files in basepath
 for i = 1 : length(basepath)
     datFiles = [datFiles; dir([basepath{i} filesep '**' filesep '*dat'])];
-    tFiles = [tFiles; dir([basepath{i} filesep '**' filesep '*timestamps.npy'])];
+    tFiles = [tFiles; dir([basepath{i} filesep '**' filesep 'synchronized_timestamps.npy'])];
 end
 if length(datFiles) > 1 && ~concat
     error(['multiple dat files found in %s\n',...

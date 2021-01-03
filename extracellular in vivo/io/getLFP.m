@@ -149,15 +149,16 @@ if cf
     end
     sig = iosr.dsp.sincFilter(sig, filtRatio);
     if concat
-        lfp.data = reshape(sig, sz);
+        sig = reshape(sig, sz);
     end
 end
 
 % remove DC component
 if dc
     fprintf('removing dc component\n')
-    lfp.data = rmDC(lfp.data, 'dim', 1);
+    sig = rmDC(sig, 'dim', 1);
 end
+lfp.data = sig;
 
 % resmaple
 if isempty(fs) % do not resample if new sampling frequency not specified 

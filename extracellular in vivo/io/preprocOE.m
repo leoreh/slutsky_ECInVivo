@@ -68,7 +68,17 @@ fs = 20000;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 fprintf('\nprocessing %s\n\n', basepath)
+% enter record node and remove spaces from name. this is for catDat system
+% command
 cd(basepath)
+recNodeDir = dir;
+recNodeDir = recNodeDir(3);
+recNodeName = recNodeDir.name;
+if any(isspace(recNodeName))
+    recNodeName = recNodeName(~isspace(recNodeName));
+    movefile(recNodeDir.name, recNodeName)
+end
+cd(recNodeName);
 
 % find paths to relavent experiments
 files = dir(['**' filesep '*.*']);
@@ -87,7 +97,7 @@ end
 k = 1;
 for i = 1 : length(exp)
     expIdx(i) = find(strcmp(expNames, ['experiment' num2str(exp(i))]));
-    exPath{i} = fullfile(expFolders(expIdx(i)).folder, expNames(expIdx(i)));
+    exPath{i} = fullfile(expFolders(expIdx(i)).folder, expNames{expIdx(i)});
     % get time from xml file
     if isequal(exp(i), 1)
         xmlname = ['settings.xml'];
@@ -118,7 +128,11 @@ for i = 1 : length(exp)
         txt = fscanf(fid, '%s');
         txt = split(txt, ':');
         txt = split(txt{end}, '@');
-        recStart(ii) = str2num(txt{1}) / fs;
+        if ~isempty(txt{1})
+            recStart(ii) = str2num(txt{1}) / fs;
+        else
+            recStart(ii) = 60 * 5;
+        end
         k = k + 1;
     end
 end

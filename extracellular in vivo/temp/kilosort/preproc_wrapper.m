@@ -5,14 +5,13 @@ cd(basepath)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % open ephys
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'F:\Data\Processed\lh52\2020-06-28_08-30-43';
-rmvch = [];
-rmvch = [10 12 13 16 17 21 23 24];
-mapch = [26 27 28 29 31 2 3 30 4 5 6 7 8 9 10 11 12 13 14 15 32 1 16 17 18 19 20 21 22 23 24 25 33 34 35];
-% mapch = [1 : 19];
+basepath = 'F:\fepsp\m5\2020-12-30_09-52-47';
+rmvch = [2 : 8];
+% mapch = [26 27 28 29 31 2 3 30 4 5 6 7 8 9 10 11 12 13 14 15 32 1 16 17 18 19 20 21 22 23 24 25 33 34 35];
+mapch = [1 : 8];
 exp = [1];
 rec = cell(max(exp), 1);
-% rec{1} = [2 : 7];
+rec{1} = [2 : 11];
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
     'rmvch', rmvch, 'mapch', mapch, 'concat', true, 'nchans', length(mapch));
 
@@ -48,7 +47,15 @@ intens = [50];
 fepsp = fEPSPfromDat('basepath', basepath, 'fname', '', 'nchans', nchans,...
     'spkgrp', spkgrp, 'intens', intens, 'saveVar', true,...
     'force', true, 'extension', 'dat', 'recSystem', 'tdt',...
-    'protocol', 'stp', 'anaflag', true, 'inspect', true);  
+    'protocol', 'stp', 'anaflag', true, 'inspect', false);  
+
+intens = [50 90];
+fepsp = fEPSPfromWCP('basepath', basepath, 'sfiles', [],...
+    'sufx', 'io1', 'force', true, 'protocol', 'io',...
+    'intens', intens, 'inspect', true, 'fs', 30000);
+
+fepsp = fEPSP_analysis('fepsp', fepsp, 'basepath', basepath);
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % spike sorting
