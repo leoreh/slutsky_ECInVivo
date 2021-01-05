@@ -59,32 +59,32 @@ if forceA
         spkgrp = session.extracellular.spikeGroups.channels;
         
         % vars
-                session = varArray{i, 1}.session;
-                cm = varArray{i, 2}.cell_metrics;
-                spikes = varArray{i, 3}.spikes;
-                ss = varArray{i, 4}.SleepState;
-                fr = varArray{i, 5}.fr;
-                datInfo = varArray{i, 6}.datInfo;
+        session = varArray{i, 1}.session;
+        cm = varArray{i, 2}.cell_metrics;
+        spikes = varArray{i, 3}.spikes;
+        ss = varArray{i, 4}.SleepState;
+        fr = varArray{i, 5}.fr;
+        datInfo = varArray{i, 6}.datInfo;
         
         % spikes
-%         fixSpkAndRes('grp', [], 'fs', fs, 'stdFactor', 0, 'nchans', nchans);
-%         spikes = loadSpikes('session', session);
-%         spikes = fixCEspikes('basepath', filepath, 'saveVar', false,...
-%             'force', true);
-%         
-%         spikes = cluVal('spikes', spikes, 'basepath', filepath, 'saveVar', true,...
-%             'saveFig', false, 'force', true, 'mu', [], 'graphics', false,...
-%             'vis', 'on', 'spkgrp', spkgrp);
-%         
-%         cell_metrics = ProcessCellMetrics('session', session,...
-%             'manualAdjustMonoSyn', false, 'summaryFigures', false,...
-%             'debugMode', true, 'transferFilesFromClusterpath', false,...
-%             'submitToDatabase', false, 'spikes', spikes);
+        % fixSpkAndRes('grp', [], 'fs', fs, 'stdFactor', 0, 'nchans', nchans);
+        spikes = loadSpikes('session', session);
+        spikes = fixCEspikes('basepath', filepath, 'saveVar', false,...
+            'force', true);
+        
+        spikes = cluVal('spikes', spikes, 'basepath', filepath, 'saveVar', true,...
+            'saveFig', false, 'force', true, 'mu', [], 'graphics', false,...
+            'vis', 'on', 'spkgrp', spkgrp);
+        
+        cell_metrics = ProcessCellMetrics('session', session,...
+            'manualAdjustMonoSyn', false, 'summaryFigures', false,...
+            'debugMode', true, 'transferFilesFromClusterpath', false,...
+            'submitToDatabase', false, 'spikes', spikes);
         % cell_metrics = CellExplorer('basepath', filepath);
         
-%         cc = cellclass('basepath', filepath,...
-%             'waves', cat(1, spikes.rawWaveform{:})', 'saveVar', true,...
-%             'graphics', false);
+        cc = cellclass('basepath', filepath,...
+            'waves', cat(1, spikes.rawWaveform{:})', 'saveVar', true,...
+            'graphics', false);
         
         % firing rate
         binsize = 30;
@@ -118,7 +118,7 @@ close all
 grp = [1 : 8];          % which tetrodes to plot
 state = [];             % [] - all; 1 - awake; 2 - NREM
 FRdata = 'strd';        % plot absolute fr or normalized
-unitClass = 'pyr';      % plot 'int', 'pyr', or 'all'
+unitClass = 'int';      % plot 'int', 'pyr', or 'all'
 suFlag = 1;             % plot only su or all units
 minfr = 0;              % include only units with fr greater than
 maxfr = 3000;           % include only units with fr lower than
@@ -127,7 +127,7 @@ p1 = 1;                 % firing rate vs. time, one fig per session
 p2 = 0;                 % mfr across sessions, one fig
 p3 = 0;                 % firing rate vs. time, one fig for all sessions. not rubust
 p4 = 0;                 % number of cells per session, one fig
-plotStyle = 'box';      % for p2. can by 'bar' or 'box'
+plotStyle = 'bar';      % for p2. can by 'bar' or 'box'
 clr = ['bbbkkkkrrr'];
 
 for i = 1 : nsessions

@@ -5,8 +5,8 @@ function fixSpkAndRes(varargin)
 % (depending on orientation of the mean waveform). (2) enforces a dead time
 % on spike times (res) that typically occurs when kilosort tries to find
 % spikes that occur simultaneously. re-alignment occurs first because it
-% changes spike times. alas recalculates pca. if backup is flagged
-% then copies the original files to a separate directory.
+% changes spike times. alas recalculates pca. if backup is flagged then
+% copies the original files to a separate directory.
 % -------------------------------------------------------------------------
 % since waveforms were detrended in ks2ns, the beginning and end of a spike
 % are equal to zero and thus circhshift can be used to recenter the peak /
@@ -16,6 +16,10 @@ function fixSpkAndRes(varargin)
 % larger spike will always be centered even if the cluster originally
 % referred to the smaller spike.
 % -------------------------------------------------------------------------
+% update 04 jan 21; snipping spikes from whitened data reduces variability
+% considerabily. Thus, the total isolation distance is greater (3233 vs
+% 2078) and there are more su (87 vs 69) w/o fixSpkAndRes. Alternatively,
+% this can be done on temp_wh data. 
 %
 % INPUT:
 %   basepath    string. path to recording folder {pwd}.
@@ -41,7 +45,10 @@ function fixSpkAndRes(varargin)
 %   plotCCG
 %   plotWaveform
 %
-% 22 jun 20 LH  yod
+% TO DO lIST
+%   # snip from temp_wh
+% 
+% 22 jun 20 LH  
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments

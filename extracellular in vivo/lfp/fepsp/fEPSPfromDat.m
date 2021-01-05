@@ -71,6 +71,7 @@ function fepsp = fEPSPfromDat(varargin)
 %   # improve graphics (done)
 %   # add option to resample (see getAcc) (done)
 %   # sort mats according to intensity (done)
+%   # fix tdt using interp1 on timestamps from tdtbin2mat
 %
 % 22 apr 20 LH   UPDATES:
 % 28 jun 20        first average electrodes and then calculate range
@@ -91,6 +92,7 @@ function fepsp = fEPSPfromDat(varargin)
 %                  Addif force is false check for analysis before returning
 %                  (and send to analyse if needed)
 % 09 Dec 20 LD     Fix XAxis during inspect in samples instead of time
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
