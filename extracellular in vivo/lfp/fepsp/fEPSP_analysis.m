@@ -367,9 +367,9 @@ OpenFigs = AnalysisWin;
                 end
                 
                 %Redo on mean wave. Save closest points that define about 10%-50% & 20%-90% to avoid recalcuating for graphics
-                [~,EndStimINDAvg(j,nn,LL)] = min(squeeze(fepsp.wavesAvg(j,nn,(EndStimTimeINDBase(j, nn, LL) - MinINDTol):(EndStimTimeINDBase(j, nn, LL) + MinINDTol))));
-                EndStimINDAvg(j,nn, LL) = EndStimTimeINDBase(j, nn, LL) + EndStimINDAvg(j,nn,LL) - MinINDTol;
-                EndStimINDAvg(j,nn, LL) = max(EndStimINDAvg(j,nn, LL),StartStimTimeIND(j, i, LL)+1); % Vs found point < start point bug, due to tolarence
+                [~,EndStimINDAvg(j,nn,LL)] = min(squeeze(fepsp.wavesAvg(j,nn,max(EndStimTimeINDBase(j, nn, LL) - MinINDTol,StartStimTimeIND(j, nn, LL)+1):...
+                    (EndStimTimeINDBase(j, nn, LL) + MinINDTol))));
+                EndStimINDAvg(j,nn, LL) = max(EndStimTimeINDBase(j, nn, LL) - MinINDTol,StartStimTimeIND(j, nn, LL)+1) + EndStimINDAvg(j,nn,LL);
                 fepsp.amp(j, nn, LL) = abs(fepsp.wavesAvg(j, nn, StartStimTimeIND(j,nn, LL)) - fepsp.wavesAvg(j, nn,EndStimINDAvg(j,nn,LL)));
                 AllPointsAmp = squeeze(abs(fepsp.wavesAvg(j, nn, StartStimTimeIND(j,nn,LL):EndStimINDAvg(j,nn,LL)) - fepsp.wavesAvg(j, nn, StartStimTimeIND(j,nn,LL))));
                 MinusMat = fepsp.amp(j, nn,LL)*[0.1 0.5 0.2 0.9];
@@ -518,8 +518,8 @@ OpenFigs = AnalysisWin;
             for nn = 1:nstim
                 [~,EndStimINDTrace{j, i}(nn,:)] = min(fepsp.waves{j,i}(max(EndStimTimeINDBase(j, i,nn) - MinINDTol,StartStimTimeIND(j, i,nn)+1)...
                     :EndStimTimeINDBase(j, i,nn) + MinINDTol,:)); %The max make sure Tolarence doesn't take before StartStimTimeIND
+                EndStimINDTrace{j, i}(nn,:) = max(squeeze(EndStimTimeINDBase(j, i,nn)) - MinINDTol,StartStimTimeIND(j, i,nn)+1) + EndStimINDTrace{j, i}(nn,:); %Match 2 TimeFrameWindow
             end
-            EndStimINDTrace{j, i} = squeeze(EndStimTimeINDBase(j, i,:)) + EndStimINDTrace{j, i} - MinINDTol;
             fepsp.info.AnalysedTimePoints(j,i,1:2:end) = TimeFrameWindow(StartStimTimeIND(j,i,:));
             fepsp.info.AnalysedTimePoints(j,i,2:2:end) = TimeFrameWindow(EndStimTimeINDBase(j,i,:));
         else
@@ -530,8 +530,9 @@ OpenFigs = AnalysisWin;
                     for nn = 1:nstim
                         [~,EndStimINDTrace{j, i}(nn,:)] = min(fepsp.waves{j,i}(max(EndStimTimeINDBase(j, i,nn) - MinINDTol,StartStimTimeIND(j, i,nn)+1)...
                             :EndStimTimeINDBase(j, i,nn) + MinINDTol,:)); %The max make sure Tolarence doesn't take before StartStimTimeIND
+                        EndStimINDTrace{j, i}(nn,:) = max(squeeze(EndStimTimeINDBase(j, i,nn)) - MinINDTol,StartStimTimeIND(j, i,nn)+1) +...
+                            EndStimINDTrace{j, i}(nn,:); %Match 2 TimeFrameWindow
                     end
-                    EndStimINDTrace{j, i} = squeeze(EndStimTimeINDBase(j, i,:)) + EndStimINDTrace{j, i} - MinINDTol;
                     fepsp.info.AnalysedTimePoints(j,i,1:2:end) = TimeFrameWindow(StartStimTimeIND(j,i,:));
                     fepsp.info.AnalysedTimePoints(j,i,2:2:end) = TimeFrameWindow(EndStimTimeINDBase(j,i,:));
                 case 'MeanInTet'
@@ -540,8 +541,9 @@ OpenFigs = AnalysisWin;
                     for nn = 1:nstim
                         [~,EndStimINDTrace{j, i}(nn,:)] = min(fepsp.waves{j,i}(max(EndStimTimeINDBase(j, i,nn) - MinINDTol,StartStimTimeIND(j, i,nn)+1)...
                             :EndStimTimeINDBase(j, i,nn) + MinINDTol,:)); %The max make sure Tolarence doesn't take before StartStimTimeIND
+                        EndStimINDTrace{j, i}(nn,:) = max(squeeze(EndStimTimeINDBase(j, i,nn)) - MinINDTol,StartStimTimeIND(j, i,nn)+1) +...
+                            EndStimINDTrace{j, i}(nn,:); %Match 2 TimeFrameWindow
                     end
-                    EndStimINDTrace{j, i} = squeeze(EndStimTimeINDBase(j, i,:)) + EndStimINDTrace{j, i} - MinINDTol;
                     fepsp.info.AnalysedTimePoints(j,i,1:2:end) = TimeFrameWindow(StartStimTimeIND(j,i,:));
                     fepsp.info.AnalysedTimePoints(j,i,2:2:end) = TimeFrameWindow(EndStimTimeINDBase(j,i,:));
             end
@@ -568,10 +570,6 @@ OpenFigs = AnalysisWin;
         title(ax,{sprintf('%s - T%d @ %duA',basename,WantedTetNum,fepsp.intens(WantedIntNum))...
             'Move green / red lines to start / end of each response accordingly'...
             'Press "Enter\return" to move to next intns'}) %Change title to match new Ints & Tets
-        ylim([min([ThePlot.YData]) max([ThePlot.YData])]*1.1)
-        for aa = 1:length(d)
-            d(aa).Position(:,2) = ylim();
-        end
     end
     function closeAnalysedFig(fh,CurrentTet)
         % Close the Analyse fig (fh) when requested. Export it if saveFig in true
@@ -696,13 +694,17 @@ OpenFigs = AnalysisWin;
         % Use right click to remove trace from all Tets.
         nspkgrpInfnc = length(fepsp.info.spkgrp);
         Trace = gco;
+        if ~strcmp(class(Trace),'matlab.graphics.chart.primitive.Line')
+           errordlg({'For some reason, no trace have been capture.' 'Please Try again'})
+           return
+        end
         TraceNum = str2double(Trace.Tag);
         Status = questDlg({'Are you sure you want to remove trace?' 'This is Parament for the struct'},'Removal Confirm','Yes','No','Yes');
         if ismember(Status,{'No',''})
             return
         end
         for nn = 1:nspkgrpInfnc
-            fepsp.info.rm{nn,NowInt} = TraceNum;
+            fepsp.info.rm{nn,NowInt} = [fepsp.info.rm{nn,NowInt} TraceNum];
             fepsp.traces{nn,NowInt}(:,TraceNum) = [];
             fepsp.waves{nn, NowInt}(:,TraceNum) = [];
             fepsp.traceAvg(nn, NowInt, :) = mean(fepsp.traces{nn, NowInt}, 2);
@@ -764,6 +766,10 @@ OpenFigs = AnalysisWin;
                     NowTet.BackgroundColor = 'w';
                     NowInt.BackgroundColor = 'w';
                     PlotANew(ax,NowTet.Value,NowInt.Value,cm)
+                    ylim([min([ThePlot.YData]) max([ThePlot.YData])]*1.1)
+                    for aa = 1:length(d)
+                        d(aa).Position(:,2) = ylim();
+                    end
                 else
                     NowInt.Value = NowInt.Value-1;
                     PlotANew(ax,NowTet.Value,NowInt.Value,cm)
@@ -802,6 +808,10 @@ OpenFigs = AnalysisWin;
                         return
                 end
                 PlotANew(ax,NowTet.Value,NowInt.Value,cm)
+                ylim([min([ThePlot.YData]) max([ThePlot.YData])]*1.1)
+                for aa = 1:length(d)
+                    d(aa).Position(:,2) = ylim();
+                end
                 AnalysisWin.UserData.LastTet = NowTet.Value;
                 figure(AnalysisWin);
             case 'Int'
