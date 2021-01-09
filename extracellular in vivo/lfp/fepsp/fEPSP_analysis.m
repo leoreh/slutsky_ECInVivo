@@ -43,6 +43,9 @@ function fepsp = fEPSP_analysis(varargin)
 %   # Diffrent msg between overwriting data & saving new in switchTetInt
 %   # Add "Export Struct Now" & option to name variable
 %   # Add Option to remove MainTets after giving them some kind of data
+%   # Change nomenclature "Tet".
+%   # Change all figs to Grouped BoxPlots?
+%   # Make Intensities Colors constant in each tet fig & between tet figs.
 %
 % 16 oct 20 LH  UPDATES
 % 02 Nov 20 LD  Change analysis from range on relevant window to
@@ -60,6 +63,10 @@ function fepsp = fEPSP_analysis(varargin)
 % 29 Dec 30 LD+LH   Bugs fix
 % 08 Jan 21 LD  Add STP,Change so every time doing "In tet analysis" the
 %               tet is one of main Tets.
+% 09 Jan 21 LD  Improve uicontext abilty to find the trace in expance of
+%               hovering DataTips - using DataCruseMode still works.
+%               Improve ylim changes when moving ChannleGroup(? - Tet) &
+%               inverting traces. Exporting Fig & fepsp using savename.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -243,8 +250,8 @@ end
 % Build Gui Base
 AnalysisWin = figure('WindowState','maximized');
 AnalysisWin.Tag = 'Main Window'; %We will use tags to locate our figures
-yLimit = [min(fepsp.traces{MainTets(1), end}, [], 'all'),...
-    max(fepsp.traces{MainTets(1), end}, [], 'all')];
+yLimit = [min(fepsp.waves{MainTets(1), end}, [], 'all'),...
+    max(fepsp.waves{MainTets(1), end}, [], 'all')];
 ThePlot = plot(TimeFrameWindow,fepsp.traces{MainTets(1),nfiles}(min(wvwin(:,1)) : max(wvwin(:,2)), :));
 ax = gca;
 xlabel('Time [ms]')
@@ -283,11 +290,12 @@ AnalyseTetB = uicontrol(AnalysisWin,'Style','pushbutton','String','AnalyseTet','
 AnalyseAllB = uicontrol(AnalysisWin,'Style','pushbutton','String','Analyse All','Callback',@(~,~) AnalyseAll([d.Position],NowTet.Value,NowInt.Value));
 SaveExitB = uicontrol(AnalysisWin,'Style','pushbutton','String','Save&Exit','Callback',@(~,~) SaveExit([d.Position],NowTet.Value,NowInt.Value,Lis));
 align([AnalyseTetB,AnalyseAllB,SaveExitB,NowTet,NowInt],'Fixed',5,'bottom')
-uimenu(cm,'Label','Remove Trace','Callback',@(~,~) RemoveTrace(NowInt.Value));
-uimenu(cm,'Label','Invert Trace','Callback',@(~,~) InvertTrace(NowInt.Value));
+uimenu(cm,'Label','Remove Trace','Callback',@(obj,~) RemoveTrace(obj,NowInt.Value));
+uimenu(cm,'Label','Invert Trace','Callback',@(obj,~) InvertTrace(obj,NowTet.Value,NowInt.Value));
 for ii = 1:length(ThePlot)
     ThePlot(ii).UIContextMenu = cm;
     ThePlot(ii).Tag = num2str(ii);
+    ThePlot(ii).ButtonDownFcn = {@MarkPlot,cm};
 end
 AnalysisWin.CloseRequestFcn = @(~,~) closeMain(AnalysisWin,Lis);
 AnalysisWin.KeyReleaseFcn =  @(~,evt) KeyPressfnc(evt,AnalysisWin,ax,NowTet,NowInt,cm,[d.Position],Lis);
@@ -475,7 +483,7 @@ OpenFigs = AnalysisWin;
                 bar([fepsp.slope_10_50(j,:);fepsp.slope_20_90(j,:)])
                 xticklabels({'From 10% to 50%' 'From 20% to 90%'})
                 xlabel('Measure area')
-                ylabel('Slope [mV/mS]')
+                ylabel('Slope [mV/ms]')
                 legend([split(num2str(sort(fepsp.intens)))])
                 box off
                 
@@ -553,7 +561,8 @@ OpenFigs = AnalysisWin;
         % Export the Analyse fig (fh) when requested
         figpath = fullfile(basepath, 'graphics');
         mkdir(figpath)
-        figname = [figpath '\' basename '_fepsp_t' num2str(CurrentTet)];
+        figname = fepspname(1:(find(fepspname == '.',1)-1));
+        figname = [figpath '\' figname '_fepsp_t' num2str(CurrentTet)];
         %         export_fig(fh,figname, '-tif', '-r300')
         saveas(fh, figname, 'jpeg')
     end
@@ -592,16 +601,22 @@ OpenFigs = AnalysisWin;
                 closeAnalysedFig(fh,str2double(NonMain(nn).Tag(end)))
             end
         end
+        VarName = [fepspname(1:(find(fepspname == '.',1)-1)) '_fepsp'];
         BaseVars = evalin('base','whos'); %Temp solution - better to let user choose var name/use save-load
-        if any(ismember({BaseVars.name},'fepsp'))
+        if any(ismember({BaseVars.name},VarName)) || ~isvarname(VarName)
             assignin('base','ans',fepsp)
-            fprintf('Assinged in base workspace as "ans"\n')
+            fprintf('Assinged in base workspace as "ans" (%s was taken or not valid)\n',VarName)
         else
-            assignin('base','fepsp',fepsp)
-            fprintf('Assinged in base workspace as "fepsp"\n')
+            assignin('base',VarName,fepsp)
+            fprintf('Assinged in base workspace as "%s"\n',VarName)
         end
         delete(Lis)
         delete(AnalysisWin)
+    end
+    function MarkPlot(obj,~,cm)
+%        Will help the uicontext miss less often, in the cost of hover datatip 
+%        (datacrusermode will still work as usual however)
+        cm.UserData = obj;
     end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Buttons & Interactivity Functions
@@ -690,11 +705,11 @@ OpenFigs = AnalysisWin;
         end
         closeMain(OpenFigs(strcmp({OpenFigs.Tag},'Main Window')),Lis);
     end
-    function RemoveTrace(NowInt)
+    function RemoveTrace(obj,NowInt)
         % Use right click to remove trace from all Tets.
         nspkgrpInfnc = length(fepsp.info.spkgrp);
-        Trace = gco;
-        if ~strcmp(class(Trace),'matlab.graphics.chart.primitive.Line')
+        Trace = obj.Parent.UserData;
+        if ~isa(Trace,'matlab.graphics.chart.primitive.Line')
            errordlg({'For some reason, no trace have been capture.' 'Please Try again'})
            return
         end
@@ -724,10 +739,14 @@ OpenFigs = AnalysisWin;
         end
         delete(Trace);
     end
-    function InvertTrace(NowInt)
+    function InvertTrace(obj,NowTet,NowInt)
         % Invert Trace in all Tets
         nspkgrpInfnc = length(fepsp.info.spkgrp);
-        Trace = gco;
+        Trace = obj.Parent.UserData;
+        if ~isa(Trace,'matlab.graphics.chart.primitive.Line')
+           errordlg({'For some reason, no trace have been capture.' 'Please Try again'})
+           return
+        end
         TraceNum = str2double(Trace.Tag);
         for nn = 1:nspkgrpInfnc
             fepsp.traces{nn,NowInt}(:,TraceNum) = -fepsp.traces{nn,NowInt}(:,TraceNum);
@@ -736,6 +755,11 @@ OpenFigs = AnalysisWin;
             fepsp.wavesAvg(nn, NowInt, :) = mean(fepsp.waves{nn, NowInt}, 2);
         end
         Trace.YData = -Trace.YData;
+        YlimtsBase = [min(fepsp.waves{NowTet, end}(:)) max(fepsp.waves{NowTet, end}(:))];
+        ylim([min(min([ThePlot.YData]),YlimtsBase(1)) max(max([ThePlot.YData]),YlimtsBase(2))]*1.1)
+        for aa = 1:length(d)
+            d(aa).Position(:,2) = ylim();
+        end
     end
     function SwitchTetInt(AnalysisWin,ax,NowTet,NowInt,Parm,cm,LinesPos,Lis)
         % Bureaucratic, manage the trasfer between plots.
@@ -766,7 +790,7 @@ OpenFigs = AnalysisWin;
                     NowTet.BackgroundColor = 'w';
                     NowInt.BackgroundColor = 'w';
                     PlotANew(ax,NowTet.Value,NowInt.Value,cm)
-                    ylim([min([ThePlot.YData]) max([ThePlot.YData])]*1.1)
+                    ylim([min(fepsp.waves{NowTet.Value, end}(:)) max(fepsp.waves{NowTet.Value, end}(:))]*1.1)
                     for aa = 1:length(d)
                         d(aa).Position(:,2) = ylim();
                     end
@@ -808,7 +832,7 @@ OpenFigs = AnalysisWin;
                         return
                 end
                 PlotANew(ax,NowTet.Value,NowInt.Value,cm)
-                ylim([min([ThePlot.YData]) max([ThePlot.YData])]*1.1)
+                ylim([min(fepsp.waves{NowTet.Value, end}(:)) max(fepsp.waves{NowTet.Value, end}(:))]*1.1)
                 for aa = 1:length(d)
                     d(aa).Position(:,2) = ylim();
                 end
