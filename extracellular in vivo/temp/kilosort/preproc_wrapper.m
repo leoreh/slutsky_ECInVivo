@@ -55,7 +55,8 @@ fepsp = fEPSPfromWCP('basepath', basepath, 'sfiles', [],...
     'sufx', 'stp', 'force', true, 'protocol', 'stp',...
     'intens', intens, 'inspect', false, 'fs', 30000);
 
-fepsp = fEPSP_analysis('fepsp', fepsp, 'basepath', basepath);
+fepsp = fEPSP_analysis('fepsp', fepsp, 'basepath', basepath,...
+    'force', true);
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
