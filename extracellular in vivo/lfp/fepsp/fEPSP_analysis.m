@@ -575,6 +575,7 @@ OpenFigs = AnalysisWin;
         for aa = 1:length(ThePlot) % Add the contextmenu to the plots
             ThePlot(aa).UIContextMenu = cm;
             ThePlot(aa).Tag = num2str(aa);
+            ThePlot(aa).ButtonDownFcn = {@MarkPlot,cm};
         end
         title(ax,{sprintf('%s - T%d @ %duA',basename,WantedTetNum,fepsp.intens(WantedIntNum))...
             'Move green / red lines to start / end of each response accordingly'...

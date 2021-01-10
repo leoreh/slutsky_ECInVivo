@@ -129,6 +129,11 @@ if ~isempty(sfiles)
     filenames = filenames(sfiles);
 else
     [filenames, basepath] = uigetfile('*.wcp', 'MultiSelect', 'on');
+    if ~iscell(filenames)
+        filenames = {filenames};
+    elseif isempty(filenames)
+        error('No files selected. Aborting')
+    end
 end
 
 % session metadata; assumes file structure: animal/date/
