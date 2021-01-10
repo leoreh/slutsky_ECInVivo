@@ -5,15 +5,16 @@ cd(basepath)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % open ephys
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'F:\fepsp\m5\2020-12-30_09-52-47';
+basepath = 'F:\fepsp\m5\2021-01-08_19-14-24';
 rmvch = [2 : 8];
 % mapch = [26 27 28 29 31 2 3 30 4 5 6 7 8 9 10 11 12 13 14 15 32 1 16 17 18 19 20 21 22 23 24 25 33 34 35];
 mapch = [1 : 8];
 exp = [1];
 rec = cell(max(exp), 1);
-rec{1} = [2 : 11];
+% rec{1} = [1, 2];
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
-    'rmvch', rmvch, 'mapch', mapch, 'concat', true, 'nchans', length(mapch));
+    'rmvch', rmvch, 'mapch', mapch, 'concat', true,...
+    'nchans', length(mapch), 'fsIn', 30000);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % tdt
@@ -49,10 +50,10 @@ fepsp = fEPSPfromDat('basepath', basepath, 'fname', '', 'nchans', nchans,...
     'force', true, 'extension', 'dat', 'recSystem', 'tdt',...
     'protocol', 'stp', 'anaflag', true, 'inspect', false);  
 
-intens = [50 90];
+intens = [70];
 fepsp = fEPSPfromWCP('basepath', basepath, 'sfiles', [],...
-    'sufx', 'io1', 'force', true, 'protocol', 'io',...
-    'intens', intens, 'inspect', true, 'fs', 30000);
+    'sufx', 'stp', 'force', true, 'protocol', 'stp',...
+    'intens', intens, 'inspect', false, 'fs', 30000);
 
 fepsp = fEPSP_analysis('fepsp', fepsp, 'basepath', basepath);
 

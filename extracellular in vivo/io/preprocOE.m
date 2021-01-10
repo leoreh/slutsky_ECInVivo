@@ -51,6 +51,7 @@ addOptional(p, 'concat', true, @islogical);
 addOptional(p, 'nchans', 35, @isnumeric);
 addOptional(p, 'mapch', [], @isnumeric);
 addOptional(p, 'rmvch', [], @isnumeric);
+addOptional(p, 'fsIn', 20000, @isnumeric);
 
 parse(p, varargin{:})
 basepath = p.Results.basepath;
@@ -60,8 +61,7 @@ concat = p.Results.concat;
 nchans = p.Results.nchans;
 mapch = p.Results.mapch;
 rmvch = p.Results.rmvch;
-
-fs = 20000;
+fsIn = p.Results.fsIn;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % get files and folders
@@ -129,7 +129,7 @@ for i = 1 : length(exp)
         txt = split(txt, ':');
         txt = split(txt{end}, '@');
         if ~isempty(txt{1})
-            recStart(ii) = str2num(txt{1}) / fs;
+            recStart(ii) = str2num(txt{1}) / fsIn;
         else
             recStart(ii) = 60 * 5;
         end
@@ -173,14 +173,14 @@ end
     % create lfp file
     LFPfromDat('basepath', exPathNew, 'cf', 450, 'chunksize', 5e6,...
         'nchans', length(mapch) - length(rmvch), 'fsOut', 1250,...
-        'fsIn', 20000)
+        'fsIn', fsIn)
     
     % get acceleration
-    newch = length(mapch) - length(rmvch);
-    chAcc = [newch : -1 : newch - 2];
-    EMGfromACC('basepath', exPathNew, 'fname', '',...
-        'nchans', newch, 'ch', chAcc, 'force', false, 'saveVar', true,...
-        'graphics', false, 'fsOut', 1250);
+%     newch = length(mapch) - length(rmvch);
+%     chAcc = [newch : -1 : newch - 2];
+%     EMGfromACC('basepath', exPathNew, 'fname', '',...
+%         'nchans', newch, 'ch', chAcc, 'force', false, 'saveVar', true,...
+%         'graphics', false, 'fsOut', 1250, 'fsIn', fsIn);
     
     % copy xml
     basefiles = dir(fileparts(newpath));
@@ -206,7 +206,7 @@ end
 
     % states (depends on xml file)
     if ~isempty(xmlfiles)
-        SleepScoreMaster(exPathNew, 'rejectChannels', chAcc)
+%         SleepScoreMaster(exPathNew, 'rejectChannels', chAcc)
     end
     
 end
