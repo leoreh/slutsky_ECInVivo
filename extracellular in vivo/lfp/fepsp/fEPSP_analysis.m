@@ -438,10 +438,10 @@ OpenFigs = AnalysisWin;
         % Mark on each waveform Start & End of analysed area
         Yind = sub2ind(size(fepsp.wavesAvg),ones(nfilesInfnc,nstim)*j,...
             repmat((1:size(fepsp.wavesAvg,2))',1,nstim),reshape(StartStimTimeIND(j,:,:),nfilesInfnc,nstim));
-        StartMarks = plot(squeeze(fepsp.info.AnalysedTimePoints(j,:,1:2:end)),fepsp.wavesAvg(Yind),'*');
+        StartMarks = plot(squeeze(fepsp.info.AnalysedTimePoints(j,:,1:2:end)),squeeze(fepsp.wavesAvg(Yind)),'*');
         Yind = sub2ind(size(fepsp.wavesAvg),ones(nfilesInfnc,nstim)*j,...
             repmat((1:size(fepsp.wavesAvg,2))',1,nstim),reshape(EndStimINDAvg(j,:,:),nfilesInfnc,nstim));
-        EndMarks = plot(TimeFrameWindow(squeeze(EndStimINDAvg(j,:,:))),fepsp.wavesAvg(Yind),'O');
+        EndMarks = plot(TimeFrameWindow(squeeze(EndStimINDAvg(j,:,:))),squeeze(fepsp.wavesAvg(Yind)),'O');
         
         % Marker area in which slope was analysed
         for kk = 1:nfilesInfnc
