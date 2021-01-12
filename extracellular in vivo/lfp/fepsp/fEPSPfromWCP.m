@@ -130,7 +130,9 @@ if ~isempty(sfiles)
 else
     [filenames, basepath] = uigetfile('*.wcp', 'MultiSelect', 'on');
     if ~iscell(filenames)
-        filenames = cellstr(filenames);
+        filenames = {filenames};
+    elseif isempty(filenames)
+        error('No files selected. Aborting')
     end
 end
 
