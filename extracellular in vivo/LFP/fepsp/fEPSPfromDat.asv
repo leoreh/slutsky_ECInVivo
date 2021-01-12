@@ -20,8 +20,6 @@ function fepsp = fEPSPfromDat(varargin)
 %               for each trace (currently not implemented)
 %   dc          logical. remove DC component {1}
 %   cf          numeric. cut-off frequency for low-pass filter {450}
-%   fsIn        numeric. sampling frequency of dat file {30000}. If tdt
-%               will be overwritten from store
 %   precision   char. sample precision of dat file {'int16'}
 %   extension   string. load from 'dat' or {'lfp'} file
 %   recSystem   string. data from 'tdt' or {'oe'}
@@ -127,7 +125,6 @@ intens      = p.Results.intens;
 protocol    = p.Results.protocol;
 dc          = p.Results.dc;
 cf          = p.Results.cf;
-fsIn        = p.Results.fsIn;
 precision   = p.Results.precision;
 extension   = p.Results.extension;
 recSystem   = p.Results.recSystem;
@@ -204,8 +201,8 @@ nfiles = length(datInfo.nsamps);  % number of intensities
 
 switch recSystem
     case 'oe'
-        % note the b2uv conversion was tested rhd2000 and analog input to
-        % oe. in doubt you should check structure.oebin
+        % note this is true for rhd2000 only. if using analog input the
+        % value is 0.00015. see structure.oebin
         b2uv = 0.195;   
 
         % load digital input

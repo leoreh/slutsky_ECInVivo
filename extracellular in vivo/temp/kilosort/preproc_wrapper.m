@@ -5,13 +5,13 @@ cd(basepath)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % open ephys
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'F:\fepsp\m5\2021-01-08_19-14-24';
-rmvch = [2 : 8];
+basepath = 'F:\fepsp\m7\2021-01-12_11-27-33';
+rmvch = [1 : 35, 37 : 43];
 % mapch = [26 27 28 29 31 2 3 30 4 5 6 7 8 9 10 11 12 13 14 15 32 1 16 17 18 19 20 21 22 23 24 25 33 34 35];
-mapch = [1 : 8];
-exp = [1];
+mapch = [1 : 43];
+exp = [2];
 rec = cell(max(exp), 1);
-% rec{1} = [1, 2];
+% rec{1} = [1 : 5];
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
     'rmvch', rmvch, 'mapch', mapch, 'concat', true,...
     'nchans', length(mapch), 'fsIn', 30000);
@@ -47,10 +47,11 @@ spkgrp = session.extracellular.spikeGroups.channels;
 intens = [50];
 fepsp = fEPSPfromDat('basepath', basepath, 'fname', '', 'nchans', nchans,...
     'spkgrp', spkgrp, 'intens', intens, 'saveVar', true,...
-    'force', true, 'extension', 'dat', 'recSystem', 'tdt',...
-    'protocol', 'stp', 'anaflag', true, 'inspect', false);  
+    'force', true, 'extension', 'dat', 'recSystem', 'oe',...
+    'protocol', 'stp', 'anaflag', true, 'inspect', false, 'fsIn', fs,...
+    'cf', 0);  
 
-intens = [70];
+intens = [300];
 fepsp = fEPSPfromWCP('basepath', basepath, 'sfiles', [],...
     'sufx', 'stp', 'force', true, 'protocol', 'stp',...
     'intens', intens, 'inspect', false, 'fs', 30000);

@@ -3,10 +3,10 @@
 % params
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-basepath = 'D:\Google Drive\PhD\Slutsky\Data Summaries';
-filename = 'b3.xlsx';
+basepath = 'E:\Leore';
+filename = 'b4.xlsx';
 filename = fullfile(basepath, filename);
-mnames = [60 61 62 63 66 67];
+mnames = [1, 3 : 9];
 
 forceL = false;
 saveFig = false;
@@ -58,9 +58,9 @@ if forceL || ~exist('micenames', 'var')
     BLweight = num(1, 2 : end);
     
     % read water intake
-    [num, ~, raw] = xlsread(filename, 'WaterIntake');
-    water = num(:, 2 : nmice + 1);
-    waterDate = num(:, 1);
+%     [num, ~, raw] = xlsread(filename, 'WaterIntake');
+%     water = num(:, 2 : nmice + 1);
+%     waterDate = num(:, 1);
 end
 
 % find max number of sessions
@@ -83,19 +83,15 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics - params vs. session
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-mice = [1 : 6];
-% mice = [2, 6];
+mice = [1 : 8];
 delay = 10;
-dates = [];
 % dates = [2.9 : 9.9];
-dates = [2.1 : 14.1];
-shadeIdx = [5 10];
-shaedIdx = [];
-% shadeIdx = [8.5 9.5];
+dates = [];
+% shadeIdx = [5 10];
+shadeIdx = [];
 mClr = 'nnn';
-pflag = [1 1 1 1];      % (1) success, (2) duration, (3) weight, (4) water
+pflag = [1 1 1 0];      % (1) success, (2) duration, (3) weight, (4) water
 avgFlag = [1];
-% avgFlag = 1;
 cump = cumsum(pflag);
 
 % select specific data
@@ -112,10 +108,10 @@ for i = mice
     end
     idx = delayIdx & dateIdx;
 end
-waterIdx = zeros(length(waterDate), 1);
-for i = 1 : length(dates)
-    waterIdx = waterIdx | dates(i) == waterDate;
-end
+% waterIdx = zeros(length(waterDate), 1);
+% for i = 1 : length(dates)
+%     waterIdx = waterIdx | dates(i) == waterDate;
+% end
 
 close all
 % -------------------------------------------------------------------------

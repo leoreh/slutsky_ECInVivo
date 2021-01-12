@@ -5,7 +5,7 @@ if force
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % load data
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    filename = 'C:\Users\LeoreHeim\Downloads\batch2s1.xlsx';
+    filename = 'E:\Leore\b4.xlsx';
     ndays = 12;
     
     % initialize
