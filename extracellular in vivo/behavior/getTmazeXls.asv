@@ -6,7 +6,7 @@
 basepath = 'E:\Leore';
 filename = 'b4.xlsx';
 filename = fullfile(basepath, filename);
-mnames = [74 : 80];
+mnames = [1, 3 : 7, 9];
 
 forceL = false;
 saveFig = false;
@@ -18,7 +18,7 @@ nmice = length(mnames);
 if forceL || ~exist('micenames', 'var')
     for i = 1 : nmice
         
-        micenames{i} = ['lh', num2str(mnames(i))];
+        micenames{i} = ['m', num2str(mnames(i))];
         [num, ~, raw] = xlsread(filename, micenames{i});
         m{i}.name = micenames{i};
         m{i}.date = num(1, 2 : 2 : end);
@@ -82,7 +82,9 @@ end
 
 % select specific data
 mice = [1 : 7];
-delay = 10;
+delay = 30;
+% dates = [2.9 : 9.9];
+dates = [];
 
 % initialize mats (session x mouse)
 correct = nan(maxsessions, nmice);
@@ -90,35 +92,35 @@ dur = nan(maxsessions, nmice);
 weight = nan(maxsessions, nmice);
 for i = mice
     nsessions = length(m{i}.date);
-    delayIdx = find(m{i}.delay == delay);
+    delayIdx = m{i}.delay == delay;
     for ii = 1 : length(delayIdx)
-        correct(find(dates == m{i}.date(delayIdx(ii)), 1), i) =...
-            nanmean(m{i}.correct(:, delayIdx(ii)), 1);
-        dur(find(dates == m{i}.date(delayIdx(ii)), 1), i) =...
-            nanmean(m{i}.dur(:, delayIdx(ii)), 1);
-        weight(find(dates == m{i}.date(delayIdx(ii)), 1), i) =...
-            nanmean(m{i}.weight(:, delayIdx(ii)), 1);
+    correct(find(dates == m{i}.date(delayIdx(ii)), 1)
     end
+
+    x = m{i}.date(delayIdx);
     
-    %     x = m{i}.date(delayIdx);
-    %
-    %     find(dates == x(ii), 1)
-    %
-    %     dateIdx = zeros(1, nsessions);
-    %     if isempty(dates)
-    %         dates = unique(m{1}.date);
-    %     end
-    %     for ii = 1 : length(dates)
-    %         dateIdx = dateIdx | m{i}.date == dates(ii);
-    %     end
-    %     idx = delayIdx & dateIdx;
-    %
-    %     correct(idx, i) = nanmean(m{i}.correct(:, idx), 1);
-    %     dur(idx, i) = nanmean(m{i}.dur(:, idx), 1);
-    %     weight(idx, i) = nanmean(m{i}.weight(:, idx), 1);
+    find(dates == x(ii), 1)
+    
+    dateIdx = zeros(1, nsessions);
+    if isempty(dates)
+        dates = unique(m{1}.date);
+    end
+    for ii = 1 : length(dates)
+        dateIdx = dateIdx | m{i}.date == dates(ii);
+    end
+    idx = delayIdx & dateIdx;
+    
+    correct(idx, i) = nanmean(m{i}.correct(:, idx), 1);
+    dur(idx, i) = nanmean(m{i}.dur(:, idx), 1);
+    weight(idx, i) = nanmean(m{i}.weight(:, idx), 1);
+end
+
+for i = 1 : size(correct, 2)
+    correct(i, :) = correct(~isnan(correct))
 end
 
 % remove nan
+max(sum(~isnan(correct), 2));
 rmidx = find(all(isnan(correct), 2));
 correct(rmidx, :) = [];
 dur(rmidx, :) = [];
@@ -182,7 +184,7 @@ if pflag(4)
 end
 
 xlabel('Time [date]')
-legend('best', micenames(mice))
+% legend('best', micenames(mice))
 xticks([1 : length(dates)])
 xticklabels(split(num2str(dates)))
 
@@ -199,7 +201,7 @@ end
 pflag = 0;
 if pflag
     clear data
-    mice = [1 : 7];
+    mice = [1, 3, 4, 6];
     rmDates = [3.9, 4.9, 5.9, 6.9];      % dates to exclude from calculation
     
     delays = unique(m{i}.delay);
@@ -229,29 +231,6 @@ if pflag
     set(gca, 'TickLength', [0 0])
     title('Mnemonic Difficulty')
 end
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% no. trials on variation
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-mice = [1 : 7];
-delay = 30;
-ntrials = 20;
-
-correct = nan(maxsessions, nmice);
-dur = nan(maxsessions, nmice);
-weight = nan(maxsessions, nmice);
-for i = mice
-    nsessions = length(m{i}.date);
-    delayIdx = find(m{i}.delay == delay);
-    for ii = 1 : length(delayIdx)
-        correct(find(dates == m{i}.date(delayIdx(ii)), 1), i) =...
-            nanmean(m{i}.correct(1 : ntrials, delayIdx(ii)), 1);
-    end
-end
-rmidx = find(all(isnan(correct), 2));
-correct(rmidx, :) = [];
-dur(rmidx, :) = [];
-weight(rmidx, :) = [];
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -149,7 +149,7 @@ switch protocol
         % correct stim frequency
         if strcmp(fepsp.info.recSystem, 'oe') || strcmp(fepsp.info.recSystem, 'tdt')
             ts = fepsp.info.stimTs;
-            ts = mean(ts(ts < 500)) / fs * 1000;
+            ts = mean(ts(ts < 800)) / fs * 1000;
         elseif strcmp(fepsp.info.recSystem, 'wcp')
             ts = 20;
         end
