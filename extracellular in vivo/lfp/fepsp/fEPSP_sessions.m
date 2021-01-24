@@ -67,7 +67,7 @@ if forceA
         fepsp = fEPSPfromDat('basepath', filepath, 'fname', '', 'nchans', nchans,...
             'spkgrp', spkgrp, 'intens', intens, 'saveVar', true,...
             'force', true, 'extension', 'dat', 'recSystem', 'oe',...
-            'protocol', 'io', 'inspect', true, 'anaflag', false, 'cf', 1250);
+            'protocol', 'io', 'inspect', false, 'anaflag', false, 'cf', 450);
   
         fepsp = fEPSP_analysis('fepsp', fepsp, 'graphics', [9],...
             'force', true, 'saveVar', true, 'MainTets', [1, 2, 5 : 7],...
@@ -104,8 +104,8 @@ switch protocol
         ampmat = nan(ngrp, length(intens), nsessions);
         wvmat = nan(ngrp, nsessions, size(fepsp.wavesAvg, 3));
         ampcell = cell(1, nsessions);
-        si = 300;        % selected intensity [uA]
-        grp = 1;          % selected tetrode
+        si = 150;        % selected intensity [uA]
+        grp = 6;          % selected tetrode
         dataVar = 'ampcell';
         for i = 1 : nsessions
             fepsp = varArray{i, 2}.fepsp;
@@ -154,7 +154,7 @@ sessionDate = sessionDate(2 : 3 : end);
 ss = [1 : nsessions];
 p = 1;
 clr = ['kgggrrryyy'];        % must be sorted (i.e. g before k before r)
-grp = 1;
+% grp = 1;
 if p
     fh = figure;
     subplot(2, 1, 1)
