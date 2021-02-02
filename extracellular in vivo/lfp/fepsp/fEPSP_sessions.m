@@ -12,7 +12,7 @@ saveFig = false;
 
 % full path and name to xls file with session metadata
 xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
-mname = 'lh52';     % mouse name
+mname = 'lh76';     % mouse name
 
 % column name in xls sheet where dirnames exist
 colName = 'Session';
@@ -104,9 +104,9 @@ switch protocol
         ampmat = nan(ngrp, length(intens), nsessions);
         wvmat = nan(ngrp, nsessions, size(fepsp.wavesAvg, 3));
         ampcell = cell(1, nsessions);
-        si = 150;        % selected intensity [uA]
-        grp = 6;          % selected tetrode
-        dataVar = 'ampcell';
+        si = 30;        % selected intensity [uA]
+        grp = 1;          % selected tetrode
+        dataVar = 'slopecell_20_90';
         for i = 1 : nsessions
             fepsp = varArray{i, 2}.fepsp;
             sintens = sort(fepsp.intens);
@@ -192,7 +192,7 @@ if p
                         clr(i), 'FaceAlpha', alphaIdx(i))
                 end
             end
-            ylabel('Amplidute [mV]')
+            ylabel(dataVar)
         case 'stp'
             plot([1 : nsessions], fac(:, grp))
     end
