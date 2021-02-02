@@ -142,9 +142,9 @@ switch protocol
         [~, wvwin(2)] = min(abs(tstamps - 30));
         wvwin(1) = wvwin(1) + dt;
     case 'stp'
-        % 5 pulses of 500 us at 50 Hz. starts after 10 ms. recording length
+        % 5 or 3 pulses of 500 us at 50 Hz. starts after 10 ms. recording length
         % 200 ms. repeated once every 30 s
-        nstim = 5;
+        nstim = 3;
         
         % correct stim frequency
         if strcmp(fepsp.info.recSystem, 'oe') || strcmp(fepsp.info.recSystem, 'tdt')
@@ -153,9 +153,9 @@ switch protocol
         elseif strcmp(fepsp.info.recSystem, 'wcp')
             ts = 20;
         end
-        wvwin = round([10 : ts : 5 * ts; 30 : ts : 5 * ts + 10]' * fs / 1000);
+        wvwin = round([10 : ts : nstim * ts; 30 : ts : nstim * ts + 10]' * fs / 1000);
         wvwin(:, 1) = wvwin(:, 1) + dt;
-        wvwin(1:4, 2) = wvwin(1:4, 2) - dt;
+        wvwin(1 : nstim - 1, 2) = wvwin(1 : nstim - 1, 2) - dt;
 end
 
 % Prepere fepsp fields

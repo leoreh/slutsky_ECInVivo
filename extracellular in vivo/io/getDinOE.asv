@@ -110,10 +110,10 @@ for i = 1 : length(jsonFiles)
     mDat = load_open_ephys_binary(jsonName, 'continuous', 1, 'mmap');
        
     % separate by channels and get rising phase
-    chans = double(unique(mDin.ChannelIndex));
+    dChans = double(unique(mDin.ChannelIndex));
     idxRise = mDin.Data > 0;        % rising phase
-    for ii = 1 : length(chans)
-        idxCh = mDin.ChannelIndex == chans(ii);
+    for ii = 1 : length(dChans)
+        idxCh = mDin.ChannelIndex == dChans(ii);
         tstamps{ii} = [tstamps{ii}; mDin.Timestamps(idxRise & idxCh)];
     end
     
@@ -123,23 +123,22 @@ for i = 1 : length(jsonFiles)
     totsamps = cumsum(nsamps);
     
     % return if there are no events
-    if all(cellfun(@isempty, tstamps))
+    if isempty(data)
         warning('no events found, skipping Din')
         return
     end
     
-%     if data(end) > totsamps(end)
-%         txt = sprintf(['digital input longer than recording duration\n',...
-%             'check if argument nchans is correct']);
-%         error(txt)
-%     end
+    if data(end) > totsamps(end)
+        txt = sprintf(['digital input longer than recording duration\n',...
+            'check if argument nchans is correct']);
+        error(txt)
+    end
 end
 
 % arrange struct output and save
 din.tstamps = tstamps;
 din.origDir = {jsonFiles.folder};
 din.fs = mDin.Header.sample_rate;
-din.chans = chans;
 
 if saveVar
     save(destination, 'din');

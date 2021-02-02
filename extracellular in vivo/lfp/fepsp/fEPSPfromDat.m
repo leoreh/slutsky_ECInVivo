@@ -221,9 +221,10 @@ switch recSystem
         load(fullfile(basepath, [basename, '.tstamps.mat']));
         
         % convert tstamps to idx of samples
-        stamps = zeros(1, length(din.data));
-        for i = 1 : length(din.data)
-            stamps(i) = find(tstamps == din.data(i));
+        dinStamps = din.tstamps{1};     % assumes stim recorded on ch1
+        stamps = zeros(1, length(dinStamps));
+        for i = 1 : length(dinStamps)
+            stamps(i) = find(tstamps == dinStamps(i));
         end
         
     case 'tdt'
