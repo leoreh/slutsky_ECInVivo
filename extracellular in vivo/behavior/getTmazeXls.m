@@ -82,7 +82,7 @@ end
 
 % select specific data
 mice = [1 : 7];
-delay = 10;
+delay = 30;
 
 % initialize mats (session x mouse)
 correct = nan(maxsessions, nmice);
@@ -99,23 +99,6 @@ for i = mice
         weight(find(dates == m{i}.date(delayIdx(ii)), 1), i) =...
             nanmean(m{i}.weight(:, delayIdx(ii)), 1);
     end
-    
-    %     x = m{i}.date(delayIdx);
-    %
-    %     find(dates == x(ii), 1)
-    %
-    %     dateIdx = zeros(1, nsessions);
-    %     if isempty(dates)
-    %         dates = unique(m{1}.date);
-    %     end
-    %     for ii = 1 : length(dates)
-    %         dateIdx = dateIdx | m{i}.date == dates(ii);
-    %     end
-    %     idx = delayIdx & dateIdx;
-    %
-    %     correct(idx, i) = nanmean(m{i}.correct(:, idx), 1);
-    %     dur(idx, i) = nanmean(m{i}.dur(:, idx), 1);
-    %     weight(idx, i) = nanmean(m{i}.weight(:, idx), 1);
 end
 
 % remove nan
@@ -234,18 +217,22 @@ end
 % no. trials on variation
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 mice = [1 : 7];
-delay = 30;
-ntrials = 20;
+delay = 00;
+trials = 1 : 10;
+% trials = [];
 
 correct = nan(maxsessions, nmice);
 dur = nan(maxsessions, nmice);
 weight = nan(maxsessions, nmice);
+if isempty(trials)
+    trials = ':';
+end
 for i = mice
     nsessions = length(m{i}.date);
     delayIdx = find(m{i}.delay == delay);
     for ii = 1 : length(delayIdx)
         correct(find(dates == m{i}.date(delayIdx(ii)), 1), i) =...
-            nanmean(m{i}.correct(1 : ntrials, delayIdx(ii)), 1);
+            nanmean(m{i}.correct(trials, delayIdx(ii)), 1);
     end
 end
 rmidx = find(all(isnan(correct), 2));
