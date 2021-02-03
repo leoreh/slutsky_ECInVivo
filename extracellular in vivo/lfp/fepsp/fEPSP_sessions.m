@@ -12,7 +12,7 @@ saveFig = false;
 
 % full path and name to xls file with session metadata
 xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
-mname = 'lh76';     % mouse name
+mname = 'lh79';     % mouse name
 
 % column name in xls sheet where dirnames exist
 colName = 'Session';
@@ -104,9 +104,9 @@ switch protocol
         ampmat = nan(ngrp, length(intens), nsessions);
         wvmat = nan(ngrp, nsessions, size(fepsp.wavesAvg, 3));
         ampcell = cell(1, nsessions);
-        si = 30;        % selected intensity [uA]
+        si = 20;        % selected intensity [uA]
         grp = 1;          % selected tetrode
-        dataVar = 'slopecell_20_90';
+        dataVar = 'ampcell';
         for i = 1 : nsessions
             fepsp = varArray{i, 2}.fepsp;
             sintens = sort(fepsp.intens);
