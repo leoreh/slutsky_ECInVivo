@@ -113,12 +113,12 @@ sessionDate = [pathPieces{:}];
 sessionDate = sessionDate(2 : 3 : end);
  
 close all
-grp = [1 : 4];          % which tetrodes to plot
-state = [];            % [] - all; 1 - awake; 2 - NREM; 3 - REM
+grp = [1 : 8];          % which tetrodes to plot
+state = [1];            % [] - all; 1 - awake; 2 - NREM; 3 - REM
 Y = [0 250];            % ylim
-p1 = 1;                 % firing rate vs. time, one fig per session
-p2 = 0;                 % mfr across sessions, one fig
-p3 = 1;                 % spike rate vs. time, one fig for all sessions
+p1 = 0;                 % firing rate vs. time, one fig per session
+p2 = 1;                 % mfr across sessions, one fig
+p3 = 0;                 % spike rate vs. time, one fig for all sessions
 plotStyle = 'bar';      % for p2. can by 'bar' or 'box'
 clr = ['bbbbbkkkkkkkkrrrrrrrr'];        % color sessions
 clr = ['bbbbbkkkkkkkkkkkkrrrrr'];        % color sessions
@@ -250,7 +250,7 @@ if p3
         ss = varArray{i, 2}.SleepState;
         datInfo = varArray{i, 3}.datInfo;
         sr = varArray{i, 4}.fr;
-        st = varArray{i, 5}.spktimes;
+        t = varArray{i, 5}.spktimes;
         filepath = char(fullfile(basepath, dirnames{i}));
         [~, basename] = fileparts(filepath);
         

@@ -115,19 +115,19 @@ sessionDate = [pathPieces{:}];
 sessionDate = sessionDate(2 : 3 : end);
 
 close all
-grp = [1 : 8];          % which tetrodes to plot
-state = [];             % [] - all; 1 - awake; 2 - NREM
+grp = [2 : 8];          % which tetrodes to plot
+state = [2];             % [] - all; 1 - awake; 2 - NREM
 FRdata = 'strd';        % plot absolute fr or normalized
 unitClass = 'int';      % plot 'int', 'pyr', or 'all'
 suFlag = 1;             % plot only su or all units
 minfr = 0;              % include only units with fr greater than
 maxfr = 3000;           % include only units with fr lower than
 Y = [0 10];             % ylim
-p1 = 1;                 % firing rate vs. time, one fig per session
-p2 = 0;                 % mfr across sessions, one fig
+p1 = 0;                 % firing rate vs. time, one fig per session
+p2 = 1;                 % mfr across sessions, one fig
 p3 = 0;                 % firing rate vs. time, one fig for all sessions. not rubust
 p4 = 0;                 % number of cells per session, one fig
-plotStyle = 'bar';      % for p2. can by 'bar' or 'box'
+plotStyle = 'box';      % for p2. can by 'bar' or 'box'
 clr = ['bbbkkkkrrr'];
 
 for i = 1 : nsessions
