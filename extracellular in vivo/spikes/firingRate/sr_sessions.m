@@ -85,14 +85,14 @@ if forceA
 %         % spike rate per tetrode. note that using firingRate requires
 %         % special care becasue spktimes is given in samples and not seconds
 %         load(fullfile(filepath, [basename '.spktimes.mat']))
-%         for ii = 1 : length(spkgrp)
-%             spktimes{ii} = spktimes{ii} / fs;
-%         end
-%         binsize = 60;
-%         sr = firingRate(spktimes, 'basepath', filepath,...
-%             'graphics', false, 'saveFig', false,...
-%             'binsize', binsize, 'saveVar', 'sr', 'smet', 'none',...
-%             'winBL', [0 Inf]);     
+        for ii = 1 : length(spkgrp)
+            spktimes{ii} = spktimes{ii} / fs;
+        end
+        binsize = 60;
+        sr = firingRate(spktimes, 'basepath', filepath,...
+            'graphics', false, 'saveFig', false,...
+            'binsize', binsize, 'saveVar', 'sr', 'smet', 'none',...
+            'winBL', [0 Inf]);     
     end
 end
 

@@ -15,7 +15,7 @@ function spktimes2ks(varargin)
 %   nchans      numeric. number of channels in dat file.
 %   dur         numeric. duration of trim period [min]
 %   t           string. start time of trim period. if empty than will take
-%               dur minuted from end of recording. can be in the format
+%               dur minutes from end of recording. can be in the format
 %               'HHmmss' or 'HHmm'.
 %   mkClu       logical. create also clu file for inspection w/ ns {false}
 %   spkFile     string. clip spike waveforms from {'dat'} or 'temp_wh'
@@ -25,6 +25,7 @@ function spktimes2ks(varargin)
 %
 % TO DO LIST
 %   # replace memmap w/ fread 
+%   # clean temp_wh after creation of ns files
 %
 % 09 nov 20 LH      
 

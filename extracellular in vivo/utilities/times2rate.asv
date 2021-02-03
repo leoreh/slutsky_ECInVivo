@@ -1,4 +1,4 @@
-function [r, binedges, bincents, binidx] = times2rate(spktimes, varargin)
+function [r, binedges, bincents] = times2rate(spktimes, varargin)
 
 % for each unit counts spikes in bins. output may be given as spike count
 % and thus to convert to Hz the output must be divided by the binsize. This
@@ -101,12 +101,11 @@ for i = 1 : nwin
             r(ii, k : k + nbins - 1) = histcounts(spktimes{ii}, binedges{i},...
                 'Normalization', 'count');
         end
-    end
-    
+    end    
+        
     % find bin centers
     for ii = 1 : nbins
         bincents(k) = binedges{i}(ii) + ceil(diff(binedges{i}(ii : ii + 1)) / 2);
-        binidx(k) = i;
         k = k + 1;
     end
 end
