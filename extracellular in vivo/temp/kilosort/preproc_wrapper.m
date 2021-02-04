@@ -5,13 +5,13 @@ cd(basepath)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % open ephys
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'F:\fepsp\lh79\2021-02-03_16-26-15';
+basepath = 'F:\fepsp\lh76\2021-02-01_17-11-53';
 rmvch = [1 : 35, 37 : 43];
 rmvch = [1 : 19, 21 : 27];
 % mapch = [26 27 28 29 31 2 3 30 4 5 6 7 8 9 10 11 12 13 14 15 32 1 16 17 18 19 20 21 22 23 24 25 33 34 35];
 mapch = [1 : 43];
 mapch = [1 : 27];
-exp = [2];
+exp = [1];
 rec = cell(max(exp), 1);
 % rec{1} = [8 : 15];
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
@@ -21,13 +21,14 @@ datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
 %%%%%%%%%%%%%%%%%%%%%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % tdt
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'D:\VMs\shared\lh47\lh47_200308';
+basepath = 'D:\Data\lh81\030221_0640';
 store = 'Raw1';
-blocks = [3 : 10];
+blocks = [4];
 chunksize = 300;
 mapch = [1 : 16];
 % mapch = [1 : 2 : 7, 2 : 2 : 8, 9 : 2 : 15, 10 : 2 : 16];
 rmvch = [1, 3, 5, 7, 9 : 16];
+rmvch = [];
 clip = cell(1, 1);
 % clip{39} = [480 * 60 Inf];
 datInfo = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
@@ -46,16 +47,16 @@ spkgrp = session.extracellular.spikeGroups.channels;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % field
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-intens = [20 15 17.5];
+intens = flip([100 : 20 : 200, 240, 280, 320]);
 fepsp = fEPSPfromDat('basepath', basepath, 'fname', '', 'nchans', nchans,...
     'spkgrp', spkgrp, 'intens', intens, 'saveVar', true,...
     'force', true, 'extension', 'dat', 'recSystem', 'oe',...
-    'protocol', 'stp', 'anaflag', true, 'inspect', false, 'fsIn', fs,...
+    'protocol', 'io', 'anaflag', true, 'inspect', false, 'fsIn', fs,...
     'cf', 0);  
 
-intens = [300];
+intens = (100);
 fepsp = fEPSPfromWCP('basepath', basepath, 'sfiles', [],...
-    'sufx', 'stp', 'force', true, 'protocol', 'stp',...
+    'sufx', 'stp_3pulse', 'force', true, 'protocol', 'stp',...
     'intens', intens, 'inspect', false, 'fs', 30000);
 
 fepsp = fEPSP_analysis('fepsp', fepsp, 'basepath', basepath,...
@@ -71,13 +72,14 @@ rez = runKS('basepath', basepath, 'fs', fs, 'nchans', nchans,...
 
 % kk
 [spktimes, ~] = spktimesWh('basepath', basepath, 'fs', fs, 'nchans', nchans,...
-    'spkgrp', spkgrp, 'saveVar', true, 'saveWh', false,...
-    'graphics', false);
+    'spkgrp', spkgrp, 'saveVar', true, 'saveWh', true,...
+    'graphics', false, 'force', true);
         
 % create ns files for sorting
 spktimes2ks('basepath', basepath, 'fs', fs,...
     'nchans', nchans, 'spkgrp', spkgrp, 'mkClu', true,...
-    'dur', 240, 't', [], 'psamp', [], 'grps', [1 : length(spkgrp)]);
+    'dur', 240, 't', '200000', 'psamp', [], 'grps', [1 : length(spkgrp)],...
+    'spkFile', 'temp_wh');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % fix manual curation
@@ -154,13 +156,18 @@ lfp = getLFP('basepath', basepath, 'ch', [spkgrp{:}], 'chavg', {},...
     'fs', 1250, 'interval', [0 inf], 'extension', 'lfp',...
     'savevar', true, 'forceL', true, 'basename', '');
 
+% get emg
+[~, basename] = fileparts(basepath);
+filename = [basename '.emg.dat'];
+emg.data = double(bz_LoadBinary(filename, 'nChannels', 4, 'channels', 3));
+emg.tstamps = [1 : length(emg.data)] / fs;
+save([basename '.emg.mat'], 'emg')
+
+% states
 badch = setdiff([session.extracellular.electrodeGroups.channels{:}],...
     [session.extracellular.spikeGroups.channels{:}]);
 SleepScoreMaster(basepath, 'noPrompts', true, 'rejectChannels', badch)
 
-TheStateEditor
-
-% states
 states = {SleepState.ints.WAKEstate, SleepState.ints.NREMstate, SleepState.ints.REMstate};
 for ii = 1 : length(states)
     tStates{ii} = InIntervals(fr.tstamps, states{ii});

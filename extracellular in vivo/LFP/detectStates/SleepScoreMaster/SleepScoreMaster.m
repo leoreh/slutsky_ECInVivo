@@ -229,7 +229,11 @@ end
 % Schomburg E.W. Neuron 84, 470?485. 2014)
 [~, basename] = fileparts(basePath);
 accname = [basename '.acceleration.mat'];
-if exist(accname, 'file')
+emgname = [basename '.emg.mat'];
+if exist(emgname, 'file')
+    load(emgname);
+    EMGFromLFP = emg;
+elseif exist(accname, 'file')
     fprintf('\nloading acceleration')
     load(accname);
     EMGFromLFP = acc;
