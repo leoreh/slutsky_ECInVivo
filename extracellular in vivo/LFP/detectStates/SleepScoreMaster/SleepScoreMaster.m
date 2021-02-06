@@ -230,10 +230,10 @@ end
 [~, basename] = fileparts(basePath);
 accname = [basename '.acceleration.mat'];
 emgname = [basename '.emg.mat'];
-if exist(emgname, 'file')
-    load(emgname);
-    EMGFromLFP = emg;
-elseif exist(accname, 'file')
+% if exist(emgname, 'file')
+%     load(emgname);
+%     EMGFromLFP = emg;
+if exist(accname, 'file')
     fprintf('\nloading acceleration')
     load(accname);
     EMGFromLFP = acc;

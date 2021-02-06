@@ -9,7 +9,7 @@ forceA = false;
 
 % full path and name to xls file with session metadata
 xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
-mname = 'lh52';     % mouse name
+mname = 'lh81';     % mouse name
 
 % column name in xls sheet where dirnames exist
 colName = 'Session';                    
@@ -17,7 +17,7 @@ colName = 'Session';
 % string array of variables to load
 vars = ["session.mat";...
     "SleepState.states";....
-    "datInfo";
+    ".datInfo";
     ".sr.mat"];
 
 % column name of logical values for each session. only if true than session
@@ -58,12 +58,12 @@ if forceA
         spkgrp = session.extracellular.spikeGroups.channels;
         
         % sleep states
-%         badstamps = [];
-%         badch = setdiff([session.extracellular.electrodeGroups.channels{:}],...
-%             [session.extracellular.spikeGroups.channels{:}]);
-%         SleepScoreMaster(filepath, 'noPrompts', true,...
-%             'rejectChannels', badch, 'overwrite', true,...
-%             'NotchTheta', true, 'ignoretime', badstamps)
+        badstamps = [];
+        badch = setdiff([session.extracellular.electrodeGroups.channels{:}],...
+            [session.extracellular.spikeGroups.channels{:}]);
+        SleepScoreMaster(filepath, 'noPrompts', true,...
+            'rejectChannels', badch, 'overwrite', true,...
+            'NotchTheta', true, 'ignoretime', badstamps)
 %         TheStateEditor(fullfile(filepath, basename))
 %         % find bad times from sw spect    
 %         badtimes = SleepState.detectorinfo.StatePlotMaterials.swFFTspec(1, :) > 0.6e4;
@@ -72,19 +72,19 @@ if forceA
 %             'interDur', 10, 'exclude', false);
         
         % detect spikes
-%         [spktimes, ~] = spktimesWh('basepath', filepath, 'fs', fs, 'nchans', nchans,...
-%             'spkgrp', spkgrp, 'saveVar', true, 'saveWh', true,...
-%             'graphics', false, 'force', true);
+        [spktimes, ~] = spktimesWh('basepath', filepath, 'fs', fs, 'nchans', nchans,...
+            'spkgrp', spkgrp, 'saveVar', true, 'saveWh', true,...
+            'graphics', false, 'force', true);
         
 %         % create ns files for sorting
         spktimes2ks('basepath', filepath, 'fs', fs,...
             'nchans', nchans, 'spkgrp', spkgrp, 'mkClu', true,...
-            'dur', 150, 't', '030000', 'psamp', [], 'grps', [1 : length(spkgrp)],...
+            'dur', 240, 't', '080000', 'psamp', [], 'grps', [1 : length(spkgrp)],...
             'spkFile', 'temp_wh');
 %          
 %         % spike rate per tetrode. note that using firingRate requires
 %         % special care becasue spktimes is given in samples and not seconds
-%         load(fullfile(filepath, [basename '.spktimes.mat']))
+        load(fullfile(filepath, [basename '.spktimes.mat']))
         for ii = 1 : length(spkgrp)
             spktimes{ii} = spktimes{ii} / fs;
         end
@@ -113,11 +113,11 @@ sessionDate = [pathPieces{:}];
 sessionDate = sessionDate(2 : 3 : end);
  
 close all
-grp = [1 : 8];          % which tetrodes to plot
-state = [1];            % [] - all; 1 - awake; 2 - NREM; 3 - REM
+grp = [1 : 4];          % which tetrodes to plot
+state = [];            % [] - all; 1 - awake; 2 - NREM; 3 - REM
 Y = [0 250];            % ylim
-p1 = 0;                 % firing rate vs. time, one fig per session
-p2 = 1;                 % mfr across sessions, one fig
+p1 = 1;                 % firing rate vs. time, one fig per session
+p2 = 0;                 % mfr across sessions, one fig
 p3 = 0;                 % spike rate vs. time, one fig for all sessions
 plotStyle = 'bar';      % for p2. can by 'bar' or 'box'
 clr = ['bbbbbkkkkkkkkrrrrrrrr'];        % color sessions
@@ -174,6 +174,7 @@ for i = sessions
         ylabel('Spike Rate [Hz]')
         xlabel('Time [m]')
         title(dirnames{i})
+        
         if saveFig
             figname = sprintf('%s_SRvsTime', sessionDate{i})
             figname = fullfile(basepath, figname);

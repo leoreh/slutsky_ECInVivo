@@ -116,6 +116,8 @@ for i = 1 : ndirs
         filename = dir(['*', vars{ii}, '*']);
         if length(filename) == 1
             varArray{i, ii} = load(filename.name);
+        elseif length(filename) > 1
+            varArray{i, ii} = load(filename(2).name);       % lazy fix for tdt if both Raw and EMG streams were loaded
         else
             warning('no %s file in %s, skipping', vars{ii}, filepath)
         end

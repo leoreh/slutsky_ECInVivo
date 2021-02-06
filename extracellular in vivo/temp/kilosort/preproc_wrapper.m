@@ -21,16 +21,15 @@ datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
 %%%%%%%%%%%%%%%%%%%%%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % tdt
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'D:\Data\lh81\030221_0640';
+basepath = 'K:\Data\050221_0701';
 store = 'Raw1';
-blocks = [4];
+blocks = [2, 3, 4, 5];
 chunksize = 300;
 mapch = [1 : 16];
-% mapch = [1 : 2 : 7, 2 : 2 : 8, 9 : 2 : 15, 10 : 2 : 16];
-rmvch = [1, 3, 5, 7, 9 : 16];
+% mapch = [1 : 4];
 rmvch = [];
 clip = cell(1, 1);
-% clip{39} = [480 * 60 Inf];
+% clip{12} = [42000 Inf];
 datInfo = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
     'chunksize', chunksize, 'mapch', mapch, 'rmvch', rmvch, 'clip', clip);
 
@@ -81,6 +80,16 @@ spktimes2ks('basepath', basepath, 'fs', fs,...
     'dur', 240, 't', '200000', 'psamp', [], 'grps', [1 : length(spkgrp)],...
     'spkFile', 'temp_wh');
 
+% spike rate
+for ii = 1 : length(spkgrp)
+    spktimes{ii} = spktimes{ii} / fs;
+end
+binsize = 60;
+sr = firingRate(spktimes, 'basepath', basepath,...
+    'graphics', false, 'saveFig', false,...
+    'binsize', binsize, 'saveVar', 'sr', 'smet', 'none',...
+    'winBL', [0 Inf]);
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % fix manual curation
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -119,20 +128,6 @@ winBL = [5 * 60 20 * 60];
 fr = firingRate(spikes.times, 'basepath', basepath, 'graphics', false, 'saveFig', false,...
     'binsize', binsize, 'saveVar', true, 'smet', 'MA', 'winBL', winBL);
 
-figure
-subplot(2, 1, 1)
-data = fr.norm;
-plot(fr.tstamps / 60, data')
-hold on
-plot(fr.tstamps / 60, mean(data, 1), 'k', 'LineWidth', 3)
-ylabel('Norm. FR')
-subplot(2, 1, 2)
-data = fr.strd;
-plot(fr.tstamps / 60, data')
-hold on
-plot(fr.tstamps / 60, mean(data, 1), 'k', 'LineWidth', 3)
-ylabel('FR [Hz]')
-xlabel('Time [m]')
 
 % CCG
 binSize = 0.001; dur = 0.12; % low res
@@ -159,21 +154,21 @@ lfp = getLFP('basepath', basepath, 'ch', [spkgrp{:}], 'chavg', {},...
 % get emg
 [~, basename] = fileparts(basepath);
 filename = [basename '.emg.dat'];
-emg.data = double(bz_LoadBinary(filename, 'nChannels', 4, 'channels', 3));
-emg.tstamps = [1 : length(emg.data)] / fs;
+emg.orig = double(bz_LoadBinary(filename, 'nChannels', 4, 'channels', 2,...
+    'precision', 'int16', 'start', 0, 'frequency', datInfo.fs));
+emg.data = bz_NormToRange(zscore(emg.orig), [0 1]);
+emg.tstamps = [1 : length(emg.orig)] / datInfo.fs;
 save([basename '.emg.mat'], 'emg')
+
+emg.timestamps = emg.tstamps;
+EMGFromLFP = emg;
+save([basename '.EMGFromLFP.LFP.mat'], 'EMGFromLFP')
 
 % states
 badch = setdiff([session.extracellular.electrodeGroups.channels{:}],...
     [session.extracellular.spikeGroups.channels{:}]);
 SleepScoreMaster(basepath, 'noPrompts', true, 'rejectChannels', badch)
-
-states = {SleepState.ints.WAKEstate, SleepState.ints.NREMstate, SleepState.ints.REMstate};
-for ii = 1 : length(states)
-    tStates{ii} = InIntervals(fr.tstamps, states{ii});
-    t{ii} = fr.tstamps(tStates{ii});
-    frStates{ii} = mean(fr.strd(:, tStates{ii}), 2);
-end
+TheStateEditor(fullfile(basepath, basename))
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % spike detection routine
