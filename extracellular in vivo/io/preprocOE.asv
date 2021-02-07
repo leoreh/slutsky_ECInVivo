@@ -210,7 +210,7 @@ end
 
     % states (depends on xml file)
     if ~isempty(xmlfiles)
-%         SleepScoreMaster(exPathNew, 'rejectChannels', accCh)
+        SleepScoreMaster(exPathNew, 'rejectChannels', accCh)
     end
     
 end
