@@ -33,7 +33,7 @@ ncond = ["fepsp"];
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if ~exist('varArray', 'var') && ~forceL
-    [varArray, dirnames, basepath] = getSessionVars('vars', vars,...
+    [varArray, dirnames, mousepath] = getSessionVars('vars', vars,...
         'pcond', pcond, 'ncond', ncond, 'sortDir', false, 'dirnames', [],...
         'xlsname', xlsname, 'mname', mname);
 end
@@ -47,9 +47,9 @@ if forceA
     for i = 1 : nsessions
         
         % file
-        filepath = char(fullfile(basepath, dirnames{i}));
-        basepaths{i} = fullfile(basepath, dirnames{i});
-        cd(filepath)
+        basepath = char(fullfile(mousepath, dirnames{i}));
+        basepaths{i} = fullfile(mousepath, dirnames{i});
+        cd(basepath)
         
         % params
         session = CE_sessionTemplate(pwd, 'viaGUI', false,...
@@ -69,10 +69,10 @@ if forceA
         % spikes
         % fixSpkAndRes('grp', [], 'fs', fs, 'stdFactor', 0, 'nchans', nchans);
         spikes = loadSpikes('session', session);
-        spikes = fixCEspikes('basepath', filepath, 'saveVar', false,...
+        spikes = fixCEspikes('basepath', basepath, 'saveVar', false,...
             'force', true);
         
-        spikes = cluVal('spikes', spikes, 'basepath', filepath, 'saveVar', true,...
+        spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
             'saveFig', false, 'force', true, 'mu', [], 'graphics', false,...
             'vis', 'on', 'spkgrp', spkgrp);
         
@@ -82,14 +82,14 @@ if forceA
             'submitToDatabase', false, 'spikes', spikes);
         % cell_metrics = CellExplorer('basepath', filepath);
         
-        cc = cellclass('basepath', filepath,...
+        cc = cellclass('basepath', basepath,...
             'waves', cat(1, spikes.rawWaveform{:})', 'saveVar', true,...
             'graphics', false);
         
         % firing rate
         binsize = 30;
         winBL = [10 * 60 30 * 60];
-        fr = firingRate(spikes.times, 'basepath', filepath,...
+        fr = firingRate(spikes.times, 'basepath', basepath,...
             'graphics', false, 'saveFig', false,...
             'binsize', binsize, 'saveVar', true, 'smet', 'MA',...
             'winBL', winBL);
@@ -224,7 +224,7 @@ for i = 1 : nsessions
             end
             figname = sprintf('%s_%s_FRvsTime', sessionDate{i}, unitClass)
             suptitle(figname)
-            figname = fullfile(basepath, figname);
+            figname = fullfile(mousepath, figname);
             % print(fh, figname, '-dpdf', '-bestfit', '-painters');
             export_fig(figname, '-tif', '-transparent', '-r300')
         end
@@ -258,7 +258,7 @@ for i = 1 : nsessions
         title(dirnames{i})
         if saveFig
             figname = sprintf('LTP')
-            figname = fullfile(basepath, figname);
+            figname = fullfile(mousepath, figname);
             % print(fh, figname, '-dpdf', '-bestfit', '-painters');
             export_fig(figname, '-tif', '-transparent', '-r300')
         end
@@ -309,7 +309,7 @@ if p2
     title(txt)
     if saveFig
         figname = sprintf('MSR of Tetrode #%s', num2str(grp));
-        figname = fullfile(basepath, figname);
+        figname = fullfile(mousepath, figname);
         % print(fh, figname, '-dpdf', '-bestfit', '-painters');
         export_fig(figname, '-tif', '-transparent', '-r300')
     end
@@ -355,7 +355,7 @@ if p4
     box off
     
     if saveFig
-        figname = fullfile(basepath, 'UnitsDetected');
+        figname = fullfile(mousepath, 'UnitsDetected');
         % print(fh, figname, '-dpdf', '-bestfit', '-painters');
         export_fig(figname, '-tif', '-transparent', '-r300')
     end

@@ -12,7 +12,7 @@ xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
 mname = 'lh81';     % mouse name
 
 % column name in xls sheet where dirnames exist
-colName = 'Session';                    
+colName = 'Session';
 
 % string array of variables to load
 vars = ["session.mat";...
@@ -32,7 +32,7 @@ ncond = ["fepsp"];
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if ~exist('varArray', 'var') && ~forceL
-    [varArray, dirnames, basepath] = getSessionVars('vars', vars,...
+    [varArray, dirnames, mousepath] = getSessionVars('vars', vars,...
         'pcond', pcond, 'ncond', ncond, 'sortDir', false, 'dirnames', [],...
         'xlsname', xlsname, 'mname', mname);
 end
@@ -46,9 +46,9 @@ if forceA
     for i = 1 : nsessions
         
         % file
-        filepath = char(fullfile(basepath, dirnames{i}));
-        [~, basename] = fileparts(filepath);
-        cd(filepath)
+        basepath = char(fullfile(mousepath, dirnames{i}));
+        [~, basename] = fileparts(basepath);
+        cd(basepath)
         
         % params
         session = CE_sessionTemplate(pwd, 'viaGUI', false,...
@@ -58,41 +58,46 @@ if forceA
         spkgrp = session.extracellular.spikeGroups.channels;
         
         % sleep states
+        ss = accusleep_wrapper('basepath', basepath, 'cleanRec', 2,...
+            'SR', 512, 'epochLen', 2.5, 'recSystem', 'tdt', 'calfile', [],...
+            'badEpochs', [], 'lfpCh', 13, 'emgCh', [], 'viaGui', false,...
+            'forceCalibrate', false, 'inspectLabels', true, 'saveVar', true);
+        
         badstamps = [];
         badch = setdiff([session.extracellular.electrodeGroups.channels{:}],...
             [session.extracellular.spikeGroups.channels{:}]);
-        SleepScoreMaster(filepath, 'noPrompts', true,...
+        SleepScoreMaster(basepath, 'noPrompts', true,...
             'rejectChannels', badch, 'overwrite', true,...
             'NotchTheta', true, 'ignoretime', badstamps)
-%         TheStateEditor(fullfile(filepath, basename))
-%         % find bad times from sw spect    
-%         badtimes = SleepState.detectorinfo.StatePlotMaterials.swFFTspec(1, :) > 0.6e4;
-%         figure, plot(SleepState.detectorinfo.StatePlotMaterials.swFFTspec(1, :))
-%         badstamps = binary2epochs('vec', badtimes', 'minDur', 2, 'maxDur', 200000000,...
-%             'interDur', 10, 'exclude', false);
+        %         TheStateEditor(fullfile(filepath, basename))
+        %         % find bad times from sw spect
+        %         badtimes = SleepState.detectorinfo.StatePlotMaterials.swFFTspec(1, :) > 0.6e4;
+        %         figure, plot(SleepState.detectorinfo.StatePlotMaterials.swFFTspec(1, :))
+        %         badstamps = binary2epochs('vec', badtimes', 'minDur', 2, 'maxDur', 200000000,...
+        %             'interDur', 10, 'exclude', false);
         
         % detect spikes
-        [spktimes, ~] = spktimesWh('basepath', filepath, 'fs', fs, 'nchans', nchans,...
+        [spktimes, ~] = spktimesWh('basepath', basepath, 'fs', fs, 'nchans', nchans,...
             'spkgrp', spkgrp, 'saveVar', true, 'saveWh', true,...
             'graphics', false, 'force', true);
         
-%         % create ns files for sorting
-        spktimes2ks('basepath', filepath, 'fs', fs,...
+        % create ns files for sorting
+        spktimes2ks('basepath', basepath, 'fs', fs,...
             'nchans', nchans, 'spkgrp', spkgrp, 'mkClu', true,...
-            'dur', 240, 't', '080000', 'psamp', [], 'grps', [1 : length(spkgrp)],...
+            'dur', 240, 't', '200000', 'psamp', [], 'grps', [1 : length(spkgrp)],...
             'spkFile', 'temp_wh');
-%          
-%         % spike rate per tetrode. note that using firingRate requires
-%         % special care becasue spktimes is given in samples and not seconds
-        load(fullfile(filepath, [basename '.spktimes.mat']))
+        
+        % spike rate per tetrode. note that using firingRate requires
+        % special care becasue spktimes is given in samples and not seconds
+        load(fullfile(basepath, [basename '.spktimes.mat']))
         for ii = 1 : length(spkgrp)
             spktimes{ii} = spktimes{ii} / fs;
         end
         binsize = 60;
-        sr = firingRate(spktimes, 'basepath', filepath,...
+        sr = firingRate(spktimes, 'basepath', basepath,...
             'graphics', false, 'saveFig', false,...
             'binsize', binsize, 'saveVar', 'sr', 'smet', 'none',...
-            'winBL', [0 Inf]);     
+            'winBL', [0 Inf]);
     end
 end
 
@@ -111,7 +116,7 @@ saveFig = false;
 pathPieces = regexp(dirnames(:), '_', 'split'); % assumes filename structure: animal_date_time
 sessionDate = [pathPieces{:}];
 sessionDate = sessionDate(2 : 3 : end);
- 
+
 close all
 grp = [1 : 4];          % which tetrodes to plot
 state = [];            % [] - all; 1 - awake; 2 - NREM; 3 - REM
@@ -131,7 +136,7 @@ for i = sessions
     ss = varArray{i, 2}.SleepState;
     datInfo = varArray{i, 3}.datInfo;
     sr = varArray{i, 4}.fr;
-   
+    
     tstamps = sr.tstamps ;
     if isfield(datInfo, 'nsamps')
         nsamps = cumsum(datInfo.nsamps);
@@ -140,14 +145,14 @@ for i = sessions
     else
         nsamps = 120 * 60 * fs;
     end
-      
+    
     % mfr in selected state across sessions (mean +- std)
     states = {ss.ints.WAKEstate, ss.ints.NREMstate, ss.ints.REMstate};
     if ~isempty(state)
-        mfr{i} = mean(sr.states.fr{state}(grp, :), 2);               
+        mfr{i} = mean(sr.states.fr{state}(grp, :), 2);
         txt = sprintf('MSR of T#%s in %s', num2str(grp), sr.states.statenames{state});
     else
-        mfr{i} = mean(sr.strd(grp, :), 2);       
+        mfr{i} = mean(sr.strd(grp, :), 2);
         txt = sprintf('MSR of T#%s', num2str(grp));
     end
     
@@ -177,7 +182,7 @@ for i = sessions
         
         if saveFig
             figname = sprintf('%s_SRvsTime', sessionDate{i})
-            figname = fullfile(basepath, figname);
+            figname = fullfile(mousepath, figname);
             % print(fh, figname, '-dpdf', '-bestfit', '-painters');
             export_fig(figname, '-tif', '-transparent', '-r300')
         end
@@ -226,20 +231,20 @@ if p2
     box off
     title(txt)
     if saveFig
-        figname = fullfile(basepath, ['sessionSummary of ' txt]);
+        figname = fullfile(mousepath, ['sessionSummary of ' txt]);
         % print(fh, figname, '-dpdf', '-bestfit', '-painters');
         export_fig(figname, '-tif', '-transparent', '-r300')
     end
 end
 
 % spike rate vs. time across all sessions (1 fig)
-% state = [];            
+% state = [];
 onSession = 'lh70_201015_1815';
 onSession = 'lh58_200830_180803';
 offSession = 'lh70_201019_1831';
 offSession = 'lh58_200905_180929';
 CNOidx = [0 0];
-if p3  
+if p3
     msr = [];
     tsr = [];
     tss = [];
@@ -252,8 +257,8 @@ if p3
         datInfo = varArray{i, 3}.datInfo;
         sr = varArray{i, 4}.fr;
         t = varArray{i, 5}.spktimes;
-        filepath = char(fullfile(basepath, dirnames{i}));
-        [~, basename] = fileparts(filepath);
+        basepath = char(fullfile(mousepath, dirnames{i}));
+        [~, basename] = fileparts(basepath);
         
         if ~isempty(state)
             data = sr.states.fr{state};
@@ -270,7 +275,7 @@ if p3
             CNOidx(1) = length(msr);
         elseif strcmp(basename, offSession)
             CNOidx(2) = length(msr);
-        end       
+        end
         
         % arrange time indices
         recStart = split(basename, '_');
@@ -288,7 +293,7 @@ if p3
         end
         s = seconds(t - recStart);
         [~, idx] = min(abs(s - tstamps));
-        xidx(i) = idx + length(msr);      
+        xidx(i) = idx + length(msr);
         xname{i} = [char(sessionDate(i)) '_' datestr(t, 'HHMM')];
         
         msr = [msr, data];
@@ -305,7 +310,7 @@ if p3
     fh = figure;
     plot(msr(grp, :)', 'LineWidth', 1)
     hold on
-%     stdshade(msr(grp, :), '0.3', 'k')
+    %     stdshade(msr(grp, :), '0.3', 'k')
     yLimit = ylim;
     patch([CNOidx CNOidx(2) CNOidx(1)],...
         [yLimit(1) yLimit(1) yLimit(2) yLimit(2)],...
@@ -320,9 +325,9 @@ if p3
     axis tight
     ylabel('mean SR [Hz]')
     xlabel('Time [hhmm]')
-%     title(txt)
+    %     title(txt)
     if saveFig
-        figname = fullfile(basepath, txt);
+        figname = fullfile(mousepath, txt);
         % print(fh, figname, '-dpdf', '-bestfit', '-painters');
         export_fig(figname, '-tif', '-transparent', '-r300')
     end

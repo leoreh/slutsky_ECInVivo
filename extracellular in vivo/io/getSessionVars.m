@@ -1,4 +1,4 @@
-function [varArray, dirnames, basepath] = getSessionVars(varargin)
+function [varArray, dirnames, mousepath] = getSessionVars(varargin)
 
 % loads specific matlab variables from specified directories and organizes
 % them in a cell array. the directories can be specified directly as input
@@ -6,7 +6,7 @@ function [varArray, dirnames, basepath] = getSessionVars(varargin)
 % variables in each dir are named "dirname.varname.mat".
 
 % INPUT:
-%   basepath    string. path to mouse folder with all sessions {pwd}. if
+%   mousepath   string. path to mouse folder with all sessions {pwd}. if
 %               empty will be retreived from xls
 %   xlsname     string. name of xls file with list of sessions. must
 %               include extension {'sessionList.xlsx'}
@@ -31,7 +31,7 @@ function [varArray, dirnames, basepath] = getSessionVars(varargin)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 p = inputParser;
-addOptional(p, 'basepath', pwd);
+addOptional(p, 'mousepath', pwd);
 addOptional(p, 'xlsname', 'sessionList.xlsx', @ischar);
 addOptional(p, 'mname', '', @ischar);
 addOptional(p, 'dirColumn', "Session", @isstring);
@@ -42,7 +42,7 @@ addOptional(p, 'sortDir', true, @islogical);
 addOptional(p, 'dirnames', []);
 
 parse(p, varargin{:})
-basepath        = p.Results.basepath;
+mousepath       = p.Results.mousepath;
 xlsname         = p.Results.xlsname;
 mname           = p.Results.mname;
 dirColumn       = p.Results.dirColumn;
@@ -100,12 +100,12 @@ varArray = cell(length(dirnames), length(vars));
 for i = 1 : ndirs
     % handle cases where not all sessions are in the same basepath
     if ~isempty(basepaths{i})
-        basepath = basepaths{i};
+        mousepath = basepaths{i};
     else
-        basepath = basepath_default;
+        mousepath = basepath_default;
     end  
     
-    filepath = char(fullfile(basepath, dirnames(i)));
+    filepath = char(fullfile(mousepath, dirnames(i)));
     if ~exist(filepath, 'dir')
         warning('%s does not exist, skipping...', filepath)
         continue

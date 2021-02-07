@@ -33,15 +33,15 @@ ncond = ["spktimes"];
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if ~exist('varArray', 'var') && ~forceL
-    [varArray, dirnames, basepath] = getSessionVars('vars', vars,...
+    [varArray, dirnames, mousepath] = getSessionVars('vars', vars,...
         'pcond', pcond, 'ncond', ncond, 'sortDir', false, 'dirnames', [],...
         'xlsname', xlsname, 'mname', mname, 'basepath', []);
 end
 nsessions = length(dirnames);
 
 % session info
-filepath = char(fullfile(basepath, dirnames(1)));
-cd(filepath)
+basepath = char(fullfile(mousepath, dirnames(1)));
+cd(basepath)
 session = CE_sessionTemplate(pwd, 'viaGUI', false,...
     'force', true, 'saveVar', true);
 nchans = session.extracellular.nChannels;
@@ -57,14 +57,14 @@ if forceA
     for i = 3 : nsessions
         
         % file
-        filepath = char(fullfile(basepath, dirnames(i)));
-        cd(filepath)
+        basepath = char(fullfile(mousepath, dirnames(i)));
+        cd(basepath)
         
         fepsp = varArray{i, 2}.fepsp;
         
         % fepsp
         intens = [];
-        fepsp = fEPSPfromDat('basepath', filepath, 'fname', '', 'nchans', nchans,...
+        fepsp = fEPSPfromDat('basepath', basepath, 'fname', '', 'nchans', nchans,...
             'spkgrp', spkgrp, 'intens', intens, 'saveVar', true,...
             'force', true, 'extension', 'dat', 'recSystem', 'oe',...
             'protocol', 'io', 'inspect', false, 'anaflag', false, 'cf', 450);
@@ -206,7 +206,7 @@ if p
     suptitle(['T#' num2str(grp) ' @ ' num2str(si) 'uA'])
     
     if saveFig
-        figname = fullfile(basepath, 'fepspSessions');
+        figname = fullfile(mousepath, 'fepspSessions');
         % print(fh, figname, '-dpdf', '-bestfit', '-painters');
         export_fig(figname, '-tif', '-transparent', '-r300')
     end
