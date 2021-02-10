@@ -14,7 +14,7 @@ function datInfo = catDat(varargin)
 %   newpath     string. path where new file should be save. if empty than
 %               new file will be save in basepath
 %   newname     string. name of new file. if empty will be extracted from
-%               newpath. in newpath not specified will be named as original
+%               newpath. if newpath not specified will be named as original
 %               file with the extension '_new'
 %   concat      logical. concatenate dat files {true} or not (false)
 %   precision   char. sample precision {'int16'}

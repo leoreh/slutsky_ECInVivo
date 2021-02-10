@@ -5,7 +5,7 @@ function [chunks] = n2chunks(varargin)
 % chunks. note that clipping only works if chunksize is small enough such
 % that no 2 clips are in the same chunk. for this: (alt 1) acertain that
 % chunksize = min(diff(clip)), (alt 2) combine adjacent clips. the first may
-% create (to) many chunks, the second will remove more samples than
+% create (too) many chunks, the second will remove more samples than
 % needed.
 %
 % INPUT:

@@ -21,18 +21,19 @@ datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
 %%%%%%%%%%%%%%%%%%%%%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % tdt
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'K:\Data\050221_0701';
+basepath = 'K:\Data\070221_0653';
 store = 'Raw1';
-blocks = [6];
+blocks = [1, 2];
 chunksize = 300;
 mapch = [1 : 16];
 % mapch = [1 : 4];
 rmvch = [];
 % rmvch = [1 : 3];
 clip = cell(1, 1);
-% clip{12} = [42000 Inf];
+% clip{3} = [41150 Inf];
 datInfo = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
     'chunksize', chunksize, 'mapch', mapch, 'rmvch', rmvch, 'clip', clip);
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % session info (cell explorer foramt)
@@ -201,3 +202,18 @@ sr.tstamps = sr.tstamps / binsize;
 
 figure, plot(sr.tstamps, sr.strd)
 legend
+
+%%% cat dat
+newpath = 'D:\Data\lh81\lh81_210207_045300';
+datFiles{1} = 'D:\Data\lh81\lh81_210206_190000\lh81_210206_190000.dat';
+datFiles{2} = 'D:\Data\lh81\lh81_210207_065300\lh81_210207_065300.dat';
+info = dir(datFiles{1});
+nsamps = info.bytes / 2 / 16;
+parts{1} = [nsamps - 2 * 60 * 60 * 24414.06 nsamps];
+parts{2} = [0 4 * 60 * 60 * 24414.06];
+
+catDatMemmap('datFiles', datFiles, 'newpath', newpath, 'parts', parts,...
+    'nchans', 16, 'saveVar', true)
+
+
+

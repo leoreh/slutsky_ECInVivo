@@ -16,9 +16,10 @@ colName = 'Session';
 
 % string array of variables to load
 vars = ["session.mat";...
-    "SleepState.states";....
+    "SleepState.states.mat";...
     ".datInfo";
-    ".sr.mat"];
+    ".sr.mat";...
+    "AccuSleep_states"];
 
 % column name of logical values for each session. only if true than session
 % will be loaded. can be a string array and than all conditions must be
@@ -58,17 +59,20 @@ if forceA
         spkgrp = session.extracellular.spikeGroups.channels;
         
         % sleep states
-        ss = accusleep_wrapper('basepath', basepath, 'cleanRec', 2,...
+        ss = accusleep_wrapper('basepath', basepath, 'cleanRec', [],...
             'SR', 512, 'epochLen', 2.5, 'recSystem', 'tdt', 'calfile', [],...
-            'badEpochs', [], 'lfpCh', 13, 'emgCh', [], 'viaGui', false,...
-            'forceCalibrate', false, 'inspectLabels', true, 'saveVar', true);
+            'badEpochs', [], 'lfpCh', [13 : 16], 'emgCh', [], 'viaGui', false,...
+            'forceCalibrate', false, 'inspectLabels', true, 'saveVar', true,...
+            'force', true);
+%         AccuSleep_viewer(EEG, EMG, ss.fs, 0.5, ss.labels, []);
         
-        badstamps = [];
-        badch = setdiff([session.extracellular.electrodeGroups.channels{:}],...
-            [session.extracellular.spikeGroups.channels{:}]);
-        SleepScoreMaster(basepath, 'noPrompts', true,...
-            'rejectChannels', badch, 'overwrite', true,...
-            'NotchTheta', true, 'ignoretime', badstamps)
+        % AccuSleep_GUI
+        %         badstamps = [];
+        %         badch = setdiff([session.extracellular.electrodeGroups.channels{:}],...
+        %             [session.extracellular.spikeGroups.channels{:}]);
+        %         SleepScoreMaster(basepath, 'noPrompts', true,...
+        %             'rejectChannels', badch, 'overwrite', true,...
+        %             'NotchTheta', true, 'ignoretime', badstamps)
         %         TheStateEditor(fullfile(filepath, basename))
         %         % find bad times from sw spect
         %         badtimes = SleepState.detectorinfo.StatePlotMaterials.swFFTspec(1, :) > 0.6e4;
@@ -77,15 +81,15 @@ if forceA
         %             'interDur', 10, 'exclude', false);
         
         % detect spikes
-        [spktimes, ~] = spktimesWh('basepath', basepath, 'fs', fs, 'nchans', nchans,...
-            'spkgrp', spkgrp, 'saveVar', true, 'saveWh', true,...
-            'graphics', false, 'force', true);
+%         [spktimes, ~] = spktimesWh('basepath', basepath, 'fs', fs, 'nchans', nchans,...
+%             'spkgrp', spkgrp, 'saveVar', true, 'saveWh', true,...
+%             'graphics', false, 'force', true);
         
-        % create ns files for sorting
-        spktimes2ks('basepath', basepath, 'fs', fs,...
-            'nchans', nchans, 'spkgrp', spkgrp, 'mkClu', true,...
-            'dur', 240, 't', '200000', 'psamp', [], 'grps', [1 : length(spkgrp)],...
-            'spkFile', 'temp_wh');
+%         % create ns files for sorting
+%         spktimes2ks('basepath', basepath, 'fs', fs,...
+%             'nchans', nchans, 'spkgrp', spkgrp, 'mkClu', true,...
+%             'dur', [], 't', [], 'psamp', [], 'grps', [1 : length(spkgrp)],...
+%             'spkFile', 'temp_wh');
         
         % spike rate per tetrode. note that using firingRate requires
         % special care becasue spktimes is given in samples and not seconds
@@ -98,6 +102,7 @@ if forceA
             'graphics', false, 'saveFig', false,...
             'binsize', binsize, 'saveVar', 'sr', 'smet', 'none',...
             'winBL', [0 Inf]);
+        
     end
 end
 
@@ -119,7 +124,7 @@ sessionDate = sessionDate(2 : 3 : end);
 
 close all
 grp = [1 : 4];          % which tetrodes to plot
-state = [];            % [] - all; 1 - awake; 2 - NREM; 3 - REM
+state = [];             % [] - all; 1 - awake; 2 - NREM; 3 - REM
 Y = [0 250];            % ylim
 p1 = 1;                 % firing rate vs. time, one fig per session
 p2 = 0;                 % mfr across sessions, one fig
@@ -128,15 +133,16 @@ plotStyle = 'bar';      % for p2. can by 'bar' or 'box'
 clr = ['bbbbbkkkkkkkkrrrrrrrr'];        % color sessions
 clr = ['bbbbbkkkkkkkkkkkkrrrrr'];        % color sessions
 sessions = 1 : nsessions;
-% sessions = [1 : 2, 4 : 7]
+[nsub] = numSubplots(length(sessions));
 k = 1;
 for i = sessions
     
     session = varArray{i, 1}.session;
-    ss = varArray{i, 2}.SleepState;
+%     ss = varArray{i, 2}.SleepState;
     datInfo = varArray{i, 3}.datInfo;
     sr = varArray{i, 4}.fr;
-    
+    ss = varArray{i, 5}.ss;
+
     tstamps = sr.tstamps ;
     if isfield(datInfo, 'nsamps')
         nsamps = cumsum(datInfo.nsamps);
@@ -147,7 +153,8 @@ for i = sessions
     end
     
     % mfr in selected state across sessions (mean +- std)
-    states = {ss.ints.WAKEstate, ss.ints.NREMstate, ss.ints.REMstate};
+%     states = {ss.ints.WAKEstate, ss.ints.NREMstate, ss.ints.REMstate};
+    states = ss.stateEpochs;
     if ~isempty(state)
         mfr{i} = mean(sr.states.fr{state}(grp, :), 2);
         txt = sprintf('MSR of T#%s in %s', num2str(grp), sr.states.statenames{state});
@@ -161,7 +168,6 @@ for i = sessions
         if ~exist('fh1', 'var')
             fh1 = figure;
         end
-        [nsub] = numSubplots(length(sessions));
         subplot(nsub(1), nsub(2), k)
         plot(sr.tstamps / 60, (sr.strd(grp, :))', 'LineWidth', 1.5)
         hold on
@@ -188,6 +194,92 @@ for i = sessions
         end
     end
     k = k + 1;
+end
+
+% histogram bins of firing rate in states
+p3 = 1;
+k = 1;
+tet = 1;
+if p3
+    fh = figure;
+    for i = 1 : nsessions
+        session = varArray{i, 1}.session;
+        datInfo = varArray{i, 3}.datInfo;
+        sr = varArray{i, 4}.fr;
+        ss = varArray{i, 5}.ss;
+        
+        subplot(nsub(1), nsub(2), k)
+        hold on
+        for ii = 2 : 3
+            sum(diff(ss.stateEpochs{ii}'));
+            nbins = min([length(sr.states.fr{ii}), 200]);
+            binidx = randperm(length(sr.states.fr{ii}), nbins);
+            h = histogram(sr.states.fr{ii}(tet, binidx), round(nbins / 5), 'EdgeAlpha', 0,...
+                'FaceAlpha', 0.3, 'Normalization', 'count');
+        end
+        ylabel('Counts')
+        xlabel('Spike Rate [Hz]')
+        xlim([0 150])
+        if k == 1
+            legend({'WAKE', 'NREM'})
+        end
+        title(dirnames{i})
+        k = k + 1;
+    end
+end
+
+% stacked plot of episode duration
+p3 = 1;
+if p3
+    for i = 1 : nsessions
+        session = varArray{i, 1}.session;
+        datInfo = varArray{i, 3}.datInfo;
+        sr = varArray{i, 4}.fr;
+        ss = varArray{i, 5}.ss;
+        
+        for ii = 1 : 3
+            clipped = sum(diff([datInfo.clip{:}]));
+            epDur(i, ii) = sum(diff(ss.stateEpochs{ii}')) /...
+                (sum(datInfo.nsec) - ss.tRemoved) * 100;
+%             epDur(i, ii) = sum(diff(ss.stateEpochs{ii}')) / 60 / 60
+        end
+    end
+    fh = figure;
+    bar(epDur, 'stacked')
+    xticklabels(cellstr(dirnames))
+    xtickangle(45)
+    ylim([0 100])
+    ylabel('Time [&]')
+    legend({'REM', 'WAKE', 'NREM'})
+    title('State Duration')
+end
+
+% histogram duration of episodes
+p3 = 1;
+k = 1;
+if p3
+    fh = figure;
+    for i = 1 : nsessions
+        ss = varArray{i, 5}.ss;
+        
+        subplot(nsub(1), nsub(2), k)
+        hold on
+        for ii = 3
+            epLen = log10(diff(ss.stateEpochs{ii}'));
+            
+            h = histogram(epLen, round(length(epLen) / 20), 'EdgeAlpha', 0,...
+                'FaceAlpha', 0.3, 'Normalization', 'count');
+        end
+        ylabel('Counts')
+        xlabel('Duration [log10(s)]')
+        xlim([0 2.5])
+        ylim([0 100])
+        if k == 1
+            legend({'NREM'})
+        end
+        title(dirnames{i})
+        k = k + 1;
+    end
 end
 
 if p2
@@ -244,7 +336,8 @@ onSession = 'lh58_200830_180803';
 offSession = 'lh70_201019_1831';
 offSession = 'lh58_200905_180929';
 CNOidx = [0 0];
-if p3
+p4 = 0;
+if p4
     msr = [];
     tsr = [];
     tss = [];
@@ -256,7 +349,7 @@ if p3
         ss = varArray{i, 2}.SleepState;
         datInfo = varArray{i, 3}.datInfo;
         sr = varArray{i, 4}.fr;
-        t = varArray{i, 5}.spktimes;
+        st = varArray{i, 5}.spktimes;
         basepath = char(fullfile(mousepath, dirnames{i}));
         [~, basename] = fileparts(basepath);
         

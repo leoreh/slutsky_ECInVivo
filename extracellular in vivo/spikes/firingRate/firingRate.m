@@ -86,7 +86,20 @@ nunits = length(spktimes);
 
 % calc fr according to states. based on Buzsaki format. note states,
 % binsize, and spktimes must be the same units (typically sec)
-if exist(fullfile(basepath, [basename '.SleepState.states.mat']))
+if exist(fullfile(basepath, [basename '.AccuSleep_states.mat']))
+    load(fullfile(basepath, [basename '.AccuSleep_states.mat']), 'ss')
+    
+    fr.states.stateNames = ss.labelNames;
+    nstates = length(ss.stateEpochs);
+    for i = 1 : nstates
+        if ~isempty(ss.stateEpochs{i})
+        [fr.states.fr{i}, fr.states.binedges, fr.states.tstamps{i}, fr.states.binidx] =...
+            times2rate(spktimes, 'binsize', binsize, 'winCalc', ss.stateEpochs{i}, 'c2r', true);
+        else
+        end
+    end
+    
+elseif exist(fullfile(basepath, [basename '.SleepState.states.mat']))
     load(fullfile(basepath, [basename '.SleepState.states.mat']))
     
     fr.states.statenames = {'WAKE', 'NREM', 'REM'};

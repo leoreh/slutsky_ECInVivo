@@ -2,7 +2,8 @@ function epochs = binary2epochs(varargin)
 
 % gets a binary vector and returns the start \ stop times of epochs. can be
 % used for BS, ripples, anesthesia states etc. accounts for inter-epoch
-% interval and duration
+% interval and duration. note that epoch defines start including idx and
+% stop not including idx. this is for legacy purposes. 
 % 
 % INPUT
 %       vec         binary vector 

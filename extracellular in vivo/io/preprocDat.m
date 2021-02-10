@@ -15,7 +15,7 @@ function datInfo = preprocDat(varargin)
 %   bkup        logical. save original file (true) or not {false}
 %   clip        mat n x 2 indicating samples to diregard from chunks.
 %               for example: clip = [0 50; 700 Inf] will remove the first
-%               50 samples and all samples between 700 and n
+%               50 samples and all samples between 700 and end of recording
 %   nchans      numeric. original number of channels in dat file {35}.
 %   mapch       vec. new order of channels {[]}. 1-based.
 %   rmvch       vec. channels to remove (according to original order) {[]}.
