@@ -12,7 +12,7 @@ saveFig = false;
 
 % full path and name to xls file with session metadata
 xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
-mname = 'lh79';     % mouse name
+mname = 'lh76';     % mouse name
 
 % column name in xls sheet where dirnames exist
 colName = 'Session';
@@ -35,7 +35,7 @@ ncond = ["spktimes"];
 if ~exist('varArray', 'var') && ~forceL
     [varArray, dirnames, mousepath] = getSessionVars('vars', vars,...
         'pcond', pcond, 'ncond', ncond, 'sortDir', false, 'dirnames', [],...
-        'xlsname', xlsname, 'mname', mname, 'basepath', []);
+        'xlsname', xlsname, 'mname', mname);
 end
 nsessions = length(dirnames);
 
@@ -104,7 +104,7 @@ switch protocol
         ampmat = nan(ngrp, length(intens), nsessions);
         wvmat = nan(ngrp, nsessions, size(fepsp.wavesAvg, 3));
         ampcell = cell(1, nsessions);
-        si = 20;        % selected intensity [uA]
+        si = 30;        % selected intensity [uA]
         grp = 1;          % selected tetrode
         dataVar = 'ampcell';
         for i = 1 : nsessions
@@ -203,7 +203,7 @@ if p
     xtickangle(45)
     xlabel('Session')
     box off
-    suptitle(['T#' num2str(grp) ' @ ' num2str(si) 'uA'])
+    suptitle([mname ' T#' num2str(grp) ' @ ' num2str(si) 'uA'])
     
     if saveFig
         figname = fullfile(mousepath, 'fepspSessions');
