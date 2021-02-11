@@ -62,9 +62,9 @@ if forceA
         ss = accusleep_wrapper('basepath', basepath, 'cleanRec', [],...
             'SR', 512, 'epochLen', 2.5, 'recSystem', 'tdt', 'calfile', [],...
             'badEpochs', [], 'lfpCh', [13 : 16], 'emgCh', [], 'viaGui', false,...
-            'forceCalibrate', false, 'inspectLabels', true, 'saveVar', true,...
-            'force', true);
-%         AccuSleep_viewer(EEG, EMG, ss.fs, 0.5, ss.labels, []);
+            'forceCalibrate', false, 'inspectLabels', false, 'saveVar', true,...
+            'forceAnalyze', true, 'forceLoad', false);
+        %         AccuSleep_viewer(EEG, EMG, ss.fs, 2.5, ss.labels, []);
         
         % AccuSleep_GUI
         %         badstamps = [];
@@ -81,15 +81,15 @@ if forceA
         %             'interDur', 10, 'exclude', false);
         
         % detect spikes
-%         [spktimes, ~] = spktimesWh('basepath', basepath, 'fs', fs, 'nchans', nchans,...
-%             'spkgrp', spkgrp, 'saveVar', true, 'saveWh', true,...
-%             'graphics', false, 'force', true);
+        [spktimes, ~] = spktimesWh('basepath', basepath, 'fs', fs, 'nchans', nchans,...
+            'spkgrp', spkgrp, 'saveVar', true, 'saveWh', true,...
+            'graphics', false, 'force', true);
         
-%         % create ns files for sorting
-%         spktimes2ks('basepath', basepath, 'fs', fs,...
-%             'nchans', nchans, 'spkgrp', spkgrp, 'mkClu', true,...
-%             'dur', [], 't', [], 'psamp', [], 'grps', [1 : length(spkgrp)],...
-%             'spkFile', 'temp_wh');
+                % create ns files for sorting
+                spktimes2ks('basepath', basepath, 'fs', fs,...
+                    'nchans', nchans, 'spkgrp', spkgrp, 'mkClu', true,...
+                    'dur', [], 't', [], 'psamp', [], 'grps', [1 : length(spkgrp)],...
+                    'spkFile', 'temp_wh');
         
         % spike rate per tetrode. note that using firingRate requires
         % special care becasue spktimes is given in samples and not seconds
@@ -123,7 +123,7 @@ sessionDate = [pathPieces{:}];
 sessionDate = sessionDate(2 : 3 : end);
 
 close all
-grp = [1 : 4];          % which tetrodes to plot
+tet = [1 : 4];          % which tetrodes to plot
 state = [];             % [] - all; 1 - awake; 2 - NREM; 3 - REM
 Y = [0 250];            % ylim
 p1 = 1;                 % firing rate vs. time, one fig per session
@@ -133,16 +133,18 @@ plotStyle = 'bar';      % for p2. can by 'bar' or 'box'
 clr = ['bbbbbkkkkkkkkrrrrrrrr'];        % color sessions
 clr = ['bbbbbkkkkkkkkkkkkrrrrr'];        % color sessions
 sessions = 1 : nsessions;
+% sessions = 11;
 [nsub] = numSubplots(length(sessions));
+
 k = 1;
 for i = sessions
     
     session = varArray{i, 1}.session;
-%     ss = varArray{i, 2}.SleepState;
+    %     ss = varArray{i, 2}.SleepState;
     datInfo = varArray{i, 3}.datInfo;
     sr = varArray{i, 4}.fr;
     ss = varArray{i, 5}.ss;
-
+    
     tstamps = sr.tstamps ;
     if isfield(datInfo, 'nsamps')
         nsamps = cumsum(datInfo.nsamps);
@@ -153,14 +155,14 @@ for i = sessions
     end
     
     % mfr in selected state across sessions (mean +- std)
-%     states = {ss.ints.WAKEstate, ss.ints.NREMstate, ss.ints.REMstate};
+    %     states = {ss.ints.WAKEstate, ss.ints.NREMstate, ss.ints.REMstate};
     states = ss.stateEpochs;
     if ~isempty(state)
-        mfr{i} = mean(sr.states.fr{state}(grp, :), 2);
-        txt = sprintf('MSR of T#%s in %s', num2str(grp), sr.states.statenames{state});
+        mfr{i} = mean(sr.states.fr{state}(tet, :), 2);
+        txt = sprintf('MSR of T#%s in %s', num2str(tet), sr.states.statenames{state});
     else
-        mfr{i} = mean(sr.strd(grp, :), 2);
-        txt = sprintf('MSR of T#%s', num2str(grp));
+        mfr{i} = mean(sr.strd(tet, :), 2);
+        txt = sprintf('MSR of T#%s', num2str(tet));
     end
     
     % firing rate vs. time. 1 fig per session
@@ -169,7 +171,7 @@ for i = sessions
             fh1 = figure;
         end
         subplot(nsub(1), nsub(2), k)
-        plot(sr.tstamps / 60, (sr.strd(grp, :))', 'LineWidth', 1.5)
+        plot(sr.tstamps / 60, (sr.strd(tet, :))', 'LineWidth', 1.5)
         hold on
         % medata = median((data(grp, :)), 1);
         % plot(tstamps, medata, 'k', 'LineWidth', 5)
@@ -185,7 +187,9 @@ for i = sessions
         ylabel('Spike Rate [Hz]')
         xlabel('Time [m]')
         title(dirnames{i})
-        
+        if i == sessions(1)
+            legend(split(num2str(tet)))
+        end
         if saveFig
             figname = sprintf('%s_SRvsTime', sessionDate{i})
             figname = fullfile(mousepath, figname);
@@ -199,10 +203,10 @@ end
 % histogram bins of firing rate in states
 p3 = 1;
 k = 1;
+fh = figure;
 tet = 1;
 if p3
-    fh = figure;
-    for i = 1 : nsessions
+    for i = sessions
         session = varArray{i, 1}.session;
         datInfo = varArray{i, 3}.datInfo;
         sr = varArray{i, 4}.fr;
@@ -210,18 +214,25 @@ if p3
         
         subplot(nsub(1), nsub(2), k)
         hold on
-        for ii = 2 : 3
-            sum(diff(ss.stateEpochs{ii}'));
-            nbins = min([length(sr.states.fr{ii}), 200]);
+        stateidx = 2 : 4;
+        for ii = stateidx
+            nbins = min([length(sr.states.fr{ii}), 200000]);
             binidx = randperm(length(sr.states.fr{ii}), nbins);
-            h = histogram(sr.states.fr{ii}(tet, binidx), round(nbins / 5), 'EdgeAlpha', 0,...
-                'FaceAlpha', 0.3, 'Normalization', 'count');
+            if ~isempty(data) && nbins > 10
+                data = mean(sr.states.fr{ii}(tet, binidx), 1);
+                h = histogram(data, round(nbins / 10), 'EdgeAlpha', 0,...
+                    'FaceAlpha', 0.3, 'Normalization', 'count');
+            end
         end
         ylabel('Counts')
         xlabel('Spike Rate [Hz]')
+%         legend({'WAKE', 'NREM', 'REM'})
+        legend(sr.states.stateNames(stateidx))
+
+        
         xlim([0 150])
-        if k == 1
-            legend({'WAKE', 'NREM'})
+        if i == sessions(1)
+            legend(ss.labelNames)
         end
         title(dirnames{i})
         k = k + 1;
@@ -229,7 +240,7 @@ if p3
 end
 
 % stacked plot of episode duration
-p3 = 1;
+p3 = 0;
 if p3
     for i = 1 : nsessions
         session = varArray{i, 1}.session;
@@ -237,11 +248,11 @@ if p3
         sr = varArray{i, 4}.fr;
         ss = varArray{i, 5}.ss;
         
-        for ii = 1 : 3
+        for ii = 1 : 4
             clipped = sum(diff([datInfo.clip{:}]));
             epDur(i, ii) = sum(diff(ss.stateEpochs{ii}')) /...
                 (sum(datInfo.nsec) - ss.tRemoved) * 100;
-%             epDur(i, ii) = sum(diff(ss.stateEpochs{ii}')) / 60 / 60
+            %             epDur(i, ii) = sum(diff(ss.stateEpochs{ii}')) / 60 / 60
         end
     end
     fh = figure;
@@ -250,12 +261,12 @@ if p3
     xtickangle(45)
     ylim([0 100])
     ylabel('Time [&]')
-    legend({'REM', 'WAKE', 'NREM'})
+    legend({'REM', 'WAKE', 'NREM', 'DROWSY'})
     title('State Duration')
 end
 
 % histogram duration of episodes
-p3 = 1;
+p3 = 0;
 k = 1;
 if p3
     fh = figure;
@@ -264,7 +275,7 @@ if p3
         
         subplot(nsub(1), nsub(2), k)
         hold on
-        for ii = 3
+        for ii = 1 : 3
             epLen = log10(diff(ss.stateEpochs{ii}'));
             
             h = histogram(epLen, round(length(epLen) / 20), 'EdgeAlpha', 0,...
@@ -272,10 +283,10 @@ if p3
         end
         ylabel('Counts')
         xlabel('Duration [log10(s)]')
-        xlim([0 2.5])
-        ylim([0 100])
-        if k == 1
-            legend({'NREM'})
+        %         xlim([0 2.5])
+        %         ylim([0 100])
+        if i == sessions(1)
+            legend(ss.labelNames)
         end
         title(dirnames{i})
         k = k + 1;
@@ -297,7 +308,7 @@ if p2
             patch([idx idx(2) idx(1)],...
                 [yLimit(1) yLimit(1) yLimit(2) yLimit(2)],...
                 'b', 'FaceAlpha', 0.1)
-            legend(split(num2str(grp)))
+            legend(split(num2str(tet)))
         case 'box'
             boxplot(mfrmat, 'PlotStyle', 'traditional');
             bh = findobj(gca, 'Tag', 'Box');
@@ -401,7 +412,7 @@ if p4
     end
     
     fh = figure;
-    plot(msr(grp, :)', 'LineWidth', 1)
+    plot(msr(tet, :)', 'LineWidth', 1)
     hold on
     %     stdshade(msr(grp, :), '0.3', 'k')
     yLimit = ylim;
