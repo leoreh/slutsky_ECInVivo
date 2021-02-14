@@ -8,7 +8,7 @@ forceA = false;
 
 % full path and name to xls file with session metadata
 xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
-mname = 'lh52';
+mname = 'lh81';
 
 % column name in xls sheet where dirnames exist
 colName = 'Session';                    
@@ -67,7 +67,7 @@ if forceA
         datInfo = varArray{i, 6}.datInfo;
         
         % spikes
-        % fixSpkAndRes('grp', [], 'fs', fs, 'stdFactor', 0, 'nchans', nchans);
+        fixSpkAndRes('grp', [], 'fs', fs, 'stdFactor', 0, 'nchans', nchans);
         spikes = loadSpikes('session', session);
         spikes = fixCEspikes('basepath', basepath, 'saveVar', false,...
             'force', true);
@@ -87,8 +87,8 @@ if forceA
             'graphics', false);
         
         % firing rate
-        binsize = 30;
-        winBL = [10 * 60 30 * 60];
+        binsize = 60;
+        winBL = [1 * 60 110 * 60];
         fr = firingRate(spikes.times, 'basepath', basepath,...
             'graphics', false, 'saveFig', false,...
             'binsize', binsize, 'saveVar', true, 'smet', 'MA',...
