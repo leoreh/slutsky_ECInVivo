@@ -5,7 +5,8 @@
 % files
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-basepath = 'D:\Data\lh81\lh81_210208_065300';
+basepath = 'D:\Data\RA_WT2';
+cd(basepath)
 [~, basename] = fileparts(basepath);
 
 labelsfile = [basename, '.AccuSleep_labels.mat'];
@@ -19,16 +20,52 @@ load(eegfile, 'EEG')
 load([basename, '.session.mat'])
 load(labelsmanfile, 'labels')
 gldstrd = labels;
+labels = gldstrd;
+
+gldstrd(gldstrd == 5) = 4;
 
 % params
 mousepath = fileparts(basepath);
-SR = 512;
+SR = 1000;
 epochLen = 2.5;
 minBoutLen = epochLen;
-nstates = 4; 
-labelnames = {'REM', 'WAKE', 'NREM', 'DROWSY'};
+nstates = 5; 
+labelnames = {'REM', 'WAKE', 'QWAKE', 'NREM', 'LSLEEP'};
 
-% separate data to 2
+% calc weights
+weights = histcounts(gldstrd) / length(gldstrd);
+weights = round(weights * 100) / 100;       % round to two decimals
+weights(3) = weights(3) + 1 - sum(weights);  % add remainder to NREM
+weights = [0.08 0.32 0.38 0.16 0.06]; 
+
+% config file
+configfile = 'D:\Code\AccuSleep\AS_config.mat';
+load(configfile)
+cfg_colors = cfg_colors(1 : nstates);
+cfg_names = cfg_names(1 : nstates); cfg_names{4} = 'DROWSY';
+cfg_weights = weights;
+save(configfile, 'cfg_colors', 'cfg_names', 'cfg_weights')
+
+configfile = 'D:\Code\AccuSleep\AS_config.mat';
+load(configfile)
+cfg_colors{1} = [160 100 170] / 255;
+cfg_colors{2} = [240 110 110] / 255;
+cfg_colors{3} = [240 170 125] / 255;
+cfg_colors{4} = [110 180 200] / 255;
+cfg_colors{5} = [150 205 130] / 255;
+cfg_names = labelnames;
+cfg_weights = weights;
+save(configfile, 'cfg_colors', 'cfg_names', 'cfg_weights')
+
+% ALT 1: train network on entire data
+fileList{1, 1} = fullfile(basepath, eegfile);
+fileList{1, 2} = fullfile(basepath, emgfile);
+fileList{1, 3} = fullfile(basepath, labelsmanfile);
+netpath = 'D:\Code\slutskycode\extracellular in vivo\lfp\detectStates\AccuSleep';
+[net] = AccuSleep_train(fileList, SR, epochLen, 13, netpath);
+save('D:\Code\slutskycode\extracellular in vivo\lfp\detectStates\AccuSleep\4states_2,5s_6hrLabels_RAeeg2_net', 'net')         % !!! careful not to overwrite!!!
+
+% ALT 2: separate data to 2
 EMG_1st = EMG(1 : length(EMG) / 2);
 EEG_1st = EEG(1 : length(EEG) / 2);
 labels_1st = labels(1 : length(labels) / 2);
@@ -54,8 +91,8 @@ end
 
 % visualize data
 % AccuSleep_viewer(EEG, EMG, SR, epochLen, labels, [])
-% AccuSleep_viewer(EEG_2nd, EMG_2nd, SR, epochLen, labels_2nd, [])
-% AccuSleep_viewer(EEG_1st, EMG_1st, SR, epochLen, labels_1st, [])
+AccuSleep_viewer(EEG_2nd, EMG_2nd, SR, epochLen, labels_2nd, [])
+AccuSleep_viewer(EEG_1st, EMG_1st, SR, epochLen, labels_1st, [])
 
 % save vars
 netpath = 'D:\Code\slutskycode\extracellular in vivo\lfp\detectStates\AccuSleep';
@@ -70,10 +107,8 @@ save(fileList{1, 2}, 'EMG')
 save(fileList{1, 3}, 'labels')
 
 % train network
-[net] = AccuSleep_train_nStates(fileList, SR, epochLen, 13, netpath);
-netfile = 'D:\Code\AccuSleep\trainedNetworks\trainedNetwork2,5secEpochs.mat';
-netfile = 'D:\Code\slutskycode\extracellular in vivo\lfp\detectStates\AccuSleep\4states_2,5s_6hrLabels_net.mat';
-save('', 'net')         % !!! careful not to overwrite!!!
+[net] = AccuSleep_train(fileList, SR, epochLen, 13, netpath);
+save('D:\Code\slutskycode\extracellular in vivo\lfp\detectStates\AccuSleep\4states_2,5s_6hrLabels_RAeeg2_net', 'net')         % !!! careful not to overwrite!!!
 load(netfile, 'net')
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -103,6 +138,7 @@ labelsOutput = AccuSleep_classify(EEG, EMG, net, SR, epochLen,...
 
 % visualize data
 AccuSleep_viewer(EEG, EMG, SR, epochLen, labelsOutput, [])
+AccuSleep_viewer(EEG, EMG, SR, epochLen, gldstrd, [])
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % inspect results
@@ -111,6 +147,7 @@ AccuSleep_viewer(EEG, EMG, SR, epochLen, labelsOutput, [])
 % initialize
 statesOutput = zeros(nstates, nstates);
 edges = [1 : nstates + 1];
+% accuracy
 stateEpochs = histcounts(gldstrd);
 for jj = 1 : nstates
     statesOutput(jj, :) = histcounts(labelsOutput(gldstrd == jj),...

@@ -10,6 +10,7 @@ function [sig, dc] = rmDC(sig, varargin)
 %   win         time window for calculating DC {[1 Inf]}. specified as
 %               index to mat rows.
 %   dim         numeric. dimension on which to calculate mean {2}.
+%   DCmod       string. remove 'median' or {'mean'}
 % 
 % OUTPUT
 %   sig         input singal without DC component   
@@ -34,6 +35,7 @@ validate_win = @(win) assert(isnumeric(win) && length(win) == 2,...
 p = inputParser;
 addOptional(p, 'win', [1 Inf], validate_win);
 addOptional(p, 'dim', 2, @isnumeric);
+addOptional(p, 'DCmod', 'mean', @ischar);
 
 parse(p,varargin{:})
 win = p.Results.win;
@@ -47,13 +49,25 @@ end
 % calculation
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % calc mean
-if dim == 2
-    dc = mean(sig(:, win(1) : win(2)), 2);
-elseif dim == 1
-    dc = mean(sig(win(1) : win(2), :), 1);
-else
-    error('dimension incorrect')
+switch DCmod
+    case 'mean'
+        if dim == 2
+            dc = mean(sig(:, win(1) : win(2)), 2);
+        elseif dim == 1
+            dc = mean(sig(win(1) : win(2), :), 1);
+        else
+            error('dimension incorrect')
+        end
+    case 'median'
+        if dim == 2
+            dc = median(sig(:, win(1) : win(2)), 2);
+        elseif dim == 1
+            dc = median(sig(win(1) : win(2), :), 1);
+        else
+            error('dimension incorrect')
+        end
 end
+
 % convert to same class as sig
 cl = class(sig);
 eval(['dc = ' cl '(dc);'])

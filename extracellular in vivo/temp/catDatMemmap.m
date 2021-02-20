@@ -1,6 +1,7 @@
 function datInfo = catDatMemmap(varargin)
 
 % concatenates specific parts of dat files. 
+% below also segment to concat states.
 %
 % INPUT:
 %   datFiles    string array with full path and name of dat files. the 
@@ -144,3 +145,38 @@ fprintf('that took %.2f minutes\n', toc / 60)
 end
 
 % EOF
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% cat states
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+statesfile = 'D:\Data\lh81\lh81_210207_045300\lh81_210207_045300.AccuSleep_states.mat';
+file1 = 'D:\Data\lh81\lh81_210206_190000\lh81_210206_190000.AccuSleep_states.mat';
+file2 = 'D:\Data\lh81\lh81_210207_065300\lh81_210207_065300.AccuSleep_states.mat';
+tcut = [2 4];
+
+% params
+nstates = 4;
+epochLen = 2.5;
+
+% get labels
+ss1 = load(file1, 'ss');
+ss1 = ss1.ss;
+ss2 = load(file2);
+ss2 = ss2.ss;
+ss = ss1;
+l1 = length(ss1.labels);
+l2 = length(ss2.labels);
+idx1 = l1 : -1 : l1 - tcut(1) * 60 * 60 / 2.5;
+idx2 = 1 : 1 + tcut(2) * 60 * 60 / 2.5;
+ss.labels = [ss1.labels(idx1); ss2.labels(idx2)];
+
+% convert labels to state epochs. 
+for i = 1 : nstates
+    binaryVec = zeros(length(ss.labels), 1);
+    binaryVec(ss.labels == i) = 1;
+    stateEpisodes = binary2epochs('vec', binaryVec, 'minDur', [], 'maxDur', [],...
+        'interDur', [], 'exclude', false); % these are given as indices are equivalent to seconds
+    ss.stateEpochs{i} = stateEpisodes * epochLen;
+end
+
+save(statesfile, 'ss')

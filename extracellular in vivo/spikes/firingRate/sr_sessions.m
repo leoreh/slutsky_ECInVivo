@@ -59,12 +59,13 @@ if forceA
         spkgrp = session.extracellular.spikeGroups.channels;
         
         % sleep states
-        ss = accusleep_wrapper('basepath', basepath, 'cleanRec', [],...
-            'SR', 512, 'epochLen', 2.5, 'recSystem', 'tdt', 'calfile', [],...
-            'badEpochs', [], 'lfpCh', [13 : 16], 'emgCh', [], 'viaGui', false,...
-            'forceCalibrate', false, 'inspectLabels', false, 'saveVar', true,...
-            'forceAnalyze', true, 'forceLoad', false);
-        %         AccuSleep_viewer(EEG, EMG, ss.fs, 2.5, ss.labels, []);
+%         ss = accusleep_wrapper('basepath', basepath, 'cleanRec', [],...
+%             'SR', 512, 'epochLen', 2.5, 'recSystem', 'tdt', 'calfile', [],...
+%             'lfpCh', [13 : 16], 'emgCh', [], 'viaGui', false,...
+%             'forceCalibrate', true, 'inspectLabels', true, 'saveVar', true,...
+%             'forceAnalyze', true, 'forceLoad', true);
+        labelsmanfile = [basename, '.AccuSleep_labelsMan'];
+%         AccuSleep_viewer(EEG, EMG, 512, 2.5, [], labelsmanfile);
         
         % AccuSleep_GUI
         %         badstamps = [];
@@ -81,15 +82,15 @@ if forceA
         %             'interDur', 10, 'exclude', false);
         
         % detect spikes
-        [spktimes, ~] = spktimesWh('basepath', basepath, 'fs', fs, 'nchans', nchans,...
-            'spkgrp', spkgrp, 'saveVar', true, 'saveWh', true,...
-            'graphics', false, 'force', true);
-        
-                % create ns files for sorting
-                spktimes2ks('basepath', basepath, 'fs', fs,...
-                    'nchans', nchans, 'spkgrp', spkgrp, 'mkClu', true,...
-                    'dur', [], 't', [], 'psamp', [], 'grps', [1 : length(spkgrp)],...
-                    'spkFile', 'temp_wh');
+%         [spktimes, ~] = spktimesWh('basepath', basepath, 'fs', fs, 'nchans', nchans,...
+%             'spkgrp', spkgrp, 'saveVar', true, 'saveWh', true,...
+%             'graphics', false, 'force', true);
+%         
+%                 % create ns files for sorting
+%                 spktimes2ks('basepath', basepath, 'fs', fs,...
+%                     'nchans', nchans, 'spkgrp', spkgrp, 'mkClu', true,...
+%                     'dur', [], 't', [], 'psamp', [], 'grps', [1 : length(spkgrp)],...
+%                     'spkFile', 'temp_wh');
         
         % spike rate per tetrode. note that using firingRate requires
         % special care becasue spktimes is given in samples and not seconds
@@ -203,9 +204,10 @@ end
 % histogram bins of firing rate in states
 p3 = 1;
 k = 1;
-fh = figure;
+data = [];
 tet = 1;
 if p3
+    fh = figure;
     for i = sessions
         session = varArray{i, 1}.session;
         datInfo = varArray{i, 3}.datInfo;
@@ -214,21 +216,21 @@ if p3
         
         subplot(nsub(1), nsub(2), k)
         hold on
-        stateidx = 2 : 4;
+        stateidx = 1 : 3;
         for ii = stateidx
             nbins = min([length(sr.states.fr{ii}), 200000]);
             binidx = randperm(length(sr.states.fr{ii}), nbins);
+            data = mean(sr.states.fr{ii}(tet, binidx), 1);
             if ~isempty(data) && nbins > 10
-                data = mean(sr.states.fr{ii}(tet, binidx), 1);
                 h = histogram(data, round(nbins / 10), 'EdgeAlpha', 0,...
                     'FaceAlpha', 0.3, 'Normalization', 'count');
             end
         end
         ylabel('Counts')
         xlabel('Spike Rate [Hz]')
-%         legend({'WAKE', 'NREM', 'REM'})
-        legend(sr.states.stateNames(stateidx))
-
+        if k == 1
+            legend(sr.states.stateNames(stateidx))
+        end
         
         xlim([0 150])
         if i == sessions(1)
@@ -240,7 +242,7 @@ if p3
 end
 
 % stacked plot of episode duration
-p3 = 0;
+p3 = 1;
 if p3
     for i = 1 : nsessions
         session = varArray{i, 1}.session;
@@ -260,13 +262,13 @@ if p3
     xticklabels(cellstr(dirnames))
     xtickangle(45)
     ylim([0 100])
-    ylabel('Time [&]')
-    legend({'REM', 'WAKE', 'NREM', 'DROWSY'})
+    ylabel('Time [%]')
+    legend(sr.states.stateNames)
     title('State Duration')
 end
 
 % histogram duration of episodes
-p3 = 0;
+p3 = 1;
 k = 1;
 if p3
     fh = figure;
@@ -342,25 +344,22 @@ end
 
 % spike rate vs. time across all sessions (1 fig)
 % state = [];
-onSession = 'lh70_201015_1815';
-onSession = 'lh58_200830_180803';
-offSession = 'lh70_201019_1831';
-offSession = 'lh58_200905_180929';
-CNOidx = [0 0];
-p4 = 0;
+onSession = 'lh81_210204_072400';
+offSession = 'lh81_210207_065300';
+patchIdx = [0 0];
+p4 = 1;
 if p4
     msr = [];
     tsr = [];
     tss = [];
-    offset = 0;
     NREMstates = [];
     prev_t = 0;
     for i = 1 : nsessions
         session = varArray{i, 1}.session;
-        ss = varArray{i, 2}.SleepState;
+%         ss = varArray{i, 2}.SleepState;
         datInfo = varArray{i, 3}.datInfo;
         sr = varArray{i, 4}.fr;
-        st = varArray{i, 5}.spktimes;
+%         st = varArray{i, 5}.spktimes;
         basepath = char(fullfile(mousepath, dirnames{i}));
         [~, basename] = fileparts(basepath);
         
@@ -370,15 +369,14 @@ if p4
         else
             data = sr.strd;
             tstamps = sr.tstamps;
-            tss = [tss; ss.ints.NREMstate + offset];
-            offset = offset + ss.idx.timestamps(end);
+%             tss = [tss; ss.ints.NREMstate + offset];
         end
         
         % find idx of CNO on/off
         if strcmp(basename, onSession)
-            CNOidx(1) = length(msr);
+            patchIdx(1) = length(msr);
         elseif strcmp(basename, offSession)
-            CNOidx(2) = length(msr);
+            patchIdx(2) = length(msr);
         end
         
         % arrange time indices
@@ -390,7 +388,7 @@ if p4
             tformat = 'HHmm';
         end
         recStart = datetime(recStart, 'InputFormat', tformat);
-        t = '120000';
+        t = '080000';
         t = datetime(t, 'InputFormat', tformat);
         if t <= recStart
             t = t + hours(12);
@@ -404,11 +402,13 @@ if p4
     end
     
     % smooth data
-    smf = 3;
-    gk = gausswin(smf);
-    gk = gk / sum(gk);
-    for i = 1 : size(msr, 1)
-        msr(i, :) = conv(msr(i, :), gk, 'same');
+    smf = [31];
+    if smf > 2
+        gk = gausswin(smf);
+        gk = gk / sum(gk);
+        for i = 1 : size(msr, 1)
+            msr(i, :) = conv(msr(i, :), gk, 'same');
+        end
     end
     
     fh = figure;
@@ -416,10 +416,10 @@ if p4
     hold on
     %     stdshade(msr(grp, :), '0.3', 'k')
     yLimit = ylim;
-    patch([CNOidx CNOidx(2) CNOidx(1)],...
+    patch([patchIdx patchIdx(2) patchIdx(1)],...
         [yLimit(1) yLimit(1) yLimit(2) yLimit(2)],...
         'r', 'FaceAlpha', 0.2)
-    if isempty(state)
+    if ~isempty(state)
         fill([tss fliplr(tss)]' / 60, [yLimit(1) yLimit(1) yLimit(2) yLimit(2)],...
             'b', 'FaceAlpha', 0.15,  'EdgeAlpha', 0);
     end

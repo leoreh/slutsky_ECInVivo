@@ -19,12 +19,13 @@ vars = ["session.mat";...
     "spikes.cellinfo";...
     "SleepState.states";....
     "fr.mat";...
-    "datInfo"];
+    "datInfo";...
+    "AccuSleep_states"];
 
 % column name of logical values for each session. only if true than session
 % will be loaded. can be a string array and than all conditions must be
 % met.
-pcond = ["tempflag"; "mancur"];
+pcond = ["mancur"];
 
 % same but imposes a negative condition
 ncond = ["fepsp"];
@@ -59,32 +60,34 @@ if forceA
         spkgrp = session.extracellular.spikeGroups.channels;
         
         % vars
-        session = varArray{i, 1}.session;
-        cm = varArray{i, 2}.cell_metrics;
+%         session = varArray{i, 1}.session;
+%         cm = varArray{i, 2}.cell_metrics;
         spikes = varArray{i, 3}.spikes;
-        ss = varArray{i, 4}.SleepState;
-        fr = varArray{i, 5}.fr;
-        datInfo = varArray{i, 6}.datInfo;
-        
-        % spikes
-        fixSpkAndRes('grp', [], 'fs', fs, 'stdFactor', 0, 'nchans', nchans);
-        spikes = loadSpikes('session', session);
-        spikes = fixCEspikes('basepath', basepath, 'saveVar', false,...
-            'force', true);
-        
-        spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
-            'saveFig', false, 'force', true, 'mu', [], 'graphics', false,...
-            'vis', 'on', 'spkgrp', spkgrp);
-        
-        cell_metrics = ProcessCellMetrics('session', session,...
-            'manualAdjustMonoSyn', false, 'summaryFigures', false,...
-            'debugMode', true, 'transferFilesFromClusterpath', false,...
-            'submitToDatabase', false, 'spikes', spikes);
-        % cell_metrics = CellExplorer('basepath', filepath);
-        
-        cc = cellclass('basepath', basepath,...
-            'waves', cat(1, spikes.rawWaveform{:})', 'saveVar', true,...
-            'graphics', false);
+%         if ~isempty(varArray{i, 4})
+%             ss = varArray{i, 4}.SleepState;
+%         end
+%         fr = varArray{i, 5}.fr;
+%         datInfo = varArray{i, 6}.datInfo;
+%         
+%         % spikes
+%         fixSpkAndRes('grp', [], 'fs', fs, 'stdFactor', 0, 'nchans', nchans);
+%         spikes = loadSpikes('session', session);
+%         spikes = fixCEspikes('basepath', basepath, 'saveVar', false,...
+%             'force', true);
+%         
+%         spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
+%             'saveFig', false, 'force', true, 'mu', [], 'graphics', false,...
+%             'vis', 'on', 'spkgrp', spkgrp);
+%         
+%         cell_metrics = ProcessCellMetrics('session', session,...
+%             'manualAdjustMonoSyn', false, 'summaryFigures', false,...
+%             'debugMode', true, 'transferFilesFromClusterpath', false,...
+%             'submitToDatabase', false, 'spikes', spikes);
+%         % cell_metrics = CellExplorer('basepath', basepath);
+%         
+%         cc = cellclass('basepath', basepath,...
+%             'waves', cat(1, spikes.rawWaveform{:})', 'saveVar', true,...
+%             'graphics', false, 'fs', fs);
         
         % firing rate
         binsize = 60;
@@ -115,20 +118,22 @@ sessionDate = [pathPieces{:}];
 sessionDate = sessionDate(2 : 3 : end);
 
 close all
-grp = [2 : 8];          % which tetrodes to plot
-state = [2];             % [] - all; 1 - awake; 2 - NREM
+grp = [1 : 4];          % which tetrodes to plot
+state = [];             % [] - all; 1 - awake; 2 - NREM
 FRdata = 'strd';        % plot absolute fr or normalized
-unitClass = 'int';      % plot 'int', 'pyr', or 'all'
+unitClass = 'pyr';      % plot 'int', 'pyr', or 'all'
 suFlag = 1;             % plot only su or all units
 minfr = 0;              % include only units with fr greater than
 maxfr = 3000;           % include only units with fr lower than
 Y = [0 10];             % ylim
-p1 = 0;                 % firing rate vs. time, one fig per session
-p2 = 1;                 % mfr across sessions, one fig
+yscale = 'log';         % log or linear
+p1 = 1;                 % firing rate vs. time, one fig per session
+p2 = 0;                 % mfr across sessions, one fig
 p3 = 0;                 % firing rate vs. time, one fig for all sessions. not rubust
 p4 = 0;                 % number of cells per session, one fig
 plotStyle = 'box';      % for p2. can by 'bar' or 'box'
 clr = ['bbbkkkkrrr'];
+[nsub] = numSubplots(nsessions);
 
 for i = 1 : nsessions
     
@@ -136,11 +141,14 @@ for i = 1 : nsessions
     session = varArray{i, 1}.session;
     cm = varArray{i, 2}.cell_metrics;
     spikes = varArray{i, 3}.spikes;
-    ss = varArray{i, 4}.SleepState;
+    if ~isempty(varArray{i, 4})
+        ss = varArray{i, 4}.SleepState;
+    end
     fr = varArray{i, 5}.fr;
     datInfo = varArray{i, 6}.datInfo;
     fs = session.extracellular.sr;   
-       
+    ss = varArray{i, 7}.ss;
+    
     % su vs mu
     su = ones(length(spikes.ts), 1);    % override
     if isfield(spikes, 'su') && suFlag
@@ -162,32 +170,33 @@ for i = 1 : nsessions
     wide = strcmp(cm.putativeCellType, 'Wide Interneuron');
     int = strcmp(cm.putativeCellType, 'Narrow Interneuron');
     if strcmp(unitClass, 'pyr')
-        units = pyr & su' & grpidx & mfrunits';
+        units{i} = pyr & su' & grpidx & mfrunits';
     elseif strcmp(unitClass, 'int')
-        units = int & su' & grpidx & mfrunits';
+        units{i} = int & su' & grpidx & mfrunits';
     else
-        units = su' & grpidx & mfrunits';     % override
+        units{i} = su' & grpidx & mfrunits';     % override
     end
-    if ~any(units)
+    if ~any(units{i})
         error('no units match criteria')
     end
     
     % states
-    states = {ss.ints.WAKEstate, ss.ints.NREMstate, ss.ints.REMstate};
+    if ~isempty(varArray{i, 4})
+        states = {ss.ints.WAKEstate, ss.ints.NREMstate, ss.ints.REMstate};
+    else
+        states = [];
+    end
+    states = ss.stateEpochs;
     if ~isempty(state) && state > 0
-        data = fr.states.fr{state}(units, :);
+        data = fr.states.fr{state}(units{i}, :);
         tstamps = fr.states.tstamps{state};
         txt = sprintf('mFR of %s %s in %s', unitClass, suTxt, fr.states.statenames{state});
     else
-        data = fr.strd(units, :);
+        data = fr.(FRdata)(units{i}, :);
         tstamps = fr.tstamps;
         txt = sprintf('mFR of %s %s', unitClass, suTxt);
     end
     mfr{i} = mean(data, 2);
-    
-    %%%
-    % mfr{i} = cm.burstIndex_NREMstate(units);
-    %%%
     
     if isfield(datInfo, 'nsamps')
         nsamps = cumsum(datInfo.nsamps);
@@ -200,7 +209,7 @@ for i = 1 : nsessions
         figure
         plot(tstamps / 60, (data'), 'LineWidth', 1)
         hold on
-        medata = mean((data), 1);
+        medata = median((data), 1, 'omitnan');
         plot(tstamps / 60, medata, 'k', 'LineWidth', 4)
 %         stdshade(data, 0.3, 'k', tstamps / 60)
         for ii = 1 : length(nsamps) - 1
@@ -208,9 +217,12 @@ for i = 1 : nsessions
                 'LineWidth', 2)
         end
         axis tight
-        fill([states{2} fliplr(states{2})]' / 60, [Y(1) Y(1) Y(2) Y(2)],...
-            'b', 'FaceAlpha', 0.15,  'EdgeAlpha', 0);
         ylim(Y)
+%         set(gca, 'YScale', yscale)
+        if ~isempty(states)
+            fill([states{2} fliplr(states{2})]' / 60, [Y(1) Y(1) Y(2) Y(2)],...
+                'b', 'FaceAlpha', 0.15,  'EdgeAlpha', 0);
+        end
         ylabel('Firing Rate [Hz]')
         xlabel('Time [m]')
         if isfield(datInfo, 'spktrim')
@@ -241,7 +253,7 @@ for i = 1 : nsessions
     %          "lh69_200908_evening"];
     if p3
         subplot(2, 2, k(i))
-        plot(tstamps / 60, mean(data(units, :)), 'k', 'LineWidth', 2)
+        plot(tstamps / 60, mean(data(units{i}, :)), 'k', 'LineWidth', 2)
         hold on
         if i == 3
             for ii = 2
@@ -358,5 +370,54 @@ if p4
         figname = fullfile(mousepath, 'UnitsDetected');
         % print(fh, figname, '-dpdf', '-bestfit', '-painters');
         export_fig(figname, '-tif', '-transparent', '-r300')
+    end
+end
+
+% mean firing rate in states per unit
+p3 = 1;
+k = 1;
+data = [];
+tet = 1;
+stateidx = 1 : 4;
+if p3
+    fh = figure;
+    for i = 1 : nsessions
+           % vars
+           session = varArray{i, 1}.session;
+           cm = varArray{i, 2}.cell_metrics;
+           spikes = varArray{i, 3}.spikes;
+           fr = varArray{i, 5}.fr;
+           datInfo = varArray{i, 6}.datInfo;
+           fs = session.extracellular.sr;
+           ss = varArray{i, 7}.ss;
+           nunits = length(spikes.ts);
+           
+           clear data
+           for ii = 1 : length(ss.labelNames)
+               data(:, ii) = mean(fr.states.fr{ii}(units{i}, :), 2);
+%                if ~isempty(data)
+%                    h = histogram(data, round(nunits / 4), 'EdgeAlpha', 0,...
+%                        'FaceAlpha', 0.3, 'Normalization', 'count');
+%                end
+           end
+           
+           subplot(nsub(1), nsub(2), k)
+           plot(data(:, stateidx)')
+           hold on
+           plot(median(data(:, stateidx)), 'k', 'LineWidth', 2)
+           xticks([1 : length(stateidx)])
+           xticklabels(fr.states.stateNames(stateidx))
+        ylabel('Mean Firing Rate [Hz]')
+        xlabel('State')
+        if k == 1
+            legend(fr.states.stateNames(stateidx))
+        end
+        
+%         xlim([0 150])
+        if i == 1
+            legend(ss.labelNames)
+        end
+        title(dirnames{i})
+        k = k + 1;
     end
 end
