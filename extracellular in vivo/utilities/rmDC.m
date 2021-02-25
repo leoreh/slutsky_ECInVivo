@@ -40,6 +40,7 @@ addOptional(p, 'DCmod', 'mean', @ischar);
 parse(p,varargin{:})
 win = p.Results.win;
 dim = p.Results.dim;
+DCmod = p.Results.DCmod;
 
 if win(2) == inf
     win(2) = size(sig, dim);

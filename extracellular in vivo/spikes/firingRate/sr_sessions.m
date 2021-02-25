@@ -50,7 +50,7 @@ if forceA
         basepath = char(fullfile(mousepath, dirnames{i}));
         [~, basename] = fileparts(basepath);
         cd(basepath)
-        
+                
         % params
         session = CE_sessionTemplate(pwd, 'viaGUI', false,...
             'force', true, 'saveVar', true);
@@ -65,7 +65,7 @@ if forceA
 %             'forceCalibrate', true, 'inspectLabels', true, 'saveVar', true,...
 %             'forceAnalyze', true, 'forceLoad', true);
         labelsmanfile = [basename, '.AccuSleep_labelsMan'];
-%         AccuSleep_viewer(EEG, EMG, 512, 2.5, [], labelsmanfile);
+%         AccuSleep_viewer(EEG, EMG, 512, 2.5, [], []);
         
         % AccuSleep_GUI
         %         badstamps = [];
@@ -205,7 +205,8 @@ end
 p3 = 1;
 k = 1;
 data = [];
-tet = 1;
+tet = 1 : 4;
+stateidx = 1 : 4;
 if p3
     fh = figure;
     for i = sessions
@@ -216,13 +217,12 @@ if p3
         
         subplot(nsub(1), nsub(2), k)
         hold on
-        stateidx = 1 : 3;
         for ii = stateidx
             nbins = min([length(sr.states.fr{ii}), 200000]);
             binidx = randperm(length(sr.states.fr{ii}), nbins);
-            data = mean(sr.states.fr{ii}(tet, binidx), 1);
-            if ~isempty(data) && nbins > 10
-                h = histogram(data, round(nbins / 10), 'EdgeAlpha', 0,...
+            binstates{i, ii} = mean(sr.states.fr{ii}(tet, binidx), 1);
+            if ~isempty(binstates{i, ii}) && nbins > 10
+                h = histogram(binstates{i, ii}, round(nbins / 10), 'EdgeAlpha', 0,...
                     'FaceAlpha', 0.3, 'Normalization', 'count');
             end
         end
@@ -241,8 +241,13 @@ if p3
     end
 end
 
+% binstates troughout time for selected state
+stateidx = 1;
+cell2nanmat(binstates(:, stateidx)');
+
 % stacked plot of episode duration
 p3 = 1;
+stateidx = 1 : 4;
 if p3
     for i = 1 : nsessions
         session = varArray{i, 1}.session;
@@ -250,7 +255,7 @@ if p3
         sr = varArray{i, 4}.fr;
         ss = varArray{i, 5}.ss;
         
-        for ii = 1 : 4
+        for ii = stateidx
             clipped = sum(diff([datInfo.clip{:}]));
             epDur(i, ii) = sum(diff(ss.stateEpochs{ii}')) /...
                 (sum(datInfo.nsec) - ss.tRemoved) * 100;
@@ -270,6 +275,7 @@ end
 % histogram duration of episodes
 p3 = 1;
 k = 1;
+stateidx = [1, 2, 3];
 if p3
     fh = figure;
     for i = 1 : nsessions
@@ -277,18 +283,19 @@ if p3
         
         subplot(nsub(1), nsub(2), k)
         hold on
-        for ii = 1 : 3
-            epLen = log10(diff(ss.stateEpochs{ii}'));
+        for ii = stateidx
+            epLen{i, ii} = log10(diff(ss.stateEpochs{ii}'));
             
-            h = histogram(epLen, round(length(epLen) / 20), 'EdgeAlpha', 0,...
-                'FaceAlpha', 0.3, 'Normalization', 'count');
+            h = histogram(epLen{i, ii}, 'BinMethod', 'auto', 'EdgeAlpha', 0,...
+                'FaceAlpha', 0.3, 'Normalization', 'probability');
+%             set(gca, 'XScale', 'log')
         end
         ylabel('Counts')
         xlabel('Duration [log10(s)]')
-        %         xlim([0 2.5])
-        %         ylim([0 100])
+                xlim([0 4])
+                ylim([0 0.3])
         if i == sessions(1)
-            legend(ss.labelNames)
+            legend(ss.labelNames(stateidx))
         end
         title(dirnames{i})
         k = k + 1;

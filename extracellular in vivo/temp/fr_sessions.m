@@ -377,7 +377,6 @@ end
 p3 = 1;
 k = 1;
 data = [];
-tet = 1;
 stateidx = 1 : 4;
 if p3
     fh = figure;
@@ -404,7 +403,7 @@ if p3
            subplot(nsub(1), nsub(2), k)
            plot(data(:, stateidx)')
            hold on
-           plot(median(data(:, stateidx)), 'k', 'LineWidth', 2)
+           plot(mean(data(:, stateidx)), 'k', 'LineWidth', 2)
            xticks([1 : length(stateidx)])
            xticklabels(fr.states.stateNames(stateidx))
         ylabel('Mean Firing Rate [Hz]')

@@ -24,7 +24,7 @@ vars = ["session.mat";...
 % column name of logical values for each session. only if true than session
 % will be loaded. can be a string array and than all conditions must be
 % met.
-pcond = ["fepsp"];
+pcond = ["fepsp"; "tempflag"];
 
 % same but imposes a negative condition
 ncond = ["spktimes"];
@@ -54,7 +54,7 @@ ngrp = length(spkgrp);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if forceA
     close all
-    for i = 3 : nsessions
+    for i = 1 : nsessions
         
         % file
         basepath = char(fullfile(mousepath, dirnames(i)));
@@ -65,14 +65,14 @@ if forceA
         % fepsp
         intens = [];
         fepsp = fEPSPfromDat('basepath', basepath, 'fname', '', 'nchans', nchans,...
-            'spkgrp', spkgrp, 'intens', intens, 'saveVar', true,...
+            'spkgrp', spkgrp, 'intens', intens, 'saveVar', false,...
             'force', true, 'extension', 'dat', 'recSystem', 'oe',...
-            'protocol', 'io', 'inspect', false, 'anaflag', false, 'cf', 450);
-  
-        fepsp = fEPSP_analysis('fepsp', fepsp, 'graphics', [9],...
-            'force', true, 'saveVar', true, 'MainTets', [1, 2, 5 : 7],...
-            'vis', 'off');
+            'protocol', 'stp', 'anaflag', true, 'inspect', false, 'fsIn', fs,...
+            'cf', 0);
         
+%         fepsp = fEPSP_analysis('fepsp', fepsp, 'basepath', basepath,...
+%             'force', true);
+  
     end
 end
 
@@ -90,52 +90,57 @@ for i = 1 : nsessions
     intens = sort(unique([intens, fepsp.intens]));
 end
 
-% protocol = fepsp.info.protocol;
-protocol = 'io';
+si = [];            % selected intensity [uA]. for stp if empty than maximum facilitation will bet taken
+grp = 1;            % selected tetrode
+dataVar = 'ampcell';
+if exist('fepsp', 'var')
+    protocol = fepsp.info.protocol;
+else
+    protocol = 'io';
+end
 switch protocol
     case 'io'
         % ampmat    3d mat of amplitudes; tetrode x intensity x session. data will
         %           be extrapolated to intensities not recorded in session.
+        % iomat     2d mat of io curves; intensity x session
         % wvmat     3d mat of average waveforms; tetrode x session x sample
         %           for 1 selected intensity.
         % ampcell   array of amplitudes for selected intensity. each cell
         %           contains amps of all traces. if itensity not recorded will be
         %           extrapolated.
         ampmat = nan(ngrp, length(intens), nsessions);
-        wvmat = nan(ngrp, nsessions, size(fepsp.wavesAvg, 3));
+        wvmat = nan(ngrp, nsessions, size(fepsp.traceAvg, 3));
         ampcell = cell(1, nsessions);
-        si = 30;        % selected intensity [uA]
-        grp = 1;          % selected tetrode
-        dataVar = 'ampcell';
+        iomat = nan(length(intens), nsessions);
         for i = 1 : nsessions
             fepsp = varArray{i, 2}.fepsp;
             sintens = sort(fepsp.intens);
             [~, ia] = intersect(sintens, si);
             [~, ib] = intersect(intens, si);
+            [~, ic] = intersect(intens, sintens);
             ampmat(:, :, i) = [interp1(sintens, fepsp.amp(:, :)', intens, 'linear', 'extrap')]';
             if ~isempty(ia)
                 for ii = 1 : ngrp
-                    wvmat(ii, i, :) = fepsp.wavesAvg(ii, ia, :);
+                    wvmat(ii, i, :) = fepsp.traceAvg(ii, ia, :);
                     ampcell{i} = fepsp.(dataVar){grp, ia};
                 end
             else
                 ampcell{i} = ampmat(grp, ib, i);
             end
+            iomat(ic, i) = mean(cell2nanmat(fepsp.(dataVar)), 'omitnan');
         end
         
     case 'stp'
-        grp = 6;    % selected tetrode
-        si = [];    % selected index for intensity. if empty than maximum will be taken
         wvmat = nan(ngrp, nsessions, size(fepsp.traceAvg, 3));
-        facilitation = nan(ngrp, nsessions);
+        ampmat = nan(nsessions, length(fepsp.ampNorm));
         for i = 1 : nsessions
             fepsp = varArray{i, 2}.fepsp;
+            fac{i} = max(squeeze(fepsp.ampNorm(grp, : ,:))');
             if isempty(si)
-                [~, si] = max(fepsp.facilitation, [], 2);
-                si = round(median(si));
+                    [~, ia] = max(fac{i});
             end
-            fac(i, :) = fepsp.facilitation(:, si);
-            wvmat(:, i, :) = fepsp.traceAvg(:, si, :);
+            wvmat(:, i, :) = fepsp.traceAvg(:, ia, :);
+            ampmat(i, :) = squeeze(fepsp.ampNorm(grp, ia, :));
         end
 end
 
@@ -147,6 +152,7 @@ end
 pathPieces = regexp(dirnames(:), '_', 'split'); % assumes filename structure: animal_date_time
 sessionDate = [pathPieces{:}];
 sessionDate = sessionDate(2 : 3 : end);
+[nsub] = numSubplots(nsessions);
 
 % waveform and box plot of amplitudes across sessions for selected
 % intensity and tetrode. can select specific sessions for waveform
@@ -154,7 +160,6 @@ sessionDate = sessionDate(2 : 3 : end);
 ss = [1 : nsessions];
 p = 1;
 clr = ['kgggrrryyy'];        % must be sorted (i.e. g before k before r)
-% grp = 1;
 if p
     fh = figure;
     subplot(2, 1, 1)
@@ -181,7 +186,7 @@ if p
     switch protocol
         case 'io'
             ampmat = cell2nanmat(ampcell);
-            %             boxplot(ampmat, 'PlotStyle', 'traditional');
+%                         boxplot(ampmat, 'PlotStyle', 'traditional');
             bar(nanmean(ampmat))
             bh = findobj(gca, 'Tag', 'Box');
             if length(bh) == length(clr)
@@ -193,15 +198,19 @@ if p
                 end
             end
             ylabel(dataVar)
+            xticks(1 : nsessions)
+            xticklabels(sessionDate)
+            xtickangle(45)
+            xlabel('Session')
         case 'stp'
-            plot([1 : nsessions], fac(:, grp))
+            plot(ampmat')
+            xticks(1 : length(fepsp.ampNorm))
+            xlabel('Stimulus No.')
+            ylabel('Normalized Amplitude')
     end
     y = ylim;
     %     ylim([0 y(2)]);
-    xticks(1 : nsessions)
-    xticklabels(sessionDate)
-    xtickangle(45)
-    xlabel('Session')
+    
     box off
     suptitle([mname ' T#' num2str(grp) ' @ ' num2str(si) 'uA'])
     
@@ -231,16 +240,13 @@ end
 
 % io across sessions, one figure per selected grp
 p = 0;
-grp = 3;
+grp = 1;
 if p
     for i = grp
-        figure
-        for ii = 1 : nsessions
-            fepsp = varArray{ii, 2}.fepsp;
-            plot(sort(fepsp.intens), fepsp.amp(i, :))
-            hold on
-        end
+        fh = figure;
+        plot(iomat)
         axis tight
+        xticklabels(split(num2str(intens)))
         xlabel('Intensity [uA]')
         ylabel('Amplitude [mV]')
         title(sprintf('T%d', i))
@@ -338,6 +344,40 @@ si = [200, 250, 300];    % reliable intensities
 %     legend(split(num2str(sg)))
 %     title(sprintf('night / day @%d uA', intens(ib)))
 % end
+
+% find range of stim artifact
+
+fh = figure;
+for i = 2 : nsessions
+    
+    % file
+    basepath = char(fullfile(mousepath, dirnames(i)));
+    cd(basepath)
+    
+    fepsp = varArray{i, 2}.fepsp;
+    
+    [~, stimidx] = min(abs(fepsp.tstamps - 0));
+    margin = fepsp.info.fs * 1 / 1000;
+    stimidx = [stimidx - margin : stimidx + margin];
+    alphaIdx = linspace(1, 0.3, length(fepsp.intens));
+    cmap = colormap(winter(length(fepsp.intens)));
+    subplot(nsub(1), nsub(2), i)
+    hold on
+    clear stimArt
+    for j = 1 : length(fepsp.intens)
+        stimArt{j} = range(fepsp.traces{j}(stimidx, :));
+        ph = plot(fepsp.ampcell{j}, stimArt{j}, 'LineStyle', 'none',...
+            'Marker', 'o', 'MarkerFaceColor', cmap(j, :), 'MarkerSize', 8,...
+            'MarkerEdgeColor', 'none');
+        %         ph.Color = cmap(j)
+    end
+    xlabel('fEPSP Amplitude [mV]')
+    ylabel('Sti. Artifact Amplitude [mV]')
+    ylim([0 0.08])
+    xlim([0. 0.6])
+    
+    [r, p] = corrcoef([fepsp.ampcell{:}], [stimArt{:}]);
+end
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -46,6 +46,9 @@ function fepsp = fEPSP_analysis(varargin)
 %   # Change nomenclature "Tet".
 %   # Change all figs to Grouped BoxPlots?
 %   # Make Intensities Colors constant in each tet fig & between tet figs.
+%   # uiwait for batch processing (lh 20 feb 21)
+%   # wavesAvg for stp not always the same length (lh 20 feb 21)
+%   # fix win of waves to include stim artifact w/o affecting amp
 %
 % 16 oct 20 LH  UPDATES
 % 02 Nov 20 LD  Change analysis from range on relevant window to

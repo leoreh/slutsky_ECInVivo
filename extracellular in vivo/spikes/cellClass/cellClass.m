@@ -27,6 +27,10 @@ function cc = cellclass(varargin)
 % DEPENDENCIES
 %   getWavelet      from buzcode
 %   fft_upsample    from Kamran Diba
+% 
+% TO DO LIST
+%   # add tail slope (Torrado Pacheco et al., Neuron, 2021). TP threshold
+%   in that article was ~0.4 ms
 %
 % 08 apr 19 LH      updates: 
 % 21 nov 19 LH      added spikes and FR in scatter

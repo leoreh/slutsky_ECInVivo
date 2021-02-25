@@ -30,13 +30,13 @@ SR = 1000;
 epochLen = 2.5;
 minBoutLen = epochLen;
 nstates = 5; 
-labelnames = {'REM', 'WAKE', 'QWAKE', 'NREM', 'LSLEEP'};
+labelnames = {'WAKE', 'QWAKE', 'LSLEEP', 'NREM', 'REM'};
 
 % calc weights
 weights = histcounts(gldstrd) / length(gldstrd);
 weights = round(weights * 100) / 100;       % round to two decimals
 weights(3) = weights(3) + 1 - sum(weights);  % add remainder to NREM
-weights = [0.08 0.32 0.38 0.16 0.06]; 
+weights = [0.32 0.16 0.06 0.38 0.08]; 
 
 % config file
 configfile = 'D:\Code\AccuSleep\AS_config.mat';
@@ -48,11 +48,11 @@ save(configfile, 'cfg_colors', 'cfg_names', 'cfg_weights')
 
 configfile = 'D:\Code\AccuSleep\AS_config.mat';
 load(configfile)
-cfg_colors{1} = [160 100 170] / 255;
-cfg_colors{2} = [240 110 110] / 255;
-cfg_colors{3} = [240 170 125] / 255;
+cfg_colors{1} = [240 110 110] / 255;
+cfg_colors{2} = [240 170 125] / 255;
+cfg_colors{3} = [150 205 130] / 255;
 cfg_colors{4} = [110 180 200] / 255;
-cfg_colors{5} = [150 205 130] / 255;
+cfg_colors{5} = [170 100 170] / 255;
 cfg_names = labelnames;
 cfg_weights = weights;
 save(configfile, 'cfg_colors', 'cfg_names', 'cfg_weights')

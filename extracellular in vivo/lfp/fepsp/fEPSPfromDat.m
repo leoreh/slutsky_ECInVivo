@@ -172,7 +172,7 @@ if exist(fepspname, 'file')
     if ~force && ~anaflag
         return
     elseif ~force && anaflag
-        if isfield(fepsp,'amp')
+        if isfield(fepsp, 'amp')
             return
         else
             fprintf('Loaded File isn''t analysed, analaysing...\n')
@@ -183,8 +183,6 @@ if exist(fepspname, 'file')
             intens = fepsp.info.intensOrig;
         elseif isfield(fepsp, 'intens')
             intens = fepsp.intens;
-%         if isfield(fepsp.info, 'stamps')
-%             stamps = fepsp.info.stamps;
         end
     end
 end
@@ -220,8 +218,13 @@ switch recSystem
         % load timestamps
         load(fullfile(basepath, [basename, '.tstamps.mat']));
         
-        % convert tstamps to idx of samples
-        dinStamps = din.tstamps{1};     % assumes stim recorded on ch1
+        % convert tstamps to idx of samples. assumes stim recorded on ch1.
+        % data field of din is legacy. 
+        if isfield(din, 'data')
+            dinStamps = din.data;     
+        elseif isfield(din, 'tstamps')
+            dinStamps = din.tstamps{1};     
+        end
         stamps = zeros(1, length(dinStamps));
         for i = 1 : length(dinStamps)
             stamps(i) = find(tstamps == dinStamps(i));
@@ -303,12 +306,12 @@ switch protocol
     case 'stp'
         % 5 pulses of 500 us at 50 Hz. recording length 200 ms. repeated
         % once every 30 s.
-        nstim = 5;
+        nstim = 3;
         baseline = [1 floor(9 * fsOut / 1000)];        % samples of baseline period
         snipwin = round([-0.01 * fsOut 0.19 * fsOut]);
         tstamps = [snipwin(1) : snipwin(2)] / fsOut * 1000;
         ts = diff(stamps);
-        stamps = stamps(1 : 5 : end);
+        stamps = stamps(1 : nstim : end);
 end
 
 % snip
