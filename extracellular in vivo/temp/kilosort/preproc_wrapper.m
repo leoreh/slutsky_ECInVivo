@@ -18,22 +18,22 @@ datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
     'rmvch', rmvch, 'mapch', mapch, 'concat', true,...
     'nchans', length(mapch), 'fsIn', 30000);
 
-%%%%%%%%%%%%%%%%%%%%%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % tdt
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'K:\Data\090221_0659';
-store = 'Raw1';
-blocks = [3];
+basepath = 'K:\Data\lh86\lh86_210303';
+store = 'EMG2';
+blocks = [1];
 chunksize = 300;
 mapch = [1 : 16];
-% mapch = [1 : 4];
-rmvch = [];
-% rmvch = [1 : 3];
+mapch = [1 : 4];
+rmvch = 6;
+rmvch = [2, 4];
 clip = cell(1, 1);
-clip{3} = [28200 Inf];
+% clip{2} = [28104 Inf];
+% clip{3} = [1080 Inf];
 datInfo = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
     'chunksize', chunksize, 'mapch', mapch, 'rmvch', rmvch, 'clip', clip);
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % session info (cell explorer foramt)

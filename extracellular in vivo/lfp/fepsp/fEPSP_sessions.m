@@ -81,7 +81,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % intensities throughout sessions
-intens = [];
+intens = [50];
 for i = 1 : nsessions
     if isempty(varArray{i, 2})
         continue
@@ -90,9 +90,9 @@ for i = 1 : nsessions
     intens = sort(unique([intens, fepsp.intens]));
 end
 
-si = [];            % selected intensity [uA]. for stp if empty than maximum facilitation will bet taken
+si = [50];            % selected intensity [uA]. for stp if empty than maximum facilitation will bet taken
 grp = 1;            % selected tetrode
-dataVar = 'ampcell';
+dataVar = 'ampcellNorm';
 if exist('fepsp', 'var')
     protocol = fepsp.info.protocol;
 else
@@ -305,89 +305,62 @@ if p
     end
 end
 
-% comparison night and day
-% amp during night (even) devided by values in day (odd).
-% tetrodes x intensities x days.
+% stim artifact
 p = 0;
-sg = [1, 4 : 8];    % excluded tetrodes not in ca1.
-si = [200, 250, 300];    % reliable intensities
-[~, ib] = intersect(intens, si);
-
-% night = ampmat(sg, ib, 2 : 2 : end);
-% night = mean(night(:, :, [1 : 3]), 3);
-% day = ampmat(sg, ib, 1 : 2 : end);
-% day = mean(day(:, :, [1 : 3]), 3);
-% night ./ day
-% night = ampmat(sg, ib, 2 : 2 : end);
-% night = mean(night(:, :, [5 : 10]), 3);
-% day = ampmat(sg, ib, 1 : 2 : end);
-% day = mean(day(:, :, [5 : 10]), 3);
-% night ./ day
-% night = ampmat(sg, ib, 2 : 2 : end);
-% night = mean(night(:, :, [12 : 13]), 3);
-% day = ampmat(sg, ib, 1 : 2 : end);
-% day = mean(day(:, :, [12 : 13]), 3);
-% night ./ day
-
-% ndmat = ampmat(sg, ib, 2 : 2 : end) ./  ampmat(sg, ib, 1 : 2 : end);
-% if p
-%     figure
-%     [~, ib] = intersect(intens, si);
-%     plot(squeeze(mean(ndmat(:, :, :), 2))', 'LineWidth', 2)
-%     hold on
-%     plot([1 size(ndmat, 3)], [1 1], '--k')
-%     axis tight
-%     y = ylim;
-%     ylim([0 y(2)])
-%     xlabel('Time [days]')
-%     ylabel('Ratio night / day')
-%     legend(split(num2str(sg)))
-%     title(sprintf('night / day @%d uA', intens(ib)))
-% end
-
-% find range of stim artifact
-
-fh = figure;
-for i = 2 : nsessions
-    
-    % file
-    basepath = char(fullfile(mousepath, dirnames(i)));
-    cd(basepath)
-    
-    fepsp = varArray{i, 2}.fepsp;
-    
-    [~, stimidx] = min(abs(fepsp.tstamps - 0));
-    margin = fepsp.info.fs * 1 / 1000;
-    stimidx = [stimidx - margin : stimidx + margin];
-    alphaIdx = linspace(1, 0.3, length(fepsp.intens));
-    cmap = colormap(winter(length(fepsp.intens)));
-    subplot(nsub(1), nsub(2), i)
-    hold on
-    clear stimArt
-    for j = 1 : length(fepsp.intens)
-        stimArt{j} = range(fepsp.traces{j}(stimidx, :));
-        ph = plot(fepsp.ampcell{j}, stimArt{j}, 'LineStyle', 'none',...
-            'Marker', 'o', 'MarkerFaceColor', cmap(j, :), 'MarkerSize', 8,...
-            'MarkerEdgeColor', 'none');
-        %         ph.Color = cmap(j)
+if p
+    fh = figure;
+    for i = 1 : nsessions
+        
+        basepath = char(fullfile(mousepath, dirnames(i)));
+        cd(basepath)
+        fepsp = varArray{i, 2}.fepsp;
+        
+        [~, stimidx] = min(abs(fepsp.tstamps - 0));
+        margin = fepsp.info.fs * 1 / 1000;
+        stimidx = [stimidx - margin : stimidx + margin];
+        alphaIdx = linspace(1, 0.3, length(fepsp.intens));
+        cmap = colormap(winter(length(fepsp.intens)));
+        subplot(nsub(1), nsub(2), i)
+        hold on
+        clear stimArt
+        for j = 1 : length(fepsp.intens)
+            stimArt{j} = range(fepsp.traces{j}(stimidx, :));
+            ph = plot(stimArt{j}, fepsp.ampcell{j}, 'LineStyle', 'none',...
+                'Marker', 'o', 'MarkerFaceColor', cmap(j, :), 'MarkerSize', 8,...
+                'MarkerEdgeColor', 'none');
+        end
+        axis tight
+        
+        % linear correlation and regression
+        x = [stimArt{:}]';
+        y = [fepsp.ampcell{:}]';
+        [r, p] = corrcoef(x, y);
+        b = polyfit(x, y, 1);
+        yfit = polyval(b, x);
+        ssresid = sum((y - yfit).^2);
+        sstot = (length(y) - 1) * var(y);
+        rsq = 1 - ssresid / sstot;
+        
+        % plot regression
+        plot(x, yfit, 'k', 'LineWidth', 1)
+        
+        ylabel('fEPSP Amplitude [mV]')
+        xlabel('Sti. Artifact Amplitude [mV]')
+        legend(split(num2str(fepsp.intens)))
+        title(sprintf('%s\nR = %.2f; p = %.4f\ncoef = %.2f, const = %.2f, rsq = %.2f',...
+            dirnames(i), r(2, 1), p(2, 1), b(1), b(2), rsq))
+        
+        traces = [fepsp.traces{:}];
+        traces = traces(1 : 750, :);
+        sigRms(i) = mean(rms(traces));
+        
+        k = 0;
+        for j = 1 : length(fepsp.intens)
+            idx = length(fepsp.ampcell{j});
+            fepsp.ampcellNorm{j} = [y(k + 1 : k + idx) ./ x(k + 1 : k + idx)]';
+            k = k + idx;
+        end
+        fepsp.stimArt = stimArt;
+%         save([dirnames{i}, '.fepsp.mat'], 'fepsp')
     end
-    xlabel('fEPSP Amplitude [mV]')
-    ylabel('Sti. Artifact Amplitude [mV]')
-    ylim([0 0.08])
-    xlim([0. 0.6])
-    
-    [r, p] = corrcoef([fepsp.ampcell{:}], [stimArt{:}]);
 end
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% to prism
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% squeeze(ampmat(7, :, :));
-% squeeze(wvmat(7, :, :));
-%
-% squeeze(mean(mean(ndmat(:, :, 1 : 3), 2), 1))
-% squeeze(mean(mean(ndmat(:, :, 5 : 10), 2), 1))
-% squeeze(mean(mean(ndmat(:, :, 12 : 13), 2), 1))
-%
-% plot(squeeze(mean(ampmat([1, 4 : 8], [2 : 6], :), 1))')

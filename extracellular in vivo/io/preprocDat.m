@@ -22,6 +22,7 @@ function datInfo = preprocDat(varargin)
 %               1-based.
 %   pli         numeric. channel from which to extract line crossings.
 %               if 0 will not remove pli. 
+%   rmvArt      logical. remove artifacts
 %   precision   char. sample precision {'int16'} 
 %   saveVar     logical. save datInfo {true} or not (false).
 %
@@ -56,6 +57,7 @@ addOptional(p, 'clip', [], @isnumeric);
 addOptional(p, 'mapch', [], @isnumeric);
 addOptional(p, 'rmvch', [], @isnumeric);
 addOptional(p, 'pli', 0, @isnumeric);
+addOptional(p, 'rmvArt', false, @islogical);
 addOptional(p, 'bkup', false, @islogical);
 addOptional(p, 'saveVar', true, @islogical);
 
@@ -69,6 +71,7 @@ clip = p.Results.clip;
 mapch = p.Results.mapch;
 rmvch = p.Results.rmvch;
 pli = p.Results.pli;
+rmvArt = p.Results.rmvArt;
 bkup = p.Results.bkup;
 saveVar = p.Results.saveVar;
 
@@ -144,7 +147,7 @@ for i = 1 : nchunks
     
     % load chunk
     d = raw.mapped(:, chunks(i, 1) : chunks(i, 2));
-       
+    
     % remove channels
     if ~isempty(rmvch)                     
         % save channel used for line crossing detection
@@ -162,14 +165,62 @@ for i = 1 : nchunks
     % remove dc
     [d, dc(i, :)] = rmDC(d, 'dim', 2);
     
-    % remove pli
-    if pli                                 
-        linet = lineDetect('x', d(pli, :), 'fs', fs, 'graphics', false);
-        for j = 1 : size(d, 1)
-            d(j, :) = lineRemove(d(j, :), linet, [], [], 0, 1);
-        end
-    end
-    
+    % remove artifacts by voltage threshold
+%     if rmvArt
+%         rmvSamps = [];
+%         fs = 24414.06;
+%         b2uv = 1000;    % tdt, for oe 0.195;
+%         marg = round(0.005 * fs);
+%         for ii = 1 : size(d, 1)
+%             dch = double(d(ii, :));
+%             artfcts = abs(dch) > 1.2 * b2uv;
+%             artidx = binary2epochs('vec', artfcts', 'exclude', false, 'minDur', [],...
+%                 'maxDur', [], 'interDur', marg);
+%             artDur = artidx(:, 2) - artidx(:, 1);
+%             
+%             % go over and spline interpolate if short, remove if long. if
+%             % long also save in datInfo.
+%             k = 1;
+%             rmvIdx = [];
+%             for iii = 1 : size(artidx, 1)
+%                 if artDur(iii) >= marg * 10
+%                     rmvIdx(k, :) = (artidx(iii, :) + chunks(i, 2) - 1) / fs;
+%                     k = k + 1;
+%                 else
+%                     margSp = 0.25 * fs; % assumes spline requires half a cycle to properly estimate delta
+%                     splineIdx = artidx(iii, 1) - 0.25 * fs : artidx(iii, 2) + 0.25 * fs;
+% %                     interp1(splineIdx, 
+% %                     dch(artidx(iii, 1) : artidx(iii, 2))
+%                 end
+%             end
+%             
+%             
+%             if ~isempty(artidx)
+%                 artidx = unique(artidx(:));
+%                 artidx(artidx > chunksize) = [];
+%                 % ALT 1 - simply remove artifacts from the recording
+%                 d(:, artidx) = [];
+%                 rmvSamps = [rmvSamps; (artidx + chunks(i, 2) - 1) / fs];
+%                 % ALT 2 - if short spline interpolate section, if long than remove
+%             end
+%             
+%             % graphics for debugging
+%             figure
+%             plot([1 : chunksize] / fs, dch)
+%             hold on
+%             scatter(find(artfcts) / fs, dch(find(artfcts)));
+%             axis tight
+%                 
+%             % remove pli
+%             if pli
+%                 linet = lineDetect('x', d(pli, :), 'fs', fs, 'graphics', false);
+%                 for j = 1 : size(d, 1)
+%                     d(j, :) = lineRemove(d(j, :), linet, [], [], 0, 1);
+%                 end
+%             end
+%         end   
+%     end   
+
     fwrite(fid, d(:), precision);
 end
 
@@ -208,6 +259,7 @@ datInfo.mapCh = orig_mapch;
 datInfo.rmvCh = rmvch;
 datInfo.pli = pli;
 datInfo.dc = mean(dc, 1);
+% datInfo.rmvSamps = rmvSamps;
 
 if saveVar
     save(infoname, 'datInfo', '-v7.3');

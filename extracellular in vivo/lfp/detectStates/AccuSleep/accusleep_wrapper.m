@@ -104,19 +104,19 @@ end
 % minBoutLen = epochLen;
 
 % change to user input or from configuration file
-nstates = 4;        
-ss.labelNames{1} = 'REM';
-ss.labelNames{2} = 'WAKE';
-ss.labelNames{3} = 'NREM';
-ss.labelNames{4} = 'DROWSY';
+configfile = 'D:\Code\AccuSleep\AS_config.mat';
+load(configfile)
+ss.labelNames = cfg_names;
+nstates = length(ss.labelNames);
 
 % session info
 [~, basename] = fileparts(basepath);
 load([basename, '.session.mat'])
-basepath = session.general.basePath;
 nchans = session.extracellular.nChannels;
 recDur = session.general.duration;
 fsLfp = session.extracellular.srLfp;
+basepath = session.general.basePath;
+cd(basepath)
 
 % files
 mousepath = fileparts(basepath);
@@ -146,6 +146,10 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arrange data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% currently this must be updated manually according to recording setup
+% configuration. ALT 1 - real EEG (screw frontal lobe); ALT 2 - lfp from
+% tetrodes.
+eegAlt = 1;
 
 if exist(emgfile, 'file') && exist(eegfile, 'file') && ~forceLoad
     load(eegfile, 'EEG')
@@ -159,16 +163,26 @@ else
             fsEmg = datInfo.fs;
             emgname = [basename '.emg.dat'];
             emg_orig = double(bz_LoadBinary(emgname, 'duration', Inf,...
-                'frequency', fsEmg, 'nchannels', 1, 'start', 0,...
+                'frequency', fsEmg, 'nchannels', 2, 'start', 0,...
                 'channels', 1, 'downsample', 1));
             
-            % lfp (same for oe system)
-            lfpname = [basename, '.lfp'];
-            eeg_orig = double(bz_LoadBinary(lfpname, 'duration', Inf,...
-                'frequency', fsLfp, 'nchannels', nchans, 'start', 0,...
-                'channels', lfpCh, 'downsample', 1));
-            if size(eeg_orig, 2) > 1
-                eeg_orig = mean(eeg_orig, 2);
+            % eeg
+            switch eegAlt
+                case 1
+                   fsLfp = fsEmg;
+                    eeg_orig = double(bz_LoadBinary(emgname, 'duration', Inf,...
+                        'frequency', fsLfp, 'nchannels', 2, 'start', 0,...
+                        'channels', 2, 'downsample', 1)); 
+                    
+                case 2
+                    % lfp (same for oe system)
+                    lfpname = [basename, '.lfp'];
+                    eeg_orig = double(bz_LoadBinary(lfpname, 'duration', Inf,...
+                        'frequency', fsLfp, 'nchannels', nchans, 'start', 0,...
+                        'channels', lfpCh, 'downsample', 1));
+                    if size(eeg_orig, 2) > 1
+                        eeg_orig = mean(eeg_orig, 2);
+                    end
             end
         case 'oe'
     end
@@ -178,12 +192,15 @@ else
     
     % low-pass filter to assure nyquist.
     % note accusleep only uses spectrogram up to 50 Hz
-    %     cf = 100;        % cutoff frequency
-    %     fprintf('\nlow-pass filtering, cutoff = %d Hz\n', cf)
-    %     import iosr.dsp.*
-    %     filtRatio = cf / (fsLfp / 2);
-    %     eeg_orig = iosr.dsp.sincFilter(eeg_orig, filtRatio);
-    
+        cf = 128;        % cutoff frequency
+        fprintf('\nlow-pass filtering, cutoff = %d Hz\n', cf)
+        import iosr.dsp.*
+        filtRatio = cf / (fsLfp / 2);
+        eeg_orig = iosr.dsp.sincFilter(eeg_orig, filtRatio);
+        
+        cf = [20 50];
+        filtRatio = cf / (fsEmg / 2);
+        emg_orig = iosr.dsp.sincFilter(emg_orig, filtRatio);
     % remove DC component
     % fprintf('removing dc component\n')
     % EEG = rmDC(EEG, 'dim', 1);

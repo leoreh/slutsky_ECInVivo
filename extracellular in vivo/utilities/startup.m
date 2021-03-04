@@ -33,9 +33,9 @@ warning('off', 'MATLAB:MKDIR:DirectoryExists');
 % change default graphics
 % NOTE groot is the root of all graphical objects (previously referred to
 % as 0)
-% set(groot, 'DefaultTextInterpreter', 'none');
-% set(groot, 'DefaultAxesTickLabelInterpreter', 'none');
-% set(groot, 'DefaultLegendInterpreter', 'none');
+set(groot, 'DefaultTextInterpreter', 'none');
+set(groot, 'DefaultAxesTickLabelInterpreter', 'none');
+set(groot, 'DefaultLegendInterpreter', 'none');
 % set(groot, 'DefaultAxesFontName', 'Diverda Sans Com')
 % set(groot, 'DefaultTextFontName', 'Diverda Sans Com')
 % set(groot, 'DefaultAxesFontSize', 12)

@@ -149,7 +149,7 @@ for i = 1 : Nbatch
         buff = cat(2, bpad, buff(:, 1:NTbuff-ntb)); 
     end    
     wh    = gpufilter(buff, ops, chanMap);    
-    wh(ntb + [1:ntb], :) = w_edge .* wh(ntb + [1:ntb], :) +...
+    wh(ntb + [1 : ntb], :) = w_edge .* wh(ntb + [1 : ntb], :) +...
         (1 - w_edge) .* datr_prev;
     datr_prev = wh(ntb +NT + [1:ops.ntbuff], :);
     wh    = wh(ntb + (1:NT),:);   

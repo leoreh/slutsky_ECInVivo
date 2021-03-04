@@ -8,7 +8,7 @@ forceA = false;
 
 % full path and name to xls file with session metadata
 xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
-mname = 'lh81';
+mname = 'lh52';
 
 % column name in xls sheet where dirnames exist
 colName = 'Session';                    
@@ -121,14 +121,14 @@ close all
 grp = [1 : 4];          % which tetrodes to plot
 state = [];             % [] - all; 1 - awake; 2 - NREM
 FRdata = 'strd';        % plot absolute fr or normalized
-unitClass = 'pyr';      % plot 'int', 'pyr', or 'all'
+unitClass = 'int';      % plot 'int', 'pyr', or 'all'
 suFlag = 1;             % plot only su or all units
 minfr = 0;              % include only units with fr greater than
 maxfr = 3000;           % include only units with fr lower than
 Y = [0 10];             % ylim
 yscale = 'log';         % log or linear
 p1 = 1;                 % firing rate vs. time, one fig per session
-p2 = 0;                 % mfr across sessions, one fig
+p2 = 1;                 % mfr across sessions, one fig
 p3 = 0;                 % firing rate vs. time, one fig for all sessions. not rubust
 p4 = 0;                 % number of cells per session, one fig
 plotStyle = 'box';      % for p2. can by 'bar' or 'box'
@@ -141,13 +141,16 @@ for i = 1 : nsessions
     session = varArray{i, 1}.session;
     cm = varArray{i, 2}.cell_metrics;
     spikes = varArray{i, 3}.spikes;
-    if ~isempty(varArray{i, 4})
+    if ~isempty(varArray{i, 7})
+        ss = varArray{i, 7}.ss;
+    elseif ~isempty(varArray{i, 4})
         ss = varArray{i, 4}.SleepState;
+    else
+        ss = [];
     end
     fr = varArray{i, 5}.fr;
     datInfo = varArray{i, 6}.datInfo;
     fs = session.extracellular.sr;   
-    ss = varArray{i, 7}.ss;
     
     % su vs mu
     su = ones(length(spikes.ts), 1);    % override
@@ -181,12 +184,15 @@ for i = 1 : nsessions
     end
     
     % states
-    if ~isempty(varArray{i, 4})
-        states = {ss.ints.WAKEstate, ss.ints.NREMstate, ss.ints.REMstate};
+    if ~isempty(ss)
+        if isfield(ss, 'ints')
+            states = {ss.ints.WAKEstate, ss.ints.NREMstate, ss.ints.REMstate};
+        elseif isfield(ss, 'stateEpochs')
+            states = ss.stateEpochs;
+        end
     else
         states = [];
     end
-    states = ss.stateEpochs;
     if ~isempty(state) && state > 0
         data = fr.states.fr{state}(units{i}, :);
         tstamps = fr.states.tstamps{state};
@@ -374,7 +380,7 @@ if p4
 end
 
 % mean firing rate in states per unit
-p3 = 1;
+p3 = 0;
 k = 1;
 data = [];
 stateidx = 1 : 4;
