@@ -21,16 +21,16 @@ datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % tdt
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'K:\Data\lh86\lh86_210303';
+basepath = 'K:\Data\lh86\lh86_210304';
 store = 'EMG2';
-blocks = [1];
+blocks = [3];
 chunksize = 300;
 mapch = [1 : 16];
 mapch = [1 : 4];
 rmvch = 6;
 rmvch = [2, 4];
 clip = cell(1, 1);
-% clip{2} = [28104 Inf];
+% clip{1} = [24000 Inf];
 % clip{3} = [1080 Inf];
 datInfo = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
     'chunksize', chunksize, 'mapch', mapch, 'rmvch', rmvch, 'clip', clip);
@@ -77,9 +77,11 @@ rez = runKS('basepath', basepath, 'fs', fs, 'nchans', nchans,...
     'graphics', false, 'force', true);
         
 % create ns files for sorting
+dur = 360;
+t = [];
 spktimes2ks('basepath', basepath, 'fs', fs,...
     'nchans', nchans, 'spkgrp', spkgrp, 'mkClu', true,...
-    'dur', 240, 't', '200000', 'psamp', [], 'grps', [1 : length(spkgrp)],...
+    'dur', dur, 't', t, 'psamp', [], 'grps', [1 : length(spkgrp)],...
     'spkFile', 'temp_wh');
 
 % spike rate

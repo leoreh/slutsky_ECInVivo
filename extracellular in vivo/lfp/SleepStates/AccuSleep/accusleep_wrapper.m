@@ -114,7 +114,7 @@ nstates = length(ss.labelNames);
 load([basename, '.session.mat'])
 nchans = session.extracellular.nChannels;
 recDur = session.general.duration;
-fsLfp = session.extracellular.srLfp;
+fs_eeg = session.extracellular.srLfp;
 basepath = session.general.basePath;
 cd(basepath)
 
@@ -149,7 +149,7 @@ end
 % currently this must be updated manually according to recording setup
 % configuration. ALT 1 - real EEG (screw frontal lobe); ALT 2 - lfp from
 % tetrodes.
-eegAlt = 1;
+eegAlt = 2;
 
 if exist(emgfile, 'file') && exist(eegfile, 'file') && ~forceLoad
     load(eegfile, 'EEG')
@@ -160,25 +160,25 @@ else
             % emg
             emgInfo = dir([basename, '.EMG*.datInfo*']);
             load(emgInfo.name)
-            fsEmg = datInfo.fs;
+            fs_emg = datInfo.fs;
             emgname = [basename '.emg.dat'];
             emg_orig = double(bz_LoadBinary(emgname, 'duration', Inf,...
-                'frequency', fsEmg, 'nchannels', 2, 'start', 0,...
+                'frequency', fs_emg, 'nchannels', 2, 'start', 0,...
                 'channels', 1, 'downsample', 1));
             
             % eeg
             switch eegAlt
                 case 1
-                   fsLfp = fsEmg;
+                   fs_eeg = fs_emg;
                     eeg_orig = double(bz_LoadBinary(emgname, 'duration', Inf,...
-                        'frequency', fsLfp, 'nchannels', 2, 'start', 0,...
+                        'frequency', fs_eeg, 'nchannels', 2, 'start', 0,...
                         'channels', 2, 'downsample', 1)); 
                     
                 case 2
                     % lfp (same for oe system)
                     lfpname = [basename, '.lfp'];
                     eeg_orig = double(bz_LoadBinary(lfpname, 'duration', Inf,...
-                        'frequency', fsLfp, 'nchannels', nchans, 'start', 0,...
+                        'frequency', fs_eeg, 'nchannels', nchans, 'start', 0,...
                         'channels', lfpCh, 'downsample', 1));
                     if size(eeg_orig, 2) > 1
                         eeg_orig = mean(eeg_orig, 2);
@@ -187,29 +187,31 @@ else
         case 'oe'
     end
     
-    % find corresponsding timestamps for EMG and labels [s]
-    tstamps_sig = [1 / SR : 1 / SR : recDur];
-    
     % low-pass filter to assure nyquist.
     % note accusleep only uses spectrogram up to 50 Hz
-        cf = 128;        % cutoff frequency
-        fprintf('\nlow-pass filtering, cutoff = %d Hz\n', cf)
-        import iosr.dsp.*
-        filtRatio = cf / (fsLfp / 2);
-        eeg_orig = iosr.dsp.sincFilter(eeg_orig, filtRatio);
-        
-        cf = [20 50];
-        filtRatio = cf / (fsEmg / 2);
-        emg_orig = iosr.dsp.sincFilter(emg_orig, filtRatio);
-    % remove DC component
+    cf_eeg = 128;        % cutoff frequency
+    fprintf('\nlow-pass filtering EEG, cutoff = %d Hz\n', cf_eeg)
+    import iosr.dsp.*
+    filtRatio = cf_eeg / (fs_eeg / 2);
+    eeg_orig = iosr.dsp.sincFilter(eeg_orig, filtRatio);
+    
+    cf_emg = [10 100];   % cutoff frequency
+    fprintf('\nlow-pass filtering EMG, cutoff = %d Hz\n', cf_emg)
+    filtRatio = cf_emg / (fs_emg / 2);
+    emg_orig = iosr.dsp.sincFilter(emg_orig, filtRatio);
+    
+    %remove DC component
     % fprintf('removing dc component\n')
     % EEG = rmDC(EEG, 'dim', 1);
     % EEG = rmDC(EEG, 'dim', 1);
     
+    % find corresponsding timestamps for EMG and labels [s]
+    tstamps_sig = [1 / SR : 1 / SR : recDur];
+    
     % resmaple
-    EMG = [interp1([1 : length(emg_orig)] / fsEmg, emg_orig, tstamps_sig,...
+    EMG = [interp1([1 : length(emg_orig)] / fs_emg, emg_orig, tstamps_sig,...
         'pchip')]';
-    EEG = [interp1([1 : length(eeg_orig)] / fsLfp, eeg_orig, tstamps_sig,...
+    EEG = [interp1([1 : length(eeg_orig)] / fs_eeg, eeg_orig, tstamps_sig,...
         'pchip')]';
     
     % save files
@@ -364,14 +366,18 @@ for i = 1 : nstates
     ss.stateEpochs{i} = stateEpisodes * epochLen;
 end
 
+ss.info.net = netfile;
+ss.info.fs = SR;
+ss.info.fs_eeg = fs_eeg;
+ss.info.fs_emg = fs_emg;
+ss.info.cf_eeg = cf_eeg;
+ss.info.cf_emg = cf_emg;
+ss.info.calibrationData = calibrationData;
+ss.info.rmtimes = rmtimes;
+ss.info.tRemoved = tRemoved;
 ss.labels = labels;
 ss.labels_orig = labels_orig;
 ss.labels_calibration = labels_calibration;
-ss.calibrationData = calibrationData;
-ss.rmtimes = rmtimes;
-ss.tRemoved = tRemoved;
-ss.fs = SR;
-ss.net = netfile; 
 ss.accuracy = statesAccuracy;
 
 if saveVar

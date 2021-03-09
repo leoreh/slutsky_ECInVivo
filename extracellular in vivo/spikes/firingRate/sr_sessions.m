@@ -59,18 +59,18 @@ if forceA
         spkgrp = session.extracellular.spikeGroups.channels;
         
         % pre-process dat
-        mapch = 1 : 15;
-        rmvch = [];
-        datInfo = preprocDat('basepath', basepath, 'fname', [basename, '.dat'], 'mapch', mapch,...
-            'rmvch', rmvch, 'nchans', nchans, 'saveVar', true,...
-            'chunksize', 5e6, 'precision', 'int16', 'bkup', true,...
-            'clip', round([406 * fs * 60 438 * fs * 60]), 'rmvArt', false);
+%         mapch = 1 : 15;
+%         rmvch = [];
+%         datInfo = preprocDat('basepath', basepath, 'fname', [basename, '.dat'], 'mapch', mapch,...
+%             'rmvch', rmvch, 'nchans', nchans, 'saveVar', true,...
+%             'chunksize', 5e6, 'precision', 'int16', 'bkup', true,...
+%             'clip', round([406 * fs * 60 438 * fs * 60]), 'rmvArt', false);
         
         % create lfp
-        LFPfromDat('basepath', basepath, 'cf', 450, 'chunksize', 5e6,...
-            'nchans', nchans, 'fsOut', 1250,...
-            'fsIn', fs)
-        
+%         LFPfromDat('basepath', basepath, 'cf', 450, 'chunksize', 5e6,...
+%             'nchans', nchans, 'fsOut', 1250,...
+%             'fsIn', fs)
+%         
         % sleep states
 %         ss = accusleep_wrapper('basepath', basepath, 'cleanRec', [],...
 %             'SR', 512, 'epochLen', 2.5, 'recSystem', 'tdt', 'calfile', [],...
@@ -78,7 +78,7 @@ if forceA
 %             'forceCalibrate', true, 'inspectLabels', true, 'saveVar', true,...
 %             'forceAnalyze', true, 'forceLoad', true);
 %         labelsmanfile = [basename, '.AccuSleep_labelsMan.mat'];
-%         AccuSleep_viewer(EEG, EMG, 512, 2.5, labels, labelsmanfile);
+%         AccuSleep_viewer(EEG, EMG, 512, 1, [], []);
         
         % AccuSleep_GUI
         %         badstamps = [];
@@ -100,10 +100,10 @@ if forceA
             'graphics', false, 'force', true);
         
         % create ns files for sorting
-%         spktimes2ks('basepath', basepath, 'fs', fs,...
-%             'nchans', nchans, 'spkgrp', spkgrp, 'mkClu', true,...
-%             'dur', [], 't', [], 'psamp', [], 'grps', [1 : length(spkgrp)],...
-%             'spkFile', 'temp_wh');
+        spktimes2ks('basepath', basepath, 'fs', fs,...
+            'nchans', nchans, 'spkgrp', spkgrp, 'mkClu', true,...
+            'dur', 360, 't', '220000', 'psamp', [], 'grps', [1 : length(spkgrp)],...
+            'spkFile', 'temp_wh');
         
         % spike rate per tetrode. note that using firingRate requires
         % special care becasue spktimes is given in samples and not seconds
@@ -376,8 +376,8 @@ end
 
 % spike rate vs. time across all sessions (1 fig)
 % state = [];
-onSession = 'lh81_210204_072400';
-offSession = 'lh81_210207_065300';
+onSession = 'lh86_210226_184500';
+offSession = 'lh86_210228_190000';
 patchIdx = [0 0];
 p4 = 1;
 if p4
@@ -420,7 +420,7 @@ if p4
             tformat = 'HHmm';
         end
         recStart = datetime(recStart, 'InputFormat', tformat);
-        t = '080000';
+        t = '090000';
         t = datetime(t, 'InputFormat', tformat);
         if t <= recStart
             t = t + hours(12);
@@ -434,7 +434,7 @@ if p4
     end
     
     % smooth data
-    smf = [31];
+    smf = [1];
     if smf > 2
         gk = gausswin(smf);
         gk = gk / sum(gk);

@@ -13,10 +13,11 @@ function spktimes2ks(varargin)
 %   psamp       numeric. peak / trough sample {16}. if empty will be
 %               set to half nsamps.
 %   nchans      numeric. number of channels in dat file.
-%   dur         numeric. duration of trim period [min]
+%   dur         numeric. duration of trim period [min]. 
 %   t           string. start time of trim period. if empty than will take
-%               dur minutes from end of recording. can be in the format
-%               'HHmmss' or 'HHmm'.
+%               dur minutes from end of recording (if dur is negative) or
+%               dur minutes from start of recording (if dur is positive).
+%               can be in the format 'HHmmss' or 'HHmm'.
 %   mkClu       logical. create also clu file for inspection w/ ns {false}
 %   spkFile     string. clip spike waveforms from {'dat'} or 'temp_wh'
 % 
@@ -26,8 +27,9 @@ function spktimes2ks(varargin)
 % TO DO LIST
 %   # replace memmap w/ fread 
 %   # clean temp_wh after creation of ns files
-%
-% 09 nov 20 LH      
+% 
+% 09 nov 20 LH  updates
+% 09 mar 20 LH  dur can be pos / neg
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -61,8 +63,6 @@ spkFile   	= p.Results.spkFile;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preparations
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-dur = dur * 60 * fs;
 
 sniplength = ceil(1.6 * 10^-3 * fs);
 win = [-(floor(sniplength / 2) - 1) floor(sniplength / 2)];   
@@ -107,6 +107,7 @@ raw = m.Data;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % find boundry samples
+dur = dur * 60 * fs;
 recStart = '';
 if ischar(t)
     recStart = split(basename, '_');
@@ -123,13 +124,15 @@ if ischar(t)
     end
     s = seconds(t - recStart) * fs;
     if ~isempty(dur)
-        trimEdges = [s s + dur];
+        trimEdges = sort([s s + dur]);
     else
         trimEdges = [s nsamps];
     end
 else
-    if ~isempty(dur)
-        trimEdges = [nsamps - dur nsamps];
+    if dur < 0 
+        trimEdges = [nsamps + dur nsamps];
+    elseif dur > 0
+        trimEdges = [1 dur];
     else
         trimEdges = [1 nsamps];
     end
