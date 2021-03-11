@@ -78,7 +78,7 @@ rez = runKS('basepath', basepath, 'fs', fs, 'nchans', nchans,...
         
 % create ns files for sorting
 dur = 360;
-t = [];
+t = '000000';
 spktimes2ks('basepath', basepath, 'fs', fs,...
     'nchans', nchans, 'spkgrp', spkgrp, 'mkClu', true,...
     'dur', dur, 't', t, 'psamp', [], 'grps', [1 : length(spkgrp)],...
@@ -104,7 +104,6 @@ fixSpkAndRes('grp', 2, 'fs', fs);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % spikes and cell metrics
-fixSpkAndRes('grp', [], 'fs', fs);
 spikes = loadSpikes('session', session);
 spikes = fixCEspikes('basepath', basepath, 'saveVar', false,...
     'force', true);

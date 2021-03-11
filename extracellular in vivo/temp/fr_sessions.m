@@ -8,7 +8,7 @@ forceA = false;
 
 % full path and name to xls file with session metadata
 xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
-mname = 'lh52';
+mname = 'lh86';
 
 % column name in xls sheet where dirnames exist
 colName = 'Session';                    
@@ -62,7 +62,7 @@ if forceA
         % vars
 %         session = varArray{i, 1}.session;
 %         cm = varArray{i, 2}.cell_metrics;
-        spikes = varArray{i, 3}.spikes;
+%         spikes = varArray{i, 3}.spikes;
 %         if ~isempty(varArray{i, 4})
 %             ss = varArray{i, 4}.SleepState;
 %         end
@@ -70,24 +70,24 @@ if forceA
 %         datInfo = varArray{i, 6}.datInfo;
 %         
 %         % spikes
-%         fixSpkAndRes('grp', [], 'fs', fs, 'stdFactor', 0, 'nchans', nchans);
-%         spikes = loadSpikes('session', session);
-%         spikes = fixCEspikes('basepath', basepath, 'saveVar', false,...
-%             'force', true);
-%         
-%         spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
-%             'saveFig', false, 'force', true, 'mu', [], 'graphics', false,...
-%             'vis', 'on', 'spkgrp', spkgrp);
-%         
-%         cell_metrics = ProcessCellMetrics('session', session,...
-%             'manualAdjustMonoSyn', false, 'summaryFigures', false,...
-%             'debugMode', true, 'transferFilesFromClusterpath', false,...
-%             'submitToDatabase', false, 'spikes', spikes);
+        fixSpkAndRes('grp', [], 'fs', fs, 'stdFactor', 0, 'nchans', nchans);
+        spikes = loadSpikes('session', session);
+        spikes = fixCEspikes('basepath', basepath, 'saveVar', false,...
+            'force', true);
+        
+        spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
+            'saveFig', false, 'force', true, 'mu', [], 'graphics', false,...
+            'vis', 'on', 'spkgrp', spkgrp);
+        
+        cell_metrics = ProcessCellMetrics('session', session,...
+            'manualAdjustMonoSyn', false, 'summaryFigures', false,...
+            'debugMode', true, 'transferFilesFromClusterpath', false,...
+            'submitToDatabase', false, 'spikes', spikes);
 %         % cell_metrics = CellExplorer('basepath', basepath);
 %         
-%         cc = cellclass('basepath', basepath,...
-%             'waves', cat(1, spikes.rawWaveform{:})', 'saveVar', true,...
-%             'graphics', false, 'fs', fs);
+        cc = cellclass('basepath', basepath,...
+            'waves', cat(1, spikes.rawWaveform{:})', 'saveVar', true,...
+            'graphics', false, 'fs', fs);
         
         % firing rate
         binsize = 60;
@@ -121,14 +121,14 @@ close all
 grp = [1 : 4];          % which tetrodes to plot
 state = [];             % [] - all; 1 - awake; 2 - NREM
 FRdata = 'strd';        % plot absolute fr or normalized
-unitClass = 'int';      % plot 'int', 'pyr', or 'all'
+unitClass = 'pyr';      % plot 'int', 'pyr', or 'all'
 suFlag = 1;             % plot only su or all units
 minfr = 0;              % include only units with fr greater than
 maxfr = 3000;           % include only units with fr lower than
-Y = [0 10];             % ylim
+Y = [0 30];             % ylim
 yscale = 'log';         % log or linear
 p1 = 1;                 % firing rate vs. time, one fig per session
-p2 = 1;                 % mfr across sessions, one fig
+p2 = 0;                 % mfr across sessions, one fig
 p3 = 0;                 % firing rate vs. time, one fig for all sessions. not rubust
 p4 = 0;                 % number of cells per session, one fig
 plotStyle = 'box';      % for p2. can by 'bar' or 'box'
