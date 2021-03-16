@@ -78,7 +78,7 @@ if forceA
 %             'forceCalibrate', true, 'inspectLabels', true, 'saveVar', true,...
 %             'forceAnalyze', true, 'forceLoad', true);
 %         labelsmanfile = [basename, '.AccuSleep_labelsMan.mat'];
-%         AccuSleep_viewer(EEG, EMG, 512, 1, [], []);
+%         AccuSleep_viewer(EEG, EMG, 512, 1, labels, labelsmanfile);
         
         % AccuSleep_GUI
         %         badstamps = [];
@@ -100,9 +100,11 @@ if forceA
             'graphics', false, 'force', true);
         
         % create ns files for sorting
+        dur = [];
+        t = [];
         spktimes2ks('basepath', basepath, 'fs', fs,...
             'nchans', nchans, 'spkgrp', spkgrp, 'mkClu', true,...
-            'dur', 360, 't', '220000', 'psamp', [], 'grps', [1 : length(spkgrp)],...
+            'dur', dur, 't', t, 'psamp', [], 'grps', [1 : length(spkgrp)],...
             'spkFile', 'temp_wh');
         
         % spike rate per tetrode. note that using firingRate requires

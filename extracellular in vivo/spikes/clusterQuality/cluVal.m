@@ -167,35 +167,6 @@ else
     spikes.mDist = mDist;
 end
 
-% -------------------------------------------------------------------------
-% clean cluster by mDist
-
-% step 1 - only if nspks > ~10000
-% step 2 - fit gauss dist to mDist?
-% # limit the number of spikes that can be removed
-
-% mDist = [spikes.mDist{:}];
-% % for i = 1 : nunits
-% for i = 1 : find(~spikes.su)    
-% nspks(i, 1) = length(spikes.times{i});
-%     which = find(diff(spikes.times{i}) < ref);
-%     which = unique([which which + 1]);
-%     
-%     figure
-%     histogram(mDist{i})
-%     hold on
-% 
-%     sh = scatter(mDist{i}(which), mean(get(gca, 'YLim')) *...
-%         ones(size(mDist{i}(which))), 'k' );
-%     set(sh, 'Marker', 'x')
-% xlim([0 500])
-% end
-% 
-% xx = ss_default_params(Fs);
-% spikes.params = xx.params;
-% spikes.waveforms = spikes.rawWaveform
-
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % estimate SU or MU
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

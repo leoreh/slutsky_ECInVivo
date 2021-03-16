@@ -93,15 +93,15 @@ if isempty(minBoutLen)
     minBoutLen = epochLen;
 end
 
-% badEpochs = [];
-% recSystem = 'tdt';
-% SR = 512;            
-% epochLen = 2.5;        
-% lfpCh = 13 : 16;
-% viaGui = false;
-% cleanRec = 2;
-% forceCalibrate = false;
-% minBoutLen = epochLen;
+badEpochs = [];
+recSystem = 'tdt';
+SR = 512;            
+epochLen = 1;        
+lfpCh = 13 : 16;
+viaGui = false;
+cleanRec = 2;
+forceCalibrate = false;
+minBoutLen = epochLen;
 
 % change to user input or from configuration file
 configfile = 'D:\Code\AccuSleep\AS_config.mat';

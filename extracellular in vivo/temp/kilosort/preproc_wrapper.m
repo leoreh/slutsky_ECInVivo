@@ -5,18 +5,18 @@ cd(basepath)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % open ephys
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'F:\fepsp\lh76\2021-02-01_17-11-53';
+basepath = 'D:\Data\lh86\2021-03-11_09-55-43';
 rmvch = [1 : 35, 37 : 43];
-rmvch = [1 : 19, 21 : 27];
+rmvch = [21 : 27];
 % mapch = [26 27 28 29 31 2 3 30 4 5 6 7 8 9 10 11 12 13 14 15 32 1 16 17 18 19 20 21 22 23 24 25 33 34 35];
 mapch = [1 : 43];
 mapch = [1 : 27];
 exp = [1];
 rec = cell(max(exp), 1);
-% rec{1} = [8 : 15];
+rec{1} = [2, 3];
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
     'rmvch', rmvch, 'mapch', mapch, 'concat', true,...
-    'nchans', length(mapch), 'fsIn', 30000);
+    'nchans', length(mapch), 'fsIn', 20000);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % tdt
@@ -93,6 +93,8 @@ sr = firingRate(spktimes, 'basepath', basepath,...
     'graphics', false, 'saveFig', false,...
     'binsize', binsize, 'saveVar', 'sr', 'smet', 'none',...
     'winBL', [0 Inf]);
+
+mu = postKKrvd('basepath', basepath, 'grps', []);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % fix manual curation
