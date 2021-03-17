@@ -91,8 +91,8 @@ for j = 1 : ngrps
         cluidx = find(clu == uclu(jj));
          
         % rvd
-        rvd = find(diff([0; res(cluidx)]) < ref); 
-        mu{grps(j)}(jj) = length(rvd) / length(cluidx) * 100;
+        rpv{grps(j)}(jj) = find(diff([0; res(cluidx)]) < ref); 
+        mu{grps(j)}(jj) = length(rpv{grps(j)}(jj)) / length(cluidx) * 100;
         
         if mu{grps(j)}(jj) > ref(2)
             clu(cluidx) = 1;
@@ -149,16 +149,16 @@ for jj = 1 : nclu
         end
         cluidx = find(clu == uclu(jj));
     
-        % rvd
-        rvd = find(diff([0; res(cluidx)]) < ref);
-        mu{j}(jj) = length(rvd) / length(cluidx) * 100;
+        % rpv
+        rpv{j}(jj) = sum(diff([0; res(cluidx)]) < ref);
+        mu{j}(jj) = rpv{j}(jj) / length(cluidx) * 100;
         
         % for ccg
         stimes{jj} = res(cluidx) / fs;
 end
 
 % CCG
-binSize = 0.001; dur = 0.06; % low res
+binSize = 0.0001; dur = 0.06; % low res
 [ccg, t] = CCG(stimes, [], 'duration', dur, 'binSize', binSize);
 
 for jj = 1 : nclu
@@ -168,11 +168,24 @@ for jj = 1 : nclu
         cluidx = find(clu == uclu(jj));
     
         % rvd
-        muACG(jj) = sum(ccg(30 : 32, jj, jj)) / sum(ccg(:, jj, jj)) * 100;        
+        rpvACG{j}(jj) = sum(ccg(30 : 32, jj, jj));
+        muACG{j}(jj) = rpvACG{j}(jj) / sum(ccg(:, jj, jj)) * 100;        
 end
 
-jj = [14];
+jj = [5, 21];
 plotCCG('ccg', ccg(:, jj, jj), 't', t, 'basepath', basepath,...
     'saveFig', false, 'c', {'k'}, 'u', jj);
 
-
+figure
+subplot(1, 2, 1)
+scatter(rpv{j}, rpvACG{j}, 'x')
+set(gca, 'YScale', 'log')
+set(gca, 'XScale', 'log')
+xlabel('ISI #rpvs')
+ylabel('ACG #rpvs')
+subplot(1, 2, 2)
+scatter(mu{j}, muACG{j}, 'x')
+set(gca, 'YScale', 'log')
+set(gca, 'XScale', 'log')
+xlabel('ISI rpv fraction')
+ylabel('ACG rpv fraction')

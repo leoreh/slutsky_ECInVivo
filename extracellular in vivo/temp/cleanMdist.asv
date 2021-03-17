@@ -125,38 +125,24 @@ for j = 1 : ngrps
         bins = linspace(0, max(mCluster), 500);
         binIntervals = [0 bins(1 : end - 1); bins]';
         
-        normmode = 'cdf';
         for ifet = 1 : nfet
-            [spkpdf, binedges] = histcounts(fetclu(:, ifet), nbins, 'Normalization', normmode);
-            [rpvpdf] = histcounts(fetclu(rpv, ifet), 'BinEdges', binedges, 'Normalization', normmode);
-            
-            histogram(rpvpdf - spkpdf, 100)
-            figure
-            plot(spkpdf)
-            hold on
-            plot(rpvpdf)
-            plot(movmean(rpvpdf - spkpdf, 3))
-
+            [spkpdf, binedges] = histcounts(fetclu(:, ifet), nbins, 'Normalization', 'probability');
+            [rpvpdf] = histcounts(fetclu(rpv, ifet), 'BinEdges', binedges, 'Normalization', 'probability');
             bincents = (binedges(2 : end) + edges(1 : (end - 1))) / 2;
 
-%             kl(ifet) = kldiv(bincents', spkpdf' + eps, rpvpdf' + eps, 'sym');
-            
-            phat = mle(spkpdf, 'distribution', 'Half Normal')
-            pd = fitdist(mdistpdf', 'HalfNormal')
+            kl(ifet) = kldiv(bincents', spkpdf' + eps, rpvpdf' + eps, 'sym');
+               
         end
-        
-%         [mdistpdf] = histcounts(mCluster, 'Normalization', normmode);
-
-        
+                
         % test removal
-        nrmv = histcounts(fetclu(:, 2), 'BinEdges', [-2500 -200]);
-        rpvrmv = histcounts(fetclu(rpv, 2), 'BinEdges', [-2500 -200]);
-        muOrig = (length(rpv)) / (length(cluidx)) * 100;
+        nrmv = histcounts(fetclu(:, 2), 'BinEdges', [-2500 500]);
+        rpvrmv = histcounts(fetclu(rpv, 2), 'BinEdges', [-2500 500]);
         mu = (length(rpv) - rpvrmv) / (length(cluidx) - nrmv) * 100;
         
         % graphics
         figure
         [nsub] = numSubplots(nfet + 1);
+        xLim = [-2500 2500];
         nbins = 100;
         normmode = 'probability';
         for ifet = 1 : nfet
@@ -169,7 +155,7 @@ for j = 1 : ngrps
             sh = scatter(fetclu(rpv, ifet), mean(get(gca, 'YLim')) *...
                 ones(length(rpv), 1), 'k');
             set(sh, 'Marker', 'x')
-%             ylim([0 1])
+            xlim(xLim)
             title(sprintf('fet #%d, KL = %.2f', ifet, kl(ifet)))
             if ifet == 1
                 legend({'All spks', 'RPVs'})
