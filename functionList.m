@@ -114,6 +114,44 @@ emglfp = getEMGfromLFP(double(lfp.data(:, :)),...
     'emgFs', 10, 'saveVar', true);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% spikes sorting
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% ks
+rez = runKS('basepath', basepath, 'fs', fs, 'nchans', nchans,...
+    'spkgrp', spkgrp, 'saveFinal', true, 'viaGui', false,...
+    'trange', [0 Inf], 'outFormat', 'ns');
+
+% kk
+[spktimes, ~] = spktimesWh('basepath', basepath, 'fs', fs, 'nchans', nchans,...
+    'spkgrp', spkgrp, 'saveVar', true, 'saveWh', true,...
+    'graphics', false, 'force', true);
+        
+% create ns files for sorting
+dur = 360;
+t = '000000';
+spktimes2ns('basepath', basepath, 'fs', fs,...
+    'nchans', nchans, 'spkgrp', spkgrp, 'mkClu', true,...
+    'dur', dur, 't', t, 'psamp', [], 'grps', [1 : length(spkgrp)],...
+    'spkFile', 'temp_wh');
+
+% post sorting cluster clean
+cleanCluByFet('basepath', pwd, 'manCur', true)
+
+% cut spk from dat and realign
+fixSpkAndRes('grp', 4, 'fs', fs, 'nchans', nchans, 'spkgrp', spkgrp);
+
+
+% spike rate
+for ii = 1 : length(spkgrp)
+    spktimes{ii} = spktimes{ii} / fs;
+end
+binsize = 60;
+sr = firingRate(spktimes, 'basepath', basepath,...
+    'graphics', false, 'saveFig', false,...
+    'binsize', binsize, 'saveVar', 'sr', 'smet', 'none',...
+    'winBL', [0 Inf]);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % spikes
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % load

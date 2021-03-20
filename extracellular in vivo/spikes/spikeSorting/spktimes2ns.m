@@ -1,4 +1,4 @@
-function spktimes2ks(varargin)
+function spktimes2ns(varargin)
 
 % creates ns files (spk, res, fet, and clu) from spktimes. can clip
 % spktimes according to requested start time and/or duration. 
@@ -147,9 +147,9 @@ end
 
 % trim spktimes
 load([basename '.spktimes.mat'])
-for i = 1 : ngrps
-    spktimes{i} = spktimes{i}(spktimes{i} > trimEdges(1)...
-        & spktimes{i} < trimEdges(2));
+for igrp = 1 : ngrps
+    spktimes{igrp} = spktimes{igrp}(spktimes{igrp} > trimEdges(1)...
+        & spktimes{igrp} < trimEdges(2));
 end
 
 % save trim info 
@@ -167,36 +167,36 @@ end
 % go over groups and save file
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-for i = 1 : ngrps
-    grp = grps(i);
-    nspks(i) = length(spktimes{i});
-    grpchans = spkgrp{i};
+for igrp = 1 : ngrps
+    grp = grps(igrp);
+    nspks(igrp) = length(spktimes{igrp});
+    grpchans = spkgrp{igrp};
     
     % ---------------------------------------------------------------------
     % spk file (binary, nsamples around each spike)
     spkname = fullfile([basename '.spk.' num2str(grp)]);
     fprintf('\nCreating \t%s. ', spkname)
-    spk = zeros(length(grpchans), sniplength, nspks(i));   
-    for ii = 1 : nspks(i)
+    spk = zeros(length(grpchans), sniplength, nspks(igrp));   
+    for ispk = 1 : nspks(igrp)
         % print progress
-        if mod(ii, 10000) == 0
-            if ii ~= 10000
+        if mod(ispk, 10000) == 0
+            if ispk ~= 10000
                 fprintf(repmat('\b', 1, length(txt)))
             end
-            txt = ['Extracted ', num2str(ii), ' / ', num2str(nspks(i)), ' spks'];
+            txt = ['Extracted ', num2str(ispk), ' / ', num2str(nspks(igrp)), ' spks'];
             fprintf('%s', txt)     
         end       
         % fix special case where spike is at end / begining of recording
-        if spktimes{i}(ii) + win(1) < 1 || spktimes{i}(ii) + win(2) > nsamps
-            warning('\nskipping stamp %d because waveform incomplete', ii)
-            spk(:, :, ii) = [];
-            spktimes{i}(ii) = [];
-            nspks(i) = nspks(i) - 1;
+        if spktimes{igrp}(ispk) + win(1) < 1 || spktimes{igrp}(ispk) + win(2) > nsamps
+            warning('\nskipping stamp %d because waveform incomplete', ispk)
+            spk(:, :, ispk) = [];
+            spktimes{igrp}(ispk) = [];
+            nspks(igrp) = nspks(igrp) - 1;
             continue
         end        
         % get waveform and remove best fit
-        v = double(raw.mapped(grpchans, spktimes{i}(ii) + win(1) :...
-            spktimes{i}(ii) + win(2)));
+        v = double(raw.mapped(grpchans, spktimes{igrp}(ispk) + win(1) :...
+            spktimes{igrp}(ispk) + win(2)));
         if strcmp(spkFile, 'dat')
             v = [v' - W * (R \ Q' * v')]';
         end
@@ -212,7 +212,7 @@ for i = 1 : ngrps
 %                     spktimes{i}(ii) + win(2)));
 %                 v = [v' - W * (R \ Q' * v')]';
 %         end
-        spk(:, :, ii) = v;       
+        spk(:, :, ispk) = v;       
 
     end
     % save to spk file
@@ -229,7 +229,7 @@ for i = 1 : ngrps
     % res 
     resname = fullfile([basename '.res.' num2str(grp)]);
     fid = fopen(resname, 'w');
-    fprintf(fid, '%d\n', spktimes{i});
+    fprintf(fid, '%d\n', spktimes{igrp});
     rc = fclose(fid);
     if rc == 0
         fprintf('\nCreated \t%s', resname)
@@ -242,7 +242,7 @@ for i = 1 : ngrps
     if mkClu
         mkdir(['kk' filesep 'preSorting']) 
         nclu = 1;
-        clugrp = ones(1, nspks(i));
+        clugrp = ones(1, nspks(igrp));
         cluname = fullfile(['kk' filesep 'preSorting'], [basename '.clu.' num2str(grp)]);
         fid = fopen(cluname, 'w');
         fprintf(fid, '%d\n', nclu);
@@ -260,21 +260,21 @@ for i = 1 : ngrps
     fetname = fullfile([basename '.fet.' num2str(grp)]);
     fprintf('\nCreating \t%s. Computing PCAs...', fetname)
     nFeatures = length(grpchans) * 3 + length(grpchans) + 1;
-    fetMat = zeros(nspks(i), nFeatures);
+    fetMat = zeros(nspks(igrp), nFeatures);
     enrgIdx = length(grpchans) * 3;
     if ~isempty(spk)
-        for ii = 1 : length(grpchans)
-            [~, pcFeat] = pca(permute(spk(ii, :, :), [3, 2, 1]));
-            chEnrgy = sum(abs(permute(spk(ii, :, :), [3, 2, 1])), 2);
-            fetMat(:, ii * 3 - 2 : ii * 3) = (pcFeat(:, 1 : 3));
-            fetMat(:, enrgIdx + ii) = (chEnrgy);
+        for ichan = 1 : length(grpchans)
+            [~, pcFeat] = pca(permute(spk(ichan, :, :), [3, 2, 1]), 'NumComponents', 3);
+            chEnrgy = sum(abs(permute(spk(ichan, :, :), [3, 2, 1])), 2);
+            fetMat(:, ichan * 3 - 2 : ichan * 3) = pcFeat;
+            fetMat(:, enrgIdx + ichan) = (chEnrgy);
         end
     end
-    fetMat(:, end) = double(spktimes{i});
+    fetMat(:, end) = double(spktimes{igrp});
     fet = int32(fetMat');
     fid = fopen(fetname, 'w');
     formatstring = '%d';
-    for ii = 2 : nFeatures
+    for ifet = 2 : nFeatures
         formatstring = [formatstring, '\t%d'];
     end
     formatstring = [formatstring, '\n'];  

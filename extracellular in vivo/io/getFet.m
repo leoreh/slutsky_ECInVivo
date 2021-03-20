@@ -83,7 +83,7 @@ for i = 1 : nclufiles
         error('cannot open file');
     end
     nfet = fscanf(fid, '%d', 1);
-    fet{i} = fscanf(fid, '%f', [nfet, inf])';
+    fet{i} = fscanf(fid, '%d', [nfet, inf])';
     fclose(fid);
       
     fid = fopen(clufilenames{i}, 'r');

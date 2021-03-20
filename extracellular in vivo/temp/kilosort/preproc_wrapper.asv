@@ -66,21 +66,17 @@ fepsp = fEPSP_analysis('fepsp', fepsp, 'basepath', basepath,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % spike sorting
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% spike detection from temp_wh
+% ks
+rez = runKS('basepath', basepath, 'fs', fs, 'nchans', nchans,...
+    'spkgrp', spkgrp, 'saveFinal', true, 'viaGui', false,...
+    'trange', [0 Inf], 'outFormat', 'ns');
+
+% kk
 [spktimes, ~] = spktimesWh('basepath', basepath, 'fs', fs, 'nchans', nchans,...
     'spkgrp', spkgrp, 'saveVar', true, 'saveWh', true,...
     'graphics', false, 'force', true);
-
-% spike rate
-for ii = 1 : length(spkgrp)
-    spktimes{ii} = spktimes{ii} / fs;
-end
-sr = firingRate(spktimes, 'basepath', basepath,...
-    'graphics', false, 'saveFig', false,...
-    'binsize', 60, 'saveVar', 'sr', 'smet', 'none',...
-    'winBL', [0 Inf]);
-
-% create ns files 
+        
+% create ns files for sorting
 dur = 360;
 t = '000000';
 spktimes2ns('basepath', basepath, 'fs', fs,...
@@ -88,18 +84,22 @@ spktimes2ns('basepath', basepath, 'fs', fs,...
     'dur', dur, 't', t, 'psamp', [], 'grps', [1 : length(spkgrp)],...
     'spkFile', 'temp_wh');
 
-% clean clusters after sorting 
+% post sorting cluster clean
 cleanCluByFet('basepath', pwd, 'manCur', true)
 
 % cut spk from dat and realign
 fixSpkAndRes('grp', 4, 'fs', fs, 'nchans', nchans, 'spkgrp', spkgrp);
 
-% cell explorer metrics
-cell_metrics = ProcessCellMetrics('session', session,...
-    'manualAdjustMonoSyn', false, 'summaryFigures', false,...
-    'debugMode', true, 'transferFilesFromClusterpath', false,...
-    'submitToDatabase', false);
-% cell_metrics = CellExplorer('basepath', basepath);
+
+% spike rate
+for ii = 1 : length(spkgrp)
+    spktimes{ii} = spktimes{ii} / fs;
+end
+binsize = 60;
+sr = firingRate(spktimes, 'basepath', basepath,...
+    'graphics', false, 'saveFig', false,...
+    'binsize', binsize, 'saveVar', 'sr', 'smet', 'none',...
+    'winBL', [0 Inf]);
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
