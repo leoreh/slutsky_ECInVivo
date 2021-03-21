@@ -60,9 +60,9 @@ if forceA
         spkgrp = session.extracellular.spikeGroups.channels;
         
         % vars
-        session = varArray{i, 1}.session;
-        cm = varArray{i, 2}.cell_metrics;
-        spikes = varArray{i, 3}.spikes;
+%         session = varArray{i, 1}.session;
+%         cm = varArray{i, 2}.cell_metrics;
+%         spikes = varArray{i, 3}.spikes;
 %         if ~isempty(varArray{i, 4})
 %             ss = varArray{i, 4}.SleepState;
 %         end

@@ -18,6 +18,8 @@ function cleanCluByFet(varargin)
 % DEPENDENCIES
 %
 % TO DO LIST
+%   # remove all global vars except res, fet and clu
+%   # track total number of spks removed from cluster
 %
 % 15 mar 21 LH
 
@@ -96,9 +98,9 @@ if manCur
     uclu = unique(clu);
     
     % rmv spks from selected cluster
-    cluid = 5;      % cluster id
+    cluid = 9;      % cluster id
     cluidx = find(clu == cluid);    
-    cleanClu(0.0001, [0.03 0.15]);           % inputs: cdfThr, RmLim
+    cleanClu(0.0001, [0.02 0.15]);           % inputs: cdfThr, RmLim
     saveClu()
     
     % rmv spks from all clusters until criterion is reached
@@ -108,7 +110,7 @@ if manCur
     plotFets('on')
     
     % calc quality of cluster separation
-    sprintCluDist([5])
+    sprintCluDist([])
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -130,36 +132,38 @@ for igrp = 1 : length(grps)
     
     % ---------------------------------------------------------------------
     % go over each cluster
-    for iclu = 1 : length(uclu)   
-        cluid = uclu(iclu);
-        if cluid == 0 || cluid == 1
-            continue
-        end
-        cluidx = find(clu == cluid);
-        nspks = length(cluidx);
-        
-        % skip if low number of spikes or rpvs
-        if nspks < nspksMin || rpvRatio < rpvRatioThr
-            continue
-        end
-        
-        % clean cluster
-        cleanClu(cdfThr, rmvLim)
-        
-        % plot cluster summary if cleaned
-        if graphics && any(any(rmvflag))
-            fprintf('cleaning clu #%d...\n', cluid)
-            plotFets('off')
-        end
-        
-        % remove entire cluster if still too many rpvs
-        if ~isempty(rpvThr)
-            if rpvRatioNew > rpvThr
-                clu(cluidx) = 1;
-                fprintf('removing clu #%d...\n', cluid)
-            end
-        end
-    end
+    clean2criterion(rpvCrt, rmvLim)
+    
+    %     for iclu = 1 : length(uclu)
+    %         cluid = uclu(iclu);
+    %         if cluid == 0 || cluid == 1
+    %             continue
+    %         end
+    %         cluidx = find(clu == cluid);
+    %         nspks = length(cluidx);
+    %
+    %         % skip if low number of spikes or rpvs
+    %         if nspks < nspksMin || rpvRatio < rpvRatioThr
+    %             continue
+    %         end
+    %
+    %         % clean cluster
+    %         cleanClu(cdfThr, rmvLim)
+    %
+    %         % plot cluster summary if cleaned
+    %         if graphics && any(any(rmvflag))
+    %             fprintf('cleaning clu #%d...\n', cluid)
+    %             plotFets('off')
+    %         end
+    %
+    %         % remove entire cluster if still too many rpvs
+    %         if ~isempty(rpvThr)
+    %             if rpvRatioNew > rpvThr
+    %                 clu(cluidx) = 1;
+    %                 fprintf('removing clu #%d...\n', cluid)
+    %             end
+    %         end
+    %     end
     
     % save clu
     saveClu()
@@ -391,6 +395,8 @@ end
     end
 
     function sprintCluDist(sclu)
+        fetMdist = [fet, clu];
+        fetMdist(clu <= 1, :) = [];
         lRat = zeros(length(uclu), 1);
         iDist = zeros(length(uclu), 1);
         if isempty(sclu)
@@ -401,8 +407,6 @@ end
             if cluid == 0 || cluid == 1
                 continue
             end
-            fetMdist = [fet, clu];
-            fetMdist(clu <= 1, :) = [];
             cluidx2 = find(fetMdist(:, end) == cluid);
             vecidx = find(uclu == sclu(iclu));
             [lRat(vecidx, 1), iDist(vecidx, 1), ~] = cluDist(fetMdist(:, 1 : nfet), cluidx2);

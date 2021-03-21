@@ -18,6 +18,8 @@ function cleanCluByFet(varargin)
 % DEPENDENCIES
 %
 % TO DO LIST
+%   # remove all global vars except res, fet and clu
+%   # track total number of spks removed from cluster
 %
 % 15 mar 21 LH
 
@@ -96,9 +98,9 @@ if manCur
     uclu = unique(clu);
     
     % rmv spks from selected cluster
-    cluid = 4;      % cluster id
+    cluid = 9;      % cluster id
     cluidx = find(clu == cluid);    
-    cleanClu(0.0001, [0.03 0.15]);           % inputs: cdfThr, RmLim
+    cleanClu(0.0001, [0.02 0.15]);           % inputs: cdfThr, RmLim
     saveClu()
     
     % rmv spks from all clusters until criterion is reached
@@ -108,7 +110,7 @@ if manCur
     plotFets('on')
     
     % calc quality of cluster separation
-    sprintCluDist([6])
+    sprintCluDist([])
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -391,6 +393,8 @@ end
     end
 
     function sprintCluDist(sclu)
+        fetMdist = [fet, clu];
+        fetMdist(clu <= 1, :) = [];
         lRat = zeros(length(uclu), 1);
         iDist = zeros(length(uclu), 1);
         if isempty(sclu)
@@ -401,10 +405,9 @@ end
             if cluid == 0 || cluid == 1
                 continue
             end
-            fetMdist = [fet, clu];
-            fetMdist(clu <= 1, :) = [];
             cluidx2 = find(fetMdist(:, end) == cluid);
-            [lRat(iclu, 1), iDist(iclu, 1), ~] = cluDist(fetMdist(:, 1 : nfet), cluidx2);
+            vecidx = find(uclu == sclu(iclu));
+            [lRat(vecidx, 1), iDist(vecidx, 1), ~] = cluDist(fetMdist(:, 1 : nfet), cluidx2);
         end
         [uclu, iDist, lRat]
     end
