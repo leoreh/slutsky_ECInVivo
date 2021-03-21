@@ -25,7 +25,7 @@ vars = ["session.mat";...
 % column name of logical values for each session. only if true than session
 % will be loaded. can be a string array and than all conditions must be
 % met.
-pcond = ["mancur"];
+pcond = ["mancur"; "tempflag"];
 
 % same but imposes a negative condition
 ncond = ["fepsp"];
@@ -121,11 +121,11 @@ close all
 grp = [1 : 4];          % which tetrodes to plot
 state = [];             % [] - all; 1 - awake; 2 - NREM
 FRdata = 'strd';        % plot absolute fr or normalized
-unitClass = 'pyr';      % plot 'int', 'pyr', or 'all'
+unitClass = 'int';      % plot 'int', 'pyr', or 'all'
 suFlag = 1;             % plot only su or all units
 minfr = 0;              % include only units with fr greater than
 maxfr = 3000;           % include only units with fr lower than
-Y = [0 30];             % ylim
+Y = [0 10];             % ylim
 yscale = 'log';         % log or linear
 p1 = 1;                 % firing rate vs. time, one fig per session
 p2 = 0;                 % mfr across sessions, one fig
@@ -382,7 +382,7 @@ end
 % mean firing rate in states per unit
 p3 = 0;
 k = 1;
-data = [];
+% data = [];
 stateidx = 1 : 4;
 if p3
     fh = figure;

@@ -1,6 +1,6 @@
 function cleanCluByFet(varargin)
 
-% removes spikes that are rvds based on fet / mDist
+% removes rpv spikes on fet / mDist
 
 % alternative option tested was to compare distributions with the
 % Kullback–Leibler divergence, e.g.: kl(ifet) = kldiv(bincents', spkpdf' + eps, rpvpdf' + eps, 'sym');
@@ -60,65 +60,55 @@ if isempty(fs) || isempty(spkgrp)
 end
 bkpath = fullfile(basepath, 'kk', 'bkupFixRvd');
 mkdir(bkpath)
-        
+
 npca = 3;
 ref = ref * fs;
-sniplength = ceil(1.6 * 10^-3 * fs);
 if isempty(grps)
     grps = 1 : length(spkgrp);
 end
 
 % constants
-RmLim = 0.1;        % ratio of spikes allowed to be removed from one feature
-nspksMin = 10000;   % cluster with less spikes will not be cleaned
-cdfThr = 0.1;       % threshold for cdf difference from which to clean cluster
-rpvRatioThr = 0.35; % threshold for rpv ratio above which to clean cluster
-nbins = 100;        % for histograms
+rmvLim = [0.05 0.25];   % ratio of spikes allowed to be removed from one feature and in total
+nspksMin = 10000;       % cluster with less spikes will not be cleaned
+cdfThr = 0.1;           % threshold for cdf difference from which to clean cluster
+rpvRatioThr = 0.35;     % threshold for rpv ratio above which to clean cluster
+nbins = 100;            % for histograms
+rpvCrt = 0.5;           % rpv ratio cluster much reach in while loop
 
 % shared vars between nested and parent
-cluname = [];
-uclu = [];
-nclu = [];
-nfet = [];
-db1 = [];       % poofed vars to static workspacevar for debugging 
-db2 = [];       
+cluname = []; uclu = []; nclu = []; nfet = []; nspks = []; rmvSpkIdx = [];
+rpvRatioAll = []; rmvLimTemp = []; nrmvSpk = []; nrmvSpkTot = [];
+% poofed vars to static workspace for debugging
+db1 = []; db2 = [];
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % manual inspection of features and rpvs
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if manCur
-    dbstop in cleanCluByFet at 95 if manCur
+    dbstop in cleanCluByFet at 90 if manCur
     
-    igrp = 1;                   % select spiking grp
+    igrp = 4;                   % select spiking grp
     [res, fet] = loadResFet;    % load data (once per group)
-    
+    rmvflag = zeros(nfet, 2);
+
     % print to screen rpv ratio of all clusters in group
-    [nclu, clu] = sprintRPV();
+    [~, clu] = sprintRPV();
+    uclu = unique(clu);
     
-    % plot fets of specific cluster
-    iclu = 3;      % change to cluster id. note in rest of code iclu is idx s.t. cluster id is given by uclu(iclu)
-    cluidx = find(clu == iclu);
-    fetclu = fet(cluidx, :);
-    rpv = find(diff([0; res(cluidx)]) < ref);
-    rpvRatioNew = []; rmSpkIdx = []; rmflag = zeros(nfet, 2);
-    plotFets('on')
-    
-    % auto rmv additional spks
-    cleanClu(0.00001, 0.3, []);           % inputs: cdfThr, RmLim
+    % rmv spks from selected cluster
+    cluid = 4;      % cluster id
+    cluidx = find(clu == cluid);    
+    cleanClu(0.0001, [0.03 0.25]);           % inputs: cdfThr, RmLim
     saveClu()
     
+    % rmv spks from all clusters until criterion is reached
+    clean2criterion(rpvCrt, rmvLim)   
+    
+    % plot fets of specific cluster
+    plotFets('on')
+    
     % calc quality of cluster separation
-    clear lRat iDist
-    iclu = 12
-    for iclu = 1 : nclu
-        if uclu(iclu) == 0 || uclu(iclu) == 1
-            continue
-        end
-        cluidx = find(clu == uclu(iclu));
-        mDist = mahal(fet, fet(cluidx, :));
-        [lRat(iclu, 1), iDist(iclu, 1), ~] = cluDist(fet, cluidx, mDist);       
-    end
-    [uclu, iDist]
+    sprintCluDist(sclu)
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -140,29 +130,25 @@ for igrp = 1 : length(grps)
     
     % ---------------------------------------------------------------------
     % go over each cluster
-    for iclu = 1 : nclu
-        
-        if uclu(iclu) == 0 || uclu(iclu) == 1
+    for iclu = 1 : length(uclu)   
+        cluid = uclu(iclu);
+        if cluid == 0 || cluid == 1
             continue
         end
-        cluidx = find(clu == uclu(iclu));
-        fetclu = fet(cluidx, :);        % from fet files
-        
-        % rpv
-        rpv = find(diff([0; res(cluidx)]) < ref);
-        rpvRatio = (length(rpv)) / (length(cluidx)) * 100;
+        cluidx = find(clu == cluid);
+        nspks = length(cluidx);
         
         % skip if low number of spikes or rpvs
-        if length(cluidx) < nspksMin || rpvRatio < rpvRatioThr
+        if nspks < nspksMin || rpvRatio < rpvRatioThr
             continue
         end
         
         % clean cluster
-        cleanClu(cdfThr, RmLim, rpvThr)
+        cleanClu(cdfThr, rmvLim)
         
         % plot cluster summary if cleaned
-        if graphics && any(any(rmflag))
-            fprintf('cleaning clu #%d...\n', iclu)
+        if graphics && any(any(rmvflag))
+            fprintf('cleaning clu #%d...\n', cluid)
             plotFets('off')
         end
         
@@ -170,7 +156,7 @@ for igrp = 1 : length(grps)
         if ~isempty(rpvThr)
             if rpvRatioNew > rpvThr
                 clu(cluidx) = 1;
-                fprintf('removing clu #%d...\n', iclu)
+                fprintf('removing clu #%d...\n', cluid)
             end
         end
     end
@@ -183,6 +169,14 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % nested functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% -------------------------------------------------------------------------
+% find rpv and calc rpv ratio
+    function [rpv, rpvRatio] = getRpv()
+        rpv = find(diff([0; res(cluidx)]) < ref);
+        nspks = length(cluidx);
+        rpvRatio = length(rpv) / nspks * 100;
+    end
 
 % -------------------------------------------------------------------------
 % load clu data
@@ -201,8 +195,11 @@ end
 % -------------------------------------------------------------------------
 % save new clu file
     function saveClu
-        copyfile(cluname, bkpath)
-        
+        % bkup       
+        source = fullfile(basepath, cluname);
+        destination = fullfile(bkpath, [cluname, '.' datestr(datetime, 'ddmmyy_HHMMss')]);
+        copyfile(source, destination)     
+        % save
         fid = fopen(cluname, 'w');
         fprintf(fid, '%d\n', length(unique(clu)));
         fprintf(fid, '%d\n', clu);
@@ -241,6 +238,7 @@ end
         % if not nested, required arguments are: fetclu, rpv, grp,
         % iclu, rmflag, rpvRatioNew, rmSpkIdx
         
+        fetclu = fet(cluidx, :);
         nfet = size(fetclu, 2);
         [nsub] = numSubplots(nfet);
         nbins = 100;
@@ -254,11 +252,11 @@ end
             histogram(fetclu(rpv, ifet), nbins,...
                 'FaceAlpha', 0.4, 'LineStyle', 'none', 'Normalization', normmode)
             yLim = ylim;
-            if rmflag(ifet, 1) ~= 0
-                plot([rmflag(ifet, 1) rmflag(ifet, 1)], yLim, '--k', 'LineWidth', 3)
+            if rmvflag(ifet, 1) ~= 0
+                plot([rmvflag(ifet, 1) rmvflag(ifet, 1)], yLim, '--k', 'LineWidth', 3)
             end
-            if rmflag(ifet, 2) ~= 0
-                plot([rmflag(ifet, 2) rmflag(ifet, 2)], yLim, '--k', 'LineWidth', 3)
+            if rmvflag(ifet, 2) ~= 0
+                plot([rmvflag(ifet, 2) rmvflag(ifet, 2)], yLim, '--k', 'LineWidth', 3)
             end
             title(sprintf('fet #%d', ifet))
             if ifet == 1
@@ -266,7 +264,7 @@ end
             end
         end
         suptitle(sprintf('T#%d clu#%d; RPV from %.2f to %.2f; removed %d%% of spks', igrp, iclu,...
-            length(rpv) / length(fetclu) * 100, rpvRatioNew, round(length(unique(rmSpkIdx)) / length(fetclu) * 100)))
+            length(rpv) / length(fetclu) * 100, rpvRatioNew, round(length(unique(rmvSpkIdx)) / length(fetclu) * 100)))
         if strcmp(visible, 'off')
             mkdir(fullfile('graphics', 'clusterClean'))
             figname = fullfile('graphics', 'clusterClean', sprintf('T%d_clu%d', igrp, iclu));
@@ -279,26 +277,31 @@ end
     function [nclu, clu] = sprintRPV()
         % load clu
         [nclu, clu] = loadClu;
-        uclu = unique(clu);
-        
-        rpvRatio = zeros(nclu, 2);
-        for iclu = 1 : nclu
-            cluidx = find(clu == uclu(iclu));
-            
-            % rpv
-            rpv = find(diff([0; res(cluidx)]) < ref);
-            rpvRatio(iclu, 1) = uclu(iclu);
-            rpvRatio(iclu, 2) = length(rpv) / length(cluidx) * 100;
+        uclu = unique(clu);        
+        % rpv
+        rpvRatioAll = zeros(length(uclu), 2);
+        rpvRatioAll(:, 1) = uclu;
+        for iclu = 1 : length(uclu)
+            cluid = uclu(iclu);
+            if cluid == 0 || cluid == 1
+                continue
+            end
+            cluidx = find(clu == cluid);
+            npks = length(cluidx);
+            [~, rpvRatioAll(iclu, 2)] = getRpv();
         end
-        rpvRatio
+        rpvRatioAll
     end
 
 % -------------------------------------------------------------------------
 % go over fets, calc cdf diff and remove spikes from clu
-    function cleanClu(cdfThr, RmLim, rpvThr)
-        spkRmLim = floor(length(cluidx) * RmLim);
-        rmSpkIdx = [];
-        rmflag = zeros(nfet, 2);
+    function [nrmvSpk] = cleanClu(cdfThr, rmvLim)
+        fetclu = fet(cluidx, :);
+        [rpv, rpvRatio] = getRpv();
+        spkRmvLimFet = floor(nspks * rmvLim(1));
+        spkRmvLimTot = floor(nspks * rmvLim(2));
+        rmvSpkIdx = [];
+        rmvflag = zeros(nfet, 2);
         for ifet = 1 : nfet
             
             % find bin where number of spikes reaches percent limit
@@ -308,37 +311,99 @@ end
             rightSpk = fliplr(cumsum(spkcount, 'reverse'));
             leftRpv = cumsum(rpvcount);
             rightRpv = fliplr(cumsum(rpvcount, 'reverse'));
-            [~, limLeft] = min(abs(spkRmLim - leftSpk));
-            [~, limRight] = min(abs(spkRmLim - rightSpk));
+            [~, limLeft] = min(abs(spkRmvLimFet - leftSpk));
+            [~, limRight] = min(abs(spkRmvLimFet - rightSpk));
             
             % calculate difference between cdf of spks and rpvs
             % left side
-            spkcdf = leftSpk(1 : limLeft - 1) / length(cluidx);
+            spkcdf = leftSpk(1 : limLeft - 1) / nspks;
             rpvcdf = leftRpv(1 : limLeft - 1) / length(rpv);
             [cdfDiff, rmBinIdx] = max(rpvcdf - spkcdf);
             if cdfDiff > cdfThr        % remove only if
-                rmflag(ifet, 1) = binedges(rmBinIdx);
-                rmSpkIdx = [rmSpkIdx; find(fetclu(:, ifet) < binedges(rmBinIdx))];
+                rmvflag(ifet, 1) = binedges(rmBinIdx);
+                rmvSpkIdx = [rmvSpkIdx; find(fetclu(:, ifet) < binedges(rmBinIdx))];
             end
             
             % right side
-            spkcdf = rightSpk(1 : limRight) / length(cluidx);
+            spkcdf = rightSpk(1 : limRight) / nspks;
             rpvcdf = rightRpv(1 : limRight) / length(rpv);
             [cdfDiff, rmBinIdx] = max(rpvcdf - spkcdf);
             if cdfDiff > cdfThr
-                rmflag(ifet, 2) = binedges(end - rmBinIdx);
-                rmSpkIdx = [rmSpkIdx; find(fetclu(:, ifet) > rmflag(ifet, 2))];
+                rmvflag(ifet, 2) = binedges(end - rmBinIdx);
+                rmvSpkIdx = [rmvSpkIdx; find(fetclu(:, ifet) > rmvflag(ifet, 2))];
+            end
+            rmvSpkIdx = unique(rmvSpkIdx);
+            nrmvSpk = length(rmvSpkIdx);
+            
+            % check if total number of spikes removed is greater than upper
+            % limit
+            if nrmvSpk > spkRmvLimTot
+                break
             end
         end
         
         % remove spks
-        clu(cluidx(unique(rmSpkIdx))) = 0;
-        cluidx(unique(rmSpkIdx)) = [];
-        rpvNew = find(diff([0; res(cluidx)]) < ref);
-        rpvRatioNew = (length(rpvNew)) / (length(cluidx)) * 100;      
+        clu(cluidx(rmvSpkIdx)) = 0;     % from clu
+        cluidx(rmvSpkIdx) = [];         % from cluidx
+        nspks = length(cluidx);
+        [~, rpvRatioNew] = getRpv();
+        
+        % print to screen
         fprintf('removed %d (%d%%) spikes from clu #%d\n',...
-            length(unique(rmSpkIdx)), round(length(unique(rmSpkIdx)) / length(cluidx)  * 100), iclu)
-        fprintf('rpv ratio: %.2f -> %.2f\n', length(rpv) / length(cluidx) * 100, rpvRatioNew) 
+            nrmvSpk, round(nrmvSpk / nspks  * 100), cluid)
+        fprintf('rpv ratio: %.2f -> %.2f\n', length(rpv) / nspks * 100, rpvRatioNew)
+    end
+
+% -------------------------------------------------------------------------
+% clean all clusters to rpv criteria
+    function clean2criterion(rpvCrt, rmvLim)       
+        for iclu = 1 : length(uclu)
+            cluid = uclu(iclu);
+            if cluid == 0 || cluid == 1
+                continue
+            end
+            cluidx = find(clu == cluid);
+            nspks = length(cluidx);            
+            [~, rpvRatio] = getRpv();
+            
+            rmvLimTemp = [0.005 rmvLim(2)];    
+            nrmvSpkTot = 0;
+            nrmvSpk = 0;
+            while 1
+                while 1
+                    nrmvSpk = cleanClu(0.0001, rmvLimTemp);
+                    nrmvSpkTot = nrmvSpkTot + nrmvSpk;
+                    if (nrmvSpkTot / nspks) > rmvLim(2) ||...
+                            round(nrmvSpk / nspks)  * 100 < 1
+                        break
+                    end
+                end
+                [~, rpvRatio] = getRpv();
+                if rpvRatio < rpvCrt
+                    break
+                end
+                rmvLimTemp(1) = rmvLimTemp(1) + 0.005;
+            end
+        end        
+    end
+
+    function sprintCluDist(sclu)
+        lRat = zeros(length(uclu), 1);
+        iDist = zeros(length(uclu), 1);
+        if isempty(sclu)
+            sclu = uclu;
+        end
+        for iclu = 1 : length(sclu)
+            cluid = sclu(iclu);
+            if cluid == 0 || cluid == 1
+                continue
+            end
+            fetMdist = [fet, clu];
+            fetMdist(clu <= 1, :) = [];
+            cluidx2 = find(fetMdist(:, end) == cluid);
+            [lRat(iclu, 1), iDist(iclu, 1), ~] = cluDist(fetMdist(:, 1 : nfet), cluidx2);
+        end
+        [sclu, iDist, lRat]
     end
 end
 % EOF
@@ -355,7 +420,7 @@ end
 %     fetnew(:, ichan * 3 - 2 : ichan * 3) = pcFeat;
 % end
 %
-% rpvgrp = ones(length(cluidx), 1);
+% rpvgrp = ones(nspks, 1);
 % rpvgrp(rpv) = 2;
 % figure
 % [nsub] = numSubplots(nfet / 2);
@@ -369,6 +434,7 @@ end
 % end
 %
 % % spk
+%     sniplength = ceil(1.6 * 10^-3 * fs);
 %     spkname = fullfile([basename '.spk.' num2str(grp)]);
 %     fid = fopen(spkname, 'r');
 %     spk = fread(fid, 'int16');
