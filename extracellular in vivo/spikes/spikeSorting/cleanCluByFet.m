@@ -96,9 +96,9 @@ if manCur
     uclu = unique(clu);
     
     % rmv spks from selected cluster
-    cluid = 2;      % cluster id
+    cluid = 5;      % cluster id
     cluidx = find(clu == cluid);    
-    cleanClu(0.0001, [0.03 0.25]);           % inputs: cdfThr, RmLim
+    cleanClu(0.0001, [0.03 0.15]);           % inputs: cdfThr, RmLim
     saveClu()
     
     % rmv spks from all clusters until criterion is reached
@@ -108,7 +108,7 @@ if manCur
     plotFets('on')
     
     % calc quality of cluster separation
-    sprintCluDist(sclu)
+    sprintCluDist([5])
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -238,6 +238,7 @@ end
         % if not nested, required arguments are: fetclu, rpv, grp,
         % iclu, rmflag, rpvRatioNew, rmSpkIdx
         
+        fetclu = fet(cluidx, :);
         nfet = size(fetclu, 2);
         [nsub] = numSubplots(nfet);
         nbins = 100;
@@ -364,6 +365,9 @@ end
             cluidx = find(clu == cluid);
             nspks = length(cluidx);            
             [~, rpvRatio] = getRpv();
+            if rpvRatio < rpvCrt
+                continue
+            end
             
             rmvLimTemp = [0.005 rmvLim(2)];    
             nrmvSpkTot = 0;
@@ -400,9 +404,10 @@ end
             fetMdist = [fet, clu];
             fetMdist(clu <= 1, :) = [];
             cluidx2 = find(fetMdist(:, end) == cluid);
-            [lRat(iclu, 1), iDist(iclu, 1), ~] = cluDist(fetMdist(:, 1 : nfet), cluidx2);
+            vecidx = find(uclu == sclu(iclu));
+            [lRat(vecidx, 1), iDist(vecidx, 1), ~] = cluDist(fetMdist(:, 1 : nfet), cluidx2);
         end
-        [sclu, iDist, lRat]
+        [uclu, iDist, lRat]
     end
 end
 % EOF
