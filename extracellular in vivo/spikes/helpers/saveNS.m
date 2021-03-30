@@ -101,7 +101,7 @@ switch datatype
         rc = fclose(fid);
         
     case 'fet'   
-        nfet = size(data, 2);
+        nfet = size(data, 1);
         fid = fopen(filename, 'w');
         formatstring = '%d';
         for ifet = 2 : nfet

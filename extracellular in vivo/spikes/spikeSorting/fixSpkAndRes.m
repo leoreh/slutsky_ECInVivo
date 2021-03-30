@@ -160,7 +160,7 @@ for igrp = grp
     res = loadNS('datatype', 'res', 'session', session, 'grpid', igrp);
     spk = loadNS('datatype', 'spk', 'session', session, 'grpid', igrp,...
         'nspks', nspks);
-    
+        
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % go over clusters
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
