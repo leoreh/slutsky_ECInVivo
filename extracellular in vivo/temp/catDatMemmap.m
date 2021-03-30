@@ -13,7 +13,7 @@ function datInfo = catDatMemmap(varargin)
 %               samples of the first file with the first 15 samples of the
 %               second file
 %   newpath     string. path where new file should be save. if empty than
-%               new file will be save in pwd
+%               new file will be in pwd
 %   newname     string. name of new file. if empty will be extracted from
 %               newpath. if newpath not specified will be named as original
 %               file with the extension '_new'
@@ -93,7 +93,7 @@ end
 for i = 1 : length(datFiles)
     % memory map to original files
     info = dir(datFiles{i});
-    nsamps = info.bytes / nbytes / nchans;
+    nsamps = floor(info.bytes / nbytes / nchans);
     m = memmapfile(datFiles{i}, 'Format', {'int16' [nchans nsamps] 'mapped'});
     raw = m.data;
     
@@ -142,7 +142,7 @@ end
 
 fprintf('that took %.2f minutes\n', toc / 60)
 
-end
+return
 
 % EOF
 

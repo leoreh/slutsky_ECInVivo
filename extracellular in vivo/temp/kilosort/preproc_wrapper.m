@@ -89,7 +89,7 @@ spktimes2ns('basepath', basepath, 'fs', fs,...
     'spkFile', 'temp_wh');
 
 % clean clusters after sorting 
-cleanCluByFet('basepath', pwd, 'manCur', false)
+cleanCluByFet('basepath', pwd, 'manCur', true)
 
 % cut spk from dat and realign
 fixSpkAndRes('grp', 4, 'fs', fs, 'nchans', nchans, 'spkgrp', spkgrp);
@@ -215,16 +215,17 @@ figure, plot(sr.tstamps, sr.strd)
 legend
 
 %%% cat dat
-newpath = 'D:\Data\lh81\lh81_210207_045300';
-datFiles{1} = 'D:\Data\lh81\lh81_210206_190000\lh81_210206_190000.dat';
-datFiles{2} = 'D:\Data\lh81\lh81_210207_065300\lh81_210207_065300.dat';
+nchans = 15;
+newpath = 'D:\Data\lh86\lh86_210228_130000';
+datFiles{1} = 'D:\Data\lh86\lh86_210228_070000\lh86_210228_070000.dat';
+datFiles{2} = 'D:\Data\lh86\lh86_210228_190000\lh86_210228_190000.dat';
 info = dir(datFiles{1});
-nsamps = info.bytes / 2 / 16;
-parts{1} = [nsamps - 2 * 60 * 60 * 24414.06 nsamps];
-parts{2} = [0 4 * 60 * 60 * 24414.06];
+nsamps = floor(info.bytes / class2bytes('int16') / nchans);
+parts{1} = [nsamps - 6 * 60 * 60 * fs nsamps];
+parts{2} = [0 6 * 60 * 60 * fs];
 
 catDatMemmap('datFiles', datFiles, 'newpath', newpath, 'parts', parts,...
-    'nchans', 16, 'saveVar', true)
+    'nchans', nchans, 'saveVar', true)
 
 
 
