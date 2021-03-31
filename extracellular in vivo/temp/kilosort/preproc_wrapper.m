@@ -92,7 +92,7 @@ spktimes2ns('basepath', basepath, 'fs', fs,...
 cleanCluByFet('basepath', pwd, 'manCur', true)
 
 % cut spk from dat and realign
-fixSpkAndRes('grp', 4, 'fs', fs, 'nchans', nchans, 'spkgrp', spkgrp);
+fixSpkAndRes('grp', grpid, 'dt', 0, 'stdFactor', 0);
 
 % cell explorer metrics
 cell_metrics = ProcessCellMetrics('session', session,...
