@@ -92,6 +92,7 @@ if manCur
     
     % select spiking grp
     grpid = 3;
+    
     % load data
     res = loadNS('datatype', 'res', 'session', session, 'grpid', grpid);
     fet = loadNS('datatype', 'fet', 'session', session, 'grpid', grpid);
