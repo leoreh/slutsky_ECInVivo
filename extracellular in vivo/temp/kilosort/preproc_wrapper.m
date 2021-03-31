@@ -89,7 +89,7 @@ spktimes2ns('basepath', basepath, 'fs', fs,...
     'spkFile', 'temp_wh');
 
 % clean clusters after sorting 
-cleanCluByFet('basepath', pwd, 'manCur', true)
+cleanCluByFet('basepath', pwd, 'manCur', false)
 
 % cut spk from dat and realign
 fixSpkAndRes('grp', grpid, 'dt', 0, 'stdFactor', 0);
@@ -98,7 +98,7 @@ fixSpkAndRes('grp', grpid, 'dt', 0, 'stdFactor', 0);
 cell_metrics = ProcessCellMetrics('session', session,...
     'manualAdjustMonoSyn', false, 'summaryFigures', false,...
     'debugMode', true, 'transferFilesFromClusterpath', false,...
-    'submitToDatabase', false);
+    'submitToDatabase', false, 'getWaveformsFromDat', true);
 cell_metrics = CellExplorer('basepath', basepath);
 
 % cluster validation
