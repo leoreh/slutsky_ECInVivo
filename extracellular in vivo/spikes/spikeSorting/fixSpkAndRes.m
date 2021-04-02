@@ -36,7 +36,7 @@ function fixSpkAndRes(varargin)
 %               greater than std @ begining * stdFactor {1.1}. if 0
 %               then all clusters will undergo re-alignment.
 %   graphics    logical. plot the before / after of each cluster {false}.
-%   bkup        logical. create backup of files in basepath/ns/bkup {true}.
+%   bkup        logical. create backup of files before save in basepath/ns/bkup {true}.
 %   saveFiles   logical. save ns files after processing {true}.
 %   resnip      logical. resnip from dat / temp_wh (true) or use circshift
 %               {false}
@@ -302,7 +302,7 @@ for igrp = grp
     end
     
     % recalculate PCA
-    fprintf('Calculating PCA... \t')
+    fprintf('calculating PCA... \t')
     nfet = nchansGrp * 3 + nchansGrp + 1;
     fetMat = zeros(nspks, nfet);
     enrgIdx = nchansGrp * 3;
@@ -316,13 +316,14 @@ for igrp = grp
     end
     fetMat(:, end) = res;
     fet = int32(fetMat');
-    
+    fprintf('done. \n')
+
     % save files
     if saveFiles
-        saveNS(clu, 'datatype', 'clu', 'session', session, 'grpid', igrp);
-        saveNS(res, 'datatype', 'res', 'session', session, 'grpid', igrp);
-        saveNS(spk, 'datatype', 'spk', 'session', session, 'grpid', igrp);
-        saveNS(fet, 'datatype', 'fet', 'session', session, 'grpid', igrp);
+        saveNS(clu, 'datatype', 'clu', 'session', session, 'grpid', igrp, 'bkup', bkup);
+        saveNS(res, 'datatype', 'res', 'session', session, 'grpid', igrp, 'bkup', bkup);
+        saveNS(spk, 'datatype', 'spk', 'session', session, 'grpid', igrp, 'bkup', bkup);
+        saveNS(fet, 'datatype', 'fet', 'session', session, 'grpid', igrp, 'bkup', bkup);
     end
 end
 

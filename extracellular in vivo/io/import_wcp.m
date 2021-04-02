@@ -121,6 +121,12 @@ while length(tline)<200 % better condition here?
 end
 %% Read recording blocks
 % which recordings to extract
+
+% fix case where header reads no recordings     lh 02 apr 21
+if wcp.nr == 0
+    wcp.nr = 1;
+end
+
 if isempty(recordings)
     recordings=1:wcp.nr;
 else

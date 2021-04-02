@@ -102,8 +102,8 @@ if manCur
     rpvRatioAll = displayRPV(res, ref)
     
     % rmv spks from selected cluster
-    cluid = 12;      % cluster id
-    [cluidx, rmvSpks] = cleanClu(fet, res, cluid, ref, 0.0001, [0.02 0.15]);
+    cluid = 49;      % cluster id
+    [cluidx, rmvSpks] = cleanClu(fet, res, cluid, ref, 0.0001, [0.02 0.055]);
         
     % rmv spks from all clusters until criterion is reached
     sclu = [];      % selected clusters. if empty will clean all
@@ -114,13 +114,14 @@ if manCur
     
     % plot fets of specific cluster
     fetclu = fet(clu == cluid, :);
-    [rpv, ~] = getRpv(res(clu == cluid), ref);
+    [rpv, rpvRatioOrig] = getRpv(res(clu == cluid), ref);
+    [~, rpvRatio] = getRpv(res(clu == cluid), ref);
     plotFetRpvHist(fetclu, rpv, 'cluid', cluid, 'grpid', grpid,...
         'rmvSpks', rmvSpks, 'rpvRatioOrig', rpvRatioOrig,...
         'rpvRatio', rpvRatio, 'visible', 'on', 'saveFig', false)
     
     % calc quality of cluster separation
-    distOfClus = displayCluDist(fet, sclu);
+    distOfClus = displayCluDist(fet, sclu)
         
     % realign spikes to peak / trough
     fixSpkAndRes('grp', grpid, 'dt', 0, 'stdFactor', 0);
@@ -362,7 +363,7 @@ end
 
 % -------------------------------------------------------------------------
 % print to screen isolation distance for all clusters in grp
-function cluDist = displayCluDist(fet, sclu)
+function distOfClus = displayCluDist(fet, sclu)
 global clu
 uclu = unique(clu);
 nfet = size(fet, 2);

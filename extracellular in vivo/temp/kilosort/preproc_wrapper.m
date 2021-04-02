@@ -89,7 +89,7 @@ spktimes2ns('basepath', basepath, 'fs', fs,...
     'spkFile', 'temp_wh');
 
 % clean clusters after sorting 
-cleanCluByFet('basepath', pwd, 'manCur', false)
+cleanCluByFet('basepath', pwd, 'manCur', true)
 
 % cut spk from dat and realign
 fixSpkAndRes('grp', grpid, 'dt', 0, 'stdFactor', 0);
