@@ -33,6 +33,7 @@ function out=import_wcp(fn, varargin)
 % 18 nov 19 LH      changed fread array size according to nChans
 %                   restored out.S to cell
 %                   fixed case where last trial incomplete
+% 04 apr 21 LH      fixed case where header reads no recordings
 
 if nargin < 1 || strcmp(fn,'')
     [FileName,PathName,FilterIndex] = uigetfile('*.wcp');
@@ -119,13 +120,16 @@ while length(tline)<200 % better condition here?
         tline = fgetl(fid);
     end
 end
-%% Read recording blocks
-% which recordings to extract
 
+% -------------------------------------------------------------------------
 % fix case where header reads no recordings     lh 02 apr 21
 if wcp.nr == 0
     wcp.nr = 1;
 end
+% -------------------------------------------------------------------------
+
+%% Read recording blocks
+% which recordings to extract
 
 if isempty(recordings)
     recordings=1:wcp.nr;
