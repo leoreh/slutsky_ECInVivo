@@ -92,9 +92,9 @@ resnip      = p.Results.resnip;
 % try to load params from session info (cell explorer format)
 cd(basepath)
 [~, basename] = fileparts(basepath);
-infoname = fullfile(basepath, [basename '.session.mat']);
-if exist(infoname, 'file')
-    load(infoname)
+sessionfile = fullfile(basepath, [basename '.session.mat']);
+if exist(sessionfile, 'file')
+    load(sessionfile)
 end
 if isempty(spkgrp)
     spkgrp = session.extracellular.spikeGroups.channels;
@@ -251,6 +251,7 @@ for igrp = grp
             spkGrp(:, :, ispk) = wv;
         end
         spk(:, :, cluIdx) = spkGrp;
+        clear spkGrp
         res(cluIdx) = res(cluIdx) + ishift;
         
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

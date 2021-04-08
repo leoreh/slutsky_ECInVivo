@@ -74,19 +74,19 @@ end
 pathPieces = regexp(basepath, filesep, 'split');
 
 % General metadata
-session.general.basePath =  basepath; % Full path
-
-session.general.name = pathPieces{end}; % Session name / basename
-session.general.version = 5; % Metadata version
+session.general.basePath    =  basepath; % Full path
+session.general.name        = pathPieces{end}; % Session name / basename
+session.general.version     = 5; % Metadata version
 session.general.sessionType = 'Chronic'; % Type of recording: Chronic, Acute
+session.general.nsamps      = 0;        % see end of script
 
 % limited animal metadata
 if ~isfield(session, 'animal') || force
-    session.animal.name = pathPieces{end - 1};
-    session.animal.sex = 'Male';
-    session.animal.species = 'Mouse';
-    session.animal.strain = 'C57BL';
-    session.animal.geneticLine = 'WT';
+    session.animal.name         = pathPieces{end - 1};
+    session.animal.sex          = 'Male';
+    session.animal.species      = 'Mouse';
+    session.animal.strain       = 'C57BL';
+    session.animal.geneticLine  = 'WT';
 end
 
 if ~isfield(session.general, 'experimenters') ||...
@@ -335,6 +335,16 @@ end
 %         end
 %     end
 % end
+
+% nsamps
+[~, basename] = fileparts(basepath);
+nchans = length([session.extracellular.electrodeGroups.channels{:}]);
+nbytes = class2bytes('int16');
+fraw = dir([basename '.dat']);
+if ~isempty(fraw)
+    nsamps = fraw.bytes / nbytes / nchans;
+    session.general.nsamps = nsamps;
+end
 
 % Finally show GUI if requested by user
 if viaGUI

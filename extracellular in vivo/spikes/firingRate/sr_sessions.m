@@ -384,16 +384,16 @@ patchIdx = [0 0];
 p4 = 1;
 if p4
     msr = [];
-    tsr = [];
+    tlast = 0;
     tss = [];
     NREMstates = [];
     prev_t = 0;
     for i = 1 : nsessions
         session = varArray{i, 1}.session;
-%         ss = varArray{i, 2}.SleepState;
+        % ss = varArray{i, 2}.SleepState;
         datInfo = varArray{i, 3}.datInfo;
         sr = varArray{i, 4}.fr;
-%         st = varArray{i, 5}.spktimes;
+        % st = varArray{i, 5}.spktimes;
         basepath = char(fullfile(mousepath, dirnames{i}));
         [~, basename] = fileparts(basepath);
         
@@ -403,7 +403,7 @@ if p4
         else
             data = sr.strd;
             tstamps = sr.tstamps;
-%             tss = [tss; ss.ints.NREMstate + offset];
+            % tss = [tss; ss.ints.NREMstate + offset];
         end
         
         % find idx of CNO on/off
@@ -433,6 +433,8 @@ if p4
         xname{i} = [char(sessionDate(i)) '_' datestr(t, 'HHMM')];
         
         msr = [msr, data];
+        tsr{i} = tstamps + tlast;
+        tlast = tsr{i}(end);
     end
     
     % smooth data
