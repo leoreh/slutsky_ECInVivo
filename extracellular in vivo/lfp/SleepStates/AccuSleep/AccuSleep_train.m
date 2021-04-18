@@ -1,4 +1,4 @@
-function [net] = AccuSleep_train(fileList, SR, epochLen, epochs, imageLocation)
+function [net, trainInfo] = AccuSleep_train(fileList, SR, epochLen, epochs, imageLocation)
 % AccuSleep_train  Train a network for classifying brain states
 % Zeke Barger, 021321
 %

@@ -292,7 +292,7 @@ else
         uiwait
         load(callabelsfile)
         calibrationData = createCalibrationData(standardizeSR(EEG, SR, 128),...
-            standardizeSR(EMG, SR, 128), labels, 128, epochLen);
+            standardizeSR(EMG, SR, 128), labels_2nd, 128, epochLen);
         save(calfile, 'calibrationData')
     else
         load(calfile)
@@ -301,7 +301,7 @@ else
     labels_calibration = labels;
     
     % classify recording
-    labels_orig = AccuSleep_classify(EEG, EMG, net, SR, epochLen, calibrationData, minBoutLen);
+    [labels_orig, scores] = AccuSleep_classify(EEG, EMG, net, SR, epochLen, calibrationData, minBoutLen);
     labels = labels_orig;
     save(labelsfile, 'labels')
 end

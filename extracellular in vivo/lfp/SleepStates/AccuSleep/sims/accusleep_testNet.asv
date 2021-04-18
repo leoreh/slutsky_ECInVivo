@@ -13,30 +13,33 @@
 % configuration file
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% load config file
-configfile = 'D:\Code\slutskycode\extracellular in vivo\lfp\SleepStates\AccuSleep\AS_config.mat';
-load(configfile)
-
-% change params
-cfg_names = {'WAKE', 'QWAKE', 'LSLEEP', 'NREM', 'REM', 'N/REM', 'BIN'};
-
 % calc weights
 weights = histcounts(gldstrd) / length(gldstrd);
 weights = round(weights * 100) / 100;       % round to two decimals
-weights(4) = weights(4) + 1 - sum(weights); % add remainder to NREM
-weights = [0.32 0.16 0.06 0.38 0.08 0 0];   % overwrite
-cfg_weights = weights;
+weights(3) = weights(3) + 1 - sum(weights);  % add remainder to NREM
+weights = [0.32 0.16 0.06 0.38 0.08 0]; 
 
-% colors
+% config file
+configfile = 'D:\Code\AccuSleep\AS_config.mat';
+load(configfile)
+cfg_colors = cfg_colors(1 : nstates);
+cfg_names = {'WAKE', 'QWAKE', 'LSLEEP', 'NREM', 'N/REM', 'REM', 'BIN'};
+
+cfg_weights = weights;
+save(configfile, 'cfg_colors', 'cfg_names', 'cfg_weights')
+
+configfile = 'D:\Code\AccuSleep\AS_config.mat';
+load(configfile)
 cfg_colors{1} = [240 110 110] / 255;
 cfg_colors{2} = [240 170 125] / 255;
 cfg_colors{3} = [150 205 130] / 255;
 cfg_colors{4} = [110 180 200] / 255;
 cfg_colors{5} = [170 100 170] / 255;
-cfg_colors{6} = [200 200 100] / 255;
-cfg_colors{7} = [200 200 200] / 255;
+cfg_colors{5} = [170 100 170] / 255;
+cfg_colors{6} = [200 200 200] / 255;
 
-% save
+cfg_names = labelnames;
+cfg_weights = weights;
 save(configfile, 'cfg_colors', 'cfg_names', 'cfg_weights')
 
 
@@ -177,7 +180,7 @@ AccuSimResults.labelsCal = labelsCal;
 AccuSimResults.labelsOutput = labelsOutput;
 AccuSimResults.statesOutput = labelsOutput;
 AccuSimResults.caldata = calibrationData;
-AccuSimResults.labelnames = cfg_names;
+AccuSimResults.labelnames = labelnames;
 save(fullfile(mousepath, 'AccuSimResults.mat'), 'AccuSimResults')
 
 

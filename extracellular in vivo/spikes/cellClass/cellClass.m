@@ -238,3 +238,13 @@ fprintf('\nthat took %.1f minutes\n', toc / 60)
 end
 
 % EOF
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% paths used to compare CE results
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+basepaths{1} = 'G:\RA\hDLX_Gq_WT2\200820_bslDay1';
+basepaths{2} = 'G:\RA\hDLX_Gq_Tg\210820_bslDay2Raw2';
+basepaths{3} = 'D:\Data\lh86\lh86_210301_072600';
+basepaths{4} = 'G:\lh81\lh81_210207_045300';
+cell_metrics = CellExplorer('basepaths', basepaths);
+
