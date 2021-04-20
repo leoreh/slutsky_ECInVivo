@@ -112,7 +112,7 @@ else % if no sleep stages provided, set to undefined
 end
 
 % get spectrogram and time axes
-showFreqs = find(fAxis <= 30); % only show frequencies under 30 Hz
+showFreqs = find(fAxis <= 15); % only show frequencies under 30 Hz ----> changed to 15 (lh 19 apr 21)
 G.specTs = (1:G.nbins)*G.epochLen - G.epochLen/2; % spectrogram time axis, in seconds
 G.specTh = G.specTs./3600; % spectrogram time axis, in hours
 G.spectrogram = spec(:,showFreqs); % our EEG spectrogram

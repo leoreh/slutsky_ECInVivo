@@ -10,8 +10,8 @@ function lfp = getLFP(varargin)
 %   basename    string. filename of data file. if empty retrieved from
 %               basepath. should not include extension.
 %   basepath    string. path to load filename and save output {pwd}
-%   extension   load from {'lfp'} (neurosuite), 'abf', 'wcp', or 'dat'.
-%   forceL      logical. force reload {false}.
+%   extension   load from {'lfp'}, 'abf', 'wcp', or 'dat'.
+%   forceLoad   logical. force reload {false}.
 %   fs          numeric. requested sampling frequency {1250}
 %   interval    numeric mat. list of intervals to read from lfp file [s]
 %               can also be an interval of traces from wcp
@@ -33,14 +33,14 @@ function lfp = getLFP(varargin)
 % 
 % OUTPUT
 %   lfp         structure with the following fields:
-%   fs
-%   fs_orig
-%   extension
-%   interval    
-%   duration    
-%   chans
-%   timestamps 
-%   data  
+%       fs
+%       fs_orig
+%       extension
+%       interval    
+%       duration    
+%       chans
+%       timestamps 
+%       data  
 % 
 % 01 apr 19 LH & RA
 % 19 nov 19     load mat if exists  
@@ -54,7 +54,6 @@ function lfp = getLFP(varargin)
 %       # load in chunks
 %       # downsample by subsampling
 
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -62,7 +61,7 @@ p = inputParser;
 addOptional(p, 'basepath', pwd);
 addOptional(p, 'basename', '');
 addOptional(p, 'extension', 'lfp');
-addOptional(p, 'forceL', false, @islogical);
+addOptional(p, 'forceLoad', false, @islogical);
 addOptional(p, 'fs', 1250, @isnumeric);
 addOptional(p, 'interval', [0 inf], @isnumeric);
 addOptional(p, 'ch', [1 : 16], @isnumeric);
@@ -78,7 +77,7 @@ parse(p,varargin{:})
 basepath = p.Results.basepath;
 basename = p.Results.basename;
 extension = p.Results.extension;
-forceL = p.Results.forceL;
+forceLoad = p.Results.forceLoad;
 fs = p.Results.fs;
 interval = p.Results.interval;
 ch = p.Results.ch;
@@ -103,7 +102,7 @@ end
 % check if file exists
 cd(basepath)
 filename = [basename '.lfp.mat'];
-if exist(filename) && ~forceL
+if exist(filename) && ~forceLoad
     fprintf('\n loading %s \n', filename)
     load(filename)
     return

@@ -63,7 +63,7 @@ if forceA
         % vars
 %         session = varArray{i, 1}.session;
 %         cm = varArray{i, 2}.cell_metrics;
-%         spikes = varArray{i, 3}.spikes;
+        spikes = varArray{i, 3}.spikes;
 %         if ~isempty(varArray{i, 4})
 %             ss = varArray{i, 4}.SleepState;
 %         end
@@ -76,24 +76,28 @@ if forceA
 %         spikes = fixCEspikes('basepath', basepath, 'saveVar', false,...
 %             'force', true);
 %         
-%         spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
-%             'saveFig', false, 'force', true, 'mu', [], 'graphics', false,...
-%             'vis', 'on', 'spkgrp', spkgrp);
+        spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
+            'saveFig', false, 'force', true, 'mu', [], 'graphics', false,...
+            'vis', 'on', 'spkgrp', spkgrp);
         
 cell_metrics = ProcessCellMetrics('session', session,...
     'manualAdjustMonoSyn', false, 'summaryFigures', false,...
     'debugMode', true, 'transferFilesFromClusterpath', false,...
     'submitToDatabase', false, 'getWaveformsFromDat', true);
-%         % cell_metrics = CellExplorer('basepath', basepath);
+%         cell_metrics = CellExplorer('basepath', basepath);
 %         
-%         cc = cellclass('basepath', basepath,...
-%             'waves', cat(1, spikes.rawWaveform{:})', 'saveVar', true,...
-%             'graphics', false, 'fs', fs);
+        cc = cellclass('basepath', basepath,...
+            'waves', cat(1, spikes.rawWaveform{:})', 'saveVar', true,...
+            'graphics', false, 'fs', fs);
         
         % firing rate
         load([basename '.spikes.cellinfo.mat'])
-        binsize = 60;
-        winBL = [1 * 60 110 * 60];
+%         binsize = 60;
+%         winBL = [1 * 60 110 * 60];
+%         for ii = 1 : length(spikes.ts)
+% %             spikes.ts{ii} = spikes.ts{ii} / fs;
+%             lastspk(ii) = spikes.times{ii}(end);
+%         end
         fr = firingRate(spikes.times, 'basepath', basepath,...
             'graphics', false, 'saveFig', false,...
             'binsize', binsize, 'saveVar', true, 'smet', 'MA',...
@@ -123,7 +127,7 @@ close all
 grp = [1 : 4];          % which tetrodes to plot
 state = [];             % [] - all; 1 - awake; 2 - NREM
 FRdata = 'strd';        % plot absolute fr or normalized
-unitClass = 'int';      % plot 'int', 'pyr', or 'all'
+unitClass = 'pyr';      % plot 'int', 'pyr', or 'all'
 suFlag = 1;             % plot only su or all units
 minfr = 0;              % include only units with fr greater than
 maxfr = 3000;           % include only units with fr lower than

@@ -34,6 +34,7 @@ function events = findLFPevents(varargin)
 % 
 % CALLS
 %   fastrms
+%   filterLFP
 % 
 % TO DO LIST:
 %   compare with original script on various data

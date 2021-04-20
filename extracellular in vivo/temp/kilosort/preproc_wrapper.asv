@@ -1,4 +1,4 @@
-% preproc_wrapper
+ % preproc_wrapper
 basepath = 'D:\VMs\shared\lh58\lh58_200901_080917';
 cd(basepath)
 
@@ -21,14 +21,14 @@ datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % tdt
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'K:\Data\lh86\lh86_210304';
-store = 'EMG2';
-blocks = [3];
+basepath = 'G:\HB\hb1\baseline_18042021_0811';
+store = 'Raw1';
+blocks = [1];
 chunksize = 300;
 mapch = [1 : 16];
-mapch = [1 : 4];
-rmvch = 6;
-rmvch = [2, 4];
+% mapch = [1 : 4];
+rmvch = [1, 2, 3, 5, 7 : 9, 11 : 13, 15, 16];
+% rmvch = [2, 4];
 clip = cell(1, 1);
 % clip{1} = [24000 Inf];
 % clip{3} = [1080 Inf];
@@ -44,6 +44,7 @@ basepath = session.general.basePath;
 nchans = session.extracellular.nChannels;
 fs = session.extracellular.sr;
 spkgrp = session.extracellular.spikeGroups.channels;
+[~, basename] = fileparts(basepath);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % field
@@ -94,7 +95,7 @@ spktimes2ns('basepath', basepath, 'fs', fs,...
     'spkFile', 'temp_wh');
 
 % clean clusters after sorting 
-cleanCluByFet('basepath', pwd, 'manCur', false, 'grp', [1 : 4])
+cleanCluByFet('basepath', pwd, 'manCur', true, 'grp', [1 : 4])
 
 % cut spk from dat and realign
 fixSpkAndRes('grp', 3, 'dt', 0, 'stdFactor', 0);
@@ -112,8 +113,6 @@ spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
     'saveFig', false, 'force', true, 'mu', mu, 'graphics', false,...
     'vis', 'on', 'spkgrp', spkgrp);
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % cell explorer
@@ -166,29 +165,32 @@ LFPfromDat('basepath', basepath, 'cf', 450, 'chunksize', 5e6,...
     'fsIn', fs)   
 
 % load lfp
+lfpInterval = [150 * 60, 180 * 60];
 lfp = getLFP('basepath', basepath, 'ch', [spkgrp{:}], 'chavg', {},...
-    'fs', 1250, 'interval', [0 inf], 'extension', 'lfp',...
+    'fs', 1250, 'interval', lfpInterval, 'extension', 'lfp',...
     'savevar', true, 'forceL', true, 'basename', '');
 
-% get emg
-[~, basename] = fileparts(basepath);
-filename = [basename '.emg.dat'];
-emg.orig = double(bz_LoadBinary(filename, 'nChannels', 4, 'channels', 2,...
-    'precision', 'int16', 'start', 0, 'frequency', datInfo.fs));
-emg.data = bz_NormToRange(zscore(emg.orig), [0 1]);
-emg.tstamps = [1 : length(emg.orig)] / datInfo.fs;
-save([basename '.emg.mat'], 'emg')
-
-emg.timestamps = emg.tstamps;
-EMGFromLFP = emg;
-save([basename '.EMGFromLFP.LFP.mat'], 'EMGFromLFP')
-
-% states
+% Buzsaki
 badch = setdiff([session.extracellular.electrodeGroups.channels{:}],...
     [session.extracellular.spikeGroups.channels{:}]);
 SleepScoreMaster(basepath, 'noPrompts', true, 'rejectChannels', badch)
 TheStateEditor(fullfile(basepath, basename))
 
+% accusleep
+% prep signal
+[EMG, EEG, sigInfo] = as_prepSig([basename, '.lfp'], [basename, '.emg.dat'],...
+    'eegCh', [5 : 8], 'emgCh', 3,...
+    'inspectSig', true, 'forceLoad', true, 'eegFs', 1250, 'emgFs', );
+
+% manually create labels
+labelsmanfile = [basename, '.AccuSleep_labelsMan.mat'];
+AccuSleep_viewer(EEG, EMG, 1000, 1, labels, labelsmanfile);
+
+% classify with a network
+ss = as_wrapper(EMG, EEG, [], 'basepath', basepath, 'calfile', [],...
+    'viaGui', false, 'forceCalibrate', true, 'inspectLabels', true,...
+    'saveVar', true, 'forceAnalyze', true, 'fs', 1000);
+        
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % spike detection routine
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -225,8 +227,8 @@ nchans = 15;
 newpath = 'D:\Data\lh86\lh86_210228_130000';
 datFiles{1} = 'D:\Data\lh86\lh86_210228_070000\lh86_210228_070000.dat';
 datFiles{2} = 'D:\Data\lh86\lh86_210228_190000\lh86_210228_190000.dat';
-info = dir(datFiles{1});
-nsamps = floor(info.bytes / class2bytes('int16') / nchans);
+sigInfo = dir(datFiles{1});
+nsamps = floor(sigInfo.bytes / class2bytes('int16') / nchans);
 parts{1} = [nsamps - 6 * 60 * 60 * fs nsamps];
 parts{2} = [0 6 * 60 * 60 * fs];
 

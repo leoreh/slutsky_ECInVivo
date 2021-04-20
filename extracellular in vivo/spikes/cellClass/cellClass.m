@@ -235,7 +235,7 @@ end
 
 fprintf('\nthat took %.1f minutes\n', toc / 60)
 
-end
+return
 
 % EOF
 

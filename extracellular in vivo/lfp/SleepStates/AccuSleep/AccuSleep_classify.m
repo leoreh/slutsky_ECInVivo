@@ -1,4 +1,4 @@
-function [labels, scores] = AccuSleep_classify(EEG, EMG, net, SR, epochLen, calibrationData, minBoutLen)
+function [labels, netScores] = AccuSleep_classify(EEG, EMG, net, SR, epochLen, calibrationData, minBoutLen)
 % AccuSleep_classify  Classify brain states
 % Zeke Barger 021321
 %
@@ -86,7 +86,7 @@ end
 % classify
 X = uint8(X.*255);
 % ------------------------------------------------------------ lh 08 apr 21
-[labels, scores] = classify(net, X);
+[labels, netScores] = classify(net, X);
 labels = double(labels');
 % labels = double(classify(net,X))';
 % ------------------------------------------------------------ lh 08 apr 21

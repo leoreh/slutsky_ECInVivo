@@ -1,4 +1,4 @@
-function vid = getVid(filename, varargin)
+function vid = getVidToxTrac(filename, varargin)
 
 % gets video struct from .xls of ToxTrac (Rodriguez et al., 2018)
 %  
