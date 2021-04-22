@@ -113,7 +113,7 @@ nstates = length(ss.labelNames);
 
 % network file
 if isempty(netfile)
-    netfile = 'D:\Code\slutskycode\extracellular in vivo\lfp\SleepStates\AccuSleep\trainedNetworks\lh86_4hr.mat';
+    netfile = 'D:\Code\slutskycode\extracellular in vivo\lfp\SleepStates\AccuSleep\trainedNetworks\lh86_6hr.mat';
 end
 if ~exist(netfile)
     [netfile, netpath] = uigetfile('', 'Please select network file');
@@ -149,7 +149,7 @@ else
         uiwait
         load(callabelsfile)
         labels_calibration = labels;
-        labels(labels > nstates) = nstates;         % ignore bin state      
+        labels(labels > nstates - 1) = nstates;         % ignore bin state      
         calibrationData = createCalibrationData(standardizeSR(EEG, fs, 128),...
             standardizeSR(EMG, fs, 128), labels, 128, epochLen);
         save(calfile, 'calibrationData')
@@ -169,8 +169,8 @@ end
 idxManLabels = labels_calibration < nstates;
 cm = confusionmat(labels_calibration(idxManLabels), labels(idxManLabels));
 
-% function handles. precision: when predicts yes, how often is it correct?
-% TP / (TP + FP). recall: when actually yes, how often does it predict yes?
+% function handles. precision (column): when predicts yes, how often is it correct?
+% TP / (TP + FP). recall (row): when actually yes, how often does it predict yes?
 % TP / (TP + FN)
 precision = @(cm) diag(cm)./sum(cm, 2);
 recall = @(confusionMat) diag(confusionMat) ./ sum(confusionMat, 1)';
