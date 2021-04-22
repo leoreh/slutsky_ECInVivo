@@ -6,3 +6,10 @@
 
 % AccuSleep_classify
 % # output netScores (line 90)
+% # remove last state from config file so the net won't be trained on bin
+
+% AccuSleep_train
+% # remove last state from config file so the net won't be trained on bin
+
+% createCalibrationData
+% # remove last state from config file so the net won't be trained on bin

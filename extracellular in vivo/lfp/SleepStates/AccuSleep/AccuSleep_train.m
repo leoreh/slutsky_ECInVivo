@@ -48,6 +48,13 @@ if ischar(config)
 end
 n_states = length(config.cfg_names);
 
+% -------------- lh 22 apr 21 (remove bin state from training)
+n_states = n_states - 1;
+config.cfg_names = config.cfg_names(1 : n_states);
+config.cfg_weights = config.cfg_weights(1 : n_states);
+config.cfg_colors = config.cfg_names(1 : n_states);
+% --------------
+
 % do a basic check on the fileList structure
 if ~iscell(fileList) || (size(fileList,1) < 1 || size(fileList,2) ~= 3)
     error(['fileList argument is not correctly formatted.',...
