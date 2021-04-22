@@ -70,6 +70,7 @@ function fepsp = fEPSP_analysis(varargin)
 %               hovering DataTips - using DataCruseMode still works.
 %               Improve ylim changes when moving ChannleGroup(? - Tet) &
 %               inverting traces. Exporting Fig & fepsp using savename.
+% 22 Apr 21 LD  Changed window to include first stimulation artifact
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -143,7 +144,7 @@ switch protocol
         nstim = 1;
         [~, wvwin(1)] = min(abs(tstamps - 0));
         [~, wvwin(2)] = min(abs(tstamps - 30));
-        wvwin(1) = wvwin(1) + dt;
+        wvwin(1) = wvwin(1) - dt;
     case 'stp'
         % 5 or 3 pulses of 500 us at 50 Hz. starts after 10 ms. recording length
         % 200 ms. repeated once every 30 s
@@ -157,8 +158,8 @@ switch protocol
             ts = 20;
         end
         wvwin = round([10 : ts : nstim * ts; 30 : ts : nstim * ts + 10]' * fs / 1000);
-        wvwin(:, 1) = wvwin(:, 1) + dt;
-        wvwin(1 : nstim - 1, 2) = wvwin(1 : nstim - 1, 2) - dt;
+        wvwin(:, 1) = wvwin(:, 1) - dt;
+        wvwin(1 : nstim - 1, 2) = wvwin(1 : nstim - 1, 2);
 end
 
 % Prepere fepsp fields
@@ -247,14 +248,18 @@ for j = 1:nspkgrp
     end
 end
 
+MiniWvwin = [];
+for j = 1:nstim
+    MiniWvwin = [MiniWvwin wvwin(j,1)+2*dt:wvwin(j,2)-dt]; %Only Grow 1 to 3 times
+end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Create Analysis GUI
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Build Gui Base
 AnalysisWin = figure('WindowState','maximized');
 AnalysisWin.Tag = 'Main Window'; %We will use tags to locate our figures
-yLimit = [min(fepsp.waves{MainTets(1), end}, [], 'all'),...
-    max(fepsp.waves{MainTets(1), end}, [], 'all')];
+yLimit = [min(fepsp.traces{MainTets(1), end}(MiniWvwin,:), [], 'all'),...
+    max(fepsp.traces{MainTets(1), end}(MiniWvwin,:), [], 'all')];
 ThePlot = plot(TimeFrameWindow,fepsp.traces{MainTets(1),nfiles}(min(wvwin(:,1)) : max(wvwin(:,2)), :));
 ax = gca;
 xlabel('Time [ms]')
@@ -267,7 +272,8 @@ ylim(yLimit*1.1)
 
 % Create Movable Lines
 %XLims = xlim();
-LineStartPos = fepsp.tstamps(wvwin');
+% LineStartPos = fepsp.tstamps(wvwin');
+LineStartPos = fepsp.tstamps([wvwin(:,1)+2*dt,wvwin(:,2)-dt]');
 Colors = {'g','r'};
 Pos = {'S','E'};
 for ii = numel(LineStartPos):-1:1
@@ -326,6 +332,7 @@ OpenFigs = AnalysisWin;
 % saveFig
 % dt
 % d
+% MiniWvwin
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Core Functions
@@ -460,10 +467,11 @@ OpenFigs = AnalysisWin;
             end
         end
         axis tight
-        ylim(ylim()*1.05)
+        ylim([min(fepsp.traceAvg(j, :, MiniWvwin),[],'all') max(fepsp.traceAvg(j, :, MiniWvwin),[],'all')]*1.05)
         xlabel('Time [ms]')
         ylabel('Voltage [mV]')
-        legend([TheWaves;StartMarks(1);EndMarks(1)],[split(num2str(sort(fepsp.intens)));{'Amp measure point Stim Start';'Amp measure point Stim End'}],'Location','best','NumColumns',2)
+        legend([TheWaves;StartMarks(1);EndMarks(1)],[split(num2str(sort(fepsp.intens)));{'Amp measure point Stim Start';'Amp measure point Stim End'}]...
+            ,'Location','northeast','NumColumns',2)
         box off
         P_10_50.Annotation.LegendInformation.IconDisplayStyle = 'on';
         P_10_50.DisplayName = 'Slope Area 10%-50%';
@@ -487,7 +495,7 @@ OpenFigs = AnalysisWin;
                 xticklabels({'From 10% to 50%' 'From 20% to 90%'})
                 xlabel('Measure area')
                 ylabel('Slope [mV/ms]')
-                legend([split(num2str(sort(fepsp.intens)))])
+                legend([split(num2str(sort(fepsp.intens)))],'Location','best')
                 box off
                 
             case 'stp'
@@ -794,7 +802,7 @@ OpenFigs = AnalysisWin;
                     NowTet.BackgroundColor = 'w';
                     NowInt.BackgroundColor = 'w';
                     PlotANew(ax,NowTet.Value,NowInt.Value,cm)
-                    ylim([min(fepsp.waves{NowTet.Value, end}(:)) max(fepsp.waves{NowTet.Value, end}(:))]*1.1)
+                    ylim([min(fepsp.traces{NowTet.Value, end}(MiniWvwin,:),[],'all') max(fepsp.traces{NowTet.Value, end}(MiniWvwin,:),[],'all')]*1.1)
                     for aa = 1:length(d)
                         d(aa).Position(:,2) = ylim();
                     end
@@ -836,7 +844,7 @@ OpenFigs = AnalysisWin;
                         return
                 end
                 PlotANew(ax,NowTet.Value,NowInt.Value,cm)
-                ylim([min(fepsp.waves{NowTet.Value, end}(:)) max(fepsp.waves{NowTet.Value, end}(:))]*1.1)
+                ylim([min(fepsp.traces{NowTet.Value, end}(MiniWvwin,:),[],'all') max(fepsp.traces{NowTet.Value, end}(MiniWvwin,:),[],'all')]*1.1)
                 for aa = 1:length(d)
                     d(aa).Position(:,2) = ylim();
                 end
