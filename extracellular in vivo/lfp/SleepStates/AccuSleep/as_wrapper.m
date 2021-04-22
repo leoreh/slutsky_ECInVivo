@@ -107,7 +107,7 @@ nstates = length(ss.labelNames);
 
 % network file
 if isempty(netfile)
-    netfile = 'D:\Code\AccuSleep\trainedNetworks\trainedNetwork2,5secEpochs.mat';
+    netpath = 'D:\Code\slutskycode\extracellular in vivo\lfp\SleepStates\AccuSleep\trainedNetworks\lh86_4hr.mat';
 end
 if ~exist(netfile)
     [netfile, netpath] = uigetfile('', 'Please select network file');

@@ -184,7 +184,7 @@ TheStateEditor(fullfile(basepath, basename))
 
 % manually create labels
 labelsmanfile = [basename, '.AccuSleep_labelsMan.mat'];
-AccuSleep_viewer(EEG, EMG, 1250, 1, labels, labelsmanfile);
+AccuSleep_viewer(EEG, EMG, 1250, 1, [], labelsmanfile)
 
 
 idx = 1 : 10 * 60 * 60 * 1250;
@@ -193,8 +193,8 @@ AccuSleep_viewer(EEG(idx), EMG(idx), 1250, 1, [], []);
 
 % classify with a network
 ss = as_wrapper(EMG, EEG, [], 'basepath', basepath, 'calfile', [],...
-    'viaGui', false, 'forceCalibrate', true, 'inspectLabels', true,...
-    'saveVar', true, 'forceAnalyze', true, 'fs', 1000);
+    'viaGui', false, 'forceCalibrate', false, 'inspectLabels', true,...
+    'saveVar', true, 'forceAnalyze', true, 'fs', 1250);
         
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % spike detection routine
