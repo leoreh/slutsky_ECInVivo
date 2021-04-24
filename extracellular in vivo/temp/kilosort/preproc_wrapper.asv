@@ -184,7 +184,7 @@ TheStateEditor(fullfile(basepath, basename))
 
 % manually create labels
 labelsmanfile = [basename, '.AccuSleep_labelsMan.mat'];
-AccuSleep_viewer(EEG, EMG, 1250, 1, labels, labelsmanfile)
+AccuSleep_viewer(EEG, EMG, 1250, 1, [], labelsmanfile)
 
 % classify with a network
 ss = as_wrapper(EMG, EEG, [], 'basepath', basepath, 'calfile', [],...

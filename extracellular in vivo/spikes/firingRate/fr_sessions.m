@@ -8,7 +8,7 @@ forceA = false;
 
 % full path and name to xls file with session metadata
 xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
-mname = 'lh86';
+mname = 'lh81';
 
 % column name in xls sheet where dirnames exist
 colName = 'Session';                    
@@ -92,12 +92,8 @@ cell_metrics = ProcessCellMetrics('session', session,...
         
         % firing rate
         load([basename '.spikes.cellinfo.mat'])
-%         binsize = 60;
-%         winBL = [1 * 60 110 * 60];
-%         for ii = 1 : length(spikes.ts)
-% %             spikes.ts{ii} = spikes.ts{ii} / fs;
-%             lastspk(ii) = spikes.times{ii}(end);
-%         end
+        binsize = 60;
+        winBL = [1 * 60 110 * 60];
         fr = firingRate(spikes.times, 'basepath', basepath,...
             'graphics', false, 'saveFig', false,...
             'binsize', binsize, 'saveVar', true, 'smet', 'MA',...

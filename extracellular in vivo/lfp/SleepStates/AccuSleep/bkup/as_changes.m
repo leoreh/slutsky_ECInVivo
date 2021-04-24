@@ -3,6 +3,10 @@
 
 % AccuSleep_viewer
 % # show frequencies up to 15 (line 115)
+% # set(G.A6a,'XTick',[]) => set(G.A6a,'XTick',[]) - line 379
+% # set(G.A6, 'YTick', []) => set(G.A6) - line 389
+
+
 
 % AccuSleep_classify
 % # output netScores (line 90)

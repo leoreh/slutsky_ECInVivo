@@ -63,13 +63,16 @@ save(configfile, 'cfg_colors', 'cfg_names', 'cfg_weights')
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % ALT 1: train network on entire data
-basepaths{1} = 'E:\Data\lh86\lh86_210227_190600';
-basepaths{2} = 'E:\Data\lh86\lh86_210301_072600';
+basepaths{2} = 'D:\Data\lh86\lh86_210227_190600';
+basepaths{2} = 'D:\Data\lh86\lh86_210301_072600';
+basepaths{3} = 'D:\Data\lh86\lh86_210302_183000';
+basepaths{1} = 'D:\Data\lh86\lh86_210304_180800';
+
 fileList = as_fileLists(basepaths);
 
 netpath = 'D:\Code\slutskycode\extracellular in vivo\lfp\SleepStates\AccuSleep\trainedNetworks';
-netname = 'lh86_6hr'; 
-[net] = AccuSleep_train(fileList, fs, epochLen, 13);
+netname = 'net_2sessions.mat'; 
+[net] = AccuSleep_train(fileList, fs, epochLen, 26);
 save(fullfile(netpath, netname), 'net')        
 
 

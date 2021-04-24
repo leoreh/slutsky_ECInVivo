@@ -20,6 +20,10 @@ function [EMG, EEG, sigInfo] = as_prepSig(eegData, emgData, varargin)
 %               be a vector and then the channels will be averaged
 %   emgCh       numeric. channel number of eeg to load from lfp file. for
 %               oe recording system
+%   eegNchans   numeric. no channels in eeg data file. if empty will be
+%               extracted from session info file
+%   emgNchans   numeric. no channels in emg data file. if empty will equal
+%               to eegNchans
 %   basepath    string. path to recording folder {pwd}
 %   saveVar     logical. save ss var {true}
 %   forceLoad   logical. reload recordings even if mat exists
@@ -46,6 +50,8 @@ addOptional(p, 'eegCh', 1, @isnumeric);
 addOptional(p, 'emgCh', 1, @isnumeric);
 addOptional(p, 'eegFs', [], @isnumeric);
 addOptional(p, 'emgFs', [], @isnumeric);
+addOptional(p, 'eegNchans', [], @isnumeric);
+addOptional(p, 'emgNchans', [], @isnumeric);
 addOptional(p, 'saveVar', true, @islogical);
 addOptional(p, 'inspectSig', false, @islogical);
 addOptional(p, 'forceLoad', false, @islogical);
@@ -56,6 +62,8 @@ eegCh           = p.Results.eegCh;
 emgCh           = p.Results.emgCh;
 eegFs           = p.Results.eegFs;
 emgFs           = p.Results.emgFs;
+eegNchans       = p.Results.eegNchans;
+emgNchans       = p.Results.emgNchans;
 saveVar         = p.Results.saveVar;
 inspectSig      = p.Results.inspectSig;
 forceLoad       = p.Results.forceLoad;
@@ -95,14 +103,19 @@ import iosr.dsp.*
 % session info
 if exist(sessionInfoFile, 'file')
     load([basename, '.session.mat'])
-    nchans = session.extracellular.nChannels;
     recDur = session.general.duration;
+    if isempty(eegNchans)
+        eegNchans = session.extracellular.nChannels;
+    end
     if isempty(eegFs)
         eegFs = session.extracellular.srLfp;
     end
     if isempty(emgFs)
         emgFs = eegFs;
     end
+end
+if isempty(emgNchans)
+    emgNchans = eegNchans;
 end
 
 % load data from lfp file if raw data was not given 
@@ -122,12 +135,12 @@ if ischar(eegData) || isempty(eegData)
     
     % load emg
     emgOrig = double(bz_LoadBinary(emgData, 'duration', Inf,...
-        'frequency', emgFs, 'nchannels', 2, 'start', 0,...
+        'frequency', emgFs, 'nchannels', emgNchans, 'start', 0,...
         'channels', emgCh, 'downsample', 1));
         
     % load eeg and average across given channels
     eegOrig = double(bz_LoadBinary(eegData, 'duration', Inf,...
-        'frequency', eegFs, 'nchannels', nchans, 'start', 0,...
+        'frequency', eegFs, 'nchannels', eegNchans, 'start', 0,...
         'channels', eegCh, 'downsample', 1));
     if size(eegOrig, 2) > 1
         eegOrig = mean(eegOrig, 2);

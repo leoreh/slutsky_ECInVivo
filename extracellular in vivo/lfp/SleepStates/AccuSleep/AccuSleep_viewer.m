@@ -376,7 +376,7 @@ message = 'Data loaded successfully';
             G.eegYlim(2)-.1*diff(G.eegYlim)],'Color','r', 'LineWidth', .5);
         line(G.A6a,[G.timepointS-G.epochLen/2, G.timepointS+G.epochLen/2], [G.eegYlim(2) G.eegYlim(2)],...
             'Color','r', 'LineWidth', .5);
-        set(G.A6a,'XTick',[],'YTick',[])
+        set(G.A6a,'XTick',[]); % -------- lh 23 apr 21
         
         % label x axis nicely
         G.A6.XTick = tp-(G.show/2)*G.epochLen + G.epochLen*(0:G.show);
@@ -386,7 +386,7 @@ message = 'Data loaded successfully';
             xlbl{i} = sec2hr(ticks(i));
         end
         G.A6.XTickLabel = xlbl;
-        set(G.A6, 'YTick', []);
+%         set(G.A6); % -------- lh 23 apr 21
         
         % Plot Progress Button
         tp = G.timepointH; % time in seconds at the center of the screen
