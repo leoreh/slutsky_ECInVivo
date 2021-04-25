@@ -82,6 +82,7 @@ cd(basepath)
 mousepath = fileparts(basepath);
 [~, basename] = fileparts(basepath);
 callabelsfile = [basename, '.AccuSleep_labelsCalibration.mat'];
+manlabelsfile = [basename, '.AccuSleep_labelsMan.mat'];
 labelsfile = [basename, '.AccuSleep_labels.mat'];
 statesfile = [basename '.AccuSleep_states.mat'];
 if isempty(calfile)
@@ -113,7 +114,10 @@ nstates = length(ss.labelNames);
 
 % network file
 if isempty(netfile)
-    netfile = 'D:\Code\slutskycode\extracellular in vivo\lfp\SleepStates\AccuSleep\trainedNetworks\lh86_6hr.mat';
+    netpath = 'D:\Code\slutskycode\extracellular in vivo\lfp\SleepStates\AccuSleep\trainedNetworks';
+    netfiles = dir([netpath, '/net*']);
+    netfiles = sort({netfiles.name});
+    netfile = netfiles{end};
 end
 if ~exist(netfile)
     [netfile, netpath] = uigetfile('', 'Please select network file');
@@ -133,8 +137,6 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % AccuSleep pipeline
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-labels = ones(1, floor(length(EMG) / fs / epochLen)) * nstates + 1;
-
 if viaGui
     AccuSleep_GUI       % open gui
     uiwait
@@ -142,25 +144,40 @@ else
     % get mouse calibration. if does not exist already, manualy score some
     % of the data and save the labels
     if ~exist(calfile, 'file') || forceCalibrate
-        if exist(callabelsfile)
+        if exist(manlabelsfile)
+            load(manlabelsfile)            
+        elseif exist(callabelsfile)
             load(callabelsfile)
+        else
+            labels = ones(1, floor(length(EMG) / fs / epochLen)) * nstates + 1;
         end
-        AccuSleep_viewer(EEG, EMG, fs, epochLen, [], callabelsfile);
+        fprintf('\nlabel some data for calibration, then press save.\n')
+        AccuSleep_viewer(EEG, EMG, fs, epochLen, labels, callabelsfile);
         uiwait
+        
+        % ignore bin state     
         load(callabelsfile)
         labels_calibration = labels;
-        labels(labels > nstates - 1) = nstates;         % ignore bin state      
+        labels(labels > nstates - 1) = nstates;          
+        
+        % calibration matrix
+        fprintf('creating calbiration matrix... ')
         calibrationData = createCalibrationData(standardizeSR(EEG, fs, 128),...
             standardizeSR(EMG, fs, 128), labels, 128, epochLen);
         save(calfile, 'calibrationData')
+        fprintf('done.\n')
     else
         load(calfile)
+        load(callabelsfile)
+        labels_calibration = labels;
     end
     
     % classify recording
+    fprintf('classifying... ')
     [labels_net, netScores] = AccuSleep_classify(EEG, EMG, net, fs, epochLen, calibrationData, minBoutLen);
     labels = labels_net;
     save(labelsfile, 'labels')
+    fprintf('done.\n')
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -169,9 +186,9 @@ end
 idxManLabels = labels_calibration < nstates;
 cm = confusionmat(labels_calibration(idxManLabels), labels(idxManLabels));
 
-% function handles. precision (column): when predicts yes, how often is it correct?
-% TP / (TP + FP). recall (row): when actually yes, how often does it predict yes?
-% TP / (TP + FN)
+% precision (column): when predicts yes, how often is it correct? TP / (TP
+% + FP). recall (row): when actually yes, how often does it predict yes? TP
+% / (TP + FN)
 precision = @(cm) diag(cm)./sum(cm, 2);
 recall = @(confusionMat) diag(confusionMat) ./ sum(confusionMat, 1)';
 
@@ -181,16 +198,13 @@ ss.netRecall = recall(cm);
 
 % plot confusion chart
 if graphics
-    % ALT 1:
-    % plotconfusion(categorical(labels_calibration), categorical(labels_net))
-    
-    % ALT 2:
     fh = figure;
     fh.Position = [500 200 900 700];
-    confusionchart(cm, cfg_names(1 : nstates - 1), 'ColumnSummary',...
+    cmh = confusionchart(cm, cfg_names(1 : nstates - 1), 'ColumnSummary',...
         'column-normalized', 'RowSummary', 'row-normalized',...
         'title', 'State Classification Confusion Matrix', 'Normalization',...
-        'total-normalized')
+        'total-normalized');
+    sortClasses(cmh, cfg_names(1 : nstates - 1))
     
     if saveFig
         figpath = fullfile('graphics', 'sleepState');
@@ -251,6 +265,6 @@ inspectLabels = true;
 saveVar = true;
 forceAnalyze = true;
 fs = 1250;
-
-
+netfile = [];
+sigInfo = [];
 

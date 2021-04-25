@@ -95,7 +95,7 @@ spktimes2ns('basepath', basepath, 'fs', fs,...
     'spkFile', 'temp_wh');
 
 % clean clusters after sorting 
-cleanCluByFet('basepath', pwd, 'manCur', true, 'grp', [1 : 4])
+cleanCluByFet('basepath', pwd, 'manCur', false, 'grp', [1 : 4])
 
 % cut spk from dat and realign
 fixSpkAndRes('grp', 3, 'dt', 0, 'stdFactor', 0);
@@ -187,10 +187,16 @@ labelsmanfile = [basename, '.AccuSleep_labelsMan.mat'];
 AccuSleep_viewer(EEG, EMG, 1250, 1, labels, labelsmanfile)
 
 % classify with a network
-ss = as_wrapper(EMG, EEG, [], 'basepath', basepath, 'calfile', [],...
-    'viaGui', false, 'forceCalibrate', false, 'inspectLabels', true,...
+ss = as_wrapper(EEG, EMG, [], 'basepath', basepath, 'calfile', [],...
+    'viaGui', false, 'forceCalibrate', true, 'inspectLabels', true,...
     'saveVar', true, 'forceAnalyze', true, 'fs', 1250);
-        
+
+% show only x hours of data
+x = 11;
+tidx = [1 : x * 60 * 60 * 1250];
+lidx = [1 : x * 60 * 60];
+AccuSleep_viewer(EEG(tidx), EMG(tidx), 1250, 1, labels(lidx), [])
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % spike detection routine
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

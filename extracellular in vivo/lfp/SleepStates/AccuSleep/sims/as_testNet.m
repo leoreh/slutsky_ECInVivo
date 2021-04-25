@@ -37,6 +37,7 @@ load(configfile)
 cfg_names = {'WAKE'; 'QWAKE'; 'LSLEEP'; 'NREM'; 'REM'; 'N/REM'; 'BIN'};
 
 % calc weights
+gldstrd = labels;
 idx = gldstrd ~= 8;
 weights = histcounts(gldstrd(idx)) / length(gldstrd(idx));
 weights = round(weights * 100) / 100;       % round to two decimals
@@ -63,16 +64,15 @@ save(configfile, 'cfg_colors', 'cfg_names', 'cfg_weights')
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % ALT 1: train network on entire data
-basepaths{2} = 'D:\Data\lh86\lh86_210227_190600';
-basepaths{2} = 'D:\Data\lh86\lh86_210301_072600';
 basepaths{3} = 'D:\Data\lh86\lh86_210302_183000';
 basepaths{1} = 'D:\Data\lh86\lh86_210304_180800';
+basepaths{2} = 'D:\Data\lh86\lh86_210301_183700';
 
 fileList = as_fileLists(basepaths);
 
 netpath = 'D:\Code\slutskycode\extracellular in vivo\lfp\SleepStates\AccuSleep\trainedNetworks';
-netname = 'net_2sessions.mat'; 
-[net] = AccuSleep_train(fileList, fs, epochLen, 26);
+netname = ['net_',  datestr(datetime, 'yymmdd_HHMMss')]; 
+[net] = AccuSleep_train(fileList, fs, epochLen, 35);
 save(fullfile(netpath, netname), 'net')        
 
 

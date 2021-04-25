@@ -24,6 +24,9 @@ function [message] = AccuSleep_viewer(EEG, EMG, SR, epochLen, userLabels, savepa
 %   a variable called 'labels' that is a vector with the same number of
 %   epochs as the EEG/EMG signals and values ranging from 1 to <# states>+1
 
+% set graphics to default
+setMatlabGraphics(true)
+
 %% Check the inputs
 G = struct; % holds everything
 
