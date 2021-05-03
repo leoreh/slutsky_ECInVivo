@@ -157,7 +157,7 @@ plotCCG('ccg', ccg(:, u, u), 't', t, 'basepath', basepath,...
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% sleep states
+% lfp
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % create lfp
 LFPfromDat('basepath', basepath, 'cf', 450, 'chunksize', 5e6,...
@@ -170,21 +170,18 @@ lfp = getLFP('basepath', basepath, 'ch', [spkgrp{:}], 'chavg', {},...
     'fs', 1250, 'interval', lfpInterval, 'extension', 'lfp',...
     'savevar', true, 'forceL', true, 'basename', '');
 
-% Buzsaki
-badch = setdiff([session.extracellular.electrodeGroups.channels{:}],...
-    [session.extracellular.spikeGroups.channels{:}]);
-SleepScoreMaster(basepath, 'noPrompts', true, 'rejectChannels', badch)
-TheStateEditor(fullfile(basepath, basename))
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% sleep states
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% accusleep
 % prep signal
 [EMG, EEG, sigInfo] = as_prepSig([basename, '.lfp'], [basename, '.emg.dat'],...
-    'eegCh', [9 : 12], 'emgCh', 1, 'saveVar', true, 'emgNchans', 2,...
-    'inspectSig', false, 'forceLoad', true, 'eegFs', 1250, 'emgFs', 3051.75);
+    'eegCh', [9 : 12], 'emgCh', 1, 'saveVar', true, 'emgNchans', 1,...
+    'inspectSig', false, 'forceLoad', true, 'eegFs', 1250, 'emgFs', 1017.25);
 
 % manually create labels
 labelsmanfile = [basename, '.AccuSleep_labelsMan.mat'];
-AccuSleep_viewer(EEG, EMG, 1250, 1, labels, labelsmanfile)
+AccuSleep_viewer(EEG, EMG, 1250, 1, labels, [])
 
 % classify with a network
 ss = as_wrapper(EEG, EMG, [], 'basepath', basepath, 'calfile', [],...
@@ -198,48 +195,29 @@ lidx = [1 : x * 60 * 60];
 AccuSleep_viewer(EEG(tidx), EMG(tidx), 1250, 1, labels(lidx), [])
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% spike detection routine
+% handle dat  files
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% create wh.dat
-ops = opsKS('basepath', basepath, 'fs', fs, 'nchans', nchans,...
-    'spkgrp', spkgrp, 'trange', [0 Inf]);
-preprocessDataSub(ops);
-
-% detect spikes
-[spktimes, spkch] = spktimesWh('basepath', basepath, 'fs', fs, 'nchans', nchans,...
-    'spkgrp', spkgrp, 'saveVar', true, 'chunksize', 2048 ^ 2 + 64,...
-    'graphics', false);
-
-% create ns files for kk sorting
-% spktimes2ks
-
-% firing rate per tetrode. note that using times2rate requires special care
-% becasue spktimes is given in samples and not seconds
-binsize = 60 * fs;
-winCalc = [0 Inf];
-[sr.strd, sr.edges, sr.tstamps] = times2rate(spktimes, 'binsize', binsize,...
-    'winCalc', winCalc, 'c2r', false);
-% convert counts to rate
-sr.strd = sr.strd ./ (diff(sr.edges) / fs);
-% fix tstamps
-sr.tstamps = sr.tstamps / binsize;
-
-figure, plot(sr.tstamps, sr.strd)
-legend
-
 %%% cat dat
-nchans = 15;
-newpath = 'D:\Data\lh86\lh86_210228_130000';
-datFiles{1} = 'D:\Data\lh86\lh86_210228_070000\lh86_210228_070000.dat';
-datFiles{2} = 'D:\Data\lh86\lh86_210228_190000\lh86_210228_190000.dat';
+nchans = 16;
+fs = 1250;
+newpath = mousepath;
+datFiles{1} = 'G:\lh81\lh81_210206_190000\lh81_210206_190000.lfp';
+datFiles{2} = 'G:\lh81\lh81_210207_065300\lh81_210207_065300.lfp';
 sigInfo = dir(datFiles{1});
 nsamps = floor(sigInfo.bytes / class2bytes('int16') / nchans);
-parts{1} = [nsamps - 6 * 60 * 60 * fs nsamps];
-parts{2} = [0 6 * 60 * 60 * fs];
+parts{1} = [nsamps - 2 * 60 * 60 * fs nsamps];
+parts{2} = [0 4 * 60 * 60 * fs];
 
 catDatMemmap('datFiles', datFiles, 'newpath', newpath, 'parts', parts,...
     'nchans', nchans, 'saveVar', true)
+
+
+% preproc dat
+% clip = 
+datInfo = preprocDat('basepath', basepath, 'fname', 'lh81_210206_044300.emg.dat', 'mapch', 1,...
+    'rmvch', [], 'nchans', 1, 'saveVar', false, 'clip', clip,...
+    'chunksize', 5e6, 'precision', 'int16', 'bkup', true);
 
 
 

@@ -70,28 +70,40 @@ if forceA
         %         spikes = fixCEspikes('basepath', basepath, 'saveVar', false,...
         %             'force', true);
         
-%         cell_metrics = ProcessCellMetrics('session', session,...
-%             'manualAdjustMonoSyn', false, 'summaryFigures', false,...
-%             'debugMode', true, 'transferFilesFromClusterpath', false,...
-%             'submitToDatabase', false, 'getWaveformsFromDat', true);
+        %         cell_metrics = ProcessCellMetrics('session', session,...
+        %             'manualAdjustMonoSyn', false, 'summaryFigures', false,...
+        %             'debugMode', true, 'transferFilesFromClusterpath', false,...
+        %             'submitToDatabase', false, 'getWaveformsFromDat', true);
         %         cell_metrics = CellExplorer('basepath', basepath);
         %
         %         cc = cellclass('basepath', basepath,...
         %             'waves', cat(1, spikes.rawWaveform{:})', 'saveVar', true,...
         %             'graphics', false, 'fs', fs);
         
-        load([basename '.spikes.cellinfo.mat'])
-%         spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
-%             'saveFig', false, 'force', true, 'mu', [], 'graphics', false,...
-%             'vis', 'on', 'spkgrp', spkgrp);
+        %         spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
+        %             'saveFig', false, 'force', true, 'mu', [], 'graphics', false,...
+        %             'vis', 'on', 'spkgrp', spkgrp);
         
         % firing rate
+        load([basename '.spikes.cellinfo.mat'])
         binsize = 60;
         winBL = [1 * 60 110 * 60];
         fr = firingRate(spikes.times, 'basepath', basepath,...
             'graphics', false, 'saveFig', false,...
             'binsize', binsize, 'saveVar', true, 'smet', 'MA',...
             'winBL', winBL);
+        
+        % spike rate per tetrode. note that using firingRate requires
+        % special care becasue spktimes is given in samples and not seconds
+        load(fullfile(basepath, [basename '.spktimes.mat']))
+        for ii = 1 : length(spkgrp)
+            spktimes{ii} = spktimes{ii} / fs;
+        end
+        binsize = 60;
+        sr = firingRate(spktimes, 'basepath', basepath,...
+            'graphics', false, 'saveFig', false,...
+            'binsize', binsize, 'saveVar', 'sr', 'smet', 'none',...
+            'winBL', [0 Inf]);               
     end
 end
 
@@ -113,18 +125,18 @@ pathPieces = regexp(dirnames(:), '_', 'split'); % assumes filename structure: an
 sessionDate = [pathPieces{:}];
 sessionDate = sessionDate(2 : 3 : end);
 setMatlabGraphics(false)
+[nsub] = numSubplots(nsessions);
 
 close all
 grp = [1 : 4];          % which tetrodes to plot
 state = [];             % [] - all; 1 - awake; 2 - NREM
 FRdata = 'strd';        % plot absolute fr or normalized
-unitClass = 'int';      % plot 'int', 'pyr', or 'all'
+unitClass = 'pyr';      % plot 'int', 'pyr', or 'all'
 suFlag = 1;             % plot only su or all units
 frBoundries = [0 Inf];  % include only units with fr greater than
 Y = [0 10];             % ylim
 yscale = 'log';         % log or linear
 p1 = 1;                 % firing rate vs. time, one fig per session
-[nsub] = numSubplots(nsessions);
 
 plotStyle = 'box';      % for p2. can by 'bar' or 'box'
 clr = ['bbbkkkkrrr'];
@@ -151,11 +163,11 @@ for isession = 1 : nsessions
     if ~isempty(state) && state > 0
         data = fr.states.fr{state}(units{isession}, :);
         tstamps = fr.states.tstamps{state};
-        txt = sprintf('mFR of %s %s in %s', unitClass, suTxt, fr.states.statenames{state});
+        txt = sprintf('mFR of %s %s in %s', unitClass, fr.states.statenames{state});
     else
         data = fr.(FRdata)(units{isession}, :);
         tstamps = fr.tstamps;
-        txt = sprintf('mFR of %s %s', unitClass, suTxt);
+        txt = sprintf('mFR of %s %s', unitClass);
     end
     mfr{isession} = mean(data, 2);
     
@@ -209,8 +221,8 @@ for isession = 1 : nsessions
     end
 end
 
-p = 0;
-if p
+figFlag = 0;
+if figFlag
     fh = figure;
     mfrmat = cell2nanmat(mfr);
     switch plotStyle
@@ -252,6 +264,7 @@ if p
     xtickangle(45)
     box off
     title(txt)
+    
     if saveFig
         figname = sprintf('MSR of Tetrode #%s', num2str(grp));
         figname = fullfile(mousepath, figname);
@@ -261,58 +274,37 @@ if p
 end
 
 % number of SU and MU (top - pyr; bottom - int) from selected tetrodes
-p = 0;
-if p
+figFlag = 0;
+if figFlag
     clear units
     for isession = 1 : nsessions
-        cm = varArray{isession, 2}.cell_metrics;
-        spikes = varArray{isession, 3}.spikes;
-        pyr = strcmp(cm.putativeCellType, 'Pyramidal Cell');
-        wide = strcmp(cm.putativeCellType, 'Wide Interneuron');
-        pyr = pyr | wide;
-        int = strcmp(cm.putativeCellType, 'Narrow Interneuron');
-        grpidx = zeros(1, length(spikes.shankID));
-        for ii = 1 : length(grp)
-            grpidx = grpidx | spikes.shankID == grp(ii);
-        end
-        units(isession, 1) = sum(~spikes.su & pyr & grpidx);
-        units(isession, 2) = sum(spikes.su & pyr & grpidx);
-        units(isession, 3) = sum(~spikes.su & int & grpidx);
-        units(isession, 4) = sum(spikes.su & int & grpidx);
-        %         units(i, 5) = sum(grpidx) - sum(units(i, 1 : 4));
+        assignVars(varArray, isession)
+        units(isession, 1) = sum(selectUnits(spikes, cm, fr, 1, grp, frBoundries, 'pyr'));
+        units(isession, 2) = sum(selectUnits(spikes, cm, fr, 1, grp, frBoundries, 'int'));
     end
     fh = figure;
     bar(units, 'stacked')
-    hold on
-    if nsessions == length(clr)
-        idx = [find(clr == 'k', 1) find(clr == 'r', 1)] - 0.5;
-        yLimit = ylim;
-        patch([idx idx(2) idx(1)],...
-            [yLimit(1) yLimit(1) yLimit(2) yLimit(2)],...
-            'b', 'FaceAlpha', 0.1)
-    end
-    
-    legend({"pyr mu"; "pyr su"; "int mu"; "int su"; "CNO"})
+    legend({"RS"; "FS"})
     xticks(1 : nsessions)
-    xticklabels(sessionDate)
+    xticklabels(dirnames)
+    xtickangle(45)
     title('Number of Units')
     xlabel('Session')
-    ylabel('No. units')
+    ylabel('No. Units')
     box off
     
     if saveFig
-        figname = fullfile(mousepath, 'UnitsDetected');
-        % print(fh, figname, '-dpdf', '-bestfit', '-painters');
+        figname = fullfile(mousepath, 'graphics', 'UnitsDetected');
         export_fig(figname, '-tif', '-transparent', '-r300')
     end
 end
 
 % mean firing rate in states per unit
-p = 1;
+figFlag = 1;
 stateidx = [1, 4];
 unitClass = 'pyr';
 clear stateFrUnits
-if p
+if figFlag
     fh = figure;
     for isession = 1 : nsessions
         
@@ -324,7 +316,11 @@ if p
         hold on
         k = 1;
         for istate = stateidx
-            stateFrUnits{isession}(:, k) = mean(fr.states.fr{istate}(units, :), 2);
+            % select specific times
+            idx = fr.states.tstamps{istate} > 2 * 60 * 60 &...
+                fr.states.tstamps{istate} < 6 * 60 * 60;
+            frmat = fr.states.fr{istate}(units, idx);
+            stateFrUnits{isession}(:, k) = mean(frmat, 2);
             k = k + 1;
         end
         
@@ -377,12 +373,11 @@ if p
     end
 end
 
-
 % histogram of bins for each state for multiunit activity 
-p = 1;
+figFlag = 1;
 grp = 1 : 4;
 stateidx = [1, 4];
-if p
+if figFlag
     fh = figure;
     for isession = 1 : nsessions
         
@@ -393,6 +388,8 @@ if p
         subplot(nsub(1), nsub(2), isession)
         hold on
         for istate = stateidx
+            tidx = sr.states.tstamps{istate} > 2 * 60 * 60;
+            srmat = sr.states.fr{istate}(:, tidx);
             nbins = min([length(sr.states.fr{istate}), 250]);
             binidx = randperm(length(sr.states.fr{istate}), nbins);
             binstates{isession, istate} = mean(sr.states.fr{istate}(grp, binidx), 1);
@@ -403,8 +400,8 @@ if p
         end
         
         set(gca, 'xscale', 'log')
-        xlim([40 300])
-        ylim([0 50])
+        xlim([10 250])
+        ylim([0 60])
         ylabel('Counts')
         xlabel('Spike Rate [Hz]')
         title(sessionDate{isession})   
@@ -421,6 +418,69 @@ if p
     end   
 end
 
+% lfp fft 
+figFlag = 1;
+ch = [9 : 12];
+stateidx = [1, 4];
+win = hann(2 ^ nextpow2(10 * fs));
+noverlap = fs;
+clear psdPow
+if figFlag
+    % arrange data
+    for isession = 1 : nsessions
+        
+        assignVars(varArray, isession)
+        basepath = session.general.basePath;
+        nchans = session.extracellular.nChannels;
+        cd(basepath)
+        [~, basename] = fileparts(basepath);
+        
+        % load lfp
+        fs = 1250;
+        istart = 0;
+        dur = 10 * 60 * 60;
+        lfp = double(bz_LoadBinary([basename, '.lfp'], 'duration', dur,...
+            'frequency', 1250, 'nchannels', nchans, 'start', istart,...
+            'channels', ch, 'downsample', 1));       
+        
+        % limit lfp to state
+        counter = 1;
+        for istate = 1 : length(stateidx)
+            epochs = ss.stateEpochs{istate};
+            epochInTime = epochs(:, 1) > istart & epochs(:, 2) < dur;
+            epochs = epochs(epochInTime, :);
+            epochidx = [];
+            for iepoch = 1 : size(epochs, 1)
+                epochidx = [epochidx, epochs(iepoch, 1) * fs : epochs(iepoch, 2) * fs];
+            end
+            lfpInState = mean(lfp(epochidx, :), 2);
+            lfpInState = lfpInState - mean(lfpInState);
+            
+            % calc psd
+            [pxx, psdFreq] = pwelch(lfpInState, win, noverlap, [], fs);
+            pxx = 10 * log10(pxx);
+            psdPow{counter}(:, isession) = pxx;
+            counter = counter + 1;
+        end        
+    end
+    
+    % plot
+    fh = figure;
+    for istate = 1 : length(stateidx)
+        subplot(1, length(stateidx), istate)
+        plot(psdFreq, psdPow{istate})
+        xlim([2 100])
+        set(gca, 'xscale', 'linear', 'yscale', 'linear', 'box', 'off')
+        title(sessionDate{isession})
+    end
+    
+    if saveFig
+        figpath = fullfile(mousepath, 'graphics');
+        mkdir(figpath)
+        figname = fullfile(figpath, ['psd']);
+        export_fig(figname, '-tif', '-transparent', '-r300')
+    end   
+end
 
 
 
