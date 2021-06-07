@@ -210,7 +210,7 @@ if graphics
         figpath = fullfile('graphics', 'sleepState');
         mkdir(figpath)
         figname = fullfile(figpath, sprintf('%s_stateConfusionMat', basename));
-        export_fig(figname)
+        export_fig(figname, '-tif', '-transparent', '-r300')
     end
 end
 

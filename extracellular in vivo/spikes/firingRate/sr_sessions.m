@@ -9,7 +9,7 @@ forceA = false;
 
 % full path and name to xls file with session metadata
 xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
-mname = 'lh86';     % mouse name
+mname = 'lh87';     % mouse name
 
 % column name in xls sheet where dirnames exist
 colName = 'Session';
@@ -59,51 +59,48 @@ if forceA
         spkgrp = session.extracellular.spikeGroups.channels;
         
         % pre-process dat
-%         mapch = 1 : 15;
-%         rmvch = [];
-%         datInfo = preprocDat('basepath', basepath, 'fname', [basename, '.dat'], 'mapch', mapch,...
-%             'rmvch', rmvch, 'nchans', nchans, 'saveVar', true,...
-%             'chunksize', 5e6, 'precision', 'int16', 'bkup', true,...
-%             'clip', round([406 * fs * 60 438 * fs * 60]), 'rmvArt', false);
+        %         mapch = 1 : 15;
+        %         rmvch = [];
+        %         datInfo = preprocDat('basepath', basepath, 'fname', [basename, '.dat'], 'mapch', mapch,...
+        %             'rmvch', rmvch, 'nchans', nchans, 'saveVar', true,...
+        %             'chunksize', 5e6, 'precision', 'int16', 'bkup', true,...
+        %             'clip', round([406 * fs * 60 438 * fs * 60]), 'rmvArt', false);
         
         % create lfp
-%         LFPfromDat('basepath', basepath, 'cf', 450, 'chunksize', 5e6,...
-%             'nchans', nchans, 'fsOut', 1250,...
-%             'fsIn', fs)
-%         
+        %         LFPfromDat('basepath', basepath, 'cf', 450, 'chunksize', 5e6,...
+        %             'nchans', nchans, 'fsOut', 1250,...
+        %             'fsIn', fs)
+        %
         % sleep states
-%         ss = accusleep_wrapper('basepath', basepath, 'cleanRec', [],...
-%             'SR', 512, 'epochLen', 1, 'recSystem', 'tdt', 'calfile', [],...
-%             'lfpCh', [8 : 11], 'emgCh', [], 'viaGui', false,...
-%             'forceCalibrate', true, 'inspectLabels', true, 'saveVar', true,...
-%             'forceAnalyze', true, 'forceLoad', true);
-%         labelsmanfile = [basename, '.AccuSleep_labelsMan.mat'];
-%         AccuSleep_viewer(EEG, EMG, 512, 1, labels, labelsmanfile);
-            
+        [EMG, EEG, sigInfo] = as_prepSig([basename, '.lfp'], [basename, '.emg.dat'],...
+            'eegCh', 1, 'emgCh', 1, 'saveVar', true, 'emgNchans', 1,...
+            'inspectSig', true, 'forceLoad', true, 'eegFs', 1250, 'emgFs', 6103.515625);
+        %         AccuSleep_viewer(EEG, EMG, 1250, 1, [], [])
+        
         % detect spikes
-%         [spktimes, ~] = spktimesWh('basepath', basepath, 'fs', fs, 'nchans', nchans,...
-%             'spkgrp', spkgrp, 'saveVar', true, 'saveWh', true,...
-%             'graphics', false, 'force', true);
-        
-        % create ns files for sorting
-%         dur = [];
-%         t = [];
-%         spktimes2ns('basepath', basepath, 'fs', fs,...
-%             'nchans', nchans, 'spkgrp', spkgrp, 'mkClu', true,...
-%             'dur', dur, 't', t, 'psamp', [], 'grps', [1 : length(spkgrp)],...
-%             'spkFile', 'temp_wh');
-        
-        % spike rate per tetrode. note that using firingRate requires
-        % special care becasue spktimes is given in samples and not seconds
-        load(fullfile(basepath, [basename '.spktimes.mat']))
-        for ii = 1 : length(spkgrp)
-            spktimes{ii} = spktimes{ii} / fs;
-        end
-        binsize = 60;
-        sr = firingRate(spktimes, 'basepath', basepath,...
-            'graphics', false, 'saveFig', false,...
-            'binsize', binsize, 'saveVar', 'sr', 'smet', 'none',...
-            'winBL', [0 Inf]);
+        %         [spktimes, ~] = spktimesWh('basepath', basepath, 'fs', fs, 'nchans', nchans,...
+        %             'spkgrp', spkgrp, 'saveVar', true, 'saveWh', true,...
+        %             'graphics', false, 'force', true);
+        %
+        %         % create ns files for sorting
+        %         dur = [];
+        %         t = [];
+        %         spktimes2ns('basepath', basepath, 'fs', fs,...
+        %             'nchans', nchans, 'spkgrp', spkgrp, 'mkClu', true,...
+        %             'dur', dur, 't', t, 'psamp', [], 'grps', [1 : length(spkgrp)],...
+        %             'spkFile', 'temp_wh');
+        %
+        %         % spike rate per tetrode. note that using firingRate requires
+        %         % special care becasue spktimes is given in samples and not seconds
+        %         load(fullfile(basepath, [basename '.spktimes.mat']))
+        %         for ii = 1 : length(spkgrp)
+        %             spktimes{ii} = spktimes{ii} / fs;
+        %         end
+        %         binsize = 60;
+        %         sr = firingRate(spktimes, 'basepath', basepath,...
+        %             'graphics', false, 'saveFig', false,...
+        %             'binsize', binsize, 'saveVar', 'sr', 'smet', 'none',...
+        %             'winBL', [0 Inf]);
         
     end
 end
@@ -143,7 +140,9 @@ for i = sessions
     
     session = varArray{i, 1}.session;
     %     ss = varArray{i, 2}.SleepState;
-    datInfo = varArray{i, 3}.datInfo;
+    if ~isempty(varArray{i, 3})
+        datInfo = varArray{i, 3}.datInfo;
+    end
     sr = varArray{i, 4}.fr;
     if ~isempty(varArray{i, 5})
         ss = varArray{i, 5}.ss;
@@ -186,14 +185,14 @@ for i = sessions
         % medata = median((data(grp, :)), 1);
         % plot(tstamps, medata, 'k', 'LineWidth', 5)
         % stdshade(sr.strd(grp, :), 0.3, 'k', tstamps / 60)
-        for ii = 1 : length(nsamps) - 1
-            plot([nsamps(ii) nsamps(ii)] / fs / 60, Y, '--k',...
-                'LineWidth', 2)
-        end
+%         for ii = 1 : length(nsamps) - 1
+%             plot([nsamps(ii) nsamps(ii)] / fs / 60, Y, '--k',...
+%                 'LineWidth', 2)
+%         end
         axis tight
         if ~isempty(states)
-        fill([states{2} fliplr(states{2})]' / 60, [Y(1) Y(1) Y(2) Y(2)],...
-            'b', 'FaceAlpha', 0.15,  'EdgeAlpha', 0);
+            fill([states{2} fliplr(states{2})]' / 60, [Y(1) Y(1) Y(2) Y(2)],...
+                'b', 'FaceAlpha', 0.15,  'EdgeAlpha', 0);
         end
         ylim(Y)
         ylabel('Spike Rate [Hz]')
@@ -225,7 +224,7 @@ if p3
         datInfo = varArray{i, 3}.datInfo;
         sr = varArray{i, 4}.fr;
         if ~isempty(varArray{i, 5})
-        ss = varArray{i, 5}.ss;
+            ss = varArray{i, 5}.ss;
         end
         
         subplot(nsub(1), nsub(2), k)
@@ -301,12 +300,12 @@ if p3
             
             h = histogram(epLen{i, ii}, 'BinMethod', 'auto', 'EdgeAlpha', 0,...
                 'FaceAlpha', 0.3, 'Normalization', 'probability');
-%             set(gca, 'XScale', 'log')
+            %             set(gca, 'XScale', 'log')
         end
         ylabel('Counts')
         xlabel('Duration [log10(s)]')
-                xlim([0 4])
-                ylim([0 0.3])
+        xlim([0 4])
+        ylim([0 0.3])
         if i == sessions(1)
             legend(ss.labelNames(stateidx))
         end
@@ -367,7 +366,7 @@ end
 onSession = 'lh86_210226_184500';
 offSession = 'lh86_210228_190000';
 patchIdx = [0 0];
-p4 = 1;
+p4 = 0;
 if p4
     msr = [];
     tlast = 0;
@@ -377,7 +376,9 @@ if p4
     for i = 1 : nsessions
         session = varArray{i, 1}.session;
         % ss = varArray{i, 2}.SleepState;
-        datInfo = varArray{i, 3}.datInfo;
+        if ~isempty(varArray{i, 3})
+            datInfo = varArray{i, 3}.datInfo;
+        end
         sr = varArray{i, 4}.fr;
         % st = varArray{i, 5}.spktimes;
         basepath = char(fullfile(mousepath, dirnames{i}));
@@ -408,7 +409,7 @@ if p4
             tformat = 'HHmm';
         end
         recStart = datetime(recStart, 'InputFormat', tformat);
-        t = '090000';
+        t = '110000';
         t = datetime(t, 'InputFormat', tformat);
         if t <= recStart
             t = t + hours(12);
