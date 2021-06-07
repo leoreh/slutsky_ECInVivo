@@ -16,7 +16,6 @@ function lfp = getLFP(varargin)
 %   interval    numeric mat. list of intervals to read from lfp file [s]
 %               can also be an interval of traces from wcp
 %   ch          vec. channels to load
-%   nchans      numeric. number of channels in lfp / dat file
 %   pli         logical. filter power line interferance {0}
 %   dc          logical. remove DC component {0}
 %   invertSig   logical. invert signal s.t. max is positive {0}
@@ -66,7 +65,7 @@ addOptional(p, 'forceLoad', false, @islogical);
 addOptional(p, 'fs', 1250, @isnumeric);
 addOptional(p, 'interval', [0 inf], @isnumeric);
 addOptional(p, 'ch', [1 : 16], @isnumeric);
-addOptional(p, 'nchans', 16, @isnumeric);
+addOptional(p, 'nchans', 20, @isnumeric);
 addOptional(p, 'pli', false, @islogical);
 addOptional(p, 'dc', false, @islogical);
 addOptional(p, 'invertSig', false, @islogical);
@@ -93,9 +92,10 @@ concat = p.Results.concat;
 cf = p.Results.cf;
 
 if isempty(nchans)
-    warning('wrong')    
+    warning('You are very stupid. it is clear you have not read the instructions fully, even thoug hyou are using tis function for two years now. I do not know what to do with you')    
     nchans = length(ch);
 end
+
 if isempty(basename)
     [~, basename] = fileparts(basepath);
 end
