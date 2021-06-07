@@ -83,6 +83,7 @@ mousepath = fileparts(basepath);
 [~, basename] = fileparts(basepath);
 eegfile = [basename '.AccuSleep_EEG.mat'];
 emgfile = [basename '.AccuSleep_EMG.mat'];
+sigInfofile = [basename '.AccuSleep_sigInfo.mat'];
 sessionInfoFile = [basename, '.session.mat'];
 
 % initialize
@@ -119,6 +120,8 @@ if isempty(emgNchans)
 end
 
 % load data from lfp file if raw data was not given 
+fprintf('working on %s\n', basename)
+fprintf('loading data...\n')
 if ischar(eegData) || isempty(eegData)
     if isempty(eegData)
         eegData = [basename '.lfp'];
@@ -128,11 +131,11 @@ if ischar(eegData) || isempty(eegData)
                 error('could not fine %s. please specify lfp file or input data directly', eegfile)
             end
         end
-        if isempty(emgData)
-            emgData = eegData;
-        end
     end
-    
+    if isempty(emgData)
+        emgData = eegData;
+    end
+        
     % load emg
     emgOrig = double(bz_LoadBinary(emgData, 'duration', Inf,...
         'frequency', emgFs, 'nchannels', emgNchans, 'start', 0,...
@@ -194,38 +197,46 @@ tstamps_sig = [1 / fs : 1 / fs : recDur];
 % (tdt). currently, this is done even when fs == round(fs) for added
 % consistancy.
 fprintf('downsampling to %d Hz\n', fs)
-if fs ~= emgFs
-    EMG = [interp1([1 : length(emgOrig)] / emgFs, emgOrig, tstamps_sig,...
-        'pchip')]';
-end
-if fs ~= eegFs || length(emgOrig) ~= length(eegOrig)
-    EEG = [interp1([1 : length(eegOrig)] / eegFs, eegOrig, tstamps_sig,...
-        'pchip')]';
-end
+EMG = [interp1([1 : length(emgOrig)] / emgFs, emgOrig, tstamps_sig,...
+    'pchip')]';
+EEG = [interp1([1 : length(eegOrig)] / eegFs, eegOrig, tstamps_sig,...
+    'pchip')]';
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % finilize and save
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-info.fs = fs;
-info.eegFs = eegFs;
-info.emgFs = emgFs;
-info.eegCf = eegCf;
-info.emgCf = emgCf;
-info.emgCh = emgCh;
-info.eegCh = eegCh;
+sigInfo.newFs = fs;
+sigInfo.eegFs = eegFs;
+sigInfo.emgFs = emgFs;
+sigInfo.eegCf = eegCf;
+sigInfo.emgCf = emgCf;
+sigInfo.emgCh = emgCh;
+sigInfo.eegCh = eegCh;
+if ischar(emgData)
+    sigInfo.emgFile = emgData;
+else
+    sigInfo.emgFile = 'inputData';
+end
+if ischar(eegData)
+    sigInfo.eegFile = eegData;
+else
+    sigInfo.eegFile = 'inputData';
+end
 
 % save files
 if saveVar
-    fprintf('saving signals...\n')
+    fprintf('saving signals... ')
     save(eegfile, 'EEG')
     save(emgfile, 'EMG')
+    save(sigInfofile, 'sigInfo')
     fprintf('done.\nthat took %.2f s\n\n', toc)
 end
 
 % inspect signals
 if inspectSig
     AccuSleep_viewer(EEG, EMG, fs, 1, [], [])
+    uiwait
 end
 
 return

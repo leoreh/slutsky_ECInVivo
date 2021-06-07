@@ -5,15 +5,12 @@ cd(basepath)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % open ephys
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'D:\Data\lh86\2021-03-11_09-55-43';
-rmvch = [1 : 35, 37 : 43];
-rmvch = [21 : 27];
-% mapch = [26 27 28 29 31 2 3 30 4 5 6 7 8 9 10 11 12 13 14 15 32 1 16 17 18 19 20 21 22 23 24 25 33 34 35];
-mapch = [1 : 43];
-mapch = [1 : 27];
-exp = [1];
+basepath = 'K:\Data\lh91\2021-05-29_08-25-58';
+rmvch = [3, 7, 13];
+mapch = [1 : 20];
+exp = [3];
 rec = cell(max(exp), 1);
-rec{1} = [2, 3];
+% rec{1} = [2, 3];
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
     'rmvch', rmvch, 'mapch', mapch, 'concat', true,...
     'nchans', length(mapch), 'fsIn', 20000);
@@ -21,17 +18,16 @@ datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % tdt
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'G:\HB\hb1\baseline_18042021_0811';
-store = 'Raw1';
+basepath = 'D:\Data\lh89_210512_090700';
+store = 'Raw2';
 blocks = [1];
 chunksize = 300;
-mapch = [1 : 16];
-% mapch = [1 : 4];
-rmvch = [1, 2, 3, 5, 7 : 9, 11 : 13, 15, 16];
-% rmvch = [2, 4];
+mapch = [1 : 10];
+% mapch = [1];
+rmvch = [6 : 10];
+% rmvch = [];
 clip = cell(1, 1);
-% clip{1} = [24000 Inf];
-% clip{3} = [1080 Inf];
+clip{1} = [0, 42780; 80290, Inf];
 datInfo = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
     'chunksize', chunksize, 'mapch', mapch, 'rmvch', rmvch, 'clip', clip);
 
@@ -87,7 +83,7 @@ sr = firingRate(spktimes, 'basepath', basepath,...
 % nsClip('dur', dur, 't', t, 'bkup', true, 'grp', [3 : 4]);
 
 % create ns files 
-dur = -720;
+dur = [];
 t = [];
 spktimes2ns('basepath', basepath, 'fs', fs,...
     'nchans', nchans, 'spkgrp', spkgrp, 'mkClu', true,...
@@ -95,7 +91,7 @@ spktimes2ns('basepath', basepath, 'fs', fs,...
     'spkFile', 'temp_wh');
 
 % clean clusters after sorting 
-cleanCluByFet('basepath', pwd, 'manCur', false, 'grp', [1 : 4])
+cleanCluByFet('basepath', pwd, 'manCur', true, 'grp', [1 : 4])
 
 % cut spk from dat and realign
 fixSpkAndRes('grp', 3, 'dt', 0, 'stdFactor', 0);
@@ -106,29 +102,6 @@ cell_metrics = ProcessCellMetrics('session', session,...
     'debugMode', true, 'transferFilesFromClusterpath', false,...
     'submitToDatabase', false, 'getWaveformsFromDat', true);
 cell_metrics = CellExplorer('basepath', basepath);
-
-% cluster validation
-mu = [];
-spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
-    'saveFig', false, 'force', true, 'mu', mu, 'graphics', false,...
-    'vis', 'on', 'spkgrp', spkgrp);
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% cell explorer
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% spikes and cell metrics
-spikes = loadSpikes('session', session);
-spikes = fixCEspikes('basepath', basepath, 'saveVar', false,...
-    'force', true);
-
-cell_metrics = ProcessCellMetrics('session', session,...
-    'manualAdjustMonoSyn', false, 'summaryFigures', false,...
-    'debugMode', true, 'transferFilesFromClusterpath', false,...
-    'submitToDatabase', false);
-
-cell_metrics = CellExplorer('metrics', cell_metrics);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % spikes
@@ -142,8 +115,7 @@ spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
 
 % firing rate
 binsize = 60;
-winBL = [5 * 60 20 * 60];
-% winBL = [1 Inf];
+winBL = [1 Inf];
 fr = firingRate(spikes.times, 'basepath', basepath, 'graphics', false, 'saveFig', false,...
     'binsize', binsize, 'saveVar', true, 'smet', 'MA', 'winBL', winBL);
 
@@ -154,7 +126,6 @@ binSize = 0.0001; dur = 0.02; % high res
 u = 20;
 plotCCG('ccg', ccg(:, u, u), 't', t, 'basepath', basepath,...
     'saveFig', false, 'c', {'k'}, 'u', spikes.UID(u));
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % lfp
@@ -181,6 +152,7 @@ lfp = getLFP('basepath', basepath, 'ch', [spkgrp{:}], 'chavg', {},...
 
 % manually create labels
 labelsmanfile = [basename, '.AccuSleep_labelsMan.mat'];
+AccuSleep_viewer(EEG, EMG, 1250, 1, [], labelsmanfile)
 AccuSleep_viewer(EEG, EMG, 1250, 1, labels, [])
 
 % classify with a network
@@ -199,11 +171,11 @@ AccuSleep_viewer(EEG(tidx), EMG(tidx), 1250, 1, labels(lidx), [])
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%% cat dat
-nchans = 16;
+nchans = 17;
 fs = 1250;
 newpath = mousepath;
-datFiles{1} = 'G:\lh81\lh81_210206_190000\lh81_210206_190000.lfp';
-datFiles{2} = 'G:\lh81\lh81_210207_065300\lh81_210207_065300.lfp';
+datFiles{1} = 'K:\Data\lh91\experiment11\recording1\continuous\Rhythm_FPGA-109.0\continuous.dat';
+datFiles{2} = 'K:\Data\lh91\experiment11\recording1\continuous\Rhythm_FPGA-109.0\28e1.dat';
 sigInfo = dir(datFiles{1});
 nsamps = floor(sigInfo.bytes / class2bytes('int16') / nchans);
 parts{1} = [nsamps - 2 * 60 * 60 * fs nsamps];
@@ -214,10 +186,10 @@ catDatMemmap('datFiles', datFiles, 'newpath', newpath, 'parts', parts,...
 
 
 % preproc dat
-% clip = 
-datInfo = preprocDat('basepath', basepath, 'fname', 'lh81_210206_044300.emg.dat', 'mapch', 1,...
-    'rmvch', [], 'nchans', 1, 'saveVar', false, 'clip', clip,...
+clip = [1, 112800000];
+datInfo = preprocDat('basepath', pwd,...
+    'fname', 'continuous.dat', 'mapch', 1 : 20,...
+    'rmvch', [], 'nchans', 20, 'saveVar', false, 'clip', clip,...
     'chunksize', 5e6, 'precision', 'int16', 'bkup', true);
-
 
 

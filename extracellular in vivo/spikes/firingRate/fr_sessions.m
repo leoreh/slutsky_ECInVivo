@@ -8,7 +8,7 @@ forceA = false;
 
 % full path and name to xls file with session metadata
 xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
-mname = 'lh81';
+mname = 'lh91';
 
 % column name in xls sheet where dirnames exist
 colName = 'Session';
@@ -26,7 +26,7 @@ vars = ["session.mat";...
 % column name of logical values for each session. only if true than session
 % will be loaded. can be a string array and than all conditions must be
 % met.
-pcond = ["tempflag"; "states"];
+pcond = ["tempflag"];
 
 % same but imposes a negative condition
 ncond = ["fepsp"];
@@ -127,11 +127,11 @@ sessionDate = sessionDate(2 : 3 : end);
 setMatlabGraphics(false)
 [nsub] = numSubplots(nsessions);
 
-close all
+% close all
 grp = [1 : 4];          % which tetrodes to plot
 state = [];             % [] - all; 1 - awake; 2 - NREM
 FRdata = 'strd';        % plot absolute fr or normalized
-unitClass = 'pyr';      % plot 'int', 'pyr', or 'all'
+unitClass = 'int';      % plot 'int', 'pyr', or 'all'
 suFlag = 1;             % plot only su or all units
 frBoundries = [0 Inf];  % include only units with fr greater than
 Y = [0 10];             % ylim
@@ -299,7 +299,7 @@ if figFlag
 end
 
 % mean firing rate in states per unit
-figFlag = 1;
+figFlag = 0;
 stateidx = [1, 4];
 unitClass = 'pyr';
 clear stateFrUnits
@@ -373,7 +373,7 @@ if figFlag
 end
 
 % histogram of bins for each state for multiunit activity 
-figFlag = 1;
+figFlag = 0;
 grp = 1 : 4;
 stateidx = [1, 4];
 if figFlag
@@ -418,7 +418,7 @@ if figFlag
 end
 
 % lfp fft 
-figFlag = 1;
+figFlag = 0;
 ch = [9 : 12];
 stateidx = [1, 4];
 win = hann(2 ^ nextpow2(10 * fs));
@@ -505,48 +505,47 @@ intMedian = [];
 
 % gather data
 % for i = 1 : nsessions
-for isession = 4 : 10
-    
-    % vars
-    assignVars(varArray, isession)
-    
-    % timestamps
-    tstamps = [tstamps, fr.tstamps / 60 / 60 + tidx(isession)];
-    if isession == 1
-        tidx(isession) = fr.tstamps(end) / 60 / 60;
-    else
-        tidx(isession) = fr.tstamps(end) / 60 / 60 + tidx(isession - 1);
-    end
-    
-    % MU
-    muFr = [muFr, sr.strd];
-    
-    % RS
-    units = selectUnits(spikes, cm, fr, suFlag, grp, frBoundries, 'pyr');
-    pyrMean = [pyrMean, mean(fr.strd(units, :), 1)];
-    pyrMedian = [pyrMedian, median(fr.strd(units, :), 1)];
-    
-    % FS
-    units = selectUnits(spikes, cm, fr, suFlag, grp, frBoundries, 'int');
-    intMean = [intMean, mean(fr.strd(units, :), 1)];
-    intMedian = [intMedian, median(fr.strd(units, :), 1)];
-    
-end
+%     
+%     % vars
+%     assignVars(varArray, isession)
+%     
+%     % timestamps
+%     tstamps = [tstamps, fr.tstamps / 60 / 60 + tidx(isession)];
+%     if isession == 1
+%         tidx(isession) = fr.tstamps(end) / 60 / 60;
+%     else
+%         tidx(isession) = fr.tstamps(end) / 60 / 60 + tidx(isession - 1);
+%     end
+%     
+%     % MU
+%     muFr = [muFr, sr.strd];
+%     
+%     % RS
+%     units = selectUnits(spikes, cm, fr, suFlag, grp, frBoundries, 'pyr');
+%     pyrMean = [pyrMean, mean(fr.strd(units, :), 1)];
+%     pyrMedian = [pyrMedian, median(fr.strd(units, :), 1)];
+%     
+%     % FS
+%     units = selectUnits(spikes, cm, fr, suFlag, grp, frBoundries, 'int');
+%     intMean = [intMean, mean(fr.strd(units, :), 1)];
+%     intMedian = [intMedian, median(fr.strd(units, :), 1)];
+%     
+% end
 
 % plot
-
-fh = figure;
-subplot(2, 1, 1)
-plot(muFr')
-set(gca, 'xtick', [], 'box', 'off')
-ylabel('Multi-unit firing rate [Hz]')
-subplot(2, 1, 2)
-plot(tstamps, pyrMean)
-hold on
-plot(tstamps, intMean)
-xlabel('Time [h]')
-ylabel('Single unit firing rate [Hz]')
-set(gca, 'box', 'off')
+% 
+% fh = figure;
+% subplot(2, 1, 1)
+% plot(muFr')
+% set(gca, 'xtick', [], 'box', 'off')
+% ylabel('Multi-unit firing rate [Hz]')
+% subplot(2, 1, 2)
+% plot(tstamps, pyrMean)
+% hold on
+% plot(tstamps, intMean)
+% xlabel('Time [h]')
+% ylabel('Single unit firing rate [Hz]')
+% set(gca, 'box', 'off')
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % nested function
