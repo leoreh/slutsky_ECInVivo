@@ -5,10 +5,10 @@ cd(basepath)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % open ephys
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'K:\Data\lh91\2021-05-29_08-25-58';
+basepath = 'K:\Data\lh91\2021-05-30_10-29-42';
 rmvch = [3, 7, 13];
 mapch = [1 : 20];
-exp = [3];
+exp = [4];
 rec = cell(max(exp), 1);
 % rec{1} = [2, 3];
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
@@ -152,7 +152,7 @@ lfp = getLFP('basepath', basepath, 'ch', [spkgrp{:}], 'chavg', {},...
 
 % manually create labels
 labelsmanfile = [basename, '.AccuSleep_labelsMan.mat'];
-AccuSleep_viewer(EEG, EMG, 1250, 1, [], labelsmanfile)
+AccuSleep_viewer(EEG, EMG, 1250, 1, labels, labelsmanfile)
 AccuSleep_viewer(EEG, EMG, 1250, 1, labels, [])
 
 % classify with a network
