@@ -91,7 +91,7 @@ spktimes2ns('basepath', basepath, 'fs', fs,...
     'spkFile', 'temp_wh');
 
 % clean clusters after sorting 
-cleanCluByFet('basepath', pwd, 'manCur', true, 'grp', [1 : 4])
+cleanCluByFet('basepath', pwd, 'manCur', false, 'grp', [1 : 4])
 
 % cut spk from dat and realign
 fixSpkAndRes('grp', 3, 'dt', 0, 'stdFactor', 0);
@@ -160,6 +160,12 @@ ss = as_wrapper(EEG, EMG, [], 'basepath', basepath, 'calfile', [],...
     'viaGui', false, 'forceCalibrate', true, 'inspectLabels', true,...
     'saveVar', true, 'forceAnalyze', true, 'fs', 1250);
 
+% inspect separation after manual scoring
+as_inspectSeparation(EEG, EMG, labels)
+
+% get confusion matrix between two labels
+[ss.netPrecision, ss.netRecall] = as_cm(labels1, labels2);
+
 % show only x hours of data
 x = 11;
 tidx = [1 : x * 60 * 60 * 1250];
@@ -186,10 +192,10 @@ catDatMemmap('datFiles', datFiles, 'newpath', newpath, 'parts', parts,...
 
 
 % preproc dat
-clip = [1, 112800000];
+clip = [1, 864000000];
 datInfo = preprocDat('basepath', pwd,...
     'fname', 'continuous.dat', 'mapch', 1 : 20,...
-    'rmvch', [], 'nchans', 20, 'saveVar', false, 'clip', clip,...
+    'rmvch', [3, 7, 13], 'nchans', 20, 'saveVar', false, 'clip', clip,...
     'chunksize', 5e6, 'precision', 'int16', 'bkup', true);
 
 

@@ -97,18 +97,7 @@ if exist(statesfile, 'file') && ~forceAnalyze
 end
 
 % get params from configuration file
-configfile = 'D:\Code\AccuSleep\AS_config.mat';
-if ~exist(configfile, 'file')
-    scriptfile = mfilename('fullpath');
-    scriptpath = fileparts(scriptfile);
-    configfile = fullfile(scriptpath, 'AS_config.mat');
-    
-    if ~exist(configfile, 'file')
-        [configfile, configpath] = uigetfile('', 'Please select  the configuration file');
-        configfile = [fullfile(configpath, configfile), '.mat'];
-    end
-end
-load(configfile)
+[cfg_colors, cfg_names, cfg_weights] = as_loadConfig([]);
 ss.labelNames = cfg_names;
 nstates = length(ss.labelNames);
 
@@ -174,7 +163,8 @@ else
     
     % classify recording
     fprintf('classifying... ')
-    [labels_net, netScores] = AccuSleep_classify(EEG, EMG, net, fs, epochLen, calibrationData, minBoutLen);
+    [labels_net, netScores] = AccuSleep_classify(standardizeSR(EEG, fs, 128),...
+        standardizeSR(EMG, fs, 128), net, fs, epochLen, calibrationData, minBoutLen);
     labels = labels_net;
     save(labelsfile, 'labels')
     fprintf('done.\n')
@@ -183,36 +173,10 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % confusion matrix (relative to clabiration data)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-idxManLabels = labels_calibration < nstates;
-cm = confusionmat(labels_calibration(idxManLabels), labels(idxManLabels));
+labels1 = labels_calibration;
+labels2 = labels_net;
 
-% precision (column): when predicts yes, how often is it correct? TP / (TP
-% + FP). recall (row): when actually yes, how often does it predict yes? TP
-% / (TP + FN)
-precision = @(cm) diag(cm)./sum(cm, 2);
-recall = @(confusionMat) diag(confusionMat) ./ sum(confusionMat, 1)';
-
-% calc
-ss.netPrecision = precision(cm);
-ss.netRecall = recall(cm);
-
-% plot confusion chart
-if graphics
-    fh = figure;
-    fh.Position = [500 200 900 700];
-    cmh = confusionchart(cm, cfg_names(1 : nstates - 1), 'ColumnSummary',...
-        'column-normalized', 'RowSummary', 'row-normalized',...
-        'title', 'State Classification Confusion Matrix', 'Normalization',...
-        'total-normalized');
-    sortClasses(cmh, cfg_names(1 : nstates - 1))
-    
-    if saveFig
-        figpath = fullfile('graphics', 'sleepState');
-        mkdir(figpath)
-        figname = fullfile(figpath, sprintf('%s_stateConfusionMat', basename));
-        export_fig(figname, '-tif', '-transparent', '-r300')
-    end
-end
+[ss.netPrecision, ss.netRecall] = as_cm(labels1, labels2);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % finalize and save
