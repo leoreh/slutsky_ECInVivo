@@ -9,7 +9,7 @@ forceA = false;
 
 % full path and name to xls file with session metadata
 xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
-mname = 'lh87';     % mouse name
+mname = 'lh91';     % mouse name
 
 % column name in xls sheet where dirnames exist
 colName = 'Session';

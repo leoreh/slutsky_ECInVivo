@@ -70,22 +70,22 @@ if forceA
         %         spikes = fixCEspikes('basepath', basepath, 'saveVar', false,...
         %             'force', true);
         
-        %         cell_metrics = ProcessCellMetrics('session', session,...
-        %             'manualAdjustMonoSyn', false, 'summaryFigures', false,...
-        %             'debugMode', true, 'transferFilesFromClusterpath', false,...
-        %             'submitToDatabase', false, 'getWaveformsFromDat', true);
-        %         cell_metrics = CellExplorer('basepath', basepath);
-        %
-        %         cc = cellclass('basepath', basepath,...
-        %             'waves', cat(1, spikes.rawWaveform{:})', 'saveVar', true,...
-        %             'graphics', false, 'fs', fs);
+        cell_metrics = ProcessCellMetrics('session', session,...
+            'manualAdjustMonoSyn', false, 'summaryFigures', false,...
+            'debugMode', true, 'transferFilesFromClusterpath', false,...
+            'submitToDatabase', false, 'getWaveformsFromDat', true);
+        cell_metrics = CellExplorer('basepath', basepath);
         
-        %         spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
-        %             'saveFig', false, 'force', true, 'mu', [], 'graphics', false,...
-        %             'vis', 'on', 'spkgrp', spkgrp);
+        load([basename '.spikes.cellinfo.mat'])
+        cc = cellclass('basepath', basepath,...
+            'waves', cat(1, spikes.rawWaveform{:})', 'saveVar', true,...
+            'graphics', false, 'fs', fs);
+        
+        spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
+            'saveFig', false, 'force', true, 'mu', [], 'graphics', false,...
+            'vis', 'on', 'spkgrp', spkgrp);
         
         % firing rate
-        load([basename '.spikes.cellinfo.mat'])
         binsize = 60;
         winBL = [1 * 60 110 * 60];
         fr = firingRate(spikes.times, 'basepath', basepath,...
@@ -95,15 +95,15 @@ if forceA
         
         % spike rate per tetrode. note that using firingRate requires
         % special care becasue spktimes is given in samples and not seconds
-        load(fullfile(basepath, [basename '.spktimes.mat']))
-        for ii = 1 : length(spkgrp)
-            spktimes{ii} = spktimes{ii} / fs;
-        end
-        binsize = 60;
-        sr = firingRate(spktimes, 'basepath', basepath,...
-            'graphics', false, 'saveFig', false,...
-            'binsize', binsize, 'saveVar', 'sr', 'smet', 'none',...
-            'winBL', [0 Inf]);               
+%         load(fullfile(basepath, [basename '.spktimes.mat']))
+%         for ii = 1 : length(spkgrp)
+%             spktimes{ii} = spktimes{ii} / fs;
+%         end
+%         binsize = 60;
+%         sr = firingRate(spktimes, 'basepath', basepath,...
+%             'graphics', false, 'saveFig', false,...
+%             'binsize', binsize, 'saveVar', 'sr', 'smet', 'none',...
+%             'winBL', [0 Inf]);               
     end
 end
 
@@ -131,7 +131,7 @@ setMatlabGraphics(false)
 grp = [1 : 4];          % which tetrodes to plot
 state = [];             % [] - all; 1 - awake; 2 - NREM
 FRdata = 'strd';        % plot absolute fr or normalized
-unitClass = 'int';      % plot 'int', 'pyr', or 'all'
+unitClass = 'pyr';      % plot 'int', 'pyr', or 'all'
 suFlag = 1;             % plot only su or all units
 frBoundries = [0 Inf];  % include only units with fr greater than
 Y = [0 10];             % ylim
@@ -486,17 +486,16 @@ if figFlag
 end
 
 
-
 % mean and median across time for all sessions (one figure)
-grp = [1 : 4];          % which tetrodes to plot
-unitClass = 'int';      % plot 'int', 'pyr', or 'all'
+grp = [2];          % which tetrodes to plot
+unitClass = 'pyr';      % plot 'int', 'pyr', or 'all'
 suFlag = 1;             % plot only su or all units
 frBoundries = [0 Inf];  % include only units with fr greater than
 yscale = 'log';         % log or linear
 
 % initialize
 tstamps = [];
-tidx = [];
+tidx = 0;
 muFr = [];
 pyrMean = [];
 pyrMedian = [];
@@ -504,48 +503,48 @@ intMean = [];
 intMedian = [];
 
 % gather data
-% for i = 1 : nsessions
-%     
-%     % vars
-%     assignVars(varArray, isession)
-%     
-%     % timestamps
-%     tstamps = [tstamps, fr.tstamps / 60 / 60 + tidx(isession)];
-%     if isession == 1
-%         tidx(isession) = fr.tstamps(end) / 60 / 60;
-%     else
-%         tidx(isession) = fr.tstamps(end) / 60 / 60 + tidx(isession - 1);
-%     end
-%     
-%     % MU
-%     muFr = [muFr, sr.strd];
-%     
-%     % RS
-%     units = selectUnits(spikes, cm, fr, suFlag, grp, frBoundries, 'pyr');
-%     pyrMean = [pyrMean, mean(fr.strd(units, :), 1)];
-%     pyrMedian = [pyrMedian, median(fr.strd(units, :), 1)];
-%     
-%     % FS
-%     units = selectUnits(spikes, cm, fr, suFlag, grp, frBoundries, 'int');
-%     intMean = [intMean, mean(fr.strd(units, :), 1)];
-%     intMedian = [intMedian, median(fr.strd(units, :), 1)];
-%     
-% end
+for isession = 1 : nsessions
+    
+    % vars
+    assignVars(varArray, isession)
+    
+    % timestamps
+    tstamps = [tstamps, fr.tstamps / 60 / 60 + tidx(isession)];
+    if isession == 1
+        tidx(isession + 1) = fr.tstamps(end) / 60 / 60;
+    else
+        tidx(isession + 1) = fr.tstamps(end) / 60 / 60 + tidx(isession);
+    end
+
+    % MU
+    muFr = [muFr, sr.strd];
+    
+    % RS
+    units = selectUnits(spikes, cm, fr, suFlag, grp, frBoundries, 'pyr');
+    pyrFr{isession} = fr.strd(units, :);
+    
+    % FS
+    units = selectUnits(spikes, cm, fr, suFlag, grp, frBoundries, 'int');
+    intFr{isession} = fr.strd(units, :);
+end
+
 
 % plot
-% 
-% fh = figure;
-% subplot(2, 1, 1)
-% plot(muFr')
-% set(gca, 'xtick', [], 'box', 'off')
-% ylabel('Multi-unit firing rate [Hz]')
-% subplot(2, 1, 2)
-% plot(tstamps, pyrMean)
-% hold on
-% plot(tstamps, intMean)
-% xlabel('Time [h]')
-% ylabel('Single unit firing rate [Hz]')
-% set(gca, 'box', 'off')
+fh = figure;
+subplot(2, 1, 1)
+plot(muFr')
+set(gca, 'xtick', [], 'box', 'off')
+ylabel('Multi-unit firing rate [Hz]')
+legend
+xline(tidx, '--k')
+subplot(2, 1, 2)
+plot(tstamps, nanmean(cell2nanmat(pyrFr, 1)))
+hold on
+plot(tstamps, nanmean(cell2nanmat(intFr, 1)))
+xlabel('Time [h]')
+ylabel('Single unit firing rate [Hz]')
+set(gca, 'box', 'off')
+legend('RS', 'FS')
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % nested function
