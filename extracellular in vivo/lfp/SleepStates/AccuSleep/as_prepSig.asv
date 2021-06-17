@@ -74,7 +74,7 @@ forceLoad       = p.Results.forceLoad;
 
 % analysis params (decided by RA, HB, and LH 20 apr 21)
 eegCf = 60;         % cutoff frequency for eeg
-emgCf = [10 600];   % cutoff frequency for emg
+emgCf = [10 200];   % cutoff frequency for emg
 fs = 1250;          % requested sampling frequency
 
 % file names
@@ -119,13 +119,9 @@ if isempty(emgNchans)
     emgNchans = eegNchans;
 end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% load data
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% eeg
-fprintf('\nworking on %s\n', basename)
-fprintf('loading data...')
+% load data from lfp file if raw data was not given 
+fprintf('working on %s\n', basename)
+fprintf('loading data...\n')
 if ischar(eegData) || isempty(eegData)
     if isempty(eegData)
         eegData = [basename '.lfp'];
@@ -136,35 +132,22 @@ if ischar(eegData) || isempty(eegData)
             end
         end
     end
+    if isempty(emgData)
+        emgData = eegData;
+    end
         
-    % load average across given channels
+    % load emg
+    emgOrig = double(bz_LoadBinary(emgData, 'duration', Inf,...
+        'frequency', emgFs, 'nchannels', emgNchans, 'start', 0,...
+        'channels', emgCh, 'downsample', 1));
+        
+    % load eeg and average across given channels
     eegOrig = double(bz_LoadBinary(eegData, 'duration', Inf,...
         'frequency', eegFs, 'nchannels', eegNchans, 'start', 0,...
         'channels', eegCh, 'downsample', 1));
     if size(eegOrig, 2) > 1
         eegOrig = mean(eegOrig, 2);
-    end
-else
-    eegOrig = eegData;
-end
-
-% emg
-if ischar(emgData) || isempty(emgData)
-    if isempty(emgData)
-        emgData = [basename '.lfp'];
-        if ~exist(emgData, 'file')
-            emgData = [basename '.dat'];
-            if ~exist(emgData, 'file')
-                error('could not fine %s. please specify lfp file or input data directly', eegfile)
-            end
-        end
-    end
-        
-    emgOrig = double(bz_LoadBinary(emgData, 'duration', Inf,...
-        'frequency', emgFs, 'nchannels', emgNchans, 'start', 0,...
-        'channels', emgCh, 'downsample', 1));        
-else
-    emgOrig = emgData;
+    end   
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -178,6 +161,10 @@ if ~isempty(eegCf)
     filtRatio = eegCf / (eegFs / 2);
     eegOrig = iosr.dsp.sincFilter(eegOrig, filtRatio);
 end
+
+% remove 50 Hz from signal
+emgOrig = filterLFP(emgOrig, 'fs', 1250, 'stopband', [49 51],...
+    'dataOnly', true, 'saveVar', false);
 
 if ~isempty(emgCf)
     fprintf('\nfiltering EMG, cutoff = %d Hz', emgCf)

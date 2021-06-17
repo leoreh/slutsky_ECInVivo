@@ -168,7 +168,7 @@ m = memmapfile(fname, 'Format', {precision, [nchans, nsamps] 'mapped'});
 raw = m.data;
 
 % go over chunks
-a = [];
+acc.mag = [];
 for i = 1 : nchunks
     % print progress
     if i ~= 1
@@ -201,7 +201,7 @@ for i = 1 : nchunks
     mag = filterLFP(mag, 'fs', fsOut, 'passband', [0.5 150], 'type', 'butter',...
         'order', 4, 'dataOnly', true, 'graphics', false, 'saveVar', false); 
     
-    a = [a; mag];
+    acc.mag = [acc.mag; mag];
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -220,39 +220,15 @@ smf = 7;
 % ALT 2: PC1 of power in broadband
 freq = logspace(0, 2, 100);
 win = hann(binsize);
-[~, ~, tband, pband] = spectrogram(a, win, 0, freq, fsOut, 'yaxis', 'psd');
+[~, ~, tband, pband] = spectrogram(acc.mag, win, 0, freq, fsOut, 'yaxis', 'psd');
 pband = 10 * log10(abs(pband));
-[~, pc1] = pca(pband', 'NumComponents', 1);
-data = smooth(pc1, smf);
-data = bz_NormToRange(data, [0 1]);
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% find episodes of sleep
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% fprintf('\nfinding episodes of sleep')
-% 
-% % find immobility threshold 
-% thr = sepBimodel('x', pband, 'lognorm', false, 'nbins', 100,...
-%     'smf', 20, 'graphics', false);
-% thr = 1400;
-% 
-% % define episodes of sleep
-% vec = [pband < thr];
-% sleep = binary2epochs('vec', vec, 'minDur', 10, 'interDur', 1);
-% sleep = tband(sleep); % bins to samples
-% if sleep == tband(1) % correct edges
-%     sleep(1) = 1;
-% end
-% if ~isempty(sleep)
-%     if sleep(end) == tband(end)
-%         sleep(end) = tband(length(pband));
-%     end
-% end
+[~, acc.pc1] = pca(pband', 'NumComponents', 1);
+acc.pc1 = smooth(acc.pc1, smf);
+acc.pc1 = bz_NormToRange(acc.pc1, [0 1]);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arrange struct and save
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-acc.data = data;
 acc.tstamps = tband;
 acc.fs = fsOut;
 acc.fs_orig = fsIn;
