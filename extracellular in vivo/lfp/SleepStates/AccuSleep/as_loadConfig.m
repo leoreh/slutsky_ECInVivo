@@ -1,4 +1,4 @@
-function [cfg_colors, cfg_names, cfg_weights] = as_loadConfig(configfile)
+function [cfg_colors, cfg_names, cfg_weights, configfile] = as_loadConfig(configfile)
 
 % loads accuSleep params from configuration file. full name nad path of
 % config file can be specified, if not will look in default location, if

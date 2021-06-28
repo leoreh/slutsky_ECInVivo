@@ -15,7 +15,7 @@ function mat = cell2nanmat(c, dim)
 % 13 jun 21         adapted for arrays with n dimensions
 
 c = c(:);
-nDimensions = unique(cellfun(@isvector, c));
+nDimensions = unique(cellfun('ndims', c));
 if numel(nDimensions) > 1
     error('all arrays must have the same number of dimensions')
 end
@@ -37,7 +37,7 @@ else
         end
     end
 end
-mat = cell2mat(mat');
+mat = cell2mat(mat);
 
 % EOF
 

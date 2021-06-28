@@ -146,29 +146,31 @@ emgOrig = filterLFP(emgOrig, 'fs', 1250, 'stopband', [49 51],...
     'dataOnly', true, 'saveVar', false, 'graphics', false);
 
 acc = EMGfromACC('basepath', basepath, 'fname', [basename, '.lfp'],...
-    'nchans', 20, 'ch', [17 : 19], 'saveVar', true, 'fsIn', 1250,...
+    'nchans', nchans, 'ch', nchans - 2 : nchans, 'saveVar', true, 'fsIn', 1250,...
     'graphics', false);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % sleep states
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% prep signal (alt 2)
+% prep signal
 [EMG, EEG, sigInfo] = as_prepSig([basename, '.lfp'], acc.mag,...
-    'eegCh', [9 : 12], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
-    'inspectSig', true, 'forceLoad', true, 'eegFs', 1250, 'emgFs', 1250);
+    'eegCh', [7 : 10], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
+    'inspectSig', false, 'forceLoad', true, 'eegFs', 1250, 'emgFs', 1250);
 
 % manually create labels
 labelsmanfile = [basename, '.AccuSleep_labelsMan.mat'];
-AccuSleep_viewer(EEG, EMG, 1250, 1, [], labelsmanfile)
+AccuSleep_viewer(EEG, EMG, 1250, 1, labels, labelsmanfile)
 
 % classify with a network
+netfile = 'D:\Code\slutskycode\extracellular in vivo\lfp\SleepStates\AccuSleep\trainedNetworks\net_210622_165845.mat';
 ss = as_wrapper(EEG, EMG, [], 'basepath', basepath, 'calfile', [],...
-    'viaGui', false, 'forceCalibrate', true, 'inspectLabels', true,...
-    'saveVar', true, 'forceAnalyze', true, 'fs', 1250);
+    'viaGui', false, 'forceCalibrate', true, 'inspectLabels', false,...
+    'saveVar', true, 'forceAnalyze', true, 'fs', 1250, 'netfile', netfile,...
+    'graphics', true);
 
-% inspect separation after manual scoring
-as_inspectSeparation(EEG, EMG, labels)
+% inspect separation after classifying / manual scoring
+as_stateSeparation(EEG, EMG, labels)
 
 % get confusion matrix between two labels
 [ss.netPrecision, ss.netRecall] = as_cm(labels1, labels2);

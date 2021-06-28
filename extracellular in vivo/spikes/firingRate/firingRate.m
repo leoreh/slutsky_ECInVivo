@@ -97,7 +97,8 @@ if exist(fullfile(basepath, [basename '.AccuSleep_states.mat']))
             times2rate(spktimes, 'binsize', binsize, 'winCalc', ss.stateEpochs{i}, 'c2r', true);
         end
     end
-    
+
+    % buzsaki format
 elseif exist(fullfile(basepath, [basename '.SleepState.states.mat']))
     load(fullfile(basepath, [basename '.SleepState.states.mat']))
     

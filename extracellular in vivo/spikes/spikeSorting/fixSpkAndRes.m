@@ -48,7 +48,8 @@ function fixSpkAndRes(varargin)
 %   plotWaveform
 %
 % TO DO lIST
-%   # snip from temp_wh instead of circshift
+%   # snip from temp_wh instead of circshift (done)
+%   # find missing spk
 %
 % 22 jun 20 LH  UPDATES
 % 24 mar 21 LH  embed load / save NS, the script now requires session
@@ -265,10 +266,10 @@ for igrp = grp
             resGrp(ir) = [];
             rmIdx = [rmIdx; ir];
         end
-        res(cluIdx(rmIdx)) = [];
-        clu(cluIdx(rmIdx)) = [];
-        spk(:, :, cluIdx(rmIdx)) = [];
-        nspks = length(clu);
+%         res(cluIdx(rmIdx)) = [];
+        clu(cluIdx(rmIdx)) = 0;
+%         spk(:, :, cluIdx(rmIdx)) = [];
+%         nspks = length(clu);
         
         % graphics
         if graphics

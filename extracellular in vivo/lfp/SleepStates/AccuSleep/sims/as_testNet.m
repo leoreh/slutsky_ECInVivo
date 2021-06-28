@@ -20,18 +20,7 @@ minBoutLen = epochLen;
 nstates = 6; 
 
 % load configuration file
-configfile = 'D:\Code\slutskycode\extracellular in vivo\lfp\SleepStates\AccuSleep\AS_config.mat';
-if ~exist(configfile, 'file')
-    scriptfile = mfilename('fullpath');
-    scriptpath = fileparts(scriptfile);
-    configfile(fullfile(scriptpath, 'AS_config.mat'));
-    
-    if ~exist(configfile, 'file')
-        [configfile, configpath] = uigetfile('', 'Please select  the configuration file');
-        configfile = [fullfile(configpath, configfile), '.mat'];
-    end
-end
-load(configfile)
+[cfg_colors, cfg_names, cfg_weights, configfile] = as_loadConfig([]);
 
 % state names
 cfg_names = {'WAKE'; 'QWAKE'; 'LSLEEP'; 'NREM'; 'REM'; 'N/REM'; 'BIN'};
@@ -64,18 +53,20 @@ save(configfile, 'cfg_colors', 'cfg_names', 'cfg_weights')
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % ALT 1: train network on entire data
-basepaths{3} = 'D:\Data\lh86\lh86_210302_183000';
-basepaths{1} = 'D:\Data\lh86\lh86_210304_180800';
-basepaths{2} = 'D:\Data\lh86\lh86_210301_183700';
+basepaths{1} = 'D:\Data\lh87\lh87_210522_095319';
+basepaths{2} = 'D:\Data\lh87\lh87_210523_100607';
+basepaths{3} = 'D:\Data\lh87\lh87_210523_224654';
+basepaths{4} = 'D:\Data\lh87\lh87_210524_123505';
+basepaths{5} = 'D:\Data\lh87\lh87_210524_220000';
+basepaths{6} = 'D:\Data\lh87\lh87_210525_104820';
+basepaths{7} = 'D:\Data\lh87\lh87_210525_211957';
 
 fileList = as_fileLists(basepaths);
 
 netpath = 'D:\Code\slutskycode\extracellular in vivo\lfp\SleepStates\AccuSleep\trainedNetworks';
 netname = ['net_',  datestr(datetime, 'yymmdd_HHMMss')]; 
-[net] = AccuSleep_train(fileList, fs, epochLen, 35);
+[net] = AccuSleep_train(fileList, fs, epochLen, 63);
 save(fullfile(netpath, netname), 'net')        
-
-
 
 cd(basepaths{1})
 [~, basename] = fileparts(basepaths{1});
@@ -90,8 +81,6 @@ load(eegfile, 'EEG')
 load([basename, '.session.mat'])
 load(labelsmanfile, 'labels')
 gldstrd = labels;
-
-
 
 % ALT 2: separate data to 2
 EMG_1st = EMG(1 : length(EMG) / 2);
@@ -122,18 +111,6 @@ end
 AccuSleep_viewer(EEG_2nd, EMG_2nd, fs, epochLen, labels_2nd, [])
 AccuSleep_viewer(EEG_1st, EMG_1st, fs, epochLen, labels_1st, [])
 
-% save vars
-netpath = 'D:\Data\ser2';
-EEG = EEG_1st;
-EMG = EMG_1st;
-labels = labels_1st;
-fileList{1, 1} = fullfile(netpath, [basename, '.AccuSleep_EEG1st.mat']);
-fileList{1, 2} = fullfile(netpath, [basename, '.AccuSleep_EMG1st.mat']);
-fileList{1, 3} = fullfile(netpath, [basename, '.AccuSleep_labels1st.mat']);
-save(fileList{1, 1}, 'EEG')
-save(fileList{1, 2}, 'EMG')
-save(fileList{1, 3}, 'labels')
-
 % train network
 [net, trainInfo] = AccuSleep_train(fileList, fs, epochLen, 13, netpath);
 save('D:\Data\ser2\6states_1s_6hrLabels_HBser2_net', 'net')         % !!! careful not to overwrite!!!
@@ -157,8 +134,8 @@ labelsOutput = zeros(length(calLen), nepochs);
 labelsCal = ones(length(calLen), nepochs) * 4;
   
 % create calibration 
-calibrationData = createCalibrationData(standardizefs(EEG, fs, 128),...
-    standardizefs(EMG, fs, 128), gldstrd, 128, epochLen);
+calibrationData = createCalibrationData(standardizeSR(EEG, fs, 128),...
+    standardizeSR(EMG, fs, 128), gldstrd, 128, epochLen);
 
 % classify
 [labelsOutput, scores] = AccuSleep_classify(EEG, EMG, net, fs, epochLen,...
@@ -173,30 +150,7 @@ AccuSleep_viewer(EEG, EMG, fs, epochLen, gldstrd, [])
 % inspect results
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% initialize
-statesOutput = zeros(nstates, nstates);
-edges = [1 : nstates + 1];
-% accuracy
-stateEpochs = histcounts(gldstrd);
-for istate = 1 : nstates
-    statesOutput(istate, :) = histcounts(labelsOutput(gldstrd == istate),...
-        edges) / stateEpochs(istate) * 100;
-end
-
-stateEpochs = histcounts(labelsClean, edges);
-for istate = 1 : nstates
-    statesOutput(istate, :) = histcounts(gldstrd(labelsClean == istate),...
-        edges) / stateEpochs(istate) * 100;
-end
-
-AccuSimResults.calLen = calLen;
-AccuSimResults.labelsCal = labelsCal;
-AccuSimResults.labelsOutput = labelsOutput;
-AccuSimResults.statesOutput = labelsOutput;
-AccuSimResults.caldata = calibrationData;
-AccuSimResults.labelnames = cfg_names;
-save(fullfile(mousepath, 'AccuSimResults.mat'), 'AccuSimResults')
-
+[netPrecision, netRecall] = as_cm(labels, labelsOutput);
 
 
 

@@ -481,7 +481,7 @@ if figFlag
 end
 
 % -------------------------------------------------------------------------
-% distribution of mu bins in each state
+% histogram of mu bins in each state
 figFlag = 1; saveFig = true;
 grp = 1 : 4;
 stateidx = [1 : 6];
@@ -525,7 +525,7 @@ if figFlag
             end
             xticks([])
             ylabel('MU spike rate [Hz]')
-            ylim([0 180])
+            ylim([0 200])
         end
         
         title(sessionDate{sessionidx(isession)})
@@ -544,13 +544,13 @@ end
 
 
 % -------------------------------------------------------------------------
-% distribution of su firing rate per state
+% su firing rate per state
 figFlag = 1; saveFig = true;
 stateidx = [1 : 6];
 sessionidx = 1;
 [nsub] = numSubplots(length(sessionidx));
 grp = [1 : 4];          % which tetrodes to plot
-unitClass = 'int';      % plot 'int', 'pyr', or 'all'
+unitClass = 'pyr';      % plot 'int', 'pyr', or 'all'
 suFlag = 1;             % plot only su or all units
 frBoundries = [0 Inf];  % include only units with mean fr in these boundries
 
@@ -576,7 +576,7 @@ if figFlag
         end
         xticks([])
         ylabel('SU firing rate [Hz]')
-        ylim([0 15])
+        ylim([0 5])
         title(sessionDate{sessionidx(isession)})
         if isession == 1
             legend(ss.labelNames(stateidx))
