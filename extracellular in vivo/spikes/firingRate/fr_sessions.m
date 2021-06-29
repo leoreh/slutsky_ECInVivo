@@ -26,7 +26,7 @@ vars = ["session.mat";...
 % column name of logical values for each session. only if true than session
 % will be loaded. can be a string array and than all conditions must be
 % met.
-pcond = ["tempflag"; "mancur"];
+pcond = ["tempflag"; "mancur"; "states"];
 
 % same but imposes a negative condition
 ncond = ["fepsp"];
@@ -128,10 +128,17 @@ spkgrp = session.extracellular.spikeGroups.channels;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-saveFig = false;
-pathPieces = regexp(dirnames(:), '_', 'split'); % assumes filename structure: animal_date_time
-sessionDate = [pathPieces{:}];
-sessionDate = sessionDate(2 : 3 : end);
+
+% arrange title names
+if length(dirnames) > 1
+    pathPieces = regexp(dirnames(:), '_', 'split'); % assumes filename structure: animal_date_time
+    sessionDate = [pathPieces{:}];
+    sessionDate = sessionDate(2 : 3 : end);
+else
+    pathPieces = regexp(dirnames(:), '_', 'split');
+    sessionDate = {pathPieces{2}};
+end
+
 setMatlabGraphics(false)
 
 sessionidx = 1 : nsessions;
@@ -497,7 +504,7 @@ if figFlag
         subplot(nsub(1), nsub(2), isession)
         hold on
         for istate = stateidx
-            srmat = sr.states.fr{istate}(:, :);
+            srmat = sr.states.fr{istate}(grp, :);
             srStates{istate} = srmat(:);
             
             if strcmp(plotStyle, 'histogram')
@@ -541,7 +548,6 @@ if figFlag
         export_fig(figname, '-tif', '-transparent', '-r300')
     end   
 end
-
 
 % -------------------------------------------------------------------------
 % distribution of su firing rate per state

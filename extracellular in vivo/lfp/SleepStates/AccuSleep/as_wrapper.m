@@ -139,13 +139,14 @@ else
             load(callabelsfile)
         else
             labels = ones(1, floor(length(EMG) / fs / epochLen)) * nstates + 1;
-            fprintf('\nlabel some data for calibration, then press save.\n')
-            AccuSleep_viewer(EEG, EMG, fs, epochLen, labels, callabelsfile);
-            uiwait
         end
         
-        % ignore bin state     
+        fprintf('\nlabel some data for calibration, then press save.\n')
+        AccuSleep_viewer(EEG, EMG, fs, epochLen, labels, callabelsfile);
+        uiwait
         load(callabelsfile)
+        
+        % ignore bin state     
         labels_calibration = labels;
         labels(labels > nstates - 1) = nstates;          
         
