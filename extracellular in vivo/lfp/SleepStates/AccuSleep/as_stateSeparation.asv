@@ -229,8 +229,12 @@ set(gca, 'YTick', [])
 % histogram of epoch lengths for NREM, REM, and WAKE
 fh.CurrentAxes = sb5;
 hold on
-stateidx = [1 : 6];
+stateidx = [1, 4, 5];
 epMat = cell2nanmat(epLen(stateidx));
+
+maxY = max([prctile(frcell{istate, itstamps}, 95), maxY]);
+
+
 plot([1 : size(epMat, 2)], mean(epMat, 1, 'omitnan'),...
     'kd', 'markerfacecolor', 'k')
 boxplot(epMat, 'PlotStyle', 'traditional', 'Whisker', 1.5);
@@ -242,9 +246,9 @@ for ibox = 1 : length(bh)
 end
 xticklabels(cfg_names(stateidx))
 xtickangle(45)
-set(sb5, 'YScale', 'log')
 ylabel('Epoch Length [log(s)]')
-ylim([0 ceil(prctile(epMat(:), 99.99))])
+
+ylim([0 ceil(maxY)])
     
 % percent time in state
 fh.CurrentAxes = sb6;
