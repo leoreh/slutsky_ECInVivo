@@ -136,7 +136,7 @@ noverlap = 0.25 * newFs;
 faxis = [0 : 0.2 : 50]; % freqencies for power analysis
 fftSum = zeros(nstates - 1, length(faxis));
 for istate = sstates
-    for iepoch = 1 : length(stateEpochs{istate})
+    for iepoch = 1 : length(epLen{istate})
         % skip epochs shorter than one bin (may happen at end of recording)
         if epLen{istate}(iepoch) < 1 
             continue
@@ -177,7 +177,7 @@ set([sb1, sb2, sb3, sb4, sb5, sb6], 'box', 'off', 'TickLength', [0 0])
 % emg vs time colored by state
 fh.CurrentAxes = sb1;
 hold on
-for istate = sstates
+for istate = 1 : nstates
     stateLabels = find(labels == istate);
     scatter(stateLabels / epochLen / 60 / 60,...
         processedEMG(stateLabels),...
@@ -233,7 +233,7 @@ stateidx = [1 : 6];
 epMat = cell2nanmat(epLen(stateidx));
 plot([1 : size(epMat, 2)], mean(epMat, 1, 'omitnan'),...
     'kd', 'markerfacecolor', 'k')
-boxplot(epMat, 'PlotStyle', 'traditional', 'Whisker', 1.5);
+boxplot(epMat, 'PlotStyle', 'traditional', 'Whisker', 6);
 bh = findobj(sb5, 'Tag', 'Box');
 bh = flipud(bh);
 for ibox = 1 : length(bh)

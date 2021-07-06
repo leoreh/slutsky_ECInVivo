@@ -13,9 +13,9 @@
 saveFig = true;
 grp = [1 : 4];
 stateidx = [1 : 6];
-dataType = 'su';        % can be 'mu' (bins of sr) or 'su' (fr)
+dataType = 'mu';        % can be 'mu' (bins of sr) or 'su' (fr)
 unitClass = 'pyr';      % plot 'int', 'pyr', or 'all'
-suFlag = 0;             % plot only su or all units
+suFlag = 1;             % plot only su or all units
 frBoundries = [0 Inf];  % include only units with mean fr in these boundries
 
 % initialize
@@ -29,17 +29,22 @@ sessionidx = [1];
 % selection of timestamps from the same recording for comparison
 if length(sessionidx) == 1
     assignVars(varArray, sessionidx(1))
-    figpath = session.general.basePath;
-    
     csamps = cumsum(datInfo.nsamps) / fs;
     tstamps = [ceil(csamps(1)), floor(csamps(2));...
         ceil(csamps(2)), floor(csamps(3));...
         ceil(csamps(3)), floor(csamps(4))];
     xLabels = ["Saline"; "K_0.5"; "K_1"];
-else
-    figpath = fileparts(session.general.basePath);
 end
-cd(figpath)
+
+% session params
+session = CE_sessionTemplate(pwd, 'viaGUI', false,...
+    'force', true, 'saveVar', true);      
+basepath = session.general.basePath;
+nchans = session.extracellular.nChannels;
+fs = session.extracellular.sr;
+spkgrp = session.extracellular.spikeGroups.channels;
+[~, basename] = fileparts(basepath);
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % data
@@ -59,7 +64,7 @@ if length(sessionidx) > 1
                     nunits = sum(units);
                     frcell{istate, isession} = mean(fr.states.fr{istate}(units, :), 2, 'omitnan');
             end
-            maxY = max([prctile(frcell{istate, isession}, 99), maxY]);
+            maxY = max([prctile(frcell{istate, isession}, 95), maxY]);
         end
     end
     xLabels = sessionDate(sessionidx);
@@ -78,7 +83,7 @@ else
                     nunits = sum(units);
                     frcell{istate, itstamps} = mean(fr.states.fr{istate}(units, tidx), 2, 'omitnan');
             end
-            maxY = max([prctile(frcell{istate, itstamps}, 99.99), maxY]);
+            maxY = max([prctile(frcell{istate, itstamps}, 95), maxY]);
         end
     end
 end
@@ -111,13 +116,8 @@ for istate = 1 : length(stateidx)
 end
 
 if saveFig
-    figpath = fullfile(figpath, 'graphics', 'sleepState');
+    figpath = fullfile(basepath, 'graphics', 'sleepState');
     mkdir(figpath)
-    switch dataType
-        case 'mu'
-            figname = fullfile(figpath, ['mu_states_times']);
-        case 'su'
-            figname = fullfile(figpath, [unitClass, '_states_times']);
-    end
+    figname = fullfile(figpath, ['mu_states_times']);
     export_fig(figname, '-tif', '-transparent', '-r300')
 end

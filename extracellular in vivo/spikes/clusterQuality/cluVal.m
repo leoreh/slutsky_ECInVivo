@@ -21,6 +21,7 @@ function spikes = cluVal(varargin)
 %   vis             string. show figure {'on'} or not {'off'}
 %   saveFig         logical. save figure {1} or not (0)
 %   saveVar         logical. save variables (update spikes and save su)
+%   session         struct. session info (see CE_sessionTemplate)
 %
 % OUTPUT:           additional fields to struct (all 1 x nunits):
 %   su              SU (1) or MU (0)
@@ -30,7 +31,7 @@ function spikes = cluVal(varargin)
 %
 % DEPENDENCIES:
 %   getSpikes       optional (if not given as input)
-%   getFet          PCA feature array
+%   loadNS          load fet
 %   cluDist         L ratio and iDist
 %   plotCluster     plot waveform and ISI histogram
 %
@@ -44,6 +45,7 @@ function spikes = cluVal(varargin)
 %                   added predetermined mu
 %                   adjusted i\o params
 % 25 jun 20 LH      spkgrp and adaptation to cell explorer format
+% 04 jul 21 LH      replaced getFet w/ loadNS
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -59,18 +61,35 @@ addOptional(p, 'graphics', true, @islogical);
 addOptional(p, 'vis', 'on', @ischar);
 addOptional(p, 'saveFig', true, @islogical);
 addOptional(p, 'saveVar', true, @islogical);
+addOptional(p, 'session', []);
 
 parse(p, varargin{:})
-spikes = p.Results.spikes;
-basepath = p.Results.basepath;
-npca = p.Results.npca;
-spkgrp = p.Results.spkgrp;
-mu = p.Results.mu;
-force = p.Results.force;
-graphics = p.Results.graphics;
-vis = p.Results.vis;
-saveFig = p.Results.saveFig;
-saveVar = p.Results.saveVar;
+spikes      = p.Results.spikes;
+basepath    = p.Results.basepath;
+npca        = p.Results.npca;
+spkgrp      = p.Results.spkgrp;
+mu          = p.Results.mu;
+force       = p.Results.force;
+graphics    = p.Results.graphics;
+vis         = p.Results.vis;
+saveFig     = p.Results.saveFig;
+saveVar     = p.Results.saveVar;
+session     = p.Results.session;
+
+% sessionInfo
+[~, basename] = fileparts(basepath);
+if isempty(session)
+    sessionName = [basename, '.session.mat'];
+    if ~exist(sessionName, 'file')
+        session = CE_sessionTemplate(pwd, 'viaGUI', false,...
+            'force', true, 'saveVar', true);
+    else
+        load(sessionName)
+    end
+end
+if isempty(spkgrp)
+    spkgrp = session.extracellular.spikeGroups.channels;
+end
 
 % load spikes if empty
 if isempty(spikes)
@@ -98,9 +117,9 @@ nunits = length(spikes.times);
 ref = 0.002;
 thr = 1;
 spikes.isiViolation = zeros(1, nunits);
-for i = 1 : nunits
-    nspks(i, 1) = length(spikes.times{i});
-    spikes.isiViolation(1, i) = sum(diff(spikes.times{i}) < ref) / nspks(i, 1) * 100;
+for iunit = 1 : nunits
+    nspks(iunit, 1) = length(spikes.times{iunit});
+    spikes.isiViolation(1, iunit) = sum(diff(spikes.times{iunit}) < ref) / nspks(iunit, 1) * 100;
 end
 
 % arrange pre-determined multiunits
@@ -110,55 +129,43 @@ mu = sort(unique([mu, find(spikes.isiViolation > 1)]));
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % calculate cluster separation
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-fet = getFet(basepath, true, false);
-
 if all(isfield(spikes, {'mDist', 'iDist', 'lRat'})) && ~force
     warning('separation matrices already calculated. Skipping cluDist');
 else
     sprintf('\ncalculating separation matrices\n\n');
-    
-    % arrange predetermined mu
-    rmmu = cell(1, length(fet));
-    if ~isempty(mu)
-        u = spikes.cluID(mu);
-        for i = 1 : length(fet)
-            rmmu{i} = u(spikes.shankID(mu) == i);
-        end
-    end
-    
+        
     % go over each spike group, clean and calc separation
-    for i = 1 : length(fet)
+    for igrp = 1 : length(spkgrp)
         
-        % disgard noise and artifact spikes
-        if ~isempty(fet{i})
-            rmidx = find(fet{i}(:, end) <= 1);
-            totSpks(i) = size(fet{i}, 1);
-            nonClusteredSpks(i) = length(rmidx);
-            fet{i}(rmidx, :) = [];
-        end
-              
-        % disgard spikes that belong to predetermined mu
-        for j = 1 : length(rmmu{i})
-            rmidx = find(fet{i}(:, end) == rmmu{i}(j));
-            fet{i}(rmidx, :) = [];
+        % load data
+        fet = loadNS('datatype', 'fet', 'session', session, 'grpid', igrp);
+        clu = loadNS('datatype', 'clu', 'session', session, 'grpid', igrp);
+
+        % find noise and artifact spikes
+        rmidx = find(clu <= 1);
+        nonClusteredSpks(igrp) = length(rmidx);
+        totSpks(igrp) = length(clu);
+
+        % find predetermined mu spikes (mu numbering given by spikes.UID)
+        rmclu = spikes.cluID(mu(spikes.shankID(mu) == igrp));
+        if ~isempty(rmclu)
+            rmidx = unique([rmidx; find(clu == rmclu)]);
         end
         
-        % calculate separation matrices
-        clu = spikes.cluID(spikes.shankID == i);
-        lRat{i} = zeros(length(clu), 1);
-        iDist{i} = zeros(length(clu) ,1);
-        ncol = npca * length(spkgrp{i});
-        for j = 1 : length(clu)
-            cluidx = find(fet{i}(:, end) == clu(j));
-            
-            if length(cluidx) < ncol
-                lRat{i}(j, 1) = NaN;
-                iDist{i}(j, 1) = NaN;
-                mDist{i}{j} = NaN;
-            else
-                [lRat{i}(j, 1), iDist{i}(j, 1), mDist{i}{j}] = cluDist(fet{i}(:, 1 : ncol), cluidx);
-            end         
-        end
+        uclu = unique(clu);
+        nfet = npca * length(spkgrp{igrp});        
+        fetDist = [fet, clu];
+        fetDist(rmidx, :) = [];
+        k = 1;
+        for iclu = 1 : length(uclu)
+            cluid = uclu(iclu);
+            if cluid == 0 || cluid == 1
+                continue
+            end
+            [lRat{igrp}(k, 1), iDist{igrp}(k, 1), mDist{igrp}{k}] =...
+                cluDist(fetDist(:, 1 : nfet), find((fetDist(:, end) == cluid)));
+            k = k + 1;
+        end    
     end
     
     % concatenate cell
@@ -168,11 +175,11 @@ else
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% estimate SU or MU
+% SU or MU
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 spikes.su = spikes.iDist > 10 & spikes.isiViolation < 1;
 spikes.nonClusteredSpks = nonClusteredSpks ./ totSpks;
-spikes.muSpks = 1 - length(vertcat(spikes.ts{spikes.su})) / sum(totSpks);
+spikes.suSpks = 1 - length(vertcat(spikes.ts{spikes.su})) / sum(totSpks);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % save vars

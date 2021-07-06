@@ -64,11 +64,6 @@ basepaths{7} = 'D:\Data\lh87\lh87_210525_211957';
 basepaths{1} = 'F:\Data\Colleagues\HB\sleepStates\baseline_19042021_0822';
 basepaths{2} = 'G:\lh90\lh90_210508_201100';
 basepaths{3} = 'G:\lh89\lh89_210510_085700';
-basepaths{4} = 'G:\lh89\lh89_210507_200800';
-basepaths{5} = 'G:\lh89\lh89_210508_083400';
-basepaths{6} = 'G:\lh89\lh89_210508_201100';
-basepaths{7} = 'G:\lh89\lh89_210509_081100';
-basepaths{8} = 'G:\lh89\lh89_210509_200000';
 
 fileList = as_fileLists(basepaths);
 

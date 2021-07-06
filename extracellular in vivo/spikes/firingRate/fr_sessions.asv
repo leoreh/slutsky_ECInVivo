@@ -8,7 +8,7 @@ forceA = false;
 
 % full path and name to xls file with session metadata
 xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
-mname = 'lh90';
+mname = 'lh89';
 
 % column name in xls sheet where dirnames exist
 colName = 'Session';
@@ -78,11 +78,11 @@ if forceA
 %         spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
 %             'saveFig', false, 'force', true, 'mu', [], 'graphics', false,...
 %             'vis', 'on', 'spkgrp', spkgrp);
-        
+%         
 load([basename, '.AccuSleep_EEG.mat'])
 load([basename, '.AccuSleep_EMG.mat'])
 labelsmanfile = [basename, '.AccuSleep_labelsMan.mat'];
-AccuSleep_viewer(EEG, EMG, 1250, 1, [], labelsmanfile)
+AccuSleep_viewer(EEG, EMG, 1250, 1, labels, labelsmanfile)
 ss = as_wrapper(EEG, EMG, [], 'basepath', basepath, 'calfile', [],...
     'viaGui', false, 'forceCalibrate', false, 'inspectLabels', false,...
     'saveVar', true, 'forceAnalyze', true, 'fs', 1250, 'netfile', [],...

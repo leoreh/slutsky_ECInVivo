@@ -91,7 +91,7 @@ if manCur
     dbstop in cleanCluByFet at 94 if manCur
     
     % select spiking grp
-    grpid = 3;
+    grpid = 2;
     
     % load data
     res = loadNS('datatype', 'res', 'session', session, 'grpid', grpid);
@@ -109,8 +109,8 @@ if manCur
     saveNS(clu, 'datatype', 'clu', 'session', session, 'grpid', grpid);
     
     % rmv spks from selected cluster
-    sclu = 19      % cluster id
-    [cluidx, rmvSpks] = cleanClu(fet, res, sclu, ref, 0.0001, [0.22 0.08]);
+    sclu = 10      % cluster id
+    [cluidx, rmvSpks] = cleanClu(fet, res, sclu, ref, 0.0001, [0.02 0.055]);
     
     % plot fets of specific cluster
     fetclu = fet(clu == cluid, :);

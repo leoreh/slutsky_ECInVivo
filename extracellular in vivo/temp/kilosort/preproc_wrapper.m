@@ -5,7 +5,7 @@ cd(basepath)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % open ephys
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'K:\Data\lh91\2021-05-30_10-29-42';
+basepath = 'H:\sleep after CFC\OS\os1\2021-06-30_12-24-18';
 rmvch = [3, 7, 13];
 mapch = [1 : 20];
 exp = [4];
@@ -160,8 +160,7 @@ acc = EMGfromACC('basepath', basepath, 'fname', [basename, '.lfp'],...
 
 % manually create labels
 labelsmanfile = [basename, '.AccuSleep_labelsMan.mat'];
-AccuSleep_viewer(EEG, EMG, 1250, 1, [], labelsmanfile)
-AccuSleep_viewer(EEG, EMG, 1250, 1, labels, [])
+AccuSleep_viewer(EEG, EMG, 1250, 1, labels, labelsmanfile)
 
 % classify with a network
 netfile = 'D:\Code\slutskycode\extracellular in vivo\lfp\SleepStates\AccuSleep\trainedNetworks\net_210622_165845.mat';

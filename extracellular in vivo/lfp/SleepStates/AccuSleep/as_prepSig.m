@@ -3,8 +3,8 @@ function [EMG, EEG, sigInfo] = as_prepSig(eegData, emgData, varargin)
 % prepare signals for accusleep. filters and subsamples eeg and emg. two
 % options to input data; ALT 1 is to directly input eeg and emg data as
 % vectors (e.g. via getLFP). this requires inputing the signals sampling
-% frequency. ALT 2 is to load traces from an lfp / dat file. this requires
-% session info struct (cell explorer format) and inputing the signal
+% frequency. ALT 2 is to load traces from an lfp / dat file. recommend
+% using session info struct (cell explorer format) and inputing the signal
 % channels within the file.
 %
 % INPUT:

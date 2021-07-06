@@ -166,7 +166,13 @@ else
     fprintf('classifying... ')
     [labels_net, netScores] = AccuSleep_classify(standardizeSR(EEG, fs, 128),...
         standardizeSR(EMG, fs, 128), net, 128, epochLen, calibrationData, minBoutLen);
+    
+    % insert calibrated labels to final results. this is because
+    % AccuSleep_classify doesn't allow for 'only overwrite undefind' as in the
+    % gui
     labels = labels_net;
+    calidx = find(labels_calibration ~= nstates + 1);
+    labels(calidx) = labels_calibration(calidx);
     save(labelsfile, 'labels')
     fprintf('done.\n')
 end
@@ -188,12 +194,6 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % finalize and save
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% insert calibrated labels to final results. this is because
-% AccuSleep_classify doesn't allow for 'only overwrite undefind' as in the
-% gui
-calidx = find(labels_calibration ~= nstates + 1);
-labels(calidx) = labels_calibration(calidx);
 
 if inspectLabels
     AccuSleep_viewer(EEG, EMG, fs, epochLen, labels, labelsfile)

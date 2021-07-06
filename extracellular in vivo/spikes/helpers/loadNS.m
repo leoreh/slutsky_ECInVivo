@@ -38,7 +38,7 @@ addOptional(p, 'basename', '', @ischar);
 addOptional(p, 'datatype', '', @ischar);
 addOptional(p, 'grpid', 1, @isnumeric);
 addOptional(p, 'fs', [], @isnumeric);
-addOptional(p, 'nfet', 12, @isnumeric);
+addOptional(p, 'nfet', [], @isnumeric);
 addOptional(p, 'spkgrp', {}, @iscell);
 addOptional(p, 'session', []);
 addOptional(p, 'nspks', [], @isnumeric);
@@ -57,9 +57,7 @@ nspks       = p.Results.nspks;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preparations
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-if isempty(basename)
-    [~, basename] = fileparts(basepath);
-end
+
 if isempty(session)
     sessionName = [basename, '.session.mat'];
     if ~exist(sessionName, 'file')
@@ -68,6 +66,9 @@ if isempty(session)
     else
         load(sessionName)
     end
+end
+if isempty(basename)
+    [~, basename] = fileparts(basepath);
 end
 if isempty(spkgrp)
     spkgrp = session.extracellular.spikeGroups.channels;
