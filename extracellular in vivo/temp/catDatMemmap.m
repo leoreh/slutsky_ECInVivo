@@ -66,7 +66,7 @@ nbytes = class2bytes(precision);
 % make sure datFiles are cell
 datFiles = cellstr(datFiles);
 
-chunksize = 5e6;
+chunksize = 5e5;
 
 % handle names for new path and new file
 if isempty(newpath)
@@ -98,7 +98,7 @@ for i = 1 : length(datFiles)
     raw = m.data;
     
     for ii = 1 : size(parts{i}, 1)
-        if parts{i}(ii, 1) == 0
+        if parts{i}(ii, 1) < 1
             parts{i}(ii, 1) = 1;
         end
         if parts{i}(ii, 2) > nsamps

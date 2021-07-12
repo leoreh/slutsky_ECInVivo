@@ -1,4 +1,4 @@
-function [net, trainInfo] = AccuSleep_train(fileList, SR, epochLen, epochs, imageLocation)
+function [net, netInfo] = AccuSleep_train(fileList, SR, epochLen, epochs, imageLocation)
 % AccuSleep_train  Train a network for classifying brain states
 % Zeke Barger, 021321
 %
@@ -163,7 +163,7 @@ for i = 1:nFiles
             % create filename
             fName = [imageLocation,filesep,num2str(data.c.labels(j)),...
                 filesep,'rec',num2str(i),'t',num2str(j-pad,'%05.f'),'.png'];
-            % write to file
+            % write to file 
             imwrite(thisImg, fName);
         end
     end
@@ -244,12 +244,20 @@ layers = [
     softmaxLayer
     classificationLayer];
 
+% net info (lh 09 jul 21) -------------------------------------------------
+for ifile = 1 : size(fileList, 1)
+    netInfo.files{ifile} = fileparts(fileList{ifile, 1});
+    [~, basename] = fileparts(netInfo.files{ifile});
+    load(fileList{ifile, 3})
+    netInfo.duration(ifile) = sum(labels < n_states);
+end
+
 % train
 disp('Training network')
-[net, trainInfo] = trainNetwork(imdsTrain,layers,options);
+[net, netInfo.train] = trainNetwork(imdsTrain,layers,options);
 
 disp('Training complete: Final validation accuracy:')
-disp([num2str(trainInfo.ValidationAccuracy(end)),'%'])
+disp([num2str(netInfo.train.ValidationAccuracy(end)),'%'])
 
 % delete the images
 if deleteImages

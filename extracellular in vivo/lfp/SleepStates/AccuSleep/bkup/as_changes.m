@@ -7,13 +7,13 @@
 % # set(G.A6, 'YTick', []) => set(G.A6) - line 389
 % set graphics to default => setMatlabGraphics(true) - line 27
 
-
 % AccuSleep_classify
 % # output netScores (line 90)
 % # remove last state from config file so the net won't be trained on bin
 
 % AccuSleep_train
 % # remove last state from config file so the net won't be trained on bin
+% # added net info to output (line 247)
 
 % createCalibrationData
 % # remove last state from config file so the net won't be trained on bin

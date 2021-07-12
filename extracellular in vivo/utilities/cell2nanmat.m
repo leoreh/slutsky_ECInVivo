@@ -20,7 +20,7 @@ if numel(nDimensions) > 1
     error('all arrays must have the same number of dimensions')
 end
 
-if nargin < 2 || isempty(dim) || nDimensions == 1
+if nargin < 2 || isempty(dim)
     dim = 1;
 end
 maxlength = max(cellfun('size', c, dim));

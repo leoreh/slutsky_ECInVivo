@@ -15,26 +15,25 @@ if isempty(varArray{isession, 3})
 else
     assignin('base', 'spikes', varArray{isession, 3}.spikes)
 end
-if isempty(varArray{isession, 5})
+if isempty(varArray{isession, 4})
     assignin('base', 'fr', [])
 else
-    assignin('base', 'fr', varArray{isession, 5}.fr)
+    assignin('base', 'fr', varArray{isession, 4}.fr)
 end
-if isempty(varArray{isession, 6})
+if isempty(varArray{isession, 5})
     assignin('base', 'datInfo', [])
 else
-    assignin('base', 'datInfo', varArray{isession, 6}.datInfo)
+    assignin('base', 'datInfo', varArray{isession, 5}.datInfo)
 end
-if isempty(varArray{isession, 8})
-    assignin('base', 'sr', [])
-else
-    assignin('base', 'sr', varArray{isession, 8}.fr)
-end
-if isempty(varArray{isession, 7})
+if isempty(varArray{isession, 6})
     assignin('base', 'ss', [])
 else
-    assignin('base', 'ss', varArray{isession, 7}.ss)
+    assignin('base', 'ss', varArray{isession, 6}.ss)
 end
-
+if isempty(varArray{isession, 7})
+    assignin('base', 'sr', [])
+else
+    assignin('base', 'sr', varArray{isession, 7}.fr)
+end
 
 end

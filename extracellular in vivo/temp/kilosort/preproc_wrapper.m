@@ -154,19 +154,19 @@ acc = EMGfromACC('basepath', basepath, 'fname', [basename, '.lfp'],...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % prep signal
-[EMG, EEG, sigInfo] = as_prepSig([basename, '.lfp'], acc.mag,...
-    'eegCh', [7 : 10], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
-    'inspectSig', false, 'forceLoad', true, 'eegFs', 1250, 'emgFs', 1250);
+[EMG, EEG, sigInfo] = as_prepSig([basename, '.lfp'], [basename, '.emg.dat'],...
+    'eegCh', [1 : 15], 'emgCh', 1, 'saveVar', true, 'emgNchans', 2,...
+    'inspectSig', false, 'forceLoad', true, 'eegFs', 1250, 'emgFs', 3051.7578125);
 
 % manually create labels
 labelsmanfile = [basename, '.AccuSleep_labelsMan.mat'];
 AccuSleep_viewer(EEG, EMG, 1250, 1, labels, labelsmanfile)
 
 % classify with a network
-netfile = 'D:\Code\slutskycode\extracellular in vivo\lfp\SleepStates\AccuSleep\trainedNetworks\net_210622_165845.mat';
+netfile = 'D:\Code\slutskycode\extracellular in vivo\lfp\SleepStates\AccuSleep\trainedNetworks\net_210708_200155.mat';
 ss = as_wrapper(EEG, EMG, [], 'basepath', basepath, 'calfile', [],...
     'viaGui', false, 'forceCalibrate', true, 'inspectLabels', false,...
-    'saveVar', true, 'forceAnalyze', true, 'fs', 1250, 'netfile', netfile,...
+    'saveVar', false, 'forceAnalyze', true, 'fs', 1250, 'netfile', netfile,...
     'graphics', true);
 
 % inspect separation after classifying / manual scoring
@@ -186,15 +186,15 @@ AccuSleep_viewer(EEG(tidx), EMG(tidx), 1250, 1, labels(lidx), [])
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%% cat dat
-nchans = 17;
-fs = 1250;
+nchans = 2;
+fs = 3051.7578125;
 newpath = mousepath;
-datFiles{1} = 'K:\Data\lh91\experiment11\recording1\continuous\Rhythm_FPGA-109.0\continuous.dat';
-datFiles{2} = 'K:\Data\lh91\experiment11\recording1\continuous\Rhythm_FPGA-109.0\28e1.dat';
+datFiles{1} = 'G:\lh86\lh86_210228_070000\lh86_210228_070000.emg.dat';
+datFiles{2} = 'G:\lh86\lh86_210228_190000\lh86_210228_190000.emg.dat';
 sigInfo = dir(datFiles{1});
 nsamps = floor(sigInfo.bytes / class2bytes('int16') / nchans);
-parts{1} = [nsamps - 2 * 60 * 60 * fs nsamps];
-parts{2} = [0 4 * 60 * 60 * fs];
+parts{1} = round([195360091 722703787] / 24414.06 * fs);
+parts{2} = round([1 722703787] / 24414.06 * fs);
 
 catDatMemmap('datFiles', datFiles, 'newpath', newpath, 'parts', parts,...
     'nchans', nchans, 'saveVar', true)

@@ -162,7 +162,7 @@ else
             if cluid == 0 || cluid == 1
                 continue
             end
-            [lRat{igrp}(k, 1), iDist{igrp}(k, 1), mDist{igrp}{k}] =...
+            [lRat{igrp}(k, 1), iDist{igrp}(k, 1), ~] =...
                 cluDist(fetDist(:, 1 : nfet), find((fetDist(:, end) == cluid)));
             k = k + 1;
         end    
@@ -171,7 +171,6 @@ else
     % concatenate cell
     spikes.lRat = cat(1, lRat{:})';
     spikes.iDist = cat(1, iDist{:})';
-    spikes.mDist = mDist;
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -187,7 +186,7 @@ spikes.suSpks = 1 - length(vertcat(spikes.ts{spikes.su})) / sum(totSpks);
 if saveVar
     [~, basename] = fileparts(basepath);
     % spikes
-    save([basename '.spikes.cellinfo.mat'], 'spikes')
+    save([basename '.spikes.cellinfo.mat'], 'spikes', '-v7.3')
     
     % cell metrics
     cmName = [basename, '.cell_metrics.cellinfo.mat'];
