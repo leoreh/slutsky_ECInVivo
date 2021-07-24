@@ -4,7 +4,7 @@
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = 'lh87';
+mname = 'lh86';
 forceL = false;
 forceA = false;
 
@@ -33,7 +33,6 @@ if ~exist('varArray', 'var') && ~forceL
         'xlsname', xlsname, 'mname', mname);
 end
 nsessions = length(dirnames);
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % general params
@@ -65,6 +64,7 @@ suFlag = 1;                     % plot only su or all units
 frBoundries = [0 Inf];          % include only units with fr greater than
 
 [nsub] = numSubplots(length(sessionidx));
+[cfg_colors, cfg_names, ~] = as_loadConfig([]);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % analyze data
@@ -95,14 +95,14 @@ if forceA
 %                     'submitToDatabase', false, 'getWaveformsFromDat', true);
 %                 cell_metrics = CellExplorer('basepath', basepath);
         
-                load([basename '.spikes.cellinfo.mat'])
-%                 cc = cellclass('basepath', basepath,...
-%                     'waves', cat(1, spikes.rawWaveform{:})', 'saveVar', true,...
-%                     'graphics', false, 'fs', fs);
-        
-                spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
-                    'saveFig', false, 'force', true, 'mu', [], 'graphics', false,...
-                    'vis', 'on', 'spkgrp', spkgrp);
+%                 load([basename '.spikes.cellinfo.mat'])
+% %                 cc = cellclass('basepath', basepath,...
+% %                     'waves', cat(1, spikes.rawWaveform{:})', 'saveVar', true,...
+% %                     'graphics', false, 'fs', fs);
+%         
+%                 spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
+%                     'saveFig', false, 'force', true, 'mu', [], 'graphics', false,...
+%                     'vis', 'on', 'spkgrp', spkgrp);
         
         %         load([basename, '.AccuSleep_EEG.mat'])
         %         load([basename, '.AccuSleep_EMG.mat'])
@@ -115,29 +115,29 @@ if forceA
         %             'graphics', true);
         
         % firing rate
-        load([basename '.spikes.cellinfo.mat'])
-        binsize = 60;
-        winBL = [1 * 60 110 * 60];
-        fr = firingRate(spikes.times, 'basepath', basepath,...
-            'graphics', false, 'saveFig', false,...
-            'binsize', binsize, 'saveVar', true, 'smet', 'MA',...
-            'winBL', winBL);
-        
-        %         spike rate per tetrode. note that using firingRate requires
-        %         special care becasue spktimes is given in samples and not seconds
-        load(fullfile(basepath, [basename '.spktimes.mat']))
-        for ii = 1 : length(spkgrp)
-            spktimes{ii} = spktimes{ii} / fs;
-        end
-        binsize = 60;
-        sr = firingRate(spktimes, 'basepath', basepath,...
-            'graphics', false, 'saveFig', false,...
-            'binsize', binsize, 'saveVar', 'sr', 'smet', 'none',...
-            'winBL', [0 Inf]);
+%         load([basename '.spikes.cellinfo.mat'])
+%         binsize = 60;
+%         winBL = [1 * 60 110 * 60];
+%         fr = firingRate(spikes.times, 'basepath', basepath,...
+%             'graphics', false, 'saveFig', false,...
+%             'binsize', binsize, 'saveVar', true, 'smet', 'MA',...
+%             'winBL', winBL);
+%         
+%         %         spike rate per tetrode. note that using firingRate requires
+%         %         special care becasue spktimes is given in samples and not seconds
+%         load(fullfile(basepath, [basename '.spktimes.mat']))
+%         for ii = 1 : length(spkgrp)
+%             spktimes{ii} = spktimes{ii} / fs;
+%         end
+%         binsize = 60;
+%         sr = firingRate(spktimes, 'basepath', basepath,...
+%             'graphics', false, 'saveFig', false,...
+%             'binsize', binsize, 'saveVar', 'sr', 'smet', 'none',...
+%             'winBL', [0 Inf]);
     end
 end
 
-% cell_metrics = CellExplorer('basepaths', basepaths);
+cell_metrics = CellExplorer('basepaths', basepaths);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
@@ -463,7 +463,6 @@ stateidx = [1 : 6];
 sessionidx = 1 : nsessions;
 [nsub] = numSubplots(length(sessionidx));
 plotStyle = 'box';      % can be 'histogram' or 'box'
-[cfg_colors, cfg_names, ~] = as_loadConfig([]);
 
 if figFlag
     fh = figure;
@@ -522,11 +521,11 @@ end
 % distribution of su firing rate per state
 figFlag = 1; saveFig = true;
 stateidx = [1 : 6];
-sessionidx = 1;
+sessionidx = 1 : nsessions;
 [nsub] = numSubplots(length(sessionidx));
 grp = [1 : 4];          % which tetrodes to plot
 unitClass = 'int';      % plot 'int', 'pyr', or 'all'
-suFlag = 1;             % plot only su or all units
+suFlag = 0;             % plot only su or all units
 frBoundries = [0 Inf];  % include only units with mean fr in these boundries
 
 if figFlag
@@ -542,7 +541,7 @@ if figFlag
         end
         subplot(nsub(1), nsub(2), isession)
         hold on
-        boxplot(frState{isession}(:, stateidx), 'PlotStyle', 'traditional', 'Whisker', 1.5);
+        boxplot(frState{isession}(:, stateidx), 'PlotStyle', 'traditional', 'Whisker', 8);
         bh = findobj(gca, 'Tag', 'Box');
         bh = flipud(bh);
         for ibox = 1 : length(bh)
@@ -550,7 +549,7 @@ if figFlag
                 cfg_colors{stateidx(ibox)}, 'FaceAlpha', 0.5)
         end
         xticks([])
-        ylabel('SU firing rate [Hz]')
+        ylabel([unitClass, ' firing rate [Hz]'])
         ylim([0 15])
         title(sessionDate{sessionidx(isession)})
         if isession == 1

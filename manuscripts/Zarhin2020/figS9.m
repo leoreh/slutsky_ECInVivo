@@ -261,7 +261,7 @@ c2 = 'kr';
 % WT and APPPS1 only
 gidx = [ones(1, 30), ones(1, 30) * 2];
 % data = as.deepFraction(:, 1 : 2);
-data = cell2nanmat(as.bsrDeep(:, 1 : 2));
+data = cell2nanmat(as.bsrDeep(:, 1 : 2), 2);
 % data = as.bsr
 
 sh = subaxis(nrow, 4, [16, 20],...
