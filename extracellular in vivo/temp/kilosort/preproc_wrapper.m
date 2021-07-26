@@ -172,6 +172,10 @@ ss = as_wrapper(EEG, EMG, [], 'basepath', basepath, 'calfile', [],...
 % inspect separation after classifying / manual scoring
 as_stateSeparation(EEG, EMG, labels)
 
+% calc psd in states
+[psdStates, faxis, emgRMS] = psd_states('eeg', EEG, 'emg', EMG,...
+    'labels', labels, 'fs', 1250, 'graphics', true);
+
 % get confusion matrix between two labels
 [ss.netPrecision, ss.netRecall] = as_cm(labels1, labels2);
 

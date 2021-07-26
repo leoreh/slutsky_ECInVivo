@@ -55,7 +55,7 @@ end
 if isempty(fs)
     fs = 1250;
 end
-newFs = 128;
+newFs = 250;
 
 tic;
 fprintf('\nPreparing signals, this may take some time...')
@@ -120,8 +120,9 @@ fprintf('\ndone in %.1f sec\n\n', toc)
 % calculate stuff
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-[psdStates, faxis, emgRMS] = psd_states('eeg', eeg, 'emg', emg,...
-    'labels', labels, 'fs', newFs, 'graphics', false);
+[psdStates, emgRMS] = psd_states('eeg', eeg, 'emg', emg,...
+    'labels', labels, 'fs', newFs);
+
 
 % convert labels to state epochs. 
 for istate = 1 : nstates
@@ -130,8 +131,43 @@ for istate = 1 : nstates
     stateEpisodes = binary2epochs('vec', binaryVec, 'minDur', [], 'maxDur', [],...
         'interDur', [], 'exclude', false); % these are given as indices and are equivalent to seconds
     stateEpochs{istate} = stateEpisodes * epochLen;
+    epLen{istate} = [diff(stateEpochs{istate}')]';
 end
-epLen = cellfun(@(x) (diff(x')'), stateEpochs, 'UniformOutput', false);
+
+
+xx = cellfun(@(x) diff(x'), stateEpochs, 'UniformOutput', false);
+
+
+
+
+% calculate power for each epoch separatly
+win = hann(2 ^ (nextpow2(2 * newFs) - 1));
+noverlap = 0.25 * newFs;
+faxis = [0 : 0.2 : 50]; % freqencies for power analysis
+psdStates = zeros(nstates - 1, length(faxis));
+for istate = sstates
+    for iepoch = 1 : length(epLen{istate})
+        % skip epochs shorter than one bin (may happen at end of recording)
+        if epLen{istate}(iepoch) < 1 
+            continue
+        end
+        
+        % get eeg data in epoch
+        dataIdx = stateEpochs{istate}(iepoch, 1) * newFs :...
+            stateEpochs{istate}(iepoch, 2) * newFs - 1;
+        
+        % calc power
+        [pow, ~] = pwelch(eeg(dataIdx), win, noverlap, faxis, newFs);
+        psdStates(istate, :) = psdStates(istate, :) + pow; 
+               
+        % eeg ratio high / low
+        eegRatio{istate}(iepoch) = sum(pow(faxis > 25)) / sum(pow(faxis < 5));        
+               
+        % emg rms 
+        emgRMS{istate}(iepoch) = rms(emg(dataIdx));
+    end
+    psdStates(istate, :) = psdStates(istate, :) / length(stateEpochs{istate});    
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
@@ -182,11 +218,11 @@ xlabel('Time [h]')
 
 % spectral power per state
 fh.CurrentAxes = sb3;
-ph = plot(faxis, psdStates ./ sum(psdStates, 2), 'LineWidth', 3);
+ph = plot(faxis, psdStates, 'LineWidth', 3);
 set(ph, {'color'}, cfg_colors(sstates))
-xlim([0 30])
+xlim([0 20])
 xlabel('Frequency [Hz]')
-ylabel('Norm PSD')     
+ylabel('Power [dB]')     
 % set(gca, 'YTick', [])
 
 % scatter spectrogram vs. emg (could not use axes handle w/ gscatter)
