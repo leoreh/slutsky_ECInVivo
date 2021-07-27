@@ -4,7 +4,7 @@
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = 'lh86';
+mname = 'lh87';
 forceL = false;
 forceA = false;
 
@@ -277,7 +277,7 @@ end
 % -------------------------------------------------------------------------
 % rearrange state of entire experiment
 sessionidx = 1 : nsessions;
-stateidx = [1, 4];
+stateidx = [1, 4, 5];
 ts = 1;                         % state labels epoch length
 lightHr = '080000';             % when does light cycle start [HHMM]
 
@@ -312,14 +312,14 @@ for isession = sessionidx
     expLabels(idx_recStart : idx_recStart + length(ss.labels) - 1) = ss.labels;   
     
     % emg
-%     load([basename, '.AccuSleep_EMG.mat'])
-%     processedEMG = processEMG(standardizeSR(EMG, 1250, 128), 128, 1);  
-%     processedEMG = (processedEMG - ss.info.calibrationData(end, 1)) ./...
-%         ss.info.calibrationData(end, 2);
-%     processedEMG = (processedEMG + 4.5) ./ 9;    
-%     processedEMG(processedEMG < 0) = 0;
-%     processedEMG(processedEMG > 1) = 1;
-%     expEmg(idx_recStart : idx_recStart + length(processedEMG) - 1) = processedEMG;
+    load([basename, '.AccuSleep_EMG.mat'])
+    processedEMG = processEMG(standardizeSR(EMG, 1250, 128), 128, 1);  
+    processedEMG = (processedEMG - ss.info.calibrationData(end, 1)) ./...
+        ss.info.calibrationData(end, 2);
+    processedEMG = (processedEMG + 4.5) ./ 9;    
+    processedEMG(processedEMG < 0) = 0;
+    processedEMG(processedEMG > 1) = 1;
+    expEmg(idx_recStart : idx_recStart + length(processedEMG) - 1) = processedEMG;
 end
 
 % percent time of state in timebins
@@ -352,47 +352,47 @@ tlabel = datestr(datenum(dtStart : hours(binHr) : dtStart + hours(24)), 'HH:MM')
 tlegend = datestr(datenum(dtStart : hours(24) : dtEnd), 'dd/mm');
 
 % create 24 hr cycles 
-saveFig = true;
-fh = figure;
-sessionidx = [4, 5, 7];
-clr = ['rrb'];
-for istate = 1 : length(stateidx)
-    subplot(length(stateidx), 1, istate)
-    stateMat{istate} = reshape(stateBin(:, istate), 24 / binHr, size(stateBin(:, istate), 1) / (24 / binHr));
-    stateMat{istate} = stateMat{istate}(:, sessionidx);
-    ph = plot([1.5 : 24 / binHr + 0.5], stateMat{istate}, 'LineWidth', 2);
-    set(ph, {'Color'}, num2cell(clr)')
-    xticks([1 : 24 / binHr + 1])
-    xticklabels(tlabel)
-    xtickangle(45)
-    title(cfg_names(stateidx(istate)))
-    if istate == 1
-        legend(tlegend, 'Location', 'NorthWest')
-    end
-    ylabel(['State Duration [', dataNorm, ']'])
-    xlabel('Time')
-end
-if saveFig
-    figpath = fullfile(mousepath, 'graphics');
-    mkdir(figpath)
-    figname = fullfile(figpath, ['stateDuration_perDay']);
-    export_fig(figname, '-tif', '-transparent', '-r300')
-end
+% saveFig = true;
+% fh = figure;
+% sessionidx = [1, 2];
+% clr = ['rrb'];
+% for istate = 1 : length(stateidx)
+%     subplot(length(stateidx), 1, istate)
+%     stateMat{istate} = reshape(stateBin(:, istate), 24 / binHr, size(stateBin(:, istate), 1) / (24 / binHr));
+%     stateMat{istate} = stateMat{istate}(:, sessionidx);
+%     ph = plot([1.5 : 24 / binHr + 0.5], stateMat{istate}, 'LineWidth', 2);
+%     set(ph, {'Color'}, num2cell(clr)')
+%     xticks([1 : 24 / binHr + 1])
+%     xticklabels(tlabel)
+%     xtickangle(45)
+%     title(cfg_names(stateidx(istate)))
+%     if istate == 1
+%         legend(tlegend, 'Location', 'NorthWest')
+%     end
+%     ylabel(['State Duration [', dataNorm, ']'])
+%     xlabel('Time')
+% end
+% if saveFig
+%     figpath = fullfile(mousepath, 'graphics');
+%     mkdir(figpath)
+%     figname = fullfile(figpath, ['stateDuration_perDay']);
+%     export_fig(figname, '-tif', '-transparent', '-r300')
+% end
     
 % graphics
 fh = figure;
-% subplot(4, 1, 1)
-% hold on
-% for istate = stateidx
-%     stateLabels = find(expLabels == istate);
-%     scatter(stateLabels / fs / 60 / 60,...
-%         expEmg(stateLabels),...
-%         3, cfg_colors{istate})
-% end
-% xlim([1 / fs / 60 / 60, length(expLabels) / fs / 60 / 60])
-% ylim([min(expEmg) 1])
-% ylabel('Norm. EMG RMS')
-% set(gca, 'XTick', [], 'YTick', [])
+subplot(4, 1, 1)
+hold on
+for istate = stateidx
+    stateLabels = find(expLabels == istate);
+    scatter(stateLabels / fs / 60 / 60,...
+        expEmg(stateLabels),...
+        3, cfg_colors{istate})
+end
+xlim([1 / fs / 60 / 60, length(expLabels) / fs / 60 / 60])
+ylim([min(expEmg) 1])
+ylabel('Norm. EMG RMS')
+set(gca, 'XTick', [], 'YTick', [])
 
 subplot(4, 1, [2 : 4])
 xidx = bins(:, 2) - binSample / binHr;
@@ -403,7 +403,7 @@ axis tight
 hold on
 plot([bins(1 : 2 : end, 1), bins(1 : 2 : end, 1)], ylim, '--k', 'LineWidth', 0.5)
 xticks(bins(1 : 2 : end, 1))
-xticklabels(tlabel(1 : 2 : end))
+xticklabels(tlabel(1 : 2 : end, :))
 xtickangle(45)
 xlabel('Time')
 ylabel(['State Duration [', dataNorm, ']'])
