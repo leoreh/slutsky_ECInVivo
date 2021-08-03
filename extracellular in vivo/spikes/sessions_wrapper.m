@@ -204,6 +204,13 @@ for itime = 1 : length(dtAxis)
     tlabel{itime} = datestr(datenum(dtAxis(itime)), 'dd/mm_HH:MM');
 end
 
+% get tidx of manipulation
+dt1 = datetime(2021, 02, 28, 19, 00, 00);
+dt2 = datetime(2021, 03, 03, 17, 10, 00);
+[~, shadeIdx(1)] = tstamp2time('dtstr', dtStart, 'tstr', dt1, 'fs', 1 / ts);
+[~, shadeIdx(2)] = tstamp2time('dtstr', dtStart, 'tstr', dt2, 'fs', 1 / ts);
+shadeIdx = [0, 0];  % override
+
 % initialize vars that will carry information from entire experiment
 expRS = nan(expLen, length(spikes.su));
 expFS = nan(expLen, length(spikes.su));
@@ -231,13 +238,6 @@ for isession = sessionIdx
 %     expFS(idx_session, 1 : sum(FSunits{isession})) = fr.strd(FSunits{isession}, :)';  
     
 end
-
-% get tidx of manipulation
-dt1 = datetime(2021, 02, 28, 19, 00, 00);
-dt2 = datetime(2021, 03, 03, 17, 10, 00);
-[~, shadeIdx(1)] = tstamp2time('dtstr', dtStart, 'tstr', dt1, 'fs', 1 / ts);
-[~, shadeIdx(2)] = tstamp2time('dtstr', dtStart, 'tstr', dt2, 'fs', 1 / ts);
-shadeIdx = [0, 0];
 
 % plot
 fh = figure;
