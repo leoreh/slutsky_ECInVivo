@@ -44,7 +44,7 @@ tic;
 
 p = inputParser;
 addOptional(p, 'datFiles', []);
-addOptional(p, 'parts', [], @iscell);
+addOptional(p, 'parts', []);
 addOptional(p, 'newpath', '', @ischar);
 addOptional(p, 'newname', '', @ischar);
 addOptional(p, 'precision', 'int16', @ischar);
@@ -75,9 +75,16 @@ if isempty(newpath)
     mkdir(newpath)
 end
 cd(newpath)
+basename = bz_BasenameFromBasepath(newpath);
 if isempty(newname)
-    basename = bz_BasenameFromBasepath(newpath);
     newname = [basename '.dat'];
+end
+
+% handle parts    
+if isempty(parts)
+    for ifiles = 1 : length(datFiles)
+        parts{ifiles} = [1 Inf];
+    end
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

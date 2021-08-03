@@ -5,10 +5,10 @@ cd(basepath)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % open ephys
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'H:\sleep after CFC\OS\os1\2021-06-30_12-24-18';
-rmvch = [3, 7, 13];
+basepath = 'D:\Data\lh93\2021-08-02_22-00-16';
+rmvch = [5, 1];
 mapch = [1 : 20];
-exp = [4];
+exp = [1];
 rec = cell(max(exp), 1);
 % rec{1} = [2, 3];
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
@@ -65,7 +65,7 @@ fepsp = fEPSP_analysis('fepsp', fepsp, 'basepath', basepath,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % spike detection from temp_wh
 [spktimes, ~] = spktimesWh('basepath', basepath, 'fs', fs, 'nchans', nchans,...
-    'spkgrp', spkgrp, 'saveVar', true, 'saveWh', true,...
+    'spkgrp', spkgrp, 'saveVar', false, 'saveWh', true,...
     'graphics', false, 'force', true);
 
 % spike rate
@@ -147,26 +147,26 @@ emgOrig = filterLFP(emgOrig, 'fs', 1250, 'stopband', [49 51],...
 
 acc = EMGfromACC('basepath', basepath, 'fname', [basename, '.lfp'],...
     'nchans', nchans, 'ch', nchans - 2 : nchans, 'saveVar', true, 'fsIn', 1250,...
-    'graphics', false);
+    'graphics', false, 'force', true);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % sleep states
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % prep signal
-[EMG, EEG, sigInfo] = as_prepSig([basename, '.lfp'], [basename, '.emg.dat'],...
-    'eegCh', [1 : 15], 'emgCh', 1, 'saveVar', true, 'emgNchans', 2,...
-    'inspectSig', false, 'forceLoad', true, 'eegFs', 1250, 'emgFs', 3051.7578125);
+[EMG, EEG, sigInfo] = as_prepSig([basename, '.lfp'], acc.mag,...
+    'eegCh', [4 : 7], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
+    'inspectSig', true, 'forceLoad', true, 'eegFs', 1250, 'emgFs', 1250);
 
 % manually create labels
 labelsmanfile = [basename, '.AccuSleep_labelsMan.mat'];
 AccuSleep_viewer(EEG, EMG, 1250, 1, labels, labelsmanfile)
 
 % classify with a network
-netfile = 'D:\Code\slutskycode\extracellular in vivo\lfp\SleepStates\AccuSleep\trainedNetworks\net_210708_200155.mat';
+netfile = 'D:\Code\slutskycode\extracellular in vivo\lfp\SleepStates\AccuSleep\trainedNetworks\net_210709_142246.mat';
 ss = as_wrapper(EEG, EMG, [], 'basepath', basepath, 'calfile', [],...
-    'viaGui', false, 'forceCalibrate', true, 'inspectLabels', false,...
-    'saveVar', false, 'forceAnalyze', true, 'fs', 1250, 'netfile', netfile,...
+    'viaGui', false, 'forceCalibrate', false, 'inspectLabels', false,...
+    'saveVar', true, 'forceAnalyze', true, 'fs', 1250, 'netfile', netfile,...
     'graphics', true);
 
 % inspect separation after classifying / manual scoring
@@ -190,25 +190,27 @@ AccuSleep_viewer(EEG(tidx), EMG(tidx), 1250, 1, labels(lidx), [])
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%% cat dat
-nchans = 2;
+nchans = 20;
 fs = 3051.7578125;
-newpath = mousepath;
-datFiles{1} = 'G:\lh86\lh86_210228_070000\lh86_210228_070000.emg.dat';
-datFiles{2} = 'G:\lh86\lh86_210228_190000\lh86_210228_190000.emg.dat';
-sigInfo = dir(datFiles{1});
-nsamps = floor(sigInfo.bytes / class2bytes('int16') / nchans);
-parts{1} = round([195360091 722703787] / 24414.06 * fs);
-parts{2} = round([1 722703787] / 24414.06 * fs);
+newpath = 'D:\Data\lh93\lh93_210730_100000';
+datFiles{1} = 'D:\Data\lh93\lh93_210730_100000\continuous.dat';
+datFiles{2} = 'D:\Data\lh93\2021-07-31_12-44-16\Record Node 133\experiment1\recording1\continuous\Rhythm_FPGA-130.0\continuous.dat';
+datFiles{3} = 'D:\Data\lh93\2021-07-31_16-26-24\Record Node 133\experiment1\recording1\continuous\Rhythm_FPGA-130.0\continuous.dat';
+% sigInfo = dir(datFiles{1});
+% nsamps = floor(sigInfo.bytes / class2bytes('int16') / nchans);
+% parts{1} = round([195360091 722703787] / 24414.06 * fs);
+% parts{2} = round([1 722703787] / 24414.06 * fs);
+parts = [];
 
 catDatMemmap('datFiles', datFiles, 'newpath', newpath, 'parts', parts,...
-    'nchans', nchans, 'saveVar', true)
+    'nchans', nchans, 'saveVar', true, 'newname', 'lh93_210730_100000.dat')
 
 
 % preproc dat
-clip = [1, 864000000];
+clip = [];
 datInfo = preprocDat('basepath', pwd,...
-    'fname', 'continuous.dat', 'mapch', 1 : 20,...
-    'rmvch', [3, 7, 13], 'nchans', 20, 'saveVar', false, 'clip', clip,...
+    'fname', 'lh93_210730_100000.dat', 'mapch', 1 : 20,...
+    'rmvch', [1, 5], 'nchans', 20, 'saveVar', true, 'clip', clip,...
     'chunksize', 5e6, 'precision', 'int16', 'bkup', true);
 
 

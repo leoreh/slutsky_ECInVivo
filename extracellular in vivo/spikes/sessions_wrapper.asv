@@ -1,10 +1,10 @@
 % wrapper for batch processing
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% arguments
+% load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = 'lh87';
+mname = 'lh93';
 forceL = false;
 forceA = false;
 
@@ -12,7 +12,7 @@ forceA = false;
 xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
 
 % conditions
-pcond = ["tempflag"; "states"];
+pcond = ["tempflag"];
 ncond = ["fepsp"];
 
 % string array of variables to load
@@ -24,15 +24,11 @@ vars = ["session.mat";...
     "AccuSleep_states";...
     "sr.mat"];
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% load data
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if ~exist('varArray', 'var') && ~forceL
     [varArray, dirnames, mousepath] = getSessionVars('vars', vars,...
         'pcond', pcond, 'ncond', ncond, 'sortDir', false, 'dirnames', [],...
         'xlsname', xlsname, 'mname', mname);
 end
-nsessions = length(dirnames);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % general params
@@ -44,6 +40,20 @@ nchans = session.extracellular.nChannels;
 fs = session.extracellular.sr;
 spkgrp = session.extracellular.spikeGroups.channels;
 
+sessionidx = 1 : nsessions;
+stateidx = [1, 4, 5];
+grp = [1 : 4];                  % which tetrodes to plot
+unitClass = 'pyr';              % plot 'int', 'pyr', or 'all'
+suFlag = 1;                     % plot only su or all units
+frBoundries = [0 Inf];          % include only units with fr greater than
+
+nsessions = length(dirnames);
+[nsub] = numSubplots(length(sessionidx));
+[cfg_colors, cfg_names, ~] = as_loadConfig([]);
+setMatlabGraphics(false)
+
+
+
 % arrange title names
 if length(dirnames) > 1
     pathPieces = regexp(dirnames(:), '_', 'split'); % assumes filename structure: animal_date_time
@@ -53,18 +63,10 @@ else
     pathPieces = regexp(dirnames(:), '_', 'split');
     sessionDate = {pathPieces{2}};
 end
-setMatlabGraphics(false)
 
-% selection
-sessionidx = 1 : nsessions;
-stateidx = [1, 4, 5];
-grp = [1 : 4];                  % which tetrodes to plot
-unitClass = 'pyr';              % plot 'int', 'pyr', or 'all'
-suFlag = 1;                     % plot only su or all units
-frBoundries = [0 Inf];          % include only units with fr greater than
 
-[nsub] = numSubplots(length(sessionidx));
-[cfg_colors, cfg_names, ~] = as_loadConfig([]);
+
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % analyze data
@@ -147,7 +149,7 @@ cell_metrics = CellExplorer('basepaths', basepaths);
 % number of SU and MU (top - pyr; bottom - int) 
 grp = [1 : 4];          % which tetrodes to plot
 suFlag = 0;             % plot only su or all units
-frBoundries = [0 Inf];  % include only units with fr greater than
+frBoundries = [0 Inf];  % include only units with fr greater / lower than
 figFlag = 1; saveFig = true;
 
 if figFlag
@@ -178,12 +180,12 @@ end
 % mean firing rate across time for all sessions concatenated (one figure)
 grp = [1 : 4];                  % which tetrodes to plot
 suFlag = 0;                     % plot only su or all units
-frBoundries = [0 Inf];          % include only units with fr greater than
+frBoundries = [0 Inf];          % include only units with fr greater / lower than
 sessionidx = 1 : nsessions;     % selection of sessions
 
 % find date time of start and end of experiment (round to hour)
 assignVars(varArray, sessionidx(end))
-ts = fr.binsize;     
+ts = sr.binsize;     
 [dtStart, ~] = guessDateTime(dirnames(sessionidx(1)));
 dtStart = dateshift(dtStart, 'start', 'hour');
 [dtEnd, ~] = guessDateTime(dirnames(sessionidx(end)));

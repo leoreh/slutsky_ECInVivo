@@ -109,7 +109,7 @@ if manCur
     saveNS(clu, 'datatype', 'clu', 'session', session, 'grpid', grpid);
     
     % rmv spks from selected cluster
-    sclu = 9      % cluster id
+    sclu = 2      % cluster id
     [cluidx, rmvSpks] = cleanClu(fet, res, sclu, ref, 0.0001, [0.22 0.08]);
     
     % plot fets of specific cluster
