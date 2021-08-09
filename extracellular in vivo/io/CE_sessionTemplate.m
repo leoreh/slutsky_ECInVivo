@@ -116,7 +116,7 @@ end
 if ~isfield(session, 'extracellular') ||...
         (isfield(session, 'extracellular') && (~isfield(session.extracellular, 'leastSignificantBit')) ||...
         isempty(session.extracellular.leastSignificantBit)) || force
-    session.extracellular.leastSignificantBit = 0.195; % [µV]. Intan = 0.195, Amplipex = 0.3815
+    session.extracellular.leastSignificantBit = 0.195; % [?V]. Intan = 0.195, Amplipex = 0.3815
 end
 if ~isfield(session, 'extracellular') ||...
         (isfield(session, 'extracellular') && (~isfield(session.extracellular,'probeDepths')) ||...
@@ -171,7 +171,7 @@ if ~isfield(session, 'analysisTags') ||...
         (isfield(session, 'analysisTags') && (~isfield(session.analysisTags, 'probesLayout')) ||...
         isempty(session.analysisTags.probesLayout)) || force
     session.analysisTags.probesLayout = 'staggered'; % Probe layout: linear,staggered,poly2,edge,poly3,poly5
-    session.analysisTags.probesVerticalSpacing = 10; % [µm] Vertical spacing between sites.
+    session.analysisTags.probesVerticalSpacing = 10; % [?m] Vertical spacing between sites.
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -202,7 +202,7 @@ if exist(sessionInfoName, 'file')
     session.extracellular.spikeGroups.channels=cellfun(@(x) x+1,session.extracellular.spikeGroups.channels,'un',0);
     % load from xml
 elseif exist('LoadXml.m', 'file') && exist(xmlName, 'file')
-    sessionInfo = LoadXml(xmlName);
+    sessionInfo = loadxml(xmlName);
     if isfield(sessionInfo, 'SpkGrps')
         session.extracellular.nSpikeGroups = length(sessionInfo.SpkGrps); % Number of spike groups
         session.extracellular.spikeGroups.channels = {sessionInfo.SpkGrps.Channels}; % Spike groups

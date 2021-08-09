@@ -155,12 +155,12 @@ acc = EMGfromACC('basepath', basepath, 'fname', [basename, '.lfp'],...
 
 % prep signal
 [EMG, EEG, sigInfo] = as_prepSig([basename, '.lfp'], [basename, '.emg.dat'],...
-    'eegCh', [1 : 15], 'emgCh', 1, 'saveVar', true, 'emgNchans', 2,...
-    'inspectSig', false, 'forceLoad', true, 'eegFs', 1250, 'emgFs', 3051.7578125);
+    'eegCh', [5], 'emgCh', 1, 'saveVar', true, 'emgNchans', 4,'eegNchans',[16],...
+    'inspectSig', false, 'forceLoad', true, 'eegFs', 1250, 'emgFs', 1017.25);
 
 % manually create labels
 labelsmanfile = [basename, '.AccuSleep_labelsMan.mat'];
-AccuSleep_viewer(EEG, EMG, 1250, 1, labels, labelsmanfile)
+AccuSleep_viewer(EEG, EMG, 1250, 1, [], labelsmanfile)
 
 % classify with a network
 netfile = 'D:\Code\slutskycode\extracellular in vivo\lfp\SleepStates\AccuSleep\trainedNetworks\net_210708_200155.mat';

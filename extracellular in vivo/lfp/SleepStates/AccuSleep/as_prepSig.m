@@ -74,7 +74,7 @@ forceLoad       = p.Results.forceLoad;
 
 % analysis params (decided by RA, HB, and LH 20 apr 21)
 eegCf = 60;         % cutoff frequency for eeg
-emgCf = [10 600];   % cutoff frequency for emg
+emgCf = [10 200];   % cutoff frequency for emg
 fs = 1250;          % requested sampling frequency
 
 % file names
