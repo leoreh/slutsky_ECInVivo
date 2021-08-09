@@ -2,15 +2,20 @@ function [psdStates, faxis, emgRMS] = psd_states(varargin)
 
 % calculates the lfp /eeg psd for each state epoch, averages and
 % normalizes. can also calculate the emg rms for each epoch. subsamples
-% signals to 128 Hz for faster computation time. another parameter observed
-% in Yuval Nir's code is eeg ratio high / low calculated as:
-% eegRatio{istate}(iepoch) = sum(pow(faxis > 25)) / sum(pow(faxis < 5));
+% signals to 128 Hz for faster computation time. this fits lfp data from
+% as_prepSig where a low-pass of 60 Hz is applied. if higher frequencies
+% are wanted then use raw data and subsample to nyquist (or do not
+% subsample at all).
+
+% another parameter observed in Yuval Nir's code is eeg ratio high / low
+% calculated as: eegRatio{istate}(iepoch) = sum(pow(faxis > 25)) /
+% sum(pow(faxis < 5));
 %
 % INPUT:
 %   emg             numeric. emg data (1 x n)
 %   eeg             numeric. eeg data (1 x n)
 %   labels          numeric. 
-%   fs              numeric. sampling frequency. 
+%   fs              numeric. sampling frequency {1250}. 
 %   graphics        logical. plot figure {true}
 % 
 % OUTPUT
@@ -47,8 +52,17 @@ graphics        = p.Results.graphics;
 % preparations
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% manually alternate between as signal (60 Hz low-pass) and raw data
+dataMode = 'raw';
+if strcmp(dataMode, 'as')
+    newFs = 128;
+    maxF = 50;
+elseif strcmp(dataMode, 'raw')
+    newFs = 1250;
+    maxF = 250;
+end
+
 % subsample signals
-newFs = 128;
 if fs ~= newFs
     eeg = standardizeSR(eeg, fs, newFs);
     emg = standardizeSR(emg, fs, newFs);
@@ -71,7 +85,7 @@ noverlap = floor(0.25 * newFs);
 % psd also reduces the the frequency resolution. further, we omit the first
 % and last bin of an epoch to assure no contamination from other states.
 % thus the minEpDur was set to twice the theoretical minimum (10 s).
-faxis = [0.2 : 0.2 : 50];       
+faxis = [0.2 : 0.2 : maxF];       
     
 % convert labels to state epochs. 
 for istate = 1 : nstates
@@ -121,7 +135,7 @@ end
 % use 10*log10(psdStates) for [dB]
 
 if graphics
-    xLimit = [0 30];
+    xLimit = [0 maxF];
     fh = figure;
     % raw psd
     sb1 = subplot(1, 2, 1);

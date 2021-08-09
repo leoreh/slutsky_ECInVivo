@@ -34,25 +34,23 @@ end
 % general params
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+nsessions = length(dirnames);
 session = CE_sessionTemplate(pwd, 'viaGUI', false,...
     'force', true, 'saveVar', true);
 nchans = session.extracellular.nChannels;
 fs = session.extracellular.sr;
 spkgrp = session.extracellular.spikeGroups.channels;
 
-sessionidx = 1 : nsessions;
+sessionIdx = 1 : nsessions;
 stateidx = [1, 4, 5];
 grp = [1 : 4];                  % which tetrodes to plot
 unitClass = 'pyr';              % plot 'int', 'pyr', or 'all'
 suFlag = 1;                     % plot only su or all units
 frBoundries = [0 Inf];          % include only units with fr greater than
 
-nsessions = length(dirnames);
-[nsub] = numSubplots(length(sessionidx));
+[nsub] = numSubplots(length(sessionIdx));
 [cfg_colors, cfg_names, ~] = as_loadConfig([]);
 setMatlabGraphics(false)
-
-
 
 % arrange title names
 if length(dirnames) > 1
@@ -63,10 +61,6 @@ else
     pathPieces = regexp(dirnames(:), '_', 'split');
     sessionDate = {pathPieces{2}};
 end
-
-
-
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % analyze data
@@ -91,20 +85,20 @@ if forceA
         % vars
         % assignVars(varArray, isession)
         
-%                 cell_metrics = ProcessCellMetrics('session', session,...
-%                     'manualAdjustMonoSyn', false, 'summaryFigures', false,...
-%                     'debugMode', true, 'transferFilesFromClusterpath', false,...
-%                     'submitToDatabase', false, 'getWaveformsFromDat', true);
+        cell_metrics = ProcessCellMetrics('session', session,...
+            'manualAdjustMonoSyn', false, 'summaryFigures', false,...
+            'debugMode', true, 'transferFilesFromClusterpath', false,...
+            'submitToDatabase', false, 'getWaveformsFromDat', true);
 %                 cell_metrics = CellExplorer('basepath', basepath);
         
-%                 load([basename '.spikes.cellinfo.mat'])
-% %                 cc = cellclass('basepath', basepath,...
-% %                     'waves', cat(1, spikes.rawWaveform{:})', 'saveVar', true,...
-% %                     'graphics', false, 'fs', fs);
-%         
-%                 spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
-%                     'saveFig', false, 'force', true, 'mu', [], 'graphics', false,...
-%                     'vis', 'on', 'spkgrp', spkgrp);
+        load([basename '.spikes.cellinfo.mat'])
+        cc = cellclass('basepath', basepath,...
+            'waves', cat(1, spikes.rawWaveform{:})', 'saveVar', true,...
+            'graphics', false, 'fs', fs);
+        
+        spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
+            'saveFig', false, 'force', true, 'mu', [], 'graphics', false,...
+            'vis', 'on', 'spkgrp', spkgrp);
         
         %         load([basename, '.AccuSleep_EEG.mat'])
         %         load([basename, '.AccuSleep_EMG.mat'])
@@ -118,12 +112,12 @@ if forceA
         
         % firing rate
 %         load([basename '.spikes.cellinfo.mat'])
-%         binsize = 60;
-%         winBL = [1 * 60 110 * 60];
-%         fr = firingRate(spikes.times, 'basepath', basepath,...
-%             'graphics', false, 'saveFig', false,...
-%             'binsize', binsize, 'saveVar', true, 'smet', 'MA',...
-%             'winBL', winBL);
+        binsize = 60;
+        winBL = [1 * 60 110 * 60];
+        fr = firingRate(spikes.times, 'basepath', basepath,...
+            'graphics', false, 'saveFig', false,...
+            'binsize', binsize, 'saveVar', true, 'smet', 'MA',...
+            'winBL', winBL);
 %         
 %         %         spike rate per tetrode. note that using firingRate requires
 %         %         special care becasue spktimes is given in samples and not seconds
@@ -181,26 +175,48 @@ end
 grp = [1 : 4];                  % which tetrodes to plot
 suFlag = 0;                     % plot only su or all units
 frBoundries = [0 Inf];          % include only units with fr greater / lower than
-sessionidx = 1 : nsessions;     % selection of sessions
+sessionIdx = 1 : nsessions;     % selection of sessions
+sessionIdx = 4;
 
 % find date time of start and end of experiment (round to hour)
-assignVars(varArray, sessionidx(end))
+assignVars(varArray, sessionIdx(end))
 ts = sr.binsize;     
-[dtStart, ~] = guessDateTime(dirnames(sessionidx(1)));
+[dtStart, ~] = guessDateTime(dirnames(sessionIdx(1)));
 dtStart = dateshift(dtStart, 'start', 'hour');
-[dtEnd, ~] = guessDateTime(dirnames(sessionidx(end)));
+[dtEnd, ~] = guessDateTime(dirnames(sessionIdx(end)));
 dtEnd = dtEnd + seconds(length(sr.strd) * ts);
 dtEnd = dateshift(dtEnd, 'end', 'hour');
 expLen = seconds(dtEnd - dtStart) / ts;     
 
+% get datetime indices and labels for x axis
+dtAxis = dtStart : hours(6) : dtEnd;
+tidx = 1;
+for itime = 1 : length(dtAxis)
+    [~, tidx(itime)] = tstamp2time('dtstr', dtStart, 'tstr', dtAxis(itime), 'fs', 1 / ts);
+    if tidx(itime) == 0
+        tidx(itime) = 1;
+    end
+    tlabel{itime} = datestr(datenum(dtAxis(itime)), 'dd/mm_HH:MM');
+end
+
+% get tidx of manipulation
+dt1 = datetime(2021, 02, 28, 19, 00, 00);
+dt2 = datetime(2021, 03, 03, 17, 10, 00);
+[~, shadeIdx(1)] = tstamp2time('dtstr', dtStart, 'tstr', dt1, 'fs', 1 / ts);
+[~, shadeIdx(2)] = tstamp2time('dtstr', dtStart, 'tstr', dt2, 'fs', 1 / ts);
+shadeIdx = [0, 0];  % override
+
 % initialize vars that will carry information from entire experiment
-expRS = nan(expLen, length(spikes.su));
-expFS = nan(expLen, length(spikes.su));
+if ~isempty(varArray{isession, 3})
+    expRS = nan(expLen, length(spikes.su));
+    expFS = nan(expLen, length(spikes.su));
+end
 expMU = nan(expLen, 4);
 
 % concatenate data from different sessions. finds the index of rec start
 % from basename and assumes the session recording is continuous
-for isession = sessionidx
+idx_recStart = zeros(length(sessionIdx), 1);
+for isession = sessionIdx
     assignVars(varArray, isession)   
     
     % indices
@@ -210,29 +226,16 @@ for isession = sessionidx
     % MU
     expMU(idx_session, :) = sr.strd';
 
-    % RS
-    RSunits{isession} = selectUnits(spikes, cm, fr, suFlag, grp, frBoundries, 'pyr');
-    expRS(idx_session, 1 : sum(RSunits{isession})) = fr.strd(RSunits{isession}, :)';    
-    
-    % FS
-    FSunits{isession} = selectUnits(spikes, cm, fr, suFlag, grp, frBoundries, 'int');
-    expFS(idx_session, 1 : sum(FSunits{isession})) = fr.strd(FSunits{isession}, :)';  
-    
+    if ~isempty(varArray{isession, 3})
+        % RS
+        RSunits{isession} = selectUnits(spikes, cm, fr, suFlag, grp, frBoundries, 'pyr');
+        expRS(idx_session, 1 : sum(RSunits{isession})) = fr.strd(RSunits{isession}, :)';
+        
+        % FS
+        FSunits{isession} = selectUnits(spikes, cm, fr, suFlag, grp, frBoundries, 'int');
+        expFS(idx_session, 1 : sum(FSunits{isession})) = fr.strd(FSunits{isession}, :)';
+    end 
 end
-
-% get datetime indices and labels for x axis
-dtAxis = dtStart : hours(12) : dtEnd;
-tidx = 1;
-for itime = 2 : length(dtAxis)
-    [~, tidx(itime)] = tstamp2time('dtstr', dtStart, 'tstr', dtAxis(itime), 'fs', 1 / ts);
-    tlabel{itime} = datestr(datenum(dtAxis(itime)), 'dd/mm_HH:MM');
-end
-
-% get tidx of manipulation
-dt1 = datetime(2021, 02, 28, 19, 00, 00);
-dt2 = datetime(2021, 03, 03, 17, 10, 00);
-[~, shadeIdx(1)] = tstamp2time('dtstr', dtStart, 'tstr', dt1, 'fs', 1 / ts);
-[~, shadeIdx(2)] = tstamp2time('dtstr', dtStart, 'tstr', dt2, 'fs', 1 / ts);
 
 % plot
 fh = figure;
@@ -250,8 +253,9 @@ xticklabels(tlabel)
 xtickangle(45)
 ylabel('Multi-unit firing rate [Hz]')
 lgh = legend(split(num2str(grp)));
+
 sb2 = subplot(2, 1, 2);
-plot(mean(expRS', 'omitnan'), 'b', 'LineWidth', 2)
+% plot(mean(expRS', 'omitnan'), 'b', 'LineWidth', 2)
 hold on
 plot(mean(expFS', 'omitnan'), 'r', 'LineWidth', 2)
 plot([idx_recStart; idx_recStart], ylim, '--k');
@@ -262,8 +266,10 @@ set(gca, 'box', 'off')
 xticks(tidx)
 xticklabels(tlabel)
 xtickangle(45)
-legend(sprintf('RS ~= %d su', round(mean(sum(cell2nanmat(RSunits, 2), 'omitnan')))),...
- sprintf('FS ~= %d su', round(mean(sum(cell2nanmat(FSunits, 2), 'omitnan')))));
+% legend(sprintf('RS ~= %d su', round(mean(sum(cell2nanmat(RSunits(sessionIdx), 2), 'omitnan')))),...
+%  sprintf('FS ~= %d su', round(mean(sum(cell2nanmat(FSunits(sessionIdx), 2), 'omitnan')))));
+legend(sprintf('RS ~= %d su', round(mean(sum(cell2nanmat(RSunits(sessionIdx), 2), 'omitnan')))),...
+ sprintf('FS ~= %d su', round(mean(sum(cell2nanmat(FSunits(sessionIdx), 2), 'omitnan')))));
 linkaxes([sb1, sb2], 'x')
 if saveFig
     figpath = fullfile(mousepath, 'graphics');
@@ -278,20 +284,20 @@ end
 
 % -------------------------------------------------------------------------
 % rearrange state of entire experiment
-sessionidx = 1 : nsessions;
+sessionIdx = 1 : nsessions;
 stateidx = [1, 4, 5];
 ts = 1;                         % state labels epoch length
 lightHr = '080000';             % when does light cycle start [HHMM]
 
 [cfg_colors, cfg_names, ~] = as_loadConfig([]);
-assignVars(varArray, sessionidx(end))
+assignVars(varArray, sessionIdx(end))
 
 % find date time of start and end of experiment and round it according to
 % the light cycle
-[dtStart, ~] = guessDateTime(dirnames(sessionidx(1)));
+[dtStart, ~] = guessDateTime(dirnames(sessionIdx(1)));
 dtStart = dateshift(dtStart, 'start', 'hour');
 dtStart = dtStart + timeofday(guessDateTime(lightHr)) - timeofday(dtStart);
-[dtEnd, ~] = guessDateTime(dirnames(sessionidx(end)));
+[dtEnd, ~] = guessDateTime(dirnames(sessionIdx(end)));
 dtEnd = dtEnd + seconds(length(ss.labels) * ts);
 dtEnd = dateshift(dtEnd, 'end', 'hour');
 dtEnd = dtEnd + timeofday(guessDateTime(lightHr)) - timeofday(dtEnd);
@@ -303,7 +309,7 @@ expEmg = nan(expLen, 1);
 
 % concatenate data from different sessions. finds the index of rec start
 % from basename and assumes the session recording is continuous
-for isession = sessionidx
+for isession = sessionIdx
     assignVars(varArray, isession)   
     basepath = fullfile(mousepath, dirnames{isession});
     cd(basepath)
@@ -421,11 +427,11 @@ end
 % stacked bar plot of state duration across sessions
 figFlag = 1; saveFig = true;
 stateidx = [1 : 6];
-sessionidx = 1 : nsessions;
-[nsub] = numSubplots(length(sessionidx));
+sessionIdx = 1 : nsessions;
+[nsub] = numSubplots(length(sessionIdx));
 if figFlag
     clear stateDur
-    for isession = sessionidx
+    for isession = sessionIdx
         assignVars(varArray, isession)
         [cfg_colors, cfg_names, ~] = as_loadConfig([]);
         for istate = stateidx 
@@ -436,12 +442,12 @@ if figFlag
     
     fh = figure;
     bh = bar(stateDur, 'stacked', 'FaceColor', 'flat');
-    for isession = sessionidx
+    for isession = sessionIdx
         for istate = stateidx          
             bh(istate).CData(isession, :) = cfg_colors{istate};
         end
     end
-    xticks([1 : length(sessionidx)]);
+    xticks([1 : length(sessionIdx)]);
     xticklabels(cellstr(dirnames))
     xtickangle(45)
     ylim([0 100])
@@ -462,15 +468,15 @@ end
 figFlag = 1; saveFig = true;
 grp = 1 : 4;
 stateidx = [1 : 6];
-sessionidx = 1 : nsessions;
-[nsub] = numSubplots(length(sessionidx));
+sessionIdx = 1 : nsessions;
+[nsub] = numSubplots(length(sessionIdx));
 plotStyle = 'box';      % can be 'histogram' or 'box'
 
 if figFlag
     fh = figure;
-    for isession = 1 : length(sessionidx)
+    for isession = 1 : length(sessionIdx)
         
-        assignVars(varArray, sessionidx(isession))
+        assignVars(varArray, sessionIdx(isession))
         subplot(nsub(1), nsub(2), isession)
         hold on
         for istate = stateidx
@@ -505,7 +511,7 @@ if figFlag
             ylim([0 180])
         end
         
-        title(sessionDate{sessionidx(isession)})
+        title(sessionDate{sessionIdx(isession)})
         if isession == 1
             legend(ss.labelNames(stateidx))
         end
@@ -523,8 +529,8 @@ end
 % distribution of su firing rate per state
 figFlag = 1; saveFig = true;
 stateidx = [1 : 6];
-sessionidx = 1 : nsessions;
-[nsub] = numSubplots(length(sessionidx));
+sessionIdx = 1 : nsessions;
+[nsub] = numSubplots(length(sessionIdx));
 grp = [1 : 4];          % which tetrodes to plot
 unitClass = 'int';      % plot 'int', 'pyr', or 'all'
 suFlag = 0;             % plot only su or all units
@@ -533,8 +539,8 @@ frBoundries = [0 Inf];  % include only units with mean fr in these boundries
 if figFlag
     fh = figure;
     clear frState
-    for isession = 1 : length(sessionidx)
-        assignVars(varArray, sessionidx(isession))
+    for isession = 1 : length(sessionIdx)
+        assignVars(varArray, sessionIdx(isession))
         units = selectUnits(spikes, cm, fr, suFlag, grp, frBoundries, unitClass);
         nunits = sum(units);
         
@@ -553,7 +559,7 @@ if figFlag
         xticks([])
         ylabel([unitClass, ' firing rate [Hz]'])
         ylim([0 15])
-        title(sessionDate{sessionidx(isession)})
+        title(sessionDate{sessionIdx(isession)})
         if isession == 1
             legend(ss.labelNames(stateidx))
         end
@@ -568,75 +574,3 @@ end
 
 
 
-
-
-
-
-% -------------------------------------------------------------------------
-% lfp fft 
-figFlag = 0;
-ch = [9 : 12];
-stateidx = [1, 4];
-win = hann(2 ^ nextpow2(10 * fs));
-noverlap = 5 * fs;
-clear psdPow
-if figFlag
-    % arrange data
-    for isession = 1 : nsessions
-        
-        assignVars(varArray, isession)
-        basepath = session.general.basePath;
-        nchans = session.extracellular.nChannels;
-        cd(basepath)
-        [~, basename] = fileparts(basepath);
-        
-        % load lfp
-        fs = 1250;
-        istart = 0;
-        dur = 5.9 * 60 * 60;
-        lfp = double(bz_LoadBinary([basename, '.lfp'], 'duration', dur,...
-            'frequency', 1250, 'nchannels', nchans, 'start', istart,...
-            'channels', ch, 'downsample', 1));       
-        
-        % limit lfp to state
-        counter = 1;
-        for istate = 1 : length(stateidx)
-            epochs = ss.stateEpochs{istate};
-            epochInTime = epochs(:, 1) > 2 * 60 * 60 & epochs(:, 2) < dur;
-            epochs = epochs(epochInTime, :);
-            epochidx = [];
-            for iepoch = 1 : size(epochs, 1)
-                epochidx = [epochidx, epochs(iepoch, 1) * fs : epochs(iepoch, 2) * fs];
-            end
-            lfpInState = mean(lfp(epochidx, :), 2);
-            lfpInState = lfpInState - mean(lfpInState);
-            
-            % calc psd
-            [pxx, psdFreq] = pwelch(lfpInState, win, noverlap, [], fs);
-            pxx = log10(pxx);
-            psdPow{counter}(:, isession) = pxx;
-            counter = counter + 1;
-        end        
-    end
-     
-    % plot
-    fh = figure;
-    for istate = 1 : length(stateidx)
-        subplot(1, length(stateidx), istate)
-        plot(psdFreq, movmean(psdPow{istate}, 1))
-        xlim([1.5 100])
-        ylim([0.5 4])
-        set(gca, 'xscale', 'log', 'yscale', 'linear', 'box', 'off')
-        legend(sessionDate)
-        legend({'K 10mg/kg', 'Saline', 'K 60mg/kg'})
-        title(ss.labelNames{stateidx(istate)})
-        ylabel('PSD [dB/Hz]')
-        xlabel('Frequency [log(Hz)]')
-    end    
-    if saveFig
-        figpath = fullfile(mousepath, 'graphics');
-        mkdir(figpath)
-        figname = fullfile(figpath, ['psd']);
-        export_fig(figname, '-tif', '-transparent', '-r300')
-    end   
-end
