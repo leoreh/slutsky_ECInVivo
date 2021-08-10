@@ -5,7 +5,7 @@ cd(basepath)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % open ephys
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'D:\Data\lh93\2021-08-03_22-00-08';
+basepath = 'D:\Data\lh93\2021-08-09_22-08-24';
 rmvch = [5, 1];
 mapch = [1 : 20];
 exp = [1];
@@ -18,7 +18,7 @@ datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % tdt
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'D:\Data\lh89_210512_090700';
+basepath = 'D:\Data\lh93\lh93_210809_151600';
 store = 'Raw2';
 blocks = [1];
 chunksize = 300;
@@ -182,7 +182,7 @@ as_stateSeparation(EEG, EMG, labels)
 % load lfp
 lfpData = double(bz_LoadBinary([basename, '.lfp'], 'duration', Inf,...
         'frequency', 1250, 'nchannels', nchans, 'start', 0,...
-        'channels', [1], 'downsample', 1));
+        'channels', [9 : 12], 'downsample', 1));
 EEG = mean(lfpData, 2);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

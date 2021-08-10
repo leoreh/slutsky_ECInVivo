@@ -52,8 +52,8 @@ graphics        = p.Results.graphics;
 % preparations
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% manually alternate between as signal (60 Hz low-pass) and raw data
-dataMode = 'raw';
+% manually alternate between accuSleep signal (60 Hz low-pass) and raw data
+dataMode = 'as';
 if strcmp(dataMode, 'as')
     newFs = 128;
     maxF = 50;
@@ -143,13 +143,18 @@ if graphics
     set(ph, {'color'}, cfg_colors(sstates))
     xlim(xLimit)
     xlabel('Frequency [Hz]')
-    ylabel('PSD [mV^2/Hz]')    
-    
+    ylabel('PSD [mV^2/Hz]')
+    if strcmp(dataMode, 'raw')
+        set(gca, 'YScale', 'log')
+    end
     % norm psd
     sb2 = subplot(1, 2, 2);
     ph = plot(faxis, psdStates ./ sum(psdStates, 2), 'LineWidth', 3);
     set(ph, {'color'}, cfg_colors(sstates))
     xlim(xLimit)
     xlabel('Frequency [Hz]')
-    ylabel('norm PSD')   
+    ylabel('norm PSD')
+    if strcmp(dataMode, 'raw')
+        set(gca, 'YScale', 'log')
+    end
 end
