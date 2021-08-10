@@ -90,7 +90,7 @@ for i = 1 : nwin
 %         binmod = mod(winCalc(i, 2), binsize);         
 %         binedges{i}(end) = binedges{i}(end) + binmod - 1;
     end
-    
+ 
     % count spikes
     nbins = length(binedges{i}) - 1;
     for ii = 1 : nunits

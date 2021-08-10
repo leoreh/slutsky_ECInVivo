@@ -6,7 +6,7 @@ function fr = firingRate(spktimes, varargin)
 % in sliding 1-min windows of 20 s steps (Miyawaki et al., Sci. Rep.,
 % 2019). In practice this is done by setting binsize to 60 s and smoothing
 % w/ moving average of 3 points.
-% 
+%
 % INPUT
 %   spktimes    a cell array of vectors. each vector (unit / tetrode)
 %               contains the timestamps of spikes. for example
@@ -27,12 +27,15 @@ function fr = firingRate(spktimes, varargin)
 %               baseline. default = none.
 %   smet        method for smoothing firing rate: moving average (MA) or
 %               Gaussian kernel (GK) impleneted by multiple-pass MA. {[]}.
-% 
+%
 % OUTPUT
 % fr            struct with fields strd, norm, bins, binsize,
 %               normMethod, normWin
 %
-% 26 feb 19 LH. 
+% TO DO LIST
+%               adjust winCalc to matrix
+%
+% 26 feb 19 LH.
 % 21 nov 19 LH  added active periods and mFR accordingly
 % 09 may 20 LH  fixed c2r issues with calcFR
 % 03 feb 21 LH  added states
@@ -89,15 +92,32 @@ nunits = length(spktimes);
 if exist(fullfile(basepath, [basename '.AccuSleep_states.mat']))
     load(fullfile(basepath, [basename '.AccuSleep_states.mat']), 'ss')
     
+    % adjust stateEpochs to fit winCalc
     fr.states.stateNames = ss.labelNames;
     nstates = length(ss.stateEpochs);
+  
+    for istate = 1 : nstates - 1
+        epochIdx = ss.stateEpochs{istate}(:, 2) < winCalc(2) &...
+            ss.stateEpochs{istate}(:, 1) > winCalc(1)  ;
+        ss.stateEpochs{istate} = ss.stateEpochs{istate}(epochIdx==1, :);
+        for i = 1 : length(ss.stateEpochs{istate})
+            thrIdx(i) =  ss.stateEpochs{istate}(i,2) - ss.stateEpochs{istate}(i,1) > 60 ;
+        end
+          thrIdx=thrIdx';
+        ss.stateEpochs{istate}=ss.stateEpochs{istate}(thrIdx==1,:);
+          thrIdx=[];
+    end
+    
+  
+    
     for i = 1 : nstates
         if ~isempty(ss.stateEpochs{i})
-        [fr.states.fr{i}, fr.states.binedges, fr.states.tstamps{i}, fr.states.binidx] =...
-            times2rate(spktimes, 'binsize', binsize, 'winCalc', ss.stateEpochs{i}, 'c2r', true);
+            [fr.states.fr{i}, fr.states.binedges, fr.states.tstamps{i}, fr.states.binidx] =...
+                times2rate(spktimes, 'binsize', binsize, 'winCalc', ss.stateEpochs{i}, 'c2r', true);
         end
     end
-
+    
+    
     % buzsaki format
 elseif exist(fullfile(basepath, [basename '.SleepState.states.mat']))
     load(fullfile(basepath, [basename '.SleepState.states.mat']))
@@ -107,7 +127,7 @@ elseif exist(fullfile(basepath, [basename '.SleepState.states.mat']))
     nstates = length(ss);
     for i = 1 : nstates
         statetimes = ss{i};
-        [fr.states.fr{i}, fr.states.binedges, fr.states.tstamps{i}, fr.states.binidx] =...
+        [fr.states.fr{i}, fr.states.binedges, fr.states.tstamps{i}, fr.states.binidx{i}] =...
             times2rate(spktimes, 'binsize', binsize, 'winCalc', statetimes, 'c2r', true);
     end
 end
@@ -163,16 +183,16 @@ fr.mfr = mean(fr.strd, 2);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if graphics
     plotFRtime('fr', fr, 'spktimes', spktimes, 'units', true,...
-        'avg', true, 'raster', true, 'saveFig', saveFig)  
+        'avg', true, 'raster', true, 'saveFig', saveFig)
     
-%     bl = blFR(fr.norm, 'method', metBL, 'win', winBL);
-%     plotFRdistribution(bl, 'saveFig', saveFig) 
+    %     bl = blFR(fr.norm, 'method', metBL, 'win', winBL);
+    %     plotFRdistribution(bl, 'saveFig', saveFig)
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % save
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-if saveVar  
+if saveVar
     if ischar(saveVar)
         save([basepath, filesep, basename, '.' saveVar '.mat'], 'fr')
     else
@@ -190,7 +210,7 @@ return
 
 % session params
 session = CE_sessionTemplate(pwd, 'viaGUI', false,...
-    'force', false, 'saveVar', false);      
+    'force', false, 'saveVar', false);
 basepath = session.general.basePath;
 nchans = session.extracellular.nChannels;
 fs = session.extracellular.sr;
@@ -224,7 +244,7 @@ end
 grp = [1 : 4];
 pyr = strcmp(cell_metrics.putativeCellType, 'Pyramidal Cell');
 int = strcmp(cell_metrics.putativeCellType, 'Narrow Interneuron');
-% pyr = ones(1, length(spikes.ts)); % override 
+% pyr = ones(1, length(spikes.ts)); % override
 if isfield(spikes, 'su')
     su = spikes.su';
 else
@@ -239,7 +259,7 @@ end
 % select units
 units = int & su & grpidx;
 data = fr.strd;
-tstamps = fr.tstamps / 60;     
+tstamps = fr.tstamps / 60;
 nsamps = cumsum(datInfo.nsamps);
 state = 2;      % 1 - awake; 2 - NREM
 

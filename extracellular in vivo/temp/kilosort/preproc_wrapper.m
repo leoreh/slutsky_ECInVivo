@@ -115,9 +115,10 @@ spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
 
 % firing rate
 binsize = 60;
-winBL = [1 Inf];
-fr = firingRate(spikes.times, 'basepath', basepath, 'graphics', false, 'saveFig', false,...
-    'binsize', binsize, 'saveVar', true, 'smet', 'MA', 'winBL', winBL);
+winBL = [1 3*60*60];
+winCalc=[1 6*60*60];
+fr = firingRate(spktimes, 'basepath', basepath, 'graphics', false, 'saveFig', false,...
+    'binsize', binsize, 'saveVar', true, 'smet', 'MA', 'winBL', winBL,'winCalc',winCalc);
 
 % CCG
 binSize = 0.001; dur = 0.12; % low res
@@ -160,13 +161,13 @@ acc = EMGfromACC('basepath', basepath, 'fname', [basename, '.lfp'],...
 
 % manually create labels
 labelsmanfile = [basename, '.AccuSleep_labelsMan.mat'];
-AccuSleep_viewer(EEG, EMG, 1250, 1, [], labelsmanfile)
+AccuSleep_viewer(EEG, EMG, 1250, 1, labels, labelsmanfile)
 
 % classify with a network
-netfile = 'D:\Code\slutskycode\extracellular in vivo\lfp\SleepStates\AccuSleep\trainedNetworks\net_210708_200155.mat';
-ss = as_wrapper(EEG, EMG, [], 'basepath', basepath, 'calfile', [],...
+netfile = 'D:\Code\slutskycode\extracellular in vivo\lfp\SleepStates\AccuSleep\trainedNetworks';
+ss = as_wrapper(EEG, EMG, sigInfo, 'basepath', basepath, 'calfile', [],...
     'viaGui', false, 'forceCalibrate', true, 'inspectLabels', false,...
-    'saveVar', false, 'forceAnalyze', true, 'fs', 1250, 'netfile', netfile,...
+    'saveVar', true, 'forceAnalyze', true, 'fs', 1250, 'netfile', netfile,...
     'graphics', true);
 
 % inspect separation after classifying / manual scoring

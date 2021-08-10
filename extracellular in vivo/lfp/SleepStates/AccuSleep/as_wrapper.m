@@ -110,7 +110,7 @@ if isempty(netfile)
 end
 if ~exist(netfile)
     [netfile, netpath] = uigetfile('', 'Please select network file');
-    netfile = [fullfile(netpath, netfile), '.mat'];
+    netfile = [fullfile(netpath, netfile)];
 end
 load(netfile, 'net')    
 
