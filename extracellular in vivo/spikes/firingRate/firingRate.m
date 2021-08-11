@@ -90,34 +90,30 @@ nunits = length(spktimes);
 % calc fr according to states. note states, binsize, and spktimes must be
 % the same units (typically sec)
 if exist(fullfile(basepath, [basename '.AccuSleep_states.mat']))
-    load(fullfile(basepath, [basename '.AccuSleep_states.mat']), 'ss')
-    
-    % adjust stateEpochs to fit winCalc
+    load(fullfile(basepath, [basename '.AccuSleep_states.mat']), 'ss')    
     fr.states.stateNames = ss.labelNames;
     nstates = length(ss.stateEpochs);
   
+    % apply threshold for epoch leng to calc states
+    thrBin = [60, 5, 5, 60, 8, 5];
+    if length(thrBin) == 1
+        thrBin = repmat(thrBin, 6, 1);
+    elseif length(thrBin) ~= nstates - 1
+        warning('thrBin length is different than the number of states')
+    end
+
+    % limit stateEpochs according to epoch length and fit to winCalc
     for istate = 1 : nstates - 1
         epochIdx = ss.stateEpochs{istate}(:, 2) < winCalc(2) &...
-            ss.stateEpochs{istate}(:, 1) > winCalc(1)  ;
-        ss.stateEpochs{istate} = ss.stateEpochs{istate}(epochIdx==1, :);
-        for i = 1 : length(ss.stateEpochs{istate})
-            thrIdx(i) =  ss.stateEpochs{istate}(i,2) - ss.stateEpochs{istate}(i,1) > 60 ;
-        end
-          thrIdx=thrIdx';
-        ss.stateEpochs{istate}=ss.stateEpochs{istate}(thrIdx==1,:);
-          thrIdx=[];
-    end
-    
-  
-    
-    for i = 1 : nstates
-        if ~isempty(ss.stateEpochs{i})
-            [fr.states.fr{i}, fr.states.binedges, fr.states.tstamps{i}, fr.states.binidx] =...
-                times2rate(spktimes, 'binsize', binsize, 'winCalc', ss.stateEpochs{i}, 'c2r', true);
+            ss.stateEpochs{istate}(:, 1) > winCalc(1);
+        thrIdx =  ss.epLen{istate} > thrBin(istate);
+        ss.stateEpochs{istate} = ss.stateEpochs{istate}(thrIdx & epochIdx, :);
+         if ~isempty(ss.stateEpochs{istate})
+            [fr.states.fr{istate}, fr.states.binedges, fr.states.tstamps{istate}, fr.states.binidx] =...
+                times2rate(spktimes, 'binsize', binsize, 'winCalc', ss.stateEpochs{istate}, 'c2r', true);
         end
     end
-    
-    
+        
     % buzsaki format
 elseif exist(fullfile(basepath, [basename '.SleepState.states.mat']))
     load(fullfile(basepath, [basename '.SleepState.states.mat']))

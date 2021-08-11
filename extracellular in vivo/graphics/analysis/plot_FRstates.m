@@ -23,7 +23,7 @@ maxY = 0;
 [cfg_colors, cfg_names, ~] = as_loadConfig([]);
 
 % selection of sessions. if sessionidx longer than one will ingore tstamps
-sessionidx = [7];
+sessionidx = [1];
 
 % selection of timestamps from the same recording for comparison
 assignVars(varArray, sessionidx(1))

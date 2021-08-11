@@ -4,7 +4,7 @@
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = 'lh93';
+mname = 'lh87';
 forceL = false;
 forceA = false;
 
@@ -111,12 +111,12 @@ if forceA
         %             'graphics', true);
         
         % firing rate
-%         load([basename '.spikes.cellinfo.mat'])
+        load([basename '.spikes.cellinfo.mat'])
         binsize = 60;
         winBL = [1 * 60 110 * 60];
         fr = firingRate(spikes.times, 'basepath', basepath,...
             'graphics', false, 'saveFig', false,...
-            'binsize', binsize, 'saveVar', true, 'smet', 'MA',...
+            'binsize', binsize, 'saveVar', false, 'smet', 'MA',...
             'winBL', winBL);
 %         
 %         %         spike rate per tetrode. note that using firingRate requires

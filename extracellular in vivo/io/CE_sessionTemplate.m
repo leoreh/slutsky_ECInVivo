@@ -202,7 +202,7 @@ if exist(sessionInfoName, 'file')
     session.extracellular.spikeGroups.channels=cellfun(@(x) x+1,session.extracellular.spikeGroups.channels,'un',0);
     % load from xml
 elseif exist('LoadXml.m', 'file') && exist(xmlName, 'file')
-    sessionInfo = loadxml(xmlName);
+    sessionInfo = LoadXml(xmlName);
     if isfield(sessionInfo, 'SpkGrps')
         session.extracellular.nSpikeGroups = length(sessionInfo.SpkGrps); % Number of spike groups
         session.extracellular.spikeGroups.channels = {sessionInfo.SpkGrps.Channels}; % Spike groups

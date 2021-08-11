@@ -5,10 +5,10 @@ cd(basepath)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % open ephys
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'H:\sleep after CFC\OS\os1\2021-06-30_12-24-18';
-rmvch = [3, 7, 13];
+basepath = 'D:\Data\lh93\2021-08-10_10-08-10';
+rmvch = [5, 1];
 mapch = [1 : 20];
-exp = [4];
+exp = [1, 3, 4, 5];
 rec = cell(max(exp), 1);
 % rec{1} = [2, 3];
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
