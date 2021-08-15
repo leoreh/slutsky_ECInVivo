@@ -4,7 +4,7 @@
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = 'lh87';
+mname = 'lh93';
 forceL = false;
 forceA = false;
 
@@ -113,23 +113,23 @@ if forceA
         % firing rate
         load([basename '.spikes.cellinfo.mat'])
         binsize = 60;
-        winBL = [1 * 60 110 * 60];
+        winBL = [1 * 60 300 * 60];
         fr = firingRate(spikes.times, 'basepath', basepath,...
             'graphics', false, 'saveFig', false,...
-            'binsize', binsize, 'saveVar', false, 'smet', 'MA',...
+            'binsize', binsize, 'saveVar', true, 'smet', 'MA',...
             'winBL', winBL);
-%         
-%         %         spike rate per tetrode. note that using firingRate requires
-%         %         special care becasue spktimes is given in samples and not seconds
-%         load(fullfile(basepath, [basename '.spktimes.mat']))
-%         for ii = 1 : length(spkgrp)
-%             spktimes{ii} = spktimes{ii} / fs;
-%         end
-%         binsize = 60;
-%         sr = firingRate(spktimes, 'basepath', basepath,...
-%             'graphics', false, 'saveFig', false,...
-%             'binsize', binsize, 'saveVar', 'sr', 'smet', 'none',...
-%             'winBL', [0 Inf]);
+        
+        % spike rate per tetrode. note that using firingRate requires
+        % special care becasue spktimes is given in samples and not seconds
+        load(fullfile(basepath, [basename '.spktimes.mat']))
+        for ii = 1 : length(spkgrp)
+            spktimes{ii} = spktimes{ii} / fs;
+        end
+        binsize = 60;
+        sr = firingRate(spktimes, 'basepath', basepath,...
+            'graphics', false, 'saveFig', false,...
+            'binsize', binsize, 'saveVar', 'sr', 'smet', 'none',...
+            'winBL', [0 Inf]);
     end
 end
 
@@ -170,13 +170,48 @@ if figFlag
     end
 end
 
+% number of SU and MU per spike grp 
+suFlag = 0;             % plot only su or all units
+frBoundries = [0 Inf];  % include only units with fr greater / lower than
+figFlag = 1; saveFig = true;
+sessionIdx = 11;
+
+if figFlag
+    units = cell(1, length(sessionIdx));
+    for isession = sessionIdx
+        assignVars(varArray, isession)
+        for igrp = unique(spikes.shankID)
+            units{isession}(igrp, 1) = sum(selectUnits(spikes, cm, fr, suFlag, igrp, frBoundries, 'pyr'));
+            units{isession}(igrp, 2) = sum(selectUnits(spikes, cm, fr, suFlag, igrp, frBoundries, 'int'));
+        end
+    end
+    fh = figure;
+    k = 1;
+    for isession = sessionIdx
+        subplot(nsub(1), nsub(2), k)
+        bar(units{isession}, 'stacked')
+        legend({"RS"; "FS"})
+        xticks(1 : length(unique(spikes.shankID)))
+        title('Number of Units')
+        xlabel('Spike Group')
+        ylabel('No. Units')
+        box off
+        k = k + 1;
+    end
+     
+    if saveFig
+        figname = fullfile(mousepath, 'graphics', 'UnitsPerGrp');
+        export_fig(figname, '-tif', '-transparent', '-r300')
+    end
+end
+
 % -------------------------------------------------------------------------
 % mean firing rate across time for all sessions concatenated (one figure)
 grp = [1 : 4];                  % which tetrodes to plot
-suFlag = 0;                     % plot only su or all units
+suFlag = 1;                     % plot only su or all units
 frBoundries = [0 Inf];          % include only units with fr greater / lower than
 sessionIdx = 1 : nsessions;     % selection of sessions
-sessionIdx = 2;
+% sessionIdx = 11;
 
 % find date time of start and end of experiment (round to hour)
 assignVars(varArray, sessionIdx(end))
@@ -211,7 +246,7 @@ if ~isempty(varArray{isession, 3})
     expRS = nan(expLen, length(spikes.su));
     expFS = nan(expLen, length(spikes.su));
 end
-expMU = nan(expLen, 4);
+expMU = nan(expLen, length(grp));
 
 % concatenate data from different sessions. finds the index of rec start
 % from basename and assumes the session recording is continuous
@@ -224,7 +259,7 @@ for isession = sessionIdx
     idx_session = idx_recStart(isession) : idx_recStart(isession) + length(sr.strd) - 1;
     
     % MU
-    expMU(idx_session, :) = sr.strd';
+    expMU(idx_session, :) = sr.strd(grp, :)';
 
     if ~isempty(varArray{isession, 3})
         % RS

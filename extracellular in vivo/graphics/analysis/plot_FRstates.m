@@ -11,11 +11,11 @@
 
 % general
 saveFig = true;
-grp = [1 : 4];
-stateidx = [1, 4 ,5];
+grp = [1, 3, 4];
+stateidx = [1 : 6];
 dataType = 'su';        % can be 'mu' (bins of sr) or 'su' (fr)
 unitClass = 'pyr';      % plot 'int', 'pyr', or 'all'
-suFlag = 0;             % plot only su or all units
+suFlag = 1;             % plot only su or all units
 frBoundries = [0 Inf];  % include only units with mean fr in these boundries
 
 % initialize
@@ -23,7 +23,7 @@ maxY = 0;
 [cfg_colors, cfg_names, ~] = as_loadConfig([]);
 
 % selection of sessions. if sessionidx longer than one will ingore tstamps
-sessionidx = [1];
+sessionidx = [11];
 
 % selection of timestamps from the same recording for comparison
 assignVars(varArray, sessionidx(1))
@@ -35,7 +35,7 @@ if length(sessionidx) == 1
 %         ceil(csamps(2)), floor(csamps(3));...
 %         ceil(csamps(3)), floor(csamps(4))];
     
-    tstamps = [1, 150 * 60; 200 * 60, Inf];
+    tstamps = [1, 300 * 60; 400 * 60, Inf];
     
     xLabel = ["Before"; "After"];
 else

@@ -18,9 +18,9 @@ datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % tdt
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'K:\Data\lh94\lh94_210813_090800';
+basepath = 'K:\Data\lh94\lh94_210811_200500';
 store = 'EMG1';
-blocks = [1 : 4];
+blocks = [2];
 chunksize = 300;
 mapch = [1 : 4];
 % mapch = [1 : 16];
@@ -207,9 +207,9 @@ catDatMemmap('datFiles', datFiles, 'newpath', newpath, 'parts', parts,...
 
 
 % preproc dat
-clip = [round(29889 * 1250), Inf];
+clip = [round(29889 * datInfo.fs), Inf];
 datInfo = preprocDat('basepath', pwd,...
-    'fname', 'lh94_210811_200500.lfp', 'mapch', 1 : 16,...
+    'fname', 'lh94_210811_200500.emg.dat', 'mapch', 1 : 16,...
     'rmvch', [], 'nchans', 16, 'saveVar', false, 'clip', clip,...
     'chunksize', 5e6, 'precision', 'int16', 'bkup', true);
 

@@ -215,8 +215,7 @@ for igrp = grp
                 % fix special case where spike is at end / begining of recording
                 if spkidx + win(1) < 1 || spkidx + win(2) > nsampsRaw
                     warning('\nskipping stamp %d because waveform incomplete', iclu)
-                    spkGrp(:, :, ispk) = [];
-                    res(cluIdx(ispk)) = [];
+                    clu(cluIdx(ispk)) = 0;
                     nspks(igrp) = nspks(igrp) - 1;
                     continue
                 end

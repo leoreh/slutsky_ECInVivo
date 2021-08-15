@@ -20,6 +20,9 @@ function [EMG, EEG, sigInfo] = as_prepSig(eegData, emgData, varargin)
 %               be a vector and then the channels will be averaged
 %   emgCh       numeric. channel number of eeg to load from lfp file. for
 %               oe recording system
+%   emgCf       numeric. cut off frequency for emg signal [10 200] or acc
+%               signal [10 600]. decided by RA, HB, and LH 20 apr 21
+%   eegCf       numeric. low-pass frequency for eeg signal [60]
 %   eegNchans   numeric. no channels in eeg data file. if empty will be
 %               extracted from session info file
 %   emgNchans   numeric. no channels in emg data file. if empty will equal
@@ -52,6 +55,8 @@ addOptional(p, 'eegFs', [], @isnumeric);
 addOptional(p, 'emgFs', [], @isnumeric);
 addOptional(p, 'eegNchans', [], @isnumeric);
 addOptional(p, 'emgNchans', [], @isnumeric);
+addOptional(p, 'emgCf', [10 200], @isnumeric);
+addOptional(p, 'eegCf', [60], @isnumeric);
 addOptional(p, 'saveVar', true, @islogical);
 addOptional(p, 'inspectSig', false, @islogical);
 addOptional(p, 'forceLoad', false, @islogical);
@@ -62,6 +67,8 @@ eegCh           = p.Results.eegCh;
 emgCh           = p.Results.emgCh;
 eegFs           = p.Results.eegFs;
 emgFs           = p.Results.emgFs;
+emgCf           = p.Results.emgCf;
+eegCf           = p.Results.eegCf;
 eegNchans       = p.Results.eegNchans;
 emgNchans       = p.Results.emgNchans;
 saveVar         = p.Results.saveVar;
@@ -72,9 +79,6 @@ forceLoad       = p.Results.forceLoad;
 % preparations
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% analysis params (decided by RA, HB, and LH 20 apr 21)
-eegCf = 60;         % cutoff frequency for eeg
-emgCf = [10 200];   % cutoff frequency for emg
 fs = 1250;          % requested sampling frequency
 
 % file names
@@ -271,3 +275,17 @@ labelsNew = labels(1 : newFs / oldFs : end)
 labelsNew = interp1([1 : floor(length(EEG) / oldFs)], labels, [1 : floor(length(EEG) / newFs)]);
 labelsNew = round(labelsNew);       % necassary only if upsampling
 labels = labelsNew;
+
+% -------------------------------------------------------------------------
+% call for accelerometer
+[EMG, EEG, sigInfo] = as_prepSig([basename, '.lfp'], acc.mag,...
+    'eegCh', [4 : 7], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
+    'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
+    'eegFs', 1250, 'emgFs', 1250, 'emgCf', [10 600]);
+
+% call for emg dat file
+[EMG, EEG, sigInfo] = as_prepSig([basename, '.lfp'], [basename, '.emg.dat'],...
+    'eegCh', [5], 'emgCh', 1, 'saveVar', true, 'emgNchans', 4, 'eegNchans',[16],...
+    'inspectSig', false, 'forceLoad', true, 'eegFs', 1250, 'emgFs', 1017.25,...
+    'emgCf', [10 200]);
+
