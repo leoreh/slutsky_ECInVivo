@@ -252,6 +252,7 @@ MiniWvwin = [];
 for j = 1:nstim
     MiniWvwin = [MiniWvwin wvwin(j,1)+2*dt:wvwin(j,2)-dt]; %Only Grow 1 to 3 times
 end
+MiniWvwin = [1:min(wvwin(:,1)) MiniWvwin];
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Create Analysis GUI
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -266,7 +267,7 @@ xlabel('Time [ms]')
 ylabel('Amp [mV]')
 title({sprintf('%s - T%d @ %duA',basename,MainTets(1),fepsp.intens(nfiles))...
     'Move green / red lines to start / end of each response accordingly'...
-    'Press "Enter\return" to move to next intns'})
+    'Press "Enter / return" to move to next intns'})
 axis tight
 ylim(yLimit*1.1)
 
@@ -590,7 +591,7 @@ OpenFigs = AnalysisWin;
         end
         title(ax,{sprintf('%s - T%d @ %duA',basename,WantedTetNum,fepsp.intens(WantedIntNum))...
             'Move green / red lines to start / end of each response accordingly'...
-            'Press "Enter\return" to move to next intns'}) %Change title to match new Ints & Tets
+            'Press "Enter / return" to move to next intns'}) %Change title to match new Ints & Tets
     end
     function closeAnalysedFig(fh,CurrentTet)
         % Close the Analyse fig (fh) when requested. Export it if saveFig in true
@@ -809,6 +810,13 @@ OpenFigs = AnalysisWin;
                 else
                     NowInt.Value = NowInt.Value-1;
                     PlotANew(ax,NowTet.Value,NowInt.Value,cm)
+                    NowYlim = ylim();
+                    NewYlim = [min(min(fepsp.traces{NowTet.Value,NowInt.Value}(MiniWvwin,:), [], 'all').*1.1,NowYlim(1)),...
+                        max(max(fepsp.traces{NowTet.Value,NowInt.Value}(MiniWvwin,:), [], 'all').*1.1,NowYlim(2))];
+                    ylim(NewYlim)
+                    for aa = 1:length(d)
+                        d(aa).Position(:,2) = ylim';
+                    end
                     NowInt.BackgroundColor = 'g';
                     pause(0.2)
                     NowInt.BackgroundColor = 'w';

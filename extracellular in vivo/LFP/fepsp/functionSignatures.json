@@ -1,0 +1,59 @@
+{
+    "fEPSPfromWCP":
+    {
+        "inputs":
+        [
+            {"name":"basepath", "kind":"namevalue", "type":["string"]},
+            {"name":"sufx", "kind":"namevalue", "type":["string"]},
+            {"name":"intens", "kind":"namevalue", "type":[["numeric", "vector"]]},
+            {"name":"protocol", "kind":"namevalue", "type":["choices={'io','stp'}"]},
+            {"name":"dt", "kind":"namevalue", "type":[["numeric", "scalar"]]},
+            {"name":"sfiles", "kind":"namevalue", "type":["numeric"]},
+            {"name":"fs", "kind":"namevalue", "type":[["numeric", "scalar",">0"]]},
+            {"name":"saveVar", "kind":"namevalue", "type":["logical"]},
+            {"name":"saveFig", "kind":"namevalue", "type":["logical"]},
+            {"name":"force", "kind":"namevalue", "type":["logical"]},
+            {"name":"anaflag", "kind":"namevalue", "type":["logical"]},
+            {"name":"AddAnalyseParm", "kind":"namevalue", "type":[["cell", "vector"]]}
+        ]
+    },
+    "fEPSP_analysis":
+    {
+        "inputs":
+        [
+            {"name":"fepsp", "kind":"namevalue", "type":["struct"]},
+            {"name":"basepath", "kind":"namevalue", "type":["folder"]},
+            {"name":"dt", "kind":"namevalue", "type":[["numeric", "scalar"]]},
+            {"name":"force", "kind":"namevalue", "type":["logical"]},
+            {"name":"saveVar", "kind":"namevalue", "type":["logical"]},
+            {"name":"saveFig", "kind":"namevalue", "type":["logical"]},
+            {"name":"vis", "kind":"namevalue", "type":["choices={'on','off'}"]},
+            {"name":"savename", "kind":"namevalue", "type":["string"]},
+            {"name":"MainTets", "kind":"namevalue", "type":[["numeric", "vector"]]},
+            {"name":"MinTimeTol", "kind":"namevalue", "type":[["numeric", "scalar"]]}
+        ]
+    },
+    "fEPSPfromDat":
+    {
+        "inputs":
+        [
+            {"name":"basepath", "kind":"namevalue", "type":["folder"]},
+            {"name":"fname", "kind":"namevalue", "type":["folder"]},
+            {"name":"nchans", "kind":"namevalue", "type":["numeric"]},
+            {"name":"spkgrp", "kind":"namevalue", "type":[["cell", "vector"]]},
+            {"name":"intens", "kind":"namevalue", "type":[["numeric", "vector"]]},
+            {"name":"protocol", "kind":"namevalue", "type":["choices={'io','stp'}"]},
+            {"name":"dc", "kind":"namevalue", "type":["logical"]},
+            {"name":"cf", "kind":"namevalue", "type":["numeric"]},
+            {"name":"fsIn", "kind":"namevalue", "type":["numeric"]},
+            {"name":"precision", "kind":"namevalue", "type":["string"]},
+            {"name":"extension", "kind":"namevalue", "type":["choices={'lfp','dat'}"]},
+            {"name":"recSystem", "kind":"namevalue", "type":["choices={'tdt','oe'}"]},
+            {"name":"force", "kind":"namevalue", "type":["logical"]},
+            {"name":"saveVar", "kind":"namevalue", "type":["logical"]},
+            {"name":"saveFig", "kind":"namevalue", "type":["logical"]},
+            {"name":"inspect", "kind":"namevalue", "type":["logical"]},
+            {"name":"AddAnalyseParm", "kind":"namevalue", "type":[["cell", "vector"]]}
+        ]
+    }
+}
