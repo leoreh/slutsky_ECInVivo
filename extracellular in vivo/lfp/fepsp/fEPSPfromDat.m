@@ -31,6 +31,10 @@ function fepsp = fEPSPfromDat(varargin)
 %   anaflag     logical. send to analysis {1}
 %   saveFig     logical. save graphics {1}. Only relevant If anaflag is
 %               true
+%   AddAnalyseParm
+%               Additional Parameters to pass to fEPSP_analysis, as cell
+%               vector (see fEPSP_analysis for more info). { {} }
+%
 % CALLS
 %   snipFromDat
 %   tdtbin2mat
@@ -116,7 +120,7 @@ addOptional(p, 'saveVar', true, @islogical);
 addOptional(p, 'anaflag', true, @islogical);
 addOptional(p, 'inspect', false, @islogical);
 addOptional(p, 'saveFig', true, @islogical);
-
+addOptional(p, 'AddAnalyseParm',{},@(x) validateattributes(x,"cell",{'vector'}))
 
 parse(p, varargin{:})
 basepath    = p.Results.basepath;
@@ -136,6 +140,7 @@ force       = p.Results.force;
 saveVar     = p.Results.saveVar;
 anaflag     = p.Results.anaflag;
 saveFig     = p.Results.saveFig;
+AddAnalyseParm = p.Results.AddAnalyseParm;
 
 % params
 if isempty(spkgrp)
@@ -434,7 +439,8 @@ end
 
 % send to analysis
 if anaflag
-    fepsp = fEPSP_analysis('fepsp', fepsp,'saveFig',saveFig,'saveVar',saveVar,'savename',fepspname);
+    AnalyseParm = {'fepsp', fepsp,'saveFig',saveFig,'saveVar',saveVar,'savename',fepspname, AddAnalyseParm{:}};
+    fepsp = fEPSP_analysis(AnalyseParm{:});
 end
 
 return

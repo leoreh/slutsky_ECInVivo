@@ -28,6 +28,9 @@ function fepsp = fEPSPfromWCP(varargin)
 %   graphics    REMOVED! - logical. plot graphics {1}.
 %   force       logical. force reload {0}.
 %   anaflag     logical. send to analysis {1}
+%   AddAnalyseParm
+%               Additional Parameters to pass to fEPSP_analysis, as cell
+%               vector (see fEPSP_analysis for more info). { {} }
 % 
 % DEPENDENCIES
 %   getLFP
@@ -99,6 +102,7 @@ addOptional(p, 'saveFig', true, @islogical);
 %addOptional(p, 'graphics', true, @islogical);
 addOptional(p, 'inspect', false, @islogical);
 addOptional(p, 'anaflag', true, @islogical);
+addOptional(p, 'AddAnalyseParm',{},@(x) validateattributes(x,"cell",{'vector'}))
 
 parse(p, varargin{:})
 basepath = p.Results.basepath;
@@ -114,6 +118,7 @@ saveFig = p.Results.saveFig;
 %graphics = p.Results.graphics;
 inspect = p.Results.inspect;
 anaflag = p.Results.anaflag;
+AddAnalyseParm = p.Results.AddAnalyseParm;  
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % params
@@ -323,7 +328,8 @@ end
 %     end
 
 if anaflag
-    fepsp = fEPSP_analysis('fepsp', fepsp,'saveFig',saveFig,'saveVar',saveVar,'savename',fepspname);
+    AnalyseParm = {'fepsp', fepsp,'saveFig',saveFig,'saveVar',saveVar,'savename',fepspname, AddAnalyseParm{:}};
+    fepsp = fEPSP_analysis(AnalyseParm{:});
 end
 
 end
