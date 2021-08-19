@@ -5,10 +5,10 @@ cd(basepath)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % open ephys
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'D:\Data\lh93\2021-08-18_22-00-09';
-rmvch = [4];
-mapch = [1 : 19];
-exp = [1];
+basepath = 'H:\karni\KLBO\kb1\2021-08-18_13-29-44';
+rmvch = [];
+mapch = [1 : 16];
+exp = [5];
 rec = cell(max(exp), 1);
 % rec{1} = [2, 3];
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
