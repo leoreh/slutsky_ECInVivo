@@ -5,9 +5,9 @@ cd(basepath)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % open ephys
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'D:\Data\lh93\2021-08-11_22-00-24';
-rmvch = [5, 1];
-mapch = [1 : 20];
+basepath = 'D:\Data\lh93\2021-08-18_22-00-09';
+rmvch = [4];
+mapch = [1 : 19];
 exp = [1];
 rec = cell(max(exp), 1);
 % rec{1} = [2, 3];
@@ -18,14 +18,14 @@ datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % tdt
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'K:\Data\lh94\lh94_210813_090800';
-store = 'EMG1';
-blocks = [1 : 4];
+basepath = 'K:\Data\lh94\lh94_210818_201200';
+store = 'Raw1';
+blocks = [1, 2];
 chunksize = 300;
 mapch = [1 : 4];
-% mapch = [1 : 16];
+mapch = [1 : 16];
 rmvch = [3, 4];
-% rmvch = [];
+rmvch = [7];
 clip = cell(1, 1);
 datInfo = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
     'chunksize', chunksize, 'mapch', mapch, 'rmvch', rmvch, 'clip', clip);
@@ -62,24 +62,25 @@ fepsp = fEPSP_analysis('fepsp', fepsp, 'basepath', basepath,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % spike sorting
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% in this pipeline waveforms are extracted from the whitened data and are
+% used all the way until manual curation (including calculation of
+% isolation distance). Afterwards, cell explorer resnips the waveform for
+% the dat file and detrends them such that the cell class is determined
+% from the raw waveforms.
+
 % spike detection from temp_wh
 [spktimes, ~] = spktimesWh('basepath', basepath, 'fs', fs, 'nchans', nchans,...
     'spkgrp', spkgrp, 'saveVar', true, 'saveWh', true,...
     'graphics', false, 'force', true);
 
 % spike rate
-for ii = 1 : length(spkgrp)
-    spktimes{ii} = spktimes{ii} / fs;
+for igrp = 1 : length(spkgrp)
+    spktimes{igrp} = spktimes{igrp} / fs;
 end
 sr = firingRate(spktimes, 'basepath', basepath,...
     'graphics', false, 'saveFig', false,...
     'binsize', 60, 'saveVar', 'sr', 'smet', 'none',...
     'winBL', [0 Inf]);
-
-% clip ns files
-% dur = -420;
-% t = [];
-% nsClip('dur', dur, 't', t, 'bkup', true, 'grp', [3 : 4]);
 
 % create ns files 
 dur = [];
@@ -88,6 +89,11 @@ spktimes2ns('basepath', basepath, 'fs', fs,...
     'nchans', nchans, 'spkgrp', spkgrp, 'mkClu', true,...
     'dur', dur, 't', t, 'psamp', [], 'grps', [1 : length(spkgrp)],...
     'spkFile', 'temp_wh');
+
+% clip ns files
+% dur = -420;
+% t = [];
+% nsClip('dur', dur, 't', t, 'bkup', true, 'grp', [3 : 4]);
 
 % clean clusters after sorting 
 cleanCluByFet('basepath', pwd, 'manCur', true, 'grp', [1 : 4])
@@ -107,6 +113,7 @@ cell_metrics = ProcessCellMetrics('session', session,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % cluster validation
+load([basename, '.spikes.cellinfo.mat'])
 mu = [];
 spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
     'saveFig', false, 'force', true, 'mu', mu, 'graphics', false,...
@@ -116,7 +123,7 @@ spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
 binsize = 60;
 winBL = [0 300 * 60];
 winCalc = [0 Inf];
-fr = firingRate(spktimes, 'basepath', basepath, 'graphics', false, 'saveFig', false,...
+fr = firingRate(spikes.times, 'basepath', basepath, 'graphics', false, 'saveFig', false,...
     'binsize', binsize, 'saveVar', true, 'smet', 'MA', 'winBL',...
     winBL, 'winCalc', winCalc);
 
@@ -207,10 +214,20 @@ catDatMemmap('datFiles', datFiles, 'newpath', newpath, 'parts', parts,...
 
 
 % preproc dat
-clip = [round(29889 * 1250), Inf];
+clip = [(397 * 60 + 53), (402 * 60 + 20);...
+        (410 * 60 + 16), (410 * 60 + 56);...
+        (414 * 60 + 45), (415 * 60 + 25);...
+        (427 * 60 + 48), (429 * 60 + 41);...
+        (436 * 60 + 21), (436 * 60 + 41);...
+        (392 * 60 + 3), (393 * 60 + 33);...
+        (386 * 60 + 3), (388 * 60 + 3);...
+        (364 * 60 + 5), (364 * 60 + 45);...
+        (283 * 60 + 28), (283 * 60 + 48)];...
+clip = sort(clip) * fs;
+
 datInfo = preprocDat('basepath', pwd,...
-    'fname', 'lh94_210811_200500.lfp', 'mapch', 1 : 16,...
-    'rmvch', [], 'nchans', 16, 'saveVar', false, 'clip', clip,...
+    'fname', 'lh93_210817_220339.dat', 'mapch', 1 : 18,...
+    'rmvch', [], 'nchans', 18, 'saveVar', false, 'clip', clip,...
     'chunksize', 5e6, 'precision', 'int16', 'bkup', true);
 
 

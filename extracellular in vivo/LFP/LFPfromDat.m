@@ -72,6 +72,10 @@ cf = p.Results.cf;
 chunksize = p.Results.chunksize;
 force = p.Results.force;
 
+% suppress integer warning (for tdt fs)
+warning('off', 'MATLAB:colon:nonIntegerIndex') 
+
+% import sync filter toolbox
 import iosr.dsp.*
 
 % size of one data point in bytes
@@ -169,6 +173,9 @@ fclose(fid);
 fclose(fidOut);
 
 fprintf('\nLFP file created. that took %.2f minutes\n', toc / 60)
+
+% restore integer warning (for tdt fs)
+warning('on', 'MATLAB:colon:nonIntegerIndex') 
 
 end
 

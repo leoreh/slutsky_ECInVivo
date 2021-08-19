@@ -218,6 +218,7 @@ assignVars(varArray, sessionIdx(end))
 ts = sr.binsize;     
 [dtStart, ~] = guessDateTime(dirnames(sessionIdx(1)));
 dtStart = dateshift(dtStart, 'start', 'hour');
+dtStart = dtStart - seconds(60 * 60); % override
 [dtEnd, ~] = guessDateTime(dirnames(sessionIdx(end)));
 dtEnd = dtEnd + seconds(length(sr.strd) * ts);
 dtEnd = dateshift(dtEnd, 'end', 'hour');
@@ -242,7 +243,7 @@ dt2 = datetime(2021, 03, 03, 17, 10, 00);
 shadeIdx = [0, 0];  % override
 
 % initialize vars that will carry information from entire experiment
-if ~isempty(varArray{isession, 3})
+if ~isempty(varArray{1, 3})
     expRS = nan(expLen, length(spikes.su));
     expFS = nan(expLen, length(spikes.su));
 end
@@ -293,7 +294,8 @@ sb2 = subplot(2, 1, 2);
 plot(mean(expRS', 'omitnan'), 'b', 'LineWidth', 2)
 hold on
 plot(mean(expFS', 'omitnan'), 'r', 'LineWidth', 2)
-plot([idx_recStart; idx_recStart], ylim, '--k');
+yLimit = [1 max([range(expFS), range(expRS)])];
+plot([idx_recStart, idx_recStart], yLimit, '--k');
 axis tight
 xlabel('Time [h]')
 ylabel('Single unit firing rate [Hz]')
@@ -301,9 +303,9 @@ set(gca, 'box', 'off')
 xticks(tidx)
 xticklabels(tlabel)
 xtickangle(45)
+linkaxes([sb1, sb2], 'x')
 legend(sprintf('RS ~= %d su', round(mean(sum(cell2nanmat(RSunits(sessionIdx), 2), 'omitnan')))),...
  sprintf('FS ~= %d su', round(mean(sum(cell2nanmat(FSunits(sessionIdx), 2), 'omitnan')))));
-linkaxes([sb1, sb2], 'x')
 if saveFig
     figpath = fullfile(mousepath, 'graphics');
     mkdir(figpath)

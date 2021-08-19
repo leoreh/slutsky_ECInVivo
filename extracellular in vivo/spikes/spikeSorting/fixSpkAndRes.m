@@ -63,7 +63,7 @@ tic;
 p = inputParser;
 addOptional(p, 'basepath', pwd);
 addOptional(p, 'spkgrp', {}, @iscell);
-addOptional(p, 'nchans', 35, @isnumeric);
+addOptional(p, 'nchans', [], @isnumeric);
 addOptional(p, 'grp', [], @isnumeric);
 addOptional(p, 'fs', [], @isnumeric);
 addOptional(p, 'dt', 8, @isnumeric);
