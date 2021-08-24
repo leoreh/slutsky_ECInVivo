@@ -18,6 +18,7 @@ function [fft_data,varargout] = TDTfft(data, channel, varargin)
 %                   frequencies will be returned instead of full scale
 %                   (default = [0 FS/2])
 %      'RESOLUTION' scalar, the frequency resolution, (default = 1)
+%      'LEGEND'     Add a string to describe the data trace
 %
 %   Example
 %      data = TDTbin2mat('C:\TDT\OpenEx\Tanks\DEMOTANK2\Block-1');
@@ -33,8 +34,9 @@ NUMAVG   = 1;
 SPECPLOT = false;
 FREQ = [0, data.fs/2];
 RESOLUTION = 1;
+LEGEND = false;
 
-VALID_PARS = {'PLOT','NUMAVG','SPECPLOT','FREQ','RESOLUTION'};
+VALID_PARS = {'PLOT','NUMAVG','SPECPLOT','FREQ','RESOLUTION','LEGEND'};
 
 % parse varargin
 for ii = 1:2:length(varargin)
@@ -140,9 +142,14 @@ else
 end
 
 % set time scale
-if round(max(t)) == 0
+if floor(t(end)/10) == 0
+    % if less than 10 seconds, use ms
     t = t*1000;
     x_units = 'ms';
+elseif floor(t(end)/600) > 0
+    % if over 10 minutes, use minutes
+    t = t/60;
+    x_units = 'min';
 else
     x_units = 's';
 end
@@ -150,14 +157,26 @@ end
 % plot raw signal
 plot(t,y*factor)
 xlabel(['Time (' x_units ')'])
-if max(y*factor) < 0
-    axis([0 t(end) min(y*factor)*1.05 max(y*factor)*.95]);
+x_axis = [0 t(end)];
+if max(abs(y)) > 0 && all(isfinite(y))
+    if max(y*factor) < 0
+        y_axis = [min(y*factor)*1.05 max(y*factor)*.95];
+    elseif min(y*factor) > 0
+        y_axis = [min(y*factor)*.95 max(y*factor)*1.05];
+    else
+        y_axis = [min(y*factor)*1.05 max(y*factor)*1.05];
+    end
 else
-    axis([0 t(end) min(y*factor)*1.05 max(y*factor)*1.05]);
+    y_axis = [-1 1];
 end
+axis([x_axis y_axis])
 grid on;
 ylabel(y_units)
 title(sprintf('Raw Signal (%.2f %srms)', r*factor, y_units))
+if LEGEND
+   legendstr = LEGEND; 
+   legend(legendstr);
+end
 
 % plot single-sided amplitude spectrum
 subplot(numplots,1,2);
@@ -166,10 +185,17 @@ title('Single-Sided Amplitude Spectrum of y(t)')
 xlabel('Frequency (Hz)')
 ylabel('|Y(f)|')
 if length(FREQ) == 1
-    axis([0 fft_freq(end) 0 max(fft_data)*1.05]);
+    freq_axis = [0 fft_freq(end)];
 else
-    axis([FREQ(1) FREQ(2) 0 max(fft_data)*1.05]);
+    freq_axis = FREQ;
 end
+
+y_axis = [-1 1];
+mx = max(fft_data);
+if mx ~= 0 && isfinite(mx)
+    y_axis = [0 mx*1.05];
+end
+axis([freq_axis y_axis])
 
 % plot power spectrum
 subplot(numplots,1,3)
@@ -178,14 +204,16 @@ semilogx(fft_freq, fft_data)
 title('Power Spectrum')
 xlabel('Frequency (Hz)')
 ylabel('dBV')
-if length(FREQ) == 1
-    axis([0 fft_freq(end) min(fft_data)*1.05 max(fft_data)/1.05]);
-else
-    axis([FREQ(1) FREQ(2) min(fft_data)*1.05 max(fft_data)/1.05]);
+
+y_axis = [-1 1];
+if max(abs(fft_data)) > 0 && all(isfinite(fft_data))
+    y_axis = [min(fft_data)*1.05 max(fft_data)/1.05];
 end
+axis([freq_axis y_axis]);
 
 % plot spectrogram
 if ~SPECPLOT, return, end
 subplot(numplots,1,4)
 spectrogram(double(y),256,240,256,Fs,'yaxis'); 
+colormap('gray')
 title('Spectrogram')
