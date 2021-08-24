@@ -55,7 +55,7 @@ xrep = [20 40 60 80];
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % list of channel indices (including dead \ non-ephys channels)
-chanMap = [1 : nchans];
+chanMap = [spkgrp{:}];
 chanMap0ind = chanMap - 1;
 % the first thing Kilosort does is reorder the data with data = data(chanMap, :).
 % Now we declare which channels are "connected" in this normal ordering,
@@ -69,16 +69,16 @@ connected = true(nchans, 1);
 % the rest of the probe. This helps the algorithm discard noisy templates
 % shared across groups. In this case, we set kcoords to indicate which
 % group the channel belongs to.
-badch = setdiff(chanMap, sort([spkgrp{:}]));
-for i = 1 : length(spkgrp)
-    l = length(spkgrp{i});
-    kcoords = [kcoords, ones(1, l) * i];
-    xcoords = [xcoords, xrep(1 : l)];
-    ycoords = [ycoords, ones(1, l) * i * 200];
+badch = setdiff([1 : nchans], chanMap);
+for igrp = 1 : length(spkgrp)
+    nchGrp = length(spkgrp{igrp});
+    kcoords = [kcoords, ones(1, nchGrp) * igrp];
+    xcoords = [xcoords, xrep(1 : nchGrp)];
+    ycoords = [ycoords, ones(1, nchGrp) * igrp * 20];
 end
-xcoords(badch) = NaN;
-ycoords(badch) = NaN;
-kcoords(badch) = NaN;
+% xcoords(badch) = NaN;
+% ycoords(badch) = NaN;
+% kcoords(badch) = NaN;
 connected(badch) = false; % e.g. acceleration
 % at this point in Kilosort we do data = data(connected, :), ycoords =
 % ycoords(connected), xcoords = xcoords(connected) and kcoords =

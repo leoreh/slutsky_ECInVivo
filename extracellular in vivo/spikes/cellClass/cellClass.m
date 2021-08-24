@@ -82,6 +82,28 @@ fb = cwtfilterbank('SignalLength', nsamp, 'VoicesPerOctave', 32,...
 fprintf('\ncalculating waveform parameters\n\n')
 tic
 
+% load waveforms from spk file
+cd(basepath)
+session = CE_sessionTemplate(pwd, 'viaGUI', false,...
+    'force', true, 'saveVar', false);
+spkgrp = session.extracellular.spikeGroups.channels;
+waves = zeros(size(waves));
+k = 1;
+for igrp = 1 : length(spkgrp)
+    spk = loadNS('datatype', 'spk', 'session', session, 'grpid', igrp);
+    clu = loadNS('datatype', 'clu', 'session', session, 'grpid', igrp);
+    uclu = unique(clu);
+    for iclu = 1 : length(uclu)
+        if uclu(iclu) == 0 ||  uclu(iclu) == 1
+            continue
+        end
+        w = mean(spk(:, :, clu == uclu(iclu)), 3);
+        [~, chIdx] = max(range(w, 2));
+        waves(:, k) = w(chIdx, :);
+        k = k + 1;
+    end
+end
+
 % initialize
 tp = nan(1, nunits);
 spkw = nan(1, nunits);

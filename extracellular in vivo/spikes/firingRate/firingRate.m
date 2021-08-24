@@ -80,7 +80,7 @@ nunits = length(spktimes);
 [~, basename] = fileparts(basepath);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% calculations
+% calc firing rate
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % calc fr across entire session
@@ -128,6 +128,10 @@ elseif exist(fullfile(basepath, [basename '.SleepState.states.mat']))
     end
 end
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% modulate
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 % smooth
 switch smet
     case 'MA'
@@ -153,6 +157,12 @@ else
     end
 end
 fr.norm = fr.strd ./ mean(fr.strd(:, winBL(1) : winBL(2)), 2);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% apply criterions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+bl = mean(fr.strd(:, winBL(1) : winBL(2)));
 
 % select units who fired above thr
 if any(strcmp(select, 'thr'))
