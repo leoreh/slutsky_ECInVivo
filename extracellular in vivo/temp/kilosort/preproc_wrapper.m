@@ -18,17 +18,26 @@ datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % tdt
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'K:\Data\lh94\lh94_210818_201200';
-store = 'Raw1';
-blocks = [1, 2];
+basepath = 'E:\Leore\LH\DataTanks\lh94\lh94_210823_121100';
+store = 'Raw2';
+blocks = [3];
 chunksize = 300;
 mapch = [1 : 4];
 mapch = [1 : 16];
 rmvch = [3, 4];
-rmvch = [7];
+rmvch = [];
 clip = cell(1, 1);
+clip{1} = [0 seconds(hours(2) + minutes(41) + seconds(37))];
 datInfo = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
     'chunksize', chunksize, 'mapch', mapch, 'rmvch', rmvch, 'clip', clip);
+
+% get start/stop time of specific block from tdt
+for iblock = 1 : length(blocks)
+    blockpath = fullfile(basepath, ['block-', num2str(blocks(iblock))]);
+    heads{iblock} = TDTbin2mat(blockpath, 'HEADERS', 1);
+    heads{iblock}.startDate = datestr(datenum([1970, 1, 1, 0, 0, heads{iblock}.startTime]) + hours(3));
+    heads{iblock}.stopDate = datestr(datenum([1970, 1, 1, 0, 0, heads{iblock}.stopTime]) + hours(3));
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % session info (cell explorer foramt)
