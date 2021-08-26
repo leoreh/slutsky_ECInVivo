@@ -1,5 +1,5 @@
  % preproc_wrapper
-basepath = 'D:\VMs\shared\lh58\lh58_200901_080917';
+basepath = 'D:\LFP\SWC\TDT\TG\TG2\tg2_210716_2020';
 cd(basepath)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -169,7 +169,7 @@ acc = EMGfromACC('basepath', basepath, 'fname', [basename, '.lfp'],...
 
 % manually create labels
 labelsmanfile = [basename, '.AccuSleep_labelsMan.mat'];
-AccuSleep_viewer(EEG, EMG, 1250, 1, [], labelsmanfile)
+AccuSleep_viewer(EEG, EMG, 1250, 1, labels, [])
 
 % classify with a network
 netfile = 'D:\Code\slutskycode\extracellular in vivo\lfp\SleepStates\AccuSleep\trainedNetworks\net_210709_142246.mat';

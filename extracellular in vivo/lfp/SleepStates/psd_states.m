@@ -85,7 +85,7 @@ noverlap = floor(0.25 * newFs);
 % psd also reduces the the frequency resolution. further, we omit the first
 % and last bin of an epoch to assure no contamination from other states.
 % thus the minEpDur was set to twice the theoretical minimum (10 s).
-faxis = [0.2 : 0.2 : maxF];       
+faxis = [0.2 : 0.2 : 50];       
     
 % convert labels to state epochs. 
 for istate = 1 : nstates
@@ -135,7 +135,7 @@ end
 % use 10*log10(psdStates) for [dB]
 
 if graphics
-    xLimit = [0 maxF];
+    xLimit = [0 50];
     fh = figure;
     % raw psd
     sb1 = subplot(1, 2, 1);

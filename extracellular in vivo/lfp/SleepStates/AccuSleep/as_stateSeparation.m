@@ -236,6 +236,10 @@ if saveFig
     export_fig(figname, '-tif', '-transparent', '-r300')
 end
 
+%%changes%%
+save ('epMatrix','epMat');
+timeSpentInState = sum(cell2nanmat(epLen(sstates)), 1, 'omitnan'), ones(1, length(sstates));
+save ('timeSpentinState','timeSpentInState');
 end
 
 % EOF
