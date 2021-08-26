@@ -105,7 +105,7 @@ switch datatype
         
     case 'spk'
         if isempty(nspks)
-            clu = loadNS('datatype', 'clu');
+            clu = loadNS('datatype', 'clu', 'grpid', grpid);
             nspks = length(clu);
         end
         if isempty(fs)

@@ -11,35 +11,35 @@ function data = TDTbin2mat(BLOCK_PATH, varargin)
 %                   data)
 %   data.scalars    contains all scalar data (samples and timestamps)
 %   data.info       contains additional information about the block
-%F
+%
 %   'parameter', value pairs
-%        'T1'         scalar, retrieve data starting at T1 (default = 0 for
-%                         beginning of recording)
-%        'T2'         scalar, retrieve data ending at T2 (default = 0 for end
-%                         of recording)
-%        'SORTNAME'   string, specify sort ID to use when extracting snippets
-%        'TYPE'       array of scalars or cell array of strings, specifies
-%                         what type of data stores to retrieve from the tank
+%      'T1'         scalar, retrieve data starting at T1 (default = 0 for
+%                       beginning of recording)
+%      'T2'         scalar, retrieve data ending at T2 (default = 0 for end
+%                       of recording)
+%      'SORTNAME'   string, specify sort ID to use when extracting snippets
+%      'TYPE'       array of scalars or cell array of strings, specifies
+%                       what type of data stores to retrieve from the tank
 %                     1: all (default)
 %                     2: epocs
 %                     3: snips
 %                     4: streams
 %                     5: scalars
 %                     TYPE can also be cell array of any combination of
-%                         'epocs', 'streams', 'scalars', 'snips', 'all'
+%                       'epocs', 'streams', 'scalars', 'snips', 'all'
 %                     examples:
-%                         data = TDTbin2mat('MyTank','Block-1','TYPE',[1 2]);
-%                             > returns only epocs and snips
-%                         data = TDTbin2mat('MyTank','Block-1','TYPE',{'epocs','snips'});
-%                             > returns only epocs and snips
+%                       data = TDTbin2mat(BLOCKPATH,'TYPE',[1 2]);
+%                           > returns only epocs and snips
+%                       data = TDTbin2mat(BLOCKPATH,'TYPE',{'epocs','snips'});
+%                           > returns only epocs and snips
 %      'RANGES'     array of valid time range column vectors
 %      'NODATA'     boolean, only return timestamps, channels, and sort 
 %                       codes for snippets, no waveform data (default = false)
 %      'STORE'      string, specify a single store to extract
 %                   cell of strings, specify cell arrow of stores to extract
-%      'CHANNEL'    integer, choose a single channel, to extract from
-%                       stream or snippet events. Default is 0, to extract
-%                       all channels.
+%      'CHANNEL'    integer or array, choose a single channel or array of
+%                       channels to extract from stream or snippet events
+%                       Default is 0, to extract all channels.
 %      'BITWISE'    string, specify an epoc store or scalar store that 
 %                       contains individual bits packed into a 32-bit 
 %                       integer. Onsets/offsets from individual bits will
@@ -86,6 +86,13 @@ for ii = 1:2:length(varargin)
         error('%s is not a valid parameter. See help TDTbin2mat.', upper(varargin{ii}));
     end
     eval([upper(varargin{ii}) '=varargin{ii+1};']);
+end
+
+% round timestamps to the nearest sample
+T1 = ceil((T1/2.56e-6)) * 2.56e-6;
+T2 = floor((T2/2.56e-6)) * 2.56e-6;
+if ~isempty(RANGES)
+    RANGES = [ceil(RANGES(1,:)/2.56e-6) * 2.56e-6;floor(RANGES(2,:)/2.56e-6) * 2.56e-6];
 end
 
 ALLOWED_TYPES = {'ALL','EPOCS','SNIPS','STREAMS','SCALARS'};
@@ -215,9 +222,9 @@ catch
     warning('TNT file could not be processed')
 end
 
-customSortEvent = '';
-customSortChannelMap = zeros(1,1024);
-customSortCodes = [];
+customSortEvent = {};
+customSortChannelMap = {};
+customSortCodes = {};
 
 % look for SortIDs
 if ismember(3, TYPE) && ~strcmp(SORTNAME, 'TankSort')
@@ -233,15 +240,17 @@ if ismember(3, TYPE) && ~strcmp(SORTNAME, 'TankSort')
     for ii = 3:numel(sortFolders)
         if sortFolders(ii).isdir
             % parse sort result file name
-            sortFile = dir([SORT_PATH filesep sortFolders(ii).name filesep '*.SortResult']);
-            periodInd = strfind(sortFile(1).name, '.');
-            sortIDs.event{ind} = '';
-            if ~isempty(periodInd)
-                sortIDs.event{ind} = sortFile(1).name(1:periodInd(end)-1);
+            sortFile = dir([SORT_PATH filesep sortFolders(ii).name filesep '*.SortResult']);  
+            for tempp = 1:numel(sortFile)
+                periodInd = strfind(sortFile(tempp).name, '.');
+                sortIDs.event{ind} = '';
+                if ~isempty(periodInd)
+                    sortIDs.event{ind} = sortFile(tempp).name(1:periodInd(end)-1);
+                end
+                sortIDs.fileNames{ind} = [[SORT_PATH filesep sortFolders(ii).name] filesep sortFile(tempp).name];
+                sortIDs.sortID{ind} = sortFolders(ii).name;   
+                ind = ind + 1;
             end
-            sortIDs.fileNames{ind} = [[SORT_PATH filesep sortFolders(ii).name] filesep sortFile(1).name];
-            sortIDs.sortID{ind} = sortFolders(ii).name;
-            ind = ind + 1;
         end
     end
     
@@ -258,16 +267,22 @@ if ismember(3, TYPE) && ~strcmp(SORTNAME, 'TankSort')
     % an event on the entire TSQ file.
     
     % look for the exact one
-    [lia, loc] = ismember(SORTNAME, sortIDs.sortID);
-    if ~lia
-        warning('SortID: %s not found\n', SORTNAME);
+    loc = find(ismember(sortIDs.sortID, SORTNAME));
+    if ~any(loc)
+        warning('SortID:%s not found\n', SORTNAME);
     else
-        fprintf('Using SortID: %s for event: %s\n', SORTNAME, sortIDs.event{loc});
-        customSortEvent = sortIDs.event{loc};
-        fid = fopen(sortIDs.fileNames{loc}, 'rb');
-        customSortChannelMap = fread(fid, 1024);
-        customSortCodes = uint16(fread(fid, Inf, '*char'));
-        fclose(fid);
+        ind = 1;
+        for tempp = 1:numel(sortIDs.sortID)
+            if ismember(tempp, loc)
+                fprintf('Using SortID:%s for event:%s\n', SORTNAME, sortIDs.event{tempp});
+                customSortEvent{ind} = sortIDs.event{tempp};
+                fid = fopen(sortIDs.fileNames{tempp}, 'rb');
+                customSortChannelMap{ind} = fread(fid, 1024);
+                customSortCodes{ind} = uint16(fread(fid, Inf, '*char'));
+                fclose(fid);
+                ind = ind + 1;
+            end
+        end
     end
 end
 
@@ -304,7 +319,7 @@ if ~useOutsideHeaders
     fseek(tsq, -32, 'eof');
     code2 = fread(tsq, 1, '*int32');
     if code2 ~= EVMARK_STOPBLOCK
-        warning('Block end marker not found');
+        warning('Block end marker not found, block did not end cleanly. Try setting T2 smaller if errors occur');
         headerStruct.stopTime = nan;
     else
         fseek(tsq, -24, 'eof');
@@ -331,71 +346,10 @@ end
 s1 = datenum([1970, 1, 1, 0, 0, headerStruct.startTime]);
 s2 = datenum([1970, 1, 1, 0, 0, headerStruct.stopTime]);
 if headerStruct.stopTime > 0
-    data.info.duration = datestr(s2-s1,'HH:MM:SS');
+    data.info.duration = datestr(s2-s1,'DD:HH:MM:SS');
 end
 data.info.streamChannel = CHANNEL;
 data.info.snipChannel = CHANNEL;
-
-% look for Synapse recording notes
-notesTxtPath = [BLOCK_PATH 'Notes.txt'];
-noteTxtLines = {};
-try
-    txt = fopen(notesTxtPath, 'rt');
-    ind = 1;
-    while ~feof(txt)
-        noteTxtLines{ind} = fgetl(txt);
-        ind = ind + 1;
-    end
-    fclose(txt);
-    fprintf('Found Synapse note file: %s\n', notesTxtPath);
-catch
-    %warning('Synapse Notes file could not be processed')
-end
-
-NoteText = {};
-if ~isempty(noteTxtLines)
-    targets = {'Experiment','Subject','User','Start','Stop'};
-    NoteText = cell(numel(noteTxtLines),1);
-    noteInd = 1;
-    for n = 1:numel(noteTxtLines)
-        noteLine = noteTxtLines{n};
-        if isempty(noteLine)
-            continue
-        end
-        bTargetFound = false;
-        for t = 1:length(targets)
-            testStr = [targets{t} ':'];
-            eee = length(testStr);
-            if length(noteLine) >= eee + 2
-                if strcmp(noteLine(1:eee), testStr)
-                    data.info.(targets{t}) = noteLine(eee+2:end);
-                    bTargetFound = true;
-                    break
-                end
-            end
-        end
-        if bTargetFound
-            continue
-        end
-
-        % look for actual notes
-        testStr = 'Note-';
-        eee = length(testStr);
-        if length(noteLine) >= eee + 2
-            if strcmp(noteLine(1:eee), testStr)
-                noteInd = str2double(noteLine(strfind(noteLine,'-')+1:strfind(noteLine,':')-1));
-                noteIdentifier = noteLine(strfind(noteLine, '[')+1:strfind(noteLine,']')-1);
-                if strcmp(noteIdentifier, 'none')
-                    quotes = strfind(noteLine, '"');
-                    NoteText{noteInd} = noteLine(quotes(1)+1:quotes(2)-1);
-                else
-                    NoteText{noteInd} = noteIdentifier;
-                end            
-            end
-        end
-    end
-    NoteText = NoteText(1:noteInd);
-end
 
 epocs = struct;
 epocs.name = {};
@@ -413,6 +367,111 @@ notes.index = {};
 notes.ts = {};
 
 if ~useOutsideHeaders
+    % look for Synapse recording notes
+    notesTxtPath = [BLOCK_PATH 'Notes.txt'];
+    noteTxtLines = {};
+    try
+        txt = fopen(notesTxtPath, 'rt');
+        ind = 1;
+        while ~feof(txt)
+            noteTxtLines{ind} = fgetl(txt);
+            ind = ind + 1;
+        end
+        fclose(txt);
+        fprintf('Found Synapse note file: %s\n', notesTxtPath);
+    catch
+        %warning('Synapse Notes file could not be processed')
+    end
+
+    NoteText = {};
+    NoteTS = [];
+    bDoOnce = 1;
+    if ~isempty(noteTxtLines)
+        targets = {'Experiment','Subject','User','Start','Stop'};
+        NoteText = cell(numel(noteTxtLines),1);
+        noteInd = 1;
+        for n = 1:numel(noteTxtLines)
+            noteLine = noteTxtLines{n};
+            if isempty(noteLine)
+                continue
+            end
+            bTargetFound = false;
+            for t = 1:length(targets)
+                testStr = [targets{t} ':'];
+                eee = length(testStr);
+                if length(noteLine) >= eee + 2
+                    if strcmp(noteLine(1:eee), testStr)
+                        data.info.(targets{t}) = noteLine(eee+2:end);
+                        bTargetFound = true;
+                        break
+                    end
+                end
+            end
+            if bTargetFound
+                continue
+            end
+
+            if bDoOnce
+                if ~isempty(strfind(data.info.Start, '-'))
+                    yearfmt = 'yyyy-mm-dd';
+                else
+                    yearfmt = 'mm/dd/yyyy';
+                end
+                if ~isempty(strfind(data.info.Start, 'm'))
+                    timefmt = 'HH:MM:SSPM';
+                else
+                    timefmt = 'HH:MM:SS';
+                end
+                recStart = datenum(upper(data.info.Start), [timefmt ' ' yearfmt]);
+                temp = datevec(recStart);
+                currDay = temp(3);
+                currMonth = temp(2);
+                currYear = temp(1);
+                bDoOnce = 0;
+            end
+
+            % look for actual notes
+            testStr = 'Note-';
+            eee = length(testStr);
+            if length(noteLine) >= eee + 2
+                if strcmp(noteLine(1:eee), testStr)
+                    noteInd = str2double(noteLine(strfind(noteLine,'-')+1:strfind(noteLine,':')-1));
+                    noteIdentifier = noteLine(strfind(noteLine, '[')+1:strfind(noteLine,']')-1);
+                    spaces = strfind(noteLine, ' ');
+                    noteTime = noteLine(spaces(1)+1:spaces(2)-1);
+                    noteDT = datenum(upper(noteTime), timefmt);
+                    vec = datevec(noteDT);
+                    vec(1) = currYear;
+                    vec(2) = currMonth;
+                    vec(3) = currDay;
+                    noteTimeRelative = etime(vec, datevec(recStart));
+                    NoteTS(noteInd) = noteTimeRelative;
+                    if strcmp(noteIdentifier, 'none')
+                        quotes = strfind(noteLine, '"');
+                        noteText = noteLine(quotes(1)+1:quotes(2)-1);
+                        if numel(noteText) > 16
+                            if strcmp('date changed to ', noteText(1:16))
+                                disp(noteText)
+                                temp = datevec(datenum(upper(noteText(17:end)), yearfmt));
+                                currDay = temp(3);
+                                currMonth = temp(2);
+                                currYear = temp(1);
+                                NoteTS(noteInd) = -1;
+                            end
+                        end
+                        NoteText{noteInd} = noteText;
+                    else
+                        NoteText{noteInd} = noteIdentifier;
+                    end            
+                end
+            end
+        end
+        NoteText = NoteText(1:noteInd);
+    end
+    ind = NoteTS > 0;
+    headerStruct.NoteTS = NoteTS(ind);
+    headerStruct.NoteText = NoteText(ind);
+
     %tsqFileSize = fread(tsq, 1, '*int64');
     fseek(tsq, 40, 'bof');
     
@@ -426,12 +485,16 @@ if ~useOutsideHeaders
     
     % map store code to other info
     headerStruct.stores = struct();
+    code_ct = 0;
     while ~feof(tsq)
         loopCt = loopCt + 1;
         
         % read all headers into one giant array
         heads = fread(tsq, readSize*4, '*uint8');
         heads = typecast(heads, 'uint32');
+        if isempty(heads)
+            continue
+        end
         
         % reshape so each column is one header
         if mod(numel(heads), 10) ~= 0
@@ -451,7 +514,7 @@ if ~useOutsideHeaders
             codes = heads(3,:);
         end
         
-        % find unique stores and a pointed to one of their headers
+        % find unique stores and a pointer to one of their headers
         sortedCodes = sort(codes);
         uniqueCodes = sortedCodes([true,diff(sortedCodes)>0]);
         temp = zeros(size(uniqueCodes));
@@ -489,10 +552,12 @@ if ~useOutsideHeaders
                 for i = 1:numel(blockNotes)
                     temp = blockNotes(i);
                     if strcmp(temp.StoreName, name)
-                        if strcmp(temp.Enabled, '2')
-                            %disp([temp.StoreName ' STORE DISABLED'])
-                            bSkipDisabled = 1;
-                            break;
+                        if isfield(temp, 'Enabled')
+                            if strcmp(temp.Enabled, '2')
+                                %disp([temp.StoreName ' STORE DISABLED'])
+                                bSkipDisabled = 1;
+                                break;
+                            end
                         end
                     end
                 end
@@ -559,7 +624,6 @@ if ~useOutsideHeaders
                     headerStruct.stores.(varName).dform = heads(9,sortedCodes(x));
                 end
             end
-            
             validInd = find(codes == uniqueCodes(x));
             
             % look for notes in 'freqs' field for epoch or scalar events
@@ -578,6 +642,8 @@ if ~useOutsideHeaders
                     end
                     tsInd = validInd(noteInd);
                     noteTS = typecast(reshape(heads(5:6, tsInd), 1, []), 'double') - headerStruct.startTime;
+                    % round timestamps to the nearest sample
+                    noteTS = round(noteTS/2.56e-6) * 2.56e-6;
                     noteIndex = typecast(myNotes(noteInd),'uint32');
                     
                     [lia, loc] = ismember(name, notes.name);
@@ -589,17 +655,29 @@ if ~useOutsideHeaders
             temp = typecast(heads(4, validInd), 'uint16');
             if ~strcmp(storeTypes{x},'epocs')
                 headerStruct.stores.(varName).ts{loopCt} = typecast(reshape(heads(5:6, validInd), 1, []), 'double') - headerStruct.startTime;
+                % round timestamps to the nearest sample
+                headerStruct.stores.(varName).ts{loopCt} = round(headerStruct.stores.(varName).ts{loopCt}/2.56e-6) * 2.56e-6;
                 if ~NODATA || strcmp(storeTypes{x},'streams')
                     headerStruct.stores.(varName).data{loopCt} = typecast(reshape(heads(7:8, validInd), 1, []), 'double');
                 end
                 headerStruct.stores.(varName).chan{loopCt} = temp(1:2:end);
                 if strcmpi(headerStruct.stores.(varName).typeStr, 'snips')
-                    if ~isempty(customSortCodes) && strcmp(headerStruct.stores.(varName).name, customSortEvent)
-                        % apply custom sort codes
-                        sortChannels = find(customSortChannelMap) - 1;
-                        headerStruct.stores.(varName).sortcode{loopCt} = customSortCodes(validInd)';
-                        headerStruct.stores.(varName).sortname = SORTNAME;
-                        headerStruct.stores.(varName).sortchannels = sortChannels;
+                    if ismember(3, TYPE) && ~strcmp(SORTNAME, 'TankSort')
+                        for tempp = 1:numel(customSortEvent)
+                            if ~isempty(customSortCodes{tempp}) && strcmp(headerStruct.stores.(varName).name, customSortEvent{tempp})
+                                % apply custom sort codes
+                                sortChannels = find(customSortChannelMap{tempp}) - 1;
+                                headerStruct.stores.(varName).sortcode{loopCt} = customSortCodes{tempp}(validInd+code_ct)';
+                                code_ct = code_ct + numel(codes);
+                                headerStruct.stores.(varName).sortname = SORTNAME;
+                                headerStruct.stores.(varName).sortchannels = sortChannels;
+                            elseif isempty(customSortCodes{tempp}) && strcmp(headerStruct.stores.(varName).name, customSortEvent{tempp})
+                                headerStruct.stores.(varName).sortcode{loopCt} = temp(2:2:end);
+                                headerStruct.stores.(varName).sortname = 'TankSort';
+                            else
+                                continue
+                            end
+                        end
                     else
                         headerStruct.stores.(varName).sortcode{loopCt} = temp(2:2:end);
                         headerStruct.stores.(varName).sortname = 'TankSort';
@@ -607,7 +685,10 @@ if ~useOutsideHeaders
                 end
             else
                 [lia, loc] = ismember(name, epocs.name);
-                epocs.ts{loc} = [epocs.ts{loc} typecast(reshape(heads(5:6, validInd), 1, []), 'double') - headerStruct.startTime];
+                ddd = typecast(reshape(heads(5:6, validInd), 1, []), 'double') - headerStruct.startTime;
+                % round timestamps to nearest sample
+                ddd = round((ddd/2.56e-6)) * 2.56e-6;
+                epocs.ts{loc} = [epocs.ts{loc} ddd];
                 epocs.data{loc} = [epocs.data{loc} typecast(reshape(heads(7:8, validInd), 1, []), 'double')];
             end
             
@@ -616,14 +697,34 @@ if ~useOutsideHeaders
         clear codes;
         
         lastTS = typecast(reshape(heads(5:6, end), 1, []), 'double') - headerStruct.startTime;
+        % round timestamp to nearest sample
+        lastTS = round((lastTS/2.56e-6)) * 2.56e-6;
         
         % break early if time filter
         if T2 > 0 && lastTS > T2
             break
         end
     end
-    fprintf('read from t=%.2fs to t=%.2fs\n', T1, max(lastTS, T2));
+    if T2 > 0
+        lastRead = T2;
+    else
+        lastRead = lastTS;
+    end
+    fprintf('read from t=%.2fs to t=%.2fs\n', T1, lastRead);
     
+    % make fake Note epoc if it doesn't exist already
+    if ~isempty(headerStruct.NoteText) && ~ismember('Note', epocs.name)
+        epocs.name = [epocs.name {'Note'}];
+        epocs.buddies = [epocs.buddies {'    '}];
+        epocs.code = [epocs.code {typecast(uint8('Note'), 'uint32')}];
+        epocs.ts = [epocs.ts {headerStruct.NoteTS}];
+        epocs.type = [epocs.type {'onset'}];
+        epocs.typeStr = [epocs.typeStr {'epocs'}];
+        epocs.typeNum = 2;
+        epocs.data = [epocs.data {1:length(headerStruct.NoteTS)}];
+        epocs.dform = [epocs.dform {4}];
+    end
+
     % put epocs into headerStruct
     for ii = 1:numel(epocs.name)
         % find all non-buddies first
@@ -646,6 +747,11 @@ if ~useOutsideHeaders
     for ii = 1:numel(epocs.name)
         if strcmp(epocs.type{ii}, 'offset')
             varName = fixVarName(epocs.buddies{ii});
+            if ~isfield(headerStruct.stores, varName)
+                warning('%s buddy epoc not found, skipping', epocs.buddies{ii});
+                continue
+            end
+            
             headerStruct.stores.(varName).offset = epocs.ts{ii};
             
             % handle odd case where there is a single offset event and no 
@@ -671,7 +777,40 @@ if ~useOutsideHeaders
             end
         end
     end
+    
+    % fix secondary epoc offsets
+    if ~isempty(fieldnames(blockNotes))
+        for ii = 1:numel(epocs.name)
+            if strcmp(epocs.type{ii}, 'onset')
+                currentName = epocs.name{ii};
+                varName = fixVarName(currentName);
+                [lia, loc] = ismember(headerStruct.stores.(varName).name, {blockNotes(:).StoreName});
+                if lia
+                    nnn = blockNotes(loc);
+                    if ~isempty(strfind(nnn.HeadName, '|'))
+                        primary = fixVarName(nnn.HeadName(end-3:end));
+                        if VERBOSE, fprintf('%s is secondary epoc of %s\n', currentName, primary), end
+                        headerStruct.stores.(varName).offset = headerStruct.stores.(primary).offset;
+                    end
+                end
+            end
+        end
+    end
+    
     clear epocs;
+    
+    % if there is a custom sort name but this store ID isn't included, ignore it altogether
+    fff = fields(headerStruct.stores);
+    for xxx = 1:numel(fff)
+        varName = fff{xxx};
+        if strcmpi(headerStruct.stores.(varName).typeStr, 'snips')
+            if ismember(3, TYPE) && ~strcmp(SORTNAME, 'TankSort')
+                if ~isfield(headerStruct.stores.(varName), 'sortcode')
+                    headerStruct.stores = rmfield(headerStruct.stores, varName);
+                end
+            end
+        end
+    end
     
     fff = fields(headerStruct.stores);
     for xxx = 1:numel(fff)
@@ -690,9 +829,7 @@ if ~useOutsideHeaders
         end
         if isfield(headerStruct.stores.(varName), 'data')
             if ~strcmp(headerStruct.stores.(varName).typeStr, 'epocs')
-                if isfield(headerStruct.stores.(varName), 'data')
-                    headerStruct.stores.(varName).data = cat(2,headerStruct.stores.(varName).data{:});
-                end
+                headerStruct.stores.(varName).data = cat(2,headerStruct.stores.(varName).data{:});
             end
         end
         
@@ -713,12 +850,10 @@ if ~useOutsideHeaders
 end
 
 if doHeadersOnly
+    if (tsq), fclose(tsq); end
     data = headerStruct;
     return;
 end
-
-% loop through all possible stores
-storeNames = fields(headerStruct.stores);
 
 if T2 > 0
     validTimeRange = [T1; T2];
@@ -734,6 +869,12 @@ if numRanges > 0
     data.time_ranges = validTimeRange;
 end
 
+% round time ranges to nearest integer
+validTimeRange = round((validTimeRange/2.56e-6)) * 2.56e-6;
+
+% loop through all possible stores
+storeNames = fields(headerStruct.stores);
+
 % do full time filter here
 for ii = 1:numel(storeNames)
     varName = storeNames{ii};
@@ -748,17 +889,38 @@ for ii = 1:numel(storeNames)
             start = validTimeRange(1,jj);
             stop = validTimeRange(2,jj);
             filterInd{jj} = find(headerStruct.stores.(varName).ts >= start & headerStruct.stores.(varName).ts < stop);
+            bSkip = 0;
+            if isempty(filterInd{jj})
+                % if it's a stream and a short window, we might have missed it
+                if strcmpi(headerStruct.stores.(varName).typeStr, 'streams')
+                    end_index = find(headerStruct.stores.(varName).ts < stop);
+                    if numel(end_index) > 0
+                        end_index = end_index(end);
+                        % keep one prior for streams (for all channels)
+                        nchan = max(headerStruct.stores.(varName).chan);
+                        if end_index - nchan > 0
+                            filterInd{jj} = end_index - (double(nchan:-1:1)-1);
+                            temp = headerStruct.stores.(varName).ts(filterInd{jj});
+                            headerStruct.stores.(varName).startTime{jj} = temp(1);
+                            bSkip = 1;
+                        end
+                    end
+                end
+            end
+            
             if ~isempty(filterInd{jj})
                 % parse out the information we need
                 if strcmpi(headerStruct.stores.(varName).typeStr, 'streams')
                     % keep one prior for streams (for all channels)
-                    nchan = max(headerStruct.stores.(varName).chan);
-                    temp = filterInd{jj};
-                    if temp(1)-nchan > 0
-                        filterInd{jj} = [-(double(nchan:-1:1)) + temp(1) filterInd{jj}];
+                    if ~bSkip
+                        nchan = max(headerStruct.stores.(varName).chan);
+                        temp = filterInd{jj};
+                        if temp(1) - nchan > 0
+                            filterInd{jj} = [-(double(nchan:-1:1)) + temp(1) filterInd{jj}];
+                        end
+                        temp = headerStruct.stores.(varName).ts(filterInd{jj});
+                        headerStruct.stores.(varName).startTime{jj} = temp(1);
                     end
-                    temp = headerStruct.stores.(varName).ts(filterInd{jj});
-                    headerStruct.stores.(varName).startTime{jj} = temp(1);
                 else
                     headerStruct.stores.(varName).filteredTS{jj} = headerStruct.stores.(varName).ts(filterInd{jj});
                 end
@@ -803,6 +965,11 @@ for ii = 1:numel(storeNames)
                 if isfield(headerStruct.stores.(varName), 'filteredChan')
                     headerStruct.stores.(varName).chan = [headerStruct.stores.(varName).filteredChan{:}];
                     headerStruct.stores.(varName) = rmfield(headerStruct.stores.(varName), 'filteredChan');
+                    if strcmp(headerStruct.stores.(varName).typeStr, 'snips')
+                        if numel(unique(headerStruct.stores.(varName).chan)) == 1
+                            headerStruct.stores.(varName).chan = headerStruct.stores.(varName).chan(1);
+                        end
+                    end
                 else
                     headerStruct.stores.(varName).chan = [];
                 end
@@ -839,7 +1006,12 @@ for ii = 1:numel(storeNames)
             headerStruct.stores.(varName).data = headerStruct.stores.(varName).data(filterInd);
             headerStruct.stores.(varName).offset = headerStruct.stores.(varName).offset(filterInd);
             if strcmp(varName, 'Note')
-                headerStruct.stores.(varName).notes = NoteText(filterInd);
+                try
+                    headerStruct.stores.(varName).notes = headerStruct.NoteText(filterInd);
+                catch
+                    fprintf('Problem with Notes.txt file\n')
+                    headerStruct.stores.(varName).notes = {};
+                end
             end
             % fix time ranges
             if headerStruct.stores.(varName).offset(1) < headerStruct.stores.(varName).onset(1)
@@ -875,6 +1047,9 @@ for ii = 1:numel(storeNames)
         end
     end
 end
+
+% see which stores might be in SEV files
+sevNames = SEV2mat(BLOCK_PATH, 'JUSTNAMES', 1);
 
 for ii = 1:numel(storeNames)
     currentName = storeNames{ii};
@@ -942,7 +1117,7 @@ for ii = 1:numel(storeNames)
             end
             
             % only use timestamps from first channel
-            headerStruct.stores.(currentName).ts = headerStruct.stores.(currentName).ts(ind{xx});
+            headerStruct.stores.(currentName).ts = headerStruct.stores.(currentName).ts(ind{1});
             
             % remove channels field
             headerStruct.stores.(currentName) = rmfield(headerStruct.stores.(currentName),'chan');
@@ -957,22 +1132,18 @@ for ii = 1:numel(storeNames)
         headerStruct.stores.(currentName).name = currentName;
         headerStruct.stores.(currentName).fs = currentFreq;
         
-        if CHANNEL > 0
-            if numel(headerStruct.stores.(currentName).chan) == 1
-                if CHANNEL == headerStruct.stores.(currentName).chan
-                    % there is only one channel and we want it..
-                else
-                    error(['CHANNEL ' num2str(CHANNEL) ' not found']);
-                end
-            else
-                validInd = headerStruct.stores.(currentName).chan == CHANNEL;
-                if ~NODATA
-                    allOffsets = double(headerStruct.stores.(currentName).data(validInd));
-                end
-                headerStruct.stores.(currentName).chan = headerStruct.stores.(currentName).chan(validInd);
-                headerStruct.stores.(currentName).sortcode = headerStruct.stores.(currentName).sortcode(validInd);
-                headerStruct.stores.(currentName).ts = headerStruct.stores.(currentName).ts(validInd);
+        if ~any(CHANNEL == 0)
+            if any(~ismember(CHANNEL, headerStruct.stores.(currentName).chan))
+                % a channel we specified is not in this data set
+                error('Channel(s) %s not found in store %s', num2str(CHANNEL(~ismember(CHANNEL, headerStruct.stores.(currentName).chan))), currentName);
             end
+            validInd = ismember(headerStruct.stores.(currentName).chan, CHANNEL);
+            if ~NODATA
+                allOffsets = double(headerStruct.stores.(currentName).data(validInd));
+            end
+            headerStruct.stores.(currentName).chan = headerStruct.stores.(currentName).chan(validInd);
+            headerStruct.stores.(currentName).sortcode = headerStruct.stores.(currentName).sortcode(validInd);
+            headerStruct.stores.(currentName).ts = headerStruct.stores.(currentName).ts(validInd);
         else
             if ~NODATA
                 allOffsets = double(headerStruct.stores.(currentName).data);
@@ -999,6 +1170,7 @@ for ii = 1:numel(storeNames)
             headerStruct.stores.(currentName).data = {};
             npts = (currentSize-10) * 4/sz;
             eventCount = 0;
+            
             for f = 1:numel(arr)
                 if fseek(tev, markers(f), 'bof') == -1
                     ferror(tev);
@@ -1047,6 +1219,7 @@ for ii = 1:numel(storeNames)
                     eventCount = eventCount + size(ind, 1);
                 end
             end
+            
             % convert cell array for output
             headerStruct.stores.(currentName).data = cat(1,headerStruct.stores.(currentName).data{:});
             totalEvents = size(headerStruct.stores.(currentName).data,1);
@@ -1060,16 +1233,13 @@ for ii = 1:numel(storeNames)
         headerStruct.stores.(currentName).name = currentName;
         headerStruct.stores.(currentName).fs = currentFreq;
         
-        % catch if the data is in SEV file
-        sevList = dir([BLOCK_PATH '*.sev']);
-        useSEVs = 0;
-        for jj = 1:length(sevList)
-            if strfind(sevList(jj).name, currentName) > 0
-                useSEVs = 1;
-                break
-            end
+        if ~isempty(sevNames)
+            indexC = strfind(sevNames, currentName);
+            useSEVs = find(not(cellfun('isempty',indexC)));
+        else
+            useSEVs = 0;
         end
-        
+
         if useSEVs
             
             % try to catch if sampling rate is wrong in SEV files
@@ -1080,19 +1250,17 @@ for ii = 1:numel(storeNames)
                     expectedFS = str2double(blockNotes(loc).SampleFreq);
                 end
             end
-            if CHANNEL == 0
-                d = SEV2mat(BLOCK_PATH, 'EVENTNAME', currentName, 'VERBOSE', 0, 'RANGES', validTimeRange, 'FS', expectedFS);
-            else
-                d = SEV2mat(BLOCK_PATH, 'EVENTNAME', currentName, 'CHANNEL', CHANNEL, 'VERBOSE', 0, 'RANGES', validTimeRange, 'FS', expectedFS);
+            d = SEV2mat(BLOCK_PATH, 'EVENTNAME', currentName, 'VERBOSE', VERBOSE, 'RANGES', validTimeRange, 'FS', expectedFS, 'CHANNEL', CHANNEL);
+            if ~isempty(d)
+                detectedFS = d.(currentName).fs;
+                if expectedFS > 0 && (abs(expectedFS - detectedFS) > 1)
+                    warning('Detected fs in SEV files was %.3f Hz, expected %.3f Hz. Using %.3f Hz.', detectedFS, expectedFS, expectedFS);
+                    d.(currentName).fs = expectedFS;
+                end
+
+                headerStruct.stores.(currentName) = d.(currentName);
+                headerStruct.stores.(currentName).startTime = ceil(validTimeRange(1) * d.(currentName).fs) / d.(currentName).fs;
             end
-            detectedFS = d.(currentName).fs;
-            if expectedFS > 0 && (abs(expectedFS - detectedFS) > 1)
-                warning('Detected fs in SEV files was %.3f Hz, expected %.3f Hz. Using %.3f Hz.', detectedFS, expectedFS, expectedFS);
-                d.(currentName).fs = expectedFS;
-            end
-            
-            headerStruct.stores.(currentName) = d.(currentName);
-            headerStruct.stores.(currentName).startTime = 0;
         else
             % make sure SEV files are there if they are supposed to be
             if headerStruct.stores.(currentName).ucf == 1
@@ -1105,36 +1273,31 @@ for ii = 1:numel(storeNames)
                 if isempty(fc)
                     continue
                 end
-                if CHANNEL > 0
-                    if all(headerStruct.stores.(currentName).filteredChan{jj} == 1)
-                        % there is only one channel here, use them all
-                        validInd = 1:numel(headerStruct.stores.(currentName).filteredData{jj});
-                    else
-                        validInd = fc == CHANNEL;
-                        if ~any(validInd)
-                            error('Channel %d not found in store %s', CHANNEL, currentName);
-                        end
-                        headerStruct.stores.(currentName).filteredChan{jj} = fc(validInd);    
+                if ~any(CHANNEL == 0)
+                    validInd = ismember(fc, CHANNEL);
+                    if ~all(ismember(CHANNEL, fc))
+                        error('Channel(s) %s not found in store %s', num2str(CHANNEL(~ismember(CHANNEL, fc))), currentName);
                     end
-                    nchan = 1;
-                    chanIndex = 1;
+                    headerStruct.stores.(currentName).filteredChan{jj} = fc(validInd);
+                    fd = headerStruct.stores.(currentName).filteredData{jj};
+                    headerStruct.stores.(currentName).filteredData{jj} = fd(validInd);
+                    channels = CHANNEL;
                 else
-                    validInd = 1:numel(headerStruct.stores.(currentName).filteredData{jj});
-                    nchan = double(max(fc));
-                    chanIndex = ones(1,nchan);
+                    channels = 1:max(fc);
                 end
+                nchan = length(channels);  % nchan = double(max(fc));
+                chanIndex = ones(1,nchan);
                 
                 fc = headerStruct.stores.(currentName).filteredChan{jj};
                 theseOffsets = double(headerStruct.stores.(currentName).filteredData{jj});
-                theseOffsets = theseOffsets(validInd);
                 
                 % preallocate data array
                 npts = (currentSize-10) * 4/sz;
                 headerStruct.stores.(currentName).data{jj} = zeros(nchan, npts*numel(theseOffsets)/nchan, fmt);
-                
+                    
                 % try to optimally read data from disk in bigger chunks
                 maxReadSize = 10000000;
-                iter = min(8192, size(theseOffsets,2)-1);
+                iter = max(min(8192, size(theseOffsets,2)-1),1);
                 arr = 1:iter:size(theseOffsets,2);
                 markers = theseOffsets(arr);
                 while max(diff(markers)) > maxReadSize
@@ -1172,35 +1335,24 @@ for ii = 1:numel(storeNames)
                     for kk = 1:numel(relativeOffsets)
                         if nchan > 1
                             chan = fc(channelOffset);
+                            % map big array channel number into channels array
+                            chan = find(chan == channels);
                         else
                             chan = 1;
                         end
                         channelOffset = channelOffset + 1;
-                        if CHANNEL > 0
-                            if isempty(find((ind(kk,:) <= numel(tevData)),1))
-                                if ~foundEmpty
-                                    warning('data missing from TEV file for STORE:%s CHANNEL:%d TIME:%.2fs', currentName, chan, T1 + chanIndex / headerStruct.stores.(currentName).fs)
-                                    foundEmpty = true;
-                                end
-                                chanIndex = chanIndex + npts;
-                                continue
+                        
+                        if any(ind(kk,:) > numel(tevData))
+                            if ~foundEmpty
+                                warning('data missing from TEV file for STORE:%s CHANNEL:%d TIME:%.2fs', currentName, chan, T1 + chanIndex(chan) / headerStruct.stores.(currentName).fs)
+                                foundEmpty = true;
                             end
-                            foundEmpty = false;
-                            headerStruct.stores.(currentName).data{jj}(1, chanIndex:(chanIndex + npts - 1)) = tevData(ind(kk,:))';
-                            chanIndex = chanIndex + npts;
-                        else
-                            if isempty(find((ind(kk,:) <= numel(tevData)),1))
-                                if ~foundEmpty
-                                    warning('data missing from TEV file for STORE:%s CHANNEL:%d TIME:%.2fs', currentName, chan, T1 + chanIndex(chan) / headerStruct.stores.(currentName).fs)
-                                    foundEmpty = true;
-                                end
-                                chanIndex(chan) = chanIndex(chan) + npts;
-                                continue
-                            end
-                            foundEmpty = false;
-                            headerStruct.stores.(currentName).data{jj}(chan, chanIndex(chan):chanIndex(chan) + npts - 1) = tevData(ind(kk,:));
                             chanIndex(chan) = chanIndex(chan) + npts;
+                            continue
                         end
+                        foundEmpty = false;
+                        headerStruct.stores.(currentName).data{jj}(chan, chanIndex(chan):chanIndex(chan) + npts - 1) = tevData(ind(kk,:));
+                        chanIndex(chan) = chanIndex(chan) + npts;
                     end
                     % add data to big cell array
                 end
@@ -1208,14 +1360,20 @@ for ii = 1:numel(storeNames)
                 % be more exact with streams time range filter.
                 % keep timestamps >= validTimeRange(1) and < validTimeRange(2)
                 % index 1 is at headerStruct.stores.(currentName).startTime
-                minSample = max(ceil((validTimeRange(1,jj)-headerStruct.stores.(currentName).startTime{jj})*headerStruct.stores.(currentName).fs),0)+1;
-                maxSample = min(max(floor((validTimeRange(2,jj)-headerStruct.stores.(currentName).startTime{jj})*headerStruct.stores.(currentName).fs),0)+1, size(headerStruct.stores.(currentName).data{jj}, 2));
+                
+                % round timestamps to the nearest sample
+                tlo_sample = double(uint64(validTimeRange(1,jj)/2.56e-6));
+                thi_sample = double(uint64(validTimeRange(2,jj)/2.56e-6));
+                td_sample = double(uint64(headerStruct.stores.(currentName).startTime{jj}/2.56e-6));
+                
+                sf = 1/(2.56e-6*headerStruct.stores.(currentName).fs);
+                minSample = max(ceil((tlo_sample-td_sample)/sf),0)+1;
+                maxSample = max(floor((thi_sample-td_sample)/sf),0)+1;
+                maxSample = min(maxSample, size(headerStruct.stores.(currentName).data{jj}, 2));
                 headerStruct.stores.(currentName).data{jj} = headerStruct.stores.(currentName).data{jj}(:,minSample:maxSample);
                 headerStruct.stores.(currentName).startTime{jj} = headerStruct.stores.(currentName).startTime{jj} + (minSample-1) / headerStruct.stores.(currentName).fs;
             end
-            if CHANNEL > 0
-                headerStruct.stores.(currentName).channel = CHANNEL;
-            end
+            headerStruct.stores.(currentName).channel = channels;
             headerStruct.stores.(currentName) = rmfield(headerStruct.stores.(currentName), 'filteredChan');
             headerStruct.stores.(currentName) = rmfield(headerStruct.stores.(currentName), 'filteredData');
         end
@@ -1227,6 +1385,38 @@ for ii = 1:numel(storeNames)
     data.(currentTypeStr).(currentName) = headerStruct.stores.(currentName);
 end
 
+% find SEV files that weren't in TSQ file
+if ismember(4, TYPE)
+    for ii = 1:numel(sevNames)
+        % if looking for a particular store and this isn't it, skip it
+        if iscell(STORE)
+            if all(~strcmp(STORE, sevNames{ii})), continue; end
+        else
+            if ~strcmp(STORE, '') && ~strcmp(STORE, sevNames{ii}), continue; end
+        end
+        if isstruct(data.streams)
+            indexC = strfind(fields(data.streams), sevNames{ii});
+            bFound = ~all(cellfun('isempty',indexC));
+        else
+            bFound = 0;
+        end
+        if ~bFound
+            d = SEV2mat(BLOCK_PATH, 'EVENTNAME', sevNames{ii}, 'CHANNEL', CHANNEL, 'VERBOSE', VERBOSE, 'RANGES', validTimeRange);
+            if ~isempty(d)
+                fff = fields(d);
+                for jj = 1:numel(fff)
+                    if isfield(d.(fff{jj}), 'name')
+                        if strcmp(d.(fff{jj}).name, sevNames{ii})
+                            data.streams.(fff{jj}) = d.(fff{jj});
+                            data.streams.(fff{jj}).startTime = ceil(validTimeRange(1) * d.(fff{jj}).fs) / d.(fff{jj}).fs;
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
 if ~isempty(COMBINE)
     for ii = 1:numel(COMBINE)
         if ~isfield(data.snips, COMBINE{ii})
@@ -1235,7 +1425,7 @@ if ~isempty(COMBINE)
         data.snips.(COMBINE{ii}) = snip_maker(data.snips.(COMBINE{ii}));
     end
 end
-    
+
 if ~strcmp(BITWISE , '')
     if ~(isfield(data.epocs, BITWISE) || isfield(data.scalars, BITWISE))
         error(['Specified BITWISE store name ' BITWISE ' is not in epocs or scalars']);
@@ -1270,7 +1460,7 @@ if ~strcmp(BITWISE , '')
         bbb = dec2bin(xxx(1), 32);
         curr_state = str2num(bbb');          %#ok<ST2NM>
         big_array(2:nbits+1,i) = curr_state;
-            
+        
         % look for changes from previous state
         changes = find(xor(prev_state, curr_state));
         
@@ -1360,12 +1550,10 @@ else
     VERBOSE = varargin{1};
 end
 varname = name;
+if ~isstrprop(varname(1), 'alpha')
+    varname = ['x' varname];
+end
 for ii = 1:numel(varname)
-    if ii == 1
-        if isstrprop(varname(ii), 'digit')
-            varname(ii) = 'x';
-        end
-    end
     if ~isstrprop(varname(ii), 'alphanum')
         varname(ii) = '_';
     end
@@ -1395,8 +1583,8 @@ delimInd = strfind(s, '[USERNOTEDELIMITER]');
 try
     s = s(delimInd(2):delimInd(3));
 catch
-    warning('Bad TBK file, try running the TankRestore tool to correct. See http://www.tdt.com/technotes/#0935.htm')
-    return;
+    warning('Bad TBK file, try running the TankRestore tool to correct. See https://www.tdt.com/docs/technotes/synapse/#tn0935')
+    return
 end
 lines = textscan(s, '%s', 'delimiter', sprintf('\n'));
 lines = lines{1};
@@ -1415,11 +1603,16 @@ for i = 1:length(lines)-1
     semi = strfind(lines{i},';');
     
     % grab field and value between the '=' and ';'
-    fieldstr = lines{i}(equals(1)+1:semi(1)-1);
-    value = lines{i}(equals(3)+1:semi(3)-1);
+    try
+        fieldstr = lines{i}(equals(1)+1:semi(1)-1);
+        value = lines{i}(equals(3)+1:semi(3)-1);
     
-    % insert new field and value into store struct
-    blockNotes(storenum).(fieldstr) = value;
+        % insert new field and value into store struct
+        blockNotes(storenum).(fieldstr) = value;
+    catch
+        warning('Bad TBK file, try running the TankRestore tool to correct. See https://www.tdt.com/technotes/#0935.htm')
+        return
+    end
 end
 
 % print out store information

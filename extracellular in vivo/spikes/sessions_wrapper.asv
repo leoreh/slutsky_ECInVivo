@@ -4,7 +4,7 @@
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = 'lh94';
+mname = 'lh95';
 forceL = true;
 forceA = false;
 
@@ -53,8 +53,13 @@ frBoundries = [0 Inf];          % include only units with fr greater than
 setMatlabGraphics(false)
 
 % arrange title names
-for isession = 1 : nsessions
-    sessionName{isession} = dirnames{isession}(length(mname) + 2 : end);
+if length(dirnames) > 1
+    pathPieces = regexp(dirnames(:), '_', 'split'); % assumes filename structure: animal_date_time
+    sessionNames = [pathPieces{:}];
+    sessionDate = sessionDate(2 : 3 : end);
+else
+    pathPieces = regexp(dirnames(:), '_', 'split');
+    sessionDate = {pathPieces{2}};
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -62,7 +67,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if forceA
-    for isession = [7, 9]
+    for isession = [8, 11, 15, 19]
 
         
         % file
@@ -108,12 +113,12 @@ if forceA
         
         % firing rate
 %         load([basename '.spikes.cellinfo.mat'])
-        binsize = 60;
-        winBL = [1 * 60 300 * 60];
-        fr = firingRate(spikes.times, 'basepath', basepath,...
-            'graphics', false, 'saveFig', false,...
-            'binsize', binsize, 'saveVar', true, 'smet', 'MA',...
-            'winBL', winBL);
+%         binsize = 60;
+%         winBL = [1 * 60 300 * 60];
+%         fr = firingRate(spikes.times, 'basepath', basepath,...
+%             'graphics', false, 'saveFig', false,...
+%             'binsize', binsize, 'saveVar', true, 'smet', 'MA',...
+%             'winBL', winBL);
         
         % spike rate per tetrode. note that using firingRate requires
         % special care becasue spktimes is given in samples and not seconds
@@ -132,7 +137,6 @@ end
 clear basepaths
 k = 1;
 sessionIdx = [8, 11, 15, 19];
-sessionIdx = [7, 9];
 for isession = sessionIdx  
     basepaths{k} = fullfile(mousepath, dirnames{isession});
     k = k + 1;
@@ -202,7 +206,7 @@ if figFlag
         bar(units{isession}, 'stacked')
         legend({"RS"; "FS"})
         xticks(1 : length(grp))
-        title(sessionName{isession})
+        title(dirnames{isession})
         xlabel('Spike Group')
         ylabel('No. Units')
         box off
@@ -223,7 +227,7 @@ suFlag = 1;                     % plot only su or all units
 frBoundries = [0 Inf];          % include only units with fr greater / lower than
 saveFig = false;
 sessionIdx = 1 : nsessions;     % selection of sessions
-
+% sessionIdx = 11;
 
 % find date time of start and end of experiment (round to hour)
 assignVars(varArray, sessionIdx(end))

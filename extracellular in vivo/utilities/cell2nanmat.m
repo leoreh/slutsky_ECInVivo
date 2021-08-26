@@ -14,11 +14,18 @@ function mat = cell2nanmat(c, dim)
 % 09 may 20 LH  updates:
 % 13 jun 21         adapted for arrays with n dimensions
 
+% make sure all cells have the same number of dimensions. nan empty cells.
 c = c(:);
-nDimensions = unique(cellfun(@isvector, c));
-if numel(nDimensions) > 1
-    error('all arrays must have the same number of dimensions')
+not_vec = find(~cellfun(@isvector, c));
+sz_good = size(c{find(cellfun(@isvector, c), 1)});
+for icell = 1 : length(not_vec)
+    if isempty(c{not_vec(icell)})
+        c{not_vec(icell)} = nan(sz_good);
+    else
+        error('all arrays must have the same number of dimensions')
+    end
 end
+nDimensions = unique(cellfun(@isvector, c));
 
 if nargin < 2 || isempty(dim)
     dim = 1;

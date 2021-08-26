@@ -18,13 +18,13 @@ function [spktimes, spkch] = spktimesWh(varargin)
 % DEPENDENCIES
 %   get_whitening_matrix (ks)
 %   my_min (ks)
-%   loadChanMap (ks)
-%   get_file_size (ks)
 %   class2bytes
 %
 % TO DO LIST:
 % 
 % 01 nov 20 LH      
+% 22 aug 21 LH   allows for empty tetrodes. this is so that rogue
+%                electrodes do not contaminate the whitening matrix 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -64,10 +64,18 @@ fprintf('/n/ndetecting spikes in %s/n', basename)
 tic;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% params
+% preparations
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-nchansWh = length([spkgrp{:}]);
+% adjust spkgrps for empty tetrodes
+[~, chIdx] = sort([spkgrp{:}]);
+k = 1;
+for igrp = 1 : length(spkgrp)
+    for ich = 1 : length(spkgrp{igrp})
+        spkgrp_ch{igrp}(ich) = chIdx(k);
+        k = k + 1;
+    end
+end
 
 % constants
 loc_range = [6 max(size(cell2nanmat(spkgrp, 2), 1))];  % for running minimum (dim 1 - sample; dim 2 - channel] 
@@ -78,30 +86,29 @@ dt = 8;             % dead time between spikes [samples]
 % whitening params from ks
 ops = opsKS('basepath', basepath, 'fs', fs, 'nchans', nchans,...
     'spkgrp', spkgrp, 'trange', [0 Inf]);
-NT              = ops.NT;
 NT              = 1024 ^ 2 + 64;        % override
 ops.NT          = NT;
 NchanTOT        = ops.NchanTOT; 
-bytes           = get_file_size(ops.fbinary); 
-nTimepoints     = floor(bytes/NchanTOT/2); 
+bytes           = dir(ops.fbinary);
+bytes           = bytes.bytes;
+nTimepoints     = floor(bytes / NchanTOT / 2); 
 ops.tstart      = ceil(ops.trange(1) * ops.fs); 
 ops.tend        = min(nTimepoints, ceil(ops.trange(2) * ops.fs)); 
 ops.sampsToRead = ops.tend-ops.tstart; 
 ops.twind       = ops.tstart * NchanTOT*2; 
 Nbatch          = ceil(ops.sampsToRead / NT); 
 ops.Nbatch      = Nbatch;
-[chanMap, xc, yc, kcoords, ~] = loadChanMap(ops.chanMap);
+load(ops.chanMap)
 ops.igood       = true(size(chanMap));
-ops.Nchan       = numel(chanMap); 
+ops.Nchan       = numel(kcoords); 
 ops.Nfilt       = getOr(ops, 'nfilt_factor', 4) * ops.Nchan; 
 rez.ops         = ops; 
-rez.xc          = xc; % for historical reasons, make all these copies of the channel coordinates
-rez.yc          = yc;
-rez.xcoords     = xc;
-rez.ycoords     = yc;
-rez.ops.chanMap = chanMap;
+rez.xc          = xcoords; % for historical reasons, make all these copies of the channel coordinates
+rez.yc          = ycoords;
+rez.xcoords     = xcoords;
+rez.ycoords     = ycoords;
 rez.ops.kcoords = kcoords;
-NTbuff          = NT + 3*ops.ntbuff; % we need buffers on both sides for filtering
+NTbuff          = NT + 3 * ops.ntbuff; % we need buffers on both sides for filtering
 rez.ops.NTbuff  = NTbuff;
 rez.ops.chanMap = chanMap;
 
@@ -127,32 +134,32 @@ end
 spktimes = cell(1, length(spkgrp));
 spkch = cell(1, length(spkgrp));
 spkamp = cell(1, length(spkgrp));
-for i = 1 : Nbatch          
+for ibatch = 1 : Nbatch          
      
     % print progress
-    if i ~= 1
+    if ibatch ~= 1
         fprintf(repmat('\b', 1, length(txt)))
     end
-    txt = sprintf('working on chunk %d / %d', i, Nbatch);
+    txt = sprintf('working on chunk %d / %d', ibatch, Nbatch);
     fprintf(txt)
     
     % create whitened data
-    offset = max(0, ops.twind + 2*NchanTOT*(NT * (i - 1) - ntb)); 
+    offset = max(0, ops.twind + 2*NchanTOT*(NT * (ibatch - 1) - ntb)); 
     fseek(fid, offset, 'bof'); 
     buff = fread(fid, [NchanTOT NTbuff], '*int16'); 
     nsampcurr = size(buff,2); 
     if nsampcurr<NTbuff
-        buff(:, nsampcurr+1:NTbuff) = repmat(buff(:,nsampcurr), 1, NTbuff-nsampcurr); 
+        buff(:, nsampcurr + 1 : NTbuff) = repmat(buff(:, nsampcurr), 1, NTbuff - nsampcurr); 
     end
-    if offset==0
-        bpad = repmat(buff(:,1), 1, ntb);
-        buff = cat(2, bpad, buff(:, 1:NTbuff-ntb)); 
+    if offset == 0
+        bpad = repmat(buff(:, 1), 1, ntb);
+        buff = cat(2, bpad, buff(:, 1 : NTbuff-ntb)); 
     end    
-    wh    = gpufilter(buff, ops, chanMap);    
+    wh = gpufilter(buff, ops, chanMap);    
     wh(ntb + [1 : ntb], :) = w_edge .* wh(ntb + [1 : ntb], :) +...
         (1 - w_edge) .* datr_prev;
-    datr_prev = wh(ntb +NT + [1:ops.ntbuff], :);
-    wh    = wh(ntb + (1:NT),:);   
+    datr_prev = wh(ntb + NT + [1:ops.ntbuff], :);
+    wh    = wh(ntb + (1 : NT), :);   
     wh    = wh * Wrot; % whiten the data and scale by 200 for int16 range    
     if saveWh
         datcpu  = gather(int16(wh')); % convert to int16, and gather on the CPU side
@@ -161,19 +168,24 @@ for i = 1 : Nbatch
     wh = wh / scaleproc;   
     
     % find spikes on each tetrode 
-    for ii = 1 : length(spkgrp)
-
+    for igrp = 1 : length(spkgrp_ch)
+        
+        % skip empty tetrodes
+        if isempty(spkgrp_ch{igrp})
+            continue
+        end
+        
         % moving minimum across channels and samples 
-        smin = my_min(wh(:, spkgrp{ii}), loc_range, [1, 2]);
+        smin = my_min(wh(:, spkgrp_ch{igrp}), loc_range, [1, 2]);
         
         % peaks are samples that achieve this local minimum AND have
         % negativities less than a preset threshold
-        crossings = wh(:, spkgrp{ii}) < smin + 1e-5 &...
-            wh(:, spkgrp{ii}) < thr;
+        crossings = wh(:, spkgrp_ch{igrp}) < smin + 1e-5 &...
+            wh(:, spkgrp_ch{igrp}) < thr;
         
         % find the non-zero peaks, and take their amplitudes.
-        [samp, ch, amp] = find(crossings .* wh(:, spkgrp{ii})); 
-        [samp, ia] = sort(gather(samp + NT * (i - 1)));
+        [samp, ch, amp] = find(crossings .* wh(:, spkgrp_ch{igrp})); 
+        [samp, ia] = sort(gather(samp + NT * (igrp - 1)));
         ch = gather(ch(ia));
         amp = gather(amp(ia));
                 
@@ -188,10 +200,10 @@ for i = 1 : Nbatch
             samp(idx3) = [];
             ch(idx3) = [];
         end        
-        spktimes{ii} = [spktimes{ii}; samp]; 
-        spkch{ii} = [spkch{ii}; spkgrp{ii}(ch)'];
+        spktimes{igrp} = [spktimes{igrp}; samp]; 
+        spkch{igrp} = [spkch{igrp}; spkgrp_ch{igrp}(ch)'];
         if graphics
-            spkamp{ii} = [spkamp{ii}; amp];
+            spkamp{igrp} = [spkamp{igrp}; amp];
         end
     end
 end
@@ -222,9 +234,9 @@ if graphics
     ax1 = subplot(3, 1, 1);
     yOffset = gather(median(range(buff)));
     hold on
-    for i = length(spkgrp{grp}) : -1 : 1
-        plot(xLimit / fs, buff(:, spkgrp{grp}(i))...
-            + yOffset * (i - 1), clr(i))
+    for igrp = length(spkgrp{grp}) : -1 : 1
+        plot(xLimit / fs, buff(:, spkgrp{grp}(igrp))...
+            + yOffset * (igrp - 1), clr(igrp))
     end
     set(gca, 'TickLength', [0 0])
     title('Raw')
@@ -233,13 +245,13 @@ if graphics
     ax2 = subplot(3, 1, 2);
     yOffset = gather(max(range(wh)));
     hold on
-    for i = length(spkgrp{grp}) : -1 : 1
-        plot(xLimit / fs, wh(:, spkgrp{grp}(i))...
-            + yOffset * (i - 1), clr(i))
-        scatter((spktimes{grp}(spkch{grp} == spkgrp{grp}(i)) - NT * (i - 1)) / fs,...
-            spkamp{grp}(spkch{grp} == spkgrp{grp}(i))...
-            + yOffset * (i - 1), '*')
-        yline(thr + yOffset * (i - 1), '--r');
+    for igrp = length(spkgrp{grp}) : -1 : 1
+        plot(xLimit / fs, wh(:, spkgrp{grp}(igrp))...
+            + yOffset * (igrp - 1), clr(igrp))
+        scatter((spktimes{grp}(spkch{grp} == spkgrp{grp}(igrp)) - NT * (igrp - 1)) / fs,...
+            spkamp{grp}(spkch{grp} == spkgrp{grp}(igrp))...
+            + yOffset * (igrp - 1), '*')
+        yline(thr + yOffset * (igrp - 1), '--r');
     end
     set(gca, 'TickLength', [0 0])
     title('Whitened')
@@ -249,9 +261,9 @@ if graphics
     ax3 = subplot(3, 1, 3);
     yOffset = gather(max(range(smin)));
     hold on
-    for i = length(spkgrp{grp}) : -1 : 1
-        plot(xLimit / fs, smin(:, i)...
-            + yOffset * (i - 1), clr(i))
+    for igrp = length(spkgrp{grp}) : -1 : 1
+        plot(xLimit / fs, smin(:, igrp)...
+            + yOffset * (igrp - 1), clr(igrp))
     end
     set(gca, 'TickLength', [0 0])
     xlabel('Time [s]')
