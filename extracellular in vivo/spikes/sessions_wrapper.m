@@ -4,7 +4,7 @@
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = 'lh94';
+mname = 'lh95';
 forceL = true;
 forceA = false;
 
@@ -131,8 +131,7 @@ end
 
 clear basepaths
 k = 1;
-sessionIdx = [8, 11, 15, 19];
-sessionIdx = [7, 9];
+sessionIdx = [4];
 for isession = sessionIdx  
     basepaths{k} = fullfile(mousepath, dirnames{isession});
     k = k + 1;

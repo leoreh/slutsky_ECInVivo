@@ -185,7 +185,7 @@ for ibatch = 1 : Nbatch
         
         % find the non-zero peaks, and take their amplitudes.
         [samp, ch, amp] = find(crossings .* wh(:, spkgrp_ch{igrp})); 
-        [samp, ia] = sort(gather(samp + NT * (igrp - 1)));
+        [samp, ia] = sort(gather(samp + NT * (ibatch - 1)));
         ch = gather(ch(ia));
         amp = gather(amp(ia));
                 
