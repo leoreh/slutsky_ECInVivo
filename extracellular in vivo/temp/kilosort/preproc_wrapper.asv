@@ -19,13 +19,13 @@ datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
 % tdt
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 basepath = 'K:\Data\lh94\lh94_210826_200000';
-store = 'Raw1';
+store = 'EMG1';
 blocks = [1];
 chunksize = 300;
 mapch = [1 : 4];
-mapch = [1 : 16];
+% mapch = [1 : 16];
 rmvch = [3, 4];
-rmvch = [7];
+% rmvch = [7];
 clip = cell(1, 1);
 datInfo = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
     'chunksize', chunksize, 'mapch', mapch, 'rmvch', rmvch, 'clip', clip);

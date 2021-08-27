@@ -4,7 +4,7 @@
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = 'lh95';
+mname = 'lh93';
 forceL = true;
 forceA = false;
 
@@ -92,12 +92,6 @@ if forceA
 %             'waves', cat(1, spikes.rawWaveform{:})', 'saveVar', true,...
 %             'graphics', false, 'fs', fs);
      
-
-acc = EMGfromACC('basepath', basepath, 'fname', [basename, '.lfp'],...
-    'nchans', nchans, 'ch', nchans - 2 : nchans, 'saveVar', true, 'fsIn', 1250,...
-    'graphics', false);
-
-
 [EMG, EEG, sigInfo] = as_prepSig([basename, '.lfp'], acc.mag,...
     'eegCh', [4 : 7], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
     'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
