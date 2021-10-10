@@ -51,20 +51,14 @@ save(configfile, 'cfg_colors', 'cfg_names', 'cfg_weights')
 
 % -------------------------------------------------------------------------
 % ALT 1: train network on entire data
-basepaths = netInfo.files;
+lh89 = netInfo.files;
+lh86 = netInfo.files;
 
-newpath = 'G:\lh87';
-for i = 1 : 15
-    [~, basename] = fileparts(basepath{i};
-    basepaths{i} = 
-end
-
-basepaths{16} = 'D:\Data\lh93\lh93_210818_103103';
-basepaths{17} = 'D:\Data\lh93\lh93_210818_220009';
-basepaths{18} = 'D:\Data\lh93\lh93_210819_104212';
-basepaths{19} = 'D:\Data\lh93\lh93_210819_221608';
-basepaths{20} = 'D:\Data\lh93\lh93_210810_100810';
-basepaths{21} = 'D:\Data\lh93\lh93_210811_102035';
+basepaths = [lh89 lh86];
+basepaths{24} = 'K:\Data\lh95\lh95_210824_083300';
+basepaths{25} = 'K:\Data\lh95\lh95_210824_202100';
+basepaths{26} = 'K:\Data\lh95\lh95_210825_080400';
+basepaths{27} = 'K:\Data\lh95\lh95_210825_200300';
 
 fileList = as_fileLists(basepaths);
 

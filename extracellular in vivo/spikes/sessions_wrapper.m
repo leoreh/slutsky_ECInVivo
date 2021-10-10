@@ -55,6 +55,8 @@ setMatlabGraphics(false)
 % arrange title names
 for isession = 1 : nsessions
     sessionName{isession} = dirnames{isession}(length(mname) + 2 : end);
+    basepath = char(fullfile(mousepath, dirnames{isession}));
+    basepaths{isession} = fullfile(mousepath, dirnames{isession});
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -93,51 +95,53 @@ if forceA
 %             'graphics', false, 'fs', fs);
      
 
-acc = EMGfromACC('basepath', basepath, 'fname', [basename, '.lfp'],...
-    'nchans', nchans, 'ch', nchans - 2 : nchans, 'saveVar', true, 'fsIn', 1250,...
-    'graphics', false);
+% acc = EMGfromACC('basepath', basepath, 'fname', [basename, '.lfp'],...
+%     'nchans', nchans, 'ch', nchans - 2 : nchans, 'saveVar', true, 'fsIn', 1250,...
+%     'graphics', false);
 
 
-[EMG, EEG, sigInfo] = as_prepSig([basename, '.lfp'], acc.mag,...
-    'eegCh', [4 : 7], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
-    'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
-    'eegFs', 1250, 'emgFs', 1250, 'emgCf', [10 600]);
+% [EMG, EEG, sigInfo] = as_prepSig([basename, '.lfp'], acc.mag,...
+%     'eegCh', [4 : 7], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
+%     'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
+%     'eegFs', 1250, 'emgFs', 1250, 'emgCf', [10 600]);
 
 
 %         spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
 %             'saveFig', false, 'force', true, 'mu', [], 'graphics', false,...
 %             'vis', 'on', 'spkgrp', spkgrp);
         
-        %         load([basename, '.AccuSleep_EEG.mat'])
-        %         load([basename, '.AccuSleep_EMG.mat'])
-        %         %         labelsmanfile = [basename, '.AccuSleep_labelsMan.mat'];
-        %         %         AccuSleep_viewer(EEG, EMG, 1250, 1, labels, labelsmanfile)
-        %         netfile = 'D:\Code\slutskycode\extracellular in vivo\lfp\SleepStates\AccuSleep\trainedNetworks\net_210708_200155.mat';
-        %         ss = as_wrapper(EEG, EMG, [], 'basepath', basepath, 'calfile', [],...
-        %             'viaGui', false, 'forceCalibrate', false, 'inspectLabels', false,...
-        %             'saveVar', false, 'forceAnalyze', true, 'fs', 1250, 'netfile', [],...
-        %             'graphics', true);
+load([basename, '.AccuSleep_EEG.mat'])
+load([basename, '.AccuSleep_EMG.mat'])
+load([basename, '.AccuSleep_sigInfo.mat'])
+%         labelsmanfile = [basename, '.AccuSleep_labelsMan.mat'];
+%         AccuSleep_viewer(EEG, EMG, 1250, 1, labels, labelsmanfile)
+netfile = 'D:\Code\slutskycode\extracellular in vivo\lfp\SleepStates\AccuSleep\trainedNetworks\net_210826_231004.mat';
+% netfile = [];
+ss = as_wrapper(EEG, EMG, sigInfo, 'basepath', basepath, 'calfile', [],...
+    'viaGui', false, 'forceCalibrate', false, 'inspectLabels', false,...
+    'saveVar', true, 'forceAnalyze', true, 'fs', 1250, 'netfile', netfile,...
+    'graphics', true);
         
         % firing rate
-%         load([basename '.spikes.cellinfo.mat'])
-%         binsize = 60;
-%         winBL = [1 * 60 300 * 60];
-%         fr = firingRate(spikes.times, 'basepath', basepath,...
-%             'graphics', false, 'saveFig', false,...
-%             'binsize', binsize, 'saveVar', true, 'smet', 'MA',...
-%             'winBL', winBL);
-%         
+        load([basename '.spikes.cellinfo.mat'])
+        binsize = 60;
+        winBL = [1 * 60 300 * 60];
+        fr = firingRate(spikes.times, 'basepath', basepath,...
+            'graphics', false, 'saveFig', false,...
+            'binsize', binsize, 'saveVar', true, 'smet', 'MA',...
+            'winBL', winBL);
+         
         % spike rate per tetrode. note that using firingRate requires
         % special care becasue spktimes is given in samples and not seconds
-%         load(fullfile(basepath, [basename '.spktimes.mat']))
-%         for ii = 1 : length(spkgrp)
-%             spktimes{ii} = spktimes{ii} / fs;
-%         end
-%         binsize = 60;
-%         sr = firingRate(spktimes, 'basepath', basepath,...
-%             'graphics', false, 'saveFig', false,...
-%             'binsize', binsize, 'saveVar', 'sr', 'smet', 'none',...
-%             'winBL', [0 Inf]);
+        load(fullfile(basepath, [basename '.spktimes.mat']))
+        for ii = 1 : length(spkgrp)
+            spktimes{ii} = spktimes{ii} / fs;
+        end
+        binsize = 60;
+        sr = firingRate(spktimes, 'basepath', basepath,...
+            'graphics', false, 'saveFig', false,...
+            'binsize', binsize, 'saveVar', 'sr', 'smet', 'none',...
+            'winBL', [0 Inf]);
     end
 end
 
@@ -234,7 +238,7 @@ suFlag = 1;                     % plot only su or all units
 frBoundries = [0 Inf];          % include only units with fr greater / lower than
 saveFig = false;
 sessionIdx = 1 : nsessions;     % selection of sessions
-
+% sessionIdx = 7 : nsessions;
 
 % find date time of start and end of experiment (round to hour)
 assignVars(varArray, sessionIdx(end))

@@ -17,7 +17,7 @@ function [EMG, EEG, sigInfo] = as_prepSig(eegData, emgData, varargin)
 %   eegFs       numeric. eeg sampling frequency
 %   emgFs       numeric. emg sampling frequency
 %   eegCh       numeric. channel number of eeg to load from lfp file. can
-%               be a vector and then the channels will be averaged
+%               be a vector and then the channels will be averaged. 
 %   emgCh       numeric. channel number of eeg to load from lfp file. for
 %               oe recording system
 %   emgCf       numeric. cut off frequency for emg signal [10 200] or acc

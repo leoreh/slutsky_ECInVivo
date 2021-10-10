@@ -19,13 +19,13 @@ datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
 % tdt
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 basepath = 'K:\Data\lh94\lh94_210826_200000';
-store = 'Raw1';
+store = 'Raw2';
 blocks = [1];
 chunksize = 300;
 mapch = [1 : 4];
 mapch = [1 : 16];
-rmvch = [3, 4];
-rmvch = [7];
+rmvch = [1, 2];
+rmvch = [];
 clip = cell(1, 1);
 datInfo = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
     'chunksize', chunksize, 'mapch', mapch, 'rmvch', rmvch, 'clip', clip);
@@ -81,7 +81,8 @@ fepsp = fEPSP_analysis('fepsp', fepsp, 'basepath', basepath,...
     'spkgrp', spkgrp, 'saveVar', true, 'saveWh', true,...
     'graphics', false, 'force', true);
 
-% spike rate
+% spike rate per tetrode. note that using firingRate requires
+% special care becasue spktimes is given in samples and not seconds
 for igrp = 1 : length(spkgrp)
     spktimes{igrp} = spktimes{igrp} / fs;
 end
@@ -104,7 +105,7 @@ spktimes2ns('basepath', basepath, 'fs', fs,...
 % nsClip('dur', dur, 't', t, 'bkup', true, 'grp', [3 : 4]);
 
 % clean clusters after sorting 
-cleanCluByFet('basepath', pwd, 'manCur', true, 'grp', [1 : 4])
+cleanCluByFet('basepath', pwd, 'manCur', true, 'grp', 1)
 
 % cut spk from dat and realign
 fixSpkAndRes('grp', 3, 'dt', 0, 'stdFactor', 0);
@@ -170,22 +171,24 @@ acc = EMGfromACC('basepath', basepath, 'fname', [basename, '.lfp'],...
     'nchans', nchans, 'ch', nchans - 2 : nchans, 'saveVar', true, 'fsIn', 1250,...
     'graphics', false);
 
+emgLfp = ce_EMGFromLFP(session, 'samplingFrequency', 125);
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % sleep states
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % prep signal
 [EMG, EEG, sigInfo] = as_prepSig([basename, '.lfp'], [basename, '.emg.dat'],...
-    'eegCh', [9 : 12], 'emgCh', [2], 'saveVar', true, 'emgNchans', [2],...
-    'eegNchans', 16, 'inspectSig', true, 'forceLoad', true,...
+    'eegCh', [1 : 4], 'emgCh', [2], 'saveVar', true, 'emgNchans', [2],...
+    'eegNchans', 16, 'inspectSig', false, 'forceLoad', true,...
     'eegFs', 1250, 'emgFs', 6103.515625, 'emgCf', [10 200]);
 
 % manually create labels
 labelsmanfile = [basename, '.AccuSleep_labelsMan.mat'];
-AccuSleep_viewer(EEG, EMG, 1250, 1, [], labelsmanfile)
+AccuSleep_viewer(EEG, EMG,  1250, 1, labels, labelsmanfile)
 
 % classify with a network
-netfile = 'D:\Code\slutskycode\extracellular in vivo\lfp\SleepStates\AccuSleep\trainedNetworks\net_210709_142246.mat';
+% netfile = 'D:\Code\slutskycode\extracellular in vivo\lfp\SleepStates\AccuSleep\trainedNetworks\net_210801_185816.mat';
 netfile = [];
 ss = as_wrapper(EEG, EMG, sigInfo, 'basepath', basepath, 'calfile', [],...
     'viaGui', false, 'forceCalibrate', false, 'inspectLabels', false,...

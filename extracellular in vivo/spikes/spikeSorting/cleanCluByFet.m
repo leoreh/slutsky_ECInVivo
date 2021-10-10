@@ -99,7 +99,7 @@ if manCur
     clu = loadNS('datatype', 'clu', 'session', session, 'grpid', grpid);
     rpvRatioAll = displayRPV(res, ref)
 
-    % rmv spks from all clusters until criterion is reached
+    % remove rpv spks from all clusters until criterion is reached
     sclu = [];      % selected clusters. if empty will clean all
     clean2criterion(fet, res, ref, rpvCrt, rmvLim, sclu, grpid, false)
             
@@ -107,7 +107,7 @@ if manCur
     saveNS(clu, 'datatype', 'clu', 'session', session, 'grpid', grpid);
     
     % rmv spks from selected cluster
-    sclu = 4;      % cluster id
+    sclu = 8;      % cluster id
     [cluidx, rmvSpks] = cleanClu(fet, res, sclu, ref, 0.0001, [0.12 0.05]);
     
     % plot fets of specific cluster
