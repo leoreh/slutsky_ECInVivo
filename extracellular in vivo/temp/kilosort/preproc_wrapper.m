@@ -105,10 +105,11 @@ spktimes2ns('basepath', basepath, 'fs', fs,...
 % nsClip('dur', dur, 't', t, 'bkup', true, 'grp', [3 : 4]);
 
 % clean clusters after sorting 
-cleanCluByFet('basepath', pwd, 'manCur', true, 'grp', 1)
+cleanCluByFet('basepath', pwd, 'manCur', false, 'grp', [1 : 4])
 
 % cut spk from dat and realign
-fixSpkAndRes('grp', 3, 'dt', 0, 'stdFactor', 0);
+fixSpkAndRes('grp', [1 : 4], 'dt', 0, 'stdFactor', 0);
+fixSpkAndRes('grp', [1 : 4], 'dt', 0, 'stdFactor', 0, 'resnip', true);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % spikes
@@ -118,8 +119,12 @@ fixSpkAndRes('grp', 3, 'dt', 0, 'stdFactor', 0);
 cell_metrics = ProcessCellMetrics('session', session,...
     'manualAdjustMonoSyn', false, 'summaryFigures', false,...
     'debugMode', true, 'transferFilesFromClusterpath', false,...
-    'submitToDatabase', false, 'getWaveformsFromDat', true);
-% cell_metrics = CellExplorer('basepath', basepath);
+    'submitToDatabase', false, 'getWaveformsFromDat', true,...
+    'forceReloadSpikes', false);
+% cell_metrics = CellExplorer('basepath', pwd);
+
+% load spikes ce format
+spikes = loadSpikes('format', 'klustakwik', 'getWaveformsFromSource', true, 'LSB', 1);
 
 % cluster validation
 load([basename, '.spikes.cellinfo.mat'])
@@ -199,8 +204,13 @@ ss = as_wrapper(EEG, EMG, sigInfo, 'basepath', basepath, 'calfile', [],...
 as_stateSeparation(EEG, EMG, labels)
 
 % calc psd in states
-[psdStates, faxis, emgRMS] = psd_states('eeg', EEG, 'emg', EMG,...
-    'labels', labels, 'fs', 1250, 'graphics', true);
+EEG = double(bz_LoadBinary([basename, '.lfp'], 'duration', Inf,...
+    'frequency', 1250, 'nchannels', nchans, 'start', 0,...
+    'channels', [4 : 7], 'downsample', 1));
+EEG = mean(EEG, 2);
+load([basename, '.AccuSleep_labels.mat'])
+[psdStates, faxis, emgRMS] = psd_states('eeg', EEG, 'emg', [],...
+    'labels', labels, 'fs', 1250, 'graphics', true, 'sstates', [1, 4, 5]);
 
 % get confusion matrix between two labels
 [ss.netPrecision, ss.netRecall] = as_cm(labels1, labels2);

@@ -4,7 +4,7 @@
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = 'lh95';
+mname = 'lh93';
 forceL = true;
 forceA = false;
 
@@ -81,18 +81,19 @@ if forceA
         spkgrp = session.extracellular.spikeGroups.channels;
         
         % vars
-        % assignVars(varArray, isession)
+        assignVars(varArray, isession)
         
-%         cell_metrics = ProcessCellMetrics('session', session,...
-%             'manualAdjustMonoSyn', false, 'summaryFigures', false,...
-%             'debugMode', true, 'transferFilesFromClusterpath', false,...
-%             'submitToDatabase', false, 'getWaveformsFromDat', true);
-%                 cell_metrics = CellExplorer('basepath', basepath);
+        % cm
+        cell_metrics = ProcessCellMetrics('session', session,...
+            'manualAdjustMonoSyn', false, 'summaryFigures', false,...
+            'debugMode', true, 'transferFilesFromClusterpath', false,...
+            'submitToDatabase', false, 'getWaveformsFromDat', true);
+        % cell_metrics = CellExplorer('basepath', pwd);
         
-%         load([basename '.spikes.cellinfo.mat'])
-%         cc = cellclass('basepath', basepath,...
-%             'waves', cat(1, spikes.rawWaveform{:})', 'saveVar', true,...
-%             'graphics', false, 'fs', fs);
+        load([basename '.spikes.cellinfo.mat'])
+        cc = cellclass('basepath', basepath,...
+            'waves', cat(1, spikes.rawWaveform{:})', 'saveVar', true,...
+            'graphics', false, 'fs', fs);
      
 
 % acc = EMGfromACC('basepath', basepath, 'fname', [basename, '.lfp'],...
@@ -105,22 +106,23 @@ if forceA
 %     'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
 %     'eegFs', 1250, 'emgFs', 1250, 'emgCf', [10 600]);
 
-
-%         spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
-%             'saveFig', false, 'force', true, 'mu', [], 'graphics', false,...
-%             'vis', 'on', 'spkgrp', spkgrp);
-        
-load([basename, '.AccuSleep_EEG.mat'])
-load([basename, '.AccuSleep_EMG.mat'])
-load([basename, '.AccuSleep_sigInfo.mat'])
+%         
+% load([basename, '.AccuSleep_EEG.mat'])
+% load([basename, '.AccuSleep_EMG.mat'])
+% load([basename, '.AccuSleep_sigInfo.mat'])
 %         labelsmanfile = [basename, '.AccuSleep_labelsMan.mat'];
 %         AccuSleep_viewer(EEG, EMG, 1250, 1, labels, labelsmanfile)
-netfile = 'D:\Code\slutskycode\extracellular in vivo\lfp\SleepStates\AccuSleep\trainedNetworks\net_210826_231004.mat';
-% netfile = [];
-ss = as_wrapper(EEG, EMG, sigInfo, 'basepath', basepath, 'calfile', [],...
-    'viaGui', false, 'forceCalibrate', false, 'inspectLabels', false,...
-    'saveVar', true, 'forceAnalyze', true, 'fs', 1250, 'netfile', netfile,...
-    'graphics', true);
+% netfile = 'D:\Code\slutskycode\extracellular in vivo\lfp\SleepStates\AccuSleep\trainedNetworks\net_210826_231004.mat';
+% % netfile = [];
+% ss = as_wrapper(EEG, EMG, sigInfo, 'basepath', basepath, 'calfile', [],...
+%     'viaGui', false, 'forceCalibrate', false, 'inspectLabels', false,...
+%     'saveVar', true, 'forceAnalyze', true, 'fs', 1250, 'netfile', netfile,...
+%     'graphics', true);
+
+        spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
+            'saveFig', false, 'force', true, 'mu', [], 'graphics', false,...
+            'vis', 'on', 'spkgrp', spkgrp);
+
         
         % firing rate
         load([basename '.spikes.cellinfo.mat'])
@@ -157,6 +159,9 @@ cell_metrics = CellExplorer('basepaths', basepaths);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% edit plot_FRtime_session.m
+% edit plot_FRtime_exp.m
 
 % -------------------------------------------------------------------------
 % number of SU and MU (top - pyr; bottom - int) 
@@ -229,117 +234,6 @@ if figFlag
         figname = fullfile(mousepath, 'graphics', 'UnitsPerGrp');
         export_fig(figname, '-tif', '-transparent', '-r300')
     end
-end
-
-% -------------------------------------------------------------------------
-% mean firing rate across time for all sessions concatenated (one figure)
-grp = [1 : 4];                  % which tetrodes to plot
-suFlag = 1;                     % plot only su or all units
-frBoundries = [0 Inf];          % include only units with fr greater / lower than
-saveFig = false;
-sessionIdx = 1 : nsessions;     % selection of sessions
-% sessionIdx = 7 : nsessions;
-
-% find date time of start and end of experiment (round to hour)
-assignVars(varArray, sessionIdx(end))
-ts = sr.binsize;     
-[dtStart, ~] = guessDateTime(dirnames(sessionIdx(1)));
-dtStart = dateshift(dtStart, 'start', 'hour');
-dtStart = dtStart - seconds(60 * 60); % override
-[dtEnd, ~] = guessDateTime(dirnames(sessionIdx(end)));
-dtEnd = dtEnd + seconds(length(sr.strd) * ts);
-dtEnd = dateshift(dtEnd, 'end', 'hour');
-expLen = seconds(dtEnd - dtStart) / ts;     
-
-% get datetime indices and labels for x axis
-dtAxis = dtStart : hours(6) : dtEnd;
-tidx = 1;
-for itime = 1 : length(dtAxis)
-    [~, tidx(itime)] = tstamp2time('dtstr', dtStart, 'tstr', dtAxis(itime), 'fs', 1 / ts);
-    if tidx(itime) == 0
-        tidx(itime) = 1;
-    end
-    tlabel{itime} = datestr(datenum(dtAxis(itime)), 'dd/mm_HH:MM');
-end
-
-% get tidx of manipulation
-dt1 = datetime(2021, 02, 28, 19, 00, 00);
-dt2 = datetime(2021, 03, 03, 17, 10, 00);
-[~, shadeIdx(1)] = tstamp2time('dtstr', dtStart, 'tstr', dt1, 'fs', 1 / ts);
-[~, shadeIdx(2)] = tstamp2time('dtstr', dtStart, 'tstr', dt2, 'fs', 1 / ts);
-shadeIdx = [0, 0];  % override
-
-% initialize vars that will carry information from entire experiment
-expRS = nan(expLen, 100);
-expFS = nan(expLen, 100);
-expMU = nan(expLen, length(grp));
-
-% concatenate data from different sessions. finds the index of rec start
-% from basename and assumes the session recording is continuous
-idx_recStart = zeros(length(sessionIdx), 1);
-for isession = sessionIdx
-    assignVars(varArray, isession)   
-    
-    % initialize
-    RSunits{isession} = nan(1, 1);
-    FSunits{isession} = nan(1, 1);
-
-    % indices
-    idx_recStart(isession) = floor(max([1, seconds(guessDateTime(dirnames(isession)) - dtStart) / ts]));
-    idx_session = idx_recStart(isession) : idx_recStart(isession) + length(sr.strd) - 1;
-    
-    % MU
-    expMU(idx_session, :) = sr.strd(grp, :)';
-
-    if ~isempty(varArray{isession, 3})
-        % RS
-        RSunits{isession} = selectUnits(spikes, cm, fr, suFlag, grp, frBoundries, 'pyr');
-        expRS(idx_session, 1 : sum(RSunits{isession})) = fr.strd(RSunits{isession}, :)';
-        
-        % FS
-        FSunits{isession} = selectUnits(spikes, cm, fr, suFlag, grp, frBoundries, 'int');
-        expFS(idx_session, 1 : sum(FSunits{isession})) = fr.strd(FSunits{isession}, :)';
-    end 
-end
-
-% plot
-fh = figure;
-sb1 = subplot(2, 1, 1);
-yLimit = [1 max(range(expMU))];
-rectangle('Position', [shadeIdx(1) yLimit(1) diff(shadeIdx) diff(yLimit)],...
-    'Curvature',0.2, 'faceColor', [0.95 0.95 0.95])
-hold on
-plot(expMU)
-axis tight
-xlim([1 length(expMU)])
-set(gca, 'box', 'off');
-xticks(tidx)
-xticklabels(tlabel)
-xtickangle(45)
-ylabel('Multi-unit firing rate [Hz]')
-lgh = legend(split(num2str(grp)));
-
-sb2 = subplot(2, 1, 2);
-plot(mean(expRS', 'omitnan'), 'b', 'LineWidth', 2)
-hold on
-plot(mean(expFS', 'omitnan'), 'r', 'LineWidth', 2)
-yLimit = [1 max([range(expFS), range(expRS)])];
-plot([idx_recStart, idx_recStart], yLimit, '--k');
-axis tight
-xlabel('Time [h]')
-ylabel('Single unit firing rate [Hz]')
-set(gca, 'box', 'off')
-xticks(tidx)
-xticklabels(tlabel)
-xtickangle(45)
-linkaxes([sb1, sb2], 'x')
-legend(sprintf('RS ~= %d su', round(mean(sum(cell2nanmat(RSunits(sessionIdx), 2)), 'omitnan'))),...
- sprintf('FS ~= %d su', round(mean(sum(cell2nanmat(FSunits(sessionIdx), 2)), 'omitnan'))));
-if saveFig
-    figpath = fullfile(mousepath, 'graphics');
-    mkdir(figpath)
-    figname = fullfile(figpath, ['FR_time']);
-    export_fig(figname, '-tif', '-transparent', '-r300')
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

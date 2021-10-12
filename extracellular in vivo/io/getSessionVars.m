@@ -98,12 +98,17 @@ ndirs = length(dirnames);
 % load files
 varArray = cell(length(dirnames), length(vars));
 for i = 1 : ndirs
+    
     % handle cases where not all sessions are in the same basepath
-    if ~isempty(basepaths{i})
-        mousepath = basepaths{i};
+    if exist('basepaths', 'var')
+        if ~isempty(basepaths{i})
+            mousepath = basepaths{i};
+        else
+            mousepath = basepath_default;
+        end
     else
-        mousepath = basepath_default;
-    end  
+        mousepath = fileparts(pwd);
+    end
     
     filepath = char(fullfile(mousepath, dirnames(i)));
     if ~exist(filepath, 'dir')

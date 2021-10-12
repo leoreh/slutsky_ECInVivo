@@ -55,7 +55,8 @@ setMatlabGraphics(false)
 % arrange title names
 for isession = 1 : nsessions
     sessionName{isession} = dirnames{isession}(length(mname) + 2 : end);
-    basepath
+    basepath = char(fullfile(mousepath, dirnames{isession}));
+    basepaths{isession} = fullfile(mousepath, dirnames{isession});
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -80,18 +81,19 @@ if forceA
         spkgrp = session.extracellular.spikeGroups.channels;
         
         % vars
-        % assignVars(varArray, isession)
+        assignVars(varArray, isession)
         
-%         cell_metrics = ProcessCellMetrics('session', session,...
-%             'manualAdjustMonoSyn', false, 'summaryFigures', false,...
-%             'debugMode', true, 'transferFilesFromClusterpath', false,...
-%             'submitToDatabase', false, 'getWaveformsFromDat', true);
-%                 cell_metrics = CellExplorer('basepath', basepath);
+        % cm
+        cell_metrics = ProcessCellMetrics('session', session,...
+            'manualAdjustMonoSyn', false, 'summaryFigures', false,...
+            'debugMode', true, 'transferFilesFromClusterpath', false,...
+            'submitToDatabase', false, 'getWaveformsFromDat', true);
+        % cell_metrics = CellExplorer('basepath', pwd);
         
-%         load([basename '.spikes.cellinfo.mat'])
-%         cc = cellclass('basepath', basepath,...
-%             'waves', cat(1, spikes.rawWaveform{:})', 'saveVar', true,...
-%             'graphics', false, 'fs', fs);
+        load([basename '.spikes.cellinfo.mat'])
+        cc = cellclass('basepath', basepath,...
+            'waves', cat(1, spikes.rawWaveform{:})', 'saveVar', true,...
+            'graphics', false, 'fs', fs);
      
 
 % acc = EMGfromACC('basepath', basepath, 'fname', [basename, '.lfp'],...
@@ -104,22 +106,23 @@ if forceA
 %     'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
 %     'eegFs', 1250, 'emgFs', 1250, 'emgCf', [10 600]);
 
-
-%         spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
-%             'saveFig', false, 'force', true, 'mu', [], 'graphics', false,...
-%             'vis', 'on', 'spkgrp', spkgrp);
-        
-load([basename, '.AccuSleep_EEG.mat'])
-load([basename, '.AccuSleep_EMG.mat'])
-load([basename, '.AccuSleep_sigInfo.mat'])
+%         
+% load([basename, '.AccuSleep_EEG.mat'])
+% load([basename, '.AccuSleep_EMG.mat'])
+% load([basename, '.AccuSleep_sigInfo.mat'])
 %         labelsmanfile = [basename, '.AccuSleep_labelsMan.mat'];
 %         AccuSleep_viewer(EEG, EMG, 1250, 1, labels, labelsmanfile)
-netfile = 'D:\Code\slutskycode\extracellular in vivo\lfp\SleepStates\AccuSleep\trainedNetworks\net_210826_231004.mat';
-% netfile = [];
-ss = as_wrapper(EEG, EMG, sigInfo, 'basepath', basepath, 'calfile', [],...
-    'viaGui', false, 'forceCalibrate', false, 'inspectLabels', false,...
-    'saveVar', true, 'forceAnalyze', true, 'fs', 1250, 'netfile', netfile,...
-    'graphics', true);
+% netfile = 'D:\Code\slutskycode\extracellular in vivo\lfp\SleepStates\AccuSleep\trainedNetworks\net_210826_231004.mat';
+% % netfile = [];
+% ss = as_wrapper(EEG, EMG, sigInfo, 'basepath', basepath, 'calfile', [],...
+%     'viaGui', false, 'forceCalibrate', false, 'inspectLabels', false,...
+%     'saveVar', true, 'forceAnalyze', true, 'fs', 1250, 'netfile', netfile,...
+%     'graphics', true);
+
+        spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
+            'saveFig', false, 'force', true, 'mu', [], 'graphics', false,...
+            'vis', 'on', 'spkgrp', spkgrp);
+
         
         % firing rate
         load([basename '.spikes.cellinfo.mat'])
@@ -260,7 +263,7 @@ for itime = 1 : length(dtAxis)
     end
     tlabel{itime} = datestr(datenum(dtAxis(itime)), 'dd/mm_HH:MM');
 end
-
+ 
 % get tidx of manipulation
 dt1 = datetime(2021, 02, 28, 19, 00, 00);
 dt2 = datetime(2021, 03, 03, 17, 10, 00);
@@ -304,7 +307,7 @@ end
 % plot
 fh = figure;
 sb1 = subplot(2, 1, 1);
-yLimit = [1 max(range(expMU))];
+yLimit = [0 max(max(expMU))];
 rectangle('Position', [shadeIdx(1) yLimit(1) diff(shadeIdx) diff(yLimit)],...
     'Curvature',0.2, 'faceColor', [0.95 0.95 0.95])
 hold on
@@ -322,7 +325,7 @@ sb2 = subplot(2, 1, 2);
 plot(mean(expRS', 'omitnan'), 'b', 'LineWidth', 2)
 hold on
 plot(mean(expFS', 'omitnan'), 'r', 'LineWidth', 2)
-yLimit = [1 max([range(expFS), range(expRS)])];
+yLimit = [0 max(mean(expFS', 'omitnan'))];
 plot([idx_recStart, idx_recStart], yLimit, '--k');
 axis tight
 xlabel('Time [h]')
@@ -340,6 +343,19 @@ if saveFig
     figname = fullfile(figpath, ['FR_time']);
     export_fig(figname, '-tif', '-transparent', '-r300')
 end
+
+%%% find tidx from sample in specific dat file
+sessionIdx2 = 3;
+basename = dirnames(sessionIdx2);
+csum = cumsum(datInfo.nsamps);
+[dtSession, ~] = guessDateTime(basename);
+
+% get time within session
+[dt, ~] = tstamp2time('dtstr', basename, 'tstamp', csum(3), 'fs', fs);
+% get idx relative to experiment start
+floor(seconds(dt - dtStart) / ts)
+[dt, ~] = tstamp2time('dtstr', basename, 'tstamp', csum(3), 'fs', fs);
+%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % states

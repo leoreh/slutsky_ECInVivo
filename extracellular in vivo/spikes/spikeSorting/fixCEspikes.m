@@ -1,4 +1,4 @@
-function spikes = getSpikes(varargin)
+function spikes = fixCEspikes(varargin)
 % bz_getSpikes - Get spike timestamps.
 %
 % USAGE

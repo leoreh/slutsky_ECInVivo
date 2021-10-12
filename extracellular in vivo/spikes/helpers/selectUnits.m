@@ -14,6 +14,7 @@ function units = selectUnits(spikes, cm, fr, suFlag, grp, frBoundries, unitClass
     
     % mfr
     mfrunits = fr.mfr > frBoundries(1) & fr.mfr < frBoundries(2);
+%     mfrunits = mfrunits & [std(fr.strd') < mean(fr.strd')]';
     
     % cell class
     pyr = strcmp(cm.putativeCellType, 'Pyramidal Cell');

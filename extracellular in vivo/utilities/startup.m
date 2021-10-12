@@ -26,6 +26,9 @@ if feature('IsDebugMode')
     dbquit all
 end
 
+% change garphics defaults to more aesthethic 
+setMatlabGraphics(false)
+
 % Get rid of warning about directory already existing:
 % "Warning: Directory already exists."
 warning('off', 'MATLAB:MKDIR:DirectoryExists');

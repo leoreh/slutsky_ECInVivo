@@ -95,9 +95,9 @@ noverlap = floor(0.25 * newFs);
 faxis = [0.2 : 0.2 : maxF];       
     
 % convert labels to state epochs. 
-for istate = 1 : length(sstates)
+for istate = 1 : nstates
     binaryVec = zeros(length(labels), 1);
-    binaryVec(labels == sstates(istate)) = 1;
+    binaryVec(labels == istate) = 1;
     stateEpisodes = binary2epochs('vec', binaryVec, 'minDur', [], 'maxDur', [],...
         'interDur', [], 'exclude', false); % these are given as indices and are equivalent to seconds
     stateEpochs{istate} = stateEpisodes * epochLen;
@@ -109,8 +109,8 @@ nepochs = cellfun(@length, epLen);
 % calc power for each epoch separatly
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-psdStates = zeros(length(sstates), length(faxis));
-for istate = 1 : length(sstates)
+psdStates = zeros(nstates - 1, length(faxis));
+for istate = sstates
     for iepoch = 1 : length(epLen{istate})
         
         % use only epochs longer than minEpDur
@@ -147,7 +147,7 @@ if graphics
     % raw psd
     sb1 = subplot(1, 2, 1);
     ph = plot(faxis, psdStates, 'LineWidth', 3);
-    set(ph, {'color'}, cfg_colors(sstates))
+    set(ph, {'color'}, cfg_colors(1 : nstates - 1))
     xlim(xLimit)
     xlabel('Frequency [Hz]')
     ylabel('PSD [mV^2/Hz]')

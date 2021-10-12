@@ -111,6 +111,30 @@ ngrp = length(unique(spikes.shankID));  % only tetrodes with units
 nunits = length(spikes.times);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% waveform params
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% define a good waveform such that at least two channels exhibit a spike
+% amplitude (range) greater than the maximum std on that channel
+
+% count = 1;
+% for igrp = 1 : ngrp
+%     clu = loadNS('datatype', 'clu', 'session', session, 'grpid', igrp);
+%     uclu = unique(clu);
+%     spk = loadNS('datatype', 'spk', 'session', session, 'grpid', igrp,...
+%         'nspks', length(clu));
+%     
+%     for iclu = 1 : length(uclu)
+%         if uclu(iclu) == 0 || uclu(iclu) == 1
+%             continue
+%         end
+%         wvgrp = spk(:, :, clu == uclu(iclu));
+%         
+%         goodwv(count) = sum(range([mean(wvgrp, 3)]') > max([std(wvgrp, [], 3)]'));
+%         count = count + 1;
+%     end
+% end    
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ISI contamination
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SU = 1% of ISIs < 0.002
@@ -135,7 +159,7 @@ else
     sprintf('\ncalculating separation matrices\n\n');
         
     % go over each spike group, clean and calc separation
-    for igrp = 1 : length(spkgrp)
+    for igrp = 1 : ngrp
         
         % load data
         fet = loadNS('datatype', 'fet', 'session', session, 'grpid', igrp);

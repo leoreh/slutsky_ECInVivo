@@ -16,14 +16,14 @@ stateidx = [1, 4, 5];
 dataType = 'su';        % can be 'mu' (bins of sr) or 'su' (fr)
 unitClass = 'pyr';      % plot 'int', 'pyr', or 'all'
 suFlag = 1;             % plot only su or all units
-frBoundries = [0 Inf];  % include only units with mean fr in these boundries
+frBoundries = [0.3 Inf];  % include only units with mean fr in these boundries
 
 % initialize
 maxY = 0;
 [cfg_colors, cfg_names, ~] = as_loadConfig([]);
 
 % selection of sessions. if sessionidx longer than one will ingore tstamps
-sessionidx = [4];
+sessionidx = [1];
 % sessionidx = 1 : nsessions;
 
 % selection of timestamps from the same recording for comparison
@@ -31,12 +31,12 @@ assignVars(varArray, sessionidx(1))
 if length(sessionidx) == 1
     figpath = session.general.basePath;
     
-    csamps = cumsum(datInfo.nsamps) / fs;
-    tstamps = [1, floor(csamps(1));...
-        ceil(csamps(1)), Inf];
+%     csamps = cumsum(datInfo.nsamps) / fs;
+%     tstamps = [1, floor(csamps(1));...
+%         ceil(csamps(2)), Inf];
     
-%     tstamps = floor([1, 5 * 60 * 60; 7 * 60 * 60, Inf]);
-%     tstamps = [0 Inf];
+    tstamps = floor([1, 5 * 60 * 60; 7 * 60 * 60, Inf]);
+    tstamps = [0 Inf];
     
     xLabel = ["Before"; "After"];
 else
@@ -141,10 +141,4 @@ if saveFig
 end
 
 % arrange to prism --------------------------------------------------------
-clear prismData
-prismData = [];
-for istate = 1 : size(frcell, 1)
-    x = cell2nanmat(frcell(istate, :));
-    x = x(:);
-    prismData(istate, :) = x;
-end
+
