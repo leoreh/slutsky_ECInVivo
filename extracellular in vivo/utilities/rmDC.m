@@ -1,7 +1,7 @@
 function [sig, dc] = rmDC(sig, varargin)
 
 % removes dc offset from signal by calculating mean in window (baseline).
-% adjusts class of dc to that of sig. function only works for 1/2
+% adjusts class of dc to that of sig. function only works for 1 or 2
 % dimensions.
 % 
 % INPUT
@@ -16,12 +16,13 @@ function [sig, dc] = rmDC(sig, varargin)
 %   sig         input singal without DC component   
 %   dc          mean signal in window
 % 
+% REVISIONS
 % 09 mar 19 LH
-% 10 apr 20     compatibability with different classes and dim
+% 10 apr 20     compatibability with different classes and dim (done)
 % 
-% notes
+% NOTES
 % 10 apr 20     compared performance on array of 35 x 5e6. if class double,
-%               rmDC took 1.2 s but the remainder mean after dc removal was
+%               rmDC took 1.2 s and the remainder mean after dc removal was
 %               <1e-8 - 1e-11. if single, rmDC took 0.83 s and the
 %               remainder was <1e-2 - 1e-4. if int16, rmDc took 0.79 s and
 %               the remainder was 0.1-0.5.

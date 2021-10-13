@@ -135,7 +135,7 @@ if resnip
     b = max(a, 0);
     W = b(:);
     W = [reshape(W, sniplength, []), ones(sniplength,1)];
-    [Q, R] = qr(W,0);
+    [Q, R] = qr(W, 0);
     
     % memory map to dat file
     fraw = dir([basename '.dat']);

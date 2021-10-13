@@ -14,7 +14,7 @@ saveFig = false;
 grp = [1 : 4];
 stateidx = [1, 4, 5];
 dataType = 'su';        % can be 'mu' (bins of sr) or 'su' (fr)
-unitClass = 'pyr';      % plot 'int', 'pyr', or 'all'
+unitClass = 'int';      % plot 'int', 'pyr', or 'all'
 suFlag = 1;             % plot only su or all units
 frBoundries = [0 Inf];  % include only units with mean fr in these boundries
 
@@ -23,11 +23,12 @@ maxY = 0;
 [cfg_colors, cfg_names, ~] = as_loadConfig([]);
 
 % selection of sessions. if sessionidx longer than one will ingore tstamps
-sessionidx = [4];
+sessionidx = [2];
 % sessionidx = 1 : nsessions;
 
 % selection of timestamps from the same recording for comparison
 assignVars(varArray, sessionidx(1))
+           
 if length(sessionidx) == 1
     figpath = session.general.basePath;
     
@@ -74,8 +75,8 @@ else
     % compare different times from the same session
     for istate = 1 : length(stateidx)
         for itstamps = 1 : size(tstamps, 1)
-            tidx = sr.states.tstamps{stateidx(istate)} > tstamps(itstamps, 1) &...
-                sr.states.tstamps{stateidx(istate)} < tstamps(itstamps, 2);
+            tidx = fr.states.tstamps{stateidx(istate)} > tstamps(itstamps, 1) &...
+                fr.states.tstamps{stateidx(istate)} < tstamps(itstamps, 2);
             switch dataType
                 case 'mu'
                     frcell{istate, itstamps} = sr.states.fr{stateidx(istate)}(grp, tidx);
@@ -90,15 +91,23 @@ else
     end
 end
 
-% compare firing ratio between two states
-stateRatio = [];
+% gain factor between two states
+clear gainfactor
+stateRatio = [1, 4];    % two states for comparison
 if ~isempty(stateRatio)
-    for isession = 1 : length(sessionidx)
-        tempcell{1, isession} = frcell{stateRatio(1), isession} ./...
-            frcell{stateRatio(2), isession};
+    
+    for itime = 1 : size(frcell, 2)
+        gainfactor{itime} = frcell{1, itime} - frcell{2, itime} ./...
+            [max([frcell{1, itime}, frcell{2, itime}]')]';
     end
-    frcell = tempcell;
-    stateidx = 1;
+    
+    fh = figure;
+    gainmat = cell2nanmat(gainfactor, 1);
+    plot([1 : size(gainmat, 2)], mean(gainmat, 1, 'omitnan'),...
+        'kd', 'markerfacecolor', 'k')
+    boxplot(gainmat, 'PlotStyle', 'traditional', 'Whisker', 3);
+%     set(gca, 'YScale', 'log')
+    
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -139,6 +148,12 @@ if saveFig
     end
     export_fig(figname, '-tif', '-transparent', '-r300')
 end
+
+% EOF 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% helpers
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % arrange to prism --------------------------------------------------------
 clear prismData

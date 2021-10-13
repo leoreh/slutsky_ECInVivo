@@ -95,10 +95,10 @@ if exist(fullfile(basepath, [basename '.AccuSleep_states.mat']))
     nstates = length(ss.stateEpochs);
   
     % apply threshold for epoch leng to calc states
-    thrBin = [60, 5, 5, 60, 8, 5];
-    if length(thrBin) == 1
-        thrBin = repmat(thrBin, 6, 1);
-    elseif length(thrBin) ~= nstates - 1
+    fr.states.epochThr = [10, 10, 0, 10, 0, 0];
+    if length(fr.states.epochThr) == 1
+        fr.states.epochThr = repmat(fr.states.epochThr, 6, 1);
+    elseif length(fr.states.epochThr) ~= nstates - 1
         warning('thrBin length is different than the number of states')
     end
 
@@ -106,7 +106,7 @@ if exist(fullfile(basepath, [basename '.AccuSleep_states.mat']))
     for istate = 1 : nstates - 1
         epochIdx = ss.stateEpochs{istate}(:, 2) < winCalc(2) &...
             ss.stateEpochs{istate}(:, 1) > winCalc(1);
-        thrIdx =  ss.epLen{istate} > thrBin(istate);
+        thrIdx =  ss.epLen{istate} > fr.states.epochThr(istate);
         ss.stateEpochs{istate} = ss.stateEpochs{istate}(thrIdx & epochIdx, :);
          if ~isempty(ss.stateEpochs{istate})
             [fr.states.fr{istate}, fr.states.binedges, fr.states.tstamps{istate}, fr.states.binidx] =...
