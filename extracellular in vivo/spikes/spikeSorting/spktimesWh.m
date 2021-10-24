@@ -18,6 +18,7 @@ function [spktimes, spkch] = spktimesWh(varargin)
 % DEPENDENCIES
 %   get_whitening_matrix (ks)
 %   my_min (ks)
+%   getOr (ks)
 %   class2bytes
 %
 % TO DO LIST:

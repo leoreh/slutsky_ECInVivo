@@ -22,24 +22,22 @@ frBoundries = [0 Inf];  % include only units with mean fr in these boundries
 maxY = 0;
 [cfg_colors, cfg_names, ~] = as_loadConfig([]);
 
-% selection of sessions. if sessionidx longer than one will ingore tstamps
-sessionidx = [2];
+% select sessions. if sessionidx > 1 will ingore tstamps
+sessionidx = [3];
 % sessionidx = 1 : nsessions;
 
-% selection of timestamps from the same recording for comparison
-assignVars(varArray, sessionidx(1))
-           
-if length(sessionidx) == 1
-    figpath = session.general.basePath;
-    
+% select of tstamps from the same recording for comparison
+assignVars(varArray, sessionidx(1))    
+if length(sessionidx) == 1   
     csamps = cumsum(datInfo.nsamps) / fs;
     tstamps = [1, floor(csamps(1));...
-        ceil(csamps(1)), Inf];
+        ceil(csamps(1)), Inf];    
     
-%     tstamps = floor([1, 5 * 60 * 60; 7 * 60 * 60, Inf]);
-%     tstamps = [0 Inf];
+    tstamps = [1, 6 * 60 * 60 - 1;...
+        6 * 60 * 60 Inf];
     
     xLabel = ["Before"; "After"];
+    figpath = session.general.basePath;
 else
     figpath = fileparts(session.general.basePath);
 end
@@ -66,12 +64,14 @@ if length(sessionidx) > 1
             maxY = max([prctile(frcell{istate, isession}, 80), maxY]);
         end
     end
+    
     % get x labels for dirnames
     for isession = 1 : length(sessionidx)
         [dt, ~] = guessDateTime(dirnames(sessionidx(isession)));
         xLabel{isession} = datestr(datenum(dt), 'dd/mm_HH:MM');
     end
 else
+    
     % compare different times from the same session
     for istate = 1 : length(stateidx)
         for itstamps = 1 : size(tstamps, 1)
@@ -160,6 +160,8 @@ clear prismData
 prismData = [];
 for istate = 1 : size(frcell, 1)
     x = cell2nanmat(frcell(istate, :));
-    x = x(:);
-    prismData(istate, :) = x;
+    prismData = [prismData, x];
+    
+%     x = x(:);
+%     prismData(istate, :) = x;
 end

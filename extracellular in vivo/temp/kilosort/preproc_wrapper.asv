@@ -140,7 +140,7 @@ cc = cellclass('basepath', basepath,...
 
 % firing rate
 binsize = 60;
-winBL = [0 30 * 60];
+winBL = [0 300 * 60];
 winCalc = [0 Inf];
 fr = firingRate(spikes.times, 'basepath', basepath, 'graphics', false, 'saveFig', false,...
     'binsize', binsize, 'saveVar', true, 'smet', 'MA', 'winBL',...
@@ -176,7 +176,7 @@ acc = EMGfromACC('basepath', basepath, 'fname', [basename, '.lfp'],...
     'nchans', nchans, 'ch', nchans - 2 : nchans, 'saveVar', true, 'fsIn', 1250,...
     'graphics', false);
 
-emgLfp = ce_EMGFromLFP(session, 'samplingFrequency', 1250);
+emgLfp = ce_EMGFromLFP(session, 'samplingFrequency', 125);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % sleep states

@@ -19,7 +19,6 @@ function [psdStates, faxis, emgRMS] = psd_states(varargin)
 %   sstates         numeric. idx of selected states. e.g. [1, 4, 5] will
 %                   only plot wake, nrem and rem
 %   graphics        logical. plot figure {true}
-
 % 
 % OUTPUT
 %   psdStates       raw averaged psd for each state (mat nstates x faxis)
@@ -63,8 +62,8 @@ if strcmp(dataMode, 'as')
     newFs = 128;
     maxF = 50;
 elseif strcmp(dataMode, 'raw')
-    newFs = 1250;
-    maxF = 250;
+    newFs = 256;
+    maxF = 120;
 end
 
 % subsample signals
@@ -163,5 +162,5 @@ if graphics
     ylabel('norm PSD')
     if strcmp(dataMode, 'raw')
         set(gca, 'YScale', 'log')
-    end
+    end    
 end

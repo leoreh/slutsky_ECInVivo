@@ -47,8 +47,10 @@ shadeIdx = [0, 0];  % override
 clear units
 for isession = 1 : nsessions
     assignVars(varArray, isession)
-    units(isession, 1) = sum(selectUnits(spikes, cm, fr, suFlag, grp, frBoundries, 'pyr'));
-    units(isession, 2) = sum(selectUnits(spikes, cm, fr, suFlag, grp, frBoundries, 'int'));
+    if ~isempty(spikes)
+        units(isession, 1) = sum(selectUnits(spikes, cm, fr, suFlag, grp, frBoundries, 'pyr'));
+        units(isession, 2) = sum(selectUnits(spikes, cm, fr, suFlag, grp, frBoundries, 'int'));
+    end
 end
 maxUnitsSession = max(units);
 expRS = nan(expLen, maxUnitsSession(1));
@@ -99,7 +101,6 @@ xticklabels(tlabel)
 xtickangle(45)
 ylabel('Multi-unit firing rate [Hz]')
 lgh = legend(split(num2str(grp)));
-ylim([0 100])
 
 sb2 = subplot(2, 1, 2);
 plot(mean(expRS', 'omitnan'), 'b', 'LineWidth', 2)

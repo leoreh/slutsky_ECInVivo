@@ -40,6 +40,7 @@ end
 % x axis in hr
 ts = fr.binsize;
 xidx = [1 : length(fr.strd)] / ts;
+
 % idx of block tranisition (dashed lines)
 if ~isempty(datInfo)
     if ~isfield('datInfo', 'fs')

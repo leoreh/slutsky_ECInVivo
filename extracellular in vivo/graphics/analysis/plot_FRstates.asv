@@ -14,7 +14,7 @@ saveFig = false;
 grp = [1 : 4];
 stateidx = [1, 4, 5];
 dataType = 'su';        % can be 'mu' (bins of sr) or 'su' (fr)
-unitClass = 'pyr';      % plot 'int', 'pyr', or 'all'
+unitClass = 'int';      % plot 'int', 'pyr', or 'all'
 suFlag = 1;             % plot only su or all units
 frBoundries = [0 Inf];  % include only units with mean fr in these boundries
 
@@ -23,23 +23,20 @@ maxY = 0;
 [cfg_colors, cfg_names, ~] = as_loadConfig([]);
 
 % selection of sessions. if sessionidx longer than one will ingore tstamps
-sessionidx = [1];
-sessionidx = 1 : nsessions;
+sessionidx = [2];
+% sessionidx = 1 : nsessions;
 
 % selection of timestamps from the same recording for comparison
 assignVars(varArray, sessionidx(1))
            
-if length(sessionidx) == 1
-    figpath = session.general.basePath;
-    
+if length(sessionidx) == 1   
     csamps = cumsum(datInfo.nsamps) / fs;
     tstamps = [1, floor(csamps(1));...
-        ceil(csamps(1)), Inf];
-    
-%     tstamps = floor([1, 5 * 60 * 60; 7 * 60 * 60, Inf]);
-%     tstamps = [0 Inf];
+        ceil(csamps(1)), Inf];    
+    % tstamps = [0 Inf];
     
     xLabel = ["Before"; "After"];
+        figpath = session.general.basePath;
 else
     figpath = fileparts(session.general.basePath);
 end
@@ -66,12 +63,14 @@ if length(sessionidx) > 1
             maxY = max([prctile(frcell{istate, isession}, 80), maxY]);
         end
     end
+    
     % get x labels for dirnames
     for isession = 1 : length(sessionidx)
         [dt, ~] = guessDateTime(dirnames(sessionidx(isession)));
         xLabel{isession} = datestr(datenum(dt), 'dd/mm_HH:MM');
     end
 else
+    
     % compare different times from the same session
     for istate = 1 : length(stateidx)
         for itstamps = 1 : size(tstamps, 1)
@@ -92,6 +91,7 @@ else
 end
 
 % gain factor between two states
+clear gainfactor
 stateRatio = [1, 4];    % two states for comparison
 if ~isempty(stateRatio)
     
@@ -105,7 +105,7 @@ if ~isempty(stateRatio)
     plot([1 : size(gainmat, 2)], mean(gainmat, 1, 'omitnan'),...
         'kd', 'markerfacecolor', 'k')
     boxplot(gainmat, 'PlotStyle', 'traditional', 'Whisker', 3);
-    set(gca, 'YScale', 'log')
+%     set(gca, 'YScale', 'log')
     
 end
 
@@ -154,11 +154,11 @@ end
 % helpers
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% % arrange to prism --------------------------------------------------------
-% clear prismData
-% prismData = [];
-% for istate = 1 : size(frcell, 1)
-%     x = cell2nanmat(frcell(istate, :));
-%     x = x(:);
-%     prismData(istate, :) = x;
-% end
+% arrange to prism --------------------------------------------------------
+clear prismData
+prismData = [];
+for istate = 1 : size(frcell, 1)
+    x = cell2nanmat(frcell(istate, :));
+    x = x(:);
+    prismData(istate, :) = x;
+end
