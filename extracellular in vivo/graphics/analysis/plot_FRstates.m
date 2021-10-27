@@ -12,7 +12,7 @@
 % general
 saveFig = false;
 grp = [1 : 4];
-stateidx = [1, 4, 5];
+stateIdx = [1, 4, 5];
 dataType = 'su';        % can be 'mu' (bins of sr) or 'su' (fr)
 unitClass = 'int';      % plot 'int', 'pyr', or 'all'
 suFlag = 1;             % plot only su or all units
@@ -49,17 +49,17 @@ cd(figpath)
 clear frcell units
 if length(sessionidx) > 1
     % compare different sessions
-    for istate = 1 : length(stateidx)
+    for istate = 1 : length(stateIdx)
         for isession = 1 : length(sessionidx)
             assignVars(varArray, sessionidx(isession))
             switch dataType
                 case 'mu'
-                    frcell{istate, isession} = sr.states.fr{stateidx(istate)}(grp, :);
+                    frcell{istate, isession} = sr.states.fr{stateIdx(istate)}(grp, :);
                     frcell{istate, isession} = frcell{istate, isession}(:);
                 case 'su'
                     units = selectUnits(spikes, cm, fr, suFlag, grp, frBoundries, unitClass);
                     nunits = sum(units);
-                    frcell{istate, isession} = mean(fr.states.fr{stateidx(istate)}(units, :), 2, 'omitnan');
+                    frcell{istate, isession} = mean(fr.states.fr{stateIdx(istate)}(units, :), 2, 'omitnan');
             end
             maxY = max([prctile(frcell{istate, isession}, 80), maxY]);
         end
@@ -73,18 +73,18 @@ if length(sessionidx) > 1
 else
     
     % compare different times from the same session
-    for istate = 1 : length(stateidx)
+    for istate = 1 : length(stateIdx)
         for itstamps = 1 : size(tstamps, 1)
-            tidx = fr.states.tstamps{stateidx(istate)} > tstamps(itstamps, 1) &...
-                fr.states.tstamps{stateidx(istate)} < tstamps(itstamps, 2);
+            tidx = fr.states.tstamps{stateIdx(istate)} > tstamps(itstamps, 1) &...
+                fr.states.tstamps{stateIdx(istate)} < tstamps(itstamps, 2);
             switch dataType
                 case 'mu'
-                    frcell{istate, itstamps} = sr.states.fr{stateidx(istate)}(grp, tidx);
+                    frcell{istate, itstamps} = sr.states.fr{stateIdx(istate)}(grp, tidx);
                     frcell{istate, itstamps} = frcell{istate, itstamps}(:);
                 case 'su'
                     units = selectUnits(spikes, cm, fr, suFlag, grp, frBoundries, unitClass);
                     nunits = sum(units);
-                    frcell{istate, itstamps} = mean(fr.states.fr{stateidx(istate)}(units, tidx), 2, 'omitnan');
+                    frcell{istate, itstamps} = mean(fr.states.fr{stateIdx(istate)}(units, tidx), 2, 'omitnan');
             end
             maxY = max([prctile(frcell{istate, itstamps}, 90), maxY]);
         end
@@ -116,7 +116,7 @@ end
 
 fh = figure;
 for istate = 1 : size(frcell, 1)
-    subplot(1, length(stateidx), istate)
+    subplot(1, length(stateIdx), istate)
     hold on
     frmat = cell2nanmat(frcell(istate, :));
     plot([1 : size(frmat, 2)], mean(frmat, 1, 'omitnan'),...
@@ -126,14 +126,14 @@ for istate = 1 : size(frcell, 1)
     bh = flipud(bh);
     for ibox = 1 : length(bh)
         patch(get(bh(ibox), 'XData'), get(bh(ibox), 'YData'),...
-            cfg_colors{stateidx(istate)}, 'FaceAlpha', 0.5)
+            cfg_colors{stateIdx(istate)}, 'FaceAlpha', 0.5)
     end
     xticklabels(xLabel)
     xtickangle(45)
     if istate == 1
         ylabel([dataType, ' firing rate [Hz]'])
     end
-    title(cfg_names(stateidx(istate)))
+    title(cfg_names(stateIdx(istate)))
     ylim([0 ceil(maxY)])
 end
 

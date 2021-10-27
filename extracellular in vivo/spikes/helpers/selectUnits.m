@@ -11,15 +11,19 @@ function units = selectUnits(spikes, cm, fr, suFlag, grp, frBoundries, unitClass
     for ii = 1 : length(grp)
         grpidx = grpidx | spikes.shankID == grp(ii);
     end
-    
-    % mfr
-    mfrunits = fr.mfr > frBoundries(1) & fr.mfr < frBoundries(2);
-%     mfrunits = mfrunits & [std(fr.strd') < mean(fr.strd')]';
-    
+       
     % cell class
     pyr = strcmp(cm.putativeCellType, 'Pyramidal Cell');
     wide = strcmp(cm.putativeCellType, 'Wide Interneuron');
     int = strcmp(cm.putativeCellType, 'Narrow Interneuron');
+    
+    % mfr
+    mfrRS = pyr' & fr.mfr > frBoundries(1, 1) & fr.mfr < frBoundries(1, 2);
+    mfrFS = int' | wide' & fr.mfr > frBoundries(2, 1) & fr.mfr < frBoundries(2, 2);
+    mfrStable = [std(fr.strd') < mean(fr.strd')]';    
+    mfrunits = mfrStable & (mfrRS | mfrFS);
+    
+    % combine
     if strcmp(unitClass, 'pyr')
         units = pyr & su' & grpidx & mfrunits';
     elseif strcmp(unitClass, 'int')

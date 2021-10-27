@@ -4,30 +4,13 @@
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = 'lh95';
+mname = 'lh93';
 forceL = true;
 forceA = false;
 
-% full path and name to xls file with session metadata
-xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
-
-% conditions
-pcond = ["tempflag"];
-ncond = ["fepsp"];
-
-% string array of variables to load
-vars = ["session.mat";...
-    "cell_metrics.cellinfo";...
-    "spikes.cellinfo";...
-    "fr.mat";...
-    "datInfo";...
-    "AccuSleep_states";...
-    "sr.mat"];
-
 if ~exist('varArray', 'var') || forceL
-    [varArray, dirnames, mousepath] = getSessionVars('vars', vars,...
-        'pcond', pcond, 'ncond', ncond, 'sortDir', false, 'dirnames', [],...
-        'xlsname', xlsname, 'mname', mname);
+    [varArray, dirnames, mousepath] = getSessionVars('sortDir', false,...
+        'dirnames', [], 'mname', mname);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -160,81 +143,6 @@ cell_metrics = CellExplorer('basepaths', basepaths);
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% edit plot_FRtime_session.m
-% edit plot_FRtime_exp.m
-
-% -------------------------------------------------------------------------
-% number of SU and MU (top - pyr; bottom - int) 
-grp = [1 : 4];          % which tetrodes to plot
-suFlag = 0;             % plot only su or all units
-frBoundries = [0 Inf];  % include only units with fr greater / lower than
-figFlag = 1; saveFig = true;
-
-if figFlag
-    clear units
-    for isession = 1 : nsessions
-        assignVars(varArray, isession)
-        units(isession, 1) = sum(selectUnits(spikes, cm, fr, suFlag, grp, frBoundries, 'pyr'));
-        units(isession, 2) = sum(selectUnits(spikes, cm, fr, suFlag, grp, frBoundries, 'int'));
-    end
-    fh = figure;
-    bar(units, 'stacked')
-    legend({"RS"; "FS"})
-    xticks(1 : nsessions)
-    xticklabels(dirnames)
-    xtickangle(45)
-    title('Number of Units')
-    xlabel('Session')
-    ylabel('No. Units')
-    box off
-    
-    if saveFig
-        figname = fullfile(mousepath, 'graphics', 'UnitsDetected');
-        export_fig(figname, '-tif', '-transparent', '-r300')
-    end
-end
-
-% number of SU and MU per spike grp 
-suFlag = 0;             % plot only su or all units
-frBoundries = [0 Inf];  % include only units with fr greater / lower than
-figFlag = 1; saveFig = true;
-sessionIdx = 1 : nsessions;
-grp = [1 : 4];
-
-if figFlag
-    units = cell(1, length(sessionIdx));
-    for isession = sessionIdx
-        assignVars(varArray, isession)
-        if isempty(varArray{isession, 3})
-            units{isession}(:, 1) = zeros(length(grp), 1);
-            units{isession}(:, 2) = zeros(length(grp), 1);
-            continue
-        end
-        for igrp = unique(spikes.shankID)
-            units{isession}(igrp, 1) = sum(selectUnits(spikes, cm, fr, suFlag, igrp, frBoundries, 'pyr'));
-            units{isession}(igrp, 2) = sum(selectUnits(spikes, cm, fr, suFlag, igrp, frBoundries, 'int'));
-        end
-    end
-    fh = figure;
-    k = 1;
-    for isession = sessionIdx
-        subplot(nsub(1), nsub(2), k)
-        bar(units{isession}, 'stacked')
-        legend({"RS"; "FS"})
-        xticks(1 : length(grp))
-        title(sessionName{isession})
-        xlabel('Spike Group')
-        ylabel('No. Units')
-        box off
-        k = k + 1;
-    end
-     
-    if saveFig
-        mkdir(fullfile(mousepath, 'graphics'))
-        figname = fullfile(mousepath, 'graphics', 'UnitsPerGrp');
-        export_fig(figname, '-tif', '-transparent', '-r300')
-    end
-end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % states

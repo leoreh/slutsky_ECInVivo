@@ -6,25 +6,21 @@
 % params and data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = 'lh93';
-forceL = false;
-if ~exist('varArray', 'var') || forceL
-    [varArray, dirnames, mousepath] = getSessionVars('sortDir', false,...
-        'dirnames', [], 'mname', mname);
-end
+mname = 'lh95';
+[varArray, dirnames, mousepath] = getSessionVars('sortDir', false,...
+    'dirnames', [], 'mname', mname);
 
 % params
-grp = [3 : 4];                   % which tetrodes to plot
+grp = [1 : 4];                  % which tetrodes to plot
 suFlag = 1;                     % plot only su or all units
-% include only units with fr greater / lower than. 1st row RS 2nd row FS
-frBoundries = [0.2 Inf; 0.2 Inf];    
+frBoundries = [0 Inf];          % include only units with fr greater / lower than
+saveFig = false;
 
 nsessions = length(dirnames);
 sessionIdx = 1 : nsessions;     % selected sessions
 
 assignVars(varArray, sessionIdx(end))   % last session
 ts = sr.binsize;                        % firing rate sampling period
-saveFig = false;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % prepare vars for entire experiment
@@ -100,12 +96,6 @@ for isession = sessionIdx
     end 
 end
 
-% smooth
-smf = 15;
-expRS = movmedian(expRS, smf, 1);
-expFS = movmedian(expFS, smf, 1);
-expMU = movmedian(expMU, smf, 1);
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % concatenate data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -128,7 +118,6 @@ ylabel('Multi-unit firing rate [Hz]')
 lgh = legend(split(num2str(grp)));
 
 sb2 = subplot(2, 1, 2);
-set(fh, 'defaultAxesColorOrder', [0 0 1; 1 0 0]);
 % rs
 plot(mean(expRS', 'omitnan'), 'b', 'LineWidth', 2)
 hold on

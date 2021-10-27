@@ -25,6 +25,7 @@ function [varArray, dirnames, mousepath] = getSessionVars(varargin)
 %   add option to input dirnames
 %
 % 21 oct 20 LH      updates:
+%   added default values for my convinience
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -32,12 +33,12 @@ function [varArray, dirnames, mousepath] = getSessionVars(varargin)
 
 p = inputParser;
 addOptional(p, 'mousepath', pwd);
-addOptional(p, 'xlsname', 'sessionList.xlsx', @ischar);
+addOptional(p, 'xlsname', '', @ischar);
 addOptional(p, 'mname', '', @ischar);
 addOptional(p, 'dirColumn', "Session", @isstring);
-addOptional(p, 'vars', "session", @isstring);
-addOptional(p, 'pcond', "tempFlag", @isstring);
-addOptional(p, 'ncond', "", @isstring);
+addOptional(p, 'vars', string([]), @isstring);
+addOptional(p, 'pcond', "tempflag", @isstring);
+addOptional(p, 'ncond', "fepsp", @isstring);
 addOptional(p, 'sortDir', true, @islogical);
 addOptional(p, 'dirnames', []);
 
@@ -51,6 +52,22 @@ pcond           = p.Results.pcond;
 ncond           = p.Results.ncond;
 sortDir         = p.Results.sortDir;
 dirnames        = p.Results.dirnames;
+
+% default path to xls file with session metadata
+if isempty(xlsname)
+    xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
+end
+
+% deafuly variables to load. note this is congruent with assignVars.m
+if isempty(vars)
+    vars = ["session.mat";...
+        "cell_metrics.cellinfo";...
+        "spikes.cellinfo";...
+        "fr.mat";...
+        "datInfo";...
+        "AccuSleep_states";...
+        "sr.mat"];
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Get directory paths
