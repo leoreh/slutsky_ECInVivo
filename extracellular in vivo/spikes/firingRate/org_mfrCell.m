@@ -1,7 +1,8 @@
-function mfrCell = org_mfrCell(varargin)
+function [mfrCell, gainCell] = org_mfrCell(varargin)
 
 % organizes mfr of units / tetrodes according to states and other params
-% (e.g. spiking group, fr boundries, etc). 
+% (e.g. spiking group, fr boundries, etc). can also organize gain factor
+% (nrem - wake).
 %
 % INPUT: 
 %   spikes          struct. CE format.
@@ -27,6 +28,10 @@ function mfrCell = org_mfrCell(varargin)
 %                   (column). if mu than mfrCell is 1d with nstates
 %                   columns. if su than mfrCell has two rows, one for
 %                   pyr and one for int.
+%   gainCell        array where each cell contains a mat of gain fire per
+%                   unit (row) in each time bin (column). gain cell has two
+%                   rows, one for pyr and one for int. if dataType = 'mu'
+%                   or stateIdx is empty, will return empty cell.
 %
 % DEPENDENCIES
 %
@@ -64,6 +69,9 @@ suFlag = p.Results.suFlag;
 % preparations
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% initialize
+gainCell = cell(2, 1);
+
 if strcmp(dataType, 'su')
     if ~isempty(spikes) && ~isempty(cm) && isfield(spikes, 'su')
     pyrUnits = selectUnits(spikes, cm, fr, suFlag, grp, frBoundries, 'pyr');
@@ -74,6 +82,10 @@ if strcmp(dataType, 'su')
         warning('\n\nSome input may be missing. selecting all units\n\n')
     end
 end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% organize mfr cell
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if ~isempty(stateIdx)
     for istate = 1 : length(stateIdx)
@@ -94,10 +106,12 @@ if ~isempty(stateIdx)
                         mean(fr.states.fr{stateIdx(istate)}(pyrUnits, tidx), 2, 'omitnan');
                     mfrCell{2, istate}(:, ibin) =...         % int
                         mean(fr.states.fr{stateIdx(istate)}(intUnits, tidx), 2, 'omitnan');
+
             end
         end
     end
 else
+    % regardless of state
     for ibin = 1 : size(timebins, 1)
         
         % tstamps relavent to timebin
@@ -116,6 +130,31 @@ else
     end
 end
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% organize gain factor cell
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%      
+
+for ibin = 1 : size(timebins, 1)
+    
+    % tstamps relavent to timebin (wake)
+    tidxWake = fr.states.tstamps{1} > timebins(ibin, 1) &...
+        fr.states.tstamps{1} < timebins(ibin, 2);
+    tidxNREM = fr.states.tstamps{4} > timebins(ibin, 1) &...
+        fr.states.tstamps{4} < timebins(ibin, 2);
+    
+    % rs data
+    wakeMat = fr.states.fr{1}(pyrUnits, tidxWake);
+    nremMat = fr.states.fr{4}(pyrUnits, tidxNREM);
+    gainCell{1}(:, ibin) = (mean(nremMat') - mean(wakeMat')) ./ ...
+        max([max(wakeMat'); max(nremMat')]) * 100;
+    
+    % fs data
+    wakeMat = fr.states.fr{1}(intUnits, tidxWake);
+    nremMat = fr.states.fr{4}(intUnits, tidxNREM);
+    gainCell{2}(:, ibin) = (mean(nremMat') - mean(wakeMat')) ./ ...
+        max([max(wakeMat'); max(nremMat')]) * 100;
+end
+ 
 end
 
 % EOF

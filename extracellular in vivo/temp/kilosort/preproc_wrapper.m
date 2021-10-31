@@ -146,6 +146,10 @@ fr = firingRate(spikes.times, 'basepath', basepath, 'graphics', false, 'saveFig'
     'binsize', binsize, 'saveVar', true, 'smet', 'MA', 'winBL',...
     winBL, 'winCalc', winCalc);
 
+[mfrCell, gainCell] = org_mfrCell('spikes', spikes, 'cm', cm, 'fr', fr,...
+    'timebins', [1 Inf], 'dataType', 'su', 'grp', [1 : 4], 'suFlag', suFlag,...
+    'frBoundries', [0 Inf; 0 Inf], 'stateIdx', stateIdx);
+
 % CCG
 binSize = 0.001; dur = 0.12; % low res
 binSize = 0.0001; dur = 0.02; % high res

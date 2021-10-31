@@ -9,25 +9,18 @@
 basepath = pwd;
 [~, basename] = fileparts(basepath);
 cd(basepath)
+guessDateTime(basename)
 
 grp = [1 : 4];                  % which tetrodes to plot
 suFlag = 1;                     % plot only su or all units
-frBoundries = [0 Inf];          % include only units with fr greater / lower than
 saveFig = false;
+% include only units with fr greater / lower than. 1st row RS 2nd row FS
+frBoundries = [0.2 Inf; 0.2 Inf];  
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-vars = ["session.mat";...
-    "cell_metrics.cellinfo";...
-    "spikes.cellinfo";...
-    "fr.mat";...
-    "datInfo";...
-    "AccuSleep_states";...
-    "sr.mat"];
-
-[varArray, ~, mousepath] = getSessionVars('vars', vars,...
-    'dirnames', string(basename));
+[varArray, ~, mousepath] = getSessionVars('dirnames', string(basename));
 assignVars(varArray, 1)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -93,4 +86,3 @@ if saveFig
     export_fig(figname, '-tif', '-transparent', '-r300')
 end
 
-guessDateTime(basename)
