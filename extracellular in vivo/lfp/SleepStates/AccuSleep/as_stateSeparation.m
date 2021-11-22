@@ -44,6 +44,7 @@ minBoutLen = epochLen;
 
 % get params from configuration file
 [cfg_colors, cfg_names, ~] = as_loadConfig([]);
+cfg_colors = cfg_colors(:);
 nstates = length(cfg_names);
 sstates = 1 : nstates - 1;      % selected states (ignore bin)
 
@@ -203,8 +204,7 @@ set(gca, 'YTick', [])
 % histogram of epoch lengths for NREM, REM, and WAKE
 fh.CurrentAxes = sb5;
 hold on
-stateidx = [1 : 6];
-epMat = cell2nanmat(epLen(stateidx));
+epMat = cell2nanmat(epLen(sstates));
 plot([1 : size(epMat, 2)], mean(epMat, 1, 'omitnan'),...
     'kd', 'markerfacecolor', 'k')
 boxplot(epMat, 'PlotStyle', 'traditional', 'Whisker', 6);
@@ -212,9 +212,9 @@ bh = findobj(sb5, 'Tag', 'Box');
 bh = flipud(bh);
 for ibox = 1 : length(bh)
     patch(get(bh(ibox), 'XData'), get(bh(ibox), 'YData'),...
-        cfg_colors{stateidx(ibox)}, 'FaceAlpha', 0.5)
+        cfg_colors{sstates(ibox)}, 'FaceAlpha', 0.5)
 end
-xticklabels(cfg_names(stateidx))
+xticklabels(cfg_names(sstates))
 xtickangle(45)
 set(sb5, 'YScale', 'log')
 ylabel('Epoch Length [log(s)]')
@@ -236,10 +236,6 @@ if saveFig
     export_fig(figname, '-tif', '-transparent', '-r300')
 end
 
-%%changes%%
-save ('epMatrix','epMat');
-timeSpentInState = sum(cell2nanmat(epLen(sstates)), 1, 'omitnan'), ones(1, length(sstates));
-save ('timeSpentinState','timeSpentInState');
 end
 
 % EOF

@@ -17,7 +17,7 @@ if ~exist(configfile, 'file')
     
     if ~exist(configfile, 'file')
         [configfile, configpath] = uigetfile('', 'Please select  the configuration file');
-        configfile = [fullfile(configpath, configfile), '.mat'];
+        configfile = [fullfile(configpath, configfile)];
     end
 end
 load(configfile)

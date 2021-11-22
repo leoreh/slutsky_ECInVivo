@@ -185,7 +185,7 @@ if graphics
     % confusion matrix (relative to clabiration data)
     labels1 = labels_calibration;
     labels2 = labels_net;
-    [ss.netPrecision, ss.netRecall] = as_cm(labels1, labels2);
+    [ss.netPrecision, ss.netRecall] = as_cm(labels1, labels2, netScores);
 
     % stateSeparation
     as_stateSeparation(EEG, EMG, labels)

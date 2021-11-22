@@ -18,9 +18,9 @@ datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % tdt
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'J:\Data\lh96_211121_153700';
+basepath = 'J:\Data\lh96\lh96_211120_123800';
 store = 'Raw1';
-blocks = [5];
+blocks = [2];
 chunksize = 300;
 mapch = [1 : 4];
 mapch = [1 : 16];
@@ -29,6 +29,14 @@ rmvch = [14];
 clip = cell(1, 1);
 datInfo = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
     'chunksize', chunksize, 'mapch', mapch, 'rmvch', rmvch, 'clip', clip);
+
+% get start/stop time of specific block from tdt
+for iblock = 1 : length(blocks)
+    blockpath = fullfile(basepath, ['block-', num2str(blocks(iblock))]);
+    heads{iblock} = TDTbin2mat(blockpath, 'HEADERS', 1);
+    heads{iblock}.startDate = datestr(datenum([1970, 1, 1, 0, 0, heads{iblock}.startTime]) + hours(3));
+    heads{iblock}.stopDate = datestr(datenum([1970, 1, 1, 0, 0, heads{iblock}.stopTime]) + hours(3));
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % session info (cell explorer foramt)
@@ -180,14 +188,9 @@ emgLfp = ce_EMGFromLFP(session, 'samplingFrequency', 1250);
 
 % prep signal
 [EMG, EEG, sigInfo] = as_prepSig([basename, '.lfp'], [basename, '.emg.dat'],...
-    'eegCh', [5 : 8], 'emgCh', [1], 'saveVar', true, 'emgNchans', [2],...
-    'eegNchans', 15, 'inspectSig', false, 'forceLoad', true,...
-    'eegFs', 1250, 'emgFs', 3051.7578125, 'emgCf', [10 200]);
-
-[EMG, EEG, sigInfo] = as_prepSig([basename, '.emg.dat'], [basename, '.emg.dat'],...
-    'eegCh', 2, 'emgCh', 1, 'saveVar', false, 'emgNchans', [2],...
-    'eegNchans', 2, 'inspectSig', true, 'forceLoad', true,...
-    'eegFs', 3051.7578125, 'emgFs', 3051.7578125, 'emgCf', [10 200]);
+    'eegCh', [1 : 4], 'emgCh', [2], 'saveVar', true, 'emgNchans', [2],...
+    'eegNchans', 16, 'inspectSig', false, 'forceLoad', true,...
+    'eegFs', 1250, 'emgFs', 6103.515625, 'emgCf', [10 200]);
 
 % manually create labels
 labelsmanfile = [basename, '.AccuSleep_labelsMan.mat'];
@@ -209,14 +212,9 @@ EEG = double(bz_LoadBinary([basename, '.lfp'], 'duration', Inf,...
     'frequency', 1250, 'nchannels', nchans, 'start', 0,...
     'channels', [4 : 7], 'downsample', 1));
 EEG = mean(EEG, 2);
-
-EEG = double(bz_LoadBinary([basename, '.emg.dat'], 'duration', Inf,...
-    'frequency', 3051.7578125, 'nchannels', 2, 'start', 0,...
-    'channels', 2, 'downsample', 1));
-
 load([basename, '.AccuSleep_labels.mat'])
 [psdStates, faxis, emgRMS] = psd_states('eeg', EEG, 'emg', [],...
-    'labels', labels, 'fs', 3051.7578125, 'graphics', true, 'sstates', [1, 4]);
+    'labels', labels, 'fs', 1250, 'graphics', true, 'sstates', [1, 4, 5]);
 
 % get confusion matrix between two labels
 [ss.netPrecision, ss.netRecall] = as_cm(labels1, labels2);

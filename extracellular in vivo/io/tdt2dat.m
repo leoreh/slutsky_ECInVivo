@@ -110,6 +110,14 @@ if ~isempty(blocks)
 end
 nblocks = length(blocknames);
 
+% get start/stop date time of blocks
+for iblock = 1 : nblocks
+    blockpath = fullfile(basepath, ['block-', num2str(blocks(iblock))]);
+    blockHead = TDTbin2mat(blockpath, 'HEADERS', 1);
+    blockStart{iblock} = datestr(datenum([1970, 1, 1, 0, 0, blockHead.startTime]) + hours(2), 'yymmdd_HHMMss');
+    blockEnd{iblock} = datestr(datenum([1970, 1, 1, 0, 0, blockHead.stopTime]) + hours(2), 'yymmdd_HHMMss');
+end
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Raw
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -134,8 +142,8 @@ for i = 1 : nblocks
     blockpath = fullfile(basepath, blocknames{i});
     fprintf(1, 'Working on %s\n', blocknames{i});
     
-    heads = TDTbin2mat(blockpath, 'TYPE', {'streams'}, 'STORE', store, 'HEADERS', 1);
-    nsec(i) = heads.stores.(store).ts(end);
+    blockHead = TDTbin2mat(blockpath, 'TYPE', {'streams'}, 'STORE', store, 'HEADERS', 1);
+    nsec(i) = blockHead.stores.(store).ts(end);
     
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % partition into chunks
@@ -239,16 +247,13 @@ datInfo.blockduration = nsec;
 datInfo.clip = clip;
 datInfo.rmvch = rmvch;
 datInfo.mapch = mapch;
-datInfo.fs = heads.stores.(store).fs;
+datInfo.fs = blockHead.stores.(store).fs;
 datInfo.nsamps = nsamps; 
 datInfo.nsec = nsec; 
+datInfo.blockStart = blockStart;
+datInfo.blockEnd = blockEnd;
 
 if saveVar
-    if strcmp(store, 'Raw1')
-        infoname = [basename, '.datInfo.mat'];
-    else
-        infoname = [basename, '.' store, '.datInfo.mat'];
-    end
     save([basename, '.' store, '.datInfo.mat'], 'datInfo');
     if nargout == 2
         save([basename, '.' store, '.data.mat'], 'data');
@@ -262,7 +267,7 @@ end
 if contains(store, 'Raw')
     LFPfromDat('basepath', basepath, 'cf', 450, 'chunksize', 5e6,...
         'nchans', length(mapch), 'fsOut', 1250,...
-        'fsIn', heads.stores.(store).fs)
+        'fsIn', blockHead.stores.(store).fs)
 end
 
 end

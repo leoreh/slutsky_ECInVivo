@@ -76,6 +76,7 @@ end
 epochLen = 1;                   % period of labels [s]    
 minEpDur = 10;                  % minimum segement duration (see below)
 [cfg_colors, cfg_names, ~] = as_loadConfig([]);
+cfg_colors = cfg_colors(:);
 nstates = length(cfg_names);
 if isempty(sstates)
     sstates = 1 : nstates - 1;      % selected states (ignore bin)
