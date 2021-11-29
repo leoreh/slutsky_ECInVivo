@@ -18,9 +18,9 @@ datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % tdt
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'J:\Data\lh96_211121_153700';
+basepath = 'J:\Data\lh96_211128_065900';
 store = 'Raw1';
-blocks = [5];
+blocks = [1 : 3];
 chunksize = 300;
 mapch = [1 : 4];
 mapch = [1 : 16];

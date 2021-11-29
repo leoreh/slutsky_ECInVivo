@@ -1,0 +1,129 @@
+function burstiness = burstMetrics(spikes, varargin)
+
+%  calculate metrics of burstiness from ACG. based on calc_ACG_metrics from
+%  cell explorer. metrics include: busrtIndex_Royer2012, Mizuseki2012,
+%  Doublets. calculates two ACGs: narrow (100ms, 0.5ms bins) and wide (1s,
+%  1ms bins)
+
+
+% INPUT:
+%   spikes          struct (see getSpikes)
+%   sunits          numeric vec. indices of selected units for calculation
+%                   {[]}.
+%   basepath        path to recording
+%   graphics        logical. plot graphics {true} or not (false)
+%   saveFig         logical. save figure {1} or not (0)
+%   saveVar         logical. save variables (update spikes and save su)
+%   session         struct. session info (see CE_sessionTemplate)
+%
+% OUTPUT:           
+
+%
+% DEPENDENCIES:
+%   CCG             
+%
+% TO DO LIST:
+%
+% 24 nov 21 LH      
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% arguments
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+p = inputParser;
+addOptional(p, 'spikes', []);
+addOptional(p, 'sunits', []);
+addOptional(p, 'basepath', pwd, @ischar);
+addOptional(p, 'graphics', true, @islogical);
+addOptional(p, 'saveFig', true, @islogical);
+addOptional(p, 'saveVar', true, @islogical);
+
+parse(p, varargin{:})
+spikes      = p.Results.spikes;
+basepath    = p.Results.basepath;
+graphics    = p.Results.graphics;
+saveFig     = p.Results.saveFig;
+saveVar     = p.Results.saveVar;
+
+% load spikes if empty
+if isempty(spikes)
+    [~, filename] = fileparts(basepath);
+    spkname = [filename '.spikes.cellinfo.mat'];
+    if exist(spkname, 'file')
+        load(spkname)
+    else
+        error('%s not found', spkname)
+    end
+end
+
+% make sure spikes has required fields
+if ~all(isfield(spikes, {'shankID', 'cluID', 'times'}))
+    error('spikes missing required fields')
+end
+
+% selected untis
+if isemtpy(sunits)
+    sunits = 1 : length(spikes.times);
+end
+
+% load session info
+[~, basename] = fileparts(basepath);
+sessionName = [basename, '.session.mat'];
+if ~exist(sessionName, 'file')
+    session = CE_sessionTemplate(pwd, 'viaGUI', false,...
+        'force', true, 'saveVar', true);
+else
+    load(sessionName)
+end
+
+% params
+fs = session.extracellular.sr;
+spkgrp = session.extracellular.spikeGroups.channels;
+ngrp = length(unique(spikes.shankID));  % only tetrodes with units
+nunits = length(spikes.times);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% calc ACGs
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% initialize
+bins_wide = 500;
+binsize_wide = 0.001;
+duration_wide = 1; 
+acg_wide = zeros(duration_wide / binsize_wide + 1, length(sunits));
+
+bins_narrow = 100;
+binsize_narrow = 0.0005;
+duration_narrow = 0.1; 
+acg_narrow = zeros(duration_narrow / binsize_narrow + 1, length(sunits));
+
+for iunit = sunits
+    acg_wide(:, iunit) = CCG(spikes.times{iunit},...
+        ones(size(spikes.times{iunit})), 'binSize', binsize_wide,...
+        'duration', duration_wide, 'norm', 'rate', 'Fs', 1 / fs);
+    
+    acg_narrow(:, iunit) = CCG(spikes.times{iunit},...
+        ones(size(spikes.times{iunit})), 'binSize', binsize_narrow,...
+        'duration', duration_narrow, 'norm', 'rate', 'Fs', 1 / fs);
+    
+    % metrics
+     burstiness.doublets(iunit) = max(acg_narrow(bins_narrow + 1 + 5 : bins_narrow+1+16,i))/mean(acg_narrow(bins_narrow+1+16:bins_narrow+1+23,i));
+     BurstIndex_Royer2012(i) = mean(acg_wide(bins_wide+1+3:bins_wide+1+5,i))/mean(acg_wide(bins_wide+1+200:bins_wide+1+300,i));
+end
+
+
+for i = cell_indexes
+    acg_wide(:,i) = CCG(spikes.times{i},ones(size(spikes.times{i})),'binSize',0.001,'duration',1,'norm','rate','Fs',1/sr);
+    acg_narrow(:,i) = CCG(spikes.times{i},ones(size(spikes.times{i})),'binSize',0.0005,'duration',0.100,'norm','rate','Fs',1/sr);
+    % Metrics from narrow
+    BurstIndex_Doublets(i) = max(acg_narrow(bins_narrow+1+5:bins_narrow+1+16,i))/mean(acg_narrow(bins_narrow+1+16:bins_narrow+1+23,i));
+    % Metrics from wide
+    ThetaModulationIndex(i) = (mean(acg_wide(bins_wide+1+100:bins_wide+1+140,i)) - mean(acg_wide(bins_wide+1+50:bins_wide+1+70,i)))/(mean(acg_wide(bins_wide+1+50:bins_wide+1+70,i))+mean(acg_wide(bins_wide+1+100:bins_wide+1+140,i)));
+    BurstIndex_Royer2012(i) = mean(acg_wide(bins_wide+1+3:bins_wide+1+5,i))/mean(acg_wide(bins_wide+1+200:bins_wide+1+300,i));
+end
+toc
+
+
+
+end
+
+% EOF
