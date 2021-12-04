@@ -183,10 +183,14 @@ if ~isempty(eegCf)
     eegOrig = iosr.dsp.sincFilter(eegOrig, filtRatio);
 end
 
-if ~isempty(emgCf)   
+if ~isempty(emgCf)
+      
+    
     fprintf('\nfiltering EMG, cutoff = %d Hz', emgCf)
     filtRatio = emgCf / (emgFs / 2);
-    emgOrig = iosr.dsp.sincFilter(emgOrig, filtRatio);    
+    emgOrig = iosr.dsp.sincFilter(emgOrig, filtRatio);
+    
+    
 end
 
 % remove DC component
@@ -222,6 +226,13 @@ EMG = [interp1([1 : length(emgOrig)] / emgFs, emgOrig, tstamps_sig,...
     'pchip')]';
 EEG = [interp1([1 : length(eegOrig)] / eegFs, eegOrig, tstamps_sig,...
     'pchip')]';
+% 
+% EMG = filterLFP(EMG, 'fs', 1250, 'type', 'butter', 'dataOnly', true,...
+%     'order', 3, 'stopband', [48 52], 'graphics', false);
+% EMG = filterLFP(EMG, 'fs', 1250, 'type', 'butter', 'dataOnly', true,...
+%     'order', 3, 'stopband', [98 102], 'graphics', false);
+% EMG = filterLFP(EMG, 'fs', 1250, 'type', 'butter', 'dataOnly', true,...
+%     'order', 3, 'stopband', [148 152], 'graphics', false);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % finilize and save
@@ -291,11 +302,4 @@ labels = labelsNew;
 
 % -------------------------------------------------------------------------
 % fix special case where emg changes in the middle of a recording, such as
-% the sudden appearance of strong HR artifacts. Thus, although wake and
-% nrem are still noticeable different, the difference between them is not
-% homegenous and the same calibration matrix cannot be used for the entire
-% recording. so, classify the recording twice (or more) and each time
-% during the calibration use only the manual (calibration) labels from the
-% parts of the recording that look similar. then, combine the labels from
-% the different classifications. The transitions will probably need to be
-% manually labeled. 
+% the sudden appearance of strong HR artifacts. in the 

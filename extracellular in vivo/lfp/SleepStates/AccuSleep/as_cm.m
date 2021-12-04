@@ -57,10 +57,14 @@ recall = @(confusionMat) diag(confusionMat) ./ sum(confusionMat, 1)';
 
 % select relavent labels
 idxLabels = labels2 < nstates & labels1 < nstates;
+labels1 = labels1(idxLabels);
+labels2 = labels2(idxLabels);
+if ~isempty(scores)
+    scores = scores(idxLabels, :);
+end
 
 % calc confusion matrix
-cm = confusionmat(labels1(idxLabels), labels2(idxLabels));
-
+cm = confusionmat(labels1, labels2);
 statePrecision = precision(cm);
 stateRecall = recall(cm);
 
@@ -91,18 +95,21 @@ if graphics
                 scoreIdx = scores(:, istate) < thr(ithr) & stateIdx;
                 
                 lostData(ithr, istate) = sum(scoreIdx) / sum(stateIdx) * 100;
-                newLabels(scoreIdx) = size(scores, 2) + 2;
+                newLabels(scoreIdx) = nstates + 1;
             end
             
             % poor fix for when removes an entire state 
-            [tempPrecision, tempRecall] =...
-                as_cm(labels1, newLabels, 'graphics', false);
-            if length(tempPrecision) == size(tempPrecision, 1)
+            tempCm = confusionmat(labels1, newLabels);
+            tempPrecision = precision(cm);
+            tempRecall = recall(cm);
+%             [tempPrecision, tempRecall] =...
+%                 as_cm(labels1, newLabels, 'graphics', false);
+            if length(tempPrecision) == nstates - 1
                 netPrecision(ithr, :) = tempPrecision;
                 netRecall(ithr, :) = tempRecall;
             else
-                netPrecision(ithr, :) = zeros(1, size(netPrecision, 2));
-                netRecall(ithr, :) = zeros(1, size(netPrecision, 2));
+                netPrecision(ithr, :) = zeros(1, nstates - 1);
+                netRecall(ithr, :) = zeros(1, nstates - 1);
             end
         end
         

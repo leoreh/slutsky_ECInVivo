@@ -26,7 +26,7 @@ function KL = kldiv(varValue,pVect1,pVect2,varargin)
 %
 %   KLDIV(X,P1,P2,'js') returns the Jensen-Shannon divergence, given by
 %   [KL(P1,Q)+KL(P2,Q)]/2, where Q = (P1+P2)/2.  See the Wikipedia article
-%   for "Kullback?eibler divergence".  This is equal to 1/2 the so-called
+%   for "Kullback豊eibler divergence".  This is equal to 1/2 the so-called
 %   "Jeffrey divergence."  See Rubner et al. (2000).
 %
 %   EXAMPLE:  Let the event set and probability sets be as follow:
@@ -58,7 +58,7 @@ function KL = kldiv(varValue,pVect1,pVect2,varargin)
 %   3) Rubner, Y., Tomasi, C., and Guibas, L. J., 2000. "The Earth Mover's 
 %      distance as a metric for image retrieval." International Journal of 
 %      Computer Vision, 40(2): 99-121.
-%   4) <a href="matlab:web('http://en.wikipedia.org/wiki/Kullback%E2%80%93Leibler_divergence','-browser')">Kullback?eibler divergence</a>. Wikipedia, The Free Encyclopedia.
+%   4) <a href="matlab:web('http://en.wikipedia.org/wiki/Kullback%E2%80%93Leibler_divergence','-browser')">Kullback豊eibler divergence</a>. Wikipedia, The Free Encyclopedia.
 %
 %   See also: MUTUALINFO, ENTROPY
 if ~isequal(unique(varValue),sort(varValue)),

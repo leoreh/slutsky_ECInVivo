@@ -7,6 +7,8 @@ function as_stateSeparation(EEG, EMG, labels, varargin)
 %   EMG             numeric. emg data (1 x n)
 %   EEG             numeric. eeg data (1 x n)
 %   labels          numeric. 
+%   stateEpochs     cell of nstates where each cell contains an 2 x n
+%                   describing the start and end of an epoch
 %   fs              numeric. sampling frequency
 %   saveFig         logical. save figure {true}
 %
@@ -24,10 +26,12 @@ function as_stateSeparation(EEG, EMG, labels, varargin)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 p = inputParser;
-addOptional(p, 'fs', [], @isnumeric);
+addOptional(p, 'stateEpochs', []);
+addOptional(p, 'fs', []);
 addOptional(p, 'saveFig', true, @islogical);
 
 parse(p, varargin{:})
+stateEpochs     = p.Results.stateEpochs;
 fs              = p.Results.fs;
 saveFig         = p.Results.saveFig;
 
@@ -124,13 +128,15 @@ fprintf('\ndone in %.1f sec\n\n', toc)
 [psdStates, faxis, emgRMS] = psd_states('eeg', eeg, 'emg', emg,...
     'labels', labels, 'fs', newFs, 'graphics', false);
 
-% convert labels to state epochs. 
-for istate = 1 : nstates
-    binaryVec = zeros(length(labels), 1);
-    binaryVec(labels == istate) = 1;
-    stateEpisodes = binary2epochs('vec', binaryVec, 'minDur', [], 'maxDur', [],...
-        'interDur', [], 'exclude', false); % these are given as indices and are equivalent to seconds
-    stateEpochs{istate} = stateEpisodes * epochLen;
+% convert labels to state epochs.
+if isempty(stateEpochs)
+    for istate = 1 : nstates
+        binaryVec = zeros(length(labels), 1);
+        binaryVec(labels == istate) = 1;
+        stateEpisodes = binary2epochs('vec', binaryVec, 'minDur', [], 'maxDur', [],...
+            'interDur', [], 'exclude', false); % these are given as indices and are equivalent to seconds
+        stateEpochs{istate} = stateEpisodes * epochLen;
+    end
 end
 epLen = cellfun(@(x) (diff(x')'), stateEpochs, 'UniformOutput', false);
 

@@ -114,8 +114,12 @@ nblocks = length(blocknames);
 for iblock = 1 : nblocks
     blockpath = fullfile(basepath, ['block-', num2str(blocks(iblock))]);
     blockHead = TDTbin2mat(blockpath, 'HEADERS', 1);
-    blockStart{iblock} = datestr(datenum([1970, 1, 1, 0, 0, blockHead.startTime]) + hours(2), 'yymmdd_HHMMss');
-    blockEnd{iblock} = datestr(datenum([1970, 1, 1, 0, 0, blockHead.stopTime]) + hours(2), 'yymmdd_HHMMss');
+    if ~isnan(blockHead.startTime)
+        blockStart{iblock} = datestr(datenum([1970, 1, 1, 0, 0, blockHead.startTime]) + hours(2), 'yymmdd_HHMMss');
+    end
+    if ~isnan(blockHead.stopTime)
+        blockEnd{iblock} = datestr(datenum([1970, 1, 1, 0, 0, blockHead.stopTime]) + hours(2), 'yymmdd_HHMMss');
+    end
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

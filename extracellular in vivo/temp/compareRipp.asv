@@ -1,0 +1,33 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% load and params
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+basepath = 'J:\Data\lh96\lh96_211201_070100';
+[mousepath, basename] = fileparts(basepath);
+
+% load and assign
+varArray = getSessionVars('dirnames', {basename}, 'mousepath', mousepath,...
+    'sortDir', false);
+assignVars(varArray, 1)
+
+% params
+fs = session.extracellular.sr;
+fsLfp = session.extracellular.srLfp;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% separate ripples 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+csum_blockDur = cumsum(datInfo.nsec);
+dark_phase_start = csum_blockDur(3);
+inj_time = csum_blockDur(1);
+
+% rippels in NREM
+idx_nrem = InIntervals(ripp.peakPos, ss.stateEpochs{4});
+idx_pre = ripp.peakPos < inj_time & idx_nrem;
+idx_post = ripp.peakPos > inj_time & & idx_nrem;
+
+% percent of ripples that occured in nrem
+percent_nrem_pre = sum(idx_pre) / sum(ripp.peakPos < inj_time);
+percent_nrem_post = sum(idx_post) / sum(ripp.peakPos > inj_time);
+

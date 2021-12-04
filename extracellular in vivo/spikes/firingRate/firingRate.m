@@ -94,7 +94,7 @@ if exist(fullfile(basepath, [basename '.AccuSleep_states.mat']))
     fr.states.stateNames = ss.labelNames;
     nstates = length(ss.stateEpochs);
   
-    % apply threshold for epoch leng to calc states
+    % apply threshold for epoch length to calc states
     fr.states.epochThr = [10, 10, 0, 10, 0, 0];
     if length(fr.states.epochThr) == 1
         fr.states.epochThr = repmat(fr.states.epochThr, 6, 1);

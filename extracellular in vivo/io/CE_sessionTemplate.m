@@ -346,6 +346,11 @@ if ~isempty(fraw)
     session.general.nsamps = nsamps;
 end
 
+% correct tdt sampling rate rounded by xml
+if session.extracellular.sr == 24414.1
+    session.extracellular.sr = 24414.0625;
+end
+
 % Finally show GUI if requested by user
 if viaGUI
     session = gui_session(session);
@@ -354,6 +359,7 @@ end
 if saveVar
     save(sessionName, 'session')
 end
+
 
 end
 

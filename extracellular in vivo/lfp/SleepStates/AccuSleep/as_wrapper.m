@@ -4,6 +4,7 @@ function ss = as_wrapper(EEG, EMG, sigInfo, varargin)
 % paper: Barger et al., PlosOne, 2019
 % git: https://github.com/zekebarger/AccuSleep
 % documentation: doc AccuSleep_instructions
+% ignores last state (assumes bin)
 %
 % INPUT:
 %   EMG             numeric. emg data (1 x n)
@@ -28,6 +29,7 @@ function ss = as_wrapper(EEG, EMG, sigInfo, varargin)
 % DEPENDENCIES:
 %   AccuSleep (modified in slutskycode)
 %   IOSR.DSP.SINCFILTER     for filtering data
+%   binary2epochs
 %
 % TO DO LIST:
 %       # filter before resampling to assure nyquist (done)
@@ -38,6 +40,7 @@ function ss = as_wrapper(EEG, EMG, sigInfo, varargin)
 %
 % 06 feb 21 LH  updates:
 % 19 apr 21     separated prepSig
+% 29 nov 21     add minDur and interDur
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -74,8 +77,8 @@ saveFig         = p.Results.saveFig;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % constants
-epochLen = 1;        
-minBoutLen = epochLen;
+minEpochLen = 1;        
+minBoutLen = minEpochLen;
 
 % arrange files 
 cd(basepath)
@@ -138,11 +141,11 @@ else
         elseif exist(callabelsfile)
             load(callabelsfile)
         else
-            labels = ones(1, floor(length(EMG) / fs / epochLen)) * nstates + 1;
+            labels = ones(1, floor(length(EMG) / fs / minEpochLen)) * nstates + 1;
         end
         
         fprintf('\nlabel some data for calibration, then press save.\n')
-        AccuSleep_viewer(EEG, EMG, fs, epochLen, labels, callabelsfile);
+        AccuSleep_viewer(EEG, EMG, fs, minEpochLen, labels, callabelsfile);
         uiwait
         load(callabelsfile)
         
@@ -153,7 +156,7 @@ else
         % calibration matrix
         fprintf('creating calbiration matrix... ')
         calibrationData = createCalibrationData(standardizeSR(EEG, fs, 128),...
-            standardizeSR(EMG, fs, 128), labels, 128, epochLen);
+            standardizeSR(EMG, fs, 128), labels, 128, minEpochLen);
         save(calfile, 'calibrationData')
         fprintf('done.\n')
     else
@@ -165,7 +168,7 @@ else
     % classify recording
     fprintf('classifying... ')
     [labels_net, netScores] = AccuSleep_classify(standardizeSR(EEG, fs, 128),...
-        standardizeSR(EMG, fs, 128), net, 128, epochLen, calibrationData, minBoutLen);
+        standardizeSR(EMG, fs, 128), net, 128, minEpochLen, calibrationData, minBoutLen);
     
     % insert calibrated labels to final results. this is because
     % AccuSleep_classify doesn't allow for 'only overwrite undefind' as in the
@@ -178,45 +181,66 @@ else
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% convert labels to state epochs
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ 
+minDur = [10, 10, 0, 10, 0, 0]; % threshold of minimum epoch length
+interDur = 4;                   % combine epochs separated by <= interDur
+
+if length(minDur) == 1
+    minDur = repamt(minDur, nstates - 1, 1);
+elseif length(minDur) ~= nstates - 1
+    error('minDur length is different than the number of states')
+end
+if length(interDur) == 1
+    interDur = repmat(interDur, nstates - 1, 1);
+elseif length(interDur) ~= nstates - 1
+    error('interDur length is different than the number of states')
+end
+
+% create state epochs
+for istate = 1 : nstates - 1
+    binaryVec = zeros(length(labels), 1);
+    binaryVec(labels == istate) = 1;
+    stateEpochs = binary2epochs('vec', binaryVec, 'minDur', minDur(istate), 'maxDur', [],...
+        'interDur', interDur(istate), 'exclude', false);
+    ss.stateEpochs{istate} = stateEpochs * minEpochLen; % convert indices to seconds
+    ss.epLen{istate} = [diff(ss.stateEpochs{istate}')]';
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if graphics
-    % confusion matrix (relative to clabiration data)
+    % confusion matrix (relative to calibration data)
     labels1 = labels_calibration;
     labels2 = labels_net;
     [ss.netPrecision, ss.netRecall] = as_cm(labels1, labels2, netScores);
 
     % stateSeparation
-    as_stateSeparation(EEG, EMG, labels)
+    as_stateSeparation(EEG, EMG, labels, 'stateEpochs', ss.stateEpochs)
+end
+
+if inspectLabels
+    AccuSleep_viewer(EEG, EMG, fs, minEpochLen, labels, labelsfile)
+    uiwait
+    load(labelsfile)
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % finalize and save
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-if inspectLabels
-    AccuSleep_viewer(EEG, EMG, fs, epochLen, labels, labelsfile)
-    uiwait
-    load(labelsfile)
-end
-
-% convert labels to state epochs. 
-for istate = 1 : nstates
-    binaryVec = zeros(length(labels), 1);
-    binaryVec(labels == istate) = 1;
-    stateEpochs = binary2epochs('vec', binaryVec, 'minDur', [], 'maxDur', [],...
-        'interDur', [], 'exclude', false); % these are given as indices and are equivalent to seconds
-    ss.stateEpochs{istate} = stateEpochs * epochLen;
-    ss.epLen{istate} = [diff(ss.stateEpochs{istate}')]';
-end
-
 ss.info = sigInfo;
 ss.info.net = netfile;
 ss.info.calibrationData = calibrationData;
 ss.info.analysisDate = datetime;
-ss.info.epochLen = epochLen;
+ss.info.epochLen = minEpochLen;
 ss.info.minBoutLen = minBoutLen;
+ss.info.minDur = minDur;
+ss.info.interDur = interDur;
+ss.info.runtime = datetime(now, 'ConvertFrom', 'datenum');
 ss.labels = labels;
 ss.labels_net = labels_net;
 ss.labels_calibration = labels_calibration;

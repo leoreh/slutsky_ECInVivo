@@ -89,7 +89,7 @@ if manCur
     dbstop in cleanCluByFet at 94 if manCur
     
     % select spiking grp
-    grpid = 3;
+    grpid = 1;
     
     % load data
     res = loadNS('datatype', 'res', 'session', session, 'grpid', grpid);

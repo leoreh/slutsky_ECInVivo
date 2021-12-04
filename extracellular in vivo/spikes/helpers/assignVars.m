@@ -44,5 +44,14 @@ if iscell(varArray) && isnumeric(isession)
     else
         assignin('base', 'sr', varArray{isession, 7}.fr)
     end
-    
+    if isempty(varArray{isession, 8})
+        assignin('base', 'st', [])
+    else
+        assignin('base', 'st', varArray{isession, 8}.st)
+    end
+    if isempty(varArray{isession, 9})
+        assignin('base', 'ripp', [])
+    else
+        assignin('base', 'ripp', varArray{isession, 9}.ripp)
+    end
 end

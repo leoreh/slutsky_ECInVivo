@@ -6,6 +6,8 @@ function [varArray, dirnames, mousepath] = getSessionVars(varargin)
 % variables in each dir are named "dirname.varname.mat".
 
 % INPUT:
+%   dirnames    cell of strings to dirs of interest. if mousepath empty
+%               than should include full path.
 %   mousepath   string. path to mouse folder with all sessions {pwd}. if
 %               empty will be retreived from xls
 %   xlsname     string. name of xls file with list of sessions. must
@@ -66,14 +68,16 @@ if isempty(vars)
         "fr.mat";...
         "datInfo";...
         "AccuSleep_states";...
-        "sr.mat"];
+        "sr.mat";...
+        "st_metrics.mat";...
+        "ripp.mat"];
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Get directory paths
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-if exist('dirnames', 'var') && isstring(dirnames)
+if exist('dirnames', 'var')
     % ALT 1: user input dirnames
     dirnames = dirnames;
     
@@ -123,8 +127,6 @@ for i = 1 : ndirs
         else
             mousepath = basepath_default;
         end
-    else
-        mousepath = fileparts(pwd);
     end
     
     filepath = char(fullfile(mousepath, dirnames(i)));

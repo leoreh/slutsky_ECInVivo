@@ -32,7 +32,9 @@ function units = selectUnits(spikes, cm, fr, suFlag, grp, frBoundries, unitClass
         units = wide & su' & grpidx & mfrunits';
     else
         units = su' & grpidx & mfrunits';     % override
-    end    
+    end
+    units = logical(units(:));
+    
 end
 
 % EOF
