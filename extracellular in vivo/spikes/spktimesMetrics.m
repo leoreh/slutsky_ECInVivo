@@ -190,6 +190,9 @@ for iunit = sunits
         % Fano factor: variability in fr relative to mfr
         % brustiness.ff = var(fr) / mean(fr)
         
+        % AR(1): auto-regressive
+        % plot(fr.strd(iunit, 1 : end-1), fr.strd(iunit, 2 : end), '*')
+        
     end
 end
 

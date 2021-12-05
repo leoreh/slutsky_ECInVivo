@@ -242,7 +242,7 @@ if graphics
     plot([epochs(rippSelect, 1), epochs(rippSelect, 1)], yLimit, 'g')
     plot([epochs(rippSelect, 2), epochs(rippSelect, 2)], yLimit, 'r')
     xlim([peakPos(rippCenter) - 0.5, peakPos(rippCenter) + 0.5])
-    legend('Raw LFP', 'Filtered')
+    legend('Raw', 'Filtered')
     xlabel('Time [s]')
     
     % examples of ripples (filtered) superimposed

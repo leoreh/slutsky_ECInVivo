@@ -18,14 +18,14 @@ datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % tdt
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'J:\Data\lh96_211202_070500';
-store = 'Raw1';
-blocks = [1,2,3];
+basepath = 'J:\Data\lh96_211204_084200';
+store = 'EMG1';
+blocks = [1 : 2];
 chunksize = 300;
 mapch = [1 : 4];
-mapch = [1 : 16];
+% mapch = [1 : 16];
 rmvch = [2, 4];
-rmvch = [14];
+% rmvch = [14];
 clip = cell(1, 1);
 datInfo = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
     'chunksize', chunksize, 'mapch', mapch, 'rmvch', rmvch, 'clip', clip);
@@ -171,12 +171,12 @@ lfp = getLFP('basepath', basepath, 'ch', [spkgrp{:}], 'chavg', {},...
 emgOrig = filterLFP(emgOrig, 'fs', 1250, 'stopband', [49 51],...
     'dataOnly', true, 'saveVar', false, 'graphics', false);
 
+% create emg signal from accelerometer
 acc = EMGfromACC('basepath', basepath, 'fname', [basename, '.lfp'],...
     'nchans', nchans, 'ch', nchans - 2 : nchans, 'saveVar', true, 'fsIn', 1250,...
     'graphics', false);
 
-emgLfp = ce_EMGFromLFP(session, 'samplingFrequency', 1250);
-
+% get ripples
 ripp = getRipples('basepath', basepath, 'ch', [12 : 15],...
     'recWin', [0, Inf]);
 
@@ -195,21 +195,15 @@ ripp = getRipples('basepath', basepath, 'ch', [12 : 15],...
     'eegNchans', 2, 'inspectSig', true, 'forceLoad', true,...
     'eegFs', 3051.7578125, 'emgFs', 3051.7578125, 'emgCf', [10 200]);
 
-EMG1 = EMG(1 : 5 * 60 * 60 * 1250);
-[EMG, EEG, sigInfo] = as_prepSig(EEG, EMG1,...
-    'eegCh', [1 : 4], 'emgCh', [1], 'saveVar', false, 'emgNchans', [2],...
-    'eegNchans', 15, 'inspectSig', true, 'forceLoad', true,...
-    'eegFs', 1250, 'emgFs', 3051.7578125, 'emgCf', [10 48]);
-
 % manually create labels
 labelsmanfile = [basename, '.AccuSleep_labelsMan.mat'];
-AccuSleep_viewer(EEG, EMG,  1250, 1, [], labelsmanfile)
+AccuSleep_viewer(EEG, EMG,  1250, 1, labels, labelsmanfile)
 
 % classify with a network
 netfile = 'D:\Code\slutskycode\extracellular in vivo\lfp\SleepStates\AccuSleep\trainedNetworks\net_211107_141044.mat';
 % netfile = [];
 ss = as_wrapper(EEG, EMG, [], 'basepath', pwd, 'calfile', [],...
-    'viaGui', false, 'forceCalibrate', false, 'inspectLabels', false,...
+    'viaGui', false, 'forceCalibrate', true, 'inspectLabels', false,...
     'saveVar', true, 'forceAnalyze', true, 'fs', 1250, 'netfile', netfile,...
     'graphics', true);
 
@@ -232,12 +226,6 @@ load([basename, '.AccuSleep_labels.mat'])
 
 % get confusion matrix between two labels
 [ss.netPrecision, ss.netRecall] = as_cm(labels1, labels2);
-
-% show only x hours of data
-x = 11;
-tidx = [1 : x * 60 * 60 * 1250];
-lidx = [1 : x * 60 * 60];
-AccuSleep_viewer(EEG(tidx), EMG(tidx), 1250, 1, labels(lidx), [])
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % handle dat  files

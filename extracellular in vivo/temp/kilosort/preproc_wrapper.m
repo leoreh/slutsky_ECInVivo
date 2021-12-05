@@ -18,14 +18,14 @@ datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % tdt
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'J:\Data\lh96_211202_070500';
-store = 'Raw1';
-blocks = [4, 5];
+basepath = 'J:\Data\lh96_211204_111500';
+store = 'EMG1';
+blocks = [2 : 4];
 chunksize = 300;
 mapch = [1 : 4];
-mapch = [1 : 16];
+% mapch = [1 : 16];
 rmvch = [2, 4];
-rmvch = [14];
+% rmvch = [14];
 clip = cell(1, 1);
 datInfo = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
     'chunksize', chunksize, 'mapch', mapch, 'rmvch', rmvch, 'clip', clip);
@@ -120,9 +120,8 @@ cell_metrics = ProcessCellMetrics('session', session,...
 
 % cluster validation
 load([basename, '.spikes.cellinfo.mat'])
-mu = [];
 spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
-    'saveFig', false, 'force', true, 'mu', mu, 'graphics', false,...
+    'saveFig', false, 'force', true, 'mu', [], 'graphics', false,...
     'vis', 'on', 'spkgrp', spkgrp);
 
 % pyr vs. int
@@ -130,16 +129,15 @@ cc = cellclass('basepath', basepath,...
     'waves', cat(1, spikes.rawWaveform{:})', 'saveVar', true,...
     'graphics', false, 'fs', fs);
 
-% spk times metrics
+% spike timing metrics
 st = spktimesMetrics('winCalc', ss.stateEpochs([1, 4]));
 
 % firing rate
 binsize = 60;
 winBL = [0 30 * 60];
-winCalc = [0 Inf];
 fr = firingRate(spikes.times, 'basepath', basepath, 'graphics', false, 'saveFig', false,...
     'binsize', binsize, 'saveVar', true, 'smet', 'MA', 'winBL',...
-    winBL, 'winCalc', winCalc);
+    winBL, 'winCalc', [0, Inf]);
 
 [mfrCell, gainCell] = org_mfrCell('spikes', spikes, 'cm', cm, 'fr', fr,...
     'timebins', [1 Inf], 'dataType', 'su', 'grp', [1 : 4], 'suFlag', suFlag,...
@@ -156,15 +154,15 @@ plotCCG('ccg', ccg(:, u, u), 't', t, 'basepath', basepath,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % lfp
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 % create lfp
 LFPfromDat('basepath', basepath, 'cf', 450, 'chunksize', 5e6,...
     'nchans', nchans, 'fsOut', 1250,...
     'fsIn', fs)   
 
 % load lfp
-lfpInterval = [150 * 60, 180 * 60];
 lfp = getLFP('basepath', basepath, 'ch', [spkgrp{:}], 'chavg', {},...
-    'fs', 1250, 'interval', lfpInterval, 'extension', 'lfp',...
+    'fs', 1250, 'interval', [0, Inf], 'extension', 'lfp',...
     'savevar', true, 'forceL', true, 'basename', '');
 
 % remove 50 Hz from signal
@@ -186,18 +184,13 @@ ripp = getRipples('basepath', basepath, 'ch', [12 : 15],...
 
 % prep signal
 [EMG, EEG, sigInfo] = as_prepSig([basename, '.lfp'], [basename, '.emg.dat'],...
-    'eegCh', [1 : 4], 'emgCh', [1], 'saveVar', false, 'emgNchans', [2],...
-    'eegNchans', 15, 'inspectSig', true, 'forceLoad', true,...
+    'eegCh', [1 : 4], 'emgCh', [1], 'saveVar', true, 'emgNchans', [2],...
+    'eegNchans', 15, 'inspectSig', false, 'forceLoad', true,...
     'eegFs', 1250, 'emgFs', 3051.7578125, 'emgCf', [10 200]);
-
-[EMG, EEG, sigInfo] = as_prepSig([basename, '.emg.dat'], [basename, '.emg.dat'],...
-    'eegCh', 2, 'emgCh', 1, 'saveVar', false, 'emgNchans', [2],...
-    'eegNchans', 2, 'inspectSig', true, 'forceLoad', true,...
-    'eegFs', 3051.7578125, 'emgFs', 3051.7578125, 'emgCf', [10 200]);
 
 % manually create labels
 labelsmanfile = [basename, '.AccuSleep_labelsMan.mat'];
-AccuSleep_viewer(EEG, EMG,  1250, 1, pre, labelsmanfile)
+AccuSleep_viewer(EEG, EMG,  1250, 1, [], labelsmanfile)
 
 % classify with a network
 netfile = 'D:\Code\slutskycode\extracellular in vivo\lfp\SleepStates\AccuSleep\trainedNetworks\net_211107_141044.mat';
@@ -234,15 +227,18 @@ load([basename, '.AccuSleep_labels.mat'])
 %%% cat dat
 nchans = 2;
 fs = 3051.7578125;
-newpath = mousepath;
-datFiles{1} = 'G:\lh86\lh86_210228_070000\lh86_210228_070000.emg.dat';
-datFiles{2} = 'G:\lh86\lh86_210228_190000\lh86_210228_190000.emg.dat';
+newpath = 'J:\Data';
+datFiles{1} = 'J:\Data\lh96_211204_084200\lh96_211204_084200.emg.dat';
+datFiles{2} = 'J:\Data\lh96_211204_111500\lh96_211204_111500\lh96_211204_111500.emg.dat';
 sigInfo = dir(datFiles{1});
 nsamps = floor(sigInfo.bytes / class2bytes('int16') / nchans);
 parts{1} = round([195360091 722703787] / 24414.06 * fs);
 parts{2} = round([1 722703787] / 24414.06 * fs);
 
-catDatMemmap('datFiles', datFiles, 'newpath', newpath, 'parts', parts,...
+parts{1} = round([0, 72 * 60 + 44] * fs);
+parts{2} = round([0, Inf]);
+
+catDatMemmap('datFiles', datFiles, 'newpath', newpath, 'parts', [],...
     'nchans', nchans, 'saveVar', true)
 
 

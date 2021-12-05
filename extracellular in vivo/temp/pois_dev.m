@@ -55,7 +55,7 @@ stimes = stimes(:);
 
 nunits = length(stimes);
 sunits = 1 : nunits;
-sunits = 10 : 20;
+sunits = 10 : 15;
 graphics = true;
 
 for iunit = sunits
