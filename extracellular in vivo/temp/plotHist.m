@@ -1,8 +1,10 @@
-function plotHist(histData, clr)
+function plotHist(histData, clr, histBins)
 if isempty(clr)
     clr = 'k';
 end
-histBins = 200;
+if isempty(histBins)
+    histBins = 200;
+end
 h = histogram(histData, histBins, 'Normalization', 'probability');
 h.FaceColor = clr;
 h.EdgeColor = 'none';

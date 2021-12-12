@@ -1,13 +1,9 @@
 function [bs] = getBS(varargin)
 
-% receives an lfp signal, divides it to 500 ms bins and for each bin
+% receives an lfp signal, divides it to 500 ms  bins and for each bin
 % calculates several variables (e.g. the first principle component of the
-% spectrogram). clusters each bin as either a burst or suppression. defines
-% epochs of burst while accounting for duration parameters. finds the
-% precise timing of a transition between an epoch of burst and suppression
-% (currently not implemented). allows the user to go over the data
-% and manually mark epochs of burst. calculates several params such as the
-% burst suppression ratio. 
+% spectrogram). clusters each bin as eto onw of two groups - burst and suppression.
+% and for each epoch  detects burst events in LFP.
 % 
 % INPUT
 %   sig         numeric vec of lfp data.
@@ -20,7 +16,7 @@ function [bs] = getBS(varargin)
 %   vars        cell of strings. one string per variable to use for
 %               clustering. possible variables are 'std', 'rms', 'max',
 %               'sum', 'p', 'energy', 'pc1'
-%   lognorm     logical {true}. log10 variables.
+%   lognorm     logical {true}. log10 variables
 %   basepath    recording session path {pwd}
 %   basename    string. if empty extracted from basepath
 %   graphics    logical. plot figure {1}
@@ -198,15 +194,12 @@ varmat = [varmat, pc1];
 
 switch clustmet
     case 'gmm'
-        
         % fit distribution
         options = statset('MaxIter', 500);
         bs.gm = fitgmdist(varmat, nclust,...
             'options', options, 'Start', 'plus', 'Replicates', 50);
-        
         % cluster
         [gi, ~, ~, ~, mDist] = cluster(bs.gm, varmat);
-        
         % cluster separation
         for i = 1 : nclust
             [lRat(i), iDist(i)] = cluDist(varmat, find(gi == i), mDist(:, i));

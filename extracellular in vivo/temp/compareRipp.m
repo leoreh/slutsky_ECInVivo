@@ -14,16 +14,77 @@ assignVars(varArray, 1)
 fs = session.extracellular.sr;
 fsLfp = session.extracellular.srLfp;
 
+% recording window
+csum_blockDur = cumsum(datInfo.nsec);
+dark_phase_start = csum_blockDur(2);
+inj_time = csum_blockDur(1);
+recWin = [0, inj_time;...
+    inj_time + 1, dark_phase_start];
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% distribution of ripple rate
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% rate --------------------------------------------------------------------
+fh = figure;
+histBins = 50;
+lgndstr = {'Baseline', 'aCSF'};
+
+% all ripples
+for iwin = 1 : size(recWin, 2)
+    idx_win{iwin} = InIntervals(ripp.rate.tstamps, recWin(iwin, :));
+end
+
+subplot(2, 2, 1)
+plotHist(ripp.rate.rate(idx_win{1}), 'k', histBins)
+hold on
+plotHist(ripp.rate.rate(idx_win{2}), 'b', histBins)
+xlabel('Ripple Rate [Hz]')
+subtitle('All Ripples')
+legend(lgndstr)
+
+% only in nrem
+for iwin = 1 : size(recWin, 2)
+    idx_win{iwin} = InIntervals(ripp.states.tstamps{4}, recWin(iwin, :));
+end
+
+subplot(2, 2, 2)
+plotHist(ripp.states.rate{4}(idx_win{1}), 'k', histBins)
+hold on
+plotHist(ripp.states.rate{4}(idx_win{2}), 'b', histBins)
+xlabel('Ripple Rate [Hz]')
+subtitle('NREM Ripples')
+legend(lgndstr)
+
+% amplitude ---------------------------------------------------------------
+for iwin = 1 : size(recWin, 2)
+    idx_rec = InIntervals(ripp.peakPos, recWin(iwin, :));
+    idx_nrem = InIntervals(ripp.peakPos, ss.stateEpochs{4});
+    idx_win{iwin} = idx_rec & idx_nrem;
+end
+
+histBins = 200;
+subplot(2, 2, 3)
+plotHist(ripp.peakAmp(idx_win{1}), 'k', histBins)
+hold on
+plotHist(ripp.peakAmp(idx_win{2}), 'b', histBins)
+xlabel('Peak Amplitude')
+subtitle('NREM Ripples')
+legend(lgndstr)
+
+histBins = 200;
+subplot(2, 2, 4)
+plotHist(ripp.dur(idx_win{1}), 'k', histBins)
+hold on
+plotHist(ripp.dur(idx_win{2}), 'b', histBins)
+xlabel('Ripple Duration [s]')
+subtitle('NREM Ripples')
+legend(lgndstr)
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % separate ripples 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% recording window
-csum_blockDur = cumsum(datInfo.nsec);
-dark_phase_start = csum_blockDur(3);
-inj_time = csum_blockDur(1);
-recWin = [0, inj_time;...
-    inj_time + 1, dark_phase_start];
 
 % get ripples
 ripp1 = getRipples('basepath', basepath, 'ch', [12 : 15],...

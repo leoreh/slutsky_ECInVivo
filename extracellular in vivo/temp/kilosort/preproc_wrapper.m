@@ -5,9 +5,9 @@ cd(basepath)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % open ephys
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'D:\Data\lh93\2021-08-19_22-16-08';
-rmvch = [4];
-mapch = [1 : 19];
+basepath = 'J:\Data\lh99\2021-12-10_21-24-22';
+rmvch = [];
+mapch = [26,27,28,30,2,3,31,29,4,5,6,7,8,9,10,11,12,13,14,15,1,16,17,32,18,19,20,21,22,23,24,25,33,34,35,36,37];
 exp = [1];
 rec = cell(max(exp), 1);
 % rec{1} = [2, 3];
@@ -15,17 +15,23 @@ datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
     'rmvch', rmvch, 'mapch', mapch, 'concat', true,...
     'nchans', length(mapch), 'fsIn', 20000);
 
+% pre-process dat
+datInfo = preprocDat('basepath', 'J:\Data\lh99\lh99_211211_090453',...
+    'fname', '', 'mapch', mapch,...
+    'rmvch', rmvch, 'nchans', nchans, 'saveVar', true,...
+    'chunksize', 5e6, 'precision', 'int16', 'bkup', false);   
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % tdt
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'J:\Data\lh96_211204_111500';
-store = 'EMG1';
-blocks = [2 : 4];
+basepath = 'J:\Data\lh96_211208_070600';
+store = 'Raw2';
+blocks = [2, 6, 7];
 chunksize = 300;
 mapch = [1 : 4];
-% mapch = [1 : 16];
+mapch = [1 : 16];
 rmvch = [2, 4];
-% rmvch = [14];
+rmvch = [7];
 clip = cell(1, 1);
 datInfo = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
     'chunksize', chunksize, 'mapch', mapch, 'rmvch', rmvch, 'clip', clip);
@@ -175,18 +181,18 @@ acc = EMGfromACC('basepath', basepath, 'fname', [basename, '.lfp'],...
     'graphics', false);
 
 % get ripples
-ripp = getRipples('basepath', basepath, 'ch', [12 : 15],...
-    'recWin', [0, Inf]);
+ripp = getRipples('basepath', basepath, 'rippCh', [23], 'emgCh', [],...
+    'emg', EMG(1 : 4 * 60 * 60 * 1250), 'recWin', [0, 4 * 60 * 60]);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % sleep states
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % prep signal
-[EMG, EEG, sigInfo] = as_prepSig([basename, '.lfp'], [basename, '.emg.dat'],...
-    'eegCh', [1 : 4], 'emgCh', [1], 'saveVar', true, 'emgNchans', [2],...
-    'eegNchans', 15, 'inspectSig', false, 'forceLoad', true,...
-    'eegFs', 1250, 'emgFs', 3051.7578125, 'emgCf', [10 200]);
+[EMG, EEG, sigInfo] = as_prepSig([basename, '.lfp'], [basename, '.lfp'],...
+    'eegCh', [25 : 28], 'emgCh', [33], 'saveVar', true, 'emgNchans', [],...
+    'eegNchans', 37, 'inspectSig', false, 'forceLoad', true,...
+    'eegFs', 1250, 'emgFs', 1250, 'emgCf', [10 200]);
 
 % manually create labels
 labelsmanfile = [basename, '.AccuSleep_labelsMan.mat'];
@@ -195,7 +201,7 @@ AccuSleep_viewer(EEG, EMG,  1250, 1, [], labelsmanfile)
 % classify with a network
 netfile = 'D:\Code\slutskycode\extracellular in vivo\lfp\SleepStates\AccuSleep\trainedNetworks\net_211107_141044.mat';
 % netfile = [];
-ss = as_wrapper(EEG, EMG, [], 'basepath', pwd, 'calfile', [],...
+ss = as_wrapper(EEG, EMG, sigInfo, 'basepath', pwd, 'calfile', [],...
     'viaGui', false, 'forceCalibrate', true, 'inspectLabels', false,...
     'saveVar', true, 'forceAnalyze', true, 'fs', 1250, 'netfile', netfile,...
     'graphics', true);
@@ -225,22 +231,26 @@ load([basename, '.AccuSleep_labels.mat'])
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%% cat dat
-nchans = 2;
-fs = 3051.7578125;
-newpath = 'J:\Data';
-datFiles{1} = 'J:\Data\lh96_211204_084200\lh96_211204_084200.emg.dat';
-datFiles{2} = 'J:\Data\lh96_211204_111500\lh96_211204_111500\lh96_211204_111500.emg.dat';
+nchans = 37;
+fs = 20000;
+newpath = 'J:\Data\lh99';
+datFiles{1} = 'J:\Data\lh99\lh99_211210_090834\lh99_211210_090834.dat';
+datFiles{2} = 'J:\Data\lh99\lh99_211210_212422\lh99_211210_212422.dat';
 sigInfo = dir(datFiles{1});
 nsamps = floor(sigInfo.bytes / class2bytes('int16') / nchans);
 parts{1} = round([195360091 722703787] / 24414.06 * fs);
 parts{2} = round([1 722703787] / 24414.06 * fs);
 
-parts{1} = round([0, 72 * 60 + 44] * fs);
-parts{2} = round([0, Inf]);
-
 catDatMemmap('datFiles', datFiles, 'newpath', newpath, 'parts', [],...
     'nchans', nchans, 'saveVar', true)
 
+
+source{1} = 'J:\Data\lh99\2021-12-11_09-04-53\RecordNode107\experiment1\recording1\continuous\Rhythm_FPGA-100.0\continuous.dat';
+source{2} = 'J:\Data\lh99\2021-12-11_09-04-53\RecordNode107\experiment2\recording1\continuous\Rhythm_FPGA-100.0\continuous.dat';
+source{3} = 'J:\Data\lh99\2021-12-11_21-48-55\RecordNode107\experiment1\recording1\continuous\Rhythm_FPGA-100.0\continuous.dat';
+destination = 'J:\Data\lh99\lh99.dat';
+cmd = ['!copy /b ' strjoin(source, ' + '), ' ' destination];
+eval(cmd);
 
 % preproc dat
 clip = [0, 10 * 60 * 1250];

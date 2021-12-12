@@ -10,17 +10,17 @@ function st = spktimesMetrics(varargin)
 %   spikes          struct (see getSpikes)
 %   sunits          numeric vec. indices of selected units for calculation
 %                   {[]}.
-%   winCalc         cell array where each cell is an n x 2 mat of indices.
+%   winCalc         cell array of n x 2 mats of intervals.
 %                   metrices will be calculated for each cell by limiting
-%                   spktimes to the within the times specified by the n x 2
-%                   mat. can be for example ss.stateEpochs. must
-%                   be the same units as spikes.times (e.g. [s])
+%                   spktimes to the intervals. can be for example
+%                   ss.stateEpochs. must be the same units as spikes.times
+%                   (e.g. [s])
 %   basepath        path to recording
 %   graphics        logical. plot graphics {true} or not (false)
 %   saveVar         logical. save variables (update spikes and save su)
 %
 % OUTPUT:
-%   
+%   st              struct
 %
 % DEPENDENCIES:
 %   CCG

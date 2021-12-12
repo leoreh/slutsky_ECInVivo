@@ -9,10 +9,18 @@ function ripp = getRipples(varargin)
 % 
 % INPUT:
 %   basepath        path to recording {pwd}
-%   fs          	numeric. sampling frequency of lfp file. if empty will
-%                   be extracted from session info (ce format)
-%   ch              numeric vec. channels to load and average from lfp
-%                   file {1}.
+%   sig             numeric vec of lfp data. if empty will be loaded from
+%                   basename.lfp according to rippCh.  
+%   emg             numeric of of emg data. must be the same sampling
+%                   frequency as sig. if empty will be loaded from
+%                   basename.lfp according to emgCh.
+%   fs          	numeric. sampling frequency of lfp file / data. 
+%                   if empty will be extracted from session info (ce
+%                   format)
+%   rippCh          numeric vec. channels to load and average from lfp
+%                   file {1}. if empty will be selected best on the ratio
+%                   of mean to median within the passband. 
+%   emgCh           numeric vec. emg channel in basename.lfp file. 
 %   recWin          numeric 2 element vector. time to analyse in recording
 %                   [s]. start of recording is marked by 0. {[0 Inf]}
 %   graphics        logical. plot graphics {true} or not (false)
@@ -34,6 +42,9 @@ function ripp = getRipples(varargin)
 %   rate (done)
 %   exclusion by emg noise
 %   exclusion by spiking activity
+%   exlude active periods when normalizing signal
+%   allow user to input sig directly instead of loading from binary (done)
+%   improve routine to select best ripple channel automatically
 %
 % 02 dec 21 LH
 
@@ -42,16 +53,22 @@ function ripp = getRipples(varargin)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 p = inputParser;
 addOptional(p, 'basepath', pwd);
+addOptional(p, 'sig', [], @isnumeric);
+addOptional(p, 'emg', [], @isnumeric);
 addOptional(p, 'recWin', [0 Inf]);
-addOptional(p, 'ch', 1, @isnumeric);
+addOptional(p, 'rippCh', 1, @isnumeric);
+addOptional(p, 'emgCh', [], @isnumeric);
 addOptional(p, 'fs', [], @isnumeric);
 addOptional(p, 'graphics', true, @islogical);
 addOptional(p, 'saveVar', true, @islogical);
 
 parse(p, varargin{:})
 basepath    = p.Results.basepath;
+sig         = p.Results.sig;
+emg         = p.Results.emg;
 recWin      = p.Results.recWin;
-ch          = p.Results.ch;
+rippCh      = p.Results.rippCh;
+emgCh       = p.Results.emgCh;
 fs          = p.Results.fs;
 graphics    = p.Results.graphics;
 saveVar     = p.Results.saveVar;
@@ -62,9 +79,11 @@ saveVar     = p.Results.saveVar;
 
 basepath = pwd;
 win = ones(11, 1) / 11;     % for moving average
-thr = [1 2.5];              % threshold of stds above the sig
+shift = (length(win) - 1) / 2;
+thr = [1 4];                % threshold of stds above the sig
 limDur = [20, 150, 30];     % min, max, and inter dur limits for ripples [ms]
 passband = [100 200];
+binsizeRate = 30;           % binsize for calculating ripple rate [s]
 
 % load session info
 [~, basename] = fileparts(basepath);
@@ -76,37 +95,123 @@ else
     load(sessionName)
 end
 
+spkgrp = session.extracellular.spikeGroups.channels;
+spkch = sort([spkgrp{:}]);
 nchans = session.extracellular.nChannels;
 if isempty(fs)
     fs = session.extracellular.srLfp;
 end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% prep signal
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+fprintf('\ngetting ripples for %s\n', basename)
 
-fprintf('\npreparing LFP data\n')
-
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % load data
-sig = double(bz_LoadBinary([basename, '.lfp'], 'duration', diff(recWin),...
-    'frequency', fs, 'nchannels', nchans, 'start', recWin(1),...
-    'channels', ch, 'downsample', 1));
-sig = mean(sig, 2);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% filter
+if isempty(sig)    
+    if isempty(rippCh)
+        % if rippCh not specified, load 4 hr of data and find ch with best
+        % SNR for ripples. note this subrutine occasionally points to the
+        % channel with the highest movement artifacts / spikes. it is also
+        % very time consuming. better to select manually.
+        fprintf('selecting best ripple channel...\n')
+
+        recDur = min([diff(recWin), 4 * 60 * 60]);
+        sig = double(bz_LoadBinary([basename, '.lfp'], 'duration', recDur,...
+            'frequency', fs, 'nchannels', nchans, 'start', recWin(1),...
+            'channels', spkch, 'downsample', 1));
+        
+        sig_filt = filterLFP(sig, 'fs', fs, 'type', 'butter', 'dataOnly', true,...
+            'order', 3, 'passband', passband, 'graphics', false);
+        
+        pow = fastrms(sig_filt, 15);
+        ch_rippPowRatio = mean(pow) ./ median(pow);
+        [~, rippCh] = max(ch_rippPowRatio);
+    end
+    
+    % load all data and average across channels
+    fprintf('loading lfp data...\n')
+    sig = double(bz_LoadBinary([basename, '.lfp'], 'duration', diff(recWin),...
+        'frequency', fs, 'nchannels', nchans, 'start', recWin(1),...
+        'channels', rippCh, 'downsample', 1));
+    if length(rippCh) > 1
+        sig = mean(sig, 2);
+    end
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% find and exclude epochs of high movement / active wake
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% -------------------------------------------------------------------------
+% ALT 1: load emg data and find epochs of high activity
+% load emg data from basename.lfp
+if isempty(emg) && ~isempty(emgCh)
+    emg = double(bz_LoadBinary([basename, '.lfp'], 'duration', diff(recWin),...
+        'frequency', fs, 'nchannels', nchans, 'start', recWin(1),...
+        'channels', emgCh, 'downsample', 1));
+end
+
+% find epochs of high activity
+mov_idx = zeros(1, length(sig));
+if ~isempty(emg)
+    fprintf('finding epochs of high activity...\n')   
+    emg_rms = fastrms(emg, 15);
+    mov_idx = emg_rms > prctile(emg_rms, 80);    
+end
+
+% ALT 2: use active wake from sleep states
+ssfile = fullfile(basepath, [basename '.AccuSleep_states.mat']);
+if exist(ssfile)    
+    load(ssfile, 'ss')    
+    [~, cfg_names, ~] = as_loadConfig([]);
+    wake_stateIdx = find(strcmp(cfg_names, 'WAKE'));
+    
+    wake_inInt = InIntervals(ss.stateEpochs{wake_idx}, recWin);
+    wake_epochs = ss.stateEpochs{wake_idx}(wake_inInt, :) * fs;  
+    wake_sampleIdx = false(1, length(sig));
+    for iwake = 1 : size(wake_epochs, 1)
+        wake_sampleIdx(wake_epochs(iwake, 1) : wake_epochs(iwake, 2)) = true;
+    end
+end
+ 
+fprintf('preparing signal...\n')
+
+% filter lfp data in ripple band
 sig_filt = filterLFP(sig, 'fs', fs, 'type', 'butter', 'dataOnly', true,...
     'order', 3, 'passband', passband, 'graphics', false);
 
-% square
-nss = sig_filt.^2;
+% remove samples of high movement 
+sig_filt(mov_idx) = nan;
 
-% move mean and correct shift
+% sqaure, moving average and correct shift
+nss = sig_filt .^ 2;
 [nss, z] = filter(win, 1, nss);
-shift = (length(win) - 1) / 2;
 nss = [nss(shift + 1 : end, :); z(1 : shift, :)];
 
 % standardize
-nss = (nss - mean(nss)) / std(nss); 
+nss = (nss - mean(nss, 'omitnan')) / std(nss, 'omitnan'); 
+
+% debugging of mov_idx ----------------------------------------------------
+debugNow = 1;
+fh = figure; 
+sb1 = subplot(2, 1, 1);
+plot([1 : length(nss)] / 1250 / 60 / 60, nss);
+hold on
+scatter(find(nss > thr(1)) / 1250 / 60 / 60, 10 * ones(1, sum(nss > thr(1))), '.');
+xlabel('Time [h]')
+ylabel('NSS')
+legend({'', 'nss > thr'})
+
+sb2 = subplot(2, 1, 2);
+plot([1 : length(nss)] / 1250 / 60 / 60, emg_rms)
+hold on
+scatter(find(mov_idx) / 1250 / 60 / 60, 10 * ones(1, sum(mov_idx)), '.');
+xlabel('Time [h]')
+ylabel('EMG RMS')
+legend({'', 'emg > median'})
+
+linkaxes([sb1, sb2], 'x')
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % find ripples
@@ -188,7 +293,7 @@ ripp.corr.dur_amp = corrcoef(ripp.dur, ripp.peakAmp);
 
 % rate
 [ripp.rate.rate, ripp.rate.binedges, ripp.rate.tstamps] =...
-    times2rate(peakPos, 'binsize', 60, 'winCalc', [0, Inf],...
+    times2rate(peakPos, 'binsize', binsizeRate, 'winCalc', [0, Inf],...
     'c2r', true);
 
 % relation to sleep states
@@ -207,7 +312,7 @@ if exist(ssfile)
             % rate in states
             [ripp.states.rate{istate}, ripp.states.binedges{istate},...
                 ripp.states.tstamps{istate}] =...
-                times2rate(peakPos, 'binsize', 60,...
+                times2rate(peakPos, 'binsize', binsizeRate,...
                 'winCalc', ss.stateEpochs{istate}(epochIdx, :), 'c2r', true);
             
             % idx of rippels in state
@@ -232,8 +337,8 @@ if graphics
     idx_recMargin = 10 * fs;     % [s]
     rippSelect = 500 : 550;
     rippCenter = round((rippSelect(end) - rippSelect(1)) / 2) + rippSelect(1);
-    idx_rec = [peakPos(525) * fs - idx_recMargin :...
-        peakPos(525) * fs + idx_recMargin];
+    idx_rec = round([peakPos(525) * fs - idx_recMargin :...
+        peakPos(525) * fs + idx_recMargin]);
     plot(idx_rec / fs, sig(idx_rec), 'k')
     hold on
     plot(idx_rec / fs, sig_filt(idx_rec), 'm')

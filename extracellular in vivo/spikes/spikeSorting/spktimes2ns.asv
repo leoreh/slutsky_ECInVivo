@@ -176,8 +176,9 @@ for igrp = 1 : ngrps
     % spk file (binary, nsamples around each spike)
     spkname = fullfile([basename '.spk.' num2str(grp)]);
     fprintf('\nCreating \t%s. ', spkname)
-    spk = zeros(length(grpchans), sniplength, nspks(igrp));   
+    spk = nan(length(grpchans), sniplength, nspks(igrp));   
     for ispk = 1 : nspks(igrp)
+        
         % print progress
         if mod(ispk, 10000) == 0
             if ispk ~= 10000
@@ -185,16 +186,14 @@ for igrp = 1 : ngrps
             end
             txt = ['Extracted ', num2str(ispk), ' / ', num2str(nspks(igrp)), ' spks'];
             fprintf('%s', txt)     
-        end       
+        end
+        
         % fix special case where spike is at end / begining of recording
         if spktimes{igrp}(ispk) + win(1) < 1 || spktimes{igrp}(ispk) + win(2) > nsamps
             warning('\nskipping stamp %d because waveform incomplete', ispk)
-            spk(:, :, ispk) = [];
-            spktimes{igrp}(ispk) = [];
-            nspks(igrp) = nspks(igrp) - 1;
-            ispk = ispk - 1;
             continue
-        end        
+        end
+        
         % get waveform and remove best fit
         v = double(raw.mapped(grpchans, spktimes{igrp}(ispk) + win(1) :...
             spktimes{igrp}(ispk) + win(2)));
@@ -214,8 +213,14 @@ for igrp = 1 : ngrps
 %                 v = [v' - W * (R \ Q' * v')]';
 %         end
         spk(:, :, ispk) = v;       
-
     end
+    
+    % remove incomplete spks
+    rmv_spk = find(all(isnan(spk), [1, 2]));
+    spktimes{igrp}(rmv_spk) = [];
+    spk(:, :, rmv_spk) = [];
+    nspks = nspks - length(rmv_spk);
+    
     % save to spk file
     fid = fopen(spkname, 'w');
     fwrite(fid, spk(:), 'int16');
