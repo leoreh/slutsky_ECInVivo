@@ -80,9 +80,9 @@ saveVar     = p.Results.saveVar;
 basepath = pwd;
 win = ones(11, 1) / 11;     % for moving average
 shift = (length(win) - 1) / 2;
-thr = [1 4];                % threshold of stds above the sig
+thr = [2 7];                % threshold of stds above the sig
 limDur = [20, 150, 30];     % min, max, and inter dur limits for ripples [ms]
-passband = [100 200];
+passband = [130 200];
 binsizeRate = 30;           % binsize for calculating ripple rate [s]
 
 % load session info
@@ -143,6 +143,10 @@ end
 % find and exclude epochs of high movement / active wake
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+ignore_idx = false(length(sig), 1);
+mov_idx = false(length(sig), 1);
+wake_idx = false(length(sig), 1);
+
 % -------------------------------------------------------------------------
 % ALT 1: load emg data and find epochs of high activity
 % load emg data from basename.lfp
@@ -152,8 +156,23 @@ if isempty(emg) && ~isempty(emgCh)
         'channels', emgCh, 'downsample', 1));
 end
 
+% make sure emg and sig (lfp) are the same length. if not, assumes
+% discrepancy is due to the non-integer sampling frequency of tdt, and
+% fixes this by interpolating the shorter of the two signals.
+lenDiff = length(emg) - length(sig);
+if lenDiff ~= 0
+    fprintf('emg and sig differ by %d samples (%.2f%%). interpolating...\n',...
+        lenDiff, abs(lenDiff / length(sig) * 100))
+    if lenDiff < 0
+        tstamps_sig = [1 : length(sig)] / fs;
+        emg = [interp1([1 : length(emg)] / fs, emg, tstamps_sig, 'pchip')]';        
+    elseif lenDiff > 0
+        tstamps_sig = [1 : length(emg)] / fs;
+        sig = [interp1([1 : length(sig)] / fs, sig, tstamps_sig, 'pchip')]';
+    end
+end
+
 % find epochs of high activity
-mov_idx = zeros(1, length(sig));
 if ~isempty(emg)
     fprintf('finding epochs of high activity...\n')   
     emg_rms = fastrms(emg, 15);
@@ -167,14 +186,14 @@ if exist(ssfile)
     [~, cfg_names, ~] = as_loadConfig([]);
     wake_stateIdx = find(strcmp(cfg_names, 'WAKE'));
     
-    wake_inInt = InIntervals(ss.stateEpochs{wake_idx}, recWin);
-    wake_epochs = ss.stateEpochs{wake_idx}(wake_inInt, :) * fs;  
-    wake_sampleIdx = false(1, length(sig));
+    wake_inInt = InIntervals(ss.stateEpochs{wake_stateIdx}, recWin);
+    wake_epochs = ss.stateEpochs{wake_stateIdx}(wake_inInt, :) * fs;  
     for iwake = 1 : size(wake_epochs, 1)
-        wake_sampleIdx(wake_epochs(iwake, 1) : wake_epochs(iwake, 2)) = true;
+        wake_idx(wake_epochs(iwake, 1) : wake_epochs(iwake, 2)) = true;
     end
 end
- 
+ignore_idx = wake_idx | mov_idx;
+
 fprintf('preparing signal...\n')
 
 % filter lfp data in ripple band
@@ -182,36 +201,38 @@ sig_filt = filterLFP(sig, 'fs', fs, 'type', 'butter', 'dataOnly', true,...
     'order', 3, 'passband', passband, 'graphics', false);
 
 % remove samples of high movement 
-sig_filt(mov_idx) = nan;
+nss = sig_filt;
+nss(ignore_idx) = nan;
 
 % sqaure, moving average and correct shift
-nss = sig_filt .^ 2;
-[nss, z] = filter(win, 1, nss);
-nss = [nss(shift + 1 : end, :); z(1 : shift, :)];
+nss = nss .^ 2;
+% [nss, z] = filter(win, 1, nss);
+% nss = [nss(shift + 1 : end, :); z(1 : shift, :)];
 
 % standardize
 nss = (nss - mean(nss, 'omitnan')) / std(nss, 'omitnan'); 
 
 % debugging of mov_idx ----------------------------------------------------
-debugNow = 1;
-fh = figure; 
-sb1 = subplot(2, 1, 1);
-plot([1 : length(nss)] / 1250 / 60 / 60, nss);
-hold on
-scatter(find(nss > thr(1)) / 1250 / 60 / 60, 10 * ones(1, sum(nss > thr(1))), '.');
-xlabel('Time [h]')
-ylabel('NSS')
-legend({'', 'nss > thr'})
-
-sb2 = subplot(2, 1, 2);
-plot([1 : length(nss)] / 1250 / 60 / 60, emg_rms)
-hold on
-scatter(find(mov_idx) / 1250 / 60 / 60, 10 * ones(1, sum(mov_idx)), '.');
-xlabel('Time [h]')
-ylabel('EMG RMS')
-legend({'', 'emg > median'})
-
-linkaxes([sb1, sb2], 'x')
+debugFlag = 0;
+if debugFlag
+    fh = figure;
+    sb1 = subplot(2, 1, 1);
+    plot([1 : length(nss)] / 1250 / 60 / 60, nss);
+    hold on
+    scatter(find(nss > thr(1)) / 1250 / 60 / 60, 10 * ones(1, sum(nss > thr(1))), '.');
+    xlabel('Time [h]')
+    ylabel('NSS')
+    legend({'', 'nss > thr'})
+    
+    sb2 = subplot(2, 1, 2);
+    plot([1 : length(nss)] / 1250 / 60 / 60, emg_rms)
+    hold on
+    scatter(find(mov_idx) / 1250 / 60 / 60, 10 * ones(1, sum(mov_idx)), '.');
+    xlabel('Time [h]')
+    ylabel('EMG RMS')
+    legend({'', 'emg > median'})
+    linkaxes([sb1, sb2], 'x')
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % find ripples
@@ -437,7 +458,7 @@ end
 % finalize and save
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-ripp.info.ch = ch;
+ripp.info.rippCh = rippCh;
 ripp.info.limDur = limDur;
 ripp.info.recWin = recWin;
 ripp.info.runtime = datetime(now, 'ConvertFrom', 'datenum');

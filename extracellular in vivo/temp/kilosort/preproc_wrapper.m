@@ -181,8 +181,8 @@ acc = EMGfromACC('basepath', basepath, 'fname', [basename, '.lfp'],...
     'graphics', false);
 
 % get ripples
-ripp = getRipples('basepath', basepath, 'rippCh', [23], 'emgCh', [],...
-    'emg', EMG(1 : 4 * 60 * 60 * 1250), 'recWin', [0, 4 * 60 * 60]);
+ripp = getRipples('basepath', basepath, 'rippCh', [23], 'emgCh', [33],...
+    'emg', [], 'recWin', [0, 4 * 60 * 60]);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % sleep states
