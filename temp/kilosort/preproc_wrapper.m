@@ -48,24 +48,6 @@ spkgrp = session.extracellular.spikeGroups.channels;
 [~, basename] = fileparts(basepath);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% field
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-intens = flip([100 : 20 : 200, 240, 280, 320]);
-fepsp = fEPSPfromDat('basepath', basepath, 'fname', '', 'nchans', nchans,...
-    'spkgrp', spkgrp, 'intens', intens, 'saveVar', true,...
-    'force', true, 'extension', 'dat', 'recSystem', 'oe',...
-    'protocol', 'io', 'anaflag', true, 'inspect', false, 'fsIn', fs,...
-    'cf', 0);  
-
-intens = (100);
-fepsp = fEPSPfromWCP('basepath', basepath, 'sfiles', [],...
-    'sufx', 'stp_3pulse', 'force', true, 'protocol', 'stp',...
-    'intens', intens, 'inspect', false, 'fs', 30000);
-
-fepsp = fEPSP_analysis('fepsp', fepsp, 'basepath', basepath,...
-    'force', true);
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % spike sorting
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % in this pipeline waveforms are extracted from the whitened data and are
@@ -98,19 +80,16 @@ spktimes2ns('basepath', basepath, 'fs', fs,...
     'spkFile', 'temp_wh');
 
 % clip ns files
-% dur = -420;
-% t = [];
-% nsClip('dur', dur, 't', t, 'bkup', true, 'grp', [3 : 4]);
+nsClip('dur', -420, 't', [], 'bkup', true, 'grp', [3 : 4]);
 
 % clean clusters after sorting 
 cleanCluByFet('basepath', pwd, 'manCur', true, 'grp', [1 : 4])
 
 % cut spk from dat and realign
-fixSpkAndRes('grp', [1 : 4], 'dt', 0, 'stdFactor', 0);
 fixSpkAndRes('grp', [1 : 4], 'dt', 0, 'stdFactor', 0, 'resnip', true);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% spikes
+% spikes (post-sorting)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % cell explorer metrics

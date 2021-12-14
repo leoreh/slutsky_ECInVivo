@@ -95,48 +95,37 @@ bs = getBS('sig', double(lfp.data(:, ch)), 'fs', lfp.fs,...
 emglfp = getEMGfromLFP(double(lfp.data(:, :)),...
     'emgFs', 10, 'saveVar', true);
 
-% create emg signal from accelerometer data
+% create emg signal from accelerometer
 acc = EMGfromACC('basepath', basepath, 'fname', [basename, '.lfp'],...
     'nchans', nchans, 'ch', nchans - 2 : nchans, 'saveVar', true, 'fsIn', 1250,...
     'graphics', false);
 
-% get ripples
-ripp = getRipples('basepath', basepath, 'rippCh', [23], 'emgCh', [33],...
-    'emg', [], 'recWin', [0, 4 * 60 * 60]);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% fEPSP signals
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% all functions here are obsolete. see slutsky_fepsp repository
 
-% sleep states ------------------------------------------------------------
+% fEPSP from Dat
+intens = [40 80 100 150 200];
+fepsp = fEPSPfromDat('basepath', filepath, 'fname', '', 'nchans', nchans,...
+    'spkgrp', spkgrp, 'intens', intens, 'concat', false, 'saveVar', false,...
+    'force', true, 'extension', 'dat', 'recSystem', 'oe',...
+    'protocol', 'io', 'graphics', true);
 
-% prep signal
-[EMG, EEG, sigInfo] = as_prepSig([basename, '.lfp'], [basename, '.lfp'],...
-    'eegCh', [25 : 28], 'emgCh', [33], 'saveVar', true, 'emgNchans', [],...
-    'eegNchans', 37, 'inspectSig', false, 'forceLoad', true,...
-    'eegFs', 1250, 'emgFs', 1250, 'emgCf', [10 200]);
+% fEPSP from WCP
+basepath = 'C:\Users\heiml\Downloads\fEPSP\fEPSP\lh60';
+intens = [30 : 10 : 60];
+sfiles = [];
+fepsp = fEPSPfromWCP('basepath', basepath, 'sfiles', [],...
+    'sufx', 'io1', 'force', true, 'protocol', 'io',...
+    'intens', intens, 'inspect', true, 'fs', 20000);
 
-% manually create labels
-labelsmanfile = [basename, '.AccuSleep_labelsMan.mat'];
-AccuSleep_viewer(EEG, EMG,  1250, 1, [], labelsmanfile)
-
-% classify with a network
-netfile = 'D:\Code\slutskycode\extracellular in vivo\lfp\SleepStates\AccuSleep\trainedNetworks\net_211107_141044.mat';
-ss = as_wrapper(EEG, EMG, sigInfo, 'basepath', pwd, 'calfile', [],...
-    'viaGui', false, 'forceCalibrate', true, 'inspectLabels', false,...
-    'saveVar', true, 'forceAnalyze', true, 'fs', 1250, 'netfile', netfile,...
-    'graphics', true);
-
-% inspect separation after classifying / manual scoring
-as_stateSeparation(EEG, EMG, labels)
-
-% calc psd in states
-EEG = double(bz_LoadBinary([basename, '.emg.dat'], 'duration', Inf,...
-    'frequency', 3051.7578125, 'nchannels', 2, 'start', 0,...
-    'channels', 2, 'downsample', 1));
-load([basename, '.AccuSleep_labels.mat'])
-[psdStates, faxis, emgRMS] = psd_states('eeg', EEG, 'emg', [],...
-    'labels', labels, 'fs', 3051.7578125, 'graphics', true, 'sstates', [1, 4]);
-
-% get confusion matrix between two labels
-[ss.netPrecision, ss.netRecall] = as_cm(labels1, labels2);
-       
+% anesthesia states (see also aneStates_wrp)
+[bs, iis, ep] = aneStates('ch', 1, 'basepath', basepath,...
+    'basename', basename, 'graphics', graphics,...
+    'saveVar', saveVar, 'saveFig', saveFig, 'forceA', forceA,...
+    'binsize', 30, 'smf', 7, 'thrMet', 1);
+        
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % spike sorting
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -177,10 +166,6 @@ cleanCluByFet('basepath', pwd, 'manCur', true, 'grp', [1 : 4])
 
 % cut spk from dat and realign
 fixSpkAndRes('grp', [1 : 4], 'dt', 0, 'stdFactor', 0, 'resnip', true);
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% spikes (post-sorting)
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % cell explorer metrics
 cell_metrics = ProcessCellMetrics('session', session,...
@@ -226,35 +211,12 @@ u = 20;
 plotCCG('ccg', ccg(:, u, u), 't', t, 'basepath', basepath,...
     'saveFig', false, 'c', {'k'}, 'u', spikes.UID(u));
 
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % analysis across sessions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 fEPSP_sessions
 fr_sessions
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% fEPSP signals
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% all functions here are obsolete. see slutsky_fepsp repository
 
-% fEPSP from Dat
-intens = [40 80 100 150 200];
-fepsp = fEPSPfromDat('basepath', filepath, 'fname', '', 'nchans', nchans,...
-    'spkgrp', spkgrp, 'intens', intens, 'concat', false, 'saveVar', false,...
-    'force', true, 'extension', 'dat', 'recSystem', 'oe',...
-    'protocol', 'io', 'graphics', true);
-
-% fEPSP from WCP
-basepath = 'C:\Users\heiml\Downloads\fEPSP\fEPSP\lh60';
-intens = [30 : 10 : 60];
-sfiles = [];
-fepsp = fEPSPfromWCP('basepath', basepath, 'sfiles', [],...
-    'sufx', 'io1', 'force', true, 'protocol', 'io',...
-    'intens', intens, 'inspect', true, 'fs', 20000);
-
-% anesthesia states (see also aneStates_wrp)
-[bs, iis, ep] = aneStates('ch', 1, 'basepath', basepath,...
-    'basename', basename, 'graphics', graphics,...
-    'saveVar', saveVar, 'saveFig', saveFig, 'forceA', forceA,...
-    'binsize', 30, 'smf', 7, 'thrMet', 1);
 
