@@ -140,13 +140,13 @@ if isempty(sig)
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% noramlize data to ripple power during NREM
+% prepare signal
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 fprintf('preparing signal...\n')
 
-% initialize
-nrem_idx = false(length(sig), 1);
+% normalize data to ripple power during NREM
+nrem_idx = false(length(sig), 1);   % initialize
 
 ssfile = fullfile(basepath, [basename '.AccuSleep_states.mat']);
 if exist(ssfile)    
@@ -182,12 +182,12 @@ d0 = diff(medfilt1(sig_unwrapped, 12)) ./ dt;
 d1 = interp1(t_diff, d0, tstamps(2 : end - 1, 1));
 sig_freq = [d0(1); d1; d0(end)] / (2 * pi);
 
-
+% smooth amplitude. not TL averages the smoothed amplitude from a few
+% channels.
 sm = smoothdata(sig_amp, 'gaussian', round(5 / (1000 / 1250)));
 
-
-% standardize
-nss = (nss - mean(nss, 'omitnan')) / std(nss, 'omitnan'); 
+% normalize smooothed amplitude
+sm = (sm - mean(sm)) / std(sm);
 
 % debugging of mov_idx ----------------------------------------------------
 debugFlag = 0;

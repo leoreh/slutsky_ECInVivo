@@ -245,9 +245,9 @@ catDatMemmap('datFiles', datFiles, 'newpath', newpath, 'parts', [],...
     'nchans', nchans, 'saveVar', true)
 
 
-source{1} = 'J:\Data\lh99\2021-12-11_09-04-53\RecordNode107\experiment1\recording1\continuous\Rhythm_FPGA-100.0\continuous.dat';
-source{2} = 'J:\Data\lh99\2021-12-11_09-04-53\RecordNode107\experiment2\recording1\continuous\Rhythm_FPGA-100.0\continuous.dat';
-source{3} = 'J:\Data\lh99\2021-12-11_21-48-55\RecordNode107\experiment1\recording1\continuous\Rhythm_FPGA-100.0\continuous.dat';
+source{1} = 'J:\Data\lh99\2021-12-13_09-13-55\RecordNode107\experiment1\recording1\continuous\Rhythm_FPGA-100.0\continuous.dat';
+source{2} = 'J:\Data\lh99\2021-12-13_09-13-55\RecordNode107\experiment3\recording1\continuous\Rhythm_FPGA-100.0\continuous.dat';
+source{3} = 'J:\Data\lh99\2021-12-13_09-13-55\RecordNode107\experiment4\recording1\continuous\Rhythm_FPGA-100.0\continuous.dat';
 destination = 'J:\Data\lh99\lh99.dat';
 cmd = ['!copy /b ' strjoin(source, ' + '), ' ' destination];
 eval(cmd);

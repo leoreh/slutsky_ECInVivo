@@ -82,7 +82,7 @@ win = ones(11, 1) / 11;     % for moving average
 shift = (length(win) - 1) / 2;
 thr = [2 7];                % threshold of stds above the sig
 limDur = [20, 150, 30];     % min, max, and inter dur limits for ripples [ms]
-passband = [130 200];
+passband = [130 250];
 binsizeRate = 30;           % binsize for calculating ripple rate [s]
 
 % load session info
@@ -140,86 +140,63 @@ if isempty(sig)
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% find and exclude epochs of high movement / active wake
+% prepare signal
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-ignore_idx = false(length(sig), 1);
-mov_idx = false(length(sig), 1);
-wake_idx = false(length(sig), 1);
+fprintf('preparing signal...\n')
 
-% -------------------------------------------------------------------------
-% ALT 1: load emg data and find epochs of high activity
-% load emg data from basename.lfp
-if isempty(emg) && ~isempty(emgCh)
-    emg = double(bz_LoadBinary([basename, '.lfp'], 'duration', diff(recWin),...
-        'frequency', fs, 'nchannels', nchans, 'start', recWin(1),...
-        'channels', emgCh, 'downsample', 1));
-end
+% normalize data to ripple power during NREM
+nrem_idx = false(length(sig), 1);   % initialize
 
-% make sure emg and sig (lfp) are the same length. if not, assumes
-% discrepancy is due to the non-integer sampling frequency of tdt, and
-% fixes this by interpolating the shorter of the two signals.
-lenDiff = length(emg) - length(sig);
-if lenDiff ~= 0
-    fprintf('emg and sig differ by %d samples (%.2f%%). interpolating...\n',...
-        lenDiff, abs(lenDiff / length(sig) * 100))
-    if lenDiff < 0
-        tstamps_sig = [1 : length(sig)] / fs;
-        emg = [interp1([1 : length(emg)] / fs, emg, tstamps_sig, 'pchip')]';        
-    elseif lenDiff > 0
-        tstamps_sig = [1 : length(emg)] / fs;
-        sig = [interp1([1 : length(sig)] / fs, sig, tstamps_sig, 'pchip')]';
-    end
-end
-
-% find epochs of high activity
-if ~isempty(emg)
-    fprintf('finding epochs of high activity...\n')   
-    emg_rms = fastrms(emg, 15);
-    mov_idx = emg_rms > prctile(emg_rms, 80);    
-end
-
-% ALT 2: use active wake from sleep states
 ssfile = fullfile(basepath, [basename '.AccuSleep_states.mat']);
 if exist(ssfile)    
     load(ssfile, 'ss')    
     [~, cfg_names, ~] = as_loadConfig([]);
-    wake_stateIdx = find(strcmp(cfg_names, 'WAKE'));
+    nrem_stateIdx = find(strcmp(cfg_names, 'NREM'));
     
-    wake_inInt = InIntervals(ss.stateEpochs{wake_stateIdx}, recWin);
-    wake_epochs = ss.stateEpochs{wake_stateIdx}(wake_inInt, :) * fs;  
-    for iwake = 1 : size(wake_epochs, 1)
-        wake_idx(wake_epochs(iwake, 1) : wake_epochs(iwake, 2)) = true;
-    end
+    % find nrem indices by upsampling the labels. assumes the binsize
+    % (epoch length) of labels is 1 sec.
+    nrem_inInt = InIntervals([1 : length(ss.labels)], recWin);
+    nrem_idx = repelem(ss.labels(nrem_inInt) == nrem_stateIdx, fs);
 end
-ignore_idx = wake_idx | mov_idx;
 
-fprintf('preparing signal...\n')
+% normalize
+sig_z = (sig - mean(sig(nrem_idx))) / std(sig(nrem_idx));
 
 % filter lfp data in ripple band
-sig_filt = filterLFP(sig, 'fs', fs, 'type', 'butter', 'dataOnly', true,...
-    'order', 3, 'passband', passband, 'graphics', false);
+sig_filt = filterLFP(sig_z, 'fs', fs, 'type', 'butter', 'dataOnly', true,...
+    'order', 5, 'passband', passband, 'graphics', false);
 
-% remove samples of high movement 
-nss = sig_filt;
-nss(ignore_idx) = nan;
+% instantaneous phase and amplitude
+h = hilbert(sig_filt);
+sig_phase = angle(h);
+sig_amp = abs(h);
+sig_unwrapped = unwrap(sig_phase);
 
-% sqaure, moving average and correct shift
-nss = nss .^ 2;
-% [nss, z] = filter(win, 1, nss);
-% nss = [nss(shift + 1 : end, :); z(1 : shift, :)];
+% instantaneous frequency
+tstamps = [1 / fs : 1 / fs : length(sig) / fs];
+tstamps = tstamps(:);
+dt = diff(tstamps);
+t_diff = tstamps(1 : end - 1) + dt / 2;
+d0 = diff(medfilt1(sig_unwrapped, 12)) ./ dt;
+d1 = interp1(t_diff, d0, tstamps(2 : end - 1, 1));
+sig_freq = [d0(1); d1; d0(end)] / (2 * pi);
 
-% standardize
-nss = (nss - mean(nss, 'omitnan')) / std(nss, 'omitnan'); 
+% smooth amplitude. not TL averages the smoothed amplitude from a few
+% channels.
+sm = smoothdata(sig_amp, 'gaussian', round(5 / (1000 / 1250)));
+
+% normalize smooothed amplitude
+sm = (sm - mean(sm)) / std(sm);
 
 % debugging of mov_idx ----------------------------------------------------
 debugFlag = 0;
 if debugFlag
     fh = figure;
     sb1 = subplot(2, 1, 1);
-    plot([1 : length(nss)] / 1250 / 60 / 60, nss);
+    plot([1 : length(sm)] / 1250 / 60 / 60, sm);
     hold on
-    scatter(find(nss > thr(1)) / 1250 / 60 / 60, 10 * ones(1, sum(nss > thr(1))), '.');
+    scatter(find(sm > thr(1)) / 1250 / 60 / 60, 10 * ones(1, sum(sm > thr(1))), '.');
     xlabel('Time [h]')
     ylabel('NSS')
     legend({'', 'nss > thr'})
@@ -269,21 +246,6 @@ end
 nepochs = size(epochs, 1);
 peakPos = peakPos / fs;
 epochs = epochs / fs;
-
-% instantaneous phase and amplitude
-h = hilbert(sig_filt);
-sig_phase = angle(h);
-sig_amp = abs(h);
-sig_unwrapped = unwrap(sig_phase);
-
-% instantaneous frequency
-tstamps = [1 / fs : 1 / fs : length(sig) / fs];
-tstamps = tstamps(:);
-dt = diff(tstamps);
-t_diff = tstamps(1 : end - 1) + dt / 2;
-d0 = diff(medfilt1(sig_unwrapped, 12)) ./ dt;
-d1 = interp1(t_diff, d0, tstamps(2 : end - 1, 1));
-sig_freq = [d0(1); d1; d0(end)] / (2 * pi);
 
 % arrange maps
 ripp.maps.durWin = [-75 75] / 1000;
