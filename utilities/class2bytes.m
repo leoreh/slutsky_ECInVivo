@@ -1,6 +1,6 @@
 function nbytes = class2bytes(x, varargin)
 
-% returns the size in bytes of a data point of certain class.
+% returns the size in bytes of a data point of a certain class.
 % 
 % INPUT:
 %   x        any variable or specific string representing class.

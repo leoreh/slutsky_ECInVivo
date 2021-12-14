@@ -227,6 +227,32 @@ plotCCG('ccg', ccg(:, u, u), 't', t, 'basepath', basepath,...
     'saveFig', false, 'c', {'k'}, 'u', spikes.UID(u));
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% utilities
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% convert binary vector to epochs
+epochs = binary2epochs('vec', binaryVec, 'minDur', 20, 'maxDur', 100,...
+    'interDur', 30, 'exclude', false);
+
+% convert cell to mat padded by nan (for different length arrays)
+mat = cell2nanmat(c, dim);
+
+% get size of bytes for a variable or class
+nbytes = class2bytes(x, 'var', var);
+
+% convert basename to date time 
+[dt, dtFormat] = guessDateTime(dtstr);
+
+% convert number to chunks. can clip parts or apply an overlap
+chunks = n2chunks('n', nsamps, 'chunksize', chunksize, 'clip', clip);
+
+% basically a wrapper for histcounts
+[rate, binedges, tstamps, binidx] = times2rate(spktimes,...
+    'binsize', binsize, 'winCalc', winCalc, 'c2r', true);
+        
+% convert timestamp to datetime based on the date time string
+[dt, tstamp] = tstamp2time(varargin);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % analysis across sessions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 fEPSP_sessions
