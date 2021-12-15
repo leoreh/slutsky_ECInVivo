@@ -140,7 +140,7 @@ for i = 1 : length(datFiles)
         if length(tmap.Data.d) < nsamps(i)
             warning(['more samples than timestamps in %s\n'...
                 'initializing valTstampsOE'], source{i}) 
-            valTstampsOE('basepath', tFiles(idx).folder, 'precision', precision,...
+            validate_OE_tstamps('basepath', tFiles(idx).folder, 'precision', precision,...
                 'chunksize', 5e6, 'bkup', false, 'saveVar', true,...
                 'nchans', nchans)
             nsamps(i) = length(tmap.Data.d);
@@ -159,7 +159,7 @@ eval(cmd);
 info = dir(destination);
 nsampsNew = info.bytes / nbytes / nchans;
 if ~isequal(nsampsNew, sum(nsamps))
-    error('copying failed, dats are of different length')
+    warning('copying failed, dats are of different length')
 end
 fprintf('new file size = %.2f MB\n', info.bytes / 1e6);
 

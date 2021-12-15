@@ -44,7 +44,7 @@ addOptional(p, 'newpath', '', @ischar);
 addOptional(p, 'newname', '', @ischar);
 addOptional(p, 'concat', true, @islogical);
 addOptional(p, 'precision', 'int16', @isstr);
-addOptional(p, 'nchans', 35, @isnumeric);
+addOptional(p, 'nchans', [], @isnumeric);
 addOptional(p, 'saveVar', true, @islogical);
 
 parse(p, varargin{:})
@@ -55,9 +55,6 @@ concat = p.Results.concat;
 precision = p.Results.precision;
 nchans = p.Results.nchans;
 saveVar = p.Results.saveVar;
-
-% size of one data point in bytes
-nbytes = class2bytes(precision);
 
 % initialize
 nsamps = 0;
@@ -102,13 +99,17 @@ end
 % process
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+fprintf('\nCreating %s from files:\n', destination)
+
 for i = 1 : length(jsonFiles)
     
+  
     % create file maps
     jsonName = fullfile(jsonFiles(i).folder, jsonFiles(i).name);
     mDin = load_open_ephys_binary(jsonName, 'events', 1, 'mmap');
-    mDat = load_open_ephys_binary(jsonName, 'continuous', 1, 'mmap');
-       
+    
+    fprintf('%s...\n', jsonName)
+    
     % separate by channels and get rising phase
     chans = double(unique(mDin.ChannelIndex));
     idxRise = mDin.Data > 0;        % rising phase
@@ -117,10 +118,20 @@ for i = 1 : length(jsonFiles)
         tstamps{ii} = [tstamps{ii}; mDin.Timestamps(idxRise & idxCh)];
     end
     
-    % get nsamps of recording from corresponding .dat file
-    nsamps(i) = datFiles(i).bytes / nbytes / nchans; 
-    nsamps(i) = mDat.Timestamps(end);
-    totsamps = cumsum(nsamps);
+    % validate Din length by checking the nsamps of recording from
+    % corresponding .dat file and
+    if ~isempty(nchans)
+        mDat = load_open_ephys_binary(jsonName, 'continuous', 1, 'mmap');
+        nbytes = class2bytes(precision);
+        nsamps(i) = datFiles(i).bytes / nbytes / nchans;
+        nsamps(i) = mDat.Timestamps(end);
+        totsamps = cumsum(nsamps);
+        if data(end) > totsamps(end)
+            txt = sprintf(['digital input longer than recording duration\n',...
+                'check if argument nchans is correct']);
+            error(txt)
+        end
+    end
     
     % return if there are no events
     if all(cellfun(@isempty, tstamps))
@@ -128,11 +139,6 @@ for i = 1 : length(jsonFiles)
         return
     end
     
-%     if data(end) > totsamps(end)
-%         txt = sprintf(['digital input longer than recording duration\n',...
-%             'check if argument nchans is correct']);
-%         error(txt)
-%     end
 end
 
 % arrange struct output and save

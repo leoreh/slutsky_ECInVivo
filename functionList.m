@@ -21,46 +21,45 @@ spkgrp = session.extracellular.spikeGroups.channels;
 [~, basename] = fileparts(basepath);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% IO
+% preprocessing of dat files
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'D:\VMs\shared\lh57-lh69\lh57-lh69_200904';
-store = 'Raw1';
-fs = 24414.06;
-blocks = [2 : 8];
-chunksize = 300;
-mapch = [1 : 16];
-% mapch = [1 : 2 : 7, 2 : 2 : 8, 9 : 2 : 15, 10 : 2 : 16];
-rmvch = [4];
-clip = cell(1, 1);
+basepath = 'J:\Data\lh99\lh99_211213_091355';
+mapch = [26,27,28,30,2,3,31,29,4,5,6,7,8,9,10,11,12,13,14,15,1,16,17,...
+    32,18,19,20,21,22,23,24,25,33,34,35,36,37];
+rmvch = [];
+% mapch = [1 : 21];
+% rmvch = [17];
 
 % tank to dat
+store = 'Raw1';
+blocks = [2 : 8];
+chunksize = 300;
+clip = cell(1, 1);
 datInfo = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
     'chunksize', chunksize, 'mapch', mapch, 'rmvch', rmvch, 'clip', clip);
 
 % open ephys to dat
-exp = [10];
+exp = [1];
 rec = cell(max(exp), 1);
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
-    'rmvch', rmvch, 'mapch', mapch, 'concat', true, 'nchans', 35,...
-    'intens', intens);
+    'rmvch', rmvch, 'mapch', mapch, 'concat', true,...
+    'nchans', length(mapch), 'fsIn', 20000);
 
 % digital input from OE
+recPath{1} = 'J:\Data\lh99\2021-12-13_09-13-55\RecordNode107\experiment1\recording1';
+recPath{2} = 'J:\Data\lh99\2021-12-13_09-13-55\RecordNode107\experiment3\recording1';
+recPath{3} = 'J:\Data\lh99\2021-12-13_09-13-55\RecordNode107\experiment4\recording1';
+exPathNew = pwd;
 getDinOE('basepath', recPath, 'newpath', exPathNew,...
-    'concat', true, 'nchans', nchans, 'precision', 'int16',...
-    'saveVar', true);
+    'concat', true, 'saveVar', true);
 
 % pre-process dat (remove channels, reorder, etc.)
+clip = [];
 datInfo = preprocDat('basepath', basepath, 'fname', '', 'mapch', mapch,...
-    'rmvch', rmvch, 'nchans', nchans, 'saveVar', true,...
+    'rmvch', rmvch, 'nchans', length(mapch), 'saveVar', true,...
     'chunksize', 1e7, 'precision', 'int16', 'bkup', true,...
-    'clip', [808593667 Inf]);
+    'clip', clip);
 
-% acceleration
-newch = length(mapch) - length(rmvch);
-chAcc = [newch : -1 : newch - 2];
-EMGfromACC('basepath', exPathNew, 'fname', '',...
-    'nchans', newch, 'ch', chAcc, 'force', false, 'saveVar', true,...
-    'graphics', false, 'fsOut', 1250);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % LFP

@@ -2,8 +2,11 @@ function [chunks] = n2chunks(varargin)
 
 % gets a number of elements and divides it to chunks of chunksize. handles
 % start/end points. allows clipping of certain elements and overlap between
-% chunks. update dec 21: fixed problem that occured when two or more clips
-% were in the same chunk. 
+% chunks. note that clipping only works if chunksize is small enough such
+% that no 2 clips are in the same chunk. for this: (alt 1) acertain that
+% chunksize = min(diff(clip)), (alt 2) combine adjacent clips. the first may
+% create (too) many chunks, the second will remove more samples than
+% needed.
 %
 % INPUT:
 %   n           numeric. number of elements to split
@@ -28,7 +31,6 @@ function [chunks] = n2chunks(varargin)
 %
 % 22 apr 20 LH  updates:
 % 11 aug 20 LH  overlap
-% 14 dec 21 LH  fixed clipping
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -81,13 +83,11 @@ chunks(:, 2) = chunks(:, 2) + overlap(2);
 chunks(nchunks, 2) = n;
 chunks(1, 1) = 1;
 
-% assimilate clip into chunks
 for iclip = 1 : size(clip, 1)
     
     % change chunk end to clip start
     clip_start = find(clip(iclip, 1) < chunks(:, 2), 1, 'first');
-    chunk_end = chunks(clip_start, 2);
-    chunks(clip_start, 2) = clip(iclip, 1) - 1;
+    chunks(clip_start, 2) = clip(iclip, 1);
     
     if iclip == size(clip, 1)
         % change chunk start to clip end
@@ -95,8 +95,46 @@ for iclip = 1 : size(clip, 1)
     else
         % add another chunk from clip end to clip + 1 start
         chunks = [chunks(1 : clip_start, :);...
-            clip(iclip, 2) + 1, chunk_end;...           
+            clip(iclip, 2) + 1, clip(iclip + 1, 1) - 1;...
+            
             chunks(clip_start + 1 : end, :)];
+%         % change chunk start to clip end
+%         chunks(clip_start + 2, 1) = clip(iclip + 1, 1);
     end
 end
+
+
+% assimilate clip into chunks
+if ~isempty(clip)
+    if isempty(chunksize)
+        if size(clip, 1) == 1 && clip(1) == 0
+            chunks(1, 1) = clip(1, 2);
+        elseif size(clip, 1) == 1 && clip(2) == Inf
+            chunks(1, 2) = clip(1, 1);
+        else
+            for ichunk = 1 : size(clip, 1) - 1
+                chunks = [chunks; clip(ichunk, 2) clip(ichunk + 1, 1)];
+            end
+        end
+        if clip(1, 1) > 0
+            chunks = [0 clip(1, 1); chunks];
+        end
+    else
+        idx = zeros(1, 2);
+        for ichunk = 1 : size(clip, 1)
+            idx(1) = find(chunks(:, 2) > clip(ichunk, 1), 1, 'first');
+            chunks(idx(1), 2) = clip(ichunk, 1);
+            if clip(ichunk, 2) ~= Inf
+                idx(2) = find(chunks(:, 1) > clip(ichunk, 2), 1, 'first');
+                chunks(idx(2), 1) = clip(ichunk, 2);
+                rmblk = idx(1) + 1 : idx(2) - 1;
+            else
+                rmblk = idx(1) + 1 : size(chunks, 1);
+            end
+            if ~isempty(rmblk)
+                chunks(rmblk, :) = [];
+            end
+        end
+    end
+    chunks = chunks(any(chunks, 2), :);
 end

@@ -5,7 +5,7 @@ cd(basepath)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % open ephys
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'J:\Data\lh99\2021-12-10_21-24-22';
+basepath = 'J:\Data\lh99\2021-12-13_09-13-55';
 rmvch = [];
 mapch = [26,27,28,30,2,3,31,29,4,5,6,7,8,9,10,11,12,13,14,15,1,16,17,32,18,19,20,21,22,23,24,25,33,34,35,36,37];
 exp = [1];
@@ -223,11 +223,10 @@ parts{2} = round([1 722703787] / 24414.06 * fs);
 catDatMemmap('datFiles', datFiles, 'newpath', newpath, 'parts', [],...
     'nchans', nchans, 'saveVar', true)
 
-
-source{1} = 'J:\Data\lh99\2021-12-13_09-13-55\RecordNode107\experiment1\recording1\continuous\Rhythm_FPGA-100.0\continuous.dat';
-source{2} = 'J:\Data\lh99\2021-12-13_09-13-55\RecordNode107\experiment3\recording1\continuous\Rhythm_FPGA-100.0\continuous.dat';
-source{3} = 'J:\Data\lh99\2021-12-13_09-13-55\RecordNode107\experiment4\recording1\continuous\Rhythm_FPGA-100.0\continuous.dat';
-destination = 'J:\Data\lh99\lh99.dat';
+clear source
+source{1} = 'J:\Data\lh99\lh99_211213_091355\lh99_211213_091355.dat';
+source{2} = 'J:\Data\lh99\lh99_211213_210211\lh99_211213_210211.dat';
+destination = 'J:\Data\lh99\lh99_211213.dat';
 cmd = ['!copy /b ' strjoin(source, ' + '), ' ' destination];
 eval(cmd);
 

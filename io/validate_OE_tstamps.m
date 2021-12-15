@@ -1,4 +1,4 @@
-function datInfo = valTstampsOE(varargin)
+function datInfo = validate_OE_tstamps(varargin)
 
 % fix for bug in open ephys binary format. description of problem: the
 % first recording in most (but not all) experiments have more data points
