@@ -23,12 +23,12 @@ spkgrp = session.extracellular.spikeGroups.channels;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preprocessing of dat files
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'J:\Data\lh99\lh99_211213_091355';
+basepath = 'J:\Data\lh98\2021-12-14_09-05-32';
 mapch = [26,27,28,30,2,3,31,29,4,5,6,7,8,9,10,11,12,13,14,15,1,16,17,...
     32,18,19,20,21,22,23,24,25,33,34,35,36,37];
 rmvch = [];
-% mapch = [1 : 21];
-% rmvch = [17];
+mapch = [1 : 21];
+rmvch = [17];
 
 % tank to dat
 store = 'Raw1';
@@ -39,7 +39,7 @@ datInfo = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
     'chunksize', chunksize, 'mapch', mapch, 'rmvch', rmvch, 'clip', clip);
 
 % open ephys to dat
-exp = [1];
+exp = [1, 2, 4];
 rec = cell(max(exp), 1);
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
     'rmvch', rmvch, 'mapch', mapch, 'concat', true,...
@@ -103,7 +103,9 @@ acc = EMGfromACC('basepath', basepath, 'fname', [basename, '.lfp'],...
 ripp = getRipples('basepath', basepath, 'rippCh', [23], 'emgCh', [33],...
     'emg', [], 'recWin', [0, 4 * 60 * 60]);
 
-% sleep states ------------------------------------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% sleep states
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % prep signal
 [EMG, EEG, sigInfo] = as_prepSig([basename, '.lfp'], [basename, '.lfp'],...
