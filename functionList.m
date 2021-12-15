@@ -1,10 +1,10 @@
-% list of functions and their calls
+% example calls for frequently used functions 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % general boolean arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-forceA = false;
-forceL = false;
+forceA = false;     % force analyze 
+forceL = false;     % force save
 saveFig = false;
 graphics = false;
 saveVar = false;
@@ -23,12 +23,12 @@ spkgrp = session.extracellular.spikeGroups.channels;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preprocessing of dat files
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'J:\Data\lh98\2021-12-14_09-05-32';
+basepath = 'J:\Data\lh99\2021-12-14_21-01-55';
 mapch = [26,27,28,30,2,3,31,29,4,5,6,7,8,9,10,11,12,13,14,15,1,16,17,...
     32,18,19,20,21,22,23,24,25,33,34,35,36,37];
 rmvch = [];
-mapch = [1 : 21];
-rmvch = [17];
+% mapch = [1 : 21];
+% rmvch = [17];
 
 % tank to dat
 store = 'Raw1';
@@ -39,16 +39,17 @@ datInfo = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
     'chunksize', chunksize, 'mapch', mapch, 'rmvch', rmvch, 'clip', clip);
 
 % open ephys to dat
-exp = [1, 2, 4];
+exp = [1];
 rec = cell(max(exp), 1);
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
     'rmvch', rmvch, 'mapch', mapch, 'concat', true,...
     'nchans', length(mapch), 'fsIn', 20000);
 
 % digital input from OE
-recPath{1} = 'J:\Data\lh99\2021-12-13_09-13-55\RecordNode107\experiment1\recording1';
-recPath{2} = 'J:\Data\lh99\2021-12-13_09-13-55\RecordNode107\experiment3\recording1';
-recPath{3} = 'J:\Data\lh99\2021-12-13_09-13-55\RecordNode107\experiment4\recording1';
+clear recPath
+recPath{1} = 'J:\Data\lh99\2021-12-14_09-05-32\RecordNode107\experiment1\recording1';
+recPath{2} = 'J:\Data\lh99\2021-12-14_09-05-32\RecordNode107\experiment3\recording1';
+recPath{3} = 'J:\Data\lh99\2021-12-14_09-05-32\RecordNode107\experiment4\recording1';
 exPathNew = pwd;
 getDinOE('basepath', recPath, 'newpath', exPathNew,...
     'concat', true, 'saveVar', true);
@@ -215,17 +216,10 @@ fr = firingRate(spikes.times, 'basepath', basepath, 'graphics', false, 'saveFig'
     'binsize', binsize, 'saveVar', true, 'smet', 'MA', 'winBL',...
     winBL, 'winCalc', [0, Inf]);
 
+% organize firing rate 
 [mfrCell, gainCell] = org_mfrCell('spikes', spikes, 'cm', cm, 'fr', fr,...
     'timebins', [1 Inf], 'dataType', 'su', 'grp', [1 : 4], 'suFlag', suFlag,...
     'frBoundries', [0 Inf; 0 Inf], 'stateIdx', stateIdx);
-
-% CCG
-binSize = 0.001; dur = 0.12; % low res
-binSize = 0.0001; dur = 0.02; % high res
-[ccg, t] = CCG({xx.times{:}}, [], 'duration', dur, 'binSize', binSize, 'norm', 'counts');
-u = 20;
-plotCCG('ccg', ccg(:, u, u), 't', t, 'basepath', basepath,...
-    'saveFig', false, 'c', {'k'}, 'u', spikes.UID(u));
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % utilities
@@ -240,18 +234,28 @@ mat = cell2nanmat(c, dim);
 % get size of bytes for a variable or class
 nbytes = class2bytes(x, 'var', var);
 
-% convert basename to date time 
-[dt, dtFormat] = guessDateTime(dtstr);
-
 % convert number to chunks. can clip parts or apply an overlap
 chunks = n2chunks('n', nsamps, 'chunksize', chunksize, 'clip', clip);
 
 % basically a wrapper for histcounts
 [rate, binedges, tstamps, binidx] = times2rate(spktimes,...
     'binsize', binsize, 'winCalc', winCalc, 'c2r', true);
-        
+
+% convert basename to date time 
+[~, dtFormat] = guessDateTime(dtstr);
+
 % convert timestamp to datetime based on the date time string
 [dt, tstamp] = tstamp2time(varargin);
+
+% select specific units based on firing rate, cell class, etc.
+units = selectUnits(spikes, cm, fr, suFlag, grp, frBoundries, unitClass);
+
+% creates a cell array of variables
+varArray = getSessionVars('dirnames', {basename}, 'mousepath', mousepath,...
+    'sortDir', false);
+
+% assigns vars to base workspace
+assignVars(varArray, isession)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % analysis across sessions
@@ -262,7 +266,7 @@ fr_sessions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % fEPSP signals
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% all functions here are obsolete. see slutsky_fepsp repository
+% see slutsky_fepsp repository 
 
 % fEPSP from Dat
 intens = [40 80 100 150 200];
@@ -278,10 +282,4 @@ sfiles = [];
 fepsp = fEPSPfromWCP('basepath', basepath, 'sfiles', [],...
     'sufx', 'io1', 'force', true, 'protocol', 'io',...
     'intens', intens, 'inspect', true, 'fs', 20000);
-
-% anesthesia states (see also aneStates_wrp)
-[bs, iis, ep] = aneStates('ch', 1, 'basepath', basepath,...
-    'basename', basename, 'graphics', graphics,...
-    'saveVar', saveVar, 'saveFig', saveFig, 'forceA', forceA,...
-    'binsize', 30, 'smf', 7, 'thrMet', 1);
 

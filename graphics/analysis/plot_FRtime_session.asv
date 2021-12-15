@@ -126,6 +126,3 @@ if saveFig
     export_fig(figname, '-tif', '-transparent', '-r300')
 end
 
-end
-
-% EOF

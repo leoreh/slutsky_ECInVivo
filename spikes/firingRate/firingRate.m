@@ -188,11 +188,7 @@ fr.mfr = mean(fr.strd, 2);
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if graphics
-    plotFRtime('fr', fr, 'spktimes', spktimes, 'units', true,...
-        'avg', true, 'raster', true, 'saveFig', saveFig)
-    
-    %     bl = blFR(fr.norm, 'method', metBL, 'win', winBL);
-    %     plotFRdistribution(bl, 'saveFig', saveFig)
+    plot_FRtime_session(basepath)
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
