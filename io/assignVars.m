@@ -10,48 +10,48 @@ function assignVars(varArray, isession)
 if iscell(varArray) && isnumeric(isession)
     
     if isempty(varArray{isession, 1})
-        assignin('base', 'session', [])
+        assignin('caller', 'session', [])
     else
-        assignin('base', 'session', varArray{isession, 1}.session)
+        assignin('caller', 'session', varArray{isession, 1}.session)
     end
     if isempty(varArray{isession, 2})
-        assignin('base', 'cm', [])
+        assignin('caller', 'cm', [])
     else
-        assignin('base', 'cm', varArray{isession, 2}.cell_metrics)
+        assignin('caller', 'cm', varArray{isession, 2}.cell_metrics)
     end
     if isempty(varArray{isession, 3})
-        assignin('base', 'spikes', [])
+        assignin('caller', 'spikes', [])
     else
-        assignin('base', 'spikes', varArray{isession, 3}.spikes)
+        assignin('caller', 'spikes', varArray{isession, 3}.spikes)
     end
     if isempty(varArray{isession, 4})
-        assignin('base', 'fr', [])
+        assignin('caller', 'fr', [])
     else
-        assignin('base', 'fr', varArray{isession, 4}.fr)
+        assignin('caller', 'fr', varArray{isession, 4}.fr)
     end
     if isempty(varArray{isession, 5})
-        assignin('base', 'datInfo', [])
+        assignin('caller', 'datInfo', [])
     else
-        assignin('base', 'datInfo', varArray{isession, 5}.datInfo)
+        assignin('caller', 'datInfo', varArray{isession, 5}.datInfo)
     end
     if isempty(varArray{isession, 6})
-        assignin('base', 'ss', [])
+        assignin('caller', 'ss', [])
     else
-        assignin('base', 'ss', varArray{isession, 6}.ss)
+        assignin('caller', 'ss', varArray{isession, 6}.ss)
     end
     if isempty(varArray{isession, 7})
-        assignin('base', 'sr', [])
+        assignin('caller', 'sr', [])
     else
-        assignin('base', 'sr', varArray{isession, 7}.fr)
+        assignin('caller', 'sr', varArray{isession, 7}.fr)
     end
     if isempty(varArray{isession, 8})
-        assignin('base', 'st', [])
+        assignin('caller', 'st', [])
     else
-        assignin('base', 'st', varArray{isession, 8}.st)
+        assignin('caller', 'st', varArray{isession, 8}.st)
     end
     if isempty(varArray{isession, 9})
-        assignin('base', 'ripp', [])
+        assignin('caller', 'ripp', [])
     else
-        assignin('base', 'ripp', varArray{isession, 9}.ripp)
+        assignin('caller', 'ripp', varArray{isession, 9}.ripp)
     end
 end

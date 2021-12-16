@@ -21,9 +21,9 @@ spkgrp = session.extracellular.spikeGroups.channels;
 [~, basename] = fileparts(basepath);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% preprocessing of dat files
+% preprocessing of raw files
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'J:\Data\lh99\2021-12-14_21-01-55';
+basepath = 'J:\Data\lh99\2021-12-15_21-02-03';
 mapch = [26,27,28,30,2,3,31,29,4,5,6,7,8,9,10,11,12,13,14,15,1,16,17,...
     32,18,19,20,21,22,23,24,25,33,34,35,36,37];
 rmvch = [];
@@ -47,9 +47,9 @@ datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
 
 % digital input from OE
 clear recPath
-recPath{1} = 'J:\Data\lh99\2021-12-14_09-05-32\RecordNode107\experiment1\recording1';
-recPath{2} = 'J:\Data\lh99\2021-12-14_09-05-32\RecordNode107\experiment3\recording1';
-recPath{3} = 'J:\Data\lh99\2021-12-14_09-05-32\RecordNode107\experiment4\recording1';
+recPath{1} = 'J:\Data\lh99\2021-12-15_09-01-22\RecordNode107\experiment1\recording1';
+recPath{2} = 'J:\Data\lh99\2021-12-15_09-01-22\RecordNode107\experiment3\recording1';
+recPath{3} = 'J:\Data\lh99\2021-12-15_09-01-22\RecordNode107\experiment3\recording2';
 exPathNew = pwd;
 getDinOE('basepath', recPath, 'newpath', exPathNew,...
     'concat', true, 'saveVar', true);
@@ -159,7 +159,7 @@ for igrp = 1 : length(spkgrp)
     spktimes{igrp} = spktimes{igrp} / fs;
 end
 sr = firingRate(spktimes, 'basepath', basepath,...
-    'graphics', false, 'saveFig', false,...
+    'graphics', true, 'saveFig', false,...
     'binsize', 60, 'saveVar', 'sr', 'smet', 'none',...
     'winBL', [0 Inf]);
 
@@ -195,8 +195,19 @@ cell_metrics = ProcessCellMetrics('session', session,...
 % load spikes ce format
 % spikes = loadSpikes('format', 'klustakwik', 'getWaveformsFromSource', true, 'LSB', 1);
 
-% cluster validation
+% firing rate
 load([basename, '.spikes.cellinfo.mat'])
+binsize = 60;
+winBL = [0 30 * 60];
+fr = firingRate(spikes.times, 'basepath', basepath, 'graphics', true, 'saveFig', false,...
+    'binsize', binsize, 'saveVar', true, 'smet', 'MA', 'winBL',...
+    winBL, 'winCalc', [0, Inf]);
+
+% plot fr vs. time
+plot_FRtime_session('basepath', pwd, 'grp', [1 : 4, 7, 8],...
+    'frBoundries', [0.1 Inf; 0.1 Inf], 'muFlag', false)
+
+% cluster validation
 spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
     'saveFig', false, 'force', true, 'mu', [], 'graphics', false,...
     'vis', 'on', 'spkgrp', spkgrp);
@@ -208,13 +219,6 @@ cc = cellclass('basepath', basepath,...
 
 % spike timing metrics
 st = spktimesMetrics('winCalc', ss.stateEpochs([1, 4]));
-
-% firing rate
-binsize = 60;
-winBL = [0 30 * 60];
-fr = firingRate(spikes.times, 'basepath', basepath, 'graphics', false, 'saveFig', false,...
-    'binsize', binsize, 'saveVar', true, 'smet', 'MA', 'winBL',...
-    winBL, 'winCalc', [0, Inf]);
 
 % organize firing rate 
 [mfrCell, gainCell] = org_mfrCell('spikes', spikes, 'cm', cm, 'fr', fr,...
@@ -256,6 +260,9 @@ varArray = getSessionVars('dirnames', {basename}, 'mousepath', mousepath,...
 
 % assigns vars to base workspace
 assignVars(varArray, isession)
+
+% set matlab graphics to custom or factory defaults
+setMatlabGraphics(false)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % analysis across sessions

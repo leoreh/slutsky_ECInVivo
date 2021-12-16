@@ -185,13 +185,6 @@ fr.binsize = binsize;
 fr.mfr = mean(fr.strd, 2);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% graphics
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-if graphics
-    plot_FRtime_session(basepath)
-end
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % save
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if saveVar
@@ -202,120 +195,14 @@ if saveVar
     end
 end
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% graphics
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+if graphics
+    plot_FRtime_session('basepath', basepath)
+end
+
 return
 
 % EOF
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% messaround with figures
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% session params
-session = CE_sessionTemplate(pwd, 'viaGUI', false,...
-    'force', false, 'saveVar', false);
-basepath = session.general.basePath;
-nchans = session.extracellular.nChannels;
-fs = session.extracellular.sr;
-spkgrp = session.extracellular.spikeGroups.channels;
-
-% recalculate firing rate
-binsize = 60;
-winBL = [1 * 60 120 * 60];
-% winBL = [1 Inf];
-fr = firingRate(spikes.times, 'basepath', basepath, 'graphics', false, 'saveFig', false,...
-    'binsize', binsize, 'saveVar', true, 'smet', 'MA', 'winBL', winBL);
-
-% load vars
-cd(basepath)
-[~, basename] = fileparts(basepath);
-load([basename '.cell_metrics.cellinfo.mat'])
-load([basename '.spikes.cellinfo.mat'])
-load([basename '.SleepState.states.mat'])
-load([basename '.fr.mat'])
-infoname = dir('*datInfo*');
-load(infoname.name)
-
-% states
-states = {SleepState.ints.WAKEstate, SleepState.ints.NREMstate, SleepState.ints.REMstate};
-for ii = 1 : length(states)
-    tStates{ii} = InIntervals(fr.tstamps, states{ii});
-    t{ii} = fr.tstamps(tStates{ii});
-    frStates{ii} = mean(fr.strd(:, tStates{ii}), 2);
-end
-
-grp = [1 : 4];
-pyr = strcmp(cell_metrics.putativeCellType, 'Pyramidal Cell');
-int = strcmp(cell_metrics.putativeCellType, 'Narrow Interneuron');
-% pyr = ones(1, length(spikes.ts)); % override
-if isfield(spikes, 'su')
-    su = spikes.su';
-else
-    su = ones(1, length(spikes.ts));
-end
-grpidx = zeros(1, length(spikes.shankID));
-for ii = 1 : length(grp)
-    grpidx = grpidx | spikes.shankID == grp(ii);
-end
-
-% fr vs. time -------------------------------------------------------------
-% select units
-units = int & su & grpidx;
-data = fr.strd;
-tstamps = fr.tstamps / 60;
-nsamps = cumsum(datInfo.nsamps);
-state = 2;      % 1 - awake; 2 - NREM
-
-figure
-plot(tstamps, (data(units, :))')
-hold on
-medata = median((data(units, :)), 1);
-% plot(tstamps, medata, 'k', 'LineWidth', 5)
-stdshade(data(units, :), 0.3, 'k', tstamps)
-for i = 1 : length(nsamps) - 1
-    plot([nsamps(i) nsamps(i)] / fs / 60, ylim, '--k')
-end
-axis tight
-Y = ylim;
-fill([states{state} fliplr(states{state})]' / 60, [Y(1) Y(1) Y(2) Y(2)],...
-    'b', 'FaceAlpha', 0.15,  'EdgeAlpha', 0);
-% ylim([0 3])
-ylabel('norm MFR')
-
-% fr between two time periods----------------------------------------------
-
-data = fr.strd;
-state = 1;      % 1 - awake; 2 - NREM
-
-win = floor([1, nsamps(2);...
-    nsamps(4) nsamps(end)] / fs / 60);
-if win(1, 1) == 0; win(1, 1) = 1; end
-
-wint1 = InIntervals(tstamps, win(1, :));
-wint2 = InIntervals(tstamps, win(2, :));
-idx1 = wint1 & tStates{state};
-idx2 = wint2 & tStates{state};
-
-% average in periods
-m1 = mean(data(units, idx1), 2)
-m2 = mean(data(units, idx2), 2)
-
-% histogram
-figure
-histogram(m1, 8)
-hold on
-histogram(m2, 8)
-
-% scatter plot
-units = su & grpidx;
-m1 = mean(data(units, idx1), 2)
-m2 = mean(data(units, idx2), 2)
-c = repmat([0 0 1], length(spikes.ts), 1);
-c(int, :) = repmat([1 0 0], sum(int), 1);
-
-scatter(m1, m2, 50, c(units, :), 'filled')
-hold on
-X = xlim;
-Y = ylim;
-plot([0 X(2)], [0 Y(2)], '--k')
-
 

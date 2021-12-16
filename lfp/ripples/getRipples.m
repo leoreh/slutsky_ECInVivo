@@ -310,6 +310,11 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if graphics
+    
+    setMatlabGraphics(false)
+    set(groot, 'DefaultAxesLabelFontSizeMultiplier', 1.1)
+    set(groot, 'DefaultAxesTitleFontSizeMultiplier', 1.2)   
+    
     fh = figure;
     durPlot = [-50 50] / 1000;
     x = durPlot(1) : diff(durPlot) / nepochs : durPlot(2);
