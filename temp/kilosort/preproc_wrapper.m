@@ -224,9 +224,9 @@ catDatMemmap('datFiles', datFiles, 'newpath', newpath, 'parts', [],...
     'nchans', nchans, 'saveVar', true)
 
 clear source
-source{1} = 'J:\Data\lh98\lh98_211215_092500\lh98_211215_092500.dat';
-source{2} = 'J:\Data\lh98\lh98_211215_210203\lh98_211215_210203.dat';
-destination = 'J:\Data\lh98\lh98_211215.dat';
+source{1} = 'J:\Data\lh99\lh99_211217_091358\lh99_211217_091358.dat';
+source{2} = 'J:\Data\lh99\lh99_211217_153637\lh99_211217_153637.dat';
+destination = 'J:\Data\lh99\lh99_211217.dat';
 cmd = ['!copy /b ' strjoin(source, ' + '), ' ' destination];
 eval(cmd);
 

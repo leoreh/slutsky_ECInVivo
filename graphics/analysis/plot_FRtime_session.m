@@ -16,7 +16,7 @@ function plot_FRtime_session(varargin)
 p = inputParser;
 addOptional(p, 'basepath', pwd);
 addOptional(p, 'saveFig', true, @islogical);
-addOptional(p, 'grp', [1 : 4], @isnumeric);          
+addOptional(p, 'grp', [], @isnumeric);          
 addOptional(p, 'frBoundries', [0.2 Inf; 0.2 Inf], @isnumeric);          
 addOptional(p, 'muFlag', false, @islogical);
 
@@ -48,13 +48,17 @@ varArray = getSessionVars('dirnames', {basename}, 'mousepath', mousepath,...
 assignVars(varArray, 1)
 
 fs = session.extracellular.sr;
+spkgrp = session.extracellular.spikeGroups.channels;
+if isempty(grp)
+    grp = 1 : length(spkgrp);
+end
 
 % x axis in hr
 ts = sr.binsize;
 xidx = [1 : length(sr.strd)] / ts;
 
 % idx of block tranisition (dashed lines)
-if ~isempty(datInfo)
+if ~isempty(datInfo) && isfield(datInfo, 'nsamps')
     csum = cumsum(datInfo.nsamps) / fs / 60 / 60;
     tidx = csum(:);
 else
@@ -114,7 +118,7 @@ else
     plot([tidx tidx], ylim, '--k')
     axis tight
     xlabel('Time [h]')
-    ylabel('RS firing rate [Hz]')
+    ylabel('Firing rate [log(Hz)]')
     set(gca, 'box', 'off')
     legend(sprintf('RS = %d su', sum(units(1, :))))
 
@@ -134,7 +138,7 @@ else
     plot([tidx tidx], ylim, '--k')
     axis tight
     xlabel('Time [h]')
-    ylabel('FS firing rate [Hz]')
+    ylabel('Firing rate [log(Hz)]')
     set(gca, 'box', 'off')
     legend(sprintf('FS = %d su', sum(units(2, :))));
 
@@ -148,7 +152,7 @@ else
     plot([tidx tidx], yLimit, '--k')
     axis tight
     xlabel('Time [h]')
-    ylabel('Single unit firing rate [Hz]')
+    ylabel('Firing rate [Hz]')
     set(gca, 'box', 'off')
     linkaxes([sb1, sb2, sb3], 'x')    
     figname = 'fr_time';
@@ -159,7 +163,7 @@ if saveFig
     figpath = fullfile(basepath, 'graphics');
     mkdir(figpath)
     figname = fullfile(figpath, [basename, '_', figname]);
-    export_fig(figname, '-tif', '-transparent', '-r300')
+    export_fig(figname, '-jpg', '-transparent', '-r300')
 end
 
 end

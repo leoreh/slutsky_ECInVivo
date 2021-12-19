@@ -23,12 +23,12 @@ spkgrp = session.extracellular.spikeGroups.channels;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preprocessing of raw files
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'J:\Data\lh99\2021-12-15_21-02-03';
+basepath = 'J:\Data\lh98\2021-12-17_15-36-27';
 mapch = [26,27,28,30,2,3,31,29,4,5,6,7,8,9,10,11,12,13,14,15,1,16,17,...
     32,18,19,20,21,22,23,24,25,33,34,35,36,37];
 rmvch = [];
-% mapch = [1 : 21];
-% rmvch = [17];
+mapch = [1 : 21];
+rmvch = [17];
 
 % tank to dat
 store = 'Raw1';
@@ -204,7 +204,7 @@ fr = firingRate(spikes.times, 'basepath', basepath, 'graphics', true, 'saveFig',
     winBL, 'winCalc', [0, Inf]);
 
 % plot fr vs. time
-plot_FRtime_session('basepath', pwd, 'grp', [1 : 4, 7, 8],...
+plot_FRtime_session('basepath', pwd, 'grp', [],...
     'frBoundries', [0.1 Inf; 0.1 Inf], 'muFlag', false)
 
 % cluster validation
