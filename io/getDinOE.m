@@ -81,9 +81,9 @@ end
 destination = [newpath, filesep, newname, '.din.mat'];
 
 % find corresponding .dat and din.npy files
-for i = 1 : length(basepath)
-    datFiles(i) = dir([basepath{i} filesep '**' filesep '*dat']);
-    jsonFiles(i) = dir([basepath{i} filesep '**' filesep '*oebin']);
+for ifile = 1 : length(basepath)
+    datFiles(ifile) = dir([basepath{ifile} filesep '**' filesep '*dat']);
+    jsonFiles(ifile) = dir([basepath{ifile} filesep '**' filesep '*oebin']);
 end
 
 if length(jsonFiles) ~= length(datFiles)
@@ -101,11 +101,10 @@ end
 
 fprintf('\nCreating %s from files:\n', destination)
 
-for i = 1 : length(jsonFiles)
-    
+for ifile = 1 : length(jsonFiles)    
   
     % create file maps
-    jsonName = fullfile(jsonFiles(i).folder, jsonFiles(i).name);
+    jsonName = fullfile(jsonFiles(ifile).folder, jsonFiles(ifile).name);
     mDin = load_open_ephys_binary(jsonName, 'events', 1, 'mmap');
     
     fprintf('%s...\n', jsonName)
@@ -113,18 +112,19 @@ for i = 1 : length(jsonFiles)
     % separate by channels and get rising phase
     chans = double(unique(mDin.ChannelIndex));
     idxRise = mDin.Data > 0;        % rising phase
-    for ii = 1 : length(chans)
-        idxCh = mDin.ChannelIndex == chans(ii);
-        tstamps{ii} = [tstamps{ii}; mDin.Timestamps(idxRise & idxCh)];
+    for ich = 1 : length(chans)
+        idxCh = mDin.ChannelIndex == chans(ich);
+        tstamps{ich} = [tstamps{ich}; mDin.Timestamps(idxRise & idxCh)];
     end
     
     % validate Din length by checking the nsamps of recording from
-    % corresponding .dat file and
+    % corresponding .dat file and. this can take a long time and is
+    % typically not necassary. 
     if ~isempty(nchans)
         mDat = load_open_ephys_binary(jsonName, 'continuous', 1, 'mmap');
         nbytes = class2bytes(precision);
-        nsamps(i) = datFiles(i).bytes / nbytes / nchans;
-        nsamps(i) = mDat.Timestamps(end);
+        nsamps(ifile) = datFiles(ifile).bytes / nbytes / nchans;
+        nsamps(ifile) = mDat.Timestamps(end);
         totsamps = cumsum(nsamps);
         if data(end) > totsamps(end)
             txt = sprintf(['digital input longer than recording duration\n',...
@@ -135,8 +135,7 @@ for i = 1 : length(jsonFiles)
     
     % return if there are no events
     if all(cellfun(@isempty, tstamps))
-        warning('no events found, skipping Din')
-        return
+        warning('no events in %s', jsonName)
     end
     
 end

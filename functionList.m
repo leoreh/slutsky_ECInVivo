@@ -23,7 +23,7 @@ spkgrp = session.extracellular.spikeGroups.channels;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preprocessing of raw files
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'J:\Data\lh98\2021-12-17_15-36-27';
+basepath = 'J:\Data\lh99\2021-12-22_17-37-33';
 mapch = [26,27,28,30,2,3,31,29,4,5,6,7,8,9,10,11,12,13,14,15,1,16,17,...
     32,18,19,20,21,22,23,24,25,33,34,35,36,37];
 rmvch = [];
@@ -42,25 +42,24 @@ datInfo = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
 exp = [1];
 rec = cell(max(exp), 1);
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
-    'rmvch', rmvch, 'mapch', mapch, 'concat', true,...
+    'rmvch', rmvch, 'mapch', mapch,...
     'nchans', length(mapch), 'fsIn', 20000);
 
 % digital input from OE
 clear recPath
-recPath{1} = 'J:\Data\lh99\2021-12-15_09-01-22\RecordNode107\experiment1\recording1';
-recPath{2} = 'J:\Data\lh99\2021-12-15_09-01-22\RecordNode107\experiment3\recording1';
-recPath{3} = 'J:\Data\lh99\2021-12-15_09-01-22\RecordNode107\experiment3\recording2';
+recPath{1} = 'J:\Data\lh99\2021-12-21_21-00-45\Record Node 107\experiment1\recording1';
 exPathNew = pwd;
 getDinOE('basepath', recPath, 'newpath', exPathNew,...
     'concat', true, 'saveVar', true);
 
 % pre-process dat (remove channels, reorder, etc.)
 clip = [];
-datInfo = preprocDat('basepath', basepath, 'fname', '', 'mapch', mapch,...
-    'rmvch', rmvch, 'nchans', length(mapch), 'saveVar', true,...
-    'chunksize', 1e7, 'precision', 'int16', 'bkup', true,...
-    'clip', clip);
-
+clear orig_paths
+orig_paths{1} = 'J:\Data\lh99\lh99_211222_090505';
+orig_paths{2} = 'J:\Data\lh99\lh99_211222_173733';
+datInfo = preprocDat('orig_paths', orig_paths, 'mapch', 1 : nchans,...
+    'rmvch', [], 'nchans', nchans, 'saveVar', true,...
+    'chunksize', 1e7, 'precision', 'int16', 'clip', clip);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % LFP
@@ -168,7 +167,7 @@ dur = [];
 t = [];
 spktimes2ns('basepath', basepath, 'fs', fs,...
     'nchans', nchans, 'spkgrp', spkgrp, 'mkClu', true,...
-    'dur', dur, 't', t, 'psamp', [], 'grps', [1 : length(spkgrp)],...
+    'dur', dur, 't', t, 'grps', [1 : length(spkgrp)],...
     'spkFile', 'temp_wh');
 
 % clip ns files
@@ -192,9 +191,6 @@ cell_metrics = ProcessCellMetrics('session', session,...
     'forceReloadSpikes', false);
 % cell_metrics = CellExplorer('basepath', pwd);
 
-% load spikes ce format
-% spikes = loadSpikes('format', 'klustakwik', 'getWaveformsFromSource', true, 'LSB', 1);
-
 % firing rate
 load([basename, '.spikes.cellinfo.mat'])
 binsize = 60;
@@ -212,13 +208,11 @@ spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
     'saveFig', false, 'force', true, 'mu', [], 'graphics', false,...
     'vis', 'on', 'spkgrp', spkgrp);
 
-% pyr vs. int
-cc = cellclass('basepath', basepath,...
-    'waves', cat(1, spikes.rawWaveform{:})', 'saveVar', true,...
-    'graphics', false, 'fs', fs);
-
 % spike timing metrics
-st = spktimesMetrics('winCalc', ss.stateEpochs([1, 4]));
+st = spktimesMetrics('winCalc', []);
+
+% spike waveform metrics
+swv = spkwvMetrics('basepath', basepath, 'fs', fs);
 
 % organize firing rate 
 [mfrCell, gainCell] = org_mfrCell('spikes', spikes, 'cm', cm, 'fr', fr,...
@@ -228,6 +222,13 @@ st = spktimesMetrics('winCalc', ss.stateEpochs([1, 4]));
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % utilities
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% snip segments (e.g. spikes) from binary 
+[spkwv, ~] = snipFromBinary('stamps', spktimes, 'fname', datname,...
+    'win', win, 'nchans', nchans, 'ch', ch, 'align_peak', 'min',...
+    'precision', 'int16', 'rmv_trend', 6, 'saveVar', false,...
+    'l2norm', false);
+        
 % convert binary vector to epochs
 epochs = binary2epochs('vec', binaryVec, 'minDur', 20, 'maxDur', 100,...
     'interDur', 30, 'exclude', false);

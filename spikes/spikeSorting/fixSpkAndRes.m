@@ -1,6 +1,6 @@
 function fixSpkAndRes(varargin)
 
-% processes neurosuite files after /during manual curation. answers two
+% processes neurosuite files after / during manual curation. answers two
 % issues: (1) re-aligns individual waveforms according to their peak /
 % trough depending on the orientation of the mean waveform. (2) enforces a
 % dead time on spike times (res) that typically occurs when kilosort tries
@@ -14,10 +14,10 @@ function fixSpkAndRes(varargin)
 % -------------------------------------------------------------------------
 % update 04 jan 21; snipping spikes from whitened data reduces variability
 % considerabily. Thus, the total isolation distance is greater (3233 vs
-% 2078) and there are more su (87 vs 69) w/o fixSpkAndRes. Alternatively,
-% fixSpk can be done on temp_wh data. update 25 mar 21; instead of
-% re-snipping from temp_wh, circhshift can be used to recenter the peak /
-% trough because the beginning and end of a spike are assumed to be zero
+% 2078) and there are more su (87 vs 69) w/o snipping from dat. update 25
+% mar 21; instead of re-snipping from temp_wh, circhshift can be used to
+% recenter the peak / trough because the beginning and end of a spike are
+% assumed to be zero.
 %
 % INPUT:
 %   basepath    string. path to recording folder {pwd}.
@@ -187,7 +187,7 @@ for igrp = grp
         spkMean = mean(spkGrp, 3);
         [~, ampMaxCh] = max(range(spkMean, 2));
         
-        % re-align waveforms only if std at peak greater than at edges
+        % re-align cluster only if std at peak greater than at edges
         spkStd = std(spkGrp(ampMaxCh, :, :), [], 3);
         if spkStd(psamp) < mean(spkStd(1 : 5)) * stdFactor
             continue
@@ -265,10 +265,10 @@ for igrp = grp
             resGrp(ir) = [];
             rmIdx = [rmIdx; ir];
         end
-%         res(cluIdx(rmIdx)) = [];
-        clu(cluIdx(rmIdx)) = 0;
-%         spk(:, :, cluIdx(rmIdx)) = [];
-%         nspks = length(clu);
+        res(cluIdx(rmIdx)) = [];
+        clu(cluIdx(rmIdx)) = [];
+        spk(:, :, cluIdx(rmIdx)) = [];
+        nspks = length(clu);
         
         % graphics
         if graphics
@@ -328,6 +328,9 @@ for igrp = grp
         saveNS(fet, 'datatype', 'fet', 'session', session, 'grpid', igrp, 'bkup', bkup);
     end
 end
+
+clear raw
+clear m
 
 fprintf('that took %.2f minutes\n', toc / 60)
 

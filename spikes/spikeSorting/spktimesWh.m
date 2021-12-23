@@ -145,7 +145,7 @@ for ibatch = 1 : Nbatch
     fprintf(txt)
     
     % create whitened data
-    offset = max(0, ops.twind + 2*NchanTOT*(NT * (ibatch - 1) - ntb)); 
+    offset = max(0, ops.twind + 2 * NchanTOT * (NT * (ibatch - 1) - ntb)); 
     fseek(fid, offset, 'bof'); 
     buff = fread(fid, [NchanTOT NTbuff], '*int16'); 
     nsampcurr = size(buff,2); 

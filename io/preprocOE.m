@@ -12,7 +12,6 @@ function datInfo = preprocOE(varargin)
 %               contains indices to the relavent recordings of that
 %               experiment. also corresponds to name and not number of
 %               folders.
-%   concat      logical. concatenate dat files in experiments {true}
 %   mapch       vec. new order of channels {[]}. 1-based. 
 %   rmvch       vec. channels to remove (according to original order) {[]}
 %   nchans      numeric. number of channels in dat file {35}.
@@ -49,7 +48,6 @@ p = inputParser;
 addOptional(p, 'basepath', pwd);
 addOptional(p, 'exp', [], @isnumeric);
 addOptional(p, 'rec', {}, @iscell);
-addOptional(p, 'concat', true, @islogical);
 addOptional(p, 'nchans', 35, @isnumeric);
 addOptional(p, 'mapch', [], @isnumeric);
 addOptional(p, 'rmvch', [], @isnumeric);
@@ -60,7 +58,6 @@ parse(p, varargin{:})
 basepath = p.Results.basepath;
 exp = p.Results.exp;
 rec = p.Results.rec;
-concat = p.Results.concat;
 nchans = p.Results.nchans;
 mapch = p.Results.mapch;
 rmvch = p.Results.rmvch;
@@ -72,16 +69,11 @@ accCh = p.Results.accCh;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 fprintf('\nprocessing %s\n\n', basepath)
-% enter record node and remove spaces from name. this is for catDat system
-% command
+% enter record node
 cd(basepath)
 recNodeDir = dir;
 recNodeDir = recNodeDir(3);
 recNodeName = recNodeDir.name;
-if any(isspace(recNodeName))
-    recNodeName = recNodeName(~isspace(recNodeName));
-    movefile(recNodeDir.name, recNodeName)
-end
 cd(recNodeName);
 
 % find paths to relavent experiments
@@ -160,14 +152,15 @@ end
     mkdir(exPathNew)
     fprintf('created %s\n', exPathNew)
        
-    % move / concatenate dat
-    catDat('basepath', recPath, 'newpath', exPathNew,...
-        'concat', concat, 'nchans', nchans, 'saveVar', true);
+    % concatenate timestamps.npy and make sure dat files are not zero padded
+    cat_OE_tstamps('orig_paths', recPath, 'new_path', exPathNew,...
+        'nchans', nchans, 'saveVar', true);
     
     % pre-process dat
-    datInfo = preprocDat('basepath', exPathNew, 'fname', '', 'mapch', mapch,...
+    datInfo = preprocDat('orig_paths', recPath,...
+        'newfile', fullfile(exPathNew, [expName, '.dat']), 'mapch', mapch,...
         'rmvch', rmvch, 'nchans', nchans, 'saveVar', true,...
-        'chunksize', 5e6, 'precision', 'int16', 'bkup', false);  
+        'chunksize', 5e6, 'precision', 'int16');  
     
     % get digital input
     getDinOE('basepath', recPath, 'newpath', exPathNew,...
@@ -208,11 +201,6 @@ end
         movefile([exPathNew, filesep, xmlfiles.name], xmlnew);
     end
 
-    % states (depends on xml file)
-    if ~isempty(xmlfiles)
-%         SleepScoreMaster(exPathNew, 'rejectChannels', accCh)
-    end
-    
 end
 
 % EOF

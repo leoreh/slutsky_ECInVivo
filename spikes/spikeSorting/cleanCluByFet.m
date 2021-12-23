@@ -114,7 +114,7 @@ if manCur
     
     % rmv spks from selected cluster
     sclu = 7;      % cluster id
-    [cluidx, rmvSpks] = cleanClu(fet, res, sclu, ref, 0.0001, [0.12 0.05]);
+    [cluidx, rmvSpks] = cleanClu(fet, res, sclu, ref, 0.0001, [0.12 0.06]);
     
     % plot fets of specific cluster
     fetclu = fet(clu == cluid, :);

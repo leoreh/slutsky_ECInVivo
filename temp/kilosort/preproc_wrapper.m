@@ -212,30 +212,29 @@ load([basename, '.AccuSleep_labels.mat'])
 %%% cat dat
 nchans = 37;
 fs = 20000;
-newpath = 'J:\Data\lh99';
-datFiles{1} = 'J:\Data\lh99\lh99_211210_090834\lh99_211210_090834.dat';
-datFiles{2} = 'J:\Data\lh99\lh99_211210_212422\lh99_211210_212422.dat';
+newpath = 'J:\Data\lh98';
+datFiles{1} = 'J:\Data\lh98\lh98_211219_085802\lh98_211219_085802.dat';
+datFiles{2} = 'J:\Data\lh98\lh98_211219_181302\lh98_211219_181302.dat';
 sigInfo = dir(datFiles{1});
 nsamps = floor(sigInfo.bytes / class2bytes('int16') / nchans);
-parts{1} = round([195360091 722703787] / 24414.06 * fs);
-parts{2} = round([1 722703787] / 24414.06 * fs);
+parts{1} = round([0, Inf]);
+parts{2} = round([0,  (748 * 60 + 8) * fs]);
 
 catDatMemmap('datFiles', datFiles, 'newpath', newpath, 'parts', [],...
     'nchans', nchans, 'saveVar', true)
 
 clear source
-source{1} = 'J:\Data\lh99\lh99_211217_091358\lh99_211217_091358.dat';
-source{2} = 'J:\Data\lh99\lh99_211217_153637\lh99_211217_153637.dat';
-destination = 'J:\Data\lh99\lh99_211217.dat';
+source{1} = 'J:\Data\lh98\lh98_211220_104619\lh98_211220_104619.dat';
+source{2} = 'J:\Data\lh98\lh98_211220_211037\lh98_211220_211037.dat';
+destination = 'J:\Data\lh98\lh98_211220.dat';
 cmd = ['!copy /b ' strjoin(source, ' + '), ' ' destination];
 eval(cmd);
 
 % preproc dat
-clip = [0, 10 * 60 * 1250];
-clip = [];
+clip = [(1290 * 60 + 17) * fs, Inf];
 datInfo = preprocDat('basepath', pwd,...
-    'fname', [basename, '.dat'], 'mapch', 1 : 16,...
-    'rmvch', 14, 'nchans', 16, 'saveVar', false, 'clip', clip,...
-    'chunksize', 5e6, 'precision', 'int16', 'bkup', true);
+    'fname', [basename, '.dat'], 'mapch', 1 : nchans,...
+    'rmvch', [], 'nchans', nchans, 'saveVar', false, 'clip', clip,...
+    'chunksize', 5e7, 'precision', 'int16', 'bkup', true);
 
 
