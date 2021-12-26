@@ -7,7 +7,10 @@ function st = spktimesMetrics(varargin)
 
 
 % INPUT:
-%   spikes          struct (see getSpikes)
+%   spktimes        cell of spike times in s. if empty will be extracted
+%                   from spikes struct.
+%   fs              numeric. sampling frequency. 
+%   spikes          struct (see getSpikes).
 %   sunits          numeric vec. indices of selected units for calculation
 %                   {[]}.
 %   winCalc         cell array of n x 2 mats of intervals.
@@ -18,6 +21,8 @@ function st = spktimesMetrics(varargin)
 %   basepath        path to recording
 %   graphics        logical. plot graphics {true} or not (false)
 %   saveVar         logical. save variables (update spikes and save su)
+%   forceA          logical. force analysis even if struct file exists
+%                   {false}
 %
 % OUTPUT:
 %   st              struct
@@ -27,6 +32,7 @@ function st = spktimesMetrics(varargin)
 %
 % TO DO LIST:
 %   rmv dependency on spikes struct and cell explorer
+%   add metric from Miura et al., j. neurosci., 2007
 %
 % 24 nov 21 LH
 
@@ -34,30 +40,49 @@ function st = spktimesMetrics(varargin)
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 p = inputParser;
+addOptional(p, 'spktimes', [], @iscell);
+addOptional(p, 'fs', [], @isnumeric);
 addOptional(p, 'spikes', []);
 addOptional(p, 'sunits', []);
 addOptional(p, 'winCalc', {[0 Inf]});
 addOptional(p, 'basepath', pwd, @ischar);
 addOptional(p, 'graphics', true, @islogical);
 addOptional(p, 'saveVar', true, @islogical);
+addOptional(p, 'forceA', false, @islogical);
 
 parse(p, varargin{:})
+spktimes    = p.Results.spktimes;
+fs          = p.Results.fs;
 spikes      = p.Results.spikes;
 sunits      = p.Results.sunits;
 winCalc     = p.Results.winCalc;
 basepath    = p.Results.basepath;
 graphics    = p.Results.graphics;
 saveVar     = p.Results.saveVar;
+forceA      = p.Results.forceA;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% preparations
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% file names
+[~, basename] = fileparts(basepath);
+stFile = fullfile(basepath, [basename, '.st_metrics.mat']);
+spkFile = [basename '.spikes.cellinfo.mat'];
+sessionFile = [basename, '.session.mat'];
+
+% check if already analyzed 
+if exist(stFile, 'file') && ~forceA
+    load(stFile)
+    return
+end
 
 % load spikes if empty
-if isempty(spikes)
-    [~, filename] = fileparts(basepath);
-    spkname = [filename '.spikes.cellinfo.mat'];
-    if exist(spkname, 'file')
-        load(spkname)
-    else
-        error('%s not found', spkname)
+if isempty(spktimes)
+    if exist(spkFile, 'file')
+        load(spkFile)
     end
+    spktimes = spikes.times;
 end
 
 if isempty(winCalc)
@@ -67,24 +92,21 @@ if ~iscell(winCalc)
     winCalc = {winCalc};
 end
 
-% make sure spikes has required fields
-if ~all(isfield(spikes, {'shankID', 'cluID', 'times'}))
-    error('spikes missing required fields')
-end
-
 % selected untis
 if isempty(sunits)
-    sunits = 1 : length(spikes.times);
+    sunits = 1 : length(spktimes);
 end
 
-% load session info
-[~, basename] = fileparts(basepath);
-sessionName = [basename, '.session.mat'];
-if ~exist(sessionName, 'file')
-    session = CE_sessionTemplate(pwd, 'viaGUI', false,...
-        'force', true, 'saveVar', true);
-else
-    load(sessionName)
+% load session info for fs
+if exist(sessionFile, 'file')
+    load(sessionFile)
+end
+if isempty(fs)
+    if exist(session, 'var')
+        fs = session.extracellular.sr;
+    else
+        fs = 20000;
+    end
 end
 
 % acg params
@@ -98,7 +120,6 @@ st.info.acg_narrow_bnsz = 0.0005;
 st.info.acg_narrow_dur = 0.1;
 
 % spk params
-fs = session.extracellular.sr;
 nunits = length(sunits);
 nwin = length(winCalc);
 
@@ -122,19 +143,19 @@ for iunit = sunits
     for iwin = 1 : length(winCalc)
             
         % limit spktimes to window
-        spkIdx = InIntervals(spikes.times{iunit}, winCalc{iwin});
-        spktimes = spikes.times{iunit}(spkIdx);
-        nspks = length(spktimes);
-        isi = diff(spktimes);
+        spkIdx = InIntervals(spktimes{iunit}, winCalc{iwin});
+        st_unit = spktimes{iunit}(spkIdx);
+        nspks = length(st_unit);
+        isi = diff(st_unit);
         nisi = length(isi);
         
         % acg
-        [st.acg_wide(:, iwin, iunit), st.info.acg_wide_tstamps] = CCG(spktimes,...
-            ones(size(spktimes)), 'binSize', st.info.acg_wide_bnsz,...
+        [st.acg_wide(:, iwin, iunit), st.info.acg_wide_tstamps] = CCG(st_unit,...
+            ones(size(st_unit)), 'binSize', st.info.acg_wide_bnsz,...
             'duration', st.info.acg_wide_dur, 'norm', 'rate', 'Fs', 1 / fs);
         
-        [st.acg_narrow(:, iwin, iunit), st.info.acg_narrow_tstamps] = CCG(spktimes,...
-            ones(size(spktimes)), 'binSize', st.info.acg_narrow_bnsz,...
+        [st.acg_narrow(:, iwin, iunit), st.info.acg_narrow_tstamps] = CCG(st_unit,...
+            ones(size(st_unit)), 'binSize', st.info.acg_narrow_bnsz,...
             'duration', st.info.acg_narrow_dur, 'norm', 'rate', 'Fs', 1 / fs);
         
         % burstiness ------------------------------------------------------
@@ -158,9 +179,9 @@ for iunit = sunits
         
         % Mizuseki 2011: fraction of spikes with a ISI for following or preceding
         % spikes < 0.006
-        burst_temp = zeros(1, length(spktimes) - 1);
-        for ispk = 2 : length(spktimes) - 1
-            burst_temp(ispk) = any(diff(spktimes(ispk - 1 : ispk + 1)) < 0.006);
+        burst_temp = zeros(1, length(st_unit) - 1);
+        for ispk = 2 : length(st_unit) - 1
+            burst_temp(ispk) = any(diff(st_unit(ispk - 1 : ispk + 1)) < 0.006);
         end
         st.mizuseki(iwin, iunit) = sum(burst_temp > 0) / length(burst_temp);
         
@@ -195,12 +216,23 @@ for iunit = sunits
         end
         st.lvr(iwin, iunit) = 3 / (nisi - 1) * lv_term;
         
-        % Fano factor: variability in fr relative to mfr
-        % brustiness.ff = var(fr) / mean(fr)
-        
-        % AR(1): auto-regressive
-        % plot(fr.strd(iunit, 1 : end-1), fr.strd(iunit, 2 : end), '*')
-        
+        % fit triple exponential to acg. adapted from CE (fit_ACG.m).
+        % requires the Curve Fitting Toolbox. no idea whats going on here
+        g = fittype('max(c*(exp(-(x-f)/a)-d*exp(-(x-f)/b))+h*exp(-(x-f)/g)+e,0)',...
+            'dependent',{'y'},'independent',{'x'},...
+            'coefficients',{'a','b','c','d','e','f','g','h'});       
+        a0 = [20, 1, 30, 2, 0.5, 5, 1.5, 2];
+        lb = [1, 0.1, 0, 0, -30, 0, 0.1, 0];
+        ub = [500, 50, 500, 15, 50, 20, 5, 100];
+        offset = 101;
+        x = ([1 : 100] / 2)';
+        [f0, ~] = fit(x, st.acg_narrow(x * 2 + offset, iunit),...
+            g, 'StartPoint', a0, 'Lower', lb, 'Upper', ub);
+        fit_params = coeffvalues(f0);      
+        st.tau_rise(iwin, iunit) = fit_params(2);
+        st.tau_burst(iwin, iunit) = fit_params(7);
+        st.acg_refrac(iwin, iunit) = fit_params(6);       
+               
     end
 end
 
@@ -217,9 +249,8 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if saveVar
-       
-    [~, basename] = fileparts(basepath);
-    save([basepath, filesep, basename, '.st_metrics.mat'], 'st')
+    
+    save(stFile, 'st')
 
     % update cell metrics
     cmName = [basename, '.cell_metrics.cellinfo.mat'];

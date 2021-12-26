@@ -11,6 +11,7 @@ function swv = spkwvMetrics(varargin)
 %   fs          sampling frequency. used only to determine the waveform
 %               length (which is typically 1.6 ms)
 %   saveVar     save variable {1}.
+%   forceA      logical. force analysis even if struct file exists {false}
 % 
 % OUTPUT
 %   swv         struct
@@ -34,29 +35,42 @@ addOptional(p, 'basepath', pwd);
 addOptional(p, 'wv', []);
 addOptional(p, 'fs', 20000, @isnumeric);
 addOptional(p, 'saveVar', true, @islogical);
+addOptional(p, 'forceA', false, @islogical);
 
 parse(p, varargin{:})
-basepath = p.Results.basepath;
-wv = p.Results.wv;
-fs = p.Results.fs;
-saveVar = p.Results.saveVar;
+basepath    = p.Results.basepath;
+wv          = p.Results.wv;
+fs          = p.Results.fs;
+saveVar     = p.Results.saveVar;
+forceA      = p.Results.forceA;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preparations
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% file names
 [~, basename] = fileparts(basepath);
-cmName = fullfile(basepath, [basename, '.cell_metrics.cellinfo.mat']);
-swvName = fullfile(basepath, [basename, '.swv_metrics.mat']);
-swvRaw = fullfile(basepath, [basename, '.swv.mat']);
-sessionName = fullfile(basepath, [basename, '.session.mat']);
-spikesName = fullfile(basepath, [basename, '.spikes.cellinfo.mat']);
+cmFile = fullfile(basepath, [basename, '.cell_metrics.cellinfo.mat']);
+swvFile = fullfile(basepath, [basename, '.swv_metrics.mat']);
+swvRawFile = fullfile(basepath, [basename, '.swv.mat']);
+sessionFile = fullfile(basepath, [basename, '.session.mat']);
+spkFile = fullfile(basepath, [basename, '.spikes.cellinfo.mat']);
+
+% check if already analyzed 
+if exist(swvFile, 'file') && ~forceA
+    load(swvFile)
+    return
+end
 
 % number of spikes to snip per cluster
 spks2snip = 20000;
 
-% spk wave length
-spklength = ceil(1.6 * 10^-3 * fs);  % spike wave is 1.6 ms 
+% waveform params
+if ~isempty(wv)
+    spklength = size(wv, 2);
+else
+    spklength = ceil(1.6 * 10^-3 * fs);  % spike wave is 1.6 ms
+end
 win = [-(floor(spklength / 2) - 1) floor(spklength / 2)];   
 upsamp = 10;            % upsample factor for waveforms
 upsamp_met = 'spline';  % method for upsampling. can also be 'fft'.
@@ -65,6 +79,9 @@ upsamp_met = 'spline';  % method for upsampling. can also be 'fft'.
 nfs = fs * upsamp;
 fb = cwtfilterbank('SignalLength', spklength * upsamp, 'VoicesPerOctave', 32,...
     'SamplingFrequency', nfs, 'FrequencyLimits', [1 fs / 4]);
+
+% initialize
+wv_std = [];
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % prepare waveforms
@@ -77,14 +94,14 @@ fb = cwtfilterbank('SignalLength', spklength * upsamp, 'VoicesPerOctave', 32,...
 
 if isempty(wv)
         
-    if exist(swvRaw, 'file')
-        load(swvRaw)
+    if exist(swvRawFile, 'file')
+        load(swvRawFile)
         
     else
 
         % load spikes and session info struct
-        load(spikesName);
-        load(sessionName);
+        load(spkFile);
+        load(sessionFile);
         ch = num2cell(spikes.maxWaveformCh1);
         nchans = session.extracellular.nChannels;
         
@@ -105,7 +122,7 @@ if isempty(wv)
         wv_all = cellfun(@squeeze, wv_all, 'UniformOutput', false);
         
         if saveVar
-            save(swvRaw, 'wv_all')
+            save(swvRawFile, 'wv_all')
         end
         
     end
@@ -209,11 +226,11 @@ swv.hpk = hpk;
 
 if saveVar   
     
-    save(swvName, 'swv')
+    save(swvFile, 'swv')
     
     % cell metrics
-    if exist(cmName, 'file')
-        load(cmName)
+    if exist(cmFile, 'file')
+        load(cmFile)
         cell_metrics.waveforms.wv = num2cell(swv.wv, 2)';
         cell_metrics.waveforms.filt = num2cell(swv.wv, 2)';
         cell_metrics.waveforms.filt_std = num2cell(swv.wv_std, 2)';
@@ -221,7 +238,7 @@ if saveVar
         cell_metrics.swv_tp = swv.tp;
         cell_metrics.swv_asym = swv.asym;
         cell_metrics.swv_hpk = swv.hpk;
-        save(cmName, 'cell_metrics')
+        save(cmFile, 'cell_metrics')
     end
 end
 

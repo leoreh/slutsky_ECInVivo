@@ -82,13 +82,18 @@ destination = [newpath, filesep, newname, '.din.mat'];
 
 % find corresponding .dat and din.npy files
 for ifile = 1 : length(basepath)
-    datFiles(ifile) = dir([basepath{ifile} filesep '**' filesep '*dat']);
-    jsonFiles(ifile) = dir([basepath{ifile} filesep '**' filesep '*oebin']);
+    tmp = dir([basepath{ifile} filesep '**' filesep '*dat']);
+    if ~isempty(tmp)
+        datFiles(ifile) = tmp;
+    end
+    tmp = dir([basepath{ifile} filesep '**' filesep '*oebin']);
+    if ~isempty(tmp)
+        jsonFiles(ifile) = tmp;
+    end
 end
 
 if length(jsonFiles) ~= length(datFiles)
     warning('number of .oebin and .dat files not equal')
-    return
 end
 if length(jsonFiles) > 1 && ~concat
     error(['multiple .oebin files found in %s\n',...
@@ -102,7 +107,11 @@ end
 fprintf('\nCreating %s from files:\n', destination)
 
 for ifile = 1 : length(jsonFiles)    
-  
+    
+    if isempty(jsonFiles(ifile).name)
+        continue
+    end
+    
     % create file maps
     jsonName = fullfile(jsonFiles(ifile).folder, jsonFiles(ifile).name);
     mDin = load_open_ephys_binary(jsonName, 'events', 1, 'mmap');

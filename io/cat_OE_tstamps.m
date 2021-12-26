@@ -124,12 +124,13 @@ for i = 1 : length(datFiles)
         if length(tmap.Data.d) < nsamps(i)
             warning(['more samples than timestamps in %s\n'...
                 'initializing valTstampsOE'], source{i})
-            validate_OE_tstamps('orig_paths', tFiles(idx).folder, 'precision', precision,...
+            validate_OE_tstamps('basepath', tFiles(idx).folder, 'precision', precision,...
                 'chunksize', 5e6, 'bkup', false, 'saveVar', true,...
                 'nchans', nchans)
             nsamps(i) = length(tmap.Data.d);
         end      
         tstamps = [tstamps; tmap.Data.d];
+        clear tmap
        
     end
 end

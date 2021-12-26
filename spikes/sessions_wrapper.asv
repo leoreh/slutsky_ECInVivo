@@ -22,6 +22,7 @@ varsFile = ["session";...
 % name of vars for assignment in workspace
 vars = ["fr"; "mea"; "st"; "swv"; "cm"];
 
+
 if ~exist('varArray', 'var') || forceL
     [varArray, dirnames, mousepath] = getSessionVars('sortDir', false,...
         'dirnames', [], 'mname', mname);
@@ -69,23 +70,78 @@ if forceA
         basepaths{isession} = fullfile(mousepath, dirnames{isession});
         cd(basepath)
         [~, basename] = fileparts(basepath);
-              
-        % vars
-        assignVars(varArray, isession, vars)
         
         % params
+        session = CE_sessionTemplate(pwd, 'viaGUI', false,...
+            'force', true, 'saveVar', true);
         nchans = session.extracellular.nChannels;
         fs = session.extracellular.sr;
         spkgrp = session.extracellular.spikeGroups.channels;
         
-        % fr
-        winBL = [0 30 * 60];
+        % vars
+        assignVars(varArray, isession)
+        
+        % cm
+%         cell_metrics = ProcessCellMetrics('session', session,...
+%             'manualAdjustMonoSyn', false, 'summaryFigures', false,...
+%             'debugMode', true, 'transferFilesFromClusterpath', false,...
+%             'submitToDatabase', false, 'getWaveformsFromDat', true);
+%         % cell_metrics = CellExplorer('basepath', pwd);
+%         
+%         load([basename '.spikes.cellinfo.mat'])
+%         cc = cellclass('basepath', basepath,...
+%             'waves', cat(1, spikes.rawWaveform{:})', 'saveVar', true,...
+%             'graphics', false, 'fs', fs);
+     
+
+% acc = EMGfromACC('basepath', basepath, 'fname', [basename, '.lfp'],...
+%     'nchans', nchans, 'ch', nchans - 2 : nchans, 'saveVar', true, 'fsIn', 1250,...
+%     'graphics', false);
+
+
+% [EMG, EEG, sigInfo] = as_prepSig([basename, '.lfp'], acc.mag,...
+%     'eegCh', [4 : 7], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
+%     'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
+%     'eegFs', 1250, 'emgFs', 1250, 'emgCf', [10 600]);
+
+%         
+% load([basename, '.AccuSleep_EEG.mat'])
+% load([basename, '.AccuSleep_EMG.mat'])
+% load([basename, '.AccuSleep_sigInfo.mat'])
+%         labelsmanfile = [basename, '.AccuSleep_labelsMan.mat'];
+%         AccuSleep_viewer(EEG, EMG, 1250, 1, labels, labelsmanfile)
+% netfile = 'D:\Code\slutskycode\extracellular in vivo\lfp\SleepStates\AccuSleep\trainedNetworks\net_210826_231004.mat';
+% % netfile = [];
+% ss = as_wrapper(EEG, EMG, sigInfo, 'basepath', basepath, 'calfile', [],...
+%     'viaGui', false, 'forceCalibrate', false, 'inspectLabels', false,...
+%     'saveVar', true, 'forceAnalyze', true, 'fs', 1250, 'netfile', netfile,...
+%     'graphics', true);
+
+%         spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
+%             'saveFig', false, 'force', true, 'mu', [], 'graphics', false,...
+%             'vis', 'on', 'spkgrp', spkgrp);
+
+        
+        % firing rate
+%         load([basename '.spikes.cellinfo.mat'])
+        binsize = 60;
+        winBL = [1 * 60 300 * 60];
         fr = firingRate(spikes.times, 'basepath', basepath,...
-            'graphics', true, 'saveFig', false,...
-            'binsize', 60, 'saveVar', true, 'smet', 'GK', 'winBL',...
-            winBL, 'winCalc', [0, Inf]);
-
-
+            'graphics', false, 'saveFig', false,...
+            'binsize', binsize, 'saveVar', true, 'smet', 'MA',...
+            'winBL', winBL);
+         
+        % spike rate per tetrode. note that using firingRate requires
+        % special care becasue spktimes is given in samples and not seconds
+        load(fullfile(basepath, [basename '.spktimes.mat']))
+        for ii = 1 : length(spkgrp)
+            spktimes{ii} = spktimes{ii} / fs;
+        end
+        binsize = 60;
+        sr = firingRate(spktimes, 'basepath', basepath,...
+            'graphics', false, 'saveFig', false,...
+            'binsize', binsize, 'saveVar', 'sr', 'smet', 'none',...
+            'winBL', [0 Inf]);
     end
 end
 

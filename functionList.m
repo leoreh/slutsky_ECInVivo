@@ -23,7 +23,7 @@ spkgrp = session.extracellular.spikeGroups.channels;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preprocessing of raw files
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'J:\Data\lh99\2021-12-22_17-37-33';
+basepath = 'J:\Data\lh99\2021-12-22_21-06-23';
 mapch = [26,27,28,30,2,3,31,29,4,5,6,7,8,9,10,11,12,13,14,15,1,16,17,...
     32,18,19,20,21,22,23,24,25,33,34,35,36,37];
 rmvch = [];
@@ -43,22 +43,27 @@ exp = [1];
 rec = cell(max(exp), 1);
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
     'rmvch', rmvch, 'mapch', mapch,...
-    'nchans', length(mapch), 'fsIn', 20000);
+    'nchans', nchans, 'fsIn', 20000);
 
 % digital input from OE
 clear recPath
-recPath{1} = 'J:\Data\lh99\2021-12-21_21-00-45\Record Node 107\experiment1\recording1';
+orig_paths{1} = 'J:\Data\lh99\2021-12-21_21-00-45\Record Node 107\experiment1\recording1';
 exPathNew = pwd;
-getDinOE('basepath', recPath, 'newpath', exPathNew,...
+getDinOE('basepath', orig_paths, 'newpath', exPathNew,...
     'concat', true, 'saveVar', true);
+
+% concatenate timestamps.npy and make sure dat files are not zero padded
+cat_OE_tstamps('orig_paths', orig_paths, 'new_path', exPathNew,...
+    'nchans', length(mapch), 'saveVar', true);
 
 % pre-process dat (remove channels, reorder, etc.)
 clip = [];
 clear orig_paths
-orig_paths{1} = 'J:\Data\lh99\lh99_211222_090505';
-orig_paths{2} = 'J:\Data\lh99\lh99_211222_173733';
-datInfo = preprocDat('orig_paths', orig_paths, 'mapch', 1 : nchans,...
-    'rmvch', [], 'nchans', nchans, 'saveVar', true,...
+orig_paths{1} = 'K:\Data\lh99\2021-12-24_08-45-28\Record Node 107\experiment1\recording1';
+orig_paths{2} = 'K:\Data\lh99\2021-12-24_08-45-28\Record Node 107\experiment2\recording1';
+orig_paths{3} = 'K:\Data\lh99\2021-12-24_21-01-37\Record Node 107\experiment1\recording1';
+datInfo = preprocDat('orig_paths', orig_paths, 'mapch', mapch,...
+    'rmvch', rmvch, 'nchans', length(mapch), 'saveVar', true,...
     'chunksize', 1e7, 'precision', 'int16', 'clip', clip);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -193,10 +198,9 @@ cell_metrics = ProcessCellMetrics('session', session,...
 
 % firing rate
 load([basename, '.spikes.cellinfo.mat'])
-binsize = 60;
 winBL = [0 30 * 60];
 fr = firingRate(spikes.times, 'basepath', basepath, 'graphics', true, 'saveFig', false,...
-    'binsize', binsize, 'saveVar', true, 'smet', 'MA', 'winBL',...
+    'binsize', 60, 'saveVar', true, 'smet', 'GK', 'winBL',...
     winBL, 'winCalc', [0, Inf]);
 
 % plot fr vs. time

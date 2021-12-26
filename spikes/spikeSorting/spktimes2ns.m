@@ -239,7 +239,7 @@ end
 
 % save variable
 if saveVar
-    save(fullfile(basepath, [basename, 'spktimes.mat']), 'spktimes')
+    save(fullfile(basepath, [basename, '.spktimes.mat']), 'spktimes')
 end
 
 end
