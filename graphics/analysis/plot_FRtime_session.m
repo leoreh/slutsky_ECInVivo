@@ -54,7 +54,7 @@ if isempty(grp)
 end
 
 % x axis in hr
-ts = sr.binsize;
+ts = sr.info.binsize;
 xidx = [1 : length(sr.strd)] / ts;
 
 % idx of block tranisition (dashed lines)
@@ -88,8 +88,8 @@ title(basename)
 if isempty(fr) | muFlag
     yLimit = ceil([0 max(max(sr.strd(grp, :)))]);
     hold on
-    plot(xidx, sr.strd(grp, :)')
-    plot([tidx tidx], yLimit, '--k')
+    plot(xidx, sr.strd(grp, :)', 'LineWidth', 1)
+    plot([tidx tidx], yLimit, '--k', 'LineWidth', 1)
     axis tight
     set(gca, 'box', 'off');
     ylabel('Multi-unit firing rate [Hz]')

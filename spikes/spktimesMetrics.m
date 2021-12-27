@@ -40,7 +40,7 @@ function st = spktimesMetrics(varargin)
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 p = inputParser;
-addOptional(p, 'spktimes', [], @iscell);
+addOptional(p, 'spktimes', []);
 addOptional(p, 'fs', [], @isnumeric);
 addOptional(p, 'spikes', []);
 addOptional(p, 'sunits', []);

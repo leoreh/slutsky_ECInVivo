@@ -77,7 +77,7 @@ end
 % Get directory paths
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-if exist('dirnames', 'var')
+if ~isempty(dirnames)
     % ALT 1: user input dirnames
     dirnames = dirnames;
     

@@ -20,7 +20,11 @@ for ivar = 1 : length(vars)
     if strcmp(vars{ivar}, 'sr')
         assignin('caller', vars{ivar}, varArray{isession, ivar}.fr)
     elseif strcmp(vars{ivar}, 'cm')
-        assignin('caller', vars{ivar}, varArray{isession, ivar}.cell_metrics)
+        if isempty(varArray{isession, ivar})
+            assignin('caller', vars{ivar}, [])
+        else
+            assignin('caller', vars{ivar}, varArray{isession, ivar}.cell_metrics)
+        end
     else
         if isempty(varArray{isession, ivar})
             assignin('caller', vars{ivar}, [])

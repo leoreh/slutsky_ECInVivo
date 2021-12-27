@@ -16,17 +16,20 @@ function fr = firingRate(spktimes, varargin)
 %   saveVar     logical / char. save variable {true}. if char than variable
 %               will be named saveVar.mat
 %   winCalc     time window for calculation {[1 Inf]}. specified in s.
-%   binsize     size bins {60}. specified in s.
+%   binsize     size bins {60}. must be the same units as spktimes (e.g.
+%               [s])
 %   winBL       window to calculate baseline FR {[1 Inf]}.
 %               specified in s.
 %   smet        method for smoothing firing rate: moving average (MA) or
 %               Gaussian kernel (GK) impleneted by multiple-pass MA. {[]}.
+%   forceA      logical. force analysis even if struct file exists {false}
 %
 % OUTPUT
 % fr            struct 
 %
 % TO DO LIST
-%               adjust winCalc to matrix
+%               adjust winCalc to matrix (done)
+%               apply params (e.g. gini) to states
 %
 % 26 feb 19 LH  updates:
 % 21 nov 19 LH  added active periods and mFR accordingly
@@ -48,6 +51,7 @@ addOptional(p, 'winBL', [], validate_win);
 addOptional(p, 'smet', 'none', @ischar);
 addOptional(p, 'graphics', true, @islogical);
 addOptional(p, 'saveVar', true);
+addOptional(p, 'forceA', true, @islogical);
 
 parse(p, varargin{:})
 basepath = p.Results.basepath;
@@ -57,10 +61,30 @@ winBL = p.Results.winBL;
 smet = p.Results.smet;
 graphics = p.Results.graphics;
 saveVar = p.Results.saveVar;
+forceA = p.Results.forceA;
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% preparations
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% params
 smfactor = 7;    % smooth factor
 nunits = length(spktimes);
+
+% filenames
 [~, basename] = fileparts(basepath);
+if ischar(saveVar)
+    frFile = [basepath, filesep, basename, '.' saveVar '.mat'];
+else
+    frFile = [basepath, filesep, basename, '.fr.mat'];
+end
+asFile = fullfile(basepath, [basename '.AccuSleep_states.mat']);
+
+% check if already analyzed
+if exist(frFile, 'file') && ~forceA
+    load(frFile)
+    return
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % calc firing rate
@@ -69,12 +93,11 @@ nunits = length(spktimes);
 % calc fr across entire session
 [fr.strd, ~, fr.tstamps] = times2rate(spktimes, 'binsize', binsize,...
     'winCalc', winCalc, 'c2r', true);
-fr.mfr = mean(fr.strd, 2);
 
 % calc fr according to states. note states, binsize, and spktimes must be
 % the same units (typically sec)
-if exist(fullfile(basepath, [basename '.AccuSleep_states.mat']))
-    load(fullfile(basepath, [basename '.AccuSleep_states.mat']), 'ss')    
+if exist(asFile)
+    load(asFile, 'ss')    
     fr.states.stateNames = ss.labelNames;
     nstates = length(ss.stateEpochs);
 
@@ -119,14 +142,14 @@ else
     end
 end
 bl_fr = fr.strd(:, winBL(1) : winBL(2));
-bl_avg = mean(bl_fr, 2);
-bl_std = std(bl_fr, [], 2);
-fr.norm = fr.strd ./ bl_avg;
+fr.mfr = mean(bl_fr, 2, 'omitnan');
+fr.mfr_std = std(bl_fr, [], 2, 'omitnan');
+fr.norm = fr.strd ./ fr.mfr;
 
 % apply criterions
 bl_thr = 0.01;   % [Hz]
-fr.bl_thr = bl_avg > bl_thr;
-fr.stable = bl_std < bl_avg;
+fr.bl_thr = fr.mfr > bl_thr;
+fr.stable = fr.mfr_std < fr.mfr;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % more params 
@@ -164,11 +187,7 @@ fr.info.bl_thr = bl_thr;
 
 % save
 if saveVar
-    if ischar(saveVar)
-        save([basepath, filesep, basename, '.' saveVar '.mat'], 'fr')
-    else
-        save([basepath, filesep, basename, '.fr.mat'], 'fr')
-    end
+    save(frFile, 'fr')
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

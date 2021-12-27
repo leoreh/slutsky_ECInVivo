@@ -240,6 +240,7 @@ end
 
 datInfo.orig_files = orig_files;
 datInfo.orig_info = orig_info;
+datInfo.nsamps = nsamps;
 datInfo.clip = clip;
 datInfo.mapCh = orig_mapch;
 datInfo.rmvCh = rmvch;

@@ -219,7 +219,7 @@ for igrp = 1 : ngrps
             fetMat(:, enrgIdx + ichan) = (chEnrgy);
         end
     end
-    fetMat(:, end) = double(spktimes{igrp});
+    fetMat(:, end) = double(spktimes{grp});
     fet = int32(fetMat');
     fid = fopen(fetname, 'w');
     formatstring = '%d';

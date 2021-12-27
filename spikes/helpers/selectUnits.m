@@ -6,7 +6,6 @@ if isempty(frBoundries)
     frBoundries = [0 Inf; 0 Inf];
 end
 
-
 nunits = length(fr.mfr);
 
 % su vs mu

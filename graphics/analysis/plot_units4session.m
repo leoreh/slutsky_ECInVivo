@@ -7,7 +7,7 @@
 % params and data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = 'lh93';
+mname = 'lh99';
 forceL = false;
 if ~exist('varArray', 'var') || forceL
     [varArray, dirnames, mousepath] = getSessionVars('sortDir', false,...
@@ -17,7 +17,7 @@ nsessions = length(dirnames);
 sessionIdx = 1 : nsessions;
 
 % params
-grp = [1 : 4];              % which tetrodes to plot
+grp = [1 : 8];              % which tetrodes to plot
 suFlag = 1;                 % plot only su or all units
 % include only units with fr greater / lower than. 1st row RS 2nd row FS
 frBoundries = [0.2 Inf; 0.2 Inf];    
@@ -75,8 +75,8 @@ for isession = sessionIdx
 end
 
 if saveFig
-    mkdir(fullfile(mousepath, 'graphics'))
-    figname = fullfile(mousepath, 'graphics', 'UnitsPerGrp');
+    mkdir(fullfile(basepath, 'graphics'))
+    figname = fullfile(basepath, 'graphics', 'UnitsPerGrp');
     export_fig(figname, '-tif', '-transparent', '-r300')
 end
 

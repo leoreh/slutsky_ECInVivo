@@ -33,7 +33,7 @@ function swv = spkwvMetrics(varargin)
 p = inputParser;
 addOptional(p, 'basepath', pwd);
 addOptional(p, 'wv', []);
-addOptional(p, 'fs', 20000, @isnumeric);
+addOptional(p, 'fs', [], @isnumeric);
 addOptional(p, 'saveVar', true, @islogical);
 addOptional(p, 'forceA', false, @islogical);
 
@@ -60,6 +60,15 @@ spkFile = fullfile(basepath, [basename, '.spikes.cellinfo.mat']);
 if exist(swvFile, 'file') && ~forceA
     load(swvFile)
     return
+end
+
+% get params from session info
+if exist(sessionFile, 'file')
+    load(sessionFile);
+    if isempty(fs)
+        fs = session.extracellular.sr;
+    end
+    nchans = session.extracellular.nChannels;
 end
 
 % number of spikes to snip per cluster
@@ -101,9 +110,7 @@ if isempty(wv)
 
         % load spikes and session info struct
         load(spkFile);
-        load(sessionFile);
         ch = num2cell(spikes.maxWaveformCh1);
-        nchans = session.extracellular.nChannels;
         
         % select a random fraction of spikes
         fn = @(x) randperm(length(x), min([length(x), spks2snip]));

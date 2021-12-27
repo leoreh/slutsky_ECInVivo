@@ -4,7 +4,7 @@
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = 'lh93';
+mname = 'lh98';
 forceL = true;
 forceA = false;
 
@@ -20,11 +20,12 @@ varsFile = ["session";...
     "ripp"];
 
 % name of vars for assignment in workspace
-vars = ["fr"; "mea"; "st"; "swv"; "cm"];
+vars = ["session"; "cm"; "spikes"; "fr"; "datInfo"; "as"; "sr";...
+    "st"; "ripp"];
 
 if ~exist('varArray', 'var') || forceL
     [varArray, dirnames, mousepath] = getSessionVars('sortDir', false,...
-        'dirnames', [], 'mname', mname);
+        'mname', mname);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -62,7 +63,6 @@ end
 
 if forceA
     for isession = 1 : nsessions
-
         
         % file
         basepath = char(fullfile(mousepath, dirnames{isession}));
@@ -78,12 +78,47 @@ if forceA
         fs = session.extracellular.sr;
         spkgrp = session.extracellular.spikeGroups.channels;
         
+        % datInfo
+        infoFiles = dir('*datInfo*');
+        load(infoFiles(2).name, 'datInfo');
+        datInfo2 = datInfo;
+        load(infoFiles(3).name, 'datInfo');
+        datInfo3 = datInfo;
+        load(infoFiles(1).name, 'datInfo');
+        
+        csum = cumsum(datInfo.nsamps) / 60 / 60 / 20000;
+        
+        datInfo.nsamps = [datInfo.nsamps, datInfo2.nsamps];
+        
+        datInfo.origFile = [datInfo.origFile, datInfo2.origFile]
+        
+        datInfo.orig_files = [datInfo.orig_files, datInfo2.orig_files datInfo3.orig_files]
+        datInfo.orig_info = [datInfo.orig_info, datInfo2.orig_info datInfo3.orig_info]
+        
+        datInfo.origFile{length(csum) + 1} = datInfo3.origFile;
+        save(fullfile(basepath, [basename, '.datInfo.mat']), 'datInfo')
+        
+        for ifile = 1 : length(datInfo.orig_info)
+            datInfo.nsamps(ifile) = datInfo.orig_info{ifile}.bytes / 2 / 21
+        end
+                      
         % fr
-        winBL = [0 30 * 60];
+        load([basename, '.spktimes.mat'])
+        for igrp = 1 : length(spkgrp)
+            spktimes{igrp} = spktimes{igrp} / fs;
+        end
+        winBL = floor([0 5 * 60]);
+        sr = firingRate(spktimes, 'basepath', basepath,...
+            'graphics', true, 'binsize', 60, 'saveVar', 'sr', 'smet', 'none',...
+            'winBL', winBL);
+        
+        % plot fr vs. time
+        plot_FRtime_session('basepath', pwd, 'grp', [1 : 4, 7, 8],...
+            'frBoundries', [0.1 Inf; 0.1 Inf], 'muFlag', false)
+        
         fr = firingRate(spikes.times, 'basepath', basepath,...
-            'graphics', true, 'saveFig', false,...
-            'binsize', 60, 'saveVar', true, 'smet', 'GK', 'winBL',...
-            winBL, 'winCalc', [0, Inf]);
+            'graphics', true, 'binsize', 60, 'saveVar', true,...
+            'smet', 'GK', 'winBL', winBL, 'winCalc', [0, Inf]);
 
 
     end
@@ -114,7 +149,6 @@ stateidx = [1, 4, 5];
 ts = 1;                         % state labels epoch length
 lightHr = '080000';             % when does light cycle start [HHMM]
 
-[cfg_colors, cfg_names, ~] = as_loadConfig([]);
 assignVars(varArray, sessionIdx(end))
 
 % find date time of start and end of experiment and round it according to
@@ -258,7 +292,6 @@ if figFlag
     clear stateDur
     for isession = sessionIdx
         assignVars(varArray, isession)
-        [cfg_colors, cfg_names, ~] = as_loadConfig([]);
         for istate = stateidx 
             stateDur(isession, istate) = sum(ss.epLen{istate}) /...
                 length(ss.labels) * 100;
