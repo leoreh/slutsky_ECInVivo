@@ -59,8 +59,8 @@ cat_OE_tstamps('orig_paths', orig_paths, 'new_path', exPathNew,...
 % pre-process dat (remove channels, reorder, etc.)
 clip = [];
 clear orig_paths
-orig_paths{1} = 'G:\Data\lh93\lh93_210811_102035';
-orig_paths{2} = 'G:\Data\lh93\lh93_210811_220024';
+orig_paths{1} = 'G:\Data\lh93\12hr\lh93_210813_110609';
+orig_paths{2} = 'G:\Data\lh93\12hr\lh93_210813_220003';
 datInfo = preprocDat('orig_paths', orig_paths, 'mapch', [1 : nchans],...
     'rmvch', [], 'nchans', nchans, 'saveVar', true,...
     'chunksize', 1e7, 'precision', 'int16', 'clip', clip);

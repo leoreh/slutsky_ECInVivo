@@ -72,7 +72,7 @@ if exist(sessionFile, 'file')
 end
 
 % number of spikes to snip per cluster
-spks2snip = 20000;
+spks2snip = 10000;
 
 % waveform params
 if ~isempty(wv)
@@ -125,7 +125,7 @@ if isempty(wv)
         [wv_all, ~] = snipFromBinary('stamps', spktimes, 'fname', datname,...
             'win', win, 'nchans', nchans, 'ch', ch, 'align_peak', 'min',...
             'precision', 'int16', 'rmv_trend', 6, 'saveVar', false,...
-            'l2norm', true);
+            'l2norm', false);
         wv_all = cellfun(@squeeze, wv_all, 'UniformOutput', false);
         
         if saveVar
