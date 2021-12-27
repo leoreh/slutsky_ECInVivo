@@ -12,7 +12,7 @@ function [r, binedges, bincents, binidx] = times2rate(spktimes, varargin)
 %               timestamps of spikes. for example {spikes.times{1:4}}. can
 %               also be a single vector
 % optional:
-%   winCalc     time window for calculation {[1 Inf]}. 
+%   winCalc     time window for calculation {[0 Inf]}. 
 %               last elemet should be recording duration (e.g.
 %               lfp.duration). if Inf will be the last spike. can also be
 %               an n x 2 matrix.
@@ -87,8 +87,6 @@ for i = 1 : nwin
     else
         binedges{i} = winCalc(i, 1) : binsize : winCalc(i, 2);
         binedges{i}(end) = winCalc(i, 2);       % correct last bin
-%         binmod = mod(winCalc(i, 2), binsize);         
-%         binedges{i}(end) = binedges{i}(end) + binmod - 1;
     end
  
     % count spikes

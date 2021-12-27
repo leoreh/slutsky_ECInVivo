@@ -40,8 +40,10 @@ mizuseki = []; lvr = []; asym = []; hpk = []; rs = []; fs = [];
 
 for isession = 1 : nsessions
     
-    rs = [rs, selectUnits([], cm, fr, 0, [], [], 'pyr')'];
-    fs = [fs, selectUnits([], cm, fr, 0, [], [], 'int')'];
+    rs = [rs, selectUnits([], varArray(isession).cm,...
+        varArray(isession).fr, 0, [], [], 'pyr')'];
+    fs = [fs, selectUnits([], varArray(isession).cm,...
+        varArray(isession).fr, 0, [], [], 'int')'];
     mfr = [mfr, varArray(isession).fr.mfr'];
 
     asym = [asym, varArray(isession).swv.asym];

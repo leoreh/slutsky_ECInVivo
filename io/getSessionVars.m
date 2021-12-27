@@ -77,18 +77,11 @@ if isempty(xlsname)
     xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
 end
 
-% deafuly variables to load. note this is congruent with assignvarsFile.m
+% deafuly variables to load
 if isempty(varsFile)
-    varsFile = ["session";...
-        "cell_metrics.cellinfo";...
-        "spikes.cellinfo";...
-        "fr";...
-        "datInfo";...
-        "AccuSleep_states";...
-        "sr";...
-        "st_metrics";...
-        "swv_metrics";...
-        "ripp"];
+    varsFile = ["session"; "cell_metrics.cellinfo"; "spikes.cellinfo";...
+        "fr"; "datInfo"; "AccuSleep_states"; "sr"; "st_metrics";
+        "swv_metrics"; "ripp"];
 end
 
 if isempty(varsName)
@@ -165,27 +158,31 @@ for idir = 1 : ndirs
         continue
     end
     cd(filepath)
+    [~, basename] = fileparts(filepath);
     
     for ifile = 1 : length(varsFile)
         filename = dir(['*', varsFile{ifile}, '*']);
         if length(filename) > 1
             % if there are two files that share the same name, default is
             % to load the first. specific corrections can be applied below
-            if contains(varsFile{ifile}, 'datInfo')
+            if contains(varsFile{ifile}, 'datInfo')             % tdt has a datInfo for each stream
                 fileidx = contains({filename.name}, 'EMG');
                 filename = filename(~fileidx).name;
+            elseif any(~contains({filename.name}, basename))     % mea raw data names is a mess
+                filename = filename(contains({filename.name}, basename)).name;
             else
                 filename = filename(1).name;
             end
         elseif isempty(filename)         
             warning('no %s file in %s, skipping', varsFile{ifile}, filepath)
+            varArray(idir).(varsName{ifile}) = [];
             continue
         else
             filename = filename(1).name;
         end
         
-        % correct special cases where var name does not fit file name of
-        % new field name
+        % correct special cases where var name does not fit file name or
+        % field name
         temp = load(filename);
         if strcmp(varsName{ifile}, 'cm')
                 varArray(idir).(varsName{ifile}) = temp.cell_metrics;

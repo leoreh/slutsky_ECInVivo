@@ -102,7 +102,7 @@ if exist(sessionFile, 'file')
     load(sessionFile)
 end
 if isempty(fs)
-    if exist(session, 'var')
+    if exist('session', 'var')
         fs = session.extracellular.sr;
     else
         fs = 20000;

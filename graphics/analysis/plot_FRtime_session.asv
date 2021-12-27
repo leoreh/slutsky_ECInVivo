@@ -42,15 +42,14 @@ suFlag = 1;                     % plot only su or all units
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % load data
+% deafuly variables to load. note this is congruent with assignvarsFile.m
 varsFile = ["session"; "cell_metrics.cellinfo"; "spikes.cellinfo";...
     "fr"; "datInfo"; "sr";];
 varsName = ["session"; "cm"; "spikes"; "fr"; "datInfo"; "sr"];
-v = getSessionVars('basepaths', {basepath}, 'varsFile', varsFile,...
+varArray = getSessionVars('basepaths', {basepath}, 'varsFile', varsFile,...
     'varsName', varsName);
 
-% distribute vars
-session = v.session; cm = v.cm; spikes = v.spikes; fr = v.fr;
-datInfo = v.datInfo; sr = v.sr;
+assignVars(varArray, 1)
 
 fs = session.extracellular.sr;
 spkgrp = session.extracellular.spikeGroups.channels;
@@ -59,7 +58,7 @@ if isempty(grp)
 end
 
 % x axis in hr
-ts = v.sr.info.binsize;
+ts = sr.info.binsize;
 xidx = [1 : length(sr.strd)] / ts;
 
 % idx of block tranisition (dashed lines)

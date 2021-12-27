@@ -79,7 +79,7 @@ forceLoad       = p.Results.forceLoad;
 % preparations
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-fs = 1250;          % requested sampling frequency
+fs = 128;          % requested sampling frequency
 
 % file names
 cd(basepath)

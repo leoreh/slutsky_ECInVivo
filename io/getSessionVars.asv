@@ -1,7 +1,7 @@
-function [varArray, dirnames, mousepath] = getSessionVars(varargin)
+function [varArray, basepaths] = getSessionVars(varargin)
 
 % loads a list of specific variables from multiple directories and
-% organizes them in an array of structs. the directories (basepaths) can be
+% organizes them in struct. the directories (basepaths) can be
 % specified directly as input or recieved from an xls file with certain
 % conditions. assumes all variables in each dir are named
 % "dirname.varname.mat".
@@ -29,9 +29,9 @@ function [varArray, dirnames, mousepath] = getSessionVars(varargin)
 %   varArray = getSessionVars('basepaths', basepaths,...
 %       'varsFile', ["cell_metrics"; "spktimesMetrics"],...
 %       'varsName', ["cm"; "st"])
-%   The output varArray will have two cells, each a struct with fields
-%   .cm and .st that contain the variables loaded from cell_metrics and
-%   spktimesMetrics, respectively.
+%   The output varArray is a struct of length 2 (one for each basepath)
+%   with fields .cm and .st that contain the variables loaded from
+%   cell_metrics and spktimesMetrics, respectively.
 % 
 % DEPENDENCIES
 %   none
@@ -64,7 +64,7 @@ mname           = p.Results.mname;
 dirCol          = p.Results.dirCol;
 pathCol         = p.Results.pathCol;
 varsFile        = p.Results.varsFile;
-varsName        = p.Results.varsFile;
+varsName        = p.Results.varsName;
 pcond           = p.Results.pcond;
 ncond           = p.Results.ncond;
 
@@ -77,22 +77,15 @@ if isempty(xlsname)
     xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
 end
 
-% deafuly variables to load. note this is congruent with assignvarsFile.m
+% deafuly variables to load
 if isempty(varsFile)
-    varsFile = ["session";...
-        "cell_metrics.cellinfo";...
-        "spikes.cellinfo";...
-        "fr";...
-        "datInfo";...
-        "AccuSleep_states";...
-        "sr";...
-        "st_metrics";...
-        "swv_metrics";...
-        "ripp"];
+    varsFile = ["session"; "cell_metrics.cellinfo"; "spikes.cellinfo";...
+        "fr"; "datInfo"; "AccuSleep_states"; "sr"; "st_metrics";
+        "swv_metrics"; "ripp"];
 end
 
 if isempty(varsName)
-    varsName = ["session"; "cm"; "spikes"; "fr"; "datInfo"; "as";...
+    varsName = ["session"; "cm"; "spikes"; "fr"; "datInfo"; "ss";...
         "sr"; "st"; "swv"; "ripp"];
 end
 
@@ -165,32 +158,40 @@ for idir = 1 : ndirs
         continue
     end
     cd(filepath)
+    [~, basename] = fileparts(filepath);
     
     for ifile = 1 : length(varsFile)
         filename = dir(['*', varsFile{ifile}, '*']);
         if length(filename) > 1
             % if there are two files that share the same name, default is
             % to load the first. specific corrections can be applied below
-            if contains(varsFile{ifile}, 'datInfo')
+            if contains(varsFile{ifile}, 'datInfo')             % tdt has a datInfo for each stream
                 fileidx = contains({filename.name}, 'EMG');
                 filename = filename(~fileidx).name;
+            elseif any(~contains({filename.name}, basename))     % mea raw data names is a mess
+                filename = filename(contains({filename.name}, basename)).name;
             else
                 filename = filename(1).name;
             end
         elseif isempty(filename)         
             warning('no %s file in %s, skipping', varsFile{ifile}, filepath)
+            varArray(idir).(varsName{ifile}) = [];
             continue
         else
             filename = filename(1).name;
         end
         
-        % correct special cases where var name does not fit file name of
-        % new field name
+        % correct special cases where var name does not fit file name or
+        % field name
         temp = load(filename);
-        if strcmp(
-        varArray(idir).(varsName{ifile}) = temp.(varsFile{ifile});
+        if strcmp(varsName{ifile}, 'cm')
+                varArray(idir).(varsName{ifile}) = temp.cell_metrics;
+        elseif strcmp(varsName{ifile}, 'sr')
+            varArray(idir).(varsName{ifile}) = temp.fr;
+        else
+            varArray(idir).(varsName{ifile}) = temp.(varsName{ifile});
+        end
     end
 end
-
 
 end

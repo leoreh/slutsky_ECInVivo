@@ -219,7 +219,8 @@ if graphics
     [ss.netPrecision, ss.netRecall] = as_cm(labels1, labels2, netScores);
 
     % stateSeparation
-    as_stateSeparation(EEG, EMG, labels, 'stateEpochs', ss.stateEpochs)
+    as_stateSeparation(EEG, EMG, labels, 'stateEpochs', ss.stateEpochs,...
+        'fs', fs)
 end
 
 if inspectLabels

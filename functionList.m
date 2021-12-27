@@ -59,10 +59,10 @@ cat_OE_tstamps('orig_paths', orig_paths, 'new_path', exPathNew,...
 % pre-process dat (remove channels, reorder, etc.)
 clip = [];
 clear orig_paths
-orig_paths{1} = 'K:\Data\lh99\2021-12-25_08-45-48\Record Node 107\experiment1\recording1';
-orig_paths{2} = 'K:\Data\lh99\2021-12-25_08-45-48\Record Node 107\experiment2\recording1';
-datInfo = preprocDat('orig_paths', orig_paths, 'mapch', mapch,...
-    'rmvch', rmvch, 'nchans', length(mapch), 'saveVar', true,...
+orig_paths{1} = 'G:\Data\lh93\lh93_210811_102035';
+orig_paths{2} = 'G:\Data\lh93\lh93_210811_220024';
+datInfo = preprocDat('orig_paths', orig_paths, 'mapch', [1 : nchans],...
+    'rmvch', [], 'nchans', nchans, 'saveVar', true,...
     'chunksize', 1e7, 'precision', 'int16', 'clip', clip);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -111,20 +111,20 @@ ripp = getRipples('basepath', basepath, 'rippCh', [23], 'emgCh', [33],...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % prep signal
-[EMG, EEG, sigInfo] = as_prepSig([basename, '.lfp'], [basename, '.lfp'],...
-    'eegCh', [5 : 9], 'emgCh', [33], 'saveVar', true, 'emgNchans', [],...
-    'eegNchans', 37, 'inspectSig', false, 'forceLoad', true,...
+[EMG, EEG, sigInfo] = as_prepSig([basename, '.lfp'], acc.mag,...
+    'eegCh', [5 : 9], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
+    'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
     'eegFs', 1250, 'emgFs', 1250, 'emgCf', [10 200]);
 
 % manually create labels
 labelsmanfile = [basename, '.AccuSleep_labelsMan.mat'];
-AccuSleep_viewer(EEG, EMG,  1250, 1, [], labelsmanfile)
+AccuSleep_viewer(EEG, EMG,  128, 1, labels, labelsmanfile)
 
 % classify with a network
-netfile = 'D:\Code\slutskycode\extracellular in vivo\lfp\SleepStates\AccuSleep\trainedNetworks\net_211107_141044.mat';
+netfile = 'D:\Code\slutsky_ECInVivo\lfp\SleepStates\AccuSleep\trainedNetworks\net_210826_224240.mat';
 ss = as_wrapper(EEG, EMG, sigInfo, 'basepath', pwd, 'calfile', [],...
     'viaGui', false, 'forceCalibrate', true, 'inspectLabels', false,...
-    'saveVar', true, 'forceAnalyze', true, 'fs', 1250, 'netfile', netfile,...
+    'saveVar', true, 'forceAnalyze', true, 'fs', 128, 'netfile', netfile,...
     'graphics', true);
 
 % inspect separation after classifying / manual scoring
@@ -199,7 +199,7 @@ cell_metrics = ProcessCellMetrics('session', session,...
 
 % firing rate
 load([basename, '.spikes.cellinfo.mat'])
-winBL = [0 30 * 60];
+winBL = [0 120 * 60];
 fr = firingRate(spikes.times, 'basepath', basepath, 'graphics', true,...
     'binsize', 60, 'saveVar', true, 'smet', 'GK', 'winBL',...
     winBL, 'winCalc', [0, Inf]);
@@ -260,37 +260,11 @@ chunks = n2chunks('n', nsamps, 'chunksize', chunksize, 'clip', clip);
 % select specific units based on firing rate, cell class, etc.
 units = selectUnits(spikes, cm, fr, suFlag, grp, frBoundries, unitClass);
 
-% loads a list of variabels from multiple sessions and organized them in a
+% loads a list of variabels from multiple sessions and organizes them in a
 % struct
 varArray = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
     'varsName', varsName);
 
 % set matlab graphics to custom or factory defaults
 setMatlabGraphics(false)
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% analysis across sessions
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-fEPSP_sessions
-fr_sessions
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% fEPSP signals
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% see slutsky_fepsp repository 
-
-% fEPSP from Dat
-intens = [40 80 100 150 200];
-fepsp = fEPSPfromDat('basepath', filepath, 'fname', '', 'nchans', nchans,...
-    'spkgrp', spkgrp, 'intens', intens, 'concat', false, 'saveVar', false,...
-    'force', true, 'extension', 'dat', 'recSystem', 'oe',...
-    'protocol', 'io', 'graphics', true);
-
-% fEPSP from WCP
-basepath = 'C:\Users\heiml\Downloads\fEPSP\fEPSP\lh60';
-intens = [30 : 10 : 60];
-sfiles = [];
-fepsp = fEPSPfromWCP('basepath', basepath, 'sfiles', [],...
-    'sufx', 'io1', 'force', true, 'protocol', 'io',...
-    'intens', intens, 'inspect', true, 'fs', 20000);
 

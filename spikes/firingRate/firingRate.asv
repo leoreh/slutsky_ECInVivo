@@ -112,7 +112,7 @@ if exist(asFile)
         end
     end
     
-    % gain factor compared to state 1 (AWAKE)
+    % gain factor compared to wake (state 1)
     for istate = 1 : nstates
         mat1 = fr.states.fr{1};
         mat2 = fr.states.fr{istate};
@@ -120,16 +120,17 @@ if exist(asFile)
             mean(mat1, 2, 'omitnan')) ./ max([mat1, mat2], [], 2) * 100;
     end
     
-    % normalized ratio (mizuseki, cell rep., 2008). organized as a 3d mat
-    % of all pairs.
+    % normalized ratio (mizuseki, cell rep., 2008). organized as a 3d mat. 
     for istate = 1 : nstates
         for istate2 = 1 : nstates
         mat1 = mean(fr.states.fr{istate}, 2, 'omitnan');
         mat2 = mean(fr.states.fr{istate2}, 2, 'omitnan');
         fr.states.ratio(istate, istate2, :) =...
-            (mat1 - mat2) ./ (mat1 + mat2);
+            (mat1 - mat2) ./ (mat1 + mat2)
         end
-    end    
+    end
+    
+    
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
