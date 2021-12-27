@@ -4,7 +4,7 @@
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = 'lh98';
+mname = 'lh93';
 forceL = true;
 forceA = false;
 
@@ -24,8 +24,7 @@ vars = ["session"; "cm"; "spikes"; "fr"; "datInfo"; "as"; "sr";...
     "st"; "ripp"];
 
 if ~exist('varArray', 'var') || forceL
-    [varArray, dirnames, mousepath] = getSessionVars('sortDir', false,...
-        'mname', mname);
+    [varArray, dirnames, mousepath] = getSessionVars('mname', mname);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

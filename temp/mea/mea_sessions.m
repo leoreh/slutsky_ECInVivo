@@ -4,16 +4,6 @@
 % stuff
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% paths used to compare CE results
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepaths{1} = 'G:\RA\hDLX_Gq_WT2\200820_bslDay1';
-basepaths{2} = 'G:\RA\hDLX_Gq_Tg\210820_bslDay2Raw2';
-basepaths{3} = 'D:\Data\lh86\lh86_210301_072600';
-basepaths{4} = 'G:\lh81\lh81_210207_045300';
-cell_metrics = CellExplorer('basepaths', basepaths);
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -24,6 +14,9 @@ d = d([d(:).isdir]);
 d = d(~ismember({d(:).name},{'.','..'}));
 basenames = {d.name};
 nsessions = length(basenames);
+for isession = 1 : nsessions
+    basepaths{isession} = fullfile(masterpath, basenames{isession});
+end
 
 % analyze all sessions
 for isession = 1 : nsessions
@@ -32,16 +25,10 @@ for isession = 1 : nsessions
 end
 
 % load vars from each session
-varsFile = ["fr";...
-    "mea";...
-    "st_metrics";...
-    "swv_metrics";...
-    "cell_metrics"];
-varArray = getSessionVars('dirnames', basenames, 'mousepath', masterpath,...
-    'sortDir', false, 'vars', varsFile);
-
-% name of vars for assignment in workspace
-vars = ["fr"; "mea"; "st"; "swv"; "cm"];
+varsFile = ["fr"; "mea"; "st_metrics"; "swv_metrics"; "cell_metrics"];
+varsName = ["fr"; "mea"; "st"; "swv"; "cm"];
+varArray = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
+    'varsName', varsName);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % concat data
@@ -52,22 +39,21 @@ tp = []; spkw = []; royer = []; lidor = []; mfr =[]; tau_rise = [];
 mizuseki = []; lvr = []; asym = []; hpk = []; rs = []; fs = [];
 
 for isession = 1 : nsessions
-    assignVars(varArray, isession, vars)
     
     rs = [rs, selectUnits([], cm, fr, 0, [], [], 'pyr')'];
     fs = [fs, selectUnits([], cm, fr, 0, [], [], 'int')'];
-    mfr = [mfr, fr.mfr'];
+    mfr = [mfr, varArray(isession).fr.mfr'];
 
-    asym = [asym, swv.asym];
-    hpk = [hpk, swv.hpk];
-    tp = [tp, swv.tp];
-    spkw = [spkw, swv.spkw];
+    asym = [asym, varArray(isession).swv.asym];
+    hpk = [hpk, varArray(isession).swv.hpk];
+    tp = [tp, varArray(isession).swv.tp];
+    spkw = [spkw, varArray(isession).swv.spkw];
     
-    lvr = [lvr, st.lvr];
-    royer = [royer, st.royer];
-    lidor = [lidor, st.lidor];
-    mizuseki = [mizuseki, st.mizuseki];
-    tau_rise = [tau_rise, st.tau_rise];
+    lvr = [lvr, varArray(isession).st.lvr];
+    royer = [royer, varArray(isession).st.royer];
+    lidor = [lidor, varArray(isession).st.lidor];
+    mizuseki = [mizuseki, varArray(isession).st.mizuseki];
+    tau_rise = [tau_rise, varArray(isession).st.tau_rise];
     
 end
 

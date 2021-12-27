@@ -23,7 +23,7 @@ spkgrp = session.extracellular.spikeGroups.channels;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preprocessing of raw files
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'J:\Data\lh99\2021-12-22_21-06-23';
+basepath = 'K:\Data\lh99\2021-12-25_08-45-48';
 mapch = [26,27,28,30,2,3,31,29,4,5,6,7,8,9,10,11,12,13,14,15,1,16,17,...
     32,18,19,20,21,22,23,24,25,33,34,35,36,37];
 rmvch = [];
@@ -39,11 +39,11 @@ datInfo = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
     'chunksize', chunksize, 'mapch', mapch, 'rmvch', rmvch, 'clip', clip);
 
 % open ephys to dat
-exp = [1];
+exp = [];
 rec = cell(max(exp), 1);
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
     'rmvch', rmvch, 'mapch', mapch,...
-    'nchans', nchans, 'fsIn', 20000);
+    'nchans', length(mapch), 'fsIn', 20000);
 
 % digital input from OE
 clear recPath
@@ -54,14 +54,13 @@ getDinOE('basepath', orig_paths, 'newpath', exPathNew,...
 
 % concatenate timestamps.npy and make sure dat files are not zero padded
 cat_OE_tstamps('orig_paths', orig_paths, 'new_path', exPathNew,...
-    'nchans', length(mapch), 'saveVar', true);
+    'nchans', length(mapch));
 
 % pre-process dat (remove channels, reorder, etc.)
 clip = [];
 clear orig_paths
-orig_paths{1} = 'G:\Data\lh98\2021-12-24_08-45-28\Record Node 101\experiment1\recording1';
-orig_paths{2} = 'G:\Data\lh98\2021-12-24_08-45-28\Record Node 101\experiment2\recording1';
-orig_paths{3} = 'G:\Data\lh98\2021-12-24_21-01-37\Record Node 101\experiment1\recording1';
+orig_paths{1} = 'K:\Data\lh99\2021-12-25_08-45-48\Record Node 107\experiment1\recording1';
+orig_paths{2} = 'K:\Data\lh99\2021-12-25_08-45-48\Record Node 107\experiment2\recording1';
 datInfo = preprocDat('orig_paths', orig_paths, 'mapch', mapch,...
     'rmvch', rmvch, 'nchans', length(mapch), 'saveVar', true,...
     'chunksize', 1e7, 'precision', 'int16', 'clip', clip);
@@ -113,7 +112,7 @@ ripp = getRipples('basepath', basepath, 'rippCh', [23], 'emgCh', [33],...
 
 % prep signal
 [EMG, EEG, sigInfo] = as_prepSig([basename, '.lfp'], [basename, '.lfp'],...
-    'eegCh', [25 : 28], 'emgCh', [33], 'saveVar', true, 'emgNchans', [],...
+    'eegCh', [5 : 9], 'emgCh', [33], 'saveVar', true, 'emgNchans', [],...
     'eegNchans', 37, 'inspectSig', false, 'forceLoad', true,...
     'eegFs', 1250, 'emgFs', 1250, 'emgCf', [10 200]);
 
@@ -170,7 +169,7 @@ dur = [];
 t = [];
 spktimes2ns('basepath', basepath, 'fs', fs,...
     'nchans', nchans, 'spkgrp', spkgrp, 'mkClu', true,...
-    'dur', dur, 't', t, 'grps', [2 : length(spkgrp)],...
+    'dur', dur, 't', t, 'grps', [1 : length(spkgrp)],...
     'spkFile', 'temp_wh');
 
 % clip ns files
@@ -261,12 +260,10 @@ chunks = n2chunks('n', nsamps, 'chunksize', chunksize, 'clip', clip);
 % select specific units based on firing rate, cell class, etc.
 units = selectUnits(spikes, cm, fr, suFlag, grp, frBoundries, unitClass);
 
-% creates a cell array of variables
-varArray = getSessionVars('dirnames', {basename}, 'mousepath', mousepath,...
-    'sortDir', false);
-
-% assigns vars to base workspace
-assignVars(varArray, isession)
+% loads a list of variabels from multiple sessions and organized them in a
+% struct
+varArray = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
+    'varsName', varsName);
 
 % set matlab graphics to custom or factory defaults
 setMatlabGraphics(false)

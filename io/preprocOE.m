@@ -154,7 +154,7 @@ end
        
     % concatenate timestamps.npy and make sure dat files are not zero padded
     cat_OE_tstamps('orig_paths', recPath, 'new_path', exPathNew,...
-        'nchans', nchans, 'saveVar', true);
+        'nchans', nchans);
     
     % pre-process dat
     datInfo = preprocDat('orig_paths', recPath,...
@@ -168,9 +168,9 @@ end
         'saveVar', true);
     
     % create lfp file
-%     LFPfromDat('basepath', exPathNew, 'cf', 450, 'chunksize', 5e6,...
-%         'nchans', length(mapch) - length(rmvch), 'fsOut', 1250,...
-%         'fsIn', fsIn)
+    LFPfromDat('basepath', exPathNew, 'cf', 450, 'chunksize', 5e6,...
+        'nchans', length(mapch) - length(rmvch), 'fsOut', 1250,...
+        'fsIn', fsIn)
     
     % get acceleration
     if ~isempty(accCh)

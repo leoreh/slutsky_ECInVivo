@@ -13,8 +13,8 @@
 
 % -------------------------------------------------------------------------
 % single units 
-basepaths{1} = 'G:\RA\hDLX_Gq_WT2\200820_bslDay1';
-basepaths{2} = 'G:\RA\hDLX_Gq_Tg\210820_bslDay2Raw2';
+basepaths{1} = 'F:\Data\Colleagues\RA\tg4_210730_155700';
+basepaths{2} = 'F:\Data\Colleagues\RA\hDLX_Gq_WT5\040221_0655_24hr';
 basepaths{3} = 'I:\lh86\lh86_210304_070700';                % after op removal
 basepaths{4} = 'I:\lh81\lh81_210206_044300';                % saline injection
 basepaths{5} = 'K:\Data\lh99\lh99_211219_085802';           % ketamine local
@@ -32,7 +32,7 @@ d = d(~ismember({d(:).name},{'.','..'}));
 basenames = {d.name};
 nsessions = length(basenames);
 for isession = 1 : nsessions
-    basepaths{isessions} = fullfile(masterpath, basenames{isession});
+    basepaths{isession} = fullfile(masterpath, basenames{isession});
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -79,8 +79,6 @@ for isession = 1 : nsessions
         'smet', 'GK', 'winBL', winBL, 'winCalc', [0, Inf], 'forceA', forceA);
 end
 
-
-
 % -------------------------------------------------------------------------
 % mea
 for isession = 1 : nsessions
@@ -98,7 +96,7 @@ varsFile = ["fr";...
     "st_metrics";...
     "swv_metrics";...
     "cell_metrics"];
-varArray = getSessionVars('dirnames', basenames, 'mousepath', masterpath,...
+varArray = getSessionVars('dirnames', basepaths, 'mousepath', [],...
     'sortDir', false, 'vars', varsFile);
 
 % name of vars for assignment in workspace
@@ -115,15 +113,18 @@ mizuseki = []; lvr = []; asym = []; hpk = []; rs = []; fs = [];
 for isession = 1 : nsessions
     assignVars(varArray, isession, vars)
     
+    % units and mfr
     rs = [rs, selectUnits([], cm, fr, 0, [], [], 'pyr')'];
     fs = [fs, selectUnits([], cm, fr, 0, [], [], 'int')'];
     mfr = [mfr, fr.mfr'];
-
+    
+    % waveform
     asym = [asym, swv.asym];
     hpk = [hpk, swv.hpk];
     tp = [tp, swv.tp];
     spkw = [spkw, swv.spkw];
     
+    % burstiness
     lvr = [lvr, st.lvr];
     royer = [royer, st.royer];
     lidor = [lidor, st.lidor];

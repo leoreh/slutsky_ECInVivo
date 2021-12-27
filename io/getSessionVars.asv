@@ -1,7 +1,7 @@
-function [varArray, basepaths] = getSessionVars(varargin)
+function [varArray, dirnames, mousepath] = getSessionVars(varargin)
 
 % loads a list of specific variables from multiple directories and
-% organizes them in struct. the directories (basepaths) can be
+% organizes them in an array of structs. the directories (basepaths) can be
 % specified directly as input or recieved from an xls file with certain
 % conditions. assumes all variables in each dir are named
 % "dirname.varname.mat".
@@ -29,9 +29,9 @@ function [varArray, basepaths] = getSessionVars(varargin)
 %   varArray = getSessionVars('basepaths', basepaths,...
 %       'varsFile', ["cell_metrics"; "spktimesMetrics"],...
 %       'varsName', ["cm"; "st"])
-%   The output varArray is a struct of length 2 (one for each basepath)
-%   with fields .cm and .st that contain the variables loaded from
-%   cell_metrics and spktimesMetrics, respectively.
+%   The output varArray will have two cells, each a struct with fields
+%   .cm and .st that contain the variables loaded from cell_metrics and
+%   spktimesMetrics, respectively.
 % 
 % DEPENDENCIES
 %   none
@@ -64,7 +64,7 @@ mname           = p.Results.mname;
 dirCol          = p.Results.dirCol;
 pathCol         = p.Results.pathCol;
 varsFile        = p.Results.varsFile;
-varsName        = p.Results.varsName;
+varsName        = p.Results.varsFile;
 pcond           = p.Results.pcond;
 ncond           = p.Results.ncond;
 
@@ -92,7 +92,7 @@ if isempty(varsFile)
 end
 
 if isempty(varsName)
-    varsName = ["session"; "cm"; "spikes"; "fr"; "datInfo"; "ss";...
+    varsName = ["session"; "cm"; "spikes"; "fr"; "datInfo"; "as";...
         "sr"; "st"; "swv"; "ripp"];
 end
 
@@ -187,14 +187,10 @@ for idir = 1 : ndirs
         % correct special cases where var name does not fit file name of
         % new field name
         temp = load(filename);
-        if strcmp(varsName{ifile}, 'cm')
-                varArray(idir).(varsName{ifile}) = temp.cell_metrics;
-        elseif strcmp(varsName{ifile}, 'sr')
-            varArray(idir).(varsName{ifile}) = temp.fr;
-        else
-            varArray(idir).(varsName{ifile}) = temp.(varsName{ifile});
-        end
+        if strcmp(
+        varArray(idir).(varsName{ifile}) = temp.(varsFile{ifile});
     end
 end
+
 
 end
