@@ -9,6 +9,7 @@ function plot_FRtime_session(varargin)
 %   saveFig         logical {true}
 %   grp             numeric. spike groups to plot
 %   frBoundries     2 x 2 mat. include only units with mfr within the
+%   dataType        char. plot 'strd' or 'norm'.
 %                   boundries specified by each row. 1st row RS 2nd row FS
 %   muFlag          logical. plot multi unit (sr) activity even if fr
 %                   exists {false}
@@ -17,6 +18,7 @@ p = inputParser;
 addOptional(p, 'basepath', pwd);
 addOptional(p, 'saveFig', true, @islogical);
 addOptional(p, 'grp', [], @isnumeric);          
+addOptional(p, 'dataType', 'strd', @ischar);          
 addOptional(p, 'frBoundries', [0.2 Inf; 0.2 Inf], @isnumeric);          
 addOptional(p, 'muFlag', false, @islogical);
 
@@ -24,6 +26,7 @@ parse(p, varargin{:})
 basepath = p.Results.basepath;
 saveFig = p.Results.saveFig;
 grp = p.Results.grp;
+dataType = p.Results.dataType;
 frBoundries = p.Results.frBoundries;
 muFlag = p.Results.muFlag;
 
@@ -33,7 +36,6 @@ muFlag = p.Results.muFlag;
 
 [mousepath, basename] = fileparts(basepath);
 cd(basepath)
-guessDateTime(basename)
 
 suFlag = 1;                     % plot only su or all units
 
@@ -42,7 +44,7 @@ suFlag = 1;                     % plot only su or all units
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % load data
-varsFile = ["session"; "cell_metrics.cellinfo"; "spikes.cellinfo";...
+varsFile = ["session"; "cell_metrics"; "spikes";...
     "fr"; "datInfo"; "sr";];
 varsName = ["session"; "cm"; "spikes"; "fr"; "datInfo"; "sr"];
 v = getSessionVars('basepaths', {basepath}, 'varsFile', varsFile,...
@@ -52,15 +54,24 @@ v = getSessionVars('basepaths', {basepath}, 'varsFile', varsFile,...
 session = v.session; cm = v.cm; spikes = v.spikes; fr = v.fr;
 datInfo = v.datInfo; sr = v.sr;
 
-fs = session.extracellular.sr;
-spkgrp = session.extracellular.spikeGroups.channels;
+if ~isempty(session)
+    fs = session.extracellular.sr;
+end
 if isempty(grp)
-    grp = 1 : length(spkgrp);
+    if ~isempty(session)
+        spkgrp = session.extracellular.spikeGroups.channels;
+        grp = 1 : length(spkgrp);
+    end
 end
 
 % x axis in hr
-ts = v.sr.info.binsize;
-xidx = [1 : length(sr.strd)] / ts;
+if isempty(fr)
+    ts = sr.info.binsize;
+    xidx = [1 : length(sr.strd)] / ts;
+else
+    ts = fr.info.binsize;
+    xidx = [1 : length(fr.strd)] / ts;
+end
 
 % idx of block tranisition (dashed lines)
 if ~isempty(datInfo) && isfield(datInfo, 'nsamps')
@@ -71,11 +82,7 @@ else
 end
 
 % units
-if ~isempty(fr)
-    if length(fr.strd) ~= length(sr.strd)
-        warning('check length of mu and su firing rate')
-    end
-    
+if ~isempty(fr)    
     clear units
     units(1, :) = selectUnits(spikes, cm, fr, suFlag, grp, frBoundries, 'pyr');
     units(2, :) = selectUnits(spikes, cm, fr, suFlag, grp, frBoundries, 'int');
@@ -91,7 +98,7 @@ fh = figure;
 title(basename)
 
 if isempty(fr) | muFlag
-    yLimit = ceil([0 max(max(sr.strd(grp, :)))]);
+    yLimit = ceil([0 max(max(sr.(dataType)(grp, :)))]);
     hold on
     plot(xidx, sr.strd(grp, :)', 'LineWidth', 1)
     plot([tidx tidx], yLimit, '--k', 'LineWidth', 1)
@@ -110,7 +117,7 @@ else
     title(basename)
     hold on
     % rs
-    ph = plot(xidx, fr.strd(units(1, :), :), 'b', 'LineWidth', 1);
+    ph = plot(xidx, fr.(dataType)(units(1, :), :), 'b', 'LineWidth', 1);
     alphaIdx = linspace(1, 0.2, length(ph));
     clrIdx = linspace(0.2, 0.6, length(ph));
     [~, mfr_order] = sort(fr.mfr(units(1, :)));
@@ -130,7 +137,7 @@ else
     % fs
     sb2 = subplot(3, 1, 2);
     hold on
-    ph = plot(xidx, fr.strd(units(2, :), :), 'r', 'LineWidth', 1);
+    ph = plot(xidx, fr.(dataType)(units(2, :), :), 'r', 'LineWidth', 1);
     alphaIdx = linspace(1, 0.2, length(ph));
     clrIdx = linspace(0.2, 0.6, length(ph));
     [~, mfr_order] = sort(fr.mfr(units(2, :)));
@@ -152,8 +159,8 @@ else
     sb3 = subplot(3, 1, 3);
     yLimit = [0 ceil(max(mean(fr.strd(units(2, :), :), 'omitnan')))];
     hold on
-    plot(xidx, mean(fr.strd(units(1, :), :), 'omitnan'), 'b', 'LineWidth', 2)
-    plot(xidx, mean(fr.strd(units(2, :), :), 'omitnan'), 'r', 'LineWidth', 2)
+    plot(xidx, mean(fr.(dataType)(units(1, :), :), 'omitnan'), 'b', 'LineWidth', 2)
+    plot(xidx, mean(fr.(dataType)(units(2, :), :), 'omitnan'), 'r', 'LineWidth', 2)
     plot([tidx tidx], yLimit, '--k')
     axis tight
     xlabel('Time [h]')

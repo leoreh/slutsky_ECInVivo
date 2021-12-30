@@ -11,6 +11,7 @@ function mea_analyze(varargin)
 %               calculations [sec]. {[0 Inf]}.
 %   saveVar     logical. save variables {true}.
 %   graphics    logical. plot graphics or not {true}. 
+%   forceA      logical. reanalyze even if struct file exists
 %
 % DEPENDENCIES
 %
@@ -30,6 +31,7 @@ addOptional(p, 'basepath', pwd, @ischar);
 addOptional(p, 'winBL', [0 Inf], validate_win);
 addOptional(p, 'saveVar', true, @islogical);
 addOptional(p, 'graphics', true, @islogical);
+addOptional(p, 'forceA', false, @islogical);
 
 parse(p, varargin{:})
 mea         = p.Results.mea;
@@ -37,6 +39,7 @@ basepath    = p.Results.basepath;
 winBL       = p.Results.winBL;
 saveVar     = p.Results.saveVar;
 graphics    = p.Results.graphics;
+forceA      = p.Results.forceA;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % calc
@@ -54,17 +57,17 @@ fs = mea.info.fs;
 
 % spike timing metrics
 st = spktimesMetrics('basepath', basepath, 'spktimes', mea.spktimes,...
-    'winCalc', [], 'saveVar', saveVar, 'fs', fs);
+    'winCalc', [], 'saveVar', saveVar, 'fs', fs, 'forceA', false);
 
 % spike waveform metrics
 swv = spkwvMetrics('wv', mea.wv, 'basepath', basepath, 'fs', fs,...
-    'saveVar', saveVar);
+    'saveVar', saveVar, 'forceA', false);
 
 % firing rate
 binsize = 60;
 fr = firingRate(mea.spktimes, 'basepath', basepath,...
     'graphics', false, 'binsize', binsize, 'saveVar', saveVar,...
-    'smet', 'GK', 'winBL', winBL, 'winCalc', [0, Inf]);
+    'smet', 'GK', 'winBL', winBL, 'winCalc', [0, Inf], 'forceA', forceA);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % classify
@@ -76,7 +79,7 @@ cm.putativeCellType = repmat({'Pyramidal Cell'}, 1, nunits);
 cm.putativeCellType(swv.tp < 0.425) = {'Narrow Interneuron'};
 cm.putativeCellType(st.tau_rise > 6 & swv.tp < 0.425) = {'Wide Interneuron'};
 cell_metrics = cm;
-save(fullfile(basepath, [basename, '.cell_metrics.mat']), 'cell_metrics')
+save(fullfile(basepath, [basename, '.cell_metrics.cellinfo.mat']), 'cell_metrics')
 
 % select units based on criterion 
 units(1, :) = selectUnits([], cm, fr, 0, [], [], 'pyr');
@@ -127,7 +130,7 @@ if graphics
     
     % ---------------------------------------------------------------------
     % figure per unit
-    sunits = randperm(nunits, 10);
+    sunits = randperm(nunits, 20);
     for iunit = sunits
         
         fh = figure('Visible', 'off');

@@ -103,6 +103,11 @@ if exist(asFile)
 
     % fit stateEpochs to winCalc and count spikes in states
     for istate = 1 : nstates
+        if isempty(ss.stateEpochs{istate})
+            fr.states.fr{istate} = zeros(nunits, 1);
+            fr.states.tstamps{istate} = 0;
+            continue
+        end
         epochIdx = ss.stateEpochs{istate}(:, 2) < winCalc(2) &...
             ss.stateEpochs{istate}(:, 1) > winCalc(1);
         stateEpochs = ss.stateEpochs{istate}(epochIdx, :);

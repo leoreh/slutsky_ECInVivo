@@ -4,34 +4,28 @@
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = 'lh93';
+mname = 'lh99';
 forceL = true;
 forceA = false;
 
+pcond = ["tempflag"];
+ncond = [""];
+
 % load vars from each session
-varsFile = ["session";...
-    "cell_metrics.cellinfo";...
-    "spikes.cellinfo";...
-    "fr";...
-    "datInfo";...
-    "AccuSleep_states";...
-    "sr";...
-    "st_metrics";...
-    "ripp"];
-
-% name of vars for assignment in workspace
-vars = ["session"; "cm"; "spikes"; "fr"; "datInfo"; "as"; "sr";...
-    "st"; "ripp"];
-
+varsFile = ["fr"; "sr"; "spikes"; "st_metrics"; "swv_metrics";...
+    "cell_metrics"; "AccuSleep_states"; "ripp"; "datInfo"; "session"];
+varsName = ["fr"; "sr"; "spikes"; "st"; "swv"; "cm"; "ss"; "ripp";...
+    "datInfo"; "session"];
 if ~exist('varArray', 'var') || forceL
-    [varArray, dirnames, mousepath] = getSessionVars('mname', mname);
+    [v, basepaths] = getSessionVars('mname', mname, 'varsFile', varsFile,...
+        'varsName', varsName, 'pcond', pcond, 'ncond', ncond);
 end
+nsessions = length(basepaths);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % general params
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-nsessions = length(dirnames);
 session = CE_sessionTemplate(pwd, 'viaGUI', false,...
     'force', true, 'saveVar', true);
 nchans = session.extracellular.nChannels;
@@ -64,61 +58,25 @@ if forceA
     for isession = 1 : nsessions
         
         % file
-        basepath = char(fullfile(mousepath, dirnames{isession}));
-        basepaths{isession} = fullfile(mousepath, dirnames{isession});
+        basepath = basepaths{isession};
         cd(basepath)
         [~, basename] = fileparts(basepath);
-              
-        % vars
-        assignVars(varArray, isession, vars)
         
         % params
+        session = v(isession).session;
         nchans = session.extracellular.nChannels;
         fs = session.extracellular.sr;
-        spkgrp = session.extracellular.spikeGroups.channels;
-        
-        % datInfo
-        infoFiles = dir('*datInfo*');
-        load(infoFiles(2).name, 'datInfo');
-        datInfo2 = datInfo;
-        load(infoFiles(3).name, 'datInfo');
-        datInfo3 = datInfo;
-        load(infoFiles(1).name, 'datInfo');
-        
-        csum = cumsum(datInfo.nsamps) / 60 / 60 / 20000;
-        
-        datInfo.nsamps = [datInfo.nsamps, datInfo2.nsamps];
-        
-        datInfo.origFile = [datInfo.origFile, datInfo2.origFile]
-        
-        datInfo.orig_files = [datInfo.orig_files, datInfo2.orig_files datInfo3.orig_files]
-        datInfo.orig_info = [datInfo.orig_info, datInfo2.orig_info datInfo3.orig_info]
-        
-        datInfo.origFile{length(csum) + 1} = datInfo3.origFile;
-        save(fullfile(basepath, [basename, '.datInfo.mat']), 'datInfo')
-        
-        for ifile = 1 : length(datInfo.orig_info)
-            datInfo.nsamps(ifile) = datInfo.orig_info{ifile}.bytes / 2 / 21
-        end
+        spkgrp = session.extracellular.spikeGroups.channels;       
                       
-        % fr
-        load([basename, '.spktimes.mat'])
-        for igrp = 1 : length(spkgrp)
-            spktimes{igrp} = spktimes{igrp} / fs;
-        end
-        winBL = floor([0 5 * 60]);
-        sr = firingRate(spktimes, 'basepath', basepath,...
-            'graphics', true, 'binsize', 60, 'saveVar', 'sr', 'smet', 'none',...
-            'winBL', winBL);
+        % create lfp file
+        LFPfromDat('basepath', basepath, 'cf', 450, 'chunksize', 5e6,...
+            'nchans', nchans, 'fsOut', 1250, 'fsIn', fs)
         
-        % plot fr vs. time
-        plot_FRtime_session('basepath', pwd, 'grp', [1 : 4, 7, 8],...
-            'frBoundries', [0.1 Inf; 0.1 Inf], 'muFlag', false)
-        
-        fr = firingRate(spikes.times, 'basepath', basepath,...
-            'graphics', true, 'binsize', 60, 'saveVar', true,...
-            'smet', 'GK', 'winBL', winBL, 'winCalc', [0, Inf]);
-
+        % prep signal
+        [EMG, EEG, sigInfo] = as_prepSig([basename, '.lfp'], [basename, '.lfp'],...
+            'eegCh', [5 : 9], 'emgCh', [32], 'saveVar', false, 'emgNchans', [],...
+            'eegNchans', nchans, 'inspectSig', false, 'forceLoad', false,...
+            'eegFs', 1250, 'emgFs', 1250, 'emgCf', [10 200]);
 
     end
 end

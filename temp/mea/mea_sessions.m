@@ -8,7 +8,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % get all folders in masterpath
-masterpath = 'K:\Data\MEA';
+masterpath = 'G:\Data\MEA';
 d = dir(masterpath);
 d = d([d(:).isdir]);
 d = d(~ismember({d(:).name},{'.','..'}));
@@ -20,8 +20,14 @@ end
 
 % analyze all sessions
 for isession = 1 : nsessions
-    mea_analyze('basepath', fullfile(masterpath, basenames{isession}),...
-        'winBL', [0, 120 * 60], 'graphics', false)
+    mea_analyze('basepath', basepaths{isession},...
+        'winBL', [0, 120 * 60], 'graphics', false, 'forceA', true)
+
+    % plot fr vs. time
+    plot_FRtime_session('basepath', basepaths{isession}, 'grp', [],...
+        'frBoundries', [0.01 Inf; 0.01 Inf], 'muFlag', false, 'saveFig', false,...
+        'dataType', 'norm')
+    
 end
 
 % load vars from each session

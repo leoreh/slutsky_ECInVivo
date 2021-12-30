@@ -20,15 +20,17 @@ function swv = spkwvMetrics(varargin)
 % 
 % TO DO LIST
 %   # add tail slope (Torrado Pacheco et al., Neuron, 2021). TP threshold
-%   in that article was ~0.4 ms
+%   in that article was ~0.4 ms (done)
 %
 % 08 apr 19 LH      updates: 
 % 14 may 20 LH      added upsampling by fft
 % 12 dec 21 LH      snip raw from dat
+% 29 dec 21 LH      added time to repolarization
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+tic;
 
 p = inputParser;
 addOptional(p, 'basepath', pwd);
@@ -52,7 +54,7 @@ forceA      = p.Results.forceA;
 [~, basename] = fileparts(basepath);
 cmFile = fullfile(basepath, [basename, '.cell_metrics.cellinfo.mat']);
 swvFile = fullfile(basepath, [basename, '.swv_metrics.mat']);
-swvRawFile = fullfile(basepath, [basename, '.swv.mat']);
+swvRawFile = fullfile(basepath, [basename, '.swv_raw.mat']);
 sessionFile = fullfile(basepath, [basename, '.session.mat']);
 spkFile = fullfile(basepath, [basename, '.spikes.cellinfo.mat']);
 
@@ -72,7 +74,7 @@ if exist(sessionFile, 'file')
 end
 
 % number of spikes to snip per cluster
-spks2snip = 10000;
+spks2snip = 20000;
 
 % waveform params
 if ~isempty(wv)
@@ -81,7 +83,7 @@ else
     spklength = ceil(1.6 * 10^-3 * fs);  % spike wave is 1.6 ms
 end
 win = [-(floor(spklength / 2) - 1) floor(spklength / 2)];   
-upsamp = 10;            % upsample factor for waveforms
+upsamp = 20;            % upsample factor for waveforms
 upsamp_met = 'spline';  % method for upsampling. can also be 'fft'.
 
 % create wavelet filter
@@ -95,11 +97,11 @@ wv_std = [];
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % prepare waveforms
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% if mean waveforms were not given, resnip from the raw dat file a
-% random fraction of spikes for each cluster. this is much superior to the
-% extraction done by CE (accurate detrending instead of
-% filtering). note that the spikes struct of CE is currently still
-% necassary for the maximum amplitude channel
+% if mean waveforms were not given, resnip from the raw dat file a random
+% number of spikes for each cluster. this is much superior to the
+% extraction done by CE (accurate detrending instead of filtering). note
+% that the spikes struct of CE is still necassary to obtain for the maximum
+% amplitude channel before resnipping.
 
 if isempty(wv)
         
@@ -122,22 +124,22 @@ if isempty(wv)
         end
         
         datname = fullfile(basepath, [basename, '.dat']);
-        [wv_all, ~] = snipFromBinary('stamps', spktimes, 'fname', datname,...
+        [swv_raw, ~] = snipFromBinary('stamps', spktimes, 'fname', datname,...
             'win', win, 'nchans', nchans, 'ch', ch, 'align_peak', 'min',...
             'precision', 'int16', 'rmv_trend', 6, 'saveVar', false,...
             'l2norm', false);
-        wv_all = cellfun(@squeeze, wv_all, 'UniformOutput', false);
+        swv_raw = cellfun(@squeeze, swv_raw, 'UniformOutput', false);
         
         if saveVar
-            save(swvRawFile, 'wv_all')
+            save(swvRawFile, 'swv_raw')
         end
         
     end
     
     % get mean and std
-    wv = cellfun(@(x) [mean(x, 2)]', wv_all, 'UniformOutput', false);
+    wv = cellfun(@(x) [mean(x, 2)]', swv_raw, 'UniformOutput', false);
     wv = cell2mat(wv');
-    wv_std = cellfun(@(x) [std(x, [], 2)]', wv_all, 'UniformOutput', false);
+    wv_std = cellfun(@(x) [std(x, [], 2)]', swv_raw, 'UniformOutput', false);
     wv_std = cell2mat(wv_std');
 
 end
@@ -145,6 +147,7 @@ end
 % interpolate
 x_orig = linspace(0, 1, size(wv, 2));
 x_upsamp = linspace(0, 1, size(wv, 2) * upsamp);
+x_time = [1 : size(wv, 2) * upsamp] / nfs * 1000;
 switch upsamp_met
     case 'spline'
         wv_interp = [interp1(x_orig, wv', x_upsamp, 'spline', nan)]';
@@ -156,8 +159,7 @@ end
 % calc metrics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-fprintf('\ncalculating waveform parameters\n\n')
-tic
+fprintf('\ncalculating waveform parameters\n')
 
 % initialize
 nunits = size(wv, 1);
@@ -165,35 +167,46 @@ tp = nan(1, nunits);
 spkw = nan(1, nunits);
 hpk = nan(1, nunits);
 asym = nan(1, nunits);
+rtau = nan(1, nunits);
+tslope = zeros(1, nunits);
+ampTp = nan(1, nunits);
+ampP = nan(1, nunits);
 
 for iunit = 1 : nunits
     
+    % ---------------------------------------------------------------------
+    % general waveform params
     w = wv_interp(iunit, :);
+    [minVal, imin] = min(w);                            % trough
+    [maxVal_post, imax_post] = max(w(imin + 1 : end));  % peak after trough
+    imax_post = imax_post + imin;
+    [maxVal_pre, ~] = max(w(1 : imin - 1));             % peak before trough
+    ampTp(iunit) = maxVal_post - minVal;                % amplitude trough to after peak
+    ampP(iunit) = maxVal_post - w(end);                 % amplitude peak to end
     
     % ---------------------------------------------------------------------
     % trough-to-peak time (artho et al., 2004) and asymmetry (Sirota et
     % al., 2008)
-    [~, minpos] = min(w);
-    [maxval, ~] = max(w(1 : minpos - 1));   
-    [maxvalpost, maxpost] = max(w(minpos + 1 : end));               
-    if ~isempty(maxpost)
-        tp(iunit) = maxpost;
-        if ~isempty(maxval)
-            asym(iunit) = (maxvalpost - maxval) / (maxvalpost + maxval);
+    if ~isempty(imax_post)
+        tp(iunit) = imax_post * 1000 / nfs;      % samples to ms
+        if ~isempty(maxVal_pre)
+            asym(iunit) = (maxVal_post - maxVal_pre) / (maxVal_post + maxVal_pre);
         end
     else
         warning('waveform may be corrupted')
-        tp(iunit) = NaN;
-        asym(iunit) = NaN;
     end
     
     % ---------------------------------------------------------------------
+    % tail slope (Torrado Pacheco et al., Neuron, 2021)
+    tslope(iunit) = ampP(iunit) / (spklength * upsamp - imax_post);
+    
+    % ---------------------------------------------------------------------
     % half peak width (Medrihan et al., 2017)
-    wu = w / maxvalpost;
-    th1 = find(wu(minpos : maxpost + minpos) < 0.5);
+    wu = w / maxVal_post;
+    th1 = find(wu(imin : imax_post) < 0.5);
     if any(th1)
-        th1 = maxpost - th1(end);
-        th2 = find(wu(maxpost + minpos : end) < 0.5);        
+        th1 = imax_post - th1(end);
+        th2 = find(wu(imax_post + imin : end) < 0.5);
         if any(th2)
             th2 = th2(1);
         else
@@ -205,17 +218,24 @@ for iunit = 1 : nunits
     end
     hpk(iunit) = (th1 + th2) * 1000 / nfs;
     
-    % add Ardid et al., J. Neurosci., 2015 (https://github.com/LofNaDI)
+    % ---------------------------------------------------------------------
+    % time for repolarization (Ardid et al., J. Neurosci., 2015;
+    % https://github.com/LofNaDI). this fails for most of our
+    % cells.
+    decayVal = maxVal_post - 0.25 * ampTp(iunit);
+    rtau_idx = nearest(w(imax_post + 1 : end), decayVal);
+    if ~isempty(rtau_idx)
+        rtau(iunit) = x_time(imax_post + rtau_idx) - x_time(imax_post);
+    end
     
-    %  spike width by inverse of max frequency in spectrum (stark et al., 2013)
+    % ---------------------------------------------------------------------
+    % spike width by inverse of max frequency in spectrum (stark et al., 2013)
     [cfs, f, ~] = cwt(w, 'FilterBank', fb);
     [~, ifreq] = max(abs(squeeze(cfs)), [], 1);
     maxf = f(ifreq(round(length(w) / 2)));
     spkw(iunit) = 1000 / maxf;
+    
 end
-
-% samples to ms
-tp = tp * 1000 / nfs;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % organize and save
@@ -224,15 +244,19 @@ tp = tp * 1000 / nfs;
 swv.info.runtime = datetime(now, 'ConvertFrom', 'datenum');
 swv.info.upsamp_met = 'spline'; 
 swv.info.upsamp = upsamp; 
+swv.info.spks2snip = spks2snip;
 swv.wv = wv;
 swv.wv_std = wv_std;
 swv.tp = tp;
 swv.spkw = spkw;
 swv.asym = asym;
 swv.hpk = hpk;
+swv.rtau = rtau;
+swv.tslope = tslope;
+swv.ampTp = ampTp;
+swv.ampP = ampP;
 
-if saveVar   
-    
+if saveVar       
     save(swvFile, 'swv')
     
     % cell metrics
@@ -245,6 +269,10 @@ if saveVar
         cell_metrics.swv_tp = swv.tp;
         cell_metrics.swv_asym = swv.asym;
         cell_metrics.swv_hpk = swv.hpk;
+        cell_metrics.swv_rtau = swv.rtau;
+        cell_metrics.swv_tslope = swv.tslope;
+        cell_metrics.swv_ampTp = swv.ampTp;
+        cell_metrics.swv_ampP = swv.ampP;
         save(cmFile, 'cell_metrics')
     end
 end
@@ -254,13 +282,3 @@ fprintf('\nthat took %.1f minutes\n', toc / 60)
 return
 
 % EOF
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% paths used to compare CE results
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepaths{1} = 'G:\RA\hDLX_Gq_WT2\200820_bslDay1';
-basepaths{2} = 'G:\RA\hDLX_Gq_Tg\210820_bslDay2Raw2';
-basepaths{3} = 'D:\Data\lh86\lh86_210301_072600';
-basepaths{4} = 'G:\lh81\lh81_210207_045300';
-cell_metrics = CellExplorer('basepaths', basepaths);
-

@@ -58,11 +58,11 @@ cat_OE_tstamps('orig_paths', orig_paths, 'new_path', exPathNew,...
 
 % pre-process dat (remove channels, reorder, etc.)
 clip = [];
-clear orig_paths
-orig_paths{1} = 'G:\Data\lh93\12hr\lh93_210813_110609';
-orig_paths{2} = 'G:\Data\lh93\12hr\lh93_210813_220003';
-datInfo = preprocDat('orig_paths', orig_paths, 'mapch', [1 : nchans],...
-    'rmvch', [], 'nchans', nchans, 'saveVar', true,...
+clear orig_files
+orig_files{1} = 'K:\Data\lh95\12hr\lh95_210824_083300\lh95_210824_083300.emg.dat';
+orig_files{2} = 'K:\Data\lh95\12hr\lh95_210824_202100\lh95_210824_202100.emg.dat';
+datInfo = preprocDat('orig_files', orig_files, 'mapch', [1 : 2],...
+    'rmvch', [], 'nchans', 2, 'saveVar', true,...
     'chunksize', 1e7, 'precision', 'int16', 'clip', clip);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -110,15 +110,15 @@ ripp = getRipples('basepath', basepath, 'rippCh', [23], 'emgCh', [33],...
 % sleep states
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% prep signal
+% call for accelerometer
 [EMG, EEG, sigInfo] = as_prepSig([basename, '.lfp'], acc.mag,...
-    'eegCh', [5 : 9], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
+    'eegCh', [4 : 7], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
     'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
     'eegFs', 1250, 'emgFs', 1250, 'emgCf', [10 200]);
 
 % manually create labels
 labelsmanfile = [basename, '.AccuSleep_labelsMan.mat'];
-AccuSleep_viewer(EEG, EMG,  128, 1, labels, labelsmanfile)
+AccuSleep_viewer(EEG, EMG,  1250, 1, labels, labelsmanfile)
 
 % classify with a network
 netfile = 'D:\Code\slutsky_ECInVivo\lfp\SleepStates\AccuSleep\trainedNetworks\net_210826_224240.mat';
@@ -199,14 +199,15 @@ cell_metrics = ProcessCellMetrics('session', session,...
 
 % firing rate
 load([basename, '.spikes.cellinfo.mat'])
-winBL = [0 120 * 60];
+winBL = [0 5 * 60 * 60];
 fr = firingRate(spikes.times, 'basepath', basepath, 'graphics', true,...
     'binsize', 60, 'saveVar', true, 'smet', 'GK', 'winBL',...
     winBL, 'winCalc', [0, Inf]);
 
 % plot fr vs. time
-plot_FRtime_session('basepath', pwd, 'grp', [],...
-    'frBoundries', [0.1 Inf; 0.1 Inf], 'muFlag', false)
+plot_FRtime_session('basepath', pwd, 'grp', [3, 4],...
+    'frBoundries', [0.01 Inf; 0.01 Inf], 'muFlag', false, 'saveFig', false,...
+    'dataType', 'strd')
 
 % cluster validation
 spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
@@ -268,3 +269,5 @@ varArray = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
 % set matlab graphics to custom or factory defaults
 setMatlabGraphics(false)
 
+% nonsense
+guessDateTime(basename)

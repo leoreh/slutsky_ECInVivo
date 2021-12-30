@@ -163,13 +163,15 @@ for idir = 1 : ndirs
     for ifile = 1 : length(varsFile)
         filename = dir(['*', varsFile{ifile}, '*']);
         if length(filename) > 1
-            % if there are two files that share the same name, default is
+            % if more than one file share the same name, default is
             % to load the first. specific corrections can be applied below
             if contains(varsFile{ifile}, 'datInfo')             % tdt has a datInfo for each stream
                 fileidx = contains({filename.name}, 'EMG');
                 filename = filename(~fileidx).name;
             elseif any(~contains({filename.name}, basename))     % mea raw data names is a mess
                 filename = filename(contains({filename.name}, basename)).name;
+            elseif any(~contains({filename.name}, ['.', varsFile{ifile}, '.']))     % e.g. fr instead of from 
+                filename = filename(contains({filename.name}, ['.', varsFile{ifile}, '.'])).name;
             else
                 filename = filename(1).name;
             end

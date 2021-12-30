@@ -169,6 +169,8 @@ for i = 1 : nchunks
     fwrite(fidOut, dd(:), 'int16'); 
 end
 
+clear raw
+clear m
 fclose(fid);
 fclose(fidOut);
 

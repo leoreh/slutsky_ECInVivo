@@ -79,7 +79,7 @@ forceLoad       = p.Results.forceLoad;
 % preparations
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-fs = 128;          % requested sampling frequency
+fs = 256;          % requested sampling frequency
 
 % file names
 cd(basepath)
@@ -190,9 +190,9 @@ if ~isempty(emgCf)
 end
 
 % remove 50 from emg
-emgOrig = filterLFP(emgOrig, 'fs', emgFs, 'stopband', [48 52],...
-    'order', 4, 'type', 'butter', 'dataOnly', true, 'graphics', false',...
-    'saveVar', false);
+% emgOrig = filterLFP(emgOrig, 'fs', emgFs, 'stopband', [48 52],...
+%     'order', 4, 'type', 'butter', 'dataOnly', true, 'graphics', false',...
+%     'saveVar', false);
 
 % remove DC component
 fprintf('\nremoving DC component\n')

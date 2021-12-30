@@ -1,3 +1,18 @@
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% params
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% acc
+basepaths = [{'K:\Data\lh99\lh99_211219_085802'},...            % local ketamine. 120 min man
+    {'G:\Data\lh93\lh93_210813_110609'},...                     % local ketamine. 150 min man
+    ];   
+
+% emg
+basepaths = [{'F:\Data\Processed\lh96\lh96_211201_070100'},...  % local acsf.  180 min man
+    {'F:\Data\Processed\lh96\lh96_211205_072000'},...           % local mk801. 120 min man
+    ];
+
 % trains a network on half a data set and test
 % accuracy on the other half
 
