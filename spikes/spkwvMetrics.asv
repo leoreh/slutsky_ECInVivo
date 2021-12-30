@@ -273,13 +273,12 @@ if saveVar
         cell_metrics.swv_slopeTp = swv.slopeTp;
         cell_metrics.swv_slopeTail = swv.slopeTail;
         cell_metrics.swv_ampTp = swv.ampTp;
-        cell_metrics.swv_ampTail = swv.ampTail;
+        cell_metrics.swv_ampP = swv.ampP;
         save(cmFile, 'cell_metrics')
     end
 end
 
 fprintf('\nthat took %.1f minutes\n', toc / 60)
-
 
 return
 
