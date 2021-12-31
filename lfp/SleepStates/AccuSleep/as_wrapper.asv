@@ -24,6 +24,7 @@ function ss = as_wrapper(EEG, EMG, sigInfo, varargin)
 %   forceAnalyze    logical. reanalyze recordings even if ss struct
 %                   exists (false)
 %   graphics        logical. plot confusion chart and state separation {true}
+%   saveFig         logical. save figure {true}
 %
 % DEPENDENCIES:
 %   AccuSleep (modified in slutskycode)
@@ -56,6 +57,7 @@ addOptional(p, 'inspectLabels', [], @islogical);
 addOptional(p, 'saveVar', true, @islogical);
 addOptional(p, 'forceAnalyze', false, @islogical);
 addOptional(p, 'graphics', true, @islogical);
+addOptional(p, 'saveFig', true, @islogical);
 
 parse(p, varargin{:})
 basepath        = p.Results.basepath;
@@ -68,6 +70,7 @@ inspectLabels   = p.Results.inspectLabels;
 saveVar         = p.Results.saveVar;
 forceAnalyze    = p.Results.forceAnalyze;
 graphics        = p.Results.graphics;
+saveFig         = p.Results.saveFig;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preparations
@@ -134,24 +137,26 @@ else
     % of the data and save the labels
     if ~exist(callabelsfile, 'file') || forceCalibrate
         if exist(manlabelsfile)
-            load(manlabelsfile)
+            load(manlabelsfile)            
         elseif exist(callabelsfile)
             load(callabelsfile)
         else
-            fprintf('\nlabel some data for calibration, then press save.\n')
-            AccuSleep_viewer(EEG, EMG, fs, minEpochLen, [], callabelsfile);
-            uiwait
-            load(callabelsfile)
+            labels = ones(1, floor(length(EMG) / fs / minEpochLen)) * nstates + 1;
         end
-
+        
+        fprintf('\nlabel some data for calibration, then press save.\n')
+        AccuSleep_viewer(EEG, EMG, fs, minEpochLen, labels, callabelsfile);
+        uiwait
+        load(callabelsfile)
+        
         % ignore bin state     
         labels_calibration = labels;
         labels(labels > nstates - 1) = nstates;          
         
         % calibration matrix
         fprintf('creating calbiration matrix... ')
-        calibrationData = createCalibrationData(EEG,...
-            EMG, labels, fs, minEpochLen);
+        calibrationData = createCalibrationData(standardizeSR(EEG, fs, 128),...
+            standardizeSR(EMG, fs, 128), labels, 128, minEpochLen);
         save(calfile, 'calibrationData')
         fprintf('done.\n')
     else
@@ -162,8 +167,8 @@ else
     
     % classify recording
     fprintf('classifying... ')
-    [labels_net, netScores] = AccuSleep_classify(EEG,...
-        EMG, net, fs, minEpochLen, calibrationData, minBoutLen);
+    [labels_net, netScores] = AccuSleep_classify(standardizeSR(EEG, fs, 128),...
+        standardizeSR(EMG, fs, 128), net, 128, minEpochLen, calibrationData, minBoutLen);
     
     % insert calibrated labels to final results. this is because
     % AccuSleep_classify doesn't allow for 'only overwrite undefind' as in the

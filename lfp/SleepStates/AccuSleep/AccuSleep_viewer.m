@@ -68,7 +68,7 @@ switch nargin
 end
 
 G.originalSR = SR; % EEG/EMG sampling rate
-G.SR = 128; % sampling rate used when calculating spectrogram and processed EMG
+G.SR = SR; % sampling rate used when calculating spectrogram and processed EMG
 G.epochLen  = epochLen; % length of one epoch (spectrogram column) in seconds
 
 if length(EEG) ~= length(EMG)
@@ -80,9 +80,9 @@ G.EEG = EEG - mean(EEG);
 G.EMG = EMG - mean(EMG);
 clear('EMG','EEG');
 
-% create spectrogram and process EMG at a standard SR (128)
-[spec, tAxis, fAxis] = createSpectrogram(standardizeSR(G.EEG, G.originalSR, G.SR), G.SR, G.epochLen);
-G.processedEMG = processEMG(standardizeSR(G.EMG, G.originalSR, G.SR), G.SR, G.epochLen);
+% create spectrogram and process EMG at a standard SR
+[spec, tAxis, fAxis] = createSpectrogram(G.EEG, G.SR, G.epochLen);
+G.processedEMG = processEMG(G.EMG, G.SR, G.epochLen);
 % set ceiling for EMG trace at 2.5 SD when plotting
 G.cappedEMG = G.processedEMG;
 emgCap = mean(G.cappedEMG) + 2.5*std(G.cappedEMG);

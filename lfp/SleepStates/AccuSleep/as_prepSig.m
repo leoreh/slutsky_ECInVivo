@@ -14,6 +14,7 @@ function [EMG, EEG, sigInfo] = as_prepSig(eegData, emgData, varargin)
 %   emgData     ALT 1; emg numeric data (1 x n2).
 %               ALT 2; string. name of file with data. must include
 %               extension (e.g. lfp / dat)
+%   fs          numeric. requested new sampling frequency
 %   eegFs       numeric. eeg sampling frequency
 %   emgFs       numeric. emg sampling frequency
 %   eegCh       numeric. channel number of eeg to load from lfp file. can
@@ -53,6 +54,7 @@ addOptional(p, 'eegCh', 1, @isnumeric);
 addOptional(p, 'emgCh', 1, @isnumeric);
 addOptional(p, 'eegFs', [], @isnumeric);
 addOptional(p, 'emgFs', [], @isnumeric);
+addOptional(p, 'fs', 1250, @isnumeric);
 addOptional(p, 'eegNchans', [], @isnumeric);
 addOptional(p, 'emgNchans', [], @isnumeric);
 addOptional(p, 'emgCf', [10 200], @isnumeric);
@@ -67,6 +69,7 @@ eegCh           = p.Results.eegCh;
 emgCh           = p.Results.emgCh;
 eegFs           = p.Results.eegFs;
 emgFs           = p.Results.emgFs;
+fs              = p.Results.fs;
 emgCf           = p.Results.emgCf;
 eegCf           = p.Results.eegCf;
 eegNchans       = p.Results.eegNchans;
@@ -79,7 +82,6 @@ forceLoad       = p.Results.forceLoad;
 % preparations
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-fs = 256;          % requested sampling frequency
 
 % file names
 cd(basepath)
@@ -197,36 +199,37 @@ end
 % remove DC component
 fprintf('\nremoving DC component\n')
 eegOrig = rmDC(eegOrig, 'dim', 1);
-if numel(emgCf) ~= 2
-    emgOrig = rmDC(emgOrig, 'dim', 1);
-end
 
 if isempty(recDur)
-    recDur = length(emgOrig) / emgFs;
+    recDur = length(eegOrig) / eegFs;
 end
 
-% validate recording duration and sampling frequency 
-emgDur = length(emgOrig) / emgFs;
-eegDur = length(eegOrig) / eegFs;
-if abs(emgDur - eegDur) > 2
-    warning(['EEG and EMG are of differnet duration (diff = %.2f s).\n',...
-        'Check data and sampling frequencies.\n'], abs(emgDur - eegDur))
+% validate recording duration and sampling frequency. subsample emg and eeg
+% to the same length. assumes both signals span the same time interval.
+% interpolation, as opposed to idx subsampling, is necassary for cases
+% where the sampling frequency is not a round number (tdt).
+if length(emgOrig) ~= length(eegOrig) && fs ~= eegFs
+    emgDur = length(emgOrig) / emgFs;
+    eegDur = length(eegOrig) / eegFs;
+    if abs(emgDur - eegDur) > 2
+        warning(['EEG and EMG are of differnet duration (diff = %.2f s).\n',...
+            'Check data and sampling frequencies.\n'], abs(emgDur - eegDur))
+    end
+    tstamps_sig = [1 / fs : 1 / fs : recDur];
+    
+    
+    fprintf('downsampling to %d Hz\n', fs)
+    EMG = [interp1([1 : length(emgOrig)] / emgFs, emgOrig, tstamps_sig,...
+        'spline')]';
+    EEG = [interp1([1 : length(eegOrig)] / eegFs, eegOrig, tstamps_sig,...
+        'spline')]';
+else
+    EMG = emgOrig;
+    EEG = eegOrig;
 end
-if isempty(recDur)
-    recDur = eegDur;
-end
-tstamps_sig = [1 / fs : 1 / fs : recDur];
 
-% subsample emg and eeg to the same length. assumes both signals span the
-% same time interval. interpolation, as opposed to idx subsampling, is
-% necassary for cases where the sampling frequency is not a round number
-% (tdt). currently, this is done even when fs == round(fs) for added
-% consistancy.
-fprintf('downsampling to %d Hz\n', fs)
-EMG = [interp1([1 : length(emgOrig)] / emgFs, emgOrig, tstamps_sig,...
-    'pchip')]';
-EEG = [interp1([1 : length(eegOrig)] / eegFs, eegOrig, tstamps_sig,...
-    'pchip')]';
+EMG = EMG(:);
+EEG = EEG(:);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % finilize and save

@@ -1,6 +1,12 @@
 % as_changes
 % list of changes done to accusleep functions
 
+% general
+% removed standardizeSR from all functions
+
+% processEMG
+% removed the 20-50 passband filter
+
 % AccuSleep_viewer
 % # show frequencies up to 15 (line 115)
 % # set(G.A6a,'XTick',[]) => set(G.A6a,'XTick',[]) - line 379

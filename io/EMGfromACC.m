@@ -66,6 +66,7 @@ function acc = EMGfromACC(varargin)
 % 09 apr 20 LH  UPDATES:
 % 29 jun 20     changed according to EMGFromLFP
 % 01 dec 20     get from lfp file if exists
+% 31 dec 21     removed low-pass filter
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -186,7 +187,7 @@ for i = 1 : nchunks
     % remove dc. this is done mainly to diminish edge effects due to the
     % filter embedded within resample (assumes zeros before and after the
     % signal).
-    % [d] = rmDC(d, 'dim', 2);
+    [d] = rmDC(d, 'dim', 2);
     
     % resmaple. tstamps does not require filtering and thus downsample is
     % preferred.
@@ -198,11 +199,15 @@ for i = 1 : nchunks
     mag = vecnorm(d, 2);
     
     % filter
-    mag = filterLFP(mag, 'fs', fsOut, 'passband', [0.5 150], 'type', 'butter',...
-        'order', 4, 'dataOnly', true, 'graphics', false, 'saveVar', false); 
+%     mag = filterLFP(mag, 'fs', fsOut, 'passband', [0.5 150], 'type', 'butter',...
+%         'order', 4, 'dataOnly', true, 'graphics', false, 'saveVar', false); 
     
-    acc.mag = [acc.mag; mag];
+    acc.mag = [acc.mag, mag];
 end
+
+% close files
+clear raw
+clear m
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % calculate power
@@ -218,18 +223,18 @@ smf = 7;
 % data = bz_NormToRange(pband, [0 1]);
 
 % ALT 2: PC1 of power in broadband
-freq = logspace(0, 2, 100);
-win = hann(binsize);
-[~, ~, tband, pband] = spectrogram(acc.mag, win, 0, freq, fsOut, 'yaxis', 'psd');
-pband = 10 * log10(abs(pband));
-[~, acc.pc1] = pca(pband', 'NumComponents', 1);
-acc.pc1 = smooth(acc.pc1, smf);
-acc.pc1 = bz_NormToRange(acc.pc1, [0 1]);
+% freq = logspace(0, 2, 100);
+% win = hann(binsize);
+% [~, ~, tband, pband] = spectrogram(acc.mag, win, 0, freq, fsOut, 'yaxis', 'psd');
+% pband = 10 * log10(abs(pband));
+% [~, acc.pc1] = pca(pband', 'NumComponents', 1);
+% acc.pc1 = smooth(acc.pc1, smf);
+% acc.pc1 = bz_NormToRange(acc.pc1, [0 1]);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arrange struct and save
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-acc.tstamps = tband;
+% acc.tstamps = tband;
 acc.fs = fsOut;
 acc.fs_orig = fsIn;
 
