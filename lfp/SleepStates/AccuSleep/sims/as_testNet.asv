@@ -6,8 +6,8 @@
 % hippocampal tetrodes ----------------------------------------------------
 % acc
 basepaths = [{'K:\Data\lh99\lh99_211219_085802'},...            % local acsf. 120 min man
-    {'K:\Data\lh99\lh99_211220_091903'},...                     % local ketamine. 150 min man
-    {'G:\Data\lh93\lh93_210811_102035'},...                     % local ketamine. 150 min man
+    {'F:\Data\lh99\lh99_211220_091903'},...                     % local ketamine. 150 min man
+    {'G:\Data\lh93\lh93_210813_110609'},...                     % local ketamine. 150 min man
     {'D:\Data\lh93\lh93_210810_100810'},...                     % local ketamine. 120 min man
     {'I:\lh87\lh87_210523_100607'},...                          % op saline. 360 min man
     ];
@@ -35,19 +35,8 @@ basepaths = [{'I:\lh89\lh89_210510_085700'},...                 % op ketamine. 6
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 for isession = 1 : length(basepaths)
-    cd(basepaths{isession})
-    [~, basename] = fileparts(basepaths{isession});
-    load([basename, '.AccuSleep_EEG.mat'])
-    load([basename, '.AccuSleep_EMG.mat'])
-    load([basename, '.AccuSleep_labelsMan.mat'])
-    load([basename, '.AccuSleep_sigInfo.mat'])
-    
-    EEG = standardizeSR(EEG, 1250, 256);
-    EMG = standardizeSR(EMG, 1250, 256);
-    
-    labelsmanfile = [basename, '.AccuSleep_labelsMan.mat'];
-    AccuSleep_viewer(EEG, EMG,  256, 1, labels, [])
-    
+    [~, basename] = fileparts(basepaths{isession})
+    load([basename, '.AccuSleep_EEG
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
