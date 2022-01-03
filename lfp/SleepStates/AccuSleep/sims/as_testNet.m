@@ -5,10 +5,12 @@
 
 % hippocampal tetrodes ----------------------------------------------------
 % acc
-basepaths = [{'K:\Data\lh99\lh99_211219_085802'},...            % local acsf. 120 min man
-    {'K:\Data\lh99\lh99_211220_091903'},...                     % local ketamine. 150 min man
+basepaths = [{'G:\Data\lh93\as\lh99_211219_085802'},...         % local acsf. 120 min man
+    {'G:\Data\lh93\as\lh99_211220_091903'},...                  % local ketamine. 150 min man
     {'G:\Data\lh93\lh93_210811_102035'},...                     % local ketamine. 150 min man
     {'D:\Data\lh93\lh93_210810_100810'},...                     % local ketamine. 120 min man
+    {'D:\Data\lh93\lh93_210819_104212'},...                     % local saline. 70 min man
+    {'D:\Data\lh93\lh93_210819_221608'},...                     % night. 70 min man
     {'I:\lh87\lh87_210523_100607'},...                          % op saline. 360 min man
     ];
 
@@ -29,29 +31,15 @@ basepaths = [{'F:\Data\Processed\lh96\lh96_211201_070100'},...  % local acsf. 18
 % emg
 basepaths = [{'I:\lh89\lh89_210510_085700'},...                 % op ketamine. 60 min man
     ];
+'lh86'
+'lh99'
+'lh98'
+
+% file list
+fileList = as_fileLists(basepaths);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% adjust recordings
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-for isession = 1 : length(basepaths)
-    cd(basepaths{isession})
-    [~, basename] = fileparts(basepaths{isession});
-    load([basename, '.AccuSleep_EEG.mat'])
-    load([basename, '.AccuSleep_EMG.mat'])
-    load([basename, '.AccuSleep_labelsMan.mat'])
-    load([basename, '.AccuSleep_sigInfo.mat'])
-    
-    EEG = standardizeSR(EEG, 1250, 256);
-    EMG = standardizeSR(EMG, 1250, 256);
-    
-    labelsmanfile = [basename, '.AccuSleep_labelsMan.mat'];
-    AccuSleep_viewer(EEG, EMG,  256, 1, labels, [])
-    
-end
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% params
+% config file
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % general
@@ -87,72 +75,14 @@ cfg_names = {'WAKE'; 'QWAKE'; 'LSLEEP'; 'NREM'; 'REM'; 'N/REM'; 'BIN'};
 save(configfile, 'cfg_colors', 'cfg_names', 'cfg_weights')
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% files and data
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% -------------------------------------------------------------------------
-% ALT 1: train network on entire data
-lh89 = netInfo.files;
-lh86 = netInfo.files;
-
-basepaths = [lh89 lh86];
-basepaths{1} = 'K:\Data\lh95\lh95_210824_083300';
-basepaths{2} = 'K:\Data\lh95\lh95_210824_202100';
-basepaths{3} = 'K:\Data\lh95\lh95_210825_080400';
-basepaths{4} = 'K:\Data\lh95\lh95_210825_200300';
-
-fileList = as_fileLists(basepaths);
-
-% -------------------------------------------------------------------------
-% ALT 2: use part of the data for training and part for testing
-
-% indices
-idx = [0 18];      % time for training [h]
-idxT = idx * 60 * 60 * fs;
-idxL = idx * 60 * 60;
-if idxT(1) == 0
-    idxT(1) = 1;
-    idxL(1) = 1;
-end
-if idxT(2) == Inf
-    idxT(2) = length(EMG);
-    idxL(2) = labels;
-end
-
-% data
-EMG_orig = EMG; 
-EEG_orig = EEG;
-gldstrd = labels;
-EMG = EMG_orig(idxT(1) : idxT(2));
-EEG = EEG_orig(idxT(1) : idxT(2));
-labels = gldstrd(idxL(1) : idxL(2));
-idxT2 = setdiff(1 : length(EMG_orig), idxT(1) : idxT(2));
-idxL2 = setdiff(1 : length(gldstrd), idxL(1) : idxL(2));
-labels2 = gldstrd(idxL2);
-EMG2 = EMG_orig(idxT2);
-EEG2 = EEG_orig(idxT2);
-
-% visualize data
-AccuSleep_viewer(EEG_orig, EMG_orig, fs, epochLen, gldstrd, [])
-AccuSleep_viewer(EEG2, EMG2, fs, epochLen, labels2, [])
-AccuSleep_viewer(EEG, EMG, fs, epochLen, labels, [])
-
-% files
-basepath = 'F:\Data\Colleagues\KBO\040721_0746';
-[~, basename] = fileparts(basepath);
-basepath = fullfile(basepath, 'netTraining');
-mkdir(basepath)
-save(fullfile(basepath, [basename, '.AccuSleep_EEG.mat']), 'EEG')
-save(fullfile(basepath, [basename, '.AccuSleep_EMG.mat']), 'EMG')
-save(fullfile(basepath, [basename, '.AccuSleep_labelsMan.mat']), 'labels1')
-fileList = as_fileLists(basepaths);
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % train
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-[net, netInfo] = AccuSleep_train(fileList, fs, epochLen, 63);
-netpath = 'D:\Code\slutskycode\extracellular in vivo\lfp\SleepStates\AccuSleep\trainedNetworks';
+cntxEpochs = 63;
+[net, netInfo] = AccuSleep_train(fileList, fs, epochLen, cntxEpochs);
+netInfo.epochLen = epochLen;
+netInfo.cntxEpochs = cntxEpochs;
+netpath = 'D:\Code\slutsky_ECInVivo\lfp\SleepStates\AccuSleep\trainedNetworks';
 netname = ['net_',  datestr(datetime, 'yymmdd_HHMMss')]; 
 save(fullfile(netpath, netname), 'net', 'netInfo')      
 

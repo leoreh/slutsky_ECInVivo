@@ -249,7 +249,7 @@ for ifile = 1 : size(fileList, 1)
     netInfo.files{ifile} = fileparts(fileList{ifile, 1});
     [~, basename] = fileparts(netInfo.files{ifile});
     load(fileList{ifile, 3})
-    netInfo.duration(ifile) = sum(labels < n_states);
+    netInfo.labelsDuration(ifile) = sum(labels < n_states);
 end
 
 % train

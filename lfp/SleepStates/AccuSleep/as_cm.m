@@ -1,4 +1,4 @@
-function [statePrecision, stateRecall] = as_cm(labels1, labels2, varargin)
+function [netPrecision, netRecall] = as_cm(labels1, labels2, varargin)
 
 % calculate and plot confusion matrix between labels1 (gold standard) and
 % labels2. if netScores are provided then will plot the effect of a
@@ -18,6 +18,7 @@ function [statePrecision, stateRecall] = as_cm(labels1, labels2, varargin)
 %
 % 08 jun 21 LH      updates:
 % 08 nov 21         score threshold 
+% 02 jan 21         bug fix in score threshold
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -42,7 +43,7 @@ basepath = pwd;
 
 % load params from config file
 [cfg_colors, cfg_names, ~] = as_loadConfig([]);
-nstates = length(cfg_names);
+nstates = length(cfg_names) - 1;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % calc
@@ -53,98 +54,102 @@ nstates = length(cfg_names);
 % + FP). recall (row): when actually yes, how often does it predict yes? TP
 % / (TP + FN)
 precision = @(cm) diag(cm)./sum(cm, 2);
-recall = @(confusionMat) diag(confusionMat) ./ sum(confusionMat, 1)';
+recall = @(cm) diag(cm) ./ sum(cm, 1)';
 
 % select relavent labels
-idxLabels = labels2 < nstates & labels1 < nstates;
+idxLabels = labels2 <= nstates & labels1 <= nstates;
 labels1 = labels1(idxLabels);
 labels2 = labels2(idxLabels);
 if ~isempty(scores)
     scores = scores(idxLabels, :);
 end
 
-% calc confusion matrix
+% calc confusion matrix on entire data
 cm = confusionmat(labels1, labels2);
-statePrecision = precision(cm);
-stateRecall = recall(cm);
+netPrecision = precision(cm);
+netRecall = recall(cm);
+
+% simulate effect of thersholding the network score on performace
+thr = 0 : 0.1 : 1;
+thr_precision = zeros(length(thr), nstates);
+thr_recall = zeros(length(thr), nstates);
+for ithr = 1 : length(thr)
+    scoreIdx = scores < thr(ithr);
+    rmIdx = zeros(length(labels2), nstates);
+    for istate = 1 : size(scores, 2)
+        stateIdx = labels2 == istate;
+        rmIdx(:, istate) = stateIdx & scoreIdx(:, istate);
+        lostData(ithr, istate) = sum(rmIdx(:, istate)) / sum(stateIdx) * 100;
+    end
+    rmIdx = any(rmIdx, 2);
+    labels1_thr = labels1(~rmIdx);
+    labels2_thr = labels2(~rmIdx);
+    cm_thr = confusionmat(labels1_thr, labels2_thr);
+    temp_precision = precision(cm_thr);
+    temp_recall = recall(cm_thr);
+    
+    % correct case where threholding removed all labels
+    remainingStates = any(labels1_thr == [1 : 6]) | any(labels2_thr == [1 : 6]);
+    
+    thr_precision(ithr, remainingStates) = temp_precision;
+    thr_recall(ithr, remainingStates) = temp_recall;
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if graphics
     
-    if isempty(scores)
-        setMatlabGraphics(true)
-        fh = figure;
-        fh.Position = [500 200 900 700];
-        cmh = confusionchart(cm, cfg_names(1 : nstates - 1), 'ColumnSummary',...
-            'column-normalized', 'RowSummary', 'row-normalized',...
-            'title', 'State Classification Confusion Matrix', 'Normalization',...
-            'total-normalized');
-        sortClasses(cmh, cfg_names(1 : nstates - 1))
+    % ---------------------------------------------------------------------
+    % figure of net performace
+    setMatlabGraphics(true)
+    fh = figure;
+    fh.Position = [500 200 900 700];
+    cmh = confusionchart(cm, cfg_names(1 : nstates), 'ColumnSummary',...
+        'column-normalized', 'RowSummary', 'row-normalized',...
+        'title', 'State Classification Confusion Matrix', 'Normalization',...
+        'total-normalized');
+    sortClasses(cmh, cfg_names(1 : nstates))
     
-    else
+    if saveFig
+        figpath = fullfile('graphics', 'sleepState');
+        mkdir(figpath)
+        figname = fullfile(figpath, sprintf('%s_cm', basename));
+        export_fig(figname, '-tif', '-transparent', '-r300')
+    end
         
-        % simulate effect of score threshold on performace
-        newLabels = labels2;
-        thr = 0 : 0.1 : 1;       
-        for ithr = 1 : length(thr)
-            for istate = 1 : size(scores, 2)
-                
-                stateIdx = labels2 == istate;
-                scoreIdx = scores(:, istate) < thr(ithr) & stateIdx;
-                
-                lostData(ithr, istate) = sum(scoreIdx) / sum(stateIdx) * 100;
-                newLabels(scoreIdx) = nstates + 1;
-            end
-            
-            % poor fix for when removes an entire state 
-            tempCm = confusionmat(labels1, newLabels);
-            tempPrecision = precision(cm);
-            tempRecall = recall(cm);
-%             [tempPrecision, tempRecall] =...
-%                 as_cm(labels1, newLabels, 'graphics', false);
-            if length(tempPrecision) == nstates - 1
-                netPrecision(ithr, :) = tempPrecision;
-                netRecall(ithr, :) = tempRecall;
-            else
-                netPrecision(ithr, :) = zeros(1, nstates - 1);
-                netRecall(ithr, :) = zeros(1, nstates - 1);
-            end
-        end
+    % ---------------------------------------------------------------------   
+    % figure of net performace given threshold on net scores
+    setMatlabGraphics(false)
+    fh = figure;
+    for istate = 1 : nstates
         
-        % plot performace vs. threshoold
-        setMatlabGraphics(false)
-        fh = figure;
-        for istate = 1 : size(scores, 2)
-            
-            subplot(2, size(scores, 2) / 2, istate)
-            plot(thr, netPrecision(:, istate) * 100, 'k', 'LineWidth', 2)
-            hold on
-            plot(thr, netRecall(:, istate) * 100, 'LineWidth', 2, 'Color', [0.5 0.5 0.5]);
-            xlabel('Threshold')
-            ylabel('Performance [%]')
-            ylim([50 100])
-            
-            yyaxis right
-            ph = plot(thr, lostData(:, istate), 'LineWidth', 2);
-            ph.Color = cfg_colors{istate};
-            ylabel('Data Lost [%]')
-            set(gca, 'ycolor', cfg_colors{istate})
-            ylim([0 100])
-            
-            set(gca, 'box', 'off', 'TickLength', [0 0])
-            title(cfg_names{istate})
-            if istate == 1
-                legend({'Precision', 'Recall', 'DataLost'})
-            end
+        subplot(2, size(scores, 2) / 2, istate)
+        plot(thr, thr_precision(:, istate) * 100, 'k', 'LineWidth', 2)
+        hold on
+        plot(thr, thr_recall(:, istate) * 100, 'LineWidth', 2, 'Color', [0.5 0.5 0.5]);
+        xlabel('Threshold')
+        ylabel('Performance [%]')
+        ylim([50 100])
+        
+        yyaxis right
+        ph = plot(thr, lostData(:, istate), 'LineWidth', 2);
+        ph.Color = cfg_colors{istate};
+        ylabel('Data Lost [%]')
+        set(gca, 'ycolor', cfg_colors{istate})
+        ylim([0 100])
+        
+        set(gca, 'box', 'off', 'TickLength', [0 0])
+        title(cfg_names{istate})
+        if istate == 1
+            legend({'Precision', 'Recall', 'DataLost'})
         end
     end
     
     if saveFig
         figpath = fullfile('graphics', 'sleepState');
         mkdir(figpath)
-        figname = fullfile(figpath, sprintf('%s_CM', basename));
+        figname = fullfile(figpath, sprintf('%s_cm_netScores', basename));
         export_fig(figname, '-tif', '-transparent', '-r300')
     end
 end
