@@ -58,7 +58,7 @@ addOptional(p, 'fs', 1250, @isnumeric);
 addOptional(p, 'eegNchans', [], @isnumeric);
 addOptional(p, 'emgNchans', [], @isnumeric);
 addOptional(p, 'emgCf', [10 200], @isnumeric);
-addOptional(p, 'eegCf', [60], @isnumeric);
+addOptional(p, 'eegCf', [], @isnumeric);
 addOptional(p, 'saveVar', true, @islogical);
 addOptional(p, 'inspectSig', false, @islogical);
 addOptional(p, 'forceLoad', false, @islogical);
@@ -208,7 +208,7 @@ end
 % to the same length. assumes both signals span the same time interval.
 % interpolation, as opposed to idx subsampling, is necassary for cases
 % where the sampling frequency is not a round number (tdt).
-if length(emgOrig) ~= length(eegOrig) && fs ~= eegFs
+if length(emgOrig) ~= length(eegOrig) || fs ~= emgFs
     emgDur = length(emgOrig) / emgFs;
     eegDur = length(eegOrig) / eegFs;
     if abs(emgDur - eegDur) > 2
