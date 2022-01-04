@@ -34,8 +34,10 @@ function ss = as_wrapper(EEG, EMG, sigInfo, varargin)
 %       # filter before resampling to assure nyquist (done)
 %       # implement forceLoad (done)
 %       # uigetf for net (done)
-%       # implement cleanSig 
-%       # graphics
+%       # graphics (done)
+%       # implement tsa filter
+%       # batch processing
+%       # load sig instead of input (memory)
 %
 % 06 feb 21 LH  updates:
 % 19 apr 21     separated prepSig

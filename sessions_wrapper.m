@@ -4,7 +4,7 @@
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = 'lh99';
+mname = 'lh96';
 forceL = true;
 forceA = false;
 
@@ -13,7 +13,7 @@ ncond = [""];
 
 % load vars from each session
 varsFile = ["fr"; "sr"; "spikes"; "st_metrics"; "swv_metrics";...
-    "cell_metrics"; "AccuSleep_states"; "ripp"; "datInfo"; "session"];
+    "cell_metrics"; "AccuSleep_states"; "ripp.mat"; "datInfo"; "session"];
 varsName = ["fr"; "sr"; "spikes"; "st"; "swv"; "cm"; "ss"; "ripp";...
     "datInfo"; "session"];
 if ~exist('varArray', 'var') || forceL
@@ -68,15 +68,12 @@ if forceA
         fs = session.extracellular.sr;
         spkgrp = session.extracellular.spikeGroups.channels;       
                       
-        % create lfp file
-        LFPfromDat('basepath', basepath, 'cf', 450, 'chunksize', 5e6,...
-            'nchans', nchans, 'fsOut', 1250, 'fsIn', fs)
-        
-        % prep signal
-        [EMG, EEG, sigInfo] = as_prepSig([basename, '.lfp'], [basename, '.lfp'],...
-            'eegCh', [5 : 9], 'emgCh', [32], 'saveVar', false, 'emgNchans', [],...
-            'eegNchans', nchans, 'inspectSig', false, 'forceLoad', false,...
-            'eegFs', 1250, 'emgFs', 1250, 'emgCf', [10 200]);
+        % call for emg dat file
+        [EMG, EEG, sigInfo] = as_prepSig([basename, '.lfp'], [basename, '.emg.dat'],...
+            'eegCh', [1 : 4], 'emgCh', 1, 'saveVar', true, 'emgNchans', 2, 'eegNchans', nchans,...
+            'inspectSig', false, 'forceLoad', true, 'eegFs', 1250, 'emgFs', 3051.7578125,...
+            'emgCf', [10 600]);
+
 
     end
 end

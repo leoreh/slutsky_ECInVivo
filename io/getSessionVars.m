@@ -170,7 +170,7 @@ for idir = 1 : ndirs
                 filename = filename(~fileidx).name;
             elseif any(~contains({filename.name}, basename))     % mea raw data names is a mess
                 filename = filename(contains({filename.name}, basename)).name;
-            elseif any(~contains({filename.name}, ['.', varsFile{ifile}, '.']))     % e.g. fr instead of from 
+            elseif any(~contains({filename.name}, ['.', varsFile{ifile}, '.']))     % e.g. fr instead of "from" 
                 filename = filename(contains({filename.name}, ['.', varsFile{ifile}, '.'])).name;
             else
                 filename = filename(1).name;

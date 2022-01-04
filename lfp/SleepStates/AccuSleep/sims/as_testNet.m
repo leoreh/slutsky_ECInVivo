@@ -5,8 +5,8 @@
 
 % hippocampal tetrodes ----------------------------------------------------
 % acc
-basepaths = [{'G:\Data\lh93\as\lh99_211219_085802'},...         % local acsf. 120 min man
-    {'G:\Data\lh93\as\lh99_211220_091903'},...                  % local ketamine. 150 min man
+basepaths_acc = [{'G:\Data\lh99\as\lh99_211219_085802'},...     % local acsf. 120 min man
+    {'G:\Data\lh99\as\lh99_211220_091903'},...                  % local ketamine. 150 min man
     {'G:\Data\lh93\lh93_210811_102035'},...                     % local ketamine. 150 min man
     {'D:\Data\lh93\lh93_210810_100810'},...                     % local ketamine. 120 min man
     {'D:\Data\lh93\lh93_210819_104212'},...                     % local saline. 70 min man
@@ -14,15 +14,18 @@ basepaths = [{'G:\Data\lh93\as\lh99_211219_085802'},...         % local acsf. 12
     {'I:\lh87\lh87_210523_100607'},...                          % op saline. 360 min man
     ];
 
-test = [{'G:\Data\lh98\lh98_211218_090630'},...                 % local acsf. * min man
+test_acc = [{'G:\Data\lh98\lh98_211218_090630'},...             % local acsf. * min man
     {'I:\lh87\lh87_210522_095319'},...                          % op saline. 330 min man
     ];
 
+test_emg = [{'G:\Data\lh95\as\lh95_210825_080400'},...          % local ketamine. 120 min man
+    {'G:\Data\lh99\as\lh99_211220_091903'},...                  % local ketamin. man done on acc
+    ];
+
 % emg
-basepaths = [{'F:\Data\Processed\lh96\lh96_211201_070100'},...  % local acsf. 180 min man
+basepaths_emg = [{'F:\Data\Processed\lh96\lh96_211201_070100'},...  % local acsf. 180 min man
     {'F:\Data\Processed\lh96\lh96_211205_072000'},...           % local mk801. 120 min man
-    {'F:\Data\lh95\lh95_210824_083300'},...                     % local acsf. 200 min man
-    {'F:\Data\lh95\lh95_210825_080400'},...                     % local ketamine. 120 min man
+    {'G:\Data\lh95\as\lh95_210824_083300'},...                  % local acsf. 200 min man                  
     {'I:\lh86\lh86_210302_183000'},...                          % op ketamine. 60 min man
     {'I:\lh86\lh86_210304_180800'},...                          % washout. 60 min man
     ];
@@ -31,9 +34,9 @@ basepaths = [{'F:\Data\Processed\lh96\lh96_211201_070100'},...  % local acsf. 18
 % emg
 basepaths = [{'I:\lh89\lh89_210510_085700'},...                 % op ketamine. 60 min man
     ];
-'lh86'
-'lh99'
-'lh98'
+% 'lh86'
+% 'lh99'
+% 'lh98'
 
 % file list
 fileList = as_fileLists(basepaths);
