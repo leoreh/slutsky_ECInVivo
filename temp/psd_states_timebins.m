@@ -8,7 +8,7 @@
 % session
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-basepath = 'F:\Data\lh99\lh99_211224_084528';
+basepath = 'F:\Data\lh99\lh99_211220_091903';
 cd(basepath)
 [~, basename] = fileparts(basepath);
 
@@ -35,7 +35,9 @@ recLen = floor(fileinfo.bytes / 2 / nchans / fs);
 
 % separate recording to timebins
 nbins = 4;
-injTime = floor(v.datInfo.nsamps(1) / fs);
+csec = floor(cumsum(v.datInfo.nsamps) / fs);
+[~, injIdx] = min(abs(csec - 6 * 60 * 60));
+injTime = csec(injIdx);
 timebins = n2chunks('n', recLen, 'chunksize', ceil(recLen / nbins));
 timebins(1, 2) = floor(injTime);
 timebins(2, 1) = ceil(injTime) + 1;
@@ -64,7 +66,7 @@ for iwin = 1 : nbins
 
     [psdLfp(iwin, :, :), ~, ~, epStats(iwin)] = psd_states('eeg', sig, 'emg', [],...
         'labels', labels, 'fs', fsLfp, 'faxis', faxis,...
-        'graphics', true, 'sstates', sstates);
+        'graphics', false, 'sstates', sstates);
 
     % ---------------------------------------------------------------------
     % frontal eeg
@@ -83,7 +85,7 @@ for iwin = 1 : nbins
     end
     [psdEeg(iwin, :, :), ~, ~, ~] = psd_states('eeg', sig, 'emg', [],...
         'labels', labels, 'fs', fsLfp, 'faxis', faxis,...
-        'graphics', true, 'sstates', sstates);
+        'graphics', false, 'sstates', sstates);
     
 end
 
@@ -120,17 +122,24 @@ save(psdfile, 'psdBins')
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-fh = figure;
+setMatlabGraphics(false)
 alphaIdx = linspace(0.5, 1, nbins);
 [cfg_colors, cfg_names, ~] = as_loadConfig([]);
-lim_fAxis = faxis > 2;
+lim_fAxis = faxis > 1;
+smf = 7;
+gk = gausswin(smf);
+gk = gk / sum(gk);
 
+fh = figure;
 for istate = 1 : length(sstates)
     
     % lfp
     subplot(3, 3, istate)
     psdMat = squeeze(psdBins.psdLfp(:, istate, lim_fAxis));
-    psdMat = psdMat ./ sum(psdMat, 2);
+    %     for iwin = 1 : nbins
+    %         psdMat(iwin, :) = conv(psdMat(iwin, :), gk, 'same');
+    %     end
+    %     psdMat = psdMat ./ sum(psdMat, 2);
     ph = plot(faxis(lim_fAxis), psdMat', 'LineWidth', 2);
     for iwin = 1 : length(ph)
         ph(iwin).Color(istate) = cfg_colors{sstates(istate)}(istate) - iwin * 0.003;
@@ -138,7 +147,7 @@ for istate = 1 : length(sstates)
     end
     title(cfg_names{sstates(istate)})
     xlabel('Frequency [Hz]')
-    ylabel('LFP norm. PSD')
+    ylabel('LFP PSD [mV^2/Hz]')
     legend(tbins_txt, 'Location', 'Southwest')
     set(gca, 'YScale', 'log', 'XScale', 'log')
     xlim([faxis(find(lim_fAxis, 1)), faxis(find(lim_fAxis, 1, 'last'))])
@@ -146,14 +155,17 @@ for istate = 1 : length(sstates)
     % eeg
     subplot(3, 3, istate + 3)
     psdMat = squeeze(psdBins.psdEeg(:, istate, lim_fAxis));
-    psdMat = psdMat ./ sum(psdMat, 2);
+    %     for iwin = 1 : nbins
+    %         psdMat(iwin, :) = conv(psdMat(iwin, :), gk, 'same');
+    %     end
+    %     psdMat = psdMat ./ sum(psdMat, 2);
     ph = plot(faxis(lim_fAxis), psdMat', 'LineWidth', 2);
     for iwin = 1 : length(ph)
         ph(iwin).Color(istate) = cfg_colors{sstates(istate)}(istate) - iwin * 0.003;
         ph(iwin).Color(4) = alphaIdx(iwin);
     end
     xlabel('Frequency [Hz]')
-    ylabel('EEG norm. PSD')
+    ylabel('EEG PSD [mV^2/Hz]')
     set(gca, 'YScale', 'log', 'XScale', 'log')
     xlim([faxis(find(lim_fAxis, 1)), faxis(find(lim_fAxis, 1, 'last'))])
     
@@ -182,6 +194,7 @@ for istate = 1 : length(sstates)
     
 end
 
+saveFig = true;
 if saveFig
     figpath = fullfile(basepath, 'graphics', 'sleepState');
     mkdir(figpath)

@@ -8,7 +8,7 @@
 % session
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-basepath = 'F:\Data\lh99\lh99_211219_085802';
+basepath = 'F:\Data\lh99\lh99_211220_091903';
 cd(basepath)
 [~, basename] = fileparts(basepath);
 
@@ -35,17 +35,20 @@ recLen = floor(fileinfo.bytes / 2 / nchans / fs);
 
 % separate recording to timebins
 nbins = 4;
-injTime = floor(v.datInfo.nsamps(1) / fs);
+csec = floor(cumsum(v.datInfo.nsamps) / fs);
+[~, injIdx] = min(abs(csec - 6 * 60 * 60));
+injTime = csec(injIdx);
 timebins = n2chunks('n', recLen, 'chunksize', ceil(recLen / nbins));
 timebins(1, 2) = floor(injTime);
 timebins(2, 1) = ceil(injTime) + 1;
+timebins(end, end) = length(v.ss.labels);
 
-% timebins text
 tbins_txt = {'0-6 ZT', '6-12 ZT', '12-18 ZT', '18-24 ZT'};
 
 faxis = 0.2 : 0.2 : 120;
 sstates = [1, 4, 5];
-psdStates = nan(nbins, 3, length(faxis));
+psdLfp = nan(nbins, length(sstates), length(faxis));
+psdEeg = nan(nbins, length(sstates), length(faxis));
 for iwin = 1 : nbins
     
     labels = v.ss.labels(timebins(iwin, 1) : timebins(iwin, 2));
@@ -63,7 +66,7 @@ for iwin = 1 : nbins
 
     [psdLfp(iwin, :, :), ~, ~, epStats(iwin)] = psd_states('eeg', sig, 'emg', [],...
         'labels', labels, 'fs', fsLfp, 'faxis', faxis,...
-        'graphics', true, 'sstates', sstates);
+        'graphics', false, 'sstates', sstates);
 
     % ---------------------------------------------------------------------
     % frontal eeg
@@ -82,7 +85,7 @@ for iwin = 1 : nbins
     end
     [psdEeg(iwin, :, :), ~, ~, ~] = psd_states('eeg', sig, 'emg', [],...
         'labels', labels, 'fs', fsLfp, 'faxis', faxis,...
-        'graphics', true, 'sstates', sstates);
+        'graphics', false, 'sstates', sstates);
     
 end
 
@@ -119,41 +122,44 @@ save(psdfile, 'psdBins')
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+setMatlabGraphics(false)
 fh = figure;
 alphaIdx = linspace(0.5, 1, nbins);
 [cfg_colors, cfg_names, ~] = as_loadConfig([]);
+lim_fAxis = faxis > 2;
 
 for istate = 1 : length(sstates)
     
     % lfp
     subplot(3, 3, istate)
-    psdMat = squeeze(psdBins.psdLfp(:, istate, :));
-    psdMat = psdMat ./ sum(psdMat, 2);
-    ph = plot(faxis, psdMat', 'LineWidth', 2);
+    psdMat = squeeze(psdBins.psdLfp(:, istate, lim_fAxis));
+    psdMat = smooth(psdMat);
+    %     psdMat = psdMat ./ sum(psdMat, 2);
+    ph = plot(faxis(lim_fAxis), psdMat', 'LineWidth', 2);
     for iwin = 1 : length(ph)
-        ph(iwin).Color(istate) = cfg_colors{sstates(istate)}(istate) - iwin * 0.005;
+        ph(iwin).Color(istate) = cfg_colors{sstates(istate)}(istate) - iwin * 0.003;
         ph(iwin).Color(4) = alphaIdx(iwin);
     end
-    xlim([1 100])
     title(cfg_names{sstates(istate)})
     xlabel('Frequency [Hz]')
     ylabel('LFP norm. PSD')
-    legend(split(num2str(1 : nbins)), 'Location', 'Southwest')
+    legend(tbins_txt, 'Location', 'Southwest')
     set(gca, 'YScale', 'log', 'XScale', 'log')
-    
+    xlim([faxis(find(lim_fAxis, 1)), faxis(find(lim_fAxis, 1, 'last'))])
+   
     % eeg
     subplot(3, 3, istate + 3)
-    psdMat = squeeze(psdBins.psdEeg(:, istate, :));
-    psdMat = psdMat ./ sum(psdMat, 2);
-    ph = plot(faxis, psdMat', 'LineWidth', 2);
+    psdMat = squeeze(psdBins.psdEeg(:, istate, lim_fAxis));
+%     psdMat = psdMat ./ sum(psdMat, 2);
+    ph = plot(faxis(lim_fAxis), psdMat', 'LineWidth', 2);
     for iwin = 1 : length(ph)
-        ph(iwin).Color(istate) = cfg_colors{sstates(istate)}(istate) - iwin * 0.005;
+        ph(iwin).Color(istate) = cfg_colors{sstates(istate)}(istate) - iwin * 0.003;
         ph(iwin).Color(4) = alphaIdx(iwin);
     end
     xlabel('Frequency [Hz]')
     ylabel('EEG norm. PSD')
     set(gca, 'YScale', 'log', 'XScale', 'log')
-    xlim([1 120])
+    xlim([faxis(find(lim_fAxis, 1)), faxis(find(lim_fAxis, 1, 'last'))])
     
     % state duration
     subplot(3, 3, istate + 6)
@@ -175,9 +181,12 @@ for istate = 1 : length(sstates)
     ax = gca;
     set(ax.YAxis(1), 'color', cfg_colors{sstates(istate)})
     set(ax.YAxis(2), 'color', 'k')
+    xticklabels(tbins_txt)
+    xtickangle(45)
     
 end
 
+saveFig = true;
 if saveFig
     figpath = fullfile(basepath, 'graphics', 'sleepState');
     mkdir(figpath)
