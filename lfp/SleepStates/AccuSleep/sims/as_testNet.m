@@ -16,6 +16,7 @@ basepaths_acc = [{'G:\Data\lh99\as\lh99_211219_085802'},...     % local acsf. 12
 
 test_acc = [{'G:\Data\lh98\lh98_211218_090630'},...             % local acsf. * min man
     {'I:\lh87\lh87_210522_095319'},...                          % op saline. 330 min man
+    {'F:\Data\lh99\lh99_211218_090630'},...                     % local acsf. 120 min man
     ];
 
 test_emg = [{'G:\Data\lh95\as\lh95_210825_080400'},...          % local ketamine. 120 min man
@@ -28,6 +29,7 @@ basepaths_emg = [{'F:\Data\Processed\lh96\lh96_211201_070100'},...  % local acsf
     {'G:\Data\lh95\as\lh95_210824_083300'},...                  % local acsf. 200 min man                  
     {'I:\lh86\lh86_210302_183000'},...                          % op ketamine. 60 min man
     {'I:\lh86\lh86_210304_180800'},...                          % washout. 60 min man
+    {'F:\Data\Processed\lh96\lh96_211207_071500'},...           % local baclofen. 60 min man
     ];
 
 % frontal eeg -------------------------------------------------------------
