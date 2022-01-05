@@ -79,6 +79,9 @@ emg = emg(:);
 calibrationData = createCalibrationData(eeg,...
     emg, labels, newFs, epochLen);
 
+calibrationData = createCalibrationData(EEG,...
+    EMG, labels, fs, epochLen);
+
 % select relavent labels
 labelsIdx = find(labels < nstates);
 

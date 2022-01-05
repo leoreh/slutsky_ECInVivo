@@ -8,10 +8,6 @@ frBoundries = [0.01 Inf; 0.01 Inf];
 % data base
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% i.p. 10 mg/kg
-% F:\Data\lh99\lh99_211224_084528
-% F:\Data\Processed\lh96\lh96_211206_070400
-
 % lh94
 % lh94_210812_081900 - ket 20 mM @ 1 ul - can use t3 from. note ripples
 % lh94_210813_090800 - saline @ 1 ul
@@ -58,7 +54,7 @@ for isession = 1 : nsessions
     fileinfo = dir([basename, '.dat']);
     recLen = floor(fileinfo.bytes / 2 / nchans / fs);
     injTime = floor(v(isession).datInfo.nsamps(1) / fs);
-    timebins = n2chunks('n', recLen, 'chunksize', ceil(recLen / nbins));
+    timebins = n2chunks('n', recLen, 'chunksize', floor(recLen / nbins));
     timebins(1, 2) = floor(injTime);
     timebins(2, 1) = ceil(injTime) + 1;
 
@@ -86,12 +82,12 @@ for isession = 1 : nsessions
             'fs', fsLfp, 'faxis', faxis,...
             'graphics', true, 'sstates', sstates);
     end
-    psdStruct.timebins = timebins;
+    epStats.timebins = timebins;
     
     psdfile = fullfile(basepath, [basename, '.psd_timebins.mat']);
     save(psdfile, 'psdStates', 'epStats')
     
-    % graphics
+    % grap
     fh = figure;
     alphaIdx = linspace(0.4, 1, nbins);
     [cfg_colors, cfg_names, ~] = as_loadConfig([]);
@@ -113,11 +109,6 @@ for isession = 1 : nsessions
     end
     
 end
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% firing rate
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % re-organize vars of interest
 for isession = 1 : nsessions

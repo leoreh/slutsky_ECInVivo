@@ -23,3 +23,4 @@
 
 % createCalibrationData
 % # remove last state from config file so the net won't be trained on bin
+% # added tolerance to difference in length of labels and t of spectrogram

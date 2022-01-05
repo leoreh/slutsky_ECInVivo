@@ -42,12 +42,6 @@ weights = config.cfg_weights'; % rem, wake, nrem, ...
 
 % create the spectrogram
 [s, t, f] = createSpectrogram(EEG, SR, epochLen);
-% check if labels has the correct length
-if length(t) ~= length(labels)
-    calibrationData = [];
-    disp('Labels are not the proper length for this recording');
-    return
-end
 
 % check if there are at least a few labeled epochs for each state
 count_by_state = zeros(1, n_states);
@@ -68,6 +62,20 @@ s = s(:, [1:(f20idx-1), f20idx:2:f50idx]);
 s = log(s);
 % calculate log rms for each EMG bin
 processedEMG = processEMG(EMG, SR, epochLen);
+
+% check if labels has the correct length
+diffLD = length(t) - length(labels);
+if diffLD > 0
+    if diffLD > 2
+        calibrationData = [];
+        disp('Labels are not the proper length for this recording');
+        return
+    else
+        t = t(1 : length(labels));
+        s = s(1 : length(labels), :);
+        processedEMG = processedEMG(1 : length(labels));
+    end
+end
 
 % make an image for the entire recording
 s = [s, processedEMG']; % we only need one of the emg columns

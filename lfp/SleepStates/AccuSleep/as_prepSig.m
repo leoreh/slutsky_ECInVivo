@@ -227,8 +227,8 @@ EMG = EMG(:);
 EEG = EEG(:);
 
 % remove 50 from emg
-[EMG, tsaSig, ~] = tsa_filter('sig', EMG, 'fs', fs, 'tw', false,...
-    'ma', true, 'graphics', true);
+% [EMG, tsaSig, ~] = tsa_filter('sig', EMG, 'fs', fs, 'tw', false,...
+%     'ma', true, 'graphics', true);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % finilize and save

@@ -180,8 +180,8 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % convert labels to state epochs
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
- 
-minDur = [10, 10, 0, 10, 0, 0]; % threshold of minimum epoch length
+
+minDur = [10, 5, 5, 10, 5, 5];  % threshold of minimum epoch length
 interDur = 4;                   % combine epochs separated by <= interDur
 
 if length(minDur) == 1
@@ -234,7 +234,7 @@ ss.info = sigInfo;
 ss.info.net = netfile;
 ss.info.calibrationData = calibrationData;
 ss.info.analysisDate = datetime;
-ss.info.epochLen = minEpochLen;
+ss.info.minEpochLen = minEpochLen;
 ss.info.minBoutLen = minBoutLen;
 ss.info.minDur = minDur;
 ss.info.interDur = interDur;
