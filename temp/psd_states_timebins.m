@@ -8,7 +8,7 @@
 % session
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-basepath = 'F:\Data\lh99\lh99_211220_091903';
+basepath = 'F:\Data\lh99\lh99_211223_090020';
 cd(basepath)
 [~, basename] = fileparts(basepath);
 

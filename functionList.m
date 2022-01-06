@@ -133,7 +133,7 @@ ripp = getRipples('basepath', basepath, 'rippCh', [23], 'emgCh', [33],...
 
 % manually create labels
 labelsmanfile = [basename, '.AccuSleep_labelsMan.mat'];
-AccuSleep_viewer(EEG, EMG,  1250, 1, [], labelsmanfile)
+AccuSleep_viewer(EEG, EMG,  1250, 1, labels, [])
 
 % classify with a network
 netfile = 'D:\Code\slutsky_ECInVivo\lfp\SleepStates\AccuSleep\trainedNetworks\net_220103_151924.mat';
