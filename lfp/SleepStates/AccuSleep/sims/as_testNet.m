@@ -21,6 +21,7 @@ test_acc = [{'G:\Data\lh98\lh98_211218_090630'},...             % local acsf. * 
 
 test_emg = [{'G:\Data\lh95\as\lh95_210825_080400'},...          % local ketamine. 120 min man
     {'G:\Data\lh99\as\lh99_211220_091903'},...                  % local ketamin. man done on acc
+    {'F:\Data\Processed\lh96\lh96_211206_070400'},...           % ketamine i.p. 90 min man from 1st half, 30 min from 2nd half
     ];
 
 % emg

@@ -185,11 +185,11 @@ if ~isempty(eegCf)
     eegOrig = iosr.dsp.sincFilter(eegOrig, filtRatio);
 end
 
-if ~isempty(emgCf)   
-    fprintf('\nfiltering EMG, cutoff = %d Hz', emgCf)
-    filtRatio = emgCf / (emgFs / 2);
-    emgOrig = iosr.dsp.sincFilter(emgOrig, filtRatio);    
-end
+% if ~isempty(emgCf)   
+%     fprintf('\nfiltering EMG, cutoff = %d Hz', emgCf)
+%     filtRatio = emgCf / (emgFs / 2);
+%     emgOrig = iosr.dsp.sincFilter(emgOrig, filtRatio);    
+% end
 
 % remove DC component from eeg
 fprintf('\nremoving DC component\n')
@@ -211,13 +211,15 @@ if length(emgOrig) ~= length(eegOrig) || fs ~= emgFs
             'Check data and sampling frequencies.\n'], abs(emgDur - eegDur))
     end
     tstamps_sig = [1 / fs : 1 / fs : recDur];
-    
+    tstamps_sig = [1 : length(eegOrig)] / eegFs;
+
     
     fprintf('downsampling to %d Hz\n', fs)
     EMG = [interp1([1 : length(emgOrig)] / emgFs, emgOrig, tstamps_sig,...
         'spline')]';
-    EEG = [interp1([1 : length(eegOrig)] / eegFs, eegOrig, tstamps_sig,...
-        'spline')]';
+%     EEG = [interp1([1 : length(eegOrig)] / eegFs, eegOrig, tstamps_sig,...
+%         'spline')]';
+    EEG = eegOrig;
 else
     EMG = emgOrig;
     EEG = eegOrig;
@@ -225,6 +227,13 @@ end
 
 EMG = EMG(:);
 EEG = EEG(:);
+
+if ~isempty(emgCf)   
+    fprintf('\nfiltering EMG, cutoff = %d Hz', emgCf)
+    filtRatio = emgCf / (1250 / 2);
+    EMG = iosr.dsp.sincFilter(EMG, filtRatio);    
+end
+
 
 % remove 50 from emg
 % [EMG, tsaSig, ~] = tsa_filter('sig', EMG, 'fs', fs, 'tw', false,...
