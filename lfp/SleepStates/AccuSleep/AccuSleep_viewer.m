@@ -1,4 +1,4 @@
-function [message] = AccuSleep_viewer(EEG, EMG, SR, epochLen, userLabels, savepath)
+function [message] = AccuSleep_viewer(sSig, userLabels, savepath)
 %AccuSleep_viewer A GUI for manually assigning sleep stage labels to EEG/EMG data.
 %   Zeke Barger 021321
 %   Arguments:
@@ -30,30 +30,28 @@ setMatlabGraphics(true)
 %% Check the inputs
 G = struct; % holds everything
 
-% load config info
-config = load_config_data();
-if ischar(config)
-    message = config;
-    return
-else
-    G.config = config;
-    G.n_states = length(config.cfg_names);
-end
+% load cfg info
+% load cfg data
+cfg = as_loadConfig();
+epochLen = cfg.epochLen;
+
+G.cfg = cfg;
+G.nstates = length(cfg.names);
 
 % make sure we have at least 3 arguments
 switch nargin
-    case {0,1,2,3}
+    case {0}
         disp('Not enough arguments')
         message = 'ERROR: Not enough arguments';
         return
-    case 4
+    case 1
         G.labels = [];
-    case {5,6}
+    case {2, 3}
         if ~isempty(userLabels) % user tried to pass some labels
             % check whether they have the correct format
             q = struct;
             q.labels = userLabels;
-            if checkLabels(q, 0, G.n_states) % meets certain conditions
+            if checkLabels(q, 0, G.nstates) % meets certain conditions
                 G.labels = q.labels;
                 if isrow(G.labels)
                     G.labels = G.labels';
@@ -67,22 +65,26 @@ switch nargin
         end
 end
 
+SR = sSig.fs;
 G.originalSR = SR; % EEG/EMG sampling rate
 G.SR = SR; % sampling rate used when calculating spectrogram and processed EMG
 G.epochLen  = epochLen; % length of one epoch (spectrogram column) in seconds
 
-if length(EEG) ~= length(EMG)
+if length(sSig.eeg) ~= length(sSig.emg)
     message = 'ERROR: EEG and EMG are different lengths';
     return
 end
 
-G.EEG = EEG - mean(EEG);
-G.EMG = EMG - mean(EMG);
-clear('EMG','EEG');
+G.EEG = sSig.eeg - mean(sSig.eeg);
+G.EMG = sSig.emg - mean(sSig.emg);
+clear('sSig.eeg','sSig.emg');
 
 % create spectrogram and process EMG at a standard SR
-[spec, tAxis, fAxis] = createSpectrogram(G.EEG, G.SR, G.epochLen);
-G.processedEMG = processEMG(G.EMG, G.SR, G.epochLen);
+spec = sSig.spec;
+tAxis = sSig.spec_tstamps;
+fAxis = sSig.spec_freq;
+G.processedEMG = sSig.emg_rms;
+
 % set ceiling for EMG trace at 2.5 SD when plotting
 G.cappedEMG = G.processedEMG;
 emgCap = mean(G.cappedEMG) + 2.5*std(G.cappedEMG);
@@ -91,15 +93,15 @@ G.cappedEMG(G.cappedEMG > emgCap) = emgCap;
 % set various parameters
 G.show = 5; %  default number of bins to display on screen
 G.dt = 1/G.originalSR; % duration of each EEG/EMG sample in seconds
-G.advance = 0; % whether to advance automatically when a state is assigned
-G.colors = zeros(G.n_states + 2, 3);
+G.advance = 1; % whether to advance automatically when a state is assigned
+G.colors = zeros(G.nstates + 2, 3);
 G.colors(1,:) = [1 1 1]; % background color, white
 G.colors(end,:) = [0 0 0]; % undefined color, black
-for r = 1:G.n_states % insert colors for each stage
-    G.colors(r + 1, :) = G.config.cfg_colors{r};
+for r = 1:G.nstates % insert colors for each stage
+    G.colors(r + 1, :) = G.cfg.colors{r};
 end
 G.mid = ceil(G.show/2); % important for plotting the current time marker - middle of G.show
-G.savepath = ''; % where to save the sleep stage labels
+G.savepath = savepath; % where to save the sleep stage labels
 G.nbins = length(tAxis); % total number of time bins in the recording
 G.unsavedChanges = 0; % whether anything has changed since user last saved
 
@@ -111,7 +113,7 @@ if ~isempty(G.labels)
         return
     end
 else % if no sleep stages provided, set to undefined
-    G.labels = ones(G.nbins,1) * (G.n_states + 1);
+    G.labels = ones(G.nbins,1) * (G.nstates + 1);
 end
 
 % get spectrogram and time axes
@@ -326,13 +328,13 @@ message = 'Data loaded successfully';
         cla(G.A7)
         hold(G.A7,'on')
         xlim(G.A7, [-n-0.5 n+0.5]);
-        ylim(G.A7, [0.5, G.n_states+.5]);
+        ylim(G.A7, [0.5, G.nstates+.5]);
         set(G.A7, 'XLimMode','manual', 'YLimMode','manual');
         
         for i = 1:length(seq)
-            if seq(i)==G.n_states+1
+            if seq(i)==G.nstates+1
                 pX = [x(i)-.5, x(i)+.5, x(i)+.5, x(i)-.5];
-                pY = [G.n_states+.5, G.n_states+.5, .5, .5];
+                pY = [G.nstates+.5, G.nstates+.5, .5, .5];
                 patch(G.A7,pX,pY,G.colors(seq(i)+1,:),'EdgeColor','none');
             else
                 pX = [x(i)-.5, x(i)+.5, x(i)+.5, x(i)-.5];
@@ -341,7 +343,7 @@ message = 'Data loaded successfully';
             end
         end
         
-        set(G.A7, 'XTickLabel', [],'XTick',[], 'YTick', 1:G.n_states, 'YTickLabel', G.config.cfg_names);
+        set(G.A7, 'XTickLabel', [],'XTick',[], 'YTick', 1:G.nstates, 'YTickLabel', G.cfg.names);
         box(G.A7, 'off');
         
         % plot EEG and EMG
@@ -437,20 +439,20 @@ message = 'Data loaded successfully';
         hold(G.A1, 'on');
         box(G.A1,'on');
         ylim(G.A1,[0 1]);
-        ylim(G.A1,[.5 G.n_states+.5]);
+        ylim(G.A1,[.5 G.nstates+.5]);
         xlim(G.A1,li) % make sure x limits are correct
         set(G.A1,'XLimMode','manual','YLimMode','manual');
-        imagesc(G.A1,G.specTh,1:G.n_states,makeSleepStageImage(G.labels),[0 G.n_states+1]);
+        imagesc(G.A1,G.specTh,1:G.nstates,makeSleepStageImage(G.labels),[0 G.nstates+1]);
         colormap(G.A1,G.colors);
-        set(G.A1, 'XTickLabel', [],'XTick',[], 'YTick', 1:G.n_states, 'YTickLabel', G.config.cfg_names);
+        set(G.A1, 'XTickLabel', [],'XTick',[], 'YTick', 1:G.nstates, 'YTickLabel', G.cfg.names);
     end
 
     function [im] = makeSleepStageImage(state) % create the image to show
         % in the top sleep stage panel
-        im = zeros(G.n_states,length(state));
-        for i = 1:G.n_states
+        im = zeros(G.nstates,length(state));
+        for i = 1:G.nstates
             im(i,:) = (state==i).*i;
-            im(i,state==(G.n_states+1)) = G.n_states+1;
+            im(i,state==(G.nstates+1)) = G.nstates+1;
         end
     end
 
@@ -536,7 +538,7 @@ message = 'Data loaded successfully';
                     'numpad5','numpad6','numpad7','numpad8',...
                     'numpad9'} % set to brain state
                 state = str2num(evt.Key(end));
-                if state <= G.n_states+1
+                if state <= G.nstates+1
                     G.labels(G.index) = state;
                     G.unsavedChanges = 1;
                     updateState;
@@ -545,7 +547,7 @@ message = 'Data loaded successfully';
                 end    
                 
             case 'x' % set undefined
-                G.labels(G.index) = G.n_states+1;
+                G.labels(G.index) = G.nstates+1;
                 G.unsavedChanges = 1;
                 updateState;
                 updatePlots;
@@ -576,7 +578,7 @@ message = 'Data loaded successfully';
                 
                 [label,~] = listdlg('PromptString','Set label to:',...
                     'SelectionMode','single',...
-                    'ListString',[G.config.cfg_names;{'Undefined'}]);
+                    'ListString',[G.cfg.names;{'Undefined'}]);
                 if isempty(label) % no label selected
                     delete(t);
                     return
@@ -752,7 +754,7 @@ message = 'Data loaded successfully';
             'H : show help menu';
             ' ';
             'Numbers 1-9 : set brain state';
-            '   If there are n brain states in the config file,';
+            '   If there are n brain states in the cfg file,';
             '   n+1 is the undefined state';
             'X : set undefined';
             '* (multiply) : set labels for a range of timepoints.';
@@ -776,7 +778,7 @@ message = 'Data loaded successfully';
             return
         end
         f = load([path,file]); % load the file
-        if checkLabels(f,1,G.n_states) % make sure file has the correct contents
+        if checkLabels(f,1,G.nstates) % make sure file has the correct contents
             G.labels = f.labels; % use these labels
             G.savepath = ''; % clear the save path to avoid confusion
             updateState; % plot the new labels
@@ -807,7 +809,7 @@ message = 'Data loaded successfully';
     end
 
 % check if a structure x has a properly constructed labels field
-    function [allChecksPassed] = checkLabels(x, checkLen, n_states)
+    function [allChecksPassed] = checkLabels(x, checkLen, nstates)
         allChecksPassed = 0;
         if ~isfield(x, 'labels') % needs a labels variable
             msgbox('Error: file does not contain a variable called labels')
@@ -817,9 +819,9 @@ message = 'Data loaded successfully';
             msgbox('Error: labels variable must be numeric')
             return
         end
-        if ~isempty(setdiff(unique(x.labels), 1:(n_states+1))) % in the range 1:n_states+1
+        if ~isempty(setdiff(unique(x.labels), 1:(nstates+1))) % in the range 1:nstates+1
             msgbox(['Error: labels variable must be in the range 1:',...
-                num2str(n_states+1),'.'])
+                num2str(nstates+1),'.'])
             return
         end
         if length(size(x.labels)) > 2 || min(size(x.labels)) >  1 % should be a vector

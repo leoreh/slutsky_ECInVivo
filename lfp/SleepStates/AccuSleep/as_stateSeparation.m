@@ -1,15 +1,13 @@
-function as_stateSeparation(EEG, EMG, labels, varargin)
+function as_stateSeparation(sSig, labels, varargin)
 
 % plot the separation of states based on emg (rms) and eeg (spectrogram)
 % signals
 %
 % INPUT:
-%   EMG             numeric. emg data (1 x n)
-%   EEG             numeric. eeg data (1 x n)
+%   sSig            struct. see as_prepSig.m
 %   labels          numeric. 
 %   stateEpochs     cell of nstates where each cell contains an 2 x n
 %                   describing the start and end of an epoch
-%   fs              numeric. sampling frequency
 %   saveFig         logical. save figure {true}
 %
 % DEPENDENCIES
@@ -27,12 +25,10 @@ function as_stateSeparation(EEG, EMG, labels, varargin)
 
 p = inputParser;
 addOptional(p, 'stateEpochs', []);
-addOptional(p, 'fs', []);
 addOptional(p, 'saveFig', true, @islogical);
 
 parse(p, varargin{:})
 stateEpochs     = p.Results.stateEpochs;
-fs              = p.Results.fs;
 saveFig         = p.Results.saveFig;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -42,56 +38,45 @@ saveFig         = p.Results.saveFig;
 basepath = pwd;
 [~, basename] = fileparts(basepath);
 
-% constants
-epochLen = 1;        
-minBoutLen = epochLen;
-
 % get params from configuration file
-[cfg_colors, cfg_names, ~] = as_loadConfig([]);
-cfg_colors = cfg_colors(:);
-nstates = length(cfg_names);
-sstates = 1 : nstates - 1;      % selected states (ignore bin)
+cfg = as_loadConfig();
+epochLen = cfg.epochLen;
+nstates = cfg.nstates;
+sstates = 1 : nstates;      
 
 % validate data
-if length(EEG) ~= length(EMG)
-    error('EEG and EMG must be the same length')
+if length(sSig.eeg) ~= length(sSig.emg)
+    error('eeg and emg must be the same length')
 end
-
-if isempty(fs)
-    fs = 1250;
-end
-newFs = 128;
-
-tic;
-fprintf('\nPreparing signals, this may take some time...')
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % prep signals (similar pipeline to AccuSleep_classify)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% standardize
-eeg = standardizeSR(EEG, fs, newFs);
-emg = standardizeSR(EMG, fs, newFs);
-eeg = eeg(:);
-emg = emg(:);
-
 % calibration 
-calibrationData = createCalibrationData(eeg,...
-    emg, labels, newFs, epochLen);
+calData =...
+    createCalibrationData(sSig.spec, sSig.spec_freq, sSig.emg_rms, labels);
 
-% select relavent labels
-labelsIdx = find(labels < nstates);
+% scale the emg
+sSig.emg_rms = (sSig.emg_rms - calData(end, 1)) ./ calData(end, 2);
+sSig.emg_rms = (sSig.emg_rms + 4.5) ./ 9;
 
-% create spectrogram
-[specDisp, taxis, f] = createSpectrogram(eeg, newFs, epochLen);
+% clip
+sSig.emg_rms(sSig.emg_rms < 0) = 0;
+sSig.emg_rms(sSig.emg_rms > 1) = 1;
+
+% -------------------------------------------------------------------------
+% normalize spectrogram for power in specific bands
+specDisp = sSig.spec;
+taxis = sSig.spec_tstamps;
 
 % frequency indices
-[~, f1idx] = min(abs(f - 1));
-[~, f4idx] = min(abs(f - 4));
-[~, f6idx] = min(abs(f - 6));
-[~, f12idx] = min(abs(f - 12));
-[~, f20idx] = min(abs(f - 20)); % index in f of 20Hz
-[~, f50idx] = min(abs(f - 50)); % index in f of 50Hz
+[~, f1idx] = min(abs(sSig.spec_freq - 1));
+[~, f4idx] = min(abs(sSig.spec_freq - 4));
+[~, f6idx] = min(abs(sSig.spec_freq - 6));
+[~, f12idx] = min(abs(sSig.spec_freq - 12));
+[~, f20idx] = min(abs(sSig.spec_freq - 20)); % index in f of 20Hz
+[~, f50idx] = min(abs(sSig.spec_freq - 50)); % index in f of 50Hz
 
 % select frequencies up to 50 Hz, and downsample between 20 and 50 Hz
 specNorm = specDisp(:, [1 : (f20idx - 1), f20idx : 2 : f50idx]);
@@ -99,7 +84,7 @@ specNorm = specDisp(:, [1 : (f20idx - 1), f20idx : 2 : f50idx]);
 specNorm = log(specNorm);
 % scale the spectrogram
 for j = 1:size(specNorm, 2)
-    specNorm(:, j) = (specNorm(:, j) - calibrationData(j, 1)) ./ calibrationData(j, 2);
+    specNorm(:, j) = (specNorm(:, j) - calData(j, 1)) ./ calData(j, 2);
     specNorm(:, j) = (specNorm(:, j) + 4.5) ./ 9; % clip z scores
 end
 % clip
@@ -110,25 +95,14 @@ sDelta = sum(specNorm(:, f1idx : f4idx), 2);
 sTheta = sum(specNorm(:, f6idx : f12idx), 2);
 sRatio = sDelta ./ sTheta;
 
-% calculate log rms for each EMG bin
-processedEMG = processEMG(emg, newFs, epochLen);
-
-% scale the EMG
-processedEMG = (processedEMG - calibrationData(end, 1)) ./ calibrationData(end, 2);
-processedEMG = (processedEMG + 4.5) ./ 9;
-
-% clip
-processedEMG(processedEMG < 0) = 0;
-processedEMG(processedEMG > 1) = 1;
-
 fprintf('\ndone in %.1f sec\n\n', toc)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % calculate stuff
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-[psdStates, faxis, emgRMS] = psd_states('eeg', eeg, 'emg', emg,...
-    'labels', labels, 'fs', newFs, 'graphics', false);
+[psdStates, faxis, ~] = psd_states('eeg', sSig.eeg,...
+    'labels', labels, 'fs', sSig.fs, 'graphics', false);
 
 % convert labels to state epochs.
 if isempty(stateEpochs)
@@ -163,12 +137,12 @@ hold on
 for istate = 1 : nstates
     stateLabels = find(labels == istate);
     scatter(stateLabels / epochLen / 60 / 60,...
-        processedEMG(stateLabels),...
-        3, cfg_colors{istate})
+        sSig.emg_rms(stateLabels),...
+        3, cfg.colors{istate})
 end
 axis tight
-ylim([min(processedEMG) 1])
-ylabel('Norm. EMG RMS')
+ylim([min(sSig.emg_rms) 1])
+ylabel('Norm. emg RMS')
 set(gca, 'XTick', [], 'YTick', [])
 
 % spectrogram
@@ -192,7 +166,7 @@ xlabel('Time [h]')
 % spectral power per state
 fh.CurrentAxes = sb3;
 ph = plot(faxis, psdStates ./ sum(psdStates, 2), 'LineWidth', 3);
-set(ph, {'color'}, cfg_colors(sstates))
+set(ph, {'color'}, cfg.colors(sstates))
 xlim([0 30])
 xlabel('Frequency [Hz]')
 ylabel('Norm PSD')     
@@ -202,10 +176,10 @@ ylabel('Norm PSD')
 fh.CurrentAxes = sb4;
 hold on
 for istate = sstates
-scatter(sRatio(labels == istate), processedEMG(labels == istate)',...
-    2, cfg_colors{istate}, 'filled')
+scatter(sRatio(labels == istate), sSig.emg_rms(labels == istate)',...
+    2, cfg.colors{istate}, 'filled')
 end
-ylabel('Norm. EMG RMS')
+ylabel('Norm. emg RMS')
 xlabel('Delta / Theta Ratio')
 set(gca, 'YTick', [])
 
@@ -220,9 +194,9 @@ bh = findobj(sb5, 'Tag', 'Box');
 bh = flipud(bh);
 for ibox = 1 : length(bh)
     patch(get(bh(ibox), 'XData'), get(bh(ibox), 'YData'),...
-        cfg_colors{sstates(ibox)}, 'FaceAlpha', 0.5)
+        cfg.colors{sstates(ibox)}, 'FaceAlpha', 0.5)
 end
-xticklabels(cfg_names(sstates))
+xticklabels(cfg.names(sstates))
 xtickangle(45)
 set(sb5, 'YScale', 'log')
 ylabel('Epoch Length [log(s)]')
@@ -233,8 +207,8 @@ fh.CurrentAxes = sb6;
 pie(sum(cell2nanmat(epLen(sstates)), 1, 'omitnan'), ones(1, length(sstates)));
 hold on
 ph = findobj(sb6, 'Type', 'Patch');
-set(ph, {'FaceColor'}, flipud(cfg_colors(sstates)))
-legend(cfg_names, 'Units', 'normalized', 'Position', [0.81 0.11 0.10 0.20]);
+set(ph, {'FaceColor'}, flipud(cfg.colors(sstates)))
+legend(cfg.names, 'Units', 'normalized', 'Position', [0.81 0.11 0.10 0.20]);
 
 % save figure
 if saveFig

@@ -1,14 +1,11 @@
-function [net, netInfo] = AccuSleep_train(fileList, SR, epochLen, epochs, imageLocation)
+function [net, netInfo] = AccuSleep_train(basepaths, SR, epochs, imageLocation)
 % AccuSleep_train  Train a network for classifying brain states
 % Zeke Barger, 021321
 %
 %   Arguments:
-%   fileList - a cell array with three columns. Each entry is the path to a
-%       file of training data (as a string). The first column is the EEG, 
-%       2nd is the EMG, 3rd is the sleep stage labels. Labels other than 
-%       {1,2,...,n_states} are ignored during training.
-%   SR - sampling rate, in Hz
-%   epochLen - length of each scoring epoch, in seconds
+%   basepaths - a cell array of strings depicting the full path to the data
+%   folder. each folder should contain a [basename].sleep_sig and
+%   [basename].labelsMan.
 %   epochs - the number of epochs for the network to consider at once when
 %       scoring each individual epoch. More epochs provide more context,
 %       but using fewer epochs is more efficient.
@@ -30,36 +27,21 @@ function [net, netInfo] = AccuSleep_train(fileList, SR, epochLen, epochs, imageL
 %% Check the inputs and prepare the image folder
 net = [];
 switch nargin
-    case {0, 1, 2, 3}
+    case {0, 1, 2}
         error('Not enough arguments')
-    case 4
+    case 3
         imageLocation = [char(cd),filesep,'training_images_',...    
             char(datetime(now,'ConvertFrom','datenum',...
             'Format','yyyy-MM-dd_HH-mm-ss'))];
         deleteImages = 1;
-    case 5
+    case 4
         deleteImages = 0;
 end
 
 % load config data
-config = load_config_data();
-if ischar(config)
-    error(config)
-end
-n_states = length(config.cfg_names);
-
-% -------------- lh 22 apr 21 (remove bin state from training)
-n_states = n_states - 1;
-config.cfg_names = config.cfg_names(1 : n_states);
-config.cfg_weights = config.cfg_weights(1 : n_states);
-config.cfg_colors = config.cfg_names(1 : n_states);
-% --------------
-
-% do a basic check on the fileList structure
-if ~iscell(fileList) || (size(fileList,1) < 1 || size(fileList,2) ~= 3)
-    error(['fileList argument is not correctly formatted.',...
-        'Type "help AccuSleep_train" for details.'])
-end
+cfg = as_loadConfig();
+nstates = cfg.nstates;
+epochLen = cfg.epochLen;
 
 % make directory to hold training images
 % remove slash at the end of the path if it's there already
@@ -72,7 +54,7 @@ imageLocation = [imageLocation,filesep,'training_images_',...
             'Format','yyyy-MM-dd_HH-mm-ss'))];
 mkdir(imageLocation);
 % make folders for each class
-for i = 1:n_states
+for i = 1:nstates
     mkdir([imageLocation,filesep,num2str(i)])
 end
 
@@ -81,31 +63,43 @@ end
 pad = round((epochs - 1) / 2);
 
 %%  Process the recordings
-nFiles = size(fileList, 1);
+nFiles = size(basepaths, 1);
 disp(['Processing ',num2str(nFiles),' files (this may take a while)'])
 for i = 1:nFiles
     % load the files
+    basepath = basepaths{i};
+    [~, basename] = fileparts(basepath);
+    sigfile = fullfile(basepath, [basename, '.sleep_sig.mat']);
+    labelmanfile = fullfile(basepath, [basename, '.sleep_labelsMan.mat']);
+    
+    SR = load(sigfile, 'fs');
     data = struct;
-    data.a = load(fileList{i,1});
-    data.b = load(fileList{i,2});
-    data.c = load(fileList{i,3});
+%     data.a = load(basepaths{i,1});
+%     data.b = load(basepaths{i,2});
+    data.c = load(labelmanfile, 'labels');
+    s = load(sigfile, 'spec');
+    s = s.spec;
+    f = load(sigfile, 'spec_freq');
+    f = f.spec_freq;
+    processedEMG = load(sigfile, 'emg_rms');
+    processedEMG = processedEMG.emg_rms;
     
     % make sure the files look ok
-    switch checkFiles(data, SR, epochLen, i, n_states)
-        % user opts to skip
-        case 0
-            continue
-            % user opts to quit
-        case -1
-            % delete the images
-            if deleteImages
-                rmdir(imageLocation);
-            end
-            return
-    end
+%     switch checkFiles(data, SR, epochLen, i, nstates)
+%         % user opts to skip
+%         case 0
+%             continue
+%             % user opts to quit
+%         case -1
+%             % delete the images
+%             if deleteImages
+%                 rmdir(imageLocation);
+%             end
+%             return
+%     end
     
     % create the spectrogram
-    [s, ~, f] = createSpectrogram(data.a.EEG, SR, epochLen);
+%     [s, ~, f] = createSpectrogram(data.a.EEG, SR, epochLen);
     % select frequencies up to 50 Hz, and downsample between 20 and 50 Hz
     [~,f20idx] = min(abs(f - 20)); % index in f of 20Hz
     [~,f50idx] = min(abs(f - 50)); % index in f of 50Hz
@@ -113,7 +107,7 @@ for i = 1:nFiles
     % take log of the spectrogram
     s = log(s);
     % calculate log rms EMG for each epoch
-    processedEMG = processEMG(data.b.EMG, SR, epochLen);
+%     processedEMG = processEMG(data.b.EMG, SR, epochLen);
     % make sure labels are the right length
     if length(data.c.labels) > length(processedEMG)
         data.c.labels = data.c.labels(1:length(processedEMG));
@@ -127,22 +121,22 @@ for i = 1:nFiles
     im = [s, repmat(processedEMG',1,9)];
     
     % calibrate the features
-    weights = config.cfg_weights'; % rem wake nrem ...
-    m = zeros(size(im, 2), n_states);
-    v = zeros(size(im, 2), n_states);
+    weights = cfg.weights(:); % rem wake nrem ...
+    m = zeros(size(im, 2), nstates);
+    v = zeros(size(im, 2), nstates);
     % for each brain state
-    for j = 1:n_states
+    for j = 1:nstates
         % calculate mean and var for all features
         m(:,j) = mean(im(data.c.labels==j,:));
         v(:,j) = var(im(data.c.labels==j,:));
     end
     % mixture means are just weighted combinations of state means
     calibrationData = zeros(size(im, 2), 2);
-    calibrationData(:,1) = m * weights';
+    calibrationData(:,1) = m * weights;
     % mixture variance is given by law of total variance
     % sqrt to get the standard deviation
-    calibrationData(:,2) = sqrt(v * weights' +...
-        ((m - repmat(calibrationData(:,1),1,n_states)).^2) * weights');
+    calibrationData(:,2) = sqrt(v * weights +...
+        ((m - repmat(calibrationData(:,1),1,nstates)).^2) * weights);
     
     % perform scaling
     for j = 1:size(im,2)
@@ -158,7 +152,7 @@ for i = 1:nFiles
     % take all datapoints with sufficient epochs on either side
     for j = (pad+1):(length(processedEMG)-pad)
         % only take timepoints with labels in range 1:n_states
-        if data.c.labels(j) > 0 && data.c.labels(j) < (n_states+1)
+        if data.c.labels(j) > 0 && data.c.labels(j) < (nstates+1)
             thisImg = im((j-pad):(j+pad),:);
             % create filename
             fName = [imageLocation,filesep,num2str(data.c.labels(j)),...
@@ -172,14 +166,14 @@ end
 %% Oversample training data to achieve balanced classes
 disp('Balancing classes')
 % count examples of each class
-counts = zeros(1, n_states);
-for i = 1:n_states
+counts = zeros(1, nstates);
+for i = 1:nstates
     d = dir([imageLocation,filesep,num2str(i)]);
     counts(i) = length(d)-2;
 end
 
 % make more if necessary
-for i = 1:n_states
+for i = 1:nstates
    if counts(i) < max(counts)
       numSamples = max(counts) - counts(i);
       d = dir([imageLocation,filesep,num2str(i)]);
@@ -240,16 +234,16 @@ layers = [
     convolution2dLayer(3,32,'Padding','same')
     batchNormalizationLayer
     reluLayer
-    fullyConnectedLayer(n_states)
+    fullyConnectedLayer(nstates)
     softmaxLayer
     classificationLayer];
 
 % net info (lh 09 jul 21) -------------------------------------------------
-for ifile = 1 : size(fileList, 1)
-    netInfo.files{ifile} = fileparts(fileList{ifile, 1});
+for ifile = 1 : size(basepaths, 1)
+    netInfo.files{ifile} = fileparts(basepaths{ifile, 1});
     [~, basename] = fileparts(netInfo.files{ifile});
-    load(fileList{ifile, 3})
-    netInfo.labelsDuration(ifile) = sum(labels < n_states);
+    load(basepaths{ifile, 3})
+    netInfo.labelsDuration(ifile) = sum(labels < nstates);
 end
 
 % train

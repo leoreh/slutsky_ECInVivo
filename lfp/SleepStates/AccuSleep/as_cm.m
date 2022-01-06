@@ -42,8 +42,8 @@ basepath = pwd;
 [~, basename] = fileparts(basepath);
 
 % load params from config file
-[cfg_colors, cfg_names, ~] = as_loadConfig([]);
-nstates = length(cfg_names) - 1;
+cfg = as_loadConfig();
+nstates = cfg.nstates;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % calc
@@ -105,11 +105,11 @@ if graphics
     setMatlabGraphics(true)
     fh = figure;
     fh.Position = [500 200 900 700];
-    cmh = confusionchart(cm, cfg_names(1 : nstates), 'ColumnSummary',...
+    cmh = confusionchart(cm, cfg.names(1 : nstates), 'ColumnSummary',...
         'column-normalized', 'RowSummary', 'row-normalized',...
         'title', 'State Classification Confusion Matrix', 'Normalization',...
         'total-normalized');
-    sortClasses(cmh, cfg_names(1 : nstates))
+    sortClasses(cmh, cfg.names(1 : nstates))
     
     if saveFig
         figpath = fullfile('graphics', 'sleepState');
@@ -134,13 +134,13 @@ if graphics
         
         yyaxis right
         ph = plot(thr, lostData(:, istate), 'LineWidth', 2);
-        ph.Color = cfg_colors{istate};
+        ph.Color = cfg.colors{istate};
         ylabel('Data Lost [%]')
-        set(gca, 'ycolor', cfg_colors{istate})
+        set(gca, 'ycolor', cfg.colors{istate})
         ylim([0 100])
         
         set(gca, 'box', 'off', 'TickLength', [0 0])
-        title(cfg_names{istate})
+        title(cfg.names{istate})
         if istate == 1
             legend({'Precision', 'Recall', 'DataLost'})
         end

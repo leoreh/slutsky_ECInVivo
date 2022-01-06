@@ -48,14 +48,9 @@ fileList = as_fileLists(basepaths);
 % config file
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% general
-fs = 1250;
-epochLen = 1;
-minBoutLen = epochLen;
-nstates = 6; 
-
 % load configuration file
-[cfg_colors, cfg_names, cfg_weights, configfile] = as_loadConfig([]);
+configfile = 'D:\Code\slutsky_ECInVivo\lfp\SleepStates\AccuSleep\as_config.mat';
+[cfg] = as_loadConfig([]);
 
 % weights
 gldstrd = labels;
@@ -63,22 +58,30 @@ idx = gldstrd ~= 8;
 weights = histcounts(gldstrd(idx)) / length(gldstrd(idx));
 weights = round(weights * 100) / 100;       % round to two decimals
 weights(4) = weights(4) + 1 - sum(weights); % add remainder to NREM
-cfg_weights = weights;
-cfg_weights = [cfg_weights 0];
+cfg.weights = weights;
+cfg.weights = [cfg.weights];
 
 % colors
-cfg_colors{1} = [240 110 110] / 255;
-cfg_colors{2} = [240 170 125] / 255;
-cfg_colors{3} = [150 205 130] / 255;
-cfg_colors{4} = [110 180 200] / 255;
-cfg_colors{5} = [170 100 170] / 255;
-cfg_colors{6} = [200 200 100] / 255;
-cfg_colors{7} = [200 200 200] / 255;
+cfg.colors{1} = [240 110 110] / 255;
+cfg.colors{2} = [240 170 125] / 255;
+cfg.colors{3} = [150 205 130] / 255;
+cfg.colors{4} = [110 180 200] / 255;
+cfg.colors{5} = [170 100 170] / 255;
+cfg.colors{6} = [200 200 100] / 255;
+cfg.colors{7} = [200 200 200] / 255;
+cfg.colors = cfg.colors(:);
+
 % state names
-cfg_names = {'WAKE'; 'QWAKE'; 'LSLEEP'; 'NREM'; 'REM'; 'N/REM'; 'BIN'};
+cfg.names = {'WAKE'; 'QWAKE'; 'LSLEEP'; 'NREM'; 'REM'; 'N/REM'; 'BIN'};
+
+% general
+cfg.fs = 1250;
+cfg.epochLen = 1;
+cfg.minBoutLen = 0;
+cfg.nstates = length(cfg.names) - 1; 
 
 % save
-save(configfile, 'cfg_colors', 'cfg_names', 'cfg_weights')
+save(configfile, 'cfg')
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % train

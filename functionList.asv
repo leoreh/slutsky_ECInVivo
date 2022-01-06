@@ -125,7 +125,7 @@ sSig = as_prepSig([basename, '.lfp'], acc.mag,...
     'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [10 600], 'fs', 1250);
 
 % manually create labels
-labelsmanfile = [basename, '.sleep_labelsMan.mat'];
+labelsmanfile = [basename, '.AccuSleep_labelsMan.mat'];
 AccuSleep_viewer(sSig, labels, [])
 
 % classify with a network

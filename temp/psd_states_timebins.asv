@@ -8,7 +8,7 @@
 % session
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-basepath = 'F:\Data\lh95\lh95_210824_083300';
+basepath = 'F:\Data\lh99\lh99_211218_090630';
 cd(basepath)
 [~, basename] = fileparts(basepath);
 
@@ -56,8 +56,8 @@ psdEeg = nan(nbins, length(sstates), length(faxis));
 for iwin = 1 : nbins
     
     labels = v.ss.labels(timebins(iwin, 1) : timebins(iwin, 2));
-    chLfp = v.ss.info.sSig.eegCh;
-    chEeg = 1;
+    chLfp = v.ss.info.eegCh;
+    chEeg = 34;
     
     % ---------------------------------------------------------------------
     % hippocampal lfp
@@ -74,6 +74,7 @@ for iwin = 1 : nbins
 
     % ---------------------------------------------------------------------
     % frontal eeg
+    chLfp = v.ss.info.eegCh;
     if chEeg < 3
         sig = double(bz_LoadBinary([basename, '.emg.dat'],...
             'duration', diff(timebins(iwin, :)) + 1,...
@@ -88,7 +89,7 @@ for iwin = 1 : nbins
             'frequency', fsLfp, 'nchannels', nchans, 'start', timebins(iwin, 1),...
             'channels', chEeg, 'downsample', 1));
     end
-    [psdEeg(iwin, :, :), ~, epStats(iwin)] = psd_states('eeg', sig,...
+    [psdLfp(iwin, :, :), ~, epStats(iwin)] = psd_states('eeg', sig,...
         'labels', labels, 'fs', fsLfp, 'faxis', faxis,...
         'graphics', false, 'sstates', sstates);
     
@@ -129,7 +130,7 @@ save(psdfile, 'psdBins')
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 setMatlabGraphics(false)
 alphaIdx = linspace(0.5, 1, nbins);
-cfg = as_loadConfig();
+[cfg_colors, cfg_names, ~] = as_loadConfig([]);
 lim_fAxis = faxis > 1;
 smf = 7;
 gk = gausswin(smf);
@@ -147,10 +148,10 @@ for istate = 1 : length(sstates)
     %     psdMat = psdMat ./ sum(psdMat, 2);
     ph = plot(faxis(lim_fAxis), psdMat', 'LineWidth', 2);
     for iwin = 1 : length(ph)
-        ph(iwin).Color(istate) = cfg.colors{sstates(istate)}(istate) - iwin * 0.003;
+        ph(iwin).Color(istate) = cfg_colors{sstates(istate)}(istate) - iwin * 0.003;
         ph(iwin).Color(4) = alphaIdx(iwin);
     end
-    title(cfg.names{sstates(istate)})
+    title(cfg_names{sstates(istate)})
     xlabel('Frequency [Hz]')
     ylabel('LFP PSD [mV^2/Hz]')
     legend(tbins_txt, 'Location', 'Southwest')
@@ -166,7 +167,7 @@ for istate = 1 : length(sstates)
     %     psdMat = psdMat ./ sum(psdMat, 2);
     ph = plot(faxis(lim_fAxis), psdMat', 'LineWidth', 2);
     for iwin = 1 : length(ph)
-        ph(iwin).Color(istate) = cfg.colors{sstates(istate)}(istate) - iwin * 0.003;
+        ph(iwin).Color(istate) = cfg_colors{sstates(istate)}(istate) - iwin * 0.003;
         ph(iwin).Color(4) = alphaIdx(iwin);
     end
     xlabel('Frequency [Hz]')
@@ -182,7 +183,7 @@ for istate = 1 : length(sstates)
     bh = flipud(bh);
     for ibox = 1 : length(bh)
         patch(get(bh(ibox), 'XData'), get(bh(ibox), 'YData'),...
-            cfg.colors{sstates(istate)}, 'FaceAlpha', alphaIdx(ibox))
+            cfg_colors{sstates(istate)}, 'FaceAlpha', alphaIdx(ibox))
     end
     ylabel('Epoch Length [log(s)]')
     set(gca, 'YScale', 'log')
@@ -192,7 +193,7 @@ for istate = 1 : length(sstates)
         'kd', 'markerfacecolor', 'k')
     ylabel('State duration [min]')
     ax = gca;
-    set(ax.YAxis(1), 'color', cfg.colors{sstates(istate)})
+    set(ax.YAxis(1), 'color', cfg_colors{sstates(istate)})
     set(ax.YAxis(2), 'color', 'k')
     xticklabels(tbins_txt)
     xtickangle(45)

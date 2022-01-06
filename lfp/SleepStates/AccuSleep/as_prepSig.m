@@ -1,4 +1,4 @@
-function [EMG, EEG, sigInfo] = as_prepSig(eegData, emgData, varargin)
+function sSig = as_prepSig(eegData, emgData, varargin)
 
 % prepare signals for accusleep. filters and subsamples eeg and emg. two
 % options to input data; ALT 1 is to directly input eeg and emg data as
@@ -29,12 +29,14 @@ function [EMG, EEG, sigInfo] = as_prepSig(eegData, emgData, varargin)
 %   emgNchans   numeric. no channels in emg data file. if empty will equal
 %               to eegNchans
 %   basepath    string. path to recording folder {pwd}
-%   saveVar     logical. save ss var {true}
+%   saveVar     logical. save signals as mat var {true}
 %   forceLoad   logical. reload recordings even if mat exists
 %   inspectSig  logical. inspect signals via accusleep gui {false}
 %
+% OUTPUT
+%   sSig        struct
+% 
 % DEPENDENCIES:
-%   rmDC
 %   iosr.DSP.SINCFILTER     for low-pass filtering EEG data
 %
 % TO DO LIST:
@@ -84,25 +86,28 @@ forceLoad       = p.Results.forceLoad;
 % preparations
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% sig info
+if ischar(emgData)
+    sSig.info.emgFile = emgData;
+else
+    sSig.info.emgFile = 'inputData';
+end
+if ischar(eegData)
+    sSig.info.eegFile = eegData;
+else
+    sSig.info.eegFile = 'inputData';
+end
 
 % file names
 cd(basepath)
-mousepath = fileparts(basepath);
 [~, basename] = fileparts(basepath);
-eegfile = [basename '.AccuSleep_EEG.mat'];
-emgfile = [basename '.AccuSleep_EMG.mat'];
-sigInfofile = [basename '.AccuSleep_sigInfo.mat'];
-sessionInfoFile = [basename, '.session.mat'];
-
-% initialize
-sigInfo = [];
-recDur = [];
+sigfile = [basename '.sleep_sig.mat'];
+sessionfile = [basename, '.session.mat'];
 
 % reload data if already exists and return
-if exist(emgfile, 'file') && exist(eegfile, 'file') && ~forceLoad
-    fprintf('\n%s and %s already exist. loading...\n', emgfile, eegfile)
-    load(eegfile, 'EEG')
-    load(emgfile, 'EMG')
+if exist(sigfile, 'file') && ~forceLoad
+    fprintf('\n%s already exists. loading...\n', sigfile)
+    load(sigfile)
     return
 end
     
@@ -110,9 +115,8 @@ end
 import iosr.dsp.*
 
 % session info
-if exist(sessionInfoFile, 'file')
-    load([basename, '.session.mat'])
-    recDur = session.general.duration;
+if exist(sessionfile, 'file')
+    load(sessionfile)
     if isempty(eegNchans)
         eegNchans = session.extracellular.nChannels;
     end
@@ -146,14 +150,12 @@ if ischar(eegData) || isempty(eegData)
     end
         
     % load channels and average
-    eegOrig = double(bz_LoadBinary(eegData, 'duration', Inf,...
+    eegData = double(bz_LoadBinary(eegData, 'duration', Inf,...
         'frequency', eegFs, 'nchannels', eegNchans, 'start', 0,...
         'channels', eegCh, 'downsample', 1));
-    if size(eegOrig, 2) > 1
-        eegOrig = mean(eegOrig, 2);
+    if size(eegData, 2) > 1
+        eegData = mean(eegData, 2);
     end
-else
-    eegOrig = eegData;
 end
 
 % emg
@@ -168,11 +170,9 @@ if ischar(emgData) || isempty(emgData)
         end
     end
         
-    emgOrig = double(bz_LoadBinary(emgData, 'duration', Inf,...
+    emgData = double(bz_LoadBinary(emgData, 'duration', Inf,...
         'frequency', emgFs, 'nchannels', emgNchans, 'start', 0,...
         'channels', emgCh, 'downsample', 1));        
-else
-    emgOrig = emgData;
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -199,77 +199,76 @@ if eegFs ~= fs
     if ~isempty(eegCf)
         fprintf('\nfiltering EEG, cutoff = %d Hz', eegCf)
         filtRatio = eegCf / (eegFs / 2);
-        eegOrig = iosr.dsp.sincFilter(eegOrig, filtRatio);
+        eegData = iosr.dsp.sincFilter(eegData, filtRatio);
     end
     
     % subsample
     fprintf('\nsubsampling eeg from %.2f to %d Hz', eegFs, fs)
-    EEG = eegOrig(fsRatio : fsRatio : length(eegOrig));
+    eegData = eegData(fsRatio : fsRatio : length(eegData));
 
 else
-    EEG = eegOrig;
+    eegData = eegData;
 end
 
 % handle emg data
-if emgFs ~= fs || length(emgOrig) ~= length(EEG)
-    tstamps_sig = [1 : length(EEG)] / fs;
+if emgFs ~= fs || length(emgData) ~= length(eegData)
+    tstamps_sig = [1 : length(eegData)] / fs;
     
     % interpolate
     fprintf('\ninterpolating emg from %.2f to %d Hz', emgFs, fs)
-    EMG = [interp1([1 : length(emgOrig)] / emgFs, emgOrig, tstamps_sig,...
+    emgData = [interp1([1 : length(emgData)] / emgFs, emgData, tstamps_sig,...
         'spline')]';
-    
-    % filter
-    if ~isempty(emgCf)
-        fprintf('\nfiltering EMG, cutoff = %d Hz', emgCf)
-        filtRatio = emgCf / (fs / 2);
-        EMG = iosr.dsp.sincFilter(EMG, filtRatio);
-    end
-else
-    EMG = emgOrig;
 end
-
-EMG = EMG(:);
-EEG = EEG(:);
-
+% filter
+if ~isempty(emgCf)
+    fprintf('\nfiltering EMG, cutoff = %d Hz', emgCf)
+    filtRatio = emgCf / (fs / 2);
+    emgData = iosr.dsp.sincFilter(emgData, filtRatio);
+end
+    
 % remove 50 from emg
 % [EMG, tsaSig, ~] = tsa_filter('sig', EMG, 'fs', fs, 'tw', false,...
 %     'ma', true, 'graphics', true);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% prepare spectrogram and emg rms 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% spectrogram
+[sSig.spec, sSig.spec_tstamps, sSig.spec_freq] =...
+    createSpectrogram(eegData, fs, 1);
+
+% emg rms
+sSig.emg_rms = processEMG(emgData, fs, 1);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % finilize and save
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-sigInfo.newFs = fs;
-sigInfo.eegFs = eegFs;
-sigInfo.emgFs = emgFs;
-sigInfo.eegCf = eegCf;
-sigInfo.emgCf = emgCf;
-sigInfo.emgCh = emgCh;
-sigInfo.eegCh = eegCh;
-if ischar(emgData)
-    sigInfo.emgFile = emgData;
-else
-    sigInfo.emgFile = 'inputData';
-end
-if ischar(eegData)
-    sigInfo.eegFile = eegData;
-else
-    sigInfo.eegFile = 'inputData';
-end
+% info
+sSig.emg = emgData(:);
+clear emgData
+sSig.eeg = eegData(:);
+clear eegData
+sSig.fs = fs;
+sSig.info.eegFs = eegFs;
+sSig.info.emgFs = emgFs;
+sSig.info.eegCf = eegCf;
+sSig.info.emgCf = emgCf;
+sSig.info.emgCh = emgCh;
+sSig.info.eegCh = eegCh;
+
 
 % save files
 if saveVar
     fprintf('\nsaving signals... ')
-    save(eegfile, 'EEG')
-    save(emgfile, 'EMG')
-    save(sigInfofile, 'sigInfo')
+    save(sigfile, '-struct', 'sSig')
     fprintf('done.\nthat took %.2f s\n\n', toc)
 end
 
 % inspect signals
 if inspectSig
-    AccuSleep_viewer(EEG, EMG, fs, 1, [], [])
+    AccuSleep_viewer(sSig, [], [])
 end
 
 return
@@ -285,26 +284,26 @@ newFs = 1250;
 labelsNew = labels(1 : newFs / oldFs : end)
 
 % interpolate
-labelsNew = interp1([1 : floor(length(EEG) / oldFs)], labels, [1 : floor(length(EEG) / newFs)]);
+labelsNew = interp1([1 : floor(length(eegData) / oldFs)], labels, [1 : floor(length(eegData) / newFs)]);
 labelsNew = round(labelsNew);       % necassary only if upsampling
 labels = labelsNew;
 
 % -------------------------------------------------------------------------
 % call for lfp and emg in same file 
-[EMG, EEG, sigInfo] = as_prepSig([basename, '.lfp'], [],...
+[emgData, eegData, info] = as_prepSig([basename, '.lfp'], [],...
     'eegCh', [1 : 4], 'emgCh', 33, 'saveVar', true, 'emgNchans', [], 'eegNchans', nchans,...
     'inspectSig', false, 'forceLoad', true, 'eegFs', 1250, 'emgFs', [],...
     'emgCf', [10 600], 'eegCf', [], 'fs', 1250);
 
 
 % call for emg dat file
-[EMG, EEG, sigInfo] = as_prepSig([basename, '.lfp'], [basename, '.emg.dat'],...
+[emgData, eegData, info] = as_prepSig([basename, '.lfp'], [basename, '.emg.dat'],...
     'eegCh', [8 : 11], 'emgCh', 1, 'saveVar', true, 'emgNchans', 2, 'eegNchans', nchans,...
     'inspectSig', false, 'forceLoad', true, 'eegFs', 1250, 'emgFs', 3051.7578125,...
     'emgCf', [10 600]);
 
 % call for accelerometer
-[EMG, EEG, sigInfo] = as_prepSig([basename, '.lfp'], acc.mag,...
+[emgData, eegData, info] = as_prepSig([basename, '.lfp'], acc.mag,...
     'eegCh', [1 : 4], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
     'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
     'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [10 600], 'fs', 1250);
@@ -312,7 +311,7 @@ labels = labelsNew;
 % -------------------------------------------------------------------------
 % fix special case where emg changes in the middle of a recording, such as
 % the sudden appearance of strong HR artifacts. Thus, although wake and
-% nrem are still noticeable different, the difference between them is not
+% nrem are still noticeably different, the difference between them is not
 % homegenous and the same calibration matrix cannot be used for the entire
 % recording. so, classify the recording twice (or more) and each time
 % during the calibration use only the manual (calibration) labels from the

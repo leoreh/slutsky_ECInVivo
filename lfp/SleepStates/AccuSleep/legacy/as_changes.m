@@ -3,6 +3,8 @@
 
 % general
 % removed standardizeSR from all functions
+% combined emg and eeg to single struct. 
+% pass spectrogram and emg rms instead of raw data
 
 % processEMG
 % removed the 20-50 passband filter

@@ -1,4 +1,4 @@
-function [psdStates, faxis, emgRMS, epStats] = psd_states(varargin)
+function [psdStates, faxis, epStats] = psd_states(varargin)
 
 % calculates the lfp / eeg psd for each state epoch, averages and
 % normalizes. can also calculate the emg rms for each epoch. subsamples
@@ -12,7 +12,6 @@ function [psdStates, faxis, emgRMS, epStats] = psd_states(varargin)
 % sum(pow(faxis < 5));
 %
 % INPUT:
-%   emg             numeric. emg data (1 x n)
 %   eeg             numeric. eeg data (1 x n)
 %   labels          numeric. 
 %   fs              numeric. sampling frequency {1250} of the signals.
@@ -40,7 +39,6 @@ function [psdStates, faxis, emgRMS, epStats] = psd_states(varargin)
 
 p = inputParser;
 addOptional(p, 'eeg', [], @isnumeric);
-addOptional(p, 'emg', [], @isnumeric);
 addOptional(p, 'labels', [], @isnumeric);
 addOptional(p, 'fs', 1250, @isnumeric);
 addOptional(p, 'faxis', [0.2 : 0.2 : 120], @isnumeric);
@@ -49,7 +47,6 @@ addOptional(p, 'graphics', true, @islogical);
 
 parse(p, varargin{:})
 eeg             = p.Results.eeg;
-emg             = p.Results.emg;
 labels          = p.Results.labels;
 fs              = p.Results.fs;
 faxis           = p.Results.faxis;
@@ -59,9 +56,6 @@ graphics        = p.Results.graphics;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preparations
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% initialize
-emgRMS = {};
 
 % fft params
 if isempty(faxis)
@@ -79,11 +73,10 @@ noverlap = floor(0.25 * fs);
 % (10 s).
 
 % state params
-[cfg_colors, cfg_names, ~] = as_loadConfig([]);
-cfg_colors = cfg_colors(:);
-nstates = length(cfg_names);
+cfg = as_loadConfig();
+nstates = cfg.nstates;
 if isempty(sstates)
-    sstates = 1 : nstates - 1;      % selected states (ignore bin)
+    sstates = 1 : nstates;      % selected states (ignore bin)
 end
 
 % convert labels to state epochs. 
@@ -91,18 +84,18 @@ minDur = [10, 5, 5, 10, 5, 5];  % threshold of minimum epoch length
 interDur = 4;                   % combine epochs separated by <= interDur
 
 if length(minDur) == 1
-    minDur = repamt(minDur, nstates - 1, 1);
-elseif length(minDur) ~= nstates - 1
+    minDur = repamt(minDur, nstates, 1);
+elseif length(minDur) ~= nstates
     error('minDur length is different than the number of states')
 end
 if length(interDur) == 1
-    interDur = repmat(interDur, nstates - 1, 1);
-elseif length(interDur) ~= nstates - 1
+    interDur = repmat(interDur, nstates, 1);
+elseif length(interDur) ~= nstates
     error('interDur length is different than the number of states')
 end
 
 % create state epochs
-for istate = 1 : nstates - 1
+for istate = 1 : nstates
     binaryVec = zeros(length(labels), 1);
     binaryVec(labels == istate) = 1;
     stateEpochs{istate} = binary2epochs('vec', binaryVec, 'minDur', minDur(istate), 'maxDur', [],...
@@ -131,10 +124,6 @@ for istate = 1 : length(sstates)
         [pow, ~] = pwelch(eeg(dataIdx), win, noverlap, faxis, fs);
         psdStates(istate, :) = psdStates(istate, :) + pow;                       
                
-        % emg rms 
-        if ~isempty(emg)
-            emgRMS{istate}(iepoch) = rms(emg(dataIdx));
-        end
     end
     % average power
     psdStates(istate, :) = psdStates(istate, :) / epStats.nepochs(sidx);
@@ -151,7 +140,7 @@ if graphics
     % raw psd
     sb1 = subplot(1, 2, 1);
     ph = plot(faxis, psdStates, 'LineWidth', 3);
-    set(ph, {'color'}, cfg_colors(sstates))
+    set(ph, {'color'}, cfg.colors(sstates))
     xlim(xLimit)
     xlabel('Frequency [Hz]')
     ylabel('PSD [mV^2/Hz]')
@@ -160,7 +149,7 @@ if graphics
     % norm psd
     sb2 = subplot(1, 2, 2);
     ph = plot(faxis, psdStates ./ sum(psdStates, 2), 'LineWidth', 3);
-    set(ph, {'color'}, cfg_colors(sstates))
+    set(ph, {'color'}, cfg.colors(sstates))
     xlim(xLimit)
     xlabel('Frequency [Hz]')
     ylabel('norm PSD')
