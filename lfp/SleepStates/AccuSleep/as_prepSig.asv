@@ -40,10 +40,9 @@ function [EMG, EEG, sigInfo] = as_prepSig(eegData, emgData, varargin)
 % TO DO LIST:
 %       # implement cleanSig (irrelavent)
 %       # input nchans for emg / eeg files separately (done)
-%       # implement tsa_filt
 %
 % 19 apr 21 LH  updates:
-% 06 jan 22     changed how signals are handled
+% 06 jan 22     interpolating the eeg added strong slow activity 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -203,7 +202,6 @@ if eegFs ~= fs
     end
     
     % subsample
-    fprintf('\nsubsampling eeg from %.2f to %d Hz', eegFs, fs)
     EEG = eegOrig(fsRatio : fsRatio : length(eegOrig));
 
 else
@@ -215,22 +213,60 @@ if emgFs ~= fs || length(emgOrig) ~= length(EEG)
     tstamps_sig = [1 : length(EEG)] / fs;
     
     % interpolate
-    fprintf('\ninterpolating emg from %.2f to %d Hz', emgFs, fs)
+    fprintf('interpolating emg from %d to %d Hz\n', emgFs, fs)
     EMG = [interp1([1 : length(emgOrig)] / emgFs, emgOrig, tstamps_sig,...
         'spline')]';
     
     % filter
-    if ~isempty(emgCf)
-        fprintf('\nfiltering EMG, cutoff = %d Hz', emgCf)
-        filtRatio = emgCf / (fs / 2);
-        EMG = iosr.dsp.sincFilter(EMG, filtRatio);
-    end
+    
 else
     EMG = emgOrig;
+end
+% if ~isempty(emgCf)   
+%     fprintf('\nfiltering EMG, cutoff = %d Hz', emgCf)
+%     filtRatio = emgCf / (emgFs / 2);
+%     emgOrig = iosr.dsp.sincFilter(emgOrig, filtRatio);    
+% end
+
+
+
+if isempty(recDur)
+    recDur = length(eegOrig) / eegFs;
+end
+
+% validate recording duration and sampling frequency. subsample emg and eeg
+% to the same length. assumes both signals span the same time interval.
+% interpolation, as opposed to idx subsampling, is necassary for cases
+% where the sampling frequency is not a round number (tdt).
+if length(emgOrig) ~= length(eegOrig) || fs ~= emgFs
+    emgDur = length(emgOrig) / emgFs;
+    eegDur = length(eegOrig) / eegFs;
+    if abs(emgDur - eegDur) > 2
+        warning(['EEG and EMG are of differnet duration (diff = %.2f s).\n',...
+            'Check data and sampling frequencies.\n'], abs(emgDur - eegDur))
+    end
+    tstamps_sig = [1 / fs : 1 / fs : recDur];
+%     
+
+    
+
+    EEG = [interp1([1 : length(eegOrig)] / eegFs, eegOrig, tstamps_sig,...
+        'spline')]';
+    EEG = eegOrig;
+else
+    EMG = emgOrig;
+    EEG = eegOrig;
 end
 
 EMG = EMG(:);
 EEG = EEG(:);
+
+if ~isempty(emgCf)   
+    fprintf('\nfiltering EMG, cutoff = %d Hz', emgCf)
+    filtRatio = emgCf / (1250 / 2);
+    EMG = iosr.dsp.sincFilter(EMG, filtRatio);    
+end
+
 
 % remove 50 from emg
 % [EMG, tsaSig, ~] = tsa_filter('sig', EMG, 'fs', fs, 'tw', false,...
@@ -260,7 +296,7 @@ end
 
 % save files
 if saveVar
-    fprintf('\nsaving signals... ')
+    fprintf('saving signals... ')
     save(eegfile, 'EEG')
     save(emgfile, 'EMG')
     save(sigInfofile, 'sigInfo')
