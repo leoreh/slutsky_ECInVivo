@@ -235,6 +235,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % spectrogram
+fprintf('\ncreating spectrogram', emgCf)
 [sSig.spec, sSig.spec_tstamps, sSig.spec_freq] =...
     createSpectrogram(eegData, fs, 1);
 
@@ -262,7 +263,7 @@ sSig.info.eegCh = eegCh;
 % save files
 if saveVar
     fprintf('\nsaving signals... ')
-    save(sigfile, 'sSig')
+    save(sigfile, '-struct', 'sSig')
     fprintf('done.\nthat took %.2f s\n\n', toc)
 end
 

@@ -61,7 +61,7 @@ addOptional(p, 'emgFs', [], @isnumeric);
 addOptional(p, 'fs', 1250, @isnumeric);
 addOptional(p, 'eegNchans', [], @isnumeric);
 addOptional(p, 'emgNchans', [], @isnumeric);
-addOptional(p, 'emgCf', [10 600], @isnumeric);
+addOptional(p, 'emgCf', [10 450], @isnumeric);
 addOptional(p, 'eegCf', [450], @isnumeric);
 addOptional(p, 'saveVar', true, @islogical);
 addOptional(p, 'inspectSig', false, @islogical);
@@ -235,6 +235,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % spectrogram
+fprintf('\ncreating spectrogram...', emgCf)
 [sSig.spec, sSig.spec_tstamps, sSig.spec_freq] =...
     createSpectrogram(eegData, fs, 1);
 

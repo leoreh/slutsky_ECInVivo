@@ -112,6 +112,9 @@ ripp = getRipples('basepath', basepath, 'rippCh', [23], 'emgCh', [33],...
 % sleep states
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% load sig info from sSig
+sSig = load([basename, '.sleep_sig.mat'])
+
 % call for emg dat file
 sSig = as_prepSig([basename, '.lfp'], [basename, '.emg.dat'],...
     'eegCh', [1 : 4], 'emgCh', 2, 'saveVar', true, 'emgNchans', 2, 'eegNchans', nchans,...
@@ -125,8 +128,8 @@ sSig = as_prepSig([basename, '.lfp'], acc.mag,...
     'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [10 600], 'fs', 1250);
 
 % manually create labels
-labelsmanfile = [basename, '.AccuSleep_labelsMan.mat'];
-AccuSleep_viewer(sSig, labels, [])
+labelsmanfile = [basename, '.sleep_labelsMan.mat'];
+AccuSleep_viewer(sSig, labels, labelsmanfile)
 
 % classify with a network
 netfile = 'D:\Code\slutsky_ECInVivo\lfp\SleepStates\AccuSleep\trainedNetworks\net_220103_151924.mat';
