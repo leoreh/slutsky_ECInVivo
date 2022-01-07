@@ -1,9 +1,9 @@
 function ss = as_classify(sSig, varargin)
 
-% wrapper for state classification via AccuSleep by Yang Dan
-% paper: Barger et al., PlosOne, 2019
-% git: https://github.com/zekebarger/AccuSleep
-% documentation: doc AccuSleep_instructions.
+% state classification via AccuSleep by Yang Dan paper: Barger et al.,
+% PlosOne, 2019 git: https://github.com/zekebarger/AccuSleep documentation:
+% doc AccuSleep_instructions. as_prepSig must be called beforehand.
+% function is basically a wrapper for AccuSleep_classify. 
 %
 % INPUT:
 %   sSig            struct. see as_prepSig.m
