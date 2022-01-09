@@ -31,7 +31,7 @@ int = strcmp(cm.putativeCellType, 'Narrow Interneuron');
 
 % mfr
 mfrRS = pyr' & fr.mfr > frBoundries(1, 1) & fr.mfr < frBoundries(1, 2);
-mfrFS = int' | wide' & fr.mfr > frBoundries(2, 1) & fr.mfr < frBoundries(2, 2);
+mfrFS = (int' | wide') & fr.mfr > frBoundries(2, 1) & fr.mfr < frBoundries(2, 2);
 mfrunits = fr.stable & fr.bl_thr & (mfrRS | mfrFS);
 
 % combine

@@ -151,7 +151,7 @@ nrem_idx = false(length(sig), 1);   % initialize
 ssfile = fullfile(basepath, [basename '.AccuSleep_states.mat']);
 if exist(ssfile)    
     load(ssfile, 'ss')    
-    cfg = as_loadConfig([]);
+    [~, cfg.names, ~] = as_loadConfig([]);
     nrem_stateIdx = find(strcmp(cfg.names, 'NREM'));
     
     % find nrem indices by upsampling the labels. assumes the binsize

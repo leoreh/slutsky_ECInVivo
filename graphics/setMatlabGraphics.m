@@ -20,7 +20,8 @@ if ~factoryFlag
     set(groot, 'DefaultFigurePaperUnits', 'normalize')
     set(groot, 'DefaultFigureUnits', 'normalize')
     set(groot, 'DefaultFigurePaperPosition', [0 0 1 1])
-    set(groot, 'DefaultFigurePosition', [0.2 0.075 0.6 0.85])
+%     set(groot, 'DefaultFigurePosition', [0.2 0.075 0.6 0.85])
+    set(groot, 'DefaultFigurePosition', [0.1 0.1 0.8 0.8])
     set(groot, 'DefaultFigurePaperType', 'a4')
     set(groot, 'DefaultFigureColor', [1 1 1])       % figure white instead of gray
     set(groot, 'DefaultFigurePaperOrientation', 'portrait')

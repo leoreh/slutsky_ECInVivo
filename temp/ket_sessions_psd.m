@@ -1,4 +1,4 @@
-% ket_sessions
+% ket_sessions_psd
 
 forceL = true;
 normFlag = false;
@@ -9,14 +9,11 @@ frBoundries = [0.1, Inf; 0.1, Inf];
 % data base
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% local mk801
-basepaths = [{'F:\Data\Processed\lh96\lh96_211205_072000'}];
-
 % local ket
-basepaths = [{'I:\lh96\lh96_211126_072000'},...
-    {'F:\Data\Processed\lh96\lh96_211202_070500'},...
+basepaths = [{'F:\Data\Processed\lh96\lh96_211202_070500'},...
     {'K:\Data\lh95\lh95_210825_080400'},...
-    {'K:\Data\lh99\lh99_211219_085802'}];
+    {'K:\Data\lh99\lh99_211219_085802'},...
+    {'G:\Data\lh93\lh93_210813_110609'}];
 
 % baclofen
 basepaths = [{'F:\Data\Processed\lh96\lh96_211207_071500'},...
@@ -30,11 +27,22 @@ basepaths = [{'K:\Data\lh99\lh99_211218_090630'},...
     {'K:\Data\lh95\lh95_210824_083300'},...
     {'G:\Data\lh93\lh93_210811_102035'}];
 
+% ket 10 mg/kg i.p.
+basepaths = [{'K:\Data\lh99\lh99_211224_084528'},...
+{'G:\Data\lh98\lh98_211224_084528'},...    
+{'F:\Data\Processed\lh96\lh96_211206_070400'},...
+    {'G:\Data\lh81\lh81_210204_190000'}];
+basepaths = basepaths(1 : 3);
+
+% ket 60 mg/kg i.p.
+basepaths = [{'G:\Data\lh84\lh84_210504_225608'},...
+    {'G:\Data\lh81\lh81_210206_190000'}];
+
+
+
 % load vars from each session
-varsFile = ["fr"; "sr"; "spikes"; "st_metrics"; "swv_metrics";...
-    "cell_metrics"; "sleep_states"; "datInfo"; "session"];
-varsName = ["fr"; "sr"; "spikes"; "st"; "swv"; "cm"; "ss";...
-    "datInfo"; "session"];
+varsFile = ["datInfo"; "session"; "psdBins.mat"];
+varsName = ["datInfo"; "session"; "psdBins"];
 if ~exist('v', 'var') || forceL
     v = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
         'varsName', varsName);
@@ -44,10 +52,12 @@ nsessions = length(basepaths);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % firing rate
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+faxis = 0.2 : 0.2 : 120;
+stateIdx = 1;
+freqIdx = faxis > 20 & faxis < 100;
+faxis(freqIdx);
 
-units = [];
-injIdx = [];
-tLen = [];
+dataMat = nan(nsessions * 8, sum(freqIdx));
 for isession = 1 : nsessions
     
     % session params
@@ -55,46 +65,23 @@ for isession = 1 : nsessions
     cd(basepath)
     [~, basename] = fileparts(basepath);
     
-    fs = v(isession).session.extracellular.sr;
-    fsLfp = v(isession).session.extracellular.srLfp;
-    spkgrp = v(isession).session.extracellular.spikeGroups.channels;
-    nchans = v(isession).session.extracellular.nChannels;
+        tbins_txt = {'0-3ZT', '3-6ZT', '6-9ZT', '9-12ZT',...
+            '12-15ZT', '15-18ZT', '18-21ZT', '21-24ZT'};
+        psdBins = psd_states_timebins('basepath', pwd,...
+            'chEeg', [], 'forceA', false, 'graphics', true,...
+            'timebins', chunks, 'saveVar', true,...
+            'sstates', [1, 4, 5], 'tbins_txt', tbins_txt);
     
-    if contains(basename, 'lh99')
-        grp = [1, 3 : 4, 7]; 
-    else
-        grp = [];
-    end
-    
-    % plot fr vs. time   
-%     plot_FRtime_session('basepath', pwd, 'grp', grp,...
-%         'frBoundries', [0.01 Inf; 0.01 Inf], 'muFlag', false, 'saveFig', false,...
-%         'dataType', 'strd')
-% %     
-%     plot_FRtime_session('basepath', pwd, 'grp', grp,...
-%         'frBoundries', [0.01 Inf; 0.01 Inf], 'muFlag', false, 'saveFig', false,...
-%         'dataType', 'norm')
-    
-    % timebins
-    fileinfo = dir([basename, '.dat']);
-    recLen = floor(fileinfo.bytes / 2 / nchans / fs);
-    csec = floor(cumsum(v(isession).datInfo.nsamps / fs));
-    [~, pntIdx] = min(abs(csec - 5.5 * 60 * 60));
-    timepoints = csec(pntIdx);
-    % timepoints = v(isession).datInfo.nsec;
-    chunks = n2nchunks('n', recLen, 'nchunks', 8, 'timepoints', timepoints);
-    
-    [~, injIdx(isession)] = min(abs(v(isession).fr.tstamps - timepoints));
-    tLen(isession) = length(v(isession).fr.tstamps);
-    
-    clear tmp_units
-    tmp_units(1, :) = selectUnits(v(isession).spikes, v(isession).cm,...
-        v(isession).fr, 1, grp, frBoundries, 'pyr');
-    tmp_units(2, :) = selectUnits(v(isession).spikes, v(isession).cm,...
-        v(isession).fr, 1, grp, frBoundries, 'int');
-    units = [units, tmp_units];
-    nunits(isession) = length(tmp_units);
+end
 
+cnt = 1;
+for ibin = 1 : 8
+    for isession = 1 : nsessions
+        dataVec = squeeze(v(isession).psdBins.psdLfp(ibin, stateIdx, freqIdx));
+        dataVec = dataVec / sum(dataVec);
+        dataMat(cnt, :) = dataVec;           
+        cnt = cnt + 1;
+    end
 end
 
 units = logical(units);

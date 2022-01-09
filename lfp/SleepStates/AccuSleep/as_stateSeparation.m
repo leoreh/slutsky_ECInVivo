@@ -95,8 +95,6 @@ sDelta = sum(specNorm(:, f1idx : f4idx), 2);
 sTheta = sum(specNorm(:, f6idx : f12idx), 2);
 sRatio = sDelta ./ sTheta;
 
-fprintf('\ndone in %.1f sec\n\n', toc)
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % calculate stuff
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

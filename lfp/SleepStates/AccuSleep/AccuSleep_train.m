@@ -1,4 +1,4 @@
-function [net, netInfo] = AccuSleep_train(basepaths, SR, epochs, imageLocation)
+function [net, netInfo] = AccuSleep_train(basepaths, epochs, imageLocation)
 % AccuSleep_train  Train a network for classifying brain states
 % Zeke Barger, 021321
 %
@@ -27,14 +27,14 @@ function [net, netInfo] = AccuSleep_train(basepaths, SR, epochs, imageLocation)
 %% Check the inputs and prepare the image folder
 net = [];
 switch nargin
-    case {0, 1, 2}
+    case {0, 1}
         error('Not enough arguments')
-    case 3
+    case 2
         imageLocation = [char(cd),filesep,'training_images_',...    
             char(datetime(now,'ConvertFrom','datenum',...
             'Format','yyyy-MM-dd_HH-mm-ss'))];
         deleteImages = 1;
-    case 4
+    case 3
         deleteImages = 0;
 end
 
@@ -237,14 +237,6 @@ layers = [
     fullyConnectedLayer(nstates)
     softmaxLayer
     classificationLayer];
-
-% net info (lh 09 jul 21) -------------------------------------------------
-for ifile = 1 : size(basepaths, 1)
-    netInfo.files{ifile} = fileparts(basepaths{ifile, 1});
-    [~, basename] = fileparts(netInfo.files{ifile});
-    load(basepaths{ifile, 3})
-    netInfo.labelsDuration(ifile) = sum(labels < nstates);
-end
 
 % train
 disp('Training network')

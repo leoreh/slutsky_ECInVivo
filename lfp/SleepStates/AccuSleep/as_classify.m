@@ -9,6 +9,7 @@ function ss = as_classify(sSig, varargin)
 %   sSig            struct. see as_prepSig.m
 %   basepath        string. path to recording folder {pwd}
 %   netfile         string. path to network file. 
+%   calData         numeric. calibration data. 
 %   inspectLabels   logical. manually review classification 
 %   saveVar         logical. save ss var {true}
 %   forceA          logical. reanalyze recordings even if ss struct
@@ -41,6 +42,7 @@ function ss = as_classify(sSig, varargin)
 p = inputParser;
 addOptional(p, 'basepath', pwd);
 addOptional(p, 'netfile', []);
+addOptional(p, 'calData', [], @isnumeric);
 addOptional(p, 'inspectLabels', [], @islogical);
 addOptional(p, 'saveVar', true, @islogical);
 addOptional(p, 'forceA', false, @islogical);
@@ -49,6 +51,7 @@ addOptional(p, 'graphics', true, @islogical);
 parse(p, varargin{:})
 basepath        = p.Results.basepath;
 netfile         = p.Results.netfile;
+calData         = p.Results.calData;
 inspectLabels   = p.Results.inspectLabels;
 saveVar         = p.Results.saveVar;
 forceA          = p.Results.forceA;
@@ -82,7 +85,7 @@ end
 
 % network file
 if isempty(netfile)
-    netpath = 'D:\Code\slutskycode\extracellular in vivo\lfp\SleepStates\AccuSleep\trainedNetworks';
+    netpath = 'D:\Code\slutsky_ECInVivo\lfp\SleepStates\AccuSleep\trainedNetworks\';
     netfiles = dir([netpath, '/net*']);
     netfiles = sort({netfiles.name});
     netfile = netfiles{end};
@@ -104,26 +107,30 @@ end
 
 % get mouse calibration. if does not exist already, manualy score some
 % of the data and save the labels
-if ~exist(manlabelsfile, 'file')
-    if exist(manlabelsfilelegacy, 'file')
-        manlabelsfile = manlabelsfilelegacy;
-    else
-    fprintf('\nlabel some data for calibration, then press save.\n')
-    AccuSleep_viewer(sSig, [], manlabelsfile)
-    uiwait
+if isempty(calData)
+    if ~exist(manlabelsfile, 'file')
+        if exist(manlabelsfilelegacy, 'file')
+            manlabelsfile = manlabelsfilelegacy;
+        else
+            fprintf('\nlabel some data for calibration, then press save.\n')
+            AccuSleep_viewer(sSig, [], manlabelsfile)
+            uiwait
+        end
     end
-end
-load(manlabelsfile, 'labels')
-
-% ignore bin state
-labels_man = labels;
-labels(labels > nstates - 1) = nstates;
+    load(manlabelsfile, 'labels')
     
-% calibration matrix
-fprintf('\ncreating calbiration matrix... ')
-calData =...
-    createCalibrationData(sSig.spec, sSig.spec_freq, sSig.emg_rms, labels);
-fprintf('done.\n')
+    % ignore bin state
+    labels_man = labels;
+    labels(labels > nstates - 1) = nstates;
+    
+    % calibration matrix
+    fprintf('\ncreating calbiration matrix... ')
+    calData =...
+        createCalibrationData(sSig.spec, sSig.spec_freq, sSig.emg_rms, labels);
+    fprintf('done.\n')
+else
+    labels_man = ones(1, length(sSig.spec_tstamps)) * nstates + 2;
+end
 
 % classify recording
 fprintf('classifying... ')
@@ -172,8 +179,10 @@ end
 
 if graphics
     % confusion matrix (relative to manual labels)
-    [ss.netPrecision, ss.netRecall] = as_cm(labels_man, labels_net, netScores);
-
+    if any(labels_man ~= nstates + 2)
+        [ss.netPrecision, ss.netRecall] = as_cm(labels_man, labels_net, netScores);
+    end
+    
     % stateSeparation
     as_stateSeparation(sSig, labels, 'stateEpochs', ss.stateEpochs)
 end
@@ -181,7 +190,9 @@ end
 if inspectLabels
     AccuSleep_viewer(sSig, labels, labelsfile)
     uiwait
-    load(labelsfile, 'labels')
+    if exist(labelsfile, 'file')
+        load(labelsfile, 'labels')
+    end
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

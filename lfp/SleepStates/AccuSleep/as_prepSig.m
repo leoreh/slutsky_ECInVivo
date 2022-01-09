@@ -45,7 +45,7 @@ function sSig = as_prepSig(eegData, emgData, varargin)
 %       # implement tsa_filt
 %
 % 19 apr 21 LH  updates:
-% 06 jan 22     changed how signals are handled
+% 06 jan 22     combined signals to struct
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -258,7 +258,8 @@ sSig.info.eegCf = eegCf;
 sSig.info.emgCf = emgCf;
 sSig.info.emgCh = emgCh;
 sSig.info.eegCh = eegCh;
-
+sSig.info.emgNchans = emgNchans;
+sSig.info.eegNchans = eegNchans;
 
 % save files
 if saveVar

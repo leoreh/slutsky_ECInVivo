@@ -3,46 +3,30 @@
 % data base
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% hippocampal tetrodes ----------------------------------------------------
-% acc
-basepaths_acc = [{'G:\Data\lh99\as\lh99_211219_085802'},...     % local acsf. 120 min man
-    {'G:\Data\lh99\as\lh99_211220_091903'},...                  % local ketamine. 150 min man
-    {'G:\Data\lh93\lh93_210811_102035'},...                     % local ketamine. 150 min man
-    {'D:\Data\lh93\lh93_210810_100810'},...                     % local ketamine. 120 min man
-    {'D:\Data\lh93\lh93_210819_104212'},...                     % local saline. 70 min man
-    {'D:\Data\lh93\lh93_210819_221608'},...                     % night. 70 min man
-    {'I:\lh87\lh87_210523_100607'},...                          % op saline. 360 min man
-    ];
+% basepaths from xls file
+xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\ss_database.xlsx';
+xlsfile = dir(xlsname);
+ssDB = readtable(fullfile(xlsfile.folder, xlsfile.name));
 
-test_acc = [{'G:\Data\lh98\lh98_211218_090630'},...             % local acsf. * min man
-    {'I:\lh87\lh87_210522_095319'},...                          % op saline. 330 min man
-    {'F:\Data\lh99\lh99_211218_090630'},...                     % local acsf. 120 min man
-    ];
+% create basepaths and check that files exist
+dbIdx = find(contains(ssDB.Path, 'Testing'));
+basepaths = fullfile(ssDB.Path, ssDB.Filename);
+idx1 = contains(ssDB.EMG_ACC, 'emg');
+idx2 = ssDB.tempflag; idx2(isnan(idx2)) = 0;
+basepaths = basepaths(logical(idx2));
+rmidx = cellfun(@isempty, basepaths);
+basepaths = basepaths(~rmidx);
 
-test_emg = [{'G:\Data\lh95\as\lh95_210825_080400'},...          % local ketamine. 120 min man
-    {'G:\Data\lh99\as\lh99_211220_091903'},...                  % local ketamin. man done on acc
-    {'F:\Data\Processed\lh96\lh96_211206_070400'},...           % ketamine i.p. 90 min man from 1st half, 30 min from 2nd half
-    ];
-
-% emg
-basepaths_emg = [{'F:\Data\Processed\lh96\lh96_211201_070100'},...  % local acsf. 180 min man
-    {'F:\Data\Processed\lh96\lh96_211205_072000'},...           % local mk801. 120 min man
-    {'G:\Data\lh95\as\lh95_210824_083300'},...                  % local acsf. 200 min man                  
-    {'I:\lh86\lh86_210302_183000'},...                          % op ketamine. 60 min man
-    {'I:\lh86\lh86_210304_180800'},...                          % washout. 60 min man
-    {'F:\Data\Processed\lh96\lh96_211207_071500'},...           % local baclofen. 60 min man
-    ];
-
-% frontal eeg -------------------------------------------------------------
-% emg
-basepaths = [{'I:\lh89\lh89_210510_085700'},...                 % op ketamine. 60 min man
-    ];
-% 'lh86'
-% 'lh99'
-% 'lh98'
-
-% file list
-fileList = as_fileLists(basepaths);
+% check that files exist
+for ipath = 1 : length(basepaths)
+    basepath = basepaths{ipath};
+    [~, basename] = fileparts(basepath);
+    sigfile = fullfile(basepath, [basename, '.sleep_sig.mat']);
+    labelsmanfile = fullfile(basepath, [basename, '.sleep_labelsMan.mat']);
+    if ~exist(sigfile, 'file') || ~exist(labelsmanfile, 'file')
+        error('missing %s', basename)
+    end   
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % config file
@@ -50,7 +34,7 @@ fileList = as_fileLists(basepaths);
 
 % load configuration file
 configfile = 'D:\Code\slutsky_ECInVivo\lfp\SleepStates\AccuSleep\as_config.mat';
-[cfg] = as_loadConfig([]);
+cfg = as_loadConfig();
 
 % weights
 gldstrd = labels;
@@ -87,9 +71,22 @@ save(configfile, 'cfg')
 % train
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+cfg = as_loadConfig();
 cntxEpochs = 63;
-[net, netInfo] = AccuSleep_train(fileList, fs, epochLen, cntxEpochs);
-netInfo.epochLen = epochLen;
+tic
+[net, netInfo] = AccuSleep_train(basepaths, cntxEpochs);
+netInfo.trainingTime = toc / 60;
+
+% labels duration
+for ipath = 1 : length(basepaths)
+    basepath = basepaths{ipath};
+    [~, basename] = fileparts(basepath);
+    labelsmanfile = fullfile(basepath, [basename, '.sleep_labelsMan.mat']);
+    load(labelsmanfile, 'labels')
+    netInfo.labelsDuration(ipath) = sum(labels < cfg.nstates + 1);
+end
+ 
+netInfo.cfg = cfg;
 netInfo.cntxEpochs = cntxEpochs;
 netpath = 'D:\Code\slutsky_ECInVivo\lfp\SleepStates\AccuSleep\trainedNetworks';
 netname = ['net_',  datestr(datetime, 'yymmdd_HHMMss')]; 

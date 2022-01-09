@@ -78,7 +78,7 @@ if ischar(saveVar)
 else
     frFile = [basepath, filesep, basename, '.fr.mat'];
 end
-asFile = fullfile(basepath, [basename '.AccuSleep_states.mat']);
+asFile = fullfile(basepath, [basename '.sleep_states.mat']);
 
 % check if already analyzed
 if exist(frFile, 'file') && ~forceA
@@ -98,7 +98,7 @@ end
 % the same units (typically sec)
 if exist(asFile)
     load(asFile, 'ss')    
-    fr.states.stateNames = ss.labelNames;
+    fr.states.stateNames = ss.info.names;
     nstates = length(ss.stateEpochs);
 
     % fit stateEpochs to winCalc and count spikes in states

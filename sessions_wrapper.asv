@@ -4,7 +4,7 @@
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = 'lh96';
+mname = 'lh81';
 forceL = true;
 forceA = true;
 
@@ -44,7 +44,7 @@ if forceA
         fileinfo = dir([basename, '.dat']);
         recLen = floor(fileinfo.bytes / 2 / nchans / fs);
         csec = floor(cumsum(v(isession).datInfo.nsamps / fs));
-        [~, pntIdx] = min(abs(csec - 5.5 * 60 * 60));
+        [~, pntIdx] = min(abs(csec - 12 * 60 * 60));
         timepoints = csec(pntIdx);
         % timepoints = v(isession).datInfo.nsec;
         
@@ -54,16 +54,13 @@ if forceA
             timepoints + 2 * 60 * 60, timepoints + 4 * 60 * 60];
         
         chunks = n2nchunks('n', recLen, 'nchunks', 8, 'timepoints', timepoints);
-        if chunks(end, end) > length(v(isession).ss.labels)
-            chunks(end, end) = length(v(isession).ss.labels);
-        end
         
-        tbins_txt = {'0-3ZT', '3-6ZT', '6-9ZT', '9-12ZT',...
-            '12-15ZT', '15-18ZT', '18-21ZT', '21-24ZT'};
+        tbins_txt = {'12-15ZT', '15-18ZT', '18-21ZT', '21-24ZT',...
+            '0-3ZT', '3-6ZT', '6-9ZT', '9-12ZT'};
         psdBins = psd_states_timebins('basepath', pwd,...
             'chEeg', [], 'forceA', true, 'graphics', true,...
             'timebins', chunks, 'saveVar', true,...
-            'sstates', [1, 4, 5], 'tbins_txt', tbins_txt);
+            'sstates', [1, 4, 5], 'tbins_t);
         
         %         psdBins = psd_timebins('basepath', pwd,...
         %             'chEeg', [34], 'forceA', true, 'graphics', true,...
@@ -75,7 +72,10 @@ if forceA
         
 %         frBins = fr_timebins('basepath', pwd,...
 %             'forceA', true, 'graphics', true,...
-%             'timebins', chunks, 'saveVar', true);                
+%             'timebins', chunks, 'saveVar', true);
+        
+
+        
         
     end
 end

@@ -24,12 +24,10 @@ function [chunks] = n2chunks(varargin)
 % CALLS:
 %
 % TO DO LIST:
-%   # add an option to restrict minimum chunk size
 %
 % 22 apr 20 LH  updates:
 % 11 aug 20 LH  overlap
 % 14 dec 21 LH  fixed clipping
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
