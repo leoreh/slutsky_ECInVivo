@@ -12,11 +12,11 @@ frBoundries = [0.1, Inf; 0.1, Inf];
 % local mk801
 basepaths = [{'F:\Data\Processed\lh96\lh96_211205_072000'}];
 
-% local ket
-basepaths = [{'I:\lh96\lh96_211126_072000'},...
-    {'F:\Data\Processed\lh96\lh96_211202_070500'},...
-    {'K:\Data\lh95\lh95_210825_080400'},...
-    {'K:\Data\lh99\lh99_211219_085802'}];
+% local acsf
+basepaths = [{'K:\Data\lh99\lh99_211218_090630'},...
+    {'F:\Data\Processed\lh96\lh96_211201_070100'},...
+    {'K:\Data\lh95\lh95_210824_083300'},...
+    {'G:\Data\lh93\lh93_210811_102035'}];
 
 % baclofen
 basepaths = [{'F:\Data\Processed\lh96\lh96_211207_071500'},...
@@ -24,11 +24,11 @@ basepaths = [{'F:\Data\Processed\lh96\lh96_211207_071500'},...
     {'G:\Data\lh98\lh98_211220_104619'}];
 basepaths = basepaths(1 : 2);
 
-% local acsf
-basepaths = [{'K:\Data\lh99\lh99_211218_090630'},...
-    {'F:\Data\Processed\lh96\lh96_211201_070100'},...
-    {'K:\Data\lh95\lh95_210824_083300'},...
-    {'G:\Data\lh93\lh93_210811_102035'}];
+% local ket
+basepaths = [{'I:\lh96\lh96_211126_072000'},...
+    {'F:\Data\Processed\lh96\lh96_211202_070500'},...
+    {'K:\Data\lh95\lh95_210825_080400'},...
+    {'K:\Data\lh99\lh99_211219_085802'}];
 
 % load vars from each session
 varsFile = ["fr"; "sr"; "spikes"; "st_metrics"; "swv_metrics";...
@@ -61,19 +61,19 @@ for isession = 1 : nsessions
     nchans = v(isession).session.extracellular.nChannels;
     
     if contains(basename, 'lh99')
-        grp = [1, 3 : 4, 7]; 
+        grp = [1, 3 : 4, 7];
     else
         grp = [];
     end
     
-    % plot fr vs. time   
-%     plot_FRtime_session('basepath', pwd, 'grp', grp,...
-%         'frBoundries', [0.01 Inf; 0.01 Inf], 'muFlag', false, 'saveFig', false,...
-%         'dataType', 'strd')
-% %     
-%     plot_FRtime_session('basepath', pwd, 'grp', grp,...
-%         'frBoundries', [0.01 Inf; 0.01 Inf], 'muFlag', false, 'saveFig', false,...
-%         'dataType', 'norm')
+    % plot fr vs. time
+    %     plot_FRtime_session('basepath', pwd, 'grp', grp,...
+    %         'frBoundries', [0.01 Inf; 0.01 Inf], 'muFlag', false, 'saveFig', false,...
+    %         'dataType', 'strd')
+    % %
+    %     plot_FRtime_session('basepath', pwd, 'grp', grp,...
+    %         'frBoundries', [0.01 Inf; 0.01 Inf], 'muFlag', false, 'saveFig', false,...
+    %         'dataType', 'norm')
     
     % timebins
     fileinfo = dir([basename, '.dat']);
@@ -94,7 +94,7 @@ for isession = 1 : nsessions
         v(isession).fr, 1, grp, frBoundries, 'int');
     units = [units, tmp_units];
     nunits(isession) = length(tmp_units);
-
+    
 end
 
 units = logical(units);
@@ -127,7 +127,9 @@ tidx = maxIdx / 60;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
+set(groot, 'DefaultAxesLabelFontSizeMultiplier', 1.3)
+set(groot, 'DefaultAxesTitleFontSizeMultiplier', 1.5)
+set(groot, 'DefaultAxesFontSize', 14)
 fh = figure;
 % ---------------------------------------------------------------------
 % individual cells on a log scale
@@ -144,7 +146,7 @@ for iunit = 1 : length(ph)
     ph(iunit).Color(4) = alphaIdx(mfr_order(iunit));
 end
 set(gca, 'YScale', 'log')
-plot([tidx tidx], ylim, '--k')
+plot([tidx tidx], ylim, '--k', 'LineWidth', 2)
 axis tight
 ylabel(ytxt)
 set(gca, 'box', 'off')
@@ -164,7 +166,7 @@ for iunit = 1 : length(ph)
     ph(iunit).Color(4) = alphaIdx(mfr_order(iunit));
 end
 set(gca, 'YScale', 'log')
-plot([tidx tidx], ylim, '--k')
+plot([tidx tidx], ylim, '--k', 'LineWidth', 2)
 axis tight
 ylabel(ytxt)
 set(gca, 'box', 'off')
@@ -181,7 +183,7 @@ yyaxis right
 plot(xidx, mean(frNorm(units(2, :), :), 1, 'omitnan'), 'r', 'LineWidth', 2)
 ylabel(['FS ' ytxt])
 yLimit = ylim;
-plot([tidx tidx], yLimit, '--k')
+plot([tidx tidx], yLimit, '--k', 'LineWidth', 2)
 ax = gca;
 set(ax.YAxis(1), 'color', 'b')
 set(ax.YAxis(2), 'color', 'r')
@@ -190,8 +192,11 @@ set(gca, 'box', 'off')
 linkaxes([sb1, sb2, sb3], 'x')
 xlim([0 24])
 xticks([0 : 3 : 24])
-figname = 'fr_time';
 
+figname = 'fr_time';
+figpath = 'D:\Google Drive\PhD\Slutsky';
+figname = fullfile(figpath, 'fr_temp');
+export_fig(figname, '-tif', '-transparent', '-r300')
 
 
 

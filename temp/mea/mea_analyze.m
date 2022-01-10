@@ -61,7 +61,7 @@ st = spktimesMetrics('basepath', basepath, 'spktimes', mea.spktimes,...
 
 % spike waveform metrics
 swv = spkwvMetrics('wv', mea.wv, 'basepath', basepath, 'fs', fs,...
-    'saveVar', saveVar, 'forceA', false);
+    'saveVar', saveVar, 'forceA', forceA);
 
 % firing rate
 binsize = 60;
@@ -76,8 +76,8 @@ fr = firingRate(mea.spktimes, 'basepath', basepath,...
 % CE thresholds
 nunits = length(fr.mfr);
 cm.putativeCellType = repmat({'Pyramidal Cell'}, 1, nunits);
-cm.putativeCellType(swv.tp < 0.425) = {'Narrow Interneuron'};
-cm.putativeCellType(st.tau_rise > 6 & swv.tp < 0.425) = {'Wide Interneuron'};
+cm.putativeCellType(swv.spkw < 0.65) = {'Narrow Interneuron'};
+% cm.putativeCellType(st.tau_rise > 6 & swv.tp < 0.425) = {'Wide Interneuron'};
 cell_metrics = cm;
 save(fullfile(basepath, [basename, '.cell_metrics.cellinfo.mat']), 'cell_metrics')
 
@@ -99,6 +99,7 @@ if graphics
     tp = swv.tp;
     spkw = swv.spkw;
     royer = st.royer;
+    slopeTail = swv.slopeTail;
     lidor = st.lidor;
     tau_rise = st.tau_rise;
     mfr = normalize(fr.mfr, 'range', [0.1 1]);    
@@ -115,14 +116,14 @@ if graphics
     ylabel('Burstiness (royer)')
     
     subplot(1, 2, 2)
-    sh = scatter(spkw(units(1, :)), tau_rise(units(1, :)),...
+    sh = scatter(spkw(units(1, :)), slopeTail(units(1, :)),...
         mfr(units(1, :)) * 3000, 'b', '.');
     hold on
-    sh = scatter(spkw(units(2, :)), tau_rise(units(2, :)),...
+    sh = scatter(spkw(units(2, :)), slopeTail(units(2, :)),...
         mfr(units(2, :)) * 3000, 'r', '.');
     set(gca, 'yscale', 'log')
     xlabel('Spike Width [ms]')
-    ylabel('Tau Rise')        
+    ylabel('Slope tail')        
     
     % save
     figname = fullfile(figpath, [basename, '_cellClass']);
@@ -130,7 +131,7 @@ if graphics
     
     % ---------------------------------------------------------------------
     % figure per unit
-    sunits = randperm(nunits, 20);
+    sunits = randperm(nunits, 1);
     for iunit = sunits
         
         fh = figure('Visible', 'off');

@@ -1,9 +1,9 @@
 function st = spktimesMetrics(varargin)
 
-%  calculate metrics of st_metrics from ACG. based on calc_ACG_metrics from
-%  cell explorer. metrics include: busrtIndex_Royer2012, Mizuseki2012,
-%  Doublets. calculates two ACGs: narrow (100ms, 0.5ms bins) and wide (1s,
-%  1ms bins)
+%  calculate spike timing metrics from ACG and ISI histogram. based in part
+%  on calc_ACG_metrics from cell explorer. metrics include:
+%  busrtIndex_Royer2012, Mizuseki2012, Doublets. calculates two ACGs:
+%  narrow (100ms, 0.5ms bins) and wide (1s, 1ms bins)
 
 
 % INPUT:
@@ -122,22 +122,23 @@ st.info.acg_narrow_dur = 0.1;
 % spk params
 nunits = length(sunits);
 nwin = length(winCalc);
+minSpkTHr = 50;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % calc
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % initialize
-st.acg_wide     = zeros(st.info.acg_wide_dur / st.info.acg_wide_bnsz + 1, nwin, nunits);
-st.acg_narrow   = zeros(st.info.acg_narrow_dur / st.info.acg_narrow_bnsz + 1, nwin, nunits);
-st.doublets     = zeros(nwin, nunits);
-st.royer        = zeros(nwin, nunits);
-st.lidor        = zeros(nwin, nunits);
-st.mizuseki     = zeros(nwin, nunits);
-st.cv           = zeros(nwin, nunits);
-st.cv2          = zeros(nwin, nunits);
-st.lv           = zeros(nwin, nunits);
-st.lvr          = zeros(nwin, nunits);
+st.acg_wide     = nan(st.info.acg_wide_dur / st.info.acg_wide_bnsz + 1, nwin, nunits);
+st.acg_narrow   = nan(st.info.acg_narrow_dur / st.info.acg_narrow_bnsz + 1, nwin, nunits);
+st.doublets     = nan(nwin, nunits);
+st.royer        = nan(nwin, nunits);
+st.lidor        = nan(nwin, nunits);
+st.mizuseki     = nan(nwin, nunits);
+st.cv           = nan(nwin, nunits);
+st.cv2          = nan(nwin, nunits);
+st.lv           = nan(nwin, nunits);
+st.lvr          = nan(nwin, nunits);
 
 for iunit = sunits
     for iwin = 1 : length(winCalc)
@@ -148,6 +149,10 @@ for iunit = sunits
         nspks = length(st_unit);
         isi = diff(st_unit);
         nisi = length(isi);
+        
+        if nspks < minSpkTHr
+            continue
+        end
         
         % acg
         [st.acg_wide(:, iwin, iunit), st.info.acg_wide_tstamps] = CCG(st_unit,...
@@ -226,7 +231,7 @@ for iunit = sunits
         ub = [500, 50, 500, 15, 50, 20, 5, 100];
         offset = 101;
         x = ([1 : 100] / 2)';
-        [f0, ~] = fit(x, st.acg_narrow(x * 2 + offset, iunit),...
+        [f0, ~] = fit(x, st.acg_narrow(x * 2 + offset, iwin, iunit),...
             g, 'StartPoint', a0, 'Lower', lb, 'Upper', ub);
         fit_params = coeffvalues(f0);      
         st.tau_rise(iwin, iunit) = fit_params(2);

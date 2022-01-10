@@ -96,67 +96,62 @@ for iwin = 1 : nbins
     mfrNrem(iwin, :) = mean(frBins(iwin).states.fr{4}, 2);
         
 end
+frBins.sratio = [];
+frBins.sratio =
+frBins.sratio
+frBins.sratio = sratio;
+frBins.mfrWake = mfrWake;
+frBins.mfrNrem = mfrNrem;
 
 yLimit = [min([sratio], [], 'all'), max([sratio], [], 'all')];
-
+tbins_txt = {'0-3ZT', '3-6ZT', '6-9ZT', '9-12ZT',...
+    '12-15ZT', '15-18ZT', '18-21ZT', '21-24ZT'};
+        
 % graphics
 fh = figure;
+cfg = as_loadConfig();
 
 subplot(3, 2, 1)
 dataMat = mfrWake(:, units(1, :));
-plot([1 : nbins], mean(dataMat, 2, 'omitnan'),...
-    'kd', 'markerfacecolor', 'k')
-hold on
-boxplot(dataMat', 'PlotStyle', 'traditional', 'Whisker', 6);
-ylabel('MFR AWAKE')
+plot_boxMean('dataMat', dataMat', 'clr', cfg.colors{1})
+ylabel('MFR WAKE')
 subtitle('RS units')
+xticklabels(tbins_txt)
 
 subplot(3, 2, 2)
 dataMat = mfrWake(:, units(2, :));
-plot([1 : nbins], mean(dataMat, 2, 'omitnan'),...
-    'kd', 'markerfacecolor', 'k')
-hold on
-boxplot(dataMat', 'PlotStyle', 'traditional', 'Whisker', 6);
-ylabel('MFR AWAKE')
+plot_boxMean('dataMat', dataMat', 'clr', cfg.colors{1})
+ylabel('MFR WAKE')
 subtitle('FS units')
+xticklabels(tbins_txt)
 
 subplot(3, 2, 3)
 dataMat = mfrNrem(:, units(1, :));
-plot([1 : nbins], mean(mfrNrem(:, units(1, :)), 2, 'omitnan'),...
-    'kd', 'markerfacecolor', 'k')
-hold on
-boxplot(mfrNrem(:, units(1, :))', 'PlotStyle', 'traditional', 'Whisker', 6);
+plot_boxMean('dataMat', dataMat', 'clr', cfg.colors{4})
 ylabel('MFR NREM')
-subtitle('FS units')
+xticklabels(tbins_txt)
 
 subplot(3, 2, 4)
-plot([1 : nbins], mean(mfrNrem(:, units(2, :)), 2, 'omitnan'),...
-    'kd', 'markerfacecolor', 'k')
-hold on
-boxplot(mfrNrem(:, units(2, :))', 'PlotStyle', 'traditional', 'Whisker', 6);
+dataMat = mfrNrem(:, units(2, :));
+plot_boxMean('dataMat', dataMat', 'clr', cfg.colors{4})
 ylabel('MFR NREM')
-subtitle('FS units')
+xticklabels(tbins_txt)
 
-% RS
-subplot(2, 2, 2)
-plot([1 : nbins], mean(sratio(:, units(1, :)), 2, 'omitnan'),...
-    'kd', 'markerfacecolor', 'k')
-hold on
-boxplot(sratio', 'PlotStyle', 'traditional', 'Whisker', 6);
-ylabel('AWAKE - NREM')
+subplot(3, 2, 5)
+dataMat = sratio(:, units(1, :));
+plot_boxMean('dataMat', dataMat', 'clr', 'k')
+ylabel('WAKE - NREM / WAKE + NREM')
 ylim(yLimit)
-subtitle('RS units')
+xticklabels(tbins_txt)
 
-% FS
-subplot(2, 2, 4)
-plot([1 : nbins], mean(sratio(:, units(2, :)), 2, 'omitnan'),...
-    'kd', 'markerfacecolor', 'k')
-hold on
-boxplot(sratio', 'PlotStyle', 'traditional', 'Whisker', 6);
-ylabel('AWAKE - NREM')
+subplot(3, 2, 6)
+dataMat = sratio(:, units(2, :));
+plot_boxMean('dataMat', dataMat', 'clr', 'k')
+ylabel('WAKE - NREM / WAKE + NREM')
 ylim(yLimit)
-subtitle('FS units')
-title(basename)
+xticklabels(tbins_txt)
+
+sgtitle(basename)
 
 
 

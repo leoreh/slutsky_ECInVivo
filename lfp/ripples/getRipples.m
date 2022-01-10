@@ -85,15 +85,25 @@ limDur = [20, 150, 30];     % min, max, and inter dur limits for ripples [ms]
 passband = [130 250];
 binsizeRate = 30;           % binsize for calculating ripple rate [s]
 
-% load session info
+% files
 [~, basename] = fileparts(basepath);
-sessionName = [basename, '.session.mat'];
-if ~exist(sessionName, 'file')
+ssfile = fullfile(basepath, [basename '.sleep_states.mat']);
+sessionfile = fullfile(basepath, [basename, '.session.mat']);
+rippfile = fullfile(basepath, [basename, '.ripp.mat']);
+clufile = fullfile(basepath, [basename, '.ripp.clu.1']);
+resfile = fullfile(basepath, [basename, '.ripp.res.1']);
+
+% load session info
+if ~exist(sessionfile, 'file')
     session = CE_sessionTemplate(pwd, 'viaGUI', false,...
         'force', true, 'saveVar', true);
 else
-    load(sessionName)
+    load(sessionfile)
 end
+
+% state configuration
+cfg = as_loadConfig([]);
+sstates = [1 : 6];  % selected states
 
 spkgrp = session.extracellular.spikeGroups.channels;
 spkch = sort([spkgrp{:}]);
@@ -148,10 +158,8 @@ fprintf('preparing signal...\n')
 % normalize data to ripple power during NREM
 nrem_idx = false(length(sig), 1);   % initialize
 
-ssfile = fullfile(basepath, [basename '.AccuSleep_states.mat']);
 if exist(ssfile)    
     load(ssfile, 'ss')    
-    cfg = as_loadConfig([]);
     nrem_stateIdx = find(strcmp(cfg.names, 'NREM'));
     
     % find nrem indices by upsampling the labels. assumes the binsize
@@ -182,7 +190,7 @@ d0 = diff(medfilt1(sig_unwrapped, 12)) ./ dt;
 d1 = interp1(t_diff, d0, tstamps(2 : end - 1, 1));
 sig_freq = [d0(1); d1; d0(end)] / (2 * pi);
 
-% smooth amplitude. not TL averages the smoothed amplitude from a few
+% smooth amplitude. note TL averages the smoothed amplitude from a few
 % channels.
 sm = smoothdata(sig_amp, 'gaussian', round(5 / (1000 / 1250)));
 
@@ -217,13 +225,13 @@ end
 
 % find epochs with power > low threshold. correct for durations
 limDur = limDur / 1000 * fs;
-epochs = binary2epochs('vec', nss > thr(1), 'minDur', limDur(1),...
+epochs = binary2epochs('vec', sm > thr(1), 'minDur', limDur(1),...
     'maxDur', limDur(2), 'interDur', limDur(3));
 
 % discard ripples with a peak power < high threshold
 peakPowNorm = zeros(size(epochs, 1), 1);
 for iepoch = 1 : size(epochs, 1)
-    peakPowNorm(iepoch) = max(nss(epochs(iepoch, 1) : epochs(iepoch, 2)));
+    peakPowNorm(iepoch) = max(sm(epochs(iepoch, 1) : epochs(iepoch, 2)));
 end
 dicard_idx = peakPowNorm < thr(2);
 epochs(dicard_idx, :) = [];
@@ -280,14 +288,12 @@ ripp.corr.dur_amp = corrcoef(ripp.dur, ripp.peakAmp);
     'c2r', true);
 
 % relation to sleep states
-ssfile = fullfile(basepath, [basename '.AccuSleep_states.mat']);
+ssfile = fullfile(basepath, [basename '.sleep_states.mat']);
 if exist(ssfile)    
     load(ssfile, 'ss')    
-    [cfg_colors, ~, ~] = as_loadConfig([]);
 
-    ripp.states.stateNames = ss.labelNames;
+    ripp.states.stateNames = ss.info.names;
     nstates = length(ss.stateEpochs);
-    sstates = [1 : 5];  % selected states
     
     for istate = sstates
         epochIdx = InIntervals(ss.stateEpochs{istate}, recWin);
@@ -306,11 +312,47 @@ if exist(ssfile)
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% finalize and save
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+ripp.info.rippCh = rippCh;
+ripp.info.limDur = limDur;
+ripp.info.recWin = recWin;
+ripp.info.runtime = datetime(now, 'ConvertFrom', 'datenum');
+ripp.info.thr = thr;
+ripp.epochs         = epochs + recWin(1);  
+ripp.peakPos        = peakPos;
+ripp.peakPow        = peakPow;
+ripp.peakPowNorm    = peakPowNorm;
+
+if saveVar      
+    save(rippfile, 'ripp')
+
+    % create ns files for visualization with neuroscope
+    fs_dat = session.extracellular.sr;
+    nepochs = size(ripp.epochs, 1);
+    
+    res = [ripp.epochs(:, 1); ripp.epochs(:, 2); ripp.peakPos] * fs_dat;
+    [res, sort_idx] = sort(round(res));
+    fid = fopen(resfile, 'w');
+    fprintf(fid, '%d\n', res);
+    rc = fclose(fid);
+   
+    clu = [ones(nepochs, 1); ones(nepochs, 1) * 2; ones(nepochs, 1) * 3];
+    clu = clu(sort_idx);
+    fid = fopen(clufile, 'w');
+    fprintf(fid, '%d\n', 3);
+    fprintf(fid, '%d\n', clu);
+    rc = fclose(fid);
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if graphics
     
+    nepochs = size(ripp.epochs, 1);
     setMatlabGraphics(false)
     set(groot, 'DefaultAxesLabelFontSizeMultiplier', 1.1)
     set(groot, 'DefaultAxesTitleFontSizeMultiplier', 1.2)   
@@ -319,23 +361,24 @@ if graphics
     durPlot = [-50 50] / 1000;
     x = durPlot(1) : diff(durPlot) / nepochs : durPlot(2);
     histBins = 200;
+    nbins = size(ripp.maps.freq, 2);
     
     % examples on raw and filtered data
     sb1 = subplot(4, 3, [1, 2]);    
     idx_recMargin = 10 * fs;     % [s]
     rippSelect = 500 : 550;
     rippCenter = round((rippSelect(end) - rippSelect(1)) / 2) + rippSelect(1);
-    idx_rec = round([peakPos(525) * fs - idx_recMargin :...
-        peakPos(525) * fs + idx_recMargin]);
+    idx_rec = round([ripp.peakPos(525) * fs - idx_recMargin :...
+        ripp.peakPos(525) * fs + idx_recMargin]);
     plot(idx_rec / fs, sig(idx_rec), 'k')
     hold on
-    plot(idx_rec / fs, sig_filt(idx_rec), 'm')
+%     plot(idx_rec / fs, sig_filt(idx_rec), 'm')
     yLimit = ylim;
-    plot([peakPos(rippSelect), peakPos(rippSelect)], yLimit, 'b')
-    plot([epochs(rippSelect, 1), epochs(rippSelect, 1)], yLimit, 'g')
-    plot([epochs(rippSelect, 2), epochs(rippSelect, 2)], yLimit, 'r')
-    xlim([peakPos(rippCenter) - 0.5, peakPos(rippCenter) + 0.5])
-    legend('Raw LFP', 'Filtered')
+    plot([ripp.peakPos(rippSelect), ripp.peakPos(rippSelect)], yLimit, 'b')
+    plot([ripp.epochs(rippSelect, 1), ripp.epochs(rippSelect, 1)], yLimit, 'g')
+    plot([ripp.epochs(rippSelect, 2), ripp.epochs(rippSelect, 2)], yLimit, 'r')
+    xlim([ripp.peakPos(rippCenter) - 0.5, ripp.peakPos(rippCenter) + 0.5])
+%     legend('Raw LFP', 'Filtered')
     xlabel('Time [s]')
     
     % examples of ripples (filtered) superimposed
@@ -355,13 +398,12 @@ if graphics
         for istate = sstates
             ph = plot(ripp.states.tstamps{istate} / 60 / 60,...
                 ripp.states.rate{istate}, '.', 'MarkerSize', 5);
-            ph.Color = cfg_colors{istate};
+            ph.Color = cfg.colors{istate};
         end
         xlabel('Time [h]')
         ylabel('Ripple Rate [Hz]')
-        legend(["Total", ripp.states.stateNames{sstates}]);
+        % legend(["Total", ripp.states.stateNames{sstates}]);
     end
-    ylim([0 3])
     
     % percent rippels in state
     sb6 = subplot(4, 3, 6);
@@ -369,7 +411,10 @@ if graphics
         pie(sum(cell2nanmat(ripp.states.idx), 1, 'omitnan'), ones(1, length(sstates)))
         hold on
         ph = findobj(sb6, 'Type', 'Patch');
-        set(ph, {'FaceColor'}, flipud(cfg_colors(sstates)'))
+        set(ph, {'FaceColor'}, flipud(cfg.colors(sstates)))
+        legend({ripp.states.stateNames{sstates}}, 'FontSize', 10,...
+            'Units', 'normalized', 'Position', [0.661 0.605 0.02 0.10],...
+            'NumColumns', 2);
     end
       
     % frequency map
@@ -414,45 +459,13 @@ if graphics
     xlabel('Ripple Duration [ms]')
     ylabel('Probability')
     
+    sgtitle(basename)
+    
     % save figure
     figpath = fullfile(basepath, 'graphics');
     mkdir(figpath)
     figname = fullfile(figpath, sprintf('%s_ripples', basename));
-%     export_fig(figname, '-tif', '-transparent', '-r300')   
-end
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% finalize and save
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-ripp.info.rippCh = rippCh;
-ripp.info.limDur = limDur;
-ripp.info.recWin = recWin;
-ripp.info.runtime = datetime(now, 'ConvertFrom', 'datenum');
-ripp.info.thr = thr;
-ripp.epochs         = epochs + recWin(1);  
-ripp.peakPos        = peakPos;
-ripp.peakPow        = peakPow;
-ripp.peakPowNorm    = peakPowNorm;
-
-if saveVar      
-    save([basepath, filesep, basename, '.ripp.mat'], 'ripp')
-    
-    % create ns files for visualization with neuroscope
-    fs_dat = session.extracellular.sr;
-    
-    res = [ripp.epochs(:, 1); ripp.epochs(:, 2); ripp.peakPos] * fs_dat;
-    [res, sort_idx] = sort(round(res));
-    fid = fopen([basename, '.ripp.res.1'], 'w');
-    fprintf(fid, '%d\n', res);
-    rc = fclose(fid);
-   
-    clu = [ones(nepochs, 1); ones(nepochs, 1) * 2; ones(nepochs, 1) * 3];
-    clu = clu(sort_idx);
-    fid = fopen([basename, '.ripp.clu.1'], 'w');
-    fprintf(fid, '%d\n', 3);
-    fprintf(fid, '%d\n', clu);
-    rc = fclose(fid);
+    export_fig(figname, '-tif', '-transparent', '-r300')
 end
 
 end

@@ -177,12 +177,18 @@ for iunit = 1 : nunits
     
     % general waveform params
     w = wv_interp(iunit, :);
-    [minVal, imin] = min(w);                            % trough
-    [maxVal_post, imax_post] = max(w(imin + 1 : end));  % peak after trough
+    [minVal, imin] = min(w);                                % trough
+    [maxVal_post, imax_post] = max(w(imin + 1 : end));      % peak after trough
     imax_post = imax_post + imin;
-    [maxVal_pre, ~] = max(w(1 : imin - 1));             % peak before trough
-    ampTp(iunit) = maxVal_post - minVal;                % amplitude trough to after peak
-    ampTail(iunit) = maxVal_post - w(end);              % amplitude tail (peak to end)
+    [maxVal_pre, ~] = max(w(1 : imin - 1));                 % peak before trough
+    [minVal_post, imin_post] = min(w(imax_post + 1 : end)); % min after peak
+    if isempty(minVal_post)
+        minVal_post = w(end);
+        imin_post = length(w);
+    end
+    imin_post = imin_post + imax_post;
+    ampTp(iunit) = maxVal_post - minVal;                    % amplitude trough to after peak
+    ampTail(iunit) = maxVal_post - minVal_post;             % amplitude tail
     
     % trough-to-peak time (artho et al., 2004) and asymmetry (Sirota et
     % al., 2008)
@@ -196,7 +202,7 @@ for iunit = 1 : nunits
     end
     
     % slope peak to end (Torrado Pacheco et al., Neuron, 2021)
-    slopeTail(iunit) = ampTail(iunit) / (spklength * upsamp - imax_post);
+    slopeTail(iunit) = ampTail(iunit) / (imin_post - imax_post);
     
     % slope trough to peak (no reference)
     slopeTp(iunit) = ampTp(iunit) / (imax_post - imin);

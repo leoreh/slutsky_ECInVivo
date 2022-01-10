@@ -89,7 +89,6 @@ units(1, :) = selectUnits(v.spikes, v.cm,...
 units(2, :) = selectUnits(v.spikes, v.cm,...
     v.fr, 1, [], frBoundries, 'int');
 
-clear rs.sratio fs.sratio
 for iwin = 1 : nbins
     sratio(iwin, :) = squeeze(frBins(iwin).states.ratio(ridx(1), ridx(2), :));    
     mfrWake(iwin, :) = mean(frBins(iwin).states.fr{1}, 2);
@@ -98,8 +97,9 @@ for iwin = 1 : nbins
 end
 
 yLimit = [min([sratio], [], 'all'), max([sratio], [], 'all')];
-tbins_txt = {'0-6 ZT', '6-12 ZT', '12-18 ZT', '18-24 ZT'};
-
+tbins_txt = {'0-3ZT', '3-6ZT', '6-9ZT', '9-12ZT',...
+    '12-15ZT', '15-18ZT', '18-21ZT', '21-24ZT'};
+        
 % graphics
 fh = figure;
 cfg = as_loadConfig();
@@ -109,34 +109,40 @@ dataMat = mfrWake(:, units(1, :));
 plot_boxMean('dataMat', dataMat', 'clr', cfg.colors{1})
 ylabel('MFR WAKE')
 subtitle('RS units')
+xticklabels(tbins_txt)
 
 subplot(3, 2, 2)
 dataMat = mfrWake(:, units(2, :));
 plot_boxMean('dataMat', dataMat', 'clr', cfg.colors{1})
 ylabel('MFR WAKE')
 subtitle('FS units')
+xticklabels(tbins_txt)
 
 subplot(3, 2, 3)
 dataMat = mfrNrem(:, units(1, :));
 plot_boxMean('dataMat', dataMat', 'clr', cfg.colors{4})
 ylabel('MFR NREM')
+xticklabels(tbins_txt)
 
 subplot(3, 2, 4)
 dataMat = mfrNrem(:, units(2, :));
 plot_boxMean('dataMat', dataMat', 'clr', cfg.colors{4})
 ylabel('MFR NREM')
+xticklabels(tbins_txt)
 
 subplot(3, 2, 5)
 dataMat = sratio(:, units(1, :));
 plot_boxMean('dataMat', dataMat', 'clr', 'k')
-ylabel('WAKE - NREM / WAKE + NREM')
+ylabel({'WAKE - NREM /', 'WAKE + NREM'})
 ylim(yLimit)
+xticklabels(tbins_txt)
 
 subplot(3, 2, 6)
 dataMat = sratio(:, units(2, :));
 plot_boxMean('dataMat', dataMat', 'clr', 'k')
-ylabel('WAKE - NREM / WAKE + NREM')
+ylabel({'WAKE - NREM /', 'WAKE + NREM'})
 ylim(yLimit)
+xticklabels(tbins_txt)
 
 sgtitle(basename)
 

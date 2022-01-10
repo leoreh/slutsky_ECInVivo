@@ -21,10 +21,10 @@ function mea = mea_orgNex(varargin)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 p = inputParser;
-addOptional(p, 'fname', '', @ischar);
-addOptional(p, 'basepath', pwd, @ischar);
-addOptional(p, 'forceL', false, @islogical);
-addOptional(p, 'saveVar', true, @islogical);
+addParameter(p, 'fname', '', @ischar);
+addParameter(p, 'basepath', pwd, @ischar);
+addParameter(p, 'forceL', false, @islogical);
+addParameter(p, 'saveVar', true, @islogical);
 
 parse(p, varargin{:})
 fname       = p.Results.fname;
@@ -40,7 +40,7 @@ saveVar     = p.Results.saveVar;
 idx_ch = 1;
 idx_unitID = 2;
 idx_spktimes = 3;
-wvlength = 30;
+wvlength = 29;      % for Anto data wv is 32 samples, and for max 31
 fs = 10000;
 
 % file
@@ -71,7 +71,7 @@ for ich = 1 : nch
     
     nunitsCh = unique(nex.(unitFields{ich})(:, idx_unitID));
     
-    for iunit = 1 : nunitsCh
+    for iunit = 1 : length(nunitsCh)
         
         unitIdx = nex.(unitFields{ich})(:, idx_unitID) == nunitsCh(iunit);      
         mea.ch(cnt) = unique(nex.(unitFields{ich})(unitIdx, idx_ch));

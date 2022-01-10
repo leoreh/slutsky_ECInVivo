@@ -44,7 +44,7 @@ suFlag = 1;                     % plot only su or all units
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % load data
-varsFile = ["session"; "cell_metrics"; "spikes";...
+varsFile = ["session"; "cell_metrics"; "spikes.cellinfo";...
     "fr"; "datInfo"; "sr";];
 varsName = ["session"; "cm"; "spikes"; "fr"; "datInfo"; "sr"];
 v = getSessionVars('basepaths', {basepath}, 'varsFile', varsFile,...
@@ -88,6 +88,13 @@ if ~isempty(fr)
     units(2, :) = selectUnits(spikes, cm, fr, suFlag, grp, frBoundries, 'int');
 end
 
+switch dataType
+    case 'norm'
+        ytxt = 'Norm Firing Rate';
+    case 'strd'
+        ytxt = 'Firing Rate [Hz]';
+end
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % plot
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -104,7 +111,7 @@ if isempty(fr) | muFlag
     plot([tidx tidx], yLimit, '--k', 'LineWidth', 1)
     axis tight
     set(gca, 'box', 'off');
-    ylabel('Multi-unit firing rate [Hz]')
+    ylabel(['Multi-unit ', ytxt])
     xlabel('Time [h]')
     lgh = legend(split(num2str(grp)));
     figname = 'sr_time';
@@ -130,7 +137,7 @@ else
     plot([tidx tidx], ylim, '--k')
     axis tight
     xlabel('Time [h]')
-    ylabel('Firing rate [log(Hz)]')
+    ylabel(ytxt)
     set(gca, 'box', 'off')
     legend(sprintf('RS = %d su', sum(units(1, :))))
 
@@ -150,21 +157,28 @@ else
     plot([tidx tidx], ylim, '--k')
     axis tight
     xlabel('Time [h]')
-    ylabel('Firing rate [log(Hz)]')
+    ylabel(ytxt)
     set(gca, 'box', 'off')
     legend(sprintf('FS = %d su', sum(units(2, :))));
 
     % ---------------------------------------------------------------------
     % mean per cell class on a linear scale 
     sb3 = subplot(3, 1, 3);
-    yLimit = [0 ceil(max(mean(fr.strd(units(2, :), :), 'omitnan')))];
     hold on
     plot(xidx, mean(fr.(dataType)(units(1, :), :), 'omitnan'), 'b', 'LineWidth', 2)
+    ylabel(['RS ' ytxt])    
+    axis tight
+    yyaxis right
     plot(xidx, mean(fr.(dataType)(units(2, :), :), 'omitnan'), 'r', 'LineWidth', 2)
+    axis tight
+    ylabel(['FS ' ytxt])
+    yLimit = ylim;
     plot([tidx tidx], yLimit, '--k')
     axis tight
+    ax = gca;
+    set(ax.YAxis(1), 'color', 'b')
+    set(ax.YAxis(2), 'color', 'r')
     xlabel('Time [h]')
-    ylabel('Firing rate [Hz]')
     set(gca, 'box', 'off')
     linkaxes([sb1, sb2, sb3], 'x')    
     figname = 'fr_time';
