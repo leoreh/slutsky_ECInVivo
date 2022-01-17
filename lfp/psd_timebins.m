@@ -1,244 +1,131 @@
-function psdBins = psd_timebins(varargin)
+function [psdBins, faxis] = psd_timebins(varargin)
 
-% calculating the psd per state in different time bins of a
-% session.
+% calculates the psd of a signal with the pwelch method in specific time
+% bins by averaging. assumes winCalc is in seconds and thus need fs to
+% index sig. 
 %
 % INPUT:
-%   basepath        string. path to recording folder {pwd}
-%   fs              numeric. sampling frequency of lfp data. if empty will
-%                   be extracted from session struct. also determines the
-%                   new sampling frequency of the eeg signal.
-%   fsEeg           numeric. sampling frequency of eeg data
-%   chEeg           numeric. channels of eeg signal. if greater than 2
-%                   will assume it is recorded in same lfp file. otherwise
-%                   will assume it is recorded in emg.dat file. if empty
-%                   will assume no eeg recording exists. 
-%   nchansEeg       numeric. number of channels in [basename].emg.dat file
-%   timebins        numeric. timebins to calc psd
-%                   in relation to these poitns [sec].  
-%   saveVar         logical. save ss var {true}
-%   forceA          logical. reanalyze recordings even if ss struct
-%                   exists (false)
-%   graphics        logical. plot confusion chart and state separation {true}
+%   sig             numeric. eeg data (1 x n)
+%   fs              numeric. sampling frequency {1250} of the signals.
+%   faxis           numeric. frequencies of psd estimate {[0.2 : 0.2 : 120]}
+%   winCalc         cell of n x 2 mats. the psd will be calculated for each
+%                   cell separately according to the time windows specified
+%                   in each cell. 
+%   graphics        logical. plot figure {true}
+% 
+% OUTPUT
+%   psdStates       raw averaged psd for each state (mat nstates x faxis)
+%   faxis           frequencies of psd estimate 
 %
 % DEPENDENCIES
-%
+% 
 % TO DO LIST
 %
-% 07 jan 22 LH
+% 26 jul 21 LH      updates:
+% 05 jan 21         removed downsampling
+% 12 jan 22         winCalc. removed state dependancy
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 p = inputParser;
-addOptional(p, 'basepath', pwd);
-addOptional(p, 'fsEeg', [], @isnumeric);
-addOptional(p, 'chEeg', 1, @isnumeric);
-addOptional(p, 'nchansEeg', [], @isnumeric);
-addOptional(p, 'timebins', [0 Inf], @isnumeric);
-addOptional(p, 'tbins_txt', []);
-addOptional(p, 'saveVar', true, @islogical);
-addOptional(p, 'forceA', false, @islogical);
+addOptional(p, 'sig', [], @isnumeric);
+addOptional(p, 'fs', 1250, @isnumeric);
+addOptional(p, 'faxis', [0.2 : 0.2 : 120], @isnumeric);
+addOptional(p, 'winCalc', []);
 addOptional(p, 'graphics', true, @islogical);
 
 parse(p, varargin{:})
-basepath        = p.Results.basepath;
-fsEeg           = p.Results.fsEeg;
-chEeg           = p.Results.chEeg;
-nchansEeg       = p.Results.nchansEeg;
-timebins        = p.Results.timebins;
-tbins_txt       = p.Results.tbins_txt;
-saveVar         = p.Results.saveVar;
-forceA          = p.Results.forceA;
+sig             = p.Results.sig;
+fs              = p.Results.fs;
+faxis           = p.Results.faxis;
+winCalc         = p.Results.winCalc;
 graphics        = p.Results.graphics;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preparations
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% file
-cd(basepath)
-[~, basename] = fileparts(basepath);
-psdfile = fullfile(basepath, [basename, '.psd_bins.mat']);
-
-% load session vars
-varsFile = ["sleep_states"; "datInfo"; "session"];
-varsName = ["ss"; "datInfo"; "session"];
-v = getSessionVars('basepaths', {basepath}, 'varsFile', varsFile,...
-    'varsName', varsName);
-
-% recording params
-fileinfo = dir([basename, '.dat']);
-nchans = v.session.extracellular.nChannels;
-fsDat = v.session.extracellular.sr;
-fsLfp = v.session.extracellular.srLfp;
-if isempty(fsEeg)
-    fsEeg = v.ss.info.sSig.emgFs;
+% assert time bins
+if ~iscell(winCalc)
+    if size(winCalc, 2) ~= 2
+        error('check the input winCalc')
+    end
+    winCalc = {winCalc};
 end
-if isempty(nchansEeg)
-    nchansEeg = nchans;
+if isempty(winCalc)
+    winCalc = {[0 Inf]};
 end
-chLfp = v.ss.info.sSig.eegCh;
-recLen = floor(fileinfo.bytes / 2 / nchans / fsDat);
-
-nbins = size(timebins, 1);
-
-if isempty(tbins_txt) && nbins == 4
-    tbins_txt = {'0-6 ZT', '6-12 ZT', '12-18 ZT', '18-24 ZT'};
-else
-    tbins_txt = split(num2str(1 : nbins));
+nwin = size(winCalc, 2);
+nbins = cellfun(@size, winCalc, 'UniformOutput', false);
+for iwin = 1 : nwin
+    if nbins{iwin}(2) == 2
+        nbins{iwin}(2) = [];
+    else
+        error('check the input winCalc')
+    end
 end
-
-% params for filtering eeg
-import iosr.dsp.*
-filtRatio = 450 / (fsEeg / 2);
-fsRatio = (fsEeg / fsLfp);
-
-% state params
-faxis = 0.2 : 0.2 : 120;
-sstates = [1, 4, 5];
-
-% initialize
-psdLfp = nan(nbins, length(faxis));
-psdEeg = nan(nbins, length(faxis));
+nbins = cell2mat(nbins);
 
 % fft params
-faxis = [0.2 : 0.2 : 120];
-win = hann(2 ^ (nextpow2(2 * fsLfp) - 1));
-noverlap = floor(0.25 * fsLfp);
+if isempty(faxis)
+    faxis = [0.2 : 0.2 : 120];       
+end
+win = hann(2 ^ (nextpow2(2 * fs) - 1));
+noverlap = floor(0.25 * fs);
+% frequencies for psd estimate. note that both the slowest frequency and
+% the frequency resolution is determined by 1 / epoch length. For example,
+% to estimate frequencies in a resolution of 0.2 Hz, the minimum epoch
+% duration must be 5 seconds (minDur). however, using a hamming window to
+% smooth the psd also reduces the frequency resolution. further, we omit
+% the first and last bin of an epoch to assure no contamination from other
+% states. this is why the minDur was set to twice the theoretical minimum
+% (10 s).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% calc psd
+% calc power for each epoch separatly
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% check if already analyzed
-if exist(psdfile, 'file') && ~forceA
-    load(psdfile)
-else
-    for iwin = 1 : nbins
-                
-        % ---------------------------------------------------------------------
-        % hippocampal lfp
-        sig = double(bz_LoadBinary([basename, '.lfp'],...
-            'duration', diff(timebins(iwin, :)) + 1,...
-            'frequency', fsLfp, 'nchannels', nchans, 'start', timebins(iwin, 1),...
-            'channels', chLfp, 'downsample', 1));
-        sig = mean(sig, 2);
+psdBins = zeros(nwin, length(faxis));
+for iwin = 1 : nwin
+    for ibin = 1 : nbins(iwin)
+               
+        % idx to signal w/o first and last bin
+        dataIdx = (winCalc{iwin}(ibin, 1) + 1) * fs :...
+            (winCalc{iwin}(ibin, 2) - 1) * fs - 1;
         
-        psdLfp(iwin, :) = pwelch(sig, win, noverlap, faxis, fsLfp);
-        
-        % ---------------------------------------------------------------------
-        % frontal eeg
-        if ~isempty(chEeg)
-            if chEeg < 3
-                sig = double(bz_LoadBinary([basename, '.emg.dat'],...
-                    'duration', diff(timebins(iwin, :)) + 1,...
-                    'frequency', fsEeg, 'nchannels', 2, 'start', timebins(iwin, 1),...
-                    'channels', chEeg, 'downsample', 1));
-                sig = [iosr.dsp.sincFilter(sig, filtRatio)]';
-                sig = sig(fsRatio : fsRatio : length(sig));
-            else
-                sig = double(bz_LoadBinary([basename, '.lfp'],...
-                    'duration', diff(timebins(iwin, :)) + 1,...
-                    'frequency', fsLfp, 'nchannels', nchansEeg, 'start', timebins(iwin, 1),...
-                    'channels', chEeg, 'downsample', 1));
-            end
-            psdEeg(iwin, :) = pwelch(sig, win, noverlap, faxis, fsLfp);
-
-        end
-        
+        % calc power and sum across bins
+        [pow, ~] = pwelch(sig(dataIdx), win, noverlap, faxis, fs);
+        psdBins(iwin, :) = psdBins(iwin, :) + pow;                       
+               
     end
-    
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    % arrange in struct and save
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    
-  
-    
-    psdBins.info.runtime = datetime(now, 'ConvertFrom', 'datenum');
-    psdBins.info.chLfp = chLfp;
-    psdBins.info.chEeg = chEeg;
-    psdBins.info.fsLfp = fsLfp;
-    psdBins.info.fsEeg = fsEeg;
-    psdBins.timebins = timebins;
-    psdBins.psdLfp = psdLfp;
-    psdBins.psdEeg = psdEeg;
-    
-    if saveVar
-        save(psdfile, 'psdBins')
-    end
-    
+    % average power
+    psdBins(iwin, :) = psdBins(iwin, :) / nbins(iwin);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% graphics
+% plot spectral power per window
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% use 10*log10(psdStates) for [dB]
 
 if graphics
-    
-    if all(isnan(psdBins.psdEeg), 'all')
-        nsub = 1;
-    else
-        nsub = 2;
-    end
-
-    setMatlabGraphics(false)
-    alphaIdx = linspace(0.5, 1, nbins);
-    lim_fAxis = faxis > 1;
-    smf = 7;
-    gk = gausswin(smf);
-    gk = gk / sum(gk);
-    
+    xLimit = [0 faxis(end)];
     fh = figure;
-    for istate = 1 : length(sstates)
-        
-        % lfp
-        subplot(1, nsub, 1)
-        psdMat = squeeze(psdBins.psdLfp(:, lim_fAxis));
-        %     for iwin = 1 : nbins
-        %         psdMat(iwin, :) = conv(psdMat(iwin, :), gk, 'same');
-        %     end
-        psdMat = psdMat ./ sum(psdMat, 2);
-        ph = plot(faxis(lim_fAxis), psdMat', 'LineWidth', 2);
-        for iwin = 1 : length(ph)
-            ph(iwin).Color(2) = 1 - iwin * 0.2;
-            ph(iwin).Color(3) = 0.5 + iwin * 0.05;
-            ph(iwin).Color(4) = alphaIdx(iwin);
-        end
-        xlabel('Frequency [Hz]')
-        ylabel('LFP PSD [mV^2/Hz]')
-        legend(tbins_txt, 'Location', 'Southwest')
-        set(gca, 'YScale', 'log', 'XScale', 'log')
-        xlim([faxis(find(lim_fAxis, 1)), faxis(find(lim_fAxis, 1, 'last'))])
-        
-        % eeg
-        if ~isempty(chEeg)
-            subplot(1, nsub, 2)
-            psdMat = squeeze(psdBins.psdEeg(:, lim_fAxis));
-            %     for iwin = 1 : nbins
-            %         psdMat(iwin, :) = conv(psdMat(iwin, :), gk, 'same');
-            %     end
-            psdMat = psdMat ./ sum(psdMat, 2);
-            ph = plot(faxis(lim_fAxis), psdMat', 'LineWidth', 2);
-            for iwin = 1 : length(ph)
-                ph(iwin).Color(2) = 1 - iwin * 0.2;
-                ph(iwin).Color(3) = 0.5 + iwin * 0.05;
-                ph(iwin).Color(4) = alphaIdx(iwin);
-            end
-            xlabel('Frequency [Hz]')
-            ylabel('EEG PSD [mV^2/Hz]')
-            set(gca, 'YScale', 'log', 'XScale', 'log')
-            xlim([faxis(find(lim_fAxis, 1)), faxis(find(lim_fAxis, 1, 'last'))])
-        end
-    end
-    sgtitle(basename)
     
-    saveFig = true;
-    if saveFig
-        figpath = fullfile(basepath, 'graphics');
-        mkdir(figpath)
-        figname = fullfile(figpath, [basename, '_psdBins']);
-        export_fig(figname, '-jpg', '-transparent', '-r300')
-    end    
+    % raw psd
+    sb1 = subplot(1, 2, 1);
+    ph = plot(faxis, psdBins, 'LineWidth', 3);
+    xlim(xLimit)
+    xlabel('Frequency [Hz]')
+    ylabel('PSD [mV^2/Hz]')
+    set(gca, 'YScale', 'log')
+    
+    % norm psd
+    sb2 = subplot(1, 2, 2);
+    ph = plot(faxis, psdBins ./ sum(psdBins, 2), 'LineWidth', 3);
+    xlim(xLimit)
+    xlabel('Frequency [Hz]')
+    ylabel('norm PSD')
+    set(gca, 'YScale', 'log')
 end
-

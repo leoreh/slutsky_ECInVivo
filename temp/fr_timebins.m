@@ -2,14 +2,17 @@ function frBins = fr_timebins(varargin)
 
 % INPUT:
 %   basepath        string. path to recording folder {pwd}
-%   timebins        numeric. timebins to calc psd
-%                   in relation to these poitns [sec].  
-%   saveVar         logical. save ss var {true}
-%   forceA          logical. reanalyze recordings even if ss struct
-%                   exists (false)
-%   graphics        logical. plot confusion chart and state separation {true}
+%   timebins        n x 2 numeric. timebins to calc fr [s]
+%   sstates         numeric. selected states (indexed according to as_cfg)
+%   saveVar         logical {true}
+%   tbins_txt       cell of chars for xticklabels
+%   forceA          logical. reanalyze recording even if fr_bins var exists
+%                   {false}
+%   graphics        logical {true}
+%   saveFig         logical {true}
 %
 % DEPENDENCIES
+%   firingRate
 %
 % TO DO LIST
 %
@@ -21,51 +24,65 @@ function frBins = fr_timebins(varargin)
 
 p = inputParser;
 addOptional(p, 'basepath', pwd);
-addOptional(p, 'timebins', [0 Inf], @isnumeric);
+addOptional(p, 'timebins', [], @isnumeric);
+addOptional(p, 'sstates', [], @isnumeric);
 addOptional(p, 'tbins_txt', []);
 addOptional(p, 'saveVar', true, @islogical);
 addOptional(p, 'forceA', false, @islogical);
 addOptional(p, 'graphics', true, @islogical);
+addOptional(p, 'saveFig', true, @islogical);
 
 parse(p, varargin{:})
 basepath        = p.Results.basepath;
 timebins        = p.Results.timebins;
+sstates         = p.Results.sstates;
 tbins_txt       = p.Results.tbins_txt;
 saveVar         = p.Results.saveVar;
 forceA          = p.Results.forceA;
 graphics        = p.Results.graphics;
+saveFig         = p.Results.saveFig;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preparations
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % load vars from each session
-varsFile = ["fr"; "sr"; "spikes"; "st_metrics"; "swv_metrics";...
-    "cell_metrics"; "AccuSleep_states"; "ripp.mat"; "datInfo"; "session"];
-varsName = ["fr"; "sr"; "spikes"; "st"; "swv"; "cm"; "ss"; "ripp";...
-    "datInfo"; "session"];
-if ~exist('varArray', 'var') || forceL
-    v = getSessionVars('basepaths', {basepath}, 'varsFile', varsFile,...
-        'varsName', varsName);
-end
+varsFile = ["fr"; "sr"; "spikes"; "cell_metrics"; "datInfo"; "session"];
+varsName = ["fr"; "sr"; "spikes"; "cm"; "datInfo"; "session"];
+v = getSessionVars('basepaths', {basepath}, 'varsFile', varsFile,...
+    'varsName', varsName);
 
 % file
 cd(basepath)
 [~, basename] = fileparts(basepath);
 frfile = fullfile(basepath, [basename, '.fr_bins.mat']);
 
-nbins = length(timebins);
+% timebins
+if isempty(timebins)
+    if isfield(v.session.general, 'timebins')
+        timebins = v.session.general.timebins;
+    else
+        error('no timebins specified')
+    end
+end
+nwin = size(timebins, 1);
+
+% states
+cfg = as_loadConfig();
+nstates = cfg.nstates;
+if isempty(sstates)
+    sstates = 1 : nstates;
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% firing rate
+% calc firing rate in time bins
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % check if already analyzed
 if exist(frfile, 'file') && ~forceA
     load(frfile)
 else
-    for iwin = 1 : nbins
-        
+    for iwin = 1 : nwin        
         frBins(iwin) = firingRate(v.spikes.times,...
             'basepath', basepath, 'graphics', false,...
             'binsize', 60, 'saveVar', false, 'smet', 'GK', 'winBL',...
@@ -74,80 +91,79 @@ else
     end
 end
 
+% re-organize vars of interest in 3d mat of state x win x unit
+for iwin = 1 : nwin
+    for istate = 1 : length(sstates)
+        stateMfr(istate, iwin, :) = mean(frBins(iwin).states.fr{istate}, 2, 'omitnan');
+        stateRatio(istate, iwin, :) = squeeze(frBins(iwin).states.ratio(1, istate, :));
+    end
+    stateGain(:, iwin, :) = frBins(iwin).states.gain;
+end
+units = selectUnits('basepath', basepath);
+
 if saveVar
     save(frfile, 'frBins')
 end
 
-% re-organize vars of interest
-frBoundries = [0.01, Inf; 0.01, Inf];
-% arrange
-ridx = [1, 4];
-% units
-clear units
-units(1, :) = selectUnits(v.spikes, v.cm,...
-    v.fr, 1, [], frBoundries, 'pyr');
-units(2, :) = selectUnits(v.spikes, v.cm,...
-    v.fr, 1, [], frBoundries, 'int');
+istate = 5;
+squeeze(stateMfr(istate, :, units(2, :)));
+squeeze(stateRatio(istate, :, units(2, :)));
 
-for iwin = 1 : nbins
-    sratio(iwin, :) = squeeze(frBins(iwin).states.ratio(ridx(1), ridx(2), :));    
-    mfrWake(iwin, :) = mean(frBins(iwin).states.fr{1}, 2);
-    mfrNrem(iwin, :) = mean(frBins(iwin).states.fr{4}, 2);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% graphics
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+if graphics
+    
+    % units
+    
+    tbins_txt = {'0-3ZT', '3-6ZT', '6-9ZT', '9-12ZT',...
+        '12-15ZT', '15-18ZT', '18-21ZT', '21-24ZT'};
+    unitchar = {'RS', 'FS'};
+    
+    for iunit = 1 : 2
+        fh = figure;
+        yLimitMfr = [min(stateMfr(:, :, units(iunit, :)), [], 'all'),...
+            max(stateMfr(:, :, units(iunit, :)), [], 'all')];
+        yLimitRatio = [min(stateRatio(:, :, units(iunit, :)), [], 'all'),...
+            max(stateRatio(:, :, units(iunit, :)), [], 'all')];
+    
+        for istate = 1 : length(sstates)
+            
+            % mfr in state
+            subplot(2, length(sstates), istate)
+            dataMat = squeeze(stateMfr(istate, :, units(iunit, :)));
+            plot_boxMean('dataMat', dataMat', 'clr', cfg.colors{istate})
+            ylabel(sprintf('MFR %s', cfg.names{sstates(istate)}))
+            ylim(yLimitMfr)
+            xticklabels(tbins_txt)
+            xtickangle(45)
+            
+            % state ratio
+            if sstates(istate) ~= 1
+                subplot(2, length(sstates), istate + length(sstates))
+                dataMat = squeeze(stateRatio(istate, :, units(iunit, :)));
+                plot_boxMean('dataMat', dataMat', 'clr', cfg.colors{istate})
+                ylabel({sprintf('%s - %s /', cfg.names{1}, cfg.names{sstates(istate)}),...
+                    sprintf('%s + %s', cfg.names{1}, cfg.names{sstates(istate)})})
+                ylim(yLimitRatio)
+                xticklabels(tbins_txt)
+                xtickangle(45)
+            end                   
+        end       
+        sgtitle([basename, '_', unitchar{iunit}])
         
+        if saveFig
+            figpath = fullfile(basepath, 'graphics', 'sleepState');
+            mkdir(figpath)
+            figname = fullfile(figpath, [basename, '_frBins_', unitchar{iunit}]);
+            export_fig(figname, '-tif', '-transparent', '-r300')
+        end
+    end
 end
 
-yLimit = [min([sratio], [], 'all'), max([sratio], [], 'all')];
-tbins_txt = {'0-3ZT', '3-6ZT', '6-9ZT', '9-12ZT',...
-    '12-15ZT', '15-18ZT', '18-21ZT', '21-24ZT'};
-        
-% graphics
-fh = figure;
-cfg = as_loadConfig();
+end
 
-subplot(3, 2, 1)
-dataMat = mfrWake(:, units(1, :));
-plot_boxMean('dataMat', dataMat', 'clr', cfg.colors{1})
-ylabel('MFR WAKE')
-subtitle('RS units')
-xticklabels(tbins_txt)
-
-subplot(3, 2, 2)
-dataMat = mfrWake(:, units(2, :));
-plot_boxMean('dataMat', dataMat', 'clr', cfg.colors{1})
-ylabel('MFR WAKE')
-subtitle('FS units')
-xticklabels(tbins_txt)
-
-subplot(3, 2, 3)
-dataMat = mfrNrem(:, units(1, :));
-plot_boxMean('dataMat', dataMat', 'clr', cfg.colors{4})
-ylabel('MFR NREM')
-xticklabels(tbins_txt)
-
-subplot(3, 2, 4)
-dataMat = mfrNrem(:, units(2, :));
-plot_boxMean('dataMat', dataMat', 'clr', cfg.colors{4})
-ylabel('MFR NREM')
-xticklabels(tbins_txt)
-
-subplot(3, 2, 5)
-dataMat = sratio(:, units(1, :));
-plot_boxMean('dataMat', dataMat', 'clr', 'k')
-ylabel({'WAKE - NREM /', 'WAKE + NREM'})
-ylim(yLimit)
-xticklabels(tbins_txt)
-
-subplot(3, 2, 6)
-dataMat = sratio(:, units(2, :));
-plot_boxMean('dataMat', dataMat', 'clr', 'k')
-ylabel({'WAKE - NREM /', 'WAKE + NREM'})
-ylim(yLimit)
-xticklabels(tbins_txt)
-
-sgtitle(basename)
-
-
-
-
+% EOF
 
 

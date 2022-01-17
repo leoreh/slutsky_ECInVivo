@@ -1,13 +1,11 @@
-function as_stateSeparation(sSig, labels, varargin)
+function as_stateSeparation(sSig, ss, varargin)
 
 % plot the separation of states based on emg (rms) and eeg (spectrogram)
 % signals
 %
 % INPUT:
 %   sSig            struct. see as_prepSig.m
-%   labels          numeric. 
-%   stateEpochs     cell of nstates where each cell contains an 2 x n
-%                   describing the start and end of an epoch
+%   ss          	struct. see as_classify.m 
 %   saveFig         logical. save figure {true}
 %
 % DEPENDENCIES
@@ -17,18 +15,18 @@ function as_stateSeparation(sSig, labels, varargin)
 % TO DO LIST
 %   calc fft power through spectrogram
 %
-% 08 jun 21 LH  
+% 08 jun 21 LH      updates:
+% 12 jan 22 LH      ss as input instead of labels
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 p = inputParser;
-addOptional(p, 'stateEpochs', []);
 addOptional(p, 'saveFig', true, @islogical);
 
 parse(p, varargin{:})
-stateEpochs     = p.Results.stateEpochs;
 saveFig         = p.Results.saveFig;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -49,13 +47,14 @@ if length(sSig.eeg) ~= length(sSig.emg)
     error('eeg and emg must be the same length')
 end
 
+labels = ss.labels;
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % prep signals (similar pipeline to AccuSleep_classify)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % calibration 
-calData =...
-    createCalibrationData(sSig.spec, sSig.spec_freq, sSig.emg_rms, labels);
+calData = ss.info.calibrationData;
 
 % scale the emg
 sSig.emg_rms = (sSig.emg_rms - calData(end, 1)) ./ calData(end, 2);
@@ -95,24 +94,9 @@ sDelta = sum(specNorm(:, f1idx : f4idx), 2);
 sTheta = sum(specNorm(:, f6idx : f12idx), 2);
 sRatio = sDelta ./ sTheta;
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% calculate stuff
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-[psdStates, faxis, ~] = psd_states('eeg', sSig.eeg,...
-    'labels', labels, 'fs', sSig.fs, 'graphics', false);
-
-% convert labels to state epochs.
-if isempty(stateEpochs)
-    for istate = 1 : nstates
-        binaryVec = zeros(length(labels), 1);
-        binaryVec(labels == istate) = 1;
-        stateEpisodes = binary2epochs('vec', binaryVec, 'minDur', [], 'maxDur', [],...
-            'interDur', [], 'exclude', false); % these are given as indices and are equivalent to seconds
-        stateEpochs{istate} = stateEpisodes * epochLen;
-    end
-end
-epLen = cellfun(@(x) (diff(x')'), stateEpochs, 'UniformOutput', false);
+% calculate psd according to states
+[psdStates, faxis] = psd_timebins('sig', sSig.eeg,...
+    'fs', sSig.fs, 'graphics', false, 'winCalc', ss.stateEpochs);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
@@ -184,7 +168,7 @@ set(gca, 'YTick', [])
 % histogram of epoch lengths for NREM, REM, and WAKE
 fh.CurrentAxes = sb5;
 hold on
-epMat = cell2nanmat(epLen(sstates));
+epMat = cell2nanmat(ss.epLen(sstates));
 plot([1 : size(epMat, 2)], mean(epMat, 1, 'omitnan'),...
     'kd', 'markerfacecolor', 'k')
 boxplot(epMat, 'PlotStyle', 'traditional', 'Whisker', 6);
@@ -202,7 +186,7 @@ ylim([0 ceil(prctile(epMat(:), 99.99))])
     
 % percent time in state
 fh.CurrentAxes = sb6;
-pie(sum(cell2nanmat(epLen(sstates)), 1, 'omitnan'), ones(1, length(sstates)));
+pie(sum(cell2nanmat(ss.epLen(sstates)), 1, 'omitnan'), ones(1, length(sstates)));
 hold on
 ph = findobj(sb6, 'Type', 'Patch');
 set(ph, {'FaceColor'}, flipud(cfg.colors(sstates)))

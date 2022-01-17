@@ -76,8 +76,9 @@ fr = firingRate(mea.spktimes, 'basepath', basepath,...
 % CE thresholds
 nunits = length(fr.mfr);
 cm.putativeCellType = repmat({'Pyramidal Cell'}, 1, nunits);
+% cm.putativeCellType(swv.tp < 0.425) = {'Narrow Interneuron'};
 cm.putativeCellType(swv.spkw < 0.65) = {'Narrow Interneuron'};
-% cm.putativeCellType(st.tau_rise > 6 & swv.tp < 0.425) = {'Wide Interneuron'};
+cm.putativeCellType(st.tau_rise > 6 & swv.tp < 0.425) = {'Wide Interneuron'};
 cell_metrics = cm;
 save(fullfile(basepath, [basename, '.cell_metrics.cellinfo.mat']), 'cell_metrics')
 
@@ -93,6 +94,8 @@ if graphics
     
     figpath = fullfile(basepath, 'graphics');
     mkdir(figpath)
+    fsIdx = unique(mono_res.sig_con_inhibitory(:, 1));
+    rsIdx = unique(mono_res.sig_con_excitatory(:, 1));
     
     % ---------------------------------------------------------------------
     % classification    
@@ -111,6 +114,10 @@ if graphics
     hold on
     sh = scatter(tp(units(2, :)), royer(units(2, :)),...
         mfr(units(2, :)) * 3000, 'r', '.');
+    sh = scatter(tp(fsIdx), royer(fsIdx),...
+        mfr(fsIdx) * 3000, 'g', '.');
+    sh = scatter(tp(rsIdx), royer(rsIdx),...
+        mfr(rsIdx) * 3000, 'm', '.');
     set(gca, 'yscale', 'log')
     xlabel('Trough to Peak [ms]')
     ylabel('Burstiness (royer)')
@@ -121,6 +128,10 @@ if graphics
     hold on
     sh = scatter(spkw(units(2, :)), slopeTail(units(2, :)),...
         mfr(units(2, :)) * 3000, 'r', '.');
+    sh = scatter(spkw(fsIdx), slopeTail(fsIdx),...
+        mfr(fsIdx) * 3000, 'g', '.');
+    sh = scatter(spkw(rsIdx), slopeTail(rsIdx),...
+        mfr(rsIdx) * 3000, 'm', '.');
     set(gca, 'yscale', 'log')
     xlabel('Spike Width [ms]')
     ylabel('Slope tail')        

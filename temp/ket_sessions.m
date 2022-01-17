@@ -1,6 +1,6 @@
 % ket_sessions
 
-forceL = true;
+forceL = false;
 normFlag = false;
 frBoundries = [0.1, Inf; 0.1, Inf];
 
@@ -28,7 +28,8 @@ basepaths = basepaths(1 : 2);
 basepaths = [{'I:\lh96\lh96_211126_072000'},...
     {'F:\Data\Processed\lh96\lh96_211202_070500'},...
     {'K:\Data\lh95\lh95_210825_080400'},...
-    {'K:\Data\lh99\lh99_211219_085802'}];
+    {'K:\Data\lh99\lh99_211219_085802'},...
+    {'G:\Data\lh93\lh93_210813_110609'}];
 
 % load vars from each session
 varsFile = ["fr"; "sr"; "spikes"; "st_metrics"; "swv_metrics";...
@@ -62,6 +63,8 @@ for isession = 1 : nsessions
     
     if contains(basename, 'lh99')
         grp = [1, 3 : 4, 7];
+    elseif contains(basename, 'lh93')
+        grp = [3];
     else
         grp = [];
     end
@@ -80,11 +83,13 @@ for isession = 1 : nsessions
     recLen = floor(fileinfo.bytes / 2 / nchans / fs);
     csec = floor(cumsum(v(isession).datInfo.nsamps / fs));
     [~, pntIdx] = min(abs(csec - 5.5 * 60 * 60));
-    timepoints = csec(pntIdx);
+    pnts = csec(pntIdx);
     % timepoints = v(isession).datInfo.nsec;
-    chunks = n2nchunks('n', recLen, 'nchunks', 8, 'timepoints', timepoints);
-    
-    [~, injIdx(isession)] = min(abs(v(isession).fr.tstamps - timepoints));
+    chunks = n2nchunks('n', recLen, 'nchunks', 8, 'timepoints', pnts);
+        
+    chunks = n2chunks('n', recLen, 'nchunks', 8, 'pnts', pnts);
+
+    [~, injIdx(isession)] = min(abs(v(isession).fr.tstamps - pnts));
     tLen(isession) = length(v(isession).fr.tstamps);
     
     clear tmp_units

@@ -1,4 +1,3 @@
-
 function plot_FRtime_session(varargin)
 
 % plots firing rate of mu (sr) and su (pyr and int) across time for a
@@ -8,18 +7,19 @@ function plot_FRtime_session(varargin)
 %   basepath        recording session {pwd}
 %   saveFig         logical {true}
 %   grp             numeric. spike groups to plot
-%   frBoundries     2 x 2 mat. include only units with mfr within the
 %   dataType        char. plot 'strd' or 'norm'.
 %                   boundries specified by each row. 1st row RS 2nd row FS
 %   muFlag          logical. plot multi unit (sr) activity even if fr
 %                   exists {false}
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% arguments
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 p = inputParser;
 addOptional(p, 'basepath', pwd);
 addOptional(p, 'saveFig', true, @islogical);
-addOptional(p, 'grp', [], @isnumeric);          
-addOptional(p, 'dataType', 'strd', @ischar);          
-addOptional(p, 'frBoundries', [0.2 Inf; 0.2 Inf], @isnumeric);          
+addOptional(p, 'grp', [], @isnumeric);
+addOptional(p, 'dataType', 'strd', @ischar);
 addOptional(p, 'muFlag', false, @islogical);
 
 parse(p, varargin{:})
@@ -27,21 +27,14 @@ basepath = p.Results.basepath;
 saveFig = p.Results.saveFig;
 grp = p.Results.grp;
 dataType = p.Results.dataType;
-frBoundries = p.Results.frBoundries;
 muFlag = p.Results.muFlag;
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% params
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-[mousepath, basename] = fileparts(basepath);
-cd(basepath)
-
-suFlag = 1;                     % plot only su or all units
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preparations
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+[~, basename] = fileparts(basepath);
+cd(basepath)
 
 % load data
 varsFile = ["session"; "cell_metrics"; "spikes.cellinfo";...
@@ -65,7 +58,7 @@ if isempty(grp)
 end
 
 % x axis in hr
-if isempty(fr)
+if isempty(fr) || muFlag
     ts = sr.info.binsize;
     xidx = [1 : length(sr.strd)] / ts;
 else
@@ -82,10 +75,9 @@ else
 end
 
 % units
-if ~isempty(fr)    
-    clear units
-    units(1, :) = selectUnits(spikes, cm, fr, suFlag, grp, frBoundries, 'pyr');
-    units(2, :) = selectUnits(spikes, cm, fr, suFlag, grp, frBoundries, 'int');
+if ~isempty(fr)
+    units = selectUnits('basepath', basepath, 'grp', grp, 'saveVar', false,...
+        'forceA', true);
 end
 
 switch dataType
@@ -119,57 +111,61 @@ if isempty(fr) | muFlag
 else
     
     % ---------------------------------------------------------------------
-    % individual cells on a log scale    
+    % individual cells on a log scale
     sb1 = subplot(3, 1, 1);
-    title(basename)
-    hold on
-    % rs
-    ph = plot(xidx, fr.(dataType)(units(1, :), :), 'b', 'LineWidth', 1);
-    alphaIdx = linspace(1, 0.2, length(ph));
-    clrIdx = linspace(0.2, 0.6, length(ph));
-    [~, mfr_order] = sort(fr.mfr(units(1, :)));
-    for iunit = 1 : length(ph)
-        ph(iunit).Color(1) = clrIdx(mfr_order(iunit));
-        ph(iunit).Color(2) = alphaIdx(mfr_order(iunit));
-        ph(iunit).Color(4) = alphaIdx(mfr_order(iunit));
+    if sum(units(1, :)) > 0
+        title(basename)
+        hold on
+        % rs
+        ph = plot(xidx, fr.(dataType)(units(1, :), :), 'b', 'LineWidth', 1);
+        alphaIdx = linspace(1, 0.2, length(ph));
+        clrIdx = linspace(0.2, 0.6, length(ph));
+        [~, mfr_order] = sort(fr.mfr(units(1, :)));
+        for iunit = 1 : length(ph)
+            ph(iunit).Color(1) = clrIdx(mfr_order(iunit));
+            ph(iunit).Color(2) = alphaIdx(mfr_order(iunit));
+            ph(iunit).Color(4) = alphaIdx(mfr_order(iunit));
+        end
+        set(gca, 'YScale', 'log')
+        plot([tidx tidx], ylim, '--k')
+        axis tight
+        xlabel('Time [h]')
+        ylabel(ytxt)
+        set(gca, 'box', 'off')
+        legend(sprintf('RS = %d su', sum(units(1, :))))
     end
-    set(gca, 'YScale', 'log')
-    plot([tidx tidx], ylim, '--k')
-    axis tight
-    xlabel('Time [h]')
-    ylabel(ytxt)
-    set(gca, 'box', 'off')
-    legend(sprintf('RS = %d su', sum(units(1, :))))
-
+    
     % fs
     sb2 = subplot(3, 1, 2);
-    hold on
-    ph = plot(xidx, fr.(dataType)(units(2, :), :), 'r', 'LineWidth', 1);
-    alphaIdx = linspace(1, 0.2, length(ph));
-    clrIdx = linspace(0.2, 0.6, length(ph));
-    [~, mfr_order] = sort(fr.mfr(units(2, :)));
-    for iunit = 1 : length(ph)
-        ph(iunit).Color(3) = clrIdx(mfr_order(iunit));
-        ph(iunit).Color(2) = alphaIdx(mfr_order(iunit));    
-        ph(iunit).Color(4) = alphaIdx(mfr_order(iunit));
+    if sum(units(2, :)) > 0
+        hold on
+        ph = plot(xidx, fr.(dataType)(units(2, :), :), 'r', 'LineWidth', 1);
+        alphaIdx = linspace(1, 0.2, length(ph));
+        clrIdx = linspace(0.2, 0.6, length(ph));
+        [~, mfr_order] = sort(fr.mfr(units(2, :)));
+        for iunit = 1 : length(ph)
+            ph(iunit).Color(3) = clrIdx(mfr_order(iunit));
+            ph(iunit).Color(2) = alphaIdx(mfr_order(iunit));
+            ph(iunit).Color(4) = alphaIdx(mfr_order(iunit));
+        end
+        set(gca, 'YScale', 'log')
+        plot([tidx tidx], ylim, '--k')
+        axis tight
+        xlabel('Time [h]')
+        ylabel(ytxt)
+        set(gca, 'box', 'off')
+        legend(sprintf('FS = %d su', sum(units(2, :))));
     end
-    set(gca, 'YScale', 'log')
-    plot([tidx tidx], ylim, '--k')
-    axis tight
-    xlabel('Time [h]')
-    ylabel(ytxt)
-    set(gca, 'box', 'off')
-    legend(sprintf('FS = %d su', sum(units(2, :))));
-
+    
     % ---------------------------------------------------------------------
-    % mean per cell class on a linear scale 
+    % mean per cell class on a linear scale
     sb3 = subplot(3, 1, 3);
     hold on
-    plot(xidx, mean(fr.(dataType)(units(1, :), :), 'omitnan'), 'b', 'LineWidth', 2)
-    ylabel(['RS ' ytxt])    
+    plot(xidx, mean(fr.(dataType)(units(1, :), :), 1, 'omitnan'), 'b', 'LineWidth', 2)
+    ylabel(['RS ' ytxt])
     axis tight
     yyaxis right
-    plot(xidx, mean(fr.(dataType)(units(2, :), :), 'omitnan'), 'r', 'LineWidth', 2)
+    plot(xidx, mean(fr.(dataType)(units(2, :), :), 1, 'omitnan'), 'r', 'LineWidth', 2)
     axis tight
     ylabel(['FS ' ytxt])
     yLimit = ylim;
@@ -180,9 +176,9 @@ else
     set(ax.YAxis(2), 'color', 'r')
     xlabel('Time [h]')
     set(gca, 'box', 'off')
-    linkaxes([sb1, sb2, sb3], 'x')    
+    linkaxes([sb1, sb2, sb3], 'x')
     figname = 'fr_time';
-
+    
 end
 
 if saveFig

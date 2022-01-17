@@ -7,8 +7,9 @@ function session = CE_sessionTemplate(s, varargin)
 %   basepath    string. path to recording folder {pwd}
 %   importCh    logical. import skipped / synced channel from xml
 %   viaGUI      logical. open CR session GUI {true}
-%   force       logical. force default params set here to session even if
+%   forceDef    logical. force default params set here to session even if
 %               they already exist {false}
+%   forceL      logical. force load even session file exists {false}
 %   saveVar     logical. save variable {true}
 %
 % CALLS:
@@ -29,14 +30,16 @@ p = inputParser;
 addRequired(p, 's', @(X) (ischar(X) && exist(X, 'dir')) || isstruct(X));
 addParameter(p, 'importCh', true, @islogical);
 addParameter(p, 'viaGUI', true, @islogical);
-addParameter(p, 'force', true, @islogical);
+addParameter(p, 'forceDef', true, @islogical);
+addParameter(p, 'forceL', false, @islogical);
 addParameter(p, 'saveVar', true, @islogical);
 
 % Parsing inputs
 parse(p, s, varargin{:})
 importCh = p.Results.importCh;
 viaGUI = p.Results.viaGUI;
-force = p.Results.force;
+forceDef = p.Results.forceDef;
+forceL = p.Results.forceL;
 saveVar = p.Results.saveVar;
 
 % Initializing session struct and defining basepath
@@ -60,9 +63,12 @@ session.channelTags = [];
 % load existing basename.session.mat file if exist
 [~, basename, ~] = fileparts(basepath);
 sessionName = fullfile(basepath, [basename, '.session.mat']);
-if ~exist('session', 'var') && exist(sessionName, 'file')
+if exist(sessionName, 'file')
     sprintf('loading %s', sessionName)
     load(sessionName)
+    if ~forceL
+        return
+    end
 elseif ~exist('session', 'var')
     session = [];
 end
@@ -81,7 +87,7 @@ session.general.sessionType = 'Chronic'; % Type of recording: Chronic, Acute
 session.general.nsamps      = 0;        % see end of script
 
 % limited animal metadata
-if ~isfield(session, 'animal') || force
+if ~isfield(session, 'animal') || forceDef
     session.animal.name         = pathPieces{end - 1};
     session.animal.sex          = 'Male';
     session.animal.species      = 'Mouse';
@@ -90,10 +96,10 @@ if ~isfield(session, 'animal') || force
 end
 
 if ~isfield(session.general, 'experimenters') ||...
-        isempty(session.general.experimenters) || force
+        isempty(session.general.experimenters) || forceDef
     session.general.experimenters = 'LH';
 end
-if isfield(session.general, 'notes') || force
+if isfield(session.general, 'notes') || forceDef
     session.general.notes = '';
 end
 
@@ -104,7 +110,7 @@ end
 % default params (will be replaced later by xml params)
 if ~isfield(session, 'extracellular') ||...
         (isfield(session, 'extracellular') && (~isfield(session.extracellular, 'sr')) ||...
-        isempty(session.extracellular.sr)) || force
+        isempty(session.extracellular.sr)) || forceDef
     session.extracellular.sr = 20000;           % Sampling rate
     session.extracellular.nChannels = 64;       % number of channels
     session.extracellular.fileName = '';        % (optional) file name of raw data if different from basename.dat
@@ -115,17 +121,17 @@ if ~isfield(session, 'extracellular') ||...
 end
 if ~isfield(session, 'extracellular') ||...
         (isfield(session, 'extracellular') && (~isfield(session.extracellular, 'leastSignificantBit')) ||...
-        isempty(session.extracellular.leastSignificantBit)) || force
+        isempty(session.extracellular.leastSignificantBit)) || forceDef
     session.extracellular.leastSignificantBit = 0.195; % [?V]. Intan = 0.195, Amplipex = 0.3815
 end
 if ~isfield(session, 'extracellular') ||...
         (isfield(session, 'extracellular') && (~isfield(session.extracellular,'probeDepths')) ||...
-        isempty(session.extracellular.probeDepths)) || force
+        isempty(session.extracellular.probeDepths)) || forceDef
     session.extracellular.probeDepths = 0;
 end
 if ~isfield(session, 'extracellular') ||...
         (isfield(session, 'extracellular') && (~isfield(session.extracellular, 'precision')) ||...
-        isempty(session.extracellular.precision)) || force
+        isempty(session.extracellular.precision)) || forceDef
     session.extracellular.precision = 'int16';
 end
 
@@ -169,7 +175,7 @@ end
 % Analysis tags
 if ~isfield(session, 'analysisTags') ||...
         (isfield(session, 'analysisTags') && (~isfield(session.analysisTags, 'probesLayout')) ||...
-        isempty(session.analysisTags.probesLayout)) || force
+        isempty(session.analysisTags.probesLayout)) || forceDef
     session.analysisTags.probesLayout = 'staggered'; % Probe layout: linear,staggered,poly2,edge,poly3,poly5
     session.analysisTags.probesVerticalSpacing = 10; % [?m] Vertical spacing between sites.
 end
@@ -231,7 +237,7 @@ end
 %     end
 % end
 if isfield(session,'extracellular') &&...
-        isfield(session.extracellular,'nChannels') || force
+        isfield(session.extracellular,'nChannels') || forceDef
     fullpath = fullfile(session.general.basePath,[session.general.name,'.dat']);
     if exist(fullpath,'file')
         temp2_ = dir(fullpath);

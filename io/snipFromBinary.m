@@ -15,8 +15,8 @@ function [snips, stamps] = snipFromBinary(varargin)
 %               [samples]. if cell than snips will also be organized in a cell.
 %               this is to avoid the need to call the function (and memmap)
 %               multiple times when, e.g. organizing clusters.
-%   m           memory map to binary file. this can be helpful when calling
-%               the function several times as to keep snips relatively
+%   raw         data field of memory map to binary file. this can be helpful
+%               when calling the function several times to keep snips relatively
 %               small
 %   win         vec of 2 elements. determines length of snip. for example,
 %               win = [5 405] each snip will be 401 samples, starting
@@ -63,7 +63,7 @@ function [snips, stamps] = snipFromBinary(varargin)
 p = inputParser;
 addOptional(p, 'fname', '', @ischar);
 addOptional(p, 'stamps', []);
-addOptional(p, 'm', []);
+addOptional(p, 'raw', []);
 addOptional(p, 'win', [-16 16], @isnumeric);
 addOptional(p, 'nchans', 35, @isnumeric);
 addOptional(p, 'ch', []);
@@ -76,7 +76,7 @@ addOptional(p, 'saveVar', false, @islogical);
 parse(p, varargin{:})
 fname       = p.Results.fname;
 stamps      = p.Results.stamps;
-m           = p.Results.m;
+raw         = p.Results.raw;
 win         = p.Results.win;
 nchans      = p.Results.nchans;
 ch          = p.Results.ch;
@@ -142,7 +142,7 @@ w_full = [reshape(w_full, sniplength, []), ones(sniplength, 1)];
 % -------------------------------------------------------------------------
 % map binary file
 minput = false;
-if isempty(m)
+if isempty(raw)
     [basepath, basename] = fileparts(fname);
     info = dir(fname);
     if isempty(info)
@@ -150,10 +150,10 @@ if isempty(m)
     end
     nsamps = info.bytes / nbytes / nchans;
     m = memmapfile(fname, 'Format', {precision, [nchans, nsamps] 'mapped'});
+    raw = m.Data;
 else
     minput = true;
 end
-raw = m.Data;
 nsamps = size(raw.mapped, 2);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

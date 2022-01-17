@@ -4,7 +4,7 @@
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = 'lh95';
+mname = 'lh86';
 forceL = true;
 forceA = true;
 
@@ -16,7 +16,7 @@ varsFile = ["fr"; "sr"; "spikes"; "st_metrics"; "swv_metrics";...
     "cell_metrics"; "sleep_states"; "ripp.mat"; "datInfo"; "session"];
 varsName = ["fr"; "sr"; "spikes"; "st"; "swv"; "cm"; "ss"; "ripp";...
     "datInfo"; "session"];
-if ~exist('varArray', 'var') || forceL
+if ~exist('v', 'var') || forceL
     [v, basepaths] = getSessionVars('mname', mname, 'varsFile', varsFile,...
         'varsName', varsName, 'pcond', pcond, 'ncond', ncond);
 end
@@ -25,9 +25,10 @@ nsessions = length(basepaths);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % analyze data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+templateCal = ss.info.calibrationData;
 
 if forceA
-    for isession = 1 : nsessions
+    for isession = 8 : nsessions
         
         % file
         basepath = basepaths{isession};
@@ -40,23 +41,24 @@ if forceA
         fs = session.extracellular.sr;
         spkgrp = session.extracellular.spikeGroups.channels;
         
-        % timebins
-        fileinfo = dir([basename, '.dat']);
-        recLen = floor(fileinfo.bytes / 2 / nchans / fs);
-        csec = floor(cumsum(v(isession).datInfo.nsamps / fs));
-        [~, pntIdx] = min(abs(csec - 5.5 * 60 * 60));
-        timepoints = csec(pntIdx);
-        % timepoints = v(isession).datInfo.nsec;
-        
-        chunks = [timepoints - 4 * 60 * 60, timepoints - 2 * 60 * 60;
-            timepoints - 2 * 60 * 60, timepoints;
-            timepoints, timepoints + 2 * 60 * 60;
-            timepoints + 2 * 60 * 60, timepoints + 4 * 60 * 60];
-        
-        chunks = n2nchunks('n', recLen, 'nchunks', 8, 'timepoints', timepoints);
-        if chunks(end, end) > length(v(isession).ss.labels)
-            chunks(end, end) = length(v(isession).ss.labels);
+        % state
+        % call for emg dat file
+        sSig = as_prepSig([basename, '.lfp'], [basename, '.emg.dat'],...
+            'eegCh', [1 : 4], 'emgCh', 1, 'saveVar', true, 'emgNchans', 2, 'eegNchans', nchans,...
+            'inspectSig', false, 'forceLoad', true, 'eegFs', 1250, 'emgFs', 3051.7578125,...
+            'emgCf', [10 450]);
+
+        % classify with a network
+        if exist([basename, '.AccuSleep_labelsMan'], 'file')
+            calData = [];
+        else
+            calData = templateCal;
         end
+        netfile = [];
+        ss = as_classify(sSig, 'basepath', pwd, 'inspectLabels', false,...
+            'saveVar', true, 'forceA', true, 'netfile', netfile,...
+            'graphics', true, 'calData', calData);
+        
                
         tbins_txt = {'0-3ZT', '3-6ZT', '6-9ZT', '9-12ZT',...
             '12-15ZT', '15-18ZT', '18-21ZT', '21-24ZT'};
@@ -73,9 +75,9 @@ if forceA
 %             'binsize', 60, 'saveVar', true, 'smet', 'GK', 'winBL',...
 %             [0 timepoints], 'winCalc', [0, Inf], 'forceA', true);
         
-        frBins(isession) = fr_timebins('basepath', pwd,...
-            'forceA', false, 'graphics', true,...
-            'timebins', chunks, 'saveVar', true);                
+%         frBins(isession) = fr_timebins('basepath', pwd,...
+%             'forceA', false, 'graphics', true,...
+%             'timebins', chunks, 'saveVar', true);                
         
     end
 end

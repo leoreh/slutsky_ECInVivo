@@ -57,6 +57,7 @@ swvFile = fullfile(basepath, [basename, '.swv_metrics.mat']);
 swvRawFile = fullfile(basepath, [basename, '.swv_raw.mat']);
 sessionFile = fullfile(basepath, [basename, '.session.mat']);
 spkFile = fullfile(basepath, [basename, '.spikes.cellinfo.mat']);
+datfile = fullfile(basepath, [basename, '.dat']);
 
 % check if already analyzed 
 if exist(swvFile, 'file') && ~forceA
@@ -72,6 +73,10 @@ if exist(sessionFile, 'file')
     end
     nchans = session.extracellular.nChannels;
 end
+
+% size of one data point in bytes
+precision = 'int16';
+nbytes = class2bytes(precision);
 
 % number of spikes to snip per cluster
 spks2snip = 20000;
@@ -109,7 +114,12 @@ if isempty(wv)
         load(swvRawFile)
         
     else
-
+        % memory map to datfile
+        info = dir(datfile);
+        nsamps = info.bytes / nbytes / nchans;
+        m = memmapfile(datfile, 'Format', {precision, [nchans, nsamps] 'mapped'});
+        raw = m.Data;
+        
         % load spikes and session info struct
         load(spkFile);
         ch = num2cell(spikes.maxWaveformCh1);
@@ -123,17 +133,23 @@ if isempty(wv)
             spktimes{iunit} = spikes.ts{iunit}(spkidx{iunit});
         end
         
-        datname = fullfile(basepath, [basename, '.dat']);
-        [swv_raw, ~] = snipFromBinary('stamps', spktimes, 'fname', datname,...
+        [swv_raw, ~] = snipFromBinary('stamps', spktimes, 'fname', datfile,...
             'win', win, 'nchans', nchans, 'ch', ch, 'align_peak', 'min',...
             'precision', 'int16', 'rmv_trend', 6, 'saveVar', false,...
-            'l2norm', false);
+            'l2norm', false, 'raw', raw);
         swv_raw = cellfun(@squeeze, swv_raw, 'UniformOutput', false);
         
         if saveVar
             save(swvRawFile, 'swv_raw')
         end
         
+        clear raw
+        clear m
+    end
+    
+    % l2norm
+    for iunit = 1 : length(swv_raw)
+        swv_raw{iunit} = swv_raw{iunit} ./ vecnorm(swv_raw{iunit}, 2, 1);
     end
     
     % get mean and std
@@ -172,28 +188,29 @@ slopeTp = zeros(1, nunits);
 slopeTail = zeros(1, nunits);
 ampTp = nan(1, nunits);
 ampTail = nan(1, nunits);
+imin = nan(1, nunits);
 
 for iunit = 1 : nunits
     
     % general waveform params
     w = wv_interp(iunit, :);
-    [minVal, imin] = min(w);                                % trough
-    [maxVal_post, imax_post] = max(w(imin + 1 : end));      % peak after trough
-    imax_post = imax_post + imin;
-    [maxVal_pre, ~] = max(w(1 : imin - 1));                 % peak before trough
-    [minVal_post, imin_post] = min(w(imax_post + 1 : end)); % min after peak
+    [minVal, imin(iunit)] = min(w);                             % trough
+    [maxVal_post, imax_post] = max(w(imin(iunit) + 1 : end));   % peak after trough
+    imax_post = imax_post + imin(iunit);
+    [maxVal_pre, ~] = max(w(1 : imin(iunit) - 1));              % peak before trough
+    [minVal_post, imin_post] = min(w(imax_post + 1 : end));     % min after peak
     if isempty(minVal_post)
         minVal_post = w(end);
         imin_post = length(w);
     end
     imin_post = imin_post + imax_post;
-    ampTp(iunit) = maxVal_post - minVal;                    % amplitude trough to after peak
-    ampTail(iunit) = maxVal_post - minVal_post;             % amplitude tail
+    ampTp(iunit) = maxVal_post - minVal;                        % amplitude trough to after peak
+    ampTail(iunit) = maxVal_post - minVal_post;                 % amplitude tail
     
     % trough-to-peak time (artho et al., 2004) and asymmetry (Sirota et
     % al., 2008)
     if ~isempty(imax_post)
-        tp(iunit) = imax_post * 1000 / nfs;      % samples to ms
+        tp(iunit) = (imax_post - imin(iunit)) * 1000 / nfs;      % samples to ms
         if ~isempty(maxVal_pre)
             asym(iunit) = (maxVal_post - maxVal_pre) / (maxVal_post + maxVal_pre);
         end
@@ -205,15 +222,15 @@ for iunit = 1 : nunits
     slopeTail(iunit) = ampTail(iunit) / (imin_post - imax_post);
     
     % slope trough to peak (no reference)
-    slopeTp(iunit) = ampTp(iunit) / (imax_post - imin);
+    slopeTp(iunit) = ampTp(iunit) / (imax_post - imin(iunit));
 
     
     % half peak width (Medrihan et al., 2017)
     wu = w / maxVal_post;
-    th1 = find(wu(imin : imax_post) < 0.5);
+    th1 = find(wu(imin(iunit) : imax_post) < 0.5);
     if any(th1)
         th1 = imax_post - th1(end);
-        th2 = find(wu(imax_post + imin : end) < 0.5);
+        th2 = find(wu(imax_post + imin(iunit) : end) < 0.5);
         if any(th2)
             th2 = th2(1);
         else
@@ -261,6 +278,7 @@ swv.slopeTp = slopeTp;
 swv.slopeTail = slopeTail;
 swv.ampTp = ampTp;
 swv.ampTail = ampTail;
+swv.imin = imin;
 
 if saveVar       
     save(swvFile, 'swv')
@@ -269,8 +287,7 @@ if saveVar
     if exist(cmFile, 'file')
         load(cmFile)
         cell_metrics.waveforms.wv = num2cell(swv.wv, 2)';
-        cell_metrics.waveforms.filt = num2cell(swv.wv, 2)';
-        cell_metrics.waveforms.filt_std = num2cell(swv.wv_std, 2)';
+        cell_metrics.waveforms.wv_std = num2cell(swv.wv_std, 2)';
         cell_metrics.swv_spkw = swv.spkw;
         cell_metrics.swv_tp = swv.tp;
         cell_metrics.swv_asym = swv.asym;

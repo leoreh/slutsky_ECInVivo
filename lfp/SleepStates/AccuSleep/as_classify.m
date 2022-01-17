@@ -64,6 +64,7 @@ graphics        = p.Results.graphics;
 % load config data
 cfg = as_loadConfig();
 ss.info.names = cfg.names;
+ss.info.colors = cfg.colors;
 ss.info.epochLen = cfg.epochLen;
 ss.info.minBoutLen = cfg.minBoutLen;
 nstates = cfg.nstates;
@@ -145,55 +146,20 @@ manIdx = find(labels_man ~= nstates + 2);
 labels(manIdx) = labels_man(manIdx);
 fprintf('done.\n')
 
+% remove labels of uncertainty
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % convert labels to state epochs
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-minDur = [10, 5, 5, 10, 5, 5];  % threshold of minimum epoch length
-interDur = 4;                   % combine epochs separated by <= interDur
+minDur = [10, 5, 5, 10, 5, 5];
+interDur = 4;
 
-if length(minDur) == 1
-    minDur = repamt(minDur, nstates, 1);
-elseif length(minDur) ~= nstates
-    error('minDur length is different than the number of states')
-end
-if length(interDur) == 1
-    interDur = repmat(interDur, nstates, 1);
-elseif length(interDur) ~= nstates
-    error('interDur length is different than the number of states')
-end
-
-% create state epochs
-for istate = 1 : nstates
-    binaryVec = zeros(length(labels), 1);
-    binaryVec(labels == istate) = 1;
-    stateEpochs = binary2epochs('vec', binaryVec, 'minDur', minDur(istate), 'maxDur', [],...
-        'interDur', interDur(istate), 'exclude', false);
-    ss.stateEpochs{istate} = stateEpochs * cfg.epochLen; % convert indices to seconds
-    ss.epLen{istate} = [diff(ss.stateEpochs{istate}')]';
-end
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% graphics
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-if graphics
-    % confusion matrix (relative to manual labels)
-    if any(labels_man ~= nstates + 2)
-        [ss.netPrecision, ss.netRecall] = as_cm(labels_man, labels_net, netScores);
-    end
-    
-    % stateSeparation
-    as_stateSeparation(sSig, labels, 'stateEpochs', ss.stateEpochs)
-end
-
-if inspectLabels
-    AccuSleep_viewer(sSig, labels, labelsfile)
-    uiwait
-    if exist(labelsfile, 'file')
-        load(labelsfile, 'labels')
-    end
-end
+[ss.stateEpochs, epochStats] = as_epochs('labels', labels,...
+    'minDur', minDur, 'interDur', interDur);
+ss.epLen = epochStats.epLen;
+ss.nepochs = epochStats.nepochs;
+ss.totDur = epochStats.totDur;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % finalize and save
@@ -213,6 +179,32 @@ ss.netScores = netScores;
 
 if saveVar
     save(statesfile, 'ss')
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% graphics
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+if graphics
+    % confusion matrix (relative to manual labels)
+    if any(labels_man ~= nstates + 2)
+        [ss.netPrecision, ss.netRecall] = as_cm(labels_man, labels_net, netScores);
+    end
+    
+    % stateSeparation
+    as_stateSeparation(sSig, ss)
+    
+    % duration in timebins
+    as_plotZT('nwin', 4, 'sstates', [1, 2, 4, 5], 'ss', ss)
+    
+end
+
+if inspectLabels
+    AccuSleep_viewer(sSig, labels, labelsfile)
+    uiwait
+    if exist(labelsfile, 'file')
+        load(labelsfile, 'labels')
+    end
 end
 
 return

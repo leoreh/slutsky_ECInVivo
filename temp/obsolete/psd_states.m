@@ -12,7 +12,7 @@ function [psdStates, faxis, epStats] = psd_states(varargin)
 % sum(pow(faxis < 5));
 %
 % INPUT:
-%   eeg             numeric. eeg data (1 x n)
+%   sig             numeric. eeg data (1 x n)
 %   labels          numeric. 
 %   fs              numeric. sampling frequency {1250} of the signals.
 %   faxis           numeric. frequencies of psd estimate {[0.2 : 0.2 : 120]}
@@ -38,7 +38,7 @@ function [psdStates, faxis, epStats] = psd_states(varargin)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 p = inputParser;
-addOptional(p, 'eeg', [], @isnumeric);
+addOptional(p, 'sig', [], @isnumeric);
 addOptional(p, 'labels', [], @isnumeric);
 addOptional(p, 'fs', 1250, @isnumeric);
 addOptional(p, 'faxis', [0.2 : 0.2 : 120], @isnumeric);
@@ -46,7 +46,7 @@ addOptional(p, 'sstates', [], @isnumeric);
 addOptional(p, 'graphics', true, @islogical);
 
 parse(p, varargin{:})
-eeg             = p.Results.eeg;
+sig             = p.Results.sig;
 labels          = p.Results.labels;
 fs              = p.Results.fs;
 faxis           = p.Results.faxis;
@@ -80,32 +80,7 @@ if isempty(sstates)
 end
 
 % convert labels to state epochs. 
-minDur = [10, 5, 5, 10, 5, 5];  % threshold of minimum epoch length
-interDur = 4;                   % combine epochs separated by <= interDur
-
-if length(minDur) == 1
-    minDur = repamt(minDur, nstates, 1);
-elseif length(minDur) ~= nstates
-    error('minDur length is different than the number of states')
-end
-if length(interDur) == 1
-    interDur = repmat(interDur, nstates, 1);
-elseif length(interDur) ~= nstates
-    error('interDur length is different than the number of states')
-end
-
-% create state epochs
-for istate = 1 : nstates
-    binaryVec = zeros(length(labels), 1);
-    binaryVec(labels == istate) = 1;
-    stateEpochs{istate} = binary2epochs('vec', binaryVec, 'minDur', minDur(istate), 'maxDur', [],...
-        'interDur', interDur(istate), 'exclude', false);
-end
-
-% epoch stats
-epStats.epLen = cellfun(@(x) (diff(x')'), stateEpochs, 'UniformOutput', false);
-epStats.nepochs = cellfun(@length, epStats.epLen);
-epStats.totDur = cellfun(@sum, epStats.epLen);
+[stateEpochs, ~] = as_epochs('lables', labels);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % calc power for each epoch separatly
@@ -121,7 +96,7 @@ for istate = 1 : length(sstates)
             (stateEpochs{sidx}(iepoch, 2) - 1) * fs - 1;
         
         % calc power and sum across epochs
-        [pow, ~] = pwelch(eeg(dataIdx), win, noverlap, faxis, fs);
+        [pow, ~] = pwelch(sig(dataIdx), win, noverlap, faxis, fs);
         psdStates(istate, :) = psdStates(istate, :) + pow;                       
                
     end

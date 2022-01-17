@@ -1,12 +1,95 @@
-function units = selectUnits(spikes, cm, fr, suFlag, grp, frBoundries, unitClass)
+function units = selectUnits(varargin)
 
-% selects specific units of a session based on multiple params
+% selects specific units of a session based on multiple params. arranges
+% the units in two logical rows (rs; fs) and saves it in the session info
+% struct (ce format). can also update the spikes struct with the params of
+% selection
+%
+% INPUT:
+%   basepath        char. path to session folder {pwd}
+%   spikes          struct
+%   cm              struct (cell_metrics)
+%   fr              struct. see firingRate.m 
+%   suFlag          logical. include only well isolated single units 
+%   stableFlag      logical. include only units with stable baseline firing
+%                   rate (according to fr struct)
+%   blFlag          logical. include only units that passed the baseline
+%                   mfr threshold
+%   grp             numeric. spike groups to include 
+%   frBoundries     2 x 2 mat. include only units with mfr within
+%                   frBoundries. 1st row rs; 2nd row fs
+%   forceA          logical. re-select units even if units var exists
+%   saveVar         logical 
+%
+% DEPENDENCIES:
+% 
+% TO DO LIST:
+%
+% 06 feb 21 LH  updates:
+% 12 jan 22 LH  save in spikes struct
 
-if isempty(frBoundries)
-    frBoundries = [0 Inf; 0 Inf];
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% arguments
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+p = inputParser;
+addParameter(p, 'basepath', pwd, @ischar);
+addParameter(p, 'spikes', []);
+addParameter(p, 'cm', []);
+addParameter(p, 'fr', []);
+addParameter(p, 'grp', []);
+addParameter(p, 'frBoundries', [0 Inf; 0 Inf], @isnumeric);
+addParameter(p, 'suFlag', true, @islogical);
+addParameter(p, 'stableFlag', false, @islogical);
+addParameter(p, 'blFlag', false, @islogical);
+addParameter(p, 'forceA', false, @islogical);
+addParameter(p, 'saveVar', true, @islogical);
+
+parse(p, varargin{:})
+basepath        = p.Results.basepath;
+spikes          = p.Results.spikes;
+cm              = p.Results.cm;
+fr              = p.Results.fr;
+grp             = p.Results.grp;
+frBoundries     = p.Results.frBoundries;
+suFlag          = p.Results.suFlag;
+stableFlag      = p.Results.stableFlag;
+blFlag          = p.Results.blFlag;
+forceA          = p.Results.forceA;
+saveVar         = p.Results.saveVar;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% preparations
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% files
+[~, basename] = fileparts(basepath);
+spikesfile = fullfile(basepath, [basename, '.spikes.cellinfo.mat']);
+cmfile = fullfile(basepath, [basename, '.cell_metrics.cellinfo.mat']);
+frfile = fullfile(basepath, [basename, '.fr.mat']);
+unitsfile = fullfile(basepath, [basename, '.units.mat']);
+
+if exist(unitsfile, 'file') && ~forceA
+    load(unitsfile, 'units')
+    return
+end
+
+if isempty(spikes)
+    load(spikesfile)
+end
+if isempty(cm)
+    load(cmfile, 'cell_metrics')
+    cm = cell_metrics;
+end
+if isempty(fr)
+    load(frfile)
 end
 
 nunits = length(fr.mfr);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% selection
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % su vs mu
 su = ones(nunits, 1);    % override
@@ -29,22 +112,38 @@ pyr = strcmp(cm.putativeCellType, 'Pyramidal Cell');
 wide = strcmp(cm.putativeCellType, 'Wide Interneuron');
 int = strcmp(cm.putativeCellType, 'Narrow Interneuron');
 
-% mfr
+% fr 
+if isempty(frBoundries)
+    frBoundries = [0 Inf; 0 Inf];
+end
 mfrRS = pyr' & fr.mfr > frBoundries(1, 1) & fr.mfr < frBoundries(1, 2);
 mfrFS = (int' | wide') & fr.mfr > frBoundries(2, 1) & fr.mfr < frBoundries(2, 2);
-mfrunits = fr.stable & fr.bl_thr & (mfrRS | mfrFS);
+
+mfrStable = ones(nunits, 1);
+if stableFlag
+    mfrStable = fr.stable;
+end
+mfrBL = ones(1, nunits);
+if blFlag
+    mfrBL = fr.bl_thr;
+end
 
 % combine
-if strcmp(unitClass, 'pyr')
-    units = pyr & su' & grpidx & mfrunits';
-elseif strcmp(unitClass, 'int')
-    units = int & su' & grpidx & mfrunits';
-elseif strcmp(unitClass, 'wide')
-    units = wide & su' & grpidx & mfrunits';
-else
-    units = su' & grpidx & mfrunits';     % override
+units(1, :) = pyr & su' & grpidx & mfrRS' & mfrStable' & mfrBL;
+units(2, :) = int & su' & grpidx & mfrFS' & mfrStable' & mfrBL;
+units = logical(units);
+
+% save
+if saveVar
+    spikes.units.idx = units;
+    spikes.units.frBoundries = frBoundries;
+    spikes.units.grp = grp;
+    spikes.units.suFlag = suFlag;
+    spikes.units.stableFlag = stableFlag;
+    spikes.units.blFlag = blFlag;
+    save(spikesfile, 'spikes')
+    save(unitsfile, 'units')
 end
-units = logical(units(:));
 
 end
 

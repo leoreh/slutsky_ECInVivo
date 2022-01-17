@@ -13,7 +13,7 @@ saveVar = false;
 % session info (cell explorer foramt)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 session = CE_sessionTemplate(pwd, 'viaGUI', false,...
-    'force', true, 'saveVar', true);      
+    'forceDef', true, 'forceL', false, 'saveVar', true);      
 basepath = session.general.basePath;
 nchans = session.extracellular.nChannels;
 fs = session.extracellular.sr;
@@ -57,11 +57,14 @@ cat_OE_tstamps('orig_paths', orig_paths, 'new_path', exPathNew,...
 % pre-process dat (remove channels, reorder, etc.)
 clip = [];
 clear orig_files
-orig_files{1} = 'G:\Data\lh94\lh94_210813_090800\lh94_210813_090800.dat';
-orig_files{2} = 'E:\Data\Processed\lh94\lh94_210813_211900\lh94_210813_211900.dat';
-datInfo = preprocDat('orig_files', orig_files, 'mapch', 1 : 15,...
-    'rmvch', [], 'nchans', 15, 'saveVar', true,...
+orig_files{1} = 'I:\lh87\lh87_210526_094021\lh87_210526_094021.dat';
+orig_files{2} = 'I:\lh87\lh87_210526_233634\lh87_210526_233634.dat';
+datInfo = preprocDat('orig_files', orig_files, 'mapch', 1 : nchans,...
+    'rmvch', [], 'nchans', nchans, 'saveVar', true,...
     'chunksize', 1e7, 'precision', 'int16', 'clip', clip);
+
+% add timebins to datInfo
+[timebins, timepnt] = metaInfo_timebins('reqPnt', []);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % LFP
@@ -116,27 +119,15 @@ ripp = getRipples('basepath', basepath, 'rippCh', [13 : 15], 'emgCh', [],...
 sigInfo = load([basename, '.sleep_sig.mat'], 'info');
 sSig = load([basename, '.sleep_sig.mat']);
 
-% call for lfp and emg from same file
-sSig = as_prepSig([basename, '.lfp'], [],...
-    'eegCh', [29 : 32], 'emgCh', 33, 'saveVar', true, 'eegNchans', nchans,...
-    'inspectSig', false, 'forceLoad', true, 'eegFs', 1250, 'emgFs', [],...
-    'emgCf', [10 450]);
-
 % call for emg dat file
 sSig = as_prepSig([basename, '.lfp'], [basename, '.emg.dat'],...
-    'eegCh', [1 : 4], 'emgCh', 1, 'saveVar', true, 'emgNchans', 2, 'eegNchans', nchans,...
-    'inspectSig', false, 'forceLoad', true, 'eegFs', 1250, 'emgFs', 3051.7578125,...
+    'eegCh', [8 : 11], 'emgCh', 1, 'saveVar', true, 'emgNchans', 2, 'eegNchans', nchans,...
+    'inspectSig', false, 'forceLoad', true, 'eegFs', 1250, 'emgFs', 6103.515625,...
     'emgCf', [10 450]);
-
-% call for accelerometer
-sSig = as_prepSig([basename, '.lfp'], acc.mag,...
-    'eegCh', [1 : 4], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
-    'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
-    'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [10 450], 'fs', 1250);
 
 % manually create labels
 labelsmanfile = [basename, '.sleep_labelsMan.mat'];
-AccuSleep_viewer(sSig, ss.labels, labelsmanfile)
+AccuSleep_viewer(sSig, [], labelsmanfile)
 
 % classify with a network
 netfile = 'D:\Code\slutsky_ECInVivo\lfp\SleepStates\AccuSleep\trainedNetworks\net_220107_233307.mat';
@@ -144,14 +135,18 @@ netfile = [];
 % calData = ss.info.calibrationData;
 calData = [];
 ss = as_classify(sSig, 'basepath', pwd, 'inspectLabels', false,...
-    'saveVar', true, 'forceA', true, 'netfile', netfile,...
+    'saveVar', false, 'forceA', true, 'netfile', netfile,...
     'graphics', true, 'calData', calData);
 
 % inspect separation after classifying / manual scoring
-as_stateSeparation(sSig, ss.labels)
+as_stateSeparation(sSig, ss)
 
 % get confusion matrix between two labels
 [ss.netPrecision, ss.netRecall] = as_cm(labels1, labels2);
+
+% plot state duration in timebins
+[totDur, epLen] = as_plotZT('nwin', 8, 'sstates', [1, 2, 3, 4, 5],...
+    'ss', ss, 'timebins', session.general.timebins);
 
 % calc psd in states
 psdBins = psd_states_timebins('basepath', pwd,...
@@ -203,7 +198,7 @@ fixSpkAndRes('grp', [1 : 4], 'dt', 0, 'stdFactor', 0, 'resnip', true);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % cell explorer metrics
-excludeMetrics = [{'monoSynaptic_connections'}, {'deepSuperficial'},...
+excludeMetrics = [{'deepSuperficial'},...
     {'theta_metrics'}, {'spatial_metrics'}, {'event_metrics'},...
     {'manipulation_metrics'}, {'state_metrics'}, {'psth_metrics'}];
 cell_metrics = ProcessCellMetrics('session', session,...
@@ -221,10 +216,21 @@ fr = firingRate(spikes.times, 'basepath', basepath, 'graphics', true,...
     'binsize', 60, 'saveVar', true, 'smet', 'GK', 'winBL',...
     winBL, 'winCalc', [0, Inf]);
 
+% select specific units
+units = selectUnits('basepath', basepath, 'grp', [1 : 4],...
+    'forceA', true);
+
 % plot fr vs. time
-plot_FRtime_session('basepath', pwd, 'grp', [4],...
-    'frBoundries', [0.01 Inf; 0.01 Inf], 'muFlag', false, 'saveFig', false,...
-    'dataType', 'strd')
+frBoundries = [];
+plot_FRtime_session('basepath', pwd, 'grp', [1 : 4],...
+    'muFlag', false, 'saveFig', false,...
+    'dataType', 'strd', 'muFlag', false)
+
+% number of units per spike group
+plot_nunits_session('basepath', basepath, 'frBoundries', frBoundries)
+
+% mfr by states in time bins
+frBins = fr_timebins('basepath', basepath, 'forceA', false);
 
 % cluster validation
 spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
@@ -232,7 +238,7 @@ spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
     'vis', 'on', 'spkgrp', spkgrp);
 
 % spike timing metrics
-st = spktimesMetrics('winCalc', []);
+st = spktimesMetrics('winCalc', [], 'forceA', true);
 
 % spike waveform metrics
 swv = spkwvMetrics('basepath', basepath, 'fs', fs);
