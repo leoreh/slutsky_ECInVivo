@@ -112,12 +112,15 @@ end
 
 % handle clip
 if isempty(clip)
-    clip = cell(length(orig_files), 1);
+    clip = cell(nfiles, 1);
 end
 if ~iscell(clip)
     clip = {clip};
 end
-
+if length(clip) ~= nfiles
+    error('length of clip and orig_files not equal')
+end
+    
 % create newname if doesn't exist
 if isempty(newfile)
     [newpath, newname, ~] = fileparts(orig_files{1});

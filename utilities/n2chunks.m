@@ -75,7 +75,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % partition into chunks
-if isempty(chunksize)       % load entire file
+if isempty(chunksize)       % one large chunk
     chunks = [1 n];
 else                        % load file in chunks
     nchunks = ceil(n / chunksize);
@@ -92,6 +92,13 @@ chunks(1, 1) = 1;
 
 % assimilate clip into chunks
 for iclip = 1 : size(clip, 1)
+    
+    % special care if clip includes first samples
+    if clip(iclip, 1) == 1
+        rmIdx = chunks(:, 1) <= clip(iclip, 2);
+        chunks(rmIdx, :) = [];
+        chunks(1, 1) = clip(iclip, 2);
+    end
     
     % change chunk end to clip start
     clip_start = find(clip(iclip, 1) < chunks(:, 2), 1, 'first');
