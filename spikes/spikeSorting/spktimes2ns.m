@@ -81,6 +81,7 @@ nsamps = info.bytes / nbytes / nchans;
 
 % memory map to temp_wh binary
 m = memmapfile(fname, 'Format', {'int16', [nchans, nsamps] 'mapped'});
+raw = m.Data;
 
 % snip params
 sniplength = ceil(1.6 * 10^-3 * fs);
@@ -159,7 +160,7 @@ for igrp = 1 : ngrps
     % snip spikes from whitened data
     [spks, spktimes{grp}] = snipFromBinary('stamps', spktimes{grp}, 'fname', '',...
         'win', win, 'nchans', nchans, 'ch', grpchans, 'align_peak', 'min',...
-        'precision', 'int16', 'rmv_trend', 0, 'saveVar', false, 'm', m);
+        'precision', 'int16', 'rmv_trend', 0, 'saveVar', false, 'raw', raw);
         
     % ---------------------------------------------------------------------
     % spk file (binary, nsamples around each spike)   
@@ -241,6 +242,9 @@ end
 if saveVar
     save(fullfile(basepath, [basename, '.spktimes.mat']), 'spktimes')
 end
+
+clear raw
+clear m
 
 end
 

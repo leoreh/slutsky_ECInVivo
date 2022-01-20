@@ -60,10 +60,10 @@ end
 % x axis in hr
 if isempty(fr) || muFlag
     ts = sr.info.binsize;
-    xidx = [1 : length(sr.strd)] / ts;
+    xidx = sr.tstamps / 60 / 60;
 else
     ts = fr.info.binsize;
-    xidx = [1 : length(fr.strd)] / ts;
+    xidx = fr.tstamps / 60 / 60;
 end
 
 % idx of block tranisition (dashed lines)

@@ -13,11 +13,13 @@ p = inputParser;
 addOptional(p, 'dataMat', [], @isnumeric);
 addOptional(p, 'clr', []);
 addOptional(p, 'alphaIdx', []);
+addOptional(p, 'allPnts', false, @islogical);
 
 parse(p, varargin{:})
 dataMat = p.Results.dataMat;
 clr = p.Results.clr;
 alphaIdx = p.Results.alphaIdx;
+allPnts = p.Results.allPnts;
 
 ngrp = size(dataMat, 2);
 
@@ -25,19 +27,31 @@ ngrp = size(dataMat, 2);
 % plot
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-plot(1 : ngrp, mean(dataMat, 1, 'omitnan'), 'kd', 'markerfacecolor', 'k')
-hold on
+
 boxplot(dataMat, 'PlotStyle', 'traditional', 'Whisker', 6);
 if ~isempty(clr)
     bh = findobj(gca, 'Tag', 'Box');
     bh = flipud(bh);
     if isempty(alphaIdx)
-        alphaIdx = linspace(0.5, 0.9, ngrp);
+        alphaIdx = linspace(0.1, 0.3, ngrp);
     end
     for ibox = 1 : length(bh)
         patch(get(bh(ibox), 'XData'), get(bh(ibox), 'YData'),...
             clr, 'FaceAlpha', alphaIdx(ibox))
     end
+end
+hold on
+if allPnts
+    for ibox = 1 : length(bh)
+        jitter = (0.2) .* rand(size(dataMat, 1), 1) - 0.1;
+        xval = ones(size(dataMat, 1), 1) * ibox + jitter;
+        ph = plot(xval, dataMat(:, ibox),...
+            '.', 'MarkerSize', 30);
+        ph.Color = 'k';
+    end
+else
+    plot(1 : ngrp, mean(dataMat, 1, 'omitnan'), 'kd', 'markerfacecolor', 'k',...
+    'MarkerSize', 10)
 end
 
 end

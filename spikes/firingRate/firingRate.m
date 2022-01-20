@@ -114,26 +114,26 @@ if exist(asFile)
     fr.states.stateNames = ss.info.names;
     nstates = length(ss.stateEpochs);
     
-    % change AWAKE to include only very high emg activity
-    %     emg_rms = load([basename, '.sleep_sig.mat'], 'emg_rms');
-    %     emg_rms = emg_rms.emg_rms;
-    %     wakeIdx = ss.labels == 1;
-    %     emgIdx = emg_rms < prctile(emg_rms, 90);
-    % %     labels2 = ss.labels;
-    %     ss.labels(wakeIdx & emgIdx') = 8;
-    % %     sum(labels2 == 1)
-    % %     sum(ss.labels == 1)
-    labels = ss.labels;
-    netThr = 0.9;
-    for istate = 1 : nstates
-        stateIdx = labels == istate;
-        scoreIdx = ss.netScores(:, istate) < netThr;
-        labels(stateIdx & scoreIdx) = 8;
-    end
-    
-    [ss.stateEpochs, ~] = as_epochs('labels', labels,...
-        'confMarg', [1 1], 'interDur', 0);
-    
+%     % change AWAKE to include only very high emg activity
+%     %     emg_rms = load([basename, '.sleep_sig.mat'], 'emg_rms');
+%     %     emg_rms = emg_rms.emg_rms;
+%     %     wakeIdx = ss.labels == 1;
+%     %     emgIdx = emg_rms < prctile(emg_rms, 90);
+%     % %     labels2 = ss.labels;
+%     %     ss.labels(wakeIdx & emgIdx') = 8;
+%     % %     sum(labels2 == 1)
+%     % %     sum(ss.labels == 1)
+%     labels = ss.labels;
+%     netThr = 0.9;
+%     for istate = 1 : nstates
+%         stateIdx = labels == istate;
+%         scoreIdx = ss.netScores(:, istate) < netThr;
+%         labels(stateIdx & scoreIdx) = 8;
+%     end
+%     
+%     [ss.stateEpochs, ~] = as_epochs('labels', labels,...
+%         'confMarg', [1 1], 'interDur', 0);
+  
     % fit stateEpochs to winCalc and count spikes in states
     for istate = 1 : nstates
         if isempty(ss.stateEpochs{istate})
