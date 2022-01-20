@@ -95,7 +95,7 @@ end
 for iwin = 1 : nwin
     for istate = 1 : length(sstates)
         stateMfr(istate, iwin, :) = mean(frBins(iwin).states.fr{istate}, 2, 'omitnan');
-        stateRatio(istate, iwin, :) = squeeze(frBins(iwin).states.ratio(1, istate, :));
+        stateRat(istate, iwin, :) = squeeze(frBins(iwin).states.ratio(1, istate, :));
     end
     stateGain(:, iwin, :) = frBins(iwin).states.gain;
 end
@@ -107,7 +107,7 @@ end
 
 istate = 5;
 squeeze(stateMfr(istate, :, units(2, :)));
-squeeze(stateRatio(istate, :, units(2, :)));
+squeeze(stateRat(istate, :, units(2, :)));
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
@@ -115,8 +115,7 @@ squeeze(stateRatio(istate, :, units(2, :)));
 
 if graphics
     
-    % units
-    
+    % units    
     tbins_txt = {'0-3ZT', '3-6ZT', '6-9ZT', '9-12ZT',...
         '12-15ZT', '15-18ZT', '18-21ZT', '21-24ZT'};
     unitchar = {'RS', 'FS'};
@@ -125,8 +124,8 @@ if graphics
         fh = figure;
         yLimitMfr = [min(stateMfr(:, :, units(iunit, :)), [], 'all'),...
             max(stateMfr(:, :, units(iunit, :)), [], 'all')];
-        yLimitRatio = [min(stateRatio(:, :, units(iunit, :)), [], 'all'),...
-            max(stateRatio(:, :, units(iunit, :)), [], 'all')];
+        yLimitRatio = [min(stateRat(:, :, units(iunit, :)), [], 'all'),...
+            max(stateRat(:, :, units(iunit, :)), [], 'all')];
     
         for istate = 1 : length(sstates)
             
@@ -142,7 +141,7 @@ if graphics
             % state ratio
             if sstates(istate) ~= 1
                 subplot(2, length(sstates), istate + length(sstates))
-                dataMat = squeeze(stateRatio(istate, :, units(iunit, :)));
+                dataMat = squeeze(stateRat(istate, :, units(iunit, :)));
                 plot_boxMean('dataMat', dataMat', 'clr', cfg.colors{istate})
                 ylabel({sprintf('%s - %s /', cfg.names{1}, cfg.names{sstates(istate)}),...
                     sprintf('%s + %s', cfg.names{1}, cfg.names{sstates(istate)})})

@@ -13,6 +13,7 @@ function units = selectUnits(varargin)
 %   suFlag          logical. include only well isolated single units 
 %   stableFlag      logical. include only units with stable baseline firing
 %                   rate (according to fr struct)
+%   giniFlag        logical. include only units with gini coeff > 0.5
 %   blFlag          logical. include only units that passed the baseline
 %                   mfr threshold
 %   grp             numeric. spike groups to include 
@@ -41,6 +42,7 @@ addParameter(p, 'grp', []);
 addParameter(p, 'frBoundries', [0 Inf; 0 Inf], @isnumeric);
 addParameter(p, 'suFlag', true, @islogical);
 addParameter(p, 'stableFlag', false, @islogical);
+addParameter(p, 'giniFlag', false, @islogical);
 addParameter(p, 'blFlag', false, @islogical);
 addParameter(p, 'forceA', false, @islogical);
 addParameter(p, 'saveVar', true, @islogical);
@@ -54,6 +56,7 @@ grp             = p.Results.grp;
 frBoundries     = p.Results.frBoundries;
 suFlag          = p.Results.suFlag;
 stableFlag      = p.Results.stableFlag;
+giniFlag        = p.Results.giniFlag;
 blFlag          = p.Results.blFlag;
 forceA          = p.Results.forceA;
 saveVar         = p.Results.saveVar;
@@ -123,14 +126,20 @@ mfrStable = ones(nunits, 1);
 if stableFlag
     mfrStable = fr.stable;
 end
+
+mfrGini = ones(nunits, 1);
+if giniFlag
+    mfrGini = fr.gini_unit <= 0.5;
+end
+
 mfrBL = ones(1, nunits);
 if blFlag
     mfrBL = fr.bl_thr;
 end
 
 % combine
-units(1, :) = pyr & su' & grpidx & mfrRS' & mfrStable' & mfrBL;
-units(2, :) = int & su' & grpidx & mfrFS' & mfrStable' & mfrBL;
+units(1, :) = pyr & su' & grpidx & mfrRS' & mfrStable' & mfrBL & mfrGini';
+units(2, :) = int & su' & grpidx & mfrFS' & mfrStable' & mfrBL & mfrGini';
 units = logical(units);
 
 % save
