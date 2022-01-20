@@ -13,7 +13,7 @@ saveVar = false;
 % session info (cell explorer foramt)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 session = CE_sessionTemplate(pwd, 'viaGUI', false,...
-    'forceDef', true, 'forceL', true, 'saveVar', true);      
+    'forceDef', true, 'forceL', false, 'saveVar', true);      
 basepath = session.general.basePath;
 nchans = session.extracellular.nChannels;
 fs = session.extracellular.sr;
@@ -59,14 +59,14 @@ cat_OE_tstamps('orig_paths', orig_paths, 'new_path', exPathNew,...
 
 % pre-process dat (remove channels, reorder, etc.)
 clear orig_files
-orig_files{1} = 'E:\Leore\lh99\2022-01-19_09-00-35\Record Node 107\experiment1\recording1\continuous\Rhythm_FPGA-100.0\continuous.dat';
-orig_files{2} = 'E:\Leore\lh99\2022-01-19_09-00-35\Record Node 107\experiment2\recording1\continuous\Rhythm_FPGA-100.0\continuous.dat';
-orig_files{3} = 'E:\Leore\lh99\2022-01-19_09-00-35\Record Node 107\experiment4\recording1\continuous\Rhythm_FPGA-100.0\continuous.dat';
-orig_files{4} = 'E:\Leore\lh99\2022-01-19_21-00-32\Record Node 107\experiment1\recording1\continuous\Rhythm_FPGA-100.0\continuous.dat';
+orig_files{1} = 'E:\Leore\lh96\2022-01-19_09-00-35\Record Node 101\experiment2\recording1\continuous\Rhythm_FPGA-100.0\continuous.dat';
+orig_files{1} = 'E:\Leore\lh96\2022-01-19_09-00-35\Record Node 101\experiment1\recording1\continuous\Rhythm_FPGA-100.0\continuous.dat';
+orig_files{1} = 'E:\Leore\lh96\2022-01-19_09-00-35\Record Node 101\experiment1\recording1\continuous\Rhythm_FPGA-100.0\continuous.dat';
+orig_files{2} = 'E:\Leore\lh96\2022-01-19_21-00-32\Record Node 101\experiment1\recording1\continuous\Rhythm_FPGA-100.0\continuous.dat';
 clip = cell(1, length(orig_files));
 % clip{2} = [(seconds(minutes(158)) + 19) * 20000, Inf];
 
-datInfo = preprocDat('orig_files', orig_files, 'mapch', mapch,...
+datInfo = preprocDat('orig_files', orig_files, 'mapch', 1 : length(mapch),...
     'rmvch', [rmvch], 'nchans', length(mapch), 'saveVar', true,...
     'chunksize', 1e7, 'precision', 'int16', 'clip', clip);
 

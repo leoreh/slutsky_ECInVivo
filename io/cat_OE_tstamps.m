@@ -66,7 +66,6 @@ nbytes = class2bytes(precision);
 % initialize
 datFiles = [];
 tFiles = [];
-tstamps = [];
 
 % set orig_paths to cell
 orig_paths = cellstr(orig_paths);
@@ -82,6 +81,9 @@ end
 
 % open file
 fid = fopen(new_name, 'w');
+if(fid == -1)
+    error('cannot open file');
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arrange files and concatenate
@@ -119,7 +121,6 @@ for ifile = 1 : length(datFiles)
             readNPYheader(tname);
         tmap = memmapfile(tname, 'Format', {dataType, arrayShape(end:-1:1), 'd'},...
             'Offset', totalHeaderLength);
-        isempty(tmap.data)
         raw = tmap.data;
         nsamps_t = length(raw.d);
         
@@ -134,7 +135,7 @@ for ifile = 1 : length(datFiles)
         end
         
         % write to file
-        fwrite(fid, tstamps, 'int64');
+        fwrite(fid, raw.d, 'int64');
         
         % clear data
         clear raw
