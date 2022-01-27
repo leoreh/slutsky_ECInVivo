@@ -4,7 +4,7 @@
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = 'lh86';
+mname = 'lh99';
 forceL = true;
 forceA = true;
 
@@ -28,7 +28,7 @@ nsessions = length(basepaths);
 templateCal = ss.info.calibrationData;
 
 if forceA
-    for isession = 8 : nsessions
+    for isession = 6 : nsessions
         
         % file
         basepath = basepaths{isession};
@@ -41,27 +41,32 @@ if forceA
         fs = session.extracellular.sr;
         spkgrp = session.extracellular.spikeGroups.channels;
         
+        % create emg signal from accelerometer data
+        acc = EMGfromACC('basepath', basepath, 'fname', [basename, '.lfp'],...
+            'nchans', nchans, 'ch', nchans - 2 : nchans, 'saveVar', true, 'fsIn', 1250,...
+            'graphics', false, 'force', true);
+        
         % state
-        % call for emg dat file
-        sSig = as_prepSig([basename, '.lfp'], [basename, '.emg.dat'],...
-            'eegCh', [1 : 4], 'emgCh', 1, 'saveVar', true, 'emgNchans', 2, 'eegNchans', nchans,...
-            'inspectSig', false, 'forceLoad', true, 'eegFs', 1250, 'emgFs', 3051.7578125,...
-            'emgCf', [10 450]);
+        sSig = as_prepSig([basename, '.lfp'], acc.mag,...
+            'eegCh', [1 : 4], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
+            'eegNchans', nchans, 'inspectSig', true, 'forceLoad', true,...
+            'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [10 450], 'fs', 1250);
 
         % classify with a network
-        if exist([basename, '.AccuSleep_labelsMan'], 'file')
-            calData = [];
-        else
-            calData = templateCal;
-        end
+        calData = templateCal;
         netfile = [];
         ss = as_classify(sSig, 'basepath', pwd, 'inspectLabels', false,...
             'saveVar', true, 'forceA', true, 'netfile', netfile,...
             'graphics', true, 'calData', calData);
         
+        
+%         sSig = load([basename, '.sleep_sig.mat']);
+%         load([basename, '.sleep_states.mat']);
+%         as_stateSeparation(sSig, ss)
+
                
-        tbins_txt = {'0-3ZT', '3-6ZT', '6-9ZT', '9-12ZT',...
-            '12-15ZT', '15-18ZT', '18-21ZT', '21-24ZT'};
+%         tbins_txt = {'0-3ZT', '3-6ZT', '6-9ZT', '9-12ZT',...
+%             '12-15ZT', '15-18ZT', '18-21ZT', '21-24ZT'};
 %         psdBins = psd_states_timebins('basepath', pwd,...
 %             'chEeg', [], 'forceA', true, 'graphics', true,...
 %             'timebins', chunks, 'saveVar', true,...
@@ -256,44 +261,7 @@ if saveFig
     export_fig(figname, '-tif', '-transparent', '-r300')
 end
 
-% -------------------------------------------------------------------------
-% stacked bar plot of state duration across sessions
-figFlag = 1; saveFig = true;
-stateidx = [1 : 6];
-sessionIdx = 1 : nsessions;
-[nsub] = numSubplots(length(sessionIdx));
-if figFlag
-    clear stateDur
-    for isession = sessionIdx
-        assignVars(varArray, isession)
-        for istate = stateidx 
-            stateDur(isession, istate) = sum(ss.epLen{istate}) /...
-                length(ss.labels) * 100;
-        end               
-    end
-    
-    fh = figure;
-    bh = bar(stateDur, 'stacked', 'FaceColor', 'flat');
-    for isession = sessionIdx
-        for istate = stateidx          
-            bh(istate).CData(isession, :) = cfg_colors{istate};
-        end
-    end
-    xticks([1 : length(sessionIdx)]);
-    xticklabels(cellstr(dirnames))
-    xtickangle(45)
-    ylim([0 100])
-    ylabel('Time [%]')
-    legend(ss.labelNames)
-    title('State Duration')
-    
-    if saveFig
-        figpath = fullfile(mousepath, 'graphics');
-        mkdir(figpath)
-        figname = fullfile(figpath, ['stateDuration']);
-        export_fig(figname, '-tif', '-transparent', '-r300')
-    end
-end
+
 
 % -------------------------------------------------------------------------
 % distribution of mu bins in each state
@@ -356,53 +324,4 @@ if figFlag
         export_fig(figname, '-tif', '-transparent', '-r300')
     end   
 end
-
-% -------------------------------------------------------------------------
-% distribution of su firing rate per state
-figFlag = 1; saveFig = true;
-stateidx = [1 : 6];
-sessionIdx = 1 : nsessions;
-[nsub] = numSubplots(length(sessionIdx));
-grp = [1 : 4];          % which tetrodes to plot
-unitClass = 'int';      % plot 'int', 'pyr', or 'all'
-suFlag = 0;             % plot only su or all units
-frBoundries = [0 Inf];  % include only units with mean fr in these boundries
-
-if figFlag
-    fh = figure;
-    clear frState
-    for isession = 1 : length(sessionIdx)
-        assignVars(varArray, sessionIdx(isession))
-        units = selectUnits(spikes, cm, fr, suFlag, grp, frBoundries, unitClass);
-        nunits = sum(units);
-        
-        for istate = stateidx
-            frState{isession}(:, istate) = mean(fr.states.fr{istate}(units, :), 2, 'omitnan');
-        end
-        subplot(nsub(1), nsub(2), isession)
-        hold on
-        boxplot(frState{isession}(:, stateidx), 'PlotStyle', 'traditional', 'Whisker', 8);
-        bh = findobj(gca, 'Tag', 'Box');
-        bh = flipud(bh);
-        for ibox = 1 : length(bh)
-            patch(get(bh(ibox), 'XData'), get(bh(ibox), 'YData'),...
-                cfg_colors{stateidx(ibox)}, 'FaceAlpha', 0.5)
-        end
-        xticks([])
-        ylabel([unitClass, ' firing rate [Hz]'])
-        ylim([0 15])
-        title(sessionDate{sessionIdx(isession)})
-        if isession == 1
-            legend(ss.labelNames(stateidx))
-        end
-    end
-    if saveFig
-        figpath = fullfile(mousepath, 'graphics');
-        mkdir(figpath)
-        figname = fullfile(figpath, [unitClass, '_states']);
-        export_fig(figname, '-tif', '-transparent', '-r300')
-    end
-end
-
-
 

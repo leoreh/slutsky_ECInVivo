@@ -58,12 +58,11 @@ if isempty(winCalc)
     winCalc = {[0 Inf]};
 end
 nwin = size(winCalc, 2);
-nbins = cellfun(@size, winCalc, 'UniformOutput', false);
+nbins = cellfun(@length, winCalc, 'UniformOutput', false);
 for iwin = 1 : nwin
-    if nbins{iwin}(2) == 2
-        nbins{iwin}(2) = [];
-    else
-        error('check the input winCalc')
+    if nbins{iwin} < 1
+        fprintf('\nWARNING: some timebins are empty\n')
+        winCalc{iwin} = [];
     end
 end
 nbins = cell2mat(nbins);

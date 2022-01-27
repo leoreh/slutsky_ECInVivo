@@ -208,7 +208,7 @@ fr.fanoFactor = var(bl_fr, [], 2) ./ mean(bl_fr, 2);
 % Gini coefficient. calculated per unit (as in CE); the gini describes the
 % inequality of fr bins throughout time. calculated across the popultion
 % (mizuseki, cell rep., 2008), the gini describes the degree to which high
-% mfr units accounted for most the spikes recorded
+% mfr units account for most the spikes recorded
 cum_fr = cumsum(sort(bl_fr, 2), 2);
 cum_fr_norm = cum_fr ./ max(cum_fr, [], 2);
 fr.gini_unit = nan(nunits, 1);

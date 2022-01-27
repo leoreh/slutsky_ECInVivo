@@ -20,6 +20,9 @@ fs = session.extracellular.sr;
 spkgrp = session.extracellular.spikeGroups.channels;
 [~, basename] = fileparts(basepath);
 
+% add timebins to datInfo
+[timebins, timepnt] = metaInfo_timebins('reqPnt', 5.5 * 60 * 60);
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preprocessing of raw files
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -59,19 +62,16 @@ cat_OE_tstamps('orig_paths', orig_paths, 'new_path', exPathNew,...
 
 % pre-process dat (remove channels, reorder, etc.)
 clear orig_files
-orig_files{1} = 'E:\Leore\lh99\2022-01-19_09-00-35\Record Node 107\experiment1\recording1\continuous\Rhythm_FPGA-100.0\continuous.dat';
-orig_files{2} = 'E:\Leore\lh99\2022-01-19_09-00-35\Record Node 107\experiment2\recording1\continuous\Rhythm_FPGA-100.0\continuous.dat';
-orig_files{3} = 'E:\Leore\lh99\2022-01-19_09-00-35\Record Node 107\experiment4\recording1\continuous\Rhythm_FPGA-100.0\continuous.dat';
-orig_files{4} = 'E:\Leore\lh99\2022-01-19_21-00-32\Record Node 107\experiment1\recording1\continuous\Rhythm_FPGA-100.0\continuous.dat';
+orig_files{1} = 'K:\Data\lh99\2022-01-25_09-00-41\Record Node 107\experiment1\recording1\continuous\Rhythm_FPGA-100.0\continuous.dat';
+orig_files{2} = 'K:\Data\lh99\2022-01-25_09-00-41\Record Node 107\experiment2\recording1\continuous\Rhythm_FPGA-100.0\continuous.dat';
+orig_files{3} = 'K:\Data\lh99\2022-01-25_09-00-41\Record Node 107\experiment3\recording1\continuous\Rhythm_FPGA-100.0\continuous.dat';
+orig_files{4} = 'K:\Data\lh99\2022-01-25_21-00-20\Record Node 107\experiment1\recording1\continuous\Rhythm_FPGA-100.0\continuous.dat';
 clip = cell(1, length(orig_files));
 % clip{2} = [(seconds(minutes(158)) + 19) * 20000, Inf];
 
 datInfo = preprocDat('orig_files', orig_files, 'mapch', mapch,...
     'rmvch', [rmvch], 'nchans', length(mapch), 'saveVar', true,...
     'chunksize', 1e7, 'precision', 'int16', 'clip', clip);
-
-% add timebins to datInfo
-[timebins, timepnt] = metaInfo_timebins('reqPnt', []);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % LFP
@@ -126,11 +126,11 @@ ripp = getRipples('basepath', basepath, 'rippCh', [13 : 15], 'emgCh', [],...
 sigInfo = load([basename, '.sleep_sig.mat'], 'info');
 sSig = load([basename, '.sleep_sig.mat']);
 
-% call for emg dat file
-sSig = as_prepSig([basename, '.lfp'], [basename, '.emg.dat'],...
-    'eegCh', [8 : 11], 'emgCh', 1, 'saveVar', true, 'emgNchans', 2, 'eegNchans', nchans,...
-    'inspectSig', false, 'forceLoad', true, 'eegFs', 1250, 'emgFs', 6103.515625,...
-    'emgCf', [10 450]);
+% call for acceleration
+sSig = as_prepSig([basename, '.lfp'], acc.mag,...
+    'eegCh', [13 : 16], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
+    'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
+    'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [10 450], 'fs', 1250);
 
 % manually create labels
 labelsmanfile = [basename, '.sleep_labelsMan.mat'];
@@ -172,7 +172,7 @@ psdBins = psd_states_timebins('basepath', pwd,...
 % spike detection from temp_wh
 [spktimes, ~] = spktimesWh('basepath', basepath, 'fs', fs, 'nchans', nchans,...
     'spkgrp', spkgrp, 'saveVar', true, 'saveWh', true,...
-    'graphics', false, 'force', true);
+    'graphics', false, 'force', true, 'winWh', [1, 4 * 60 * 60]);
 
 % spike rate per tetrode. note that using firingRate requires
 % special care becasue spktimes is given in samples and not seconds
@@ -216,29 +216,33 @@ cell_metrics = ProcessCellMetrics('session', session,...
     'excludeMetrics', excludeMetrics);
 % cell_metrics = CellExplorer('basepath', pwd);
 
+% select specific units
+units = selectUnits('basepath', basepath, 'grp', [], 'saveVar', false,...
+    'forceA', false, 'frBoundries', [0.1 Inf; 0.1 Inf],...
+    'spikes', spikes);   
+
 % firing rate
 load([basename, '.spikes.cellinfo.mat'])
-winBL = [0 5 * 60 * 60];
-fr = firingRate(spikes.times, 'basepath', basepath, 'graphics', true,...
-    'binsize', 60, 'saveVar', true, 'smet', 'GK', 'winBL',...
-    winBL, 'winCalc', [0, Inf]);
-
-% select specific units
-units = selectUnits('basepath', basepath, 'grp', [1 : 4],...
-    'forceA', true);
+timepnt = session.general.timepnt;
+winBL = [0 timepnt];
+fr = firingRate(spikes.times, 'basepath', basepath,...
+    'graphics', true, 'binsize', 60, 'saveVar', true,...
+    'smet', 'none', 'winBL', winBL, 'winCalc', [0, Inf]);
 
 % plot fr vs. time
-frBoundries = [];
-plot_FRtime_session('basepath', pwd, 'grp', [1 : 4],...
+unitsClean = units.idx & units.gini' & units.mfrBL';
+plot_FRtime_session('basepath', pwd,...
     'muFlag', false, 'saveFig', false,...
-    'dataType', 'strd', 'muFlag', false)
+    'dataType', 'norm', 'units', unitsClean)
 
 % number of units per spike group
 plot_nunits_session('basepath', basepath, 'frBoundries', frBoundries)
 
 % mfr by states in time bins
-frBins = fr_timebins('basepath', basepath, 'forceA', false);
-
+timebins = session.general.timebins; 
+fr_timebins('basepath', pwd, 'forceA', true, 'graphics', false,...
+        'timebins', timebins, 'saveVar', true, 'sstates', [1, 4, 5]);
+    
 % cluster validation
 spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
     'saveFig', false, 'force', true, 'mu', [], 'graphics', false,...

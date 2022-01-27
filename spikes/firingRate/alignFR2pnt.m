@@ -34,7 +34,6 @@ if suFlag
 else
     dataStruct = 'sr';
 end
-dataType = 'strd';
 
 % load vars from each session
 varsFile = ["fr"; "sr"; "datInfo"; "session"];
@@ -49,7 +48,7 @@ for isession = 1 : nsessions
     timepnt = v(isession).session.general.timepnt;
     [~, timeIdx(isession)] = min(abs(v(isession).(dataStruct).tstamps - timepnt));
     tLen(isession) = length(v(isession).(dataStruct).tstamps);
-    nunits(isession) = size(v(isession).(dataStruct).strd, 1);
+    nunits(isession) = size(v(isession).(dataStruct).(dataType), 1);
 end
 
 % initialize

@@ -46,6 +46,15 @@ saveFig         = p.Results.saveFig;
 % preparations
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+if isempty(tbins_txt) & size(timebins, 1) == 8
+    tbins_txt = {'0-3ZT', '3-6ZT', '6-9ZT', '9-12ZT',...
+        '12-15ZT', '15-18ZT', '18-21ZT', '21-24ZT'};
+else
+    tbins_txt = split(num2str(1 : size(timebins, 1)));
+end
+
+unitchar = {'RS', 'FS'};
+
 % load vars from each session
 varsFile = ["fr"; "sr"; "spikes"; "cell_metrics"; "datInfo"; "session"];
 varsName = ["fr"; "sr"; "spikes"; "cm"; "datInfo"; "session"];
@@ -100,26 +109,18 @@ for iwin = 1 : nwin
     stateGain(:, iwin, :) = frBins(iwin).states.gain;
 end
 units = selectUnits('basepath', basepath);
+units = units.idx;
 
 if saveVar
     save(frfile, 'frBins')
 end
-
-istate = 5;
-squeeze(stateMfr(istate, :, units(2, :)));
-squeeze(stateRat(istate, :, units(2, :)));
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if graphics
-    
-    % units    
-    tbins_txt = {'0-3ZT', '3-6ZT', '6-9ZT', '9-12ZT',...
-        '12-15ZT', '15-18ZT', '18-21ZT', '21-24ZT'};
-    unitchar = {'RS', 'FS'};
-    
+       
     for iunit = 1 : 2
         fh = figure;
         yLimitMfr = [min(stateMfr(:, :, units(iunit, :)), [], 'all'),...
@@ -132,7 +133,7 @@ if graphics
             % mfr in state
             subplot(2, length(sstates), istate)
             dataMat = squeeze(stateMfr(istate, :, units(iunit, :)));
-            plot_boxMean('dataMat', dataMat', 'clr', cfg.colors{istate})
+            plot_boxMean('dataMat', dataMat', 'clr', cfg.colors{sstates(istate)})
             ylabel(sprintf('MFR %s', cfg.names{sstates(istate)}))
             ylim(yLimitMfr)
             xticklabels(tbins_txt)
@@ -142,7 +143,7 @@ if graphics
             if sstates(istate) ~= 1
                 subplot(2, length(sstates), istate + length(sstates))
                 dataMat = squeeze(stateRat(istate, :, units(iunit, :)));
-                plot_boxMean('dataMat', dataMat', 'clr', cfg.colors{istate})
+                plot_boxMean('dataMat', dataMat', 'clr', cfg.colors{sstates(istate)})
                 ylabel({sprintf('%s - %s /', cfg.names{1}, cfg.names{sstates(istate)}),...
                     sprintf('%s + %s', cfg.names{1}, cfg.names{sstates(istate)})})
                 ylim(yLimitRatio)

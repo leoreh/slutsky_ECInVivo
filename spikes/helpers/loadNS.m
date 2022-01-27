@@ -62,7 +62,7 @@ if isempty(session)
     sessionName = [basename, '.session.mat'];
     if ~exist(sessionName, 'file')
         session = CE_sessionTemplate(pwd, 'viaGUI', false,...
-            'force', true, 'saveVar', true);
+            'forceL', true, 'saveVar', true);
     else
         load(sessionName)
     end

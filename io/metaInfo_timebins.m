@@ -8,6 +8,7 @@ function [timebins, timepnt] = metaInfo_timebins(varargin)
 %   basepath    recording session {pwd}
 %   reqPnt      numeric. time of interest from the start of the recording
 %               [s]
+%   nbins       numeric. number of time bins to create {8}
 %   nchans      numeric. number of channels in dat file. if empty will be
 %               extracted from session info. used for converting recording
 %               length in sample to seconds (same as fs)
@@ -20,12 +21,14 @@ function [timebins, timepnt] = metaInfo_timebins(varargin)
 p = inputParser;
 addOptional(p, 'basepath', pwd);
 addOptional(p, 'reqPnt', [], @isnumeric);
+addOptional(p, 'nbins', 8, @isnumeric);
 addOptional(p, 'fs', [], @isnumeric);
 addOptional(p, 'nchans', [], @isnumeric);
 
 parse(p, varargin{:})
 basepath        = p.Results.basepath;
 reqPnt          = p.Results.reqPnt;
+nbins           = p.Results.nbins;
 fs              = p.Results.fs;
 nchans          = p.Results.nchans;
 
@@ -63,7 +66,7 @@ if ~isempty(reqPnt)
 end
 
 % timebins
-timebins = n2chunks('n', recLen, 'nchunks', 8, 'pnts', timepnt);
+timebins = n2chunks('n', recLen, 'nchunks', nbins, 'pnts', timepnt);
 
 % save session
 session.general.timebins = timebins;

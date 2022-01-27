@@ -223,7 +223,6 @@ for iunit = 1 : nunits
     
     % slope trough to peak (no reference)
     slopeTp(iunit) = ampTp(iunit) / (imax_post - imin(iunit));
-
     
     % half peak width (Medrihan et al., 2017)
     wu = w / maxVal_post;
@@ -256,6 +255,14 @@ for iunit = 1 : nunits
     [~, ifreq] = max(abs(squeeze(cfs)), [], 1);
     maxf = f(ifreq(round(length(w) / 2)));
     spkw(iunit) = 1000 / maxf;
+    
+    % complex spike index (McHugh 1996), defined as percentage of first lag
+    % isi that fall between 3 ms and 15 ms and whose second spike is
+    % smaller than the first. could not find a code reference so
+    % implemented manually. csi requires knowing the amp of each spike.
+    % here I snip ~20k spikes which is ok so long as they are contineous in
+    % time and not randomely seleceted.
+    
     
 end
 

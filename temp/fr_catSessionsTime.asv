@@ -30,6 +30,11 @@ ts = v(1).sr.info.binsize;
 
 ncol = size(v(1).sr.strd, 1);
 
+% initialize
+tstamps = [];
+xidx = [];
+lastT = 0;
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % time
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -48,9 +53,6 @@ expEnd = expEnd + seconds(sum(v(end).datInfo.nsamps) / fs);
 expLen = ceil(seconds(expEnd - expStart) / ts); 
 expData = nan(expLen, ncol);
 
-% initialize
-tstamps = [];
-xidx = [];
 for isession = 1 : nsessions
     
     % find index to dataMat according to recording start
@@ -63,7 +65,7 @@ for isession = 1 : nsessions
     
     % cat tstamps and block transitions
     tstamps = [tstamps, v(isession).sr.tstamps / 60 / 60 + recIdx];
-    xidx = [xidx, cumsum(v(isession).datInfo.nsamps) / fs / ts + recIdx];
+    xidx = [xidx, v(isession).datInfo.nsamps / fs 60 + recIdx];
     
 end
 
@@ -80,15 +82,38 @@ tidxLabels = datestr(datenum(tStartLabel : hours(xTicksBinsize) : expEnd));
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-smoothData = movmean(expData, 13, 1);
-
-
 fh = figure;
-plot(smoothData)
+plot(expData)
 xticks(tidx)
 xticklabels(tidxLabels)
 hold on
 plot([xidx; xidx], ylim, '--k')
 
+legend(split(num2str(1 : 6)))
+
+
+% initialize
+fr = [];
+tstamps = [];
+xidx = [];
+lastT = 0;
+for isession = 1 : nsessions
+    fr = [fr, v(isession).sr.strd];
+    tstamps = [tstamps, v(isession).sr.tstamps / 60 / 60 + lastT];
+    xidx = [xidx, v(isession).datInfo.nsamps / fs / 60 / 60 + lastT];
+    lastT = tstamps(end);
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% graphics
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+setMatlabGraphics(false)
+
+data = movmean(fr, 13 ,2);
+
+fh = figure;
+plot(tstamps, (data))
+hold on
+plot([xidx; xidx], ylim, '--k')
 legend(split(num2str(1 : 6)))
 

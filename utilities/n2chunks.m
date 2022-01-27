@@ -118,8 +118,11 @@ for iclip = 1 : size(clip, 1)
     % remove chunks that are after clip. this occurs when clip is greater
     % than chunksize.
     rmidx = find(chunks(:, 1) > chunks(:, 2));
-    chunks(rmidx + 1, 1) = chunks(rmidx, 1);
-    chunks(rmidx, :) = [];
+    if ~isempty(rmidx)
+        replaceidx = find(chunks(rmidx, 1) < chunks(:, 2), 1);
+        chunks(replaceidx, 1) = chunks(rmidx, 1);
+        chunks(rmidx : replaceidx - 1, :) = [];
+    end
 end
 
 % remove chunks that are greater than nsamps. this can occur if clip

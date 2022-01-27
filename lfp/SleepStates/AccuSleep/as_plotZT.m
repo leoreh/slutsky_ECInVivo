@@ -85,7 +85,6 @@ if isempty(interDur)
     interDur = ss.info.interDur;
 end
 
-
 if length(minDur) == 1
     minDur = repamt(minDur, nstates, 1);
 elseif length(minDur) ~= nstates
@@ -135,6 +134,9 @@ if graphics
         % state duration
         subplot(2, length(sstates), istate)
         epMat = epLen{istate};
+        if isempty(epMat)
+            continue
+        end
         plot([1 : size(epMat, 2)], totDur(:, istate) / 60,...
             'Color', cfg.colors{sstates(istate)}, 'LineWidth', 2)
         ylabel('State duration [min]')
