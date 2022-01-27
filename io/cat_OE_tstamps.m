@@ -80,8 +80,8 @@ if isempty(new_name)
 end
 
 % open file
-fid = fopen(new_name, 'w');
-if(fid == -1)
+fidTstamps = fopen(new_name, 'w');
+if(fidTstamps == -1)
     error('cannot open file');
 end
 
@@ -135,7 +135,7 @@ for ifile = 1 : length(datFiles)
         end
         
         % write to file
-        fwrite(fid, raw.d, 'int64');
+        fwrite(fidTstamps, raw.d, 'int64');
         
         % clear data
         clear raw
@@ -144,7 +144,7 @@ for ifile = 1 : length(datFiles)
     end
 end
 
-rc = fclose(fid);
+rc = fclose(fidTstamps);
 if rc == 0
     fprintf('that took %.2f minutes\n', toc / 60)
 else
