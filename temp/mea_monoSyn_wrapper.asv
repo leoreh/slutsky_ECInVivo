@@ -24,7 +24,7 @@ acg_narrow_dur = 0.1;
 
 % params
 winCalc = [0, 4 * 60 * 60];         % [s]
-% winCalc = [0, Inf];                 % [s]
+winCalc = [0, Inf];                 % [s]
 minSpks = 3000;
 
 nunits = length(mea.spktimes);
@@ -68,12 +68,11 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 clear ccExc 
-clear refExc
 
 % limit results to pairs with enough counts in the raw cch
-ccThr = 500;
+ccThr = 300;
 ccBad = squeeze(sum(acg_narrow, 1)) < ccThr;
-[ccExc(1, :), ccExc(2, :)] = find(ccBad);
+[ccExc(1, :) ccExc(2, :)] = find(ccBad);
 [~, ccIdx] = cidx2cpair(nunits, [], ccExc');
 
 % limit results to pairs with no refractory period
@@ -81,7 +80,7 @@ refThr = 5;
 refTidx = round(length(acg_narrow_tstamps) / 2) - 1 :...
    round(length(acg_narrow_tstamps) / 2) + 1;
 refBad = squeeze(sum(acg_narrow(refTidx, :, :))) < refThr;
-[refExc(1, :), refExc(2, :)] = find(refBad);
+[refExc(1, :) refExc(2, :)] = find(refBad);
 [~, refIdx] = cidx2cpair(nunits, [], refExc');
 
 % limit results according to stg ([ext, inh])

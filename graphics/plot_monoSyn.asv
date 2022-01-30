@@ -68,14 +68,13 @@ ccg_dur = 0.1;
 ccg_tstamps = ccg_tstamps * 1000;
 
 % ccg2
-if isempty(ccg2) || isempty(ccg2_tstamps)
+if isempty(ccg2) 
     ccg2_bnsz = 0.0001;
     ccg2_dur = 0.02;
     [ccg2, ccg2_tstamps] = CCG(spktimes,...
         [], 'binSize', ccg2_bnsz,...
         'duration', ccg2_dur, 'norm', 'rate', 'Fs', 1 / fs);
     ccg2_tstamps = ccg2_tstamps * 1000;
-    ccg2 = squeeze(ccg2(:, 1, 2));
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -124,7 +123,8 @@ title(sprintf('Unit #%d (Postsynaptic)', units(2)))
 
 % ccg super narrow 
 subplot(2, 3, 5)
-bh = bar(ccg2_tstamps, ccg2, 'BarWidth', 1);
+bh = bar(ccg2_tstamps,...
+    squeeze(acg_narrow(:, 1, 2)), 'BarWidth', 1);
 hold on
 plot([0, 0], ylim, '--k')
 ylabel('Rate [Hz]')
@@ -133,7 +133,6 @@ bh.FaceColor = 'k';
 bh.EdgeColor = 'none';
 box off
 axis tight
-title(sprintf('STG = %.2f', stg))
 
 if ~isempty(wv)
     

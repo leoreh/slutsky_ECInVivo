@@ -83,8 +83,9 @@ cell_metrics = cm;
 save(fullfile(basepath, [basename, '.cell_metrics.cellinfo.mat']), 'cell_metrics')
 
 % select units based on criterion 
-units(1, :) = selectUnits([], cm, fr, 0, [], [], 'pyr');
-units(2, :) = selectUnits([], cm, fr, 0, [], [], 'int');
+units = selectUnits('basepath', basepath, 'grp', [], 'saveVar', false,...
+    'forceA', true, 'cm', cm, 'fr', fr);
+units = units.idx;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
@@ -94,8 +95,8 @@ if graphics
     
     figpath = fullfile(basepath, 'graphics');
     mkdir(figpath)
-    fsIdx = unique(mono_res.sig_con_inhibitory(:, 1));
-    rsIdx = unique(mono_res.sig_con_excitatory(:, 1));
+%     fsIdx = unique(mono_res.sig_con_inhibitory(:, 1));
+%     rsIdx = unique(mono_res.sig_con_excitatory(:, 1));
     
     % ---------------------------------------------------------------------
     % classification    
@@ -236,7 +237,7 @@ if graphics
     title(basename)
     hold on
     
-    xidx = fr.tstamps / 60 / 60 * 6;
+    xidx = fr.tstamps / 60 / 60 * 3;
     
     % rs
     ph = plot(xidx, fr.strd(units(1, :), :), 'b', 'LineWidth', 1);

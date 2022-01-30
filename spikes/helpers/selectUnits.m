@@ -64,7 +64,9 @@ if exist(unitsfile, 'file') && ~forceA
 end
 
 if isempty(spikes)
-    load(spikesfile)
+    if exist(spikesfile, 'file')
+        load(spikesfile)
+    end
 end
 if isempty(cm)
     load(cmfile, 'cell_metrics')
