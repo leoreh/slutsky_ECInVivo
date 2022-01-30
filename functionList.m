@@ -239,10 +239,15 @@ plot_FRtime_session('basepath', pwd,...
 plot_nunits_session('basepath', basepath, 'frBoundries', frBoundries)
 
 % mfr by states in time bins
-timebins = session.general.timebins; 
+timebins = session.general.timebins;
 fr_timebins('basepath', pwd, 'forceA', true, 'graphics', false,...
-        'timebins', timebins, 'saveVar', true, 'sstates', [1, 4, 5]);
-    
+    'timebins', timebins, 'saveVar', true, 'sstates', [1, 4, 5]);
+
+% concatenate var from different sessions
+mname = 'lh99';
+[srData, tidx, tidxLabels] = sessions_catVarTime('mname', mname,...
+    'dataPreset', 'both', 'graphics', true);
+
 % cluster validation
 spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
     'saveFig', false, 'force', true, 'mu', [], 'graphics', false,...
@@ -302,6 +307,3 @@ varArray = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
 
 % set matlab graphics to custom or factory defaults
 setMatlabGraphics(false)
-
-% nonsense
-guessDateTime(basename)

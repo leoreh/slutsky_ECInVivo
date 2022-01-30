@@ -28,7 +28,7 @@ nsessions = length(basepaths);
 templateCal = ss.info.calibrationData;
 
 if forceA
-    for isession = 6 : nsessions
+    for isession = 8 : nsessions
         
         % file
         basepath = basepaths{isession};
@@ -49,7 +49,7 @@ if forceA
         % state
         sSig = as_prepSig([basename, '.lfp'], acc.mag,...
             'eegCh', [1 : 4], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
-            'eegNchans', nchans, 'inspectSig', true, 'forceLoad', true,...
+            'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
             'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [10 450], 'fs', 1250);
 
         % classify with a network
