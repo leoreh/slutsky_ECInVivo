@@ -122,11 +122,9 @@ for iwin = 1 : nwin
     [u1, u2] = find(ms(iwin).iSig);
     uI = sub2ind([nunits, nunits], u1, u2);
     
-    for iwin2 = 1 : nwin
-        
-        eStg{iwin} = [eStg{iwin}, ms(iwin2).eStg(uE)];
-        iStg{iwin} = [iStg{iwin}, ms(iwin2).iStg(uI)];
-        
+    for ifile = 1 : nwin        
+        eStg{iwin} = [eStg{iwin}, ms(ifile).eStg(uE)];
+        iStg{iwin} = [iStg{iwin}, ms(ifile).iStg(uI)];        
     end
     
     % nspks per cell

@@ -27,7 +27,7 @@ function monosyn = monoSyn_wrapper(varargin)
 %   CCG             zugaro (buzcode format)
 %
 % TO DO lIST
-%   calc synapse stats per cell. include number of significant bins
+%   calc synapse stats per cell. include number of significant bins (done)
 %
 % 31 jan 22 LH  
 
