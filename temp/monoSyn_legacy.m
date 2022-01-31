@@ -1,4 +1,4 @@
-function mea_monoSyn_wrapper(varargin)
+function monosyn = monoSyn_wrapper(varargin)
 
 % calculates the spike transimission gain between pairs of units.
 % Essentially a wrapper for CCH-deconvolution of Lidor.
@@ -8,7 +8,11 @@ function mea_monoSyn_wrapper(varargin)
 %   basepath    char. path to recording session.
 %   winCalc     2-element vector describing the window for calculating the
 %               stgs [s] {[0 Inf]}.
-%   saveVar     logical. save variable {true}.
+%   fs          numeric. sampling frequency {10000}.
+%   wv          2 x n numeric. mean waveform of units.
+%   wv_std      2 x n numeric. std of units waveforms.
+%   saveVar     logical / char. save variable {true}. if char then save
+%               name will include saveVar as a suffix
 %   graphics    logical. plot graphics or not {true}. 
 %   forceA      logical. reanalyze even if struct file exists
 %
@@ -17,7 +21,7 @@ function mea_monoSyn_wrapper(varargin)
 %   CCH-deconvolution (lidor)
 %
 % TO DO lIST
-%   total exc / inh per cell
+%   calc synapse stats per cell. include number of significant bins
 %
 % 31 jan 22 LH  
 
@@ -50,7 +54,10 @@ p = inputParser;
 addOptional(p, 'spktimes', {}, @iscell);
 addOptional(p, 'basepath', pwd, @ischar);
 addOptional(p, 'winCalc', [0 Inf], validate_win);
-addOptional(p, 'saveVar', true, @islogical);
+addOptional(p, 'fs', 10000, @isnumeric);
+addOptional(p, 'wv', [], @isnumeric);
+addOptional(p, 'wv_std', [], @isnumeric);
+addOptional(p, 'saveVar', true);
 addOptional(p, 'graphics', true, @islogical);
 addOptional(p, 'forceA', false, @islogical);
 
@@ -58,6 +65,9 @@ parse(p, varargin{:})
 spktimes    = p.Results.spktimes;
 basepath    = p.Results.basepath;
 winCalc     = p.Results.winCalc;
+fs          = p.Results.fs;
+wv          = p.Results.wv;
+wv_std      = p.Results.wv_std;
 saveVar     = p.Results.saveVar;
 graphics    = p.Results.graphics;
 forceA      = p.Results.forceA;
@@ -66,11 +76,17 @@ forceA      = p.Results.forceA;
 % preparations
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% params
-nunits = length(spktimes);
-npairs = nunits * nunits - nunits;
-nspks = cellfun(@length, mea.spktimes, 'uni', true);
-spkFS = mea.info.fs;
+% check if already analyzed
+[~, basename] = fileparts(basepath);
+if ischar(saveVar)
+    monofile = fullfile(basepath, [basename, '.monosyn', saveVar, '.mat']);
+else
+monofile = fullfile(basepath, [basename, '.monosyn.mat']);
+end
+if exist(monofile) && ~forceA
+    load(monofile)
+    return
+end
 
 % constants
 refThr = 1;
@@ -86,53 +102,85 @@ nfigs = 5;              % number of synapses to plot
 % window
 spkL = [];
 spkT = [];
-for iunit = 1 : nunits
+for iunit = 1 : length(spktimes)
     spkIdx = spktimes{iunit} > winCalc(1) &...
         spktimes{iunit} < winCalc(2);
+    if sum(spkIdx) == 0
+        spkIdx = 1;
+    end
     spkT = [spkT; spktimes{iunit}(spkIdx)];
     spkL = [spkL; ones(sum(spkIdx), 1) * iunit];
 end
+nunits = length(unique(spkL));
+npairs = nunits * nunits - nunits;
+nspks = cellfun(@length, spktimes, 'uni', true);
 
 % get spk transmission gain. note lidor probably uses a different version
 % of CCG.m which requires spktimes in samples.
-[excStg, inhStg, act, sil, dcCCH, crCCH, cchbins] =...
-    call_cch_stg(spkT * spkFS, spkL, spkFS);
+[eStg, iStg, act, sil, dcCCH, crCCH, cchbins] =...
+    call_cch_stg(spkT * fs, spkL, fs);
 
 % calc ccg 50 @ 1 counts
-[ccg50, ccg50_tstamps] = CCG(mea.spktimes, [], 'binSize', 0.001,...
-    'duration',  0.05, 'Fs', 1 / mea.info.fs);
+[ccg50, ccg50_tstamps] = CCG(spktimes, [], 'binSize', 0.001,...
+    'duration',  0.05, 'Fs', 1 / fs);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % limit results
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % limit to pairs with enough counts in the raw cch
-ccBad = squeeze(sum(ccg50, 1)) > ccThr;
-clear ccExc; [ccExc(1, :), ccExc(2, :)] = find(ccBad);
+ccGood = squeeze(sum(ccg50, 1)) > ccThr;
+clear ccExc; [ccExc(1, :), ccExc(2, :)] = find(ccGood);
 [~, ccIdx] = cidx2cpair(nunits, [], ccExc');
 
 % limit to pairs with no refractory period
 refTidx = round(length(ccg50_tstamps) / 2) - 1 :...
    round(length(ccg50_tstamps) / 2) + 1;
-refBad = squeeze(sum(ccg50(refTidx, :, :))) > refThr;
-clear refExc; [refExc(1, :), refExc(2, :)] = find(refBad);
+refGood = squeeze(sum(ccg50(refTidx, :, :))) > refThr;
+clear refExc; [refExc(1, :), refExc(2, :)] = find(refGood);
 [~, refIdx] = cidx2cpair(nunits, [], refExc');
+cmnIdx = intersect(ccIdx, refIdx);
 
 % limit according to stg
-stgExcIdx = find(eSTG1 > stgThr(1) | isnan(eSTG1));
-stgInhIdx = find(eSTG2 < -stgThr(2) | isnan(eSTG2));
+stgEidx = find(eStg > stgThr(1) | ~isnan(eStg));
+stgIidx = find(iStg < -stgThr(2) | ~isnan(iStg));
 
 % get remaining excitatory pairs
-excIdx = unique([ccIdx, refIdx, stgExcIdx, find(act)]);
-excPair = cidx2cpair(nunits, excIdx, []);
+eIdx = intersect(intersect(cmnIdx, stgEidx), find(act));
+ePair = cidx2cpair(nunits, eIdx, []);
 fprintf('\nExcitatory: orig = %d, final = %d\n',...
-    sum(act), length(excIdx))
+    sum(act), length(eIdx))
 
 % get remaining inhibitory pairs
-inhIdx = unique([ccIdx, refIdx, stgInhIdx, find(sil)]);
-inhPair = cidx2cpair(nunits, inhIdx, []);
+iIdx = intersect(intersect(cmnIdx, stgIidx), find(sil));
+iPair = cidx2cpair(nunits, iIdx, []);
 fprintf('\nInhibitory: orig = %d, final = %d\n',...
-    sum(sil), length(inhIdx))
+    sum(sil), length(iIdx))
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% synapse stats
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+for iunit = 1 : nunits
+        
+    % get indices to all synapses of a unit
+    cpair_unit = [ones(1, nunits) * iunit; 1 : nunits]';
+    cpair_unit(iunit, :) = []; 
+    [~, cidx_unit] = cidx2cpair(nunits, [], cpair_unit);
+    
+    eNsyn(iunit) = sum(ePair(:, 1) == iunit);
+    iNsyn(iunit) = sum(iPair(:, 1) == iunit);
+    
+    eStrength(iunit) = sum(eStg(intersect(eIdx, cidx_unit)), 'omitnan');
+    iStrength(iunit) = sum(iStg(intersect(iIdx, cidx_unit)), 'omitnan');
+    
+    x = [eNsyn' eStrength'];
+    sortrows(x, 2);
+       
+end
+
+% E-I dominanace (Kobayashi et al., Nat. Comm., 2019)
+ei_dom = (eNsyn - iNsyn) ./ (eNsyn + iNsyn);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
@@ -141,26 +189,103 @@ fprintf('\nInhibitory: orig = %d, final = %d\n',...
 if graphics
     
     % excitatory synapses
-    npairsPlot = min([nfigs, length(excIdx)]);
+    npairsPlot = min([nfigs, length(eIdx)]);
     for ipair = 1 : npairsPlot
-        cpair = excPair(ipair, :);
-        cidx = excIdx(ipair);
-        plot_monoSyn('spktimes', mea.spktimes(cpair), 'wv', mea.wv(cpair, :),...
-            'wv_std', mea.wv_std(cpair, :), 'clr', 'kk', 'fs', 10000,...
+        cpair = ePair(ipair, :);
+        cidx = eIdx(ipair);
+
+        plot_monoSyn('spktimes', spktimes(cpair), 'wv', wv(cpair, :),...
+            'wv_std', wv_std(cpair, :), 'clr', 'bk', 'fs', 10000,...
             'saveFig', false, 'units', cpair)
     end
     
     % inhibitory synapses
-    npairsPlot = min([nfigs, length(inhIdx)]);
+    npairsPlot = min([nfigs, length(iIdx)]);
     for ipair = 1 : npairsPlot
-        cpair = inhPair(ipair, :);
-        cidx = inhIdx(ipair);
-        plot_monoSyn('spktimes', mea.spktimes(cpair), 'wv', mea.wv(cpair, :),...
-            'wv_std', mea.wv_std(cpair, :), 'clr', 'kk', 'fs', 10000,...
+        cpair = iPair(ipair, :);
+        cidx = iIdx(ipair);
+        plot_monoSyn('spktimes', spktimes(cpair), 'wv', wv(cpair, :),...
+            'wv_std', wv_std(cpair, :), 'clr', 'rk', 'fs', 10000,...
             'saveFig', false, 'units', cpair)
     end
     
 end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% compare manual calculation of dccch to original
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+stms = spktimes(cpair(ipair, :));
+
+% ccg 50 @ 1 counts
+[ccg50, ccg50_bins] = CCG(stms, [], 'binSize', 0.001,...
+    'duration', 0.05, 'Fs', 1 / fs);
+ccg50_bins = ccg50_bins * 1000;
+
+
+% dcccg 50 @ 1 rate
+dcccg = cchdeconv(ccg50(:, 1, 2), ccg50(:, 1, 1), nspks(1),...
+    ccg50(:, 2, 2), nspks(2));
+
+% predictor
+[~, pred] = cch_conv(dcccg, 11, 'median', 1, 0);
+
+% crcch
+dt = diff(ccg50_bins(1 : 2)) / 1000;  % [s]               
+den = (ones(length(ccg50_bins), 1) * nspks(1)) * dt; 
+crccg = (dcccg - pred) ./ den;
+
+% calculate gain
+roiMS = [2, 10]; 
+roi_t = ccg50_bins >= roiMS(1) & ccg50_bins <= roiMS(2);
+roi_t_idx = find(roi_t);
+[g1, g2] = calc_stg(crccg, roi_t, dt, 0, [1, 0]);
+
+% determine if any bin in the ROI is significant
+alfa        = 0.001;
+nBonf       = sum(roi_t);
+gbUpper     = poissinv(1 - alfa / nBonf, max(pred(roi_t, :), [], 1));
+gbLower     = poissinv(alfa / nBonf, min( pred( roi_t, : ), [], 1));
+act         = any(dcccg(roi_t, :) >= ones(sum(roi_t), 1) * gbUpper, 1);
+sil         = any(dcccg(roi_t, :) <= ones(sum(roi_t), 1) * gbLower, 1);
+exc_bins    = dcccg(roi_t, :) >= ones(sum(roi_t), 1) * gbUpper;
+inh_bins    = dcccg(roi_t, :) <= ones(sum(roi_t), 1) * gbLower;
+
+
+% ccg 50 @ 1 counts
+% [ccg50, ccg50_bins] = CCG(spktimes(cpair), [], 'binSize', 0.001,...
+%     'duration', 0.05, 'Fs', 1 / fs);
+% ccg50_bins = ccg50_bins * 1000;
+% % dcccg 50 @ 1 rate
+% dcccg = cchdeconv(ccg50(:, 1, 2), ccg50(:, 1, 1), nspks(cpair(1)),...
+%     ccg50(:, 2, 2), nspks(cpair(2)));
+% 
+% fh = figure;
+% subplot(1, 2, 1)
+% bh = bar(cchbins, dcCCH(:, cidx), 'BarWidth', 1);
+% hold on
+% plot([0, 0], ylim, '--k')
+% ylabel('Counts')
+% xlabel('Time [ms]')
+% bh.FaceColor = 'k';
+% bh.FaceAlpha = 0.4;
+% bh.EdgeColor = 'none';
+% box off
+% axis tight
+% 
+% subplot(1, 2, 2)
+% bh = bar(cchbins, dcccg, 'BarWidth', 1);
+% hold on
+% plot([0, 0], ylim, '--k')
+% ylabel('Counts')
+% xlabel('Time [ms]')
+% bh.FaceColor = 'k';
+% bh.FaceAlpha = 0.4;
+% bh.EdgeColor = 'none';
+% box off
+% axis tight
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arrange struct and save
@@ -172,79 +297,21 @@ monosyn.info.winCalc = winCalc;
 monosyn.info.ccThr = ccThr;
 monosyn.info.refThr = refThr;
 monosyn.info.stgThr = stgThr;
-monosyn.excPair = excPair;
-monosyn.excIdx = excIdx;
-monosyn.excStg = excStg;
-monosyn.inhPair = inhPair;
-monosyn.inhIdx = inhIdx;
-monosyn.inhStg = inhStg;
+monosyn.ePair = ePair;
+monosyn.eIdx = eIdx;
+monosyn.eStg = eStg;
+monosyn.iPair = iPair;
+monosyn.iIdx = iIdx;
+monosyn.iStg = iStg;
+monosyn.ei_dom = ei_dom;
 
 if saveVar
-    monofile = fullfile(basepath, [basename, '.monosyn.mat']);
     save(monofile, 'monosyn')
 end
 
 end
 
 % EOF
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% legacy messaround
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
-% 
-% % convert a pair of units to an stg idx
-% cpair = [14, 17];
-% [~, cidx] = cidx2cpair(nunits, [], cpair);
-% % convert an stg idx to pair of units
-% ccIidx = 11129;
-% [cpair, ~] = cidx2cpair(nunits, cidx, []);
-
-
-% 
-% 
-% 
-% 
-% [~, sortidx] = sort(sum(ccg50(:, :, 3), 1));
-% cpair = [sortidx(100), 3];
-% [~, cidx] = cidx2cpair(nunits, [], cpair);
-% plot_monoSyn('spktimes', mea.spktimes(cpair), 'wv', mea.wv(cpair, :),...
-%     'wv_std', mea.wv_std(cpair, :), 'clr', 'kk', 'fs', 10000,...
-%     'ccg2', dcCCH(:, cidx), 'stg', eSTG2(cidx), 'saveFig', false,...
-%     'units', cpair, 'ccg2_tstamps', cchbins * 1000)
-% 
-% % compute dcCCH. note ccg must be in counts and not rate
-% cpair = [1, 2];
-% cch = squeeze(ccg50(:, cpair(1), cpair(2)));
-% ach11 = squeeze(ccg50(:, cpair(1), cpair(1)));
-% ach22 = squeeze(ccg50(:, cpair(2), cpair(2)));
-% nspks11 = nspks(cpair(1))
-% nspks22 = nspks(cpair(2))
-% dcCCH2 = cchdeconv( cch, ach11, nspks11, ach22, nspks22 );
-% [~, cidx] = cidx2cpair(nunits, [], cpair);
-% max(dcCCH(:, cidx) - dcCCH2)
-% 
-% [~, pred] = cch_conv( cc( :, u1, u2 ), 1, 'median', 1, 0);
-% 
-% 
-% 
-% 
-% figure
-% subplot(1, 2, 1)
-% bar( cchbins, crCCH( :, ccIidx ), 1, 'FaceColor', Cdc, 'EdgeColor', 'none' );
-% set( gca, 'box', 'off', 'tickdir', 'out' )
-% xlabel( 'Time lag [s]' )
-% ylabel( 'Count' )
-% title( sprintf( 'rSTG: %0.5f  eSTG: %0.5f', [ NaN eSTG1( ccIidx ) ] ) )
-% subplot(1, 2, 2)
-% bar( cchbins, dcCCH( :, ccIidx ), 1, 'FaceColor', Cdc, 'EdgeColor', 'none' );
-% set( gca, 'box', 'off', 'tickdir', 'out' )
-% xlabel( 'Time lag [s]' )
-% ylabel( 'Count' )
-% title( sprintf( 'rSTG: %0.5f  eSTG: %0.5f', [ NaN eSTG1( ccIidx ) ] ) )
-% 
-% 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % cell explorer

@@ -102,12 +102,12 @@ fr = [cell2mat(frTemp')] ./ [diff(tbins)];
 % manually adjust the timebins. this is because the experimenter sometimes
 % changes the number of bins saved per hour. note that tbins_real will
 % usually be shorter by 1 element than tbins. to fix this must correct
-% spktimes to real times (maybe later). for now this is ok because fr is
-% also one element shorter.
+% spktimes to real times (maybe later). for nelast bin should be the last spike
+% after spktimes is corrected. However
 bl_tpnt = 4;        % time point when baseline ended [h]
 binjumps = 2;       % number of bins skipped once experiment starts
 tbins_real = [[1 : bl_tpnt],...
-    [5 : binjumps : (length(tbins) - bl_tpnt) * binjumps]];
+    [5 : 2binjumps : (length(tbins) - bl_tpnt) * binjumps]];
 if length(tbins_real) < length(tbins)
     tbins_real = [tbins_real, tbins_real(end) + binjumps];
 end

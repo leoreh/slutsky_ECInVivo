@@ -277,7 +277,7 @@ mea_analyze('basepath', pwd,...
 % use fr plot to select winCalc
 fr.tstamps / 60 / 60 * 3
 dtstamps = 80;
-tstart = 1021;
+tstart = 3;
 winCalc = [fr.tstamps(tstart) fr.tstamps(tstart + dtstamps)];
 winSave = round(winCalc / 60 / 60);
 saveVar = [num2str(winSave(1)), '-', num2str(winSave(2))];

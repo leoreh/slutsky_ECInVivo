@@ -113,12 +113,12 @@ if graphics
     sh = scatter(tp(units(1, :)), royer(units(1, :)),...
         mfr(units(1, :)) * 3000, 'b', '.');
     hold on
-    sh = scatter(tp(units(2, :)), royer(units(2, :)),...
-        mfr(units(2, :)) * 3000, 'r', '.');
-    sh = scatter(tp(fsIdx), royer(fsIdx),...
-        mfr(fsIdx) * 3000, 'g', '.');
-    sh = scatter(tp(rsIdx), royer(rsIdx),...
-        mfr(rsIdx) * 3000, 'm', '.');
+%     sh = scatter(tp(units(2, :)), royer(units(2, :)),...
+%         mfr(units(2, :)) * 3000, 'r', '.');
+%     sh = scatter(tp(fsIdx), royer(fsIdx),...
+%         mfr(fsIdx) * 3000, 'g', '.');
+%     sh = scatter(tp(rsIdx), royer(rsIdx),...
+%         mfr(rsIdx) * 3000, 'm', '.');
     set(gca, 'yscale', 'log')
     xlabel('Trough to Peak [ms]')
     ylabel('Burstiness (royer)')
@@ -127,12 +127,12 @@ if graphics
     sh = scatter(spkw(units(1, :)), slopeTail(units(1, :)),...
         mfr(units(1, :)) * 3000, 'b', '.');
     hold on
-    sh = scatter(spkw(units(2, :)), slopeTail(units(2, :)),...
-        mfr(units(2, :)) * 3000, 'r', '.');
-    sh = scatter(spkw(fsIdx), slopeTail(fsIdx),...
-        mfr(fsIdx) * 3000, 'g', '.');
-    sh = scatter(spkw(rsIdx), slopeTail(rsIdx),...
-        mfr(rsIdx) * 3000, 'm', '.');
+%     sh = scatter(spkw(units(2, :)), slopeTail(units(2, :)),...
+%         mfr(units(2, :)) * 3000, 'r', '.');
+%     sh = scatter(spkw(fsIdx), slopeTail(fsIdx),...
+%         mfr(fsIdx) * 3000, 'g', '.');
+%     sh = scatter(spkw(rsIdx), slopeTail(rsIdx),...
+%         mfr(rsIdx) * 3000, 'm', '.');
     set(gca, 'yscale', 'log')
     xlabel('Spike Width [ms]')
     ylabel('Slope tail')        
@@ -167,7 +167,7 @@ if graphics
             clr, 'EdgeColor', 'none', 'FaceAlpha', .2, 'HitTest', 'off')
         xlabel('Time [ms]')
         ylabel('Voltage [mV]')
-        subtitle('Waveform')
+%         subtitle('Waveform')
 
         % fr vs. time
         subplot(2, 3, 2)
@@ -176,7 +176,7 @@ if graphics
         ylabel('Firing Rate [Hz]')
         box off
         axis tight
-        subtitle('FR vs. time')
+%         subtitle('FR vs. time')
 
         % fr distribution
         subplot(2, 3, 3)
@@ -185,7 +185,7 @@ if graphics
         hh.EdgeColor = 'none';
         xlabel('Firing Rate [Hz]')
         ylabel('Probability')
-        subtitle('FR distribution')
+%         subtitle('FR distribution')
 
         % acg narrow
         subplot(2, 3, 4)
@@ -197,7 +197,7 @@ if graphics
         bh.EdgeColor = 'none';
         box off
         axis tight
-        subtitle('ACG narrow')
+%         subtitle('ACG narrow')
 
         % acg wide
         subplot(2, 3, 5)
@@ -209,7 +209,7 @@ if graphics
         bh.EdgeColor = 'none';
         box off
         axis tight
-        subtitle('ACG wide')
+%         subtitle('ACG wide')
 
         % isi histogram
         subplot(2, 3, 6)
@@ -221,7 +221,7 @@ if graphics
         xlim([0 x_max])
         xlabel('Time [ms]')
         ylabel('Probability')
-        subtitle('ISI histogram')
+%         subtitle('ISI histogram')
         
         % save
         figname = fullfile(figpath, txt);

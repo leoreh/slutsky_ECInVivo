@@ -29,56 +29,17 @@ if isempty(cpair)
     end
 end
 
-% 
+% % another approach - could not make it work
+% % find cidx from cpairs
 % if isempty(cidx)
-%     cidx = (cpair(:, 2) - 1) .* (nunits - 1) + cpair(:, 1);
+%         tmp = sub2ind([nunits nunits], cpair(:, 1), cpair(:, 2));
+%         cidx = tmp - round(tmp ./ nunits);
 % end
 % 
-% 
-% nunits = 10;
-% cpair = [1, 2];
-% cidx12 = cpair(:, 1) + cpair(:, 2) .* (nunits - 1)
-% cpair = [10, 1];
-% cidx34 = cpair(:, 1) + cpair(:, 2) .* (nunits - 1)
-% 
-% cpair = [1, 2];
-% temp = cpair(:, 2) * (nunits - 1);
-% cidx12 = temp + cpair(:, 1)
-% cpair = [10, 1];
-% temp = cpair(:, 2) * (nunits - 1);
-% cidx34 = temp + cpair(:, 1)
-% 
-% nunits = 10;
-% bs = nunits - 1;
-% u1 = 1;
-% u2 = 2;
-% cidx12 = ( u2 - 1 ) * bs + u1
-% u3 = 10;
-% u4 = 1;
-% cidx34 = ( u4 - 1 ) * bs + u3
-% 
-% 
-% for cidx = 1 : 11
-% cpair = [];
+% % find cpairs from cidx
 % if isempty(cpair)
-%     cpair(:, 2) = ceil(cidx ./ (nunits - 1));
-%     cpair(:, 1) = cidx - (cpair(:, 2) - 1) .* (nunits)
+%     [u1, u2] = ind2sub([nunits, nunits], cidx);
+%     cpair = [u1 + round(cidx ./ nunits), u2];
 % end
-% end
-% 
-% 
-% 
-% if isempty(cpair)
-%     cpair(:, 2) = ceil(cidx ./ (nunits - 1));
-%     cpair(:, 1) = cidx - (cpair(:, 2) - 1) .* (nunits - 1);
-% end
-% 
-% 
-%  mat_cidx = reshape(1 : numel(ones(nunits, nunits)), nunits, nunits);
-%  mat_cidx(diag(mat_cidx)) = nan;
-%  for iunit = 1 : nunits
-%      mat_cidx(:, iunit) = mat_cidx(:, iunit) - 1 * iunit;
-%  end
-%  mat_cidx(triu(true(nunits))) = mat_cidx(triu(true(nunits))) + 1;
 
 end
