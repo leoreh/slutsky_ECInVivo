@@ -30,7 +30,7 @@ if isempty(cpair)
 end
 
 % % another approach - could not make it work
-% % find cidx from cpairs
+% find cidx from cpairs
 % if isempty(cidx)
 %         tmp = sub2ind([nunits nunits], cpair(:, 1), cpair(:, 2));
 %         cidx = tmp - round(tmp ./ nunits);

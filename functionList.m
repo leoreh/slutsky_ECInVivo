@@ -268,24 +268,17 @@ swv = spkwvMetrics('basepath', basepath, 'fs', fs);
 % mea
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-fname = '2021.5.27_IGF1R_Cre-_Bac10uM_spikes.mat';
+fname = '2021-05-16T17-34-298hBsln_20uMK_Bac_spikes SORTED';
 mea = mea_orgNex('fname', fname, 'basepath', pwd, 'forceL', true);
 
 mea_analyze('basepath', pwd,...
-    'winBL', [0, 120 * 60], 'graphics', true, 'forceA', false)
-
-% use fr plot to select winCalc
-fr.tstamps / 60 / 60 * 3
-dtstamps = 80;
-tstart = 1021;
-winCalc = [fr.tstamps(tstart) fr.tstamps(tstart + dtstamps)];
-winSave = round(winCalc / 60 / 60);
-saveVar = [num2str(winSave(1)), '-', num2str(winSave(2))];
+    'winBL', [0, 120 * 60], 'graphics', false, 'forceA', false)
 
 % mono synaptic interactions (spike transmission gain)
 monosyn = monoSyn_wrapper('spktimes', mea.spktimes, 'basepath', pwd,...
-    'winCalc', winCalc, 'saveVar', saveVar, 'graphics', false,...
-    'forceA', true, 'fs', mea.info.fs, 'wv', mea.wv, 'wv_std', mea.wv_std);
+    'winCalc', [0, Inf], 'saveVar', true, 'graphics', true,...
+    'forceA', true, 'fs', mea.info.fs, 'saveFig', false,...
+    'wv', mea.wv, 'wv_std', mea.wv_std);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % utilities

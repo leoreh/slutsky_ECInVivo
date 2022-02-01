@@ -69,31 +69,39 @@ load(meafile)
 
 % plot of MFR 
 fh = figure;
-yLimit = [0 ceil(max(mean(fr.strd, 2, 'omitnan')))];
-hold on
-plot(fr.tstamps / 60 / 60, mean(fr.strd, 1, 'omitnan'), 'k', 'LineWidth', 2)
+frMat = fr.strd(fr.stable, :);
+plot(fr.tstamps / 60 / 60, mean(frMat, 1, 'omitnan'), 'k', 'LineWidth', 2)
 axis tight
 xlabel('Time [~h]')
 ylabel('Firing rate [Hz]')
 set(gca, 'box', 'off')
+legend(sprintf('nunits = %d', size(frMat, 1)))
+title(basename)
 
-% time windows
-winD = 60 * 60;                 % winCalc size [s]
-winStart = [0.2, 7.5]';     % start time for each win [h]
+% calc monosyn in time window of entire recording w/o baclofen
+winCalc = [0.2, 1.8; 3.5, 5.5; 9.5, 13] * 60 * 60;
+monosyn = monoSyn_wrapper('spktimes', mea.spktimes, 'basepath', pwd,...
+    'winCalc', winCalc, 'saveVar', true, 'graphics', false,...
+    'forceA', true, 'fs', mea.info.fs, 'saveFig', false,...
+    'wv', mea.wv, 'wv_std', mea.wv_std);
+     
+% calc monosyn before and after baclofen
+winD = 90 * 60;                 % winCalc size [s]
+winStart = [0.2, 3.5, 11.5]';            % start time for each win [h]
 winCalc = [winStart * 60 * 60, winStart * 60 * 60 + winD];
 nwin = size(winCalc, 1);
 
-% mono synaptic interactions (spike transmission gain)
 for iwin = 1 : nwin
     winSave = round(winCalc(iwin, :) / 60 / 60);
     saveVar = [num2str(winSave(1)), '-', num2str(winSave(2))];
-    ms(iwin) = monoSyn_wrapper('spktimes', mea.spktimes, 'basepath', pwd,...
+    ms = monoSyn_wrapper('spktimes', mea.spktimes, 'basepath', pwd,...
         'winCalc', winCalc(iwin, :), 'saveVar', saveVar, 'graphics', false,...
-        'forceA', true, 'fs', mea.info.fs, 'wv', mea.wv, 'wv_std', mea.wv_std);
+        'forceA', true, 'fs', mea.info.fs, 'saveFig', false,...
+        'wv', mea.wv, 'wv_std', mea.wv_std);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% load ms structs if already analzed
+% load ms structs if already analyzed
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 monofiles = dir('*monoSyn*');
@@ -103,6 +111,75 @@ for ifile = 1 : length(monofiles)
     load(monofiles{ifile})
     ms(ifile) = monosyn;
 end
+nwin = length(ms) - 1;
+nunits = length(ms(1).eiDom);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% compare
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% find significant synapses from the entire recording and compare how they
+% changed before / after the perturbation. this is to separate the
+% detection of synapses and quantification of their strength.
+[u1, u2] = find(ms(end).eSig);
+uE = sub2ind([nunits, nunits], u1, u2);
+[u1, u2] = find(ms(end).iSig);
+uI = sub2ind([nunits, nunits], u1, u2);
+
+% concat stgs from the different time windows 
+eStg = [];
+iStg = [];
+for iwin = 1 : nwin
+    eStg = [eStg, ms(iwin).eStg(uE)];
+    iStg = [iStg, ms(iwin).eStg(uI)];
+end
+
+compIdx = [2, 3]
+eRat = (eStg(:, compIdx(1)) - eStg(:, compIdx(2))) ./ (eStg(:, compIdx(1)) + eStg(:, compIdx(2)));
+iRat = (iStg(:, compIdx(1)) - iStg(:, compIdx(2))) ./ (iStg(:, compIdx(1)) + iStg(:, compIdx(2)));
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% graphics
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+clr = 'rgb';
+clear lgndTxt
+fh = figure;
+
+subplot(2, 2, [1, 2])
+frMat = fr.strd(fr.stable, :);
+plot(fr.tstamps / 60 / 60, mean(frMat, 1, 'omitnan'), 'k', 'LineWidth', 2)
+hold on
+axis tight
+for iwin = 1 : nwin
+    plot([ms(iwin).info.winCalc; ms(iwin).info.winCalc] / 60 / 60,...
+        ylim, '--', 'Color', clr(iwin), 'LineWidth', 2)
+end
+xlabel('Time [~h]')
+ylabel('Firing rate [Hz]')
+set(gca, 'box', 'off')
+title(basename)
+legend(sprintf('nunits = %d', size(frMat, 1)))
+
+subplot(2, 2, 3)
+hold on
+plot_boxMean('dataMat', cell2nanmat([{eRat, iRat}]), 'allPnts', true,...
+    'clr', 'br')
+xticklabels({'E', 'I'})
+xlim([0.5 2.5])
+ylabel({sprintf('STG ratio'),...
+    sprintf('pre - post /pre + post')})
+
+
+
+
+
+
+
+
+
+
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % compare
@@ -141,17 +218,19 @@ clear lgndTxt
 fh = figure;
 
 subplot(2, 2, [1, 2])
-plot(fr.tstamps / 60 / 60, mean(fr.strd, 1, 'omitnan'), 'k', 'LineWidth', 2)
+frMat = fr.strd(fr.stable, :);
+plot(fr.tstamps / 60 / 60, mean(frMat, 1, 'omitnan'), 'k', 'LineWidth', 2)
 hold on
+axis tight
 for iwin = 1 : nwin
     plot([ms(iwin).info.winCalc; ms(iwin).info.winCalc] / 60 / 60,...
         ylim, '--', 'Color', clr(iwin), 'LineWidth', 2)
 end
-axis tight
 xlabel('Time [~h]')
 ylabel('Firing rate [Hz]')
 set(gca, 'box', 'off')
 title(basename)
+legend(sprintf('nunits = %d', size(frMat, 1)))
 
 subplot(2, 2, 3)
 hold on

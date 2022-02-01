@@ -51,35 +51,35 @@ nspks = cellfun(@length, spktimes, 'uni', true);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % ccg 50 @ 1 counts
-[ccg50, ccg50_bins] = CCG(spktimes, [], 'binSize', 0.001,...
+[cc50, cc50bins] = CCG(spktimes, [], 'binSize', 0.001,...
     'duration', 0.05, 'Fs', 1 / fs);
-ccg50_bins = ccg50_bins * 1000;
+cc50bins = cc50bins * 1000;
 
 % ccg 100 @ 1 rate
-[ccg100, ccg100_bins] = CCG(spktimes, [], 'binSize', 0.001,...
+[cc100, cc100bins] = CCG(spktimes, [], 'binSize', 0.001,...
     'duration', 0.1, 'Fs', 1 / fs);
-ccg100_bins = ccg100_bins * 1000;
+cc100bins = cc100bins * 1000;
 
-% ccg 26 @ 0.5 counts
-[ccg20, ccg20_bins] = CCG(spktimes, [], 'binSize', 0.0002,...
+% ccg 20 @ 0.5 counts
+[cc20, cc20bins] = CCG(spktimes, [], 'binSize', 0.0002,...
     'duration', 0.02, 'Fs', 1 / fs);
-ccg20_bins = ccg20_bins * 1000;
+cc20bins = cc20bins * 1000;
 
-% dcccg 50 @ 1 rate
-dcccg = cchdeconv(ccg50(:, 1, 2), ccg50(:, 1, 1), nspks(1),...
-    ccg50(:, 2, 2), nspks(2));
+% dccc 50 @ 1 rate
+dccc = cchdeconv(cc50(:, 1, 2), cc50(:, 1, 1), nspks(1),...
+    cc50(:, 2, 2), nspks(2));
 
 % predictor
-[~, pred] = cch_conv(dcccg, 11, 'median', 1, 0);
+[~, pred] = cch_conv(dccc, 11, 'median', 1, 0);
 
-% crcch
-dt = diff(ccg50_bins(1 : 2)) / 1000;  % [s]               
-den = (ones(length(ccg50_bins), 1) * nspks(1)) * dt; 
-crccg = (dcccg - pred) ./ den;
+% crcc
+dt = diff(cc50bins(1 : 2)) / 1000;  % [s]               
+den = (ones(length(cc50bins), 1) * nspks(1)) * dt; 
+crccg = (dccc - pred) ./ den;
 
 % calculate gain
 roiMS = [2, 10]; 
-roi_t = ccg50_bins >= roiMS(1) & ccg50_bins <= roiMS(2);
+roi_t = cc50bins >= roiMS(1) & cc50bins <= roiMS(2);
 roi_t_idx = find(roi_t);
 [g1, g2] = calc_stg(crccg, roi_t, dt, 0, [1, 0]);
 
@@ -88,10 +88,10 @@ alfa        = 0.001;
 nBonf       = sum(roi_t);
 gbUpper     = poissinv(1 - alfa / nBonf, max(pred(roi_t, :), [], 1));
 gbLower     = poissinv(alfa / nBonf, min( pred( roi_t, : ), [], 1));
-act         = any(dcccg(roi_t, :) >= ones(sum(roi_t), 1) * gbUpper, 1);
-sil         = any(dcccg(roi_t, :) <= ones(sum(roi_t), 1) * gbLower, 1);
-exc_bins    = dcccg(roi_t, :) >= ones(sum(roi_t), 1) * gbUpper;
-inh_bins    = dcccg(roi_t, :) <= ones(sum(roi_t), 1) * gbLower;
+act         = any(dccc(roi_t, :) >= ones(sum(roi_t), 1) * gbUpper, 1);
+sil         = any(dccc(roi_t, :) <= ones(sum(roi_t), 1) * gbLower, 1);
+exc_bins    = dccc(roi_t, :) >= ones(sum(roi_t), 1) * gbUpper;
+inh_bins    = dccc(roi_t, :) <= ones(sum(roi_t), 1) * gbLower;
 
 % select excitatory or inhibitory
 if sil
@@ -108,108 +108,42 @@ setMatlabGraphics(false)
 fh = figure;
 
 sb1 = subplot(2, 4, 1);     % acg100 unit1
-sb2 = subplot(2, 4, 2);     % ccg50 counts
-sb3 = subplot(2, 4, 3);     % dcccg
+sb2 = subplot(2, 4, 2);     % cc50 counts
+sb3 = subplot(2, 4, 3);     % dccc
 sb4 = subplot(2, 4, 4);     % acg100 unit2
 sb5 = subplot(2, 4, 5);     % wv unit1
-sb6 = subplot(2, 4, 6);     % ccg100
+sb6 = subplot(2, 4, 6);     % cc100
 sb7 = subplot(2, 4, 7);     % ccg25
 sb8 = subplot(2, 4, 8);     % wv unit2
 
 % acg 1
 set(gcf, 'CurrentAxes', sb1)
-bh = bar(ccg100_bins, squeeze(ccg100(:, 1, 1)), 'BarWidth', 1);
-ylabel('Counts')
-xlabel('Time [ms]')
-bh.FaceColor = clr(1);
-bh.EdgeColor = 'none';
-box off
-axis tight
+plotCc(cc100(:, 1, 1), cc100bins, clr(1), [], [], [])
 title(sprintf('Unit #%d (Presynaptic)', units(1)))
 
 % acg 2
 set(gcf, 'CurrentAxes', sb4)
-bh = bar(ccg100_bins, squeeze(ccg100(:, 2, 2)), 'BarWidth', 1);
-ylabel('Counts')
-xlabel('Time [ms]')
-bh.FaceColor = clr(2);
-bh.EdgeColor = 'none';
-box off
-axis tight
+plotCc(cc100(:, 2, 2), cc100bins, clr(2), [], [], [])
 title(sprintf('Unit #%d (Postsynaptic)', units(2)))
 
-% ccg50 counts
+% cc50 counts
 set(gcf, 'CurrentAxes', sb2)
-bh = bar(ccg50_bins, squeeze(ccg50(:, 1, 2)), 'BarWidth', 1);
-bh.FaceColor = 'k';
-bh.FaceAlpha = 0.4;
-bh.EdgeColor = 'none';
-hold on
-plot([0, 0], ylim, '--k')
-% add significant excitatory bins
-bh = bar(ccg50_bins(roi_t_idx(exc_bins)), ccg50(roi_t_idx(exc_bins), 1, 2), 'BarWidth', 1);
-bh.FaceColor = 'b';
-bh.FaceAlpha = 1;
-bh.EdgeColor = 'none';
-bh = bar(ccg50_bins(roi_t_idx(inh_bins)), ccg50(roi_t_idx(inh_bins), 1, 2), 'BarWidth', 1);
-bh.FaceColor = 'r';
-bh.FaceAlpha = 1;
-bh.EdgeColor = 'none';
-ylabel('Counts')
-xlabel('Time [ms]')
+plotCc(cc50(:, 1, 2), cc50bins, 'k', [],...
+    roi_t_idx(exc_bins), roi_t_idx(inh_bins))
 
-box off
-axis tight
-
-% dcccg
+% dccc
 set(gcf, 'CurrentAxes', sb3)
-bh = bar(ccg50_bins, dcccg, 'BarWidth', 1);
-bh.FaceColor = clr(2);
-bh.FaceAlpha = 0.4;
-bh.EdgeColor = 'none';
-hold on
-plot([0, 0], ylim, '--k')
-plot(ccg50_bins, pred, '--k', 'LineWidth', 2)
-% add significant excitatory bins
-bh = bar(ccg50_bins(roi_t_idx(exc_bins)), dcccg(roi_t_idx(exc_bins)), 'BarWidth', 1);
-bh.FaceColor = 'b';
-bh.FaceAlpha = 1;
-bh.EdgeColor = 'none';
-bh = bar(ccg50_bins(roi_t_idx(inh_bins)), dcccg(roi_t_idx(inh_bins)), 'BarWidth', 1);
-bh.FaceColor = 'r';
-bh.FaceAlpha = 1;
-bh.EdgeColor = 'none';
-ylabel('Counts')
-xlabel('Time [ms]')
-box off
-axis tight
+plotCc(dccc, cc50bins, 'k', pred,...
+    roi_t_idx(exc_bins), roi_t_idx(inh_bins))
 title(sprintf('STG = %.4f', stg))
 
-% ccg low res 
+% cc100 counts 
 set(gcf, 'CurrentAxes', sb6)
-bh = bar(ccg100_bins, ccg100(:, 1, 2), 'BarWidth', 1);
-hold on
-plot([0, 0], ylim, '--k')
-ylabel('Counts')
-xlabel('Time [ms]')
-bh.FaceColor = 'k';
-bh.FaceAlpha = 0.4;
-bh.EdgeColor = 'none';
-box off
-axis tight
+plotCc(cc100(:, 1, 2), cc100bins, 'k', [], [], [])
 
-% ccg high res
+% cc20 counts
 set(gcf, 'CurrentAxes', sb7)
-bh = bar(ccg20_bins, ccg20(:, 1, 2), 'BarWidth', 1);
-hold on
-plot([0, 0], ylim, '--k')
-ylabel('Counts')
-xlabel('Time [ms]')
-bh.FaceColor = 'k';
-bh.FaceAlpha = 0.4;
-bh.EdgeColor = 'none';
-box off
-axis tight
+plotCc(cc20(:, 1, 2), cc20bins, 'k', [], [], [])
 
 if ~isempty(wv)
     
@@ -236,6 +170,7 @@ if ~isempty(wv)
     ylabel('Voltage [mV]')
     
 end
+drawnow
 
 % save
 if saveFig
@@ -244,9 +179,46 @@ if saveFig
     export_fig(figname, '-jpg', '-transparent', '-r300')
 end
 
-% % local functions ---------------------------------------------------------
-%     function plotCc(cc, ccbins, 
-
 end
 
 % EOF
+
+% local functions ---------------------------------------------------------
+function plotCc(cc, ccbins, clr, pred, sigbins1, sigbins2)
+
+sigclr = ['br'];
+if isempty(clr)
+    clr = 'k';
+end
+
+bh = bar(ccbins, cc, 'BarWidth', 1);
+bh.FaceColor = clr;
+bh.FaceAlpha = 0.4;
+bh.EdgeColor = 'none';
+hold on
+
+% add significant bins
+if ~isempty(sigbins1)
+    bh = bar(ccbins(sigbins1), cc(sigbins1), 'BarWidth', 1);
+    bh.FaceColor = sigclr(1);
+    bh.FaceAlpha = 1;
+    bh.EdgeColor = 'none';
+end
+if ~isempty(sigbins2)
+    bh = bar(ccbins(sigbins1), cc(sigbins2), 'BarWidth', 1);
+    bh.FaceColor = sigclr(2);
+    bh.FaceAlpha = 1;
+    bh.EdgeColor = 'none';
+end
+if ~isempty(pred)
+    plot(ccbins, pred, '--k', 'LineWidth', 2)
+end
+
+plot([0, 0], ylim, '--k')
+ylabel('Counts')
+xlabel('Time [ms]')
+box off
+axis tight
+
+end
+
