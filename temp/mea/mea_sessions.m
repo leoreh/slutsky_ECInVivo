@@ -16,39 +16,37 @@ basenames = {d.name};
 for isession = 1 : length(basenames)
     basepaths{isession} = fullfile(masterpath, basenames{isession});
 end
-% basepaths = basepaths(1 : 3);
-basepaths = basepaths([1, 3, 5, 6]);
+
+% get specific basepaths
+basepaths = {'D:\Google Drive\Data\mea\baclofen\210325_082300',...
+    'D:\Google Drive\Data\mea\baclofen\210527_045600',...
+    'D:\Google Drive\Data\mea\baclofen\190824_123000',...
+    'D:\Google Drive\Data\mea\baclofen\190910_045200',...
+    'D:\Google Drive\Data\mea\ketamine\210516_174646',...
+    'D:\Google Drive\Data\mea\ketamine\201227_161755',...
+        };
+       
 nsessions = length(basepaths);
 
 % analyze all sessions
 for isession = 1 : nsessions
-%     mea_analyze('basepath', basepaths{isession},...
-%         'winBL', [0, 120 * 60], 'graphics', true, 'forceA', false)
-
-    % plot fr vs. time
-    plot_FRtime_session('basepath', basepaths{isession}, 'grp', [],...
-        'frBoundries', [0.01 Inf; 0.01 Inf], 'muFlag', false, 'saveFig', false,...
-        'dataType', 'strd')
-    xTicks = xticks;
-    xTicks = xTicks * 3;
-    h = get(gcf,'children');
-    for ih = 1 : 2 : 5
-    xticklabels(h(ih), split(num2str(xTicks)));
-    end
+    %     mea_analyze('basepath', basepaths{isession},...
+    %         'winBL', [0, 120 * 60], 'graphics', true, 'forceA', false)
     
-    figname = 'fr_time';
-    figpath = 'D:\Google Drive\PhD\Slutsky';
-    figname = fullfile(figpath, 'fr_temp');
-    export_fig(figname, '-tif', '-transparent', '-r300')
+    winCalc = v(isession).monosyn.info.winCalc;
+    mea = v(isession).mea;
+    monosyn = monoSyn_wrapper('spktimes', mea.spktimes, 'basepath', pwd,...
+        'winCalc', winCalc, 'saveVar', true, 'graphics', false,...
+        'forceA', true, 'fs', mea.info.fs, 'saveFig', false,...
+        'wv', mea.wv, 'wv_std', mea.wv_std);    
     
 end
 
 % load vars from each session
-varsFile = ["fr"; "mea"; "st_metrics"; "swv_metrics"; "cell_metrics"];
-varsName = ["fr"; "mea"; "st"; "swv"; "cm"];
-varArray = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
+varsFile = ["fr"; "mea"; "st_metrics"; "swv_metrics"; "cell_metrics"; "monoSyn.mat"];
+varsName = ["fr"; "mea"; "st"; "swv"; "cm"; "monosyn"];
+v = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
     'varsName', varsName);
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % concat data
@@ -56,36 +54,38 @@ varArray = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
 
 % initialize
 tp = []; spkw = []; royer = []; lidor = []; mfr =[]; tau_rise = [];
-mizuseki = []; lvr = []; asym = []; hpk = []; rs = []; fs = []; 
-slopeTail = [];
+mizuseki = []; lvr = []; asym = []; hpk = []; rs = []; fs = [];
+slopeTail = []; eiDom = []; slopeTp = []; ampTail = [];
 
 
 for isession = 1 : nsessions
     
-    rs = [rs, selectUnits([], varArray(isession).cm,...
-        varArray(isession).fr, 0, [], [], 'pyr')'];
-    fs = [fs, selectUnits([], varArray(isession).cm,...
-        varArray(isession).fr, 0, [], [], 'int')'];
-    mfr = [mfr, varArray(isession).fr.mfr'];
-
-    asym = [asym, varArray(isession).swv.asym];
-    hpk = [hpk, varArray(isession).swv.hpk];
-    tp = [tp, varArray(isession).swv.tp];
-    spkw = [spkw, varArray(isession).swv.spkw];
-    slopeTail = [slopeTail, varArray(isession).swv.slopeTail];
-
-    lvr = [lvr, varArray(isession).st.lvr];
-    royer = [royer, varArray(isession).st.royer];
-    lidor = [lidor, varArray(isession).st.lidor];
-    mizuseki = [mizuseki, varArray(isession).st.mizuseki];
-    tau_rise = [tau_rise, varArray(isession).st.tau_rise];
+    mfr = [mfr, v(isession).fr.mfr'];
+    
+    eiDom = [eiDom; v(isession).monosyn.eiDom];
+    
+    asym = [asym, v(isession).swv.asym];
+    hpk = [hpk, v(isession).swv.hpk];
+    tp = [tp, v(isession).swv.tp];
+    spkw = [spkw, v(isession).swv.spkw];
+    slopeTail = [slopeTail, v(isession).swv.slopeTail];
+    slopeTp = [slopeTp, v(isession).swv.slopeTp];
+    ampTail = [ampTail, v(isession).swv.ampTail];
+    
+    lvr = [lvr, v(isession).st.lvr];
+    royer = [royer, v(isession).st.royer];
+    lidor = [lidor, v(isession).st.lidor];
+    mizuseki = [mizuseki, v(isession).st.mizuseki];
+    tau_rise = [tau_rise, v(isession).st.tau_rise];
     
 end
 
-mfr = normalize(mfr, 'range', [0.1 1]);
-clear units
-units(1, :) = logical(rs);
-units(2, :) = logical(fs);
+% mfr = normalize(mfr, 'range', [0.1 1]);
+
+% separate units according to E-I dominance
+eiThr = [-0.3, 0.3];
+eu = eiDom > eiThr(2);
+iu = eiDom < eiThr(1);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
@@ -95,50 +95,71 @@ units(2, :) = logical(fs);
 % classification
 
 fh = figure;
-subplot(1, 2, 1)
-sh = scatter(tp(units(1, :)), royer(units(1, :)),...
-    mfr(units(1, :)) * 3000, 'b', '.');
+subplot(2, 3, 1)
+plot(mfr, eiDom, '.k', 'markerSize', 15)
 hold on
-sh = scatter(tp(units(2, :)), royer(units(2, :)),...
-    mfr(units(2, :)) * 3000, 'r', '.');
-set(gca, 'yscale', 'log')
-xlabel('Trough to Peak [ms]')
-ylabel('Burstiness (royer)')
-legend({sprintf('RS = %d su', sum(units(1, :))),...
-    sprintf('FS = %d su', sum(units(2, :)))})
+plot(mfr(eu), eiDom(eu), '.b', 'markerSize', 15)
+plot(mfr(iu), eiDom(iu), '.r', 'markerSize', 15)
+set(gca, 'XScale', 'log')
+plot(xlim, [eiThr(1) eiThr(1)], '--r')
+plot(xlim, [eiThr(2) eiThr(2)], '--b')
+xlabel('Firing Rate')
+ylabel('E-I dominance')
 
-
-subplot(1, 2, 2)
-sh = scatter(spkw(units(1, :)), slopeTail(units(1, :)),...
-    mfr(units(1, :)) * 3000, 'b', '.');
+subplot(2, 3, 2)
+var1 = tp;
+var2 = royer;
+plot(var1, var2, '.k', 'markerSize', 15)
 hold on
-sh = scatter(spkw(units(2, :)), slopeTail(units(2, :)),...
-    mfr(units(2, :)) * 3000, 'r', '.');
-set(gca, 'yscale', 'log')
-xlabel('Spike Width [ms]')
-ylabel('Tail Slope')
-% 
-% subplot(2, 2, 3)
-% sh = scatter(asym(units(1, :)), royer(units(1, :)),...
-%     mfr(units(1, :)) * 3000, 'b', '.');
-% hold on
-% sh = scatter(asym(units(2, :)), royer(units(2, :)),...
-%     mfr(units(2, :)) * 3000, 'r', '.');
-% set(gca, 'yscale', 'log')
-% xlabel('Asymmetry [ms]')
-% ylabel('Burstiness (mizuseki)')
-% 
-% subplot(2, 2, 4)
-% sh = scatter(hpk(units(1, :)), lvr(units(1, :)),...
-%     mfr(units(1, :)) * 3000, 'b', '.');
-% hold on
-% sh = scatter(hpk(units(2, :)), lvr(units(2, :)),...
-%     mfr(units(2, :)) * 3000, 'r', '.');
-% set(gca, 'yscale', 'log')
-% xlabel('half peak')
-% ylabel('Irregularity (LvR)')
+plot(var1(eu), var2(eu), '.b', 'markerSize', 15)
+plot(var1(iu), var2(iu), '.r', 'markerSize', 15)
+set(gca, 'YScale', 'log')
+xlabel('TP')
+ylabel('Royer')
 
-% save
-figname = fullfile(masterpath, 'cellClass');
-export_fig(figname, '-jpg', '-transparent', '-r300')
+subplot(2, 3, 3)
+var1 = lvr;
+var2 = spkw;
+plot(var1, var2, '.k', 'markerSize', 15)
+hold on
+plot(var1(eu), var2(eu), '.b', 'markerSize', 15)
+plot(var1(iu), var2(iu), '.r', 'markerSize', 15)
+xlabel('LvR')
+ylabel('Spike Width')
+
+subplot(2, 3, 4)
+var1 = mfr;
+var2 = lvr;
+plot(var1, var2, '.k', 'markerSize', 15)
+hold on
+plot(var1(eu), var2(eu), '.b', 'markerSize', 15)
+plot(var1(iu), var2(iu), '.r', 'markerSize', 15)
+xlabel('MFR')
+ylabel('LvR')
+set(gca, 'XScale', 'log')
+
+subplot(2, 3, 5)
+var1 = tp;
+var2 = asym;
+plot(var1, var2, '.k', 'markerSize', 15)
+hold on
+plot(var1(eu), var2(eu), '.b', 'markerSize', 15)
+plot(var1(iu), var2(iu), '.r', 'markerSize', 15)
+xlabel('TP')
+ylabel('Asymmetry')
+
+subplot(2, 3, 6)
+var1 = slopeTp;
+var2 = ampTail;
+plot(var1, var2, '.k', 'markerSize', 15)
+hold on
+plot(var1(eu), var2(eu), '.b', 'markerSize', 15)
+plot(var1(iu), var2(iu), '.r', 'markerSize', 15)
+xlabel('slopeTp')
+ylabel('ampTail')
+
+% 
+% % save
+% figname = fullfile(masterpath, 'cellClass');
+% export_fig(figname, '-jpg', '-transparent', '-r300')
 

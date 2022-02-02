@@ -9,7 +9,7 @@ function monosyn = monoSyn_wrapper(varargin)
 % INPUT:
 %   spktimes    cell of spktimes [s].  
 %   basepath    char. path to recording session.
-%   winCalc     2-element vector describing the window for calculating the
+%   winCalc     2 x n vec describing the window/s for calculating the
 %               stgs [s] {[0 Inf]}.
 %   fs          numeric. sampling frequency {10000}.
 %   wv          2 x n numeric. mean waveform of units.
@@ -60,13 +60,10 @@ function monosyn = monoSyn_wrapper(varargin)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-validate_win = @(win) assert(isnumeric(win) && length(win) == 2,...
-    'time window must be in the format [start end]');
-
 p = inputParser;
 addOptional(p, 'spktimes', {}, @iscell);
 addOptional(p, 'basepath', pwd, @ischar);
-addOptional(p, 'winCalc', [0 Inf], validate_win);
+addOptional(p, 'winCalc', [0 Inf], @isnumeric);
 addOptional(p, 'fs', 10000, @isnumeric);
 addOptional(p, 'wv', [], @isnumeric);
 addOptional(p, 'wv_std', [], @isnumeric);
@@ -94,9 +91,16 @@ forceA      = p.Results.forceA;
 roi_ms = [1, 8];       % region of interest for mono synaptic connections [ms]
 alfa = 0.001;          % significance level (consider differentiating for E and I)
 refThr = 1;
-ccThr = [100 500];
+ccThr = [700 700];
 stgThr = [0, -Inf];    % [E, I]
 nfigs = 5;             % number of synapses to plot
+
+% for static workspace addition
+a = [];
+b = [];
+c = [];
+d = [];
+e = [];
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preparations
@@ -138,10 +142,10 @@ nspks = cellfun(@length, spktimes, 'uni', true);
 cc50bins = cc50bins * 1000;
 
 if graphics
-    % ccg 100 @ 1 counts
-    [cc100, cc100bins] = CCG(spktimes, [], 'binSize', 0.001,...
-        'duration', 0.1, 'Fs', 1 / fs);
-    cc100bins = cc100bins * 1000;
+    % ccg 150 @ 1 counts
+    [cc150, cc150bins] = CCG(spktimes, [], 'binSize', 0.001,...
+        'duration', 0.15, 'Fs', 1 / fs);
+    cc150bins = cc150bins * 1000;
     
     % ccg 20 @ 0.2 counts
     [cc20, cc20bins] = CCG(spktimes, [], 'binSize', 0.0002,...
@@ -198,11 +202,6 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % limit results
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-a = [];
-b = [];
-c = [];
-d = [];
-e = [];
 
 % limit to synapses with enough cc counts
 ccGoode = squeeze(sum(cc50, 1)) > ccThr(1);
@@ -220,21 +219,16 @@ iStgGood = iStg < -stgThr(2) | ~isnan(iStg);
 % limit to synapses with minimum significant bins. can also use strfind
 % to limit results to consectutive bins.
 % any(strfind(iBins(:, a(isyn))', ones(1, minSigBins)))
-minSigBins = 3;
-[a] = squeeze(sum(eBins, 1) > minSigBins);
+% minSigBins = 3;
+% [a] = squeeze(sum(eBins, 1) > minSigBins);
 
 % get remaining excitatory / inhibitory synapses
 eSig = ccGoode & refGood & eStgGood & squeeze(any(eBins));
 iSig = ccGoodi & refGood & iStgGood & squeeze(any(iBins));
 fprintf('\nExcitatory: orig = %d, final = %d',...
-    sum(squeeze(any(eBins)), 'all'), sum(any(eSig), 'all'))
+    sum(squeeze(any(eBins)), 'all'), sum(eSig, 'all'))
 fprintf('\nInhibitory: orig = %d, final = %d\n\n',...
-    sum(squeeze(any(iBins)), 'all'), sum(any(iSig), 'all'))
-
-fprintf('sigE = %d\n', sum(ccGoode, 'all'))
-fprintf('sigI = %d\n', sum(ccGoodi, 'all'))
-fprintf('ref = %d\n', sum(refGood, 'all'))
-
+    sum(squeeze(any(iBins)), 'all'), sum(iSig, 'all'))
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % synapse stats
@@ -251,7 +245,6 @@ eiDom = (eSyn_unit - iSyn_unit) ./ (eSyn_unit + iSyn_unit);
 
 if graphics
     
-    nfigs = 10;
     % excitatory synapses
     nplot = min([nfigs, sum(eSig, 'all')]);
     [u1, u2] = find(eSig, nplot);
@@ -295,23 +288,23 @@ end
         
         % plot mono synaptic connection       
         fh = figure;        
-        sb1 = subplot(2, 4, 1);     % acg100 unit1
+        sb1 = subplot(2, 4, 1);     % ac150 unit1
         sb2 = subplot(2, 4, 2);     % cc50 counts
         sb3 = subplot(2, 4, 3);     % dccc
-        sb4 = subplot(2, 4, 4);     % acg100 unit2
+        sb4 = subplot(2, 4, 4);     % ac150 unit2
         sb5 = subplot(2, 4, 5);     % wv unit1
-        sb6 = subplot(2, 4, 6);     % cc100
+        sb6 = subplot(2, 4, 6);     % cc150
         sb7 = subplot(2, 4, 7);     % ccg25
         sb8 = subplot(2, 4, 8);     % wv unit2
         
         % acg 1
         set(gcf, 'CurrentAxes', sb1)
-        plotCc(cc100(:, u1, u1), cc100bins, clr(1), [], [], [])
+        plotCc(cc150(:, u1, u1), cc150bins, clr(1), [], [], [])
         title(sprintf('Unit #%d (Presynaptic)', u1))
         
         % acg 2
         set(gcf, 'CurrentAxes', sb4)
-        plotCc(cc100(:, u2, u2), cc100bins, clr(2), [], [], [])
+        plotCc(cc150(:, u2, u2), cc150bins, clr(2), [], [], [])
         title(sprintf('Unit #%d (Postsynaptic)', u2))
         
         % cc50 counts
@@ -329,9 +322,9 @@ end
             title(sprintf('eSTG = %.4f', eStg(u1, u2)))
         end
         
-        % cc100 counts
+        % cc150 counts
         set(gcf, 'CurrentAxes', sb6)
-        plotCc(cc100(:, u1, u2), cc100bins, 'k', [], [], [])
+        plotCc(cc150(:, u1, u2), cc150bins, 'k', [], [], [])
         
         % cc20 counts
         set(gcf, 'CurrentAxes', sb7)

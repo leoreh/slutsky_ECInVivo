@@ -90,9 +90,9 @@ end
 
 % get time bins. mea recordings include only 20 min of every hour. 
 binsize = 1200;                                             % 20 min in [s]
-maxdur = max(cellfun(@max, mea.spktimes, 'uni', true));     % last spike [s]
-tbins = 0 : binsize : maxdur; 
-tbins = [tbins, maxdur];
+lastspike = max(cellfun(@max, mea.spktimes, 'uni', true));     % last spike [s]
+tbins = 0 : binsize : lastspike; 
+tbins = [tbins, lastspike];
 
 % calculate firing rate in time bins
 funh = @(x)  histcounts(x, tbins);

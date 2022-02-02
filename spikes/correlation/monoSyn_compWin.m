@@ -79,15 +79,16 @@ legend(sprintf('nunits = %d', size(frMat, 1)))
 title(basename)
 
 % calc monosyn in time window of entire recording w/o baclofen
-winCalc = [0.2, 1.8; 3.5, 5.5; 9.5, 13] * 60 * 60;
+winCalc = [0.2, 1.8; 6, 9] * 60 * 60;
+winCalc = [0, 9 * 60 * 60];
 monosyn = monoSyn_wrapper('spktimes', mea.spktimes, 'basepath', pwd,...
-    'winCalc', winCalc, 'saveVar', true, 'graphics', false,...
+    'winCalc', winCalc, 'saveVar', true, 'graphics', true,...
     'forceA', true, 'fs', mea.info.fs, 'saveFig', false,...
     'wv', mea.wv, 'wv_std', mea.wv_std);
      
 % calc monosyn before and after baclofen
-winD = 90 * 60;                 % winCalc size [s]
-winStart = [0.2, 3.5, 11.5]';            % start time for each win [h]
+winD = 60 * 60;                 % winCalc size [s]
+winStart = [0.2, 8]';            % start time for each win [h]
 winCalc = [winStart * 60 * 60, winStart * 60 * 60 + winD];
 nwin = size(winCalc, 1);
 
@@ -112,7 +113,7 @@ for ifile = 1 : length(monofiles)
     ms(ifile) = monosyn;
 end
 nwin = length(ms) - 1;
-nunits = length(ms(1).eiDom);
+nunits = length(ms(end).eiDom);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % compare
@@ -126,17 +127,13 @@ uE = sub2ind([nunits, nunits], u1, u2);
 [u1, u2] = find(ms(end).iSig);
 uI = sub2ind([nunits, nunits], u1, u2);
 
-% concat stgs from the different time windows 
+% concat STGs from different time windows 
 eStg = [];
 iStg = [];
 for iwin = 1 : nwin
     eStg = [eStg, ms(iwin).eStg(uE)];
     iStg = [iStg, ms(iwin).eStg(uI)];
 end
-
-compIdx = [2, 3]
-eRat = (eStg(:, compIdx(1)) - eStg(:, compIdx(2))) ./ (eStg(:, compIdx(1)) + eStg(:, compIdx(2)));
-iRat = (iStg(:, compIdx(1)) - iStg(:, compIdx(2))) ./ (iStg(:, compIdx(1)) + iStg(:, compIdx(2)));
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
@@ -162,13 +159,29 @@ title(basename)
 legend(sprintf('nunits = %d', size(frMat, 1)))
 
 subplot(2, 2, 3)
+compIdx = [1, 2];
+eRat = (eStg(:, compIdx(1)) - eStg(:, compIdx(2))) ./ (eStg(:, compIdx(1)) + eStg(:, compIdx(2)));
+iRat = (iStg(:, compIdx(1)) - iStg(:, compIdx(2))) ./ (iStg(:, compIdx(1)) + iStg(:, compIdx(2)));
 hold on
 plot_boxMean('dataMat', cell2nanmat([{eRat, iRat}]), 'allPnts', true,...
     'clr', 'br')
 xticklabels({'E', 'I'})
 xlim([0.5 2.5])
 ylabel({sprintf('STG ratio'),...
-    sprintf('pre - post /pre + post')})
+    sprintf('red - green / red + green')})
+
+subplot(2, 2, 4)
+compIdx = [2, 3];
+eRat = (eStg(:, compIdx(1)) - eStg(:, compIdx(2))) ./ (eStg(:, compIdx(1)) + eStg(:, compIdx(2)));
+iRat = (iStg(:, compIdx(1)) - iStg(:, compIdx(2))) ./ (iStg(:, compIdx(1)) + iStg(:, compIdx(2)));
+hold on
+plot_boxMean('dataMat', cell2nanmat([{eRat, iRat}]), 'allPnts', true,...
+    'clr', 'br')
+xticklabels({'E', 'I'})
+xlim([0.5 2.5])
+ylabel({sprintf('STG ratio'),...
+    sprintf('green - blue / green + blue')})
+
 
 
 
