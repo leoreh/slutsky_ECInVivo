@@ -41,8 +41,8 @@ zt0 = guessDateTime('0900');    % lights on at 09:00 AM
 % load data from each session
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-varsFile = ["sr"; "datInfo"; "session"];
-varsName = ["sr"; "datInfo"; "session"];
+varsFile = ["sr"; "fr"; "units"; "datInfo"; "session"];
+varsName = ["sr"; "fr"; "units"; "datInfo"; "session"];
 
 if isempty(basepaths)
     [v, basepaths] = getSessionVars('mname', mname, 'varsFile', varsFile,...
@@ -81,6 +81,23 @@ switch dataPreset
         end
         ts = v(1).sr.info.binsize;          % sampling period [s]
         grp = 1 : v(1).session.extracellular.nSpikeGroups;
+        
+    case 'fr'
+        % nan pad each session to the max number of units
+        units = [];
+        for isession = 1 : nsessions
+            datasz(isession, :) = size(v(isession).fr.strd);
+            v(isession).data = v(isession).fr.strd(units.idx(1, :));
+            units = v(isession).units.idx;
+        end
+        for isession = 1 : nsessions
+            v(isession).data = [v(isession).data;...
+                nan(max(datasz(:, 1)) - datasz(isession, 1),...
+                datasz(isession, 2))];
+        end
+        ts = v(1).fr.info.binsize;          % sampling period [s]        
+        units = logical(units);
+        
     otherwise
         DISP('\nno such data preset\n')
 end
@@ -155,12 +172,16 @@ if graphics
             plot(smoothData(:, grp))
             ylabel('Multi-Unit Firing Rate [Hz]')
             legend(split(num2str(grp)))
+            
+        case 'fr'
+            smoothData = movmean(expData, 13, 1);
+            plot(smoothData)
     end
     
     xticks(tidx)
     xticklabels(tidxLabels)
     hold on
-    plot([xidx; xidx], ylim, '--k')
+    plot([xidx; xidx], ylim, '--k', 'HandleVisibility', 'off')
     xlabel('Time [h]')
     
     if saveFig

@@ -216,27 +216,32 @@ cell_metrics = ProcessCellMetrics('session', session,...
     'excludeMetrics', excludeMetrics);
 % cell_metrics = CellExplorer('basepath', pwd);
 
-% select specific units
-units = selectUnits('basepath', basepath, 'grp', [], 'saveVar', false,...
-    'forceA', false, 'frBoundries', [0.1 Inf; 0.1 Inf],...
-    'spikes', spikes);   
 
 % firing rate
 load([basename, '.spikes.cellinfo.mat'])
-timepnt = session.general.timepnt;
+if isfield(session.general, 'timepnt')
+    timepnt = session.general.timepnt;
+else
+    timepnt = Inf;
+end
 winBL = [0 timepnt];
 fr = firingRate(spikes.times, 'basepath', basepath,...
     'graphics', true, 'binsize', 60, 'saveVar', true,...
     'smet', 'none', 'winBL', winBL, 'winCalc', [0, Inf]);
 
+% select specific units
+units = selectUnits('basepath', pwd, 'grp', [], 'saveVar', true,...
+    'forceA', false, 'frBoundries', [0.1 Inf; 0.1 Inf],...
+    'spikes', []);  
+
 % plot fr vs. time
 unitsClean = units.idx & units.gini' & units.mfrBL';
 plot_FRtime_session('basepath', pwd,...
     'muFlag', false, 'saveFig', false,...
-    'dataType', 'norm', 'units', unitsClean)
+    'dataType', 'strd', 'units', units.idx)
 
 % number of units per spike group
-plot_nunits_session('basepath', basepath, 'frBoundries', frBoundries)
+plot_nunits_session('basepath', basepath, 'frBoundries', [])
 
 % mfr by states in time bins
 timebins = session.general.timebins;
@@ -244,9 +249,9 @@ fr_timebins('basepath', pwd, 'forceA', true, 'graphics', false,...
     'timebins', timebins, 'saveVar', true, 'sstates', [1, 4, 5]);
 
 % concatenate var from different sessions
-mname = 'lh99';
+mname = 'lh96';
 [srData, tidx, tidxLabels] = sessions_catVarTime('mname', mname,...
-    'dataPreset', 'both', 'graphics', true);
+    'dataPreset', 'sr', 'graphics', true);
 
 % cluster validation
 spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
@@ -258,11 +263,6 @@ st = spktimesMetrics('winCalc', [], 'forceA', true);
 
 % spike waveform metrics
 swv = spkwvMetrics('basepath', basepath, 'fs', fs);
-
-% organize firing rate 
-[mfrCell, gainCell] = org_mfrCell('spikes', spikes, 'cm', cm, 'fr', fr,...
-    'timebins', [1 Inf], 'dataType', 'su', 'grp', [1 : 4], 'suFlag', suFlag,...
-    'frBoundries', [0 Inf; 0 Inf], 'stateIdx', stateIdx);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % mea

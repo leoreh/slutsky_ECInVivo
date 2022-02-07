@@ -42,10 +42,7 @@ varsName = ["fr"; "spikes"; "cm"; "datInfo"; "session"];
 if ~exist('v', 'var')
     v = getSessionVars('basepaths', {basepath}, 'varsFile', varsFile,...
         'varsName', varsName);
-end
-
-% plot only su or all units
-suFlag = true;                 
+end             
 
 % spike groups
 grp = unique(v.spikes.shankID);
@@ -53,12 +50,14 @@ grp = unique(v.spikes.shankID);
 % select units
 units_grp = zeros(length(grp), 3);
 for igrp = 1 : length(grp)
-    units_grp(igrp, 1 : 2) = sum(selectUnits('basepath', basepath, 'spikes', v.spikes,...
-        'cm', v.cm, 'fr', v.fr, 'suFlag', suFlag, 'grp', igrp,...
-        'frBoundries', frBoundries, 'forceA', true, 'saveVar', false), 2)';
-    units_grp(igrp, 3) = sum(v.spikes.shankID == igrp) - sum(units_grp(igrp, :));
+    units = selectUnits('basepath', basepath, 'spikes', v.spikes,...
+        'cm', v.cm, 'fr', v.fr, 'grp', igrp,...
+        'frBoundries', frBoundries, 'forceA', true, 'saveVar', false);
+    units_grp(igrp, 1) = sum(units.grp & units.rs & units.su');
+    units_grp(igrp, 2) = sum(units.grp & units.fs & units.su');
+    units_grp(igrp, 3) = sum(units.grp) - sum(units_grp(igrp, 1 : 2));
 end
-        
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
