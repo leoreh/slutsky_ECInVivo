@@ -216,7 +216,6 @@ cell_metrics = ProcessCellMetrics('session', session,...
     'excludeMetrics', excludeMetrics);
 % cell_metrics = CellExplorer('basepath', pwd);
 
-
 % firing rate
 load([basename, '.spikes.cellinfo.mat'])
 if isfield(session.general, 'timepnt')
@@ -243,16 +242,6 @@ plot_FRtime_session('basepath', pwd,...
 % number of units per spike group
 plot_nunits_session('basepath', basepath, 'frBoundries', [])
 
-% mfr by states in time bins
-timebins = session.general.timebins;
-fr_timebins('basepath', pwd, 'forceA', true, 'graphics', false,...
-    'timebins', timebins, 'saveVar', true, 'sstates', [1, 4, 5]);
-
-% concatenate var from different sessions
-mname = 'lh96';
-[srData, tidx, tidxLabels] = sessions_catVarTime('mname', mname,...
-    'dataPreset', 'sr', 'graphics', true);
-
 % cluster validation
 spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
     'saveFig', false, 'force', true, 'mu', [], 'graphics', false,...
@@ -262,7 +251,23 @@ spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
 st = spktimesMetrics('winCalc', [], 'forceA', true);
 
 % spike waveform metrics
-swv = spkwvMetrics('basepath', basepath, 'fs', fs);
+swv = spkwvMetrics('basepath', basepath, 'fs', fs, 'forceA', true);
+
+% mfr by states in time bins
+timebins = session.general.timebins;
+fr_timebins('basepath', pwd, 'forceA', true, 'graphics', false,...
+    'timebins', timebins, 'saveVar', true, 'sstates', [1, 4, 5]);
+
+% concatenate var from different sessions
+mname = 'lh96';
+[srData, tidx, tidxLabels] = sessions_catVarTime('mname', mname,...
+    'dataPreset', {'fr', 'spec'}, 'graphics', true);
+
+% mono synaptic interactions (spike transmission gain)
+monosyn = monoSyn_wrapper('spktimes', spikes.times, 'basepath', pwd,...
+    'winCalc', [0, Inf], 'saveVar', true, 'graphics', true,...
+    'forceA', true, 'fs', fs, 'saveFig', false,...
+    'wv', swv.wv, 'wv_std', swv.wv_std);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % mea

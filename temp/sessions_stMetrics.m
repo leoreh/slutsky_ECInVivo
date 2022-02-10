@@ -1,0 +1,104 @@
+% function [expData, tidx, tidxLabels] = sessions_catVarTime(varargin)
+
+% concatenates a variable from different sessions. assumes sessions are
+% contineous. concatenates according to the time of day extracted from
+% basenames. current variables supported are sr and spectrogram.
+
+% INPUT
+%   basepaths       cell of chars to recording sessions
+%   mname           char of mouse name. if basepaths is empty will get
+%                   basepaths from the sessionList.xlsx file
+%   graphics        logical {true}
+%   saveFig         logical {true}
+%   dataPreset      char. variable to cat. can be 'sr', 'spec' or 'both'
+
+
+% example call
+% mname = 'lh96';
+% [srData, tidx, tidxLabels] = sessions_catVarTime('mname', mname, 'dataPreset', 'both', 'graphics', false);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% arguments
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+p = inputParser;
+addParameter(p, 'basepaths', {}, @iscell);
+addParameter(p, 'mname', '', @ischar);
+addParameter(p, 'dataPreset', 'sr', @ischar);
+addParameter(p, 'graphics', true, @islogical);
+addParameter(p, 'saveFig', true, @islogical);
+
+parse(p, varargin{:})
+basepaths   = p.Results.basepaths;
+mname       = p.Results.mname;
+dataPreset  = p.Results.dataPreset;
+graphics    = p.Results.graphics;
+saveFig     = p.Results.saveFig;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% load data from each session
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+mname = 'lh96';
+basepaths = {};
+
+varsFile = ["sr"; "fr"; "units"; "datInfo"; "session";...
+    "st_metrics"; "units"];
+varsName = ["sr"; "fr"; "units"; "datInfo"; "session";...
+    "st"; "units"];
+
+if isempty(basepaths)
+    [v, basepaths] = getSessionVars('mname', mname, 'varsFile', varsFile,...
+        'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""]);
+else
+    [v, basepaths] = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
+        'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""]);
+end
+
+[~, basenames] = cellfun(@fileparts, basepaths, 'uni', false);
+nsessions = length(basepaths);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% cat vars
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+varsPlot = ["lidor"; "lvr"; "royer"; "cv"];
+unitidx = 1;
+
+clear vp
+for ivar = 1 : length(varsPlot)
+    for isession = 1 : nsessions
+        vp.(varsPlot(ivar)){isession} =...
+            v(isession).st.(varsPlot(ivar))(v(isession).units.idx(unitidx, :));
+    end
+    vp.(varsPlot(ivar)) = cell2nanmat(vp.(varsPlot(ivar)), 2);
+end
+
+for isession = 1 : nsessions
+    vp.ff{isession} = v(isession).fr.fanoFactor(v(isession).units.idx(unitidx, :));
+end
+vp.ff = cell2nanmat(vp.ff(:), 2);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% graphics
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+varsPlot = ["lidor"; "royer"; "lvr"; "cv"];
+yLabels = ["Burstiness"; "Burstiness"; "Firing Irregularity"; "STD / MEAN"];
+xLabels = ["Baseline"; "Baclofen"; "Baclofen"; "Baclofen"; "Baclofen";...
+    "Washout"; "Washout"];
+
+fh = figure;
+for ivar = 1 : length(varsPlot)
+    subplot(2, 2, ivar)
+    plot_boxMean(vp.(varsPlot(ivar)), 'allPnts', true)
+    title(varsPlot(ivar))
+    xticklabels(xLabels)
+    
+    if strcmp(varsPlot(ivar), "royer") || strcmp(varsPlot(ivar), "cv")
+        set(gca, 'yscale', 'log')
+    end
+    
+    ylabel(yLabels{ivar})
+    
+end
+
+% end

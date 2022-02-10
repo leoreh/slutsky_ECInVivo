@@ -31,11 +31,16 @@ ndim = unique(cellfun(@length, szc, 'uni', true));
 if length(ndim) > 1 
     error('all arrays must have the same number of dimensions')
 end
+cellvec = all(cellfun(@isvector, c, 'uni', true));
+
+if cellvec
+    c = cellfun(@(x) x(:), c, 'uni', false);
+end
 
 % max length along dimension
-maxlength = max(cellfun('size', c, dim));
+maxlength = max(cellfun('size', c, 1));
 
-if ndim == 1
+if cellvec
     mat = cellfun(@(x) [x(:); nan(maxlength - length(x), 1)], c,...
         'UniformOutput', false);
 else
