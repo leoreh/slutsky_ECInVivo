@@ -293,9 +293,8 @@ if saveVar
     % cell metrics
     if exist(cmFile, 'file')
         load(cmFile)
-%         cell_metrics.waveforms.wv = num2cell(swv.wv, 2)';
-        cell_metrics.waveforms.wv = num2cell(wv_interp, 2)';
-%         cell_metrics.waveforms.wv_std = num2cell(swv.wv_std, 2)';
+        cell_metrics.waveforms.wv = num2cell(swv.wv, 2)';
+        cell_metrics.waveforms.wv_std = num2cell(swv.wv_std, 2)';
         cell_metrics.swv_spkw = swv.spkw;
         cell_metrics.swv_tp = swv.tp;
         cell_metrics.swv_asym = swv.asym;

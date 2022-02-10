@@ -216,32 +216,27 @@ cell_metrics = ProcessCellMetrics('session', session,...
     'excludeMetrics', excludeMetrics);
 % cell_metrics = CellExplorer('basepath', pwd);
 
+% select specific units
+units = selectUnits('basepath', basepath, 'grp', [], 'saveVar', false,...
+    'forceA', false, 'frBoundries', [0.1 Inf; 0.1 Inf],...
+    'spikes', spikes);   
 
 % firing rate
 load([basename, '.spikes.cellinfo.mat'])
-if isfield(session.general, 'timepnt')
-    timepnt = session.general.timepnt;
-else
-    timepnt = Inf;
-end
+timepnt = session.general.timepnt;
 winBL = [0 timepnt];
 fr = firingRate(spikes.times, 'basepath', basepath,...
     'graphics', true, 'binsize', 60, 'saveVar', true,...
     'smet', 'none', 'winBL', winBL, 'winCalc', [0, Inf]);
 
-% select specific units
-units = selectUnits('basepath', pwd, 'grp', [], 'saveVar', true,...
-    'forceA', false, 'frBoundries', [0.1 Inf; 0.1 Inf],...
-    'spikes', []);  
-
 % plot fr vs. time
 unitsClean = units.idx & units.gini' & units.mfrBL';
 plot_FRtime_session('basepath', pwd,...
     'muFlag', false, 'saveFig', false,...
-    'dataType', 'strd', 'units', units.idx)
+    'dataType', 'norm', 'units', unitsClean)
 
 % number of units per spike group
-plot_nunits_session('basepath', basepath, 'frBoundries', [])
+plot_nunits_session('basepath', basepath, 'frBoundries', frBoundries)
 
 % mfr by states in time bins
 timebins = session.general.timebins;
@@ -249,9 +244,9 @@ fr_timebins('basepath', pwd, 'forceA', true, 'graphics', false,...
     'timebins', timebins, 'saveVar', true, 'sstates', [1, 4, 5]);
 
 % concatenate var from different sessions
-mname = 'lh96';
+mname = 'lh99';
 [srData, tidx, tidxLabels] = sessions_catVarTime('mname', mname,...
-    'dataPreset', 'sr', 'graphics', true);
+    'dataPreset', 'both', 'graphics', true);
 
 % cluster validation
 spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
@@ -264,21 +259,33 @@ st = spktimesMetrics('winCalc', [], 'forceA', true);
 % spike waveform metrics
 swv = spkwvMetrics('basepath', basepath, 'fs', fs);
 
+% organize firing rate 
+[mfrCell, gainCell] = org_mfrCell('spikes', spikes, 'cm', cm, 'fr', fr,...
+    'timebins', [1 Inf], 'dataType', 'su', 'grp', [1 : 4], 'suFlag', suFlag,...
+    'frBoundries', [0 Inf; 0 Inf], 'stateIdx', stateIdx);
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % mea
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-fname = '2021-05-16T17-34-298hBsln_20uMK_Bac_spikes SORTED';
+fname = '2021.5.27_IGF1R_Cre-_Bac10uM_spikes.mat';
 mea = mea_orgNex('fname', fname, 'basepath', pwd, 'forceL', true);
 
 mea_analyze('basepath', pwd,...
-    'winBL', [0, 120 * 60], 'graphics', false, 'forceA', false)
+    'winBL', [0, 120 * 60], 'graphics', true, 'forceA', false)
+
+% use fr plot to select winCalc
+fr.tstamps / 60 / 60 * 3
+dtstamps = 80;
+tstart = 3;
+winCalc = [fr.tstamps(tstart) fr.tstamps(tstart + dtstamps)];
+winSave = round(winCalc / 60 / 60);
+saveVar = [num2str(winSave(1)), '-', num2str(winSave(2))];
 
 % mono synaptic interactions (spike transmission gain)
 monosyn = monoSyn_wrapper('spktimes', mea.spktimes, 'basepath', pwd,...
-    'winCalc', [0, Inf], 'saveVar', true, 'graphics', true,...
-    'forceA', true, 'fs', mea.info.fs, 'saveFig', false,...
-    'wv', mea.wv, 'wv_std', mea.wv_std);
+    'winCalc', winCalc, 'saveVar', saveVar, 'graphics', false,...
+    'forceA', true, 'fs', mea.info.fs, 'wv', mea.wv, 'wv_std', mea.wv_std);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % utilities

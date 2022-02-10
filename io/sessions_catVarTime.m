@@ -10,16 +10,12 @@ function [expData, tidx, tidxLabels] = sessions_catVarTime(varargin)
 %                   basepaths from the sessionList.xlsx file
 %   graphics        logical {true}
 %   saveFig         logical {true}
-%   dataPreset      string or cell of string depicting the variable to cat. 
-%                   can be any combination of 'sr', 'spec', 'fr'
-%   axh             handle to plot axis
+%   dataPreset      char. variable to cat. can be 'sr', 'spec' or 'both'
+
 
 % example call
 % mname = 'lh96';
 % [srData, tidx, tidxLabels] = sessions_catVarTime('mname', mname, 'dataPreset', 'both', 'graphics', false);
-
-% TO DO LIST
-%   organize output
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -27,10 +23,9 @@ function [expData, tidx, tidxLabels] = sessions_catVarTime(varargin)
 p = inputParser;
 addParameter(p, 'basepaths', {}, @iscell);
 addParameter(p, 'mname', '', @ischar);
-addParameter(p, 'dataPreset', 'sr');
+addParameter(p, 'dataPreset', 'sr', @ischar);
 addParameter(p, 'graphics', true, @islogical);
 addParameter(p, 'saveFig', true, @islogical);
-addParameter(p, 'axh', []);
 
 parse(p, varargin{:})
 basepaths   = p.Results.basepaths;
@@ -38,29 +33,13 @@ mname       = p.Results.mname;
 dataPreset  = p.Results.dataPreset;
 graphics    = p.Results.graphics;
 saveFig     = p.Results.saveFig;
-axh         = p.Results.axh;
-
+ 
 xTicksBinsize = 12;             % mark x tick every 12 hr
 zt0 = guessDateTime('0900');    % lights on at 09:00 AM
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % load data from each session
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% run recursively through the function if several data vars are requested
-if iscell(dataPreset)
-    fh = figure;
-    for idata = 1 : length(dataPreset)
-        sb(idata) = subplot(length(dataPreset), 1, idata);
-        [expData, tidx, tidxLabels] = sessions_catVarTime('mname', mname,...
-            'dataPreset', dataPreset{idata}, 'graphics', true, 'axh', sb(idata));
-        if idata < length(dataPreset)
-            set(sb(idata), 'xticklabels', {[]})
-            xlabel('')
-        end
-    end
-    return
-end
 
 varsFile = ["sr"; "fr"; "units"; "datInfo"; "session"];
 varsName = ["sr"; "fr"; "units"; "datInfo"; "session"];
@@ -96,7 +75,7 @@ switch dataPreset
         load(filename, 'spec_freq');
         faxis = spec_freq;
         
-    case 'sr'
+    case {'sr', 'both'}
         for isession = 1 : nsessions
             v(isession).data = v(isession).sr.strd;
         end
@@ -105,26 +84,19 @@ switch dataPreset
         
     case 'fr'
         % nan pad each session to the max number of units
-        nunits = [];
+        units = [];
         for isession = 1 : nsessions
             datasz(isession, :) = size(v(isession).fr.strd);
+            v(isession).data = v(isession).fr.strd(units.idx(1, :));
             units = v(isession).units.idx;
-            nunits(isession, :) = [sum(units(1, :)), sum(units(2, :))];
-            v(isession).rs = v(isession).fr.strd(units(1, :), :);
-            v(isession).fs = v(isession).fr.strd(units(2, :), :);
         end
         for isession = 1 : nsessions
-            v(isession).data = [v(isession).fr.strd;...
+            v(isession).data = [v(isession).data;...
                 nan(max(datasz(:, 1)) - datasz(isession, 1),...
-                datasz(isession, 2))];
-            v(isession).rs = [v(isession).rs;...
-                nan(max(nunits(:, 1)) - nunits(isession, 1),...
-                datasz(isession, 2))];
-            v(isession).fs = [v(isession).fs;...
-                nan(max(nunits(:, 2)) - nunits(isession, 2),...
                 datasz(isession, 2))];
         end
         ts = v(1).fr.info.binsize;          % sampling period [s]        
+        units = logical(units);
         
     otherwise
         DISP('\nno such data preset\n')
@@ -145,8 +117,6 @@ expEnd = guessDateTime(basenames{end});
 expEnd = expEnd + seconds(sum(v(end).datInfo.nsamps) / fs);
 expLen = ceil(seconds(expEnd - expStart) / ts); 
 expData = nan(expLen, ncol);
-expRs = nan(expLen, ncol);
-expFs = nan(expLen, ncol);
 
 % initialize
 xidx = [];
@@ -159,11 +129,6 @@ for isession = 1 : nsessions
     
     % insert recording data to experiment data
     expData(recIdx : recIdx + recLen - 1, :) = recData';
-    
-    if strcmp(dataPreset, 'fr')
-        expRs(recIdx : recIdx + recLen - 1, 1 : max(nunits(:, 1))) = v(isession).rs';
-        expFs(recIdx : recIdx + recLen - 1, 1 : max(nunits(:, 2))) = v(isession).fs';
-    end
     
     % cat block transitions
     xidx = [xidx, cumsum(v(isession).datInfo.nsamps) / fs / ts + recIdx];
@@ -186,11 +151,7 @@ tidxLabels = datestr(datenum(tStartLabel : hours(xTicksBinsize) : expEnd),...
 
 if graphics
     
-    if isempty(axh)
-        fh = figure;
-    else
-        set(gcf, 'CurrentAxes', axh)
-    end
+    fh = figure;
     switch dataPreset
         case 'spec'
             
@@ -208,28 +169,19 @@ if graphics
             
         case {'sr', 'both'}
             smoothData = movmean(expData, 13, 1);
-            plot([1 : expLen], smoothData(:, grp))
+            plot(smoothData(:, grp))
             ylabel('Multi-Unit Firing Rate [Hz]')
             legend(split(num2str(grp)))
-            axis tight
             
         case 'fr'
-            smoothData = movmean(mean(expRs, 2, 'omitnan'), 13, 1);
-            plot([1 : expLen], smoothData)
-            hold on
-            smoothData = movmean(mean(expFs, 2, 'omitnan'), 13, 1);
-            plot([1 : expLen], smoothData)
-            legend({sprintf('RS <= %d', max(nunits(:, 1))),...
-                sprintf('FS <= %d', max(nunits(:, 2)))})
-            ylabel('Firing Rate [Hz]')
-            axis tight
+            smoothData = movmean(expData, 13, 1);
+            plot(smoothData)
     end
     
     xticks(tidx)
     xticklabels(tidxLabels)
-    xtickangle(45)
     hold on
-%     plot([xidx; xidx], ylim, '--k', 'HandleVisibility', 'off')
+    plot([xidx; xidx], ylim, '--k', 'HandleVisibility', 'off')
     xlabel('Time [h]')
     
     if saveFig
@@ -242,6 +194,68 @@ if graphics
         export_fig(figname, '-jpg', '-transparent', '-r300')
     end
     
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% create figure of both vars
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+if ~strcmp(dataPreset, 'both')
+    return
+else
+    srData = expData;
+    [specData, ~, ~] = sessions_catVarTime('mname', mname,...
+        'dataPreset', 'spec', 'graphics', true);
+    load(fullfile(basepaths{isession},...
+        [basenames{isession}, '.sleep_sig.mat']), 'spec_freq');
+    faxis = spec_freq;
+end
+
+% select specific tidx to plot
+sidx = [11, 25];
+xtimes(sidx)
+sxidx = xidx(sidx);
+
+% plot
+fh = figure;
+
+subplot(2, 1, 1)
+smoothData = movmean(srData, 13, 1);
+plot(smoothData)
+ylabel('Multi-Unit Firing Rate [Hz]')
+xticks(tidx)
+xticklabels(tidxLabels)
+hold on
+plot([sxidx; sxidx], ylim, '--k', 'LineWidth', 2)
+xlabel('Time')
+axis tight
+legend(split(num2str(1 : size(smoothData, 2))))
+
+% spec
+subplot(2, 1, 2)
+showFreqs = find(faxis <= 15);  % freqs to display
+sampleBins = randperm(expLen, round(expLen / 10));
+specSample = reshape(specData(sampleBins, showFreqs), 1, length(sampleBins) * length(showFreqs));
+caxis1 = prctile(specSample, [6 98]);
+imagesc([1 : expLen], faxis(showFreqs)', specData(:, showFreqs)', caxis1);
+colormap(AccuSleep_colormap());
+axis('xy')
+ylabel('Frequency [Hz]')
+xticks(tidx)
+xticklabels(tidxLabels)
+hold on
+plot([sxidx; sxidx], ylim, '--y', 'LineWidth', 2)
+xlabel('Time')
+
+saveFig = false;
+if saveFig
+    mousepath = fileparts(basepaths{1});
+    [~, mname] = fileparts(mousepath);
+    figpath = fullfile(mousepath, 'graphics');
+    figname = sprintf('%s_%s_sessions', mname, dataPreset);
+    mkdir(figpath)
+    figname = fullfile(figpath, figname);
+    export_fig(figname, '-jpg', '-transparent', '-r300')
 end
 
 end

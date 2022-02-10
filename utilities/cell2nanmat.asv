@@ -32,7 +32,6 @@ if length(ndim) > 1
     error('all arrays must have the same number of dimensions')
 end
 
-% max length along dimension
 maxlength = max(cellfun('size', c, dim));
 
 if ndim == 1
@@ -47,11 +46,7 @@ else
         end
     end
 end
-if dim == 1
-    mat = cell2mat(mat);
-else
-    mat = cell2mat(mat');
-end
+mat = cell2mat(mat');
 
 % EOF
 
