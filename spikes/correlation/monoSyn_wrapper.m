@@ -94,7 +94,7 @@ forceA      = p.Results.forceA;
 roi_ms = [1, 8];       % region of interest for mono synaptic connections [ms]
 alfa = 0.001;          % significance level (consider differentiating for E and I)
 refThr = 1;
-ccThr = [100 800];
+ccThr = [0 800];
 stgThr = [0, -Inf];    % [E, I]
 nfigs = 5;             % number of synapses to plot
 
@@ -128,8 +128,8 @@ spktimes = cellfun(funh, spktimes, 'uni', false);
 % add one spike to empty units. this is important so that
 % nunits is independent of winCalc
 emptyunits = find(cellfun(@isempty, spktimes, 'uni', true));
-for iempty = emptyunits
-    spktimes{iempty} = 1;
+for iempty = 1 : length(emptyunits)
+    spktimes{emptyunits(iempty)} = 1;
 end
 nunits = length(spktimes);
 npairs = nunits * nunits - nunits;
@@ -250,17 +250,20 @@ if graphics
     
     % excitatory synapses
     nplot = min([nfigs, sum(eSig, 'all')]);
+    if nplot > 0
     [u1, u2] = find(eSig, nplot);
     for isyn = 1 : nplot
         plotSyn(u1(isyn), u2(isyn), 'bk')
     end
-    
+    end
     % inhibitory synapses
     nplot = min([nfigs, sum(iSig, 'all')]);
+    if nplot > 0
     [u1, u2] = find(iSig, nplot);
     for isyn = 1 : nplot
         plotSyn(u1(isyn), u2(isyn), 'rk')
     end   
+    end
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

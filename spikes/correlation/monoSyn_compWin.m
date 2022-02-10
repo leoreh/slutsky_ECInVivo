@@ -79,7 +79,6 @@ legend(sprintf('nunits = %d', size(frMat, 1)))
 title(basename)
 
 % calc monosyn in time window of entire recording w/o baclofen
-winCalc = [0.2, 1.8; 6, 9] * 60 * 60;
 winCalc = [0, 9 * 60 * 60];
 monosyn = monoSyn_wrapper('spktimes', mea.spktimes, 'basepath', pwd,...
     'winCalc', winCalc, 'saveVar', true, 'graphics', true,...
@@ -88,7 +87,7 @@ monosyn = monoSyn_wrapper('spktimes', mea.spktimes, 'basepath', pwd,...
      
 % calc monosyn before and after baclofen
 winD = 60 * 60;                 % winCalc size [s]
-winStart = [0.2, 8]';            % start time for each win [h]
+winStart = [0.2, 2, 8]';            % start time for each win [h]
 winCalc = [winStart * 60 * 60, winStart * 60 * 60 + winD];
 nwin = size(winCalc, 1);
 
