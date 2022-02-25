@@ -28,7 +28,7 @@ nsessions = length(basepaths);
 templateCal = ss.info.calibrationData;
 
 if forceA
-    for isession = 1 : nsessions
+    for isession = 2 : nsessions
         
         % file
         basepath = basepaths{isession};
@@ -42,32 +42,38 @@ if forceA
         spkgrp = session.extracellular.spikeGroups.channels;
         
         % update units
-        units = selectUnits('basepath', pwd, 'grp', [], 'saveVar', true,...
-            'forceA', true, 'frBoundries', [0.1 Inf; 0.1 Inf],...
-            'spikes', []);
-
-%         swv = spkwvMetrics('basepath', basepath, 'fs', fs, 'forceA', true);
-         
-
-
-%         % create emg signal from accelerometer data
-%         acc = EMGfromACC('basepath', basepath, 'fname', [basename, '.lfp'],...
-%             'nchans', nchans, 'ch', nchans - 2 : nchans, 'saveVar', true, 'fsIn', 1250,...
-%             'graphics', false, 'force', true);
-%         
-%         % state
-%         sSig = as_prepSig([basename, '.lfp'], acc.mag,...
-%             'eegCh', [1 : 4], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
-%             'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
-%             'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [10 450], 'fs', 1250);
-%         
-%         % classify with a network
-%         calData = templateCal;
-%         netfile = [];
-%         ss = as_classify(sSig, 'basepath', pwd, 'inspectLabels', false,...
-%             'saveVar', true, 'forceA', true, 'netfile', netfile,...
-%             'graphics', true, 'calData', calData);
-%         
+        %         units = selectUnits('basepath', pwd, 'grp', [], 'saveVar', true,...
+        %             'forceA', true, 'frBoundries', [0.1 Inf; 0.1 Inf],...
+        %             'spikes', []);
+        
+        % get ripples
+%         ripp = getRipples('basepath', basepath, 'rippCh', [9],...
+%             'emg', acc.mag, 'recWin', [0, Inf], 'saveVar', true,...
+%             'spkFlag', true, 'graphics', true, 'saveVar', true);
+        
+        %         swv = spkwvMetrics('basepath', basepath, 'fs', fs, 'forceA', true);
+        
+        
+        
+        %         % create emg signal from accelerometer data
+        %         acc = EMGfromACC('basepath', basepath, 'fname', [basename, '.lfp'],...
+        %             'nchans', nchans, 'ch', nchans - 2 : nchans, 'saveVar', true, 'fsIn', 1250,...
+        %             'graphics', false, 'force', true);
+        %
+        %         % state
+        load([basename, '.acceleration.mat'])
+                sSig = as_prepSig([basename, '.lfp'], acc.mag,...
+                    'eegCh', [16], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
+                    'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
+                    'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [10 450], 'fs', 1250);
+        %
+        %         % classify with a network
+%                 calData = templateCal;
+%                 netfile = [];
+%                 ss = as_classify(sSig, 'basepath', pwd, 'inspectLabels', false,...
+%                     'saveVar', true, 'forceA', true, 'netfile', netfile,...
+%                     'graphics', true, 'calData', calData);
+        %
         
         %         sSig = load([basename, '.sleep_sig.mat']);
         %         load([basename, '.sleep_states.mat']);
@@ -89,9 +95,9 @@ if forceA
         %             'binsize', 60, 'saveVar', true, 'smet', 'GK', 'winBL',...
         %             [0 timepoints], 'winCalc', [0, Inf], 'forceA', true);
         
-%         frBins(isession) = fr_timebins('basepath', pwd,...
-%             'forceA', false, 'graphics', true,...
-%             'timebins', chunks, 'saveVar', true);                
+        %         frBins(isession) = fr_timebins('basepath', pwd,...
+        %             'forceA', false, 'graphics', true,...
+        %             'timebins', chunks, 'saveVar', true);
         
     end
 end

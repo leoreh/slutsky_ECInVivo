@@ -115,14 +115,14 @@ end
 limDur = [20 150, 30];      % min, max, and inter dur limits for ripples [ms]
 limDur = limDur / 1000 * fs;
 passband = [120 250];
-binsizeRate = 30;           % binsize for calculating ripple rate [s]
+binsizeRate = 60;           % binsize for calculating ripple rate [s]
 emgThr = 50;                % exclude ripples that occur when emg > thr
 
 % threshold of stds above sig_amp
 dtctMet = 1;        % 1 = TL; 2 = BZ
 switch dtctMet
     case 1
-        thr = [2.5 5];
+        thr = [2.5 3.5];
     case 2
         thr = [1 3];
 end
@@ -187,7 +187,7 @@ elseif exist(ssfile)
 end
 
 % normalize
-sig_filt = (sig - mean(sig(norm_idx))) / std(sig(norm_idx));
+% sig_filt = (sig - mean(sig(norm_idx))) / std(sig(norm_idx));
 
 % filter lfp data in ripple band
 sig_filt = filterLFP(sig, 'fs', fs, 'type', 'butter', 'dataOnly', true,...
@@ -426,15 +426,16 @@ end
 % finalize and save
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-ripp.info.rippCh    = rippCh;
-ripp.info.limDur    = limDur;
-ripp.info.recWin    = recWin;
-ripp.info.runtime   = datetime(now, 'ConvertFrom', 'datenum');
-ripp.info.thr       = thr;
-ripp.epochs         = epochs + recWin(1);  
-ripp.peakPos        = peakPos;
-ripp.peakPow        = peakPow;
-ripp.peakPowNorm    = peakPowNorm;
+ripp.info.rippCh        = rippCh;
+ripp.info.limDur        = limDur;
+ripp.info.recWin        = recWin;
+ripp.info.runtime       = datetime(now, 'ConvertFrom', 'datenum');
+ripp.info.thr           = thr;
+ripp.info.binsizeRate   = binsizeRate;
+ripp.epochs             = epochs + recWin(1);  
+ripp.peakPos            = peakPos;
+ripp.peakPow            = peakPow;
+ripp.peakPowNorm        = peakPowNorm;
 
 if saveVar      
     save(rippfile, 'ripp')
@@ -523,7 +524,7 @@ if graphics
     % percent rippels in state
     sb6 = subplot(4, 3, 6);
     if exist(ssfile)
-        pie(sum(cell2nanmat(ripp.states.idx), 1, 'omitnan'), ones(1, length(sstates)))
+        pie(sum(cell2nanmat(ripp.states.idx, 2), 1, 'omitnan'), ones(1, length(sstates)))
         hold on
         ph = findobj(sb6, 'Type', 'Patch');
         set(ph, {'FaceColor'}, flipud(cfg.colors(sstates)))

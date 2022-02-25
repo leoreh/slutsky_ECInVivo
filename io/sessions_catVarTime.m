@@ -3,7 +3,7 @@ function [expData, tidx, tidxLabels] = sessions_catVarTime(varargin)
 % concatenates a variable from different sessions. assumes sessions are
 % contineous. concatenates according to the time of day extracted from
 % basenames. current variables supported are sr and spectrogram.
-
+% 
 % INPUT
 %   basepaths       cell of chars to recording sessions
 %   mname           char of mouse name. if basepaths is empty will get
@@ -13,13 +13,16 @@ function [expData, tidx, tidxLabels] = sessions_catVarTime(varargin)
 %   dataPreset      string or cell of string depicting the variable to cat. 
 %                   can be any combination of 'sr', 'spec', 'fr'
 %   axh             handle to plot axis
-
-% example call
+% 
+% EXAMPLE
 % mname = 'lh96';
 % [srData, tidx, tidxLabels] = sessions_catVarTime('mname', mname, 'dataPreset', 'both', 'graphics', false);
-
+% 
 % TO DO LIST
 %   organize output
+% 
+% UPDATES
+%   12 feb 22       added ripples
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -59,11 +62,12 @@ if iscell(dataPreset)
             xlabel('')
         end
     end
+    %     linkaxes(sb, 'x')
     return
 end
 
-varsFile = ["sr"; "fr"; "units"; "datInfo"; "session"];
-varsName = ["sr"; "fr"; "units"; "datInfo"; "session"];
+varsFile = ["units"; "datInfo"; "session"; string(dataPreset)];
+varsName = ["units"; "datInfo"; "session"; string(dataPreset)];
 
 if isempty(basepaths)
     [v, basepaths] = getSessionVars('mname', mname, 'varsFile', varsFile,...
@@ -125,6 +129,12 @@ switch dataPreset
                 datasz(isession, 2))];
         end
         ts = v(1).fr.info.binsize;          % sampling period [s]        
+        
+    case 'ripp'
+         for isession = 1 : nsessions
+            v(isession).data = v(isession).ripp.rate.rate';
+        end
+        ts = mode(diff(v(isession).ripp.rate.binedges{1}));                 
         
     otherwise
         DISP('\nno such data preset\n')
@@ -206,7 +216,7 @@ if graphics
             axis('xy')
             ylabel('Frequency [Hz]')
             
-        case {'sr', 'both'}
+        case 'sr'
             smoothData = movmean(expData, 13, 1);
             plot([1 : expLen], smoothData(:, grp))
             ylabel('Multi-Unit Firing Rate [Hz]')
@@ -222,6 +232,11 @@ if graphics
             legend({sprintf('RS <= %d', max(nunits(:, 1))),...
                 sprintf('FS <= %d', max(nunits(:, 2)))})
             ylabel('Firing Rate [Hz]')
+            axis tight
+            
+        case 'ripp'
+            plot([1 : expLen], expData)
+            ylabel('Ripple Rate [Hz]')
             axis tight
     end
     
