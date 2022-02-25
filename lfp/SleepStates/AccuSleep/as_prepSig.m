@@ -46,6 +46,7 @@ function sSig = as_prepSig(eegData, emgData, varargin)
 %
 % 19 apr 21 LH  updates:
 % 06 jan 22     combined signals to struct
+% 25 feb 22     specBand instead of createSpectrogram
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -235,9 +236,10 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % spectrogram
-fprintf('\ncreating spectrogram...', emgCf)
-[sSig.spec, sSig.spec_tstamps, sSig.spec_freq] =...
-    createSpectrogram(eegData, fs, 1);
+fprintf('\ncreating spectrogram...')
+[sSig.spec, sSig.spec_tstamps, sSig.spec_freq] = specBand('sig', sig,...
+    'fs', 1250, 'graphics', false, 'saveVar', false,...
+    'pad', -1, 'winstep', 1, 'logfreq', false, 'ftarget', [0 : 0.2 : 64]);
 
 % emg rms
 sSig.emg_rms = processEMG(emgData, fs, 1);
@@ -260,6 +262,7 @@ sSig.info.emgCh = emgCh;
 sSig.info.eegCh = eegCh;
 sSig.info.emgNchans = emgNchans;
 sSig.info.eegNchans = eegNchans;
+sSig.info.runtime = datetime(now, 'ConvertFrom', 'datenum');
 
 % save files
 if saveVar

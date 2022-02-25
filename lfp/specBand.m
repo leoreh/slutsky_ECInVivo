@@ -1,4 +1,4 @@
-function [zband, t, pband] = specBand(varargin)
+function [s, tstamps, freq] = specBand(varargin)
 
 % a wrapper for the multitaper spectrogram by chronux, with touches from
 % accusleep. creates and plots a spectrogram. 
@@ -6,173 +6,191 @@ function [zband, t, pband] = specBand(varargin)
 % specified time windews. should normalize
 %
 % INPUT
+%   basepath    char. fullpath to recording folder {pwd}
 %   sig         signal for detection
 %   fs          sampling frequency {1250}.
-%   band        vector. e.g. {[1 4]} for delta
-%   binsize     scalar {10}. in [samples]
-%   smf         smooth factor {winsize}. empty means no smoothing. zero
-%               means smf = binsize
-%   normband    logical. normalize to broadband (1) or not {0}
-%   logaxis     logical. ploy y axis (f) on logscale {false}
-%   graphics    logical. plot figure {1}
-%
-% OUTPUT
-%   zband       power spectra in band
-%   t           bin centers over which zband is calculated
-%
-% TO DO LIST
-%       # make compatible with band as matrix (multiple bands)
+%   ftarget     numeric. target frequency range and resolution. this can 
+%               be used to control the frequency axis of the spectrogram
+%               which depends on (1) the degree of zero padding chunks of
+%               the signal to for the fft ('pad') and (2) the time
+%               resolution (frequency binsize = 1 / window). {[]}. if empty
+%               than the freuqency range will be [0 120] and the resolution
+%               will be determined by window and pad.
+%   padftt      numeric. zero pad chunks of the data to the next pow2
+%               when applying fft. 0 means yes -1 means no. see mtspecgramc.m
+%   winstep     numeric. determines the time resolution of the spectrogram.
+%               for accusleep should be equal to epoch length. {1} [sec]
+%   logfreq     logical. ploy y axis (freq) on logscale {false}
+%   graphics    logical. plot figure {true}
+%   saveVar     logical. organize and save struct
 %
 % CALLS
-%       spectrogram
+%   mtspecgramc
+% 
+% TO DO LIST
+%       # find a way to set the frequency resolution in a log scale
+%       # normalize spectrogram
 %
-% 13 jan 20 LH.     updates:
-% 20 feb 20 LH      normalize to broadband
+% 13 jan 20 LH      updates:
+% 20 feb 20         normalize to broadband
+% 25 feb 22         adapted mtspecgramc
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 p = inputParser;
+addParameter(p, 'basepath', pwd, @ischar)
 addParameter(p, 'sig', [], @isnumeric)
 addParameter(p, 'fs', 1250, @isnumeric)
-addParameter(p, 'band', [1 4], @isnumeric)
-addParameter(p, 'binsize', 10, @isnumeric)
-addParameter(p, 'smf', 0, @isnumeric)
-addParameter(p, 'normband', true, @islogical)
-addParameter(p, 'logaxis', false, @islogical)
+addParameter(p, 'ftarget', [], @isnumeric)
+addParameter(p, 'padftt', 0, @isnumeric)
+addParameter(p, 'winstep', 1, @isnumeric)
+addParameter(p, 'logfreq', false, @islogical)
 addParameter(p, 'graphics', false, @islogical)
+addParameter(p, 'saveVar', true, @islogical)
 
 parse(p, varargin{:})
-sig = p.Results.sig;
-fs = p.Results.fs;
-band = p.Results.band;
-binsize = p.Results.binsize;
-smf = p.Results.smf;
-normband = p.Results.normband;
-logaxis = p.Results.logaxis;
-graphics = p.Results.graphics;
+basepath        = p.Results.basepath;
+sig             = p.Results.sig;
+fs              = p.Results.fs;
+ftarget         = p.Results.ftarget;
+padftt          = p.Results.padftt;
+winstep         = p.Results.winstep;
+logfreq         = p.Results.logfreq;
+graphics        = p.Results.graphics;
+saveVar         = p.Results.saveVar;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % params
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% params
-freq = logspace(0, 2, 100);
+% recording
+basepath = pwd;
+[~, basename] = fileparts(basepath);
+specfile = fullfile(basepath, [basename, '.spec.mat']);
 
-if smf == 0
-    smf = binsize;
+% prep frequencies
+if isempty(ftarget)
+    frange = [1 120];
+else
+    frange = [ftarget(1), ftarget(end)];
+    if frange(2) > fs / 2
+        error('requested max frequency greater than nyquist')
+    end
 end
 
-% initialize output
-zband = [];
-idx = zeros(1, 2);
-
-
+% mtspecgramc params
 window = max([5, winstep]);
+mtspec_params.pad = padftt;
+mtspec_params.Fs = fs;
+mtspec_params.fpass = frange;
+mtspec_params.tapers = [3 5];
 
-params = struct;
-params.pad = -1;
-params.Fs = SR;
-params.fpass = [0 64];
-params.tapers = [3 5];
-% make sure sig is a row
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% prep sig
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% should add option to load data from lfp binary and average multiple
+% channels. see trialave in mtspecgramc.m
+
+% assert row
 if ~isrow(sig)
     sig = sig';
 end
+
+% truncate sig to a multiple of fs * winstep
+sig = sig(1 : (length(sig) - mod(length(sig), fs * winstep)));
+
+% pad the sig signal so that the first bin starts at time 0
+sig = [sig(1 : round(fs * (window - winstep) / 2)), sig,...
+    sig((end + 1 - round(fs * (window - winstep) / 2)) : end)];
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % create spectrogram
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% truncate sig to a multiple of SR*winstep
-sig = sig(1:(length(sig)-mod(length(sig), SR*winstep)));
+[s, tstamps, freq] = mtspecgramc(sig, [window, winstep], mtspec_params);
 
-% pad the sig signal so that the first bin starts at time 0
-sig = [sig(1:round(SR*(window-winstep)/2)), sig, sig((end+1-round(SR*(window-winstep)/2)):end)];
-[s, t, f] = mtspecgramc(sig, [window, winstep], params);
-% adjust time axis to reflect this change
-t = t - (window-winstep)/2;
+% adjust time axis
+tstamps = tstamps - (window - winstep) / 2;
 
-% if the window is larger than 5, downsample along the frequency axis
-if window > 5
-    fTarget = 0:.2:64; % specify desired frequency axis
-    fIdx = zeros(1,length(fTarget)); % find closest indices in f
-    for i = 1:length(fTarget)
-        [~, fIdx(i)] = min(abs(f-fTarget(i)));
+% adjust the fequency domain to the target frequencies by finding the
+% closes indices to freq
+if ~isempty(ftarget)
+    fidx = zeros(1, length(ftarget)); % find closest indices in f
+    for ifreq = 1 : length(ftarget)
+        [fdev(ifreq), fidx(ifreq)] = min(abs(freq - ftarget(ifreq)));
     end
-    f = fTarget;
-    s = s(:,fIdx);
+    spec.info.freqOrig = freq;
+    freq = ftarget;
+    s = s(:, fidx);
 end
 
-
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% legacy
+% calculate power in specific bands
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% % instead of 10 s window w/ 1 s overlap, 0 overlap and smooth with 10
-% % points. this is so that p is congruent with bsr / iis rate
-% win = hann(2 ^ nextpow2(binsize));
-% [~, f, t, pband] = spectrogram(sig, win, 0, freq, fs, 'yaxis', 'psd');
-% 
-% % psd in dB
-% pband = 10 * log10(abs(pband));
-% 
-% % normalize to broadband
-% broad = sum(pband, 1);
-% [~, idx(1)] = min(abs(f - band(1)));
-% [~, idx(2)] = min(abs(f - band(2)));
-% narrow = sum(pband(idx(1) : idx(2), :), 1);
-% if normband
-%     zband = bz_NormToRange(zscore(narrow ./ broad), [0 1]);
-%     %     zband = narrow ./ broad;
-% else
-%     zband = narrow;
-% end
-% 
-% % smooth
-% if ~isempty(smf)
-%     zband = movmean(zband, smf);
-%     pband = movmean(pband, smf);
-% end
-% zband = zband(:);
-% 
-% % % smooth and z-score
-% % if ~isempty(band)
-% %     zband = sum(pband, 1);
-% %     zband = movmean(zband, smf);
-% %     if znorm
-% %         zband = bz_NormToRange(zscore(zband), [0 1]);
-% %     end
-% % else
-% %     zband = pband;
-% % end
-% % zband = zband(:);
-% 
-% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% % graphics
-% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% 
-% % ~same as Matlab default plot spectrogram
-% if graphics
-%     pband = bz_NormToRange(pband, [0 1]);
-%     surf(t / 60, f, pband, 'EdgeColor', 'none');
-%     axis xy;
-%     axis tight;
-%     view(0,90);
-%     origSize = get(gca, 'Position');
-%     colormap(jet);
-%     colorbar;
-%     ylabel('Frequency [Hz]');
-%     set(gca, 'Position', origSize);
-%     set(gca, 'TickLength', [0 0])
-%     if logaxis
-%         set(gca, 'YScale', 'log')
-%     end
-%     box off
-%     title('Wideband spectrogram')
-% end
+% should use decibels
+% maybe standardize with calibration data from accusleep
+% increase freq resolution in lower bands by recalculating spec
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% save
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+if saveVar
+    spec.info.runtime = datetime(now, 'ConvertFrom', 'datenum');
+    spec.info.tapers = mtspec_params.tapers;
+    spec.info.window = window;
+    spec.info.winstep = winstep;
+    spec.info.pad = mtspec_params.pad;
+    spec.s = s;
+    spec.freq = freq;
+    spec.tstamps = tstamps;
+    
+    save(specfile, 'spec')
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% graphics
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+if graphics
+    
+    % time axis in hours
+    nbins = length(tstamps);
+    tspec = ((1 : nbins) * winstep - winstep / 2) / 3600;
+    
+    % take a sample of the spectrogram to help initialize the colormap
+    sampleBins = randperm(nbins, round(nbins / 10));
+    specSample = reshape(s(sampleBins, :), 1, length(sampleBins) * length(freq));
+    cLimit = prctile(specSample, [6 98]);
+    
+    % plot
+    fh = figure;
+    if ~logfreq
+        imagesc(tspec, freq, s', cLimit);
+    else
+        pband = 10 * log10(abs(s));
+        pband = bz_NormToRange(pband, [0 1]);
+        surf(tspec, freq, pband', 'EdgeColor', 'none');
+        set(gca, 'yscale', 'log')
+        view(0, 90);
+        ylim([max([0.5, freq(1)]), freq(end)])
+    end
+    colormap(AccuSleep_colormap());
+    axis('xy')
+    ylabel('Frequency [Hz]')
+    xlabel('Time [h]')
+    
+    % save
+    figpath = fullfile('graphics', 'sleepState');
+    mkdir(figpath)
+    figname = fullfile(figpath, sprintf('%s_spec', basename));
+    export_fig(figname, '-tif', '-transparent', '-r300')
+    
+end
 
 end
 
