@@ -170,8 +170,8 @@ end
 
 fprintf('preparing signal...\n')
 
-% normalize data to ripple power during immobility or NREM. currently note
-% used
+% normalize data to ripple power during immobility or NREM. currently not
+% used. should also check out NormToInt from bz
 norm_idx = true(length(sig), 1);   % initialize
 if ~isempty(emg)
     norm_idx = emg < prctile(emg, 100 - emgThr);

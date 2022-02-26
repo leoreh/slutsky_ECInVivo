@@ -73,6 +73,8 @@ poweredges(1) = -Inf; poweredges(end) = Inf;
 %Calculate Power/Phase Spike Histogram
 %phaseamphist = cellfun(@(X,Y) hist3([X,Y],{powerbins,phasebins}),spikeamp,spikephase,'UniformOutput',false);
 
+% for each cell, create a bivariate histogram of lfp mag and phase during
+% each spike. both mag and phase are divided to nbins
 [PowerPhaseRatemap.Nspikes,~,~,spikebinIDs.powerbin,spikebinIDs.phasebin] = ...
     cellfun(@(X,Y,Z) histcounts2(X(Z),Y(Z),poweredges,phaseedges),...
     spikes.amp,spikes.phase,instatespiketimes,...
@@ -82,66 +84,74 @@ poweredges(1) = -Inf; poweredges(end) = Inf;
 %phaseamphist_t = hist3([t_amp,t_phase],{powerbins,phasebins});
 %phaseamphist_t = phaseamphist_t./sf_LFP;
 
+% calculate how much of the signal was in each phase or power in seconds
 PowerPhaseRatemap.occupancy = ...
     histcounts2(filteredLFP.amp(instateLFPtimes),...
     filteredLFP.phase(instateLFPtimes),poweredges,phaseedges);
 PowerPhaseRatemap.occupancy = ...
     PowerPhaseRatemap.occupancy./filteredLFP.samplingRate;
+
+% sum the amount of time across phases
 PowerPhaseRatemap.powerdist = sum(PowerPhaseRatemap.occupancy,2);
 
-%Normalize Rate
+% normalize counts to rate by dividing the number of spks with a specific
+% mag and phase by the occupancy (duration) of that mag and phase
 %totaltime = sum(diff(ints,1,2));
 %meanrate = cellfun(@(X) length(X)./totaltime,spiketimes,'UniformOutput',false);
 PowerPhaseRatemap.ratemap = cellfun(@(X) X./PowerPhaseRatemap.occupancy,...
     PowerPhaseRatemap.Nspikes,'UniformOutput',false);
 %phaseamprate = cellfun(@(X,Y) X./Y,phaseamprate,meanrate,'UniformOutput',false);
 
+% average across cells
 PowerPhaseRatemap.meanrate = nanmean(cat(3,PowerPhaseRatemap.ratemap{:}),3);
 
-if ~isempty(metric)
-    for po = 1:length(PowerPhaseRatemap.powerbins)
-        for ph = 1:length(PowerPhaseRatemap.phasebins)
-
-            %Find the spikes in the right bin
-            inbinspikes = cellfun(@(X,Y,Z) X==po & Y==ph ,...
-                spikebinIDs.powerbin,spikebinIDs.phasebin,...
-                'UniformOutput',false);
-            
-            %Find the metric from spikes in the state
-            instatmetric = cellfun(@(X,Y) X(Y),metric,instatespiketimes,...
-                'UniformOutput',false);
-
-            %Map for each cell
-            for cc = 1:numcells
-                PowerPhaseRatemap.metricmap{cc}(po,ph) = ...
-                    nanmean(instatmetric{cc}(inbinspikes{cc}));
-                
-                 %Threshold.
-                if sum(inbinspikes{cc}) < Nspikethresh
-                    PowerPhaseRatemap.metricmap{cc}(po,ph) = nan;
-                end
-            end
-
-        end
-    end
-    
-	PowerPhaseRatemap.meanmetric = nanmean(cat(3,PowerPhaseRatemap.metricmap{:}),3);
-
-end
+% if ~isempty(metric)
+%     for po = 1:length(PowerPhaseRatemap.powerbins)
+%         for ph = 1:length(PowerPhaseRatemap.phasebins)
+% 
+%             %Find the spikes in the right bin
+%             inbinspikes = cellfun(@(X,Y,Z) X==po & Y==ph ,...
+%                 spikebinIDs.powerbin,spikebinIDs.phasebin,...
+%                 'UniformOutput',false);
+%             
+%             %Find the metric from spikes in the state
+%             instatmetric = cellfun(@(X,Y) X(Y),metric,instatespiketimes,...
+%                 'UniformOutput',false);
+% 
+%             %Map for each cell
+%             for cc = 1:numcells
+%                 PowerPhaseRatemap.metricmap{cc}(po,ph) = ...
+%                     nanmean(instatmetric{cc}(inbinspikes{cc}));
+%                 
+%                  %Threshold.
+%                 if sum(inbinspikes{cc}) < Nspikethresh
+%                     PowerPhaseRatemap.metricmap{cc}(po,ph) = nan;
+%                 end
+%             end
+% 
+%         end
+%     end
+%     
+% 	PowerPhaseRatemap.meanmetric = nanmean(cat(3,PowerPhaseRatemap.metricmap{:}),3);
+% 
+% end
 %%
-%excell = randsample(spikes.numcells,1);
 figure
-% subplot(2,2,1)
-%     imagesc(PowerPhaseRatemap.phasebins,PowerPhaseRatemap.powerbins,...
-%         PowerPhaseRatemap.ratemap{excell})
-%     hold on
-%     imagesc(PowerPhaseRatemap.phasebins+2*pi,PowerPhaseRatemap.powerbins,...
-%         PowerPhaseRatemap.ratemap{excell})
-%     xlim([-pi 3*pi])
-%     axis xy
-%     colorbar
+
+% example of a single random cell
+excell = randsample(spikes.numcells,1);
+subplot(2,2,2)
+    imagesc(PowerPhaseRatemap.phasebins,PowerPhaseRatemap.powerbins,...
+        PowerPhaseRatemap.ratemap{excell})
+    hold on
+    imagesc(PowerPhaseRatemap.phasebins+2*pi,PowerPhaseRatemap.powerbins,...
+        PowerPhaseRatemap.ratemap{excell})
+    xlim([-pi 3*pi])
+    axis xy
+    colorbar
     
-subplot(2,2,1)
+% heat map across all cells
+    subplot(2,2,1)
     imagesc(PowerPhaseRatemap.phasebins,PowerPhaseRatemap.powerbins,...
         PowerPhaseRatemap.meanrate)
     hold on
@@ -154,28 +164,14 @@ subplot(2,2,1)
     xlabel('Phase');
     ylabel('Power (Z(log))')
     
-subplot(2,2,3)
+% histogram of power occupancy
+    subplot(2,2,3)
     bar(PowerPhaseRatemap.powerbins,PowerPhaseRatemap.powerdist)
     xlabel('Power (Z(log))');ylabel('Time (s)')
     box off
     axis tight
     
-if ~isempty(metric)
-    subplot(2,2,2)
-        h = imagesc(PowerPhaseRatemap.phasebins,PowerPhaseRatemap.powerbins,...
-            PowerPhaseRatemap.meanmetric);
-        hold on
-        h2 = imagesc(PowerPhaseRatemap.phasebins+2*pi,PowerPhaseRatemap.powerbins,...
-            PowerPhaseRatemap.meanmetric);
-        set(h,'AlphaData',~isnan(PowerPhaseRatemap.meanmetric));
-        set(h2,'AlphaData',~isnan(PowerPhaseRatemap.meanmetric));
-        plot(linspace(-pi,3*pi,100),cos(linspace(-pi,3*pi,100)),'k')
-        xlim([-pi 3*pi])
-        axis xy
-        colorbar  
-        xlabel('Phase');
-        ylabel('Power (Z(log))')
-end
+
 
 end
 

@@ -10,8 +10,9 @@
 % interneurons (Li, Sci. Reports, 2017). (2) original looped across lfp
 % channels, probably for linear probes. 
 
+winCalc = [0 3 * 60 * 60];
 [spklfp] = spkLfpCoupling('basepath', pwd, 'winCalc', winCalc, 'ch', 9,...
-    'frange', [6 100], 'nfreq', 10);
+    'frange', [6 16], 'nfreq', 1);
 
 % mtspecgramc params
 window = max([5, 1]);

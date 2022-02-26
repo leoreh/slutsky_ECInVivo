@@ -165,6 +165,32 @@ switch nfreq
         clear tmp
 end
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% restrict anaylsis to epochs with enough power in frange
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% approximate power in frequency band
+power = fastrms(sig_filt, ceil(fs ./ frange(1)), 1);
+powThr = 2;
+minpow = mean(power) + std(power) * powThr;
+
+% set the minimum duration to two cycles
+mindur = (fs ./ frange(2)) * 2; 
+    
+% if working on multiple frequencies simultaneously, must run this in a
+% loop
+% find epochs with power > low threshold. correct for durations
+bad_epochs = binary2epochs('vec', power < minpow, 'minDur', mindur,...
+    'maxDur', 0, 'interDur', 0);
+nepochs = size(bad_epochs, 1);
+
+% subtract out low power intervals
+intervals = SubtractIntervals(winCalc, bad_epochs);  
+
+
+angle(sig_filt) - mod(angle(sig_filt),2*pi)
+        lfpphase = mod(angle(hilb),2*pi);
+
 % get the lfp mag/phase of each frequency during each bin of spkcounts
 spkcnts.lfp_filt = interp1(tstamps, sig_filt, spkcnts.timestamps, 'nearest');
 
