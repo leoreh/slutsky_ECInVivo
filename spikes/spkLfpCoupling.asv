@@ -29,6 +29,10 @@ function [spklfp] = spkLfpCoupling(varargin)
 % however, i think both of these methods are mainly suitable for tasks with
 % repeated  trials
 
+% currently only a single lfp channel is used. need to think how to improve
+% this. in fieldtrip they mention bleeding of a spike waveform energy into
+% the lfp recorded on the same channel. could be problamatic 
+
 % INPUT
 %   basepath    char. fullpath to recording folder {pwd}
 %   winCalc     n x 2 mat
@@ -200,12 +204,7 @@ lfp_epochs = SubtractIntervals(winCalc, bad_epochs / fs);
 spktimes = cellfun(@(x) x(InIntervals(x, lfp_epochs)),...
     spikes.times, 'uni', false);
 
-% create a matrix of spike counts (each row is a differnet cell). the time
-% resolution is binsize and the overlap for moving average is window /
-% stepsize.
-window = 0.02;
-stepsize = 0.005;
-spkcnts = bz_SpktToSpkmat(spktimes, 'binsize', window, 'dt', stepsize);
+
 
 % if computation takes too long, can add a limit to the number of spikes
 % here
@@ -263,7 +262,7 @@ for iunit = 1 : nunits
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% rate map vs. power and phase
+% rate map as a function of power and phase
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % here, a bivariate histogram is created for each cell by dividing the lfp
@@ -335,22 +334,6 @@ axis tight
 title('Occupancy')
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% calc coupling
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% % for each cell, get the lfp mag/phase of each frequency during each spike
-% for iunit = 1 : nunits
-%     bz_Counter(iunit, nunits, 'Interpolating Cell')
-%     spikes.lfp_filt{iunit} = interp1(tstamps, sig_z, spktimes{iunit},'nearest');
-% end
-% 
-% % spk-phase coupling
-% spkz = cellfun(@(x) mean(x, 1, 'omitnan'), spikes.lfp_filt, 'uni', false);
-% spkz = cell2mat(spkz');
-% spkmag = abs(spkz);
-% spkphase = angle(spkz);
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % jitter
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -383,25 +366,41 @@ if jitterSig
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% population synchrony
+% wide band metrices 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% an alternative approach towards rate modulation is to count the number of
-% spikes in 5 ms bins with a moving average of x bins, and calculate the
-% spearman correlation between the counts and lfp magnitude. 
+% filter lfp at nfreq frequencies (log spaced) and normalize to mean
+frange = [0.5 120];
+nfreq = 20;
+tmp = bz_WaveSpec(sig, 'showprogress', true,...
+    'ncyc', 7, 'nfreqs', nfreq, 'frange', frange,...
+    'samplingRate', 1250);
+freqs = tmp.freqs;
+sig_z = tmp.data ./ mean(abs(tmp.data), 1, 'omitnan');
+clear tmp
 
-% get the lfp mag/phase of each frequency during each bin of spkcounts
+% -------------------------------------------------------------------------
+% correlations 
+% rate modulation by counting the number of spikes in 5 ms
+% bins with a moving average of 4 bins, then calculating the spearman
+% correlation between counts and lfp magnitude. seems to me that stepsize
+% for spkcounts should be adjusted according to the frequency of interest.
+
+% mat of spike counts
+window = 0.02;
+stepsize = 0.005;
+spkcnts = bz_SpktToSpkmat(spktimes, 'binsize', window, 'dt', stepsize);
+
+% get lfp mag/phase of each frequency during each bin of spkcounts
 spkcnts.lfp_filt = interp1(tstamps, sig_z, spkcnts.timestamps, 'nearest');
 
-% rate-magnitue modulation. correlation between spkcounts in each bin to
-% the magnitude of the lfp in each frequecny band. it seems to me that
-% stepsize for spkcounts should be adjusted according to the frequency of
-% interest.
-[ratemag_r, ratemag_p] = corr(spkcnts.data, abs(spkcnts.lfp_filt),...
+% rate-mag modulation. 
+[wideband.ratemag_r, wideband.ratemag_p] = corr(spkcnts.data, abs(spkcnts.lfp_filt),...
     'type', 'spearman', 'rows', 'complete');
 
-% Population Synchrony: Phase Coupling and Rate Modulation
-% here is where the separation of rs and fs is useful
+% -------------------------------------------------------------------------
+% population synchrony
+% must be computed separately for rs and fs cells
 for ipop = 1 : length(pop.names)
     
     pop.popidx(:, ipop) = strcmp(pop.subpops, pop.names{ipop});
@@ -428,6 +427,17 @@ for ipop = 1 : length(pop.names)
     pop.synphase(:, ipop) = angle(popz);
     
 end
+wideband.pop = pop;
+
+% -------------------------------------------------------------------------
+% spike triggered average and pairwise phase consistency. this is perhaps
+% best done by fieldtrip, but their data structure is impossible at the
+% moment. here i examined building an sta via fmatoolbox. very slow
+% durWin = [-0.5, 0.5];   % [sec]
+% nbinsMap = floor(fs * diff(durWin) / 2) * 2 + 1; % must be odd
+% [r, i] = Sync([tstamps' sig], spktimes{iunit}, 'durations', durWin);
+% tmpmap = SyncMap(r, i, 'durations', durWin,...
+%     'nbins', nbinsMap, 'smooth', 0);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % organize struct and save

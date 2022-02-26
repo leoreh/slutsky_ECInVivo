@@ -1,17 +1,37 @@
 function [spklfp] = spkLfpCoupling(varargin)
 
-% investigate spk - lfp coupling. based on bz_GenSpikeLFPCoupling.
-% main differences from bz_GenSpikeLFPCoupling: (1) original also had a
-% subrouting for calculating mutual information between power and ISI
-% distribution which i ignored. could be relavent for theta-driving
-% interneurons (Li, Sci. Reports, 2017). (2) original loopes across lfp
-% channels, probably for linear probes. otherwise this version is simply
-% more organized. 
+% investigate spk - lfp coupling as point to fields.
 
-% should also implement coherencypt from chronux which calculates the
+% should calculate across frequencies and for specific bands
+
+% current metrices include (1) phase coupling per cell, including significance
+% test (Rayleigh or jittering), (2) rate map for each cell by lfp phase and
+% power of a single band, (3) correlation between spk counts and lfp
+% magnitude across lfp frequencies, and correlation between population
+% synchrony (by spk counts) and magnitude across frequencies.
+
+% currently i think only (3) is suitable for wide band investigation.
+% should think how and when to separate rs vs fs cells
+
+% based on bz_GenSpikeLFPCoupling, bz_PhaseModulation, and
+% bz_PowerPhaseRatemap. main differences from bz_GenSpikeLFPCoupling: (1)
+% original also had a subrouting for calculating mutual information between
+% power and ISI distribution which i ignored. could be relavent for
+% theta-driving interneurons (Li, Sci. Reports, 2017). (2) original loopes
+% across lfp channels, probably for linear probes.
+
+% alternatives: (1) coherencypt from chronux which calculates the
 % cross-spectrom of the multitaper specs (point-process) spktimes and
-% (contineous) lfp. also should inspect the sta method of Vinck 2012 which is
-% implemented in fieldtrip
+% (contineous) lfp. 
+% see http://www-users.med.cornell.edu/~jdvicto/pdfs/pubo08.pdf
+% (2) the sta method of Vinck 2012 which is implemented in fieldtrip. see 
+% https://www.fieldtriptoolbox.org/tutorial/spikefield/
+% however, i think both of these methods are mainly suitable for tasks with
+% repeated  trials
+
+% currently only a single lfp channel is used. need to think how to improve
+% this. in fieldtrip they mention bleeding of a spike waveform energy into
+% the lfp recorded on the same channel. could be problamatic 
 
 % INPUT
 %   basepath    char. fullpath to recording folder {pwd}
@@ -29,6 +49,8 @@ function [spklfp] = spkLfpCoupling(varargin)
 %   bz_LoadBinary
 %   bz_SpktToSpkmat
 %   bz_Counter
+%   CircularDistribution (fmat)
+%   NormToInt
 %
 % TO DO LIST
 %       # allow user to input data (spktimes, lfp, units)
@@ -103,9 +125,6 @@ if exist(spksfile, 'file')
 end
 nunits = length(spikes.times);
 
-% restrict to winCalc
-spktimes = cellfun(@(x) x(InIntervals(x, winCalc)), spikes.times, 'uni', false);
-
 % get subpopulations of cells (e.g. rs and fs)
 pop.subpops = cell(1, nunits);
 pop.subpops(:) = {'unwn'};
@@ -120,20 +139,6 @@ if exist(unitsfile, 'file')
     end
 end
 pop.names = unique(pop.subpops);
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% spike count matrix
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% create a matrix of spike counts (each row is a differnet cell). the time
-% resolution is binsize and the overlap for moving average is window /
-% stepsize.
-window = 0.02;
-stepsize = 0.005;
-spkcnts = bz_SpktToSpkmat(spktimes, 'binsize', window, 'dt', stepsize);
-
-% if computation takes too long, can add a limit to the number of spikes
-% here
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arrange lfp
@@ -153,21 +158,25 @@ switch nfreq
     case 1
         sig_filt = filterLFP(sig, 'fs', fs, 'type', 'fir1', 'dataOnly', true,...
             'order', 7, 'passband', frange, 'graphics', false);
-        sig_filt = 	hilbert(sig_filt);
-        sig_filt = sig_filt ./ mean(abs(sig_filt));
+        sig_z = hilbert(sig_filt);
+        sig_z = sig_z ./ mean(abs(sig_z));
         
     otherwise
         tmp = bz_WaveSpec(sig, 'showprogress', true,...
             'ncyc', 7, 'nfreqs', nfreq, 'frange', frange,...
             'samplingRate', 1250);
         freqs = tmp.freqs;
-        sig_filt = tmp.data ./ mean(abs(tmp.data), 1, 'omitnan');
+        sig_z = tmp.data ./ mean(abs(tmp.data), 1, 'omitnan');
         clear tmp
 end
 
+% must remove copies of the signal due to memory (raw, filt, hilbert)
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% restrict anaylsis to epochs with enough power in frange
+% restrict anaylsis to epochs with enough power in band
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% if working on multiple frequencies simultaneously, must run this in a
+% loop
 
 % approximate power in frequency band
 power = fastrms(sig_filt, ceil(fs ./ frange(1)), 1);
@@ -177,52 +186,160 @@ minpow = mean(power) + std(power) * powThr;
 % set the minimum duration to two cycles
 mindur = (fs ./ frange(2)) * 2; 
     
-% if working on multiple frequencies simultaneously, must run this in a
-% loop
-% find epochs with power > low threshold. correct for durations
+% find epochs with power > low threshold. correct for durations. NOT SURE
+% THIS IS THE CORRECT APPROACH FOR BAC EXPERIMENTS WHEN DELTA IS ALWAYS
+% HIGH
 bad_epochs = binary2epochs('vec', power < minpow, 'minDur', mindur,...
-    'maxDur', 0, 'interDur', 0);
+    'maxDur', Inf, 'interDur', 0);
 nepochs = size(bad_epochs, 1);
 
 % subtract out low power intervals
-intervals = SubtractIntervals(winCalc, bad_epochs);  
+lfp_epochs = SubtractIntervals(winCalc, bad_epochs / fs);  
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% handle spikes
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% restrict spktimes to lfp epochs
+spktimes = cellfun(@(x) x(InIntervals(x, lfp_epochs)),...
+    spikes.times, 'uni', false);
 
 
-angle(sig_filt) - mod(angle(sig_filt),2*pi)
-        lfpphase = mod(angle(hilb),2*pi);
 
-% get the lfp mag/phase of each frequency during each bin of spkcounts
-spkcnts.lfp_filt = interp1(tstamps, sig_filt, spkcnts.timestamps, 'nearest');
+% if computation takes too long, can add a limit to the number of spikes
+% here
 
-% for each cell, get the lfp mag/phase of each frequency during each spike
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% bz_PhaseModulation
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+nbins = 180;
+
+% initialize
+spkphase        = cell(1,length(spikes.times));
+phase.dist      = nan(nbins, nunits);
+phase.kappa     = nan(1, nunits);
+phase.theta     = nan(1, nunits);
+phase.r         = nan(1, nunits);
+phase.p         = nan(1, nunits);
+h = [];
 for iunit = 1 : nunits
-    bz_Counter(iunit, nunits, 'Interpolating Cell')
-    spikes.lfp_filt{iunit} = interp1(tstamps, sig_filt, spktimes{iunit},'nearest');
+    
+    if isempty(spktimes{iunit})
+        continue
+    end
+    
+    % find phase of lfp for each spike. notes: (1) in bz_PhaseModulation
+    % this is done by indexing angle(sig_z) with spktimes * fs which is
+    % faster but less accurate. (2) converting angles to 0 : 2pi rather
+    % than -pi : pi is neccassary because that is how cicrcularDistribution
+    % divides nbins. (3) in bz_genSpikeLfpCoupling they take
+    % the angle and magnitude of the mean(hilbert) instead of averaging the
+    % angle and magnitude separately which i think is a mistake
+    spkphase{iunit} = interp1(tstamps, mod(angle(sig_z), 2 * pi), spktimes{iunit}, 'nearest');
+    
+    % use zugaro for circular statstics. mean phase - theta; mean resultant
+    % length - r; Von Mises concentraion - kappa; Rayleigh significance of
+    % uniformity - p; see also:
+    % https://ncss-wpengine.netdna-ssl.com/wp-content/themes/ncss/pdf/Procedures/NCSS/Circular_Data_Analysis.pdf
+    [phase.dist(:, iunit), phase.bins, tmp] = CircularDistribution(spkphase{iunit}, 'nBins', nbins);
+    phase.kappa(iunit) = tmp.k;
+    phase.theta(iunit) = tmp.m;
+    phase.r(iunit) = tmp.r;
+    phase.p(iunit) = tmp.p;
+
+    % plotting   
+    h(end+1) = figure;
+    hax = subplot(1,2,1);
+    rose(spkphase{iunit})
+    title(sprintf('Cell %d; Rayleigh = %.2f', iunit, phase.p(iunit)))
+    
+    hax = subplot(1,2,2);
+    bar(phase.bins * 180 / pi, phase.dist(:, iunit))
+    xlim([0 360])
+    set(hax,'XTick',[0 90 180 270 360])
+    hold on;
+    plot([0:360],cos(pi/180*[0:360])*0.05*max(phase.dist(:, iunit))+0.95*max(phase.dist(:, iunit)),'color',[.7 .7 .7])
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% calc coupling
+% rate map as a function of power and phase
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% rate-magnitue modulation. correlation between spkcounts in each bin to
-% the magnitude of the lfp in each frequecny band. it seems to me that
-% stepsize for spkcounts should be adjusted according to the frequency of
-% interest.
-[ratemag_r, ratemag_p] = corr(spkcnts.data, abs(spkcnts.lfp_filt),...
-    'type', 'spearman', 'rows', 'complete');
+% here, a bivariate histogram is created for each cell by dividing the lfp
+% power and phase to nbins x nbins and counting the number of spikes in each
+% bin. the counts or normalized to rate by occupance - the duration of each
+% bin. based on bz_PowerPhaseRatemap
+nbins_rate = 20;
 
-% spk-phase coupling
-spkz = cellfun(@(x) mean(x, 1, 'omitnan'), spikes.lfp_filt, 'uni', false);
-spkz = cell2mat(spkz');
-spkmag = abs(spkz);
-spkphase = angle(spkz);
+% convert amp to power and normalize by z-scoring. dicided to include
+% entire signal and not just epochs of high power
+sig_pow = NormToInt(log10(abs(sig_z)), 'Z', [0 Inf], fs);
+sig_phase = mod(angle(sig_z), 2 * pi);
+
+% get power and phase of each spike for each cell
+spikes.pow = cellfun(@(x) interp1(tstamps, sig_pow, x, 'nearest'),...
+    spktimes, 'uni', false);
+spikes.phase = cellfun(@(x) interp1(tstamps, sig_phase, x, 'nearest'),...
+    spktimes, 'uni', false);
+
+% create bins for power and phase
+phase_edges = linspace(0, 2 * pi, nbins_rate + 1);
+ratemap.phase_bins = phase_edges(1 : end - 1) + 0.5 .* diff(phase_edges(1 : 2));
+pow_edges = linspace(-1.8, 1.8, nbins_rate + 1);
+ratemap.power_bins = pow_edges(1 : end - 1) + 0.5 .* diff(pow_edges(1 : 2));
+pow_edges(1) = -Inf; pow_edges(end) = Inf;
+
+% calculate occupance; duration [sec] of the signal for each pair of phase
+% and power
+ratemap.occupancy = ...
+    histcounts2(sig_pow, sig_phase, pow_edges, phase_edges) / fs;
+
+% for each cell, count spikes in each bin of power and phase
+ratemap.counts = cellfun(@(x, y) histcounts2(x, y, pow_edges, phase_edges),...
+    spikes.pow, spikes.phase, 'uni', false);
+
+% normalize counts to rate by dividing with occupancy
+ratemap.rate = cellfun(@(x) x ./ ratemap.occupancy,...
+    ratemap.counts, 'uni', false);
+
+% convert to 3d mat (power x phase x cell)
+ratemap.counts = cat(3, ratemap.counts{:});
+ratemap.rate = cat(3, ratemap.rate{:});
+
+% graphics. THIS SHOULD BE DIVIDED PER POPULATION
+figure
+    
+% mean rate across all cells
+subplot(2, 2, 1)
+imagesc(ratemap.phase_bins, ratemap.power_bins,...
+    mean(ratemap.rate, 3, 'omitnan'))
+hold on
+imagesc(ratemap.phasebins + 2 * pi, ratemap.power_bins,...
+    mean(ratemap.rate, 3, 'omitnan'))
+plot(linspace(0, 2 * pi, 100), cos(linspace(-pi, 2 * pi, 100)), 'k')
+xlim([0 2 * pi])
+axis xy
+colorbar
+xlabel('Phase');
+ylabel('Norm. Power')
+title('Mean Rate')
+
+% histogram of power occupancy
+subplot(2, 2, 3)
+bar(ratemap.power_bins, sum(ratemap.occupancy, 2))
+xlabel('Norm. Power')
+ylabel('Time [sec]')
+box off
+axis tight
+title('Occupancy')
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % jitter
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% get significance of spkphase by jitterign spktimes. this takes an insane
-% amount of time
+% get significance of spkphase by jittering spktimes. this takes an insane
+% amount of time. however, currently it seems that with Rayleigh all cells
+% have significant modulation of phase. need to dive deeper
 if jitterSig
     
     njitt = 30;
@@ -234,7 +351,7 @@ if jitterSig
             display(['Jitter ', num2str(ijitt), ' of ', num2str(njitt)])
         end
         jitterspikes = bz_JitterSpiketimes(spktimes, jitterwin);
-        jitt_lfp = cellfun(@(X) interp1(tstamps, sig_filt, X, 'nearest'),...
+        jitt_lfp = cellfun(@(X) interp1(tstamps, sig_z, X, 'nearest'),...
             jitterspikes, 'UniformOutput', false);
         
         for iunit = 1 : nunits
@@ -249,11 +366,41 @@ if jitterSig
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% population synchrony
+% wide band metrices 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% Population Synchrony: Phase Coupling and Rate Modulation
-% here is where the separation of rs and fs is useful
+% filter lfp at nfreq frequencies (log spaced) and normalize to mean
+frange = [0.5 120];
+nfreq = 20;
+tmp = bz_WaveSpec(sig, 'showprogress', true,...
+    'ncyc', 7, 'nfreqs', nfreq, 'frange', frange,...
+    'samplingRate', 1250);
+freqs = tmp.freqs;
+sig_z = tmp.data ./ mean(abs(tmp.data), 1, 'omitnan');
+clear tmp
+
+% -------------------------------------------------------------------------
+% correlations 
+% rate modulation by counting the number of spikes in 5 ms
+% bins with a moving average of 4 bins, then calculating the spearman
+% correlation between counts and lfp magnitude. seems to me that stepsize
+% for spkcounts should be adjusted according to the frequency of interest.
+
+% mat of spike counts
+window = 0.02;
+stepsize = 0.005;
+spkcnts = bz_SpktToSpkmat(spktimes, 'binsize', window, 'dt', stepsize);
+
+% get lfp mag/phase of each frequency during each bin of spkcounts
+spkcnts.lfp_filt = interp1(tstamps, sig_z, spkcnts.timestamps, 'nearest');
+
+% rate-mag modulation. 
+[wideband.ratemag_r, wideband.ratemag_p] = corr(spkcnts.data, abs(spkcnts.lfp_filt),...
+    'type', 'spearman', 'rows', 'complete');
+
+% -------------------------------------------------------------------------
+% population synchrony
+% must be computed separately for rs and fs cells
 for ipop = 1 : length(pop.names)
     
     pop.popidx(:, ipop) = strcmp(pop.subpops, pop.names{ipop});
@@ -280,6 +427,17 @@ for ipop = 1 : length(pop.names)
     pop.synphase(:, ipop) = angle(popz);
     
 end
+wideband.pop = pop;
+
+% -------------------------------------------------------------------------
+% spike triggered average and pairwise phase consistency. this is perhaps
+% best done by fieldtrip, but their data structure is impossible at the
+% moment. here i examined building an sta via fmatoolbox. very slow
+% durWin = [-0.5, 0.5];   % [sec]
+% nbinsMap = floor(fs * diff(durWin) / 2) * 2 + 1; % must be odd
+% [r, i] = Sync([tstamps' sig], spktimes{iunit}, 'durations', durWin);
+% tmpmap = SyncMap(r, i, 'durations', durWin,...
+%     'nbins', nbinsMap, 'smooth', 0);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % organize struct and save
@@ -393,7 +551,7 @@ if graphics
     % save
     figpath = fullfile(basepath, 'graphics');
     mkdir(figpath)
-    figname = fullfile(figpath, sprintf('%spk_lfp', basename));
+    figname = fullfile(figpath, sprintf('%.spk_lfp', basename));
     export_fig(figname, '-tif', '-transparent', '-r300')
 end
 
