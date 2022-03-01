@@ -65,9 +65,6 @@ sig = double(bz_LoadBinary(lfpfile, 'duration', diff(winCalc),...
     'channels', ch, 'downsample', 1));
 sig = mean(sig, 2);
 
-% filter lfp
-
-
 % clip spike times
 spktimes = cellfun(@(x) x(InIntervals(x, winCalc)),...
     spikes.times, 'uni', false);
@@ -76,11 +73,97 @@ spktimes = cellfun(@(x) x(InIntervals(x, winCalc)),...
 % single band analysis
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-frange = [1 12];
-[spklfp] = spklfp_singleband('basepath', basepath, 'fs', fs,...
-    'sig', sig, 'spktimes', spktimes, 'frange', frange,...
-    'jitterSig', false, 'srtUnits', true, 'graphics', true,...
-    'saveVar', true);
+frange = [0.5 1.5; 1.5, 4; 4, 6; 6, 10;];
+frange = [frange; [10 : 10 : 90; 20 : 10 : 100]'];
+
+clear spklfp
+for ifreq = 1 : size(frange, 1)
+    
+    fprintf('working on frequency %d of %d', ifreq, size(frange, 1))
+    
+    % filter lfp
+    sig_filt = filterLFP(sig, 'fs', fs, 'type', 'butter', 'dataOnly', true,...
+        'order', 3, 'passband', frange(ifreq, :), 'graphics', false);
+    
+    [spklfp(ifreq)] = spklfp_singleband('basepath', basepath, 'fs', fs,...
+        'sig', sig_filt, 'spktimes', spktimes, 'frange', frange(ifreq, :),...
+        'srtUnits', true, 'graphics', true,...
+        'saveVar', false);    
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% wide band graphics
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% cat struct
+sl = catfields(spklfp, 'catdef', 'symmetric');
+
+% center frequencies 
+freq = sl.info.frange(:, 1) + diff(sl.info.frange, 1, 2) / 2;
+
+fh = figure;
+posnegcolor = makeColorMap([0 0 0.8],[1 1 1],[0.8 0 0]);
+
+sb1 = subplot(2, 3, 1);     % syn mag correlation
+sb2 = subplot(2, 3, 2);     % cell map of rate mag correlation
+sb3 = subplot(2, 3, 3);     % polar of spk phase/mag coupling
+sb4 = subplot(2, 3, 4);     % syn phase coupling
+sb5 = subplot(2, 3, 5);     % cell map of spk phase coupling
+sb6 = subplot(2, 3, 6);     % rose histogram of spk phse coupling
+
+% syn mag correlation
+fh.CurrentAxes = sb1;
+hold on
+plot(sb1, freq, sl.pop.synmag_r)
+plot(sb1, freq([1 end]), [0 0], 'k--')
+xticks([0.1, 1, 10, 100])
+box off
+set(gca, 'xscale', 'log')
+title('Syn - Mag Correlation')
+xlabel('Frequency [Hz]');
+ylabel('Rho')
+
+% syn phase coupling
+fh.CurrentAxes = sb4;
+hold on
+plot(freq, sl.pop.phase.r)
+axis tight
+box off
+set(gca, 'xscale', 'log')
+xlabel('Frequency [Hz]');
+ylabel('Mean Resultant Length')
+ylabel('Syn - Phase Coupling')
+
+% cell map of rate mag correlation
+fh.CurrentAxes = sb2;
+imagesc(freq, 1 : nunits, sl.ratemag.r)
+xlabel('Frequency [Hz]');
+ylabel('Cell')
+axis tight
+axis xy
+colormap(gca, posnegcolor)
+title('Spike - Mag Correlation')
+
+% cell map of rate mag correlation
+fh.CurrentAxes = sb5;
+data = bz_NormToRange(squeeze(sl.pop.phase.dist(2 : end, 1 : end, 2)), [0 1]);
+imagesc(pop.phase.bins, freq, data)
+xlabel('Phase');
+ylabel('Frequency')
+axis tight
+colormap
+title('Synchrony - Phase Correlation')
+
+% map of mean rate
+
+
+% save
+figpath = fullfile(basepath, 'graphics');
+mkdir(figpath)
+figname = fullfile(figpath, sprintf('%.spk_lfp', basename));
+export_fig(figname, '-tif', '-transparent', '-r300')
+
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % wide band analysis

@@ -1,4 +1,5 @@
 
+% spklfp_wrapper
 
 % investigate spk - lfp coupling.
 
@@ -9,25 +10,11 @@
 % magnitude.
 
 % in addition to working on multiple / single frequency, single band
-% filters the data with a time domain 
-
-% current metrices include (1) phase coupling per cell, including significance
-% test (Rayleigh or jittering), (2) rate map for each cell by lfp phase and
-% power of a single band, (3) correlation between spk counts and lfp
-% magnitude across lfp frequencies, and correlation between population
-% synchrony (by spk counts) and magnitude across frequencies.
-
-% currently i think only (3) is suitable for wide band investigation.
-% should think how and when to separate rs vs fs cells
+% filters the data by fir whereas wide band filters each frequency band
+% with by wavelet convolution. 
 
 % based on bz_GenSpikeLFPCoupling, bz_PhaseModulation, and
-% bz_PowerPhaseRatemap. main differences from bz_GenSpikeLFPCoupling: (1)
-% original also had a subrouting for calculating mutual information between
-% power and ISI distribution which i ignored. could be relavent for
-% theta-driving interneurons (Li, Sci. Reports, 2017). (2) original loopes
-% across lfp channels, probably for linear probes.
-
-% alternatives: 
+% bz_PowerPhaseRatemap. alternatives include:
 % (1) coherencypt from chronux which calculates the cross
 % multitaper spectroms of the (point-process) spktimes and (contineous)
 % lfp. see http://www-users.med.cornell.edu/~jdvicto/pdfs/pubo08.pdf 
@@ -35,11 +22,6 @@
 % https://www.fieldtriptoolbox.org/tutorial/spikefield/ however, i think
 % both of these methods are mainly suitable for tasks with repeated trials
 % i think
-
-
-% currently only a single lfp channel is used. need to think how to improve
-% this. in fieldtrip they mention bleeding of a spike waveform energy into
-% the lfp recorded on the same channel. could be problamatic 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % prepare data
@@ -91,17 +73,41 @@ spktimes = cellfun(@(x) x(InIntervals(x, winCalc)),...
 % single band analysis
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-frange = [6 12];
-[spklfp] = spklfp_singleband('basepath', basepath, 'fs', fs,...
-    'sig', sig, 'spktimes', spktimes, 'frange', frange,...
-    'jitterSig', false, 'srtUnits', true, 'graphics', true,...
-    'saveVar', true);
+
+frange = [1, 4; 6, 10; 10, 20; 20 : 30; 30 : 40; 40 : 50];
+frange = 1 : 4 : 100;
+
+clear spklfp
+for ifreq = 1 : size(frange, 1)
+    
+    fprintf('working on frequency %d', ifreq)
+    
+    % filter lfp
+    sig_filt = filterLFP(sig, 'fs', fs, 'type', 'butter', 'dataOnly', true,...
+        'order', 3, 'passband', frange(ifreq, :), 'graphics', false);
+    
+    [spklfp(ifreq)] = spklfp_singleband('basepath', basepath, 'fs', fs,...
+        'sig', sig_filt, 'spktimes', spktimes, 'frange', frange(ifreq, :),...
+        'srtUnits', true, 'graphics', true,...
+        'saveVar', false);
+    
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% wide band graphics
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+sl = catfields(spklfp, 'catdef', 'symmetric');
+
+
+sl.ratemap
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % wide band analysis
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-frange = [0.5 120];
+frange = [1 100];
 nfreq = 20;
 [spklfp] = spklfp_wideband('basepath', basepath, 'fs', fs,...
     'sig', sig, 'spktimes', spktimes, 'frange', frange,...
