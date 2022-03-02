@@ -64,6 +64,7 @@ nbins_rate = 20;
 % params for spk count mat
 movWin = 0.02;
 stepsize = 0.005;
+nunits = length(spktimes);
 
 % files
 [~, basename] = fileparts(basepath);
@@ -86,7 +87,7 @@ sig_z = hilbert(sig);
 sig_pow = NormToInt(log10(abs(sig_z)), 'Z', [0 Inf], fs);
 
 % norm to mean
-sig_z = sig_z ./ mean(abs(sig_z));
+% sig_z = sig_z ./ mean(abs(sig_z));
 
 % get angles in range 0 : 2pi rather than -pi : pi. this is neccassary
 % because of the way circularDistribution bins the data. 
@@ -116,7 +117,6 @@ lfp_occupancy = sum(lfp_epochs(:, 2) - lfp_epochs(:, 1)) ./...
 
 % restrict spktimes to lfp epochs. if computation takes too long, can add a
 % limit to the number of spikes here
-nunits = length(spktimes);
 
 % get power and phase of each spike for each cell. in bz_PhaseModulation
 % this is done by indexing angle(sig_z) with spktimes * fs which is
@@ -194,7 +194,7 @@ ratemap.counts = cat(3, ratemap.counts{:});
 ratemap.rate = cat(3, ratemap.rate{:});
 
 % mean rate
-ratemap.ratemean = squeeze(mean(ratemap.rate, 1, 'omitnan'));
+ratemap.ratemean = squeeze(mean(ratemap.rate, 3, 'omitnan'));
 
 % clear memory
 clear spk_pow 
@@ -258,16 +258,20 @@ for ipop = 1 : length(pop.names)
     % standardize to the mean
     popsyn = popsyn ./ mean(popsyn);
     
-    % correlation between synchrony and lfp mag for each frequency
+    % correlation between synchrony and lfp mag 
     [pop.synmag_r(:, ipop), pop.synmag_p(:, ipop)] =...
         corr(popsyn, abs(lfp_z), 'type', 'spearman',...
         'rows', 'complete');
     
     % synchrony phase coupling. in bz this is doen by averaging the complex
-    % number but decided to adapt the same procedure as
-    % for single cells
+    % number but decided to adapt the same procedure as for single cells
     pop_z = abs(lfp_z) .* (popsyn .* exp(1i .* angle(lfp_z)));
     pop_angle = mod(angle(pop_z), 2 * pi);
+    
+    % select only counts during high lfp power
+    pop_angle = pop_angle(InIntervals(spkcnts.timestamps, lfp_epochs));
+    
+    % zugaro
     [pop.phase.dist(:, ipop), pop.phase.bins, tmp] =...
         CircularDistribution(pop_angle, 'nBins', nbins_phase);
     pop.phase.kappa(ipop) = tmp.k;
@@ -316,8 +320,8 @@ if graphics
     imagesc(spklfp.ratemap.phase_bins, spklfp.ratemap.power_bins,...
         mean(spklfp.ratemap.rate, 3, 'omitnan'))
     hold on
-    imagesc(spklfp.ratemap.phase_bins + 2 * pi, spklfp.ratemap.power_bins,...
-        mean(spklfp.ratemap.rate, 3, 'omitnan'))
+%     imagesc(spklfp.ratemap.phase_bins + 2 * pi, spklfp.ratemap.power_bins,...
+%         mean(spklfp.ratemap.rate, 3, 'omitnan'))
     plot(linspace(0, 2 * pi, 100), cos(linspace(-pi, 2 * pi, 100)), 'k')
     xlim([0 2 * pi])
     axis xy
