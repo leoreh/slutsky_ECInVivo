@@ -10,7 +10,7 @@ function [spktimes, spkch] = spktimesWh(varargin)
 %   spkgrp      array where each cell is the electrodes for a spike group. 
 %   chunksize   numeric. size of chunk to load [samples]. note data 
 %               is loaded and processed in batces of spkgrps
-%   winCalc     numeric. time range to to whiten [s]{[0 Inf]}
+%   winCalc     numeric. time range to whiten [s]{[0 Inf]}
 %   winWh       numeric. time range to use for the cov mat [s]{[0 Inf]}
 %   saveWh      logical. save temp_wh.dat {false}
 %   saveVar     logical. save output {true}
@@ -126,6 +126,9 @@ datr_prev       = gpuArray.zeros(ntb, ops.Nchan, 'single');
 
 % get a rotation matrix (Nchan by Nchan) which whitens the zero-timelag
 % covariance of the data
+if winWh(2) > nTimepoints / fs
+    winWh(2) = floor(nTimepoints / fs);
+end
 Wrot = get_whitening_matrix(rez, winWh); 
 
 fid = fopen(ops.fbinary, 'r'); % open for reading raw data

@@ -66,7 +66,6 @@ if iscell(dataPreset)
         end
     end
         linkaxes(sb, 'x')
-        axis tight
     return
 end
 
@@ -96,18 +95,6 @@ switch dataPreset
         for isession = 1 : nsessions
             filename = fullfile(basepaths{isession},...
                 [basenames{isession}, '.sleep_sig.mat']);
-            load(filename, 'spec');
-            v(isession).data = spec';
-        end
-        cfg = as_loadConfig();
-        ts = cfg.epochLen;                 % sampling period [s]
-        load(filename, 'spec_freq');
-        faxis = spec_freq;
-    
-    case 'specEEG'
-        for isession = 1 : nsessions
-            filename = fullfile(basepaths{isession},...
-                [basenames{isession}, '.sleep_sig_eeg.mat']);
             load(filename, 'spec');
             v(isession).data = spec';
         end
@@ -218,7 +205,7 @@ tidxLabels = string(datestr(datenum(tStartLabel : hours(xTicksBinsize) : expEnd)
 % add date to x labels once a day
 tidxLabels(1 : 24 / xTicksBinsize : end) =...
     string(datestr(datenum(tStartLabel : hours(24) : expEnd),...
-    'yymmdd', 2000));
+    'yymmdd_HH:MM', 2000));
 % data for x-axis
 xdata = [1 : ts : ceil(seconds(expEnd - expStart))];
 
@@ -234,7 +221,7 @@ if graphics
         set(gcf, 'CurrentAxes', axh)
     end
     switch dataPreset
-        case {'spec', 'specEEG'}
+        case 'spec'
             
             % take a sample of the spectrogram to help initialize the colormap
             showFreqs = find(faxis <= 15);  % freqs to display
@@ -250,11 +237,10 @@ if graphics
         
         case 'emg'            
             % plot
-            smoothData = movmean(expData, 33, 1);
-            plot(xdata, smoothData);
+            plot(xdata, expData(:, showFreqs)', caxis1);
             colormap(AccuSleep_colormap());
             axis('xy')
-            ylabel('Norm. EMG')
+            ylabel('Frequency [Hz]')
             
         case 'sr'
             smoothData = movmean(expData, 13, 1);
@@ -265,10 +251,10 @@ if graphics
             
         case 'fr'
             smoothData = movmean(mean(expRs, 2, 'omitnan'), 13, 1);
-            plot(xdata, smoothData, 'LineWidth', 2)
+            plot(xdata, smoothData)
             hold on
             smoothData = movmean(mean(expFs, 2, 'omitnan'), 13, 1);
-            plot(xdata, smoothData, 'LineWidth', 2)
+            plot(xdata, smoothData)
             legend({sprintf('RS <= %d', max(nunits(:, 1))),...
                 sprintf('FS <= %d', max(nunits(:, 2)))})
             ylabel('Firing Rate [Hz]')
@@ -280,7 +266,6 @@ if graphics
             axis tight
     end
     
-    axis tight
     xticks(tidx * ts)
     xticklabels(tidxLabels)
     xtickangle(45)
