@@ -141,7 +141,7 @@ for iunit = 1 : nunits
     % restrict spikes to epochs of high power. for other metrices all
     % spikes are used
     spkidx = InIntervals(spktimes{iunit}, lfp_epochs);
-    if isempty(spkidx)
+    if sum(spkidx) == 0 || isempty(spkidx)
         continue
     end
 
@@ -156,7 +156,7 @@ for iunit = 1 : nunits
         CircularDistribution(spk_phase{iunit}(spkidx), 'nBins', nbins_phase);
     phase.kappa(iunit) = tmp.k;
     phase.theta(iunit) = tmp.m;
-    phase.r(iunit) = tmp.r;
+    phase.mrl(iunit) = tmp.r;
     phase.p(iunit) = tmp.p;
 end
 
@@ -197,7 +197,7 @@ ratemap.rate = cat(3, ratemap.rate{:});
 ratemap.ratemean = squeeze(mean(ratemap.rate, 1, 'omitnan'));
 
 % clear memory
-clear spk_pow 
+% clear spk_pow 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % rate - magnitude correlation
@@ -242,7 +242,7 @@ pop.names = unique(pop.subpops);
 pop.phase.dist      = nan(nbins_phase, length(pop.names));
 pop.phase.kappa     = nan(1, length(pop.names));
 pop.phase.theta     = nan(1, length(pop.names));
-pop.phase.r         = nan(1, length(pop.names));
+pop.phase.mrl         = nan(1, length(pop.names));
 pop.phase.p         = nan(1, length(pop.names));
 
 % must be computed separately for rs and fs cells
@@ -272,7 +272,7 @@ for ipop = 1 : length(pop.names)
         CircularDistribution(pop_angle, 'nBins', nbins_phase);
     pop.phase.kappa(ipop) = tmp.k;
     pop.phase.theta(ipop) = tmp.m;
-    pop.phase.r(ipop) = tmp.r;
+    pop.phase.mrl(ipop) = tmp.r;
     pop.phase.p(ipop) = tmp.p;
 end
 
@@ -312,27 +312,46 @@ if graphics
     fh = figure;
     
     % mean rate across all cells
-    subplot(2, 2, 1)
-    imagesc(spklfp.ratemap.phase_bins, spklfp.ratemap.power_bins,...
-        mean(spklfp.ratemap.rate, 3, 'omitnan'))
+    sb1 = subplot(2, 3, 1);
     hold on
-    imagesc(spklfp.ratemap.phase_bins + 2 * pi, spklfp.ratemap.power_bins,...
+    imagesc(sb1, spklfp.ratemap.phase_bins, spklfp.ratemap.power_bins,...
         mean(spklfp.ratemap.rate, 3, 'omitnan'))
-    plot(linspace(0, 2 * pi, 100), cos(linspace(-pi, 2 * pi, 100)), 'k')
-    xlim([0 2 * pi])
+    imagesc(sb1, spklfp.ratemap.phase_bins + 2 * pi, spklfp.ratemap.power_bins,...
+        mean(spklfp.ratemap.rate, 3, 'omitnan'))
+    plot(sb1, linspace(0, 4 * pi, 100), cos(linspace(0, 4 * pi, 100)), 'k')
+    axis tight
+    ax = gca;
+    xticks([0 : pi : 4 * pi])
+    xticklabels(string(0 : 4) + "pi")
     axis xy
     colorbar
-    xlabel('Phase');
+    xlabel('Phase [rad]');
     ylabel('Norm. Power')
     title('Mean Rate')
-    
+
     % polar plot of mean phase and resultant length per cell
-    subplot(2, 2, 2)
-    polar(spklfp.phase.theta, spklfp.phase.r, '.')
-    title('phase and MRL per cell')
-    
+    subplot(2, 3, 2)
+    polarplot(spklfp.phase.theta, spklfp.phase.mrl, '.')
+    rlim([0 1])
+    rticks([])
+    thetaticks([0 : 90 : 270])
+    pax = gca;
+    pax.ThetaAxisUnits = 'radians';
+    pax.GridAlpha = 0.2;
+    title('phase and MRL per cell')   
+
+    % polar histogram of phase distribution between cells
+    subplot(2, 3, 3)
+    polarhistogram(spklfp.phase.theta, 10)
+    title('phase distribution')
+    rticks([])
+    thetaticks([0 : 90 : 270])
+    pax = gca;
+    pax.ThetaAxisUnits = 'radians';
+    pax.GridAlpha = 0.2;
+
     % histogram of power occupancy
-    subplot(2, 2, 4)
+    subplot(2, 3, 4)
     bar(spklfp.ratemap.power_bins, sum(spklfp.ratemap.occupancy, 2))
     xlabel('Norm. Power')
     ylabel('Time [sec]')
@@ -340,13 +359,16 @@ if graphics
     axis tight
     title('Occupancy')   
     
-    % histogram of power occupancy
-    subplot(2, 2, 3)
+    % histogram of phase modulation of population synchrony
+    subplot(2, 3, 5)
     bar(spklfp.pop.phase.bins(2 : end), spklfp.pop.phase.dist(2 : end, :))
-    xlabel('Counts')
+    xlabel('Phase [rad]')
     ylabel('Time [sec]')
+    ax = gca;
+    xlim([0 2 * pi])
+    xticks([0 : pi : 2 * pi])
+    xticklabels(string(0 : 2) + "pi")
     box off
-    axis tight
     title('Synchrony phase')
     
     sgtitle(sprintf('%.1f - %.1f Hz', frange))

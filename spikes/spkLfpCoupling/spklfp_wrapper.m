@@ -96,10 +96,10 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % cat struct
-sl = catfields(spklfp, 'catdef', 'symmetric');
+sl = catfields(spklfp, 'catdef', 'addim');
 
 % center frequencies 
-freq = sl.info.frange(:, 1) + diff(sl.info.frange, 1, 2) / 2;
+freq = sl.info.frange(1, :) + diff(sl.info.frange) / 2;
 
 fh = figure;
 posnegcolor = makeColorMap([0 0 0.8],[1 1 1],[0.8 0 0]);
@@ -126,13 +126,12 @@ ylabel('Rho')
 % syn phase coupling
 fh.CurrentAxes = sb4;
 hold on
-plot(freq, sl.pop.phase.r)
-axis tight
+plot(freq, sl.pop.phase.mrl)
+xticks([0.1, 1, 10, 100])
 box off
 set(gca, 'xscale', 'log')
 xlabel('Frequency [Hz]');
 ylabel('Mean Resultant Length')
-ylabel('Syn - Phase Coupling')
 
 % cell map of rate mag correlation
 fh.CurrentAxes = sb2;
@@ -144,18 +143,23 @@ axis xy
 colormap(gca, posnegcolor)
 title('Spike - Mag Correlation')
 
-% cell map of rate mag correlation
+% map of mean rate across phases and frequencies
 fh.CurrentAxes = sb5;
-data = bz_NormToRange(squeeze(sl.pop.phase.dist(2 : end, 1 : end, 2)), [0 1]);
-imagesc(pop.phase.bins, freq, data)
-xlabel('Phase');
-ylabel('Frequency')
-axis tight
-colormap
-title('Synchrony - Phase Correlation')
+data = squeeze(mean(mean(sl.ratemap.rate, 1, 'omitnan'), 3, 'omitnan'));
+imagesc(sl.ratemap.phase_bins(:, 1), freq, data)
+ylabel('Frequency [Hz]')
+xlabel('Phase [rad]')
+xticks([0 : pi : 2 * pi])
+xticklabels(string(0 : 2) + "pi")
+title('Mean Rate Across Cells')
 
-% map of mean rate
-
+% mrl of all cells vs. frequency
+fh.CurrentAxes = sb6;
+plot_boxMean(sl.phase.mrl, 'allPnts', true)
+xticklabels(string(freq))
+xlabel('Frequency [Hz]')
+ylabel('Mean Resultant Length')
+title('MRL vs. Frequency')
 
 % save
 figpath = fullfile(basepath, 'graphics');
@@ -163,6 +167,10 @@ mkdir(figpath)
 figname = fullfile(figpath, sprintf('%.spk_lfp', basename));
 export_fig(figname, '-tif', '-transparent', '-r300')
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% buzsaki
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

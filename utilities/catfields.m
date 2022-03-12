@@ -4,7 +4,8 @@ function cats = catfields(s, varargin)
 %
 % INPUT:
 %   catdef          default behavior of concatenation. can be 'long',
-%                   'symmetric', or a scalar. if the default is not
+%                   'symmetric', 'addim', or a scalar. if the default is
+%                   not possible will revert to cell 
 %   force           logical. if true, will try to concatenate fields even
 %                   if requested default is not available. will even try to
 %                   transpose array to allow for concatenation
@@ -94,6 +95,13 @@ for ifield = 1 : length(fields)
         continue
     end
     
+    % cat by adding another dimension if possible
+    if strcmp(catdef, 'addim') && all(eqdim)
+        cats.(fields{ifield}) = cat(length(eqdim) + 1, valarray{:, ifield});
+        cats.(fields{ifield}) = squeeze(cats.(fields{ifield}));
+        continue
+    end
+
     % cat according to user selection / default if multiple options exist
     [~, sdim] = sort(valsz(1, eqdim));
     switch catdef
@@ -109,7 +117,6 @@ for ifield = 1 : length(fields)
             end
     end
 end
-cats
 
 end
 
