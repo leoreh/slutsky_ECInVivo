@@ -119,7 +119,7 @@ if mod(chunksize, fsRatio) ~= 0
 end
 
 ntbuff = 525;  % default filter size in iosr toolbox
-if mod(ntbuff, fsRatio)~=0
+if mod(ntbuff, fsRatio) ~= 0
     ntbuff = round(ntbuff + fsRatio - mod(ntbuff, fsRatio));
 end
 

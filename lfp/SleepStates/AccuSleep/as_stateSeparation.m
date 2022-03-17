@@ -187,7 +187,7 @@ ylim([0 ceil(prctile(epMat(:), 99.99))])
     
 % percent time in state
 fh.CurrentAxes = sb6;
-pie(sum(cell2nanmat(ss.epLen(sstates)), 1, 'omitnan'), ones(1, length(sstates)));
+pie(sum(cell2nanmat(ss.epLen(sstates), 2), 1, 'omitnan'), ones(1, length(sstates)));
 hold on
 ph = findobj(sb6, 'Type', 'Patch');
 set(ph, {'FaceColor'}, flipud(cfg.colors(sstates)))

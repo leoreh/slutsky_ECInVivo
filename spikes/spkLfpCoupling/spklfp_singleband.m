@@ -1,16 +1,37 @@
 function [spklfp] = spklfp_singleband(varargin)
 
 % investigate spk - lfp coupling as point to fields in a single frequency
-% band. metrices include (1) phase coupling per cell including significance
-% test (Rayleigh or jittering), and rate map for each cell by lfp phase and
-% power.
+% band. based on bz_GenSpikeLFPCoupling, bz_PhaseModulation, and
+% bz_PowerPhaseRatemap.
 
-% based on bz_GenSpikeLFPCoupling, bz_PhaseModulation, and
-% bz_PowerPhaseRatemap. 
+% metrices include: (1) phase coupling per cell. lfp is restricted to
+% epochs with high rms. the phase of spikes during these epochs is used to
+% calculate the mean phase, mean resultant length and other circular
+% distribution params. (2) rate map per cell. divides the phase (0 - 2pi)
+% and power (+/-2 z-scores) into bins and for each cell created a 2d
+% histogram of spike counts; how many spikes occured when the lfp was in
+% this and that phase and power. converts counts to rate by dividing with
+% the bin occupancy. (3) correlation between rate (spike counts in 5 ms)
+% and lfp magnitude. (4) population synchrony. averages the number of cell
+% active in each 5 ms time bin. calculates the correlation between the
+% popsyn and lfp magnitude. also tries to find the phase coupling of popsyn
+% but i don't think this is working.
+% the function also creates a spike triggered lfp but this is currently
+% used for visualization only
 
+% alternatives include:
+% (1) coherencypt from chronux which calculates the cross
+% multitaper spectroms of the (point-process) spktimes and (contineous)
+% lfp. see http://www-users.med.cornell.edu/~jdvicto/pdfs/pubo08.pdf 
+% (2) the sta method of Vinck 2012 which is implemented in fieldtrip. see
+% https://www.fieldtriptoolbox.org/tutorial/spikefield/ however, i think
+% both of these methods are mainly suitable for tasks with repeated trials
+
+% notes: (1) in bzcode, single band filters the data by fir whereas
+% wideband filters each frequency band with by wavelet convolution. (2)
 % currently only a single lfp channel is used. need to think how to improve
 % this. in fieldtrip they mention bleeding of a spike waveform energy into
-% the lfp recorded on the same channel which could be problamatic 
+% the lfp recorded on the same channel which could be problematic
 
 % INPUT
 %   basepath    char. fullpath to recording folder {pwd}
@@ -20,14 +41,17 @@ function [spklfp] = spklfp_singleband(varargin)
 %   frange      2 x 1 numeric of passband frequency range
 %   saveVar     logical {true}
 %   graphics    logical {true}
-%   srtUnits    logical {true}. currently not implemented
 %
 % CALLS
 %   CircularDistribution (fmat)
 %   NormToInt (bz)
+%   bz_SpktToSpkmat (bz)
+%   SubtractIntervals (fmat)
+%   binary2epochs 
 %
 % TO DO LIST
 %   # jitter in a reasonable way
+%   # sort units for graphics
 %
 % 25 feb 22 LH      
 
@@ -41,7 +65,6 @@ addParameter(p, 'sig', [], @isnumeric)
 addParameter(p, 'spktimes', {}, @iscell)
 addParameter(p, 'fs', 1250, @isnumeric)
 addParameter(p, 'frange', [1.5 100], @isnumeric)
-addParameter(p, 'srtUnits', true, @islogical)
 addParameter(p, 'graphics', true, @islogical)
 addParameter(p, 'saveVar', true, @islogical)
 
@@ -51,12 +74,11 @@ sig             = p.Results.sig;
 spktimes        = p.Results.spktimes;
 fs              = p.Results.fs;
 frange          = p.Results.frange;
-srtUnits        = p.Results.srtUnits;
 graphics        = p.Results.graphics;
 saveVar         = p.Results.saveVar;
 
 % params 
-powThr = 2;                         % stds above mean power in band
+powThr = 1;                         % stds above mean power in band
 mindur = (fs ./ frange(2)) * 2;     % minimum duration of epoch is two cycles
 nbins_phase = 180;
 nbins_rate = 20;
@@ -70,7 +92,8 @@ nunits = length(spktimes);
 [~, basename] = fileparts(basepath);
 cd(basepath)
 unitsfile = fullfile(basepath, [basename, '.units.mat']);
-spklfpfile = fullfile(basepath, [basename, '.spklfp.mat']);
+spklfpfile = fullfile(basepath, sprintf('%s.spklfp_%d-%dHz',...
+    basename, frange));
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % prepare signal
@@ -86,15 +109,14 @@ sig_z = hilbert(sig);
 % which includes the entire signal and not just high power epochs
 sig_pow = NormToInt(log10(abs(sig_z)), 'Z', [0 Inf], fs);
 
-% norm to mean
-% sig_z = sig_z ./ mean(abs(sig_z));
-
 % get angles in range 0 : 2pi rather than -pi : pi. this is neccassary
 % because of the way circularDistribution bins the data. 
 sig_phase = mod(angle(sig_z), 2 * pi);
 
 % restrict anaylsis to epochs with enough power in band. not sure why use
-% the rms and not the normalized power. this is only for phase coupling
+% the rms and not the normalized power. this is only for phase coupling. i
+% changed the threshold to 1 instead of 2. i think eventually i will
+% restrict lfp according to sleep states and remove this threshold
 sig_rms = fastrms(sig, ceil(fs ./ frange(1)), 1);
 minrms = mean(sig_rms) + std(sig_rms) * powThr;
 
@@ -134,7 +156,7 @@ spk_phase = cellfun(@(x) interp1(tstamps, sig_phase, x, 'nearest'),...
 phase.dist      = nan(nbins_phase, nunits);
 phase.kappa     = nan(1, nunits);
 phase.theta     = nan(1, nunits);
-phase.r         = nan(1, nunits);
+phase.mrl         = nan(1, nunits);
 phase.p         = nan(1, nunits);
 for iunit = 1 : nunits
     
@@ -146,12 +168,12 @@ for iunit = 1 : nunits
     end
 
     % use zugaro for circular statstics. mean phase - theta; mean resultant
-    % length - r; Von Mises concentraion - kappa; Rayleigh significance of
-    % uniformity - p; see also:
+    % length - mrl; Von Mises concentration - kappa; Rayleigh significance
+    % of uniformity - p; see also:
     % https://ncss-wpengine.netdna-ssl.com/wp-content/themes/ncss/pdf/Procedures/NCSS/Circular_Data_Analysis.pdf
-    % in bz_genSpikeLfpCoupling they take the angle and magnitude of
-    % the mean(hilbert) instead of averaging the angle and magnitude
-    % separately which i think is a mistake
+    % in bz_genSpikeLfpCoupling they take the angle and magnitude of the
+    % mean(hilbert) instead of averaging the angle and magnitude separately
+    % which i think is a mistake
     [phase.dist(:, iunit), phase.bins, tmp] =...
         CircularDistribution(spk_phase{iunit}(spkidx), 'nBins', nbins_phase);
     phase.kappa(iunit) = tmp.k;
@@ -176,7 +198,7 @@ ratemap.phase_bins = phase_edges(1 : end - 1) + 0.5 .* diff(phase_edges(1 : 2));
 ratemap.power_bins = pow_edges(1 : end - 1) + 0.5 .* diff(pow_edges(1 : 2));
 pow_edges(1) = -Inf; pow_edges(end) = Inf;
 
-% calculate occupance; duration [sec] of the signal for each phase-power
+% calculate occupancy; duration [sec] of the signal for each phase-power
 % bin
 ratemap.occupancy = ...
     histcounts2(sig_pow, sig_phase, pow_edges, phase_edges) / fs;
@@ -212,10 +234,10 @@ ratemap.ratemean = squeeze(mean(ratemap.rate, 1, 'omitnan'));
 spkcnts = bz_SpktToSpkmat(spktimes, 'binsize', movWin, 'dt', stepsize);
 
 % get lfp mag/phase of each frequency during each bin of spkcounts
-lfp_z = interp1(tstamps, sig_z, spkcnts.timestamps, 'nearest');
+spkcnts.lfp_z = interp1(tstamps, sig_z, spkcnts.timestamps, 'nearest');
 
 % rate mag correlation. 
-[ratemag.r, ratemag.p] = corr(spkcnts.data, abs(lfp_z),...
+[ratemag.r, ratemag.p] = corr(spkcnts.data, abs(spkcnts.lfp_z),...
     'type', 'spearman', 'rows', 'complete');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -258,15 +280,15 @@ for ipop = 1 : length(pop.names)
     % standardize to the mean
     popsyn = popsyn ./ mean(popsyn);
     
-    % correlation between synchrony and lfp mag for each frequency
+    % correlation between synchrony and lfp mag
     [pop.synmag_r(:, ipop), pop.synmag_p(:, ipop)] =...
-        corr(popsyn, abs(lfp_z), 'type', 'spearman',...
+        corr(popsyn, abs(spkcnts.lfp_z), 'type', 'spearman',...
         'rows', 'complete');
     
     % synchrony phase coupling. in bz this is doen by averaging the complex
     % number but decided to adapt the same procedure as
     % for single cells
-    pop_z = abs(lfp_z) .* (popsyn .* exp(1i .* angle(lfp_z)));
+    pop_z = abs(spkcnts.lfp_z) .* (popsyn .* exp(1i .* angle(spkcnts.lfp_z)));
     pop_angle = mod(angle(pop_z), 2 * pi);
     [pop.phase.dist(:, ipop), pop.phase.bins, tmp] =...
         CircularDistribution(pop_angle, 'nBins', nbins_phase);
@@ -277,25 +299,48 @@ for ipop = 1 : length(pop.names)
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% organize struct and save
+% spike triggered lfp
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% sort units by the number of spikes or the strength of the spkphase
-% coupling. only the figure and not the struct output will be sorted
-if srtUnits
-%     [~, srtOrder] = sort(spk_phase);
-    srtOrder = [1 : nunits];
+% params
+lfpmap.mapWin = [-0.5, 0.5];                                        % [sec]
+lfpmap.nbinsMap = floor(fs * diff(lfpmap.mapWin) / 2) * 2 + 1;    % must be odd
+
+% loop through cells
+maxnspks = 1000;
+lfpmap.lfp = cell(nunits, 1);
+for iunit = 1 : length(spktimes)
+    
+    bz_Counter(iunit, length(spktimes), 'spk-triggered LFP')
+
+    % selects maxnspks which are best separated from each other
+    nspks = min(maxnspks, length(spktimes{iunit}));
+    if nspks < 5
+        lfpmap.lfp{iunit} = nan;
+        continue
+    end
+    spkidx = floor(linspace(1, length(spktimes{iunit}), maxnspks));
+
+    % extract 1 sec of lfp sorrounding each cell
+    [r, i] = Sync([tstamps' sig], spktimes{iunit}(spkidx), 'durations', lfpmap.mapWin);
+    lfpmap.lfp{iunit} = SyncMap(r, i, 'durations', lfpmap.mapWin,...
+        'nbins', lfpmap.nbinsMap, 'smooth', 0);
 end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% organize struct and save
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % organize struct
 spklfp.info.runtime         = datetime(now, 'ConvertFrom', 'datenum');
 spklfp.info.frange          = frange;
 spklfp.info.epochs          = lfp_epochs;
 spklfp.info.occupancy       = lfp_occupancy;
+spklfp.lfpmap               = lfpmap;
+spklfp.ratemag              = ratemag;
 spklfp.ratemap              = ratemap;
 spklfp.phase                = phase;
 spklfp.pop                  = pop;
-spklfp.ratemag              = ratemag;
 
 % save
 if saveVar
@@ -307,12 +352,62 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if graphics
-    setMatlabGraphics(false)
-     
+    setMatlabGraphics(false)    
     fh = figure;
     
+    % example cells
+    subplot(2, 4, 1)
+    [skappa, su] = sort(spklfp.phase.kappa, 'descend');
+    su = su(~isnan(skappa));
+    for iu = 1 : 3
+        spkidx = InIntervals(spktimes{su(iu)}, lfp_epochs);
+        polarhistogram(spk_phase{su(iu)}(spkidx), 'normalization', 'probability',...
+            'DisplayStyle', 'stairs')
+        hold on
+    end
+    rticks([])
+    thetaticks([0 : 90 : 270])
+    pax = gca;
+    pax.ThetaAxisUnits = 'radians';
+    pax.GridAlpha = 0.2;
+    title('Example phase distribution')  
+    legend("Unit" + string(su(1 : 3)), 'Location', 'best')
+
+    % polar plot of mean phase and resultant length per cell
+    subplot(2, 4, 2)
+    polarplot(spklfp.phase.theta, spklfp.phase.mrl, '.')
+    rlim([0 1])
+    rticks([])
+    thetaticks([0 : 90 : 270])
+    pax = gca;
+    pax.ThetaAxisUnits = 'radians';
+    pax.GridAlpha = 0.2;
+    title('Phase and MRL per cell')
+    
+    % polar histogram of phase distribution between cells
+    subplot(2, 4, 3)
+    polarhistogram(spklfp.phase.theta, 10)
+    rticks([])
+    thetaticks([0 : 90 : 270])
+    pax = gca;
+    pax.ThetaAxisUnits = 'radians';
+    pax.GridAlpha = 0.2;
+    title('Phase distribution across cells')
+    
+    % histogram of phase modulation of population synchrony
+    subplot(2, 4, 4)
+    bar(spklfp.pop.phase.bins(2 : end), spklfp.pop.phase.dist(2 : end, :))
+    xlabel('Phase [rad]')
+    ylabel('Time [sec]')
+    ax = gca;
+    xlim([0 2 * pi])
+    xticks([0 : pi : 2 * pi])
+    xticklabels(string(0 : 2) + "pi")
+    box off
+    title('Population synchrony')
+
     % mean rate across all cells
-    sb1 = subplot(2, 3, 1);
+    sb1 = subplot(2, 4, 5);
     hold on
     imagesc(sb1, spklfp.ratemap.phase_bins, spklfp.ratemap.power_bins,...
         mean(spklfp.ratemap.rate, 3, 'omitnan'))
@@ -327,79 +422,45 @@ if graphics
     colorbar
     xlabel('Phase [rad]');
     ylabel('Norm. Power')
-    title('Mean Rate')
-
-    % polar plot of mean phase and resultant length per cell
-    subplot(2, 3, 2)
-    polarplot(spklfp.phase.theta, spklfp.phase.mrl, '.')
-    rlim([0 1])
-    rticks([])
-    thetaticks([0 : 90 : 270])
-    pax = gca;
-    pax.ThetaAxisUnits = 'radians';
-    pax.GridAlpha = 0.2;
-    title('phase and MRL per cell')   
-
-    % polar histogram of phase distribution between cells
-    subplot(2, 3, 3)
-    polarhistogram(spklfp.phase.theta, 10)
-    title('phase distribution')
-    rticks([])
-    thetaticks([0 : 90 : 270])
-    pax = gca;
-    pax.ThetaAxisUnits = 'radians';
-    pax.GridAlpha = 0.2;
+    title('Mean rate across cells')
 
     % histogram of power occupancy
-    subplot(2, 3, 4)
+    subplot(2, 4, 6)
     bar(spklfp.ratemap.power_bins, sum(spklfp.ratemap.occupancy, 2))
     xlabel('Norm. Power')
     ylabel('Time [sec]')
     box off
     axis tight
-    title('Occupancy')   
+    title('LFP power occupancy')   
     
-    % histogram of phase modulation of population synchrony
-    subplot(2, 3, 5)
-    bar(spklfp.pop.phase.bins(2 : end), spklfp.pop.phase.dist(2 : end, :))
-    xlabel('Phase [rad]')
-    ylabel('Time [sec]')
-    ax = gca;
-    xlim([0 2 * pi])
-    xticks([0 : pi : 2 * pi])
-    xticklabels(string(0 : 2) + "pi")
-    box off
-    title('Synchrony phase')
-    
+    % spk-triggered lfp 
+    subplot(2, 4, [7 : 8])
+    hold on
+    [~, su] = sort(cellfun(@length, spktimes, 'uni', true), 'descend');
+    xval = linspace(lfpmap.mapWin(1), lfpmap.mapWin(2), lfpmap.nbinsMap);
+    for iu = 1 : 5
+        yval = lfpmap.lfp{su(iu)};
+        plot(xval, mean(yval, 'omitnan'));
+        hold on
+    end
+    axis tight
+    plot([0 0], ylim, '--k')
+    xWin = min([0.25, 1 / min(frange)]);
+    xlim([-xWin * 2, xWin * 2])
+    ylabel('LFP [mV]')
+    xlabel('Time [s]')
+    title('Spike Triggered LFP')
+    legend("Unit" + string(su(1 : 5)))
+
     sgtitle(sprintf('%.1f - %.1f Hz', frange))
     
     % save
-    figpath = fullfile(basepath, 'graphics');
+    figpath = fullfile(basepath, 'graphics', 'spklfp');
     mkdir(figpath)
-    figname = fullfile(figpath, sprintf('%.spk_lfp', basename));
+    figname = fullfile(figpath, sprintf('%s.spk-lfp_%d-%dHz',...
+        basename, frange));
     export_fig(figname, '-tif', '-transparent', '-r300')
     
-    % ---------------------------------------------------------------------
-    % per unit
-    %     sunits = randperm(nunits, 10);
-    %     for iunit = 1 : 10
-    %         su = sunits(iunit);
-    %
-    %         fh = figure;
-    %
-    %         subplot(1, 2, 1);
-    %         rose(spklfp.phase.spk_phase{su})
-    %         title(sprintf('Cell %d; Rayleigh = %.2f', iunit, phase.p(su)))
-    %
-    %         subplot(1, 2, 2);
-    %         bar(spklfp.phase.bins * 180 / pi, spklfp.phase.dist(:, su))
-    %         xlim([0 360])
-    %         set(gca, 'XTick', [0 90 180 270 360])
-    %         hold on;
-    %         plot([0 : 360], cos(pi / 180 * [0 : 360]) * 0.05 *...
-    %             max(spklfp.phase.dist(:, su)) + 0.95 * max(spklfp.phase.dist(:, su)),...
-    %             'color', [.7 .7 .7])
-    %     end
 end
 
 end

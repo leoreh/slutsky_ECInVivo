@@ -6,9 +6,9 @@ end
 
 if ~factoryFlag
     
-    set(groot, 'DefaultTextInterpreter', 'latex');
-    set(groot, 'DefaultAxesTickLabelInterpreter', 'latex');
-    set(groot, 'DefaultLegendInterpreter', 'latex');
+    set(groot, 'DefaultTextInterpreter', 'none');
+    set(groot, 'DefaultAxesTickLabelInterpreter', 'none');
+    set(groot, 'DefaultLegendInterpreter', 'none');
     set(groot, 'DefaultAxesFontName', 'Diverda Sans Com')
     set(groot, 'DefaultTextFontName', 'Diverda Sans Com')
     set(groot, 'DefaultAxesFontSize', 13)

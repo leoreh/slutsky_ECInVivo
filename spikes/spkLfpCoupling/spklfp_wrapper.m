@@ -1,27 +1,8 @@
 
 % spklfp_wrapper
 
-% investigate spk - lfp coupling.
-
-% spklfp_singleband calculates for a specifiec band (e.g. theta) the phase coupling and rate
-% map as a function of phase and lfp power. spklfp_wideband calculates the
-% correlation between spike counts in 5 ms bins and the lfp magnitude and
-% the correlation between population synchrony (in 5 ms bins) and lfp
-% magnitude.
-
-% in addition to working on multiple / single frequency, single band
-% filters the data by fir whereas wide band filters each frequency band
-% with by wavelet convolution. 
-
-% based on bz_GenSpikeLFPCoupling, bz_PhaseModulation, and
-% bz_PowerPhaseRatemap. alternatives include:
-% (1) coherencypt from chronux which calculates the cross
-% multitaper spectroms of the (point-process) spktimes and (contineous)
-% lfp. see http://www-users.med.cornell.edu/~jdvicto/pdfs/pubo08.pdf 
-% (2) the sta method of Vinck 2012 which is implemented in fieldtrip. see
-% https://www.fieldtriptoolbox.org/tutorial/spikefield/ however, i think
-% both of these methods are mainly suitable for tasks with repeated trials
-% i think
+% to do list
+% adapt wavelet filtering (bz_WaveSpec)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % prepare data
@@ -37,6 +18,7 @@ unitsfile = fullfile(basepath, [basename, '.units.mat']);
 lfpfile = fullfile(basepath, [basename, '.lfp']);
 sessionfile = fullfile(basepath, [basename, '.session.mat']);
 spklfpfile = fullfile(basepath, [basename, '.spklfp.mat']);
+sleepfile = fullfile(basepath, [basename, '.sleep_states.mat']);
 
 % load session info
 if ~exist(sessionfile, 'file')
@@ -69,12 +51,19 @@ sig = mean(sig, 2);
 spktimes = cellfun(@(x) x(InIntervals(x, winCalc)),...
     spikes.times, 'uni', false);
 
+% restrict to sleep states 
+if exist(sleepfile, 'file')
+    load(sleepfile, 'ss')
+end
+istate = 4;         % state of interest
+spktimes = cellfun(@(x) x(InIntervals(x, ss.stateEpochs{istate})),...
+    spktimes, 'uni', false);
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % single band analysis
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-frange = [0.5 1.5; 1.5, 4; 4, 6; 6, 10;];
-frange = [frange; [10 : 10 : 90; 20 : 10 : 100]'];
+frange = [0.5 2; 2, 4; 5, 11; 12, 18; 18, 30; 30, 50; 50, 80];
 
 clear spklfp
 for ifreq = 1 : size(frange, 1)
@@ -87,66 +76,112 @@ for ifreq = 1 : size(frange, 1)
     
     [spklfp(ifreq)] = spklfp_singleband('basepath', basepath, 'fs', fs,...
         'sig', sig_filt, 'spktimes', spktimes, 'frange', frange(ifreq, :),...
-        'srtUnits', true, 'graphics', true,...
-        'saveVar', false);    
+        'graphics', true, 'saveVar', true);    
 end
+
+% cat struct
+sl = catfields(spklfp, 'catdef', 'addim');
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% spike triggered lfp
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% params
+tstamps = [winCalc(1) : 1 / fs : winCalc(2) - 1 / fs];
+durWin = [-500 500] / 1000;         % [sec]
+nbinsMap = floor(fs * diff(durWin) / 2) * 2 + 1; % must be odd
+centerBin = ceil(nbinsMap / 2);
+
+% loop through cells
+maxnspks = 1000;
+for iunit = 1 : length(spktimes)
+    
+    bz_Counter(iunit, length(spktimes), 'spk-triggered LFP')
+
+    % select spikes
+    nspks = min(maxnspks, length(spktimes{iunit}));
+    if nspks < 500
+        sl.lfpmap{iunit} = nan;
+        continue
+    end
+    spkidx = floor(linspace(1, length(spktimes{iunit}), maxnspks));
+
+    % extract 1 sec of lfp sorrounding each cell
+    [r, i] = Sync([tstamps' sig], spktimes{iunit}(spkidx), 'durations', durWin);
+    sl.lfpmap{iunit} = SyncMap(r, i, 'durations', durWin,...
+        'nbins', nbinsMap, 'smooth', 0);
+end
+
+% cat to single matrix
+lfpmap = [];
+for iunit = 1 : length(spktimes)
+    if ~isnan(sl.lfpmap{iunit})
+        lfpmap = [lfpmap; sl.lfpmap{iunit}];
+    end
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% save
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% save
+save(fullfile(basepath, [basename, '.spklfp.mat']), 'sl')
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % wide band graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% cat struct
-sl = catfields(spklfp, 'catdef', 'addim');
 
 % center frequencies 
 freq = sl.info.frange(1, :) + diff(sl.info.frange) / 2;
 
-fh = figure;
 posnegcolor = makeColorMap([0 0 0.8],[1 1 1],[0.8 0 0]);
 
-sb1 = subplot(2, 3, 1);     % syn mag correlation
-sb2 = subplot(2, 3, 2);     % cell map of rate mag correlation
-sb3 = subplot(2, 3, 3);     % polar of spk phase/mag coupling
-sb4 = subplot(2, 3, 4);     % syn phase coupling
-sb5 = subplot(2, 3, 5);     % cell map of spk phase coupling
-sb6 = subplot(2, 3, 6);     % rose histogram of spk phse coupling
+fh = figure;
+th = tiledlayout(2, 3);
 
 % syn mag correlation
-fh.CurrentAxes = sb1;
+nexttile
 hold on
-plot(sb1, freq, sl.pop.synmag_r)
-plot(sb1, freq([1 end]), [0 0], 'k--')
-xticks([0.1, 1, 10, 100])
+plot(log2(freq), sl.pop.synmag_r)
+plot(log2(freq([1 end])), [0 0], 'k--')
 box off
-set(gca, 'xscale', 'log')
+LogScale('x', 2)
+axis tight
 title('Syn - Mag Correlation')
 xlabel('Frequency [Hz]');
 ylabel('Rho')
 
-% syn phase coupling
-fh.CurrentAxes = sb4;
-hold on
-plot(freq, sl.pop.phase.mrl)
-xticks([0.1, 1, 10, 100])
+% MRL per population
+nexttile
+plot(log2(freq), sl.pop.phase.mrl)
+LogScale('x', 2)
+axis tight
 box off
-set(gca, 'xscale', 'log')
 xlabel('Frequency [Hz]');
 ylabel('Mean Resultant Length')
+legend({'RS', 'FS'})
+title('Syn Phase')
 
-% cell map of rate mag correlation
-fh.CurrentAxes = sb2;
-imagesc(freq, 1 : nunits, sl.ratemag.r)
+% cell map of spkcount-mag correlation
+nexttile
+imagesc(1 : length(freq), 1 : nunits, sl.ratemag.r)
+colormap(gca, posnegcolor)
+ColorbarWithAxis([-0.2 0.2], 'rho')
+xticks(1 : length(freq))
+xticklabels(string(floor(freq)))
 xlabel('Frequency [Hz]');
 ylabel('Cell')
 axis tight
 axis xy
-colormap(gca, posnegcolor)
 title('Spike - Mag Correlation')
 
-% map of mean rate across phases and frequencies
-fh.CurrentAxes = sb5;
+% cell map of spike rate during in phase bins across frequencies
+nexttile
 data = squeeze(mean(mean(sl.ratemap.rate, 1, 'omitnan'), 3, 'omitnan'));
-imagesc(sl.ratemap.phase_bins(:, 1), freq, data)
+imagesc(sl.ratemap.phase_bins(:, 1), 1 : length(freq), data')
+yticks(1 : length(freq))
+yticklabels(string(floor(freq)))
 ylabel('Frequency [Hz]')
 xlabel('Phase [rad]')
 xticks([0 : pi : 2 * pi])
@@ -154,24 +189,97 @@ xticklabels(string(0 : 2) + "pi")
 title('Mean Rate Across Cells')
 
 % mrl of all cells vs. frequency
-fh.CurrentAxes = sb6;
+nexttile
 plot_boxMean(sl.phase.mrl, 'allPnts', true)
-xticklabels(string(freq))
+xticklabels(string(floor(freq)))
+ylim([0 1])
 xlabel('Frequency [Hz]')
 ylabel('Mean Resultant Length')
 title('MRL vs. Frequency')
 
+% spike triggered lfp of 3 cells
+xval = linspace(-0.5, 0.5, nbinsMap);
+yval = sl.lfpmap{6};
+for 
+plot(xval, mean(yval, 'omitnan'));
+hold on 
+ylabel('LFP [mV]')
+xlabel('Time [s]')
+title('Spike Triggered LFP')
+
+
 % save
-figpath = fullfile(basepath, 'graphics');
+figpath = fullfile(basepath, 'graphics', 'spklfp');
 mkdir(figpath)
-figname = fullfile(figpath, sprintf('%.spk_lfp', basename));
+figname = fullfile(figpath, sprintf('%.spk-lfp_wideband', basename));
 export_fig(figname, '-tif', '-transparent', '-r300')
 
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% buzsaki
+% bzcode
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% data
+basepath = pwd;
+[~, basename] = fileparts(basepath);
+cd(basepath)
+
+load([basename, '.spktimes.mat'])
+load([basename, '.spikes.cellinfo.mat'])
+load([basename, '.units.mat'])
+load([basename, '.cell_metrics.cellinfo.mat'])
+
+fs = 1250;
+
+% clip spikes times to reasonable window
+winCalc = [0, 3 * 60 * 60];
+recDur = diff(winCalc);
+
+% load lfp
+sig = double(bz_LoadBinary([basename, '.lfp'], 'duration', recDur,...
+    'frequency', fs, 'nchannels', 19, 'start', winCalc(1),...
+    'channels', [9 : 11], 'downsample', 1));
+sig = mean(sig, 2);
+
+% filter
+% sig_filt = filterLFP(sig, 'fs', fsLfp, 'type', 'butter', 'dataOnly', true,...
+%     'order', 3, 'passband', [0.5 8], 'graphics', false);
+
+% buzcode
+subpops = cell(1, length(units.rs));
+for iunit = 1 : length(subpops)
+    if units.fs(iunit)
+        subpops{iunit} = 'fs';
+    elseif units.rs(iunit)
+        subpops{iunit} = 'rs';
+    end
+end
+
+lfp.data = sig;
+lfp.timestamps = [winCalc(1) : 1 / fs : winCalc(2) - 1 / fs];
+lfp.samplingRate = fs;
+lfp.channels = 1;
+[SpikeLFPCoupling] = bz_GenSpikeLFPCoupling(spikes, lfp,...
+    'spikeLim', 500000, 'frange', [1 100], 'nfreqs', [20],...
+    'cellclass', subpops, 'sorttype', 'rate', 'saveMat', true);
+
+
+% -----------------------------
+flfp.timestamps = [winCalc(1) : 1 / fs : winCalc(2) - 1 / fs];
+sig_z = hilbert(sig);
+flfp.amp = abs(sig_z);
+flfp.phase = angle(sig_z);
+flfp.samplingRate = fs;
+bz_PowerPhaseRatemap(spikes, flfp)
+
+
+% stimes = cellfun(@(x) x(InIntervals(x, winCalc))', spikes.times, 'uni', false);
+% 
+% % sort by fr
+% [~, sidx] = sort(cellfun(@length, stimes, 'uni', true), 'descend');
+% stimes = stimes(sidx);
+% 
+% % choose pyr
+% stimes = stimes(units.idx(1, :));
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % wide band analysis

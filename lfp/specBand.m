@@ -12,7 +12,7 @@ function [s, tstamps, freq] = specBand(varargin)
 %   ftarget     numeric. target frequency range and resolution. this can 
 %               be used to control the frequency axis of the spectrogram
 %               which depends on (1) the degree of zero padding chunks of
-%               the signal to for the fft ('pad') and (2) the time
+%               the signal for the fft ('pad') and (2) the time
 %               resolution (frequency binsize = 1 / window). {[]}. if empty
 %               than the freuqency range will be [0 120] and the resolution
 %               will be determined by window and pad.
@@ -21,8 +21,8 @@ function [s, tstamps, freq] = specBand(varargin)
 %   winstep     numeric. determines the time resolution of the spectrogram.
 %               for accusleep should be equal to epoch length. {1} [sec]
 %   logfreq     logical. ploy y axis (freq) on logscale {false}
-%   graphics    logical. plot figure {true}
-%   saveVar     logical. organize and save struct
+%   graphics    logical. plot figure {false}
+%   saveVar     logical. organize and save struct {true}
 %
 % CALLS
 %   mtspecgramc
@@ -30,6 +30,7 @@ function [s, tstamps, freq] = specBand(varargin)
 % TO DO LIST
 %       # find a way to set the frequency resolution in a log scale
 %       # normalize spectrogram
+%       # separate graphics to stand alone
 %
 % 13 jan 20 LH      updates:
 % 20 feb 20         normalize to broadband
@@ -66,7 +67,6 @@ saveVar         = p.Results.saveVar;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % recording
-basepath = pwd;
 [~, basename] = fileparts(basepath);
 specfile = fullfile(basepath, [basename, '.spec.mat']);
 
@@ -185,7 +185,7 @@ if graphics
     xlabel('Time [h]')
     
     % save
-    figpath = fullfile('graphics', 'sleepState');
+    figpath = fullfile(basepath, 'graphics', 'sleepState');
     mkdir(figpath)
     figname = fullfile(figpath, sprintf('%s_spec', basename));
     export_fig(figname, '-tif', '-transparent', '-r300')
