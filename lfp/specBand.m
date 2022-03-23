@@ -168,7 +168,7 @@ if graphics
     cLimit = prctile(specSample, [6 98]);
     
     % plot
-    fh = figure;
+%     fh = gcf;
     if ~logfreq
         imagesc(tspec, freq, s', cLimit);
     else

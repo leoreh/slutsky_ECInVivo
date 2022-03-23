@@ -15,7 +15,7 @@ function [timebins, timepnt] = metaInfo_timebins(varargin)
 %   fs          numeric. sampling frequency of dat file
 % 
 % OUTPUT
-%   timebins    n x 2 mat
+%   timebins    n x 2 mat [s]
 %   timepnt     precise point of interest from datInfo.nsamps
 
 p = inputParser;

@@ -15,9 +15,7 @@ function [spklfp] = spklfp_singleband(varargin)
 % and lfp magnitude. (4) population synchrony. averages the number of cell
 % active in each 5 ms time bin. calculates the correlation between the
 % popsyn and lfp magnitude. also tries to find the phase coupling of popsyn
-% but i don't think this is working.
-% the function also creates a spike triggered lfp but this is currently
-% used for visualization only
+% but i don't think this is working. (6) spike triggered lfp.
 
 % alternatives include:
 % (1) coherencypt from chronux which calculates the cross
@@ -41,6 +39,7 @@ function [spklfp] = spklfp_singleband(varargin)
 %   frange      2 x 1 numeric of passband frequency range
 %   saveVar     logical {true}
 %   graphics    logical {true}
+%   stlFlag     logical {false}. create spike triggered lfp
 %
 % CALLS
 %   CircularDistribution (fmat)
@@ -67,6 +66,7 @@ addParameter(p, 'fs', 1250, @isnumeric)
 addParameter(p, 'frange', [1.5 100], @isnumeric)
 addParameter(p, 'graphics', true, @islogical)
 addParameter(p, 'saveVar', true, @islogical)
+addParameter(p, 'stlFlag', false, @islogical)
 
 parse(p, varargin{:})
 basepath        = p.Results.basepath;
@@ -76,6 +76,7 @@ fs              = p.Results.fs;
 frange          = p.Results.frange;
 graphics        = p.Results.graphics;
 saveVar         = p.Results.saveVar;
+stlFlag         = p.Results.stlFlag;
 
 % params 
 powThr = 1;                         % stds above mean power in band
@@ -92,7 +93,7 @@ nunits = length(spktimes);
 [~, basename] = fileparts(basepath);
 cd(basepath)
 unitsfile = fullfile(basepath, [basename, '.units.mat']);
-spklfpfile = fullfile(basepath, sprintf('%s.spklfp_%d-%dHz',...
+spklfpfile = fullfile(basepath, sprintf('%s.spklfp_%.1f-%.1fHz',...
     basename, frange));
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -232,6 +233,7 @@ ratemap.ratemean = squeeze(mean(ratemap.rate, 1, 'omitnan'));
 
 % mat of spike counts
 spkcnts = bz_SpktToSpkmat(spktimes, 'binsize', movWin, 'dt', stepsize);
+spkcnts.data = double(spkcnts.data);
 
 % get lfp mag/phase of each frequency during each bin of spkcounts
 spkcnts.lfp_z = interp1(tstamps, sig_z, spkcnts.timestamps, 'nearest');
@@ -303,28 +305,31 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % params
-lfpmap.mapWin = [-0.5, 0.5];                                        % [sec]
+lfpmap.mapWin = [-0.5, 0.5];                                      % [sec]
 lfpmap.nbinsMap = floor(fs * diff(lfpmap.mapWin) / 2) * 2 + 1;    % must be odd
 
-% loop through cells
-maxnspks = 1000;
-lfpmap.lfp = cell(nunits, 1);
-for iunit = 1 : length(spktimes)
-    
-    bz_Counter(iunit, length(spktimes), 'spk-triggered LFP')
+if stlFlag    
 
-    % selects maxnspks which are best separated from each other
-    nspks = min(maxnspks, length(spktimes{iunit}));
-    if nspks < 5
-        lfpmap.lfp{iunit} = nan;
-        continue
+    % loop through cells
+    maxnspks = 1000;
+    lfpmap.lfp = cell(nunits, 1);
+    for iunit = 1 : length(spktimes)
+
+        bz_Counter(iunit, length(spktimes), 'spk-triggered LFP')
+
+        % selects maxnspks which are best separated from each other
+        nspks = min(maxnspks, length(spktimes{iunit}));
+        if nspks < 5
+            lfpmap.lfp{iunit} = nan;
+            continue
+        end
+        spkidx = floor(linspace(1, length(spktimes{iunit}), maxnspks));
+
+        % extract 1 sec of lfp sorrounding each cell
+        [r, i] = Sync([tstamps' sig], spktimes{iunit}(spkidx), 'durations', lfpmap.mapWin);
+        lfpmap.lfp{iunit} = SyncMap(r, i, 'durations', lfpmap.mapWin,...
+            'nbins', lfpmap.nbinsMap, 'smooth', 0);
     end
-    spkidx = floor(linspace(1, length(spktimes{iunit}), maxnspks));
-
-    % extract 1 sec of lfp sorrounding each cell
-    [r, i] = Sync([tstamps' sig], spktimes{iunit}(spkidx), 'durations', lfpmap.mapWin);
-    lfpmap.lfp{iunit} = SyncMap(r, i, 'durations', lfpmap.mapWin,...
-        'nbins', lfpmap.nbinsMap, 'smooth', 0);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -415,7 +420,6 @@ if graphics
         mean(spklfp.ratemap.rate, 3, 'omitnan'))
     plot(sb1, linspace(0, 4 * pi, 100), cos(linspace(0, 4 * pi, 100)), 'k')
     axis tight
-    ax = gca;
     xticks([0 : pi : 4 * pi])
     xticklabels(string(0 : 4) + "pi")
     axis xy
@@ -434,30 +438,32 @@ if graphics
     title('LFP power occupancy')   
     
     % spk-triggered lfp 
-    subplot(2, 4, [7 : 8])
-    hold on
-    [~, su] = sort(cellfun(@length, spktimes, 'uni', true), 'descend');
-    xval = linspace(lfpmap.mapWin(1), lfpmap.mapWin(2), lfpmap.nbinsMap);
-    for iu = 1 : 5
-        yval = lfpmap.lfp{su(iu)};
-        plot(xval, mean(yval, 'omitnan'));
+    if stlFlag
+        subplot(2, 4, [7 : 8])
         hold on
+        [~, su] = sort(cellfun(@length, spktimes, 'uni', true), 'descend');
+        xval = linspace(lfpmap.mapWin(1), lfpmap.mapWin(2), lfpmap.nbinsMap);
+        for iu = 1 : 5
+            yval = lfpmap.lfp{su(iu)};
+            plot(xval, mean(yval, 'omitnan'));
+            hold on
+        end
+        axis tight
+        plot([0 0], ylim, '--k')
+        xWin = min([0.25, 1 / min(frange)]);
+        xlim([-xWin * 2, xWin * 2])
+        ylabel('LFP [mV]')
+        xlabel('Time [s]')
+        title('Spike Triggered LFP')
+        legend("Unit" + string(su(1 : 5)))
     end
-    axis tight
-    plot([0 0], ylim, '--k')
-    xWin = min([0.25, 1 / min(frange)]);
-    xlim([-xWin * 2, xWin * 2])
-    ylabel('LFP [mV]')
-    xlabel('Time [s]')
-    title('Spike Triggered LFP')
-    legend("Unit" + string(su(1 : 5)))
 
     sgtitle(sprintf('%.1f - %.1f Hz', frange))
     
     % save
     figpath = fullfile(basepath, 'graphics', 'spklfp');
     mkdir(figpath)
-    figname = fullfile(figpath, sprintf('%s.spk-lfp_%d-%dHz',...
+    figname = fullfile(figpath, sprintf('%s.spk-lfp_%.1f-%.1fHz',...
         basename, frange));
     export_fig(figname, '-tif', '-transparent', '-r300')
     

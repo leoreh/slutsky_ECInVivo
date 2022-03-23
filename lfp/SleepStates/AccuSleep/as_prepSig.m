@@ -191,7 +191,7 @@ end
 % emg is filtered after the interpolation. note that although accusleep
 % only uses the spectrogram up to 50 hz, there is no benifit to low-pass
 % filtering the eeg if the sampling frequency is maintained at 1250 (which
-% is better for the emg rms siganl).
+% is better for the emg rms signal).
 
 % handle eeg data
 if eegFs ~= fs

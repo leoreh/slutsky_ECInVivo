@@ -4,7 +4,7 @@ function cats = catfields(s, varargin)
 %
 % INPUT:
 %   catdef          default behavior of concatenation. can be 'long',
-%                   'symmetric', 'addim', or a scalar. if the default is
+%                   'symmetric', 'addim', 'cell', or a scalar. if the default is
 %                   not possible will revert to cell 
 %   force           logical. if true, will try to concatenate fields even
 %                   if requested default is not available. will even try to
@@ -65,7 +65,13 @@ for ifield = 1 : length(fields)
         cats.(fields{ifield}) = valarray(:, ifield);
         continue
     end
-       
+    
+    % if catdef cell cat as cell
+    if strcmp(catdef, 'cell')
+        cats.(fields{ifield}) = valarray(:, ifield);
+        continue
+    end
+
     valsz = cellfun(@size, valarray(:, ifield), 'uni', false);
     ndim = cellfun(@numel, valsz, 'uni', true);
     
