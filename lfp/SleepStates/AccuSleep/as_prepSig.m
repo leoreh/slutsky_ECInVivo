@@ -237,9 +237,12 @@ end
 
 % spectrogram
 fprintf('\ncreating spectrogram...')
-[sSig.spec, sSig.spec_tstamps, sSig.spec_freq] = specBand('sig', sig,...
+spec = calc_spec('sig', sig,...
     'fs', 1250, 'graphics', false, 'saveVar', false,...
-    'pad', -1, 'winstep', 1, 'logfreq', false, 'ftarget', [0 : 0.2 : 64]);
+    'padfft', -1, 'winstep', 1, 'logfreq', false, 'ftarget', [0 : 0.2 : 64]);
+sSig.spec = spec.s;
+sSig.spec_tstamps = spec.tstamps;
+sSig.spec_freq = spec.freq;
 
 % emg rms
 sSig.emg_rms = processEMG(emgData, fs, 1);

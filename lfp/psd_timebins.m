@@ -1,7 +1,7 @@
 function [psdBins, faxis] = psd_timebins(varargin)
 
 % calculates the psd of a signal with the pwelch method in specific time
-% bins by averaging. assumes winCalc is in seconds and thus need fs to
+% bins by averaging. assumes winCalc is in seconds and thus needs fs to
 % index sig. 
 %
 % INPUT:
@@ -57,15 +57,20 @@ end
 if isempty(winCalc)
     winCalc = {[0 Inf]};
 end
+
+maxsec = floor(length(sig) / fs);
+if winCalc{end}(end) > maxsec
+    winCalc{end}(end) = maxsec;
+end
+
 nwin = size(winCalc, 2);
-nbins = cellfun(@length, winCalc, 'UniformOutput', false);
+nbins = cellfun(@(x) size(winCalc, 1), winCalc, 'uni', true);
 for iwin = 1 : nwin
-    if nbins{iwin} < 1
+    if nbins(iwin) < 1
         fprintf('\nWARNING: some timebins are empty\n')
         winCalc{iwin} = [];
     end
 end
-nbins = cell2mat(nbins);
 
 % fft params
 if isempty(faxis)

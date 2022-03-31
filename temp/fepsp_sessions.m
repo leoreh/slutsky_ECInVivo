@@ -1,11 +1,84 @@
 
 
-% fepsp_sessions
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% single session analysis
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+basepath = 'G:\Data\lh103\220329';
+
+wcpfiles = [16, 17];
+intens = [38, 36];
+
+% io
+fepsp_wcpPipeline('basepath', basepath, 'wcpfiles', wcpfiles,...
+    'fepsp_protocol', 'stp', 'recname', '220329_stp1', 'intens', intens,...
+    'saveFlag', true)
+
+% freerun
+fepsp_wcpPipeline('basepath', basepath, 'wcpfiles', wcpfiles,...
+    'fepsp_protocol', 'freerun', 'recname', 'freerun', 'intens', [],...
+    'saveFlag', true)
+
+
+
+% plot spec ---------------------------------------------------------------
+% load
+basepath = pwd;
+[~, basename] = fileparts(basepath);
+specfile = fullfile(basepath, [basename, '.spec.mat']);
+load(specfile)
+
+% graphics
+setMatlabGraphics(false)
+fh = figure;
+
+plot_spec(spec, false, false)
+hold on
+axis tight
+yLimit = ylim;
+tidx = [cumsum(lfp.filelength) / 60 / 60]';
+tidx = [0; tidx(1 : end - 1)];
+plot([tidx, tidx], ylim, '--k', 'LineWidth', 1)
+hold on
+% text(tidx, ones(1, length(tidx)) * (yLimit(2) + 0.05 * yLimit(2)), string(wcpfiles))
+
+% save
+figpath = fullfile(basepath, 'graphics');
+mkdir(figpath)
+figname = fullfile(figpath, sprintf('%s_spec', basename));
+export_fig(figname, '-tif', '-transparent', '-r300')
+
+% psd timebins ------------------------------------------------------------
+
+fs = lfp.fs;
+nsec = cumsum(lfp.filelength);
+clear winCalc
+winCalc{1} = [1, nsec(1)];
+winCalc{2} = [nsec(1), nsec(3)];
+winCalc{3} = [nsec(3), nsec(4)];
+% winCalc{4} = [nsec(6), nsec(7)];
+winCalc{4} = [nsec(8), nsec(9)];
+winCalc{5} = [nsec(9), nsec(10)];
+
+winCalc = cellfun(@round, winCalc, 'uni', false);
+
+[psdBins, faxis] = psd_timebins('sig', lfp.data, 'fs', fs,...
+    'winCalc', winCalc, 'graphics', true);
+legend
+
+psdBins ./ sum(psdBins, 2)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% multi-session analysis
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% load data ---------------------------------------------------------------
 
 % experiment folder
-exppath = 'G:\Data\hb_a2';
+exppath = 'G:\Data\lh103\220329';
 cd(exppath)
-basepaths = dir('*_io*');
+basepaths = dir('*_stp*');
 basepaths = fullfile({basepaths.folder}, {basepaths.name});
 nfiles = length(basepaths);
 
@@ -16,8 +89,59 @@ ids = cellfun(@(x) x(end - 2 : end), basenames, 'uni', false);
 % load data
 varsFile = ["fepsp_traces"; "fepsp_results"; "lfp"];
 varsName = ["traces"; "results"; "lfp"];
-vIO = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
+v = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
     'varsName', varsName);
+
+
+% to prism ----------------------------------------------------------------
+
+for ifile = 1 : nfiles
+    
+    % intens
+    [intens, sidx] = sort(v(ifile).lfp.intens);
+
+    % mean trace per intensity
+    traces = cellfun(@(x) mean(x, 2, 'omitnan'), v(ifile).traces, 'uni', false);
+    traces = cell2mat(traces);
+    traces = traces(:, sidx);
+
+    % timestamps
+    protocol_info = fepsp_getProtocol('protocol_id', v(ifile).lfp.fepsp_protocol);
+    tstamps = v(ifile).lfp.timestamps * 1000 - protocol_info.stim_times(1); 
+    tstamps = tstamps(1 : length(traces));
+
+
+    % amp
+    amp = cell2nanmat(v(ifile).results.all_traces.Amp, 2)';
+    amp = amp(sidx, :);
+
+    % slope
+    slope = cell2nanmat(v(ifile).results.all_traces.Slope, 2)';
+    slope = slope(sidx, :);
+    
+
+
+    v(ifile).results.avg_traces.Amp{1}
+    v(ifile).results.avg_traces.Amp{1} / v(ifile).results.avg_traces.Amp{1}(1)
+
+    v(ifile).results.avg_traces.Slope{1}
+    v(ifile).results.avg_traces.Slope{1} / v(ifile).results.avg_traces.Slope{1}(1)
+
+
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 % load stp
 cd(exppath)
@@ -28,6 +152,15 @@ varsFile = ["fepsp_traces"; "fepsp_results"; "lfp"];
 varsName = ["traces"; "results"; "lfp"];
 vSTP = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
     'varsName', varsName);
+
+
+
+
+
+
+
+
+
 
 % graphics
 fh = figure;
@@ -102,24 +235,6 @@ plot([tidx, tidx], ylim, '--k', 'LineWidth', 2)
 hold on
 text(tidx(end - 2), yLimit(2) + 0.01 * yLimit(2), "Baclofen")
 
-
-
-
-
-
-
-
-
-exppath = 'G:\Data\hb_a2';
-basename = 'test_stp';
-fepsp_protocol = 'stp';
-wcpfiles = [24];
-intens = [50];
-
-% load single file
-fepsp_wcpPipeline('basepath', exppath, 'wcpfiles', wcpfiles,...
-    'intens', intens, 'recname', basename,...
-    'fepsp_protocol', fepsp_protocol, 'saveFlag', true)
 
 
 

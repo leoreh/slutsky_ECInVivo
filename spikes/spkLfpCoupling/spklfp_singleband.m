@@ -270,7 +270,7 @@ pop.phase.mrl         = nan(1, length(pop.names));
 pop.phase.p         = nan(1, length(pop.names));
 
 % must be computed separately for rs and fs cells
-for ipop = 1 : length(pop.names)
+for ipop = 1 : 2
     
     pop.popidx(:, ipop) = strcmp(pop.subpops, pop.names{ipop});
     

@@ -1,9 +1,8 @@
-function [s, tstamps, freq] = specBand(varargin)
+function [s, tstamps, freq] = calc_spec(varargin)
 
-% a wrapper for the multitaper spectrogram by chronux, with touches from
-% accusleep. creates and plots a spectrogram. 
-% should also calculate the power in specific bands (delta, theta) during
-% specified time windews. should normalize
+% creates a spectrogram with the multitaper spectrogram by chronux, with
+% refinements from accusleep. should also calculate the power in specific
+% bands (delta, theta) during specified time windews. should normalize
 %
 % INPUT
 %   basepath    char. fullpath to recording folder {pwd}
@@ -156,40 +155,8 @@ end
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-if graphics
-    
-    % time axis in hours
-    nbins = length(tstamps);
-    tspec = ((1 : nbins) * winstep - winstep / 2) / 3600;
-    
-    % take a sample of the spectrogram to help initialize the colormap
-    sampleBins = randperm(nbins, round(nbins / 10));
-    specSample = reshape(s(sampleBins, :), 1, length(sampleBins) * length(freq));
-    cLimit = prctile(specSample, [6 98]);
-    
-    % plot
-%     fh = gcf;
-    if ~logfreq
-        imagesc(tspec, freq, s', cLimit);
-    else
-        pband = 10 * log10(abs(s));
-        pband = bz_NormToRange(pband, [0 1]);
-        surf(tspec, freq, pband', 'EdgeColor', 'none');
-        set(gca, 'yscale', 'log')
-        view(0, 90);
-        ylim([max([0.5, freq(1)]), freq(end)])
-    end
-    colormap(AccuSleep_colormap());
-    axis('xy')
-    ylabel('Frequency [Hz]')
-    xlabel('Time [h]')
-    
-    % save
-    figpath = fullfile(basepath, 'graphics', 'sleepState');
-    mkdir(figpath)
-    figname = fullfile(figpath, sprintf('%s_spec', basename));
-    export_fig(figname, '-tif', '-transparent', '-r300')
-    
+if graphics    
+    plot_spec(spec, logfreq, basepath)  
 end
 
 end

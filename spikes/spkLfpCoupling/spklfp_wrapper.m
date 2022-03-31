@@ -85,12 +85,11 @@ nunits = length(spikes.times);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 for iwin = 1 : length(winCalc)
-
+    
+    % load lfp
     winstart = min(winCalc{iwin});
     winend = max(winCalc{iwin});
     recDur = winend - winstart;
-
-    % load lfp
     sig = double(bz_LoadBinary(lfpfile, 'duration', recDur,...
         'frequency', fs, 'nchannels', nchans, 'start', winstart,...
         'channels', ch, 'downsample', 1));
@@ -99,14 +98,10 @@ for iwin = 1 : length(winCalc)
     % clip spike times
     spktimes = cellfun(@(x) x(InIntervals(x, winCalc{iwin})),...
         spikes.times, 'uni', false);
-
-    % % restrict to sleep states
-    % if exist(sleepfile, 'file')
-    %     load(sleepfile, 'ss')
-    % end
-    % istate = 4;         % state of interest
-    % spktimes = cellfun(@(x) x(InIntervals(x, ss.stateEpochs{istate})),...
-    %     spktimes, 'uni', false);
+    
+    % adjust spktimes so that they correspond to signal length
+    spktimes = cellfun(@(x) x - winCalc{iwin}(1),...
+        spktimes, 'uni', false);
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % single band analysis
@@ -134,12 +129,12 @@ for iwin = 1 : length(winCalc)
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
     % params
-    tstamps = [winstart : 1 / fs : winend - 1 / fs];
+    tstamps = [1 / fs : 1 / fs : recDur];
     mapWin = sl.lfpmap.mapWin(:, 1);
     nbinsMap = sl.lfpmap.nbinsMap(1);
 
     % loop through cells
-    maxnspks = 1000;
+    maxnspks = 500;
     for iunit = 1 : length(spktimes)
 
         bz_Counter(iunit, length(spktimes), 'spk-triggered LFP')
@@ -163,13 +158,18 @@ for iwin = 1 : length(winCalc)
 
     % cat for all windows
     s(iwin) = sl;
+    s(iwin).info.winCalc = winCalc{iwin};
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % wide band graphics
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+    setMatlabGraphics(false)
     fh = figure;
-    th = tiledlayout(3, 3);
+    th = tiledlayout(3, 3, 'TileSpacing', 'Compact');
+    figname = sprintf('%s; %d-%d hr',...
+        basename, round(winCalc{iwin} / 60 / 60));
+    title(th, figname, 'Interpreter', 'none')
     posnegcolor = makeColorMap([0 0 0.8],[1 1 1],[0.8 0 0]);
 
     % syn mag correlation

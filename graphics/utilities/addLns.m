@@ -22,7 +22,6 @@ lns = p.Results.lns;
 lbs = p.Results.lbs;
 ax = p.Results.ax;
 
-
 if length(lns) ~= length(lbs) 
     error('length of lns and lbs must be equal')
 end

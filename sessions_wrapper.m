@@ -43,14 +43,15 @@ if forceA
         
         % add timebins to datInfo
         nbins = 4;
-        [timebins, timepnt] = metaInfo_timebins('reqPnt', [],...
+        reqPnt = 6 * 60 * 60;
+        [timebins, timepnt] = metaInfo_timebins('reqPnt', reqPnt,...
             'nbins', nbins);
         winCalc = mat2cell(timebins, ones(nbins, 1), 2);
         
         % spk lfp
         frange = [0.5, 4; 5, 12; 50, 80];
         sl = spklfp_wrapper('basepath', basepath, 'winCalc', winCalc,...
-            'ch', 9 : 11, 'frange', frange,...
+            'ch', 9, 'frange', frange,...
             'graphics', true, 'saveVar', false);
 
         % spike timing metrics
