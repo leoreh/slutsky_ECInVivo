@@ -304,12 +304,32 @@ end
 % spike triggered lfp
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-spklfp.stl = [];
-if stlFlag
-    stlname = sprintf('stl_%.1f-%.1fHz', frange);
-    spklfp.stl = spklfp_stl('basepath', basepath, 'fs', fs,...
-        'sig', sig, 'spktimes', spktimes, 'mapWin', [],...
-        'graphics', false, 'saveVar', stlname);
+% params
+lfpmap.mapWin = [-0.5, 0.5];                                      % [sec]
+lfpmap.nbinsMap = floor(fs * diff(lfpmap.mapWin) / 2) * 2 + 1;    % must be odd
+
+if stlFlag    
+
+    % loop through cells
+    maxnspks = 1000;
+    lfpmap.lfp = cell(nunits, 1);
+    for iunit = 1 : length(spktimes)
+
+        bz_Counter(iunit, length(spktimes), 'spk-triggered LFP')
+
+        % selects maxnspks which are best separated from each other
+        nspks = min(maxnspks, length(spktimes{iunit}));
+        if nspks < 5
+            lfpmap.lfp{iunit} = nan;
+            continue
+        end
+        spkidx = floor(linspace(1, length(spktimes{iunit}), maxnspks));
+
+        % extract 1 sec of lfp sorrounding each cell
+        [r, i] = Sync([tstamps' sig], spktimes{iunit}(spkidx), 'durations', lfpmap.mapWin);
+        lfpmap.lfp{iunit} = SyncMap(r, i, 'durations', lfpmap.mapWin,...
+            'nbins', lfpmap.nbinsMap, 'smooth', 0);
+    end
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -321,6 +341,7 @@ spklfp.info.runtime         = datetime(now, 'ConvertFrom', 'datenum');
 spklfp.info.frange          = frange;
 spklfp.info.epochs          = lfp_epochs;
 spklfp.info.occupancy       = lfp_occupancy;
+spklfp.lfpmap               = lfpmap;
 spklfp.ratemag              = ratemag;
 spklfp.ratemap              = ratemap;
 spklfp.phase                = phase;

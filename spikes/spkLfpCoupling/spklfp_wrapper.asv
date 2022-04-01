@@ -121,57 +121,38 @@ for iwin = 1 : length(winCalc)
             'graphics', false, 'saveVar', false);
     end
 
-    % cat struct
-    sl = catfields(spklfp, 'catdef', 'addim');
-
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % spike triggered lfp
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    
+    stlname = sprintf('stl_wideband_win%d', iwin);
+    stl = spklfp_stl('basepath', basepath, 'fs', fs,...
+            'sig', sig, 'spktimes', spktimes, 'mapWin', [],...
+            'graphics', true, 'saveVar', stlname);
 
-    % params
-    tstamps = [1 / fs : 1 / fs : recDur];
-    mapWin = sl.lfpmap.mapWin(:, 1);
-    nbinsMap = sl.lfpmap.nbinsMap(1);
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % cat across frequencies
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-    % loop through cells
-    maxnspks = 500;
-    for iunit = 1 : length(spktimes)
-
-        bz_Counter(iunit, length(spktimes), 'spk-triggered LFP')
-
-        % select spikes
-        nspks = min(maxnspks, length(spktimes{iunit}));
-        if nspks < 500
-            sl.lfpmap.wideband{iunit} = nan(maxnspks, nbinsMap);
-            continue
-        end
-        spkidx = floor(linspace(1, length(spktimes{iunit}), maxnspks));
-
-        % extract 1 sec of lfp sorrounding each cell
-        [r, i] = Sync([tstamps' sig], spktimes{iunit}(spkidx), 'durations', mapWin);
-        sl.lfpmap.wideband{iunit} = SyncMap(r, i, 'durations', mapWin,...
-            'nbins', nbinsMap, 'smooth', 0);
-    end
-
-    % cat to 3d mat of spike x timebin x unit
-    sl.lfpmap.wideband = cat(3, sl.lfpmap.wideband{:});
-
-    % cat for all windows
-    s(iwin) = sl;
+    s(iwin) = catfields(spklfp, 'catdef', 'addim');
+    s(iwin).info.winCalc = winCalc{iwin};
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % wide band graphics
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+    setMatlabGraphics(false)
     fh = figure;
-    th = tiledlayout(3, 3, 'TileSpacing', 'Compact');
-    title(th, sprintf('%s; %d-%d hr', basename, round(winCalc{iwin} / 60 / 60)))
+    th = tiledlayout(2, 3, 'TileSpacing', 'Compact');
+    figname = sprintf('%s; %d-%d hr',...
+        basename, round(winCalc{iwin} / 60 / 60));
+    title(th, figname, 'Interpreter', 'none')
     posnegcolor = makeColorMap([0 0 0.8],[1 1 1],[0.8 0 0]);
 
     % syn mag correlation
     nexttile
     hold on
-    plot(log2(freq), sl.pop.synmag_r)
+    plot(log2(freq), s(iwin).pop.synmag_r)
     plot(log2(freq([1 end])), [0 0], 'k--')
     box off
     LogScale('x', 2)
@@ -182,7 +163,7 @@ for iwin = 1 : length(winCalc)
 
     % MRL per population
     nexttile
-    plot(log2(freq), sl.pop.phase.mrl)
+    plot(log2(freq), s(iwin).pop.phase.mrl)
     LogScale('x', 2)
     axis tight
     box off
@@ -193,7 +174,7 @@ for iwin = 1 : length(winCalc)
 
     % cell map of spkcount-mag correlation
     nexttile
-    imagesc(1 : length(freq), 1 : nunits, sl.ratemag.r)
+    imagesc(1 : length(freq), 1 : nunits, s(iwin).ratemag.r)
     colormap(gca, posnegcolor)
     ColorbarWithAxis([-0.2 0.2], 'rho')
     xticks(1 : length(freq))
@@ -206,8 +187,8 @@ for iwin = 1 : length(winCalc)
 
     % cell map of spike rate during in phase bins across frequencies
     nexttile
-    data = squeeze(mean(mean(sl.ratemap.rate, 1, 'omitnan'), 3, 'omitnan'));
-    imagesc(sl.ratemap.phase_bins(:, 1), 1 : length(freq), data')
+    data = squeeze(mean(mean(s(iwin).ratemap.rate, 1, 'omitnan'), 3, 'omitnan'));
+    imagesc(s(iwin).ratemap.phase_bins(:, 1), 1 : length(freq), data')
     yticks(1 : length(freq))
     yticklabels(string(floor(freq)))
     ylabel('Frequency [Hz]')
@@ -218,42 +199,18 @@ for iwin = 1 : length(winCalc)
 
     % mrl of all cells vs. frequency
     nexttile
-    plot_boxMean(sl.phase.mrl, 'allPnts', true)
+    plot_boxMean(s(iwin).phase.mrl, 'allPnts', true)
     xticklabels(string(floor(freq)))
     ylim([0 1])
     xlabel('Frequency [Hz]')
     ylabel('Mean Resultant Length')
     title('MRL vs. Frequency')
 
-    % spike triggered lfp
-    nexttile
-    hold on
-    xval = linspace(mapWin(1), mapWin(2), nbinsMap);
-    yval = squeeze(mean(mean(sl.lfpmap.wideband, 3, 'omitnan'), 1, 'omitnan'));
-    plot(xval, yval);
-    axis tight
-    plot([0 0], ylim, '--k')
-    ylabel('LFP [mV]')
-    xlabel('Time [s]')
-    title('Spike Triggered LFP')
-
-    % spike triggered psd
-    nexttile(9)
-    faxis = [0.2 : 0.2 : 100];
-    win = hann(2 ^ (nextpow2(fs) - 1));
-    noverlap = floor(0.125 * fs);
-    [pow, ~] = pwelch(yval, win, noverlap, faxis, fs);
-    ph = plot(faxis, pow, 'LineWidth', 3);
-    set(gca, 'xscale', 'log')
-    xlim([faxis(1), faxis(end)])
-    xlabel('Frequency [Hz]')
-    ylabel('PSD')
-    title('Spike Triggered PSD')
-
     % save figure
     figpath = fullfile(basepath, 'graphics', 'spklfp');
     mkdir(figpath)
-    figname = fullfile(figpath, sprintf('%.spk-lfp_wideband', basename));
+    figname = sprintf('%s_spklfp_wideband_win%d', basename, iwin);
+    figname = fullfile(figpath, figname);
     export_fig(figname, '-tif', '-transparent', '-r300')
 
 end
