@@ -398,7 +398,8 @@ else % Equivalent to elseif iscell(spikes).
                 trialYPoints = [ (trials-halfSpikeHeight)*ones(1,nSpikes);...
                     (trials+halfSpikeHeight)*ones(1,nSpikes); nanSeparator ];
                 trialYPoints = trialYPoints(:);
-                
+                trialYPoints = trialYPoints + vertSpikePosition;
+
                 % Save points and update current index
                 xPoints(currentInd:currentInd+nSpikes*3-1) = trialXPoints;
                 yPoints(currentInd:currentInd+nSpikes*3-1) = trialYPoints;

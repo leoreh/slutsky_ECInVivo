@@ -1,4 +1,4 @@
-function [sl] = spklfp_wrapper(varargin)
+function s = spklfp_wrapper(varargin)
 
 % INPUT
 %   basepath    char. fullpath to recording folder {pwd}
@@ -118,7 +118,7 @@ for iwin = 1 : length(winCalc)
 
         [spklfp(ifreq)] = spklfp_singleband('basepath', basepath, 'fs', fs,...
             'sig', sig_filt, 'spktimes', spktimes, 'frange', frange(ifreq, :),...
-            'graphics', true, 'saveVar', false);
+            'graphics', false, 'saveVar', false);
     end
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

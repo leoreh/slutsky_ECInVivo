@@ -267,6 +267,9 @@ if graphics
             axis tight
             
         case 'fr'
+            smoothData = movmean(expFs, 13, 1);
+            prismx = linspace(-30, 130, size(expFs, 1));
+
             smoothData = movmean(mean(expRs, 2, 'omitnan'), 13, 1);
             plot(xdata, smoothData, 'LineWidth', 2)
             hold on
