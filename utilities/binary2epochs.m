@@ -18,6 +18,8 @@ function epochs = binary2epochs(varargin)
 %     
 % EXAMPLE
 %       see aneStates.m or getBS.m
+%       epochs = binary2epochs('vec', binaryVec, 'minDur', minDur, 'maxDur', [],...
+%           'interDur', interDur, 'exclude', false);
 % 
 % 14 jan 19 LH. 
 

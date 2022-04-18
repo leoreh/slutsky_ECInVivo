@@ -18,7 +18,7 @@ function [r, binedges, bincents, binidx] = times2rate(spktimes, varargin)
 %               an n x 2 matrix.
 %   binsize     size of bins {60}. can be of any units so long corresponse
 %               to spktimes. for example, spktimes from Wh (per tetrode) is
-%               given in samples whereas spktimes from ce (per units) is
+%               given in samples whereas spktimes from ce (per unit) is
 %               given in seconds
 %   c2r         convert counts to rate by dividing with binsize 
 % 
@@ -79,7 +79,7 @@ nwin = size(winCalc, 1);
 % arrange bins
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%%% currently assumes bins are consecutive !!!
+% currently assumes bins are consecutive !!!
 k = 1;
 for i = 1 : nwin
     if winCalc(i, 2) - winCalc(i, 1) <= binsize

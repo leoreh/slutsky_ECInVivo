@@ -133,6 +133,7 @@ st.acg_wide     = nan(st.info.acg_wide_dur / st.info.acg_wide_bnsz + 1, nwin, nu
 st.acg_narrow   = nan(st.info.acg_narrow_dur / st.info.acg_narrow_bnsz + 1, nwin, nunits);
 st.doublets     = nan(nwin, nunits);
 st.royer        = nan(nwin, nunits);
+st.royer2       = nan(nwin, nunits);
 st.lidor        = nan(nwin, nunits);
 st.mizuseki     = nan(nwin, nunits);
 st.cv           = nan(nwin, nunits);
@@ -175,6 +176,18 @@ for iunit = sunits
         st.royer(iwin, iunit) = mean(st.acg_wide(st.info.acg_wide_bins + 1 + 3 : st.info.acg_wide_bins + 1 + 5, iwin, iunit)) /...
             mean(st.acg_wide(st.info.acg_wide_bins + 1 + 200 : st.info.acg_wide_bins + 1 + 300, iwin, iunit));
         
+        % royer 2012: max(0:10) / mean(40:50) normalized
+        peakbrst = max(st.acg_wide(st.info.acg_wide_bins + 1 :...
+            st.info.acg_wide_bins + 1 + 10, iwin, iunit));
+        basebrst = mean(st.acg_wide(st.info.acg_wide_bins + 1 + 40 :...
+            st.info.acg_wide_bins + 1 + 50, iwin, iunit));
+        if peakbrst > basebrst
+            st.royer2(iwin, iunit) = (peakbrst - basebrst) / peakbrst;
+        else
+            st.royer2(iwin, iunit) = (peakbrst - basebrst) / basebrst;
+        end        
+
+
         % lidor: sum of spikes in 2-10 ms normalized to sum in 35-50
         t1 = find(st.info.acg_narrow_tstamps > 0.002 & st.info.acg_narrow_tstamps < 0.01);
         t2 = find(st.info.acg_narrow_tstamps > 0.035 & st.info.acg_narrow_tstamps < 0.05);
@@ -263,6 +276,7 @@ if saveVar
         load(cmName)
         cell_metrics.st_doublets    = st.doublets;
         cell_metrics.st_royer       = st.royer;
+        cell_metrics.st_royer2      = st.royer2;
         cell_metrics.st_lidor       = st.lidor;
         cell_metrics.st_mizuseki    = st.mizuseki;
         cell_metrics.st_cv          = st.cv;
