@@ -15,9 +15,9 @@ function spec = calc_spec(varargin)
 %   ch          cell of vecs depicting groups of channels (indices to the
 %               rows of sig) whose spectrogram should be averaged. this is
 %               done in mtspectrumc.m. if sig is loaded from binary then
-%               averaging will be done on the lfp traces and not the
-%               spctrogram to save computation time. this was done for
-%               tetrodes (i.e. ch = spkgrp)
+%               averaging will be done on the lfp traces because this is
+%               faster. for example, this can be used for tetrodes (i.e. ch =
+%               spkgrp) and/or to compare eeg w/ lfp signals
 %   fs          sampling frequency {1250}.
 %   ftarget     numeric. target frequency range and resolution. this can 
 %               be used to control the frequency axis of the spectrogram
