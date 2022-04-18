@@ -5,14 +5,14 @@
 % single session analysis
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-basepath = 'G:\Data\lh105\220411';
+basepath = 'G:\Data\lh105\220410';
 
-wcpfiles = [6];
-intens = [450];
+wcpfiles = [22 : 27];
+intens = [350, 450];
 
 % io
 fepsp_wcpPipeline('basepath', basepath, 'wcpfiles', wcpfiles,...
-    'fepsp_protocol', 'stp', 'recname', '220411_stp1', 'intens', intens,...
+    'fepsp_protocol', 'io', 'recname', '220410_io4', 'intens', intens,...
     'saveFlag', true)
 
 % freerun

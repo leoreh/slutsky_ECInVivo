@@ -12,7 +12,12 @@ function [expData, tidx, tidxLabels] = sessions_catVarTime(varargin)
 %   graphics        logical {true}
 %   saveFig         logical {true}
 %   dataPreset      string or cell of string depicting the variable to cat. 
+<<<<<<< Updated upstream
 %                   can be any combination of 'sr', 'spec', 'fr'
+=======
+%                   can be any combination of 'sr', 'spec', 'fr', 'ripp',
+%                   or 'emg'
+>>>>>>> Stashed changes
 %   axh             handle to plot axis
 % 
 % EXAMPLE
@@ -57,7 +62,11 @@ if iscell(dataPreset)
     fh = figure;
     for idata = 1 : length(dataPreset)
         sb(idata) = subplot(length(dataPreset), 1, idata);
+<<<<<<< Updated upstream
         [expData, tidx, tidxLabels] = sessions_catVarTime('basepaths', basepaths,...
+=======
+        [expData, tidx, tidxLabels] = sessions_catVarTime('mname', mname,...
+>>>>>>> Stashed changes
             'dataPreset', dataPreset{idata}, 'graphics', true,...
             'axh', sb(idata), 'xTicksBinsize', xTicksBinsize);
         if idata < length(dataPreset)
@@ -93,6 +102,7 @@ fs = v(1).session.extracellular.sr;
 
 switch dataPreset
     case 'spec'       
+<<<<<<< Updated upstream
         for isession = 1 : nsessions
             filename = fullfile(basepaths{isession},...
                 [basenames{isession}, '.sleep_sig.mat']);
@@ -116,6 +126,20 @@ switch dataPreset
         load(filename, 'spec_freq');
         faxis = spec_freq;
         
+=======
+        ch = 1;         % manually change this to switch between spectrograms
+        for isession = 1 : nsessions
+            if ndims(v(isession).spec.s) == 3
+                v(isession).data = squeeze(v(isession).spec.s(:, :, ch))';
+            else
+                v(isession).data = v(isession).spec.s';
+            end
+        end
+        cfg = as_loadConfig();
+        ts = cfg.epochLen;                 % sampling period [s]
+        faxis = v(isession).spec.freq;
+    
+>>>>>>> Stashed changes
     case 'emg'
         for isession = 1 : nsessions
             filename = fullfile(basepaths{isession},...
@@ -222,9 +246,12 @@ tidxLabels(1 : 24 / xTicksBinsize : end) =...
 % data for x-axis
 xdata = [1 : ts : ceil(seconds(expEnd - expStart))];
 
+<<<<<<< Updated upstream
 % alternative for x labels
 tidxLabels = string(-32 : xTicksBinsize : 130);
 
+=======
+>>>>>>> Stashed changes
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -237,10 +264,17 @@ if graphics
         set(gcf, 'CurrentAxes', axh)
     end
     switch dataPreset
+<<<<<<< Updated upstream
         case {'spec', 'specEEG'}
             
             % take a sample of the spectrogram to help initialize the colormap
             showFreqs = find(faxis <= 15);  % freqs to display
+=======
+        case {'spec'}
+            
+            % take a sample of the spectrogram to help initialize the colormap
+            showFreqs = find(faxis <= 100);  % freqs to display
+>>>>>>> Stashed changes
             sampleBins = randperm(expLen, round(expLen / 10));
             specSample = reshape(expData(sampleBins, showFreqs), 1, length(sampleBins) * length(showFreqs));
             caxis1 = prctile(specSample, [6 98]);
@@ -267,9 +301,12 @@ if graphics
             axis tight
             
         case 'fr'
+<<<<<<< Updated upstream
             smoothData = movmean(expFs, 13, 1);
             prismx = linspace(-30, 130, size(expFs, 1));
 
+=======
+>>>>>>> Stashed changes
             smoothData = movmean(mean(expRs, 2, 'omitnan'), 13, 1);
             plot(xdata, smoothData, 'LineWidth', 2)
             hold on

@@ -26,23 +26,23 @@ spkgrp = session.extracellular.spikeGroups.channels;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preprocessing of raw files
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'K:\Data\lh99\2021-12-25_08-45-48';
-mapch = [26,27,28,30,2,3,31,29,4,5,6,7,8,9,10,11,12,13,14,15,1,16,17,...
-    32,18,19,20,21,22,23,24,25,33,34,35,36,37];
-rmvch = [12 : 15, 1, 16, 17, 32];
+basepath = 'L:\Data\lh101\2022-04-17_14-09-57';
 mapch = 1 : 21;
-rmvch = [10 17];
+rmvch = [];
+rmvch = [5, 17];
+mapch = [1 : 6];
+rmvch = [1, 3, 5];
 
 % tank to dat
-store = 'Raw1';
-blocks = [2 : 8];
+store = 'Raw2';
+blocks = [1 : 2];
 chunksize = 300;
 clip = cell(1, 1);
 datInfo = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
     'chunksize', chunksize, 'mapch', mapch, 'rmvch', rmvch, 'clip', clip);
 
 % open ephys to dat
-exp = [];
+exp = [1 : 3];
 rec = cell(max(exp), 1);
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
     'rmvch', rmvch, 'mapch', mapch,...
@@ -62,16 +62,16 @@ cat_OE_tstamps('orig_paths', orig_paths, 'new_path', exPathNew,...
 
 % pre-process dat (remove channels, reorder, etc.)
 clear orig_files
-orig_files{1} = 'K:\Data\lh99\2022-01-25_09-00-41\Record Node 107\experiment1\recording1\continuous\Rhythm_FPGA-100.0\continuous.dat';
-orig_files{2} = 'K:\Data\lh99\2022-01-25_09-00-41\Record Node 107\experiment2\recording1\continuous\Rhythm_FPGA-100.0\continuous.dat';
-orig_files{3} = 'K:\Data\lh99\2022-01-25_09-00-41\Record Node 107\experiment3\recording1\continuous\Rhythm_FPGA-100.0\continuous.dat';
-orig_files{4} = 'K:\Data\lh99\2022-01-25_21-00-20\Record Node 107\experiment1\recording1\continuous\Rhythm_FPGA-100.0\continuous.dat';
-clip = cell(1, length(orig_files));
-% clip{2} = [(seconds(minutes(158)) + 19) * 20000, Inf];
+orig_files{1} = 'L:\Data\lh101\lh101_220417_101911\lh101_220417_101911.dat';
+orig_files{2} = 'L:\Data\lh101\lh101_220417_140957\lh101_220417_140957.dat';
+
+clip{2} = [1, seconds(minutes(27)) * 20000];
+clip = [];
 
 datInfo = preprocDat('orig_files', orig_files, 'mapch', mapch,...
     'rmvch', [rmvch], 'nchans', length(mapch), 'saveVar', true,...
     'chunksize', 1e7, 'precision', 'int16', 'clip', clip);
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % LFP
@@ -129,7 +129,7 @@ sSig = load([basename, '.sleep_sig.mat']);
 
 % call for acceleration
 sSig = as_prepSig([basename, '.lfp'], acc.mag,...
-    'eegCh', [16], 'emgCh', [], 'saveVar', false, 'emgNchans', [],...
+    'eegCh', [5 : 7], 'emgCh', [], 'saveVar', false, 'emgNchans', [],...
     'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
     'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [10 450], 'fs', 1250);
 
@@ -162,13 +162,12 @@ psdBins = psd_states_timebins('basepath', pwd,...
     'timepoints', timepoints, 'nbins', 8, 'saveVar', false);
 
 % calc spec
-dur = 4 * 60 * 60;
+dur = Inf;
 sig = double(bz_LoadBinary([basename, '.lfp'], 'duration', dur,...
     'frequency', 1250, 'nchannels', nchans, 'start', 0,...
-    'channels', 4, 'downsample', 1));
-[s, tstamps, freq] = specBand('sig', sig, 'fs', 1250,...
-    'graphics', true, 'saveVar', true,...
-    'pad', 0, 'winstep', 1, 'logfreq', false);
+    'channels', [5, 16], 'downsample', 1));
+spec = calc_spec('sig', sig, 'fs', 1250, 'graphics', true, 'saveVar', true,...
+    'padfft', -1, 'winstep', 1, 'logfreq', false, 'ftarget', []);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % spike sorting
@@ -182,7 +181,7 @@ sig = double(bz_LoadBinary([basename, '.lfp'], 'duration', dur,...
 % spike detection from temp_wh
 [spktimes, ~] = spktimesWh('basepath', basepath, 'fs', fs, 'nchans', nchans,...
     'spkgrp', spkgrp, 'saveVar', true, 'saveWh', true,...
-    'graphics', false, 'force', true, 'winWh', [1, 4 * 60 * 60]);
+    'graphics', false, 'force', true, 'winWh', [0 Inf]);
 
 % spike rate per tetrode. note that using firingRate requires
 % special care becasue spktimes is given in samples and not seconds
@@ -295,10 +294,16 @@ monosyn = monoSyn_wrapper('spktimes', mea.spktimes, 'basepath', pwd,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % concatenate var from different sessions
+<<<<<<< Updated upstream
 mname = 'lh96';
 [srData, tidx, tidxLabels] = sessions_catVarTime('basepaths', basepaths,...
     'dataPreset', {'emg', 'spec', 'specEEG'}, 'graphics', true, 'xTicksBinsize', 1);
 
+=======
+mname = 'lh100';
+[srData, tidx, tidxLabels] = sessions_catVarTime('mname', mname,...
+    'dataPreset', {'sr', 'spec'}, 'graphics', true);
+>>>>>>> Stashed changes
 
 % snip segments (e.g. spikes) from binary 
 [spkwv, ~] = snipFromBinary('stamps', spktimes, 'fname', datname,...

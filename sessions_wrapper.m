@@ -4,7 +4,7 @@
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = 'lh96';
+mname = 'lh100';
 forceL = true;
 forceA = true;
 
@@ -27,63 +27,86 @@ nsessions = length(basepaths);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 templateCal = ss.info.calibrationData;
 
-if forceA
-    for isession = 1 : nsessions
-        
-        % file
-        basepath = basepaths{isession};
-        cd(basepath)
-        [~, basename] = fileparts(basepath);
-        
-        % params
-        session = v(isession).session;
-        nchans = session.extracellular.nChannels;
-        fs = session.extracellular.sr;
-        spkgrp = session.extracellular.spikeGroups.channels;
-        
-        % add timebins to datInfo
-        nbins = 4;
-        reqPnt = 6 * 60 * 60;
-        [timebins, timepnt] = metaInfo_timebins('reqPnt', reqPnt,...
-            'nbins', nbins);
-        winCalc = mat2cell(timebins, ones(nbins, 1), 2);
-        
-        % spk lfp
-        frange = [0.5, 4; 5, 12; 50, 80];
-        sl = spklfp_wrapper('basepath', basepath, 'winCalc', winCalc,...
-            'ch', 9, 'frange', frange,...
-            'graphics', true, 'saveVar', false);
+for isession = 1 : nsessions
 
-        % spike timing metrics
-        st = spktimesMetrics('winCalc', winCalc, 'forceA', true);
+    % file
+    basepath = basepaths{isession};
+    cd(basepath)
+    [~, basename] = fileparts(basepath);
+    session = CE_sessionTemplate(pwd, 'viaGUI', false,...
+        'forceDef', true, 'forceL', true, 'saveVar', true);
+    basepath = session.general.basePath;
+    nchans = session.extracellular.nChannels;
+    fs = session.extracellular.sr;
+    spkgrp = session.extracellular.spikeGroups.channels;
+    [~, basename] = fileparts(basepath);
 
 
-        % update units
-        %         units = selectUnits('basepath', pwd, 'grp', [], 'saveVar', true,...
-        %             'forceA', true, 'frBoundries', [0.1 Inf; 0.1 Inf],...
-        %             'spikes', []);
-           
-        %         tbins_txt = {'0-3ZT', '3-6ZT', '6-9ZT', '9-12ZT',...
-        %             '12-15ZT', '15-18ZT', '18-21ZT', '21-24ZT'};
-        %         psdBins = psd_states_timebins('basepath', pwd,...
-        %             'chEeg', [], 'forceA', true, 'graphics', true,...
-        %             'timebins', chunks, 'saveVar', true,...
-        %             'sstates', [1, 4, 5], 'tbins_txt', tbins_txt);
-        
-        %         psdBins = psd_timebins('basepath', pwd,...
-        %             'chEeg', [34], 'forceA', true, 'graphics', true,...
-        %             'timebins', chunks, 'saveVar', true);
-        
-        %         fr = firingRate(v(isession).spikes.times, 'basepath', basepath, 'graphics', true,...
-        %             'binsize', 60, 'saveVar', true, 'smet', 'GK', 'winBL',...
-        %             [0 timepoints], 'winCalc', [0, Inf], 'forceA', true);
-        
-        %         frBins(isession) = fr_timebins('basepath', pwd,...
-        %             'forceA', false, 'graphics', true,...
-        %             'timebins', chunks, 'saveVar', true);
-        
-    end
+    % params
+    %         session = v(isession).session;
+    %         nchans = session.extracellular.nChannels;
+    %         fs = session.extracellular.sr;
+    %         spkgrp = session.extracellular.spikeGroups.channels;
+
+    % add timebins to datInfo
+    %         nbins = 4;
+    %         reqPnt = 6 * 60 * 60;
+    %         [timebins, timepnt] = metaInfo_timebins('reqPnt', reqPnt,...
+    %             'nbins', nbins);
+    %         winCalc = mat2cell(timebins, ones(nbins, 1), 2);
+    %
+    %         % spk lfp
+    %         frange = [0.5, 4; 5, 12; 50, 80];
+    %         sl = spklfp_wrapper('basepath', basepath, 'winCalc', winCalc,...
+    %             'ch', 9, 'frange', frange,...
+    %             'graphics', true, 'saveVar', false);
+    %
+    %         % spike timing metrics
+    %         st = spktimesMetrics('winCalc', winCalc, 'forceA', true);
+
+    %         tbins_txt = {'0-3ZT', '3-6ZT', '6-9ZT', '9-12ZT',...
+    %             '12-15ZT', '15-18ZT', '18-21ZT', '21-24ZT'};
+    %         psdBins = psd_states_timebins('basepath', pwd,...
+    %             'chEeg', [], 'forceA', true, 'graphics', true,...
+    %             'timebins', chunks, 'saveVar', true,...
+    %             'sstates', [1, 4, 5], 'tbins_txt', tbins_txt);
+
+    %         psdBins = psd_timebins('basepath', pwd,...
+    %             'chEeg', [34], 'forceA', true, 'graphics', true,...
+    %             'timebins', chunks, 'saveVar', true);
+
+    %         fr = firingRate(v(isession).spikes.times, 'basepath', basepath, 'graphics', true,...
+    %             'binsize', 60, 'saveVar', true, 'smet', 'GK', 'winBL',...
+    %             [0 timepoints], 'winCalc', [0, Inf], 'forceA', true);
+
+    %         frBins(isession) = fr_timebins('basepath', pwd,...
+    %             'forceA', false, 'graphics', true,...
+    %             'timebins', chunks, 'saveVar', true);
+    
+
+% create emg signal from accelerometer data
+acc = EMGfromACC('basepath', basepath, 'fname', [basename, '.lfp'],...
+    'nchans', nchans, 'ch', nchans - 2 : nchans, 'saveVar', true, 'fsIn', 1250,...
+    'graphics', false, 'force', true);
+
+% call for acceleration
+sSig = as_prepSig([basename, '.lfp'], acc.mag,...
+    'eegCh', [5 : 7], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
+    'eegNchans', nchans, 'inspectSig', true, 'forceLoad', true,...
+    'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [10 450], 'fs', 1250);
+
+    % calc spec
+%     fh = figure;
+%     dur = Inf;
+%     sig = double(bz_LoadBinary([basename, '.lfp'], 'duration', dur,...
+%         'frequency', 1250, 'nchannels', nchans, 'start', 0,...
+%         'channels', [6, 18], 'downsample', 1));
+%     spec = calc_spec('sig', sig, 'fs', 1250, 'graphics', true,...
+%         'saveVar', true, 'padfft', -1, 'winstep', 1,...
+%         'logfreq', false, 'ftarget', [], 'ch', [{1}, {2}]);
+
 end
+
 
 cell_metrics = CellExplorer('basepaths', basepaths);
 

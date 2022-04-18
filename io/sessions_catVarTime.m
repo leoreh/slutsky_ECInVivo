@@ -12,7 +12,8 @@ function [expData, tidx, tidxLabels] = sessions_catVarTime(varargin)
 %   graphics        logical {true}
 %   saveFig         logical {true}
 %   dataPreset      string or cell of string depicting the variable to cat. 
-%                   can be any combination of 'sr', 'spec', 'fr'
+%                   can be any combination of 'sr', 'spec', 'fr', 'ripp',
+%                   or 'emg'
 %   axh             handle to plot axis
 % 
 % EXAMPLE
@@ -93,29 +94,18 @@ fs = v(1).session.extracellular.sr;
 
 switch dataPreset
     case 'spec'       
+        ch = 1;         % manually change this to switch between spectrograms
         for isession = 1 : nsessions
-            filename = fullfile(basepaths{isession},...
-                [basenames{isession}, '.sleep_sig.mat']);
-            load(filename, 'spec');
-            v(isession).data = spec';
+            if ndims(v(isession).spec.s) == 3
+                v(isession).data = squeeze(v(isession).spec.s(:, :, ch))';
+            else
+                v(isession).data = v(isession).spec.s';
+            end
         end
         cfg = as_loadConfig();
         ts = cfg.epochLen;                 % sampling period [s]
-        load(filename, 'spec_freq');
-        faxis = spec_freq;
+        faxis = v(isession).spec.freq;
     
-    case 'specEEG'
-        for isession = 1 : nsessions
-            filename = fullfile(basepaths{isession},...
-                [basenames{isession}, '.sleep_sig_eeg.mat']);
-            load(filename, 'spec');
-            v(isession).data = spec';
-        end
-        cfg = as_loadConfig();
-        ts = cfg.epochLen;                 % sampling period [s]
-        load(filename, 'spec_freq');
-        faxis = spec_freq;
-        
     case 'emg'
         for isession = 1 : nsessions
             filename = fullfile(basepaths{isession},...
@@ -237,10 +227,10 @@ if graphics
         set(gcf, 'CurrentAxes', axh)
     end
     switch dataPreset
-        case {'spec', 'specEEG'}
+        case {'spec'}
             
             % take a sample of the spectrogram to help initialize the colormap
-            showFreqs = find(faxis <= 15);  % freqs to display
+            showFreqs = find(faxis <= 100);  % freqs to display
             sampleBins = randperm(expLen, round(expLen / 10));
             specSample = reshape(expData(sampleBins, showFreqs), 1, length(sampleBins) * length(showFreqs));
             caxis1 = prctile(specSample, [6 98]);

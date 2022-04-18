@@ -80,10 +80,10 @@ if isempty(new_name)
 end
 
 % open file
-% fidTstamps = fopen(new_name, 'w');
-% if(fidTstamps == -1)
-%     error('cannot open file');
-% end
+fidTstamps = fopen(new_name, 'w');
+if(fidTstamps == -1)
+    error('cannot open file');
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arrange files and concatenate
@@ -135,7 +135,7 @@ for ifile = 1 : length(datFiles)
         end
         
         % write to file
-        %         fwrite(fidTstamps, raw.d, 'int64');
+        fwrite(fidTstamps, raw.d, 'int64');
         
         % clear data
         clear raw
@@ -144,12 +144,12 @@ for ifile = 1 : length(datFiles)
     end
 end
 
-% rc = fclose(fidTstamps);
-% if rc == 0
-%     fprintf('that took %.2f minutes\n', toc / 60)
-% else
-%     fprintf('. Failed to create %s!', new_name)
-% end
+rc = fclose(fidTstamps);
+if rc == 0
+    fprintf('that took %.2f minutes\n', toc / 60)
+else
+    fprintf('. Failed to create %s!', new_name)
+end
 
 end
 
