@@ -3,7 +3,7 @@ function plot_spec(spec, logfreq, saveFig)
 % plots a spectrogram on the current figure using the struct created in
 % calc_spec.
 %
-% INPUT
+% INPUTedit s
 %   spec        struct. see calc_spec
 %   logfreq     logical. plot y-axis on log (true) or linear {false} scale
 %   saveFig     logical / char. if char will be treated as the filepath for
@@ -14,11 +14,6 @@ function plot_spec(spec, logfreq, saveFig)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% laze fix for multichannel
-if ndims(spec.s) == 3
-    spec.s = squeeze(spec.s(:, :, 1));
-end
 
 % params
 winstep = spec.info.winstep;

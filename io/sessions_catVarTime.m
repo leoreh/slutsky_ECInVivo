@@ -58,9 +58,9 @@ if iscell(dataPreset)
     fh = figure;
     for idata = 1 : length(dataPreset)
         sb(idata) = subplot(length(dataPreset), 1, idata);
-        [expData, tidx, tidxLabels] = sessions_catVarTime('basepaths', basepaths,...
-            'dataPreset', dataPreset{idata}, 'graphics', true,...
-            'axh', sb(idata), 'xTicksBinsize', xTicksBinsize);
+        [expData, tidx, tidxLabels] = sessions_catVarTime('mname', mname,...
+            'basepaths', basepaths, 'dataPreset', dataPreset{idata},...
+            'graphics', true, 'axh', sb(idata), 'xTicksBinsize', xTicksBinsize);
         if idata < length(dataPreset)
             set(sb(idata), 'xticklabels', {[]})
             xlabel('')
@@ -213,7 +213,7 @@ tidxLabels(1 : 24 / xTicksBinsize : end) =...
 xdata = [1 : ts : ceil(seconds(expEnd - expStart))];
 
 % alternative for x labels
-tidxLabels = string(-32 : xTicksBinsize : 130);
+% tidxLabels = string(-32 : xTicksBinsize : 130);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics

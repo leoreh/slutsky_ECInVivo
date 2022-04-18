@@ -294,16 +294,9 @@ monosyn = monoSyn_wrapper('spktimes', mea.spktimes, 'basepath', pwd,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % concatenate var from different sessions
-<<<<<<< Updated upstream
-mname = 'lh96';
-[srData, tidx, tidxLabels] = sessions_catVarTime('basepaths', basepaths,...
-    'dataPreset', {'emg', 'spec', 'specEEG'}, 'graphics', true, 'xTicksBinsize', 1);
-
-=======
-mname = 'lh100';
+mname = 'lh99';
 [srData, tidx, tidxLabels] = sessions_catVarTime('mname', mname,...
-    'dataPreset', {'sr', 'spec'}, 'graphics', true);
->>>>>>> Stashed changes
+    'dataPreset', {'sr'}, 'graphics', true);
 
 % snip segments (e.g. spikes) from binary 
 [spkwv, ~] = snipFromBinary('stamps', spktimes, 'fname', datname,...
