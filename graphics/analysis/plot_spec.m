@@ -15,6 +15,11 @@ function plot_spec(spec, logfreq, saveFig)
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% lazy fix for multichannel spec
+if ndims(spec.s) == 3
+    spec.s = spec.s(:, :, 1);
+end
+
 % params
 winstep = spec.info.winstep;
 freq = spec.freq;

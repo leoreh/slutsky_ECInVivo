@@ -1,18 +1,23 @@
 function spec = calc_spec(varargin)
 
-% creates a spectrogram with the multitaper spectrogram by chronux, with
-% refinements from accusleep. multichannel support includes (1) averaging
-% the spectrogram across channels (e.g. from a single tetrodes). These
-% group of channels are indicated in the input "ch", and (2) calculating
-% the spectrogram for multiple can groups. 
+% calculates the multitaper spectrogram via chronux with refinements from
+% accusleep. data can be loaded from .lfp or provided as input.
+% multichannel support includes averaging channels (e.g. electrodes from
+% the same tetrode) or avergaing spectrograms across channels and/or
+% calculating the spectrogram separately for groups of channels. these are
+% determined by the input 'ch'
 %
 % INPUT
 %   basepath    char. fullpath to recording folder {pwd}
 %   sig         lfp signal. if matrix assumes columns are samples and rows
-%               are channels
+%               are channels. if empty will load from (basename).lfp
+%               according to ch
 %   ch          cell of vecs depicting groups of channels (indices to the
 %               rows of sig) whose spectrogram should be averaged. this is
-%               done in mtspectrumc.m 
+%               done in mtspectrumc.m. if sig is loaded from binary then
+%               averaging will be done on the lfp traces and not the
+%               spctrogram to save computation time. this was done for
+%               tetrodes (i.e. ch = spkgrp)
 %   fs          sampling frequency {1250}.
 %   ftarget     numeric. target frequency range and resolution. this can 
 %               be used to control the frequency axis of the spectrogram
@@ -38,7 +43,7 @@ function spec = calc_spec(varargin)
 %   mtspecgramc
 % 
 % TO DO LIST
-%       # find a way to set the frequency resolution in a log scale
+%       # find a way to set request freqs in a log scale
 %       # normalize spectrogram
 %       # separate graphics to stand alone (done)
 %       # calc power in bands (e.g. delta / theta)
@@ -83,10 +88,18 @@ saveVar         = p.Results.saveVar;
 % files
 [~, basename] = fileparts(basepath);
 specfile = fullfile(basepath, [basename, '.spec.mat']);
+sessionfile = fullfile(basepath, [basename, '.session.mat']);
+
+% session params
+if exist(sessionfile, 'file')
+    load(sessionfile, 'session')
+    nchans = session.extracellular.nChannels;
+    spkgrp = session.extracellular.spikeGroups.channels;
+end
 
 % prep frequencies
 if isempty(ftarget)
-    frange = [1 120];
+    frange = [1 100];
 else
     frange = [ftarget(1), ftarget(end)];
     if frange(2) > fs / 2
@@ -102,9 +115,26 @@ mtspec_params.fpass = frange;
 mtspec_params.tapers = [3 5];
 mtspec_params.trialave = 1;
 
+% organize channel groups
+spec.info.ch = ch;
+if isempty(ch)
+    ch = {1};
+end
+ngrp = length(ch);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% signal
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 % prep sig
-% should add option to load data from lfp binary and average multiple
-% channels. see trialave in mtspecgramc.m
+if isempty(sig)
+    for igrp = 1 : ngrp
+        sig(:, igrp) = mean(double(bz_LoadBinary([basename, '.lfp'], 'duration', Inf,...
+            'frequency', 1250, 'nchannels', nchans, 'start', 0,...
+            'channels', ch{igrp}, 'downsample', 1)), 2);
+        ch{igrp} = igrp;
+    end
+end
 
 % check sig orientation
 [nsamps, nch] = size(sig);
@@ -119,12 +149,6 @@ sig = sig(1 : (length(sig) - mod(length(sig), fs * winstep)), :);
 % pad the sig signal so that the first bin starts at time 0
 sig = [sig(1 : round(fs * (window - winstep) / 2), :); sig;...
     sig((end + 1 - round(fs * (window - winstep) / 2)) : end, :)];
-
-% organize channel groups
-if isempty(ch)
-    ch = {1};
-end
-ngrp = length(ch);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % create spectrogram
