@@ -1,10 +1,11 @@
-function plot_spec(spec, logfreq, saveFig)
+function plot_spec(spec, ch, logfreq, saveFig)
 
 % plots a spectrogram on the current figure using the struct created in
 % calc_spec.
 %
 % INPUTedit s
 %   spec        struct. see calc_spec
+%   ch          numeric. channel to plot from within specf
 %   logfreq     logical. plot y-axis on log (true) or linear {false} scale
 %   saveFig     logical / char. if char will be treated as the filepath for
 %               saving the figure
@@ -17,7 +18,7 @@ function plot_spec(spec, logfreq, saveFig)
 
 % lazy fix for multichannel spec
 if ndims(spec.s) == 3
-    spec.s = spec.s(:, :, 1);
+    spec.s = spec.s(:, :, ch);
 end
 
 % params

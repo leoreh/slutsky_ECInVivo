@@ -26,7 +26,7 @@ spkgrp = session.extracellular.spikeGroups.channels;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preprocessing of raw files
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'L:\Data\lh101\2022-04-17_14-09-57';
+basepath = 'L:\Data\lh100\2022-04-19_09-58-14';
 mapch = 1 : 21;
 rmvch = [];
 rmvch = [5, 17];
@@ -35,14 +35,14 @@ rmvch = [1, 3, 5];
 
 % tank to dat
 store = 'Raw2';
-blocks = [1 : 2];
+blocks = [1];
 chunksize = 300;
 clip = cell(1, 1);
 datInfo = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
     'chunksize', chunksize, 'mapch', mapch, 'rmvch', rmvch, 'clip', clip);
 
 % open ephys to dat
-exp = [1 : 3];
+exp = [1, 2, 5 : 7];
 rec = cell(max(exp), 1);
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
     'rmvch', rmvch, 'mapch', mapch,...
@@ -62,11 +62,11 @@ cat_OE_tstamps('orig_paths', orig_paths, 'new_path', exPathNew,...
 
 % pre-process dat (remove channels, reorder, etc.)
 clear orig_files
-orig_files{1} = 'L:\Data\lh101\lh101_220417_101911\lh101_220417_101911.dat';
-orig_files{2} = 'L:\Data\lh101\lh101_220417_140957\lh101_220417_140957.dat';
+orig_files{1} = 'L:\Data\lh101\2022-04-18_10-16-41\Record Node 107\experiment4\recording1\continuous\Rhythm_FPGA-100.0\continuous.dat';
+% orig_files{2} = 'L:\Data\lh101\lh101_220417_140957\lh101_220417_140957.dat';
 
-clip{2} = [1, seconds(minutes(27)) * 20000];
-clip = [];
+clip{1} = [seconds(minutes(19)) * 20000, Inf];
+% clip = [];
 
 datInfo = preprocDat('orig_files', orig_files, 'mapch', mapch,...
     'rmvch', [rmvch], 'nchans', length(mapch), 'saveVar', true,...
@@ -133,6 +133,12 @@ sSig = as_prepSig([basename, '.lfp'], acc.mag,...
     'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
     'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [10 450], 'fs', 1250);
 
+% call for lfp
+sSig = as_prepSig([basename, '.lfp'], [],...
+    'eegCh', [2], 'emgCh', [3], 'saveVar', true, 'emgNchans', [],...
+    'eegNchans', nchans, 'inspectSig', true, 'forceLoad', true,...
+    'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [10 450], 'fs', 1250);
+
 % manually create labels
 labelsmanfile = [basename, '.sleep_labelsMan.mat'];
 AccuSleep_viewer(sSig, [], labelsmanfile)
@@ -162,12 +168,20 @@ psdBins = psd_states_timebins('basepath', pwd,...
     'timepoints', timepoints, 'nbins', 8, 'saveVar', false);
 
 % calc spec
-dur = Inf;
-sig = double(bz_LoadBinary([basename, '.lfp'], 'duration', dur,...
-    'frequency', 1250, 'nchannels', nchans, 'start', 0,...
-    'channels', [5, 16], 'downsample', 1));
-spec = calc_spec('sig', sig, 'fs', 1250, 'graphics', true, 'saveVar', true,...
-    'padfft', -1, 'winstep', 1, 'logfreq', false, 'ftarget', []);
+spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true, 'saveVar', true,...
+    'padfft', -1, 'winstep', 1, 'logfreq', false, 'ftarget', [],...
+    'ch', [{1}, {2}]);
+
+fh = figure;
+subplot(2, 1, 1)
+plot_spec(spec, 2, false, basepath)
+hold on
+tidx = cumsum(datInfo.nsec) / 60 / 60;
+plot([tidx; tidx], ylim, '--k')
+subplot(2, 1, 2)
+plot([1 : length(sSig.emg_rms)] / 1250 / 60 / 60, sSig.emg_rms);
+
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % spike sorting
@@ -294,9 +308,9 @@ monosyn = monoSyn_wrapper('spktimes', mea.spktimes, 'basepath', pwd,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % concatenate var from different sessions
-mname = 'lh92';
+mname = 'lh102';
 [srData, tidx, tidxLabels] = sessions_catVarTime('mname', mname,...
-    'dataPreset', {'sr', 'spec'}, 'graphics', true);
+    'dataPreset', {'spec'}, 'graphics', true);
 
 % snip segments (e.g. spikes) from binary 
 [spkwv, ~] = snipFromBinary('stamps', spktimes, 'fname', datname,...

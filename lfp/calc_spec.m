@@ -94,7 +94,6 @@ sessionfile = fullfile(basepath, [basename, '.session.mat']);
 if exist(sessionfile, 'file')
     load(sessionfile, 'session')
     nchans = session.extracellular.nChannels;
-    spkgrp = session.extracellular.spikeGroups.channels;
 end
 
 % prep frequencies
@@ -126,7 +125,7 @@ ngrp = length(ch);
 % signal
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% prep sig
+% load and average within channel groups
 if isempty(sig)
     for igrp = 1 : ngrp
         sig(:, igrp) = mean(double(bz_LoadBinary([basename, '.lfp'], 'duration', Inf,...
@@ -178,6 +177,9 @@ end
 % calculate power in specific bands
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% bands taken from Boyce et al., Science, 2016
+bandNames = ["swa", "delta", "theta", "alpha", "beta", "glow", "ghigh"];
+bandFreqs = [0.5, 1; 1, 4; 4, 10; 10, 14; 15, 30; 30, 60; 60, 100];
 % should use decibels
 % maybe standardize with calibration data from accusleep
 % increase freq resolution in lower bands by recalculating spec
@@ -205,7 +207,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if graphics    
-    plot_spec(spec, logfreq, basepath)  
+    plot_spec(spec, 1, logfreq, basepath)  
 end
 
 end

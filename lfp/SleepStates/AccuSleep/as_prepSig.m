@@ -108,7 +108,7 @@ sessionfile = [basename, '.session.mat'];
 % reload data if already exists and return
 if exist(sigfile, 'file') && ~forceLoad
     fprintf('\n%s already exists. loading...\n', sigfile)
-    load(sigfile)
+    load(sigfile, 'info')
     return
 end
     

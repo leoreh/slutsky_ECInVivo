@@ -94,7 +94,7 @@ fs = v(1).session.extracellular.sr;
 
 switch dataPreset
     case 'spec'       
-        ch = 3;         % manually change this to switch between spectrograms
+        ch = 1;         % manually change this to switch between spectrograms
         for isession = 1 : nsessions
             if ndims(v(isession).spec.s) == 3
                 v(isession).data = squeeze(v(isession).spec.s(:, :, ch))';
