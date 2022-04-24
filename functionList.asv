@@ -26,7 +26,7 @@ spkgrp = session.extracellular.spikeGroups.channels;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preprocessing of raw files
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'G:\Data\lh103\lh103_220421_100100';
+basepath = 'L:\Data\lh100\2022-04-21_10-05-03';
 mapch = 1 : 21;
 rmvch = [];
 rmvch = [5, 17];
@@ -34,15 +34,15 @@ mapch = [1 : 6];
 rmvch = [1, 3, 5];
 
 % tank to dat
-store = 'Raw1';
-blocks = [1 : 4];
+store = 'Raw2';
+blocks = [1];
 chunksize = 300;
 clip = cell(1, 1);
 datInfo = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
     'chunksize', chunksize, 'mapch', mapch, 'rmvch', rmvch, 'clip', clip);
 
 % open ephys to dat
-exp = [1, 2, 4];
+exp = [1, 2];
 rec = cell(max(exp), 1);
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
     'rmvch', rmvch, 'mapch', mapch,...
@@ -310,7 +310,7 @@ monosyn = monoSyn_wrapper('spktimes', mea.spktimes, 'basepath', pwd,...
 % concatenate var from different sessions
 mname = 'lh100';
 [srData, tidx, tidxLabels] = sessions_catVarTime('mname', mname,...
-    'dataPreset', {'sr', 'spec', 'emg'}, 'graphics', true);
+    'dataPreset', {'sr', 'spec'}, 'graphics', true);
 
 % snip segments (e.g. spikes) from binary 
 [spkwv, ~] = snipFromBinary('stamps', spktimes, 'fname', datname,...

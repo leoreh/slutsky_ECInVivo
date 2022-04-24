@@ -76,10 +76,10 @@ varsName = ["units"; "datInfo"; "session"; string(dataPreset)];
 
 if isempty(basepaths)
     [v, basepaths] = getSessionVars('mname', mname, 'varsFile', varsFile,...
-        'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""]);
+        'varsName', varsName, 'pcond', ["tempflag"]);
 else
     [v, ~] = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
-        'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""]);
+        'varsName', varsName, 'pcond', ["tempflag"]);
 end
 
 [~, basenames] = cellfun(@fileparts, basepaths, 'uni', false);
