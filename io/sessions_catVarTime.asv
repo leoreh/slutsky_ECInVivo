@@ -1,4 +1,4 @@
-function [expData, xData] = sessions_catVarTime(varargin)
+function [expData, xdata] = sessions_catVarTime(varargin)
 
 % concatenates a variable from different sessions. assumes sessions are
 % contineous. concatenates according to the time of day extracted from
@@ -62,7 +62,7 @@ if iscell(dataPreset)
     fh = figure;
     for idata = 1 : length(dataPreset)
         sb(idata) = subplot(length(dataPreset), 1, idata);
-        [expData{idata}, xData{idata}] = sessions_catVarTime('mname', mname,...
+        [expData, tidx, tidxLabels] = sessions_catVarTime('mname', mname,...
             'basepaths', basepaths, 'dataPreset', dataPreset{idata},...
             'graphics', true, 'axh', sb(idata), 'xTicksBinsize', xTicksBinsize);
         if idata < length(dataPreset)
@@ -213,7 +213,7 @@ tidxLabels(1 : 24 / xTicksBinsize : end) =...
     string(datestr(datenum(tStartLabel : hours(24) : expEnd),...
     'yymmdd', 2000));
 % data for x-axis
-xData = [1 : ts : ceil(seconds(expEnd - expStart))];
+xdata = [1 : ts : ceil(seconds(expEnd - expStart))];
 
 % alternative for x labels
 % tidxLabels = string(-32 : xTicksBinsize : 130);
@@ -238,7 +238,7 @@ if graphics
             caxis1 = prctile(specSample, [6 92]);
 
             % plot
-            imagesc(xData, faxis', expData', caxis1);
+            imagesc(xdata, faxis', expData', caxis1);
             colormap(AccuSleep_colormap());
             axis('xy')
             ylabel('Frequency [Hz]')
@@ -249,31 +249,31 @@ if graphics
         case 'emg'            
             % plot
             expData = movmean(expData, 33, 1);
-            plot(xData, expData);
+            plot(xdata, expData);
             colormap(AccuSleep_colormap());
             axis('xy')
             ylabel('Norm. EMG')
             
         case 'sr'
             expData = movmean(expData, 13, 1);
-            plot(xData, expData(:, grp))
+            plot(xdata, expData(:, grp))
             ylabel('Multi-Unit Firing Rate [Hz]')
             legend(split(num2str(grp)))
             axis tight
             
         case 'fr'
             expData = movmean(mean(expRs, 2, 'omitnan'), 13, 1);
-            plot(xData, expData, 'LineWidth', 2)
+            plot(xdata, expData, 'LineWidth', 2)
             hold on
             expData = movmean(mean(expFs, 2, 'omitnan'), 13, 1);
-            plot(xData, expData, 'LineWidth', 2)
+            plot(xdata, expData, 'LineWidth', 2)
             legend({sprintf('RS <= %d', max(nunits(:, 1))),...
                 sprintf('FS <= %d', max(nunits(:, 2)))})
             ylabel('Firing Rate [Hz]')
             axis tight
             
         case 'ripp'
-            plot(xData, expData)
+            plot(xdata, expData)
             ylabel('Ripple Rate [Hz]')
             axis tight
     end

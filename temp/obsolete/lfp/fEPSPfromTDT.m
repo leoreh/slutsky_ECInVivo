@@ -7,7 +7,6 @@ function lfp = fEPSPfromTDT(varargin)
 %               basepath. if .lfp should not include extension, if .wcp
 %               should include extension
 %   basepath    string. path to load filename and save output {pwd}
-%   extension   load from {'lfp'} (neurosuite), 'abf', or 'wcp'.
 %   forceL      logical. force reload {false}.
 %   fs          numeric. requested sampling frequency {1250}
 %   mapch       new order of channels {[]}.

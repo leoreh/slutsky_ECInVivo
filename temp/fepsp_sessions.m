@@ -1,73 +1,37 @@
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% wrapper for tdt 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % single session analysis
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-basepath = 'G:\Data\lh105\220411';
-
-wcpfiles = [6];
-intens = [450];
-
-% io
+% wcp
+basepath        = 'G:\Data\lh104\220410';
+wcpfiles        = [1 : 8];
+intens          = [70, 90, 100, 120];
+recname         = '220410_io1';
 fepsp_wcpPipeline('basepath', basepath, 'wcpfiles', wcpfiles,...
-    'fepsp_protocol', 'stp', 'recname', '220411_stp1', 'intens', intens,...
-    'saveFlag', true)
-
-% freerun
-fepsp_wcpPipeline('basepath', basepath, 'wcpfiles', wcpfiles,...
-    'fepsp_protocol', 'freerun', 'recname', 'freerun', 'intens', [],...
+    'protocol_id', 'io', 'recname', recname, 'intens', intens,...
     'saveFlag', true)
 
 
-
-% plot spec ---------------------------------------------------------------
-% load
-basepath = pwd;
-[~, basename] = fileparts(basepath);
-specfile = fullfile(basepath, [basename, '.spec.mat']);
-load(specfile)
-
-% graphics
-setMatlabGraphics(false)
-fh = figure;
-
-plot_spec(spec, false, false)
-hold on
-axis tight
-yLimit = ylim;
-tidx = [cumsum(lfp.filelength) / 60 / 60]';
-tidx = [0; tidx(1 : end - 1)];
-plot([tidx, tidx], ylim, '--k', 'LineWidth', 1)
-hold on
-% text(tidx, ones(1, length(tidx)) * (yLimit(2) + 0.05 * yLimit(2)), string(wcpfiles))
-
-% save
-figpath = fullfile(basepath, 'graphics');
-mkdir(figpath)
-figname = fullfile(figpath, sprintf('%s_spec', basename));
-export_fig(figname, '-tif', '-transparent', '-r300')
-
-% psd timebins ------------------------------------------------------------
-
-fs = lfp.fs;
-nsec = cumsum(lfp.filelength);
-clear winCalc
-winCalc{1} = [1, nsec(1)];
-winCalc{2} = [nsec(1), nsec(3)];
-winCalc{3} = [nsec(3), nsec(4)];
-% winCalc{4} = [nsec(6), nsec(7)];
-winCalc{4} = [nsec(8), nsec(9)];
-winCalc{5} = [nsec(9), nsec(10)];
-
-winCalc = cellfun(@round, winCalc, 'uni', false);
-
-[psdBins, faxis] = psd_timebins('sig', lfp.data, 'fs', fs,...
-    'winCalc', winCalc, 'graphics', true);
-legend
-
-psdBins ./ sum(psdBins, 2)
+% tdt
+basepath        = 'G:\Data\lh104\lh104_220425_112200';
+mapch           = [1 : 6];
+rmvch           = [1, 3, 5, 7, 8];
+intens          = [250, 500, 750];
+blocks          = [41 : 43];
+protocol_id     = 'stp';
+store           = 'Raw1';
+recsuffix       = 'stp6';
+ch              = 2;
+fepsp_tdtPipeline('basepath', basepath, 'blocks', blocks,...
+    'protocol_id', protocol_id, 'recsuffix', recsuffix, 'intens', intens,...
+    'ch', ch, 'mapch', mapch', 'rmvch', rmvch, 'store', store)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % multi-session analysis
@@ -76,10 +40,11 @@ psdBins ./ sum(psdBins, 2)
 % load data ---------------------------------------------------------------
 
 % experiment folder
-exppath = 'G:\Data\lh103\220329';
+exppath = 'G:\Data\lh104\lh104_220426_090900';
 cd(exppath)
-basepaths = dir('*_stp*');
+basepaths = dir('*_io*');
 basepaths = fullfile({basepaths.folder}, {basepaths.name});
+
 nfiles = length(basepaths);
 
 % stim session names
@@ -87,8 +52,8 @@ nfiles = length(basepaths);
 ids = cellfun(@(x) x(end - 2 : end), basenames, 'uni', false);
 
 % load data
-varsFile = ["fepsp_traces"; "fepsp_results"; "lfp"];
-varsName = ["traces"; "results"; "lfp"];
+varsFile = ["fepsp_traces"; "fepsp_results"];
+varsName = ["traces"; "results"];
 v = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
     'varsName', varsName);
 
@@ -98,7 +63,7 @@ v = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
 for ifile = 1 : nfiles
     
     % intens
-    [intens, sidx] = sort(v(ifile).lfp.intens);
+    [intens, sidx] = sort(v(ifile).results.info.intens);
 
     % mean trace per intensity
     traces = cellfun(@(x) mean(x, 2, 'omitnan'), v(ifile).traces, 'uni', false);
@@ -106,26 +71,25 @@ for ifile = 1 : nfiles
     traces = traces(:, sidx);
 
     % timestamps
-    protocol_info = fepsp_getProtocol('protocol_id', v(ifile).lfp.fepsp_protocol);
+    protocol_info = fepsp_getProtocol('protocol_id', v(ifile).lfp.protocol_id);
     tstamps = v(ifile).lfp.timestamps * 1000 - protocol_info.stim_times(1); 
     tstamps = tstamps(1 : length(traces));
 
+    
+    % stp intensity idx
+    idx = 1;
 
     % amp
-    amp = cell2nanmat(v(ifile).results.all_traces.Amp, 2)';
+    amp = cell2nanmat(v(ifile).results.all_traces.Amp(idx), 2)';
     amp = amp(sidx, :);
 
     % slope
-    slope = cell2nanmat(v(ifile).results.all_traces.Slope, 2)';
+    slope = cell2nanmat(v(ifile).results.all_traces.Slope(idx), 2)';
     slope = slope(sidx, :);
     
 
-
-    v(ifile).results.avg_traces.Amp{1}
-    v(ifile).results.avg_traces.Amp{1} / v(ifile).results.avg_traces.Amp{1}(1)
-
-    v(ifile).results.avg_traces.Slope{1}
-    v(ifile).results.avg_traces.Slope{1} / v(ifile).results.avg_traces.Slope{1}(1)
+    ampNorm = v(ifile).results.avg_traces.Amp{idx} / v(ifile).results.avg_traces.Amp{idx}(1);
+    slopeNorm = v(ifile).results.avg_traces.Slope{idx} / v(ifile).results.avg_traces.Slope{idx}(1);
 
 
 end
@@ -134,14 +98,60 @@ end
 
 
 
+% params
+fileIdx = [1 : 7];
+intens = 70;
+fileNames = {'Baseline', 'aCSF', 'aCSF2', 'Ket' ,'Ket2', 'ket3', 'ket24'};
+
+% graphics
+fh = figure;
+th = tiledlayout(3, 2);
+
+% raw io traces
+nexttile
+xval = [1 : size(v(end - 2).traces{2}, 1)] / 10000 * 1000;
+hold on
+for ifile = 1 : length(fileIdx)
+    [~, intensIdx] = min(abs(intens - (v(fileIdx(ifile)).lfp.intens))); 
+    plot(xval, mean(v(fileIdx(ifile)).traces{intensIdx}, 2, 'omitnan'))
+end
+legend
+xlabel('Time [ms]')
+ylabel('Amplitude [mV]')
+legend(fileNames)
+title('Traces @ 70 uA')
+
+% io curve amp
+nexttile
+hold on
+for ifile = 1 : length(fileIdx)
+[intensVal, sidx] = sort(v(fileIdx(ifile)).lfp.intens);
+    plot(intensVal,...
+    [v(fileIdx(ifile)).results.avg_traces.Amp{sidx}])
+end
+legend(fileNames)
+xlabel('Intensity [uA]')
+ylabel('Amplitude [mV]')
+title('IO Curve')
+
+% io curve slope
+nexttile
+hold on
+for ifile = 1 : length(fileIdx)
+[intensVal, sidx] = sort(v(fileIdx(ifile)).lfp.intens);
+    plot(intensVal,...
+    [v(fileIdx(ifile)).results.avg_traces.Slope{sidx}])
+end
+legend(fileNames)
+xlabel('Intensity [uA]')
+ylabel('Slope')
+title('IO Curve')
 
 
 
 
-
-
-
-
+% ------- stp
+% load
 
 % load stp
 cd(exppath)
@@ -152,44 +162,6 @@ varsFile = ["fepsp_traces"; "fepsp_results"; "lfp"];
 varsName = ["traces"; "results"; "lfp"];
 vSTP = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
     'varsName', varsName);
-
-
-
-
-
-
-
-
-
-
-% graphics
-fh = figure;
-th = tiledlayout(3, 2);
-
-% raw io traces
-nexttile
-xval = [1 : size(vIO(end - 2).traces{2}, 1)] / 10000 * 1000;
-plot(xval, mean(vIO(end - 2).traces{2}, 2, 'omitnan'))
-hold on
-plot(xval, mean(vIO(end).traces{2}, 2, 'omitnan'))
-xlabel('Time [ms]')
-ylabel('Amplitude [mV]')
-legend({'Baseline', 'Baclofen'})
-title('Traces @ 70 uA')
-
-% io curve
-nexttile
-xval = [50, 70, 90];
-plot(xval, [vIO(end - 2).results.avg_traces.Amp{:}])
-hold on
-plot(xval, [vIO(end).results.avg_traces.Amp{:}])
-xticks([30, 50, 70, 90])
-xlabel('Intensity [uA]')
-ylabel('Amplitude [mV]')
-title('IO Curve')
-
-% ------- stp
-% load
 
 % stp traces
 nexttile
@@ -216,6 +188,9 @@ xlabel('Stim No.')
 ylabel('Norm. Amplitude [%]')
 title('Facilitation')
 
+
+
+
 % free run
 cd(exppath)
 basepaths = dir('*_freerun*');
@@ -238,31 +213,3 @@ text(tidx(end - 2), yLimit(2) + 0.01 * yLimit(2), "Baclofen")
 
 
 
-
-
-% 
-% % experiment folder
-% exppath = 'G:\Data\hb_a2';
-% cd(exppath)
-% basepaths = dir('*_stp*');
-% basepaths = fullfile({basepaths.folder}, {basepaths.name});
-% nfiles = length(basepaths);
-% 
-% for ifile = 1 : nfiles
-%     
-%     ifile = 6;
-%     cd(basepaths{ifile})
-%     [~, basename] = fileparts(basepaths{ifile});
-%     load([basename, '.lfp.mat'])
-%     [~, wcpfiles] = fileparts(lfp.files)
-%     intens = [50, 70];
-% 
-%     if ~iscell(wcpfiles)
-%         wcpfiles = {wcpfiles};
-%     end
-% 
-%     fepsp_wcpPipeline('basepath', exppath, 'wcpfiles', wcpfiles,...
-%         'intens', intens, 'fsOut', [], 'recname', basename,...
-%         'fepsp_protocol', lfp.fepsp_protocol)
-% 
-% end

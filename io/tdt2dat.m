@@ -205,7 +205,7 @@ for i = 1 : nblocks
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     for j = 1 : nchunks
         dat = TDTbin2mat(blockpath, 'TYPE', {'streams'}, 'STORE', store,...
-            'T1', chunks(j , 1) , 'T2' ,chunks(j , 2) );
+            'T1', chunks(j , 1) , 'T2' ,chunks(j , 2));
         dat = dat.streams.(store).data;
         
         if ~isempty(dat)
@@ -268,7 +268,7 @@ end
 % more processing
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % create lfp file
-if contains(store, 'Raw')
+if contains(store, 'Raw') && nargout == 1 
     LFPfromDat('basepath', basepath, 'cf', 450, 'chunksize', 5e6,...
         'nchans', length(mapch), 'fsOut', 1250,...
         'fsIn', blockHead.stores.(store).fs)

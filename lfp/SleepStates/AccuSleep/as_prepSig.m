@@ -43,10 +43,12 @@ function sSig = as_prepSig(eegData, emgData, varargin)
 %       # implement cleanSig (irrelavent)
 %       # input nchans for emg / eeg files separately (done)
 %       # implement tsa_filt
+%       # chunk processing
 %
 % 19 apr 21 LH  updates:
 % 06 jan 22     combined signals to struct
 % 25 feb 22     specBand instead of createSpectrogram
+% 28 apr 22     ftarget starting at 0.5. must also consider rayleigh
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -193,13 +195,15 @@ end
 % filtering the eeg if the sampling frequency is maintained at 1250 (which
 % is better for the emg rms signal).
 
-% handle eeg data
+% handle eeg data (must apply batch proccessing due to memory)
 if eegFs ~= fs
     
+    filtRatio = eegCf / (eegFs / 2);
+    fsRatio = eegFs / fs;
+
     % low-pass filter
     if ~isempty(eegCf)
         fprintf('\nfiltering EEG, cutoff = %d Hz', eegCf)
-        filtRatio = eegCf / (eegFs / 2);
         eegData = iosr.dsp.sincFilter(eegData, filtRatio);
     end
     
@@ -238,8 +242,8 @@ end
 % spectrogram
 fprintf('\ncreating spectrogram...')
 spec = calc_spec('sig', eegData,...
-    'fs', 1250, 'graphics', false, 'saveVar', false,...
-    'padfft', -1, 'winstep', 1, 'logfreq', false, 'ftarget', [0 : 0.2 : 64]);
+    'fs', 1250, 'graphics', false, 'saveVar', false, 'force', true,...
+    'padfft', -1, 'winstep', 1, 'logfreq', false, 'ftarget', [0.5 : 0.2 : 64]);
 sSig.spec = spec.s;
 sSig.spec_tstamps = spec.tstamps;
 sSig.spec_freq = spec.freq;

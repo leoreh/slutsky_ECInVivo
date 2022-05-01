@@ -168,7 +168,7 @@ for icell = 1 : length(stamps)
     fprintf('\nworking on cell #%d: ', icell)
     
     % initialize
-    rmvsnip = [];
+    rmvsnip = 0;
     nsnips = length(stamps{icell});
     snips{icell} = nan(length(ch{icell}), sniplength, nsnips);
     
@@ -229,14 +229,12 @@ for icell = 1 : length(stamps)
         snips{icell}(:, :, isnip) = v;
                         
     end
+end
 
-    % remove incomplete snips
-    for isnip = 1 : length(rmvsnip)
-        snips{icell}(:, :, rmvsnip(isnip)) = [];
-        stamps{icell}(rmvsnip(isnip)) = []
-    end
-
-
+% remove incomplete snips
+for isnip = 1 : length(rmvsnip)
+    snips{icell}(:, :, isnip) = [];
+    stamps
 end
 
 % return outputs as vec / mat instead of cell 

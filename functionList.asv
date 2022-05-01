@@ -26,23 +26,25 @@ spkgrp = session.extracellular.spikeGroups.channels;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preprocessing of raw files
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'L:\Data\lh100\2022-04-21_10-05-03';
+basepath = 'I:\Data\lh106\2022-04-30_10-50-48';
 mapch = 1 : 21;
-rmvch = [];
+rmvch = [18];
 rmvch = [5, 17];
 mapch = [1 : 6];
 rmvch = [1, 3, 5];
+mapch = [1 : 8];
+rmvch = [2, 4, 6, 7, 8];
 
 % tank to dat
-store = 'Raw2';
-blocks = [1];
+store = 'Raw1';
+blocks = [2 : 8];
 chunksize = 300;
 clip = cell(1, 1);
 datInfo = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
     'chunksize', chunksize, 'mapch', mapch, 'rmvch', rmvch, 'clip', clip);
 
 % open ephys to dat
-exp = [1, 2];
+exp = [1 : 3];
 rec = cell(max(exp), 1);
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
     'rmvch', rmvch, 'mapch', mapch,...
@@ -62,10 +64,10 @@ cat_OE_tstamps('orig_paths', orig_paths, 'new_path', exPathNew,...
 
 % pre-process dat (remove channels, reorder, etc.)
 clear orig_files
-orig_files{1} = 'L:\Data\lh101\2022-04-18_10-16-41\Record Node 107\experiment4\recording1\continuous\Rhythm_FPGA-100.0\continuous.dat';
+orig_files{1} = 'I:\Data\lh107\lh107_220430_105048\lh107_220430_105048.dat';
 % orig_files{2} = 'L:\Data\lh101\lh101_220417_140957\lh101_220417_140957.dat';
 
-clip{1} = [seconds(minutes(19)) * 20000, Inf];
+clip{1} = [seconds(minutes(839)), seconds(minutes(882))]  * 20000;
 % clip = [];
 
 datInfo = preprocDat('orig_files', orig_files, 'mapch', mapch,...
@@ -129,7 +131,7 @@ sSig = load([basename, '.sleep_sig.mat']);
 
 % call for acceleration
 sSig = as_prepSig([basename, '.lfp'], acc.mag,...
-    'eegCh', [5 : 7], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
+    'eegCh', [1 : 4], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
     'eegNchans', nchans, 'inspectSig', true, 'forceLoad', true,...
     'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [10 450], 'fs', 1250);
 
@@ -170,18 +172,7 @@ psdBins = psd_states_timebins('basepath', pwd,...
 % calc spec
 spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true, 'saveVar', true,...
     'padfft', -1, 'winstep', 1, 'logfreq', false, 'ftarget', [],...
-    'ch', [{1 : 4}, {16}]);
-
-fh = figure;
-subplot(2, 1, 1)
-plot_spec(spec, 2, false, basepath)
-hold on
-tidx = cumsum(datInfo.nsec) / 60 / 60;
-plot([tidx; tidx], ylim, '--k')
-subplot(2, 1, 2)
-plot([1 : length(sSig.emg_rms)] / 1250 / 60 / 60, sSig.emg_rms);
-
-
+    'ch', [{1}, {2}], 'force', true);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % spike sorting
@@ -308,9 +299,9 @@ monosyn = monoSyn_wrapper('spktimes', mea.spktimes, 'basepath', pwd,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % concatenate var from different sessions
-mname = 'lh100';
+mname = 'lh104';
 [srData, tidx, tidxLabels] = sessions_catVarTime('mname', mname,...
-    'dataPreset', {'sr', 'spec'}, 'graphics', true);
+    'dataPreset', {'spec', 'emg'}, 'graphics', true);
 
 % snip segments (e.g. spikes) from binary 
 [spkwv, ~] = snipFromBinary('stamps', spktimes, 'fname', datname,...
