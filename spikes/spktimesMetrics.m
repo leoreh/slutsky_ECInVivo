@@ -81,6 +81,8 @@ end
 if isempty(spktimes)
     if exist(spkFile, 'file')
         load(spkFile)
+    else
+        error('spikes file does not exist, input spktimes')
     end
     spktimes = spikes.times;
 end
