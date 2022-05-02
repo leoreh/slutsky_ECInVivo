@@ -5,8 +5,8 @@
 
 % user input
 mname = 'lh101';
-basepath = 'G:\Data\lh104\lh104_220430_104900';
-blocks = [1, 10, 19];
+basepath = 'I:\Data\lh104\lh104_220501_102100';
+blocks = [1, 11, 12, 21];
 
 % tank to dat (tetrodes)
 store = 'Raw3';
@@ -121,12 +121,12 @@ delete('*temp_wh*')
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % user input
-mname = 'lh105';
-basepath = 'G:\Data\lh104\lh104_220430_104900';
-blocks = [1, 10, 19];
+mname = 'lh104';
+basepath = 'I:\Data\lh104\lh104_220501_102100';
+blocks = [1, 11, 12, 21];
 
 % tank to dat (tetrodes)
-store = 'Raw2';
+store = 'Raw1';
 mapch = [1 : 8];
 rmvch = [1 : 2 : 7, 8];
 chunksize = 300;
@@ -194,7 +194,6 @@ legend(spec.bands.bandNames(2 : end))
 ylabel('Norm. Spectral Power [dB]')
 xlabel('Time [hr]')
 linkaxes(axh, 'x')
-
 
 tidx = cumsum(datInfo.nsec) / 60 / 60;
 hold on
