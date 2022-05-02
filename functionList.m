@@ -262,7 +262,7 @@ spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
     'vis', 'on', 'spkgrp', spkgrp);
 
 % spike timing metrics
-st = spktimes_metrics('winCalc', [], 'forceA', true);
+st = spktimes_metrics('bins', [], 'forceA', true);
 
 % burstiness (mea)
 brst = spktimes_meaBrst(spikes.times, 'binsize', Inf, 'isiThr', 0.02,...
@@ -303,11 +303,12 @@ monosyn = monoSyn_wrapper('spktimes', mea.spktimes, 'basepath', pwd,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % concatenate var from different sessions
-mname = 'lh104';
+mname = 'lh96';
 basepaths = {basepath};
+basepaths = {};
 [expData, xData] = sessions_catVarTime('mname', mname,...
-    'dataPreset', {'emg', 'fr'}, 'graphics', true,...
-    'basepaths', basepaths, 'xTicksBinsize', 1, 'markRecTrans', true);
+    'dataPreset', {'fr', 'emg', 'spec', 'bands'}, 'graphics', true,...
+    'basepaths', basepaths, 'xTicksBinsize', 12, 'markRecTrans', true);
 
 % snip segments (e.g. spikes) from binary 
 [spkwv, ~] = snipFromBinary('stamps', spktimes, 'fname', datname,...

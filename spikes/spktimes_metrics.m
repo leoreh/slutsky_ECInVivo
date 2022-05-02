@@ -240,29 +240,30 @@ for iunit = sunits
         st.lvr(ibin, iunit) = 3 / (nisi - 1) * lv_term;
         
         if fullA
-        % fit triple exponential to acg. adapted from CE (fit_ACG.m).
-        % requires the Curve Fitting Toolbox. no idea whats going on here
-        g = fittype('max(c*(exp(-(x-f)/a)-d*exp(-(x-f)/b))+h*exp(-(x-f)/g)+e,0)',...
-            'dependent',{'y'},'independent',{'x'},...
-            'coefficients',{'a','b','c','d','e','f','g','h'});       
-        a0 = [20, 1, 30, 2, 0.5, 5, 1.5, 2];
-        lb = [1, 0.1, 0, 0, -30, 0, 0.1, 0];
-        ub = [500, 50, 500, 15, 50, 20, 5, 100];
-        offset = 101;
-        x = ([1 : 100] / 2)';
-        [f0, ~] = fit(x, st.acg_narrow(x * 2 + offset, ibin, iunit),...
-            g, 'StartPoint', a0, 'Lower', lb, 'Upper', ub);
-        fit_params = coeffvalues(f0);      
-        st.tau_rise(ibin, iunit) = fit_params(2);
-        st.tau_burst(ibin, iunit) = fit_params(7);
-        st.acg_refrac(ibin, iunit) = fit_params(6);       
-        
-        % burstiness (mea)
-        st.brst = spktimes_meaBrst(spikes.times, 'bins', bins, 'isiThr', 0.02,...
-            'minSpks', 2, 'saveVar', false, 'force', true, 'bins', bins);
-        
+            % fit triple exponential to acg. adapted from CE (fit_ACG.m).
+            % requires the Curve Fitting Toolbox. no idea whats going on here
+            g = fittype('max(c*(exp(-(x-f)/a)-d*exp(-(x-f)/b))+h*exp(-(x-f)/g)+e,0)',...
+                'dependent',{'y'},'independent',{'x'},...
+                'coefficients',{'a','b','c','d','e','f','g','h'});
+            a0 = [20, 1, 30, 2, 0.5, 5, 1.5, 2];
+            lb = [1, 0.1, 0, 0, -30, 0, 0.1, 0];
+            ub = [500, 50, 500, 15, 50, 20, 5, 100];
+            offset = 101;
+            x = ([1 : 100] / 2)';
+            [f0, ~] = fit(x, st.acg_narrow(x * 2 + offset, ibin, iunit),...
+                g, 'StartPoint', a0, 'Lower', lb, 'Upper', ub);
+            fit_params = coeffvalues(f0);
+            st.tau_rise(ibin, iunit) = fit_params(2);
+            st.tau_burst(ibin, iunit) = fit_params(7);
+            st.acg_refrac(ibin, iunit) = fit_params(6);
         end
     end
+end
+
+% burstiness (mea)
+if fullA
+    st.brst = spktimes_meaBrst(spikes.times, 'bins', bins, 'isiThr', 0.02,...
+        'minSpks', 2, 'saveVar', false, 'force', true, 'bins', bins);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

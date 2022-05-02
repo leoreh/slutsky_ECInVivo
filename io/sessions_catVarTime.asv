@@ -115,11 +115,9 @@ switch dataPreset
             filename = fullfile(basepaths{isession},...
                 [basenames{isession}, '.spec.mat']);
             load(filename, 'spec');
-            yval = movmean(squeeze(spec.bands.db(:, :, ch)), 100,  2);
-            v(isession).data = yval(2 : end, :) ./ yval(1, :);
-            v(isession).data = yval(2 : end, :);
+            v(isession).data = squeeze(spec.bands.db(:, :, ch));
         end
-        ts = spec.info.winstep;     % sampling period [s]
+        ts = v(isession).spec.info.winstep;     % sampling period [s]
 
     case 'emg'
         for isession = 1 : nsessions
@@ -260,7 +258,7 @@ if graphics
         
         case 'bands'
             expData = movmean(expData, 33, 1);
-            plot(xData, expData, 'lineWidth', 2.5);
+            plot(xData, expData);
             ylabel('Norm. Spectral Power [dB]')
             
             for iband = 1 : length(spec.bands.bandFreqs)
@@ -268,7 +266,7 @@ if graphics
                     spec.bands.bandNames{iband}, floor(spec.bands.bandFreqs(iband, 1)),...
                     spec.bands.bandFreqs(iband, 2));
             end
-            legend(lgd{2 : end}, 'location', 'best')
+            legend
 
         case 'emg'            
             % plot

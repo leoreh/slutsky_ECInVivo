@@ -242,10 +242,17 @@ if graphics
         'axh', axh)  
 
     axh(2) = nexttile;
+    
+    for iband = 1 : length(spec.bands.bandFreqs)
+        lgd{iband} = sprintf('%s [%d-%d Hz]',...
+            spec.bands.bandNames{iband}, floor(spec.bands.bandFreqs(iband, 1)),...
+            spec.bands.bandFreqs(iband, 2));
+    end 
+    
     yval = movmean(squeeze(spec.bands.db(:, :, ch)), 100,  2);
     plot(spec.tstamps / 60 / 60,...
         yval(2 : end, :) ./ yval(1, :), 'LineWidth', 2)
-    legend(spec.bands.bandNames(2 : end))
+    legend(lgd{2 : end})
     ylabel('Norm. Spectral Power [dB]')
     xlabel('Time [hr]')
     linkaxes(axh, 'x')

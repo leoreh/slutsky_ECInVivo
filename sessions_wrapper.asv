@@ -96,10 +96,10 @@ for isession = 1 : nsessions
 %     'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [10 450], 'fs', 1250);
 
     % calc spec
-%     spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true,...
-%         'saveVar', true, 'padfft', -1, 'winstep', 5,...
-%         'ftarget', [], 'ch', [{1 : 4}, {16}],...
-%         'force', true);
+    spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true,...
+        'saveVar', true, 'padfft', -1, 'winstep', 5,...
+        'ftarget', [], 'ch', [{1 : 4}, {16}],...
+        'force', true);
 
 end
 
@@ -145,13 +145,8 @@ varsName = ["datInfo"; "session"; "st"; "units"];
     'varsName', varsName);
 nsessions = length(basepaths);
 
-% brst vars to organize and plot
-% from avg sub-struct
 brstVar = {'freq', 'dur', 'spkprct', 'ibi', 'nspks'};
-
-% fron nbrsts sub-struct
-
-unitType = 'rs';
+unitType = 'su';
 
 % initialize
 brst = cell2struct(cell(1, length(brstVar)), brstVar, 2);
@@ -164,7 +159,7 @@ for isession = 1 : nsessions
         brst.(brstVar{ivar}){isession} = v(isession).st.brst.avg.(brstVar{ivar})(:, su)';
     end
 
-    brst.nbrsts{isession} = v(isession).st.brst.nbrsts.freqNorm(:, su)';
+    brst.nbrsts{isession} = v(isession).st.brst.nbrsts.freq(:, su)';
 end
 
 % organize in mat

@@ -137,7 +137,7 @@ for ibin = 1 : nbins
         b.freq = b.nspks ./ (b.dur);
         
         % percent of spikes that participate in bursts
-        b.spkprct = sum(b.nspks) / nspks;
+        b.spkprct = sum(b.nspks) / nspks * 100;
         
         % inter-burst interval
         b.ibi = b.times(2 : end, 1) - b.times(1 : end - 1, 2);
