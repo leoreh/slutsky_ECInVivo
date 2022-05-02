@@ -13,7 +13,7 @@ function st = spktimesMetrics(varargin)
 %   spikes          struct (see getSpikes).
 %   sunits          numeric vec. indices of selected units for calculation
 %                   {[]}.
-%   winCalc         cell array of n x 2 mats of intervals.
+%   bins            cell array of n x 2 mats of intervals.
 %                   metrices will be calculated for each cell by limiting
 %                   spktimes to the intervals. can be for example
 %                   ss.stateEpochs. must be the same units as spikes.times
@@ -23,6 +23,7 @@ function st = spktimesMetrics(varargin)
 %   saveVar         logical. save variables (update spikes and save su)
 %   forceA          logical. force analysis even if struct file exists
 %                   {false}
+%   fullA           logical. analyse all parameters (slow) {true}
 %
 % OUTPUT:
 %   st              struct
@@ -44,22 +45,24 @@ addOptional(p, 'spktimes', []);
 addOptional(p, 'fs', [], @isnumeric);
 addOptional(p, 'spikes', []);
 addOptional(p, 'sunits', []);
-addOptional(p, 'winCalc', {[0 Inf]});
+addOptional(p, 'bins', {[0 Inf]});
 addOptional(p, 'basepath', pwd, @ischar);
 addOptional(p, 'graphics', true, @islogical);
 addOptional(p, 'saveVar', true, @islogical);
 addOptional(p, 'forceA', false, @islogical);
+addOptional(p, 'fullA', true, @islogical);
 
 parse(p, varargin{:})
 spktimes    = p.Results.spktimes;
 fs          = p.Results.fs;
 spikes      = p.Results.spikes;
 sunits      = p.Results.sunits;
-winCalc     = p.Results.winCalc;
+bins     = p.Results.bins;
 basepath    = p.Results.basepath;
 graphics    = p.Results.graphics;
 saveVar     = p.Results.saveVar;
 forceA      = p.Results.forceA;
+fullA       = p.Results.fullA;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preparations
@@ -87,11 +90,11 @@ if isempty(spktimes)
     spktimes = spikes.times;
 end
 
-if isempty(winCalc)
-    winCalc = [0 Inf];
+if isempty(bins)
+    bins = [0 Inf];
 end
-if ~iscell(winCalc)
-    winCalc = {winCalc};
+if ~iscell(bins)
+    bins = {bins};
 end
 
 % selected untis
@@ -113,7 +116,7 @@ end
 
 % acg params
 st.info.runtime = datetime(now, 'ConvertFrom', 'datenum');
-st.info.winCalc = winCalc;
+st.info.bins = bins;
 st.info.acg_wide_bins = 500;
 st.info.acg_wide_bnsz = 0.001;
 st.info.acg_wide_dur = 1;
@@ -123,7 +126,7 @@ st.info.acg_narrow_dur = 0.1;
 
 % spk params
 nunits = length(sunits);
-nwin = length(winCalc);
+nbins = length(bins);
 minSpkTHr = 50;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -131,23 +134,23 @@ minSpkTHr = 50;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % initialize
-st.acg_wide     = nan(st.info.acg_wide_dur / st.info.acg_wide_bnsz + 1, nwin, nunits);
-st.acg_narrow   = nan(st.info.acg_narrow_dur / st.info.acg_narrow_bnsz + 1, nwin, nunits);
-st.doublets     = nan(nwin, nunits);
-st.royer        = nan(nwin, nunits);
-st.royer2       = nan(nwin, nunits);
-st.lidor        = nan(nwin, nunits);
-st.mizuseki     = nan(nwin, nunits);
-st.cv           = nan(nwin, nunits);
-st.cv2          = nan(nwin, nunits);
-st.lv           = nan(nwin, nunits);
-st.lvr          = nan(nwin, nunits);
+st.acg_wide     = nan(st.info.acg_wide_dur / st.info.acg_wide_bnsz + 1, nbins, nunits);
+st.acg_narrow   = nan(st.info.acg_narrow_dur / st.info.acg_narrow_bnsz + 1, nbins, nunits);
+st.doublets     = nan(nbins, nunits);
+st.royer        = nan(nbins, nunits);
+st.royer2       = nan(nbins, nunits);
+st.lidor        = nan(nbins, nunits);
+st.mizuseki     = nan(nbins, nunits);
+st.cv           = nan(nbins, nunits);
+st.cv2          = nan(nbins, nunits);
+st.lv           = nan(nbins, nunits);
+st.lvr          = nan(nbins, nunits);
 
 for iunit = sunits
-    for iwin = 1 : length(winCalc)
+    for ibin = 1 : length(bins)
             
         % limit spktimes to window
-        spkIdx = InIntervals(spktimes{iunit}, winCalc{iwin});
+        spkIdx = InIntervals(spktimes{iunit}, bins{ibin});
         st_unit = spktimes{iunit}(spkIdx);
         nspks = length(st_unit);
         isi = diff(st_unit);
@@ -158,11 +161,11 @@ for iunit = sunits
         end
         
         % acg
-        [st.acg_wide(:, iwin, iunit), st.info.acg_wide_tstamps] = CCG(st_unit,...
+        [st.acg_wide(:, ibin, iunit), st.info.acg_wide_tstamps] = CCG(st_unit,...
             ones(size(st_unit)), 'binSize', st.info.acg_wide_bnsz,...
             'duration', st.info.acg_wide_dur, 'norm', 'rate', 'Fs', 1 / fs);
         
-        [st.acg_narrow(:, iwin, iunit), st.info.acg_narrow_tstamps] = CCG(st_unit,...
+        [st.acg_narrow(:, ibin, iunit), st.info.acg_narrow_tstamps] = CCG(st_unit,...
             ones(size(st_unit)), 'binSize', st.info.acg_narrow_bnsz,...
             'duration', st.info.acg_narrow_dur, 'norm', 'rate', 'Fs', 1 / fs);
         
@@ -170,32 +173,32 @@ for iunit = sunits
         
         % doublets: max bin count from 2.5-8ms normalized by the average number
         % of spikes in the 8-11.5ms bins
-        st.doublets(iwin, iunit) = max(st.acg_narrow(st.info.acg_narrow_bins + 1 + 5 : st.info.acg_narrow_bins + 1 + 16, iwin, iunit)) /...
-            mean(st.acg_narrow(st.info.acg_narrow_bins + 1 + 16 : st.info.acg_narrow_bins + 1 + 23, iwin, iunit));
+        st.doublets(ibin, iunit) = max(st.acg_narrow(st.info.acg_narrow_bins + 1 + 5 : st.info.acg_narrow_bins + 1 + 16, ibin, iunit)) /...
+            mean(st.acg_narrow(st.info.acg_narrow_bins + 1 + 16 : st.info.acg_narrow_bins + 1 + 23, ibin, iunit));
         
         % royer 2012: average number of spikes in the 3-5 ms bins divided by the
         % average number of spikes in the 200-300 ms bins
-        st.royer(iwin, iunit) = mean(st.acg_wide(st.info.acg_wide_bins + 1 + 3 : st.info.acg_wide_bins + 1 + 5, iwin, iunit)) /...
-            mean(st.acg_wide(st.info.acg_wide_bins + 1 + 200 : st.info.acg_wide_bins + 1 + 300, iwin, iunit));
+        st.royer(ibin, iunit) = mean(st.acg_wide(st.info.acg_wide_bins + 1 + 3 : st.info.acg_wide_bins + 1 + 5, ibin, iunit)) /...
+            mean(st.acg_wide(st.info.acg_wide_bins + 1 + 200 : st.info.acg_wide_bins + 1 + 300, ibin, iunit));
         
         % royer 2012: max(0:10) / mean(40:50) normalized
         peakbrst = max(st.acg_wide(st.info.acg_wide_bins + 1 :...
-            st.info.acg_wide_bins + 1 + 10, iwin, iunit));
+            st.info.acg_wide_bins + 1 + 10, ibin, iunit));
         basebrst = mean(st.acg_wide(st.info.acg_wide_bins + 1 + 40 :...
-            st.info.acg_wide_bins + 1 + 50, iwin, iunit));
+            st.info.acg_wide_bins + 1 + 50, ibin, iunit));
         if peakbrst > basebrst
-            st.royer2(iwin, iunit) = (peakbrst - basebrst) / peakbrst;
+            st.royer2(ibin, iunit) = (peakbrst - basebrst) / peakbrst;
         else
-            st.royer2(iwin, iunit) = (peakbrst - basebrst) / basebrst;
+            st.royer2(ibin, iunit) = (peakbrst - basebrst) / basebrst;
         end        
 
 
         % lidor: sum of spikes in 2-10 ms normalized to sum in 35-50
         t1 = find(st.info.acg_narrow_tstamps > 0.002 & st.info.acg_narrow_tstamps < 0.01);
         t2 = find(st.info.acg_narrow_tstamps > 0.035 & st.info.acg_narrow_tstamps < 0.05);
-        burst_temp = sum(st.acg_narrow(t1, iwin, iunit));
-        bl_temp = sum(st.acg_narrow(t2, iwin, iunit));
-        st.lidor(iwin, iunit) = (burst_temp - bl_temp) ./ (burst_temp + bl_temp);
+        burst_temp = sum(st.acg_narrow(t1, ibin, iunit));
+        bl_temp = sum(st.acg_narrow(t2, ibin, iunit));
+        st.lidor(ibin, iunit) = (burst_temp - bl_temp) ./ (burst_temp + bl_temp);
         
         % Mizuseki 2011: fraction of spikes with a ISI for following or preceding
         % spikes < 0.006
@@ -203,17 +206,17 @@ for iunit = sunits
         for ispk = 2 : length(st_unit) - 1
             burst_temp(ispk) = any(diff(st_unit(ispk - 1 : ispk + 1)) < 0.006);
         end
-        st.mizuseki(iwin, iunit) = sum(burst_temp > 0) / length(burst_temp);
+        st.mizuseki(ibin, iunit) = sum(burst_temp > 0) / length(burst_temp);
         
         % firing irregularity ---------------------------------------------
         
         % Cv (coefficient of variation): Shinomoto 2003
-        st.cv(iwin, iunit) = std(isi) / mean(isi);
+        st.cv(ibin, iunit) = std(isi) / mean(isi);
         
         % Cv2 (local cv): Holt 1996, taken from CE
         cv2_temp = 2 * abs(isi(1 : end - 1) - isi(2 : end)) ./...
             (isi(1 : end - 1) + isi(2 : end));
-        st.cv2(iwin, iunit) = mean(cv2_temp(cv2_temp < 1.95));
+        st.cv2(ibin, iunit) = mean(cv2_temp(cv2_temp < 1.95));
         
         % Lv: Shinomoto 2003 and Kobayashi 2019.
         lv_term = 0;
@@ -222,7 +225,7 @@ for iunit = sunits
             sum_term = (isi(ispk) + isi(ispk + 1))^2;
             lv_term = lv_term + diff_term / sum_term;
         end
-        st.lv(iwin, iunit) = lv_term / (nisi - 1);
+        st.lv(ibin, iunit) = lv_term / (nisi - 1);
         
         % LvR: Shinomoto 2009
         ref = 0.005;                    % refractory constant [s]
@@ -234,8 +237,9 @@ for iunit = sunits
             right_term = 1 + (4 * ref) / sum_term;
             lv_term = lv_term + left_term * right_term;
         end
-        st.lvr(iwin, iunit) = 3 / (nisi - 1) * lv_term;
+        st.lvr(ibin, iunit) = 3 / (nisi - 1) * lv_term;
         
+        if fullA
         % fit triple exponential to acg. adapted from CE (fit_ACG.m).
         % requires the Curve Fitting Toolbox. no idea whats going on here
         g = fittype('max(c*(exp(-(x-f)/a)-d*exp(-(x-f)/b))+h*exp(-(x-f)/g)+e,0)',...
@@ -246,13 +250,18 @@ for iunit = sunits
         ub = [500, 50, 500, 15, 50, 20, 5, 100];
         offset = 101;
         x = ([1 : 100] / 2)';
-        [f0, ~] = fit(x, st.acg_narrow(x * 2 + offset, iwin, iunit),...
+        [f0, ~] = fit(x, st.acg_narrow(x * 2 + offset, ibin, iunit),...
             g, 'StartPoint', a0, 'Lower', lb, 'Upper', ub);
         fit_params = coeffvalues(f0);      
-        st.tau_rise(iwin, iunit) = fit_params(2);
-        st.tau_burst(iwin, iunit) = fit_params(7);
-        st.acg_refrac(iwin, iunit) = fit_params(6);       
-               
+        st.tau_rise(ibin, iunit) = fit_params(2);
+        st.tau_burst(ibin, iunit) = fit_params(7);
+        st.acg_refrac(ibin, iunit) = fit_params(6);       
+        
+        % burstiness (mea)
+        st.brst = spktimes_meaBrst(spikes.times, 'bins', bins, 'isiThr', 0.02,...
+            'minSpks', 2, 'saveVar', false, 'force', true, 'bins', bins);
+        
+        end
     end
 end
 

@@ -1,20 +1,32 @@
-function   all_su_bursts = brst(data, isiThr, minSpksBrst) 
+function brst = spktimes_meaBrst(spktimes, varargin) 
 
-% calculates the multitaper spectrogram via chronux with refinements from
-% accusleep. data can be loaded from .lfp or provided as input.
-% multichannel support includes averaging channels (e.g. electrodes from
-% the same tetrode) or avergaing spectrograms across channels and/or
-% calculating the spectrogram separately for groups of channels. these are
-% determined by the input 'ch'
+% calculates burstiness stats per unit in timebins. based on analysis done
+% for mea recordings
 %
 % INPUT
+%   spktimes    cell of spike times per unit. typically in [s]. can also be
+%               samples, ms, etc. but then binsize, and isiThr must be the
+%               same units
+%   binsize     numeric. duration of bins {3600 [s]}
+%   bins        cell array of n x 2 mats of intervals.
+%               metrices will be calculated for each cell by limiting
+%               spktimes to the intervals. can be for example
+%               ss.stateEpochs. must be the same units as spikes.times
+%               (e.g. [s]). will override binsize
+%   isiThr      numeric. minimum inter-spike interval for defining a burst
+%               {0.02 [s]}
+%   minSpks     numeric. minimum number of spikes for defining a burst {2}
+%   
 %   basepath    char. fullpath to recording folder {pwd}
-%   saveVar     logical. organize and save struct {true}
+%   saveVar     logical. save struct {true}
+%   force       logical. force analyze even if file exists {false}
 % 
 % OUTPUT
+%   brst        struct
 %
 % CALLS
 %   binary2epochs
+%   n2chunks
 % 
 % TO DO LIST
 %
@@ -26,28 +38,55 @@ function   all_su_bursts = brst(data, isiThr, minSpksBrst)
 
 p = inputParser;
 addParameter(p, 'basepath', pwd, @ischar)
+addParameter(p, 'isiThr', 0.02, @isnumeric)
+addParameter(p, 'binsize', 3600, @isnumeric)
+addParameter(p, 'bins', [])
+addParameter(p, 'minSpks', 2, @isnumeric)
 addParameter(p, 'saveVar', true, @islogical)
+addParameter(p, 'force', false, @islogical)
 
 parse(p, varargin{:})
 basepath        = p.Results.basepath;
+isiThr          = p.Results.isiThr;
+binsize         = p.Results.binsize;
+bins            = p.Results.bins;
+minSpks         = p.Results.minSpks;
 saveVar         = p.Results.saveVar;
-
-spktimes = spikes.times;
-isiThr = 0.02;  % units must be as spktimes
-binsize = 3600;  
-minSpksBrst = 2;    % minimum no. spikes in a burst
+force           = p.Results.force;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preparations
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-nunits = length(spktimes);
-
 % separate recording to bins
 recLen = max(cellfun(@max, spktimes, 'uni', true));
-bins = n2chunks('n', recLen, 'chunksize', binsize, 'overlap', [1 0]);
-bins(1) = 0;
+if isempty(bins)
+    if binsize > recLen
+        binsize = recLen;
+        bins = [0, binsize];
+    else
+        bins = n2chunks('n', recLen, 'chunksize', binsize, 'overlap', [1 0]);
+        bins(1) = 0; bins(end - 1, 2) = recLen; bins(end, :) = [];
+    end
+end
+if ~iscell(bins)
+    bins = mat2cell(bins, ones(size(bins, 1), 1), size(bins, 2));
+end
 nbins = size(bins, 1);
+
+% load if exists
+[~, basename] = fileparts(basepath);
+brstfile = fullfile(basepath, [basename, '.brst.mat']);
+if exist(brstfile, 'file') && ~force
+    load(brstfile, 'brst')
+    return
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% calc burstiness per unit per timebin
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+nunits = length(spktimes);
 
 % initialize
 clear brst
@@ -62,17 +101,16 @@ brst.nbrsts.freq = zeros(nbins, nunits);
 brst.nbrsts.freqNorm = zeros(nbins, nunits);
 brst.nbrsts.shortPrct = zeros(nbins, nunits);
 
-% make cell array of spikes per unit per time
 for ibin = 1 : nbins
     for iunit = 1 : nunits
         
-        spks = spktimes{iunit}(InIntervals(spktimes{iunit}, bins(ibin, :)));
+        spks = spktimes{iunit}(InIntervals(spktimes{iunit}, bins{ibin}));
         isi = diff(spks);
         nspks = length(spks);
 
         % get indices of first and last spike in each burst and force minSpksBrst
-        [b.idx, nepochs] = binary2epochs('vec', isi <= isiThr,...
-            'minDur', minSpksBrst - 1, 'printFlag', false);
+        [b.idx, nbrsts] = binary2epochs('vec', isi <= isiThr,...
+            'minDur', minSpks - 1, 'printFlag', false);
 
         if isempty(b.idx)
             continue
@@ -122,6 +160,19 @@ for ibin = 1 : nbins
         brst.nbrsts.shortPrct(ibin, iunit) = nbrsts.shortPrct;
 
     end
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% save
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+if saveVar
+    brst.info.runtime = datetime(now, 'ConvertFrom', 'datenum');
+    brst.info.input = p.Results;
+    brst.info.bins = bins;
+    brst.info.recLen = recLen;
+
+    save(brstfile, 'brst')
 end
 
 end

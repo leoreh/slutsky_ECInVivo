@@ -26,7 +26,7 @@ spkgrp = session.extracellular.spikeGroups.channels;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preprocessing of raw files
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'I:\Data\lh106\2022-04-30_10-50-48';
+basepath = 'I:\Data\lh107\2022-05-01_10-26-41';
 mapch = 1 : 21;
 rmvch = [18];
 rmvch = [5, 17];
@@ -262,10 +262,14 @@ spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
     'vis', 'on', 'spkgrp', spkgrp);
 
 % spike timing metrics
-st = spktimesMetrics('winCalc', [], 'forceA', true);
+st = spktimes_metrics('winCalc', [], 'forceA', true);
+
+% burstiness (mea)
+brst = spktimes_meaBrst(spikes.times, 'binsize', Inf, 'isiThr', 0.02,...
+    'minSpks', 2, 'saveVar', true, 'force', true);
 
 % spike waveform metrics
-swv = spkwvMetrics('basepath', basepath, 'fs', fs, 'forceA', true);
+swv = spkwv_metrics('basepath', basepath, 'fs', fs, 'forceA', true);
 
 % mfr by states in time bins
 timebins = session.general.timebins;
