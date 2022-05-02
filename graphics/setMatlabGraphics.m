@@ -11,7 +11,7 @@ if ~factoryFlag
     set(groot, 'DefaultLegendInterpreter', 'none');
     set(groot, 'DefaultAxesFontName', 'Diverda Sans Com')
     set(groot, 'DefaultTextFontName', 'Diverda Sans Com')
-    set(groot, 'DefaultAxesFontSize', 13)
+    set(groot, 'DefaultAxesFontSize', 18)
     set(groot, 'DefaultAxesOuterPosition', [0 0 1 1])
     set(groot, 'DefaultAxesLabelFontSizeMultiplier', 1.4)
     set(groot, 'DefaultAxesFontWeight', 'normal')
