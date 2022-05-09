@@ -5,8 +5,8 @@
 
 % user input
 mname = 'lh101';
-basepath = 'I:\Data\lh104\lh104_220501_102100';
-blocks = [1, 11, 12, 21];
+basepath = 'G:\Data\lh104\lh104_220503_091700';
+blocks = [1, 10, 11, 20, 21];
 
 % tank to dat (tetrodes)
 store = 'Raw3';
@@ -14,7 +14,6 @@ mapch = 1 : 16;
 rmvch = [];
 chunksize = 300;
 clip = cell(1, 1);
-clip{10} = [7100, Inf];
 datInfo = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
     'chunksize', chunksize, 'mapch', mapch, 'rmvch', rmvch, 'clip', clip);
 
@@ -121,12 +120,12 @@ delete('*temp_wh*')
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % user input
-mname = 'lh104';
-basepath = 'I:\Data\lh104\lh104_220501_102100';
-blocks = [1, 11, 12, 21];
+mname = 'lh105';
+basepath = 'G:\Data\lh104\lh104_220503_091700';
+blocks = [1, 10, 11, 20, 21];
 
 % tank to dat (tetrodes)
-store = 'Raw1';
+store = 'Raw2';
 mapch = [1 : 8];
 rmvch = [1 : 2 : 7, 8];
 chunksize = 300;

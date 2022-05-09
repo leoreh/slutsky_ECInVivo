@@ -4,7 +4,7 @@
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = 'lh96';
+mname = 'lh103';
 forceL = true;
 forceA = true;
 
@@ -31,18 +31,20 @@ nsessions = length(basepaths);
 % templateCal = ss.info.calibrationData;
 
 for isession = 1 : nsessions
-   
-    % print progress
-    fprintf('sessions_wrapper: working on session %d of %d, %s\n',...
-        isession, nsessions, basename)
 
     % file
     basepath = basepaths{isession};
     cd(basepath)
     [~, basename] = fileparts(basepath);
 
+    % print progress
+    fprintf('sessions_wrapper: working on session %d of %d, %s\n',...
+        isession, nsessions, basename)
+
     % params
-    session = v(isession).session;
+    session = CE_sessionTemplate(pwd, 'viaGUI', false,...
+        'forceDef', true, 'forceL', false, 'saveVar', true);
+    %     session = v(isession).session;
     nchans = session.extracellular.nChannels;
     fs = session.extracellular.sr;
     spkgrp = session.extracellular.spikeGroups.channels;
@@ -52,17 +54,17 @@ for isession = 1 : nsessions
     %     reqPnt = 6 * 60 * 60;
     %     [timebins, timepnt] = metaInfo_timebins('reqPnt', reqPnt,...
     %         'nbins', nbins);
-    timebins = session.general.timebins;
-    bins = mat2cell(timebins, ones(size(timebins, 1), 1), 2);
-    
+    %     timebins = session.general.timebins;
+    %     bins = mat2cell(timebins, ones(size(timebins, 1), 1), 2);
+
     %         % spk lfp
     %         frange = [0.5, 4; 5, 12; 50, 80];
     %         sl = spklfp_wrapper('basepath', basepath, 'winCalc', winCalc,...
     %             'ch', 9, 'frange', frange,...
     %             'graphics', true, 'saveVar', false);
-    
+
     % spike timing metrics
-    st = spktimes_metrics('bins', bins, 'forceA', true);
+    %     st = spktimes_metrics('bins', bins, 'forceA', true);
 
     %         tbins_txt = {'0-3ZT', '3-6ZT', '6-9ZT', '9-12ZT',...
     %             '12-15ZT', '15-18ZT', '18-21ZT', '21-24ZT'};
@@ -82,24 +84,24 @@ for isession = 1 : nsessions
     %         frBins(isession) = fr_timebins('basepath', pwd,...
     %             'forceA', false, 'graphics', true,...
     %             'timebins', chunks, 'saveVar', true);
-    
 
-% create emg signal from accelerometer data
-% acc = EMGfromACC('basepath', basepath, 'fname', [basename, '.lfp'],...
-%     'nchans', nchans, 'ch', nchans - 2 : nchans, 'saveVar', true, 'fsIn', 1250,...
-%     'graphics', false, 'force', false);
-% 
-% % call for acceleration
-% sSig = as_prepSig([basename, '.lfp'], acc.mag,...
-%     'eegCh', [5 : 7], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
-%     'eegNchans', nchans, 'inspectSig', false, 'forceLoad', false,...
-%     'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [10 450], 'fs', 1250);
+
+    % create emg signal from accelerometer data
+    % acc = EMGfromACC('basepath', basepath, 'fname', [basename, '.lfp'],...
+    %     'nchans', nchans, 'ch', nchans - 2 : nchans, 'saveVar', true, 'fsIn', 1250,...
+    %     'graphics', false, 'force', false);
+    %
+    % % call for acceleration
+    sSig = as_prepSig([basename, '.lfp'], [],...
+        'eegCh', [2], 'emgCh', [3], 'saveVar', true, 'emgNchans', [],...
+        'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
+        'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [10 450], 'fs', 1250);
 
     % calc spec
-%     spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true,...
-%         'saveVar', true, 'padfft', -1, 'winstep', 5,...
-%         'ftarget', [], 'ch', [{1 : 4}, {16}],...
-%         'force', true);
+    spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true,...
+        'saveVar', true, 'padfft', -1, 'winstep', 5,...
+        'ftarget', [], 'ch', [{1}, {2}],...
+        'force', true);
 
 end
 

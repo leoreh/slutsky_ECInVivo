@@ -26,7 +26,7 @@ spkgrp = session.extracellular.spikeGroups.channels;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preprocessing of raw files
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'I:\Data\lh107\2022-05-01_10-26-41';
+basepath = 'I:\Data\lh107\2022-05-02_10-10-15';
 mapch = 1 : 21;
 rmvch = [18];
 rmvch = [5, 17];
@@ -171,8 +171,8 @@ psdBins = psd_states_timebins('basepath', pwd,...
 
 % calc spec
 spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true, 'saveVar', true,...
-    'padfft', -1, 'winstep', 1, 'logfreq', false, 'ftarget', [],...
-    'ch', [{1 : 4}, {18}], 'force', true);
+    'padfft', -1, 'winstep', 6, 'logfreq', true, 'ftarget', [],...
+    'ch', [{13 : 16}], 'force', true);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % spike sorting
@@ -303,12 +303,12 @@ monosyn = monoSyn_wrapper('spktimes', mea.spktimes, 'basepath', pwd,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % concatenate var from different sessions
-mname = 'lh96';
-basepaths = {basepath};
+mname = 'lh104';
+% basepaths = {basepath};
 basepaths = {};
 [expData, xData] = sessions_catVarTime('mname', mname,...
-    'dataPreset', {'fr', 'emg', 'spec', 'bands'}, 'graphics', true,...
-    'basepaths', basepaths, 'xTicksBinsize', 12, 'markRecTrans', true);
+    'dataPreset', {'emg', 'spec'}, 'graphics', true,...
+    'basepaths', basepaths, 'xTicksBinsize', 12, 'markRecTrans', false);
 
 % snip segments (e.g. spikes) from binary 
 [spkwv, ~] = snipFromBinary('stamps', spktimes, 'fname', datname,...

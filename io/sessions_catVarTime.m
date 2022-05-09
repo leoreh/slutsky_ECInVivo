@@ -60,11 +60,13 @@ zt0 = guessDateTime('0900');    % lights on at 09:00 AM
 % run recursively through the function if several data vars are requested
 if iscell(dataPreset)
     fh = figure;
+    th = tiledlayout(length(dataPreset), 1, 'TileSpacing', 'Compact');
     for idata = 1 : length(dataPreset)
-        sb(idata) = subplot(length(dataPreset), 1, idata);
+        sb(idata) = nexttile;
         [expData{idata}, xData{idata}] = sessions_catVarTime('mname', mname,...
             'basepaths', basepaths, 'dataPreset', dataPreset{idata},...
-            'graphics', true, 'axh', sb(idata), 'xTicksBinsize', xTicksBinsize);
+            'graphics', true, 'axh', sb(idata),...
+            'xTicksBinsize', xTicksBinsize, 'markRecTrans', markRecTrans);
         if idata < length(dataPreset)
             set(sb(idata), 'xticklabels', {[]})
             xlabel('')
@@ -247,7 +249,7 @@ if graphics
             % take a sample of the spectrogram to help initialize the colormap
             sampleBins = randperm(expLen, round(expLen / 10));
             specSample = reshape(expData(sampleBins, :), 1, length(sampleBins) * length(faxis));
-            caxis1 = prctile(specSample, [6 98]);
+            caxis1 = prctile(specSample, [6 80]);
 
             % plot
             imagesc(xData, faxis', expData', caxis1);
@@ -261,7 +263,7 @@ if graphics
         case 'bands'
             expData = movmean(expData, 33, 1);
             plot(xData, expData, 'lineWidth', 2.5);
-            ylabel('Norm. Spectral Power [dB]')
+            ylabel('Spectral Power [dB]')
             
             for iband = 1 : length(spec.bands.bandFreqs)
                 lgd{iband} = sprintf('%s [%d-%d Hz]',...
@@ -281,7 +283,7 @@ if graphics
         case 'sr'
             expData = movmean(expData, 13, 1);
             plot(xData, expData(:, grp))
-            ylabel('Multi-Unit Firing Rate [Hz]')
+            ylabel('MU Firing Rate [Hz]')
             legend(split(num2str(grp)))
             axis tight
             

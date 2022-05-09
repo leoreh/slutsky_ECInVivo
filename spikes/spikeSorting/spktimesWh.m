@@ -16,6 +16,8 @@ function [spktimes, spkch] = spktimesWh(varargin)
 %   saveVar     logical. save output {true}
 %   graphics    logical. plot graphics {false}
 %   force       logical. perform detection even if spktimes exists {false}
+%   createWh    logical. create temp_wh.dat even file exists {true}.
+%               currently not working
 %
 % DEPENDENCIES
 %   get_whitening_matrix (ks)
@@ -45,6 +47,7 @@ addOptional(p, 'saveWh', true, @islogical);
 addOptional(p, 'saveVar', true, @islogical);
 addOptional(p, 'graphics', false, @islogical);
 addOptional(p, 'force', false, @islogical);
+addOptional(p, 'createWh', true, @islogical);
 
 parse(p, varargin{:})
 basepath    = p.Results.basepath;
@@ -58,17 +61,7 @@ saveWh      = p.Results.saveWh;
 saveVar     = p.Results.saveVar;
 graphics    = p.Results.graphics;
 force       = p.Results.force;
-
-% check if spktimes already exists
-[~, basename] = fileparts(basepath);
-varname = fullfile(basepath, [basename '.spktimes.mat']);
-if exist(varname) && ~force
-    load(varname)
-    return
-end
-
-fprintf('/n/ndetecting spikes in %s/n', basename)
-tic;
+createWh    = p.Results.createWh;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preparations
@@ -87,7 +80,7 @@ end
 % constants
 loc_range = [6 max(size(cell2nanmat(spkgrp, 2), 1))];  % for running minimum (dim 1 - sample; dim 2 - channel] 
 scaleproc = 200;    % conversion back from unit variance to voltage
-thr = -4;           % spike threshold in standard deviations {-6}
+thr = -8;           % spike threshold in standard deviations {-6}
 dt = 8;             % dead time between spikes [samples]
 
 % whitening params from ks
@@ -119,21 +112,44 @@ NTbuff          = NT + 3 * ops.ntbuff; % we need buffers on both sides for filte
 rez.ops.NTbuff  = NTbuff;
 rez.ops.chanMap = chanMap;
 
-% weights to combine batches at the edge
-w_edge          = linspace(0, 1, ops.ntbuff)';
-ntb             = ops.ntbuff;
-datr_prev       = gpuArray.zeros(ntb, ops.Nchan, 'single');
-
-% get a rotation matrix (Nchan by Nchan) which whitens the zero-timelag
-% covariance of the data
-if winWh(2) > nTimepoints / fs
-    winWh(2) = floor(nTimepoints / fs);
+% check if spktimes already exists
+[~, basename] = fileparts(basepath);
+varname = fullfile(basepath, [basename '.spktimes.mat']);
+if exist(varname) && ~force
+    load(varname)
+    return
 end
-Wrot = get_whitening_matrix(rez, winWh); 
 
-fid = fopen(ops.fbinary, 'r'); % open for reading raw data
-if saveWh
-    fidW = fopen(ops.fproc, 'w+'); % open for writing processed data
+% check if temp_wh already exists
+if ~exist(ops.fproc, 'file')
+    createWh = true;
+end
+
+fprintf('/n/ndetecting spikes in %s/n', basename)
+tic;
+
+if createWh
+
+    % weights to combine batches at the edge
+    w_edge          = linspace(0, 1, ops.ntbuff)';
+    ntb             = ops.ntbuff;
+    datr_prev       = gpuArray.zeros(ntb, ops.Nchan, 'single');
+
+    % get a rotation matrix (Nchan by Nchan) which whitens the zero-timelag
+    % covariance of the data
+    if winWh(2) > nTimepoints / fs
+        winWh(2) = floor(nTimepoints / fs);
+    end
+    Wrot = get_whitening_matrix(rez, winWh);
+
+    fid = fopen(ops.fbinary, 'r'); % open for reading raw data
+    if saveWh
+        fidW = fopen(ops.fproc, 'w+'); % open for writing processed data
+    end
+
+else
+    fidW = fopen(ops.fproc, 'r'); % open for writing processed data
+
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -153,28 +169,40 @@ for ibatch = 1 : Nbatch
     txt = sprintf('working on chunk %d / %d', ibatch, Nbatch);
     fprintf(txt)
     
-    % create whitened data
-    offset = max(0, ops.twind + 2 * NchanTOT * (NT * (ibatch - 1) - ntb)); 
-    fseek(fid, offset, 'bof'); 
-    buff = fread(fid, [NchanTOT NTbuff], '*int16'); 
-    nsampcurr = size(buff,2); 
-    if nsampcurr<NTbuff
-        buff(:, nsampcurr + 1 : NTbuff) = repmat(buff(:, nsampcurr), 1, NTbuff - nsampcurr); 
+    % create or load whitened data
+    if createWh
+        offset = max(0, ops.twind + 2 * NchanTOT * (NT * (ibatch - 1) - ntb));
+        fseek(fid, offset, 'bof');
+        buff = fread(fid, [NchanTOT NTbuff], '*int16');
+        nsampcurr = size(buff,2);
+        if nsampcurr<NTbuff
+            buff(:, nsampcurr + 1 : NTbuff) = repmat(buff(:, nsampcurr), 1, NTbuff - nsampcurr);
+        end
+        if offset == 0
+            bpad = repmat(buff(:, 1), 1, ntb);
+            buff = cat(2, bpad, buff(:, 1 : NTbuff-ntb));
+        end
+        wh = gpufilter(buff, ops, chanMap);
+        wh(ntb + [1 : ntb], :) = w_edge .* wh(ntb + [1 : ntb], :) +...
+            (1 - w_edge) .* datr_prev;
+        datr_prev = wh(ntb + NT + [1:ops.ntbuff], :);
+        wh    = wh(ntb + (1 : NT), :);
+        wh    = wh * Wrot; % whiten the data and scale by 200 for int16 range
+        if saveWh
+            datcpu  = gather(int16(wh')); % convert to int16, and gather on the CPU side
+            fwrite(fidW, datcpu, 'int16'); % write this batch to binary file
+        end
+
+    else
+        offset = max(0, ops.twind + 2 * NchanTOT * (NT * (ibatch - 1)));
+        fseek(fidW, offset, 'bof');
+        wh = fread(fidW, [NchanTOT (NTbuff - ntb * 3)], '*int16')';
+        wh = wh(:, [spkgrp{:}]);
+        wh    = wh(ntb + (1 : NT), [spkgrp{:}]);
+        wh = wh / scaleproc;
+
     end
-    if offset == 0
-        bpad = repmat(buff(:, 1), 1, ntb);
-        buff = cat(2, bpad, buff(:, 1 : NTbuff-ntb)); 
-    end    
-    wh = gpufilter(buff, ops, chanMap);    
-    wh(ntb + [1 : ntb], :) = w_edge .* wh(ntb + [1 : ntb], :) +...
-        (1 - w_edge) .* datr_prev;
-    datr_prev = wh(ntb + NT + [1:ops.ntbuff], :);
-    wh    = wh(ntb + (1 : NT), :);   
-    wh    = wh * Wrot; % whiten the data and scale by 200 for int16 range    
-    if saveWh
-        datcpu  = gather(int16(wh')); % convert to int16, and gather on the CPU side
-        fwrite(fidW, datcpu, 'int16'); % write this batch to binary file
-    end      
+
     wh = wh / scaleproc;   
     
     % find spikes on each tetrode 

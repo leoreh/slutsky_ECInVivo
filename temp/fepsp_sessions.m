@@ -10,12 +10,12 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % wcp
-basepath        = 'G:\Data\lh104\220410';
-wcpfiles        = [1 : 8];
-intens          = [70, 90, 100, 120];
-recname         = '220410_io1';
+basepath        = 'G:\Data\lh104\220505';
+wcpfiles        = [23];
+intens          = [110];
+recname         = '220505_stp2';
 fepsp_wcpPipeline('basepath', basepath, 'wcpfiles', wcpfiles,...
-    'protocol_id', 'io', 'recname', recname, 'intens', intens,...
+    'protocol_id', 'stp', 'recname', recname, 'intens', intens,...
     'saveFlag', true)
 
 
@@ -58,7 +58,9 @@ v = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
     'varsName', varsName);
 
 
-% to prism ----------------------------------------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% to prism
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 for ifile = 1 : nfiles
     
@@ -93,6 +95,23 @@ for ifile = 1 : nfiles
 
 
 end
+
+
+% single session
+avgtraces = cellfun(@(x) mean(x, 2, 'omitnan'), traces, 'uni', false);
+cell2nanmat(avgtraces, 2);
+
+results.avg_traces.Amp{1}
+results.avg_traces.Amp{1} / results.avg_traces.Amp{1}(1)
+
+lfp.timestamps * 1000 - 10
+
+cell2nanmat(results.all_traces.Amp, 2)
+
+
+
+
+
 
 
 
