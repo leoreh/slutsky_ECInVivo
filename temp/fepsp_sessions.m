@@ -10,10 +10,10 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % wcp
-basepath        = 'G:\Data\lh104\220505';
-wcpfiles        = [23];
-intens          = [110];
-recname         = '220505_stp2';
+basepath        = 'G:\Data\lh104\220509';
+wcpfiles        = [17];
+intens          = [100];
+recname         = '220509_stp3';
 fepsp_wcpPipeline('basepath', basepath, 'wcpfiles', wcpfiles,...
     'protocol_id', 'stp', 'recname', recname, 'intens', intens,...
     'saveFlag', true)

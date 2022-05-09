@@ -26,9 +26,9 @@ spkgrp = session.extracellular.spikeGroups.channels;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preprocessing of raw files
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'I:\Data\lh107\2022-05-02_10-10-15';
+basepath = 'K:\Data\lh106\2022-05-08_10-15-27';
 mapch = 1 : 21;
-rmvch = [18];
+rmvch = [];
 rmvch = [5, 17];
 mapch = [1 : 6];
 rmvch = [1, 3, 5];
@@ -44,7 +44,7 @@ datInfo = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
     'chunksize', chunksize, 'mapch', mapch, 'rmvch', rmvch, 'clip', clip);
 
 % open ephys to dat
-exp = [1 : 3];
+exp = [1 : 4];
 rec = cell(max(exp), 1);
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
     'rmvch', rmvch, 'mapch', mapch,...
