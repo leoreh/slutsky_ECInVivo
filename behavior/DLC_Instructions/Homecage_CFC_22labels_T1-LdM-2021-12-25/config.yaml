@@ -1,0 +1,156 @@
+    # Project definitions (do not edit)
+Task: Homecage_CFC_22labels_T1
+scorer: LdM
+date: Dec25
+multianimalproject: true
+identity: true
+
+    # Project path (change when moving around)
+project_path: D:\DLC_Instructions\Homecage_CFC_22labels_T1-LdM-2021-12-25
+
+    # Annotation data set configuration (and individual video cropping parameters)
+video_sets:
+  H:\My Drive\Projects\Inna\Data\Homecage_CFC_22labels_T1-LdM-2021-12-25\videos\210824-Kusbara-1.mp4:
+    crop: 0, 1280, 0, 1024
+  H:\My Drive\Projects\Inna\Data\Homecage_CFC_22labels_T1-LdM-2021-12-25\videos\210824-Kusbara-2.mp4:
+    crop: 0, 1280, 0, 1024
+  H:\My Drive\Projects\Inna\Data\Homecage_CFC_22labels_T1-LdM-2021-12-25\videos\210825-Kusbara-1.mp4:
+    crop: 0, 1280, 0, 1024
+  H:\My Drive\Projects\Inna\Data\Homecage_CFC_22labels_T1-LdM-2021-12-25\videos\210825-Kusbara-2.mp4:
+    crop: 0, 1280, 0, 1024
+  H:\My Drive\Projects\Inna\Data\Homecage_CFC_22labels_T1-LdM-2021-12-25\videos\210826-Kusbara-1.mp4:
+    crop: 0, 1280, 0, 1024
+  ? H:\My Drive\Projects\Inna\Data\Homecage_CFC_22labels_T1-LdM-2021-12-25\videos\lh49_CFC_Basler_Cam__22940788__20200326_093015106.mp4
+  : crop: 0, 1280, 0, 1024
+  ? H:\My Drive\Projects\Inna\Data\Homecage_CFC_22labels_T1-LdM-2021-12-25\videos\lh49_CFC_Basler_Cam__22940788__20200331_092520649.mp4
+  : crop: 0, 1280, 0, 1024
+  H:\My Drive\Projects\Inna\Data\Homecage_CFC_22labels_T1-LdM-2021-12-25\videos\lh58_Cam_1__23339300__20200918_154312734.mp4:
+    crop: 0, 1280, 0, 1024
+  H:\My Drive\Projects\Inna\Data\Homecage_CFC_22labels_T1-LdM-2021-12-25\videos\lh70_Cam_1__23339300__20201026_173507937.mp4:
+    crop: 0, 1280, 0, 1024
+  H:\My Drive\Projects\Inna\Data\Homecage_CFC_22labels_T1-LdM-2021-12-25\videos\lh82__23339300__20210731_124431271short.mp4:
+    crop: 0, 1280, 0, 1024
+  H:\My Drive\Projects\Inna\Data\Homecage_CFC_22labels_T1-LdM-2021-12-25\videos\lh82__23339300__20210802_103542671.mp4:
+    crop: 0, 1280, 0, 1024
+  H:\My Drive\Projects\Inna\Data\Homecage_CFC_22labels_T1-LdM-2021-12-25\videos\lh84_Cam_1__23339300__20210404_120305331.mp4:
+    crop: 0, 1280, 0, 1024
+  H:\My Drive\Projects\Inna\Data\Homecage_CFC_22labels_T1-LdM-2021-12-25\videos\lh86__23019416__20210226_075058761_Trim.mp4:
+    crop: 0, 1280, 0, 1024
+  H:\My Drive\Projects\Inna\Data\Homecage_CFC_22labels_T1-LdM-2021-12-25\videos\lh87_Cam_1__23339300__20210524_153309284.mp4:
+    crop: 0, 1280, 0, 1024
+  H:\My Drive\Projects\Inna\Data\Homecage_CFC_22labels_T1-LdM-2021-12-25\videos\lh90__23339300__20210307_173926395.mp4:
+    crop: 0, 1280, 0, 1024
+  ? H:\My Drive\Projects\Inna\Data\Homecage_CFC_22labels_T1-LdM-2021-12-25\videos\lh49_CFC_Basler_Cam__22940788__20200324_101630863.mp4
+  : crop: 0, 1280, 0, 1024
+individuals:
+- individual1
+- individual2
+
+uniquebodyparts: []
+multianimalbodyparts:
+- Nose
+- head_base
+- head_device
+- head_center
+- right_ear
+- left_ear
+- body_center
+- tail_base
+- perc25_bodylength
+- perc75_bodylength
+- tail_tip
+- perc25_tail
+- tail_middle
+- perc75_tail
+- FR_shoulder
+- FR_leg
+- FL_shoulder
+- FL_leg
+- BR_shoulder
+- BR_leg
+- BL_shoulder
+- BL_leg
+skeleton:
+- - Nose
+  - head_device
+- - Nose
+  - head_center
+- - head_center
+  - head_base
+- - head_device
+  - head_base
+- - right_ear
+  - head_base
+- - left_ear
+  - head_base
+- - head_base
+  - perc25_bodylength
+- - head_base
+  - perc25_bodylength
+- - perc25_bodylength
+  - body_center
+- - body_center
+  - perc75_bodylength
+- - perc75_bodylength
+  - tail_base
+- - tail_base
+  - perc25_tail
+- - perc25_tail
+  - tail_middle
+- - tail_middle
+  - perc75_tail
+- - perc75_tail
+  - tail_tip
+- - perc75_tail
+  - tail_tip
+- - FR_shoulder
+  - perc25_bodylength
+- - FL_shoulder
+  - perc25_bodylength
+- - BR_shoulder
+  - perc75_bodylength
+- - BL_shoulder
+  - perc75_bodylength
+- - FR_leg
+  - FR_shoulder
+- - FL_leg
+  - FL_shoulder
+- - BR_leg
+  - BR_shoulder
+- - BL_leg
+  - BL_shoulder
+bodyparts: MULTI!
+start: 0
+stop: 1
+numframes2pick: 20
+
+    # Plotting configuration
+skeleton_color: green
+pcutoff: 0.1
+dotsize: 3
+alphavalue: 0.7
+colormap: rainbow
+
+    # Training,Evaluation and Analysis configuration
+TrainingFraction:
+- 0.95
+iteration: 1
+default_net_type: resnet_152
+default_augmenter: multi-animal-imgaug
+default_track_method: ellipse
+snapshotindex: 2
+batch_size: 8
+
+    # Cropping Parameters (for analysis and outlier frame detection)
+cropping: false
+    #if cropping is true for analysis, then set the values here:
+x1: 0
+x2: 640
+y1: 277
+y2: 624
+
+    # Refinement configuration (parameters from annotation dataset configuration also relevant in this stage)
+corner2move2:
+- 50
+- 50
+move2corner: true
