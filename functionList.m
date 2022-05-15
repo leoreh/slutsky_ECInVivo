@@ -21,19 +21,14 @@ spkgrp = session.extracellular.spikeGroups.channels;
 [~, basename] = fileparts(basepath);
 
 % add timebins to datInfo
-[timebins, timepnt] = metaInfo_timebins('reqPnt', 5.5 * 60 * 60);
+[timebins, timepnt] = metaInfo_timebins('reqPnt', 5.5 * 60 * 60, 'nbins', 4);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preprocessing of raw files
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'K:\Data\lh106\2022-05-08_10-15-27';
+basepath = 'I:\Data\lh107\2022-05-11_10-28-21';
 mapch = 1 : 21;
-rmvch = [];
-rmvch = [5, 17];
-mapch = [1 : 6];
-rmvch = [1, 3, 5];
-mapch = [1 : 8];
-rmvch = [2, 4, 6, 7, 8];
+rmvch = [18];
 
 % tank to dat
 store = 'Raw1';
@@ -44,7 +39,7 @@ datInfo = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
     'chunksize', chunksize, 'mapch', mapch, 'rmvch', rmvch, 'clip', clip);
 
 % open ephys to dat
-exp = [1 : 4];
+exp = [1 : 3];
 rec = cell(max(exp), 1);
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
     'rmvch', rmvch, 'mapch', mapch,...
@@ -64,14 +59,14 @@ cat_OE_tstamps('orig_paths', orig_paths, 'new_path', exPathNew,...
 
 % pre-process dat (remove channels, reorder, etc.)
 clear orig_files
-orig_files{1} = 'I:\Data\lh107\lh107_220430_105048\lh107_220430_105048.dat';
+orig_files{1} = 'I:\Data\lh107\lh107_220511_102821\lh107_220511_102821.dat';
 % orig_files{2} = 'L:\Data\lh101\lh101_220417_140957\lh101_220417_140957.dat';
 
-clip{1} = [seconds(minutes(839)), seconds(minutes(882))]  * 20000;
+clip{1} = [seconds(minutes(720)), seconds(minutes(735))]  * 20000;
 % clip = [];
 
-datInfo = preprocDat('orig_files', orig_files, 'mapch', mapch,...
-    'rmvch', [rmvch], 'nchans', length(mapch), 'saveVar', true,...
+datInfo = preprocDat('orig_files', orig_files, 'mapch', 1 : 20,...
+    'rmvch', [], 'nchans', 20, 'saveVar', true,...
     'chunksize', 1e7, 'precision', 'int16', 'clip', clip);
 
 
