@@ -1,0 +1,6 @@
+,Training iterations:,%Training dataset,Shuffle number, Train error(px), Test error(px),p-cutoff used,Train error with p-cutoff,Test error with p-cutoff
+0,60000,95,2,3.84,6.25,0.1,3.82,5.99
+1,75000,95,2,3.8,9.76,0.1,3.68,7.22
+2,90000,95,2,3.42,7.34,0.1,3.42,6.82
+3,105000,95,2,3.6,10.44,0.1,3.6,6.09
+4,120000,95,2,3.66,9.87,0.1,3.66,5.67
