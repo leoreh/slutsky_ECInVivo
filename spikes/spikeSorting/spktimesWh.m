@@ -28,8 +28,9 @@ function [spktimes, spkch] = spktimesWh(varargin)
 % TO DO LIST:
 % 
 % 01 nov 20 LH      
-% 22 aug 21 LH   allows for empty tetrodes. this is so that rogue
+% 22 aug 21      allows for empty tetrodes. this is so that rogue
 %                electrodes do not contaminate the whitening matrix 
+% 15 may 22      getWhiteMat from get_whitening_matrix to add window
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -140,7 +141,7 @@ if createWh
     if winWh(2) > nTimepoints / fs
         winWh(2) = floor(nTimepoints / fs);
     end
-    Wrot = get_whitening_matrix(rez, winWh);
+    Wrot = getWhiteMat(rez, winWh);
 
     fid = fopen(ops.fbinary, 'r'); % open for reading raw data
     if saveWh
