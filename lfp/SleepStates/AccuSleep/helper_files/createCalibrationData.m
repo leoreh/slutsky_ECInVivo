@@ -33,9 +33,9 @@ if any(count_by_state < 3)
 end
 
 % select frequencies up to 50 Hz, and downsample between 20 and 50 Hz
-[~,f20idx] = min(abs(freq - 20)); % index in f of 20Hz
-[~,f50idx] = min(abs(freq - 50)); % index in f of 50Hz
-spec = spec(:, [1:(f20idx-1), f20idx:2:f50idx]);
+% [~,f20idx] = min(abs(freq - 20)); % index in f of 20Hz
+% [~,f50idx] = min(abs(freq - 50)); % index in f of 50Hz
+% spec = spec(:, [1:(f20idx-1), f20idx:2:f50idx]);
 % take log of the spectrogram
 spec = log(spec);
 

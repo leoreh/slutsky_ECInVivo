@@ -69,9 +69,18 @@ for i = (pad+1):(length(emg_rms)-pad)
     X(:,:,1,(i-pad)) = [spec((i-pad):(i+pad),:), repmat(emg_rms((i-pad):(i+pad))',1,9)];
 end
 
+% function path. this is because there are two functions called classify
+% (stats and nnet toolboxes)
+funpath = matlabroot;
+funpath = fullfile(funpath, 'toolbox', 'nnet', 'cnn', '@DAGNetwork', 'classify.m');
+funh = str2func(funpath);
+
+import(funpath)
+l = import('matlab.nnet.cnn.DAGNetwork.classify.*')
+
 % classify
 X = uint8(X.*255);
-[labels, netScores] = classify(net, X);
+[labels, netScores] = classifyNnet(net, X);
 labels = double(labels);
 
 % put labels in correct orientation

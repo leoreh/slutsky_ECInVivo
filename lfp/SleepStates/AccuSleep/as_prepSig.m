@@ -243,7 +243,8 @@ end
 fprintf('\ncreating spectrogram...')
 spec = calc_spec('sig', eegData,...
     'fs', 1250, 'graphics', false, 'saveVar', false, 'force', true,...
-    'padfft', -1, 'winstep', 1, 'logfreq', false, 'ftarget', [0.5 : 0.2 : 64]);
+    'padfft', -1, 'winstep', 1, 'logfreq', false,...
+    'ftarget', [0.5 : 0.2 : 20, 20.5 : 0.5 : 50]);
 sSig.spec = spec.s;
 sSig.spec_tstamps = spec.tstamps;
 sSig.spec_freq = spec.freq;

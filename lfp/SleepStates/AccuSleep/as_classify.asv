@@ -169,6 +169,7 @@ ss.totDur = epochStats.totDur;
 ss.info.sSig = sSig.info;
 ss.info.net = netfile;
 ss.info.calibrationData = calData;
+ss.info.analysisDate = datetime;
 ss.info.minDur = minDur;
 ss.info.interDur = interDur;
 ss.info.runtime = datetime(now, 'ConvertFrom', 'datenum');
