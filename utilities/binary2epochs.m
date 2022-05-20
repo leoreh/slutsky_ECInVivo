@@ -114,7 +114,7 @@ if ~isempty(interDur)
     while min(iei) < interDur
         temp = [];
         event = epochs(1, :);
-        for i = 2 : nepochs.thr
+        for i = 2 : nepochs.detect
             if epochs(i, 1) - event(2) < interDur
                 event = [event(1) epochs(i, 2)];
             else

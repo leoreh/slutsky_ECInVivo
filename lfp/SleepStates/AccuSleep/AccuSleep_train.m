@@ -100,10 +100,11 @@ for i = 1:nFiles
     
     % create the spectrogram
 %     [s, ~, f] = createSpectrogram(data.a.EEG, SR, epochLen);
-    % select frequencies up to 50 Hz, and downsample between 20 and 50 Hz
-    [~,f20idx] = min(abs(f - 20)); % index in f of 20Hz
-    [~,f50idx] = min(abs(f - 50)); % index in f of 50Hz
-    s = s(:, [1:(f20idx-1), f20idx:2:f50idx]);
+    % select frequencies up to 50 Hz, and downsample between 20 and 50 Hz.
+    % redundant after changes to as_prepSig, May2022
+%     [~,f20idx] = min(abs(f - 20)); % index in f of 20Hz
+%     [~,f50idx] = min(abs(f - 50)); % index in f of 50Hz
+%     s = s(:, [1:(f20idx-1), f20idx:2:f50idx]);
     % take log of the spectrogram
     s = log(s);
     % calculate log rms EMG for each epoch

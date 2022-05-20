@@ -126,7 +126,7 @@ end
 cd(basepath)
 datfiles = dir([basepath filesep '**' filesep '*.dat']);
 lfpfiles = dir([basepath filesep '**' filesep '*.lfp']);
-if ~isempty(lfpfiles) && isempty(fname)
+if ~isempty(lfpfiles) 
     fname = lfpfiles.name;
     fsIn = 1250;
 else
