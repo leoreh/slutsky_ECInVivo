@@ -81,7 +81,7 @@ end
 % constants
 loc_range = [6 max(size(cell2nanmat(spkgrp, 2), 1))];  % for running minimum (dim 1 - sample; dim 2 - channel] 
 scaleproc = 200;    % conversion back from unit variance to voltage
-thr = -8;           % spike threshold in standard deviations {-6}
+thr = -4;           % spike threshold in standard deviations {-6}
 dt = 8;             % dead time between spikes [samples]
 
 % whitening params from ks

@@ -58,7 +58,8 @@ cLimit = prctile(specSample, [0.1 90]);
 
 % plot   
 if isempty(axh)
-    axh = figure;
+    fh = figure;
+    axh = subplot(1, 1, 1);
 end
 imagesc(axh, tspec, freq, spec.s', cLimit);
 colormap(AccuSleep_colormap());

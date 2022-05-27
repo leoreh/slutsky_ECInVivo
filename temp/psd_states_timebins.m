@@ -60,6 +60,9 @@ graphics        = p.Results.graphics;
 % preparations
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% tbins_txt = {'0-3ZT', '3-6ZT', '6-9ZT', '9-12ZT',...
+    %             '12-15ZT', '15-18ZT', '18-21ZT', '21-24ZT'};
+
 % file
 cd(basepath)
 [~, basename] = fileparts(basepath);

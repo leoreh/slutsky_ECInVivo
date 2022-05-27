@@ -15,7 +15,7 @@ function [expData, xData] = sessions_catVarTime(varargin)
 %                   between recordings
 %   dataPreset      string or cell of string depicting the variable to cat. 
 %                   can be any combination of 'sr', 'spec', 'fr', 'ripp',
-%                   or 'emg'
+%                   or 'sleep_emg'
 %   axh             handle to plot axis      
 % 
 % EXAMPLE
@@ -123,7 +123,7 @@ switch dataPreset
         end
         ts = spec.info.winstep;     % sampling period [s]
 
-    case 'emg'
+    case 'sleep_emg'
         for isession = 1 : nsessions
             filename = fullfile(basepaths{isession},...
                 [basenames{isession}, '.sleep_sig.mat']);
@@ -272,7 +272,7 @@ if graphics
             end
             legend(lgd{2 : end}, 'location', 'best')
 
-        case 'emg'            
+        case 'sleep_emg'            
             % plot
             expData = movmean(expData, 33, 1);
             plot(xData, expData);

@@ -5,8 +5,8 @@
 
 % user input
 mname = 'lh106';
-basepath = 'I:\Data\lh106\lh106_220517_094900';
-blocks = [1, 2, 3];
+basepath = 'I:\Data\lh106\lh106_220525_091000';
+blocks = [1 : 2];
 
 % tank to dat (tetrodes)
 store = 'Raw1';
@@ -32,7 +32,7 @@ for ifile = 1 : length(fnames)
 end
 
 % emg data
-mapch = 1 : 2;
+mapch = [1, 2];
 rmvch = [];
 store = 'EMG1';
 datInfo = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
@@ -88,7 +88,7 @@ clear sSig
 lfp = mean(double(bz_LoadBinary([basename, '.lfp'], 'frequency', 1250, 'nChannels', 16,...
     'channels', [13 : 16])), 2);
 eeg = double(bz_LoadBinary([basename, '.emg.dat'], 'frequency', 1250, 'nChannels', 2,...
-    'channels', 1));
+    'channels', 2));
 tlfp = [1 : length(lfp)] / 1250;
 eeg = [interp1([1 : length(eeg)] / 1250, eeg, tlfp,...
     'spline')]';
@@ -126,8 +126,8 @@ delete('*temp_wh*')
 
 % user input
 mname = 'lh107';
-basepath = 'I:\Data\lh106\lh106_220515_100700';
-blocks = [4, 5, 6];
+basepath = 'I:\Data\lh106\lh106_220525_091000';
+blocks = [1 : 2];
 
 % tank to dat (tetrodes)
 store = 'Raw2';

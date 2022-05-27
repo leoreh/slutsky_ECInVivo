@@ -21,7 +21,7 @@ spkgrp = session.extracellular.spikeGroups.channels;
 [~, basename] = fileparts(basepath);
 
 % add timebins to datInfo
-[timebins, timepnt] = metaInfo_timebins('reqPnt', 5.5 * 60 * 60, 'nbins', 4);
+[timebins, timepnt] = metaInfo_timebins('reqPnt', 6 * 60 * 60, 'nbins', 4);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preprocessing of raw files
@@ -169,6 +169,9 @@ spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true, 'saveVar', true,...
     'padfft', -1, 'winstep', 6, 'logfreq', true, 'ftarget', [],...
     'ch', [{13 : 16}], 'force', true);
 
+plot_spec(spec, 'ch', 1, 'logfreq', true, 'saveFig', false,...
+    'axh', [])
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % spike sorting
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -302,7 +305,7 @@ mname = 'lh107';
 % basepaths = {basepath};
 basepaths = {};
 [expData, xData] = sessions_catVarTime('mname', mname,...
-    'dataPreset', {'fr'}, 'graphics', true,...
+    'dataPreset', {'sr', 'spec', 'sleep_emg'}, 'graphics', true,...
     'basepaths', basepaths, 'xTicksBinsize', 12, 'markRecTrans', true);
 
 % snip segments (e.g. spikes) from binary 
