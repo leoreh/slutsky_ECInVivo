@@ -100,7 +100,7 @@ filtRatio = 450 / (fsEeg / 2);
 fsRatio = (fsEeg / fsLfp);
 
 % state params
-faxis = 0.2 : 0.2 : 120;
+faxis = 1 : 0.2 : 100;
 
 % initialize
 psdLfp = nan(nbins, length(sstates), length(faxis));
@@ -126,7 +126,7 @@ else
             'channels', chLfp, 'downsample', 1));
         sig = mean(sig, 2);
         
-        [psdLfp(iwin, :, :), ~, epStats(iwin)] = psd_states('eeg', sig,...
+        [psdLfp(iwin, :, :), ~, epStats(iwin)] = psd_states('sig', sig,...
             'labels', labels, 'fs', fsLfp, 'faxis', faxis,...
             'graphics', false, 'sstates', sstates);
         
@@ -165,7 +165,7 @@ else
         totDur(iwin, :) = epStats(iwin).totDur(sstates);
     end
     for istate = 1 : length(sstates)
-        epLen{istate} = cell2nanmat(epLen_temp(:, istate));
+        epLen{istate} = cell2nanmat(epLen_temp(:, istate), 2);
     end
     
     psdBins.info.runtime = datetime(now, 'ConvertFrom', 'datenum');
@@ -202,8 +202,8 @@ if graphics
     setMatlabGraphics(false)
     alphaIdx = linspace(0.5, 1, nbins);
     cfg = as_loadConfig();
-    lim_fAxis = faxis > 1.5;
-    smf = 7;
+    lim_fAxis = faxis >= 1;
+    smf = 17;
     gk = gausswin(smf);
     gk = gk / sum(gk);
     
@@ -215,10 +215,10 @@ if graphics
         % lfp
         subplot(nrows, length(sstates), istate)
         psdMat = squeeze(psdBins.psdLfp(:, istate, lim_fAxis));
-        %     for iwin = 1 : nbins
-        %         psdMat(iwin, :) = conv(psdMat(iwin, :), gk, 'same');
-        %     end
-        psdMat = psdMat ./ sum(psdMat, 2);
+        for iwin = 1 : nbins
+            psdMat(iwin, :) = conv(psdMat(iwin, :), gk, 'same');
+        end
+        psdMat = psdMat ./ sum(psdMat(:, 21 : end), 2);
         ph = plot(faxis(lim_fAxis), psdMat', 'LineWidth', 2);
         for iwin = 1 : length(ph)
             ph(iwin).Color(istate) = cfg.colors{sstates(istate)}(istate) - iwin * 0.003;

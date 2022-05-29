@@ -107,14 +107,9 @@ for ifld = 1 : length(flds)
         cats.(flds{ifld}) = squeeze(cats.(flds{ifld}));
         continue
     end
-    
-    % finalize which dimensions are available for concatenation
-    [~, sdim] = sort(valsz(1, eqdim));
-    if max(ndim) > 2
-        sdim = 3;
-    end
 
     % cat according to user selection / default if multiple options exist
+    [~, sdim] = sort(valsz(1, eqdim));
     switch catdef
         case 'long'
             cats.(flds{ifld}) = cat(sdim(end), valarray{:, ifld});

@@ -59,7 +59,7 @@ graphics        = p.Results.graphics;
 
 % fft params
 if isempty(faxis)
-    faxis = [0.2 : 0.2 : 120];       
+    faxis = [0.5 : 0.2 : 100];       
 end
 win = hann(2 ^ (nextpow2(2 * fs) - 1));
 noverlap = floor(0.25 * fs);
@@ -80,7 +80,7 @@ if isempty(sstates)
 end
 
 % convert labels to state epochs. 
-[stateEpochs, ~] = as_epochs('lables', labels);
+[stateEpochs, epStats] = as_epochs('labels', labels);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % calc power for each epoch separatly

@@ -6,19 +6,37 @@
 
 % aCSF
 basepaths = [
-    {'E:\Data\Processed\lh95\lh95_210824_083300'},...
-    {'F:\Data\Processed\lh96\lh96_211201_070100'},...
-    {'K:\Data\lh99\lh99_211218_090630'},...
+    {'F:\Data\lh95\lh95_210824_083300'},...
+    {'F:\Data\lh96\lh96_211201_070100'},...
+    {'F:\Data\lh100\lh100_220405_100406'},...
     ];
 %     {'F:\Data\Processed\lh96\lh96_211124_073800'},...
 %     {'D:\Data\lh93\lh93_210811_102035'},...
+%     {'F:\Data\lh99\lh99_211218_090630'},...
+
 
 % local ket
 basepaths = [
-    {'E:\Data\Processed\lh95\lh95_210825_080400'},...
-    {'F:\Data\Processed\lh96\lh96_211126_072000'},...
-    {'F:\Data\Processed\lh96\lh96_211202_070500'},...
-    {'K:\Data\lh99\lh99_211219_085802'},...
+    {'F:\Data\lh95\lh95_210825_080400'},...
+    {'F:\Data\lh96\lh96_211126_072000'},...
+    {'F:\Data\lh96\lh96_211202_070500'},...
+    {'F:\Data\lh100\lh100_220403_100052'},...
+    ];
+% {'F:\Data\lh99\lh99_220119_090035'},...
+
+% ip ket 10 mg/kg
+basepaths = [
+    {'F:\Data\lh96\lh96_211206_070400'},...
+    {'F:\Data\lh98\lh98_211224_084528'},...
+    {'F:\Data\lh106\lh106_220512_102302'},...
+    ];
+% lh99_211224_084528
+% F:\Data\lh81\lh81_210204_190000   inj 0zt
+
+% ip ket 60 mg/kg
+basepaths = [
+    {'F:\Data\lh106\lh106_220513_104446'},...
+    {'F:\Data\lh107\lh107_220513_104446'},...
     ];
 
 % baclofen
@@ -32,7 +50,7 @@ basepaths = [
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % load vars from each session
-forceL = false;
+forceL = true;
 if ~exist('v', 'var') || forceL
     varsFile = ["fr"; "spikes"; "datInfo"; "session"];
     varsName = ["fr"; "spikes"; "datInfo"; "session"];
@@ -41,7 +59,7 @@ if ~exist('v', 'var') || forceL
 end
 nsessions = length(basepaths);
 
-% recalculate firing rate
+% itterate 
 for isession = 1 : nsessions
     basepath = basepaths{isession};
     cd(basepath)
@@ -62,9 +80,9 @@ for isession = 1 : nsessions
 %         'forceA', true, 'frBoundries', [0 Inf; 0 Inf],...
 %         'spikes', v(isession).spikes);
 %     
-%     [timebins, timepnt] = metaInfo_timebins('reqPnt', 5.5 * 60 * 60,...
-%         'nbins', 8);
-    timebins = v(isession).session.general.timebins;
+    [timebins, timepnt] = metaInfo_timebins('reqPnt', 5.5 * 60 * 60,...
+        'nbins', 8);
+%     timebins = v(isession).session.general.timebins;
     fr_timebins('basepath', pwd,...
         'forceA', true, 'graphics', true,...
         'timebins', timebins, 'saveVar', true, 'sstates', [1, 4, 5]);
@@ -79,6 +97,8 @@ unitClr = {'b', 'r'};
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % concate sessions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+x = catfields([v.fr], 'catdef', 'long', 'force', false)
 
 % load concatenated data from basepaths
 frCat = catFrSessions('basepaths', basepaths, 'binidx', 3);
@@ -97,10 +117,11 @@ sessionIdx = frCat.sessionIdx;
 tstamps = frCat.tstamps;          
 
 % manualy remove units by criteria
+clear unitsClean
 unitsClean(1, :) = units(1, :) & unitsGini' & unitsMfr';
 unitsClean(2, :) = units(2, :) & unitsGini' & unitsMfr';
 
-unitNo = 2;
+unitNo = 1;
 prismIdx = num2str(sessionIdx);
 prismIdx = string(prismIdx(unitsClean(unitNo, :)));
 
@@ -109,13 +130,45 @@ prismIdx = string(prismIdx(unitsClean(unitNo, :)));
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 plot_FRstates_sextiles('stateMfr', stateMfr([1, 4], :), 'units', unitsClean,...
-    'ntiles', 6, 'saveFig', false)
+    'ntiles', 2, 'saveFig', false)
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% graphics - psd in states according to timebins
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% analyze
+for isession = 1 : nsessions
+    cd(basepaths{isession});
+    session = v(isession).session;
+    [timebins, timepnt] = metaInfo_timebins('reqPnt', 5.5 * 60 * 60,...
+        'nbins', 8);
+    psdBins = psd_states_timebins('basepath', pwd,...
+        'chEeg', [], 'forceA', false, 'graphics', true,...
+        'timebins', timebins, 'saveVar', true, 'sstates', [1, 4, 5]);
+end
+
+% load
+varsFile = ["psdBins"; "session"];
+varsName = ["psdBins"; "session"];
+v = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
+    'varsName', varsName);
+
+% 2prism
+freq = psdBins.info.freq;
+ibin = 2;
+istate = 3;
+psdState = nan(length(freq), nsessions);
+for isession = 1 : nsessions
+    psdtmp = squeeze(v(isession).psdBins.psdLfp(ibin, istate, :));
+    psdState(:, isession) = psdtmp / sum(psdtmp);
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics - box plot of mfr across states divided by median
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 setMatlabGraphics(false)
+stateIdx = [1 : 5];
 
 fh = figure;
 for iunit = 1 : 2
@@ -137,7 +190,7 @@ for iunit = 1 : 2
     end
     ylabel('Firing Rate [Hz]')
     xticklabels(cfg.names)
-    subtitle(sprintf('High MFR %s = %d', unitChar{iunit}, sum(medUnits)))
+    title(sprintf('High MFR %s = %d', unitChar{iunit}, sum(medUnits)))
     ylim(yLimit)
     
     % low firing units
@@ -153,7 +206,7 @@ for iunit = 1 : 2
     end
     ylabel('Firing Rate [Hz]')
     xticklabels(cfg.names)
-    subtitle(sprintf('Low MFR %s = %d', unitChar{iunit}, sum(medUnits)))
+    title(sprintf('Low MFR %s = %d', unitChar{iunit}, sum(medUnits)))
     ylim(yLimit)
     
 end

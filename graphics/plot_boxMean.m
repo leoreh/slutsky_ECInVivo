@@ -25,8 +25,9 @@ ngrp = size(dataMat, 2);
 if isempty(clr)
     clr = repmat('k', 1, ngrp);
 end
+clr = clr(:);
 if length(clr) ~= ngrp
-    clr = repmat(clr(1), 1, ngrp);
+    clr = repmat(clr, 1, ngrp);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -41,7 +42,7 @@ if isempty(alphaIdx)
 end
 for ibox = 1 : length(bh)
     patch(get(bh(ibox), 'XData'), get(bh(ibox), 'YData'),...
-        clr(ibox), 'FaceAlpha', alphaIdx(ibox))
+        clr(:, ibox)', 'FaceAlpha', alphaIdx(ibox))
 end
 hold on
 if allPnts

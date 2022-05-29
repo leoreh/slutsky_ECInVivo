@@ -201,7 +201,7 @@ powdb = 10 * log10(s);
 for iband = 1 : length(bandFreqs)
     [~, bandIdx(1)] = min(abs(freq - bandFreqs(iband, 1)));
     [~, bandIdx(2)] = min(abs(freq - bandFreqs(iband, 2)));
-    spec.bands.db(iband, :, :) = squeeze(mean(powdb(:, bandIdx(1) : bandIdx(2), :), 2));
+    spec.bands.db(iband, :, :) = squeeze(sum(powdb(:, bandIdx(1) : bandIdx(2), :), 2));
 end
 spec.bands.bandNames = bandNames;
 spec.bands.bandFreqs = bandFreqs;
@@ -232,28 +232,39 @@ end
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-if graphics    
+if graphics
+    % manual selections
     ch = 1;
+    dataType = 'raw';   % can be raw / norm
+
     clear axh
     fh = figure;
     th = tiledlayout(2, 1, 'TileSpacing', 'Compact');
     axh(1) = nexttile;
     plot_spec(spec, 'ch', ch, 'logfreq', logfreq, 'saveFig', true,...
-        'axh', axh)  
+        'axh', axh)
 
     axh(2) = nexttile;
-    
+
     for iband = 1 : length(spec.bands.bandFreqs)
         lgd{iband} = sprintf('%s [%d-%d Hz]',...
             spec.bands.bandNames{iband}, floor(spec.bands.bandFreqs(iband, 1)),...
             spec.bands.bandFreqs(iband, 2));
-    end 
-    
+    end
+
     yval = movmean(squeeze(spec.bands.db(:, :, ch)), 100,  2);
-    plot(spec.tstamps / 60 / 60,...
-        yval(2 : end, :) ./ yval(1, :), 'LineWidth', 2)
+
+    switch dataType
+        case 'raw'
+            plot(spec.tstamps / 60 / 60,...
+                yval(2 : end, :), 'LineWidth', 2)
+            ylabel('Spectral Power [mV2/Hz]')
+        case 'norm'
+            plot(spec.tstamps / 60 / 60,...
+                yval(2 : end, :) ./ yval(1, :), 'LineWidth', 2)
+            ylabel('Norm. Spectral Power [dB]')
+    end
     legend(lgd{2 : end})
-    ylabel('Norm. Spectral Power [dB]')
     xlabel('Time [hr]')
     linkaxes(axh, 'x')
 end

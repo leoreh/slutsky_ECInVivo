@@ -40,12 +40,11 @@ saveFig     = p.Results.saveFig;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % calculate state ratio
-stateRat = [(stateMfr(2, :) - stateMfr(1, :)) ./...
-    (stateMfr(2, :) + stateMfr(1, :))]';
+stateRat = [(stateMfr(2, :) - stateMfr(1, :)) ./ (sum(stateMfr))]';
 
 % organize units
 if isempty(units)
-    units = logical(ones(1, length(stateMfr)));
+    units = true(1, length(stateMfr));
     unitsAny = units;
 end
 
@@ -90,7 +89,7 @@ for iunit = 1 : size(units, 1)
             stateMfr(1  , :) < tiles(itile + 1);
         dataMat{itile} = stateRat(unitsTile);
     end
-    dataMat = cell2nanmat(dataMat);
+    dataMat = cell2nanmat(dataMat, 2);
     plot_boxMean('dataMat', dataMat, 'clr', unitClr{iunit}, 'allPnts', true)
     hold on
     plot(xlim, [0, 0], '--k')
@@ -98,7 +97,7 @@ for iunit = 1 : size(units, 1)
         sprintf('%s + %s', stateNames{2}, stateNames{1})})
     xlabel(sprintf('Sixtiles (by %s)', stateNames{1}))
     ylim(yLimit)
-    subtitle(sprintf('%s = %d', unitType{iunit}, sum(units(iunit, :))))
+    title(sprintf('%s = %d', unitType{iunit}, sum(units(iunit, :))))
     
     subplot(2, size(units, 1), iunit + size(units, 1))
     infidx = isinf(log10(x));   
@@ -115,7 +114,7 @@ for iunit = 1 : size(units, 1)
     ylabel('NREM firing rate [Hz]')
     xlim(eqLine)
     ylim(eqLine)
-    subtitle(sprintf('Slope = %.2f; R2 = %.2f',...
+    title(sprintf('Slope = %.2f; R2 = %.2f',...
         mdl.Coefficients.Estimate(2), mdl.Rsquared.Ordinary))
 end
 
