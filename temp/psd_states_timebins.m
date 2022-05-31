@@ -15,7 +15,7 @@ function psdBins = psd_states_timebins(varargin)
 %                   will assume no eeg recording exists. 
 %   nchansEeg       numeric. number of channels in [basename].emg.dat file
 %   nbins           numeric. how many time bins to separate the recording
-%   timepoints      numeric. points of interest. chunks will be created
+%   timebins        numeric. points of interest. chunks will be created
 %                   in relation to these poitns [sec].  
 %   saveVar         logical. save ss var {true}
 %   forceA          logical. reanalyze recordings even if ss struct
@@ -146,7 +146,7 @@ else
                     'frequency', fsLfp, 'nchannels', nchansEeg, 'start', timebins(iwin, 1),...
                     'channels', chEeg, 'downsample', 1));
             end
-            [psdEeg(iwin, :, :), ~, epStats(iwin)] = psd_states('eeg', sig,...
+            [psdEeg(iwin, :, :), ~, epStats(iwin)] = psd_states('sig', sig,...
                 'labels', labels, 'fs', fsLfp, 'faxis', faxis,...
                 'graphics', false, 'sstates', sstates);
         end
@@ -215,10 +215,10 @@ if graphics
         % lfp
         subplot(nrows, length(sstates), istate)
         psdMat = squeeze(psdBins.psdLfp(:, istate, lim_fAxis));
-        for iwin = 1 : nbins
-            psdMat(iwin, :) = conv(psdMat(iwin, :), gk, 'same');
-        end
-        psdMat = psdMat ./ sum(psdMat(:, 21 : end), 2);
+%         for iwin = 1 : nbins
+%             psdMat(iwin, :) = conv(psdMat(iwin, :), gk, 'same');
+%         end
+%         psdMat = psdMat ./ sum(psdMat(:, 21 : end), 2);
         ph = plot(faxis(lim_fAxis), psdMat', 'LineWidth', 2);
         for iwin = 1 : length(ph)
             ph(iwin).Color(istate) = cfg.colors{sstates(istate)}(istate) - iwin * 0.003;

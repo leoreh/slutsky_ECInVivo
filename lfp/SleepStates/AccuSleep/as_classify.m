@@ -195,7 +195,7 @@ if graphics
     as_stateSeparation(sSig, ss)
     
     % duration in timebins
-    as_plotZT('nwin', 4, 'sstates', [1, 2, 4, 5], 'ss', ss)
+    as_plotZT('nwin', 4, 'sstates', [1, 4, 5], 'ss', ss)
     
 end
 

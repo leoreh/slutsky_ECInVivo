@@ -5,8 +5,8 @@
 
 % user input
 mname = 'lh106';
-basepath = 'I:\Data\lh106\lh106_220525_091000';
-blocks = [1 : 2];
+basepath = 'K:\Data\lh106_220529_090700';
+blocks = [1 : 5];
 
 % tank to dat (tetrodes)
 store = 'Raw1';
@@ -126,8 +126,8 @@ delete('*temp_wh*')
 
 % user input
 mname = 'lh107';
-basepath = 'I:\Data\lh106\lh106_220525_091000';
-blocks = [1 : 2];
+basepath = 'K:\Data\lh106_220529_090700';
+blocks = [1, 3 : 5];
 
 % tank to dat (tetrodes)
 store = 'Raw2';

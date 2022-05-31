@@ -117,7 +117,7 @@ for iwin = 1 : nwin
     totDur(iwin, :) = epochStats(iwin).totDur(sstates);
 end
 for istate = 1 : length(sstates)
-    epLen{istate} = cell2nanmat(epLen_temp(:, istate));
+    epLen{istate} = cell2nanmat(epLen_temp(:, istate), 2);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -55,7 +55,12 @@ load(infofile, 'datInfo')
 
 % recording length
 fileinfo = dir([basename, '.dat']);
-recLen = floor(fileinfo.bytes / 2 / nchans / fs);
+if isempty(fileinfo)
+    fileinfo = dir([basename, '.lfp']);
+    recLen = floor(fileinfo.bytes / 2 / nchans / 1250);
+else
+    recLen = floor(fileinfo.bytes / 2 / nchans / fs);
+end
 
 % point of interest relative to 'block' transition in the recording
 timepnt = 0;
