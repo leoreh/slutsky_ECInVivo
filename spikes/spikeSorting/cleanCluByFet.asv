@@ -3,7 +3,7 @@ function cleanCluByFet(varargin)
 % removes rpv spikes on fet / mDist
 
 % alternative option tested was to compare distributions with the
-% Kullback–Leibler divergence, e.g.: kl(ifet) = kldiv(bincents', spkpdf' + eps, rpvpdf' + eps, 'sym');
+% Kullbackâ€“Leibler divergence, e.g.: kl(ifet) = kldiv(bincents', spkpdf' + eps, rpvpdf' + eps, 'sym');
 %
 % INPUT:
 %   basepath    string. path to recording folder {pwd}.
@@ -89,7 +89,7 @@ if manCur
     dbstop in cleanCluByFet at 94 if manCur
     
     % select spiking grp
-    grpid = 1;
+    grpid = 3;
     
     % load data
     res = loadNS('datatype', 'res', 'session', session, 'grpid', grpid);
@@ -113,7 +113,7 @@ if manCur
     fixSpkAndRes('grp', grpid, 'dt', 0, 'stdFactor', 0, 'resnip', false);
     
     % rmv spks from selected cluster
-    sclu = 8;      % cluster id
+    sclu = 6;      % cluster id
     [cluidx, rmvSpks] = cleanClu(fet, res, sclu, ref, 0.0001, [0.12 0.06]);
     
     % plot fets of specific cluster

@@ -1,4 +1,4 @@
-function Wrot = getWhiteMat(rez, winWh)
+function Wrot = ks_get_whitening_matrix(rez, winWh)
 % based on a subset of the data, compute a channel whitening matrix
 % this requires temporal filtering first (gpufilter)
 

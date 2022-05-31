@@ -1,4 +1,4 @@
-function ops = opsKS(varargin)
+function ops = ks_ops(varargin)
 
 % kilosort configuration. based on configFile384.m,
 % make_eMouseChannelMap.m, and KilosortConfiguration (kilosortWrapper).
@@ -118,7 +118,7 @@ ops.criterionNoiseChannels = 0.2;
 % pass also collects noise: an additional per neuron threshold is set
 % afterwards, and a splitting step ensures clusters with multiple units get
 % split. {[10 4]}
-ops.Th = [8 4];
+ops.Th = [10 4];
 
 % how important is the amplitude penalty {10}. The individual spike
 % amplitudes are biased towards the mean of the cluster by this factor; 50
@@ -131,10 +131,10 @@ ops.lam = 25;
 % if, additionally, the cross-correlogram of the split units does not
 % contain a big dip at time 0. splitting a cluster at the end requires at
 % least this much isolation for each sub-cluster (max = 1){0.9}.
-ops.AUCsplit = 0.86;
+ops.AUCsplit = 0.9;
 
 % frequency for high pass filtering {150}
-ops.fshigh = 300;
+ops.fshigh = 150;
 
 % frequency for low (band) pass filtering {none}
 % ops.fslow = 300;
@@ -148,7 +148,7 @@ ops.minFR = 1/100;
 
 % number of samples to average over (annealed from first to second value)
 % {20 400}
-ops.momentum = [20 800];
+ops.momentum = [20 400];
 
 % spatial constant in um for computing residual variance of spike
 ops.sigmaMask = 30;
@@ -169,10 +169,10 @@ ops.nt0             = 61;
 % time sample where the negative peak should be aligned {2} 
 ops.nt0min  = ceil(20 * ops.nt0 / 61); 
 
-ops.spkTh           = -4;       % spike threshold in standard deviations {-6}
+ops.spkTh           = -6;       % spike threshold in standard deviations {-6}
 ops.reorder         = 1;        % whether to reorder batches for drift correction.
 ops.nskip           = 25;       % how many batches to skip for determining spike PCs
-ops.Nfilt           = 256;      % number of filters to use (2-4 times more than Nchan, should be a multiple of 32)
+ops.Nfilt           = 1024;     % number of filters to use (2-4 times more than Nchan, should be a multiple of 32)
 ops.nfilt_factor    = 8;        % max number of clusters per good channel (even temporary ones) {4}
 ops.ntbuff          = 64;       % samples of symmetrical buffer for whitening and spike detection
 ops.nSkipCov        = 25;       % skip n batches when computing whitening matrix 

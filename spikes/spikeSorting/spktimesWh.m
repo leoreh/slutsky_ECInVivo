@@ -20,9 +20,9 @@ function [spktimes, spkch] = spktimesWh(varargin)
 %               currently not working
 %
 % DEPENDENCIES
-%   get_whitening_matrix (ks)
-%   my_min (ks)
-%   getOr (ks)
+%   ks_get_whitening_matrix 
+%   ks_my_min 
+%   ks_ops
 %   class2bytes
 %
 % TO DO LIST:
@@ -85,7 +85,7 @@ thr = -4;           % spike threshold in standard deviations {-6}
 dt = 8;             % dead time between spikes [samples]
 
 % whitening params from ks
-ops = opsKS('basepath', basepath, 'fs', fs, 'nchans', nchans,...
+ops = ks_ops('basepath', basepath, 'fs', fs, 'nchans', nchans,...
     'spkgrp', spkgrp, 'trange', winCalc);
 NT              = chunksize;        % override
 ops.NT          = NT;
@@ -102,7 +102,7 @@ ops.Nbatch      = Nbatch;
 load(ops.chanMap)
 ops.igood       = true(size(chanMap));
 ops.Nchan       = numel(kcoords); 
-ops.Nfilt       = getOr(ops, 'nfilt_factor', 4) * ops.Nchan; 
+ops.Nfilt       = ops.nfilt_factor * ops.Nchan; 
 rez.ops         = ops; 
 rez.xc          = xcoords; % for historical reasons, make all these copies of the channel coordinates
 rez.yc          = ycoords;
@@ -141,7 +141,7 @@ if createWh
     if winWh(2) > nTimepoints / fs
         winWh(2) = floor(nTimepoints / fs);
     end
-    Wrot = getWhiteMat(rez, winWh);
+    Wrot = ks_get_whitening_matrix(rez, winWh);
 
     fid = fopen(ops.fbinary, 'r'); % open for reading raw data
     if saveWh
