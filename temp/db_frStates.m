@@ -144,7 +144,7 @@ for isession = 1 : nsessions
     [timebins, timepnt] = metaInfo_timebins('reqPnt', 5.5 * 60 * 60,...
         'nbins', 8);
     psdBins = psd_states_timebins('basepath', pwd,...
-        'chEeg', [], 'forceA', false, 'graphics', true,...
+        'chEeg', [], 'forceA', true, 'graphics', true,...
         'timebins', timebins, 'saveVar', true, 'sstates', [1, 4, 5]);
 end
 
@@ -162,6 +162,7 @@ psdState = nan(length(freq), nsessions);
 for isession = 1 : nsessions
     psdtmp = squeeze(v(isession).psdBins.psdLfp(ibin, istate, :));
     psdState(:, isession) = psdtmp / sum(psdtmp);
+    psdState(:, isession) = psdtmp;
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

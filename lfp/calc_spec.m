@@ -56,6 +56,7 @@ function spec = calc_spec(varargin)
 % 25 feb 22         adapted mtspecgramc
 % 18 apr 22         multichannel support
 % 26 apr 22         bands
+% 29 may 22         band through sum instead of mean
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
