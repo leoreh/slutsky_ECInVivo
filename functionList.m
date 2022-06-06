@@ -21,7 +21,7 @@ spkgrp = session.extracellular.spikeGroups.channels;
 [~, basename] = fileparts(basepath);
 
 % add timebins to datInfo
-[timebins, timepnt] = metaInfo_timebins('reqPnt', 5.5 * 60 * 60, 'nbins', 4);
+[timebins, timepnt] = metaInfo_timebins('reqPnt', 5.5 * 60 * 60, 'nbins', 8);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preprocessing of raw files
@@ -59,8 +59,8 @@ cat_OE_tstamps('orig_paths', orig_paths, 'new_path', exPathNew,...
 
 % pre-process dat (remove channels, reorder, etc.)
 clear orig_files
-orig_files{1} = 'G:\Data\lh107\lh107_220512_102302\lh107_220512_102302.dat';
-clip{1} = [seconds(minutes(1323)) * 20000, Inf];
+orig_files{1} = 'D:\Data\lh96_220120_090157\lh96_220120_090157.dat';
+clip{1} = [seconds(minutes(6 * 60)) * 20000, Inf];
 datInfo = preprocDat('orig_files', orig_files, 'mapch', 1 : nchans,...
     'rmvch', [], 'nchans', nchans, 'saveVar', true,...
     'chunksize', 1e7, 'precision', 'int16', 'clip', clip);
@@ -121,8 +121,8 @@ sSig = load([basename, '.sleep_sig.mat']);
 
 % call for acceleration
 sSig = as_prepSig([basename, '.lfp'], acc.mag,...
-    'eegCh', [1 : 4], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
-    'eegNchans', nchans, 'inspectSig', true, 'forceLoad', true,...
+    'eegCh', [5 : 8], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
+    'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
     'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [10 450], 'fs', 1250);
 
 % call for eeg
@@ -139,7 +139,7 @@ sSig = as_prepSig([basename, '.lfp'], [],...
 
 % manually create labels
 labelsmanfile = [basename, '.sleep_labelsMan.mat'];
-AccuSleep_viewer(sSig, [], labelsmanfile)
+AccuSleep_viewer(sSig, ss.labels_net, labelsmanfile)
 
 % classify with a network
 netfile = [];
@@ -209,7 +209,7 @@ nsClip('dur', -420, 't', [], 'bkup', true, 'grp', [3 : 4]);
 cleanCluByFet('basepath', pwd, 'manCur', true, 'grp', [1 : 4])
 
 % cut spk from dat and realign
-fixSpkAndRes('grp', [1 : 4], 'dt', 0, 'stdFactor', 0, 'resnip', true);
+fixSpkAndRes('grp', 1, 'dt', 0, 'stdFactor', 0, 'resnip', false);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % spikes (post-sorting)
@@ -240,18 +240,23 @@ fr = firingRate(spikes.times, 'basepath', basepath,...
     'smet', 'none', 'winBL', winBL, 'winCalc', [0, Inf]);
 
 % select specific units
-units = selectUnits('basepath', pwd, 'grp', [], 'saveVar', true,...
+units = selectUnits('basepath', pwd, 'grp', [4], 'saveVar', true,...
     'forceA', true, 'frBoundries', [0 Inf; 0 Inf],...
     'spikes', []);  
+unitsClean = units.idx & units.gini' & units.stable' & units.mfrBL' &...
+    units.su' & units.cnt';
 
 % plot fr vs. time
-unitsClean = units.idx & units.gini' & units.mfrBL';
 plot_FRtime_session('basepath', pwd,...
     'muFlag', false, 'saveFig', false,...
     'dataType', 'strd', 'units', unitsClean)
 
 % number of units per spike group
-plot_nunits_session('basepath', basepath, 'frBoundries', [])
+plot_nunits_session('basepath', pwd, 'frBoundries', [])
+
+% state ratio according to mfr percetiles
+plot_FRstates_sextiles('stateMfr', fr.states.mfr(:, [1, 4])', 'units', unitsClean,...
+    'ntiles', 2, 'saveFig', false)
 
 % cluster validation
 spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
@@ -261,12 +266,12 @@ spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
 % spike timing metrics
 st = spktimes_metrics('bins', [], 'forceA', true);
 
+% spike waveform metrics
+swv = spkwv_metrics('basepath', basepath, 'fs', fs, 'forceA', true);
+
 % burstiness (mea)
 brst = spktimes_meaBrst(spikes.times, 'binsize', Inf, 'isiThr', 0.02,...
     'minSpks', 2, 'saveVar', true, 'force', true);
-
-% spike waveform metrics
-swv = spkwv_metrics('basepath', basepath, 'fs', fs, 'forceA', true);
 
 % mfr by states in time bins
 timebins = session.general.timebins;

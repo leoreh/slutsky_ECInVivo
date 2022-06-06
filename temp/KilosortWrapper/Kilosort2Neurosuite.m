@@ -1,10 +1,10 @@
 function Kilosort2Neurosuite(rez)
 % Converts KiloSort output (.rez structure) to Neurosuite files: fet,res,clu,spk files.
 % Based on the GPU enable filter from Kilosort and fractions from Brendon
-% Watson's code for saving Neurosuite files. 
+% Watson's code for saving Neurosuite files.
 
-% The script has a high memory usage as all waveforms are loaded into 
-% memory at the same time. If you experience a memory error, increase 
+% The script has a high memory usage as all waveforms are loaded into
+% memory at the same time. If you experience a memory error, increase
 % your swap/cashe file, and increase the amount of memory MATLAB can use.
 %
 % 1) Waveforms are extracted from the dat file via GPU enabled filters.
@@ -20,18 +20,18 @@ t1 = tic;
 spikeTimes = uint64(rez.st3(:,1)); % uint64
 spikeTemplates = uint32(rez.st3(:,2)); % uint32 % template id for each spike
 kcoords = rez.ops.kcoords;
-basename = rez.ops.basename;
+
+%basename = rez.ops.basename;
+[~, basename] = fileparts(pwd);
 
 Nchan = rez.ops.Nchan;
 samples = rez.ops.nt0;
 
-% templates = gpuArray(zeros(Nchan, size(rez.W,1), rez.ops.Nfilt, 'single'));
-templates = gpuArray(zeros(Nchan, size(rez.W,1), size(rez.U, 2), 'single'));
-% for iNN = 1:rez.ops.Nfilt
-for iNN = 1:size(rez.U, 2)
+templates = zeros(Nchan, size(rez.W,1), rez.ops.Nfilt, 'single');
+for iNN = 1:rez.ops.Nfilt
     templates(:,:,iNN) = squeeze(rez.U(:,iNN,:)) * squeeze(rez.W(:,iNN,:))';
 end
-% amplitude_max_channel = [];
+amplitude_max_channel = [];
 for i = 1:size(templates,3)
     [~,amplitude_max_channel(i)] = max(range(templates(:,:,i)'));
 end
@@ -102,11 +102,11 @@ for i = 1:length(kcoords2)
     fprintf(['Computing PCAs for group ', num2str(kcoords3),'. '])
     PCAs_global = zeros(3,sum(kcoords==kcoords3),length(ia{i}));
     waveforms = waveforms_all{i};
-    
+
     waveforms2 = reshape(waveforms,[size(waveforms,1)*size(waveforms,2),size(waveforms,3)]);
     wranges = int64(range(waveforms2,1));
     wpowers = int64(sum(waveforms2.^2,1)/size(waveforms2,1)/100);
-    
+
     % Calculating PCAs in parallel if stated in ops.parfor
     if isempty(gcp('nocreate'))
         for k = 1:size(waveforms,1)
@@ -121,7 +121,7 @@ for i = 1:length(kcoords2)
     PCAs_global2 = reshape(PCAs_global,size(PCAs_global,1)*size(PCAs_global,2),size(PCAs_global,3));
     factor = (2^15)./max(abs(PCAs_global2'));
     PCAs_global2 = int64(PCAs_global2 .* factor');
-    
+
     fid=fopen([basename,'.fet.',num2str(kcoords3)],'w');
     Fet = double([PCAs_global2; wranges; wpowers; spikeTimes(ia{i})']);
     nFeatures = size(Fet, 1);
@@ -130,7 +130,7 @@ for i = 1:length(kcoords2)
         formatstring = [formatstring,'\t%d'];
     end
     formatstring = [formatstring,'\n'];
-    
+
     fprintf(fid, '%d\n', nFeatures);
     fprintf(fid,formatstring,Fet);
     fclose(fid);
@@ -138,7 +138,7 @@ end
 fprintf('\n'); toc(t1)
 fprintf('\nComplete!')
 
-	function waveforms_all = Kilosort_ExtractWaveforms(rez)
+    function waveforms_all = Kilosort_ExtractWaveforms(rez)
         % Extracts waveforms from a dat file using GPU enable filters.
         % Based on the GPU enable filter from Kilosort.
         % All settings and content are extracted from the rez input structure
@@ -148,7 +148,7 @@ fprintf('\nComplete!')
         %
         % Outputs:
         %   waveforms_all - structure with extracted waveforms
-        
+
         % Extracting content from the .rez file
         ops = rez.ops;
         NT = ops.NT;
@@ -163,7 +163,7 @@ fprintf('\nComplete!')
         kcoords = ops.kcoords;
         ia = rez.ia;
         spikeTimes = rez.st3(:,1);
-        
+
         if ispc
             dmem         = memory;
             memfree      = dmem.MemAvailableAllArrays/8;
@@ -175,20 +175,20 @@ fprintf('\nComplete!')
         ops.ForceMaxRAMforDat   = 10000000000;
         memallocated = ops.ForceMaxRAMforDat;
         nint16s      = memallocated/2;
-        
+
         NTbuff      = NT + 4*ops.ntbuff;
         Nbatch      = ceil(d.bytes/2/NchanTOT /(NT-ops.ntbuff));
         Nbatch_buff = floor(4/5 * nint16s/ops.Nchan /(NT-ops.ntbuff)); % factor of 4/5 for storing PCs of spikes
         Nbatch_buff = min(Nbatch_buff, Nbatch);
-        
+
         DATA =zeros(NT, NchanTOT,Nbatch_buff,'int16');
-        
+
         if isfield(ops,'fslow')&&ops.fslow<ops.fs/2
             [b1, a1] = butter(3, [ops.fshigh/ops.fs,ops.fslow/ops.fs]*2, 'bandpass');
         else
             [b1, a1] = butter(3, ops.fshigh/ops.fs*2, 'high');
         end
-        
+
         if isfield(ops,'xml')
             disp('Loading xml from rez for probe layout')
             xml = ops.xml;
@@ -197,30 +197,30 @@ fprintf('\nComplete!')
             xml = LoadXml(fullfile(ops.root,[ops.basename,'.xml']));
             ops.xml = xml;
         end
-        
+
         fid = fopen(ops.fbinary, 'r');
-        
+
         waveforms_all = [];
-%         kcoords2 = unique(ops.kcoords);
+        %         kcoords2 = unique(ops.kcoords);
         template_kcoords = kcoords(amplitude_max_channel);
         kcoords2 = unique(template_kcoords);
 
         channel_order = {};
         indicesTokeep = {};
-%         connected_index = zeros(size(rez.connected));
-%         connected_index(rez.connected)=1:length(chanMapConn);
-        
+        %         connected_index = zeros(size(rez.connected));
+        %         connected_index(rez.connected)=1:length(chanMapConn);
+
         for i = 1:length(kcoords2)
             kcoords3 = kcoords2(i);
             waveforms_all{i} = zeros(sum(kcoords==kcoords3),ops.nt0,size(rez.ia{i},1));
             if exist('xml')
                 [channel_order,channel_index] = sort(xml.AnatGrps(kcoords2(i)).Channels+1);
                 [~,indicesTokeep{i},~] = intersect(chanMapConn,channel_order);
-                
+
                 %indicesTokeep{i} = connected_index(indicesTokeep{i});
             end
         end
-        
+
         fprintf('Extraction of waveforms begun \n')
         for ibatch = 1:Nbatch
             if mod(ibatch,10)==0
@@ -229,7 +229,7 @@ fprintf('\nComplete!')
                 end
                 fprintf('%d percent complete', round(100*ibatch/Nbatch));
             end
-            
+
             offset = max(0, 2*NchanTOT*((NT - ops.ntbuff) * (ibatch-1) - 2*ops.ntbuff));
             if ibatch==1
                 ioffset = 0;
@@ -238,9 +238,9 @@ fprintf('\nComplete!')
             end
             fseek(fid, offset, 'bof');
             buff = fread(fid, [NchanTOT NTbuff], '*int16');
-            
+
             %         keyboard;
-            
+
             if isempty(buff)
                 break;
             end
@@ -253,7 +253,7 @@ fprintf('\nComplete!')
             else
                 dataRAW = buff;
             end
-            
+
             dataRAW = dataRAW';
             dataRAW = single(dataRAW);
             dataRAW = dataRAW(:, chanMapConn);
@@ -267,14 +267,14 @@ fprintf('\nComplete!')
             % Saves the waveforms occuring within each batch
             for i = 1:length(kcoords2)
                 kcoords3 = kcoords2(i);
-%                 ch_subset = 1:length(chanMapConn);
-                temp = find(ismember(spikeTimes(ia{i}), round([ops.nt0/2+1:size(DATA,1)-ops.nt0/2]) + dat_offset));
+                %                 ch_subset = 1:length(chanMapConn);
+                temp = find(ismember(spikeTimes(ia{i}), [ops.nt0/2+1:size(DATA,1)-ops.nt0/2] + dat_offset));
                 temp2 = spikeTimes(ia{i}(temp))-dat_offset;
-                
+
                 startIndicies = temp2-ops.nt0/2+1;
                 stopIndicies = temp2+ops.nt0/2;
                 X = cumsum(accumarray(cumsum([1;stopIndicies(:)-startIndicies(:)+1]),[startIndicies(:);0]-[0;stopIndicies(:)]-1)+1);
-                X = round(X(1:end-1));
+                X = X(1:end-1);
                 waveforms_all{i}(:,:,temp) = reshape(DATA(X,indicesTokeep{i})',size(indicesTokeep{i},1),ops.nt0,[]);
             end
         end

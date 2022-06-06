@@ -103,12 +103,20 @@ rs = strcmp(cm.putativeCellType, 'Pyramidal Cell');
 wide = strcmp(cm.putativeCellType, 'Wide Interneuron');
 fs = strcmp(cm.putativeCellType, 'Narrow Interneuron');
 
-% fr 
+% fr in boundries during baseline
 if isempty(frBoundries)
     frBoundries = [0 Inf; 0 Inf];
 end
 mfrRS = rs' & fr.mfr > frBoundries(1, 1) & fr.mfr < frBoundries(1, 2);
 mfrFS = fs' & fr.mfr > frBoundries(2, 1) & fr.mfr < frBoundries(2, 2);
+
+% fr continuous during baseline and throughout recording
+bl_idx = fr.tstamps > fr.info.winBL(1) & fr.tstamps < fr.info.winBL(2);
+cnt_bl = sum(fr.strd(:, bl_idx) > 0.01, 2) / sum(bl_idx) > 0.8;
+cnt_all = sum(fr.strd > 0.01, 2) / size(fr.strd, 2) > 0.8;
+
+% fr "stable" during baseline
+fr.stable = fr.mfr_std < fr.mfr;
 
 % combine
 unitsidx(1, :) = rs & su' & grpidx;
@@ -117,6 +125,7 @@ unitsidx(2, :) = fs & su' & grpidx;
 % arrange struct
 units.idx = logical(unitsidx);
 units.mfrBL = mfrRS | mfrFS;
+units.cnt = cnt_bl & cnt_all;
 units.stable = fr.stable;
 units.gini = fr.gini_unit <= 0.5 | isnan(fr.gini_unit);
 units.grp = grpidx;

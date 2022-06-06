@@ -21,7 +21,7 @@ function [chunks] = n2chunks(varargin)
 %               for example: clip = [0 50; 700 Inf] will remove the first
 %               50 samples and all samples between 700 and n
 %   pnts        numeric. specific points that should serve as the start /
-%               end of a chunk. will find the chunk closest to timepoints
+%               end of a chunk. will find the chunk closest to pnts
 %               and replace its boundries with the specific time point
 %
 % OUTPUT

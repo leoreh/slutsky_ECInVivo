@@ -55,6 +55,7 @@ if size(units, 1) == 2
 else
     unitType = {'Units'};
     unitClr = {'k'};
+    unitsAny = units;
 end
 
 if isempty(stateNames)

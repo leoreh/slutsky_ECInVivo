@@ -94,7 +94,7 @@ for isession = 1 : nsessions
     sessionIdx = [sessionIdx; ones(nunits, 1) * isession];
     
     % gini and stable
-    giniCoeff = [giniCoeff; v(isession).fr.gini_unit];
+%     giniCoeff = [giniCoeff; v(isession).fr.gini_unit];
     stableIdx = logical([stableIdx; v(isession).fr.stable]);
 end
 
@@ -105,7 +105,7 @@ frCat.units = units;
 frCat.unitsGini = unitsGini;
 frCat.unitsMfr = unitsMfr;
 frCat.mfr = mfr;
-frCat.giniCoeff = giniCoeff;
+% frCat.giniCoeff = giniCoeff;
 frCat.stableIdx = stableIdx;
 frCat.sessionIdx = sessionIdx;
 frCat.tstamps = tstamps;

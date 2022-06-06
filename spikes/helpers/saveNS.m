@@ -8,7 +8,7 @@ function saveNS(data, varargin)
 %               basepath
 %   data        numeric. data to save (clu / res / spk / fet)
 %   datatype    string. data to load; 'res', 'spk', {'clu'}, or 'fet'
-%   grpid        numeric. spkgrp number {1}
+%   grpid       numeric. spkgrp number {1}
 %   session     struct. session info (see CE_sessionTemplate)
 %   nfet        numeric. number of columns in fet file {17}
 %   spkgrp      array where each cell is the electrodes for a spike group
@@ -58,8 +58,9 @@ end
 if isempty(session)
     sessionName = [basename, '.session.mat'];
     if ~exist(sessionName, 'file')
+        % session params
         session = CE_sessionTemplate(pwd, 'viaGUI', false,...
-            'force', true, 'saveVar', true);
+            'forceDef', true, 'forceL', false, 'saveVar', false);
     else
         load(sessionName)
     end

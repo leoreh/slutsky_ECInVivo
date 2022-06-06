@@ -107,32 +107,12 @@ end
 [fr.strd, ~, fr.tstamps] = times2rate(spktimes, 'binsize', binsize,...
     'winCalc', winCalc, 'c2r', true);
 
-% calc fr according to states. note states, binsize, and spktimes must be
+% calc fr according to states. states, binsize, and spktimes must be
 % the same units (typically sec)
-if exist(asFile)
+if exist(asFile, 'file')
     load(asFile, 'ss')
     fr.states.stateNames = ss.info.names;
     nstates = length(ss.stateEpochs);
-    
-%     % change AWAKE to include only very high emg activity
-%     %     emg_rms = load([basename, '.sleep_sig.mat'], 'emg_rms');
-%     %     emg_rms = emg_rms.emg_rms;
-%     %     wakeIdx = ss.labels == 1;
-%     %     emgIdx = emg_rms < prctile(emg_rms, 90);
-%     % %     labels2 = ss.labels;
-%     %     ss.labels(wakeIdx & emgIdx') = 8;
-%     % %     sum(labels2 == 1)
-%     % %     sum(ss.labels == 1)
-%     labels = ss.labels;
-%     netThr = 0.9;
-%     for istate = 1 : nstates
-%         stateIdx = labels == istate;
-%         scoreIdx = ss.netScores(:, istate) < netThr;
-%         labels(stateIdx & scoreIdx) = 8;
-%     end
-%     
-%     [ss.stateEpochs, ~] = as_epochs('labels', labels,...
-%         'confMarg', [1 1], 'interDur', 0);
   
     % fit stateEpochs to winCalc and count spikes in states
     for istate = 1 : nstates
@@ -168,6 +148,10 @@ if exist(asFile)
                 (mat1 - mat2) ./ (mat1 + mat2);
         end
     end
+    
+    fr.states.mfr = cellfun(@(x) mean(x, 2), fr.states.fr, 'uni', false);
+    fr.states.mfr = cell2nanmat(fr.states.mfr, 2);
+
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -192,11 +176,6 @@ bl_fr = fr.strd(:, bl_idx);
 fr.mfr = mean(bl_fr, 2, 'omitnan');
 fr.mfr_std = std(bl_fr, [], 2, 'omitnan');
 fr.norm = fr.strd ./ fr.mfr;
-
-% apply criterions
-bl_thr = 0.01;   % [Hz]
-fr.bl_thr = fr.mfr > bl_thr;
-fr.stable = fr.mfr_std < fr.mfr;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % more params 
@@ -231,7 +210,6 @@ fr.info.winBL = winBL;
 fr.info.winCalc = winCalc;
 fr.info.binsize = binsize;
 fr.info.smoothMethod = smet;
-fr.info.bl_thr = bl_thr;
 
 % save
 if saveVar

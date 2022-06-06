@@ -74,7 +74,7 @@ for igrp = 1 : length(spkgrp)
     nchGrp = length(spkgrp{igrp});
     kcoords = [kcoords, ones(1, nchGrp) * igrp];
     xcoords = [xcoords, xrep(1 : nchGrp)];
-    ycoords = [ycoords, ones(1, nchGrp) * igrp * 20];
+    ycoords = [ycoords, ones(1, nchGrp) * igrp * 200];
 end
 % xcoords(badch) = NaN;
 % ycoords(badch) = NaN;
@@ -108,7 +108,7 @@ ops.trange          = trange;   % time range to sort [s]
 % groups at which to set the threshold. So if a template occupies more than
 % this many channel groups, it will not be restricted to a single channel
 % group {0.2}.
-ops.criterionNoiseChannels = 0.2; 
+ops.criterionNoiseChannels = 0; 
 
 % Thresholds on spike detection used during the optimization Th(1) or
 % during the final pass Th(2). These thresholds are applied to the template
@@ -117,13 +117,13 @@ ops.criterionNoiseChannels = 0.2;
 % can pick all of the spikes of these units. It doesn't matter if the final
 % pass also collects noise: an additional per neuron threshold is set
 % afterwards, and a splitting step ensures clusters with multiple units get
-% split. {[10 4]}
-ops.Th = [10 4];
+% split. {[10 4] => changed to [9 9] in ks3}
+ops.Th = [4 4];
 
 % how important is the amplitude penalty {10}. The individual spike
 % amplitudes are biased towards the mean of the cluster by this factor; 50
 % is a lot, 0 is no bias.
-ops.lam = 25;
+ops.lam = 10;
 
 % Threshold on the area under the curve (AUC) criterion for performing a
 % split in the final step. If the AUC of the split is higher than this,
@@ -131,10 +131,10 @@ ops.lam = 25;
 % if, additionally, the cross-correlogram of the split units does not
 % contain a big dip at time 0. splitting a cluster at the end requires at
 % least this much isolation for each sub-cluster (max = 1){0.9}.
-ops.AUCsplit = 0.9;
+ops.AUCsplit = 0.85;
 
-% frequency for high pass filtering {150}
-ops.fshigh = 150;
+% frequency for high pass filtering {300, changes in ks2.5}
+ops.fshigh = 300;
 
 % frequency for low (band) pass filtering {none}
 % ops.fslow = 300;
@@ -144,7 +144,7 @@ ops.minfr_goodchannels = 0.05;
 
 % minimum spike rate (Hz), if a cluster falls below this for too long it
 % gets removed {1/50}.
-ops.minFR = 1/100;
+ops.minFR = 0;
 
 % number of samples to average over (annealed from first to second value)
 % {20 400}
@@ -157,10 +157,10 @@ ops.sigmaMask = 30;
 ops.sig = 20;
 
 % type of data shifting (0 = none, 1 = rigid, 2 = nonrigid)
-ops.nblocks = 5;
+ops.nblocks = 0;
 
 % threshold crossings for pre-clustering (in PCA projection space)
-ops.ThPre = 8;
+ops.ThPre = 4;
 
 % number of time samples for the templates (has to be <=81 due to GPU
 % shared memory). {61}. 
@@ -169,22 +169,22 @@ ops.nt0             = 61;
 % time sample where the negative peak should be aligned {2} 
 ops.nt0min  = ceil(20 * ops.nt0 / 61); 
 
-ops.spkTh           = -6;       % spike threshold in standard deviations {-6}
+ops.spkTh           = -4;       % spike threshold in standard deviations {-6}
 ops.reorder         = 1;        % whether to reorder batches for drift correction.
 ops.nskip           = 25;       % how many batches to skip for determining spike PCs
 ops.Nfilt           = 1024;     % number of filters to use (2-4 times more than Nchan, should be a multiple of 32)
-ops.nfilt_factor    = 8;        % max number of clusters per good channel (even temporary ones) {4}
+ops.nfilt_factor    = 20;       % max number of clusters per good channel (even temporary ones) {4}
 ops.ntbuff          = 64;       % samples of symmetrical buffer for whitening and spike detection
 ops.nSkipCov        = 25;       % skip n batches when computing whitening matrix 
 ops.scaleproc       = 200;      % int16 scaling of whitened data
 ops.nPCs            = 3;        % how many PCs to project the spikes into
 ops.GPU             = 1;        % has to be 1, no CPU version yet, sorry
 ops.useRAM          = 0;        % not yet available
-ops.fig             = 1;        % plot figures
+ops.fig             = 0;        % plot figures
 
 % nomber of time points per batch (try decreasing if out of memory). must
 % be multiple of 32 + ntbuff.
-ops.NT              = 128 * 1024 + ops.ntbuff;
+ops.NT              = 1024 * 1024 + ops.ntbuff;  
 
 % how many channels to whiten together (Inf for whole probe whitening)
 ops.whiteningRange  = min([64 sum(connected)]); 
