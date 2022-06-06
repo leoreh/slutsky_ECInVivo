@@ -59,11 +59,10 @@ binsize     = p.Results.binsize;
 winCalc     = p.Results.winCalc;
 c2r         = p.Results.c2r;
 
-% arrange in cell
+% prepare spike times
 if ~iscell(spktimes)
     spktimes = {spktimes};
 end
-
 nunits = length(spktimes);
 
 % validate window
@@ -80,32 +79,32 @@ nwin = size(winCalc, 1);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % currently assumes bins are consecutive !!!
-k = 1;
-for i = 1 : nwin
-    if winCalc(i, 2) - winCalc(i, 1) <= binsize
-        binedges{i} = winCalc(i, :);
+cnt = 1;
+for iwin = 1 : nwin
+    if winCalc(iwin, 2) - winCalc(iwin, 1) <= binsize
+        binedges{iwin} = winCalc(iwin, :);
     else
-        binedges{i} = winCalc(i, 1) : binsize : winCalc(i, 2);
-        binedges{i}(end) = winCalc(i, 2);       % correct last bin
+        binedges{iwin} = winCalc(iwin, 1) : binsize : winCalc(iwin, 2);
+        binedges{iwin}(end) = winCalc(iwin, 2);       % correct last bin
     end
  
     % count spikes
-    nbins = length(binedges{i}) - 1;
-    for ii = 1 : nunits
+    nbins = length(binedges{iwin}) - 1;
+    for iunit = 1 : nunits
         if c2r
-            r(ii, k : k + nbins - 1) = histcounts(spktimes{ii}, binedges{i},...
+            r(iunit, cnt : cnt + nbins - 1) = histcounts(spktimes{iunit}, binedges{iwin},...
                 'Normalization', 'countdensity');
         else
-            r(ii, k : k + nbins - 1) = histcounts(spktimes{ii}, binedges{i},...
+            r(iunit, cnt : cnt + nbins - 1) = histcounts(spktimes{iunit}, binedges{iwin},...
                 'Normalization', 'count');
         end
     end
     
     % find bin centers
-    for ii = 1 : nbins
-        bincents(k) = binedges{i}(ii) + ceil(diff(binedges{i}(ii : ii + 1)) / 2);
-        binidx(k) = i;
-        k = k + 1;
+    for ibin = 1 : nbins
+        bincents(cnt) = binedges{iwin}(ibin) + ceil(diff(binedges{iwin}(ibin : ibin + 1)) / 2);
+        binidx(cnt) = iwin;
+        cnt = cnt + 1;
     end
 end
 

@@ -26,7 +26,7 @@ if isempty(clr)
     clr = repmat('k', 1, ngrp);
 end
 clr = clr(:);
-if length(clr) ~= ngrp
+if size(clr, 2) ~= ngrp
     clr = repmat(clr, 1, ngrp);
 end
 

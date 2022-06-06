@@ -113,7 +113,7 @@ if manCur
     fixSpkAndRes('grp', grpid, 'dt', 0, 'stdFactor', 0, 'resnip', false);
     
     % rmv spks from selected cluster
-    sclu = 3;      % cluster id
+    sclu = 5;      % cluster id
     [cluidx, rmvSpks] = cleanClu(fet, res, sclu, ref, 0.0001, [0.12 0.06]);
     
     % plot fets of specific cluster

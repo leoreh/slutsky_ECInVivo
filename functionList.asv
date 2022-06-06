@@ -21,7 +21,7 @@ spkgrp = session.extracellular.spikeGroups.channels;
 [~, basename] = fileparts(basepath);
 
 % add timebins to datInfo
-[timebins, timepnt] = metaInfo_timebins('reqPnt', 5.5 * 60 * 60, 'nbins', 4);
+[timebins, timepnt] = metaInfo_timebins('reqPnt', 5.5 * 60 * 60, 'nbins', 8);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preprocessing of raw files
@@ -227,6 +227,9 @@ cell_metrics = ProcessCellMetrics('session', session,...
     'excludeMetrics', excludeMetrics);
 % cell_metrics = CellExplorer('basepath', pwd);
 
+% number of units per spike group
+plot_nunits_session('basepath', pwd, 'frBoundries', [])
+
 % firing rate
 load([basename, '.spikes.cellinfo.mat'])
 if isfield(session.general, 'timepnt')
@@ -240,18 +243,20 @@ fr = firingRate(spikes.times, 'basepath', basepath,...
     'smet', 'none', 'winBL', winBL, 'winCalc', [0, Inf]);
 
 % select specific units
-units = selectUnits('basepath', pwd, 'grp', [], 'saveVar', true,...
+units = selectUnits('basepath', pwd, 'grp', [2 : 3], 'saveVar', true,...
     'forceA', true, 'frBoundries', [0 Inf; 0 Inf],...
     'spikes', []);  
+unitsClean = units.idx & units.gini' & units.stable' & units.mfrBL' &...
+    units.su' & units.cnt';
 
 % plot fr vs. time
-unitsClean = units.idx & units.gini' & units.mfrBL';
 plot_FRtime_session('basepath', pwd,...
     'muFlag', false, 'saveFig', false,...
     'dataType', 'strd', 'units', unitsClean)
 
-% number of units per spike group
-plot_nunits_session('basepath', basepath, 'frBoundries', [])
+% state ratio according to mfr percetiles
+plot_FRstates_sextiles('stateMfr', fr.states.mfr(:, [1, 4])', 'units', unitsClean,...
+    'ntiles', 2, 'saveFig', false)
 
 % cluster validation
 spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...

@@ -6,11 +6,12 @@
 
 % aCSF
 basepaths = [
+    {'F:\Data\lh93\lh93_210811_102035'},...
     {'F:\Data\lh95\lh95_210824_083300'},...
     {'F:\Data\lh96\lh96_211201_070100'},...
+    {'F:\Data\lh99\lh99_211218_090630'},...
     {'F:\Data\lh100\lh100_220405_100406'},...
     {'F:\Data\lh107\lh107_220509_095738'},...
-    {'F:\Data\lh93\lh93_210811_102035'},...
     ];
 %     {'F:\Data\Processed\lh96\lh96_211124_073800'},...
 %     {'F:\Data\lh93\lh93_210811_102035'},...
@@ -20,12 +21,13 @@ basepaths = [
 basepaths = [
     {'F:\Data\lh93\lh93_210813_110609'},...
     {'F:\Data\lh95\lh95_210825_080400'},...
-    {'F:\Data\lh96\lh96_211202_070500'},...
+    {'F:\Data\lh96\lh96_211204_084200'},...
     {'F:\Data\lh100\lh100_220403_100052'},...
     {'F:\Data\lh107\lh107_220501_102641'},...
     ];
 % {'F:\Data\lh99\lh99_220119_090035'},...
 %     {'F:\Data\lh96\lh96_211126_072000'},...
+%     {'F:\Data\lh96\lh96_211202_070500'},...
 
 % ip ket 10 mg/kg
 basepaths = [
@@ -54,8 +56,8 @@ basepaths = [
 
 % load vars from each session
 forceL = true;
-varsFile = ["fr"; "spikes"; "datInfo"; "session"];
-varsName = ["fr"; "spikes"; "datInfo"; "session"];
+varsFile = ["fr"; "fr_bins"; "spikes"; "datInfo"; "session"; "units"];
+varsName = ["fr"; "frBins"; "spikes"; "datInfo"; "session"; "units"];
 vload = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
     'varsName', varsName);
 nsessions = length(basepaths);
@@ -67,25 +69,46 @@ for isession = 1 : nsessions
     [mousename, basename] = fileparts(basepath);
     [~, mousename] = fileparts(mousename);
 
+    % number of units per spike group
+    plot_nunits_session('basepath', basepath, 'frBoundries', [])
+
     % select specific units
-    %     units = selectUnits('basepath', pwd, 'grp', [2 : 4], 'saveVar', true,...
-    %         'forceA', true, 'frBoundries', [0 Inf; 0 Inf],...
-    %         'spikes', vload(isession).spikes);
+    units = selectUnits('basepath', basepath, 'grp', [2 : 7], 'saveVar', true,...
+        'forceA', true, 'frBoundries', [0 Inf; 0 Inf],...
+        'spikes', vload(isession).spikes);
+    units = vload(isession).units;
+    unitsClean = units.idx & units.gini' & units.stable' & units.mfrBL' &...
+        units.su' & units.cnt';
+    
+    % plot fr vs. time
+    plot_FRtime_session('basepath', basepath,...
+        'muFlag', false, 'saveFig', false,...
+        'dataType', 'strd', 'units', unitsClean)
 
-    timepnt = vload(isession).session.general.timepnt;
-    winBL = [0 timepnt];
-    fr = firingRate(vload(isession).spikes.times, 'basepath', basepath,...
-        'graphics', true, 'binsize', 60, 'saveVar', true,...
-        'smet', 'none', 'winBL', winBL, 'winCalc', [0, Inf]);
+    % state ratio according to mfr percetiles
+    frBins = catfields(vload(isession).frBins, 'catdef', 'addim', 'force', false);
+    stateMfr = frBins.states.mfr(:, [1, 4], 1);
+    plot_FRstates_sextiles('stateMfr', stateMfr', 'units', unitsClean,...
+        'ntiles', 2, 'saveFig', false)
 
-    %     [timebins, timepnt] = metaInfo_timebins('reqPnt', 5.5 * 60 * 60,...
-    %         'nbins', 8);
-    %     %     timebins = v(isession).session.general.timebins;
-    %     timebins = [1, timepnt - 10 * 60; timepnt, timepnt + 3 * 60 * 60];
-    %     fr_timebins('basepath', pwd,...
-    %         'forceA', true, 'graphics', true,...
-    %         'timebins', timebins, 'saveVar', true, 'sstates', [1, 4, 5]);
+%     timebins = v(isession).session.general.timebins;
+%     timepnt = vload(isession).session.general.timepnt;
+%     timebins = [1, timepnt; timepnt, timepnt + 3 * 60 * 60;...
+%         timepnt + 3 * 60 * 60, timepnt + 6 * 60 * 60;
+%         timepnt + 6 * 60 * 60, timepnt + 12 * 60 * 60;
+%         timepnt + 12 * 60 * 60, Inf];
+%     winBL = [0 timepnt];
+% 
+%     fr = firingRate(vload(isession).spikes.times, 'basepath', basepath,...
+%         'graphics', true, 'binsize', 60, 'saveVar', true,...
+%         'smet', 'none', 'winBL', winBL, 'winCalc', [0, Inf]);
+% 
+%     fr_timebins('basepath', pwd,...
+%         'forceA', true, 'graphics', true,...
+%         'timebins', timebins, 'saveVar', true, 'sstates', [1, 4]);
 end
+
+cell_metrics = CellExplorer('basepaths', basepaths);
 
 % params
 cfg = as_loadConfig();
@@ -98,34 +121,31 @@ unitClr = {'b', 'r'};
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % load vars from each session
-varsFile = ["units"; "fr_bins"; "fr"];
-varsName = ["units"; "frBins"; "fr"];
+varsFile = ["session"; "units"; "fr_bins"; "fr"];
+varsName = ["session"; "units"; "frBins"; "fr"];
 v = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
     'varsName', varsName);
 nsessions = length(basepaths);
 
-% select states / timebins
-tbins = [1, 2];
+% select states
 sstates = [1, 4];
 
 % cat and select units
 units = catfields([v.units], 'catdef', 'long', 'force', false);
 unitsClean = units.idx & units.gini' & units.stable' & units.mfrBL' &...
     units.su' & units.cnt';
-% unitsClean = unitsClean(1, :) | unitsClean(2, :);
+unitsClean = unitsClean(1, :) | unitsClean(2, :);
 
 % concate mfr in states
 stateMfr = [];
 for isession = 1 : nsessions
     frBins = catfields(v(isession).frBins, 'catdef', 'addim', 'force', false);
-    stateMfr = [stateMfr; frBins.states.mfr(:, sstates, tbins)];
+    stateMfr = [stateMfr; frBins.states.mfr(:, sstates, :)];
 end
-
-
 
 fr = catfields([v.fr], 'catdef', 'long', 'force', false);
 fr.mfr;
-
+squeeze(stateMfr(unitsClean, :, 2))
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics - box plot of mfr state ratio divided to sextiles
@@ -134,6 +154,19 @@ fr.mfr;
 plot_FRstates_sextiles('stateMfr', squeeze(stateMfr(:, :, 1))', 'units', unitsClean,...
     'ntiles', 2, 'saveFig', false)
 
+istate = 1;
+normChange = (squeeze(stateMfr(unitsClean, istate, 2)) -...
+    squeeze(stateMfr(unitsClean, istate, 1))) ./...
+    (squeeze(stateMfr(unitsClean, istate, 1)) +...
+    squeeze(stateMfr(unitsClean, istate, 2)));
+
+normChange = (squeeze(stateMfr(unitsClean, istate, 2)) ./...
+    squeeze(stateMfr(unitsClean, istate, 1)) * 100);
+
+
+fh = figure;
+plot(squeeze(stateMfr(unitsClean, istate, 1)), normChange, '*')
+set(gca, 'XScale', 'log')
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % percent change between bins
@@ -247,7 +280,7 @@ for iunit = 1 : 2
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% graphics - gini ceoff vs. mfr at basline colored by stability
+% graphics - gini ceoff vs. mfr at baseline colored by stability
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % load concatenated data from basepaths
@@ -320,43 +353,35 @@ end
 % to prism
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-frCat = catFrSessions('basepaths', basepaths, 'binidx', []);
-structvars(frCat);
-stateMfr = frCat.stateMfr;         
-stateRat = frCat.stateRat;         
-units = frCat.units;               
-unitsGini = frCat.unitsGini;       
-unitsMfr = frCat.unitsMfr;         
-mfr = frCat.mfr;                   
-giniCoeff = frCat.giniCoeff;       
-stableIdx = frCat.stableIdx;       
-sessionIdx = frCat.sessionIdx;     
-tstamps = frCat.tstamps;     
-
-
 % firing rate vs. time across all units, aligned to point of injection
 units = catfields([v.units], 'catdef', 'long', 'force', false);
 unitsClean = units.idx & units.gini' & units.stable' & units.mfrBL' &...
     units.su' & units.cnt';
 
-
-% firing rate vs. time across all units, aligned to point of injection
-[frMat, timeIdx] = alignFR2pnt('basepaths', basepaths, 'dataType', 'norm');
+% firing rate vs. time across all units, aligned to point of injection. can
+% extract strd or normalized data
+[frMat, timeIdx] = alignFR2pnt('basepaths', basepaths, 'dataType', 'strd');
 
 % grab fr
 unitNo = 1;
-frMat(unitsClean(unitNo, :), :)
+prism_data = frMat(unitsClean(unitNo, :), :)';
+prism_tstamps = [1 : length(frMat)]' / 60;
+prism_injTime = max(timeIdx) / 60;
 
-% prepare for prism
-unitIdx = num2str(sessionIdx);
-unitIdx(~unitsMfr) = repmat('m', sum(~unitsMfr), 1);
-unitIdx(~unitsGini) = repmat('g', sum(~unitsGini), 1);
+% list of units per session
+prism_rs = []; prism_fs = [];
+for isession = 1 : nsessions
+    units = v(isession).units;
+    unitsClean = units.idx & units.gini' & units.stable' & units.mfrBL' &...
+    units.su' & units.cnt';
+    prism_rs = [prism_rs; ones(sum(unitsClean(1, :)), 1) * isession];
+    prism_fs = [prism_fs; ones(sum(unitsClean(2, :)), 1) * isession];
+end
 
-prismData = frMat(units(unitNo, :), :)';
-prismIdx = string(unitIdx(units(unitNo, :)))';
-prismTstamps = [1 : length(frMat)] / 60;
-max(timeIdx) / 60
-
+% select units based on mfr
+fr = catfields([v.fr], 'catdef', 'long', 'force', false);
+units_mfr = fr.mfr < 3;
+unitsClean = unitsClean & units_mfr';
 
 % single session
 dataType = 'norm';

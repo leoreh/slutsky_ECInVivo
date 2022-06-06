@@ -40,7 +40,7 @@ saveFig     = p.Results.saveFig;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % calculate state ratio
-stateRat = [(stateMfr(2, :) - stateMfr(1, :)) ./ (sum(stateMfr))]';
+stateRat = [(stateMfr(2, :) - stateMfr(1, :)) ./ (sum(stateMfr))]' * 100;
 
 % organize units
 if isempty(units)
@@ -70,6 +70,7 @@ setMatlabGraphics(false)
 eqLine = 10 .^ [floor(log10(min(stateMfr(stateMfr(:) ~= 0)))),...
     ceil(log10(max(stateMfr(:))))];
 yLimit = [-max(abs(stateRat(unitsAny))), max(abs(stateRat(unitsAny)))];
+yLimit = [-100, 100];
 
 fh = figure;
 for iunit = 1 : size(units, 1)
@@ -101,7 +102,7 @@ for iunit = 1 : size(units, 1)
     title(sprintf('%s = %d', unitType{iunit}, sum(units(iunit, :))))
     
     subplot(2, size(units, 1), iunit + size(units, 1))
-    infidx = isinf(log10(x));   
+    infidx = isinf(log10(x)) | isinf(log10(y));   
     mdl = fitlm(log10(x(~infidx)), log10(y(~infidx)));
     fitCoeff = flipud(mdl.Coefficients.Estimate); 
     y2 = 10 .^ [polyval(fitCoeff, log10(eqLine(1) : eqLine(2)))];

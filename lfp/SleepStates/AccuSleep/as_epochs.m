@@ -5,14 +5,12 @@ function [stateEpochs, epochStats] = as_epochs(varargin)
 %
 % INPUT:
 %   labels          numeric. see as_classify 
-%   sstates         numeric. idx of selected states. e.g. [1, 4, 5] will
-%                   only plot wake, nrem and rem
 %   minDur          numeric. minimum duration of an epoch. 
 %                   if length(minDur) == nstates than a different minimum
 %                   duration will be applied to each state
 %   interDur        numeric. combine epochs separated by <= interDur
 %   confMarg        2 x 1 numeric. confidance margin. for example, [1 2]
-%                   will will change the epoch [789 810] to [790 808]. 
+%                   will change the epoch [789 810] to [790 808]. 
 %                   this is to assure that the previous and next state to
 %                   not influence the current state
 % 
@@ -30,14 +28,12 @@ function [stateEpochs, epochStats] = as_epochs(varargin)
 
 p = inputParser;
 addOptional(p, 'labels', [], @isnumeric);
-addOptional(p, 'sstates', [], @isnumeric);
 addOptional(p, 'minDur', [10, 5, 5, 10, 5, 5], @isnumeric);
 addOptional(p, 'interDur', 4, @isnumeric);
 addOptional(p, 'confMarg', [], @isnumeric);
 
 parse(p, varargin{:})
 labels          = p.Results.labels;
-sstates         = p.Results.sstates;
 minDur          = p.Results.minDur;
 interDur        = p.Results.interDur;
 confMarg        = p.Results.confMarg;
@@ -49,9 +45,6 @@ confMarg        = p.Results.confMarg;
 % state params
 cfg = as_loadConfig();
 nstates = cfg.nstates;
-if isempty(sstates)
-    sstates = 1 : nstates;      % selected states (ignore bin)
-end
 
 if length(minDur) == 1
     minDur = repamt(minDur, nstates, 1);
