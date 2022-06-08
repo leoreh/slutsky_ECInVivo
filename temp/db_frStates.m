@@ -34,6 +34,7 @@ basepaths = [
     {'F:\Data\lh96\lh96_211206_070400'},...
     {'F:\Data\lh98\lh98_211224_084528'},...
     {'F:\Data\lh106\lh106_220512_102302'},...
+    {'F:\Data\lh107\lh107_220512_102302'},...
     ];
 % lh99_211224_084528
 % F:\Data\lh81\lh81_210204_190000   inj 0zt
@@ -61,6 +62,8 @@ varsName = ["fr"; "frBins"; "spikes"; "datInfo"; "session"; "units"];
 vload = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
     'varsName', varsName);
 nsessions = length(basepaths);
+
+cell_metrics = CellExplorer('basepaths', basepaths);
 
 % itterate
 for isession = 1 : nsessions
@@ -108,8 +111,6 @@ for isession = 1 : nsessions
 %         'timebins', timebins, 'saveVar', true, 'sstates', [1, 4]);
 end
 
-cell_metrics = CellExplorer('basepaths', basepaths);
-
 % params
 cfg = as_loadConfig();
 nstates = cfg.nstates;
@@ -121,8 +122,8 @@ unitClr = {'b', 'r'};
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % load vars from each session
-varsFile = ["session"; "units"; "fr_bins"; "fr"];
-varsName = ["session"; "units"; "frBins"; "fr"];
+varsFile = ["session"; "units"; "fr_bins"; "fr"; "sleep_states"];
+varsName = ["session"; "units"; "frBins"; "fr"; "ss"];
 v = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
     'varsName', varsName);
 nsessions = length(basepaths);
@@ -145,7 +146,11 @@ end
 
 fr = catfields([v.fr], 'catdef', 'long', 'force', false);
 fr.mfr;
-squeeze(stateMfr(unitsClean, :, 2))
+% squeeze(stateMfr(unitsClean, :, 2))
+dataMat = fr.states.mfr(:, sstates);
+plot_FRstates_sextiles('stateMfr', dataMat', 'units', unitsClean,...
+    'ntiles', 2, 'saveFig', false)
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics - box plot of mfr state ratio divided to sextiles
@@ -155,18 +160,31 @@ plot_FRstates_sextiles('stateMfr', squeeze(stateMfr(:, :, 1))', 'units', unitsCl
     'ntiles', 2, 'saveFig', false)
 
 istate = 1;
-normChange = (squeeze(stateMfr(unitsClean, istate, 2)) -...
-    squeeze(stateMfr(unitsClean, istate, 1))) ./...
-    (squeeze(stateMfr(unitsClean, istate, 1)) +...
-    squeeze(stateMfr(unitsClean, istate, 2)));
+% normChange = (squeeze(stateMfr(unitsClean, istate, 2)) -...
+%     squeeze(stateMfr(unitsClean, istate, 1))) ./...
+%     (squeeze(stateMfr(unitsClean, istate, 1)) +...
+%     squeeze(stateMfr(unitsClean, istate, 2)));
 
-normChange = (squeeze(stateMfr(unitsClean, istate, 2)) ./...
+
+xval = squeeze(stateMfr(unitsClean, istate, 1));
+yval = (squeeze(stateMfr(unitsClean, istate, 2)) ./...
     squeeze(stateMfr(unitsClean, istate, 1)) * 100);
 
+infidx = isinf(log10(xval));
+mdl = fitlm(log10(xval(~infidx)), yval(~infidx),...
+    'Exclude', xval(~infidx) < 0.01);
+
+% mdl = fitlm(yval(~infidx), log10(xval(~infidx)),...
+%     'Exclude', xval(~infidx) < 0);
 
 fh = figure;
-plot(squeeze(stateMfr(unitsClean, istate, 1)), normChange, '*')
+plot(mdl)
+
+
+fh = figure; 
+plot(xval, yval, '*')
 set(gca, 'XScale', 'log')
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % percent change between bins
@@ -231,6 +249,35 @@ for isession = 1 : nsessions
     psdState(:, isession) = psdtmp / sum(psdtmp);
     psdState(:, isession) = psdtmp;
 end
+
+% time in states
+nbins = 4;
+sstates = [1, 4];
+totDur = nan(nbins, length(sstates), nsessions);
+epLen = cell(length(sstates), nsessions);
+for isession = 1 : nsessions
+    basepath = basepaths{isession};
+    cd(basepath)
+    
+    [tempDur, epLen(:, isession), timebins] =...
+        as_plotZT('nwin', nbins, 'sstates', sstates, 'ss', ss,...
+        'graphics', false);
+    
+    binLen = diff(timebins');
+    totDur(:, :, isession) = (tempDur ./ binLen') * 100;
+end   
+
+fh = figure;
+th = tiledlayout(2, 2, 'TileSpacing', 'Compact');
+axh = nexttile;
+dataVec = mean(totDur, 3, 'omitnan');
+plot([1 : nbins], dataVec(:, istate),...
+    'Color', cfg.colors{sstates(istate)}, 'LineWidth', 2)
+ylabel('State duration [%]')
+ylim([0 100])
+ax = gca;
+set(ax.YAxis, 'color', cfg.colors{sstates(istate)})
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics - box plot of mfr across states divided by median

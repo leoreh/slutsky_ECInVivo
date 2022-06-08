@@ -153,8 +153,8 @@ fprintf('done.\n')
 % convert labels to state epochs
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-minDur = [50, 5, 5, 50, 5, 5];
-interDur = 8;
+minDur = [10, 5, 5, 10, 5, 5];
+interDur = 4;
 
 [ss.stateEpochs, epochStats] = as_epochs('labels', labels,...
     'minDur', minDur, 'interDur', interDur);

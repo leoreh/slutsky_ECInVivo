@@ -1,4 +1,4 @@
-function [totDur, epLen, timebins] = as_plotZT(varargin)
+function [totDur, epLen] = as_plotZT(varargin)
 
 % receives a labels vector, divides it to states within timebins, and plots
 % the epoch destribution and duration. 
@@ -103,7 +103,7 @@ if isempty(timebins)
     timebins = n2chunks('n', length(labels), 'nchunks', nbins);
 end
 nbins = size(timebins, 1);
-binLen = diff(timebins');
+
 
 % calc epoch stats according to timebins
 for iwin = 1 : nbins
@@ -137,12 +137,10 @@ if graphics
         % state duration
         subplot(2, length(sstates), istate)
         dataVec = totDur(:, istate) / 60;
-        dataVec = (totDur(:, istate) ./ binLen) * 100;
-        plot([1 : nbins], dataVec,...
+        dataVec = totDur(:, istate) / 60 ./ 
+        plot([1 : nbins], totDur(:, istate) / 60,...
             'Color', cfg.colors{sstates(istate)}, 'LineWidth', 2)
         ylabel('State duration [min]')
-        ylabel('State duration [%]')
-        ylim([0 100])
         ax = gca;
         set(ax.YAxis, 'color', cfg.colors{sstates(istate)})
 %         xticklabels(tbins_txt)
