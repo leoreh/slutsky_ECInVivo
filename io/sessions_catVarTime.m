@@ -15,7 +15,7 @@ function [expData, xData] = sessions_catVarTime(varargin)
 %                   between recordings
 %   dataPreset      string or cell of string depicting the variable to cat. 
 %                   can be any combination of 'sr', 'spec', 'fr', 'ripp',
-%                   or 'sleep_emg'
+%                   'sleep_emg' or 'bands'
 %   axh             handle to plot axis      
 % 
 % EXAMPLE
@@ -123,7 +123,7 @@ switch dataPreset
         end
         ts = spec.info.winstep;     % sampling period [s]
 
-    case 'sleep_emg'
+    case 'emg_rms'
         for isession = 1 : nsessions
             filename = fullfile(basepaths{isession},...
                 [basenames{isession}, '.sleep_sig.mat']);
@@ -132,7 +132,21 @@ switch dataPreset
         end
         cfg = as_loadConfig();
         ts = cfg.epochLen;                 % sampling period [s]        
-        
+    
+    case 'emg_states'
+        for isession = 1 : nsessions
+            filename = fullfile(basepaths{isession},...
+                [basenames{isession}, '.sleep_sig.mat']);
+            load(filename, 'emg_rms');
+            v(isession).data = emg_rms;
+
+            filename = fullfile(basepaths{isession},...
+                [basenames{isession}, '.sleep_states.mat']);
+            load(filename, 'ss')
+        end
+        cfg = as_loadConfig();
+        ts = cfg.epochLen;                 % sampling period [s]
+
     case 'sr'
         for isession = 1 : nsessions
             v(isession).data = v(isession).sr.strd;
@@ -145,7 +159,7 @@ switch dataPreset
         nunits = [];
         for isession = 1 : nsessions
             datasz(isession, :) = size(v(isession).fr.strd);
-            units = v(isession).units.idx;
+            units = v(isession).units.clean;
             nunits(isession, :) = [sum(units(1, :)), sum(units(2, :))];
             v(isession).rs = v(isession).fr.strd(units(1, :), :);
             v(isession).fs = v(isession).fr.strd(units(2, :), :);
@@ -222,15 +236,14 @@ tStartLabel = datetime(expStart.Year, expStart.Month, expStart.Day,...
     zt0.Hour, zt0.Minute, zt0.Second);
 tidxLabels = string(datestr(datenum(tStartLabel : hours(xTicksBinsize) : expEnd),...
     'HH:MM', 2000));
+
 % add date to x labels once a day
 tidxLabels(1 : 24 / xTicksBinsize : end) =...
     string(datestr(datenum(tStartLabel : hours(24) : expEnd),...
     'yymmdd', 2000));
+
 % data for x-axis
 xData = [1 : ts : ceil(seconds(expEnd - expStart))];
-
-% alternative for x labels
-% tidxLabels = string(-32 : xTicksBinsize : 130);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
@@ -272,7 +285,7 @@ if graphics
             end
             legend(lgd{2 : end}, 'location', 'best')
 
-        case 'sleep_emg'            
+        case 'emg_rms'            
             % plot
             expData = movmean(expData, 33, 1);
             plot(xData, expData);

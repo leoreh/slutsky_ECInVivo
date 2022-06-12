@@ -1,125 +1,54 @@
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% data base
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% aCSF
-basepaths = [
-    {'F:\Data\lh93\lh93_210811_102035'},...
-    {'F:\Data\lh95\lh95_210824_083300'},...
-    {'F:\Data\lh96\lh96_211201_070100'},...
-    {'F:\Data\lh99\lh99_211218_090630'},...
-    {'F:\Data\lh100\lh100_220405_100406'},...
-    {'F:\Data\lh107\lh107_220509_095738'},...
-    ];
-%     {'F:\Data\Processed\lh96\lh96_211124_073800'},...
-%     {'F:\Data\lh93\lh93_210811_102035'},...
-%     {'F:\Data\lh99\lh99_211218_090630'},...
-
-% local ket
-basepaths = [
-    {'F:\Data\lh93\lh93_210813_110609'},...
-    {'F:\Data\lh95\lh95_210825_080400'},...
-    {'F:\Data\lh96\lh96_211204_084200'},...
-    {'F:\Data\lh100\lh100_220403_100052'},...
-    {'F:\Data\lh107\lh107_220501_102641'},...
-    ];
-% {'F:\Data\lh99\lh99_220119_090035'},...
-%     {'F:\Data\lh96\lh96_211126_072000'},...
-%     {'F:\Data\lh96\lh96_211202_070500'},...
-
-% ip ket 10 mg/kg
-basepaths = [
-    {'F:\Data\lh96\lh96_211206_070400'},...
-    {'F:\Data\lh98\lh98_211224_084528'},...
-    {'F:\Data\lh106\lh106_220512_102302'},...
-    {'F:\Data\lh107\lh107_220512_102302'},...
-    ];
-% lh99_211224_084528
-% F:\Data\lh81\lh81_210204_190000   inj 0zt
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% reanalyze something
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% load vars from each session
-forceL = true;
-varsFile = ["fr"; "fr_bins"; "spikes"; "datInfo"; "session"; "units"];
-varsName = ["fr"; "frBins"; "spikes"; "datInfo"; "session"; "units"];
-vload = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
-    'varsName', varsName);
-nsessions = length(basepaths);
-
-cell_metrics = CellExplorer('basepaths', basepaths);
-
-% itterate
-for isession = 1 : nsessions
-    basepath = basepaths{isession};
-    cd(basepath)
-    [mousename, basename] = fileparts(basepath);
-    [~, mousename] = fileparts(mousename);
-
-    % number of units per spike group
-    plot_nunits_session('basepath', basepath, 'frBoundries', [])
-
-    % select specific units
-    units = selectUnits('basepath', basepath, 'grp', [2 : 7], 'saveVar', true,...
-        'forceA', true, 'frBoundries', [0 Inf; 0 Inf],...
-        'spikes', vload(isession).spikes);
-    units = vload(isession).units;
-    unitsClean = units.idx & units.gini' & units.stable' & units.mfrBL' &...
-        units.su' & units.cnt';
-    
-  
-end
 
 % params
 cfg = as_loadConfig();
 nstates = cfg.nstates;
-unitChar = {'RS', 'FS'};
-unitClr = {'b', 'r'};
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% concate sessions
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% load vars from each session
-varsFile = ["session"; "units"; "fr_bins"; "fr"; "sleep_states"];
-varsName = ["session"; "units"; "frBins"; "fr"; "ss"];
-v = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
-    'varsName', varsName);
-nsessions = length(basepaths);
-
-% select states
 sstates = [1, 4];
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% per session spec vs. time
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+isession = 2;
+[expData, xData] = sessions_catVarTime('mname', '',...
+    'dataPreset', {'fr', 'sleep_emg', 'spec', 'bands'}, 'graphics', true,...
+    'basepaths', basepaths(isession), 'xTicksBinsize', 3,...
+    'markRecTrans', true);
+
+% spec
+spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true, 'saveVar', false,...
+    'padfft', -1, 'winstep', 5, 'logfreq', false, 'ftarget', [],...
+    'ch', v(isession).spec.info.ch, 'force', true);
+plot_spec(spec, 'ch', 1, 'logfreq', false, 'saveFig', false,...
+    'axh', [])
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% graphics - psd in states according to timebins
+% psd in states according to timebins
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % analyze
 for isession = 1 : nsessions
-    cd(basepaths{isession});
+    basepath = basepaths{isession};
+    cd(basepath)
+    
+    % arrange timebins
     session = v(isession).session;
-    [timebins, timepnt] = metaInfo_timebins('reqPnt', 5.5 * 60 * 60,...
-        'nbins', 8);
+    timebins = session.general.timebins;
+    timepnt = session.general.timepnt;
+%     timebins = [1, timepnt; 
+%         timepnt, timepnt + 2 * 3600;
+%         timepnt + 2 * 3600, timepnt + 4 * 3600;
+%         timepnt + 4 * 3600, timepnt + 6 * 3600];
+
     psdBins = psd_states_timebins('basepath', pwd,...
         'chEeg', [], 'forceA', true, 'graphics', true,...
-        'timebins', timebins, 'saveVar', true, 'sstates', [1, 4, 5]);
+        'timebins', timebins, 'saveVar', false, 'sstates', [1, 4]);
 end
 
-% load
-varsFile = ["psdBins"; "session"];
-varsName = ["psdBins"; "session"];
-v = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
-    'varsName', varsName);
-
 % 2prism
-freq = psdBins.info.freq;
+freq = v(1).psdBins.info.freq;
 ibin = 2;
-istate = 3;
+istate = 1;
 psdState = nan(length(freq), nsessions);
 for isession = 1 : nsessions
     psdtmp = squeeze(v(isession).psdBins.psdLfp(ibin, istate, :));
@@ -127,7 +56,55 @@ for isession = 1 : nsessions
     psdState(:, isession) = psdtmp;
 end
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% psd regardless of states
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% analyze
+faxis = [0.5 : 0.5 : 120];
+clear psd
+for isession = 1 : nsessions
+    basepath = basepaths{isession};
+    [~, basename] = fileparts(basepath);
+    cd(basepath)
+    
+    % arrange winCalc
+    session = v(isession).session;
+    timebins = session.general.timebins;   
+    timepnt = session.general.timepnt;
+
+    timebins = [timepnt, timepnt + 20 * 60];
+    
+    % load data and calc psd
+    ch = v(isession).ss.info.sSig.eegCh;
+    for ibin = 1 : size(timebins, 1)
+        sig = double(bz_LoadBinary([basename, '.lfp'],...
+            'duration', diff(timebins(ibin, :)) + 1,...
+            'frequency', 1250, 'nchannels', session.extracellular.nChannels,...
+            'start', timebins(ibin, 1), 'channels', ch, 'downsample', 1));
+        sig = mean(sig, 2);
+
+        psd(isession, ibin, :) = psd_timebins('sig', sig, 'winCalc', [],...
+            'fs', 1250, 'graphics', false, 'faxis', faxis);          
+    end
+end
+
+ibin = 1;
+prism_data = squeeze(psd(:, ibin, :))';
+for isession = 1 : nsessions
+    prism_data(:, isession) = prism_data(:, isession) / sum(prism_data(:, isession), 1);
+end
+
+fh = figure;
+plot(faxis, squeeze(mean(psd(:, ibin, :), 1)))
+set(gca, 'XScale', 'log')
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % time in states
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 nbins = 4;
 sstates = [1, 4];
 totDur = nan(nbins, length(sstates), nsessions);
@@ -159,41 +136,3 @@ set(ax.YAxis, 'color', cfg.colors{sstates(istate)})
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % to prism
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% firing rate vs. time across all units, aligned to point of injection
-units = catfields([v.units], 'catdef', 'long', 'force', false);
-unitsClean = units.idx & units.gini' & units.stable' & units.mfrBL' &...
-    units.su' & units.cnt';
-
-% firing rate vs. time across all units, aligned to point of injection. can
-% extract strd or normalized data
-[frMat, timeIdx] = alignFR2pnt('basepaths', basepaths, 'dataType', 'strd');
-
-% grab fr
-unitNo = 1;
-prism_data = frMat(unitsClean(unitNo, :), :)';
-prism_tstamps = [1 : length(frMat)]' / 60;
-prism_injTime = max(timeIdx) / 60;
-
-% list of units per session
-prism_rs = []; prism_fs = [];
-for isession = 1 : nsessions
-    units = v(isession).units;
-    unitsClean = units.idx & units.gini' & units.stable' & units.mfrBL' &...
-    units.su' & units.cnt';
-    prism_rs = [prism_rs; ones(sum(unitsClean(1, :)), 1) * isession];
-    prism_fs = [prism_fs; ones(sum(unitsClean(2, :)), 1) * isession];
-end
-
-% select units based on mfr
-fr = catfields([v.fr], 'catdef', 'long', 'force', false);
-units_mfr = fr.mfr < 3;
-unitsClean = unitsClean & units_mfr';
-
-% single session
-dataType = 'norm';
-data = fr.(dataType)(units.idx(unitNo, :), :)';
-data(~isfinite(data)) = nan;
-excludeIdx = ~units.gini' | ~units.mfrBL';
-prismIdx = excludeIdx(units.idx(unitNo, :));
-tstamps = fr.tstamps / 60 / 60;

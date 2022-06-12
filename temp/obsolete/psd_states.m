@@ -112,6 +112,7 @@ end
 if graphics
     xLimit = [0 faxis(end)];
     fh = figure;
+    
     % raw psd
     sb1 = subplot(1, 2, 1);
     ph = plot(faxis, psdStates, 'LineWidth', 3);

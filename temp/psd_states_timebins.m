@@ -66,7 +66,7 @@ graphics        = p.Results.graphics;
 % file
 cd(basepath)
 [~, basename] = fileparts(basepath);
-psdfile = fullfile(basepath, [basename, '.psdBins.mat']);
+psdfile = fullfile(basepath, [basename, '.psd_bins.mat']);
 
 % load session vars
 varsFile = ["sleep_states"; "datInfo"; "session"];
@@ -86,6 +86,8 @@ if isempty(nchansEeg)
 end
 chLfp = v.ss.info.sSig.eegCh;
 
+% timebins
+% timebins(isinf(timebins)) = floor(v.session.general.duration);
 nbins = size(timebins, 1);
 
 if isempty(tbins_txt) && nbins == 4
@@ -115,9 +117,11 @@ if exist(psdfile, 'file') && ~forceA
     load(psdfile)
 else
     for iwin = 1 : nbins
-        
+                        
+        % get state epochs
         labels = v.ss.labels(timebins(iwin, 1) : timebins(iwin, 2));
-        
+        [stateEpochs, epStats(iwin)] = as_epochs('labels', labels);
+
         % ---------------------------------------------------------------------
         % hippocampal lfp
         sig = double(bz_LoadBinary([basename, '.lfp'],...
@@ -125,10 +129,9 @@ else
             'frequency', fsLfp, 'nchannels', nchans, 'start', timebins(iwin, 1),...
             'channels', chLfp, 'downsample', 1));
         sig = mean(sig, 2);
-        
-        [psdLfp(iwin, :, :), ~, epStats(iwin)] = psd_states('sig', sig,...
-            'labels', labels, 'fs', fsLfp, 'faxis', faxis,...
-            'graphics', false, 'sstates', sstates);
+
+        psdLfp(iwin, :, :) = psd_timebins('sig', sig, 'winCalc', stateEpochs(sstates),...
+            'fs', fsLfp, 'faxis', faxis, 'graphics', false);  
         
         % ---------------------------------------------------------------------
         % frontal eeg
@@ -138,17 +141,19 @@ else
                     'duration', diff(timebins(iwin, :)) + 1,...
                     'frequency', fsEeg, 'nchannels', 2, 'start', timebins(iwin, 1),...
                     'channels', chEeg, 'downsample', 1));
-                sig = [iosr.dsp.sincFilter(sig, filtRatio)]';
-                sig = sig(fsRatio : fsRatio : length(sig));
+                if fsEeg ~= fsLfp
+                    sig = [iosr.dsp.sincFilter(sig, filtRatio)]';
+                    sig = sig(fsRatio : fsRatio : length(sig));
+                end
             else
                 sig = double(bz_LoadBinary([basename, '.lfp'],...
                     'duration', diff(timebins(iwin, :)) + 1,...
                     'frequency', fsLfp, 'nchannels', nchansEeg, 'start', timebins(iwin, 1),...
                     'channels', chEeg, 'downsample', 1));
             end
-            [psdEeg(iwin, :, :), ~, epStats(iwin)] = psd_states('sig', sig,...
-                'labels', labels, 'fs', fsLfp, 'faxis', faxis,...
-                'graphics', false, 'sstates', sstates);
+            psdEeg(iwin, :, :) = psd_timebins('sig', sig, 'winCalc', stateEpochs(sstates),...
+                'fs', fsLfp, 'faxis', faxis, 'graphics', false);
+
         end
         
     end

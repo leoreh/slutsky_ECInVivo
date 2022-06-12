@@ -107,7 +107,8 @@ if ~all(isfield(spikes, {'shankID', 'cluID', 'times'}))
 end
 
 % params
-ngrp = length(unique(spikes.shankID));  % only tetrodes with units
+grps = unique(spikes.shankID);
+ngrp = length(grps);  % only tetrodes with units
 nunits = length(spikes.times);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -159,25 +160,28 @@ else
     sprintf('\ncalculating separation matrices\n\n');
         
     % go over each spike group, clean and calc separation
+    cnt = 1;
     for igrp = 1 : ngrp
         
+        grpid = grps(igrp);
+
         % load data
-        fet = loadNS('datatype', 'fet', 'session', session, 'grpid', igrp);
-        clu = loadNS('datatype', 'clu', 'session', session, 'grpid', igrp);
+        fet = loadNS('datatype', 'fet', 'session', session, 'grpid', grpid);
+        clu = loadNS('datatype', 'clu', 'session', session, 'grpid', grpid);
 
         % find noise and artifact spikes
         rmidx = find(clu <= 1);
-        nonClusteredSpks(igrp) = length(rmidx);
-        totSpks(igrp) = length(clu);
+        nonClusteredSpks(cnt) = length(rmidx);
+        totSpks(cnt) = length(clu);
 
         % find predetermined mu spikes (mu numbering given by spikes.UID)
-        rmclu = spikes.cluID(mu(spikes.shankID(mu) == igrp));
+        rmclu = spikes.cluID(mu(spikes.shankID(mu) == grpid));
         if ~isempty(rmclu)
             rmidx = unique([rmidx; find(clu == rmclu)]);
         end
         
         uclu = unique(clu);
-        nfet = npca * length(spkgrp{igrp});        
+        nfet = npca * length(spkgrp{grpid});        
         fetDist = [fet, clu];
         fetDist(rmidx, :) = [];
         k = 1;
@@ -186,10 +190,11 @@ else
             if cluid == 0 || cluid == 1
                 continue
             end
-            [lRat{igrp}(k, 1), iDist{igrp}(k, 1), ~] =...
+            [lRat{cnt}(k, 1), iDist{cnt}(k, 1), ~] =...
                 cluDist(fetDist(:, 1 : nfet), find((fetDist(:, end) == cluid)));
             k = k + 1;
-        end    
+        end
+        cnt = cnt + 1;
     end
     
     % concatenate cell

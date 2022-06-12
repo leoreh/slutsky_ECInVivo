@@ -111,8 +111,11 @@ end
 
 % prep frequencies
 if isempty(ftarget)
-    ftarget = logspace(log10(0.5), 2, 200);
-    logfreq = true;
+    if logfreq
+        ftarget = logspace(log10(0.5), 2, 200);
+    else
+        ftarget = linspace(0.5, 100, 200);
+    end
 end
 frange = [ftarget(1), ftarget(end)];
 if frange(2) > fs / 2
@@ -236,8 +239,8 @@ end
 if graphics
     % manual selections
     ch = 1;
-    dataType = 'raw';   % can be raw / norm
-
+    dataType = 'none';   % can be raw / norm / none
+    
     clear axh
     fh = figure;
     th = tiledlayout(2, 1, 'TileSpacing', 'Compact');
@@ -246,15 +249,12 @@ if graphics
         'axh', axh)
 
     axh(2) = nexttile;
-
     for iband = 1 : length(spec.bands.bandFreqs)
         lgd{iband} = sprintf('%s [%d-%d Hz]',...
             spec.bands.bandNames{iband}, floor(spec.bands.bandFreqs(iband, 1)),...
             spec.bands.bandFreqs(iband, 2));
     end
-
     yval = movmean(squeeze(spec.bands.db(:, :, ch)), 100,  2);
-
     switch dataType
         case 'raw'
             plot(spec.tstamps / 60 / 60,...
@@ -264,6 +264,8 @@ if graphics
             plot(spec.tstamps / 60 / 60,...
                 yval(2 : end, :) ./ yval(1, :), 'LineWidth', 2)
             ylabel('Norm. Spectral Power [dB]')
+        case 'none'
+            return
     end
     legend(lgd{2 : end})
     xlabel('Time [hr]')

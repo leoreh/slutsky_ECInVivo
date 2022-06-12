@@ -83,9 +83,9 @@ nunits = length(fr.mfr);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % su vs mu
-su = ones(nunits, 1);    % override
+units.su = ones(nunits, 1);    % override
 if isfield(spikes, 'su')
-    su = spikes.su';
+    units.su = spikes.su';
 end
 
 % tetrode
@@ -97,42 +97,40 @@ else
         grpidx = grpidx | spikes.shankID == grp(igrp);
     end
 end
+units.grp = grpidx;
 
 % cell class
-rs = strcmp(cm.putativeCellType, 'Pyramidal Cell');
-wide = strcmp(cm.putativeCellType, 'Wide Interneuron');
-fs = strcmp(cm.putativeCellType, 'Narrow Interneuron');
+units.rs = strcmp(cm.putativeCellType, 'Pyramidal Cell');
+units.wide = strcmp(cm.putativeCellType, 'Wide Interneuron');
+units.fs = strcmp(cm.putativeCellType, 'Narrow Interneuron');
 
 % fr in boundries during baseline
 if isempty(frBoundries)
     frBoundries = [0 Inf; 0 Inf];
 end
-mfrRS = rs' & fr.mfr > frBoundries(1, 1) & fr.mfr < frBoundries(1, 2);
-mfrFS = fs' & fr.mfr > frBoundries(2, 1) & fr.mfr < frBoundries(2, 2);
+mfrRS = units.rs' & fr.mfr > frBoundries(1, 1) & fr.mfr < frBoundries(1, 2);
+mfrFS = units.fs' & fr.mfr > frBoundries(2, 1) & fr.mfr < frBoundries(2, 2);
+units.mfrBL = mfrRS | mfrFS;
 
 % fr continuous during baseline and throughout recording
 bl_idx = fr.tstamps > fr.info.winBL(1) & fr.tstamps < fr.info.winBL(2);
 cnt_bl = sum(fr.strd(:, bl_idx) > 0, 2) / sum(bl_idx) > 0.5;
 cnt_all = sum(fr.strd > 0, 2) / size(fr.strd, 2) > 0.5;
+units.cnt = cnt_bl & cnt_all;
 
 % fr "stable" during baseline
-fr.stable = fr.mfr_std < fr.mfr;
+units.stable = fr.mfr_std < fr.mfr;
+
+% fr gini coeff
+units.gini = fr.gini_unit <= 0.5 | isnan(fr.gini_unit);
 
 % combine
-unitsidx(1, :) = rs & su' & grpidx;
-unitsidx(2, :) = fs & su' & grpidx;
+units.clean(1, :) = logical(units.rs & units.su' & units.grp &...
+    units.gini' & units.stable' & units.mfrBL' & units.cnt');
+units.clean(2, :) = logical(units.fs & units.su' & units.grp &...
+    units.gini' & units.stable' & units.mfrBL' & units.cnt');
 
-% arrange struct
-units.idx = logical(unitsidx);
-units.mfrBL = mfrRS | mfrFS;
-units.cnt = cnt_bl & cnt_all;
-units.stable = fr.stable;
-units.gini = fr.gini_unit <= 0.5 | isnan(fr.gini_unit);
-units.grp = grpidx;
-units.rs = rs;
-units.fs = fs;
-units.wide = wide;
-units.su = su;
+% info
 units.info.frBoundries = frBoundries;
 units.info.grp = grp;
 

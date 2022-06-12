@@ -1,20 +1,19 @@
 function [psdBins, faxis] = psd_timebins(varargin)
 
 % calculates the psd of a signal with the pwelch method in specific time
-% bins by averaging. assumes winCalc is in seconds and thus needs fs to
-% index sig. 
+% bins by averaging. 
 %
 % INPUT:
 %   sig             numeric. eeg data (1 x n)
 %   fs              numeric. sampling frequency {1250} of the signals.
-%   faxis           numeric. frequencies of psd estimate {[0.2 : 0.2 : 120]}
+%   faxis           numeric. frequencies of psd estimate {[0.5 : 0.2 : 100]}
 %   winCalc         cell of n x 2 mats. the psd will be calculated for each
 %                   cell separately according to the time windows specified
-%                   in each cell. 
+%                   in each cell [sec]
 %   graphics        logical. plot figure {true}
 % 
 % OUTPUT
-%   psdStates       raw averaged psd for each state (mat nstates x faxis)
+%   psdBins         raw averaged psd for each state (mat nstates x faxis)
 %   faxis           frequencies of psd estimate 
 %
 % DEPENDENCIES
@@ -32,7 +31,7 @@ function [psdBins, faxis] = psd_timebins(varargin)
 p = inputParser;
 addOptional(p, 'sig', [], @isnumeric);
 addOptional(p, 'fs', 1250, @isnumeric);
-addOptional(p, 'faxis', [0.2 : 0.2 : 120], @isnumeric);
+addOptional(p, 'faxis', [], @isnumeric);
 addOptional(p, 'winCalc', []);
 addOptional(p, 'graphics', true, @islogical);
 
@@ -43,19 +42,23 @@ faxis           = p.Results.faxis;
 winCalc         = p.Results.winCalc;
 graphics        = p.Results.graphics;
 
+if isempty(faxis)
+    faxis = [0.5 : 0.2 : 100];
+end
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preparations
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % assert time bins
+if isempty(winCalc)
+    winCalc = {[0 Inf]};
+end
 if ~iscell(winCalc)
     if size(winCalc, 2) ~= 2
         error('check the input winCalc')
     end
     winCalc = {winCalc};
-end
-if isempty(winCalc)
-    winCalc = {[0 Inf]};
 end
 
 maxsec = floor(length(sig) / fs);
@@ -64,7 +67,7 @@ if winCalc{end}(end) > maxsec
 end
 
 nwin = size(winCalc, 2);
-nbins = cellfun(@(x) size(winCalc, 1), winCalc, 'uni', true);
+nbins = cellfun(@(x) size(x, 1), winCalc, 'uni', true);
 for iwin = 1 : nwin
     if nbins(iwin) < 1
         fprintf('\nWARNING: some timebins are empty\n')
@@ -73,9 +76,6 @@ for iwin = 1 : nwin
 end
 
 % fft params
-if isempty(faxis)
-    faxis = [0.2 : 0.2 : 120];       
-end
 win = hann(2 ^ (nextpow2(2 * fs) - 1));
 noverlap = floor(0.25 * fs);
 % frequencies for psd estimate. note that both the slowest frequency and
@@ -133,3 +133,7 @@ if graphics
     ylabel('norm PSD')
     set(gca, 'YScale', 'log')
 end
+
+end
+
+% EOF
