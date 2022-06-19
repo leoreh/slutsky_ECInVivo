@@ -12,6 +12,8 @@ function plot_spec(spec, varargin)
 %   logfreq     logical. plot y-axis on log (true) or linear {false} scale
 %   saveFig     logical / char. if char will be treated as the filepath for
 %               saving the figure
+%   xtime       numeric. factor by which to divide tstamps for x-axis.
+%               e.g., 3600 will plot spec in hours
 %   axh         axis handle for plot. if empty will create new figure
 %
 % 29 mar 22 LH      
@@ -25,6 +27,7 @@ addParameter(p, 'basepath', pwd, @ischar)
 addParameter(p, 'ch', 1, @isnumeric)
 addParameter(p, 'logfreq', false, @islogical)
 addParameter(p, 'saveFig', true, @islogical)
+addParameter(p, 'xtime', 3600, @isnumeric)
 addParameter(p, 'axh', [])
 
 parse(p, varargin{:})
@@ -32,7 +35,8 @@ basepath        = p.Results.basepath;
 ch              = p.Results.ch;
 logfreq         = p.Results.logfreq;
 saveFig         = p.Results.saveFig;
-axh              = p.Results.axh;
+xtime           = p.Results.xtime;
+axh             = p.Results.axh;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
@@ -47,9 +51,9 @@ end
 winstep = spec.info.winstep;
 freq = spec.freq;
 
-% time axis in hours
+% time axis
 nbins = length(spec.tstamps);
-tspec = ((1 : nbins) * winstep - winstep / 2) / 3600;
+tspec = ((1 : nbins) * winstep - winstep / 2) / xtime;
 
 % take a sample of the spectrogram to help initialize the colormap
 sampleBins = randperm(nbins, round(nbins / 5));

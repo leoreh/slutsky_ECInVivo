@@ -1,79 +1,77 @@
-function plotWaveform(varargin)
+ function plot_wv(varargin)
 
 % plots mean +- std waveform of all channels horizontal (concatenated) or
 % vertical
 %
 % INPUT
-%   avgwv       average waveform [nchans x nsamps] 
-%   stdwv       std of waveform [nchams x nsamps]
-%   c           color of plot
+%   wv          average waveform [nchans x nsamps] 
+%   wv_std      std of waveform [nchams x nsamps]
+%   clr         color of plot
 %   orient      channels horizontal {horz} or vertical (vert)
 %   sbar        plot scale bar {1} or not (0)
 %   fs          sampling rate
 %
-% SEE ALSO
-%   plotCluster.m
-% 
-% 04 dec 18 LH. updates:
-% 22 jan 19 LH  horizontal plot
-% 08 may 19 LH  offset according to trace
-% 06 oct 19 LH  offset according to known value
+% 04 dec 18 LH  updates:
+% 22 jan 19     horizontal plot
+% 08 may 19     offset according to trace
+% 06 oct 19     offset according to known value
+% 18 jun 22     clean up
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 p = inputParser;
-addOptional(p, 'avgwv', []);
-addOptional(p, 'stdwv', []);
-addOptional(p, 'c', 'k', @ischar);
+addOptional(p, 'wv', []);
+addOptional(p, 'wv_std', []);
+addOptional(p, 'clr', 'k', @ischar);
 addOptional(p, 'orient', 'horz', @ischar);
 addOptional(p, 'fs', 24414.06, @isnumeric);
 addOptional(p, 'sbar', true, @islogical);
 
 parse(p,varargin{:})
-avgwv   = p.Results.avgwv;
-stdwv   = p.Results.stdwv;
-c       = p.Results.c;
-orient  = p.Results.orient;
-fs      = p.Results.fs;
-sbar    = p.Results.sbar;
+wv          = p.Results.wv;
+wv_std      = p.Results.wv_std;
+clr         = p.Results.clr;
+orient      = p.Results.orient;
+fs          = p.Results.fs;
+sbar        = p.Results.sbar;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % plot
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-[nchans, nsamps] = size(avgwv);
+[nchans, nsamps] = size(wv);
 j = 1;
 if strcmp(orient, 'horz')
-        avgwv = [avgwv, NaN(nchans, nsamps / 4)];
-        avgwv = reshape(avgwv', [], 1);
-        if ~isempty(stdwv)
-            stdwv = [stdwv, zeros(nchans, nsamps / 4)];
-            stdwv = reshape(stdwv', [], 1);
-            errbounds = [avgwv + stdwv, avgwv - stdwv];
+        wv = [wv, NaN(nchans, nsamps / 4)];
+        wv = reshape(wv', [], 1);
+        if ~isempty(wv_std)
+            wv_std = [wv_std, zeros(nchans, nsamps / 4)];
+            wv_std = reshape(wv_std', [], 1);
+            errbounds = [wv + wv_std, wv - wv_std];
             errbounds(isnan(errbounds)) = 0;
             p = patch([1 : length(errbounds), length(errbounds) : -1 : 1],...
-                [errbounds(:, 1); errbounds(end : -1 : 1, 2)]', c);
+                [errbounds(:, 1); errbounds(end : -1 : 1, 2)]', clr);
             p.EdgeColor = 'none';
             p.FaceAlpha = 0.3;
         end
         hold on
-        l = plot(avgwv, 'lineWidth', 2, 'Color', c);
+        l = plot(wv, 'lineWidth', 2, 'Color', clr);
 %         ylim([-200 200])
 else
     for j = 1 : nchans
-        % offset = j * (max(avgwv(j, :)) - min(avgwv(j, :)));
+        % offset = j * (max(wv(j, :)) - min(wv(j, :)));
         offset = 500 * (j - 1);
-        if ~isempty(stdwv)
-            errbounds = [avgwv(j, :) + stdwv(j, :);...
-                avgwv(j, :) - stdwv(j, :)];
+        if ~isempty(wv_std)
+            errbounds = [wv(j, :) + wv_std(j, :);...
+                wv(j, :) - wv_std(j, :)];
             p = patch([1 : nsamps, nsamps : -1 : 1],...
-                [errbounds(1, :), errbounds(2, end : -1 : 1)], c);
+                [errbounds(1, :), errbounds(2, end : -1 : 1)], clr);
             p.EdgeColor = 'none';
             p.FaceAlpha = 0.3;
             set(p, 'YData', get(p, 'YData') - offset);
         end
         hold on
-        l = plot(avgwv(j, :), 'lineWidth', 1, 'Color', c);
+        l = plot(wv(j, :), 'lineWidth', 1, 'Color', clr);
         set(l, 'YData', get(l, 'YData') - offset);
     end
 end

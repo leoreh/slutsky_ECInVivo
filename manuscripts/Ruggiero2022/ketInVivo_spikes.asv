@@ -5,7 +5,7 @@
 % reanalyze something
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-cell_metrics = CellExplorer('basepaths', basepaths);
+cell_metrics = CellExplorer('basepath', basepath);
 
 % itterate
 for isession = 1 : nsessions
@@ -220,7 +220,7 @@ end
 
 % params
 tbins = [1, 2, 6];
-iunit = 2;
+iunit = 1;
 
 % mean of all units
 chg_raw = [];
@@ -296,8 +296,6 @@ prism_data = frMat(units.(unitChar), :)';
 prism_injTime = max(timeIdx) / 60;
 prism_tstamps = [1 : length(frMat)]' / 60 - prism_injTime;
 
-% mfr during basaeline
-mean(mean(prism_data(prism_tstamps < 0, prism_units > 0), 1, 'omitnan'))
 
 
 % params

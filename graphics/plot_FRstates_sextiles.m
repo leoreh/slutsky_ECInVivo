@@ -40,7 +40,7 @@ saveFig     = p.Results.saveFig;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % calculate state ratio
-stateRat = [(stateMfr(2, :) - stateMfr(1, :)) ./ (sum(stateMfr))]' * 100;
+stateRat = [(stateMfr(2, :) - stateMfr(1, :)) ./ (sum(stateMfr))]';
 
 % organize units
 if isempty(units)
@@ -70,7 +70,7 @@ setMatlabGraphics(false)
 eqLine = 10 .^ [floor(log10(min(stateMfr(stateMfr(:) ~= 0)))),...
     ceil(log10(max(stateMfr(:))))];
 yLimit = [-max(abs(stateRat(unitsAny))), max(abs(stateRat(unitsAny)))];
-yLimit = [-100, 100];
+yLimit = [-1, 1];
 
 fh = figure;
 for iunit = 1 : size(units, 1)

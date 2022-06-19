@@ -15,7 +15,7 @@ function [expData, xData] = sessions_catVarTime(varargin)
 %                   between recordings
 %   dataPreset      string or cell of string depicting the variable to cat. 
 %                   can be any combination of 'sr', 'spec', 'fr', 'ripp',
-%                   'sleep_emg' or 'bands'
+%                   'emg_rms', 'bands', or 'hypnogram'
 %   axh             handle to plot axis      
 % 
 % EXAMPLE
@@ -60,7 +60,7 @@ zt0 = guessDateTime('0900');    % lights on at 09:00 AM
 % run recursively through the function if several data vars are requested
 if iscell(dataPreset)
     fh = figure;
-    th = tiledlayout(length(dataPreset), 1, 'TileSpacing', 'Compact');
+    th = tiledlayout(length(dataPreset), 1, 'TileSpacing', 'none');
     for idata = 1 : length(dataPreset)
         sb(idata) = nexttile;
         [expData{idata}, xData{idata}] = sessions_catVarTime('mname', mname,...
@@ -122,6 +122,15 @@ switch dataPreset
             v(isession).data = yval(2 : end, :);
         end
         ts = spec.info.winstep;     % sampling period [s]
+    
+    case 'hypnogram'
+        for isession = 1 : nsessions
+            filename = fullfile(basepaths{isession},...
+                [basenames{isession}, '.sleep_states.mat']);
+            load(filename, 'ss');
+            v(isession).data = ss.labels';
+        end
+        ts = ss.info.epochLen;      % sampling period [s]
 
     case 'emg_rms'
         for isession = 1 : nsessions
@@ -131,22 +140,8 @@ switch dataPreset
             v(isession).data = emg_rms;
         end
         cfg = as_loadConfig();
-        ts = cfg.epochLen;                 % sampling period [s]        
+        ts = cfg.epochLen;                  % sampling period [s]        
     
-    case 'emg_states'
-        for isession = 1 : nsessions
-            filename = fullfile(basepaths{isession},...
-                [basenames{isession}, '.sleep_sig.mat']);
-            load(filename, 'emg_rms');
-            v(isession).data = emg_rms;
-
-            filename = fullfile(basepaths{isession},...
-                [basenames{isession}, '.sleep_states.mat']);
-            load(filename, 'ss')
-        end
-        cfg = as_loadConfig();
-        ts = cfg.epochLen;                 % sampling period [s]
-
     case 'sr'
         for isession = 1 : nsessions
             v(isession).data = v(isession).sr.strd;
@@ -284,13 +279,15 @@ if graphics
                     spec.bands.bandFreqs(iband, 2));
             end
             legend(lgd{2 : end}, 'location', 'best')
+        
+        case 'hypnogram'
+            plot_hypnogram('labels', expData, 'axh', axh)
+            pbaspect([30, 1, 1])
 
         case 'emg_rms'            
             % plot
             expData = movmean(expData, 33, 1);
             plot(xData, expData);
-            colormap(AccuSleep_colormap());
-            axis('xy')
             ylabel('Norm. EMG')
             
         case 'sr'

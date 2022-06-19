@@ -114,8 +114,8 @@ units.mfrBL = mfrRS | mfrFS;
 
 % fr continuous during baseline and throughout recording
 bl_idx = fr.tstamps > fr.info.winBL(1) & fr.tstamps < fr.info.winBL(2);
-cnt_bl = sum(fr.strd(:, bl_idx) > 0, 2) / sum(bl_idx) > 0.5;
-cnt_all = sum(fr.strd > 0, 2) / size(fr.strd, 2) > 0.5;
+cnt_bl = sum(fr.strd(:, bl_idx) > frBoundries(1, 1), 2) / sum(bl_idx) > 0.5;
+cnt_all = sum(fr.strd > frBoundries(1, 1), 2) / size(fr.strd, 2) > 0.5;
 units.cnt = cnt_bl & cnt_all;
 
 % fr "stable" during baseline

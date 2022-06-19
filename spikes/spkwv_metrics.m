@@ -1,4 +1,4 @@
-function swv = spkwvMetrics(varargin)
+function swv = spkwv_metrics(varargin)
 
 % calculates various waveform parameters typically used to separate RS and
 % FS cells

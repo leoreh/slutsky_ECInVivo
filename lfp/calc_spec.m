@@ -203,9 +203,8 @@ powdb = 10 * log10(s);
 
 % calc power in band. db is a 3d array of freqBand x time x channel
 for iband = 1 : length(bandFreqs)
-    [~, bandIdx(1)] = min(abs(freq - bandFreqs(iband, 1)));
-    [~, bandIdx(2)] = min(abs(freq - bandFreqs(iband, 2)));
-    spec.bands.db(iband, :, :) = squeeze(sum(powdb(:, bandIdx(1) : bandIdx(2), :), 2));
+    bandIdx = InIntervals(freq, bandFreqs(iband, :));
+    spec.bands.db(iband, :, :) = squeeze(sum(powdb(:, bandIdx, :), 2));
 end
 spec.bands.bandNames = bandNames;
 spec.bands.bandFreqs = bandFreqs;
@@ -239,7 +238,7 @@ end
 if graphics
     % manual selections
     ch = 1;
-    dataType = 'none';   % can be raw / norm / none
+    dataType = 'raw';   % can be raw / norm / none
     
     clear axh
     fh = figure;

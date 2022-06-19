@@ -102,7 +102,7 @@ filtRatio = 450 / (fsEeg / 2);
 fsRatio = (fsEeg / fsLfp);
 
 % state params
-faxis = 0.5 : 0.2 : 100;
+faxis = 0.5 : 0.5 : 120;
 
 % initialize
 psdLfp = nan(nbins, length(sstates), length(faxis));

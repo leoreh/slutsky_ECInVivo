@@ -47,7 +47,7 @@ cfg = as_loadConfig();
 nstates = cfg.nstates;
 
 if length(minDur) == 1
-    minDur = repamt(minDur, nstates, 1);
+    minDur = repmat(minDur, nstates, 1);
 elseif length(minDur) ~= nstates
     error('minDur length is different than the number of states')
 end

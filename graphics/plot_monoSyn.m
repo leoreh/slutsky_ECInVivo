@@ -118,32 +118,32 @@ sb8 = subplot(2, 4, 8);     % wv unit2
 
 % acg 1
 set(gcf, 'CurrentAxes', sb1)
-plotCc(cc100(:, 1, 1), cc100bins, clr(1), [], [], [])
+plot_ccg(cc100(:, 1, 1), cc100bins, clr(1), [], [], [])
 title(sprintf('Unit #%d (Presynaptic)', units(1)))
 
 % acg 2
 set(gcf, 'CurrentAxes', sb4)
-plotCc(cc100(:, 2, 2), cc100bins, clr(2), [], [], [])
+plot_ccg(cc100(:, 2, 2), cc100bins, clr(2), [], [], [])
 title(sprintf('Unit #%d (Postsynaptic)', units(2)))
 
 % cc50 counts
 set(gcf, 'CurrentAxes', sb2)
-plotCc(cc50(:, 1, 2), cc50bins, 'k', [],...
+plot_ccg(cc50(:, 1, 2), cc50bins, 'k', [],...
     roi_t_idx(exc_bins), roi_t_idx(inh_bins))
 
 % dccc
 set(gcf, 'CurrentAxes', sb3)
-plotCc(dccc, cc50bins, 'k', pred,...
+plot_ccg(dccc, cc50bins, 'k', pred,...
     roi_t_idx(exc_bins), roi_t_idx(inh_bins))
 title(sprintf('STG = %.4f', stg))
 
 % cc100 counts 
 set(gcf, 'CurrentAxes', sb6)
-plotCc(cc100(:, 1, 2), cc100bins, 'k', [], [], [])
+plot_ccg(cc100(:, 1, 2), cc100bins, 'k', [], [], [])
 
 % cc20 counts
 set(gcf, 'CurrentAxes', sb7)
-plotCc(cc20(:, 1, 2), cc20bins, 'k', [], [], [])
+plot_ccg(cc20(:, 1, 2), cc20bins, 'k', [], [], [])
 
 if ~isempty(wv)
     
@@ -182,43 +182,4 @@ end
 end
 
 % EOF
-
-% local functions ---------------------------------------------------------
-function plotCc(cc, ccbins, clr, pred, sigbins1, sigbins2)
-
-sigclr = ['br'];
-if isempty(clr)
-    clr = 'k';
-end
-
-bh = bar(ccbins, cc, 'BarWidth', 1);
-bh.FaceColor = clr;
-bh.FaceAlpha = 0.4;
-bh.EdgeColor = 'none';
-hold on
-
-% add significant bins
-if ~isempty(sigbins1)
-    bh = bar(ccbins(sigbins1), cc(sigbins1), 'BarWidth', 1);
-    bh.FaceColor = sigclr(1);
-    bh.FaceAlpha = 1;
-    bh.EdgeColor = 'none';
-end
-if ~isempty(sigbins2)
-    bh = bar(ccbins(sigbins1), cc(sigbins2), 'BarWidth', 1);
-    bh.FaceColor = sigclr(2);
-    bh.FaceAlpha = 1;
-    bh.EdgeColor = 'none';
-end
-if ~isempty(pred)
-    plot(ccbins, pred, '--k', 'LineWidth', 2)
-end
-
-plot([0, 0], ylim, '--k')
-ylabel('Counts')
-xlabel('Time [ms]')
-box off
-axis tight
-
-end
 

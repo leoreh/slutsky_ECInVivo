@@ -1,4 +1,4 @@
-function f = plotCCG(varargin)
+function f = plot_ccg_session(varargin)
 
 % plot cross correlogram. if vector than plots single ccg, if matrix [t x
 % ngroups x ngroups] than plots all pairs

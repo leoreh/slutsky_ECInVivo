@@ -135,7 +135,7 @@ if exist(asFile, 'file')
         mat1 = fr.states.fr{1};
         mat2 = fr.states.fr{istate};
         fr.states.gain(istate, :) = (mean(mat2, 2, 'omitnan') -...
-            mean(mat1, 2, 'omitnan')) ./ max([mat1, mat2], [], 2) * 100;
+            mean(mat1, 2, 'omitnan')) ./ max([mat1, mat2], [], 2);
     end
     
     % normalized ratio (mizuseki, cell rep., 2008). organized as a 3d mat

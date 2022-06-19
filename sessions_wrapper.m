@@ -4,7 +4,7 @@
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = 'lh107';
+mname = 'lh106';
 forceL = true;
 forceA = true;
 
@@ -50,17 +50,17 @@ for isession = 1 : nsessions
     spkgrp = session.extracellular.spikeGroups.channels;
 
     % add timebins to datInfo
-    nbins = 8;
-    reqPnt = 5.5 * 60 * 60;
-    [timebins, timepnt] = metaInfo_timebins('reqPnt', reqPnt,...
-        'nbins', nbins);
-    timebins = session.general.timebins;
-    bins = mat2cell(timebins, ones(size(timebins, 1), 1), 2);
+%     nbins = 8;
+%     reqPnt = 5.5 * 60 * 60;
+%     [timebins, timepnt] = metaInfo_timebins('reqPnt', reqPnt,...
+%         'nbins', nbins);
+%     timebins = session.general.timebins;
+%     bins = mat2cell(timebins, ones(size(timebins, 1), 1), 2);
 
     % calc psd in states
-    psdBins = psd_states_timebins('basepath', pwd,...
-        'chEeg', [], 'forceA', true, 'graphics', true,...
-        'timepoints', timebins, 'nbins', 8, 'saveVar', false);
+%     psdBins = psd_states_timebins('basepath', pwd,...
+%         'chEeg', [], 'forceA', true, 'graphics', true,...
+%         'timepoints', timebins, 'nbins', 8, 'saveVar', false);
     
     %         fr = firingRate(v(isession).spikes.times, 'basepath', basepath, 'graphics', true,...
     %             'binsize', 60, 'saveVar', true, 'smet', 'GK', 'winBL',...
@@ -112,8 +112,6 @@ for isession = 1 : nsessions
             'spkFile', 'temp_wh');
 
         delete('*temp_wh*')
-
-
 end
 
 

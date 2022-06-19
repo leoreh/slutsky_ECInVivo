@@ -305,23 +305,27 @@ end
         
         % acg 1
         set(gcf, 'CurrentAxes', sb1)
-        plotCc(cc150(:, u1, u1), cc150bins, clr(1), [], [], [])
+        plot_ccg(cc150(:, u1, u1), cc150bins, 'clr', clr(1),...
+            'pred', [], 'sigbins1', [], 'sigbins2', [])
         title(sprintf('Unit #%d (Presynaptic)', u1))
         
         % acg 2
         set(gcf, 'CurrentAxes', sb4)
-        plotCc(cc150(:, u2, u2), cc150bins, clr(2), [], [], [])
+        plot_ccg(cc150(:, u2, u2), cc150bins, 'clr', clr(2),...
+            'pred', [], 'sigbins1', [], 'sigbins2', [])
         title(sprintf('Unit #%d (Postsynaptic)', u2))
         
         % cc50 counts
         set(gcf, 'CurrentAxes', sb2)
-        plotCc(cc50(:, u1, u2), cc50bins, 'k', [],...
-            roi_t(logical(eBins(:, u1, u2))), roi_t(logical(iBins(:, u1, u2))))
+        plot_ccg(cc50(:, u1, u2), cc50bins, 'clr', 'k',...
+            'pred', [], 'sigbins1', roi_t(logical(eBins(:, u1, u2))),...
+            'sigbins2', roi_t(logical(iBins(:, u1, u2))))
         
         % dccc
         set(gcf, 'CurrentAxes', sb3)
-        plotCc(dccc(:, u1, u2), cc50bins, 'k', pred(:, u1, u2),...
-            roi_t(logical(eBins(:, u1, u2))), roi_t(logical(iBins(:, u1, u2))))
+        plot_ccg(dccc(:, u1, u2), cc50bins, 'clr', 'k',...
+            'pred', pred(:, u1, u2), 'sigbins1', roi_t(logical(eBins(:, u1, u2))),...
+            'sigbins2', roi_t(logical(iBins(:, u1, u2))))
         if strcmp(clr(1), 'r')
             title(sprintf('iSTG = %.4f', iStg(u1, u2)))
         else
@@ -330,11 +334,13 @@ end
         
         % cc150 counts
         set(gcf, 'CurrentAxes', sb6)
-        plotCc(cc150(:, u1, u2), cc150bins, 'k', [], [], [])
+        plot_ccg(cc150(:, u1, u2), cc150bins, 'clr', 'k',...
+            'pred', [], 'sigbins1', [], 'sigbins2', [])
         
         % cc20 counts
         set(gcf, 'CurrentAxes', sb7)
-        plotCc(cc20(:, u1, u2), cc20bins, 'k', [], [], [])
+        plot_ccg(cc20(:, u1, u2), cc20bins, 'clr', 'k',...
+            'pred', [], 'sigbins1', [], 'sigbins2', [])
         
         if ~isempty(wv)
             
@@ -377,47 +383,6 @@ end
 end
 
 % EOF
-
-% local functions ---------------------------------------------------------
-function plotCc(cc, ccbins, clr, pred, sigbins1, sigbins2)
-
-sigclr = ['br'];
-if isempty(clr)
-    clr = 'k';
-end
-
-bh = bar(ccbins, cc, 'BarWidth', 1);
-bh.FaceColor = clr;
-bh.FaceAlpha = 0.4;
-bh.EdgeColor = 'none';
-hold on
-
-% add significant bins
-if ~isempty(sigbins1)
-    bh = bar(ccbins(sigbins1), cc(sigbins1), 'BarWidth', 1);
-    bh.FaceColor = sigclr(1);
-    bh.FaceAlpha = 1;
-    bh.EdgeColor = 'none';
-end
-if ~isempty(sigbins2)
-    bh = bar(ccbins(sigbins2), cc(sigbins2), 'BarWidth', 1);
-    bh.FaceColor = sigclr(2);
-    bh.FaceAlpha = 1;
-    bh.EdgeColor = 'none';
-end
-if ~isempty(pred)
-    plot(ccbins, pred, '--k', 'LineWidth', 2)
-end
-
-plot([0, 0], ylim, '--k')
-ylabel('Counts')
-xlabel('Time [ms]')
-box off
-axis tight
-
-end
-
-% EOS
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % cell explorer

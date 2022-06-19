@@ -79,7 +79,7 @@ if ~isempty(fr)
     if isempty(units)
         units = selectUnits('basepath', basepath, 'grp', [], 'saveVar', false,...
             'forceA', false);
-        units = units.idx;
+        units = [units.rs; units.fs];
     end
 end
 
@@ -154,7 +154,9 @@ else
     data = mean(data, 1, 'omitnan');
     plot(xidx, data, 'b', 'LineWidth', 2)
     axis tight
-    
+    ylim([0 5])
+    yticks([0 : 5])
+
     % create 2 axes if raw fr
     if strcmp(dataType, 'strd')
         ylabel(['RS ' ytxt])
@@ -171,6 +173,7 @@ else
     plot(xidx, data, 'r', 'LineWidth', 2)
     axis tight
     
+    ylim([0 15])
     yLimit = ylim;   
     plot([tidx tidx], yLimit, '--k')
     xlabel('Time [h]')
