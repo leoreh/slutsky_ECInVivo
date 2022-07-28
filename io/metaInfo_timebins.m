@@ -61,6 +61,7 @@ if isempty(fileinfo)
 else
     recLen = floor(fileinfo.bytes / 2 / nchans / fs);
 end
+recLen = recLen - 1;    % margin of error
 
 % point of interest relative to 'block' transition in the recording
 timepnt = 0;

@@ -21,7 +21,7 @@ spkgrp = session.extracellular.spikeGroups.channels;
 [~, basename] = fileparts(basepath);
 
 % add timebins to datInfo
-[timebins, timepnt] = metaInfo_timebins('reqPnt', 5.5 * 60 * 60, 'nbins', 8);
+[timebins, timepnt] = metaInfo_timebins('reqPnt', 5.5 * 60 * 60, 'nbins', 2);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preprocessing of raw files
@@ -122,7 +122,7 @@ sSig = load([basename, '.sleep_sig.mat']);
 
 % call for acceleration
 sSig = as_prepSig([basename, '.lfp'], acc.mag,...
-    'eegCh', [10 : 12], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
+    'eegCh', [1 : 4], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
     'eegNchans', nchans, 'inspectSig', true, 'forceLoad', true,...
     'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [10 450], 'fs', 1250);
 
@@ -134,11 +134,12 @@ sSig = as_prepSig([basename, '.lfp'], [basename, '.emg.dat'],...
 
 % manually create labels
 labelsmanfile = [basename, '.sleep_labelsMan.mat'];
-AccuSleep_viewer(sSig, labels, labelsmanfile)
+AccuSleep_viewer(sSig, [], labelsmanfile)
 
 % classify with a network
 netfile = [];
 calData = [];
+% calData = ss.info.calibrationData;
 ss = as_classify(sSig, 'basepath', pwd, 'inspectLabels', false,...
     'saveVar', true, 'forceA', true, 'netfile', netfile,...
     'graphics', true, 'calData', calData);
@@ -259,12 +260,12 @@ spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
 % spike timing metrics
 st = spktimes_metrics('bins', [], 'forceA', true);
 
-% spike waveform metrics
-swv = spkwv_metrics('basepath', basepath, 'fs', fs, 'forceA', true);
-
 % burstiness (mea)
 brst = spktimes_meaBrst(spikes.times, 'binsize', Inf, 'isiThr', 0.02,...
     'minSpks', 2, 'saveVar', true, 'force', true);
+
+% spike waveform metrics
+swv = spkwv_metrics('basepath', basepath, 'fs', fs, 'forceA', true);
 
 % mfr by states in time bins
 timebins = session.general.timebins;
@@ -304,11 +305,11 @@ monosyn = monoSyn_wrapper('spktimes', mea.spktimes, 'basepath', pwd,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % concatenate var from different sessions
-mname = 'lh106';
+mname = 'lh90';
 % basepaths = {basepath};
 basepaths = {};
 [expData, xData] = sessions_catVarTime('mname', mname,...
-    'dataPreset', {'emg_rms', 'spec'}, 'graphics', true,...
+    'dataPreset', {'spec', 'bands'}, 'graphics', true,...
     'basepaths', basepaths, 'xTicksBinsize', 12, 'markRecTrans', true);
 
 % snip segments (e.g. spikes) from binary 

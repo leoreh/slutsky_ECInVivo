@@ -30,7 +30,7 @@ function spec = calc_spec(varargin)
 %   winstep     numeric. determines the time resolution of the spectrogram.
 %               for accusleep should be equal to epoch length. {1} [sec]
 %   logfreq     logical. plot freq axis on logscale {false}. requires
-%               that ftarget be log-spaces
+%               that ftarget be log-spaced
 %   force       logical. re-analyze even if spec file exists
 %   graphics    logical. plot figure {false}
 %   saveVar     logical. organize and save struct {true}

@@ -31,7 +31,7 @@ ndim = unique(cellfun(@length, szc, 'uni', true));
 if length(ndim) > 1 
     error('all arrays must have the same number of dimensions')
 end
-cellvec = all(cellfun(@isvector, c, 'uni', true));
+cellvec = all(cellfun(@isvector, c(~isempty(c)), 'uni', true));
 
 if cellvec
     c = cellfun(@(x) x(:), c, 'uni', false);

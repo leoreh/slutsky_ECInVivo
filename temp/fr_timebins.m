@@ -109,7 +109,7 @@ for iwin = 1 : nwin
     stateGain(:, iwin, :) = frBins(iwin).states.gain;
 end
 units = selectUnits('basepath', basepath);
-units = units.idx;
+units = units.clean;
 
 if saveVar
     save(frfile, 'frBins')

@@ -14,38 +14,37 @@ for isession = 1 : nsessions
     [mousename, basename] = fileparts(basepath);
     [~, mousename] = fileparts(mousename);
 
-    % number of units per spike group
-    plot_nunits_session('basepath', basepath, 'frBoundries', [])
-
-    % select specific units
-    grp = v(isession).units.info.grp;
-    grp = [1, 3, 4];
-    units = selectUnits('basepath', basepath, 'grp', grp, 'saveVar', true,...
-        'forceA', true, 'frBoundries', [0.05 Inf; 0.05 Inf],...
-        'spikes', v(isession).spikes);
+%     % number of units per spike group
+%     plot_nunits_session('basepath', basepath, 'frBoundries', [])
+% 
+%     % select specific units
+%     grp = v(isession).units.info.grp;
+%     grp = [1 : 4];
+%     units = selectUnits('basepath', basepath, 'grp', grp, 'saveVar', true,...
+%         'forceA', true, 'frBoundries', [0.05 Inf; 0.05 Inf],...
+%         'spikes', v(isession).spikes);
 %     units = v(isession).units;
-%     units.clean = units.clean(1, :) | units.clean(2, :);
-%     
-    % plot fr vs. time
-    plot_FRtime_session('basepath', basepath,...
-        'muFlag', false, 'saveFig', false,...
-        'dataType', 'strd', 'units', units.clean)
+% %     units.clean = units.clean(1, :) | units.clean(2, :);
+% %     
+%     % plot fr vs. time
+%     plot_FRtime_session('basepath', basepath,...
+%         'muFlag', false, 'saveFig', false,...
+%         'dataType', 'strd', 'units', units.clean)
  
     % state ratio according to mfr percetiles
-    frBins = catfields(v(isession).frBins, 'catdef', 'addim', 'force', false);
-    stateMfr = frBins.states.mfr(:, [1, 4], 1);
-    plot_FRstates_sextiles('stateMfr', stateMfr', 'units', units.clean,...
-        'ntiles', 2, 'saveFig', false)
+%     frBins = catfields(v(isession).frBins, 'catdef', 'addim', 'force', false);
+%     stateMfr = frBins.states.mfr(:, [1, 4], 1);
+%     plot_FRstates_sextiles('stateMfr', stateMfr', 'units', units.clean,...
+%         'ntiles', 2, 'saveFig', false)
     
     timebins = v(isession).session.general.timebins;
     timepnt = v(isession).session.general.timepnt;
-    timebins = [timepnt - 3 * 60 * 60, timepnt; timepnt, timepnt + 3 * 60 * 60;...
+    timebins = [10 * 60, timepnt; timepnt, timepnt + 3 * 60 * 60;...
         timepnt + 3 * 60 * 60, timepnt + 6 * 60 * 60;
         timepnt + 6 * 60 * 60, timepnt + 9 * 60 * 60;
-        timepnt + 9 * 60 * 60, timepnt + 12 * 60 * 60;
-        timepnt + 12 * 60 * 60, Inf];
+        timepnt + 9 * 60 * 60, Inf];
     winBL = [0 timepnt];
-    
+
     % update session file
     sessionfile = fullfile(basepath, [basename, '.session.mat']);
     session = v(isession).session;
@@ -58,7 +57,7 @@ for isession = 1 : nsessions
         'smet', 'none', 'winBL', winBL, 'winCalc', [0, Inf]);
 
     fr_timebins('basepath', pwd,...
-        'forceA', true, 'graphics', false,...
+        'forceA', true, 'graphics', true,...
         'timebins', timebins, 'saveVar', true, 'sstates', [1, 4]);
 end
 
@@ -107,7 +106,6 @@ plot_FRstates_sextiles('stateMfr', squeeze(stateMfr(:, :, 1))', 'units', units.c
 istate = 1;
 iunit = 1;
 ntiles = 2;
-itile = 1;
 
 % data
 mfr_bl = squeeze(stateMfr(units.clean(iunit, :), 1, 1));
@@ -219,12 +217,11 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % params
-tbins = [1, 2, 6];
+tbins = [1, 2, 5];
 iunit = 2;
 
 % mean of all units
 chg_raw = [];
-chg_norm = [];
 for isession = 1 : nsessions
     unitsClean = v(isession).units.clean(iunit, :);
 
@@ -264,7 +261,6 @@ ylabel('Mean Firing Rate [% Baseline]')
 % inspect timebins
 v(1).session.general.timebins / 60 / 60
 
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % to prism
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -277,7 +273,7 @@ units = catfields([v.units], 'catdef', 'long', 'force', false);
 [frMat, timeIdx] = alignFR2pnt('basepaths', basepaths, 'dataType', 'strd');
 
 % list of all units per session
-iunit = 2; % change also rs / fs in units struct
+iunit = 1; % change also rs / fs in units struct
 if iunit == 1
     unitChar = 'rs';
 else
@@ -299,11 +295,10 @@ prism_tstamps = [1 : length(frMat)]' / 60 - prism_injTime;
 % mfr during basaeline
 mean(mean(prism_data(prism_tstamps < 0, prism_units > 0), 1, 'omitnan'))
 
-
 % params
 istate = [1, 4];
 ibin = [1, 2];
-iunit = 2;
+iunit = 1;
 ntiles = 2;
 
 % cat units
@@ -359,3 +354,54 @@ gainMat = cell2nanmat(gainCell, 2);
 
 [gainMat(:, 1)', gainMat(:, 2)'; gainMat(:, 3)', gainMat(:, 4)']
 
+
+% kernel plot -------------------------------------------------------------
+data = [bsl_wake, inj_wake ./ bsl_wake * 100];
+data(31, :) = [];
+fh = figure;
+th = tiledlayout(1, 2, 'TileSpacing', 'compact');
+
+% define grid for evaluating the kernel density estimate
+% xgrid = linspace(-1, max(data(:, 1)));
+% ygrid = linspace(-1, max(data(:, 2)));
+xgrid = linspace(-1, 7);
+ygrid = linspace(-50, 200);
+[x1, y1] = meshgrid(xgrid, ygrid);
+xi = [x1(:) y1(:)];
+
+% estimate the kernel density
+[f, ep, bw] = ksdensity(data, xi, 'function', 'pdf');
+
+% format in matrix
+X = reshape(ep(:, 1), length(xgrid), length(ygrid));
+Y = reshape(ep(:, 2), length(xgrid), length(ygrid));
+Z = reshape(f, length(xgrid), length(ygrid));
+
+% plot
+axh = nexttile;
+ph = contourf(X, Y, Z, 8);
+cr = linspace(0.95, 0);
+map = [ones(1, 100); cr; cr]';
+colormap(axh, map)
+% xlim([0 7])
+% ylim([0 200])
+xlabel('MFR BSL (Hz)')
+ylabel('MFR KET / MFR BSL (%)')
+title('AW')
+
+% NREM
+data = [bsl_nrem, inj_nrem ./ bsl_nrem * 100];
+[f, ep, ~] = ksdensity(data, xi, 'function', 'pdf');
+Z = reshape(f, length(xgrid), length(ygrid));
+
+% plot
+axh = nexttile;
+ph = contourf(X, Y, Z, 10);
+cr = linspace(0.95, 0);
+map = [cr; cr; ones(1, 100)]';
+colormap(axh, map)
+% xlim([0 7])
+% ylim([0 200])
+xlabel('MFR BSL (Hz)')
+ylabel('MFR KET / MFR BSL (%)')
+title('NREM')

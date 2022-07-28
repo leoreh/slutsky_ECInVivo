@@ -13,6 +13,7 @@ function psdBins = psd_states_timebins(varargin)
 %                   will assume it is recorded in same lfp file. otherwise
 %                   will assume it is recorded in emg.dat file. if empty
 %                   will assume no eeg recording exists. 
+%   chLfp           numeric. channel number to load from lfp file
 %   nchansEeg       numeric. number of channels in [basename].emg.dat file
 %   nbins           numeric. how many time bins to separate the recording
 %   timebins        numeric. points of interest. chunks will be created
@@ -36,6 +37,7 @@ p = inputParser;
 addOptional(p, 'basepath', pwd);
 addOptional(p, 'fsEeg', [], @isnumeric);
 addOptional(p, 'chEeg', 1, @isnumeric);
+addOptional(p, 'chLfp', [], @isnumeric);
 addOptional(p, 'nchansEeg', [], @isnumeric);
 addOptional(p, 'timebins', [], @isnumeric);
 addOptional(p, 'tbins_txt', []);
@@ -48,6 +50,7 @@ parse(p, varargin{:})
 basepath        = p.Results.basepath;
 fsEeg           = p.Results.fsEeg;
 chEeg           = p.Results.chEeg;
+chLfp           = p.Results.chLfp;
 nchansEeg       = p.Results.nchansEeg;
 timebins        = p.Results.timebins;
 tbins_txt       = p.Results.tbins_txt;
@@ -84,7 +87,9 @@ end
 if isempty(nchansEeg)
     nchansEeg = nchans;
 end
-chLfp = v.ss.info.sSig.eegCh;
+if isempty(chLfp)
+    chLfp = v.ss.info.sSig.eegCh;
+end
 
 % timebins
 % timebins(isinf(timebins)) = floor(v.session.general.duration);

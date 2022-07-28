@@ -112,30 +112,6 @@ ngrp = length(grps);  % only tetrodes with units
 nunits = length(spikes.times);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% waveform params
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% define a good waveform such that at least two channels exhibit a spike
-% amplitude (range) greater than the maximum std on that channel
-
-% count = 1;
-% for igrp = 1 : ngrp
-%     clu = loadNS('datatype', 'clu', 'session', session, 'grpid', igrp);
-%     uclu = unique(clu);
-%     spk = loadNS('datatype', 'spk', 'session', session, 'grpid', igrp,...
-%         'nspks', length(clu));
-%     
-%     for iclu = 1 : length(uclu)
-%         if uclu(iclu) == 0 || uclu(iclu) == 1
-%             continue
-%         end
-%         wvgrp = spk(:, :, clu == uclu(iclu));
-%         
-%         goodwv(count) = sum(range([mean(wvgrp, 3)]') > max([std(wvgrp, [], 3)]'));
-%         count = count + 1;
-%     end
-% end    
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ISI contamination
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SU = 1% of ISIs < 0.002
@@ -176,23 +152,23 @@ else
 
         % find predetermined mu spikes (mu numbering given by spikes.UID)
         rmclu = spikes.cluID(mu(spikes.shankID(mu) == grpid));
-        if ~isempty(rmclu)
-            rmidx = unique([rmidx; find(clu == rmclu)]);
+        for iclu = 1 : length(rmclu)
+            rmidx = unique([rmidx; find(clu == rmclu(iclu))]);
         end
         
         uclu = unique(clu);
         nfet = npca * length(spkgrp{grpid});        
         fetDist = [fet, clu];
         fetDist(rmidx, :) = [];
-        k = 1;
+        cnt2 = 1;
         for iclu = 1 : length(uclu)
             cluid = uclu(iclu);
             if cluid == 0 || cluid == 1
                 continue
             end
-            [lRat{cnt}(k, 1), iDist{cnt}(k, 1), ~] =...
+            [lRat{cnt}(cnt2, 1), iDist{cnt}(cnt2, 1), ~] =...
                 cluDist(fetDist(:, 1 : nfet), find((fetDist(:, end) == cluid)));
-            k = k + 1;
+            cnt2 = cnt2 + 1;
         end
         cnt = cnt + 1;
     end

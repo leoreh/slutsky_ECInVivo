@@ -4,7 +4,7 @@
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = 'lh106';
+mname = 'lh87';
 forceL = true;
 forceA = true;
 
@@ -28,10 +28,10 @@ nsessions = length(basepaths);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % analyze data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% templateCal = ss.info.calibrationData;
+templateCal = ss.info.calibrationData;
 
-for isession = 1 : nsessions
-
+for isession = 17 : nsessions
+    
     % file
     basepath = basepaths{isession};
     cd(basepath)
@@ -48,70 +48,52 @@ for isession = 1 : nsessions
     nchans = session.extracellular.nChannels;
     fs = session.extracellular.sr;
     spkgrp = session.extracellular.spikeGroups.channels;
-
+    
     % add timebins to datInfo
-%     nbins = 8;
-%     reqPnt = 5.5 * 60 * 60;
-%     [timebins, timepnt] = metaInfo_timebins('reqPnt', reqPnt,...
-%         'nbins', nbins);
-%     timebins = session.general.timebins;
-%     bins = mat2cell(timebins, ones(size(timebins, 1), 1), 2);
+    [timebins, timepnt] = metaInfo_timebins('reqPnt', [], 'nbins', 2);
+    winCalc = mat2cell(timebins, [1, 1], 2)';
+    
+%     % sleep signals
+%     sSig = as_prepSig([basename, '.lfp'], [],...
+%         'eegCh', [5], 'emgCh', [3], 'saveVar', true, 'emgNchans', [],...
+%         'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
+%         'eegFs', 1250, 'emgFs', [], 'eegCf', [], 'emgCf', [10 450], 'fs', 1250);
+%     
+%     % manual lables
+%     labelsfile = [basename, '.AccuSleep_labelsMan.mat'];
+%     labelsmanfile = [basename, '.sleep_labelsMan.mat'];
+%     if exist(labelsfile, 'file')
+%         load(labelsfile, 'labels')
+%     end
+%     save(labelsmanfile, 'labels')
+%     %     AccuSleep_viewer(sSig, labels, labelsmanfile)
+%     
+%     % classify
+%     ss = as_classify(sSig, 'basepath', pwd, 'inspectLabels', false,...
+%         'saveVar', true, 'forceA', true, 'netfile', [],...
+%         'graphics', true, 'calData', templateCal);
 
     % calc psd in states
-%     psdBins = psd_states_timebins('basepath', pwd,...
-%         'chEeg', [], 'forceA', true, 'graphics', true,...
-%         'timepoints', timebins, 'nbins', 8, 'saveVar', false);
-    
-    %         fr = firingRate(v(isession).spikes.times, 'basepath', basepath, 'graphics', true,...
-    %             'binsize', 60, 'saveVar', true, 'smet', 'GK', 'winBL',...
-    %             [0 timepoints], 'winCalc', [0, Inf], 'forceA', true);
+    psdBins = psd_states_timebins('basepath', pwd,...
+        'chEeg', [], 'forceA', true, 'graphics', true,...
+        'timebins', timebins, 'saveVar', true, 'sstates', [1, 4]);
 
-    %         frBins(isession) = fr_timebins('basepath', pwd,...
-    %             'forceA', false, 'graphics', true,...
-    %             'timebins', chunks, 'saveVar', true);
-
-
-    % create emg signal from accelerometer data
-    % acc = EMGfromACC('basepath', basepath, 'fname', [basename, '.lfp'],...
-    %     'nchans', nchans, 'ch', nchans - 2 : nchans, 'saveVar', true, 'fsIn', 1250,...
-    %     'graphics', false, 'force', false);
-    %
-%     % % call for acceleration
-%     sSig = as_prepSig([basename, '.lfp'], [],...
-%         'eegCh', [2], 'emgCh', [3], 'saveVar', true, 'emgNchans', [],...
-%         'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
-%         'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [10 450], 'fs', 1250);
+%     % load data
+%     sig = double(bz_LoadBinary([basename, '.lfp'],...
+%         'duration', Inf, 'frequency', 1250, 'nchannels', nchans,...
+%         'start', 0, 'channels', 2, 'downsample', 1));
+%     
+%     % calc psd
+%     freq = [0.5 : 0.5 : 120];
+%     psd = psd_timebins('sig', sig, 'winCalc', winCalc,...
+%         'fs', 1250, 'graphics', true, 'faxis', freq);
 % 
 %     % calc spec
 %     spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true,...
 %         'saveVar', true, 'padfft', -1, 'winstep', 5,...
-%         'ftarget', [], 'ch', [{1}, {2}],...
-%         'force', true);
-    
+%         'ftarget', [], 'ch', [{1}, {2}, {4}, {5}],...
+%         'force', true, 'logfreq', true);
 
-        % spike detection from temp_wh
-        [spktimes, ~] = spktimesWh('basepath', basepath, 'fs', fs, 'nchans', nchans,...
-            'spkgrp', spkgrp, 'saveVar', true, 'saveWh', true,...
-            'graphics', false, 'force', true, 'winWh', [0 Inf]);
-
-        % spike rate per tetrode. note that using firingRate requires
-        % special care becasue spktimes is given in samples and not seconds
-        for igrp = 1 : length(spkgrp)
-            spktimes{igrp} = spktimes{igrp} / fs;
-        end
-        sr = firingRate(spktimes, 'basepath', basepath,...
-            'graphics', true, 'binsize', 60, 'saveVar', 'sr', 'smet', 'none',...
-            'winBL', [0 Inf]);
-
-        % create ns files
-        dur = [];
-        t = [];
-        spktimes2ns('basepath', basepath, 'fs', fs,...
-            'nchans', nchans, 'spkgrp', spkgrp, 'mkClu', true,...
-            'dur', dur, 't', t, 'grps', [1 : length(spkgrp)],...
-            'spkFile', 'temp_wh');
-
-        delete('*temp_wh*')
 end
 
 

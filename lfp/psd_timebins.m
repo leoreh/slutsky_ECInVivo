@@ -62,8 +62,10 @@ if ~iscell(winCalc)
 end
 
 maxsec = floor(length(sig) / fs);
-if winCalc{end}(end) > maxsec
-    winCalc{end}(end) = maxsec;
+if ~isempty(winCalc{end})
+    if winCalc{end}(end) > maxsec
+        winCalc{end}(end) = maxsec;
+    end
 end
 
 nwin = size(winCalc, 2);
@@ -78,14 +80,6 @@ end
 % fft params
 win = hann(2 ^ (nextpow2(2 * fs) - 1));
 noverlap = floor(0.25 * fs);
-% frequencies for psd estimate. note that both the slowest frequency and
-% the frequency resolution is determined by 1 / epoch length. For example,
-% to estimate frequencies in a resolution of 0.2 Hz, the minimum epoch
-% duration must be 5 seconds (minDur). however, using a hamming window to
-% smooth the psd also reduces the frequency resolution. further, we omit
-% the first and last bin of an epoch to assure no contamination from other
-% states. this is why the minDur was set to twice the theoretical minimum
-% (10 s).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % calc power for each epoch separatly

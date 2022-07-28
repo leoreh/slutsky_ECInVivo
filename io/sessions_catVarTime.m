@@ -100,7 +100,7 @@ fs = v(1).session.extracellular.sr;
 
 switch dataPreset
     case 'spec'       
-        ch = 1;     % manually change
+        ch = 2;     % manually change
         for isession = 1 : nsessions
             if ndims(v(isession).spec.s) == 3
                 v(isession).data = squeeze(v(isession).spec.s(:, :, ch))';
@@ -112,7 +112,7 @@ switch dataPreset
         faxis = v(isession).spec.freq;
     
     case 'bands'
-        ch = 1;     % manually change
+        ch = 2;     % manually change
         for isession = 1 : nsessions
             filename = fullfile(basepaths{isession},...
                 [basenames{isession}, '.spec.mat']);
