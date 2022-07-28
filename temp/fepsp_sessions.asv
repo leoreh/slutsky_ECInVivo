@@ -10,13 +10,14 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % wcp
-basepath        = 'G:\Data\lh110\220728';
-wcpfiles        = [8];
-intens          = [62];
-recname         = '220728_stp1';
+basepath        = 'L:\Data\lh110\220727';
+wcpfiles        = [9, 10];
+intens          = [70, 75];
+recname         = '220727_stp1';
 fepsp_wcpPipeline('basepath', basepath, 'wcpfiles', wcpfiles,...
     'fepsp_protocol', 'stp', 'recname', recname, 'intens', intens,...
-    'fsOut', [])
+    'fsOut', [1250])
+
 
 % tdt
 basepath        = 'G:\Data\lh104\lh104_220425_112200';
