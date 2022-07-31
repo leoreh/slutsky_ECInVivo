@@ -5,8 +5,8 @@
 
 % user input
 mname           = 'lh110';
-basepath        = 'F:\Data\lh110\lh110_220729_111000';
-blocks          = [1];
+basepath        = 'G:\Data\lh110\lh110_220731_102200';
+blocks          = [1 : 2];
 
 % tank to dat 
 mapch           = [];
@@ -21,7 +21,7 @@ datInfo = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
 intens          = [300, 500, 700];
 protocol_id     = 'pair';
 ch              = 2;
-blocks          = 1;                            
+blocks          = 2;                            
 fepsp_tdtPipeline('basepath', basepath, 'blocks', blocks,...
     'protocol_id', protocol_id, 'recsuffix', '', 'intens', intens,...
     'ch', ch, 'mapch', mapch', 'rmvch', rmvch, 'store', store)
@@ -68,13 +68,33 @@ spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true, 'saveVar', true,...
     'padfft', -1, 'winstep', 5, 'logfreq', true, 'ftarget', [],...
     'ch', [{1}], 'force', true);
 
-sig = double(bz_LoadBinary([basename, '.dat'],...
-    'duration', Inf, 'frequency', fs, 'nchannels', 2,...
-    'start', 0, 'channels', 1, 'downsample', 1));
-spec = calc_spec('sig', sig, 'fs', fs, 'graphics', true, 'saveVar', false,...
-    'padfft', -1, 'winstep', 5, 'logfreq', true, 'ftarget', logspace(log10(0.5), 2, 100),...
-    'ch', [{1}], 'force', true);
+% -------------------------------------------------------------------------
+% fepsp in relation to states
 
+% load data
+varsFile = ["fepsp_traces"; "fepsp_results"; "sleep_states"];
+varsName = ["traces"; "results"; "ss"];
+v = getSessionVars('basepaths', {basepath}, 'varsFile', varsFile,...
+    'varsName', varsName);
+
+% get stim indices in specific state
+istate = 1;
+stateStim = InIntervals(v.results.info.stimIdx, v.ss.stateEpochs{istate});
+
+nstims = 45;
+nintens = length(intens);
+cellIdx = num2cell(reshape(1 : nstims, nstims / nintens, nintens), 1);
+clear amp traces
+for iintens = 1 : nintens
+    stimIdx = stateStim(cellIdx{iintens});
+    amp{iintens} = v.results.all_traces.Amp{iintens}(:, stimIdx);
+    traces(iintens, :) = mean(v.traces{iintens}(:, stimIdx), 2);
+end
+
+protocol_info = fepsp_getProtocol("protocol_id", 'pair', "fs", fs);
+protocol_info.Tstamps;
+
+cell2nanmat(amp, 2)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % lh109
