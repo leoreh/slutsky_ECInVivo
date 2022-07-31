@@ -179,7 +179,7 @@ switch dataPreset
         ts = mode(diff(v(isession).ripp.rate.binedges{1}));                 
         
     otherwise
-        DISP('\nno such data preset\n')
+        sprintf('\nno such data preset\n')
 end
 
 ncol = size(v(1).data, 1);
@@ -194,7 +194,7 @@ ncol = size(v(1).data, 1);
 recStart = cellfun(@guessDateTime, basenames, 'uni', true);
 expStart = recStart(1) - max([0, diff(timeofday([zt0, recStart(1)]))]);
 expEnd = guessDateTime(basenames{end});
-expEnd = expEnd + seconds(sum(v(end).datInfo.nsamps) / fs);
+expEnd = expEnd + seconds(v(end).session.general.nsamps / fs);
 expLen = ceil(seconds(expEnd - expStart) / ts); 
 expData = nan(expLen, ncol);
 expRs = nan(expLen, ncol);
@@ -218,7 +218,11 @@ for isession = 1 : nsessions
     end
     
     % cat block transitions
-    xidx = [xidx, cumsum(v(isession).datInfo.nsamps) / fs / ts + recIdx];
+    if ~isempty(v(isession).datInfo)
+        xidx = [xidx, cumsum(v(isession).datInfo.nsamps) / fs / ts + recIdx];
+    else
+        xidx = 0;
+    end
 
 end
 xtimes = tstamp2time('tstamp', xidx * ts, 'dtstr', expStart);    % times of block transitions

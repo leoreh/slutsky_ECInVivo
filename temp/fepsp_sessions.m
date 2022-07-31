@@ -11,11 +11,11 @@
 
 % wcp
 basepath        = 'F:\Data\lh110\220727';
-wcpfiles        = [11, 12, 21, 22, 35, 46];
-intens          = [62];
-recname         = '220727_freerun';
+wcpfiles        = [24 : 29];
+intens          = [70, 75, 80, 90, 60, 65];
+recname         = '220727_io3';
 fepsp_wcpPipeline('basepath', basepath, 'wcpfiles', wcpfiles,...
-    'fepsp_protocol', 'freerun', 'recname', recname, 'intens', intens,...
+    'fepsp_protocol', 'io', 'recname', recname, 'intens', intens,...
     'fsOut', [])
 
 % tdt
@@ -39,7 +39,7 @@ fepsp_tdtPipeline('basepath', basepath, 'blocks', blocks,...
 % load data ---------------------------------------------------------------
 
 % experiment folder
-exppath = 'G:\Data\lh104\lh104_220426_090900';
+exppath = 'F:\Data\lh110\220727';
 cd(exppath)
 basepaths = dir('*_io*');
 basepaths = fullfile({basepaths.folder}, {basepaths.name});
@@ -56,6 +56,14 @@ varsName = ["traces"; "results"];
 v = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
     'varsName', varsName);
 
+
+for ifile = 1 : nfiles
+    cd(basepaths{ifile})
+    resultsfile = [basenames{ifile}, '_fepsp_results.mat'];
+    load(resultsfile, 'results')
+    results.info.intens = [60, 62, 65, 68, 70, 75, 80];
+    save(resultsfile, 'results')
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % to prism
@@ -76,7 +84,6 @@ for ifile = 1 : nfiles
     tstamps = v(ifile).lfp.timestamps * 1000 - protocol_info.stim_times(1); 
     tstamps = tstamps(1 : length(traces));
 
-    
     % stp intensity idx
     idx = 1;
 
