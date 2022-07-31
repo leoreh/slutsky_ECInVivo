@@ -305,11 +305,11 @@ monosyn = monoSyn_wrapper('spktimes', mea.spktimes, 'basepath', pwd,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % concatenate var from different sessions
-mname = 'lh90';
+mname = 'lh103';
 % basepaths = {basepath};
 basepaths = {};
 [expData, xData] = sessions_catVarTime('mname', mname,...
-    'dataPreset', {'spec', 'bands'}, 'graphics', true,...
+    'dataPreset', {'spec', 'emg_rms'}, 'graphics', true,...
     'basepaths', basepaths, 'xTicksBinsize', 12, 'markRecTrans', true);
 
 % snip segments (e.g. spikes) from binary 

@@ -4,7 +4,7 @@
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = 'lh87';
+mname = 'lh91';
 forceL = true;
 forceA = true;
 
@@ -30,7 +30,7 @@ nsessions = length(basepaths);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 templateCal = ss.info.calibrationData;
 
-for isession = 17 : nsessions
+for isession = 1 : nsessions
     
     % file
     basepath = basepaths{isession};
@@ -49,9 +49,17 @@ for isession = 17 : nsessions
     fs = session.extracellular.sr;
     spkgrp = session.extracellular.spikeGroups.channels;
     
-    % add timebins to datInfo
-    [timebins, timepnt] = metaInfo_timebins('reqPnt', [], 'nbins', 2);
-    winCalc = mat2cell(timebins, [1, 1], 2)';
+    load([basename, '.spktimes.mat'])
+    for igrp = 1 : length(spkgrp)
+        spktimes{igrp} = spktimes{igrp} / fs;
+    end
+    sr = firingRate(spktimes, 'basepath', basepath,...
+        'graphics', true, 'binsize', 60, 'saveVar', 'sr', 'smet', 'none',...
+        'winBL', [0 Inf]);
+
+%     % add timebins to datInfo
+%     [timebins, timepnt] = metaInfo_timebins('reqPnt', [], 'nbins', 2);
+%     winCalc = mat2cell(timebins, [1, 1], 2)';
     
 %     % sleep signals
 %     sSig = as_prepSig([basename, '.lfp'], [],...
@@ -73,10 +81,10 @@ for isession = 17 : nsessions
 %         'saveVar', true, 'forceA', true, 'netfile', [],...
 %         'graphics', true, 'calData', templateCal);
 
-    % calc psd in states
-    psdBins = psd_states_timebins('basepath', pwd,...
-        'chEeg', [], 'forceA', true, 'graphics', true,...
-        'timebins', timebins, 'saveVar', true, 'sstates', [1, 4]);
+%     % calc psd in states
+%     psdBins = psd_states_timebins('basepath', pwd,...
+%         'chEeg', [], 'forceA', true, 'graphics', true,...
+%         'timebins', timebins, 'saveVar', true, 'sstates', [1, 4]);
 
 %     % load data
 %     sig = double(bz_LoadBinary([basename, '.lfp'],...
