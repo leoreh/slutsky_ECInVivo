@@ -87,8 +87,8 @@ if ~isempty(mapch)
     nch = length(mapch);
     if sum(mapch > nch)
         mat = [unique(mapch); (1 : nch)]';
-        for j = 1 : nch
-            mapch(j) = mat(mat(:, 1) == mapch(j), 2);
+        for ich = 1 : nch
+            mapch(ich) = mat(mat(:, 1) == mapch(ich), 2);
         end
     end
 end
@@ -270,7 +270,7 @@ end
 % create lfp file
 if contains(store, 'Raw') && nargout == 1 
     LFPfromDat('basepath', basepath, 'cf', 450, 'chunksize', 5e6,...
-        'nchans', length(mapch), 'fsOut', 1250,...
+        'nchans', size(dat, 1), 'fsOut', 1250,...
         'fsIn', blockHead.stores.(store).fs)
 end
 

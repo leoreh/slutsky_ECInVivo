@@ -58,7 +58,7 @@ tspec = ((1 : nbins) * winstep - winstep / 2) / xtime;
 % take a sample of the spectrogram to help initialize the colormap
 sampleBins = randperm(nbins, round(nbins / 5));
 specSample = reshape(spec.s(sampleBins, :), 1, length(sampleBins) * length(freq));
-cLimit = prctile(specSample, [10 96]);
+cLimit = prctile(specSample, [10 90]);
 
 % plot   
 if isempty(axh)

@@ -10,23 +10,23 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % wcp
-basepath        = 'G:\Data\lh110\220728';
-wcpfiles        = [8];
+basepath        = 'F:\Data\lh110\220727';
+wcpfiles        = [11, 12, 21, 22, 35, 46];
 intens          = [62];
-recname         = '220728_stp1';
+recname         = '220727_freerun';
 fepsp_wcpPipeline('basepath', basepath, 'wcpfiles', wcpfiles,...
-    'fepsp_protocol', 'stp', 'recname', recname, 'intens', intens,...
+    'fepsp_protocol', 'freerun', 'recname', recname, 'intens', intens,...
     'fsOut', [])
 
 % tdt
-basepath        = 'G:\Data\lh104\lh104_220425_112200';
-mapch           = [1 : 6];
-rmvch           = [1, 3, 5, 7, 8];
-intens          = [250, 500, 750];
-blocks          = [41 : 43];
-protocol_id     = 'stp';
-store           = 'Raw1';
-recsuffix       = 'stp6';
+basepath        = 'F:\Data\lh110\lh110_220728_093900';
+mapch           = [];
+rmvch           = [1, 3];
+intens          = [300, 500, 700];
+blocks          = [1 : 5];
+protocol_id     = 'pair';
+store           = 'Raw2';
+recsuffix       = 'io';
 ch              = 2;
 fepsp_tdtPipeline('basepath', basepath, 'blocks', blocks,...
     'protocol_id', protocol_id, 'recsuffix', recsuffix, 'intens', intens,...
