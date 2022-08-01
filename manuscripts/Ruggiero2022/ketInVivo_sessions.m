@@ -55,14 +55,15 @@ end
 
 if any(strcmp(expType, 'ket60'))
     basepaths = [basepaths...
-        {'F:\Data\lh86\lh86_210311_100153'},...     % only 8 hr rec
+        
         {'F:\Data\lh98\lh98_211224_084528'},...
         {'F:\Data\lh106\lh106_220512_102302'},...
         {'F:\Data\lh107\lh107_220512_102302'},...
         ];
 
     % lh99_211224_084528
-    % F:\Data\lh81\lh81_210204_190000   inj 0zt
+    % F:\Data\lh81\lh81_210204_190000       inj 0zt
+    % F:\Data\lh86\lh86_210311_100153       only 8 hr rec
 end
 
 nsessions = length(basepaths);

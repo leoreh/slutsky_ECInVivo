@@ -21,7 +21,7 @@ spkgrp = session.extracellular.spikeGroups.channels;
 [~, basename] = fileparts(basepath);
 
 % add timebins to datInfo
-[timebins, timepnt] = metaInfo_timebins('reqPnt', 5.5 * 60 * 60, 'nbins', 2);
+[timebins, timepnt] = metaInfo_timebins('reqPnt', 2 * 60 * 60, 'nbins', 2);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preprocessing of raw files
@@ -122,7 +122,7 @@ sSig = load([basename, '.sleep_sig.mat']);
 
 % call for acceleration
 sSig = as_prepSig([basename, '.lfp'], acc.mag,...
-    'eegCh', [1 : 4], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
+    'eegCh', [5 : 8], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
     'eegNchans', nchans, 'inspectSig', true, 'forceLoad', true,...
     'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [10 450], 'fs', 1250);
 
@@ -156,7 +156,7 @@ as_stateSeparation(sSig, ss)
 
 % calc psd in states
 psdBins = psd_states_timebins('basepath', pwd,...
-    'chEeg', [2], 'forceA', true, 'graphics', true,...
+    'chEeg', [], 'chLfp', [1 : 4], 'forceA', true, 'graphics', true,...
     'timebins', timebins, 'saveVar', true, 'sstates', [1, 4]);
 
 % calc spec
@@ -305,12 +305,12 @@ monosyn = monoSyn_wrapper('spktimes', mea.spktimes, 'basepath', pwd,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % concatenate var from different sessions
-mname = 'lh103';
+mname = 'lh50';
 % basepaths = {basepath};
 basepaths = {};
 [expData, xData] = sessions_catVarTime('mname', mname,...
     'dataPreset', {'spec', 'emg_rms'}, 'graphics', true,...
-    'basepaths', basepaths, 'xTicksBinsize', 12, 'markRecTrans', true);
+    'basepaths', basepaths, 'xTicksBinsize', 1, 'markRecTrans', true);
 
 % snip segments (e.g. spikes) from binary 
 [spkwv, ~] = snipFromBinary('stamps', spktimes, 'fname', datname,...

@@ -1,5 +1,5 @@
 
-[basepaths, v, nsessions] = ketInVivo_sessions('ket');
+[basepaths, v, nsessions] = ketInVivo_sessions('ket60');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % reanalyze something
@@ -273,7 +273,7 @@ units = catfields([v.units], 'catdef', 'long', 'force', false);
 [frMat, timeIdx] = alignFR2pnt('basepaths', basepaths, 'dataType', 'strd');
 
 % list of all units per session
-iunit = 1; % change also rs / fs in units struct
+iunit = 2; 
 if iunit == 1
     unitChar = 'rs';
 else
@@ -292,7 +292,7 @@ prism_data = frMat(units.(unitChar), :)';
 prism_injTime = max(timeIdx) / 60;
 prism_tstamps = [1 : length(frMat)]' / 60 - prism_injTime;
 
-% mfr during basaeline
+% mfr during baseline
 mean(mean(prism_data(prism_tstamps < 0, prism_units > 0), 1, 'omitnan'))
 
 % params
