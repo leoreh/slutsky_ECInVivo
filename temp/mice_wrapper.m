@@ -5,12 +5,12 @@
 
 % user input
 mname           = 'lh110';
-basepath        = 'G:\Data\lh110\lh110_220731_102200';
+basepath        = 'F:\Data\lh110\lh110_220806_092400';
 blocks          = [1 : 2];
 
 % tank to dat 
 mapch           = [];
-rmvch           = [1, 3];
+rmvch           = [2, 4];
 store           = 'Raw2';
 chunksize       = 300;
 clip            = cell(1, 1);
@@ -20,7 +20,7 @@ datInfo = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
 % fepsp 
 intens          = [300, 500, 700];
 protocol_id     = 'pair';
-ch              = 2;
+ch              = 1;
 blocks          = 2;                            
 fepsp_tdtPipeline('basepath', basepath, 'blocks', blocks,...
     'protocol_id', protocol_id, 'recsuffix', '', 'intens', intens,...
@@ -60,13 +60,32 @@ basepath = session.general.basePath;
 % sleep signals
 sSig = as_prepSig([basename, '.lfp'], [],...
     'eegCh', [1], 'emgCh', [2], 'saveVar', true, 'emgNchans', nchans,...
-    'eegNchans', nchans, 'inspectSig', true, 'forceLoad', true,...
+    'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
     'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [50 450], 'fs', 1250);
+labelsmanfile = [basename, '.sleep_labelsMan.mat'];
+AccuSleep_viewer(sSig, [], labelsmanfile)
+
+% classify with a network
+calData = [];
+calData = ss.info.calibrationData;
+ss = as_classify(sSig, 'basepath', pwd, 'inspectLabels', false,...
+    'saveVar', true, 'forceA', true, 'netfile', [],...
+    'graphics', true, 'calData', calData);
 
 % calc spec
 spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true, 'saveVar', true,...
     'padfft', -1, 'winstep', 5, 'logfreq', true, 'ftarget', [],...
     'ch', [{1}], 'force', true);
+
+[expData, xData] = sessions_catVarTime('mname', '',...
+    'dataPreset', {'spec', 'emg_rms'}, 'graphics', true,...
+    'basepaths', {basepath}, 'xTicksBinsize', 1, 'markRecTrans', true);
+
+fh = figure;
+plot(sSig.emg_rms)
+xidx = v.results.info.stimIdx;
+hold on
+plot([xidx; xidx], ylim, '--k', 'LineWidth', 3)
 
 % -------------------------------------------------------------------------
 % fepsp in relation to states
@@ -78,37 +97,49 @@ v = getSessionVars('basepaths', {basepath}, 'varsFile', varsFile,...
     'varsName', varsName);
 
 % get stim indices in specific state
-istate = 1;
-stateStim = InIntervals(v.results.info.stimIdx, v.ss.stateEpochs{istate});
-
-nstims = 45;
-nintens = length(intens);
-cellIdx = num2cell(reshape(1 : nstims, nstims / nintens, nintens), 1);
-clear amp traces
-for iintens = 1 : nintens
-    stimIdx = stateStim(cellIdx{iintens});
-    amp{iintens} = v.results.all_traces.Amp{iintens}(:, stimIdx);
-    traces(iintens, :) = mean(v.traces{iintens}(:, stimIdx), 2);
+nstates = 6;
+clear stateStim
+for istate = 1 : nstates
+    stateStim(:, istate) = InIntervals(v.results.info.stimIdx, v.ss.stateEpochs{istate});
 end
+sum(stateStim)
 
-protocol_info = fepsp_getProtocol("protocol_id", 'pair', "fs", fs);
-protocol_info.Tstamps;
+histcounts(ss.labels(round(v.results.info.stimIdx)), [1 : 7])
 
-cell2nanmat(amp, 2)
+nstims = 60;
+nintens = length(intens);
+idxCell = num2cell(reshape(1 : nstims, nstims / nintens, nintens), 1);
+clear amp traces
+for istate = 1 : nstates
+    for iintens = 1 : nintens
+        stimIdx = stateStim(idxCell{iintens}, istate);
+        nstimState(istate, iintens) = sum(stimIdx);
+        amp{istate, iintens} = v.results.all_traces.Amp{iintens}(:, stimIdx);
+        traces{istate}(iintens, :) = mean(v.traces{iintens}(:, stimIdx), 2);
+    end
+end
+% 
+% protocol_info = fepsp_getProtocol("protocol_id", 'pair', "fs", fs);
+% protocol_info.Tstamps;
+% 
+% cell2nanmat(amp, 2)
 
+hold on
+xidx = [v.results.info.stimIdx / 60 / 60];
+plot(xidx, xidx, )
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % lh109
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % user input
 mname           = 'lh109';
-basepath        = 'F:\Data\lh110\lh110_220729_111000';
-blocks          = [1];
+basepath        = 'F:\Data\lh110\lh110_220803_092100';
+blocks          = [1 : 4];
 cd(basepath)
 
 % tank to dat 
 mapch           = [];
-rmvch           = [1, 3, 5];
+rmvch           = [2 : 2 : 6];
 store           = 'Raw1';
 chunksize       = 300;
 clip            = cell(1, 1);
@@ -149,8 +180,16 @@ basepath = session.general.basePath;
 % sleep signals
 sSig = as_prepSig([basename, '.lfp'], [],...
     'eegCh', [1], 'emgCh', [2], 'saveVar', true, 'emgNchans', nchans,...
-    'eegNchans', nchans, 'inspectSig', true, 'forceLoad', true,...
+    'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
     'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [50 450], 'fs', 1250);
+labelsmanfile = [basename, '.sleep_labelsMan.mat'];
+AccuSleep_viewer(sSig, [], labelsmanfile)
+
+% classify with a network
+% calData = ss.info.calibrationData;
+ss = as_classify(sSig, 'basepath', pwd, 'inspectLabels', false,...
+    'saveVar', true, 'forceA', true, 'netfile', [],...
+    'graphics', true, 'calData', []);
 
 % calc spec
 spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true, 'saveVar', true,...

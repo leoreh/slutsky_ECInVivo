@@ -40,7 +40,7 @@ saveFig     = p.Results.saveFig;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % calculate state ratio
-stateRat = [(stateMfr(2, :) - stateMfr(1, :)) ./ (sum(stateMfr))]';
+stateRat = [(stateMfr(2, :) - stateMfr(1, :)) ./ (sum(stateMfr))]' * 100;
 
 % organize units
 if isempty(units)
@@ -70,7 +70,7 @@ setMatlabGraphics(false)
 eqLine = 10 .^ [floor(log10(min(stateMfr(stateMfr(:) ~= 0)))),...
     ceil(log10(max(stateMfr(:))))];
 yLimit = [-max(abs(stateRat(unitsAny))), max(abs(stateRat(unitsAny)))];
-yLimit = [-1, 1];
+yLimit = [-100, 100];
 
 fh = figure;
 for iunit = 1 : size(units, 1)
@@ -85,13 +85,15 @@ for iunit = 1 : size(units, 1)
     tiles = prctile(x, [1 / ntiles : 1 / ntiles : 1 - 1 / ntiles] * 100);
     tiles = [0, tiles, Inf];
 
-    clear dataMat
+    clear dataMat mfrBsl
     for itile = 1 : ntiles
         unitsTile = units(iunit, :) & stateMfr(1, :) >= tiles(itile) &...
-            stateMfr(1  , :) < tiles(itile + 1);
+            stateMfr(1, :) < tiles(itile + 1);
         dataMat{itile} = stateRat(unitsTile);
+        mfrBsl{itile} = stateMfr(1, unitsTile);
     end
     dataMat = cell2nanmat(dataMat, 2);
+    mfrBsl = cell2nanmat(mfrBsl, 2);
     plot_boxMean('dataMat', dataMat, 'clr', unitClr{iunit}, 'allPnts', true)
     hold on
     plot(xlim, [0, 0], '--k')

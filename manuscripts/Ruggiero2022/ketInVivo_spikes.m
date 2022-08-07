@@ -1,5 +1,5 @@
 
-[basepaths, v, nsessions] = ketInVivo_sessions('ket60');
+[basepaths, v, nsessions] = ketInVivo_sessions('ket');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % reanalyze something
