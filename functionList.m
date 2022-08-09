@@ -261,8 +261,8 @@ spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
 st = spktimes_metrics('bins', [], 'forceA', true);
 
 % burstiness (mea)
-brst = spktimes_meaBrst(spikes.times, 'binsize', Inf, 'isiThr', 0.02,...
-    'minSpks', 2, 'saveVar', true, 'force', true);
+brst = spktimes_meaBrst(spikes.times, 'binsize', 3600, 'isiThr', 0.02,...
+    'minSpks', 2, 'saveVar', false, 'force', true);
 
 % spike waveform metrics
 swv = spkwv_metrics('basepath', basepath, 'fs', fs, 'forceA', true);

@@ -1,4 +1,4 @@
-function st = spktimesMetrics(varargin)
+function st = spktimes_metrics(varargin)
 
 %  calculate spike timing metrics from ACG and ISI histogram. based in part
 %  on calc_ACG_metrics from cell explorer. metrics include:
@@ -146,12 +146,12 @@ st.cv2          = nan(nbins, nunits);
 st.lv           = nan(nbins, nunits);
 st.lvr          = nan(nbins, nunits);
 
-for iunit = sunits
+for iunit = 1 : length(sunits)
     for ibin = 1 : length(bins)
             
         % limit spktimes to window
-        spkIdx = InIntervals(spktimes{iunit}, bins{ibin});
-        st_unit = spktimes{iunit}(spkIdx);
+        spkIdx = InIntervals(spktimes{sunits(iunit)}, bins{ibin});
+        st_unit = spktimes{sunits(iunit)}(spkIdx);
         nspks = length(st_unit);
         isi = diff(st_unit);
         nisi = length(isi);
@@ -191,7 +191,6 @@ for iunit = sunits
         else
             st.royer2(ibin, iunit) = (peakbrst - basebrst) / basebrst;
         end        
-
 
         % lidor: sum of spikes in 2-10 ms normalized to sum in 35-50
         t1 = find(st.info.acg_narrow_tstamps > 0.002 & st.info.acg_narrow_tstamps < 0.01);

@@ -69,17 +69,11 @@ if isempty(bins)
         bins(1) = 0; bins(end - 1, 2) = recLen; bins(end, :) = [];
     end
 end
-
-% convert bins to cell
 if ~iscell(bins)
     bins = mat2cell(bins, ones(size(bins, 1), 1), size(bins, 2));
 end
 nbins = length(bins);
-
-% get binsize
-for ibin = 1 : nbins
-    binsize(ibin) = sum(bins{ibin}(:, 2) - bins{ibin}(:, 1));
-end
+binsize = bins(:, 2) - bins(:, 1);
 
 % load if exists
 [~, basename] = fileparts(basepath);
@@ -102,14 +96,14 @@ brst.info.input         = p.Results;
 brst.info.bins          = bins;
 brst.info.binsize       = binsize;
 brst.info.recLen        = recLen;
-brst.detect             = nan(nbins, nunits);
-brst.nspks              = nan(nbins, nunits);
-brst.spkprct            = nan(nbins, nunits);
-brst.brstDur            = nan(nbins, nunits);
-brst.freqIn             = nan(nbins, nunits);
-brst.freqOf             = nan(nbins, nunits);
-brst.freqOfNorm         = nan(nbins, nunits);
-brst.ibi                = nan(nbins, nunits);
+brst.detect             = zeros(nbins, nunits);
+brst.nspks              = zeros(nbins, nunits);
+brst.spkprct            = zeros(nbins, nunits);
+brst.brstDur            = zeros(nbins, nunits);
+brst.freqIn             = zeros(nbins, nunits);
+brst.freqOf             = zeros(nbins, nunits);
+brst.freqOfNorm         = zeros(nbins, nunits);
+brst.ibi                = zeros(nbins, nunits);
 
 for ibin = 1 : nbins
     for iunit = 1 : nunits
@@ -149,8 +143,8 @@ for ibin = 1 : nbins
         brst.shortPrct(ibin, iunit) = (nbrsts.detect - nbrsts.dur) / nbrsts.detect * 100;
 
         % number of bursts relative to binsize and ~firing rate
-        brst.freqOf(ibin, iunit) = nbrsts.dur / binsize(ibin);
-        brst.freqOfNorm(ibin, iunit) = brst.freqOf(ibin, iunit) / (nspks / binsize(ibin));
+        brst.freqOf(ibin, iunit) = nbrsts.detect / binsize;
+        brst.freqOfNorm(ibin, iunit) = brst.freqOf(ibin, iunit) / (nspks / binsize);
 
         % organize and average stats
         brst.all(ibin, iunit) = b;
