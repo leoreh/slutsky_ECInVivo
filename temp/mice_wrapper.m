@@ -5,8 +5,8 @@
 
 % user input
 mname           = 'lh110';
-basepath        = 'F:\Data\lh110\lh110_220806_092400';
-blocks          = [1 : 2];
+basepath        = 'F:\Data\lh110\lh110_220808_095100';
+blocks          = [1 : 3];
 
 % tank to dat 
 mapch           = [];
@@ -67,6 +67,7 @@ AccuSleep_viewer(sSig, [], labelsmanfile)
 
 % classify with a network
 calData = [];
+load(fullfile(mousepath, ['lh110_220803_092100.sleep_states.mat']), 'ss')
 calData = ss.info.calibrationData;
 ss = as_classify(sSig, 'basepath', pwd, 'inspectLabels', false,...
     'saveVar', true, 'forceA', true, 'netfile', [],...
@@ -77,16 +78,6 @@ spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true, 'saveVar', true,...
     'padfft', -1, 'winstep', 5, 'logfreq', true, 'ftarget', [],...
     'ch', [{1}], 'force', true);
 
-[expData, xData] = sessions_catVarTime('mname', '',...
-    'dataPreset', {'spec', 'emg_rms'}, 'graphics', true,...
-    'basepaths', {basepath}, 'xTicksBinsize', 1, 'markRecTrans', true);
-
-fh = figure;
-plot(sSig.emg_rms)
-xidx = v.results.info.stimIdx;
-hold on
-plot([xidx; xidx], ylim, '--k', 'LineWidth', 3)
-
 % -------------------------------------------------------------------------
 % fepsp in relation to states
 
@@ -96,15 +87,16 @@ varsName = ["traces"; "results"; "ss"];
 v = getSessionVars('basepaths', {basepath}, 'varsFile', varsFile,...
     'varsName', varsName);
 
-% get stim indices in specific state
+% get stim indices in specific state. note some stims may be attributed to
+% two or more states due to overlap in stateEpochs. This can prevented by
+% using labels instead.
 nstates = 6;
 clear stateStim
 for istate = 1 : nstates
     stateStim(:, istate) = InIntervals(v.results.info.stimIdx, v.ss.stateEpochs{istate});
 end
 sum(stateStim)
-
-histcounts(ss.labels(round(v.results.info.stimIdx)), [1 : 7])
+% histcounts(ss.labels(round(v.results.info.stimIdx)), [1 : 7])
 
 nstims = 60;
 nintens = length(intens);
@@ -118,22 +110,30 @@ for istate = 1 : nstates
         traces{istate}(iintens, :) = mean(v.traces{iintens}(:, stimIdx), 2);
     end
 end
-% 
-% protocol_info = fepsp_getProtocol("protocol_id", 'pair', "fs", fs);
-% protocol_info.Tstamps;
-% 
+
+% organize in struct
+protocol_info = fepsp_getProtocol("protocol_id", 'pair', "fs", fs);
+fstates.tstamps = protocol_info.Tstamps;
+fstates.nstims = nstimState;
+fstates.amp = amp;
+fstates.traces = traces;
 % cell2nanmat(amp, 2)
 
+% check stim time
+fh = figure;
+plot(sSig.emg_rms)
+xidx = v.results.info.stimIdx;
 hold on
-xidx = [v.results.info.stimIdx / 60 / 60];
-plot(xidx, xidx, )
+plot([xidx; xidx], ylim, '--k', 'LineWidth', 3)
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % lh109
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % user input
 mname           = 'lh109';
-basepath        = 'F:\Data\lh110\lh110_220803_092100';
+basepath        = 'F:\Data\lh110\lh110_220807_084900';
 blocks          = [1 : 4];
 cd(basepath)
 
@@ -183,7 +183,9 @@ sSig = as_prepSig([basename, '.lfp'], [],...
     'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
     'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [50 450], 'fs', 1250);
 labelsmanfile = [basename, '.sleep_labelsMan.mat'];
-AccuSleep_viewer(sSig, [], labelsmanfile)
+AccuSleep_viewer(sSig, labels, labelsmanfile)
+
+%%% artifacts when cable moves. states could be better. 
 
 % classify with a network
 % calData = ss.info.calibrationData;
