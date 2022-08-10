@@ -106,9 +106,9 @@ brst.detect             = nan(nbins, nunits);
 brst.nspks              = nan(nbins, nunits);
 brst.spkprct            = nan(nbins, nunits);
 brst.brstDur            = nan(nbins, nunits);
-brst.freqIn             = nan(nbins, nunits);
-brst.freqOf             = nan(nbins, nunits);
-brst.freqOfNorm         = nan(nbins, nunits);
+brst.freq               = nan(nbins, nunits);
+brst.rate               = nan(nbins, nunits);
+brst.rateNorm           = nan(nbins, nunits);
 brst.ibi                = nan(nbins, nunits);
 
 for ibin = 1 : nbins
@@ -149,8 +149,8 @@ for ibin = 1 : nbins
         brst.shortPrct(ibin, iunit) = (nbrsts.detect - nbrsts.dur) / nbrsts.detect * 100;
 
         % number of bursts relative to binsize and ~firing rate
-        brst.freqOf(ibin, iunit) = nbrsts.dur / binsize(ibin);
-        brst.freqOfNorm(ibin, iunit) = brst.freqOf(ibin, iunit) / (nspks / binsize(ibin));
+        brst.rate(ibin, iunit) = nbrsts.dur / binsize(ibin);
+        brst.rateNorm(ibin, iunit) = brst.rate(ibin, iunit) / (nspks / binsize(ibin));
 
         % organize and average stats
         brst.all(ibin, iunit) = b;
@@ -158,7 +158,7 @@ for ibin = 1 : nbins
         brst.detect(ibin, iunit) = nbrsts.detect;
         brst.nspks(ibin, iunit) = mean(b.nspks);
         brst.brstDur(ibin, iunit) = mean(b.dur);
-        brst.freqIn(ibin, iunit) = mean(b.freq);
+        brst.freq(ibin, iunit) = mean(b.freq);
         brst.spkprct(ibin, iunit) = mean(b.spkprct);
         brst.ibi(ibin, iunit) = mean(b.ibi);
 

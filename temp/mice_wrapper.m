@@ -5,8 +5,8 @@
 
 % user input
 mname           = 'lh110';
-basepath        = 'F:\Data\lh110\lh110_220808_095100';
-blocks          = [1 : 3];
+basepath        = 'F:\Data\lh110\lh110_220809_090100';
+blocks          = [1 : 6];
 
 % tank to dat 
 mapch           = [];
@@ -21,7 +21,7 @@ datInfo = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
 intens          = [300, 500, 700];
 protocol_id     = 'pair';
 ch              = 1;
-blocks          = 2;                            
+blocks          = 3;                            
 fepsp_tdtPipeline('basepath', basepath, 'blocks', blocks,...
     'protocol_id', protocol_id, 'recsuffix', '', 'intens', intens,...
     'ch', ch, 'mapch', mapch', 'rmvch', rmvch, 'store', store)
@@ -98,7 +98,7 @@ end
 sum(stateStim)
 % histcounts(ss.labels(round(v.results.info.stimIdx)), [1 : 7])
 
-nstims = 60;
+nstims = length(v.results.info.stimIdx);
 nintens = length(intens);
 idxCell = num2cell(reshape(1 : nstims, nstims / nintens, nintens), 1);
 clear amp traces
@@ -133,8 +133,8 @@ plot([xidx; xidx], ylim, '--k', 'LineWidth', 3)
 
 % user input
 mname           = 'lh109';
-basepath        = 'F:\Data\lh110\lh110_220807_084900';
-blocks          = [1 : 4];
+basepath        = 'F:\Data\lh110\lh110_220809_090100';
+blocks          = [1 : 6];
 cd(basepath)
 
 % tank to dat 

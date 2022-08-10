@@ -5,8 +5,8 @@
 
 % user input
 mname           = 'lh110';
-basepath        = 'F:\Data\lh110\lh110_220807_084900';
-blocks          = [1 : 4];
+basepath        = 'F:\Data\lh110\lh110_220809_090100';
+blocks          = [1 : 6];
 
 % tank to dat 
 mapch           = [];
@@ -98,7 +98,7 @@ end
 sum(stateStim)
 % histcounts(ss.labels(round(v.results.info.stimIdx)), [1 : 7])
 
-nstims = 59;
+nstims = length(v.results.info.stimIdx);
 nintens = length(intens);
 idxCell = num2cell(reshape(1 : nstims, nstims / nintens, nintens), 1);
 clear amp traces
@@ -183,7 +183,9 @@ sSig = as_prepSig([basename, '.lfp'], [],...
     'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
     'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [50 450], 'fs', 1250);
 labelsmanfile = [basename, '.sleep_labelsMan.mat'];
-AccuSleep_viewer(sSig, [], labelsmanfile)
+AccuSleep_viewer(sSig, labels, labelsmanfile)
+
+%%% artifacts when cable moves. states could be better. 
 
 % classify with a network
 % calData = ss.info.calibrationData;
