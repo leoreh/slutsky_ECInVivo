@@ -60,14 +60,12 @@ force           = p.Results.force;
 
 % separate recording to bins
 recLen = max(cellfun(@max, spktimes, 'uni', true));
+if isempty(binsize) || binsize > recLen
+    binsize = recLen;
+end
 if isempty(bins)
-    if binsize > recLen
-        binsize = recLen;
-        bins = [0, binsize];
-    else
-        bins = n2chunks('n', recLen, 'chunksize', binsize, 'overlap', [1 0]);
-        bins(1) = 0; bins(end - 1, 2) = recLen; bins(end, :) = [];
-    end
+    bins = n2chunks('n', recLen, 'chunksize', binsize, 'overlap', [1 0]);
+    bins(1) = 0; bins(end - 1, 2) = recLen; bins(end, :) = [];
 end
 
 % convert bins to cell
@@ -75,6 +73,12 @@ if ~iscell(bins)
     bins = mat2cell(bins, ones(size(bins, 1), 1), size(bins, 2));
 end
 nbins = length(bins);
+
+for ibin = 1 : nbins
+    if bins{ibin}(end) > recLen
+        bins{ibin}(end) = recLen;
+    end
+end
 
 % get binsize
 for ibin = 1 : nbins
@@ -110,6 +114,7 @@ brst.freq               = nan(nbins, nunits);
 brst.rate               = nan(nbins, nunits);
 brst.rateNorm           = nan(nbins, nunits);
 brst.ibi                = nan(nbins, nunits);
+brst.shortPrct          = nan(nbins, nunits);
 
 for ibin = 1 : nbins
     for iunit = 1 : nunits
@@ -136,7 +141,7 @@ for ibin = 1 : nbins
         % burst duration [s]
         b.dur = diff(b.times, 1, 2); 
         
-        % average frequency within burst
+        % frequency within burst
         b.freq = b.nspks ./ (b.dur);
         
         % percent of spikes that participate in bursts
@@ -145,8 +150,8 @@ for ibin = 1 : nbins
         % inter-burst interval
         b.ibi = b.times(2 : end, 1) - b.times(1 : end - 1, 2);
         
-        % ratio of bursts that pass the min spks criterion
-        brst.shortPrct(ibin, iunit) = (nbrsts.detect - nbrsts.dur) / nbrsts.detect * 100;
+        % percent bursts that pass the min spks criterion
+        brst.shortPrct(ibin, iunit) =  (nbrsts.dur / nbrsts.detect) * 100;
 
         % number of bursts relative to binsize and ~firing rate
         brst.rate(ibin, iunit) = nbrsts.dur / binsize(ibin);

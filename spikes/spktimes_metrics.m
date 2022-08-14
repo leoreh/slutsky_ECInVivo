@@ -209,7 +209,9 @@ for iunit = 1 : length(sunits)
         
         % firing irregularity ---------------------------------------------
         
-        % Cv (coefficient of variation): Shinomoto 2003
+        % Cv (coefficient of variation): Shinomoto 2003. note that when
+        % calculated for stateEpochs, this is terribly biased due to large
+        % ISI's between epochs
         st.cv(ibin, iunit) = std(isi) / mean(isi);
         
         % Cv2 (local cv): Holt 1996, taken from CE
@@ -257,12 +259,6 @@ for iunit = 1 : length(sunits)
             st.acg_refrac(ibin, iunit) = fit_params(6);
         end
     end
-end
-
-% burstiness (mea)
-if fullA
-    st.brst = spktimes_meaBrst(spikes.times, 'bins', bins, 'isiThr', 0.02,...
-        'minSpks', 2, 'saveVar', false, 'force', true, 'bins', bins);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

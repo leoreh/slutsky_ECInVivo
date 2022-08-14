@@ -21,7 +21,7 @@ spkgrp = session.extracellular.spikeGroups.channels;
 [~, basename] = fileparts(basepath);
 
 % add timebins to datInfo
-[timebins, timepnt] = metaInfo_timebins('reqPnt', 2 * 60 * 60, 'nbins', 2);
+[timebins, timepnt] = metaInfo_timebins('reqPnt', 6 * 60 * 60, 'nbins', 2);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preprocessing of raw files
@@ -101,7 +101,7 @@ emglfp = getEMGfromLFP(double(lfp.data(:, :)),...
 % create emg signal from accelerometer data
 acc = EMGfromACC('basepath', basepath, 'fname', [basename, '.lfp'],...
     'nchans', nchans, 'ch', nchans - 2 : nchans, 'saveVar', true, 'fsIn', 1250,...
-    'graphics', false, 'force', false);
+    'graphics', false, 'force', true);
 
 % get ripples
 ripp = getRipples('basepath', basepath, 'rippCh', [9],...
@@ -122,7 +122,7 @@ sSig = load([basename, '.sleep_sig.mat']);
 
 % call for acceleration
 sSig = as_prepSig([basename, '.lfp'], acc.mag,...
-    'eegCh', [5 : 8], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
+    'eegCh', [1 : 4], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
     'eegNchans', nchans, 'inspectSig', true, 'forceLoad', true,...
     'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [10 450], 'fs', 1250);
 
@@ -132,9 +132,15 @@ sSig = as_prepSig([basename, '.lfp'], [],...
     'eegNchans', nchans, 'inspectSig', true, 'forceLoad', true,...
     'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [10 450], 'fs', 1250);
 
+% call for lfp
+sSig = as_prepSig([basename, '.lfp'], [basename, '.emg.dat'],...
+    'eegCh', [13 : 16], 'emgCh', [1], 'saveVar', true, 'emgNchans', 1,...
+    'eegNchans', nchans, 'inspectSig', true, 'forceLoad', true,...
+    'eegFs', 1250, 'emgFs', 1017.25, 'eegCf', [], 'emgCf', [10 450], 'fs', 1250);
+
 % manually create labels
 labelsmanfile = [basename, '.sleep_labelsMan.mat'];
-AccuSleep_viewer(sSig, [], labelsmanfile)
+AccuSleep_viewer(sSig, labels, labelsmanfile)
 
 % classify with a network
 netfile = [];
@@ -162,7 +168,7 @@ psdBins = psd_states_timebins('basepath', pwd,...
 % calc spec
 spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true, 'saveVar', true,...
     'padfft', -1, 'winstep', 5, 'logfreq', true, 'ftarget', [],...
-    'ch', [{5 : 8}], 'force', true);
+    'ch', [{13 : 16}], 'force', true);
 
 plot_spec(spec, 'ch', 1, 'logfreq', true, 'saveFig', false,...
     'axh', [])
@@ -256,17 +262,7 @@ plot_FRstates_sextiles('stateMfr', fr.states.mfr(:, [1, 4])', 'units', units.cle
 spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
     'saveFig', false, 'force', true, 'mu', [], 'graphics', false,...
     'vis', 'on', 'spkgrp', spkgrp);
-
-% spike timing metrics
-st = spktimes_metrics('bins', [], 'forceA', true);
-
-% burstiness (mea)
-brst = spktimes_meaBrst(spikes.times, 'binsize', 3600, 'isiThr', 0.02,...
-    'minSpks', 2, 'saveVar', false, 'force', true);
-
-% spike waveform metrics
-swv = spkwv_metrics('basepath', basepath, 'fs', fs, 'forceA', true);
-
+x
 % mfr by states in time bins
 timebins = session.general.timebins;
 fr_timebins('basepath', pwd, 'forceA', true, 'graphics', false,...
@@ -305,12 +301,12 @@ monosyn = monoSyn_wrapper('spktimes', mea.spktimes, 'basepath', pwd,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % concatenate var from different sessions
-mname = 'lh50';
+mname = 'lh109';
 % basepaths = {basepath};
 basepaths = {};
 [expData, xData] = sessions_catVarTime('mname', mname,...
     'dataPreset', {'spec', 'emg_rms'}, 'graphics', true,...
-    'basepaths', basepaths, 'xTicksBinsize', 1, 'markRecTrans', true);
+    'basepaths', basepaths, 'xTicksBinsize', 3, 'markRecTrans', true);
 
 % snip segments (e.g. spikes) from binary 
 [spkwv, ~] = snipFromBinary('stamps', spktimes, 'fname', datname,...

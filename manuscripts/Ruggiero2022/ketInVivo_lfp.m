@@ -75,7 +75,7 @@ psd = permute(psd_cat.psdLfp, [4, 1, 3, 2]);
 
 % -------------------------------------------------------------------------
 % organize psd in specific bands and normalize after to before
-bandFreqs = [0.5, 1; 1, 4; 4, 10; 30, 60; 60, 100];
+bandFreqs = [0.5, 1; 1, 4; 4, 10; 30, 100; 60, 100];
 nbands = size(bandFreqs, 1);
 bands = nan(nsessions, nbands, length(sstates));
 for iband = 1 : nbands
@@ -87,7 +87,7 @@ for iband = 1 : nbands
 end
 
 % to prism
-iband = 2;
+iband = 5;
 istate = 1;
 prism_vec = bands(:, iband, istate);
 prism_data = vec2nanmat(prism_vec, [6, 5, 5]) * 100;
@@ -171,10 +171,10 @@ for iband = 1 : nbands
 end
 
 % to prism
-iband = 8;
+iband = 7;
 istate = 1;
 prism_vec = bands_norm(:, iband, istate);
-prism_data = vec2nanmat(prism_vec, [6, 5, 5]);
+prism_data = vec2nanmat(prism_vec, [6, 5, 4]);
 
 % stats
 setMatlabGraphics(true)
@@ -228,7 +228,7 @@ set(ax.YAxis, 'color', cfg.colors{sstates(istate)})
 % calc psd
 freq = [0.5 : 0.5 : 120];
 clear psd
-for isession = 12 : 16
+for isession = 1 : 15
     basepath = basepaths{isession};
     [~, basename] = fileparts(basepath);
     cd(basepath)
@@ -262,12 +262,13 @@ ylabel('PSD')
 legend
 
 % calc bands from psd
-bandFreqs = [40, 60];
+bandFreqs = [30, 60];
 bandIdx = InIntervals(freq, bandFreqs);
 bands = sum(psd(:, bandIdx), 2, 'omitnan');
 
 % to prism
 cnt = 1;
+grpsz = [6, 5, 4];
 prism_data = cell(1, length(grpsz));
 for igrp = 1 : length(grpsz)
     prism_data{igrp} = bands(cnt : cnt + grpsz(igrp) - 1);

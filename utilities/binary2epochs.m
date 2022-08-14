@@ -60,9 +60,13 @@ stop = find([0; diff(vec)] < 0);
 if isempty(start) && isempty(stop)
     if unique(vec) == 1
         epochs = [1 length(vec)];
-        nepochs.detection = 1;
+        nepochs.detect = 1;
+        nepochs.dur = 1;
+        nepochs.merge = 1;
     else
-        nepochs.detection = 0;
+        nepochs.detect = 0;
+        nepochs.dur = 0;
+        nepochs.merge = 0;
         if printFlag
             fprintf('\nNo epochs detected\n');
         end
