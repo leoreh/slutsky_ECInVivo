@@ -1,5 +1,5 @@
 
-[basepaths, v, nsessions] = ketInVivo_sessions('ket');
+[basepaths, v, nfiles] = ketInVivo_sessions('ket');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % reanalyze something
@@ -8,57 +8,78 @@
 cell_metrics = CellExplorer('basepaths', basepaths);
 
 % itterate
-for isession = 1 : nsessions
-    basepath = basepaths{isession};
+for ifile = 1 : nfiles
+    basepath = basepaths{ifile};
     cd(basepath)
     [mousename, basename] = fileparts(basepath);
     [~, mousename] = fileparts(mousename);
 
-%     % number of units per spike group
-%     plot_nunits_session('basepath', basepath, 'frBoundries', [])
-% 
-%     % select specific units
-%     grp = v(isession).units.info.grp;
-%     grp = [1 : 4];
-%     units = selectUnits('basepath', basepath, 'grp', grp, 'saveVar', true,...
-%         'forceA', true, 'frBoundries', [0.05 Inf; 0.05 Inf],...
-%         'spikes', v(isession).spikes);
-%     units = v(isession).units;
-% %     units.clean = units.clean(1, :) | units.clean(2, :);
-% %     
-%     % plot fr vs. time
-%     plot_FRtime_session('basepath', basepath,...
-%         'muFlag', false, 'saveFig', false,...
-%         'dataType', 'strd', 'units', units.clean)
- 
+    %     % number of units per spike group
+    %     plot_nunits_session('basepath', basepath, 'frBoundries', [])
+    %
+    %     % select specific units
+    %     grp = v(ifile).units.info.grp;
+    %     grp = [1 : 4];
+    %     units = selectUnits('basepath', basepath, 'grp', grp, 'saveVar', true,...
+    %         'forceA', true, 'frBoundries', [0.05 Inf; 0.05 Inf],...
+    %         'spikes', v(ifile).spikes);
+    %     units = v(ifile).units;
+    % %     units.clean = units.clean(1, :) | units.clean(2, :);
+    % %
+    %     % plot fr vs. time
+    %     plot_FRtime_session('basepath', basepath,...
+    %         'muFlag', false, 'saveFig', false,...
+    %         'dataType', 'strd', 'units', units.clean)
+
     % state ratio according to mfr percetiles
-%     frBins = catfields(v(isession).frBins, 'catdef', 'addim', 'force', false);
-%     stateMfr = frBins.states.mfr(:, [1, 4], 1);
-%     plot_FRstates_sextiles('stateMfr', stateMfr', 'units', units.clean,...
-%         'ntiles', 2, 'saveFig', false)
-    
-    timebins = v(isession).session.general.timebins;
-    timepnt = v(isession).session.general.timepnt;
-    timebins = [10 * 60, timepnt; timepnt, timepnt + 3 * 60 * 60;...
-        timepnt + 3 * 60 * 60, timepnt + 6 * 60 * 60;
-        timepnt + 6 * 60 * 60, timepnt + 9 * 60 * 60;
-        timepnt + 9 * 60 * 60, Inf];
-    winBL = [0 timepnt];
+    %     frBins = catfields(v(ifile).frBins, 'catdef', 'addim', 'force', false);
+    %     stateMfr = frBins.states.mfr(:, [1, 4], 1);
+    %     plot_FRstates_sextiles('stateMfr', stateMfr', 'units', units.clean,...
+    %         'ntiles', 2, 'saveFig', false)
 
-    % update session file
-    sessionfile = fullfile(basepath, [basename, '.session.mat']);
-    session = v(isession).session;
-    session.general.timebins = timebins;
-    session.general.timepnt = timepnt;
-    save(sessionfile, 'session')
+    timebins = v(ifile).session.general.timebins;
+    timepnt = v(ifile).session.general.timepnt;
+    %     timebins = [10 * 60, timepnt; timepnt, timepnt + 3 * 60 * 60;...
+    %         timepnt + 3 * 60 * 60, timepnt + 6 * 60 * 60;
+    %         timepnt + 6 * 60 * 60, timepnt + 9 * 60 * 60;
+    %         timepnt + 9 * 60 * 60, Inf];
+    %     winBL = [0 timepnt];
+    %
+    %     % update session file
+    %     sessionfile = fullfile(basepath, [basename, '.session.mat']);
+    %     session = v(ifile).session;
+    %     session.general.timebins = timebins;
+    %     session.general.timepnt = timepnt;
+    %     save(sessionfile, 'session')
+    %
+    %     fr = firingRate(v(ifile).spikes.times, 'basepath', basepath,...
+    %         'graphics', false, 'binsize', 60, 'saveVar', true,...
+    %         'smet', 'none', 'winBL', winBL, 'winCalc', [0, Inf]);
+    %
+    %     fr_timebins('basepath', pwd,...
+    %         'forceA', true, 'graphics', true,...
+    %         'timebins', timebins, 'saveVar', true, 'sstates', [1, 4]);
 
-    fr = firingRate(v(isession).spikes.times, 'basepath', basepath,...
-        'graphics', false, 'binsize', 60, 'saveVar', true,...
-        'smet', 'none', 'winBL', winBL, 'winCalc', [0, Inf]);
 
-    fr_timebins('basepath', pwd,...
-        'forceA', true, 'graphics', true,...
-        'timebins', timebins, 'saveVar', true, 'sstates', [1, 4]);
+    % bins w/ respec to states
+    ss = v(ifile).ss.stateEpochs([1, 4]);
+    cnt = 1; clear bins
+    for istate = 1 : 2
+        bins{cnt} = ss{istate}(InIntervals(ss{istate}, timebins(1, :)), :);
+        bins{cnt + 1} = ss{istate}(InIntervals(ss{istate}, timebins(2, :)), :);
+        cnt = cnt + 2;
+    end
+    bins{5} = timebins(1, :);
+    bins{6} = timebins(2, :);
+    bintxt = {'AW-BSL'; 'AW-KET'; 'NREM-BSL'; 'NREM-KET'; 'BSL'; 'KET'};
+
+    % spike timing metrics
+%     st = spktimes_metrics('spikes', v(ifile).spikes, 'sunits', [],...
+%         'bins', bins, 'forceA', true, 'saveVar', true, 'fullA', false);
+
+    % brst (mea)
+    brst = spktimes_meaBrst(v(ifile).spikes.times, 'binsize', [], 'isiThr', 0.05,...
+        'minSpks', 2, 'saveVar', true, 'force', true, 'bins', bins);
 end
 
 % params
@@ -80,8 +101,8 @@ units = catfields([v.units], 'catdef', 'long', 'force', false);
 
 % concate mfr in states
 stateMfr = [];
-for isession = 1 : nsessions
-    frBins = catfields(v(isession).frBins, 'catdef', 'addim', 'force', false);
+for ifile = 1 : nfiles
+    frBins = catfields(v(ifile).frBins, 'catdef', 'addim', 'force', false);
     stateMfr = [stateMfr; frBins.states.mfr(:, sstates, :)];
 end
 
@@ -89,6 +110,34 @@ end
 fr = catfields([v.fr], 'catdef', 'long', 'force', false);
 mfr_bl = fr.mfr;
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% investigate burstiness
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+iunit = 1;
+
+brstVar = ["rateNorm"; "rate"; "freq"; "spkprct"; "brstDur"; "ibi"; "detect"; "shortPrct"];    
+brst = catfields([v(:).brst], 'catdef', 'long');
+for ivar = 1 : length(brstVar)
+    fh = figure;
+    ydata = brst.(brstVar{ivar})(:, units.clean(iunit, :))';
+    plot_boxMean('dataMat', ydata, 'clr', 'k')
+    xticklabels(bintxt)
+    ylabel(brstVar{ivar})
+end
+
+spkVar = ["royer"; "lidor"; "doublets"; "mizuseki"; "lvr"];    
+st = catfields([v(:).st], 'catdef', 'long');
+for ivar = 1 : length(spkVar)
+    fh = figure;
+    ydata = st.(spkVar{ivar})(:, units.clean(iunit, :))';
+    plot_boxMean('dataMat', ydata, 'clr', 'k')
+    xticklabels(bintxt)
+    ylabel(spkVar{ivar})
+end
+
+fr.mfr(units.clean(iunit, :));
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % mfr states - box plot of gain ratio divided to sextiles
@@ -132,8 +181,6 @@ plot_boxMean('dataMat', chgMat, 'clr', 'k', 'allPnts', true)
 
 
 
-
-
 infidx = isinf(log10(mfr_bl));
 mdl = fitlm(log10(mfr_bl(~infidx)), mfr_chg(~infidx),...
     'Exclude', mfr_bl(~infidx) < 0);
@@ -150,21 +197,47 @@ plot(mdl)
 
 % params
 istate = 1;
-ibin = 2;
+ibin = 1;
 iunit = 1;
+bedges = logspace(-1, 0.2, 10);
+
+ttltxt = {'BSL'; 'KET'};
 
 fh = figure;
-th = tiledlayout(2, length(sstates), 'TileSpacing', 'Compact');
+th = tiledlayout(1, length(sstates), 'TileSpacing', 'Compact');
 
-for istate = 1 : 2
-    data = log10(stateMfr(units.clean(iunit, :), istate, ibin));
-    hh = histogram(data, 15,...
-        'Normalization', 'probability');
-    hh.EdgeColor = 'none';
-    hh.FaceColor = cfg.colors{sstates(istate)};
-    hh.FaceAlpha = 0.3;
-    hold on
+for ibin = [1, 2]
+    axh = nexttile;
+    for istate = [1, 2]
+        %     ydata = log10(stateMfr(unitsTile(:, 1), istate, ibin));
+
+        ydata = (stateMfr(units.clean(iunit, :), istate, ibin));
+        ydata(ydata == 0) = [];
+        logstats(ibin, istate, :) = lognfit(ydata);
+        mstats(ibin, istate) = mean(ydata, 1, 'omitnan');
+        sstats(ibin, istate) = std(ydata, 1, 'omitnan');
+        ydata = log10(ydata);
+
+        hh = histfit(ydata, 15, 'normal', 'Normalization', 'probability');
+        hh(1).EdgeColor = 'none';
+        hh(1).FaceColor = cfg.colors{sstates(istate)};
+        hh(1).FaceAlpha = 0.3;
+        hh(2).Color = cfg.colors{sstates(istate)};
+        hh(2).LineWidth = 3;
+        hold on
+        xlim([-3 3])
+        ylim([0 30])
+
+    end
+    xlabel('log MFR [Hz]')
+    ylabel('Probability')
+    title(axh, ttltxt{ibin})
 end
+
+fh = figure;
+ydata = squeeze(stateMfr(units.clean(iunit, :), :, 1));
+plot_boxMean('dataMat', ydata, 'clr', 'k')
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % box plot of mfr across states divided by median
@@ -222,29 +295,29 @@ iunit = 2;
 
 % mean of all units
 chg_raw = [];
-for isession = 1 : nsessions
-    unitsClean = v(isession).units.clean(iunit, :);
+for ifile = 1 : nfiles
+    unitsClean = v(ifile).units.clean(iunit, :);
 
     chg_tmp = nan(sum(unitsClean), length(tbins));
     for ibin = 1 : length(tbins)
-        chg_tmp(:, ibin) = v(isession).frBins(tbins(ibin)).mfr(unitsClean);   
+        chg_tmp(:, ibin) = v(ifile).frBins(tbins(ibin)).mfr(unitsClean);   
     end
     chg_raw = [chg_raw; chg_tmp];
 end
 chg_raw'
 
 % mean per session
-chg_raw = nan(length(tbins) + 1, nsessions);
-chg_norm = nan(length(tbins), nsessions);
-for isession = 1 : nsessions
-    unitsClean = v(isession).units.clean(iunit, :);
+chg_raw = nan(length(tbins) + 1, nfiles);
+chg_norm = nan(length(tbins), nfiles);
+for ifile = 1 : nfiles
+    unitsClean = v(ifile).units.clean(iunit, :);
 
-    chg_raw(1, isession) = mean(v(isession).frBins(1).mfr(unitsClean));
+    chg_raw(1, ifile) = mean(v(ifile).frBins(1).mfr(unitsClean));
     cnt = 1;
     for ibin = 1 : length(tbins)
-        chg_raw(cnt + 1, isession) = mean(v(isession).frBins(tbins(ibin)).mfr(unitsClean), 'omitnan');
-        chg_norm(cnt, isession) = mean(v(isession).frBins(tbins(ibin)).mfr(unitsClean) ./...
-            v(isession).frBins(1).mfr(unitsClean) * 100, 'omitnan');
+        chg_raw(cnt + 1, ifile) = mean(v(ifile).frBins(tbins(ibin)).mfr(unitsClean), 'omitnan');
+        chg_norm(cnt, ifile) = mean(v(ifile).frBins(tbins(ibin)).mfr(unitsClean) ./...
+            v(ifile).frBins(1).mfr(unitsClean) * 100, 'omitnan');
         cnt = cnt + 1;
     end
 end
@@ -280,8 +353,8 @@ else
     unitChar = 'fs';
 end
 prism_units = [];
-for isession = 1 : nsessions
-    units_tmp = ones(sum(v(isession).units.(unitChar)), 1) * isession;
+for ifile = 1 : nfiles
+    units_tmp = ones(sum(v(ifile).units.(unitChar)), 1) * ifile;
     prism_units = [prism_units; units_tmp];
 end
 sum(prism_units ~= 0)
@@ -298,21 +371,23 @@ mean(mean(prism_data(prism_tstamps < 0, prism_units > 0), 1, 'omitnan'))
 % params
 istate = [1, 4];
 ibin = [1, 2];
-iunit = 1;
+iunit = 2;
 ntiles = 2;
 
 % cat units
 units = catfields([v.units], 'catdef', 'long', 'force', false);
 
-% cat mfr in states
-stateMfr = []; gainf = [];
-for isession = 1 : nsessions
-    frBins = catfields(v(isession).frBins, 'catdef', 'addim', 'force', false);
+% cat mfr in states. note ratio vs. gain
+stateMfr = []; gainf = []; sratio = [];
+for ifile = 1 : nfiles
+    frBins = catfields(v(ifile).frBins, 'catdef', 'addim', 'force', false);
     stateMfr = [stateMfr; frBins.states.mfr];
-    gainf = [gainf; squeeze(frBins.states.gain(4, :, :)) / 100];
+    gainf = [gainf; squeeze(frBins.states.gain(4, :, :))];      
+    sratio = [sratio; squeeze(frBins.states.ratio(4, 1, :, :))];
 end
 stateMfr = stateMfr(units.clean(iunit, :), istate, ibin);
 gainf = gainf(units.clean(iunit, :), ibin);
+sratio = sratio(units.clean(iunit, :), ibin);
 
 % data
 bsl_wake = squeeze(stateMfr(:, 1, 1));
@@ -340,19 +415,24 @@ end
 chgMat = cell2nanmat(chgCell, 2) * 100;
 
 % gain factor
-clear gainCell 
+clear gainCell stateCell
 for itile = 1 : ntiles
     sunits = unitsTile(itile, :);
     gainCell{itile} = gainf(sunits, 1);
-        gainCell{itile + 2} = gainf(sunits, 2);
+    gainCell{itile + 2} = gainf(sunits, 2);
+    stateCell{itile} = sratio(sunits, 1);
+    stateCell{itile + 2} = sratio(sunits, 2);
 end
 gainMat = cell2nanmat(gainCell, 2);
+stateMat = cell2nanmat(stateCell, 2) * 100;
 
 
 % for 2-way anova
 [chgMat(:, 1)', chgMat(:, 2)'; chgMat(:, 3)', chgMat(:, 4)']
 
 [gainMat(:, 1)', gainMat(:, 2)'; gainMat(:, 3)', gainMat(:, 4)']
+
+[stateMat(:, 1)', stateMat(:, 2)'; stateMat(:, 3)', stateMat(:, 4)']
 
 
 % kernel plot -------------------------------------------------------------

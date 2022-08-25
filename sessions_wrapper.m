@@ -4,7 +4,7 @@
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = 'lh91';
+mname = 'lh86';
 forceL = true;
 forceA = true;
 
@@ -13,24 +13,23 @@ ncond = [""];
 
 % load vars from each session
 varsFile = ["fr"; "sr"; "spikes"; "st_metrics"; "swv_metrics";...
-    "cell_metrics"; "sleep_states"; "ripp.mat"; "datInfo"; "session"];
+    "cell_metrics"; "sleep_states"; "ripp.mat"; "datInfo"; "session";...
+    "psd_bins"];
 varsName = ["fr"; "sr"; "spikes"; "st"; "swv"; "cm"; "ss"; "ripp";...
-    "datInfo"; "session"];
+    "datInfo"; "session"; "psdBins"];
 xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
 
-if ~exist('v', 'var') || forceL
-    [v, basepaths] = getSessionVars('mname', mname, 'varsFile', varsFile,...
-        'varsName', varsName, 'pcond', pcond, 'ncond', ncond,...
-        'xlsname', xlsname);
-end
-nsessions = length(basepaths);
+[v, basepaths] = getSessionVars('mname', mname, 'varsFile', varsFile,...
+    'varsName', varsName, 'pcond', pcond, 'ncond', ncond,...
+    'xlsname', xlsname);
+nfiles = length(basepaths);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % analyze data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 templateCal = ss.info.calibrationData;
 
-for isession = 1 : nsessions
+for isession = 1 : nfiles
     
     % file
     basepath = basepaths{isession};
@@ -39,7 +38,7 @@ for isession = 1 : nsessions
 
     % print progress
     fprintf('sessions_wrapper: working on session %d of %d, %s\n',...
-        isession, nsessions, basename)
+        isession, nfiles, basename)
 
     % params
     session = CE_sessionTemplate(pwd, 'viaGUI', false,...
@@ -117,7 +116,7 @@ nchans = session.extracellular.nChannels;
 fs = session.extracellular.sr;
 spkgrp = session.extracellular.spikeGroups.channels;
 
-sessionIdx = 1 : nsessions;
+sessionIdx = 1 : nfiles;
 stateidx = [1, 4, 5];
 grp = [1 : 4];                  % which tetrodes to plot
 unitClass = 'pyr';              % plot 'int', 'pyr', or 'all'
@@ -129,7 +128,7 @@ frBoundries = [0 Inf];          % include only units with fr greater than
 setMatlabGraphics(false)
 
 % arrange title names
-for isession = 1 : nsessions
+for isession = 1 : nfiles
     sessionName{isession} = dirnames{isession}(length(mname) + 2 : end);
     basepath = char(fullfile(mousepath, dirnames{isession}));
     basepaths{isession} = fullfile(mousepath, dirnames{isession});
@@ -144,7 +143,7 @@ varsFile = ["datInfo"; "session"; "st_metrics"; "units"];
 varsName = ["datInfo"; "session"; "st"; "units"];
 [v, ~] = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
     'varsName', varsName);
-nsessions = length(basepaths);
+nfiles = length(basepaths);
 
 % brst vars to organize and plot
 % from avg sub-struct
@@ -158,7 +157,7 @@ unitType = 'rs';
 brst = cell2struct(cell(1, length(brstVar)), brstVar, 2);
 
 % concate to cell
-for isession = 1 : nsessions
+for isession = 1 : nfiles
     su = v(isession).units.(unitType);
 
     for ivar = 1 : length(brstVar)

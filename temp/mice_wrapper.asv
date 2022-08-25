@@ -156,7 +156,7 @@ protocol_info = fepsp_getProtocol("protocol_id", 'pair', "fs", fs);
 xdata = protocol_info.Tstamps;
 
 % fepsp per state
-ifile = 3;
+ifile = 2;
 nstates = 6;
 intens = [350, 500, 650];
 clear stateStim
@@ -169,9 +169,6 @@ sum(stateStim)
 nstims = length(v(ifile).results.info.stimIdx);
 nintens = length(intens);
 idxCell = num2cell(reshape(1 : nstims, nstims / nintens, nintens), 1);
-% idxCell{1} = [1 : 20];
-% idxCell{2} = [21 : 40];
-% idxCell{3} = [41 : 59];
 clear amp traces
 for istate = 1 : nstates
     for iintens = 1 : nintens

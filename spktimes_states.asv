@@ -395,7 +395,7 @@ corr(log10(xdata), ydata', 'Rows','complete')
 % analyze CV of isi 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-thr = 10; % [s]
+thr = 4; % [s]
 cnt = 1;
 cv = nan(length(unitIdx), length(sstates));
 cv = cell(length(unitIdx), length(sstates));
@@ -419,7 +419,7 @@ mdata = cellfun(@(x) mean(log10(x), 1, 'omitnan'), cv(unitIdx, :), 'uni', true);
 sdata = cellfun(@(x) std(log10(x), 1, 'omitnan'), cv(unitIdx, :), 'uni', true);
 cvdata = sdata ./ mdata;
 
-clear cnts edges
+bins = 
 for iunit = 1 : nunits
     for ibin = 1 : length(sstates)
         tmp = lognfit(cv{iunit, ibin});
@@ -427,40 +427,12 @@ for iunit = 1 : nunits
         vlog(iunit, ibin) = tmp(2);
 
         [cnts{ibin}(iunit, :), edges{ibin}(iunit, :)] =...
-            histcounts(log10(cv{iunit, ibin}), 30,...
-            'Normalization', 'probability');
+            histcounts(log10(cv{iunit, ibin}), 200,...
+            'Normalization', 'countdensity')
     end
 end
 cvdata = vlog ./ mlog;
 gcv = exp(1) .^ log((vlog .* log(10))) - 1;
-
-sunits = randperm(nunits, nunits);
-fh = figure;
-th = tiledlayout(1, 2);
-axh = nexttile;
-hold on
-for iunit = 1 : length(sunits)
-    plot(edges{2}(sunits(iunit), 2 : end) - median(diff(edges{2}(sunits(iunit), :))) / 2,...
-        cnts{2}(sunits(iunit), :))
-end
-title(axh, 'NREM')
-xlabel('log ISI')
-ylabel('Probability')
-yLimit = ylim;
-xLimit = xlim;
-
-axh = nexttile;
-hold on
-for iunit = 1 : length(sunits)
-    plot(edges{1}(sunits(iunit), 2 : end) - median(diff(edges{1}(sunits(iunit), :))) / 2,...
-        cnts{1}(sunits(iunit), :))
-end
-title(axh, 'AW')
-xlabel('log ISI')
-ylabel('Probability')
-ylim(yLimit)
-xlim(xLimit)
-
 
 
 

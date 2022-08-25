@@ -34,7 +34,7 @@ end
 % plot
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-boxplot(dataMat, 'PlotStyle', 'traditional', 'Whisker', Inf);
+boxplot(dataMat, 'PlotStyle', 'traditional', 'Whisker', 2);
 bh = findobj(gca, 'Tag', 'Box');
 bh = flipud(bh);
 if isempty(alphaIdx)

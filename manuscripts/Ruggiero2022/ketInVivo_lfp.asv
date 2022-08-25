@@ -46,7 +46,7 @@ sstates = [1, 4, 5];
 
 % calculate
 clear psdBins
-for ifile = 1 : nfiles
+for ifile = 10 : nfiles
     basepath = basepaths{ifile};
     cd(basepath)
     [~, basename] = fileparts(basepath);
@@ -56,16 +56,16 @@ for ifile = 1 : nfiles
 
     % arrange timebins
     session = v(ifile).session;
-%     timepnt = session.general.timepnt;
-%     % timebins = v(ifile).session.general.timebins;
-%     timebins = [1, timepnt; timepnt, timepnt + 30 * 60;...
-%         timepnt, timepnt + 60 * 60;
-%         timepnt, timepnt + 120 * 60];
-%     %     timebins = [1, timebins(end)];
+    timepnt = session.general.timepnt;
+    % timebins = v(ifile).session.general.timebins;
+    timebins = [1, timepnt; timepnt, timepnt + 30 * 60;...
+        timepnt, timepnt + 60 * 60;
+        timepnt, timepnt + 120 * 60];
+    %     timebins = [1, timebins(end)];
     timebins = floor([1, session.general.duration - 60]);
 
     psdBins(ifile) = psd_states_timebins('basepath', pwd,...
-        'chEeg', [2], 'chLfp', [info.eegCh], 'forceA', true, 'graphics', false,...
+        'chEeg', [1], 'chLfp', [5], 'forceA', true, 'graphics', false,...
         'timebins', timebins, 'saveVar', true, 'sstates', sstates);
 
 end
@@ -98,13 +98,14 @@ istate = 1;
 prism_vec = bands(:, iband, istate);
 prism_data = vec2nanmat(prism_vec, length(sfiles)) * 100;
 
+psd = permute(psd_cat.psdEeg, [4, 1, 3, 2]);    
 istate = 1;
-ibin = [2];
-sfiles = 2 : 2 : nfiles;
-ydata = squeeze(psd_cat.psdLfp(istate, :, sfiles));
-ydata = movmean(ydata, 5);
+ibin = [1];
+ifile = 1 : nfiles;
+x = squeeze(psd(ifile, ibin, :, istate))';
+x = movmean(x, 5);
 fh = figure;
-plot(ydata, 'LineWidth', 2)
+plot(x)
 set(gca, 'yscale', 'log', 'xscale', 'log')
 legend
 

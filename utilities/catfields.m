@@ -89,43 +89,45 @@ for ifld = 1 : length(flds)
         eqdim(idim) = all(valsz(:, idim) == valsz(1, idim));
     end
     
-    % cat as cell if no dimensions are equal
-    if ~any(eqdim)
+    % cat as cell if more than one dimension is unequal
+    if sum(~eqdim) > 1
         cats.(flds{ifld}) = valarray(:, ifld);
         continue
     end
     
     % cat to the only dimension available
-    if sum(eqdim) == 1
+    if sum(~eqdim) == 1
         cats.(flds{ifld}) = cat(find(~eqdim), valarray{:, ifld});
         continue
     end
     
     % cat by adding another dimension if possible
-    if strcmp(catdef, 'addim') && all(eqdim)
+    if strcmp(catdef, 'addim') && sum(eqdim) == unique(ndim)
         cats.(flds{ifld}) = cat(length(eqdim) + 1, valarray{:, ifld});
         cats.(flds{ifld}) = squeeze(cats.(flds{ifld}));
         continue
     end
     
-    % finalize which dimensions are available for concatenation
-    [~, sdim] = sort(valsz(1, eqdim));
-    if max(ndim) > 2
-        sdim = 3;
-    end
+    % sort the dimensions available for concatenation
+    [~, sdim] = sort(valsz(1, :));
+    sdim = sdim(eqdim);
+    
+%     if isemtpy(sdim)
+%         cats.(flds{ifld}) = valarray(:, ifld);
+%         continue
+%     end
 
     % cat according to user selection / default if multiple options exist
-    switch catdef
-        case 'long'
-            cats.(flds{ifld}) = cat(sdim(end), valarray{:, ifld});
-        case 'symmetric'
-            cats.(flds{ifld}) = cat(sdim(1), valarray{:, ifld});
-        otherwise
-            if eqdim(catdef)
-                cats.(flds{ifld}) = cat(catdef, valarray{:, ifld});
-            else
-                cats.(flds{ifld}) = cat(find(~eqdim, 1), valarray{:, ifld});
-            end
+    if strcmp(catdef, 'long')
+        cats.(flds{ifld}) = cat(sdim(end), valarray{:, ifld});
+    elseif strcmp(catdef, 'symmetric')
+        cats.(flds{ifld}) = cat(sdim(1), valarray{:, ifld});
+    elseif isnumeric(catdef)
+        if eqdim(catdef)
+            cats.(flds{ifld}) = cat(catdef, valarray{:, ifld});
+        else
+            cats.(flds{ifld}) = cat(find(~eqdim, 1), valarray{:, ifld});
+        end
     end
 end
 

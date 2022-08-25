@@ -100,7 +100,7 @@ fs = v(1).session.extracellular.sr;
 
 switch dataPreset
     case 'spec'       
-        ch = 2;     % manually change
+        ch = 1;     % manually change
         for isession = 1 : nsessions
             if ndims(v(isession).spec.s) == 3
                 v(isession).data = squeeze(v(isession).spec.s(:, :, ch))';
@@ -261,7 +261,7 @@ if graphics
             % take a sample of the spectrogram to help initialize the colormap
             sampleBins = randperm(expLen, round(expLen / 10));
             specSample = reshape(expData(sampleBins, :), 1, length(sampleBins) * length(faxis));
-            caxis1 = prctile(specSample, [15 85]);
+            caxis1 = prctile(specSample, [20 90]);
 
             % plot
             imagesc(xData, faxis', expData', caxis1);
