@@ -93,8 +93,8 @@ chunks(1, 1) = 1;
 % assimilate clip into chunks
 for iclip = 1 : size(clip, 1)
     
-    % special care if clip includes first samples
-    if clip(iclip, 1) == 1
+    % special care if clip includes first sample
+    if clip(iclip, 1) <= 1
         rmIdx = chunks(:, 1) <= clip(iclip, 2);
         chunks(rmIdx, :) = [];
         chunks(1, 1) = clip(iclip, 2);
@@ -118,10 +118,10 @@ for iclip = 1 : size(clip, 1)
     % remove chunks that are after clip. this occurs when clip is greater
     % than chunksize.
     rmidx = find(chunks(:, 1) > chunks(:, 2));
-    if ~isempty(rmidx)
-        replaceidx = find(chunks(rmidx, 1) < chunks(:, 2), 1);
-        chunks(replaceidx, 1) = chunks(rmidx, 1);
-        chunks(rmidx : replaceidx - 1, :) = [];
+    for ichunk = 1 : length(rmidx)
+        replaceidx = find(chunks(rmidx(ichunk), 1) < chunks(:, 2), 1);
+        chunks(replaceidx, 1) = chunks(rmidx(ichunk), 1);
+        chunks(rmidx(ichunk) : replaceidx - 1, :) = [];
     end
 end
 

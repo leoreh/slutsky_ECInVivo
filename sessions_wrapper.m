@@ -4,7 +4,7 @@
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = 'lh86';
+mname = 'lh111';
 forceL = true;
 forceA = true;
 
@@ -48,13 +48,13 @@ for isession = 1 : nfiles
     fs = session.extracellular.sr;
     spkgrp = session.extracellular.spikeGroups.channels;
     
-    load([basename, '.spktimes.mat'])
-    for igrp = 1 : length(spkgrp)
-        spktimes{igrp} = spktimes{igrp} / fs;
-    end
-    sr = firingRate(spktimes, 'basepath', basepath,...
-        'graphics', true, 'binsize', 60, 'saveVar', 'sr', 'smet', 'none',...
-        'winBL', [0 Inf]);
+%     load([basename, '.spktimes.mat'])
+%     for igrp = 1 : length(spkgrp)
+%         spktimes{igrp} = spktimes{igrp} / fs;
+%     end
+%     sr = firingRate(spktimes, 'basepath', basepath,...
+%         'graphics', true, 'binsize', 60, 'saveVar', 'sr', 'smet', 'none',...
+%         'winBL', [0 Inf]);
 
 %     % add timebins to datInfo
 %     [timebins, timepnt] = metaInfo_timebins('reqPnt', [], 'nbins', 2);
@@ -96,10 +96,10 @@ for isession = 1 : nfiles
 %         'fs', 1250, 'graphics', true, 'faxis', freq);
 % 
 %     % calc spec
-%     spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true,...
-%         'saveVar', true, 'padfft', -1, 'winstep', 5,...
-%         'ftarget', [], 'ch', [{1}, {2}, {4}, {5}],...
-%         'force', true, 'logfreq', true);
+    spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true,...
+        'saveVar', true, 'padfft', -1, 'winstep', 5,...
+        'ftarget', [], 'ch', {[7 : 10]},...
+        'force', true, 'logfreq', true);
 
 end
 

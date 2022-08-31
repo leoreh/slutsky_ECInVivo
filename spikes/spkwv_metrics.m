@@ -79,7 +79,7 @@ precision = 'int16';
 nbytes = class2bytes(precision);
 
 % number of spikes to snip per cluster
-spks2snip = 20000;
+spks2snip = 10000;
 
 % waveform params
 if ~isempty(wv)
