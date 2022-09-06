@@ -117,7 +117,7 @@ ripp = getRipples('basepath', basepath, 'rippCh', [9],...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % load sSig or just the sig info
-sigInfo = load([basename, '.sleep_sig.mat'], 'info');
+load([basename, '.sleep_sig.mat'], 'info');
 sSig = load([basename, '.sleep_sig.mat']);
 
 % call for acceleration
@@ -316,7 +316,7 @@ mname = 'lh105';
 basepaths = {};
 [expData, xData] = sessions_catVarTime('mname', mname,...
     'dataPreset', {'spec', 'emg_rms'}, 'graphics', true,...
-    'basepaths', basepaths, 'xTicksBinsize', 12, 'markRecTrans', true);
+    'basepaths', basepaths, 'xTicksBinsize', 6, 'markRecTrans', true);
 
 % snip segments (e.g. spikes) from binary 
 [spkwv, ~] = snipFromBinary('stamps', spktimes, 'fname', datname,...
