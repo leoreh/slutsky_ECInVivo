@@ -253,7 +253,7 @@ for ifile = 1 : 3
     sig = mean(sig, 2);
     
     % calc psd
-    psd(ifile, :) = psd_timebins('sig', sig, 'winCalc', [],...
+    psd(ifile, :) = calc_psd('sig', sig, 'winCalc', [],...
         'fs', 1250, 'graphics', false, 'faxis', freq);
 end
 

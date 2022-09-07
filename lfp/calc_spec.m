@@ -6,6 +6,8 @@ function spec = calc_spec(varargin)
 % the same tetrode) or avergaing spectrograms across channels and/or
 % calculating the spectrogram separately for groups of channels. these are
 % determined by the input 'ch'
+% see wonderful explanation of multitaper estimates here:
+% https://www.youtube.com/watch?v=6qTD7qtHius
 %
 % INPUT
 %   basepath    char. fullpath to recording folder {pwd}
@@ -15,9 +17,9 @@ function spec = calc_spec(varargin)
 %   ch          cell of vecs depicting groups of channels (indices to the
 %               rows of sig) whose spectrogram should be averaged. this is
 %               done in mtspectrumc.m. if sig is loaded from binary then
-%               averaging will be done on the lfp traces because this is
-%               faster. for example, this can be used for tetrodes (i.e. ch =
-%               spkgrp) and/or to compare eeg w/ lfp signals
+%               averaging will be done on the lfp traces. for example, this
+%               can be used for tetrodes (i.e. ch = spkgrp) and/or to
+%               compare eeg w/ lfp signals
 %   fs          sampling frequency {1250}.
 %   ftarget     numeric. requested frequency range and resolution. this 
 %               determines the range passed to chronux but the actual
@@ -122,13 +124,14 @@ if frange(2) > fs / 2
     error('requested max frequency greater than nyquist')
 end
 
-% mtspecgramc params
+% chronux params
 window = max([5, winstep]);
 mtspec_params.pad = padfft;
 mtspec_params.Fs = fs;
 mtspec_params.fpass = frange;
-mtspec_params.tapers = [3 5];
+mtspec_params.tapers = [ceil(window / 2), ceil(window / 2) * 2 - 1];
 mtspec_params.trialave = 1;
+mtspec_params.err = [0, 0];
 
 % organize channel groups
 spec.info.ch = ch;

@@ -4,13 +4,13 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % user input
-mname           = 'lh112';
-basepath        = 'J:\Data\lh112\2022-09-02_10-41-23';
-exp             = [1];
+mname           = 'lh111';
+basepath        = 'I:\Data\lh111\2022-08-28_10-43-58';
+exp             = [1, 2];
 
 % dat from oe 
 mapch = 1 : 20;
-rmvch = [];
+rmvch = [5, 6];
 rec = cell(max(exp), 1);
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
     'rmvch', rmvch, 'mapch', mapch,...
@@ -38,8 +38,7 @@ spkgrp = session.extracellular.spikeGroups.channels;
 clear datfile
 datfile = {fullfile(basepath, [basename, '.dat'])};
 clip = cell(1, length(datfile));
-clip{1} = [seconds(minutes(109)), seconds(minutes(120));...
-    seconds(minutes(176)), seconds(minutes(346))] * fs;
+clip{1} = [seconds(minutes(215)), seconds(minutes(332))] * fs;
 datInfo = preprocDat('orig_files', datfile, 'mapch', 1 : nchans,...
     'rmvch', [], 'nchans', nchans, 'saveVar', true,...
     'chunksize', 1e7, 'precision', 'int16', 'clip', clip);
@@ -94,8 +93,8 @@ spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true,...
 
 % user input
 mname           = 'lh112';
-basepath        = 'J:\Data\lh112\2022-08-30_10-19-50';
-exp             = [1 : 2];
+basepath        = 'I:\Data\lh112\2022-09-03_11-23-20';
+exp             = [1];
 
 % dat from oe 
 mapch = 1 : 20;
@@ -127,7 +126,7 @@ spkgrp = session.extracellular.spikeGroups.channels;
 clear datfile
 datfile = {fullfile(basepath, [basename, '.dat'])};
 clip = cell(1, length(datfile));
-clip{1} = [seconds(minutes(760)), seconds(minutes(Inf))] * fs;
+clip{1} = [seconds(minutes(755)), Inf] * fs;
 datInfo = preprocDat('orig_files', datfile, 'mapch', 1 : nchans,...
     'rmvch', [], 'nchans', nchans, 'saveVar', true,...
     'chunksize', 1e7, 'precision', 'int16', 'clip', clip);

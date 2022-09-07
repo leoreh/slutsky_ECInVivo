@@ -27,10 +27,10 @@ nfiles = length(basepaths);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % analyze data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-templateCal = ss.info.calibrationData;
+% templateCal = ss.info.calibrationData;
 
 for isession = 1 : nfiles
-    
+
     % file
     basepath = basepaths{isession};
     cd(basepath)
@@ -41,97 +41,138 @@ for isession = 1 : nfiles
         isession, nfiles, basename)
 
     % params
-    session = CE_sessionTemplate(pwd, 'viaGUI', false,...
-        'forceDef', true, 'forceL', false, 'saveVar', true);
-    %     session = v(isession).session;
+    session = v(isession).session;
     nchans = session.extracellular.nChannels;
     fs = session.extracellular.sr;
     spkgrp = session.extracellular.spikeGroups.channels;
-    
-%     load([basename, '.spktimes.mat'])
-%     for igrp = 1 : length(spkgrp)
-%         spktimes{igrp} = spktimes{igrp} / fs;
-%     end
-%     sr = firingRate(spktimes, 'basepath', basepath,...
-%         'graphics', true, 'binsize', 60, 'saveVar', 'sr', 'smet', 'none',...
-%         'winBL', [0 Inf]);
 
-%     % add timebins to datInfo
-%     [timebins, timepnt] = metaInfo_timebins('reqPnt', [], 'nbins', 2);
-%     winCalc = mat2cell(timebins, [1, 1], 2)';
-    
+
+    %     % add timebins to datInfo
+    %     [timebins, timepnt] = metaInfo_timebins('reqPnt', [], 'nbins', 2);
+    %     winCalc = mat2cell(timebins, [1, 1], 2)';
+
 %     % sleep signals
-%     sSig = as_prepSig([basename, '.lfp'], [],...
-%         'eegCh', [5], 'emgCh', [3], 'saveVar', true, 'emgNchans', [],...
-%         'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
-%         'eegFs', 1250, 'emgFs', [], 'eegCf', [], 'emgCf', [10 450], 'fs', 1250);
-%     
-%     % manual lables
-%     labelsfile = [basename, '.AccuSleep_labelsMan.mat'];
-%     labelsmanfile = [basename, '.sleep_labelsMan.mat'];
-%     if exist(labelsfile, 'file')
-%         load(labelsfile, 'labels')
+%     load([basename, '.sleep_sig.mat'], 'info');
+%     if ~any(info.eegCh ==7)
+%         load([basename, '.acceleration.mat'])
+%         sSig = as_prepSig([basename, '.lfp'], acc.mag,...
+%             'eegCh', [7 : 10], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
+%             'eegNchans', nchans, 'inspectSig', true, 'forceLoad', true,...
+%             'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [10 450], 'fs', 1250);
+%     else
+%         sSig = load([basename, '.sleep_sig.mat']);
 %     end
-%     save(labelsmanfile, 'labels')
-%     %     AccuSleep_viewer(sSig, labels, labelsmanfile)
-%     
+% 
 %     % classify
-%     ss = as_classify(sSig, 'basepath', pwd, 'inspectLabels', false,...
+%     ss = as_classify(sSig, 'basepath', basepath, 'inspectLabels', false,...
 %         'saveVar', true, 'forceA', true, 'netfile', [],...
 %         'graphics', true, 'calData', templateCal);
 
-%     % calc psd in states
-%     psdBins = psd_states_timebins('basepath', pwd,...
-%         'chEeg', [], 'forceA', true, 'graphics', true,...
-%         'timebins', timebins, 'saveVar', true, 'sstates', [1, 4]);
+        % calc psd in states
+        psd = psd_states('basepath', basepath, 'sstates', [1, 4],...
+            'ch', [7], 'fs', [], 'wins', [0, Inf], 'saveVar', true,...
+            'graphics', true, 'forceA', true);
 
-%     % load data
-%     sig = double(bz_LoadBinary([basename, '.lfp'],...
-%         'duration', Inf, 'frequency', 1250, 'nchannels', nchans,...
-%         'start', 0, 'channels', 2, 'downsample', 1));
-%     
-%     % calc psd
-%     freq = [0.5 : 0.5 : 120];
-%     psd = psd_timebins('sig', sig, 'winCalc', winCalc,...
-%         'fs', 1250, 'graphics', true, 'faxis', freq);
-% 
-%     % calc spec
-    spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true,...
-        'saveVar', true, 'padfft', -1, 'winstep', 5,...
-        'ftarget', [], 'ch', {[7 : 10]},...
-        'force', true, 'logfreq', true);
+    %
+    %     % calc spec
+    %     spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true,...
+    %         'saveVar', true, 'padfft', -1, 'winstep', 5,...
+    %         'ftarget', [], 'ch', {[7 : 10]},...
+    %         'force', true, 'logfreq', true);
 
 end
 
-
 cell_metrics = CellExplorer('basepaths', basepaths);
 
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% general params
+% psd across sessions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-session = CE_sessionTemplate(pwd, 'viaGUI', false,...
-    'force', true, 'saveVar', true);
-nchans = session.extracellular.nChannels;
-fs = session.extracellular.sr;
-spkgrp = session.extracellular.spikeGroups.channels;
+% load vars from each session
+varsFile = ["session"; "psd"];
+varsName = ["session"; "psd"];
+[v, ~] = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
+    'varsName', varsName);
+nfiles = length(basepaths);
 
-sessionIdx = 1 : nfiles;
-stateidx = [1, 4, 5];
-grp = [1 : 4];                  % which tetrodes to plot
-unitClass = 'pyr';              % plot 'int', 'pyr', or 'all'
-suFlag = 1;                     % plot only su or all units
-frBoundries = [0 Inf];          % include only units with fr greater than
+% cat psd struct
+psd = catfields([v(1 : nfiles).psd], 'catdef', 'addim');
 
-[nsub] = numSubplots(length(sessionIdx));
-[cfg_colors, cfg_names, ~] = as_loadConfig([]);
-setMatlabGraphics(false)
+% get params
+cfg = as_loadConfig();
+nstates = size(psd.psd, 1);
+sstates = psd.info.input.sstates;
+faxis = v(1).psd.info.input.faxis;
+lim_fAxis = faxis >= 0;
 
-% arrange title names
-for isession = 1 : nfiles
-    sessionName{isession} = dirnames{isession}(length(mname) + 2 : end);
-    basepath = char(fullfile(mousepath, dirnames{isession}));
-    basepaths{isession} = fullfile(mousepath, dirnames{isession});
+fh = figure;
+th = tiledlayout(1, length(sstates), 'TileSpacing', 'Compact');
+alphaIdx = linspace(0.5, 1, nfiles);
+
+for istate = 1 : nstates
+    axh = nexttile;
+
+    ydata = squeeze(psd.psd(istate, :, :));
+%     ydata = ydata ./ sum(ydata(lim_fAxis, :), 1);
+
+    ph = plot(faxis, ydata, 'LineWidth', 2);
+    for ifile = 1 : nfiles
+        ph(ifile).Color(istate) = cfg.colors{sstates(istate)}(istate) - ifile * 0.01;
+        ph(ifile).Color(4) = alphaIdx(ifile);
+    end
+    set(gca, 'YScale', 'log', 'XScale', 'log')
+    title(cfg.names{sstates(istate)})
+    xlabel('Frequency [Hz]')
+    legend(split(num2str(1 : nfiles)), 'Location', 'Southwest', 'FontSize', 9)
+
+end
+
+% ----------------
+
+% load vars from each session
+varsFile = ["session"; "spec"; "sleep_states"];
+varsName = ["session"; "spec"; "ss"];
+[v, ~] = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
+    'varsName', varsName);
+nfiles = length(basepaths);
+
+sstates = [1, 4];
+clear psd
+for ifile = 1 : nfiles
+    
+    cd(basepaths{ifile})
+    spec(ifile) = calc_spec('basepath', basepaths{ifile},...
+        'sig', [], 'fs', 1250, 'graphics', false,...
+        'saveVar', true, 'padfft', -1, 'winstep', 1,...
+        'ftarget', [], 'ch', {[7]},...
+        'force', true, 'logfreq', true);
+    
+    for istate = 1 : length(sstates)
+        psd(ifile, istate, :) = mean(spec(ifile).s(v(ifile).ss.labels == sstates(istate), :), 1);
+    end
+end
+
+fh = figure;
+th = tiledlayout(1, length(sstates), 'TileSpacing', 'Compact');
+alphaIdx = linspace(0.5, 1, nfiles);
+
+for istate = 1 : nstates
+    axh = nexttile;
+
+    ydata = squeeze(psd(:, istate, :));
+%     ydata = ydata ./ sum(ydata(lim_fAxis, :), 1);
+
+    ph = plot(spec(ifile).freq, ydata, 'LineWidth', 2);
+    for ifile = 1 : nfiles
+        ph(ifile).Color(istate) = cfg.colors{sstates(istate)}(istate) - ifile * 0.01;
+        ph(ifile).Color(4) = alphaIdx(ifile);
+    end
+    set(gca, 'YScale', 'log', 'XScale', 'log')
+    title(cfg.names{sstates(istate)})
+    xlabel('Frequency [Hz]')
+    legend(split(num2str(1 : nfiles)), 'Location', 'Southwest', 'FontSize', 9)
+
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

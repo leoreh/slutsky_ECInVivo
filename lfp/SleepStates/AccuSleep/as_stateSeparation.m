@@ -95,7 +95,7 @@ sTheta = sum(specNorm(:, f6idx : f12idx), 2);
 sRatio = sDelta ./ sTheta;
 
 % calculate psd according to states
-[psdStates, faxis] = psd_timebins('sig', sSig.eeg,...
+[psd, faxis] = calc_psd('sig', sSig.eeg,...
     'fs', sSig.fs, 'graphics', false, 'winCalc', ss.stateEpochs);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -148,7 +148,7 @@ xlabel('Time [h]')
 
 % spectral power per state
 fh.CurrentAxes = sb3;
-ph = plot(faxis, psdStates ./ sum(psdStates, 2), 'LineWidth', 3);
+ph = plot(faxis, psd ./ sum(psd, 2), 'LineWidth', 3);
 set(ph, {'color'}, cfg.colors(sstates))
 xlim([0 30])
 xlabel('Frequency [Hz]')

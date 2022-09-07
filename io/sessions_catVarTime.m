@@ -218,7 +218,7 @@ for isession = 1 : nsessions
     end
     
     % cat block transitions
-    if ~isempty(v(isession).datInfo)
+    if ~isempty(v(isession).datInfo) && isfield(v(isession).datInfo, 'nsamps')
         xidx = [xidx, cumsum(v(isession).datInfo.nsamps) / fs / ts + recIdx];
     else
         xidx = 0;

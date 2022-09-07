@@ -114,7 +114,7 @@ for i = 1 : length(idx)
 end
 info = dir(fname);
 nsamps = info.bytes / nbytes / nchans;
-chunks = n2chunks('n', nsamps, 'chunksize', chunksize, 'clip', clip);
+chunks = n2chunks('n', nsamps, 'chunksize', 5e4, 'clip', clip);
 nchunks = size(chunks, 1);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

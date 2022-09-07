@@ -73,7 +73,6 @@ nstates = cfg.nstates;
 cd(basepath)
 [~, basename] = fileparts(basepath);
 manlabelsfile = [basename, '.sleep_labelsMan.mat'];
-manlabelsfilelegacy = [basename, '.AccuSleep_labelsMan.mat'];
 labelsfile = [basename, '.sleep_labels.mat'];
 statesfile = [basename '.sleep_states.mat'];
 
@@ -107,31 +106,34 @@ end
 % AccuSleep pipeline
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% get mouse calibration. if does not exist already, manualy score some
-% of the data and save the labels
-if isempty(calData)
-    if ~exist(manlabelsfile, 'file')
-        if exist(manlabelsfilelegacy, 'file')
-            manlabelsfile = manlabelsfilelegacy;
-        else
-            fprintf('\nlabel some data for calibration, then press save.\n')
-            AccuSleep_viewer(sSig, [], manlabelsfile)
-            uiwait
-        end
-    end
+% load manual labels if exists
+if exist(manlabelsfile, 'file')
     load(manlabelsfile, 'labels')
-    
+
     % ignore bin state
     labels_man = labels;
-    labels(labels > nstates - 1) = nstates;
-    
+    labels(labels > nstates) = nstates + 2;
+
+else
+    labels_man = ones(1, length(sSig.spec_tstamps)) * nstates + 2;
+end
+
+% get mouse calibration or manualy score some of the data and save the labels
+if isempty(calData)
+    if ~exist(manlabelsfile, 'file')
+        fprintf('\nlabel some data for calibration, then press save.\n')
+        AccuSleep_viewer(sSig, [], manlabelsfile)
+        uiwait
+        load(manlabelsfile, 'labels')
+        labels_man = labels;
+        labels(labels > nstates) = nstates + 2;
+    end
+  
     % calibration matrix
     fprintf('\ncreating calbiration matrix... ')
     calData =...
         createCalibrationData(sSig.spec, sSig.spec_freq, sSig.emg_rms, labels);
     fprintf('done.\n')
-else
-    labels_man = ones(1, length(sSig.spec_tstamps)) * nstates + 2;
 end
 
 % classify recording
@@ -139,7 +141,7 @@ fprintf('classifying... ')
 [labels_net, netScores] = AccuSleep_classify(sSig.spec,...
     sSig.spec_freq, sSig.emg_rms, calData, net);
 
-% insert calibrated labels to final results. this is because
+% insert munual labels to final results. this is because
 % AccuSleep_classify doesn't allow for 'only overwrite undefind' as in the
 % gui
 labels = labels_net;
