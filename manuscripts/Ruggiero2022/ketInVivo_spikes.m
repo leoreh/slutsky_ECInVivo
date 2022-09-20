@@ -371,7 +371,7 @@ mean(mean(prism_data(prism_tstamps < 0, prism_units > 0), 1, 'omitnan'))
 % params
 istate = [1, 4];
 ibin = [1, 2];
-iunit = 2;
+iunit = 1;
 ntiles = 2;
 
 % cat units
@@ -414,6 +414,12 @@ for itile = 1 : ntiles
 end
 chgMat = cell2nanmat(chgCell, 2) * 100;
 
+% corrected gain factor
+clear gaint
+gaint(:, 1) = (bsl_nrem - bsl_wake)' ./ max([bsl_nrem, bsl_wake]');
+gaint(:, 2) = (inj_nrem - inj_wake)' ./ max([inj_nrem, inj_wake]'); 
+
+
 % gain factor
 clear gainCell stateCell
 for itile = 1 : ntiles
@@ -422,8 +428,12 @@ for itile = 1 : ntiles
     gainCell{itile + 2} = gainf(sunits, 2);
     stateCell{itile} = sratio(sunits, 1);
     stateCell{itile + 2} = sratio(sunits, 2);
+
+    gainCell{itile} = gaint(sunits, 1);
+    gainCell{itile + 2} = gaint(sunits, 2);
+
 end
-gainMat = cell2nanmat(gainCell, 2);
+gainMat = cell2nanmat(gainCell, 2) * 100;
 stateMat = cell2nanmat(stateCell, 2) * 100;
 
 
@@ -460,8 +470,8 @@ Z = reshape(f, length(xgrid), length(ygrid));
 % plot
 axh = nexttile;
 ph = contourf(X, Y, Z, 8);
-cr = linspace(0.95, 0);
-map = [ones(1, 100); cr; cr]';
+cr = linspace(210 / 255, 10 / 255);
+map = [240 * ones(1, 100) / 255; cr; cr]';
 colormap(axh, map)
 % xlim([0 7])
 % ylim([0 200])
@@ -477,8 +487,8 @@ Z = reshape(f, length(xgrid), length(ygrid));
 % plot
 axh = nexttile;
 ph = contourf(X, Y, Z, 10);
-cr = linspace(0.95, 0);
-map = [cr; cr; ones(1, 100)]';
+cr = linspace(180 / 255, 50 / 255);
+map = [cr; cr; 200 * ones(1, 100) / 255]';
 colormap(axh, map)
 % xlim([0 7])
 % ylim([0 200])

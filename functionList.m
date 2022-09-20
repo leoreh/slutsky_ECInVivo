@@ -122,8 +122,8 @@ sSig = load([basename, '.sleep_sig.mat']);
 
 % call for acceleration
 sSig = as_prepSig([basename, '.lfp'], acc.mag,...
-    'eegCh', [7 : 10], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
-    'eegNchans', nchans, 'inspectSig', true, 'forceLoad', true,...
+    'eegCh', [7], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
+    'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
     'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [10 450], 'fs', 1250);
 
 % call for lfp
@@ -144,8 +144,8 @@ AccuSleep_viewer(sSig, labels, labelsmanfile)
 
 % classify with a network
 netfile = [];
-% calData = [];
-calData = ss.info.calibrationData;
+calData = [];
+% calData = ss.info.calibrationData;
 ss = as_classify(sSig, 'basepath', basepath, 'inspectLabels', false,...
     'saveVar', true, 'forceA', true, 'netfile', netfile,...
     'graphics', true, 'calData', calData);
@@ -207,7 +207,7 @@ spktimes2ns('basepath', basepath, 'fs', fs,...
 nsClip('dur', -420, 't', [], 'bkup', true, 'grp', [3 : 4]);
 
 % clean clusters after sorting 
-cleanCluByFet('basepath', pwd, 'manCur', true, 'grp', [1 : 4])
+cleanCluByFet('basepath', basepath, 'manCur', true, 'grp', [1 : 4])
 
 % cut spk from dat and realign
 fixSpkAndRes('grp', 1, 'dt', 0, 'stdFactor', 0, 'resnip', false);
@@ -240,22 +240,10 @@ fr = firingRate(spikes.times, 'basepath', basepath,...
     'graphics', true, 'binsize', 60, 'saveVar', true,...
     'smet', 'none', 'winBL', winBL, 'winCalc', [0, Inf]);
 
-% number of units per spike group
-plot_nunits_session('basepath', pwd, 'frBoundries', [])
-
 % select specific units
 units = selectUnits('basepath', pwd, 'grp', [1 : 4], 'saveVar', true,...
     'forceA', true, 'frBoundries', [0.05 Inf; 0.05 Inf],...
     'spikes', spikes);  
-
-% plot fr vs. time
-plot_FRtime_session('basepath', pwd,...
-    'muFlag', false, 'saveFig', false,...
-    'dataType', 'strd', 'units', units.clean)
-
-% state ratio according to mfr percetiles
-plot_FRstates_sextiles('stateMfr', fr.states.mfr(:, [1, 4])', 'units', units.clean,...
-    'ntiles', 2, 'saveFig', true)
 
 % cluster validation
 spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
@@ -290,6 +278,19 @@ sl = spklfp_wrapper('basepath', basepath, 'winCalc', winCalc,...
     'ch', 9, 'frange', frange,...
     'graphics', true, 'saveVar', false);
 
+% number of units per spike group
+plot_nunits_session('basepath', pwd, 'frBoundries', [])
+
+% plot fr vs. time
+plot_FRtime_session('basepath', pwd,...
+    'muFlag', false, 'saveFig', false,...
+    'dataType', 'strd', 'units', units.clean)
+
+% state ratio according to mfr percetiles
+plot_FRstates_sextiles('stateMfr', fr.states.mfr(:, [1, 4])', 'units', units.clean,...
+    'ntiles', 2, 'saveFig', true)
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % mea
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -311,11 +312,10 @@ monosyn = monoSyn_wrapper('spktimes', mea.spktimes, 'basepath', pwd,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % concatenate var from different sessions
-mname = 'lh112';
-basepaths = {};
+mname = 'lh111';
 [expData, xData] = sessions_catVarTime('mname', mname,...
-    'dataPreset', {'sr', 'spec', 'emg_rms'}, 'graphics', true,...
-    'basepaths', basepaths, 'xTicksBinsize', 6, 'markRecTrans', true);
+    'dataPreset', {'fr', 'spec'}, 'graphics', true,...
+    'basepaths', {}, 'xTicksBinsize', 6, 'markRecTrans', true);
 
 % snip segments (e.g. spikes) from binary 
 [spkwv, ~] = snipFromBinary('stamps', spktimes, 'fname', datname,...

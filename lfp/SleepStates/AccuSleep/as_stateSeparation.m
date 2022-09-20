@@ -96,7 +96,7 @@ sRatio = sDelta ./ sTheta;
 
 % calculate psd according to states
 [psd, faxis] = calc_psd('sig', sSig.eeg,...
-    'fs', sSig.fs, 'graphics', false, 'winCalc', ss.stateEpochs);
+    'fs', sSig.fs, 'graphics', false, 'bins', ss.stateEpochs);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics

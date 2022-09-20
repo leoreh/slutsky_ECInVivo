@@ -26,6 +26,9 @@ function [chunks] = n2chunks(varargin)
 %
 % OUTPUT
 %   chunks      mat n x 2 
+% 
+% DEPENDENCIES 
+%   SubtractIntervals (FMAT)                
 %
 % EXAMPLE
 %   chunks = n2chunks('n', 80000, 'nchunks', 8, 'pnts', 74980, 'overlap', [1000 0])
@@ -36,6 +39,7 @@ function [chunks] = n2chunks(varargin)
 % 11 aug 20 LH  overlap
 % 14 dec 21 LH  fixed clipping
 % 12 jan 22 LH  timepoints
+% 08 sep 22 LH  SubtractIntervals 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -91,38 +95,9 @@ chunks(nchunks, 2) = n;
 chunks(1, 1) = 1;
 
 % assimilate clip into chunks
-for iclip = 1 : size(clip, 1)
-    
-    % special care if clip includes first sample
-    if clip(iclip, 1) <= 1
-        rmIdx = chunks(:, 1) <= clip(iclip, 2);
-        chunks(rmIdx, :) = [];
-        chunks(1, 1) = clip(iclip, 2);
-    end
-    
-    % change chunk end to clip start
-    clip_start = find(clip(iclip, 1) < chunks(:, 2), 1, 'first');
-    chunk_end = chunks(clip_start, 2);
-    chunks(clip_start, 2) = clip(iclip, 1) - 1;
-    
-    if iclip == size(clip, 1)
-        % change chunk start to clip end
-        chunks(clip_start + 1, 1) = clip(iclip, 2) - 1;
-    else
-        % add another chunk from clip end to clip + 1 start
-        chunks = [chunks(1 : clip_start, :);...
-            clip(iclip, 2) + 1, chunk_end;...           
-            chunks(clip_start + 1 : end, :)];
-    end
-    
-    % remove chunks that are after clip. this occurs when clip is greater
-    % than chunksize.
-    rmidx = find(chunks(:, 1) > chunks(:, 2));
-    for ichunk = 1 : length(rmidx)
-        replaceidx = find(chunks(rmidx(ichunk), 1) < chunks(:, 2), 1);
-        chunks(replaceidx, 1) = chunks(rmidx(ichunk), 1);
-        chunks(rmidx(ichunk) : replaceidx - 1, :) = [];
-    end
+if ~isempty(clip)
+    chunks = SubtractIntervals(chunks,...
+        clip(clipchunks(iclip, 1) : clipchunks(iclip, 2), :));
 end
 
 % remove chunks that are greater than nsamps. this can occur if clip

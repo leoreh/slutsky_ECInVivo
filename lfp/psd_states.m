@@ -115,7 +115,9 @@ if ~isempty(ch)         % from binary
         'duration', Inf,...
         'frequency', fs, 'nchannels', nchans, 'start', 0,...
         'channels', ch, 'downsample', 1));
-    sig = mean(sig, 2);
+    if length(ch) > 1
+        sig = mean(sig, 2);
+    end
 
 else                    % from sSig
     

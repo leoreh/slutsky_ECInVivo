@@ -106,13 +106,8 @@ if frange(2) > fs / 2
     error('requested max frequency greater than nyquist')
 end
 
-% fft params
-% win = hann(2 ^ (nextpow2(2 * fs) - 1));
-% noverlap = floor(0.25 * fs);
-
 % chronux params
 window = min([5, minwin]);     % [s]
-window = 30;
 segave = 1;
 mtspec_params.pad = 0;
 mtspec_params.Fs = fs;
@@ -121,7 +116,7 @@ mtspec_params.tapers = [ceil(window / 2), ceil(window / 2) * 2 - 1];
 mtspec_params.trialave = 0;
 mtspec_params.err = [0, 0];
 
-% frequency grid from chronux
+% frequency grid from chronux (for initializing)
 N = window * fs;
 nfft = max(2 ^ (nextpow2(N) + mtspec_params.pad), N);
 [f, ~] = getfgrid(fs, nfft, frange); 
@@ -130,26 +125,42 @@ nfft = max(2 ^ (nextpow2(N) + mtspec_params.pad), N);
 % calc power for each epoch separatly
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-psd = zeros(nwin, length(f));
+alt = 2;
+
+psd = nan(nwin, length(f));
 for iwin = 1 : nwin
+    
+    % ---------------------------------------------------------------------
+    % ALT 1: calc psd per epoch and average across epochs
+    if alt == 1
     for ibin = 1 : nbins(iwin)
 
-        % idx to signal w/o the edges (sigMrgin)
+        % idx to signal w/o edges (sigMrgin)
         dataIdx = (bins{iwin}(ibin, 1) + sigMrgin) * fs :...
-            (bins{iwin}(ibin, 2) - sigMrgin) * fs - 1;
+            (bins{iwin}(ibin,     2) - sigMrgin) * fs - 1;
 
         if length(dataIdx) < window * fs
+            nbins(iwin) = nbins(iwin) - 1;
+            warning('some epochs too short for fft window')
             continue
         end
 
         % calc power and sum across bins
-        [pow, f] = mtspectrumsegc(sig(dataIdx), window, mtspec_params, segave);
-        %         [pow, ~] = pwelch(sig(dataIdx), win, noverlap, ftarget, fs);
-        psd(iwin, :) = psd(iwin, :) + pow';
+        [pow(ibin, :), f] = mtspectrumsegc(sig(dataIdx), window, mtspec_params, segave);
+        psd(iwin, :) = psd(iwin, :) + pow(ibin, :);
 
     end
     % average power
     psd(iwin, :) = psd(iwin, :) / nbins(iwin);
+
+    % ---------------------------------------------------------------------
+    % ALT 2: cat epochs and calc psd once across a single vector
+    else
+        dataIdx = Restrict([1 : length(sig)], bins{iwin} * fs);
+        [psd(iwin, :), f] = mtspectrumsegc(sig(dataIdx), window, mtspec_params, segave);
+        % [psd(iwin, :), f] = mtspectrumc(sig(dataIdx), mtspec_params);
+    end
+
 end
 
 % adjust the fequency domain to the target frequencies by finding the
