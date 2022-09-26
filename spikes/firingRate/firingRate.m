@@ -8,25 +8,29 @@ function fr = firingRate(spktimes, varargin)
 % w/ moving average of 3 points.
 %
 % INPUT
-%   spktimes    a cell array of vectors. each vector (unit / tetrode)
+%   spktimes    cell of vectors. each vector (unit / tetrode)
 %               contains the timestamps of spikes. for example
 %               {spikes.times{1:4}}
-%   basepath    recording session path {pwd}
-%   graphics    plot figure {1}.
-%   saveVar     logical / char. save variable {true}. if char than variable
-%               will be named saveVar.mat
-%   winCalc     time window for calculation {[1 Inf]}. specified in s.
+%   basepath    char. recording session path {pwd}
 %   binsize     size bins {60}. must be the same units as spktimes (e.g.
 %               [s])
+%   winCalc     time window for calculation {[1 Inf]}. specified in s.
 %   winBL       window to calculate baseline FR {[1 Inf]}.
 %               specified in s.
 %   smet        method for smoothing firing rate: moving average (MA) or
 %               Gaussian kernel (GK) impleneted by multiple-pass MA. {[]}.
 %   forceA      logical. force analysis even if struct file exists {true}
+%   graphics    logical. plot figure {true}.
+%   saveVar     logical / char. save variable {true}. if char than variable
+%               will be named [saveVar].mat
 %
 % OUTPUT
-% fr            struct 
+%   fr          struct 
 %
+% CALLS
+%   times2rate
+%   InIntervals (fmat)
+% 
 % TO DO LIST
 %               adjust winCalc to matrix (done)
 %               apply params (e.g. gini) to states
@@ -68,7 +72,7 @@ forceA = p.Results.forceA;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % params
-smfactor = 7;    % smooth factor
+smfactor = 3;    % smooth factor
 nunits = length(spktimes);
 
 % filenames
@@ -107,7 +111,7 @@ end
 [fr.strd, ~, fr.tstamps] = times2rate(spktimes, 'binsize', binsize,...
     'winCalc', winCalc, 'c2r', true);
 
-% calc fr according to states. states, binsize, and spktimes must be
+% calc fr in states. states, binsize, and spktimes must be
 % the same units (typically sec)
 if exist(asFile, 'file')
     load(asFile, 'ss')
@@ -121,8 +125,7 @@ if exist(asFile, 'file')
             fr.states.tstamps{istate} = 0;
             continue
         end
-        epochIdx = ss.stateEpochs{istate}(:, 2) < winCalc(2) &...
-            ss.stateEpochs{istate}(:, 1) > winCalc(1);
+        epochIdx = InIntervals(ss.stateEpochs{istate}, winCalc);
         stateEpochs = ss.stateEpochs{istate}(epochIdx, :);
         if ~isempty(ss.stateEpochs{istate})
             [fr.states.fr{istate}, fr.states.binedges, fr.states.tstamps{istate}, fr.states.binidx] =...
@@ -130,12 +133,11 @@ if exist(asFile, 'file')
         end
     end
     
-    % gain factor compared to state 1 (AWAKE)
+    % gain factor compared to AW (sela, j. neurosci, 2020)
+    mat1 = mean(fr.states.fr{1}, 2, 'omitnan');
     for istate = 1 : nstates
-        mat1 = fr.states.fr{1};
-        mat2 = fr.states.fr{istate};
-        fr.states.gain(istate, :) = (mean(mat2, 2, 'omitnan') -...
-            mean(mat1, 2, 'omitnan')) ./ max([mat1, mat2], [], 2);
+        mat2 = mean(fr.states.fr{istate}, 2, 'omitnan');
+        fr.states.gain(istate, :) = (mat2 - mat1) ./ max([mat1, mat2], [], 2) * 100;
     end
     
     % normalized ratio (mizuseki, cell rep., 2008). organized as a 3d mat
@@ -145,10 +147,11 @@ if exist(asFile, 'file')
             mat1 = mean(fr.states.fr{istate}, 2, 'omitnan');
             mat2 = mean(fr.states.fr{istate2}, 2, 'omitnan');
             fr.states.ratio(istate, istate2, :) =...
-                (mat1 - mat2) ./ (mat1 + mat2);
+                ((mat1 - mat2) ./ (mat1 + mat2)) * 100;
         end
     end
     
+    % calc mfr per state
     fr.states.mfr = cellfun(@(x) mean(x, 2), fr.states.fr, 'uni', false);
     fr.states.mfr = cell2nanmat(fr.states.mfr, 2);
 
@@ -201,7 +204,7 @@ fr.gini_pop = gini(ones(1, size(bl_fr, 1)),...
 % plot(fr.strd(iunit, 1 : end-1), fr.strd(iunit, 2 : end), '*')
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% organize and save
+% finalize and save
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % struct
@@ -216,14 +219,12 @@ if saveVar
     save(frFile, 'fr')
 end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if graphics
     plot_FRtime_session('basepath', basepath)
 end
 
-return
+end
 
 % EOF
 

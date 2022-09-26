@@ -36,9 +36,10 @@ spkgrp = session.extracellular.spikeGroups.channels;
 
 % clip bad parts
 clear datfile
-datfile = {fullfile(basepath, [basename, '.dat'])};
+datfile = {fullfile(basepath, [basename, '.lfp'])};
 clip = cell(1, length(datfile));
-clip{1} = [seconds(minutes(215)), seconds(minutes(332))] * fs;
+clip{1} = [seconds(minutes(575)), seconds(minutes(595));...
+    seconds(minutes(517)), seconds(minutes(545))] * fs;
 datInfo = preprocDat('orig_files', datfile, 'mapch', 1 : nchans,...
     'rmvch', [], 'nchans', nchans, 'saveVar', true,...
     'chunksize', 1e7, 'precision', 'int16', 'clip', clip);

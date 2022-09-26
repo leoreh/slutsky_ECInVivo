@@ -28,6 +28,7 @@ function sSig = as_prepSig(eegData, emgData, varargin)
 %               extracted from session info file
 %   emgNchans   numeric. no channels in emg data file. if empty will equal
 %               to eegNchans
+%   sigWin      numeric 1 x 2. time to load in sec {[0 Inf]}
 %   basepath    string. path to recording folder {pwd}
 %   saveVar     logical. save signals as mat var {true}
 %   forceLoad   logical. reload recordings even if mat exists
@@ -66,6 +67,7 @@ addOptional(p, 'eegNchans', [], @isnumeric);
 addOptional(p, 'emgNchans', [], @isnumeric);
 addOptional(p, 'emgCf', [10 450], @isnumeric);
 addOptional(p, 'eegCf', [450], @isnumeric);
+addOptional(p, 'sigWin', [0 Inf], @isnumeric);
 addOptional(p, 'saveVar', true, @islogical);
 addOptional(p, 'inspectSig', false, @islogical);
 addOptional(p, 'forceLoad', false, @islogical);
@@ -81,6 +83,7 @@ emgCf           = p.Results.emgCf;
 eegCf           = p.Results.eegCf;
 eegNchans       = p.Results.eegNchans;
 emgNchans       = p.Results.emgNchans;
+sigWin          = p.Results.sigWin;
 saveVar         = p.Results.saveVar;
 inspectSig      = p.Results.inspectSig;
 forceLoad       = p.Results.forceLoad;
@@ -101,6 +104,11 @@ else
     sSig.info.eegFile = 'inputData';
 end
 
+% assert sigWin
+if numel(sigWin) ~= 2 || sigWin(2) <= sigWin(1)
+    error('check sigWin')
+end
+
 % file names
 cd(basepath)
 [~, basename] = fileparts(basepath);
@@ -117,7 +125,7 @@ end
 % import toolbox for filtering    
 import iosr.dsp.*
 
-% session info
+% session info and signal params
 if exist(sessionfile, 'file')
     load(sessionfile)
     if isempty(eegNchans)
@@ -153,8 +161,8 @@ if ischar(eegData) || isempty(eegData)
     end
         
     % load channels and average
-    eegData = double(bz_LoadBinary(eegData, 'duration', Inf,...
-        'frequency', eegFs, 'nchannels', eegNchans, 'start', 0,...
+    eegData = double(bz_LoadBinary(eegData, 'duration', diff(sigWin),...
+        'frequency', eegFs, 'nchannels', eegNchans, 'start', sigWin(1),...
         'channels', eegCh, 'downsample', 1));
     if size(eegData, 2) > 1
         eegData = mean(eegData, 2);
@@ -173,8 +181,8 @@ if ischar(emgData) || isempty(emgData)
         end
     end
         
-    emgData = double(bz_LoadBinary(emgData, 'duration', Inf,...
-        'frequency', emgFs, 'nchannels', emgNchans, 'start', 0,...
+    emgData = double(bz_LoadBinary(emgData, 'duration', diff(sigWin),...
+        'frequency', emgFs, 'nchannels', emgNchans, 'start', sigWin(1),...
         'channels', emgCh, 'downsample', 1));        
 end
 

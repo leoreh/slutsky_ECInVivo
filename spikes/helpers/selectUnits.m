@@ -123,7 +123,7 @@ units.stable = fr.mfr_std < fr.mfr;
 units.stable = ones(nunits, 1);    % override
 
 % fr gini coeff
-units.gini = fr.gini_unit <= 0.8 | isnan(fr.gini_unit);
+units.gini = fr.gini_unit <= 0.5 | isnan(fr.gini_unit);
 
 % combine
 units.clean(1, :) = logical(units.rs & units.su' & units.grp &...

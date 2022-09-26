@@ -4,59 +4,61 @@
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = 'lh111';
-forceL = true;
-forceA = true;
+mname = 'lh96';
 
-pcond = ["tempflag"];
-ncond = [""];
-
-% load vars from each session
 varsFile = ["fr"; "sr"; "spikes"; "st_metrics"; "swv_metrics";...
     "cell_metrics"; "sleep_states"; "ripp.mat"; "datInfo"; "session";...
     "psd_bins"; "units"];
 varsName = ["fr"; "sr"; "spikes"; "st"; "swv"; "cm"; "ss"; "ripp";...
     "datInfo"; "session"; "psdBins"; "units"];
 xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
-
 [v, basepaths] = getSessionVars('mname', mname, 'varsFile', varsFile,...
-    'varsName', varsName, 'pcond', pcond, 'ncond', ncond,...
+    'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
     'xlsname', xlsname);
 nfiles = length(basepaths);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % analyze data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% templateCal = ss.info.calibrationData;
+templateCal = ss.info.calibrationData;
 
-for isession = 1 : nfiles
+for ifile = 1 : nfiles
 
     % file
-    basepath = basepaths{isession};
+    basepath = basepaths{ifile};
     cd(basepath)
     [~, basename] = fileparts(basepath);
 
     % print progress
     fprintf('sessions_wrapper: working on session %d of %d, %s\n',...
-        isession, nfiles, basename)
+        ifile, nfiles, basename)
 
     % params
-    session = v(isession).session;
+    session = v(ifile).session;
     nchans = session.extracellular.nChannels;
     fs = session.extracellular.sr;
     spkgrp = session.extracellular.spikeGroups.channels;
     
+    % spike timing metrics
+    st = spktimes_metrics('spikes', v(ifile).spikes, 'sunits', [],...
+        'bins', [0 Inf], 'forceA', true, 'saveVar', true, 'fullA', false);
+
     % select specific units
-    units = selectUnits('basepath', basepath, 'grp', [1 : 4], 'saveVar', true,...
-        'forceA', true, 'frBoundries', [0.05 Inf; 0.05 Inf],...
-        'spikes', v(isession).spikes);
+%     units = selectUnits('basepath', basepath, 'grp', [1 : 4], 'saveVar', true,...
+%         'forceA', true, 'frBoundries', [0.05 Inf; 0.05 Inf],...
+%         'spikes', v(ifile).spikes);
+    
+% fr
+% fr = firingRate(v(ifile).spikes.times, 'basepath', basepath,...
+%     'graphics', true, 'binsize', 60, 'saveVar', true,...
+%     'smet', 'none', 'winBL', [0 Inf], 'winCalc', [0, Inf]);
 
     % sleep signals
-%     load([basename, '.acceleration.mat'])
-%     sSig = as_prepSig([basename, '.lfp'], acc.mag,...
-%         'eegCh', [7], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
+%     sSig = as_prepSig([basename, '.lfp'], [],...
+%         'eegCh', [2], 'emgCh', [2], 'saveVar', true, 'emgNchans', nchans,...
 %         'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
-%         'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [10 450], 'fs', 1250);
+%         'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [100 450],...
+%         'fs', 1250, 'sigWin', [0 Inf]);
 
     % classify
 %     ss = as_classify(sSig, 'basepath', basepath, 'inspectLabels', false,...
@@ -65,13 +67,13 @@ for isession = 1 : nfiles
 
     % calc psd in states
 %     psd = psd_states('basepath', basepath, 'sstates', [1, 4],...
-%         'ch', [7], 'fs', [], 'wins', [0, Inf], 'saveVar', true,...
-%         'graphics', false, 'forceA', true);
-    
+%         'ch', [2], 'fs', [], 'wins', [0, Inf], 'saveVar', true,...
+%         'graphics', false, 'forceA', true, 'ftarget', [0.1 : 0.5 : 100]);
+
     % calc spec
 %     spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true,...
 %         'saveVar', true, 'padfft', -1, 'winstep', 5,...
-%         'ftarget', [], 'ch', {[7]},...
+%         'ftarget', [], 'ch', {[1 : 4], [5 : 8], [13 : 16], [17 : 20], [21 : 24], 25},...
 %         'force', true, 'logfreq', true);
 
 end
@@ -79,26 +81,11 @@ end
 cell_metrics = CellExplorer('basepaths', basepaths);
 
 % concatenate var from different sessions
-mname = 'lh111';
 [expData, xData] = sessions_catVarTime('mname', mname,...
-    'dataPreset', {'sr', 'fr'}, 'graphics', true,...
+    'dataPreset', {'fr'}, 'graphics', true,...
     'basepaths', {}, 'xTicksBinsize', 6, 'markRecTrans', true);
 
 
-
-clear clu4grp
-for ifile = 1 : nfiles
-    clu4grp(ifile, :) = histcounts(v(ifile).spikes.shankID);
-end
-
-ngrp = 4;
-clear nunits
-for ifile = 1 : nfiles
-    for igrp = 1 : ngrp
-        nunits(:, ifile, igrp) = sum(v(ifile).units.clean & v(ifile).spikes.shankID == igrp, 2);
-    end
-end
-squeeze(nunits(2, :, :))
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % psd across sessions
@@ -118,8 +105,8 @@ psd = catfields([v(1 : nfiles).psd], 'catdef', 'addim');
 cfg = as_loadConfig();
 nstates = size(psd.psd, 1);
 sstates = psd.info.sstates(:, 1);
-faxis = v(1).psd.info.input.faxis;
-lim_fAxis = faxis >= 0;
+faxis = v(1).psd.info.faxis;
+lim_fAxis = faxis >= 0 & faxis < Inf;
 
 fh = figure;
 th = tiledlayout(1, length(sstates), 'TileSpacing', 'Compact');
@@ -136,10 +123,10 @@ for istate = 1 : nstates
 %     end
 
     ph = plot(faxis, ydata, 'LineWidth', 2);
-    for ifile = 1 : nfiles
-        ph(ifile).Color(istate) = cfg.colors{sstates(istate)}(istate) - ifile * 0.01;
-        ph(ifile).Color(4) = alphaIdx(ifile);
-    end
+%     for ifile = 1 : nfiles
+%         ph(ifile).Color(istate) = cfg.colors{sstates(istate)}(istate) - ifile * 0.01;
+%         ph(ifile).Color(4) = alphaIdx(ifile);
+%     end
     set(gca, 'YScale', 'log', 'XScale', 'log')
     title(cfg.names{sstates(istate)})
     xlabel('Frequency [Hz]')
@@ -157,18 +144,30 @@ varsName = ["session"; "spec"; "ss"];
 nfiles = length(basepaths);
 
 sstates = [1, 4];
-clear psd
+clear psd spec
 for ifile = 1 : nfiles
-    
+
     cd(basepaths{ifile})
+    basepath = basepaths{ifile};
+    [~, basename] = fileparts(basepath);
+    nchans = v(ifile).session.extracellular.nChannels;
+    ch = 7;
+    dur = 6 * 60 * 60;
+
+    sig = mean(double(bz_LoadBinary([basename, '.lfp'], 'duration', dur,...
+        'frequency', 1250, 'nchannels', nchans, 'start', 0,...
+        'channels', 7, 'downsample', 1)), 2);
+
     spec(ifile) = calc_spec('basepath', basepaths{ifile},...
-        'sig', [], 'fs', 1250, 'graphics', false,...
-        'saveVar', true, 'padfft', -1, 'winstep', 1,...
-        'ftarget', [], 'ch', {[7]},...
+        'sig', sig, 'fs', 1250, 'graphics', false,...
+        'saveVar', false, 'padfft', -1, 'winstep', 1,...
+        'ftarget', [0.1 : 0.5 : 100], 'ch', {[1]},...
         'force', true, 'logfreq', true);
     
     for istate = 1 : length(sstates)
-        psd(ifile, istate, :) = mean(spec(ifile).s(v(ifile).ss.labels == sstates(istate), :), 1);
+        stateIdx = v(ifile).ss.labels == sstates(istate);
+        stateIdx = stateIdx(1 : dur);
+        psd(ifile, istate, :) = mean(spec(ifile).s(stateIdx, :), 1);
     end
 end
 
@@ -179,14 +178,14 @@ alphaIdx = linspace(0.5, 1, nfiles);
 for istate = 1 : nstates
     axh = nexttile;
 
-    ydata = squeeze(psd(:, istate, :));
-%     ydata = ydata ./ sum(ydata(lim_fAxis, :), 1);
+    ydata = squeeze(psd(:, istate, :))';
+    ydata = ydata ./ sum(ydata(lim_fAxis, :), 1);
 
     ph = plot(spec(ifile).freq, ydata, 'LineWidth', 2);
-    for ifile = 1 : nfiles
-        ph(ifile).Color(istate) = cfg.colors{sstates(istate)}(istate) - ifile * 0.01;
-        ph(ifile).Color(4) = alphaIdx(ifile);
-    end
+%     for ifile = 1 : nfiles
+%         ph(ifile).Color(istate) = cfg.colors{sstates(istate)}(istate) - ifile * 0.01;
+%         ph(ifile).Color(4) = alphaIdx(ifile);
+%     end
     set(gca, 'YScale', 'log', 'XScale', 'log')
     title(cfg.names{sstates(istate)})
     xlabel('Frequency [Hz]')
@@ -217,14 +216,14 @@ unitType = 'rs';
 brst = cell2struct(cell(1, length(brstVar)), brstVar, 2);
 
 % concate to cell
-for isession = 1 : nfiles
-    su = v(isession).units.(unitType);
+for ifile = 1 : nfiles
+    su = v(ifile).units.(unitType);
 
     for ivar = 1 : length(brstVar)
-        brst.(brstVar{ivar}){isession} = v(isession).st.brst.avg.(brstVar{ivar})(:, su)';
+        brst.(brstVar{ivar}){ifile} = v(ifile).st.brst.avg.(brstVar{ivar})(:, su)';
     end
 
-    brst.nbrsts{isession} = v(isession).st.brst.nbrsts.freqNorm(:, su)';
+    brst.nbrsts{ifile} = v(ifile).st.brst.nbrsts.freqNorm(:, su)';
 end
 
 % organize in mat

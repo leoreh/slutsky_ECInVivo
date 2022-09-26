@@ -18,7 +18,7 @@ function psd = psd_states(varargin)
 %   sigfile         char. name of file to load signal from. if empty but
 %                   channel is specified, will load from [basename.lfp]
 %   sstates         numeric. index of selected states to calculate psd 
-%   ftarget         numeric. requested frequencies for calculating the psd
+%   faxis           numeric. frequencies for calculating the psd
 %   saveVar         logical. save ss var {true}
 %   forceA          logical. reanalyze recordings even if ss struct
 %                   exists (false)
@@ -42,7 +42,7 @@ addOptional(p, 'ch', [], @isnumeric);
 addOptional(p, 'fs', 1, @isnumeric);
 addOptional(p, 'sigfile', [], @ischar);
 addOptional(p, 'sstates', [1, 4, 5], @isnumeric);
-addOptional(p, 'ftarget', [0.5 : 0.5 : 120], @isnumeric);
+addOptional(p, 'faxis', [0.5 : 0.5 : 120], @isnumeric);
 addOptional(p, 'saveVar', true, @islogical);
 addOptional(p, 'forceA', false, @islogical);
 addOptional(p, 'graphics', true, @islogical);
@@ -54,7 +54,7 @@ ch              = p.Results.ch;
 fs              = p.Results.fs;
 sigfile         = p.Results.sigfile;
 sstates         = p.Results.sstates;
-ftarget         = p.Results.ftarget;
+faxis           = p.Results.faxis;
 saveVar         = p.Results.saveVar;
 forceA          = p.Results.forceA;
 graphics        = p.Results.graphics;
@@ -116,9 +116,9 @@ if ~isempty(ch)         % from binary
         'duration', Inf,...
         'frequency', fs, 'nchannels', nchans, 'start', 0,...
         'channels', ch, 'downsample', 1));
-    if length(ch) > 1
-        sig = mean(sig, 2);
-    end
+%     if length(ch) > 1
+%         sig = mean(sig, 2);
+%     end
 
 else                    % from sSig
     
@@ -139,7 +139,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % initialize
-% psd.psd = nan(nwin, length(sstates), length(faxis));
+psd.psd = nan(nwin, length(sstates), length(faxis));
 for iwin = 1 : nwin
 
     % calc state epochs in window
@@ -156,9 +156,9 @@ for iwin = 1 : nwin
     end
 
     % calc psd
-    [psd.psd(iwin, :, :), faxis] = calc_psd('sig', sig(sigidx(1) : sigidx(2), :),...
+    psd.psd(iwin, :, :) = calc_psd('sig', sig(sigidx(1) : sigidx(2), :),...
         'bins', stateEpochs(sstates),...
-        'fs', fs, 'ftarget', ftarget, 'graphics', false);
+        'fs', fs, 'ftarget', faxis, 'graphics', false);
 
 end
 
@@ -171,7 +171,6 @@ psd.info.sigfile = sigfile;
 psd.info.fs = fs;
 psd.info.wins = wins;
 psd.info.faxis = faxis;
-psd.info.ftarget = ftarget;
 psd.info.sstates = sstates;
 
 if saveVar

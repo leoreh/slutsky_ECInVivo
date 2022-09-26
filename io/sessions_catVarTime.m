@@ -100,7 +100,7 @@ fs = v(1).session.extracellular.sr;
 
 switch dataPreset
     case 'spec'       
-        ch = 2;     % manually change
+        ch = 1;     % manually change
         for isession = 1 : nsessions
             if ndims(v(isession).spec.s) == 3
                 v(isession).data = squeeze(v(isession).spec.s(:, :, ch))';
@@ -303,9 +303,11 @@ if graphics
             
         case 'fr'
             expData = movmean(mean(expRs, 2, 'omitnan'), 13, 1);
+%             expData = mean(expRs, 2, 'omitnan');
             plot(xData, expData, 'LineWidth', 2)
             hold on
             expData = movmean(mean(expFs, 2, 'omitnan'), 13, 1);
+%             expData = mean(expFs, 2, 'omitnan');
             plot(xData, expData, 'LineWidth', 2)
             legend({sprintf('RS <= %d', max(nunits(:, 1))),...
                 sprintf('FS <= %d', max(nunits(:, 2)))})

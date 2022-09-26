@@ -96,8 +96,7 @@ chunks(1, 1) = 1;
 
 % assimilate clip into chunks
 if ~isempty(clip)
-    chunks = SubtractIntervals(chunks,...
-        clip(clipchunks(iclip, 1) : clipchunks(iclip, 2), :));
+    chunks = SubtractIntervals(chunks, clip);
 end
 
 % remove chunks that are greater than nsamps. this can occur if clip

@@ -16,10 +16,11 @@ function cats = catfields(s, varargin)
 % DEPENDENCIES:
 %
 % TO DO LIST:
-%   add option to cat by adding dimension
+%   add option to cat by adding dimension (done)
 %   add option to transponse
 %   add option to specify dim for specific fields
 %   add option to input separate structs and handle unique fields
+%   add option to cat by cell2nanmat
 %
 % 28 feb 22 LH
 
@@ -111,11 +112,6 @@ for ifld = 1 : length(flds)
     % sort the dimensions available for concatenation
     [~, sdim] = sort(valsz(1, :));
     sdim = sdim(eqdim);
-    
-%     if isemtpy(sdim)
-%         cats.(flds{ifld}) = valarray(:, ifld);
-%         continue
-%     end
 
     % cat according to user selection / default if multiple options exist
     if strcmp(catdef, 'long')

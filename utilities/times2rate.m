@@ -1,26 +1,23 @@
-function [r, binedges, bincents, binidx] = times2rate(spktimes, varargin)
+function [r, binedges, bincents, binidx] = times2rate(times, varargin)
 
-% for each unit counts spikes in bins. output may be given as spike count
-% and thus to convert to Hz the output must be divided by the binsize. This
-% is so that times2rate can replace times2binary (i.e. output a binary
-% matrix if the binsize is small). spktimes, binsize and winCalc must be
-% the same units (e.g. seconds or samples).
+% gets a vector of times and converts to rate (counts the number of
+% occurances) in a specified binsize. essentially a wrapper for histcounts.
+% e.g., used to converts spikes.times to firing rate. can limit the bins to
+% the boundries specified by winCalc.
 % 
 % INPUT
-% required:
-%   spktimes    a cell array of vectors where each vector (unit) contains the
+%   times       cell array of vectors where each vector (unit) contains the
 %               timestamps of spikes. for example {spikes.times{1:4}}. can
 %               also be a single vector
-% optional:
 %   winCalc     time window for calculation {[0 Inf]}. 
 %               last elemet should be recording duration (e.g.
 %               lfp.duration). if Inf will be the last spike. can also be
 %               an n x 2 matrix.
 %   binsize     size of bins {60}. can be of any units so long corresponse
-%               to spktimes. for example, spktimes from Wh (per tetrode) is
-%               given in samples whereas spktimes from ce (per unit) is
+%               to times. for example, times from Wh (per tetrode) is
+%               given in samples whereas times from ce (per unit) is
 %               given in seconds
-%   c2r         convert counts to rate by dividing with binsize 
+%   c2r         logical. convert counts to rate by dividing with binsize 
 % 
 % OUTPUT
 %   r           matrix of units (rows) x rate in time bins (columns)
@@ -59,23 +56,27 @@ binsize     = p.Results.binsize;
 winCalc     = p.Results.winCalc;
 c2r         = p.Results.c2r;
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% preparations
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 % prepare spike times
-if ~iscell(spktimes)
-    spktimes = {spktimes};
+if ~iscell(times)
+    times = {times};
 end
-nunits = length(spktimes);
+nunits = length(times);
 
 % validate window
 if isempty(winCalc)
-    winCalc = [1 max(vertcat(spktimes{:}))];
+    winCalc = [1 max(vertcat(times{:}))];
 end
 if winCalc(end) == Inf
-    winCalc(end) = max(vertcat(spktimes{:}));
+    winCalc(end) = max(vertcat(times{:}));
 end
 nwin = size(winCalc, 1);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% arrange bins
+% calc
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % currently assumes bins are consecutive !!!
@@ -92,10 +93,10 @@ for iwin = 1 : nwin
     nbins = length(binedges{iwin}) - 1;
     for iunit = 1 : nunits
         if c2r
-            r(iunit, cnt : cnt + nbins - 1) = histcounts(spktimes{iunit}, binedges{iwin},...
+            r(iunit, cnt : cnt + nbins - 1) = histcounts(times{iunit}, binedges{iwin},...
                 'Normalization', 'countdensity');
         else
-            r(iunit, cnt : cnt + nbins - 1) = histcounts(spktimes{iunit}, binedges{iwin},...
+            r(iunit, cnt : cnt + nbins - 1) = histcounts(times{iunit}, binedges{iwin},...
                 'Normalization', 'count');
         end
     end
