@@ -1,11 +1,16 @@
    
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% lh111
+% lh114
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % user input
+<<<<<<< Updated upstream
 mname           = 'lh111';
 basepath        = 'I:\Data\lh111\2022-08-28_10-43-58';
+=======
+mname           = 'lh114';
+basepath        = 'J:\Data\lh114\2022-09-26_10-00-36';
+>>>>>>> Stashed changes
 exp             = [1, 2];
 
 % dat from oe 
@@ -46,7 +51,7 @@ datInfo = preprocDat('orig_files', datfile, 'mapch', 1 : nchans,...
 
 % spike detection from temp_wh
 [spktimes, ~] = spktimesWh('basepath', basepath, 'fs', fs, 'nchans', nchans,...
-    'spkgrp', spkgrp, 'saveVar', true, 'saveWh', true,...
+    'spkgrp', spkgrp, 'saveVar', false, 'saveWh', true,...
     'graphics', false, 'force', true, 'winWh', [0 Inf]);
 
 % spike rate per tetrode
@@ -94,7 +99,11 @@ spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true,...
 
 % user input
 mname           = 'lh112';
+<<<<<<< Updated upstream
 basepath        = 'D:\Data\lh112\2022-09-03_11-23-20';
+=======
+basepath        = 'J:\Data\lh112\2022-09-03_11-23-20';
+>>>>>>> Stashed changes
 exp             = [1];
 
 % dat from oe 
