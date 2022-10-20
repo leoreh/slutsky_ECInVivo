@@ -1,10 +1,8 @@
-function psd = psd_states(varargin)
+function psd = psd_emgPrctile(varargin)
 
-% wrapper for calc_psd dedicated to sleep states. uses the eeg signal from
-% sSig by default, but can load any specified ch from a binary file. can
-% separate the recording to windows and calc the psd per state per window.
-% if sleep_states.mat is not found, will separate the recording to "AW" and
-% "NREM" according to high- and low-emg activity. 
+% wrapper for calc_psd that uses the emg_rms from sSig to calculate the psd
+% during high- and low-emg activity. uses the eeg signal from sSig by
+% default, but can load any specified ch from a binary file.
 %
 % INPUT:
 %   basepath        string. path to recording folder {pwd}
@@ -19,13 +17,10 @@ function psd = psd_states(varargin)
 %                   new sampling frequency of the eeg signal.
 %   sigfile         char. name of file to load signal from. if empty but
 %                   channel is specified, will load from [basename.lfp]
-%   sstates         numeric. index of selected states to calculate psd 
-%   ftarget         numeric. requested frequencies for calculating the psd
 %   prct            numeric. percent by which to seprate high- and low-emg.
 %                   e.g., prct = 50 is the median 
-%   emgFlag         logical. calc psd in high- and low-emg even if states
-%                   file exists
-%   saveVar         logical. save ss var {true}
+%   ftarget         numeric. requested frequencies for calculating the psd
+%   saveVar         logical. save var {true}
 %   forceA          logical. reanalyze recordings even if ss struct
 %                   exists (false)
 %   graphics        logical. plot confusion chart and state separation {true}
@@ -47,10 +42,8 @@ addOptional(p, 'wins', [0 Inf], @isnumeric);
 addOptional(p, 'ch', [], @isnumeric);
 addOptional(p, 'fs', 1, @isnumeric);
 addOptional(p, 'sigfile', [], @ischar);
-addOptional(p, 'sstates', [1, 4, 5], @isnumeric);
-addOptional(p, 'ftarget', [0.5 : 0.5 : 120], @isnumeric);
 addOptional(p, 'prct', [70], @isnumeric);
-addOptional(p, 'emgFlag', false, @islogical);
+addOptional(p, 'ftarget', [0.5 : 0.5 : 120], @isnumeric);
 addOptional(p, 'saveVar', true, @islogical);
 addOptional(p, 'forceA', false, @islogical);
 addOptional(p, 'graphics', true, @islogical);
@@ -61,10 +54,8 @@ wins            = p.Results.wins;
 ch              = p.Results.ch;
 fs              = p.Results.fs;
 sigfile         = p.Results.sigfile;
-sstates         = p.Results.sstates;
-ftarget         = p.Results.ftarget;
 prct            = p.Results.prct;
-emgFlag         = p.Results.emgFlag;
+ftarget         = p.Results.ftarget;
 saveVar         = p.Results.saveVar;
 forceA          = p.Results.forceA;
 graphics        = p.Results.graphics;
@@ -76,36 +67,8 @@ graphics        = p.Results.graphics;
 % files
 cd(basepath)
 [~, basename] = fileparts(basepath);
+psdfile = fullfile(basepath, [basename, '.psdEmg.mat']);
 sleepfile = fullfile(basepath, [basename, '.sleep_sig.mat']);
-
-% state params
-cfg = as_loadConfig();
-if isempty(sstates)
-    sstates = 1 : nstates;
-end
-
-% smoothing params (graphics only)
-smf = 17;
-gk = gausswin(smf);
-gk = gk / sum(gk);
-
-% load session vars
-varsFile = ["sleep_states"; "datInfo"; "session"];
-varsName = ["ss"; "datInfo"; "session"];
-v = getSessionVars('basepaths', {basepath}, 'varsFile', varsFile,...
-    'varsName', varsName);
-
-% check if states file exists, if not flag emg
-if isempty(v.ss) || emgFlag
-    emgFlag = true;
-    psdfile = fullfile(basepath, [basename, '.psdEmg.mat']);
-    sstates = [1, 4];    
-    emg = load(sleepfile, 'emg_rms');
-    emg = emg.emg_rms;
-else
-    emgFlag = false;
-    psdfile = fullfile(basepath, [basename, '.psd.mat']);
-end
 
 % check if already analyzed
 if exist(psdfile, 'file') && ~forceA
@@ -113,17 +76,32 @@ if exist(psdfile, 'file') && ~forceA
     return
 end
 
+% load session vars
+varsFile = ["sleep_states"; "datInfo"; "session"];
+varsName = ["ss"; "datInfo"; "session"];
+v = getSessionVars('basepaths', {basepath}, 'varsFile', varsFile,...
+    'varsName', varsName);
+
+% load emg
+emg = load(sleepfile, 'emg_rms');
+emg = emg.emg_rms;
+
 % assure wins is in range of recording. note wins is used as index to state labels
 if isempty(wins)
     wins = [0 Inf];
 end
 nwin = size(wins, 1);
 wins(wins == 0) = 1;    
-if ~emgFlag
-    wins(wins > length(v.ss.labels)) = length(v.ss.labels);
-else
-    wins(wins > length(emg)) = length(emg);
-end
+wins(wins > length(emg)) = length(emg);
+
+% state params
+cfg = as_loadConfig();
+sstates = [1, 4];       % AW and NREM
+
+% smoothing params (graphics only)
+smf = 17;
+gk = gausswin(smf);
+gk = gk / sum(gk);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % load signal from sSig or from binary if ch specified
@@ -154,15 +132,6 @@ else                    % from sSig
     load(sigfile, 'fs');
 end
 
-% filter signal? usfeul for emg.dat files
-% params for filtering eeg
-% import iosr.dsp.*
-% filtRatio = 450 / (fsEeg / 2);
-% fsRatio = (fsEeg / fsLfp);
-
-%%% GET ARTIFACTS FROM SPECTROGRAM AND REMOVE FROM EMG IDX
-
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % calc psd
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -170,23 +139,15 @@ end
 % initialize
 % psd.psd = nan(nwin, length(sstates), length(faxis));
 for iwin = 1 : nwin
-
-    if ~emgFlag
-        % calc state epochs in window
-        labels = v.ss.labels(wins(iwin, 1) : wins(iwin, 2));
-        [stateEpochs, epStats(iwin)] = as_epochs('labels', labels);     
-
-    else
-        % get indices to high- and low-emg
-        labels = double(emg > prctile(emg, prct));
-        labels(emg < prctile(emg, 100 - prct)) = 2;
-
-        % limit indices to time window and get "state" epochs
-        labels = labels(wins(iwin, 1) : wins(iwin, 2));
-        [stateEpochs, ~] = as_epochs('labels', labels, 'minDur', 10, 'interDur', 4);
-        stateEpochs = stateEpochs([1 : 2]);
-
-    end
+ 
+    % get indices to high- and low-emg
+    labels = double(emg > prctile(emg, prct));
+    labels(emg < prctile(emg, 100 - prct)) = 2;
+    
+    % limit indices to time window and get "state" epochs
+    labels = labels(wins(iwin, 1) : wins(iwin, 2));
+    [stateEpochs, ~] = as_epochs('labels', labels, 'minDur', 10, 'interDur', 4);
+    stateEpochs = stateEpochs([1 : 2]);
 
     % get indices to signal according to window
     sigidx = wins(iwin, :) * fs;
@@ -240,7 +201,7 @@ if graphics
     alphaIdx = linspace(0.5, 1, nwin);
     lim_fAxis = faxis >= 1;
 
-    for istate = 1 : length(sstates)        
+    for istate = 1 : 2      
         axh = nexttile;
         
         % grab relevant data
@@ -273,14 +234,15 @@ if graphics
         ylabel(ytxt)
         legend('Location', 'Southwest', 'FontSize', 9)
         xlim([faxis(find(lim_fAxis, 1)), faxis(find(lim_fAxis, 1, 'last'))])
-         
+        ylim([0.1, 10^5])
+        
     end
     title(th, basename)
     
     if flgSaveFig
         figpath = fullfile(basepath, 'graphics', 'sleepState');
         mkdir(figpath)
-        figname = fullfile(figpath, [basename, '_psdStates']);
+        figname = fullfile(figpath, [basename, '_psdEmg']);
         export_fig(figname, '-jpg', '-transparent', '-r300')
     end  
 end

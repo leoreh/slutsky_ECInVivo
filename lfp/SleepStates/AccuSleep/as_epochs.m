@@ -66,7 +66,7 @@ for istate = 1 : nstates
     binaryVec = zeros(length(labels), 1);
     binaryVec(labels == istate) = 1;
     stateEpochs{istate} = binary2epochs('vec', binaryVec, 'minDur', minDur(istate), 'maxDur', [],...
-        'interDur', interDur(istate), 'exclude', false);
+        'interDur', interDur(istate), 'exclude', false, 'printFlag', false);
 end
 
 % remove confindance margins

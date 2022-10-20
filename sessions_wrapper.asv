@@ -4,7 +4,7 @@
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = 'lh102';
+mname = 'lh100';
 
 varsFile = ["fr"; "sr"; "spikes"; "st_metrics"; "swv_metrics";...
     "cell_metrics"; "sleep_states"; "ripp.mat"; "datInfo"; "session";...
@@ -39,32 +39,49 @@ for ifile = 1 : nfiles
     fs = session.extracellular.sr;
     spkgrp = session.extracellular.spikeGroups.channels;
     
-    % select specific units
-%     units = selectUnits('basepath', basepath, 'grp', [1, 3 : 4], 'saveVar', true,...
-%         'forceA', true, 'frBoundries', [0.05 Inf; 0.05 Inf],...
-%         'spikes', v(isession).spikes);
+    % spike timing metrics
+%     st = spktimes_metrics('spikes', v(ifile).spikes, 'sunits', [],...
+%         'bins', [0 Inf], 'forceA', true, 'saveVar', true, 'fullA', false);
 
+    % select specific units
+%     units = selectUnits('basepath', basepath, 'grp', [1 : 4], 'saveVar', true,...
+%         'forceA', true, 'frBoundries', [0.05 Inf; 0.05 Inf],...
+%         'spikes', v(ifile).spikes, 'altClean', 2);
+    
     % sleep signals
-%     sSig = as_prepSig([basename, '.lfp'], [],...
-%         'eegCh', [1], 'emgCh', [3], 'saveVar', true, 'emgNchans', nchans,...
-%         'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
-%         'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [10 450],...
-%         'fs', 1250, 'sigWin', [0 Inf]);
+    load([basename, '.acceleration.mat'])
+    sSig = as_prepSig([basename, '.lfp'], acc.mag,...
+        'eegCh', [12 : 15], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
+        'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
+        'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [10 450], 'fs', 1250);
 
     % classify
 %     ss = as_classify(sSig, 'basepath', basepath, 'inspectLabels', false,...
 %         'saveVar', true, 'forceA', true, 'netfile', [],...
 %         'graphics', true, 'calData', templateCal);
 
-    % calc psd in states
-    psd = psd_states('basepath', basepath, 'sstates', [1, 4],...
-        'ch', [1], 'fs', [], 'wins', [4 * 60 * 60, Inf], 'saveVar', true,...
-        'graphics', false, 'forceA', true, 'ftarget', [0.1 : 0.5 : 100]);
-    
+    % fr
+%     fr = firingRate(v(ifile).spikes.times, 'basepath', basepath,...
+%         'graphics', true, 'binsize', 60, 'saveVar', true,...
+%         'smet', 'none', 'winBL', [0 Inf], 'winCalc', [0, Inf]);
+
+%     % calc psd in states  
+%     psd = psd_states('basepath', basepath, 'sstates', [1, 4],...
+%         'ch', [], 'fs', [], 'wins', [0, Inf], 'saveVar', true,...
+%         'graphics', true, 'forceA', true, 'ftarget', [0.1 : 0.5 : 100]);
+
+    % calc psd according to high/low emg
+%     csec = cumsum(v(ifile).datInfo.nsamps) / fs
+%     wins = [csec(3), Inf];
+    wins = [0, Inf];
+    psd = psd_emgPrctile('basepath', basepath, 'prct', 70,...
+        'ch', [], 'fs', [], 'wins', wins, 'saveVar', true,...
+        'graphics', true, 'forceA', true, 'ftarget', [0.1 : 0.5 : 100]);
+
     % calc spec
 %     spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true,...
 %         'saveVar', true, 'padfft', -1, 'winstep', 5,...
-%         'ftarget', [], 'ch', {[1], [2]},...
+%         'ftarget', [], 'ch', {[1 : 4], [5 : 8], [13 : 16], [17 : 20], [21 : 24], 25},...
 %         'force', true, 'logfreq', true);
 
 end
@@ -73,37 +90,25 @@ cell_metrics = CellExplorer('basepaths', basepaths);
 
 % concatenate var from different sessions
 [expData, xData] = sessions_catVarTime('mname', mname,...
-    'dataPreset', {'spec', 'emg_rms'}, 'graphics', true,...
+    'dataPreset', {'fr', 'spec'}, 'graphics', true,...
     'basepaths', {}, 'xTicksBinsize', 6, 'markRecTrans', true);
 
 
-clear clu4grp
-for ifile = 1 : nfiles
-    clu4grp(ifile, :) = histcounts(v(ifile).spikes.shankID);
-end
-
-ngrp = 4;
-clear nunits
-for ifile = 1 : nfiles
-    for igrp = 1 : ngrp
-        nunits(:, ifile, igrp) = sum(v(ifile).units.clean & v(ifile).spikes.shankID == igrp, 2);
-    end
-end
-squeeze(nunits(2, :, :))
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % psd across sessions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % load vars from each session
-varsFile = ["session"; "psd"];
+varsFile = ["session"; "psdEmg"];
 varsName = ["session"; "psd"];
 [v, ~] = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
     'varsName', varsName);
 nfiles = length(basepaths);
-
+sflies = 1 : nfiles;
+sfiles = [1, 2, 3, 4, 7, 8];
 % cat psd struct
-psd = catfields([v(1 : nfiles).psd], 'catdef', 'addim');
+psd = catfields([v(sfiles).psd], 'catdef', 'addim');
 
 % get params
 cfg = as_loadConfig();
@@ -120,7 +125,7 @@ for istate = 1 : nstates
     axh = nexttile;
 
     ydata = squeeze(psd.psd(istate, :, :));
-    ydata = ydata ./ sum(ydata(lim_fAxis, :), 1);
+%     ydata = ydata ./ sum(ydata(lim_fAxis, :), 1);
     
 %     for ifile = 1 : nfiles
 %         ydata(:, ifile) = bz_NormToRange(ydata(:, ifile), [0 1]);

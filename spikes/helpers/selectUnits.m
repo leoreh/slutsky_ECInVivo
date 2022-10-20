@@ -14,6 +14,8 @@ function units = selectUnits(varargin)
 %                   frBoundries. 1st row rs; 2nd row fs
 %   forceA          logical. re-select units even if units var exists
 %   saveVar         logical 
+%   altClean        numeric. alternative selection of criteria to define
+%                   clean units.
 %
 % DEPENDENCIES:
 % 
@@ -35,6 +37,7 @@ addParameter(p, 'grp', []);
 addParameter(p, 'frBoundries', [0 Inf; 0 Inf], @isnumeric);
 addParameter(p, 'forceA', false, @islogical);
 addParameter(p, 'saveVar', true, @islogical);
+addParameter(p, 'altClean', 1, @isnumeric);
 
 parse(p, varargin{:})
 basepath        = p.Results.basepath;
@@ -45,6 +48,7 @@ grp             = p.Results.grp;
 frBoundries     = p.Results.frBoundries;
 forceA          = p.Results.forceA;
 saveVar         = p.Results.saveVar;
+altClean        = p.Results.altClean;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preparations
@@ -79,7 +83,7 @@ end
 nunits = length(fr.mfr);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% selection
+% organize
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % su vs mu
@@ -125,11 +129,28 @@ units.stable = ones(nunits, 1);    % override
 % fr gini coeff
 units.gini = fr.gini_unit <= 0.5 | isnan(fr.gini_unit);
 
-% combine
-units.clean(1, :) = logical(units.rs & units.su' & units.grp &...
-    units.gini' & units.stable' & units.mfrBL' & units.cnt');
-units.clean(2, :) = logical(units.fs & units.su' & units.grp &...
-    units.gini' & units.stable' & units.mfrBL' & units.cnt');
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% choose what is clean and save
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% select criteria
+switch altClean
+    case 1 % all
+        units.clean(1, :) = logical(units.rs & units.su' & units.grp &...
+            units.gini' & units.stable' & units.mfrBL' & units.cnt');
+        units.clean(2, :) = logical(units.fs & units.su' & units.grp &...
+            units.gini' & units.stable' & units.mfrBL' & units.cnt');
+
+    case 2 % none
+        units.clean(1, :) = logical(units.rs);
+        units.clean(2, :) = logical(units.fs);
+
+    case 3 % all but stability
+        units.clean(1, :) = logical(units.rs & units.su' & units.grp &...
+            units.mfrBL');
+        units.clean(2, :) = logical(units.fs & units.su' & units.grp &...
+            units.mfrBL');
+end
 
 % info
 units.info.frBoundries = frBoundries;

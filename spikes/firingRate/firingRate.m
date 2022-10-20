@@ -71,7 +71,7 @@ forceA = p.Results.forceA;
 % preparations
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% params
+% constants
 smfactor = 3;    % smooth factor
 nunits = length(spktimes);
 
