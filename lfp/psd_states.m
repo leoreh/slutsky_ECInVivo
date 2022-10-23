@@ -23,7 +23,7 @@ function psd = psd_states(varargin)
 %   ftarget         numeric. requested frequencies for calculating the psd
 %   prct            numeric. percent by which to seprate high- and low-emg.
 %                   e.g., prct = 50 is the median 
-%   emgFlag         logical. calc psd in high- and low-emg even if states
+%   flgEmg          logical. calc psd in high- and low-emg even if states
 %                   file exists
 %   saveVar         logical. save ss var {true}
 %   forceA          logical. reanalyze recordings even if ss struct
@@ -50,7 +50,7 @@ addOptional(p, 'sigfile', [], @ischar);
 addOptional(p, 'sstates', [1, 4, 5], @isnumeric);
 addOptional(p, 'ftarget', [0.5 : 0.5 : 120], @isnumeric);
 addOptional(p, 'prct', [70], @isnumeric);
-addOptional(p, 'emgFlag', false, @islogical);
+addOptional(p, 'flgEmg', false, @islogical);
 addOptional(p, 'saveVar', true, @islogical);
 addOptional(p, 'forceA', false, @islogical);
 addOptional(p, 'graphics', true, @islogical);
@@ -64,7 +64,7 @@ sigfile         = p.Results.sigfile;
 sstates         = p.Results.sstates;
 ftarget         = p.Results.ftarget;
 prct            = p.Results.prct;
-emgFlag         = p.Results.emgFlag;
+flgEmg          = p.Results.flgEmg;
 saveVar         = p.Results.saveVar;
 forceA          = p.Results.forceA;
 graphics        = p.Results.graphics;
@@ -96,14 +96,14 @@ v = getSessionVars('basepaths', {basepath}, 'varsFile', varsFile,...
     'varsName', varsName);
 
 % check if states file exists, if not flag emg
-if isempty(v.ss) || emgFlag
-    emgFlag = true;
+if isempty(v.ss) || flgEmg
+    flgEmg = true;
     psdfile = fullfile(basepath, [basename, '.psdEmg.mat']);
     sstates = [1, 4];    
     emg = load(sleepfile, 'emg_rms');
     emg = emg.emg_rms;
 else
-    emgFlag = false;
+    flgEmg = false;
     psdfile = fullfile(basepath, [basename, '.psd.mat']);
 end
 
@@ -119,7 +119,7 @@ if isempty(wins)
 end
 nwin = size(wins, 1);
 wins(wins == 0) = 1;    
-if ~emgFlag
+if ~flgEmg
     wins(wins > length(v.ss.labels)) = length(v.ss.labels);
 else
     wins(wins > length(emg)) = length(emg);
@@ -171,7 +171,7 @@ end
 % psd.psd = nan(nwin, length(sstates), length(faxis));
 for iwin = 1 : nwin
 
-    if ~emgFlag
+    if ~flgEmg
         % calc state epochs in window
         labels = v.ss.labels(wins(iwin, 1) : wins(iwin, 2));
         [stateEpochs, epStats(iwin)] = as_epochs('labels', labels);     

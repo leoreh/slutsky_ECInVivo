@@ -4,13 +4,13 @@
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = 'lh105';
+mname = 'lh112';
 
 varsFile = ["fr"; "sr"; "spikes"; "st_metrics"; "swv_metrics";...
     "cell_metrics"; "sleep_states"; "ripp.mat"; "datInfo"; "session";...
-    "psd_bins"; "units"];
+    "units"];
 varsName = ["fr"; "sr"; "spikes"; "st"; "swv"; "cm"; "ss"; "ripp";...
-    "datInfo"; "session"; "psdBins"; "units"];
+    "datInfo"; "session"; "units"];
 xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
 [v, basepaths] = getSessionVars('mname', mname, 'varsFile', varsFile,...
     'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
@@ -66,20 +66,20 @@ for ifile = 1 : nfiles
     %         'smet', 'none', 'winBL', [0 Inf], 'winCalc', [0, Inf]);
 
     %     % calc psd in states
-    %     csec = cumsum(v(ifile).datInfo.nsamps) / fs;
-    %     csec / 60 / 60
-    %     wins = [csec(1), Inf];
+    csec = cumsum(v(ifile).datInfo.nsamps) / fs;
+    csec / 60 / 60
+    wins = [csec(1), Inf];
     wins = [0, Inf];
     psd = psd_states('basepath', basepath, 'sstates', [1, 4],...
-        'ch', [], 'fs', [], 'wins', [0, Inf], 'saveVar', true,...
+        'ch', [], 'fs', [], 'wins', wins, 'saveVar', true,...
         'graphics', true, 'forceA', true, 'ftarget', [0.1 : 0.5 : 100],...
-        'prct', 70, 'emgFlag', true);
+        'prct', 70, 'flgEmg', false);
 
     % calc spec
-    %     spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true,...
-    %         'saveVar', true, 'padfft', -1, 'winstep', 5,...
-    %         'ftarget', [], 'ch', {[1 : 4], [5 : 8], [13 : 16], [17 : 20], [21 : 24], 25},...
-    %         'force', true, 'logfreq', true);
+%     spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true,...
+%         'saveVar', false, 'padfft', -1, 'winstep', 5,...
+%         'ftarget', [], 'ch', {[13 : 16]},...
+%         'force', true, 'logfreq', true);
 
 end
 
@@ -96,51 +96,12 @@ cell_metrics = CellExplorer('basepaths', basepaths);
 % psd across sessions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% load vars from each session
-varsFile = ["session"; "psdEmg"];
-varsName = ["session"; "psd"];
-[v, basepaths] = getSessionVars('mname', mname, 'varsFile', varsFile,...
-    'varsName', varsName);
-nfiles = length(basepaths);
-sfiles = 1 : nfiles;
-% sfiles = [1, 2, 3, 4, 7, 8];
-% cat psd struct
-psd = catfields([v(sfiles).psd], 'catdef', 'addim');
+bands = psd_sessions('lh106', 'flgNormBand', true, 'flgAnalyze', false);
 
-% get params
-cfg = as_loadConfig();
-nstates = size(psd.psd, 1);
-sstates = psd.info.sstates(:, 1);
-faxis = v(1).psd.info.faxis;
-lim_fAxis = faxis >= 0 & faxis < Inf;
 
-fh = figure;
-th = tiledlayout(1, length(sstates), 'TileSpacing', 'Compact');
-alphaIdx = linspace(0.5, 1, nfiles);
 
-for istate = 1 : nstates
-    axh = nexttile;
 
-    ydata = squeeze(psd.psd(istate, :, :));
-    ydata = ydata ./ sum(ydata(lim_fAxis, :), 1);
-    
-%     for ifile = 1 : nfiles
-%         ydata(:, ifile) = bz_NormToRange(ydata(:, ifile), [0 1]);
-%     end
-
-    ph = plot(faxis, ydata, 'LineWidth', 2);
-%     for ifile = 1 : nfiles
-%         ph(ifile).Color(istate) = cfg.colors{sstates(istate)}(istate) - ifile * 0.01;
-%         ph(ifile).Color(4) = alphaIdx(ifile);
-%     end
-    set(gca, 'YScale', 'log', 'XScale', 'log')
-    title(cfg.names{sstates(istate)})
-    xlabel('Frequency [Hz]')
-    legend(split(num2str(1 : nfiles)), 'Location', 'Southwest', 'FontSize', 9)
-
-end
-
-% ----------------
+% ---------------- psd from spec
 
 % load vars from each session
 varsFile = ["session"; "spec"; "sleep_states"];

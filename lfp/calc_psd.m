@@ -15,6 +15,9 @@ function [psd, faxis] = calc_psd(varargin)
 % to calculating the psd per electrode and averaging the psds. the results
 % are different then calculating the psd based on a single channel.
 % -------------------------------------------------------------------------
+% see also Savolainen, scientific reports, 2021 and K. van Vugt et al., J.
+% neurosci. met., 2007
+% -------------------------------------------------------------------------
 %
 % INPUT:
 %   sig             numeric. lfp / eeg data (1 x n)

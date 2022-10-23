@@ -201,7 +201,7 @@ end
 bandNames = ["broad", "swa", "delta", "theta", "alpha", "beta", "glow", "ghigh"];
 bandFreqs = [0.5, 100; 0.5, 1; 1, 4; 4, 10; 10, 14; 15, 30; 30, 60; 60, 100];
 
-% convert to dB (note chronux output is power not magnitude)
+% convert to dB (chronux output is power not magnitude)
 powdb = 10 * log10(s);
 
 % calc power in band. db is a 3d array of freqBand x time x channel
