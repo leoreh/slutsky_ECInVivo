@@ -13,7 +13,8 @@ function sSig = as_prepSig(eegData, emgData, varargin)
 %               extension (e.g. lfp / dat)
 %   emgData     ALT 1; emg numeric data (1 x n2).
 %               ALT 2; string. name of file with data. must include
-%               extension (e.g. lfp / dat)
+%               extension (e.g. lfp / dat). If empty will be the same as
+%               eegData
 %   fs          numeric. requested new sampling frequency
 %   eegFs       numeric. eeg sampling frequency
 %   emgFs       numeric. emg sampling frequency
@@ -22,7 +23,7 @@ function sSig = as_prepSig(eegData, emgData, varargin)
 %   emgCh       numeric. channel number of eeg to load from lfp file. for
 %               oe recording system
 %   emgCf       numeric. cut off frequency for emg signal [10 200] or acc
-%               signal [10 600]. decided by RA, HB, and LH 20 apr 21
+%               signal [10 450]. decided by RA, HB, and LH 20 apr 21
 %   eegCf       numeric. low-pass frequency for eeg signal [60]
 %   eegNchans   numeric. no channels in eeg data file. if empty will be
 %               extracted from session info file
