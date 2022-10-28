@@ -8,9 +8,9 @@ mname = 'lh106';
 
 varsFile = ["fr"; "sr"; "spikes"; "st_metrics"; "swv_metrics";...
     "cell_metrics"; "sleep_states"; "ripp.mat"; "datInfo"; "session";...
-    "psd_bins"; "units"];
+    "units"];
 varsName = ["fr"; "sr"; "spikes"; "st"; "swv"; "cm"; "ss"; "ripp";...
-    "datInfo"; "session"; "psdBins"; "units"];
+    "datInfo"; "session"; "units"];
 xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
 [v, basepaths] = getSessionVars('mname', mname, 'varsFile', varsFile,...
     'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
@@ -66,20 +66,20 @@ for ifile = 1 : nfiles
     %         'smet', 'none', 'winBL', [0 Inf], 'winCalc', [0, Inf]);
 
     %     % calc psd in states
-    %     csec = cumsum(v(ifile).datInfo.nsamps) / fs;
-    %     csec / 60 / 60
-    %     wins = [csec(1), Inf];
+    csec = cumsum(v(ifile).datInfo.nsamps) / fs;
+    csec / 60 / 60
+    wins = [csec(1), Inf];
     wins = [0, Inf];
     psd = psd_states('basepath', basepath, 'sstates', [1, 4],...
-        'ch', 2, 'fs', [], 'wins', [0, Inf], 'saveVar', true,...
+        'ch', [13 : 16], 'fs', [], 'wins', wins, 'saveVar', true,...
         'graphics', true, 'forceA', true, 'ftarget', [0.1 : 0.5 : 100],...
-        'prct', 70, 'emgFlag', true);
+        'prct', 70, 'flgEmg', true, 'sif');
 
     % calc spec
-    spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true,...
-        'saveVar', false, 'padfft', -1, 'winstep', 5,...
-        'ftarget', [], 'ch', {[1]},...
-        'force', true, 'logfreq', true);
+%     spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true,...
+%         'saveVar', false, 'padfft', -1, 'winstep', 5,...
+%         'ftarget', [], 'ch', {[13 : 16]},...
+%         'force', true, 'logfreq', true);
 
 end
 
@@ -96,7 +96,7 @@ cell_metrics = CellExplorer('basepaths', basepaths);
 % psd across sessions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-bands = psd_sessions('lh100', 'flgNormBand', false);
+bands = psd_sessions('lh106', 'flgNormBand', true, 'flgAnalyze', false);
 
 
 

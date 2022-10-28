@@ -15,6 +15,9 @@ function [psd, faxis] = calc_psd(varargin)
 % to calculating the psd per electrode and averaging the psds. the results
 % are different then calculating the psd based on a single channel.
 % -------------------------------------------------------------------------
+% see also Savolainen, scientific reports, 2021 and K. van Vugt et al., J.
+% neurosci. met., 2007
+% -------------------------------------------------------------------------
 %
 % INPUT:
 %   sig             numeric. lfp / eeg data (1 x n)
@@ -89,6 +92,7 @@ if ~isempty(bins{end})
     end
 end
 
+% get number of bins
 nwin = size(bins, 2);
 nbins = cellfun(@(x) size(x, 1), bins, 'uni', true);
 for iwin = 1 : nwin
@@ -99,7 +103,7 @@ for iwin = 1 : nwin
 end
 
 % get minimum bin length
-minwin = min(cellfun(@(x) min(diff(x')), bins, 'uni', true));
+minwin = min(cellfun(@(x) min(diff(x')), bins(nbins > 0), 'uni', true));
 
 % prep frequencies
 if isempty(ftarget)
@@ -134,7 +138,7 @@ nfft = max(2 ^ (nextpow2(N) + mtspec_params.pad), N);
 % calc power for each epoch separatly
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-alt = 2;
+alt = 1;
 
 % initialize
 if alt < 3
@@ -145,6 +149,10 @@ end
 
 for iwin = 1 : nwin
     
+    if nbins(iwin) == 0
+        continue
+    end
+
     % ---------------------------------------------------------------------
     % ALT 1: calc psd per epoch and average across epochs (mspectrumsegc)
     if alt == 1        
@@ -157,7 +165,7 @@ for iwin = 1 : nwin
 
             % idx to signal w/o edges (sigMrgin)
             dataIdx = (bins{iwin}(ibin, 1) + sigMrgin) * fs :...
-                (bins{iwin}(ibin,     2) - sigMrgin) * fs - 1;
+                (bins{iwin}(ibin, 2) - sigMrgin) * fs - 1;
 
             if length(dataIdx) < window * fs
                 nbins(iwin) = nbins(iwin) - 1;
@@ -227,16 +235,6 @@ for iwin = 1 : nwin
     end
 end
 
-% adjust the fequency domain to the target frequencies by finding the
-% closest indices to freq
-% if alt < 3
-%     fidx = zeros(1, length(ftarget)); % find closest indices in f
-%     for ifreq = 1 : length(ftarget)
-%         [fdev(ifreq), fidx(ifreq)] = min(abs(f - ftarget(ifreq)));
-%     end
-%     psd = psd(:, fidx);
-% end
-% faxis = f(fidx);
 faxis = f;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

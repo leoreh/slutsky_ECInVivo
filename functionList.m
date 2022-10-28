@@ -141,7 +141,7 @@ sSig = as_prepSig([basename, '.lfp'], [basename, '.emg.dat'],...
 
 % manually create labels
 labelsmanfile = [basename, '.sleep_labelsMan.mat'];
-AccuSleep_viewer(sSig, labels, labelsmanfile)
+AccuSleep_viewer(sSig, [], labelsmanfile)
 
 % classify with a network
 netfile = [];
@@ -318,7 +318,7 @@ monosyn = monoSyn_wrapper('spktimes', mea.spktimes, 'basepath', pwd,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % concatenate var from different sessions
-mname = 'lh100';
+mname = 'lh106';
 [expData, xData] = sessions_catVarTime('mname', mname,...
     'dataPreset', {'spec', 'emg_rms'}, 'graphics', true,...
     'basepaths', {}, 'xTicksBinsize', 6, 'markRecTrans', true);

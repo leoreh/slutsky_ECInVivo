@@ -2,7 +2,7 @@ function [expData, xData] = sessions_catVarTime(varargin)
 
 % concatenates a variable from different sessions. assumes sessions are
 % contineous. concatenates according to the time of day extracted from
-% basenames. current variables supported are sr and spectrogram.
+% basenames. 
 % 
 % INPUT
 %   basepaths       cell of chars to recording sessions
@@ -65,15 +65,16 @@ if iscell(dataPreset)
         sb(idata) = nexttile;
         [expData{idata}, xData{idata}] = sessions_catVarTime('mname', mname,...
             'basepaths', basepaths, 'dataPreset', dataPreset{idata},...
-            'graphics', true, 'axh', sb(idata),...
+            'graphics', graphics, 'axh', sb(idata),...
             'xTicksBinsize', xTicksBinsize, 'markRecTrans', markRecTrans);
         if idata < length(dataPreset)
             set(sb(idata), 'xticklabels', {[]})
             xlabel('')
         end
     end
-        linkaxes(sb, 'x')
-        axis tight
+    linkaxes(sb, 'x')
+    axis tight
+    title(th, mname)
     return
 end
 
@@ -112,7 +113,7 @@ switch dataPreset
         faxis = v(isession).spec.freq;
     
     case 'bands'
-        ch = 2;     % manually change
+        ch = 1;     % manually change
         for isession = 1 : nsessions
             filename = fullfile(basepaths{isession},...
                 [basenames{isession}, '.spec.mat']);
@@ -243,6 +244,11 @@ tidxLabels(1 : 24 / xTicksBinsize : end) =...
 
 % data for x-axis
 xData = [1 : ts : ceil(seconds(expEnd - expStart))];
+
+% assign fr to output
+if strcmp(dataPreset, 'fr')
+    expData = movmean(mean(expRs, 2, 'omitnan'), 13, 1);
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics

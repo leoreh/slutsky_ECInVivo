@@ -1,7 +1,7 @@
 % psd_mice
 
 bandNames = ["broad", "swa", "delta", "theta", "alpha", "beta", "gamma"];
-mice = ["lh96"; "lh107"];
+mice = ["lh96"; "lh107"; "lh105"];
 datapath = 'F:\Data\';
 
 for imouse = 1 : length(mice)
@@ -9,8 +9,8 @@ for imouse = 1 : length(mice)
     mname = mice{imouse};
     
     % analyze
-    bands = sessions_psd(mname, 'flgNormBand', true, 'flgAnalyze', false,...
-        'flgNormTime', true, 'flgEmg', false, 'idxBsl', [1]);
+    bands = sessions_psd(mname, 'flgNormBand', false, 'flgAnalyze', false,...
+        'flgNormTime', true, 'flgEmg', true, 'idxBsl', [1], 'flgDb', false);
     
     % load
     bandsfile = fullfile(datapath, mname, [mname, '_psdBands.mat']);

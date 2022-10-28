@@ -165,7 +165,7 @@ for iwin = 1 : nwin
 
             % idx to signal w/o edges (sigMrgin)
             dataIdx = (bins{iwin}(ibin, 1) + sigMrgin) * fs :...
-                (bins{iwin}(ibin,     2) - sigMrgin) * fs - 1;
+                (bins{iwin}(ibin, 2) - sigMrgin) * fs - 1;
 
             if length(dataIdx) < window * fs
                 nbins(iwin) = nbins(iwin) - 1;
