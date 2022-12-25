@@ -142,8 +142,8 @@ switch altClean
             units.gini' & units.stable' & units.mfrBL' & units.cnt');
 
     case 2 % none
-        units.clean(1, :) = logical(units.rs);
-        units.clean(2, :) = logical(units.fs);
+        units.clean(1, :) = logical(units.rs) & units.grp;
+        units.clean(2, :) = logical(units.fs) & units.grp;
 
     case 3 % all but stability
         units.clean(1, :) = logical(units.rs & units.su' & units.grp &...
@@ -155,6 +155,12 @@ end
 % info
 units.info.frBoundries = frBoundries;
 units.info.grp = grp;
+
+% stats, organized as [grp1, grp2,... grpN, total]
+% units.stats.spksDetected = 
+% units.stats.spksSU = 
+% units.stats.grpRs = 
+
 
 % save
 if saveVar
