@@ -1,21 +1,16 @@
    
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% lh114
+% lh123
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % user input
-<<<<<<< Updated upstream
-mname           = 'lh111';
-basepath        = 'I:\Data\lh111\2022-08-28_10-43-58';
-=======
-mname           = 'lh114';
-basepath        = 'J:\Data\lh114\2022-09-26_10-00-36';
->>>>>>> Stashed changes
+mname           = 'lh123';
+basepath        = 'J:\Data\lh123\2022-12-23_11-26-31';
 exp             = [1, 2];
 
 % dat from oe 
-mapch = 1 : 20;
-rmvch = [5, 6];
+mapch = 1 : 19;
+rmvch = [10];
 rec = cell(max(exp), 1);
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
     'rmvch', rmvch, 'mapch', mapch,...
@@ -40,18 +35,18 @@ spkgrp = session.extracellular.spikeGroups.channels;
 [~, basename] = fileparts(basepath);
 
 % clip bad parts
-clear datfile
-datfile = {fullfile(basepath, [basename, '.lfp'])};
-clip = cell(1, length(datfile));
-clip{1} = [seconds(minutes(575)), seconds(minutes(595));...
-    seconds(minutes(517)), seconds(minutes(545))] * fs;
-datInfo = preprocDat('orig_files', datfile, 'mapch', 1 : nchans,...
+clear orig_files
+orig_files{1} = 'J:\Data\lh123\lh123_221223_110431\lh123_221223_110431.dat';
+orig_files{2} = 'J:\Data\lh123\lh123_221223_112631\lh123_221223_112631.dat';
+clip = cell(1, length(orig_files));
+% clip{1} = [seconds(minutes(1304)), Inf] * 20000;
+datInfo = preprocDat('orig_files', orig_files, 'mapch', 1 : nchans,...
     'rmvch', [], 'nchans', nchans, 'saveVar', true,...
     'chunksize', 1e7, 'precision', 'int16', 'clip', clip);
 
 % spike detection from temp_wh
 [spktimes, ~] = spktimesWh('basepath', basepath, 'fs', fs, 'nchans', nchans,...
-    'spkgrp', spkgrp, 'saveVar', false, 'saveWh', true,...
+    'spkgrp', spkgrp, 'saveVar', true, 'saveWh', true,...
     'graphics', false, 'force', true, 'winWh', [0 Inf]);
 
 % spike rate per tetrode
@@ -63,12 +58,12 @@ sr = firingRate(spktimes, 'basepath', basepath,...
     'winBL', [0 Inf]);
 
 % create ns files 
-dur = [];
-t = [];
 spktimes2ns('basepath', basepath, 'fs', fs,...
     'nchans', nchans, 'spkgrp', spkgrp, 'mkClu', true,...
-    'dur', dur, 't', t, 'grps', [1 : length(spkgrp)],...
+    'dur', [], 't', [], 'grps', [1 : length(spkgrp)],...
     'spkFile', 'temp_wh');
+
+delete('temp_wh.dat')
 
 % create lfp file
 LFPfromDat('basepath', basepath, 'cf', 450, 'chunksize', 5e6,...
@@ -81,7 +76,7 @@ acc = EMGfromACC('basepath', basepath, 'fname', [basename, '.lfp'],...
 
 % sleep sig
 sSig = as_prepSig([basename, '.lfp'], acc.mag,...
-    'eegCh', [7 : 10], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
+    'eegCh', [12 : 15], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
     'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
     'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [10 450], 'fs', 1250);
 labelsmanfile = [basename, '.sleep_labelsMan.mat'];
@@ -90,24 +85,21 @@ AccuSleep_viewer(sSig, [], labelsmanfile)
 % calc spec
 spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true,...
     'saveVar', true, 'padfft', -1, 'winstep', 5,...
-    'ftarget', [], 'ch', {[7 : 10]},...
+    'ftarget', [], 'ch', {[12 : 15]},...
     'force', true, 'logfreq', true);
 
+  
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% lh112
+% lh122
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % user input
-mname           = 'lh112';
-<<<<<<< Updated upstream
-basepath        = 'D:\Data\lh112\2022-09-03_11-23-20';
-=======
-basepath        = 'J:\Data\lh112\2022-09-03_11-23-20';
->>>>>>> Stashed changes
-exp             = [1];
+mname           = 'lh122';
+basepath        = 'J:\Data\lh122\2022-12-23_11-26-31';
+exp             = [1 : 2];
 
 % dat from oe 
-mapch = 1 : 20;
+mapch = 1 : 19;
 rmvch = [];
 rec = cell(max(exp), 1);
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
@@ -133,11 +125,13 @@ spkgrp = session.extracellular.spikeGroups.channels;
 [~, basename] = fileparts(basepath);
 
 % clip bad parts
-clear datfile
-datfile = {fullfile(basepath, [basename, '.dat'])};
-clip = cell(1, length(datfile));
-clip{1} = [seconds(minutes(755)), Inf] * fs;
-datInfo = preprocDat('orig_files', datfile, 'mapch', 1 : nchans,...
+clear orig_files
+orig_files{1} = 'J:\Data\lh122\lh122_221223_092656\lh122_221223_092656.dat';
+orig_files{2} = 'J:\Data\lh122\lh122_221223_112631\lh122_221223_112631.dat';
+clip = cell(1, length(orig_files));
+clip{1} = [seconds(minutes(88)), Inf] * 20000;
+clip{2} = [seconds(minutes(254)), seconds(minutes(573))] * 20000;
+datInfo = preprocDat('orig_files', orig_files, 'mapch', 1 : nchans,...
     'rmvch', [], 'nchans', nchans, 'saveVar', true,...
     'chunksize', 1e7, 'precision', 'int16', 'clip', clip);
 
@@ -155,12 +149,12 @@ sr = firingRate(spktimes, 'basepath', basepath,...
     'winBL', [0 Inf]);
 
 % create ns files 
-dur = [];
-t = [];
 spktimes2ns('basepath', basepath, 'fs', fs,...
     'nchans', nchans, 'spkgrp', spkgrp, 'mkClu', true,...
-    'dur', dur, 't', t, 'grps', [1 : length(spkgrp)],...
+    'dur', [], 't', [], 'grps', [1 : length(spkgrp)],...
     'spkFile', 'temp_wh');
+
+delete('temp_wh.dat')
 
 % create lfp file
 LFPfromDat('basepath', basepath, 'cf', 450, 'chunksize', 5e6,...
@@ -173,7 +167,7 @@ acc = EMGfromACC('basepath', basepath, 'fname', [basename, '.lfp'],...
 
 % sleep sig
 sSig = as_prepSig([basename, '.lfp'], acc.mag,...
-    'eegCh', [7], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
+    'eegCh', [1 : 4], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
     'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
     'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [10 450], 'fs', 1250);
 labelsmanfile = [basename, '.sleep_labelsMan.mat'];
@@ -182,7 +176,6 @@ AccuSleep_viewer(sSig, [], labelsmanfile)
 % calc spec
 spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true,...
     'saveVar', true, 'padfft', -1, 'winstep', 5,...
-    'ftarget', [], 'ch', {[7]},...
+    'ftarget', [], 'ch', {[1 : 4]},...
     'force', true, 'logfreq', true);
-
 

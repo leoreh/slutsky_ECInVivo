@@ -21,14 +21,14 @@ spkgrp = session.extracellular.spikeGroups.channels;
 [~, basename] = fileparts(basepath);
 
 % add timebins to datInfo
-[timebins, timepnt] = metaInfo_timebins('reqPnt', 6 * 60 * 60, 'nbins', 2);
+[timebins, timepnt] = metaInfo_timebins('reqPnt', 5 * 60 * 60, 'nbins', 2);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preprocessing of raw files
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepath = 'D:\Data\lh106\2022-04-27_07-43-05';
-mapch = 1 : 21;
-rmvch = [];
+basepath = 'K:\lh123\2022-12-16_15-27-02';
+mapch = 1 : 19;
+rmvch = [10];
 
 % tank to dat
 store = 'Raw1';
@@ -39,7 +39,7 @@ datInfo = tdt2dat('basepath', basepath, 'store', store, 'blocks',  blocks,...
     'chunksize', chunksize, 'mapch', mapch, 'rmvch', rmvch, 'clip', clip);
 
 % open ephys to dat
-exp = [2 : 5];
+exp = [1];
 rec = cell(max(exp), 1);
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
     'rmvch', rmvch, 'mapch', mapch,...
@@ -59,11 +59,12 @@ cat_OE_tstamps('orig_paths', orig_paths, 'new_path', exPathNew,...
 
 % pre-process dat (remove channels, reorder, etc.)
 clear orig_files
-orig_files{1} = 'F:\Data\lh107\lh107_220521_091000\lh107_220521_091000.emg.dat';
-clip{1} = [seconds(minutes(670)), seconds(minutes(710));...
-    seconds(minutes(1466)), Inf] * 1250;
-datInfo = preprocDat('orig_files', orig_files, 'mapch', 1 : 1,...
-    'rmvch', [], 'nchans', 1, 'saveVar', true,...
+orig_files{1} = 'K:\lh123\lh123_221216_095305\lh123_221216_095305.dat';
+orig_files{2} = 'K:\lh123\lh123_221216_152702\lh123_221216_152702.dat';
+clip = cell(1, length(orig_files));
+clip{1} = [seconds(minutes(190)), Inf] * 20000;
+datInfo = preprocDat('orig_files', orig_files, 'mapch', 1 : 18,...
+    'rmvch', [], 'nchans', 18, 'saveVar', true,...
     'chunksize', 1e7, 'precision', 'int16', 'clip', clip);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -249,7 +250,7 @@ fr = calc_fr(spikes.times, 'basepath', basepath,...
 % select specific units
 units = selectUnits('basepath', pwd, 'grp', [1 : 4], 'saveVar', true,...
     'forceA', true, 'frBoundries', [0.05 Inf; 0.05 Inf],...
-    'spikes', spikes, 'altClean', 3);  
+    'spikes', spikes, 'altClean', 2);  
 
 % cluster validation
 spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
@@ -287,15 +288,19 @@ sl = spklfp_wrapper('basepath', basepath, 'winCalc', winCalc,...
 % number of units per spike group
 plot_nunits_session('basepath', pwd, 'frBoundries', [])
 
+% select specific units
+units = selectUnits('basepath', pwd, 'grp', [1 : 4], 'saveVar', true,...
+    'forceA', true, 'frBoundries', [0.0 Inf; 0.0 Inf],...
+    'spikes', spikes, 'altClean', 2);  
+
 % plot fr vs. time
 plot_FRtime_session('basepath', pwd,...
-    'muFlag', false, 'saveFig', false,...
+    'muFlag', false, 'saveFig', true,...
     'dataType', 'strd', 'units', units.clean)
 
 % state ratio according to mfr percetiles
 plot_FRstates_sextiles('stateMfr', fr.states.mfr(:, [1, 4])', 'units', units.clean,...
     'ntiles', 2, 'saveFig', true)
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % mea
@@ -318,9 +323,9 @@ monosyn = monoSyn_wrapper('spktimes', mea.spktimes, 'basepath', pwd,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % concatenate var from different sessions
-mname = 'lh106';
+mname = 'lh123';
 [expData, xData] = sessions_catVarTime('mname', mname,...
-    'dataPreset', {'spec', 'emg_rms'}, 'graphics', true,...
+    'dataPreset', {'sr'}, 'graphics', true,...
     'basepaths', {}, 'xTicksBinsize', 6, 'markRecTrans', true);
 
 % snip segments (e.g. spikes) from binary 

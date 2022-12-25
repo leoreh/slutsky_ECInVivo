@@ -106,7 +106,7 @@ if isempty(fr) | muFlag
     yLimit = ceil([0 max(max(sr.(dataType)(grp, :)))]);
     hold on
     plot(xidx, sr.strd(grp, :)', 'LineWidth', 1)
-    plot([tidx tidx], yLimit, '--k', 'LineWidth', 1)
+    plot([tidx'; tidx'], yLimit, '--k', 'LineWidth', 1)
     axis tight
     set(gca, 'box', 'off');
     ylabel(['Multi-unit ', ytxt])
@@ -175,7 +175,7 @@ else
     
     ylim([0 15])
     yLimit = ylim;   
-    plot([tidx tidx], yLimit, '--k')
+    plot([tidx'; tidx'], yLimit, '--k')
     xlabel('Time [h]')
     set(gca, 'box', 'off')
     linkaxes([sb{1}, sb{2}, sb3], 'x')

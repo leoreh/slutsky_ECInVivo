@@ -1,5 +1,6 @@
 function ripp = getRipples(varargin)
 
+% IMPORTANT: read and implement Liu et al., Nat. Comm., 2022
 % Detects ripples from lfp: rectifies (squares) the signal, applies a
 % moving average, standardizes, finds crossings of a threshold
 %(in z-scores) and converts them to epochs by applying duration criterions.

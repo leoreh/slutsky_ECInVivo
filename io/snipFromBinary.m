@@ -192,6 +192,7 @@ for icell = 1 : length(stamps)
         end
 
         % snip
+
         v = double(raw.mapped(ch{icell}, stamps{icell}(isnip) + win(1) :...
             stamps{icell}(isnip) + win(2)));
         

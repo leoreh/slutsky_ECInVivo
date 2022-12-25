@@ -3,7 +3,7 @@ function cleanCluByFet(varargin)
 % removes rpv spikes on fet / mDist
 
 % alternative option tested was to compare distributions with the
-% Kullback–Leibler divergence, e.g.: kl(ifet) = kldiv(bincents', spkpdf' + eps, rpvpdf' + eps, 'sym');
+% Kullbackâ€“Leibler divergence, e.g.: kl(ifet) = kldiv(bincents', spkpdf' + eps, rpvpdf' + eps, 'sym');
 %
 % INPUT:
 %   basepath    string. path to recording folder {pwd}.
