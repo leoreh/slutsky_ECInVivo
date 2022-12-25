@@ -7,19 +7,23 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 basepaths = {
-%     'F:\Data\Colleagues\RA\tg4_210730_155700';...   % baseline. 24 hr rec
-%     'F:\Data\lh52\lh52_200615_084111';...           % baseline. 9 hr rec
-%     'F:\Data\lh70\lh70_201015_0951';...             % baseline. 8 hr rec
+    'F:\Data\Colleagues\RA\tg4_210730_155700';...   % baseline. 24 hr rec
+    'F:\Data\Colleagues\RA\hDLX_Gq_WT5\040221_0655_24hr';...    % baseline. 24 hr rec
+    'F:\Data\lh52\lh52_200615_084111';...           % baseline. 9 hr rec
+    'F:\Data\lh70\lh70_201015_0951';...             % baseline. 8 hr rec
     'F:\Data\lh81\lh81_210206_044300';...           % ip saline. 6 hr rec
-    'F:\Data\lh86\lh86_210304_070700';...           % washout ket
+    'F:\Data\lh86\lh86_210304_070700';...           % washout ket. 12 hr rec
     'F:\Data\lh87\lh87_210523_100607';...           % op saline
     'F:\Data\lh93\lh93_210811_102035';...           % local nacl
     'F:\Data\lh95\lh95_210824_083300';...           % local nacl
-    'F:\Data\lh96\lh96_220125_090041';...           % washout after bac
+    'F:\Data\lh96\lh96_220120_090157';...           % baseline
     'F:\Data\lh98\lh98_211224_084528';...           % ket ip 10
-    'F:\Data\lh100\lh100_220405_100406';...         % local acsf
-    'F:\Data\lh106\lh106_220512_102302';...         % ket ip 10
-    'F:\Data\lh107\lh107_220509_095738'};           % local acsf
+    'F:\Data\lh100\lh100_220413_111004';...         % op acsf
+    'F:\Data\lh106\lh106_220512_102302';...         % ket ip 10. too few units
+    'F:\Data\lh107\lh107_220518_091200';...         % op acsf
+    'F:\Data\lh111\lh111_220823_094417';...         % baseline
+    'F:\Data\lh112\lh112_220828_104358';...         % baseline
+    };           
 nfiles = length(basepaths);
 sfiles = [1 : nfiles];
 
@@ -61,23 +65,24 @@ for ifile = 1 : nfiles
     bins = v(ifile).ss.stateEpochs(sstates);
     bins{end + 1} = [0 Inf];
 
-    % select specific units
-    units = selectUnits('basepath', pwd, 'grp', [1 : 4], 'saveVar', true,...
-        'forceA', true, 'frBoundries', [0.05 Inf; 0.05 Inf],...
-        'spikes', v(ifile).spikes);
-
     % firing rate
-    fr = firingRate(v(ifile).spikes.times, 'basepath', basepath,...
-        'graphics', false, 'binsize', 60, 'saveVar', true,...
-        'smet', 'none', 'winBL', [0 Inf], 'winCalc', [0, Inf], 'forceA', true);
+%     fr = calc_fr(v(ifile).spikes.times, 'basepath', basepath,...
+%         'graphics', false, 'binsize', 60, 'saveVar', true,...
+%         'smet', 'none', 'winBL', [0 Inf], 'winCalc', [0, Inf], 'forceA', true);
 
     % spike timing metrics
     st = spktimes_metrics('spikes', v(ifile).spikes, 'sunits', [],...
         'bins', bins, 'forceA', true, 'saveVar', true, 'fullA', false);
+% 
+%     % brst (mea)
+%     brst = spktimes_meaBrst(v(ifile).spikes.times, 'binsize', [], 'isiThr', 0.1,...
+%         'minSpks', 8, 'saveVar', true, 'force', true, 'bins', bins);
+% 
+%     % select specific units
+%     units = selectUnits('basepath', pwd, 'grp', [1 : 4], 'saveVar', true,...
+%         'forceA', true, 'frBoundries', [0.05 Inf; 0.05 Inf],...
+%         'spikes', v(ifile).spikes);
 
-    % brst (mea)
-    brst = spktimes_meaBrst(v(ifile).spikes.times, 'binsize', [], 'isiThr', 0.1,...
-        'minSpks', 8, 'saveVar', true, 'force', true, 'bins', bins);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -85,11 +90,12 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % -------------------------------------------------------------------------
-% analyze
+% analyze and combine in single struct
+
 bfile = fullfile('F:\Data', 'brst_sessions.mat');
 minSpks = [2 : 6, 8, 10, 15, 20, 30];
 isiThr = [0.003, 0.005, 0.008, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1];
-
+% 
 % clear b
 % for ifile = 1 : nfiles
 %     basepath = basepaths{ifile};
@@ -212,6 +218,16 @@ legend(split(num2str(isiThr)))
 % investigate specific criterion
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% fr in states by percentiles. ogranize to prism
+fitLine = nan(9, nfiles);
+for ifile = 1 : nfiles
+    [~, fitLine(:, ifile)] = plot_frStateTiles('basepath', basepaths{ifile},...
+        'ntiles', 2, 'graphics', false);
+
+end
+
+st.cv(1 : 3, unitIdx);
+
 % -------------------------------------------------------------------------
 % plot mfr and burst frequency in states 
 
@@ -220,9 +236,6 @@ fr = catfields([v(:).fr], 'catdef', 'symmetric');
 st = catfields([v(:).st], 'catdef', 'long');
 units = catfields([v(:).units], 'catdef', 'long');
 brst = catfields([b(:, 5, 8)], 'catdef', 'long');
-
-
-brst.rate(2, unitIdx)
 
 % plot
 fh = figure;
@@ -240,6 +253,10 @@ plot_boxMean(ydata, 'clr', 'k', 'allPnts', false)
 set(gca, 'yscale', 'log')
 ylabel('MFR [Hz]')
 xticklabels(stateNames(sstates))
+
+% to prism
+squeeze(fr.states.ratio(4, 1, unitIdx))
+fr.states.gain(4, unitIdx)
 
 % select only high-firing units
 unitHiFr = fr.states.mfr(:, 1) > median(fr.states.mfr(unitIdx, 1), 'omitnan');
@@ -268,9 +285,6 @@ xticklabels(stateNames(sstates))
 unitHiBrst = st.lidor(1, :) > median(st.lidor(1, unitIdx), 'omitnan');
 ydata = fr.states.mfr(unitIdx & unitHiBrst, [1, 4, 5]);
 
-% various vars across states
-ydata = brst.spkprct(:, unitIdx)';
-ydata = brst.nspks(:, unitIdx)';
 
 % mean per session (data only, from v struct)
 ivar = 2;
@@ -279,8 +293,10 @@ ithr = 7;
 mbr = nan(nfiles, length(sstates));
 mfr = nan(nfiles, length(sstates));
 for ifile = 1 : nfiles
-    mbr(ifile, :) = mean(b(ifile, ispk, ithr).(brstVar{ivar})(1 : 3, v(ifile).units.rs), 2, 'omitnan');
-    mfr(ifile, :) = mean(v(ifile).fr.states.mfr(v(ifile).units.rs, [1, 4, 5]), 1, 'omitnan');
+    idxUnits = v(ifile).units.rs;
+
+    mbr(ifile, :) = mean(b(ifile, ispk, ithr).(brstVar{ivar})(1 : 3, idxUnits), 2, 'omitnan');
+    mfr(ifile, :) = mean(v(ifile).fr.states.mfr(idxUnits, [1, 4, 5]), 1, 'omitnan');
 end
 
 % -------------------------------------------------------------------------
@@ -342,7 +358,6 @@ plot(xlim, [yval yval], '--r')
 
 
 
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % analyse state differences in burstiness through acg
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -395,10 +410,11 @@ corr(log10(xdata), ydata', 'Rows','complete')
 % analyze CV of isi 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-thr = 10; % [s]
+% see also  Vyazovskiy et al (Tononi), Neuron, 2009
+
+thr = 20; % [s]
 cnt = 1;
-cv = nan(length(unitIdx), length(sstates));
-cv = cell(length(unitIdx), length(sstates));
+isiCell = cell(length(unitIdx), length(sstates));
 for ifile = 1 : nfiles
     bins = v(ifile).ss.stateEpochs(sstates);
     for iunit = 1 : length(v(ifile).spikes.times)
@@ -409,82 +425,65 @@ for ifile = 1 : nfiles
             isi = diff(spks);
             isi(isi > thr) = [];
             isi(isi == 0) = [];
-            cv{cnt, ibin} = (isi);
+            isiCell{cnt, ibin} = (isi);
         end
         cnt = cnt + 1;
     end
 end
+% mdata = cellfun(@(x) mean(log10(x), 1, 'omitnan'), isiCell(unitIdx, :), 'uni', true);
+% sdata = cellfun(@(x) std(log10(x), 1, 'omitnan'), isiCell(unitIdx, :), 'uni', true);
+% cvdata = sdata ./ mdata;
 
-mdata = cellfun(@(x) mean(log10(x), 1, 'omitnan'), cv(unitIdx, :), 'uni', true);
-sdata = cellfun(@(x) std(log10(x), 1, 'omitnan'), cv(unitIdx, :), 'uni', true);
-cvdata = sdata ./ mdata;
-
-clear cnts edges
-for iunit = 1 : nunits
+% calculate the geometric cv
+clear isiHists 
+histEdges = logspace(-3, 1.5, 30);
+for iunit = 1 : length(unitIdx)
     for ibin = 1 : length(sstates)
-        tmp = lognfit(cv{iunit, ibin});
+        tmp = lognfit(isiCell{iunit, ibin});
         mlog(iunit, ibin) = tmp(1);
         vlog(iunit, ibin) = tmp(2);
 
-        [cnts{ibin}(iunit, :), edges{ibin}(iunit, :)] =...
-            histcounts(log10(cv{iunit, ibin}), 30,...
+        isiHists{ibin}(iunit, :) =...
+            histcounts(log10(isiCell{iunit, ibin}), log10(histEdges),...
             'Normalization', 'probability');
     end
 end
 cvdata = vlog ./ mlog;
-gcv = exp(1) .^ log((vlog .* log(10))) - 1;
-
-sunits = randperm(nunits, nunits);
-fh = figure;
-th = tiledlayout(1, 2);
-axh = nexttile;
-hold on
-for iunit = 1 : length(sunits)
-    plot(edges{2}(sunits(iunit), 2 : end) - median(diff(edges{2}(sunits(iunit), :))) / 2,...
-        cnts{2}(sunits(iunit), :))
-end
-title(axh, 'NREM')
-xlabel('log ISI')
-ylabel('Probability')
-yLimit = ylim;
-xLimit = xlim;
-
-axh = nexttile;
-hold on
-for iunit = 1 : length(sunits)
-    plot(edges{1}(sunits(iunit), 2 : end) - median(diff(edges{1}(sunits(iunit), :))) / 2,...
-        cnts{1}(sunits(iunit), :))
-end
-title(axh, 'AW')
-xlabel('log ISI')
-ylabel('Probability')
-ylim(yLimit)
-xlim(xLimit)
-
-
+gcv = sqrt(exp(vlog .^ 2) - 1);
+% gcv = exp(1) .^ log((vlog .* log(10))) - 1;
+cvdata = cvdata(unitIdx, :);
+gcv = gcv(unitIdx, :);
 
 
 fh = figure;
-plot_boxMean('dataMat', cvdata, 'clr', 'k', 'allPnts', false)
+plot_boxMean('dataMat', gcv, 'clr', 'k', 'allPnts', false)
 set(gca, 'yscale', 'log')
 
 fh = figure;
-xdata = cellfun(@(x) mean(x, 1, 'omitnan'), cv(unitIdx, :), 'uni', true);
-ydata = cv(unitIdx, 2);
-plot(xdata, ydata, '.', 'MarkerSize', 10)
-maxLimit = max([xlim, ylim]);
-ylim([0 maxLimit])
-xlim([0 maxLimit])
-hold on
-plot(xlim, ylim, '--k')
+plot(fr.mfr(unitIdx), gcv, '*')
+set(gca, 'xscale', 'log')
 
+
+% plot isi histograms in states
 fh = figure;
-xdata = cv(unitIdx, 1);
-ydata = squeeze(fr.states.ratio(4, 1, unitIdx));
-plot(xdata, ydata, '.', 'MarkerSize', 10)
-ylim([-1 1])
-hold on
-plot(xlim, [0 0], '--k')
+th = tiledlayout(1, length(sstates));
+ylimit = [0, max(cellfun(@(x) max(x, [], 'all'), isiHists, 'uni', true))];
+xLimit = log10([histEdges(1), histEdges(end)]);
+for istate = 1 : length(sstates)
+    axh = nexttile;
+    ydata = isiHists{istate}(unitIdx, :);
+    plot(log10(histEdges(2 : end)), ydata)
+    hold on
+    plot(log10(histEdges(2 : end)), mean(ydata, 1),...
+        'k', 'LineWidth', 2)
+    title(axh, stateNames{sstates(istate)})
+    xlabel('log ISI')
+    ylabel('Probability')
+    ylim(yLimit)
+    xlim(xLimit)
+end
+
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -625,7 +624,7 @@ for ifile = 1 : nfiles
         cnt = cnt + 1;
     end
 
-%     sr = firingRate(spktimes, 'basepath', basepath,...
+%     sr = calc_fr(spktimes, 'basepath', basepath,...
 %         'graphics', false, 'binsize', 60, 'saveVar', 'sr', 'smet', 'none',...
 %         'winBL', [0 Inf]);
 

@@ -1,7 +1,7 @@
-function [tileMat, tileIdx] = vec2tileMat(vec, ntiles, include)
+function [tileMat, tileIdx, tiles] = vec2tileMat(vec, ntiles, include)
 
-% organizes a vector as a matrix (nan-padded if necassary) according to
-% percentiles (columns).
+% organizes a vector as a matrix (nan-padded) according to
+% percentiles (columns). also returns indices as a cell array
 %
 % INPUT
 %   vec         numeric
@@ -16,9 +16,10 @@ function [tileMat, tileIdx] = vec2tileMat(vec, ntiles, include)
 %               sum of include. the mat values are those of vec sorted per
 %               column
 %   tileIdx     cell (1 x ntiles) of indices to vec
+%   tiles       vec of tile borders
 %
 % CALLS
-%   none
+%   cell2nanmat
 %
 % TO DO LIST
 %

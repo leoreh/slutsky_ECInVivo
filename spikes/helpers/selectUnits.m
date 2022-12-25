@@ -8,7 +8,7 @@ function units = selectUnits(varargin)
 %   basepath        char. path to session folder {pwd}
 %   spikes          struct
 %   cm              struct (cell_metrics)
-%   fr              struct. see firingRate.m 
+%   fr              struct. see calc_fr.m 
 %   grp             numeric. spike groups to include 
 %   frBoundries     2 x 2 mat. include only units with mfr within
 %                   frBoundries. 1st row rs; 2nd row fs

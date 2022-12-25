@@ -1,4 +1,4 @@
-function fr = firingRate(spktimes, varargin)
+function fr = calc_fr(spktimes, varargin)
 
 % wrapper for firing rate functions. calculates firing rate based on spike
 % times and smoothes result by a moving average (MA) or Gaussian kernel
