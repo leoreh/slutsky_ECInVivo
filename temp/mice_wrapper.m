@@ -5,7 +5,7 @@
 
 % user input
 mname           = 'lh123';
-basepath        = 'J:\Data\lh123\2022-12-23_11-26-31';
+basepath        = 'J:\Data\lh123\2022-12-24_10-22-04';
 exp             = [1, 2];
 
 % dat from oe 

@@ -105,11 +105,6 @@ else
     end
 end
 units.grp = grpidx;
-% check cell explorer shank id
-if any(spikes.shankID ~= sort(spikes.shankID))
-    error('Possible error in loadSpikes')
-end
-
 
 % cell class
 units.rs = strcmp(cm.putativeCellType, 'Pyramidal Cell');
@@ -165,20 +160,21 @@ units.info.frBoundries = frBoundries;
 units.info.grp = grp;
 
 % stats, organized as [grp1, grp2,... grpN]
-% nunits organized [rs, fs, other (rows); per grp (columns)]
 load(spktimesfile, 'spktimes')
-units.stats.nunits = nan(3, ngrps);
 units.stats.spksDetected = cellfun(@length, spktimes, 'uni', true);
 for igrp = 1 : ngrps
     grpidx = spikes.shankID == igrp;
     units.stats.spksSU(igrp) = length(vertcat(spikes.times{grpidx}));
 
+    % nunits for [rs, fs, other (rows); per grp (columns)]
+    units.stats.nunits = nan(3, ngrps);
     for unitType = [1, 2]        
         units.stats.nunits(unitType, igrp) = sum(units.clean(unitType, :) & grpidx);
     end
     units.stats.nunits(3, igrp) = sum(~any(units.clean) & grpidx);
 
 end
+
 
 % save
 if saveVar

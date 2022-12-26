@@ -4,7 +4,7 @@
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = 'lh106';
+mname = 'lh123';
 
 varsFile = ["fr"; "sr"; "spikes"; "st_metrics"; "swv_metrics";...
     "cell_metrics"; "sleep_states"; "ripp.mat"; "datInfo"; "session";...
@@ -39,51 +39,32 @@ for ifile = 1 : nfiles
     fs = session.extracellular.sr;
     spkgrp = session.extracellular.spikeGroups.channels;
 
-    % spike timing metrics
-    %     st = spktimes_metrics('spikes', v(ifile).spikes, 'sunits', [],...
-    %         'bins', [0 Inf], 'forceA', true, 'saveVar', true, 'fullA', false);
-
     % select specific units
-    %     units = selectUnits('basepath', basepath, 'grp', [1 : 4], 'saveVar', true,...
-    %         'forceA', true, 'frBoundries', [0.05 Inf; 0.05 Inf],...
-    %         'spikes', v(ifile).spikes, 'altClean', 2);
+    units = selectUnits('basepath', basepath, 'grp', [1 : 4], 'saveVar', true,...
+        'forceA', true, 'frBoundries', [0.05 Inf; 0.05 Inf],...
+        'spikes', v(ifile).spikes, 'altClean', 2);
+    
+    % spktimes of single units (rs and fs)
+    clear srsu
+    for unittype = [1, 2]
+        for igrp = 1 : length(spkgrp)
 
-    % sleep signals
-    %     load([basename, '.acceleration.mat'])
-    %     sSig = as_prepSig([basename, '.lfp'], acc.mag,...
-    %         'eegCh', [5 : 7], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
-    %         'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
-    %         'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [100 450], 'fs', 1250);
-
-    % classify
-    %     ss = as_classify(sSig, 'basepath', basepath, 'inspectLabels', false,...
-    %         'saveVar', true, 'forceA', true, 'netfile', [],...
-    %         'graphics', true, 'calData', templateCal);
-
-    % fr
-    %     fr = calc_fr(v(ifile).spikes.times, 'basepath', basepath,...
-    %         'graphics', true, 'binsize', 60, 'saveVar', true,...
-    %         'smet', 'none', 'winBL', [0 Inf], 'winCalc', [0, Inf]);
-
-    %     % calc psd in states
-    csec = cumsum(v(ifile).datInfo.nsamps) / fs;
-    csec / 60 / 60
-    wins = [csec(1), Inf];
-    wins = [0, Inf];
-    psd = psd_states('basepath', basepath, 'sstates', [1, 4],...
-        'ch', [13 : 16], 'fs', [], 'wins', wins, 'saveVar', true,...
-        'graphics', true, 'forceA', true, 'ftarget', [0.1 : 0.5 : 100],...
-        'prct', 70, 'flgEmg', true, 'sif');
-
-    % calc spec
-%     spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true,...
-%         'saveVar', false, 'padfft', -1, 'winstep', 5,...
-%         'ftarget', [], 'ch', {[13 : 16]},...
-%         'force', true, 'logfreq', true);
+            % get rs and fs indices
+            grpidx = v(ifile).spikes.shankID == igrp;
+            rsidx = units.clean(unittype, :) & grpidx;
+            spktimes{igrp} = sort(vertcat(v(ifile).spikes.times{rsidx}));
+        end
+        srsu(unittype) = calc_fr(spktimes, 'basepath', basepath,...
+            'graphics', false, 'binsize', 60, 'saveVar', false,...
+            'smet', 'none', 'winBL', [0, Inf], 'winCalc', [0, Inf]);
+    end
+    save([fullfile(basepath), [basename, '.srsu']])
+    fh = figure; plot(srsu.strd')
 
 end
 
-cell_metrics = CellExplorer('basepaths', basepaths);
+
+% cell_metrics = CellExplorer('basepaths', basepaths);
 
 % concatenate var from different sessions
 [expData, xData] = sessions_catVarTime('mname', mname,...

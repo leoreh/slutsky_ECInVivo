@@ -15,7 +15,11 @@ function [expData, xData] = sessions_catVarTime(varargin)
 %                   between recordings
 %   dataPreset      string or cell of string depicting the variable to cat. 
 %                   can be any combination of 'sr', 'spec', 'fr', 'ripp',
-%                   'emg_rms', 'bands', or 'hypnogram'
+%                   'emg_rms', 'bands', 'srsu', or 'hypnogram'
+%   dataAlt         numeric. data alternative. relavent for some presets:
+%                   for 'spec'  represents channel
+%                   for 'bands' represents channel
+%                   for 'srsu'  represents unittype (1 = rs; 2 = fs)
 %   axh             handle to plot axis      
 % 
 % EXAMPLE
@@ -35,6 +39,7 @@ p = inputParser;
 addParameter(p, 'basepaths', {}, @iscell);
 addParameter(p, 'mname', '', @ischar);
 addParameter(p, 'dataPreset', 'sr');
+addParameter(p, 'dataAlt', 1, @isnumeric);
 addParameter(p, 'xTicksBinsize', 12, @isnumeric);
 addParameter(p, 'graphics', true, @islogical);
 addParameter(p, 'saveFig', true, @islogical);
@@ -45,6 +50,7 @@ parse(p, varargin{:})
 basepaths       = p.Results.basepaths;
 mname           = p.Results.mname;
 dataPreset      = p.Results.dataPreset;
+dataAlt         = p.Results.dataAlt;
 xTicksBinsize   = p.Results.xTicksBinsize;
 graphics        = p.Results.graphics;
 saveFig         = p.Results.saveFig;
@@ -65,7 +71,7 @@ if iscell(dataPreset)
         sb(idata) = nexttile;
         [expData{idata}, xData{idata}] = sessions_catVarTime('mname', mname,...
             'basepaths', basepaths, 'dataPreset', dataPreset{idata},...
-            'graphics', graphics, 'axh', sb(idata),...
+            'graphics', graphics, 'axh', sb(idata), 'dataAlt', dataAlt,...
             'xTicksBinsize', xTicksBinsize, 'markRecTrans', markRecTrans);
         if idata < length(dataPreset)
             set(sb(idata), 'xticklabels', {[]})
@@ -101,10 +107,9 @@ fs = v(1).session.extracellular.sr;
 
 switch dataPreset
     case 'spec'       
-        ch = 1;     % manually change
         for isession = 1 : nsessions
             if ndims(v(isession).spec.s) == 3
-                v(isession).data = squeeze(v(isession).spec.s(:, :, ch))';
+                v(isession).data = squeeze(v(isession).spec.s(:, :, dataAlt))';
             else
                 v(isession).data = v(isession).spec.s';
             end
@@ -113,12 +118,11 @@ switch dataPreset
         faxis = v(isession).spec.freq;
     
     case 'bands'
-        ch = 1;     % manually change
         for isession = 1 : nsessions
             filename = fullfile(basepaths{isession},...
                 [basenames{isession}, '.spec.mat']);
             load(filename, 'spec');
-            yval = movmean(squeeze(spec.bands.db(:, :, ch)), 100,  2);
+            yval = movmean(squeeze(spec.bands.db(:, :, dataAlt)), 100,  2);
             v(isession).data = yval(2 : end, :) ./ yval(1, :);
             v(isession).data = yval(2 : end, :);
         end
@@ -149,7 +153,14 @@ switch dataPreset
         end
         ts = v(1).sr.info.binsize;          % sampling period [s]
         grp = 1 : v(1).session.extracellular.nSpikeGroups;
-        
+  
+    case 'srsu'
+        for isession = 1 : nsessions
+            v(isession).data = v(isession).srsu(dataAlt).strd;
+        end
+        ts = v(1).srsu(dataAlt).info.binsize;          % sampling period [s]
+        grp = 1 : v(1).session.extracellular.nSpikeGroups;
+
     case 'fr'
         % nan pad each session to the max number of units
         nunits = [];
@@ -300,7 +311,7 @@ if graphics
             plot(xData, expData);
             ylabel('Norm. EMG')
             
-        case 'sr'
+        case {'sr', 'srsu'}
             expData = movmean(expData, 13, 1);
             plot(xData, expData(:, grp))
             ylabel('MU Firing Rate [Hz]')
