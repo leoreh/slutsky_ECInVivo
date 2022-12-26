@@ -16,6 +16,7 @@ function units = selectUnits(varargin)
 %   saveVar         logical 
 %   altClean        numeric. alternative selection of criteria to define
 %                   clean units.
+%   graphics        logical
 %
 % DEPENDENCIES:
 % 
@@ -37,6 +38,7 @@ addParameter(p, 'grp', []);
 addParameter(p, 'frBoundries', [0 Inf; 0 Inf], @isnumeric);
 addParameter(p, 'forceA', false, @islogical);
 addParameter(p, 'saveVar', true, @islogical);
+addParameter(p, 'graphics', true, @islogical);
 addParameter(p, 'altClean', 1, @isnumeric);
 
 parse(p, varargin{:})
@@ -48,6 +50,7 @@ grp             = p.Results.grp;
 frBoundries     = p.Results.frBoundries;
 forceA          = p.Results.forceA;
 saveVar         = p.Results.saveVar;
+graphics        = p.Results.graphics;
 altClean        = p.Results.altClean;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -182,7 +185,9 @@ if saveVar
 end
 
 % graphics
-plot_nunits(basepath, 'saveFig', true)
+if graphics
+    plot_nunits('basepaths', {basepath}, 'saveFig', true)
+end
 
 end
 

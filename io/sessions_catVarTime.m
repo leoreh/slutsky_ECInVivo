@@ -319,12 +319,12 @@ if graphics
             axis tight
             
         case 'fr'
-            expData = movmean(mean(expRs, 2, 'omitnan'), 13, 1);
-%             expData = mean(expRs, 2, 'omitnan');
+            expData = movmean(expRs, 13, 1);
+            expData = mean(expData, 2, 'omitnan');
             plot(xData, expData, 'LineWidth', 2)
             hold on
-            expData = movmean(mean(expFs, 2, 'omitnan'), 13, 1);
-%             expData = mean(expFs, 2, 'omitnan');
+            expData = movmean(expFs, 13, 1);
+            expData = mean(expData, 2, 'omitnan');
             plot(xData, expData, 'LineWidth', 2)
             legend({sprintf('RS <= %d', max(nunits(:, 1))),...
                 sprintf('FS <= %d', max(nunits(:, 2)))})

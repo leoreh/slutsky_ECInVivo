@@ -52,10 +52,10 @@ clr = [0.4 0.7 1; 0.95 0.4 0.4; 0.66 0.4 0.66];
 fh = figure;
 
 if nfiles == 1
-    figpath = fullfile(basepath, 'graphics');
-    figname = fullfile(figpath, [basename, '_nunits']);
+    figpath = fullfile(basepaths{1}, 'graphics');
+    figname = fullfile(figpath, [basenames{1}, '_nunits']);
 
-    nunits = v(1).units.stats.nunits;
+    nunits = v(1).units.nunits;
     
     subplot(1, 2, 1)
     bh = bar(nunits', 'stacked');
@@ -81,7 +81,7 @@ else
     
     % organize matrix [session (rows) x tetrode (columns)]
     units = catfields([v(:).units]);
-    units = units.stats.nunits;
+    units = units.nunits;
     ngrps = size(units, 2);
     clear rs fs other
     for igrp = 1 : ngrps

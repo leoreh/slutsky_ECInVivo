@@ -292,9 +292,6 @@ sl = spklfp_wrapper('basepath', basepath, 'winCalc', winCalc,...
 plot_nunits('basepaths', {basepath}, 'saveFig', true)
 plot_nunits('mname', 'lh123', 'saveFig', true)
 
-% number of units per spike group
-plot_nunits_session('basepath', pwd, 'frBoundries', [])
-
 % select specific units
 units = selectUnits('basepath', pwd, 'grp', [1 : 4], 'saveVar', true,...
     'forceA', true, 'frBoundries', [0.0 Inf; 0.0 Inf],...

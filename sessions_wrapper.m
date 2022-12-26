@@ -39,22 +39,20 @@ for ifile = 1 : nfiles
     fs = session.extracellular.sr;
     spkgrp = session.extracellular.spikeGroups.channels;
 
-    % correct cell explorer
-    update_cellExplorer(basepath)
-
     % select specific units
     units = selectUnits('basepath', basepath, 'grp', [1 : 4], 'saveVar', true,...
         'forceA', true, 'frBoundries', [0.05 Inf; 0.05 Inf],...
-        'spikes', v(ifile).spikes, 'altClean', 2);
+        'spikes', [], 'altClean', 2, 'graphics', false);
 
     % spktimes of single units (rs and fs)
-%     clear srsu spktimes
+%     clear srsu 
 %     for unitType = [1, 2]
+%         spktimes = cell(1, 4);
 %         for igrp = 1 : length(spkgrp)
 % 
 %             % get rs and fs indices
 %             grpidx = v(ifile).spikes.shankID == igrp;
-%             unitidx = units.clean(unitType, :) & grpidx;
+%             unitidx = v(ifile).units.clean(unitType, :) & grpidx;
 %             spktimes{igrp} = sort(vertcat(v(ifile).spikes.times{unitidx}));
 %         end
 %         srsu(unitType) = calc_fr(spktimes, 'basepath', basepath,...
@@ -70,9 +68,10 @@ end
 
 % concatenate var from different sessions
 [expData, xData] = sessions_catVarTime('mname', mname,...
-    'dataPreset', {'fr', 'spec'}, 'graphics', true,...
+    'dataPreset', {'fr'}, 'graphics', true, 'dataAlt', 1,...
     'basepaths', {}, 'xTicksBinsize', 6, 'markRecTrans', true);
 
+% cell_metrics = CellExplorer('basepath', pwd);
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
