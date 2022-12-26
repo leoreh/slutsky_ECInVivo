@@ -235,6 +235,9 @@ cell_metrics = ProcessCellMetrics('session', session,...
     'showWaveforms', false, 'excludeMetrics', excludeMetrics, 'showGUI', true);
 % cell_metrics = CellExplorer('basepath', pwd);
 
+% correct cell explorer
+update_cellExplorer(basepath)
+
 % firing rate
 load([basename, '.spikes.cellinfo.mat'])
 if isfield(session.general, 'timepnt')

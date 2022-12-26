@@ -39,11 +39,14 @@ for ifile = 1 : nfiles
     fs = session.extracellular.sr;
     spkgrp = session.extracellular.spikeGroups.channels;
 
+    % correct cell explorer
+    update_cellExplorer(basepath)
+
     % select specific units
     units = selectUnits('basepath', basepath, 'grp', [1 : 4], 'saveVar', true,...
         'forceA', true, 'frBoundries', [0.05 Inf; 0.05 Inf],...
         'spikes', v(ifile).spikes, 'altClean', 2);
-    
+
     % spktimes of single units (rs and fs)
 %     clear srsu spktimes
 %     for unitType = [1, 2]

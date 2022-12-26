@@ -164,19 +164,15 @@ end
 units.info.frBoundries = frBoundries;
 units.info.grp = grp;
 
-% stats, organized as [grp1, grp2,... grpN]
-% nunits organized [rs, fs, other (rows); per grp (columns)]
-load(spktimesfile, 'spktimes')
-units.stats.nunits = nan(3, ngrps);
-units.stats.spksDetected = cellfun(@length, spktimes, 'uni', true);
+% nunits organized [rs, fs, other (rows); grp1, grp2,... grpn (columns)]
+units.nunits = nan(3, ngrps);
 for igrp = 1 : ngrps
     grpidx = spikes.shankID == igrp;
-    units.stats.spksSU(igrp) = length(vertcat(spikes.times{grpidx}));
-
-    for unitType = [1, 2]        
-        units.stats.nunits(unitType, igrp) = sum(units.clean(unitType, :) & grpidx);
+    
+    for unitType = [1, 2]
+        units.nunits(unitType, igrp) = sum(units.clean(unitType, :) & grpidx);
     end
-    units.stats.nunits(3, igrp) = sum(~any(units.clean) & grpidx);
+    units.nunits(3, igrp) = sum(~any(units.clean) & grpidx);
 
 end
 
@@ -184,6 +180,9 @@ end
 if saveVar
     save(unitsfile, 'units')
 end
+
+% graphics
+plot_nunits(basepath, 'saveFig', true)
 
 end
 
