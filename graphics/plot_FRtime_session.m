@@ -78,7 +78,7 @@ end
 if ~isempty(fr)
     if isempty(units)
         units = selectUnits('basepath', basepath, 'grp', [], 'saveVar', false,...
-            'forceA', false);
+            'forceA', false, 'graphics', false);
         units = [units.rs; units.fs];
     end
 end
