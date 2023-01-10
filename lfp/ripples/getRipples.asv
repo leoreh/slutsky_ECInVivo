@@ -6,8 +6,7 @@ function ripp = getRipples(varargin)
 % hardware. Spikes may also induce artifacts so they recommend averaging
 % multile recording sites from the same layer. They suggest to use NREM
 % rate a s a benchmark. They suggest to report the log-distribution since
-% the power and duration follow log-normal distributions. also recommend to
-% define the bandpass from the psd. 
+% the power and duration follow log-normal distributions
 % 
 % The probelms that bothered us: 
 % Arbitrary detection thresholds result in variable SPW-R rates
