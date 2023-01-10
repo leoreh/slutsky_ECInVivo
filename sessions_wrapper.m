@@ -4,7 +4,7 @@
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = 'lh123';
+mname = 'lh122';
 
 varsFile = ["fr"; "sr"; "spikes"; "st_metrics"; "swv_metrics";...
     "cell_metrics"; "sleep_states"; "ripp.mat"; "datInfo"; "session";...

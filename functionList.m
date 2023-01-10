@@ -298,7 +298,7 @@ sl = spklfp_wrapper('basepath', basepath, 'winCalc', winCalc,...
 
 % number of units per spike group
 plot_nunits('basepaths', {basepath}, 'saveFig', true)
-plot_nunits('mname', 'lh123', 'saveFig', true)
+plot_nunits('mname', 'lh122', 'saveFig', true)
 
 % select specific units
 units = selectUnits('basepath', pwd, 'grp', [1 : 4], 'saveVar', true,...
@@ -314,21 +314,6 @@ plot_FRtime_session('basepath', pwd,...
 plot_FRstates_sextiles('stateMfr', fr.states.mfr(:, [1, 4])', 'units', units.clean,...
     'ntiles', 2, 'saveFig', true)
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% mea
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-fname = '2021-05-16T17-34-298hBsln_20uMK_Bac_spikes SORTED';
-mea = mea_orgNex('fname', fname, 'basepath', pwd, 'forceL', true);
-
-mea_analyze('basepath', pwd,...
-    'winBL', [0, 120 * 60], 'graphics', false, 'forceA', false)
-
-% mono synaptic interactions (spike transmission gain)
-monosyn = monoSyn_wrapper('spktimes', mea.spktimes, 'basepath', pwd,...
-    'winCalc', [0, Inf], 'saveVar', true, 'graphics', true,...
-    'forceA', true, 'fs', mea.info.fs, 'saveFig', false,...
-    'wv', mea.wv, 'wv_std', mea.wv_std);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % utilities
@@ -337,7 +322,7 @@ monosyn = monoSyn_wrapper('spktimes', mea.spktimes, 'basepath', pwd,...
 % concatenate var from different sessions
 mname = 'lh122';
 [expData, xData] = sessions_catVarTime('mname', mname,...
-    'dataPreset', {'sr', 'spec'}, 'graphics', true, 'dataAlt', 2,...
+    'dataPreset', {'sr'}, 'graphics', true, 'dataAlt', 2,...
     'basepaths', {}, 'xTicksBinsize', 6, 'markRecTrans', true);
 
 % snip segments (e.g. spikes) from binary 
@@ -379,3 +364,19 @@ varArray = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
 
 % set matlab graphics to custom or factory defaults
 setMatlabGraphics(false)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% mea
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+fname = '2021-05-16T17-34-298hBsln_20uMK_Bac_spikes SORTED';
+mea = mea_orgNex('fname', fname, 'basepath', pwd, 'forceL', true);
+
+mea_analyze('basepath', pwd,...
+    'winBL', [0, 120 * 60], 'graphics', false, 'forceA', false)
+
+% mono synaptic interactions (spike transmission gain)
+monosyn = monoSyn_wrapper('spktimes', mea.spktimes, 'basepath', pwd,...
+    'winCalc', [0, Inf], 'saveVar', true, 'graphics', true,...
+    'forceA', true, 'fs', mea.info.fs, 'saveFig', false,...
+    'wv', mea.wv, 'wv_std', mea.wv_std);
