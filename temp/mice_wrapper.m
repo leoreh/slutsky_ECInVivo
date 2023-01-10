@@ -5,8 +5,8 @@
 
 % user input
 mname           = 'lh122';
-basepath        = 'K:\Data\lh122\2023-01-05_08-58-51';
-exp             = [1 : 4];
+basepath        = 'J:\Data\lh122\2023-01-09_09-54-12';
+exp             = [1 : 3];
 
 % dat from oe 
 mapch = 1 : 19;
