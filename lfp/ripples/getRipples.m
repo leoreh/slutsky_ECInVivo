@@ -1,23 +1,7 @@
 function ripp = getRipples(varargin)
 
-% Liu et al., Nat. Comm., 2022. params include:
-% bandpass filter of 120-160 Hz. Duration threshold of >10 ms. They suggest
-% that movement artifacts should be addressed online rather through
-% hardware. Spikes may also induce artifacts so they recommend averaging
-% multile recording sites from the same layer. They suggest to use NREM
-% rate a s a benchmark. They suggest to report the log-distribution since
-% the power and duration follow log-normal distributions. also recommend to
-% define the bandpass from the psd. 
-% 
-% The probelms that bothered us: 
-% Arbitrary detection thresholds result in variable SPW-R rates
-% 
-% Detects ripples from lfp: rectifies (squares) the signal, applies a
-% moving average, standardizes, finds crossings of a threshold
-%(in z-scores) and converts them to epochs by applying duration criterions.
-% Alas, discards ripples with a low peak power. After detection, calculates
-% various stats and plots a summary. based in part on
-% bz_FindRipples but.
+% Detects ripples from lfp: based in part on bz_FindRipples, Liu et al.,
+% Nat. Comm., 2022, and TL
 % 
 % INPUT:
 %   basepath        path to recording {pwd}
@@ -25,7 +9,9 @@ function ripp = getRipples(varargin)
 %                   basename.lfp according to rippCh.  
 %   emg             numeric of emg data. must be the same sampling
 %                   frequency as sig. can be acc.mag. used for
-%                   normalization and exclusion of artifacts
+%                   normalization and exclusion of artifacts. must be
+%                   compatible with recWin. if not will try to fix this by
+%                   assuming emg represents the entire recording
 %   fs          	numeric. sampling frequency of lfp file / data. 
 %                   if empty will be extracted from session info (ce
 %                   format)
@@ -37,7 +23,6 @@ function ripp = getRipples(varargin)
 %                   [s]. start of recording is marked by 0. {[0 Inf]}
 %   graphics        logical. plot graphics {true} or not (false)
 %   saveVar         logical. save variables (update spikes and save su)
-%   spkFlag         logical. analyze spikes in ripples {true}
 %
 % OUTPUT:
 %   ripp            struct
@@ -48,19 +33,24 @@ function ripp = getRipples(varargin)
 %   Sync (buzcode)
 %   SyncMap (buzcode)
 %   PlotColorMap (buzcode)
-%   bz_getRipSPikes (buzcode)
 %
 % TO DO LIST:
-%   finish graphics (done)
-%   stats (done)
-%   rate (done)
-%   exclusion by emg noise (done)
-%   exclusion by spiking activity
-%   exlude active periods when normalizing signal (done)
-%   allow user to input sig directly instead of loading from binary (done)
-%   improve routine to select best ripple channel automatically
+%   # finish graphics (done)
+%   # stats (done)
+%   # rate (done)
+%   # exclusion by emg noise (done)
+%   # exclusion by spiking activity
+%   # exlude active periods when normalizing signal (done)
+%   # allow user to input sig directly instead of loading from binary (done)
+%   # improve routine to select best ripple channel automatically
+%   # add subroutine to determine bandpass, threshold, and duration limits
+%   automatically
+%   # add graphics for visualizing detection independently of neuroscope
+%   # implement batch proccessing for memory     
 %
-% 02 dec 21 LH
+% 02 dec 21 LH     updates:
+% 11 jan 23        implementad remarks from Liu et al., Nat. Comm., 2022
+%                  separated getRippleSpks and graphics                                                                          
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -75,7 +65,6 @@ addOptional(p, 'emgCh', [], @isnumeric);
 addOptional(p, 'fs', [], @isnumeric);
 addOptional(p, 'graphics', true, @islogical);
 addOptional(p, 'saveVar', true, @islogical);
-addOptional(p, 'spkFlag', true, @islogical);
 
 parse(p, varargin{:})
 basepath    = p.Results.basepath;
@@ -86,7 +75,6 @@ rippCh      = p.Results.rippCh;
 fs          = p.Results.fs;
 graphics    = p.Results.graphics;
 saveVar     = p.Results.saveVar;
-spkFlag     = p.Results.spkFlag;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % params
@@ -100,8 +88,6 @@ sessionfile = fullfile(basepath, [basename, '.session.mat']);
 rippfile = fullfile(basepath, [basename, '.ripp.mat']);
 clufile = fullfile(basepath, [basename, '.ripp.clu.1']);
 resfile = fullfile(basepath, [basename, '.ripp.res.1']);
-spikesfile = fullfile(basepath, [basename, '.spikes.cellinfo.mat']);
-spktimesfile = fullfile(basepath, [basename, '.spktimes.mat']);
 
 % load session info
 if ~exist(sessionfile, 'file')
@@ -111,10 +97,7 @@ else
     load(sessionfile)
 end
 
-% state configuration
-cfg = as_loadConfig([]);
-sstates = [1 : 6];  % selected states
-
+% session params
 spkgrp = session.extracellular.spikeGroups.channels;
 spkch = sort([spkgrp{:}]);
 nchans = session.extracellular.nChannels;
@@ -123,21 +106,18 @@ if isempty(fs)
     fs = session.extracellular.srLfp;
 end
 
-% detection params
-limDur = [20 150, 30];      % min, max, and inter dur limits for ripples [ms]
-limDur = limDur / 1000 * fs;
-passband = [120 250];
+% detection params. limDur refers to min, max, and min inter-ripple
+% duration. 4th element refers to the amount of time the power must be
+% above thr(3). all values in [ms]
+limDur = [20, 350, 20, 10]; 
+limDur = round(limDur / 1000 * fs);
+passband = [100 250];
 binsizeRate = 60;           % binsize for calculating ripple rate [s]
-emgThr = 50;                % exclude ripples that occur when emg > thr
+emgThr = 85;                % exclude ripples that occur when emg > thr
 
-% threshold of stds above sig_amp
-dtctMet = 1;        % 1 = TL; 2 = BZ
-switch dtctMet
-    case 1
-        thr = [2.5 3.5];
-    case 2
-        thr = [1 3];
-end
+% threshold of stds above sig_amp. initial detection, peak power,
+% contineous power, art             ifact power
+thr = [1.5, 4, 3, 20];
 
 fprintf('\ngetting ripples for %s\n', basename)
 
@@ -153,7 +133,8 @@ if isempty(sig)
         % very time consuming. better to select manually.
         fprintf('selecting best ripple channel...\n')
 
-        recDur = min([diff(recWin), 4 * 60 * 60]);
+        recMax = min([4 * 60 * 60, session.general.duration]);
+        recDur = min([diff(recWin), recMax]);
         sig = double(bz_LoadBinary([basename, '.lfp'], 'duration', recDur,...
             'frequency', fs, 'nchannels', nchans, 'start', recWin(1),...
             'channels', spkch, 'downsample', 1));
@@ -180,25 +161,31 @@ end
 % prepare signal
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-fprintf('preparing signal...\n')
+fprintf('preparing signals...\n')
+
+% prepare emg. assumes emg and sig are of the same sample frequency. if the
+% lengths are incompatible, assumes emg represents the entire recording and
+% clips it according to recWin
+if length(emg) > length(sig)  
+    sigIdx = recWin(1) * fs + 1 : recWin(2) * fs;
+    emg = emg(sigIdx);
+end
 
 % normalize data to ripple power during immobility or NREM. currently not
 % used. should also check out NormToInt from bz
-norm_idx = true(length(sig), 1);   % initialize
-if ~isempty(emg)
-    norm_idx = emg < prctile(emg, 100 - emgThr);
-    
-elseif exist(ssfile)    
-    load(ssfile, 'ss')    
-    nrem_stateIdx = find(strcmp(cfg.names, 'NREM'));
-    
-    % find nrem indices by upsampling the labels. assumes the binsize
-    % (epoch length) of labels is 1 sec.
-    nrem_inInt = InIntervals([1 : length(ss.labels)], recWin);
-    norm_idx = repelem(ss.labels(nrem_inInt) == nrem_stateIdx, fs);
-end
-
-% normalize
+% norm_idx = true(length(sig), 1);   % initialize
+% if ~isempty(emg)
+%     norm_idx = emg < prctile(emg, 100 - emgThr);
+%     
+% elseif exist(ssfile)    
+%     load(ssfile, 'ss')    
+%     nrem_stateIdx = find(strcmp(cfg.names, 'NREM'));
+%     
+%     % find nrem indices by upsampling the labels. assumes the binsize
+%     % (epoch length) of labels is 1 sec.
+%     nrem_inInt = InIntervals([1 : length(ss.labels)], recWin);
+%     norm_idx = repelem(ss.labels(nrem_inInt) == nrem_stateIdx, fs);
+% end
 % sig_filt = (sig - mean(sig(norm_idx))) / std(sig(norm_idx));
 
 % filter lfp data in ripple band
@@ -219,17 +206,19 @@ t_diff = tstamps(1 : end - 1) + dt / 2;
 d0 = diff(medfilt1(sig_unwrapped, 12)) ./ dt;
 d1 = interp1(t_diff, d0, tstamps(2 : end - 1, 1));
 sig_freq = [d0(1); d1; d0(end)] / (2 * pi);
-
+clear sig_unwrapped % memory
+        
 % -------------------------------------------------------------------------
 % detection signal
+dtctMet = 1;            % 1 = TL; 2 = BZ
 switch dtctMet
     case 1              % TL detection (smoothed amplitude)
         % smooth amplitude. note TL averages the smoothed amplitude from a few
         % channels.
-        % sig_dtct = smoothdata(sig_amp, 'gaussian', round(5 / (1000 / 1250)));       
-        sig_dtct = (sig_amp - mean(sig_amp)) / std(sig_amp);
+        sig_dtct = smoothdata(sig_amp, 'gaussian', round(5 / (1000 / 1250)));       
+        sig_dtct = (sig_dtct - mean(sig_dtct)) / std(sig_dtct);
         
-    case 2              % BZ detection (nss)
+    case 2              % BZ detection (normalized squared signal)
         sig_dtct = sig_filt .^ 2;
         winFilt = ones(11, 1) / 11;
         shift = (length(winFilt) - 1) / 2;
@@ -251,7 +240,7 @@ nepochs = size(epochs, 1);
 % discard ripples that occur during high emg 
 if ~isempty(emg)
     for iepoch = 1 : nepochs
-        emgRipp(iepoch) = mean(emg(epochs(iepoch, 1) : epochs(iepoch, 2)));
+        emgRipp(iepoch) = median(emg(epochs(iepoch, 1) : epochs(iepoch, 2)));
     end
     discard_idx = emgRipp > prctile(emg, emgThr);
     epochs(discard_idx, :) = [];
@@ -272,11 +261,22 @@ peakPowNorm(discard_idx) = [];
 nepochs = size(epochs, 1);
 fprintf('After peak power: %d events\n', nepochs)
 
+% discard ripples with a peak power > atrtifact threshold
+clear discard_idx
+discard_idx = peakPowNorm > thr(4);
+epochs(discard_idx, :) = [];
+peakPowNorm(discard_idx) = [];
+nepochs = size(epochs, 1);
+fprintf('After artifact power: %d events\n', nepochs)
+
 % discard ripples that do not maintain peak power for the min duration
 clear discard_idx
 for iepoch = 1 : size(epochs, 1)
-    discard_idx(iepoch) = all(maxk(sig_dtct(epochs(iepoch, 1) : epochs(iepoch, 2)),...
-        limDur(1)) > thr(2));
+    aboveThr = sig_dtct(epochs(iepoch, 1) : epochs(iepoch, 2)) > thr(3);
+    powPnts = strfind([0 aboveThr'], [0 ones(1, limDur(4))]);
+    if isempty(powPnts)
+        discard_idx(iepoch) = true;
+    end
 end
 epochs(discard_idx, :) = [];
 peakPowNorm(discard_idx) = [];
@@ -284,10 +284,10 @@ nepochs = size(epochs, 1);
 fprintf('After peak power: %d events\n', nepochs)
 
 % clear memory
-clear sig_dtct sig_unwrapped
+clear sig_dtct
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% stats
+% ripp stats
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % find negative peak position for each ripple
@@ -322,7 +322,7 @@ ripp.maps.amp = SyncMap(p, i,'durations', ripp.maps.durWin,...
     'nbins', nbinsMap, 'smooth', 0);
 
 % clear memory
-clear sig_freq sig_amp sig_phase
+clear sig_freq sig_amp sig_phase tstamps
 
 % -------------------------------------------------------------------------
 % more stats
@@ -339,103 +339,15 @@ ripp.corr.dur_freq = corrcoef(ripp.dur, ripp.peakFreq);
 ripp.corr.dur_amp = corrcoef(ripp.dur, ripp.peakAmp);
 
 % rate of ripples
+epochs             = epochs + recWin(1);  
+peakPos            = peakPos + recWin(1);
 [ripp.rate.rate, ripp.rate.binedges, ripp.rate.tstamps] =...
-    times2rate(peakPos, 'binsize', binsizeRate, 'winCalc', [0, Inf],...
+    times2rate(peakPos, 'binsize', binsizeRate, 'winCalc', recWin,...
     'c2r', true);
 
-% -------------------------------------------------------------------------
-% relation to sleep states
-ssfile = fullfile(basepath, [basename '.sleep_states.mat']);
-if exist(ssfile)    
-    load(ssfile, 'ss')    
-
-    ripp.states.stateNames = ss.info.names;
-    nstates = length(ss.stateEpochs);
-    
-    for istate = sstates
-        epochIdx = InIntervals(ss.stateEpochs{istate}, recWin);
-        if ~isempty(ss.stateEpochs{istate})
-            % rate in states
-            [ripp.states.rate{istate}, ripp.states.binedges{istate},...
-                ripp.states.tstamps{istate}] =...
-                times2rate(peakPos, 'binsize', binsizeRate,...
-                'winCalc', ss.stateEpochs{istate}(epochIdx, :), 'c2r', true);
-            
-            % idx of rippels in state
-            ripp.states.idx{istate} =...
-                InIntervals(peakPos, ss.stateEpochs{istate}(epochIdx, :));
-        end
-    end
-end
-
-% -------------------------------------------------------------------------
-% relation to spiking
-if spkFlag
-if exist(spktimesfile, 'file')      % mu 
-    fprintf('Getting MU spikes in ripples...\n')
-    
-    load(spktimesfile)
-    muSpks = sort(vertcat(spktimes{:})) / fsSpks;
-    for iepoch = 1 : nepochs
-        ripp.spks.mu.rippAbs{iepoch} = muSpks(muSpks < epochs(iepoch, 2) &...
-            muSpks > epochs(iepoch, 1));
-        ripp.spks.mu.rippRel{iepoch} = ripp.spks.mu.rippAbs{iepoch} - epochs(iepoch, 1);
-    end
-    nspksRipp = cellfun(@length, ripp.spks.mu.rippAbs, 'uni', true);
-    ripp.spks.mu.rate = nspksRipp ./ ripp.dur';
-    
-    % count spikes in sampling frequency of lfp
-    spkRate = histcounts(muSpks, [0, tstamps']);
-    
-    % create map of firing rate during ripples
-    [r, i] = Sync([tstamps spkRate'], peakPos, 'durations', ripp.maps.durWin);
-    ripp.spks.mu.rippMap = SyncMap(r, i, 'durations', ripp.maps.durWin,...
-        'nbins', nbinsMap, 'smooth', 0);
-    
-    % create map of firing rate during random times
-    randIdx = sort(randperm(floor(tstamps(end)), nepochs));
-    [r, i] = Sync([tstamps spkRate'], randIdx, 'durations', ripp.maps.durWin);
-    ripp.spks.mu.randMap = SyncMap(r, i, 'durations', ripp.maps.durWin,...
-        'nbins', nbinsMap, 'smooth', 0);
-
-end
-
-if exist(spikesfile, 'file')        % su
-    fprintf('Getting SU spikes in ripples...\n')
-
-    load(spikesfile)
-    nunits = length(spikes.times);
-    spks.su = bz_getRipSpikes('basepath', basepath,...
-        'events', epochs, 'spikes', spikes, 'saveMat', false);
-    
-    ripp.spks.su.rippMap = zeros(nunits, nepochs, nbinsMap);
-    ripp.spks.su.randMap = zeros(nunits, nepochs, nbinsMap);
-    for iunit = 1 : nunits
-        nspksRipp = cellfun(@length, spks.su.UnitEventAbs(iunit, :),...
-            'uni', true);
-        spks.su.rate(iunit, :) = nspksRipp ./ ripp.dur';       
-        
-        % count spikes in sampling frequency of lfp
-        spkRate = histcounts(spikes.times{iunit}, [0, tstamps']);
-        
-        % create map of firing rate during ripples
-        [r, i] = Sync([tstamps spkRate'], peakPos, 'durations', ripp.maps.durWin);
-        ripp.spks.su.rippMap(iunit, :, :) = SyncMap(r, i, 'durations',...
-            ripp.maps.durWin, 'nbins', nbinsMap, 'smooth', 0);
-        
-        % create map of firing rate during random times
-        randIdx = sort(randperm(floor(tstamps(end)), nepochs));
-        [r, i] = Sync([tstamps spkRate'], randIdx, 'durations', ripp.maps.durWin);
-        ripp.spks.su.randMap(iunit, :, :) = SyncMap(r, i, 'durations',...
-            ripp.maps.durWin, 'nbins', nbinsMap, 'smooth', 0);        
-    end
-end
-else
-    ripp.spks = [];
-end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% finalize and save
+% finalize, save, and graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 ripp.info.rippCh        = rippCh;
@@ -444,253 +356,44 @@ ripp.info.recWin        = recWin;
 ripp.info.runtime       = datetime(now, 'ConvertFrom', 'datenum');
 ripp.info.thr           = thr;
 ripp.info.binsizeRate   = binsizeRate;
-ripp.epochs             = epochs + recWin(1);  
+ripp.info.fs            = fs;
+ripp.info.passband      = passband;
+ripp.epochs             = epochs;  
 ripp.peakPos            = peakPos;
 ripp.peakPow            = peakPow;
 ripp.peakPowNorm        = peakPowNorm;
-
+   
 if saveVar      
     save(rippfile, 'ripp')
 
     % create ns files for visualization with neuroscope
-    fs_dat = session.extracellular.sr;
     nepochs = size(ripp.epochs, 1);
-    
-    res = round([ripp.epochs(:, 1); ripp.epochs(:, 2); ripp.peakPos] * fs_dat);
-    [res, sort_idx] = sort(round(res));
+
+    res = round([ripp.epochs(:, 1); ripp.epochs(:, 2); ripp.peakPos] * fsSpks);
+    [res, sort_idx] = sort(res);
     fid = fopen(resfile, 'w');
     fprintf(fid, '%d\n', res);
     rc = fclose(fid);
-   
+    if rc == -1
+        error('failed to close res file')
+    end
+
     clu = [ones(nepochs, 1); ones(nepochs, 1) * 2; ones(nepochs, 1) * 3];
     clu = clu(sort_idx);
     fid = fopen(clufile, 'w');
     fprintf(fid, '%d\n', 3);
     fprintf(fid, '%d\n', clu);
     rc = fclose(fid);
+    if rc == -1
+        error('failed to close clu file')
+    end
 end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% graphics
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-if graphics
-    
-    nepochs = size(ripp.epochs, 1);
-    setMatlabGraphics(false)
-    set(groot, 'DefaultAxesLabelFontSizeMultiplier', 1.1)
-    set(groot, 'DefaultAxesTitleFontSizeMultiplier', 1.2)   
-    
-    % ---------------------------------------------------------------------
-    % ripples detection and stats
-    fh = figure;
-    durPlot = [-50 50] / 1000;
-    x = durPlot(1) : diff(durPlot) / nepochs : durPlot(2);
-    histBins = 200;
-    nbinsMap = size(ripp.maps.freq, 2);
-    
-    % examples on raw and filtered data
-    sb1 = subplot(4, 3, [1, 2]);    
-    idx_recMargin = 10 * fs;     % [s]
-    nrippPlot = min([round(nepochs / 2), 50]);
-    hlfnripp = round(nrippPlot / 2);
-    rippSelect = round(hlfnripp) : round(hlfnripp) + nrippPlot;
-    rippCenter = round((rippSelect(end) - rippSelect(1)) / 2) + rippSelect(1);
-    idx_rec = round([ripp.peakPos(hlfnripp + hlfnripp) * fs - idx_recMargin :...
-        ripp.peakPos(hlfnripp + hlfnripp) * fs + idx_recMargin]);
-    plot(idx_rec / fs, sig(idx_rec), 'k')
-    hold on
-    plot(idx_rec / fs, sig_filt(idx_rec), 'm')
-    yLimit = ylim;
-    plot([ripp.peakPos(rippSelect), ripp.peakPos(rippSelect)], yLimit, 'b')
-    plot([ripp.epochs(rippSelect, 1), ripp.epochs(rippSelect, 1)], yLimit, 'g')
-    plot([ripp.epochs(rippSelect, 2), ripp.epochs(rippSelect, 2)], yLimit, 'r')
-    xlim([ripp.peakPos(rippCenter) - 0.5, ripp.peakPos(rippCenter) + 0.5])
-    legend('Raw LFP', 'Filtered')
-    xlabel('Time [s]')
-    
-    % examples of ripples (filtered) superimposed
-    sb3 = subplot(4, 3, 3);
-    ripp_idx = randperm(nepochs, min([1000, nepochs]));
-    plot(((1 : nbinsMap)' - ceil(nbinsMap / 2)) / nbinsMap * diff(durPlot),...
-        ripp.maps.ripp(ripp_idx, :)', 'k');
-    xlabel('Time [s]')
-    
-    % rate
-    sb4 = subplot(4, 3, [4, 5]);
-    plot(ripp.rate.tstamps / 60 / 60, ripp.rate.rate, 'k')
-    xlabel('Time [h]')
-    ylabel('Ripple Rate [Hz]')
-    if exist(ssfile)
-        hold on
-        for istate = sstates
-            ph = plot(ripp.states.tstamps{istate} / 60 / 60,...
-                ripp.states.rate{istate}, '.', 'MarkerSize', 5);
-            ph.Color = cfg.colors{istate};
-        end
-        xlabel('Time [h]')
-        ylabel('Ripple Rate [Hz]')
-        % legend(["Total", ripp.states.stateNames{sstates}]);
-    end
-    
-    % percent rippels in state
-    sb6 = subplot(4, 3, 6);
-    if exist(ssfile)
-        pie(sum(cell2nanmat(ripp.states.idx, 2), 1, 'omitnan'), ones(1, length(sstates)))
-        hold on
-        ph = findobj(sb6, 'Type', 'Patch');
-        set(ph, {'FaceColor'}, flipud(cfg.colors(sstates)))
-        legend({ripp.states.stateNames{sstates}}, 'FontSize', 10,...
-            'Units', 'normalized', 'Position', [0.661 0.605 0.02 0.10],...
-            'NumColumns', 2);
-    end
-      
-    % frequency map
-    sb7 = subplot(4, 3, 7);
-    PlotColorMap(ripp.maps.freq, 1, 'bar','on', 'cutoffs', [100 250], 'x', x);
-    ylabel('Ripple No.')
-    title('Frequency');   
-    
-    % amplitude map
-    sb8 = subplot(4, 3, 8);
-    PlotColorMap(ripp.maps.amp, 1, 'bar','on', 'x', x);
-    ylabel('Ripple No.')
-    title('Amplitude');
-    
-    % ACG
-    sb9 = subplot(4, 3, 9);
-    plotCCG(ripp.acg.data, ripp.acg.t);
-    xlabel('Time [ms]')
-    ylabel('Rate')
-    
-    % distribution of peak frequency
-    sb10 = subplot(4, 3, 10);
-    h = histogram(ripp.peakFreq, histBins, 'Normalization', 'probability');
-    h.FaceColor = 'k';
-    h.EdgeColor = 'none';
-    xlabel('Peak Frequency [Hz]')
-    ylabel('Probability')
-    
-    % distribution of peak amplitude
-    sb11 = subplot(4, 3, 11);
-    h = histogram(ripp.peakAmp, histBins, 'Normalization', 'probability');
-    h.FaceColor = 'k';
-    h.EdgeColor = 'none';
-    xlabel('Peak Amp')
-    ylabel('Probability')
-    
-    % distribution of ripple duration
-    sb12 = subplot(4, 3, 12);
-    h = histogram(ripp.dur * 1000, histBins, 'Normalization', 'probability');
-    h.FaceColor = 'k';
-    h.EdgeColor = 'none';
-    xlabel('Ripple Duration [ms]')
-    ylabel('Probability')
-    
-    sgtitle(basename)
-    
-    % save figure
-    figpath = fullfile(basepath, 'graphics');
-    mkdir(figpath)
-    figname = fullfile(figpath, sprintf('%s_ripples', basename));
-    export_fig(figname, '-tif', '-transparent', '-r300')
-    
-    % ---------------------------------------------------------------------
-    % spikes in ripples
-    
-    if isfield(ripp.spks, 'mu')
-        fh = figure;       
-        
-        % map of nspks per ripple
-        sb1 = subplot(2, 3, 1);
-        PlotColorMap(ripp.spks.mu.rippMap, 1, 'bar','on', 'x', x);
-        xlabel('Time [ms]')
-        ylabel('Ripple No.')
-        title('MU Spikes');
-        
-        % mean nspks across ripples
-        sb2 = subplot(2, 3, 2);
-        ydata = ripp.spks.mu.rippMap;
-        xdata = linspace(ripp.maps.durWin(1), ripp.maps.durWin(2),...
-            size(ydata, 2));
-        plot(xdata, mean(ydata), 'k')
-        hold on
-        patch([xdata, flip(xdata)], [mean(ydata) + std(ydata),...
-            flip(mean(ydata) - std(ydata))],...
-            'k', 'EdgeColor', 'none', 'FaceAlpha', .2, 'HitTest', 'off')
-        xlabel('Time [ms]')
-        ylabel('MU Spikes')
-        axis tight
-        
-        % hist of nspks in ripples vs. random epochs
-        sb3 = subplot(2, 3, 3);
-        ydata = sum(ripp.spks.mu.rippMap, 2);
-        hh = histogram(ydata, 50,...
-            'Normalization', 'probability');
-        hh.EdgeColor = 'none';
-        hh.FaceColor = 'k';
-        hh.FaceAlpha = 0.3;
-        hold on
-        ydata = sum(ripp.spks.mu.randMap, 2);
-        hh = histogram(ydata, 50,...
-            'Normalization', 'probability');
-        hh.EdgeColor = 'none';
-        hh.FaceColor = 'b';
-        hh.FaceAlpha = 0.3;
-        legend({'Ripple', 'Random'}, 'Location', 'best')
-        ylabel('Probability')
-        xlabel('MU Spikes')
-    end
-    
-    if isfield(ripp.spks, 'su')
-        % map of mean rate per unit across ripples
-        sb4 = subplot(2, 3, 4);
-        ydata = squeeze(mean(ripp.spks.su.rippMap, 2));
-        PlotColorMap(ydata, 1, 'bar','on', 'x', x);
-        xlabel('Time [ms]')
-        ylabel('Unit No.')
-        title('SU Spikes');
-        
-        % mean nspks across units and ripples
-        sb5 = subplot(2, 3, 5);
-        xdata = linspace(ripp.maps.durWin(1), ripp.maps.durWin(2),...
-            size(ydata, 2));
-        ydata = ydata ./ max(ydata, 2);
-        plot(xdata, mean(ydata), 'k')
-        hold on
-        patch([xdata, flip(xdata)], [mean(ydata) + std(ydata),...
-            flip(mean(ydata) - std(ydata))],...
-            'k', 'EdgeColor', 'none', 'FaceAlpha', .2, 'HitTest', 'off')
-        xlabel('Time [ms]')
-        ylabel('Norm. SU Spikes')
-        axis tight
-        
-        % hist of nspks in ripples vs. random epochs
-        sb6 = subplot(2, 3, 6);
-        ydata = squeeze(mean(mean(ripp.spks.su.rippMap, 2), 3));
-        xdata = squeeze(mean(mean(ripp.spks.su.randMap, 2), 3));
-        plot(xdata, ydata, '.k', 'MarkerSize', 10)
-        hold on
-        set(gca, 'yscale', 'log', 'xscale', 'log')
-        eqLim = [min([ylim, xlim]), max([ylim, xlim])];
-        plot(eqLim, eqLim, '--k', 'LineWidth', 1)
-        xlim(eqLim)
-        ylim(eqLim)
-        ylabel('Spikes in Ripples')
-        xlabel('Spikes in Random')
-    end
-    sgtitle(basename)
-    
-    % save figure
-    figpath = fullfile(basepath, 'graphics');
-    mkdir(figpath)
-    figname = fullfile(figpath, sprintf('%s_rippleSpks', basename));
-    export_fig(figname, '-tif', '-transparent', '-r300')
-     
-        
-    end
-    
+if graphics 
+    plot_ripples(ripp, 'basepath', basepath, 'saveFig', true)
 end
+ 
 
+end
 
 % EOF

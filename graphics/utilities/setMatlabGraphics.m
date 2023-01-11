@@ -30,9 +30,12 @@ if ~factoryFlag
 else
     % factory values
     
-    set(groot, 'DefaultTextInterpreter', 'remove');
-    set(groot, 'DefaultAxesTickLabelInterpreter', 'remove');
-    set(groot, 'DefaultLegendInterpreter', 'remove');
+    set(groot, 'DefaultTextInterpreter', 'none');
+    set(groot, 'DefaultAxesTickLabelInterpreter', 'none');
+    set(groot, 'DefaultLegendInterpreter', 'none');
+%     set(groot, 'DefaultTextInterpreter', 'remove');
+%     set(groot, 'DefaultAxesTickLabelInterpreter', 'remove');
+%     set(groot, 'DefaultLegendInterpreter', 'remove');
     set(groot, 'DefaultAxesFontName', 'remove')
     set(groot, 'DefaultTextFontName', 'remove')
     set(groot, 'DefaultAxesFontSize', 'remove')

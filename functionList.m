@@ -104,14 +104,30 @@ acc = EMGfromACC('basepath', basepath, 'fname', [basename, '.lfp'],...
     'nchans', nchans, 'ch', nchans - 2 : nchans, 'saveVar', true, 'fsIn', 1250,...
     'graphics', false, 'force', true);
 
-% get ripples
-ripp = getRipples('basepath', basepath, 'rippCh', [9],...
-    'emg', acc.mag, 'recWin', [0, Inf], 'saveVar', true,...
-    'spkFlag', true, 'graphics', true, 'saveVar', true);
-
 % remove pli
 [EMG, tsaSig, ~] = tsa_filter('sig', EMG, 'fs', fs, 'tw', true,...
     'ma', true, 'graphics', true);
+
+
+% -------------------------------------------------------------------------
+tic
+
+% get ripples
+ripp = getRipples('basepath', basepath, 'rippCh', [5],...
+    'emg', acc.mag, 'recWin', [0, Inf], 'saveVar', true,...
+    'graphics', true, 'saveVar', true);
+
+% ripple relation to states
+ripp = rippleStates(ripp, 'basepath', basepath, 'saveVar', true,...
+    'graphics', true)
+
+% ripple relation to spikes
+ripp = rippleSpks(ripp, 'basepath', basepath, 'graphics', true,...
+    'saveVar', true, 'fullAnalysisFlag', false)
+
+% plot ripples
+plot_ripples(ripp, 'basepath', basepath, 'saveFig', true)
+plot_rippleSpks(ripp, 'basepath', basepath, 'saveFig', true)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % sleep states
@@ -123,7 +139,7 @@ sSig = load([basename, '.sleep_sig.mat']);
 
 % call for acceleration
 sSig = as_prepSig([basename, '.lfp'], acc.mag,...
-    'eegCh', [5 : 7], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
+    'eegCh', [12 : 16], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
     'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
     'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [10 450], 'fs', 1250);
 
