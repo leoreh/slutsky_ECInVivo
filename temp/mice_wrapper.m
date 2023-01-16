@@ -5,8 +5,8 @@
 
 % user input
 mname           = 'lh122';
-basepath        = 'J:\Data\lh122\2023-01-11_13-52-12';
-exp             = [1 : 2];
+basepath        = 'K:\Data\lh122\2023-01-14_09-50-09';
+exp             = [1 : 4];
 
 % dat from oe 
 mapch = 1 : 19;
@@ -91,13 +91,13 @@ spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true,...
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% lh122
+% lh126
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % user input
 mname           = 'lh126';
-basepath        = 'J:\Data\lh126\2023-01-11_09-12-08';
-exp             = [1];
+basepath        = 'K:\Data\lh126\2023-01-14_09-50-09';
+exp             = [1 : 4];
 
 % dat from oe 
 mapch = 1 : 19;
@@ -127,8 +127,8 @@ spkgrp = session.extracellular.spikeGroups.channels;
 
 % clip bad parts
 clear orig_files
-orig_files{1} = 'J:\Data\lh122\lh122_230111_091208\lh122_230111_091208.dat';
-orig_files{2} = 'J:\Data\lh122\lh122_230111_135212\lh122_230111_135212.dat';
+orig_files{1} = 'J:\Data\lh126\lh126_230111_091208\lh126_230111_091208.dat';
+orig_files{2} = 'J:\Data\lh126\lh126_230111_135212\lh126_230111_135212.dat';
 clip = cell(1, length(orig_files));
 % clip{1} = [1, seconds(minutes(212))] * 20000;
 % clip{2} = [seconds(minutes(1440)), seconds(minutes(573))] * 20000;
@@ -168,7 +168,7 @@ acc = EMGfromACC('basepath', basepath, 'fname', [basename, '.lfp'],...
 
 % sleep sig
 sSig = as_prepSig([basename, '.lfp'], acc.mag,...
-    'eegCh', [1 : 4], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
+    'eegCh', [8 : 11], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
     'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
     'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [10 450], 'fs', 1250);
 labelsmanfile = [basename, '.sleep_labelsMan.mat'];
@@ -177,6 +177,6 @@ AccuSleep_viewer(sSig, [], labelsmanfile)
 % calc spec
 spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true,...
     'saveVar', true, 'padfft', -1, 'winstep', 5,...
-    'ftarget', [], 'ch', {[1 : 4]},...
+    'ftarget', [], 'ch', {[8 : 11]},...
     'force', true, 'logfreq', true);
 

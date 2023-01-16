@@ -331,6 +331,13 @@ if graphics
             ylabel('Firing Rate [Hz]')
             axis tight
             
+            % downsample to prism
+            dfactor = 10;
+            prismData = movmean(expFs, 13, 1);
+            prismData = prismData(1 : 10 : end, :);
+            prismX = [xData(1 : dfactor : end) / 60 / 60]';
+
+
         case 'ripp'
             plot(xData, expData)
             ylabel('Ripple Rate [Hz]')
