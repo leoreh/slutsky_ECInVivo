@@ -200,21 +200,25 @@ for icell = 1 : length(stamps)
         [~, ampMaxCh] = max(range(v, 2));
         
         % realign according to min / max
-        switch align_peak
-            case 'min'
-                [~, ia] = min(v, [], 2);
-            case 'max'
-                [~, ia] = max(v, [], 2);
-            otherwise
-                ia = psamp;
-        end        
-        wvpeak = ia(ampMaxCh) ;
-        snipshift = wvpeak - psamp;
-        if snipshift ~= 0
-            stamps{icell}(isnip) = stamps{icell}(isnip) + snipshift;
-            v = double(raw.mapped(ch{icell}, stamps{icell}(isnip) + win(1) :...
-                stamps{icell}(isnip) + win(2)));
+        if strcmp(align_peak, {'min', 'max'})
+            switch align_peak
+                case 'min'
+                    [~, ia] = min(v, [], 2);
+                case 'max'
+                    [~, ia] = max(v, [], 2);
+                otherwise
+            end
+            wvpeak = ia(ampMaxCh) ;
+            snipshift = wvpeak - psamp;
+            if snipshift ~= 0
+                stamps{icell}(isnip) = stamps{icell}(isnip) + snipshift;
+                v = double(raw.mapped(ch{icell}, stamps{icell}(isnip) + win(1) :...
+                    stamps{icell}(isnip) + win(2)));
+            end
+        else
+            ia = psamp;
         end
+
         
         % find and remove trend
         if sum(rmv_trend) > 0
