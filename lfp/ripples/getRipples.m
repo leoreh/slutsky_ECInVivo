@@ -16,8 +16,7 @@ function ripp = getRipples(varargin)
 %                   if empty will be extracted from session info (ce
 %                   format)
 %   rippCh          numeric vec. channels to load and average from lfp
-%                   file {1}. if empty will be selected best on the ratio
-%                   of mean to median within the passband. 
+%                   file {1}. 
 %   emgCh           numeric vec. emg channel in basename.lfp file. 
 %   recWin          numeric 2 element vector. time to analyse in recording
 %                   [s]. start of recording is marked by 0. {[0 Inf]}
@@ -39,18 +38,37 @@ function ripp = getRipples(varargin)
 %   # stats (done)
 %   # rate (done)
 %   # exclusion by emg noise (done)
-%   # exclusion by spiking activity
 %   # exlude active periods when normalizing signal (done)
 %   # allow user to input sig directly instead of loading from binary (done)
-%   # improve routine to select best ripple channel automatically
+%   # exclusion by spiking activity (irrelevant - can be done manually)
+%   # improve routine to select best ripple channel automatically (done)
 %   # add subroutine to determine bandpass, threshold, and duration limits
-%   automatically
+%   automatically by performing a quick first detection
 %   # add graphics for visualizing detection independently of neuroscope
-%   # implement batch proccessing for memory     
+%   # implement batch proccessing for memory
+%   # use multiple channels for detection
+%   # use phase difference between tetrodes to exclude artifacts
+%   # add option to exclude ripples detected on a "bad" channel 
 %
 % 02 dec 21 LH     updates:
 % 11 jan 23        implementad remarks from Liu et al., Nat. Comm., 2022
-%                  separated getRippleSpks and graphics                                                                          
+%                  separated getRippleSpks and graphics    
+% 25 jan 23        removed subroutine to detect best ripples channel and
+%                  normalize signal by nrem
+
+% BATCH PROCESSING: a 24 hr flat binary (int16) file of 19 channels at 1250
+% Hz is ~4 GB so with high end computers, batch processing is not critical.
+% detection includes the signal, filtered signal, amplitude (from hilbert),
+% and maybe also phase (from hilbert), and the smooth amplitude, all as double. 
+
+% detect ripples on each channel separately (good and
+% bad). requires filtering, amplitude, smooth amplitude. goes until
+% binary2epochs. than if overlap keep (good) or remove (bad).
+% next, average the start / end times from all channels. 
+% next, average the signal and recalculate, amp, phase, etc.
+% start exclusion. 
+
+% getRipples_exclusion: 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -60,7 +78,7 @@ addOptional(p, 'basepath', pwd);
 addOptional(p, 'sig', [], @isnumeric);
 addOptional(p, 'emg', [], @isnumeric);
 addOptional(p, 'recWin', [0 Inf]);
-addOptional(p, 'rippCh', 1, @isnumeric);
+addOptional(p, 'rippCh', [], @isnumeric);
 addOptional(p, 'emgCh', [], @isnumeric);
 addOptional(p, 'fs', [], @isnumeric);
 addOptional(p, 'graphics', true, @islogical);
@@ -106,7 +124,11 @@ if isempty(fs)
     fs = session.extracellular.srLfp;
 end
 
-% detection params. limDur refers to min, max, and min inter-ripple
+% threshold of stds above sig_amp. initial detection, peak power,
+% contineous power, artifact power
+thr = [1.5, 4, 3, 20];
+
+% detection params. limDir refers to min, max, and inter-ripple
 % duration. 4th element refers to the amount of time the power must be
 % above thr(3). all values in [ms]
 limDur = [20, 350, 20, 10]; 
@@ -115,10 +137,6 @@ passband = [100 250];
 binsizeRate = 60;           % binsize for calculating ripple rate [s]
 emgThr = 85;                % exclude ripples that occur when emg > thr
 
-% threshold of stds above sig_amp. initial detection, peak power,
-% contineous power, art             ifact power
-thr = [1.5, 4, 3, 20];
-
 fprintf('\ngetting ripples for %s\n', basename)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -126,27 +144,7 @@ fprintf('\ngetting ripples for %s\n', basename)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if isempty(sig)    
-    if isempty(rippCh)
-        % if rippCh not specified, load 4 hr of data and find ch with best
-        % SNR for ripples. note this subrutine occasionally points to the
-        % channel with the highest movement artifacts / spikes. it is also
-        % very time consuming. better to select manually.
-        fprintf('selecting best ripple channel...\n')
 
-        recMax = min([4 * 60 * 60, session.general.duration]);
-        recDur = min([diff(recWin), recMax]);
-        sig = double(bz_LoadBinary([basename, '.lfp'], 'duration', recDur,...
-            'frequency', fs, 'nchannels', nchans, 'start', recWin(1),...
-            'channels', spkch, 'downsample', 1));
-        
-        sig_filt = filterLFP(sig, 'fs', fs, 'type', 'butter', 'dataOnly', true,...
-            'order', 5, 'passband', passband, 'graphics', false);
-        
-        pow = fastrms(sig_filt, 15);
-        ch_rippPowRatio = mean(pow) ./ median(pow);
-        [~, rippCh] = max(ch_rippPowRatio);
-    end
-    
     % load all data and average across channels
     fprintf('loading lfp data...\n')
     sig = double(bz_LoadBinary([basename, '.lfp'], 'duration', diff(recWin),...
@@ -171,23 +169,6 @@ if length(emg) > length(sig)
     emg = emg(sigIdx);
 end
 
-% normalize data to ripple power during immobility or NREM. currently not
-% used. should also check out NormToInt from bz
-% norm_idx = true(length(sig), 1);   % initialize
-% if ~isempty(emg)
-%     norm_idx = emg < prctile(emg, 100 - emgThr);
-%     
-% elseif exist(ssfile)    
-%     load(ssfile, 'ss')    
-%     nrem_stateIdx = find(strcmp(cfg.names, 'NREM'));
-%     
-%     % find nrem indices by upsampling the labels. assumes the binsize
-%     % (epoch length) of labels is 1 sec.
-%     nrem_inInt = InIntervals([1 : length(ss.labels)], recWin);
-%     norm_idx = repelem(ss.labels(nrem_inInt) == nrem_stateIdx, fs);
-% end
-% sig_filt = (sig - mean(sig(norm_idx))) / std(sig(norm_idx));
-
 % filter lfp data in ripple band
 sig_filt = filterLFP(sig, 'fs', fs, 'type', 'butter', 'dataOnly', true,...
     'order', 5, 'passband', passband, 'graphics', false);
@@ -206,7 +187,9 @@ t_diff = tstamps(1 : end - 1) + dt / 2;
 d0 = diff(medfilt1(sig_unwrapped, 12)) ./ dt;
 d1 = interp1(t_diff, d0, tstamps(2 : end - 1, 1));
 sig_freq = [d0(1); d1; d0(end)] / (2 * pi);
-clear sig_unwrapped % memory
+
+% clear memory
+clear sig_unwrapped h 
         
 % -------------------------------------------------------------------------
 % detection signal
@@ -225,7 +208,7 @@ switch dtctMet
         [sig_dtct, z] = filter(winFilt, 1, sig_dtct);
         sig_dtct = [sig_dtct(shift + 1 : end, :); z(1 : shift, :)];
         sig_dtct = (sig_dtct - mean(sig_dtct)) / std(sig_dtct);
-        
+            
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -322,7 +305,7 @@ ripp.maps.amp = SyncMap(p, i,'durations', ripp.maps.durWin,...
     'nbins', nbinsMap, 'smooth', 0);
 
 % clear memory
-clear sig_freq sig_amp sig_phase tstamps
+clear sig_freq sig_amp sig_phase tstamps sig_filt
 
 % -------------------------------------------------------------------------
 % more stats
