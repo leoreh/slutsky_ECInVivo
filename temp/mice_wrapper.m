@@ -6,8 +6,8 @@
 
 % user input
 mname           = 'lh126';
-basepath        = 'J:\Data\lh126\2023-01-23_09-55-40';
-exp             = [1 : 5];
+basepath        = 'J:\Data\lh126\2023-01-26_09-58-04';
+exp             = [1 : 3];
 
 % dat from oe 
 mapch = 1 : 19;
@@ -37,10 +37,10 @@ spkgrp = session.extracellular.spikeGroups.channels;
 
 % clip bad parts
 clear orig_files
-orig_files{1} = 'J:\Data\lh126\lh126_230121_082525\lh126_230121_082525.dat';
-orig_files{2} = 'J:\Data\lh126\lh126_230121_152535\lh126_230121_152535.dat';
+orig_files{1} = 'J:\Data\lh126\lh126_230126_095804\lh126_230126_095804.dat';
+% orig_files{2} = 'J:\Data\lh126\lh126_230124_142619\lh126_230124_142619.dat';
 clip = cell(1, length(orig_files));
-% clip{1} = [1, seconds(minutes(212))] * 20000;
+clip{1} = [1, seconds(minutes(24 * 60))] * 20000;
 % clip{2} = [seconds(minutes(1440)), seconds(minutes(573))] * 20000;
 datInfo = preprocDat('orig_files', orig_files, 'mapch', 1 : nchans,...
     'rmvch', [], 'nchans', nchans, 'saveVar', true,...
@@ -97,8 +97,8 @@ spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true,...
 
 % user input
 mname           = 'lh129';
-basepath        = 'J:\Data\lh129\2023-01-22_09-41-46';
-exp             = [1 : 4];
+basepath        = 'J:\Data\lh129\2023-01-26_09-58-04';
+exp             = [1 : 3];
 
 % dat from oe 
 mapch = 1 : 19;
@@ -128,11 +128,11 @@ spkgrp = session.extracellular.spikeGroups.channels;
 
 % clip bad parts
 clear orig_files
-orig_files{1} = 'J:\Data\lh126\lh126_230121_082525\lh126_230121_082525.dat';
-orig_files{2} = 'J:\Data\lh126\lh126_230121_152535\lh126_230121_152535.dat';
+orig_files{1} = 'J:\Data\lh129\lh129_230126_095804\lh129_230126_095804.dat';
+% orig_files{2} = 'J:\Data\lh129\lh129_230124_142619\lh129_230124_142619.dat';
 clip = cell(1, length(orig_files));
-% clip{1} = [1, seconds(minutes(212))] * 20000;
-% clip{2} = [seconds(minutes(1440)), seconds(minutes(573))] * 20000;
+clip{1} = [1, seconds(minutes(24 * 60))] * 20000;
+% clip{2} = [seconds(minutes(38)), seconds(minutes(109))] * 20000;
 datInfo = preprocDat('orig_files', orig_files, 'mapch', 1 : nchans,...
     'rmvch', [], 'nchans', nchans, 'saveVar', true,...
     'chunksize', 1e7, 'precision', 'int16', 'clip', clip);

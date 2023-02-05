@@ -336,7 +336,7 @@ plot_FRstates_sextiles('stateMfr', fr.states.mfr(:, [1, 4])', 'units', units.cle
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % concatenate var from different sessions
-mname = 'lh126';
+mname = 'lh129';
 [expData, xData] = sessions_catVarTime('mname', mname,...
     'dataPreset', {'sr'}, 'graphics', true, 'dataAlt', 2,...
     'basepaths', {}, 'xTicksBinsize', 6, 'markRecTrans', true);
