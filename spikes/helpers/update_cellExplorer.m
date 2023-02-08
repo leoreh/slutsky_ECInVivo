@@ -41,11 +41,26 @@ for igrp = 1 : ngrps
     spikes.spksSU(igrp) = length(vertcat(spikes.times{grpidx}));
 end
 
+% replace waveforms across channels (not implemented). note that filt_all
+% must include all channels or otherwise see var channels2plot in
+% CellExplorer.m
+% cell_metrics.waveforms.filt_all
+% cell_metrics.waveforms.time_all
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % save updates
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 save(spikesfile, 'spikes')
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% preferences
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% in preferences_CellExplorer change
+% UI.preferences.waveformsAcrossChannelsAlignment = 'Electrode groups';
+
+
 
 end
 

@@ -21,6 +21,7 @@ function swv = spkwv_metrics(varargin)
 % TO DO LIST
 %   # add tail slope (Torrado Pacheco et al., Neuron, 2021). TP threshold
 %   in that article was ~0.4 ms (done)
+%   # snip across tetrode to present in cell explorer
 %
 % 08 apr 19 LH      updates: 
 % 14 may 20 LH      added upsampling by fft
@@ -105,7 +106,7 @@ wv_std = [];
 % if mean waveforms were not given, resnip from the raw dat file a random
 % number of spikes for each cluster. this is much superior to the
 % extraction done by CE (accurate detrending instead of filtering). note
-% that the spikes struct of CE is still necassary to obtain for the maximum
+% that the spikes struct of CE is still necassary to obtain the maximum
 % amplitude channel before resnipping.
 
 if isempty(wv)

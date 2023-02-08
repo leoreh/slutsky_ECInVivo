@@ -241,7 +241,7 @@ nsClip('dur', -420, 't', [], 'bkup', true, 'grp', [3 : 4]);
 cleanCluByFet('basepath', basepath, 'manCur', true, 'grp', [1 : 4])
 
 % cut spk from dat and realign
-fixSpkAndRes('grp', 1, 'dt', 0, 'stdFactor', 0, 'resnip', false);
+fixSpkAndRes('grp', [1 : 4], 'dt', 0, 'stdFactor', 0, 'resnip', false);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % spikes (post-sorting)
@@ -314,7 +314,7 @@ sl = spklfp_wrapper('basepath', basepath, 'winCalc', winCalc,...
 
 % number of units per spike group
 plot_nunits('basepaths', {basepath}, 'saveFig', true)
-plot_nunits('mname', 'lh122', 'saveFig', true)
+plot_nunits('mname', 'lh126', 'saveFig', true)
 
 % select specific units
 units = selectUnits('basepath', pwd, 'grp', [1 : 4], 'saveVar', true,...
@@ -336,9 +336,9 @@ plot_FRstates_sextiles('stateMfr', fr.states.mfr(:, [1, 4])', 'units', units.cle
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % concatenate var from different sessions
-mname = 'lh129';
+mname = 'lh126';
 [expData, xData] = sessions_catVarTime('mname', mname,...
-    'dataPreset', {'sr'}, 'graphics', true, 'dataAlt', 2,...
+    'dataPreset', {'fr', 'sr', 'spec'}, 'graphics', true, 'dataAlt', 1,...
     'basepaths', {}, 'xTicksBinsize', 6, 'markRecTrans', true);
 
 % snip segments (e.g. spikes) from binary 

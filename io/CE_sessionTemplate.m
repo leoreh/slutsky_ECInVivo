@@ -58,7 +58,7 @@ elseif isstruct(s)
 end
 
 % initialize other params
-session.channelTags = [];
+session.channelTags.Bad.channels = [];
 
 % load existing basename.session.mat file if exist
 [~, basename, ~] = fileparts(basepath);
