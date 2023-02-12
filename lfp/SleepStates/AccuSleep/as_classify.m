@@ -197,7 +197,8 @@ if graphics
     as_stateSeparation(sSig, ss)
     
     % duration in timebins
-    as_plotZT('nwin', 4, 'sstates', [1, 4, 5], 'ss', ss)
+    sstates = find(matches(cfg.names, {'WAKE', 'NREM', 'REM'}));
+    as_plotZT('nwin', 4, 'sstates', sstates, 'ss', ss)
     
 end
 

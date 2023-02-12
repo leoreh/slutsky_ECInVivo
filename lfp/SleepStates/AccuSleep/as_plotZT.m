@@ -40,7 +40,7 @@ addParameter(p, 'nwin', [1], @isnumeric);
 addParameter(p, 'sstates', [], @isnumeric);
 addParameter(p, 'ss', []);
 addParameter(p, 'labels', [], @isnumeric);
-addParameter(p, 'minDur', [10, 5, 5, 10, 5, 5], @isnumeric);
+addParameter(p, 'minDur', [], @isnumeric);
 addParameter(p, 'interDur', 4, @isnumeric);
 addParameter(p, 'graphics', true, @islogical);
 

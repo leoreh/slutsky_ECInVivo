@@ -21,12 +21,15 @@ function swv = spkwv_metrics(varargin)
 % TO DO LIST
 %   # add tail slope (Torrado Pacheco et al., Neuron, 2021). TP threshold
 %   in that article was ~0.4 ms (done)
-%   # snip across tetrode to present in cell explorer
+%   # snip across all tetrode channels to present in cell explorer
+%   # handle inverted spikes, possible by flipping before calculating
+%   params
 %
 % 08 apr 19 LH      updates: 
 % 14 may 20 LH      added upsampling by fft
 % 12 dec 21 LH      snip raw from dat
 % 29 dec 21 LH      added time to repolarization
+% 10 feb 23 LH      handle cases were minimum is at end of wv
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -193,8 +196,17 @@ imin = nan(1, nunits);
 
 for iunit = 1 : nunits
     
+    % upsampled waveform
+    w = wv_interp(iunit, :);    
+        
+    % spike width by inverse of max frequency in spectrum (stark et al.,
+    % 2013)
+    [cfs, f, ~] = cwt(w, 'FilterBank', fb);
+    [~, ifreq] = max(abs(squeeze(cfs)), [], 1);
+    maxf = f(ifreq(round(length(w) / 2)));
+    spkw(iunit) = 1000 / maxf;
+
     % general waveform params
-    w = wv_interp(iunit, :);
     [minVal, imin(iunit)] = min(w);                             % trough
     [maxVal_post, imax_post] = max(w(imin(iunit) + 1 : end));   % peak after trough
     imax_post = imax_post + imin(iunit);
@@ -205,6 +217,12 @@ for iunit = 1 : nunits
         imin_post = length(w);
     end
     imin_post = imin_post + imax_post;
+    
+    if isempty(maxVal_post)
+        continue
+    end
+
+    % amplitudes
     ampTp(iunit) = maxVal_post - minVal;                        % amplitude trough to after peak
     ampTail(iunit) = maxVal_post - minVal_post;                 % amplitude tail
     
@@ -250,12 +268,6 @@ for iunit = 1 : nunits
     if ~isempty(rtau_idx)
         rtau(iunit) = x_time(imax_post + rtau_idx) - x_time(imax_post);
     end
-    
-    % spike width by inverse of max frequency in spectrum (stark et al., 2013)
-    [cfs, f, ~] = cwt(w, 'FilterBank', fb);
-    [~, ifreq] = max(abs(squeeze(cfs)), [], 1);
-    maxf = f(ifreq(round(length(w) / 2)));
-    spkw(iunit) = 1000 / maxf;
     
     % complex spike index (McHugh 1996), defined as percentage of first lag
     % isi that fall between 3 ms and 15 ms and whose second spike is
