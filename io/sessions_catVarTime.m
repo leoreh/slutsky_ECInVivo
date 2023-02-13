@@ -284,7 +284,7 @@ if graphics
             imagesc(xData, faxis', expData', caxis1);
             colormap(AccuSleep_colormap());
             axis('xy')
-            ylabel('Frequency [Hz]')
+            ylabel('Freq. [Hz]')
             set(gca, 'yscale', 'log')
             ylim([max([0.2, faxis(1)]), faxis(end)])
             yticks([1, 10, 100])
@@ -314,7 +314,7 @@ if graphics
         case {'sr', 'srsu'}
             expData = movmean(expData, 13, 1);
             plot(xData, expData(:, grp))
-            ylabel('MU Firing Rate [Hz]')
+            ylabel('MU FR [Hz]')
             legend(split(num2str(grp)))
             axis tight
             
@@ -328,7 +328,7 @@ if graphics
             plot(xData, expData, 'LineWidth', 2)
             legend({sprintf('RS <= %d', max(nunits(:, 1))),...
                 sprintf('FS <= %d', max(nunits(:, 2)))})
-            ylabel('Firing Rate [Hz]')
+            ylabel('MFR [Hz]')
             axis tight
             
             % downsample to prism

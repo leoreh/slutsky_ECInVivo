@@ -4,7 +4,7 @@
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = 'lh122';
+mname = 'lh129';
 
 varsFile = ["fr"; "sr"; "spikes"; "st_metrics"; "swv_metrics";...
     "cell_metrics"; "sleep_states"; "ripp.mat"; "datInfo"; "session";...
@@ -42,45 +42,25 @@ for ifile = 1 : nfiles
     spkgrp = session.extracellular.spikeGroups.channels;
     [~, basename] = fileparts(basepath);
 
+
+    load([basename, '.acceleration.mat'])
+
     % get ripples
-    load([basename, '.sleep_sig.mat'], 'info');
-
-    if info.eegCh ~= [13 : 16]
-        load([basename, '.acceleration.mat'])
-        % call for acceleration
-        sSig = as_prepSig([basename, '.lfp'], acc.mag,...
-            'eegCh', [13 : 16], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
-            'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
-            'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [10 450], 'fs', 1250);
-    else
-        sSig = load([basename, '.sleep_sig.mat']);
-
-    end
-    
-    % classify with a network
-    netfile = [];
-    calData = [];
-    % calData = ss.info.calibrationData;
-    ss = as_classify(sSig, 'basepath', basepath, 'inspectLabels', false,...
-        'saveVar', true, 'forceA', true, 'netfile', netfile,...
-        'graphics', true, 'calData', calData);
-
-
 %     ripp = getRipples('basepath', basepath, 'rippCh', [9],...
-%         'emg', acc.mag, 'recWin', [0, inf], 'saveVar', true,...
+%         'emg', acc.mag, 'recWin', [0, Inf], 'saveVar', true,...
 %         'graphics', true, 'saveVar', true);
-
-    % ripple relation to states
-    ripp = rippleStates(v(ifile).ripp, 'basepath', basepath, 'saveVar', true,...
-        'graphics', true)
-
-    % ripple relation to spikes
-    ripp = rippleSpks(ripp, 'basepath', basepath, 'graphics', true,...
-        'saveVar', true, 'fullAnalysisFlag', false)
+% 
+%     % ripple relation to states
+%     ripp = rippleStates(ripp, 'basepath', basepath, 'saveVar', true,...
+%         'graphics', true);
+% 
+%     % ripple relation to spikes
+%     ripp = rippleSpks(ripp, 'basepath', basepath, 'graphics', true,...
+%         'saveVar', true, 'fullAnalysisFlag', false);
 
     % plot ripples
-    plot_ripples(ripp, 'basepath', basepath, 'saveFig', true)
-    plot_rippleSpks(ripp, 'basepath', basepath, 'saveFig', true)
+%     plot_ripples(v(ifile).ripp, 'basepath', basepath, 'saveFig', true)
+    plot_rippleSpks(v(ifile).ripp, 'basepath', basepath, 'saveFig', true)
 
 
 end

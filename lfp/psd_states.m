@@ -14,7 +14,7 @@ function psd = psd_states(varargin)
 %   ch              numeric. channels to load from the sigfile. if a vector
 %                   is specified, the signal will be averaged across
 %                   channels
-%   ch              numeric. no channels in sigfile
+%   nchans          numeric. no. channels in sigfile
 %   fs              numeric. sampling frequency of lfp data. if empty will
 %                   be extracted from session struct. also determines the
 %                   new sampling frequency of the eeg signal.
