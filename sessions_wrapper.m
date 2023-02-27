@@ -4,7 +4,7 @@
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = 'lh129';
+mname = 'lh122';
 
 varsFile = ["fr"; "sr"; "spikes"; "st_metrics"; "swv_metrics";...
     "cell_metrics"; "sleep_states"; "ripp.mat"; "datInfo"; "session";...
@@ -20,7 +20,6 @@ nfiles = length(basepaths);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % analyze data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% templateCal = ss.info.calibrationData;
 
 for ifile = 1 : nfiles
 
@@ -46,21 +45,21 @@ for ifile = 1 : nfiles
     load([basename, '.acceleration.mat'])
 
     % get ripples
-%     ripp = getRipples('basepath', basepath, 'rippCh', [9],...
-%         'emg', acc.mag, 'recWin', [0, Inf], 'saveVar', true,...
-%         'graphics', true, 'saveVar', true);
-% 
-%     % ripple relation to states
-%     ripp = rippleStates(ripp, 'basepath', basepath, 'saveVar', true,...
-%         'graphics', true);
-% 
-%     % ripple relation to spikes
-%     ripp = rippleSpks(ripp, 'basepath', basepath, 'graphics', true,...
-%         'saveVar', true, 'fullAnalysisFlag', false);
+    ripp = getRipples('basepath', basepath, 'rippCh', [13],...
+        'emg', acc.mag, 'recWin', [0, Inf], 'saveVar', true,...
+        'graphics', true, 'saveVar', true);
+
+    % ripple relation to states
+    ripp = rippleStates(ripp, 'basepath', basepath, 'saveVar', true,...
+        'graphics', true);
+
+    % ripple relation to spikes
+    ripp = rippleSpks(ripp, 'basepath', basepath, 'graphics', true,...
+        'saveVar', true, 'fullAnalysisFlag', false);
 
     % plot ripples
 %     plot_ripples(v(ifile).ripp, 'basepath', basepath, 'saveFig', true)
-    plot_rippleSpks(v(ifile).ripp, 'basepath', basepath, 'saveFig', true)
+%     plot_rippleSpks(v(ifile).ripp, 'basepath', basepath, 'saveFig', true)
 
 
 end

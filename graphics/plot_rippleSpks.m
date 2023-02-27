@@ -143,6 +143,7 @@ if isfield(ripp.spks, 'su')
     xlabel('Time [ms]')
     ylabel('Norm. SU MFR')
     legend(sprintf('n = %d', sum(unitIdx)))
+    ylim([0 1])
     title(sprintf('Norm. MFR during ripples\naveraged across RS units'));
     axis tight
 
@@ -161,6 +162,7 @@ if isfield(ripp.spks, 'su')
     xlabel('Time [ms]')
     ylabel('Norm. SU MFR')
     legend(sprintf('n = %d', sum(unitIdx)))
+    ylim([0 1])
     title(sprintf('Norm. MFR during ripples\naveraged across FS units'));
     axis tight
 

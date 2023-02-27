@@ -126,14 +126,14 @@ end
 
 % threshold of stds above sig_amp. initial detection, peak power,
 % contineous power, artifact power
-thr = [1, 2, 1.5, 200];
+thr = [1, 2, 2, 200];
 
 % detection params. limDir refers to min, max, and inter-ripple
 % duration. 4th element refers to the amount of time the power must be
 % above thr(3). all values in [ms]
-limDur = [15, 500, 5, 10]; 
+limDur = [20, 500, 20, 10]; 
 limDur = round(limDur / 1000 * fs);
-passband = [100 300];
+passband = [120 300];
 binsizeRate = 60;           % binsize for calculating ripple rate [s]
 emgThr = 95;                % exclude ripples that occur when emg > thr
 
