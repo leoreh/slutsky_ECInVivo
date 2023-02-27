@@ -154,8 +154,8 @@ end
        
             
     % concatenate timestamps.npy and make sure dat files are not zero padded
-    cat_OE_tstamps('orig_paths', recPath, 'new_path', exPathNew,...
-        'nchans', nchans);
+%     cat_OE_tstamps('orig_paths', recPath, 'new_path', exPathNew,...
+%         'nchans', nchans);
     
     % pre-process dat
     datInfo = preprocDat('orig_paths', recPath,...

@@ -74,8 +74,6 @@ end
 if isempty(newname)
     if ~isempty(newpath)
         newname = [bz_BasenameFromBasepath(newpath)];
-    else
-        [~, newname] = fileparts(datFiles(1).name);
     end
 end
 destination = [newpath, filesep, newname, '.din.mat'];

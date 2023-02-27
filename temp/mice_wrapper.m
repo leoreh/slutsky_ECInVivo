@@ -1,10 +1,11 @@
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% lh126
+% lh128
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % user input
+<<<<<<< Updated upstream
 mname           = 'lh126';
 basepath        = 'E:\Data\lh126\2023-01-28_17-11-37';
 exp             = [1];
@@ -99,6 +100,11 @@ spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true,...
 mname           = 'lh129';
 basepath        = 'E:\Data\lh129\2023-01-28_17-11-37';
 exp             = [1];
+=======
+mname           = 'lh128';
+basepath        = 'J:\Data\lh128\2023-02-23_14-11-22';
+exp             = [2 : 4];
+>>>>>>> Stashed changes
 
 % dat from oe 
 mapch = 1 : 19;
@@ -128,11 +134,20 @@ spkgrp = session.extracellular.spikeGroups.channels;
 
 % clip bad parts
 clear orig_files
+<<<<<<< Updated upstream
 orig_files{1} = 'E:\Data\lh129\lh129_230127_134847\lh129_230127_134847.dat';
 orig_files{2} = 'E:\Data\lh129\lh129_230128_171137\lh129_230128_171137.dat';
 clip = cell(1, length(orig_files));
 clip{1} = [1, seconds(minutes(20 * 60))] * 20000;
 clip{2} = [seconds(minutes(17 * 60)), Inf] * 20000;
+=======
+orig_files{1} = 'J:\Data\lh128\lh128_230223_105156\lh128_230223_105156.dat';
+orig_files{2} = 'J:\Data\lh129\2023-02-23_14-11-22\Record Node 121\experiment1\recording1\continuous\Rhythm_FPGA-100.0\continuous.dat';
+orig_files{3} = 'J:\Data\lh128\lh128_230223_143355\lh128_230223_143355.dat';
+clip = cell(1, length(orig_files));
+% clip{1} = [1, seconds(minutes(1347)) - seconds(minutes(4 * 60))] * 20000;
+% clip{2} = [seconds(minutes(1347)) - seconds(minutes(4 * 60)), Inf] * 20000;
+>>>>>>> Stashed changes
 datInfo = preprocDat('orig_files', orig_files, 'mapch', 1 : nchans,...
     'rmvch', [], 'nchans', nchans, 'saveVar', true,...
     'chunksize', 1e7, 'precision', 'int16', 'clip', clip);
@@ -178,6 +193,7 @@ AccuSleep_viewer(sSig, [], labelsmanfile)
 % calc spec
 spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true,...
     'saveVar', true, 'padfft', -1, 'winstep', 5,...
-    'ftarget', [], 'ch', {[13 : 16]},...
+    'ftarget', [], 'ch', spkgrp,...
     'force', true, 'logfreq', true);
+
 
