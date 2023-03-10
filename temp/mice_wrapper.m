@@ -5,106 +5,9 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % user input
-<<<<<<< Updated upstream
-mname           = 'lh126';
-basepath        = 'E:\Data\lh126\2023-01-28_17-11-37';
-exp             = [1];
-
-% dat from oe 
-mapch = 1 : 19;
-rmvch = [8];
-rec = cell(max(exp), 1);
-datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
-    'rmvch', rmvch, 'mapch', mapch,...
-    'nchans', length(mapch), 'fsIn', 20000);
-
-% go to new folder
-[mousepath, baseTime] = fileparts(basepath);
-cd(mousepath)
-dn = datenum(baseTime, 'yyyy-MM-dd');
-recData = datestr(dn, 'yyMMdd');
-fnames = dir(mousepath);
-fidx = contains({fnames.name}, recData);
-cd(fnames(fidx).name)
-
-% session params
-session = CE_sessionTemplate(pwd, 'viaGUI', false,...
-    'forceDef', true, 'forceL', true, 'saveVar', true);      
-basepath = session.general.basePath;
-nchans = session.extracellular.nChannels;
-fs = session.extracellular.sr;
-spkgrp = session.extracellular.spikeGroups.channels;
-[~, basename] = fileparts(basepath);
-
-% clip bad parts
-clear orig_files
-orig_files{1} = 'H:\Data\lh126\lh126_230127_095804\lh126_230127_095804.dat';
-% orig_files{2} = 'E:\Data\lh126\lh126_230128_171137\lh126_230128_171137.dat';
-clip = cell(1, length(orig_files));
-clip{1} = [seconds(minutes(216)), seconds(minutes(258))] * 20000;
-% clip{2} = [seconds(minutes(17 * 60)), Inf] * 20000;
-datInfo = preprocDat('orig_files', orig_files, 'mapch', 1 : nchans,...
-    'rmvch', [], 'nchans', nchans, 'saveVar', true,...
-    'chunksize', 1e7, 'precision', 'int16', 'clip', clip);
-
-% spike detection from temp_wh
-[spktimes, ~] = spktimesWh('basepath', basepath, 'fs', fs, 'nchans', nchans,...
-    'spkgrp', spkgrp, 'saveVar', true, 'saveWh', true,...
-    'graphics', false, 'force', true, 'winWh', [0 Inf]);
-
-% spike rate per tetrode
-for igrp = 1 : length(spkgrp)
-    spktimes{igrp} = spktimes{igrp} / fs;
-end
-sr = firingRate(spktimes, 'basepath', basepath,...
-    'graphics', true, 'binsize', 60, 'saveVar', 'sr', 'smet', 'none',...
-    'winBL', [0 Inf]);
-
-% create ns files 
-spktimes2ns('basepath', basepath, 'fs', fs,...
-    'nchans', nchans, 'spkgrp', spkgrp, 'mkClu', true,...
-    'dur', [], 't', [], 'grps', [1 : length(spkgrp)],...
-    'spkFile', 'temp_wh');
-
-delete('temp_wh.dat')
-
-% create lfp file
-LFPfromDat('basepath', basepath, 'cf', 450, 'chunksize', 5e6,...
-    'nchans', nchans, 'fsOut', 1250, 'fsIn', fs)    
-
-% create emg signal from accelerometer data
-acc = EMGfromACC('basepath', basepath, 'fname', [basename, '.lfp'],...
-    'nchans', nchans, 'ch', nchans - 2 : nchans, 'saveVar', true, 'fsIn', 1250,...
-    'graphics', false, 'force', true);
-
-% sleep sig
-sSig = as_prepSig([basename, '.lfp'], acc.mag,...
-    'eegCh', [8 : 11], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
-    'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
-    'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [10 450], 'fs', 1250);
-labelsmanfile = [basename, '.sleep_labelsMan.mat'];
-AccuSleep_viewer(sSig, [], labelsmanfile)
-
-% calc spec
-spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true,...
-    'saveVar', true, 'padfft', -1, 'winstep', 5,...
-    'ftarget', [], 'ch', {[8 : 11]},...
-    'force', true, 'logfreq', true);
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% lh129
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% user input
 mname           = 'lh129';
-basepath        = 'E:\Data\lh129\2023-01-28_17-11-37';
-exp             = [1];
-=======
-mname           = 'lh128';
-basepath        = 'J:\Data\lh128\2023-02-23_14-11-22';
-exp             = [2 : 4];
->>>>>>> Stashed changes
+basepath        = 'H:\Data\lh129\2023-02-23_14-11-22';
+exp             = [2, 3, 4];
 
 % dat from oe 
 mapch = 1 : 19;
@@ -134,20 +37,12 @@ spkgrp = session.extracellular.spikeGroups.channels;
 
 % clip bad parts
 clear orig_files
-<<<<<<< Updated upstream
-orig_files{1} = 'E:\Data\lh129\lh129_230127_134847\lh129_230127_134847.dat';
-orig_files{2} = 'E:\Data\lh129\lh129_230128_171137\lh129_230128_171137.dat';
+orig_files{1} = 'H:\Data\lh129\lh129_230222_093515\lh129_230222_093515asdfsdf.dat';
+orig_files{2} = 'H:\Data\lh129\lh129_230223_105156\lh129_230223_105156.dat';
+orig_files{3} = 'H:\Data\lh129\lh129_230223_143355\lh129_230223_143355.dat';
 clip = cell(1, length(orig_files));
-clip{1} = [1, seconds(minutes(20 * 60))] * 20000;
-clip{2} = [seconds(minutes(17 * 60)), Inf] * 20000;
-=======
-orig_files{1} = 'J:\Data\lh128\lh128_230223_105156\lh128_230223_105156.dat';
-orig_files{2} = 'J:\Data\lh129\2023-02-23_14-11-22\Record Node 121\experiment1\recording1\continuous\Rhythm_FPGA-100.0\continuous.dat';
-orig_files{3} = 'J:\Data\lh128\lh128_230223_143355\lh128_230223_143355.dat';
-clip = cell(1, length(orig_files));
-% clip{1} = [1, seconds(minutes(1347)) - seconds(minutes(4 * 60))] * 20000;
-% clip{2} = [seconds(minutes(1347)) - seconds(minutes(4 * 60)), Inf] * 20000;
->>>>>>> Stashed changes
+clip{1} = [1, seconds(minutes(1423.39946666667))] * 20000;
+% clip{2} = [seconds(minutes(17 * 60)), Inf] * 20000;
 datInfo = preprocDat('orig_files', orig_files, 'mapch', 1 : nchans,...
     'rmvch', [], 'nchans', nchans, 'saveVar', true,...
     'chunksize', 1e7, 'precision', 'int16', 'clip', clip);
@@ -193,7 +88,6 @@ AccuSleep_viewer(sSig, [], labelsmanfile)
 % calc spec
 spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true,...
     'saveVar', true, 'padfft', -1, 'winstep', 5,...
-    'ftarget', [], 'ch', spkgrp,...
+    'ftarget', [], 'ch', {[8 : 11]},...
     'force', true, 'logfreq', true);
-
 

@@ -6,9 +6,17 @@
 % event stream format can be found here:
 % https://open-ephys.github.io/gui-docs/User-Manual/Recording-data/Binary-format.html
 
+% files and paths
+basepath = 'E:\Data\lh129\lh129_230218_091553';
+oepath = 'E:\Data\lh129\lh129_230218_091553\2023-02-18_11-15-53';
+vidPath = 'H:\Data\Video\lh129';
+vidFile = 'Cam_1__23339300__20230218_133616998.mp4';
+cd(basepath)
+[~, basename] = fileparts(basepath);
+
 % get json file
-oepath = 'K:\Data\lh129\lh129_230214_093124\2023-02-14_09-31-24';
 jsonFile = dir([oepath filesep '**' filesep '*oebin']);
+% jsonFile = jsonFile(2);
 jsonName = fullfile(jsonFile.folder, jsonFile.name);
 
 % map event file
@@ -27,7 +35,7 @@ if isempty(idxCh)
 end
 
 % get indices of TTL triggers (rising or falling phase)
-trigType = 'fall';
+trigType = 'rise';
 switch trigType
     case 'rise'
         idxTrig = mDin.Data > 0;
@@ -53,8 +61,6 @@ dt = diff(tstamps) / fs;
 % video file
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-vidPath = 'J:\Data\Video\lh129';
-vidFile = 'Cam_1__23339300__20230214_133300860.mp4';
 vid = VideoReader(fullfile(vidPath, vidFile));
 nframes = vid.NumFrames;
 
@@ -68,12 +74,6 @@ tstamps = tstamps(1 : end - 1);
 % adjust tstamps to entire recording
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% this section typically done manually
-
-% recording dir
-basepath = 'K:\Data\lh129\lh129_230214_093124';
-cd(basepath)
-[~, basename] = fileparts(basepath);
 
 % dat info
 load([basename, '.datInfo.mat'])
@@ -88,18 +88,28 @@ session = CE_sessionTemplate(basepath, 'viaGUI', false,...
 
 % add recordign length to tstamps 
 recfile = 2;        % idx of relevant recording file
-ttl.tstamps = tstamps + datInfo.nsamps(recfile - 1);
+% ttl.tstamps = tstamps + datInfo.nsamps(recfile - 1);
+
+ttl.tstamps = tstamps + 253547008;
+
+
+109547008 + 144000000
+
+1828790272 - 1684790272
+
 
 % -------------------------------------------------------------------------
 % save
 
+ttl.info.header = mDin.Header;
 ttl.info.jsonfile = jsonFile;
 ttl.info.trigType = trigType;
 ttl.info.vidCh = vidCh;
 ttl.info.vid = vid;
 ttl.info.trigType = trigType;
-ttl.info.remarks = '1 more ttl than frame, so removed last ttl. added datInfo.nsamps(1) to tstamps. used original datInfo file';
+ttl.info.remarks = '1 stamp more than frames, removed last. added 253547008 to tstamps';
 ttlfile = fullfile(basepath, [basename, '.vidTTL.mat']);
 
+save(ttlfile, 'ttl')
 
 
