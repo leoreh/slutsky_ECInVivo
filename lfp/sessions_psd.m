@@ -116,7 +116,15 @@ freq = v(1).psd.info.faxis;
 bandNames = ["broad", "swa", "delta", "theta", "alpha", "beta", "gamma"];
 bandFreqs = [freq(1), 100; 0.5, 1; 1, 4; 4, 10; 10, 14; 15, 30; 30, 100];
 
-% normalize to baseline
+% convert to dB (chronux output is power not magnitude)
+if flgDb
+    powdb = 10 * log10(powdb);
+    ytxt = 'PSD [dB]';
+else
+    ytxt = 'PSD [mV^2/Hz]';
+end
+
+% normalize to broadband
 lim_freq = freq >= 0 & freq < Inf;
 if flgNormBand
     powdb = powdb ./ sum(powdb(:, lim_freq, :), 2);
@@ -124,11 +132,6 @@ if flgNormBand
     ytxt = 'Norm. PSD';
 else
     sbands = [1 : length(bandNames)];
-    if flgDb
-    ytxt = 'PSD [dB]';
-    else
-    ytxt = 'PSD [mV^2/Hz]';
-    end
 end
 
 % calc power in band. bands is a 3d array of freqBand x state x session.
@@ -144,11 +147,6 @@ if flgNormTime
     bands = (bands ./ bsl) * 100;
 else
     bands = 10 * log10(bands);
-end
-
-% convert to dB (chronux output is power not magnitude)
-if flgDb
-    powdb = 10 * log10(powdb);
 end
 
 % organize and save

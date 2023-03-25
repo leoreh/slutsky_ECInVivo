@@ -4,7 +4,7 @@
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = 'lh122';
+mname = 'lh123';
 
 varsFile = ["fr"; "sr"; "spikes"; "st_metrics"; "swv_metrics";...
     "cell_metrics"; "sleep_states"; "ripp.mat"; "datInfo"; "session";...
@@ -45,21 +45,17 @@ for ifile = 1 : nfiles
     load([basename, '.acceleration.mat'])
 
     % get ripples
-    ripp = getRipples('basepath', basepath, 'rippCh', [13],...
+    ripp = getRipples('basepath', basepath, 'rippCh', [12],...
         'emg', acc.mag, 'recWin', [0, Inf], 'saveVar', true,...
         'graphics', true, 'saveVar', true);
 
     % ripple relation to states
     ripp = rippleStates(ripp, 'basepath', basepath, 'saveVar', true,...
-        'graphics', true);
+        'graphics', true)
 
     % ripple relation to spikes
     ripp = rippleSpks(ripp, 'basepath', basepath, 'graphics', true,...
-        'saveVar', true, 'fullAnalysisFlag', false);
-
-    % plot ripples
-%     plot_ripples(v(ifile).ripp, 'basepath', basepath, 'saveFig', true)
-%     plot_rippleSpks(v(ifile).ripp, 'basepath', basepath, 'saveFig', true)
+        'saveVar', true, 'fullAnalysisFlag', false)
 
 
 end
@@ -78,11 +74,11 @@ end
 % spktimes of single units (rs and fs)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%     clear srsu 
+%     clear srsu
 %     for unitType = [1, 2]
 %         spktimes = cell(1, 4);
 %         for igrp = 1 : length(spkgrp)
-% 
+%
 %             % get rs and fs indices
 %             grpidx = v(ifile).spikes.shankID == igrp;
 %             unitidx = v(ifile).units.clean(unitType, :) & grpidx;
@@ -99,7 +95,12 @@ end
 % psd across sessions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-bands = psd_sessions('lh106', 'flgNormBand', true, 'flgAnalyze', false);
+bands = sessions_psd('lh122', 'flgNormBand', true, 'flgAnalyze', false);
+
+
+
+
+
 
 
 
@@ -133,7 +134,7 @@ for ifile = 1 : nfiles
         'saveVar', false, 'padfft', -1, 'winstep', 1,...
         'ftarget', [0.1 : 0.5 : 100], 'ch', {[1]},...
         'force', true, 'logfreq', true);
-    
+
     for istate = 1 : length(sstates)
         stateIdx = v(ifile).ss.labels == sstates(istate);
         stateIdx = stateIdx(1 : dur);
@@ -152,16 +153,52 @@ for istate = 1 : nstates
     ydata = ydata ./ sum(ydata(lim_fAxis, :), 1);
 
     ph = plot(spec(ifile).freq, ydata, 'LineWidth', 2);
-%     for ifile = 1 : nfiles
-%         ph(ifile).Color(istate) = cfg.colors{sstates(istate)}(istate) - ifile * 0.01;
-%         ph(ifile).Color(4) = alphaIdx(ifile);
-%     end
+    %     for ifile = 1 : nfiles
+    %         ph(ifile).Color(istate) = cfg.colors{sstates(istate)}(istate) - ifile * 0.01;
+    %         ph(ifile).Color(4) = alphaIdx(ifile);
+    %     end
     set(gca, 'YScale', 'log', 'XScale', 'log')
     title(cfg.names{sstates(istate)})
     xlabel('Frequency [Hz]')
     legend(split(num2str(1 : nfiles)), 'Location', 'Southwest', 'FontSize', 9)
 
 end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% MFR states
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+mname = {'lh123', 'lh122', 'lh126', 'lh129'};
+
+iunit = 1;
+istate = 2;
+
+clear fr_states fr_gain states_temp gain_temp
+for imouse = 1 : length(mname)
+    
+    % load data
+    varsFile = ["fr"; "units"];
+    varsName = ["fr"; "units"];
+    xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
+    [v, basepaths] = getSessionVars('mname', mname{imouse}, 'varsFile', varsFile,...
+        'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
+        'xlsname', xlsname);
+    nfiles = length(basepaths);
+
+    fr = catfields([v(:).fr], 'catdef', 'cell');
+
+    for ifile = 1 : nfiles
+            states_temp{ifile} = fr.states.mfr{ifile}(v(ifile).units.clean(iunit, :), istate)
+        gain_temp{ifile} = fr.states.gain{ifile}(4, v(ifile).units.clean(iunit, :))
+    end
+    fr_states{imouse} = cell2nanmat(states_temp, 2)';
+    fr_gain{imouse} = cell2nanmat(gain_temp, 2)';
+
+end
+
+cell2nanmat(fr_states)'
+cell2nanmat(fr_gain)'
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % burstiness

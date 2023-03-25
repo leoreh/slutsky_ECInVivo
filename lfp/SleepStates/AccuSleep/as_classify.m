@@ -198,7 +198,7 @@ if graphics
     
     % duration in timebins
     sstates = find(matches(cfg.names, {'WAKE', 'NREM', 'REM'}));
-    as_plotZT('nwin', 4, 'sstates', sstates, 'ss', ss)
+%     as_plotZT('nwin', 4, 'sstates', sstates, 'ss', ss)
     
 end
 

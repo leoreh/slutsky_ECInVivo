@@ -56,7 +56,7 @@ ss = v.ss;
 
 % state params
 cfg = as_loadConfig([]);
-sstates = [1 : 6];          % selected states
+sstates = [1 : 5];          % selected states
 
 % params
 fsSpk       = v.session.extracellular.sr;
@@ -91,6 +91,11 @@ for istate = sstates
         % idx of rippels in state
         ripp.states.idx{istate} =...
             InIntervals(ripp.peakPos, ss.stateEpochs{istate}(epochIdx, :));
+    else
+        ripp.states.idx{istate} = nan;
+        ripp.states.rate{istate} = nan;
+        ripp.states.binedges{istate} = nan;
+        ripp.states.tstamps{istate} = nan;
     end
 end
 
@@ -123,7 +128,8 @@ if graphics
 
     % percent rippels in state
     sb2 = subplot(1, 4, [3, 4]);
-    pie(sum(cell2nanmat(ripp.states.idx, 2), 1, 'omitnan'), ones(1, length(sstates)))
+    prct_states = sum(cell2nanmat(ripp.states.idx, 2), 1, 'omitnan');
+    pie(prct_states, ones(1, length(prct_states)))
     hold on
     ph = findobj(sb2, 'Type', 'Patch');
     set(ph, {'FaceColor'}, flipud(cfg.colors(sstates)))

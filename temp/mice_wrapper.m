@@ -5,13 +5,13 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % user input
-mname           = 'lh129';
-basepath        = 'H:\Data\lh129\2023-02-23_14-11-22';
+mname           = 'lh126';
+basepath        = 'D:\Data\lh126\2023-02-08_11-09-00';
 exp             = [2, 3, 4];
 
 % dat from oe 
 mapch = 1 : 19;
-rmvch = [];
+rmvch = [5 8 11];
 rec = cell(max(exp), 1);
 datInfo = preprocOE('basepath', basepath, 'exp', exp, 'rec', rec,...
     'rmvch', rmvch, 'mapch', mapch,...

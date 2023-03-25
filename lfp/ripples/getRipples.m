@@ -135,7 +135,7 @@ limDur = [20, 500, 20, 10];
 limDur = round(limDur / 1000 * fs);
 passband = [120 300];
 binsizeRate = 60;           % binsize for calculating ripple rate [s]
-emgThr = 95;                % exclude ripples that occur when emg > thr
+emgThr = 50;                % exclude ripples that occur when emg > thr
 
 fprintf('\ngetting ripples for %s\n', basename)
 
