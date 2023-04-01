@@ -324,9 +324,9 @@ plot_FRstates_sextiles('stateMfr', fr.states.mfr(:, [1, 4])', 'units', units.cle
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % concatenate var from different sessions
-mname = 'lh123';
+mname = 'lh130';
 [expData, xData] = sessions_catVarTime('mname', mname,...
-    'dataPreset', {'fr', 'ripp'}, 'graphics', true, 'dataAlt', 1,...
+    'dataPreset', {'sr', 'spec'}, 'graphics', true, 'dataAlt', 1,...
     'basepaths', {}, 'xTicksBinsize', 6, 'markRecTrans', true);
 
 % snip segments (e.g. spikes) from binary 
