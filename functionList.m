@@ -146,7 +146,7 @@ sSig = as_prepSig([basename, '.lfp'], acc.mag,...
 
 % manually create labels
 labelsmanfile = [basename, '.sleep_labelsMan.mat'];
-AccuSleep_viewer(sSig, [], labelsmanfile)
+AccuSleep_viewer(sSig, labels, labelsmanfile)
 
 % classify with a network
 netfile = [];
@@ -276,12 +276,12 @@ spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
 st = spktimes_metrics('spikes', spikes, 'sunits', [],...
     'bins', [0 Inf], 'forceA', true, 'saveVar', true, 'fullA', false);
 
+% spike wave metrics
+swv = spkwv_metrics('basepath', basepath, 'saveVar', true, 'forceA', false);
+
 % brst (mea)
 brst = spktimes_meaBrst(spikes.times, 'binsize', [], 'isiThr', 0.05,...
     'minSpks', 2, 'saveVar', true, 'force', true, 'bins', [0 Inf]);
-
-% spike wave metrics
-swv = spkwv_metrics('basepath', basepath, 'saveVar', true, 'forceA', false);
 
 % mfr by states in time bins
 timebins = session.general.timebins;
@@ -302,7 +302,7 @@ sl = spklfp_wrapper('basepath', basepath, 'winCalc', winCalc,...
 
 % number of units per spike group
 plot_nunits('basepaths', {basepath}, 'saveFig', true)
-plot_nunits('mname', 'lh123', 'saveFig', true)
+plot_nunits('mname', 'lh130', 'saveFig', true)
 
 % select specific units
 units = selectUnits('basepath', pwd, 'grp', [1 : 4], 'saveVar', true,...

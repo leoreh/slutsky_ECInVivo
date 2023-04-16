@@ -8,13 +8,15 @@ function plot_FRstates_sextiles(varargin)
 % INPUT
 %   basepath        recording session {pwd}
 %   stateMfr        2 x n numeric of mfr per unit in two states (rows). 
-%                   row 1 should be wake.
+%                   for example: fr.states.mfr(:, [1, 4])'
 %   units           2 x n logical mat of indices to stateMfr. row 1 is RS 
 %                   and row 2 if FS. if empty, all units in stateMfr will
 %                   be plotted. 
 %   ntiles          numeric. number of tiles to divide the units {6}.
 %   stateNames      2 x 1 cell of char. if empty will assume wake and nrem.
 %   saveFig         logical {true}
+% 
+% UPDATES
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -120,6 +122,25 @@ for iunit = 1 : size(units, 1)
     ylim(eqLine)
     title(sprintf('Slope = %.2f; R2 = %.2f',...
         mdl.Coefficients.Estimate(2), mdl.Rsquared.Ordinary))
+
+    subplot(2, size(units, 1), iunit + size(units, 1))
+    infidx = isinf(log10(x)) | isinf(log10(y));   
+    mdl = fitlm(log10(x(~infidx)), log10(y(~infidx)));
+    fitCoeff = flipud(mdl.Coefficients.Estimate); 
+    y2 = 10 .^ [polyval(fitCoeff, log10(eqLine(1) : eqLine(2)))];
+    plot(x, y, '.', 'Color', unitClr{iunit}, 'MarkerSize', 10)
+    hold on
+    plot(eqLine, eqLine, 'k')
+    plot([eqLine(1) : eqLine(2)], y2, '--', 'Color', unitClr{iunit})
+    plot([tiles(2 : end - 1); tiles(2 : end - 1)], eqLine, '--g')
+    set(gca, 'YScale', 'log', 'XScale', 'log')
+    xlabel('WAKE firing rate [Hz]')
+    ylabel('NREM firing rate [Hz]')
+    xlim(eqLine)
+    ylim(eqLine)
+    title(sprintf('Slope = %.2f; R2 = %.2f',...
+        mdl.Coefficients.Estimate(2), mdl.Rsquared.Ordinary))
+    
 end
 
 end

@@ -166,6 +166,7 @@ if exist(asFile, 'file') || ~isempty(stateEpochs)
     fr.states.mfr = cellfun(@(x) mean(x, 2), fr.states.fr, 'uni', false);
     fr.states.mfr = cell2nanmat(fr.states.mfr, 2);
 
+
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

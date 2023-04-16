@@ -4,7 +4,7 @@
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = 'lh123';
+mname = 'lh130';
 
 varsFile = ["fr"; "sr"; "spikes"; "st_metrics"; "swv_metrics";...
     "cell_metrics"; "sleep_states"; "ripp.mat"; "datInfo"; "session";...
@@ -21,6 +21,7 @@ nfiles = length(basepaths);
 % analyze data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+calData = ss.info.calibrationData;
 for ifile = 1 : nfiles
 
     % file
@@ -40,22 +41,15 @@ for ifile = 1 : nfiles
     fs = session.extracellular.sr;
     spkgrp = session.extracellular.spikeGroups.channels;
     [~, basename] = fileparts(basepath);
+    
 
+    sSig = load([basename, '.sleep_sig.mat']);
+    % classify with a network
+    netfile = [];
+    ss = as_classify(sSig, 'basepath', basepath, 'inspectLabels', false,...
+        'saveVar', true, 'forceA', true, 'netfile', netfile,...
+        'graphics', true, 'calData', calData);
 
-    load([basename, '.acceleration.mat'])
-
-    % get ripples
-    ripp = getRipples('basepath', basepath, 'rippCh', [12],...
-        'emg', acc.mag, 'recWin', [0, Inf], 'saveVar', true,...
-        'graphics', true, 'saveVar', true);
-
-    % ripple relation to states
-    ripp = rippleStates(ripp, 'basepath', basepath, 'saveVar', true,...
-        'graphics', true)
-
-    % ripple relation to spikes
-    ripp = rippleSpks(ripp, 'basepath', basepath, 'graphics', true,...
-        'saveVar', true, 'fullAnalysisFlag', false)
 
 
 end

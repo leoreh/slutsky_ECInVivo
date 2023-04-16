@@ -5,8 +5,8 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 mname           = 'lh130';
-basepath        = 'K:\Data\lh130\2023-03-28_09-00-00';
-exp             = [1 : 4];
+basepath        = 'H:\Data\lh130\2023-04-06_09-12-32';
+exp             = [1];
 
 % dat from oe 
 mapch = 1 : 19;
@@ -36,8 +36,8 @@ spkgrp = session.extracellular.spikeGroups.channels;
 
 % clip bad parts
 clear orig_files
-orig_files{1} = 'K:\Data\lh130\lh130_230325_091231\lh130_230325_091231.dat';
-orig_files{2} = 'K:\Data\lh130\lh130_230325_142724\lh130_230325_142724.dat';
+orig_files{1} = 'D:\Data\lh130\lh130_230330_090313\lh130_230330_090313.dat';
+orig_files{2} = 'D:\Data\lh130\lh130_230330_135336\lh130_230330_135336.dat';
 clip = cell(1, length(orig_files));
 % clip{1} = [0, seconds(minutes(47))] * 20000;
 datInfo = preprocDat('orig_files', orig_files, 'mapch', 1 : nchans,...

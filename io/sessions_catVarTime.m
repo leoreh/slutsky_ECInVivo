@@ -258,7 +258,11 @@ xData = [1 : ts : ceil(seconds(expEnd - expStart))];
 
 % assign fr to output
 if strcmp(dataPreset, 'fr')
-    expData = movmean(mean(expRs, 2, 'omitnan'), 13, 1);
+    if dataAlt == 1
+        expData = expRs;
+    else
+        expData = expFs;
+    end
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

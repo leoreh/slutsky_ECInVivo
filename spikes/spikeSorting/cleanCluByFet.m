@@ -115,11 +115,9 @@ if manCur
     % rmv spks from selected cluster
     sclu = 8;      % cluster id
     for sclu = 2 : max(unique(clu))
-        for cnt = 1 : 2
-            [cluidx, rmvSpks] = cleanClu(fet, res, sclu, ref, 0.0001, [0.12 0.06]);
-        end
+        [cluidx, rmvSpks] = cleanClu(fet, res, sclu, ref, 0.0001, [0.12 0.06]);
     end
-    
+        
     % plot fets of specific cluster
     fetclu = fet(clu == cluid, :);
     [rpv, rpvRatioOrig] = getRpv(res(clu == sclu), ref);

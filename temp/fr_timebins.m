@@ -1,5 +1,8 @@
 function frBins = fr_timebins(varargin)
 
+% calculates firing rate w/ calc_fr recursively for each time bin.
+% reorganizes the mfr in different states and plots them. 
+
 % INPUT:
 %   basepath        string. path to recording folder {pwd}
 %   timebins        n x 2 numeric. timebins to calc fr [s]

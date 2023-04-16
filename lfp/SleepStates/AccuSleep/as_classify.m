@@ -213,3 +213,16 @@ end
 return
 
 % EOF
+
+% -------------------------------------------------------------------------
+% subroutine for combining lables from two different classifications
+
+nlabels = length(ss.labels);
+
+idx1 = [1 : 12 * 60 * 60];
+idx2 = [12 * 60 * 60 + 1 : nlabels];
+
+labels = ones(nlabels, 1);
+labels(idx1) = ss.labels(idx1);
+labels(idx2) = ss.labels(idx2);
+
