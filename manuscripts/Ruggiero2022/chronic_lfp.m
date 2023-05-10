@@ -12,14 +12,12 @@ sstates = [1, 4];
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-% chronic mk801
+mname = 'lh122';
 
-mname = 'lh129';
-
-varsFile = ["fr"; "sr"; "spikes"; "cell_metrics"; "sleep_states";...
-    "datInfo"; "session"; "units"; "psd"; "ripp"];
-varsName = ["fr"; "sr"; "spikes"; "cm"; "ss"; "datInfo"; "session";...
-    "units"; "psd"; "ripp"];
+varsFile = ["fr"; "sr"; "sleep_states";...
+    "datInfo"; "session"; "units"; "psd"];
+varsName = ["fr"; "sr"; "ss"; "datInfo"; "session";...
+    "units"; "psd"];
 xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
 [v, basepaths] = getSessionVars('mname', mname, 'varsFile', varsFile,...
     'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
@@ -27,42 +25,39 @@ xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
 nfiles = length(basepaths);
 
 
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% organize data - spiking
+% average bands and psd from multiple mice 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-fr = [v(:).fr];
-states = catfields([fr(:).states], 'catdef', 'cell', 'force', false);
+mname = {'lh96', 'lh107', 'lh122'};
+mname = {'lh132', 'lh133'};
+flgNormTime = true;
+flgNormBand = true;
 
+clear bands powdb
+for imouse = 1 : length(mname)
+  
+    [bands(imouse, :, :, :), powdb(imouse, :, :, :)] =...
+        sessions_psd(mname{imouse}, 'flgNormBand', flgNormBand,...
+        'flgAnalyze', false, 'flgNormTime', flgNormTime,...
+        'flgEmg', true, 'idxBsl', [1], 'graphics', true);
 
-% ORGANIZE: stateFr is a cell array (of states) where each cell is a mat of
-% units (rows) x sessions (columns) depicting the MFR per unit
-clear stateFr stateFrCell
-iunit = 1; 
-for istate = 1 : length(sstates)
-    for ifile = 1 : nfiles
+end
 
-        unitIdx = v(ifile).units.clean(iunit, :);
-        stateFrCell{ifile, istate} = states.mfr{ifile}(unitIdx, sstates(istate));
+istate = 1;
+prismData = squeeze(mean(bands(:, :, istate, :), 1, 'omitnan'));
+prismData = squeeze(mean(powdb(:, istate, :, :), 1, 'omitnan'));
 
+% reshape 3d to 2d for grouped graph in prism
+x = squeeze(powdb(:, istate, :, :));
+prismData = [];
+cnt = 1;
+for ifile = 1 : size(x, 3)
+    for imouse = 1 : length(mname)
+        prismData(:, cnt) = squeeze(x(imouse, :, ifile));
+        cnt = cnt + 1;
     end
-    stateFr{istate} = cell2nanmat(stateFrCell(:, istate), 2);
 end
-
-
-% ORGANIZE: stateGain is a matrix of unit (rows) x session (columns)
-% depicting the state gain factor for istate compared to AWAKE
-clear stateGain
-iunit = 1;
-istate = 4;
-for ifile = 1 : nfiles
-
-    unitIdx = v(ifile).units.clean(iunit, :);
-    stateGain{ifile} = states.gain{ifile}(istate, unitIdx);
-
-end
-stateGain = cell2nanmat(stateGain, 2);
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -88,8 +83,17 @@ freq = psd.info.faxis{1};
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 iunit = 1;
+clear rippGain
 for ifile = 1 : nfiles
-    v(ifile).ripp.spks.su
+
+    unitIdx = v(ifile).units.clean(iunit, :);
+    rippMfr = v(ifile).ripp.spks.su.rippMap(unitIdx, :, :);
+    rippMfr = squeeze(mean(mean(rippMfr, 2), 3));
+    randMfr = v(ifile).ripp.spks.su.randMap(unitIdx, :, :);
+    randMfr = squeeze(mean(mean(randMfr, 2), 3));    
+    rippGain{ifile} = (rippMfr - randMfr) ./ (rippMfr + randMfr);
+
 end
+rippGain = cell2nanmat(rippGain, 2);
 
 

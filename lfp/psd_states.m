@@ -50,7 +50,7 @@ addOptional(p, 'nchans', [], @isnumeric);
 addOptional(p, 'fs', 1, @isnumeric);
 addOptional(p, 'sigfile', [], @ischar);
 addOptional(p, 'sstates', [1, 4, 5], @isnumeric);
-addOptional(p, 'ftarget', [0.5 : 0.5 : 120], @isnumeric);
+addOptional(p, 'ftarget', [0.5 : 0.5 : 100], @isnumeric);
 addOptional(p, 'prct', [70], @isnumeric);
 addOptional(p, 'flgEmg', false, @islogical);
 addOptional(p, 'saveVar', true, @islogical);

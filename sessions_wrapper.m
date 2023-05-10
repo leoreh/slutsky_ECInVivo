@@ -4,7 +4,7 @@
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = 'lh130';
+mname = 'lh87';
 
 varsFile = ["fr"; "sr"; "spikes"; "st_metrics"; "swv_metrics";...
     "cell_metrics"; "sleep_states"; "ripp.mat"; "datInfo"; "session";...
@@ -21,7 +21,7 @@ nfiles = length(basepaths);
 % analyze data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-calData = ss.info.calibrationData;
+% calData = ss.info.calibrationData;
 for ifile = 1 : nfiles
 
     % file
@@ -42,13 +42,14 @@ for ifile = 1 : nfiles
     spkgrp = session.extracellular.spikeGroups.channels;
     [~, basename] = fileparts(basepath);
     
+    winBL = [0 Inf];
+    fr = calc_fr(v(ifile).spikes.times, 'basepath', basepath,...
+        'graphics', true, 'binsize', 60, 'saveVar', true, 'forceA', true,...
+        'smet', 'none', 'winBL', winBL, 'winCalc', [0, Inf]);
 
-    sSig = load([basename, '.sleep_sig.mat']);
-    % classify with a network
-    netfile = [];
-    ss = as_classify(sSig, 'basepath', basepath, 'inspectLabels', false,...
-        'saveVar', true, 'forceA', true, 'netfile', netfile,...
-        'graphics', true, 'calData', calData);
+    units = selectUnits('basepath', pwd, 'grp', [1 : 4], 'saveVar', true,...
+        'forceA', true, 'frBoundries', [0.0 Inf; 0.0 Inf],...
+        'spikes', v(ifile).spikes, 'altClean', 2);
 
 
 

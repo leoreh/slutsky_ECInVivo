@@ -1,4 +1,4 @@
-function bands = sessions_psd(mname, varargin)
+function [bands, powdb] = sessions_psd(mname, varargin)
 
 % arranges the psd in states from different sessions of the same mouse.
 % also calculates the power in specific bands. can normalize the psd to
@@ -17,6 +17,10 @@ function bands = sessions_psd(mname, varargin)
 %   saveVar         logical. save ss var {true}
 %   graphics        logical. plot confusion chart and state separation {true}
 %
+% OUTPUT:
+%   bands           numeric 3d mat of band x state x session
+%   powdb           numeric 3d mat of state x freq x session
+% 
 % DEPENDENCIES:
 %   calc_psd        
 %
@@ -77,7 +81,7 @@ if flgAnalyze
         ch = [];
         prct = 70;
         sstates = [1, 4];
-        ftarget = [0.1 : 0.5 : 100];
+        ftarget = [0.5 : 0.5 : 100];
     end
 
     % go over files and re-analyze

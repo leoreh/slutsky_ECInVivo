@@ -146,7 +146,7 @@ sSig = as_prepSig([basename, '.lfp'], acc.mag,...
 
 % manually create labels
 labelsmanfile = [basename, '.sleep_labelsMan.mat'];
-AccuSleep_viewer(sSig, labels, labelsmanfile)
+AccuSleep_viewer(sSig, [], labelsmanfile)
 
 % classify with a network
 netfile = [];
@@ -173,7 +173,7 @@ psd = psd_states('basepath', basepath, 'sstates', [1, 4],...
     'prct', 70, 'flgEmg', true);
 
 % get psd per session for one mouse
-bands = sessions_psd(mname, 'flgNormBand', true, 'flgAnalyze', false,...
+[bands, powdb] = sessions_psd(mname, 'flgNormBand', true, 'flgAnalyze', false,...
     'flgNormTime', true, 'flgEmg', true, 'idxBsl', [1]);
 
 % calc spec
@@ -277,7 +277,7 @@ st = spktimes_metrics('spikes', spikes, 'sunits', [],...
     'bins', [0 Inf], 'forceA', true, 'saveVar', true, 'fullA', false);
 
 % spike wave metrics
-swv = spkwv_metrics('basepath', basepath, 'saveVar', true, 'forceA', false);
+swv = spkwv_metrics('basepath', basepath, 'saveVar', true, 'forceA', true);
 
 % brst (mea)
 brst = spktimes_meaBrst(spikes.times, 'binsize', [], 'isiThr', 0.05,...
@@ -302,9 +302,9 @@ sl = spklfp_wrapper('basepath', basepath, 'winCalc', winCalc,...
 
 % number of units per spike group
 plot_nunits('basepaths', {basepath}, 'saveFig', true)
-plot_nunits('mname', 'lh130', 'saveFig', true)
+plot_nunits('mname', 'lh132', 'saveFig', true)
 
-% select specific units
+% select specific units based on firing rate, cell class, etc.
 units = selectUnits('basepath', pwd, 'grp', [1 : 4], 'saveVar', true,...
     'forceA', true, 'frBoundries', [0.0 Inf; 0.0 Inf],...
     'spikes', spikes, 'altClean', 2);  
@@ -324,9 +324,9 @@ plot_FRstates_sextiles('stateMfr', fr.states.mfr(:, [1, 4])', 'units', units.cle
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % concatenate var from different sessions
-mname = 'lh130';
+mname = 'lh87';
 [expData, xData] = sessions_catVarTime('mname', mname,...
-    'dataPreset', {'sr', 'spec'}, 'graphics', true, 'dataAlt', 1,...
+    'dataPreset', {'fr', 'spec'}, 'graphics', true, 'dataAlt', 1,...
     'basepaths', {}, 'xTicksBinsize', 6, 'markRecTrans', true);
 
 % snip segments (e.g. spikes) from binary 
@@ -357,9 +357,6 @@ chunks = n2chunks('n', nsamps, 'chunksize', chunksize, 'clip', clip);
 
 % convert timestamp to datetime based on the date time string
 [dt, tstamp] = tstamp2time(varargin);
-
-% select specific units based on firing rate, cell class, etc.
-units = selectUnits(spikes, cm, fr, suFlag, grp, frBoundries, unitClass);
 
 % loads a list of variabels from multiple sessions and organizes them in a
 % struct

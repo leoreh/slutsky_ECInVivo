@@ -5,6 +5,7 @@
 
 % file
 basepath = 'F:\Data\lh100\lh100_220403_100052';
+basepath = 'F:\Data\lh126\lh126_230111_091208';       % mk801 baseline
 [~, basename] = fileparts(basepath);
 
 % load data
@@ -25,13 +26,13 @@ load(filename, 'emg');
 load(filename, 'eeg');
 yLimit_emg = [prctile(emg, 0.05), prctile(emg, 99.95)];
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% re-calc stuff
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 % state params
 cfg = as_loadConfig();
 sstates = [6, 3, 5, 4, 2, 1];
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% re-calc stuff
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % re-calc state epochs for better visualization
 minDur = [10, 5, 5, 10, 5, 5];
@@ -64,7 +65,7 @@ spec = calc_spec('sig', eeg, 'fs', fs_eeg, 'graphics', false, 'saveVar', false,.
 
 winDur(1) = 60 * 60;        % for plotting and scrolling through the data
 winDur(2) = 10 * 60;        % for hypnogram, spec, and emg
-winDur(3) = 10;             % for raster plot
+winDur(3) = 20;             % for raster plot
 winDur(4) = 0.5;            % for raw data
 
 % one row for every window. one column for different sections of the
@@ -72,12 +73,12 @@ winDur(4) = 0.5;            % for raw data
 winStart(1, 1) = 60 * 60;
 winStart(2, 1) = [1150];        % relative to window 1
 winStart(3, 1) = [1310];        % relative to window 1
-winStart(4, 1) = [5];           % relative to window 3
+winStart(4, 1) = [3.8];         % relative to window 3
 
 winStart(1, 2) = v.session.general.timepnt + 130 * 60;
 winStart(2, 2) = [1050];
 winStart(3, 2) = [1140];
-winStart(4, 1) = [2];           
+winStart(4, 2) = [1];           
 
 nwin = size(winStart, 2);
 
@@ -147,7 +148,7 @@ for iwin = 1 : nwin
     
     % add marking of narrow window
     yLimit = ylim;
-    plot(winLim(4, :) + winStart(3), [0, 0], 'k', 'LineWidth', 2)
+    plot(winLim(4, :) + winStart(3, iwin), [0, 0], 'k', 'LineWidth', 2)
 
     % arrange units
     [~, unitsIdx] = sortrows(v.units.clean', 'descend');
@@ -179,8 +180,8 @@ for iwin = 1 : nwin
     fs_raw = fs;
     raw = double(bz_LoadBinary([basename, '.dat'], 'duration', winDur(3),...
         'frequency', fs, 'nchannels', nchans, 'start', winStart(3, iwin),...
-        'channels', [13 : 16], 'downsample', fs / fs_raw));
-    raw_tstamps = [1 : size(raw, 1)] / fs_raw + winStart(3);
+        'channels', rawCh, 'downsample', fs / fs_raw));
+    raw_tstamps = [1 : size(raw, 1)] / fs_raw + winStart(3, iwin);
     
     % plot
     axh(iwin + nwin * 4) = nexttile(iwin + nwin * 4);
@@ -188,6 +189,11 @@ for iwin = 1 : nwin
         ypush = median(prctile(raw, 0.1)) * [0 : size(raw, 2) - 1];
     end
     plot(raw_tstamps, raw + ypush, 'k')
-    xlim(winLim(4, :) + winStart(3))
+    xlim(winLim(4, :) + winStart(3, iwin))
 
 end
+
+% save
+set(gcf,'renderer','Painters')
+figname = fullfile(basepath, 'graphics', [basename, '_rep']);
+export_fig(figname, '-pdf', 'renderer', 'painters')
