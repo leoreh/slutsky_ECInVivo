@@ -12,6 +12,7 @@ function swv = spkwv_metrics(varargin)
 %               length (which is typically 1.6 ms)
 %   saveVar     save variable {1}.
 %   forceA      logical. force analysis even if struct file exists {false}
+%   loadSpk     logical. load spikes from .spk files
 % 
 % OUTPUT
 %   swv         struct
@@ -42,6 +43,7 @@ addOptional(p, 'wv', []);
 addOptional(p, 'fs', [], @isnumeric);
 addOptional(p, 'saveVar', true, @islogical);
 addOptional(p, 'forceA', false, @islogical);
+addOptional(p, 'loadSpk', false, @islogical);
 
 parse(p, varargin{:})
 basepath    = p.Results.basepath;
@@ -49,6 +51,7 @@ wv          = p.Results.wv;
 fs          = p.Results.fs;
 saveVar     = p.Results.saveVar;
 forceA      = p.Results.forceA;
+loadSpk     = p.Results.loadSpk;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preparations
@@ -117,7 +120,7 @@ if isempty(wv)
     if exist(swvRawFile, 'file')
         load(swvRawFile)
         
-    else
+    elseif ~loadSpk
         % memory map to datfile
         info = dir(datfile);
         nsamps = info.bytes / nbytes / nchans;
@@ -149,6 +152,37 @@ if isempty(wv)
         
         clear raw
         clear m
+    else
+        
+        load(spkFile);
+        grps = unique(spikes.shankID);
+        cnt = 1;
+        
+        % load from spk file
+        for igrp = grps
+            spk = loadNS('datatype', 'spk', 'session', session, 'grpid', igrp);
+            clu = loadNS('datatype', 'clu', 'session', session, 'grpid', igrp);
+            uclu = unique(clu);
+            for iclu = 1 : length(uclu)
+                if uclu(iclu) ~= 0 && uclu(iclu) ~= 1
+                    
+                    % randomly select a subset of spikes 
+                    cluidx = find(clu == uclu(iclu));
+                    randidx = randperm(length(cluidx), min([length(cluidx), spks2snip]));
+                    cluidx = cluidx(randidx)
+                    
+                    % get channel of maximum amplitude
+                    tmp = spk(:, :, cluidx);
+                    [~, maxCh] = max(range(mean(tmp, 3), 2));
+                    swv_raw{cnt} = squeeze(tmp(maxCh, :, :));
+                    cnt = cnt + 1;
+                end
+            end
+        end
+
+        if saveVar
+            save(swvRawFile, 'swv_raw')
+        end
     end
     
     % l2norm

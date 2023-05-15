@@ -397,6 +397,29 @@ iunit = 2;
 istate = 1;
 squeeze(mfr(:, :, iunit, istate))'
 
+% acsf two sessions
+clear basepaths
+basepaths = ["F:\Data\lh107\lh107_220517_094900"; "F:\Data\lh107\lh107_220518_091200";...
+    "F:\Data\lh123\lh123_221228_102653"; "F:\Data\lh123\lh123_221229_090102";...
+    "F:\Data\lh126\lh126_230115_090453"; "F:\Data\lh126\lh126_230117_102353";...
+    "F:\Data\lh129\lh129_230214_093124"; "F:\Data\lh129\lh129_230215_092653"];
+
+nmice = length(basepaths);
+
+% fr vs. time
+iunit = 1;
+[frMat, timeIdx] = alignFR2pnt('basepaths', {basepaths{1 : 2 : end}}, 'suFlag', true,...
+    'dataType', 'strd', 'iunit', iunit, 'timeIdx', [0 0 0 0 ]);
+[frMat2, timeIdx] = alignFR2pnt('basepaths', {basepaths{2 : 2 : end}}, 'suFlag', true,...
+    'dataType', 'strd', 'iunit', iunit, 'timeIdx', [0 0 0 0 ]);
+
+npt = 91;
+prismMfr = movmean([mean(frMat, 2, 'omitnan'); mean(frMat2, 2, 'omitnan')], npt);
+prismSfr = movmean([std(frMat, [], 2, 'omitnan') / sqrt(size(frMat, 2));...
+    std(frMat2, [], 2, 'omitnan') / sqrt(size(frMat, 2))], npt);
+nunits = [ones(1, length(frMat)) * size(frMat, 2), ones(1, length(frMat2)) * size(frMat2, 2)];
+xData = [1 : (length(frMat) + length(frMat2))] / 60 - 24
+ 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % cell classification

@@ -277,7 +277,8 @@ st = spktimes_metrics('spikes', spikes, 'sunits', [],...
     'bins', [0 Inf], 'forceA', true, 'saveVar', true, 'fullA', false);
 
 % spike wave metrics
-swv = spkwv_metrics('basepath', basepath, 'saveVar', true, 'forceA', true);
+swv = spkwv_metrics('basepath', basepath, 'saveVar', true,...
+    'forceA', true, 'loadSpk', true);
 
 % brst (mea)
 brst = spktimes_meaBrst(spikes.times, 'binsize', [], 'isiThr', 0.05,...
@@ -324,9 +325,9 @@ plot_FRstates_sextiles('stateMfr', fr.states.mfr(:, [1, 4])', 'units', units.cle
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % concatenate var from different sessions
-mname = 'lh87';
+mname = 'lh130';
 [expData, xData] = sessions_catVarTime('mname', mname,...
-    'dataPreset', {'fr', 'spec'}, 'graphics', true, 'dataAlt', 1,...
+    'dataPreset', {'fr'}, 'graphics', true, 'dataAlt', 3,...
     'basepaths', {}, 'xTicksBinsize', 6, 'markRecTrans', true);
 
 % snip segments (e.g. spikes) from binary 

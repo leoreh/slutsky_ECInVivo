@@ -6,6 +6,7 @@
 % file
 basepath = 'F:\Data\lh100\lh100_220403_100052';
 basepath = 'F:\Data\lh126\lh126_230111_091208';       % mk801 baseline
+basepath = 'F:\Data\lh126\lh126_230113_101449';       % mk801 baseline
 [~, basename] = fileparts(basepath);
 
 % load data
@@ -73,11 +74,13 @@ winDur(4) = 0.4;            % for raw data
 
 % one row for every window. one column for different sections of the
 % recording
+% mk801 day 2
 winStart(1, 1) = 60 * 60;
-winStart(2, 1) = [1750];        % relative to window 1
-winStart(3, 1) = [1790];        % relative to window 1
-winStart(4, 1) = [3.8];         % relative to window 3
+winStart(2, 1) = [350];        % relative to window 1
+winStart(3, 1) = [375];        % relative to window 1
+winStart(4, 1) = [4.4];        % relative to window 3
 
+% mk801 baseline
 winStart(1, 2) = v.session.general.timepnt + 130 * 60;
 winStart(2, 2) = [1750];
 winStart(3, 2) = [1790];
