@@ -175,7 +175,7 @@ end
 squeeze(mfr(:, :, 2, 1))
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% MFR in states across mice per mouse
+% MFR (in states) across mice per mouse
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % CHECK SESSION_LIST.XLSX
@@ -184,7 +184,7 @@ sstates = [1, 4];
 mname = {'lh123'; 'lh126'; 'lh129'; 'lh130'};
 fileIdx = [2, 2, 4, 4];
 binIdx = [1, 4, 1, 4];
-clear mfr
+clear mfr_states
 for imouse = 1 : length(mname)
     varsFile = ["fr"; "fr_bins"; "datInfo"; "session"; "units"];
     varsName = ["fr"; "frBins"; "datInfo"; "session"; "units"];
@@ -196,21 +196,24 @@ for imouse = 1 : length(mname)
 
 
     for ibin = 1 : length(binIdx)
-        mfrTemp = v(fileIdx(ibin)).frBins(binIdx(ibin)).states.mfr;
+        mfrTemp_states = v(fileIdx(ibin)).frBins(binIdx(ibin)).states.mfr;
+        mfrTemp = v(fileIdx(ibin)).frBins(binIdx(ibin)).mfr;
         for iunit = 1 : 2
             unitIdx = v(fileIdx(ibin)).units.clean(iunit, :);
             for istate = 1 : length(sstates)
-                mfr(imouse, ibin, iunit, istate) = mean(mfrTemp(unitIdx, sstates(istate)), 'omitnan');
+                mfr_states(imouse, ibin, iunit, istate) = mean(mfrTemp_states(unitIdx, sstates(istate)), 'omitnan');
             end
+            mfr(imouse, ibin, iunit) = mean(mfrTemp(unitIdx), 'omitnan');
         end
     end
 end
+m4_states = mfr_states;
 m4 = mfr;
 
 mname = {'lh122'};
 fileIdx = [1, 2, 2, 3];
 binIdx = [4, 1, 4, 1];
-clear mfr
+clear mfr_states mfr
 for imouse = 1 : length(mname)
     varsFile = ["fr"; "fr_bins"; "datInfo"; "session"; "units"];
     varsName = ["fr"; "frBins"; "datInfo"; "session"; "units"];
@@ -222,19 +225,22 @@ for imouse = 1 : length(mname)
 
 
     for ibin = 1 : length(binIdx)
-        mfrTemp = v(fileIdx(ibin)).frBins(binIdx(ibin)).states.mfr;
+        mfrTemp_states = v(fileIdx(ibin)).frBins(binIdx(ibin)).states.mfr;
+        mfrTemp = v(fileIdx(ibin)).frBins(binIdx(ibin)).mfr;
         for iunit = 1 : 2
             unitIdx = v(fileIdx(ibin)).units.clean(iunit, :);
             for istate = 1 : length(sstates)
-                mfr(imouse, ibin, iunit, istate) = mean(mfrTemp(unitIdx, sstates(istate)), 'omitnan');
+                mfr_states(imouse, ibin, iunit, istate) = mean(mfrTemp_states(unitIdx, sstates(istate)), 'omitnan');
             end
+            mfr(imouse, ibin, iunit) = mean(mfrTemp(unitIdx), 'omitnan');
         end
     end
 end
 
-iunit = 1;
+iunit = 2;
 istate = 1;
-[squeeze(m4(:, :, iunit, istate)); squeeze(mfr(:, :, iunit, istate))]
+[squeeze(m4_states(:, :, iunit, istate)); squeeze(mfr_states(:, :, iunit, istate))]
+[squeeze(m4(:, :, iunit)); squeeze(mfr(:, :, iunit))]
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -319,7 +325,7 @@ plot(xData, mfr)
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% acsf
+% acsf single session
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 basepaths = [...
@@ -397,21 +403,30 @@ iunit = 2;
 istate = 1;
 squeeze(mfr(:, :, iunit, istate))'
 
-% acsf two sessions
-clear basepaths
-basepaths = ["F:\Data\lh107\lh107_220517_094900"; "F:\Data\lh107\lh107_220518_091200";...
-    "F:\Data\lh123\lh123_221228_102653"; "F:\Data\lh123\lh123_221229_090102";...
-    "F:\Data\lh126\lh126_230115_090453"; "F:\Data\lh126\lh126_230117_102353";...
-    "F:\Data\lh129\lh129_230214_093124"; "F:\Data\lh129\lh129_230215_092653"];
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% acsf two sessions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% -------------------------------------------------------------------------
+% MFR vs time
+
+clear basepaths
+basepaths = ["F:\Data\lh107\lh107_220517_094900", "F:\Data\lh107\lh107_220518_091200";...
+    "F:\Data\lh123\lh123_221228_102653", "F:\Data\lh123\lh123_221229_090102";...
+    "F:\Data\lh126\lh126_230115_090453", "F:\Data\lh126\lh126_230117_102353";...
+    "F:\Data\lh129\lh129_230214_093124", "F:\Data\lh129\lh129_230215_092653";...
+    "F:\Data\lh130\lh130_230405_094750", "F:\Data\lh130\lh130_230406_091232"];
 nmice = length(basepaths);
+nfiles = numel(basepaths);
+nsessions = size(basepaths, 2);
 
 % fr vs. time
-iunit = 1;
-[frMat, timeIdx] = alignFR2pnt('basepaths', {basepaths{1 : 2 : end}}, 'suFlag', true,...
-    'dataType', 'strd', 'iunit', iunit, 'timeIdx', [0 0 0 0 ]);
-[frMat2, timeIdx] = alignFR2pnt('basepaths', {basepaths{2 : 2 : end}}, 'suFlag', true,...
-    'dataType', 'strd', 'iunit', iunit, 'timeIdx', [0 0 0 0 ]);
+iunit = 2;
+[frMat, timeIdx] = alignFR2pnt('basepaths', {basepaths{:, 1}}, 'suFlag', true,...
+    'dataType', 'strd', 'iunit', iunit, 'timeIdx', [0 0 0 0 0]);
+[frMat2, timeIdx] = alignFR2pnt('basepaths', {basepaths{:, 2}}, 'suFlag', true,...
+    'dataType', 'strd', 'iunit', iunit, 'timeIdx', [0 0 0 0 0]);
 
 npt = 91;
 prismMfr = movmean([mean(frMat, 2, 'omitnan'); mean(frMat2, 2, 'omitnan')], npt);
@@ -420,6 +435,43 @@ prismSfr = movmean([std(frMat, [], 2, 'omitnan') / sqrt(size(frMat, 2));...
 nunits = [ones(1, length(frMat)) * size(frMat, 2), ones(1, length(frMat2)) * size(frMat2, 2)];
 xData = [1 : (length(frMat) + length(frMat2))] / 60 - 24
  
+% -------------------------------------------------------------------------
+% mfr in bins
+
+% reload data
+varsFile = ["fr"; "fr_bins"; "datInfo"; "session"; "units"];
+varsName = ["fr"; "frBins"; "datInfo"; "session"; "units"];
+xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
+[v, ~] = getSessionVars('basepaths', sort(basepaths(:)), 'varsFile', varsFile,...
+    'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
+    'xlsname', xlsname);
+
+% mfr per mouse between baseline and acute
+iunit = 2;
+clear mfr tmp
+for ifile = 1 : nfiles
+
+    unitIdx = v(ifile).units.clean(iunit, :);
+    tmp(ifile) = mean(v(ifile).frBins(1).mfr(unitIdx));
+    
+end
+mfr = [tmp(1 : 2 : end); tmp(2 : 2 : end)]';
+
+% mfr per unit across bins
+iunit = 1;
+clear tmp
+mfr = cell(1, 2);
+for isession = 1 : nsessions
+    for imouse = 1 : nmice
+
+        unitIdx = v(imouse * isession).units.clean(iunit, :);
+        tmp = [v(imouse * isession).frBins(:).mfr];
+        mfr{isession} = [mfr{isession}; tmp(unitIdx, :)];
+
+    end
+end
+prismMat = cell2nanmat(mfr);
+mean(prismMat, 'omitnan')
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % cell classification
@@ -459,4 +511,70 @@ iunit = 2;
 prismMat = [tp(logical(un(iunit, :)))', brst(logical(un(iunit, :)))'];
 scatter(prismMat(:, 1), prismMat(:, 2), 'r', 'filled')
 set(gca, 'yscale', 'log')
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% example waveform
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+basepath = 'F:\Data\lh129\lh129_230127_095804';
+cd(basepath)
+[~, basename] = fileparts(basepath);
+cm = CellExplorer('basepath', pwd);
+sessionFile = fullfile(basepath, [basename, '.session.mat']);
+spkFile = fullfile(basepath, [basename, '.spikes.cellinfo.mat']);
+load(sessionFile);
+load(spkFile);
+
+
+fs = 24;
+rs = 35;
+unitIdx = [rs, fs];
+
+igrp = 3;
+spk = loadNS('datatype', 'spk', 'session', session, 'grpid', igrp);
+clu = loadNS('datatype', 'clu', 'session', session, 'grpid', igrp);
+uclu = unique(clu);
+spks2snip = 1000;
+
+for iunit = 1 : 2
+    
+    % randomly select a subset of spikes
+    cluId = spikes.cluID(spikes.UID == unitIdx(iunit));
+
+    cluidx = find(clu == cluId);
+    randidx = randperm(length(cluidx), min([length(cluidx), spks2snip]));
+    cluidx = cluidx(randidx)
+    
+    wv{iunit} = spk(:, :, cluidx) * 0.195;
+    
+end
+
+iunit = 2
+fh= figure;
+wvMean = mean(wv{iunit}, 3, 'omitnan');
+wvSe = std(wv{iunit}, [], 3, 'omitnan') / sqrt(spks2snip);
+nunits = ones(length(wvSe), 1)' * spks2snip;
+plot_wv('wv', wvMean, 'wv_std', wvSe)
+fs = 20000;
+xval = ([-16 : 15] / fs) * 1000
+
+cnt = 1;
+for ich = 1 : 4
+    prismMat(cnt : cnt + 2, :) = [wvMean(ich, :); wvSe(ich, :); nunits]
+    cnt = cnt + 3;
+end
+
+% plots mean +- std waveform of all channels horizontal (concatenated) or
+% vertical
+%
+% INPUT
+%   wv          average waveform [nchans x nsamps] 
+%   wv_std      std of waveform [nchams x nsamps]
+%   clr         color of plot
+%   orient      channels horizontal {horz} or vertical (vert)
+%   sbar        plot scale bar {1} or not (0)
+%   fs          sampling rate
+%
+
 

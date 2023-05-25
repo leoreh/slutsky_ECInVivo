@@ -1,4 +1,4 @@
- function plot_wv(varargin)
+function plot_wv(varargin)
 
 % plots mean +- std waveform of all channels horizontal (concatenated) or
 % vertical

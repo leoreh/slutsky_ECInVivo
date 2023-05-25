@@ -4,15 +4,10 @@
 % lh137
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-<<<<<<< Updated upstream
-mname           = 'lh134';
-basepath        = 'H:\Data\lh134\lh134_230509_085817';
-exp             = [1];
-=======
+
 mname           = 'lh137';
 basepath        = 'J:\Data\lh137\2023-05-21_08-57-35';
 exp             = [1 : 3];
->>>>>>> Stashed changes
 
 % dat from oe 
 mapch = 1 : 20;

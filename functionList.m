@@ -146,7 +146,7 @@ sSig = as_prepSig([basename, '.lfp'], acc.mag,...
 
 % manually create labels
 labelsmanfile = [basename, '.sleep_labelsMan.mat'];
-AccuSleep_viewer(sSig, [], labelsmanfile)
+AccuSleep_viewer(sSig, [labels], labelsmanfile)
 
 % classify with a network
 netfile = [];
@@ -325,9 +325,9 @@ plot_FRstates_sextiles('stateMfr', fr.states.mfr(:, [1, 4])', 'units', units.cle
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % concatenate var from different sessions
-mname = 'lh130';
+mname = 'lh134';
 [expData, xData] = sessions_catVarTime('mname', mname,...
-    'dataPreset', {'fr'}, 'graphics', true, 'dataAlt', 3,...
+    'dataPreset', {'sr', 'spec'}, 'graphics', true, 'dataAlt', 3,...
     'basepaths', {}, 'xTicksBinsize', 6, 'markRecTrans', true);
 
 % snip segments (e.g. spikes) from binary 
