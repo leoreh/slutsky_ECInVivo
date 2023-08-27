@@ -7,8 +7,6 @@ function ied = detect(varargin)
 % INPUT (name-value):
 %   sig         signal for detection
 %   fs          sampling frequency
-%   binsize     scalar {60} in [s]. for rate calculation
-%   marg        scalar {0.1} in [s]. time margin for clipping spikes
 %   thr         vector of two elements. first is thr in [z-scores] and
 %               second is thr in [mV]. if one specified than the other is
 %               merely calculated. if both specified than both used for
@@ -40,15 +38,8 @@ else
 end
 
 % params
-margs = floor(ied.marg * ied.fs);           % margs [samples]; ied.marg [ms]
 interDur = round(ied.fs * 0.025);       % samples
 lowthr = 0.2;                       % mV
-
-% % initialize output
-% ied.edges = []; ied.cents = []; ied.peakPos = []; ied.peakPower = [];
-% ied.wv = []; ied.rate = []; ied.filtered = []; ied.fs = fs;
-% ied.binsize = binsize; ied.spkw = []; ied.maxf = []; ied.art = []; 
-% ied.accepted = []; ied.thrDir = thrDir;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % detect spikes
@@ -94,17 +85,12 @@ switch ied.thrDir
                 (zscore(ied.sig) < -ied.thr(1) & ied.sig < -ied.thr(2));
         end
 end
-
+thresholded = thresholded(:); % force col vec
 iie = find([0; diff(thresholded) > 0]);
 
 % return if no IIS are detected
 if isempty(iie)
     fprintf('\nno inter-ictal spikes detected\n');
-    ied.rate = zeros(1, floor(length(ied.sig) / ied.binsize));
-    ied.cents = zeros(1, floor(length(ied.sig) / ied.binsize));
-    if saveVar
-        save(filename, 'ied')
-    end
     return
 end
 
@@ -124,7 +110,7 @@ pos = zeros(length(iie), 1);
 rmidx = [];
 for i = 1 : length(iie)
     % remove last / first iis if incomplete
-    if iie(i) + margs > length(ied.sig) || iie(i) - margs < 1
+    if iie(i) + interDur > length(ied.sig) || iie(i) - interDur < 1
         rmidx = [rmidx, i];
         continue
     end

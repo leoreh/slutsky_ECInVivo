@@ -4,7 +4,9 @@ function ied = analyze(ied,varargin)
 %   INPUT (in 1st position):
 %       IED.data object, after detection.
 %   INPUT (optional, name value):
+%       binsize     scalar {60*ied.fs} in [samples]. for rate calculation
 %       smf         smooth factor for rate [bins] {7}.
+%       marg        scalar {0.1} in [s]. time margin for clipping spikes
 %       saveVar     logical {true}. save variable
 %       basepath    recording session path {pwd}
 %       basename    string. if empty extracted from basepath
@@ -12,6 +14,11 @@ function ied = analyze(ied,varargin)
 %
 % OUTPUT
 %   IED.data object
+%
+% DEPENDECIES: (out of package)
+%   slutsky_ECInVivo\utilities\times2rate.m
+%   slutsky_ECInVivo\spikes\correlation\CCG.m
+%   export_fig (not in slutsky_ECInVivo, only needed for support of 2020a<)
 %
 % Based on getIIS by LH (see +IED/legacy folder)
 % By: LdM 
@@ -29,6 +36,8 @@ if ~isa(ied,'IED.data')
 end
 
 p = inputParser;
+addParameter(p, 'binsize', [], @isnumeric)
+addParameter(p, 'marg', 0.05, @isnumeric)
 addParameter(p, 'smf', 7, @isnumeric)
 addParameter(p, 'saveVar', true, @islogical);
 addParameter(p, 'basepath', pwd, @isstr);
@@ -36,7 +45,13 @@ addParameter(p, 'basename', [], @isstr);
 addParameter(p, 'saveFig', true, @islogical);
 parse(p, varargin{:})
 
+if isempty(p.Results.binsize)
+    ied.binsize = 60*ied.fs;
+else
+    ied.binsize = p.Results.binsize;
+end
 ied.smf = p.Results.smf;
+ied.marg = p.Results.marg;
 saveVar = p.Results.saveVar;
 basepath = p.Results.basepath;
 basename = p.Results.basename;
@@ -56,8 +71,6 @@ if (saveVar || saveFig)
         fprintf("\n****Using already existing file path, as exist in ied (1st) input.\n" + ...
             "To save in a new path, change path before calling analyze function.")
     end
-
-
 end
 
 % warn if ied wasn't curated
@@ -66,11 +79,24 @@ if ~ismember(ied.status,["curated", "analysed"])
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% remove spikes with bad margins
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+margs = floor(ied.marg * ied.fs);           % margs [samples]; ied.marg [ms]
+accepted = ied.accepted;
+out_margs = find( (ied.pos+margs > length(ied.sig)) | (ied.pos-margs < 1) );
+if ~isempty(out_margs)
+    accepted(out_margs) = false;
+    fprintf("\n**** Making discharges {%s} not-accepted for analysis, as their margins is partly out of signal ****\n",...
+        num2str(out_margs,"%d, "))
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % calc rate
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % collect spikes that passed curation
-true_pos = ied.pos(ied.accepted);
+true_pos = ied.pos(accepted);
 
 [ied.rate, ied.edges, ied.cents] = times2rate(true_pos, 'winCalc', [1, length(ied.sig)],...
     'binsize', ied.binsize, 'c2r', false);
@@ -79,6 +105,7 @@ true_pos = ied.pos(ied.accepted);
 % iis.rate = iis.rate * fs * 60;      % convert counts in bins to 1 / min
 ied.rate = movmean(ied.rate, ied.smf);
 ied.status = "analysed";
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % save result if needed (overwrite)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -180,7 +207,7 @@ title('Spike waveform')
 % mean + std waveform
 axes('Position',[.542 .71 .09 .07])
 box on
-stdshade(clipped_discharges, 0.5, 'k', clipped_tstamps)
+IED.utils.stdshade(double(clipped_discharges), 0.5, 'k', clipped_tstamps)
 axis tight
 set(gca, 'TickLength', [0 0], 'YTickLabel', [], 'XTickLabel', [],...
     'XColor', 'none', 'YColor', 'none', 'Color', 'none')
@@ -210,7 +237,7 @@ title('Average Scalogram')
 
 % amplitude histogram
 subplot(3, 4, 8)
-h = histogram(log10(abs(peak_val)), 30, 'Normalization', 'Probability');
+h = histogram(log10(abs(double(peak_val))), 30, 'Normalization', 'Probability');
 h.EdgeColor = 'none';
 h.FaceColor = 'k';
 h.FaceAlpha = 1;
@@ -222,7 +249,7 @@ title('Amplitude Distribution')
 
 % max frequency and amplitude vs. time
 subplot(3, 4, 7)
-scatter(true_pos / ied.fs / 60, peak_val, 2, 'b', 'filled');
+scatter(true_pos / ied.fs / 60, double(peak_val), 2, 'b', 'filled');
 axis tight
 x = xlim;
 l2 = lsline;

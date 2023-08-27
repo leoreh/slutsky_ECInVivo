@@ -274,7 +274,7 @@ classdef curation_window < handle
             bt_strip = axtoolbar(app.zoom_out_axe,buttons2disp,"SelectionChangedFcn",@(~,~) app.axtoolbar_pressed);
             % add custom data-tips buttom - it refused to be added to uiaxe otherwise
             axtoolbarbtn(bt_strip,"state","Icon","datacursor","Tooltip","Data Tips",...
-                "ValueChangedFcn",@(e,d)datacursormode(ancestor(d.Source,'figure'),d.Value))
+                "ValueChangedFcn",@(e,d)datacursormode(ancestor(d.Source,'figure'),d.Value));
             % make sure push buttons are also clickable without moving discharged
             push_buttons = findobj(bt_strip,'Type','toolbarpushbutton');
             [push_buttons.ButtonPushedFcn] = deal(@(src,evt) app.pushbutton_axtoolbar_pressed(src,evt));
@@ -294,7 +294,7 @@ classdef curation_window < handle
             bt_strip = axtoolbar(app.zoom_in_axe,buttons2disp,"SelectionChangedFcn",@(~,~) app.axtoolbar_pressed);
             % add custom data-tips buttom - it refused to be added to uiaxe otherwise
             axtoolbarbtn(bt_strip,"state","Icon","datacursor","Tooltip","Data Tips",...
-                "ValueChangedFcn",@(e,d)datacursormode(ancestor(d.Source,'figure'),d.Value))
+                "ValueChangedFcn",@(e,d)datacursormode(ancestor(d.Source,'figure'),d.Value));
              % make sure push buttons are also clickable without moving discharged
             push_buttons = findobj(bt_strip,'Type','toolbarpushbutton');
             [push_buttons.ButtonPushedFcn] = deal(@(src,evt) app.pushbutton_axtoolbar_pressed(src,evt));

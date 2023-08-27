@@ -12,9 +12,7 @@
                      {"name":"sig", "kind":"namevalue", "type":["numeric","vector"]},
                      {"name":"fs", "kind":"namevalue", "type":["positive","scalar"]},
                      {"name":"thr", "kind":"namevalue", "type":["numeric","numel=2"]},
-                     {"name":"thrDir", "kind":"namevalue", "type":["choices={'positive','negative','both'}"]},
-                     {"name":"binsize", "kind":"namevalue", "type":["positive","integer","scalar"]},
-                     {"name":"marg", "kind":"namevalue", "type":["positive","scalar"]}
+                     {"name":"thrDir", "kind":"namevalue", "type":["choices={'positive','negative','both'}"]}
                  ]
              ]
             }
@@ -46,6 +44,8 @@
         "inputs":
         [
             {"name":"ied", "kind":"required", "type":["IED.data"]},
+            {"name":"binsize", "kind":"namevalue", "type":["positive","integer","scalar"]},
+            {"name":"marg", "kind":"namevalue", "type":["positive","scalar"]},
             {"name":"smf", "kind":"namevalue", "type":["positive","integer","scalar"]},
             {"name":"saveVar", "kind":"namevalue", "type":["logical","scalar"]},
             {"name":"basepath", "kind":"namevalue", "type":[["string","scalar"],["char","row"]]},

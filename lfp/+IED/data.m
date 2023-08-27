@@ -50,10 +50,10 @@ classdef data < handle & matlab.mixin.CustomDisplay
             %       IED_data obj.
             
             p = inputParser;
-            addParameter(p, 'sig', [], @(x) isnumeric(x) || isa(x,'memmapfile_row') || isfile(x))
+            addParameter(p, 'sig', [], @(x) isnumeric(x) || isa(x,'memmap_row') || isfile(x))
             addParameter(p, 'fs', 1250, @isnumeric)
             addParameter(p, 'thr', [10 0], @isnumeric)
-            addParameter(p, 'thrDir', 'positive', @isstr)
+            addParameter(p, 'thrDir', 'positive', @(x) ismember(x,{'positive','negative','both'}))
             addParameter(p, 'binsize', [], @isnumeric)
             addParameter(p, 'marg', 0.05, @isnumeric)
             addParameter(p, 'file_loc', "", @isstr)
