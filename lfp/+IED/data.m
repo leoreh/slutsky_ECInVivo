@@ -57,8 +57,8 @@ classdef data < handle & matlab.mixin.CustomDisplay
             addParameter(p, 'thr', [10 0], @isnumeric)
             addParameter(p, 'thrDir', 'positive', @(x) ismember(x,{'positive','negative','both'}))
             addParameter(p, 'binsize', [], @isnumeric)
-            addParameter(p, 'marg', 0.05, @isnumeric)
-            addParameter(p, 'smf', 7, @isnumeric)
+            addParameter(p, 'marg', [], @isnumeric)
+            addParameter(p, 'smf', [], @isnumeric)
             addParameter(p, 'file_loc', "", @isstr)
             p.parse(varargin{:})
             
@@ -70,12 +70,7 @@ classdef data < handle & matlab.mixin.CustomDisplay
             obj.fs      = p.Results.fs;
             obj.thr     = p.Results.thr;
             obj.thrDir  = p.Results.thrDir;
-            if isempty(p.Results.binsize)
-                % default bin size for 1 min
-                obj.binsize = obj.fs*60;
-            else
-                obj.binsize = p.Results.binsize;
-            end
+            obj.binsize = p.Results.binsize;
             obj.marg    = p.Results.marg;
 
             
@@ -135,3 +130,5 @@ classdef data < handle & matlab.mixin.CustomDisplay
         end
     end
 end
+
+% EOF

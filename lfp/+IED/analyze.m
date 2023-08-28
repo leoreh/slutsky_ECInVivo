@@ -4,13 +4,17 @@ function ied = analyze(ied,varargin)
 %   INPUT (in 1st position):
 %       IED.data object, after detection.
 %   INPUT (optional, name value):
-%       binsize     scalar {60*ied.fs} in [samples]. for rate calculation
+%       binsize     scalar {60*ied.fs} in [samples]. for rate calculation.
 %       smf         smooth factor for rate [bins] {7}.
-%       marg        scalar {0.1} in [s]. time margin for clipping discharges
-%       saveVar     logical {true}. save variable
-%       basepath    recording session path {pwd}
-%       basename    string. if empty extracted from basepath
+%       marg        scalar {0.05} in [s]. time margin for clipping discharges.
+%       saveVar     logical {true}. save variable.
+%       basepath    recording session path {pwd}, folder to save in.
+%       basename    string. if empty extracted from basepath. File name to save in.
 %       saveFig     logical {true}. save figure
+% **IMPORTANT:** When a parameter exists in both `IED.data` and is also
+%                provided by the user as a name-value pair, the user's
+%                parameter value will take precedence, overwriting the
+%                corresponding value in `IED.data`.
 %
 % OUTPUT
 %   IED.data object
@@ -25,7 +29,6 @@ function ied = analyze(ied,varargin)
 % Published: 230827
 %
 %   see also IED.data
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -46,25 +49,45 @@ addParameter(p, 'saveFig', true, @islogical);
 parse(p, varargin{:})
 
 if isempty(p.Results.binsize)
-    ied.binsize = 60*ied.fs;
+    if isempty(ied.binsize)
+        % no existing binsize val, user did not ask for anything -
+        % use default 1 min
+        ied.binsize = 60*ied.fs;
+    else
+        % keep existing ied.binsize
+    end
 else
+    % overwrite existing binsize with user request
     ied.binsize = p.Results.binsize;
 end
-ied.smf = p.Results.smf;
-ied.marg = p.Results.marg;
+if ~ismember("smf",p.UsingDefaults) || isempty(ied.smf)
+    % user ask for smf, or no specific smf exist in ied -
+    % overwrite existing
+    ied.smf = p.Results.smf;
+end
+if ~ismember("marg",p.UsingDefaults) || isempty(ied.marg)
+    % user ask for smf, or no specific smf exist in ied -
+    % overwrite existing
+    ied.marg = p.Results.marg;
+end
 saveVar = p.Results.saveVar;
 basepath = p.Results.basepath;
 basename = p.Results.basename;
 saveFig = p.Results.saveFig;
+if isempty(basename)
+    % write where to save
+    [~,basename] = fileparts(basepath);
+end
+if any(~ismember(["basepath","basename"],p.UsingDefaults)) && (saveVar || saveFig)
+    % if user gave any ifno & want to save, overwrite existing
+    ied.file_loc = fullfile(basepath,join([basename "ied.mat"],"."));
+end
 
 if (saveVar || saveFig)
-    % write where to save
+    
     if isempty(ied.file_loc)
         % create from user input
-        if isempty(basename)
-            [~,basename] = fileparts(basepath);
-        end
-        ied.file_loc = fullfile(basepath,join([basename "ied.mat"],"."));
+        
 
     elseif ~isempty(ied.file_loc) && any(~ismember(["basename","basepath"],p.UsingDefaults))
         % inform user that its input did not matter

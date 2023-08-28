@@ -402,3 +402,5 @@ classdef curation_window < handle
         end
     end
 end
+
+% EOF

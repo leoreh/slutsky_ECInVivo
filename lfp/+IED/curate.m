@@ -8,7 +8,9 @@ function ied = curate(ied,varargin)
 %       saveVar     logical {true}. save variable
 %       basepath    recording session path {pwd}
 %       basename    string. if empty extracted from basepath
-%
+%   **IMPORTANT:** if saving & basepath / basename is given, they take
+%                  precedence. File will be save as they define,
+%                  ied.file_loc will be overwritten.
 % OUTPUT
 %   IED.data object
 
@@ -30,6 +32,13 @@ saveVar = p.Results.saveVar;
 basepath = p.Results.basepath;
 basename = p.Results.basename;
 
+if any(~ismember(["basepath","basename"],p.UsingDefaults)) && saveVar
+    % if user gave any ifno & want to save, overwrite existing
+    if isempty(basename)
+        [~,basename] = fileparts(basepath);
+    end
+    ied.file_loc = fullfile(basepath,join([basename "ied.mat"],"."));
+end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % open windows, let user mark
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -49,12 +58,10 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if saveVar
-    if isempty(basename)
-        [~,basename] = fileparts(basepath);
-    end
-    ied.file_loc = fullfile(basepath,join([basename "ied.mat"],"."));
     save(ied.file_loc,"ied")
     fprintf("\n****** Save in %s ******\n",ied.file_loc)
 else
     ied.file_loc = '';
 end
+
+% EOF
