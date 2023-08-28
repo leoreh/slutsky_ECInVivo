@@ -1,5 +1,5 @@
 function ied = detect(varargin)
-% detects inter-ictal spikes from LFP.
+% detects inter-ictal discharges from LFP.
 %
 % INPUT (in 1st position):
 %   IED.data object, which already contain all the name values
@@ -12,7 +12,7 @@ function ied = detect(varargin)
 %               merely calculated. if both specified than both used for
 %               detection. values should be positive even if thrDir is
 %               negative
-%   thrDir      string. direction of threshold ditection. can be
+%   thrDir      string. direction of threshold detection. can be
 %               {'positive'}, 'negative', or 'both
 %
 % OUTPUT
@@ -42,7 +42,7 @@ interDur = round(ied.fs * 0.025);       % samples
 lowthr = 0.2;                       % mV
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% detect spikes
+% detect discharges
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % threshold
@@ -90,7 +90,7 @@ iie = find([0; diff(thresholded) > 0]);
 
 % return if no IIS are detected
 if isempty(iie)
-    fprintf('\nno inter-ictal spikes detected\n');
+    fprintf('\nno inter-ictal discharges detected\n');
     return
 end
 
@@ -104,7 +104,7 @@ while ~isempty(ii)
     ii = find(diff(iie) < interDur / 2);
 end
 
-% select local maximum and clip spikes 
+% select local maximum and clip discharges 
 peak = zeros(length(iie), 1);
 pos = zeros(length(iie), 1);
 rmidx = [];
@@ -126,7 +126,7 @@ end
 peak(rmidx) = [];
 pos(rmidx) = [];
 
-% due to overlaping localseg, 2 positions may be equal or out of order.
+% due to overlapping localseg, 2 positions may be equal or out of order.
 % fix that.
 [pos,idx] = unique(pos);
 peak = peak(idx);
@@ -170,7 +170,7 @@ nspks = length(pos);
 fprintf('after template matching: %d IED\n', nspks);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% orginaze output
+% organize output
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % place index inside
@@ -179,8 +179,8 @@ ied.pos = pos;
 % change analysis stage
 ied.status = "pre_curation";
 
-% make sure there is accepted status for every spike
+% make sure there is accepted status for every discharge
 ied.accepted = true(1,numel(ied.pos));
 
-% iniat last spike currated
+% init last discharge curated
 ied.last_mark = 1;

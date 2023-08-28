@@ -1,12 +1,12 @@
 function ied = analyze(ied,varargin)
-% analyse the ied result for rate, and display figure with info about the ied
+% analyze the ied result for rate, and display figure with info about the ied
 %
 %   INPUT (in 1st position):
 %       IED.data object, after detection.
 %   INPUT (optional, name value):
 %       binsize     scalar {60*ied.fs} in [samples]. for rate calculation
 %       smf         smooth factor for rate [bins] {7}.
-%       marg        scalar {0.1} in [s]. time margin for clipping spikes
+%       marg        scalar {0.1} in [s]. time margin for clipping discharges
 %       saveVar     logical {true}. save variable
 %       basepath    recording session path {pwd}
 %       basename    string. if empty extracted from basepath
@@ -74,12 +74,12 @@ if (saveVar || saveFig)
 end
 
 % warn if ied wasn't curated
-if ~ismember(ied.status,["curated", "analysed"])
+if ~ismember(ied.status,["curated", "analyzed"])
     warning('ied wasn''t manualy curated before analysis! Run IED.curate to perform.')
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% remove spikes with bad margins
+% remove discharges with bad margins
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 margs = floor(ied.marg * ied.fs);           % margs [samples]; ied.marg [ms]
@@ -95,7 +95,7 @@ end
 % calc rate
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% collect spikes that passed curation
+% collect discharges that passed curation
 true_pos = ied.pos(accepted);
 
 [ied.rate, ied.edges, ied.cents] = times2rate(true_pos, 'winCalc', [1, length(ied.sig)],...
@@ -104,7 +104,7 @@ true_pos = ied.pos(accepted);
 % effectively be greater than the number of counts
 % iis.rate = iis.rate * fs * 60;      % convert counts in bins to 1 / min
 ied.rate = movmean(ied.rate, ied.smf);
-ied.status = "analysed";
+ied.status = "analyzed";
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % save result if needed (overwrite)
@@ -125,10 +125,10 @@ sig_tstamps =  (1 : length(ied.sig))' / ied.fs;
 peak_val = ied.sig(true_pos);
 
 %%%% Prapare power spectrum via wavelet
-% average wavelet coefficients for each spike. note this produces very
-% similar results to the coefficients obtained from the average spike
+% average wavelet coefficients for each discharge. note this produces very
+% similar results to the coefficients obtained from the average discharge
 % waveform. individual coefficients may still be carried out if the width
-% of each spike is to be calculated
+% of each discharge is to be calculated
 
 fb = cwtfilterbank('SignalLength', size(clipped_discharges, 2), 'VoicesPerOctave', 32,...
     'SamplingFrequency', ied.fs, 'FrequencyLimits', [1 ied.fs / 4]);
@@ -158,7 +158,7 @@ markthr(ied, ax)
 ylabel('Voltage [mV]')
 yyaxis right
 plot(ied.cents / ied.fs / 60, ied.rate, 'b', 'LineWidth', 3)
-ylabel('Rate [spikes / bin]')
+ylabel('Rate [discharges / bin]')
 set(gca, 'TickLength', [0 0])
 box off
 title('Raw signal and IIS rate')
@@ -202,7 +202,7 @@ axis tight
 xticks([-ied.marg, 0, ied.marg] * 1000);
 set(gca, 'TickLength', [0 0])
 box off
-title('Spike waveform')
+title('Discharge waveform')
 
 % mean + std waveform
 axes('Position',[.542 .71 .09 .07])

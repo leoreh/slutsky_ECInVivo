@@ -1,7 +1,7 @@
 classdef data < handle & matlab.mixin.CustomDisplay
     % Hold IED data (i.e. source signal, detection location & rate) and
     % manage the detection steps.
-    % Note that this is a handle class - it is updated diractly from
+    % Note that this is a handle class - it is updated directly from
     % curation_window during curation.
     %
     % Based on getIIS by LH (see +IED/legacy folder)
@@ -12,7 +12,8 @@ classdef data < handle & matlab.mixin.CustomDisplay
     properties
         
         %%%% props for obj managment %%%%
-        status          % text scalar, stage of analysis: "init", "pre_curation", "during_curation", "curated", "analysed"
+        
+        status          % text scalar, stage of analysis: "init", "pre_curation", "during_curation", "curated", "analyzed"
         last_mark       % numeric pos scalar, last discharge viewed during curation
 
         %%%% props that hold data %%%%
@@ -35,13 +36,14 @@ classdef data < handle & matlab.mixin.CustomDisplay
         smf             % smoothing window for rate, in [bins]
 
         %%% props that saved res file location %%%%
+        
         file_loc        % full path to file, if exist (empty otherwise)
     end
     
 
     methods (Access = public)
         function obj = data(varargin)
-            % Constractor, simply fill in the properties with user data.
+            % Constructor, simply fill in the properties with user data.
             % assuming user called it before detection, or called detection
             % directly.
             %   INPUTS:
@@ -56,6 +58,7 @@ classdef data < handle & matlab.mixin.CustomDisplay
             addParameter(p, 'thrDir', 'positive', @(x) ismember(x,{'positive','negative','both'}))
             addParameter(p, 'binsize', [], @isnumeric)
             addParameter(p, 'marg', 0.05, @isnumeric)
+            addParameter(p, 'smf', 7, @isnumeric)
             addParameter(p, 'file_loc', "", @isstr)
             p.parse(varargin{:})
             
