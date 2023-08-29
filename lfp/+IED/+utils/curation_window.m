@@ -179,7 +179,7 @@ classdef curation_window < handle
                     % validate that it is not the first one
                     if 1 == app.ied.last_mark
                         uialert(app.IED_curation_UIFigure,...
-                            'Can''t go back from first discharge!','invalid return request')
+                            'Can''t go back from first IED!','invalid return request')
                     else
                         app.ied.last_mark = app.ied.last_mark-1;
                     end
