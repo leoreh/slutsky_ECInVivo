@@ -154,7 +154,7 @@ classdef curation_window < handle
                     else
                         app.ied.last_mark = app.ied.last_mark+1;
                     end
-                case {'2','return','alt'} % alt = right click & alt key
+                case {'2','return','alt','open'} % alt = right click & alt key, open = double click
                     % decline discharge
 
                     % flash red
