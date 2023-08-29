@@ -31,24 +31,31 @@ thr_Z  = 10;
 ied = IED.detect("sig",sig,"fs",fs,"thr",[thr_Z, thr_mv],"thrDir","both");
 ied = IED.curate(ied,"saveVar",true,"basepath",basepath,"basename",basename);
 
+% % The ied, from class IED.data, is the heart of everything - use it to
+% % stop & restart working:
 % % To restart from last point, simply run the line with IED.curate again
 % % (make sure you have everything you need in workspace).
 % % IED.curate with the above syntax will save your "ied" that have
-% % everything you need automaticly. However you can & should save it manualy
+% % everything you need automatically. However you can & should save it manually
 % % if needed, by:
 % ied.file_loc = fullfile(basepath,join([basename "ied.mat"],"."));
 % save(ied.file_loc,"ied")
 %
 % % to load it, simply load the mat file:
-% % mat2load = fullfile(basepath,join([basename "ied.mat"],"."));
-% % load(mat2load,"ied")
+% mat2load = fullfile(basepath,join([basename "ied.mat"],"."));
+% load(mat2load,"ied")
 %
-% Note that you can see what stage of analysis you are, by looking at: 
+% % Note that you can see what stage of analysis you are, by looking at: 
 % ied.status
 
-% analyze after finished:
+% analyze after curation:
 bin_size = ied.fs*60; % bin for rate, in [samples]
 smooth_win = 7;       % size of movemean window, in [bins]
 clip_marg = 0.05;     % how much time to show around the event
 ied = IED.analyze(ied,"binsize",bin_size,"smf",smooth_win,"marg",clip_marg,...
     "saveFig",true,"saveVar",true);
+% Use right click to enlarge any of the axes.
+% Use right click on a IED to change it to declined - note that after doing
+% this, you will need to re-run IED.analyze.
+
+% EOF
