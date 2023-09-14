@@ -285,7 +285,7 @@ classdef curation_window < handle
             app.zoom_out_axe.NextPlot = 'add';
             app.zoom_out_axe.Layout.Row = 2;
             app.zoom_out_axe.Layout.Column = 1;
-            
+            app.zoom_out_axe.XAxis.Exponent = 0;
             
             % manage zoom_out_axe toolbar
             buttons2disp = ["export","brush","pan","zoomin","zoomout","restoreview"];
@@ -312,7 +312,8 @@ classdef curation_window < handle
             app.zoom_in_axe.NextPlot = 'add';
             app.zoom_in_axe.Layout.Row = 3;
             app.zoom_in_axe.Layout.Column = 1;
-            
+            app.zoom_in_axe.XAxis.Exponent = 0;
+
             % manage zoom_in_axe toolbar
             bt_strip = axtoolbar(app.zoom_in_axe,buttons2disp,"SelectionChangedFcn",@(~,~) app.axtoolbar_pressed);
             % add custom data-tips button - it refused to be added to uiaxe otherwise
@@ -373,7 +374,10 @@ classdef curation_window < handle
             [x_data, y_data] = app.collect_data(app.ied.last_mark, app.zoom_out_marg);
             app.zoom_out_line = plot(app.zoom_out_axe ,x_data, y_data);
             app.zoom_out_peak = scatter(app.zoom_out_axe, discharge_loc_x, discharge_loc_y, 'r*');
-            ylim(app.zoom_out_axe,[min(app.ied.sig) max(app.ied.sig)])
+            sig_mean = mean(app.ied.sig);
+            sig_std = std(app.ied.sig);
+            diplay_limit = 1.5*app.ied.thr(1)*sig_std;
+            ylim(app.zoom_out_axe,[sig_mean-diplay_limit, sig_mean+diplay_limit])
             
             % prep zoom in graph
             [x_data, y_data] = app.collect_data(app.ied.last_mark, app.zoom_in_marg);

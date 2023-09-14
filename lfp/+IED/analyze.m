@@ -448,7 +448,7 @@ if answer == "Yes, do not ask again"
     % Mark user request, always just decline from now
     fig.UserData.confirm_decline = false;
     if isfield(fig.UserData,"OrigFig")
-        fig.UserData.OrigFig.confirm_decline = false;
+        fig.UserData.OrigFig.UserData.confirm_decline = false;
     end
 end
 if contains(answer,"Yes")

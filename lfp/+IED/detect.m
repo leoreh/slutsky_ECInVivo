@@ -128,7 +128,8 @@ pos(rmidx) = [];
 
 % due to overlapping localseg, 2 positions may be equal or out of order.
 % fix that.
-[pos,idx] = unique(pos);
+[pos,idx] = uniquetol(pos,interDur,'lowest','DataScale',1);
+% [pos,idx] = unique(pos);
 peak = peak(idx);
 
 % if there is no trough between peaks select highest peak. this is

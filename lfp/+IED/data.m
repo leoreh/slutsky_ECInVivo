@@ -72,20 +72,30 @@ classdef data < handle & matlab.mixin.CustomDisplay
             obj.thrDir  = p.Results.thrDir;
             obj.binsize = p.Results.binsize;
             obj.marg    = p.Results.marg;
-
+            obj.smf     = p.Results.smf;
             
         end
         
-        function [clipped_discharges, tstamps] = extract_discharges(obj)
+        function [clipped_discharges, tstamps] = extract_discharges(obj,time_marg)
             % extract IED discharges according to requested margins around.
             % Only extract accepted discharges!
             % them.
             %   OUTPUT:
             %       tstamps            - time in [ms] for each sample in clipped_discharges
             %       clipped_discharges - discharge X sample, voltage response
+            
+            % use object margs if nothing else specefied
+            if ~exist("time_marg","var")
+                time_marg = obj.marg;
+            end
 
-            margs = floor(obj.marg * obj.fs); % margs [samples]; obj.marg [ms]
-            tstamps = linspace(-obj.marg, obj.marg, margs * 2 + 1); % in [ms]
+            % convert from time margings to samples
+            margs = floor(time_marg * obj.fs); % margs [samples]; obj.marg [ms]
+            
+            % create time stamps to match margings
+            tstamps = linspace(-time_marg, time_marg, margs * 2 + 1); % in [ms]
+            
+            % extract waveforms
             true_pos = obj.pos(obj.accepted);
             for iDischarges = numel(true_pos):-1:1
                 area2clip = (true_pos(iDischarges)-margs) : (true_pos(iDischarges) + margs);
@@ -127,6 +137,13 @@ classdef data < handle & matlab.mixin.CustomDisplay
             out = matlab.mixin.CustomDisplay.getClassNameForHeader(obj);
             out = replace(out,">data<",">IED.data<");
             out = [out ' with properties:'];
+        end
+
+        function out = getFooter(obj)
+            detected_events = numel(obj.pos);
+            accepted_events = sum(obj.accepted);
+            out = sprintf('Status: %s, Detected: %d, Accepted: %d',...
+                obj.status,detected_events,accepted_events);
         end
     end
 end
