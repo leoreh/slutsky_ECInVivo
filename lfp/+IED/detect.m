@@ -128,7 +128,7 @@ pos(rmidx) = [];
 
 % due to overlapping localseg, 2 positions may be equal or out of order.
 % fix that.
-[pos,idx] = uniquetol(pos,interDur,'lowest','DataScale',1);
+[pos,idx] = uniquetol(pos,interDur,'DataScale',1);
 % [pos,idx] = unique(pos);
 peak = peak(idx);
 

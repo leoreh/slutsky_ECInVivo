@@ -78,7 +78,7 @@ if isempty(basename)
     % write where to save
     [~,basename] = fileparts(basepath);
 end
-if any(~ismember(["basepath","basename"],p.UsingDefaults)) && (saveVar || saveFig)
+if any(ismember(["basepath","basename"],p.UsingDefaults)) && (saveVar || saveFig)
     % if user gave any info & want to save, overwrite existing
     ied.file_loc = fullfile(basepath,join([basename "ied.mat"],"."));
 end
