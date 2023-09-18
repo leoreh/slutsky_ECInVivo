@@ -76,19 +76,30 @@ classdef data < handle & matlab.mixin.CustomDisplay
             
         end
         
-        function [clipped_discharges, tstamps] = extract_discharges(obj,time_marg)
+        function [clipped_discharges, tstamps] = extract_discharges(obj,time_marg,accepted)
             % extract IED discharges according to requested margins around.
             % Only extract accepted discharges!
             % them.
+            %
+            %   INPUTS:
+            %       obj                - ied object calling this method.
+            %       time_marg          - positive scalar, requested time window around each IED in [S].
+            %                            If empty or not given, use marg in ied object (default).
+            %       accepted           - logical vector, same size of ied.pos.
+            %                            If not given, use accpepted in ied object (default).
             %   OUTPUT:
             %       tstamps            - time in [ms] for each sample in clipped_discharges
             %       clipped_discharges - discharge X sample, voltage response
             
             % use object margs if nothing else specefied
-            if ~exist("time_marg","var")
+            if ~exist("time_marg","var") || isempty(time_marg)
                 time_marg = obj.marg;
             end
-
+            if ~exist("accepted","var")
+                true_pos = obj.pos(obj.accepted);
+            else
+                true_pos = obj.pos(accepted);
+            end
             % convert from time margings to samples
             margs = floor(time_marg * obj.fs); % margs [samples]; obj.marg [ms]
             
@@ -96,7 +107,6 @@ classdef data < handle & matlab.mixin.CustomDisplay
             tstamps = linspace(-time_marg, time_marg, margs * 2 + 1); % in [ms]
             
             % extract waveforms
-            true_pos = obj.pos(obj.accepted);
             for iDischarges = numel(true_pos):-1:1
                 area2clip = (true_pos(iDischarges)-margs) : (true_pos(iDischarges) + margs);
                 clipped_discharges(iDischarges,:) = obj.sig(area2clip);
@@ -120,7 +130,55 @@ classdef data < handle & matlab.mixin.CustomDisplay
 
             obj = IED.analyze(obj,varargin{:});
         end
+        
+        function [accepeted_vec] = filter_accpeted(obj, accepted_filt, accepeted_vec)
+            % Match a logical vector that was calc only on accepted IEDs,
+            % to a full accpeted vector. Used to fix accpeted after you
+            % Used for secound - stage, to remove IEDs that were accepted
+            % earlier.
+            % Note that order is important - values in accepted_filt should
+            % correspond with find(accpeted_vec).
+            %
+            % INPUT:
+            %   obj - ied object calling this function.
+            %   accepted_filt - logical vector, numel(accepted_filt) == sum(accpeted_vec).
+            %                   true for values that should remine accpeted.
+            %   accpeted_vec  - logical vector, numel(accpeted_vec) == numel(ied.pos).
+            %                   what positions of IED are accepted originaly.
+            %                   if not given, use ied.accepted.
+            %
+            % OUTPUT:
+            %   accpeted_vec  - same as accpeted_vec input, but only accpeted
+            %                   values that were true in accepted_filt are
+            %                   still true.
+            %
+            % EXAMPLE:
+            %   %%% General: %%%
+            %   accpeted_vec = [0 1 1 0];
+            %   accepted_filt = [0 1];
+            %   new_accepted = filter_accpeted(obj, accepted_filt, accpeted_vec)
+            %
+            %   %new_accepted = [0 0 1 0]
+            %   
+            %   %%% Assign new accpeted %%%
+            %   ied.accpeted = [0 1 1 0];
+            %   ied.accpeted = filter_accpeted(obj, accepted_filt)
+            
+            if ~exist("accepeted_vec","var")
+                accepeted_vec = obj.accepted;
+            elseif numel(accepeted_vec) ~= numel(obj.pos) || ~islogical(accepeted_vec) || ~isvector(accepeted_vec)
+                error('accpeted_vec need to be a logical vector, & match size with ied.pos')
+            end
+            
+            if numel(accepted_filt) ~= sum(accepeted_vec)
+                error("accepted_filt must have a value for each true val in accpeted_vec, total %d",sum(accepeted_vec))
+            end
+            
+            true_pos = find(accepeted_vec);
+            pos2rmv = true_pos(~accepted_filt);
+            accepeted_vec(pos2rmv) = false; 
 
+        end
 %         function obj = saveobj(obj)
 %             % make sure you close manual curation window before saving the
 %             % obj, so it won't be problematic
