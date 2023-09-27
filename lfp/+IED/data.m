@@ -107,9 +107,15 @@ classdef data < handle & matlab.mixin.CustomDisplay
             tstamps = linspace(-time_marg, time_marg, margs * 2 + 1); % in [ms]
             
             % extract waveforms
-            for iDischarges = numel(true_pos):-1:1
-                area2clip = (true_pos(iDischarges)-margs) : (true_pos(iDischarges) + margs);
-                clipped_discharges(iDischarges,:) = obj.sig(area2clip);
+            if isempty(true_pos)
+                % deal with empty case - return empty
+                clipped_discharges = [];
+                tstamps = [];
+            else
+                for iDischarges = numel(true_pos):-1:1
+                    area2clip = (true_pos(iDischarges)-margs) : (true_pos(iDischarges) + margs);
+                    clipped_discharges(iDischarges,:) = obj.sig(area2clip);
+                end
             end
         end
 
