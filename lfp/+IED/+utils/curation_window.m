@@ -136,7 +136,7 @@ classdef curation_window < handle
             
             key = event.Key;
             switch key
-                case {'1','normal'} % normal = left click
+                case {'1','normal','numpad1'} % normal = left click
                     % accept discharge
 
                     % flash green
@@ -154,7 +154,7 @@ classdef curation_window < handle
                     else
                         app.ied.last_mark = app.ied.last_mark+1;
                     end
-                case {'2','return','alt','open'} % alt = right click & alt key, open = double click
+                case {'2','return','alt','open','numpad2'} % alt = right click & alt key, open = double click
                     % decline discharge
 
                     % flash red
@@ -173,7 +173,7 @@ classdef curation_window < handle
                         app.ied.last_mark = app.ied.last_mark+1;
                     end
                     
-                case {'3','extend'} % extend = middle click
+                case {'3','extend','numpad3'} % extend = middle click
                     % return to previous discharge
 
                     % validate that it is not the first one

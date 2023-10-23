@@ -1,4 +1,4 @@
-function [lineOut, fillOut] = stdshade(amatrix,alpha,acolor,F,smth)
+function [lineOut, fillOut] = stdshade(ax,amatrix,alpha,acolor,F,smth)
 % usage: stdshading(amatrix,alpha,acolor,F,smth)
 % plot mean and sem/std coming from a matrix of data, at which each row is an
 % observation. sem/std is shown as shading.
@@ -32,18 +32,18 @@ astd = nanstd(amatrix,[],1); % to get std shading
 % astd = nanstd(amatrix,[],1)/sqrt(size(amatrix,1)); % to get sem shading
 
 if exist('alpha','var')==0 || isempty(alpha) 
-    fillOut = fill([F fliplr(F)],[amean+astd fliplr(amean-astd)],acolor,'linestyle','none');
+    fillOut = fill(ax,[F fliplr(F)],[amean+astd fliplr(amean-astd)],acolor,'linestyle','none');
     acolor='k';
 else
-    fillOut = fill([F fliplr(F)],[amean+astd fliplr(amean-astd)],acolor, 'FaceAlpha', alpha,'linestyle','none');
+    fillOut = fill(ax,[F fliplr(F)],[amean+astd fliplr(amean-astd)],acolor, 'FaceAlpha', alpha,'linestyle','none');
 end
 
-if ishold==0
+if ishold(ax)==0
     check=true; else check=false;
 end
 
-hold on;
-lineOut = plot(F,amean, 'color', acolor,'linewidth',1.5); %% change color or linewidth to adjust mean line
+hold(ax,"on");
+lineOut = plot(ax,F,amean, 'color', acolor,'linewidth',1.5); %% change color or linewidth to adjust mean line
 
 if check
     hold off;

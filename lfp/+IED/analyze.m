@@ -250,7 +250,7 @@ ax.UIContextMenu = cm_enlarge;
 % mean + std waveform
 ax = axes('Position',[.542 .71 .09 .07]);
 box on
-IED.utils.stdshade(double(clipped_discharges), 0.5, 'k', clipped_tstamps);
+IED.utils.stdshade(ax,double(clipped_discharges), 0.5, 'k', clipped_tstamps);
 axis tight
 set(gca, 'TickLength', [0 0], 'YTickLabel', [], 'XTickLabel', [],...
     'XColor', 'none', 'YColor', 'none', 'Color', 'none')
