@@ -277,7 +277,7 @@ end
 if mancur
     fh = figure;
     set(fh, 'units','normalized','outerposition',[0 0 1 1]);
-    suptitle({'Inspect IIS: left = accept; right = decline; middle = previous'...
+    sgtitle({'Inspect IIS: left = accept; right = decline; middle = previous'...
         'Wait for curser before pressing'});
     sp1 = subplot(2, 1, 1);
     ylabel('Voltage [mV]')
