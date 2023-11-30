@@ -11,7 +11,7 @@ function plot_boxMean(varargin)
 
 p = inputParser;
 addOptional(p, 'dataMat', [], @isnumeric);
-addOptional(p, 'clr', []);
+addOptional(p, 'clr', 'k');
 addOptional(p, 'alphaIdx', []);
 addOptional(p, 'allPnts', false, @islogical);
 

@@ -1,4 +1,4 @@
-function manShift = manAlign(varargin)
+    function manShift = manAlign(varargin)
 
 % plots two signals for visual alignment. The 1st signal is spktimes and
 % is plotted as a raster plot. The 2nd is a time series. 
@@ -58,6 +58,7 @@ axh1 = subplot(4, 1, 1);
 plotSpikeRaster({spktimes'}, 'PlotType', 'vertline', 'LineFormat', LineFormat);
 axh2 = subplot(4, 1, 2);
 pf1 = plot(tstamps, sig);
+linkaxes([axh1, axh2], 'x')
 
 % 2nd plot for zoom in view of center segment
 axh3 = subplot(4, 1, 3);

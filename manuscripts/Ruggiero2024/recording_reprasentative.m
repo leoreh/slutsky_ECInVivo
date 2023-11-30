@@ -6,7 +6,7 @@
 % file
 basepath = 'F:\Data\lh100\lh100_220403_100052';
 basepath = 'F:\Data\lh126\lh126_230111_091208';       % mk801 baseline
-basepath = 'F:\Data\lh126\lh126_230113_101449';       % mk801 baseline
+basepath = 'F:\Data\lh126\lh126_230113_101449';       % mk801
 [~, basename] = fileparts(basepath);
 
 % load data
@@ -17,15 +17,16 @@ varsName = ["fr"; "spikes"; "datInfo"; "session";...
 v = getSessionVars('basepaths', {basepath}, 'varsFile', varsFile,...
     'varsName', varsName);
 
-% session params
-nchans = v.session.extracellular.nChannels;
-fs = v.session.extracellular.sr;
-
 % sleep signals
 filename = fullfile(basepath, [basename, '.sleep_sig.mat']);
 load(filename, 'emg');
 load(filename, 'eeg');
+load(filename, 'spec')
 yLimit_emg = [prctile(emg, 0.05), prctile(emg, 99.95)];
+
+% session params
+nchans = v.session.extracellular.nChannels;
+fs = v.session.extracellular.sr;
 
 % state params
 cfg = as_loadConfig();
@@ -38,7 +39,8 @@ rawCh = [8 : 11];
 % re-calc stuff
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% re-calc state epochs for better visualization
+% re-calc state epochs for better visualization. 
+% LSLEEP => NREM; N/REM => REM
 minDur = [10, 5, 5, 10, 5, 5];
 minDur = 4;
 interDur = 10;
@@ -49,13 +51,13 @@ labels(labels == 3) = 4;
     'minDur', minDur, 'interDur', interDur);
 
 % subsample emg
-fs_eeg = 1250;
-emg = emg(1 : 1250 / fs_eeg : end);
-emg_tstamps = [1 : length(emg)] / fs_eeg;
+fsNew = 250;
+emg = emg(1 : 1250 / fsNew : end);
+emg_tstamps = [1 : length(emg)] / fsNew;
 
 % subsample eeg and re-calc spec
-eeg = eeg(1 : 1250 / fs_eeg : end);
-spec = calc_spec('sig', eeg, 'fs', fs_eeg, 'graphics', false, 'saveVar', false,...
+eeg = eeg(1 : 1250 / fsNew : end);
+spec = calc_spec('sig', eeg, 'fs', fsNew, 'graphics', false, 'saveVar', false,...
     'padfft', -1, 'winstep', 1, 'logfreq', true, 'ftarget', [],...
     'ch', [{1}], 'force', true);
 
@@ -68,7 +70,7 @@ spec = calc_spec('sig', eeg, 'fs', fs_eeg, 'graphics', false, 'saveVar', false,.
 % injection)
 
 winDur(1) = 60 * 60;        % for plotting and scrolling through the data
-winDur(2) = 10 * 60;         % for hypnogram, spec, and emg
+winDur(2) = 5 * 60;        % for hypnogram, spec, and emg
 winDur(3) = 8;              % for raster plot
 winDur(4) = 0.4;            % for raw data
 

@@ -5,6 +5,10 @@
 
 %   basepath    str. path to excel file
 %   xlsName     str. name of excel file
+%   spktimes    numeric vec. spktimes [s].
+%   sig         calcium.
+%   fs          sampling frequency of calcium.
+%   caEvents      1st col: bin number of calcium event
 
 basepath = 'D:\Google Drive\PhD\Slutsky\Data summaries';
 xlsName = 'sample data input format';
@@ -20,13 +24,12 @@ dff = xlsData.CacliumEventAmplitude_df_f_(~isnan(xlsData.CacliumEventAmplitude_d
 % distance (in bins) between a spike and event in order for them to be
 % considered a pair. The 1st element describes the minimum when a spike
 % occurs before an event, and the 2nd element describes the minimum when an
-% event occurs before a spike. If there is an event before and after a
-% spike, the one after the spike gets precedence in the assignment
+% event occurs before a spike.
 fs = 12.95;
-binTol = [80, 0];       
+binTol = [5];       
 
 % manually align spktimes and calcium
-% manShift = manAlign('spktimes', spktimes, 'sig', sig, 'fs', fs);
+manShift = manAlign('spktimes', spktimes, 'sig', sig, 'fs', fs);
 
 % apply shift to spktimes and save original
 origSpktimes = spktimes;
@@ -39,6 +42,17 @@ recDur = tstamps(end);
 % count spikes in bins corresponding to calcium
 binsSpks = [0 : 1 / fs : spktimes(end)];
 nspks = histcounts(spktimes, binsSpks, 'Normalization', 'count');
+
+% plot sanity check
+% fh = figure;
+% subplot(1, 2, 1)
+% plot(tstamps, sig);
+% yyaxis right
+% plot(binsSpks(2 : end), nspks)
+% subplot(1, 2, 2)
+% plot(tstamps, sig);
+% yyaxis right
+% plot([spktimes spktimes], ylim)
 
 % find the peak closest to each spike, but only if it is +/- from binTol.
 idxSpks = [find(nspks > 0)]';           % indices to bins with spikes
@@ -54,10 +68,8 @@ for ibin = 1 : length(idxSpks)
     [dRev, iRev] = min(-diffVal);
 
     % check and assign. the backgward direction gets precedence. 
-    if dRev <= binTol(1)
-        idxCa(ibin) = caEvents(iRev);
-    elseif dFor <= binTol(2)
-        idxCa(ibin) = caEvents(iFor);
+    if dRev > binTol
+        idxCa(ibin) = caEvents(idx);
     else
         idxCa(ibin) = nan;
     end
@@ -80,14 +92,12 @@ for ipeak = 1 : length(uPeaks)
 end
 
 % find dff that corresponds to the unique ca peaks 
-dffPeaks = zeros(size(uPeaks));
 for ipeak = 1 : length(uPeaks)
     dffIdx = find(caEvents == uPeaks(ipeak));
     dffPeaks(ipeak) = dff(dffIdx);
 end
 
-% organize output mat
-outData = [uPeaks, dffPeaks, sumSpks];
+% organize output table
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % GRAPHICS
@@ -104,11 +114,17 @@ hold on
 plot([spktimes spktimes], yLimit, '--', 'Color', [0.5 0.5 0.5])
 text(uPeaks / fs, ones(1, length(uPeaks)) * yLimit(2), num2str(sumSpks),...
     'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'center')
-text(uPeaks / fs, sig(uPeaks), num2str(dffPeaks, '%.2f'), 'Color', [0.2 0.7 0.2],...
+text(uPeaks / fs, sig(uPeaks), num2str(dffPeaks', '%.2f'), 'Color', [0.2 0.7 0.2],...
     'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'center')
 xlabel('Time (s)')
 ylabel('F')
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% OUTPUT
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% uPeaks    indices of ca peaks
+% sumSpks   number of spikes in proximity to each ca peak
 
 
 

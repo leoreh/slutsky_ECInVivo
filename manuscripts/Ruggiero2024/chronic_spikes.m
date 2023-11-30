@@ -4,7 +4,7 @@
 % analysis per mouse
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = 'lh126';
+mname = 'lh96';
 
 varsFile = ["fr"; "datInfo"; "session"; "units"];
 varsName = ["fr"; "datInfo"; "session"; "units"];
@@ -30,6 +30,8 @@ for ifile = 1 : nfiles
     % add timebins to datInfo
     [timebins, timepnt] = metaInfo_timebins('reqPnt', [], 'nbins', 4);
     timebins / 60 / 60
+    
+    plot_FRtime_session('basepath', basepath)
 
     % mfr by states in time bins
     frBins = fr_timebins('basepath', pwd, 'forceA', true, 'graphics', true,...
@@ -237,7 +239,7 @@ for imouse = 1 : length(mname)
     end
 end
 
-iunit = 2;
+iunit = 1;
 istate = 1;
 [squeeze(m4_states(:, :, iunit, istate)); squeeze(mfr_states(:, :, iunit, istate))]
 [squeeze(m4(:, :, iunit)); squeeze(mfr(:, :, iunit))]
@@ -282,7 +284,7 @@ for ifile = 1 : 3
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% get MFR vs. time across mice (baclofen)
+% MFR vs. time across mice (baclofen)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 mname = {'lh96'; 'lh107'; 'lh122'};
@@ -308,7 +310,7 @@ end
 
 % smooth each cell and than calc mean and std and smooth across population
 
-iunit = 2;
+iunit = 1;
 npt = 91;
 prismMat = cell2nanmat(fr(:, iunit));
 prismMat = movmean(prismMat, npt, 1, 'omitnan');
@@ -322,6 +324,143 @@ sfr(sfr == Inf) = nan;
 fh = figure
 plot(xData, mfr)
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% MFR per unit in time bins (baclofen / mcu-ko)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+mname = {'lh96'; 'lh107'; 'lh122'};
+
+iunit = 1;
+mfr = cell(6, 1);
+for imouse = 1 : length(mname)
+
+    % reload data
+    varsFile = ["fr"; "datInfo"; "session"; "units"; "fr_bins"];
+    varsName = ["fr"; "datInfo"; "session"; "units"; "frBins"];
+    xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
+    [v, basepaths] = getSessionVars('mname', mname{imouse}, 'varsFile', varsFile,...
+        'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
+        'xlsname', xlsname);
+    nfiles = length(basepaths);
+
+    for ifile = 1 : nfiles
+
+            unitIdx = v(ifile).units.clean(iunit, :);
+            tmpStruct = catfields([v(ifile).frBins], 'catdef', 'addim');
+            mfr{ifile} = [mfr{ifile}; tmpStruct.mfr(unitIdx, :)];
+    end
+end
+
+prismMat = cell2nanmat(mfr);
+
+fh = figure;
+plot_boxMean('dataMat', prismMat)
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% MFR per unit in time bins (baclofen mcu-ko)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+mname = {'lh132'; 'lh133'; 'lh134'};
+npt = 131;
+
+sr = cell(length(mname), 1);
+for imouse = 1 : length(mname)
+    
+    
+        % concatenate var from different sessions
+        [expData, xData] = sessions_catVarTime('mname', mname{imouse},...
+            'dataPreset', 'sr', 'graphics', false, 'dataAlt', 1,...
+            'basepaths', {}, 'xTicksBinsize', 6, 'markRecTrans', true);
+
+        % put in cell
+        sr{imouse} = expData;
+        srMean{imouse} = mean(movmean(expData, npt, 1, 'omitnan'), 2);
+        
+end
+
+prismMat = cell2nanmat(sr, 1);
+prismMat = movmean(prismMat, npt, 1, 'omitnan');
+
+
+% recalculate spike rate in bins
+sr = [];
+for imouse = 1 : length(mname)
+ 
+    % reload data
+    varsFile = ["spktimes"; "session"];
+    varsName = ["spktimes"; "session"];
+    xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
+    [v, basepaths] = getSessionVars('mname', mname{imouse}, 'varsFile', varsFile,...
+        'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
+        'xlsname', xlsname);
+    nfiles = length(basepaths);
+    
+    srTmp2 = []
+    for ifile = 1 : nfiles
+        
+        binsize = 60 * 60 * 6 * 20000;
+        nsamps = v(ifile).session.general.nsamps;
+        binedges = [0 : nsamps / 4 : nsamps];
+        binedges(end) = nsamps;
+        if length(binedges) ~= 5
+            warning('stop')
+        end
+        
+        srTmp = [];
+        for itet = 1 : 4
+            srTmp(itet, :) = histcounts(v(ifile).spktimes{itet}, binedges,...
+                'Normalization', 'countdensity')' * 20000;
+        end
+        
+        srTmp2 = [srTmp2, srTmp];
+
+    end
+
+    sr = [sr; srTmp2];
+
+        
+end
+
+% mean per mouse
+cnt = 0;
+clear srMean
+for imouse = 1 : length(mname)
+    tetIdx = [1 : 4] + 4 * cnt;
+    srMean(imouse, :) = mean(sr([tetIdx], [1, 9, 21, 28]));
+    cnt = cnt + 1;
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% MFR per mouse during timepoints (baclofen)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+mname = {'lh96'; 'lh107'; 'lh122'};
+
+iunit = 1;
+mfr = cell(length(mname), 1);
+for imouse = 1 : length(mname)
+
+    % reload data
+    varsFile = ["fr"; "datInfo"; "session"; "units"; "fr_bins"];
+    varsName = ["fr"; "datInfo"; "session"; "units"; "frBins"];
+    xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
+    [v, basepaths] = getSessionVars('mname', mname{imouse}, 'varsFile', varsFile,...
+        'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
+        'xlsname', xlsname);
+    nfiles = length(basepaths);
+
+    for ifile = 1 : nfiles
+
+            unitIdx = v(ifile).units.clean(iunit, :);
+            tmpStruct = catfields([v(ifile).frBins], 'catdef', 'addim');
+            mfr{imouse} = [mfr{imouse}; mean(tmpStruct.mfr(unitIdx, :), 1, 'omitnan')'];
+
+    end
+end
+
+prismMat = cell2nanmat(mfr, 2);
+prismMat = prismMat([1, 7, 22, 24], :)';
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

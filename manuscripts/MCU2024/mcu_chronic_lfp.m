@@ -12,7 +12,7 @@ sstates = [1, 4];
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-mname = 'lh122';
+mname = 'lh134';
 
 varsFile = ["fr"; "sr"; "sleep_states";...
     "datInfo"; "session"; "units"; "psd"];
@@ -30,7 +30,7 @@ nfiles = length(basepaths);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 mname = {'lh96', 'lh107', 'lh122'};
-mname = {'lh132', 'lh133'};
+% mname = {'lh132', 'lh133', 'lh134'};
 flgNormTime = true;
 flgNormBand = true;
 
@@ -45,6 +45,7 @@ for imouse = 1 : length(mname)
 end
 
 istate = 1;
+% transpose
 prismData = squeeze(mean(bands(:, :, istate, :), 1, 'omitnan'));
 prismData = squeeze(mean(powdb(:, istate, :, :), 1, 'omitnan'));
 
@@ -95,5 +96,57 @@ for ifile = 1 : nfiles
 
 end
 rippGain = cell2nanmat(rippGain, 2);
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% hynogram during baseline
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% mcu baseline basepaths
+basepaths = {...
+    'F:\Data\lh132\lh132_230413_094013',...
+    'F:\Data\lh133\lh133_230413_094013',...
+    'F:\Data\lh134\lh134_230504_091744',...
+    'F:\Data\lh136\lh136_230519_090043',...
+    'F:\Data\lh140\lh140_230619_090023'};
+
+
+% wt baseline basepaths
+basepaths = {...
+    'F:\Data\lh96\lh96_220120_090157',...
+    'F:\Data\lh107\lh107_220518_091200',...
+    'F:\Data\lh122\lh122_221223_092656',...
+    'F:\Data\lh142\lh142_231005_091832'};
+
+% load data
+varsFile = ["fr"; "sleep_states"; "datInfo"; "session"; "units"; "psd"];
+varsName = ["fr"; "ss"; "datInfo"; "session"; "units"; "psd"];
+xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
+[v, basepaths] = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
+    'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
+    'xlsname', xlsname);
+
+% params
+nfiles = length(basepaths);
+
+% plot hynogram
+fh = figure;
+for ifile = 1 : nfiles
+    
+    sb = subplot(nfiles, 1, ifile);
+    plot_hypnogram('stateEpochs', v(ifile).ss.stateEpochs, 'axh', sb)
+
+end
+
+% plot state in bins
+fh = figure;
+
+[timebins, timepnt] = metaInfo_timebins('reqPnt', 5 * 60 * 60, 'nbins', 2);
+
+% plot state duration in timebins
+[totDur, epLen] = as_plotZT('nwin', 4, 'sstates', [1, 2, 3, 4, 5],...
+    'ss', v(ifile).ss, 'timebins', v(ifile).session.general.timebins);
+
+
 
 

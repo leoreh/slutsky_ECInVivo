@@ -1,4 +1,4 @@
-function plot_nunits(varargin)
+function [rs, fs] = plot_nunits(varargin)
 
 % plot a stacked bar plot of the number of units per spike group
 %
@@ -43,6 +43,14 @@ for ifile = 1 : nfiles
     [mousepath, basenames{ifile}] = fileparts(basepaths{ifile});
 end
 
+% organize session names
+for ifile = 1 : nfiles
+    filenames{ifile} = datestr(guessDateTime(basenames{ifile}), 'yymmdd');
+end
+
+% initialize output
+rs = []; fs = [];
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -56,6 +64,8 @@ if nfiles == 1
     figname = fullfile(figpath, [basenames{1}, '_nunits']);
 
     nunits = v(1).units.nunits;
+    rs = nunits(1, :);
+    fs = nunits(2, :);
     
     subplot(1, 2, 1)
     bh = bar(nunits', 'stacked');
@@ -82,20 +92,22 @@ else
     % organize matrix [session (rows) x tetrode (columns)]
     units = catfields([v(:).units]);
     units = units.nunits;
-    ngrps = size(units, 2);
-    clear rs fs other
+    [nsessions, ngrps] = size(units);
     for igrp = 1 : ngrps
         rs(:, igrp) = units([1 : 3 : end], igrp);
         fs(:, igrp) = units([2 : 3 : end], igrp);
         other(:, igrp) = units([3 : 3 : end], igrp);
     end
     
+    yLimit = [0, max([sum(rs, 2); sum(fs, 2)])];
+
     subplot(1, 2, 1)
     plot(rs)
     hold on
     plot(sum(rs, 2), 'Color', 'k', 'LineWidth', 2)
-    xticks([1 : ngrps])
-    xticklabels(basenames)
+    xticks([1 : nsessions])
+    xticklabels(filenames)
+    ylim(yLimit)
     xlabel('session')
     ylabel('RS units')
     legend([split(num2str([1 : ngrps])); 'Total'])
@@ -104,8 +116,9 @@ else
     plot(fs)
     hold on
     plot(sum(fs, 2), 'Color', 'k', 'LineWidth', 2)
-    xticks([1 : ngrps])
-    xticklabels(basenames)
+    xticks([1 : nsessions])
+    xticklabels(filenames)
+    ylim(yLimit)
     xlabel('session')
     ylabel('FS units')
 end

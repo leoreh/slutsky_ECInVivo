@@ -136,11 +136,14 @@ if exist(asFile, 'file') || ~isempty(stateEpochs)
             continue
         end
         epochIdx = InIntervals(stateEpochs{istate}, winCalc);
-        if ~isempty(stateEpochs{istate})
+        if all(size(stateEpochs{istate}) > 1)
             [fr.states.fr{istate}, fr.states.binedges,...
                 fr.states.tstamps{istate}, fr.states.binidx] =...
                 times2rate(spktimes, 'binsize', binsize,...
                 'winCalc', stateEpochs{istate}(epochIdx, :), 'c2r', true);
+        else
+            fr.states.fr{istate} = [];
+            fr.states.tstamps{istate} = [];
         end
     end
     
@@ -148,7 +151,11 @@ if exist(asFile, 'file') || ~isempty(stateEpochs)
     mat1 = mean(fr.states.fr{1}, 2, 'omitnan');
     for istate = 1 : nstates
         mat2 = mean(fr.states.fr{istate}, 2, 'omitnan');
-        fr.states.gain(istate, :) = (mat2 - mat1) ./ max([mat1, mat2], [], 2) * 100;
+        if ~isempty(mat2) && ~isempty(mat1)
+            fr.states.gain(istate, :) = (mat2 - mat1) ./ max([mat1, mat2], [], 2) * 100;
+        else
+            fr.states.gain(istate, :) = nan(1, length(nunits));
+        end
     end
     
     % normalized ratio (mizuseki, cell rep., 2008). organized as a 3d mat
@@ -157,8 +164,13 @@ if exist(asFile, 'file') || ~isempty(stateEpochs)
         for istate2 = 1 : nstates
             mat1 = mean(fr.states.fr{istate}, 2, 'omitnan');
             mat2 = mean(fr.states.fr{istate2}, 2, 'omitnan');
-            fr.states.ratio(istate, istate2, :) =...
-                ((mat1 - mat2) ./ (mat1 + mat2)) * 100;
+            if ~isempty(mat2) && ~isempty(mat1)
+                fr.states.ratio(istate, istate2, :) =...
+                    ((mat1 - mat2) ./ (mat1 + mat2)) * 100;
+            else
+                 fr.states.ratio(istate, istate2, :) =...
+                    nan(1, length(nunits));
+            end
         end
     end
     

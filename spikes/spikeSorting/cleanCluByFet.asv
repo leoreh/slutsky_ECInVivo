@@ -88,6 +88,34 @@ db1 = []; db2 = [];
 if manCur
     dbstop in cleanCluByFet at 94 if manCur
     
+    %%
+    for grpid = [1 : 4]
+
+        fixSpkAndRes('grp', grpid, 'dt', 0, 'stdFactor', 0, 'resnip', false);
+        % load data
+        res = loadNS('datatype', 'res', 'session', session, 'grpid', grpid);
+        fet = loadNS('datatype', 'fet', 'session', session, 'grpid', grpid);
+
+        % print to screen rpv ratio of all clusters in group
+        clu = loadNS('datatype', 'clu', 'session', session, 'grpid', grpid);
+        rpvRatioAll = displayRPV(res, ref)
+
+        % remove rpv spks from all clusters until criterion is reached
+        sclu = [];      % selected clusters. if empty will clean all
+        clean2criterion(fet, res, ref, rpvCrt, rmvLim, sclu, grpid, false)
+
+        % save new clu
+        saveNS(clu, 'datatype', 'clu', 'session', session, 'grpid', grpid);
+
+        % calc quality of cluster separation
+        distofclus = displayCluDist(fet, [])
+
+
+
+    end
+%%
+
+
     % select spiking grp
     grpid = 4;
     
@@ -113,7 +141,7 @@ if manCur
     fixSpkAndRes('grp', grpid, 'dt', 0, 'stdFactor', 0, 'resnip', false);
     
     % rmv spks from selected cluster
-    sclu = 8;      % cluster id
+    sclu = 5;      % cluster id
     for sclu = 2 : max(unique(clu))
         [cluidx, rmvSpks] = cleanClu(fet, res, sclu, ref, 0.0001, [0.12 0.06]);
     end

@@ -206,7 +206,11 @@ ncol = size(v(1).data, 1);
 recStart = cellfun(@guessDateTime, basenames, 'uni', true);
 expStart = recStart(1) - max([0, diff(timeofday([zt0, recStart(1)]))]);
 expEnd = guessDateTime(basenames{end});
-expEnd = expEnd + seconds(v(end).session.general.nsamps / fs);
+lastDur = v(end).session.general.duration;
+if isstr(lastDur)
+    lastDur = str2num(lastDur);
+end
+expEnd = expEnd + seconds(lastDur);
 expLen = ceil(seconds(expEnd - expStart) / ts); 
 expData = nan(expLen, ncol);
 expRs = nan(expLen, ncol);
@@ -282,7 +286,7 @@ if graphics
             % take a sample of the spectrogram to help initialize the colormap
             sampleBins = randperm(expLen, round(expLen / 10));
             specSample = reshape(expData(sampleBins, :), 1, length(sampleBins) * length(faxis));
-            caxis1 = prctile(specSample, [20 80]);
+            caxis1 = prctile(specSample, [2 94]);
 
             % plot
             imagesc(xData, faxis', expData', caxis1);
@@ -291,8 +295,9 @@ if graphics
             ylabel('Freq. [Hz]')
             set(gca, 'yscale', 'log')
             ylim([max([0.2, faxis(1)]), faxis(end)])
-            yticks([1, 10, 100])
-        
+%             yticks([1, 10, 100])
+            yticks([1, 4, 16, 20])
+
         case 'bands'
             expData = movmean(expData, 33, 1);
             plot(xData, expData, 'lineWidth', 2.5);
