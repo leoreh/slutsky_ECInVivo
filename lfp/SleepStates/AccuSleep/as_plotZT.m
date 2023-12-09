@@ -1,4 +1,4 @@
-function [totDur, epLen, timebins] = as_plotZT(varargin)
+function [totDur, prctDur, epLen, timebins] = as_plotZT(varargin)
 
 % receives a labels vector, divides it to states within timebins, and plots
 % the epoch destribution and duration. 
@@ -123,6 +123,11 @@ for istate = 1 : length(sstates)
     epLen{istate} = cell2nanmat(epLen_temp(:, istate), 2);
 end
 
+% calc state duration [%]
+for istate = 1 : length(sstates)
+    prctDur(:, istate) = (totDur(:, istate) ./ binLen') * 100;
+end
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -136,9 +141,7 @@ if graphics
         
         % state duration
         subplot(2, length(sstates), istate)
-        dataVec = totDur(:, istate) / 60;
-        dataVec = (totDur(:, istate) ./ binLen) * 100;
-        plot([1 : nbins], dataVec,...
+        plot([1 : nbins], prctDur(:, istate),...
             'Color', cfg.colors{sstates(istate)}, 'LineWidth', 2)
         ylabel('State duration [min]')
         ylabel('State duration [%]')

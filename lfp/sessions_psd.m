@@ -81,7 +81,7 @@ if flgAnalyze
         ch = [];
         prct = 70;
         sstates = [1, 4];
-        ftarget = [0.5 : 0.5 : 100];
+        ftarget = [0.1 : 0.5 : 100];
     end
 
     % go over files and re-analyze

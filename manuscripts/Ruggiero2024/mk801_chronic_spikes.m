@@ -80,24 +80,30 @@ cell_metrics = CellExplorer('basepaths', basepaths);
 % sessionList: all five sessions should be considered
 
 mname = {'lh122'; 'lh123'; 'lh126'; 'lh129'; 'lh130'};
-sstates = [1, 4];
 
-mfrcat = cell(2, 2);
-frMed = [-1];      % take units with mfr > med (pos), < med (neg), or all []
+sstates = [1, 4];
+mfrcat = cell(length(sstates), 2);
+gaincat = cell(1, 2);
+frMed = [-1];         % take units with mfr > med (pos), < med (neg), or all []
+gainVar = 'ratio';   % can be 'gain' or 'ratio'
 for imouse = 1 : length(mname)
+
+    % get basepaths
+    queryStr = [mname{imouse}, '_mk801'];
+    basepaths = mk801_chronic_sessions(queryStr);
 
     % reload data
     varsFile = ["fr"; "fr_bins"; "datInfo"; "session"; "units"];
     varsName = ["fr"; "frBins"; "datInfo"; "session"; "units"];
     xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
-    [v, basepaths] = getSessionVars('mname', mname{imouse}, 'varsFile', varsFile,...
+    [v, basepaths] = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
         'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
         'xlsname', xlsname);
     nfiles = length(basepaths);
 
     % organize in cell array
     cnt = 1;
-    clear mfr stateRat stateGain
+    clear mfr stateGain
     for ifile = 1 : nfiles
         for ibin = 1 : 4
             for iunit = 1 : 2
@@ -108,9 +114,9 @@ for imouse = 1 : length(mname)
                 if isempty(frMed)
                     unitMfrIdx = ones(1, length(allMfr));
                 elseif frMed > 0
-                    unitMfrIdx = allMfr > median(unitMfr);
+                    unitMfrIdx = allMfr > prctile(unitMfr, 75);
                 elseif frMed < 0
-                    unitMfrIdx = allMfr < median(unitMfr)';
+                    unitMfrIdx = allMfr < prctile(unitMfr, 25)';
                 end
                 unitIdx = unitIdx & unitMfrIdx;
 
@@ -119,30 +125,64 @@ for imouse = 1 : length(mname)
                     mfr{cnt, istate, iunit} = v(ifile).frBins(ibin).states.mfr(unitIdx, sstates(istate));
 
                 end
-                stateRat{cnt, iunit} = squeeze(v(ifile).frBins(ibin).states.ratio(1, 4, unitIdx));
-                stateGain{cnt, iunit} = squeeze(v(ifile).frBins(ibin).states.gain(4, unitIdx));
+                
+                % get state ratio / gain factor
+                tmp = v(ifile).frBins(ibin).states.(gainVar);
+                if ndims(tmp) == 3
+                    stateGain{cnt, iunit} = squeeze(tmp(4, 1, unitIdx));
+                elseif ndims(tmp) == 2
+                    stateGain{cnt, iunit} = squeeze(tmp(4, unitIdx));
+                end
             end
             cnt = cnt + 1;
         end
     end
 
     % reorganize for prism
-    for istate = 1 : 2
+    for istate = 1 : length(sstates)
         for iunit = 1 : 2
             data = cell2nanmat(squeeze(mfr(:, istate, iunit)), 2);
             mfrcat{istate, iunit} = [mfrcat{istate, iunit};...
                 data];
         end
     end
-    iunit = 1;
-    cell2nanmat(squeeze(stateRat(:, iunit)), 2);
-    cell2nanmat(squeeze(stateGain(:, iunit)), 2);
-
+    for iunit = 1 : 2
+        data = cell2nanmat(squeeze(stateGain(:, iunit)), 2);
+        gaincat{iunit} = [gaincat{iunit}; data];
+    end
 
 end
 
-mfrcat{2, 2}
+% to prism: mfr in bins 
+iunit = 1;
+mfrcat{2, iunit}
 
+% to prism: scatter data of mfr wake vs mfr nrem vs gain factor
+iunit = 1;
+bins = -30 : 6 : 84;
+clear data
+for ibin = 1 : size(gaincat{1}, 2)
+    data = [mfrcat{1, iunit}(:, ibin),...
+        mfrcat{2, iunit}(:, ibin),...
+        gaincat{iunit}(:, ibin)];
+
+    % calc fraction of units with gain factor >0
+    tmp = gaincat{iunit}(:, ibin);
+    frct(ibin) = sum(tmp > 0) / length(tmp);
+end
+
+% correct lh122_230112_084703
+% nunits = 27;
+% for ibin = 1 : 4
+%     frBins(ibin).mfr = nan(nunits, 1);
+%     frBins(ibin).states.mfr = nan(nunits, 6);
+%     frBins(ibin).states.gain = nan(6, nunits);
+%     frBins(ibin).states.ratio = nan(6, 6, nunits);
+% end
+% basepath = pwd;
+% [~, basename] = fileparts(basepath)
+% filename = [basename, '.fr_bins.mat'];
+% save(filename, 'frBins')
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % MFR in states across mice per unit

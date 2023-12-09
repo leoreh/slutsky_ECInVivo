@@ -235,7 +235,6 @@ basepaths = {...
     'F:\Data\lh136\lh136_230519_090043',...
     'F:\Data\lh140\lh140_230619_090023'};
 
-
 % wt baseline basepaths
 basepaths = {...
     'F:\Data\lh96\lh96_220120_090157',...
@@ -245,8 +244,10 @@ basepaths = {...
 
 
 % load data
-varsFile = ["fr"; "sleep_states"; "datInfo"; "session"; "units"];
-varsName = ["fr"; "ss"; "datInfo"; "session"; "units"];
+varsFile = ["fr"; "sleep_states"; "datInfo"; "session"; "units";...
+    "st_metrics"; "st_brst"; "spikes"];
+varsName = ["fr"; "ss"; "datInfo"; "session"; "units";...
+    "st"; "brst"; "spikes"];
 xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
 [v, basepaths] = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
     'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
@@ -256,12 +257,60 @@ nfiles = length(basepaths);
 sstates = [1, 4, 5];
 iunit = 1;
 
-mfr = [];
+% population mfr
+data = [];
+pmfr = nan(nfiles, length(sstates));
 for ifile = 1 : nfiles
 
     unitIdx = v(ifile).units.clean(iunit, :);
-    mfr = [mfr; v(ifile).fr.states.mfr(unitIdx, sstates)];
+    
+    data = [data; v(ifile).fr.states.mfr(unitIdx, sstates)];
+    pmfr(ifile, :) = mean(v(ifile).fr.states.mfr(unitIdx, sstates));
 
+end
+
+% fr per unit in AW, NREM, Gain
+data = [];
+for ifile = 1 : nfiles
+
+    unitIdx = v(ifile).units.clean(iunit, :);   
+    data = [data; v(ifile).fr.states.mfr(unitIdx, 1),...
+        v(ifile).fr.states.mfr(unitIdx, 4),...
+        v(ifile).fr.states.gain(4, unitIdx)'];
+
+end
+
+% burstiness from st
+data = [];
+dataType = 'royer';
+for ifile = 1 : nfiles
+
+    unitIdx = v(ifile).units.clean(iunit, :);
+    
+    % mfr
+    data = [data, v(ifile).st.(dataType)(unitIdx)];
+    
+end
+
+% burstiness from mea_brst
+data = [];
+dataType = 'rate';
+for ifile = 1 : nfiles
+
+    unitIdx = v(ifile).units.clean(iunit, :);
+    
+    % mfr
+    data = [data, v(ifile).brst.(dataType)(unitIdx)];
+    
+end
+
+
+
+%%% analyze
+for ifile = 1 : nfiles
+    cd(basepaths{ifile})
+    brst = spktimes_meaBrst(v(ifile).spikes.times, 'binsize', [], 'isiThr', 0.05,...
+        'minSpks', 2, 'saveVar', true, 'force', true, 'bins', [0 Inf]);
 end
 
 

@@ -257,7 +257,7 @@ nfiles = length(basepaths);
 sstates = [1, 4, 5];
 iunit = 1;
 
-% mfr
+% population mfr
 data = [];
 pmfr = nan(nfiles, length(sstates));
 for ifile = 1 : nfiles
@@ -266,6 +266,17 @@ for ifile = 1 : nfiles
     
     data = [data; v(ifile).fr.states.mfr(unitIdx, sstates)];
     pmfr(ifile, :) = mean(v(ifile).fr.states.mfr(unitIdx, sstates));
+
+end
+
+% fr per unit in AW, NREM, Gain
+data = [];
+for ifile = 1 : nfiles
+
+    unitIdx = v(ifile).units.clean(iunit, :);   
+    data = [data; v(ifile).fr.states.mfr(unitIdx, 1),...
+        v(ifile).fr.states.mfr(unitIdx, 4),...
+        v(ifile).fr.states.gain(4, unitIdx)'];
 
 end
 
