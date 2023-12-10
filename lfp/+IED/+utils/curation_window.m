@@ -66,7 +66,7 @@ classdef curation_window < handle
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
  
     %%%%%%%%%%%%%%  app management %%%%%%%%%%%%%%%%
-    methods (Access = private)
+    methods (Hidden)
         function [x_data, y_data] = collect_data(app,nDischarge,marg)
             % collect what x_data & y_data are relevant to discharge.
             % INPUT:
@@ -112,7 +112,7 @@ classdef curation_window < handle
     end
     
     %%%%%%%%%%%%%%  Callbacks that handle component events %%%%%%%%%%%%%%%%
-    methods (Access = private)
+    methods (Hidden)
 
         % Close request function: IED_curation_UIFigure
         function IED_curation_UIFigureCloseRequest(app)
@@ -242,7 +242,7 @@ classdef curation_window < handle
 
     
     %%%%%%%%%%%%%%  Component initialization %%%%%%%%%%%%%%%%
-    methods (Access = private)
+    methods (Hidden)
 
         % Create UIFigure and components
         function createComponents(app)
