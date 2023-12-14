@@ -39,7 +39,7 @@ if ~isa(ied,'IED.data')
 end
 
 p = inputParser;
-addParameter(p, 'binsize', [], @isnumeric)
+addParameter(p, 'binsize', 60*ied.fs, @isnumeric)
 addParameter(p, 'marg', 0.05, @isnumeric)
 addParameter(p, 'smf', 7, @isnumeric)
 addParameter(p, 'saveVar', true, @islogical);
@@ -48,16 +48,10 @@ addParameter(p, 'basename', [], @isstr);
 addParameter(p, 'saveFig', true, @islogical);
 parse(p, varargin{:})
 
-if isempty(p.Results.binsize)
-    if isempty(ied.binsize)
-        % no existing binsize val, user did not ask for anything -
-        % use default 1 min
-        ied.binsize = 60*ied.fs;
-    else
-        % keep existing ied.binsize
-    end
-else
-    % overwrite existing binsize with user request
+
+if  ~ismember("binsize",p.UsingDefaults) || isempty(ied.binsize)
+    % user ask for binsize, or no specific binsize exist in ied -
+    % overwrite existing
     ied.binsize = p.Results.binsize;
 end
 if ~ismember("smf",p.UsingDefaults) || isempty(ied.smf)
@@ -66,34 +60,23 @@ if ~ismember("smf",p.UsingDefaults) || isempty(ied.smf)
     ied.smf = p.Results.smf;
 end
 if ~ismember("marg",p.UsingDefaults) || isempty(ied.marg)
-    % user ask for smf, or no specific smf exist in ied -
+    % user ask for marg, or no specific marg exist in ied -
     % overwrite existing
     ied.marg = p.Results.marg;
 end
+
 saveVar = p.Results.saveVar;
 basepath = p.Results.basepath;
 basename = p.Results.basename;
 saveFig = p.Results.saveFig;
+
 if isempty(basename)
     % write where to save
     [~,basename] = fileparts(basepath);
 end
-if any(ismember(["basepath","basename"],p.UsingDefaults)) && (saveVar || saveFig)
+if any(~ismember(["basepath","basename"],p.UsingDefaults)) && (saveVar || saveFig)
     % if user gave any info & want to save, overwrite existing
     ied.file_loc = fullfile(basepath,join([basename "ied.mat"],"."));
-end
-
-if (saveVar || saveFig)
-
-    if isempty(ied.file_loc)
-        % create from user input
-
-
-    elseif ~isempty(ied.file_loc) && any(~ismember(["basename","basepath"],p.UsingDefaults))
-        % inform user that its input did not matter
-        fprintf("\n****Using already existing file path, as exist in ied (1st) input.\n" + ...
-            "To save in a new path, change path before calling analyze function.")
-    end
 end
 
 % warn if ied wasn't curated
