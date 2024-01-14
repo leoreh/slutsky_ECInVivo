@@ -5,15 +5,18 @@ cd(basepath)
 [~, basename] = fileparts(basepath);
 
 % load lfp from WCP/lfp
-channel2load = 2;
 channels_in_file = 4;
+lfp_chan2load = 2;
+emg_chan2load = 4; % note this is optional, leave empty ( [] ) & comment relevant lines to skip emg
+
 
 file_type = 'lfp';
-lfp = getLFP('basepath', basepath, 'nchans', channels_in_file, 'ch', channel2load, 'chavg', {},...
+lfp = getLFP('basepath', basepath, 'nchans', channels_in_file, 'ch', [lfp_chan2load, emg_chan2load], 'chavg', {},...
     'fs', 1250, 'interval', [0 inf], 'extension', file_type,...
     'savevar', false,'concat',true, 'forceL', false, 'basename', basename,'pli', false); 
 fs = lfp.fs;
-sig = lfp.data;
+sig = lfp.data(:,1);
+emg = lfp.data(:,2);
 
 % % If you use .lfp file, its fs is already 1250, and you don't care for the
 % % 450 low pass / have already a filtered file:
@@ -23,7 +26,8 @@ sig = lfp.data;
 % file_name = fullfile(basepath, join([basename ".lfp"],""));
 % map_format = map_creator(file_name,channels_in_file,"int16");
 % maped_file = memmapfile(file_name,"Format",[map_format 'Mapped']);
-% sig = memmap_row(maped_file,channel2load);
+% sig = memmap_row(maped_file,lfp_chan2load);
+% emg = memmap_row(maped_file,emg_chan2load); % note assumption that emg is same file. if it isn't, just do the full process with a new file.
 % fs = 1250;
 
 thr_mv = 0;

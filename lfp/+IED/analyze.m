@@ -112,6 +112,11 @@ true_pos = ied.pos(accepted);
 ied.rate = movmean(ied.rate, ied.smf);
 ied.status = "analyzed";
 
+try
+    ied.git_last_step = get_gits_status(["slutsky_ECInVivo", "CellExplorer"]);
+catch err
+    ied.git_last_step = join(["Error: " err.message]);
+end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % save result if needed (overwrite)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

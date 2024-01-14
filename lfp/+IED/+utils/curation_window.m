@@ -28,6 +28,8 @@ classdef curation_window < handle
         title_instruction      matlab.ui.control.Label
         zoom_in_axe            matlab.ui.control.UIAxes
         zoom_out_axe           matlab.ui.control.UIAxes
+        zoom_in_axe_emg        matlab.ui.control.UIAxes
+        save_button            matlab.ui.control.Button
     end
 
     
@@ -37,16 +39,20 @@ classdef curation_window < handle
         zoom_out_line     % line in the zoom out graph
         zoom_out_peak     % marker showing current discharge
         zoom_out_thr      % lines showing threshold values
-        zoom_out_marg = 5 % zoom out margins, in seconds
+        zoom_out_marg = 5 % zoom out margins (one side), in seconds
 
         %%% zoom in props %%%
         zoom_in_line       % line in the zoom in graph
         zoom_in_peak       % marker showing current discharge
         zoom_in_thr        % lines showing threshold values
-        zoom_in_marg = 0.5 % zoom in margins, in seconds
+        zoom_in_marg = 0.5 % zoom in margins (one side), in seconds
         
+        %%% zoom in emg props %%%
+        zoom_in_emg_line       % line in the zoom in graph
+        zoom_in_emg_peak       % marker showing current discharge
+
         %%% general %%%
-        toolbar_pressed = false % when true, window-press give precedence to ax toolbars
+        block_keypress = false % when true, window-press give precedence to ax toolbars
     end
     
     %%%%%%%%%%%%%%  data properties  %%%%%%%%%%%%%%%%
@@ -67,12 +73,13 @@ classdef curation_window < handle
  
     %%%%%%%%%%%%%%  app management %%%%%%%%%%%%%%%%
     methods (Hidden)
-        function [x_data, y_data] = collect_data(app,nDischarge,marg)
+        function [x_data, y_data] = collect_data(app,nDischarge,marg,src)
             % collect what x_data & y_data are relevant to discharge.
             % INPUT:
             %   app - base obj.
             %   nDischarge - numeric scalar, idx of discharge in detection
-            %   marg      - how much to collect around the discharge [in sec]
+            %   marg       - how much to collect around the discharge [in sec]
+            %   src        - text scalar, from where in the ied to collect the data ("sig" / "emg")
             % OUTPUT:
             %   x_data, y_data - numeric vectors, data to display.
             
@@ -84,11 +91,11 @@ classdef curation_window < handle
 
             % collect window start & end
             win_start = max([1 Discharge_pos - marg]);
-            win_end   =  min([length(app.ied.sig) Discharge_pos + marg]);
+            win_end   =  min([length(app.ied.(src)) Discharge_pos + marg]);
 
             % transform to x & y vectors
             x_data = app.tstamps(win_start : win_end);
-            y_data = app.ied.sig(win_start : win_end);
+            y_data = app.ied.(src)(win_start : win_end);
         end
 
         function change_discharge(app)
@@ -96,17 +103,24 @@ classdef curation_window < handle
             discharge_num = app.ied.last_mark;
 
             % collect discharge info
-            [discharge_loc_x, discharge_loc_y] = app.collect_data(discharge_num, 0);
+            [discharge_loc_x, discharge_loc_y] = app.collect_data(discharge_num, 0, "sig");
 
             % update zoom out
-            [app.zoom_out_line.XData,app.zoom_out_line.YData] = app.collect_data(discharge_num, app.zoom_out_marg);
-            [app.zoom_out_peak.XData,app.zoom_out_peak.YData] = deal(discharge_loc_x,discharge_loc_y);
+            [app.zoom_out_line.XData, app.zoom_out_line.YData] = app.collect_data(discharge_num, app.zoom_out_marg, "sig");
+            [app.zoom_out_peak.XData, app.zoom_out_peak.YData] = deal(discharge_loc_x,discharge_loc_y);
 
             % update zoom in
-            [app.zoom_in_line.XData,app.zoom_in_line.YData] = app.collect_data(discharge_num, app.zoom_in_marg);
-            [app.zoom_in_peak.XData,app.zoom_in_peak.YData] = deal(discharge_loc_x,discharge_loc_y);
+            [app.zoom_in_line.XData, app.zoom_in_line.YData] = app.collect_data(discharge_num, app.zoom_in_marg, "sig");
+            [app.zoom_in_peak.XData, app.zoom_in_peak.YData] = deal(discharge_loc_x,discharge_loc_y);
             title(app.zoom_in_axe, sprintf('spk %d/%d', app.ied.last_mark, numel(app.ied.pos)) )
             ylim(app.zoom_in_axe, [min(app.zoom_in_line.YData) max(app.zoom_in_line.YData)])
+
+            % update zoom in emg
+            if isvalid(app.zoom_in_axe_emg)
+                [app.zoom_in_emg_line.XData, app.zoom_in_emg_line.YData] = app.collect_data(discharge_num, app.zoom_in_marg, "emg");
+                [discharge_loc_x, discharge_loc_y] = app.collect_data(discharge_num, 0, "emg");
+                [app.zoom_in_emg_peak.XData, app.zoom_in_emg_peak.YData] = deal(discharge_loc_x,discharge_loc_y);
+            end
         end
         
     end
@@ -119,7 +133,7 @@ classdef curation_window < handle
             % raise exit validation
             
             answer = uiconfirm(app.IED_curation_UIFigure,...
-                {'Ready to leave?' 'Changes will be saved in the IED.data obj'}, 'Exit Curation',...
+                {'Ready to leave?' 'Changes are already updated in the IED.data obj'}, 'Exit Curation',...
                 "Options",["Yes","No"],...
                 'CancelOption',"No","DefaultOption","No");
             if answer == "Yes"
@@ -132,7 +146,11 @@ classdef curation_window < handle
         function IED_curation_UIFigureWindowKeyPress(app, event)
             % Manage key response - what each key means.
             % Note this manage both keyboard & mouse clicks, by being
-            % called from IED_curation_UIFigureWindowButtonDown.
+            % called from IED_curation_UIFigureWindowButtonDown. Normal
+            % callback only detect keyboard clicks, otherwise.
+            
+            % validate that press wasn't on save_button
+            % keyboard
             
             key = event.Key;
             switch key
@@ -195,13 +213,14 @@ classdef curation_window < handle
 
         % Window button up function: IED_curation_UIFigure
         function IED_curation_UIFigureWindowButtonUp(app)
+            % run when mouse key is pressed.
             % make sure axtoolbar wasn't released, and pass mouse key to
             % key-pressed function
-            
-            if app.toolbar_pressed
-                % axtoolbar was released.
+            pause(0.01)
+            if app.block_keypress
+                % Clicked object was released.
                 % Remove block, but do not move discharge
-                app.toolbar_pressed = false;
+                app.block_keypress = false;
             else
                 % collect what mouse key was pressed, pass it to
                 % keypress-manager
@@ -217,7 +236,7 @@ classdef curation_window < handle
             % Changing the property here is evaluated before
             % IED_curation_UIFigureWindowButtonUp, and inside the next
             % function app.toolbar_pressed block behavior.
-            app.toolbar_pressed = true;
+            app.block_keypress = true;
         end
         
         % Button pushed function: zoom_in_axe's & zoom_out_axe's toolbarpushbutton
@@ -225,7 +244,7 @@ classdef curation_window < handle
             % axtoolbar SelectionChangedFcn do not respond to pushbuttons.
             % this wrapper make sure to conserve buttons functionality,
             % while still preventing response to user calls.
-            app.axtoolbar_pressed
+            app.axtoolbar_pressed()
             switch src.Tag
                 case 'restoreview'
                     matlab.graphics.controls.internal.resetHelper(evt.Axes,true)
@@ -237,6 +256,38 @@ classdef curation_window < handle
                     matlab.graphics.internal.export.exportTo(matlab.graphics.controls.internal.exportHelper(evt.Axes),'target','clipboard','format','vector','vector',true)
             end
             
+        end
+   
+        % Button pushed function: save_button
+        function save_ied(app)
+            % save ied object at its current state
+            
+            % block IED_curation_UIFigureWindowKeyPress for this press.
+            % this will be restore in IED_curation_UIFigureWindowButtonUp,
+            % following mouse release.
+            app.block_keypress = true;
+
+            % block app while saving
+            progress_dlg = uiprogressdlg(app.IED_curation_UIFigure,...
+                "Indeterminate","on","Message","Saving IED","Cancelable","off","Title","ied saving");
+            cl = onCleanup(@() close(progress_dlg)); % remove progress_dlg block on any form of exit (i.e. error)
+            
+            % find where to save if needed
+            if isempty(app.ied.file_loc) || ~isfolder(fileparts(app.ied.file_loc))
+                progress_dlg.Message = "Choose where to save";
+                [save_file,save_path] = uiputfile('*.ied.mat');
+                if isnumeric(save_file)
+                    % user cancled, return
+                    return
+                else
+                    % place location in ied
+                    app.ied.file_loc = fullfile(save_path,save_file);
+                end
+            end
+
+            progress_dlg.Message = "Saving (might take a while)";
+            ied = app.ied; %#ok<PROP> this is so saved name will be ied as expected
+            save(ied.file_loc,"ied","-v7.3") %#ok<PROP> this is so saved name will be ied as expected
         end
     end
 
@@ -255,15 +306,15 @@ classdef curation_window < handle
             app.IED_curation_UIFigure = uifigure('Visible', 'off');
             app.IED_curation_UIFigure.Color = [1 1 1];
             app.IED_curation_UIFigure.Position = [100 100 640 480];
-            app.IED_curation_UIFigure.Name = 'MATLAB App';
+            app.IED_curation_UIFigure.Name = 'IED Curation';
             app.IED_curation_UIFigure.CloseRequestFcn = @(~,~) app.IED_curation_UIFigureCloseRequest;
             app.IED_curation_UIFigure.WindowButtonUpFcn =  @(~,~) app.IED_curation_UIFigureWindowButtonUp;
             app.IED_curation_UIFigure.WindowKeyPressFcn = @(~,evt) app.IED_curation_UIFigureWindowKeyPress(evt);
 
             % Create GridLayout
             app.GridLayout = uigridlayout(app.IED_curation_UIFigure);
-            app.GridLayout.ColumnWidth = {'1x'};
-            app.GridLayout.RowHeight = {'0.2x', '1x', '1x'};
+            app.GridLayout.ColumnWidth = {'0.2x','1x'};
+            app.GridLayout.RowHeight = {'0.2x', '1x', '1x', '1x'};
             if (str2double(mat_ver(3:6)) > 2020) || ( (str2double(mat_ver(3:6))==2020) && (mat_ver(7) == "b") )
                 % only from 2020b and later
                 app.GridLayout.BackgroundColor = [1 1 1];
@@ -284,7 +335,7 @@ classdef curation_window < handle
             app.zoom_out_axe.TickLength = [0 0];
             app.zoom_out_axe.NextPlot = 'add';
             app.zoom_out_axe.Layout.Row = 2;
-            app.zoom_out_axe.Layout.Column = 1;
+            app.zoom_out_axe.Layout.Column = [1 2];
             app.zoom_out_axe.XAxis.Exponent = 0;
             
             % manage zoom_out_axe toolbar
@@ -311,7 +362,7 @@ classdef curation_window < handle
             app.zoom_in_axe.TickLength = [0 0];
             app.zoom_in_axe.NextPlot = 'add';
             app.zoom_in_axe.Layout.Row = 3;
-            app.zoom_in_axe.Layout.Column = 1;
+            app.zoom_in_axe.Layout.Column = [1 2];
             app.zoom_in_axe.XAxis.Exponent = 0;
 
             % manage zoom_in_axe toolbar
@@ -322,6 +373,34 @@ classdef curation_window < handle
              % make sure push buttons are also clickable without moving discharged
             push_buttons = findobj(bt_strip,'Type','toolbarpushbutton');
             [push_buttons.ButtonPushedFcn] = deal(@(src,evt) app.pushbutton_axtoolbar_pressed(src,evt));
+            
+            % Create zoom_in_axe_emg
+            app.zoom_in_axe_emg = uiaxes(app.GridLayout);
+            ylabel(app.zoom_in_axe_emg, 'Voltage [mV]')
+            zlabel(app.zoom_in_axe_emg, 'Z')
+            app.zoom_in_axe_emg.YLim = [0 1];
+            if str2double(mat_ver(3:6)) >= 2021
+                % only from 2021a and later
+                app.zoom_in_axe_emg.XLimitMethod = 'tight';
+            else
+                axis(app.zoom_in_axe_emg,'tight')
+            end
+            app.zoom_in_axe_emg.TickLength = [0 0];
+            app.zoom_in_axe_emg.NextPlot = 'add';
+            app.zoom_in_axe_emg.Layout.Row = 4;
+            app.zoom_in_axe_emg.Layout.Column = [1 2];
+            app.zoom_in_axe_emg.XAxis.Exponent = 0;
+            title(app.zoom_in_axe_emg, 'EMG zoomed in')
+
+            % manage zoom_in_axe_emg toolbar
+            bt_strip = axtoolbar(app.zoom_in_axe_emg,buttons2disp,"SelectionChangedFcn",@(~,~) app.axtoolbar_pressed);
+            % add custom data-tips button - it refused to be added to uiaxe otherwise
+            axtoolbarbtn(bt_strip,"state","Icon","datacursor","Tooltip","Data Tips",...
+                "ValueChangedFcn",@(e,d)datacursormode(ancestor(d.Source,'figure'),d.Value));
+             % make sure push buttons are also clickable without moving discharged
+            push_buttons = findobj(bt_strip,'Type','toolbarpushbutton');
+            [push_buttons.ButtonPushedFcn] = deal(@(src,evt) app.pushbutton_axtoolbar_pressed(src,evt));
+
 
             % Create title_instruction
             app.title_instruction = uilabel(app.GridLayout);
@@ -330,8 +409,17 @@ classdef curation_window < handle
             app.title_instruction.FontSize = 14;
             app.title_instruction.FontWeight = 'bold';
             app.title_instruction.Layout.Row = 1;
-            app.title_instruction.Layout.Column = 1;
+            app.title_instruction.Layout.Column = [1 2];
             app.title_instruction.Text = {'Inspect IIS:'; 'left/1 = accept; right/2/enter/alt = decline; middle/3 = previous'};
+
+            % create save button
+            app.save_button = uibutton(app.GridLayout,"push");
+            app.save_button.Text = "Save ied object";
+            app.save_button.WordWrap = "on";
+            app.save_button.HorizontalAlignment = "center";
+            app.save_button.ButtonPushedFcn = @(~,~) app.save_ied();
+            app.save_button.Layout.Row = 1;
+            app.save_button.Layout.Column = 1;
 
             % Show the figure after all components are created
             app.IED_curation_UIFigure.Visible = 'on';
@@ -368,10 +456,10 @@ classdef curation_window < handle
             createComponents(app)
 
             % collect discharge info
-            [discharge_loc_x, discharge_loc_y] = app.collect_data(app.ied.last_mark, 0);
+            [discharge_loc_x, discharge_loc_y] = app.collect_data(app.ied.last_mark, 0, "sig");
             
             % prep zoom out graph
-            [x_data, y_data] = app.collect_data(app.ied.last_mark, app.zoom_out_marg);
+            [x_data, y_data] = app.collect_data(app.ied.last_mark, app.zoom_out_marg, "sig");
             app.zoom_out_line = plot(app.zoom_out_axe ,x_data, y_data);
             app.zoom_out_peak = scatter(app.zoom_out_axe, discharge_loc_x, discharge_loc_y, 'r*');
             sig_mean = mean(app.ied.sig);
@@ -380,11 +468,30 @@ classdef curation_window < handle
             ylim(app.zoom_out_axe,[sig_mean-diplay_limit, sig_mean+diplay_limit])
             
             % prep zoom in graph
-            [x_data, y_data] = app.collect_data(app.ied.last_mark, app.zoom_in_marg);
+            [x_data, y_data] = app.collect_data(app.ied.last_mark, app.zoom_in_marg, "sig");
             app.zoom_in_line = plot(app.zoom_in_axe ,x_data, y_data);
             app.zoom_in_peak = scatter(app.zoom_in_axe, discharge_loc_x, discharge_loc_y, 'r*');
             ylim(app.zoom_in_axe, [min(y_data) max(y_data)])
             title(app.zoom_in_axe, sprintf('spk %d/%d', app.ied.last_mark, numel(app.ied.pos)));
+
+            % prep zoom in emg graph
+            if ~isempty(app.ied.emg)
+                % ied have emg data, use it
+                
+                % create lines
+                [x_data, y_data] = app.collect_data(app.ied.last_mark, app.zoom_in_marg, "emg");
+                [discharge_loc_x, discharge_loc_y] = app.collect_data(app.ied.last_mark, 0, "emg");
+                app.zoom_in_emg_line = plot(app.zoom_in_axe_emg ,x_data, y_data);
+                app.zoom_in_emg_peak = scatter(app.zoom_in_axe_emg, discharge_loc_x, discharge_loc_y, 'r*');
+
+                % choose ylimit - same as zoom_out
+                ylim(app.zoom_in_axe_emg,[sig_mean-diplay_limit, sig_mean+diplay_limit])
+            else
+                % ied do not have emg data, remove unused axe
+                row2rmv = app.zoom_in_axe_emg.Layout.Row;
+                delete(app.zoom_in_axe_emg)
+                app.GridLayout.RowHeight(row2rmv) = [];
+            end
 
             % add threshold markers
             if ismember(app.ied.thrDir,["positive","both"])
@@ -396,6 +503,7 @@ classdef curation_window < handle
                 app.zoom_in_thr(2)  = yline(app.zoom_in_axe,  -app.ied.thr(2), '--r');
             end
 
+            
         end
 
         % Code that executes before app deletion

@@ -12,6 +12,7 @@
                      {"name":"sig", "kind":"namevalue", "type":["numeric","vector"]},
                      {"name":"fs", "kind":"namevalue", "type":["positive","scalar"]},
                      {"name":"thr", "kind":"namevalue", "type":["numeric","numel=2"]},
+                     {"name":"emg", "kind":"namevalue", "type":["numeric","vector"]},
                      {"name":"thrDir", "kind":"namevalue", "type":["choices={'positive','negative','both'}"]}
                  ]
              ]

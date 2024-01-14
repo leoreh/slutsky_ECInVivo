@@ -53,6 +53,13 @@ else
     ied.status = "during_curation";
 end
 
+% update git info
+try
+    ied.git_last_step = get_gits_status(["slutsky_ECInVivo", "CellExplorer"]);
+catch err
+    ied.git_last_step = join(["Error: " err.message]);
+end
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % save result if needed
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

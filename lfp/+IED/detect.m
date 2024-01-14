@@ -4,7 +4,7 @@ function ied = detect(varargin)
 % INPUT (in 1st position):
 %   IED.data object, which already contain all the name values
 % OR:
-% INPUT (name-value):
+% INPUT (name-value, required):
 %   sig         signal for detection
 %   fs          sampling frequency
 %   thr         vector of two elements. first is thr in [z-scores] and
@@ -12,8 +12,12 @@ function ied = detect(varargin)
 %               merely calculated. if both specified than both used for
 %               detection. values should be positive even if thrDir is
 %               negative
-%   thrDir      string. direction of threshold detection. can be
-%               {'positive'}, 'negative', or 'both
+%
+% INPUT (name-value, optional)
+%   thrDir      text scalar. direction of threshold detection. can be
+%               'positive', 'negative', or {'both'}
+%   emg         emg signal. Note that it MUST have the same sampling rate
+%               as sig, and be of the same length.
 %
 % OUTPUT
 %   IED.data object
