@@ -14,6 +14,7 @@ function [bands, powdb] = sessions_psd(mname, varargin)
 %   flgEmg          logical. load [basename].psdEmg.mat {true}
 %   flgAnalyze      logical. re-analyze psd {false}
 %   flgDb           logical. convert psd to dB {true}
+%   ignorePli       logical. ignore freq of power line interferance {true}
 %   saveVar         logical. save ss var {true}
 %   graphics        logical. plot confusion chart and state separation {true}
 %
@@ -39,6 +40,7 @@ addOptional(p, 'flgNormBand', true, @islogical);
 addOptional(p, 'flgEmg', true, @islogical);
 addOptional(p, 'flgAnalyze', false, @islogical);
 addOptional(p, 'flgDb', true, @islogical);
+addOptional(p, 'ignorePli', true, @islogical);
 addOptional(p, 'saveVar', true, @islogical);
 addOptional(p, 'graphics', true, @islogical);
 
@@ -49,8 +51,12 @@ flgNormBand     = p.Results.flgNormBand;
 flgEmg          = p.Results.flgEmg;
 flgAnalyze      = p.Results.flgAnalyze;
 flgDb           = p.Results.flgDb;
+ignorePli       = p.Results.ignorePli;
 saveVar         = p.Results.saveVar;
 graphics        = p.Results.graphics;
+
+% params
+freq_pli = [49, 51];
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % load or analyze
@@ -119,20 +125,21 @@ freq = v(1).psd.info.faxis;
 
 % band params. taken from Boyce et al., Science, 2016
 bandNames = ["broad", "swa", "delta", "theta", "alpha", "beta", "gamma"];
-bandFreqs = [freq(1), 100; 0.5, 1; 1, 4; 4, 10; 10, 14; 15, 30; 30, 100];
+bandFreqs = [0.5, 100; 0.5, 1; 1, 4; 4, 10; 10, 14; 15, 30; 30, 100];
+% bandNames = ["broad", "delta", "theta", "alpha", "beta", "gamma"];
+% bandFreqs = [0.5, 100; 1, 4; 4, 10; 10, 14; 15, 30; 30, 100];
 
-% convert to dB (chronux output is power not magnitude)
-if flgDb
-    powdb = 10 * log10(powdb);
-    ytxt = 'PSD [dB]';
-else
-    ytxt = 'PSD [mV^2/Hz]';
-end
-
-% normalize to broadband
-lim_freq = freq >= 0 & freq < Inf;
+% normalize psd to broadband. running this before calculating bands is the
+% same as dividing bands w/ broadband
 if flgNormBand
+    if ignorePli
+        lim_freq = (freq >= 0.5 & freq < freq_pli(1)) | (freq > freq_pli(2) & freq < Inf);
+    else
+        lim_freq = (freq >= 0.5 & freq < Inf);
+    end
+
     powdb = powdb ./ sum(powdb(:, lim_freq, :), 2);
+
     sbands = [2 : length(bandNames)];
     ytxt = 'Norm. PSD';
 else
@@ -142,7 +149,13 @@ end
 % calc power in band. bands is a 3d array of freqBand x state x session.
 % psd is a 3d array of state x freq x session.
 for iband = 1 : length(bandFreqs)
+    
     bandIdx = InIntervals(freq, bandFreqs(iband, :));
+
+    if InIntervals(freq_pli, bandFreqs(iband, :))
+        bandIdx = bandIdx & ~InIntervals(freq,freq_pli);
+    end
+    
     bands(iband, :, :) = squeeze(sum(powdb(:, bandIdx, :), 2));
 end
 
@@ -150,8 +163,14 @@ end
 if flgNormTime
     bsl = mean(bands(:, :, idxBsl), 3, 'omitnan');
     bands = (bands ./ bsl) * 100;
+end
+
+% convert to dB (chronux output is power not magnitude)
+if flgDb
+    powdb = 10 * log10(powdb);
+    ytxt = 'PSD [dB]';
 else
-    bands = 10 * log10(bands);
+    ytxt = 'PSD [mV^2/Hz]';
 end
 
 % organize and save
@@ -165,6 +184,7 @@ end
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+dlFileIdx = [2, 4, 6];
 if graphics
 
     fh = figure;
@@ -188,6 +208,7 @@ if graphics
         xlabel('Frequency [Hz]')
         ylabel(ytxt)
         legend(split(num2str(1 : nfiles)), 'Location', 'Southwest', 'FontSize', 9)
+        delete(ph(dlFileIdx))
 
     end
 
@@ -196,8 +217,8 @@ if graphics
         plot(squeeze(bands(sbands, istate, :))', 'LineWidth', 2)
         hold on
         plot(xlim, [100 100], '--k')
-        ylabel([ytxt, ' (% BSL)'])
-        set(gca, 'YScale', 'log')
+        ylabel(['PSD [mV^2/Hz]', ' (% BSL)'])
+%         set(gca, 'YScale', 'log')
     end
     legend(bandNames(sbands))
     title(th, mname)

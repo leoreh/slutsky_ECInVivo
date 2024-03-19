@@ -16,7 +16,8 @@ function plot_spec(spec, varargin)
 %               e.g., 3600 will plot spec in hours
 %   axh         axis handle for plot. if empty will create new figure
 %
-% 29 mar 22 LH      
+% 29 mar 22 LH      updates:
+% 05 mar 24             changes mapping of x values according to tstamps
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -53,7 +54,8 @@ freq = spec.freq;
 
 % time axis
 nbins = length(spec.tstamps);
-tspec = ((1 : nbins) * winstep - winstep / 2) / xtime;
+% tspec = ((1 : nbins) * winstep - winstep / 2) / xtime;
+tspec = spec.tstamps / xtime;
 
 % take a sample of the spectrogram to help initialize the colormap
 sampleBins = randperm(nbins, round(nbins / 5));

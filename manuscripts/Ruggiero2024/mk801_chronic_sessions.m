@@ -1,6 +1,6 @@
 
 
-function basepaths = chronic_sessions(queryStr)
+function basepaths = mk801_chronic_sessions(queryStr)
 
 if strcmp(queryStr, 'bsl')
 
@@ -9,7 +9,7 @@ if strcmp(queryStr, 'bsl')
         "F:\Data\lh123\lh123_221219_094508";...
         "F:\Data\lh126\lh126_230111_091208";...
         "F:\Data\lh129\lh129_230123_095540";...
-        "F:\Data\lh130\lh130_230321_084932";...
+        "F:\Data\lh130\lh130_230322_084541";...
         };
 
 elseif strcmp(queryStr, 'mk801')

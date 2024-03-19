@@ -201,13 +201,13 @@ end
 bandNames = ["broad", "swa", "delta", "theta", "alpha", "beta", "glow", "ghigh"];
 bandFreqs = [0.5, 100; 0.5, 1; 1, 4; 4, 10; 10, 14; 15, 30; 30, 60; 60, 100];
 
-% convert to dB (chronux output is power not magnitude)
-powdb = 10 * log10(s);
-
 % calc power in band. db is a 3d array of freqBand x time x channel
 for iband = 1 : length(bandFreqs)
     bandIdx = InIntervals(freq, bandFreqs(iband, :));
-    spec.bands.db(iband, :, :) = squeeze(sum(powdb(:, bandIdx, :), 2));
+    tmp = squeeze(sum(s(:, bandIdx, :), 2));
+    
+    % convert to dB (chronux output is power not magnitude)
+    spec.bands.db(iband, :, :) = 10 * log10(tmp);
 end
 spec.bands.bandNames = bandNames;
 spec.bands.bandFreqs = bandFreqs;
@@ -261,7 +261,7 @@ if graphics
         case 'raw'
             plot(spec.tstamps / 60 / 60,...
                 yval(2 : end, :), 'LineWidth', 2)
-            ylabel('Spectral Power [mV2/Hz]')
+            ylabel('Spectral Power [dB]')
         case 'norm'
             plot(spec.tstamps / 60 / 60,...
                 yval(2 : end, :) ./ yval(1, :), 'LineWidth', 2)

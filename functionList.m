@@ -21,7 +21,7 @@ spkgrp = session.extracellular.spikeGroups.channels;
 [~, basename] = fileparts(basepath);
 
 % add timebins to datInfo
-[timebins, timepnt] = metaInfo_timebins('reqPnt', 5 * 60 * 60, 'nbins', 2);
+[timebins, timepnt] = metaInfo_timebins('reqPnt', 5 * 60 * 60, 'nbins', 4);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preprocessing of raw files
@@ -144,9 +144,14 @@ sSig = as_prepSig([basename, '.lfp'], acc.mag,...
     'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
     'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [10 450], 'fs', 1250);
 
+sSig = as_prepSig([basename, '.lfp'], [basename, '.emg.dat'],...
+    'eegCh', [5 : 8], 'emgCh', 1, 'saveVar', true, 'emgNchans', 1, 'eegNchans', nchans,...
+    'inspectSig', true, 'forceLoad', true, 'eegFs', 1250, 'emgFs', 1250,...
+    'emgCf', [80 450]);
+
 % manually create labels
 labelsmanfile = [basename, '.sleep_labelsMan.mat'];
-AccuSleep_viewer(sSig, ss.labels, labelsmanfile)
+AccuSleep_viewer(sSig, [], labelsmanfile)
 
 % classify with a network
 netfile = [];
@@ -182,6 +187,11 @@ spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true, 'saveVar', true,...
     'ch', spkgrp, 'force', true);
 plot_spec(spec, 'ch', 4, 'logfreq', true, 'saveFig', false,...
     'axh', [])
+
+
+spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true, 'saveVar', false,...
+    'padfft', -1, 'winstep', 10, 'logfreq', true, 'ftarget', [],...
+    'ch', {1 : 4}, 'force', true);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % spike sorting
@@ -327,9 +337,9 @@ plot_FRstates_sextiles('stateMfr', fr.states.mfr(:, [1, 4])', 'units', units.cle
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % concatenate var from different sessions
-mname = 'lh122';
+mname = 'lh133';
 [expData, xData] = sessions_catVarTime('mname', mname,...
-    'dataPreset', {'fr', 'spec'}, 'graphics', true, 'dataAlt', 4,...
+    'dataPreset', {'fr', 'spec', 'emg_rms'}, 'graphics', true, 'dataAlt', 1,...
     'basepaths', {}, 'xTicksBinsize', 6, 'markRecTrans', true);
 
 % snip segments (e.g. spikes) from binary 

@@ -756,4 +756,32 @@ end
 %   fs          sampling rate
 %
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% compare mfr (per unit) w/ msr (per tetrode)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+basepaths = mk801_chronic_sessions('bsl');
+
+varsFile = ["session"; "fr"; "sr"; "units"];
+varsName = ["session"; "fr"; "sr"; "units"];
+xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
+[v, basepaths] = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
+    'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
+    'xlsname', xlsname);
+nfiles = length(basepaths);
+
+mfr = []; msr = [];
+for ifile = 1 : nfiles
+    
+    unitIdx = v(ifile).units.clean(1, :);
+    mfr = [mfr; v(ifile).fr.mfr(unitIdx)];
+    msr = [msr; v(ifile).sr.mfr];
+
+end
+
+sqrt(var(mfr)) / mean(mfr)
+sqrt(var(msr)) / mean(msr)
+
+
 

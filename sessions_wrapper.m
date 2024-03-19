@@ -4,7 +4,7 @@
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = 'lh133';
+mname = 'lh142';
 
 varsFile = ["fr"; "sr"; "spikes"; "st_metrics"; "swv_metrics";...
     "cell_metrics"; "sleep_states"; "ripp.mat"; "datInfo"; "session";...
@@ -22,9 +22,8 @@ nfiles = length(basepaths);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % calData = ss.info.calibrationData;
-% for ifile = 1 : nfiles
-for ifile = [2, 6]
-
+for ifile = 1 : nfiles
+    
     % file
     basepath = basepaths{ifile};
     cd(basepath)
@@ -44,19 +43,11 @@ for ifile = [2, 6]
     [~, basename] = fileparts(basepath);
 
 
-    % calc psd
-    ch = [1 : 4];
-    sstates = [1, 4];
-    ftarget = [0.1 : 0.5 : 100];
-    prct = 70;
-    flgEmg = true;
-    wins = [0, Inf];
-    wins = [session.general.timebins(1, 2), Inf]
-    v(ifile).psd = psd_states('basepath', basepaths{ifile}, 'sstates', sstates,...
-        'ch', ch, 'fs', [], 'wins', wins, 'saveVar', true,...
-        'graphics', true, 'forceA', true, 'ftarget', ftarget,...
-        'prct', prct, 'flgEmg', flgEmg);
+    sSig = load([basename, '.sleep_sig.mat']);
 
+    ss = as_classify(sSig, 'basepath', basepath, 'inspectLabels', false,...
+        'saveVar', true, 'forceA', true, 'netfile', netfile,...
+        'graphics', true, 'calData', calData);
 
 end
 

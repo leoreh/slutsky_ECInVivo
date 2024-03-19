@@ -145,9 +145,19 @@ if ~isempty(ch)         % from binary
         'duration', Inf,...
         'frequency', fs, 'nchannels', nchans, 'start', 0,...
         'channels', ch, 'downsample', 1));
+
+    % average tetrode
     if length(ch) > 1
         sig = mean(sig, 2);
     end
+
+%     % filter pli.
+%     ALT 1: fieldtrip (Leske & Dalal, 2019, NeuroImage)
+%     [sig] = [ft_preproc_dftfilter(sig', fs, [50],...
+%         'dftreplace', 'neighbour', 'dftbandwidth', [1], 'dftneighbourwidth', [2])]';
+%     ALT 2: notch filter
+%     sig = filterLFP(sig, 'stopband', [49, 51], 'fs', fs,...
+%         'saveVar', false, 'graphics', false, 'dataOnly', true);
 
 else                    % from sSig
     

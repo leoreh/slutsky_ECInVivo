@@ -1,4 +1,4 @@
-function [expData, xData] = sessions_catVarTime(varargin)
+function [expData, xData, xTicks] = sessions_catVarTime(varargin)
 
 % concatenates a variable from different sessions. assumes sessions are
 % contineous. concatenates according to the time of day extracted from
@@ -123,8 +123,9 @@ switch dataPreset
                 [basenames{isession}, '.spec.mat']);
             load(filename, 'spec');
             yval = movmean(squeeze(spec.bands.db(:, :, dataAlt)), 100,  2);
-            v(isession).data = yval(2 : end, :) ./ yval(1, :);
-            v(isession).data = yval(2 : end, :);
+            v(isession).data = yval;
+%             v(isession).data = yval(2 : end, :) ./ yval(1, :);
+%             v(isession).data = yval(2 : end, :);
         end
         ts = spec.info.winstep;     % sampling period [s]
     
@@ -251,6 +252,7 @@ tStartLabel = datetime(expStart.Year, expStart.Month, expStart.Day,...
     zt0.Hour, zt0.Minute, zt0.Second);
 tidxLabels = string(datestr(datenum(tStartLabel : hours(xTicksBinsize) : expEnd),...
     'HH:MM', 2000));
+xTicks = tidx * ts;
 
 % add date to x labels once a day
 tidxLabels(1 : 24 / xTicksBinsize : end) =...
@@ -295,8 +297,7 @@ if graphics
             ylabel('Freq. [Hz]')
             set(gca, 'yscale', 'log')
             ylim([max([0.2, faxis(1)]), faxis(end)])
-%             yticks([1, 10, 100])
-            yticks([1, 4, 16, 20])
+            yticks([1, 4, 16, 64])
 
         case 'bands'
             expData = movmean(expData, 33, 1);
@@ -308,7 +309,7 @@ if graphics
                     spec.bands.bandNames{iband}, floor(spec.bands.bandFreqs(iband, 1)),...
                     spec.bands.bandFreqs(iband, 2));
             end
-            legend(lgd{2 : end}, 'location', 'best')
+            legend(lgd{1 : end}, 'location', 'northeast')
         
         case 'hypnogram'
             plot_hypnogram('labels', expData, 'axh', axh)
@@ -318,7 +319,7 @@ if graphics
             % plot
             expData = movmean(expData, 33, 1);
             plot(xData, expData);
-            ylabel('Norm. EMG')
+            ylabel('EMG RMS')
             
         case {'sr', 'srsu'}
             expData = movmean(expData, 13, 1);
@@ -328,13 +329,13 @@ if graphics
             axis tight
             
         case 'fr'
-            expData = movmean(expRs, 13, 1);
-            expData = mean(expData, 2, 'omitnan');
-            plot(xData, expData, 'LineWidth', 2)
+            plotData = movmean(expRs, 13, 1);
+            plotData = mean(plotData, 2, 'omitnan');
+            plot(xData, plotData, 'LineWidth', 2)
             hold on
-            expData = movmean(expFs, 13, 1);
-            expData = mean(expData, 2, 'omitnan');
-            plot(xData, expData, 'LineWidth', 2)
+            plotData = movmean(expFs, 13, 1);
+            plotData = mean(plotData, 2, 'omitnan');
+            plot(xData, plotData, 'LineWidth', 2)
             legend({sprintf('RS <= %d', max(nunits(:, 1))),...
                 sprintf('FS <= %d', max(nunits(:, 2)))})
             ylabel('MFR [Hz]')
@@ -354,7 +355,7 @@ if graphics
     end
     
     axis tight
-    xticks(tidx * ts)
+    xticks(xTicks)
     xticklabels(tidxLabels)
     xtickangle(45)
     xlabel('Time [h]')
