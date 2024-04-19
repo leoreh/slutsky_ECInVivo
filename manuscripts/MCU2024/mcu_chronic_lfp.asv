@@ -723,53 +723,23 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % files
-mname = 'wt_wsh';
-vars = ["session"; "psd"];
-[basepaths, v] = mcu_sessions(mname, vars);
+mname = 'mcu_bsl';
+basepaths = [mcu_sessions(mname)];
+
+% load data
+varsFile = ["session"; "psd"];
+varsName = ["session"; "psd"];
+xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
+[v, basepaths] = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
+    'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
+    'xlsname', xlsname);
 nfiles = length(basepaths);
 
 psd = catfields([v(:).psd], 'addim', true);
 istate = 1;
 prismData = squeeze(psd.psd(istate, :, :));
-prismData = mean(prismData ./ sum(prismData), 2);
-
 psd.info{1}.faxis
 
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% broadband power during baseline and washout
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% grps
-clear mname
-mname{1} = 'wt_bsl';
-mname{2} = 'wt_wsh';
-mname{3} = 'mcu_bsl';
-mname{4} = 'mcu_wsh';
-ngrp = length(mname)
-
-bband = nan(ngrp, 6, 3);
-for igrp = 1 : ngrp
-
-    % load data
-    vars = ["psd"];
-    [basepaths, v] = mcu_sessions(mname{igrp}, vars);
-    nfiles = length(basepaths);
-
-    % nunits
-    for ifile = 1 : nfiles
-        bband(igrp, ifile, :) = v(ifile).psd.bands.mean(:, 1);
-    end
-end
-
-% for grp plot
-istate = 2;
-sz = size(bband);
-prismData = squeeze(bband([1 : 2], :, istate));
-prismData(:, sz(2) + 1 : sz(2) * 2) = squeeze(bband([3, 4], :, istate));
-
-% for individual lines plot
-istate = 2;
-prismData = squeeze(bband(:, :, istate));
 

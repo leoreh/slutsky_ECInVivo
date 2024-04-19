@@ -102,9 +102,8 @@ if graphics
     
     % ---------------------------------------------------------------------
     % figure of net performace
-    setMatlabGraphics(true)
+    setMatlabGraphics(false)
     fh = figure;
-    fh.Position = [500 200 900 700];
     cmh = confusionchart(cm, cfg.names(1 : nstates), 'ColumnSummary',...
         'column-normalized', 'RowSummary', 'row-normalized',...
         'title', 'State Classification Confusion Matrix', 'Normalization',...
@@ -115,43 +114,43 @@ if graphics
         figpath = fullfile('graphics', 'sleepState');
         mkdir(figpath)
         figname = fullfile(figpath, sprintf('%s_cm', basename));
-        export_fig(figname, '-tif', '-transparent', '-r300')
+        savefig(fh, figname, 'compact')
     end
         
     % ---------------------------------------------------------------------   
     % figure of net performace given threshold on net scores
-    setMatlabGraphics(false)
-    fh = figure;
-    for istate = 1 : nstates
-        
-        subplot(2, size(scores, 2) / 2, istate)
-        plot(thr, thr_precision(:, istate) * 100, 'k', 'LineWidth', 2)
-        hold on
-        plot(thr, thr_recall(:, istate) * 100, 'LineWidth', 2, 'Color', [0.5 0.5 0.5]);
-        xlabel('Threshold')
-        ylabel('Performance [%]')
-        ylim([50 100])
-        
-        yyaxis right
-        ph = plot(thr, lostData(:, istate), 'LineWidth', 2);
-        ph.Color = cfg.colors{istate};
-        ylabel('Data Lost [%]')
-        set(gca, 'ycolor', cfg.colors{istate})
-        ylim([0 100])
-        
-        set(gca, 'box', 'off', 'TickLength', [0 0])
-        title(cfg.names{istate})
-        if istate == 1
-            legend({'Precision', 'Recall', 'DataLost'})
-        end
-    end
-    
-    if saveFig
-        figpath = fullfile('graphics', 'sleepState');
-        mkdir(figpath)
-        figname = fullfile(figpath, sprintf('%s_cm_netScores', basename));
-        export_fig(figname, '-tif', '-transparent', '-r300')
-    end
+%     setMatlabGraphics(false)
+%     fh = figure;
+%     for istate = 1 : nstates
+%         
+%         subplot(2, size(scores, 2) / 2, istate)
+%         plot(thr, thr_precision(:, istate) * 100, 'k', 'LineWidth', 2)
+%         hold on
+%         plot(thr, thr_recall(:, istate) * 100, 'LineWidth', 2, 'Color', [0.5 0.5 0.5]);
+%         xlabel('Threshold')
+%         ylabel('Performance [%]')
+%         ylim([50 100])
+%         
+%         yyaxis right
+%         ph = plot(thr, lostData(:, istate), 'LineWidth', 2);
+%         ph.Color = cfg.colors{istate};
+%         ylabel('Data Lost [%]')
+%         set(gca, 'ycolor', cfg.colors{istate})
+%         ylim([0 100])
+%         
+%         set(gca, 'box', 'off', 'TickLength', [0 0])
+%         title(cfg.names{istate})
+%         if istate == 1
+%             legend({'Precision', 'Recall', 'DataLost'})
+%         end
+%     end
+%     
+%     if saveFig
+%         figpath = fullfile('graphics', 'sleepState');
+%         mkdir(figpath)
+%         figname = fullfile(figpath, sprintf('%s_cm_netScores', basename));
+%         savefig(fh, figname, 'compact')
+%     end
 end
 
 end

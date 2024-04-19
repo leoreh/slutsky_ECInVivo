@@ -70,7 +70,7 @@ for i = 1:nFiles
     basepath = basepaths{i};
     [~, basename] = fileparts(basepath);
     sigfile = fullfile(basepath, [basename, '.sleep_sig.mat']);
-    labelmanfile = fullfile(basepath, [basename, '.sleep_labelsMan.mat']);
+    labelmanfile = fullfile(basepath, [basename, '.sleep_labelsMan_4st.mat']);
     
     SR = load(sigfile, 'fs');
     data = struct;

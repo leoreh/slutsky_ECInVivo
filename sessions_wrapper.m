@@ -6,11 +6,8 @@
 
 mname = 'lh142';
 
-varsFile = ["fr"; "sr"; "spikes"; "st_metrics"; "swv_metrics";...
-    "cell_metrics"; "sleep_states"; "ripp.mat"; "datInfo"; "session";...
-    "units"];
-varsName = ["fr"; "sr"; "spikes"; "st"; "swv"; "cm"; "ss"; "ripp";...
-    "datInfo"; "session"; "units"];
+varsFile = ["cell_metrics"; "sleep_states"; "datInfo"; "session"; "units"];
+varsName = ["cm"; "ss"; "datInfo"; "session"; "units"];
 xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
 [v, basepaths] = getSessionVars('mname', mname, 'varsFile', varsFile,...
     'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
@@ -21,9 +18,8 @@ nfiles = length(basepaths);
 % analyze data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% calData = ss.info.calibrationData;
 for ifile = 1 : nfiles
-    
+
     % file
     basepath = basepaths{ifile};
     cd(basepath)
@@ -42,14 +38,46 @@ for ifile = 1 : nfiles
     spkgrp = session.extracellular.spikeGroups.channels;
     [~, basename] = fileparts(basepath);
 
+    % create emg signal from accelerometer data
+%     acc = EMGfromACC('basepath', basepath, 'fname', [basename, '.lfp'],...
+%         'nchans', nchans, 'ch', nchans - 2 : nchans, 'saveVar', true, 'fsIn', 1250,...
+%         'graphics', false, 'force', true);
+% 
+%     %     % call for acceleration
+%     sSig = as_prepSig([basename, '.lfp'], acc.mag,...
+%         'eegCh', spkgrp{2}, 'emgCh', [], 'saveVar', false, 'emgNchans', [],...
+%         'eegNchans', nchans, 'inspectSig', true, 'forceLoad', true,...
+%         'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [10 450], 'fs', 1250);
 
-    sSig = load([basename, '.sleep_sig.mat']);
 
-    ss = as_classify(sSig, 'basepath', basepath, 'inspectLabels', false,...
-        'saveVar', true, 'forceA', true, 'netfile', netfile,...
-        'graphics', true, 'calData', calData);
+
+load([basename, '.sleep_sig.mat'], 'info');
+info.eegCh
+
+sSig = load([basename, '.sleep_sig.mat']);
+
+as_stateSeparation(sSig, v(ifile).ss)
+
+
+% % % % % manually create labels
+labelsmanfile = [basename, '.sleep_labelsMan.mat'];
+AccuSleep_viewer(sSig, [], labelsmanfile)
+AccuSleep_viewer(sSig, v(ifile).ss.labels_net, [])
+% 
+netfile = 'D:\Code\slutsky_ECInVivo\lfp\SleepStates\AccuSleep\trainedNetworks\net_230212_103132.mat';
+if exist([basename, '.sleep_labelsMan.mat'], 'file')
+    calData = [];
+elseif ifile < 4
+    calData = v(2).ss.info.calibrationData;
+elseif ifile >= 4
+    calData = v(8).ss.info.calibrationData;
+end
+ss = as_classify(sSig, 'basepath', basepath, 'inspectLabels', false,...
+    'saveVar', true, 'forceA', true, 'netfile', netfile,...
+    'graphics', true, 'calData', calData);
 
 end
+
 
 
 % cell_metrics = CellExplorer('basepaths', basepaths);
@@ -167,7 +195,7 @@ istate = 2;
 
 clear fr_states fr_gain states_temp gain_temp
 for imouse = 1 : length(mname)
-    
+
     % load data
     varsFile = ["fr"; "units"];
     varsName = ["fr"; "units"];
@@ -180,7 +208,7 @@ for imouse = 1 : length(mname)
     fr = catfields([v(:).fr], 'catdef', 'cell');
 
     for ifile = 1 : nfiles
-            states_temp{ifile} = fr.states.mfr{ifile}(v(ifile).units.clean(iunit, :), istate)
+        states_temp{ifile} = fr.states.mfr{ifile}(v(ifile).units.clean(iunit, :), istate)
         gain_temp{ifile} = fr.states.gain{ifile}(4, v(ifile).units.clean(iunit, :))
     end
     fr_states{imouse} = cell2nanmat(states_temp, 2)';
@@ -253,4 +281,5 @@ xlabel('Time [h]')
 ylabel('Norm. Freq')
 
 
-
+%%% spike lfp coupling
+% Theta-band phase locking during encoding leads to coordinated entorhinal-hippocampal replay

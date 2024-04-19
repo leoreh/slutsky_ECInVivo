@@ -1,4 +1,4 @@
-function [expData, xData, xTicks] = sessions_catVarTime(varargin)
+function [expData, info] = sessions_catVarTime(varargin)
 
 % concatenates a variable from different sessions. assumes sessions are
 % contineous. concatenates according to the time of day extracted from
@@ -27,10 +27,10 @@ function [expData, xData, xTicks] = sessions_catVarTime(varargin)
 % [srData, tidx, tidxLabels] = sessions_catVarTime('mname', mname, 'dataPreset', 'both', 'graphics', false);
 % 
 % TO DO LIST
-%   organize output
 % 
 % UPDATES
 %   12 feb 22       added ripples
+%   18 apr 24       organized time info
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -60,29 +60,38 @@ axh             = p.Results.axh;
 zt0 = guessDateTime('0900');    % lights on at 09:00 AM
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% load data from each session
+% run recursively through the function if several data vars are requested
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% run recursively through the function if several data vars are requested
 if iscell(dataPreset)
     fh = figure;
     th = tiledlayout(length(dataPreset), 1, 'TileSpacing', 'none');
     for idata = 1 : length(dataPreset)
         sb(idata) = nexttile;
-        [expData{idata}, xData{idata}] = sessions_catVarTime('mname', mname,...
+        [expData{idata}, info{idata}] = sessions_catVarTime('mname', mname,...
             'basepaths', basepaths, 'dataPreset', dataPreset{idata},...
             'graphics', graphics, 'axh', sb(idata), 'dataAlt', dataAlt,...
             'xTicksBinsize', xTicksBinsize, 'markRecTrans', markRecTrans);
+        
         if idata < length(dataPreset)
             set(sb(idata), 'xticklabels', {[]})
             xlabel('')
         end
     end
+
     linkaxes(sb, 'x')
     axis tight
     title(th, mname)
+
+    % concatenate info struct
+    info = catfields([info{:}], 2);
+
     return
 end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% get sessions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 varsFile = ["units"; "datInfo"; "session"; string(dataPreset)];
 varsName = ["units"; "datInfo"; "session"; string(dataPreset)];
@@ -124,10 +133,8 @@ switch dataPreset
             load(filename, 'spec');
             yval = movmean(squeeze(spec.bands.db(:, :, dataAlt)), 100,  2);
             v(isession).data = yval;
-%             v(isession).data = yval(2 : end, :) ./ yval(1, :);
-%             v(isession).data = yval(2 : end, :);
         end
-        ts = spec.info.winstep;     % sampling period [s]
+        ts = spec.info.winstep;                          % sampling period [s]
     
     case 'hypnogram'
         for isession = 1 : nsessions
@@ -136,7 +143,7 @@ switch dataPreset
             load(filename, 'ss');
             v(isession).data = ss.labels';
         end
-        ts = ss.info.epochLen;      % sampling period [s]
+        ts = ss.info.epochLen;                           % sampling period [s]
 
     case 'emg_rms'
         for isession = 1 : nsessions
@@ -146,14 +153,15 @@ switch dataPreset
             v(isession).data = emg_rms;
         end
         cfg = as_loadConfig();
-        ts = cfg.epochLen;                  % sampling period [s]        
+        ts = cfg.epochLen;                              % sampling period [s]        
     
     case 'sr'
         for isession = 1 : nsessions
             v(isession).data = v(isession).sr.strd;
         end
-        ts = v(1).sr.info.binsize;          % sampling period [s]
+        ts = v(1).sr.info.binsize;                      % sampling period [s]
         grp = 1 : v(1).session.extracellular.nSpikeGroups;
+        grp = dataAlt;
   
     case 'srsu'
         for isession = 1 : nsessions
@@ -204,25 +212,25 @@ ncol = size(v(1).data, 1);
 % initialize data mat for all sessions based on the time from the first to
 % the last session, and the sampling frequency of the variable. assumes the
 % recordings are contineous. 
-recStart = cellfun(@guessDateTime, basenames, 'uni', true);
-expStart = recStart(1) - max([0, diff(timeofday([zt0, recStart(1)]))]);
-expEnd = guessDateTime(basenames{end});
+t_recStart = cellfun(@guessDateTime, basenames, 'uni', true);
+t_expStart = t_recStart(1) - max([0, diff(timeofday([zt0, t_recStart(1)]))]);
+t_expEnd = guessDateTime(basenames{end});
 lastDur = v(end).session.general.duration;
 if isstr(lastDur)
     lastDur = str2num(lastDur);
 end
-expEnd = expEnd + seconds(lastDur);
-expLen = ceil(seconds(expEnd - expStart) / ts); 
+t_expEnd = t_expEnd + seconds(lastDur);
+expLen = ceil(seconds(t_expEnd - t_expStart) / ts); 
 expData = nan(expLen, ncol);
 expRs = nan(expLen, ncol);
 expFs = nan(expLen, ncol);
 
 % initialize
-xidx = [];
+x_blockTrans = [];
 for isession = 1 : nsessions
     
     % find index to dataMat according to recording start
-    recIdx = round(max([1, seconds(recStart(isession) - expStart) / ts]));
+    recIdx = round(max([1, seconds(t_recStart(isession) - t_expStart) / ts]));
     recData = v(isession).data;
     recLen = length(recData);
     
@@ -236,31 +244,30 @@ for isession = 1 : nsessions
     
     % cat block transitions
     if ~isempty(v(isession).datInfo) && isfield(v(isession).datInfo, 'nsamps')
-        xidx = [xidx, cumsum(v(isession).datInfo.nsamps) / fs / ts + recIdx];
+        x_blockTrans = [x_blockTrans, cumsum(v(isession).datInfo.nsamps) / fs / ts + recIdx];
     else
-        xidx = 0;
+        x_blockTrans = 0;
     end
 
 end
-xtimes = tstamp2time('tstamp', xidx * ts, 'dtstr', expStart);    % times of block transitions
 
 % create timstamps and labels for x-axis
 xTicksSamples = xTicksBinsize * 60 * 60;   % [seconds]
-zt0idx = round(seconds(diff(timeofday([recStart(1), zt0])))) / ts;
+zt0idx = round(seconds(diff(timeofday([t_recStart(1), zt0])))) / ts;
 tidx = round([zt0idx : xTicksSamples / ts : expLen]);
-tStartLabel = datetime(expStart.Year, expStart.Month, expStart.Day,...
+tStartLabel = datetime(t_expStart.Year, t_expStart.Month, t_expStart.Day,...
     zt0.Hour, zt0.Minute, zt0.Second);
-tidxLabels = string(datestr(datenum(tStartLabel : hours(xTicksBinsize) : expEnd),...
+x_labels = string(datestr(datenum(tStartLabel : hours(xTicksBinsize) : t_expEnd),...
     'HH:MM', 2000));
-xTicks = tidx * ts;
+x_ticks = tidx * ts;
 
 % add date to x labels once a day
-tidxLabels(1 : 24 / xTicksBinsize : end) =...
-    string(datestr(datenum(tStartLabel : hours(24) : expEnd),...
+x_labels(1 : 24 / xTicksBinsize : end) =...
+    string(datestr(datenum(tStartLabel : hours(24) : t_expEnd),...
     'yymmdd', 2000));
 
 % data for x-axis
-xData = [1 : ts : ceil(seconds(expEnd - expStart))];
+x_data = [1 : ts : ceil(seconds(t_expEnd - t_expStart))];
 
 % assign fr to output
 if strcmp(dataPreset, 'fr')
@@ -272,6 +279,19 @@ if strcmp(dataPreset, 'fr')
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% ogranize time info struct
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+info.x_data = x_data';
+info.x_ticks = x_ticks';
+info.x_labels = x_labels;
+info.x_blockTrans = x_blockTrans';
+info.t_blockTrans = tstamp2time('tstamp', x_blockTrans * ts, 'dtstr', t_expStart)';
+info.t_recStart = t_recStart';
+info.t_expStart = t_expStart;
+info.t_expEnd = t_expEnd;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -279,8 +299,10 @@ if graphics
     
     if isempty(axh)
         fh = figure;
+        set(fh, 'WindowState','maximized');
     else
         set(gcf, 'CurrentAxes', axh)
+        set(gcf, 'WindowState','maximized');
     end
     switch dataPreset
         case 'spec'
@@ -291,7 +313,7 @@ if graphics
             caxis1 = prctile(specSample, [2 94]);
 
             % plot
-            imagesc(xData, faxis', expData', caxis1);
+            imagesc(x_data, faxis', expData', caxis1);
             colormap(AccuSleep_colormap());
             axis('xy')
             ylabel('Freq. [Hz]')
@@ -301,7 +323,7 @@ if graphics
 
         case 'bands'
             expData = movmean(expData, 33, 1);
-            plot(xData, expData, 'lineWidth', 2.5);
+            plot(x_data, expData, 'lineWidth', 2.5);
             ylabel('Spectral Power [dB]')
             
             for iband = 1 : length(spec.bands.bandFreqs)
@@ -318,12 +340,12 @@ if graphics
         case 'emg_rms'            
             % plot
             expData = movmean(expData, 33, 1);
-            plot(xData, expData);
+            plot(x_data, expData);
             ylabel('EMG RMS')
             
         case {'sr', 'srsu'}
             expData = movmean(expData, 13, 1);
-            plot(xData, expData(:, grp))
+            plot(x_data, expData(:, grp))
             ylabel('MU FR [Hz]')
             legend(split(num2str(grp)))
             axis tight
@@ -331,37 +353,31 @@ if graphics
         case 'fr'
             plotData = movmean(expRs, 13, 1);
             plotData = mean(plotData, 2, 'omitnan');
-            plot(xData, plotData, 'LineWidth', 2)
+            plot(x_data, plotData, 'LineWidth', 2)
             hold on
             plotData = movmean(expFs, 13, 1);
             plotData = mean(plotData, 2, 'omitnan');
-            plot(xData, plotData, 'LineWidth', 2)
+            plot(x_data, plotData, 'LineWidth', 2)
             legend({sprintf('RS <= %d', max(nunits(:, 1))),...
                 sprintf('FS <= %d', max(nunits(:, 2)))})
             ylabel('MFR [Hz]')
             axis tight
-            
-            % downsample to prism
-            dfactor = 10;
-            prismData = movmean(expFs, 13, 1);
-            prismData = prismData(1 : 10 : end, :);
-            prismX = [xData(1 : dfactor : end) / 60 / 60]';
-
 
         case 'ripp'
-            plot(xData, expData)
+            plot(x_data, expData)
             ylabel('Ripple Rate [Hz]')
             axis tight
     end
     
+    % plot block transitions
     axis tight
-    xticks(xTicks)
-    xticklabels(tidxLabels)
+    xticks(x_ticks)
+    xticklabels(x_labels)
     xtickangle(45)
     xlabel('Time [h]')
     if markRecTrans
         hold on
-        plot([xidx; xidx] * ts, ylim, '--k', 'HandleVisibility', 'off')
+        plot([x_blockTrans; x_blockTrans] * ts, ylim, '--k', 'HandleVisibility', 'off')
     end
     
     if saveFig
@@ -371,7 +387,7 @@ if graphics
         figname = sprintf('%s_%s_sessions', mname, dataPreset);
         mkdir(figpath)
         figname = fullfile(figpath, figname);
-        export_fig(figname, '-jpg', '-transparent', '-r300')
+        savefig(gcf, figname, 'compact')
     end
     
 end

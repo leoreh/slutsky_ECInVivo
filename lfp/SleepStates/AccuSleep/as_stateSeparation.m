@@ -94,9 +94,10 @@ sDelta = sum(specNorm(:, f1idx : f4idx), 2);
 sTheta = sum(specNorm(:, f6idx : f12idx), 2);
 sRatio = sDelta ./ sTheta;
 
+faxis = sSig.spec_freq;
 % calculate psd according to states
-[psd, faxis] = calc_psd('sig', sSig.eeg,...
-    'fs', sSig.fs, 'graphics', false, 'bins', ss.stateEpochs);
+% [psd, faxis] = calc_psd('sig', sSig.eeg,...
+%     'fs', sSig.fs, 'graphics', false, 'bins', ss.stateEpochs);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
@@ -147,58 +148,58 @@ xlabel('Time [h]')
 % set(gca, 'YTick', [])
 
 % spectral power per state
-fh.CurrentAxes = sb3;
-ph = plot(faxis, psd ./ sum(psd, 2), 'LineWidth', 3);
-set(ph, {'color'}, cfg.colors(sstates))
-xlim([0 30])
-xlabel('Frequency [Hz]')
-ylabel('Norm PSD')     
+% fh.CurrentAxes = sb3;
+% ph = plot(faxis, psd ./ sum(psd, 2), 'LineWidth', 3);
+% set(ph, {'color'}, cfg.colors(sstates))
+% xlim([0 30])
+% xlabel('Frequency [Hz]')
+% ylabel('Norm PSD')     
 % set(gca, 'YTick', [])
 
 % scatter spectrogram vs. emg (could not use axes handle w/ gscatter)
-fh.CurrentAxes = sb4;
-hold on
-for istate = sstates
-scatter(sRatio(labels == istate), sSig.emg_rms(labels == istate)',...
-    2, cfg.colors{istate}, 'filled')
-end
-ylabel('Norm. emg RMS')
-xlabel('Delta / Theta Ratio')
-set(gca, 'YTick', [])
+% fh.CurrentAxes = sb4;
+% hold on
+% for istate = sstates
+% scatter(sRatio(labels == istate), sSig.emg_rms(labels == istate)',...
+%     2, cfg.colors{istate}, 'filled')
+% end
+% ylabel('Norm. emg RMS')
+% xlabel('Delta / Theta Ratio')
+% set(gca, 'YTick', [])
 
 % histogram of epoch lengths for NREM, REM, and WAKE
-fh.CurrentAxes = sb5;
-hold on
-epMat = cell2nanmat(ss.epLen(sstates));
-plot([1 : size(epMat, 2)], mean(epMat, 1, 'omitnan'),...
-    'kd', 'markerfacecolor', 'k')
-boxplot(epMat, 'PlotStyle', 'traditional', 'Whisker', 6);
-bh = findobj(sb5, 'Tag', 'Box');
-bh = flipud(bh);
-for ibox = 1 : length(bh)
-    patch(get(bh(ibox), 'XData'), get(bh(ibox), 'YData'),...
-        cfg.colors{sstates(ibox)}, 'FaceAlpha', 0.5)
-end
-xticklabels(cfg.names(sstates))
-xtickangle(45)
-set(sb5, 'YScale', 'log')
-ylabel('Epoch Length [log(s)]')
-ylim([0 ceil(prctile(epMat(:), 99.99))])
+% fh.CurrentAxes = sb5;
+% hold on
+% epMat = cell2nanmat(ss.epLen(sstates));
+% plot([1 : size(epMat, 2)], mean(epMat, 1, 'omitnan'),...
+%     'kd', 'markerfacecolor', 'k')
+% boxplot(epMat, 'PlotStyle', 'traditional', 'Whisker', 6);
+% bh = findobj(sb5, 'Tag', 'Box');
+% bh = flipud(bh);
+% for ibox = 1 : length(bh)
+%     patch(get(bh(ibox), 'XData'), get(bh(ibox), 'YData'),...
+%         cfg.colors{sstates(ibox)}, 'FaceAlpha', 0.5)
+% end
+% xticklabels(cfg.names(sstates))
+% xtickangle(45)
+% set(sb5, 'YScale', 'log')
+% ylabel('Epoch Length [log(s)]')
+% ylim([0 ceil(prctile(epMat(:), 99.99))])
     
 % percent time in state
 fh.CurrentAxes = sb6;
-pie(sum(cell2nanmat(ss.epLen(sstates), 2), 1, 'omitnan'), ones(1, length(sstates)));
-hold on
-ph = findobj(sb6, 'Type', 'Patch');
-set(ph, {'FaceColor'}, flipud(cfg.colors(sstates)))
-legend(cfg.names, 'Units', 'normalized', 'Position', [0.81 0.11 0.10 0.20]);
+% pie(sum(cell2nanmat(ss.epLen(sstates), 2), 1, 'omitnan'), ones(1, length(sstates)));
+% hold on
+% ph = findobj(sb6, 'Type', 'Patch');
+% set(ph, {'FaceColor'}, flipud(cfg.colors(sstates)))
+% legend(cfg.names, 'Units', 'normalized', 'Position', [0.81 0.11 0.10 0.20]);
 
 % save figure
 if saveFig
     figpath = fullfile('graphics', 'sleepState');
     mkdir(figpath)
     figname = fullfile(figpath, sprintf('%s_stateSeparation', basename));
-    export_fig(figname, '-tif', '-transparent', '-r300')
+    savefig(fh, figname, 'compact')
 end
 
 end

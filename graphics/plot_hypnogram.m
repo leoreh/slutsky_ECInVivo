@@ -6,6 +6,8 @@ function plot_hypnogram(varargin)
 %   labels          1 x n integers of state labels. see as_classify 
 %   stateEpochs     cell of n x 2 mats. see as_classify 
 %   sstates         selected states to mark. see below
+%   clr             cell of colors for each state. if empty will load cfg.colors
+%   yshift          scalar. shift location of lines {1}
 %   axh             axis handle for plot
 %
 %   18 jun 22 LH  
@@ -17,12 +19,16 @@ p = inputParser;
 addOptional(p, 'labels', [], @isnumeric);
 addOptional(p, 'stateEpochs', [], @iscell);
 addOptional(p, 'sstates', [], @isnumeric);
+addOptional(p, 'clr', []);
+addOptional(p, 'yshift', 1, @isnumeric);
 addOptional(p, 'axh', []);
 
 parse(p,varargin{:})
 labels          = p.Results.labels;
 stateEpochs     = p.Results.stateEpochs;
 sstates         = p.Results.sstates;
+clr             = p.Results.clr;
+yshift          = p.Results.yshift;
 axh             = p.Results.axh;
 
 if isempty(stateEpochs) && isempty(labels)
@@ -50,16 +56,15 @@ if isempty(sstates)
     sstates = 1 : cfg.nstates;
 end
 
-% remove small states
-%     labels(labels == 6) = 5;
-%     labels(labels == 3) = 4;
+% colors for states
+if isempty(clr)
+    clr = cfg.colors(sstates);
+end
 
 % re-calc state epochs from labels
 if isempty(stateEpochs)
-    minDur = [5, 2, 2, 5, 2, 2];
-    interDur = 10;
     [stateEpochs, ~] = as_epochs('labels', labels,...
-        'minDur', minDur, 'interDur', interDur);
+        'minDur', minDur, 'interDur', interDur, 'graphics', false);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -70,12 +75,14 @@ hold on
 for istate = 1 : length(sstates)
     sepochs = stateEpochs{sstates(istate)};
     if ~isempty(sepochs)
-        plot(axh, sepochs', 1 * ones(size(sepochs))',...
-            'color', cfg.colors{sstates(istate)}, 'LineWidth', 25)
+        plot(axh, sepochs', yshift * ones(size(sepochs))',...
+            'color', clr{istate}, 'LineWidth', 25)
     end
 end
 set(gca, 'ytick', [])
 set(gca, 'YColor', 'none')
+yLimit = ylim;
+ylim([yLimit(1) - diff(yLimit), yLimit(1) + diff(yLimit)])
 
 end 
 

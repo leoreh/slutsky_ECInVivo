@@ -9,7 +9,7 @@ function session = CE_sessionTemplate(s, varargin)
 %   viaGUI      logical. open CR session GUI {true}
 %   forceDef    logical. force default params set here to session even if
 %               they already exist {false}
-%   forceL      logical. force load even session file exists {false}
+%   forceL      logical. force load even if session file exists {false}
 %   saveVar     logical. save variable {true}
 %
 % CALLS:
@@ -239,10 +239,15 @@ end
 if isfield(session,'extracellular') &&...
         isfield(session.extracellular,'nChannels') || forceDef
     fullpath = fullfile(session.general.basePath,[session.general.name,'.dat']);
+    lfppath = fullfile(session.general.basePath,[session.general.name,'.lfp']);
     if exist(fullpath,'file')
         temp2_ = dir(fullpath);
         session.extracellular.nSamples = temp2_.bytes/session.extracellular.nChannels/2;
         session.general.duration = session.extracellular.nSamples/session.extracellular.sr;
+    elseif exist(lfppath, 'file')
+        temp3_ = dir(lfppath);
+        session.extracellular.nSamples = temp3_.bytes/session.extracellular.nChannels/2;
+        session.general.duration = session.extracellular.nSamples/session.extracellular.srLfp;
     end
 end
 

@@ -140,7 +140,7 @@ sSig = load([basename, '.sleep_sig.mat']);
 
 % call for acceleration
 sSig = as_prepSig([basename, '.lfp'], acc.mag,...
-    'eegCh', [13 : 16], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
+    'eegCh', [9 : 12], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
     'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
     'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [10 450], 'fs', 1250);
 
@@ -150,11 +150,14 @@ sSig = as_prepSig([basename, '.lfp'], [basename, '.emg.dat'],...
     'emgCf', [80 450]);
 
 % manually create labels
+labelsmanfile = [basename, '.sleep_labelsRev.mat'];
+AccuSleep_viewer(sSig, ss.labels, labelsmanfile)
+
 labelsmanfile = [basename, '.sleep_labelsMan.mat'];
-AccuSleep_viewer(sSig, [], labelsmanfile)
+AccuSleep_viewer(sSig, ss.labels, '')
 
 % classify with a network
-netfile = [];
+netfile = 'D:\Code\slutsky_ECInVivo\lfp\SleepStates\AccuSleep\trainedNetworks\net_230212_103132.mat';
 calData = [];
 % calData = ss.info.calibrationData;
 ss = as_classify(sSig, 'basepath', basepath, 'inspectLabels', false,...
@@ -168,7 +171,7 @@ as_stateSeparation(sSig, ss)
 [ss.netPrecision, ss.netRecall] = as_cm(labels1, labels2);
 
 % plot state duration in timebins
-[totDur, epLen] = as_plotZT('nwin', 8, 'sstates', [1, 2, 3, 4, 5],...
+[totDur, epLen] = as_plotZT('nbins', 8, 'sstates', [1, 2, 3, 4, 5],...
     'ss', ss, 'timebins', session.general.timebins);
 
 % calc psd in states
@@ -178,20 +181,21 @@ psd = psd_states('basepath', basepath, 'sstates', [1, 4],...
     'prct', 70, 'flgEmg', true);
 
 % get psd per session for one mouse
-[bands, powdb] = sessions_psd(mname, 'flgNormBand', true, 'flgAnalyze', false,...
-    'flgNormTime', true, 'flgEmg', true, 'idxBsl', [1]);
+[bands, powdb] = sessions_psd(mname, 'flgNormBand', true,...
+    'flgNormTime', true, 'flgEmg', true, 'idxBsl', [1], 'saveFig', false);
 
 % calc spec
 spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true, 'saveVar', true,...
-    'padfft', -1, 'winstep', 5, 'logfreq', true, 'ftarget', [],...
+    'padfft', 0, 'winstep', 5, 'logfreq', true, 'ftarget', [],...
     'ch', spkgrp, 'force', true);
-plot_spec(spec, 'ch', 4, 'logfreq', true, 'saveFig', false,...
+
+plot_spec(spec, 'ch', [1 : 4], 'logfreq', true, 'saveFig', false,...
     'axh', [])
 
+% get spectrogram outliers
+otl = get_specOutliers('basepath', basepath, 'saveVar', true,...
+    'flgCalc', false, 'flgForce', true, 'graphics', true);
 
-spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true, 'saveVar', false,...
-    'padfft', -1, 'winstep', 10, 'logfreq', true, 'ftarget', [],...
-    'ch', {1 : 4}, 'force', true);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % spike sorting
@@ -313,7 +317,7 @@ sl = spklfp_wrapper('basepath', basepath, 'winCalc', winCalc,...
 
 % number of units per spike group
 [rs, fs] = plot_nunits('basepaths', {basepath}, 'saveFig', true)
-[rs, fs] = plot_nunits('mname', 'lh107', 'saveFig', true);
+[rs, fs] = plot_nunits('mname', 'lh100', 'saveFig', true);
 
 [sum(rs, 2), sum(fs, 2)]
 
@@ -337,10 +341,13 @@ plot_FRstates_sextiles('stateMfr', fr.states.mfr(:, [1, 4])', 'units', units.cle
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % concatenate var from different sessions
-mname = 'lh133';
-[expData, xData] = sessions_catVarTime('mname', mname,...
-    'dataPreset', {'fr', 'spec', 'emg_rms'}, 'graphics', true, 'dataAlt', 1,...
-    'basepaths', {}, 'xTicksBinsize', 6, 'markRecTrans', true);
+mname = 'lh107';
+for ialt = 1 : 4
+[~, info] = sessions_catVarTime('mname', mname,...
+    'dataPreset', {'fr', 'spec', 'emg_rms'}, 'graphics', true, 'dataAlt', ialt,...
+    'basepaths', {}, 'xTicksBinsize', 6, 'markRecTrans', true,...
+    'saveFig', false);
+end
 
 % snip segments (e.g. spikes) from binary 
 [spkwv, ~] = snipFromBinary('stamps', spktimes, 'fname', datname,...

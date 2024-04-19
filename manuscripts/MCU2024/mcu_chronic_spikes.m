@@ -372,202 +372,16 @@ end
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% MFR per state **epoch** during baseline
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% mcu baseline basepaths
-basepaths = {...
-    'F:\Data\lh132\lh132_230413_094013',...
-    'F:\Data\lh133\lh133_230413_094013',...
-    'F:\Data\lh134\lh134_230504_091744',...
-    'F:\Data\lh136\lh136_230519_090043',...
-    'F:\Data\lh140\lh140_230619_090023'};
-
-% wt baseline basepaths
-basepaths = {...
-    'F:\Data\lh96\lh96_220120_090157',...
-    'F:\Data\lh107\lh107_220518_091200',...
-    'F:\Data\lh122\lh122_221223_092656',...
-    'F:\Data\lh142\lh142_231005_091832'};
-
-% load data
-varsFile = ["fr"; "sleep_states"; "datInfo"; "session"; "units";...
-    "st_metrics"; "st_brst"; "spikes"];
-varsName = ["fr"; "ss"; "datInfo"; "session"; "units";...
-    "st"; "brst"; "spikes"];
-xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
-[v, basepaths] = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
-    'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
-    'xlsname', xlsname);
-nfiles = length(basepaths);
-
-sstates = [1, 4, 5];
-iunit = 1;
-clr = v(1).ss.info.colors(sstates);
-snames = v(1).ss.info.names(sstates);
-graphics = true;
-yLimit_fr = [0, 4];
-
-% firing rate
-clear dataMat
-for ifile = 1 : nfiles
-
-    basepath = basepaths{ifile};
-    [~, basename] = fileparts(basepath);
-    cd(basepath)
-
-    % recalculate fr with large binsize to get mfr per epoch
-    if isfield(v(ifile).session.general, 'timepnt')
-        timepnt = v(ifile).session.general.timepnt;
-    else
-        timepnt = Inf;
-    end
-    winBL = [0 timepnt];
-    fr = calc_fr(v(ifile).spikes.times, 'basepath', basepath,...
-        'graphics', false, 'binsize', Inf, 'saveVar', false, 'forceA', true,...
-        'smet', 'none', 'winBL', winBL, 'winCalc', [0, Inf]);
-
-    % get mfr across units per epoch in selected states
-    unitIdx = v(ifile).units.clean(iunit, :);
-    dataMat = cellfun(@(x) mean(x(unitIdx, :), 1)', fr.states.fr, 'uni', false);
-    dataMat = cell2nanmat(dataMat(sstates), 2);
-
-    % graphics
-    if graphics
-        setMatlabGraphics(false)
-        fh = figure;
-        tlayout = [2, 3];
-        th = tiledlayout(tlayout(1), tlayout(2));
-        th.TileSpacing = 'tight';
-        th.Padding = 'none';
-
-        % comparison of epoch MFR between states
-        axh = nexttile(th, 1, [1, 1]);
-        plot_boxMean('dataMat', dataMat, 'allpnts', true)
-        bh = findobj(axh, 'Tag', 'Box');
-        bh = flipud(bh);
-        for ibox = 1 : length(bh)
-            patch(get(bh(ibox), 'XData'), get(bh(ibox), 'YData'),...
-                clr{ibox}, 'FaceAlpha', 0.5)
-        end
-        %         bar(axh, mean(dataMat, 'omitnan'))
-        ylim(yLimit_fr)
-        xticklabels(snames)
-        ylabel('Epoch MFR [Hz]')
-        title(axh, 'All epochs')
-
-        % comparison of epoch MFR between states, subsampled to the number of units
-        axh = nexttile(th, 2, [1, 1]);
-        clear tmp
-        for istate = 1 : length(sstates)
-            nepochs = sum(~isnan(dataMat(:, istate)));
-            subIdx = randperm(nepochs, sum(unitIdx));
-            tmp(:, istate) = dataMat(subIdx, istate);
-        end
-        plot_boxMean('dataMat', tmp, 'allpnts', true)
-        bh = findobj(axh, 'Tag', 'Box');
-        bh = flipud(bh);
-        for ibox = 1 : length(bh)
-            patch(get(bh(ibox), 'XData'), get(bh(ibox), 'YData'),...
-                clr{ibox}, 'FaceAlpha', 0.5)
-        end
-        %         bar(axh, mean(tmp, 'omitnan'))
-        ylim(yLimit_fr)
-        xticklabels(snames)
-        ylabel('Epoch MFR [Hz]')
-        title(axh, 'Random subset of epochs')
-
-        % comparison of unit MFR between states
-        axh = nexttile(th, 3, [1, 1]);
-        tmp = fr.states.mfr(unitIdx, sstates);
-        plot_boxMean('dataMat', tmp, 'allpnts', true)
-        bh = findobj(axh, 'Tag', 'Box');
-        bh = flipud(bh);
-        for ibox = 1 : length(bh)
-            patch(get(bh(ibox), 'XData'), get(bh(ibox), 'YData'),...
-                clr{ibox}, 'FaceAlpha', 0.5)
-        end
-        %         bar(axh, mean(tmp, 'omitnan'))
-        ylim(yLimit_fr)
-        xticklabels(snames)
-        ylabel('SU MFR [Hz]')
-        title(axh, 'Single Unit MFR')
-
-        % MFR per state epoch across time
-        axh = nexttile(th, 4, [1, 2]);
-        hold on
-        for istate = 1 : length(sstates)
-            stateIdx = sstates(istate);
-
-            tstamps = fr.states.tstamps{stateIdx} / 60 / 60;
-            yval = dataMat(:, istate);
-            yval(isnan(yval)) = [];
-            scatter(tstamps, yval, 30, 'filled', 'MarkerFaceColor', clr{istate})
-            xlabel('Time [h]')
-            ylabel('MFR [Hz]')
-            legend(snames)
-        end
-        ylim(yLimit_fr)
-        title(axh, 'Epoch MFR across time')
-
-        % correlation between epoch dur and mfr
-        axh = nexttile(th, 6, [1, 1]);
-        hold on
-        for istate = 1 : length(sstates)
-            stateIdx = sstates(istate);
-
-            epochDur = cellfun(@(x) diff(x), fr.states.binedges{stateIdx}, 'uni', true);
-            yval = dataMat(:, istate);
-            yval(isnan(yval)) = [];
-            scatter(epochDur, yval, 30, 'filled', 'MarkerFaceColor', clr{istate})
-            xlabel('Epoch Duration [s]')
-            ylabel('MFR [Hz]')
-            set(gca, 'xscale', 'log')
-        end
-        ylim(yLimit_fr)
-        title(axh, 'Correlation')
-
-        title(th, basename, 'Interpreter', 'none')
-    end
-
-    % organize data for prism
-    prismMat{ifile} = dataMat;
-    
-    % save figure
-    saveas(fh, fullfile('C:\Users\Leore\Downloads', [basename, '.png']));
-
-end
-
-clear perMouse
-for ifile = 1 : nfiles
-    perMouse(ifile, :) = mean(prismMat{ifile}, 'omitnan');
-end
-allMice = vertcat(prismMat{:});
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Circadian - slope of mfr across time
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% mcu baseline basepaths
-basepaths = {...
-    'F:\Data\lh132\lh132_230413_094013',...
-    'F:\Data\lh133\lh133_230413_094013',...
-    'F:\Data\lh134\lh134_230504_091744',...
-    'F:\Data\lh136\lh136_230519_090043',...
-    'F:\Data\lh140\lh140_230619_090023'};
-
-% wt baseline basepaths
-basepaths = {...
-    'F:\Data\lh96\lh96_220120_090157',...
-    'F:\Data\lh107\lh107_220518_091200',...
-    'F:\Data\lh122\lh122_221223_092656',...
-    'F:\Data\lh142\lh142_231005_091832'};
-
-% load data
-varsFile = ["fr"; "sleep_states"; "datInfo"; "session"; "units";...
-    "st_metrics"; "st_brst"; "spikes"];
-varsName = ["fr"; "ss"; "datInfo"; "session"; "units";...
-    "st"; "brst"; "spikes"];
+% files
+basepaths = [mcu_sessions('wt_bsl')];
+idx_wt = length(basepaths);
+idx_mcu = idx_wt + 1;
+basepaths = [basepaths, mcu_sessions('mcu_bsl')];
+varsFile = ["fr"; "sleep_states"; "datInfo"; "session"; "units"];
+varsName = ["fr"; "ss"; "datInfo"; "session"; "units"];
 xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
 [v, basepaths] = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
     'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
@@ -582,13 +396,37 @@ for ifile = 1 : nfiles
     unitIdx = v(ifile).units.clean(iunit, :);
     frMat = v(ifile).fr.strd(unitIdx, :);
     mfr = mean(frMat, 1);
-
     midDay = round(size(frMat, 2) / 2);
+    
     frDiff{ifile} = mean(frMat(:, 1 : midDay), 2) - mean(frMat(:, midDay + 1 : end), 2);  
-%     frDiff(ifile) = mean(mfr(1 : midDay)) - mean(mfr(midDay + 1 : end));
+
+    coef = polyfit(v(ifile).fr.tstamps, mean(frMat, 1, 'omitnan'), 1);
+    slope(ifile) = coef(1);
 
 end
-prismData = vertcat(frDiff{:});
+acrossMice = vertcat(frDiff{:});
+
+fh = figure;
+tlayout = [1, 2];
+th = tiledlayout(tlayout(1), tlayout(2));
+th.TileSpacing = 'tight';
+th.Padding = 'none';
+
+axh = nexttile(th, 1, [1, 1]);
+perMouse{1} = cellfun(@mean, frDiff(1 : idx_wt), 'uni', true);
+perMouse{2} = cellfun(@mean, frDiff(idx_mcu : end), 'uni', true);
+prismData = cell2nanmat(perMouse, 2);
+plot_boxMean('dataMat', prismData, 'allPnts', true)
+
+axh = nexttile(th, 2, [1, 1]);
+perMouse{1} = slope(1 : idx_wt);
+perMouse{2} = slope(idx_mcu : end);
+prismData = cell2nanmat(perMouse, 2);
+plot_boxMean('dataMat', prismData, 'allPnts', true)
+
+
+
+% see also https://onlinelibrary.wiley.com/doi/10.1002/hipo.20969
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % cell classification

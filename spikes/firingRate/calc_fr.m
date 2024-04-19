@@ -85,7 +85,7 @@ nunits = length(spktimes);
 if ischar(saveVar)
     frFile = [basepath, filesep, basename, '.' saveVar '.mat'];
 else
-    frFile = [basepath, filesep, basename, '.fr.mat'];
+    frFile = fullfile(basepath, [basename, '.fr.mat']);
 end
 asFile = fullfile(basepath, [basename '.sleep_states.mat']);
 sessionFile = fullfile(basepath, [basename '.session.mat']);
@@ -116,8 +116,9 @@ end
 [fr.strd, ~, fr.tstamps] = times2rate(spktimes, 'binsize', binsize,...
     'winCalc', winCalc, 'c2r', true);
 
-% calc fr in states. states, binsize, and spktimes must be
-% the same units (typically sec)
+% calc fr in states. states, binsize, and spktimes must be the same units
+% (typically sec)
+
 if exist(asFile, 'file') || ~isempty(stateEpochs)
     if isempty(stateEpochs)
         load(asFile, 'ss')
@@ -130,23 +131,29 @@ if exist(asFile, 'file') || ~isempty(stateEpochs)
 
     % fit stateEpochs to winCalc and count spikes in states
     for istate = 1 : nstates
+        
         if isempty(stateEpochs{istate})
             fr.states.fr{istate} = zeros(nunits, 1);
             fr.states.tstamps{istate} = 0;
             continue
         end
         epochIdx = InIntervals(stateEpochs{istate}, winCalc);
+        
         if all(size(stateEpochs{istate}) > 1)
             [fr.states.fr{istate}, fr.states.binedges{istate},...
                 fr.states.tstamps{istate}, fr.states.binidx] =...
-                times2rate(spktimes, 'binsize', binsize,...
+                times2rate(spktimes, 'binsize', Inf,...
                 'winCalc', stateEpochs{istate}(epochIdx, :), 'c2r', true);
         else
             fr.states.fr{istate} = [];
             fr.states.tstamps{istate} = [];
         end
     end
-    
+       
+    % mean across state
+    fr.states.mfr = cellfun(@(x) mean(x, 2, 'omitnan'), fr.states.fr, 'uni', false);
+    fr.states.mfr = cell2nanmat(fr.states.mfr, 2);
+
     % gain factor compared to AW (sela, j. neurosci, 2020)
     mat1 = mean(fr.states.fr{1}, 2, 'omitnan');
     for istate = 1 : nstates
@@ -173,12 +180,6 @@ if exist(asFile, 'file') || ~isempty(stateEpochs)
             end
         end
     end
-    
-    % calc mfr per state
-    fr.states.mfr = cellfun(@(x) mean(x, 2), fr.states.fr, 'uni', false);
-    fr.states.mfr = cell2nanmat(fr.states.mfr, 2);
-
-
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

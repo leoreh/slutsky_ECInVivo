@@ -190,6 +190,8 @@ for idir = 1 : ndirs
                 varArray(idir).(varsName{ifile}) = temp.cell_metrics;
         elseif strcmp(varsName{ifile}, 'sr')
             varArray(idir).(varsName{ifile}) = temp.fr;
+        elseif strcmp(varsName{ifile}, 'psdEmg')
+            varArray(idir).(varsName{ifile}) = temp.psd;
         else
             varArray(idir).(varsName{ifile}) = temp.(varsName{ifile});
         end
