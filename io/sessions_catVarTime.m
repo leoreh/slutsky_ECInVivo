@@ -65,7 +65,13 @@ zt0 = guessDateTime('0900');    % lights on at 09:00 AM
 
 if iscell(dataPreset)
     fh = figure;
-    th = tiledlayout(length(dataPreset), 1, 'TileSpacing', 'none');
+    set(fh, 'WindowState', 'maximized');
+    th = tiledlayout(length(dataPreset), 1);
+    th.TileSpacing = 'tight';
+    th.Padding = 'none';
+    set(fh, 'DefaultAxesFontSize', 16);
+    title(th, mname, 'interpreter', 'none', 'FontSize', 20)
+
     for idata = 1 : length(dataPreset)
         sb(idata) = nexttile;
         [expData{idata}, info{idata}] = sessions_catVarTime('mname', mname,...
@@ -81,7 +87,6 @@ if iscell(dataPreset)
 
     linkaxes(sb, 'x')
     axis tight
-    title(th, mname)
 
     % concatenate info struct
     info = catfields([info{:}], 2);

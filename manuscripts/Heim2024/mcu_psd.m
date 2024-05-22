@@ -76,7 +76,7 @@ for ifile = 1 : nfiles
     % calc psd accordign to emg state separation
     psdEmg = psd_states('basepath', basepath, 'sstates', [1, 2],...
         'sig', sig, 'fs', fs, 'saveVar', saveVar,...
-        'graphics', false, 'forceA', true, 'ftarget', ftarget,...
+        'graphics', true, 'forceA', true, 'ftarget', ftarget,...
         'emgThr', [], 'flgEmg', true);
 
     % graphics ------------------------------------------------------------
@@ -89,26 +89,44 @@ for ifile = 1 : nfiles
         th = tiledlayout(tlayout(1), tlayout(2));
         th.TileSpacing = 'tight';
         th.Padding = 'none';
-        title(th, basename, 'interpreter', 'none')
+        title(th, basename, 'interpreter', 'none', 'FontSize', 20)
+        set(fh, 'DefaultAxesFontSize', 16);
 
-        % superposition of state hypnogram and emg-states
+        % spectrogram
         axh(1) = nexttile(th, 1, [1, 3]); cla; hold on
-        plot_hypnogram('stateEpochs', psd.epochs.stateEpochs, 'sstates', [1 : 3],...
-            'axh', axh, 'yshift', 3, 'clr', clr)
-        plot_hypnogram('stateEpochs', psdEmg.epochs.stateEpochs, 'sstates', [1, 2],...
-            'axh', axh, 'clr', clrEmg, 'yshift', 1.5)
-        plot([1 : length(emg)], emg, 'k', 'LineWidth', 0.5)
+        plot_spec(spec, 'ch', 1, 'logfreq', false, 'saveFig', false,...
+            'axh', axh(1), 'xtime', 1)
         axis tight
         yLimit = ylim;
-        ylim([yLimit(1) - 1, yLimit(2) + 1])
+        scatter(otl.idx, ones(length(otl.idx), 1) * yLimit(2), 20, 'filled', 'r')
+        xval = [3600 : 3600 : length(spec.s)];
+        xticks(xval);
+        xticklabels(string(xval / 3600))
+
+        % superposition of state hypnogram and emg-states
+        axh(2) = nexttile(th, 5, [1, 3]); cla; hold on
+                plot([1 : length(emg)], emg, 'k', 'LineWidth', 0.5)
+        axis tight
+        plot_hypnogram('stateEpochs', psd.epochs.stateEpochs, 'sstates', [1 : 3],...
+            'axh', axh(2), 'yshift', 1.05, 'clr', clr, 'lWidth', 30)
+        yshift = 1.1;
+        plot_hypnogram('stateEpochs', psdEmg.epochs.stateEpochs, 'sstates', [1, 2],...
+            'axh', axh(2), 'clr', clrEmg, 'yshift', yshift, 'lWidth', 30)
+        yLimit = ylim;
+        ylim([yLimit(1), yLimit(2) * yshift])
         xval = [3600 : 3600 : length(spec.s)];
         xticks(xval);
         xticklabels(string(xval / 3600))
         xlabel('Time (h)')
-        title(axh(1), 'Hypnogram')
+        set(axh(2), 'YTickMode', 'auto')
+        set(axh(2), 'YColor', 'k')
+        yticks([])
+        ylabel('EMG')
+        title(axh(2), 'Hypnogram')
+        linkaxes([axh(2), axh(2)], 'x')
 
         % histogram of emg values
-        axh(2) = nexttile(th, 4, [1, 1]);
+        axh(3) = nexttile(th, 4, [1, 1]);
         hold on
         emgThr = psdEmg.info.emgThr;
         [counts, edges] = histcounts(emg);
@@ -121,20 +139,6 @@ for ifile = 1 : nfiles
         xlabel('EMG')
         ylabel('Counts')
         title(axh(2), 'EMG Distribution')
-
-        % spectrogram
-        axh(3) = nexttile(th, 5, [1, 3]); cla
-        hold on
-        plot_spec(spec, 'ch', 1, 'logfreq', false, 'saveFig', false,...
-            'axh', axh(3), 'xtime', 1)
-        axis tight
-        yLimit = ylim;
-        scatter(otl.idx, ones(length(otl.idx), 1) * yLimit(2), 20, 'filled', 'r')
-        xval = [3600 : 3600 : length(spec.s)];
-        xticks(xval);
-        xticklabels(string(xval / 3600))
-        linkaxes([axh(1), axh(3)], 'x')
-        hold on
 
         % psd comparison between AS and EMG states
         axh(4) = nexttile(th, 8, [1, 1]);

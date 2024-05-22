@@ -77,7 +77,7 @@ if isempty(xlsname)
     xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
 end
 
-% deafuly variables to load
+% deafult variables to load
 if isempty(varsFile)
     varsFile = ["session"; "cell_metrics.cellinfo"; "spikes.cellinfo";...
         "fr"; "datInfo"; "AccuSleep_states"; "sr"; "st_metrics";

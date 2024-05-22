@@ -126,16 +126,18 @@ end
 
 % threshold of stds above sig_amp. initial detection, peak power,
 % contineous power, artifact power
-thr = [1, 2, 2, 200];
+thr = [1.5, 2.5, 2, 200];
+% thr = [0.5, 1, 1.5, 200];
+% thr = [0.5, 1, 0.5, 200];
 
 % detection params. limDir refers to min, max, and inter-ripple
 % duration. 4th element refers to the amount of time the power must be
 % above thr(3). all values in [ms]
-limDur = [20, 500, 20, 10]; 
+limDur = [20, 300, 20, 10]; 
 limDur = round(limDur / 1000 * fs);
-passband = [120 300];
+passband = [100 300];
 binsizeRate = 60;           % binsize for calculating ripple rate [s]
-emgThr = 50;                % exclude ripples that occur when emg > thr
+emgThr = 75;                % exclude ripples that occur when emg > thr
 
 fprintf('\ngetting ripples for %s\n', basename)
 
@@ -222,10 +224,22 @@ nepochs = size(epochs, 1);
 
 % discard ripples that occur during high emg 
 if ~isempty(emg)
+    
+    % calc emg rms throughout the recording in 4s bins
+    emg_binLen = fs * 4;
+    emg_nbins = floor(length(emg) / emg_binLen);
+    emg_rms = log(rms(reshape(emg(1 : emg_nbins * emg_binLen), emg_binLen, emg_nbins)));
+
+    % calc emg rms per epoch
     for iepoch = 1 : nepochs
-        emgRipp(iepoch) = median(emg(epochs(iepoch, 1) : epochs(iepoch, 2)));
+        emgRipp(iepoch) = log(rms(emg(epochs(iepoch, 1) : epochs(iepoch, 2))));
     end
-    discard_idx = emgRipp > prctile(emg, emgThr);
+    discard_idx = emgRipp > prctile(emg_rms, emgThr);
+
+%     find threshold from the bimodal distribution of emg
+%         [~, cents] = kmeans(emg_rms(:), 2);
+%         emgThr = mean(cents);
+%         discard_idx = emgRipp > emgThr;
     epochs(discard_idx, :) = [];
     emgRipp(discard_idx) = [];
     nepochs = size(epochs, 1);
@@ -264,7 +278,7 @@ end
 epochs(discard_idx, :) = [];
 peakPowNorm(discard_idx) = [];
 nepochs = size(epochs, 1);
-fprintf('After peak power: %d events\n', nepochs)
+fprintf('After contineous power: %d events\n', nepochs)
 
 % clear memory
 clear sig_dtct
@@ -272,6 +286,8 @@ clear sig_dtct
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ripp stats
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%% change to maxPow and minPow
 
 % find negative peak position for each ripple
 peakPos = zeros(size(epochs, 1), 1);
@@ -291,6 +307,9 @@ epochs = epochs / fs;
 ripp.maps.durWin = [-75 75] / 1000;
 nbinsMap = floor(fs * diff(ripp.maps.durWin) / 2) * 2 + 1; % must be odd
 centerBin = ceil(nbinsMap / 2);
+[r, i] = Sync([tstamps sig], peakPos, 'durations', ripp.maps.durWin);
+ripp.maps.raw = SyncMap(r, i, 'durations', ripp.maps.durWin,...
+    'nbins', nbinsMap, 'smooth', 0);
 [r, i] = Sync([tstamps sig_filt], peakPos, 'durations', ripp.maps.durWin);
 ripp.maps.ripp = SyncMap(r, i, 'durations', ripp.maps.durWin,...
     'nbins', nbinsMap, 'smooth', 0);
@@ -349,7 +368,8 @@ ripp.peakPowNorm        = peakPowNorm;
 if saveVar      
     save(rippfile, 'ripp')
 
-    % create ns files for visualization with neuroscope
+    % create ns files for visualization with neuroscope. note currently
+    % this only works if recWin(1) = 0
     nepochs = size(ripp.epochs, 1);
 
     res = round([ripp.epochs(:, 1); ripp.epochs(:, 2); ripp.peakPos] * fsSpks);

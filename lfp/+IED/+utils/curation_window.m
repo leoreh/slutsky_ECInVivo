@@ -154,6 +154,26 @@ classdef curation_window < handle
             
             key = event.Key;
             switch key
+                case {'4'} 
+                    % mark as movement artifact
+
+                    % flash green
+                    app.zoom_in_axe.Title.Color  = 'y';
+                    pause(0.05)
+                    app.zoom_in_axe.Title.Color  = 'k';
+
+                    % mark denied
+                    app.ied.accepted(app.ied.last_mark) = false;
+                    app.ied.mvArts(app.ied.last_mark) = true;
+
+                    % move to next discharge
+                    if numel(app.ied.pos) < app.ied.last_mark+1
+                        close(app.IED_curation_UIFigure)
+                        return
+                    else
+                        app.ied.last_mark = app.ied.last_mark+1;
+                    end
+
                 case {'1','normal','numpad1'} % normal = left click
                     % accept discharge
 
@@ -287,6 +307,8 @@ classdef curation_window < handle
 
             progress_dlg.Message = "Saving (might take a while)";
             ied = app.ied; %#ok<PROP> this is so saved name will be ied as expected
+            ied.sig = [];
+            ied.emg = [];
             save(ied.file_loc,"ied","-v7.3") %#ok<PROP> this is so saved name will be ied as expected
         end
     end
@@ -466,7 +488,7 @@ classdef curation_window < handle
             sig_std = std(app.ied.sig);
             diplay_limit = 1.5*app.ied.thr(1)*sig_std;
             ylim(app.zoom_out_axe,[sig_mean-diplay_limit, sig_mean+diplay_limit])
-            
+
             % prep zoom in graph
             [x_data, y_data] = app.collect_data(app.ied.last_mark, app.zoom_in_marg, "sig");
             app.zoom_in_line = plot(app.zoom_in_axe ,x_data, y_data);

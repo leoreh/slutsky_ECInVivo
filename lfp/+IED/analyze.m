@@ -3,6 +3,8 @@ function ied = analyze(ied,varargin)
 %
 %   INPUT (in 1st position):
 %       IED.data object, after detection.
+%   INPUT (name-value, required):
+%       sig         signal used for detection
 %   INPUT (optional, name value):
 %       binsize     scalar {60*ied.fs} in [samples]. for rate calculation.
 %       smf         smooth factor for rate [bins] {7}.
@@ -39,6 +41,7 @@ if ~isa(ied,'IED.data')
 end
 
 p = inputParser;
+addParameter(p, 'sig', [], @isnumeric);
 addParameter(p, 'binsize', 60*ied.fs, @isnumeric)
 addParameter(p, 'marg', 0.05, @isnumeric)
 addParameter(p, 'smf', 7, @isnumeric)
@@ -65,6 +68,7 @@ if ~ismember("marg",p.UsingDefaults) || isempty(ied.marg)
     ied.marg = p.Results.marg;
 end
 
+sig = p.Results.sig;
 saveVar = p.Results.saveVar;
 basepath = p.Results.basepath;
 basename = p.Results.basename;
@@ -90,7 +94,7 @@ end
 
 margs = floor(ied.marg * ied.fs);           % margs [samples]; ied.marg [ms]
 accepted = ied.accepted;
-out_margs = find( (ied.pos+margs > length(ied.sig)) | (ied.pos-margs < 1) );
+out_margs = find( (ied.pos+margs > length(sig)) | (ied.pos-margs < 1) );
 if ~isempty(out_margs)
     accepted(out_margs) = false;
     fprintf("\n**** Making discharges {%s} not-accepted for analysis, as their margins is partly out of signal ****\n",...
@@ -104,7 +108,7 @@ end
 % collect discharges that passed curation
 true_pos = ied.pos(accepted);
 
-[ied.rate, ied.edges, ied.cents] = times2rate(true_pos, 'winCalc', [1, length(ied.sig)],...
+[ied.rate, ied.edges, ied.cents] = times2rate(true_pos, 'winCalc', [1, length(sig)],...
     'binsize', ied.binsize, 'c2r', false);
 % this is super dangerous because if binsize < 1 min than the rate will
 % effectively be greater than the number of counts
@@ -131,9 +135,11 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%% collect clips for displaying later
-sig_tstamps =  (1 : length(ied.sig))' / ied.fs;
+sig_tstamps =  (1 : length(sig))' / ied.fs;
+ied.sig = sig;
 [clipped_discharges, clipped_tstamps] = extract_discharges(ied);
-peak_val = ied.sig(true_pos);
+ied.sig = [];
+peak_val = sig(true_pos);
 
 %%%% prepare power spectrum via wavelet
 % average wavelet coefficients for each discharge. note this produces very
@@ -169,7 +175,7 @@ uimenu(cm_decline_discharge,"Text","Decline Event","MenuSelectedFcn",@decline_di
 
 % raw and ied rate
 ax = subplot(3, 4, 1 : 2);
-plot(sig_tstamps / 60, ied.sig ,'k')
+plot(sig_tstamps / 60, sig ,'k')
 axis tight
 hold on
 markthr(ax,ied.thrDir,ied.thr(2))
@@ -183,36 +189,36 @@ title('Raw signal and IIS rate')
 ax.UIContextMenu = cm_enlarge;
 
 % detection
-ax = subplot(3, 4, 5 : 6);
-plot(sig_tstamps / 60, zscore(ied.sig), 'k')
-hold on
-axis tight
-markthr(ax,ied.thrDir,ied.thr(1))
-plot([true_pos true_pos] / ied.fs / 60, [-10 -1], '--g', 'LineWidth', 2)
-xlabel('Time [m]')
-ylabel('Z-score')
-set(gca, 'TickLength', [0 0])
-box off
-title('IED detection')
-ax.UIContextMenu = cm_enlarge;
+% ax = subplot(3, 4, 5 : 6);
+% plot(sig_tstamps / 60, zscore(sig), 'k')
+% hold on
+% axis tight
+% markthr(ax,ied.thrDir,ied.thr(1))
+% plot([true_pos true_pos] / ied.fs / 60, [-10 -1], '--g', 'LineWidth', 2)
+% xlabel('Time [m]')
+% ylabel('Z-score')
+% set(gca, 'TickLength', [0 0])
+% box off
+% title('IED detection')
+% ax.UIContextMenu = cm_enlarge;
 
 % zoom in
-ax = subplot(3, 4, 9 : 10);
-midsig = round(length(ied.sig) / 2);
-idx = round(midsig - 2 * ied.fs * 60 : midsig + 2 * ied.fs * 60);
-idx2 = true_pos > idx(1) & true_pos < idx(end);
-plot(sig_tstamps(idx) / 60, ied.sig(idx), 'k')
-axis tight
-hold on
-scatter(true_pos(idx2) / ied.fs / 60,...
-    peak_val(idx2), '*');
-ylabel('Voltage [mV]')
-xlabel('Time [m]')
-xticks(round([midsig / ied.fs / 60 - 2, midsig / ied.fs / 60 + 2]))
-set(gca, 'TickLength', [0 0])
-box off
-title('Mid Signal Zoom In')
-ax.UIContextMenu = cm_enlarge;
+% ax = subplot(3, 4, 9 : 10);
+% midsig = round(length(sig) / 2);
+% idx = round(midsig - 2 * ied.fs * 60 : midsig + 2 * ied.fs * 60);
+% idx2 = true_pos > idx(1) & true_pos < idx(end);
+% plot(sig_tstamps(idx) / 60, sig(idx), 'k')
+% axis tight
+% hold on
+% scatter(true_pos(idx2) / ied.fs / 60,...
+%     peak_val(idx2), '*');
+% ylabel('Voltage [mV]')
+% xlabel('Time [m]')
+% xticks(round([midsig / ied.fs / 60 - 2, midsig / ied.fs / 60 + 2]))
+% set(gca, 'TickLength', [0 0])
+% box off
+% title('Mid Signal Zoom In')
+% ax.UIContextMenu = cm_enlarge;
 
 % IED waveforms
 ax = subplot(3, 4, 3);

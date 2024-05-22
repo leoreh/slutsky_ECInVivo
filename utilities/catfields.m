@@ -106,13 +106,11 @@ for ifld = 1 : length(flds)
         fieldSets = cellfun(@fieldnames, fieldData, 'uni', false);
         refSet = fieldSets{1};
         uniSet = all(cellfun(@(fields) isequal(fields, refSet), fieldSets));
-        uniSet = false; % manual override, currently not working (e.g., v(:).psd
         
         if uniSet
 
             % recursively handle structs
-            recurCat = arrayfun(@(x) catfields(x, 'catdef', catdef), [fieldData{:}], 'uni', false);
-            cats.(flds{ifld}) = cell2nanmat(recurCat, catdef);
+            cats.(flds{ifld}) = catfields([fieldData{:}], catdef, copen);
         else
             
             % store as cells if struct fields are not uniform

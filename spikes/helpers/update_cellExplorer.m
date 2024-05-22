@@ -41,6 +41,17 @@ for igrp = 1 : ngrps
     spikes.spksSU(igrp) = length(vertcat(spikes.times{grpidx}));
 end
 
+% replace spikes.times. this is because for tdt recordings, somewhere in
+% loadspikes, the fs is rounded to 24414.1 instead of 24414.0625
+if spikes.sr ~= session.extracellular.sr
+    warning('spikes fs different than session')
+    spikes.sr = session.extracellular.sr
+
+    for iunit = 1 : length(spikes.times)
+        spikes.times{iunit} = spikes.ts{iunit} / spikes.sr;
+    end
+end
+
 % replace waveforms across channels (not implemented). note that filt_all
 % must include all channels or otherwise see var channels2plot in
 % CellExplorer.m

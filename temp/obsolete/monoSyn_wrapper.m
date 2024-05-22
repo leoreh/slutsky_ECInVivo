@@ -12,8 +12,6 @@ function monosyn = monoSyn_wrapper(varargin)
 %   winCalc     2 x n vec describing the window/s for calculating the
 %               stgs [s] {[0 Inf]}.
 %   fs          numeric. sampling frequency {10000}.
-%   wv          2 x n numeric. mean waveform of units.
-%   wv_std      2 x n numeric. std of units waveforms.
 %   saveVar     logical / char. save variable {true}. if char then save
 %               name will include saveVar as a suffix
 %   graphics    logical. plot graphics or not {true}. 
@@ -33,7 +31,8 @@ function monosyn = monoSyn_wrapper(varargin)
 %   graphics 2 gui
 %   implement Kubayashi 2019, https://github.com/NII-Kobayashi/GLMCC
 %
-% 31 jan 22 LH  
+% 31 jan 22 LH  updates:
+% 10 may 25         separated graphics
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % questions for lidor
@@ -68,8 +67,6 @@ addOptional(p, 'spktimes', {}, @iscell);
 addOptional(p, 'basepath', pwd, @ischar);
 addOptional(p, 'winCalc', [0 Inf], @isnumeric);
 addOptional(p, 'fs', 10000, @isnumeric);
-addOptional(p, 'wv', [], @isnumeric);
-addOptional(p, 'wv_std', [], @isnumeric);
 addOptional(p, 'saveVar', true);
 addOptional(p, 'graphics', true, @islogical);
 addOptional(p, 'saveFig', true, @islogical);
@@ -80,8 +77,6 @@ spktimes    = p.Results.spktimes;
 basepath    = p.Results.basepath;
 winCalc     = p.Results.winCalc;
 fs          = p.Results.fs;
-wv          = p.Results.wv;
-wv_std      = p.Results.wv_std;
 saveVar     = p.Results.saveVar;
 graphics    = p.Results.graphics;
 saveFig     = p.Results.saveFig;
@@ -91,12 +86,13 @@ forceA      = p.Results.forceA;
 % params
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-roi_ms = [1, 8];       % region of interest for mono synaptic connections [ms]
-alfa = 0.001;          % significance level (consider differentiating for E and I)
+roi_ms = [1.5, 4];       % region of interest for mono synaptic connections [ms]
+alfa = 0.001;            % significance level (consider differentiating for E and I)
 refThr = 1;
-ccThr = [0 800];
-stgThr = [0, -Inf];    % [E, I]
-nfigs = 5;             % number of synapses to plot
+ccThr = [0 800];         % minimum counts of spikes in cc [E, I]
+stgThr = [0.001, -0];    % minimum synpatic strength [E, I]
+minConsecBins = [2, 1];  % minimum no of consecutive significant bins [E, I]
+nfigs = 20;              % number of synapses to plot
 
 % for static workspace addition
 a = [];
@@ -140,39 +136,37 @@ nspks = cellfun(@length, spktimes, 'uni', true);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % cc 50 @ 0.5 counts
-[cc50, cc50bins] = CCG(spktimes, [], 'binSize', 0.0005,...
+[cc.cc50, cc.cc50bins] = CCG(spktimes, [], 'binSize', 0.0005,...
     'duration',  0.05, 'Fs', 1 / fs);
-cc50bins = cc50bins * 1000;
+cc.cc50bins = cc.cc50bins * 1000;
 
-if graphics
-    % ccg 150 @ 1 counts
-    [cc150, cc150bins] = CCG(spktimes, [], 'binSize', 0.001,...
-        'duration', 0.15, 'Fs', 1 / fs);
-    cc150bins = cc150bins * 1000;
-    
-    % ccg 20 @ 0.2 counts
-    [cc20, cc20bins] = CCG(spktimes, [], 'binSize', 0.0002,...
-        'duration', 0.02, 'Fs', 1 / fs);
-    cc20bins = cc20bins * 1000;
-end
+% ccg 150 @ 1 counts
+[cc.cc150, cc.cc150bins] = CCG(spktimes, [], 'binSize', 0.001,...
+    'duration', 0.15, 'Fs', 1 / fs);
+cc.cc150bins = cc.cc150bins * 1000;
+
+% ccg 20 @ 0.2 counts
+[cc.cc20, cc.cc20bins] = CCG(spktimes, [], 'binSize', 0.0002,...
+    'duration', 0.02, 'Fs', 1 / fs);
+cc.cc20bins = cc.cc20bins * 1000;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % calc stg
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % run all pairs through nested loops
-roi_idx = cc50bins >= roi_ms(1) & cc50bins <= roi_ms(2);
-roi_t = find(roi_idx);
+roi_idx = cc.cc50bins >= roi_ms(1) & cc.cc50bins <= roi_ms(2);
+roi_binIdx = find(roi_idx);
 roi_nbins = sum(roi_idx);
-dt = diff(cc50bins(1 : 2)) / 1000;  % [s]
+dt = diff(cc.cc50bins(1 : 2)) / 1000;  % [s]
 
 % initialize
 eStg = nan(nunits, nunits);
 iStg = nan(nunits, nunits);
-eBins = zeros(roi_nbins, nunits, nunits);
-iBins = zeros(roi_nbins, nunits, nunits);
-dccc = zeros(size(cc50));
-pred = zeros(size(cc50));
+eBins = false(roi_nbins, nunits, nunits);
+iBins = false(roi_nbins, nunits, nunits);
+dccc = zeros(size(cc.cc50));
+pred = zeros(size(cc.cc50));
 for u1 = 1 : nunits
     for u2 = 1 : nunits
         
@@ -181,14 +175,14 @@ for u1 = 1 : nunits
         end
         
         % dccc
-        dccc(:, u1, u2) = cchdeconv(cc50(:, u1, u2), cc50(:, u1, u1), nspks(u1),...
-            cc50(:, u2, u2), nspks(u2));
+        dccc(:, u1, u2) = cchdeconv(cc.cc50(:, u1, u2), cc.cc50(:, u1, u1), nspks(u1),...
+            cc.cc50(:, u2, u2), nspks(u2));
         
         % predictor
         [~, pred(:, u1, u2)] = cch_conv(dccc(:, u1, u2), 11, 'median', 1, 0);
         
         % crcch (normalized to rate)
-        den = (ones(length(cc50bins), 1) * nspks(u1)) * dt;
+        den = (ones(length(cc.cc50bins), 1) * nspks(u1)) * dt;
         crcc = (dccc(:, u1, u2) - pred(:, u1, u2)) ./ den;
         
         % stg
@@ -207,27 +201,36 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % limit to synapses with enough cc counts
-ccGoode = squeeze(sum(cc50, 1)) > ccThr(1);
-ccGoodi = squeeze(sum(cc50, 1)) > ccThr(2);
+ccGoode = squeeze(sum(cc.cc50, 1)) > ccThr(1);
+ccGoodi = squeeze(sum(cc.cc50, 1)) > ccThr(2);
 
 % limit to synapses with no refractory period
-refIdx = round(length(cc50bins) / 2) - 1 :...
-   round(length(cc50bins) / 2) + 1;
-refGood = squeeze(sum(cc50(refIdx, :, :))) > refThr;
+refIdx = round(length(cc.cc50bins) / 2) - 1 :...
+   round(length(cc.cc50bins) / 2) + 1;
+refGood = squeeze(sum(cc.cc50(refIdx, :, :))) > refThr;
 
 % limit to synapses with minimum stg
-eStgGood = eStg > stgThr(1) | ~isnan(eStg);
-iStgGood = iStg < -stgThr(2) | ~isnan(iStg);
+eStgGood = eStg > stgThr(1) & ~isnan(eStg);
+iStgGood = iStg < stgThr(2) & ~isnan(iStg);
 
 % limit to synapses with minimum significant bins. can also use strfind
 % to limit results to consectutive bins.
-% any(strfind(iBins(:, a(isyn))', ones(1, minSigBins)))
-% minSigBins = 3;
-% [a] = squeeze(sum(eBins, 1) > minSigBins);
+eConsecGood = false(nunits, nunits);
+iConsecGood = false(nunits, nunits);
+for u1 = 1 : nunits
+    for u2 = 1 : nunits
+        
+        if u1 == u2
+            continue
+        end
+        eConsecGood(u1, u2) = any(strfind(eBins(:, u1, u2)', ones(1, minConsecBins(1))));
+        iConsecGood(u1, u2) = any(strfind(iBins(:, u1, u2)', ones(1, minConsecBins(2))));
+    end
+end
 
 % get remaining excitatory / inhibitory synapses
-eSig = ccGoode & refGood & eStgGood & squeeze(any(eBins));
-iSig = ccGoodi & refGood & iStgGood & squeeze(any(iBins));
+eSig = ccGoode & refGood & eStgGood & eConsecGood & squeeze(any(eBins));
+iSig = ccGoodi & refGood & iStgGood & iConsecGood & squeeze(any(iBins));
 fprintf('\nExcitatory: orig = %d, final = %d',...
     sum(squeeze(any(eBins)), 'all'), sum(eSig, 'all'))
 fprintf('\nInhibitory: orig = %d, final = %d\n\n',...
@@ -243,32 +246,21 @@ iSyn_unit = sum(iSig, 2);
 eiDom = (eSyn_unit - iSyn_unit) ./ (eSyn_unit + iSyn_unit);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% graphics
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-if graphics
-    
-    % excitatory synapses
-    nplot = min([nfigs, sum(eSig, 'all')]);
-    if nplot > 0
-    [u1, u2] = find(eSig, nplot);
-    for isyn = 1 : nplot
-        plotSyn(u1(isyn), u2(isyn), 'bk')
-    end
-    end
-    % inhibitory synapses
-    nplot = min([nfigs, sum(iSig, 'all')]);
-    if nplot > 0
-    [u1, u2] = find(iSig, nplot);
-    for isyn = 1 : nplot
-        plotSyn(u1(isyn), u2(isyn), 'rk')
-    end   
-    end
-end
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arrange struct and save
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+[monosyn.eIdx(:, 1), monosyn.eIdx(:, 2)] = find(monosyn.eSig);
+[monosyn.iIdx(:, 1), monosyn.iIdx(:, 2)] = find(monosyn.iSig);
+monosyn.eBins = eBins;
+monosyn.iBins = iBins;
+monosyn.eSig = eSig;
+monosyn.iSig = iSig;
+monosyn.eStg = eStg;
+monosyn.iStg = iStg;
+monosyn.eiDom = eiDom;
+monosyn.nspks = nspks;
+monosyn.cc = cc;
+monosyn.cc.dccc = dccc;
 
 monosyn.info.runtime = datetime(now, 'ConvertFrom', 'datenum');
 monosyn.info.basename = basename;
@@ -276,109 +268,24 @@ monosyn.info.winCalc = winCalc;
 monosyn.info.ccThr = ccThr;
 monosyn.info.refThr = refThr;
 monosyn.info.stgThr = stgThr;
-monosyn.info.roi_ms = roi_ms;     
-monosyn.info.alfa = alfa;     
-monosyn.eSig = eSig;
-monosyn.eStg = eStg;
-monosyn.iSig = iSig;
-monosyn.iStg = iStg;
-monosyn.eiDom = eiDom;
-monosyn.nspks = nspks;
+monosyn.info.roi_ms = roi_ms;   
+monosyn.info.roi_binIdx = roi_binIdx;     
+monosyn.info.alfa = alfa;
+monosyn.info.pred = pred;
+monosyn.info.minConsecBins = minConsecBins;
 
 if saveVar
     save(monofile, 'monosyn')
 end
 
-% nested functions --------------------------------------------------------
-    function plotSyn(u1, u2, clr)
-        
-        % plot mono synaptic connection       
-        fh = figure;        
-        sb1 = subplot(2, 4, 1);     % ac150 unit1
-        sb2 = subplot(2, 4, 2);     % cc50 counts
-        sb3 = subplot(2, 4, 3);     % dccc
-        sb4 = subplot(2, 4, 4);     % ac150 unit2
-        sb5 = subplot(2, 4, 5);     % wv unit1
-        sb6 = subplot(2, 4, 6);     % cc150
-        sb7 = subplot(2, 4, 7);     % ccg25
-        sb8 = subplot(2, 4, 8);     % wv unit2
-        
-        % acg 1
-        set(gcf, 'CurrentAxes', sb1)
-        plot_ccg(cc150(:, u1, u1), cc150bins, 'clr', clr(1),...
-            'pred', [], 'sigbins1', [], 'sigbins2', [])
-        title(sprintf('Unit #%d (Presynaptic)', u1))
-        
-        % acg 2
-        set(gcf, 'CurrentAxes', sb4)
-        plot_ccg(cc150(:, u2, u2), cc150bins, 'clr', clr(2),...
-            'pred', [], 'sigbins1', [], 'sigbins2', [])
-        title(sprintf('Unit #%d (Postsynaptic)', u2))
-        
-        % cc50 counts
-        set(gcf, 'CurrentAxes', sb2)
-        plot_ccg(cc50(:, u1, u2), cc50bins, 'clr', 'k',...
-            'pred', [], 'sigbins1', roi_t(logical(eBins(:, u1, u2))),...
-            'sigbins2', roi_t(logical(iBins(:, u1, u2))))
-        
-        % dccc
-        set(gcf, 'CurrentAxes', sb3)
-        plot_ccg(dccc(:, u1, u2), cc50bins, 'clr', 'k',...
-            'pred', pred(:, u1, u2), 'sigbins1', roi_t(logical(eBins(:, u1, u2))),...
-            'sigbins2', roi_t(logical(iBins(:, u1, u2))))
-        if strcmp(clr(1), 'r')
-            title(sprintf('iSTG = %.4f', iStg(u1, u2)))
-        else
-            title(sprintf('eSTG = %.4f', eStg(u1, u2)))
-        end
-        
-        % cc150 counts
-        set(gcf, 'CurrentAxes', sb6)
-        plot_ccg(cc150(:, u1, u2), cc150bins, 'clr', 'k',...
-            'pred', [], 'sigbins1', [], 'sigbins2', [])
-        
-        % cc20 counts
-        set(gcf, 'CurrentAxes', sb7)
-        plot_ccg(cc20(:, u1, u2), cc20bins, 'clr', 'k',...
-            'pred', [], 'sigbins1', [], 'sigbins2', [])
-        
-        if ~isempty(wv)
-            
-            % waveform 1
-            set(gcf, 'CurrentAxes', sb5)
-            x_val = [1 : size(wv, 2)] / fs * 1000;
-            plot(x_val, wv(u1, :), clr(1), 'LineWidth', 2)
-            if ~isempty(wv_std)
-                patch([x_val, flip(x_val)], [wv(u1, :) + wv_std(u1, :),...
-                    flip(wv(u1, :) - wv_std(u1, :))],...
-                    clr(1), 'EdgeColor', 'none', 'FaceAlpha', .2, 'HitTest', 'off')
-            end
-            xlabel('Time [ms]')
-            ylabel('Voltage [mV]')
-            
-            % waveform 2
-            set(gcf, 'CurrentAxes', sb8)
-            x_val = [1 : size(wv, 2)] / fs * 1000;
-            plot(x_val, wv(u2, :), clr(2), 'LineWidth', 2)
-            if ~isempty(wv_std)
-                patch([x_val, flip(x_val)], [wv(u2, :) + wv_std(u2, :),...
-                    flip(wv(u2, :) - wv_std(u2, :))],...
-                    clr(2), 'EdgeColor', 'none', 'FaceAlpha', .2, 'HitTest', 'off')
-            end
-            xlabel('Time [ms]')
-            ylabel('Voltage [mV]')
-            
-        end
-        drawnow
-        
-        % save
-        if saveFig
-            figpath = fullfile(basepath, 'graphics', 'monoSyn');
-            figname = fullfile(figpath, sprintf('monoSyn_%d_%d', u1, u2));
-            export_fig(figname, '-jpg', '-transparent', '-r300')
-        end
-        
-    end
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% graphics
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+if graphics
+    plot_stg(monosyn, 'basepath', basepath, 'nSyn', 10,...
+        'synIdx', [], 'saveFig', true)
+end
 
 end
 

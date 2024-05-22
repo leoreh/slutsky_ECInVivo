@@ -151,10 +151,10 @@ sSig = as_prepSig([basename, '.lfp'], [basename, '.emg.dat'],...
 
 % manually create labels
 labelsmanfile = [basename, '.sleep_labelsRev.mat'];
-AccuSleep_viewer(sSig, ss.labels, labelsmanfile)
+AccuSleep_viewer(sSig, [], labelsmanfile)
 
 labelsmanfile = [basename, '.sleep_labelsMan.mat'];
-AccuSleep_viewer(sSig, ss.labels, '')
+AccuSleep_viewer(sSig, labels, labelsmanfile)
 
 % classify with a network
 netfile = 'D:\Code\slutsky_ECInVivo\lfp\SleepStates\AccuSleep\trainedNetworks\net_230212_103132.mat';
@@ -304,10 +304,10 @@ fr_timebins('basepath', pwd, 'forceA', true, 'graphics', false,...
     'timebins', timebins, 'saveVar', true, 'sstates', [1, 4, 5]);
 
 % mono synaptic interactions (spike transmission gain)
-monosyn = monoSyn_wrapper('spktimes', spikes.times, 'basepath', pwd,...
-    'winCalc', [0, Inf], 'saveVar', true, 'graphics', true,...
-    'forceA', true, 'fs', fs, 'saveFig', false,...
-    'wv', swv.wv, 'wv_std', swv.wv_std);
+stg = calc_stgs('spktimes', v(ifile).spikes.times, 'basepath', pwd,...
+    'winCalc', [0, Inf], 'saveVar', true, 'mancur', true,...
+    'forceA', true, 'fs', fs);
+
 
 % spk lfp
 frange = [0.5, 4; 5, 12; 50, 80];
@@ -341,10 +341,10 @@ plot_FRstates_sextiles('stateMfr', fr.states.mfr(:, [1, 4])', 'units', units.cle
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % concatenate var from different sessions
-mname = 'lh107';
+mname = 'lh133';
 for ialt = 1 : 4
 [~, info] = sessions_catVarTime('mname', mname,...
-    'dataPreset', {'fr', 'spec', 'emg_rms'}, 'graphics', true, 'dataAlt', ialt,...
+    'dataPreset', {'fr', 'ripp'}, 'graphics', true, 'dataAlt', ialt,...
     'basepaths', {}, 'xTicksBinsize', 6, 'markRecTrans', true,...
     'saveFig', false);
 end

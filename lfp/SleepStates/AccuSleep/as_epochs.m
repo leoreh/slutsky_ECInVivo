@@ -151,6 +151,7 @@ end
 
 % remove spec outliers
 origEpochs = stateEpochs;
+otl = [];
 if rmOtl
     
     % get outliers
@@ -185,7 +186,7 @@ epochStats.nepochs = cellfun(@length, epochStats.epLen);
 epochStats.totDur = cellfun(@sum, epochStats.epLen);
 epochStats.prctDur = epochStats.totDur * 100 ./ binLen';
 epochStats.confMarg = confMarg;
-epochStats.rmOtl = rmOtl;
+epochStats.otl = otl;
 epochStats.origEpochs = origEpochs;
 epochStats.timebins = timebins;
 

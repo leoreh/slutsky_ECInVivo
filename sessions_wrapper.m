@@ -4,7 +4,7 @@
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = 'lh142';
+mname = 'lh107';
 
 varsFile = ["cell_metrics"; "sleep_states"; "datInfo"; "session"; "units"];
 varsName = ["cm"; "ss"; "datInfo"; "session"; "units"];
@@ -38,43 +38,32 @@ for ifile = 1 : nfiles
     spkgrp = session.extracellular.spikeGroups.channels;
     [~, basename] = fileparts(basepath);
 
-    % create emg signal from accelerometer data
-%     acc = EMGfromACC('basepath', basepath, 'fname', [basename, '.lfp'],...
-%         'nchans', nchans, 'ch', nchans - 2 : nchans, 'saveVar', true, 'fsIn', 1250,...
-%         'graphics', false, 'force', true);
-% 
-%     %     % call for acceleration
-%     sSig = as_prepSig([basename, '.lfp'], acc.mag,...
-%         'eegCh', spkgrp{2}, 'emgCh', [], 'saveVar', false, 'emgNchans', [],...
-%         'eegNchans', nchans, 'inspectSig', true, 'forceLoad', true,...
-%         'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [10 450], 'fs', 1250);
+
+    % correct cell explorer
+    update_cellExplorer(basepath)
+
+    % firing rate
+    load([basename, '.spikes.cellinfo.mat'])
+    if isfield(session.general, 'timepnt')
+        timepnt = session.general.timepnt;
+    else
+        timepnt = Inf;
+    end
+    winBL = [0 timepnt];
+    fr = calc_fr(spikes.times, 'basepath', basepath,...
+        'graphics', true, 'binsize', 60, 'saveVar', true, 'forceA', true,...
+        'smet', 'none', 'winBL', winBL, 'winCalc', [0, Inf]);
 
 
+    % cluster validation
+    spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
+        'saveFig', false, 'force', false, 'mu', [], 'graphics', false,...
+        'vis', 'on', 'spkgrp', spkgrp);
 
-load([basename, '.sleep_sig.mat'], 'info');
-info.eegCh
+    % spike timing metrics
+    st = spktimes_metrics('spikes', spikes, 'sunits', [],...
+        'bins', [0 Inf], 'forceA', true, 'saveVar', true, 'fullA', false);
 
-sSig = load([basename, '.sleep_sig.mat']);
-
-as_stateSeparation(sSig, v(ifile).ss)
-
-
-% % % % % manually create labels
-labelsmanfile = [basename, '.sleep_labelsMan.mat'];
-AccuSleep_viewer(sSig, [], labelsmanfile)
-AccuSleep_viewer(sSig, v(ifile).ss.labels_net, [])
-% 
-netfile = 'D:\Code\slutsky_ECInVivo\lfp\SleepStates\AccuSleep\trainedNetworks\net_230212_103132.mat';
-if exist([basename, '.sleep_labelsMan.mat'], 'file')
-    calData = [];
-elseif ifile < 4
-    calData = v(2).ss.info.calibrationData;
-elseif ifile >= 4
-    calData = v(8).ss.info.calibrationData;
-end
-ss = as_classify(sSig, 'basepath', basepath, 'inspectLabels', false,...
-    'saveVar', true, 'forceA', true, 'netfile', netfile,...
-    'graphics', true, 'calData', calData);
 
 end
 

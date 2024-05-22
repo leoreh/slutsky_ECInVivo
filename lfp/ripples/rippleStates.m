@@ -92,7 +92,7 @@ for istate = sstates
         ripp.states.idx{istate} =...
             InIntervals(ripp.peakPos, ss.stateEpochs{istate}(epochIdx, :));
     else
-        ripp.states.idx{istate} = nan;
+        ripp.states.idx{istate} = false(length(ripp.peakPos), 1);
         ripp.states.rate{istate} = nan;
         ripp.states.binedges{istate} = nan;
         ripp.states.tstamps{istate} = nan;
@@ -128,7 +128,7 @@ if graphics
 
     % percent rippels in state
     sb2 = subplot(1, 4, [3, 4]);
-    prct_states = sum(cell2nanmat(ripp.states.idx, 2), 1, 'omitnan');
+    prct_states = sum(cell2padmat(ripp.states.idx, 2), 1, 'omitnan');
     pie(prct_states, ones(1, length(prct_states)))
     hold on
     ph = findobj(sb2, 'Type', 'Patch');

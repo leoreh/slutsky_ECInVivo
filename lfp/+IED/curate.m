@@ -1,4 +1,4 @@
-function ied = curate(ied,varargin)
+function ied = curate(ied, varargin)
 % open manual curation window & wait for user to close it.
 % save IED upon request.
 %
@@ -65,6 +65,8 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if saveVar
+    ied.sig = [];
+    ied.emg = [];
     save(ied.file_loc,"ied")
     fprintf("\n****** Save in %s ******\n",ied.file_loc)
 else

@@ -154,10 +154,11 @@ fprintf('\nafter detection: %d IED\n', nspks);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 rmidx = [];
 % baseline = mean(ied.sig) + 1 * std(ied.sig);
+winWidth = round(0.025 * ied.fs);
 for i = 1 : nspks
     
     % check that peak-to-peak in narrow window is greater than thr in mV
-    win = ied.sig(pos(i) - round(0.015 * ied.fs) : pos(i) + round(0.015 * ied.fs));
+    win = ied.sig(pos(i) - winWidth : pos(i) + winWidth * 4);
     amp(i) = peak2peak(win);
     if  amp(i) < ied.thr(2)
         rmidx = [rmidx, i];
@@ -186,6 +187,7 @@ ied.status = "pre_curation";
 
 % make sure there is accepted status for every discharge
 ied.accepted = true(1,numel(ied.pos));
+ied.mvArts = false(1,numel(ied.pos));
 
 % init last discharge curated
 ied.last_mark = 1;

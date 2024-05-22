@@ -29,6 +29,7 @@ classdef data < handle & matlab.mixin.CustomDisplay & matlab.mixin.Copyable
         % analysis results
         pos             % discharges detected idx (in samples)
         accepted        % logical vec, true when discharge is accepted (default: true)
+        mvArts          % logical vec describing movement artifacts detected during curation (default: false)
         rate            % calculated discharge rate, see times2rate
         edges           % edges of bins used for rate, see times2rate
         cents           % centers of bins used for rate, see times2rate

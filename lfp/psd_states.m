@@ -149,6 +149,16 @@ if exist(psdfile, 'file') && ~forceA
     return
 end
 
+% load spectrogram for plot
+if graphics
+    if ~exist('emg', 'var')
+        emg = load(sleepfile, 'emg_rms');
+        emg = emg.emg_rms;
+    end
+
+    load(fullfile(basepath, [basename, '.spec.mat']))
+end
+
 % update params
 nstates = length(sstates);
 
@@ -225,9 +235,11 @@ if isempty(stateEpochs)
     end
 
     % re-calc state epochs from labels
-    [stateEpochs, ~] = as_epochs('labels', labels(timeWin(1) : timeWin(2)),...
+    [stateEpochs, epochStats] = as_epochs('labels', labels(timeWin(1) : timeWin(2)),...
         'minDur', minDur, 'interDur', interDur, 'rmOtl', true);
     stateEpochs = stateEpochs(sstates);
+    specOtl = epochStats.otl;
+    clear epochStats
 
     % add timeWin(1) to each epoch
     stateEpochs = cellfun(@(x) round(x + timeWin(1) - 1),...
@@ -251,13 +263,19 @@ epochStats.totDur = cellfun(@sum, epochStats.epLen);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % remove outlier epochs
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% outliers are detected in two iterations, first by pc1 and then by
+% outliers are detected in several iterations, first by pc1 and then by
 % mahalnobis distance. the pca is recalculated between iterations. this
 % was determined by empiric examination of the data (march 2024).
+
+% initialize vars
 clear otl
 psd.epochs.original = psd_epochs;
 tmp_epochs = psd_epochs;
+otlIdx = cell(nstates, 1);
+origIdx = cell(nstates, 1);
+for istate = 1 : nstates
+    origIdx{istate} = 1 : size(stateEpochs{istate}, 1);
+end
 
 % project epoch PSDs on feature space
 [~, pc, ~, ~, expl] = pca(vertcat(tmp_epochs{:}), 'NumComponents', nfet);
@@ -269,6 +287,7 @@ for istate = 1 : nstates
     stateIdx = [stateIdx; istate * ones(epochStats.nepochs(istate), 1)];
     clrIdx = [clrIdx; repmat(clr{istate}, epochStats.nepochs(istate), 1)];
 end
+startIdx = [0, cumsum(epochStats.nepochs(1 : end - 1))];
 
 % detect outliers
 nrep = 3;
@@ -291,6 +310,10 @@ for irep = 1 : nrep
         else
             badIdx{istate} = false(sum(tmpIdx), 1);
         end
+
+        % track indices to original epochs
+        otlIdx{istate} = [otlIdx{istate}; origIdx{istate}(badIdx{istate})'];
+
     end
 
     % organize outliers struct as an array (of iterations)
@@ -309,8 +332,11 @@ for irep = 1 : nrep
         if any(badIdx{istate})
             stateEpochs{istate}(badIdx{istate}, :) = [];
             tmp_epochs{istate}(badIdx{istate}, :) = [];
+            origIdx{istate}(badIdx{istate}) = [];
         end
     end
+
+    % calculate epochStats
     epochStats.epLen = cellfun(@(x) (diff(x')'), stateEpochs, 'UniformOutput', false);
     epochStats.nepochs = cellfun(@length, epochStats.epLen);
     epochStats.totDur = cellfun(@sum, epochStats.epLen);
@@ -327,6 +353,12 @@ for irep = 1 : nrep
 
 end
 
+% organize global indices of outliers (to pc mat)
+for istate = 1 : nstates
+    otlIdx_glbl{istate} = otlIdx{istate} + startIdx(istate);
+end
+otlIdx_glbl = sort(cat(1, otlIdx_glbl{:}));
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % organize psd struct
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -341,6 +373,8 @@ psd.epochs.expl = expl;
 psd.epochs.sil = silhouette(pc, stateIdx, 'Euclidean');
 psd.epochs.stateIdx = stateIdx;
 psd.epochs.clrIdx = clrIdx;
+psd.epochs.otlIdx = otlIdx;
+psd.epochs.otlIdx_glbl = otlIdx_glbl;
 
 % info
 psd.info.sstates = sstates;
@@ -376,92 +410,137 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-if graphics
 
+%%% plot spec, emg_rms, and hypnogram with outlier epochs in black.
+% plot only the original and final steps of cleaning (perhaps keep the
+% opion to plot all steps) 
+
+if graphics
+      
+    % open figure
     setMatlabGraphics(true)
     fh = figure;
-    set(fh, 'WindowState','maximized');
-    tlayout = [nrep + 1, nstates + 3];
+    set(fh, 'WindowState', 'maximized');
+    tlayout = [4, nstates + 3];
     th = tiledlayout(tlayout(1), tlayout(2));
     th.TileSpacing = 'tight';
     th.Padding = 'none';
-    title(th, basename, 'interpreter', 'none')
+    title(th, basename, 'interpreter', 'none', 'FontSize', 20)
+    set(fh, 'DefaultAxesFontSize', 16);
 
-    for irep = 1 : nrep
-        tilebias = (irep - 1) * (nstates + 3);
+    % spectrogram
+    axh1 = nexttile(th, 1, [1, tlayout(2)]); cla; hold on
+    plot_spec(spec, 'ch', 1, 'logfreq', false, 'saveFig', false,...
+        'axh', axh1, 'xtime', 1)
+    axis tight
+    yLimit = ylim;
+    if ~isempty(specOtl)
+        scatter(specOtl.idx, ones(length(specOtl.idx), 1) * yLimit(2), 30, 'filled', 'r')
+    end
+    xticks([]);
+    xlabel('')
 
-        for istate = 1 : nstates
-            axh = nexttile(th, istate + tilebias, [1, 1]); cla; hold on
+    % hypnogram and emg
+    axh2 = nexttile(th, tlayout(2) + 1, [1, tlayout(2)]); cla; hold on
+    plot([1 : length(emg)], emg, 'k', 'LineWidth', 0.5)
+    yLimit = ylim;
+    plot_hypnogram('stateEpochs', psd.epochs.stateEpochs,...
+        'clr', clr, 'axh', axh2, 'sstates', [1 : length(sstates)],...
+        'yshift', 1)
+    for istate = 1 : nstates
+        badEpochs{istate} = psd.epochs.otl(1).stateEpochs{istate}(psd.epochs.otlIdx{istate}, :);
+    end
+    yshift = 1.05;
+    plot_hypnogram('stateEpochs', badEpochs,...
+        'clr', repmat({[0 0 0]}, length(sstates), 1),...
+        'axh', axh2, 'sstates', [1 : length(sstates)], 'yshift', yshift)
+    yLimit = ylim;
+    ylim([yLimit(1), yLimit(2) * yshift])
+    xval = [3600 : 3600 : length(emg)];
+    xticks(xval);
+    xticklabels(string(xval / 3600))
+    xlabel('Time [Hr]')
+    set(axh2, 'YTickMode', 'auto')
+    set(axh2, 'YColor', 'k')
+    yticks(axh2, [])
+    linkaxes([axh1, axh2], 'x')
+    axis tight
+    ylabel(axh2, 'EMG')
 
-            psdMat = psd.epochs.otl(irep).psd_epochs{istate};
-            badIdx = psd.epochs.otl(irep).badIdx{istate};
-            if ~isempty(psdMat)
-                if any(badIdx)
-                    ph = plot(faxis, psdMat(badIdx, :), 'LineWidth', 0.5,...
-                        'Color', [0.7 0.7 0.7]);
-                end
-                ph = plot(faxis, mean(psdMat, 1), 'LineWidth', 3,...
-                    'Color', clr{istate});
-                set(gca, 'YScale', 'log', 'XScale', 'log')
-                xlabel('Frequency [Hz]')
-                ylabel('PSD [mV^2/Hz]')
-                title(axh, snames{istate})
-                lgdTxt = sprintf('Ourliers n=%d', sum(badIdx));
-                legend({'Mean', lgdTxt})
+    tilebias = tlayout(2) * 2;
+    for istate = 1 : nstates
+        axh = nexttile(th, istate + tilebias, [1, 1]); cla; hold on
+
+        psdMat = psd.epochs.original{istate};
+        badIdx = psd.epochs.otlIdx{istate};
+        if ~isempty(psdMat)
+            if any(badIdx)
+                ph = plot(faxis, psdMat(badIdx, :), 'LineWidth', 0.5,...
+                    'Color', [0.7 0.7 0.7]);
+                ph = ph(1);
             end
-        end
-
-        % scree plot
-        axh = nexttile(th, nstates + 1 + tilebias, [1, 1]);
-        expl = psd.epochs.otl(irep).expl;
-        plot(cumsum(expl), 'LineWidth', 2);
-        xlabel('PC');
-        ylabel('Cumulative Variance (%)');
-        title('Scree Plot');
-        hold on
-        xlim([0 10])
-        bh = bar(expl);
-        bh.FaceColor = 'flat';
-        bh.CData(1 : nfet, :) = repmat([0 0 0], nfet, 1);
-        bh.CData(nfet + 1 : end, :) = repmat([1 0 0], size(bh.CData, 1) - nfet, 1);
-
-        % state clusters in feature space
-        axh = nexttile(th, nstates + 2 + tilebias, [1, 1]); cla; hold on
-        pcMat = psd.epochs.otl(irep).pc;
-        badIdx = vertcat(psd.epochs.otl(irep).badIdx{:});
-        clrIdx = psd.epochs.otl(irep).clrIdx;      
-        sh = scatter3(axh, pcMat(:, 1), pcMat(:, 2), pcMat(:, 3),...
-            30, clrIdx, 'filled');
-        scatter3(pcMat(badIdx, 1), pcMat(badIdx, 2), pcMat(badIdx, 3),...
-            50, 'd', 'LineWidth', 1, 'MarkerEdgeColor', 'k');
-        view(-25, 25)
-        grid minor
-        sh.MarkerFaceAlpha = 0.6;
-        xlabel('PC1'); ylabel('PC2'); zlabel('PC3')
-        title(axh, 'Epoch PSD projection')
-
-        % silhouette plot
-        axh = nexttile(th, nstates + 3 + tilebias, [1, 1]); cla; hold on
-        stateIdx = psd.epochs.otl(irep).stateIdx;
-        silhouette(pcMat, stateIdx, 'Euclidean');
-        xlim([-1 1])
-        yticklabels(snames)
-        ylabel('')
-        sh = get(gca, 'Children');
-        sh.FaceColor = 'flat';
-        sh.CData(~isnan(sh.YData), :) = clrIdx;
-        title(axh, 'Separation Quality')
-        yTickVals = yticks;
-        for istate = 1 : nstates
-            meanSil = mean(psd.epochs.otl(irep).sil(stateIdx == istate));
-            if ~isnan(meanSil)
-                text(-0.75, yTickVals(istate), num2str(meanSil, '%.3f'));
-            end
+            ph(2) = plot(faxis, mean(psdMat, 1), 'LineWidth', 3,...
+                'Color', clr{istate});
+            set(gca, 'YScale', 'log', 'XScale', 'log')
+            xlabel('Frequency [Hz]')
+            ylabel('PSD [mV^2/Hz]')
+            title(axh, snames{istate})
+            lgdTxt = sprintf('Outliers n=%d', length(badIdx));
+            legend(ph, {lgdTxt, 'Mean'}, 'Location', 'southwest')
         end
     end
-    
+
+    % scree plot
+    axh = nexttile(th, nstates + 1 + tilebias, [1, 1]);
+    expl = psd.epochs.otl(1).expl;
+    plot(cumsum(expl), 'LineWidth', 2);
+    xlabel('PC');
+    ylabel('Cum. Var. (%)');
+    title('Scree Plot');
+    hold on
+    xlim([0 10])
+    bh = bar(expl);
+    bh.FaceColor = 'flat';
+    bh.CData(1 : nfet, :) = repmat([0 0 0], nfet, 1);
+    bh.CData(nfet + 1 : end, :) = repmat([1 0 0], size(bh.CData, 1) - nfet, 1);
+
+    % state clusters in feature space
+    axh = nexttile(th, nstates + 2 + tilebias, [1, 1]); cla; hold on
+    pcMat = psd.epochs.otl(1).pc;
+    badIdx = psd.epochs.otlIdx_glbl;
+    clrIdx = psd.epochs.otl(1).clrIdx;
+    sh = scatter3(axh, pcMat(:, 1), pcMat(:, 2), pcMat(:, 3),...
+        30, clrIdx, 'filled');
+    scatter3(pcMat(badIdx, 1), pcMat(badIdx, 2), pcMat(badIdx, 3),...
+        50, 'd', 'LineWidth', 1, 'MarkerEdgeColor', 'k');
+    view(-25, 25)
+    grid minor
+    sh.MarkerFaceAlpha = 0.6;
+    xlabel('PC1'); ylabel('PC2'); zlabel('PC3')
+    title(axh, 'Epoch PSD projection')
+
+    % silhouette plot
+    axh = nexttile(th, nstates + 3 + tilebias, [1, 1]); cla; hold on
+    stateIdx = psd.epochs.otl(1).stateIdx;
+    silhouette(pcMat, stateIdx, 'Euclidean');
+    xlim([-1 1])
+    yticklabels(snames)
+    ylabel('')
+    sh = get(gca, 'Children');
+    sh.FaceColor = 'flat';
+    sh.CData(~isnan(sh.YData), :) = clrIdx;
+    title(axh, 'Separation Quality')
+    yTickVals = yticks;
+    for istate = 1 : nstates
+        meanSil = mean(psd.epochs.otl(1).sil(stateIdx == istate));
+        if ~isnan(meanSil)
+            text(-0.75, yTickVals(istate), num2str(meanSil, '%.3f'));
+        end
+    end
+
     % final psd after cleaning
-    tilebias = nrep * (nstates + 3);
+    tilebias = tlayout(2) * 3;
+    
     for istate = 1 : length(sstates)
         axh = nexttile(th, istate + tilebias, [1, 1]); cla; hold on
 
@@ -469,15 +548,16 @@ if graphics
         if ~isempty(psdMat)
             ph = plot(faxis, psdMat, 'LineWidth', 0.5,...
                 'Color', [0.7 0.7 0.7]);
-            ph = plot(faxis, mean(psdMat, 1), 'LineWidth', 3,...
+            ph = ph(1);
+            ph(2) = plot(faxis, mean(psdMat, 1), 'LineWidth', 3,...
                 'Color', clr{istate});
         end
         set(gca, 'YScale', 'log', 'XScale', 'log')
         xlabel('Frequency [Hz]')
         ylabel('PSD [mV^2/Hz]')
         title(axh, snames{istate})
-        lgdTxt = sprintf('All n=%d', size(psdMat, 1));
-        legend({'Mean', lgdTxt})
+        lgdTxt = sprintf('Clean n=%d', size(psdMat, 1));
+        legend(ph, {lgdTxt, 'Mean'}, 'Location', 'southwest')
     end    
 
     % scree plot
@@ -532,6 +612,168 @@ if graphics
     end
 
 end
+
+
+%%% ALT 2 - all iterations
+% if graphics
+% 
+%     setMatlabGraphics(true)
+%     fh = figure;
+%     set(fh, 'WindowState','maximized');
+%     tlayout = [nrep + 1, nstates + 3];
+%     th = tiledlayout(tlayout(1), tlayout(2));
+%     th.TileSpacing = 'tight';
+%     th.Padding = 'none';
+%     title(th, basename, 'interpreter', 'none', 'FontSize', 20)
+%     set(fh, 'DefaultAxesFontSize', 16);
+% 
+%     for irep = 1 : nrep
+%         tilebias = (irep - 1) * (nstates + 3);
+% 
+%         for istate = 1 : nstates
+%             axh = nexttile(th, istate + tilebias, [1, 1]); cla; hold on
+% 
+%             psdMat = psd.epochs.otl(irep).psd_epochs{istate};
+%             badIdx = psd.epochs.otl(irep).badIdx{istate};
+%             if ~isempty(psdMat)
+%                 if any(badIdx)
+%                     ph = plot(faxis, psdMat(badIdx, :), 'LineWidth', 0.5,...
+%                         'Color', [0.7 0.7 0.7]);
+%                 end
+%                 ph = plot(faxis, mean(psdMat, 1), 'LineWidth', 3,...
+%                     'Color', clr{istate});
+%                 set(gca, 'YScale', 'log', 'XScale', 'log')
+%                 xlabel('Frequency [Hz]')
+%                 ylabel('PSD [mV^2/Hz]')
+%                 title(axh, snames{istate})
+%                 lgdTxt = sprintf('Ourliers n=%d', sum(badIdx));
+%                 legend({'Mean', lgdTxt}, 'Location', 'southwest')
+%             end
+%         end
+% 
+%         % scree plot
+%         axh = nexttile(th, nstates + 1 + tilebias, [1, 1]);
+%         expl = psd.epochs.otl(irep).expl;
+%         plot(cumsum(expl), 'LineWidth', 2);
+%         xlabel('PC');
+%         ylabel('Cum. Var. (%)');
+%         title('Scree Plot');
+%         hold on
+%         xlim([0 10])
+%         bh = bar(expl);
+%         bh.FaceColor = 'flat';
+%         bh.CData(1 : nfet, :) = repmat([0 0 0], nfet, 1);
+%         bh.CData(nfet + 1 : end, :) = repmat([1 0 0], size(bh.CData, 1) - nfet, 1);
+% 
+%         % state clusters in feature space
+%         axh = nexttile(th, nstates + 2 + tilebias, [1, 1]); cla; hold on
+%         pcMat = psd.epochs.otl(irep).pc;
+%         badIdx = vertcat(psd.epochs.otl(irep).badIdx{:});
+%         clrIdx = psd.epochs.otl(irep).clrIdx;      
+%         sh = scatter3(axh, pcMat(:, 1), pcMat(:, 2), pcMat(:, 3),...
+%             30, clrIdx, 'filled');
+%         scatter3(pcMat(badIdx, 1), pcMat(badIdx, 2), pcMat(badIdx, 3),...
+%             50, 'd', 'LineWidth', 1, 'MarkerEdgeColor', 'k');
+%         view(-25, 25)
+%         grid minor
+%         sh.MarkerFaceAlpha = 0.6;
+%         xlabel('PC1'); ylabel('PC2'); zlabel('PC3')
+%         title(axh, 'Epoch PSD projection')
+% 
+%         % silhouette plot
+%         axh = nexttile(th, nstates + 3 + tilebias, [1, 1]); cla; hold on
+%         stateIdx = psd.epochs.otl(irep).stateIdx;
+%         silhouette(pcMat, stateIdx, 'Euclidean');
+%         xlim([-1 1])
+%         yticklabels(snames)
+%         ylabel('')
+%         sh = get(gca, 'Children');
+%         sh.FaceColor = 'flat';
+%         sh.CData(~isnan(sh.YData), :) = clrIdx;
+%         title(axh, 'Separation Quality')
+%         yTickVals = yticks;
+%         for istate = 1 : nstates
+%             meanSil = mean(psd.epochs.otl(irep).sil(stateIdx == istate));
+%             if ~isnan(meanSil)
+%                 text(-0.75, yTickVals(istate), num2str(meanSil, '%.3f'));
+%             end
+%         end
+%     end
+%     
+%     % final psd after cleaning
+%     tilebias = nrep * (nstates + 3);
+%     for istate = 1 : length(sstates)
+%         axh = nexttile(th, istate + tilebias, [1, 1]); cla; hold on
+% 
+%         psdMat = psd.epochs.clean{istate};
+%         if ~isempty(psdMat)
+%             ph = plot(faxis, psdMat, 'LineWidth', 0.5,...
+%                 'Color', [0.7 0.7 0.7]);
+%             ph = plot(faxis, mean(psdMat, 1), 'LineWidth', 3,...
+%                 'Color', clr{istate});
+%         end
+%         set(gca, 'YScale', 'log', 'XScale', 'log')
+%         xlabel('Frequency [Hz]')
+%         ylabel('PSD [mV^2/Hz]')
+%         title(axh, snames{istate})
+%         lgdTxt = sprintf('All n=%d', size(psdMat, 1));
+%         legend({'Mean', lgdTxt}, 'Location', 'southwest')
+%     end    
+% 
+%     % scree plot
+%     axh = nexttile(th, nstates + 1 + tilebias, [1, 1]); cla; hold on
+%     expl = psd.epochs.expl;
+%     plot(cumsum(expl), 'LineWidth', 2);
+%     xlabel('PC');
+%     ylabel('Cumulative Variance (%)');
+%     title('Scree Plot');
+%     hold on
+%     xlim([0 10])
+%     bh = bar(expl);
+%     bh.FaceColor = 'flat';
+%     bh.CData(1 : nfet, :) = repmat([0 0 0], nfet, 1);
+% 
+%     % state clusters in feature space
+%     axh = nexttile(th, nstates + 2 + tilebias, [1, 1]); cla; hold on
+%     pcMat = psd.epochs.pc;
+%     clrIdx = psd.epochs.clrIdx;
+%     sh = scatter3(axh, pcMat(:, 1), pcMat(:, 2), pcMat(:, 3),...
+%         30, clrIdx, 'filled');
+%     view(-25, 25)
+%     grid minor
+%     sh.MarkerFaceAlpha = 0.6;
+%     xlabel('PC1'); ylabel('PC2'); zlabel('PC3')
+%     title(axh, 'Epoch PSD projection')
+% 
+%     % silhouette plot
+%     axh = nexttile(th, nstates + 3 + tilebias, [1, 1]); cla; hold on
+%     stateIdx = psd.epochs.stateIdx;
+%     silhouette(pcMat, stateIdx, 'Euclidean');
+%     xlim([-1 1])
+%     yticklabels(snames)
+%     ylabel('')
+%     sh = get(gca, 'Children');
+%     sh.FaceColor = 'flat';
+%     sh.CData(~isnan(sh.YData), :) = clrIdx;
+%     title(axh, 'Silhouette of PCA Clusters')
+%     yTickVals = yticks;
+%     for istate = 1 : nstates
+%         meanSil = mean(psd.epochs.sil(stateIdx == istate));
+%         if ~isnan(meanSil)
+%             text(-0.75, yTickVals(istate), num2str(meanSil, '%.3f'));
+%         end
+%     end
+% 
+%     if flgSaveFig
+%         figpath = fullfile(basepath, 'graphics', 'sleepState');
+%         mkdir(figpath)
+%         figname = fullfile(figpath, [basename, '_', namePrefix]);
+%         savefig(fh, figname, 'compact')
+%     end
+% 
+% end
+% 
+
 
 end
 
