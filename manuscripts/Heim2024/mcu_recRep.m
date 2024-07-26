@@ -6,9 +6,10 @@
 % select mouse
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = 'lh96';
-mname = 'lh133';
-mname = 'lh107';
+% mname = 'lh96';
+% mname = 'lh133';
+mname = 'lh132';
+% mname = 'lh107';
 
 forceL = false;
 forceL = true;
@@ -138,18 +139,24 @@ th.Padding = 'none';
 axh = nexttile(th, 1, [1, 4]);
 
 % get fr data
-[expData, xData, xt] = sessions_catVarTime('mname', mname,...
+[expData, info] = sessions_catVarTime('mname', mname,...
     'dataPreset', 'fr', 'graphics', false, 'dataAlt', 1,...
     'basepaths', {}, 'xTicksBinsize', 24, 'markRecTrans', false,...
     'axh', axh, 'saveFig', false);
 expData = mean(expData, 2, 'omitnan');
 
+
+xData = info.x_data;
+xt = info.x_ticks;
+
+
 % replace nan values
 if strcmp(mname, 'lh133')
-    [tmp, tmpx] = sessions_catVarTime('mname', 'lh107',...
+    [tmp, info_tmp] = sessions_catVarTime('mname', 'lh107',...
         'dataPreset', 'fr', 'graphics', false, 'dataAlt', 1,...
         'basepaths', {}, 'xTicksBinsize', 24, 'markRecTrans', false,...
         'axh', axh, 'saveFig', false);
+    tmpx = info_tmp.x_data;
     nanIdx = isnan(expData');
     gapStarts = find(diff([false, nanIdx, false]) == 1);
     gapEnds = find(diff([false, nanIdx, false]) == -1) - 1;

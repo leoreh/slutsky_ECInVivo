@@ -1,21 +1,17 @@
 
 % groups
-queryStr = ["wt_bsl"; "wt_bac2"];
+queryStr = ["wt_bsl"; "wt_bac2"; "wt_bac3"; "wt_wsh"];
+ngrp = length(queryStr);
 
-% general params
-varsFile = ["fr"; "units"];
-varsName = ["fr"; "units"];
-
-clear drft d dgrp
-for igrp = 1 : length(queryStr)
+clear drft2 drft
+for igrp = 1 : ngrp
 
     % load data
     basepaths = mcu_sessions(queryStr{igrp});
-    v = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
-        'varsName', varsName, 'pcond', ["tempflag"]);
     nfiles = length(basepaths);
 
     % go over files
+    clear drft1
     for ifile = 1 : nfiles
 
         % file params
@@ -23,21 +19,20 @@ for igrp = 1 : length(queryStr)
         cd(basepath)
         [~, basename] = fileparts(basepath);
 
-        drft(ifile) = drift_file(basepath, false);
+        drft1(ifile) = drift_file('basepath', basepath, 'graphics', false);
 
     end
 
-    d(igrp) = catfields(drft, 'addim');
+    drft2(igrp) = catfields(drft1, 'addim');
 
 end
-dgrp = catfields(d, 'addim');
+drft = catfields(drft2, 'addim');
 
 % dimensions of dgrp are (example m_corr):
 % data x unit x state x file x grp
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% -------------------------------------------------------------------------
 % graphics
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 ulabel = ["RS"; "FS"];
 slabel = ["Full Recordings"; "AW"; "NREM"];
@@ -45,31 +40,41 @@ slabel = ["Full Recordings"; "AW"; "NREM"];
 setMatlabGraphics(true)
 fh = figure;
 set(fh, 'WindowState', 'maximized');
-tlayout = [2, 3];
+tlayout = [2, length(slabel)];
 th = tiledlayout(tlayout(1), tlayout(2));
 th.TileSpacing = 'tight';
 th.Padding = 'none';
 set(fh, 'DefaultAxesFontSize', 16);
 
-yLimit = [0, round(max(dgrp.drate, [], 'all') * 100) / 100];
+yLimit = [0, round(max(drft.drate, [], 'all') * 100) / 100];
 tbias = 1;
 for iunit = 1 : 2
-    for istate = 1
+    for istate = 1 
         axh = nexttile(th, tbias, [1, 1]); cla; hold on
-        dataMat = squeeze(dgrp.drate(iunit, istate, :, :));
+        dataMat = squeeze(drft.drate(iunit, istate, :, :));
         plot_boxMean('dataMat', dataMat, 'plotType', 'bar',...
             'allPnts', false, 'axh', axh)
-        plot(axh, [1, 2], dataMat)
+        plot(axh, [1 : ngrp], dataMat)
 
-        ylim(yLimit)            
+        ylim(yLimit)
         ylabel(sprintf('%s Drift Rate [1 / h]', ulabel(iunit)))
         title(axh, slabel(istate))
         tbias = tbias + 1;
     end
 end
 
-
 % data for prism
-tmp = squeeze(dgrp.drate(:, 1, :, :));
+istate = 1;
+iunit = 1;
+tmp = squeeze(drft.drate(iunit, istate, :, :));
+
+
+prismData = reshape(tmp, 1, 10)
+
+
+igrp = 2;
+tmp = squeeze(drft.drate(:, [2, 3], :, igrp));
+tmp = permute(tmp, [1, 3, 2]);
 prismData = reshape(tmp, 2, 10)
+
 

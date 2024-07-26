@@ -30,16 +30,19 @@ if isempty(axh)
     set(fh, 'DefaultAxesFontSize', 16);
 end
 
-xaxis = 1 : length(drft.m_corr);
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % plot
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+xval = [1 : length(drft.m_corr)];
+
 hold on
-plot(xaxis, drft.dt_corr, '.', 'Color', [.5 .5 .5]);
-plot(xaxis, drft.m_corr, '.k', 'MarkerSize', 15);
-plot(xaxis, drft.lin_coef(2) + drft.lin_coef(1) * xaxis,'b');
+plot(xval, drft.dt_corr, '.', 'Color', [.5 .5 .5]);
+plot(xval, drft.m_corr, '.k', 'MarkerSize', 15);
+plot(xval, drft.lin_coef(2) + drft.lin_coef(1) * xval,'b');
+
+xticks([1 : 3600 / drft.info.winsize : xval(end)]);
+xticklabels(1 : xval(end)); 
 
 title(sprintf('%Drift Rate = %.3f', drft.drate),...
     'interpreter', 'none', 'FontSize', 20);

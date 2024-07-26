@@ -1,5 +1,40 @@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% manually curate state epochs
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+queryStr = 'wt_bsl'
+basepaths = [mcu_sessions(queryStr)];
+nfiles = length(basepaths);
+
+for ifile = 1 : nfiles
+    
+    basepath = basepaths{ifile};
+    [~, basename] = fileparts(basepath);
+    cd(basepath)
+   
+    % create bkup of manual labels
+    labelsrevfile = [basename, '.sleep_labelsRev.mat'];
+    labelsmanfile = [basename, '.sleep_labelsMan.mat'];
+    if exist(labelsrevfile, "file")
+        load(labelsrevfile)
+        mkdir(fullfile(basepath, 'ss'))
+        ctime = datetime('now', 'Format', 'yyMMdd_HHmmss');
+        bkupName = [basename, '.labelsRev', '_', char(ctime), '.mat']; 
+        bkupFile = fullfile(basepath, 'ss', bkupName);
+        save(bkupFile, 'labels')
+    else
+
+    end
+
+    % load sleep sig and network labels
+    sSig = load([basename, '.sleep_sig.mat']);
+
+    AccuSleep_viewer(sSig, labels, labelsrevfile)
+
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % state (emg) epochs
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

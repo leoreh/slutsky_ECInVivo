@@ -1,10 +1,13 @@
-function drft = drift_file(basepath, graphics)
+function drft = drift_file(varargin)
 
 % wrapper for drift_calc. repeats the calculation for RS and FS units, and
-% for NREM and AW. relies on fr and units files in basepath
+% for sleep states. relies on fr and units files in basepath
 %
 % INPUT:
 %   basepath        string. path to recording folder {pwd}
+%   stateEpochs     cell of n x 2 mats. each cell describes the epochs of
+%                   a state (s). if empty will try to load from
+%                   sleep_states.mat and will only analyze aw and nrem
 %   graphics        logical. plot {false}
 %
 % DEPENDENCIES:
@@ -16,15 +19,22 @@ function drft = drift_file(basepath, graphics)
 % 22 may 24 LH      based on Lee's code. see also geva (ziv) et al., Neuron, 2013
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% input
+% arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-if nargin < 1
-    basepath = pwd;
-end
-if nargin < 2
-    graphics = false
-end
+p = inputParser;
+addOptional(p, 'basepath', pwd);
+addOptional(p, 'stateEpochs', []);
+addOptional(p, 'graphics', false, @islogical);
+
+parse(p, varargin{:})
+basepath        = p.Results.basepath;
+stateEpochs     = p.Results.stateEpochs;
+graphics        = p.Results.graphics;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% preparations
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 [~, basename] = fileparts(basepath);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -33,13 +43,14 @@ end
 
 % analysis params
 winsize = 3600;
-thrLin = 4;
+thrLin = 0;
 thrFr = 0.005;
-thrWin = 10;
+thrWin = 0;
+timeAlt = 1;    
 
 % load data
-varsFile = ["fr"; "units"];
-varsName = ["fr"; "units"];
+varsFile = ["fr"; "units"; "sleep_states"];
+varsName = ["fr"; "units"; "ss"];
 v = getSessionVars('basepaths', {basepath}, 'varsFile', varsFile,...
     'varsName', varsName, 'pcond', ["tempflag"]);
 
@@ -47,6 +58,12 @@ v = getSessionVars('basepaths', {basepath}, 'varsFile', varsFile,...
 sstates = [1, 4];       % selected states for calculating drift
 cfg = as_loadConfig;
 snames = cfg.names(sstates);
+
+if isempty(stateEpochs)
+    if ~isempty(v.ss)
+        stateEpochs = v.ss.stateEpochs(sstates);
+    end
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % analyze
@@ -56,15 +73,34 @@ for iunit = 1 : 2
     unitIdx = v.units.clean(iunit, :);
 
     % calc drift across recording
-    fr_mat = v.fr.strd(unitIdx, :);
-    tstamps = v.fr.tstamps;
-    drft(iunit, 1) = drift_calc(fr_mat, tstamps, 'graphics', false,...
-        'winsize', winsize, 'thrLin', thrLin, 'thrFr', thrFr, 'thrWin', thrWin);
+    drft(iunit, 1) = drift_calc(v.fr.strd(unitIdx, :), v.fr.tstamps,...
+        'graphics', false, 'winsize', winsize, 'thrLin', thrLin,...
+        'thrFr', thrFr, 'thrWin', thrWin);
 
     % calc drift per state
     for istate = 1 : length(sstates)
-        fr_mat = v.fr.states.fr{sstates(istate)}(unitIdx, :);
-        tstamps = v.fr.states.tstamps{sstates(istate)};
+        
+        stateIdx = InIntervals(v.fr.tstamps, stateEpochs{istate});
+        fr_mat = v.fr.strd(unitIdx, stateIdx);
+
+        switch timeAlt
+            case 1
+                % ALT 1: concatenate epochs and ignore actual time when
+                % calculating drift
+                tstamps = [30 : 60 : size(fr_mat, 2) * 60];
+
+            case 2
+                % ALT 2: maintain original tstamps such that drift includes
+                % elpased time
+                tstamps = v.fr.tstamps(stateIdx);
+
+            case 3
+                % ALT 3: grab fr in states from fr struct. same as ALT 2
+                % but more accurate. overrides the stateEpochs input
+                fr_mat = v.fr.states.fr{sstates(istate)}(unitIdx, :);
+                tstamps = v.fr.states.tstamps{sstates(istate)};
+        end
+
         drft(iunit, istate + 1) = drift_calc(fr_mat, tstamps, 'graphics', false,...
             'winsize', winsize, 'thrLin', thrLin, 'thrFr', thrFr, 'thrWin', thrWin);
     end
@@ -77,26 +113,28 @@ end
 % plot drift per unit and state
 
 ulabel = ["RS"; "FS"];
+d = catfields(drft, 'addim');
+yLimit = [min(d.m_corr, [], 'all'), 1];
 
 if graphics
 
     setMatlabGraphics(true)
     fh = figure;
     set(fh, 'WindowState', 'maximized');
-    tlayout = [2, 3];
+    tlayout = [1, length(sstates) + 1];
     th = tiledlayout(tlayout(1), tlayout(2));
     th.TileSpacing = 'tight';
     th.Padding = 'none';
     set(fh, 'DefaultAxesFontSize', 16);
     title(th, basename, 'interpreter', 'none', 'FontSize', 20);
 
-    for iunit = 1 : 2
+    for iunit = 1
         tbias = (iunit - 1) * tlayout(2) + 1;
         axh = nexttile(th, tbias, [1, 1]); cla; hold on
         drift_plot(drft(iunit, 1), axh);
         ylabel(sprintf('%s Drift Rate [1 / h]', ulabel(iunit)))
         title(axh, 'Full Recording')
-        ylim([0 1])
+        ylim(yLimit)
 
         for istate = 1 : length(sstates)
             tbias = (iunit - 1) * tlayout(2) + 1 + istate;
@@ -104,7 +142,7 @@ if graphics
             drift_plot(drft(iunit, istate + 1), axh);
             ylabel(sprintf('%s Drift Rate [1 / h]', ulabel(iunit)))
             title(axh, snames(istate))
-            ylim([0 1])
+            ylim(yLimit)
 
         end
     end

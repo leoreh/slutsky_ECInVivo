@@ -24,7 +24,7 @@ clr = p.Results.clr;
 alphaIdx = p.Results.alphaIdx;
 allPnts = p.Results.allPnts;
 plotType = p.Results.plotType;      % can be 'box' or 'bar'
-axh = p.Results.axh;      % can be 'box' or 'bar'
+axh = p.Results.axh;      
 
 % prepare colors
 ngrp = size(dataMat, 2);
