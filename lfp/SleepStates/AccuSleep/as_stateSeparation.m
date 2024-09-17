@@ -103,7 +103,7 @@ faxis = sSig.spec_freq;
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-setMatlabGraphics(false)
+setMatlabGraphics(true)
 set(groot, 'DefaultAxesFontSize', 12)
 fh = figure('Color', 'w', 'Position', [0.08, 0.04, 0.83, 0.88]);
 sb1 = axes('Position' ,[0.08, 0.85, 0.83, 0.12]);   % emg vs time

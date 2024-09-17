@@ -136,7 +136,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if graphics
-    setMatlabGraphics(false)
+    setMatlabGraphics(true)
     alphaIdx = linspace(0.5, 1, nbins);
     fh = figure;
     

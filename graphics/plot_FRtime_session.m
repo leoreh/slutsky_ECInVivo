@@ -97,7 +97,7 @@ unitClr = {'b', 'r'};
 % plot
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-setMatlabGraphics(false)
+setMatlabGraphics(true)
 
 fh = figure;
 title(basename)
@@ -187,7 +187,7 @@ if saveFig
     figpath = fullfile(basepath, 'graphics');
     mkdir(figpath)
     figname = fullfile(figpath, [basename, '_', figname]);
-    export_fig(figname, '-jpg', '-transparent', '-r300')
+    saveas(gcf, [figname, '.png']);
 end
 
 end

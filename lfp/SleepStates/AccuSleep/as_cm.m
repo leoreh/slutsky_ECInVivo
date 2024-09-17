@@ -102,7 +102,7 @@ if graphics
     
     % ---------------------------------------------------------------------
     % figure of net performace
-    setMatlabGraphics(false)
+    setMatlabGraphics(true)
     fh = figure;
     cmh = confusionchart(cm, cfg.names(1 : nstates), 'ColumnSummary',...
         'column-normalized', 'RowSummary', 'row-normalized',...

@@ -27,7 +27,7 @@ if feature('IsDebugMode')
 end
 
 % change garphics defaults to more aesthethic 
-setMatlabGraphics(false)
+setMatlabGraphics(true)
 
 % Get rid of warning about directory already existing:
 % "Warning: Directory already exists."
