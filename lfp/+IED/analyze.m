@@ -167,12 +167,22 @@ cm_decline_discharge = uicontextmenu(fh);
 uimenu(cm_enlarge,"Text","Enlarge","MenuSelectedFcn",@undock_axe)
 uimenu(cm_decline_discharge,"Text","Decline Event","MenuSelectedFcn",@decline_discharge)
 
+% prepare thresholds
+if numel(ied.thr) == 2
+    thr_mV = ied.thr(2);
+    thr_Z = ied.thr(1);
+elseif numel(ied.thr) == 1 % moving z score thr
+    sig_mu = movmean(ied.sig, 5*ied.fs);
+    sig_sigma = movstd(ied.sig, 5*ied.fs);
+    thr_mV = ied.thr.*sig_sigma + sig_mu;
+    thr_Z = (thr_mV - mean(ied.sig))/std(ied.sig);
+end
 % raw and ied rate
 ax = subplot(3, 4, 1 : 2);
 plot(sig_tstamps / 60, ied.sig ,'k')
 axis tight
 hold on
-markthr(ax,ied.thrDir,ied.thr(2))
+markthr(ax,ied.thrDir, thr_mV, sig_tstamps / 60)
 ylabel('Voltage [mV]')
 yyaxis right
 plot(ied.cents / ied.fs / 60, ied.rate, 'b', 'LineWidth', 3)
@@ -187,7 +197,7 @@ ax = subplot(3, 4, 5 : 6);
 plot(sig_tstamps / 60, zscore(ied.sig), 'k')
 hold on
 axis tight
-markthr(ax,ied.thrDir,ied.thr(1))
+markthr(ax,ied.thrDir, thr_Z, sig_tstamps / 60)
 plot([true_pos true_pos] / ied.fs / 60, [-10 -1], '--g', 'LineWidth', 2)
 xlabel('Time [m]')
 ylabel('Z-score')
@@ -328,21 +338,28 @@ end
 
 end
 
-function markthr(ax,thrDir,thr)
+function markthr(ax,thrDir,thr, x_vals)
 % simply add threshold marking to requested ax.
 % INPUTS:
 %   ax     - axis 2 mark on.
 %   thrDir - string scalar, dircation of threshold, "positive",negative or "both".
 %   thr    - threshold value.
+%   x_vals - when thr is not scalar, what x values to match the thr with.
+%            ignored if thr is scalar.
 
-
+% choose plotting function
+if numel(thr) == 1
+    plt_fun = @(thr) yline(ax, thr, '--r');
+else
+    plt_fun = @(thr) plot(ax, x_vals, thr, '--r');
+end
 
 % add threshold markers
 if ismember(thrDir,["positive","both"])
-    yline(ax, thr, '--r');
+    plt_fun(thr);
 end
 if ismember(thrDir,["negative","both"])
-    yline(ax, -thr, '--r');
+    plt_fun(-thr);
 end
 end
 

@@ -43,7 +43,7 @@ function [stat_tab, git_repos] = get_gits_status(git_dirs)
     % Published: 240114
 
     arguments
-        git_dirs (1,:) string {mustBeText} = ["slutsky_ECInVivo", "CellExplorer"]; % never should actually use pwd, nargin will take precedence
+        git_dirs (1,:) string {mustBeText} = ["slutsky_ECInVivo", "CellExplorer", "my_MATLAB_code"]; % never should actually use pwd, nargin will take precedence
     end
 
     %%%%%%%% find folders to work on
@@ -53,10 +53,15 @@ function [stat_tab, git_repos] = get_gits_status(git_dirs)
     % If you can't find a folder, skip it (instead of error).
 
     % find path to folders
+    current_subfolders = dir();
+    current_subfolders(~[current_subfolders.isdir]) = [];
+    current_subfolders = {current_subfolders.name};
     for iFold = numel(git_dirs):-1:1
 
-        if isfolder(git_dirs(iFold))
-            % what was given is a full folder path, no need to search
+        if isfolder(git_dirs(iFold)) && ~ismember(git_dirs(iFold), current_subfolders)
+            % what was given is a full folder path, no need to search.
+            % note that creating full path is needed if the name is a
+            % current subfolder without full path.
             continue
         else
             % collect folder info from path

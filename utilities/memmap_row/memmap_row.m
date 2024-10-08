@@ -251,7 +251,22 @@ classdef memmap_row < handle
             [varargout{1:max(1,nargout)}] = builtin("ctranspose",varargin{:});
         end
         
+        % rolling calc function
+        function varargout = movmean(varargin)
+            varargin = collect_all_rows(varargin);
+            [varargout{1:max(1,nargout)}] = builtin("movmean",varargin{:});
+        end
 
+        function varargout = movstd(varargin)
+            varargin = collect_all_rows(varargin);
+            [varargout{1:max(1,nargout)}] = builtin("movstd",varargin{:});
+        end
+
+        function varargout = movmedian(varargin)
+            varargin = collect_all_rows(varargin);
+            [varargout{1:max(1,nargout)}] = builtin("movmedian",varargin{:});
+        end
+        
         % graphics
         function res = plot(varargin)
             varargin = collect_all_rows(varargin);
@@ -265,10 +280,21 @@ classdef memmap_row < handle
             
         end
         
+        % function res = histogram(varargin)
+        %     varargin = collect_all_rows(varargin);
+        % 
+        %     if nargout == 0
+        %         % do not define res if no outputs were asked
+        %         builtin("histogram",varargin{:});
+        %     else
+        %         res = builtin("histogram",varargin{:});
+        %     end
+        % 
+        % end
 
         % convert to other numeric types
         function res = double(obj)
-            res = builtin("double",obj.mapped_file.Data.(obj.data_name));
+            res = builtin("double", obj.mapped_file.Data.(obj.data_name)(obj.row2indx,:));
         end
     end
     

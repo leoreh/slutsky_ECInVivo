@@ -1,4 +1,4 @@
-function [events_width_half_amp, events_amp, event_width_10_amp] = calculate_props(obj, margs)
+function [events_width_half_amp, events_amp, event_width_10_amp] = calculate_props(obj, pos2calc, margs)
     % calculate_props - Calculate properties of interictal epileptiform discharges (IEDs)
     %
     % This function calculates various properties of interictal epileptiform
@@ -10,6 +10,9 @@ function [events_width_half_amp, events_amp, event_width_10_amp] = calculate_pro
     %
     % INPUT ARGUMENTS:
     %   obj     - An object of class IED.data containing EEG signal and related data.
+    %  pos2calc - A logical vector, which detections in the ied object to
+    %             calculate propeties on.
+    %             Defaults to obj.accepted if not provided.
     %   margs   - (Optional) Double array representing additional parameters.
     %             Defaults to obj.marg if not provided.
     %
@@ -28,16 +31,20 @@ function [events_width_half_amp, events_amp, event_width_10_amp] = calculate_pro
     % - IED.data
     %
     % Author: LdM
-    % Date: 240111
+    
 
     arguments
         obj IED.data
+        pos2calc logical = obj.accepted
         margs double = obj.marg
     end
-
+    
+    if ~isvector(pos2calc) || (numel(pos2calc) ~= numel(obj.pos))
+        error("pos2calc must be a vector with same number of elements as in 'pos' in the IED.data object")
+    end
     win_means = movmean(obj.sig(:),obj.fs);
-    true_pos = obj.pos(obj.accepted);
-    local_segs = obj.extract_discharges(margs);
+    true_pos = obj.pos(pos2calc);
+    local_segs = obj.extract_discharges(margs, pos2calc);
     detec_p = ceil(size(local_segs,2)/2);
 
     for iEvt = numel(true_pos):-1:1

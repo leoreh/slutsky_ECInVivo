@@ -34,9 +34,18 @@ function [clipped_discharges, tstamps] = extract_discharges(obj,time_marg,accept
         clipped_discharges = [];
         tstamps = [];
     else
-        for iDischarges = numel(true_pos):-1:1
+        clipped_discharges = nan(numel(true_pos), numel(tstamps));
+        for iDischarges = 1:numel(true_pos)
             area2clip = (true_pos(iDischarges)-margs) : (true_pos(iDischarges) + margs);
-            clipped_discharges(iDischarges,:) = obj.sig(area2clip);
+            if max(area2clip) > length(obj.sig) || any(area2clip < 0)
+                warning("IED_DATA:Extract_Discharges:Out_Of_Bound",...
+                    "With time margins %g [Sec], discharge at sample %d is out of signal bound.\n" + ...
+                    "Therefore, it is returned as nan. Consider using smaller margins.",...
+                    time_marg, true_pos(iDischarges))
+                clipped_discharges(iDischarges,:) = nan;
+            else
+                clipped_discharges(iDischarges,:) = obj.sig(area2clip);
+            end
         end
     end
 end
