@@ -8,8 +8,8 @@ function [totDur, prctDur, epLen, timebins] = as_plotZT(varargin)
 %   timebins        n x 2 numeric of time windows (indices to labels). 
 %                   epochs of each state will be calculated for each time
 %                   window separately. 
-%   nwin            numeric. if timebins not specified, will divide labels
-%                   to nwin timebins
+%   nbins           numeric. if timebins not specified, will divide labels
+%                   to nbins timebins
 %   sstates         numeric. idx of selected states. e.g. [1, 4, 5] will
 %                   only plot wake, nrem and rem
 %   ss              struct. see as_classify. if given then labels, minDur,
@@ -36,7 +36,7 @@ function [totDur, prctDur, epLen, timebins] = as_plotZT(varargin)
 p = inputParser;
 addParameter(p, 'basepath', pwd, @ischar);
 addParameter(p, 'timebins', [], @isnumeric);
-addParameter(p, 'nwin', [1], @isnumeric);
+addParameter(p, 'nbins', [1], @isnumeric);
 addParameter(p, 'sstates', [], @isnumeric);
 addParameter(p, 'ss', []);
 addParameter(p, 'labels', [], @isnumeric);
@@ -47,7 +47,7 @@ addParameter(p, 'graphics', true, @islogical);
 parse(p, varargin{:})
 basepath        = p.Results.basepath;
 timebins        = p.Results.timebins;
-nbins            = p.Results.nwin;
+nbins           = p.Results.nbins;
 ss              = p.Results.ss;
 sstates         = p.Results.sstates;
 labels          = p.Results.labels;
@@ -88,7 +88,7 @@ if isempty(interDur)
     interDur = ss.info.interDur;
 end
 if length(minDur) == 1
-    minDur = repamt(minDur, nstates, 1);
+    minDur = repmat(minDur, nstates, 1);
 elseif length(minDur) ~= nstates
     error('minDur length is different than the number of states')
 end
@@ -116,6 +116,9 @@ end
 for iwin = 1 : nbins
     for istate = 1 : length(sstates)
         epLen_temp{iwin, istate} = epochStats(iwin).epLen{sstates(istate)};
+        if isempty(epLen_temp{iwin, istate})
+            epLen_temp{iwin, istate} = 0;
+        end
     end
     totDur(iwin, :) = epochStats(iwin).totDur(sstates);
 end
@@ -133,7 +136,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if graphics
-    setMatlabGraphics(false)
+    setMatlabGraphics(true)
     alphaIdx = linspace(0.5, 1, nbins);
     fh = figure;
     
@@ -153,7 +156,7 @@ if graphics
         
         % epoch length
         epMat = epLen{istate};
-        if isempty(epMat)
+        if ~all(epMat)
             continue
         end
         subplot(2, length(sstates), istate + length(sstates))
@@ -180,7 +183,7 @@ if graphics
         figpath = fullfile(basepath, 'graphics', 'sleepState');
         mkdir(figpath)
         figname = fullfile(figpath, [basename, '_ZTtimebins']);
-        export_fig(figname, '-jpg', '-transparent', '-r300')
+        savefig(fh, figname, 'compact')
     end
 end
 

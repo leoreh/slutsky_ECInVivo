@@ -125,20 +125,20 @@ if isfield(ripp.spks, 'su')
     ydata = [ydata' ./ max(ydata')]';
     PlotColorMap(ydata, 1, 'bar','on', 'x', x);
     xlabel('Time [ms]')
-    ylabel('Unit no.')
+    ylabel('Unit No.')
     title('Norm. SU MFR');
 
     % mean nspks across RS units and ripples
     sb6 = subplot(4, 3, 8);
     unitIdx = units.clean(1, :);
-    ydata = squeeze(mean(ripp.spks.su.rippMap(unitIdx, :, :), 2));
+    ydata = squeeze(mean(ripp.spks.su.rippMap(unitIdx, :, :), 2, 'omitnan'));
     xdata = linspace(ripp.maps.durWin(1), ripp.maps.durWin(2),...
         size(ydata, 2));
     ydata = [ydata' ./ max(ydata')]';
-    plot(xdata, mean(ydata), 'b')
+    plot(xdata, mean(ydata, 'omitnan'), 'b')
     hold on
-    patch([xdata, flip(xdata)], [mean(ydata) + std(ydata),...
-        flip(mean(ydata) - std(ydata))],...
+    patch([xdata, flip(xdata)], [mean(ydata, 'omitnan') + std(ydata, 'omitnan'),...
+        flip(mean(ydata, 'omitnan') - std(ydata, 'omitnan'))],...
         'b', 'EdgeColor', 'none', 'FaceAlpha', .2, 'HitTest', 'off')
     xlabel('Time [ms]')
     ylabel('Norm. SU MFR')
@@ -150,14 +150,14 @@ if isfield(ripp.spks, 'su')
     % mean nspks across FS units and ripples
     sb7 = subplot(4, 3, 11);
     unitIdx = units.clean(2, :);
-    ydata = squeeze(mean(ripp.spks.su.rippMap(unitIdx, :, :), 2));
+    ydata = squeeze(mean(ripp.spks.su.rippMap(unitIdx, :, :), 2, 'omitnan'));
     xdata = linspace(ripp.maps.durWin(1), ripp.maps.durWin(2),...
         size(ydata, 2));
     ydata = [ydata' ./ max(ydata')]';
-    plot(xdata, mean(ydata), 'r')
+    plot(xdata, mean(ydata, 'omitnan'), 'r')
     hold on
-    patch([xdata, flip(xdata)], [mean(ydata) + std(ydata),...
-        flip(mean(ydata) - std(ydata))],...
+    patch([xdata, flip(xdata)], [mean(ydata, 'omitnan') + std(ydata, 'omitnan'),...
+        flip(mean(ydata, 'omitnan') - std(ydata, 'omitnan'))],...
         'b', 'EdgeColor', 'none', 'FaceAlpha', .2, 'HitTest', 'off')
     xlabel('Time [ms]')
     ylabel('Norm. SU MFR')

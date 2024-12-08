@@ -4,13 +4,10 @@
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = 'lh133';
+mname = 'lh107';
 
-varsFile = ["fr"; "sr"; "spikes"; "st_metrics"; "swv_metrics";...
-    "cell_metrics"; "sleep_states"; "ripp.mat"; "datInfo"; "session";...
-    "units"];
-varsName = ["fr"; "sr"; "spikes"; "st"; "swv"; "cm"; "ss"; "ripp";...
-    "datInfo"; "session"; "units"];
+varsFile = ["cell_metrics"; "sleep_states"; "datInfo"; "session"; "units"];
+varsName = ["cm"; "ss"; "datInfo"; "session"; "units"];
 xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
 [v, basepaths] = getSessionVars('mname', mname, 'varsFile', varsFile,...
     'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
@@ -21,9 +18,7 @@ nfiles = length(basepaths);
 % analyze data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% calData = ss.info.calibrationData;
-% for ifile = 1 : nfiles
-for ifile = [2, 6]
+for ifile = 1 : nfiles
 
     % file
     basepath = basepaths{ifile};
@@ -44,21 +39,34 @@ for ifile = [2, 6]
     [~, basename] = fileparts(basepath);
 
 
-    % calc psd
-    ch = [1 : 4];
-    sstates = [1, 4];
-    ftarget = [0.1 : 0.5 : 100];
-    prct = 70;
-    flgEmg = true;
-    wins = [0, Inf];
-    wins = [session.general.timebins(1, 2), Inf]
-    v(ifile).psd = psd_states('basepath', basepaths{ifile}, 'sstates', sstates,...
-        'ch', ch, 'fs', [], 'wins', wins, 'saveVar', true,...
-        'graphics', true, 'forceA', true, 'ftarget', ftarget,...
-        'prct', prct, 'flgEmg', flgEmg);
+    % correct cell explorer
+    update_cellExplorer(basepath)
+
+    % firing rate
+    load([basename, '.spikes.cellinfo.mat'])
+    if isfield(session.general, 'timepnt')
+        timepnt = session.general.timepnt;
+    else
+        timepnt = Inf;
+    end
+    winBL = [0 timepnt];
+    fr = calc_fr(spikes.times, 'basepath', basepath,...
+        'graphics', true, 'binsize', 60, 'saveVar', true, 'forceA', true,...
+        'smet', 'none', 'winBL', winBL, 'winCalc', [0, Inf]);
+
+
+    % cluster validation
+    spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
+        'saveFig', false, 'force', false, 'mu', [], 'graphics', false,...
+        'vis', 'on', 'spkgrp', spkgrp);
+
+    % spike timing metrics
+    st = spktimes_metrics('spikes', spikes, 'sunits', [],...
+        'bins', [0 Inf], 'forceA', true, 'saveVar', true, 'fullA', false);
 
 
 end
+
 
 
 % cell_metrics = CellExplorer('basepaths', basepaths);
@@ -176,7 +184,7 @@ istate = 2;
 
 clear fr_states fr_gain states_temp gain_temp
 for imouse = 1 : length(mname)
-    
+
     % load data
     varsFile = ["fr"; "units"];
     varsName = ["fr"; "units"];
@@ -189,7 +197,7 @@ for imouse = 1 : length(mname)
     fr = catfields([v(:).fr], 'catdef', 'cell');
 
     for ifile = 1 : nfiles
-            states_temp{ifile} = fr.states.mfr{ifile}(v(ifile).units.clean(iunit, :), istate)
+        states_temp{ifile} = fr.states.mfr{ifile}(v(ifile).units.clean(iunit, :), istate)
         gain_temp{ifile} = fr.states.gain{ifile}(4, v(ifile).units.clean(iunit, :))
     end
     fr_states{imouse} = cell2nanmat(states_temp, 2)';
@@ -262,4 +270,5 @@ xlabel('Time [h]')
 ylabel('Norm. Freq')
 
 
-
+%%% spike lfp coupling
+% Theta-band phase locking during encoding leads to coordinated entorhinal-hippocampal replay

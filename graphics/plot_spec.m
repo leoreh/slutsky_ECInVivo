@@ -16,7 +16,8 @@ function plot_spec(spec, varargin)
 %               e.g., 3600 will plot spec in hours
 %   axh         axis handle for plot. if empty will create new figure
 %
-% 29 mar 22 LH      
+% 29 mar 22 LH      updates:
+% 05 mar 24             changes mapping of x values according to tstamps
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -42,38 +43,58 @@ axh             = p.Results.axh;
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% lazy fix for multichannel spec
-if ndims(spec.s) == 3
-    spec.s = spec.s(:, :, ch);
-end
-
 % params
-winstep = spec.info.winstep;
 freq = spec.freq;
-
-% time axis
 nbins = length(spec.tstamps);
-tspec = ((1 : nbins) * winstep - winstep / 2) / xtime;
+tspec = spec.tstamps / xtime;
+nch = length(ch);
 
-% take a sample of the spectrogram to help initialize the colormap
-sampleBins = randperm(nbins, round(nbins / 5));
-specSample = reshape(spec.s(sampleBins, :), 1, length(sampleBins) * length(freq));
-cLimit = prctile(specSample, [2 94]);
+% file
+[~, basename] = fileparts(basepath);
 
-% plot   
+% open figure if no axis provided   
 if isempty(axh)
+    clear axh
     fh = figure;
-    axh = subplot(1, 1, 1);
+    set(fh, 'WindowState', 'maximized');
+    tlayout = [nch, 1];
+    th = tiledlayout(nch, 1);
+    th.TileSpacing = 'tight';
+    th.Padding = 'none';
+    title(th, basename, 'interpreter', 'none')
 end
-imagesc(axh, tspec, freq, spec.s', cLimit);
-colormap(AccuSleep_colormap());
-axis('xy')
-ylabel('Frequency [Hz]')
-xlabel('Time [h]')
-if logfreq
-    set(gca, 'yscale', 'log')
-    ylim([max([0.2, freq(1)]), freq(end)])
+
+for ich = 1 : nch
+
+    if exist('fh', 'var')
+        axh(ich) = nexttile(th, ich, [1, 1]); cla; hold on
+    end
+    
+    s = spec.s(:, :, ch(ich));
+
+    % take a sample of the spectrogram to initialize the colormap
+    sampleBins = randperm(length(tspec), round(length(tspec) / 5));
+    specSample = reshape(s(sampleBins, :), 1, []);
+    cLimit = prctile(specSample, [2 94]);
+    
+    imagesc(axh(ich), tspec, freq, s', cLimit);
+    colormap(axh(ich), AccuSleep_colormap());
+    axis(axh(ich), 'xy');
+    ylabel(axh(ich), 'Frequency [Hz]');
+    xlabel(axh(ich), 'Time [h]');
+    if logfreq
+        set(axh(ich), 'yscale', 'log');
+        ylim(axh, [max([0.2, freq(1)]), freq(end)]);
+    else
+        set(axh(ich), 'yscale', 'linear');
+    end
+
 end
+
+if length(axh) > 1
+    linkaxes(axh, 'x')
+end
+axis tight
 
 % save
 if saveFig
@@ -86,28 +107,9 @@ if saveFig
     figpath = fullfile(basepath, 'graphics');
     mkdir(figpath)
     figname = fullfile(figpath, sprintf('%s_spec', basename));
-    export_fig(figname, '-tif', '-transparent', '-r300')
+    savefig(fh, figname, 'compact')
 end
 
 end
 
 % EOF
-
-% if ~logfreq
-%     
-%     specSample = reshape(spec.s(sampleBins, :), 1, length(sampleBins) * length(freq));
-%     cLimit = prctile(specSample, [6 98]);
-% 
-%     imagesc(tspec, freq, spec.s', cLimit);
-% else
-%     pband = 10 * log10(abs(spec.s));
-%     pband = bz_NormToRange(pband, [0 1]);
-%     surf(tspec, freq, pband', 'EdgeColor', 'none');
-%     set(gca, 'yscale', 'log')
-%     view(0, 90);
-%     ylim([max([0.5, freq(1)]), freq(end)])
-% 
-%     specSample = reshape(pband(sampleBins, :), 1, length(sampleBins) * length(freq));
-%     cLimit = prctile(specSample, [35 99.9]);
-%     clim(cLimit)
-% end

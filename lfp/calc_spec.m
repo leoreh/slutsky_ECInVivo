@@ -197,29 +197,20 @@ end
 % calculate power in specific bands
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% bands taken from Boyce et al., Science, 2016
-bandNames = ["broad", "swa", "delta", "theta", "alpha", "beta", "glow", "ghigh"];
-bandFreqs = [0.5, 100; 0.5, 1; 1, 4; 4, 10; 10, 14; 15, 30; 30, 60; 60, 100];
-
-% convert to dB (chronux output is power not magnitude)
-powdb = 10 * log10(s);
-
-% calc power in band. db is a 3d array of freqBand x time x channel
-for iband = 1 : length(bandFreqs)
-    bandIdx = InIntervals(freq, bandFreqs(iband, :));
-    spec.bands.db(iband, :, :) = squeeze(sum(powdb(:, bandIdx, :), 2));
+% bands is a 3d array of freqBand x time x channel
+for igrp = 1 : ngrp
+    [bands(:, :, igrp), info] = calc_bands('psdData', squeeze(s(:, :, igrp)),...
+    'freq', freq, 'flgNormBand', false);
 end
-spec.bands.bandNames = bandNames;
-spec.bands.bandFreqs = bandFreqs;
-
-% standardization can be done by deviding with broadband or perhaps with
-% the calibration data from accusleep. 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % save
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % organize struct
+spec.bands = bands;
+spec.info.bandNames = info.bandNames;
+spec.info.bandFreqs = info.bandFreqs;
 spec.info.runtime = datetime(now, 'ConvertFrom', 'datenum');
 spec.info.tapers = mtspec_params.tapers;
 spec.info.window = window;
@@ -239,6 +230,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if graphics
+    
     % manual selections
     ch = 1;
     dataType = 'raw';   % can be raw / norm / none
@@ -251,27 +243,29 @@ if graphics
         'axh', axh)
 
     axh(2) = nexttile;
-    for iband = 1 : length(spec.bands.bandFreqs)
+    for iband = 1 : length(spec.info.bandFreqs)
         lgd{iband} = sprintf('%s [%d-%d Hz]',...
-            spec.bands.bandNames{iband}, floor(spec.bands.bandFreqs(iband, 1)),...
-            spec.bands.bandFreqs(iband, 2));
+            spec.info.bandNames{iband}, floor(spec.info.bandFreqs(iband, 1)),...
+            spec.info.bandFreqs(iband, 2));
     end
-    yval = movmean(squeeze(spec.bands.db(:, :, ch)), 100,  2);
+    yval = movmean(squeeze(spec.bands(:, :, ch)), 51,  2);
+%     yval = squeeze(spec.bands(:, :, ch));
     switch dataType
         case 'raw'
             plot(spec.tstamps / 60 / 60,...
-                yval(2 : end, :), 'LineWidth', 2)
-            ylabel('Spectral Power [mV2/Hz]')
+                yval(1 : end, :), 'LineWidth', 2)
+            ylabel('Spectral Power')
         case 'norm'
             plot(spec.tstamps / 60 / 60,...
                 yval(2 : end, :) ./ yval(1, :), 'LineWidth', 2)
-            ylabel('Norm. Spectral Power [dB]')
+            ylabel('Norm. Spectral Power')
         case 'none'
             return
     end
-    legend(lgd{2 : end})
+    legend(lgd{1 : end})
     xlabel('Time [hr]')
     linkaxes(axh, 'x')
+    set(gca, 'yscale', 'log')
 end
 
 end

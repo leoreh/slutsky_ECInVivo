@@ -94,15 +94,16 @@ sDelta = sum(specNorm(:, f1idx : f4idx), 2);
 sTheta = sum(specNorm(:, f6idx : f12idx), 2);
 sRatio = sDelta ./ sTheta;
 
+faxis = sSig.spec_freq;
 % calculate psd according to states
-[psd, faxis] = calc_psd('sig', sSig.eeg,...
-    'fs', sSig.fs, 'graphics', false, 'bins', ss.stateEpochs);
+% [psd, faxis] = calc_psd('sig', sSig.eeg,...
+%     'fs', sSig.fs, 'graphics', false, 'bins', ss.stateEpochs);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-setMatlabGraphics(false)
+setMatlabGraphics(true)
 set(groot, 'DefaultAxesFontSize', 12)
 fh = figure('Color', 'w', 'Position', [0.08, 0.04, 0.83, 0.88]);
 sb1 = axes('Position' ,[0.08, 0.85, 0.83, 0.12]);   % emg vs time
@@ -147,24 +148,24 @@ xlabel('Time [h]')
 % set(gca, 'YTick', [])
 
 % spectral power per state
-fh.CurrentAxes = sb3;
-ph = plot(faxis, psd ./ sum(psd, 2), 'LineWidth', 3);
-set(ph, {'color'}, cfg.colors(sstates))
-xlim([0 30])
-xlabel('Frequency [Hz]')
-ylabel('Norm PSD')     
+% fh.CurrentAxes = sb3;
+% ph = plot(faxis, psd ./ sum(psd, 2), 'LineWidth', 3);
+% set(ph, {'color'}, cfg.colors(sstates))
+% xlim([0 30])
+% xlabel('Frequency [Hz]')
+% ylabel('Norm PSD')     
 % set(gca, 'YTick', [])
 
 % scatter spectrogram vs. emg (could not use axes handle w/ gscatter)
-fh.CurrentAxes = sb4;
-hold on
-for istate = sstates
-scatter(sRatio(labels == istate), sSig.emg_rms(labels == istate)',...
-    2, cfg.colors{istate}, 'filled')
-end
-ylabel('Norm. emg RMS')
-xlabel('Delta / Theta Ratio')
-set(gca, 'YTick', [])
+% fh.CurrentAxes = sb4;
+% hold on
+% for istate = sstates
+% scatter(sRatio(labels == istate), sSig.emg_rms(labels == istate)',...
+%     2, cfg.colors{istate}, 'filled')
+% end
+% ylabel('Norm. emg RMS')
+% xlabel('Delta / Theta Ratio')
+% set(gca, 'YTick', [])
 
 % histogram of epoch lengths for NREM, REM, and WAKE
 fh.CurrentAxes = sb5;
@@ -187,11 +188,11 @@ ylim([0 ceil(prctile(epMat(:), 99.99))])
     
 % percent time in state
 fh.CurrentAxes = sb6;
-pie(sum(cell2nanmat(ss.epLen(sstates), 2), 1, 'omitnan'), ones(1, length(sstates)));
-hold on
-ph = findobj(sb6, 'Type', 'Patch');
-set(ph, {'FaceColor'}, flipud(cfg.colors(sstates)))
-legend(cfg.names, 'Units', 'normalized', 'Position', [0.81 0.11 0.10 0.20]);
+% pie(sum(cell2nanmat(ss.epLen(sstates), 2), 1, 'omitnan'), ones(1, length(sstates)));
+% hold on
+% ph = findobj(sb6, 'Type', 'Patch');
+% set(ph, {'FaceColor'}, flipud(cfg.colors(sstates)))
+% legend(cfg.names, 'Units', 'normalized', 'Position', [0.81 0.11 0.10 0.20]);
 
 % save figure
 if saveFig

@@ -55,11 +55,13 @@ plot(ripp.rate.tstamps / 60 / 60, ripp.rate.rate, 'k')
 xlabel('Time [h]')
 ylabel('Ripple Rate [1/min]')
 
-% examples of ripples (filtered) superimposed
-sb2= subplot(3, 3, 3);
-ripp_idx = randperm(nepochs, min([300, nepochs]));
-plot(((1 : nbinsMap)' - ceil(nbinsMap / 2)) / nbinsMap * diff(durPlot),...
-    ripp.maps.ripp(ripp_idx, :)', 'k');
+% examples of ripples
+ripp_idx = randperm(nepochs, min([100, nepochs]));
+
+% mean +/- std of ripples (filtered) superimposed
+sb2 = subplot(3, 3, 3);
+xval = ((1 : nbinsMap)' - ceil(nbinsMap / 2)) / nbinsMap * diff(durPlot);
+plot_stdShade(sb2, ripp.maps.ripp, 0.3, 'k', xval, [])
 xlabel('Time [s]')
 
 % frequency map

@@ -239,10 +239,6 @@ if ~isempty(emgCf)
     filtRatio = emgCf / (fs / 2);
     emgData = iosr.dsp.sincFilter(emgData, filtRatio);
 end
-    
-% remove 50 from emg
-% [EMG, tsaSig, ~] = tsa_filter('sig', EMG, 'fs', fs, 'tw', false,...
-%     'ma', true, 'graphics', true);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % prepare spectrogram and emg rms 

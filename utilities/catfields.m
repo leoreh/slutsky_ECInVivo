@@ -1,130 +1,137 @@
-function cats = catfields(s, varargin)
+function cats = catfields(s, catdef, copen)
 
-% cats fields of a struct
+% concatenates fields of a struct array. if a field consists of different
+% data types it will be concatenated as a cell. if array dimensions are not
+% compatiple for concatenation along the requested dimension they will be
+% padded
 %
 % INPUT:
-%   catdef          default behavior of concatenation. can be 'long',
-%                   'symmetric', 'addim', 'cell', or a scalar. if the default is
-%                   not possible will revert to cell 
-%   force           logical. if true, will try to concatenate fields even
-%                   if requested default is not available. will even try to
-%                   transpose array to allow for concatenation
-%
+%   s               struct array to concatenate fields from
+%   catdef          default behavior of concatenation. can be 'cell',
+%                   addim', or a scalar. 
+%   copen           logical. if true, for fields consisting of cells, will
+%                   try to concatenate the contents of the cells rather
+%                   then the cells themselves
+% 
 % OUTPUT:
 %   cats            struct with concatenated fields
 %
 % DEPENDENCIES:
+%   cell2padmat     for padding arrays when needed
 %
 % TO DO LIST:
 %   add option to cat by adding dimension (done)
-%   add option to transponse
-%   add option to specify dim for specific fields
+%   add option to cat by cell2nanmat (done - 14 apr 24)
+%   add option to specify catdef for specific fields
 %   add option to input separate structs and handle unique fields
-%   add option to cat by cell2nanmat
 %
 % 28 feb 22 LH
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% arguments
+% function
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-p = inputParser;
-addOptional(p, 'catdef', 1);
-addOptional(p, 'force', true, @islogical);
 
-parse(p, varargin{:})
-catdef      = p.Results.catdef;
-force       = p.Results.force;
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% params
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-clear cats
-
-% create 2d cell array of struct x field
-flds = fieldnames(s(1));    % make sure this will work for dissimilar structs or add perp step of concat
-for istruct = 1 : length(s)
-    vals{istruct, :} = struct2cell(s(istruct));       
-    for ifld = 1 : length(flds)
-        valarray{istruct, ifld} = vals{istruct}{ifld};
-        
-        % check data type of field
-        tf{istruct, ifld} = class(valarray{istruct, ifld});
-    end
+if nargin < 3
+    copen = false;
 end
 
-% cat
+% prepare
+cats = struct();
+flds = fieldnames(s(1));
+
+% iterate over each field
 for ifld = 1 : length(flds)
+
+    % extract data for the current field
+    fieldData = {s.(flds{ifld})};
+    fieldTypes = cellfun(@class, fieldData, 'uni', false);
     
-    % if all struct iterate
-    if all(strcmp({tf{:, ifld}}, 'struct'))
-        cats.(flds{ifld}) = catfields([valarray{:, ifld}], 'catdef', catdef);
-        continue
-    end
-    
-    % if any struct cat as cell
-    if any(strcmp({tf{:, ifld}}, 'struct'))
-        cats.(flds{ifld}) = valarray(:, ifld);
-        continue
-    end
-    
-    % if catdef cell cat as cell
-    if strcmp(catdef, 'cell')
-        cats.(flds{ifld}) = valarray(:, ifld);
-        continue
+    % determine dimension for concatenation
+    if strcmp(catdef, 'addim')
+        dim = max(cellfun(@ndims, fieldData)) + 1;
+    else
+        dim = catdef;
     end
 
-    valsz = cellfun(@size, valarray(:, ifld), 'uni', false);
-    ndim = cellfun(@numel, valsz, 'uni', true);
-    
-    % cat as cell if arrays of same field have different number of
-    % dimensions
-    if ~all(ndim == ndim(1))
-        cats.(flds{ifld}) = valarray(:, ifld);
-        continue
+    % if default concatenation is 'cell', or the field consists of different
+    % data types, concatenate as cell
+    if strcmp(catdef, 'cell') || ~all(strcmp(fieldTypes, fieldTypes{1}))            
+        cats.(flds{ifld}) = fieldData;
+        continue;
     end
     
-    % find dimensions that can be used for cat
-    valsz = vertcat(valsz{:});
-    eqdim = false(1, ndim(1));
-    for idim = 1 : ndim
-        eqdim(idim) = all(valsz(:, idim) == valsz(1, idim));
-    end
-    
-    % cat as cell if more than one dimension is unequal
-    if sum(~eqdim) > 1
-        cats.(flds{ifld}) = valarray(:, ifld);
-        continue
-    end
-    
-    % cat to the only dimension available
-    if sum(~eqdim) == 1
-        cats.(flds{ifld}) = cat(find(~eqdim), valarray{:, ifld});
-        continue
-    end
-    
-    % cat by adding another dimension if possible
-    if strcmp(catdef, 'addim') && sum(eqdim) == unique(ndim)
-        cats.(flds{ifld}) = cat(length(eqdim) + 1, valarray{:, ifld});
-        cats.(flds{ifld}) = squeeze(cats.(flds{ifld}));
-        continue
-    end
-    
-    % sort the dimensions available for concatenation
-    [~, sdim] = sort(valsz(1, :));
-    sdim = sdim(eqdim);
+    % if fields consist of cells, try to cat across dimension or revert to
+    % concatenating as cell. if cellOpen will try to cat the contents of
+    % the cells rather then the cells themselves
+    if all(strcmp(fieldTypes, 'cell'))
+        if copen
+            try
+                cellContents = {fieldData{:}};
+                
+                % determine dimension for concatenation
+                if strcmp(catdef, 'addim')
+                    cellDim = max(cellfun(@ndims, cellContents)) + 1;
+                else
+                    cellDim = catdef;
+                end
 
-    % cat according to user selection / default if multiple options exist
-    if strcmp(catdef, 'long')
-        cats.(flds{ifld}) = cat(sdim(end), valarray{:, ifld});
-    elseif strcmp(catdef, 'symmetric')
-        cats.(flds{ifld}) = cat(sdim(1), valarray{:, ifld});
-    elseif isnumeric(catdef)
-        if eqdim(catdef)
-            cats.(flds{ifld}) = cat(catdef, valarray{:, ifld});
-        else
-            cats.(flds{ifld}) = cat(find(~eqdim, 1), valarray{:, ifld});
+                cats.(flds{ifld}) = cell2padmat(cellContents, cellDim);
+                continue
+            end
         end
+
+        try
+            cats.(flds{ifld}) = (cat(dim, fieldData{:}));
+        catch
+            cats.(flds{ifld}) = fieldData;
+        end
+        continue
     end
+
+    % if field consists of chars / strings, cat as cell 
+    if all(cellfun(@(x) ischar(x) || isstring(x), fieldData))
+        try
+            cats.(flds{ifld}) = cell2padmat(fieldData, dim)
+        catch
+            cats.(flds{ifld}) = fieldData;
+        end
+        continue
+    end
+
+    % if the field is made of structs, assure all structs contain the
+    % same fields and concatenate them recursively
+    if all(cellfun(@isstruct, fieldData))
+
+        % check if all structs have the same fields
+        fieldSets = cellfun(@fieldnames, fieldData, 'uni', false);
+        refSet = fieldSets{1};
+        uniSet = all(cellfun(@(fields) isequal(fields, refSet), fieldSets));
+        
+        if uniSet
+
+            % recursively handle structs
+            cats.(flds{ifld}) = catfields([fieldData{:}], catdef, copen);
+        else
+            
+            % store as cells if struct fields are not uniform
+            cats.(flds{ifld}) = fieldData;
+        end
+
+        continue
+    end
+        
+    % if the field is made of numeric / logical arrays concatenate
+    % using cell2nanmat
+    if all(cellfun(@(x) isnumeric(x) || islogical(x), fieldData))
+
+        cats.(flds{ifld}) = cell2padmat(fieldData, dim);
+    
+    % if non of the above criteria were met, concatenate as cells
+    else
+        cats.(flds{ifld}) = fieldData;
+
+    end
+
 end
 
 end

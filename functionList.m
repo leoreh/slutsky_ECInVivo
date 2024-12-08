@@ -21,7 +21,7 @@ spkgrp = session.extracellular.spikeGroups.channels;
 [~, basename] = fileparts(basepath);
 
 % add timebins to datInfo
-[timebins, timepnt] = metaInfo_timebins('reqPnt', 5 * 60 * 60, 'nbins', 2);
+[timebins, timepnt] = metaInfo_timebins('reqPnt', 5 * 60 * 60, 'nbins', 4);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preprocessing of raw files
@@ -140,16 +140,28 @@ sSig = load([basename, '.sleep_sig.mat']);
 
 % call for acceleration
 sSig = as_prepSig([basename, '.lfp'], acc.mag,...
-    'eegCh', [13 : 16], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
+    'eegCh', [9 : 12], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
     'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
     'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [10 450], 'fs', 1250);
 
+% call for acceleration
+sSig = as_prepSig([basename, '.lfp'], [basename, '.lfp'],...
+    'eegCh', [9 : 12], 'emgCh', 20, 'saveVar', true, 'emgNchans', [],...
+    'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
+    'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [], 'fs', 1250);
+
+
+sSig = as_prepSig([basename, '.lfp'], [basename, '.emg.dat'],...
+    'eegCh', [5 : 8], 'emgCh', 1, 'saveVar', true, 'emgNchans', 1, 'eegNchans', nchans,...
+    'inspectSig', true, 'forceLoad', true, 'eegFs', 1250, 'emgFs', 1250,...
+    'emgCf', [80 450]);
+
 % manually create labels
 labelsmanfile = [basename, '.sleep_labelsMan.mat'];
-AccuSleep_viewer(sSig, ss.labels, labelsmanfile)
+AccuSleep_viewer(sSig, labels, labelsmanfile)
 
 % classify with a network
-netfile = [];
+netfile = 'D:\Code\slutsky_ECInVivo\lfp\SleepStates\AccuSleep\trainedNetworks\net_230212_103132.mat';
 calData = [];
 % calData = ss.info.calibrationData;
 ss = as_classify(sSig, 'basepath', basepath, 'inspectLabels', false,...
@@ -163,7 +175,7 @@ as_stateSeparation(sSig, ss)
 [ss.netPrecision, ss.netRecall] = as_cm(labels1, labels2);
 
 % plot state duration in timebins
-[totDur, epLen] = as_plotZT('nwin', 8, 'sstates', [1, 2, 3, 4, 5],...
+[totDur, epLen] = as_plotZT('nbins', 8, 'sstates', [1, 2, 3, 4, 5],...
     'ss', ss, 'timebins', session.general.timebins);
 
 % calc psd in states
@@ -173,15 +185,21 @@ psd = psd_states('basepath', basepath, 'sstates', [1, 4],...
     'prct', 70, 'flgEmg', true);
 
 % get psd per session for one mouse
-[bands, powdb] = sessions_psd(mname, 'flgNormBand', true, 'flgAnalyze', false,...
-    'flgNormTime', true, 'flgEmg', true, 'idxBsl', [1]);
+[bands, powdb] = sessions_psd(mname, 'flgNormBand', true,...
+    'flgNormTime', true, 'flgEmg', true, 'idxBsl', [1], 'saveFig', false);
 
 % calc spec
 spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true, 'saveVar', true,...
-    'padfft', -1, 'winstep', 5, 'logfreq', true, 'ftarget', [],...
+    'padfft', 0, 'winstep', 5, 'logfreq', true, 'ftarget', [],...
     'ch', spkgrp, 'force', true);
-plot_spec(spec, 'ch', 4, 'logfreq', true, 'saveFig', false,...
+
+plot_spec(spec, 'ch', [1 : 4], 'logfreq', true, 'saveFig', false,...
     'axh', [])
+
+% get spectrogram outliers
+otl = get_specOutliers('basepath', basepath, 'saveVar', true,...
+    'flgCalc', false, 'flgForce', true, 'graphics', true);
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % spike sorting
@@ -290,10 +308,10 @@ fr_timebins('basepath', pwd, 'forceA', true, 'graphics', false,...
     'timebins', timebins, 'saveVar', true, 'sstates', [1, 4, 5]);
 
 % mono synaptic interactions (spike transmission gain)
-monosyn = monoSyn_wrapper('spktimes', spikes.times, 'basepath', pwd,...
-    'winCalc', [0, Inf], 'saveVar', true, 'graphics', true,...
-    'forceA', true, 'fs', fs, 'saveFig', false,...
-    'wv', swv.wv, 'wv_std', swv.wv_std);
+stg = calc_stgs('spktimes', v(ifile).spikes.times, 'basepath', pwd,...
+    'winCalc', [0, Inf], 'saveVar', true, 'mancur', true,...
+    'forceA', true, 'fs', fs);
+
 
 % spk lfp
 frange = [0.5, 4; 5, 12; 50, 80];
@@ -303,7 +321,7 @@ sl = spklfp_wrapper('basepath', basepath, 'winCalc', winCalc,...
 
 % number of units per spike group
 [rs, fs] = plot_nunits('basepaths', {basepath}, 'saveFig', true)
-[rs, fs] = plot_nunits('mname', 'lh107', 'saveFig', true);
+[rs, fs] = plot_nunits('mname', 'lh100', 'saveFig', true);
 
 [sum(rs, 2), sum(fs, 2)]
 
@@ -327,10 +345,13 @@ plot_FRstates_sextiles('stateMfr', fr.states.mfr(:, [1, 4])', 'units', units.cle
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % concatenate var from different sessions
-mname = 'lh122';
-[expData, xData] = sessions_catVarTime('mname', mname,...
-    'dataPreset', {'fr', 'spec'}, 'graphics', true, 'dataAlt', 4,...
-    'basepaths', {}, 'xTicksBinsize', 6, 'markRecTrans', true);
+mname = 'lh133';
+for ialt = 1 : 4
+[~, info] = sessions_catVarTime('mname', mname,...
+    'dataPreset', {'fr', 'ripp'}, 'graphics', true, 'dataAlt', ialt,...
+    'basepaths', {}, 'xTicksBinsize', 6, 'markRecTrans', true,...
+    'saveFig', false);
+end
 
 % snip segments (e.g. spikes) from binary 
 [spkwv, ~] = snipFromBinary('stamps', spktimes, 'fname', datname,...

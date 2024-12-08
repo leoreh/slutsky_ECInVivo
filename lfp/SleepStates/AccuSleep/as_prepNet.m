@@ -37,7 +37,7 @@ for ipath = 1 : length(basepaths)
     [~, basename] = fileparts(basepath);
     cd(basepath)
     sigfile = fullfile(basepath, [basename, '.sleep_sig.mat']);
-    labelsmanfile = fullfile(basepath, [basename, '.sleep_labelsMan.mat']);
+    labelsmanfile = fullfile(basepath, [basename, '.sleep_labelsMan_4st.mat']);
 
     % check exists
     if ~exist(sigfile, 'file') || ~exist(labelsmanfile, 'file')
@@ -73,7 +73,11 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % change one state to another. make sure the order is correct.
-stSwitch = [3, 2; 6, 5; 4, 3; 5, 4; 8, 6]
+stSwitch = [6, 5;...    % N/REM to original REM
+    4, 3;...            % NREM to LSLEEP (will be NREM)
+    5, 4;...            % REM to new position
+    8, 5;...            % none to new position
+    7, 5];              % none to new position
 
 for ipath = 1 : length(basepaths)
 
@@ -128,7 +132,7 @@ save(fullfile(netpath, netname), 'net', 'netInfo')
 
 % weights (must load any labelsMan file)
 gldstrd = labels;
-idx = gldstrd ~= 6;
+idx = gldstrd ~= 5;
 weights = histcounts(gldstrd(idx)) / length(gldstrd(idx));
 weights = round(weights * 100) / 100;       % round to two decimals
 weights(3) = weights(3) + 1 - sum(weights); % add remainder to NREM
@@ -163,7 +167,7 @@ save(configfile, 'cfg')
 
 % weights (must load any labelsMan file)
 gldstrd = labels;
-idx = gldstrd ~= 8;
+idx = gldstrd < 7;
 weights = histcounts(gldstrd(idx)) / length(gldstrd(idx));
 weights = round(weights * 100) / 100;       % round to two decimals
 weights(4) = weights(4) + 1 - sum(weights); % add remainder to NREM

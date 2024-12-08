@@ -112,7 +112,7 @@ if exist(manlabelsfile, 'file')
 
     % ignore bin state
     labels_man = labels;
-    labels(labels > nstates) = nstates + 2;
+    labels(labels > nstates) = nstates + 1;
 
 else
     labels_man = ones(1, length(sSig.spec_tstamps)) * nstates + 2;
@@ -126,7 +126,7 @@ if isempty(calData)
         uiwait
         load(manlabelsfile, 'labels')
         labels_man = labels;
-        labels(labels > nstates) = nstates + 2;
+        labels(labels > nstates) = nstates + 1;
     end
   
     % calibration matrix
@@ -145,7 +145,7 @@ fprintf('classifying... ')
 % AccuSleep_classify doesn't allow for 'only overwrite undefind' as in the
 % gui
 labels = labels_net;
-manIdx = find(labels_man ~= nstates + 2);
+manIdx = find(labels_man < nstates + 1);
 labels(manIdx) = labels_man(manIdx);
 fprintf('done.\n')
 
@@ -198,7 +198,7 @@ if graphics
     
     % duration in timebins
     sstates = find(matches(cfg.names, {'WAKE', 'NREM', 'REM'}));
-%     as_plotZT('nwin', 4, 'sstates', sstates, 'ss', ss)
+    as_plotZT('nbins', 4, 'sstates', sstates, 'ss', ss)
     
 end
 

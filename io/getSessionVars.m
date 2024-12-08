@@ -77,7 +77,7 @@ if isempty(xlsname)
     xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
 end
 
-% deafuly variables to load
+% deafult variables to load
 if isempty(varsFile)
     varsFile = ["session"; "cell_metrics.cellinfo"; "spikes.cellinfo";...
         "fr"; "datInfo"; "AccuSleep_states"; "sr"; "st_metrics";
@@ -190,6 +190,8 @@ for idir = 1 : ndirs
                 varArray(idir).(varsName{ifile}) = temp.cell_metrics;
         elseif strcmp(varsName{ifile}, 'sr')
             varArray(idir).(varsName{ifile}) = temp.fr;
+        elseif strcmp(varsName{ifile}, 'psdEmg')
+            varArray(idir).(varsName{ifile}) = temp.psd;
         else
             varArray(idir).(varsName{ifile}) = temp.(varsName{ifile});
         end

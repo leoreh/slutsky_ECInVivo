@@ -29,14 +29,12 @@ nfiles = length(basepaths);
 % average bands and psd from multiple mice 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mname = {'lh96', 'lh107', 'lh122', 'lh142'};
-mname = {'lh133'};
+mname = {'lh96', 'lh107', 'lh122'};
+% mname = {'lh132', 'lh133', 'lh134'};
 flgNormTime = true;
-flgNormBand = false;
+flgNormBand = true;
 
 clear bands powdb
-% bands(imouse, iband, istate, isession)
-% powdb(imouse, istate, ifreq, isession)
 for imouse = 1 : length(mname)
   
     [bands(imouse, :, :, :), powdb(imouse, :, :, :)] =...
@@ -46,14 +44,8 @@ for imouse = 1 : length(mname)
 
 end
 
-% get mouse data (transpose s.t. sessions are rows). if flgNormBand, ignore
-% first column (broadband)
-istate = 2;
-imouse = 1;
-prismData = squeeze(bands(imouse, :, istate, :))';
-prismData = squeeze(powdb(imouse, istate, :, :));
-
-% transpose grp data
+istate = 1;
+% transpose
 prismData = squeeze(mean(bands(:, :, istate, :), 1, 'omitnan'));
 prismData = squeeze(mean(powdb(:, istate, :, :), 1, 'omitnan'));
 
@@ -67,9 +59,6 @@ for ifile = 1 : size(x, 3)
         cnt = cnt + 1;
     end
 end
-
-%%%% for each freq point, calc diff between bsl and bac effect, and plot as
-%%%% function of freq point
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -90,25 +79,34 @@ end
 statePsd = statePsd ./ sum(statePsd);
 freq = psd.info.faxis{1};
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% organize data - ripples
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+iunit = 1;
+clear rippGain
+for ifile = 1 : nfiles
+
+    unitIdx = v(ifile).units.clean(iunit, :);
+    rippMfr = v(ifile).ripp.spks.su.rippMap(unitIdx, :, :);
+    rippMfr = squeeze(mean(mean(rippMfr, 2), 3));
+    randMfr = v(ifile).ripp.spks.su.randMap(unitIdx, :, :);
+    randMfr = squeeze(mean(mean(randMfr, 2), 3));    
+    rippGain{ifile} = (rippMfr - randMfr) ./ (rippMfr + randMfr);
+
+end
+rippGain = cell2nanmat(rippGain, 2);
+
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % hynogram during baseline
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % mcu baseline basepaths
-basepaths = {...
-    'F:\Data\lh132\lh132_230413_094013',...
-    'F:\Data\lh133\lh133_230413_094013',...
-    'F:\Data\lh134\lh134_230504_091744',...
-    'F:\Data\lh136\lh136_230519_090043',...
-    'F:\Data\lh140\lh140_230619_090023'};
-
-% wt baseline basepaths
-basepaths = {...
-    'F:\Data\lh96\lh96_220120_090157',...
-    'F:\Data\lh107\lh107_220518_091200',...
-    'F:\Data\lh122\lh122_221223_092656',...
-    'F:\Data\lh142\lh142_231005_091832'};
+queryStr = 'mk801';
+basepaths = mk801_chronic_sessions(queryStr)
+nfiles = length(basepaths);
 
 % load data
 varsFile = ["sleep_states"; "datInfo"; "session"];
@@ -118,9 +116,6 @@ xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
     'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
     'xlsname', xlsname);
 
-% params
-nfiles = length(basepaths);
-
 % check states
 for ifile = 1 : nfiles
     cd(basepaths{ifile})
@@ -129,12 +124,12 @@ for ifile = 1 : nfiles
     AccuSleep_viewer(sSig, v(ifile).ss.labels, [])
 end
 
-% % add timebins to session
-% for ifile = 1 : nfiles
-%     cd(basepaths{ifile})
-%     [timebins, timepnt] = metaInfo_timebins('reqPnt', 6 * 60 * 60, 'nbins', 4);
-%     timebins / 60 / 60
-% end
+% add timebins to session
+for ifile = 1 : nfiles
+    cd(basepaths{ifile})
+    [timebins, timepnt] = metaInfo_timebins('reqPnt', 6 * 60 * 60, 'nbins', 4);
+    timebins / 60 / 60
+end
 
 
 % plot hynogram
@@ -151,22 +146,14 @@ sstates = [1, 4, 5];
 clear prctDur
 for ifile = 1 : nfiles
     cd(basepaths{ifile})
-    [totDur, prctDur(ifile, :, :), epLen] = as_plotZT('nwin', 4,...
+    [totDur, prctDur(ifile, :, :), epLen] = as_plotZT('nbins', 4,...
         'sstates', sstates, 'ss', v(ifile).ss,...
         'timebins', v(ifile).session.general.timebins, 'graphics', false);
 end
 
 % reorganize for prism
-istate = 3;
-prismData = prctDur(:, :, istate)';
-
-
-
-
-
-
-
-
+istate = 2;
+prismData = prctDur(:, :, istate);
 
 
 

@@ -1,19 +1,19 @@
-function mat = cell2nanmat(c, dim)
+function [mat, cpad] = cell2nanmat(c, dim)
 
-% converts a cell array of n vectors with maximum length m to a matrix n x
-% m. vectors shorter than m are nan padded. can also concatenate an
-% array of 2d matrices along the dim dimension by nan padding the other
-% dimension. c must be a 1d cell array. 
+% converts a cell array of numeric arrays to a matrix.
+% numeric arrays are nan-padded along dimensions necessary for concatenation.
+% 'c' must be a 1D cell array.
 %
 % INPUT:
-%   c           cell of numeric vectors
-%   dim         dimension to concatenate along
+%   c               1D cell of numeric matrices
+%   dim             dimension to concatenate along
 %
 % OUTPUT
-%   mat         
+%   mat             nan-padded and concatenated matrix
+%   cpad            1D cell of matrices after nan padding
 %
-% 09 may 20 LH  updates:
-% 13 jun 21         adapted for arrays with n dimensions
+% 09 may 20 LH  
+% 13 jun 21 LH      adapted for arrays with n dimensions
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % prep
@@ -23,40 +23,40 @@ if nargin < 2 || isempty(dim)
     dim = 1;
 end
 
+% ensure c is a column array
 c = c(:);
 
-% validate cells have the same number of dimensions.
-szc = cellfun(@size, c, 'uni', false);
-ndim = unique(cellfun(@length, szc, 'uni', true));
-if length(ndim) > 1 
-    error('all arrays must have the same number of dimensions')
-end
-cellvec = all(cellfun(@isvector, c(~isempty(c)), 'uni', true));
+% find the maximum size in each dimension across all arrays
+maxSize = max(cell2mat(cellfun(@(x) padarray(size(x),...
+    [0 max(0, dim - numel(size(x)))], 'post'), c, 'uni', false)), [], 1);
 
-if cellvec
-    c = cellfun(@(x) x(:), c, 'uni', false);
-end
+% initialize cell array for padded arrays
+cpad = cell(size(c));
 
-% max length along dimension
-maxlength = max(cellfun('size', c, 1));
+% iterate through each cell to pad necessary dimensions
+for icell = 1 : length(c)
+    
+    x = c{icell}; % Current array
+    sz = size(x); % Current size
 
-if cellvec
-    mat = cellfun(@(x) [x(:); nan(maxlength - length(x), 1)], c,...
-        'UniformOutput', false);
-else
-    for icell = 1 : length(c)
-        if dim == 1
-            mat{icell} = [c{icell}; nan(maxlength - size(c{icell}, 1), size(c{icell}, 2))];
-        elseif dim == 2
-            mat{icell} = [c{icell}, nan(maxlength - size(c{icell}, 2), size(c{icell}, 1))];
-        end
+    % ensure 'sz' covers up to 'dim' dimensions
+    if numel(sz) < dim
+        sz = [sz ones(1, dim - numel(sz))];
     end
+
+    % determine padding size for each dimension
+    padSize = maxSize - sz;
+    padSize(dim) = 0; % no padding in the concatenation dimension
+    
+   % adjust padSize to ensure all elements are nonnegative
+    padSize = max(padSize, 0);
+
+    % pad array with NaNs in necessary dimensions
+    cpad{icell} = padarray(x, padSize, NaN, 'post');
 end
-if dim == 1
-    mat = cell2mat(mat);
-else
-    mat = cell2mat(mat');
-end
+
+% concatenate padded arrays along the specified dimension
+mat = cat(dim, cpad{:});
 
 % EOF
 
