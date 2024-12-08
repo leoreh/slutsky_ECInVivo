@@ -33,7 +33,7 @@ basepath = p.Results.basepath;
 basename = p.Results.basename;
 
 if any(~ismember(["basepath","basename"],p.UsingDefaults)) && saveVar
-    % if user gave any ifno & want to save, overwrite existing
+    % if user gave any info & want to save, overwrite existing
     if isempty(basename)
         [~,basename] = fileparts(basepath);
     end
@@ -43,8 +43,9 @@ end
 % open windows, let user mark
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-cur_win = IED.utils.curation_window(ied);
-waitfor(cur_win.IED_curation_UIFigure)
+cur_win = IED_curation_GUI("ied",ied);
+dbstop in IED.curate at 48
+waitfor(cur_win.UIFigure)
 
 % decide analysis stage - "during_curation" or "curated"
 if ied.last_mark == numel(ied.pos)

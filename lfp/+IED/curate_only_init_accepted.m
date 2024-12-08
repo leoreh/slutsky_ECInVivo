@@ -43,14 +43,22 @@ end
 % open windows, let user mark
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-cur_win = IED.utils.curation_window_only_init_accepted(ied);
-waitfor(cur_win.IED_curation_UIFigure)
+cur_win = IED_curation_GUI("ied",ied,"only_init_accepted",true);
+dbstop in IED.curate_only_init_accepted at 48
+waitfor(cur_win.UIFigure)
 
 % decide analysis stage - "during_curation" or "curated"
 if ied.last_mark == numel(ied.pos)
     ied.status = "curated";
 else
     ied.status = "during_curation";
+end
+
+% update git info
+try
+    ied.git_last_step = get_gits_status(["slutsky_ECInVivo", "CellExplorer"]);
+catch err
+    ied.git_last_step = join(["Error: " err.message]);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

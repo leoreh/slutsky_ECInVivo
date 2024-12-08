@@ -169,7 +169,7 @@ set(gca, 'YTick', [])
 % histogram of epoch lengths for NREM, REM, and WAKE
 fh.CurrentAxes = sb5;
 hold on
-epMat = cell2nanmat(ss.epLen(sstates));
+epMat = cell2nanmat(ss.epLen(sstates),2);
 plot([1 : size(epMat, 2)], mean(epMat, 1, 'omitnan'),...
     'kd', 'markerfacecolor', 'k')
 boxplot(epMat, 'PlotStyle', 'traditional', 'Whisker', 6);
@@ -198,7 +198,8 @@ if saveFig
     figpath = fullfile('graphics', 'sleepState');
     mkdir(figpath)
     figname = fullfile(figpath, sprintf('%s_stateSeparation', basename));
-    export_fig(figname, '-tif', '-transparent', '-r300')
+    % export_fig(figname, '-tif', '-transparent', '-r300')
+    exportgraphics(fh, figname + ".tif", "BackgroundColor","white")
 end
 
 end

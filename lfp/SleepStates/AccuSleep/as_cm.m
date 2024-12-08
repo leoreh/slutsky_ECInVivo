@@ -115,7 +115,8 @@ if graphics
         figpath = fullfile('graphics', 'sleepState');
         mkdir(figpath)
         figname = fullfile(figpath, sprintf('%s_cm', basename));
-        export_fig(figname, '-tif', '-transparent', '-r300')
+        % export_fig(figname, '-tif', '-transparent', '-r300')
+        exportgraphics(fh, figname + ".tif", "BackgroundColor","white")
     end
         
     % ---------------------------------------------------------------------   
@@ -150,7 +151,8 @@ if graphics
         figpath = fullfile('graphics', 'sleepState');
         mkdir(figpath)
         figname = fullfile(figpath, sprintf('%s_cm_netScores', basename));
-        export_fig(figname, '-tif', '-transparent', '-r300')
+        % export_fig(figname, '-tif', '-transparent', '-r300')
+        exportgraphics(fh, figname + ".tif", "BackgroundColor","white")
     end
 end
 
