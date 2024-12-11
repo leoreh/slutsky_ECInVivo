@@ -44,7 +44,6 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 cur_win = IED_curation_GUI("ied",ied);
-dbstop in IED.curate at 48
 waitfor(cur_win.UIFigure)
 
 % decide analysis stage - "during_curation" or "curated"

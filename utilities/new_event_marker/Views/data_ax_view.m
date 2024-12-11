@@ -95,7 +95,8 @@ classdef data_ax_view < handle
                 ax.XAxis.Exponent = 0;
                 % ax.XAxis.Visible = 'off';
                 ax.Interactions = dataTipInteraction;
-                
+                ax.YTick = 0; % This is important to solve a resizing bug - all axes in the app need to have the same Y ticks
+
                 % set axis ylims to match +-2 std in a 30 min / 10% period in mid recording
                 rec_len = app.model.longest_data;
                 mid_rec = rec_len./2;

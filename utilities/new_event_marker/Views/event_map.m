@@ -137,8 +137,7 @@ classdef event_map < handle
             xlabel(app.local_map_ax, 'Time [Sec]')
             app.local_map_ax.Toolbar.Visible = 'off';
             app.local_map_ax.YLim = [-1.1 1.1];
-            app.local_map_ax.YTick = [];
-            app.local_map_ax.YTickLabel = [];
+            app.local_map_ax.YTick = 0;
             app.local_map_ax.Layout.Row = map_ax_row;
             app.local_map_ax.Layout.Column = map_ax_col;
             app.local_map_ax.XAxis.Exponent = 0;

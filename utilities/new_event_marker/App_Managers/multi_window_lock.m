@@ -158,13 +158,6 @@ classdef multi_window_lock < event_marker_gui
             app.controlers.events_controlers.set_controlers(...
                 "marking_area",{data_ax_p, rows2pos, col2pos})
 
-            % make sure axes resize to match event ax on size change
-            for iAx = 1:numel(data_axes)
-                addlistener(data_axes(iAx),'SizeChanged',@(~,~) app.rematch_axes(data_labels(iAx)));
-            end
-            % app.UIFigure.AutoResizeChildren = "off";
-            % app.UIFigure.SizeChangedFcn = @(varargin) app.resize_fun(data_labels, varargin);
-
             % create new events lines to match data
             % use default colors
             % event_types = app.model.events_types;

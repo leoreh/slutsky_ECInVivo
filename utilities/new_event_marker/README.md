@@ -13,3 +13,7 @@ and have a later "set_controller / set_view" method to construct the controller/
 ### NOTE:
 This is a work in progress, documentation is sparse. Some architectural changes are needed, but the core functionality is there.
 See "event_marker_gui_v2" for a suggested improvement.
+
+### TO DO
+* Make a better unified and sensible architecture.
+* Solve resizing bug - current process is recommanding all axes to have the same YTick.

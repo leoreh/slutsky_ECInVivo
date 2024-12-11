@@ -190,13 +190,6 @@ classdef event_marker_gui < handle
             app.controlers.events_controlers.set_controlers(...
                 "marking_area",{data_ax_p, rows2pos, col2pos})
 
-            % make sure axes resize to match event ax on size change
-            % for iAx = 1:numel(data_axes)
-            %     addlistener(data_axes(iAx),'SizeChanged',@(~,~) app.rematch_axes(data_labels(iAx)));
-            % end
-            app.UIFigure.AutoResizeChildren = "off";
-            app.UIFigure.SizeChangedFcn = @(varargin) app.resize_fun(data_labels, varargin);
-
             % make sure event_map start by showing the whole signal
             app.views.event_map.reset_global_map_end();
 
