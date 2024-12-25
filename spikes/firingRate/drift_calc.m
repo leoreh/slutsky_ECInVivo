@@ -89,7 +89,7 @@ for iwin = 1 : nwin
     winIdx = InIntervals(tstamps, wins(iwin, :));
     npnts(iwin) = sum(winIdx);
     fr_vec = mean(fr_mat(:, winIdx), 2);
-    pv(:, iwin) = fr_vec / norm(fr_vec);
+    pv(:, iwin) = fr_vec /  norm(fr_vec);
 end
 
 % apply criterion such that only units with fr > thrFr are included in the

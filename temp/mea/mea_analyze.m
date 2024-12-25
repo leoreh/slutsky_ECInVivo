@@ -56,11 +56,11 @@ end
 fs = mea.info.fs;
 
 % spike timing metrics
-st = spktimesMetrics('basepath', basepath, 'spktimes', mea.spktimes,...
-    'winCalc', [], 'saveVar', saveVar, 'fs', fs, 'forceA', false);
+st = spktimes_metrics('basepath', basepath, 'spktimes', mea.spktimes,...
+    'bins', [0 Inf], 'saveVar', saveVar, 'fs', fs, 'fullA', false);
 
 % spike waveform metrics
-swv = spkwvMetrics('wv', mea.wv, 'basepath', basepath, 'fs', fs,...
+swv = spkwv_metrics('wv', mea.wv, 'basepath', basepath, 'fs', fs,...
     'saveVar', saveVar, 'forceA', forceA);
 
 % firing rate
@@ -78,21 +78,19 @@ nunits = length(fr.mfr);
 cm.putativeCellType = repmat({'Pyramidal Cell'}, 1, nunits);
 % cm.putativeCellType(swv.tp < 0.425) = {'Narrow Interneuron'};
 cm.putativeCellType(swv.spkw < 0.65) = {'Narrow Interneuron'};
-cm.putativeCellType(st.tau_rise > 6 & swv.tp < 0.425) = {'Wide Interneuron'};
 cell_metrics = cm;
 save(fullfile(basepath, [basename, '.cell_metrics.cellinfo.mat']), 'cell_metrics')
 
 % select units based on criterion 
-units = selectUnits('basepath', basepath, 'grp', [], 'saveVar', false,...
-    'forceA', true, 'cm', cm, 'fr', fr);
-units = units.idx;
+units = selectUnits('basepath', basepath, 'grp', [], 'saveVar', true,...
+    'forceA', true, 'cm', cm, 'fr', fr, 'graphics', false);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if graphics
-    
+   units = units.clean; 
     figpath = fullfile(basepath, 'graphics');
     mkdir(figpath)
 %     fsIdx = unique(mono_res.sig_con_inhibitory(:, 1));
@@ -105,7 +103,7 @@ if graphics
     royer = st.royer;
     slopeTail = swv.slopeTail;
     lidor = st.lidor;
-    tau_rise = st.tau_rise;
+    tau_rise = st.lidor;
     mfr = normalize(fr.mfr, 'range', [0.1 1]);    
     
     fh = figure;
@@ -139,7 +137,7 @@ if graphics
     
     % save
     figname = fullfile(figpath, [basename, '_cellClass']);
-    export_fig(figname, '-jpg', '-transparent', '-r300')
+    savefig(fh, figname)
     
     % ---------------------------------------------------------------------
     % figure per unit

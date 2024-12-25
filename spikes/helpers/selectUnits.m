@@ -76,7 +76,11 @@ if isempty(spikes)
         load(spikesfile)
     end
 end
-ngrps = length(unique(spikes.shankID));
+if ~isempty(spikes)
+    ngrps = length(unique(spikes.shankID));
+else
+    ngrps = [];
+end
 
 if isempty(cm)
     load(cmfile, 'cell_metrics')
@@ -108,11 +112,13 @@ else
     end
 end
 units.grp = grpidx;
-% check cell explorer shank id
-if any(spikes.shankID ~= sort(spikes.shankID))
-    error('Possible error in loadSpikes')
-end
 
+% check cell explorer shank id
+if ~isempty(spikes)
+    if any(spikes.shankID ~= sort(spikes.shankID))
+        error('Possible error in loadSpikes')
+    end
+end
 
 % cell class
 units.rs = strcmp(cm.putativeCellType, 'Pyramidal Cell');
@@ -171,7 +177,7 @@ units.info.grp = grp;
 units.nunits = nan(3, ngrps);
 for igrp = 1 : ngrps
     grpidx = spikes.shankID == igrp;
-    
+
     for unitType = [1, 2]
         units.nunits(unitType, igrp) = sum(units.clean(unitType, :) & grpidx);
     end
