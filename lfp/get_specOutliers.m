@@ -109,7 +109,7 @@ otl.epochs = binary2epochs('vec', otl.boolean, 'minDur', [], 'maxDur', [],...
     'interDur', [], 'exclude', false, 'printFlag', false);
 otl.tstamps = minutes(seconds(otl.idx));
 otl.info.flgCalc = flgCalc;
-otl.info.flgCalc = datetime(now, 'ConvertFrom', 'datenum');
+otl.info.flgCalc = datetime("now");
 
 if saveVar
     save(otlfile, 'otl')

@@ -1,4 +1,5 @@
-function [message] = AccuSleep_viewer(sSig, userLabels, savepath)
+function [message] = AccuSleep_viewer(sSig, userLabels, savepath, flgEmg)
+
 %AccuSleep_viewer A GUI for manually assigning sleep stage labels to EEG/EMG data.
 %   Zeke Barger 021321
 %   Arguments:
@@ -30,9 +31,12 @@ setMatlabGraphics(true)
 %% Check the inputs
 G = struct; % holds everything
 
-% load cfg info
 % load cfg data
-cfg = as_loadConfig();
+if nargin == 4
+    cfg = as_loadConfig('flgEmg', flgEmg);
+else
+    cfg = as_loadConfig();
+end
 epochLen = cfg.epochLen;
 
 G.cfg = cfg;
@@ -46,7 +50,7 @@ switch nargin
         return
     case 1
         G.labels = [];
-    case {2, 3}
+    case {2, 3, 4}
         if ~isempty(userLabels) % user tried to pass some labels
             % check whether they have the correct format
             q = struct;

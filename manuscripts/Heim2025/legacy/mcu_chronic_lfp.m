@@ -12,13 +12,13 @@ sstates = [1, 4];
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-mname = 'lh134';
+mname = 'lh132';
 
 varsFile = ["fr"; "sr"; "sleep_states";...
     "datInfo"; "session"; "units"; "psd"];
 varsName = ["fr"; "sr"; "ss"; "datInfo"; "session";...
     "units"; "psd"];
-xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
+xlsname = 'D:\OneDrive - Tel-Aviv University\PhD\Slutsky\Data summaries\sessionList.xlsx';
 [v, basepaths] = getSessionVars('mname', mname, 'varsFile', varsFile,...
     'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
     'xlsname', xlsname);
@@ -684,7 +684,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % files
-mname = 'lh122';
+mname = 'lh132';
 basepaths = [mcu_sessions(mname)];
 
 % load data

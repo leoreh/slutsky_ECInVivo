@@ -3,8 +3,7 @@ function [stateEpochs, epochStats] = as_epochs(varargin)
 % recieves a labels vector and returns the state epochs. basically a
 % wrapper for binary2epochs with params adjusted for sleep scoring. can
 % separate the recording to timebins and calculate epochs for each time
-% bin, can apply duration thresholds, and remove spec outliers. if flgEmg,
-% will create a labels vector from the bimodal distribution of emg rms
+% bin, can apply duration thresholds, and remove spec outliers.
 %
 % INPUT:
 %   labels          numeric. see as_classify 
@@ -24,7 +23,6 @@ function [stateEpochs, epochStats] = as_epochs(varargin)
 %                   this is to assure that the previous and next state do
 %                   not influence the current state
 %   rmOtl           logical. remove spectrogram outliers. see get_specOutliers.m
-%   emgFlg          logical
 %   graphics        logical
 % 
 % OUTPUT
@@ -35,6 +33,7 @@ function [stateEpochs, epochStats] = as_epochs(varargin)
 %
 % 12 jan 22 LH      updates:
 % 26 mar 24             rmOtl
+% 25 dec 25             separates flgEmg to as_emg
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -49,7 +48,6 @@ addOptional(p, 'timebins', [], @isnumeric);
 addOptional(p, 'nbins', 1, @isnumeric);
 addOptional(p, 'confMarg', [], @isnumeric);
 addOptional(p, 'rmOtl', false, @islogical);
-addOptional(p, 'flgEmg', false, @islogical);
 addOptional(p, 'graphics', false, @islogical);
 
 parse(p, varargin{:})
@@ -61,7 +59,6 @@ timebins        = p.Results.timebins;
 nbins           = p.Results.nbins;
 confMarg        = p.Results.confMarg;
 rmOtl           = p.Results.rmOtl;
-flgEmg          = p.Results.flgEmg;
 graphics        = p.Results.graphics;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -73,32 +70,10 @@ basepath = pwd;
 [~, basename] = fileparts(pwd);
 sleepfile = fullfile(basepath, [basename, '.sleep_sig.mat']);
 
-% state params
-if flgEmg
-    namePrefix = 'epochsEmg';
-    clr = {[150, 70, 55] / 255, [200, 170, 100] / 255};
-    snames = {'High-EMG', 'Low-EMG'};
-    sstates = [1, 2];
-
-    % emg data
-    emg = load(sleepfile, 'emg_rms');
-    emg = emg.emg_rms;
-
-    % find threshold to separate the bimodal distribution of emg
-    [~, cents] = kmeans(emg(:), 2);
-    emgThr = mean(cents);
-
-    % create EMG labels
-    labels = double(emg > emgThr);
-    labels(emg < emgThr) = 2;
-
-else
-    
-    cfg = as_loadConfig();
-    clr = cfg.colors(sstates);
-    snames = cfg.names(sstates);
-
-end
+% state params  
+cfg = as_loadConfig();
+clr = cfg.colors(sstates);
+snames = cfg.names(sstates);
 
 % selected states
 if isempty(sstates)

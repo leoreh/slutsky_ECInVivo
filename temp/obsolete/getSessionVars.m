@@ -74,7 +74,7 @@ ncond           = p.Results.ncond;
 
 % default path to xls file with session metadata
 if isempty(xlsname)
-    xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
+    xlsname = 'D:\OneDrive - Tel-Aviv University\PhD\Slutsky\Data summaries\sessionList.xlsx';
 end
 
 % deafult variables to load

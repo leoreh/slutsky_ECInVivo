@@ -1,4 +1,4 @@
-function [mat, cpad] = cell2nanmat(c, dim, paddef)
+function [mat, cpad] = cell2padmat(c, dim, paddef)
 
 % converts a cell array to a matrix, paddig as needed.
 %

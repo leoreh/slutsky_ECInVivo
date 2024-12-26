@@ -1,4 +1,4 @@
-function [cfg] = as_loadConfig(configfile)
+function [cfg] = as_loadConfig(varargin)
 
 % loads accuSleep params from configuration file. full name and path of
 % config file can be specified. if not will look in default location, if
@@ -7,12 +7,28 @@ function [cfg] = as_loadConfig(configfile)
 
 % 08 jun 21 LH
 
-if nargin == 0
-    configfile = [];
-end
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% arguments
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+p = inputParser;
+addOptional(p, 'configfile', []);
+addOptional(p, 'flgEmg', false, @islogical);
+
+parse(p, varargin{:})
+configfile      = p.Results.configfile;
+flgEmg          = p.Results.flgEmg;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% load
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if isempty(configfile)
-    configfile = 'D:\Code\slutsky_ECInVivo\lfp\SleepStates\AccuSleep\as_config.mat';
+    if flgEmg
+        configfile = 'D:\Code\slutsky_ECInVivo\lfp\SleepStates\AccuSleep\as_configEmg.mat';
+    else
+        configfile = 'D:\Code\slutsky_ECInVivo\lfp\SleepStates\AccuSleep\as_config.mat';
+    end
 end
 if ~exist(configfile, 'file')
     scriptfile = mfilename('fullpath');

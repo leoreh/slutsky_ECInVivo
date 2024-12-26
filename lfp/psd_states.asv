@@ -121,8 +121,8 @@ if flgEmg
     emg = emg.emg_rms;
 
     % state epoch duration limits
-    minDur = [5];
-    interDur = 3;
+    minDur = [20];
+    interDur = 0;
 
 else
     flgEmg = false;

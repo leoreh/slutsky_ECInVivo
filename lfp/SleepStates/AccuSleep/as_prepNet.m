@@ -197,3 +197,31 @@ cfg.nstates = length(cfg.names) - 1;
 configfile = 'D:\Code\slutsky_ECInVivo\lfp\SleepStates\AccuSleep\as_config.mat';
 save(configfile, 'cfg')
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% config file - emg
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+clear cfg
+
+% weights
+cfg.weights = [0.45, 0.55];
+
+% colors
+cfg.colors{1} = [150, 70, 55] / 255;
+cfg.colors{2} = [200, 170, 100] / 255;
+cfg.colors{3} = [200 200 200] / 255;
+cfg.colors = cfg.colors(:);
+
+% state names
+cfg.names = {'High-EMG'; 'Low-EMG'; 'BIN'};
+
+% general
+cfg.fs = 1250;
+cfg.epochLen = 1;
+cfg.minBoutLen = 0;
+cfg.nstates = length(cfg.names) - 1; 
+
+% save
+configfile = 'D:\Code\slutsky_ECInVivo\lfp\SleepStates\AccuSleep\as_configEmg.mat';
+save(configfile, 'cfg')
+

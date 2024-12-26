@@ -4,7 +4,27 @@ if nargin < 2
     vars = [];
 end
 
-if strcmp(queryStr, 'mcu_bsl')
+if strcmp(queryStr, 'mcu')
+
+    basepaths = {...
+        'lh132',...
+        'lh133',...
+        'lh134',...
+        'lh136',...
+        'lh140',...
+        };
+
+elseif strcmp(queryStr, 'wt')
+
+    basepaths = {...
+        'lh96',...
+        'lh100',...
+        'lh107',...
+        'lh122',...
+        'lh142',...
+        };
+
+elseif strcmp(queryStr, 'mcu_bsl')
 
     basepaths = {...
         'E:\Data\lh132\lh132_230413_094013',...
@@ -108,7 +128,7 @@ elseif strcmp(queryStr, 'ra')
         };
 
 elseif contains(queryStr, 'lh')
-    xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
+    xlsname = 'D:\OneDrive - Tel-Aviv University\PhD\Slutsky\Data summaries\sessionList.xlsx';
     [~, basepaths] = getSessionVars('mname', queryStr, 'varsFile', ["session"],...
         'varsName', ["session"], 'pcond', ["tempflag"], 'ncond', [""],...
         'xlsname', xlsname);
@@ -169,6 +189,10 @@ if ~isempty(vars)
     if ~isempty(varIdx)
         varsName(varIdx) = "ss";
     end
+    varIdx = find(strcmp(vars, 'sleep_statesEmg'));
+    if ~isempty(varIdx)
+        varsName(varIdx) = "ssEmg";
+    end
     varIdx = find(strcmp(vars, 'psdEmg'));
     if ~isempty(varIdx)
         varsName(varIdx) = "psd";
@@ -183,10 +207,8 @@ if ~isempty(vars)
     end
 
 
-    xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
     [v, basepaths] = getSessionVars('basepaths', basepaths, 'varsFile', vars,...
-        'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
-        'xlsname', xlsname);
+        'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""]);
 end
 
 end
