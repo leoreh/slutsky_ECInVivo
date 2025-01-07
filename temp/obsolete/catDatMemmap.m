@@ -163,7 +163,7 @@ tcut = [2 4];
 
 % params
 nstates = 4;
-epochLen = 2.5;
+boutLen = 2.5;
 
 % get labels
 ss1 = load(file1, 'ss');
@@ -177,13 +177,13 @@ idx1 = l1 : -1 : l1 - tcut(1) * 60 * 60 / 2.5;
 idx2 = 1 : 1 + tcut(2) * 60 * 60 / 2.5;
 ss.labels = [ss1.labels(idx1); ss2.labels(idx2)];
 
-% convert labels to state epochs. 
+% convert labels to state bouts. 
 for i = 1 : nstates
     binaryVec = zeros(length(ss.labels), 1);
     binaryVec(ss.labels == i) = 1;
-    stateEpisodes = binary2epochs('vec', binaryVec, 'minDur', [], 'maxDur', [],...
+    stateEpisodes = binary2bouts('vec', binaryVec, 'minDur', [], 'maxDur', [],...
         'interDur', [], 'exclude', false); % these are given as indices are equivalent to seconds
-    ss.stateEpochs{i} = stateEpisodes * epochLen;
+    ss.boutTimes{i} = stateEpisodes * boutLen;
 end
 
 save(statesfile, 'ss')

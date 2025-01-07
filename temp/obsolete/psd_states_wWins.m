@@ -25,7 +25,7 @@ function psd = psd_states(varargin)
 %                   new sampling frequency of the eeg signal.
 %   sigfile         char. name of file to load signal from. if empty but
 %                   channel is specified, will load from [basename.lfp]
-%   stateEpochs     cell of n x 2 mats. if empty will calculate from
+%   boutTimes       cell of n x 2 mats. if empty will calculate from
 %                   ss.labels or from emg_labels
 %   sstates         numeric. index of selected states to calculate psd 
 %   ftarget         numeric. requested frequencies for calculating the psd
@@ -59,7 +59,7 @@ addOptional(p, 'nchans', [], @isnumeric);
 addOptional(p, 'fs', 1, @isnumeric);
 addOptional(p, 'sigfile', [], @ischar);
 addOptional(p, 'sstates', [1, 4, 5], @isnumeric);
-addOptional(p, 'stateEpochs', []);
+addOptional(p, 'boutTimes', []);
 addOptional(p, 'ftarget', [0.5 : 0.5 : 100], @isnumeric);
 addOptional(p, 'emgThr', [50], @isnumeric);
 addOptional(p, 'flgEmg', false, @islogical);
@@ -76,7 +76,7 @@ nchans          = p.Results.nchans;
 fs              = p.Results.fs;
 sigfile         = p.Results.sigfile;
 sstates         = p.Results.sstates;
-stateEpochs     = p.Results.stateEpochs;
+boutTimes       = p.Results.boutTimes;
 ftarget         = p.Results.ftarget;
 emgThr          = p.Results.emgThr;
 flgEmg          = p.Results.flgEmg;
@@ -99,7 +99,7 @@ if isempty(sstates)
     sstates = 1 : nstates;
 end
 
-% state epoch duration limits
+% state bout duration limits
 minDur = 20;
 interDur = 2;
 
@@ -181,15 +181,15 @@ if isempty(sig)
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% calculate state epochs if not provided
+% calculate state bouts if not provided
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 for iwin = 1 : nwin
     
     idxWin = floor(wins(iwin, 1) : wins(iwin, 2));
 
-    % get stateEpochs
-    if isempty(stateEpochs)
+    % get boutTimes
+    if isempty(boutTimes)
         if ~flgEmg           
             
             % get AS labels and limit to time window
@@ -208,9 +208,10 @@ for iwin = 1 : nwin
             labels = labels(idxWin);
         end
         
-        % re-calc state epochs from labels
-        [stateEpochs, ~] = as_epochs('labels', labels,...
+        % re-calc state bouts from labels
+        bouts = as_bouts('labels', labels,...
             'minDur', minDur, 'interDur', interDur, 'rmArtifacts', true);
+        boutTimes = bouts.times;
     end
 
 end
@@ -232,14 +233,14 @@ for iwin = 1 : nwin
     end
 
     % calc psd
-    [psd.psd(iwin, :, :), faxis, psd.psd_epochs(iwin, :)] = calc_psd('sig',...
-        sig(idxSig(1) : idxSig(2), :), 'bins', stateEpochs(sstates),...
+    [psd.psd(iwin, :, :), faxis, psd.psd_bouts(iwin, :)] = calc_psd('sig',...
+        sig(idxSig(1) : idxSig(2), :), 'bins', boutTimes(sstates),...
         'fs', fs, 'ftarget', ftarget, 'graphics', graphics);
     
     % calc power in specific frequency bands
     for istate = 1 : length(sstates)
         stateIdx = sstates(istate);
-        [psd.bands{iwin, istate}, psd.info.bands] = calc_bands('psdData', psd.psd_epochs{istate},...
+        [psd.bands{iwin, istate}, psd.info.bands] = calc_bands('psdData', psd.psd_bouts{istate},...
             'freq', faxis, 'flgNormBand', false);
     end
 
@@ -248,8 +249,8 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % organize in struct and save
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-psd.info.stateEpochs = stateEpochs;
-psd.info.runtime = datetime(now, 'ConvertFrom', 'datenum');
+psd.info.boutTimes = bouts.times;
+psd.info.runtime = datetime("now");
 psd.info.input = p.Results;
 psd.info.sigfile = sigfile;
 psd.info.fs = fs;

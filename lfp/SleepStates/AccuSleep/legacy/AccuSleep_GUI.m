@@ -470,13 +470,13 @@ for i = 1:n_states
 end
 if any(count_by_state < 3)
     animateBoxes(getappdata(handles.D,'outputIndicators'),0);
-    disptext(handles, 'ERROR: At least some epochs of each stage must be labeled.');
+    disptext(handles, 'ERROR: At least some bouts of each stage must be labeled.');
     disptext(handles, '       Click the user manual button for details.');
     lockInputs(handles,0);
     return
 end
 % check if we have a reasonable number of labels
-ts = str2num(get(handles.tsBox,'String')); % epoch length
+ts = str2num(get(handles.tsBox,'String')); % bout length
 if sum(labels <= n_states | labels >= 1) * ts / 60 < 5
     disptext(handles, 'WARNING: At least 5 minutes of labeled data are recommended for');
     disptext(handles, '         creating a calibration data file');
@@ -515,7 +515,7 @@ animateBoxes([ind{1}(3), ind{2}(3),ind{3}(3),ind{4}(3),ind{5}(3)], 2, codes);
 if isempty(calibrationData)
     animateBoxes(getappdata(handles.D,'outputIndicators'),0);
     disptext(handles, 'ERROR: Length of label file does not match length');
-    disptext(handles, '       of EEG/EMG. Check the SR or epoch size?');
+    disptext(handles, '       of EEG/EMG. Check the SR or bout size?');
     lockInputs(handles,0);
     return
 end
@@ -560,20 +560,20 @@ if ischar(config)
 end
 n_states = length(config.cfg_names);
 
-% When the minimum bout length is much longer than the epoch length, this
+% When the minimum bout length is much longer than the bout length, this
 % creates ambiguity that can make the scoring somewhat unreliable. 
 % get minimum bout length
 minBoutLen = str2num(get(handles.boutBox,'String'));
 if isempty(minBoutLen)
     minBoutLen = 0;
 end
-epoch_length = str2double(get(handles.tsBox,'String'));
-if minBoutLen / epoch_length > 5
+bout_length = str2double(get(handles.tsBox,'String'));
+if minBoutLen / bout_length > 5
     answer = questdlg(...
         ['When the minimum bout length is much longer ',...
-        'than the epoch length, this creates ambiguity ',...
+        'than the bout length, this creates ambiguity ',...
         'that can decrease the reliability of the labels. ',....
-        'Consider using a longer epoch length or shorter ',...
+        'Consider using a longer bout length or shorter ',...
         'minimum bout length.'], ...
         'WARNING', ...
         'Continue anyway','Cancel','Cancel');
@@ -622,7 +622,7 @@ for i = 1:length(allRecordings)
     % run AccuSleep_classify on the recording
     newLabels{i} = AccuSleep_classify(standardizeSR(eegFile.EEG, oldSR, 128),...
         standardizeSR(emgFile.EMG, oldSR, 128),...
-        getappdata(handles.D,'net'),128, epoch_length,...
+        getappdata(handles.D,'net'),128, bout_length,...
         getappdata(handles.D,'calibrationData'), minBoutLen);
     if isempty(newLabels{i}) % if something went wrong
         % show an error message and quit. This shouldn't happen often.
@@ -655,7 +655,7 @@ for i = 1:length(allRecordings)
                     ['The length of the existing labels for ',...
                     currentList{i},' does not match the new labels. ',...
                     'This could be caused by a discrepancy in the ',...
-                    'sampling rate or epoch length.'], ...
+                    'sampling rate or bout length.'], ...
                     'Problem with label length', ...
                     'Replace old labels','Cancel','Cancel');
                 if strcmp(answer,'Cancel')
@@ -717,21 +717,21 @@ for i = idx1:idx2 % for all recordings (or just one)
     % perform various checks
     if isempty(handles.tsBox.String)
         animateBoxes(getappdata(handles.D,'tsIndicators'),0);
-        disptext(handles, 'ERROR: Please set the epoch length for sleep stage labels');
+        disptext(handles, 'ERROR: Please set the bout length for sleep stage labels');
         return
     end
     if ~isnumeric(str2num(get(handles.srBox,'String'))) ||...
             ~isnumeric(str2num(get(handles.tsBox,'String')))
         animateBoxes([getappdata(handles.D,'srIndicators'),...
             getappdata(handles.D,'tsIndicators')],0);
-        disptext(handles, 'ERROR: Sampling rate and epoch length must be numeric');
+        disptext(handles, 'ERROR: Sampling rate and bout length must be numeric');
         return
     end
     if str2num(get(handles.srBox,'String')) <= 0 ||...
             str2num(get(handles.tsBox,'String')) <= 0
         animateBoxes([getappdata(handles.D,'srIndicators'),...
             getappdata(handles.D,'tsIndicators')],0);
-        disptext(handles, 'ERROR: Sampling rate and epoch length must be positive');
+        disptext(handles, 'ERROR: Sampling rate and bout length must be positive');
         return
     end
     if isempty(rec.EEGpath)
@@ -790,7 +790,7 @@ if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgr
     set(hObject,'BackgroundColor','white');
 end
 
-% what to do when new epoch length is entered
+% what to do when new bout length is entered
 function tsBox_Callback(hObject, eventdata, handles)
 setIndicator(getappdata(handles.D,'tsIndicators'), 'failure')
 ts = str2num(get(handles.tsBox,'String'));
@@ -800,7 +800,7 @@ if ~isempty(ts) % if it's a number
             setIndicator(getappdata(handles.D,'tsIndicators'), 'success')
         else
             setIndicator(getappdata(handles.D,'tsIndicators'), 'serious_warn')
-            disptext(handles, 'WARNING: Epoch length less than 2 seconds not recommended');
+            disptext(handles, 'WARNING: Bout length less than 2 seconds not recommended');
         end
     end
 end

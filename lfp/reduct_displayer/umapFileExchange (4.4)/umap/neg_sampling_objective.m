@@ -42,8 +42,8 @@ function result = neg_sampling_objective(head_embedding, tail_embedding, head, t
 %         * minkowski
 %         * seuclidean
 % 
-% n_epochs: integer (optional)
-%     The number of training epochs to be used in optimizing the low
+% n_bouts: integer (optional)
+%     The number of training bouts to be used in optimizing the low
 %     dimensional embedding. Larger values result in more accurate
 %     embeddings. If 0, a value will be selected based on the size of the
 %     input dataset (200 for large datasets, 500 for small).

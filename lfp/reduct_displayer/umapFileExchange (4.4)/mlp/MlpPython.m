@@ -39,7 +39,7 @@ classdef MlpPython
 %           classified manually, this example includes a QFMatch run
 %           to compare MLP with this previous manual classification.
 
-%           modelTensorFlowFile1=MlpPython.Train('balbc4FmoLabeled.csv', 'epochs', 210, 'class', .12, 'confirm_model', false);
+%           modelTensorFlowFile1=MlpPython.Train('balbc4FmoLabeled.csv', 'bouts', 210, 'class', .12, 'confirm_model', false);
 %           % The above command sets modelTensorFlowFile1='~/Documents/run_umap/examples/balbc4FmoLabeled';
 %           lbls=MlpPython.Predict('balbcFmoLabeled.csv', 'model_file', modelTensorFlowFile1, 'test_label_file', 'balbc4FmoLabeled.properties', 'training_label_file', 'balbcFmoLabeled.properties', 'confirm_model', false);
 %
@@ -53,7 +53,7 @@ classdef MlpPython
 %           is genetically modified to lack T cells or B cells. Then show
 %           the Hi-D match result.
 %
-%           modelTensorFlowFile2=MlpPython.Train('balbc4RagLabeled.csv', 'epochs', 210, 'confirm_model', false, 'wait', false);
+%           modelTensorFlowFile2=MlpPython.Train('balbc4RagLabeled.csv', 'bouts', 210, 'confirm_model', false, 'wait', false);
 %           % The above command sets modelTensorFlowFile2='~/Documents/run_umap/examples/balbc4RagLabeled';
 %           lbls=MlpPython.Predict('ragLabeled.csv', 'model_file', modelTensorFlowFile2, 'test_label_file', 'balbc4RagLabeled.properties', 'training_label_file', 'ragLabeled.properties', 'confirm_model', false);
 %
@@ -76,7 +76,7 @@ classdef MlpPython
 %
 %         columns={'FSC-A', 'SSC-A', 'CD5:PE-Cy5-A', 'CD11b:APC-Cy7-A', 'CD11c-biot:Qdot 605-A', 'CD19:PE-Cy55-A', 'F4/80:FITC-A','IgD:APC-Cy5-5-A', 'IgM:PE-Cy7-A'};
 %         flowJoURI='all_3-3.fcs/Sing*/Live*@https://storage.googleapis.com/cytogenie.org/GetDown2/domains/FACS/demo/bCellMacrophageDiscovery/eliver3.wsp';
-%         MlpPython.Train(flowJoURI, 'flowjo_columns', columns, 'flowjo_ask', false, 'epochs', 210, 'class', .12, 'confirm_model', true);
+%         MlpPython.Train(flowJoURI, 'flowjo_columns', columns, 'flowjo_ask', false, 'bouts', 210, 'class', .12, 'confirm_model', true);
 %           
 %         This next command uses the trained MLP model to classify a
 %         separate sample for a RAG mouse strain which is genetically
@@ -145,8 +145,8 @@ properties(Constant)
 
         function p=DefineArgsForTrain
             p = Mlp.DefineArgsForTrain;
-            addParameter(p, 'epochs', 200, ... %25 seems fine for most flow cytometry so far
-                @(x)Args.IsNumber(x,'epochs', 10, 200000));
+            addParameter(p, 'bouts', 200, ... %25 seems fine for most flow cytometry so far
+                @(x)Args.IsNumber(x,'bouts', 10, 200000));
             addParameter(p, 'wait', true, @islogical);
         end
 
@@ -203,7 +203,7 @@ properties(Constant)
 %                           to confirm the model file name.
 %                           Default is true.
 %
-%  'epochs'                 The # of epochs to run for training.
+%  'bouts'                 The # of bouts to run for training.
 %                           Default is 200.
 %           
 %  'wait'                   true/false to wait for model to complete.
@@ -276,7 +276,7 @@ properties(Constant)
                 args.model_file, args.confirm_model, ...
                 true, true, true, args.class_limit, ...
                 args.props, args.property, ...
-                args.model_default_folder, args.epochs);
+                args.model_default_folder, args.bouts);
             if isempty(csvFile) || isempty(modelFileName)
                 if closePu
                     args.pu.close;
@@ -324,14 +324,14 @@ properties(Constant)
             modelArg=String.ToSystem(modelFileName);
             fullCmd=[cmdline ' ' pythonScript ' ' pathArg...
                 ' ' modelArg ...
-                ' --epochs ' num2str(args.epochs)];
+                ' --bouts ' num2str(args.bouts)];
             fldr=fileparts(csvFile);
                 terminalName=['  >>> Training MLP via '...
                     'Python TensorFlow ' ];
             script=fullfile(fldr, 'mlp.cmd');
             args.pu.stop;
-            args.pu.setText2([num2str(args.epochs) ...
-                ' epochs for:'...
+            args.pu.setText2([num2str(args.bouts) ...
+                ' bouts for:'...
                 Html.FileTree(modelFileName)])
             x=tic;
             [status, stdout]=File.Spawn(fullCmd, script,  ...

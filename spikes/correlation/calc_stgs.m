@@ -300,7 +300,7 @@ end
 % spikes.cluID = [1 : length(mea.spktimes)];
 % 
 % mono_res = ce_MonoSynConvClick(spikes,...
-%     'includeInhibitoryConnections', true, 'epoch', [0 4 * 60 * 60]);
+%     'includeInhibitoryConnections', true, 'bout', [0 4 * 60 * 60]);
 % 
 % basepath = pwd;
 % [~, basename] = fileparts(basepath);

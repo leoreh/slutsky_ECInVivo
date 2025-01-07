@@ -118,7 +118,7 @@ emgOutliers = emg_rms' > prctile(emg_rms, prctEmg);
 % organize and save
 artifacts.boolean = specOutliers & emgOutliers;
 artifacts.idx = find(artifacts.boolean);
-artifacts.epochs = binary2epochs('vec', artifacts.boolean, 'minDur', [], 'maxDur', [],...
+artifacts.bouts = binary2bouts('vec', artifacts.boolean, 'minDur', [], 'maxDur', [],...
     'interDur', [], 'exclude', false, 'printFlag', false);
 artifacts.tstamps = minutes(seconds(artifacts.idx));
 artifacts.info.flgCalc = flgCalc;

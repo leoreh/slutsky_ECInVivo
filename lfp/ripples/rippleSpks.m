@@ -63,8 +63,8 @@ v = getSessionVars('basepaths', {basepath}, 'varsFile', varsFile,...
 % params
 fsSpk       = v.session.extracellular.sr;
 fs          = ripp.info.fs;
-epochs      = ripp.epochs;
-nepochs     = size(epochs, 1);
+bouts      = ripp.bouts;
+nbouts     = size(bouts, 1);
 nbinsMap    = size(ripp.maps.freq, 2);
 durWin      = [-75 75] / 1000;
 recWin      = ripp.info.recWin;
@@ -81,34 +81,34 @@ ripp.spks = [];
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% create non-ripple epochs for baseline comparison
+% create non-ripple bouts for baseline comparison
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% get recording epochs without ripples, including confidance margin
-nonRipp = SubtractIntervals([recWin(1), recWin(2)], epochs + durWin);        
+% get recording bouts without ripples, including confidance margin
+nonRipp = SubtractIntervals([recWin(1), recWin(2)], bouts + durWin);        
 
-% make sure these epochs are long enough
+% make sure these bouts are long enough
 durIdx = diff(nonRipp') < sum(abs(durWin));
 nonRipp(durIdx, :) = [];
 
 % create timestamps without ripples
 randTimes = Restrict([tbins], nonRipp);
 
-% make sure the number of non-ripple epochs is at least as nepochs. If not
+% make sure the number of non-ripple bouts is at least as nbouts. If not
 % that most definitely means there was a problem with the detection
-if length(randTimes) < nepochs
+if length(randTimes) < nbouts
     error('Check ripple detection')
 end
 
-% select a random subset of non-ripples epochs
-randIdx = randperm(length(randTimes), nepochs);
+% select a random subset of non-ripples bouts
+randIdx = randperm(length(randTimes), nbouts);
 
-% take the center of non-ripple epochs as the "peak position"
+% take the center of non-ripple bouts as the "peak position"
 randPos = sort(randTimes(randIdx));
 
 % make sure this worked
-if ~all(Restrict(randPos, nonRipp)) || any(InIntervals(nonRipp, epochs))
-    error('finding non-ripples epochs failed')
+if ~all(Restrict(randPos, nonRipp)) || any(InIntervals(nonRipp, bouts))
+    error('finding non-ripples bouts failed')
 end
 
 
@@ -125,10 +125,10 @@ if ~isempty(v.spktimes)
         % find all spikes from all tetrodes that occured during each
         % ripple. save their absolute timestamp (relative to the recording)
         % and relative timestamps (to the ripples start)
-        for iepoch = 1 : nepochs
-            ripp.spks.mu.rippAbs{iepoch} = muSpks(muSpks < epochs(iepoch, 2) &...
-                muSpks > epochs(iepoch, 1));
-            ripp.spks.mu.rippRel{iepoch} = ripp.spks.mu.rippAbs{iepoch} - epochs(iepoch, 1);
+        for ibout = 1 : nbouts
+            ripp.spks.mu.rippAbs{ibout} = muSpks(muSpks < bouts(ibout, 2) &...
+                muSpks > bouts(ibout, 1));
+            ripp.spks.mu.rippRel{ibout} = ripp.spks.mu.rippAbs{ibout} - bouts(ibout, 1);
         end
 
         % find the mu spike rate per ripple by dividing the total number of
@@ -167,10 +167,10 @@ if ~isempty(v.spikes)
 
     if fullAnalysisFlag
         spks.su = bz_getRipSpikes('basepath', basepath,...
-            'events', epochs, 'spikes', v.spikes, 'saveMat', false);
+            'events', bouts, 'spikes', v.spikes, 'saveMat', false);
 
-        ripp.spks.su.rippMap = zeros(nunits, nepochs, nbinsMap);
-        ripp.spks.su.randMap = zeros(nunits, nepochs, nbinsMap);
+        ripp.spks.su.rippMap = zeros(nunits, nbouts, nbinsMap);
+        ripp.spks.su.randMap = zeros(nunits, nbouts, nbinsMap);
         for iunit = 1 : nunits
             nspksRipp = cellfun(@length, spks.su.UnitEventAbs(iunit, :),...
                 'uni', true);

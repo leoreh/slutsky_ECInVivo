@@ -30,17 +30,17 @@ classdef StochasticGradientDescent < handle
         end
         
         function [out, cmdOut]=Go(inFile, outFile, head_embedding, ...
-                tail_embedding,head, tail, n_epochs, n_vertices, ...
-                epochs_per_sample, a, b, gamma, initial_alpha, ...
+                tail_embedding,head, tail, n_bouts, n_vertices, ...
+                bouts_per_sample, a, b, gamma, initial_alpha, ...
                 negative_sample_rate, rand, dataDims, progress_callback)
             hasCallback=isequal('function_handle', class(progress_callback));
             if ~exist('head_embedding', 'var') || isempty(head_embedding) ...
                || ~exist('tail_embedding', 'var') || isempty(tail_embedding) ...
                || ~exist('head', 'var') || isempty(head) ...
                || ~exist('tail', 'var') || isempty(tail) ...
-               || ~exist('n_epochs', 'var') || isempty(n_epochs) ...
+               || ~exist('n_bouts', 'var') || isempty(n_bouts) ...
                || ~exist('n_vertices', 'var') || isempty(n_vertices) ...
-               || ~exist('epochs_per_sample', 'var') || isempty(epochs_per_sample) ...
+               || ~exist('bouts_per_sample', 'var') || isempty(bouts_per_sample) ...
                || ~exist('n_vertices', 'var') || isempty(n_vertices) ...
                || ~exist('a', 'var') || isempty(a) ...
                || ~exist('b', 'var') || isempty(b) ...
@@ -52,15 +52,15 @@ classdef StochasticGradientDescent < handle
                     error('Not enough input parameters');
             end 
             StochasticGradientDescent.WriteText(inFile, head_embedding, ...
-                tail_embedding,head, tail, n_epochs, ...
-                n_vertices, epochs_per_sample, a, b, gamma, ...
+                tail_embedding,head, tail, n_bouts, ...
+                n_vertices, bouts_per_sample, a, b, gamma, ...
                 initial_alpha, negative_sample_rate);
             cmd=[ StochasticGradientDescent.GetCmd ' ' ...
                 String.ToSystem(inFile) ' ' ...
                 String.ToSystem(outFile) ' ' num2str(rand) ' 1'];
             fileSpec=[outFile '.*'];
-            progressObj.getEpochsDone=1;
-            progressObj.getEpochsToDo=n_epochs;
+            progressObj.getBoutsDone=1;
+            progressObj.getBoutsToDo=n_bouts;
             progressObj.getEmbedding=head_embedding;
             delete(fileSpec);
             if hasCallback
@@ -70,7 +70,7 @@ classdef StochasticGradientDescent < handle
                     return;
                 end
             else
-                fprintf('0/%d epochs done\n', n_epochs);
+                fprintf('0/%d bouts done\n', n_bouts);
             end
             if ismac 
                 cmd=[cmd ' &'];
@@ -98,7 +98,7 @@ classdef StochasticGradientDescent < handle
             if ~hasCallback
                 pu=PopUp(Html.WrapC...
                     (['Finding data islands (' ...
-                    num2str(n_epochs) ' epochs)<hr><br>' sizeDsc...
+                    num2str(n_bouts) ' bouts)<hr><br>' sizeDsc...
                     '(<i>Click cancel to halt C++ executable</i>)...']), ...
                     'center', 'Stochastic gradient descent',  ...
                     false, true);
@@ -111,16 +111,16 @@ classdef StochasticGradientDescent < handle
                 if ~isempty(allFiles)
                     allFiles=sortStructs(allFiles, 'datenum', 'descend');
                     fl=allFiles(1);
-                    [~,~, epochs]=fileparts(fl.name);
-                    progressObj.getEpochsDone=str2double(epochs(2:end));
-                    epochFile=fullfile(fl.folder, fl.name);
+                    [~,~, bouts]=fileparts(fl.name);
+                    progressObj.getBoutsDone=str2double(bouts(2:end));
+                    boutFile=fullfile(fl.folder, fl.name);
                     if hasCallback
                         progressObj.getEmbedding=...
-                            StochasticGradientDescent.ReadEmbedding(epochFile);
+                            StochasticGradientDescent.ReadEmbedding(boutFile);
                         ok=feval(progress_callback, progressObj);
                     else
-                        fprintf('%d/%d epochs done\n', ...
-                            progressObj.getEpochsDone, n_epochs);
+                        fprintf('%d/%d bouts done\n', ...
+                            progressObj.getBoutsDone, n_bouts);
                         drawnow;
                         ok=~pu.cancelled;
                     end
@@ -153,11 +153,11 @@ classdef StochasticGradientDescent < handle
             if exist(outFile, 'file')
                 out=StochasticGradientDescent.GetResult(outFile, inFile);
                 if hasCallback
-                    progressObj.getEpochsDone=n_epochs+1;
+                    progressObj.getBoutsDone=n_bouts+1;
                     progressObj.getEmbedding=out;
                     feval(progress_callback, progressObj);
                 else
-                    fprintf('%d/%d epochs done\n', n_epochs, n_epochs);
+                    fprintf('%d/%d bouts done\n', n_bouts, n_bouts);
                 end
             else
                 out=[];
@@ -188,8 +188,8 @@ classdef StochasticGradientDescent < handle
         end
         
         
-        function WriteText(inFile, head_embedding, tail_embedding,head, tail, n_epochs, ...
-            n_vertices, epochs_per_sample, a, b, gamma, ...
+        function WriteText(inFile, head_embedding, tail_embedding,head, tail, n_bouts, ...
+            n_vertices, bouts_per_sample, a, b, gamma, ...
             initial_alpha, negative_sample_rate)
             h = fopen(inFile, 'wb');
             
@@ -212,17 +212,17 @@ classdef StochasticGradientDescent < handle
             fprintf(h, "%d\n", d(1));
             fprintf(h, "%d\n", tail);
             
-            d=size(n_epochs);
+            d=size(n_bouts);
             fprintf(h, "%d\n", d(1));
-            fprintf(h, "%d\n", n_epochs);
+            fprintf(h, "%d\n", n_bouts);
             
             d=size(n_vertices);
             fprintf(h, "%d\n", d(1));
             fprintf(h, "%d\n", n_vertices);
             
-            d=size(epochs_per_sample);
+            d=size(bouts_per_sample);
             fprintf(h, "%d\n", d(1));
-            fprintf(h, "%f\n", epochs_per_sample);
+            fprintf(h, "%f\n", bouts_per_sample);
             
             d=size(a);
             fprintf(h, "%d\n", d(1));
@@ -247,8 +247,8 @@ classdef StochasticGradientDescent < handle
             fclose(h);
         end
         
-        function [head_embedding, tail_embedding,head, tail, n_epochs, ...
-            n_vertices, epochs_per_sample, a, b, gamma, ...
+        function [head_embedding, tail_embedding,head, tail, n_bouts, ...
+            n_vertices, bouts_per_sample, a, b, gamma, ...
             initial_alpha, negative_sample_rate, randis] = ReadText(outFile)
             h = fopen(outFile, 'rb');
             
@@ -267,13 +267,13 @@ classdef StochasticGradientDescent < handle
             tail = fscanf(h, "%f\n", d);
             
             d = fscanf(h, "%d\n", 1);  
-            n_epochs = fscanf(h, "%f\n", d);
+            n_bouts = fscanf(h, "%f\n", d);
             
             d = fscanf(h, "%d\n", 1);  
             n_vertices = fscanf(h, "%f\n", d);
             
             d = fscanf(h, "%d\n", 1);  
-            epochs_per_sample = fscanf(h, "%f\n", d);
+            bouts_per_sample = fscanf(h, "%f\n", d);
             
             d = fscanf(h, "%d\n", 1);  
             a = fscanf(h, "%f\n", d);

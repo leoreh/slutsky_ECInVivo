@@ -24,19 +24,19 @@ for ifile = 1 : nfiles
     [~, basename] = fileparts(basepath);
     cd(basepath)
 
-    % get state epochs from psd
-    stateEpochs = v(ifile).psd.epochs.stateEpochs;
-    %     stateEpochs = v(ifile).ss.stateEpochs(sstates);
+    % get state bouts from psd
+    boutTimes = v(ifile).psd.bouts.boutTimes;
+    %     boutTimes = v(ifile).ss.boutTimes(sstates);
 
-    % get mfr per epoch
+    % get mfr per bout
     fr = calc_fr(v(ifile).spikes.times, 'basepath', basepath,...
         'graphics', false, 'binsize', 60, 'saveVar', 'frEmg', 'forceA', true,...
         'smet', 'none', 'winBL', [0, Inf], 'winCalc', [0, Inf],...
-        'stateEpochs', stateEpochs);
+        'boutTimes', boutTimes);
 
     if graphics
         unitIdx = v(ifile).units.clean(iunit, :);
-        plot_fr_stateEpochs(fr(ifile), 'unitIdx', unitIdx,...
+        plot_fr_boutTimes(fr(ifile), 'unitIdx', unitIdx,...
             'sstates', sstates, 'saveFig', false)
     end
 
@@ -57,7 +57,7 @@ mname{2} = 'mcu_bsl';
 % mname{1} = 'wt_wsh';
 % mname{2} = 'mcu_wsh';
 
-clear epochGrp unitGrp
+clear boutGrp unitGrp
 for igrp = 1 : length(mname)
 
     % load data
@@ -66,27 +66,27 @@ for igrp = 1 : length(mname)
     nfiles = length(basepaths);
 
     % firing rate
-    clear unitCell epochCell
+    clear unitCell boutCell
     for ifile = 1 : nfiles
 
-        % get mfr across units per state epoch
+        % get mfr across units per state bout
         unitIdx = v(ifile).units.clean(iunit, :);
         tmp = cellfun(@(x) mean(x(unitIdx, :), 1)', v(ifile).fr.states.fr, 'uni', false);
         tmp = cell2padmat(tmp, 2);
-        epochCell{ifile} = tmp;
+        boutCell{ifile} = tmp;
 
-        % get mfr across state epochs per unit
+        % get mfr across state bouts per unit
         unitCell{ifile} = v(ifile).fr.states.mfr(unitIdx, :);        
         
     end
-    epochGrp{igrp} = cell2padmat(epochCell, 3);
+    boutGrp{igrp} = cell2padmat(boutCell, 3);
     unitGrp{igrp} = cell2padmat(unitCell, 3);
 
 end
-epochMat = cell2padmat(epochGrp, 4);
+boutMat = cell2padmat(boutGrp, 4);
 unitMat = cell2padmat(unitGrp, 4);
 
-% FRs per unit across epochs, all units
+% FRs per unit across bouts, all units
 clear prismGrp prismData
 for igrp = 1 : 2;
     tmp = squeeze(unitMat(:, :, :, igrp));
@@ -98,10 +98,10 @@ for igrp = 1 : 2;
 end
 prismData = cat(2, prismGrp{:});
 
-% MFR per epochs across units, all epochs
+% MFR per bouts across units, all bouts
 clear prismGrp
 for igrp = 1 : 2;
-    tmp = squeeze(epochMat(:, :, :, igrp));
+    tmp = squeeze(boutMat(:, :, :, igrp));
     prismData = reshape(permute(tmp, [1, 3, 2]), [], 3);
     nunits = sum(~isnan(prismData));
     prismGrp{igrp} = [mean(prismData, 'omitnan')',...
@@ -112,7 +112,7 @@ prismData = cat(2, prismGrp{:});
 
 % MFR per mouse
 igrp = 2;
-tmp = squeeze(epochMat(:, :, :, igrp));
+tmp = squeeze(boutMat(:, :, :, igrp));
 prismData = squeeze(mean(tmp, 1, 'omitnan'))
 
 % Normalize MFR per mouse to overall MFR
@@ -146,13 +146,14 @@ for ifile = 1 : nfiles
     cd(basepath)
 
 
-    [stateEpochs, epochStats] = as_epochs('minDur', minDur, 'interDur',...
+    bouts = as_bouts('minDur', minDur, 'interDur',...
         interDur, 'flgEmg', true, 'graphics', graphics, 'nbins', 2);
+    boutTimes = bouts.times;
     
     % calc psd according to emg state separation
     psd = psd_states('basepath', basepath, 'sstates', [1, 2],...
         'sig', [], 'fs', fs, 'saveVar', saveVar,...
         'graphics', true, 'forceA', true, 'ftarget', ftarget,...
-        'emgThr', [], 'flgEmg', true, 'stateEpochs', stateEpochs);
+        'emgThr', [], 'flgEmg', true, 'boutTimes', boutTimes);
 
 end

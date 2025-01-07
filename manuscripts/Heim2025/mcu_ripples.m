@@ -239,7 +239,7 @@ for iunit = 1 : 2
         xlim(eqLim)
         ylim(eqLim)
         ylabel('MFR during ripples')
-        xlabel('MFR during non-ripple epochs')
+        xlabel('MFR during non-ripple bouts')
         title(axh, 'spike gain')
     end
     ph.Color = 'r';

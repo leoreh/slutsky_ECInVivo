@@ -531,8 +531,8 @@ classdef UmapUtil < handle
                     flds=rmfield(argValue, 'type');
                 else
                     flds=argValue;
-                    if isfield(flds, 'epochs') || ...
-                            isfield(flds, 'Epochs')
+                    if isfield(flds, 'bouts') || ...
+                            isfield(flds, 'Bouts')
                         mlpType='TensorFlow';
                     else
                         mlpType='fitcnet';
@@ -567,7 +567,7 @@ classdef UmapUtil < handle
                     pythonLimit=200;
                 end
                 flds.type='tensorflow';
-                flds.epochs=pythonLimit;
+                flds.bouts=pythonLimit;
                     
             else
                 if nargin<2
@@ -608,7 +608,7 @@ classdef UmapUtil < handle
             addParameter(p,'set_op_mix_ratio', 1, @(x) isnumeric(x) && x>=0 && x<=1);
             addParameter(p,'metric',defaultMetric,@(x)validateCallback(x)...
                 || any(validatestring(x,expectedMetric)));
-            addParameter(p,'n_epochs',[], @(x) isnumeric(x) && x>4);
+            addParameter(p,'n_bouts',[], @(x) isnumeric(x) && x>4);
             addParameter(p,'target_weight', .5, @(x) isnumeric(x) && x>=0 && x<=1);
             
             addParameter(p,'verbose', 'graphic',...

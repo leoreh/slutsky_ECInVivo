@@ -61,8 +61,8 @@ sstates = [1 : 5];          % selected states
 % params
 fsSpk       = v.session.extracellular.sr;
 fs          = ripp.info.fs;
-epochs      = ripp.epochs;
-nepochs     = size(epochs, 1);
+bouts      = ripp.bouts;
+nbouts     = size(bouts, 1);
 recWin      = ripp.info.recWin;
 nbinsMap    = size(ripp.maps.freq, 2);
 durWin      = [-75 75] / 1000;
@@ -70,7 +70,7 @@ durWin      = [-75 75] / 1000;
 % initialize
 ripp.states = [];
 ripp.states.stateNames = ss.info.names;
-nstates = length(ss.stateEpochs);
+nstates = length(ss.boutTimes);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ripple during states
@@ -78,19 +78,19 @@ nstates = length(ss.stateEpochs);
 
 for istate = sstates
 
-    % limit state epochs to recWin
-    epochIdx = InIntervals(ss.stateEpochs{istate}, recWin);
-    if ~isempty(ss.stateEpochs{istate})
+    % limit state bouts to recWin
+    boutIdx = InIntervals(ss.boutTimes{istate}, recWin);
+    if ~isempty(ss.boutTimes{istate})
 
         % rate in states
         [ripp.states.rate{istate}, ripp.states.binedges{istate},...
             ripp.states.tstamps{istate}] =...
             times2rate(ripp.peakPos, 'binsize', ripp.info.binsizeRate,...
-            'winCalc', ss.stateEpochs{istate}(epochIdx, :), 'c2r', true);
+            'winCalc', ss.boutTimes{istate}(boutIdx, :), 'c2r', true);
 
         % idx of rippels in state
         ripp.states.idx{istate} =...
-            InIntervals(ripp.peakPos, ss.stateEpochs{istate}(epochIdx, :));
+            InIntervals(ripp.peakPos, ss.boutTimes{istate}(boutIdx, :));
     else
         ripp.states.idx{istate} = false(length(ripp.peakPos), 1);
         ripp.states.rate{istate} = nan;

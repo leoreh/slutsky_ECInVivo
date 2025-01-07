@@ -91,7 +91,7 @@ for ifld = 1 : length(flds)
     % if field consists of chars / strings, cat as cell 
     if all(cellfun(@(x) ischar(x) || isstring(x), fieldData))
         try
-            cats.(flds{ifld}) = cell2padmat(fieldData, dim)
+            cats.(flds{ifld}) = cell2padmat(fieldData, dim);
         catch
             cats.(flds{ifld}) = fieldData;
         end

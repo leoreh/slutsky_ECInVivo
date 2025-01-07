@@ -62,7 +62,7 @@ for ifile = 1 : nfiles
 
 
     % bins w/ respec to states
-    ss = v(ifile).ss.stateEpochs([1, 4]);
+    ss = v(ifile).ss.boutTimes([1, 4]);
     cnt = 1; clear bins
     for istate = 1 : 2
         bins{cnt} = ss{istate}(InIntervals(ss{istate}, timebins(1, :)), :);

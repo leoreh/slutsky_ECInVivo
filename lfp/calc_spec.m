@@ -30,7 +30,8 @@ function spec = calc_spec(varargin)
 %   padfft      numeric. zero pad chunks of the data to the next pow2
 %               when applying fft. 0 means yes -1 means no. see mtspecgramc.m
 %   winstep     numeric. determines the time resolution of the spectrogram.
-%               for accusleep should be equal to epoch length. {1} [sec]
+%               for accusleep should be equal to bout length. {1} [sec]
+%   window      numeric. smoothing window of the spectrogram.
 %   logfreq     logical. plot freq axis on logscale {false}. requires
 %               that ftarget be log-spaced
 %   force       logical. re-analyze even if spec file exists
@@ -59,6 +60,7 @@ function spec = calc_spec(varargin)
 % 18 apr 22         multichannel support
 % 26 apr 22         bands
 % 29 may 22         band through sum instead of mean
+% 30 dec 24         added window as input (for spec outlier detection)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -72,6 +74,7 @@ addParameter(p, 'fs', 1250, @isnumeric)
 addParameter(p, 'ftarget', [], @isnumeric)
 addParameter(p, 'padfft', 0, @isnumeric)
 addParameter(p, 'winstep', 5, @isnumeric)
+addParameter(p, 'window', [], @isnumeric)
 addParameter(p, 'logfreq', false, @islogical)
 addParameter(p, 'force', false, @islogical)
 addParameter(p, 'graphics', false, @islogical)
@@ -85,6 +88,7 @@ fs              = p.Results.fs;
 ftarget         = p.Results.ftarget;
 padfft          = p.Results.padfft;
 winstep         = p.Results.winstep;
+window          = p.Results.window;
 logfreq         = p.Results.logfreq;
 force           = p.Results.force;
 saveVar         = p.Results.saveVar;
@@ -125,7 +129,9 @@ if frange(2) > fs / 2
 end
 
 % chronux params
-window = max([5, winstep]);
+if isempty(window)
+    window = max([5, winstep]);
+end
 mtspec_params.pad = padfft;
 mtspec_params.Fs = fs;
 mtspec_params.fpass = frange;
@@ -134,10 +140,10 @@ mtspec_params.trialave = 1;
 mtspec_params.err = [0, 0];
 
 % organize channel groups
-spec.info.ch = ch;
 if isempty(ch)
     ch = {1};
 end
+spec.info.ch = ch;
 ngrp = length(ch);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

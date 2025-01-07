@@ -1,5 +1,5 @@
 function embedding = optimize_layout(head_embedding, tail_embedding, ...
-    head, tail, n_epochs, n_vertices, epochs_per_sample, a, b, ...
+    head, tail, n_bouts, n_vertices, bouts_per_sample, a, b, ...
     gamma, initial_alpha, negative_sample_rate, verbose)
 %OPTIMIZE_LAYOUT Improve an embedding using stochastic gradient descent to
 % minimize the fuzzy set cross entropy between the 1-skeletons of the high
@@ -9,7 +9,7 @@ function embedding = optimize_layout(head_embedding, tail_embedding, ...
 % function is only called if the UMAP method is 'MATLAB'.
 %
 % embedding = OPTIMIZE_LAYOUT(head_embedding, tail_embedding, head, tail,
-% n_epochs, n_vertices, epochs_per_sample, a, b)
+% n_bouts, n_vertices, bouts_per_sample, a, b)
 %
 % Parameters
 % ----------
@@ -28,15 +28,15 @@ function embedding = optimize_layout(head_embedding, tail_embedding, ...
 % tail: array of size (n_1_simplices, 1)
 %     The indices of the tails of 1-simplices with non-zero membership.
 % 
-% n_epochs: double
-%     The number of training epochs to use in optimization.
+% n_bouts: double
+%     The number of training bouts to use in optimization.
 % 
 % n_vertices: double
 %     The number of vertices (0-simplices) in the dataset.
 % 
-% epochs_per_samples: array of size (n_1_simplices, 1)
-%     A double value of the number of epochs per 1-simplex. 1-simplices with
-%     weaker membership strength will have more epochs between being sampled.
+% bouts_per_samples: array of size (n_1_simplices, 1)
+%     A double value of the number of bouts per 1-simplex. 1-simplices with
+%     weaker membership strength will have more bouts between being sampled.
 % 
 % a: double
 %     Parameter of differentiable approximation of right adjoint functor.
@@ -84,7 +84,7 @@ function embedding = optimize_layout(head_embedding, tail_embedding, ...
     end
     
     dim = size(head_embedding, 2);
-    n_1_simplices = size(epochs_per_sample, 1);
+    n_1_simplices = size(bouts_per_sample, 1);
     same_embedding = isequal(head_embedding, tail_embedding);
     alpha = initial_alpha;
     ONES=ones(1, dim);
@@ -93,15 +93,15 @@ function embedding = optimize_layout(head_embedding, tail_embedding, ...
     ABNEG2=-2.0*a*b;
     BNEG1=b-1;
     
-    epochs_per_negative_sample = epochs_per_sample / single(negative_sample_rate);
-    epoch_of_next_negative_sample = epochs_per_negative_sample;
-    epoch_of_next_sample = epochs_per_sample;
+    bouts_per_negative_sample = bouts_per_sample / single(negative_sample_rate);
+    bout_of_next_negative_sample = bouts_per_negative_sample;
+    bout_of_next_sample = bouts_per_sample;
     if verbose
-        fprintf('\t0/%d epochs done\n', int32(n_epochs));
+        fprintf('\t0/%d bouts done\n', int32(n_bouts));
     end
-    for n = 1:n_epochs
+    for n = 1:n_bouts
         for i = 1:n_1_simplices 
-            if epoch_of_next_sample(i) <= n
+            if bout_of_next_sample(i) <= n
                 j = head(i);
                 k = tail(i);
 
@@ -116,9 +116,9 @@ function embedding = optimize_layout(head_embedding, tail_embedding, ...
                 grad= max(-4, min(4, grad_coeff .* (current - other)));
                 current = current + grad * alpha;
 
-                epoch_of_next_sample(i) = epoch_of_next_sample(i) + epochs_per_sample(i);
+                bout_of_next_sample(i) = bout_of_next_sample(i) + bouts_per_sample(i);
 
-                n_neg_samples = floor((single(n) - epoch_of_next_negative_sample(i)) / epochs_per_negative_sample(i));
+                n_neg_samples = floor((single(n) - bout_of_next_negative_sample(i)) / bouts_per_negative_sample(i));
                 
                 if same_embedding
                     other = other - grad * alpha;
@@ -148,16 +148,16 @@ function embedding = optimize_layout(head_embedding, tail_embedding, ...
                     tail_embedding(j,:) = current;
                 end
 
-                epoch_of_next_negative_sample(i) = epoch_of_next_negative_sample(i)+(n_neg_samples * epochs_per_negative_sample(i));
+                bout_of_next_negative_sample(i) = bout_of_next_negative_sample(i)+(n_neg_samples * bouts_per_negative_sample(i));
             end
 
         end
-        alpha = initial_alpha * (1 - single(n)/single(n_epochs));
+        alpha = initial_alpha * (1 - single(n)/single(n_bouts));
         
-        progress_checkpoint = min(floor(n_epochs / 10), 50);
+        progress_checkpoint = min(floor(n_bouts / 10), 50);
         
         if verbose && mod(n, progress_checkpoint) == 0
-            fprintf('\t%d/%d epochs done\n', int32(n), int32(n_epochs));
+            fprintf('\t%d/%d bouts done\n', int32(n), int32(n_bouts));
         end
     end
     

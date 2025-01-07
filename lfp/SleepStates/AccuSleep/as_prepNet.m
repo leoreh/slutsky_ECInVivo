@@ -102,10 +102,10 @@ end
 % train
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-cntxEpochs = 51;
+cntxBouts = 51;
 
 tic
-[net, netInfo] = AccuSleep_train(basepaths, cntxEpochs);
+[net, netInfo] = AccuSleep_train(basepaths, cntxBouts);
 netInfo.trainingTime = toc / 60;
 
 % labels duration
@@ -118,7 +118,7 @@ for ipath = 1 : length(basepaths)
 end
  
 netInfo.cfg = cfg;
-netInfo.cntxEpochs = cntxEpochs;
+netInfo.cntxBouts = cntxBouts;
 netInfo.files = basepaths;
 netpath = 'D:\Code\slutsky_ECInVivo\lfp\SleepStates\AccuSleep\trainedNetworks';
 netname = ['net_',  datestr(datetime, 'yymmdd_HHMMss')]; 
@@ -151,7 +151,7 @@ cfg.names = {'WAKE'; 'QWAKE'; 'NREM'; 'REM'; 'BIN'};
 
 % general
 cfg.fs = 1250;
-cfg.epochLen = 1;
+cfg.boutLen = 1;
 cfg.minBoutLen = 0;
 cfg.nstates = length(cfg.names) - 1; 
 
@@ -189,7 +189,7 @@ cfg.names = {'WAKE'; 'QWAKE'; 'LSLEEP'; 'NREM'; 'REM'; 'N/REM'; 'BIN'};
 
 % general
 cfg.fs = 1250;
-cfg.epochLen = 1;
+cfg.boutLen = 1;
 cfg.minBoutLen = 0;
 cfg.nstates = length(cfg.names) - 1; 
 
@@ -217,7 +217,7 @@ cfg.names = {'High-EMG'; 'Low-EMG'; 'BIN'};
 
 % general
 cfg.fs = 1250;
-cfg.epochLen = 1;
+cfg.boutLen = 1;
 cfg.minBoutLen = 0;
 cfg.nstates = length(cfg.names) - 1; 
 

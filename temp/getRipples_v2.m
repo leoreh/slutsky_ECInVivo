@@ -2,7 +2,7 @@ function ripp = getRipples(varargin)
 
 % Detects ripples from lfp: rectifies (squares) the signal, applies a
 % moving average, standardizes, finds crossings of a threshold
-%(in z-scores) and converts them to epochs by applying duration criterions.
+%(in z-scores) and converts them to bouts by applying duration criterions.
 % Alas, discards ripples with a low peak power. After detection, calculates
 % various stats and plots a summary. based in part on
 % bz_FindRipples but.
@@ -30,7 +30,7 @@ function ripp = getRipples(varargin)
 %   ripp            struct
 %
 % DEPENDENCIES:
-%   binary2epochs
+%   binary2bouts
 %   lfpFilter
 %   Sync (buzcode)
 %   SyncMap (buzcode)
@@ -140,7 +140,7 @@ if isempty(sig)
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% find and exclude epochs of high movement / active wake
+% find and exclude bouts of high movement / active wake
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 ignore_idx = false(length(sig), 1);
@@ -148,7 +148,7 @@ mov_idx = false(length(sig), 1);
 wake_idx = false(length(sig), 1);
 
 % -------------------------------------------------------------------------
-% ALT 1: load emg data and find epochs of high activity
+% ALT 1: load emg data and find bouts of high activity
 % load emg data from basename.lfp
 if isempty(emg) && ~isempty(emgCh)
     emg = double(bz_LoadBinary([basename, '.lfp'], 'duration', diff(recWin),...
@@ -172,9 +172,9 @@ if lenDiff ~= 0
     end
 end
 
-% find epochs of high activity
+% find bouts of high activity
 if ~isempty(emg)
-    fprintf('finding epochs of high activity...\n')   
+    fprintf('finding bouts of high activity...\n')   
     emg_rms = fastrms(emg, 15);
     mov_idx = emg_rms > prctile(emg_rms, 80);    
 end
@@ -187,10 +187,10 @@ if exist(ssfile)
     wake_stateIdx = find(strcmp(cfg_names, 'WAKE'));
     
 
-    wake_inInt = InIntervals(ss.stateEpochs{wake_stateIdx}, recWin);
-    wake_epochs = ss.stateEpochs{wake_stateIdx}(wake_inInt, :) * fs;  
-    for iwake = 1 : size(wake_epochs, 1)
-        wake_idx(wake_epochs(iwake, 1) : wake_epochs(iwake, 2)) = true;
+    wake_inInt = InIntervals(ss.boutTimes{wake_stateIdx}, recWin);
+    wake_bouts = ss.boutTimes{wake_stateIdx}(wake_inInt, :) * fs;  
+    for iwake = 1 : size(wake_bouts, 1)
+        wake_idx(wake_bouts(iwake, 1) : wake_bouts(iwake, 2)) = true;
     end
 end
 ignore_idx = wake_idx | mov_idx;
@@ -239,18 +239,18 @@ end
 % find ripples
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% find epochs with power > low threshold. correct for durations
+% find bouts with power > low threshold. correct for durations
 limDur = limDur / 1000 * fs;
-epochs = binary2epochs('vec', nss > thr(1), 'minDur', limDur(1),...
+bouts = binary2bouts('vec', nss > thr(1), 'minDur', limDur(1),...
     'maxDur', limDur(2), 'interDur', limDur(3));
 
 % discard ripples with a peak power < high threshold
-peakPowNorm = zeros(size(epochs, 1), 1);
-for iepoch = 1 : size(epochs, 1)
-    peakPowNorm(iepoch) = max(nss(epochs(iepoch, 1) : epochs(iepoch, 2)));
+peakPowNorm = zeros(size(bouts, 1), 1);
+for ibout = 1 : size(bouts, 1)
+    peakPowNorm(ibout) = max(nss(bouts(ibout, 1) : bouts(ibout, 2)));
 end
 dicard_idx = peakPowNorm < thr(2);
-epochs(dicard_idx, :) = [];
+bouts(dicard_idx, :) = [];
 peakPowNorm(dicard_idx) = [];
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -258,18 +258,18 @@ peakPowNorm(dicard_idx) = [];
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % find negative peak position for each ripple
-peakPos = zeros(size(epochs, 1), 1);
-peakPow = zeros(size(epochs, 1), 1);
-for iepoch = 1 : size(epochs, 1)
-    [peakPow(iepoch), peakPos(iepoch)] =...
-        min(sig_filt(epochs(iepoch, 1) : epochs(iepoch, 2)));
-    peakPos(iepoch) = peakPos(iepoch) + epochs(iepoch, 1) - 1;
+peakPos = zeros(size(bouts, 1), 1);
+peakPow = zeros(size(bouts, 1), 1);
+for ibout = 1 : size(bouts, 1)
+    [peakPow(ibout), peakPos(ibout)] =...
+        min(sig_filt(bouts(ibout, 1) : bouts(ibout, 2)));
+    peakPos(ibout) = peakPos(ibout) + bouts(ibout, 1) - 1;
 end
 
 % convert idx to seconds
-nepochs = size(epochs, 1);
+nbouts = size(bouts, 1);
 peakPos = peakPos / fs;
-epochs = epochs / fs;
+bouts = bouts / fs;
 
 % instantaneous phase and amplitude
 h = hilbert(sig_filt);
@@ -304,7 +304,7 @@ ripp.maps.amp = SyncMap(p, i,'durations', ripp.maps.durWin, 'nbins', nbins, 'smo
 ripp.maxFreq = max(ripp.maps.freq, [], 2);
 ripp.peakFreq = ripp.maps.freq(:, centerBin);
 ripp.peakAmp = ripp.maps.amp(:, centerBin);
-ripp.dur = epochs(:, 2) - epochs(:, 1);
+ripp.dur = bouts(:, 2) - bouts(:, 1);
 
 % acg and correlations
 [ripp.acg.data, ripp.acg.t] = CCG(peakPos,...
@@ -325,21 +325,21 @@ if exist(ssfile)
     [cfg_colors, ~, ~] = as_loadConfig([]);
 
     ripp.states.stateNames = ss.labelNames;
-    nstates = length(ss.stateEpochs);
+    nstates = length(ss.boutTimes);
     sstates = [1 : 5];  % selected states
     
     for istate = sstates
-        epochIdx = InIntervals(ss.stateEpochs{istate}, recWin);
-        if ~isempty(ss.stateEpochs{istate})
+        boutIdx = InIntervals(ss.boutTimes{istate}, recWin);
+        if ~isempty(ss.boutTimes{istate})
             % rate in states
             [ripp.states.rate{istate}, ripp.states.binedges{istate},...
                 ripp.states.tstamps{istate}] =...
                 times2rate(peakPos, 'binsize', binsizeRate,...
-                'winCalc', ss.stateEpochs{istate}(epochIdx, :), 'c2r', true);
+                'winCalc', ss.boutTimes{istate}(boutIdx, :), 'c2r', true);
             
             % idx of rippels in state
             ripp.states.idx{istate} =...
-                InIntervals(peakPos, ss.stateEpochs{istate}(epochIdx, :));
+                InIntervals(peakPos, ss.boutTimes{istate}(boutIdx, :));
         end
     end
 end
@@ -351,7 +351,7 @@ end
 if graphics
     fh = figure;
     durPlot = [-50 50] / 1000;
-    x = durPlot(1) : diff(durPlot) / nepochs : durPlot(2);
+    x = durPlot(1) : diff(durPlot) / nbouts : durPlot(2);
     histBins = 200;
     
     % examples on raw and filtered data
@@ -366,15 +366,15 @@ if graphics
     plot(idx_rec / fs, sig_filt(idx_rec), 'm')
     yLimit = ylim;
     plot([peakPos(rippSelect), peakPos(rippSelect)], yLimit, 'b')
-    plot([epochs(rippSelect, 1), epochs(rippSelect, 1)], yLimit, 'g')
-    plot([epochs(rippSelect, 2), epochs(rippSelect, 2)], yLimit, 'r')
+    plot([bouts(rippSelect, 1), bouts(rippSelect, 1)], yLimit, 'g')
+    plot([bouts(rippSelect, 2), bouts(rippSelect, 2)], yLimit, 'r')
     xlim([peakPos(rippCenter) - 0.5, peakPos(rippCenter) + 0.5])
     legend('Raw LFP', 'Filtered')
     xlabel('Time [s]')
     
     % examples of ripples (filtered) superimposed
     sb3 = subplot(4, 3, 3);
-    ripp_idx = randperm(nepochs, 1000);
+    ripp_idx = randperm(nbouts, 1000);
     plot(((1 : nbins)' - ceil(nbins / 2)) / nbins * diff(durPlot),...
         ripp.maps.ripp(ripp_idx, :)', 'k');
     xlabel('Time [s]')
@@ -464,7 +464,7 @@ ripp.info.limDur = limDur;
 ripp.info.recWin = recWin;
 ripp.info.runtime = datetime(now, 'ConvertFrom', 'datenum');
 ripp.info.thr = thr;
-ripp.epochs         = epochs + recWin(1);  
+ripp.bouts         = bouts + recWin(1);  
 ripp.peakPos        = peakPos;
 ripp.peakPow        = peakPow;
 ripp.peakPowNorm    = peakPowNorm;
@@ -475,13 +475,13 @@ if saveVar
     % create ns files for visualization with neuroscope
     fs_dat = session.extracellular.sr;
     
-    res = [ripp.epochs(:, 1); ripp.epochs(:, 2); ripp.peakPos] * fs_dat;
+    res = [ripp.bouts(:, 1); ripp.bouts(:, 2); ripp.peakPos] * fs_dat;
     [res, sort_idx] = sort(round(res));
     fid = fopen([basename, '.ripp.res.1'], 'w');
     fprintf(fid, '%d\n', res);
     rc = fclose(fid);
    
-    clu = [ones(nepochs, 1); ones(nepochs, 1) * 2; ones(nepochs, 1) * 3];
+    clu = [ones(nbouts, 1); ones(nbouts, 1) * 2; ones(nbouts, 1) * 3];
     clu = clu(sort_idx);
     fid = fopen([basename, '.ripp.clu.1'], 'w');
     fprintf(fid, '%d\n', 3);

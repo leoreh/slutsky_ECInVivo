@@ -158,7 +158,7 @@ elseif (lower(method) == 'wavelet')
     intervals = SubtractIntervals(intervals,below_thresh);  % subtract out low power intervals
 end
 minWidth = (samplingRate./passband(2)) * 2;
-intervals = intervals(diff(intervals')>minWidth./samplingRate,:); % only keep min width epochs
+intervals = intervals(diff(intervals')>minWidth./samplingRate,:); % only keep min width bouts
 
 
 %% Get phases for each spike for each cell

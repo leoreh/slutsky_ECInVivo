@@ -1,4 +1,4 @@
-function [message] = AccuSleep_viewer(sSig, userLabels, savepath, flgEmg)
+function [message] = AccuSleep_viewer(sSig, userLabels, savepath, cfg)
 
 %AccuSleep_viewer A GUI for manually assigning sleep stage labels to EEG/EMG data.
 %   Zeke Barger 021321
@@ -6,11 +6,11 @@ function [message] = AccuSleep_viewer(sSig, userLabels, savepath, flgEmg)
 %   EEG: the EEG signal as a vector
 %   EMG: the EMG signal as a vector
 %   SR: the sampling rate for the EEG and EMG in Hz
-%   epochLen: the desired epoch length for sleep stage labels, in seconds.
+%   boutLen: the desired bout length for sleep stage labels, in seconds.
 %             Values below 2.5 are not supported, and values above 5 are not
 %             recommended.
 %   labels (optional): a vector of sleep stage labels. The length
-%             must match the number of epochs in the EEG/EMG signal.
+%             must match the number of bouts in the EEG/EMG signal.
 %             1 = REM, 2 = wake, 3 = NREM, <# of states>+1 = undefined
 %   savepath (optional): a filename for saving the sleep stage labels.
 %             AccuSleep_GUI uses this argument, but if you are calling this
@@ -23,7 +23,7 @@ function [message] = AccuSleep_viewer(sSig, userLabels, savepath, flgEmg)
 %
 %   Likewise, labels can be loaded from a .mat file as long as it contains
 %   a variable called 'labels' that is a vector with the same number of
-%   epochs as the EEG/EMG signals and values ranging from 1 to <# states>+1
+%   bouts as the EEG/EMG signals and values ranging from 1 to <# states>+1
 
 % set graphics to default
 setMatlabGraphics(true)
@@ -32,12 +32,10 @@ setMatlabGraphics(true)
 G = struct; % holds everything
 
 % load cfg data
-if nargin == 4
-    cfg = as_loadConfig('flgEmg', flgEmg);
-else
+if nargin < 4
     cfg = as_loadConfig();
 end
-epochLen = cfg.epochLen;
+boutLen = cfg.boutLen;
 
 G.cfg = cfg;
 G.nstates = length(cfg.names);
@@ -72,7 +70,7 @@ end
 SR = sSig.fs;
 G.originalSR = SR; % EEG/EMG sampling rate
 G.SR = SR; % sampling rate used when calculating spectrogram and processed EMG
-G.epochLen  = epochLen; % length of one epoch (spectrogram column) in seconds
+G.boutLen  = boutLen; % length of one bout (spectrogram column) in seconds
 
 if length(sSig.eeg) ~= length(sSig.emg)
     message = 'ERROR: EEG and EMG are different lengths';
@@ -113,7 +111,7 @@ G.unsavedChanges = 0; % whether anything has changed since user last saved
 if ~isempty(G.labels)
     if length(G.labels) ~= G.nbins
         disp(['length of labels must be ',num2str(G.nbins),' for this recording'])
-        message = 'ERROR: Length of labels file does not match EEG/EMG. Check SR / epoch length?';
+        message = 'ERROR: Length of labels file does not match EEG/EMG. Check SR / bout length?';
         return
     end
 else % if no sleep stages provided, set to undefined
@@ -122,7 +120,7 @@ end
 
 % get spectrogram and time axes
 showFreqs = find(fAxis <= 15); % only show frequencies under 30 Hz ----> changed to 15 (lh 19 apr 21)
-G.specTs = (1:G.nbins)*G.epochLen - G.epochLen/2; % spectrogram time axis, in seconds
+G.specTs = (1:G.nbins)*G.boutLen - G.boutLen/2; % spectrogram time axis, in seconds
 G.specTh = G.specTs./3600; % spectrogram time axis, in hours
 G.spectrogram = spec(:,showFreqs); % our EEG spectrogram
 if nargin == 6 % this probably only happens when called by AccuSleep_GUI
@@ -250,7 +248,7 @@ G.gui_shiftdownEMG = uicontrol(WIN,'Style','pushbutton','Units','normalized',...
     'FontSize',9);
 G.showMenu = uicontrol(WIN,'Style','popupmenu','Units','normalized',...
     'Position',[0.93 0.54 0.062 0.02],'Callback', @fct_showmenu,...
-    'String',{'Show 1 epoch','Show 3 epochs','Show 5 epochs','Show 7 epochs','Show 9 epochs'},...
+    'String',{'Show 1 bout','Show 3 bouts','Show 5 bouts','Show 7 bouts','Show 9 bouts'},...
     'Value',3);
 G.rangebtn = uicontrol(WIN,'Style','pushbutton','Units','normalized','BackgroundColor',[.92 .92 .92],...
     'Position',[.93 .16 .062 .025],'String','set range','Callback',@setRange,...
@@ -299,7 +297,7 @@ set(G.A4,'XTick',[],'YTick',[],'box','off',...
 
 % Upper sleep stages
 box(G.A1, 'on');
-xlim(G.A1,[G.specTh(1)-G.epochLen/3600, G.specTh(end)-G.epochLen/3600]);
+xlim(G.A1,[G.specTh(1)-G.boutLen/3600, G.specTh(end)-G.boutLen/3600]);
 updateState;
 
 % Plot everything else
@@ -318,11 +316,11 @@ message = 'Data loaded successfully';
         gi = G.index; % index of bin in the center of the screen
         if G.index < G.mid
             gi = G.mid;
-            tp = gi*G.epochLen-G.epochLen/2;
+            tp = gi*G.boutLen-G.boutLen/2;
         end
         if G.nbins - G.index < (G.mid-1)
             gi = G.nbins-(G.mid-1);
-            tp = gi*G.epochLen-G.epochLen/2;
+            tp = gi*G.boutLen-G.boutLen/2;
         end
         
         seq=G.labels((1:G.show)+gi-G.mid+(G.mid-gi)*(gi<G.mid)-...
@@ -351,7 +349,7 @@ message = 'Data loaded successfully';
         box(G.A7, 'off');
         
         % plot EEG and EMG
-        n = round((G.show*G.epochLen)/G.dt/2); % number of samples on either side to show
+        n = round((G.show*G.boutLen)/G.dt/2); % number of samples on either side to show
         i = round(tp / G.dt);
         ii = i-n:i+n; % choose indices to show
         t = tp-n*G.dt:G.dt:tp+n*G.dt;
@@ -365,11 +363,11 @@ message = 'Data loaded successfully';
         set(G.A6, 'XLimMode','manual', 'YLimMode','manual');
         line(G.A6,t, G.EMG(ii), 'Color','k', 'LineWidth', 1); % plot EMG
         % plot indicator for current time bin
-        line(G.A6,ones(1,2).*(G.timepointS-G.epochLen/2), [G.emgYlim(1),...
+        line(G.A6,ones(1,2).*(G.timepointS-G.boutLen/2), [G.emgYlim(1),...
             G.emgYlim(1)+.1*diff(G.emgYlim)],'Color','r','LineWidth', .5);
-        line(G.A6,ones(1,2).*(G.timepointS+G.epochLen/2), [G.emgYlim(1),...
+        line(G.A6,ones(1,2).*(G.timepointS+G.boutLen/2), [G.emgYlim(1),...
             G.emgYlim(1)+.1*diff(G.emgYlim)],'Color','r', 'LineWidth', .5);
-        line(G.A6,[G.timepointS-G.epochLen/2, G.timepointS+G.epochLen/2], [G.emgYlim(1) G.emgYlim(1)],...
+        line(G.A6,[G.timepointS-G.boutLen/2, G.timepointS+G.boutLen/2], [G.emgYlim(1) G.emgYlim(1)],...
             'Color','r', 'LineWidth', .5);
         
         
@@ -379,16 +377,16 @@ message = 'Data loaded successfully';
         ylim(G.A6a,G.eegYlim);
         set(G.A6a, 'XLimMode','manual', 'YLimMode','manual');
         line(G.A6a,t, G.EEG(ii), 'Color','k', 'LineWidth', 1); % plot eeg
-        line(G.A6a,ones(1,2).*(G.timepointS-G.epochLen/2), [G.eegYlim(2),...
+        line(G.A6a,ones(1,2).*(G.timepointS-G.boutLen/2), [G.eegYlim(2),...
             G.eegYlim(2)-.1*diff(G.eegYlim)],'Color','r', 'LineWidth', .5);
-        line(G.A6a,ones(1,2).*(G.timepointS+G.epochLen/2), [G.eegYlim(2),...
+        line(G.A6a,ones(1,2).*(G.timepointS+G.boutLen/2), [G.eegYlim(2),...
             G.eegYlim(2)-.1*diff(G.eegYlim)],'Color','r', 'LineWidth', .5);
-        line(G.A6a,[G.timepointS-G.epochLen/2, G.timepointS+G.epochLen/2], [G.eegYlim(2) G.eegYlim(2)],...
+        line(G.A6a,[G.timepointS-G.boutLen/2, G.timepointS+G.boutLen/2], [G.eegYlim(2) G.eegYlim(2)],...
             'Color','r', 'LineWidth', .5);
         set(G.A6a,'XTick',[]); % -------- lh 23 apr 21
         
         % label x axis nicely
-        G.A6.XTick = tp-(G.show/2)*G.epochLen + G.epochLen*(0:G.show);
+        G.A6.XTick = tp-(G.show/2)*G.boutLen + G.boutLen*(0:G.show);
         ticks = G.A6.XTick;
         xlbl = cell(1, length(ticks));
         for i = 1:length(ticks)
@@ -400,10 +398,10 @@ message = 'Data loaded successfully';
         % Plot Progress Button
         tp = G.timepointH; % time in seconds at the center of the screen
         if G.index < G.mid
-            tp = gi*G.epochLen/3600-G.epochLen/3600/2;
+            tp = gi*G.boutLen/3600-G.boutLen/3600/2;
         end
         if G.nbins - G.index < (G.mid-1)
-            tp = gi*G.epochLen/3600-G.epochLen/3600/2;
+            tp = gi*G.boutLen/3600-G.boutLen/3600/2;
         end
         li = get(G.A2,'xlim');
         cla(G.A2);
@@ -415,14 +413,14 @@ message = 'Data loaded successfully';
         if G.index < G.mid  || G.nbins - G.index < (G.mid-1)
             plot(G.A2,G.timepointH, 0.5, 'rd', 'LineWidth', 3,'MarkerFaceColor','r');
             if G.index <= (G.mid-1)
-                plot(G.A2,[0, G.epochLen/3600*G.show], [0.5,0.5], 'r','LineWidth',2);
+                plot(G.A2,[0, G.boutLen/3600*G.show], [0.5,0.5], 'r','LineWidth',2);
             else
-                plot(G.A2,[G.specTh(end-G.show)+G.epochLen/3600/2, G.specTh(end)+G.epochLen/3600/2],...
+                plot(G.A2,[G.specTh(end-G.show)+G.boutLen/3600/2, G.specTh(end)+G.boutLen/3600/2],...
                     [0.5,0.5], 'r','LineWidth',2);
             end
         else
             plot(G.A2,G.timepointH, 0.5, 'rd', 'LineWidth', 3,'MarkerFaceColor','r');
-            line(G.A2,[tp-G.epochLen/3600*(G.show/2),tp+G.epochLen/3600*(G.show/2)], [0.5,0.5],...
+            line(G.A2,[tp-G.boutLen/3600*(G.show/2),tp+G.boutLen/3600*(G.show/2)], [0.5,0.5],...
                 'Color','r','LineWidth',2);
         end
         
@@ -572,7 +570,7 @@ message = 'Data loaded successfully';
                 xl = xlim(G.A1);
                 d = diff(xl);
                 roi = imrect(G.A1,[xl(1)+d/2 - d/24,-4.0287,d/12,4.9080]);
-                rectPosition = round(wait(roi)./(G.epochLen/3600));
+                rectPosition = round(wait(roi)./(G.boutLen/3600));
                 roi.delete();
                 set(G.A1,'Clipping','on')
                 if isempty(rectPosition)

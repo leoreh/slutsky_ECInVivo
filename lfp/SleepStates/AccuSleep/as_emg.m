@@ -1,22 +1,22 @@
 function ssEmg = as_emg(varargin)
 
-% recieves (or loads) an emg_rms signal (from sSig) and creates a labels_orig
-% vector from the bimodal distribution. Then creates stateEpochs and saves
-% in a new ss struct. Can manually review the labels_orig in accusleep.
+% recieves (or loads) an emg_rms signal (from sSig) and creates a labelsOrig
+% vector from the bimodal distribution. Then creates bouts and saves
+% in a new ss struct. Can manually review the labels in accusleep.
 %
 % INPUT:
 %   basepath        char. fullpath to recording folder {pwd}
-%   minDur          numeric. minimum duration of an epoch. 
+%   minDur          numeric. minimum duration of a bout. 
 %                   if length(minDur) == nstates than a different minimum
 %                   duration will be applied to each state
-%   interDur        numeric. combine epochs separated by <= interDur
+%   interDur        numeric. combine bouts separated by <= interDur
 %   saveVar         logical. save ss var {true}
-%   inspectLabels   logical. manually review classification 
+%   flgInspct       logical. manually review classification 
 % 
 % OUTPUT
 %
 % DEPENDENCIES
-%   as_epochs
+%   as_bouts
 % 
 % TO DO LIST
 %
@@ -31,22 +31,21 @@ addParameter(p, 'basepath', pwd, @ischar)
 addOptional(p, 'minDur', 5, @isnumeric);
 addOptional(p, 'interDur', 4, @isnumeric);
 addOptional(p, 'saveVar', true, @islogical);
-addOptional(p, 'inspectLabels', false, @islogical);
+addOptional(p, 'flgInspct', false, @islogical);
 
 parse(p, varargin{:})
 basepath        = p.Results.basepath;
 minDur          = p.Results.minDur;
 interDur        = p.Results.interDur;
 saveVar         = p.Results.saveVar;
-inspectLabels   = p.Results.inspectLabels;
+flgInspct       = p.Results.flgInspct;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preparations
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % files
-basepath = pwd;
-[~, basename] = fileparts(pwd);
+[~, basename] = fileparts(basepath);
 sigfile = fullfile(basepath, [basename, '.sleep_sig.mat']);
 statesfile = [basename '.sleep_statesEmg.mat'];
 
@@ -56,42 +55,27 @@ snames = cfg.names;
 clr = cfg.colors;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% load data and create labels_orig
+% load data and create labelsOrig
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % emg data
-% emg = load(sigfile, 'emg_rms');
-sSig = load(sigfile);
-emg = sSig.emg_rms;
+load(sigfile, 'emg_rms');
 
 % find threshold to separate the bimodal distribution of emg
-[~, cents] = kmeans(emg(:), 2);
+[~, cents] = kmeans(emg_rms(:), 2);
 emgThr = mean(cents);
 
-% create EMG labels_orig
-labels_orig = double(emg > emgThr);
-labels_orig(emg < emgThr) = 2;
-
+% create EMG labelsOrig
+labels = double(emg_rms > emgThr);
+labels(emg_rms < emgThr) = 2;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% create state epochs
+% create state bouts
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-[stateEpochs, epochStats] = as_epochs('labels', labels_orig,...
-    'minDur', minDur, 'interDur', interDur, 'rmOtl', true,...
+bouts = as_bouts('labels', labels,...
+    'minDur', minDur, 'interDur', interDur, 'flgOtl', true,...
     'sstates', [1, 2], 'graphics', false);
-
-% reverse engineer labels_orig such that low-emg gets precedence
-labels = ones(1, length(labels_orig)) * 3;
-
-for stateIdx = 1 : 2
-    % Create an array of indices for each epoch and set the labels_orig
-    labelsIdx = cellfun(@(x) arrayfun(@(start, stop) start : stop, x(:,1), x(:,2), 'uni', false), ...
-                  stateEpochs(stateIdx), 'uni', false);
-    labelsIdx = horzcat(labelsIdx{:});
-    labels(horzcat(labelsIdx{:})) = stateIdx;
-end
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % create and save struct 
@@ -99,19 +83,14 @@ end
 
 ssEmg.info.names = cfg.names;
 ssEmg.info.colors = cfg.colors;
-ssEmg.info.epochLen = cfg.epochLen;
+ssEmg.info.boutLen = cfg.boutLen;
 ssEmg.info.minBoutLen = cfg.minBoutLen;
-ssEmg.info.sSig = sSig.info;
 ssEmg.info.emgThr = emgThr;
 ssEmg.info.minDur = minDur;
 ssEmg.info.interDur = interDur;
 ssEmg.info.runtime = datetime("now");
-ssEmg.labels = labels;
-ssEmg.labels_orig = labels_orig;
-ssEmg.stateEpochs = stateEpochs;
-ssEmg.epLen = epochStats.epLen;
-ssEmg.nepochs = epochStats.nepochs;
-ssEmg.totDur = epochStats.totDur;
+ssEmg.labels = bouts.labels;
+ssEmg.bouts = bouts;
 
 if saveVar
     save(statesfile, 'ssEmg')
@@ -121,10 +100,13 @@ end
 % manual inspection 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% sSig = load(sigfile);
-if inspectLabels
-    labels_origmanfile = [basename, '.sleep_labels_origManEmg.mat'];
-    AccuSleep_viewer(sSig, labels, labels_origmanfile, true)
+if flgInspct
+    sSig = load(sigfile);
+    fname_labels = [basename, '.sleep_labelsManEmg.mat'];
+    
+    labels = bouts.labelsOrig;
+    AccuSleep_viewer(sSig, labels, fname_labels, cfg)
+ 
 end
 
 

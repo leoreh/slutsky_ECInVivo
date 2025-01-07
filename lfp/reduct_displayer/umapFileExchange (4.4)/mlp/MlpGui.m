@@ -115,16 +115,16 @@ classdef MlpGui < handle
                     limitArgName='IterationLimit';
                 else
                     python=true;
-                    limitArgName='epochs';
+                    limitArgName='bouts';
                     
                 end
                 limitArgValue=str2double(char(jtfLimit.getText));
                 mp.set(propIter, num2str(limitArgValue));
             end
             function setLimitTensorflow
-                jlLimit.setText(Html.WrapSmallBold('Epochs limit:'));
-                jlLimit.setToolTipText('The TensorFlow epochs setting');
-                propIter='MlpPython.epochs';
+                jlLimit.setText(Html.WrapSmallBold('Bouts limit:'));
+                jlLimit.setToolTipText('The TensorFlow bouts setting');
+                propIter='MlpPython.bouts';
                 jtfLimit.setText(mp.get(propIter, '51'));
                 pnlHoldOut.setVisible(false);
             end

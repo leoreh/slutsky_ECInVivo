@@ -5,7 +5,7 @@ function s = spklfp_wrapper(varargin)
 %   winCalc     cell array of n x 2 mats of intervals.
 %               metrices will be calculated for each cell by limiting
 %               spktimes to the intervals. can be for example
-%               ss.stateEpochs. must be the same units as spikes.times
+%               ss.boutTimes. must be the same units as spikes.times
 %               (e.g. [s])
 %   ch          numeric. lfp channels to load. can be a vector for averaging
 %   frange      2 x n mat of frequency bands to analyze

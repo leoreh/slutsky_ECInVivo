@@ -1,7 +1,7 @@
-function plot_fr_stateEpochs(fr, varargin)
+function plot_fr_boutTimes(fr, varargin)
 
-% plots state-dependent firing rates per epoch across units and per unit
-% across epochs
+% plots state-dependent firing rates per bout across units and per unit
+% across bouts
 
 % INPUT
 %   fr              struct. see calc_fr.m
@@ -49,8 +49,8 @@ if isempty(unitIdx)
 end
 
 % prep data
-epochMat = cellfun(@(x) mean(x(unitIdx, :), 1)', fr.states.fr, 'uni', false);
-epochMat = cell2padmat(epochMat, 2);
+boutMat = cellfun(@(x) mean(x(unitIdx, :), 1)', fr.states.fr, 'uni', false);
+boutMat = cell2padmat(boutMat, 2);
 unitMat = fr.states.mfr;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -65,32 +65,32 @@ th = tiledlayout(tlayout(1), tlayout(2));
 th.TileSpacing = 'tight';
 th.Padding = 'none';
 
-% comparison of epoch MFR between states
+% comparison of bout MFR between states
 axh = nexttile(th, 1, [1, 1]); cla; hold on
-plot_boxMean('dataMat', epochMat, 'allpnts', true, 'axh', axh,...
+plot_boxMean('dataMat', boutMat, 'allpnts', true, 'axh', axh,...
     'plotType', 'bar', 'clr', vertcat(clr{:}))
 ylim(yLimit_fr)
 xticklabels(snames)
-ylabel('Epoch MFR [Hz]')
-title(axh, 'All epochs')
+ylabel('Bout MFR [Hz]')
+title(axh, 'All bouts')
 title(th, basename, 'Interpreter', 'none')
 
-% comparison of epoch MFR between states, subsampled to the number of units
+% comparison of bout MFR between states, subsampled to the number of units
 axh = nexttile(th, 2, [1, 1]); cla; hold on
 clear tmp
 tmp = cell(length(sstates), 1);
 for istate = 1 : length(sstates)
-    nepochs = sum(~isnan(epochMat(:, istate)));
-    subIdx = randperm(nepochs, min([sum(unitIdx), nepochs]));
-    tmp{istate} = epochMat(subIdx, istate);
+    nbouts = sum(~isnan(boutMat(:, istate)));
+    subIdx = randperm(nbouts, min([sum(unitIdx), nbouts]));
+    tmp{istate} = boutMat(subIdx, istate);
 end
 tmp = cell2padmat(tmp, 2);
 plot_boxMean('dataMat', tmp, 'allpnts', true, 'axh', axh,...
     'plotType', 'bar', 'clr', vertcat(clr{:}))
 ylim(yLimit_fr)
 xticklabels(snames)
-ylabel('Epoch MFR [Hz]')
-title(axh, 'Random subset of epochs')
+ylabel('Bout MFR [Hz]')
+title(axh, 'Random subset of bouts')
 
 % comparison of unit MFR between states
 axh = nexttile(th, 3, [1, 1]);
@@ -102,11 +102,11 @@ xticklabels(snames)
 ylabel('SU MFR [Hz]')
 title(axh, 'Single Unit MFR')
 
-% MFR per state epoch across time
+% MFR per state bout across time
 axh = nexttile(th, 4, [1, 2]); cla; hold on
 for istate = 1 : length(sstates)
     tstamps = fr.states.tstamps{istate} / 60 / 60;
-    yval = epochMat(:, istate);
+    yval = boutMat(:, istate);
     yval(isnan(yval)) = [];
     scatter(tstamps, yval, 30, 'filled', 'MarkerFaceColor', clr{istate})
     xlabel('Time [h]')
@@ -114,16 +114,16 @@ for istate = 1 : length(sstates)
     legend(snames)
 end
 ylim(yLimit_fr)
-title(axh, 'Epoch MFR across time')
+title(axh, 'Bout MFR across time')
 
-% correlation between epoch dur and mfr
+% correlation between bout dur and mfr
 axh = nexttile(th, 6, [1, 1]); cla; hold on
 for istate = 1 : length(sstates)
-    epochDur = cellfun(@(x) diff(x), fr.states.binedges{istate}, 'uni', true);
-    yval = epochMat(:, istate);
+    boutDur = cellfun(@(x) diff(x), fr.states.binedges{istate}, 'uni', true);
+    yval = boutMat(:, istate);
     yval(isnan(yval)) = [];
-    scatter(epochDur, yval, 30, 'filled', 'MarkerFaceColor', clr{istate})
-    xlabel('Epoch Duration [s]')
+    scatter(boutDur, yval, 30, 'filled', 'MarkerFaceColor', clr{istate})
+    xlabel('Bout Duration [s]')
     ylabel('MFR [Hz]')
     set(gca, 'xscale', 'log')
 end

@@ -37,10 +37,10 @@ function [ripDetect , ripCount] = TL_ripDetect_v4(filtLFP , unfiltLFP , emgData 
 % LFP and spike data were analyzed in these different wake and sleep states.
 % SWRs (marked in red in Fig. 2A) were detected as follows: The three electrodes,
 % per hemisphere, with the largest amplitude ripple activity were included in the LFP analysis.
-% The z-scored LFP signal of each electrode during ìslow-wave sleep or quiet wakefulnessî (SWS/QW)
+% The z-scored LFP signal of each electrode during ‚Äúslow-wave sleep or quiet wakefulness‚Äù (SWS/QW)
 % periods was denoised for 60-Hz electrical noise and its 180-Hz harmonic using a second-order IIR
 % notch filter. Denoised LFP during SWS/QW periods was filtered in ripple frequency range
-% (100ñ250?Hz) with a fifth-order Butterworth band-pass filter.
+% (100‚Äì250?Hz) with a fifth-order Butterworth band-pass filter.
 % The envelopes of each band-passed LFP trace were the absolute value of its Hilbert transform.
 % These envelopes were averaged over the three electrodes/hemisphere and smoothed with Gaussian
 % 5-ms standard deviation (SD) smoother. Each event for which the envelope amplitude exceeds
@@ -69,18 +69,18 @@ function [ripDetect , ripCount] = TL_ripDetect_v4(filtLFP , unfiltLFP , emgData 
 % with MUA bursts were excluded from subsequent analysis.
 
 % Roux..Buzsaki et al 2017
-% The root-mean-square (RMS) of the bandpass-filtered (80ñ250-Hz) signal
+% The root-mean-square (RMS) of the bandpass-filtered (80‚Äì250-Hz) signal
 % was computed in two running windows, long (2 s; RMS1) and short (8 ms; RMS2).
-% Ripples were defined as events with RMS2 exceeding 3™ RMS1 (range: 3ñ3.5) for at least 8 ms
+% Ripples were defined as events with RMS2 exceeding 3¬™ RMS1 (range: 3‚Äì3.5) for at least 8 ms
 % (ref. 31).
 
 % Norimoto et al 2018
-% The root mean square (RMS) of the bandpass filtered (140ñ250 Hz) signal was
+% The root mean square (RMS) of the bandpass filtered (140‚Äì250 Hz) signal was
 % computed in two running windows, long (2 s; RMS1) and short (8 ms; RMS2). Ripples
-% were defined as events with an RMS2 exceeding 4™RMS1 for at least 8 ms
+% were defined as events with an RMS2 exceeding 4¬™RMS1 for at least 8 ms
 
 % Varela & Wilson 2020
-% The SWR detection algorithm detected times when the squared, filtered LFP (100ñ275 Hz)
+% The SWR detection algorithm detected times when the squared, filtered LFP (100‚Äì275 Hz)
 % had an amplitude above the mean plus three standard deviations for at least 20 ms (mean
 % and standard deviation calculated for the LFP when the animal was quiet). If two SWRs were closer than 20
 % ms they were considered a single ripple event. The SWR timestamp was selected as the time with
@@ -90,10 +90,10 @@ function [ripDetect , ripCount] = TL_ripDetect_v4(filtLFP , unfiltLFP , emgData 
 % LFP and spike data were analyzed in these different wake and sleep states.
 % SWRs (marked in red in Fig. 2A) were detected as follows: The three electrodes,
 % per hemisphere, with the largest amplitude ripple activity were included in the LFP analysis.
-% The z-scored LFP signal of each electrode during ìslow-wave sleep or quiet wakefulnessî (SWS/QW)
+% The z-scored LFP signal of each electrode during ‚Äúslow-wave sleep or quiet wakefulness‚Äù (SWS/QW)
 % periods was denoised for 60-Hz electrical noise and its 180-Hz harmonic using a second-order IIR
 % notch filter. Denoised LFP during SWS/QW periods was filtered in ripple frequency range
-% (100ñ250?Hz) with a fifth-order Butterworth band-pass filter.
+% (100‚Äì250?Hz) with a fifth-order Butterworth band-pass filter.
 % The envelopes of each band-passed LFP trace were the absolute value of its Hilbert transform.
 % These envelopes were averaged over the three electrodes/hemisphere and smoothed with Gaussian
 % 5-ms standard deviation (SD) smoother. Each event for which the envelope amplitude exceeds
@@ -126,7 +126,7 @@ function [ripDetect , ripCount] = TL_ripDetect_v4(filtLFP , unfiltLFP , emgData 
 % One electrode from each tetrode that had at least one cluster was considered for EEG analysis.
 % EEG signal of each electrode was denoised for 60 Hz electric noise and its 180 Hz harmonic
 % using a second-order IIR notch filter. Denoised EEG was filtered at ripple frequency range
-% (100ñ240 Hz) with a fifth-order Butterworth band-pass filter. The envelopes of each band-passed
+% (100‚Äì240 Hz) with a fifth-order Butterworth band-pass filter. The envelopes of each band-passed
 % EEG were obtained using the absolute value of its Hilbert transform and these envelopes were
 % averaged over all electrodes. After applying a Gaussian smoother with 5 ms standard deviation,
 % the averaged envelope was z-scored. Events that passed 5 standard deviations
@@ -135,7 +135,7 @@ function [ripDetect , ripCount] = TL_ripDetect_v4(filtLFP , unfiltLFP , emgData 
 % The beginning and end of each ripple were considered as where the smoothed envelope
 % crossed its mean value (i.e., zero for z-scored signal). Ripples events that happened
 % when mice were not immobilized were excluded. Mice were considered as immobilized when
-% their head speed was below 0.5 cm/s. Ripple power was obtained by applying Welchís method
+% their head speed was below 0.5 cm/s. Ripple power was obtained by applying Welch‚Äôs method
 % on each individual non-z-scored nonenveloped ripple and then averaging over calculated powers.
 
 % Cheng & Frank 2008

@@ -86,7 +86,7 @@ classdef FlowJoBridgeExamples<handle
                     case 11
                         Mlp.Predict(getEliverURI(2));
                     case 12
-                        MlpPython.Train(defaultEliverURI, mlpArgs{:}, 'epochs', 210, 'class', .12);
+                        MlpPython.Train(defaultEliverURI, mlpArgs{:}, 'bouts', 210, 'class', .12);
                     case 13
                         MlpPython.Predict(getEliverURI(4));
                     case 14

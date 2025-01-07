@@ -1,0 +1,310 @@
+function bouts = as_bouts(varargin)
+
+% recieves a labels vector and returns the state bouts. basically a
+% wrapper for binary2bouts with params adjusted for sleep scoring. can
+% separate the recording to timewins and calculate bouts for each time
+% bin, can apply duration thresholds, and remove spec outliers.
+%
+% INPUT:
+%   labels          numeric. see as_classify 
+%   minDur          numeric. minimum duration of an bout. 
+%                   if length(minDur) == nstates than a different minimum
+%                   duration will be applied to each state
+%   interDur        numeric. combine bouts separated by <= interDur
+%   sstates         numeric. values of labels for which bouts will be
+%                   calculated. default is 1 : nstates
+%   timewins        n x 2 numeric of time windows (indices to labels). 
+%                   bouts of each state will be calculated for each time
+%                   window separately. 
+%   nwins           numeric. if timewins not specified, will divide labels
+%                   to nwins timewins
+%   confMarg        2 x 1 numeric. confidance margin. for example, [1 2]
+%                   will change the bout [789 810] to [790 808]. 
+%                   this is to assure that the previous and next state do
+%                   not influence the current state
+%   flgOtl          logical. remove spectrogram outliers. see get_OtlSpec.m
+%   graphics        logical
+% 
+% OUTPUT
+%
+% DEPENDENCIES
+% 
+% TO DO LIST
+%
+% 12 jan 22 LH      updates:
+% 26 mar 24             flgOtl
+% 25 dec 25             separates flgEmg to as_emg
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% arguments
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+p = inputParser;
+addOptional(p, 'labels', [], @isnumeric);
+addOptional(p, 'minDur', [10, 5, 5, 10, 5, 5], @isnumeric);
+addOptional(p, 'interDur', 4, @isnumeric);
+addOptional(p, 'sstates', [], @isnumeric);
+addOptional(p, 'timewins', [], @isnumeric);
+addOptional(p, 'nwins', 1, @isnumeric);
+addOptional(p, 'confMarg', [], @isnumeric);
+addOptional(p, 'flgOtl', false, @islogical);
+addOptional(p, 'graphics', false, @islogical);
+
+parse(p, varargin{:})
+labels          = p.Results.labels;
+minDur          = p.Results.minDur;
+interDur        = p.Results.interDur;
+sstates         = p.Results.sstates;
+timewins        = p.Results.timewins;
+nwins           = p.Results.nwins;
+confMarg        = p.Results.confMarg;
+flgOtl          = p.Results.flgOtl;
+graphics        = p.Results.graphics;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% preparations
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% file
+basepath = pwd;
+[~, basename] = fileparts(pwd);
+sleepfile = fullfile(basepath, [basename, '.sleep_sig.mat']);
+
+% state params  
+cfg = as_loadConfig();
+clr = cfg.colors(sstates);
+snames = cfg.names(sstates);
+
+% selected states
+if isempty(sstates)
+    nstates = cfg.nstates;
+    sstates = 1 : nstates;
+else
+    nstates = length(sstates);
+end
+
+% validate duration thresholds
+if isscalar(minDur)
+    minDur = repmat(minDur, nstates, 1);
+elseif length(minDur) ~= nstates
+    error('minDur length is different than the number of states')
+end
+if isscalar(interDur)
+    interDur = repmat(interDur, nstates, 1);
+elseif length(interDur) ~= nstates
+    error('interDur length is different than the number of states')
+end
+
+% timewins 
+if isempty(timewins)
+    timewins = n2chunks('n', length(labels), 'nchunks', nwins);
+end
+nwins = size(timewins, 1);
+winlen = diff(timewins');
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% first calculation
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% bouts
+btimes = labels2bouts(labels, sstates, minDur, interDur, timewins);
+
+% save original before messing around
+btOrig = btimes;
+labelsOrig = labels;
+
+% labels
+% reverse engineer labels from bouts. merging can cause the same label to
+% be counted in >1 states. This assures each label is only counted once.
+
+% set the order by which states are converted. this determines precedence
+% (last overrides previous).
+if length(sstates) == 2
+    stateOrdr = [2, 1];
+elseif length(sstates) == 6
+    stateOrdr = [6, 3, 2, 5, 1, 4];
+else
+    stateOrdr = [1 : nstates];
+end
+
+labels = bouts2labels(btimes, 'cellOrdr', stateOrdr, 'nlabels', length(labelsOrig));
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% spectrogram outliers
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% remove spectrogram outliers from labels. this step benifits psd / spec
+% analysis but can distort vigilance states bout analysis
+
+otl = [];
+if flgOtl
+    
+    % get outliers
+    otl = get_otlSpec('basepath', pwd, 'saveVar', true,...
+        'flgForce', false, 'graphics', true);
+    
+    % subtract outlier bouts from state bouts 
+    for iwin = 1 : nwins
+        for istate = 1 : length(btOrig)
+            if ~isempty(btOrig{istate})
+                btimes{iwin, istate} = SubtractIntervals(btOrig{istate}, otl.bouts);
+
+                % re-apply min duration criterion
+                boutLen = btimes{iwin, istate}(:, 2) - btimes{iwin, istate}(:, 1);
+                badIdx = boutLen < minDur(istate);
+                btimes{iwin, istate}(badIdx, :) = [];
+            end
+        end
+    end
+
+    % mark outliers as 'bin' state in labels
+    labels(otl.boolean) = nstates + 1;
+
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% recalculate 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% this is necassary to ensure the bouts fits the label vector after it was
+% re-engineered and outliers were removed. min duration should be applied
+% but not merging (interDur) cause this can reintroduce outliers. because
+% min duration is applied, labels also needs to be recalculated
+
+% bouts
+btimes = labels2bouts(labels, sstates, minDur, [], timewins);
+
+% remove confindance margins. don't think this should be used.
+if ~isempty(confMarg)
+    funh = @(x) [x(:, 1) + confMarg(1) x(:, 2) - confMarg(2)];
+    btimes = cellfun(funh, btimes, 'uni', false);
+end
+
+% labels
+labels = bouts2labels(btimes, stateOrdr, nstates, labelsOrig, timewins);
+labels(otl.boolean) = nstates + 1;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% organize output
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% bout stats
+bouts.times = btimes;
+bouts.timesOrig = btOrig;
+bouts.labels = labels(:);
+bouts.labelsOrig = labelsOrig;
+bouts.boutLen = cellfun(@(x) (diff(x')'), btimes, 'uni', false);
+bouts.nbouts = cellfun(@length, bouts.boutLen);
+bouts.totDur = cellfun(@sum, bouts.boutLen);
+bouts.prctDur = bouts.totDur * 100 ./ winlen';
+bouts.info.confMarg = confMarg;
+bouts.info.otl = otl;
+bouts.info.timewins = timewins;
+bouts.info.calcTime = datetime("now");
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% graphics
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+if ~graphics
+    return
+end
+
+% open figure
+fh = figure;
+setMatlabGraphics(true)
+set(fh, 'WindowState','maximized');
+tlayout = [4, nstates];
+th = tiledlayout(tlayout(1), tlayout(2));
+th.TileSpacing = 'tight';
+th.Padding = 'none';
+title(th, basename, 'interpreter', 'none')
+
+% hypnogram
+axh = nexttile(th, 1, [1, nstates]); hold on; cla
+for istate = 1 : nstates
+    tmpBouts{istate} = cell2padmat(btimes(:, istate), 1);
+end
+plot_hypnogram('btimes', tmpBouts, 'clr', clr, 'axh', axh,...
+    'sstates', [1 : nstates])
+axis tight
+yLimit = ylim;
+if size(timewins, 1) > 1
+    plot([timewins(2 : end, 1), timewins(2 : end, 1)], yLimit, '--k')
+end
+xval = 3600 : 3600 : length(labels);
+xticks(xval)
+xticklabels(string(xval / 3600))
+xlabel('Time (hr)')
+
+% percent duration
+tilebias = nstates;
+for istate = 1 : nstates
+    axh = nexttile(th, istate + tilebias, [1, 1]); cla
+    dataMat = squeeze(bouts.prctDur(:, istate))';
+    plot_boxMean('dataMat', dataMat, 'clr', clr{istate},...
+        'plotType', 'bar', 'axh', axh, 'allpnts', true)
+    ylabel('Duration (%)')
+end
+
+% no. bouts
+tilebias = nstates * 2;
+for istate = 1 : nstates
+    axh = nexttile(th, istate + tilebias, [1, 1]); cla
+    dataMat = squeeze(bouts.nbouts(:, istate, :))';
+    plot_boxMean('dataMat', dataMat, 'clr', clr{istate},...
+        'plotType', 'bar', 'axh', axh, 'allpnts', true)
+    ylabel('No. Bouts')
+end
+
+% bout length
+tilebias = nstates * 3;
+for istate = 1 : nstates
+    axh = nexttile(th, istate + tilebias, [1, 1]); cla
+    dataMat = cell2padmat(bouts.boutLen(:, istate, :), 2);
+    plot_boxMean('dataMat', dataMat, 'clr', clr{istate},...
+        'plotType', 'bar', 'axh', axh, 'allpnts', false)
+    ylabel('Mean Bout Length (s)')
+end
+
+
+end
+
+% EOF
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% local functions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Converts state labels into bout intervals for each state and time window.
+function bt = labels2bouts(labels, sstates, minDur, interDur, timewins)
+
+nwins = size(timewins, 1);
+nstates = length(sstates);
+
+% Initialize bouts
+bt = cell(nwins, nstates);
+
+% Calculate bouts per state and time window
+for iwin = 1 : nwins
+    labels_win = labels(timewins(iwin, 1):timewins(iwin, 2));
+
+    for istate = 1 : nstates
+        binaryVec = zeros(length(labels_win), 1);
+        binaryVec(labels_win == sstates(istate)) = 1;
+        
+        % Calculate bouts using binary2bouts
+        if isempty(interDur)
+            bt{iwin, istate} = binary2bouts('vec', binaryVec, ...
+                'minDur', minDur(istate), 'maxDur', [], ...
+                'interDur', [], 'exclude', false, 'flgPrnt', false);
+        else
+            bt{iwin, istate} = binary2bouts('vec', binaryVec, ...
+                'minDur', minDur(istate), 'maxDur', [], ...
+                'interDur', interDur(istate), 'exclude', false, 'flgPrnt', false);
+        end
+
+        % Adjust indices to reflect global time
+        bt{iwin, istate} = bt{iwin, istate} + timewins(iwin, 1) - 1;
+    end
+end
+
+end

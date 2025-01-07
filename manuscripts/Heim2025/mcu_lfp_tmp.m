@@ -75,13 +75,13 @@ end
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% epoch stats
+% bout stats
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 grpnames{1} = ["lh96"; "lh107"; "lh122"; "lh142"; "lh100"; "lh99"];
 grpnames{2} = ["lh132"; "lh133"; "lh134"; "lh136"; "lh140"; "lh137"];
 
-% ALT 2 - epochs from labels w/o processing
+% ALT 2 - bouts from labels w/o processing
 sstates = [1, 4, 5];
 minDur = [10, 5, 5, 10, 5, 5];
 minDur = minDur(sstates);
@@ -91,7 +91,7 @@ clear grpStats
 for igrp = 1 : 2
     mnames = grpnames{igrp};
 
-    clear epochStats tmpStats mStats
+    clear boutStats tmpStats mStats
     for imouse = 1 : length(mnames)
         queryStr = mnames{imouse};
         basepaths = [mcu_sessions(queryStr)];
@@ -108,7 +108,7 @@ for igrp = 1 : 2
             'xlsname', xlsname);
         nfiles = length(basepaths);
 
-        % get epochs stats
+        % get bouts stats
         for ifile = 1 : nfiles
 
             % process labels
@@ -117,12 +117,12 @@ for igrp = 1 : 2
 %             labels(labels == 6) = 5;
 %             labels(labels == 2) = 1;
 
-            [~, tmpStats(imouse, ifile)] = as_epochs('labels', labels,...
+            [~, tmpStats(imouse, ifile)] = as_bouts('labels', labels,...
                 'minDur', minDur, 'interDur', interDur,...
                 'sstates', sstates, 'nbins', nbins, 'graphics', false);
         end
-        if isempty(tmpStats(imouse, 2).epLen)
-            tmpStats(imouse, 2).epLen = {};
+        if isempty(tmpStats(imouse, 2).boutLen)
+            tmpStats(imouse, 2).boutLen = {};
         end
         mStats(imouse) = catfields(tmpStats(imouse, :), 'addim', true);
     end
@@ -132,16 +132,16 @@ for igrp = 1 : 2
 
 end
 
-epochStats = catfields(grpStats, 3, true);
+boutStats = catfields(grpStats, 3, true);
 
 % to prism
 istate = 3;
-prismData = squeeze(epochStats.prctDur(:, istate, :, :));
+prismData = squeeze(boutStats.prctDur(:, istate, :, :));
 prismData = reshape(permute(prismData, [1, 3, 2]), nbins, []);
 
 ibin = 1;
 istate = 1;
-prismData = squeeze(epochStats.prctDur(ibin, istate, :, :));
+prismData = squeeze(boutStats.prctDur(ibin, istate, :, :));
 x = prismData([1, 2], :);
 x([1, 2], 7 : 12) = prismData([3, 4], :);
 
@@ -167,7 +167,7 @@ th.Padding = 'none';
 tilebias = 0;
 for istate = 1 : nstates
     axh = nexttile(th, istate + tilebias, [1, 1]); cla
-    dataMat = squeeze(epochStats.prctDur(:, istate, :));
+    dataMat = squeeze(boutStats.prctDur(:, istate, :));
     plot_boxMean('dataMat', dataMat, 'clr', clr{istate},...
         'plotType', 'bar', 'axh', axh, 'allpnts', true)
     ylabel('Duration (%)')
@@ -176,19 +176,19 @@ end
 tilebias = nstates;
 for istate = 1 : nstates
     axh = nexttile(th, istate + tilebias, [1, 1]); cla
-    dataMat = squeeze(epochStats.nepochs(:, istate, :));
+    dataMat = squeeze(boutStats.nbouts(:, istate, :));
     plot_boxMean('dataMat', dataMat, 'clr', clr{istate},...
         'plotType', 'bar', 'axh', axh, 'allpnts', true)
-    ylabel('No. Epochs')
+    ylabel('No. Bouts')
 end
 
 tilebias = nstates * 2;
 for istate = 1 : nstates
     axh = nexttile(th, istate + tilebias, [1, 1]); cla
-    dataMat = cellfun(@mean, squeeze(epochStats.epLen(:, istate, :)), 'uni', true);
+    dataMat = cellfun(@mean, squeeze(boutStats.boutLen(:, istate, :)), 'uni', true);
     plot_boxMean('dataMat', dataMat, 'clr', clr{istate},...
         'plotType', 'bar', 'axh', axh, 'allpnts', true)
-    ylabel('Mean Epoch Length (s)')
+    ylabel('Mean Bout Length (s)')
 end
 
 

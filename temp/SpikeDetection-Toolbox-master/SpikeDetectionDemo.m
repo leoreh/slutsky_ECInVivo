@@ -27,7 +27,7 @@ params.filter = 0;
 
 plot(t,s);
 hold on, plot(t(sppos),s(sppos),'*');
-ylabel ('Voltage in µV')
+ylabel ('Voltage in ÂµV')
 xlabel ( 'Time in s')
 hold off;
 

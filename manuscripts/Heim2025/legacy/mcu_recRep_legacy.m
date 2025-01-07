@@ -96,7 +96,7 @@ filename = fullfile(basepath, [basename, '.sleep_sig.mat']);
 load(filename, 'emg');
 load(filename, 'eeg');
 
-% re-calc state epochs for better visualization.
+% re-calc state bouts for better visualization.
 % LSLEEP => NREM; N/REM => REM
 minDur = [10, 5, 5, 10, 5, 5];
 minDur = 4;
@@ -104,8 +104,9 @@ interDur = 10;
 labels = v.ss.labels;
 labels(labels == 6) = 5;
 labels(labels == 3) = 4;
-[stateEpochs, ~] = as_epochs('labels', labels,...
+bouts = as_bouts('labels', labels,...
     'minDur', minDur, 'interDur', interDur);
+boutTimes = bouts.times;
 
 % subsample emg
 fs_emg = 250;
@@ -147,10 +148,10 @@ for ipanel = 1 : npanels
             fs = 1;
             for istate = 1 : length(sstates)
                 dummy(istate) = plot(NaN, NaN, 'color', cfg.colors{sstates(istate)}, 'LineWidth', 25);
-                winIdx = InIntervals(stateEpochs{sstates(istate)}, plotLim);
-                sepochs = stateEpochs{sstates(istate)}(winIdx, :);
-                if ~isempty(sepochs)
-                    plot(sepochs', 1 * ones(size(sepochs))',...
+                winIdx = InIntervals(boutTimes{sstates(istate)}, plotLim);
+                sbouts = boutTimes{sstates(istate)}(winIdx, :);
+                if ~isempty(sbouts)
+                    plot(sbouts', 1 * ones(size(sbouts))',...
                         'color', cfg.colors{sstates(istate)}, 'LineWidth', 25)
                 end
             end

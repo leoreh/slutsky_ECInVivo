@@ -14,7 +14,7 @@ labelsfile = [basename, '.AccuSleep_labels.mat'];
 labelsmanfile = [basename, '.AccuSleep_labelsMan.mat'];
 eegfile = [basename '.AccuSleep_EEG.mat'];
 emgfile = [basename '.AccuSleep_EMG.mat'];
-netfile = 'D:\Code\AccuSleep\trainedNetworks\trainedNetwork2,5secEpochs.mat';
+netfile = 'D:\Code\AccuSleep\trainedNetworks\trainedNetwork2,5secBouts.mat';
 netfile = 'D:\Code\slutskycode\extracellular in vivo\lfp\detectStates\AccuSleep\4states_2,5s_6hrLabels_net.mat';
 if ~exist(netfile)
     [netfile, netpath] = uigetfile;
@@ -34,40 +34,40 @@ recDur = session.general.duration;
 fsLfp = session.extracellular.srLfp;
 mousepath = fileparts(basepath);
 SR = 512;
-epochLen = 2.5;
-minBoutLen = epochLen;
+boutLen = 2.5;
+minBoutLen = boutLen;
 nstates = 4; 
 labelnames = {'REM', 'WAKE', 'NREM', 'DROWSY'};
-nepochs = length(gldstrd);
+nbouts = length(gldstrd);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % simulate
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % length of gldstrd labels used for creating the calibration data
-calLen = [100, 500, 1000, 5000, 10000, nepochs];
-calLen = nepochs;
+calLen = [100, 500, 1000, 5000, 10000, nbouts];
+calLen = nbouts;
 
 % initialize
-labelsOutput = zeros(length(calLen), nepochs);
-labelsCal = ones(length(calLen), nepochs) * 4;
+labelsOutput = zeros(length(calLen), nbouts);
+labelsCal = ones(length(calLen), nbouts) * 4;
 calibrationData = zeros(length(calLen), 177, 2);
 
 for j = 1 : length(calLen)
   
     % create calibration with a random subset of gldstrd values
-    labelidx = randperm(nepochs, calLen(j));    
+    labelidx = randperm(nbouts, calLen(j));    
     labelsCal(j, labelidx) = gldstrd(labelidx);
     calibrationData(j, :, :) = createCalibrationData(standardizeSR(EEG, SR, 128),...
-        standardizeSR(EMG, SR, 128), labelsCal(j, :), 128, epochLen);
+        standardizeSR(EMG, SR, 128), labelsCal(j, :), 128, boutLen);
     
     % classify    
-    labelsOutput(j, :) = AccuSleep_classify(EEG, EMG, net, SR, epochLen,...
+    labelsOutput(j, :) = AccuSleep_classify(EEG, EMG, net, SR, boutLen,...
         squeeze(calibrationData(j, :, :)), minBoutLen);   
 end
 
 % visualize data
-AccuSleep_viewer(EEG, EMG, SR, epochLen, labelsOutput(j, :), [])
+AccuSleep_viewer(EEG, EMG, SR, boutLen, labelsOutput(j, :), [])
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % inspect results
@@ -76,11 +76,11 @@ AccuSleep_viewer(EEG, EMG, SR, epochLen, labelsOutput(j, :), [])
 % initialize
 statesOutput = zeros(length(calLen), nstates, nstates);
 edges = [1 : nstates + 1];
-stateEpochs = histcounts(gldstrd);
+boutTimes = histcounts(gldstrd);
 for j = 1 : length(calLen)
     for jj = 1 : nstates        
         statesOutput(j, jj, :) = histcounts(labelsOutput(j, gldstrd == jj),...
-            edges) / stateEpochs(jj) * 100;
+            edges) / boutTimes(jj) * 100;
     end
 end
 

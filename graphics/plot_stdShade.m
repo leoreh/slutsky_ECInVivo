@@ -38,7 +38,8 @@ sData = std(dataMat, 0, 2, 'omitnan');
 validIdx = ~isnan(mData) & ~isnan(sData);
 mData = mData(validIdx);
 sData = sData(validIdx);
-xVal = xVal(validIdx)';
+xVal = xVal(validIdx);
+xVal = xVal(:);
 
 % correct special case where std is zero
 sData(sData == 0) = eps;
@@ -51,9 +52,13 @@ sData(sData == 0) = eps;
 plot(axh, xVal, mData, 'Color', clr, 'LineWidth', 2);
 
 % plot the shaded area for standard deviation
-fillh = fill([xVal; flipud(xVal)], [mData + sData; flipud(mData - sData)], ...
+lowerBound = max(mData - sData, eps);
+upperBound = max(mData + sData, eps);
+
+fillh = fill([xVal; flipud(xVal)], [upperBound; flipud(lowerBound)], ...
     clr, 'FaceAlpha', alpha, 'EdgeColor', 'none');
 set(fillh, 'HandleVisibility', 'off');
+
 
 end
 

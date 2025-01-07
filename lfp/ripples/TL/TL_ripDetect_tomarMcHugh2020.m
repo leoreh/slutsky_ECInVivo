@@ -86,7 +86,7 @@ for L = 1 : size(Li , 1)
     thresholded = zsm(Li(L,1):Li(L,2)) > threshOn;
     f = find(diff([0;thresholded;0]==1));
     p = f(1:2:end-1);  % Start indices
-    y = f(2:2:end)-p;  % Consecutive ones’ counts
+    y = f(2:2:end)-p;  % Consecutive onesâ€™ counts
     if max(y) >= minthreshSamps
         tempStore(end+1,:) = Li(L,:);
     end

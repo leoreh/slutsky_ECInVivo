@@ -4,7 +4,7 @@ function plot_hypnogram(varargin)
 
 % INPUT
 %   labels          1 x n integers of state labels. see as_classify 
-%   stateEpochs     cell of n x 2 mats. see as_classify 
+%   boutTimes       cell of n x 2 mats. see as_classify 
 %   sstates         selected states to mark. see below
 %   clr             cell of colors for each state. if empty will load cfg.colors
 %   yshift          scalar. shift location of lines {1}
@@ -18,7 +18,7 @@ function plot_hypnogram(varargin)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 p = inputParser;
 addOptional(p, 'labels', [], @isnumeric);
-addOptional(p, 'stateEpochs', [], @iscell);
+addOptional(p, 'boutTimes', [], @iscell);
 addOptional(p, 'sstates', [], @isnumeric);
 addOptional(p, 'clr', []);
 addOptional(p, 'yshift', 1, @isnumeric);
@@ -27,15 +27,15 @@ addOptional(p, 'axh', []);
 
 parse(p,varargin{:})
 labels          = p.Results.labels;
-stateEpochs     = p.Results.stateEpochs;
+boutTimes       = p.Results.boutTimes;
 sstates         = p.Results.sstates;
 clr             = p.Results.clr;
 yshift          = p.Results.yshift;
 lWidth          = p.Results.lWidth;
 axh             = p.Results.axh;
 
-if isempty(stateEpochs) && isempty(labels)
-    error('must input stateEpochs or labels')
+if isempty(boutTimes) && isempty(labels)
+    error('must input boutTimes or labels')
 end
 
 if isempty(axh)
@@ -52,7 +52,7 @@ cfg = as_loadConfig();
 
 % selected states. the order of sstates determines which state will be
 % shown in case of overlap in sleepStates. This overlap occurs due to
-% merging of nearby epochs. for example, if a certain bin belongs both to
+% merging of nearby bouts. for example, if a certain bin belongs both to
 % nrem and qw, setting state 4 (nrem) after state 2 (qw) will show the bin
 % as nrem
 if isempty(sstates)
@@ -64,10 +64,11 @@ if isempty(clr)
     clr = cfg.colors(sstates);
 end
 
-% re-calc state epochs from labels
-if isempty(stateEpochs)
-    [stateEpochs, ~] = as_epochs('labels', labels,...
-        'minDur', minDur, 'interDur', interDur, 'graphics', false);
+% re-calc state bouts from labels
+if isempty(boutTimes)
+    bouts = as_bouts('labels', labels,...
+        'minDur', 5, 'interDur', 3, 'graphics', false);
+    boutTimes = bouts.times;
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -77,9 +78,9 @@ end
 hold on
 yLimit = ylim;
 for istate = 1 : length(sstates)
-    sepochs = stateEpochs{sstates(istate)};
-    if ~isempty(sepochs)
-        plot(axh, sepochs', yLimit(2) * yshift * ones(size(sepochs))',...
+    sbouts = boutTimes{sstates(istate)};
+    if ~isempty(sbouts)
+        plot(axh, sbouts', yLimit(2) * yshift * ones(size(sbouts))',...
             'color', clr{istate}, 'LineWidth', lWidth)
     end
 end

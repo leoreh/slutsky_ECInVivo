@@ -5,7 +5,7 @@ function [spklfp] = spklfp_singleband(varargin)
 % bz_PowerPhaseRatemap.
 
 % metrices include: (1) phase coupling per cell. lfp is restricted to
-% epochs with high rms. the phase of spikes during these epochs is used to
+% bouts with high rms. the phase of spikes during these bouts is used to
 % calculate the mean phase, mean resultant length and other circular
 % distribution params. (2) rate map per cell. divides the phase (0 - 2pi)
 % and power (+/-2 z-scores) into bins and for each cell created a 2d
@@ -46,7 +46,7 @@ function [spklfp] = spklfp_singleband(varargin)
 %   NormToInt (bz)
 %   bz_SpktToSpkmat (bz)
 %   SubtractIntervals (fmat)
-%   binary2epochs 
+%   binary2bouts 
 %
 % TO DO LIST
 %   # jitter in a reasonable way
@@ -80,7 +80,7 @@ stlFlag         = p.Results.stlFlag;
 
 % params 
 powThr = 1;                         % stds above mean power in band
-mindur = (fs ./ frange(2)) * 2;     % minimum duration of epoch is two cycles
+mindur = (fs ./ frange(2)) * 2;     % minimum duration of bout is two cycles
 nbins_phase = 180;
 nbins_rate = 20;
 
@@ -107,38 +107,38 @@ tstamps = 1 / fs : 1 / fs : length(sig) / fs;
 sig_z = hilbert(sig);
 
 % convert amp to power and normalize by z-scoring. this is for the rate map
-% which includes the entire signal and not just high power epochs
+% which includes the entire signal and not just high power bouts
 sig_pow = NormToInt(log10(abs(sig_z)), 'Z', [0 Inf], fs);
 
 % get angles in range 0 : 2pi rather than -pi : pi. this is neccassary
 % because of the way circularDistribution bins the data. 
 sig_phase = mod(angle(sig_z), 2 * pi);
 
-% restrict anaylsis to epochs with enough power in band. not sure why use
+% restrict anaylsis to bouts with enough power in band. not sure why use
 % the rms and not the normalized power. this is only for phase coupling. i
 % changed the threshold to 1 instead of 2. i think eventually i will
 % restrict lfp according to sleep states and remove this threshold
 sig_rms = fastrms(sig, ceil(fs ./ frange(1)), 1);
 minrms = mean(sig_rms) + std(sig_rms) * powThr;
 
-% find epochs with power > low threshold. correct for durations
-bad_epochs = binary2epochs('vec', sig_rms < minrms, 'minDur', mindur,...
+% find bouts with power > low threshold. correct for durations
+bad_bouts = binary2bouts('vec', sig_rms < minrms, 'minDur', mindur,...
     'maxDur', Inf, 'interDur', 0);
 clear sig_rms
 
 % remove low power intervals
-lfp_epochs = SubtractIntervals([0, length(sig)], bad_epochs) / fs;  
-lfp_epochs(end) = length(sig) / fs;
+lfp_bouts = SubtractIntervals([0, length(sig)], bad_bouts) / fs;  
+lfp_bouts(end) = length(sig) / fs;
 
 % high power occupancy
-lfp_occupancy = sum(lfp_epochs(:, 2) - lfp_epochs(:, 1)) ./...
+lfp_occupancy = sum(lfp_bouts(:, 2) - lfp_bouts(:, 1)) ./...
     (length(sig) / fs) * 100;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % prepare spikes
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% restrict spktimes to lfp epochs. if computation takes too long, can add a
+% restrict spktimes to lfp bouts. if computation takes too long, can add a
 % limit to the number of spikes here
 
 % get power and phase of each spike for each cell. in bz_PhaseModulation
@@ -161,9 +161,9 @@ phase.mrl         = nan(1, nunits);
 phase.p         = nan(1, nunits);
 for iunit = 1 : nunits
     
-    % restrict spikes to epochs of high power. for other metrices all
+    % restrict spikes to bouts of high power. for other metrices all
     % spikes are used
-    spkidx = InIntervals(spktimes{iunit}, lfp_epochs);
+    spkidx = InIntervals(spktimes{iunit}, lfp_bouts);
     if sum(spkidx) == 0 || isempty(spkidx)
         continue
     end
@@ -319,7 +319,7 @@ end
 % organize struct
 spklfp.info.runtime         = datetime(now, 'ConvertFrom', 'datenum');
 spklfp.info.frange          = frange;
-spklfp.info.epochs          = lfp_epochs;
+spklfp.info.bouts          = lfp_bouts;
 spklfp.info.occupancy       = lfp_occupancy;
 spklfp.ratemag              = ratemag;
 spklfp.ratemap              = ratemap;
@@ -344,7 +344,7 @@ if graphics
     [skappa, su] = sort(spklfp.phase.kappa, 'descend');
     su = su(~isnan(skappa));
     for iu = 1 : 3
-        spkidx = InIntervals(spktimes{su(iu)}, lfp_epochs);
+        spkidx = InIntervals(spktimes{su(iu)}, lfp_bouts);
         polarhistogram(spk_phase{su(iu)}(spkidx), 'normalization', 'probability',...
             'DisplayStyle', 'stairs')
         hold on

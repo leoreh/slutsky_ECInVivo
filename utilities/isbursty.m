@@ -40,7 +40,7 @@ binsize = 0.05;     % binsize for iis distribution [log10(ms)].
 isiwin = [-1 : binsize : 4];   % win for calc isi distribution [ms]
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% ALT 1: ratio in ACG (Senzai and Buzs·ki, 2017; Royer et al., 2012)
+% ALT 1: ratio in ACG (Senzai and Buzs√°ki, 2017; Royer et al., 2012)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 binSize = 0.001; % [s]

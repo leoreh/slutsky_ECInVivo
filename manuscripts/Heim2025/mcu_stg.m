@@ -22,7 +22,7 @@ for ifile = 1 : nfiles
     
     % cell explorer
     mono_res = ce_MonoSynConvClick(v(ifile).spikes,...
-        'includeInhibitoryConnections', true, 'epoch', [0 4 * 60 * 60]);
+        'includeInhibitoryConnections', true, 'bout', [0 4 * 60 * 60]);
 
 
     monofile = fullfile(basepath, [basename, '.mono_res.cellinfo.mat']);

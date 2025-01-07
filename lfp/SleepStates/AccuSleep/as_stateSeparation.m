@@ -38,7 +38,7 @@ basepath = pwd;
 
 % get params from configuration file
 cfg = as_loadConfig();
-epochLen = cfg.epochLen;
+boutLen = cfg.boutLen;
 nstates = cfg.nstates;
 sstates = 1 : nstates;      
 
@@ -97,7 +97,7 @@ sRatio = sDelta ./ sTheta;
 faxis = sSig.spec_freq;
 % calculate psd according to states
 % [psd, faxis] = calc_psd('sig', sSig.eeg,...
-%     'fs', sSig.fs, 'graphics', false, 'bins', ss.stateEpochs);
+%     'fs', sSig.fs, 'graphics', false, 'bins', ss.boutTimes);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % graphics
@@ -120,7 +120,7 @@ fh.CurrentAxes = sb1;
 hold on
 for istate = 1 : nstates
     stateLabels = find(labels == istate);
-    scatter(stateLabels / epochLen / 60 / 60,...
+    scatter(stateLabels / boutLen / 60 / 60,...
         sSig.emg_rms(stateLabels),...
         3, cfg.colors{istate})
 end
@@ -133,7 +133,7 @@ set(gca, 'XTick', [], 'YTick', [])
 fh.CurrentAxes = sb2;
 % time axis in hours
 nbins = length(taxis);
-tSpec = ((1 : nbins) * epochLen - epochLen / 2) / 3600; % spectrogram time axis, in seconds
+tSpec = ((1 : nbins) * boutLen - boutLen / 2) / 3600; % spectrogram time axis, in seconds
 showFreqs = find(faxis <= 15);  % choose freqs to display
 % take a sample of the spectrogram to help initialize the colormap
 sampleBins = randperm(nbins, round(nbins / 10));
@@ -167,10 +167,10 @@ xlabel('Time [h]')
 % xlabel('Delta / Theta Ratio')
 % set(gca, 'YTick', [])
 
-% histogram of epoch lengths for NREM, REM, and WAKE
+% histogram of bout lengths for NREM, REM, and WAKE
 fh.CurrentAxes = sb5;
 hold on
-epMat = cell2nanmat(ss.epLen(sstates),2);
+epMat = cell2nanmat(ss.boutLen(sstates),2);
 plot([1 : size(epMat, 2)], mean(epMat, 1, 'omitnan'),...
     'kd', 'markerfacecolor', 'k')
 boxplot(epMat, 'PlotStyle', 'traditional', 'Whisker', 6);
@@ -183,12 +183,12 @@ end
 xticklabels(cfg.names(sstates))
 xtickangle(45)
 set(sb5, 'YScale', 'log')
-ylabel('Epoch Length [log(s)]')
+ylabel('Bout Length [log(s)]')
 ylim([0 ceil(prctile(epMat(:), 99.99))])
     
 % percent time in state
 fh.CurrentAxes = sb6;
-% pie(sum(cell2nanmat(ss.epLen(sstates), 2), 1, 'omitnan'), ones(1, length(sstates)));
+% pie(sum(cell2nanmat(ss.boutLen(sstates), 2), 1, 'omitnan'), ones(1, length(sstates)));
 % hold on
 % ph = findobj(sb6, 'Type', 'Patch');
 % set(ph, {'FaceColor'}, flipud(cfg.colors(sstates)))

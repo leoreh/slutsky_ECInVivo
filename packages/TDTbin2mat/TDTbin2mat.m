@@ -205,7 +205,7 @@ if ~doHeadersOnly
     end
 end
 
-% look for epoch tagged notes
+% look for bout tagged notes
 tntPath = strrep(headerStruct.tevPath, '.tev', '.tnt');
 noteStr = {};
 try
@@ -626,7 +626,7 @@ if ~useOutsideHeaders
             end
             validInd = find(codes == uniqueCodes(x));
             
-            % look for notes in 'freqs' field for epoch or scalar events
+            % look for notes in 'freqs' field for bout or scalar events
             if numel(noteStr) > 0 && (strcmp(storeTypes{x}, 'scalars') || strcmp(storeTypes{x}, 'epocs'))
                 
                 % find all possible notes

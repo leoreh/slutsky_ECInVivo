@@ -33,7 +33,7 @@ function [bs, iis, ep] = aneStates(varargin)
 %       getBS
 %       getIIS
 %       specBand
-%       binary2epochs
+%       binary2bouts
 %
 % EXAMPLE
 %       [bs, iis, ep] = aneStates_m('ch', 1, 'basepath', basepath,...
@@ -167,7 +167,7 @@ else
     
     % episodes of deep anesthesia
     vec = [bs.bsr > 0.3 & bs.bsr < 0.8];
-    ep.deep_stamps = binary2epochs('vec', vec, 'minDur', 1, 'interDur', 1);
+    ep.deep_stamps = binary2bouts('vec', vec, 'minDur', 1, 'interDur', 1);
     
     % bins to samples
     ep.deep_stamps = bs.cents(ep.deep_stamps);
@@ -183,10 +183,10 @@ else
     idx = [];
     idx2 = [];
     for j = 1 : size(ep.deep_stamps, 1)
-        % iis within epochs
+        % iis within bouts
         idx = [idx; find(iis.peakPos > ep.deep_stamps(j, 1) &...
             iis.peakPos < ep.deep_stamps(j, 2))];
-        % mean delta within epochs
+        % mean delta within bouts
         idx2 = [idx2, find(iis.cents >= ep.deep_stamps(j, 1) &...
             iis.cents <= ep.deep_stamps(j, 2))];
     end
@@ -196,7 +196,7 @@ else
     
     % episodes of surgical anesthesia
     vec = [bs.bsr < 0.3 & ep.dband > 0.5];
-    ep.sur_stamps = binary2epochs('vec', vec, 'minDur', 1, 'interDur', 1);
+    ep.sur_stamps = binary2bouts('vec', vec, 'minDur', 1, 'interDur', 1);
     ep.sur_stamps = bs.cents(ep.sur_stamps);
     if ~isempty(ep.sur_stamps)
         if ep.sur_stamps(1) == bs.cents(1)

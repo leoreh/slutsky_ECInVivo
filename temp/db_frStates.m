@@ -254,12 +254,12 @@ end
 nbins = 4;
 sstates = [1, 4];
 totDur = nan(nbins, length(sstates), nsessions);
-epLen = cell(length(sstates), nsessions);
+boutLen = cell(length(sstates), nsessions);
 for isession = 1 : nsessions
     basepath = basepaths{isession};
     cd(basepath)
     
-    [tempDur, epLen(:, isession), timebins] =...
+    [tempDur, boutLen(:, isession), timebins] =...
         as_plotZT('nbins', nbins, 'sstates', sstates, 'ss', ss,...
         'graphics', false);
     

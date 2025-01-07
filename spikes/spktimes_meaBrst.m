@@ -11,7 +11,7 @@ function brst = spktimes_meaBrst(spktimes, varargin)
 %   bins        cell array of n x 2 mats of intervals.
 %               metrices will be calculated for each cell by limiting
 %               spktimes to the intervals. can be for example
-%               ss.stateEpochs. must be the same units as spikes.times
+%               ss.boutTimes. must be the same units as spikes.times
 %               (e.g. [s]). will override binsize
 %   isiThr      numeric. minimum inter-spike interval for defining a burst
 %               {0.02 [s]}
@@ -25,7 +25,7 @@ function brst = spktimes_meaBrst(spktimes, varargin)
 %   brst        struct
 %
 % CALLS
-%   binary2epochs
+%   binary2bouts
 %   n2chunks
 % 
 % TO DO LIST
@@ -101,7 +101,7 @@ nunits = length(spktimes);
 
 % initialize
 clear brst
-brst.info.runtime       = datetime(now, 'ConvertFrom', 'datenum');
+brst.info.runtime       = datetime("now");
 brst.info.input         = p.Results;
 brst.info.bins          = bins;
 brst.info.binsize       = binsize;
@@ -124,8 +124,8 @@ for ibin = 1 : nbins
         nspks = length(spks);
 
         % get indices of first and last spike in each burst and force minSpksBrst
-        [b.idx, nbrsts] = binary2epochs('vec', isi <= isiThr,...
-            'minDur', minSpks - 1, 'printFlag', false);
+        [b.idx, nbrsts] = binary2bouts('vec', isi <= isiThr,...
+            'minDur', minSpks - 1, 'flgPrnt', false);
 
         if isempty(b.idx)
             continue

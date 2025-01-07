@@ -70,30 +70,30 @@ for i = nfiles
     end  
     
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    % anesthesia state epochs
+    % anesthesia state bouts
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % calc dband
     [dband, tband] = specBand('sig', sig, 'graphics', false, 'band', [1 4]);
     
-    % find epochs
+    % find bouts
     limbs = [0 0.5];
     limd = [0.5 1];
     vec = bs.bsr' > limbs(1) & bs.bsr' < limbs(2) &...
         dband' > limd(1) & dband' < limd(2);
     
     % binsize of bsr and delta power is 10 s. minimum duration is 1 min [6
-    % bins] and minimum time between epochs of deep anesthesia is 1 minutes
+    % bins] and minimum time between bouts of deep anesthesia is 1 minutes
     % [6 bins]
-    epochs = binary2epochs('vec', vec, 'minDur', 6, 'interDur', 6);
+    bouts = binary2bouts('vec', vec, 'minDur', 6, 'interDur', 6);
     
-    % epoch bins to sample idx
-    epochs = bs.cents(epochs);
+    % bout bins to sample idx
+    bouts = bs.cents(bouts);
     
-    % find IIS within anesthesia epochs
+    % find IIS within anesthesia bouts
     idx = [];
-    for j = 1 : size(epochs, 1)
-        idx = [idx; find(iis.peakPos > epochs(j, 1) &...
-            iis.peakPos < epochs(j, 2))];
+    for j = 1 : size(bouts, 1)
+        idx = [idx; find(iis.peakPos > bouts(j, 1) &...
+            iis.peakPos < bouts(j, 2))];
     end
     wv = iis.wv(idx, :);
     marg = round(0.1 * fs);
@@ -109,8 +109,8 @@ for i = nfiles
         pop.iis{i} = iis.rate;
         
         % arrange states and IIS within states
-        if ~isempty(epochs)
-            pop.stateDur(i) = sum(epochs(:, 2) - epochs(:, 1)) / fs / 60;
+        if ~isempty(bouts)
+            pop.stateDur(i) = sum(bouts(:, 2) - bouts(:, 1)) / fs / 60;
         end
         pop.IISinState = size(wv, 1);
         
@@ -185,8 +185,8 @@ for i = nfiles
         plot(tband / 60, dband, 'b', 'LineWidth', 2)
         legend({'BSR', 'Delta'})
         Y = ylim;
-        if ~isempty(epochs)
-            fill([epochs fliplr(epochs)]' / fs / 60, [Y(1) Y(1) Y(2) Y(2)],...
+        if ~isempty(bouts)
+            fill([bouts fliplr(bouts)]' / fs / 60, [Y(1) Y(1) Y(2) Y(2)],...
                 'b', 'FaceAlpha', 0.2,  'EdgeAlpha', 0, 'HandleVisibility', 'off');
         end
         xlabel('Time [m]')

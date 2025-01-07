@@ -197,12 +197,12 @@ tbl = array2table(c,"VariableNames", ...
 nbins = 4;
 sstates = [1, 4];
 totDur = nan(nbins, length(sstates), nfiles);
-epLen = cell(length(sstates), nfiles);
+boutLen = cell(length(sstates), nfiles);
 for ifile = 1 : nfiles
     basepath = basepaths{ifile};
     cd(basepath)
     
-    [tempDur, epLen(:, ifile), timebins] =...
+    [tempDur, boutLen(:, ifile), timebins] =...
         as_plotZT('nbins', nbins, 'sstates', sstates, 'ss', ss,...
         'graphics', false);
     

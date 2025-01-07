@@ -14,7 +14,7 @@ function   all_su_bursts = brst(data, isiThr, minSpksBrst)
 % OUTPUT
 %
 % CALLS
-%   binary2epochs
+%   binary2bouts
 % 
 % TO DO LIST
 %
@@ -71,7 +71,7 @@ for ibin = 1 : nbins
         nspks = length(spks);
 
         % get indices of first and last spike in each burst and force minSpksBrst
-        [b.idx, nepochs] = binary2epochs('vec', isi <= isiThr,...
+        [b.idx, nbouts] = binary2bouts('vec', isi <= isiThr,...
             'minDur', minSpksBrst - 1, 'printFlag', false);
 
         if isempty(b.idx)

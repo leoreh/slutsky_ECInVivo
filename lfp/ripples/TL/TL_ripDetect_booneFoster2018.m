@@ -18,10 +18,10 @@ function [ripDetect , ripCount] = TL_ripDetect_booneFoster2018(allLFP , vars , s
 % LFP and spike data were analyzed in these different wake and sleep states.
 % SWRs (marked in red in Fig. 2A) were detected as follows: The three electrodes,
 % per hemisphere, with the largest amplitude ripple activity were included in the LFP analysis.
-% The z-scored LFP signal of each electrode during ìslow-wave sleep or quiet wakefulnessî (SWS/QW)
+% The z-scored LFP signal of each electrode during ‚Äúslow-wave sleep or quiet wakefulness‚Äù (SWS/QW)
 % periods was denoised for 60-Hz electrical noise and its 180-Hz harmonic using a second-order IIR
 % notch filter. Denoised LFP during SWS/QW periods was filtered in ripple frequency range
-% (100ñ250?Hz) with a fifth-order Butterworth band-pass filter.
+% (100‚Äì250?Hz) with a fifth-order Butterworth band-pass filter.
 % The envelopes of each band-passed LFP trace were the absolute value of its Hilbert transform.
 % These envelopes were averaged over the three electrodes/hemisphere and smoothed with Gaussian
 % 5-ms standard deviation (SD) smoother. Each event for which the envelope amplitude exceeds

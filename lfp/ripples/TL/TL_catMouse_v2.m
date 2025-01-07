@@ -36,8 +36,8 @@ cat.MuaNonRipHz = [];
 cat.ripSpkDayT = [];
 cat.theta = [];
 cat.delta = [];
-cat.epochDayT = [];
-cat.epochLabels = [];
+cat.boutDayT = [];
+cat.boutLabels = [];
 for f = 1 : length(folnames)
     
     temp = dir([pathname , filesep , folnames{f} , filesep , 'ripples' , '*.mat']);
@@ -72,7 +72,7 @@ for f = 1 : length(folnames)
     
     [nremI , wakeI , theta , delta , ratio] = TL_deltaTheta(lfp , 1250 , [] , []);
     
-    % only zscore with non"Bin" epochs
+    % only zscore with non"Bin" bouts
     labels = labels(1:length(ratio));
     
     setnum = find(cell2mat(cellfun(@(z) ~isempty(z) , expInfo.startTime , 'uniformoutput' , false)));
@@ -154,21 +154,21 @@ for f = 1 : length(folnames)
             
         end
     end
-    % Save epochs
+    % Save bouts
     % TL this section also not appreciate timing for multiple blocks in the same set
-    epochn = [expInfo.epochNames(setI)];
-    epocht = [expInfo.EpochStartSec(setI)];
-    epochlabels = {};
-    epochDayT = [];
-    for e = 1 : length(epochn)
-        if iscell(epochn{e})
-            for ee = 1 : length(epochn{e})
-                epochlabels{end+1} = epochn{e}{ee};
-                epochDayT(end+1) = start + epocht{e}(ee)/(24*60*60);
+    boutn = [expInfo.boutNames(setI)];
+    boutt = [expInfo.EpochStartSec(setI)];
+    boutlabels = {};
+    boutDayT = [];
+    for e = 1 : length(boutn)
+        if iscell(boutn{e})
+            for ee = 1 : length(boutn{e})
+                boutlabels{end+1} = boutn{e}{ee};
+                boutDayT(end+1) = start + boutt{e}(ee)/(24*60*60);
             end
         else
-            epochlabels{end+1} = epochn{e};
-            epochDayT(end+1) = start + epocht{e}/(24*60*60);
+            boutlabels{end+1} = boutn{e};
+            boutDayT(end+1) = start + boutt{e}/(24*60*60);
         end
         
     end
@@ -185,8 +185,8 @@ for f = 1 : length(folnames)
     cat.MuaNonRipHz = [cat.MuaNonRipHz , MuaNonRipHz];
     cat.ripHz = [cat.ripHz , ripBinnedHz];
     cat.ripSpkDayT = [cat.ripSpkDayT ; ripSpkDayT];
-    cat.epochDayT = [cat.epochDayT , epochDayT];
-cat.epochLabels = [cat.epochLabels , epochlabels];
+    cat.boutDayT = [cat.boutDayT , boutDayT];
+cat.boutLabels = [cat.boutLabels , boutlabels];
     clear ripHz MuaNonRipHz muaBinnedHz ratio sptDays start stop MuaZbyDay DayT;
       
 end

@@ -1,12 +1,12 @@
-function [totDur, prctDur, epLen, timebins] = as_plotZT(varargin)
+function [totDur, prctDur, boutLen, timebins] = as_plotZT(varargin)
 
 % receives a labels vector, divides it to states within timebins, and plots
-% the epoch destribution and duration. 
+% the bout destribution and duration. 
 %
 % INPUT:
 %   basepath        char. path of recording
 %   timebins        n x 2 numeric of time windows (indices to labels). 
-%                   epochs of each state will be calculated for each time
+%                   bouts of each state will be calculated for each time
 %                   window separately. 
 %   nbins           numeric. if timebins not specified, will divide labels
 %                   to nbins timebins
@@ -15,10 +15,10 @@ function [totDur, prctDur, epLen, timebins] = as_plotZT(varargin)
 %   ss              struct. see as_classify. if given then labels, minDur,
 %                   and interDur will be extracted from ss
 %   labels          numeric. see as_classify 
-%   minDur          numeric. minimum duration of an epoch. 
+%   minDur          numeric. minimum duration of an bout. 
 %                   if length(minDur) == nstates than a different minimum
 %                   duration will be applied to each state
-%   interDur        numeric. combine epochs separated by <= interDur
+%   interDur        numeric. combine bouts separated by <= interDur
 %   graphics        logical. 
 % 
 % OUTPUT
@@ -80,7 +80,7 @@ if isempty(labels)
     labels = ss.labels;
 end
 
-% arrange epoch duration constraints
+% arrange bout duration constraints
 if isempty(minDur)
     minDur = ss.info.minDur;
 end
@@ -105,25 +105,25 @@ end
 nbins = size(timebins, 1);
 binLen = diff(timebins');
 
-% calc epoch stats according to timebins
+% calc bout stats according to timebins
 for iwin = 1 : nbins
     labels_win = labels(timebins(iwin, 1) : timebins(iwin, 2));
-    [~, epochStats(iwin)] = as_epochs('labels', labels_win,...
+    bouts(iwin) = as_bouts('labels', labels_win,...
         'minDur', minDur, 'interDur', interDur);
 end
 
-% organize epoch stats
+% organize bout stats
 for iwin = 1 : nbins
     for istate = 1 : length(sstates)
-        epLen_temp{iwin, istate} = epochStats(iwin).epLen{sstates(istate)};
-        if isempty(epLen_temp{iwin, istate})
-            epLen_temp{iwin, istate} = 0;
+        boutLen_temp{iwin, istate} = bouts(iwin).boutLen{sstates(istate)};
+        if isempty(boutLen_temp{iwin, istate})
+            boutLen_temp{iwin, istate} = 0;
         end
     end
-    totDur(iwin, :) = epochStats(iwin).totDur(sstates);
+    totDur(iwin, :) = bouts(iwin).totDur(sstates);
 end
 for istate = 1 : length(sstates)
-    epLen{istate} = cell2nanmat(epLen_temp(:, istate), 2);
+    boutLen{istate} = cell2padmat(boutLen_temp(:, istate), 2);
 end
 
 % calc state duration [%]
@@ -154,8 +154,8 @@ if graphics
 %         xticklabels(tbins_txt)
 %         xtickangle(45)
         
-        % epoch length
-        epMat = epLen{istate};
+        % bout length
+        epMat = boutLen{istate};
         if ~all(epMat)
             continue
         end
@@ -167,7 +167,7 @@ if graphics
             patch(get(bh(ibox), 'XData'), get(bh(ibox), 'YData'),...
                 cfg.colors{sstates(istate)}, 'FaceAlpha', alphaIdx(ibox))
         end
-        ylabel('Epoch Length [log(s)]')
+        ylabel('Bout Length [log(s)]')
         set(gca, 'YScale', 'log')
         ylim([0 ceil(prctile(epMat(:), 99.99))])
         ax = gca;

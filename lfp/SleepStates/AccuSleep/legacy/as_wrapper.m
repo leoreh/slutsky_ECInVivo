@@ -28,7 +28,7 @@ function ss = as_wrapper(EEG, EMG, sigInfo, varargin)
 % DEPENDENCIES:
 %   AccuSleep (modified in slutskycode)
 %   IOSR.DSP.SINCFILTER     for filtering data
-%   binary2epochs
+%   binary2bouts
 %
 % TO DO LIST:
 %       # filter before resampling to assure nyquist (done)
@@ -179,11 +179,11 @@ x(idx) = labels(idx);
 labels = x;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% convert labels to state epochs
+% convert labels to state bouts
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-minDur = [10, 5, 5, 10, 5, 5];  % threshold of minimum epoch length
-interDur = 4;                   % combine epochs separated by <= interDur
+minDur = [10, 5, 5, 10, 5, 5];  % threshold of minimum bout length
+interDur = 4;                   % combine bouts separated by <= interDur
 
 if length(minDur) == 1
     minDur = repamt(minDur, nstates - 1, 1);
@@ -196,14 +196,14 @@ elseif length(interDur) ~= nstates - 1
     error('interDur length is different than the number of states')
 end
 
-% create state epochs
+% create state bouts
 for istate = 1 : nstates - 1
     binaryVec = zeros(length(labels), 1);
     binaryVec(labels == istate) = 1;
-    stateEpochs = binary2epochs('vec', binaryVec, 'minDur', minDur(istate), 'maxDur', [],...
+    boutTimes = binary2bouts('vec', binaryVec, 'minDur', minDur(istate), 'maxDur', [],...
         'interDur', interDur(istate), 'exclude', false);
-    ss.stateEpochs{istate} = stateEpochs * minEpochLen; % convert indices to seconds
-    ss.epLen{istate} = [diff(ss.stateEpochs{istate}')]';
+    ss.boutTimes{istate} = boutTimes * minEpochLen; % convert indices to seconds
+    ss.boutLen{istate} = [diff(ss.boutTimes{istate}')]';
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -217,7 +217,7 @@ if graphics
     [ss.netPrecision, ss.netRecall] = as_cm(labels1, labels2, netScores);
 
     % stateSeparation
-    as_stateSeparation(EEG, EMG, labels, 'stateEpochs', ss.stateEpochs,...
+    as_stateSeparation(EEG, EMG, labels, 'boutTimes', ss.boutTimes,...
         'fs', fs)
 end
 

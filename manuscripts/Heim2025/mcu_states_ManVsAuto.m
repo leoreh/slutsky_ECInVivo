@@ -37,7 +37,7 @@ minDur = 4;
 
 % initialize 
 manIdx = nan(nfiles, 2);
-clear epochStats
+clear boutStats
 
 % go over files
 for ifile = 1 : nfiles
@@ -69,14 +69,14 @@ for ifile = 1 : nfiles
     curIdx = manIdx(ifile, 1) : manIdx(ifile, 2);     % manually curated indices 
     
     % ---------------------------------------------------------------------
-    % calculate epochStats for Man and Auto
+    % calculate boutStats for Man and Auto
 
     % auto
-    [~, epochStats(ifile, 1)] = as_epochs('labels', labelsAuto(curIdx),...
+    bouts(ifile, 1) = as_bouts('labels', labelsAuto(curIdx),...
         'minDur', minDur, 'interDur', interDur);
 
     % manual
-    [~, epochStats(ifile, 2)] = as_epochs('labels', labelsMan(curIdx),...
+    bouts(ifile, 2) = as_bouts('labels', labelsMan(curIdx),...
         'minDur', minDur, 'interDur', interDur);
 
 end
@@ -86,11 +86,11 @@ end
 % organize data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-epLen = nan(2, nfiles, length(sstates));
+boutLen = nan(2, nfiles, length(sstates));
 for ifile = 1 : nfiles
     for icur = 1 : 2
-        epLen(icur, ifile, :) = mean(cell2padmat(epochStats(ifile, icur).epLen(sstates), 2), 'omitnan');
-        prctDur(icur, ifile, :) = epochStats(ifile, icur).prctDur(sstates);
+        boutLen(icur, ifile, :) = mean(cell2padmat(bouts(ifile, icur).boutLen(sstates), 2), 'omitnan');
+        prctDur(icur, ifile, :) = bouts(ifile, icur).prctDur(sstates);
     end
 end
 
@@ -116,14 +116,14 @@ th.TileSpacing = 'tight';
 th.Padding = 'none';
 title(th, basename, 'interpreter', 'none');
 
-% Plot epoch length for each state
+% Plot bout length for each state
 tilebias = 0;
 for istate = 1 : length(sstates)
     axh = nexttile(th, tilebias + istate); hold on; cla;
     stateIdx = sstates(istate);
-    dataMat = epLen(:, :, istate)';
+    dataMat = boutLen(:, :, istate)';
     ph = plot([1, 2], dataMat);
-    ylabel('Epoch Length (s)');
+    ylabel('Bout Length (s)');
     title([snames{istate}]);
     ylim([0, ceil(max(dataMat(:)))]);
     xlim([0.5 2.5])
@@ -132,7 +132,7 @@ for istate = 1 : length(sstates)
 end
 legend(mnames)
 
-% Plot epoch length for each state
+% Plot bout length for each state
 tilebias = 3;
 for istate = 1 : length(sstates)
     axh = nexttile(th, tilebias + istate); hold on; cla;

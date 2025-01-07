@@ -20,7 +20,7 @@ function [xfigure, yfigure]=axescoord2figurecoord(varargin)
 % Acknowledgments are due to Scott Hirsch (shirsch@mathworks.com) for is
 % function ds2nfu. Some part of the present function derived from ds2nfu.
 %
-% Valley Benoît / Jan 2007
+% Valley BenoÃ®t / Jan 2007
 % valley@erdw.ethz.ch
 
 

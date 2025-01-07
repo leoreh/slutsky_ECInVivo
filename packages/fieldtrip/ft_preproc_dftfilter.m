@@ -41,7 +41,7 @@ function [filt] = ft_preproc_dftfilter(dat, Fs, Fl, varargin)
 % estimate is subtracted from the complete data. Due to the possibility of
 % using slightly truncated data for the estimation of the necessary signal
 % components, this method is more forgiving with respect to numerical
-% issues with respect to the sampling frequency, and suboptimal epoch
+% issues with respect to the sampling frequency, and suboptimal bout
 % lengths, in comparison to the method below.
 %
 % If dftreplace = 'neighbour_fft' the powerline component is reduced via spectrum 

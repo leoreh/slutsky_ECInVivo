@@ -1,4 +1,4 @@
-function [emg, spec, stateEpochs] = recRep_prep(varargin)
+function [emg, spec, boutTimes] = recRep_prep(varargin)
 
 % loads and prepares data for plotting a recording representative (see
 % recRep_plot). this was separated so that the figure can be plotted
@@ -60,8 +60,9 @@ interDur = 20;
 labels = v.ss.labels;
 labels(labels == 6) = 5;
 labels(labels == 3) = 4;
-[stateEpochs, ~] = as_epochs('labels', labels,...
+bouts = as_bouts('labels', labels,...
     'minDur', minDur, 'interDur', interDur);
+boutTimes = bouts.times;
 
 % subsample eeg and re-calc spec
 eeg = eeg(1 : 1250 / fs_eeg : end);

@@ -59,7 +59,7 @@ legend(lgndstr)
 % amplitude ---------------------------------------------------------------
 for iwin = 1 : size(recWin, 2)
     idx_rec = InIntervals(ripp.peakPos, recWin(iwin, :));
-    idx_nrem = InIntervals(ripp.peakPos, ss.stateEpochs{4});
+    idx_nrem = InIntervals(ripp.peakPos, ss.boutTimes{4});
     idx_win{iwin} = idx_rec & idx_nrem;
 end
 
@@ -97,17 +97,17 @@ ripp2 = getRipples('basepath', basepath, 'ch', [12 : 15],...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % rippels in NREM
-ripp1_idx = InIntervals(ripp1.peakPos, ss.stateEpochs{4});
-ripp2_idx = InIntervals(ripp2.peakPos, ss.stateEpochs{4});
+ripp1_idx = InIntervals(ripp1.peakPos, ss.boutTimes{4});
+ripp2_idx = InIntervals(ripp2.peakPos, ss.boutTimes{4});
 
 % NREM stats
-nrem_dur = ss.stateEpochs{4}(:, 2) - ss.stateEpochs{4}(:, 1);
+nrem_dur = ss.boutTimes{4}(:, 2) - ss.boutTimes{4}(:, 1);
 for iwin = 1 : length(recWin)
-    nrem_idx(iwin, :) = InIntervals(ss.stateEpochs{4}, recWin(iwin, :));
+    nrem_idx(iwin, :) = InIntervals(ss.boutTimes{4}, recWin(iwin, :));
 end
 
 % ripple rate
-winCalc = ss.stateEpochs{4};
+winCalc = ss.boutTimes{4};
 [ripp1.rate.rate, ripp1.rate.binedges, ripp1.rate.tstamps] =...
     times2rate(ripp1.peakPos, 'binsize', 60, 'winCalc', winCalc,...
     'c2r', true);

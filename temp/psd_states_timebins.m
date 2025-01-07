@@ -123,9 +123,9 @@ if exist(psdfile, 'file') && ~forceA
 else
     for iwin = 1 : nbins
                         
-        % get state epochs
+        % get state bouts
         labels = v.ss.labels(timebins(iwin, 1) : timebins(iwin, 2));
-        [stateEpochs, epStats(iwin)] = as_epochs('labels', labels);
+        [boutTimes, epStats(iwin)] = as_bouts('labels', labels);
 
         % ---------------------------------------------------------------------
         % hippocampal lfp
@@ -135,7 +135,7 @@ else
             'channels', chLfp, 'downsample', 1));
         sig = mean(sig, 2);
 
-        psdLfp(iwin, :, :) = psd_timebins('sig', sig, 'winCalc', stateEpochs(sstates),...
+        psdLfp(iwin, :, :) = psd_timebins('sig', sig, 'winCalc', boutTimes(sstates),...
             'fs', fsLfp, 'faxis', faxis, 'graphics', false);  
         
         % ---------------------------------------------------------------------
@@ -156,7 +156,7 @@ else
                     'frequency', fsLfp, 'nchannels', nchansEeg, 'start', timebins(iwin, 1),...
                     'channels', chEeg, 'downsample', 1));
             end
-            psdEeg(iwin, :, :) = psd_timebins('sig', sig, 'winCalc', stateEpochs(sstates),...
+            psdEeg(iwin, :, :) = psd_timebins('sig', sig, 'winCalc', boutTimes(sstates),...
                 'fs', fsLfp, 'faxis', faxis, 'graphics', false);
 
         end
@@ -167,15 +167,15 @@ else
     % arrange in struct and save
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
-    % organize epoch lengths according to time bins
+    % organize bout lengths according to time bins
     for iwin = 1 : nbins
         for istate = 1 : length(sstates)
-            epLen_temp{iwin, istate} = epStats(iwin).epLen{sstates(istate)};
+            boutLen_temp{iwin, istate} = epStats(iwin).boutLen{sstates(istate)};
         end
         totDur(iwin, :) = epStats(iwin).totDur(sstates);
     end
     for istate = 1 : length(sstates)
-        epLen{istate} = cell2nanmat(epLen_temp(:, istate), 2);
+        boutLen{istate} = cell2nanmat(boutLen_temp(:, istate), 2);
     end
     
     psdBins.info.runtime = datetime(now, 'ConvertFrom', 'datenum');
@@ -188,7 +188,7 @@ else
     psdBins.psdLfp = psdLfp;
     psdBins.psdEeg = psdEeg;
     psdBins.epStats = epStats;
-    psdBins.epLen_organized = epLen;
+    psdBins.boutLen_organized = boutLen;
     psdBins.totDur_organized = totDur;
     
     if saveVar
@@ -264,7 +264,7 @@ if graphics
         
         % state duration
         subplot(nrows, length(sstates), istate + (nrows - 1) * length(sstates))
-        epMat = psdBins.epLen_organized{istate};
+        epMat = psdBins.boutLen_organized{istate};
         boxplot(epMat, 'PlotStyle', 'traditional', 'Whisker', 100);
         bh = findobj(gca, 'Tag', 'Box');
         bh = flipud(bh);
@@ -272,7 +272,7 @@ if graphics
             patch(get(bh(ibox), 'XData'), get(bh(ibox), 'YData'),...
                 cfg.colors{sstates(istate)}, 'FaceAlpha', alphaIdx(ibox))
         end
-        ylabel('Epoch Length [log(s)]')
+        ylabel('Bout Length [log(s)]')
         set(gca, 'YScale', 'log')
         ylim([0 ceil(prctile(epMat(:), 99.99))])
         yyaxis right

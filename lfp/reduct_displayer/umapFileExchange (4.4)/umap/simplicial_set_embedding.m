@@ -40,8 +40,8 @@ function [embedding, method, head, tail, graph_data] = ...
 %     in greater repulsive force being applied, greater optimization
 %     cost, but slightly more accuracy.
 % 
-% n_epochs: double (optional, default 0)
-%     The number of training epochs to be used in optimizing the
+% n_bouts: double (optional, default 0)
+%     The number of training bouts to be used in optimizing the
 %     low dimensional embedding. Larger values result in more accurate
 %     embeddings. If 0 is specified a value will be selected based on
 %     the size of the input dataset (200 for large datasets, 500 for small).
@@ -85,13 +85,13 @@ function [embedding, method, head, tail, graph_data] = ...
     args=p.Results;
     probability_bin_limit = args.probability_bin_limit;
     eigen_limit=args.eigen_limit;
-    epoch_reports = args.epoch_reports;
+    bout_reports = args.bout_reports;
     progress_callback = args.progress_callback;
     method = args.method;
     verbose = args.verbose;
     min_dist=args.min_dist;
     init = args.init;
-    n_epochs = args.n_epochs;
+    n_bouts = args.n_bouts;
     negative_sample_rate = args.negative_sample_rate;
     random_state = args.random_state;
     
@@ -103,11 +103,11 @@ function [embedding, method, head, tail, graph_data] = ...
     if ~issparse(graph)
         graph = sparse(graph);
     end
-    if isempty(n_epochs)
+    if isempty(n_bouts)
         if n_rows <= 10000
-            n_epochs = 500;
+            n_bouts = 500;
         else
-            n_epochs = 200;
+            n_bouts = 200;
         end
     end
     C=size(data, 2);
@@ -119,7 +119,7 @@ function [embedding, method, head, tail, graph_data] = ...
         embedding=spectral_layout_binned(data, init, ...
             probability_bin_limit, n_components, eigen_limit);
         if isempty(embedding)
-            graph=remove_sparse(graph, @(a)lt(a, max(graph_data)/n_epochs));
+            graph=remove_sparse(graph, @(a)lt(a, max(graph_data)/n_bouts));
             embedding = spectral_layout(graph, n_components, eigen_limit);
         end
 
@@ -137,13 +137,13 @@ function [embedding, method, head, tail, graph_data] = ...
     end
 
     [head, tail, graph_data] = find(graph);
-    epochs_per_sample = make_epochs_per_sample(graph_data);
+    bouts_per_sample = make_bouts_per_sample(graph_data);
 
     debugTiming('Cost of embedding with eigen variables -->' )
     [embedding, method] = choose_optimize_layout(embedding, embedding, head, tail,...
-        n_epochs, n_vertices, epochs_per_sample, a, b, gamma, initial_alpha,...
+        n_bouts, n_vertices, bouts_per_sample, a, b, gamma, initial_alpha,...
         negative_sample_rate, verbose, method, progress_callback, ...
-        epoch_reports, random_state, min_dist, [], C, args.sgd_tasks);
+        bout_reports, random_state, min_dist, [], C, args.sgd_tasks);
     debugTiming('Cost of stochastic gradient descent--> ' );
     embedding=double(embedding);
     
@@ -151,14 +151,14 @@ function [embedding, method, head, tail, graph_data] = ...
         p = inputParser;
         addParameter(p,'eigen_limit', UMAP.EIGEN_LIMIT);
         addParameter(p,'probability_bin_limit', 64*4096);
-        addParameter(p,'epoch_reports', 0);
+        addParameter(p,'bout_reports', 0);
         addParameter(p,'progress_callback', []);
         addParameter(p,'method','Java');
         addParameter(p,'verbose', false, @islogical);
         addParameter(p,'dist_args', [], @isnumeric);
         addParameter(p,'metric', 'euclidean');
         addParameter(p,'init', 'spectral');
-        addParameter(p,'n_epochs', []);
+        addParameter(p,'n_bouts', []);
         addParameter(p,'negative_sample_rate', 5);
         addParameter(p,'random_state', true);
         addParameter(p,'min_dist', .3);

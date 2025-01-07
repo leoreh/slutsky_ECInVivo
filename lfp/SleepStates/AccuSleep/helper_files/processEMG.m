@@ -1,11 +1,11 @@
-function [processedEMG] = processEMG(EMG, SR, epochLen)
-% processEMG  Compute the RMS in each epoch of the EMG signal
+function [processedEMG] = processEMG(EMG, SR, boutLen)
+% processEMG  Compute the RMS in each bout of the EMG signal
 % Zeke Barger 100119
 %
 %   Arguments:
 %   EMG - a 1-D matrix of EMG data
 %   SR - sampling rate, in Hz
-%   epochLen - length of each epoch, in seconds
+%   boutLen - length of each bout, in seconds
 %
 %   Output:
 %   processedEMG - the processed EMG signal
@@ -18,11 +18,11 @@ function [processedEMG] = processEMG(EMG, SR, epochLen)
 % EMG = filtfilt(d, EMG);
 
 % truncate EMG to a multiple of SR
-samplesPerEpoch = SR*epochLen;
+samplesPerEpoch = SR*boutLen;
 EMG = EMG(1:(length(EMG)-mod(length(EMG), samplesPerEpoch)));
 
 % calculate log(rms) in each time window
-% we can do this faster if the number of samples per epoch is an integer
+% we can do this faster if the number of samples per bout is an integer
 if samplesPerEpoch == floor(samplesPerEpoch)
     processedEMG = log(rms(reshape(EMG,samplesPerEpoch,length(EMG)/samplesPerEpoch)));
 else

@@ -18,7 +18,7 @@ function [SleepStateEpisodes] = StatesToEpisodes(SleepState,basePath)
 %   basePath    (optional) a basepath to save the output
 % 
 % OUTPUTS
-%	SleepStateEpisodes - Struct array of relatively more processed epochs
+%	SleepStateEpisodes - Struct array of relatively more processed bouts
 %   with minimum durations and maximum interruptions imposed.  Fields below
 %       .ints.WAKEpisodes  WAKEints inputs with at least [minWAKEEpisodeDuration] 
 %                          long and without interruptions more than [maxWAKEEpisodeInterruption]

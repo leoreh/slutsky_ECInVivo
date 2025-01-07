@@ -28,7 +28,7 @@ function varargout=wtc(x,y,varargin)
 %
 % Phase arrows indicate the relative phase relationship between the series 
 % (pointing right: in-phase; left: anti-phase; down: series1 leading 
-% series2 by 90°)
+% series2 by 90Â°)
 %
 % Please acknowledge the use of this software in any publications:
 %   "Crosswavelet and wavelet coherence software were provided by

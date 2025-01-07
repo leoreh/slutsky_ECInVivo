@@ -428,7 +428,7 @@ end
 
 if ismember(39, whichOnes)
     disp('run_umap Example 39 starting...');
-    [reduction, umap, clusterIds, extras]=run_umap('balbc4RagLabeled.csv', 'label_column', 'end', 'save_template_file',  'ustBalbc4RagMlpPy.mat', 'mlp_train', struct('Epochs', 101), args{:});
+    [reduction, umap, clusterIds, extras]=run_umap('balbc4RagLabeled.csv', 'label_column', 'end', 'save_template_file',  'ustBalbc4RagMlpPy.mat', 'mlp_train', struct('Bouts', 101), args{:});
     disp('run_umap Example 39 completed...');
 end
 
@@ -443,7 +443,7 @@ end
     
 if ismember(41, whichOnes)
     disp('run_umap Example 41 starting...');
-    [reduction, umap, clusterIds, extras]=run_umap('balbc4C57Labeled.csv', 'label_column', 'end', 'save_template_file',  'ustBalbc4C57MlpPy.mat', 'mlp_train', struct('Epochs', 101), args{:});
+    [reduction, umap, clusterIds, extras]=run_umap('balbc4C57Labeled.csv', 'label_column', 'end', 'save_template_file',  'ustBalbc4C57MlpPy.mat', 'mlp_train', struct('Bouts', 101), args{:});
     disp('run_umap Example 41 completed...');
 end
     

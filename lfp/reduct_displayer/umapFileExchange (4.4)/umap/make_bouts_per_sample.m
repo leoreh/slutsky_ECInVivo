@@ -1,6 +1,6 @@
-function result = make_epochs_per_sample(weights)
+function result = make_bouts_per_sample(weights)
 %MAKE_EPOCHS_PER_SAMPLE Given a set of weights generate the number of
-% epochs per sample for each weight.
+% bouts per sample for each weight.
 %
 % result = MAKE_EPOCHS_PER_SAMPLE(weights)
 %
@@ -9,12 +9,12 @@ function result = make_epochs_per_sample(weights)
 % weights: array of size (n_1_simplices, 1)
 %     The weights of how much we wish to sample each 1-simplex.
 %
-% Note that the total number of epochs does not impact this result.
+% Note that the total number of bouts does not impact this result.
 % 
 % Returns
 % -------
 % result: array of size (n_1_simplices, 1)
-%     The number of epochs per sample, one for each 1-simplex.
+%     The number of bouts per sample, one for each 1-simplex.
 
 %   AUTHORSHIP
 %   Math Lead & Primary Developer:  Connor Meehan <connor.gw.meehan@gmail.com>

@@ -88,10 +88,10 @@ for i=1:NJ_EE
             n = [ones(NE,1)/N; ones(NI,1)/N] + 0*randn(N,1);
             m = [ones(NE,1); ones(NI,1)].*rand(N,1);
 
-            epoch_len = freq*10/dt;
-            nepochs = floor(simtime_len / epoch_len);
-            for ii = 1:nepochs-1
-                input(ii*epoch_len + 1 : (ii+1)*epoch_len ) = rand*ones(1,epoch_len);
+            bout_len = freq*10/dt;
+            nbouts = floor(simtime_len / bout_len);
+            for ii = 1:nbouts-1
+                input(ii*bout_len + 1 : (ii+1)*bout_len ) = rand*ones(1,bout_len);
             end
             input(1:steady_state) = 1;
 

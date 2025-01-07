@@ -150,7 +150,7 @@ end
 clear m d p;
 
 % Calculate mean at each 5 minute interval during ripples and nonripple
-% epochs
+% bouts
 xbins = [0:60*5:ax.pop.ripEvokedHz.XLim(2)*60]; % 1 minute averages
 ripHz = currentdata.ripples.ripHz;
 p = currentdata.ripples.peakSec;
@@ -271,7 +271,7 @@ end
 
 axbutt = ax.pop.lights.Position(2);
 % 
-%% Plot normalized firing from ripples and nonripple epochs
+%% Plot normalized firing from ripples and nonripple bouts
 ax.pop.normFiring = axes('parent' , F , 'units' , 'inches' , 'position' , [1 axbutt - 0.75  plotWidth 0.5] , 'box' , 'off' , ...
     'color' , 'none' , 'YColor' , 'k' , 'XColor' , 'none' , 'fontname' , 'arial' , 'fontsize' , 8 , 'XTickLabel' , []);
 hold on;

@@ -8,7 +8,7 @@ function [labels] = enforceMinDuration(labels, limits, enforceInOrder, setUndef)
 
 %   Arguments:
 %   labels - the vector of sleep stage labels (1=REM, 2=wake, 3=NREM, ...)
-%   limits - minimum # of epochs per bout of each brain state: [REM, wake, NREM, ...]
+%   limits - minimum # of bouts per bout of each brain state: [REM, wake, NREM, ...]
 %   enforceInOrder - DEPRECATED. Now unused.
 %       PREVIOUSLY: the order in which the limits should be enforced.
 %       For example, to enforce wake, then REM, then NREM, use [2 1 3];

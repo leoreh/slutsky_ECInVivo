@@ -97,10 +97,10 @@ fileList = as_fileLists(basepaths);
 
 % general
 fs = 1250;
-epochLen = 1;
-minBoutLen = epochLen;
+boutLen = 1;
+minBoutLen = boutLen;
 
-[net, netInfo] = AccuSleep_train(fileList, fs, epochLen, 63);
+[net, netInfo] = AccuSleep_train(fileList, fs, boutLen, 63);
 netpath = 'D:\Code\slutskycode\extracellular in vivo\lfp\SleepStates\AccuSleep\trainedNetworks';
 netname = ['net_',  datestr(datetime, 'yymmdd_HHMMss')]; 
 save(fullfile(netpath, netname), 'net', 'netInfo')      

@@ -293,13 +293,13 @@ if isfield(sessionInfo, 'region')
     end
 end
 
-% Epochs derived from MergePoints
+% Bouts derived from MergePoints
 if exist(fullfile(basepath,[session.general.name,'.MergePoints.events.mat']),'file')
     load(fullfile(basepath,[session.general.name,'.MergePoints.events.mat']),'MergePoints')
     for i = 1:size(MergePoints.foldernames,2)
-        session.epochs{i}.name =  MergePoints.foldernames{i};
-        session.epochs{i}.startTime =  MergePoints.timestamps(i,1);
-        session.epochs{i}.stopTime =  MergePoints.timestamps(i,2);
+        session.bouts{i}.name =  MergePoints.foldernames{i};
+        session.bouts{i}.startTime =  MergePoints.timestamps(i,1);
+        session.bouts{i}.stopTime =  MergePoints.timestamps(i,2);
     end
 end
 

@@ -123,7 +123,7 @@ else
     wins(wins > length(emg)) = length(emg);
 end
 
-% state epoch duration limits
+% state bout duration limits
 minDur = 10;
 interDur = 4;
 
@@ -173,23 +173,18 @@ for iwin = 1 : nwin
     idxWin = floor(wins(iwin, 1) : wins(iwin, 2));
 
     if ~flgEmg
-        % re-calc state epochs in window
-        labels = v.ss.labels(idxWin);
-        [stateEpochs, ~] = as_epochs('labels', labels,...
-            'minDur', minDur, 'interDur', interDur);
-        % override and take original
-        stateEpochs = v.ss.stateEpochs;
+        boutTimes = v.ss.boutTimes;
 
     else
         % get indices to high- and low-emg
         labels = double(emg > prctile(emg(idxWin), prct));
         labels(emg < prctile(emg(idxWin), 100 - prct)) = 2;
 
-        % limit indices to time window and get "state" epochs
+        % limit indices to time window and get "state" bouts
         labels = labels(idxWin);
-        [stateEpochs, ~] = as_epochs('labels', labels,...
+        bouts = as_bouts('labels', labels,...
             'minDur', 10, 'interDur', 4);
-        stateEpochs = stateEpochs([1 : 2]);
+        boutTimes = bouts.times([1 : 2]);
 
     end
 
@@ -203,8 +198,8 @@ for iwin = 1 : nwin
     end
 
     % calc psd
-    [psd.psd(iwin, :, :), faxis, psd.psd_epochs] = calc_psd('sig',...
-        sig(idxSig(1) : idxSig(2), :), 'bins', stateEpochs,...
+    [psd.psd(iwin, :, :), faxis, psd.psd_bouts] = calc_psd('sig',...
+        sig(idxSig(1) : idxSig(2), :), 'bins', boutTimes,...
         'fs', fs, 'ftarget', ftarget, 'graphics', graphics);
 
 end

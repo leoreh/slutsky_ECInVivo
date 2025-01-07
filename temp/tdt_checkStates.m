@@ -27,7 +27,7 @@ statefile = [basename, '.sleep_states.mat'];
 load(statefile, 'ss')
 sstates = [1, 4];
 for istate = 1 : length(sstates)
-    stateIdx = round(ss.stateEpochs{sstates(istate)} * fs);
+    stateIdx = round(ss.boutTimes{sstates(istate)} * fs);
     stateIdx(stateIdx < 0) = 1;
     stateIdx(stateIdx > length(data)) = length(data);
     stateData(:, istate) = median(data(:, InIntervals([1 : length(data)], stateIdx)), 2);

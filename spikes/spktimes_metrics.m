@@ -16,7 +16,7 @@ function st = spktimes_metrics(varargin)
 %   bins            cell array of n x 2 mats of intervals.
 %                   metrices will be calculated for each cell by limiting
 %                   spktimes to the intervals. can be for example
-%                   ss.stateEpochs. must be the same units as spikes.times
+%                   ss.boutTimes. must be the same units as spikes.times
 %                   (e.g. [s])
 %   basepath        path to recording
 %   graphics        logical. plot graphics {true} or not (false)
@@ -210,8 +210,8 @@ for iunit = 1 : length(sunits)
         % firing irregularity ---------------------------------------------
         
         % Cv (coefficient of variation): Shinomoto 2003. note that when
-        % calculated for stateEpochs, this is terribly biased due to large
-        % ISI's between epochs
+        % calculated for boutTimes, this is terribly biased due to large
+        % ISI's between bouts
         st.cv(ibin, iunit) = std(isi) / mean(isi);
         
         % Cv2 (local cv): Holt 1996, taken from CE

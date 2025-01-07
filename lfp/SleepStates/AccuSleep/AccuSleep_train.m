@@ -1,4 +1,4 @@
-function [net, netInfo] = AccuSleep_train(basepaths, epochs, imageLocation)
+function [net, netInfo] = AccuSleep_train(basepaths, bouts, imageLocation)
 % AccuSleep_train  Train a network for classifying brain states
 % Zeke Barger, 021321
 %
@@ -6,11 +6,11 @@ function [net, netInfo] = AccuSleep_train(basepaths, epochs, imageLocation)
 %   basepaths - a cell array of strings depicting the full path to the data
 %   folder. each folder should contain a [basename].sleep_sig and
 %   [basename].labelsMan.
-%   epochs - the number of epochs for the network to consider at once when
-%       scoring each individual epoch. More epochs provide more context,
-%       but using fewer epochs is more efficient.
+%   bouts - the number of bouts for the network to consider at once when
+%       scoring each individual bout. More bouts provide more context,
+%       but using fewer bouts is more efficient.
 %       ***Must be an odd number greater than or equal to 9***
-%       For 2.5s epochs, a reasonable value is 13.
+%       For 2.5s bouts, a reasonable value is 13.
 %   imageLocation (optional) - training images will be stored here. If
 %       no location is specified, a temporary folder will be created in the
 %       current directory and deleted after the network is trained.   
@@ -41,7 +41,7 @@ end
 % load config data
 cfg = as_loadConfig();
 nstates = cfg.nstates;
-epochLen = cfg.epochLen;
+boutLen = cfg.boutLen;
 
 % make directory to hold training images
 % remove slash at the end of the path if it's there already
@@ -58,9 +58,9 @@ for i = 1:nstates
     mkdir([imageLocation,filesep,num2str(i)])
 end
 
-% calculate how many epochs on either side of central epoch to include in
+% calculate how many bouts on either side of central bout to include in
 % the images
-pad = round((epochs - 1) / 2);
+pad = round((bouts - 1) / 2);
 
 %%  Process the recordings
 nFiles = size(basepaths, 1);
@@ -85,7 +85,7 @@ for i = 1:nFiles
     processedEMG = processedEMG.emg_rms;
     
     % make sure the files look ok
-%     switch checkFiles(data, SR, epochLen, i, nstates)
+%     switch checkFiles(data, SR, boutLen, i, nstates)
 %         % user opts to skip
 %         case 0
 %             continue
@@ -99,7 +99,7 @@ for i = 1:nFiles
 %     end
     
     % create the spectrogram
-%     [s, ~, f] = createSpectrogram(data.a.EEG, SR, epochLen);
+%     [s, ~, f] = createSpectrogram(data.a.EEG, SR, boutLen);
     % select frequencies up to 50 Hz, and downsample between 20 and 50 Hz.
     % redundant after changes to as_prepSig, May2022
 %     [~,f20idx] = min(abs(f - 20)); % index in f of 20Hz
@@ -107,8 +107,8 @@ for i = 1:nFiles
 %     s = s(:, [1:(f20idx-1), f20idx:2:f50idx]);
     % take log of the spectrogram
     s = log(s);
-    % calculate log rms EMG for each epoch
-%     processedEMG = processEMG(data.b.EMG, SR, epochLen);
+    % calculate log rms EMG for each bout
+%     processedEMG = processEMG(data.b.EMG, SR, boutLen);
     % make sure labels are the right length
     if length(data.c.labels) > length(processedEMG)
         data.c.labels = data.c.labels(1:length(processedEMG));
@@ -150,7 +150,7 @@ for i = 1:nFiles
     im(im > 1)=1;
     % generate the images
     disp(['Creating images for recording ',num2str(i)])
-    % take all datapoints with sufficient epochs on either side
+    % take all datapoints with sufficient bouts on either side
     for j = (pad+1):(length(processedEMG)-pad)
         % only take timepoints with labels in range 1:n_states
         if data.c.labels(j) > 0 && data.c.labels(j) < (nstates+1)
@@ -212,8 +212,8 @@ options = trainingOptions('sgdm', ...
     'LearnRateDropFactor',0.85, ...
     'LearnRateDropPeriod',1, ...
     'InitialLearnRate',0.015, ...
-    'MaxEpochs',10, ...
-    'Shuffle','every-epoch', ...
+    'MaxBouts',10, ...
+    'Shuffle','every-bout', ...
     'ValidationData',imdsValidation, ...
     'ValidationFrequency',vf, ...
     'ValidationPatience',15,...
@@ -255,7 +255,7 @@ end
 
 % make sure each set of eeg, emg, and label files looks correct
 % offer the option to skip or quit on encountering a problem
-function [looksGood] = checkFiles(data, SR, epoch_length, i, n_states)
+function [looksGood] = checkFiles(data, SR, bout_length, i, n_states)
 looksGood = 1;
 
 % need to have all the correct variables
@@ -285,7 +285,7 @@ if ~any(data.c.labels > 0 & data.c.labels < (n_states+1))
     return
 end
 % labels must be approximately the same length as EEG / EMG
-if abs(length(data.c.labels)*epoch_length*SR - length(data.a.EEG)) / length(data.a.EEG) > 0.05
+if abs(length(data.c.labels)*bout_length*SR - length(data.a.EEG)) / length(data.a.EEG) > 0.05
     looksGood = showError(['Recording ',num2str(i),' has EEG and label files of different lengths. ']);
     return
 end

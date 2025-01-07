@@ -37,14 +37,14 @@ rawCh = [8 : 11];
 % re-calc stuff
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% re-calc state epochs for better visualization
+% re-calc state bouts for better visualization
 minDur = [10, 5, 5, 10, 5, 5];
 minDur = 4;
 interDur = 10;
 labels = v.ss.labels;
 labels(labels == 6) = 5;
 labels(labels == 3) = 4;
-[stateEpochs, ~] = as_epochs('labels', labels,...
+[boutTimes, ~] = as_bouts('labels', labels,...
     'minDur', minDur, 'interDur', interDur);
 
 % subsample emg
@@ -107,10 +107,10 @@ for iwin = 1 : nwin
     axh(iwin) = nexttile(iwin);
     hold on
     for istate = 1 : length(sstates)
-        winIdx = InIntervals(stateEpochs{sstates(istate)}, winLim(1, :));
-        sepochs = stateEpochs{sstates(istate)}(winIdx, :);
-        if ~isempty(sepochs)
-            plot(sepochs' - winStart(1, iwin), 1 * ones(size(sepochs))',...
+        winIdx = InIntervals(boutTimes{sstates(istate)}, winLim(1, :));
+        sbouts = boutTimes{sstates(istate)}(winIdx, :);
+        if ~isempty(sbouts)
+            plot(sbouts' - winStart(1, iwin), 1 * ones(size(sbouts))',...
                 'color', cfg.colors{sstates(istate)}, 'LineWidth', 25)
         end
     end

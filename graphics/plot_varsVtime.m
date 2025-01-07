@@ -33,13 +33,13 @@ yLimit_emg = [prctile(emg, 0.05), prctile(emg, 99.95)];
 cfg = as_loadConfig();
 sstates = [6, 3, 5, 4, 2, 1];
 
-% re-calc state epochs for better visualization
+% re-calc state bouts for better visualization
 minDur = [5, 2, 2, 5, 2, 2];
 interDur = 10;
 labels = v.ss.labels;
 labels(labels == 6) = 5;
 labels(labels == 3) = 4;
-[stateEpochs, ~] = as_epochs('labels', labels,...
+[boutTimes, ~] = as_bouts('labels', labels,...
     'minDur', minDur, 'interDur', interDur);
 
 % subsample emg
@@ -103,15 +103,15 @@ for iwin = 1 : nwin
     axh(iwin) = nexttile(iwin);
     hold on
     
-    % limit state epochs to window
-    sepochs = cell(1, length(sstates));
+    % limit state bouts to window
+    sbouts = cell(1, length(sstates));
     for istate = 1 : length(sstates)
-        winIdx = InIntervals(stateEpochs{sstates(istate)}, winLim(1, :));
-        sepochs{sstates(istate)} = stateEpochs{sstates(istate)}(winIdx, :) - winStart(1);
+        winIdx = InIntervals(boutTimes{sstates(istate)}, winLim(1, :));
+        sbouts{sstates(istate)} = boutTimes{sstates(istate)}(winIdx, :) - winStart(1);
     end
 
     % plot
-    plot_hypnogram('stateEpochs', sepochs, 'sstates', sstates, 'axh', axh(iwin))
+    plot_hypnogram('boutTimes', sbouts, 'sstates', sstates, 'axh', axh(iwin))
     set(gca, 'ytick', [])
     set(gca, 'YColor', 'none')
     pbaspect([10, 1, 1])

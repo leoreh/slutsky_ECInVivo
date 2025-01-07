@@ -5,7 +5,7 @@ function samples = Restrict(samples,intervals,varargin)
 % Keep only samples (positions, spikes, LFP, etc.) that fall in a given list of
 % time intervals.
 %
-% The remaining epochs can optionally be 'shifted' next to each other in time,
+% The remaining bouts can optionally be 'shifted' next to each other in time,
 % removing the time gaps between them (which result from discarded samples),
 % in which case they are also shifted globally to start at t = 0.
 %
@@ -20,7 +20,7 @@ function samples = Restrict(samples,intervals,varargin)
 %    =========================================================================
 %     Properties    Values
 %    -------------------------------------------------------------------------
-%     'shift'       shift remaining epochs together in time (default = 'off')
+%     'shift'       shift remaining bouts together in time (default = 'off')
 %    =========================================================================
 %
 %  NOTE

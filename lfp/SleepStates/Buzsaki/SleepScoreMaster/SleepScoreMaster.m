@@ -73,7 +73,7 @@ function SleepState = SleepScoreMaster(basePath,varargin)
 %                   "raw" state scoring. episodes are joined episodes of 
 %                   extended (40s) time in a given states, allowing for 
 %                   brief interruptions. also contains NREM packets, 
-%                   unitary epochs of NREM as described in Watson et al 2016.
+%                   unitary bouts of NREM as described in Watson et al 2016.
 %                   saved in a .mat file:
 %                   recordingname_SleepScore.mat 
 %   

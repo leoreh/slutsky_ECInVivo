@@ -32,8 +32,8 @@ classdef UMAP < handle
 %         * minkowski
 %         * seuclidean
 % 
-% n_epochs: integer (optional)
-%     The number of training epochs to be used in optimizing the low
+% n_bouts: integer (optional)
+%     The number of training bouts to be used in optimizing the low
 %     dimensional embedding. Larger values result in more accurate
 %     embeddings. If 0, a value will be selected based on the size of the
 %     input dataset (200 for large datasets, 500 for small).
@@ -216,7 +216,7 @@ classdef UMAP < handle
         pythonTemplate;
         usingPython;
         dimNames;
-        epoch_reports;
+        bout_reports;
         eigen_limit=UMAP.EIGEN_LIMIT;
         probability_bin_limit=UMAP.PROBABILITY_BIN_LIMIT;
         progress_callback;
@@ -224,7 +224,7 @@ classdef UMAP < handle
         n_neighbors=15
         n_components=2
         metric='euclidean'
-        n_epochs
+        n_bouts
         learning_rate=1
         init=UMAP.INIT_SPECTRAL
         min_dist=0.3
@@ -284,7 +284,7 @@ classdef UMAP < handle
                 U.n_neighbors = args.n_neighbors;
                 U.n_components = args.n_components;
                 U.metric = args.metric;
-                U.n_epochs = args.n_epochs;
+                U.n_bouts = args.n_bouts;
                 U.learning_rate = args.learning_rate;
                 U.init = args.init;
                 U.min_dist = args.min_dist;
@@ -438,8 +438,8 @@ classdef UMAP < handle
                     || strcmpi(U.method, 'MEX'))
                 error('The C method currently only supports reducing to 2 dimensions');
             end
-            if ~isempty(U.n_epochs) && (U.n_epochs <= 10 || (floor(U.n_epochs) ~= U.n_epochs))
-                error('n_epochs must be a positive integer larger than 10');
+            if ~isempty(U.n_bouts) && (U.n_bouts <= 10 || (floor(U.n_bouts) ~= U.n_bouts))
+                error('n_bouts must be a positive integer larger than 10');
             end
             if ~U.randomize && U.sgd_tasks > 1
                     warning('SGD cannot be parallelized while ''randomize'' is false; setting ''sgd_tasks'' to 1!');
@@ -757,10 +757,10 @@ classdef UMAP < handle
                 U.raw_data, U.graph, U.n_components,...
                 U.initial_alpha, U.a, U.b, U.repulsion_strength, ...
                 'negative_sample_rate', U.negative_sample_rate, ...
-                'n_epochs', U.n_epochs, 'init', U.init, 'metric', U.metric,...
+                'n_bouts', U.n_bouts, 'init', U.init, 'metric', U.metric,...
                 'dist_args', U.dist_args, 'verbose', U.verbose, ...
                 'method', U.method, 'progress_callback', ...
-                U.progress_callback, 'epoch_reports', U.epoch_reports,...
+                U.progress_callback, 'bout_reports', U.bout_reports,...
                 'probability_bin_limit', U.probability_bin_limit, ...
                 'random_state', ~U.randomize, ...
                 'min_dist', U.min_dist,...
@@ -899,29 +899,29 @@ classdef UMAP < handle
             
             init_embedding = init_transform(cols, init_weights, U.embedding);
 
-            if isempty(U.n_epochs) || isnan(U.n_epochs)
+            if isempty(U.n_bouts) || isnan(U.n_bouts)
                 if n_samples <= 10000
-                    n_trans_epochs = 100;
+                    n_trans_bouts = 100;
                 else
-                    n_trans_epochs = 30;
+                    n_trans_bouts = 30;
                 end
             else
-                n_trans_epochs = floor(U.n_epochs / 3);
+                n_trans_bouts = floor(U.n_bouts / 3);
             end
 
             [~,~,graph_data]=find(weight_graph);
-            weight_graph=remove_sparse(weight_graph, @(a)lt(a, max(graph_data)/n_trans_epochs));
+            weight_graph=remove_sparse(weight_graph, @(a)lt(a, max(graph_data)/n_trans_bouts));
             
             [U.head, U.tail, U.weights] = find(weight_graph);
             U.weights = U.weights(:);
 
-            epochs_per_sample = make_epochs_per_sample(U.weights);
+            bouts_per_sample = make_bouts_per_sample(U.weights);
             U.doing_stochastic_gradient_descent=true;
             [X_new, ~] = choose_optimize_layout(init_embedding, U.embedding, U.head,...
-                U.tail, n_trans_epochs, embeddingCount, epochs_per_sample, U.a, ...
+                U.tail, n_trans_bouts, embeddingCount, bouts_per_sample, U.a, ...
                 U.b, U.repulsion_strength, U.initial_alpha,...
                 U.negative_sample_rate, U.verbose, U.method, ...
-                U.progress_callback, U.epoch_reports, ~U.randomize, ...
+                U.progress_callback, U.bout_reports, ~U.randomize, ...
                 U.min_dist, [], C, U.sgd_tasks);
         end
         
@@ -995,29 +995,29 @@ classdef UMAP < handle
             init_embedding = init_transform(old_cols, old_weights, U.embedding);
             XY_low = vertcat(init_embedding, U.embedding);
 
-            if isempty(U.n_epochs) || isnan(U.n_epochs)
+            if isempty(U.n_bouts) || isnan(U.n_bouts)
                 if n_samples <= 10000
-                    n_trans_epochs = 200;
+                    n_trans_bouts = 200;
                 else
-                    n_trans_epochs = 100;
+                    n_trans_bouts = 100;
                 end
             else
-                n_trans_epochs = floor(U.n_epochs / 2);
+                n_trans_bouts = floor(U.n_bouts / 2);
             end
 
             [~,~,graph_data]=find(weight_graph);
-            weight_graph=remove_sparse(weight_graph, @(a)lt(a, max(graph_data)/n_trans_epochs));
+            weight_graph=remove_sparse(weight_graph, @(a)lt(a, max(graph_data)/n_trans_bouts));
             
             [U.head, U.tail, U.weights] = find(weight_graph);
 
-            epochs_per_sample = make_epochs_per_sample(U.weights);
+            bouts_per_sample = make_bouts_per_sample(U.weights);
             U.doing_stochastic_gradient_descent=true;
 
             X_new = choose_optimize_layout(init_embedding, XY_low, U.head,...
-                U.tail, n_trans_epochs, embeddingCount, epochs_per_sample, U.a, ...
+                U.tail, n_trans_bouts, embeddingCount, bouts_per_sample, U.a, ...
                 U.b, U.repulsion_strength, U.initial_alpha,...
                 U.negative_sample_rate, U.verbose, U.method, ...
-                U.progress_callback, U.epoch_reports, ~U.randomize, ...
+                U.progress_callback, U.bout_reports, ~U.randomize, ...
                 U.min_dist, move_point, C);
 
         end
@@ -1038,7 +1038,7 @@ classdef UMAP < handle
                     ', n_neighbors=' mat2str(U.n_neighbors)...
                     ', n_components=' mat2str(U.n_components)...
                     ', metric=' mstr...
-                    ', n_epochs=' mat2str(U.n_epochs)...
+                    ', n_bouts=' mat2str(U.n_bouts)...
                     ', learning_rate=' mat2str(U.learning_rate)...
                     ', init=' U.init...
                     ', min_dist=' mat2str(U.min_dist)...
@@ -1066,7 +1066,7 @@ classdef UMAP < handle
                     ', n_neighbors=' mat2str(U.n_neighbors)...
                     ', n_components=' mat2str(U.n_components)...
                     ', metric=' mstr...
-                    ', n_epochs=' mat2str(U.n_epochs)...
+                    ', n_bouts=' mat2str(U.n_bouts)...
                     ', learning_rate=' mat2str(U.learning_rate)...
                     ', init=custom input'...
                     ', min_dist=' mat2str(U.min_dist)...
@@ -1151,7 +1151,7 @@ function p=parseArguments(varargin)
     addParameter(p,'n_neighbors',15);
     addParameter(p,'n_components',2);
     addParameter(p,'metric','euclidean');
-    addParameter(p,'n_epochs',[]);
+    addParameter(p,'n_bouts',[]);
     addParameter(p,'learning_rate',1);
     addParameter(p,'init',UMAP.INIT_SPECTRAL);
     addParameter(p,'min_dist',0.3);

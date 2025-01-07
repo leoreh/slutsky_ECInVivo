@@ -5,7 +5,7 @@ function [ripDetect , ripCount] = TL_ripDetect_varelaWilson2020(lfp , sleep , mu
 % Ripple detection BASED on Valera & Wilson 2020
 
 %% Varela & Wilson 2020
-% The SWR detection algorithm detected times when the squared, filtered LFP (100–275 Hz)
+% The SWR detection algorithm detected times when the squared, filtered LFP (100â€“275 Hz)
 % had an amplitude above the mean plus three standard deviations for at least 20 ms (mean 
 % and standard deviation calculated for the LFP when the animal was quiet). If two SWRs were closer than 20
 % ms they were considered a single ripple event. The SWR timestamp was selected as the time with

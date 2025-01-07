@@ -158,7 +158,7 @@ switch dataPreset
             v(isession).data = emg_rms;
         end
         cfg = as_loadConfig();
-        ts = cfg.epochLen;                              % sampling period [s]        
+        ts = cfg.boutLen;                              % sampling period [s]        
     
     case 'sr'
         for isession = 1 : nsessions

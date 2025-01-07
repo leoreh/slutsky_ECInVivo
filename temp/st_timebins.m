@@ -84,8 +84,8 @@ for isession = 1 : nsessions
     
     stateIdx = [1];
     for ichunk = 1 : nchunks
-        winIdx = InIntervals(v(isession).ss.stateEpochs{stateIdx}, chunks(ichunk, :));
-        winCalc{ichunk} = v(isession).ss.stateEpochs{stateIdx}(winIdx, :);
+        winIdx = InIntervals(v(isession).ss.boutTimes{stateIdx}, chunks(ichunk, :));
+        winCalc{ichunk} = v(isession).ss.boutTimes{stateIdx}(winIdx, :);
     end
     
     st = spktimesMetrics('winCalc', winCalc, 'fs', fs, 'forceA', true);

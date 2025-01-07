@@ -139,8 +139,8 @@ nbins = 2;
 sstates = [1, 4, 5];
 snames = v(1).ss.info.names(sstates);
 
-% get epoch stats
-clear prctDur epLen totDur
+% get bout stats
+clear prctDur boutLen totDur
 for ifile = 1 : nfiles
     
     % timebins for calculating stats
@@ -162,7 +162,7 @@ for ifile = 1 : nfiles
     minDur = 0;
 
     cd(basepaths{ifile})
-    [totDur(ifile, :, :), prctDur(ifile, :, :), epLen(ifile, :)] = as_plotZT('nbins', nbins,...
+    [totDur(ifile, :, :), prctDur(ifile, :, :), boutLen(ifile, :)] = as_plotZT('nbins', nbins,...
         'sstates', sstates, 'ss', v(ifile).ss, 'labels', labels,...
         'timebins', timebins, 'graphics', false, 'minDur', minDur);
 end
@@ -176,7 +176,7 @@ for ibin = 1 : nbins
     th.TileSpacing = 'tight';
     th.Padding = 'none';
     
-    nepochs = cellfun(@(x) sum(~isnan(x(:, ibin))), epLen, 'UniformOutput', true);
+    nbouts = cellfun(@(x) sum(~isnan(x(:, ibin))), boutLen, 'UniformOutput', true);
 
     for istate = 1 : length(sstates)  
         
@@ -192,24 +192,24 @@ for ibin = 1 : nbins
         legend({'WT', 'MCU-KO'}, 'Location', 'best');
         title(axh, snames(istate))
 
-        % epoch length per mouse
+        % bout length per mouse
         axh = nexttile(th, istate + length(sstates), [1, 1]);
         hold on
 
         dataMat =  cellfun(@(x) mean(x(:, ibin), 'omitnan'),...
-            epLen(:, istate), 'UniformOutput', true);
+            boutLen(:, istate), 'UniformOutput', true);
         dataMat = cell2nanmat({dataMat(1 : idx_wt), dataMat(idx_mcu : end)}, 2);
         plot_boxMean('dataMat', dataMat, 'clr', 'kr', 'allPnts', true)
-        ylabel('Epoch Length (s)');
+        ylabel('Bout Length (s)');
         title(axh, snames(istate))
         
-        % nepochs per mouse
+        % nbouts per mouse
         axh = nexttile(th, istate + 2 * length(sstates), [1, 1]);
         hold on
-        dataMat = nepochs(:, istate);
+        dataMat = nbouts(:, istate);
         dataMat = cell2nanmat({dataMat(1 : idx_wt), dataMat(idx_mcu : end)}, 2);
         plot_boxMean('dataMat', dataMat, 'clr', 'kr', 'allPnts', true)
-        ylabel('No. Epochs');
+        ylabel('No. Bouts');
         title(axh, snames(istate))
 
     end
@@ -239,7 +239,7 @@ fh = figure;
 for ifile = 1 : nfiles
 
     sb = subplot(nfiles, 1, ifile);
-    plot_hypnogram('stateEpochs', v(ifile).ss.stateEpochs, 'axh', sb)
+    plot_hypnogram('boutTimes', v(ifile).ss.boutTimes, 'axh', sb)
 
 end
 
@@ -256,7 +256,7 @@ end
 % (1) delta-theta ratio across time
 % (2) difference between delta (and other bands) between low and high emg
 % (3) accusleep recovers its ability to classify states
-% (4) plot emg vs. delta theta for epochs accusleep classified as AW and
+% (4) plot emg vs. delta theta for bouts accusleep classified as AW and
 % NREM and measure distance 
 
 % -------------------------------------------------------------------------
@@ -445,7 +445,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % TO DO LIST
-% recalc firing rates accorindg to new epochs
+% recalc firing rates accorindg to new bouts
 
 % DONE:
 % lh96 (t1)
@@ -534,9 +534,9 @@ for ifile = 1 : nfiles
 
         % superposition of state hypnogram and emg-states
         axh(1) = nexttile(th, 1, [1, 3]); cla; hold on
-        plot_hypnogram('stateEpochs', psd.epochs.stateEpochs, 'sstates', [1 : 3],...
+        plot_hypnogram('boutTimes', psd.bouts.boutTimes, 'sstates', [1 : 3],...
             'axh', axh, 'yshift', 3, 'clr', clr)
-        plot_hypnogram('stateEpochs', psdEmg.epochs.stateEpochs, 'sstates', [1, 2],...
+        plot_hypnogram('boutTimes', psdEmg.bouts.boutTimes, 'sstates', [1, 2],...
             'axh', axh, 'clr', clrEmg, 'yshift', 1)
         plot([1 : length(emg)], emg, 'k', 'LineWidth', 0.5)
         axis tight
@@ -596,8 +596,8 @@ for ifile = 1 : nfiles
      
         % AS state clusters in feature space
         axh(5) = nexttile(th, 9, [1, 1]); cla; hold on
-        pcMat = psd.epochs.pc;
-        clrIdx = psd.epochs.clrIdx;
+        pcMat = psd.bouts.pc;
+        clrIdx = psd.bouts.clrIdx;
         sh = scatter3(pcMat(:, 1), pcMat(:, 2), pcMat(:, 3),...
             30, clrIdx, 'filled');
         view(-25, 25)
@@ -608,7 +608,7 @@ for ifile = 1 : nfiles
 
         % AS silhouette plot
         axh(6) = nexttile(th, 10, [1, 1]); cla; hold on
-        stateIdx = psd.epochs.stateIdx;
+        stateIdx = psd.bouts.stateIdx;
         silhouette(pcMat, stateIdx, 'Euclidean');
         xlim([-1 1])
         yticklabels(snames)
@@ -619,7 +619,7 @@ for ifile = 1 : nfiles
         title(axh(6), 'AS Separation Quality')
         yTickVals = yticks;
         for istate = 1 : 3
-            meanSil = mean(psd.epochs.sil(stateIdx == istate));
+            meanSil = mean(psd.bouts.sil(stateIdx == istate));
             if ~isnan(meanSil)
                 text(-0.75, yTickVals(istate), num2str(meanSil, '%.3f'));
             end
@@ -627,8 +627,8 @@ for ifile = 1 : nfiles
         
         % EMG state clusters in feature space
         axh(7) = nexttile(th, 11, [1, 1]); cla; hold on
-        pcMat = psdEmg.epochs.pc;
-        clrIdx = psdEmg.epochs.clrIdx;
+        pcMat = psdEmg.bouts.pc;
+        clrIdx = psdEmg.bouts.clrIdx;
         sh = scatter3(pcMat(:, 1), pcMat(:, 2), pcMat(:, 3),...
             30, clrIdx, 'filled');
         view(-25, 25)
@@ -639,7 +639,7 @@ for ifile = 1 : nfiles
 
         % silhouette plot
         axh(8) = nexttile(th, 12, [1, 1]); cla; hold on
-        stateIdx = psdEmg.epochs.stateIdx;
+        stateIdx = psdEmg.bouts.stateIdx;
         silhouette(pcMat, stateIdx, 'Euclidean');
         xlim([-1 1])
         yticklabels(snames)
@@ -650,7 +650,7 @@ for ifile = 1 : nfiles
         title(axh(8), 'EMG Separation Quality')
         yTickVals = yticks;
         for istate = 1 : 2
-            meanSil = mean(psdEmg.epochs.sil(stateIdx == istate));
+            meanSil = mean(psdEmg.bouts.sil(stateIdx == istate));
             text(-0.75, yTickVals(istate), num2str(meanSil, '%.3f')); 
         end
        
@@ -713,8 +713,8 @@ for ifile = 1 : nfiles
     cd(basepath)
 
     for istate = 1 : length(sstates)
-        tstamps{istate} = diff(v(ifile).psdEmg.info.stateEpochs{istate}')' +...
-            v(ifile).psdEmg.info.stateEpochs{istate}(:, 1);
+        tstamps{istate} = diff(v(ifile).psdEmg.info.boutTimes{istate}')' +...
+            v(ifile).psdEmg.info.boutTimes{istate}(:, 1);
     end
 end
 

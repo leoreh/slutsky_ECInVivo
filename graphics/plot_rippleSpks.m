@@ -49,15 +49,15 @@ end
 setMatlabGraphics(true)
 fh = figure;
 
-nepochs = size(ripp.epochs, 1);
+nbouts = size(ripp.bouts, 1);
 durPlot = [-50 50] / 1000;
-x = durPlot(1) : diff(durPlot) / nepochs : durPlot(2);
+x = durPlot(1) : diff(durPlot) / nbouts : durPlot(2);
 
 if isfield(ripp.spks, 'mu')
 
     % map of nspks per ripple
     sb1 = subplot(4, 3, [1, 4]);
-    repIdx = randperm(nepochs, min([300, nepochs]));
+    repIdx = randperm(nbouts, min([300, nbouts]));
     PlotColorMap(ripp.spks.mu.rippMap(repIdx, :), 1, 'bar','on', 'x', x);
     xlabel('Time [ms]')
     ylabel('Ripple No.')
@@ -79,7 +79,7 @@ if isfield(ripp.spks, 'mu')
     ylabel('MU spike rate')
     title(sprintf('MU mean spike rate\nduring ripples'))
     
-    % mean nspks across random non-ripple epochs
+    % mean nspks across random non-ripple bouts
     sb3 = subplot(4, 3, 5);
     ydata = ripp.spks.mu.randMap;
     xdata = linspace(ripp.maps.durWin(1), ripp.maps.durWin(2),...
@@ -93,9 +93,9 @@ if isfield(ripp.spks, 'mu')
     ylim(yLimit)
     xlabel('Time [ms]')
     ylabel('MU spike rate')
-    title(sprintf('MU mean spike rate\nduring non-ripple epochs'))
+    title(sprintf('MU mean spike rate\nduring non-ripple bouts'))
 
-    % hist of nspks in ripples vs. random epochs
+    % hist of nspks in ripples vs. random bouts
     sb4 = subplot(4, 3, [3, 6]);
     ydata = sum(ripp.spks.mu.rippMap, 2);
     hh = histogram(ydata, 50,...
@@ -113,7 +113,7 @@ if isfield(ripp.spks, 'mu')
     legend({'Ripple', 'Non-Ripple'}, 'Location', 'best')
     ylabel('Probability')
     xlabel('MU spikes')
-    title(sprintf('MU spikes distribution\nper ripple / non-ripple epochs'))
+    title(sprintf('MU spikes distribution\nper ripple / non-ripple bouts'))
 
 end
 
@@ -166,7 +166,7 @@ if isfield(ripp.spks, 'su')
     title(sprintf('Norm. MFR during ripples\naveraged across FS units'));
     axis tight
 
-    % plot of nspks in ripples vs. random epochs per unit
+    % plot of nspks in ripples vs. random bouts per unit
     sb8 = subplot(2, 3, 6);
     unitIdx = units.clean(1, :);
     ydata = ripp.spks.su.rippMap(unitIdx, :, :);
@@ -187,9 +187,9 @@ if isfield(ripp.spks, 'su')
     xlim(eqLim)
     ylim(eqLim)
     ylabel('MFR during ripples')
-    xlabel('MFR during non-ripple epochs')
+    xlabel('MFR during non-ripple bouts')
     legend({'RS', 'FS'})
-    title(sprintf('MFR per unit during\nripples / non-ripple epochs'))
+    title(sprintf('MFR per unit during\nripples / non-ripple bouts'))
 
 end
 

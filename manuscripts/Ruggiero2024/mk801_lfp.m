@@ -137,7 +137,7 @@ fh = figure;
 for ifile = 1 : nfiles
     
     sb = subplot(nfiles, 1, ifile);
-    plot_hypnogram('stateEpochs', v(ifile).ss.stateEpochs, 'axh', sb)
+    plot_hypnogram('boutTimes', v(ifile).ss.boutTimes, 'axh', sb)
 
 end
 
@@ -146,7 +146,7 @@ sstates = [1, 4, 5];
 clear prctDur
 for ifile = 1 : nfiles
     cd(basepaths{ifile})
-    [totDur, prctDur(ifile, :, :), epLen] = as_plotZT('nbins', 4,...
+    [totDur, prctDur(ifile, :, :), boutLen] = as_plotZT('nbins', 4,...
         'sstates', sstates, 'ss', v(ifile).ss,...
         'timebins', v(ifile).session.general.timebins, 'graphics', false);
 end

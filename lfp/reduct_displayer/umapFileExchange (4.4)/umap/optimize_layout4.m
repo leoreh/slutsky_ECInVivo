@@ -1,5 +1,5 @@
 function embedding = optimize_layout4(head_embedding, tail_embedding, ...
-    head, tail, n_epochs, n_vertices, epochs_per_sample, a, b,...
+    head, tail, n_bouts, n_vertices, bouts_per_sample, a, b,...
     gamma, initial_alpha, negative_sample_rate, verbose, min_dist)
 %OPTIMIZE_LAYOUT2 Another version of optimize_layout.m that slightly
 % optimizes the speed for MATLAB; in particular, several quantities are
@@ -7,7 +7,7 @@ function embedding = optimize_layout4(head_embedding, tail_embedding, ...
 % vectorized'.
 %
 % embedding = OPTIMIZE_LAYOUT2(head_embedding, tail_embedding, head, tail,
-% n_epochs, n_vertices, epochs_per_sample, a, b)
+% n_bouts, n_vertices, bouts_per_sample, a, b)
 %
 % Parameters
 % ----------
@@ -26,15 +26,15 @@ function embedding = optimize_layout4(head_embedding, tail_embedding, ...
 % tail: array of size (n_1_simplices, 1)
 %     The indices of the tails of 1-simplices with non-zero membership.
 % 
-% n_epochs: double
-%     The number of training epochs to use in optimization.
+% n_bouts: double
+%     The number of training bouts to use in optimization.
 % 
 % n_vertices: double
 %     The number of vertices (0-simplices) in the dataset.
 % 
-% epochs_per_samples: array of size (n_1_simplices, 1)
-%     A double value of the number of epochs per 1-simplex. 1-simplices with
-%     weaker membership strength will have more epochs between being sampled.
+% bouts_per_samples: array of size (n_1_simplices, 1)
+%     A double value of the number of bouts per 1-simplex. 1-simplices with
+%     weaker membership strength will have more bouts between being sampled.
 % 
 % a: double
 %     Parameter of differentiable approximation of right adjoint functor.
@@ -89,13 +89,13 @@ function embedding = optimize_layout4(head_embedding, tail_embedding, ...
     %FOURS=4*ONES;
     ABNEG2=-2.0*a*b;
     BNEG1=b-1;
-    precompute_epochs = n_samples <= 800;
+    precompute_bouts = n_samples <= 800;
     
     same_embedding = isequal(head_embedding, tail_embedding);
     alpha = initial_alpha;
     
-    n_edges = size(epochs_per_sample, 1);
-    weights = ones(n_edges,1)./epochs_per_sample;
+    n_edges = size(bouts_per_sample, 1);
+    weights = ones(n_edges,1)./bouts_per_sample;
     
     full_weights = full(sparse(double(head), double(tail), double(weights), n_samples, size(tail_embedding, 1)));
     if same_embedding
@@ -104,17 +104,17 @@ function embedding = optimize_layout4(head_embedding, tail_embedding, ...
     repulsion_weights = 1-full_weights;
     [rep_head, rep_tail, rep_weights] = find(repulsion_weights);
     
-    repulsion_epochs = ones(size(rep_weights,1),1)./(rep_weights);
-    epochs_per_sample = vertcat(epochs_per_sample, repulsion_epochs);
+    repulsion_bouts = ones(size(rep_weights,1),1)./(rep_weights);
+    bouts_per_sample = vertcat(bouts_per_sample, repulsion_bouts);
     aughead = vertcat(head, rep_head);
     augtail = vertcat(tail, rep_tail);
     change = zeros(n_samples, dim);
     
-    n_pairs = size(epochs_per_sample, 1);
+    n_pairs = size(bouts_per_sample, 1);
     
-    %epochs_per_negative_sample = epochs_per_sample / single(negative_sample_rate);
-    %epoch_of_next_negative_sample = epochs_per_negative_sample;
-    epoch_of_next_sample = epochs_per_sample;
+    %bouts_per_negative_sample = bouts_per_sample / single(negative_sample_rate);
+    %bout_of_next_negative_sample = bouts_per_negative_sample;
+    bout_of_next_sample = bouts_per_sample;
 
     %tc=tic;
     
@@ -126,27 +126,27 @@ function embedding = optimize_layout4(head_embedding, tail_embedding, ...
             disp(['The current cross entropy is ' num2str(result)]);
             
             
-    if precompute_epochs
-        [X,Y] = meshgrid(1:double(n_epochs), double(epochs_per_sample));
-        epochs = (floor((X-1)./Y) + 1).*Y;
-        L = epochs <= X;
+    if precompute_bouts
+        [X,Y] = meshgrid(1:double(n_bouts), double(bouts_per_sample));
+        bouts = (floor((X-1)./Y) + 1).*Y;
+        L = bouts <= X;
     end
     
-    for n = 1:n_epochs
-        if precompute_epochs
+    for n = 1:n_bouts
+        if precompute_bouts
             l=L(:,n);
         else
-            l=epoch_of_next_sample <= n;
-            next=epoch_of_next_sample(l) + epochs_per_sample(l);
+            l=bout_of_next_sample <= n;
+            next=bout_of_next_sample(l) + bouts_per_sample(l);
         end
         idxs=find(l);
         N=length(idxs);
         
-        %nNegSamples = floor((single(n) - epoch_of_next_negative_sample(l)) ./ epochs_per_negative_sample(l));
+        %nNegSamples = floor((single(n) - bout_of_next_negative_sample(l)) ./ bouts_per_negative_sample(l));
         %mxNeg=max(nNegSamples);
         %randy=int32(randi(n_vertices, N, mxNeg));
-        %next=epoch_of_next_sample(l) + epochs_per_sample(l);
-        %next_neg=epoch_of_next_negative_sample(l)+(nNegSamples .* epochs_per_negative_sample(l));        
+        %next=bout_of_next_sample(l) + bouts_per_sample(l);
+        %next_neg=bout_of_next_negative_sample(l)+(nNegSamples .* bouts_per_negative_sample(l));        
         %CANNOT vectorize dist_squared OUTSIDE next for loop since head_embedding and tail_embedding
         %change WITHIN next for loop since head and tail contain repeating values
         %   dist_squareds=sqrt(sum((head_embedding(head(l),:)-tail_embedding(tail(l),:)).^2, 2)).^2;
@@ -237,15 +237,15 @@ function embedding = optimize_layout4(head_embedding, tail_embedding, ...
             
         end
             
-        if ~precompute_epochs
-            epoch_of_next_sample(l)=next;
+        if ~precompute_bouts
+            bout_of_next_sample(l)=next;
         end
-        %epoch_of_next_negative_sample(l)=next_neg;
-        alpha = initial_alpha * (1 - (single(n)/single(n_epochs)));
+        %bout_of_next_negative_sample(l)=next_neg;
+        alpha = initial_alpha * (1 - (single(n)/single(n_bouts)));
         
-        progress_checkpoint = min(floor(n_epochs / 10), 50);
+        progress_checkpoint = min(floor(n_bouts / 10), 50);
         if verbose && mod(n, progress_checkpoint) == 0
-            fprintf('\t%d/%d epochs done\n', int32(n), int32(n_epochs));
+            fprintf('\t%d/%d bouts done\n', int32(n), int32(n_bouts));
             
             dists = sqrt(sum((head_embedding(head,:) - tail_embedding(tail,:)).^2, 2));
             %spread = 1; %Should pass in spread from UMAP object.

@@ -144,10 +144,10 @@ for iwin = 1 : nwin
     labels = double(emg > prctile(emg, prct));
     labels(emg < prctile(emg, 100 - prct)) = 2;
     
-    % limit indices to time window and get "state" epochs
+    % limit indices to time window and get "state" bouts
     labels = labels(wins(iwin, 1) : wins(iwin, 2));
-    [stateEpochs, ~] = as_epochs('labels', labels, 'minDur', 10, 'interDur', 4);
-    stateEpochs = stateEpochs([1 : 2]);
+    [boutTimes, ~] = as_bouts('labels', labels, 'minDur', 10, 'interDur', 4);
+    boutTimes = boutTimes([1 : 2]);
 
     % get indices to signal according to window
     sigidx = wins(iwin, :) * fs;
@@ -160,7 +160,7 @@ for iwin = 1 : nwin
 
     % calc psd
     [psd.psd(iwin, :, :), faxis] = calc_psd('sig',...
-        sig(sigidx(1) : sigidx(2), :), 'bins', stateEpochs,...
+        sig(sigidx(1) : sigidx(2), :), 'bins', boutTimes,...
         'fs', fs, 'ftarget', ftarget, 'graphics', false);
 
 end

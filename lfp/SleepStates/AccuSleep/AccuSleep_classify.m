@@ -7,7 +7,7 @@ function [labels, netScores] = AccuSleep_classify(spec, freq, emg_rms, calibrati
 %   sSig.emg - a 1-D matrix of sSig.emg data
 %   net - a trained network. To create one, use AccuSleep_train
 %   SR - sampling rate (Hz)
-%   epochLen - length of each epoch (sec). THIS MUST MATCH THE EPOCH LENGTH
+%   boutLen - length of each bout (sec). THIS MUST MATCH THE EPOCH LENGTH
 %              THAT WAS USED WHEN TRAINING THE NETWORK
 %   calibrationData - matrix specifying how to scale features of the
 %       sSig.eeg/sSig.emg. It is recommended to create one of these for each
@@ -18,7 +18,7 @@ function [labels, netScores] = AccuSleep_classify(spec, freq, emg_rms, calibrati
 % load config data
 cfg = as_loadConfig();
 nstates = cfg.nstates;
-epochLen = cfg.epochLen;
+boutLen = cfg.boutLen;
 minBoutLen = cfg.minBoutLen;
 netScores = [];
 
@@ -80,7 +80,7 @@ if isrow(labels)
 end
 
 % remove bouts that are too short
-if minBoutLen > epochLen
-    labels = enforceMinDuration(labels, ones(1,nstates) * ceil(minBoutLen / epochLen), ...
+if minBoutLen > boutLen
+    labels = enforceMinDuration(labels, ones(1,nstates) * ceil(minBoutLen / boutLen), ...
         1:nstates, 0);
 end

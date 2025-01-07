@@ -115,7 +115,7 @@ cc = cellclass('basepath', basepath,...
     'graphics', false, 'fs', fs);
 
 % spike timing metrics
-st = spktimesMetrics('winCalc', ss.stateEpochs([1, 4]));
+st = spktimesMetrics('winCalc', ss.boutTimes([1, 4]));
 
 % firing rate
 binsize = 60;

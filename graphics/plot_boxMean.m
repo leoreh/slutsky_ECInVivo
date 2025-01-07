@@ -95,6 +95,6 @@ xlim([1 - 0.5, ngrp + 0.5])
 xticks([1 : ngrp]);
 
 % add statistical comparison
-% pVal = stat_compare1D(dataMat, 'axh', axh);
+pVal = stat_compare1D(dataMat, 'axh', axh);
 
 end

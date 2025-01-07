@@ -432,14 +432,14 @@ for isession = 1 : nsessions
     % load emg
     load(sleepfile, 'emg_rms');    
     
-    % divide emg to percentiles and create epochs
+    % divide emg to percentiles and create bouts
     prct = 50;
-    highemg = binary2epochs('vec', [emg_rms > prctile(emg_rms, prct)]',...
+    highemg = binary2bouts('vec', [emg_rms > prctile(emg_rms, prct)]',...
         'minDur', 2, 'maxDur', [], 'interDur', 2, 'exclude', false);
-    lowemg = binary2epochs('vec', [emg_rms < prctile(emg_rms, 100 - prct)]',...
+    lowemg = binary2bouts('vec', [emg_rms < prctile(emg_rms, 100 - prct)]',...
         'minDur', 2, 'maxDur', [], 'interDur', 2, 'exclude', false);
     
-    % clip spktimes to epochs
+    % clip spktimes to bouts
     spktimes = v(isession).spikes.times;
     spkhigh = cellfun(@(x) x(InIntervals(x, highemg)), spktimes, 'uni', false);
     spklow = cellfun(@(x) x(InIntervals(x, lowemg)), spktimes, 'uni', false);
@@ -529,7 +529,7 @@ for isession = 1 : nsessions
     emg_mat = reshape(emg_rms(1 : m), binsize, []);
     emg_bins = mean(emg_mat, 1, 'omitnan');
     
-    % divide emg to percentiles and create epochs
+    % divide emg to percentiles and create bouts
     prct = 50;
     highemg = emg_bins > prctile(emg_bins, prct);
     lowemg = emg_bins < prctile(emg_bins, 100 - prct);   

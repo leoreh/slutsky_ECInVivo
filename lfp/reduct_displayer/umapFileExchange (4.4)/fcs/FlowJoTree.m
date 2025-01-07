@@ -1920,7 +1920,7 @@ classdef FlowJoTree < handle
                 predict_with_background=...
                     ~endsWith(lower(mlpFile), '_no0.h5')&& ...
                     ...% produced with Abdelaal batching?
-                    ~contains(mlpFile, '_epochs__trIdxs_'); 
+                    ~contains(mlpFile, '_bouts__trIdxs_'); 
             else
                 if endsWith(lower(mlpFile), '.mlp.mat')
                     model=mlpFile(1:end-8);

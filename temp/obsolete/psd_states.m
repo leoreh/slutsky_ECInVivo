@@ -1,14 +1,14 @@
 function [psdStates, faxis, epStats] = psd_states(varargin)
 
-% calculates the lfp / eeg psd for each state epoch, averages and
-% normalizes. can also calculate the emg rms for each epoch. subsamples
+% calculates the lfp / eeg psd for each state bout, averages and
+% normalizes. can also calculate the emg rms for each bout. subsamples
 % signals to 128 Hz for faster computation time. this fits lfp data from
 % as_prepSig where a low-pass of 60 Hz is applied. if higher frequencies
 % are wanted then use raw data and subsample to nyquist (or do not
 % subsample at all).
 
 % another parameter observed in Yuval Nir's code is eeg ratio high / low
-% calculated as: eegRatio{istate}(iepoch) = sum(pow(faxis > 25)) /
+% calculated as: eegRatio{istate}(ibout) = sum(pow(faxis > 25)) /
 % sum(pow(faxis < 5));
 %
 % INPUT:
@@ -23,12 +23,12 @@ function [psdStates, faxis, epStats] = psd_states(varargin)
 % OUTPUT
 %   psdStates       raw averaged psd for each state (mat nstates x faxis)
 %   faxis           frequencies of psd estimate 
-%   emgRMS          rms for each epoch, nstates x epochs (cell of nstates)
+%   emgRMS          rms for each bout, nstates x bouts (cell of nstates)
 %
 % DEPENDENCIES
 % 
 % TO DO LIST
-%   allow input of ss struct or stateEpochs instead of labels
+%   allow input of ss struct or boutTimes instead of labels
 %
 % 26 jul 21 LH      updates:
 % 05 jan 21         removed downsampling  
@@ -64,11 +64,11 @@ end
 win = hann(2 ^ (nextpow2(2 * fs) - 1));
 noverlap = floor(0.25 * fs);
 % frequencies for psd estimate. note that both the slowest frequency and
-% the frequency resolution is determined by 1 / epoch length. For example,
-% to estimate frequencies in a resolution of 0.2 Hz, the minimum epoch
+% the frequency resolution is determined by 1 / bout length. For example,
+% to estimate frequencies in a resolution of 0.2 Hz, the minimum bout
 % duration must be 5 seconds (minDur). however, using a hamming window to
 % smooth the psd also reduces the frequency resolution. further, we omit
-% the first and last bin of an epoch to assure no contamination from other
+% the first and last bin of an bout to assure no contamination from other
 % states. this is why the minDur was set to twice the theoretical minimum
 % (10 s).
 
@@ -79,29 +79,29 @@ if isempty(sstates)
     sstates = 1 : nstates;      % selected states (ignore bin)
 end
 
-% convert labels to state epochs. 
-[stateEpochs, epStats] = as_epochs('labels', labels);
+% convert labels to state bouts. 
+[boutTimes, epStats] = as_bouts('labels', labels);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% calc power for each epoch separatly
+% calc power for each bout separatly
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 psdStates = zeros(length(sstates), length(faxis));
 for istate = 1 : length(sstates)
     sidx = sstates(istate);
-    for iepoch = 1 : epStats.nepochs(sidx)
+    for ibout = 1 : epStats.nbouts(sidx)
                
-        % idx to epoch signal w/o first and last bin
-        dataIdx = (stateEpochs{sidx}(iepoch, 1) + 1) * fs :...
-            (stateEpochs{sidx}(iepoch, 2) - 1) * fs - 1;
+        % idx to bout signal w/o first and last bin
+        dataIdx = (boutTimes{sidx}(ibout, 1) + 1) * fs :...
+            (boutTimes{sidx}(ibout, 2) - 1) * fs - 1;
         
-        % calc power and sum across epochs
+        % calc power and sum across bouts
         [pow, ~] = pwelch(sig(dataIdx), win, noverlap, faxis, fs);
         psdStates(istate, :) = psdStates(istate, :) + pow;                       
                
     end
     % average power
-    psdStates(istate, :) = psdStates(istate, :) / epStats.nepochs(sidx);
+    psdStates(istate, :) = psdStates(istate, :) / epStats.nbouts(sidx);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

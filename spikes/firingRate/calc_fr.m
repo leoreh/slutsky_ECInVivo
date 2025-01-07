@@ -19,7 +19,7 @@ function fr = calc_fr(spktimes, varargin)
 %               specified in s.
 %   smet        method for smoothing firing rate: moving average (MA) or
 %               Gaussian kernel (GK) impleneted by multiple-pass MA. {[]}.
-%   stateEpochs cell array of n x 2 time indices of states. if empty will
+%   btimes      cell array of n x 2 time indices of states. if empty will
 %               try to load from sleep_states.mat. this can be used for
 %               states defined only by emg
 %   forceA      logical. force analysis even if struct file exists {true}
@@ -54,7 +54,7 @@ p = inputParser;
 addOptional(p, 'basepath', pwd);
 addOptional(p, 'binsize', 60, @isscalar);
 addOptional(p, 'winCalc', [0 Inf], validate_win);
-addOptional(p, 'stateEpochs', []);
+addOptional(p, 'btimes', []);
 addOptional(p, 'winBL', [], validate_win);
 addOptional(p, 'smet', 'none', @ischar);
 addOptional(p, 'graphics', true, @islogical);
@@ -65,7 +65,7 @@ parse(p, varargin{:})
 basepath        = p.Results.basepath;
 binsize         = p.Results.binsize;
 winCalc         = p.Results.winCalc;
-stateEpochs     = p.Results.stateEpochs;
+btimes          = p.Results.btimes;
 winBL           = p.Results.winBL;
 smet            = p.Results.smet;
 graphics        = p.Results.graphics;
@@ -119,31 +119,31 @@ end
 % calc fr in states. states, binsize, and spktimes must be the same units
 % (typically sec)
 
-if exist(asFile, 'file') || ~isempty(stateEpochs)
-    if isempty(stateEpochs)
+if exist(asFile, 'file') || ~isempty(btimes)
+    if isempty(btimes)
         load(asFile, 'ss')
         fr.states.stateNames = ss.info.names;
-        stateEpochs = ss.stateEpochs;
+        btimes = ss.btimes;
     else
-        fr.states.stateNames = split(num2str(1 : length(stateEpochs)));
+        fr.states.stateNames = split(num2str(1 : length(btimes)));
     end
-    nstates = length(stateEpochs);
+    nstates = length(btimes);
 
-    % fit stateEpochs to winCalc and count spikes in states
+    % fit btimes to winCalc and count spikes in states
     for istate = 1 : nstates
         
-        if isempty(stateEpochs{istate})
+        if isempty(btimes{istate})
             fr.states.fr{istate} = zeros(nunits, 1);
             fr.states.tstamps{istate} = 0;
             continue
         end
-        epochIdx = InIntervals(stateEpochs{istate}, winCalc);
+        boutIdx = InIntervals(btimes{istate}, winCalc);
         
-        if all(size(stateEpochs{istate}) > 1)
+        if all(size(btimes{istate}) > 1)
             [fr.states.fr{istate}, fr.states.binedges{istate},...
                 fr.states.tstamps{istate}, fr.states.binidx] =...
                 times2rate(spktimes, 'binsize', Inf,...
-                'winCalc', stateEpochs{istate}(epochIdx, :), 'c2r', true);
+                'winCalc', btimes{istate}(boutIdx, :), 'c2r', true);
         else
             fr.states.fr{istate} = [];
             fr.states.tstamps{istate} = [];
@@ -152,7 +152,7 @@ if exist(asFile, 'file') || ~isempty(stateEpochs)
        
     % mean across state
     fr.states.mfr = cellfun(@(x) mean(x, 2, 'omitnan'), fr.states.fr, 'uni', false);
-    fr.states.mfr = cell2nanmat(fr.states.mfr, 2);
+    fr.states.mfr = cell2padmat(fr.states.mfr, 2);
 
     % gain factor compared to AW (sela, j. neurosci, 2020)
     mat1 = mean(fr.states.fr{1}, 2, 'omitnan');

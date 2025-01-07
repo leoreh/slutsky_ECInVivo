@@ -16,19 +16,19 @@ function [calibrationData] = createCalibrationData(spec, freq, emg_rms, labels)
 % load config data
 cfg = as_loadConfig();
 nstates = cfg.nstates;
-epochLen = cfg.epochLen;
+boutLen = cfg.boutLen;
 
 % set the fixed mixture weights
 weights = cfg.weights(:); % rem, wake, nrem, ...
 
-% check if there are at least a few labeled epochs for each state
+% check if there are at least a few labeled bouts for each state
 count_by_state = zeros(1, nstates);
 for i = 1:nstates
     count_by_state(i) = sum(labels==i);
 end
 if any(count_by_state < 3)
     calibrationData = [];
-    disp('At least a few epochs of each state must be labeled');
+    disp('At least a few bouts of each state must be labeled');
     return
 end
 

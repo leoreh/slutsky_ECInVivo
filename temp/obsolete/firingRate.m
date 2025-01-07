@@ -116,20 +116,20 @@ end
 if exist(asFile, 'file')
     load(asFile, 'ss')
     fr.states.stateNames = ss.info.names;
-    nstates = length(ss.stateEpochs);
+    nstates = length(ss.boutTimes);
   
-    % fit stateEpochs to winCalc and count spikes in states
+    % fit boutTimes to winCalc and count spikes in states
     for istate = 1 : nstates
-        if isempty(ss.stateEpochs{istate})
+        if isempty(ss.boutTimes{istate})
             fr.states.fr{istate} = zeros(nunits, 1);
             fr.states.tstamps{istate} = 0;
             continue
         end
-        epochIdx = InIntervals(ss.stateEpochs{istate}, winCalc);
-        stateEpochs = ss.stateEpochs{istate}(epochIdx, :);
-        if ~isempty(ss.stateEpochs{istate})
+        boutIdx = InIntervals(ss.boutTimes{istate}, winCalc);
+        boutTimes = ss.boutTimes{istate}(boutIdx, :);
+        if ~isempty(ss.boutTimes{istate})
             [fr.states.fr{istate}, fr.states.binedges, fr.states.tstamps{istate}, fr.states.binidx] =...
-                times2rate(spktimes, 'binsize', binsize, 'winCalc', stateEpochs, 'c2r', true);
+                times2rate(spktimes, 'binsize', binsize, 'winCalc', boutTimes, 'c2r', true);
         end
     end
     

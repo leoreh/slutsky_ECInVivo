@@ -20,16 +20,16 @@ function AccuSleep_instructions
 % has (so far) only been tested on rodents, not humans.
 %
 % The overall workflow when using AccuSleep_GUI looks like this:
-% 1. Enter the sampling rate and epoch length for all recordings from
+% 1. Enter the sampling rate and bout length for all recordings from
 %    one subject
 % 2. For each recording from this subject, add it to the recording list, 
 %    load the EEG/EMG data, and determine where to save the sleep stage 
 %    labels (or load the labels if they already exist)
 % (At this stage, you can score the recordings manually)
-% 3. Choose a representative recording that has some epochs of each state
+% 3. Choose a representative recording that has some bouts of each state
 %    labeled and use it to create a calibration data file (or load the
 %    calibration data file if it already exists)
-% 4. Choose a trained neural network file, with a matching epoch size
+% 4. Choose a trained neural network file, with a matching bout size
 % 5. Score all recordings for this subject automatically
 % 6. Start over for the next subject
 % 
@@ -64,7 +64,7 @@ function AccuSleep_instructions
 % Label file: a .mat file containing a variable called 'labels' that is
 %    a 1-D numeric matrix with values ranging from 1-4 (1 = REM sleep, 
 %    2 = wakefulness, 3 = NREM sleep, 4 = undefined) corresponding to
-%    the sleep stage in each epoch. 
+%    the sleep stage in each bout. 
 % 
 % Calibration data file: required for automatic labeling. See Section 4 
 %    for details.
@@ -78,8 +78,8 @@ function AccuSleep_instructions
 % ----------------------------------------------------------------------- 
 % 
 % 1. Select the recording you wish to modify from the recording list, or
-%    add a new one. Make sure the sampling rate (in Hz) and epoch length
-%    (in seconds) are set. The epoch length determines the time 
+%    add a new one. Make sure the sampling rate (in Hz) and bout length
+%    (in seconds) are set. The bout length determines the time 
 %    resolution of the labels. Typical values are 2.5, 4, and 5.
 %
 % 2. Click the 'Select EEG file' button to set the location of the EEG data.
@@ -120,7 +120,7 @@ function AccuSleep_instructions
 % in a .mat file in a variable called 'calibrationData'.
 % 
 % 1. Complete steps 1-4 of Section 3 (specifying the EEG file, EMG file,
-%    label file, sampling rate, and epoch length).
+%    label file, sampling rate, and bout length).
 % 
 % 2. The label file must contain at least some labels for each sleep 
 %    stage (REM, wakefulness, and NREM). It is recommended to label at
@@ -137,7 +137,7 @@ function AccuSleep_instructions
 % 
 % Section 4B: Creating a trained network file
 % 
-% Pre-trained neural networks are provided with AccuSleep for epoch 
+% Pre-trained neural networks are provided with AccuSleep for bout 
 % lengths of 2.5, 4, 5, 10, 15, and 30 seconds. If you wish to train 
 % your own network, see AccuSleep_train.m for details. You will need to 
 % create a cell array containing filenames of EEG, EMG, and label files 
@@ -153,7 +153,7 @@ function AccuSleep_instructions
 % batch process recordings from multiple subjects, see 
 % AccuSleep_classify.m
 % 
-% 1. Set the sampling rate and epoch length, and complete steps 1-4 of
+% 1. Set the sampling rate and bout length, and complete steps 1-4 of
 %    Section 3 (specifying the EEG file, EMG file, and label file) for
 %    each recording from one subject. Since each subject requires its
 %    own calibration file, only recordings from one subject can be 
@@ -167,12 +167,12 @@ function AccuSleep_instructions
 %    'Load calibration file' to load the calibration data file.
 % 
 % 3. Click 'Load trained network file' to load the trained neural
-%    network. The epoch length used when training this network should be
-%    the same as the current epoch length.
+%    network. The bout length used when training this network should be
+%    the same as the current bout length.
 % 
 % 4. If you wish to preserve any existing labels in the label file, and
-%    only overwrite undefined epochs, check the box labeled
-%    'Only overwrite undefined epochs'.
+%    only overwrite undefined bouts, check the box labeled
+%    'Only overwrite undefined bouts'.
 % 
 % 5. Set the minimum bout length, in seconds. A typical value is 5. 
 %    Following automatic labeling, any sleep stage bout shorter than this 
@@ -183,7 +183,7 @@ function AccuSleep_instructions
 %    recording list. Labels will be saved to the file specified by 
 %    the 'Set / load label file' field of each recording. You can click 
 %    'Score selected manually' to visualize the results. Note that unless
-%    the ‘Only overwrite undefined epochs' box is checked, any other
+%    the ‘Only overwrite undefined bouts' box is checked, any other
 %    contents (e.g., other variables) in the existing label file will 
 %    be automatically overwritten.
 % 

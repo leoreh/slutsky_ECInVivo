@@ -5,7 +5,7 @@
 % organize and load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-basepaths = [mcu_sessions('mcu_bsl')];
+basepaths = [mcu_sessions('wt_bsl'), mcu_sessions('mcu_bsl')];
 nfiles = length(basepaths);
 mnames = get_mname(basepaths);
 
@@ -30,26 +30,35 @@ minDur = 4;
 
 % go over files
 for ifile = 1 : nfiles
-    
+
     % file
     basepath = basepaths{ifile};
     cd(basepath)
     [~, basename] = fileparts(basepath);
-    
+
     % insert manual labels to auto labels
     manIdx = v(ifile).labels < cfg.nstates + 2;
     ss = v(ifile).ss;
-    ss.labels(manIdx) = v(ifile).labels(manIdx);
-    
-    % calculate state epochs
+    labels = ss.labels;
+    labels(manIdx) = v(ifile).labels(manIdx);
 
-    % auto
-    [stateEpochs, epochStats] = as_epochs('labels', labelsAuto(curIdx),...
+    % calculate state bouts
+    [bouts] = as_bouts('labels', labels,...
         'minDur', minDur, 'interDur', interDur);
 
-    % manual
-    [~, epochStats(ifile, 2)] = as_epochs('labels', labelsMan(curIdx),...
-        'minDur', minDur, 'interDur', interDur);
+    % save bckup of original ss struct 
+    ssOrig = v(ifile).ss;
+    mkdir(fullfile(basepath, 'ss'))
+    ctime = datetime('now', 'Format', 'yyMMdd_HHmmss');
+    bkupName = [basename, '.sleep_states', '_', char(ctime), '.mat'];
+    bkupFile = fullfile(basepath, 'ss', bkupName);
+    save(bkupFile, 'ss')
+
+    % save updated ss struct 
+    ssFile = fullfile(basepath, [basename, '.sleep_states.mat']);
+    ss.labels = labels;
+    ss.bouts = bouts;
+    save(ssFile, 'ss')
 
 end
 
@@ -58,21 +67,27 @@ end
 % organize data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-epLen = nan(2, nfiles, length(sstates));
-for ifile = 1 : nfiles
-    for icur = 1 : 2
-        epLen(icur, ifile, :) = mean(cell2padmat(epochStats(ifile, icur).epLen(sstates), 2), 'omitnan');
-        prctDur(icur, ifile, :) = epochStats(ifile, icur).prctDur(sstates);
-    end
+% reload data
+clear basepaths
+basepaths{1} = [mcu_sessions('wt_bsl')];
+basepaths{2} = [mcu_sessions('mcu_bsl')];
+
+% initialize
+boutLen = nan(2, nfiles, length(sstates));
+prctDur = nan(2, nfiles, length(sstates));
+
+for igrp = 1 : 2
+    v = basepaths2vars('basepaths', basepaths{igrp}, 'vars',...
+        ["sleep_states"]);
+    nfiles = length(basepaths{igrp});
+    ss = catfields([v(:).ss], 1, true);
+    
+    for ifile = 1 : nfiles        
+        boutLen(igrp, ifile, :) = mean(cell2padmat(ss.bouts.boutLen(ifile, sstates), 2), 'omitnan');
+        prctDur(igrp, ifile, :) = ss.bouts.prctDur(ifile, sstates);    
+    end    
 end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% inspect data
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% sSig = load([basename, '.sleep_sig.mat']);
-% AccuSleep_viewer(sSig, v(ifile).labels, [])
-% AccuSleep_viewer(sSig, labelsAuto, [])
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Plot Comparison
@@ -86,44 +101,38 @@ tlayout = [2, length(sstates)];
 th = tiledlayout(tlayout(1), tlayout(2));
 th.TileSpacing = 'tight';
 th.Padding = 'none';
-title(th, basename, 'interpreter', 'none');
 
-% Plot epoch length for each state
+% Plot bout length for each state
 tilebias = 0;
 for istate = 1 : length(sstates)
     axh = nexttile(th, tilebias + istate); hold on; cla;
     stateIdx = sstates(istate);
-    dataMat = epLen(:, :, istate)';
-    ph = plot([1, 2], dataMat);
-    ylabel('Epoch Length (s)');
+    dataMat = boutLen(:, :, istate)';
+    plot_boxMean('axh', axh, 'dataMat', dataMat, 'allPnt', false,...
+        'plotType', 'bar')
+    ylabel('Bout Length (s)');
     title([snames{istate}]);
     ylim([0, ceil(max(dataMat(:)))]);
     xlim([0.5 2.5])
     xticks([1, 2])
-    xticklabels({'Auto', 'Man'});
+    xticklabels({'WT', 'MCU-KO'});
 end
-legend(mnames)
 
-% Plot epoch length for each state
+
+% Plot bout length for each state
 tilebias = 3;
 for istate = 1 : length(sstates)
     axh = nexttile(th, tilebias + istate); hold on; cla;
     stateIdx = sstates(istate);
     dataMat = prctDur(:, :, istate)';
-    ph = plot([1, 2], dataMat);
+    plot_boxMean('axh', axh, 'dataMat', dataMat, 'allPnt', false,...
+        'plotType', 'bar')
     ylabel('State Duration (%)');
     title([snames{istate}]);
     ylim([0, ceil(max(dataMat(:)))]);
     xlim([0.5 2.5])
     xticks([1, 2])
-    xticklabels({'Auto', 'Man'});
+    xticklabels({'WT', 'MCU-KO'});
 end
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% plot confusion matrix
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% % confusion matrix (relative to manual labels)
-% [ss.netPrecision, ss.netRecall] = as_cm(labelsMan, labelsAuto,...
-%     'saveFig', false);

@@ -27,7 +27,7 @@ function ripp = getRipples(varargin)
 %   ripp            struct
 %
 % DEPENDENCIES:
-%   binary2epochs
+%   binary2bouts
 %   lfpFilter
 %   Sync (buzcode)
 %   SyncMap (buzcode)
@@ -63,7 +63,7 @@ function ripp = getRipples(varargin)
 
 % detect ripples on each channel separately (good and
 % bad). requires filtering, amplitude, smooth amplitude. goes until
-% binary2epochs. than if overlap keep (good) or remove (bad).
+% binary2bouts. than if overlap keep (good) or remove (bad).
 % next, average the start / end times from all channels. 
 % next, average the signal and recalculate, amp, phase, etc.
 % start exclusion. 
@@ -217,10 +217,10 @@ end
 % find ripples
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% find epochs with power > low threshold. correct for durations
-epochs = binary2epochs('vec', sig_dtct > thr(1), 'minDur', limDur(1),...
+% find bouts with power > low threshold. correct for durations
+bouts = binary2bouts('vec', sig_dtct > thr(1), 'minDur', limDur(1),...
     'maxDur', limDur(2), 'interDur', limDur(3));
-nepochs = size(epochs, 1);
+nbouts = size(bouts, 1);
 
 % discard ripples that occur during high emg 
 if ~isempty(emg)
@@ -230,9 +230,9 @@ if ~isempty(emg)
     emg_nbins = floor(length(emg) / emg_binLen);
     emg_rms = log(rms(reshape(emg(1 : emg_nbins * emg_binLen), emg_binLen, emg_nbins)));
 
-    % calc emg rms per epoch
-    for iepoch = 1 : nepochs
-        emgRipp(iepoch) = log(rms(emg(epochs(iepoch, 1) : epochs(iepoch, 2))));
+    % calc emg rms per bout
+    for ibout = 1 : nbouts
+        emgRipp(ibout) = log(rms(emg(bouts(ibout, 1) : bouts(ibout, 2))));
     end
     discard_idx = emgRipp > prctile(emg_rms, emgThr);
 
@@ -240,45 +240,45 @@ if ~isempty(emg)
 %         [~, cents] = kmeans(emg_rms(:), 2);
 %         emgThr = mean(cents);
 %         discard_idx = emgRipp > emgThr;
-    epochs(discard_idx, :) = [];
+    bouts(discard_idx, :) = [];
     emgRipp(discard_idx) = [];
-    nepochs = size(epochs, 1);
-    fprintf('After emg exclusion: %d events\n', nepochs)
+    nbouts = size(bouts, 1);
+    fprintf('After emg exclusion: %d events\n', nbouts)
 end
 
 % discard ripples with a peak power < high threshold
 clear discard_idx
-peakPowNorm = zeros(size(epochs, 1), 1);
-for iepoch = 1 : size(epochs, 1)
-    peakPowNorm(iepoch) = max(sig_dtct(epochs(iepoch, 1) : epochs(iepoch, 2)));
+peakPowNorm = zeros(size(bouts, 1), 1);
+for ibout = 1 : size(bouts, 1)
+    peakPowNorm(ibout) = max(sig_dtct(bouts(ibout, 1) : bouts(ibout, 2)));
 end
 discard_idx = peakPowNorm < thr(2);
-epochs(discard_idx, :) = [];
+bouts(discard_idx, :) = [];
 peakPowNorm(discard_idx) = [];
-nepochs = size(epochs, 1);
-fprintf('After peak power: %d events\n', nepochs)
+nbouts = size(bouts, 1);
+fprintf('After peak power: %d events\n', nbouts)
 
 % discard ripples with a peak power > atrtifact threshold
 clear discard_idx
 discard_idx = peakPowNorm > thr(4);
-epochs(discard_idx, :) = [];
+bouts(discard_idx, :) = [];
 peakPowNorm(discard_idx) = [];
-nepochs = size(epochs, 1);
-fprintf('After artifact power: %d events\n', nepochs)
+nbouts = size(bouts, 1);
+fprintf('After artifact power: %d events\n', nbouts)
 
 % discard ripples that do not maintain peak power for the min duration
-discard_idx = false(1, nepochs);
-for iepoch = 1 : size(epochs, 1)
-    aboveThr = sig_dtct(epochs(iepoch, 1) : epochs(iepoch, 2)) > thr(3);
+discard_idx = false(1, nbouts);
+for ibout = 1 : size(bouts, 1)
+    aboveThr = sig_dtct(bouts(ibout, 1) : bouts(ibout, 2)) > thr(3);
     powPnts = strfind([0 aboveThr'], [0 ones(1, limDur(4))]);
     if isempty(powPnts)
-        discard_idx(iepoch) = true;
+        discard_idx(ibout) = true;
     end
 end
-epochs(discard_idx, :) = [];
+bouts(discard_idx, :) = [];
 peakPowNorm(discard_idx) = [];
-nepochs = size(epochs, 1);
-fprintf('After contineous power: %d events\n', nepochs)
+nbouts = size(bouts, 1);
+fprintf('After contineous power: %d events\n', nbouts)
 
 % clear memory
 clear sig_dtct
@@ -290,17 +290,17 @@ clear sig_dtct
 %%% change to maxPow and minPow
 
 % find negative peak position for each ripple
-peakPos = zeros(size(epochs, 1), 1);
-peakPow = zeros(size(epochs, 1), 1);
-for iepoch = 1 : size(epochs, 1)
-    [peakPow(iepoch), peakPos(iepoch)] =...
-        min(sig_filt(epochs(iepoch, 1) : epochs(iepoch, 2)));
-    peakPos(iepoch) = peakPos(iepoch) + epochs(iepoch, 1) - 1;
+peakPos = zeros(size(bouts, 1), 1);
+peakPow = zeros(size(bouts, 1), 1);
+for ibout = 1 : size(bouts, 1)
+    [peakPow(ibout), peakPos(ibout)] =...
+        min(sig_filt(bouts(ibout, 1) : bouts(ibout, 2)));
+    peakPos(ibout) = peakPos(ibout) + bouts(ibout, 1) - 1;
 end
 
 % convert idx to seconds
 peakPos = peakPos / fs;
-epochs = epochs / fs;
+bouts = bouts / fs;
 
 % -------------------------------------------------------------------------
 % maps
@@ -331,7 +331,7 @@ clear sig_freq sig_amp sig_phase tstamps sig_filt
 ripp.maxFreq = max(ripp.maps.freq, [], 2);
 ripp.peakFreq = ripp.maps.freq(:, centerBin);
 ripp.peakAmp = ripp.maps.amp(:, centerBin);
-ripp.dur = epochs(:, 2) - epochs(:, 1);
+ripp.dur = bouts(:, 2) - bouts(:, 1);
 
 % acg and correlations
 [ripp.acg.data, ripp.acg.t] = CCG(peakPos,...
@@ -341,7 +341,7 @@ ripp.corr.dur_freq = corrcoef(ripp.dur, ripp.peakFreq);
 ripp.corr.dur_amp = corrcoef(ripp.dur, ripp.peakAmp);
 
 % rate of ripples
-epochs             = epochs + recWin(1);  
+bouts             = bouts + recWin(1);  
 peakPos            = peakPos + recWin(1);
 [ripp.rate.rate, ripp.rate.binedges, ripp.rate.tstamps] =...
     times2rate(peakPos, 'binsize', binsizeRate, 'winCalc', recWin,...
@@ -360,7 +360,7 @@ ripp.info.thr           = thr;
 ripp.info.binsizeRate   = binsizeRate;
 ripp.info.fs            = fs;
 ripp.info.passband      = passband;
-ripp.epochs             = epochs;  
+ripp.bouts             = bouts;  
 ripp.peakPos            = peakPos;
 ripp.peakPow            = peakPow;
 ripp.peakPowNorm        = peakPowNorm;
@@ -370,9 +370,9 @@ if saveVar
 
     % create ns files for visualization with neuroscope. note currently
     % this only works if recWin(1) = 0
-    nepochs = size(ripp.epochs, 1);
+    nbouts = size(ripp.bouts, 1);
 
-    res = round([ripp.epochs(:, 1); ripp.epochs(:, 2); ripp.peakPos] * fsSpks);
+    res = round([ripp.bouts(:, 1); ripp.bouts(:, 2); ripp.peakPos] * fsSpks);
     [res, sort_idx] = sort(res);
     fid = fopen(resfile, 'w');
     fprintf(fid, '%d\n', res);
@@ -381,7 +381,7 @@ if saveVar
         error('failed to close res file')
     end
 
-    clu = [ones(nepochs, 1); ones(nepochs, 1) * 2; ones(nepochs, 1) * 3];
+    clu = [ones(nbouts, 1); ones(nbouts, 1) * 2; ones(nbouts, 1) * 3];
     clu = clu(sort_idx);
     fid = fopen(clufile, 'w');
     fprintf(fid, '%d\n', 3);

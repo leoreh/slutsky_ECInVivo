@@ -1124,7 +1124,7 @@ classdef SuhRunUmap < handle
                     end
                 end
                 UmapUtil.SetArgsTemplateCanOverride(umap, args, argued, parameter_names);
-                umap.n_epochs=args.n_epochs;
+                umap.n_bouts=args.n_bouts;
                 umap.nn_descent_min_rows=args.nn_descent_min_rows;
                 umap.nn_descent_min_cols=args.nn_descent_min_cols;
                 umap.nn_descent_max_neighbors=args.nn_descent_max_neighbors;
@@ -3721,15 +3721,15 @@ classdef SuhRunUmap < handle
                             'simplicialComplex.png', simplicialSize);
                         return;
                     end
-                    if objectOrString.getEpochsDone<10
+                    if objectOrString.getBoutsDone<10
                         Gui.HideBusy(fig, busy);
                     end
                     keepComputing=~pu.cancelled;
-                    done=objectOrString.getEpochsDone-1;
-                    toDo=objectOrString.getEpochsToDo;
+                    done=objectOrString.getBoutsDone-1;
+                    toDo=objectOrString.getBoutsToDo;
                     pu.pb.setValue(3+(pu.pb.getMaximum*(done/toDo)));
                     pu.pb.setMaximum(toDo);
-                    pu.pb.setString(sprintf('%d/%d epochs done', done, toDo));
+                    pu.pb.setString(sprintf('%d/%d bouts done', done, toDo));
                     if isvalid(runAnnotation)
                         delete(runAnnotation);
                     end

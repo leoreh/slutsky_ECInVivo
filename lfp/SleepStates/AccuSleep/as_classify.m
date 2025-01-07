@@ -19,7 +19,7 @@ function ss = as_classify(sSig, varargin)
 % DEPENDENCIES:
 %   AccuSleep (modified in slutskycode)
 %   IOSR.DSP.SINCFILTER     for filtering data
-%   binary2epochs
+%   binary2bouts
 %
 % TO DO LIST:
 %       # filter before resampling to assure nyquist (done)
@@ -65,7 +65,7 @@ graphics        = p.Results.graphics;
 cfg = as_loadConfig();
 ss.info.names = cfg.names;
 ss.info.colors = cfg.colors;
-ss.info.epochLen = cfg.epochLen;
+ss.info.boutLen = cfg.boutLen;
 ss.info.minBoutLen = cfg.minBoutLen;
 nstates = cfg.nstates;
 
@@ -152,17 +152,14 @@ fprintf('done.\n')
 % remove labels of uncertainty
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% convert labels to state epochs
+% convert labels to state bouts
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 minDur = [10, 5, 5, 10, 5, 5];
 interDur = 4;
 
-[ss.stateEpochs, epochStats] = as_epochs('labels', labels,...
+ss.bouts = as_bouts('labels', labels,...
     'minDur', minDur, 'interDur', interDur);
-ss.epLen = epochStats.epLen;
-ss.nepochs = epochStats.nepochs;
-ss.totDur = epochStats.totDur;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % finalize and save
@@ -173,7 +170,7 @@ ss.info.net = netfile;
 ss.info.calibrationData = calData;
 ss.info.minDur = minDur;
 ss.info.interDur = interDur;
-ss.info.runtime = datetime(now, 'ConvertFrom', 'datenum');
+ss.info.runtime = datetime("now");
 ss.labels = labels;
 ss.labels_net = labels_net;
 ss.labels_man = labels_man;
@@ -194,7 +191,7 @@ if graphics
     end
     
     % stateSeparation
-    as_stateSeparation(sSig, ss)
+    % as_stateSeparation(sSig, ss)
     
     % duration in timebins
     sstates = find(matches(cfg.names, {'WAKE', 'NREM', 'REM'}));

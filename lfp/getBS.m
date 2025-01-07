@@ -3,10 +3,10 @@ function [bs] = getBS(varargin)
 % receives an lfp signal, divides it to 500 ms bins and for each bin
 % calculates several variables (e.g. the first principle component of the
 % spectrogram). clusters each bin as either a burst or suppression. defines
-% epochs of burst while accounting for duration parameters. finds the
-% precise timing of a transition between an epoch of burst and suppression
+% bouts of burst while accounting for duration parameters. finds the
+% precise timing of a transition between an bout of burst and suppression
 % (currently not implemented). allows the user to go over the data
-% and manually mark epochs of burst. calculates several params such as the
+% and manually mark bouts of burst. calculates several params such as the
 % burst suppression ratio. 
 % 
 % INPUT
@@ -59,7 +59,7 @@ function [bs] = getBS(varargin)
 %       cluDist             cluster separation
 %       times2rate          BSR 
 %       specBand            delta band
-%       binary2epochs       start/stop times
+%       binary2bouts       start/stop times
 % 
 % EXAMPLE
 %        bs = getBS('sig', sig, 'fs', fs, 'basepath', basepath,...
@@ -230,7 +230,7 @@ end
 % find start\stop times
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-stamps = binary2epochs('vec', gi, 'minDur', minDur, 'maxDur', maxDur,...
+stamps = binary2bouts('vec', gi, 'minDur', minDur, 'maxDur', maxDur,...
     'interDur', interDur);
 stamps = ibins(stamps);
 nevents = size(stamps, 1);

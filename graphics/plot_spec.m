@@ -107,7 +107,7 @@ if saveFig
     figpath = fullfile(basepath, 'graphics');
     mkdir(figpath)
     figname = fullfile(figpath, sprintf('%s_spec', basename));
-    savefig(fh, figname, 'compact')
+    savefig(fh, figname)
 end
 
 end

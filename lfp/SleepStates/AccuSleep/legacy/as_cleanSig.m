@@ -9,10 +9,10 @@ function [EMG, EEG, info] = as_cleanSig(eegOrig, emgOrig, lfpfile, varargin)
 % a different approach is to mark artifacts during the calibration process
 % as undefined. than, must insert the calibration labels in place of the
 % final results or use the gui and select the option only overwrite
-% undefined epochs. however, this will not prevent the artifacts from
+% undefined bouts. however, this will not prevent the artifacts from
 % influincing the spectrogram if it is normalized.
 % -------------------------------------------------------------------------
-% currently uses a temporal resolution that corresponds to epoch length but
+% currently uses a temporal resolution that corresponds to bout length but
 % should be improved to < 1 s. just need to find a way to restore deleted
 % sections afterwards.
 
@@ -23,14 +23,14 @@ if exist(artifactsfile) && ~forceLoad
 else
     if cleanRec == 1
         % ALT 1: manual mark bad times using AccuSleep gui (use NREM
-        % as a bad epoch). when done save labels.
+        % as a bad bout). when done save labels.
         AccuSleep_viewer(EEG, EMG, fs, cleanRes, [], artifactsfile)
         uiwait
         load(artifactsfile)
         ignoretimes(labels == 3) = 1;
         ignoretimes(labels == 4) = 0;
         
-        % ALT 2: semi-automatically find bad epochs from spectrogram
+        % ALT 2: semi-automatically find bad bouts from spectrogram
     elseif cleanRec == 2
         [s, ~, ~] = createSpectrogram(standardizefs(EEG, fs, 128), 128, cleanRes);
         ignoretimes = zeros(floor(recDur / cleanRes), 1);
@@ -59,22 +59,22 @@ tRemoved = sum(rmtimes) / fs; % total time removed from data [s]
 % restore bad times to labels
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% tstamps_labels = [0 : epochLen : recDur];
-% labelsLen = floor(length(EMG_newFs) / SR / epochLen);
+% tstamps_labels = [0 : boutLen : recDur];
+% labelsLen = floor(length(EMG_newFs) / SR / boutLen);
 % x = [interp1([1 : length(badtimes)] / cleanRes, badtimes,...
-%     [1 : labelsLen] * epochLen, 'linear', 'extrap')]';
+%     [1 : labelsLen] * boutLen, 'linear', 'extrap')]';
 % x = round(x);
 
-ignoreEpochs = binary2epochs('vec', ignoretimes, 'minDur', [], 'maxDur', [],...
+ignoreBouts = binary2bouts('vec', ignoretimes, 'minDur', [], 'maxDur', [],...
     'interDur', [], 'exclude', false); 
-for i = 1 : size(ignoreEpochs, 1)
-    labels = [labels(1 : ignoreEpochs(i, 1) - 1);...
-        ones(diff(ignoreEpochs(i, :)), 1) * 4;...
-    labels(ignoreEpochs(i, 1) : end)];
+for i = 1 : size(ignoreBouts, 1)
+    labels = [labels(1 : ignoreBouts(i, 1) - 1);...
+        ones(diff(ignoreBouts(i, :)), 1) * 4;...
+    labels(ignoreBouts(i, 1) : end)];
 
-    labels_calibration = [labels_calibration(1 : ignoreEpochs(i, 1) - 1);...
-        ones(diff(ignoreEpochs(i, :)), 1) * 4;...
-    labels_calibration(ignoreEpochs(i, 1) : end)];
+    labels_calibration = [labels_calibration(1 : ignoreBouts(i, 1) - 1);...
+        ones(diff(ignoreBouts(i, :)), 1) * 4;...
+    labels_calibration(ignoreBouts(i, 1) : end)];
 end
 
 

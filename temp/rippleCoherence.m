@@ -30,15 +30,15 @@ m = memmapfile(lfpfile, 'Format', {precision, [nchans, nsamps] 'mapped'});
 raw = m.Data;
 
 
-epochs = round(ripp.epochs * fs);
-nepochs = size(epochs, 1)
-stamps = epochs(:, 1);
-win = [zeros(1, nepochs); diff(epochs')]';
+bouts = round(ripp.bouts * fs);
+nbouts = size(bouts, 1)
+stamps = bouts(:, 1);
+win = [zeros(1, nbouts); diff(bouts')]';
 
-for iepoch = 10 : 20
+for ibout = 10 : 20
 
-[rippData, ~] = snipFromBinary('stamps', stamps(iepoch), 'fname', lfpfile,...
-    'win', win(iepoch, :), 'nchans', nchans, 'ch', ch, 'align_peak', 'no',...
+[rippData, ~] = snipFromBinary('stamps', stamps(ibout), 'fname', lfpfile,...
+    'win', win(ibout, :), 'nchans', nchans, 'ch', ch, 'align_peak', 'no',...
     'precision', precision, 'rmv_trend', [], 'saveVar', false,...
     'l2norm', false, 'raw', raw);
 

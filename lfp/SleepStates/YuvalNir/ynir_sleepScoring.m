@@ -8,7 +8,7 @@ if ~exist('right_scoring','var'), right_scoring = []; end
     
     SCORING_FILE_NAME = 'sleep_scoring'; % Where to save files? absoulut path or file name in current directory
 
-    Active_Window_Size = 10; % (seconds) Active window size - Scoring was done in 4 second epochs
+    Active_Window_Size = 10; % (seconds) Active window size - Scoring was done in 4 second bouts
     Inactive_Wing_Size = 2; % (seconds) size of pre & post window activity    
 	automaticSaveEvery_X_minutes = nan; % Make nan or inf to disable
     

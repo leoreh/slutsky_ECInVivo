@@ -11,7 +11,7 @@ saveVar = false;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % session info (cell explorer foramt)
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 session = CE_sessionTemplate(pwd, 'viaGUI', false,...
     'forceDef', true, 'forceL', true, 'saveVar', true);      
 basepath = session.general.basePath;
@@ -175,7 +175,7 @@ as_stateSeparation(sSig, ss)
 [ss.netPrecision, ss.netRecall] = as_cm(labels1, labels2);
 
 % plot state duration in timebins
-[totDur, epLen] = as_plotZT('nbins', 8, 'sstates', [1, 2, 3, 4, 5],...
+[totDur, boutLen] = as_plotZT('nbins', 8, 'sstates', [1, 2, 3, 4, 5],...
     'ss', ss, 'timebins', session.general.timebins);
 
 % calc psd in states
@@ -197,8 +197,8 @@ plot_spec(spec, 'ch', [1 : 4], 'logfreq', true, 'saveFig', false,...
     'axh', [])
 
 % get spectrogram outliers
-otl = get_specOutliers('basepath', basepath, 'saveVar', true,...
-    'flgCalc', false, 'flgForce', true, 'graphics', true);
+otl = get_otlSpec('basepath', pwd, 'saveVar', true,...
+    'flgForce', false, 'graphics', true);
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -345,10 +345,10 @@ plot_FRstates_sextiles('stateMfr', fr.states.mfr(:, [1, 4])', 'units', units.cle
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % concatenate var from different sessions
-mname = 'lh133';
+mname = 'lh136';
 for ialt = 1 : 4
 [~, info] = sessions_catVarTime('mname', mname,...
-    'dataPreset', {'fr', 'ripp'}, 'graphics', true, 'dataAlt', ialt,...
+    'dataPreset', {'spec', 'fr'}, 'graphics', true, 'dataAlt', ialt,...
     'basepaths', {}, 'xTicksBinsize', 6, 'markRecTrans', true,...
     'saveFig', false);
 end
@@ -359,8 +359,8 @@ end
     'precision', 'int16', 'rmv_trend', 6, 'saveVar', false,...
     'l2norm', false);
         
-% convert binary vector to epochs
-epochs = binary2epochs('vec', binaryVec, 'minDur', 20, 'maxDur', 100,...
+% convert binary vector to bouts
+bouts = binary2bouts('vec', binaryVec, 'minDur', 20, 'maxDur', 100,...
     'interDur', 30, 'exclude', false);
 
 % convert cell to mat padded by nan (for different length arrays)

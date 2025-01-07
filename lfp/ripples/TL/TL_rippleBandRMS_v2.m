@@ -37,7 +37,7 @@ baselineFols = [recFols(logical(bL))]; %%%%%%%%%%%%%%%%%%%%%%
 % exc = [exc(logical(bL))];
 clear bL recFols;
 
-%% Calculate rms from each channel across 6 hour epochs during baseline, and find the best
+%% Calculate rms from each channel across 6 hour bouts during baseline, and find the best
 
 RMS = [];
 
@@ -96,11 +96,11 @@ for b = 1 : length(baselineFols)
             if currSleep(end) == 1
                 dd = [dd ; length(currSleep)];
             end
-            epochs = [d , dd];
+            bouts = [d , dd];
             clear d dd;
             tempRMS = [];
-            for e = 1 : size(epochs , 1)
-                tempRMS = [tempRMS , repelem(rms(filtD(epochs(e,1):epochs(e,2))) , diff(epochs(e,:)))];
+            for e = 1 : size(bouts , 1)
+                tempRMS = [tempRMS , repelem(rms(filtD(bouts(e,1):bouts(e,2))) , diff(bouts(e,:)))];
             end
             RMS(currRow,c) = mean(tempRMS); %rms(filtD(logical(currSleep)));
             clear tempRMS;

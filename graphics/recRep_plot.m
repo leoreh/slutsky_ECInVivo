@@ -21,7 +21,7 @@ function recRep_plot(varargin)
 %   rawCh       numeric vector describing the channels to load for raw data
 %   emg         numeric vector of emg data
 %   spec        struct (see calc_spec.m)
-%   stateEpochs cell array (see as_epochs.m)
+%   boutTimes   cell array (see as_bouts.m)
 %   saveFig     logical
 %   adjustT     logical. adjust tstamps accordig to tLine
 %   xOffset     numeric. value to add to adjustT
@@ -51,7 +51,7 @@ addParameter(p, 'tLine', []);
 addParameter(p, 'rawCh', []);
 addParameter(p, 'emg', []);
 addParameter(p, 'spec', []);
-addParameter(p, 'stateEpochs', []);
+addParameter(p, 'boutTimes', []);
 addParameter(p, 'saveFig', false, @islogical);
 addParameter(p, 'adjustT', false, @islogical);
 addParameter(p, 'xOffset', 0);
@@ -69,7 +69,7 @@ tLine           = p.Results.tLine;
 rawCh           = p.Results.rawCh;
 emg             = p.Results.emg;
 spec            = p.Results.spec;
-stateEpochs     = p.Results.stateEpochs;
+boutTimes       = p.Results.boutTimes;
 saveFig         = p.Results.saveFig;
 adjustT         = p.Results.adjustT;
 xOffset         = p.Results.xOffset;
@@ -149,10 +149,10 @@ for ipanel = 1 : npanels
         case 'hypnogram'
             for istate = 1 : length(sstates)
                 dummy(istate) = plot(nan, nan, 'color', cfg.colors{sstates(istate)}, 'LineWidth', 25);
-                winIdx = InIntervals(stateEpochs{sstates(istate)}, plotLim);
-                sepochs = stateEpochs{sstates(istate)}(winIdx, :);
-                if ~isempty(sepochs)
-                    plot(sepochs', 1 * ones(size(sepochs))',...
+                winIdx = InIntervals(boutTimes{sstates(istate)}, plotLim);
+                sbouts = boutTimes{sstates(istate)}(winIdx, :);
+                if ~isempty(sbouts)
+                    plot(sbouts', 1 * ones(size(sbouts))',...
                         'color', cfg.colors{sstates(istate)}, 'LineWidth', 25)
                 end
             end

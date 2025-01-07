@@ -18,8 +18,8 @@ function v = basepaths2vars(varargin)
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 p = inputParser;
-addParameter(p, 'basepaths', {}, @(x) iscell(x) && all(cellfun(@ischar, x)));
-addParameter(p, 'vars', string([]), @isstring);
+addParameter(p, 'basepaths', {});
+addParameter(p, 'vars', string([]));
 parse(p, varargin{:});
 
 basepaths = p.Results.basepaths;
@@ -43,7 +43,6 @@ for ipath = 1 : npaths
         continue
     end
     cd(filepath)
-    [~, basename] = fileparts(filepath);
     
     for ifile = 1:length(vars)
         filename = dir(['*', vars{ifile}, '*.mat']);

@@ -61,7 +61,7 @@ if iterations<=0
 end
 if isPython
     mlpType='TensorFlow';
-    mlpIterType='epochs';
+    mlpIterType='bouts';
 else
     mlpType='fitcnet';
     mlpIterType='iterations';
@@ -266,7 +266,7 @@ for i = 1:CVO.NumTestSets
     if isPython
         if ~exist([mlpModel Mlp.EXT_TENSORFLOW], 'file')
             MlpPython.Train([DataTrain mlpLabels], ...
-                'epochs', iterations, ...
+                'bouts', iterations, ...
                 'confirm_model', false, ...
                 'column_names', VarNames', ...
                 'model_file', mlpModel);

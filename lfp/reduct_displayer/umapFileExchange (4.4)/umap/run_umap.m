@@ -253,7 +253,7 @@ function [reduction, umap, clusterIdentifiers, extras]=run_umap(varargin)
 %                           computing or stop computing. The objectOrString argument
 %                           is either a status description before stochastic gradient
 %                           descent starts or an object with properties
-%                           (getEmbedding, getEpochsDone and getEpochsToDo) which
+%                           (getEmbedding, getBoutsDone and getBoutsToDo) which
 %                           convey the state of progress. The function
 %                           progress_report here in run_umap.m exemplifies how to
 %                           write a callback.
@@ -387,7 +387,7 @@ function [reduction, umap, clusterIdentifiers, extras]=run_umap(varargin)
 %                           n_components>2 and verbose=graphic. If > limit then
 %                           supervisor matching ONLY occurs in the final plot
 %                           ...otherwise supervisor label matching occurs during
-%                           progress plotting before epochs finish.
+%                           progress plotting before bouts finish.
 %                           Default is 20000. 
 %                           
 %   'qf_dissimilarity'      Show QF dissimilarity scores between data groupings in 
@@ -541,7 +541,7 @@ function [reduction, umap, clusterIdentifiers, extras]=run_umap(varargin)
 %                           found no such issues on 3 versions of MATLAB using
 %                           Windows or Mac with 2 to 6 cores. What we find is
 %                           significantly better speed than when running with no
-%                           parallelism for the "epoch processing" phase that usually
+%                           parallelism for the "bout processing" phase that usually
 %                           costs over 50% of UMAP's time when reducing without
 %                           templates.
 %                           Default is set to the # of logical CPU cores assigned to

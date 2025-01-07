@@ -1,4 +1,4 @@
-function [bands, psdMat, epochStats] = sessions_psd(varargin)
+function [bands, psdMat, boutStats] = sessions_psd(varargin)
 
 % arranges the psd in states from different sessions of the same mouse.
 % also calculates the power in specific bands. can normalize the psd to
@@ -128,19 +128,19 @@ for ifile = 1 : nfiles
     for ibin = 1 : nbins
         for istate = 1 : nstates
             
-            % get indices to epochs in timebins
-            stateEpochs = v(ifile).psd.epochs.stateEpochs{istate};
-            epochIdx = stateEpochs(:, 1) > timebins(ifile, ibin, 1) &...
-                stateEpochs(:, 2) < timebins(ifile, ibin, 2);
+            % get indices to bouts in timebins
+            boutTimes = v(ifile).psd.bouts.boutTimes{istate};
+            boutIdx = boutTimes(:, 1) > timebins(ifile, ibin, 1) &...
+                boutTimes(:, 2) < timebins(ifile, ibin, 2);
             
             % recalculate mean psd
             psdMat(cnt, istate, :) =...
-                mean(v(ifile).psd.epochs.clean{istate}(epochIdx, :), 1);
+                mean(v(ifile).psd.bouts.clean{istate}(boutIdx, :), 1);
 
-            % organize epoch stats
-            epLen{istate, cnt} = v(ifile).psd.epochs.epochStats.epLen{istate}(epochIdx);
-            nepochs(istate, cnt) = numel(epLen{cnt, istate});
-            prctDur(istate, cnt) = sum(epLen{cnt, istate}) * 100 / diff(timebins(ifile, ibin, :));
+            % organize bout stats
+            boutLen{istate, cnt} = v(ifile).psd.bouts.boutStats.boutLen{istate}(boutIdx);
+            nbouts(istate, cnt) = numel(boutLen{cnt, istate});
+            prctDur(istate, cnt) = sum(boutLen{cnt, istate}) * 100 / diff(timebins(ifile, ibin, :));
         end
         cnt = cnt + 1;
     end
@@ -194,9 +194,9 @@ end
 % organize struct and save
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-epochStats.epLen = epLen;
-epochStats.nepochs = nepochs;
-epochStats.prctDur = prctDur;
+boutStats.boutLen = boutLen;
+boutStats.nbouts = nbouts;
+boutStats.prctDur = prctDur;
 
 if saveVar
     mousepath = fileparts(basepaths{1});
@@ -287,17 +287,17 @@ for istate = 1 : nstates
 end
 legend(lgd(sbands))
 
-% epoch stats - epoch length
+% bout stats - bout length
 tilebias = tlayout(2) * 3;
 for istate = 1 : nstates
     axh = nexttile(th, istate + tilebias, [1, 1]); cla
-    dataMat = cell2nanmat(epLen(:, istate), 2);
+    dataMat = cell2nanmat(boutLen(:, istate), 2);
     plot_boxMean('dataMat', dataMat, 'clr', clr{istate},...
         'plotType', 'bar', 'axh', axh)
-    ylabel('Epoch Length (s)')
+    ylabel('Bout Length (s)')
 end
 
-% epoch stats - percent duration
+% bout stats - percent duration
 tilebias = tlayout(2) * 4;
 axh = nexttile(th, 1 + tilebias, [1, 1]); cla
 ph = plot(prctDur, 'LineWidth', 2);
@@ -308,13 +308,13 @@ ylabel('Duration (%)')
 xlim([0.5, nbins * nfiles + 0.5])
 xticks([1 : nbins * nfiles])
 
-% epoch stats - percent duration
+% bout stats - percent duration
 axh = nexttile(th, 2 + tilebias, [1, 1]); cla
-ph = plot(nepochs, 'LineWidth', 2);
+ph = plot(nbouts, 'LineWidth', 2);
 for istate = 1 : nstates
     ph(istate).Color = clr{istate};
 end
-ylabel('No. Epochs')
+ylabel('No. Bouts')
 xlim([0.5, nbins * nfiles + 0.5])
 xticks([1 : nbins * nfiles])
 

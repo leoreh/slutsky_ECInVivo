@@ -162,7 +162,7 @@ for i = sessions
     % mfr in selected state across sessions (mean +- std)
     %     states = {ss.ints.WAKEstate, ss.ints.NREMstate, ss.ints.REMstate};
     if ~isempty(ss)
-        states = ss.stateEpochs;
+        states = ss.boutTimes;
     else
         states = [];
     end

@@ -48,7 +48,7 @@ function acc = EMGfromACC(varargin)
 % CALLS:
 %   class2bytes
 %   specBand
-%   binary2epochs
+%   binary2bouts
 %   sepBimodel
 %   bz_BasenameFromBasepath
 %   n2chunks

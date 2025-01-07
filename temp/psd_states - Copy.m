@@ -10,7 +10,7 @@ function psd = psd_states(varargin)
 %   sig             vector of lfp signal. if empty will grab from sSig or
 %                   sigfile (see below)
 %   timeWin         2 element numeric vector depicting the time (s) over
-%                   which to calculate stateEpochs, i.e. the time window for
+%                   which to calculate btimes, i.e. the time window for
 %                   calculating the mean psd. used as indices to labels.
 %   ch              numeric. channels to load from the sigfile. if a vector
 %                   is specified, the signal will be averaged across
@@ -21,8 +21,7 @@ function psd = psd_states(varargin)
 %                   new sampling frequency of the eeg signal.
 %   sigfile         char. name of file to load signal from. if empty but
 %                   channel is specified, will load from [basename.lfp]
-%   stateEpochs     cell of n x 2 mats. if empty will calculate from
-%                   ss.labels or from emg_labels
+%   btimes          cell of n x 2 mats. if empty will load from sleep states 
 %   sstates         numeric. index of selected states to calculate psd
 %   ftarget         numeric. requested frequencies for calculating the psd
 %   emgThr          numeric. percent by which to seprate high- and low-emg.
@@ -42,7 +41,7 @@ function psd = psd_states(varargin)
 % 07 sep 22 LH  updates:
 % 20 mar 24 LH      cleanup, emg params, band analysis
 % 26 mar 24 LH      removed win functionality since psd is now calculated
-%                   per epoch. much simpler this way. bkup exists in temp
+%                   per bout. much simpler this way. bkup exists in temp
 %                   folder
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -58,9 +57,9 @@ addOptional(p, 'nchans', [], @isnumeric);
 addOptional(p, 'fs', 1, @isnumeric);
 addOptional(p, 'sigfile', [], @ischar);
 addOptional(p, 'sstates', [1, 4, 5], @isnumeric);
-addOptional(p, 'stateEpochs', []);
-addOptional(p, 'ftarget', [0.5 : 0.5 : 100], @isnumeric);
-addOptional(p, 'emgThr', [50], @isnumeric);
+addOptional(p, 'btimes', []);
+addOptional(p, 'ftarget', 0.5 : 0.5 : 100, @isnumeric);
+addOptional(p, 'emgThr', 50, @isnumeric);
 addOptional(p, 'flgEmg', false, @islogical);
 addOptional(p, 'saveVar', true, @islogical);
 addOptional(p, 'forceA', false, @islogical);
@@ -75,7 +74,7 @@ nchans          = p.Results.nchans;
 fs              = p.Results.fs;
 sigfile         = p.Results.sigfile;
 sstates         = p.Results.sstates;
-stateEpochs     = p.Results.stateEpochs;
+btimes          = p.Results.btimes;
 ftarget         = p.Results.ftarget;
 emgThr          = p.Results.emgThr;
 flgEmg          = p.Results.flgEmg;
@@ -106,41 +105,25 @@ v = getSessionVars('basepaths', {basepath}, 'varsFile', varsFile,...
 recLen = length(v.ss.labels);
 spkgrp = v.session.extracellular.spikeGroups.channels;
 
-% flg ss epochs or emg epochs
+% state params
 if flgEmg
     flgEmg = true;
     namePrefix = 'psdEmg';
-
-    % state params
-    clr = {[150, 70, 55] / 255, [200, 170, 100] / 255};
-    snames = {'High-EMG', 'Low-EMG'};
-    sstates = [1, 2];
-
-    % emg data
-    emg = load(sleepfile, 'emg_rms');
-    emg = emg.emg_rms;
-
-    % state epoch duration limits
-    minDur = [20];
-    interDur = 0;
-
+    sstates = [1 : 2];
+    cfg = as_loadConfig('flgEmg', true);
+    statesfile = fullfile(basepath, [basename, '.sleep_statesEmg.mat']);
 else
     flgEmg = false;
     namePrefix = 'psd';
-
-    % state params
     cfg = as_loadConfig();
     if isempty(sstates)
         sstates = 1 : cfg.nstates;
     end
-    clr = cfg.colors(sstates);
-    snames = cfg.names(sstates);
-
-    % state epoch duration limits
-    minDur = [20, 5, 5, 20, 10, 5];;
-    interDur = 0;
-
+    statesfile = fullfile(basepath, [basename, '.sleep_states.mat']);
 end
+clr = cfg.colors(sstates);
+snames = cfg.names(sstates);
+nstates = length(sstates);
 
 % check if already analyzed
 psdfile = fullfile(basepath, [basename, '.', namePrefix, '.mat']);
@@ -148,19 +131,6 @@ if exist(psdfile, 'file') && ~forceA
     load(psdfile)
     return
 end
-
-% load spectrogram for plot
-if graphics
-    if ~exist('emg', 'var')
-        emg = load(sleepfile, 'emg_rms');
-        emg = emg.emg_rms;
-    end
-
-    load(fullfile(basepath, [basename, '.spec.mat']))
-end
-
-% update params
-nstates = length(sstates);
 
 % assert time window
 if isempty(timeWin)
@@ -212,82 +182,63 @@ else                        % assumes input signal is from sSig
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% calculate state epochs if not provided
+% calculate state bouts if not provided
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% get stateEpochs
-if isempty(stateEpochs)
-    if ~flgEmg
+% get btimes
+if isempty(btimes)
+    ss = load(statesfile);
+    varName = fieldnames(ss);   
+    ss = ss.(varName{1});
+    bouts = ss.bouts;
+    btimes = bouts.times;
 
-        % get AS labels
-        labels = v.ss.labels;
-    else
-
-        % find threshold to separate the bimodal distribution of emg
-        if isempty(emgThr)
-            [~, cents] = kmeans(emg(:), 2);
-            emgThr = mean(cents);
-        end
-
-        % create EMG labels
-        labels = double(emg > emgThr);
-        labels(emg < emgThr) = 2;
-    end
-
-    % re-calc state epochs from labels
-    [stateEpochs, epochStats] = as_epochs('labels', labels(timeWin(1) : timeWin(2)),...
-        'minDur', minDur, 'interDur', interDur, 'rmOtl', true);
-    stateEpochs = stateEpochs(sstates);
-    specOtl = epochStats.otl;
-    clear epochStats
-
-    % add timeWin(1) to each epoch
-    stateEpochs = cellfun(@(x) round(x + timeWin(1) - 1),...
-        stateEpochs, 'uni', false);
+    % add timeWin(1) to each bout
+    btimes = cellfun(@(x) round(x + timeWin(1) - 1),...
+        btimes, 'uni', false);
 
 end
-
-% calc epoch stats
-epochStats.epLen = cellfun(@(x) (diff(x')'), stateEpochs, 'UniformOutput', false);
-epochStats.nepochs = cellfun(@length, epochStats.epLen);
-epochStats.totDur = cellfun(@sum, epochStats.epLen);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % calc psd
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-[~, faxis, psd_epochs] = calc_psd('sig',...
-    sig, 'bins', stateEpochs,...
+[~, faxis, psd_bouts] = calc_psd('sig',...
+    sig, 'bins', btimes,...
     'fs', fs, 'ftarget', ftarget, 'graphics', false);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% remove outlier epochs
+% remove outlier bouts
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+otl = get_otl(data, 'graphics', true);
+
+
 % outliers are detected in several iterations, first by pc1 and then by
 % mahalnobis distance. the pca is recalculated between iterations. this
 % was determined by empiric examination of the data (march 2024).
 
 % initialize vars
 clear otl
-psd.epochs.original = psd_epochs;
-tmp_epochs = psd_epochs;
+psd.bouts.original = psd_bouts;
+tmp_bouts = psd_bouts;
 otlIdx = cell(nstates, 1);
 origIdx = cell(nstates, 1);
 for istate = 1 : nstates
-    origIdx{istate} = 1 : size(stateEpochs{istate}, 1);
+    origIdx{istate} = 1 : size(btimes{istate}, 1);
 end
 
-% project epoch PSDs on feature space
-[~, pc, ~, ~, expl] = pca(vertcat(tmp_epochs{:}), 'NumComponents', nfet);
+% project bout PSDs on feature space
+[~, pc, ~, ~, expl] = pca(vertcat(tmp_bouts{:}), 'NumComponents', nfet);
 
-% create state and color indices for each epoch when epochs are
+% create state and color indices for each bout when bouts are
 % concatenated (e.g., for PCs)
 stateIdx = []; clrIdx = [];
 for istate = 1 : nstates
-    stateIdx = [stateIdx; istate * ones(epochStats.nepochs(istate), 1)];
-    clrIdx = [clrIdx; repmat(clr{istate}, epochStats.nepochs(istate), 1)];
+    stateIdx = [stateIdx; istate * ones(bouts.nbouts(istate), 1)];
+    clrIdx = [clrIdx; repmat(clr{istate}, bouts.nbouts(istate), 1)];
 end
-startIdx = [0, cumsum(epochStats.nepochs(1 : end - 1))];
+startIdx = [0, cumsum(bouts.nbouts(1 : end - 1))];
 
 % detect outliers
 nrep = 1;
@@ -311,7 +262,7 @@ for irep = 1 : nrep
             badIdx{istate} = false(sum(tmpIdx), 1);
         end
 
-        % track indices to original epochs
+        % track indices to original bouts
         otlIdx{istate} = [otlIdx{istate}; origIdx{istate}(badIdx{istate})'];
 
     end
@@ -322,38 +273,39 @@ for irep = 1 : nrep
     otl(irep).stateIdx = stateIdx;
     otl(irep).clrIdx = clrIdx;
     otl(irep).badIdx = badIdx;
-    otl(irep).stateEpochs = stateEpochs;
-    otl(irep).epochStats = epochStats;
-    otl(irep).psd_epochs = tmp_epochs;
+    otl(irep).btimes = btimes;
+    otl(irep).bouts = bouts;
+    otl(irep).psd_bouts = tmp_bouts;
     otl(irep).sil = silhouette(pc, stateIdx, 'Euclidean');
 
-    % remove bad indices from epochs and recalculate epoch stats
+    % remove bad indices from bouts and recalculate bout stats
     for istate = 1 : nstates
         if any(badIdx{istate})
-            stateEpochs{istate}(badIdx{istate}, :) = [];
-            tmp_epochs{istate}(badIdx{istate}, :) = [];
+            btimes{istate}(badIdx{istate}, :) = [];
+            tmp_bouts{istate}(badIdx{istate}, :) = [];
             origIdx{istate}(badIdx{istate}) = [];
         end
     end
 
-    % calculate epochStats
-    epochStats.epLen = cellfun(@(x) (diff(x')'), stateEpochs, 'UniformOutput', false);
-    epochStats.nepochs = cellfun(@length, epochStats.epLen);
-    epochStats.totDur = cellfun(@sum, epochStats.epLen);
+    % calculate bouts
+    bouts.boutLen = cellfun(@(x) (diff(x')'), btimes, 'UniformOutput', false);
+    bouts.nbouts = cellfun(@length, bouts.boutLen);
+    bouts.totDur = cellfun(@sum, bouts.boutLen);
 
     % recalculate pca
-    [~, pc, ~, ~, expl] = pca(vertcat(tmp_epochs{:}), 'NumComponents', nfet);
+    [~, pc, ~, ~, expl] = pca(vertcat(tmp_bouts{:}), 'NumComponents', nfet);
 
     % create state and color indices
     stateIdx = []; clrIdx = [];
     for istate = 1 : nstates
-        stateIdx = [stateIdx; istate * ones(epochStats.nepochs(istate), 1)];
-        clrIdx = [clrIdx; repmat(clr{istate}, epochStats.nepochs(istate), 1)];
+        stateIdx = [stateIdx; istate * ones(bouts.nbouts(istate), 1)];
+        clrIdx = [clrIdx; repmat(clr{istate}, bouts.nbouts(istate), 1)];
     end
 
 end
 
 % organize global indices of outliers (to pc mat)
+clear otlIdx_glbl
 for istate = 1 : nstates
     otlIdx_glbl{istate} = otlIdx{istate} + startIdx(istate);
 end
@@ -363,18 +315,18 @@ otlIdx_glbl = sort(cat(1, otlIdx_glbl{:}));
 % organize psd struct
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% organize epochs
-psd.epochs.clean = tmp_epochs;
-psd.epochs.stateEpochs = stateEpochs;
-psd.epochs.epochStats = epochStats;
-psd.epochs.otl = otl;
-psd.epochs.pc = pc;
-psd.epochs.expl = expl;
-psd.epochs.sil = silhouette(pc, stateIdx, 'Euclidean');
-psd.epochs.stateIdx = stateIdx;
-psd.epochs.clrIdx = clrIdx;
-psd.epochs.otlIdx = otlIdx;
-psd.epochs.otlIdx_glbl = otlIdx_glbl;
+% organize bouts
+psd.bouts.clean = tmp_bouts;
+psd.bouts.btimes = btimes;
+psd.bouts.bouts = bouts;
+psd.bouts.otl = otl;
+psd.bouts.pc = pc;
+psd.bouts.expl = expl;
+psd.bouts.sil = silhouette(pc, stateIdx, 'Euclidean');
+psd.bouts.stateIdx = stateIdx;
+psd.bouts.clrIdx = clrIdx;
+psd.bouts.otlIdx = otlIdx;
+psd.bouts.otlIdx_glbl = otlIdx_glbl;
 
 % info
 psd.info.sstates = sstates;
@@ -385,18 +337,18 @@ psd.info.emgThr = emgThr;
 psd.info.timeWin = timeWin;
 psd.info.ch = ch;
 psd.info.spkgrpIdx = find(cellfun(@(x) all(ismember(ch, x)), spkgrp));
-psd.info.runtime = datetime(now, 'ConvertFrom', 'datenum');
+psd.info.runtime = datetime("now");
 
-% calculate vars using cleaned epochs
+% calculate vars using cleaned bouts
 for istate = 1 : length(sstates)
-    if ~isempty(psd.epochs.clean{istate})
-        psd.psd(istate, :) = mean(psd.epochs.clean{istate}, 1);
+    if ~isempty(psd.bouts.clean{istate})
+        psd.psd(istate, :) = mean(psd.bouts.clean{istate}, 1);
 
         % calc power in specific frequency bands
-        % per epoch
-        [psd.bands.epochs{istate}, psd.bands.info] = calc_bands('psdData',...
-            psd.epochs.clean{istate}, 'freq', faxis, 'flgNormBand', false);
-        % across epochs
+        % per bout
+        [psd.bands.bouts{istate}, psd.bands.info] = calc_bands('psdData',...
+            psd.bouts.clean{istate}, 'freq', faxis, 'flgNormBand', false);
+        % across bouts
         [psd.bands.mean(istate, :), ~] = calc_bands('psdData',...
             psd.psd(istate, :), 'freq', faxis, 'flgNormBand', false);
 
@@ -411,9 +363,21 @@ end
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%%% plot spec, emg_rms, and hypnogram with outlier epochs in black.
+%%% plot spec, emg_rms, and hypnogram with outlier bouts in black.
 % plot only the original and final steps of cleaning (perhaps keep the
-% opion to plot all steps) 
+% option to plot all steps) 
+
+
+% load spectrogram for plot
+if graphics
+    if ~exist('emg', 'var')
+        emg = load(sleepfile, 'emg_rms');
+        emg = emg.emg_rms;
+    end
+
+    load(fullfile(basepath, [basename, '.spec.mat']))
+end
+
 
 if graphics
       
@@ -434,24 +398,26 @@ if graphics
         'axh', axh1, 'xtime', 1)
     axis tight
     yLimit = ylim;
-    if ~isempty(specOtl)
-        scatter(specOtl.idx, ones(length(specOtl.idx), 1) * yLimit(2), 30, 'filled', 'r')
-    end
     xticks([]);
     xlabel('')
+
+    % add spectrogram outliers
+    % if ~isempty(specOtl)
+    %     scatter(specOtl.idx, ones(length(specOtl.idx), 1) * yLimit(2), 30, 'filled', 'r')
+    % end
 
     % hypnogram and emg
     axh2 = nexttile(th, tlayout(2) + 1, [1, tlayout(2)]); cla; hold on
     plot([1 : length(emg)], emg, 'k', 'LineWidth', 0.5)
     yLimit = ylim;
-    plot_hypnogram('stateEpochs', psd.epochs.stateEpochs,...
+    plot_hypnogram('btimes', psd.bouts.btimes,...
         'clr', clr, 'axh', axh2, 'sstates', [1 : length(sstates)],...
         'yshift', 1)
     for istate = 1 : nstates
-        badEpochs{istate} = psd.epochs.otl(1).stateEpochs{istate}(psd.epochs.otlIdx{istate}, :);
+        badBouts{istate} = psd.bouts.otl(1).btimes{istate}(psd.bouts.otlIdx{istate}, :);
     end
     yshift = 1.05;
-    plot_hypnogram('stateEpochs', badEpochs,...
+    plot_hypnogram('btimes', badBouts,...
         'clr', repmat({[0 0 0]}, length(sstates), 1),...
         'axh', axh2, 'sstates', [1 : length(sstates)], 'yshift', yshift)
     yLimit = ylim;
@@ -471,8 +437,8 @@ if graphics
     for istate = 1 : nstates
         axh = nexttile(th, istate + tilebias, [1, 1]); cla; hold on
 
-        psdMat = psd.epochs.original{istate};
-        badIdx = psd.epochs.otlIdx{istate};
+        psdMat = psd.bouts.original{istate};
+        badIdx = psd.bouts.otlIdx{istate};
         if ~isempty(psdMat)
             if any(badIdx)
                 ph = plot(faxis, psdMat(badIdx, :), 'LineWidth', 0.5,...
@@ -492,7 +458,7 @@ if graphics
 
     % scree plot
     axh = nexttile(th, nstates + 1 + tilebias, [1, 1]);
-    expl = psd.epochs.otl(1).expl;
+    expl = psd.bouts.otl(1).expl;
     plot(cumsum(expl), 'LineWidth', 2);
     xlabel('PC');
     ylabel('Cum. Var. (%)');
@@ -506,9 +472,9 @@ if graphics
 
     % state clusters in feature space
     axh = nexttile(th, nstates + 2 + tilebias, [1, 1]); cla; hold on
-    pcMat = psd.epochs.otl(1).pc;
-    badIdx = psd.epochs.otlIdx_glbl;
-    clrIdx = psd.epochs.otl(1).clrIdx;
+    pcMat = psd.bouts.otl(1).pc;
+    badIdx = psd.bouts.otlIdx_glbl;
+    clrIdx = psd.bouts.otl(1).clrIdx;
     sh = scatter3(axh, pcMat(:, 1), pcMat(:, 2), pcMat(:, 3),...
         30, clrIdx, 'filled');
     scatter3(pcMat(badIdx, 1), pcMat(badIdx, 2), pcMat(badIdx, 3),...
@@ -517,11 +483,11 @@ if graphics
     grid minor
     sh.MarkerFaceAlpha = 0.6;
     xlabel('PC1'); ylabel('PC2'); zlabel('PC3')
-    title(axh, 'Epoch PSD projection')
+    title(axh, 'Bout PSD projection')
 
     % silhouette plot
     axh = nexttile(th, nstates + 3 + tilebias, [1, 1]); cla; hold on
-    stateIdx = psd.epochs.otl(1).stateIdx;
+    stateIdx = psd.bouts.otl(1).stateIdx;
     silhouette(pcMat, stateIdx, 'Euclidean');
     xlim([-1 1])
     yticklabels(snames)
@@ -532,7 +498,7 @@ if graphics
     title(axh, 'Separation Quality')
     yTickVals = yticks;
     for istate = 1 : nstates
-        meanSil = mean(psd.epochs.otl(1).sil(stateIdx == istate));
+        meanSil = mean(psd.bouts.otl(1).sil(stateIdx == istate));
         if ~isnan(meanSil)
             text(-0.75, yTickVals(istate), num2str(meanSil, '%.3f'));
         end
@@ -544,7 +510,7 @@ if graphics
     for istate = 1 : length(sstates)
         axh = nexttile(th, istate + tilebias, [1, 1]); cla; hold on
 
-        psdMat = psd.epochs.clean{istate};
+        psdMat = psd.bouts.clean{istate};
         if ~isempty(psdMat)
             ph = plot(faxis, psdMat, 'LineWidth', 0.5,...
                 'Color', [0.7 0.7 0.7]);
@@ -562,7 +528,7 @@ if graphics
 
     % scree plot
     axh = nexttile(th, nstates + 1 + tilebias, [1, 1]); cla; hold on
-    expl = psd.epochs.expl;
+    expl = psd.bouts.expl;
     plot(cumsum(expl), 'LineWidth', 2);
     xlabel('PC');
     ylabel('Cumulative Variance (%)');
@@ -575,19 +541,19 @@ if graphics
 
     % state clusters in feature space
     axh = nexttile(th, nstates + 2 + tilebias, [1, 1]); cla; hold on
-    pcMat = psd.epochs.pc;
-    clrIdx = psd.epochs.clrIdx;
+    pcMat = psd.bouts.pc;
+    clrIdx = psd.bouts.clrIdx;
     sh = scatter3(axh, pcMat(:, 1), pcMat(:, 2), pcMat(:, 3),...
         30, clrIdx, 'filled');
     view(-25, 25)
     grid minor
     sh.MarkerFaceAlpha = 0.6;
     xlabel('PC1'); ylabel('PC2'); zlabel('PC3')
-    title(axh, 'Epoch PSD projection')
+    title(axh, 'Bout PSD projection')
 
     % silhouette plot
     axh = nexttile(th, nstates + 3 + tilebias, [1, 1]); cla; hold on
-    stateIdx = psd.epochs.stateIdx;
+    stateIdx = psd.bouts.stateIdx;
     silhouette(pcMat, stateIdx, 'Euclidean');
     xlim([-1 1])
     yticklabels(snames)
@@ -598,7 +564,7 @@ if graphics
     title(axh, 'Silhouette of PCA Clusters')
     yTickVals = yticks;
     for istate = 1 : nstates
-        meanSil = mean(psd.epochs.sil(stateIdx == istate));
+        meanSil = mean(psd.bouts.sil(stateIdx == istate));
         if ~isnan(meanSil)
             text(-0.75, yTickVals(istate), num2str(meanSil, '%.3f'));
         end
@@ -633,8 +599,8 @@ end
 %         for istate = 1 : nstates
 %             axh = nexttile(th, istate + tilebias, [1, 1]); cla; hold on
 % 
-%             psdMat = psd.epochs.otl(irep).psd_epochs{istate};
-%             badIdx = psd.epochs.otl(irep).badIdx{istate};
+%             psdMat = psd.bouts.otl(irep).psd_bouts{istate};
+%             badIdx = psd.bouts.otl(irep).badIdx{istate};
 %             if ~isempty(psdMat)
 %                 if any(badIdx)
 %                     ph = plot(faxis, psdMat(badIdx, :), 'LineWidth', 0.5,...
@@ -653,7 +619,7 @@ end
 % 
 %         % scree plot
 %         axh = nexttile(th, nstates + 1 + tilebias, [1, 1]);
-%         expl = psd.epochs.otl(irep).expl;
+%         expl = psd.bouts.otl(irep).expl;
 %         plot(cumsum(expl), 'LineWidth', 2);
 %         xlabel('PC');
 %         ylabel('Cum. Var. (%)');
@@ -667,9 +633,9 @@ end
 % 
 %         % state clusters in feature space
 %         axh = nexttile(th, nstates + 2 + tilebias, [1, 1]); cla; hold on
-%         pcMat = psd.epochs.otl(irep).pc;
-%         badIdx = vertcat(psd.epochs.otl(irep).badIdx{:});
-%         clrIdx = psd.epochs.otl(irep).clrIdx;      
+%         pcMat = psd.bouts.otl(irep).pc;
+%         badIdx = vertcat(psd.bouts.otl(irep).badIdx{:});
+%         clrIdx = psd.bouts.otl(irep).clrIdx;      
 %         sh = scatter3(axh, pcMat(:, 1), pcMat(:, 2), pcMat(:, 3),...
 %             30, clrIdx, 'filled');
 %         scatter3(pcMat(badIdx, 1), pcMat(badIdx, 2), pcMat(badIdx, 3),...
@@ -678,11 +644,11 @@ end
 %         grid minor
 %         sh.MarkerFaceAlpha = 0.6;
 %         xlabel('PC1'); ylabel('PC2'); zlabel('PC3')
-%         title(axh, 'Epoch PSD projection')
+%         title(axh, 'Bout PSD projection')
 % 
 %         % silhouette plot
 %         axh = nexttile(th, nstates + 3 + tilebias, [1, 1]); cla; hold on
-%         stateIdx = psd.epochs.otl(irep).stateIdx;
+%         stateIdx = psd.bouts.otl(irep).stateIdx;
 %         silhouette(pcMat, stateIdx, 'Euclidean');
 %         xlim([-1 1])
 %         yticklabels(snames)
@@ -693,7 +659,7 @@ end
 %         title(axh, 'Separation Quality')
 %         yTickVals = yticks;
 %         for istate = 1 : nstates
-%             meanSil = mean(psd.epochs.otl(irep).sil(stateIdx == istate));
+%             meanSil = mean(psd.bouts.otl(irep).sil(stateIdx == istate));
 %             if ~isnan(meanSil)
 %                 text(-0.75, yTickVals(istate), num2str(meanSil, '%.3f'));
 %             end
@@ -705,7 +671,7 @@ end
 %     for istate = 1 : length(sstates)
 %         axh = nexttile(th, istate + tilebias, [1, 1]); cla; hold on
 % 
-%         psdMat = psd.epochs.clean{istate};
+%         psdMat = psd.bouts.clean{istate};
 %         if ~isempty(psdMat)
 %             ph = plot(faxis, psdMat, 'LineWidth', 0.5,...
 %                 'Color', [0.7 0.7 0.7]);
@@ -722,7 +688,7 @@ end
 % 
 %     % scree plot
 %     axh = nexttile(th, nstates + 1 + tilebias, [1, 1]); cla; hold on
-%     expl = psd.epochs.expl;
+%     expl = psd.bouts.expl;
 %     plot(cumsum(expl), 'LineWidth', 2);
 %     xlabel('PC');
 %     ylabel('Cumulative Variance (%)');
@@ -735,19 +701,19 @@ end
 % 
 %     % state clusters in feature space
 %     axh = nexttile(th, nstates + 2 + tilebias, [1, 1]); cla; hold on
-%     pcMat = psd.epochs.pc;
-%     clrIdx = psd.epochs.clrIdx;
+%     pcMat = psd.bouts.pc;
+%     clrIdx = psd.bouts.clrIdx;
 %     sh = scatter3(axh, pcMat(:, 1), pcMat(:, 2), pcMat(:, 3),...
 %         30, clrIdx, 'filled');
 %     view(-25, 25)
 %     grid minor
 %     sh.MarkerFaceAlpha = 0.6;
 %     xlabel('PC1'); ylabel('PC2'); zlabel('PC3')
-%     title(axh, 'Epoch PSD projection')
+%     title(axh, 'Bout PSD projection')
 % 
 %     % silhouette plot
 %     axh = nexttile(th, nstates + 3 + tilebias, [1, 1]); cla; hold on
-%     stateIdx = psd.epochs.stateIdx;
+%     stateIdx = psd.bouts.stateIdx;
 %     silhouette(pcMat, stateIdx, 'Euclidean');
 %     xlim([-1 1])
 %     yticklabels(snames)
@@ -758,7 +724,7 @@ end
 %     title(axh, 'Silhouette of PCA Clusters')
 %     yTickVals = yticks;
 %     for istate = 1 : nstates
-%         meanSil = mean(psd.epochs.sil(stateIdx == istate));
+%         meanSil = mean(psd.bouts.sil(stateIdx == istate));
 %         if ~isnan(meanSil)
 %             text(-0.75, yTickVals(istate), num2str(meanSil, '%.3f'));
 %         end

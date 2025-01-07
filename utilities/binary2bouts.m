@@ -1,31 +1,31 @@
-function [epochs, nepochs] = binary2epochs(varargin)
+function [bouts, nbouts] = binary2bouts(varargin)
 
-% gets a binary vector and returns the start \ stop times of epochs. can be
-% used for BS, ripples, anesthesia states etc. accounts for inter-epoch
-% interval and duration. note that epoch defines start including idx and
+% gets a binary vector and returns the start \ stop times of bouts. can be
+% used for BS, ripples, anesthesia states etc. accounts for inter-bout
+% interval and duration. note that bout defines start including idx and
 % stop not including idx [). this is for legacy purposes. 
 % 
 % INPUT
 %       vec         binary vector 
 %       exclude     logical. exclude incomplete events (1) or not {0}.
-%       minDur      minimum duration of epoch
-%       maxDur      maximum duration of epoch
-%       interDur    maximum inter-epoch interval
-%       printFlag   logical. print to screen the number of epochs
+%       minDur      minimum duration of bout
+%       maxDur      maximum duration of bout
+%       interDur    maximum inter-bout interval
+%       flgPrnt     logical. print to screen the number of bouts
 %
 % OUTPUT
-%       epochs      n x 2 mat where n is the number of events and the
+%       bouts      n x 2 mat where n is the number of events and the
 %                   columns represent the start and end of each event [samps]
-%       nepochs     struct with fields describing number of epochs detected
+%       nbouts     struct with fields describing number of bouts detected
 %                   in each step
 %     
 % EXAMPLE
 %       see aneStates.m or getBS.m
-%       epochs = binary2epochs('vec', binaryVec, 'minDur', minDur, 'maxDur', [],...
+%       bouts = binary2bouts('vec', binaryVec, 'minDur', minDur, 'maxDur', [],...
 %           'interDur', interDur, 'exclude', false);
 % 
 % 14 jan 19 LH      updates:
-% 05 feb 22         nepochs and printFlag
+% 05 feb 22         nbouts and flgPrnt
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -37,7 +37,7 @@ addParameter(p, 'exclude', false, @islogical)
 addParameter(p, 'minDur', [], @isnumeric)
 addParameter(p, 'maxDur', [], @isnumeric)
 addParameter(p, 'interDur', [], @isnumeric)
-addParameter(p, 'printFlag', true, @islogical)
+addParameter(p, 'flgPrnt', true, @islogical)
 
 parse(p, varargin{:})
 vec         = p.Results.vec;
@@ -45,10 +45,10 @@ exclude     = p.Results.exclude;
 minDur      = p.Results.minDur;
 maxDur      = p.Results.maxDur;
 interDur    = p.Results.interDur;
-printFlag   = p.Results.printFlag;
+flgPrnt     = p.Results.flgPrnt;
 
 % initialize output
-epochs = [];
+bouts = [];
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % find start\stop times
@@ -59,16 +59,16 @@ stop = find([0; diff(vec)] < 0);
 
 if isempty(start) && isempty(stop)
     if unique(vec) == 1
-        epochs = [1 length(vec)];
-        nepochs.detect = 1;
-        nepochs.dur = 1;
-        nepochs.merge = 1;
+        bouts = [1 length(vec)];
+        nbouts.detect = 1;
+        nbouts.dur = 1;
+        nbouts.merge = 1;
     else
-        nepochs.detect = 0;
-        nepochs.dur = 0;
-        nepochs.merge = 0;
-        if printFlag
-            fprintf('\nNo epochs detected\n');
+        nbouts.detect = 0;
+        nbouts.dur = 0;
+        nbouts.merge = 0;
+        if flgPrnt
+            fprintf('\nNo bouts detected\n');
         end
     end
     return
@@ -103,10 +103,10 @@ if start(1) > stop(1)
     end
 end
 
-epochs = [start(:), stop(:)];
-nepochs.detect = size(epochs, 1);
-if printFlag
-    fprintf('\nAfter initial detection: %d events\n', nepochs.detect);
+bouts = [start(:), stop(:)];
+nbouts.detect = size(bouts, 1);
+if flgPrnt
+    fprintf('\nAfter initial detection: %d events\n', nbouts.detect);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -114,67 +114,67 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if ~isempty(interDur)
-    iei = epochs(2 : end, 1) - epochs(1 : end - 1, 2);     
+    iei = bouts(2 : end, 1) - bouts(1 : end - 1, 2);     
     while min(iei) < interDur
         temp = [];
-        event = epochs(1, :);
-        for i = 2 : nepochs.detect
-            if epochs(i, 1) - event(2) < interDur
-                event = [event(1) epochs(i, 2)];
+        event = bouts(1, :);
+        for i = 2 : nbouts.detect
+            if bouts(i, 1) - event(2) < interDur
+                event = [event(1) bouts(i, 2)];
             else
                 temp = [temp; event];
-                event = epochs(i, :);
+                event = bouts(i, :);
             end
         end
         temp = [temp; event];
-        epochs = temp;
-        iei = epochs(2 : end, 1) - epochs(1 : end - 1, 2);
+        bouts = temp;
+        iei = bouts(2 : end, 1) - bouts(1 : end - 1, 2);
     end
     
-    % correct last epoch to end of recording
-    if length(vec) - epochs(end, end) < interDur
-        epochs(end, end) = length(vec);
+    % correct last bout to end of recording
+    if length(vec) - bouts(end, end) < interDur
+        bouts(end, end) = length(vec);
     end    
 end
 
-nepochs.merge = size(epochs, 1);
-if isempty(epochs)
-    if printFlag
+nbouts.merge = size(bouts, 1);
+if isempty(bouts)
+    if flgPrnt
         fprintf('Event merge failed');
     end
     return
 end
-if printFlag
-    fprintf('After merging: %d events\n', nepochs.merge);
+if flgPrnt
+    fprintf('After merging: %d events\n', nbouts.merge);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % discard events by duration
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-dur = epochs(:, 2) - epochs(:, 1);
+dur = bouts(:, 2) - bouts(:, 1);
 if ~isempty(maxDur)
     idxMax = dur > maxDur;
 else
-    idxMax = zeros(nepochs.merge, 1);
+    idxMax = zeros(nbouts.merge, 1);
 end
 if ~isempty(minDur)
     idxMin = dur < minDur;
 else
-    idxMin = zeros(nepochs.merge, 1);
+    idxMin = zeros(nbouts.merge, 1);
 end
 idx = idxMax | idxMin;
-epochs(idx, :) = [];
+bouts(idx, :) = [];
 
-nepochs.dur = size(epochs, 1);
-if isempty(epochs)
-    if printFlag
+nbouts.dur = size(bouts, 1);
+if isempty(bouts)
+    if flgPrnt
         fprintf('duration test failed.');
     end
     return
 end
-if printFlag
-    fprintf('After duration: %d events\n', nepochs.dur);
+if flgPrnt
+    fprintf('After duration: %d events\n', nbouts.dur);
 end
 
 end

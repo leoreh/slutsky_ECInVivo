@@ -79,16 +79,16 @@ for ifile = 1 : nfiles
     labels = double(emg > prctile(emg, prct));
     labels(emg < prctile(emg, 100 - prct)) = 2;
 
-    % limit indices to time window and get "state" epochs
+    % limit indices to time window and get "state" bouts
     labels = labels(wins(:, 1) : wins(:, 2));
-    [stateEpochs, ~] = as_epochs('labels', labels, 'minDur', 10, 'interDur', 4);
-    stateEpochs = stateEpochs([1 : 2]);
+    [boutTimes, ~] = as_bouts('labels', labels, 'minDur', 10, 'interDur', 4);
+    boutTimes = boutTimes([1 : 2]);
 
     % calc firing rate
     fr = calc_fr(v(ifile).spikes.times, 'basepath', basepath,...
         'graphics', false, 'binsize', 60, 'saveVar', false,...
         'smet', 'none', 'winBL', [0, Inf], 'winCalc', [0, Inf],...
-        'stateEpochs', stateEpochs);   
+        'boutTimes', boutTimes);   
     stateRat = squeeze(fr.states.ratio(2, 1, :));
 
     % organize cell array of state ratio

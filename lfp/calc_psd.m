@@ -1,4 +1,4 @@
-function [psd, faxis, psd_epochs] = calc_psd(varargin)
+function [psd, faxis, psd_bouts] = calc_psd(varargin)
 
 % calculates the psd of a signal with the multitaper estimate by chronux.
 % the spectrum is calculated in specific timebins, or the timebins are
@@ -25,13 +25,13 @@ function [psd, faxis, psd_epochs] = calc_psd(varargin)
 %   ftarget         numeric. requested frequencies of psd estimate
 %   bins            cell of n x 2 mats. the psd will be calculated for each
 %                   cell separately according to the time windows specified
-%                   in each cell [sec]. e.g., bins = ss.stateEpochs.
+%                   in each cell [sec]. e.g., bins = ss.boutTimes.
 %   graphics        logical. plot figure {true}
 % 
 % OUTPUT
 %   psd             numeric nbins x ftarget. raw averaged psd for each bin 
 %   faxis           numeric frequency values
-%   psd_epochs      cell of nwins with the psd per bin
+%   psd_bouts       cell of nwins with the psd per bin
 %
 % DEPENDENCIES
 %   mtspectrumc
@@ -69,7 +69,7 @@ if isempty(ftarget)
     ftarget = [1 : 0.1 : 100];
 end
 
-% margin to remove from the start and end of an epoch 
+% margin to remove from the start and end of an bout 
 sigMrgin = 0;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -131,7 +131,7 @@ nfft = max(2 ^ (nextpow2(N) + mtspec_params.pad), N);
 [f, ~] = getfgrid(fs, nfft, frange); 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% calc power for each epoch separatly
+% calc power for each bout separatly
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 alt = 1;
@@ -142,7 +142,7 @@ if alt < 3
 else
     psd = nan(ncells, length(ftarget));
 end
-psd_epochs = cell(ncells, 1);
+psd_bouts = cell(ncells, 1);
 
 for icell = 1 : ncells
     
@@ -151,13 +151,13 @@ for icell = 1 : ncells
     end
 
     % ---------------------------------------------------------------------
-    % ALT 1: calc psd per epoch and average across epochs (mspectrumsegc)
+    % ALT 1: calc psd per bout and average across bouts (mspectrumsegc)
     if alt == 1        
         
         % initialize
-        psd_epochs{icell} = nan(nbins(icell), length(f));
+        psd_bouts{icell} = nan(nbins(icell), length(f));
         
-        % loop through epochs
+        % loop through bouts
         for ibin = 1 : nbins(icell)
 
             % idx to signal w/o edges (sigMrgin)
@@ -166,26 +166,26 @@ for icell = 1 : ncells
 
             if length(dataIdx) < window * fs
                 nbins(icell) = nbins(icell) - 1;
-                warning('some epochs too short for fft window')
+                warning('some bouts too short for fft window')
                 continue
             end
 
             % calc power and sum across bins
-            [psd_epochs{icell}(ibin, :), f] = mtspectrumsegc(sig(dataIdx), window, mtspec_params, segave);
+            [psd_bouts{icell}(ibin, :), f] = mtspectrumsegc(sig(dataIdx), window, mtspec_params, segave);
 
         end
         
-        % average power across epochs
-        psd(icell, :) = mean(psd_epochs{icell}, 1, 'omitnan');
+        % average power across bouts
+        psd(icell, :) = mean(psd_bouts{icell}, 1, 'omitnan');
 
     % ---------------------------------------------------------------------
-    % ALT 2: cat epochs and calc psd once (mspectrumsegc)
+    % ALT 2: cat bouts and calc psd once (mspectrumsegc)
     elseif alt == 2
         dataIdx = Restrict([1 : length(sig)], bins{icell} * fs);
         [psd(icell, :), f] = mtspectrumsegc(sig(dataIdx), window, mtspec_params, segave);
     
     % ---------------------------------------------------------------------
-    % ALT 3: cat epochs and calc psd once (mspectrumc). doesn't work good. 
+    % ALT 3: cat bouts and calc psd once (mspectrumc). doesn't work good. 
     elseif alt == 3
         dataIdx = Restrict([1 : length(sig)], bins{icell} * fs);
         [tmp, f] = mtspectrumc(sig(dataIdx), mtspec_params);
@@ -199,10 +199,10 @@ for icell = 1 : ncells
         faxis = f(fidx);
 
     % ---------------------------------------------------------------------
-    % ALT 4: calc psd per epoch and average across epochs (mspectrumc)
+    % ALT 4: calc psd per bout and average across bouts (mspectrumc)
     elseif alt == 4
         
-        psd_epochs{icell} = nan(nbins(icell), length(ftarget));
+        psd_bouts{icell} = nan(nbins(icell), length(ftarget));
         for ibin = 1 : nbins(icell)
 
             % idx to signal w/o edges (sigMrgin)
@@ -211,7 +211,7 @@ for icell = 1 : ncells
 
             if length(dataIdx) < window * fs
                 nbins(icell) = nbins(icell) - 1;
-                warning('some epochs too short for fft window')
+                warning('some bouts too short for fft window')
                 continue
             end
 
@@ -223,12 +223,12 @@ for icell = 1 : ncells
             for ifreq = 1 : length(ftarget)
                 [fdev(ifreq), fidx(ifreq)] = min(abs(f - ftarget(ifreq)));
             end
-            psd_epochs{icell}(ibin, :) = tmp(fidx);
+            psd_bouts{icell}(ibin, :) = tmp(fidx);
             faxis = f(fidx);
 
         end
         % average power
-        psd(icell, :) = mean(psd_epochs{icell}, 1, 'omitnan');
+        psd(icell, :) = mean(psd_bouts{icell}, 1, 'omitnan');
     end
 end
 

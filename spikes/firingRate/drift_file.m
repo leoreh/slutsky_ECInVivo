@@ -5,7 +5,7 @@ function drft = drift_file(varargin)
 %
 % INPUT:
 %   basepath        string. path to recording folder {pwd}
-%   stateEpochs     cell of n x 2 mats. each cell describes the epochs of
+%   boutTimes     cell of n x 2 mats. each cell describes the bouts of
 %                   a state (s). if empty will try to load from
 %                   sleep_states.mat and will only analyze aw and nrem
 %   graphics        logical. plot {false}
@@ -24,12 +24,12 @@ function drft = drift_file(varargin)
 
 p = inputParser;
 addOptional(p, 'basepath', pwd);
-addOptional(p, 'stateEpochs', []);
+addOptional(p, 'boutTimes', []);
 addOptional(p, 'graphics', false, @islogical);
 
 parse(p, varargin{:})
 basepath        = p.Results.basepath;
-stateEpochs     = p.Results.stateEpochs;
+boutTimes     = p.Results.boutTimes;
 graphics        = p.Results.graphics;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -59,9 +59,9 @@ sstates = [1, 4];       % selected states for calculating drift
 cfg = as_loadConfig;
 snames = cfg.names(sstates);
 
-if isempty(stateEpochs)
+if isempty(boutTimes)
     if ~isempty(v.ss)
-        stateEpochs = v.ss.stateEpochs(sstates);
+        boutTimes = v.ss.boutTimes(sstates);
     end
 end
 
@@ -80,12 +80,12 @@ for iunit = 1 : 2
     % calc drift per state
     for istate = 1 : length(sstates)
         
-        stateIdx = InIntervals(v.fr.tstamps, stateEpochs{istate});
+        stateIdx = InIntervals(v.fr.tstamps, boutTimes{istate});
         fr_mat = v.fr.strd(unitIdx, stateIdx);
 
         switch timeAlt
             case 1
-                % ALT 1: concatenate epochs and ignore actual time when
+                % ALT 1: concatenate bouts and ignore actual time when
                 % calculating drift
                 tstamps = [30 : 60 : size(fr_mat, 2) * 60];
 
@@ -96,7 +96,7 @@ for iunit = 1 : 2
 
             case 3
                 % ALT 3: grab fr in states from fr struct. same as ALT 2
-                % but more accurate. overrides the stateEpochs input
+                % but more accurate. overrides the boutTimes input
                 fr_mat = v.fr.states.fr{sstates(istate)}(unitIdx, :);
                 tstamps = v.fr.states.tstamps{sstates(istate)};
         end

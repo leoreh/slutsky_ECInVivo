@@ -40,7 +40,7 @@ function [bs] = getBS(varargin)
 %
 % TO DO LIST
 %       # GMM clusters such that grp #1 has higher values (= bursts).
-%       # adapt binary2epochs and account for robustness to minDur / interDur
+%       # adapt binary2bouts and account for robustness to minDur / interDur
 %       # replace changepts with https://www.mathworks.com/help/wavelet/ug/wavelet-changepoint-detection.html
 %
 % CALLS

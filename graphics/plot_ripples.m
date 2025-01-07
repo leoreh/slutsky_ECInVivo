@@ -36,9 +36,9 @@ if isempty(ripp)
 end
 
 % params
-nepochs = size(ripp.epochs, 1);
+nbouts = size(ripp.bouts, 1);
 durPlot = [-50 50] / 1000;
-x = durPlot(1) : diff(durPlot) / nepochs : durPlot(2);
+x = durPlot(1) : diff(durPlot) / nbouts : durPlot(2);
 histBins = 200;
 nbinsMap = size(ripp.maps.freq, 2);
 
@@ -56,7 +56,7 @@ xlabel('Time [h]')
 ylabel('Ripple Rate [1/min]')
 
 % examples of ripples
-ripp_idx = randperm(nepochs, min([100, nepochs]));
+ripp_idx = randperm(nbouts, min([100, nbouts]));
 
 % mean +/- std of ripples (filtered) superimposed
 sb2 = subplot(3, 3, 3);

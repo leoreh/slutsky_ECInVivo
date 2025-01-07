@@ -3,11 +3,11 @@
 %   Copyright (c) 2022 The Board of Trustees of the Leland Stanford Junior University; Herzenberg Lab
 %   License: BSD 3 clause
 
-modelTensorFlowFile1=MlpPython.Train('balbc4FmoLabeled.csv', 'epochs', 210, 'class', .12, 'confirm_model', false);
+modelTensorFlowFile1=MlpPython.Train('balbc4FmoLabeled.csv', 'bouts', 210, 'class', .12, 'confirm_model', false);
 % The above command sets modelTensorFlowFile1='~/Documents/run_umap/examples/balbc4FmoLabeled';
 lbls=MlpPython.Predict('balbcFmoLabeled.csv', 'model_file', modelTensorFlowFile1, 'test_label_file', 'balbc4FmoLabeled.properties', 'training_label_file', 'balbcFmoLabeled.properties', 'confirm_model', false);
 
-modelTensorFlowFile2=MlpPython.Train('balbc4RagLabeled.csv', 'epochs', 210, 'confirm_model', false, 'wait', false);
+modelTensorFlowFile2=MlpPython.Train('balbc4RagLabeled.csv', 'bouts', 210, 'confirm_model', false, 'wait', false);
 lbls=MlpPython.Predict('ragLabeled.csv', 'model_file', modelTensorFlowFile2, 'test_label_file', 'balbc4RagLabeled.properties', 'training_label_file', 'ragLabeled.properties', 'confirm_model', false);
            
 modelTensorFlowFile2='~/Documents/run_umap/examples/balbc4RagLabeled';
