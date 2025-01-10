@@ -29,17 +29,21 @@ switch psd_cfg.expDsgn
         grps = mcu_sessions('wt');
         psd_cfg.fmt = '{state}[mouse x freq x time]';
         flg_emg = true;
-        vars = {'psdEmg'};
         nstates = 2;
 
     case 2
         grps = {'wt_bsl'; 'mcu_bsl'};
         psd_cfg.fmt = '{gen}[state x freq x mouse]';
-        flg_emg = false;
-        vars = {'psd'};
+        flg_emg = true;
 
     otherwise
         error('Unsupported experimental design: %d', expDsgn);
+end
+
+if flg_emg
+    vars = {'psdEmg'};
+else
+    vars = {'psd'};
 end
 
 ngrps = numel(grps);

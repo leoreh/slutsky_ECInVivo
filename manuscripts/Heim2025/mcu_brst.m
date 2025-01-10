@@ -4,7 +4,6 @@
 % calculate burstiness per file
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-
 % go over each mouse and analyze all experiment days
 grps = [mcu_sessions('wt'), mcu_sessions('mcu')];
 vars = {'spikes'};
@@ -28,16 +27,18 @@ for igrp = 1 : length(grps)
         cd(basepath)
 
         % brst (mea)
-        brst = spktimes_meaBrst(v(ifile).spikes.times, 'binsize', [], 'isiThr', 0.02,...
-            'minSpks', 2, 'saveVar', true, 'force', true, 'bins', [0 Inf]);
+        % brst = spktimes_meaBrst(v(ifile).spikes.times, 'binsize', [],...
+        %     'isiThr', 0.02, 'minSpks', 2, 'bins', [0 Inf],...
+        %     'saveVar', true, 'flg_force', true, 'flg_all', false);
+
+        % spike timing metrics
+        st = spktimes_metrics('spktimes', v(ifile).spikes.times, 'sunits', [],...
+            'bins', [0 Inf], 'flg_force', true, 'saveVar', true, 'flg_all', false);
 
     end
 end
 
 
-
-
-v = basepaths2vars('basepaths', basepaths, 'vars', {'st_brst'});
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -62,12 +63,16 @@ end
 
 % organize for lme
 frml = 'Burst ~ Group * Day + (1|Mouse)';
-[fr_tbl, fr_cfg] = mcu_frOrg(grppaths, frml, true);
+[lme_tbl, lme_cfg] = mcu_lmeOrg(grppaths, frml, true);
 
 % run lme
-iunit = 1;
-lme_tbl = fr_tbl(fr_tbl.UnitType == iunit, :);
-lme = fitlme(lme_tbl, fr_cfg.frml);
+iunit = 2;
+brst_tbl = lme_tbl(lme_tbl.UnitType == iunit, :);
+lme = fitlme(brst_tbl, lme_cfg.frml);
 
-% copy results to excel
-exlTbl = lme2exl(lme);
+% plot
+mcu_lmePlot(brst_tbl, lme)
+
+
+
+

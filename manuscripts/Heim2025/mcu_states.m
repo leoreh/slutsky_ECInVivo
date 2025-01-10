@@ -196,12 +196,80 @@ for imouse = 1 : length(mice)
     end
 end
 
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% LME 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% load data for each group
+grps = {'wt', 'mcu'};
+clear grppaths
+for igrp = 1 : length(grps)
+
+    mnames = mcu_sessions(grps(igrp));
+    
+    for imouse = 1 : length(mnames)
+        basepaths = mcu_sessions(mnames{imouse});
+        grppaths{igrp}(imouse, :) = string(basepaths)';
+    end
+end
+
+% Bout length of WT vs. MCU across time
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% organize for lme
+frml = 'BLen ~ Group * Day + (1|Mouse)';
+[lme_tbl, lme_cfg] = mcu_lmeOrg(grppaths, frml, true);
+
+% run lme
+istate = 1;
+blen_tbl = lme_tbl(lme_tbl.State == categorical(istate), :);
+lme = fitlme(blen_tbl, lme_cfg.frml);
+
+% plot
+mcu_lmePlot(blen_tbl, lme);
+
+
+% Bout length of WT vs. MCU across states during baseline
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+grps = {'wt_bsl'; 'mcu_bsl'};
+
+clear grppaths
+for igrp = 1 : length(grps)
+    grppaths{igrp} = string(mcu_sessions(grps{igrp})');
+end
+
+% organize for lme
+frml = 'BLen ~ Group * State + (1|Mouse)';
+[lme_tbl, lme_cfg] = mcu_lmeOrg(grppaths, frml, true);
+
+% run lme
+blen_tbl = lme_tbl;
+lme = fitlme(blen_tbl, lme_cfg.frml);
+
+% plot
+mcu_lmePlot(blen_tbl, lme);
+
+
+for igrp = 1 : length(grps)
+    basepaths = mcu_sessions(grps{igrp})';
+    v = basepaths2vars('basepaths', basepaths, 'vars', {'sleep_states'});
+    for ifile = 1 : length(v)
+        mean(cell2padmat(v(ifile).ss.bouts.boutLen([1, 4, 5]), 2), 1, 'omitnan')
+    end
+end
+
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % compare mcu and wt during baseline
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % can use states either from accusleep or emg 
-flg_emg = false;
+flg_emg = true;
 
 % can use bouts after cleaning and merging or original
 flg_clean = true;

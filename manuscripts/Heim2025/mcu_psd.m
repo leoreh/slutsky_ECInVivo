@@ -6,7 +6,6 @@
 
 % go over each mouse and analyze all experiment days
 grps = [mcu_sessions('wt'), mcu_sessions('mcu')];
-flg_bsl = false;
 
 % go over baseline for wt vs. mcu. during experiment, only psdEmg should be
 % calculated
@@ -31,7 +30,7 @@ for igrp = 1 : length(grps)
         [~, basename] = fileparts(basepath);
         cd(basepath)
         sigfile = fullfile(basepath, [basename, '.sleep_sig.mat']);
-        
+
         % load lfp signal
         sig = load(sigfile, 'eeg');
         sig = sig.eeg;
@@ -54,6 +53,119 @@ for igrp = 1 : length(grps)
 end
 
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% calculate fooof per file
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% go over each mouse and analyze all experiment days
+grps = [mcu_sessions('wt'), mcu_sessions('mcu')];
+flg_emg = true;
+
+% go over baseline for wt vs. mcu. during experiment, only psdEmg should be
+% calculated
+grps = {'wt_bsl'; 'mcu_bsl'};
+flg_emg = false;
+
+% vars
+if flg_emg
+    vars = {'psdEmg'};
+    saveVar = 'psdEmg_1of';
+else
+    vars = {'psd'};
+    saveVar = 'psd_1of';
+end
+
+% iterate
+for igrp = 1 : length(grps)
+
+    queryStr = grps{igrp};
+    basepaths = mcu_sessions(queryStr);
+    nfiles = length(basepaths);
+    mpath = fileparts(basepaths{1});
+    v = basepaths2vars('basepaths', basepaths, 'vars', vars);
+
+    for ifile = 1 : nfiles
+
+        % files
+        basepath = basepaths{ifile};
+        [~, basename] = fileparts(basepath);
+        cd(basepath)
+       
+        % psd params
+        psd = v(ifile).psd;
+        freqs = psd.info.faxis;
+        sstates = psd.info.sstates;
+        nstates = length(sstates);
+        clr = psd.info.clr;
+        
+        % sample and plot several bouts
+        bout_idx = randperm(50, 0);
+        if ~isempty(bout_idx)
+            psd_1of = psd_fooof(psd.bouts.psd{istate}(bout_idx, :), freqs,...
+                'flg_plot', true, 'saveVar', false);
+        end
+        
+        % use psd averaged across bouts
+        psd_1of = psd_fooof(num2cell(psd.psd, 2), freqs,...
+            'flg_plot', true, 'saveVar', false);
+
+        % calculate fooof
+        psd_1of = psd_fooof(psd.bouts.psd, freqs,...
+            'flg_plot', false, 'saveVar', saveVar);
+
+        % plot
+        fh = figure;
+        set(fh, 'WindowState', 'maximized');
+        tlayout = [1, nstates];
+        th = tiledlayout(tlayout(1), tlayout(2));
+        th.TileSpacing = 'tight';
+        th.Padding = 'none';
+        title(th, 'FOOOF', 'interpreter', 'none', 'FontSize', 20)
+        set(fh, 'DefaultAxesFontSize', 16);
+        
+        % limit to boutlength
+        blen = cellfun(@(x) diff(x, 1, 2), psd.bouts.times, 'uni', false);
+        thr_blen = 0;
+        for istate = 1 : nstates
+            blen_idx = blen{istate} > thr_blen;
+            axh = nexttile(th, istate, [1, 1]); cla; hold on
+            psd_cell{1} = squeeze(psd_1of.psd_orig(istate, blen_idx, :))';
+            psd_cell{2} = squeeze(psd_1of.psd_fit(istate, blen_idx, :))';
+            mcu_psdPlot([], psd_cell, [], 'axh', axh, 'ptype', 'freq',...
+                'flg_log', false, 'faxis', freqs, 'clr', clr{istate})
+            ylim([1 5])
+        end
+
+    end
+end
+
+
+% FOOOF ~ Group + (1|Mouse)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+grps = {'wt_bsl'; 'mcu_bsl'};
+
+clear grppaths
+for igrp = 1 : length(grps)
+    grppaths{igrp} = string(mcu_sessions(grps{igrp})');
+end
+
+
+% organize for lme
+frml = 'FOOOF ~ Group * State + (1|Mouse)';
+[lme_tbl, lme_cfg] = mcu_lmeOrg(grppaths, frml, false);
+
+% run lme
+% istate = 1;
+% band_tbl = lme_tbl(lme_tbl.State == categorical(istate), :);
+lme = fitlme(lme_tbl, lme_cfg.frml);
+
+% plot
+mcu_lmePlot(lme_tbl, lme);
+
+
+
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % compare baseline psd
@@ -61,19 +173,38 @@ end
 
 % grab data
 [psd_data, psd_cfg] = mcu_psdOrg(2);
+nstates = length(psd_cfg.sstates);
 
-% select specific state for analysis
-istate = 1;
-psd_state = cell(1, 2);
-for igrp = 1 : length(psd_data)
-    psd_state{igrp} = squeeze(psd_data{igrp}(istate, :, :));
+% open figure
+setMatlabGraphics(true)
+fh = figure;
+set(fh, 'WindowState', 'maximized');
+tlayout = [2, nstates];
+th = tiledlayout(tlayout(1), tlayout(2));
+th.TileSpacing = 'tight';
+th.Padding = 'none';
+title(th, 'PSD Analysis', 'interpreter', 'none', 'FontSize', 20)
+set(fh, 'DefaultAxesFontSize', 16);
+
+% psd per state
+for istate = 1 : nstates
+    axh = nexttile(th, istate, [1, 1]); cla; hold on
+
+    psd_state = cell(1, 2);
+    for igrp = 1 : length(psd_data)
+        psd_state{igrp} = squeeze(psd_data{igrp}(istate, :, :));
+    end
+
+    % analyze psd difference between groups for this state
+    [stats, ~] = mcu_psdCBPT(psd_state, psd_cfg);
+
+    mcu_psdPlot(stats, psd_state, psd_cfg, 'axh', axh, 'ptype', 'freq',...
+        'clr', psd_cfg.clr{istate})
+
+    title(axh, psd_cfg.snames{istate})
 end
 
-% analyze psd difference between groups for this state
-[stats, cfg] = mcu_psdCBP(psd_state, psd_cfg);
 
-mcu_psdPlot(stats, psd_state, psd_cfg, 'axh', [], 'type', 'freq',...
-    'clr', psd_cfg.clr{istate})
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -105,7 +236,7 @@ faxis = psd_cfg.faxis;
 txt_yax = psd_cfg.txt_yax;
 
 axh = nexttile(th, 1, [1, ndays]); cla; hold on
-mcu_psdPlot(stats, psd_data, psd_cfg, 'axh', axh, 'type', 'heat', 'flg_log', true)
+mcu_psdPlot(stats, psd_data, psd_cfg, 'axh', axh, 'ptype', 'heat', 'flg_log', true)
 
 % plot psd across days
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -113,371 +244,139 @@ mcu_psdPlot(stats, psd_data, psd_cfg, 'axh', axh, 'type', 'heat', 'flg_log', tru
 % psd per state
 for iday = 1 : ndays
     axh = nexttile(th, iday + ndays, [1, 1]); cla; hold on
-    
+
     psd_cfg.expDsgn = 2;
     psd_cfg.grps = psd_cfg.snames;
     psd_day = {squeeze(psd_data{1}(:, :, iday))', squeeze(psd_data{2}(:, :, iday))'};
     [stats, ~] = mcu_psdCBPT(psd_day, psd_cfg);
-    mcu_psdPlot(stats, psd_day, psd_cfg, 'axh', axh, 'type', 'freq',...
+    mcu_psdPlot(stats, psd_day, psd_cfg, 'axh', axh, 'ptype', 'freq',...
         'flg_log', true)
 
     title(axh, sprintf('day %d', iday))
 end
 
 
-stats.negclusters(1)
 
 
 
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% LME
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-% normalize to broadband
-flg_norm = true;
-
-% can be done using emg or as states
-flg_emg = true;
-
-% files
-grps = ["wt_bsl"; "mcu_bsl"];
-grps = mcu_sessions('wt');
-
-% state params
-if flg_emg
-    vars = ["psdEmg"];
-    sstates = [1, 2];
-else
-    vars = ["psd"];
-    sstates = [1, 4, 5];
-end
-cfg = as_loadConfig('flgEmg', flg_emg);
-nstates = length(sstates);
-clr = cfg.colors(sstates);
-snames = cfg.names(sstates);
-
-% psd params
-if flg_norm
-    txt_yax = 'Norm. Power';
-else
-    txt_yax = 'Power [dB]';
-end
-
-% load and organize data
-clear psd psdCell
+% load data for each group
+grps = {'wt', 'mcu'};
+clear grppaths
 for igrp = 1 : length(grps)
-    
-    % load
-    basepaths = [mcu_sessions(grps{igrp})];
-    nfiles = length(basepaths);
-    v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 
-    % organize
-    psd = catfields([v(:).psd], 'addim', true);    
-    psdMat = psd.psd;
-    bandsMat = psd.bands.mean;
-   
-    % normalize
-    if flg_norm
-        broadPow = sum(psdMat, 2);
-        psdMat = psdMat ./ broadPow;
-        bandsMat = bandsMat ./ bandsMat(:, :, 1);
+    mnames = mcu_sessions(grps(igrp));
+
+    for imouse = 1 : length(mnames)
+        basepaths = mcu_sessions(mnames{imouse});
+        grppaths{igrp}(imouse, :) = string(basepaths)';
     end
-    psdCell{igrp} = psdMat;
-    bandCell{igrp} = bandsMat;
 end
 
-faxis = squeeze(psd.info.faxis(1, :, 1));
-
-% Plot PSD Comparison
+% Band ~ Group * Session + (1|Mouse)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-psd_compare(psdCell, faxis, grps, clr, snames, txt_yax)
+% organize for lme
+frml = 'Band ~ Group * Day + (1|Mouse)';
+[lme_tbl, lme_cfg] = mcu_lmeOrg(grppaths, frml, true);
+
+% run lme
+istate = 2;
+band_tbl = lme_tbl(lme_tbl.State == categorical(istate), :);
+lme = fitlme(band_tbl, lme_cfg.frml);
+
+% plot
+mcu_lmePlot(band_tbl, lme);
 
 
-% compare 
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Bout Lengths vs. Band Power
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% reorgnize to cell of states [freq x session x mouse]
-stateCell = cell(1, nstates);  
+% load data for each group
+grps = {'wt_bsl', 'mcu_bsl'};
+clear grppaths
+for igrp = 1 : length(grps)
+    grppaths{igrp} = string(mcu_sessions(grps{igrp})');
+end
 
-% Get dimensions
-nMice = length(psdCell);  % Number of mice
-nFreq = size(psdCell{1}, 2);  % Frequency bins
-nDays = cellfun(@(x) size(x, 3), psdCell);  % Days per mouse
 
-% Preallocate matrices
+% Band ~ Group * Session + (1|Mouse)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% organize for lme
+frml = 'Band ~ Group * State * BoutLength + (1|Mouse)';
+[lme_tbl, lme_cfg] = mcu_lmeOrg(grppaths, frml, false);
+
+% run lme
+lme = fitlme(lme_tbl, lme_cfg.frml);
+
+% plot
+mcu_lmePlot(lme_tbl, lme);
+
+
+% correlation per state and group
 for istate = 1 : nstates
-    stateCell{istate} = nan(nFreq, max(nDays), nMice);
+    for igrp = 1 : ngroups
+
+        grp_idx = lme_tbl.Group == categorical(igrp - 1) &...
+            lme_tbl.State == categorical(istate);
+        y_data = lme_tbl.Band(grp_idx);
+        x_data = lme_tbl.BoutLength(grp_idx);
+
+        % calculate correlation
+        [r, p] = corr(x_data, y_data);
+        r_mat(istate, igrp) = r;
+        p_mat(istate, igrp) = p;
+    end
 end
 
-% Rearrange the data
-for iMouse = 1:nMice
-    % Extract current mouse data (state x freq x day)
-    data = psdCell{iMouse};
-    
-    % For each state, reshape and store
-    stateCell{1}(:, 1:size(data, 3), iMouse) = squeeze(data(1, :, :));  % State 1
-    stateCell{2}(:, 1:size(data, 3), iMouse) = squeeze(data(2, :, :));  % State 2
-end
+fh = figure;
+colors = {'b', 'r'};
+for istate = 1 : nstates
+    subplot(1, nstates, istate)
+    hold on
 
-% run stat analysis
-stat = stat_cluPermutation(stateCell, faxis);
+    band_tbl = lme_tbl(lme_tbl.State == categorical(istate), :);
 
+    % correlation
+    for igrp = 1 : ngroups
 
+        grp_idx = band_tbl.Group == categorical(igrp - 1);
+        y_data = band_tbl.Band(grp_idx);
+        x_data = log10(band_tbl.BoutLength(grp_idx));
 
+        scatter(x_data, y_data, 15, 'filled', 'MarkerFaceAlpha', 0.2)
 
-figure;
-imagesc(stat.time, stat.freq, squeeze(stat.stat));  % Heatmap of t-values
-axis xy;
-xlabel('Days');
-ylabel('Frequency (Hz)');
-title('State Differences Across Frequency and Time');
-colorbar;
+        % add regression line
+        p = polyfit(x_data, y_data, 1);
+        xfit = linspace(min(x_data), max(x_data), 100);
+        yfit = polyval(p, xfit);
+        plot(xfit, yfit, 'LineWidth', 2)
+    end
 
-hold on;
-contour(stat.time, stat.freq, squeeze(stat.mask), 1, 'k', 'LineWidth', 1.5);  % Significant clusters
-
-
-
-
-
-
-
-
-
-
-% Assume dataCell{1} is the state you want to analyze
-data = permute(stateCell{1}, [3, 1, 2]);  % [mouse x freq x day]
-nMice = size(data, 1);
-nFreq = size(data, 2);
-nDays = size(data, 3);
-
-
-
-
-cfg = [];
-cfg.method = 'montecarlo';
-cfg.statistic = 'depsamplesFunivariate';  % Dependent t-test for repeated measures
-cfg.correctm = 'cluster';
-cfg.clusteralpha = 0.8;
-cfg.tail = 1;  % Two-tailed
-cfg.clustertail = 1;
-cfg.numrandomization = 1000;
-
-design = zeros(2, nMice);
-design(1,:) = 1:nMice;  % Mouse IDs
-design(2,:) = ones(1, nMice);  % Condition (all set to 1 initially)
-
-
-design = zeros(2, nMice * nDays);
-design(1,:) = repmat(1:nMice, 1, nDays);  % Mouse IDs (repeat for each day)
-design(2,:) = repelem(1:nDays, nMice);    % Day (condition)
-
-design = zeros(2, nMice * nDays);
-design(1,:) = repmat(1:nMice, 1, nDays);  % Mouse IDs repeated for each day
-design(2,:) = repelem(1:nDays, nMice);    % Condition (day)
-
-
-cfg.design = design;
-cfg.uvar = 1;  % Unit of observation (mouse ID)
-cfg.ivar = 2;  % Independent variable (day)
-
-
-freq_strct_split = cell(1, nDays);
-for day = 1:nDays
-    freq_strct_split{day}.powspctrm = freq_strct.powspctrm(:,:,:,day);  % Extract data for each day
-    freq_strct_split{day}.dimord = 'subj_chan_freq';
-    freq_strct_split{day}.freq = faxis;
-    freq_strct_split{day}.label = {'dummy_channel'};
-
-end
-
-
-% Expand to [mouse x 1 x freq x day] (add singleton channel dimension)
-freq_strct.powspctrm = reshape(data, nMice, 1, nFreq, nDays);
-freq_strct.powspctrm = freq_strct.powspctrm - mean(freq_strct.powspctrm(:,:,:,1), 4);
-freq_strct.dimord = 'subj_chan_freq_time';
-freq_strct.time = 1:nDays;
-freq_strct.freq = faxis;
-freq_strct.label = {'dummy_channel'};
-
-
-
-
-stat = ft_freqstatistics(cfg, freq_strct_split{:});
-
-
-figure;
-imagesc(stat.time, stat.freq, squeeze(mean(stat.stat, 1)));  % Average across subjects
-xlabel('Days');
-ylabel('Frequency (Hz)');
-title('Cluster Permutation Test Across Days (depsamplesFunivariate)');
-colorbar;
-
-
-
-
-
-
-
-
-
-
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% compare psd from emg and as
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% normalize to broadband
-flg_norm = true;
-
-% files
-grps = ["wt_bsl"; "mcu_bsl"];
-
-
-% state params
-if flg_emg
-    sstates = [1, 2];
-else
-    vars = ["psd"];
-    sstates = [1, 4, 5];
-end
-cfg = as_loadConfig('flgEmg', flg_emg);
-nstates = length(sstates);
-clr = cfg.colors(sstates);
-snames = cfg.names(sstates);
-
-% psd params
-if flg_norm
-    txt_yax = 'Norm. Power';
-else
-    txt_yax = 'Power [dB]';
+    % aesthetics
+    xlabel('Bout Length')
+    ylabel('Band Power')
+    title(sprintf('State %d', istate))
+    box off
+    axis tight
 end
 
 
 
 
 
-% load and organize data
-clear psd psdCell
-    
-% load
-basepaths = [mcu_sessions('wt_bsl'), mcu_sessions('mcu_bsl')];
-nfiles = length(basepaths);
-
-% as
-vars = ["psd"];
-v = basepaths2vars('basepaths', basepaths, 'vars', vars);
-psd = catfields([v(:).psd], 'addim', true);
-psdMat = psd.psd([1, 2], :, :);
-if flg_norm
-    broadPow = sum(psdMat, 2);
-    psdMat = psdMat ./ broadPow;
-end
-psdCell{1} = psdMat;
-
-% emg
-vars = ["psdEmg"];
-v = basepaths2vars('basepaths', basepaths, 'vars', vars);
-psd = catfields([v(:).psd], 'addim', true);
-psdMat = psd.psd;
-if flg_norm
-    broadPow = sum(psdMat, 2);
-    psdMat = psdMat ./ broadPow;
-end
-psdCell{2} = psdMat;
-
-faxis = squeeze(v(1).psd.info.faxis(1, :, 1));
-
-% Plot PSD Comparison
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-psd_compare(psdCell, faxis, grps, clr, snames, txt_yax)
 
 
 
 
 
 
-
-
-% To do
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% 1 % investigate clu permute with time
-% 1 % compare high to low emg across time 
-% 1 % compare mcu to wt across time for each state
-
-% plot heat matrix of t-values with contour of significant
-
-
-
-
-
-
-% 
-% % Plot Bands Comparison
-% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% 
-% bands_idx = [2 :  6];
-% nbands = length(bands_idx);
-% 
-% % open figure
-% setMatlabGraphics(true)
-% fh = figure;
-% set(fh, 'WindowState', 'maximized');
-% tlayout = [nstates, nbands];
-% th = tiledlayout(tlayout(1), tlayout(2));
-% th.TileSpacing = 'tight';
-% th.Padding = 'none';
-% title(th, 'Bands Baseline', 'interpreter', 'none', 'FontSize', 20)
-% set(fh, 'DefaultAxesFontSize', 16);
-% 
-% % psd per state
-% for istate = 1 : nstates
-%     for iband = 1 : nbands
-% 
-%         % organize data
-%         clear dataMat
-%         for igrp = 1 : length(grps)
-%             dataMat{igrp} = squeeze(bandCell{igrp}(istate, bands_idx(iband), :));
-%         end
-%         dataMat = cell2padmat(dataMat, 2);
-% 
-%         % plot
-%         axh = nexttile(th, nbands * (istate - 1) + iband, [1, 1]); cla; hold on
-%         plot_boxMean('axh', axh, 'dataMat', dataMat, 'allPnt', false,...
-%         'plotType', 'bar');
-%         title(axh, psd.bands.info.bandNames{1, bands_idx(iband), 1})
-%         xticklabels({'WT', 'MCU-KO'})
-%     end
-% end
-
-
-
-
-
-
-
-
-
-
-% 
-% % get psd across sessions for one mouse
-% [bands, powdb] = sessions_psd('mname', mname, 'flgNormBand', true, 'flgDb', false,...
-%     'flgNormTime', false, 'flgEmg', true, 'idxBsl', [1 : 2], 'saveFig', false);

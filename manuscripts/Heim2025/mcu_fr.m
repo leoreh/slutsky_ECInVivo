@@ -63,45 +63,67 @@ for igrp = 1 : length(grps)
     grppaths{igrp} = string(mcu_sessions(grps{igrp})');
 end
 
+
 % FR per unit, WT vs MCU for RS vs FS 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-frml = 'FR ~ Group * UnitType + (1|Mouse)';
+frml = 'FR ~ Group + UnitType + (1|Mouse)';
 
 % organize for lme
-[fr_tbl, fr_cfg] = mcu_frOrg(grppaths, frml, false);
+[lme_tbl, lme_cfg] = mcu_lmeOrg(grppaths, frml, false);
 
 % run lme
-lme_tbl = fr_tbl;
-lme = fitlme(lme_tbl, fr_cfg.frml);
+fr_tbl = lme_tbl;
+lme = fitlme(fr_tbl, lme_cfg.frml);
+
+% plot
+mcu_lmePlot(fr_tbl, lme)
 
 % copy results to excel
 exlTbl = lme2exl(lme);
 
 mcu_lmeContrasts(lme)
 
+
 % FR per unit, WT vs MCU across states
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 frml = 'FR ~ Group * State + (1|Mouse)';
 
 % organize for lme
-[fr_tbl, fr_cfg] = mcu_frOrg(grppaths, frml, false);
+[lme_tbl, lme_cfg] = mcu_lmeOrg(grppaths, frml, false);
 
 % run lme
-iunit = 1;
-lme_tbl = fr_tbl(fr_tbl.UnitType == iunit, :);
-lme = fitlme(lme_tbl, fr_cfg.frml);
+iunit = 2;
+fr_tbl = lme_tbl(lme_tbl.UnitType == iunit, :);
+lme = fitlme(fr_tbl, lme_cfg.frml);
 
-% FR per unit per bout, WT vs MCU across states, 
+% plot
+mcu_lmePlot(fr_tbl, lme)
+
+
+% FR per unit per bout, WT vs MCU across states 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 frml = 'FR ~ Group * State + BoutLength + (1|Mouse) + (1|UnitID)';
 
 % organize for lme
-[fr_tbl, fr_cfg] = mcu_frOrg(grppaths, frml, false);
+[lme_tbl, lme_cfg] = mcu_lmeOrg(grppaths, frml, false);
 
 % run lme
 iunit = 1;
-lme_tbl = fr_tbl(fr_tbl.UnitType == iunit, :);
-lme = fitlme(lme_tbl, fr_cfg.frml);
+fr_tbl = lme_tbl(lme_tbl.UnitType == iunit, :);
+lme = fitlme(fr_tbl, lme_cfg.frml);
+
+% plot
+mcu_lmePlot(fr_tbl, lme)
+
+% investigate relation BL and FR
+[r_mat, p_mat, fh] = mcu_FRvBL(fr_tbl);
+
+% limit bouts so that distribution is the same
+[idx_eq, fh] = mcu_eqBLen(fr_tbl);
+
+eq_tbl = fr_tbl(idx_eq, :);
+lme = fitlme(eq_tbl, lme_cfg.frml);
+mcu_lmePlot(eq_tbl, lme)
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -125,12 +147,16 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % organize for lme
 frml = 'FR ~ Group * Day + (1|Mouse)';
-[fr_tbl, fr_cfg] = mcu_frOrg(grppaths, frml, true);
+[lme_tbl, lme_cfg] = mcu_lmeOrg(grppaths, frml, true);
 
 % run lme
-iunit = 1;
-lme_tbl = fr_tbl(fr_tbl.UnitType == iunit, :);
-lme = fitlme(lme_tbl, fr_cfg.frml);
+iunit = 2;
+fr_tbl = lme_tbl(lme_tbl.UnitType == iunit, :);
+lme = fitlme(fr_tbl, lme_cfg.frml);
+
+% plot
+mcu_lmePlot(fr_tbl, lme)
+
 
 % copy results to excel
 exlTbl = lme2exl(lme);

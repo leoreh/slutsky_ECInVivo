@@ -7,10 +7,8 @@ function st = spktimes_metrics(varargin)
 
 
 % INPUT:
-%   spktimes        cell of spike times in s. if empty will be extracted
-%                   from spikes struct.
+%   spktimes        cell of spike times in s. 
 %   fs              numeric. sampling frequency. 
-%   spikes          struct (see getSpikes).
 %   sunits          numeric vec. indices of selected units for calculation
 %                   {[]}.
 %   bins            cell array of n x 2 mats of intervals.
@@ -19,11 +17,10 @@ function st = spktimes_metrics(varargin)
 %                   ss.boutTimes. must be the same units as spikes.times
 %                   (e.g. [s])
 %   basepath        path to recording
-%   graphics        logical. plot graphics {true} or not (false)
 %   saveVar         logical. save variables (update spikes and save su)
-%   forceA          logical. force analysis even if struct file exists
+%   flg_force       logical. force analysis even if struct file exists
 %                   {false}
-%   fullA           logical. analyse all parameters (slow) {true}
+%   flg_all         logical. analyse all parameters (slow) {true}
 %
 % OUTPUT:
 %   st              struct
@@ -43,26 +40,22 @@ function st = spktimes_metrics(varargin)
 p = inputParser;
 addOptional(p, 'spktimes', []);
 addOptional(p, 'fs', [], @isnumeric);
-addOptional(p, 'spikes', []);
 addOptional(p, 'sunits', []);
 addOptional(p, 'bins', {[0 Inf]});
 addOptional(p, 'basepath', pwd, @ischar);
-addOptional(p, 'graphics', true, @islogical);
 addOptional(p, 'saveVar', true, @islogical);
-addOptional(p, 'forceA', false, @islogical);
-addOptional(p, 'fullA', true, @islogical);
+addOptional(p, 'flg_force', false, @islogical);
+addOptional(p, 'flg_all', true, @islogical);
 
 parse(p, varargin{:})
 spktimes    = p.Results.spktimes;
 fs          = p.Results.fs;
-spikes      = p.Results.spikes;
 sunits      = p.Results.sunits;
 bins        = p.Results.bins;
 basepath    = p.Results.basepath;
-graphics    = p.Results.graphics;
 saveVar     = p.Results.saveVar;
-forceA      = p.Results.forceA;
-fullA       = p.Results.fullA;
+flg_force   = p.Results.flg_force;
+flg_all     = p.Results.flg_all;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preparations
@@ -75,7 +68,7 @@ spkFile = [basename '.spikes.cellinfo.mat'];
 sessionFile = [basename, '.session.mat'];
 
 % check if already analyzed 
-if exist(stFile, 'file') && ~forceA
+if exist(stFile, 'file') && ~flg_force
     load(stFile)
     return
 end
@@ -115,7 +108,7 @@ if isempty(fs)
 end
 
 % acg params
-st.info.runtime = datetime(now, 'ConvertFrom', 'datenum');
+st.info.runtime = datetime("now");
 st.info.bins = bins;
 st.info.acg_wide_bins = 500;
 st.info.acg_wide_bnsz = 0.001;
@@ -240,7 +233,7 @@ for iunit = 1 : length(sunits)
         end
         st.lvr(ibin, iunit) = 3 / (nisi - 1) * lv_term;
         
-        if fullA
+        if flg_all
             % fit triple exponential to acg. adapted from CE (fit_ACG.m).
             % requires the Curve Fitting Toolbox. no idea whats going on here
             g = fittype('max(c*(exp(-(x-f)/a)-d*exp(-(x-f)/b))+h*exp(-(x-f)/g)+e,0)',...
@@ -265,9 +258,7 @@ end
 % graphics
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
  
-% if graphics
-%     plot_spktimesMetrics()
-% end
+% plot_spktimesMetrics()
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % save

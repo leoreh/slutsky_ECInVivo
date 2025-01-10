@@ -88,6 +88,7 @@ info.ignorePli = ignorePli;
 info.freq_pli = freq_pli;
 info.bandNames = bandNames;
 info.bandFreqs = bandFreqs;
+info.flgNormBand = flgNormBand;
 
 end
 
