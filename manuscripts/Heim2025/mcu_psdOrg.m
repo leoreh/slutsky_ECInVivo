@@ -1,4 +1,4 @@
-function [psd_data, psd_cfg] = mcu_psdOrg(expDsgn)
+function [psd_data, psd_cfg] = mcu_psdOrg(expDsgn, flg_emg)
 
 % organizes psd data from multiple sessions into format compatible with
 % fieldtrip's ft_freqstatistics. loads data according to mcu_sessions and
@@ -34,7 +34,10 @@ switch psd_cfg.expDsgn
     case 2
         grps = {'wt_bsl'; 'mcu_bsl'};
         psd_cfg.fmt = '{gen}[state x freq x mouse]';
-        flg_emg = true;
+
+    case 3
+        grps = {'wt_bac1'; 'mcu_bac1'};
+        psd_cfg.fmt = '{gen}[state x freq x mouse]';
 
     otherwise
         error('Unsupported experimental design: %d', expDsgn);
@@ -86,7 +89,7 @@ switch expDsgn
             psd_data{istate} = permute(psd_data{istate}, [3 1 2]);
         end
 
-    case 2                      % '{gen}[state x freq x mouse]'
+    case {2, 3}                      % '{gen}[state x freq x mouse]'
         
         % load data for each genotype group
         psd_data = cell(1, ngrps);

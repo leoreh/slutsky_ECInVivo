@@ -37,6 +37,8 @@ minDur = 4;
 
 % initialize 
 manIdx = nan(nfiles, 2);
+labelsManCat = [];
+labelsAutoCat = [];
 clear boutStats
 
 % go over files
@@ -78,6 +80,11 @@ for ifile = 1 : nfiles
     % manual
     bouts(ifile, 2) = as_bouts('labels', labelsMan(curIdx),...
         'minDur', minDur, 'interDur', interDur);
+    
+    % ---------------------------------------------------------------------
+    % concatenate labels across mice
+    labelsManCat = [labelsManCat; labelsMan(curIdx)];
+    labelsAutoCat = [labelsAutoCat; labelsAuto(curIdx)];
 
 end
 
@@ -152,6 +159,9 @@ end
 % plot confusion matrix
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% % confusion matrix (relative to manual labels)
-% [ss.netPrecision, ss.netRecall] = as_cm(labelsMan, labelsAuto,...
-%     'saveFig', false);
+% confusion matrix (relative to manual labels)
+[ss.netPrecision, ss.netRecall] = as_cm(labelsManCat, labelsAutoCat,...
+    'saveFig', false);
+
+% save
+grph_save('fh', gcf, 'fname', 'StateClassification_ManVsAuto', 'frmt', {'ai', 'jpg'})

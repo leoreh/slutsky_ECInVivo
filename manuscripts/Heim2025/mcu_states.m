@@ -46,8 +46,8 @@ AccuSleep_viewer(sSig, labels, fname_labelsMan)
 % reclassify states automatically
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-basepaths = [mcu_sessions('wt_bsl'), mcu_sessions('mcu_bsl')];
-basepaths = [mcu_sessions('lh100')];
+basepaths = [mcu_sessions('wt_wsh'), mcu_sessions('mcu_wsh')];
+% basepaths = [mcu_sessions('lh100')];
 nfiles = length(basepaths);
 
 for ifile = 1 : nfiles
@@ -205,16 +205,18 @@ end
 
 % load data for each group
 grps = {'wt', 'mcu'};
+idx_rmDays = [];              % remove bac on and off
 clear grppaths
 for igrp = 1 : length(grps)
 
-    mnames = mcu_sessions(grps(igrp));
-    
+    mnames = mcu_sessions(grps(igrp));  
     for imouse = 1 : length(mnames)
         basepaths = mcu_sessions(mnames{imouse});
+        basepaths(idx_rmDays) = [];
         grppaths{igrp}(imouse, :) = string(basepaths)';
     end
 end
+
 
 % Bout length of WT vs. MCU across time
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -223,19 +225,64 @@ end
 frml = 'BLen ~ Group * Day + (1|Mouse)';
 [lme_tbl, lme_cfg] = mcu_lmeOrg(grppaths, frml, true);
 
+% select state
+istate = categorical({'Low EMG'});
+plot_tbl = lme_tbl(lme_tbl.State == istate, :);
+
 % run lme
-istate = 1;
-blen_tbl = lme_tbl(lme_tbl.State == categorical(istate), :);
-lme = fitlme(blen_tbl, lme_cfg.frml);
+lme = fitlme(plot_tbl, lme_cfg.frml);
 
 % plot
-mcu_lmePlot(blen_tbl, lme);
+fh = mcu_lmePlot(plot_tbl, lme, 'ptype', 'line');
 
+% save
+frml = [char(lme.Formula), '_', char(istate)];
+frml = frml2char(frml, 'rm_rnd', false);
+th = get(fh, 'Children'); % if you're sure it's a tiled layout
+title(th, frml, 'interpreter', 'none')
+grph_save('fh', fh, 'fname', frml, 'frmt', {'ai', 'jpg'})
+
+[prism_data] = fh2prism(fh);
+
+% test interaction of wt and mcu across all days
+interactionIndices = contains(lme.CoefficientNames, 'Group_MCU-KO:Day'); % Logical vector for interaction terms
+contrastVector = zeros(1, length(lme.Coefficients.Estimate));
+contrastVector(interactionIndices) = 1; % Test only interaction terms
+
+% Define contrast vector for the difference between MCU-KO and WT during WASH
+contrastVector = zeros(1, length(lme.Coefficients.Estimate));
+contrastVector(strcmp(lme.CoefficientNames, 'Group_MCU-KO')) = 1; % Main effect of Group
+contrastVector(strcmp(lme.CoefficientNames, 'Group_MCU-KO:Day_WASH')) = 1; % Interaction term
+
+% Run the test
+[p, h, stat] = coefTest(lme, contrastVector)
+
+% Bout length of High vs. Low EMG across time per group
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% organize for lme
+frml = 'BLen ~ Day + (1|Mouse)';
+[lme_tbl, lme_cfg] = mcu_lmeOrg(grppaths, frml, true);
+
+% select group
+igrp = categorical({'WT'});
+plot_tbl = lme_tbl(lme_tbl.Group == igrp, :);
+
+% select state
+istate = categorical({'Low EMG'});
+plot_tbl = lme_tbl(plot_tbl.State == istate, :);
+
+% run lme
+lme = fitlme(plot_tbl, lme_cfg.frml);
+
+% plot
+fh = mcu_lmePlot(plot_tbl, lme, 'ptype', 'line');
 
 % Bout length of WT vs. MCU across states during baseline
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 grps = {'wt_bsl'; 'mcu_bsl'};
+grps = {'wt_wsh'; 'mcu_wsh'};
 
 clear grppaths
 for igrp = 1 : length(grps)
@@ -244,23 +291,19 @@ end
 
 % organize for lme
 frml = 'BLen ~ Group * State + (1|Mouse)';
-[lme_tbl, lme_cfg] = mcu_lmeOrg(grppaths, frml, true);
+[lme_tbl, lme_cfg] = mcu_lmeOrg(grppaths, frml, false);
 
 % run lme
-blen_tbl = lme_tbl;
-lme = fitlme(blen_tbl, lme_cfg.frml);
+plot_tbl = lme_tbl;
+lme = fitlme(plot_tbl, lme_cfg.frml);
 
 % plot
-mcu_lmePlot(blen_tbl, lme);
+fh = mcu_lmePlot(plot_tbl, lme, 'ptype', 'line');
 
+% save
+grph_save('fh', fh, 'fname', [char(lme.Formula), '_AS'], 'frmt', {'ai', 'jpg'})
 
-for igrp = 1 : length(grps)
-    basepaths = mcu_sessions(grps{igrp})';
-    v = basepaths2vars('basepaths', basepaths, 'vars', {'sleep_states'});
-    for ifile = 1 : length(v)
-        mean(cell2padmat(v(ifile).ss.bouts.boutLen([1, 4, 5]), 2), 1, 'omitnan')
-    end
-end
+[prism_data] = fh2prism(fh);
 
 
 

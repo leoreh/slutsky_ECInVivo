@@ -101,7 +101,7 @@ for igrp = 1 : length(grps)
 
         % -----------------------------------------------------------------
         % create n PSDs per state by averaging k bouts (random sampling)
-        k = 100;        % Number of bouts to sample per average
+        k = 80;        % Number of bouts to sample per average
         npsd = 20;      % Number of averaged PSDs per state
 
         % Initialize
@@ -185,13 +185,12 @@ end
 
 % FOOOF ~ Group * Day + (1|Mouse)
 % organize for lme
-frml = 'FOOOF ~ Group * Day + (Day|Mouse)';
-[lme_tbl, lme_cfg] = mcu_lmeOrg(grppaths, frml, true, 'powsum', 1);
+frml = 'FOOOF ~ Group * Day + (1|Mouse)';
+[lme_tbl, lme_cfg] = mcu_lmeOrg(grppaths, frml, true, 'ap_offset', 3);
 
 % select unit
-istate = categorical({'High EMG'});
+istate = categorical({'Low EMG'});
 plot_tbl = lme_tbl(lme_tbl.State == istate, :);
-[plot_tbl, norm_cfg] = mcu_lmeNorm(plot_tbl, 'Day', 'BSL');
 
 % run lme
 lme = fitlme(plot_tbl, lme_cfg.frml, 'FitMethod', 'REML');
@@ -224,16 +223,6 @@ for igrp = 1 : length(grps)
         grppaths{igrp}(imouse, :) = string(basepaths)';
     end
 end
-ndays = length(basepaths);
-if ndays == 7
-    str_day = {'BSL'; 'BAC On'; 'BAC1'; 'BAC2'; 'BAC3'; 'BAC Off'; 'WASH'};
-elseif ndays == 5
-    str_day = {'BSL'; 'BAC1'; 'BAC2'; 'BAC3'; 'WASH'};
-elseif ndays == 1
-    str_day = {'BSL'};
-else
-    str_day = split(num2str(1 : ndays));
-end
 
 % vars
 flg_emg = true;
@@ -247,7 +236,6 @@ end
 % Load and organize vars for specific mouse
 igrp = 1;
 mice_idx = [1 : 5];
-mice_idx = 1;
 clear psd_1of_mouse
 for imouse = 1 : length(mice_idx)
     basepaths = grppaths{igrp}(mice_idx(imouse), :);
@@ -255,11 +243,12 @@ for imouse = 1 : length(mice_idx)
     psd_1of_mouse(imouse) = catfields([v(:).psd_1of], 'addim', true);
 end
 psd_1of = catfields([psd_1of_mouse(:)], 2, true);
+ndays = length(basepaths);
 npnts = size(psd_1of.freqs, 2);
 freqs = squeeze(psd_1of_mouse(imouse).freqs(1, :, 1));
 
 % select params
-fooof_param = 'residuals';
+fooof_param = 'psd_ap';
 
 % prepare colors 
 rgb_variants = rgbVariants([0.9, 0.1, 1], ndays);
@@ -291,15 +280,15 @@ for istate = 1 : 2
     set(axh, 'XScale', 'log')
     xlabel('Frequency [Hz]')
     ylabel('Power (log10)')
-    legend(ph, str_day)
+    legend(ph)
 end
 
-prism_data = fh2prism(fh);
 
 
 xx = psd_fooof(psd_avg, freqs,...
-    'flg_plot', false, 'saveVar', false);
-fh = psd_fooofPlot(xx, 'istate', 2);
+    'flg_plot', true, 'saveVar', false);
+xx = psd_1of;
+fh = psd_fooofPlot(xx, 'istate', 2)
 
 
 

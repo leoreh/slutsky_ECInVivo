@@ -23,6 +23,7 @@ function psd = psd_states(varargin)
 %   ftarget         numeric. requested frequencies for calculating the psd
 %   flgEmg          logical. calc psd in high- and low-emg even if states
 %                   file exists
+%   flgPli          logical. interpret freqs of power line interference (true)
 %   saveVar         logical. save ss var {true}
 %   forceA          logical. reanalyze recordings even if ss struct
 %                   exists (false)
@@ -38,6 +39,7 @@ function psd = psd_states(varargin)
 % 26 mar 24 LH      removed win functionality since psd is now calculated
 %                   per bout. much simpler this way. bkup exists in temp
 %                   folder
+% 01 feb 25 LH      added pli interpolation
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -54,6 +56,7 @@ addOptional(p, 'sstates', [1, 4, 5], @isnumeric);
 addOptional(p, 'btimes', []);
 addOptional(p, 'ftarget', 0.5 : 0.5 : 100, @isnumeric);
 addOptional(p, 'flgEmg', false, @islogical);
+addOptional(p, 'flgPli', true, @islogical);
 addOptional(p, 'saveVar', true, @islogical);
 addOptional(p, 'forceA', false, @islogical);
 addOptional(p, 'graphics', true, @islogical);
@@ -69,6 +72,7 @@ sstates         = p.Results.sstates;
 btimes          = p.Results.btimes;
 ftarget         = p.Results.ftarget;
 flgEmg          = p.Results.flgEmg;
+flgPli          = p.Results.flgPli;
 saveVar         = p.Results.saveVar;
 forceA          = p.Results.forceA;
 graphics        = p.Results.graphics;
@@ -172,6 +176,13 @@ end
 
 [~, faxis, psd_bouts] = calc_psd('sig', sig, 'bins', btimes,...
     'fs', fs, 'ftarget', ftarget, 'graphics', false);
+
+% interpolate around PLI
+if flgPli
+    for istate = 1 : nstates
+        psd_bouts{istate} = interp_pli(psd_bouts{istate}, faxis);
+    end
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % remove outlier bouts
@@ -351,3 +362,38 @@ end
 end
 
 % EOF
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% local functions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% interpolate psd to handle power line interference (PLI)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function psd_interp = interp_pli(psd_mat, freqs)
+
+% PLI interpolation preserves ability to analyze full spectrum including gamma
+% (30-100 Hz) while removing the confounding 50 Hz line noise artifact. This
+% avoids edge effects from split frequency ranges and is more elegant than
+% excluding peaks post-hoc. Particularly important when analyzing broadband
+% phenomena like cross-frequency coupling. approach adapted from brainstorm.
+
+freq_pli = [48 52];     % frequency range containing line noise [Hz]
+
+% find indices for PLI
+idx_pli = freqs >= freq_pli(1) & freqs <= freq_pli(2);
+idx_clean = ~idx_pli;
+
+% initialize interpolated psd
+psd_interp = psd_mat;
+
+% interpolate across PLI for each spectrum separately
+for ispec = 1 : size(psd_mat, 1)
+    % get values on either side of PLI
+    x = freqs(idx_clean);
+    y = psd_mat(ispec, idx_clean);
+
+    % interpolate PLI region
+    psd_interp(ispec, idx_pli) = interp1(x, y, freqs(idx_pli), 'pchip');
+end
+
+end

@@ -1,42 +1,81 @@
-function plot_boxMean(varargin)
-
+function bh = plot_boxMean(varargin)
 % plots a box plot or bar (mean + se) of the data mat and the average.
-% assumes columns are different groups. can color code the boxes / bars.
+% handles both single group and multiple group data
 %
-% 09 jan 22 LH
+% INPUT:
+%   dataMat     matrix or cell array of matrices. For grouped data, each cell
+%               contains a matrix where columns are subgroups
+%   xVal        x-axis values (optional, default: 1:n)
+%   clr         color matrix, one row per group
+%   alphaIdx    transparency values
+%   allPnts     logical, whether to plot individual points
+%   plotType    'allPnts', 'box' or 'bar'
+%   axh         axis handle
+%   grpNames    cell array of group names (optional)
+%
+% 10 jan 24 LH
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 p = inputParser;
-addOptional(p, 'dataMat', [], @isnumeric);
+addOptional(p, 'dataMat', [], @(x) isnumeric(x) || iscell(x));
+addOptional(p, 'xVal', [], @isnumeric);
 addOptional(p, 'clr', [0, 0, 0]);
 addOptional(p, 'alphaIdx', []);
-addOptional(p, 'allPnts', false, @islogical);
 addOptional(p, 'plotType', 'box', @ischar);
 addOptional(p, 'axh', []);
+addOptional(p, 'grpNames', []);
 
 parse(p, varargin{:})
 dataMat = p.Results.dataMat;
+xVal = p.Results.xVal;
 clr = p.Results.clr;
 alphaIdx = p.Results.alphaIdx;
-allPnts = p.Results.allPnts;
-plotType = p.Results.plotType;      % can be 'box' or 'bar'
-axh = p.Results.axh;      
+plotType = p.Results.plotType;
+axh = p.Results.axh;
+grpNames = p.Results.grpNames;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% preparations
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% convert to cell if matrix input
+if isnumeric(dataMat)
+    dataMat = {dataMat};
+end
+
+% get dimensions
+n_grps = length(dataMat);
+n_subgrps = cellfun(@(x) size(x,2), dataMat);
+
+% prepare x values
+if isempty(xVal)
+    xVal = 1 : max(n_subgrps);
+end
+
+% calculate offsets for grouped data
+if n_grps > 1
+    grp_width = 0.8 / n_grps;  % total width of 0.8 for all groups
+    offsets = linspace(-0.4 + grp_width/2, 0.4 - grp_width/2, n_grps);
+else
+    grp_width = 0.8;
+    offsets = 0;
+end
 
 % prepare colors
-ngrp = size(dataMat, 2);
-if isempty(clr)  
-    clr = repmat([0, 0, 0], ngrp, 1);
-end
-if size(clr, 1) == 1
-    clr = repmat(clr, ngrp, 1);
+if isempty(clr)
+    clr = repmat([0, 0, 0], n_grps, 1);
+elseif size(clr, 1) == 1
+    clr = repmat(clr, n_grps, 1);
 end
 
 % prepare transparency
 if isempty(alphaIdx)
-    alphaIdx = linspace(0.5, 1, ngrp);
+    alphaIdx = linspace(0.5, 1, n_grps);
+end
+if isscalar(alphaIdx)
+    alphaIdx = repmat(alphaIdx, 1, n_grps);
 end
 
 % prepare figure axis
@@ -44,57 +83,85 @@ if isempty(axh)
     fh = figure;
     axh = gca;
 end
-hold on
+hold(axh, 'on')
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % plot
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-if strcmp(plotType, 'box')
+% plot each group
+for igrp = 1 : n_grps
+    curr_data = dataMat{igrp};
+    curr_x = xVal + offsets(igrp);
 
-    boxplot(axh, dataMat, 'PlotStyle', 'traditional', 'Whisker', 2);
-    bh = findobj(gca, 'Tag', 'Box');
-    bh = flipud(bh);
-    for ibox = 1 : length(bh)
-        patch(get(bh(ibox), 'XData'), get(bh(ibox), 'YData'),...
-            clr(ibox, :), 'FaceAlpha', alphaIdx(ibox))
+    % add individual points
+    if strcmp(plotType, 'allPnts')
+        for isub = 1 : size(curr_data, 1)
+            valid_data = curr_data(isub, :);
+            valid_data = valid_data(~isnan(valid_data));
+
+            jitter = (grp_width/2) .* rand(length(valid_data), 1) - grp_width/4;
+            xval = ones(size(valid_data)) * curr_x(isub) + jitter;
+
+            plot(axh, xval, valid_data, '.',...
+                'MarkerSize', 5, 'Color', clr(igrp, :),...
+                'MarkerEdgeColor', clr(igrp, :), 'HandleVisibility', 'off');
+        end
+
+        % add mean markers
+        bh(igrp) = plot(axh, curr_x, mean(curr_data, 2, 'omitnan'), 'kd',...
+            'markerfacecolor', clr(igrp, :), 'MarkerSize', 10,...
+            'HandleVisibility', 'off');
+
+    elseif strcmp(plotType, 'box')
+        % box plot
+        bh = boxplot(axh, curr_data', 'Positions', curr_x,...
+            'PlotStyle', 'traditional', 'Whisker', 2,...
+            'Labels', {}, 'Color', clr(igrp,:));
+
+        % color boxes
+        bh = findobj(axh, 'Tag', 'Box');
+        bh = flipud(bh((end - size(curr_data, 1) + 1) : end));
+
+        for ibox = 1:length(bh)
+            patch(get(bh(ibox), 'XData'), get(bh(ibox), 'YData'),...
+                clr(igrp,:), 'FaceAlpha', alphaIdx(igrp))
+        end
+
+    elseif strcmp(plotType, 'bar')
+        % calculate stats
+        means = mean(curr_data, 2, 'omitnan');
+        n = sum(~isnan(curr_data), 2);
+        sem = std(curr_data, [], 2, 'omitnan') ./ sqrt(n);
+
+        % plot bars
+        bh(igrp) = bar(axh, curr_x, means, grp_width);
+        bh(igrp).CData = clr(igrp,:);
+        bh(igrp).FaceColor = 'flat';
+        bh(igrp).FaceAlpha = alphaIdx(igrp);
+
+        % add error bars
+        errorbar(curr_x, means, sem, 'k', 'linestyle', 'none',...
+            'tag', 'barError');
     end
-
-elseif strcmp(plotType, 'bar')
-    means = mean(dataMat, 1, 'omitnan');
-    sem = std(dataMat, [], 1, 'omitnan') / sqrt(size(dataMat, 1)); 
-    bh = bar(axh, 1 : ngrp, means);
-    bh.CData = clr;
-    bh.FaceColor = 'flat';
-    errorbar(1 : ngrp, means, sem, 'k', 'linestyle', 'none'); 
-    bh.FaceColorMode = 'manual'
-
 end
 
-if allPnts
-    for igrp = 1 : ngrp
-        jitter = (0.2) .* rand(size(dataMat, 1), 1) - 0.1;
-        xval = ones(size(dataMat(:, igrp), 1), 1) * igrp + jitter;
-        ph = plot(axh, xval, dataMat(:, igrp),...
-            '.', 'MarkerSize', 5);
-        ph.Color = clr(igrp, :);
-        ph.MarkerEdgeColor = 'k';
-    end
-elseif strcmp(plotType, 'box')
-    plot(axh, 1 : ngrp, mean(dataMat, 1, 'omitnan'), 'kd',...
-        'markerfacecolor', 'k', 'MarkerSize', 10)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% finalize
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% set axis properties
+if ~isempty(grpNames)
+    legend(grpNames, 'Location', 'northwest')
 end
 
-% adjust ylimit
-% dataRange = [min(dataMat(:)), max(dataMat(:))];
-% pad = diff(dataRange) * 0.5;
-% ylim([dataRange(1) - pad, dataRange(2) + pad]);
+xlim(axh, [min(xVal)-0.5, max(xVal)+0.5])
+xticks(axh, xVal)
 
-% adjust xlimit
-xlim([1 - 0.5, ngrp + 0.5])
-xticks([1 : ngrp]);
-
-% add statistical comparison
-pVal = stat_compare1D(dataMat, 'axh', axh);
+% remove temporary boxplot legends
+legend_entries = findobj(axh, 'Tag', 'Box');
+for i = 1 : length(legend_entries)
+    set(legend_entries(i), 'HandleVisibility', 'off');
+end
 
 end

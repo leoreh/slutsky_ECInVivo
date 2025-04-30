@@ -42,7 +42,7 @@ switch psd_cfg.expDsgn
         cfg_cbp.uvar = 1;       % unit variable (subject number)
         cfg_cbp.ivar = 2;       % independent variable (state)
 
-    case {2, 3}                              % '{gen}[freq x mouse]'        
+    case 2                              % '{gen}[freq x mouse]'        
         dimord = 'subj_chan_freq';
 
         % independent samples (different mice)
@@ -64,7 +64,7 @@ for igrp = 1 : 2
             powspctrm = permute(psdMat, [1 4 2 3]);     
             freq_data(igrp).time = 1 : size(psd_data{1}, 3);
 
-        case {2, 3}                      % [subj chan freq]
+        case 2                      % [subj chan freq]
             psdMat = psd_data{igrp};
             powspctrm = permute(psdMat', [1 3 2]);      
     end
@@ -79,7 +79,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 cfg_cbp.method = 'montecarlo';
 cfg_cbp.correctm = 'tfce';              % cluster / tfce
-cfg_cbp.clusteralpha = 0.05;
+cfg_cbp.clusteralpha = 0.1;
 cfg_cbp.clusterstatistic = 'maxsum';
 cfg_cbp.minnbchan = 0;
 cfg_cbp.tail = 0;

@@ -1,4 +1,4 @@
-function plot_stdShade(varargin)
+function ph = plot_stdShade(varargin)
 
 % plots the mean and standard deviation as a shaded area of the data matrix.
 % allows specifying the color and transparency for the plot.
@@ -28,11 +28,12 @@ alpha = p.Results.alpha;
 
 % ensure the axis handle is held
 axes(axh);
-hold on;
+hold on
 
 % calculate the mean and standard deviation
 mData = mean(dataMat, 2, 'omitnan');
-sData = std(dataMat, 0, 2, 'omitnan');
+n = sum(~isnan(dataMat), 2);  % number of non-NaN points per row
+sData = std(dataMat, 0, 2, 'omitnan') ./ sqrt(n);
 
 % omit nan values
 validIdx = ~isnan(mData) & ~isnan(sData);
@@ -49,15 +50,15 @@ sData(sData == 0) = eps;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % plot the mean
-plot(axh, xVal, mData, 'Color', clr, 'LineWidth', 2);
+ph = plot(axh, xVal, mData, 'Color', clr, 'LineWidth', 2);
 
 % plot the shaded area for standard deviation
 lowerBound = max(mData - sData, eps);
 upperBound = max(mData + sData, eps);
 
 fillh = fill([xVal; flipud(xVal)], [upperBound; flipud(lowerBound)], ...
-    clr, 'FaceAlpha', alpha, 'EdgeColor', 'none');
-set(fillh, 'HandleVisibility', 'off');
+    clr, 'FaceAlpha', alpha, 'EdgeColor', 'none', 'Tag', 'sePatch');
+set(fillh);
 
 
 end

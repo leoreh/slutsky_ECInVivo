@@ -70,7 +70,7 @@ if strcmpi(ptype, 'heat')
 
     % plot t-statistic (better than p-value as it shows direction of effect)
     tmap = log10(reshape(stats.stat, [length(stats.freq), size(psd_data{1}, 3)]));
-    % tmap = (reshape(stats.prob, [length(stats.freq), size(psd_data{1}, 3)]));
+    tmap = (reshape(stats.prob, [length(stats.freq), size(psd_data{1}, 3)]));
 
     X = 1 : size(tmap, 2);
     Y = stats.freq;

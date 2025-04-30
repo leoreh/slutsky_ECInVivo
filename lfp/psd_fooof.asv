@@ -355,11 +355,17 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function ffit = calc_fit(fmdl)
 
+% Residuals
+residuals = ;
+
 % Number of data points
 n = length(fmdl.power_spectrum);
 
 % Number of parameters (peaks + aperiodic)
 k = length(fmdl.gaussian_params(:)) + size(fmdl.aperiodic_params, 2);
+
+% Mean Squared Error of the model fit
+ffit.mse = mean(fmdl.power_spectrum - fmdl.fooofed_spectrum_ .^ 2);
 
 % Log-likelihood of the model fit
 ffit.loglik = -n / 2 * (log(2 * pi) + log(ffit.mse) + 1);
@@ -373,9 +379,6 @@ ffit.bic = k * log(n) - 2 * ffit.loglik;
 % r-squared
 coefs = corrcoef(fmdl.power_spectrum, fmdl.fooofed_spectrum);
 ffit.r_squared = coefs(1, 2);
-
-% Root Mean Squared Error of the model fit (difference between original and model fit)
-ffit.rmse = sqrt(mean((fmdl.power_spectrum - fmdl.fooofed_spectrum) .^ 2));
 
 end
 

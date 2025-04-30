@@ -1,72 +1,127 @@
 function fh = mcu_lmePlot(lme_tbl, lme_mdl, varargin)
 
 % plots linear mixed effects model results according to fixed effects.
-% first fixed effect determines different lines, second fixed effect
+% first fixed effect determines different lines/groups, second fixed effect
 % determines x axis values. For single fixed effect, plots as x value
 %
 % INPUT
 %   lme_tbl     table with data used in lme analysis
 %   lme_mdl     fitted linear mixed effects model
-%   ptype'      string specifying plot type {'line'}
+%   ptype       string specifying plot type {'line', 'box', 'bar'}
+%   axh         axis handle
 %
 % OUTPUT
 %   fh         handle to figure
 %
 
-% 07 Jan 24
+% 10 Jan 24
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% preparations
+% arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % handle input
 p = inputParser;
 addOptional(p, 'clr', []);
+addOptional(p, 'axh', []);
 addOptional(p, 'ptype', 'line');
 
 parse(p, varargin{:})
 clr                 = p.Results.clr;
+axh                 = p.Results.axh;
 ptype               = p.Results.ptype;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% preparations
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% organize colors
+if isempty(clr)
+    clr = lines;
+    clr(1, :) = [0.3 0.3 0.3];
+    clr(2, :) = [0.784 0.667 0.392];
+end
+clr_alpha = 0.3;
+
+% initialize figure
+if isempty(axh)
+    fh = figure;
+    tlayout = [1, 3];
+    th = tiledlayout(tlayout(1), tlayout(2));
+    th.TileSpacing = 'tight';
+    th.Padding = 'none';
+    set(fh, 'DefaultAxesFontSize', 16);
+    axh = nexttile(th, 1, [1, 2]); cla; hold on
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% organize data
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % get variables from formula
 frml = char(lme_mdl.Formula);
 [varsFxd, varRsp] = get_vars(frml);
 
-% organize data for plotting
-[y_data, grp_data, x_data] = get_data(lme_tbl, varsFxd, var2, varRsp);
+% organize data for plotting based on number of variables
+[data_grp, x_vals, var_lbls] = get_data(lme_tbl, varsFxd, varRsp);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% create figure
+%  plot
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% initialize figure
-fh = figure;
-hold on
-
-% set colormap
-colormap(p.clr);
-clr = colormap;
-n_lines = height(grp_data);
-clr_idx = round(linspace(1, size(clr, 1), n_lines));
-
-% plot according to ptype
-switch p.ptype
+switch ptype
     case 'line'
-        plot_lines(y_data, x_data, clr(clr_idx, :))
+        % plot data based on number of fixed effects
+        if length(varsFxd) >= 2
+            % multiple lines case (grouped by first variable)
+            for igrp = 1 : length(data_grp)
+                ph(igrp) = plot_stdShade('dataMat', data_grp{igrp},...
+                    'xVal', [1:length(x_vals{igrp})], ...
+                    'axh', axh, 'clr', clr(igrp, :), 'alpha', clr_alpha);
+            end
+            xlabel(varsFxd{2})
+            xticks([1:length(x_vals{igrp})])
+            xlim([1-0.2, length(x_vals{igrp})+0.2])
+            xticklabels(x_vals{igrp})
+            legend(ph, var_lbls, 'Location', 'northwest')
+        else
+            % single variable case
+            ph = plot_stdShade('dataMat', data_grp, 'xVal', [1:length(x_vals)], ...
+                'axh', axh, 'clr', clr(1,:), 'alpha', clr_alpha);
+            xlabel(varsFxd{1})
+            xticklabels(x_vals)
+            xlim([1-0.2, length(x_vals)+0.2])
+        end
+        
+
+    case {'box', 'bar', 'allPnts'}
+        if length(varsFxd) >= 2
+            % pass cell array of matrices to plot_boxMean
+            ph = plot_boxMean('dataMat', data_grp, 'xVal', 1 : length(x_vals{1}), ...
+                'clr', clr(1 : length(data_grp), :), 'alphaIdx', 1, ...
+                'plotType', ptype, 'axh', axh);
+            xlabel(varsFxd{2})
+            xticklabels(x_vals{1})
+            legend(ph, var_lbls, 'Location', 'northwest')
+        else
+            % single variable case
+            plot_boxMean('dataMat', data_grp, 'xVal', 1 : size(data_grp, 1),...
+                'clr', clr(1, :), 'alphaIdx', clr_alpha, ...
+                'plotType', ptype, 'axh', axh);
+            xlabel(varsFxd{1})
+            xticklabels(x_vals)
+        end
 end
 
-% add legend if multiple groups
-if ~isempty(varsFxd)
-    legend(grp_data.(varsFxd))
-end
-
-% labels
-xlabel(var2)
+% add response variable label
 ylabel(varRsp)
 
-end
+title(th, frml2char(frml, 'rm_rnd', false))
 
-% EOF
+% add lme stats
+txt_lme(axh, lme_mdl)
+
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % local functions
@@ -74,9 +129,6 @@ end
 
 function [varsFxd, varRsp] = get_vars(frml)
 % extract variable names from formula
-% Returns:
-% varNames - cell array containing all x variables
-% y_name - response variable name
 
 % get y variable (response)
 varRsp = regexp(frml, '(\w+)\s*~', 'tokens');
@@ -97,7 +149,7 @@ if ~isempty(interact_vars)
         varsFxd = [varsFxd, interact_vars{i}];
     end
     % Remove duplicates
-    varsFxd = unique(varsFxd);
+    varsFxd = unique(varsFxd, 'stable');
 else
     % if no interactions, process normally
     x_str = regexprep(x_str, '\s*1\s*\+?\s*', '');      % remove intercept term
@@ -109,70 +161,131 @@ end
 end
 
 
-function [y_data, grp_data, x_data] = get_data(tbl, var1, var2, y_name)
-% organize data for plotting by grouping according to variables
+function [data_grp, x_vals, var_lbls] = get_data(tbl, varsFxd, varRsp)
+% organize data for plotting based on number of fixed effects
+% Returns raw data matrices grouped by variables
 
-if ~isempty(var1)
-    % get unique groups for first variable
-    grp_data = unique(tbl(:, {var1}));
-    n_grps = height(grp_data);
-    
-    % initialize cell arrays for data
-    y_means = cell(n_grps, 1);
-    y_sems = cell(n_grps, 1);
+if length(varsFxd) >= 2
+    % case: two variables - group by first var, x-axis is second var
+    var1 = varsFxd{1};
+    var2 = varsFxd{2};
+
+    % get unique values maintaining order
+    var1_vals = unique(tbl.(var1), 'stable');
+
+    % initialize outputs
+    n_grps = length(var1_vals);
+    data_grp = cell(n_grps, 1);
     x_vals = cell(n_grps, 1);
-    
-    % calculate stats for each group
-    for igrp = 1 : n_grps
+    var_lbls = strings(n_grps, 1);
+
+    % get data for each group
+    for igrp = 1:n_grps
         % get data for current group
-        grp_idx = tbl.(var1) == grp_data.(var1)(igrp);
-        grp_tbl = tbl(grp_idx, :);
-        
-        % calculate stats per subgroup
-        [g_idx, g_lbls] = findgroups(grp_tbl(:, {var2}));
-        y_stats = splitapply(@(x) [mean(x) std(x)/sqrt(length(x))], grp_tbl.(y_name), g_idx);
-        
+        idx = tbl.(var1) == var1_vals(igrp);
+        grp_tbl = tbl(idx, :);
+
+        % get unique x values maintaining order
+        x_unique = unique(grp_tbl.(var2), 'stable');
+        n_x = length(x_unique);
+
+        % organize data matrix
+        data_mat = nan(n_x, sum(idx));
+        for ix = 1:n_x
+            x_idx = grp_tbl.(var2) == x_unique(ix);
+            y_vals = grp_tbl.(varRsp)(x_idx);
+            data_mat(ix, 1:length(y_vals)) = y_vals';
+        end
+
         % store results
-        y_means{igrp} = y_stats(:, 1);
-        y_sems{igrp} = y_stats(:, 2);
-        x_vals{igrp} = g_lbls;
+        data_grp{igrp} = data_mat;
+        x_vals{igrp} = string(x_unique);
+        var_lbls{igrp} = char(var1_vals(igrp));
+    end
+
+else
+    % case: single variable
+    var1 = varsFxd{1};
+
+    % get unique values maintaining order
+    x_unique = unique(tbl.(var1), 'stable');
+    n_x = length(x_unique);
+
+    % initialize data matrix
+    max_pts = max(histcounts(categorical(tbl.(var1))));
+    data_mat = nan(n_x, max_pts);
+
+    % fill data matrix
+    for ix = 1:n_x
+        idx = tbl.(var1) == x_unique(ix);
+        y_vals = tbl.(varRsp)(idx);
+        data_mat(ix, 1:length(y_vals)) = y_vals';
+    end
+
+    % prepare outputs
+    data_grp = data_mat;
+    x_vals = char(x_unique);
+    var_lbls = [];
+end
+
+end
+
+
+function txt_lme(axh, lme_mdl, varargin)
+
+% Add LME model results to the right of the current plot
+% Parse inputs
+p = inputParser;
+addRequired(p, 'ax', @ishandle);
+addRequired(p, 'lme_mdl');
+addParameter(p, 'FontSize', 10, @isnumeric);
+parse(p, axh, lme_mdl, varargin{:});
+fontSize = p.Results.FontSize;
+
+% Get fixed effects table
+fe = lme_mdl.Coefficients;
+% Remove intercept
+fe = fe(2:end,:);
+
+% Prepare the complete text string
+txt = '';
+for i = 1:size(fe, 1)
+    % Get original name and process it
+    fullname = fe.Name{i};
+    
+    % Handle interaction terms
+    if contains(fullname, ':')
+        interactionParts = split(fullname, ':');
+        processedParts = cell(size(interactionParts));
+        for j = 1:length(interactionParts)
+            parts = split(interactionParts{j}, '_');
+            processedParts{j} = strjoin(parts(2:end), '_');
+        end
+        name = strjoin(processedParts, ' : ');
+    else
+        parts = split(fullname, '_');
+        name = strjoin(parts(2:end), '_');
     end
     
-    % organize output
-    y_data = table(y_means, y_sems, 'VariableNames', {'mean', 'sem'});
-    x_data = x_vals;
+    pvalue = fe.pValue(i);
     
-else
-    % single fixed effect
-    grp_data = table();
-    [g_idx, g_lbls] = findgroups(tbl(:, {var2}));
-    y_stats = splitapply(@(x) [mean(x) std(x)/sqrt(length(x))], tbl.(y_name), g_idx);
-    
-    % organize as cell for consistency
-    y_data = table({y_stats(:, 1)}, {y_stats(:, 2)}, 'VariableNames', {'mean', 'sem'});
-    x_data = {g_lbls};
-end
+    % Add this line to the text
+    if i < size(fe, 1)
+        txt = sprintf('%s%s(p=%.3f)\n', txt, name, pvalue);
+    else
+        txt = sprintf('%s%s(p=%.3f)', txt, name, pvalue);
+    end
 end
 
+th = get(gcf, 'Children'); % if you're sure it's a tiled layout
+axh = nexttile(th, 3, [1, 1]); cla; hold on
+set(axh, 'Color', 'none', ... % transparent background
+    'XColor', 'none', ... % remove x axis
+    'YColor', 'none', ... % remove y axis
+    'Box', 'off', ... % remove box
+    'GridColor', 'none'); % remove grid if present
 
-function plot_lines(y_data, x_data, clr)
-% plot data as lines with error bars
-
-n_grps = height(y_data);
-
-% plot each group
-for igrp = 1 : n_grps
-    y_mean = y_data.mean{igrp};
-    y_sem = y_data.sem{igrp};
-    x_vals = 1 : length(y_mean);
-    
-    errorbar(x_vals, y_mean, y_sem, '-o', 'Color', clr(igrp, :),...
-        'LineWidth', 2, 'MarkerFaceColor', clr(igrp, :))
-end
-
-% adjust x axis based on last group
-set(gca, 'XTick', x_vals, 'XTickLabel', x_data{end}.(1))
+% Place text to the right of the axis
+text(axh, 0, 0.5, txt, 'HorizontalAlignment', 'left');
 
 end
-
-

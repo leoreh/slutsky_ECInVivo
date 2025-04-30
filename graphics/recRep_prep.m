@@ -33,6 +33,10 @@ basepath        = p.Results.basepath;
 panels2plot     = p.Results.panels2plot;
 fs_eeg          = p.Results.fs_eeg;
 
+
+
+grph_save('fh', gcf, 'fname', 'Representative_lh96_Emg', 'frmt', {'ai', 'jpg', 'fig'})
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -41,10 +45,14 @@ cd(basepath)
 [~, basename] = fileparts(basepath);
 
 % load data
-varsFile = ["session"; "units"; "sleep_states"];
-varsName = ["session"; "units"; "ss"];
+varsFile = ["session"; "units"; "sleep_statesEmg"];
+varsName = ["session"; "units"; "ssEmg"];
 v = getSessionVars('basepaths', {basepath}, 'varsFile', varsFile,...
     'varsName', varsName);
+
+if any(contains(varsName, 'Emg'))
+    v.ss = v.ssEmg;
+end
 
 % sleep signals
 filename = fullfile(basepath, [basename, '.sleep_sig.mat']);

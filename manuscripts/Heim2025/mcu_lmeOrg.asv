@@ -1,4 +1,4 @@
-function [lme_tbl, lme_cfg] = mcu_lmeOrg(grppaths, frml, flg_emg, var_field, var_idx)
+function [lme_tbl, lme_cfg] = mcu_lmeOrg(grppaths, frml, flg_emg, var_field)
 
 % organizes data from multiple sessions into format compatible with lme
 % analysis. loads data according to mcu_sessions and arranges in a table.
@@ -30,9 +30,6 @@ if nargin < 3
 end
 if nargin < 4
     var_field = [];
-end
-if nargin < 5
-    var_idx = [];
 end
 
 % set labels according to specific experiment (e.g., mcu) and formula
@@ -82,9 +79,7 @@ if contains(frml, 'Band ~')
     yName = 'Band';
 
     % bandNames = ["broad", "swa", "delta", "theta", "beta", "gamma"];
-    if isempty(var_idx)
-        var_idx = 1;
-    end
+    band_idx = 3;
 
 elseif contains(frml, 'FOOOF ~')
     if flg_emg
@@ -98,9 +93,8 @@ elseif contains(frml, 'FOOOF ~')
     if isempty(var_field)
         var_field = 'ap_exp';
     end
-    if isempty(var_idx)
-        var_idx = 1;
-    end
+    foooField = 'ap_exp';
+    iband = 3;
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -139,10 +133,10 @@ for igrp = 1 : ngrps
             data_day{iday} = org_fr(v, frml);                               % firing rate
 
         elseif contains(frml, 'Burst ~')
-            data_day{iday} = org_brst(v, var_field);                        % burstiness
+            data_day{iday} = org_brst(v, brstField);                        % burstiness
 
         elseif contains(frml, 'Band ~')
-            data_day{iday} = org_band(v, var_idx);                         % band power
+            data_day{iday} = org_band(v, band_idx);                         % band power
             nunits = 1;
 
         elseif contains(frml, 'BLen ~')
@@ -150,7 +144,7 @@ for igrp = 1 : ngrps
             nunits = 1;
 
         elseif contains(frml, 'FOOOF ~')
-            data_day{iday} = org_1of(v, var_field, var_idx);                % psd fooof parameter
+            data_day{iday} = org_1of(v, foooField, iband);                  % psd fooof parameter
             nunits = 1;
         end
     end

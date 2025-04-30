@@ -41,8 +41,7 @@ graphics        = p.Results.graphics;
 tmp_data = data;
 idx_otl = [];                    % outlier indices to original data mat (global)
 idx_tmp = [1 : size(data, 1)]';  % for tracking original indices
-% idx_iter                       % outlier indices to updated data after
-% removal of outliers from previous iteration
+% idx_iter                       % outlier indices to updated data after removal of outliers from previous iteration
 
 % iterate
 for irep = 1 : nrep

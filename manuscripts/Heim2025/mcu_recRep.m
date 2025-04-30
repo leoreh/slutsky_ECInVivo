@@ -6,9 +6,9 @@
 % select mouse
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% mname = 'lh96';
+mname = 'lh96';
 % mname = 'lh133';
-mname = 'lh132';
+% mname = 'lh132';
 % mname = 'lh107';
 
 forceL = false;
@@ -20,13 +20,13 @@ forceL = true;
 
 switch mname
     case 'lh96'
-        fname{1} = 'F:\Data\lh96\lh96_220121_090213';
-        fname{2} = 'F:\Data\lh96\lh96_220125_090041';
+        fname{1} = 'E:\Data\lh96\lh96_220121_090213';
+        fname{2} = 'E:\Data\lh96\lh96_220125_090041';
 
         rawCh{1} = [1 : 4];
         rawCh{2} = [9 : 11, 13];
 
-        xStart{1}(1) = 6.9 * 60 * 60;
+        xStart{1}(1) = 6.8 * 60 * 60;
         xStart{1}(2) = xStart{1}(1);
         xStart{1}(3) = xStart{1}(1);
         xStart{1}(4) = 25200;
@@ -43,8 +43,8 @@ switch mname
         xStart{2}(7) = xStart{2}(5) + 0.8;
 
     case 'lh133'
-        fname{1} = 'F:\Data\lh133\lh133_230414_090645';
-        fname{2} = 'F:\Data\lh133\lh133_230418_094147';
+        fname{1} = 'E:\Data\lh133\lh133_230414_090645';
+        fname{2} = 'E:\Data\lh133\lh133_230418_094147';
 
         rawCh{1} = [5 : 8];
         rawCh{2} = [5 : 8];
@@ -66,8 +66,8 @@ switch mname
         xStart{2}(7) = xStart{2}(5) + 4.4;
 
     case 'lh107'
-        fname{1} = 'F:\Data\lh107\lh107_220519_091300';
-        fname{2} = 'F:\Data\lh107\lh107_220523_102100';
+        fname{1} = 'E:\Data\lh107\lh107_220519_091300';
+        fname{2} = 'E:\Data\lh107\lh107_220523_102100';
 
         rawCh{1} = [1 : 4];
         rawCh{2} = [13 : 16];
