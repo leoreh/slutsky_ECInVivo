@@ -111,24 +111,9 @@ acc = EMGfromACC('basepath', basepath, 'fname', [basename, '.lfp'],...
 
 % -------------------------------------------------------------------------
 
-load([basename, '.acceleration.mat'])
-
-% get ripples
-ripp = getRipples('basepath', basepath, 'rippCh', [12],...
-    'emg', acc.mag, 'recWin', [0, Inf], 'saveVar', true,...
-    'graphics', true, 'saveVar', true);
-
-% ripple relation to states
-ripp = rippleStates(ripp, 'basepath', basepath, 'saveVar', true,...
-    'graphics', true)
-
-% ripple relation to spikes
-ripp = rippleSpks(ripp, 'basepath', basepath, 'graphics', true,...
-    'saveVar', true, 'fullAnalysisFlag', false)
-
-% plot ripples
-plot_ripples(ripp, 'basepath', basepath, 'saveFig', true)
-plot_rippleSpks(ripp, 'basepath', basepath, 'saveFig', true)
+ripp_data = ripp_wrapper('basepath', pwd, 'rippCh', [1:4],...
+    'limState', 4, 'flgRefine', true, 'flgGraphics', true,...
+    'flgSaveVar', true, 'flgSaveFig', true);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % sleep states

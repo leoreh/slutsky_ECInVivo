@@ -1,0 +1,376 @@
+function [dataCell] = lme_load(varargin)
+
+% organizes data from multiple sessions into format compatible with lme
+% analysis. loads data according to mcu_sessions and arranges in a table.
+% data can be firing rate or burstiness, determined by the formula.
+%
+% INPUT
+%   grppaths    (Required) cell (per group) of string arrays [mouse x session]
+%   var_name    (Required) char/string/cell indicating the primary variable field (e.g., 'fr', 'psd', 'ripp')
+%   var_field   (Optional) string. specific sub-field for certain vars (e.g., Burst, FOOOF, RippSpks, Ripp) {''''}
+%   var_idx     (Optional) integer. index for band power or frequency band (Band, FOOOF) {NaN}
+%   vCell       (Optional) cell (per group) of cell arrays (per day) of structs (optional preloaded data) {{}}
+%
+% OUTPUT
+%   dataCell    5D numeric matrix [mouse x day x unit x state x bout]
+%   uCell       5D numeric matrix [mouse x day x unit x 1 x 1] (unit type)
+%   blenCell    5D numeric matrix [mouse x day x 1 x state x bout] (bout length)
+%
+% CALLS
+%   basepaths2vars
+%   catfields
+%   cell2padmat
+%
+% 06 Jan 24
+% 23 Jul 24 - Changed unit handling
+% 31 Jul 24 - Refactored to return 5D matrix based on 'var' input
+% 01 Aug 24 - Simplified: Removed error handling, checks, flg_emg; direct var loading
+% 01 Aug 24 - Refactored: Separated loading loop, use switch, added units/blen
+% 01 Aug 24 - Refactored: Input handling using inputParser
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% preparations
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Define input parameters and their defaults/validation functions
+p = inputParser;
+addOptional(p, 'grppaths', @iscell);
+addOptional(p, 'var_name', @(x) ischar(x) || isstring(x) || iscell(x));
+addOptional(p, 'var_field', '', @(x) ischar(x) || isstring(x));
+addOptional(p, 'var_idx', NaN);
+addOptional(p, 'vCell', {}, @iscell);
+
+% Parse input arguments
+parse(p, varargin{:});
+
+% Ensure var_name is a char
+var_name  = p.Results.var_name;
+grppaths  = p.Results.grppaths;
+var_field = p.Results.var_field;
+var_idx   = p.Results.var_idx;
+vCell     = p.Results.vCell;
+
+if iscell(var_name)
+    var_name = var_name{1};
+elseif isstring(var_name)
+    var_name = char(var_name);
+end
+
+ngrps = length(grppaths);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Preload Data Loop
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+if isempty(vCell)
+    for igrp = 1 : ngrps
+        [~, ndays] = size(grppaths{igrp});
+        for iday = 1 : ndays
+            basepaths = grppaths{igrp}(:, iday);
+            vCell{igrp}{iday} = basepaths2vars('basepaths', basepaths, 'vars', {var_name});
+        end
+    end
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Process Loaded Data
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+dataCell = cell(1, ngrps);
+
+for igrp = 1 : ngrps
+
+    [~, ndays] = size(grppaths{igrp}); % Use size from grppaths for loop bounds
+    data_day = cell(1, ndays);
+
+    for iday = 1 : ndays
+        v = vCell{igrp}{iday};
+
+        % Determine data type for switch statement
+        if contains(var_name, 'fr')
+            if contains(var_field, 'binedges')
+                data_day{iday} = org_blen(v);
+            else
+                data_day{iday} = org_fr(v, var_field);
+            end
+
+        elseif contains(var_name, 'st_')
+            data_day{iday} = org_brst(v, var_field);
+
+        elseif contains(var_name, 'psd')
+            if contains(var_name, '1of')
+                data_day{iday} = org_1of(v, var_name, var_field, var_idx);
+            else
+                data_day{iday} = org_band(v, var_name, var_idx);
+            end
+
+        elseif contains(var_name, 'units')
+            data_day{iday} = org_units(v);
+
+        elseif contains(var_name, 'ripp')
+            if contains(var_field, 'fr')
+                data_day{iday} = org_rippSpks(v, var_name, var_field);
+            else
+                data_day{iday} = org_ripp(v, var_name, var_field);
+            end
+        end
+    end % end iday loop
+
+    % Concatenate across days for the current group
+    dataCell{igrp} = cell2padmat(data_day, 2, NaN);
+
+end % end igrp loop
+
+end % end function lme_load
+
+% EOF
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% local functions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+% firing rate
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function fr_data = org_fr(v, var_field)
+
+fr = catfields([v(:).fr], 'addim', true);
+nmice = length(v);
+
+% fr in states averaged across bouts [unit x state x mouse]
+if contains(var_field, 'states')
+    fr_data = permute(fr.states.mfr, [3, 4, 1, 2, 5]);
+    return
+end
+
+% fr irrespective of states [unit x 1 x mouse]
+if contains(var_field, 'bouts')
+    fr_data = permute(fr.mfr, [3, 4, 1, 2, 5]);
+
+else
+    
+    % fr in states per bout {1 x state x mouse}[unit x bout]
+    fr_tmp = cell(nmice, 1);
+    for imouse = 1 : nmice
+        % [unit x state x bout]
+        fr_tmp{imouse} = cell2padmat(fr.states.fr(1, :, imouse), 3);
+    end
+    fr_data = permute(cell2padmat(fr_tmp, 4), [4, 5, 1, 3, 2]);
+
+end
+
+end
+
+
+% burstiness
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function brst_data = org_brst(v, brstField)
+% extracts burst data from concatenated struct and returns a 5D array
+% [mouse x day x unit x 1 x 1]
+% Assumes var_name_cell = {'st_metrics'} or similar
+
+fldnames = fieldnames(v(1));
+if contains(fldnames{1}, 'brst')
+    var_brst = 'brst';
+else
+    var_brst = 'st';
+end
+
+brst = catfields([v(:).(var_brst)], 'addim', true);
+brst_data = permute(brst.(brstField), [3, 4, 2, 1]);
+
+end
+
+
+% FOOOF parameters
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function fooof_data = org_1of(v, var, fooof_param, iband)
+% extracts FOOOF parameters and returns a 5D array of
+% [mouse x day x 1 x state x bout].
+% Assumes var_name_cell = {'psd_1of'} or {'psdEmg_1of'}
+
+psd_1of = catfields([v.(var)], 'addim', true);
+nmice = length(v);
+
+fooof_tmp = cell(nmice, 1);
+for imouse = 1 : nmice
+    
+    % handle special cases of aperiodic params
+    if contains(fooof_param, 'ap')
+        curr_param = psd_1of.(fooof_param)(:, :, imouse)'; % [state x param?]
+        
+        % Need consistent output shape [unit=1 x state x bout=1]
+        fooof_tmp{imouse} = permute(curr_param(1,:), [3, 1, 2]); % Use first param, add singleton dims
+    else
+        % extract parameter for specific band [state x bout]
+        curr_param = psd_1of.(fooof_param)(:, :, iband, imouse);
+        fooof_tmp{imouse} = permute(curr_param, [3, 1, 2]); % add singleton dim [unit=1 x state x bout]
+    end
+end
+
+% organize as [mouse x day=1 x unit=1 x state x bout]
+fooof_data = permute(cell2padmat(fooof_tmp, 4), [4, 5, 1, 2, 3]);
+
+end
+
+
+% band power
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function band_data = org_band(v, var_name_cell, band_idx)
+% extracts band power from psd struct and organizes as [mouse x day x 1 x state x bout]
+% Assumes var_name_cell = {'psd'} or {'psdEmg'}
+
+psd_field = var_name_cell{1};
+flg_norm = true;
+
+psd = catfields([v.(psd_field)], 'addim', true);
+nmice = length(v);
+
+band_tmp = cell(nmice, 1);
+for imouse = 1 : nmice
+    % [1 x state x bout]
+    band_mat = cell2padmat(psd.bands.bouts(1, :, imouse), 3);
+    if flg_norm
+        band_tmp{imouse} = band_mat(band_idx, :, :) ./ band_mat(1, :, :);
+    else
+        band_tmp{imouse} = band_mat(band_idx, :, :);
+    end
+    % Reshape to [unit=1 x state x bout]
+    band_tmp{imouse} = permute(band_tmp{imouse}, [3, 1, 2]);
+end
+% Permute to [mouse x day=1 x unit=1 x state x bout]
+band_data = permute(cell2padmat(band_tmp, 4), [4, 5, 1, 2, 3]);
+
+end
+
+% bout length
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function blen_data = org_blen(v)
+% extracts bout time edges from fr struct, calculates bout length, and
+% organizes as [mouse x day x 1 x state x bout]
+% Assumes fr_var_name_cell = {'fr'} or {'frEmg'}
+
+% calculate bout length
+fr = catfields([v(:).fr], 'addim', true);
+binedges = squeeze(fr.states.binedges);
+boutLen = cellfun(@(x) cellfun(@(y) diff(y), x, 'uni', true),...
+    binedges, 'uni', false);
+
+% ogranize
+nmice = length(v);
+blen_tmp = cell(nmice, 1);
+for imouse = 1:nmice
+    % [state x bout]
+    blen_tmp{imouse} = cell2padmat(boutLen(:, imouse), 1);
+end
+blen_data = permute(cell2padmat(blen_tmp, 3), [3, 4, 5, 1, 2]);
+
+end
+
+% units
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function unit_data = org_units(v)
+% extracts unit type data from loaded struct and returns a 5D array
+% [mouse x day=1 x unit x 1 x 1] where value indicates type (1=PYR, 2=PV).
+
+% Check if units field exists
+if isfield(v, 'units')
+    % Correctly use catfields for structures within v
+    units = catfields([v(:).units], 'addim', true);
+    nmice = length(v); % Use length of v for mouse count
+
+    unit_data_mouse = cell(nmice, 1);
+    max_nunits_all = 0;
+    for imouse = 1 : nmice
+        if isfield(units, 'clean') && size(units.clean,3) >= imouse
+            clean_mouse = units.clean(:, :, imouse); % [2 x Nunits_mouse]
+            nunits_mouse = size(clean_mouse, 2);
+            max_nunits_all = max(max_nunits_all, nunits_mouse);
+
+            unit_type_vec_mouse = zeros(1, nunits_mouse); % Row vector for types
+            unit_type_vec_mouse(clean_mouse(1,:)) = 1;    % Type 1 (PYR)
+            unit_type_vec_mouse(clean_mouse(2,:)) = 2;    % Type 2 (PV)
+
+            % Reshape to [1 x 1 x nunits_mouse x 1 x 1]
+            unit_data_mouse{imouse} = reshape(unit_type_vec_mouse, [1, 1, nunits_mouse, 1, 1]);
+        else
+            unit_data_mouse{imouse} = nan(1,1,0,1,1); % Empty unit dim if no data
+        end
+    end
+
+    % Pad across mice and units
+    unit_data = cell2padmat(unit_data_mouse, 1, 0); % Pads along mouse dim (dim 1)
+    % Ensure consistent unit dimension size
+    current_max_units = size(unit_data, 3);
+    if current_max_units < max_nunits_all
+        pad_size = max_nunits_all - current_max_units;
+        unit_data = padarray(unit_data, [0 0 pad_size 0 0], 0, 'post');
+    end
+end
+
+% Final output shape: [nmice x 1 x max_nunits_all x 1 x 1]
+
+end
+
+% ripple Spike Modulation
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function ripp_data = org_rippSpks(v, var, var_field)
+% extracts ripple FR modulation data from ripp struct and returns a 5D array
+% [mouse x day x unit x state=1 x bout=1].
+% Assumes var_name_cell = {'ripp'}
+
+nmice = length(v);
+gain_tmp = cell(nmice, 1);
+max_nunits = 0;
+
+% Extract Gain vector for each mouse and find max number of units
+for imouse = 1 : nmice
+    % Add check for field existence
+    gain_vec = v(imouse).(var).spks.su.(var_field)(:); % Ensure column vector
+    nunits_mouse = length(gain_vec);
+    gain_tmp{imouse} = gain_vec'; % Store as row vector [1 x unit]
+    max_nunits = max(max_nunits, nunits_mouse);
+end
+
+% Preallocate and fill data matrix, padding with NaNs
+% Output format: [mouse x day=1 x unit x state=1 x bout=1]
+ripp_data = nan(nmice, 1, max_nunits, 1, 1);
+for imouse = 1 : nmice
+    nunits_mouse = length(gain_tmp{imouse});
+    ripp_data(imouse, 1, 1:nunits_mouse, 1, 1) = gain_tmp{imouse};
+end
+
+end
+
+% specified ripple data field (e.g., peakAmp, peakPower)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function ripp_data = org_ripp(v, var, var_field)
+% extracts specified ripple data field from ripp struct and returns a 5D array
+% [mouse x day=1 x unit=1 x state=1 x bout(=ripple)], sampling ripples per mouse.
+% Assumes var_name_cell = {'ripp'}
+
+nmice = length(v);
+nRipp = 200;                        % Max ripples to sample per mouse
+rippMat = nan(nmice, nRipp);        % Initialize [mouse x ripple]
+
+% Sample ripples (e.g., during NREM state)
+for imouse = 1 : nmice
+    % Add checks for field existence
+    rippTmp = v(imouse).(var).(var_field); % Vector of ripple values
+
+    % Find indices of ripples during NREM (assuming column 4 of idx indicates NREM)
+    idxState = find(v(imouse).(var).states.idx(:, 4));
+
+    % Filter ripple values by state
+    rippInState = rippTmp(idxState);
+
+    % Sample nRipp without replacement
+    nAvailable = length(rippInState);
+    nSamples = min(nRipp, nAvailable);
+    idxSampled = randperm(nAvailable, nSamples);
+    rippMat(imouse, 1:nSamples) = rippInState(idxSampled);
+end
+
+% Permute to [mouse x day=1 x unit=1 x state=1 x bout(=ripple)]
+ripp_data = permute(rippMat, [1, 3, 4, 5, 2]); % Add singleton dimensions
+
+end

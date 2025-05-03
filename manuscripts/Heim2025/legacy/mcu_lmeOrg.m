@@ -1,4 +1,4 @@
-function [lme_tbl, lme_cfg] = mcu_lmeOrg(grppaths, frml, flg_emg, var_field, var_idx)
+function [lme_tbl, lme_cfg] = mcu_lmeOrg(grppaths, frml, flg_emg, var_field, var_idx, vCell)
 
 % organizes data from multiple sessions into format compatible with lme
 % analysis. loads data according to mcu_sessions and arranges in a table.
@@ -9,6 +9,9 @@ function [lme_tbl, lme_cfg] = mcu_lmeOrg(grppaths, frml, flg_emg, var_field, var
 %   frml        char of fomrula for lme. determines how the table is
 %               organized
 %   flg_emg     logical. load vars by as states (false) or emg states {true}
+%   var_field   string. variable to organize as fixed effects
+%   var_idx     integer. index for band power or frequency band
+%   vCell       cell (per group) of cell arrays (per day) of structs
 %
 % OUTPUT
 %   lme_tbl    table organized for lme with fields FR, Group, State, Mouse, UnitType
@@ -20,6 +23,7 @@ function [lme_tbl, lme_cfg] = mcu_lmeOrg(grppaths, frml, flg_emg, var_field, var
 %   catfields
 %
 % 06 Jan 24
+% 23 Jul 24 - Changed unit handling
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preparations
@@ -33,6 +37,9 @@ if nargin < 4
 end
 if nargin < 5
     var_idx = [];
+end
+if nargin < 6
+    vCell = {};
 end
 
 % set labels according to specific experiment (e.g., mcu) and formula
@@ -101,6 +108,20 @@ elseif contains(frml, 'FOOOF ~')
     if isempty(var_idx)
         var_idx = 1;
     end
+
+elseif contains(frml, 'RippSpks ~')
+    vars = {'ripp'; 'units'}; 
+    yName = 'RippSpks';
+    if isempty(var_field)
+        var_field = 'frModulation';
+    end
+
+elseif contains(frml, 'Ripp ~')
+    vars = {'ripp'}; 
+    yName = 'Ripp';
+    if isempty(var_field)
+        var_field = 'peakAmp';
+    end
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -128,11 +149,15 @@ for igrp = 1 : ngrps
     for iday = 1 : ndays
 
         % Load vars for each day
-        basepaths = grppaths{igrp}(:, iday);
-        v = basepaths2vars('basepaths', basepaths, 'vars', vars);
+        if ~isempty(vCell)
+            v = vCell{igrp}{iday}; % Use preloaded data
+        else
+            basepaths = grppaths{igrp}(:, iday);
+            v = basepaths2vars('basepaths', basepaths, 'vars', vars); % Load data
+        end
 
         % Extract data
-        u_day{iday} = org_units(v);                                         % units
+        u_day{iday} = org_units(v);                                         % units 
         blen_day{iday} = org_blen(v, frml);                                 % bout length (fixed / random effect)
 
         if contains(frml, 'FR ~')
@@ -142,22 +167,26 @@ for igrp = 1 : ngrps
             data_day{iday} = org_brst(v, var_field);                        % burstiness
 
         elseif contains(frml, 'Band ~')
-            data_day{iday} = org_band(v, var_idx);                         % band power
-            nunits = 1;
+            data_day{iday} = org_band(v, var_idx);                          % band power
 
         elseif contains(frml, 'BLen ~')
             data_day{iday} = org_blen(v, 'BoutLength');                     % bout length (response variable)
-            nunits = 1;
 
         elseif contains(frml, 'FOOOF ~')
             data_day{iday} = org_1of(v, var_field, var_idx);                % psd fooof parameter
-            nunits = 1;
+        
+        elseif contains(frml, 'RippSpks ~') 
+            data_day{iday} = org_rippSpks(v, var_field);                      % ripple FR increase
+        
+        elseif contains(frml, 'Ripp ~')
+            data_day{iday} = org_ripp(v, var_field);                        % specified ripple property
+            u_day = cell(1, ndays);
         end
     end
 
     % Concatenate across days
     dataCell{igrp} = cell2padmat(data_day, 2);                              % [mouse x day x unit x state x bout]
-    uCell{igrp} = cell2padmat(u_day, 2);                                    % [mouse x day x unit x type]
+    uCell{igrp} = cell2padmat(u_day, 2);                                    % [mouse x day x unit x 1 x 1], value is type (1 or 2)
     blenCell{igrp} = cell2padmat(blen_day, 2);                              % [mouse x day x 1 x state x bout]
 end
 
@@ -169,21 +198,28 @@ end
 % Calculate table size
 nrows = 0;
 for igrp = 1 : ngrps
-    [~, ~, ~, nstates, nbouts] = size(dataCell{igrp});
+    [nmice, ndays, max_nunits_grp, nstates, nbouts] = size(dataCell{igrp});
 
     if ~isempty(uCell{igrp})
-        % For each bout, count actual non-NaN elements
-        for istate = 1 : nstates
-            for ibout = 1 : nbouts
-                valid_data = ~isnan(dataCell{igrp}(:, :, :, istate, ibout));
-                for iunit = 1 : 2
-                    unit_mask = uCell{igrp}(:, :, :, iunit);
-                    nrows = nrows + sum(valid_data(:) & unit_mask(:));
+        for imouse = 1 : nmice
+            for iday = 1 : ndays
+                % Get unit types for this mouse/day [max_nunits_grp x 1]
+                unit_types_curr = squeeze(uCell{igrp}(imouse, iday, 1:max_nunits_grp, 1, 1)); 
+                valid_unit_indices = find(unit_types_curr > 0); % Indices of units with assigned type
+
+                if ~isempty(valid_unit_indices)
+                    for istate = 1 : nstates
+                        for ibout = 1 : nbouts
+                            % Get data for valid units [n_valid_units x 1]
+                            data_curr = squeeze(dataCell{igrp}(imouse, iday, valid_unit_indices, istate, ibout));
+                            % Count non-NaN data points among valid units
+                            nrows = nrows + sum(~isnan(data_curr));
+                        end
+                    end
                 end
             end
         end
-    else
-        % If uCell is empty, still count non-NaN elements
+    else % Case for LFP data or if uCell is empty
         nrows = nrows + sum(~isnan(dataCell{igrp}(:)));
     end
 end
@@ -208,51 +244,92 @@ for igrp = 1 : ngrps
     for imouse = 1 : nmice
         for istate = 1 : nstates
             for iday = 1 : ndays
-                for iunit = 1 : nunits
+                if ~isempty(uCell{igrp})
+                    % Get unit info for this mouse/day
+                    unit_types_all = squeeze(uCell{igrp}(imouse, iday, :, 1, 1)); % [max_nunits x 1]
+                    unit_indices_exist = find(unit_types_all > 0); % Indices of units that exist
+                    actual_unit_types = unit_types_all(unit_indices_exist); % Types (1 or 2) of existing units
 
-                    % Get indices for current unit type
-                    if ~isempty(uCell{igrp})
-                        idx_unit = squeeze(uCell{igrp}(imouse, iday, :, iunit));
-                        id_unit_curr = find(idx_unit)' + ...
-                            1000 * (imouse - 1) + ...
-                            10000 * (iday - 1) + ...
-                            100000 * (igrp - 1);
-                    else
-                        idx_unit = 1;
-                        id_unit_curr = 1;
+                    if isempty(unit_indices_exist) % Skip if no units found for this mouse/day
+                        continue;
                     end
 
                     for ibout = 1 : nbouts
+                        % Get data for existing units [n_exist_units x 1]
+                        data_exist_units = squeeze(dataCell{igrp}(imouse, iday, unit_indices_exist, istate, ibout));
+                        
+                        idx_valid_data = ~isnan(data_exist_units); % Mask for non-NaN data among existing units
+                        nvalid = sum(idx_valid_data);
 
-                        % Get data
-                        curr_data = squeeze(dataCell{igrp}(imouse, iday, idx_unit, istate, ibout));
-                        idx_valid = ~isnan(curr_data);
-                        nvalid = sum(idx_valid);
-                        idx_range = idx_curr : (idx_curr + nvalid - 1);
-                        vec_data(idx_range) = curr_data(idx_valid);
+                        if nvalid > 0
+                            idx_range = idx_curr : (idx_curr + nvalid - 1);
 
-                        % get bout length (if requested)
-                        if contains(frml, ' BoutLength')
-                            curr_blen = blenCell{igrp}(imouse, iday, 1, istate, ibout);
-                            vec_blen(idx_range) = curr_blen;
+                            % Store data
+                            vec_data(idx_range) = data_exist_units(idx_valid_data);
+
+                            % Get bout length (if requested)
+                            if contains(frml, ' BoutLength')
+                                curr_blen = blenCell{igrp}(imouse, iday, 1, istate, ibout);
+                                vec_blen(idx_range) = curr_blen;
+                            end
+
+                            % Assign labels
+                            lbl_grp(idx_range) = str_grp{igrp};
+                            lbl_state(idx_range) = str_state{istate};
+                            lbl_mouse(idx_range) = mnames{igrp}{imouse};
+                            lbl_day(idx_range) = str_day{iday};
+                            
+                            % Assign unit type labels based on the type value (1 or 2)
+                            unit_types_valid = actual_unit_types(idx_valid_data);
+                            lbl_unit(idx_range) = str_unit(unit_types_valid);
+
+                            % Assign unique unit ID
+                            unit_indices_valid = unit_indices_exist(idx_valid_data);
+                            id_unit(idx_range) = unit_indices_valid + ...
+                                1000 * (imouse - 1) + ...
+                                10000 * (iday - 1) + ...
+                                100000 * (igrp - 1);
+                            
+                            % Update counter
+                            idx_curr = idx_curr + nvalid;
                         end
+                    end % end ibout loop
+                else % Handle non-unit specific data (LFP, etc.) or case where flg_hasUnits is false
+                    nunits_loop = 1; % Treat as single "unit"
+                    for iunit_dummy = 1 : nunits_loop % Loop once
+                       for ibout = 1 : nbouts
+                            % Get data (assuming unit dim is singleton or irrelevant)
+                            curr_data = squeeze(dataCell{igrp}(imouse, iday, 1, istate, ibout)); % Access first 'unit' index
+                            idx_valid = ~isnan(curr_data);
+                            nvalid = sum(idx_valid);
+                            
+                            if nvalid > 0
+                                idx_range = idx_curr : (idx_curr + nvalid - 1);
+                                vec_data(idx_range) = curr_data(idx_valid);
 
-                        % Append to vectors
-                        lbl_grp(idx_range) = repmat(str_grp{igrp}, nvalid, 1);
-                        lbl_state(idx_range) = repmat(str_state{istate}, nvalid, 1);
-                        lbl_mouse(idx_range) = repmat(mnames{igrp}{imouse}, nvalid, 1);
-                        lbl_unit(idx_range) = repmat(str_unit{iunit}, nvalid, 1);
-                        lbl_day(idx_range) = repmat(str_day{iday}, nvalid, 1);
-                        id_unit(idx_range) = id_unit_curr(idx_valid)';
+                                % get bout length (if requested)
+                                if contains(frml, ' BoutLength')
+                                    curr_blen = blenCell{igrp}(imouse, iday, 1, istate, ibout);
+                                    vec_blen(idx_range) = curr_blen;
+                                end
 
-                        % Update counter
-                        idx_curr = idx_curr + nvalid;
-                    end
-                end
-            end
-        end
-    end
-end
+                                % Append labels (UnitType will be 'NA' or similar)
+                                lbl_grp(idx_range) = repmat(str_grp{igrp}, nvalid, 1);
+                                lbl_state(idx_range) = repmat(str_state{istate}, nvalid, 1);
+                                lbl_mouse(idx_range) = repmat(mnames{igrp}{imouse}, nvalid, 1);
+                                lbl_unit(idx_range) = repmat("NA", nvalid, 1); % No specific unit type
+                                lbl_day(idx_range) = repmat(str_day{iday}, nvalid, 1);
+
+                                % Update counter
+                                idx_curr = idx_curr + nvalid;
+                            end
+                       end % end ibout
+                    end % end iunit_dummy
+                end % end if flg_hasUnits
+            end % end iday loop
+        end % end istate loop
+    end % end imouse loop
+end % end igrp loop
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % create output table and config
@@ -263,8 +340,8 @@ if contains(frml, ' BoutLength')    % here bout length is a random variable
     lme_tbl = table(vec_data, lbl_grp, lbl_state, lbl_mouse, lbl_unit, vec_blen, id_unit, lbl_day,...
         'VariableNames', {yName, 'Group', 'State', 'Mouse', 'UnitType', 'BoutLength', 'UnitID', 'Day'});
 else
-    lme_tbl = table(vec_data, lbl_grp, lbl_state, lbl_mouse, lbl_unit, lbl_day,...
-        'VariableNames', {yName, 'Group', 'State', 'Mouse', 'UnitType', 'Day'});
+    lme_tbl = table(vec_data, lbl_grp, lbl_state, lbl_mouse, lbl_unit, id_unit, lbl_day,...
+        'VariableNames', {yName, 'Group', 'State', 'Mouse', 'UnitType', 'UnitID', 'Day'});
 end
 
 % Convert to categorical
@@ -309,6 +386,7 @@ end
 % local functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+
 % firing rate
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function fr_data = org_fr(v, frml)
@@ -340,6 +418,7 @@ end
 fr_data = permute(cell2padmat(fr_tmp, 4), [4, 5, 1, 3, 2]);
 
 end
+
 
 % burstiness
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -457,13 +536,31 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function unit_data = org_units(v)
 
-% extracts unit data from loaded struct and returns a 3D [mouse x day x unit x type]
-unit_data = [];
-if ~isfield(v, 'units')
-    return
-end
+% extracts unit type data from loaded struct and returns a 5D array
+% [mouse x 1 x unit x 1 x 1] where the value indicates unit type (1=PYR, 2=PV).
+% Returns empty if 'units' field is not present.
+
 units = catfields([v(:).units], 'addim', true);
-unit_data = permute(units.clean, [3, 4, 2, 1]);
+nmice = length([v(:).units]);
+
+unit_data_mouse = cell(nmice, 1);
+for imouse = 1 : nmice
+    clean_mouse = units.clean(:, :, imouse); % [2 x Nunits_mouse]
+    nunits_mouse = size(clean_mouse, 2);
+    
+    unit_type_vec_mouse = zeros(1, nunits_mouse); % Row vector for types
+    unit_type_vec_mouse(clean_mouse(1,:)) = 1;    % Type 1 (PYR)
+    unit_type_vec_mouse(clean_mouse(2,:)) = 2;    % Type 2 (PV)
+    
+    % Reshape to [1 x 1 x nunits_mouse x 1 x 1] for consistent padding later
+    unit_data_mouse{imouse} = reshape(unit_type_vec_mouse, [1, 1, nunits_mouse, 1, 1]);
+end
+
+% Pad across mice and units to create a consistent matrix
+% Pad value 0 indicates no unit or type not assigned.
+unit_data = cell2padmat(unit_data_mouse, 1, 0); % Pads along mouse dim (dim 1)
+
+% Final output shape: [nmice x 1 x max_nunits_all x 1 x 1]
 
 end
 
@@ -519,5 +616,60 @@ else
     end
 end
 
+
+end
+
+% ripple Gain
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function ripp_data = org_rippSpks(v, var_field)
+% extracts ripple Gain data from ripp struct and returns a 5D array of
+% [mouse x day x unit x state x bout]. Assumes Gain is calculated per unit.
+
+nmice = length(v);
+gain_tmp = cell(nmice, 1);
+max_nunits = 0;
+
+% Extract Gain vector for each mouse and find max number of units
+for imouse = 1 : nmice
+    gain_vec = v(imouse).ripp.spks.su.(var_field)(:); % Ensure column vector
+    nunits_mouse = length(gain_vec);
+    gain_tmp{imouse} = gain_vec;
+    max_nunits = max(max_nunits, nunits_mouse);
+end
+
+% Preallocate and fill data matrix, padding with NaNs
+% Output format: [mouse x day x unit x state x bout]
+ripp_data = nan(nmice, 1, max_nunits, 1, 1);
+for imouse = 1 : nmice
+    if ~isempty(gain_tmp{imouse})
+        nunits_mouse = length(gain_tmp{imouse});
+        ripp_data(imouse, 1, 1:nunits_mouse, 1, 1) = gain_tmp{imouse};
+    end
+end
+
+end
+
+% specified ripple data field (e.g., peakAmp, peakPower)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function ripp_data = org_ripp(v, var_field)
+% extracts specified ripple data field from ripp struct and returns a 5D array
+% [mouse x day x 1 x 1 x ripple], randomly sampling 100 ripples per mouse.
+
+nmice = length(v);
+nRipp = 200; % Max ripples to sample per mouse
+rippMat = nan(nmice, nRipp);
+
+% Randomly sample without replacement, specifically from ripples during
+% nrem
+for imouse = 1 : nmice
+        rippTmp = v(imouse).ripp.(var_field);
+        idxState = find(v(imouse).ripp.states.idx(:, 4));
+        idxTmp = randperm(length(idxState), nRipp);
+        idxRipp = idxState(idxTmp);
+        rippMat(imouse, :) = rippTmp(idxRipp);
+end
+
+% Permute to [mouse x 1 x 1 x 1 x ripple]
+ripp_data = permute(rippMat, [1, 3, 4, 5, 2]); % Add singleton dimensions for day, unit, state
 
 end

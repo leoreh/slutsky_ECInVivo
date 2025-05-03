@@ -1,4 +1,4 @@
-function fh = mcu_lmePlot(lme_tbl, lme_mdl, varargin)
+function fh = lme_plot(lme_tbl, lme_mdl, varargin)
 
 % plots linear mixed effects model results according to fixed effects.
 % first fixed effect determines different lines/groups, second fixed effect

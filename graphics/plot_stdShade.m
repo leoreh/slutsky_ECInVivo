@@ -28,7 +28,7 @@ alpha = p.Results.alpha;
 
 % ensure the axis handle is held
 axes(axh);
-hold on
+hold on;
 
 % calculate the mean and standard deviation
 mData = mean(dataMat, 2, 'omitnan');
@@ -58,8 +58,6 @@ upperBound = max(mData + sData, eps);
 
 fillh = fill([xVal; flipud(xVal)], [upperBound; flipud(lowerBound)], ...
     clr, 'FaceAlpha', alpha, 'EdgeColor', 'none', 'Tag', 'sePatch');
-set(fillh);
-
 
 end
 
