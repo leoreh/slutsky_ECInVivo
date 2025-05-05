@@ -84,8 +84,10 @@ for igrp = 1:ngrps
         
         % Process data based on variable type
         if contains(var_name, 'fr')
-            if contains(var_field, 'binedges')
-                data_day{iday} = org_blen(v);
+            if contains(var_field, 'bouts')
+                data_day{iday} = org_fr(v, var_field);
+            elseif contains(var_field, 'bDur')
+                data_day{iday} = org_bDur(v);
             else
                 data_day{iday} = org_fr(v, var_field);
             end
@@ -99,6 +101,7 @@ for igrp = 1:ngrps
             end
         elseif contains(var_name, 'units')
             data_day{iday} = org_units(v);
+
         elseif contains(var_name, 'ripp')
             if contains(var_field, 'fr')
                 data_day{iday} = org_rippSpks(v, var_name, var_field);
@@ -132,15 +135,20 @@ if contains(var_field, 'states')
 end
 
 if contains(var_field, 'bouts')
-    % FR irrespective of states
-    fr_data = permute(fr.mfr, [3, 4, 1, 2, 5]);
-else
     % FR in states per bout
     fr_tmp = cell(nmice, 1);
     for imouse = 1:nmice
         fr_tmp{imouse} = cell2padmat(fr.states.fr(1, :, imouse), 3);
     end
     fr_data = permute(cell2padmat(fr_tmp, 4), [4, 5, 1, 3, 2]);
+
+else
+    % FR irrespective of states
+    fr_tmp = cell(nmice, 1);
+    for imouse = 1:nmice
+        fr_tmp{imouse} = fr.mfr(:, :, imouse);
+    end
+    fr_data = permute(cell2padmat(fr_tmp, 2), [2, 3, 1, 4, 5]);
 end
 end
 
@@ -148,10 +156,8 @@ end
 function brst_data = org_brst(v, brstField)
 % Organizes burstiness data: [mouse x day x unit x 1 x 1]
 
-fldnames = fieldnames(v(1));
-var_brst = contains(fldnames{1}, 'brst');
-
-brst = catfields([v(:).(var_brst)], 'addim', true);
+var_name = fieldnames(v(1));
+brst = catfields([v(:).(var_name{1})], 'addim', true);
 brst_data = permute(brst.(brstField), [3, 4, 2, 1]);
 end
 
@@ -197,20 +203,21 @@ band_data = permute(cell2padmat(band_tmp, 4), [4, 5, 1, 3, 2]);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function blen_data = org_blen(v)
+function bDur_data = org_bDur(v)
 % Organizes bout length data: [mouse x day x 1 x state x bout]
 
 fr = catfields([v(:).fr], 'addim', true);
 binedges = squeeze(fr.states.binedges);
-boutLen = cellfun(@(x) cellfun(@(y) diff(y), x, 'uni', true), binedges, 'uni', false);
+boutDur = cellfun(@(x) cellfun(@(y) diff(y), x, 'uni', true), binedges, 'uni', false);
 
 nmice = length(v);
-blen_tmp = cell(nmice, 1);
+bDur_tmp = cell(nmice, 1);
 for imouse = 1:nmice
-    blen_tmp{imouse} = cell2padmat(boutLen(:, imouse), 1);
+    bDur_tmp{imouse} = cell2padmat(boutDur(:, imouse), 1);
 end
 
-blen_data = permute(cell2padmat(blen_tmp, 3), [3, 4, 5, 1, 2]);
+padded_data = cell2padmat(bDur_tmp, 3); % [bout x state x mouse]
+bDur_data = permute(padded_data, [3, 4, 5, 1, 2]); % [mouse x day x unit x state x bout]
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -225,7 +232,7 @@ for imouse = 1 : nmice
     clean_mouse = units.clean(:, :, imouse);        % [2 x Nunits_mouse]
     nunits_mouse = size(clean_mouse, 2);
     
-    unit_type = zeros(1, nunits_mouse);             % Row vector for types
+    unit_type = ones(1, nunits_mouse) * 3;          % Row vector for types
     unit_type(clean_mouse(1,:)) = 1;                % Type 1 (PYR)
     unit_type(clean_mouse(2,:)) = 2;                % Type 2 (PV)
     
@@ -233,8 +240,7 @@ for imouse = 1 : nmice
 end
 
 % Pad across mice and units to create a consistent matrix
-% Pad value 0 indicates no unit or type not assigned.
-unit_data = cell2padmat(unit_mouse, 1, 0); % Pads along mouse dim (dim 1)
+unit_data = cell2padmat(unit_mouse, 1); % Pads along mouse dim (dim 1)
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

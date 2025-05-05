@@ -68,17 +68,20 @@ end
 frml = 'FR ~ Group * UnitType + (1|Mouse)';
 
 % organize for lme
-[lme_tbl, lme_cfg] = lme_org(grppaths, frml, false);
+[lme_tbl, lme_cfg] = lme_org('grppaths', grppaths, 'frml', frml,...
+    'flg_emg', false, 'var_field', '', 'vCell', {});
 
 % run lme
-lme = fitlme(lme_tbl, lme_cfg.frml, 'FitMethod', 'REML');
+contrasts = [1 : 4, 5, 6];
+contrasts = 'all';
+[lme_results, lme_cfg] = lme_analyse(lme_tbl, lme_cfg, 'contrasts', contrasts);
 
 % plot
-fh = mcu_lmePlot(lme_tbl, lme);
-grph_save('fh', fh, 'fname', frml, 'frmt', {'ai', 'jpg'})
+fh = lme_plot(lme_tbl, lme_cfg.mdl, 'ptype', 'bar');
+
+grph_save('fh', fh, 'fname', frml, 'frmt', {'jpg', 'fig'})
 
 prism_data = fh2prism(fh);
-exlTbl = lme2exl(lme, true);
 
 
 % FR per unit, WT vs MCU across states
@@ -86,48 +89,49 @@ exlTbl = lme2exl(lme, true);
 frml = 'FR ~ Group * State + (1|Mouse)';
 
 % organize for lme
-[lme_tbl, lme_cfg] = lme_org(grppaths, frml, false);
+[lme_tbl, lme_cfg] = lme_org('grppaths', grppaths, 'frml', frml,...
+    'flg_emg', false, 'var_field', '', 'vCell', {});
 
 % run lme
 iunit = categorical({'pPV'});
 plot_tbl = lme_tbl(lme_tbl.UnitType == iunit, :);
-lme = fitlme(plot_tbl, lme_cfg.frml, 'FitMethod', 'REML');
+[lme_results, lme_cfg] = lme_analyse(lme_tbl, lme_cfg, 'contrasts', 'all');
 
 % plot
-fh = mcu_lmePlot(plot_tbl, lme, 'ptype', 'bar');
+fh = lme_plot(lme_tbl, lme_cfg.mdl, 'ptype', 'bar');
 
 % save
-frml = [char(lme.Formula), '_', char(iunit)];
-frml = frml2char(frml, 'rm_rnd', false);
+frml = [char(lme.Formula), ' _ ', char(iunit)];
+frml = frml2char(frml, 'rm_rnd', true);
 th = get(gcf, 'Children');
 title(th, frml, 'interpreter', 'none')
 axh = get(th, 'Children');
-ylim(axh(3), [0 3])
-grph_save('fh', fh, 'fname', frml, 'frmt', {'ai', 'jpg'})
+ylim(axh(3), [0 4])
+grph_save('fh', fh, 'fname', frml, 'frmt', {'fig', 'jpg'})
 
 prism_data = fh2prism(fh);
 exlTbl = lme2exl(lme, true);
 
 
 
-% Create contrast to test MCU vs WT during NREM
-% Using the contrast matrix through coefTest or contrastTest
-contrasts = zeros(1, length(lme.CoefficientNames));
-% contrasts(strcmp(lme.CoefficientNames, 'Group_MCU-KO')) = 1;
-contrasts(strcmp(lme.CoefficientNames, 'State_NREM')) = 1;
-% contrasts(strcmp(lme.CoefficientNames, 'Group_MCU-KO:State_AW')) = 1;
 
-% Test the contrast
-[p, F, df] = coefTest(lme, contrasts)
+% Discover available coefficients
+
+
+fh = lme_plot(plot_tbl, lme, 'ptype', 'line');
+
+
 
 
 
 % FR per unit per bout, WT vs MCU across states 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-frml = 'FR ~ Group * State * BoutLength + (1|Mouse) + (1|UnitID)';
+frml = 'FR ~ Group * State + (1|BoutDur) + (1|Mouse) + (1|UnitID)';
 
 % organize for lme
-[lme_tbl, lme_cfg] = mcu_lmeOrg(grppaths, frml, false);
+[lme_tbl, lme_cfg] = lme_org('grppaths', grppaths, 'frml', frml,...
+    'flg_emg', false, 'var_field', var_field, 'vCell', {});
+
 
 % run lme
 iunit = categorical({'pPYR'});
@@ -135,7 +139,9 @@ fr_tbl = lme_tbl(lme_tbl.UnitType == iunit, :);
 lme = fitlme(fr_tbl, lme_cfg.frml, 'FitMethod', 'REML');
 
 % plot
-fh = mcu_lmePlot(fr_tbl, lme, 'ptype', 'line');
+fh = lme_plot(fr_tbl, lme, 'ptype', 'line');
+
+
 % save
 frml = [char(lme.Formula), '_', char(iunit)];
 frml = frml2char(frml, 'rm_rnd', false);
@@ -146,14 +152,7 @@ ylim(axh(3), [0 3])
 grph_save('fh', fh, 'fname', frml, 'frmt', {'ai', 'jpg'})
 
 
-% Create contrast to test MCU vs WT during NREM
-% Using the contrast matrix through coefTest or contrastTest
-contrastInteraction = zeros(1, length(lme.Coefficients.Estimate));
-contrastInteraction(strcmp(lme.CoefficientNames, 'Group_MCU-KO:State_NREM')) = 1;
-contrastInteraction(strcmp(lme.CoefficientNames, 'Group_MCU-KO:State_REM')) = 1;
 
-% Test the contrast
-[p, F, df] = coefTest(lme, contrastInteraction)
 
 
 
@@ -170,7 +169,7 @@ contrastInteraction(strcmp(lme.CoefficientNames, 'Group_MCU-KO:State_REM')) = 1;
 
 eq_tbl = fr_tbl(idx_eq, :);
 lme = fitlme(eq_tbl, lme_cfg.frml);
-mcu_lmePlot(eq_tbl, lme)
+lme_plot(eq_tbl, lme)
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -193,19 +192,31 @@ end
 
 % FR ~ Group * Day + (1|Mouse)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% organize for lme
 frml = 'FR ~ Group * Day + (Day|Mouse)';
-[lme_tbl, lme_cfg] = lme_org(grppaths, frml, true);
+
+% organize for lme
+[lme_tbl, lme_cfg] = lme_org('grppaths', grppaths, 'frml', frml,...
+    'flg_emg', true, 'var_field', '', 'vCell', {});
 
 % select unit
-iunit = categorical({'pPV'});
+iunit = categorical({'pPYR'});
 plot_tbl = lme_tbl(lme_tbl.UnitType == iunit, :);
 
+% % select state
+% istate = categorical({'Low EMG'});
+% plot_tbl = plot_tbl(plot_tbl.State == iunit, :);
+
+plot_tbl = lme_normalize('lme_tbl', lme_tbl, 'normVar', 'Day',...
+    'groupVars', {'Group', 'UnitType', 'State'});
+
 % run lme
-lme = fitlme(plot_tbl, lme_cfg.frml);
+% contrasts = [1 : 4, 5, 6];
+contrasts = [];
+contrasts = 'all';
+[lme_results, lme_cfg] = lme_analyse(plot_tbl, lme_cfg, 'contrasts', contrasts);
 
 % plot
-fh = mcu_lmePlot(plot_tbl, lme, 'ptype', 'bar');
+fh = lme_plot(plot_tbl, lme_cfg.mdl, 'ptype', 'bar');
 
 % save
 frml = [char(lme.Formula), '_', char(iunit)];

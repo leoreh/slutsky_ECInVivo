@@ -1,5 +1,5 @@
 function [idx_eq, fh] = mcu_eqBLen(lme_tbl)
-% matches bout length distributions between groups by selecting equal number of
+% matches Bout Dur distributions between groups by selecting equal number of
 % bouts per bin from each group. Uses log-spaced bins to account for the
 % skewed distribution of bout lengths.
 %
@@ -11,11 +11,11 @@ function [idx_eq, fh] = mcu_eqBLen(lme_tbl)
 %    - Randomly select that many bouts from each group
 % 2. This ensures:
 %    - Equal representation across the range despite skewed distribution
-%    - Matching bout length distributions between groups
+%    - Matching Bout Dur distributions between groups
 %    - Random selection within each bin
 %
 % INPUT
-%   lme_tbl     table with fields BoutLength, Group, State from mcu_lmeOrg
+%   lme_tbl     table with fields BoutDur, Group, State from mcu_lmeOrg
 %
 % OUTPUT
 %   idx_eq      logical vector size of lme_tbl for equal bout lengths  
@@ -49,20 +49,20 @@ for istate = 1 : nstates
    state_tbl = lme_tbl(lme_tbl.State == states(istate), :);
    
    % get bout lengths per group
-   blen = cell(ngroups, 1);
+   bDur = cell(ngroups, 1);
    for igroup = 1 : ngroups
-       blen{igroup} = state_tbl.BoutLength(state_tbl.Group == groups(igroup));
+       bDur{igroup} = state_tbl.BoutDur(state_tbl.Group == groups(igroup));
    end
    
    % create log-spaced edges
-   minval = min(vertcat(blen{:}));
-   maxval = max(vertcat(blen{:}));
+   minval = min(vertcat(bDur{:}));
+   maxval = max(vertcat(bDur{:}));
    edges = exp(linspace(log(minval), log(maxval), nbins + 1));
    
    % count bouts per bin per group
    counts = zeros(ngroups, nbins);
    for igroup = 1 : ngroups
-       counts(igroup, :) = histcounts(blen{igroup}, edges, 'Normalization', 'count');
+       counts(igroup, :) = histcounts(bDur{igroup}, edges, 'Normalization', 'count');
    end
    
    % find minimum count per bin
@@ -72,7 +72,7 @@ for istate = 1 : nstates
    for igroup = 1 : ngroups
        % get group data
        grp_idx = state_tbl.Group == groups(igroup);
-       curr_blen = state_tbl.BoutLength(grp_idx);
+       curr_blen = state_tbl.BoutDur(grp_idx);
        
        % initialize selection
        sel_idx = false(size(curr_blen));
@@ -105,21 +105,21 @@ colors = {'b', 'r'};
 for istate = 1 : nstates
    % get original distributions
    state_tbl = lme_tbl(lme_tbl.State == states(istate), :);
-   blen = cell(ngroups, 1);
+   bDur = cell(ngroups, 1);
    for igroup = 1 : ngroups
-       blen{igroup} = state_tbl.BoutLength(state_tbl.Group == groups(igroup));
+       bDur{igroup} = state_tbl.BoutDur(state_tbl.Group == groups(igroup));
    end
    
    % plot original distributions
    subplot(2, nstates, istate)
    hold on
    for igroup = 1 : ngroups
-       histogram(blen{igroup}, edges, 'Normalization', 'count',...
+       histogram(bDur{igroup}, edges, 'Normalization', 'count',...
            'FaceColor', colors{igroup}, 'FaceAlpha', 0.3)
    end
    set(gca, 'XScale', 'log')
    title(sprintf('State %d - Original', istate))
-   xlabel('Bout Length (log scale)')
+   xlabel('Bout Dur (log scale)')
    ylabel('Probability')
    legend(cellstr(groups))
    
@@ -129,12 +129,12 @@ for istate = 1 : nstates
    for igroup = 1 : ngroups
        curr_idx = lme_tbl.State == states(istate) & ...
            lme_tbl.Group == groups(igroup) & idx_eq;
-       histogram(lme_tbl.BoutLength(curr_idx), edges, 'Normalization', 'count',...
+       histogram(lme_tbl.BoutDur(curr_idx), edges, 'Normalization', 'count',...
            'FaceColor', colors{igroup}, 'FaceAlpha', 0.3)
    end
    set(gca, 'XScale', 'log')
    title(sprintf('State %d - Matched', istate))
-   xlabel('Bout Length (log scale)')
+   xlabel('Bout Dur (log scale)')
    ylabel('Probability')
    legend(cellstr(groups))
 end

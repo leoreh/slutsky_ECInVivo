@@ -57,8 +57,8 @@ end
 % Assume myGrps is defined as above
 % Assume preloadedData is a cell array structure matching vCell description
 
-var_name = 'psdEmg';
-var_field = 1;
+var_name = 'units';
+var_field = 'ap_exp';
 vCell = {};
 dataCell = lme_load('grppaths', grppaths, 'var_name', var_name, ...
     'var_field', var_field, 'vCell', vCell);     
@@ -67,10 +67,10 @@ size(dataCell{1})
 
 % FR increase during ripples
 frml = 'RippSpks ~ Group * UnitType + (1|Mouse)';
+var_field = 'frModulation';
 
 % organize for lme
-var_field = 'frModulation';
-[lme_tbl, lme_cfg] = mcu_lmeOrg(grppaths, frml, false, var_field, [], vCell);
+[lme_tbl, lme_cfg] = lme_org(grppaths, frml, false, var_field, vCell);
 
 % make sure no inf
 lme_tbl(isinf(lme_tbl.RippSpks), :) = [];
@@ -79,7 +79,7 @@ lme_tbl(isinf(lme_tbl.RippSpks), :) = [];
 lme = fitlme(lme_tbl, lme_cfg.frml, 'FitMethod', 'REML');
 
 % plot
-fh = mcu_lmePlot(lme_tbl, lme);
+fh = mcu_lmePlot(lme_tbl, lme, 'ptype', 'bar');
 grph_save('fh', fh, 'fname', frml, 'frmt', {'ai', 'jpg'})
 
 
@@ -89,14 +89,14 @@ grph_save('fh', fh, 'fname', frml, 'frmt', {'ai', 'jpg'})
 frml = 'Ripp ~ Group + (1|Mouse)';
 
 % organize for lme
-var_field = 'peakAmp';
-[lme_tbl, lme_cfg] = mcu_lmeOrg(grppaths, frml, false, var_field, [], vCell);
+var_field = 'peakFreq';
+[lme_tbl, lme_cfg] = lme_org(grppaths, frml, false, var_field, vCell);
 
 % run lme
 lme = fitlme(lme_tbl, lme_cfg.frml, 'FitMethod', 'REML');
 
 % plot
-fh = mcu_lmePlot(lme_tbl, lme, 'ptype', 'bar');
+fh = lme_plot(lme_tbl, lme, 'ptype', 'bar');
 
 grph_save('fh', fh, 'fname', frml, 'frmt', {'ai', 'jpg'})
 
@@ -292,3 +292,8 @@ box(ax2, 'off'); grid(ax2, 'on');
 
 
 
+
+
+for ifile = 1 : length(v)
+    v(ifile).ripp.info
+end

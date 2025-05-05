@@ -129,7 +129,6 @@ if flgRefine
     limDurTmp = [20, 300, 20, 10];
     refineFactor = 0.8;
 
-    thrTmp = [0.8, 2, 1, 200, 100];
     passband = [150 350];
 
     ripp = ripp_detect('basepath', basepath, 'sig', sig(winIdx), 'emg', emg(winIdx),...

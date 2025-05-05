@@ -185,14 +185,18 @@ if length(varsFxd) >= 2
         idx = tbl.(var1) == var1_vals(igrp);
         grp_tbl = tbl(idx, :);
 
-        % get unique x values maintaining order
-        x_unique = unique(grp_tbl.(var2), 'stable');
+        % get unique x values using categorical order if possible
+        if iscategorical(grp_tbl.(var2))
+            x_unique = categories(grp_tbl.(var2));
+        else
+            x_unique = unique(grp_tbl.(var2), 'stable');
+        end
         n_x = length(x_unique);
 
         % organize data matrix
         data_mat = nan(n_x, sum(idx));
         for ix = 1:n_x
-            x_idx = grp_tbl.(var2) == x_unique(ix);
+            x_idx = grp_tbl.(var2) == x_unique{ix};
             y_vals = grp_tbl.(varRsp)(x_idx);
             data_mat(ix, 1:length(y_vals)) = y_vals';
         end
@@ -207,8 +211,12 @@ else
     % case: single variable
     var1 = varsFxd{1};
 
-    % get unique values maintaining order
-    x_unique = unique(tbl.(var1), 'stable');
+    % get unique values using categorical order if possible
+    if iscategorical(tbl.(var1))
+        x_unique = categories(tbl.(var1));
+    else
+        x_unique = unique(tbl.(var1), 'stable');
+    end
     n_x = length(x_unique);
 
     % initialize data matrix
@@ -217,7 +225,7 @@ else
 
     % fill data matrix
     for ix = 1:n_x
-        idx = tbl.(var1) == x_unique(ix);
+        idx = tbl.(var1) == x_unique{ix};
         y_vals = tbl.(varRsp)(idx);
         data_mat(ix, 1:length(y_vals)) = y_vals';
     end

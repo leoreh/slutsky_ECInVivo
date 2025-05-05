@@ -26,14 +26,28 @@ alpha = p.Results.alpha;
 % preparations
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% Check orientation
+if size(dataMat, 2) == length(xVal)
+    % Preferred: columns = x-axis
+    dataMatPlot = dataMat;
+elseif size(dataMat, 1) == length(xVal)
+    % Transpose: rows = x-axis
+    dataMatPlot = dataMat';
+    warning('plot_stdShade:Transposed', ...
+        'Transposing dataMat so that columns correspond to x-axis values.');
+else
+    error('plot_stdShade:DimensionMismatch', ...
+        'Neither dimension of dataMat matches length(xVal).');
+end
+
 % ensure the axis handle is held
 axes(axh);
 hold on;
 
 % calculate the mean and standard deviation
-mData = mean(dataMat, 2, 'omitnan');
-n = sum(~isnan(dataMat), 2);  % number of non-NaN points per row
-sData = std(dataMat, 0, 2, 'omitnan') ./ sqrt(n);
+mData = mean(dataMatPlot, 1, 'omitnan');
+n = sum(~isnan(dataMatPlot), 1);  % number of non-NaN points per column
+sData = std(dataMatPlot, 0, 1, 'omitnan') ./ sqrt(n);
 
 % omit nan values
 validIdx = ~isnan(mData) & ~isnan(sData);
@@ -53,8 +67,19 @@ sData(sData == 0) = eps;
 ph = plot(axh, xVal, mData, 'Color', clr, 'LineWidth', 2);
 
 % plot the shaded area for standard deviation
-lowerBound = max(mData - sData, eps);
-upperBound = max(mData + sData, eps);
+% Check if y-axis is log scale
+if strcmp(get(axh, 'YScale'), 'log')
+    lowerBound = max(mData - sData, eps);
+    upperBound = max(mData + sData, eps);
+else
+    lowerBound = mData - sData;
+    upperBound = mData + sData;
+end
+
+% Ensure all are column vectors
+xVal = xVal(:);
+upperBound = upperBound(:);
+lowerBound = lowerBound(:);
 
 fillh = fill([xVal; flipud(xVal)], [upperBound; flipud(lowerBound)], ...
     clr, 'FaceAlpha', alpha, 'EdgeColor', 'none', 'Tag', 'sePatch');

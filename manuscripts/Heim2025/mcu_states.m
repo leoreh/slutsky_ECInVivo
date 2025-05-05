@@ -1,5 +1,74 @@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Pipeline for classification of a single mouse
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% create lfp file
+LFPfromDat('basepath', basepath, 'cf', 450, 'chunksize', 5e6,...
+    'nchans', nchans, 'fsOut', 1250, 'fsIn', fs)    
+
+
+% create emg signal from accelerometer data
+acc = EMGfromACC('basepath', basepath, 'fname', [basename, '.lfp'],...
+    'nchans', nchans, 'ch', nchans - 2 : nchans, 'saveVar', true, 'fsIn', 1250,...
+    'graphics', false, 'force', true);
+
+
+% call for acceleration
+sSig = as_prepSig([basename, '.lfp'], acc.mag,...
+    'eegCh', [9 : 12], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
+    'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
+    'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [10 450], 'fs', 1250);
+
+
+% get spec outliers
+otl = get_otlSpec('basepath', pwd, 'saveVar', true,...
+    'flgForce', true, 'graphics', false, 'flgInspect', true);
+
+
+% manually create labels. At this point, I manually classify at least 1
+% hour of data for calibrating the signal and for future examination of the
+% classification accuracy. 
+labelsmanfile = [basename, '.sleep_labelsMan.mat'];
+AccuSleep_viewer(sSig, labels, labelsmanfile)
+
+
+% classify with a network
+netfile = 'D:\Code\slutsky_ECInVivo\lfp\SleepStates\AccuSleep\trainedNetworks\net_230212_103132.mat';
+ss = as_classify(sSig, 'basepath', basepath, 'inspectLabels', false,...
+    'saveVar', true, 'forceA', true, 'netfile', netfile,...
+    'graphics', true, 'calData', []);
+
+
+% create bouts
+minDur = 5;
+interDur = 3;
+bouts = as_bouts('labels', ss.labels,...
+    'minDur', minDur, 'interDur', interDur, 'flgOtl', true,...
+    'sstates', 1 : cfg.nstates, 'graphics', false);
+
+
+% calculate EMG state bouts
+minDur = 5;
+interDur = 3;
+ssEmg = as_emg('basepath', basepath, 'flgInspct', false,...
+    'interDur', interDur, 'minDur', minDur);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % manually curate state bouts
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -83,6 +152,7 @@ for ifile = 1 : nfiles
         'saveVar', true, 'forceA', true, 'netfile', netfile,...
         'graphics', true, 'calData', []);
 
+    
 end
 
 
@@ -221,19 +291,29 @@ end
 % Bout length of WT vs. MCU across time
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+frml = 'BDur ~ Group * Day + (1|Mouse)';
+
 % organize for lme
-frml = 'BLen ~ Group * Day + (1|Mouse)';
-[lme_tbl, lme_cfg] = mcu_lmeOrg(grppaths, frml, true);
+var_field = '';
+[lme_tbl, lme_cfg] = lme_org('grppaths', grppaths, 'frml', frml,...
+    'flg_emg', true, 'var_field', var_field, 'vCell', {});
+
+% normalize to baseline
+plot_tbl = lme_normalize('lme_tbl', lme_tbl, 'normVar', 'Day', 'groupVars', {'Group', 'State'});
 
 % select state
 istate = categorical({'Low EMG'});
-plot_tbl = lme_tbl(lme_tbl.State == istate, :);
+plot_tbl = plot_tbl(plot_tbl.State == istate, :);
 
 % run lme
 lme = fitlme(plot_tbl, lme_cfg.frml);
 
 % plot
-fh = mcu_lmePlot(plot_tbl, lme, 'ptype', 'line');
+fh = lme_plot(plot_tbl, lme, 'ptype', 'line');
+
+
+
+
 
 % save
 frml = [char(lme.Formula), '_', char(istate)];

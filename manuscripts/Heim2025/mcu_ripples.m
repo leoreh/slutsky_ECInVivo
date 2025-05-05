@@ -89,7 +89,7 @@ grph_save('fh', fh, 'fname', frml, 'frmt', {'ai', 'jpg'})
 frml = 'Ripp ~ Group + (1|Mouse)';
 
 % organize for lme
-var_field = 'dur';
+var_field = 'peakFreq';
 [lme_tbl, lme_cfg] = lme_org(grppaths, frml, false, var_field, vCell);
 
 % run lme
@@ -289,6 +289,8 @@ box(ax2, 'off'); grid(ax2, 'on');
 % Optional: Save Figures
 % grph_save('fh', fh_peakFR_RS, 'fname', 'peak_normFR_RS_comparison', 'frmt', {'jpg', 'ai'});
 % grph_save('fh', fh_peakFR_FS, 'fname', 'peak_normFR_FS_comparison', 'frmt', {'jpg', 'ai'});
+
+
 
 
 

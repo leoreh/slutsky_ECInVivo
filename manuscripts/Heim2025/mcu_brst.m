@@ -56,14 +56,15 @@ end
 frml = 'Burst ~ Group + UnitType + (1|Mouse)';
 
 % organize for lme
-[lme_tbl, lme_cfg] = mcu_lmeOrg(grppaths, frml, false);
+var_field = 'royer';
+[lme_tbl, lme_cfg] = lme_org('grppaths', grppaths, 'frml', frml,...
+    'flg_emg', false, 'var_field', var_field, 'vCell', {});
 
 % run lme
-plot_tbl = lme_tbl;
-lme = fitlme(plot_tbl, lme_cfg.frml);
+lme = fitlme(lme_tbl, lme_cfg.frml);
 
 % plot
-fh = mcu_lmePlot(plot_tbl, lme, 'ptype', 'line');
+fh = lme_plot(lme_tbl, lme, 'ptype', 'bar');
 grph_save('fh', fh, 'fname', [frml, '_spkprct'], 'frmt', {'ai', 'jpg'})
 
 
@@ -91,24 +92,36 @@ end
 
 % organize for lme
 frml = 'Burst ~ Group * Day + (1|Mouse)';
-[lme_tbl, lme_cfg] = mcu_lmeOrg(grppaths, frml, true);
+
+% organize for lme
+var_field = 'lidor';
+[lme_tbl, lme_cfg] = lme_org('grppaths', grppaths, 'frml', frml,...
+    'flg_emg', false, 'var_field', var_field, 'vCell', {});
 
 % select unit
 iunit = categorical({'pPYR'});
 plot_tbl = lme_tbl(lme_tbl.UnitType == iunit, :);
 
-% select group
-igrp = categorical({'WT'});
-plot_tbl = plot_tbl(plot_tbl.Group == igrp, :);
+% run lme
+lme = fitlme(plot_tbl, lme_cfg.frml);
+
+% plot
+fh = lme_plot(plot_tbl, lme, 'ptype', 'line');
+
 
 % update formula
 lme_cfg.frml = 'Burst ~ Day + (1|Mouse)';
+
+% select group
+igrp = categorical({'WT'});
+plot_tbl = plot_tbl(plot_tbl.Group == igrp, :);
 
 % run lme
 lme = fitlme(plot_tbl, lme_cfg.frml);
 
 % plot
-fh = mcu_lmePlot(plot_tbl, lme, 'ptype', 'line');
+fh = lme_plot(plot_tbl, lme, 'ptype', 'line');
+
 frml = [char(lme.Formula), '_', char(iunit)];
 frml = frml2char(frml, 'rm_rnd', false);
 th = get(gcf, 'Children');

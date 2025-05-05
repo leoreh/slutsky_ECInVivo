@@ -2,7 +2,7 @@ function [r_mean, r_sem, fh] = mcu_FRvBL(lme_tbl)
 % analyzes correlation between bout length and firing rate per neuron
 %
 % INPUT
-%   lme_tbl     table with fields FR, BoutLength, Group, State, UnitID
+%   lme_tbl     table with fields FR, BoutDur, Group, State, UnitID
 %
 % OUTPUT
 %   r_mean      mean correlation coefficient [state x group]
@@ -43,7 +43,7 @@ for iunit = 1 : nunits
         % get state data
         idx = unit_tbl.State == states(istate);
         if sum(idx) > 5     % minimum 5 observations
-            x = unit_tbl.BoutLength(idx);
+            x = unit_tbl.BoutDur(idx);
             y = log(unit_tbl.FR(idx));
             
             % remove inf/nan

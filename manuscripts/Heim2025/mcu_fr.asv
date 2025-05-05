@@ -68,17 +68,23 @@ end
 frml = 'FR ~ Group * UnitType + (1|Mouse)';
 
 % organize for lme
-[lme_tbl, lme_cfg] = lme_org(grppaths, frml, false);
+[lme_tbl, lme_cfg] = lme_org('grppaths', grppaths, 'frml', frml,...
+    'flg_emg', false, 'var_field', var_field, 'vCell', {});
 
 % run lme
 lme = fitlme(lme_tbl, lme_cfg.frml, 'FitMethod', 'REML');
 
+
+
+
+
+
 % plot
-fh = mcu_lmePlot(lme_tbl, lme);
-grph_save('fh', fh, 'fname', frml, 'frmt', {'ai', 'jpg'})
+fh = lme_plot(lme_tbl, lme, 'ptype', 'bar');
+grph_save('fh', fh, 'fname', frml, 'frmt', {'ai', 'jpg', 'fig'})
 
 prism_data = fh2prism(fh);
-exlTbl = lme2exl(lme, true);
+exlTbl = lme2exl(lme);
 
 
 % FR per unit, WT vs MCU across states
@@ -86,7 +92,8 @@ exlTbl = lme2exl(lme, true);
 frml = 'FR ~ Group * State + (1|Mouse)';
 
 % organize for lme
-[lme_tbl, lme_cfg] = lme_org(grppaths, frml, false);
+[lme_tbl, lme_cfg] = lme_org('grppaths', grppaths, 'frml', frml,...
+    'flg_emg', false, 'var_field', var_field, 'vCell', {});
 
 % run lme
 iunit = categorical({'pPV'});
@@ -94,7 +101,7 @@ plot_tbl = lme_tbl(lme_tbl.UnitType == iunit, :);
 lme = fitlme(plot_tbl, lme_cfg.frml, 'FitMethod', 'REML');
 
 % plot
-fh = mcu_lmePlot(plot_tbl, lme, 'ptype', 'bar');
+fh = lme_plot(plot_tbl, lme, 'ptype', 'line');
 
 % save
 frml = [char(lme.Formula), '_', char(iunit)];
@@ -107,6 +114,19 @@ grph_save('fh', fh, 'fname', frml, 'frmt', {'ai', 'jpg'})
 
 prism_data = fh2prism(fh);
 exlTbl = lme2exl(lme, true);
+
+
+
+
+% Discover available coefficients
+[~, avail_contrasts] = lme_contrasts(lme, lme_tbl);
+disp(avail_contrasts);
+
+% Test specific coefficients (e.g., 2nd and 4th) with FDR correction
+selection_indices = [2, 4];
+[results_subset, ~] = lme_contrasts(my_lme, ...
+    'contrasts', selection_indices, 'correction', 'fdr');
+
 
 
 
@@ -124,10 +144,11 @@ contrasts(strcmp(lme.CoefficientNames, 'State_NREM')) = 1;
 
 % FR per unit per bout, WT vs MCU across states 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-frml = 'FR ~ Group * State * BoutLength + (1|Mouse) + (1|UnitID)';
+frml = 'FR ~ Group * State + (1|BoutDur) + (1|Mouse) + (1|UnitID)';
 
 % organize for lme
-[lme_tbl, lme_cfg] = mcu_lmeOrg(grppaths, frml, false);
+[lme_tbl, lme_cfg] = lme_org('grppaths', grppaths, 'frml', frml,...
+    'flg_emg', false, 'var_field', var_field, 'vCell', {});
 
 % run lme
 iunit = categorical({'pPYR'});
@@ -135,7 +156,9 @@ fr_tbl = lme_tbl(lme_tbl.UnitType == iunit, :);
 lme = fitlme(fr_tbl, lme_cfg.frml, 'FitMethod', 'REML');
 
 % plot
-fh = mcu_lmePlot(fr_tbl, lme, 'ptype', 'line');
+fh = lme_plot(fr_tbl, lme, 'ptype', 'line');
+
+
 % save
 frml = [char(lme.Formula), '_', char(iunit)];
 frml = frml2char(frml, 'rm_rnd', false);
@@ -170,7 +193,7 @@ contrastInteraction(strcmp(lme.CoefficientNames, 'Group_MCU-KO:State_REM')) = 1;
 
 eq_tbl = fr_tbl(idx_eq, :);
 lme = fitlme(eq_tbl, lme_cfg.frml);
-mcu_lmePlot(eq_tbl, lme)
+lme_plot(eq_tbl, lme)
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
