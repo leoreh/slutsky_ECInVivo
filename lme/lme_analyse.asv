@@ -49,7 +49,6 @@ function [lme_results, lme_cfg] = lme_analyse(lme_tbl, lme_cfg, varargin)
 %**************************************************************************
 % Theoretical Background: Linear Mixed-Effects (LME) Models
 %**************************************************************************
-%
 % Linear Mixed-Effects models are a powerful statistical tool designed for
 % analyzing data where observations are grouped or clustered. Common examples
 % include repeated measurements taken from the same subject over time, or
@@ -87,7 +86,6 @@ function [lme_results, lme_cfg] = lme_analyse(lme_tbl, lme_cfg, varargin)
 %**************************************************************************
 % Interpreting LME Fixed Effects Coefficients (Dummy Coding)
 %**************************************************************************
-%
 % When dealing with categorical predictors (like 'Group' or 'Condition') as
 % fixed effects, MATLAB's `fitlme` function generally uses 'dummy coding' (also
 % known as 'treatment contrasts'). This means one level of each categorical
@@ -122,7 +120,6 @@ function [lme_results, lme_cfg] = lme_analyse(lme_tbl, lme_cfg, varargin)
 %**************************************************************************
 % Contrast Types Generated and Tested by `lme_analyse`
 %**************************************************************************
-%
 % This function facilitates hypothesis testing about specific comparisons or
 % combinations of the fixed-effect coefficients (the betas). Mathematically,
 % each test evaluates a hypothesis like H0: H * beta = 0, where 'H' is a row
@@ -174,7 +171,6 @@ function [lme_results, lme_cfg] = lme_analyse(lme_tbl, lme_cfg, varargin)
 %**************************************************************************
 % Population-Level vs. Subject-Specific Effects
 %**************************************************************************
-%
 % It is crucial to remember that all the results produced by this function –
 % whether standard coefficients, simple effects, or marginal effects – pertain
 % strictly to the *fixed effects* part of the LME model. They allow inferences
@@ -184,9 +180,104 @@ function [lme_results, lme_cfg] = lme_analyse(lme_tbl, lme_cfg, varargin)
 % effects). Analyzing subject-specific deviations would require examining the
 % estimated random effects ('b') themselves, potentially using functions like
 % `randomEffects(lme)`.
-
-
-
+% 
+%**************************************************************************
+% Model Fit Statistics 
+%**************************************************************************
+% LogLikelihood (LL): This reflects the probability of observing the actual
+% data given the estimated model parameters. A higher LL indicates a better
+% fit, meaning the model makes the observed data more likely. However, LL
+% naturally increases as more parameters are added to a model, even if
+% those parameters don't meaningfully improve the fit, making it less
+% suitable for comparing models with different numbers of parameters on its
+% own. 
+% 
+% Deviance: Calculated as -2 times the LogLikelihood (-2\*LL). Lower
+% deviance values correspond to higher log-likelihoods and thus indicate a
+% better model fit. Deviance is primarily useful for comparing nested
+% models (where one model is a simplified version of the other) using a
+% Likelihood Ratio Test (LRT), where the difference in deviance follows a
+% chi-squared distribution.
+% 
+% AIC (Akaike Information Criterion): AIC provides a way to select models
+% by estimating the prediction error and thereby the relative quality of
+% statistical models for a given set of data. It balances goodness-of-fit
+% (related to LL) with model parsimony by adding a penalty for the number
+% of estimated parameters (k): AIC = -2*LL + 2*k. Lower AIC values suggest
+% a preferred model, indicating a better trade-off between fit and
+% complexity, often favoring models with better predictive performance.
+% 
+% BIC (Bayesian Information Criterion): Similar to AIC, BIC also balances
+% fit and complexity but applies a larger penalty for the number of
+% parameters, particularly in larger datasets (n): BIC = -2*LL + k*ln(n).
+% Lower BIC values are preferred. BIC tends to favor simpler, more
+% parsimonious models compared to AIC and is sometimes considered better
+% for selecting the "true" model if one is assumed to exist within the set
+% of candidates.
+% 
+%**************************************************************************
+% Estimate +/ SE
+%**************************************************************************
+% the Estimate column provides the model's calculated magnitude for each
+% specific term or contrast. For the Intercept, the Estimate represents the
+% predicted mean value of the response variable when all categorical fixed
+% factors are at their designated reference levels and any continuous fixed
+% predictors are held at zero. For other coefficients (main effects or
+% interactions under dummy coding), the Estimate represents the calculated
+% difference compared to the relevant reference level(s). For instance, a
+% main effect coefficient's Estimate is the difference between that factor
+% level and its reference level, specifically evaluated when other
+% interacting factors are at their reference levels. An interaction
+% coefficient's Estimate quantifies how the effect of one factor changes
+% across levels of another. For derived contrasts (like simple or marginal
+% effects), the Estimate is the calculated value of the specific linear
+% combination of coefficients being tested (e.g., the estimated mean
+% difference between two groups at a specific condition). The SE (Standard
+% Error) accompanies each Estimate and quantifies the precision of that
+% estimate; a smaller SE indicates less uncertainty or variability around
+% the estimated value. It reflects the expected standard deviation of the
+% estimate if the study were repeated many times. The SE is crucial for
+% assessing statistical significance, as it forms the denominator in the
+% t-statistic calculation (t = Estimate / SE) and is used to construct
+% confidence intervals around the Estimate.
+% 
+%**************************************************************************
+% Correcting Type I errors
+%**************************************************************************
+% When performing multiple hypothesis tests simultaneously, such as
+% examining several simple or marginal effects derived from a model, the
+% probability of obtaining a statistically significant result purely by
+% chance (a Type I error or false positive) increases. To counteract this
+% inflation of the error rate across the set of tests, correction methods
+% are applied to the calculated p-values. The 'correction' parameter allows
+% choosing between different strategies: Bonferroni ('bonferroni'): This is
+% the simplest method, controlling the Family-Wise Error Rate (FWER) – the
+% probability of making one or more Type I errors across all tests
+% performed. It achieves this by multiplying each individual p-value by the
+% total number of tests conducted (m) or, equivalently, by dividing the
+% target significance level (e.g., 0.05) by m. While straightforward and
+% providing strong control against any false positives, Bonferroni is often
+% criticized for being overly conservative, significantly reducing
+% statistical power and increasing the risk of failing to detect true
+% effects (Type II errors). Holm-Bonferroni ('holm', default): This method
+% also controls the FWER but is uniformly more powerful (less conservative)
+% than the standard Bonferroni procedure. It works sequentially: p-values
+% are ordered from smallest to largest, and the significance threshold is
+% adjusted step-by-step. The smallest p-value is compared against alpha/m,
+% the next smallest against alpha/(m-1), and so on, stopping when a p-value
+% fails to meet its adjusted threshold. This provides the same strong FWER
+% control as Bonferroni but with a better chance of detecting true effects.
+% False Discovery Rate ('fdr', specifically Benjamini-Hochberg): Instead of
+% controlling the probability of making any Type I error (FWER), the FDR
+% approach controls the expected proportion of rejected null hypotheses
+% that are actually false positives. For example, setting FDR control at 5%
+% aims to ensure that, among all the effects declared significant, no more
+% than 5% are expected to be false discoveries. This method is less
+% stringent than FWER control, particularly when a large number of tests
+% are performed. Consequently, it offers considerably more power to detect
+% true effects, making it suitable for more exploratory analyses where
+% controlling the proportion of false findings is deemed acceptable, rather
+% than strictly preventing any single false positive.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % INPUT PARSING
@@ -215,12 +306,6 @@ fit_method = params.Results.FitMethod;
 % Store the fitted model back into the configuration struct for output.
 lme = fitlme(lme_tbl, lme_cfg.frml, 'FitMethod', fit_method);
 
-% update cfg output
-lme_cfg.mdl = lme; 
-lme_cfg.contrasts = contrast_req; 
-lme_cfg.correction = correction_method; 
-lme_cfg.FitMethod = fit_method;
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % EXTRACT MODEL INFORMATION
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -232,6 +317,16 @@ coef_estimates_all = lme.Coefficients.Estimate;
 coef_map = containers.Map(all_coef_names, 1:num_all_coefs);
 lme_coef_table = lme.Coefficients;
 coef_cov = lme.CoefficientCovariance;
+
+if isempty(contrast_req)
+    contrast_req = 1 : length(all_coef_names);
+end
+
+% update cfg output
+lme_cfg.mdl = lme; 
+lme_cfg.contrasts = contrast_req; 
+lme_cfg.correction = correction_method; 
+lme_cfg.FitMethod = fit_method;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % IDENTIFY CATEGORICAL FACTORS
@@ -431,7 +526,7 @@ for i = 1:length(interaction_terms)
                 def_idx_counter = def_idx_counter + 1;
                 internal_defs_list(def_idx_counter) = struct(...
                     'DefIndex', def_idx_counter,...
-                    'Type', "Simple Effect",...
+                    'Type', "Simple",...
                     'Description', desc,...
                     'CoefficientCombination', {unique(coef_names_involved)},...
                     'H_vector', {H},...
@@ -482,7 +577,7 @@ for i = 1:length(interaction_terms)
                 def_idx_counter = def_idx_counter + 1;
                 internal_defs_list(def_idx_counter) = struct(...
                     'DefIndex', def_idx_counter,...
-                    'Type', "Simple Effect",...
+                    'Type', "Simple",...
                     'Description', desc,...
                     'CoefficientCombination', {unique(coef_names_involved)},...
                     'H_vector', {H},...
@@ -544,7 +639,7 @@ for i = 1:length(interaction_terms)
             desc = sprintf('(%s vs %s) over %s', refA, levelA, factorB);
             internal_defs_list(def_idx_counter) = struct(...
                 'DefIndex', def_idx_counter,...
-                'Type', "Marginal Effect",...
+                'Type', "Marginal",...
                 'Description', desc,...
                 'CoefficientCombination', {unique(coef_names_involved)},...
                 'H_vector', {H},...
@@ -596,7 +691,7 @@ for i = 1:length(interaction_terms)
             desc = sprintf('(%s vs %s) averaged over %s', refB, levelB, factorA);
             internal_defs_list(def_idx_counter) = struct(...
                 'DefIndex', def_idx_counter,...
-                'Type', "Marginal Effect",...
+                'Type', "Marginal",...
                 'Description', desc,...
                 'CoefficientCombination', {unique(coef_names_involved)},...
                 'H_vector', {H},...
@@ -605,17 +700,6 @@ for i = 1:length(interaction_terms)
     end % End loop levelB (for marginal effect of B)
 end % End loop through interaction terms
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% HANDLE CASE OF NO DEFINITIONS
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% If no coefficients or contrasts were generated (e.g., due to options or
-% model structure), return empty.
-num_definitions = length(internal_defs_list);
-if num_definitions == 0
-    lme_results = table();
-    disp('No contrasts or coefficients were defined based on the model and selected options.');
-    return;
-end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % DETERMINE WHICH DEFINITIONS TO INCLUDE
@@ -624,18 +708,10 @@ end
 % indices), select the subset of definitions from internal_defs_list to
 % calculate results for.
 if ischar(contrast_req) && strcmpi(contrast_req, 'all')
-    indices_to_report = 1:num_definitions;
+    indices_to_report = [internal_defs_list.DefIndex];
 elseif islogical(contrast_req)
-    if length(contrast_req) ~= num_definitions
-        error('Logical `contrasts` vector length (%d) must match number of definitions (%d).',...
-            length(contrast_req), num_definitions);
-    end
     indices_to_report = find(contrast_req);
 elseif isnumeric(contrast_req)
-    if any(contrast_req < 1) || any(contrast_req > num_definitions) || any(mod(contrast_req, 1) ~= 0)
-        error('Numeric `contrasts` vector contains invalid indices (must be integers between 1 and %d).',...
-            num_definitions);
-    end
     indices_to_report = unique(contrast_req(:)'); % Ensure row vector of unique indices
 else
     error('Invalid format for ''contrasts'' parameter. Use ''all'', logical vector, or numeric vector.');
@@ -673,7 +749,7 @@ for i = 1:num_report
     est = NaN; se = NaN; tStat = NaN; df = NaN; pVal = NaN; pAdj = NaN;
     current_h_vec = {NaN}; % Default to NaN for H-vector storage (used for coefficients)
 
-    if row_def.Type == "Coefficient"
+    if row_def.Type == "Coeff"
         orig_coef_idx = row_def.OrigCoefIndex;
         if ~isnan(orig_coef_idx) && orig_coef_idx <= height(lme_coef_table)
             est   = lme_coef_table.Estimate(orig_coef_idx);
@@ -686,7 +762,7 @@ for i = 1:num_report
                 'Invalid original coefficient index for definition %d. Results set to NaN.', current_def_idx);
         end
 
-    elseif row_def.Type == "Simple Effect" || row_def.Type == "Marginal Effect"
+    elseif row_def.Type == "Simple" || row_def.Type == "Marginal"
         H = row_def.H_vector; % This is already a cell containing the vector, access content
         current_h_vec = {H}; % Store the numeric H vector in a cell for the final table
 
@@ -823,8 +899,7 @@ for i = 1:num_report
     h_content = h_vectors_to_store{i}{1}; % Access the content within the cell
     if isnumeric(h_content) && isvector(h_content)
         % Optionally round for display, or convert to string representation
-        % formatted_h_vectors{i} = mat2str(round(h_content, 3));
-        formatted_h_vectors{i} = h_content; % Keep numeric for potential further use
+        formatted_h_vectors{i} = mat2str(round(h_content, 3));
     else
         formatted_h_vectors{i} = NaN; % Store NaN if H was not applicable/valid
     end
@@ -842,7 +917,5 @@ lme_results.SE = round(lme_results.SE, 2);
 lme_results.t_Statistic = round(lme_results.t_Statistic, 2);
 lme_results.p_Value = round(lme_results.p_Value, 4);
 lme_results.p_Adjusted = round(lme_results.p_Adjusted, 4);
-
-disp('LME analysis and contrast testing complete.');
 
 end % End of function lme_analyse

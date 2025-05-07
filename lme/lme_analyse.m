@@ -116,33 +116,6 @@ function [lme_results, lme_cfg] = lme_analyse(lme_tbl, lme_cfg, varargin)
 % captures a "difference of differences". A significant interaction term indicates
 % that the effect of FactorA is not constant but depends on the specific level
 % of FactorB (and vice-versa).
-
-
-%**************************************************************************
-% Estimate +/ SE
-%**************************************************************************
-% the Estimate column provides the model's calculated magnitude for each
-% specific term or contrast. For the Intercept, the Estimate represents the
-% predicted mean value of the response variable when all categorical fixed
-% factors are at their designated reference levels and any continuous fixed
-% predictors are held at zero. For other coefficients (main effects or
-% interactions under dummy coding), the Estimate represents the calculated
-% difference compared to the relevant reference level(s). For instance, a
-% main effect coefficient's Estimate is the difference between that factor
-% level and its reference level, specifically evaluated when other
-% interacting factors are at their reference levels. An interaction
-% coefficient's Estimate quantifies how the effect of one factor changes
-% across levels of another. For derived contrasts (like simple or marginal
-% effects), the Estimate is the calculated value of the specific linear
-% combination of coefficients being tested (e.g., the estimated mean
-% difference between two groups at a specific condition). The SE (Standard
-% Error) accompanies each Estimate and quantifies the precision of that
-% estimate; a smaller SE indicates less uncertainty or variability around
-% the estimated value. It reflects the expected standard deviation of the
-% estimate if the study were repeated many times. The SE is crucial for
-% assessing statistical significance, as it forms the denominator in the
-% t-statistic calculation (t = Estimate / SE) and is used to construct
-% confidence intervals around the Estimate.
 %
 %**************************************************************************
 % Contrast Types Generated and Tested by `lme_analyse`
@@ -207,7 +180,7 @@ function [lme_results, lme_cfg] = lme_analyse(lme_tbl, lme_cfg, varargin)
 % effects). Analyzing subject-specific deviations would require examining the
 % estimated random effects ('b') themselves, potentially using functions like
 % `randomEffects(lme)`.
-
+% 
 %**************************************************************************
 % Model Fit Statistics 
 %**************************************************************************
@@ -241,7 +214,74 @@ function [lme_results, lme_cfg] = lme_analyse(lme_tbl, lme_cfg, varargin)
 % parsimonious models compared to AIC and is sometimes considered better
 % for selecting the "true" model if one is assumed to exist within the set
 % of candidates.
+% 
+%**************************************************************************
+% Estimate +/ SE
+%**************************************************************************
+% the Estimate column provides the model's calculated magnitude for each
+% specific term or contrast. For the Intercept, the Estimate represents the
+% predicted mean value of the response variable when all categorical fixed
+% factors are at their designated reference levels and any continuous fixed
+% predictors are held at zero. For other coefficients (main effects or
+% interactions under dummy coding), the Estimate represents the calculated
+% difference compared to the relevant reference level(s). For instance, a
+% main effect coefficient's Estimate is the difference between that factor
+% level and its reference level, specifically evaluated when other
+% interacting factors are at their reference levels. An interaction
+% coefficient's Estimate quantifies how the effect of one factor changes
+% across levels of another. For derived contrasts (like simple or marginal
+% effects), the Estimate is the calculated value of the specific linear
+% combination of coefficients being tested (e.g., the estimated mean
+% difference between two groups at a specific condition). The SE (Standard
+% Error) accompanies each Estimate and quantifies the precision of that
+% estimate; a smaller SE indicates less uncertainty or variability around
+% the estimated value. It reflects the expected standard deviation of the
+% estimate if the study were repeated many times. The SE is crucial for
+% assessing statistical significance, as it forms the denominator in the
+% t-statistic calculation (t = Estimate / SE) and is used to construct
+% confidence intervals around the Estimate.
+% 
+%**************************************************************************
+% Correcting Type I errors
+%**************************************************************************
+% When performing multiple hypothesis tests simultaneously, such as
+% examining several simple or marginal effects derived from a model, the
+% probability of obtaining a statistically significant result purely by
+% chance (a Type I error or false positive) increases. To counteract this
+% inflation of the error rate across the set of tests, correction methods
+% are applied to the calculated p-values. The 'correction' parameter allows
+% choosing between different strategies:
 
+% Bonferroni ('bonferroni'): This is the simplest method, controlling the
+% Family-Wise Error Rate (FWER) – the probability of making one or more
+% Type I errors across all tests performed. It achieves this by multiplying
+% each individual p-value by the total number of tests conducted (m) or,
+% equivalently, by dividing the target significance level (e.g., 0.05) by
+% m. While straightforward and providing strong control against any false
+% positives, Bonferroni is often criticized for being overly conservative,
+% significantly reducing statistical power and increasing the risk of
+% failing to detect true effects (Type II errors).
+
+% Holm-Bonferroni ('holm', default): This method also controls the FWER but
+% is uniformly more powerful (less conservative) than the standard
+% Bonferroni procedure. It works sequentially: p-values are ordered from
+% smallest to largest, and the significance threshold is adjusted
+% step-by-step. The smallest p-value is compared against alpha/m, the next
+% smallest against alpha/(m-1), and so on, stopping when a p-value fails to
+% meet its adjusted threshold. This provides the same strong FWER control
+% as Bonferroni but with a better chance of detecting true effects.
+
+% False Discovery Rate ('fdr', specifically Benjamini-Hochberg): Instead of
+% controlling the probability of making any Type I error (FWER), the FDR
+% approach controls the expected proportion of rejected null hypotheses
+% that are actually false positives. For example, setting FDR control at 5%
+% aims to ensure that, among all the effects declared significant, no more
+% than 5% are expected to be false discoveries. This method is less
+% stringent than FWER control, particularly when a large number of tests
+% are performed. Consequently, it offers considerably more power to detect
+% true effects, making it suitable for more exploratory analyses where
+% controlling the proportion of false findings is deemed acceptable, rather
+% than strictly preventing any single false positive.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % INPUT PARSING

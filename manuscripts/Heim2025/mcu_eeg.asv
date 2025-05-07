@@ -1,0 +1,63 @@
+
+
+% manually inspect .lfp files
+
+% create eeg and spec signals that are same length and params as lfp
+
+% manually inspect spec across experiment, per mouse, eeg and lfp top and
+% bottom
+
+% create separate psd struct (for emg only, probably)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% calculate psd per file
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% go over each mouse and analyze all experiment days
+grps = [mcu_sessions('wt'), mcu_sessions('mcu')];
+
+% go over baseline for wt vs. mcu. during experiment, only psdEmg should be
+% calculated
+grps = {'mcu_bsl'; 'wt_bsl'};
+flg_bsl = true;
+flg_bsl = false;
+
+% state params
+ftarget = [1 : 0.5 : 100];
+
+% iterate
+for igrp = 1 : length(grps)
+
+    queryStr = grps{igrp};
+    basepaths = mcu_sessions(queryStr);
+    nfiles = length(basepaths);
+    mpath = fileparts(basepaths{1});
+
+    for ifile = 1 : nfiles
+
+        % files
+        basepath = basepaths{ifile};
+        [~, basename] = fileparts(basepath);
+        cd(basepath)
+        sigfile = fullfile(basepath, [basename, '.sleep_sig.mat']);
+
+        % load lfp signal
+        sig = load(sigfile, 'eeg');
+        sig = sig.eeg;
+        load(sigfile, 'fs');
+
+        % calc psd
+        if flg_bsl
+            psd = psd_states('basepath', basepath, 'sstates', [1, 4, 5],...
+                'sig', sig, 'fs', fs, 'saveVar', true,...
+                'graphics', true, 'forceA', true, 'ftarget', ftarget,...
+                'flgEmg', false);
+        end
+
+        % calc psd accordign to emg state separation
+        psdEmg = psd_states('basepath', basepath, 'sstates', [1, 2],...
+            'sig', sig, 'fs', fs, 'saveVar', true,...
+            'graphics', true, 'forceA', true, 'ftarget', ftarget,...
+            'flgEmg', true);
+    end
+end

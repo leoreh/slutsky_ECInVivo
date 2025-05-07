@@ -210,9 +210,8 @@ plot_tbl = lme_normalize('lme_tbl', lme_tbl, 'normVar', 'Day',...
     'groupVars', {'Group', 'UnitType', 'State'});
 
 % run lme
-% contrasts = [1 : 4, 5, 6];
-contrasts = [];
-contrasts = 'all';
+contrasts = [1 : 10, 19, 23];
+% contrasts = 'all';
 [lme_results, lme_cfg] = lme_analyse(plot_tbl, lme_cfg, 'contrasts', contrasts);
 
 % plot

@@ -233,6 +233,8 @@ psd.info.clr = clr;
 psd.info.faxis = faxis;
 psd.info.ch = ch;
 psd.info.runtime = datetime("now");
+psd.info.flgEmg = flgEmg;
+psd.info.flgPli = flgPli;
 
 % calculate mean psd and power in specific frequency bands
 for istate = 1 : nstates
