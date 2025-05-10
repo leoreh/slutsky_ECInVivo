@@ -56,7 +56,11 @@ cfg = as_loadConfig();
 % nrem and qw, setting state 4 (nrem) after state 2 (qw) will show the bin
 % as nrem
 if isempty(sstates)
-    sstates = 1 : cfg.nstates;
+    if isempty(labels)
+        sstates = 1 : cfg.nstates;
+    else
+        sstates = unique(labels(~isnan(labels)));
+    end
 end
 
 % colors for states

@@ -24,6 +24,7 @@ function psd = psd_states(varargin)
 %   flgEmg          logical. calc psd in high- and low-emg even if states
 %                   file exists
 %   flgPli          logical. interpret freqs of power line interference (true)
+%   flgOtl          logical. remove outliers {false}
 %   saveVar         logical. save ss var {true}
 %   forceA          logical. reanalyze recordings even if ss struct
 %                   exists (false)
@@ -57,6 +58,7 @@ addOptional(p, 'btimes', []);
 addOptional(p, 'ftarget', 0.5 : 0.5 : 100, @isnumeric);
 addOptional(p, 'flgEmg', false, @islogical);
 addOptional(p, 'flgPli', true, @islogical);
+addOptional(p, 'flgOtl', false, @islogical);
 addOptional(p, 'saveVar', true, @islogical);
 addOptional(p, 'forceA', false, @islogical);
 addOptional(p, 'graphics', true, @islogical);
@@ -73,6 +75,7 @@ btimes          = p.Results.btimes;
 ftarget         = p.Results.ftarget;
 flgEmg          = p.Results.flgEmg;
 flgPli          = p.Results.flgPli;
+flgOtl          = p.Results.flgOtl;
 saveVar         = p.Results.saveVar;
 forceA          = p.Results.forceA;
 graphics        = p.Results.graphics;
@@ -90,8 +93,8 @@ cd(basepath)
 sleepfile = fullfile(basepath, [basename, '.sleep_sig.mat']);
 
 % load session vars
-varsFile = ["sleep_states"; "datInfo"; "session"];
-varsName = ["ss"; "datInfo"; "session"];
+varsFile = ["datInfo"; "session"];
+varsName = ["datInfo"; "session"];
 v = getSessionVars('basepaths', {basepath}, 'varsFile', varsFile,...
     'varsName', varsName);
 
@@ -194,25 +197,33 @@ psd_orig = psd_bouts;
 
 % find outliers
 clear otl
-for istate = 1 : nstates
-    data = psd_bouts{istate};
-    otl(istate) = get_otl(data, 'thrFactor', 2.5, 'graphics', false);
-end
-
-% separate outliers from btimes and psd
 otltimes = [];
-for istate = 1 : nstates
+psd_otl = cell(nstates, 1);
+if flgOtl
+    for istate = 1 : nstates
+        data = psd_bouts{istate};
+        otl(istate) = get_otl(data, 'thrFactor', 2.5, 'graphics', false);
+    end
 
-    idx_bad = otl(istate).idx;
+    % separate outliers from btimes and psd
+    for istate = 1 : nstates
 
-    % times
-    otltimes = [otltimes; btimes{istate}(idx_bad, :)];
-    btimes{istate}(idx_bad, :) = [];
+        idx_bad = otl(istate).idx;
 
-    % psd
-    psd_otl{istate} = psd_bouts{istate}(idx_bad, :);
-    psd_bouts{istate}(idx_bad, :) = [];
+        % times
+        otltimes = [otltimes; btimes{istate}(idx_bad, :)];
+        btimes{istate}(idx_bad, :) = [];
 
+        % psd
+        psd_otl{istate} = psd_bouts{istate}(idx_bad, :);
+        psd_bouts{istate}(idx_bad, :) = [];
+
+    end
+else
+    for istate = 1 : nstates
+        data = psd_bouts{istate};
+        otl(istate) = get_otl(data, 'thrFactor', Inf, 'graphics', false);
+    end
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -324,15 +335,17 @@ for istate = 1 : nstates
 
     psdMat = psd.bouts.psd{istate};
     badMat = psd.bouts.psd_otl{istate};
-    if ~isempty(badMat)
-        ph = plot(faxis, badMat, 'LineWidth', 0.5,...
-            'Color', [0.7 0.7 0.7]);
-        ph = ph(1);
+    if isempty(badMat)
+        badMat = nan(1, length(faxis));
     end
-    if ~isempty(psdMat)
-        ph(2) = plot(faxis, mean(psdMat, 1), 'LineWidth', 3,...
-            'Color', clr{istate});
+    ph = plot(faxis, badMat, 'LineWidth', 0.5,...
+        'Color', [0.7 0.7 0.7]);
+    ph = ph(1);
+    if isempty(psdMat)
+        psdMat = nan(1, length(faxis));
     end
+    ph(2) = plot(faxis, mean(psdMat, 1), 'LineWidth', 3,...
+        'Color', clr{istate});
 
     set(gca, 'YScale', 'log', 'XScale', 'log')
     xlabel('Frequency [Hz]')

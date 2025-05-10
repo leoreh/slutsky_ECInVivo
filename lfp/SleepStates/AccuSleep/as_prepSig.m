@@ -275,7 +275,7 @@ sSig.info.emgCh = emgCh;
 sSig.info.eegCh = eegCh;
 sSig.info.emgNchans = emgNchans;
 sSig.info.eegNchans = eegNchans;
-sSig.info.runtime = datetime(now, 'ConvertFrom', 'datenum');
+sSig.info.runtime = datetime("now");
 
 % save files
 if saveVar

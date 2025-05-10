@@ -112,12 +112,14 @@ elseif contains(frml, 'Band ~')
 elseif contains(frml, 'FOOOF ~')    
     if flg_emg
         var_name = 'psdEmg_1of';
+        var_name = 'f1f_eeg';
+        % var_name = 'f1f';
     else
         var_name = 'psd_1of';
     end
     yName = 'FOOOF';
     if isempty(var_field)
-        var_field = 'ap_exp';
+        var_field = 'bands';
     end
     
 elseif contains(frml, 'RippSpks ~')

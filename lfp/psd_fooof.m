@@ -361,8 +361,11 @@ n = length(fmdl.power_spectrum);
 % Number of parameters (peaks + aperiodic)
 k = length(fmdl.gaussian_params(:)) + size(fmdl.aperiodic_params, 2);
 
+% Root Mean Squared Error of the model fit (difference between original and model fit)
+ffit.rmse = sqrt(mean((fmdl.power_spectrum - fmdl.fooofed_spectrum) .^ 2));
+
 % Log-likelihood of the model fit
-ffit.loglik = -n / 2 * (log(2 * pi) + log(ffit.mse) + 1);
+ffit.loglik = -n / 2 * (log(2 * pi) + log(ffit.rmse) + 1);
 
 % Akaike Information Criterion
 ffit.aic = 2 * k - 2 * ffit.loglik;
@@ -373,9 +376,6 @@ ffit.bic = k * log(n) - 2 * ffit.loglik;
 % r-squared
 coefs = corrcoef(fmdl.power_spectrum, fmdl.fooofed_spectrum);
 ffit.r_squared = coefs(1, 2);
-
-% Root Mean Squared Error of the model fit (difference between original and model fit)
-ffit.rmse = sqrt(mean((fmdl.power_spectrum - fmdl.fooofed_spectrum) .^ 2));
 
 end
 
@@ -393,13 +393,6 @@ for istate = 1 : nstates
     % reorganize peaks according to bands
     [pd.peak_params, pd.gaussian_params, pd.info] = peaks2bands(pd);
     pd.freqs = (pd.freqs(1, :, 1));
-
-    % Separate parameters to their corresponding fields
-    pd.cf = squeeze(pd.peak_params(:, 1, :));               % Center frequency [nbands x nbouts]
-    pd.pow = squeeze(pd.peak_params(:, 2, :));              % Power [nbands x nbouts]
-    pd.bw = squeeze(pd.peak_params(:, 3, :));               % Bandwidth [nbands x nbouts]
-    pd.amp = squeeze(pd.gaussian_params(:, 2, :));          % Amplitude [nbands x nbouts]
-    pd.sd = squeeze(pd.gaussian_params(:, 3, :));           % Standard deviation [nbands x nbouts]
     pd.ap_offset = squeeze(pd.aperiodic_params(1, 1, :))';
     if size(pd.aperiodic_params, 2) == 2
         pd.ap_knee = [];
@@ -464,54 +457,6 @@ for istate = 1 : nstates
         psd_1of.prob_osc(istate, iband) = sum(~isnan(psd_1of.pow(istate, :, iband))) / nbouts;
     end
 end
-
-end
-
-% restructure peaks according to pre-defined frequency bands
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [pparams, gparams, info] = peaks2bands(fd)
-
-% band params
-bandNames = ["delta", "theta", "gamma"];
-bandFreqs = [0, 5.5; 5.5, 12; 30, 100];
-nbands = length(bandNames);
-
-% initialize arrays
-for iband = 1 : nbands
-    pparams = nan(nbands, 3, size(fd.peak_params, 3));
-    gparams = nan(nbands, 3, size(fd.gaussian_params, 3));
-end
-
-% Loop through bouts
-for ibout = 1 : size(fd.peak_params, 3)
-    peak_freqs = fd.peak_params(:, 1, ibout);
-    peak_amps = fd.peak_params(:, 2, ibout);
-
-    % For each band
-    for iband = 1 : length(bandNames)
-        % Find peaks in this band
-        band_mask = peak_freqs >= bandFreqs(iband,1) & peak_freqs < bandFreqs(iband,2);
-
-        if any(band_mask)
-
-            % Get amplitudes of peaks in this band
-            band_amps = peak_amps(band_mask);
-            band_peaks = find(band_mask);
-
-            % Find index of highest amplitude peak in this band
-            [~, max_idx] = max(band_amps);
-            peak_idx = band_peaks(max_idx);
-
-            % Store parameters for highest amplitude peak
-            pparams(iband, :, ibout) = fd.peak_params(peak_idx, :, ibout);
-            gparams(iband, :, ibout) = fd.gaussian_params(peak_idx, :, ibout);
-        end
-    end
-end
-
-% append info
-info.bandFreqs = bandFreqs;
-info.bandNames = bandNames;
 
 end
 

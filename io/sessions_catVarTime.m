@@ -15,7 +15,8 @@ function [expData, info] = sessions_catVarTime(varargin)
 %                   between recordings
 %   dataPreset      string or cell of string depicting the variable to cat. 
 %                   can be any combination of 'sr', 'spec', 'fr', 'ripp',
-%                   'emg_rms', 'bands', 'srsu', or 'hypnogram'
+%                   'emg_rms', 'bands', 'srsu', 'hypnogram',
+%                   'hypnogram_emg', or 'spec_eeg'
 %   dataAlt         numeric. data alternative. relavent for some presets:
 %                   for 'spec'  represents channel
 %                   for 'bands' represents channel
@@ -131,6 +132,17 @@ switch dataPreset
         ts = v(isession).spec.info.winstep;     % sampling period [s]            
         faxis = v(isession).spec.freq;
     
+    case 'spec_eeg'       
+        for isession = 1 : nsessions
+            if ndims(v(isession).spec_eeg.s) == 3
+                v(isession).data = squeeze(v(isession).spec_eeg.s(:, :, 1))';
+            else
+                v(isession).data = v(isession).spec_eeg.s';
+            end
+        end
+        ts = v(isession).spec_eeg.info.winstep;     % sampling period [s]            
+        faxis = v(isession).spec_eeg.freq;
+
     case 'bands'
         for isession = 1 : nsessions
             filename = fullfile(basepaths{isession},...
@@ -148,7 +160,20 @@ switch dataPreset
             load(filename, 'ss');
             v(isession).data = ss.labels';
         end
-        ts = ss.info.epochLen;                           % sampling period [s]
+        ts = ss.info.boutLen;                           % sampling period [s]
+        cfg = as_loadConfig('flgEmg', false);
+        sstates = [];
+
+    case 'hypnogram_emg'
+        for isession = 1 : nsessions
+            filename = fullfile(basepaths{isession},...
+                [basenames{isession}, '.sleep_statesEmg.mat']);
+            load(filename, 'ssEmg');
+            v(isession).data = ssEmg.labels';
+        end
+        ts = ssEmg.info.boutLen;                           % sampling period [s]
+        cfg = as_loadConfig('flgEmg', true);
+        sstates = [1, 2];
 
     case 'emg_rms'
         for isession = 1 : nsessions
@@ -310,7 +335,7 @@ if graphics
         set(gcf, 'WindowState','maximized');
     end
     switch dataPreset
-        case 'spec'
+        case {'spec', 'spec_eeg'}
             
             % take a sample of the spectrogram to help initialize the colormap
             sampleBins = randperm(expLen, round(expLen / 10));
@@ -338,8 +363,9 @@ if graphics
             end
             legend(lgd{1 : end}, 'location', 'northeast')
         
-        case 'hypnogram'
-            plot_hypnogram('labels', expData, 'axh', axh)
+        case {'hypnogram', 'hypnogram_emg'}
+            plot_hypnogram('labels', expData, 'axh', axh,...
+                'clr', cfg.colors, 'sstates', sstates)
             pbaspect([30, 1, 1])
 
         case 'emg_rms'            

@@ -91,14 +91,16 @@ for igrp = 1:ngrps
             else
                 data_day{iday} = org_fr(v, var_field);
             end
+        
         elseif contains(var_name, 'st_')
             data_day{iday} = org_brst(v, var_field);
+        
         elseif contains(var_name, 'psd')
-            if contains(var_name, '1of')
-                data_day{iday} = org_1of(v, var_field);
-            else
-                data_day{iday} = org_band(v, var_field);
-            end
+            data_day{iday} = org_band(v, var_field);
+        
+        elseif contains(var_name, 'f1f')
+            data_day{iday} = org_f1f(v, var_field);
+
         elseif contains(var_name, 'units')
             data_day{iday} = org_units(v);
 
@@ -162,23 +164,25 @@ brst_data = permute(brst.(brstField), [3, 4, 2, 1]);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function fooof_data = org_1of(v, fooof_param, iband)
+function fooof_data = org_f1f(v, fooof_param)
 % Organizes FOOOF parameters: [mouse x day x 1 x state x bout]
 
-psd_1of = catfields([v(:).psd_1of], 'addim', true);
-nmice = length(v);
-fooof_tmp = cell(nmice, 1);
+iBand = 1;
+ap_param = 'exp';
+bands_param = 'pow';
 
-for imouse = 1:nmice
-    if contains(fooof_param, 'ap')
-        curr_param = psd_1of.(fooof_param)(:, :, imouse)';
-    else
-        curr_param = psd_1of.(fooof_param)(:, :, iband, imouse);
-    end
-    fooof_tmp{imouse} = permute(curr_param, [3, 1, 2]);
+flds = fieldnames(v(1));
+f1f = catfields([v(:).(flds{1})], 'addim', true, []);
+% assumes struct fields organized as    [state x boutGrp x band]
+% after concatenation will be           [state x boutGrp x band x mouse]
+if strcmp(fooof_param, 'bands')
+    fooof_data = squeeze(f1f.(fooof_param).(bands_param)(:, :, iBand, :));
+elseif strcmp(fooof_param, 'ap')
+    fooof_data = squeeze(f1f.(fooof_param).(ap_param)(:, :, :));
 end
 
-fooof_data = permute(cell2padmat(fooof_tmp, 4), [4, 5, 1, 2, 3]);
+fooof_data = permute(fooof_data, [3, 4, 5, 1, 2]);
+
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

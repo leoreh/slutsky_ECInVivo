@@ -1,4 +1,4 @@
-function cats = catfields(s, catdef, copen)
+function cats = catfields(s, catdef, copen, prmtOrdr, flgSqz)
 
 % concatenates fields of a struct array. if a field consists of different
 % data types it will be concatenated as a cell. if array dimensions are not
@@ -12,6 +12,10 @@ function cats = catfields(s, catdef, copen)
 %   copen           logical. if true, for fields consisting of cells, will
 %                   try to concatenate the contents of the cells rather
 %                   then the cells themselves
+%   prmtOrdr        vector. if not empty, and field is numeric/logical,
+%                   attempts to permute the field according to prmtOrdr.
+%   flgSqz          logical. if true, and field is numeric/logical,
+%                   squeezes the field after potential permutation.
 % 
 % OUTPUT:
 %   cats            struct with concatenated fields
@@ -24,15 +28,23 @@ function cats = catfields(s, catdef, copen)
 %   add option to cat by cell2nanmat (done - 14 apr 24)
 %   add option to specify catdef for specific fields
 %   add option to input separate structs and handle unique fields
+%   add option to permute and squeeze numeric/logical fields (done)
 %
-% 28 feb 22 LH
+% 28 feb 22 LH (updated [current_date_placeholder])
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % function
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% Handle optional arguments
+if nargin < 5
+    flgSqz = false; 
+end
+if nargin < 4
+    prmtOrdr = [];   
+end
 if nargin < 3
-    copen = false;
+    copen = false;   
 end
 
 % prepare
@@ -110,7 +122,7 @@ for ifld = 1 : length(flds)
         if uniSet
 
             % recursively handle structs
-            cats.(flds{ifld}) = catfields([fieldData{:}], catdef, copen);
+            cats.(flds{ifld}) = catfields([fieldData{:}], catdef, copen, prmtOrdr, flgSqz);
         else
             
             % store as cells if struct fields are not uniform
@@ -121,7 +133,7 @@ for ifld = 1 : length(flds)
     end
         
     % if the field is made of numeric / logical arrays concatenate
-    % using cell2nanmat
+    % using cell2padmat
     if all(cellfun(@(x) isnumeric(x) || islogical(x), fieldData))
 
         cats.(flds{ifld}) = cell2padmat(fieldData, dim);
@@ -130,6 +142,29 @@ for ifld = 1 : length(flds)
     else
         cats.(flds{ifld}) = fieldData;
 
+    end
+
+    % Apply permutation and squeeze to numeric/logical fields
+    % update field data for the current field
+    fieldData = cats.(flds{ifld});
+    if ~isstruct(fieldData) && (isnumeric(fieldData) || islogical(fieldData))
+
+        % Permute if prmtOrdr is provided and not empty
+        if ~isempty(prmtOrdr)
+            try
+                cats.(flds{ifld}) = permute(fieldData, prmtOrdr);
+                fieldData = cats.(flds{ifld}); % Update for squeeze if successful
+            catch ME
+                warning('Permutation failed for field %s', ...
+                    flds{ifld}, ME.message);
+            end
+        end
+
+        % Squeeze if flgSqz is true
+        if flgSqz
+            % Ensure the data to be squeezed is still numeric/logical
+            cats.(flds{ifld}) = squeeze(fieldData);
+        end
     end
 
 end

@@ -91,14 +91,16 @@ for igrp = 1:ngrps
             else
                 data_day{iday} = org_fr(v, var_field);
             end
+        
         elseif contains(var_name, 'st_')
             data_day{iday} = org_brst(v, var_field);
+        
         elseif contains(var_name, 'psd')
-            if contains(var_name, '1of')
-                data_day{iday} = org_1of(v, var_field);
-            else
-                data_day{iday} = org_band(v, var_field);
-            end
+            data_day{iday} = org_band(v, var_field);
+        
+        elseif contains(var_name, 'f1f')
+            data_day{iday} = org_f1f(v, var_field);
+
         elseif contains(var_name, 'units')
             data_day{iday} = org_units(v);
 
@@ -162,23 +164,24 @@ brst_data = permute(brst.(brstField), [3, 4, 2, 1]);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function fooof_data = org_1of(v, fooof_param, iband)
+function fooof_data = org_f1f(v, fooof_param)
 % Organizes FOOOF parameters: [mouse x day x 1 x state x bout]
 
-psd_1of = catfields([v(:).psd_1of], 'addim', true);
-nmice = length(v);
-fooof_tmp = cell(nmice, 1);
+iBand = 1;
+ap_param = 'exp';
 
-for imouse = 1:nmice
-    if contains(fooof_param, 'ap')
-        curr_param = psd_1of.(fooof_param)(:, :, imouse)';
-    else
-        curr_param = psd_1of.(fooof_param)(:, :, iband, imouse);
-    end
-    fooof_tmp{imouse} = permute(curr_param, [3, 1, 2]);
+flds = fieldnames(v(1));
+f1f = catfields([v(:).(flds{1})], 'addim', true, [4, 1, 2, 3]);
+% assumes struct fields organized as    [state x boutGrp x band]
+% after concatenation will be           [state x boutGrp x band x mouse]
+if strcmp(fooof_param, 'bands')
+    fooof_data = squeeze(f1f.(fooof_param).pow(:, :, :, iBand));
+elseif strcmp(fooof_param, 'ap')
+    fooof_data = squeeze(f1f.(fooof_param).(ap_param)(:, :, :));
 end
 
-fooof_data = permute(cell2padmat(fooof_tmp, 4), [4, 5, 1, 2, 3]);
+fooof_data = permute(fooof_data, [3, 4, 5, 1, 2]);
+
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -217,8 +220,7 @@ for imouse = 1:nmice
 end
 
 padded_data = cell2padmat(bDur_tmp, 3); % [bout x state x mouse]
-reshaped_data = reshape(padded_data, [size(padded_data, 1), size(padded_data, 2), size(padded_data, 3), 1, 1]); 
-bDur_data = permute(reshaped_data, [3, 4, 5, 1, 2]); % [mouse x day x unit x state x bout]
+bDur_data = permute(padded_data, [3, 4, 5, 1, 2]); % [mouse x day x unit x state x bout]
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -233,7 +235,7 @@ for imouse = 1 : nmice
     clean_mouse = units.clean(:, :, imouse);        % [2 x Nunits_mouse]
     nunits_mouse = size(clean_mouse, 2);
     
-    unit_type = zeros(1, nunits_mouse);             % Row vector for types
+    unit_type = ones(1, nunits_mouse) * 3;          % Row vector for types
     unit_type(clean_mouse(1,:)) = 1;                % Type 1 (PYR)
     unit_type(clean_mouse(2,:)) = 2;                % Type 2 (PV)
     
@@ -241,8 +243,7 @@ for imouse = 1 : nmice
 end
 
 % Pad across mice and units to create a consistent matrix
-% Pad value 0 indicates no unit or type not assigned.
-unit_data = cell2padmat(unit_mouse, 1, 0); % Pads along mouse dim (dim 1)
+unit_data = cell2padmat(unit_mouse, 1); % Pads along mouse dim (dim 1)
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -218,7 +218,7 @@ contrasts = [1 : 10, 19, 23];
 fh = lme_plot(plot_tbl, lme_cfg.mdl, 'ptype', 'bar');
 
 % save
-frml = [char(lme.Formula), '_', char(iunit)];
+frml = [char(lme_results.Formula), '_', char(iunit)];
 frml = frml2char(frml, 'rm_rnd', false);
 th = get(gcf, 'Children');
 title(th, frml, 'interpreter', 'none')

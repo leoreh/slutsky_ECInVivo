@@ -90,8 +90,12 @@ for i = 1:height(uniqueGroups)
         end
     end
 
-    % Normalize the data for the current group (all normVar categories within the group)
-    norm_data(idx_group) = norm_tbl.(yName)(idx_group) / refMean;
+    % Normalize the data for the current group (all normVar categories
+    % within the group)
+    norm_data(idx_group) = norm_tbl.(yName)(idx_group) / abs(refMean);
+
+    % Set the reference group to exactly 1 (so after scaling it's 100%)
+    norm_data(idx_ref_group) = 1;
 end
 
 % Replace the original response variable column with the normalized data

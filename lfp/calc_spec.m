@@ -241,11 +241,10 @@ if graphics
     ch = 1;
     dataType = 'raw';   % can be raw / norm / none
     
-    clear axh
     fh = figure;
     th = tiledlayout(2, 1, 'TileSpacing', 'Compact');
     axh(1) = nexttile;
-    plot_spec(spec, 'ch', ch, 'logfreq', logfreq, 'saveFig', true,...
+    plot_spec(spec, 'ch', ch, 'logfreq', logfreq, 'saveFig', false,...
         'axh', axh)
 
     axh(2) = nexttile;
