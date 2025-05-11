@@ -432,14 +432,12 @@ ripp.info.passbandData = [prctile(avgFreq, 2), prctile(peakFreq, 99.9)];
 % .res and .clu files for NeuroScope, and generates summary plots if requested.
 
 % Populate Output Structure 
-ripp                = workspace2struct(ripp);
-ripp.info           = workspace2struct(ripp.info);
+ripp = workspace2struct(ripp);
+ripp.info = workspace2struct(ripp.info);
 
 % update specific fields
-ripp.contPowDur     = contPowDur / fs * 1000;
-ripp.info.runtime   = datetime("now");
-ripp.contPowDur     = contPowDur / fs * 1000;
-ripp.dur            = ripp.dur * 1000;         % covert to ms
+ripp.contPowDur    = contPowDur / fs * 1000;
+ripp.info.runtime       = datetime("now");
 
 % Save Results 
 if flgSaveVar
@@ -491,7 +489,7 @@ function ripp = ripp_initialize()
     ripp = struct();
     % Event Timing & Core Properties
     ripp.times              = []; % Nx2 matrix, [start end] times in seconds
-    ripp.dur                = []; % Nx1 vector, duration of ripples in (ms)
+    ripp.dur                = []; % Nx1 vector, duration of ripples in seconds
     ripp.peakTime           = []; % Nx1 vector, time of ripple peak (min of filtered LFP) in seconds
     ripp.peakFilt           = []; % Nx1 vector, value of filtered LFP at peak time
     ripp.peakPower          = []; % Nx1 vector, value of detection signal (z-score) at its peak within the event

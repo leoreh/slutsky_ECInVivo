@@ -9,6 +9,7 @@ function fh = lme_plot(lme_tbl, lme_mdl, varargin)
 %   lme_mdl     fitted linear mixed effects model
 %   ptype       string specifying plot type {'line', 'box', 'bar'}
 %   axh         axis handle
+%   figShape    string specifying figure shape {'square', 'tall', 'wide'}
 %
 % OUTPUT
 %   fh         handle to figure
@@ -25,11 +26,13 @@ p = inputParser;
 addOptional(p, 'clr', []);
 addOptional(p, 'axh', []);
 addOptional(p, 'ptype', 'line');
+addOptional(p, 'figShape', 'square');
 
 parse(p, varargin{:})
 clr                 = p.Results.clr;
 axh                 = p.Results.axh;
 ptype               = p.Results.ptype;
+figShape            = p.Results.figShape;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preparations
@@ -46,12 +49,27 @@ clr_alpha = 0.3;
 % initialize figure
 if isempty(axh)
     fh = figure;
-    tlayout = [1, 3];
+    set(fh, 'Color', 'w');                      
+    fhUnits = get(fh, 'Units'); 
+    set(fh, 'Units', 'pixels');
+    fhPos = get(fh, 'Position');
+    switch figShape
+        case 'square'
+            fhPos(3) = fhPos(4);
+        case 'tall'
+            fhPos(3) = fhPos(4) * 0.62;
+        case 'wide'
+            fhPos(3) = fhPos(4) * 1.62;
+    end
+    set(fh, 'Position', fhPos);
+    set(fh, 'Units', fhUnits);
+    tlayout = [1, 1];
     th = tiledlayout(tlayout(1), tlayout(2));
-    th.TileSpacing = 'tight';
-    th.Padding = 'none';
-    set(fh, 'DefaultAxesFontSize', 16);
-    axh = nexttile(th, 1, [1, 2]); cla; hold on
+    th.TileSpacing = 'none';
+    th.Padding = 'tight';
+    axh = nexttile(th, 1, [1, 1]); cla; hold on
+    % axis(axh, 'square');        % Set axes proportions to a perfect square
+    fntSize = 16;
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -111,15 +129,33 @@ switch ptype
             xlabel(varsFxd{1})
             xticklabels(x_vals)
         end
+
+        % update graphics to the case of only two groups (assumes Control
+        % and MCU-KO)
+        hndlBar = findobj(axh, 'Type', 'Bar');
+        nBars = numel(hndlBar.YData);
+        if nBars == 2 && length(hndlBar) == 1
+            hndlBar.FaceColor = 'flat';
+            hndlBar.CData(1, :) = clr(1, :);
+            hndlBar.CData(2, :) = clr(2, :);
+            hndlBar.FaceAlpha = 1;
+        end
 end
 
-% add response variable label
+% add response variable label and title
 ylabel(varRsp)
+title(axh, lme_frml2char(frml, 'rm_rnd', false))
 
-title(th, frml2char(frml, 'rm_rnd', false))
+% Set fonts and font sizes for axes elements
+set(axh, 'FontName', 'Arial', 'FontSize', fntSize); % Affects axis labels, ticks
 
-% add lme stats
-txt_lme(axh, lme_mdl)
+% Set font and font size for the title
+hndlTtl = get(axh, 'Title');
+set(hndlTtl, 'FontName', 'Arial', 'FontSize', fntSize + 4);
+
+% Set font and font size for the legend
+hndlLgnd = findobj(fh, 'Type', 'Legend');
+set(hndlLgnd, 'FontName', 'Arial', 'FontSize', fntSize);
 
 end
 
@@ -235,65 +271,5 @@ else
     x_vals = char(x_unique);
     var_lbls = [];
 end
-
-end
-
-
-function txt_lme(axh, lme_mdl, varargin)
-
-% Add LME model results to the right of the current plot
-% Parse inputs
-p = inputParser;
-addRequired(p, 'ax', @ishandle);
-addRequired(p, 'lme_mdl');
-addParameter(p, 'FontSize', 10, @isnumeric);
-parse(p, axh, lme_mdl, varargin{:});
-fontSize = p.Results.FontSize;
-
-% Get fixed effects table
-fe = lme_mdl.Coefficients;
-% Remove intercept
-fe = fe(2:end,:);
-
-% Prepare the complete text string
-txt = '';
-for i = 1:size(fe, 1)
-    % Get original name and process it
-    fullname = fe.Name{i};
-    
-    % Handle interaction terms
-    if contains(fullname, ':')
-        interactionParts = split(fullname, ':');
-        processedParts = cell(size(interactionParts));
-        for j = 1:length(interactionParts)
-            parts = split(interactionParts{j}, '_');
-            processedParts{j} = strjoin(parts(2:end), '_');
-        end
-        name = strjoin(processedParts, ' : ');
-    else
-        parts = split(fullname, '_');
-        name = strjoin(parts(2:end), '_');
-    end
-    
-    pvalue = fe.pValue(i);
-    
-    % Add this line to the text
-    if i < size(fe, 1)
-        txt = sprintf('%s%s(p=%.3f)\n', txt, name, pvalue);
-    else
-        txt = sprintf('%s%s(p=%.3f)', txt, name, pvalue);
-    end
-end
-
-th = get(gcf, 'Children'); % if you're sure it's a tiled layout
-axh = nexttile(th, 3, [1, 1]); cla; hold on
-set(axh, 'Color', 'none', ... % transparent background
-    'XColor', 'none', ... % remove x axis
-    'YColor', 'none', ... % remove y axis
-    'Box', 'off', ... % remove box
-    'GridColor', 'none'); % remove grid if present
-
-% Place text to the right of the axis
-text(axh, 0, 0.5, txt, 'HorizontalAlignment', 'left');
 
 end

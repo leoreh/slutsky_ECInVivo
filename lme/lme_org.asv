@@ -92,7 +92,7 @@ elseif contains(frml, 'BDur ~')
     if flg_emg
         var_name = 'frEmg';
         var_name = 'sleep_statesEmg';
-        % var_name = 'psdEmg';
+        var_name = 'psdEmg';
     else
         var_name = 'fr';
     end
@@ -129,7 +129,7 @@ elseif contains(frml, 'RippSpks ~')
     flg_units = true;
     yName = 'RippSpks';
     if isempty(var_field)
-        var_field = 'frGain';
+        var_field = 'fr';
     end
     
 elseif contains(frml, 'Ripp ~')
@@ -308,11 +308,11 @@ lme_tbl.UnitType = categorical(lme_tbl.UnitType);
 lme_tbl.Group = categorical(lme_tbl.Group);
 
 % Set reference categories
-% Makes Control the reference
-if any(unique(lme_tbl.Group) == categorical({'Control'}))
+% Makes WT the reference
+if any(unique(lme_tbl.Group) == categorical({'WT'}))
     cats = categories(lme_tbl.Group);
-    other_cat = cats(~strcmp(cats, 'Control'));
-    lme_tbl.Group = reordercats(lme_tbl.Group, ['Control', other_cat]);
+    other_cat = cats(~strcmp(cats, 'WT'));
+    lme_tbl.Group = reordercats(lme_tbl.Group, ['WT', other_cat]);
 end
 
 % Set specific Day order if BSL is the first day from org_strLbls
@@ -363,10 +363,10 @@ end
 function [str_grp, str_day, str_state] = org_strLbls(grppaths, frml, flg_emg)
 % Creates string labels for groups, days, and states
 
-% Group labels from paths (assumes 1st cell is Control and 2nd MCU-KO)
+% Group labels from paths (assumes 1st cell is WT and 2nd MCU-KO)
 ngrps = length(grppaths);
 if ngrps == 2
-    str_grp = {'Control'; 'MCU-KO'};
+    str_grp = {'WT'; 'MCU-KO'};
 else
     str_grp = split(num2str(1:ngrps));
 end

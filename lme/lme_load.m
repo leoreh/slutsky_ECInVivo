@@ -86,12 +86,13 @@ for igrp = 1:ngrps
         if contains(var_name, 'fr')
             if contains(var_field, 'bouts')
                 data_day{iday} = org_fr(v, var_field);
-            elseif contains(var_field, 'bDur')
-                data_day{iday} = org_bDur(v);
             else
                 data_day{iday} = org_fr(v, var_field);
             end
         
+        elseif contains(var_field, 'bDur')
+            data_day{iday} = org_bDur(v);
+
         elseif contains(var_name, 'st_')
             data_day{iday} = org_brst(v, var_field);
         
@@ -210,18 +211,53 @@ end
 function bDur_data = org_bDur(v)
 % Organizes bout length data: [mouse x day x 1 x state x bout]
 
-fr = catfields([v(:).fr], 'addim', true);
-binedges = squeeze(fr.states.binedges);
-boutDur = cellfun(@(x) cellfun(@(y) diff(y), x, 'uni', true), binedges, 'uni', false);
+% psd = catfields([v(:).psd], 'addim', true, [], true);
+% nmice = length(v);
+% bDur_tmp = cell(nmice, 1);
+% for imouse = 1:nmice
+% 
+%     for istate = 1 : 2
+%         btimes = psd.bouts.times{:, istate, imouse};
+%         bb{istate} = btimes(:, 2) - btimes(:, 1);
+%     end
+% 
+%     bDur_tmp{imouse} = cell2padmat(bb, 2);
+% end
+% tmp = cell2padmat(bDur_tmp, 3);
+% bDur_data = permute(tmp, [3, 4, 5, 2, 1]); % [mouse x day x unit x state x bout]
+% size(bDur_data)
 
+
+
+ss = catfields([v(:).ssEmg], 'addim', true, [], true);
 nmice = length(v);
 bDur_tmp = cell(nmice, 1);
 for imouse = 1:nmice
-    bDur_tmp{imouse} = cell2padmat(boutDur(:, imouse), 1);
+    bDur_tmp{imouse} = cell2padmat(ss.bouts.boutLen(:, :, imouse), 2);
 end
+tmp = cell2padmat(bDur_tmp, 3);
+bDur_data = permute(tmp, [3, 4, 5, 2, 1]); % [mouse x day x unit x state x bout]
+size(bDur_data)
 
-padded_data = cell2padmat(bDur_tmp, 3); % [bout x state x mouse]
-bDur_data = permute(padded_data, [3, 4, 5, 1, 2]); % [mouse x day x unit x state x bout]
+% nmice = length(v);
+% bDur_tmp = cell(nmice, 1);
+% for imouse = 1:nmice
+%     bDur_tmp{imouse} = cell2padmat(boutDur(:, imouse), 1);
+% end
+% 
+% 
+% fr = catfields([v(:).fr], 'addim', true);
+% binedges = squeeze(fr.states.binedges);
+% boutDur = cellfun(@(x) cellfun(@(y) diff(y), x, 'uni', true), binedges, 'uni', false);
+% 
+% nmice = length(v);
+% bDur_tmp = cell(nmice, 1);
+% for imouse = 1:nmice
+%     bDur_tmp{imouse} = cell2padmat(boutDur(:, imouse), 1);
+% end
+% 
+% padded_data = cell2padmat(bDur_tmp, 3); % [bout x state x mouse]
+% bDur_data = permute(padded_data, [3, 4, 5, 1, 2]); % [mouse x day x unit x state x bout]
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -274,19 +310,31 @@ function ripp_data = org_ripp(v, var, var_field)
 % Organizes ripple event data: [mouse x day=1 x unit=1 x state=1 x bout(=ripple)]
 
 nmice = length(v);
-nRipp = 200;
-rippMat = nan(nmice, nRipp);
+nRipp = 500;
+stateIdx = 4;
 
-for imouse = 1:nmice
-    rippTmp = v(imouse).(var).(var_field);
-    idxState = v(imouse).(var).states.idx(:, 4);
-    rippInState = rippTmp(idxState);
-    
-    nAvailable = length(rippInState);
-    nSamples = min(nRipp, nAvailable);
-    idxSampled = randperm(nAvailable, nSamples);
-    rippMat(imouse, 1:nSamples) = rippInState(idxSampled);
+if strcmp(var_field, 'rate') ||  strcmp(var_field, 'density')
+    rippTmp = cell(nmice, 1);
+    for imouse = 1:nmice
+        rippTmp{imouse} = v(imouse).(var).states.(var_field){stateIdx};
+    end
+    rippMat = cell2padmat(rippTmp, 2);
+    ripp_data = permute(rippMat, [2, 3, 4, 5, 1]);
+
+else
+
+    rippMat = nan(nRipp, nmice);
+    for imouse = 1:nmice
+        rippTmp = v(imouse).(var).(var_field);
+        idxState = v(imouse).(var).states.idx(:, stateIdx);
+        rippTmp = rippTmp(idxState);
+
+        maxRipp = length(rippTmp);
+        nSlct = min(nRipp, maxRipp);
+        idxRipp = randperm(maxRipp, nSlct);
+        rippMat(1:nSlct, imouse) = rippTmp(idxRipp);
+    end
 end
+ripp_data = permute(rippMat, [2, 3, 4, 5, 1]);
 
-ripp_data = permute(rippMat, [1, 3, 4, 5, 2]);
 end

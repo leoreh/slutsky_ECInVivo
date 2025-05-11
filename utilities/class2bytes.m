@@ -25,9 +25,9 @@ else
             nbytes = 1;
         case {'int16', 'integer*2', 'uint16'}
             nbytes = 2;
-        case {'int32', 'integer*4', 'uint32', 'single', 'real*4', 'float32', 'real*4'}
+        case {'int32', 'integer*4', 'uint32', 'single', 'float32', 'real*4'}
             nbytes = 4;
-        case {'int64', 'integer*8', 'uint64', 'double', 'real*8', 'float64', 'real*8'}
+        case {'int64', 'integer*8', 'uint64', 'double', 'float64', 'real*8'}
             nbytes = 8;
     end
 end

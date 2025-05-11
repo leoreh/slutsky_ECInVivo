@@ -78,10 +78,15 @@ contrasts = 'all';
 
 % plot
 fh = lme_plot(lme_tbl, lme_cfg.mdl, 'ptype', 'bar');
+axh = gca;
+ylabel(axh, 'Firing Rate (Hz)', 'FontSize', 20)
+xlabel(axh, 'Unit Type', 'FontSize', 20)
+title(axh, '')
 
-grph_save('fh', fh, 'fname', frml, 'frmt', {'jpg', 'fig'})
+% save
+lme_save('fh', fh, 'fname', frml, 'frmt', {'svg', 'mat', 'xlsx'},...
+    'lme_tbl', lme_tbl, 'lme_results', lme_results, 'lme_cfg', lme_cfg)
 
-prism_data = fh2prism(fh);
 
 
 % FR per unit, WT vs MCU across states
@@ -93,8 +98,8 @@ frml = 'FR ~ Group * State + (1|Mouse)';
     'flg_emg', false, 'var_field', '', 'vCell', {});
 
 % run lme
-iunit = categorical({'pPV'});
-plot_tbl = lme_tbl(lme_tbl.UnitType == iunit, :);
+% iunit = categorical({'pPV'});
+% plot_tbl = lme_tbl(lme_tbl.UnitType == iunit, :);
 [lme_results, lme_cfg] = lme_analyse(lme_tbl, lme_cfg, 'contrasts', 'all');
 
 % plot
@@ -225,7 +230,7 @@ title(th, frml, 'interpreter', 'none')
 grph_save('fh', fh, 'fname', frml, 'frmt', {'ai', 'jpg'})
 
 [prism_data] = fh2prism(fh);
-exlTbl = lme2exl(lme, true);
+exlTbl = lme2exl(lme_cfg.mdl);
 
 % test interaction of wt and mcu across all days
 interactionIndices = contains(lme.CoefficientNames, 'Group_MCU-KO:Day'); % Logical vector for interaction terms

@@ -1,4 +1,4 @@
-function frmlSimple = frml2char(frml, varargin)
+function frmlSimple = lme_frml2char(frml, varargin)
 
 % simplifies linear mixed effects model formula by removing random effects
 % and intercept terms
@@ -13,11 +13,13 @@ p = inputParser;
 addOptional(p, 'rm_rnd', true, @islogical);
 addOptional(p, 'sfx', '', @ischar);
 addOptional(p, 'pfx', '', @ischar);
+addOptional(p, 'resNew', '', @ischar);
 
 parse(p, varargin{:});
 rm_rnd = p.Results.rm_rnd;
 sfx = p.Results.sfx;
 pfx = p.Results.pfx;
+resNew = p.Results.resNew;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preparations
@@ -25,6 +27,17 @@ pfx = p.Results.pfx;
 % check if formula is empty
 if isempty(frml)
     error('Formula cannot be empty');
+end
+
+% Replace response variable if resNew is provided
+if ~isempty(resNew)
+
+    % Find the original response variable (text before '~')
+    resOrig = regexp(frml, '^[^~]+', 'match', 'once');
+    % Ensure the new response variable ends with a space if it doesn't already
+    % and the part to replace also includes the space for cleaner replacement
+    % or directly replace up to the tilde.
+    frml = regexprep(frml, ['^' strtrim(resOrig) '\s*~'], [strtrim(resNew) ' ~']);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

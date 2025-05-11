@@ -100,13 +100,14 @@ contrasts = 'all';
 % plot
 fh = lme_plot(lme_tbl, lme_cfg.mdl, 'ptype', 'bar', 'figShape', 'tall');
 axh = gca;
-ylabel(axh, 'Rate (SWR/s)', 'FontSize', 20)
+ylabel(axh, 'Rate (SWR / s)', 'FontSize', 20)
 xlabel(axh, '', 'FontSize', 20)
 title(axh, '')
 axh.XAxis.FontSize = 20;
 axh.XTickLabelRotation = 0;
+ylim([0 3])
 
-ylbl = 'Ripp Rate';
+ylbl = 'Ripp Density';
 fname = lme_frml2char(frml, 'rm_rnd', true, 'resNew', ylbl);
 
 % save
@@ -245,6 +246,8 @@ legend(ax2, grps, 'Location', 'best', 'Interpreter', 'none');
 grid(ax2, 'on');
 % ylim(ax2, [0, 1]); % Keep y-axis limit
 
+% Save Figure - Intentionally commented out based on user edit
+% grph_save('fh', fh_peth, 'fname', 'mean_unitnorm_peth_ripples_stdshade', 'frmt', {'jpg', 'ai'});
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

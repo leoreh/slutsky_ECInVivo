@@ -141,7 +141,7 @@ for igrp = 1 : n_grps
         bh(igrp).FaceAlpha = alphaIdx(igrp);
 
         % add error bars
-        errorbar(curr_x, means, sem, 'k', 'linestyle', 'none',...
+        errorbar(curr_x, means, [], sem, 'k', 'linestyle', 'none',...
             'tag', 'barError');
     end
 end

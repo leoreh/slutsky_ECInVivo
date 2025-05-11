@@ -20,6 +20,7 @@ function ripp = ripp_wrapper(varargin)
 %
 % INPUT (Optional Key-Value Pairs):
 %   basepath        Path to recording session directory {pwd}.
+%   recWin          [start end] time window for analysis [s] {[0 Inf]}.
 %   rippCh          Channel(s) for ripple detection {session default}.
 %   thr             Initial detection thresholds (see ripp_detect)
 %                   {[1.5, 2.5, 2, 200, 100]}.
@@ -64,6 +65,7 @@ function ripp = ripp_wrapper(varargin)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 p = inputParser;
 addParameter(p, 'basepath', pwd, @ischar);
+addParameter(p, 'recWin', [0 Inf], @(x) isnumeric(x) && numel(x)==2);
 addParameter(p, 'rippCh', [], @isnumeric);
 addParameter(p, 'thr', [1, 2.5, 1.2, 200, 100], @(x) isnumeric(x) && numel(x)==5);
 addParameter(p, 'limDur', [20, 300, 20, 10], @(x) isnumeric(x) && numel(x)==4);
@@ -78,6 +80,7 @@ addParameter(p, 'bit2uv', 0.195, @(x) isnumeric(x) && isscalar(x));
 
 parse(p, varargin{:});
 basepath        = p.Results.basepath;
+recWin          = p.Results.recWin;
 rippCh          = p.Results.rippCh;
 thr             = p.Results.thr;
 limDur          = p.Results.limDur;
@@ -107,12 +110,16 @@ load(sessionfile, 'session');
 fs = session.extracellular.srLfp;
 nchans = session.extracellular.nChannels;
 
+if isfinite(recWin(2))
+    loadDur = recWin(2) - recWin(1);
+end
+
 % EMG
 load([basename, '.sleep_sig.mat'], 'emg');
 
 % LFP
 fname = fullfile(basepath, [basename, '.lfp']);
-sig = binary_load(fname, 'duration', Inf,...
+sig = binary_load(fname, 'duration', recWin(2),...
     'fs', fs, 'nCh', nchans, 'start', 0,...
     'ch', rippCh, 'downsample', 1, 'bit2uv', bit2uv);
 

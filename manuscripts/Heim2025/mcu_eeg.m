@@ -61,6 +61,8 @@ for iMouse = 1 : nMice
             eeg = double(bz_LoadBinary(eegName, 'duration', Inf,...
                 'frequency', 1250, 'nchannels', 2, 'start', 0,...
                 'channels', 2, 'downsample', 1));
+            
+            
 
             tstamps_sig = [1 : length(emg)] / fs;
 
@@ -73,9 +75,13 @@ for iMouse = 1 : nMice
         else
         
             eegName = [basename, '.lfp'];
-            eeg = double(bz_LoadBinary(eegName, 'duration', Inf,...
-                'frequency', fs, 'nchannels', nchans, 'start', 0,...
-                'channels', 2, 'downsample', 1));
+            
+            ch = [2 : 8];
+            dur = Inf;
+            start = 0;
+            eeg = double(binary_load(eegName, 'duration', dur,...
+                'fs', fs, 'nCh', nchans, 'start', start,...
+                'ch', ch, 'downsample', 1, 'bit2uv', 0.195));
         end
 
         if length(eeg) ~= length(emg)
@@ -193,62 +199,6 @@ end
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Bout Analysis
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-varPsd = '.psdEMG.mat';
-
-mNames = [{mcu_sessions('wt'), mcu_sessions('mcu')}];
-nGrp = length(mNames);
-
-clear b
-for iGrp = 1 : nGrp
-
-    nMice = length(mNames{iGrp});
-    grpMice = mNames{iGrp};
-
-    clear boutStats bMouse
-    for iMouse = 1 : nMice
-        mName = grpMice{iMouse};
-        mPaths = mcu_sessions(mName);
-        nFiles = length(mPaths);
-
-        for ifile = 1
-            basepath = mPaths{ifile};
-            [~, basename] = fileparts(basepath);
-            original_path = pwd;
-            cd(basepath);
-
-            psdFile = fullfile(basepath, [basename, varPsd]);
-
-            % extract psd struct
-            psd = load(psdFile);
-            flds = fieldnames(psd);
-            psd = psd.(flds{1});
-
-            nStates = size(psd.psd, 1);
-
-            for iState = 1 : nStates
-                stateBtimes = psd.bouts.times{iState};
-
-                [~, boutStats(iState)] = bouts_separate(stateBtimes,...
-                    'sepMet', 'mcshane', 'flgGraphics', false);
-
-            end
-        end
-        bMouse(iMouse) = catfields([boutStats(:)], 'addim');
-    end
-    b{iGrp} = catfields([bMouse(:)], 'addim', true, [4, 2, 3, 1], true);
-end
-
-fh = figure;
-istate = 1;
-histogram(b.dur(:, istate, 1, :))
-
-
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % FOOOF Analysis
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -322,8 +272,8 @@ end
 % FOOOF Inspect
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-flgEeg = true;
-mGrp = 'eeg';            % 'wt' / 'mcu' / 'eeg'
+flgEeg = false;
+mGrp = 'wt';            % 'wt' / 'mcu' / 'eeg'
 mNames = mcu_sessions(mGrp);
 nMice = length(mNames);
 
@@ -371,6 +321,48 @@ fh = fooof_plotGrp(f1f, 1, 4, 3);
 % original separation.
 % spec outliers - create new bouts
 % in psd_states, update this states structure
+
+
+% grab only during specific bouts
+size(f1f.psd_orig)
+psdWt = squeeze(f1f.psd_orig(:, 1, 1, 1, :));
+freqs = squeeze(f1f.freqs(1, 1, 1, 1, :));
+figure
+plot(freqs, psdWt);
+axh = gca;
+set(axh, 'XScale', 'log', 'YScale', 'log')
+legend
+
+psdWt = squeeze(f1f.psd_orig(:, 1, 2, :, :));
+psdWtData = squeeze(psdWt(:, 1, :));
+freqs = squeeze(f1f.freqs(1, 1, 1, 1, :));
+
+fh = figure;
+axh = subplot(1, 1, 1);
+ph = plot_stdShade('dataMat', psdWtData, 'xVal', freqs, 'alpha', 0.3,...
+    'axh', axh);
+set(axh, 'XScale', 'log', 'YScale', 'log')
+hold on
+ph = plot_stdShade('dataMat', psdMcu, 'xVal', freqs, 'alpha', 0.3,...
+    'axh', axh);
+
+
+% grab only during specific bouts
+size(f1f.psd_orig)
+psdMcu = squeeze(f1f.psd_orig(:, 1, 2, 1, :));
+
+psdWt = squeeze(f1f.psd_orig(:, 1, 2, :, :));
+psdWtData = squeeze(psdWt(:, 1, :));
+freqs = squeeze(f1f.freqs(1, 1, 1, 1, :));
+
+fh = figure;
+axh = subplot(1, 1, 1);
+ph = plot_stdShade('dataMat', psdWtData, 'xVal', freqs, 'alpha', 0.3,...
+    'axh', axh);
+set(axh, 'XScale', 'log', 'YScale', 'log')
+hold on
+ph = plot_stdShade('dataMat', psdMcu, 'xVal', freqs, 'alpha', 0.3,...
+    'axh', axh);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % LME on FOOOF

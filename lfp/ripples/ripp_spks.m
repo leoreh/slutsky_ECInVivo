@@ -379,23 +379,23 @@ function eventRates = calculate_event_rates(spikeTimes, eventTimes)
 % OUTPUT:
 %   eventRates      [N x 1] vector of firing rates (spikes/sec) per event.
 
-    if isempty(spikeTimes) || isempty(eventTimes)
-        eventRates = nan(size(eventTimes, 1), 1);
-        return;
-    end
-    
-    % Create bin edges for histcounts: [start1, end1, start2, end2, ...]
-    edges = reshape([eventTimes(:, 1), eventTimes(:, 2)]', [], 1);
+if isempty(spikeTimes) || isempty(eventTimes)
+    eventRates = nan(size(eventTimes, 1), 1);
+    return;
+end
 
-    % Use histcounts
-    counts = histcounts(spikeTimes, edges);
+% Create bin edges for histcounts: [start1, end1, start2, end2, ...]
+edges = reshape([eventTimes(:, 1), eventTimes(:, 2)]', [], 1);
 
-    % Counts within intervals are in the odd bins (1, 3, 5, ...)
-    intervalCounts = counts(1:2:end)'; % Ensure column vector
+% Use histcounts
+counts = histcounts(spikeTimes, edges);
 
-    % Calculate rates
-    eventDur = diff(eventTimes, [], 2);
-    eventRates = intervalCounts ./ eventDur;
+% Counts within intervals are in the odd bins (1, 3, 5, ...)
+intervalCounts = counts(1:2:end)'; % Ensure column vector
+
+% Calculate rates
+eventDur = diff(eventTimes, [], 2);
+eventRates = intervalCounts ./ eventDur;
 
 end % End of helper function calculate_event_rates
 

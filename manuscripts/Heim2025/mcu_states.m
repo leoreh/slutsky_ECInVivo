@@ -340,23 +340,27 @@ contrastVector(strcmp(lme.CoefficientNames, 'Group_MCU-KO:Day_WASH')) = 1; % Int
 % Bout length of High vs. Low EMG across time per group
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+
+frml = 'BDur ~ Group * Day + (1|Mouse)';
+
 % organize for lme
-frml = 'BLen ~ Day + (1|Mouse)';
-[lme_tbl, lme_cfg] = mcu_lmeOrg(grppaths, frml, true);
+[lme_tbl, lme_cfg] = lme_org('grppaths', grppaths, 'frml', frml,...
+    'flg_emg', true, 'var_field', 'BDur', 'vCell', {});
 
 % select group
-igrp = categorical({'WT'});
-plot_tbl = lme_tbl(lme_tbl.Group == igrp, :);
+% igrp = categorical({'WT'});
+% plot_tbl = lme_tbl(lme_tbl.Group == igrp, :);
 
 % select state
-istate = categorical({'Low EMG'});
-plot_tbl = lme_tbl(plot_tbl.State == istate, :);
+istate = categorical({'High EMG'});
+plot_tbl = lme_tbl(lme_tbl.State == istate, :);
 
 % run lme
-lme = fitlme(plot_tbl, lme_cfg.frml);
+contrasts = 'all';
+[lme_results, lme_cfg] = lme_analyse(plot_tbl, lme_cfg, 'contrasts', contrasts);
 
 % plot
-fh = mcu_lmePlot(plot_tbl, lme, 'ptype', 'line');
+fh = lme_plot(plot_tbl, lme_cfg.mdl, 'ptype', 'bar');
 
 % Bout length of WT vs. MCU across states during baseline
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -493,3 +497,130 @@ for istate = 1 : length(sstates)
     xticks([1, 2])
     xticklabels({'WT', 'MCU-KO'});
 end
+
+
+
+
+
+
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Bout Analysis
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+varPsd = '.psdEMG.mat';
+
+mNames = [{mcu_sessions('wt'), mcu_sessions('mcu')}];
+nGrp = length(mNames);
+
+clear b
+for iGrp = 1 : nGrp
+
+    nMice = length(mNames{iGrp});
+    grpMice = mNames{iGrp};
+
+    clear boutStats bMouse
+    for iMouse = 1 : nMice
+        mName = grpMice{iMouse};
+        mPaths = mcu_sessions(mName);
+        nFiles = length(mPaths);
+
+        for ifile = 1
+            basepath = mPaths{ifile};
+            [~, basename] = fileparts(basepath);
+            original_path = pwd;
+            cd(basepath);
+
+            psdFile = fullfile(basepath, [basename, varPsd]);
+
+            % extract psd struct
+            psd = load(psdFile);
+            flds = fieldnames(psd);
+            psd = psd.(flds{1});
+
+            nStates = size(psd.psd, 1);
+
+            for iState = 1 : nStates
+                stateBtimes = psd.bouts.times{iState};
+
+                [~, boutStats(iState)] = bouts_separate(stateBtimes,...
+                    'sepMet', 'mcshane', 'flgGraphics', false);
+
+            end
+        end
+        bMouse(iMouse) = catfields([boutStats(:)], 'addim', true, [3, 2, 1], true);
+    end
+    b{iGrp} = catfields([bMouse(:)], 'addim', true, [4, 1, 2, 3], true);
+end
+
+% Define group and bout type names/colors
+groupNames = {'WT', 'MCU'};
+boutTypeNames = {'Slab', 'Spike'};
+groupColors = {[0 0.4470 0.7410], [0.8500 0.3250 0.0980]}; % blue, orange
+
+nStates = size(b{1}.dur, 2);
+nBoutTypes = size(b{1}.dur, 3);
+
+fh = figure;
+cnt = 1;
+for iState = 1:nStates
+    for iBoutType = 1:nBoutTypes
+        subplot(nStates, nBoutTypes, cnt); hold on
+        for iGrp = 1:2
+            % Gather all durations for this group, state, bout type, all mice
+            durs = squeeze(b{iGrp}.dur(:, iState, iBoutType, :));
+            durs = durs(:);
+            durs = durs(~isnan(durs) & durs > 0); % remove NaN/zero
+            
+            % Plot histogram
+            h = histogram(durs, 'BinWidth', 2, ...
+                'EdgeColor', groupColors{iGrp}, ...
+                'LineWidth', 2, ...
+                'Normalization', 'probability');
+        end
+        title(['State ' num2str(iState) ', ' boutTypeNames{iBoutType}]);
+        xlabel('Bout duration (s)');
+        ylabel('Probability');
+        legend(groupNames);
+        hold off
+        cnt = cnt + 1;
+    end
+end
+sgtitle('Bout duration distributions by state, bout type, and group');
+
+% New figure: Fit distribution to all bout durations (irrespective of bout types) per state
+fh2 = figure;
+cnt = 1;
+durLim = [0, 180];
+for iState = 1:nStates
+    subplot(nStates, 2, cnt); hold on
+    for iGrp = 1:2
+        % Gather all durations for this group, state, all bout types, all mice
+        durs = squeeze(b{iGrp}.dur(:, iState, :, :));
+        durs = durs(:);
+        % durs = durs(~isnan(durs) & durs > durLim(1) & durs <= durLim(2)); % remove NaN/zero and limit to 180s
+        dataTmp{iGrp} = durs;
+
+        % Fit kernel density estimate
+        [f, xi] = ksdensity(durs);
+        plot(xi, f, 'Color', groupColors{iGrp}, 'LineWidth', 2);
+    end
+    title(['State ' num2str(iState) ' - All Bout Types']);
+    xlabel('Bout duration (s)');
+    ylabel('Density');
+    legend(groupNames);
+    hold off
+    cnt = cnt + 1;
+    % xlim(durLim)
+
+    axh = subplot(nStates, 2, cnt); hold on
+    dataMat = cell2padmat(dataTmp, 2);
+    plot_boxMean(dataMat', 'plotType', 'bar',...
+        'grpNames', groupNames, 'clr', cell2padmat(groupColors, 1),...
+        'xval', [1, 2], 'axh', axh);
+    cnt = cnt + 1;
+end
+sgtitle('Distribution of all bout durations by state and group');

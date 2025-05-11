@@ -82,7 +82,8 @@ upperBound = upperBound(:);
 lowerBound = lowerBound(:);
 
 fillh = fill([xVal; flipud(xVal)], [upperBound; flipud(lowerBound)], ...
-    clr, 'FaceAlpha', alpha, 'EdgeColor', 'none', 'Tag', 'sePatch');
+    clr, 'FaceAlpha', alpha, 'EdgeColor', 'none', 'Tag', 'sePatch',...
+    'HandleVisibility', 'off');
 
 end
 
