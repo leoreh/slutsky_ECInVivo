@@ -56,25 +56,25 @@ end
 frml = 'Burst ~ Group * UnitType + (1|Mouse)';
 
 % organize for lme
-varField = 'lvr';
+varField = 'spkprct';
 [lmeData, lmeCfg] = lme_org('grppaths', grppaths, 'frml', frml,...
     'flgEmg', false, 'varField', varField, 'vCell', {});
 
 % run lme
 contrasts = 'all';
-contrasts = [1:5, 6,9]; 
+contrasts = [1 : 7]; 
 [lmeStats, lmeCfg] = lme_analyse(lmeData, lmeCfg, 'contrasts', contrasts);
 
 % plot
 fh = lme_plot(lmeData, lmeCfg.lmeMdl, 'ptype', 'bar'); 
 axh = gca;
-ylabel(axh, 'Burstiness Index (a.u.)', 'FontSize', 20)
+ylabel(axh, 'Burst Spikes (%)', 'FontSize', 20)
 xlabel(axh, '', 'FontSize', 20)
 axh.XAxis.FontSize = 20;
 title(axh, '')
-axh.Legend.Location = 'northeast';
+ylim(axh, [0 50])
 
-fname = lme_frml2char(lmeCfg.frmlMdl, 'rmRnd', true, 'sfx', '_Royer');
+fname = lme_frml2char(lmeCfg.frmlMdl, 'rmRnd', true, 'sfx', '_Prct');
 
 % save
 lme_save('fh', fh, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
@@ -111,7 +111,7 @@ end
 frml = 'Burst ~ Group * Day + (1|Mouse)';
 
 % organize for lme
-varField = 'spkprct';
+varField = 'rate';
 [lmeData, lmeCfg] = lme_org('grppaths', grppaths, 'frml', frml,...
     'flgEmg', false, 'varField', varField, 'vCell', {});
 
@@ -135,17 +135,18 @@ lmeCfg.frml = {frmlCompare1, frmlCompare2};
 [lmeStats, lmeCfg] = lme_analyse(plotTbl, lmeCfg, 'contrasts', contrasts);
 
 % plot
+% Use the model selected by lme_analyse (which is in lmeCfgBac.lmeMdl)
 hndFig = lme_plot(plotTbl, lmeCfg.lmeMdl, 'ptype', 'bar', 'figShape', 'wide');
 
 % Update labels
 axh = gca; % Renamed
-ylabel(axh, 'Burst Spikes (%)', 'FontSize', 20)
+ylabel(axh, varField, 'FontSize', 20)
 xlabel(axh, '', 'FontSize', 16)
 axh.XAxis.FontSize = 20;
 title(axh, unitType)
 axh.Legend.Location = 'northwest';
-% ylim([0 130])
-fname = lme_frml2char(lmeCfg.frmlMdl, 'rmRnd', true, 'sfx', [' _', unitType, '_Prcnt']);
+
+fname = lme_frml2char(lmeCfg.frmlMdl, 'rmRnd', true, 'resNew', '', 'sfx', [' _', unitType, '_Norm']);
 
 % save
 lme_save('fh', hndFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...

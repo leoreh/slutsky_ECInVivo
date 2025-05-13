@@ -1,186 +1,740 @@
-function [lme_results, lme_cfg] = lme_analyse(lme_tbl, lme_cfg, varargin)
-%LME_ANALYSE Fits a Linear Mixed-Effects model and performs comprehensive contrast analysis.
-%
-% SYNTAX:
-%   [LME_RESULTS, LME_CFG] = LME_ANALYSE(LME_TBL, LME_CFG)
-%   [LME_RESULTS, LME_CFG] = LME_ANALYSE(LME_TBL, LME_CFG, 'PARAM1', VAL1, ...)
-%
-% DESCRIPTION:
-%   This function provides a comprehensive framework for fitting Linear Mixed-Effects
-%   (LME) models and analyzing various types of effects and contrasts. It wraps around
-%   MATLAB's fitlme functionality while adding powerful contrast analysis capabilities.
+function [lmeStats, lmeCfg] = lme_analyse(lmdData, lmeCfg, varargin)
+
+% Fits one or two user-specified Linear Mixed-Effects models using
+% `fitlme`. If two models are provided, `compare` is used to select the
+% model. The chosen model is then analyzed: overall F-test for the
+% highest-order interaction term(s) with anova, Model coefficients, Simple
+% and marginal Effects (for 2-way interactions) are generated and tested
+% while adjusting for multiple comparisons. See end of function for
+% details.
 %
 % INPUTS:
-%   LME_TBL - Table containing the data for fitting the model
-%   LME_CFG - Configuration struct that must contain at least:
-%             .frml - String specifying the model formula (e.g., 'Y ~ A*B + (1|Subject)')
-%
-% OPTIONAL NAME-VALUE PAIRS:
-%   'contrasts'      - Controls which contrasts to include in the final results:
-%                      'all' (default) | logical vector | numeric vector
-%   'correction'     - Multiple comparison correction method (applied only to
-%                      Simple/Marginal effects):
-%                      'holm' (default) | 'bonferroni' | 'fdr' | 'none'
-%   'FitMethod'      - Method for fitting the LME model:
-%                      'REML' (default) | 'ML'
+%   lmdData         (Required) Table: Data for LME model(s).
+%   lmeCfg          (Required) Struct: Configuration with at least:
+%                     .frml - Char/string (single model) OR 1x2 cell array of
+%                             char/strings (for model comparison). Formulas for `fitlme`.
+%   'contrasts'     (Optional) Controls which "Coeff", "Simple", "Marginal"
+%                   effects are in `LME_RESULTS` (ANOVA interaction row is
+%                   included if applicable).
+%                   'all' (default) | logical vector | numeric vector.
+%                   Refers to internal generation order (Coeffs, Simple, Marginal).
+%   'correction'    (Optional) Char/string: Multiple comparison correction for
+%                   Simple/Marginal effects.
+%                   'holm' (default) | 'bonferroni' | 'fdr' | 'none'.
+%   'FitMethod'     (Optional) Char/string: Method for `fitlme`.
+%                   'REML' (default) | 'ML'.
 %
 % OUTPUTS:
-%   LME_RESULTS - Table with results for the selected contrasts/coefficients:
-%       .Index        - Row index within the results table
-%       .Type         - 'Coeff', 'Simple', or 'Marginal'
-%       .Description  - Human-readable description of the contrast/test
-%       .Estimate     - Parameter or contrast estimate
-%       .SE           - Standard Error of the estimate
-%       .t_Statistic  - t-statistic for testing against zero
-%       .DF           - Degrees of freedom
-%       .p_Value      - Uncorrected p-value
-%       .p_Adjusted   - Multiple-comparison corrected p-value (for derived contrasts)
-%       .H_vector     - Linear contrast vector (for Simple/Marginal effects)
+%   LME_RESULTS     Table: Comprehensive analysis results:
+%     .Index        - Row index.
+%     .Type         - 'ANOVA', 'Coeff', 'Simple', or 'Marginal'.
+%     .Description  - Description of the test/coefficient.
+%     .Estimate     - Estimate (NaN for 'ANOVA').
+%     .SE           - Standard Error (NaN for 'ANOVA').
+%     .CI95         - [Lower Upper] 95% Confidence Interval (for 'Coeff' only,
+%                     [NaN NaN] for others).
+%     .Statistic    - F-statistic ('ANOVA') or t-statistic (others).
+%     .DF           - Degrees of freedom: '[NumDF, DenDF]' string for F-tests;
+%                     scalar Satterthwaite DF for t-tests (in cell).
+%     .pVal         - Uncorrected p-value.
+%     .pAdj         - Corrected p-value ('Simple'/'Marginal' only; NaN others).
+%     .HVec         - String of H-vector ('Simple'/'Marginal' only; NaN others).
 %
-%   LME_CFG - Updated config struct with added field:
-%       .mdl          - The fitted LinearMixedModel object
+%   LME_CFG         Struct: Updated config with:
+%     .lmeMdl         - The LinearMixedModel object selected for analysis.
+%     .lmeAlt         - The alternative LinearMixedModel object (if compared).
+%     .frmlMdl        - Formula string of `lmeMdl`.
+%     .frmlAlt        - Formula string of `lmeAlt` (if applicable).
+%     .compareRes     - Table from `compare()` (if applicable).
+%     .contrasts, .correction, .FitMethod - Input parameter values.
 %
-% CONTRAST TYPES:
-%   - Coefficients: Standard coefficients from the model (tests vs. zero)
-%   - Simple Effects: Effects of one factor at specific levels of another factor
-%   - Marginal Effects: Effects of one factor averaged across levels of another factor
-%   - ANOVA:         Overall F-tests for main effects and interactions from ANOVA table
+% DEPENDENCIES:
+%   MATLAB Statistics and Machine Learning Toolbox.
 %
+% 250513 LH
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% INPUT PARSING
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Defines and parses required and optional input arguments.
+p = inputParser;
+addRequired(p, 'lmdData', @istable);
+addRequired(p, 'lmeCfg', @isstruct);
+addParameter(p, 'contrasts', 'all', ...
+    @(x) (ischar(x) && strcmpi(x, 'all')) || islogical(x) || isnumeric(x));
+addParameter(p, 'correction', 'holm', @(x) ischar(x) || isstring(x));
+addParameter(p, 'FitMethod', 'REML', @(x) ismember(upper(x), {'REML', 'ML'}));
+parse(p, lmdData, lmeCfg, varargin{:});
+
+contrastReq         = p.Results.contrasts;
+correctionMethod    = lower(char(p.Results.correction));
+fitMethod           = p.Results.FitMethod;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% LME MODEL FITTING & SELECTION
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Fits one LME model or compares two if multiple formulas are provided in
+% lmeCfg.frml, selecting the model with lower BIC for detailed analysis.
+lmeCfg.lmeMdl = [];
+lmeCfg.lmeAlt = [];
+lmeCfg.compareMdl = [];
+lmeCfg.frmlMdl = '';
+lmeCfg.frmlAlt = '';
+
+if ischar(lmeCfg.frml) || isstring(lmeCfg.frml)
+    lmeCfg.frmlMdl = char(lmeCfg.frml);
+    lmeMdl = fitlme(lmdData, lmeCfg.frmlMdl, 'FitMethod', fitMethod);
+    lmeAlt = [];
+    
+else 
+    lmeCfg.frmlMdl = char(lmeCfg.frml{1});
+    lmeCfg.frmlAlt = char(lmeCfg.frml{2});
+    
+    lme1 = fitlme(lmdData, lmeCfg.frmlMdl, 'FitMethod', fitMethod);
+    lme2 = fitlme(lmdData, lmeCfg.frmlAlt, 'FitMethod', fitMethod);
+    
+    lmeCfg.compareMdl = compare(lme1, lme2, 'CheckNesting', true); % Allow comparing non-nested for BIC
+    
+    if all(lmeCfg.compareMdl.pValue < 0.05) || lme2.ModelCriterion.BIC < lme1.ModelCriterion.BIC
+        lmeMdl = lme2;
+        lmeAlt = lme1;
+        
+        % Swap formula strings in lmeCfg to reflect selection
+        tmpFrml = lmeCfg.frmlMdl;
+        lmeCfg.frmlMdl = lmeCfg.frmlAlt;
+        lmeCfg.frmlAlt = tmpFrml;
+    else
+        lmeMdl = lme1;
+        lmeAlt = lme2;
+    end
+end
+lmeCfg.lmeMdl = lmeMdl;
+lmeCfg.lmeAlt = lmeAlt;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% EXTRACT DETAILS FROM CHOSEN MODEL
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Retrieves coefficients, factor information, and other details from lmeMdl.
+coefNames = lmeMdl.CoefficientNames;
+nCoefs = length(coefNames);
+coefEst = lmeMdl.Coefficients.Estimate;
+coefMap = containers.Map(coefNames, 1:nCoefs);
+coefCov = lmeMdl.CoefficientCovariance;
+
+% recalculate coefficients to implement DF estimation
+[~, ~, lmeCoefTbl] = fixedEffects(lmeMdl, 'DFMethod', 'Satterthwaite');
+
+factorInfo = struct();
+frmlFactors = {};
+fixedTerms = lmeMdl.Formula.FELinearFormula.TermNames;
+for iPred = 1:length(lmeMdl.PredictorNames)
+    varName = lmeMdl.PredictorNames{iPred};
+    if ismember(varName, lmdData.Properties.VariableNames) && iscategorical(lmdData.(varName))
+        cats = categories(lmdData.(varName));
+        if ~isempty(cats)
+            factorInfo.(varName).Levels = cats;
+            factorInfo.(varName).RefLevel = cats{1};
+            if any(strcmp(varName, fixedTerms)) || ...
+               any(contains(fixedTerms, [varName ':'])) || ...
+               any(contains(fixedTerms, [':' varName]))
+                frmlFactors{end+1} = varName;
+            end
+        end
+    end
+end
+frmlFactors = unique(frmlFactors);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% GENERATE ANOVA INTERACTION 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% If the model formula includes interactions, performs ANOVA and extracts
+% F-test results for the highest-order interaction term(s).
+intDefList = struct(...
+    'DefIdx', {}, 'Type', {}, 'Description', {}, ...
+    'CoefCombo', {},'HVec', {}, 'OrigCoefIdx', {});
+defIdxCounter = 0;
+
+if contains(lmeCfg.frmlMdl, '*')
+    
+    % Find highest-order interaction terms (simplistic: those with most colons)
+    anovaTbl = anova(lmeMdl, 'DFMethod', 'Satterthwaite');
+    nColons = count(string(anovaTbl.Term), ':');
+    maxColons = max(nColons);
+    idxInteractions = find(nColons == maxColons);
+    
+    for iAnova = 1:length(idxInteractions)
+        idxTerm = idxInteractions(iAnova);
+        defIdxCounter = defIdxCounter + 1;
+        termName = anovaTbl.Term{idxTerm};
+        coefDscrpt = sprintf('ANOVA: %s', termName);
+        intDefList(defIdxCounter) = struct(...
+            'DefIdx', defIdxCounter, 'Type', "ANOVA", 'Description', coefDscrpt,...
+            'CoefCombo', {{termName}}, 'HVec', {NaN}, 'OrigCoefIdx', idxTerm);
+    end
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% GENERATE COEFFICIENT, SIMPLE & MARGINAL EFFECT DEFINITIONS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Appends definitions for "Coeff" effects
+for iCoef = 1:nCoefs
+    defIdxCounter = defIdxCounter + 1;
+    coefName = coefNames{iCoef};
+    if strcmp(coefName, '(Intercept)')
+        coefDscrpt = '(Intercept) Mean at Ref Levels';
+        
+        % fixed effect
+    elseif ~contains(coefName, ':')
+        parts = strsplit(coefName, '_'); factor = parts{1}; level = strjoin(parts(2:end),'_');
+        
+        if isfield(factorInfo, factor)
+            refLvl = factorInfo.(factor).RefLevel;
+            baseDesc = sprintf('(%s vs %s)', refLvl, level);
+            otherFactors = setdiff(frmlFactors, factor); atRefDesc = '';
+            if ~isempty(otherFactors)
+                refLvlParts = cellfun(@(f) factorInfo.(f).RefLevel, otherFactors, 'Uni', false);
+                atRefDesc = [' at ' strjoin(refLvlParts, ', ')];
+            end
+            coefDscrpt = [baseDesc, atRefDesc];
+        end
+    
+        % interaction
+    else        
+        terms = strsplit(coefName, ':'); termDescs = cell(size(terms));
+        for iTerm = 1:length(terms)
+            parts = strsplit(terms{iTerm}, '_'); factor = parts{1}; level = strjoin(parts(2:end),'_');
+            termDescs{iTerm} = sprintf('(%s vs %s)', factorInfo.(factor).RefLevel, level);
+        end
+        coefDscrpt = strjoin(termDescs, ' * ');
+    end
+    
+    intDefList(defIdxCounter) = struct(...
+        'DefIdx', defIdxCounter, 'Type', "Coeff", 'Description', coefDscrpt,...
+        'CoefCombo', {{coefName}}, 'HVec', {NaN}, 'OrigCoefIdx', iCoef);
+end
+
+% Appends definitions for "Simple" and "Marginal" effects.
+interactionTerms = lmeMdl.Formula.FELinearFormula.TermNames(...
+    contains(lmeMdl.Formula.FELinearFormula.TermNames, ':'));
+processedInteractions = struct();
+for iInt = 1:length(interactionTerms)
+    factors = strsplit(interactionTerms{iInt}, ':');
+    if length(factors) ~= 2
+        continue
+    end
+
+    intKey = strjoin(sort(factors),'_x_');
+    if isfield(processedInteractions, intKey) || ...
+       ~ismember(factors{1}, frmlFactors) || ~ismember(factors{2}, frmlFactors)
+        continue;
+    end
+    processedInteractions.(intKey) = true;
+
+    factorA = factors{1};
+    factorB = factors{2};
+    lvlsA = factorInfo.(factorA).Levels;
+    refA = factorInfo.(factorA).RefLevel;
+    nA = length(lvlsA);
+    lvlsB = factorInfo.(factorB).Levels;
+    refB = factorInfo.(factorB).RefLevel;
+    nB = length(lvlsB);
+
+    % Simple Effects
+    for iLvlB = 1:nB % Effect of A at each level of B
+        lvlB = lvlsB{iLvlB};
+        for iLvlA = 1:nA
+            lvlA = lvlsA{iLvlA};
+            if strcmp(lvlA, refA)
+                continue
+            end
+            hVec = zeros(1, nCoefs);
+            coefNamesInv = {};
+            validH = false;
+            coefMainA = sprintf('%s_%s', factorA, lvlA);
+
+            if isKey(coefMap, coefMainA)
+                hVec(coefMap(coefMainA)) = 1;
+                coefNamesInv{end+1} = coefMainA;
+                validH = true;
+                coefDscrpt = sprintf('(%s vs %s) at %s', refA, lvlA, lvlB);
+                if ~strcmp(lvlB, refB)
+                    coefInt = sprintf('%s_%s:%s_%s', factorA, lvlA, factorB, lvlB);
+                    coefIntAlt = sprintf('%s_%s:%s_%s', factorB, lvlB, factorA, lvlA);
+                    if isKey(coefMap, coefInt)
+                        hVec(coefMap(coefInt)) = 1;
+                        coefNamesInv{end+1} = coefInt;
+                    elseif isKey(coefMap, coefIntAlt)
+                        hVec(coefMap(coefIntAlt)) = 1;
+                        coefNamesInv{end+1} = coefIntAlt;
+                    else
+                        validH = false;
+                    end
+                end
+            end
+            if validH && ~(sum(hVec==1)==1 && sum(hVec==0)==length(hVec)-1) % Not duplicate of a Coeff
+                defIdxCounter = defIdxCounter + 1;
+                intDefList(defIdxCounter) = struct('DefIdx', defIdxCounter,...
+                    'Type', "Simple", 'Description', coefDscrpt,...
+                    'CoefCombo', {unique(coefNamesInv)}, 'HVec', {hVec},...
+                    'OrigCoefIdx', NaN);
+            end
+        end
+    end
+
+    for iLvlA = 1:nA % Effect of B at each level of A
+        lvlA = lvlsA{iLvlA};
+        for iLvlB = 1:nB
+            lvlB = lvlsB{iLvlB}; if strcmp(lvlB, refB); continue; end
+            hVec = zeros(1, nCoefs); coefNamesInv = {}; validH = false;
+            coefMainB = sprintf('%s_%s', factorB, lvlB);
+            if isKey(coefMap, coefMainB)
+                hVec(coefMap(coefMainB)) = 1; coefNamesInv{end+1} = coefMainB; validH = true;
+                coefDscrpt = sprintf('(%s vs %s) at %s', refB, lvlB, lvlA);
+                if ~strcmp(lvlA, refA)
+                    coefInt = sprintf('%s_%s:%s_%s', factorA, lvlA, factorB, lvlB);
+                    coefIntAlt = sprintf('%s_%s:%s_%s', factorB, lvlB, factorA, lvlA);
+                    if isKey(coefMap, coefInt); hVec(coefMap(coefInt)) = 1; coefNamesInv{end+1} = coefInt;
+                    elseif isKey(coefMap, coefIntAlt)
+                        hVec(coefMap(coefIntAlt)) = 1;
+                        coefNamesInv{end+1} = coefIntAlt;
+                    else
+                        validH = false;
+                    end
+                end
+            end
+            if validH && ~(sum(hVec==1)==1 && sum(hVec==0)==length(hVec)-1)
+                defIdxCounter = defIdxCounter+1;
+                intDefList(defIdxCounter) = struct('DefIdx', defIdxCounter,...
+                    'Type', "Simple", 'Description', coefDscrpt,...
+                    'CoefCombo', {unique(coefNamesInv)},...
+                    'HVec', {hVec}, 'OrigCoefIdx', NaN);
+            end
+        end
+    end
+    
+    % Marginal Effects
+    wB = 1/nB; wA = 1/nA;
+    for iLvlA = 1:nA % Marginal Effect of A over B
+        lvlA = lvlsA{iLvlA};
+        if strcmp(lvlA, refA)
+            continue
+        end
+        hVec = zeros(1, nCoefs);
+        coefNamesInv = {};
+        validH = false;
+        coefMainA = sprintf('%s_%s', factorA, lvlA);
+        if isKey(coefMap, coefMainA)
+            hVec(coefMap(coefMainA)) = 1;
+            coefNamesInv{end+1} = coefMainA;
+            validH = true;
+
+            for iLvlB = 1:nB
+                lvlB = lvlsB{iLvlB};
+                if strcmp(lvlB, refB)
+                    continue
+                end
+                coefInt = sprintf('%s_%s:%s_%s', factorA, lvlA, factorB, lvlB);
+                coefIntAlt = sprintf('%s_%s:%s_%s', factorB, lvlB, factorA, lvlA);
+                if isKey(coefMap, coefInt)
+                    hVec(coefMap(coefInt)) = hVec(coefMap(coefInt)) + wB;
+                    coefNamesInv{end+1} = coefInt;
+                elseif isKey(coefMap, coefIntAlt)
+                    hVec(coefMap(coefIntAlt)) = hVec(coefMap(coefIntAlt)) + wB;
+                    coefNamesInv{end+1} = coefIntAlt;
+                else
+                    validH = false;
+                    break
+                end
+            end
+        end
+        if validH
+            defIdxCounter = defIdxCounter + 1;
+            coefDscrpt = sprintf('(%s vs %s) over %s', refA, lvlA, factorB);
+            intDefList(defIdxCounter) = struct('DefIdx', defIdxCounter,...
+                'Type', "Marginal", 'Description', coefDscrpt,...
+                'CoefCombo', {unique(coefNamesInv)}, 'HVec', {hVec},...
+                'OrigCoefIdx', NaN);
+        end
+    end
+
+    for iLvlB = 1:nB % Marginal Effect of B over A
+        lvlB = lvlsB{iLvlB}; 
+        if strcmp(lvlB, refB)
+            continue
+        end
+        hVec = zeros(1, nCoefs);
+        coefNamesInv = {};
+        validH = false;
+        coefMainB = sprintf('%s_%s', factorB, lvlB);
+        if isKey(coefMap, coefMainB)
+            hVec(coefMap(coefMainB)) = 1;
+            coefNamesInv{end+1} = coefMainB;
+            validH = true;
+            for iLvlA = 1:nA
+                lvlA = lvlsA{iLvlA};
+                if strcmp(lvlA, refA)
+                    continue
+                end
+                coefInt = sprintf('%s_%s:%s_%s', factorA, lvlA, factorB, lvlB);
+                coefIntAlt = sprintf('%s_%s:%s_%s', factorB, lvlB, factorA, lvlA);
+                if isKey(coefMap, coefInt)
+                    hVec(coefMap(coefInt)) = hVec(coefMap(coefInt)) + wA;
+                    coefNamesInv{end+1} = coefInt;
+                elseif isKey(coefMap, coefIntAlt)
+                    hVec(coefMap(coefIntAlt)) = hVec(coefMap(coefIntAlt)) + wA;
+                    coefNamesInv{end+1} = coefIntAlt;
+                else
+                    validH = false;
+                    break
+                end
+            end
+        end
+        if validH
+            defIdxCounter = defIdxCounter + 1;
+            coefDscrpt = sprintf('(%s vs %s) over %s', refB, lvlB, factorA);
+            intDefList(defIdxCounter) = struct('DefIdx', defIdxCounter,...
+                'Type', "Marginal", 'Description', coefDscrpt,...
+                'CoefCombo', {unique(coefNamesInv)}, 'HVec', {hVec},...
+                'OrigCoefIdx', NaN);
+        end
+    end
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% CALCULATE STATISTICS FOR ALL DEFINITIONS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Iterates through all generated definitions, calculates relevant statistics,
+% and stores them. CI95 is added for coefficients.
+nDefs = length(intDefList);
+resData = cell(nDefs, 8); % Type,Desc,Est,SE,CI95,Stat,DF,pVal
+hVecsToStore = cell(nDefs, 1);
+
+for iDef = 1:nDefs
+    rowDef = intDefList(iDef);
+    est=NaN; se=NaN; ci95=[NaN NaN]; stat=NaN; dfOut={NaN}; pVal=NaN; hVec=NaN;
+
+    switch rowDef.Type
+        case "ANOVA"
+            anovaRowIdx = rowDef.OrigCoefIdx;
+            stat    = anovaTbl.FStat(anovaRowIdx);
+            df1     = round(anovaTbl.DF1(anovaRowIdx));
+            df2     = round(anovaTbl.DF2(anovaRowIdx));
+            dfOut   = {mat2str([df1, df2])};
+            pVal    = anovaTbl.pValue(anovaRowIdx);
+        
+        case "Coeff"
+            origCoefIdx = rowDef.OrigCoefIdx;
+            est     = lmeCoefTbl.Estimate(origCoefIdx);
+            se      = lmeCoefTbl.SE(origCoefIdx);
+            ci95    = [lmeCoefTbl.Lower(origCoefIdx), lmeCoefTbl.Upper(origCoefIdx)];
+            stat    = lmeCoefTbl.tStat(origCoefIdx);
+            dfOut   = {mat2str(round(lmeCoefTbl.DF(origCoefIdx)))};
+            pVal    = lmeCoefTbl.pValue(origCoefIdx);
+        
+        case {"Simple", "Marginal"}
+            hVec = rowDef.HVec;
+            [pVal, FVal, ~, dfTest] = coefTest(lmeMdl, hVec,...
+                0, 'DFMethod', 'Satterthwaite');
+            est = hVec * coefEst(:);
+            varContrast = hVec * coefCov * hVec';
+            if varContrast < 0 && abs(varContrast) < 1e-10
+                varContrast = 0;
+            end
+            se = sqrt(varContrast);
+            stat = sqrt(FVal) * sign(est);       % same as est / se
+            dfOut = {mat2str(round(dfTest))};
+    end
+    resData(iDef,:) = {rowDef.Type,rowDef.Description,est,se,ci95,stat,dfOut,pVal};
+    hVecsToStore{iDef} = hVec;
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% ASSEMBLE AND FILTER FULL RESULTS TABLE
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Converts data to table, formats, reorders, and applies user's contrast
+% selection.
+
 %**************************************************************************
-% Theoretical Background: Linear Mixed-Effects (LME) Models
+% Create Table
+lmeStats = cell2table(resData, 'VariableNames', ...
+    {'Type','Description','Estimate','SE','CI95','Statistic','DF','pVal'});
+
+formattedHVecs = cell(nDefs, 1);
+for iDef = 1:nDefs
+    hCont = hVecsToStore{iDef};
+    if isnumeric(hCont) && isvector(hCont)
+        formattedHVecs{iDef} = mat2str(round(hCont,3));
+    else
+        formattedHVecs{iDef} = NaN;
+    end
+end
+lmeStats.HVec = formattedHVecs;
+
 %**************************************************************************
-% Linear Mixed-Effects models are a powerful statistical tool designed for
-% analyzing data where observations are grouped or clustered. Common examples
-% include repeated measurements taken from the same subject over time, or
-% students nested within different classrooms. LME models explicitly account
-% for the fact that observations within the same group are likely to be more
-% similar to each other than observations from different groups (i.e., they
-% are not independent).
+% Round numeric columns
+clmnRnd2 = {'Estimate', 'SE', 'Statistic', 'CI95'};
+clmnRnd4 = {'pVal'};
+for iCol = 1:length(clmnRnd2)
+    col = clmnRnd2{iCol};
+    lmeStats.(col) = round(lmeStats.(col),2);
+end
+for iCol = 1:length(clmnRnd4)
+    col = clmnRnd4{iCol};
+    lmeStats.(col) = round(lmeStats.(col),4);
+end
+if isnumeric(lmeStats.CI95);
+    lmeStats.CI95 = round(lmeStats.CI95, 2);
+end
+
+% Add index for comparisons before applying use selection
+lmeStats = addvars(lmeStats, (1:height(lmeStats))', 'Before', 1, 'NewVariableNames', 'Index');
+
+% Apply user's contrast selection ('all', numeric indices, or logical
+% vector). Refers to indices in the full generated list.
+if isnumeric(contrastReq) || islogical(contrastReq)
+    lmeStats = lmeStats(contrastReq, :);
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% APPLY MULTIPLE COMPARISON CORRECTION
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Collects p-values for "Simple" and "Marginal" effects from the filtered
+% lmeStats table and applies the specified correction method.
+
+% Identify 'Simple' or 'Marginal' contrasts
+idxCntrsts = find(ismember(lmeStats.Type, ["Simple", "Marginal"]));
+pValCntrsts = lmeStats.pVal(idxCntrsts);
+nCntrsts = length(pValCntrsts);
+
+if nCntrsts > 0 && ~strcmpi(correctionMethod, 'none')
+        [pVal_sorted, sortIdx] = sort(pValCntrsts);
+        restoreIdx(sortIdx) = 1:nCntrsts;
+        
+        % calculate corrected pVal
+        switch correctionMethod
+            case 'bonferroni'
+                pAdj_sorted = min(1, pVal_sorted * nCntrsts);
+            case 'holm'
+                adjFactor = (nCntrsts:-1:1)';
+                adjPSortedRaw = pVal_sorted(:) .* adjFactor;
+                pAdj_sorted = min(1,cummax(adjPSortedRaw));
+            case 'fdr'
+                iRank = (1:nCntrsts)';
+                adjPRaw = pVal_sorted(:).*nCntrsts./iRank;
+                pAdj_sorted = min(1,cummin(adjPRaw,'reverse'));
+            otherwise
+                pAdj_sorted = pVal_sorted;
+        end
+        
+        % oragnize output
+        pAdj = nan(height(lmeStats), 1);
+        pAdj(idxCntrsts) = round(pAdj_sorted(restoreIdx), 4);
+        lmeStats = addvars(lmeStats, pAdj, 'After', 'pVal', 'NewVariableNames', 'pAdj');
+end
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Finalize 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% lmeCfg output
+lmeCfg.contrasts = contrastReq;
+lmeCfg.correction = correctionMethod;
+
+end % EOF
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% THEORETICAL CONSIDERATIONS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Linear Mixed-Effects (LME) models are used for hierarchically structured
+% data (e.g., repeated measures within subjects) to account for
+% non-independence of observations. They partition variance into fixed and
+% random effects. This function fits models using Restricted Maximum
+% Likelihood (REML) by default, as opposed to Maximum Likelihood (ML),
+% which provides unbiased estimates of variance components.
 %
-% An LME model decomposes the response variable into several components. First,
-% 'Fixed Effects', typically denoted as 'beta', represent the average effects
-% of predictor variables across the entire population being studied. These are
-% usually the primary focus of the analysis, addressing questions like the
-% overall effectiveness of a treatment or the average trend over time. This
-% function specifically targets testing hypotheses related to these fixed effects.
-% The estimation of these effects, along with other model parameters, is commonly
-% done using Maximum Likelihood (ML) or Restricted Maximum Likelihood (REML).
-% REML is often preferred because it provides more accurate estimates of the
-% variance components, particularly with smaller datasets, and it's the default
-% method used by MATLAB's `fitlme` function.
+% Fixed Effects', denoted 'beta', represent the average effects of
+% predictor variables across the entire population being studied. These are
+% usually the primary focus of the analysis. 
 %
-% Second, 'Random Effects', often denoted as 'b', capture the variability
-% *between* the groups or subjects. They model how individual subjects (or
-% classrooms, etc.) systematically deviate from the average population trends
-% described by the fixed effects. For instance, a 'random intercept' allows
-% each subject to have their own unique baseline response level (e.g., specified
-% as `(1 | Subject)` in the formula). A 'random slope' allows the effect of a
-% predictor, like time, to differ across subjects (e.g., `(Time | Subject)`).
-% By incorporating random effects, the model properly accounts for the data's
-% dependency structure when evaluating the fixed effects.
+% 'Random Effects', denoted 'b', capture the variability *between* the
+% groups or subjects. They model how individual subjects systematically
+% deviate from the average population. For instance, a 'random intercept'
+% allows each subject to have their own unique baseline response level
+% (e.g., specified as `(1 | Subject)` in the formula). A 'random slope'
+% allows the effect of a predictor, like time, to differ across subjects
+% (e.g., `(Time | Subject)`). By incorporating random effects, the model
+% properly accounts for the data's dependency structure when evaluating the
+% fixed effects.
 %
-% Finally, the 'Residual Error', denoted as 'epsilon', accounts for the
+% 'Residual Error', denoted as 'epsilon', accounts for the
 % remaining, unexplained variability or random noise in the data that isn't
 % captured by either the fixed or the random effects structure.
-%
+
 %**************************************************************************
-% Interpreting LME Fixed Effects Coefficients (Dummy Coding)
+% Dummy Coding and Coefficient Types
 %**************************************************************************
-% When dealing with categorical predictors (like 'Group' or 'Condition') as
-% fixed effects, MATLAB's `fitlme` function generally uses 'dummy coding' (also
-% known as 'treatment contrasts'). This means one level of each categorical
-% factor is chosen as the 'reference level' (often the first alphabetically or
-% numerically). All other levels of that factor are then compared directly to
-% this reference level. Understanding this is key to interpreting the output.
+% MATLAB's `fitlme` function uses 'Dummy Coding' by default for categorical
+% predictors. (also known as 'treatment contrasts'). This means one level
+% of each categorical factor is chosen as the 'reference level' (often the
+% first alphabetically or numerically). All other levels of that factor are
+% then compared directly to this reference level.
 %
-% The '(Intercept)' coefficient represents the estimated average value of the
-% response variable under a specific baseline condition: when all categorical
-% predictors in the model are at their reference levels, and simultaneously,
-% all continuous predictors included in the model formula are equal to zero.
-% A statistically significant intercept test suggests this baseline mean is
-% different from zero.
+% The '(Intercept)' coefficient represents the estimated average value of
+% the response variable under a specific baseline condition: when all
+% categorical predictors in the model are at their reference levels, and
+% simultaneously, all continuous predictors included in the model formula
+% are equal to zero. A statistically significant intercept test suggests
+% this baseline mean is different from zero.
 %
-% A 'Main Effect' coefficient, such as one named 'FactorA_LevelX', estimates the
-% *difference* in the average response between 'LevelX' of 'FactorA' and the
-% reference level of 'FactorA'. However, a critical point arises when interactions
-% are present in the model: this comparison is valid *only* when all other
-% factors that interact with 'FactorA' are held at their respective reference
-% levels. Therefore, in the presence of interactions, this coefficient does not
-% represent the overall main effect averaged across the levels of other factors.
+% A 'Main Effect' coefficient, such as one named 'FactorA_LevelX',
+% estimates the *difference* in the average response between 'LevelX' of
+% 'FactorA' and the reference level of 'FactorA'. However, a critical point
+% arises when interactions are present in the model: this comparison is
+% valid *only* when all other factors that interact with 'FactorA' are held
+% at their respective reference levels. Therefore, in the presence of
+% interactions, this coefficient does not represent the overall main effect
+% averaged across the levels of other factors.
 %
-% An 'Interaction Coefficient', for example 'FactorA_LevelX:FactorB_LevelY',
-% assesses how the effect of one factor changes depending on the level of another.
-% It quantifies the *additional difference* in the response associated with
-% FactorA being at LevelX (vs. its reference) when FactorB is specifically at
-% LevelY (compared to when FactorB is at its reference level). It essentially
-% captures a "difference of differences". A significant interaction term indicates
-% that the effect of FactorA is not constant but depends on the specific level
-% of FactorB (and vice-versa).
-%
+% An 'Interaction' Coefficient, for example
+% 'FactorA_LevelX:FactorB_LevelY', assesses how the effect of one factor
+% changes depending on the level of another. It quantifies the *additional
+% difference* in the response associated with FactorA being at LevelX (vs.
+% its reference) when FactorB is specifically at LevelY (compared to when
+% FactorB is at its reference level). It essentially captures a "difference
+% of differences". A significant interaction term indicates that the effect
+% of FactorA is not constant but depends on the specific level of FactorB
+% (and vice-versa).
+
 %**************************************************************************
-% Contrast Types Generated and Tested by `lme_analyse`
+% Contrast Types 
 %**************************************************************************
-% This function facilitates hypothesis testing about specific comparisons or
-% combinations of the fixed-effect coefficients (the betas). Mathematically,
-% each test evaluates a hypothesis like H0: H * beta = 0, where 'H' is a row
-% vector that defines the linear combination of coefficients forming the
-% contrast of interest. The results table (`lme_results`) categorizes these
-% tests into distinct types.
+% This function facilitates hypothesis testing about specific comparisons
+% or combinations of the fixed-effect coefficients (the betas).
+% Mathematically, each test evaluates a hypothesis like H0: H * beta = 0,
+% where 'H' is a row vector that defines the linear combination of
+% coefficients forming the contrast of interest. The results table
+% (`lme_results`) categorizes these tests into distinct types.
 %
 % The "Coefficient" type refers to the standard tests for individual model
-% coefficients equalling zero. The results (Estimate, SE, tStat, DF, pValue)
-% for these are taken directly from the standard output of the `fitlme` model
-% (specifically, the `lme.Coefficients` table). No separate contrast vector 'H'
-% is constructed or tested using `coefTest` here; the 'H_vector' column in the
-% output table will show NaN. For example, a test for `FactorA_LevelX` of type
-% "Coefficient" tests the hypothesis H0: beta_FactorA_LevelX = 0, under the
-% conditions described earlier regarding reference levels for interacting factors.
-% Importantly, these standard coefficient tests are *not* included in the
-% multiple comparison correction procedures (like Holm, Bonferroni, or FDR)
-% applied by this function; the `p_Adjusted` column will always be NaN for rows
-% of Type "Coefficient".
+% coefficients equalling zero. The results for these are taken directly
+% from the standard output of the `fitlme` model. No separate contrast
+% vector 'H' is constructed or tested using `coefTest` here and these
+% standard coefficient tests are *not* included in the multiple comparison
+% correction procedures; the `pAdj` column will always be NaN for
+% rows of Type "Coefficient".
 %
-% The "Simple Effect" type is generated specifically when two factors interact.
-% It tests the effect of one factor at a single, fixed level of the other factor.
-% For instance, it might test the difference between LevelX and the reference
-% level of FactorA, specifically *only* when FactorB is at LevelY. These tests
-% require constructing a specific contrast vector 'H' that typically combines
-% the main effect coefficient for FactorA_LevelX with the relevant interaction
-% coefficient (e.g., FactorA_LevelX:FactorB_LevelY). The function runs `coefTest`
-% using this H vector. The Estimate (calculated as H * beta_hat) and its
-% Standard Error (SE, calculated as sqrt(H * Cov(beta_hat) * H')) are computed.
-% The specific H vector used is stored in the `H_vector` column. These simple
-% effect tests *are* eligible for multiple comparison correction if they are
-% selected for inclusion in the final results table (via the 'contrasts' option).
-% The correction is applied collectively across all selected simple and marginal effects.
+% The "Simple Effect" type is generated specifically when two factors
+% interact. It tests the effect of one factor at a single, fixed level of
+% the other factor. For instance, it might test the difference between
+% LevelX and the reference level of FactorA, specifically *only* when
+% FactorB is at LevelY. These tests require constructing a specific
+% contrast vector 'H' that typically combines the main effect coefficient
+% for FactorA_LevelX with the relevant interaction coefficient (e.g.,
+% FactorA_LevelX:FactorB_LevelY). The function runs `coefTest` using this H
+% vector. The Estimate (calculated as H * beta_hat) and its Standard Error
+% (SE, calculated as sqrt(H * Cov(beta_hat) * H')) are computed. These
+% simple effect tests undergo multiple comparison correction if they are
+% selected for inclusion in the final results table (via the 'contrasts'
+% option). The correction is applied collectively across all selected
+% simple and marginal effects.
 %
-% The "Marginal Effect" type is also generated for two-way interactions. It tests
-% the effect of one factor averaged across all the levels of the other factor it
-% interacts with. This often aligns more closely with the intuitive notion of a
-% "main effect" in the presence of an interaction. For example, it might test
-% the difference between LevelX and the reference level of FactorA, averaged
-% across all levels of FactorB. Constructing the H vector for this involves
-% combining the main effect coefficient with a weighted sum of the relevant
-% interaction coefficients, where the weights ensure averaging (typically 1
-% divided by the number of levels of the factor being averaged over). Again,
-% `coefTest` is used with this H vector, the Estimate and SE are computed, and
-% the H vector is stored. Like simple effects, these marginal effect tests *are*
-% eligible for multiple comparison correction if selected for the output, applied
-% across the pool of selected simple and marginal tests.
+% The "Marginal Effect" type is also generated for two-way interactions. It
+% tests the effect of one factor averaged across all the levels of the
+% other factor it interacts with. This often aligns more closely with the
+% intuitive notion of a "main effect" in the presence of an interaction.
+% For example, it might test the difference between LevelX and the
+% reference level of FactorA, averaged across all levels of FactorB.
+% Constructing the H vector for this involves combining the main effect
+% coefficient with a weighted sum of the relevant interaction coefficients,
+% where the weights ensure averaging (typically 1 divided by the number of
+% levels of the factor being averaged over). Again, `coefTest` is used with
+% this H vector, the Estimate and SE are computed, and the H vector is
+% stored. Like simple effects, these marginal effect tests undergo multiple
+% comparison correction if selected for the output.
 %
-%**************************************************************************
-% Population-Level vs. Subject-Specific Effects
-%**************************************************************************
-% It is crucial to remember that all the results produced by this function –
-% whether standard coefficients, simple effects, or marginal effects – pertain
-% strictly to the *fixed effects* part of the LME model. They allow inferences
-% about *population averages*, representing overall trends or differences in the
+% All results produced by this function – whether standard coefficients,
+% simple effects, or marginal effects – pertain strictly to the *fixed
+% effects* part of the LME model. They allow inferences about
+% *population averages*, representing overall trends or differences in the
 % population from which the sample was drawn. These results do not describe
-% effects specific to individual subjects or clusters (often called conditional
-% effects). Analyzing subject-specific deviations would require examining the
-% estimated random effects ('b') themselves, potentially using functions like
+% effects specific to individual subjects or clusters (often called
+% conditional effects). Analyzing subject-specific deviations would require
+% examining the estimated random effects ('b') themselves, e.g. using
 % `randomEffects(lme)`.
-% 
+
+%**************************************************************************
+% ANOVA 
+%**************************************************************************
+% The `anova(lme)` method provides F-tests for each term. For a model
+% fitted with dummy coding:
+%
+% Interaction F-test (e.g., for Group:Day): This is a robust test for the
+% overall significance of the interaction. It should be examined first.
+%
+% Main Effect F-tests (e.g., for Group, for Day): These test hypotheses
+% about the simple effects at reference levels (due to dummy coding). If the
+% interaction is significant, these main effect F-tests are less directly
+% interpretable as "averaged effects" and the focus should shift to
+% simple/marginal effects that dissect the interaction. If the interaction
+% is *not* significant, these F-tests become more interpretable as overall
+% main effects.
+%
+% Note: To obtain Type III F-tests where main effects are tested more akin to
+% being "averaged over" other factors in the presence of interactions, `fitlme`
+% would need to be called with `'DummyVarCoding', 'effects'`. This function
+% currently uses default dummy coding to simplify H-vector construction for
+% simple/marginal effects.
+
+%**************************************************************************
+% Estimate +/ SE
+%**************************************************************************
+% The `Estimate` column provides the model's calculated magnitude for each
+% specific term or contrast. For the Intercept, the `Estimate` represents
+% the predicted mean value of the response variable when all categorical
+% fixed factors are at their designated reference levels and any continuous
+% fixed predictors are held at zero. For other coefficients (main effects
+% or interactions under dummy coding), the `Estimate` represents the
+% calculated difference compared to the relevant reference level(s). For
+% instance, a main effect coefficient's Estimate is the difference between
+% that factor level and its reference level, specifically evaluated when
+% other interacting factors are at their reference levels. An interaction
+% coefficient's Estimate quantifies how the effect of one factor changes
+% across levels of another. For derived contrasts (like simple or marginal
+% effects), the Estimate is the calculated value of the specific linear
+% combination of coefficients being tested (e.g., the estimated mean
+% difference between two groups at a specific condition). The `SE`
+% (Standard Error) accompanies each Estimate and quantifies the precision
+% of that estimate; it reflects the expected standard deviation of the
+% estimate if the study were repeated many times. The `SE` is crucial for
+% assessing statistical significance, as it forms the denominator in the
+% t-statistic calculation (t = Estimate / SE) and is used to construct
+% confidence intervals around the `Estimate`.
+ 
+%**************************************************************************
+% Statistic (t or F)
+%**************************************************************************
+% The `Statistic` column contains the test statistic associated with the
+% hypothesis test for that row. For rows of type 'Coeff', 'Simple', or
+% 'Marginal', this is the t-statistic (Estimate / SE), testing whether the
+% specific coefficient or contrast is significantly different from zero.
+% For rows of type 'ANOVA', this is the F-statistic obtained from the
+% `anova(lme)` function, testing the overall significance of the
+% interaction term in the model.
+
+%**************************************************************************
+% Degrees of Freedom (DF)
+%**************************************************************************
+% The `DF` column reports the degrees of freedom associated with the test
+% statistic. For t-tests ('Coeff', 'Simple', 'Marginal'), this is a single
+% value representing the denominator degrees of freedom. For F-tests
+% ('ANOVA'), this column displays the numerator and denominator degrees of
+% freedom as a string '[DF1, DF2]'. DF1 relates to the number of parameters
+% associated with the effect being tested, and DF2 relates to the residual
+% or error degrees of freedom. The default in this function is to estimate
+% DFs using Satterthwaite approximations.
+
 %**************************************************************************
 % Model Fit Statistics 
 %**************************************************************************
@@ -214,72 +768,26 @@ function [lme_results, lme_cfg] = lme_analyse(lme_tbl, lme_cfg, varargin)
 % parsimonious models compared to AIC and is sometimes considered better
 % for selecting the "true" model if one is assumed to exist within the set
 % of candidates.
-% 
-%**************************************************************************
-% Estimate +/ SE
-%**************************************************************************
-% The `Estimate` column provides the model's calculated magnitude for each
-% specific term or contrast. For the Intercept, the `Estimate` represents the
-% predicted mean value of the response variable when all categorical fixed
-% factors are at their designated reference levels and any continuous fixed
-% predictors are held at zero. For other coefficients (main effects or
-% interactions under dummy coding), the `Estimate` represents the calculated
-% difference compared to the relevant reference level(s). For instance, a
-% main effect coefficient's Estimate is the difference between that factor
-% level and its reference level, specifically evaluated when other
-% interacting factors are at their reference levels. An interaction
-% coefficient's Estimate quantifies how the effect of one factor changes
-% across levels of another. For derived contrasts (like simple or marginal
-% effects), the Estimate is the calculated value of the specific linear
-% combination of coefficients being tested (e.g., the estimated mean
-% difference between two groups at a specific condition). The `SE` (Standard
-% Error) accompanies each Estimate and quantifies the precision of that
-% estimate; it reflects the expected standard deviation of the
-% estimate if the study were repeated many times. The `SE` is crucial for
-% assessing statistical significance, as it forms the denominator in the
-% t-statistic calculation (t = Estimate / SE) and is used to construct
-% confidence intervals around the `Estimate`.
-% 
-%**************************************************************************
-% Statistic (t or F) and Degrees of Freedom (DF)
-%**************************************************************************
-% The `Statistic` column contains the test statistic associated with the hypothesis
-% test for that row. For rows of type 'Coeff', 'Simple', or 'Marginal', this
-% is the t-statistic (Estimate / SE), testing whether the specific coefficient
-% or contrast is significantly different from zero. For rows of type 'ANOVA',
-% this is the F-statistic obtained from the `anova(lme)` function, testing the
-% overall significance of the interaction term in the model.
-%
-% The `DF` column reports the degrees of freedom associated with the test statistic.
-% For t-tests ('Coeff', 'Simple', 'Marginal'), this is a single value representing
-% the denominator degrees of freedom, often calculated using methods like
-% Satterthwaite or Kenward-Roger approximations in mixed models. For F-tests
-% ('ANOVA'), this column displays the numerator and denominator degrees of
-% freedom as a string '[DF1, DF2]'. DF1 relates to the number of parameters
-% associated with the effect being tested, and DF2 relates to the residual or
-% error degrees of freedom.
-%
-%**************************************************************************
-% Correcting Type I errors
-%**************************************************************************
-% When performing multiple hypothesis tests simultaneously, such as
-% examining several simple or marginal effects derived from a model, the
-% probability of obtaining a statistically significant result purely by
-% chance (a Type I error or false positive) increases. To counteract this
-% inflation of the error rate across the set of tests, correction methods
-% are applied to the calculated p-values. The 'correction' parameter allows
-% choosing between different strategies:
 
+%**************************************************************************
+% Multiple Comparisons
+%**************************************************************************
+% Applied only to the family of selected "Simple Effect" and "Marginal
+% Effect". Not applied to ANOVA F-tests or individual model coefficients.
+%
+% To counteract this inflation of the error rate across the set of tests,
+% correction methods are applied to the calculated p-values. The
+% 'correction' parameter allows choosing between different strategies:
+%
 % Bonferroni ('bonferroni'): This is the simplest method, controlling the
 % Family-Wise Error Rate (FWER) – the probability of making one or more
 % Type I errors across all tests performed. It achieves this by multiplying
 % each individual p-value by the total number of tests conducted (m) or,
 % equivalently, by dividing the target significance level (e.g., 0.05) by
-% m. While straightforward and providing strong control against any false
-% positives, Bonferroni is often criticized for being overly conservative,
-% significantly reducing statistical power and increasing the risk of
-% failing to detect true effects (Type II errors).
-
+% m. Bonferroni is often overly conservative, significantly reducing
+% statistical power and increasing the risk of failing to detect true
+% effects (Type II errors).
+%
 % Holm-Bonferroni ('holm', default): This method also controls the FWER but
 % is uniformly more powerful (less conservative) than the standard
 % Bonferroni procedure. It works sequentially: p-values are ordered from
@@ -288,7 +796,7 @@ function [lme_results, lme_cfg] = lme_analyse(lme_tbl, lme_cfg, varargin)
 % smallest against alpha/(m-1), and so on, stopping when a p-value fails to
 % meet its adjusted threshold. This provides the same strong FWER control
 % as Bonferroni but with a better chance of detecting true effects.
-
+%
 % False Discovery Rate ('fdr', specifically Benjamini-Hochberg): Instead of
 % controlling the probability of making any Type I error (FWER), the FDR
 % approach controls the expected proportion of rejected null hypotheses
@@ -300,748 +808,3 @@ function [lme_results, lme_cfg] = lme_analyse(lme_tbl, lme_cfg, varargin)
 % true effects, making it suitable for more exploratory analyses where
 % controlling the proportion of false findings is deemed acceptable, rather
 % than strictly preventing any single false positive.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% INPUT PARSING
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Define expected inputs and optional parameters with their defaults and
-% validation rules.
-params = inputParser;
-addRequired(params, 'lme_tbl', @istable);
-addRequired(params, 'lme_cfg', @isstruct);
-addParameter(params, 'contrasts', 'all', ...
-    @(x) (ischar(x) && strcmpi(x, 'all')) || islogical(x) || isnumeric(x));
-addParameter(params, 'correction', 'holm', @(x) ischar(x) || isstring(x));
-addParameter(params, 'FitMethod', 'REML', @(x) ismember(upper(x), {'REML', 'ML'}));
-parse(params, lme_tbl, lme_cfg, varargin{:});
-
-% Store parsed parameters in local variables.
-contrast_req = params.Results.contrasts;
-correction_method = lower(char(params.Results.correction));
-fit_method = params.Results.FitMethod;
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% LME MODEL FITTING
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Check for the required formula field in the config struct. Fit the LME
-% model using fitlme with the specified data, formula, and fit method.
-% Store the fitted model back into the configuration struct for output.
-lme = fitlme(lme_tbl, lme_cfg.frml, 'FitMethod', fit_method)
-
-[~, ~, stats] = fixedEffects(lme, 'DFMethod', 'satterthwaite')
-
-lme = fitlme(lme_tbl, lme_cfg.frml, 'FitMethod', fit_method,...
-    'DummyVarCoding', 'effects')
-
-
-lme = fitlme(lme_tbl, lme_cfg.frml, 'FitMethod', fit_method,...
-    'DummyVarCoding', 'full')
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% EXTRACT MODEL INFORMATION
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Get coefficient names, estimates, the full coefficient table, and covariance matrix.
-% Create a map for quick lookup of coefficient indices by name.
-all_coef_names = lme.CoefficientNames;
-num_all_coefs = length(all_coef_names);
-coef_estimates_all = lme.Coefficients.Estimate;
-coef_map = containers.Map(all_coef_names, 1:num_all_coefs);
-lme_coef_table = lme.Coefficients;
-coef_cov = lme.CoefficientCovariance;
-
-if isempty(contrast_req)
-    contrast_req = 1 : length(all_coef_names);
-end
-
-% update cfg output
-lme_cfg.mdl = lme; 
-lme_cfg.contrasts = contrast_req; 
-lme_cfg.correction = correction_method; 
-lme_cfg.FitMethod = fit_method;
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% PERFORM ANOVA
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Run ANOVA on the fitted model to get overall F-tests for fixed effects.
-anova_tbl = anova(lme);
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% IDENTIFY CATEGORICAL FACTORS
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Determine which predictor variables are categorical factors involved in the fixed effects formula.
-% Store factor names, levels, and reference levels for later use in contrast generation.
-factor_info = struct();
-formula_factors = {};
-fixed_terms = lme.Formula.FELinearFormula.TermNames; % Terms like 'Group', 'Time', 'Group:Time'
-for ipredictor = 1:length(lme.PredictorNames)
-    var_name = lme.PredictorNames{ipredictor};
-    % Check if predictor is in the table and is categorical
-    if ismember(var_name, lme_tbl.Properties.VariableNames) && iscategorical(lme_tbl.(var_name))
-        cats = categories(lme_tbl.(var_name));
-        if ~isempty(cats)
-            factor_info.(var_name).Levels = cats;
-            factor_info.(var_name).RefLevel = cats{1};
-            % Check if this factor is part of any fixed effect term
-            if any(strcmp(var_name, fixed_terms)) || ...
-                    any(contains(fixed_terms, [var_name ':'])) || ...
-                    any(contains(fixed_terms, [':' var_name]))
-                formula_factors{end+1} = var_name;
-            end
-        end
-    end
-end
-formula_factors = unique(formula_factors); % Ensure unique list
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% GENERATE CONTRAST DEFINITIONS
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Prepare a structure array to hold details about each potential contrast
-% or coefficient.
-internal_defs_list = struct(...
-    'DefIndex', {}, ...             % Unique index for each definition generated
-    'Type', {}, ...                 % 'ANOVA', 'Coefficient', 'Simple Effect', 'Marginal Effect'
-    'Description', {}, ...          % User-friendly label for the contrast/coefficient
-    'CoefficientCombination', {},...% Cell array of coefficient names involved (for H construction)
-    'H_vector', {}, ...             % The contrast vector (row vector) for coefTest (NaN for Type='Coefficient')
-    'OrigCoefIndex', {});           % Index in the original lme.Coefficients table (NaN for derived contrasts)
-def_idx_counter = 0;
-
-% Prepare definitions for ANOVA results first
-for ia = 1:height(anova_tbl)
-    def_idx_counter = def_idx_counter + 1;
-    term_name = anova_tbl.Term{ia};
-    desc = sprintf('ANOVA: %s', term_name);
-    
-    % Store minimal info needed later to populate results
-    internal_defs_list(def_idx_counter) = struct(...
-        'DefIndex', def_idx_counter,...
-        'Type', "ANOVA",...
-        'Description', desc,...
-        'CoefficientCombination', {{term_name}},... % Store term name for reference
-        'H_vector', {NaN},...
-        'OrigCoefIndex', ia); % Use OrigCoefIndex to store ANOVA row index
-end
-
-% If requested, iterate through model coefficients and create entries for
-% them. Generate more descriptive labels based on factor levels.
-for icoeff = 1:num_all_coefs
-    name = all_coef_names{icoeff};
-    def_idx_counter = def_idx_counter + 1;
-    H_vec = NaN; % H-vector is not applicable for direct coefficient tests
-    desc = name; % Default description is the coefficient name
-
-    % Improve description for intercept
-    if strcmp(name, '(Intercept)')
-        desc = '(Intercept) Mean at Ref Levels';
-
-        % Improve description for main effects (non-interaction terms)
-    elseif ~contains(name, ':')
-        parts = strsplit(name, '_'); % e.g., 'Group_B' -> {'Group', 'B'}
-        factor = parts{1};
-        level = strjoin(parts(2:end),'_'); % Handle levels with underscores
-        if isfield(factor_info, factor)
-            ref_level = factor_info.(factor).RefLevel;
-            base_desc = sprintf('(%s vs %s)', ref_level, level); % e.g., "(A vs B)"
-            % Add context about other factors being at reference level
-            other_formula_factors = setdiff(formula_factors, factor);
-            at_ref_desc = '';
-            if ~isempty(other_formula_factors)
-                ref_level_parts = cell(1, length(other_formula_factors));
-                valid_refs = true;
-                for k = 1:length(other_formula_factors)
-                    other_factor = other_formula_factors{k};
-                    if isfield(factor_info, other_factor)
-                        ref_level_parts{k} = factor_info.(other_factor).RefLevel;
-                    else
-                        valid_refs = false; break; % Should not happen if formula_factors is correct
-                    end
-                end
-                if valid_refs && ~isempty(ref_level_parts)
-                    at_ref_desc = [' at ' strjoin(ref_level_parts, ', ')];
-                end
-            end
-            desc = [base_desc, at_ref_desc]; % e.g., "(A vs B) at (X)"
-        end
-
-        % Improve description for interaction effects
-    else
-        parts = strsplit(name, ':'); % e.g., 'Group_B:Time_Post' -> {'Group_B', 'Time_Post'}
-        term_descs = cell(size(parts));
-        valid_desc = true;
-        for k=1:length(parts)
-            subparts = strsplit(parts{k}, '_'); % {'Group', 'B'}
-            factor = subparts{1};
-            level = strjoin(subparts(2:end),'_');
-            if isfield(factor_info, factor)
-                term_descs{k} = sprintf('(%s vs %s)', factor_info.(factor).RefLevel, level);
-            else
-                valid_desc=false; break; % Should not happen
-            end
-        end
-        if valid_desc
-            desc = strjoin(term_descs, ' * '); % e.g., "(A vs B) * (Pre vs Post)"
-        end
-    end % End description formatting
-
-    internal_defs_list(def_idx_counter) = struct(...
-        'DefIndex', def_idx_counter,...
-        'Type', "Coeff",...
-        'Description', desc,...
-        'CoefficientCombination', {{name}},... % Name is sufficient here
-        'H_vector', {H_vec},...
-        'OrigCoefIndex', icoeff);
-end % End loop through coefficients
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% GENERATE SIMPLE & MARGINAL EFFECT DEFINITIONS
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% For each valid 2-way interaction between categorical factors:
-%   - If requested, generate definitions and H-vectors for Simple Main Effects.
-%   - If requested, generate definitions and H-vectors for Marginal Effects.
-% Keep track of processed interactions to avoid duplicates (e.g., A:B vs B:A).
-
-interaction_terms = lme.Formula.FELinearFormula.TermNames(...
-    contains(lme.Formula.FELinearFormula.TermNames, ':'));
-processed_interactions = struct(); % Track processed pairs like 'FactorA_x_FactorB'
-
-for i = 1:length(interaction_terms)
-    factors = strsplit(interaction_terms{i}, ':');
-
-    % Only process 2-way interactions currently
-    if length(factors) ~= 2
-        continue;
-    end
-    factorA = factors{1};
-    factorB = factors{2};
-
-    % Create a unique key for the interaction pair, regardless of order
-    interaction_key = strjoin(sort(factors),':');
-    interaction_struct_key = strrep(interaction_key, ':', '_x_'); % Valid struct field name
-
-    % Skip if this interaction pair was already processed or if factors
-    % aren't in the formula
-    if isfield(processed_interactions, interaction_struct_key) || ...
-            ~ismember(factorA, formula_factors) || ~ismember(factorB, formula_factors)
-        continue;
-    end
-    processed_interactions.(interaction_struct_key) = true; % Mark as processed
-
-    % Get factor levels and reference levels
-    levelsA = factor_info.(factorA).Levels; refA = factor_info.(factorA).RefLevel; numA = length(levelsA);
-    levelsB = factor_info.(factorB).Levels; refB = factor_info.(factorB).RefLevel; numB = length(levelsB);
-
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    % SIMPLE EFFECT DEFINITIONS
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    % Effect of A at each level of B
-    for levelB_idx = 1:numB
-        levelB = levelsB{levelB_idx};
-        for levelA_idx = 1:numA
-            levelA = levelsA{levelA_idx};
-            if strcmp(levelA, refA); continue; end % Compare non-ref to ref
-
-            H = zeros(1, num_all_coefs);
-            coef_names_involved = {};
-            valid_H = false;
-
-            % Main effect coefficient for A
-            coef_main_A = sprintf('%s_%s', factorA, levelA);
-            if isKey(coef_map, coef_main_A)
-                H(coef_map(coef_main_A)) = 1;
-                coef_names_involved{end+1} = coef_main_A; 
-                valid_H = true; % Start with the main effect
-                desc = sprintf('(%s vs %s) at %s', refA, levelA, levelB);
-
-                % Add interaction term if not at the reference level of B
-                if ~strcmp(levelB, refB)
-                    % Construct interaction term name possibilities (order might vary)
-                    coef_interact = sprintf('%s_%s:%s_%s', factorA, levelA, factorB, levelB);
-                    coef_interact_alt = sprintf('%s_%s:%s_%s', factorB, levelB, factorA, levelA);
-                    if isKey(coef_map, coef_interact)
-                        H(coef_map(coef_interact)) = 1;
-                        coef_names_involved{end+1} = coef_interact; %#ok<AGROW>
-                    elseif isKey(coef_map, coef_interact_alt)
-                        H(coef_map(coef_interact_alt)) = 1;
-                        coef_names_involved{end+1} = coef_interact_alt; %#ok<AGROW>
-                    else
-                        valid_H = false; % Interaction term needed but not found
-                        warning('lme_analyse:MissingInteractionTerm', ...
-                            'Could not find interaction term for simple effect: %s at %s. Skipping.', coef_main_A, levelB);
-                    end
-                end
-            else
-                warning('lme_analyse:MissingMainTerm', ...
-                    'Could not find main effect term: %s for simple effect. Skipping.', coef_main_A);
-            end
-
-            % Add definition if H-vector is valid
-            if valid_H
-                % Check if this simple effect is equivalent to a coefficient
-                is_duplicate = false;
-                % For simple effects, check if the H vector matches any coefficient's pattern
-                % A coefficient will have exactly one 1 in its H vector
-                if sum(H == 1) == 1 && sum(H == 0) == length(H) - 1
-                    is_duplicate = true;
-                end
-                
-                if ~is_duplicate
-                    def_idx_counter = def_idx_counter + 1;
-                    internal_defs_list(def_idx_counter) = struct(...
-                        'DefIndex', def_idx_counter,...
-                        'Type', "Simple",...
-                        'Description', desc,...
-                        'CoefficientCombination', {unique(coef_names_involved)},...
-                        'H_vector', {H},...
-                        'OrigCoefIndex', NaN);
-                end
-            end
-        end % End loop levelA
-    end % End loop levelB (for effect of A)
-
-    % Effect of B at each level of A (similar logic)
-    for levelA_idx = 1:numA
-        levelA = levelsA{levelA_idx};
-        for levelB_idx = 1:numB
-            levelB = levelsB{levelB_idx};
-            if strcmp(levelB, refB); continue; end % Compare non-ref to ref
-
-            H = zeros(1, num_all_coefs);
-            coef_names_involved = {};
-            valid_H = false;
-
-            coef_main_B = sprintf('%s_%s', factorB, levelB);
-            if isKey(coef_map, coef_main_B)
-                H(coef_map(coef_main_B)) = 1;
-                coef_names_involved{end+1} = coef_main_B; %#ok<AGROW>
-                valid_H = true;
-                desc = sprintf('(%s vs %s) at %s', refB, levelB, levelA);
-
-                if ~strcmp(levelA, refA)
-                    coef_interact = sprintf('%s_%s:%s_%s', factorA, levelA, factorB, levelB);
-                    coef_interact_alt = sprintf('%s_%s:%s_%s', factorB, levelB, factorA, levelA);
-                    if isKey(coef_map, coef_interact)
-                        H(coef_map(coef_interact)) = 1;
-                        coef_names_involved{end+1} = coef_interact; %#ok<AGROW>
-                    elseif isKey(coef_map, coef_interact_alt)
-                        H(coef_map(coef_interact_alt)) = 1;
-                        coef_names_involved{end+1} = coef_interact_alt; %#ok<AGROW>
-                    else
-                        valid_H = false;
-                        warning('lme_analyse:MissingInteractionTerm', ...
-                            'Could not find interaction term for simple effect: %s at %s. Skipping.', coef_main_B, levelA);
-                    end
-                end
-            else
-                warning('lme_analyse:MissingMainTerm', ...
-                    'Could not find main effect term: %s for simple effect. Skipping.', coef_main_B);
-            end
-
-            if valid_H
-                % Check if this simple effect is equivalent to a coefficient
-                is_duplicate = false;
-                % For simple effects, check if the H vector matches any coefficient's pattern
-                % A coefficient will have exactly one 1 in its H vector
-                if sum(H == 1) == 1 && sum(H == 0) == length(H) - 1
-                    is_duplicate = true;
-                end
-                
-                if ~is_duplicate
-                    def_idx_counter = def_idx_counter + 1;
-                    internal_defs_list(def_idx_counter) = struct(...
-                        'DefIndex', def_idx_counter,...
-                        'Type', "Simple",...
-                        'Description', desc,...
-                        'CoefficientCombination', {unique(coef_names_involved)},...
-                        'H_vector', {H},...
-                        'OrigCoefIndex', NaN);
-                end
-            end
-        end % End loop levelB
-    end % End loop levelA (for effect of B)
-
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    % MARGINAL EFFECT DEFINITIONS
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    weightB = 1 / numB; % Weight for averaging over levels of B
-    weightA = 1 / numA; % Weight for averaging over levels of A
-
-    % Marginal Effect of A (averaged over B)
-    for levelA_idx = 1:numA
-        levelA = levelsA{levelA_idx};
-        if strcmp(levelA, refA); continue; end % Compare non-ref to ref
-
-        H = zeros(1, num_all_coefs);
-        coef_names_involved = {};
-        valid_H = false;
-
-        % Start with main effect coefficient for A
-        coef_main_A = sprintf('%s_%s', factorA, levelA);
-        if isKey(coef_map, coef_main_A)
-            H(coef_map(coef_main_A)) = 1; % Weight = 1 for the main effect part
-            coef_names_involved{end+1} = coef_main_A; %#ok<AGROW>
-            valid_H = true;
-
-            % Add weighted interaction terms for non-reference levels of B
-            for levelB_idx = 1:numB
-                levelB = levelsB{levelB_idx};
-                if strcmp(levelB, refB); continue; end % Only need non-ref interaction terms
-
-                coef_interact = sprintf('%s_%s:%s_%s', factorA, levelA, factorB, levelB);
-                coef_interact_alt = sprintf('%s_%s:%s_%s', factorB, levelB, factorA, levelA);
-                if isKey(coef_map, coef_interact)
-                    H(coef_map(coef_interact)) = H(coef_map(coef_interact)) + weightB;
-                    coef_names_involved{end+1} = coef_interact; %#ok<AGROW>
-                elseif isKey(coef_map, coef_interact_alt)
-                    H(coef_map(coef_interact_alt)) = H(coef_map(coef_interact_alt)) + weightB;
-                    coef_names_involved{end+1} = coef_interact_alt; %#ok<AGROW>
-                else
-                    valid_H = false; % Missing interaction term needed for averaging
-                    warning('lme_analyse:MissingInteractionTerm', ...
-                        'Could not find interaction term involving %s and %s for marginal effect. Skipping.', levelA, levelB);
-                    break; % Stop processing this marginal effect if term is missing
-                end
-            end % End loop levels of B for interaction terms
-        else
-            warning('lme_analyse:MissingMainTerm', ...
-                'Could not find main effect term: %s for marginal effect. Skipping.', coef_main_A);
-        end
-
-        % Add definition if H-vector construction succeeded
-        if valid_H
-            def_idx_counter = def_idx_counter + 1;
-            desc = sprintf('(%s vs %s) over %s', refA, levelA, factorB);
-            internal_defs_list(def_idx_counter) = struct(...
-                'DefIndex', def_idx_counter,...
-                'Type', "Marginal",...
-                'Description', desc,...
-                'CoefficientCombination', {unique(coef_names_involved)},...
-                'H_vector', {H},...
-                'OrigCoefIndex', NaN);
-        end
-    end % End loop levelA (for marginal effect of A)
-
-    % Marginal Effect of B (averaged over A) - similar logic
-    for levelB_idx = 1:numB
-        levelB = levelsB{levelB_idx};
-        if strcmp(levelB, refB); continue; end
-
-        H = zeros(1, num_all_coefs);
-        coef_names_involved = {};
-        valid_H = false;
-
-        coef_main_B = sprintf('%s_%s', factorB, levelB);
-        if isKey(coef_map, coef_main_B)
-            H(coef_map(coef_main_B)) = 1;
-            coef_names_involved{end+1} = coef_main_B; %#ok<AGROW>
-            valid_H = true;
-
-            for levelA_idx = 1:numA
-                levelA = levelsA{levelA_idx};
-                if strcmp(levelA, refA); continue; end
-
-                coef_interact = sprintf('%s_%s:%s_%s', factorA, levelA, factorB, levelB);
-                coef_interact_alt = sprintf('%s_%s:%s_%s', factorB, levelB, factorA, levelA);
-                if isKey(coef_map, coef_interact)
-                    H(coef_map(coef_interact)) = H(coef_map(coef_interact)) + weightA;
-                    coef_names_involved{end+1} = coef_interact; %#ok<AGROW>
-                elseif isKey(coef_map, coef_interact_alt)
-                    H(coef_map(coef_interact_alt)) = H(coef_map(coef_interact_alt)) + weightA;
-                    coef_names_involved{end+1} = coef_interact_alt; %#ok<AGROW>
-                else
-                    valid_H = false;
-                    warning('lme_analyse:MissingInteractionTerm', ...
-                        'Could not find interaction term involving %s and %s for marginal effect. Skipping.', levelA, levelB);
-                    break;
-                end
-            end % End loop levels of A
-        else
-            warning('lme_analyse:MissingMainTerm', ...
-                'Could not find main effect term: %s for marginal effect. Skipping.', coef_main_B);
-        end
-
-        if valid_H
-            def_idx_counter = def_idx_counter + 1;
-            desc = sprintf('(%s vs %s) averaged over %s', refB, levelB, factorA);
-            internal_defs_list(def_idx_counter) = struct(...
-                'DefIndex', def_idx_counter,...
-                'Type', "Marginal",...
-                'Description', desc,...
-                'CoefficientCombination', {unique(coef_names_involved)},...
-                'H_vector', {H},...
-                'OrigCoefIndex', NaN);
-        end
-    end % End loop levelB (for marginal effect of B)
-end % End loop through interaction terms
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% DETERMINE WHICH DEFINITIONS TO INCLUDE (NOW DONE AFTER CALCULATION)
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Based on the 'contrasts' parameter ('all', logical indices, or numeric
-% indices), select the subset of definitions from internal_defs_list to
-% calculate results for.
-% if ischar(contrast_req) && strcmpi(contrast_req, 'all')
-%     indices_to_report = [internal_defs_list.DefIndex];
-% elseif islogical(contrast_req)
-%     indices_to_report = find(contrast_req);
-% elseif isnumeric(contrast_req)
-%     indices_to_report = unique(contrast_req(:)'); % Ensure row vector of unique indices
-% else
-%     error('Invalid format for ''contrasts'' parameter. Use ''all'', logical vector, or numeric vector.');
-% end
-
-% --- We now always calculate all definitions first --- 
-indices_to_report = [internal_defs_list.DefIndex];
-
-num_report = length(indices_to_report);
-if num_report == 0
-    lme_results = table();
-    return;
-end
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% CALCULATE SELECTED DEFINITIONS
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Preallocate a cell array to store results for the selected definitions.
-% Iterate through the selected definition indices.
-% For 'Coefficient' type, directly extract results from the LME coefficient table.
-% For 'Simple Effect' or 'Marginal Effect' types:
-%   - Retrieve the H-vector.
-%   - Use `coefTest` to get p-value and DF.
-%   - Calculate the estimate (H * beta_hat).
-%   - Calculate the SE (sqrt(H * Cov(beta_hat) * H')).
-%   - Calculate the t-statistic (Estimate / SE, handling potential zero SE).
-%   - Store the uncorrected p-value and track the index for potential correction later.
-results_data = cell(num_report, 8); % {Type, Desc, Est, SE, Stat, DF, pVal, pAdj} - H_vector added later
-derived_contrast_indices_in_output = []; % Track output table rows for derived contrasts
-p_values_for_correction = [];         % Store pVals ONLY for selected derived contrasts
-h_vectors_to_store = cell(num_report, 1); % Store H-vectors separately
-
-for i = 1:num_report
-    current_def_idx = indices_to_report(i);
-    row_def = internal_defs_list(current_def_idx);
-
-    % Initialize results for this row
-    est = NaN; se = NaN; stat = NaN; df_out = {NaN}; pVal = NaN; pAdj = NaN;
-    current_h_vec = {NaN}; % Default to NaN for H-vector storage
-
-    if row_def.Type == "ANOVA"
-        anova_row_idx = row_def.OrigCoefIndex; % Index in the anova_tbl
-        if ~isnan(anova_row_idx) && anova_row_idx <= height(anova_tbl)
-            stat = anova_tbl.FStat(anova_row_idx);
-            df1  = anova_tbl.DF1(anova_row_idx);
-            df2  = anova_tbl.DF2(anova_row_idx);
-            df_out = {sprintf('[%d, %d]', df1, df2)}; % Store DF as a string '[DF1, DF2]' in a cell
-            pVal = anova_tbl.pValue(anova_row_idx);
-            % Estimate, SE, pAdj, H-vector remain NaN for ANOVA rows
-        else
-             warning('lme_analyse:InvalidAnovaIndex', ...
-                'Invalid ANOVA table index for definition %d. Results set to NaN.', current_def_idx);
-        end
-
-    elseif row_def.Type == "Coeff"
-        orig_coef_idx = row_def.OrigCoefIndex;
-        if ~isnan(orig_coef_idx) && orig_coef_idx <= height(lme_coef_table)
-            est   = lme_coef_table.Estimate(orig_coef_idx);
-            se    = lme_coef_table.SE(orig_coef_idx);
-            stat  = lme_coef_table.tStat(orig_coef_idx); % Get tStat
-            df_out = {lme_coef_table.DF(orig_coef_idx)};    % Get DF, wrap in cell
-            pVal  = lme_coef_table.pValue(orig_coef_idx);
-            % pAdj and H-vector remain NaN for Coeff rows
-        else
-            warning('lme_analyse:InvalidCoefIndex', ...
-                'Invalid original coefficient index for definition %d. Results set to NaN.', current_def_idx);
-        end
-
-    elseif row_def.Type == "Simple" || row_def.Type == "Marginal"
-        H = row_def.H_vector; % This is already a cell containing the vector, access content
-        current_h_vec = {H}; % Store the numeric H vector in a cell for the final table
-
-        % Check if H is a valid numeric vector
-        if ~isnumeric(H) || isempty(H) || any(isnan(H(:)))
-            warning('lme_analyse:InvalidHVector', ...
-                'Invalid or missing H-vector for derived contrast definition %d (%s). Results set to NaN.', ...
-                current_def_idx, row_def.Description);
-            % Keep results as NaN, current_h_vec is already {H} which might be {NaN} or invalid
-        else
-            % Perform the contrast test
-            [p_test, F_test, ~, df_test] = coefTest(lme, H); % Use specific output var names
-
-            % Calculate Estimate and SE
-            est = H * coef_estimates_all(:); % Ensure beta is column vector
-            var_contrast = H * coef_cov * H';
-
-            % Handle near-zero negative variance due to numerical precision
-            if var_contrast < 0 && abs(var_contrast) < 1e-10
-                var_contrast = 0;
-            elseif var_contrast < 0
-                warning('lme_analyse:NegativeVariance', ...
-                    'Negative variance calculated for contrast %d (%s). SE set to NaN.', ...
-                    current_def_idx, row_def.Description);
-                se = NaN;
-            else
-                se = sqrt(var_contrast);
-            end
-
-            % Calculate t-statistic, handle potential division by zero/small SE
-            if ~isnan(se) && se > 1e-12 % Use a small tolerance
-                tStat = est / se;
-            elseif ~isnan(F_test) % Fallback using F-statistic if SE is zero or NaN
-                % Infer sign from estimate; if estimate is 0, t is positive sqrt(F)
-                tStat = sqrt(F_test) * sign(est + (est==0)); % Add (est==0) to make sign=1 if est is exactly 0
-            else
-                tStat = NaN; % Cannot determine t-stat
-            end
-
-            % Assign results
-            stat = tStat; % Assign calculated t-statistic to 'stat'
-            pVal = p_test;
-            df_out = {df_test}; % Store scalar DF in a cell
-
-            % Store p-value and the index *in the final output table* for correction
-            p_values_for_correction(end+1) = pVal; %#ok<AGROW>
-            derived_contrast_indices_in_output(end+1) = i; %#ok<AGROW>
-        end % End check for valid H vector
-    end % End check of definition Type
-
-    % Store results for this row in the cell array
-    results_data(i,:) = {row_def.Type, row_def.Description, est, se, stat, df_out, pVal, pAdj}; % Use stat, df_out
-    h_vectors_to_store{i} = current_h_vec; % Store the H-vector (or {NaN})
-
-end % End loop through selected contrasts
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% APPLY MULTIPLE COMPARISON CORRECTION
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Apply the chosen correction method (Holm, Bonferroni, FDR) only to the
-% p-values gathered from the *selected* derived contrasts ('Simple Effect', 'Marginal Effect').
-% Handle NaN p-values appropriately during correction.
-num_derived_tests_selected = length(p_values_for_correction);
-p_adjusted_corrected = nan(size(p_values_for_correction)); % Initialize with NaNs
-
-if num_derived_tests_selected > 0 && ~strcmpi(correction_method, 'none')
-    % Find indices of valid (non-NaN) p-values among the selected derived contrasts
-    valid_pval_indices = find(~isnan(p_values_for_correction));
-    p_values_to_correct = p_values_for_correction(valid_pval_indices);
-    num_valid_tests_to_correct = length(p_values_to_correct);
-
-    if num_valid_tests_to_correct > 1 % Only apply correction if more than one valid p-value
-        % Sort the valid p-values and get indices to restore order later
-        [p_values_sorted, sort_idx] = sort(p_values_to_correct);
-        restore_idx = zeros(size(sort_idx)); % Preallocate inverse index array
-        restore_idx(sort_idx) = 1:num_valid_tests_to_correct; % Create inverse index
-
-        adj_p_sorted = []; % Initialize adjusted p-values
-        m = num_valid_tests_to_correct; % Number of tests being corrected
-
-        switch correction_method
-            case 'bonferroni'
-                adj_p_sorted = min(1, p_values_sorted * m);
-            case 'holm'
-                % Holm-Bonferroni step-down procedure
-                adj_factor = (m:-1:1)'; % [m, m-1, ..., 1]
-                adj_p_sorted_raw = p_values_sorted(:) .* adj_factor; % Use sorted p-values
-                adj_p_sorted = min(1, cummax(adj_p_sorted_raw)); % Apply cumulative maximum
-            case 'fdr'
-                % Benjamini-Hochberg FDR control
-                i_rank = (1:m)'; % Rank [1, 2, ..., m]
-                adj_p_raw = p_values_sorted(:) .* m ./ i_rank;
-                % Apply cumulative minimum from the end (preserves order for ties)
-                adj_p_sorted = min(1, cummin(adj_p_raw, 'reverse'));
-            otherwise
-                warning('lme_analyse:UnknownCorrection', ...
-                    'Unknown correction method: "%s". No correction applied to derived contrasts.', ...
-                    correction_method);
-                adj_p_sorted = p_values_sorted; % Use uncorrected if method is unknown
-        end
-
-        % Place the corrected p-values back into the correct positions using restore_idx
-        p_adjusted_corrected(valid_pval_indices) = adj_p_sorted(restore_idx);
-
-    elseif num_valid_tests_to_correct == 1
-        % If only one test, adjusted p-value is the same as uncorrected
-        p_adjusted_corrected(valid_pval_indices) = p_values_to_correct;
-    end
-    % Any originally NaN p-values remain NaN in p_adjusted_corrected
-elseif num_derived_tests_selected > 0 && strcmpi(correction_method, 'none')
-    % If 'none' is specified, copy uncorrected p-values to the adjusted column
-    p_adjusted_corrected = p_values_for_correction;
-end
-
-% Update the pAdj column in the results_data cell array
-if ~isempty(derived_contrast_indices_in_output)
-    results_data(derived_contrast_indices_in_output, 8) = num2cell(p_adjusted_corrected(:));
-end
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% CREATE FINAL RESULTS TABLE
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Convert the cell array of results into a MATLAB table.
-% Add the H-vectors as a separate variable.
-% Add a simple sequential index column for easy reference.
-% Display completion message.
-lme_results = cell2table(results_data, ...
-    'VariableNames', {'Type', 'Description', 'Estimate', 'SE', ...
-    'Statistic', 'DF', 'p_Value', 'p_Adjusted'}); % Renamed t_Statistic -> Statistic
-
-% Add H_vector column, formatting numeric vectors
-formatted_h_vectors = cell(num_report, 1);
-for i = 1:num_report
-    h_content = h_vectors_to_store{i}{1}; % Access the content within the cell
-    if isnumeric(h_content) && isvector(h_content)
-        % Optionally round for display, or convert to string representation
-        formatted_h_vectors{i} = mat2str(round(h_content, 3));
-    else
-        formatted_h_vectors{i} = NaN; % Store NaN if H was not applicable/valid
-    end
-end
-lme_results.H_vector = formatted_h_vectors;
-
-
-% Add a simple index column at the beginning
-lme_results = addvars(lme_results, (1:num_report)', 'Before', 1, ...
-    'NewVariableNames', 'Index');
-
-% Format numeric columns for display
-lme_results.Estimate = round(lme_results.Estimate, 2);
-lme_results.SE = round(lme_results.SE, 2);
-lme_results.Statistic = round(lme_results.Statistic, 2); % Renamed from t_Statistic
-% DF is now mixed (numeric cell/string cell), handle potential errors if trying to round all
-% p-values can be rounded
-lme_results.p_Value = round(lme_results.p_Value, 4);
-lme_results.p_Adjusted = round(lme_results.p_Adjusted, 4);
-
-% Reorder rows to move ANOVA to the beginning
-if any(strcmp(lme_results.Properties.VariableNames, 'Type')) % Check if Type column exists
-    anova_rows_logic = strcmp(lme_results.Type, 'ANOVA');
-    non_anova_rows_logic = ~anova_rows_logic;
-    if any(anova_rows_logic) % Check if there are any ANOVA rows to move
-        lme_results = [lme_results(anova_rows_logic, :); lme_results(non_anova_rows_logic, :)];
-    end
-end
-
-% --- Apply user's contrast selection AFTER generating the full table ---
-if isnumeric(contrast_req)
-    % Select rows based on numeric indices provided by the user
-    % Validate indices against the current table height
-    if any(contrast_req < 1) || any(contrast_req > height(lme_results))
-        error('Numeric ''contrasts'' indices are out of bounds for the generated results table.');
-    end
-    lme_results = lme_results(contrast_req, :);
-elseif islogical(contrast_req)
-    % Select rows based on a logical mask
-    if length(contrast_req) ~= height(lme_results)
-        error('Logical ''contrasts'' vector length must match the number of rows (%d) in the full results table.', height(lme_results));
-    end
-    lme_results = lme_results(contrast_req, :);
-elseif ischar(contrast_req) && strcmpi(contrast_req, 'all')
-    % Keep all rows (already done)
-else
-    error('Invalid format for ''contrasts'' parameter. Use ''all'', logical vector, or numeric vector.');
-end
-
-% Update the Index column again after potential filtering 
-lme_results.Index = (1:height(lme_results))';
-
-end % End of function lme_analyse

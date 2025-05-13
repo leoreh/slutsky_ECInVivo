@@ -39,6 +39,15 @@ fname = lme_frml2char(fname);
 
 % create new folder based on response variable
 resName = regexp(fname, '^[^~]+', 'match', 'once');
+
+capIdx = regexp(fname(2:end), '[A-Z]');
+if isempty(capIdx)
+    firstPart = inputStr; % If no capital letters found, return the whole string
+else
+    firstPart = inputStr(1:capIdx(1)); % Return everything up to the first capital
+end
+
+
 resName = strtrim(resName);
 
 fpath = fullfile(basepath, resName);

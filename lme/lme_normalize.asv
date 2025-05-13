@@ -67,8 +67,8 @@ normVec= nan(height(normData), 1); % Initialize normalized data vector
 uniqueGroups = unique(normData(:, groupVars), 'rows');
 
 % Loop through each unique group combination
-for iGrp = 1:height(uniqueGroups)
-    uRow = uniqueGroups(iGrp, :);
+for i = 1:height(uniqueGroups)
+    uRow = uniqueGroups(i, :);
 
     % Find rows matching the current unique group combination
     idxGroup = true(height(normData), 1);
@@ -99,7 +99,7 @@ for iGrp = 1:height(uniqueGroups)
 end
 
 % Replace the original response variable column with the normalized data
-normData.(yName) = normVec * 100;
+normData.(yName) = normData * 100;
 
 % Optional: Rename the column to indicate normalization
 % normData.Properties.VariableNames{yName} = [yName ' (Norm.)'];

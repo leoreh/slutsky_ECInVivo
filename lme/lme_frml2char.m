@@ -10,13 +10,13 @@ function frmlSimple = lme_frml2char(frml, varargin)
 % arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 p = inputParser;
-addOptional(p, 'rm_rnd', true, @islogical);
+addOptional(p, 'rmRnd', true, @islogical);
 addOptional(p, 'sfx', '', @ischar);
 addOptional(p, 'pfx', '', @ischar);
 addOptional(p, 'resNew', '', @ischar);
 
 parse(p, varargin{:});
-rm_rnd = p.Results.rm_rnd;
+rmRnd = p.Results.rmRnd;
 sfx = p.Results.sfx;
 pfx = p.Results.pfx;
 resNew = p.Results.resNew;
@@ -29,23 +29,12 @@ if isempty(frml)
     error('Formula cannot be empty');
 end
 
-% Replace response variable if resNew is provided
-if ~isempty(resNew)
-
-    % Find the original response variable (text before '~')
-    resOrig = regexp(frml, '^[^~]+', 'match', 'once');
-    % Ensure the new response variable ends with a space if it doesn't already
-    % and the part to replace also includes the space for cleaner replacement
-    % or directly replace up to the tilde.
-    frml = regexprep(frml, ['^' strtrim(resOrig) '\s*~'], [strtrim(resNew) ' ~']);
-end
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % simplify formula
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % remove random effects term (anything within parentheses)
-if rm_rnd
+if rmRnd
     frmlSimple = regexprep(frml, '\s*\+ ([^)]*\)', '');
 else
     frmlSimple = frml;
@@ -55,22 +44,33 @@ end
 frmlSimple = regexprep(frmlSimple, '\s*1\s*\+\s*', '');
 frmlSimple = regexprep(frmlSimple, '\s*\+\s*1\s*', '');
 
-% remove all whitespace
-% frmlSimple = regexprep(frmlSimple, '\s+', '');
-frmlSimple = regexprep(frmlSimple, '\~', '~ ');
-
 % remove trailing operators if they exist
 frmlSimple = regexprep(frmlSimple, '[+\-*\/]\s*$', '');
 
-if rm_rnd
+if rmRnd
     % replace * with x
-    frmlSimple = regexprep(frmlSimple, '\*', ' x ');
+    frmlSimple = regexprep(frmlSimple, '\*', 'X');
 else
     frmlSimple = regexprep(frmlSimple, '\*', ' * ');
 end
 
 % add suffix and prefix
 frmlSimple = sprintf('%s%s%s', pfx, frmlSimple, sfx);
+
+% remove all whitespace
+frmlSimple = regexprep(frmlSimple, '\s+', '');
+
+% Replace response variable if resNew is provided
+if ~isempty(resNew)
+
+    % Find the original response variable (text before '~')
+    resOrig = regexp(frmlSimple, '^[^~]+', 'match', 'once');
+    % Ensure the new response variable ends with a space if it doesn't already
+    % and the part to replace also includes the space for cleaner replacement
+    % or directly replace up to the tilde.
+    frmlSimple = regexprep(frmlSimple, ['^' strtrim(resOrig) '\s*~'], [strtrim(resNew) '~']);
+end
+
 
 end
 

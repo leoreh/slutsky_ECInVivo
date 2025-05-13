@@ -1,12 +1,12 @@
-function fh = lme_plot(lme_tbl, lme_mdl, varargin)
+function fh = lme_plot(lmeData, lmeMdl, varargin)
 
 % plots linear mixed effects model results according to fixed effects.
 % first fixed effect determines different lines/groups, second fixed effect
 % determines x axis values. For single fixed effect, plots as x value
 %
 % INPUT
-%   lme_tbl     table with data used in lme analysis
-%   lme_mdl     fitted linear mixed effects model
+%   lmeData     table with data used in lme analysis
+%   lmeMdl      fitted linear mixed effects model
 %   ptype       string specifying plot type {'line', 'box', 'bar'}
 %   axh         axis handle
 %   figShape    string specifying figure shape {'square', 'tall', 'wide'}
@@ -44,7 +44,7 @@ if isempty(clr)
     clr(1, :) = [0.3 0.3 0.3];
     clr(2, :) = [0.784 0.667 0.392];
 end
-clr_alpha = 0.3;
+clrAlpha = 0.3;
 
 % initialize figure
 if isempty(axh)
@@ -77,11 +77,11 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % get variables from formula
-frml = char(lme_mdl.Formula);
+frml = char(lmeMdl.Formula);
 [varsFxd, varRsp] = get_vars(frml);
 
 % organize data for plotting based on number of variables
-[data_grp, x_vals, var_lbls] = get_data(lme_tbl, varsFxd, varRsp);
+[dataGrp, xVals, varLbls] = get_data(lmeData, varsFxd, varRsp);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %  plot
@@ -92,42 +92,42 @@ switch ptype
         % plot data based on number of fixed effects
         if length(varsFxd) >= 2
             % multiple lines case (grouped by first variable)
-            for igrp = 1 : length(data_grp)
-                ph(igrp) = plot_stdShade('dataMat', data_grp{igrp},...
-                    'xVal', [1:length(x_vals{igrp})], ...
-                    'axh', axh, 'clr', clr(igrp, :), 'alpha', clr_alpha);
+            for igrp = 1 : length(dataGrp)
+                ph(igrp) = plot_stdShade('dataMat', dataGrp{igrp},...
+                    'xVal', [1:length(xVals{igrp})], ...
+                    'axh', axh, 'clr', clr(igrp, :), 'alpha', clrAlpha);
             end
             xlabel(varsFxd{2})
-            xticks([1:length(x_vals{igrp})])
-            xlim([1-0.2, length(x_vals{igrp})+0.2])
-            xticklabels(x_vals{igrp})
-            legend(ph, var_lbls, 'Location', 'northwest')
+            xticks([1:length(xVals{igrp})])
+            xlim([1-0.2, length(xVals{igrp})+0.2])
+            xticklabels(xVals{igrp})
+            legend(ph, varLbls, 'Location', 'northwest')
         else
             % single variable case
-            ph = plot_stdShade('dataMat', data_grp, 'xVal', [1:length(x_vals)], ...
-                'axh', axh, 'clr', clr(1,:), 'alpha', clr_alpha);
+            ph = plot_stdShade('dataMat', dataGrp, 'xVal', [1:length(xVals)], ...
+                'axh', axh, 'clr', clr(1,:), 'alpha', clrAlpha);
             xlabel(varsFxd{1})
-            xticklabels(x_vals)
-            xlim([1-0.2, length(x_vals)+0.2])
+            xticklabels(xVals)
+            xlim([1-0.2, length(xVals)+0.2])
         end
         
 
     case {'box', 'bar', 'allPnts'}
         if length(varsFxd) >= 2
             % pass cell array of matrices to plot_boxMean
-            ph = plot_boxMean('dataMat', data_grp, 'xVal', 1 : length(x_vals{1}), ...
-                'clr', clr(1 : length(data_grp), :), 'alphaIdx', 1, ...
+            ph = plot_boxMean('dataMat', dataGrp, 'xVal', 1 : length(xVals{1}), ...
+                'clr', clr(1 : length(dataGrp), :), 'alphaIdx', 1, ...
                 'plotType', ptype, 'axh', axh);
             xlabel(varsFxd{2})
-            xticklabels(x_vals{1})
-            legend(ph, var_lbls, 'Location', 'northwest')
+            xticklabels(xVals{1})
+            legend(ph, varLbls, 'Location', 'northwest')
         else
             % single variable case
-            plot_boxMean('dataMat', data_grp, 'xVal', 1 : size(data_grp, 1),...
-                'clr', clr(1, :), 'alphaIdx', clr_alpha, ...
+            plot_boxMean('dataMat', dataGrp, 'xVal', 1 : size(dataGrp, 1),...
+                'clr', clr(1, :), 'alphaIdx', clrAlpha, ...
                 'plotType', ptype, 'axh', axh);
             xlabel(varsFxd{1})
-            xticklabels(x_vals)
+            xticklabels(xVals)
         end
 
         % update graphics to the case of only two groups (assumes Control
@@ -144,7 +144,7 @@ end
 
 % add response variable label and title
 ylabel(varRsp)
-title(axh, lme_frml2char(frml, 'rm_rnd', false))
+title(axh, lme_frml2char(frml, 'rmRnd', false))
 
 % Set fonts and font sizes for axes elements
 set(axh, 'FontName', 'Arial', 'FontSize', fntSize); % Affects axis labels, ticks
@@ -171,33 +171,33 @@ varRsp = regexp(frml, '(\w+)\s*~', 'tokens');
 varRsp = varRsp{1}{1};
 
 % get x variables (fixed effects) excluding random effects and intercept
-x_str = regexp(frml, '~\s*(.*?)\s*(\(|$)', 'tokens'); % get everything between ~ and (, or end
-x_str = x_str{1}{1}; % extract matched string
+xStr = regexp(frml, '~\s*(.*?)\s*(\(|$)', 'tokens'); % get everything between ~ and (, or end
+xStr = xStr{1}{1}; % extract matched string
 
 % Initialize varNames as empty cell array
 varsFxd = {};
 
 % first check for interaction terms
-interact_vars = regexp(x_str, '(\w+)\s*[*]\s*(\w+)', 'tokens');
-if ~isempty(interact_vars)
+interactVars = regexp(xStr, '(\w+)\s*[*]\s*(\w+)', 'tokens');
+if ~isempty(interactVars)
     % Process all interaction pairs
-    for i = 1:length(interact_vars)
-        varsFxd = [varsFxd, interact_vars{i}];
+    for i = 1:length(interactVars)
+        varsFxd = [varsFxd, interactVars{i}];
     end
     % Remove duplicates
     varsFxd = unique(varsFxd, 'stable');
 else
     % if no interactions, process normally
-    x_str = regexprep(x_str, '\s*1\s*\+?\s*', '');      % remove intercept term
-    x_str = regexprep(x_str, '\([^)]*\)', '');          % remove random effects
-    x_vars = strtrim(strsplit(x_str, '+'));             % split by + and trim whitespace
-    varsFxd = x_vars(~cellfun(@isempty, x_vars));       % remove any empty cells
+    xStr = regexprep(xStr, '\s*1\s*\+?\s*', '');      % remove intercept term
+    xStr = regexprep(xStr, '\([^)]*\)', '');          % remove random effects
+    xVars = strtrim(strsplit(xStr, '+'));             % split by + and trim whitespace
+    varsFxd = xVars(~cellfun(@isempty, xVars));       % remove any empty cells
 end
 
 end
 
 
-function [data_grp, x_vals, var_lbls] = get_data(tbl, varsFxd, varRsp)
+function [dataGrp, xVals, varLbls] = get_data(tbl, varsFxd, varRsp)
 % organize data for plotting based on number of fixed effects
 % Returns raw data matrices grouped by variables
 
@@ -207,40 +207,40 @@ if length(varsFxd) >= 2
     var2 = varsFxd{2};
 
     % get unique values maintaining order
-    var1_vals = unique(tbl.(var1), 'stable');
+    var1Vals = unique(tbl.(var1), 'stable');
 
     % initialize outputs
-    n_grps = length(var1_vals);
-    data_grp = cell(n_grps, 1);
-    x_vals = cell(n_grps, 1);
-    var_lbls = strings(n_grps, 1);
+    nGrps = length(var1Vals);
+    dataGrp = cell(nGrps, 1);
+    xVals = cell(nGrps, 1);
+    varLbls = strings(nGrps, 1);
 
     % get data for each group
-    for igrp = 1:n_grps
+    for igrp = 1:nGrps
         % get data for current group
-        idx = tbl.(var1) == var1_vals(igrp);
-        grp_tbl = tbl(idx, :);
+        idx = tbl.(var1) == var1Vals(igrp);
+        grpTbl = tbl(idx, :);
 
         % get unique x values using categorical order if possible
-        if iscategorical(grp_tbl.(var2))
-            x_unique = categories(grp_tbl.(var2));
+        if iscategorical(grpTbl.(var2))
+            xUnique = categories(grpTbl.(var2));
         else
-            x_unique = unique(grp_tbl.(var2), 'stable');
+            xUnique = unique(grpTbl.(var2), 'stable');
         end
-        n_x = length(x_unique);
+        nX = length(xUnique);
 
         % organize data matrix
-        data_mat = nan(n_x, sum(idx));
-        for ix = 1:n_x
-            x_idx = grp_tbl.(var2) == x_unique{ix};
-            y_vals = grp_tbl.(varRsp)(x_idx);
-            data_mat(ix, 1:length(y_vals)) = y_vals';
+        dataMat = nan(nX, sum(idx));
+        for ix = 1:nX
+            xIdx = grpTbl.(var2) == xUnique{ix};
+            yVals = grpTbl.(varRsp)(xIdx);
+            dataMat(ix, 1:length(yVals)) = yVals';
         end
 
         % store results
-        data_grp{igrp} = data_mat;
-        x_vals{igrp} = string(x_unique);
-        var_lbls{igrp} = char(var1_vals(igrp));
+        dataGrp{igrp} = dataMat;
+        xVals{igrp} = string(xUnique);
+        varLbls{igrp} = char(var1Vals(igrp));
     end
 
 else
@@ -249,27 +249,27 @@ else
 
     % get unique values using categorical order if possible
     if iscategorical(tbl.(var1))
-        x_unique = categories(tbl.(var1));
+        xUnique = categories(tbl.(var1));
     else
-        x_unique = unique(tbl.(var1), 'stable');
+        xUnique = unique(tbl.(var1), 'stable');
     end
-    n_x = length(x_unique);
+    nX = length(xUnique);
 
     % initialize data matrix
-    max_pts = max(histcounts(categorical(tbl.(var1))));
-    data_mat = nan(n_x, max_pts);
+    maxPts = max(histcounts(categorical(tbl.(var1))));
+    dataMat = nan(nX, maxPts);
 
     % fill data matrix
-    for ix = 1:n_x
-        idx = tbl.(var1) == x_unique{ix};
-        y_vals = tbl.(varRsp)(idx);
-        data_mat(ix, 1:length(y_vals)) = y_vals';
+    for ix = 1:nX
+        idx = tbl.(var1) == xUnique{ix};
+        yVals = tbl.(varRsp)(idx);
+        dataMat(ix, 1:length(yVals)) = yVals';
     end
 
     % prepare outputs
-    data_grp = data_mat;
-    x_vals = char(x_unique);
-    var_lbls = [];
+    dataGrp = dataMat;
+    xVals = char(xUnique);
+    varLbls = [];
 end
 
 end

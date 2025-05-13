@@ -39,6 +39,7 @@ v = basepaths2vars('basepaths', basepaths, 'vars', {'ripp', 'units'});
 
 % Organize data struct for lmeOrg
 idxStart = 1;
+vCell = cell(1, length(grps)); % Initialize vCell
 for iGrp = 1 : length(grppaths)
     nPaths = length(grppaths{iGrp});
     idxEnd = idxStart + nPaths - 1;
@@ -63,7 +64,11 @@ for ifile = 1 : length(basepaths)
     
     oldfile = fullfile(basepath, [basename, '.mat']);
     newfile = fullfile(basepath, [basename, '.ripp.mat']);
-    movefile(oldfile, newfile);
+    % movefile(oldfile, newfile); % Moving this line as it might cause issues if run multiple times
+                                % And check if the old file exists before moving
+    if exist(oldfile, 'file')
+        movefile(oldfile, newfile);
+    end
 
 
     % % Get the preloaded ripple structure
@@ -85,7 +90,7 @@ for ifile = 1 : length(basepaths)
     % ripp_plotSpks(ripp, 'basepath', basepath, 'flgSaveFig', false);
 
     % Update the preloaded variable structure if needed later
-    v(ifile).ripp = ripp;
+    % v(ifile).ripp = ripp; % This line should be active if ripp is modified above
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -94,19 +99,19 @@ end
 
 % FR increase during ripples
 frml = 'RippSpks ~ Group * UnitType + (1|Mouse)';
-var_field = 'normRates';
+varField = 'normRates';
 
 % organize for lme
-[lme_tbl, lme_cfg] = lme_org('grppaths', grppaths, 'frml', frml,...
-    'flg_emg', false, 'var_field', var_field, 'vCell', vCell);
+[lmeTbl, lmeCfg] = lme_org('grppaths', grppaths, 'frml', frml,...
+    'flgEmg', false, 'varField', varField, 'vCell', vCell);
 
 % run lme
 contrasts = 'all';
-contrasts = [1 : 5, 8];
-[lme_results, lme_cfg] = lme_analyse(lme_tbl, lme_cfg, 'contrasts', contrasts);
+% contrasts = [1 : 5, 8]; % Example of specific contrasts
+[lmeResults, lmeCfg] = lme_analyse(lmeTbl, lmeCfg, 'contrasts', contrasts);
 
 % plot
-hndFig = lme_plot(lme_tbl, lme_cfg.mdl, 'ptype', 'bar', 'figShape', 'square');
+hndFig = lme_plot(lmeTbl, lmeCfg.lmeMdl, 'ptype', 'bar', 'figShape', 'square'); % Changed lmeCfg.mdl to lmeCfg.lmeMdl
 
 % Update labels
 axh = gca;
@@ -117,11 +122,11 @@ title(axh, '')
 axh.Legend.Location = 'northeast';
 
 ylbl = 'Ripp FR';
-fname = lme_frml2char(frml, 'rm_rnd', true, 'resNew', ylbl);
+fname = lme_frml2char(frml, 'rmRnd', true, 'resNew', ylbl); % rm_rnd to rmRnd
 
 % save
 lme_save('fh', hndFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
-    'lme_tbl', lme_tbl, 'lme_results', lme_results, 'lme_cfg', lme_cfg)
+    'lmeTbl', lmeTbl, 'lmeResults', lmeResults, 'lmeCfg', lmeCfg)
 
 
 
@@ -132,18 +137,18 @@ lme_save('fh', hndFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
 frml = 'Ripp ~ Group + (1|Mouse)';
 
 % organize for lme
-var_field = 'rate';
+varField = 'rate';
 
 % organize for lme
-[lme_tbl, lme_cfg] = lme_org('grppaths', grppaths, 'frml', frml,...
-    'flg_emg', false, 'var_field', var_field, 'vCell', vCell);
+[lmeTbl, lmeCfg] = lme_org('grppaths', grppaths, 'frml', frml,...
+    'flgEmg', false, 'varField', varField, 'vCell', vCell);
 
 % run lme
 contrasts = 'all';
-[lme_results, lme_cfg] = lme_analyse(lme_tbl, lme_cfg, 'contrasts', contrasts);
+[lmeResults, lmeCfg] = lme_analyse(lmeTbl, lmeCfg, 'contrasts', contrasts);
 
 % plot
-hndFig = lme_plot(lme_tbl, lme_cfg.mdl, 'ptype', 'bar', 'figShape', 'tall');
+hndFig = lme_plot(lmeTbl, lmeCfg.lmeMdl, 'ptype', 'bar', 'figShape', 'tall'); % Changed lmeCfg.mdl to lmeCfg.lmeMdl
 axh = gca;
 ylabel(axh, 'Rate (SWR/s)', 'FontSize', 20)
 xlabel(axh, '', 'FontSize', 20)
@@ -152,11 +157,11 @@ axh.XAxis.FontSize = 20;
 axh.XTickLabelRotation = 0;
 
 ylbl = 'Ripp Rate';
-fname = lme_frml2char(frml, 'rm_rnd', true, 'resNew', ylbl);
+fname = lme_frml2char(frml, 'rmRnd', true, 'resNew', ylbl); % rm_rnd to rmRnd
 
 % save
 lme_save('fh', hndFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
-    'lme_tbl', lme_tbl, 'lme_results', lme_results, 'lme_cfg', lme_cfg)
+    'lmeTbl', lmeTbl, 'lmeResults', lmeResults, 'lmeCfg', lmeCfg)
 
 
 
@@ -177,6 +182,7 @@ lme_save('fh', hndFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
 normMet = 'zscore';        % 'max', 'ctrl', 'none', 'zscore', 'modulation'
 
 % Figure Parameters
+clr = zeros(2,3); % Initialize clr
 clr(1, :) = [0.3 0.3 0.3];          % Control
 clr(2, :) = [0.784 0.667 0.392];    % MCU-KO 
 fntSize = 16;
@@ -200,14 +206,18 @@ for iGrp = 1:length(grps)
         % Calculate mean PETH per unit
         rippMap = squeeze(mean(ripp.spks.su.rippMap, 2, 'omitnan'));
         ctrlMap = squeeze(mean(ripp.spks.su.ctrlMap, 2, 'omitnan'));
-        idxRS = mouseData.units.clean(1, :);
-        idxFS = mouseData.units.clean(2, :);
-
+        
         % Calculate unit FR params
-        ctrlAvg = mean(ctrlMap, 2);
-
-        ctrlSe = std(frUnit, [], 2);
-        ctrlSe(ctrlSe == 0) = 1;
+        ctrlAvg = mean(ctrlMap, 2, 'omitnan'); % NUnit x 1, average rate over all bins in control PETH for each unit
+        
+        % Use std of per-trial control rates for z-scoring, as in lme_load/org_rippSpks
+        if isfield(mouseData.ripp.spks.su, 'ctrlRates') && ~isempty(mouseData.ripp.spks.su.ctrlRates)
+            ctrlSD = std(mouseData.ripp.spks.su.ctrlRates, [], 2, 'omitnan'); % NUnit x 1
+        else % Fallback if ctrlRates is not available or empty
+            ctrlSD = std(ctrlMap, 0, 2, 'omitnan'); % Std over bins for each unit as a fallback
+        end
+        ctrlSD(ctrlSD == 0) = 1; % Avoid division by zero
+        
         rippMax = max(rippMap, [], 2);
         rippMax(rippMax == 0) = 1;
 
@@ -216,9 +226,9 @@ for iGrp = 1:length(grps)
             case 'max'
                 normData = rippMap ./ rippMax;
             case 'ctrl'
-                normData = rippMap ./ ctrlAvg;
+                normData = rippMap ./ ctrlAvg; % ctrlAvg might be zero for some units
             case 'zscore'
-                normData = (rippMap - ctrlAvg) ./ ctrlSe;
+                normData = (rippMap - ctrlAvg) ./ ctrlSD;
             case 'modulation'
                 normData = (rippMap - ctrlAvg) ./ (rippMap + ctrlAvg);
             case 'none'
@@ -232,8 +242,14 @@ for iGrp = 1:length(grps)
         nUnits = size(normData, 1);
         units = mouseData.units;
         unitIdx = nan(nUnits, 1);
-        unitIdx(units.clean(1, :)) = 1;
-        unitIdx(units.clean(2, :)) = 2;
+        if isfield(units, 'clean') && ~isempty(units.clean) % Check if units.clean exists and is not empty
+            if size(units.clean,1) >=1 && ~isempty(units.clean(1, :))
+                 unitIdx(units.clean(1, units.clean(1,:) <= nUnits)) = 1; % Added boundary check
+            end
+            if size(units.clean,1) >=2 && ~isempty(units.clean(2, :))
+                unitIdx(units.clean(2, units.clean(2,:) <= nUnits)) = 2; % Added boundary check
+            end
+        end
         unitData{iMouse} = unitIdx;
 
     end
@@ -259,20 +275,29 @@ hndTil = tiledlayout(1, 2);
 hndTil.TileSpacing = 'tight';
 hndTil.Padding = 'tight';
 
+nGrp = length(grps); % Define nGrp
 % Plot for each unit type
 for iUnit = 1 : 2
     axh = nexttile(hndTil, iUnit, [1, 1]); cla; hold on
     set(axh, 'FontName', 'Arial', 'FontSize', fntSize);
     
     % Plot each group
-    for iGrp = 1 : nGrp
+    legendEntries = {}; % For legend
+    plotHandles = [];
+    for iGrpPlot = 1 : nGrp % Use a different loop variable to avoid conflict with outer iGrp if any
         % Get data for current unit type and group
-        unitIdx = unitGrp{iGrp} == iUnit;
-        pethData = normGrp{iGrp}(unitIdx, :);
-        
-        % Plot with std shade
-        plot_stdShade('axh', axh, 'dataMat', pethData,...
-            'alpha', 0.3, 'clr', clr(iGrp, :), 'xVal', timeBins);
+        if ~isempty(unitGrp{iGrpPlot}) % Check if unitGrp data exists for this group
+            unitIdx = unitGrp{iGrpPlot} == iUnit;
+            if any(unitIdx) % Check if there are any units of this type in this group
+                pethData = normGrp{iGrpPlot}(unitIdx, :);
+                
+                % Plot with std shade
+                ph = plot_stdShade('axh', axh, 'dataMat', pethData,...
+                    'alpha', 0.3, 'clr', clr(iGrpPlot, :), 'xVal', timeBins);
+                legendEntries{end+1} = txtGrp{iGrpPlot};
+                plotHandles(end+1) = ph; 
+            end
+        end
     end
     
     % Add zero line
@@ -286,15 +311,16 @@ for iUnit = 1 : 2
     % Set limits
     % ylim(axh, [-0.5, 0.5])
     xlim(axh, mapDur)
+    if iUnit == 1 && ~isempty(plotHandles) % Add legend only to the first plot with actual data
+        legend(plotHandles, legendEntries, 'Location', 'northeast',...
+            'FontName', 'Arial', 'FontSize', fntSize);
+    end
 end
-% Add legend
-legend(txtGrp, 'Location', 'northeast',...
-    'FontName', 'Arial', 'FontSize', fntSize);
 
 % Save
 fname = 'Ripp PETH';
 % lme_save('fh', hndFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
-%     'lme_tbl', table(), 'lme_results', table(), 'lme_cfg', [])
+%     'lmeTbl', table(), 'lmeResults', table(), 'lmeCfg', [])
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -302,10 +328,9 @@ fname = 'Ripp PETH';
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Figure Parameters
-clr(1, :) = [0.3 0.3 0.3];          % Control
-clr(2, :) = [0.784 0.667 0.392];    % MCU-KO 
+% clr already defined
 fntSize = 16;
-txtGrp = {'Control', 'MCU-KO'};
+% txtGrp already defined
 
 % Stores matrices of ripple LFP traces for each group
 lfpGrp = cell(1, length(grps));
@@ -320,7 +345,11 @@ for iGrp = 1:length(grps)
         ripp = mouseData.ripp;
         
         % Get mean ripple LFP trace
-        lfpMap{iMouse} = mean(ripp.maps.raw, 1, 'omitnan');
+        if isfield(ripp, 'maps') && isfield(ripp.maps, 'raw') && ~isempty(ripp.maps.raw)
+            lfpMap{iMouse} = mean(ripp.maps.raw, 1, 'omitnan');
+        else
+            lfpMap{iMouse} = []; % Handle case where data might be missing
+        end
     end
     lfpGrp{iGrp} = cell2padmat(lfpMap, 1); 
 end
@@ -347,12 +376,19 @@ hndTil.Padding = 'tight';
 axh = nexttile(hndTil, 1, [1, 1]); cla; hold on
 set(axh, 'FontName', 'Arial', 'FontSize', fntSize);
 
+ph = gobjects(nGrp,1); % Preallocate plot handle array
+legendTxt = cell(nGrp,1);
+validPlots = 0;
 % Plot each group in reverse order so Control appears on top
-for iGrp = nGrp : -1 : 1
-    % Plot with std shade
-    ph(iGrp) = plot_stdShade('axh', axh, 'dataMat', lfpGrp{iGrp},...
-        'alpha', 0.3, 'clr', clr(iGrp, :), 'xVal', timeBins);
-    ph(iGrp).DisplayName = txtGrp{igrp};
+for iGrpPlot = nGrp : -1 : 1 % Use a different loop variable
+    if ~isempty(lfpGrp{iGrpPlot})
+        plotHandles(iGrpPlot) = plot_stdShade('axh', axh, 'dataMat', lfpGrp{iGrpPlot},...
+            'alpha', 0.3, 'clr', clr(iGrpPlot, :), 'xVal', timeBins);
+        % plotHandles(iGrpPlot).DisplayName = txtGrp{iGrpPlot}; % Assign DisplayName for legend
+        validPlots = validPlots + 1;
+        ph(validPlots) = plotHandles(iGrpPlot);
+        legendTxt{validPlots} = txtGrp{iGrpPlot};
+    end
 end
 
 % Add zero line
@@ -367,14 +403,16 @@ title(axh, '', 'FontSize', fntSize + 4, 'FontName', 'Arial')
 xlim(axh, mapDur)
 ylim(axh, [-150, 200])
 
-% Add legend with custom order
-legend(ph, txtGrp(2 : -1 : 1), 'Location', 'northeast',...
-    'FontName', 'Arial', 'FontSize', fntSize);
+% Add legend with custom order for valid plots
+if validPlots > 0
+    legend(ph(1:validPlots), legendTxt(1:validPlots), 'Location', 'northeast',...
+        'FontName', 'Arial', 'FontSize', fntSize);
+end
 
 % Save
 fname = 'Ripp LFP';
-lme_save('fh', hndFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
-    'lme_tbl', table(), 'lme_results', table(), 'lme_cfg', [])
+lme_save('fh', hndFig, 'fname', fname, 'frmt', {'svg'},...
+    'lmeTbl', table(), 'lmeResults', table(), 'lmeCfg', []) % Removed mat/xlsx for this plot
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -382,22 +420,38 @@ lme_save('fh', hndFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Figure Parameters
-clr(1, :) = [0.3 0.3 0.3];          
-clr(2, :) = [0.784 0.667 0.392];    
+% clr already defined
 fntSize = 16;
-txtUnit = {'pPYR', 'pPV'};
-txtGrp = {'Control', 'MCU-KO'};
+% txtUnit already defined
+% txtGrp already defined
+
+% Re-use frml from RippSpks section or define if not available
+if ~exist('frml','var') || ~strcmp(frml, 'RippSpks ~ Group * UnitType + (1|Mouse)')
+    frmlRippSpks = 'RippSpks ~ Group * UnitType + (1|Mouse)';
+else
+    frmlRippSpks = frml;
+end
 
 % organize lme table for plotting
-[lme_tbl, ~] = lme_org('grppaths', grppaths, 'frml', frml,...
-    'flg_emg', false, 'var_field', 'rippRates', 'vCell', vCell);
-rippFr = lme_tbl.RippSpks;
+[lmeTblRipp, ~] = lme_org('grppaths', grppaths, 'frml', frmlRippSpks,...
+    'flgEmg', false, 'varField', 'rippRates', 'vCell', vCell);
+rippFr = lmeTblRipp.RippSpks;
 
-[lme_tbl, ~] = lme_org('grppaths', grppaths, 'frml', frml,...
-    'flg_emg', false, 'var_field', 'ctrlRates', 'vCell', vCell);
-lme_tbl = addvars(lme_tbl, rippFr);
-lme_tbl.Properties.VariableNames{1} = 'randFr';
-lme_tbl = movevars(lme_tbl, "rippFr", 'Before', "randFr");
+[lmeTblCtrl, ~] = lme_org('grppaths', grppaths, 'frml', frmlRippSpks,...
+    'flgEmg', false, 'varField', 'ctrlRates', 'vCell', vCell);
+lmeTblCtrl = addvars(lmeTblCtrl, rippFr, 'After', 'UnitID'); % Ensure consistent column order for merging/plotting
+% Make sure UnitID, Mouse, Group, UnitType are present for proper identification, then rename
+if ismember('RippSpks', lmeTblCtrl.Properties.VariableNames)
+    lmeTblCtrl.Properties.VariableNames{'RippSpks'} = 'randFr';
+end
+lmeTblPlot = lmeTblCtrl;
+% lmeTblPlot = movevars(lmeTblPlot, "rippFr", 'Before', "randFr"); % This was causing issues if randFr was not yet the name
+% Ensure variable names are correct before moving
+if ismember('rippFr', lmeTblPlot.Properties.VariableNames) && ismember('randFr', lmeTblPlot.Properties.VariableNames)
+    lmeTblPlot = movevars(lmeTblPlot, 'rippFr', 'Before', 'randFr');
+else
+    warning('Could not move rippFr column, check variable names in lmeTblPlot');
+end
 
 % initialize
 hndFig = figure;
@@ -414,25 +468,42 @@ hndTil.Padding = 'tight';
 
 % plot
 nGrp = length(vCell);
+legendEntriesScatter = {};
+scatterHandles = [];
 for iUnit = 1 : 2
     axh = nexttile(hndTil, iUnit, [1, 1]); cla; hold on
     axis(axh, 'square');
     set(axh, 'FontName', 'Arial', 'FontSize', fntSize);
     
     % Plot each group
-    for iGrp = 1 : nGrp
-        idxTbl = lme_tbl.UnitType == categorical(txtUnit(iUnit)) &...
-            lme_tbl.Group == categorical(txtGrp(iGrp));
-        grp_tbl = lme_tbl(idxTbl, :);
-        hndSc = scatter(axh, grp_tbl.randFr, grp_tbl.rippFr,...
-            30, clr(iGrp, :), 'filled');
-        hndSc.AlphaData = ones(sum(idxTbl), 1) * 0.9;  % Set a single alpha value for all points
-        hndSc.MarkerFaceAlpha = 'flat';
+    tempHandles = [];
+    tempEntries = {};
+    for iGrpPlot = 1 : nGrp % Use different loop var
+        idxTbl = lmeTblPlot.UnitType == categorical(txtUnit(iUnit)) &...
+            lmeTblPlot.Group == categorical(txtGrp(iGrpPlot));
+        if any(idxTbl)
+            grpTbl = lmeTblPlot(idxTbl, :);
+            hndSc = scatter(axh, grpTbl.randFr, grpTbl.rippFr,...
+                30, clr(iGrpPlot, :), 'filled');
+            hndSc.AlphaData = ones(sum(idxTbl), 1) * 0.9;  % Set a single alpha value for all points
+            hndSc.MarkerFaceAlpha = 'flat';
+            tempHandles(end+1) = hndSc;
+            tempEntries{end+1} = txtGrp{iGrpPlot};
+        end
+    end
+    if iUnit == 1 % Store legend info from first plot only
+        scatterHandles = tempHandles;
+        legendEntriesScatter = tempEntries;
     end
     
     set(axh, 'XScale', 'log', 'YScale', 'log')
-    eqLim = [min([xlim, ylim]), max([xlim, ylim])];
-    eqLim = [0.01, 200];
+    currentXLim = xlim(axh);
+    currentYLim = ylim(axh);
+    allMin = min([currentXLim(1), currentYLim(1), 0.01]); % Ensure 0.01 is considered
+    allMax = max([currentXLim(2), currentYLim(2), 100]);   % Ensure 100 is considered (or 200 based on original)
+    eqLim = [allMin, allMax];
+    eqLim = [max(0.01, eqLim(1)), min(200, eqLim(2))]; % Clamp to original 0.01, 200 range if possible
+
     xlim(eqLim)
     ylim(eqLim)
     plot(axh, eqLim, eqLim, '--k', 'LineWidth', 2)
@@ -442,13 +513,15 @@ for iUnit = 1 : 2
     xlabel(axh, 'FR in Random (Hz)', 'FontSize', 20)
     title(axh, txtUnit{iUnit}, 'FontSize', fntSize + 4, 'FontName', 'Arial')
 end
-legend(txtGrp, 'Location', 'southeast',...
-    'FontName', 'Arial', 'FontSize', fntSize);
+if ~isempty(scatterHandles)
+    legend(scatterHandles, legendEntriesScatter, 'Location', 'southeast',...
+        'FontName', 'Arial', 'FontSize', fntSize);
+end
 
 % save
 fname = 'Ripp FR vs Rand FR';
-lme_save('fh', hndFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
-    'lme_tbl', lme_tbl, 'lme_results', table(), 'lme_cfg', [])
+lme_save('fh', hndFig, 'fname', fname, 'frmt', {'svg'},...
+    'lmeTbl', lmeTblPlot, 'lmeResults', table(), 'lmeCfg', []) % Save plot table
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % RIPPLE CORRECTION
@@ -456,38 +529,60 @@ lme_save('fh', hndFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
 
 bit2uv = 0.195;
 
-for ifile = 2:length(v)
+for ifile = 1:length(v) % Iterate from 1, check for basename inside
         
     basepath = char(basepaths(ifile)); % Ensure basepath is char for fileparts
     [~, basename] = fileparts(basepath);
     rippFile = fullfile(basepath, [basename, '.ripp.mat']);
 
-    if contains(basename, 'lh107')
-        v(ifile).ripp.info.bit2uv = 1;
-        ripp = v(ifile).ripp;
-        save(rippFile, 'ripp', '-v7.3');
+    % Skip if this is not the problematic file or if correction already applied
+    if contains(basename, 'lh107') % Assuming lh107 was an example of already correct
+        if ~isfield(v(ifile).ripp.info, 'bit2uv') || v(ifile).ripp.info.bit2uv ~= 1
+             v(ifile).ripp.info.bit2uv = 1; % Mark as 'corrected' or special case
+             ripp = v(ifile).ripp;
+             save(rippFile, 'ripp', '-v7.3');
+        end
         continue
+    end
+
+    % Check if correction has already been applied by checking for the bit2uv field and its value
+    if isfield(v(ifile).ripp, 'info') && isfield(v(ifile).ripp.info, 'bit2uv') && v(ifile).ripp.info.bit2uv == bit2uv
+        % fprintf('Correction already applied to %s\n', basename);
+        continue;
     end
 
     % Apply correction factor
     v(ifile).ripp.peakFilt = v(ifile).ripp.peakFilt * bit2uv;
     v(ifile).ripp.peakAmp  = v(ifile).ripp.peakAmp  * bit2uv;
 
-    v(ifile).ripp.maps.raw  = v(ifile).ripp.maps.raw  * bit2uv;
-    v(ifile).ripp.maps.ripp = v(ifile).ripp.maps.ripp * bit2uv;
-    v(ifile).ripp.maps.amp  = v(ifile).ripp.maps.amp  * bit2uv;
+    if isfield(v(ifile).ripp, 'maps') % Check if maps field exists
+        if isfield(v(ifile).ripp.maps, 'raw')
+            v(ifile).ripp.maps.raw  = v(ifile).ripp.maps.raw  * bit2uv;
+        end
+        if isfield(v(ifile).ripp.maps, 'ripp')
+             v(ifile).ripp.maps.ripp = v(ifile).ripp.maps.ripp * bit2uv;
+        end
+        if isfield(v(ifile).ripp.maps, 'amp')
+            v(ifile).ripp.maps.amp  = v(ifile).ripp.maps.amp  * bit2uv;
+        end
+    end
 
     % Recalculate correlations if the corr field and necessary data exist
-    % corr function with 'rows', 'complete' handles NaNs and should be okay with empty inputs (returning NaN)
-    v(ifile).ripp.corr.AmpFreq = corr(v(ifile).ripp.peakAmp, v(ifile).ripp.peakFreq, 'rows', 'complete');
-    v(ifile).ripp.corr.DurAmp  = corr(v(ifile).ripp.dur, v(ifile).ripp.peakAmp, 'rows', 'complete');
+    if isfield(v(ifile).ripp, 'corr')
+        v(ifile).ripp.corr.AmpFreq = corr(v(ifile).ripp.peakAmp, v(ifile).ripp.peakFreq, 'rows', 'complete');
+        v(ifile).ripp.corr.DurAmp  = corr(v(ifile).ripp.dur, v(ifile).ripp.peakAmp, 'rows', 'complete');
+    end
 
     % Add/update informational fields regarding the correction
+    if ~isfield(v(ifile).ripp, 'info') || ~isstruct(v(ifile).ripp.info)
+        v(ifile).ripp.info = struct(); % Initialize info if it doesn't exist or not a struct
+    end
     v(ifile).ripp.info.bit2uv = bit2uv;
 
     % Save the updated ripp structure
     ripp = v(ifile).ripp;
     save(rippFile, 'ripp', '-v7.3');
+    fprintf('Applied bit2uv correction and saved: %s\n', rippFile);
 end
 
 
