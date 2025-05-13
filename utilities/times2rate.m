@@ -1,119 +1,129 @@
-function [r, binedges, bincents, binidx] = times2rate(times, varargin)
+function [r, binEdges, binCents] = times2rate(times, varargin)
 
-% gets a vector of times and converts to rate (counts the number of
-% occurances) in a specified binsize. essentially a wrapper for histcounts.
-% e.g., used to converts spikes.times to firing rate. can limit the bins to
-% the boundries specified by winCalc.
-% 
-% INPUT
-%   times       cell array of vectors where each vector (unit) contains the
-%               timestamps of spikes. for example {spikes.times{1:4}}. can
-%               also be a single vector
-%   winCalc     time window for calculation {[0 Inf]}. 
-%               last elemet should be recording duration (e.g.
-%               lfp.duration). if Inf will be the last spike. can also be
-%               an n x 2 matrix.
-%   binsize     size of bins {60}. can be of any units so long corresponse
-%               to times. for example, times from Wh (per tetrode) is
-%               given in samples whereas times from ce (per unit) is
-%               given in seconds
-%   c2r         logical. convert counts to rate by dividing with binsize 
-% 
-% OUTPUT
-%   r           matrix of units (rows) x rate in time bins (columns)
-%   binedegs    used for calculation
-%   bincents    center of bins
+% Calculates the rate or count of events (e.g., spikes) falling into time bins.
+% Bins can be defined by a fixed 'binsize' within larger calculation windows
+% ('winCalc'), or 'winCalc' intervals can themselves be treated as individual bins.
 %
-% 24 nov 18 LH. updates:
-% 05 jan 18 LH  added normMethod and normWin
-% 07 jan 18 LH  added disqualify units and debugging
-% 11 jan 19 LH  split to various functions
-% 14 jan 19 LH  added selection methods
-% 24 feb 19 LH  debugging
-%               replaced spikes w/ stimes as input
-% 26 feb 19 LH  separated normalize and graphics to different functions
-% 02 jan 20 LH  adapted for burst suppression
-%               better handling of bins
-%               option to divide with binsize to obtain rate
-%               handle vectors
-% 02 aug 20 LH  converted calcFR to times2rate. implemented histcounts
-% 19 nov 20 LH  winClac can be matrix (e.g. for states)
-% 
-% TO DO LIST
-%   # documentation
+% INPUT:
+%   times       Cell array of vectors (timestamps per unit), or single vector.
+%   winCalc     (Optional) [M x 2] matrix defining M time windows [start, end].
+%               Default: [0, max_time_across_all_units].
+%   binsize     (Optional) Scalar, size of bins. Default: 60.
+%               If Inf, each 'winCalc' interval is a single bin.
+%   c2r         (Optional) Logical, true to convert counts to rate. Default: true.
+%
+% OUTPUT:
+%   r           Matrix [nUnits x nBins] of rates or counts.
+%   binEdges    [nBins x 2] matrix of [start, end] times for each bin.
+%   binCents    Vector [1 x nBins] of center times for each bin.
+%
+% HISTORY:
+% 02 Aug 20     Converted calcFR to times2rate. Implemented histcounts.
+% 19 Nov 20     winCalc can be matrix (e.g. for states).
+% 11 May 25     Implemented efficient 'histcounts' strategy.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% arguments
+% Argument Parsing (Minimal)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 p = inputParser;
-addOptional(p, 'binsize', 60, @isscalar);
-addOptional(p, 'winCalc', [0 Inf], @isnumeric);
-addOptional(p, 'c2r', true, @islogical);
+addRequired(p, 'times');
+addParameter(p, 'binsize', 60);
+addParameter(p, 'winCalc', []); % Default handled below
+addParameter(p, 'c2r', true);
+parse(p, times, varargin{:});
 
-parse(p, varargin{:})
-binsize     = p.Results.binsize;
+binSize     = p.Results.binsize;
 winCalc     = p.Results.winCalc;
 c2r         = p.Results.c2r;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% preparations
+% Preparations (Minimal)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% prepare spike times
+% Ensure 'times' is a cell array
 if ~iscell(times)
     times = {times};
 end
-nunits = length(times);
+nUnits = length(times);
 
-% validate window
-if isempty(winCalc)
-    winCalc = [1 max(vertcat(times{:}))];
+% Get max time across all units if winCalc is empty
+maxTimes = max(cellfun(@(x) max([0; x(:)]), times));
+if isempty(winCalc)  
+    winCalc = [0, maxTimes];
 end
-if winCalc(end) == Inf
-    winCalc(end) = max(vertcat(times{:}));
+if isinf(winCalc(end))
+    winCalc(end) = maxTimes;
 end
-nwin = size(winCalc, 1);
+nWin = size(winCalc, 1);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% calc
+% Define All Effective Bins
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% This section determines all the actual [start, end] time bins that will be
+% used for calculation, based on 'winCalc' and 'binsize'.
 
-% currently assumes bins are consecutive !!!
-cnt = 1;
-for iwin = 1 : nwin
-    if winCalc(iwin, 2) - winCalc(iwin, 1) <= binsize
-        binedges{iwin} = winCalc(iwin, :);
-    else
-        binedges{iwin} = winCalc(iwin, 1) : binsize : winCalc(iwin, 2);
-        binedges{iwin}(end) = winCalc(iwin, 2);       % correct last bin
-    end
- 
-    % count spikes
-    nbins = length(binedges{iwin}) - 1;
-    for iunit = 1 : nunits
-        if c2r
-            r(iunit, cnt : cnt + nbins - 1) = histcounts(times{iunit}, binedges{iwin},...
-                'Normalization', 'countdensity');
-        else
-            r(iunit, cnt : cnt + nbins - 1) = histcounts(times{iunit}, binedges{iwin},...
-                'Normalization', 'count');
-        end
-    end
+bins = cell(1, nWin);
+for iWin = 1:nWin
+    winDur = winCalc(iWin, 2) - winCalc(iWin, 1);
     
-    % find bin centers
-    for ibin = 1 : nbins
-        bincents(cnt) = binedges{iwin}(ibin) + ceil(diff(binedges{iwin}(ibin : ibin + 1)) / 2);
-        binidx(cnt) = iwin;
-        cnt = cnt + 1;
+    if isinf(binSize) || winDur <= binSize
+        bins{iWin} = winCalc(iWin, :);
+    else
+        bins{iWin} = winCalc(iWin, 1) : binSize : winCalc(iWin, 2);
+        bins{iWin}(end) = winCalc(iWin, 2);       % correct last bin
     end
 end
 
-% validate orientation
-if isvector(r)
-    r = r(:);
+% Convert cell array of bin edges to matrix [nBins x 2]
+binEdges = zeros(0, 2);
+for iWin = 1:nWin
+    winDur = winCalc(iWin, 2) - winCalc(iWin, 1);
+    if isinf(binSize) || winDur <= binSize
+        binEdges = [binEdges; winCalc(iWin, :)];
+    else
+        binStarts = bins{iWin}(1:end-1);
+        binEnds = bins{iWin}(2:end);
+        binEdges = [binEdges; [binStarts', binEnds']];
+    end
 end
 
+nBins = size(binEdges, 1);
+binDurs = binEdges(:,2) - binEdges(:,1); % Durations of each bin [nBins x 1]
+
+% initialize
+r = nan(nUnits, nBins);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Calculate Rates or Counts
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Uses the "odd bin trick" with histcounts for efficiency.
+% For each unit, counts spikes falling into all bins with a single histcounts call.
+
+% Create a single, interleaved edges vector for histcounts:
+% e.g., [bin1_start, bin1_end, bin2_start, bin2_end, ...]
+histEdges = reshape(binEdges', [], 1); % [2*nBins x 1]
+
+for iUnit = 1:nUnits
+    unitTimes = times{iUnit};
+
+    % Skip if no spikes for this unit 
+    if isempty(unitTimes)
+        continue; 
+    end
+
+    % Get counts; countsRaw(1) is between histEdges(1) and histEdges(2),
+    % etc. Counts for our actual defined bins are in the odd-indexed
+    % elements. [1 x nBins]
+    cnts = histcounts(unitTimes, histEdges);   
+    cnts = cnts(1:2:end); 
+
+    if c2r % Convert to rate       
+        r(iUnit, :) = cnts(:)' ./ binDurs(:)';
+    else % Keep raw counts
+        r(iUnit, :) = cnts;
+    end
 end
 
-% EOF
+% Calculate bin centers from the actual bin edges used
+binCents = mean(binEdges, 2);  % Row vector [1 x nBins] of bin centers
+
+end 

@@ -27,7 +27,7 @@ fpath = p.Results.fpath;
 fname = p.Results.fname;
 frmt = p.Results.frmt;
 lme_tbl = p.Results.lme_tbl;
-lme_results = p.Results.lme_results; % Assumed to be a table by subsequent logic if not empty
+lme_results = p.Results.lme_results; 
 lme_cfg = p.Results.lme_cfg;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

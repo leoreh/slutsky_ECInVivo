@@ -29,8 +29,8 @@ end
 % Define groups and get basepaths
 grps = {'wt_bsl_ripp'; 'mcu_bsl'};
 clear grppaths
-for igrp = 1 : length(grps)
-    grppaths{igrp} = string(mcu_sessions(grps{igrp})');
+for iGrp = 1 : length(grps)
+    grppaths{iGrp} = string(mcu_sessions(grps{iGrp})');
 end
 basepaths = vertcat(grppaths{:});
 
@@ -39,15 +39,48 @@ v = basepaths2vars('basepaths', basepaths, 'vars', {'ripp', 'units'});
 
 % Organize data struct for lmeOrg
 idxStart = 1;
-for igrp = 1 : length(grppaths)
-    nPaths = length(grppaths{igrp});
+for iGrp = 1 : length(grppaths)
+    nPaths = length(grppaths{iGrp});
     idxEnd = idxStart + nPaths - 1;
 
     % Assign the relevant subset of the preloaded 'v' to vCell
-    vCell{igrp}{1} = v(idxStart : idxEnd);
+    vCell{iGrp}{1} = v(idxStart : idxEnd);
 
     % Update start index for the next group
     idxStart = idxEnd + 1;
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Re-run only part of the analysis pipeline (e.g., ripp_spks)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Assumes data was already loaded
+
+for ifile = 1 : length(basepaths)
+
+    % File
+    basepath = basepaths{ifile};
+    [~, basename] = fileparts(basepath);
+
+    % Get the preloaded ripple structure
+    ripp = v(ifile).ripp;
+    ripp = rmfield(ripp, 'spks');
+
+    % Re-run ripp_spks
+    ripp = ripp_spks(ripp, 'basepath', basepath, 'limState', 4,...
+        'flgGraphics', true, 'flgSaveVar', true);
+    
+    % Re-run state analysis
+    % ripp = ripp_states(ripp, 'basepath', basepath, 'flgGraphics', false, ...
+    %     'flgSaveVar', true, 'flgSaveFig', true);
+
+    % plot detection
+    % ripp_plot(ripp, 'basepath', basepath, 'flgSaveFig', false);
+
+    % Plot spikes
+    % ripp_plotSpks(ripp, 'basepath', basepath, 'flgSaveFig', false);
+
+    % Update the preloaded variable structure if needed later
+    v(ifile).ripp = ripp;
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -56,7 +89,7 @@ end
 
 % FR increase during ripples
 frml = 'RippSpks ~ Group * UnitType + (1|Mouse)';
-var_field = 'frModulation';
+var_field = 'peakRates';
 
 % organize for lme
 [lme_tbl, lme_cfg] = lme_org('grppaths', grppaths, 'frml', frml,...
@@ -64,20 +97,27 @@ var_field = 'frModulation';
 
 % run lme
 contrasts = 'all';
+contrasts = [1 : 5, 8]
 [lme_results, lme_cfg] = lme_analyse(lme_tbl, lme_cfg, 'contrasts', contrasts);
 
 % plot
-fh = lme_plot(lme_tbl, lme_cfg.mdl, 'ptype', 'bar');
+hndFig = lme_plot(lme_tbl, lme_cfg.mdl, 'ptype', 'bar', 'figShape', 'square');
 
 % Update labels
 axh = gca;
-ylabel(axh, 'MFR Modulation Index', 'FontSize', 20)
-xlabel(axh, 'Unit Type', 'FontSize', 20)
+ylabel(axh, 'FR Modulation', 'FontSize', 20)
+xlabel(axh, '', 'FontSize', 16)
+axh.XAxis.FontSize = 20;
 title(axh, '')
+axh.Legend.Location = 'northeast';
+
+ylbl = 'Ripp FR';
+fname = lme_frml2char(frml, 'rm_rnd', true, 'resNew', ylbl);
 
 % save
-lme_save('fh', fh, 'fname', frml, 'frmt', {'svg', 'mat', 'xlsx'},...
+lme_save('fh', hndFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
     'lme_tbl', lme_tbl, 'lme_results', lme_results, 'lme_cfg', lme_cfg)
+
 
 
 % -------------------------------------------------------------------------
@@ -98,210 +138,312 @@ contrasts = 'all';
 [lme_results, lme_cfg] = lme_analyse(lme_tbl, lme_cfg, 'contrasts', contrasts);
 
 % plot
-fh = lme_plot(lme_tbl, lme_cfg.mdl, 'ptype', 'bar', 'figShape', 'tall');
+hndFig = lme_plot(lme_tbl, lme_cfg.mdl, 'ptype', 'bar', 'figShape', 'tall');
 axh = gca;
-ylabel(axh, 'Rate (SWR / s)', 'FontSize', 20)
+ylabel(axh, 'Rate (SWR/s)', 'FontSize', 20)
 xlabel(axh, '', 'FontSize', 20)
 title(axh, '')
 axh.XAxis.FontSize = 20;
 axh.XTickLabelRotation = 0;
-ylim([0 3])
 
-ylbl = 'Ripp Density';
+ylbl = 'Ripp Rate';
 fname = lme_frml2char(frml, 'rm_rnd', true, 'resNew', ylbl);
 
 % save
-lme_save('fh', fh, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
+lme_save('fh', hndFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
     'lme_tbl', lme_tbl, 'lme_results', lme_results, 'lme_cfg', lme_cfg)
 
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Re-run only part of the analysis pipeline (e.g., ripp_spks)
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Assumes data was already loaded
 
-for ifile = 1 : length(basepaths)
-
-    % File
-    basepath = basepaths{ifile};
-    [~, basename] = fileparts(basepath);
-
-    % Get the preloaded ripple structure
-    ripp = v(ifile).ripp;
-
-    % Re-run ripp_spks
-    % ripp = ripp_spks(ripp, 'basepath', basepath, 'limState', 4,...
-    %     'flgGraphics', false, 'flgSaveVar', true);
-    
-    % Re-run state analysis
-    ripp = ripp_states(ripp, 'basepath', basepath, 'flgGraphics', false, ...
-        'flgSaveVar', true, 'flgSaveFig', true);
-
-    % plot detection
-    % ripp_plot(ripp, 'basepath', basepath, 'flgSaveFig', false);
-
-    % Plot spikes
-    % ripp_plotSpks(ripp, 'basepath', basepath, 'flgSaveFig', false);
-
-    % Update the preloaded variable structure if needed later
-    v(ifile).ripp = ripp;
-end
 
 
 
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Play with the data
+% Concate and plot ripple PETH
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Create a mean normalized SU PETH for RS and FS units from all mice of
 % a group and create a figure the superimposes WT and MCU-KO (separately
 % for RS and FS units.
 
-% Define Parameters
-baselineFraction = 0.2; % Use first 20% of window for baseline normalization
-colors = {[0 0 1], [1 0 0]}; % WT: Blue, MCU: Red
+normMet = 'zscore';        % 'max', 'ctrl', 'none', 'zscore', 'modulation'
 
-% Get Time Axis Info (assuming consistent across sessions)
-mapInfo = vCell{1}{1}(1).ripp.spks.info;
-mapDur = mapInfo.mapDur;
-nBinsMap = mapInfo.nBinsMap;
-timeVector = linspace(mapDur(1), mapDur(2), nBinsMap);
-baselineBins = 1:floor(nBinsMap * baselineFraction);
+% Figure Parameters
+clr(1, :) = [0.3 0.3 0.3];          % Control
+clr(2, :) = [0.784 0.667 0.392];    % MCU-KO 
+fntSize = 16;
+txtUnit = {'pPYR', 'pPV'};
+txtGrp = {'Control', 'MCU-KO'};
 
 % Stores matrices of unit-normalized PETHs for each group
-normPethsRS_grp = cell(1, length(grps));
-normPethsFS_grp = cell(1, length(grps));
+normGrp = cell(1, length(grps));
+unitGrp = cell(1, length(grps));
 
 % Process data for each group
-for igrp = 1:length(grps)
-    allNormRS = []; % Renamed and kept concise
-    allNormFS = []; % Renamed and kept concise
+for iGrp = 1:length(grps)
+    nMice = length(vCell{iGrp}{1});
+    normMap = cell(nMice, 1);
+    unitData = cell(nMice, 1);
 
-    for iMouse = 1:length(vCell{igrp}{1})
-        mouseData = vCell{igrp}{1}(iMouse);
+    for iMouse = 1:nMice
+        mouseData = vCell{iGrp}{1}(iMouse);
+        ripp = mouseData.ripp;
         
-        % Access data with concise names
-        rippMap = mouseData.ripp.spks.su.rippMap;
-        % rippMap = mouseData.ripp.spks.su.ctrlMap;
+        % Calculate mean PETH per unit
+        rippMap = squeeze(mean(ripp.spks.su.rippMap, 2, 'omitnan'));
+        ctrlMap = squeeze(mean(ripp.spks.su.ctrlMap, 2, 'omitnan'));
         idxRS = mouseData.units.clean(1, :);
         idxFS = mouseData.units.clean(2, :);
 
-        % Calculate mean PETH per unit & normalize by unit max
-        meanPethUnit = squeeze(mean(rippMap, 2, 'omitnan'));
-        flgNorm = false;
-        if flgNorm
-            maxUnit = max(meanPethUnit, [], 2);
-            maxUnit(maxUnit == 0) = 1;
-            normPethUnit = meanPethUnit ./ maxUnit;
-        else
-            normPethUnit = meanPethUnit;
+        % Calculate unit FR params
+        ctrlAvg = mean(ctrlMap, 2);
+
+        ctrlSe = std(frUnit, [], 2);
+        ctrlSe(ctrlSe == 0) = 1;
+        rippMax = max(rippMap, [], 2);
+        rippMax(rippMax == 0) = 1;
+
+        % normalize
+        switch normMet
+            case 'max'
+                normData = rippMap ./ rippMax;
+            case 'ctrl'
+                normData = rippMap ./ ctrlAvg;
+            case 'zscore'
+                normData = (rippMap - ctrlAvg) ./ ctrlSe;
+            case 'modulation'
+                normData = (rippMap - ctrlAvg) ./ (rippMap + ctrlAvg);
+            case 'none'
+                normData = rippMap;
         end
+        
+        % Collect PETHs
+        normMap{iMouse} = normData;
 
-        % Collect normalized PETHs
-        allNormRS = [allNormRS; normPethUnit(idxRS, :)];
-        allNormFS = [allNormFS; normPethUnit(idxFS, :)];
+        % get unit data
+        nUnits = size(normData, 1);
+        units = mouseData.units;
+        unitIdx = nan(nUnits, 1);
+        unitIdx(units.clean(1, :)) = 1;
+        unitIdx(units.clean(2, :)) = 2;
+        unitData{iMouse} = unitIdx;
+
     end
-
-    % Store the matrices for the group
-    normPethsRS_grp{igrp} = allNormRS;
-    normPethsFS_grp{igrp} = allNormFS;
- 
+    normGrp{iGrp} = cell2padmat(normMap, 1); 
+    unitGrp{iGrp} = cell2padmat(unitData, 1);
 end
 
-% Plotting using plot_stdShade
-fh_peth = figure('Name', 'Mean Unit-Normalized PETHs with SEM');
-tl = tiledlayout(1, 2, 'Padding', 'compact', 'TileSpacing', 'compact');
-title(tl, 'Mean SU PETH around Ripple Peak (Unit-Normalized +/- SEM)');
+% Get time bins 
+mapDur = ripp.spks.info.mapDur * 1000;
+nBinsMap = ripp.spks.info.nBinsMap;
+timeBins = linspace(mapDur(1), mapDur(2), nBinsMap);
 
-% RS Units Plot
-ax1 = nexttile;
-hold(ax1, 'on');
-for igrp = 1:length(grps)
-    plot_stdShade('axh', ax1, 'dataMat', normPethsRS_grp{igrp}, 'alpha', 0.3, 'clr', colors{igrp}, 'xVal', timeVector);
+% initialize
+hndFig = figure;
+set(hndFig, 'Color', 'w');
+fhUnits = get(hndFig, 'Units');
+set(hndFig, 'Units', 'pixels');
+fhPos = get(hndFig, 'Position');
+fhPos(3) = fhPos(4) * 2;
+set(hndFig, 'Position', fhPos);
+set(hndFig, 'Units', fhUnits);
+hndTil = tiledlayout(1, 2);
+hndTil.TileSpacing = 'tight';
+hndTil.Padding = 'tight';
+
+% Plot for each unit type
+for iUnit = 1 : 2
+    axh = nexttile(hndTil, iUnit, [1, 1]); cla; hold on
+    set(axh, 'FontName', 'Arial', 'FontSize', fntSize);
+    
+    % Plot each group
+    for iGrp = 1 : nGrp
+        % Get data for current unit type and group
+        unitIdx = unitGrp{iGrp} == iUnit;
+        pethData = normGrp{iGrp}(unitIdx, :);
+        
+        % Plot with std shade
+        plot_stdShade('axh', axh, 'dataMat', pethData,...
+            'alpha', 0.3, 'clr', clr(iGrp, :), 'xVal', timeBins);
+    end
+    
+    % Add zero line
+    xline(axh, 0, '--k');
+    
+    % Update labels
+    ylabel(axh, 'Norm. FR', 'FontSize', 20)
+    xlabel(axh, 'Time (ms)', 'FontSize', 20)
+    title(axh, txtUnit{iUnit}, 'FontSize', fntSize + 4, 'FontName', 'Arial')
+    
+    % Set limits
+    % ylim(axh, [-0.5, 0.5])
+    xlim(axh, mapDur)
 end
-xline(ax1, 0, '--k');
-title(ax1, 'RS Units');
-xlabel(ax1, 'Time (s)');
-ylabel(ax1, 'Mean Norm. FR (Unit Max = 1)');
-legend(ax1, grps, 'Location', 'best', 'Interpreter', 'none');
-grid(ax1, 'on');
-% ylim(ax1, [0, 1]); % Keep y-axis limit
+% Add legend
+legend(txtGrp, 'Location', 'northeast',...
+    'FontName', 'Arial', 'FontSize', fntSize);
 
-% FS Units Plot
-ax2 = nexttile;
-hold(ax2, 'on');
-for igrp = 1:length(grps)
-     if ~isempty(normPethsFS_grp{igrp})
-        plot_stdShade('axh', ax2, 'dataMat', normPethsFS_grp{igrp}', 'alpha', 0.3, 'clr', colors{igrp}, 'xVal', timeVector);
-     end
-end
-xline(ax2, 0, '--k');
-title(ax2, 'FS Units');
-xlabel(ax2, 'Time (s)');
-ylabel(ax2, 'Mean Norm. FR (Unit Max = 1)');
-legend(ax2, grps, 'Location', 'best', 'Interpreter', 'none');
-grid(ax2, 'on');
-% ylim(ax2, [0, 1]); % Keep y-axis limit
-
-% Save Figure - Intentionally commented out based on user edit
-% grph_save('fh', fh_peth, 'fname', 'mean_unitnorm_peth_ripples_stdshade', 'frmt', {'jpg', 'ai'});
+% Save
+fname = 'Ripp PETH';
+% lme_save('fh', hndFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
+%     'lme_tbl', table(), 'lme_results', table(), 'lme_cfg', [])
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Compare Raw Spike Counts near Ripple Peak (+/- 5ms)
+% PLOT ripple LFP traces
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% Define window & bins (assuming mapDur, nBinsMap exist from PETH section)
-peakWinSec = 0.003; % +/- 5ms
-binWidth = diff(mapDur) / nBinsMap;
-centerBin = ceil(nBinsMap / 2);
-binsNeededHalf = ceil(peakWinSec / binWidth);
-binStart = max(1, centerBin - binsNeededHalf);
-binEnd = min(nBinsMap, centerBin + binsNeededHalf);
-binIdx = binStart : binEnd;
+% Figure Parameters
+clr(1, :) = [0.3 0.3 0.3];          % Control
+clr(2, :) = [0.784 0.667 0.392];    % MCU-KO 
+fntSize = 16;
+txtGrp = {'Control', 'MCU-KO'};
 
-% Store the matrices for the group
-for igrp = 1 : 2
-    peakFR_RS{igrp} = mean(normPethsRS_grp{igrp}(:, binIdx), 2);
-    peakFR_FS{igrp} = mean(normPethsFS_grp{igrp}(:, binIdx), 2); % Also calculate for FS units
+% Stores matrices of ripple LFP traces for each group
+lfpGrp = cell(1, length(grps));
+
+% Process data for each group
+for iGrp = 1:length(grps)
+    nMice = length(vCell{iGrp}{1});
+    lfpMap = cell(nMice, 1);
+
+    for iMouse = 1:nMice
+        mouseData = vCell{iGrp}{1}(iMouse);
+        ripp = mouseData.ripp;
+        
+        % Get mean ripple LFP trace
+        lfpMap{iMouse} = mean(ripp.maps.raw, 1, 'omitnan');
+    end
+    lfpGrp{iGrp} = cell2padmat(lfpMap, 1); 
 end
 
-% --- Bar Plot Comparison for RS Units using plot_boxMean ---
-fh_peakFR_RS = figure('Name', 'Peak FR RS Units');
-ax1 = gca;
-dataMat = cell2padmat(peakFR_RS, 2);
-plot_boxMean('dataMat', dataMat', 'xVal', [1, 2],...
-             'axh', ax1, ...
-             'plotType', 'bar', ...
-             'grpNames', grps, ...
-             'clr', cell2padmat(colors, 1));
-yLabel = sprintf('Mean Norm. FR per Unit (±%dms Peak)', peakWinSec*1000);
-ylabel(ax1, yLabel);
-title(ax1, 'RS Unit Normalized Firing Rate Near Ripple Peak');
-box(ax1, 'off'); grid(ax1, 'on');
+% Get time bins 
+mapDur = ripp.spks.info.mapDur * 1000;
+nBinsMap = ripp.spks.info.nBinsMap;
+timeBins = linspace(mapDur(1), mapDur(2), nBinsMap);
 
-% --- Bar Plot Comparison for FS Units using plot_boxMean ---
-fh_peakFR_FS = figure('Name', 'Peak FR RS Units');
-ax1 = gca;
-dataMat = cell2padmat(peakFR_FS, 2);
-plot_boxMean('dataMat', dataMat', 'xVal', [1, 2],...
-             'axh', ax1, ...
-             'plotType', 'bar', ...
-             'grpNames', grps, ...
-             'clr', cell2padmat(colors, 1));
-yLabel = sprintf('Mean Norm. FR per Unit (±%dms Peak)', peakWinSec*1000);
-ylabel(ax2, yLabel);
-title(ax2, 'FS Unit Normalized Firing Rate Near Ripple Peak');
-box(ax2, 'off'); grid(ax2, 'on');
+% initialize
+hndFig = figure;
+set(hndFig, 'Color', 'w');
+fhUnits = get(hndFig, 'Units');
+set(hndFig, 'Units', 'pixels');
+fhPos = get(hndFig, 'Position');
+fhPos(3) = fhPos(4);
+set(hndFig, 'Position', fhPos);
+set(hndFig, 'Units', fhUnits);
+hndTil = tiledlayout(1, 1);
+hndTil.TileSpacing = 'tight';
+hndTil.Padding = 'tight';
 
-% Optional: Save Figures
-% grph_save('fh', fh_peakFR_RS, 'fname', 'peak_normFR_RS_comparison', 'frmt', {'jpg', 'ai'});
-% grph_save('fh', fh_peakFR_FS, 'fname', 'peak_normFR_FS_comparison', 'frmt', {'jpg', 'ai'});
+% Plot
+axh = nexttile(hndTil, 1, [1, 1]); cla; hold on
+set(axh, 'FontName', 'Arial', 'FontSize', fntSize);
+
+% Plot each group in reverse order so Control appears on top
+for iGrp = nGrp : -1 : 1
+    % Plot with std shade
+    ph(iGrp) = plot_stdShade('axh', axh, 'dataMat', lfpGrp{iGrp},...
+        'alpha', 0.3, 'clr', clr(iGrp, :), 'xVal', timeBins);
+    ph(iGrp).DisplayName = txtGrp{igrp};
+end
+
+% Add zero line
+xline(axh, 0, '--k');
+
+% Update labels
+ylabel(axh, 'LFP (µV)', 'FontSize', 20)
+xlabel(axh, 'Time (ms)', 'FontSize', 20)
+title(axh, '', 'FontSize', fntSize + 4, 'FontName', 'Arial')
+
+% Set limits
+xlim(axh, mapDur)
+ylim(axh, [-150, 200])
+
+% Add legend with custom order
+legend(ph, txtGrp(2 : -1 : 1), 'Location', 'northeast',...
+    'FontName', 'Arial', 'FontSize', fntSize);
+
+% Save
+fname = 'Ripp LFP';
+lme_save('fh', hndFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
+    'lme_tbl', table(), 'lme_results', table(), 'lme_cfg', [])
 
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% PLOT firing rate in ripples vs random
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Figure Parameters
+clr(1, :) = [0.3 0.3 0.3];          
+clr(2, :) = [0.784 0.667 0.392];    
+fntSize = 16;
+txtUnit = {'pPYR', 'pPV'};
+txtGrp = {'Control', 'MCU-KO'};
+
+% organize lme table for plotting
+[lme_tbl, ~] = lme_org('grppaths', grppaths, 'frml', frml,...
+    'flg_emg', false, 'var_field', 'rippRates', 'vCell', vCell);
+rippFr = lme_tbl.RippSpks;
+
+[lme_tbl, ~] = lme_org('grppaths', grppaths, 'frml', frml,...
+    'flg_emg', false, 'var_field', 'ctrlRates', 'vCell', vCell);
+lme_tbl = addvars(lme_tbl, rippFr);
+lme_tbl.Properties.VariableNames{1} = 'randFr';
+lme_tbl = movevars(lme_tbl, "rippFr", 'Before', "randFr");
+
+% initialize
+hndFig = figure;
+set(hndFig, 'Color', 'w');
+fhUnits = get(hndFig, 'Units');
+set(hndFig, 'Units', 'pixels');
+fhPos = get(hndFig, 'Position');
+fhPos(3) = fhPos(4) * 2;
+set(hndFig, 'Position', fhPos);
+set(hndFig, 'Units', fhUnits);
+hndTil = tiledlayout(1, 2);
+hndTil.TileSpacing = 'tight';
+hndTil.Padding = 'tight';
+
+% plot
+nGrp = length(vCell);
+for iUnit = 1 : 2
+    axh = nexttile(hndTil, iUnit, [1, 1]); cla; hold on
+    axis(axh, 'square');
+    set(axh, 'FontName', 'Arial', 'FontSize', fntSize);
+    
+    % Plot each group
+    for iGrp = 1 : nGrp
+        idxTbl = lme_tbl.UnitType == categorical(txtUnit(iUnit)) &...
+            lme_tbl.Group == categorical(txtGrp(iGrp));
+        grp_tbl = lme_tbl(idxTbl, :);
+        hndSc = scatter(axh, grp_tbl.randFr, grp_tbl.rippFr,...
+            30, clr(iGrp, :), 'filled');
+        hndSc.AlphaData = ones(sum(idxTbl), 1) * 0.9;  % Set a single alpha value for all points
+        hndSc.MarkerFaceAlpha = 'flat';
+    end
+    
+    set(axh, 'XScale', 'log', 'YScale', 'log')
+    eqLim = [min([xlim, ylim]), max([xlim, ylim])];
+    eqLim = [0.01, 200];
+    xlim(eqLim)
+    ylim(eqLim)
+    plot(axh, eqLim, eqLim, '--k', 'LineWidth', 2)
+    
+    % Update labels
+    ylabel(axh, 'FR in SWR (Hz)', 'FontSize', 20)
+    xlabel(axh, 'FR in Random (Hz)', 'FontSize', 20)
+    title(axh, txtUnit{iUnit}, 'FontSize', fntSize + 4, 'FontName', 'Arial')
+end
+legend(txtGrp, 'Location', 'southeast',...
+    'FontName', 'Arial', 'FontSize', fntSize);
+
+% save
+fname = 'Ripp FR vs Rand FR';
+lme_save('fh', hndFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
+    'lme_tbl', lme_tbl, 'lme_results', table(), 'lme_cfg', [])
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % RIPPLE CORRECTION
@@ -342,6 +484,7 @@ for ifile = 2:length(v)
     ripp = v(ifile).ripp;
     save(rippFile, 'ripp', '-v7.3');
 end
+
 
 
 

@@ -44,8 +44,8 @@ function [lme_results, lme_cfg] = lme_analyse(lme_tbl, lme_cfg, varargin)
 %   - Coefficients: Standard coefficients from the model (tests vs. zero)
 %   - Simple Effects: Effects of one factor at specific levels of another factor
 %   - Marginal Effects: Effects of one factor averaged across levels of another factor
-
-
+%   - ANOVA:         Overall F-tests for main effects and interactions from ANOVA table
+%
 %**************************************************************************
 % Theoretical Background: Linear Mixed-Effects (LME) Models
 %**************************************************************************
@@ -218,12 +218,12 @@ function [lme_results, lme_cfg] = lme_analyse(lme_tbl, lme_cfg, varargin)
 %**************************************************************************
 % Estimate +/ SE
 %**************************************************************************
-% the Estimate column provides the model's calculated magnitude for each
-% specific term or contrast. For the Intercept, the Estimate represents the
+% The `Estimate` column provides the model's calculated magnitude for each
+% specific term or contrast. For the Intercept, the `Estimate` represents the
 % predicted mean value of the response variable when all categorical fixed
 % factors are at their designated reference levels and any continuous fixed
 % predictors are held at zero. For other coefficients (main effects or
-% interactions under dummy coding), the Estimate represents the calculated
+% interactions under dummy coding), the `Estimate` represents the calculated
 % difference compared to the relevant reference level(s). For instance, a
 % main effect coefficient's Estimate is the difference between that factor
 % level and its reference level, specifically evaluated when other
@@ -232,15 +232,33 @@ function [lme_results, lme_cfg] = lme_analyse(lme_tbl, lme_cfg, varargin)
 % across levels of another. For derived contrasts (like simple or marginal
 % effects), the Estimate is the calculated value of the specific linear
 % combination of coefficients being tested (e.g., the estimated mean
-% difference between two groups at a specific condition). The SE (Standard
+% difference between two groups at a specific condition). The `SE` (Standard
 % Error) accompanies each Estimate and quantifies the precision of that
-% estimate; a smaller SE indicates less uncertainty or variability around
-% the estimated value. It reflects the expected standard deviation of the
-% estimate if the study were repeated many times. The SE is crucial for
+% estimate; it reflects the expected standard deviation of the
+% estimate if the study were repeated many times. The `SE` is crucial for
 % assessing statistical significance, as it forms the denominator in the
 % t-statistic calculation (t = Estimate / SE) and is used to construct
-% confidence intervals around the Estimate.
+% confidence intervals around the `Estimate`.
 % 
+%**************************************************************************
+% Statistic (t or F) and Degrees of Freedom (DF)
+%**************************************************************************
+% The `Statistic` column contains the test statistic associated with the hypothesis
+% test for that row. For rows of type 'Coeff', 'Simple', or 'Marginal', this
+% is the t-statistic (Estimate / SE), testing whether the specific coefficient
+% or contrast is significantly different from zero. For rows of type 'ANOVA',
+% this is the F-statistic obtained from the `anova(lme)` function, testing the
+% overall significance of the interaction term in the model.
+%
+% The `DF` column reports the degrees of freedom associated with the test statistic.
+% For t-tests ('Coeff', 'Simple', 'Marginal'), this is a single value representing
+% the denominator degrees of freedom, often calculated using methods like
+% Satterthwaite or Kenward-Roger approximations in mixed models. For F-tests
+% ('ANOVA'), this column displays the numerator and denominator degrees of
+% freedom as a string '[DF1, DF2]'. DF1 relates to the number of parameters
+% associated with the effect being tested, and DF2 relates to the residual or
+% error degrees of freedom.
+%
 %**************************************************************************
 % Correcting Type I errors
 %**************************************************************************
@@ -308,7 +326,16 @@ fit_method = params.Results.FitMethod;
 % Check for the required formula field in the config struct. Fit the LME
 % model using fitlme with the specified data, formula, and fit method.
 % Store the fitted model back into the configuration struct for output.
-lme = fitlme(lme_tbl, lme_cfg.frml, 'FitMethod', fit_method);
+lme = fitlme(lme_tbl, lme_cfg.frml, 'FitMethod', fit_method)
+
+[~, ~, stats] = fixedEffects(lme, 'DFMethod', 'satterthwaite')
+
+lme = fitlme(lme_tbl, lme_cfg.frml, 'FitMethod', fit_method,...
+    'DummyVarCoding', 'effects')
+
+
+lme = fitlme(lme_tbl, lme_cfg.frml, 'FitMethod', fit_method,...
+    'DummyVarCoding', 'full')
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % EXTRACT MODEL INFORMATION
@@ -331,6 +358,12 @@ lme_cfg.mdl = lme;
 lme_cfg.contrasts = contrast_req; 
 lme_cfg.correction = correction_method; 
 lme_cfg.FitMethod = fit_method;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% PERFORM ANOVA
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Run ANOVA on the fitted model to get overall F-tests for fixed effects.
+anova_tbl = anova(lme);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % IDENTIFY CATEGORICAL FACTORS
@@ -366,12 +399,28 @@ formula_factors = unique(formula_factors); % Ensure unique list
 % or coefficient.
 internal_defs_list = struct(...
     'DefIndex', {}, ...             % Unique index for each definition generated
-    'Type', {}, ...                 % 'Coefficient', 'Simple Effect', 'Marginal Effect'
+    'Type', {}, ...                 % 'ANOVA', 'Coefficient', 'Simple Effect', 'Marginal Effect'
     'Description', {}, ...          % User-friendly label for the contrast/coefficient
     'CoefficientCombination', {},...% Cell array of coefficient names involved (for H construction)
     'H_vector', {}, ...             % The contrast vector (row vector) for coefTest (NaN for Type='Coefficient')
     'OrigCoefIndex', {});           % Index in the original lme.Coefficients table (NaN for derived contrasts)
 def_idx_counter = 0;
+
+% Prepare definitions for ANOVA results first
+for ia = 1:height(anova_tbl)
+    def_idx_counter = def_idx_counter + 1;
+    term_name = anova_tbl.Term{ia};
+    desc = sprintf('ANOVA: %s', term_name);
+    
+    % Store minimal info needed later to populate results
+    internal_defs_list(def_idx_counter) = struct(...
+        'DefIndex', def_idx_counter,...
+        'Type', "ANOVA",...
+        'Description', desc,...
+        'CoefficientCombination', {{term_name}},... % Store term name for reference
+        'H_vector', {NaN},...
+        'OrigCoefIndex', ia); % Use OrigCoefIndex to store ANOVA row index
+end
 
 % If requested, iterate through model coefficients and create entries for
 % them. Generate more descriptive labels based on factor levels.
@@ -527,14 +576,24 @@ for i = 1:length(interaction_terms)
 
             % Add definition if H-vector is valid
             if valid_H
-                def_idx_counter = def_idx_counter + 1;
-                internal_defs_list(def_idx_counter) = struct(...
-                    'DefIndex', def_idx_counter,...
-                    'Type', "Simple",...
-                    'Description', desc,...
-                    'CoefficientCombination', {unique(coef_names_involved)},...
-                    'H_vector', {H},...
-                    'OrigCoefIndex', NaN);
+                % Check if this simple effect is equivalent to a coefficient
+                is_duplicate = false;
+                % For simple effects, check if the H vector matches any coefficient's pattern
+                % A coefficient will have exactly one 1 in its H vector
+                if sum(H == 1) == 1 && sum(H == 0) == length(H) - 1
+                    is_duplicate = true;
+                end
+                
+                if ~is_duplicate
+                    def_idx_counter = def_idx_counter + 1;
+                    internal_defs_list(def_idx_counter) = struct(...
+                        'DefIndex', def_idx_counter,...
+                        'Type', "Simple",...
+                        'Description', desc,...
+                        'CoefficientCombination', {unique(coef_names_involved)},...
+                        'H_vector', {H},...
+                        'OrigCoefIndex', NaN);
+                end
             end
         end % End loop levelA
     end % End loop levelB (for effect of A)
@@ -578,14 +637,24 @@ for i = 1:length(interaction_terms)
             end
 
             if valid_H
-                def_idx_counter = def_idx_counter + 1;
-                internal_defs_list(def_idx_counter) = struct(...
-                    'DefIndex', def_idx_counter,...
-                    'Type', "Simple",...
-                    'Description', desc,...
-                    'CoefficientCombination', {unique(coef_names_involved)},...
-                    'H_vector', {H},...
-                    'OrigCoefIndex', NaN);
+                % Check if this simple effect is equivalent to a coefficient
+                is_duplicate = false;
+                % For simple effects, check if the H vector matches any coefficient's pattern
+                % A coefficient will have exactly one 1 in its H vector
+                if sum(H == 1) == 1 && sum(H == 0) == length(H) - 1
+                    is_duplicate = true;
+                end
+                
+                if ~is_duplicate
+                    def_idx_counter = def_idx_counter + 1;
+                    internal_defs_list(def_idx_counter) = struct(...
+                        'DefIndex', def_idx_counter,...
+                        'Type', "Simple",...
+                        'Description', desc,...
+                        'CoefficientCombination', {unique(coef_names_involved)},...
+                        'H_vector', {H},...
+                        'OrigCoefIndex', NaN);
+                end
             end
         end % End loop levelB
     end % End loop levelA (for effect of B)
@@ -706,20 +775,23 @@ end % End loop through interaction terms
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% DETERMINE WHICH DEFINITIONS TO INCLUDE
+% DETERMINE WHICH DEFINITIONS TO INCLUDE (NOW DONE AFTER CALCULATION)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Based on the 'contrasts' parameter ('all', logical indices, or numeric
 % indices), select the subset of definitions from internal_defs_list to
 % calculate results for.
-if ischar(contrast_req) && strcmpi(contrast_req, 'all')
-    indices_to_report = [internal_defs_list.DefIndex];
-elseif islogical(contrast_req)
-    indices_to_report = find(contrast_req);
-elseif isnumeric(contrast_req)
-    indices_to_report = unique(contrast_req(:)'); % Ensure row vector of unique indices
-else
-    error('Invalid format for ''contrasts'' parameter. Use ''all'', logical vector, or numeric vector.');
-end
+% if ischar(contrast_req) && strcmpi(contrast_req, 'all')
+%     indices_to_report = [internal_defs_list.DefIndex];
+% elseif islogical(contrast_req)
+%     indices_to_report = find(contrast_req);
+% elseif isnumeric(contrast_req)
+%     indices_to_report = unique(contrast_req(:)'); % Ensure row vector of unique indices
+% else
+%     error('Invalid format for ''contrasts'' parameter. Use ''all'', logical vector, or numeric vector.');
+% end
+
+% --- We now always calculate all definitions first --- 
+indices_to_report = [internal_defs_list.DefIndex];
 
 num_report = length(indices_to_report);
 if num_report == 0
@@ -740,7 +812,7 @@ end
 %   - Calculate the SE (sqrt(H * Cov(beta_hat) * H')).
 %   - Calculate the t-statistic (Estimate / SE, handling potential zero SE).
 %   - Store the uncorrected p-value and track the index for potential correction later.
-results_data = cell(num_report, 8); % {Type, Desc, Est, SE, tStat, DF, pVal, pAdj} - H_vector added later
+results_data = cell(num_report, 8); % {Type, Desc, Est, SE, Stat, DF, pVal, pAdj} - H_vector added later
 derived_contrast_indices_in_output = []; % Track output table rows for derived contrasts
 p_values_for_correction = [];         % Store pVals ONLY for selected derived contrasts
 h_vectors_to_store = cell(num_report, 1); % Store H-vectors separately
@@ -750,17 +822,32 @@ for i = 1:num_report
     row_def = internal_defs_list(current_def_idx);
 
     % Initialize results for this row
-    est = NaN; se = NaN; tStat = NaN; df = NaN; pVal = NaN; pAdj = NaN;
-    current_h_vec = {NaN}; % Default to NaN for H-vector storage (used for coefficients)
+    est = NaN; se = NaN; stat = NaN; df_out = {NaN}; pVal = NaN; pAdj = NaN;
+    current_h_vec = {NaN}; % Default to NaN for H-vector storage
 
-    if row_def.Type == "Coeff"
+    if row_def.Type == "ANOVA"
+        anova_row_idx = row_def.OrigCoefIndex; % Index in the anova_tbl
+        if ~isnan(anova_row_idx) && anova_row_idx <= height(anova_tbl)
+            stat = anova_tbl.FStat(anova_row_idx);
+            df1  = anova_tbl.DF1(anova_row_idx);
+            df2  = anova_tbl.DF2(anova_row_idx);
+            df_out = {sprintf('[%d, %d]', df1, df2)}; % Store DF as a string '[DF1, DF2]' in a cell
+            pVal = anova_tbl.pValue(anova_row_idx);
+            % Estimate, SE, pAdj, H-vector remain NaN for ANOVA rows
+        else
+             warning('lme_analyse:InvalidAnovaIndex', ...
+                'Invalid ANOVA table index for definition %d. Results set to NaN.', current_def_idx);
+        end
+
+    elseif row_def.Type == "Coeff"
         orig_coef_idx = row_def.OrigCoefIndex;
         if ~isnan(orig_coef_idx) && orig_coef_idx <= height(lme_coef_table)
             est   = lme_coef_table.Estimate(orig_coef_idx);
             se    = lme_coef_table.SE(orig_coef_idx);
-            tStat = lme_coef_table.tStat(orig_coef_idx);
-            df    = lme_coef_table.DF(orig_coef_idx);
+            stat  = lme_coef_table.tStat(orig_coef_idx); % Get tStat
+            df_out = {lme_coef_table.DF(orig_coef_idx)};    % Get DF, wrap in cell
             pVal  = lme_coef_table.pValue(orig_coef_idx);
+            % pAdj and H-vector remain NaN for Coeff rows
         else
             warning('lme_analyse:InvalidCoefIndex', ...
                 'Invalid original coefficient index for definition %d. Results set to NaN.', current_def_idx);
@@ -778,7 +865,7 @@ for i = 1:num_report
             % Keep results as NaN, current_h_vec is already {H} which might be {NaN} or invalid
         else
             % Perform the contrast test
-            [p_test, F_test, df_test] = coefTest(lme, H); % Use specific output var names
+            [p_test, F_test, ~, df_test] = coefTest(lme, H); % Use specific output var names
 
             % Calculate Estimate and SE
             est = H * coef_estimates_all(:); % Ensure beta is column vector
@@ -807,8 +894,9 @@ for i = 1:num_report
             end
 
             % Assign results
+            stat = tStat; % Assign calculated t-statistic to 'stat'
             pVal = p_test;
-            df = df_test;
+            df_out = {df_test}; % Store scalar DF in a cell
 
             % Store p-value and the index *in the final output table* for correction
             p_values_for_correction(end+1) = pVal; %#ok<AGROW>
@@ -817,7 +905,7 @@ for i = 1:num_report
     end % End check of definition Type
 
     % Store results for this row in the cell array
-    results_data(i,:) = {row_def.Type, row_def.Description, est, se, tStat, df, pVal, pAdj};
+    results_data(i,:) = {row_def.Type, row_def.Description, est, se, stat, df_out, pVal, pAdj}; % Use stat, df_out
     h_vectors_to_store{i} = current_h_vec; % Store the H-vector (or {NaN})
 
 end % End loop through selected contrasts
@@ -895,7 +983,7 @@ end
 % Display completion message.
 lme_results = cell2table(results_data, ...
     'VariableNames', {'Type', 'Description', 'Estimate', 'SE', ...
-    't_Statistic', 'DF', 'p_Value', 'p_Adjusted'});
+    'Statistic', 'DF', 'p_Value', 'p_Adjusted'}); % Renamed t_Statistic -> Statistic
 
 % Add H_vector column, formatting numeric vectors
 formatted_h_vectors = cell(num_report, 1);
@@ -918,8 +1006,42 @@ lme_results = addvars(lme_results, (1:num_report)', 'Before', 1, ...
 % Format numeric columns for display
 lme_results.Estimate = round(lme_results.Estimate, 2);
 lme_results.SE = round(lme_results.SE, 2);
-lme_results.t_Statistic = round(lme_results.t_Statistic, 2);
+lme_results.Statistic = round(lme_results.Statistic, 2); % Renamed from t_Statistic
+% DF is now mixed (numeric cell/string cell), handle potential errors if trying to round all
+% p-values can be rounded
 lme_results.p_Value = round(lme_results.p_Value, 4);
 lme_results.p_Adjusted = round(lme_results.p_Adjusted, 4);
+
+% Reorder rows to move ANOVA to the beginning
+if any(strcmp(lme_results.Properties.VariableNames, 'Type')) % Check if Type column exists
+    anova_rows_logic = strcmp(lme_results.Type, 'ANOVA');
+    non_anova_rows_logic = ~anova_rows_logic;
+    if any(anova_rows_logic) % Check if there are any ANOVA rows to move
+        lme_results = [lme_results(anova_rows_logic, :); lme_results(non_anova_rows_logic, :)];
+    end
+end
+
+% --- Apply user's contrast selection AFTER generating the full table ---
+if isnumeric(contrast_req)
+    % Select rows based on numeric indices provided by the user
+    % Validate indices against the current table height
+    if any(contrast_req < 1) || any(contrast_req > height(lme_results))
+        error('Numeric ''contrasts'' indices are out of bounds for the generated results table.');
+    end
+    lme_results = lme_results(contrast_req, :);
+elseif islogical(contrast_req)
+    % Select rows based on a logical mask
+    if length(contrast_req) ~= height(lme_results)
+        error('Logical ''contrasts'' vector length must match the number of rows (%d) in the full results table.', height(lme_results));
+    end
+    lme_results = lme_results(contrast_req, :);
+elseif ischar(contrast_req) && strcmpi(contrast_req, 'all')
+    % Keep all rows (already done)
+else
+    error('Invalid format for ''contrasts'' parameter. Use ''all'', logical vector, or numeric vector.');
+end
+
+% Update the Index column again after potential filtering 
+lme_results.Index = (1:height(lme_results))';
 
 end % End of function lme_analyse

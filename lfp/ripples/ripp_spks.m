@@ -21,44 +21,25 @@ function ripp = ripp_spks(ripp, varargin)
 % INPUT:
 %   ripp                Structure containing ripple detection results from
 %                       getRipples.m. Must include fields: 
-%                         ripp.times: [N x 2] ripple start/end times.
-%                         ripp.peakTime: [N x 1] ripple peak times.
-%                         ripp.dur: [N x 1] ripple durations.
-%                         ripp.info.fs: LFP sampling frequency.
-%                         ripp.info.recWin: [1 x 2] recording window used.
+%                         times: [N x 2] ripple start/end times.
+%                         peakTime: [N x 1] ripple peak times.
+%                         dur: [N x 1] ripple durations.
+%                         info.fs: LFP sampling frequency.
+%                         info.recWin: [1 x 2] recording window used.
 %                       If 'limState' is used, requires:
-%                         ripp.states.idx: Logical matrix/cell identifying ripples within states.
+%                         states.idx: Logical matrix/cell identifying ripples within states.
 %   basepath            (Optional) Path to recording session directory {pwd}.
 %   flgGraphics         (Optional) Logical flag to plot results {true}.
 %   flgSaveVar          (Optional) Logical flag to save/update the ripp
-%                       structure in a .ripp.mat file {true}.
+%                       structure in a .mat file {true}.
 %   limState            (Optional) Numeric index (e.g., 1-5) specifying a
 %                       vigilance state (from sleep_states.mat) to restrict
 %                       the *statistical analysis* (gain, p-value) to.
 %                       {Default: [], analyze all ripple events for stats}.
 %
 % OUTPUT:
-%   ripp                Updated structure containing ripple analysis results,
-%                       with the following fields added or updated under
-%                       ripp.spks:
-%                       ripp.spks.info.limState: Limiting state index used for stats.
-%                       ripp.spks.info.mapDur: Window duration used for PETH maps [start, end] in sec.
-%                       ripp.spks.info.nBinsMap: Number of bins used for PETH maps.
-%                       ripp.spks.rippIdxState: Logical index of ripples included in state-specific statistical analysis (if limState used).
-%                       ripp.spks.ctrlPeakTime: Timestamps used as control event centers.
-%                       ripp.spks.ctrlTimes: Start/end times of generated control events.
-%                       ripp.spks.mu.rippMap: [N_ripples x nBinsMap] PETH map of MU spike counts around ripple peaks.
-%                       ripp.spks.mu.ctrlMap: [N_controls x nBinsMap] PETH map of MU spike counts around control event centers.
-%                       ripp.spks.su.rippRates: {nUnits x 1} cell array, each cell [N_ripples x 1] firing rates during ripple events.
-%                       ripp.spks.su.ctrlRates: {nUnits x 1} cell array, each cell [N_controls x 1] firing rates during control events.
-%                       ripp.spks.su.pVal: [nUnits x 1] P-value from Wilcoxon sign-rank test comparing ripple vs control rates per unit (*state-filtered*).
-%                       ripp.spks.su.sigMod: [nUnits x 1] Logical flag indicating significant modulation per unit (pVal < 0.05, *state-filtered*).
-%                       ripp.spks.su.spikeGain: [nUnits x 1] Mean z-scored firing rate during ripples relative to control rate distribution per unit (*state-filtered*).
-%                       ripp.spks.su.frGain: [nUnits x 1] Mean z-scored firing rate during ripples relative to control rate distribution per unit (*state-filtered*).
-%                       ripp.spks.su.frModulation: [nUnits x 1] Modulation index ((Ripp-Ctrl)/(Ripp+Ctrl)) per unit (*state-filtered*).
-%                       ripp.spks.su.frPrct: [nUnits x 1] Percent change relative to control rate ((Ripp-Ctrl)/Ctrl*100) per unit (*state-filtered*).
-%                       ripp.spks.su.rippMap: [nUnits x N_ripples x nBinsMap] PETH map of SU spike counts around ripple peaks.
-%                       ripp.spks.su.ctrlMap: [nUnits x N_controls x nBinsMap] PETH map of SU spike counts around control event centers.
+%   ripp                Updated structure containing ripple analysis results.
+%                       See spks_initialize for detailed field descriptions.
 %
 % DEPENDENCIES:
 %   basepaths2vars (custom)
@@ -71,8 +52,7 @@ function ripp = ripp_spks(ripp, varargin)
 % 06 Aug 24 LH - Major refactor: Changed control event selection, state-limiting application, naming conventions.
 % 05 Aug 24 LH - Refactored from rippleSpks.m, integrated bz_getRipSpikes logic,
 %                added state-matching, spike gain calculation, and stats.
-% (Add current date/initials if modifying significantly)
-
+% 
 %%% consider adding phase locking
 % https://www.sciencedirect.com/science/article/pii/S2352289521000357#sec2
 
@@ -104,7 +84,7 @@ limState        = p.Results.limState;
 % files
 cd(basepath);
 [~, basename] = fileparts(basepath);
-rippfile = fullfile(basepath, [basename, '.ripp.mat']);
+rippfile = fullfile(basepath, [basename, 'ripp.mat']);
 
 % Check if essential ripple info exists
 if ~isfield(ripp, 'times') || ~isfield(ripp, 'peakTime') || ~isfield(ripp, 'info')
@@ -112,7 +92,7 @@ if ~isfield(ripp, 'times') || ~isfield(ripp, 'peakTime') || ~isfield(ripp, 'info
 end
 % Check for state info if limState is requested
 if ~isempty(limState) && size(ripp.states.idx, 2) < limState 
-     warning('ripp.states.idx{%d} not found or empty. Run rippleStates.m first or check state index. Proceeding without state limiting.', limState);
+     warning('ripp.states.idx{%d} not found.', limState);
      limState = []; % Reset limState if state data isn't available/valid
 end
 
@@ -135,7 +115,7 @@ end
 % params
 fsSpk = v.session.extracellular.sr;
 fsLfp = ripp.info.fs;
-rippTimes = ripp.times;           % Ripple start/end times [N x 2]
+rippTimes = ripp.times;             % Ripple start/end times [N x 2]
 rippPeakTime = ripp.peakTime;       % Ripple peak times [N x 1]
 rippDur = ripp.dur;                 % Ripple durations [N x 1]
 nRipples = size(rippTimes, 1);
@@ -156,11 +136,7 @@ if isfield(v.session.general, 'duration') && recWin(2) > floor(v.session.general
 end
 
 % Initialize output structure
-ripp.spks = [];
-ripp.spks.info.limState = limState;
-ripp.spks.info.mapDur = mapDur;
-ripp.spks.info.nBinsMap = nBinsMap;
-ripp.spks.rippIdxState = []; 
+spks = spks_initialize();
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % CREATE CONTROL (NON-RIPPLE) EVENTS
@@ -195,7 +171,7 @@ intervalsCtrl(durIdx, :) = [];
 
 % Check if any valid control intervals exist
 if isempty(intervalsCtrl)
-    error('No valid non-event intervals found for control event calculation within the specified state/window.');
+    error('No valid non-event intervals found.');
 end
 
 % Initialize control structures and parameters
@@ -234,76 +210,70 @@ ctrlDur = diff(ctrlTimes, 1, 2); % Recalculate duration based on actual placed e
 % INTEGRATED SPIKE-IN-EVENT CALCULATION & STATISTICS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % This section calculates the firing rate of each single unit during every 
-% ripple event and every control event using the 'calculate_event_rates' 
-% helper. It then performs statistical comparisons (Wilcoxon signed-rank test) 
-% between the distributions of ripple rates and control rates for each unit. 
-% If 'limState' is specified, only events within that state are included in 
-% the statistical tests and spike gain calculation. Spike gain is calculated 
-% as the z-scored difference between mean ripple rate and mean control rate.
+% ripple event and every control event using times2rate. It then performs 
+% statistical comparisons (Wilcoxon signed-rank test) between the distributions 
+% of ripple rates and control rates for each unit. If 'limState' is specified, 
+% only events within that state are included in the statistical tests and 
+% spike gain calculation. 
 
+% Initialize SU results fields
+spks.su.pVal = nan(nunits, 1);
+spks.su.sigMod = false(nunits, 1);
+spks.su.frGain = nan(nunits, 1);
+spks.su.frModulation = nan(nunits, 1);
+spks.su.frPrct = nan(nunits, 1);
+
+% Calculate SU firing rates during all ripple and control events for all units at once
 if nunits > 0
+    spks.su.rippRates = times2rate(v.spikes.times, 'winCalc', rippTimes, 'binsize', Inf);
+    spks.su.ctrlRates = times2rate(v.spikes.times, 'winCalc', ctrlTimes, 'binsize', Inf);
     
-    % Initialize SU results fields
-    ripp.spks.su.rippRates = cell(nunits, 1);
-    ripp.spks.su.ctrlRates = cell(nunits, 1);
-    ripp.spks.su.pVal = nan(nunits, 1);
-    ripp.spks.su.sigMod = false(nunits, 1);
-    ripp.spks.su.spikeGain = nan(nunits, 1);
-    ripp.spks.su.frGain = nan(nunits, 1);
-    ripp.spks.su.frModulation = nan(nunits, 1);
-    ripp.spks.su.frPrct = nan(nunits, 1);
+    % Calculate peak rates using a narrow window around ripple and control peaks
+    peakWin = [-0.003 0.003]; % +/- 3ms window around peaks
+    rippPeakTimes = [rippPeakTime + peakWin(1), rippPeakTime + peakWin(2)];
+    spks.su.peakRates = times2rate(v.spikes.times, 'winCalc', rippPeakTimes, 'binsize', Inf);
+end
 
-    % Calculate SU firing rates during all ripple and control events
-    for iunit = 1:nunits
-        unitSpkTimes = v.spikes.times{iunit};
-        unitSpkTimes = Restrict(unitSpkTimes, recWin); % Ensure SU spikes are within analysis window
+% Determine state index for filtering statistics
+if isempty(limState)
+    idxState = true(nRipples, 1);
+else
+    idxState = ripp.states.idx(:, limState);
+end
 
-        % Calculate rates using helper function
-        ripp.spks.su.rippRates{iunit} = calculate_event_rates(unitSpkTimes, rippTimes);
-        ripp.spks.su.ctrlRates{iunit} = calculate_event_rates(unitSpkTimes, ctrlTimes);
+% Statistical Comparison & Gain Calculation (State-Filtered)
+for iunit = 1:nunits
+    
+    % Filter rates based on state index
+    rippUnit = spks.su.rippRates(iunit, idxState);
+    ctrlUnit = spks.su.ctrlRates(iunit, idxState);
 
-    end % End unit loop for rate calculation
-
-    % Determine state index for filtering statistics
-    if isempty(limState)
-        idxState = true(nRipples, 1);
+    % Perform statistical test to see if distribution of FRs in ripples
+    % is different than in control events. The use of Wilcoxon
+    % (dependent samples) is becuase each ripp and ctrl event are
+    % matched by vigalance state and event duration.
+    % Perform test only if there are non-NaN values in both vectors
+    if any(~isnan(rippUnit)) && any(~isnan(ctrlUnit))
+        [p, h] = signrank(rippUnit, ctrlUnit);
+        spks.su.pVal(iunit) = p;
+        spks.su.sigMod(iunit) = h;
     else
-        idxState = ripp.states.idx(:, limState); 
+        spks.su.pVal(iunit) = NaN;
+        spks.su.sigMod(iunit) = false;
     end
 
-    % Statistical Comparison & Gain Calculation (State-Filtered)
-    for iunit = 1:nunits
-        % Filter rates based on state index
-        rippRatesUnit = ripp.spks.su.rippRates{iunit}(idxState);
-        ctrlRatesUnit = ripp.spks.su.ctrlRates{iunit}(idxState);
-        
-        % Perform statistical test to see if distribution of FRs in ripples
-        % is different than in control events. The use of Wilcoxon
-        % (dependent samples) is becuase each ripp and ctrl event are
-        % matched by vigalance state and event duration. 
-        % Perform test only if there are non-NaN values in both vectors
-        if any(~isnan(rippRatesUnit)) && any(~isnan(ctrlRatesUnit))
-            [p, h] = signrank(rippRatesUnit, ctrlRatesUnit);
-            ripp.spks.su.pVal(iunit) = p;
-            ripp.spks.su.sigMod(iunit) = h;
-        else
-            ripp.spks.su.pVal(iunit) = NaN;
-            ripp.spks.su.sigMod(iunit) = false;
-        end
+    % calculate firing rate increase parameters
+    meanCtrlRate = mean(ctrlUnit, 'omitnan');
+    sdCtrlRate = std(ctrlUnit, 0, 'omitnan');
+    meanRippRate = mean(rippUnit, 'omitnan');
+    diffRate = meanRippRate - meanCtrlRate;
+    sumRate = meanRippRate + meanCtrlRate;
 
-        % calculate firing rate increase parameters
-        meanCtrlRate = mean(ctrlRatesUnit, 'omitnan');
-        sdCtrlRate = std(ctrlRatesUnit, 0, 'omitnan');
-        meanRippRate = mean(rippRatesUnit, 'omitnan');
-        diffRate = meanRippRate - meanCtrlRate;
-        sumRate = meanRippRate + meanCtrlRate;
+    spks.su.frGain(iunit) = diffRate / sdCtrlRate;         % X-score
+    spks.su.frModulation(iunit) = diffRate / sumRate;      % Modulation index
+    spks.su.frPrct(iunit) = diffRate / meanCtrlRate * 100; % Percent change
 
-        ripp.spks.su.frGain(iunit) = diffRate / sdCtrlRate;         % X-score
-        ripp.spks.su.frModulation(iunit) = diffRate / sumRate;      % Modulation index
-        ripp.spks.su.frPrct(iunit) = diffRate / meanCtrlRate * 100; % Percent change
-
-    end % End unit loop for stats
-end % End if nunits > 0
+end % Unit loop 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % GENERATE PERI-EVENT SPIKE COUNT MAPS (MU and SU)
@@ -311,34 +281,29 @@ end % End if nunits > 0
 % This section generates Peri-Event Time Histograms (PETHs) by aligning 
 % multi-unit (MU) and single-unit (SU) spike times to the peak of each 
 % ripple event and the center of each control event. The helper function 
-% 'create_sync_map' is used to compute spike counts within time bins 
+% 'sync_spksMap' is used to compute spike counts within time bins 
 % relative to the alignment points across all events.
 
+% Single-Unit Maps
+spks.su.rippMap = nan(nunits, nRipples, nBinsMap);
+spks.su.ctrlMap = nan(nunits, nRipples, nBinsMap);
+
+for iunit = 1:nunits
+    unitSpkTimes = v.spikes.times{iunit};
+    unitSpkTimes = Restrict(unitSpkTimes, recWin); % Ensure SU spikes are within analysis window
+
+    spks.su.rippMap(iunit, :, :) = sync_spksMap(unitSpkTimes, rippPeakTime, mapDur, nBinsMap);
+    spks.su.ctrlMap(iunit, :, :) = sync_spksMap(unitSpkTimes, ctrlPeakTime, mapDur, nBinsMap);
+end
+
 % Multi-Unit Maps
+spks.mu = []; % Indicate no MU data
 if isfield(v, 'spktimes') && ~isempty(v.spktimes)
     muSpkTimes = sort(vertcat(v.spktimes{:})) / fsSpk;      % Combine all tetrode spikes
     muSpkTimes = Restrict(muSpkTimes, recWin);              % Ensure MU spikes are within analysis window
 
-    ripp.spks.mu.rippMap = create_sync_map(muSpkTimes, rippPeakTime, mapDur, nBinsMap);
-    ripp.spks.mu.ctrlMap = create_sync_map(muSpkTimes, ctrlPeakTime, mapDur, nBinsMap);
-else
-    ripp.spks.mu = []; % Indicate no MU data
-end
-
-% Single-Unit Maps
-if nunits > 0
-
-    % Initialize
-    ripp.spks.su.rippMap = nan(nunits, nRipples, nBinsMap);
-    ripp.spks.su.ctrlMap = nan(nunits, nRipples, nBinsMap);
-
-    for iunit = 1:nunits
-        unitSpkTimes = v.spikes.times{iunit};
-        unitSpkTimes = Restrict(unitSpkTimes, recWin); % Ensure SU spikes are within analysis window
-
-        ripp.spks.su.rippMap(iunit, :, :) = create_sync_map(unitSpkTimes, rippPeakTime, mapDur, nBinsMap);
-        ripp.spks.su.ctrlMap(iunit, :, :) = create_sync_map(unitSpkTimes, ctrlPeakTime, mapDur, nBinsMap);
-    end
+    spks.mu.rippMap = sync_spksMap(muSpkTimes, rippPeakTime, mapDur, nBinsMap);
+    spks.mu.ctrlMap = sync_spksMap(muSpkTimes, ctrlPeakTime, mapDur, nBinsMap);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -346,12 +311,16 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % This section stores the generated control event times and peak positions 
 % in the output structure. If requested ('saveVar' is true), the updated 
-% 'ripp' structure is saved to a .ripp.mat file. If requested ('graphics' 
+% 'ripp' structure is saved to a .mat file. If requested ('graphics' 
 % is true), summary plots are generated using 'plot_rippleSpks'.
 
 % store and organize output
-ripp.spks.ctrlPeakTime = ctrlPeakTime; 
-ripp.spks.ctrlTimes = ctrlTimes;   
+spks.info.ctrlPeakTime = ctrlPeakTime; 
+spks.info.ctrlTimes = ctrlTimes;   
+spks.info.limState = limState;
+spks.info.mapDur = mapDur;
+spks.info.nBinsMap = nBinsMap;
+ripp.spks = spks;
 
 % save
 if flgSaveVar
@@ -360,49 +329,19 @@ end
 
 % graphics
 if flgGraphics 
-    plot_rippleSpks(ripp, 'basepath', basepath, 'saveFig', flgSaveVar); 
+    ripp_plotSpks(ripp, 'basepath', basepath, 'flgSaveFig', true);
 end
-
 
 end % End of main function ripp_spks
 
-% -------------------------------------------------------------------------
-% Helper Function: calculate_event_rates
-% -------------------------------------------------------------------------
-function eventRates = calculate_event_rates(spikeTimes, eventTimes)
-% Calculates firing rates within specified event intervals using histcounts.
-%
-% INPUTS:
-%   spikeTimes      Vector of spike timestamps.
-%   eventIntervals  [N x 2] matrix of event start and end times.
-%
-% OUTPUT:
-%   eventRates      [N x 1] vector of firing rates (spikes/sec) per event.
-
-if isempty(spikeTimes) || isempty(eventTimes)
-    eventRates = nan(size(eventTimes, 1), 1);
-    return;
-end
-
-% Create bin edges for histcounts: [start1, end1, start2, end2, ...]
-edges = reshape([eventTimes(:, 1), eventTimes(:, 2)]', [], 1);
-
-% Use histcounts
-counts = histcounts(spikeTimes, edges);
-
-% Counts within intervals are in the odd bins (1, 3, 5, ...)
-intervalCounts = counts(1:2:end)'; % Ensure column vector
-
-% Calculate rates
-eventDur = diff(eventTimes, [], 2);
-eventRates = intervalCounts ./ eventDur;
-
-end % End of helper function calculate_event_rates
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% HELPER FUNCTIONS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % -------------------------------------------------------------------------
-% Helper Function: create_sync_map (Non-overlapping windows)
+% sync_spksMap (Non-overlapping windows)
 % -------------------------------------------------------------------------
-function syncMap = create_sync_map(spikeTimes, eventTimes, mapDur, nBinsMap)
+function syncMap = sync_spksMap(spikeTimes, eventTimes, mapDur, nBinsMap)
 % Creates a synchronized map (PETH) of spike counts around event times
 % using a single histcounts call, assuming non-overlapping event windows.
 %
@@ -447,6 +386,42 @@ function syncMap = create_sync_map(spikeTimes, eventTimes, mapDur, nBinsMap)
         syncMap(iEvent, :) = histcounts(spikeEvents, absoluteEdges(iEvent, :));
     end
 
-end % End of helper function create_sync_map
+end % End of sync_spksMap
+
+% -------------------------------------------------------------------------
+% spks_initialize
+% -------------------------------------------------------------------------
+function spks = spks_initialize()
+% Creates the initial spks structure with all fields set to default/empty.
+
+spks = struct();
+
+% Info substruct (Metadata)
+spks.info = struct();
+spks.info.limState = [];       % Limiting state index used for stats
+spks.info.mapDur = [];         % Window duration used for PETH maps [start, end] in sec
+spks.info.nBinsMap = [];       % Number of bins used for PETH maps
+spks.info.ctrlPeakTime = [];   % Timestamps used as control event centers
+spks.info.ctrlTimes = [];      % Start/end times of generated control events
+
+% Multi-unit (MU) substruct
+spks.mu = struct();
+spks.mu.rippMap = [];     % [N_ripples x nBinsMap] PETH map of MU spike counts around ripple peaks
+spks.mu.ctrlMap = [];     % [N_controls x nBinsMap] PETH map of MU spike counts around control event centers
+
+% Single-unit (SU) substruct
+spks.su = struct();
+spks.su.peakRates = [];   % [nUnits x N_ripples] firing rates during +/-3ms around ripple peaks
+spks.su.rippRates = [];   % [nUnits x N_ripples] firing rates during ripple events
+spks.su.ctrlRates = [];   % [nUnits x N_controls] firing rates during control events
+spks.su.pVal = [];        % [nUnits x 1] P-value from Wilcoxon sign-rank test
+spks.su.sigMod = [];      % [nUnits x 1] Logical flag for significant modulation
+spks.su.frGain = [];      % [nUnits x 1] Mean z-scored firing rate during ripples
+spks.su.frModulation = [];% [nUnits x 1] Modulation index ((Ripp-Ctrl)/(Ripp+Ctrl))
+spks.su.frPrct = [];      % [nUnits x 1] Percent change relative to control rate
+spks.su.rippMap = [];     % [nUnits x N_ripples x nBinsMap] PETH map of SU spike counts
+spks.su.ctrlMap = [];     % [nUnits x N_controls x nBinsMap] PETH map of SU spike counts
+
+end % End of spks_initialize
 
 % EOF

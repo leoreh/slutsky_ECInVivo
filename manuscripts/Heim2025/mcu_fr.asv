@@ -78,61 +78,16 @@ contrasts = 'all';
 
 % plot
 fh = lme_plot(lme_tbl, lme_cfg.mdl, 'ptype', 'bar');
+axh = gca;
+ylabel(axh, 'Firing Rate (Hz)', 'FontSize', 20)
+xlabel(axh, 'Unit Type', 'FontSize', 20)
+title(axh, '')
 
 % save
-lme_save('fh', fh, 'fname', frml, 'frmt', {'jpg', 'mat', 'xlsx'},...
+lme_save('fh', fh, 'fname', frml, 'frmt', {'svg', 'mat', 'xlsx'},...
     'lme_tbl', lme_tbl, 'lme_results', lme_results, 'lme_cfg', lme_cfg)
 
-% edit figure
-axh = gca;
 
-set(fh, 'Color', 'w');      % Set figure background to white
-axis(axh, 'square');        % Set axes proportions to a perfect square
-
-% Set fonts and font sizes for axes elements
-set(axh, 'FontName', 'Arial', 'FontSize', 12); % Affects axis labels, ticks
-
-% Set font and font size for the title
-% lme_plot typically sets title on the TiledChartLayout, which is parent of axh
-% or could be found directly from fh if axh is not part of a tiled layout
-tiledLayoutInFigure = findobj(fh, 'Type', 'matlab.graphics.layout.TiledChartLayout');
-
-hndlTtl = get(fh), 'Title');
-
-titleHandle = [];
-parentLayout = get(axh, 'Parent');
-if isa(parentLayout, 'matlab.graphics.layout.TiledChartLayout')
-    titleHandle = get(parentLayout, 'Title');
-else
-    % Fallback: Try to find TiledChartLayout directly from figure handle fh
-    % (e.g. if gca returned an axes not directly parented by the main tiled layout)
-    tiledLayoutInFigure = findobj(fh, 'Type', 'matlab.graphics.layout.TiledChartLayout');
-    if ~isempty(tiledLayoutInFigure)
-        % Assuming the first one found is the relevant one if multiple exist
-        titleHandle = get(tiledLayoutInFigure(1), 'Title');
-    else
-        % Further fallback: try title on axes itself, or on figure
-        titleHandleOnAxes = get(axh, 'Title');
-        if ~isempty(titleHandleOnAxes) && ~isempty(titleHandleOnAxes.String)
-             titleHandle = titleHandleOnAxes;
-        else
-             titleHandle = get(fh, 'Title'); % Title on figure directly
-        end
-    end
-end
-
-if ~isempty(titleHandle)
-    set(titleHandle, 'FontName', 'Arial', 'FontSize', 16);
-end
-
-% Set font and font size for the legend
-legendHandle = findobj(fh, 'Type', 'Legend');
-if ~isempty(legendHandle)
-    set(legendHandle, 'FontName', 'Arial', 'FontSize', 12);
-end
-
-ylabel(axh, 'Firing Rate (Hz)')
-xlabel(axh, 'Unit Type')
 
 % FR per unit, WT vs MCU across states
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -242,7 +197,66 @@ end
 
 % FR ~ Group * Day + (1|Mouse)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-frml = 'FR ~ Group * Day + (Day|Mouse)';
+
+% FR increase during ripples
+frml = 'FR ~ Group * Day + (1|Mouse)';
+
+% organize for lme
+[lme_tbl, lme_cfg] = lme_org('grppaths', grppaths, 'frml', frml,...
+    'flg_emg', true, 'var_field', '', 'vCell', {});
+
+% select unit
+unitType = 'pPYR';
+iunit = categorical({unitType});
+plot_tbl = lme_tbl(lme_tbl.UnitType == iunit, :);
+
+% normalize
+plot_tbl = lme_normalize('lme_tbl', plot_tbl, 'normVar', 'Day',...
+    'groupVars', {'Group', 'State'});
+
+% run lme
+contrasts = 'all';
+contrasts =[1 : 10, 13, 15 : 18, 27];
+[lme_results, lme_cfg] = lme_analyse(plot_tbl, lme_cfg, 'contrasts', contrasts);
+
+
+lme_cfg.frml = 'FR ~ Group * Day + (1|Mouse)';
+[lme_results, lme_cfg] = lme_analyse(plot_tbl, lme_cfg, 'contrasts', contrasts);
+lme = lme_cfg.mdl;
+
+lme_cfg.frml = 'FR ~ Group * Day + (Day|Mouse)';
+[lme_results, lme_cfg] = lme_analyse(plot_tbl, lme_cfg, 'contrasts', contrasts);
+lmealt = lme_cfg.mdl;
+
+compare(lme, lmealt)
+
+
+
+% plot
+hndFig = lme_plot(plot_tbl, lme_cfg.mdl, 'ptype', 'bar', 'figShape', 'wide');
+
+% Update labels
+axh = gca;
+ylabel(axh, 'Firing Rate (% BSL)', 'FontSize', 20)
+xlabel(axh, '', 'FontSize', 16)
+axh.XAxis.FontSize = 20;
+title(axh, unitType)
+axh.Legend.Location = 'northwest';
+
+fname = lme_frml2char(frml, 'rm_rnd', true, 'resNew', '', 'sfx', [' _', unitType, '_ Norm']);
+
+% save
+lme_save('fh', hndFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
+    'lme_tbl', plot_tbl, 'lme_results', lme_results, 'lme_cfg', lme_cfg)
+
+
+
+
+
+
+
+
+
 
 % organize for lme
 [lme_tbl, lme_cfg] = lme_org('grppaths', grppaths, 'frml', frml,...

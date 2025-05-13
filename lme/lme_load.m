@@ -106,7 +106,7 @@ for igrp = 1:ngrps
             data_day{iday} = org_units(v);
 
         elseif contains(var_name, 'ripp')
-            if contains(var_field, 'fr')
+            if contains(var_field, {'fr', 'Rates'})
                 data_day{iday} = org_rippSpks(v, var_name, var_field);
             else
                 data_day{iday} = org_ripp(v, var_name, var_field);
@@ -287,22 +287,33 @@ end
 function ripp_data = org_rippSpks(v, var, var_field)
 % Organizes ripple spike modulation: [mouse x day x unit x state=1 x bout=1]
 
-nmice = length(v);
-gain_tmp = cell(nmice, 1);
-max_nunits = 0;
+normType = 'modulation';        % modulation, zscore
 
-for imouse = 1:nmice
-    gain_vec = v(imouse).(var).spks.su.(var_field)(:);
-    nunits_mouse = length(gain_vec);
-    gain_tmp{imouse} = gain_vec';
-    max_nunits = max(max_nunits, nunits_mouse);
+nMice = length(v);
+spks = cell(nMice, 1);
+for iMouse = 1 : nMice
+    spksAvg = mean(v(iMouse).(var).spks.su.rippRates, 2, 'omitnan');
+    ctrlAvg = mean(v(iMouse).(var).spks.su.ctrlRates, 2, 'omitnan');
+    ctrlVar = std(v(iMouse).(var).spks.su.ctrlRates, [], 2, 'omitnan');
+    if contains(var_field, 'normRates')
+        switch normType
+            case 'zscore'
+                spksNorm = (spksAvg - ctrlAvg) ./ ctrlVar;
+            case 'modulation'
+                spksNorm = (spksAvg - ctrlAvg) ./ (spksAvg + ctrlAvg);
+        end
+        spks{iMouse} = spksNorm;
+    elseif contains(var_field, 'ctrlRates')
+        spks{iMouse} = ctrlAvg;
+    elseif contains(var_field, 'rippRates')
+        spks{iMouse} = spksAvg;
+    else
+        spks{iMouse} = mean(v(iMouse).(var).spks.su.(var_field), 2, 'omitnan');
+    end
 end
+ripp_data = cell2padmat(spks, 2);
+ripp_data = permute(ripp_data, [2, 3, 1, 4, 5]);
 
-ripp_data = nan(nmice, 1, max_nunits, 1, 1);
-for imouse = 1:nmice
-    nunits_mouse = length(gain_tmp{imouse});
-    ripp_data(imouse, 1, 1:nunits_mouse, 1, 1) = gain_tmp{imouse};
-end
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -98,12 +98,13 @@ frml = 'FR ~ Group * State + (1|Mouse)';
     'flg_emg', false, 'var_field', '', 'vCell', {});
 
 % run lme
-% iunit = categorical({'pPV'});
-% plot_tbl = lme_tbl(lme_tbl.UnitType == iunit, :);
-[lme_results, lme_cfg] = lme_analyse(lme_tbl, lme_cfg, 'contrasts', 'all');
+iunit = categorical({'pPYR'});
+plot_tbl = lme_tbl(lme_tbl.UnitType == iunit, :);
+
+[lme_results, lme_cfg] = lme_analyse(plot_tbl, lme_cfg, 'contrasts', 'all');
 
 % plot
-fh = lme_plot(lme_tbl, lme_cfg.mdl, 'ptype', 'bar');
+fh = lme_plot(plot_tbl, lme_cfg.mdl, 'ptype', 'bar');
 
 % save
 frml = [char(lme.Formula), ' _ ', char(iunit)];
@@ -114,16 +115,21 @@ axh = get(th, 'Children');
 ylim(axh(3), [0 4])
 grph_save('fh', fh, 'fname', frml, 'frmt', {'fig', 'jpg'})
 
-prism_data = fh2prism(fh);
-exlTbl = lme2exl(lme, true);
 
 
 
+lme_cfg.frml = 'FR ~ Group * State + (1|Mouse)';
+[lme_results, lme_cfg] = lme_analyse(plot_tbl, lme_cfg, 'contrasts', 'all');
+lme = lme_cfg.mdl;
 
-% Discover available coefficients
+lme_cfg.frml = 'FR ~ Group * State + (State|Mouse)';
+[lme_results, lme_cfg] = lme_analyse(plot_tbl, lme_cfg, 'contrasts', 'all');
+lmealt = lme_cfg.mdl;
+
+compare(lme, lmealt)
 
 
-fh = lme_plot(plot_tbl, lme, 'ptype', 'line');
+
 
 
 
@@ -197,7 +203,66 @@ end
 
 % FR ~ Group * Day + (1|Mouse)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-frml = 'FR ~ Group * Day + (Day|Mouse)';
+
+% FR increase during ripples
+frml = 'FR ~ Group * Day + (1|Mouse)';
+
+% organize for lme
+[lme_tbl, lme_cfg] = lme_org('grppaths', grppaths, 'frml', frml,...
+    'flg_emg', true, 'var_field', '', 'vCell', {});
+
+% select unit
+unitType = 'pPYR';
+iunit = categorical({unitType});
+plot_tbl = lme_tbl(lme_tbl.UnitType == iunit, :);
+
+% normalize
+plot_tbl = lme_normalize('lme_tbl', plot_tbl, 'normVar', 'Day',...
+    'groupVars', {'Group', 'State'});
+
+% run lme
+contrasts = 'all';
+contrasts =[1 : 10, 13, 15 : 18, 27];
+[lme_results, lme_cfg] = lme_analyse(plot_tbl, lme_cfg, 'contrasts', contrasts);
+
+
+lme_cfg.frml = 'FR ~ Group * Day + (1|Mouse)';
+[lme_results, lme_cfg] = lme_analyse(plot_tbl, lme_cfg, 'contrasts', contrasts);
+lme = lme_cfg.mdl;
+
+lme_cfg.frml = 'FR ~ Group * Day + (Day|Mouse)';
+[lme_results, lme_cfg] = lme_analyse(plot_tbl, lme_cfg, 'contrasts', contrasts);
+lmealt = lme_cfg.mdl;
+
+compare(lme, lmealt)
+
+
+
+% plot
+hndFig = lme_plot(plot_tbl, lme_cfg.mdl, 'ptype', 'bar', 'figShape', 'wide');
+
+% Update labels
+axh = gca;
+ylabel(axh, 'Firing Rate (% BSL)', 'FontSize', 20)
+xlabel(axh, '', 'FontSize', 16)
+axh.XAxis.FontSize = 20;
+title(axh, unitType)
+axh.Legend.Location = 'northwest';
+
+fname = lme_frml2char(frml, 'rm_rnd', true, 'resNew', '', 'sfx', [' _', unitType, '_ Norm']);
+
+% save
+lme_save('fh', hndFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
+    'lme_tbl', plot_tbl, 'lme_results', lme_results, 'lme_cfg', lme_cfg)
+
+
+
+
+
+
+
+
+
 
 % organize for lme
 [lme_tbl, lme_cfg] = lme_org('grppaths', grppaths, 'frml', frml,...

@@ -195,8 +195,8 @@ if ~isempty(ripp.spks.su)
 
     % Scatter plot of mean ripple rate vs. mean control rate per unit
     sb8 = subplot(4, 3, [9, 12]); cla;
-    rippFR = cellfun(@(x) mean(x, 'omitnan'), ripp.spks.su.rippRates);
-    ctrlFR = cellfun(@(x) mean(x, 'omitnan'), ripp.spks.su.ctrlRates);
+    rippFR = mean(ripp.spks.su.rippRates, 2, 'omitnan');
+    ctrlFR = mean(ripp.spks.su.ctrlRates, 2, 'omitnan');
 
     if flgUnits
         plot(ctrlFR(idxRS), rippFR(idxRS), '.b', 'MarkerSize', 10); hold on;

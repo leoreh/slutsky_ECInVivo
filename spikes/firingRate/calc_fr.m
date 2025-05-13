@@ -123,7 +123,7 @@ if exist(asFile, 'file') || ~isempty(btimes)
     if isempty(btimes)
         load(asFile, 'ss')
         fr.states.stateNames = ss.info.names;
-        btimes = ss.btimes;
+        btimes = ss.bouts.times;
     else
         fr.states.stateNames = split(num2str(1 : length(btimes)));
     end
@@ -138,10 +138,11 @@ if exist(asFile, 'file') || ~isempty(btimes)
             continue
         end
         boutIdx = InIntervals(btimes{istate}, winCalc);
-        
+        fr.states.binidx = boutIdx;     % for legacy
+
         if all(size(btimes{istate}) > 1)
             [fr.states.fr{istate}, fr.states.binedges{istate},...
-                fr.states.tstamps{istate}, fr.states.binidx] =...
+                fr.states.tstamps{istate}] =...
                 times2rate(spktimes, 'binsize', Inf,...
                 'winCalc', btimes{istate}(boutIdx, :), 'c2r', true);
         else
