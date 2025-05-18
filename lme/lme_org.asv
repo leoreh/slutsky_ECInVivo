@@ -1,4 +1,4 @@
-function [lme_tbl, lme_cfg] = lme_org(varargin)
+function [lmeData, lmeCfg] = lme_org(varargin)
 % LME_ORG Organizes data from multiple sessions for linear mixed effects analysis.
 %
 % SUMMARY:
@@ -8,13 +8,13 @@ function [lme_tbl, lme_cfg] = lme_org(varargin)
 % INPUT:
 %   grppaths    (Required) Cell (per group) of string arrays [mouse x session].
 %   frml        (Required) Formula for LME analysis. Determines how the table is organized.
-%   flg_emg     (Optional) Logical. Load vars as states (false) or EMG states (true).
-%   var_field   (Optional) Sub-field specifier for the variable.
+%   flgEmg      (Optional) Logical. Load vars as states (false) or EMG states (true).
+%   varField    (Optional) Sub-field specifier for the variable.
 %   vCell       (Optional) Pre-loaded data as cell array of structs.
 %
 % OUTPUT:
-%   lme_tbl     Table organized for LME with fields based on formula.
-%   lme_cfg     Struct with metadata and analysis parameters.
+%   lmeData     Table organized for LME with fields based on formula.
+%   lmeCfg      Struct with metadata and analysis parameters.
 %
 % DEPENDENCIES:
 %   lme_load, cell2padmat
@@ -33,16 +33,16 @@ function [lme_tbl, lme_cfg] = lme_org(varargin)
 p = inputParser;
 addOptional(p, 'grppaths', @iscell);
 addOptional(p, 'frml', @(x) ischar(x) || isstring(x));
-addOptional(p, 'flg_emg', false, @islogical);
-addOptional(p, 'var_field', '');
+addOptional(p, 'flgEmg', false, @islogical);
+addOptional(p, 'varField', '');
 addOptional(p, 'vCell', {}, @iscell);
 parse(p, varargin{:});
 
 % Extract parameters
 grppaths = p.Results.grppaths;
 frml = p.Results.frml;
-flg_emg = p.Results.flg_emg;
-var_field = p.Results.var_field;
+flgEmg = p.Results.flgEmg;
+varField = p.Results.varField;
 vCell = p.Results.vCell;
 
 % Ensure frml is a char
@@ -52,8 +52,8 @@ end
 
 % Set labels according to specific experiment and formula
 ngrps = length(grppaths);
-[str_grp, str_day, str_state] = org_strLbls(grppaths, frml, flg_emg);
-str_unit = {'pPYR', 'pPV', 'Other'};
+[strGrp, strDay, strState] = org_strLbls(grppaths, frml, flgEmg);
+strUnit = {'pPYR', 'pPV', 'Other'};
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % DETERMINE VARIABLES NEEDED BASED ON FORMULA
@@ -63,87 +63,96 @@ str_unit = {'pPYR', 'pPV', 'Other'};
 uCell = {};
 bDurCell = {};
 yName = '';
-flg_bDur = false;
-flg_units = false;
+flgBDur = false;
+flgUnits = false;
 
 % Parse formula to determine needed variables and response variable name
 if contains(frml, 'FR ~')
-    if flg_emg
-        var_name = 'frEmg';
+    if flgEmg
+        varName = 'frEmg';
     else
-        var_name = 'fr';
+        varName = 'fr';
     end
-    flg_units = true;
+    flgUnits = true;
     yName = 'FR';
     
     if contains(frml, 'State')
-        var_field = 'states';
+        varField = 'states';
     end
 
 elseif contains(frml, 'Burst ~')
-    var_name = 'st_metrics';
-    flg_units = true;
-    if isempty(var_field)
-        var_field = 'lidor';
+    varName = 'st_metrics';
+    varName = 'st_brst';
+    flgUnits = true;
+    if isempty(varField)
+        varField = 'lidor';
     end
     yName = 'Burst';
     
 elseif contains(frml, 'BDur ~') 
-    if flg_emg
-        var_name = 'frEmg';
-        var_name = 'sleep_statesEmg';
-        var_name = 'psdEmg';
+    if flgEmg
+        varName = 'frEmg';
+        varName = 'sleep_statesEmg';
+        % varName = 'psdEmg';
     else
-        var_name = 'fr';
+        varName = 'fr';
     end
     yName = 'BDur';
-    var_field = 'bDur';
-    flg_bDur = true;
+    varField = 'bDur';
+    flgBDur = true;
 
 elseif contains(frml, 'Band ~')
-    if flg_emg
-        var_name = 'psdEmg';
+    if flgEmg
+        varName = 'psdEmg';
     else
-        var_name = 'psd';
+        varName = 'psd';
     end
     yName = 'Band';
-    if isempty(var_field)
-        var_field = 1;
+    if isempty(varField)
+        varField = 1;
     end
     
 elseif contains(frml, 'FOOOF ~')    
-    if flg_emg
-        var_name = 'psdEmg_1of';
-        var_name = 'f1f_eeg';
-        % var_name = 'f1f';
+    if flgEmg
+        varName = 'psdEmg_1of';
+        varName = 'f1f_eeg';
+        % varName = 'f1f';
     else
-        var_name = 'psd_1of';
+        varName = 'psd_1of';
     end
     yName = 'FOOOF';
-    if isempty(var_field)
-        var_field = 'bands';
+    if isempty(varField)
+        varField = 'bands';
     end
     
 elseif contains(frml, 'RippSpks ~')
-    var_name = 'ripp';
-    flg_units = true;
+    varName = 'ripp';
+    flgUnits = true;
     yName = 'RippSpks';
-    if isempty(var_field)
-        var_field = 'fr';
+    if isempty(varField)
+        varField = 'frGain';
     end
-    
+
+elseif contains(frml, 'RippSpkLfp ~')
+    varName = 'ripp';
+    flgUnits = true;
+    yName = 'RippSpkLfp';
+    if isempty(varField)
+        varField = 'theta';
+    end
+
 elseif contains(frml, 'Ripp ~')
-    var_name = 'ripp';
+    varName = 'ripp';
     yName = 'Ripp';
-    if isempty(var_field)
-        var_field = 'peakAmp';
+    if isempty(varField)
+        varField = 'peakAmp';
     end
 end
 
 % Check if we need bout length as an additional variable
 if contains(frml, 'BoutDur')
-    var_field = 'bouts';
-    flg_bDur = true;
+    varField = 'bouts';
+    flgBDur = true;
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -151,16 +160,17 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Load main variable data
-dataCell = lme_load('grppaths', grppaths, 'var_name', var_name, 'var_field', var_field, 'vCell', vCell);
+dataCell = lme_load('grppaths', grppaths, 'varName', varName,...
+    'varField', varField, 'vCell', vCell);
 
 % Load units data if needed
-if flg_units
-    uCell = lme_load('grppaths', grppaths, 'var_name', 'units', 'vCell', vCell);
+if flgUnits
+    uCell = lme_load('grppaths', grppaths, 'varName', 'units', 'vCell', vCell);
 end
 
 % Load bout duration data if needed, in addition to the response data
-if flg_bDur
-    bDurCell = lme_load('grppaths', grppaths, 'var_name', var_name, 'var_field', 'bDur', 'vCell', vCell);   
+if flgBDur
+    bDurCell = lme_load('grppaths', grppaths, 'varName', varName, 'varField', 'bDur', 'vCell', vCell);   
 end
 
 % Get mouse names for labeling
@@ -182,17 +192,17 @@ end
 % PREALLOCATE ARRAYS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-vec_data = nan(nrows, 1);
-vec_bDur = nan(nrows, 1);
-lbl_grp = strings(nrows, 1);
-lbl_state = strings(nrows, 1);
-lbl_mouse = strings(nrows, 1);
-lbl_day = strings(nrows, 1);
-lbl_unit = strings(nrows, 1);
-id_unit = nan(nrows, 1);
+vecData = nan(nrows, 1);
+vecBDur = nan(nrows, 1);
+lblGrp = strings(nrows, 1);
+lblState = strings(nrows, 1);
+lblMouse = strings(nrows, 1);
+lblDay = strings(nrows, 1);
+lblUnit = strings(nrows, 1);
+idUnit = nan(nrows, 1);
 
 % Initialize row counter
-idx_curr = 1;
+idxCurr = 1;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % FILL ARRAYS WITH DATA
@@ -206,67 +216,67 @@ for igrp = 1:ngrps
             
             % Determine valid units and their types
             if ~isempty(uCell)
-                units_type = squeeze(uCell{igrp}(imouse, iday, :, 1, 1));
+                unitsType = squeeze(uCell{igrp}(imouse, iday, :, 1, 1));
             else
-                units_type = 1;  % Default to unit type 1
+                unitsType = 1;  % Default to unit type 1
             end
             
             for istate = 1:nstates
                 for ibout = 1:nbouts
                     
                     % Get data of response variable 
-                    data_tmp = squeeze(dataCell{igrp}(imouse, iday, :, istate, ibout));
+                    dataTmp = squeeze(dataCell{igrp}(imouse, iday, :, istate, ibout));
                     
                     % Identify valid (non-NaN) values
-                    valid_mask = ~isnan(data_tmp);
-                    nValid = sum(valid_mask);
+                    validMask = ~isnan(dataTmp);
+                    nValid = sum(validMask);
                     
                     % index to current placement of data
-                    idx_range = idx_curr:(idx_curr + nValid - 1);
+                    idxRange = idxCurr:(idxCurr + nValid - 1);
 
                     % Store data points
-                    vec_data(idx_range) = data_tmp(valid_mask);
+                    vecData(idxRange) = dataTmp(validMask);
 
                     % Create corresponding unit indices and types
-                    if length(units_type) > 1
+                    if length(unitsType) > 1
                         % For multiple units, determine which unit each value belongs to
-                        [units_idx, ~] = ind2sub(size(data_tmp), find(valid_mask));
-                        unit_type = units_type(units_idx);
+                        [unitsIdx, ~] = ind2sub(size(dataTmp), find(validMask));
+                        unitTypeVal = unitsType(unitsIdx); % Renamed to avoid conflict with outer unitsType
                     else
                         % For single unit or no units
-                        unit_type = repmat(units_type, nValid, 1);
+                        unitTypeVal = repmat(unitsType, nValid, 1); % Renamed
                     end                    
 
                     % Get bout length if needed
-                    if flg_bDur
-                        curr_bDur = bDurCell{igrp}(imouse, iday, 1, istate, ibout);
-                        vec_bDur(idx_range) = repmat(curr_bDur, nValid, 1);
+                    if flgBDur
+                        currBDur = bDurCell{igrp}(imouse, iday, 1, istate, ibout);
+                        vecBDur(idxRange) = repmat(currBDur, nValid, 1);
                     end
 
                     % Assign common labels to all data points
-                    lbl_grp(idx_range) = repmat(str_grp{igrp}, nValid, 1);
-                    lbl_state(idx_range) = repmat(str_state{istate}, nValid, 1);
-                    lbl_mouse(idx_range) = repmat(mnames{igrp}{imouse}, nValid, 1);
-                    lbl_day(idx_range) = repmat(str_day{iday}, nValid, 1);
+                    lblGrp(idxRange) = repmat(strGrp{igrp}, nValid, 1);
+                    lblState(idxRange) = repmat(strState{istate}, nValid, 1);
+                    lblMouse(idxRange) = repmat(mnames{igrp}{imouse}, nValid, 1);
+                    lblDay(idxRange) = repmat(strDay{iday}, nValid, 1);
 
                     % Handle unit information
-                    if flg_units
+                    if flgUnits
                         for i = 1:nValid
-                            idx_valid = find(valid_mask);
-                            curr_idx = idx_valid(i);
+                            idxValid = find(validMask);
+                            currIdx = idxValid(i);
 
-                            lbl_unit(idx_curr + i - 1) = str_unit{unit_type(curr_idx)};
-                            id_unit(idx_curr + i - 1) = units_idx(curr_idx) + ...
+                            lblUnit(idxCurr + i - 1) = strUnit{unitTypeVal(currIdx)}; % Used renamed unitTypeVal
+                            idUnit(idxCurr + i - 1) = unitsIdx(currIdx) + ...
                                 1000 * (imouse - 1) + ...
                                 10000 * (iday - 1) + ...
                                 100000 * (igrp - 1);
                         end
                     else
-                        lbl_unit(idx_range) = repmat(string(str_unit{1}), nValid, 1);
-                        id_unit(idx_range) = nan(nValid, 1);
+                        lblUnit(idxRange) = repmat(string(strUnit{1}), nValid, 1);
+                        idUnit(idxRange) = nan(nValid, 1);
                     end
 
-                    idx_curr = idx_curr + nValid;
+                    idxCurr = idxCurr + nValid;
                 end
             end
         end
@@ -278,56 +288,56 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Create table with appropriate columns
-if flg_bDur && ~strcmp(yName, 'BDur')
-    lme_tbl = table(vec_data, lbl_grp, lbl_state, lbl_mouse, lbl_unit, vec_bDur, id_unit, lbl_day,...
+if flgBDur && ~strcmp(yName, 'BDur')
+    lmeData = table(vecData, lblGrp, lblState, lblMouse, lblUnit, vecBDur, idUnit, lblDay,...
         'VariableNames', {yName, 'Group', 'State', 'Mouse', 'UnitType', 'BoutDur', 'UnitID', 'Day'});
 else
-    lme_tbl = table(vec_data, lbl_grp, lbl_state, lbl_mouse, lbl_unit, id_unit, lbl_day,...
+    lmeData = table(vecData, lblGrp, lblState, lblMouse, lblUnit, idUnit, lblDay,...
         'VariableNames', {yName, 'Group', 'State', 'Mouse', 'UnitType', 'UnitID', 'Day'});
 end
 
 % Clean Table
 % Find rows with NaN or Inf values
-idxRemove = isnan(lme_tbl.(yName)) | isinf(lme_tbl.(yName));
+idxRemove = isnan(lmeData.(yName)) | isinf(lmeData.(yName));
 
 % Find rows with 'Other' as unit type
-idxRemove = idxRemove | lme_tbl.UnitType == 'Other';
+idxRemove = idxRemove | lmeData.UnitType == 'Other';
 
 % Remove these rows from the table and print warning
 nRemoved = sum(idxRemove);
 if nRemoved > 0
-    lme_tbl(idxRemove, :) = [];
+    lmeData(idxRemove, :) = [];
     warning('Removing %d rows containing NaN or Inf values from %s', nRemoved, yName)
 end
 
 % Convert columns to categorical
-lme_tbl.State = categorical(lme_tbl.State);
-lme_tbl.Mouse = categorical(lme_tbl.Mouse);
-lme_tbl.Day = categorical(lme_tbl.Day);
-lme_tbl.UnitType = categorical(lme_tbl.UnitType);
-lme_tbl.Group = categorical(lme_tbl.Group);
+lmeData.State = categorical(lmeData.State);
+lmeData.Mouse = categorical(lmeData.Mouse);
+lmeData.Day = categorical(lmeData.Day);
+lmeData.UnitType = categorical(lmeData.UnitType);
+lmeData.Group = categorical(lmeData.Group);
 
 % Set reference categories
-% Makes WT the reference
-if any(unique(lme_tbl.Group) == categorical({'WT'}))
-    cats = categories(lme_tbl.Group);
-    other_cat = cats(~strcmp(cats, 'WT'));
-    lme_tbl.Group = reordercats(lme_tbl.Group, ['WT', other_cat]);
+% Makes Control the reference
+if any(unique(lmeData.Group) == categorical({'Control'}))
+    cats = categories(lmeData.Group);
+    otherCat = cats(~strcmp(cats, 'Control'));
+    lmeData.Group = reordercats(lmeData.Group, ['Control', otherCat]);
 end
 
 % Set specific Day order if BSL is the first day from org_strLbls
-% Makes BSL the reference and assert the order in str_day
-if any(unique(lme_tbl.Day) == categorical({'BSL'}))
-    tbl_cats = categories(lme_tbl.Day);
-    ordered_cats = str_day(ismember(str_day, tbl_cats));
-    lme_tbl.Day = reordercats(lme_tbl.Day, ordered_cats);
+% Makes BSL the reference and assert the order in strDay
+if any(unique(lmeData.Day) == categorical({'BSL'}))
+    tblCats = categories(lmeData.Day);
+    orderedCats = strDay(ismember(strDay, tblCats));
+    lmeData.Day = reordercats(lmeData.Day, orderedCats);
 end
 
 % Makes pPYR the reference
-if any(unique(lme_tbl.UnitType) == categorical({'pPYR'}))
-    cats = categories(lme_tbl.UnitType);
-    other_cat = cats(~strcmp(cats, 'pPYR'));
-    lme_tbl.UnitType = reordercats(lme_tbl.UnitType, ['pPYR'; other_cat]);
+if any(unique(lmeData.UnitType) == categorical({'pPYR'}))
+    cats = categories(lmeData.UnitType);
+    otherCat = cats(~strcmp(cats, 'pPYR'));
+    lmeData.UnitType = reordercats(lmeData.UnitType, ['pPYR'; otherCat]);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -335,11 +345,11 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Store metadata in config structure
-lme_cfg.grps = grppaths;
-lme_cfg.frml = frml;
-lme_cfg.flg_emg = flg_emg;
-lme_cfg.var_field = var_field;
-lme_cfg.nRemoved = nRemoved;  
+lmeCfg.grps = grppaths;
+lmeCfg.frml = frml;
+lmeCfg.flgEmg = flgEmg;
+lmeCfg.varField = varField;
+lmeCfg.nRemoved = nRemoved;  
 
 end % end function lme_org
 
@@ -360,37 +370,37 @@ end
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [str_grp, str_day, str_state] = org_strLbls(grppaths, frml, flg_emg)
+function [strGrp, strDay, strState] = org_strLbls(grppaths, frml, flgEmg)
 % Creates string labels for groups, days, and states
 
-% Group labels from paths (assumes 1st cell is WT and 2nd MCU-KO)
+% Group labels from paths (assumes 1st cell is Control and 2nd MCU-KO)
 ngrps = length(grppaths);
 if ngrps == 2
-    str_grp = {'WT'; 'MCU-KO'};
+    strGrp = {'Control'; 'MCU-KO'};
 else
-    str_grp = split(num2str(1:ngrps));
+    strGrp = split(num2str(1:ngrps));
 end
 
 % State labels
-if flg_emg
-    str_state = {'High EMG'; 'Low EMG'};
+if flgEmg
+    strState = {'High EMG'; 'Low EMG'};
 else
-    str_state = {'AW'; 'NREM'; 'REM'};
+    strState = {'AW'; 'NREM'; 'REM'};
 end
 
 % Day labels. Assumes 2nd dim of grppaths is session (day)
 ndays = unique(cellfun(@(x) size(x, 2), grppaths, 'uni', true));
 if contains(frml, ' Day')
     if ndays == 7
-        str_day = {'BSL'; 'BAC On'; 'BAC1'; 'BAC2'; 'BAC3'; 'BAC Off'; 'WASH'};
+        strDay = {'BSL'; 'BAC On'; 'BAC1'; 'BAC2'; 'BAC3'; 'BAC Off'; 'WASH'};
     elseif ndays == 5
-        str_day = {'BSL'; 'BAC1'; 'BAC2'; 'BAC3'; 'WASH'};
+        strDay = {'BSL'; 'BAC1'; 'BAC2'; 'BAC3'; 'WASH'};
     end
 else
     if ndays == 1
-        str_day = {'BSL'};
+        strDay = {'BSL'};
     else
-        str_day = split(num2str(1:ndays));
+        strDay = split(num2str(1:ndays));
     end
 end
 end

@@ -100,7 +100,7 @@ unitClr = [0 0 1; 1 0 0];
 % GRAPHICS GENERATION
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-setMatlabGraphics(false); % Apply consistent graphic settings
+setMatlabGraphics(true); % Apply consistent graphic settings
 fh = figure('Name', [basename '_rippleSpks'], 'NumberTitle', 'off');
 
 % --- Multi-Unit (MU) Plots ---

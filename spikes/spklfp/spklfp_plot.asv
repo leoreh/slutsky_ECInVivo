@@ -1,0 +1,176 @@
+function spklfp_plot(spkLfp)
+% SPKLFP_PLOT Generates and saves a summary figure for spike-LFP coupling analysis.
+%
+% SUMMARY:
+% This function takes the output structure from 'spklfp_calc' and produces a
+% multi-panel figure summarizing key spike-LFP coupling metrics. The figure
+% typically includes:
+%   - Phase distribution for example units with high phase-locking (MRL).
+%   - Polar plot of mean phase and MRL for all units, potentially colored by cell type.
+%   - Histogram of MRL values across all units.
+%   - Phase distribution of population synchrony events (if available).
+%   - Mean power-phase rate map, averaged across all units.
+%   - Histogram of LFP power occupancy.
+% The generated figure is saved to a 'graphics' subdirectory within the basepath.
+%
+% INPUTS:
+%   spkLfp      (struct) Output structure from 'spklfp_calc', containing all
+%               necessary data for plotting (e.g., phase.mrl, phase.spks,
+%               rateMap.rate, pop.phase.dist, info.fRange, etc.).
+
+% Initial setup: Extract necessary info, prepare figure and title.
+basepath = spkLfp.info.basepath;
+[~, basename] = fileparts(basepath);
+setMatlabGraphics(true); % Apply custom graphics settings (if defined elsewhere).
+hndFig = figure; % Create a new figure window.
+fRange = spkLfp.info.fRange; % LFP frequency range for titling.
+txtTtl = sprintf('Spike-LFP Coupling: %s [%.0f-%.0f Hz]', basename, fRange(1), fRange(2));
+sgtitle(txtTtl, 'Interpreter', 'none', 'FontWeight', 'bold'); % Set super title for the figure.
+clr(1, :) = [0.3 0.3 0.3];          % Color for putative PYR cells.
+clr(2, :) = [0.784 0.667 0.392];    % Color for putative PV cells.
+
+% SUBPLOT 1: Phase distribution for example units (top 3 MRL).
+% This polar histogram shows the LFP phase at which spikes occurred for the
+% three units exhibiting the strongest phase modulation (highest MRL).
+subplot(2, 3, 1);
+[~, unitSorted] = sort(spkLfp.phase.mrl, 'descend', 'MissingPlacement', 'last');
+nExmpls = 3;
+txtLgnd = cell(nExmpls, 1);
+for iEx = 1 : min(nExmpls, sum(~isnan(unitSorted))) % Plot up to nExmpls or available valid units.
+    unitIdx = unitSorted(iEx);
+    % Ensure unit index is valid and data exists.
+    polarhistogram(spkLfp.phase.spks{unitIdx}, 'Normalization', 'probability', ...
+        'DisplayStyle', 'stairs', 'LineWidth', 1.5);
+    hold on;
+    txtLgnd{iEx} = sprintf('Unit %d (MRL %.2f)', unitIdx, spkLfp.phase.mrl(unitIdx));
+
+end
+txtLgnd = txtLgnd(~cellfun('isempty',txtLgnd)); % Clean up legend entries.
+legend(txtLgnd, 'Location', 'best');
+rticks([]) % Remove radial ticks for clarity.
+thetaticks(0:90:270) % Set theta ticks at 0, 90, 180, 270 degrees.
+hndAx = gca;
+hndAx.ThetaAxisUnits = 'radians'; % Display theta axis in radians.
+hndAx.GridAlpha = 0.2;
+title('Phase Dist (Top MRL Units)');
+
+% SUBPLOT 2: Polar plot of mean phase and MRL for all units.
+% Each point represents a unit. The angle is the mean LFP phase of its spikes,
+% and the radius is the MRL (strength of phase locking). Significant locking
+% (p < 0.05) is typically highlighted. Units may be colored by type if available.
+subplot(2, 3, 2);
+phase = spkLfp.phase;
+idxValid = ~isnan(phase.theta) & ~isnan(phase.mrl) & phase.pVal < 0.05; % Indices of significantly phase-locked units.
+
+% Plot units, colored by type if population info is available.
+if isfield(spkLfp, 'pop') && isfield(spkLfp.pop, 'unitIdx') && ~isempty(spkLfp.pop.unitIdx)
+    unitPopIdx = spkLfp.pop.unitIdx;
+    uniqueTypes = unique(unitPopIdx(unitPopIdx > 0 & idxValid)); % Valid and typed units.
+    for iType = 1:length(uniqueTypes)
+        currentType = uniqueTypes(iType);
+        idxUnit = (unitPopIdx == currentType) & idxValid;
+        polarplot(phase.theta(idxUnit), phase.mrl(idxUnit), '.',...
+            'MarkerSize', 20, 'Color', clr(currentType, :));
+        hold on;
+    end
+    txtLgnd = spkLfp.pop.names; % Assumes pop.names corresponds to unitIdx values.
+    txtLgnd{end + 1} = 'N.S.'; % Legend for non-significant units.
+else % Fallback if population info is not available.
+    polarplot(phase.theta(idxValid), phase.mrl(idxValid), '.',...
+        'MarkerSize', 20, 'Color', [0 0 0]); % Default color for significant units.
+    hold on;
+    txtLgnd = {'Significant', 'N.S.'};
+end
+polarplot(phase.theta(~idxValid), phase.mrl(~idxValid), '.',...
+    'MarkerSize', 15, 'Color', [0.7 0.7 0.7]); % Plot non-significant units.
+% rlim([0 1]) 
+rticks(0.1 : 0.1 : 1)
+thetaticks(0:90:270)
+polarAxis = gca;
+polarAxis.ThetaAxisUnits = 'radians';
+polarAxis.GridAlpha = 0.2;
+title('Mean Phase & MRL (All Units)');
+legend(txtLgnd, 'Location', 'best', 'Interpreter', 'none');
+
+% SUBPLOT 3: Histogram of MRL values across all cells.
+% This shows the distribution of phase-locking strengths (MRL) across the
+% entire recorded neuronal population.
+subplot(2, 3, 3);
+histogram(phase.mrl(~isnan(phase.mrl)), 20); % Plot histogram of valid MRLs.
+xlabel('Mean Resultant Length (MRL)')
+ylabel('Number of Cells');
+xlim([0 1])
+box off
+title('MRL Distribution');
+
+% SUBPLOT 4: Population Synchrony Phase Distribution (if available).
+% If population synchrony was analyzed, this bar plot shows the distribution
+% of LFP phases at which population synchrony events occurred, potentially
+% stacked by cell type (e.g., PYR vs. PV).
+subplot(2, 3, 4);
+if isfield(spkLfp, 'pop') 
+    pop = spkLfp.pop;
+    % Ensure correct indexing for bar plot if bins include an edge for 0/2pi.
+    if size(pop.phase.dist,1) == length(pop.phase.bins)
+        bar(pop.phase.bins(1:end-1) + diff(pop.phase.bins)/2, pop.phase.dist(1:end-1, :), 'stacked');
+    else
+        bar(pop.phase.bins, pop.phase.dist, 'stacked');
+    end
+    xlabel('Phase [rad]');
+    ylabel('Weighted Synchrony Events');
+    xlim([0 2*pi]);
+    xticks(0 : pi : 2 * pi);
+    hndAx = gca;
+    hndAx.XTickLabel = {'0', '\pi', '2\pi'};
+    hndAx.TickLabelInterpreter = 'tex';
+    box off;
+    legend(pop.names(1:min(length(pop.names), size(pop.phase.dist,2))),...
+        'Location', 'best', 'Interpreter', 'none');
+    title('Population Sync Phase Dist');
+end
+
+% SUBPLOT 5: Mean Power-Phase Rate Map (averaged across cells).
+% This 2D heatmap shows the average firing rate of neurons as a function of
+% LFP phase (x-axis) and LFP power (y-axis). The phase axis is duplicated
+% (0 to 4*pi) to visualize cyclic nature. A cosine wave is overlaid as a phase reference.
+hndAx = subplot(2, 3, 5);
+rateMap = spkLfp.rateMap;
+mapAvg = mean(rateMap.rate, 3, 'omitnan'); % Average rate map across units.
+imagesc(hndAx, rateMap.phaseBins, rateMap.powBins, mapAvg); % Plot the [0, 2*pi] segment.
+hold on;
+imagesc(hndAx, rateMap.phaseBins + 2*pi, rateMap.powBins, mapAvg); % Plot the [2*pi, 4*pi] segment for cyclic view.
+% Overlay cosine wave for phase reference.
+plot(hndAx, linspace(0, 4*pi, 100), ...
+     cos(linspace(0, 4*pi, 100)) * (range(rateMap.powBins)/4) + mean(rateMap.powBins), ...
+     'k--', 'LineWidth', 0.5);
+axis xy % Ensure correct orientation (origin at bottom-left).
+colorbar
+xlim([0 4*pi])
+xticks(0:pi:4*pi)
+hndAx.XTickLabel = {'0', '\pi', '2\pi', '3\pi', '4\pi'};
+hndAx.TickLabelInterpreter = 'tex';
+xlabel('Phase [rad]')
+ylabel('Norm. LFP Power (Z-score)');
+title('Mean Power-Phase Rate Map');
+
+% SUBPLOT 6: LFP Power Occupancy.
+% This bar plot shows the total time the LFP spent at different power levels
+% (y-axis of the rate map) during the analysis intervals.
+subplot(2, 3, 6);
+powerOccupancy = sum(rateMap.occupancy, 2); % Sum occupancy across phase bins for each power bin.
+bar(rateMap.powBins, powerOccupancy);
+xlabel('Norm. LFP Power (Z-score)'); ylabel('Time [s]');
+box off; axis tight;
+title('LFP Power Occupancy');
+
+% Save the figure.
+% The figure is saved as a JPEG in a 'graphics' subdirectory of the basepath.
+figPath = fullfile(basepath, 'graphics');
+if ~exist(figPath, 'dir')
+    mkdir(figPath) % Create graphics directory if it doesn't exist.
+end
+txtFig = sprintf('%s_spkLfp_%.0f-%.0fHz', basename, fRange(1), fRange(2));
+figFile = fullfile(figPath, txtFig);
+print(hndFig, figFile, '-djpeg', '-r300'); % Save figure as JPEG at 300 DPI.
+
+end 

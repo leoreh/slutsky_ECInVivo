@@ -84,7 +84,7 @@ limState        = p.Results.limState;
 % files
 cd(basepath);
 [~, basename] = fileparts(basepath);
-rippfile = fullfile(basepath, [basename, 'ripp.mat']);
+rippfile = fullfile(basepath, [basename, '.ripp.mat']);
 
 % Check if essential ripple info exists
 if ~isfield(ripp, 'times') || ~isfield(ripp, 'peakTime') || ~isfield(ripp, 'info')
@@ -115,9 +115,9 @@ end
 % params
 fsSpk = v.session.extracellular.sr;
 fsLfp = ripp.info.fs;
-rippTimes = ripp.times;             % Ripple start/end times [N x 2]
-rippPeakTime = ripp.peakTime;       % Ripple peak times [N x 1]
-rippDur = ripp.dur;                 % Ripple durations [N x 1]
+rippTimes = ripp.times;             % Ripple start/end times 
+rippPeakTime = ripp.peakTime;       % Ripple peak times 
+rippDur = ripp.dur / 1000;          % Ripple durations (s)
 nRipples = size(rippTimes, 1);
 
 % Peri-event map parameters. Use ripple mapDur if already defined,

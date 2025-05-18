@@ -17,7 +17,7 @@ for ifile = 1 : nfiles
 
     ripp = ripp_wrapper('basepath', pwd, 'rippCh', rippCh,...
         'limState', 4, 'flgRefine', true, 'flgGraphics', true,...
-        'flgSaveVar', false, 'flgSaveFig', true);
+        'flgSaveVar', true, 'flgSaveFig', true);
 end
 
 
@@ -61,15 +61,15 @@ for ifile = 1 : length(basepaths)
     % File
     basepath = basepaths{ifile};
     [~, basename] = fileparts(basepath);
-    
-    oldfile = fullfile(basepath, [basename, '.mat']);
-    newfile = fullfile(basepath, [basename, '.ripp.mat']);
+    cd(basepath)
+
+    % oldfile = fullfile(basepath, [basename, '.mat']);
+    % newfile = fullfile(basepath, [basename, '.ripp.mat']);
     % movefile(oldfile, newfile); % Moving this line as it might cause issues if run multiple times
                                 % And check if the old file exists before moving
-    if exist(oldfile, 'file')
-        movefile(oldfile, newfile);
-    end
-
+    % if exist(oldfile, 'file')
+    %     movefile(oldfile, newfile);
+    % end
 
     % % Get the preloaded ripple structure
     % ripp = v(ifile).ripp;
@@ -91,7 +91,18 @@ for ifile = 1 : length(basepaths)
 
     % Update the preloaded variable structure if needed later
     % v(ifile).ripp = ripp; % This line should be active if ripp is modified above
+
+    % phase coupling
+    ripp = v(ifile).ripp;
+    lfpTimes = ripp.times;
+    spkLfp = spklfp_calc('basepath', basepath, 'lfpTimes', lfpTimes,...
+        'ch', ch, 'fRange', [120 200],...
+        'flgSave', true, 'flgGraphics', true, 'flgStl', false);
+    
+    ripp.spkLfp = spkLfp;
+    save(fullfile(basepath, [basename, '.ripp.mat']), 'ripp', '-v7.3')
 end
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % lme
@@ -111,7 +122,7 @@ contrasts = 'all';
 [lmeResults, lmeCfg] = lme_analyse(lmeTbl, lmeCfg, 'contrasts', contrasts);
 
 % plot
-hndFig = lme_plot(lmeTbl, lmeCfg.lmeMdl, 'ptype', 'bar', 'figShape', 'square'); % Changed lmeCfg.mdl to lmeCfg.lmeMdl
+hndFig = lme_plot(lmeTbl, lmeCfg.lmeMdl, 'ptype', 'bar', 'figShape', 'square'); 
 
 % Update labels
 axh = gca;
@@ -148,7 +159,7 @@ contrasts = 'all';
 [lmeResults, lmeCfg] = lme_analyse(lmeTbl, lmeCfg, 'contrasts', contrasts);
 
 % plot
-hndFig = lme_plot(lmeTbl, lmeCfg.lmeMdl, 'ptype', 'bar', 'figShape', 'tall'); % Changed lmeCfg.mdl to lmeCfg.lmeMdl
+hndFig = lme_plot(lmeTbl, lmeCfg.lmeMdl, 'ptype', 'bar', 'figShape', 'tall'); 
 axh = gca;
 ylabel(axh, 'Rate (SWR/s)', 'FontSize', 20)
 xlabel(axh, '', 'FontSize', 20)
@@ -157,7 +168,7 @@ axh.XAxis.FontSize = 20;
 axh.XTickLabelRotation = 0;
 
 ylbl = 'Ripp Rate';
-fname = lme_frml2char(frml, 'rmRnd', true, 'resNew', ylbl); % rm_rnd to rmRnd
+fname = lme_frml2char(frml, 'rmRnd', true, 'resNew', ylbl); 
 
 % save
 lme_save('fh', hndFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
@@ -181,14 +192,6 @@ lme_save('fh', hndFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
 
 normMet = 'zscore';        % 'max', 'ctrl', 'none', 'zscore', 'modulation'
 
-% Figure Parameters
-clr = zeros(2,3); % Initialize clr
-clr(1, :) = [0.3 0.3 0.3];          % Control
-clr(2, :) = [0.784 0.667 0.392];    % MCU-KO 
-fntSize = 16;
-txtUnit = {'pPYR', 'pPV'};
-txtGrp = {'Control', 'MCU-KO'};
-
 % Stores matrices of unit-normalized PETHs for each group
 normGrp = cell(1, length(grps));
 unitGrp = cell(1, length(grps));
@@ -202,22 +205,19 @@ for iGrp = 1:length(grps)
     for iMouse = 1:nMice
         mouseData = vCell{iGrp}{1}(iMouse);
         ripp = mouseData.ripp;
-        
+        units = mouseData.units;
+
         % Calculate mean PETH per unit
         rippMap = squeeze(mean(ripp.spks.su.rippMap, 2, 'omitnan'));
         ctrlMap = squeeze(mean(ripp.spks.su.ctrlMap, 2, 'omitnan'));
-        
+
         % Calculate unit FR params
-        ctrlAvg = mean(ctrlMap, 2, 'omitnan'); % NUnit x 1, average rate over all bins in control PETH for each unit
-        
-        % Use std of per-trial control rates for z-scoring, as in lme_load/org_rippSpks
-        if isfield(mouseData.ripp.spks.su, 'ctrlRates') && ~isempty(mouseData.ripp.spks.su.ctrlRates)
-            ctrlSD = std(mouseData.ripp.spks.su.ctrlRates, [], 2, 'omitnan'); % NUnit x 1
-        else % Fallback if ctrlRates is not available or empty
-            ctrlSD = std(ctrlMap, 0, 2, 'omitnan'); % Std over bins for each unit as a fallback
-        end
+        ctrlAvg = mean(ctrlMap, 2, 'omitnan'); 
+
+        % Use std of per-trial control rates for z-scoring
+        ctrlSD = std(mouseData.ripp.spks.su.ctrlRates, [], 2, 'omitnan');
         ctrlSD(ctrlSD == 0) = 1; % Avoid division by zero
-        
+
         rippMax = max(rippMap, [], 2);
         rippMax(rippMax == 0) = 1;
 
@@ -234,26 +234,18 @@ for iGrp = 1:length(grps)
             case 'none'
                 normData = rippMap;
         end
-        
+
         % Collect PETHs
         normMap{iMouse} = normData;
 
         % get unit data
         nUnits = size(normData, 1);
-        units = mouseData.units;
         unitIdx = nan(nUnits, 1);
-        if isfield(units, 'clean') && ~isempty(units.clean) % Check if units.clean exists and is not empty
-            if size(units.clean,1) >=1 && ~isempty(units.clean(1, :))
-                 unitIdx(units.clean(1, units.clean(1,:) <= nUnits)) = 1; % Added boundary check
-            end
-            if size(units.clean,1) >=2 && ~isempty(units.clean(2, :))
-                unitIdx(units.clean(2, units.clean(2,:) <= nUnits)) = 2; % Added boundary check
-            end
-        end
+        unitIdx(units.clean(1, :)) = 1;
+        unitIdx(units.clean(2, :)) = 2;
         unitData{iMouse} = unitIdx;
-
     end
-    normGrp{iGrp} = cell2padmat(normMap, 1); 
+    normGrp{iGrp} = cell2padmat(normMap, 1);
     unitGrp{iGrp} = cell2padmat(unitData, 1);
 end
 
@@ -262,60 +254,53 @@ mapDur = ripp.spks.info.mapDur * 1000;
 nBinsMap = ripp.spks.info.nBinsMap;
 timeBins = linspace(mapDur(1), mapDur(2), nBinsMap);
 
+% Figure Parameters
+clr = zeros(2,3); % Initialize clr
+clr(1, :) = [0.3 0.3 0.3];          % Control
+clr(2, :) = [0.784 0.667 0.392];    % MCU-KO 
+fntSize = 16;
+txtUnit = {'pPYR', 'pPV'};
+txtGrp = {'Control', 'MCU-KO'};
+
 % initialize
 hndFig = figure;
 set(hndFig, 'Color', 'w');
 fhUnits = get(hndFig, 'Units');
 set(hndFig, 'Units', 'pixels');
 fhPos = get(hndFig, 'Position');
-fhPos(3) = fhPos(4) * 2;
+fhPos(3) = fhPos(4);
 set(hndFig, 'Position', fhPos);
 set(hndFig, 'Units', fhUnits);
-hndTil = tiledlayout(1, 2);
-hndTil.TileSpacing = 'tight';
-hndTil.Padding = 'tight';
 
-nGrp = length(grps); % Define nGrp
-% Plot for each unit type
-for iUnit = 1 : 2
-    axh = nexttile(hndTil, iUnit, [1, 1]); cla; hold on
-    set(axh, 'FontName', 'Arial', 'FontSize', fntSize);
-    
-    % Plot each group
-    legendEntries = {}; % For legend
-    plotHandles = [];
-    for iGrpPlot = 1 : nGrp % Use a different loop variable to avoid conflict with outer iGrp if any
-        % Get data for current unit type and group
-        if ~isempty(unitGrp{iGrpPlot}) % Check if unitGrp data exists for this group
-            unitIdx = unitGrp{iGrpPlot} == iUnit;
-            if any(unitIdx) % Check if there are any units of this type in this group
-                pethData = normGrp{iGrpPlot}(unitIdx, :);
-                
-                % Plot with std shade
-                ph = plot_stdShade('axh', axh, 'dataMat', pethData,...
-                    'alpha', 0.3, 'clr', clr(iGrpPlot, :), 'xVal', timeBins);
-                legendEntries{end+1} = txtGrp{iGrpPlot};
-                plotHandles(end+1) = ph; 
-            end
-        end
-    end
-    
-    % Add zero line
-    xline(axh, 0, '--k');
-    
-    % Update labels
-    ylabel(axh, 'Norm. FR', 'FontSize', 20)
-    xlabel(axh, 'Time (ms)', 'FontSize', 20)
-    title(axh, txtUnit{iUnit}, 'FontSize', fntSize + 4, 'FontName', 'Arial')
-    
-    % Set limits
-    % ylim(axh, [-0.5, 0.5])
-    xlim(axh, mapDur)
-    if iUnit == 1 && ~isempty(plotHandles) % Add legend only to the first plot with actual data
-        legend(plotHandles, legendEntries, 'Location', 'northeast',...
-            'FontName', 'Arial', 'FontSize', fntSize);
-    end
+% Plot each group
+nGrp = length(grps);
+iUnit = 1;
+axh = gca; cla; hold on
+set(axh, 'FontName', 'Arial', 'FontSize', fntSize);
+hndPlt = [];
+for iGrp = 1 : nGrp 
+    % Get data for current unit type and group
+    unitIdx = unitGrp{iGrp} == iUnit;
+    pethData = normGrp{iGrp}(unitIdx, :);
+
+    % Plot with std shade
+    hndPlt(end + 1) = plot_stdShade('axh', axh, 'dataMat', pethData,...
+        'alpha', 0.3, 'clr', clr(iGrp, :), 'xVal', timeBins);
 end
+
+% Add zero line
+xline(axh, 0, '--k');
+
+% Update labels
+ylabel(axh, 'Norm. FR', 'FontSize', 20)
+xlabel(axh, 'Time (ms)', 'FontSize', 20)
+title(axh, txtUnit{iUnit}, 'FontSize', fntSize + 4, 'FontName', 'Arial')
+
+% Set limits
+% ylim(axh, [-0.5, 0.5])
+xlim(axh, [-50 50])
+legend(hndPlt, txtGrp{iGrp}, 'Location', 'northeast',...
+    'FontName', 'Arial', 'FontSize', fntSize);
 
 % Save
 fname = 'Ripp PETH';
@@ -380,14 +365,14 @@ ph = gobjects(nGrp,1); % Preallocate plot handle array
 legendTxt = cell(nGrp,1);
 validPlots = 0;
 % Plot each group in reverse order so Control appears on top
-for iGrpPlot = nGrp : -1 : 1 % Use a different loop variable
-    if ~isempty(lfpGrp{iGrpPlot})
-        plotHandles(iGrpPlot) = plot_stdShade('axh', axh, 'dataMat', lfpGrp{iGrpPlot},...
-            'alpha', 0.3, 'clr', clr(iGrpPlot, :), 'xVal', timeBins);
+for iGrp = nGrp : -1 : 1 % Use a different loop variable
+    if ~isempty(lfpGrp{iGrp})
+        hndPlt(iGrp) = plot_stdShade('axh', axh, 'dataMat', lfpGrp{iGrp},...
+            'alpha', 0.3, 'clr', clr(iGrp, :), 'xVal', timeBins);
         % plotHandles(iGrpPlot).DisplayName = txtGrp{iGrpPlot}; % Assign DisplayName for legend
         validPlots = validPlots + 1;
-        ph(validPlots) = plotHandles(iGrpPlot);
-        legendTxt{validPlots} = txtGrp{iGrpPlot};
+        ph(validPlots) = hndPlt(iGrp);
+        legendTxt{validPlots} = txtGrp{iGrp};
     end
 end
 
@@ -427,17 +412,17 @@ fntSize = 16;
 
 % Re-use frml from RippSpks section or define if not available
 if ~exist('frml','var') || ~strcmp(frml, 'RippSpks ~ Group * UnitType + (1|Mouse)')
-    frmlRippSpks = 'RippSpks ~ Group * UnitType + (1|Mouse)';
+    frml = 'RippSpks ~ Group * UnitType + (1|Mouse)';
 else
-    frmlRippSpks = frml;
+    frml = frml;
 end
 
 % organize lme table for plotting
-[lmeTblRipp, ~] = lme_org('grppaths', grppaths, 'frml', frmlRippSpks,...
+[lmeTbl, ~] = lme_org('grppaths', grppaths, 'frml', frml,...
     'flgEmg', false, 'varField', 'rippRates', 'vCell', vCell);
-rippFr = lmeTblRipp.RippSpks;
+rippFr = lmeTbl.RippSpks;
 
-[lmeTblCtrl, ~] = lme_org('grppaths', grppaths, 'frml', frmlRippSpks,...
+[lmeTblCtrl, ~] = lme_org('grppaths', grppaths, 'frml', frml,...
     'flgEmg', false, 'varField', 'ctrlRates', 'vCell', vCell);
 lmeTblCtrl = addvars(lmeTblCtrl, rippFr, 'After', 'UnitID'); % Ensure consistent column order for merging/plotting
 % Make sure UnitID, Mouse, Group, UnitType are present for proper identification, then rename
@@ -478,17 +463,19 @@ for iUnit = 1 : 2
     % Plot each group
     tempHandles = [];
     tempEntries = {};
-    for iGrpPlot = 1 : nGrp % Use different loop var
+    for iGrp = 1 : nGrp % Use different loop var
         idxTbl = lmeTblPlot.UnitType == categorical(txtUnit(iUnit)) &...
-            lmeTblPlot.Group == categorical(txtGrp(iGrpPlot));
+            lmeTblPlot.Group == categorical(txtGrp(iGrp));
         if any(idxTbl)
             grpTbl = lmeTblPlot(idxTbl, :);
-            hndSc = scatter(axh, grpTbl.randFr, grpTbl.rippFr,...
-                30, clr(iGrpPlot, :), 'filled');
+            scatterMarkerSize = 400; 
+            hndSc = polarscatter(grpTbl.randFr, grpTbl.rippFr, scatterMarkerSize, ...
+                               clr(iGrp, :), 'filled', ...
+                               'MarkerFaceAlpha', 0.5);
             hndSc.AlphaData = ones(sum(idxTbl), 1) * 0.9;  % Set a single alpha value for all points
             hndSc.MarkerFaceAlpha = 'flat';
             tempHandles(end+1) = hndSc;
-            tempEntries{end+1} = txtGrp{iGrpPlot};
+            tempEntries{end+1} = txtGrp{iGrp};
         end
     end
     if iUnit == 1 % Store legend info from first plot only
@@ -523,72 +510,166 @@ fname = 'Ripp FR vs Rand FR';
 lme_save('fh', hndFig, 'fname', fname, 'frmt', {'svg'},...
     'lmeTbl', lmeTblPlot, 'lmeResults', table(), 'lmeCfg', []) % Save plot table
 
+spklfp_plot(ripp.spkLfp)
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% RIPPLE CORRECTION
+% PLOT spike lfp coupling during ripples
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-bit2uv = 0.195;
+% Figure Parameters
+clr(1, :) = [0.3 0.3 0.3];          % Control
+clr(2, :) = [0.784 0.667 0.392];    % MCU-KO 
+fntSize = 16;
+txtUnit = {'pPYR', 'pPV'};
+txtGrp = {'Control', 'MCU-KO'};
 
-for ifile = 1:length(v) % Iterate from 1, check for basename inside
-        
-    basepath = char(basepaths(ifile)); % Ensure basepath is char for fileparts
-    [~, basename] = fileparts(basepath);
-    rippFile = fullfile(basepath, [basename, '.ripp.mat']);
+% Formula
+frml = 'RippSpkLfp ~ Group * UnitType + (1|Mouse)';
 
-    % Skip if this is not the problematic file or if correction already applied
-    if contains(basename, 'lh107') % Assuming lh107 was an example of already correct
-        if ~isfield(v(ifile).ripp.info, 'bit2uv') || v(ifile).ripp.info.bit2uv ~= 1
-             v(ifile).ripp.info.bit2uv = 1; % Mark as 'corrected' or special case
-             ripp = v(ifile).ripp;
-             save(rippFile, 'ripp', '-v7.3');
-        end
-        continue
-    end
+% organize lme table for plotting
+[lmeTbl, ~] = lme_org('grppaths', grppaths, 'frml', frml,...
+    'flgEmg', false, 'varField', 'mrl', 'vCell', vCell);
+MRL = lmeTbl.RippSpkLfp;
+[lmeTbl, ~] = lme_org('grppaths', grppaths, 'frml', frml,...
+    'flgEmg', false, 'varField', 'p', 'vCell', vCell);
+pVal = lmeTbl.RippSpkLfp;
+[lmeTbl, ~] = lme_org('grppaths', grppaths, 'frml', frml,...
+    'flgEmg', false, 'varField', 'theta', 'vCell', vCell);
+lmeTbl.Properties.VariableNames{'RippSpkLfp'} = 'Theta';
+lmeTbl = addvars(lmeTbl, MRL, 'After', 'Theta'); 
+lmeTbl = addvars(lmeTbl, pVal, 'After', 'MRL'); 
 
-    % Check if correction has already been applied by checking for the bit2uv field and its value
-    if isfield(v(ifile).ripp, 'info') && isfield(v(ifile).ripp.info, 'bit2uv') && v(ifile).ripp.info.bit2uv == bit2uv
-        % fprintf('Correction already applied to %s\n', basename);
-        continue;
-    end
+% Initialize figure
+hndFig = figure;
+set(hndFig, 'Color', 'w');
+fhUnits = get(hndFig, 'Units');
+set(hndFig, 'Units', 'pixels');
+fhPos = get(hndFig, 'Position');
+fhPos(3) = fhPos(4);
+set(hndFig, 'Position', fhPos);
+set(hndFig, 'Units', fhUnits);
 
-    % Apply correction factor
-    v(ifile).ripp.peakFilt = v(ifile).ripp.peakFilt * bit2uv;
-    v(ifile).ripp.peakAmp  = v(ifile).ripp.peakAmp  * bit2uv;
+% Plot each group
+nGrp = length(vCell);
+iUnit = 2;
+for iGrp = 1 : nGrp
+    % Get specific data from table
+    idxUnit = lmeTbl.UnitType == categorical(txtUnit(iUnit));
+    idxGrp = lmeTbl.Group == categorical(txtGrp(iGrp));
+    idxSgn = lmeTbl.pVal < 0.05;
+    idxTbl = idxUnit & idxGrp & idxSgn;
+    grpTbl = lmeTbl(idxTbl, :);
 
-    if isfield(v(ifile).ripp, 'maps') % Check if maps field exists
-        if isfield(v(ifile).ripp.maps, 'raw')
-            v(ifile).ripp.maps.raw  = v(ifile).ripp.maps.raw  * bit2uv;
-        end
-        if isfield(v(ifile).ripp.maps, 'ripp')
-             v(ifile).ripp.maps.ripp = v(ifile).ripp.maps.ripp * bit2uv;
-        end
-        if isfield(v(ifile).ripp.maps, 'amp')
-            v(ifile).ripp.maps.amp  = v(ifile).ripp.maps.amp  * bit2uv;
-        end
-    end
-
-    % Recalculate correlations if the corr field and necessary data exist
-    if isfield(v(ifile).ripp, 'corr')
-        v(ifile).ripp.corr.AmpFreq = corr(v(ifile).ripp.peakAmp, v(ifile).ripp.peakFreq, 'rows', 'complete');
-        v(ifile).ripp.corr.DurAmp  = corr(v(ifile).ripp.dur, v(ifile).ripp.peakAmp, 'rows', 'complete');
-    end
-
-    % Add/update informational fields regarding the correction
-    if ~isfield(v(ifile).ripp, 'info') || ~isstruct(v(ifile).ripp.info)
-        v(ifile).ripp.info = struct(); % Initialize info if it doesn't exist or not a struct
-    end
-    v(ifile).ripp.info.bit2uv = bit2uv;
-
-    % Save the updated ripp structure
-    ripp = v(ifile).ripp;
-    save(rippFile, 'ripp', '-v7.3');
-    fprintf('Applied bit2uv correction and saved: %s\n', rippFile);
+    % Plot units, colored by type if population info is available.
+    hndPlt = polarscatter(grpTbl.Theta, grpTbl.MRL, 50, ...
+                       clr(iGrp, :), 'filled', ...
+                       'MarkerFaceAlpha', 0.3);
+    hold on;
 end
+rlim([0 1])
+rticks(0 : 0.5 : 1)
+thetaticks(0:90:270)
+hndAx = gca;
+hndAx.ThetaAxisUnits = 'degrees';
+hndAx.GridAlpha = 0.2;
+title(txtUnit{iUnit});
+legend(txtGrp, 'Location', 'best', 'Interpreter', 'none');
+set(hndAx, 'FontName', 'Arial', 'FontSize', fntSize);
+
+% save
+% fname = 'Ripp FR vs Rand FR';
+% lme_save('fh', hndFig, 'fname', fname, 'frmt', {'svg'},...
+%     'lmeTbl', lmeTblPlot, 'lmeResults', table(), 'lmeCfg', []) % Save plot table
 
 
+% LME analysis
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% Formula
+frml = 'RippSpkLfp ~ Group * UnitType + (1|Mouse)';
 
+% organize lme table for plotting
+[lmeTbl, lmeCfg] = lme_org('grppaths', grppaths, 'frml', frml,...
+    'flgEmg', false, 'varField', 'theta', 'vCell', vCell);
+lmeTbl.RippSpkLfp = mod(rad2deg(lmeTbl.RippSpkLfp), 360);
+% lmeTbl.RippSpkLfp = rad2deg(lmeTbl.RippSpkLfp);
 
+% run lme
+contrasts = 'all';
+[lmeResults, lmeCfg] = lme_analyse(lmeTbl, lmeCfg, 'contrasts', contrasts);
 
+% plot
+hndFig = lme_plot(lmeTbl, lmeCfg.lmeMdl, 'ptype', 'bar', 'figShape', 'square'); 
+axh = gca;
+ylabel(axh, 'Mean Resultant Length', 'FontSize', 20)
+xlabel(axh, '', 'FontSize', 20)
+title(axh, '')
+axh.XAxis.FontSize = 20;
+axh.XTickLabelRotation = 0;
+axh.Legend.Location = 'northeast';
 
+ylbl = 'Ripp Theta';
+fname = lme_frml2char(frml, 'rmRnd', true, 'resNew', ylbl); 
 
+% save
+% lme_save('fh', hndFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
+%     'lmeTbl', lmeTbl, 'lmeResults', lmeResults, 'lmeCfg', lmeCfg)
+
+% Plot rate map
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% get map data
+iGrp = 1;
+iUnit = 2;
+nMice = length(grppaths{iGrp});
+mapData = cell(nMice, 1);
+for iMouse = 1 : nMice
+    ripp = vCell{iGrp}{1}(iMouse).ripp;
+    mapData{iMouse} = ripp.spkLfp.rateMap.rate;
+end
+mapData = cell2padmat(mapData, 3);
+rateMap = ripp.spkLfp.rateMap;
+
+% get unit indices
+frml = 'RippSpkLfp ~ Group * UnitType + (1|Mouse)';
+[lmeTbl, lmeCfg] = lme_org('grppaths', grppaths, 'frml', frml,...
+    'flgEmg', false, 'varField', 'p', 'vCell', vCell);
+idxGrp = lmeTbl.Group == categorical(txtGrp(iGrp));
+grpTbl = lmeTbl(idxGrp, :);
+idxUnit = grpTbl.UnitType == categorical(txtUnit(iUnit));
+idxSgn = grpTbl.RippSpkLfp < 0.05;
+idxMap = idxUnit & idxSgn;
+
+% Plot Mean Power-Phase Rate Map (averaged across cells).
+% This 2D heatmap shows the average firing rate of neurons as a function of
+% LFP phase (x-axis) and LFP power (y-axis). The phase axis is duplicated
+% (0 to 4*pi) to visualize cyclic nature. A cosine wave is overlaid as a phase reference.
+
+% Initialize figure
+hndFig = figure;
+set(hndFig, 'Color', 'w');
+fhUnits = get(hndFig, 'Units');
+set(hndFig, 'Units', 'pixels');
+fhPos = get(hndFig, 'Position');
+fhPos(3) = fhPos(4);
+set(hndFig, 'Position', fhPos);
+set(hndFig, 'Units', fhUnits);
+hndAx = gca;
+
+mapAvg = mean(mapData(:, :, idxMap), 3, 'omitnan'); % Average rate map across units.
+imagesc(hndAx, rateMap.phaseBins, rateMap.powBins, mapAvg); % Plot the [0, 2*pi] segment.
+hold on;
+imagesc(hndAx, rateMap.phaseBins + 2*pi, rateMap.powBins, mapAvg); % Plot the [2*pi, 4*pi] segment for cyclic view.
+% Overlay cosine wave for phase reference.
+plot(hndAx, linspace(0, 4*pi, 100), ...
+     cos(linspace(0, 4*pi, 100)) * (range(rateMap.powBins)/4) + mean(rateMap.powBins), ...
+     'k--', 'LineWidth', 0.5);
+axis xy % Ensure correct orientation (origin at bottom-left).
+colorbar
+xlim([0 4*pi])
+xticks(0:pi:4*pi)
+hndAx.XTickLabel = {'0', '\pi', '2\pi', '3\pi', '4\pi'};
+hndAx.TickLabelInterpreter = 'tex';
+xlabel('Phase [rad]')
+ylabel('Norm. LFP Power (Z-score)');
+title(txtUnit{iUnit});

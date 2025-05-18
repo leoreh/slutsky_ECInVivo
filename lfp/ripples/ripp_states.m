@@ -99,11 +99,6 @@ cd(basepath);
 [~, basename] = fileparts(basepath);
 rippfile = fullfile(basepath, [basename, '.ripp.mat']);
 
-% Check if essential ripple info exists
-if ~isfield(ripp, 'peakTime') || ~isfield(ripp, 'info') || ~isfield(ripp.info, 'recWin') || ~isfield(ripp.info, 'binsizeRate') || ~isfield(ripp, 'rate')
-     error('Input ''ripp'' structure is missing required fields (peakTime, info.recWin, info.binsizeRate, rate). Run ripp_detect first.');
-end
-
 % Load required session variables (sleep states)
 vars = ["sleep_states"]; 
 v = basepaths2vars('basepaths', {basepath}, 'vars', vars);

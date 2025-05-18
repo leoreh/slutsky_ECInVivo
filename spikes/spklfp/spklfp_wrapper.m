@@ -11,6 +11,7 @@ function s = spklfp_wrapper(varargin)
 %   frange      2 x n mat of frequency bands to analyze
 %   saveVar     logical {true}
 %   graphics    logical {true}
+%   bit2uv      (Optional) Bit to microvolt conversion factor {0.195}.
 %
 % CALLS
 %   spklfp_singleband
@@ -29,6 +30,7 @@ addParameter(p, 'basepath', pwd, @ischar)
 addParameter(p, 'winCalc', {[0 Inf]}, @iscell)
 addParameter(p, 'ch', 1, @isnumeric)
 addParameter(p, 'frange', [], @isnumeric)
+addParameter(p, 'bit2uv', 0.195, @isnumeric)
 addParameter(p, 'graphics', true, @islogical)
 addParameter(p, 'saveVar', true, @islogical)
 
@@ -37,6 +39,7 @@ basepath        = p.Results.basepath;
 winCalc         = p.Results.winCalc;
 ch              = p.Results.ch;
 frange          = p.Results.frange;
+bit2uv          = p.Results.bit2uv;
 graphics        = p.Results.graphics;
 saveVar         = p.Results.saveVar;
 
@@ -87,20 +90,21 @@ nunits = length(spikes.times);
 for iwin = 1 : length(winCalc)
     
     % load lfp
-    winstart = min(winCalc{iwin});
-    winend = max(winCalc{iwin});
+    winTimes = winCalc{iwin};
+    winstart = min(winTimes, [], "all");
+    winend = max(winTimes, [], "all");
     recDur = winend - winstart;
-    sig = double(bz_LoadBinary(lfpfile, 'duration', recDur,...
-        'frequency', fs, 'nchannels', nchans, 'start', winstart,...
-        'channels', ch, 'downsample', 1));
+    sig = binary_load(lfpfile, 'duration', recDur,...
+        'fs', fs, 'nCh', nchans, 'start', winstart,...
+        'ch', ch, 'downsample', 1, 'bit2uv', bit2uv);
     sig = mean(sig, 2);
 
     % clip spike times
-    spktimes = cellfun(@(x) x(InIntervals(x, winCalc{iwin})),...
+    spktimes = cellfun(@(x) x(InIntervals(x, winTimes)),...
         spikes.times, 'uni', false);
     
     % adjust spktimes so that they correspond to signal length
-    spktimes = cellfun(@(x) x - winCalc{iwin}(1),...
+    spktimes = cellfun(@(x) x - winTimes(1),...
         spktimes, 'uni', false);
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -118,7 +122,7 @@ for iwin = 1 : length(winCalc)
 
         [spklfp(ifreq)] = spklfp_singleband('basepath', basepath, 'fs', fs,...
             'sig', sig_filt, 'spktimes', spktimes, 'frange', frange(ifreq, :),...
-            'graphics', false, 'saveVar', false);
+            'winTimes', winTimes, 'graphics', false, 'saveVar', false);
     end
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -222,84 +226,5 @@ end
 % save
 save(fullfile(basepath, [basename, '.spklfp.mat']), 's', '-v7.3')
 
-
 end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% bzcode
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-% % data
-% basepath = pwd;
-% [~, basename] = fileparts(basepath);
-% cd(basepath)
-%
-% load([basename, '.spktimes.mat'])
-% load([basename, '.spikes.cellinfo.mat'])
-% load([basename, '.units.mat'])
-% load([basename, '.cell_metrics.cellinfo.mat'])
-%
-% fs = 1250;
-%
-% % clip spikes times to reasonable window
-% winCalc = [0, 3 * 60 * 60];
-% recDur = diff(winCalc);
-%
-% % load lfp
-% sig = double(bz_LoadBinary([basename, '.lfp'], 'duration', recDur,...
-%     'frequency', fs, 'nchannels', 19, 'start', winCalc(1),...
-%     'channels', [9 : 11], 'downsample', 1));
-% sig = mean(sig, 2);
-%
-% % filter
-% % sig_filt = filterLFP(sig, 'fs', fsLfp, 'type', 'butter', 'dataOnly', true,...
-% %     'order', 3, 'passband', [0.5 8], 'graphics', false);
-%
-% % buzcode
-% subpops = cell(1, length(units.rs));
-% for iunit = 1 : length(subpops)
-%     if units.fs(iunit)
-%         subpops{iunit} = 'fs';
-%     elseif units.rs(iunit)
-%         subpops{iunit} = 'rs';
-%     end
-% end
-%
-% lfp.data = sig;
-% lfp.timestamps = [winCalc(1) : 1 / fs : winCalc(2) - 1 / fs];
-% lfp.samplingRate = fs;
-% lfp.channels = 1;
-% [SpikeLFPCoupling] = bz_GenSpikeLFPCoupling(spikes, lfp,...
-%     'spikeLim', 500000, 'frange', [1 100], 'nfreqs', [20],...
-%     'cellclass', subpops, 'sorttype', 'rate', 'saveMat', true);
-%
-%
-% % -----------------------------
-% flfp.timestamps = [winCalc(1) : 1 / fs : winCalc(2) - 1 / fs];
-% sig_z = hilbert(sig);
-% flfp.amp = abs(sig_z);
-% flfp.phase = angle(sig_z);
-% flfp.samplingRate = fs;
-% bz_PowerPhaseRatemap(spikes, flfp)
-%
-%
-% % stimes = cellfun(@(x) x(InIntervals(x, winCalc))', spikes.times, 'uni', false);
-% %
-% % % sort by fr
-% % [~, sidx] = sort(cellfun(@length, stimes, 'uni', true), 'descend');
-% % stimes = stimes(sidx);
-% %
-% % % choose pyr
-% % stimes = stimes(units.idx(1, :));
-%
-% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% % wide band analysis
-% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-% frange = [1 100];
-% nfreq = 20;
-% [spklfp] = spklfp_wideband('basepath', basepath, 'fs', fs,...
-%     'sig', sig, 'spktimes', spktimes, 'frange', frange,...
-%     'nfreq', nfreq, 'srtUnits', true, 'graphics', true,...
-%     'saveVar', true);
-%

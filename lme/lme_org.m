@@ -132,7 +132,15 @@ elseif contains(frml, 'RippSpks ~')
     if isempty(varField)
         varField = 'frGain';
     end
-    
+
+elseif contains(frml, 'RippSpkLfp ~')
+    varName = 'ripp';
+    flgUnits = true;
+    yName = 'RippSpkLfp';
+    if isempty(varField)
+        varField = 'theta';
+    end
+
 elseif contains(frml, 'Ripp ~')
     varName = 'ripp';
     yName = 'Ripp';
@@ -152,7 +160,8 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Load main variable data
-dataCell = lme_load('grppaths', grppaths, 'varName', varName, 'varField', varField, 'vCell', vCell);
+dataCell = lme_load('grppaths', grppaths, 'varName', varName,...
+    'varField', varField, 'vCell', vCell);
 
 % Load units data if needed
 if flgUnits

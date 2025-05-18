@@ -189,9 +189,9 @@ sigFilt = filterLFP(sig, 'fs', fs, 'type', 'butter', 'dataOnly', true,...
     'order', 5, 'passband', passband, 'graphics', false);
 
 % Calculate Hilbert transform components (amplitude and phase)
-h = hilbert(sigFilt);
-sigAmp = abs(h);
-sigPhase = angle(h);
+sigH = hilbert(sigFilt);
+sigAmp = abs(sigH);
+sigPhase = angle(sigH);
 sigUnwrapped = unwrap(sigPhase);
 
 % Calculate instantaneous frequency
@@ -337,7 +337,7 @@ else
 end
 
 % Clear intermediate detection variables to free memory
-clear sigDetect aboveThr h sigUnwrapped baseSignal localMean localStd sigFiltPad eventPow switches startRun endRun runLengths maxIdx stdFloor
+clear sigDetect aboveThr sigH sigUnwrapped baseSignal localMean localStd sigFiltPad eventPow switches startRun endRun runLengths maxIdx stdFloor
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

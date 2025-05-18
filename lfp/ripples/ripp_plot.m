@@ -86,7 +86,7 @@ axis tight;
 
 % --- Average Ripple Waveform ---
 sb2 = subplot(3, 3, 3);
-plot_stdShade('axh', sb2, 'dataMat', ripp.maps.ripp', 'alpha', 0.3,...
+plot_stdShade('axh', sb2, 'dataMat', ripp.maps.filt', 'alpha', 0.3,...
     'clr', [0 0 0], 'xVal', xMap); % Mean +/- std of filtered LFP
 xlabel('Time relative to peak [s]');
 ylabel('Filtered LFP (norm.)'); % Assuming maps are normalized or z-scored
@@ -137,7 +137,7 @@ box off;
 
 % --- Duration Distribution ---
 sb8 = subplot(3, 3, 9);
-h = histogram(ripp.dur * 1000, histBins, 'Normalization', 'probability', 'DisplayStyle', 'stairs', 'LineWidth', 1.5, 'EdgeColor', 'k');
+h = histogram(ripp.dur, histBins, 'Normalization', 'probability', 'DisplayStyle', 'stairs', 'LineWidth', 1.5, 'EdgeColor', 'k');
 set(gca, 'xscale', 'log'); % Duration often benefits from log scale
 xlabel('Duration [ms]');
 ylabel('Probability');
