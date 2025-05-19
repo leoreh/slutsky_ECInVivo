@@ -308,12 +308,19 @@ end
 % Initialize structure for rate map results.
 rateMap = struct();
 
-% Define LFP power and phase bins for the rate map.
-% Power bins are from percentiles of LFP power during 'lfpTimes'.
-lfpIdx = Restrict(1 : length(sigPow), round(lfpTimes * fs)); 
-lfpPow = sigPow(lfpIdx); 
-powEdges = linspace(prctile(lfpPow, 5), prctile(lfpPow, 97), nBinsMap + 1);
-
+% Define LFP power and phase bins for the rate map. Power bins can be
+% percentiles of LFP power during 'lfpTimes' (alt = 1) or percentiles based
+% on power during spikes (alt = 2)
+powAlt = 2;
+switch powAlt
+    case 1
+        lfpIdx = Restrict(1 : length(sigPow), round(lfpTimes * fs));
+        lfpPow = sigPow(lfpIdx);
+        powEdges = linspace(prctile(lfpPow, 5), prctile(lfpPow, 97), nBinsMap + 1);
+    case 2
+        spkPowVec = vertcat(spkPow{:});
+        powEdges = linspace(prctile(spkPowVec, 5), prctile(spkPowVec, 97), nBinsMap + 1);
+end
 phaseEdges = linspace(0, 2 * pi, nBinsMap + 1);
 rateMap.phaseBins = phaseEdges(1 : end - 1) + 0.5 .* diff(phaseEdges(1 : 2));
 rateMap.powBins = powEdges(1 : end - 1) + 0.5 .* diff(powEdges(1 : 2));

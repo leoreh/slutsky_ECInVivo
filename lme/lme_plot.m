@@ -1,4 +1,4 @@
-function fh = lme_plot(lmeData, lmeMdl, varargin)
+function hFig = lme_plot(lmeData, lmeMdl, varargin)
 
 % plots linear mixed effects model results according to fixed effects.
 % first fixed effect determines different lines/groups, second fixed effect
@@ -8,12 +8,11 @@ function fh = lme_plot(lmeData, lmeMdl, varargin)
 %   lmeData     table with data used in lme analysis
 %   lmeMdl      fitted linear mixed effects model
 %   ptype       string specifying plot type {'line', 'box', 'bar'}
-%   axh         axis handle
-%   figShape    string specifying figure shape {'square', 'tall', 'wide'}
+%   hAx         axis handle
+%   axShape     string specifying figure shape {'square', 'tall', 'wide'}
 %
 % OUTPUT
-%   fh         handle to figure
-%
+%   hFig         handle to figure
 
 % 10 Jan 24
 
@@ -24,15 +23,15 @@ function fh = lme_plot(lmeData, lmeMdl, varargin)
 % handle input
 p = inputParser;
 addOptional(p, 'clr', []);
-addOptional(p, 'axh', []);
+addOptional(p, 'hAx', []);
 addOptional(p, 'ptype', 'line');
-addOptional(p, 'figShape', 'square');
+addOptional(p, 'axShape', 'square');
 
 parse(p, varargin{:})
 clr                 = p.Results.clr;
-axh                 = p.Results.axh;
+hAx                 = p.Results.hAx;
 ptype               = p.Results.ptype;
-figShape            = p.Results.figShape;
+axShape             = p.Results.axShape;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preparations
@@ -47,29 +46,8 @@ end
 clrAlpha = 0.3;
 
 % initialize figure
-if isempty(axh)
-    fh = figure;
-    set(fh, 'Color', 'w');                      
-    fhUnits = get(fh, 'Units'); 
-    set(fh, 'Units', 'pixels');
-    fhPos = get(fh, 'Position');
-    switch figShape
-        case 'square'
-            fhPos(3) = fhPos(4);
-        case 'tall'
-            fhPos(3) = fhPos(4) * 0.62;
-        case 'wide'
-            fhPos(3) = fhPos(4) * 1.62;
-    end
-    set(fh, 'Position', fhPos);
-    set(fh, 'Units', fhUnits);
-    tlayout = [1, 1];
-    th = tiledlayout(tlayout(1), tlayout(2));
-    th.TileSpacing = 'none';
-    th.Padding = 'tight';
-    axh = nexttile(th, 1, [1, 1]); cla; hold on
-    % axis(axh, 'square');        % Set axes proportions to a perfect square
-    fntSize = 16;
+if isempty(hAx)
+    [hFig, hAx] = plot_axSize('axShape', axShape, 'szOnly', false);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -95,7 +73,7 @@ switch ptype
             for igrp = 1 : length(dataGrp)
                 ph(igrp) = plot_stdShade('dataMat', dataGrp{igrp},...
                     'xVal', [1:length(xVals{igrp})], ...
-                    'axh', axh, 'clr', clr(igrp, :), 'alpha', clrAlpha);
+                    'axh', hAx, 'clr', clr(igrp, :), 'alpha', clrAlpha);
             end
             xlabel(varsFxd{2})
             xticks([1:length(xVals{igrp})])
@@ -105,7 +83,7 @@ switch ptype
         else
             % single variable case
             ph = plot_stdShade('dataMat', dataGrp, 'xVal', [1:length(xVals)], ...
-                'axh', axh, 'clr', clr(1,:), 'alpha', clrAlpha);
+                'axh', hAx, 'clr', clr(1,:), 'alpha', clrAlpha);
             xlabel(varsFxd{1})
             xticklabels(xVals)
             xlim([1-0.2, length(xVals)+0.2])
@@ -117,7 +95,7 @@ switch ptype
             % pass cell array of matrices to plot_boxMean
             ph = plot_boxMean('dataMat', dataGrp, 'xVal', 1 : length(xVals{1}), ...
                 'clr', clr(1 : length(dataGrp), :), 'alphaIdx', 1, ...
-                'plotType', ptype, 'axh', axh);
+                'plotType', ptype, 'axh', hAx);
             xlabel(varsFxd{2})
             xticklabels(xVals{1})
             legend(ph, varLbls, 'Location', 'northwest')
@@ -125,37 +103,30 @@ switch ptype
             % single variable case
             plot_boxMean('dataMat', dataGrp, 'xVal', 1 : size(dataGrp, 1),...
                 'clr', clr(1, :), 'alphaIdx', clrAlpha, ...
-                'plotType', ptype, 'axh', axh);
+                'plotType', ptype, 'axh', hAx);
             xlabel(varsFxd{1})
             xticklabels(xVals)
         end
 
         % update graphics to the case of only two groups (assumes Control
         % and MCU-KO)
-        hndlBar = findobj(axh, 'Type', 'Bar');
-        nBars = numel(hndlBar.YData);
-        if nBars == 2 && length(hndlBar) == 1
-            hndlBar.FaceColor = 'flat';
-            hndlBar.CData(1, :) = clr(1, :);
-            hndlBar.CData(2, :) = clr(2, :);
-            hndlBar.FaceAlpha = 1;
+        hBar = findobj(hAx, 'Type', 'Bar');
+        nBars = numel(hBar.YData);
+        if nBars == 2 && length(hBar) == 1
+            hBar.FaceColor = 'flat';
+            hBar.CData(1, :) = clr(1, :);
+            hBar.CData(2, :) = clr(2, :);
+            hBar.FaceAlpha = 1;
         end
 end
 
 % add response variable label and title
 ylabel(varRsp)
-title(axh, lme_frml2char(frml, 'rmRnd', false))
+title(hAx, lme_frml2char(frml, 'rmRnd', false))
 
-% Set fonts and font sizes for axes elements
-set(axh, 'FontName', 'Arial', 'FontSize', fntSize); % Affects axis labels, ticks
-
-% Set font and font size for the title
-hndlTtl = get(axh, 'Title');
-set(hndlTtl, 'FontName', 'Arial', 'FontSize', fntSize + 4);
-
-% Set font and font size for the legend
-hndlLgnd = findobj(fh, 'Type', 'Legend');
-set(hndlLgnd, 'FontName', 'Arial', 'FontSize', fntSize);
+% adjust figure size and aesthetics
+drawnow;
+plot_axSize('hFig', hFig, 'axShape', axShape, 'szOnly', true);
 
 end
 
@@ -273,3 +244,4 @@ else
 end
 
 end
+

@@ -77,7 +77,7 @@ function [spkLfp] = spklfp_calc(varargin)
 %     .info     Metadata (runtime, fRange, fs, lfpTimes, powThr, etc.).
 %     .phase    Phase coupling (dist, kappa, theta, mrl, p, spkPhase).
 %     .rateMap  Power-phase rate maps (occupancy, counts, rate, bins).
-%     .ratemag  Rate-magnitude correlation (r, p).
+%     .rateMag  Rate-magnitude correlation (r, p).
 %     .pop      Population synchrony results (phase coupling, synchrony-magnitude correlation).
 %     .stl      Spike-triggered LFP results (if flgStl is true).
 %
@@ -108,7 +108,7 @@ addParameter(p, 'basepath', pwd, @ischar)
 addParameter(p, 'sig', [], @isnumeric)
 addParameter(p, 'spktimes', {}, @iscell)
 addParameter(p, 'fs', 1250, @isnumeric)
-addParameter(p, 'fRange', [1.5 100], @(x) isnumeric(x) && numel(x)==2);
+addParameter(p, 'fRange', [0 0]);
 addParameter(p, 'lfpTimes', [], @isnumeric)
 addParameter(p, 'ch', [], @isnumeric)
 addParameter(p, 'bit2uv', 0.195, @isnumeric);
@@ -134,8 +134,6 @@ powThr          = p.Results.powThr;
 % Parameters for internal calculations
 nBinsPhase = 180;               % Bins for phase distribution
 nBinsMap = 20;                  % Bins for power/phase in rate map
-minCycles = 2;                  % Minimum duration of LFP bout for powThr in cycles of slowest freq
-minSamples = ceil((fs / fRange(2)) * minCycles);
 
 % File paths
 [~, basename] = fileparts(basepath);
@@ -220,6 +218,9 @@ sigPhase = mod(angle(sigH), 2 * pi);
 % Optionally restrict 'lfpTimes' to high-power LFP bouts if 'powThr' is set
 % and 'lfpTimes' were not provided as input.
 if isempty(lfpTimes) && ~isempty(powThr) 
+    minCycles = 2;                  % Minimum duration of LFP bout in cycles of slowest freq
+    minSamples = ceil((fs / fRange(2)) * minCycles);
+
     sigRms = fastrms(sig, ceil(fs ./ fRange(1)), 1); % Smoothed RMS.
     minRms = mean(sigRms) + std(sigRms) * powThr; % Power threshold.
 
@@ -291,7 +292,7 @@ for iUnit = 1 : nUnits
     [phase.dist(:, iUnit), phase.bins, tmpStats] = ...
         CircularDistribution(spkPhase{iUnit}, 'nBins', nBinsPhase);
     phase.kappa(iUnit) = tmpStats.k;
-    phase.theta(iUnit) = tmpStats.m;
+    phase.theta(iUnit) = mod(tmpStats.m, 2*pi); 
     phase.mrl(iUnit) = tmpStats.r;
     phase.pVal(iUnit) = tmpStats.p;
 end
@@ -307,12 +308,19 @@ end
 % Initialize structure for rate map results.
 rateMap = struct();
 
-% Define LFP power and phase bins for the rate map.
-% Power bins are from percentiles of LFP power during 'lfpTimes'.
-lfpIdx = Restrict(1 : length(sigPow), round(lfpTimes * fs)); 
-lfpPow = sigPow(lfpIdx); 
-powEdges = linspace(prctile(lfpPow, 5), prctile(lfpPow, 97), nBinsMap + 1);
-
+% Define LFP power and phase bins for the rate map. Power bins can be
+% percentiles of LFP power during 'lfpTimes' (alt = 1) or percentiles based
+% on power during spikes (alt = 2)
+powAlt = 2;
+switch powAlt
+    case 1
+        lfpIdx = Restrict(1 : length(sigPow), round(lfpTimes * fs));
+        lfpPow = sigPow(lfpIdx);
+        powEdges = linspace(prctile(lfpPow, 5), prctile(lfpPow, 97), nBinsMap + 1);
+    case 2
+        spkPowVec = vertcat(spkPow{:});
+        powEdges = linspace(prctile(spkPowVec, 5), prctile(spkPowVec, 97), nBinsMap + 1);
+end
 phaseEdges = linspace(0, 2 * pi, nBinsMap + 1);
 rateMap.phaseBins = phaseEdges(1 : end - 1) + 0.5 .* diff(phaseEdges(1 : 2));
 rateMap.powBins = powEdges(1 : end - 1) + 0.5 .* diff(powEdges(1 : 2));
@@ -403,12 +411,12 @@ for iPop = 1 : nPop
     % Phase coupling of population synchrony.
     popPhase = spkcnts.lfpPhase(popSyn > 0); % LFP phases at synchrony events.
 
-    [pop.phase.dist(:, iPop), pop.phase.bins, tmp] =...
+    [pop.phase.dist(:, iPop), pop.phase.bins, tmpStats] =...
         CircularDistribution(popPhase, 'nBins', nBinsPhase);
-    pop.phase.kappa(iPop) = tmp.k;
-    pop.phase.theta(iPop) = tmp.m;
-    pop.phase.mrl(iPop) = tmp.r;
-    pop.phase.pVal(iPop) = tmp.p;
+    pop.phase.kappa(iPop) = tmpStats.k;
+    pop.phase.theta(iPop) = mod(tmpStats.m, 2*pi);
+    pop.phase.mrl(iPop) = tmpStats.r;
+    pop.phase.pVal(iPop) = tmpStats.p;
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

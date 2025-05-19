@@ -1,31 +1,31 @@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% run the analysis on multiple sessions
+% ANALYZE AND LOAD DATA
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-basepaths = [mcu_sessions('wt_bsl_ripp'), mcu_sessions('mcu_bsl')];
-nfiles = length(basepaths);
+% % run the analysis on multiple sessions
+% % -------------------------------------------------------------------------
+% basepaths = [mcu_sessions('wt_bsl_ripp'), mcu_sessions('mcu_bsl')];
+% nfiles = length(basepaths);
+% 
+% v = basepaths2vars('basepaths', basepaths, 'vars', {'session'});
+% 
+% for ifile = 1 : nfiles
+%     basepath = basepaths{ifile};
+%     cd(basepath)
+%     [~, basename] = fileparts(basepath);
+% 
+%     rippCh = v(ifile).session.channelTags.Ripple;
+% 
+%     ripp = ripp_wrapper('basepath', pwd, 'rippCh', rippCh,...
+%         'limState', 4, 'flgRefine', true, 'flgGraphics', true,...
+%         'flgSaveVar', true, 'flgSaveFig', true);
+% end
 
-v = basepaths2vars('basepaths', basepaths, 'vars', {'session'});
-
-for ifile = 1 : nfiles
-    basepath = basepaths{ifile};
-    cd(basepath)
-    [~, basename] = fileparts(basepath);
-
-    rippCh = v(ifile).session.channelTags.Ripple;
-
-    ripp = ripp_wrapper('basepath', pwd, 'rippCh', rippCh,...
-        'limState', 4, 'flgRefine', true, 'flgGraphics', true,...
-        'flgSaveVar', true, 'flgSaveFig', true);
-end
 
 
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % load and organize data from all sessions
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
+% -------------------------------------------------------------------------
 % Define groups and get basepaths
 grps = {'wt_bsl_ripp'; 'mcu_bsl'};
 clear grppaths
@@ -35,7 +35,7 @@ end
 basepaths = vertcat(grppaths{:});
 
 % Preload existing ripple data
-v = basepaths2vars('basepaths', basepaths, 'vars', {'ripp', 'units'});
+v = basepaths2vars('basepaths', basepaths, 'vars', {'ripp', 'units', 'session'});
 
 % Organize data struct for lmeOrg
 idxStart = 1;
@@ -51,11 +51,10 @@ for iGrp = 1 : length(grppaths)
     idxStart = idxEnd + 1;
 end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Re-run only part of the analysis pipeline (e.g., ripp_spks)
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Assumes data was already loaded
 
+% Re-run only part of the analysis pipeline (e.g., ripp_spks)
+% -------------------------------------------------------------------------
+% Assumes data was already loaded
 for ifile = 1 : length(basepaths)
 
     % File
@@ -95,17 +94,56 @@ for ifile = 1 : length(basepaths)
     % phase coupling
     ripp = v(ifile).ripp;
     lfpTimes = ripp.times;
+    rippCh = v(ifile).session.channelTags.Ripple;
     spkLfp = spklfp_calc('basepath', basepath, 'lfpTimes', lfpTimes,...
-        'ch', ch, 'fRange', [120 200],...
-        'flgSave', true, 'flgGraphics', true, 'flgStl', false);
+        'ch', rippCh, 'fRange', [120 200],...
+        'flgSave', false, 'flgGraphics', true, 'flgStl', false);
     
     ripp.spkLfp = spkLfp;
     save(fullfile(basepath, [basename, '.ripp.mat']), 'ripp', '-v7.3')
 end
 
 
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% lme
+% RIPPLE PARAMETERS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Formula
+frml = 'Ripp ~ Group + (1|Mouse)';
+
+% Variables to examine
+varFields = {'peakFreq', 'dur', 'peakAmp', 'rate', 'density'};
+txtY = {'Peak Frequency (Hz)', 'Duration (ms)', 'Peak Amplitude (uV)', 'Rate (SWR/s)', 'Density (%)'};
+nFlds = length(varFields);
+
+for iFld = 1 : nFlds
+    varField = varFields{iFld};
+    
+    % organize for lme
+    [lmeData, lmeCfg] = lme_org('grppaths', grppaths, 'frml', frml,...
+        'flgEmg', false, 'varField', varField, 'vCell', vCell);
+
+    % run lme
+    contrasts = 'all';
+    [lmeStats, lmeCfg] = lme_analyse(lmeData, lmeCfg, 'contrasts', contrasts);
+
+    % plot
+    hFig = lme_plot(lmeData, lmeCfg.lmeMdl, 'ptype', 'bar', 'axShape', 'tall');
+    hAx = gca;
+    ylabel(hAx, txtY{iFld})
+    xlabel(hAx, '')
+    title(hAx, '')
+
+    fname = lme_frml2char(frml, 'rmRnd', true, 'sfx', ['_', varFields{iFld}]);
+
+    % save
+    lme_save('fh', hFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
+        'lmeData', lmeData, 'lmeStats', lmeStats, 'lmeCfg', lmeCfg)
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% RIPPLE SPIKES
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % FR increase during ripples
@@ -113,77 +151,36 @@ frml = 'RippSpks ~ Group * UnitType + (1|Mouse)';
 varField = 'normRates';
 
 % organize for lme
-[lmeTbl, lmeCfg] = lme_org('grppaths', grppaths, 'frml', frml,...
+[lmeData, lmeCfg] = lme_org('grppaths', grppaths, 'frml', frml,...
     'flgEmg', false, 'varField', varField, 'vCell', vCell);
 
 % run lme
 contrasts = 'all';
 % contrasts = [1 : 5, 8]; % Example of specific contrasts
-[lmeResults, lmeCfg] = lme_analyse(lmeTbl, lmeCfg, 'contrasts', contrasts);
+[lmeStats, lmeCfg] = lme_analyse(lmeData, lmeCfg, 'contrasts', contrasts);
 
 % plot
-hndFig = lme_plot(lmeTbl, lmeCfg.lmeMdl, 'ptype', 'bar', 'figShape', 'square'); 
+hFig = lme_plot(lmeData, lmeCfg.lmeMdl, 'ptype', 'bar', 'figShape', 'square'); 
 
 % Update labels
-axh = gca;
-ylabel(axh, 'FR Modulation', 'FontSize', 20)
-xlabel(axh, '', 'FontSize', 16)
-axh.XAxis.FontSize = 20;
-title(axh, '')
-axh.Legend.Location = 'northeast';
+hAx = gca;
+ylabel(hAx, 'FR Modulation', 'FontSize', 20)
+xlabel(hAx, '', 'FontSize', 16)
+hAx.XAxis.FontSize = 20;
+title(hAx, '')
+hAx.Legend.Location = 'northeast';
 
 ylbl = 'Ripp FR';
 fname = lme_frml2char(frml, 'rmRnd', true, 'resNew', ylbl); % rm_rnd to rmRnd
 
 % save
-lme_save('fh', hndFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
-    'lmeTbl', lmeTbl, 'lmeResults', lmeResults, 'lmeCfg', lmeCfg)
-
-
-
-% -------------------------------------------------------------------------
-
-
-% analyze ripple parameter
-frml = 'Ripp ~ Group + (1|Mouse)';
-
-% organize for lme
-varField = 'rate';
-
-% organize for lme
-[lmeTbl, lmeCfg] = lme_org('grppaths', grppaths, 'frml', frml,...
-    'flgEmg', false, 'varField', varField, 'vCell', vCell);
-
-% run lme
-contrasts = 'all';
-[lmeResults, lmeCfg] = lme_analyse(lmeTbl, lmeCfg, 'contrasts', contrasts);
-
-% plot
-hndFig = lme_plot(lmeTbl, lmeCfg.lmeMdl, 'ptype', 'bar', 'figShape', 'tall'); 
-axh = gca;
-ylabel(axh, 'Rate (SWR/s)', 'FontSize', 20)
-xlabel(axh, '', 'FontSize', 20)
-title(axh, '')
-axh.XAxis.FontSize = 20;
-axh.XTickLabelRotation = 0;
-
-ylbl = 'Ripp Rate';
-fname = lme_frml2char(frml, 'rmRnd', true, 'resNew', ylbl); 
-
-% save
-lme_save('fh', hndFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
-    'lmeTbl', lmeTbl, 'lmeResults', lmeResults, 'lmeCfg', lmeCfg)
-
-
-
-
-
-
+lme_save('fh', hFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
+    'lmeData', lmeData, 'lmeStats', lmeStats, 'lmeCfg', lmeCfg)
 
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Concate and plot ripple PETH
+% PLOT RIPPLE PETH
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Create a mean normalized SU PETH for RS and FS units from all mice of
@@ -263,20 +260,20 @@ txtUnit = {'pPYR', 'pPV'};
 txtGrp = {'Control', 'MCU-KO'};
 
 % initialize
-hndFig = figure;
-set(hndFig, 'Color', 'w');
-fhUnits = get(hndFig, 'Units');
-set(hndFig, 'Units', 'pixels');
-fhPos = get(hndFig, 'Position');
+hFig = figure;
+set(hFig, 'Color', 'w');
+fhUnits = get(hFig, 'Units');
+set(hFig, 'Units', 'pixels');
+fhPos = get(hFig, 'Position');
 fhPos(3) = fhPos(4);
-set(hndFig, 'Position', fhPos);
-set(hndFig, 'Units', fhUnits);
+set(hFig, 'Position', fhPos);
+set(hFig, 'Units', fhUnits);
 
 % Plot each group
 nGrp = length(grps);
 iUnit = 1;
-axh = gca; cla; hold on
-set(axh, 'FontName', 'Arial', 'FontSize', fntSize);
+hAx = gca; cla; hold on
+set(hAx, 'FontName', 'Arial', 'FontSize', fntSize);
 hndPlt = [];
 for iGrp = 1 : nGrp 
     % Get data for current unit type and group
@@ -284,28 +281,28 @@ for iGrp = 1 : nGrp
     pethData = normGrp{iGrp}(unitIdx, :);
 
     % Plot with std shade
-    hndPlt(end + 1) = plot_stdShade('axh', axh, 'dataMat', pethData,...
+    hndPlt(end + 1) = plot_stdShade('axh', hAx, 'dataMat', pethData,...
         'alpha', 0.3, 'clr', clr(iGrp, :), 'xVal', timeBins);
 end
 
 % Add zero line
-xline(axh, 0, '--k');
+xline(hAx, 0, '--k');
 
 % Update labels
-ylabel(axh, 'Norm. FR', 'FontSize', 20)
-xlabel(axh, 'Time (ms)', 'FontSize', 20)
-title(axh, txtUnit{iUnit}, 'FontSize', fntSize + 4, 'FontName', 'Arial')
+ylabel(hAx, 'Norm. FR', 'FontSize', 20)
+xlabel(hAx, 'Time (ms)', 'FontSize', 20)
+title(hAx, txtUnit{iUnit}, 'FontSize', fntSize + 4, 'FontName', 'Arial')
 
 % Set limits
 % ylim(axh, [-0.5, 0.5])
-xlim(axh, [-50 50])
+xlim(hAx, [-50 50])
 legend(hndPlt, txtGrp{iGrp}, 'Location', 'northeast',...
     'FontName', 'Arial', 'FontSize', fntSize);
 
 % Save
 fname = 'Ripp PETH';
-% lme_save('fh', hndFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
-%     'lmeTbl', table(), 'lmeResults', table(), 'lmeCfg', [])
+% lme_save('fh', hFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
+%     'lmeData', table(), 'lmeStats', table(), 'lmeCfg', [])
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -345,21 +342,21 @@ nBinsMap = ripp.spks.info.nBinsMap;
 timeBins = linspace(mapDur(1), mapDur(2), nBinsMap);
 
 % initialize
-hndFig = figure;
-set(hndFig, 'Color', 'w');
-fhUnits = get(hndFig, 'Units');
-set(hndFig, 'Units', 'pixels');
-fhPos = get(hndFig, 'Position');
+hFig = figure;
+set(hFig, 'Color', 'w');
+fhUnits = get(hFig, 'Units');
+set(hFig, 'Units', 'pixels');
+fhPos = get(hFig, 'Position');
 fhPos(3) = fhPos(4);
-set(hndFig, 'Position', fhPos);
-set(hndFig, 'Units', fhUnits);
+set(hFig, 'Position', fhPos);
+set(hFig, 'Units', fhUnits);
 hndTil = tiledlayout(1, 1);
 hndTil.TileSpacing = 'tight';
 hndTil.Padding = 'tight';
 
 % Plot
-axh = nexttile(hndTil, 1, [1, 1]); cla; hold on
-set(axh, 'FontName', 'Arial', 'FontSize', fntSize);
+hAx = nexttile(hndTil, 1, [1, 1]); cla; hold on
+set(hAx, 'FontName', 'Arial', 'FontSize', fntSize);
 
 ph = gobjects(nGrp,1); % Preallocate plot handle array
 legendTxt = cell(nGrp,1);
@@ -367,7 +364,7 @@ validPlots = 0;
 % Plot each group in reverse order so Control appears on top
 for iGrp = nGrp : -1 : 1 % Use a different loop variable
     if ~isempty(lfpGrp{iGrp})
-        hndPlt(iGrp) = plot_stdShade('axh', axh, 'dataMat', lfpGrp{iGrp},...
+        hndPlt(iGrp) = plot_stdShade('axh', hAx, 'dataMat', lfpGrp{iGrp},...
             'alpha', 0.3, 'clr', clr(iGrp, :), 'xVal', timeBins);
         % plotHandles(iGrpPlot).DisplayName = txtGrp{iGrpPlot}; % Assign DisplayName for legend
         validPlots = validPlots + 1;
@@ -377,16 +374,16 @@ for iGrp = nGrp : -1 : 1 % Use a different loop variable
 end
 
 % Add zero line
-xline(axh, 0, '--k');
+xline(hAx, 0, '--k');
 
 % Update labels
-ylabel(axh, 'LFP (µV)', 'FontSize', 20)
-xlabel(axh, 'Time (ms)', 'FontSize', 20)
-title(axh, '', 'FontSize', fntSize + 4, 'FontName', 'Arial')
+ylabel(hAx, 'LFP (µV)', 'FontSize', 20)
+xlabel(hAx, 'Time (ms)', 'FontSize', 20)
+title(hAx, '', 'FontSize', fntSize + 4, 'FontName', 'Arial')
 
 % Set limits
-xlim(axh, mapDur)
-ylim(axh, [-150, 200])
+xlim(hAx, mapDur)
+ylim(hAx, [-150, 200])
 
 % Add legend with custom order for valid plots
 if validPlots > 0
@@ -396,8 +393,8 @@ end
 
 % Save
 fname = 'Ripp LFP';
-lme_save('fh', hndFig, 'fname', fname, 'frmt', {'svg'},...
-    'lmeTbl', table(), 'lmeResults', table(), 'lmeCfg', []) % Removed mat/xlsx for this plot
+lme_save('fh', hFig, 'fname', fname, 'frmt', {'svg'},...
+    'lmeData', table(), 'lmeStats', table(), 'lmeCfg', []) % Removed mat/xlsx for this plot
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -418,9 +415,9 @@ else
 end
 
 % organize lme table for plotting
-[lmeTbl, ~] = lme_org('grppaths', grppaths, 'frml', frml,...
+[lmeData, ~] = lme_org('grppaths', grppaths, 'frml', frml,...
     'flgEmg', false, 'varField', 'rippRates', 'vCell', vCell);
-rippFr = lmeTbl.RippSpks;
+rippFr = lmeData.RippSpks;
 
 [lmeTblCtrl, ~] = lme_org('grppaths', grppaths, 'frml', frml,...
     'flgEmg', false, 'varField', 'ctrlRates', 'vCell', vCell);
@@ -439,14 +436,14 @@ else
 end
 
 % initialize
-hndFig = figure;
-set(hndFig, 'Color', 'w');
-fhUnits = get(hndFig, 'Units');
-set(hndFig, 'Units', 'pixels');
-fhPos = get(hndFig, 'Position');
+hFig = figure;
+set(hFig, 'Color', 'w');
+fhUnits = get(hFig, 'Units');
+set(hFig, 'Units', 'pixels');
+fhPos = get(hFig, 'Position');
 fhPos(3) = fhPos(4) * 2;
-set(hndFig, 'Position', fhPos);
-set(hndFig, 'Units', fhUnits);
+set(hFig, 'Position', fhPos);
+set(hFig, 'Units', fhUnits);
 hndTil = tiledlayout(1, 2);
 hndTil.TileSpacing = 'tight';
 hndTil.Padding = 'tight';
@@ -456,9 +453,9 @@ nGrp = length(vCell);
 legendEntriesScatter = {};
 scatterHandles = [];
 for iUnit = 1 : 2
-    axh = nexttile(hndTil, iUnit, [1, 1]); cla; hold on
-    axis(axh, 'square');
-    set(axh, 'FontName', 'Arial', 'FontSize', fntSize);
+    hAx = nexttile(hndTil, iUnit, [1, 1]); cla; hold on
+    axis(hAx, 'square');
+    set(hAx, 'FontName', 'Arial', 'FontSize', fntSize);
     
     % Plot each group
     tempHandles = [];
@@ -483,9 +480,9 @@ for iUnit = 1 : 2
         legendEntriesScatter = tempEntries;
     end
     
-    set(axh, 'XScale', 'log', 'YScale', 'log')
-    currentXLim = xlim(axh);
-    currentYLim = ylim(axh);
+    set(hAx, 'XScale', 'log', 'YScale', 'log')
+    currentXLim = xlim(hAx);
+    currentYLim = ylim(hAx);
     allMin = min([currentXLim(1), currentYLim(1), 0.01]); % Ensure 0.01 is considered
     allMax = max([currentXLim(2), currentYLim(2), 100]);   % Ensure 100 is considered (or 200 based on original)
     eqLim = [allMin, allMax];
@@ -493,12 +490,12 @@ for iUnit = 1 : 2
 
     xlim(eqLim)
     ylim(eqLim)
-    plot(axh, eqLim, eqLim, '--k', 'LineWidth', 2)
+    plot(hAx, eqLim, eqLim, '--k', 'LineWidth', 2)
     
     % Update labels
-    ylabel(axh, 'FR in SWR (Hz)', 'FontSize', 20)
-    xlabel(axh, 'FR in Random (Hz)', 'FontSize', 20)
-    title(axh, txtUnit{iUnit}, 'FontSize', fntSize + 4, 'FontName', 'Arial')
+    ylabel(hAx, 'FR in SWR (Hz)', 'FontSize', 20)
+    xlabel(hAx, 'FR in Random (Hz)', 'FontSize', 20)
+    title(hAx, txtUnit{iUnit}, 'FontSize', fntSize + 4, 'FontName', 'Arial')
 end
 if ~isempty(scatterHandles)
     legend(scatterHandles, legendEntriesScatter, 'Location', 'southeast',...
@@ -507,13 +504,13 @@ end
 
 % save
 fname = 'Ripp FR vs Rand FR';
-lme_save('fh', hndFig, 'fname', fname, 'frmt', {'svg'},...
-    'lmeTbl', lmeTblPlot, 'lmeResults', table(), 'lmeCfg', []) % Save plot table
+lme_save('fh', hFig, 'fname', fname, 'frmt', {'svg'},...
+    'lmeData', lmeTblPlot, 'lmeStats', table(), 'lmeCfg', []) % Save plot table
 
 spklfp_plot(ripp.spkLfp)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% PLOT spike lfp coupling during ripples
+% SPIKE RIPPLE COUPLING
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Figure Parameters
@@ -527,38 +524,38 @@ txtGrp = {'Control', 'MCU-KO'};
 frml = 'RippSpkLfp ~ Group * UnitType + (1|Mouse)';
 
 % organize lme table for plotting
-[lmeTbl, ~] = lme_org('grppaths', grppaths, 'frml', frml,...
+[lmeData, ~] = lme_org('grppaths', grppaths, 'frml', frml,...
     'flgEmg', false, 'varField', 'mrl', 'vCell', vCell);
-MRL = lmeTbl.RippSpkLfp;
-[lmeTbl, ~] = lme_org('grppaths', grppaths, 'frml', frml,...
-    'flgEmg', false, 'varField', 'p', 'vCell', vCell);
-pVal = lmeTbl.RippSpkLfp;
-[lmeTbl, ~] = lme_org('grppaths', grppaths, 'frml', frml,...
+MRL = lmeData.RippSpkLfp;
+[lmeData, ~] = lme_org('grppaths', grppaths, 'frml', frml,...
+    'flgEmg', false, 'varField', 'pVal', 'vCell', vCell);
+pVal = lmeData.RippSpkLfp;
+[lmeData, ~] = lme_org('grppaths', grppaths, 'frml', frml,...
     'flgEmg', false, 'varField', 'theta', 'vCell', vCell);
-lmeTbl.Properties.VariableNames{'RippSpkLfp'} = 'Theta';
-lmeTbl = addvars(lmeTbl, MRL, 'After', 'Theta'); 
-lmeTbl = addvars(lmeTbl, pVal, 'After', 'MRL'); 
+lmeData.Properties.VariableNames{'RippSpkLfp'} = 'Theta';
+lmeData = addvars(lmeData, MRL, 'After', 'Theta'); 
+lmeData = addvars(lmeData, pVal, 'After', 'MRL'); 
 
 % Initialize figure
-hndFig = figure;
-set(hndFig, 'Color', 'w');
-fhUnits = get(hndFig, 'Units');
-set(hndFig, 'Units', 'pixels');
-fhPos = get(hndFig, 'Position');
+hFig = figure;
+set(hFig, 'Color', 'w');
+fhUnits = get(hFig, 'Units');
+set(hFig, 'Units', 'pixels');
+fhPos = get(hFig, 'Position');
 fhPos(3) = fhPos(4);
-set(hndFig, 'Position', fhPos);
-set(hndFig, 'Units', fhUnits);
+set(hFig, 'Position', fhPos);
+set(hFig, 'Units', fhUnits);
 
 % Plot each group
 nGrp = length(vCell);
-iUnit = 2;
+iUnit = 1;
 for iGrp = 1 : nGrp
     % Get specific data from table
-    idxUnit = lmeTbl.UnitType == categorical(txtUnit(iUnit));
-    idxGrp = lmeTbl.Group == categorical(txtGrp(iGrp));
-    idxSgn = lmeTbl.pVal < 0.05;
+    idxUnit = lmeData.UnitType == categorical(txtUnit(iUnit));
+    idxGrp = lmeData.Group == categorical(txtGrp(iGrp));
+    idxSgn = lmeData.pVal < 0.05;
     idxTbl = idxUnit & idxGrp & idxSgn;
-    grpTbl = lmeTbl(idxTbl, :);
+    grpTbl = lmeData(idxTbl, :);
 
     % Plot units, colored by type if population info is available.
     hndPlt = polarscatter(grpTbl.Theta, grpTbl.MRL, 50, ...
@@ -566,20 +563,20 @@ for iGrp = 1 : nGrp
                        'MarkerFaceAlpha', 0.3);
     hold on;
 end
-rlim([0 1])
-rticks(0 : 0.5 : 1)
+rlim([0 0.6])
+rticks(0 : 0.3 : 1)
 thetaticks(0:90:270)
 hndAx = gca;
 hndAx.ThetaAxisUnits = 'degrees';
 hndAx.GridAlpha = 0.2;
 title(txtUnit{iUnit});
-legend(txtGrp, 'Location', 'best', 'Interpreter', 'none');
+legend(txtGrp, 'Location', 'northwest', 'Interpreter', 'none');
 set(hndAx, 'FontName', 'Arial', 'FontSize', fntSize);
 
 % save
 % fname = 'Ripp FR vs Rand FR';
-% lme_save('fh', hndFig, 'fname', fname, 'frmt', {'svg'},...
-%     'lmeTbl', lmeTblPlot, 'lmeResults', table(), 'lmeCfg', []) % Save plot table
+% lme_save('fh', hFig, 'fname', fname, 'frmt', {'svg'},...
+%     'lmeData', lmeTblPlot, 'lmeStats', table(), 'lmeCfg', []) % Save plot table
 
 
 % LME analysis
@@ -589,38 +586,34 @@ set(hndAx, 'FontName', 'Arial', 'FontSize', fntSize);
 frml = 'RippSpkLfp ~ Group * UnitType + (1|Mouse)';
 
 % organize lme table for plotting
-[lmeTbl, lmeCfg] = lme_org('grppaths', grppaths, 'frml', frml,...
-    'flgEmg', false, 'varField', 'theta', 'vCell', vCell);
-lmeTbl.RippSpkLfp = mod(rad2deg(lmeTbl.RippSpkLfp), 360);
-% lmeTbl.RippSpkLfp = rad2deg(lmeTbl.RippSpkLfp);
+[lmeData, lmeCfg] = lme_org('grppaths', grppaths, 'frml', frml,...
+    'flgEmg', false, 'varField', 'mrl', 'vCell', vCell);
 
 % run lme
 contrasts = 'all';
-[lmeResults, lmeCfg] = lme_analyse(lmeTbl, lmeCfg, 'contrasts', contrasts);
+[lmeStats, lmeCfg] = lme_analyse(lmeData, lmeCfg, 'contrasts', contrasts);
 
 % plot
-hndFig = lme_plot(lmeTbl, lmeCfg.lmeMdl, 'ptype', 'bar', 'figShape', 'square'); 
-axh = gca;
-ylabel(axh, 'Mean Resultant Length', 'FontSize', 20)
-xlabel(axh, '', 'FontSize', 20)
-title(axh, '')
-axh.XAxis.FontSize = 20;
-axh.XTickLabelRotation = 0;
-axh.Legend.Location = 'northeast';
+hFig = lme_plot(lmeData, lmeCfg.lmeMdl, 'ptype', 'bar', 'axShape', 'square'); 
+hAx = gca;
+ylabel(hAx, 'Mean Resultant Length'); xlabel(hAx, ''); title(hAx, '');
+hAx.Legend.Location = 'southeast';
+plot_axSize('hFig', hFig, 'szOnly', false)
+
+% add significance lines
+barIdx = {[1, 2], [1.5, 3.5], [3, 4]};
+barLbl = {'NS', '*', '***'};
+plot_sigLines(hAx, barIdx, barLbl)
 
 ylbl = 'Ripp Theta';
 fname = lme_frml2char(frml, 'rmRnd', true, 'resNew', ylbl); 
-
-% save
-% lme_save('fh', hndFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
-%     'lmeTbl', lmeTbl, 'lmeResults', lmeResults, 'lmeCfg', lmeCfg)
 
 % Plot rate map
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % get map data
 iGrp = 1;
-iUnit = 2;
+iUnit = 1;
 nMice = length(grppaths{iGrp});
 mapData = cell(nMice, 1);
 for iMouse = 1 : nMice
@@ -632,10 +625,10 @@ rateMap = ripp.spkLfp.rateMap;
 
 % get unit indices
 frml = 'RippSpkLfp ~ Group * UnitType + (1|Mouse)';
-[lmeTbl, lmeCfg] = lme_org('grppaths', grppaths, 'frml', frml,...
-    'flgEmg', false, 'varField', 'p', 'vCell', vCell);
-idxGrp = lmeTbl.Group == categorical(txtGrp(iGrp));
-grpTbl = lmeTbl(idxGrp, :);
+[lmeData, lmeCfg] = lme_org('grppaths', grppaths, 'frml', frml,...
+    'flgEmg', false, 'varField', 'pVal', 'vCell', vCell);
+idxGrp = lmeData.Group == categorical(txtGrp(iGrp));
+grpTbl = lmeData(idxGrp, :);
 idxUnit = grpTbl.UnitType == categorical(txtUnit(iUnit));
 idxSgn = grpTbl.RippSpkLfp < 0.05;
 idxMap = idxUnit & idxSgn;
@@ -646,30 +639,28 @@ idxMap = idxUnit & idxSgn;
 % (0 to 4*pi) to visualize cyclic nature. A cosine wave is overlaid as a phase reference.
 
 % Initialize figure
-hndFig = figure;
-set(hndFig, 'Color', 'w');
-fhUnits = get(hndFig, 'Units');
-set(hndFig, 'Units', 'pixels');
-fhPos = get(hndFig, 'Position');
+hFig = figure;
+set(hFig, 'Color', 'w');
+fhUnits = get(hFig, 'Units');
+set(hFig, 'Units', 'pixels');
+fhPos = get(hFig, 'Position');
 fhPos(3) = fhPos(4);
-set(hndFig, 'Position', fhPos);
-set(hndFig, 'Units', fhUnits);
+set(hFig, 'Position', fhPos);
+set(hFig, 'Units', fhUnits);
 hndAx = gca;
 
 mapAvg = mean(mapData(:, :, idxMap), 3, 'omitnan'); % Average rate map across units.
-imagesc(hndAx, rateMap.phaseBins, rateMap.powBins, mapAvg); % Plot the [0, 2*pi] segment.
-hold on;
-imagesc(hndAx, rateMap.phaseBins + 2*pi, rateMap.powBins, mapAvg); % Plot the [2*pi, 4*pi] segment for cyclic view.
+imagesc(hndAx, rateMap.phaseBins, rateMap.powBins, mapAvg); 
+hold on
 % Overlay cosine wave for phase reference.
-plot(hndAx, linspace(0, 4*pi, 100), ...
-     cos(linspace(0, 4*pi, 100)) * (range(rateMap.powBins)/4) + mean(rateMap.powBins), ...
+plot(hndAx, linspace(0, 2*pi, 100), ...
+     cos(linspace(0, 2*pi, 100)) * (range(rateMap.powBins)/4) + mean(rateMap.powBins), ...
      'k--', 'LineWidth', 0.5);
-axis xy % Ensure correct orientation (origin at bottom-left).
+axis xy
 colorbar
-xlim([0 4*pi])
-xticks(0:pi:4*pi)
-hndAx.XTickLabel = {'0', '\pi', '2\pi', '3\pi', '4\pi'};
-hndAx.TickLabelInterpreter = 'tex';
-xlabel('Phase [rad]')
+xlim([0 2 * pi])
+xticks(0:pi/2:2*pi)
+hndAx.XTickLabel = {'0', '90', '180', '270', '360'};
+xlabel('Phase [o]')
 ylabel('Norm. LFP Power (Z-score)');
 title(txtUnit{iUnit});

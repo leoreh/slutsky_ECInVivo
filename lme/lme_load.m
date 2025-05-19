@@ -273,45 +273,6 @@ end
 unitData = cell2padmat(unitMouse, 1); % Pads along mouse dim (dim 1)
 end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function rippData = org_rippSpks(v, varName, varField)
-% Organizes ripple spike modulation: [mouse x day x unit x state=1 x bout=1]
-
-
-nMice = length(v);
-spks = cell(nMice, 1);
-
-if contains(varField, {'mrl', 'kappa', 'p', 'theta'})
-    % spike lfp coupling
-
-else
-    % firing rate modulation
-    normType = 'modulation';        % modulation, zscore
-    for iMouse = 1 : nMice
-        spksAvg = mean(v(iMouse).(varName).spks.su.rippRates, 2, 'omitnan');
-        ctrlAvg = mean(v(iMouse).(varName).spks.su.ctrlRates, 2, 'omitnan');
-        ctrlVar = std(v(iMouse).(varName).spks.su.ctrlRates, [], 2, 'omitnan');
-        if contains(varField, 'normRates')
-            switch normType
-                case 'zscore'
-                    spksNorm = (spksAvg - ctrlAvg) ./ ctrlVar;
-                case 'modulation'
-                    spksNorm = (spksAvg - ctrlAvg) ./ (spksAvg + ctrlAvg);
-            end
-            spks{iMouse} = spksNorm;
-        elseif contains(varField, 'ctrlRates')
-            spks{iMouse} = ctrlAvg;
-        elseif contains(varField, 'rippRates')
-            spks{iMouse} = spksAvg;
-        else
-            spks{iMouse} = mean(v(iMouse).(varName).spks.su.(varField), 2, 'omitnan');
-        end
-    end
-    rippData = cell2padmat(spks, 2);
-    rippData = permute(rippData, [2, 3, 1, 4, 5]);
-end
-
-end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function rippData = org_ripp(v, varName, varField)
@@ -345,7 +306,7 @@ elseif contains(varField, {'peakPower', 'dur', 'peakFreq', 'maxFreq',' peakAmp'}
     end
     rippData = permute(rippMat, [2, 3, 4, 5, 1]);
 
-elseif any(strcmp(varField, {'mrl', 'kappa', 'p', 'theta'}))
+elseif any(strcmp(varField, {'mrl', 'kappa', 'pVal', 'theta'}))
     % spike lfp coupling
     for iMouse = 1 : nMice
         rippCell{iMouse} = v(iMouse).ripp.spkLfp.phase.(varField)';    
@@ -380,45 +341,5 @@ elseif contains(varField, {'frGain', 'frModulation', 'frPrct', 'Rates'})
     rippData = permute(rippData, [2, 3, 1, 4, 5]);
 
 end
-
-
-
-
-
-
-nMice = length(v);
-spks = cell(nMice, 1);
-
-if contains(varField, {'mrl', 'kappa', 'p', 'theta'})
-    % spike lfp coupling
-
-else
-    % firing rate modulation
-    normType = 'modulation';        % modulation, zscore
-    for iMouse = 1 : nMice
-        spksAvg = mean(v(iMouse).(varName).spks.su.rippRates, 2, 'omitnan');
-        ctrlAvg = mean(v(iMouse).(varName).spks.su.ctrlRates, 2, 'omitnan');
-        ctrlVar = std(v(iMouse).(varName).spks.su.ctrlRates, [], 2, 'omitnan');
-        if contains(varField, 'normRates')
-            switch normType
-                case 'zscore'
-                    spksNorm = (spksAvg - ctrlAvg) ./ ctrlVar;
-                case 'modulation'
-                    spksNorm = (spksAvg - ctrlAvg) ./ (spksAvg + ctrlAvg);
-            end
-            spks{iMouse} = spksNorm;
-        elseif contains(varField, 'ctrlRates')
-            spks{iMouse} = ctrlAvg;
-        elseif contains(varField, 'rippRates')
-            spks{iMouse} = spksAvg;
-        else
-            spks{iMouse} = mean(v(iMouse).(varName).spks.su.(varField), 2, 'omitnan');
-        end
-    end
-    rippData = cell2padmat(spks, 2);
-    rippData = permute(rippData, [2, 3, 1, 4, 5]);
-end
-
-
 
 end
