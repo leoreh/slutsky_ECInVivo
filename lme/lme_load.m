@@ -281,17 +281,21 @@ function rippData = org_ripp(v, varName, varField)
 nMice = length(v);
 nRipp = 500;
 stateIdx = 4;
+spks = cell(nMice, 1);
 
 if strcmp(varField, 'rate') ||  strcmp(varField, 'density')
     % rate of ripple events
     rippTmp = cell(nMice, 1);
     for imouse = 1:nMice
-        rippTmp{imouse} = v(imouse).(varName).states.(varField){stateIdx};
+        rippTmp{imouse} = v(imouse).(varName).states.(varField){stateIdx}(:);
     end
     rippMat = cell2padmat(rippTmp, 2);
     rippData = permute(rippMat, [2, 3, 4, 5, 1]);
+    if strcmp(varField, 'density')
+        rippData = rippData / 1000;     % correction of ms
+    end
 
-elseif contains(varField, {'peakPower', 'dur', 'peakFreq', 'maxFreq',' peakAmp'})
+elseif contains(varField, {'peakPower', 'dur', 'peakFreq', 'maxFreq', 'peakAmp'})
     % ripples parameters
     rippMat = nan(nRipp, nMice);
     for imouse = 1:nMice
@@ -339,6 +343,14 @@ elseif contains(varField, {'frGain', 'frModulation', 'frPrct', 'Rates'})
     end
     rippData = cell2padmat(spks, 2);
     rippData = permute(rippData, [2, 3, 1, 4, 5]);
+    
+    if strcmp(varField, 'frGain')
+       for iMouse = 1 : nMice
+            spks{iMouse} = v(iMouse).(varName).spks.su.(varField);
+        end
+        rippData = cell2padmat(spks, 2);
+        rippData = permute(rippData, [2, 3, 1, 4, 5]);
+    end
 
 end
 

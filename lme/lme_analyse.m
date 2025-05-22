@@ -411,7 +411,7 @@ hVecsToStore = cell(nDefs, 1);
 
 for iDef = 1:nDefs
     rowDef = intDefList(iDef);
-    est=NaN; se=NaN; ci95=[NaN NaN]; stat=NaN; dfOut={NaN}; pVal=NaN; hVec=NaN;
+    est=NaN; se=NaN; ci95={NaN}; stat=NaN; dfOut={NaN}; pVal=NaN; hVec=NaN;
 
     switch rowDef.Type
         case "ANOVA"
@@ -427,6 +427,7 @@ for iDef = 1:nDefs
             est     = lmeCoefTbl.Estimate(origCoefIdx);
             se      = lmeCoefTbl.SE(origCoefIdx);
             ci95    = [lmeCoefTbl.Lower(origCoefIdx), lmeCoefTbl.Upper(origCoefIdx)];
+            ci95    = {mat2str(round(ci95, 2))};
             stat    = lmeCoefTbl.tStat(origCoefIdx);
             dfOut   = {mat2str(round(lmeCoefTbl.DF(origCoefIdx)))};
             pVal    = lmeCoefTbl.pValue(origCoefIdx);
@@ -472,7 +473,7 @@ lmeStats.HVec = formattedHVecs;
 
 %**************************************************************************
 % Round numeric columns
-clmnRnd2 = {'Estimate', 'SE', 'Statistic', 'CI95'};
+clmnRnd2 = {'Estimate', 'SE', 'Statistic'};
 clmnRnd4 = {'pVal'};
 for iCol = 1:length(clmnRnd2)
     col = clmnRnd2{iCol};
@@ -733,7 +734,21 @@ end % EOF
 % freedom as a string '[DF1, DF2]'. DF1 relates to the number of parameters
 % associated with the effect being tested, and DF2 relates to the residual
 % or error degrees of freedom. The default in this function is to estimate
-% DFs using Satterthwaite approximations.
+% DFs using Satterthwaite approximations. This is important for
+% hierarchical data, because observations within the same group (e.g.,
+% subject) are not independent, reducing the effective degrees of freedom.
+% The default method in `fitlme` often overestimates DFs by treating random
+% effects as if they were fixed effects, and calculating DFs as the number
+% of observations minus the number of parameters, leading to overly
+% optimistic p-values. Satterthwaite's method provides a more accurate
+% approximation by accounting for the hierarchical structure of the data,
+% the uncertainty in variance component estimates, and the actual
+% dependencies between observations. This is particularly important in
+% unbalanced designs or when the number of higher-level units (e.g.,
+% subjects) is small relative to the total number of observations. While
+% Satterthwaite's method may yield smaller DFs than the default method, it
+% provides more reliable statistical inference by better reflecting the
+% true uncertainty in the parameter estimates.
 
 %**************************************************************************
 % Model Fit Statistics 

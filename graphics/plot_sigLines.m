@@ -12,7 +12,7 @@ function plot_sigLines(axh, barIdx, barLbl, varargin)
 %     'LineColor'       (default 'k')
 %     'LineWidth'       (default 1)
 %     'lineOffset'      (default 0.06 of Y-axis range, from bar top to line)
-%     'txtOffset'       (default 0.01 of Y-axis range, from line to text)
+%     'txtOffset'       (default 0.005 of Y-axis range, from line to text)
 %     'fontSize'        (default get(axh, 'FontSize'))
 %     'lineGap'         (default 0.03 of Y-axis range, between stacked notations)
 
@@ -28,10 +28,10 @@ addRequired(p, 'barLbl', @iscell);
 
 addParameter(p, 'LineColor', 'k');
 addParameter(p, 'LineWidth', 1);
-addParameter(p, 'lineOffset', 0.06);
-addParameter(p, 'txtOffset', 0.005);
+addParameter(p, 'lineOffset', 0.1);
+addParameter(p, 'txtOffset', 0.00);
 addParameter(p, 'fontSize', get(axh, 'FontSize'));
-addParameter(p, 'lineGap', 0.03);
+addParameter(p, 'lineGap', 0.06);
 
 parse(p, axh, barIdx, barLbl, varargin{:});
 opts = p.Results;

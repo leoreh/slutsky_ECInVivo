@@ -39,7 +39,7 @@ szOnly          = p.Results.szOnly;
 % Define aspect ratios and default dimension
 tallRatio = 0.62; % width/height for tall shape
 wideRatio = 1.62; % width/height for wide shape
-defDim = 400;     % Default dimension for plot area calculation
+defDim = 300;     % Default dimension for plot area calculation
 
 % Initialize figure if not provided
 if isempty(hFig)
@@ -75,7 +75,7 @@ if ~szOnly
     box(hAx, 'OFF');
     hold(hAx, 'on');
 
-    % Set font and font size for the title, axis labels, and legend
+    % Set font and font size for the title, axis labels, colorbar and legend
     hTtl = get(hAx, 'Title');
     set(hTtl, 'FontName', FntName, 'FontSize', fntSize + 4);
 
@@ -86,6 +86,11 @@ if ~szOnly
 
     hLgnd = get(hAx, 'Legend');
     set(hLgnd, 'FontName', 'Arial', 'FontSize', fntSize);
+    
+    hCb = findobj(hFig, 'Type', 'Colorbar');
+    set(hCb, 'FontName', 'Arial', 'FontSize', fntSize);
+    hCbLbl = get(hCb, 'Label');
+    set(hCbLbl, 'FontName', 'Arial', 'FontSize', fntSize + 4);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -131,27 +136,43 @@ else
     end
 end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% ADJUST FIGURE SIZE
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Check for colorbar and get its width if it exists
+hCb = findobj(hFig, 'Type', 'Colorbar');
+cbWidth = 0;
+if ~isempty(hCb)
+    cbUnits = get(hCb, 'Units');
+    set(hCb, 'Units', 'pixels');
+    cbPos = get(hCb, 'Position');
+    
+    % Get colorbar label to account for its width
+    hCbLbl = get(hCb, 'Label');
+    if ~isempty(hCbLbl)
+        cbLblUnits = get(hCbLbl, 'Units');
+        set(hCbLbl, 'Units', 'pixels');
+        cbLblExtent = get(hCbLbl, 'Extent');
+        set(hCbLbl, 'Units', cbLblUnits);
+        % Add label width plus padding for the label
+        cbWidth = cbPos(3) + cbLblExtent(3) + 15; % Increased padding for label
+    else
+        cbWidth = cbPos(3) + 5; % Just add small padding if no label
+    end
+    set(hCb, 'Units', cbUnits);
+end
+axWidth = axWidth - cbWidth;
 
 % Set axes Position to the target plot area dimensions.
 % The x,y coordinates [1, 1] are temporary and assume the current figure is large enough
-% not to clip content that affects TightInset. TightInset calculation depends primarily
-% on the Width and Height of the Position property, not its absolute X,Y location,
-% provided content isn't clipped.
+% not to clip content that affects TightInset.
 set(hAx, 'Position', [1, 1, axWidth, axHeight]);
 
 % Force MATLAB to render/update the layout based on current properties.
-% This is crucial for an accurate TightInset calculation.
 drawnow; 
 
 % Get TightInset: [left, bottom, right, top] margins in pixels
-% These margins represent the space needed around the plotArea for labels, titles, etc.
 ti = get(hAx, 'TightInset'); 
 
 % Calculate figure dimensions needed to encompass the plot area and its decorations
-figWidth = axWidth + ti(1) + ti(3);
+figWidth = axWidth + ti(1) + ti(3) + cbWidth + 15; % Add colorbar width to total figure width
 figHeight = axHeight + ti(2) + ti(4);
 
 % Set figure size. Preserve original screen position (left, bottom) of the figure.
@@ -163,10 +184,18 @@ set(hFig, 'Position', [figPos(1), figPos(2), figWidth, figHeight]);
 % Force MATLAB to render/update the figure with its new size.
 drawnow; 
 
-% Position the axes within the now-resized figure.
-% The axes plot area (Position) should start at ti(1) from the figure's client area left edge,
-% and ti(2) from the figure's client area bottom edge.
+% Position the axes within the now-resized figure
 set(hAx, 'Position', [ti(1), ti(2), axWidth, axHeight]);
+
+% If colorbar exists, position it relative to the axis
+if ~isempty(hCb)
+    set(hCb, 'Units', 'pixels');
+    % Position colorbar to the right of the axis with minimal gap
+    % Use the axis position as reference
+    axPos = get(hAx, 'Position');
+    set(hCb, 'Position', [axPos(1) + axPos(3) + 5, axPos(2), cbPos(3), axPos(4)]);
+    set(hCb, 'Units', cbUnits);
+end
 
 % Restore original units for figure and axes
 set(hFig, 'Units', fhUnits);

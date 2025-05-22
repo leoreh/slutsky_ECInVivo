@@ -70,12 +70,40 @@ for ifrmt = 1 : nfrmts
             print(fh, saveName, '-dsvg', '-r300'); 
         case 'xlsx'
             xlsName = [saveName '.xlsx'];
-
+            
             % Save lmeData to Sheet 1
             writetable(lmeData, xlsName, 'Sheet', 'LME_Data');
             
             % Save lmeStats to Sheet 2
-            writetable(lmeStats, xlsName, 'Sheet', 'LME_Stats'); 
+            writetable(lmeStats, xlsName, 'Sheet', 'LME_Stats');
+            
+            % Get additional tables from the model if lmeCfg is provided
+            if ~isempty(lmeCfg) 
+                % Get LME tables from the model
+                lmeTbl = lme_mdl2tbl(lmeCfg.lmeMdl);
+                
+                % Get field names of lmeTbl
+                tblFlds = fieldnames(lmeTbl);
+                
+                % Start after lmeStats (add 2 rows for gap)
+                currentRow = height(lmeStats) + 4;
+                
+                % Loop through each table and write to Excel
+                for iFld = 1:length(tblFlds)
+                    % Get current table
+                    currTbl = lmeTbl.(tblFlds{iFld});
+                    
+                    % Write table name as header
+                    writematrix(tblFlds{iFld}, xlsName, 'Sheet', 'LME_Stats', 'Range', ['A' num2str(currentRow)]);
+                    currentRow = currentRow + 1;
+                    
+                    % Write table data
+                    writetable(currTbl, xlsName, 'Sheet', 'LME_Stats', 'Range', ['A' num2str(currentRow)]);
+                    
+                    % Update row counter (add table height + 2 for gap)
+                    currentRow = currentRow + height(currTbl) + 3;
+                end
+            end
 
         case 'mat'
             matName = [saveName '.mat'];

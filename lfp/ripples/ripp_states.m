@@ -28,7 +28,7 @@ function ripp = ripp_states(ripp, varargin)
 %                       Must include fields: 
 %                         ripp.peakTime: [N x 1] ripple peak times.
 %                         ripp.times: [N x 2] ripple start/end times.
-%                         ripp.dur: [N x 1] ripple durations in seconds.
+%                         ripp.dur: [N x 1] ripple durations in ms.
 %                         ripp.info.fs: LFP sampling frequency.
 %                         ripp.info.recWin: [1 x 2] recording window used.
 %                         ripp.info.binsizeRate: Binsize for rate calc [s].
@@ -161,7 +161,7 @@ for iState = 1:nStates
             boutRipples = InIntervals(peakTime, stateBouts(iBout,:));
             
             % Sum durations of ripples in this bout
-            boutDensity(iBout) = sum(ripp.dur(boutRipples)) / (stateBouts(iBout,2) - stateBouts(iBout,1)) * 100;
+            boutDensity(iBout) = sum(ripp.dur(boutRipples)) / (stateBouts(iBout,2) - stateBouts(iBout,1)) * 100 / 1000;
         end
         
         % Store density results
