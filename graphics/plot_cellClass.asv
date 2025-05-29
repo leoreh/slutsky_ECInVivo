@@ -1,0 +1,144 @@
+function plot_cellClass(varargin)
+
+% Plots cell classification based on waveform and scatter metrics.
+% Can generate either waveform plots or scatter plots of cell separation.
+%
+% Assumes all inputs are correct and valid when used in the body of the function.
+% Supports both raw and processed waveform data.
+%
+% Optional b2uv scaling can be applied to waveforms regardless of flgRaw.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% arguments using inputParser
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+p = inputParser;
+addOptional(p, 'basepaths', @(x) iscell(x));
+addOptional(p, 'flgRaw', true, @islogical);
+addOptional(p, 'plotType', 'wv', @(x) ismember(lower(x), {'wv', 'scatter'}));
+addOptional(p, 'clr', [], @(x) isnumeric(x) && (isempty(x) || size(x, 2) == 3));
+addOptional(p, 'b2uv', [], @(x) isnumeric(x) && (isempty(x) || isscalar(x)));
+
+parse(p, varargin{:});
+basepaths = p.Results.basepaths;
+flgRaw = p.Results.flgRaw;
+plotType = lower(p.Results.plotType);
+clr = p.Results.clr;
+b2uv = p.Results.b2uv;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% preparations
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% load state vars
+vars = {'swv_metrics', 'st_metrics', 'units', 'swv_raw'};
+v = basepaths2vars('basepaths', basepaths, 'vars', vars);
+
+% concatenate units
+units = catfields([v.units], 2);
+nUnits = length(units.clean);
+
+% Default colors if not provided
+if isempty(clr)
+    clr(1, :) = [10 / 255 10 / 255 80 / 255];       % pPYR
+    clr(2, :) = [180 / 255 80 / 255 80 / 255];      % pPV
+end
+txtUnit = {'pPYR', 'pPV'};
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% plot based on type
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+switch plotType
+    case 'wv'
+        % Get waveforms
+        nfiles = length(v);
+        swv = cell(nfiles, 1);
+        
+        if flgRaw
+            % grab raw waveforms
+            swv = [v(:).swv_raw];
+            swv = cellfun(@(x) mean(x, 2, 'omitnan'), swv, 'uni', false);
+
+        else
+            % Process each file separately
+            for ifile = 1 : nfiles        % convert processed waveforms to cell
+                swv{ifile} = v(ifile).swv.wv;
+            end
+        end
+        
+        % store waveform length and interpolate all to 32 samples
+        wvLen = cellfun(@length, swv, 'uni', true);
+        wvOE = wvLen == 32;
+
+        % Interpolate all waveforms to 32 samples
+        swv = cellfun(@(x) interp1(linspace(0, 1, length(x)), x, linspace(0, 1, 32)', 'spline'),...
+            swv, 'UniformOutput', false);
+        
+        % concate
+        wv = cell2padmat(swv, 2)';
+        
+        % apply b2uv scaling if provided
+        if ~isempty(b2uv)
+            wv = wv * b2uv;
+        elseif flgRaw
+            % default scaling only for raw waveforms
+            wv(wvOE, :) = wv(wvOE, :) * 0.195;
+        end
+
+        % Create figure
+        [hFig, hAx] = plot_axSize('szOnly', false);
+
+        % waveform params
+        xVal = [-15 : 16] / 20000 * 1000;
+
+        % Plot waveforms
+        for iUnit = 1 : 2
+            % grab average per unit
+            wvUnit = wv(units.clean(iUnit, :), :);
+
+            % plot with std shade
+            hPlt(iUnit) = plot_stdShade('dataMat', wvUnit, 'xVal', xVal, ...
+                'axh', hAx, 'clr', clr(iUnit, :), 'alpha', 0.5);
+        end
+        
+        % Format axes
+        xlim([xVal(1), xVal(end)])
+        xlabel('Time (ms)')
+        ylabel('Amplitude (µV)')
+        legend(hAx, txtUnit, 'Location', 'southeast')
+
+        % Assert Size
+        plot_axSize('hFig', hFig, 'szOnly', false, 'axShape', 'square');
+
+    case 'scatter'
+        % Get metrics
+        swv = catfields([v.swv], 2);
+        tp = swv.tp;
+        st = catfields([v.st], 2);
+        stField = 'lidor';
+
+        % Create figure
+        [hFig, hAx] = plot_axSize('szOnly', false);
+
+        % Plot scatter
+        for iUnit = 1 : 2
+            scatter(tp(units.clean(iUnit, :)), st.(stField)(units.clean(iUnit, :)), 30,...
+                clr(iUnit, :), 'filled', 'MarkerFaceAlpha', 0.5)
+        end
+
+        % Format axes
+        xlim([0, max(tp)])
+        xlabel('Trough-to-Peak (ms)')
+        ylabel('Burstiness Index (a.u.)')
+        legend(hAx, txtUnit, 'Location', 'northwest')
+
+        % Assert Size
+        plot_axSize('hFig', hFig, 'szOnly', false, 'axShape', 'square');
+end
+
+end
+
+% EOF
+
+
+

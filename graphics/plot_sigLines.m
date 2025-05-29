@@ -29,7 +29,7 @@ addRequired(p, 'barLbl', @iscell);
 addParameter(p, 'LineColor', 'k');
 addParameter(p, 'LineWidth', 1);
 addParameter(p, 'lineOffset', 0.1);
-addParameter(p, 'txtOffset', 0.00);
+addParameter(p, 'txtOffset', -0.01);
 addParameter(p, 'fontSize', get(axh, 'FontSize'));
 addParameter(p, 'lineGap', 0.06);
 
@@ -165,8 +165,8 @@ for iBar = 1:length(barIdx)
 
     % Update maxYOverall and activeLevels for stacking
     drawnow; % Ensure text extent is calculated
-    txxtExtent = get(th, 'Extent');
-    yTop = txxtExtent(2) + txxtExtent(4); % yPos + yHeight
+    txtExtent = get(th, 'Extent');
+    yTop = txtExtent(2) + txtExtent(4); % yPos + yHeight
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

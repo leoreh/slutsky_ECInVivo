@@ -152,6 +152,27 @@ elseif contains(queryStr, 'lh')
         'varsName', ["session"], 'pcond', ["tempflag"], 'ncond', [""],...
         'xlsname', xlsname);
 
+elseif strcmp(queryStr, 'all')
+    % load data for each group
+    grps = {'wt', 'mcu'};
+    basepaths = [];
+    for iGrp = 1 : length(grps)
+        mNames = mcu_sessions(grps{iGrp});
+        mPaths = strings(length(mNames), length(mcu_sessions(mNames{1}))); % preallocate
+        for imouse = 1 : length(mNames)
+            tmpPaths = mcu_sessions(mNames{imouse});
+            mPaths(imouse, :) = string(tmpPaths)';
+        end
+        basepaths = [basepaths; mPaths(:)];
+    end
+
+    % add baseline sessions
+    grps = {'wt_bsl', 'mcu_bsl', 'wt_bsl_ripp'};
+    for iGrp = 1 : length(grps)
+        basepaths = [basepaths; string(mcu_sessions(grps{iGrp}))'];
+    end
+    basepaths = unique(basepaths);
+
 elseif strcmp(queryStr, 'prePost')
 
     basepaths{1} = {...
@@ -201,33 +222,20 @@ elseif strcmp(queryStr, 'prePost')
 
 end
 
-if ~isempty(vars)
-
-    varsName = vars;
-    varIdx = find(strcmp(vars, 'sleep_states'));
-    if ~isempty(varIdx)
-        varsName(varIdx) = "ss";
+% Replace E:\\ with D:\\ in basepaths
+if iscell(basepaths)
+    for iPath = 1:numel(basepaths)
+        if iscell(basepaths{iPath}) % Handles cases like 'prePost'
+            for j = 1:numel(basepaths{iPath})
+                if ischar(basepaths{iPath}{j})
+                    basepaths{iPath}{j} = strrep(basepaths{iPath}{j}, 'E:\', 'D:\');
+                end
+            end
+        elseif ischar(basepaths{iPath}) % Handles other cases
+            basepaths{iPath} = strrep(basepaths{iPath}, 'E:\', 'D:\');
+        end
     end
-    varIdx = find(strcmp(vars, 'sleep_statesEmg'));
-    if ~isempty(varIdx)
-        varsName(varIdx) = "ssEmg";
-    end
-    varIdx = find(strcmp(vars, 'psdEmg'));
-    if ~isempty(varIdx)
-        varsName(varIdx) = "psd";
-    end
-    varIdx = find(strcmp(vars, 'frEmg'));
-    if ~isempty(varIdx)
-        varsName(varIdx) = "fr";
-    end
-    varIdx = find(strcmp(vars, 'swv_metrics'));
-    if ~isempty(varIdx)
-        varsName(varIdx) = "swv";
-    end
-
-
-    [v, basepaths] = getSessionVars('basepaths', basepaths, 'varsFile', vars,...
-        'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""]);
 end
+
 
 end

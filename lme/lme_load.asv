@@ -215,6 +215,22 @@ end
 function bDurData = org_bDur(v)
 % Organizes bout length data: [mouse x day x 1 x state x bout]
 
+% psd = catfields([v(:).psd], 'addim', true, [], true);
+% nmice = length(v);
+% bDurTmp = cell(nmice, 1);
+% for imouse = 1:nmice
+%
+%     for istate = 1 : 2
+%         btimes = psd.bouts.times{:, istate, imouse};
+%         bb{istate} = btimes(:, 2) - btimes(:, 1);
+%     end
+%
+%     bDurTmp{imouse} = cell2padmat(bb, 2);
+% end
+% tmp = cell2padmat(bDurTmp, 3);
+% bDurData = permute(tmp, [3, 4, 5, 2, 1]); % [mouse x day x unit x state x bout]
+% size(bDurData)
+
 ss = catfields([v(:).ssEmg], 'addim', true, [], true);
 nmice = length(v);
 bDurTmp = cell(nmice, 1);
@@ -225,7 +241,25 @@ tmp = cell2padmat(bDurTmp, 3);
 bDurData = permute(tmp, [3, 4, 5, 2, 1]); % [mouse x day x unit x state x bout]
 size(bDurData)
 
-
+% nmice = length(v);
+% bDurTmp = cell(nmice, 1);
+% for imouse = 1:nmice
+%     bDurTmp{imouse} = cell2padmat(boutDur(:, imouse), 1);
+% end
+%
+%
+% fr = catfields([v(:).fr], 'addim', true);
+% binedges = squeeze(fr.states.binedges);
+% boutDur = cellfun(@(x) cellfun(@(y) diff(y), x, 'uni', true), binedges, 'uni', false);
+%
+% nmice = length(v);
+% bDurTmp = cell(nmice, 1);
+% for imouse = 1:nmice
+%     bDurTmp{imouse} = cell2padmat(boutDur(:, imouse), 1);
+% end
+%
+% padded_data = cell2padmat(bDurTmp, 3); % [bout x state x mouse]
+% bDurData = permute(padded_data, [3, 4, 5, 1, 2]); % [mouse x day x unit x state x bout]
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

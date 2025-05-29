@@ -72,8 +72,8 @@ for iGrp = 1:height(uniqueGroups)
 
     % Find rows matching the current unique group combination
     idxGroup = true(height(normData), 1);
-    for j = 1:length(groupVars)
-        idxGroup = idxGroup & (normData.(groupVars{j}) == uRow.(groupVars{j}));
+    for iVar = 1:length(groupVars)
+        idxGroup = idxGroup & (normData.(groupVars{iVar}) == uRow.(groupVars{iVar}));
     end
 
     % Find rows within this group that match the reference category of normVar
@@ -90,16 +90,21 @@ for iGrp = 1:height(uniqueGroups)
         end
     end
 
-    % Normalize the data for the current group (all normVar categories
-    % within the group)
-    normVec(idxGroup) = normData.(yName)(idxGroup) / abs(refMean);
+    % Calculate percentage difference from reference
+    diff = (normData.(yName)(idxGroup) - refMean) / abs(refMean);
+    normVec(idxGroup) = 100 - abs(diff) * 100;
+    
+    % For values above reference, we want them to be >100%
+    % For values below reference, we want them to be <100%
+    aboveRef = normData.(yName)(idxGroup) > refMean;
+    normVec(idxGroup) = 100 + (aboveRef .* abs(diff) - ~aboveRef .* abs(diff)) * 100;
 
-    % Set the reference group to exactly 1 (so after scaling it's 100%)
-    normVec(idxRefGroup) = 1;
+    % Set the reference group to exactly 100%
+    normVec(idxRefGroup) = 100;
 end
 
 % Replace the original response variable column with the normalized data
-normData.(yName) = normVec * 100;
+normData.(yName) = normVec;
 
 % Optional: Rename the column to indicate normalization
 % normData.Properties.VariableNames{yName} = [yName ' (Norm.)'];

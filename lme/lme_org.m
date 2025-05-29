@@ -9,7 +9,7 @@ function [lmeData, lmeCfg] = lme_org(varargin)
 %   grppaths    (Required) Cell (per group) of string arrays [mouse x session].
 %   frml        (Required) Formula for LME analysis. Determines how the table is organized.
 %   flgEmg      (Optional) Logical. Load vars as states (false) or EMG states (true).
-%   varField    (Optional) Sub-field specifier for the variable.
+%   varFld    (Optional) Sub-field specifier for the variable.
 %   vCell       (Optional) Pre-loaded data as cell array of structs.
 %
 % OUTPUT:
@@ -34,7 +34,7 @@ p = inputParser;
 addOptional(p, 'grppaths', @iscell);
 addOptional(p, 'frml', @(x) ischar(x) || isstring(x));
 addOptional(p, 'flgEmg', false, @islogical);
-addOptional(p, 'varField', '');
+addOptional(p, 'varFld', '');
 addOptional(p, 'vCell', {}, @iscell);
 parse(p, varargin{:});
 
@@ -42,7 +42,7 @@ parse(p, varargin{:});
 grppaths = p.Results.grppaths;
 frml = p.Results.frml;
 flgEmg = p.Results.flgEmg;
-varField = p.Results.varField;
+varFld = p.Results.varFld;
 vCell = p.Results.vCell;
 
 % Ensure frml is a char
@@ -53,7 +53,7 @@ end
 % Set labels according to specific experiment and formula
 ngrps = length(grppaths);
 [strGrp, strDay, strState] = org_strLbls(grppaths, frml, flgEmg);
-strUnit = {'pPYR', 'pPV', 'Other'};
+strUnit = {'pPYR', 'pINT', 'Other'};
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % DETERMINE VARIABLES NEEDED BASED ON FORMULA
@@ -77,18 +77,29 @@ if contains(frml, 'FR ~')
     yName = 'FR';
     
     if contains(frml, 'State')
-        varField = 'states';
+        varFld = 'states';
     end
 
-elseif contains(frml, 'Burst ~')
-    varName = 'st_metrics';
-    varName = 'st_brst';
+elseif contains(frml, 'Burst ~')    
     flgUnits = true;
-    if isempty(varField)
-        varField = 'lidor';
+    if isempty(varFld)
+        varFld = 'lidor';
+    end  
+    if contains(varFld, {'royer', 'lidor', 'lvr', 'royer2'})
+        varName = 'st_metrics';
+    else
+        varName = 'st_brst';
     end
     yName = 'Burst';
     
+elseif contains(frml, 'SWV ~')
+    varName = 'swv_metrics';
+    flgUnits = true;
+    if isempty(varFld)
+        varFld = 'tp';
+    end
+    yName = 'SWV';
+
 elseif contains(frml, 'BDur ~') 
     if flgEmg
         varName = 'frEmg';
@@ -98,7 +109,7 @@ elseif contains(frml, 'BDur ~')
         varName = 'fr';
     end
     yName = 'BDur';
-    varField = 'bDur';
+    varFld = 'bDur';
     flgBDur = true;
 
 elseif contains(frml, 'Band ~')
@@ -108,8 +119,8 @@ elseif contains(frml, 'Band ~')
         varName = 'psd';
     end
     yName = 'Band';
-    if isempty(varField)
-        varField = 1;
+    if isempty(varFld)
+        varFld = 1;
     end
     
 elseif contains(frml, 'FOOOF ~')    
@@ -121,37 +132,37 @@ elseif contains(frml, 'FOOOF ~')
         varName = 'psd_1of';
     end
     yName = 'FOOOF';
-    if isempty(varField)
-        varField = 'bands';
+    if isempty(varFld)
+        varFld = 'bands';
     end
     
 elseif contains(frml, 'RippSpks ~')
     varName = 'ripp';
     flgUnits = true;
     yName = 'RippSpks';
-    if isempty(varField)
-        varField = 'frGain';
+    if isempty(varFld)
+        varFld = 'frGain';
     end
 
 elseif contains(frml, 'RippSpkLfp ~')
     varName = 'ripp';
     flgUnits = true;
     yName = 'RippSpkLfp';
-    if isempty(varField)
-        varField = 'theta';
+    if isempty(varFld)
+        varFld = 'theta';
     end
 
 elseif contains(frml, 'Ripp ~')
     varName = 'ripp';
     yName = 'Ripp';
-    if isempty(varField)
-        varField = 'peakAmp';
+    if isempty(varFld)
+        varFld = 'peakAmp';
     end
 end
 
 % Check if we need bout length as an additional variable
 if contains(frml, 'BoutDur')
-    varField = 'bouts';
+    varFld = 'bouts';
     flgBDur = true;
 end
 
@@ -161,7 +172,7 @@ end
 
 % Load main variable data
 dataCell = lme_load('grppaths', grppaths, 'varName', varName,...
-    'varField', varField, 'vCell', vCell);
+    'varFld', varFld, 'vCell', vCell);
 
 % Load units data if needed
 if flgUnits
@@ -170,7 +181,7 @@ end
 
 % Load bout duration data if needed, in addition to the response data
 if flgBDur
-    bDurCell = lme_load('grppaths', grppaths, 'varName', varName, 'varField', 'bDur', 'vCell', vCell);   
+    bDurCell = lme_load('grppaths', grppaths, 'varName', varName, 'varFld', 'bDur', 'vCell', vCell);   
 end
 
 % Get mouse names for labeling
@@ -301,6 +312,7 @@ end
 idxRemove = isnan(lmeData.(yName)) | isinf(lmeData.(yName));
 
 % Find rows with 'Other' as unit type
+% lmeData.UnitType(lmeData.UnitType == 'Other') = 'pPYR';
 idxRemove = idxRemove | lmeData.UnitType == 'Other';
 
 % Remove these rows from the table and print warning
@@ -348,7 +360,7 @@ end
 lmeCfg.grps = grppaths;
 lmeCfg.frml = frml;
 lmeCfg.flgEmg = flgEmg;
-lmeCfg.varField = varField;
+lmeCfg.varFld = varFld;
 lmeCfg.nRemoved = nRemoved;  
 
 end % end function lme_org

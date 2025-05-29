@@ -118,11 +118,11 @@ txtY = {'Peak Frequency (Hz)', 'Peak Amplitude (µV)', 'Duration (ms)', 'Rate (S
 nFlds = length(varFields);
 
 for iFld = 1 : nFlds
-    varFld = varFields{iFld};
+    varField = varFields{iFld};
     
     % organize for lme
     [lmeData, lmeCfg] = lme_org('grppaths', grppaths, 'frml', frml,...
-        'flgEmg', false, 'varFld', varFld, 'vCell', vCell);
+        'flgEmg', false, 'varField', varField, 'vCell', vCell);
 
     % run lme
     contrasts = 'all';
@@ -152,11 +152,11 @@ end
 
 % FR increase during ripples
 frml = 'RippSpks ~ Group * UnitType + (1|Mouse)';
-varFld = 'normRates';
+varField = 'normRates';
 
 % organize for lme
 [lmeData, lmeCfg] = lme_org('grppaths', grppaths, 'frml', frml,...
-    'flgEmg', false, 'varFld', varFld, 'vCell', vCell);
+    'flgEmg', false, 'varField', varField, 'vCell', vCell);
 
 % run lme
 contrasts = 'all';
@@ -180,7 +180,7 @@ plot_sigLines(hAx, barIdx, barLbl)
 plot_axSize('hFig', hFig, 'szOnly', false, 'axShape', 'square', 'axHeight', 300)
 
 % save
-fname = lme_frml2char(frml, 'rmRnd', true, 'resNew', 'Ripp', 'sfx', ['_', varFld]);
+fname = lme_frml2char(frml, 'rmRnd', true, 'resNew', 'Ripp', 'sfx', ['_', varField]);
 lme_save('fh', hFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
     'lmeData', lmeData, 'lmeStats', lmeStats, 'lmeCfg', lmeCfg)
 
@@ -193,16 +193,9 @@ lme_save('fh', hFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
 frml = 'RippSpkLfp ~ Group * UnitType + (1|Mouse)';
 
 % organize lme table for plotting
-varFld = 'mrl';
+varField = 'mrl';
 [lmeData, lmeCfg] = lme_org('grppaths', grppaths, 'frml', frml,...
-    'flgEmg', false, 'varFld', varFld, 'vCell', vCell);
-
-% grab only significantly coupled units
-% varFld = 'mrl';
-% [sigData, ~] = lme_org('grppaths', grppaths, 'frml', frml,...
-%     'flgEmg', false, 'varFld', 'pVal', 'vCell', vCell);
-% sigIdx = sigData.RippSpkLfp < 0.05;
-% lmeData = lmeData(sigIdx, :);
+    'flgEmg', false, 'varField', varField, 'vCell', vCell);
 
 % run lme
 contrasts = 'all';
@@ -226,7 +219,7 @@ plot_sigLines(hAx, barIdx, barLbl)
 plot_axSize('hFig', hFig, 'szOnly', true, 'axShape', 'square');
 
 % Save
-fname = lme_frml2char(frml, 'rmRnd', true, 'resNew', 'Ripp', 'sfx', ['_', varFld]);
+fname = lme_frml2char(frml, 'rmRnd', true, 'resNew', 'Ripp', 'sfx', ['_', varField]);
 lme_save('fh', hFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
     'lmeData', lmeData, 'lmeStats', lmeStats, 'lmeCfg', lmeCfg)
 
@@ -443,10 +436,10 @@ frml = 'RippSpks ~ Group * UnitType + (1|Mouse)';
 
 % organize lme table for plotting
 [lmeData, ~] = lme_org('grppaths', grppaths, 'frml', frml,...
-    'flgEmg', false, 'varFld', 'rippRates', 'vCell', vCell);
+    'flgEmg', false, 'varField', 'rippRates', 'vCell', vCell);
 rippFr = lmeData.RippSpks;
 [lmeData, ~] = lme_org('grppaths', grppaths, 'frml', frml,...
-    'flgEmg', false, 'varFld', 'ctrlRates', 'vCell', vCell);
+    'flgEmg', false, 'varField', 'ctrlRates', 'vCell', vCell);
 lmeData = addvars(lmeData, rippFr, 'After', 'UnitID'); 
 lmeData.Properties.VariableNames{'RippSpks'} = 'randFr';
 lmeData = movevars(lmeData, 'rippFr', 'Before', 'randFr');
@@ -508,13 +501,13 @@ frml = 'RippSpkLfp ~ Group * UnitType + (1|Mouse)';
 
 % organize lme table for plotting
 [lmeData, ~] = lme_org('grppaths', grppaths, 'frml', frml,...
-    'flgEmg', false, 'varFld', 'mrl', 'vCell', vCell);
+    'flgEmg', false, 'varField', 'mrl', 'vCell', vCell);
 MRL = lmeData.RippSpkLfp;
 [lmeData, ~] = lme_org('grppaths', grppaths, 'frml', frml,...
-    'flgEmg', false, 'varFld', 'pVal', 'vCell', vCell);
+    'flgEmg', false, 'varField', 'pVal', 'vCell', vCell);
 pVal = lmeData.RippSpkLfp;
 [lmeData, ~] = lme_org('grppaths', grppaths, 'frml', frml,...
-    'flgEmg', false, 'varFld', 'theta', 'vCell', vCell);
+    'flgEmg', false, 'varField', 'theta', 'vCell', vCell);
 lmeData.Properties.VariableNames{'RippSpkLfp'} = 'Theta';
 lmeData = addvars(lmeData, MRL, 'After', 'Theta'); 
 lmeData = addvars(lmeData, pVal, 'After', 'MRL'); 
@@ -591,7 +584,7 @@ for iGrp = 1 : 2
         % get unit indices
         frml = 'RippSpkLfp ~ Group * UnitType + (1|Mouse)';
         [lmeData, lmeCfg] = lme_org('grppaths', grppaths, 'frml', frml,...
-            'flgEmg', false, 'varFld', 'pVal', 'vCell', vCell);
+            'flgEmg', false, 'varField', 'pVal', 'vCell', vCell);
         idxGrp = lmeData.Group == categorical(txtGrp(iGrp));
         grpTbl = lmeData(idxGrp, :);
         idxUnit = grpTbl.UnitType == categorical(txtUnit(iUnit));
@@ -600,7 +593,7 @@ for iGrp = 1 : 2
         
         % store number of significant units
         nSgn(iGrp, iUnit) = sum(idxUnit & idxSgn);
-        prctSgn(iGrp, iUnit) = sum(idxUnit & idxSgn) / sum(idxUnit) * 100;
+        prctSgn(iGrp, iUnit) = sum(idxUnit & idxSgn) / length(idxSgn) * 100;
 
         % Plot Mean Power-Phase Rate Map (averaged across cells).
         % This 2D heatmap shows the average firing rate of neurons as a function of

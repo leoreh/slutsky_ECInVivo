@@ -12,6 +12,7 @@ grps = [mcu_sessions('wt'), mcu_sessions('mcu')];
 
 % go over baseline for wt vs. mcu. during experiment, only psdEmg should be
 grps = {'mcu_bsl'; 'wt_bsl'};
+grps = {'wt_bsl_ripp'};
 
 % vars
 if flgEmg
@@ -27,16 +28,16 @@ for igrp = 1 : length(grps)
 
     % get group basepaths
     queryStr = grps{igrp};
-    basepaths = mcu_sessions(queryStr);
-    nfiles = length(basepaths);
+    grppaths = mcu_sessions(queryStr);
+    nfiles = length(grppaths);
     
     % load state vars
-    v = basepaths2vars('basepaths', basepaths, 'vars', vars);
+    v = basepaths2vars('basepaths', grppaths, 'vars', vars);
 
     for ifile = 1 : nfiles
 
         % files
-        basepath = basepaths{ifile};
+        basepath = grppaths{ifile};
         [~, basename] = fileparts(basepath);
         cd(basepath)
         
@@ -45,8 +46,7 @@ for igrp = 1 : length(grps)
         if isfield(v(ifile), 'psd') && isfield(v(ifile).psd, 'bouts') && isfield(v(ifile).psd.bouts, 'times')
             btimes = v(ifile).psd.bouts.times;
         else
-            warning('Bout times not found for %s. Skipping FR calculation.', basename);
-            continue; % Skip to next file if bout times are missing
+            btimes = [];
         end
 
         % get mfr per bout
@@ -58,8 +58,11 @@ for igrp = 1 : length(grps)
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% analysis during baseline
+% BASELINE
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% -------------------------------------------------------------------------
+% Organize files
 grps = {'wt_bsl'; 'mcu_bsl'};
 
 clear grppaths
@@ -67,85 +70,250 @@ for igrp = 1 : length(grps)
     grppaths{igrp} = string(mcu_sessions(grps{igrp})');
 end
 
+% -------------------------------------------------------------------------
 % FR per unit, WT vs MCU for RS vs FS 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 frml = 'FR ~ Group * UnitType + (1|Mouse)';
+varFld = '';
 
-% organize for lme
+% get data
 [lmeData, lmeCfg] = lme_org('grppaths', grppaths, 'frml', frml,...
-    'flgEmg', false, 'varField', '', 'vCell', {});
+    'flgEmg', false, 'varFld', varFld);
 
 % run lme
 contrasts = 'all';
-contrasts = [1 : 7]; 
+contrasts = [1 : 6]; 
 [lmeStats, lmeCfg] = lme_analyse(lmeData, lmeCfg, 'contrasts', contrasts);
 
 % plot
-fh = lme_plot(lmeData, lmeCfg.lmeMdl, 'ptype', 'bar'); % Use lmeMdl from lmeCfg
-axh = gca;
-ylabel(axh, 'Firing Rate (Hz)', 'FontSize', 20)
-xlabel(axh, '', 'FontSize', 20)
-axh.XAxis.FontSize = 20;
-title(axh, '')
+hFig = lme_plot(lmeData, lmeCfg.lmeMdl, 'ptype', 'bar', 'axShape', 'square'); 
+
+% Update labels
+hAx = gca;
+ylabel(hAx, 'Firing Rate (Hz)')
+xlabel(hAx, '')
+title(hAx, '')
+hAx.Legend.Location = 'northwest';
+
+% add significance lines
+barIdx = {[1, 2], [3, 4]};
+barLbl = {'NS', '****'};
+plot_sigLines(hAx, barIdx, barLbl, 'lineGap', 0.15)
+plot_axSize('hFig', hFig, 'szOnly', false, 'axShape', 'square', 'axHeight', 300)
 
 % save
-lme_save('fh', fh, 'fname', frml, 'frmt', {'svg', 'mat', 'xlsx'},...
+altClassify = 2;
+fname = lme_frml2char(frml, 'rmRnd', true,...
+    'sfx', ['_altClassify', num2str(altClassify)]);
+lme_save('fh', hFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
     'lmeData', lmeData, 'lmeStats', lmeStats, 'lmeCfg', lmeCfg)
 
 
+
+
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% BACLOFEN
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% -------------------------------------------------------------------------
+% load data for each group
+grps = {'wt', 'mcu'}; 
+idxRm = [];                         % remove bac on and off
+grppaths = cell(1,length(grps));       % Initialize
+for iGrp = 1 : length(grps)
+
+    mNames = mcu_sessions(grps{iGrp});  
+    mPaths = strings(length(mNames), length(mcu_sessions(mNames{1})) - length(idxRm)); % preallocate
+    for imouse = 1 : length(mNames)
+        tmpPaths = mcu_sessions(mNames{imouse});
+        tmpPaths(idxRm) = [];
+        mPaths(imouse, :) = string(tmpPaths)';
+    end
+    grppaths{iGrp} = mPaths;
+end
+
+% -------------------------------------------------------------------------
+% FR ~ Group * Day + (1|Mouse)
+frml = 'FR ~ Group * Day + (1|Mouse)'; 
+varFld = '';
+
+altClassify = 2;
+
+% get data
+[lmeData, lmeCfg] = lme_org('grppaths', grppaths, 'frml', frml,...
+    'flgEmg', false, 'varFld', varFld);
+
+% select unit
+unitType = 'pPYR';
+iUnit = categorical({unitType}); 
+plotTbl = lmeData(lmeData.UnitType == iUnit, :);
+
+% select state
+% stateType = 'High EMG';
+% iState = categorical({stateType}); 
+% plotTbl = plotTbl(plotTbl.State == iState, :);
+
+% normalize
+plotTbl = lme_normalize('lmeData', plotTbl, 'normVar', 'Day',...
+    'groupVars', {'Group', 'UnitType', 'State'});
+
+% run lme
+contrasts = 'all'; 
+contrasts =[1 : 19]; 
+
+frmlCompare1 = 'FR ~ Group * Day + (1|Mouse)';
+frmlCompare2 = 'FR ~ Group * Day + (Day|Mouse)';
+lmeCfg.frml = {frmlCompare1, frmlCompare2}; 
+% lmeCfg.frml = 'FR ~ Group * Day + (Day|Mouse)'; 
+[lmeStats, lmeCfg] = lme_analyse(plotTbl, lmeCfg, 'contrasts', contrasts);
+
+% add significance lines
+if strcmp(unitType, 'pPYR')
+    if altClassify == 2
+        barIdx = {[2, 4], [2, 8], [1, 3], [1, 7]};
+        barLbl = {'****', '****' '****', 'NS'};
+    else
+        barIdx = {[3, 4], [7, 8], [1.5, 3.5], [2, 8], [1, 7]};
+        barLbl = {'NS', '****', '****', '****', '*'};
+    end
+    lineOffset = 0.2;
+    lineGap = 0;
+else
+    if altClassify == 2
+        barIdx = {[2, 4], [2, 8], [1, 7]};
+        barLbl = {'NS', 'NS', '*'};
+    else
+        barIdx = {[2, 4], [2, 8], [1, 3], [1, 7]};
+        barLbl = {'**', '*', '***', 'NS'};
+    end
+    lineOffset = 0.3;
+    lineGap = -0.01;
+end
+
+% plot
+hFig = lme_plot(plotTbl, lmeCfg.lmeMdl, 'ptype', 'bar', 'axShape', 'wide');
+
+% Update labels
+hAx = gca; % Renamed
+ylabel(hAx, 'Firing Rate (% BSL)')
+xlabel(hAx, '')
+title(hAx, unitType)
+hAx.Legend.Location = 'northeast';
+
+% Assert Size
+plot_sigLines(hAx, barIdx, barLbl, 'lineGap', lineGap, 'lineOffset', lineOffset)
+plot_axSize('hFig', hFig, 'szOnly', false, 'axShape', 'wide', 'axHeight', 300);
+
+% save
+fname = lme_frml2char(lmeCfg.frmlMdl, 'rmRnd', true, 'resNew', '',...
+    'sfx', [' _', unitType, '_Norm', '_altClassify', num2str(altClassify)]);
+lme_save('fh', hFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
+    'lmeData', plotTbl, 'lmeStats', lmeStats, 'lmeCfg', lmeCfg)
+
+
+
+
+
+
+
+
+
+
+% -------------------------------------------------------------------------
+% FR ~ Group * UnitType * Day + (1|Mouse)
+frml = 'FR ~ Group * UnitType * Day + (1|Mouse)'; 
+varFld = '';
+
+altClassify = 3;
+
+% get data
+[lmeData, lmeCfg] = lme_org('grppaths', grppaths, 'frml', frml,...
+    'flgEmg', true, 'varFld', varFld);
+
+% normalize
+plotTbl = lme_normalize('lmeData', lmeData, 'normVar', 'Day',...
+    'groupVars', {'Group', 'UnitType', 'State'});
+
+% run lme
+contrasts = 'all'; 
+contrasts =[1 : 11, 16 : 19]; 
+
+frmlCompare1 = 'FR ~ Group * UnitType * Day + (1|Mouse)'; 
+frmlCompare2 = 'FR ~ Group * UnitType * Day + (Day|Mouse)'; 
+lmeCfg.frml = {frmlCompare1, frmlCompare2}; 
+% lmeCfg.frml = 'FR ~ Group * Day + (Day|Mouse)'; 
+[lmeStats, lmeCfg] = lme_analyse(plotTbl, lmeCfg, 'contrasts', contrasts);
+
+% add significance lines
+if strcmp(unitType, 'pPYR')
+    if altClassify == 2
+        barIdx = {[2, 4], [2, 8], [1, 3], [1, 7]};
+        barLbl = {'****', '****' '****', 'NS'};
+    else
+        barIdx = {[2, 4], [2, 8], [1, 3], [1, 7]};
+        barLbl = {'****', '****' '****', 'NS'};
+    end
+    lineOffset = 0.03;
+else
+    if altClassify == 2
+        barIdx = {[2, 4], [2, 8], [1, 7]};
+        barLbl = {'NS', 'NS', '*'};
+    else
+        barIdx = {[2, 4], [1, 7], [2, 8]};
+        barLbl = {'NS', '*', 'NS'};
+    end
+    lineOffset = 0.44;
+end
+
+% plot
+hFig = lme_plot(plotTbl, lmeCfg.lmeMdl, 'ptype', 'bar', 'axShape', 'wide');
+
+% Update labels
+hAx = gca; % Renamed
+ylabel(hAx, 'Firing Rate (% BSL)')
+xlabel(hAx, '')
+title(hAx, unitType)
+hAx.Legend.Location = 'northeast';
+
+% Assert Size
+plot_sigLines(hAx, barIdx, barLbl, 'lineGap', 0, 'lineOffset', lineOffset)
+plot_axSize('hFig', hFig, 'szOnly', false, 'axShape', 'wide', 'axHeight', 300);
+
+% save
+fname = lme_frml2char(lmeCfg.frmlMdl, 'rmRnd', true, 'resNew', '',...
+    'sfx', [' _', unitType, '_Norm', '_altClassify', num2str(altClassify)]);
+lme_save('fh', hFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
+    'lmeData', plotTbl, 'lmeStats', lmeStats, 'lmeCfg', lmeCfg)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% STATES
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % FR per unit, WT vs MCU across states
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 frml = 'FR ~ Group * State + (1|Mouse)'; % Renamed to avoid conflict
 
-% organize for lme
-[lmeData, lmeCfg] = lme_org('grppaths', grppaths, 'frml', frml,...
-    'flgEmg', false, 'varField', '', 'vCell', {});
-
-% run lme
-iUnit = categorical({'pPYR'});
-plotTbl = lmeData(lmeData.UnitType == iUnit, :);
-
-% run lme
-% contrasts = [1 : 4, 5, 6]; 
-contrasts = 'all';
-[lmeStats, lmeCfg] = lme_analyse(lmeData, lmeCfg, 'contrasts', contrasts);
-
-% plot
-fhStates = lme_plot(plotTbl, lmeCfgAnalysis.lmeMdl, 'ptype', 'bar'); % Use lmeMdl
-
-% save
-frmlSave = lme_frml2char([char(lmeCfgAnalysis.lmeMdl.Formula.char), ' _ ', char(iUnit)], 'rmRnd', true); % Use lmeMdl
-th = get(gcf, 'Children'); % This gets the tiled layout handle, not axes
-if isa(th, 'matlab.graphics.layout.TiledChartLayout') && ~isempty(th.Children)
-    axChildren = th.Children;
-    title(axChildren(1), frmlSave, 'interpreter', 'none') % title the first axes
-    if length(axChildren) > 2 && isa(axChildren(3),'matlab.graphics.axis.Axes') % Check if axChildren(3) is a valid axes
-         ylim(axChildren(3), [0 4])
-    end
-else
-    title(gca, frmlSave, 'interpreter', 'none'); % fallback to current axes
-end
-% grph_save('fh', fhStates, 'fname', frmlSave, 'frmt', {'fig', 'jpg'}) % Assuming grph_save is a custom function
-lme_save('fh', fhStates, 'fname', frmlSave, 'frmt', {'fig', 'jpg'});
-
-
-
-
 
 % FR per unit per bout, WT vs MCU across states 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 frmlBout = 'FR ~ Group * State + (1|BoutDur) + (1|Mouse) + (1|UnitID)';
-varFieldBout = 'bouts'; % Assuming varField should be 'bouts' for per-bout analysis
-
-% organize for lme
-[lmeDataBout, lmeCfgBout] = lme_org('grppaths', grppaths, 'frml', frmlBout,...
-    'flgEmg', false, 'varField', varFieldBout, 'vCell', {});
-
-
-
-
-
+varFieldBout = 'bouts'; % Assuming varFld should be 'bouts' for per-bout analysis
 
 % investigate relation BL and FR
 if exist('frTblBout', 'var') && ~isempty(frTblBout)
@@ -162,258 +330,3 @@ else
 end
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% analysis during baclofen
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% load data for each group
-grps = {'wt', 'mcu'}; 
-idxRm = [2, 6];                         % remove bac on and off
-grappaths = cell(1,length(grps));       % Initialize
-for igrpBac = 1 : length(grps)
-
-    mNames = mcu_sessions(grps{igrpBac});  
-    mPaths = strings(length(mNames), length(mcu_sessions(mNames{1})) - length(idxRm)); % preallocate
-    for imouse = 1 : length(mNames)
-        basepaths = mcu_sessions(mNames{imouse});
-        basepaths(idxRm) = [];
-        mPaths(imouse, :) = string(basepaths)';
-    end
-    grppaths{igrpBac} = mPaths;
-end
-
-% FR ~ Group * Day + (1|Mouse)
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% FR increase during ripples
-frml = 'FR ~ Group * Day + (1|Mouse)'; 
-
-% organize for lme
-[lmeData, lmeCfg] = lme_org('grppaths', grppaths, 'frml', frml,...
-    'flgEmg', true, 'varField', '', 'vCell', {});
-
-% select unit
-unitType = 'pPV';
-iUnit = categorical({unitType}); 
-plotTbl = lmeData(lmeData.UnitType == iUnit, :);
-
-% normalize
-plotTbl = lme_normalize('lmeData', plotTbl, 'normVar', 'Day',...
-    'groupVars', {'Group', 'State'});
-
-% run lme
-contrastsBac = 'all'; 
-contrastsBac =[1 : 19]; 
-
-frmlCompare1 = 'FR ~ Group * Day + (1|Mouse)';
-frmlCompare2 = 'FR ~ Group * Day + (Day|Mouse)';
-lmeCfg.frml = {frmlCompare1, frmlCompare2}; 
-
-[lmeStats, lmeCfg] = lme_analyse(plotTbl, lmeCfg, 'contrasts', contrastsBac);
-
-% plot
-% Use the model selected by lme_analyse (which is in lmeCfgBac.lmeMdl)
-hndFig = lme_plot(plotTbl, lmeCfg.lmeMdl, 'ptype', 'bar', 'figShape', 'wide');
-
-% Update labels
-axh = gca; % Renamed
-ylabel(axh, 'Firing Rate (% BSL)', 'FontSize', 20)
-xlabel(axh, '', 'FontSize', 16)
-axh.XAxis.FontSize = 20;
-title(axh, unitType)
-axh.Legend.Location = 'northwest';
-
-fname = lme_frml2char(lmeCfg.frmlMdl, 'rmRnd', true, 'resNew', '', 'sfx', [' _', unitType, '_Norm']);
-
-% save
-lme_save('fh', hndFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
-    'lmeData', plotTbl, 'lmeStats', lmeStats, 'lmeCfg', lmeCfg)
-
-
-
-
-
-
-
-
-% This section seems to be a duplicate or alternative analysis for FR ~ Group * Day * State
-% It was largely similar to the above, so I will comment it out for now to avoid confusion
-% If it's needed, it should be clarified how it differs or integrated.
-
-% organize for lme
-% [lme_tbl, lme_cfg] = lme_org('grppaths', grppathsBac, 'frml', frmlBac,...
-%     'flg_emg', true, 'var_field', '', 'vCell', {});
-% 
-% % select unit
-% iunit = categorical({'pPYR'});
-% plot_tbl = lme_tbl(lme_tbl.UnitType == iunit, :);
-% 
-% % % select state
-% % istate = categorical({'Low EMG'});
-% % plot_tbl = plot_tbl(plot_tbl.State == iunit, :); % This was iunit, should be istate if used
-% 
-% plot_tbl = lme_normalize('lme_tbl', lme_tbl, 'normVar', 'Day',...
-%     'groupVars', {'Group', 'UnitType', 'State'});
-% 
-% % run lme
-% contrasts = [1 : 10, 19, 23];
-% % contrasts = 'all';
-% [lme_results, lme_cfg] = lme_analyse(plot_tbl, lme_cfg, 'contrasts', contrasts);
-% 
-% % plot
-% fh = lme_plot(plot_tbl, lme_cfg.lmeMdl, 'ptype', 'bar');
-% 
-% % save
-% frml_save = [char(lme_results.Formula), '_', char(iunit)]; % lme_results.Formula does not exist.
-% frml_save = lme_frml2char(lme_cfg.frmlMdl, 'rm_rnd', false, 'sfx', ['_', char(iunit)]);
-% th = get(gcf, 'Children');
-% title(th, frml_save, 'interpreter', 'none')
-% % grph_save('fh', fh, 'fname', frml_save, 'frmt', {'ai', 'jpg'})
-% lme_save('fh', fh, 'fname', frml_save, 'frmt', {'ai', 'jpg'});
-
-% [prism_data] = fh2prism(fh); % Assuming fh2prism is a custom function
-% exlTbl = lme2exl(lme_cfg.mdl); % Assuming lme2exl is a custom function
-
-% test interaction of wt and mcu across all days
-% interactionIndices = contains(lme.CoefficientNames, 'Group_MCU-KO:Day'); % Logical vector for interaction terms
-% contrastVector = zeros(1, length(lme.Coefficients.Estimate));
-% contrastVector(interactionIndices) = 1; % Test only interaction terms
-% 
-% % Run the test
-% [p, h, stat] = coefTest(lme, contrastVector);
-
-
-
-% FR ~ Day * UnitType + (1|Mouse)
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% This section is for a specific group (grppathsBac{2} -> MCU)
-if length(grppathsBac) >= 2
-    frmlDayUnit = 'FR ~ Day + (1|Mouse)'; % Renamed
-    % Note: lme_org expects a cell array of group paths. Here providing just one group.
-    [lmeDataDayUnit, lmeCfgDayUnit] = lme_org('grppaths', grppathsBac(2), 'frml', frmlDayUnit, 'flgEmg', true, 'vCell', {});
-
-    % run lme
-    iunitDayUnit = categorical({'pPYR'}); % Renamed
-    plotTblDayUnit = lmeDataDayUnit(lmeDataDayUnit.UnitType == iunitDayUnit, :);
-    if ~isempty(plotTblDayUnit)
-        lmeDayUnit = fitlme(plotTblDayUnit, lmeCfgDayUnit.frml);
-
-        % plot
-        fhDayUnit = lme_plot(plotTblDayUnit, lmeDayUnit, 'ptype', 'bar');
-
-        frmlSaveDayUnit = [char(lmeDayUnit.Formula.char), '_', char(iunitDayUnit), '_MCU-KO'];
-        frmlSaveDayUnit = lme_frml2char(frmlSaveDayUnit, 'rmRnd', false);
-        thDayUnit = get(gcf, 'Children');
-        if isa(thDayUnit, 'matlab.graphics.layout.TiledChartLayout') && ~isempty(thDayUnit.Children)
-            axChildrenDayUnit = thDayUnit.Children;
-            title(axChildrenDayUnit(1), frmlSaveDayUnit, 'interpreter', 'none')
-        else
-            title(gca, frmlSaveDayUnit, 'interpreter', 'none');
-        end
-        % grph_save('fh', fhDayUnit, 'fname', frmlSaveDayUnit, 'frmt', {'ai', 'jpg'})
-        lme_save('fh', fhDayUnit, 'fname', frmlSaveDayUnit, 'frmt', {'ai', 'jpg'});
-
-
-        % This section for dual y-axis seems problematic as lme_plot creates its own axes
-        % th = get(gcf, 'Children'); 
-        % axh = get(th, 'Children');
-        % axes(axh(3))
-        % yyaxis right
-        % ylim([0, 9])
-        % yyaxis left
-        % ylim([0, 5])
-        % grph_save('fh', fh, 'fname', frml, 'frmt', {'ai', 'jpg'})
-    else
-        warning('Plot table for Day*UnitType (MCU) analysis is empty.');
-    end
-else
-    warning('Not enough groups in grppathsBac to run MCU-specific Day*UnitType analysis.');
-end
-
-
-% plot
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% This section recalculates mfr from lmeData, which was defined much earlier for baseline analysis.
-% If this is intended for the baclofen data, lmeDataBac should be used.
-% Assuming this is for baseline data (original lmeData)
-if exist('lmeData', 'var') && ~isempty(lmeData) % Check if baseline lmeData exists
-    % Calculate mean and standard error
-    mfr = grpstats(lmeData, {'Group', 'State'}, {'mean', 'sem'}, 'DataVars', 'FR');
-
-    % Extract data for plotting
-    states = categories(mfr.State);  % Get state labels
-    groups = categories(mfr.Group);  % Group labels (WT, MCU-KO)
-
-    % Prepare data for RS units
-    frData = reshape(mfr.mean_FR, length(states), length(groups));
-    frErr = reshape(mfr.sem_FR, length(states), length(groups));
-
-    % Plot RS Units
-    figure; % Create a new figure for this plot
-    bh = bar(frData);
-    hold on;
-    % ngroupsPlot = size(frData, 1); % number of states
-    nbarsPlot = size(frData, 2); % number of groups (WT, MCU)
-    xPos = nan(length(states), nbarsPlot);
-    for iBar = 1:nbarsPlot
-        xPos(:, iBar) = bh(iBar).XEndPoints;
-    end
-    errorbar(xPos, frData, frErr, 'k', 'linestyle', 'none');
-    set(gca, 'XTickLabel', states);
-    xlabel('State');
-    ylabel('Firing Rate (Hz)');
-    legend(groups, 'Location', 'northwest');
-    title('Baseline Firing Rate by State and Group');
-    hold off;
-else
-    warning('Baseline lmeData not found for grpstats plot.');
-end
-
-
-
-
-
-
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% mea example
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% plot mea
-% load('E:\Data\MEA\baclofen\190813_022600\190813_022600.fr.mat')
-% This requires a specific file, will only run if it exists.
-meaExampleFile = 'E:\Data\MEA\baclofen\190813_022600\190813_022600.fr.mat';
-if exist(meaExampleFile, 'file')
-    load(meaExampleFile, 'fr'); % Load only fr
-
-    fhMea = figure; % Renamed
-    tlayout = [1, 1];
-    thMea = tiledlayout(tlayout(1), tlayout(2)); % Renamed
-    thMea.TileSpacing = 'tight';
-    thMea.Padding = 'none';
-    title(thMea, 'FR MEA', 'interpreter', 'none', 'FontSize', 20)
-    set(fhMea, 'DefaultAxesFontSize', 16);
-
-    axhMea = nexttile(thMea, 1, [1, 1]); cla(axhMea); hold(axhMea, 'on'); % Renamed and specified target for cla/hold
-    
-    unitIdxExample = [2, 6, 23, 30]; % Renamed from unit_idx
-    frMat = fr.norm;
-    xvals = fr.tstamps * 3 / 60 / 60;
-    for iu = 1 : size(frMat, 1)
-        frMat(iu, :) = smooth(frMat(iu, :), 15);
-    end
-    plot(axhMea, xvals, frMat(unitIdxExample, :))
-    plot_stdShade('dataMat', frMat', 'xVal', xvals, ...
-        'axh', axhMea, 'clr', [0.3 0.3 0.3], 'alpha', 0.3);
-    xlabel(axhMea, 'Time (hr)')
-    ylim(axhMea, [0 4])
-    xlim(axhMea, [0 18])
-    xticks(axhMea, [0 : 6 : 24])
-    legend(axhMea, {'Unit 1', 'Unit 2', 'Unit 3', 'Unit 4', 'MFR'}, 'Location', 'northwest')
-
-    % grph_save('fh', fhMea, 'fname', 'FR_MEA', 'frmt', {'ai', 'jpg'})
-    lme_save('fh', fhMea, 'fname', 'FR_MEA', 'frmt', {'ai', 'jpg'});
-else
-    warning('MEA example file not found: %s', meaExampleFile);
-end
