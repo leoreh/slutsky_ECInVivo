@@ -1,8 +1,4 @@
-function [basepaths, v] = mcu_sessions(queryStr, vars)
-
-if nargin < 2
-    vars = [];
-end
+function [basepaths, v] = mcu_sessions(queryStr)
 
 if strcmp(queryStr, 'mcu')
 
@@ -135,6 +131,17 @@ elseif strcmp(queryStr, 'wt_bac3')
         'E:\Data\lh142\lh142_231009_102856',...
         %         'E:\Data\lh99\lh99_220124_090128',...
         };
+
+elseif strcmp(queryStr, 'mea_bac')
+
+    basepaths = {...
+        'E:\Data\MEA\baclofen\190813_022600',...
+        'E:\Data\MEA\baclofen\210325_082300',...
+        'E:\Data\MEA\baclofen\190910_045200',...
+        'E:\Data\MEA\baclofen\210325_082300',...
+        'E:\Data\MEA\baclofen\210527_045600',...
+        };
+
 
 elseif strcmp(queryStr, 'ra')
 

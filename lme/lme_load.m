@@ -91,7 +91,7 @@ for igrp = 1:ngrps
 
         elseif contains(varName, 'st_')
             dataDay{iday} = org_brst(v, varFld);
-        
+
         elseif contains(varName, 'swv_')
             dataDay{iday} = org_swv(v, varFld);
 
@@ -106,6 +106,9 @@ for igrp = 1:ngrps
 
         elseif contains(varName, 'ripp')
             dataDay{iday} = org_ripp(v, varName, varFld);
+
+        elseif contains(varName, 'prc')
+            dataDay{iday} = org_prc(v, varName, varFld);
         end
     end
 
@@ -237,7 +240,7 @@ nmice = length([v(:).units]);
 
 unitMouse = cell(nmice, 1);
 for imouse = 1 : nmice
-    cleanMouse = units.clean(:, :, imouse);        % [2 x Nunits_mouse]
+    cleanMouse = units.clean2(:, :, imouse);        % [2 x Nunits_mouse]
     nunitsMouse = size(cleanMouse, 2);
 
     unitType = ones(1, nunitsMouse) * 3;          % Row vector for types
@@ -291,7 +294,7 @@ elseif contains(varFld, {'peakPower', 'dur', 'peakFreq', 'maxFreq', 'peakAmp'})
 elseif any(strcmp(varFld, {'mrl', 'kappa', 'pVal', 'theta'}))
     % spike lfp coupling
     for iMouse = 1 : nMice
-        rippCell{iMouse} = v(iMouse).ripp.spkLfp.phase.(varFld)';    
+        rippCell{iMouse} = v(iMouse).ripp.spkLfp.phase.(varFld)';
     end
     rippData = cell2padmat(rippCell, 2);
     rippData = permute(rippData, [2, 3, 1, 4, 5]);
@@ -321,9 +324,9 @@ elseif contains(varFld, {'frGain', 'frModulation', 'frPrct', 'Rates'})
     end
     rippData = cell2padmat(spks, 2);
     rippData = permute(rippData, [2, 3, 1, 4, 5]);
-    
+
     if strcmp(varFld, {'frGain'})
-       for iMouse = 1 : nMice
+        for iMouse = 1 : nMice
             spks{iMouse} = v(iMouse).(varName).spks.su.(varFld);
         end
         rippData = cell2padmat(spks, 2);
@@ -331,5 +334,14 @@ elseif contains(varFld, {'frGain', 'frModulation', 'frPrct', 'Rates'})
     end
 
 end
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function prcData = org_prc(v, varName, varFld)
+% Organizes unit type data: [mouse x day=1 x unit x 1 x 1]
+
+prc = catfields([v(:).prc], 'addim', true);
+nmice = length([v(:).prc]);
+prcData = permute(prc.(varFld), [3, 2, 1, 4, 5]);
 
 end

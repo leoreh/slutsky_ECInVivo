@@ -77,7 +77,7 @@ forceA          = p.Results.forceA;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % constants
-smfactor = 3;    % smooth factor
+smfactor = 7;    % smooth factor
 nunits = length(spktimes);
 
 % filenames

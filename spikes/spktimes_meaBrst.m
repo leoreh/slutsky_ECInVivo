@@ -20,7 +20,7 @@ function brst = spktimes_meaBrst(spktimes, varargin)
 %   
 %   flg_all     logical. save data of each burst (true) or just mean across
 %               bursts {fale}
-%   saveVar     logical. save struct {true}
+%   flg_save     logical. save struct {true}
 %   flg_force   logical. flg_force analyze even if file exists {false}
 % 
 % OUTPUT
@@ -44,7 +44,7 @@ addParameter(p, 'isiThr', 0.02, @isnumeric)
 addParameter(p, 'binsize', 3600, @isnumeric)
 addParameter(p, 'bins', [])
 addParameter(p, 'minSpks', 2, @isnumeric)
-addParameter(p, 'saveVar', true, @islogical)
+addParameter(p, 'flg_save', true, @islogical)
 addParameter(p, 'flg_all', false, @islogical)
 addParameter(p, 'flg_force', false, @islogical)
 
@@ -54,7 +54,7 @@ isiThr          = p.Results.isiThr;
 binsize         = p.Results.binsize;
 bins            = p.Results.bins;
 minSpks         = p.Results.minSpks;
-saveVar         = p.Results.saveVar;
+flg_save         = p.Results.flg_save;
 flg_all         = p.Results.flg_all;
 flg_force       = p.Results.flg_force;
 
@@ -183,7 +183,7 @@ end
 % save
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-if saveVar
+if flg_save
     save(brstfile, 'brst')
 end
 

@@ -158,6 +158,15 @@ elseif contains(frml, 'Ripp ~')
     if isempty(varFld)
         varFld = 'peakAmp';
     end
+
+elseif contains(frml, 'PRC ~')
+    varName = 'prc';
+    yName = 'PRC';
+    if isempty(varFld)
+        varFld = 'z0';
+    end
+    flgUnits = true;
+
 end
 
 % Check if we need bout length as an additional variable
@@ -250,12 +259,14 @@ for igrp = 1:ngrps
 
                     % Create corresponding unit indices and types
                     if length(unitsType) > 1
-                        % For multiple units, determine which unit each value belongs to
-                        [unitsIdx, ~] = ind2sub(size(dataTmp), find(validMask));
-                        unitTypeVal = unitsType(unitsIdx); % Renamed to avoid conflict with outer unitsType
+                        % For multiple units, get indices of valid data points first
+                        validIndices = find(validMask);
+                        unitTypeVal = unitsType(validIndices); 
+                        unitsIdx = validIndices;
                     else
                         % For single unit or no units
-                        unitTypeVal = repmat(unitsType, nValid, 1); % Renamed
+                        unitTypeVal = repmat(unitsType, nValid, 1); 
+                        unitsIdx = ones(nValid, 1);
                     end                    
 
                     % Get bout length if needed
@@ -273,11 +284,8 @@ for igrp = 1:ngrps
                     % Handle unit information
                     if flgUnits
                         for i = 1:nValid
-                            idxValid = find(validMask);
-                            currIdx = idxValid(i);
-
-                            lblUnit(idxCurr + i - 1) = strUnit{unitTypeVal(currIdx)}; % Used renamed unitTypeVal
-                            idUnit(idxCurr + i - 1) = unitsIdx(currIdx) + ...
+                            lblUnit(idxCurr + i - 1) = strUnit{unitTypeVal(i)};
+                            idUnit(idxCurr + i - 1) = unitsIdx(i) + ...
                                 1000 * (imouse - 1) + ...
                                 10000 * (iday - 1) + ...
                                 100000 * (igrp - 1);

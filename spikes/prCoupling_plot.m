@@ -1,0 +1,164 @@
+function prCoupling_plot(prc, varargin)
+% PRCOUPLING_PLOT Generates summary plots for population coupling analysis.
+%
+% SUMMARY:
+% This function takes the output structure from prCoupling.m and creates a
+% figure summarizing key aspects of population coupling analysis. It visualizes:
+%   - Distribution of z-scored population coupling (z0) across units
+%   - Raw STPR curves for all units, sorted by coupling strength
+%   - Comparison of actual vs shuffled STPR values at zero lag
+%   - Relationship between raw STPR and z-scored coupling
+%   - Summary statistics and analysis parameters
+%
+% INPUT:
+%   prc             Structure containing population coupling results from
+%                   prCoupling.m. Must include fields:
+%                     .z0: Z-scored population coupling
+%                     .stpr0: Raw STPR at zero lag
+%                     .stpr: Full STPR curves
+%                     .sptr0shfl: Shuffled STPR values
+%                     .t: Time vector for STPR curves
+%                     .info: Analysis parameters
+%   basepath        (Optional) Path to recording session directory {pwd}
+%   flgSaveFig      (Optional) Logical flag to save the figure {true}
+%
+% OUTPUT:
+%   None. Generates and optionally saves a figure.
+%
+% DEPENDENCIES:
+%   setMatlabGraphics (custom)
+%
+% HISTORY:
+%   Aug 2024 LH - Created
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% ARGUMENT PARSING & INITIALIZATION
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Define input parameters and their defaults
+p = inputParser;
+addRequired(p, 'prc', @isstruct);
+addParameter(p, 'basepath', pwd, @ischar);
+addParameter(p, 'flgSaveFig', true, @islogical);
+
+% Parse input arguments
+parse(p, prc, varargin{:});
+prc = p.Results.prc;
+basepath = p.Results.basepath;
+flgSaveFig = p.Results.flgSaveFig;
+
+% Set basepath and get basename
+cd(basepath);
+[~, basename] = fileparts(basepath);
+
+% Validate required fields
+requiredFields = {'z0', 'stpr0', 'stpr', 'sptr0shfl', 't', 'info'};
+for i = 1:length(requiredFields)
+    if ~isfield(prc, requiredFields{i})
+        error('Input ''prc'' structure is missing required field: %s', requiredFields{i});
+    end
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% PREPARATIONS & PARAMETER EXTRACTION
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Extract key parameters
+nUnits = length(prc.z0);
+t = prc.t;
+winStpr = prc.info.winStpr;
+nShuffles = prc.info.nShuffles;
+
+% Sort units by coupling strength for visualization
+[~, sortIdx] = sort(prc.z0, 'descend');
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% GRAPHICS GENERATION
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Set up figure with consistent graphics settings
+setMatlabGraphics(true);
+fh = figure('Name', [basename '_populationCoupling'], 'NumberTitle', 'off');
+
+% --- Distribution of population coupling values ---
+subplot(2, 3, 1);
+histogram(prc.z0, 30, 'Normalization', 'probability',...
+    'FaceColor', 'k', 'EdgeColor', 'none');
+xlabel('Population Coupling (Z-score)');
+ylabel('Probability');
+title('Distribution of Coupling Strength');
+box off;
+
+% --- Raw STPR curves for all units ---
+subplot(2, 3, [2, 3]);
+imagesc(t, 1:nUnits, prc.stpr(sortIdx,:));
+colormap('jet');
+colorbar;
+xlabel('Time [s]');
+ylabel('Unit (sorted by coupling)');
+title('STPR Curves');
+box off;
+
+% --- Actual vs Shuffled STPR comparison ---
+subplot(2, 3, 4);
+hold on;
+% Plot actual STPR values
+scatter(prc.stpr0, prc.z0, 20, 'k', 'filled', 'MarkerFaceAlpha', 0.6);
+% Add shuffled distribution mean and std
+shflMean = mean(prc.sptr0shfl, 2, 'omitnan');
+shflStd = std(prc.sptr0shfl, 0, 2, 'omitnan');
+errorbar(prc.stpr0, prc.z0, shflStd, shflStd, 'k.', 'LineWidth', 0.5);
+xlabel('Raw STPR at Zero Lag');
+ylabel('Population Coupling (Z-score)');
+title('Actual vs. Shuffled STPR');
+box off;
+
+% --- Shuffled distribution for example units ---
+subplot(2, 3, 5);
+hold on;
+% Select a few representative units
+nExUnits = min(5, nUnits);
+exUnits = round(linspace(1, nUnits, nExUnits));
+colors = lines(nExUnits);
+
+for i = 1:nExUnits
+    unit = exUnits(i);
+    histogram(prc.sptr0shfl(unit,:), 20, 'Normalization', 'probability',...
+        'FaceColor', colors(i,:), 'EdgeColor', 'none', 'FaceAlpha', 0.6);
+    % Add actual value as vertical line
+    xline(prc.stpr0(unit), '--', 'Color', colors(i,:), 'LineWidth', 1);
+end
+xlabel('STPR at Zero Lag');
+ylabel('Probability');
+title('Shuffled Distributions');
+legend(arrayfun(@(x) sprintf('Unit %d', x), exUnits, 'UniformOutput', false),...
+    'Location', 'best', 'Box', 'off');
+box off;
+
+% --- Summary statistics and parameters ---
+subplot(2, 3, 6);
+hold on;
+% Create text box with summary statistics
+stats = {
+    sprintf('Total Units: %d', nUnits),
+    sprintf('Mean Coupling: %.2f', mean(prc.z0, 'omitnan')),
+    sprintf('Median Coupling: %.2f', median(prc.z0, 'omitnan')),
+    sprintf('STPR Window: %.1f s', winStpr),
+    sprintf('Shuffles: %d', nShuffles),
+    sprintf('Bin Size: %.3f s', prc.info.binSize),
+    sprintf('Gaussian HW: %.3f s', prc.info.gkHw)
+};
+text(0.1, 0.5, stats, 'Units', 'normalized', 'FontName', 'Consolas');
+axis off;
+
+% Adjust figure layout
+set(gcf, 'Position', [100, 100, 1200, 800]);
+
+% Save figure if requested
+if flgSaveFig
+    figFile = fullfile(basepath, [basename, '.prc.fig']);
+    savefig(fh, figFile);
+    fprintf('Saved figure to %s\n', figFile);
+end
+
+end 

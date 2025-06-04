@@ -55,6 +55,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 frml = 'Burst ~ Group * UnitType + (1|Mouse)';
 varFld = 'royer';
+varFld = 'rate';
 
 % get data
 [lmeData, lmeCfg] = lme_org('grppaths', grppaths, 'frml', frml,...
@@ -108,7 +109,7 @@ lme_save('fh', hFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
 
 % load data for each group
 grps = {'wt', 'mcu'};
-idxRm = [];                         % remove bac on and off
+idxRm = [2, 6];                         % remove bac on and off
 grappaths = cell(1,length(grps));       % Initialize
 for igrpBac = 1 : length(grps)
 
@@ -126,7 +127,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 frml = 'Burst ~ Group * Day + (1|Mouse)';
 
-varFlds = {'royer', 'spkprct'};
+varFlds = {'royer', 'spkprct', 'rate'};
 txtUnit = {'pPYR', 'pINT'};
 
 for iFld = 1 : length(varFlds)
@@ -207,8 +208,25 @@ end
 
 
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% BURST vs. FR
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
 
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+frml = 'Burst ~ Group * Day + (1|Mouse)';
 
+txtUnit = {'pPYR', 'pINT'};
+iUnit = 1;
+
+varFld = 'royer';
+
+% get data
+[lmeData, lmeCfg] = lme_org('grppaths', grppaths, 'frml', frml,...
+    'flgEmg', false, 'varFld', varFld);
+
+% select unit
+unitType = categorical(txtUnit(iUnit));
+plotTbl = lmeData(lmeData.UnitType == unitType, :);

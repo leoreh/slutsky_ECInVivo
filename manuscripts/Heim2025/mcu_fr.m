@@ -121,7 +121,7 @@ lme_save('fh', hFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
 % -------------------------------------------------------------------------
 % load data for each group
 grps = {'wt', 'mcu'}; 
-idxRm = [];                         % remove bac on and off
+idxRm = [2, 6];                         % remove bac on and off
 grppaths = cell(1,length(grps));       % Initialize
 for iGrp = 1 : length(grps)
 
@@ -140,14 +140,14 @@ end
 frml = 'FR ~ Group * Day + (1|Mouse)'; 
 varFld = '';
 
-altClassify = 2;
+altClassify = 3;
 
 % get data
 [lmeData, lmeCfg] = lme_org('grppaths', grppaths, 'frml', frml,...
     'flgEmg', false, 'varFld', varFld);
 
 % select unit
-unitType = 'pPYR';
+unitType = 'pINT';
 iUnit = categorical({unitType}); 
 plotTbl = lmeData(lmeData.UnitType == iUnit, :);
 
@@ -187,7 +187,7 @@ else
         barLbl = {'NS', 'NS', '*'};
     else
         barIdx = {[2, 4], [2, 8], [1, 3], [1, 7]};
-        barLbl = {'**', '*', '***', 'NS'};
+        barLbl = {'***', '*', 'NS', '***'};
     end
     lineOffset = 0.3;
     lineGap = -0.01;

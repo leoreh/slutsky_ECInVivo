@@ -17,7 +17,7 @@ function st = spktimes_metrics(varargin)
 %                   ss.boutTimes. must be the same units as spikes.times
 %                   (e.g. [s])
 %   basepath        path to recording
-%   saveVar         logical. save variables (update spikes and save su)
+%   flg_save         logical. save variables (update spikes and save su)
 %   flg_force       logical. force analysis even if struct file exists
 %                   {false}
 %   flg_all         logical. analyse all parameters (slow) {true}
@@ -43,7 +43,7 @@ addOptional(p, 'fs', [], @isnumeric);
 addOptional(p, 'sunits', []);
 addOptional(p, 'bins', {[0 Inf]});
 addOptional(p, 'basepath', pwd, @ischar);
-addOptional(p, 'saveVar', true, @islogical);
+addOptional(p, 'flg_save', true, @islogical);
 addOptional(p, 'flg_force', false, @islogical);
 addOptional(p, 'flg_all', true, @islogical);
 
@@ -53,7 +53,7 @@ fs          = p.Results.fs;
 sunits      = p.Results.sunits;
 bins        = p.Results.bins;
 basepath    = p.Results.basepath;
-saveVar     = p.Results.saveVar;
+flg_save     = p.Results.flg_save;
 flg_force   = p.Results.flg_force;
 flg_all     = p.Results.flg_all;
 
@@ -120,7 +120,7 @@ st.info.acg_narrow_dur = 0.1;
 % spk params
 nunits = length(sunits);
 nbins = length(bins);
-minSpkTHr = 50;
+minSpkTHr = 100;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % calc
@@ -264,7 +264,7 @@ end
 % save
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-if saveVar
+if flg_save
     
     save(stFile, 'st')
 

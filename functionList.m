@@ -372,7 +372,7 @@ setMatlabGraphics(false)
 % mea
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-fname = '2021-05-16T17-34-298hBsln_20uMK_Bac_spikes SORTED';
+fname = '2019.8.24_Cre-_Bac10uM_sorted';
 mea = mea_orgNex('fname', fname, 'basepath', pwd, 'forceL', true);
 
 mea_analyze('basepath', pwd,...
