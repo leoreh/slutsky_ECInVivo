@@ -240,7 +240,7 @@ nmice = length([v(:).units]);
 
 unitMouse = cell(nmice, 1);
 for imouse = 1 : nmice
-    cleanMouse = units.clean2(:, :, imouse);        % [2 x Nunits_mouse]
+    cleanMouse = units.clean(:, :, imouse);        % [2 x Nunits_mouse]
     nunitsMouse = size(cleanMouse, 2);
 
     unitType = ones(1, nunitsMouse) * 3;          % Row vector for types

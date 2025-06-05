@@ -2,14 +2,14 @@
 
 clear params
 params.winLim = [0 60 * 60];        % Analysis window [s]
-params.binSize = 0.001;             % 1ms bins
+params.binSize = 0.002;             % 1ms bins
 params.gkHw = 0.012;                % 12ms sigma
 params.winStpr = 1.0;               % 1s window
 params.nShuffles = 1000;             % Number of shuffles
 params.flg_par = false;
 params.spkLim = 2000;
 
-basepaths = mcu_sessions('wt_bsl');
+basepaths = [mcu_sessions('wt_bsl'), mcu_sessions('mcu_bsl')];
 nFiles = length(basepaths);
 vars = {'spikes'};
 v = basepaths2vars('basepaths', basepaths, 'vars', vars);
@@ -24,6 +24,101 @@ for iFile = 1 : nFiles
 
 end
 toc
+
+
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% LME
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% -------------------------------------------------------------------------
+% Organize files
+grps = {'wt_bsl'; 'mcu_bsl'};
+
+clear grppaths
+for igrp = 1 : length(grps)
+    grppaths{igrp} = string(mcu_sessions(grps{igrp})');
+end
+
+% -------------------------------------------------------------------------
+% FR per unit, WT vs MCU for RS vs FS 
+frml = 'PRC ~ Group * UnitType + (1|Mouse)';
+varFld = 'stpr0';
+
+% get data
+[lmeData, lmeCfg] = lme_org('grppaths', grppaths, 'frml', frml,...
+    'flgEmg', false, 'varFld', varFld);
+
+% run lme
+contrasts = 'all';
+contrasts = [1 : 6]; 
+[lmeStats, lmeCfg] = lme_analyse(lmeData, lmeCfg, 'contrasts', contrasts);
+
+% plot
+hFig = lme_plot(lmeData, lmeCfg.lmeMdl, 'ptype', 'bar', 'axShape', 'square'); 
+
+% Update labels
+hAx = gca;
+ylabel(hAx, 'Firing Rate (Hz)')
+xlabel(hAx, '')
+title(hAx, '')
+hAx.Legend.Location = 'northwest';
+
+% add significance lines
+barIdx = {[1, 2], [3, 4]};
+barLbl = {'NS', '****'};
+plot_sigLines(hAx, barIdx, barLbl, 'lineGap', 0.15)
+plot_axSize('hFig', hFig, 'szOnly', false, 'axShape', 'square', 'axHeight', 300)
+
+% save
+fname = lme_frml2char(frml, 'rmRnd', true,...
+    'sfx', ['_altClassify', num2str(altClassify)]);
+lme_save('fh', hFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
+    'lmeData', lmeData, 'lmeStats', lmeStats, 'lmeCfg', lmeCfg)
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% CORRELATIONS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Plot baseline vs recovery firing rate
+figure;
+
+grpStr = {'Control', 'MCU-KO'};
+unitStr = {'pPYR', 'pINT'}
+grpIdx = lmeData.Group == grpStr;
+x = 
+for iUnit = 1 : 2
+
+    unitIdx = lmeData.UnitType == unitStr{iUnit};
+    
+    subplot(2,2,iUnit);
+plot_scatterCorr(prc.stpr0, frr.bslFr, ...
+    'xLbl', 'Baseline Firing Rate (Hz)', 'yLbl', 'Recovery Firing Rate (Hz)');
+
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 iFile = 1;
 spktimes = v(iFile).mea.spktimes;

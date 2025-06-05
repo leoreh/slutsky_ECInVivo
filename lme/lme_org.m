@@ -260,9 +260,8 @@ for igrp = 1:ngrps
                     % Create corresponding unit indices and types
                     if length(unitsType) > 1
                         % For multiple units, get indices of valid data points first
-                        validIndices = find(validMask);
-                        unitTypeVal = unitsType(validIndices); 
-                        unitsIdx = validIndices;
+                        unitsIdx = find(validMask);
+                        unitTypeVal = unitsType(unitsIdx); 
                     else
                         % For single unit or no units
                         unitTypeVal = repmat(unitsType, nValid, 1); 

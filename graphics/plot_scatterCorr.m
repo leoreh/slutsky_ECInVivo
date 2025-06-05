@@ -51,17 +51,21 @@ hAx = p.Results.hAx;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Get valid indices
-[validIdx, x, y] = validate_data(x, y, flgOtl);
+[x, y] = validate_data(x, y, flgOtl);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PLOT CREATION
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+binData = histcounts(x, 'BinMethod', 'fd');
+nBins = length(binData);
+
 % Create scatter histogram
-h = scatterhistogram(x, y, ...
+hndSct = scatterhistogram(x, y, ...
     'Color', [0.3 0.3 0.3], ...
     'MarkerStyle', '.', ...
-    'MarkerSize', 20);
+    'MarkerSize', 20,...
+    'NumBins', nBins);
 
 % Calculate statistics
 [r, p] = corr(x, y, 'Type', 'Spearman', 'Rows', 'complete');
@@ -76,7 +80,7 @@ xlabel(xLbl);
 ylabel(yLbl);
 
 % Adjust appearance
-set(h, 'HistogramDisplayStyle', 'stairs');
+hndSct.HistogramDisplayStyle = 'bar';
 
 end
 
@@ -84,7 +88,7 @@ end
 % HELPER FUNCTION: VALIDATE DATA
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function [validIdx, x, y] = validate_data(x, y, flgOtl)
+function [x, y] = validate_data(x, y, flgOtl)
 % VALIDATE_DATA Validates and optionally removes outliers from input data.
 %
 % INPUT:

@@ -1,17 +1,17 @@
 
-
 clear params
 params.winLim = [0 60 * 60];        % Analysis window [s]
 params.binSize = 0.002;             % 1ms bins
 params.gkHw = 0.012;                % 12ms sigma
 params.winStpr = 1.0;               % 1s window
-params.nShuffles = 1000;             % Number of shuffles
+params.nShuffles = 1000;            % Number of shuffles
 params.flg_par = false;
 params.spkLim = 2000;
+params.shuffleMet = 'raster';
 
 basepaths = [mcu_sessions('wt_bsl'), mcu_sessions('mcu_bsl')];
 nFiles = length(basepaths);
-vars = {'spikes'};
+vars = {'spikes', 'st_metrics', 'fr', 'units'};
 v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 
 tic
@@ -26,7 +26,55 @@ end
 toc
 
 
+tmppaths = basepaths(1 : 4);
+nFiles = length(tmppaths);
+vars = {'prc', 'st_metrics', 'fr', 'units'};
+v = basepaths2vars('basepaths', tmppaths, 'vars', vars);
 
+prc = catfields([v(:).prc], 1);
+units = catfields([v(:).units], 2);
+st = catfields([v(:).st], 2);
+fr = catfields([v(:).fr], 1);
+
+% Burstiness
+figure;
+xLbl = 'Burstiness';
+yLbl = 'PRC';
+cnt = 1;
+for iUnit = 1 : 2
+
+    subplot(1, 2, cnt);
+    unitIdx = units.clean(iUnit, :); 
+    x = st.royer(unitIdx);
+    % x = fr.mfr(unitIdx);
+    y = prc.z0(unitIdx);
+    plot_scatterCorr(x, y, 'xLbl', xLbl, 'yLbl', yLbl, 'flgOtl', true);
+    cnt = cnt + 1;
+end
+sgtitle('Burstiness')
+
+
+
+
+
+
+
+% Burstiness
+figure;
+xLbl = 'Burstiness';
+yLbl = 'PRC';
+cnt = 1;
+for iUnit = 1 : 2
+
+    subplot(1, 2, cnt);
+    unitIdx = v(iFile).units.clean(iUnit, :); 
+    % y = v(iFile).st.royer(unitIdx);
+    x = v(iFile).fr.mfr(unitIdx);
+    y = prc.z0(unitIdx);
+    plot_scatterCorr(x, y, 'xLbl', xLbl, 'yLbl', yLbl, 'flgOtl', true);
+    cnt = cnt + 1;
+end
+sgtitle('Burstiness')
 
 
 
@@ -46,7 +94,7 @@ end
 % -------------------------------------------------------------------------
 % FR per unit, WT vs MCU for RS vs FS 
 frml = 'PRC ~ Group * UnitType + (1|Mouse)';
-varFld = 'z0';
+varFld = 'prc0_norm';
 
 % get data
 [lmeData, lmeCfg] = lme_org('grppaths', grppaths, 'frml', frml,...
@@ -85,13 +133,9 @@ lme_save('fh', hFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % CORRELATIONS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% -------------------------------------------------------------------------
 % Grab data
-frml = 'PRC ~ Group * UnitType + (1|Mouse)';
-varFld = 'z0';
-[lmeData, lmeCfg] = lme_org('grppaths', grppaths, 'frml', frml,...
-    'flgEmg', false, 'varFld', varFld);
 frml = 'Burst ~ Group * UnitType + (1|Mouse)';
 varFld = 'royer';
 [brstData, lmeCfg] = lme_org('grppaths', grppaths, 'frml', frml,...
@@ -99,43 +143,67 @@ varFld = 'royer';
 frml = 'FR ~ Group * UnitType + (1|Mouse)';
 [frData, lmeCfg] = lme_org('grppaths', grppaths, 'frml', frml,...
     'flgEmg', false);
+frml = 'PRC ~ Group * UnitType + (1|Mouse)';
+varFld = 'z0';
+[lmeData, lmeCfg] = lme_org('grppaths', grppaths, 'frml', frml,...
+    'flgEmg', false, 'varFld', varFld);
 
 % Find shared UnitIDs
 sharedIDs = intersect(brstData.UnitID, lmeData.UnitID);
 [~, sharedIdx] = ismember(sharedIDs, brstData.UnitID);
 
-% Select only shared units
-%
+% Select only shared units and combine table
+brstData = brstData(sharedIdx, :);
+frData = frData(sharedIdx, :);
+lmeData.Burst = brstData.Burst;
+lmeData.FR = frData.FR;
 
-% Create aligned tables with only shared units
-prcTableShared = prcTable(idxPRC, :);
-burstTableShared = burstTable(idxBurst, :);
 
-% Verify alignment
-assert(all(prcTableShared.UnitID == burstTableShared.UnitID), 'Tables not properly aligned');
-
-% Plot baseline vs recovery firing rate
-figure;
-
+% Plot
 grpStr = {'Control', 'MCU-KO'};
 unitStr = {'pPYR', 'pINT'};
 
-iGrp = 1;
-grpIdx = lmeData.Group == grpStr{iGrp};
-for iUnit = 1 : 2
+% Burstiness
+figure;
+xLbl = 'Burstiness';
+yLbl = 'PRC';
+cnt = 1;
+for iGrp = 1 : 2
+    grpIdx = lmeData.Group == grpStr{iGrp};
+    for iUnit = 1 : 2
 
-    unitIdx = lmeData.UnitType == unitStr{iUnit};
-    plotIdx = unitIdx & grpIdx;
-    x = prc.z0;
+        unitIdx = lmeData.UnitType == unitStr{iUnit};
+        plotIdx = unitIdx & grpIdx;
+        x = lmeData.Burst(plotIdx);
+        y = lmeData.PRC(plotIdx);
 
-    subplot(2,2,iUnit);
-plot_scatterCorr(prc.stpr0, frr.bslFr, ...
-    'xLbl', 'Baseline Firing Rate (Hz)', 'yLbl', 'Recovery Firing Rate (Hz)');
-
+        subplot(2,2,cnt);
+        plot_scatterCorr(x, y, 'xLbl', xLbl, 'yLbl', yLbl, 'flgOtl', true);
+        cnt = cnt + 1;
+    end
 end
+sgtitle('Burstiness')
 
+% Firing rate
+figure;
+xLbl = 'FR';
+yLbl = 'PRC';
+cnt = 1;
+for iGrp = 1 : 2
+    grpIdx = lmeData.Group == grpStr{iGrp};
+    for iUnit = 1 : 2
 
+        unitIdx = lmeData.UnitType == unitStr{iUnit};
+        plotIdx = unitIdx & grpIdx;
+        x = lmeData.FR(plotIdx);
+        y = lmeData.PRC(plotIdx);
 
+        subplot(2,2,cnt);
+        plot_scatterCorr(x, y, 'xLbl', xLbl, 'yLbl', yLbl, 'flgOtl', true);
+        cnt = cnt + 1;
+    end
+end
+sgtitle('FR')
 
 
 
