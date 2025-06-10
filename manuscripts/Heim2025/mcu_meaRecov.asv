@@ -1,0 +1,233 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% ANALYZE
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Files
+basepaths = [mcu_sessions('mea_bac')];
+nFiles = length(basepaths);
+vars = {'mea', 'st_metrics', 'fr'};
+v = basepaths2vars('basepaths', basepaths, 'vars', vars);
+
+% Analysis Params
+winLim = [0 70 * 60];        
+
+for iFile = 1 : nFiles
+
+    basepath = basepaths{iFile};
+    cd(basepath);
+    
+    % --- Population Coupling
+    % [prc] = prCoupling(v(iFile).mea.spktimes, params,...
+    %     'winLim', winLim, ,'skpLim', 2000, 'flgSave', true);
+    % prCoupling_plot(prc, 'basepath', basepath, 'flgSaveFig', true);
+    
+    % --- Firing Rate Recovery
+    frr = mea_frRecovery(v(iFile).mea.spktimes, 'winLim', [0, 9 * 60 * 60],...
+        'flgSave', true, 'flgPlot', false);
+    
+    % % --- Spike timing metrics
+    % st = spktimes_metrics('spktimes', v(iFile).mea.spktimes, 'sunits', [],...
+    %     'bins', winLim, 'flg_force', true, 'flg_save', true, 'flg_all', false);
+    % 
+    % % --- Bursts
+    % brst = spktimes_meaBrst(v(iFile).mea.spktimes, 'binsize', [], 'isiThr', 0.005,...
+    %     'minSpks', 2, 'flg_save', true, 'flg_force', true, 'bins', winLim);
+
+end
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% MULTIPLE LINEAR REGRESSION 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Files
+basepaths = [mcu_sessions('mea_bac')];
+nFiles = length(basepaths);
+vars = {'st_metrics', 'st_brst', 'frr', 'prc'};
+v = basepaths2vars('basepaths', basepaths, 'vars', vars);
+
+% Concate structs, organize vars and table
+st = catfields([v(:).st], 2);
+brst = catfields([v(:).brst], 2);
+prc = catfields([v(:).prc], 1);
+frr = catfields([v(:).frr], 1);
+
+% Select units
+uGood = frr.info.uGood;
+nUnits = sum(uGood);
+
+% -------------------------------------------------------------------------
+% PREPARE TABLE
+
+dataTbl = table();
+dataTbl.UnitID = (1:nUnits)';
+dataTbl.PRC = prc.prc0_z(uGood);
+dataTbl.BurstRoyer = st.royer(uGood)';
+dataTbl.BurstMizuseki = st.mizuseki(uGood)';
+dataTbl.BurstSpkPct = brst.spkprct(uGood)';
+dataTbl.FrBsl = frr.frFit.bslFr(uGood);
+dataTbl.RecoveryFr = frr.recovFr(uGood);
+dataTbl.RecoverySpeed = frr.normSlope(uGood);
+dataTbl.RecoveryError = frr.recovError(uGood);
+dataTbl.RecoveryChange = frr.recovChange(uGood);
+dataTbl.hCapacity = frr.hCapacity(uGood);
+dataTbl.NIF = frr.nif(uGood);
+pertDepth = (frr.bslFr - frr.frFit.troughFr) ./ frr.bslFr;
+dataTbl.PerturbationDepth = pertDepth(uGood);
+
+% Remove rows with NaN values. fitlm would do this anyway, but this
+% makes the table cleaner for inspection and ensures transformations are
+% applied to the final data.
+dataTbl = rmmissing(dataTbl, 'MinNumMissing', 9);
+dataTbl = rmmissing(dataTbl);
+infIdx = isinf(dataTbl.BurstRoyer);
+dataTbl.BurstRoyer(infIdx) = max(dataTbl.BurstRoyer(~infIdx));
+infIdx = isinf(-dataTbl.BurstRoyer);
+dataTbl.BurstRoyer(infIdx) = min(dataTbl.BurstRoyer(~infIdx));
+
+% -------------------------------------------------------------------------
+% TRANSFORM VARIABLES
+% Log transform skewed variables and Z-score all variables
+% We apply log1p (log(1+x)) to handle variables with 0s. A skewness
+% threshold of 2 is used as a rule-of-thumb for highly skewed data.
+% Z-scoring is useful in multiple regression to compare the effect of
+% predictors that are on different scales
+
+% First, apply log1p transformation to original dataTbl
+tblVars = dataTbl.Properties.VariableNames;
+skewThr = 2;
+tmpTbl = dataTbl;
+for iVar = 1:length(tblVars)
+    varName = tblVars{iVar};
+    if strcmp(varName, 'UnitID')
+        continue;
+    end
+    
+    variableData = tmpTbl.(varName);
+    
+    % Check for non-negativity before log transform
+    if min(variableData) >= 0
+        s = skewness(variableData);
+        if s > skewThr
+            % dataTbl.(varName) = log1p(variableData);
+            tmpTbl.(varName) = log10(variableData + min(variableData(variableData > 0) / 2));
+        end
+    end
+end
+
+% Now create lmTbl and apply z-scoring
+lmTbl = tmpTbl;
+varsExc = {'UnitID', 'RecoverySpeed', 'RecoveryError', 'hCapacity'};
+for iVar = 1:length(tblVars)
+    varName = tblVars{iVar};
+    if any(contains(varName, varsExc))
+        continue
+    end
+    
+    % Z-score
+    lmTbl.(varName) = zscore(lmTbl.(varName));
+end
+
+
+% -------------------------------------------------------------------------
+% MLR
+
+% Create Formula
+varsResponse = 'RecoveryError';  
+varsResponse = 'RecoverySpeed';  
+% varsResponse = 'hCapacity';  
+% varsResponse = 'NIF';  
+varsPredict = {'PRC', 'FrBsl', 'RecoveryFr', 'BurstMizuseki', 'PerturbationDepth', 'NIF'}; 
+varsPredict = {'FrBsl', 'BurstMizuseki', 'PerturbationDepth'}; 
+frml = sprintf('%s ~ %s', varsResponse, strjoin(varsPredict, ' + '));
+
+% Run
+mdl = fitlm(lmTbl, frml);
+disp(mdl);
+
+
+varsExc = {'UnitID', 'PerturbationDepth'};
+varsInc = {'hCapacity', 'RecoveryError', 'RecoverySpeed',...
+    'FrBsl', 'BurstMizuseki', 'PRC'};
+varsInc = {'hCapacity', 'RecoveryError', 'RecoverySpeed',...
+    'NIF'};
+hndFig = plot_tblPairs(dataTbl, 'varsExc', varsExc, 'varsInc', varsInc);
+
+
+
+
+% --- Examine cross-correlations between variables
+fprintf('\n--- Cross-correlation Analysis ---\n');
+
+% Get correlation matrix (excluding UnitID)
+varsForCorr = tblVars(~strcmp(tblVars, 'UnitID'));
+corrMatrix = corrcoef(lmTbl{:, varsForCorr});
+
+% Display correlation matrix
+fprintf('Correlation Matrix:\n');
+fprintf('%-15s', 'Variable');
+for i = 1:length(varsForCorr)
+    fprintf('%-12s', varsForCorr{i});
+end
+fprintf('\n');
+
+for i = 1:length(varsForCorr)
+    fprintf('%-15s', varsForCorr{i});
+    for j = 1:length(varsForCorr)
+        fprintf('%-12.3f', corrMatrix(i,j));
+    end
+    fprintf('\n');
+end
+
+% Find high correlations (|r| > 0.7)
+fprintf('\nHigh correlations (|r| > 0.7):\n');
+for i = 1:length(varsForCorr)
+    for j = i+1:length(varsForCorr)
+        if abs(corrMatrix(i,j)) > 0.7
+            fprintf('%-15s <-> %-15s: r = %.3f\n', varsForCorr{i}, varsForCorr{j}, corrMatrix(i,j));
+        end
+    end
+end
+
+% Optional: Create correlation heatmap
+figure('Name', 'Variable Correlations');
+imagesc(corrMatrix);
+colorbar;
+caxis([-1 1]);
+xticks(1:length(varsForCorr));
+yticks(1:length(varsForCorr));
+xticklabels(varsForCorr);
+yticklabels(varsForCorr);
+xtickangle(45);
+title('Cross-correlation Matrix');
+axis square;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

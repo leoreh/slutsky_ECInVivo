@@ -1,7 +1,112 @@
 #include "mex.h"
-#include "matrix.h" // Usually included by mex.h
-#include <random>    // For std::mt19937, std::uniform_int_distribution
-#include <vector>    // Though not strictly needed for this revised version
+#include "matrix.h"
+#include <random>
+#include <vector>
+#include <utility>   // For std::pair, std::swap
+#include <algorithm> // For std::swap
+
+// Fast RNG implementation (xoshiro256++)
+class Xoshiro256PP {
+    uint64_t s[4];
+public:
+    Xoshiro256PP(uint64_t seed = 12345) {
+        std::mt19937_64 gen(seed);
+        for(int i = 0; i < 4; i++) s[i] = gen();
+    }
+    
+    uint64_t next() {
+        const uint64_t result = rotl(s[0] + s[3], 23) + s[0];
+        const uint64_t t = s[1] << 17;
+        s[2] ^= s[0];
+        s[3] ^= s[1];
+        s[1] ^= s[2];
+        s[0] ^= s[3];
+        s[2] ^= t;
+        s[3] = rotl(s[3], 45);
+        return result;
+    }
+    
+private:
+    static uint64_t rotl(uint64_t x, int k) {
+        return (x << k) | (x >> (64 - k));
+    }
+};
+
+// Bit-packed matrix representation for efficient memory usage and bitwise operations
+class BitPackedMatrix {
+    std::vector<uint64_t> data;
+    size_t rows, cols;
+    size_t words_per_row;
+    
+public:
+    BitPackedMatrix(const mxArray* mat) {
+        rows = mxGetM(mat);
+        cols = mxGetN(mat);
+        words_per_row = (cols + 63) / 64;
+        data.resize(rows * words_per_row, 0);
+        
+        // Convert input MATLAB matrix (logical or double) to bit-packed format
+        if (mxIsLogical(mat)) {
+            const mxLogical* input = mxGetLogicals(mat);
+            for(size_t i = 0; i < rows; i++) {
+                for(size_t j = 0; j < cols; j++) {
+                    if(input[i + j * rows]) {
+                        data[i * words_per_row + j/64] |= (1ULL << (j % 64));
+                    }
+                }
+            }
+        } else {
+            const double* input = mxGetPr(mat);
+            for(size_t i = 0; i < rows; i++) {
+                for(size_t j = 0; j < cols; j++) {
+                    if(input[i + j * rows] != 0) {
+                        data[i * words_per_row + j/64] |= (1ULL << (j % 64));
+                    }
+                }
+            }
+        }
+    }
+    
+    // Convert back to a MATLAB logical matrix
+    mxArray* toMatlab() const {
+        mxArray* result = mxCreateLogicalMatrix(rows, cols);
+        mxLogical* output = mxGetLogicals(result);
+        
+        for(size_t i = 0; i < rows; i++) {
+            for(size_t j = 0; j < cols; j++) {
+                output[i + j * rows] = (data[i * words_per_row + j/64] & (1ULL << (j % 64))) != 0;
+            }
+        }
+        return result;
+    }
+    
+    // Get bit value at a given position
+    bool get(size_t r, size_t c) const {
+        return (data[r * words_per_row + c/64] & (1ULL << (c % 64))) != 0;
+    }
+    
+    // Flip all four corners of a 2x2 rectangle defined by (r1,c1) and (r2,c2)
+    void flipPattern(size_t r1, size_t r2, size_t c1, size_t c2) {
+        size_t word_idx1 = c1 / 64;
+        uint64_t bit_mask1 = 1ULL << (c1 % 64);
+        size_t word_idx2 = c2 / 64;
+        uint64_t bit_mask2 = 1ULL << (c2 % 64);
+
+        if (word_idx1 == word_idx2) {
+            uint64_t combined_mask = bit_mask1 | bit_mask2;
+            data[r1 * words_per_row + word_idx1] ^= combined_mask;
+            data[r2 * words_per_row + word_idx1] ^= combined_mask;
+        } else {
+            data[r1 * words_per_row + word_idx1] ^= bit_mask1;
+            data[r1 * words_per_row + word_idx2] ^= bit_mask2;
+            data[r2 * words_per_row + word_idx1] ^= bit_mask1;
+            data[r2 * words_per_row + word_idx2] ^= bit_mask2;
+        }
+    }
+    
+    size_t getRows() const { return rows; }
+    size_t getCols() const { return cols; }
+};
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
     // --- Input and Output Checks ---
@@ -18,15 +123,15 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
     const mxArray* rasterMat = prhs[0];
     if (!mxIsDouble(rasterMat) && !mxIsLogical(rasterMat)) {
         mexErrMsgIdAndTxt("shuffle_raster_mex:invalidInputType",
-                          "Input must be double or logical matrix");
+                          "Input must be a double or logical matrix.");
     }
 
     // --- Get Dimensions ---
-    mwSize nUnits = mxGetM(rasterMat);
-    mwSize nBins = mxGetN(rasterMat);
+    const mwSize nUnits = mxGetM(rasterMat);
+    const mwSize nBins = mxGetN(rasterMat);
 
     // --- Get Number of Swaps ---
-    mwSize nSwaps = nBins; // Default
+    mwSize nSwaps = nBins * nUnits;  // Default swap count
     if (nrhs > 1) {
         if (!mxIsNumeric(prhs[1]) || mxGetNumberOfElements(prhs[1]) != 1) {
              mexErrMsgIdAndTxt("shuffle_raster_mex:nSwapsInvalid", "nSwaps must be a numeric scalar.");
@@ -38,55 +143,76 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
         nSwaps = static_cast<mwSize>(nSwaps_double);
     }
 
-    // --- Create Output Matrix (Copy of Input) ---
-    plhs[0] = mxDuplicateArray(rasterMat);
-    double* shuffledMat = mxGetPr(plhs[0]); // mxGetDoubles is fine too
-
     // --- Early Exit for Trivial Cases ---
     if (nUnits < 2 || nBins < 2 || nSwaps == 0) {
-        return; // Output is already a copy of input, nothing to shuffle
+        plhs[0] = mxDuplicateArray(rasterMat);
+        return;
+    }
+
+    // --- Convert to Bit-packed Format ---
+    BitPackedMatrix matrix(rasterMat);
+
+    // --- Find all non-zero elements (spikes) ---
+    std::vector<std::pair<mwSize, mwSize>> ones_coords;
+    ones_coords.reserve(nUnits * nBins * 0.01); // Pre-allocate assuming sparsity
+    for (mwSize r = 0; r < nUnits; ++r) {
+        for (mwSize c = 0; c < nBins; ++c) {
+            if (matrix.get(r, c)) {
+                ones_coords.emplace_back(r, c);
+            }
+        }
+    }
+
+    const size_t nOnes = ones_coords.size();
+    if (nOnes < 2) {
+        plhs[0] = matrix.toMatlab(); // No swaps possible, return original
+        return;
     }
 
     // --- Initialize Random Number Generator ---
-    // Use random_device for a non-deterministic seed for general use
-    // std::random_device rd;
-    // std::mt19937 gen(rd());
-    // Or a fixed seed for reproducible testing:
-    std::mt19937 gen(12345); 
+    Xoshiro256PP rng;
 
-    std::uniform_int_distribution<mwSize> distUnits(0, nUnits - 1);
-    std::uniform_int_distribution<mwSize> distBins(0, nBins - 1);
+    mwSize successful_swaps = 0;
+    // Set a limit on attempts to avoid infinite loops in pathological cases
+    const mwSize max_attempts = nSwaps * 5; 
+    mwSize attempts = 0;
 
     // --- Perform Swaps ---
-    for (mwSize iSwap = 0; iSwap < nSwaps; ++iSwap) {
-        mwSize r1 = distUnits(gen);
-        mwSize r2;
+    while (successful_swaps < nSwaps && attempts < max_attempts) {
+        attempts++;
+        
+        // Pick two distinct random indices from the list of 'ones'
+        size_t idx1 = rng.next() % nOnes;
+        size_t idx2;
         do {
-            r2 = distUnits(gen);
-        } while (r1 == r2);
+            idx2 = rng.next() % nOnes;
+        } while (idx1 == idx2);
 
-        mwSize c1 = distBins(gen);
-        mwSize c2;
-        do {
-            c2 = distBins(gen);
-        } while (c1 == c2);
+        auto& coord1 = ones_coords[idx1];
+        auto& coord2 = ones_coords[idx2];
+        
+        // Check if the two spikes are in different rows and columns
+        if (coord1.first == coord2.first || coord1.second == coord2.second) {
+            continue;
+        }
 
-        // Get 2x2 submatrix values
-        double v11 = shuffledMat[r1 + c1 * nUnits];
-        double v12 = shuffledMat[r1 + c2 * nUnits];
-        double v21 = shuffledMat[r2 + c1 * nUnits];
-        double v22 = shuffledMat[r2 + c2 * nUnits];
+        // Check if the other two corners of the 2x2 rectangle are zeros
+        if (!matrix.get(coord1.first, coord2.second) && !matrix.get(coord2.first, coord1.second)) {
+            // Perform the swap by flipping all 4 corners of the rectangle
+            matrix.flipPattern(coord1.first, coord2.first, coord1.second, coord2.second);
 
-        // Check patterns and swap
-        // Using 1.0 and 0.0 for explicit double comparison
-        bool pattern1 = (v11 == 1.0 && v12 == 0.0 && v21 == 0.0 && v22 == 1.0);
-        bool pattern2 = (v11 == 0.0 && v12 == 1.0 && v21 == 1.0 && v22 == 0.0);
-
-        if (pattern1 || pattern2) {
-            shuffledMat[r1 + c1 * nUnits] = 1.0 - v11;
-            shuffledMat[r1 + c2 * nUnits] = 1.0 - v12;
-            shuffledMat[r2 + c1 * nUnits] = 1.0 - v21;
-            shuffledMat[r2 + c2 * nUnits] = 1.0 - v22;
+            // The 'ones' have moved, so update their column coordinates in our list
+            std::swap(coord1.second, coord2.second);
+            
+            successful_swaps++;
         }
     }
+    
+    if (successful_swaps < nSwaps && nSwaps > 0) {
+        mexWarnMsgIdAndTxt("shuffle_raster:fewerSwaps", 
+            "Performed fewer swaps than requested. The matrix may be too sparse or dense for effective shuffling.");
+    }
+
+    // --- Convert Back to MATLAB Matrix ---
+    plhs[0] = matrix.toMatlab();
 }

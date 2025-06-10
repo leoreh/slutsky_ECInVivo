@@ -4,7 +4,7 @@ function prCoupling_plot(prc, varargin)
 % SUMMARY:
 % This function takes the output structure from prCoupling.m and creates a
 % figure summarizing key aspects of population coupling analysis. It visualizes:
-%   - Distribution of z-scored population coupling (prc0_z) across units
+%   - Distribution of z-scored population coupling (prc0_norm) across units
 %   - Raw STPR curves for all units, sorted by coupling strength
 %   - Comparison of actual vs shuffled STPR values at zero lag
 %   - Relationship between raw STPR and z-scored coupling
@@ -15,7 +15,7 @@ function prCoupling_plot(prc, varargin)
 % INPUT:
 %   prc             Structure containing population coupling results from
 %                   prCoupling.m. Must include fields:
-%                     .prc0_z: Z-scored population coupling
+%                     .prc0_norm: Z-scored population coupling
 %                     .prc0: Raw STPR at zero lag
 %                     .stpr: Full STPR curves
 %                     .stpr_shfl: Shuffled STPR curves
@@ -56,28 +56,19 @@ flgSaveFig = p.Results.flgSaveFig;
 cd(basepath);
 [~, basename] = fileparts(basepath);
 
-% Validate required fields
-requiredFields = {'prc0_z', 'prc0', 'stpr', 'stpr_shfl', 'prc0_shfl', 't', 'info'};
-for i = 1:length(requiredFields)
-    if ~isfield(prc, requiredFields{i})
-        error('Input ''prc'' structure is missing required field: %s', requiredFields{i});
-    end
-end
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PREPARATIONS & PARAMETER EXTRACTION
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Extract key parameters
-nUnits = length(prc.prc0_z);
-t = prc.t;
+nUnits = length(prc.prc0_norm);
 winStpr = prc.info.winStpr;
 nShuffles = prc.info.nShuffles;
 lagBins = round((winStpr / 2) / prc.info.binSize);
 tStpr = (-lagBins:lagBins) * prc.info.binSize;
 
 % Sort units by coupling strength for visualization
-[~, sortIdx] = sort(prc.prc0_z, 'descend');
+[~, sortIdx] = sort(prc.prc0_norm, 'descend');
 
 % Select example units for detailed visualization
 nExUnits = min(5, nUnits);
@@ -132,7 +123,7 @@ box off;
 
 % --- Correlation between raw STPR and z-score ---
 subplot(3, 3, 3);
-plot_scatterCorr(prc.prc0, prc.prc0_z, 'xLbl', 'Raw STPR at Zero Lag', ...
+plot_scatterCorr(prc.prc0, prc.prc0_norm, 'xLbl', 'Raw STPR at Zero Lag', ...
     'yLbl', 'Population Coupling (Z-score)', 'flgOtl', true);
 title('STPR vs. Coupling Strength');
 
@@ -156,8 +147,8 @@ hold on;
 % Create text box with summary statistics
 stats = {
     sprintf('Total Units: %d', nUnits),
-    sprintf('Mean Coupling: %.2f', mean(prc.prc0_z, 'omitnan')),
-    sprintf('Median Coupling: %.2f', median(prc.prc0_z, 'omitnan')),
+    sprintf('Mean Coupling: %.2f', mean(prc.prc0_norm, 'omitnan')),
+    sprintf('Median Coupling: %.2f', median(prc.prc0_norm, 'omitnan')),
     sprintf('STPR Window: %.1f s', winStpr),
     sprintf('Shuffles: %d', nShuffles),
     sprintf('Bin Size: %.3f s', prc.info.binSize),

@@ -120,7 +120,7 @@ st.info.acg_narrow_dur = 0.1;
 % spk params
 nunits = length(sunits);
 nbins = length(bins);
-minSpkTHr = 100;
+minSpkThr = 100;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % calc
@@ -149,7 +149,7 @@ for iunit = 1 : length(sunits)
         isi = diff(st_unit);
         nisi = length(isi);
         
-        if nspks < minSpkTHr
+        if nspks < minSpkThr
             continue
         end
         

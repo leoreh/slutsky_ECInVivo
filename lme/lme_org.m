@@ -85,7 +85,7 @@ elseif contains(frml, 'Burst ~')
     if isempty(varFld)
         varFld = 'lidor';
     end  
-    if contains(varFld, {'royer', 'lidor', 'lvr', 'royer2'})
+    if contains(varFld, {'royer', 'lidor', 'lvr', 'royer2', 'mizuseki'})
         varName = 'st_metrics';
     else
         varName = 'st_brst';

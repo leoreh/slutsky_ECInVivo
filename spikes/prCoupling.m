@@ -26,7 +26,6 @@ function prc = prCoupling(spktimes, varargin)
 %   nShuffles     - Number of shuffles for null distribution {1000}.
 %   spkThr        - Minimum number of spikes required per unit {300}. Units with
 %                   fewer spikes will have NaN values in all output fields.
-%   flg_par       - Logical flag to use parfor for shuffling {false}.
 %   spkLim        - Maximum number of spikes to use from reference unit {Inf}.
 %                   If a unit has more spikes, a random subset is used to
 %                   reduce computation time while maintaining statistical power.
@@ -63,7 +62,6 @@ function prc = prCoupling(spktimes, varargin)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ARGUMENT PARSING & INITIALIZATION
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-tic;
 
 % Define input parameters and their defaults/validation functions
 p = inputParser;
@@ -76,7 +74,6 @@ addParameter(p, 'gkHw', 0.012, @(x) isnumeric(x) && isscalar(x) && x>0);
 addParameter(p, 'winStpr', 1.0, @(x) isnumeric(x) && isscalar(x) && x>0);
 addParameter(p, 'nShuffles', 1000, @(x) isnumeric(x) && isscalar(x));
 addParameter(p, 'spkThr', 100, @(x) isnumeric(x) && isscalar(x) && x>0);
-addParameter(p, 'flg_par', false, @islogical);
 addParameter(p, 'spkLim', Inf, @(x) isnumeric(x) && isscalar(x) && x>0);
 addParameter(p, 'shuffleMet', 'raster', @(x) ismember(x, {'raster', 'circshift'}));
 
@@ -91,7 +88,6 @@ gkHw = p.Results.gkHw;
 winStpr = p.Results.winStpr;
 nShuffles = p.Results.nShuffles;
 spkThr = p.Results.spkThr;
-flg_par = p.Results.flg_par;
 spkLim = p.Results.spkLim;
 shuffleMet = p.Results.shuffleMet;
 
@@ -141,7 +137,7 @@ prc0_norm = nan(nUnits, 1);   % Median-normalized coupling
 popShifts = randi(length(t), nGood, nShuffles);
 
 % Determine number of swaps when creating shuffled raster matrix
-nSwaps = length(t) * nUnits;
+nSwaps = length(t);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PREPARE RASTER MATRIX
@@ -156,18 +152,11 @@ for iGood = 1:nGood
     idxRef = uGood(iGood);
     uSpks = spktimes{idxRef};
     binRates(iGood,:) = histcounts(uSpks, [t, t(end) + binSize]);
-    spkBins{iGood} = find(binRates(iGood,:) > 0);
-    
-    % Subsample spike bins if needed
-    rng(idxRef);                                    % Use consistent random seed for reproducibility
-    if length(spkBins{iGood}) > spkLim        
-        spkBins{iGood} = spkBins{iGood}(randperm(length(spkBins{iGood}), spkLim));
-        spkBins{iGood} = sort(spkBins{iGood});      % Keep bins sorted in time
-    end
 end
 
-% Convert to binary
+% Convert to binary and get spike bin indices
 rasterMat = double(binRates > 0);
+spkBins = binary2idx(rasterMat, [lagBins, length(t) - lagBins], spkLim);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % CALC STPR
@@ -179,7 +168,7 @@ for iGood = 1:nGood
     unitMask(iGood) = false;
 
     % Calculate population rate with leave-one-out and convolve
-    pr = sum(rasterMat(unitMask), 1, 'omitnan') / binSize;
+    pr = sum(rasterMat(unitMask, :), 1, 'omitnan') / binSize;
     pr = conv(pr, gk, 'same');
 
     % Calculate STPR using pre-processed spike bins
@@ -194,21 +183,19 @@ end
 stpr_cell = cell(nShuffles, 1);
 prc0_cell = cell(nShuffles, 1);
 
-% Initialize progress indicator
-fprintf('Shuffling progress: 0/%d', nShuffles);
-
-% Parallel processing
 for iShuffle = 1 : nShuffles
     % Create shuffled matrix using specified method
     if strcmp(shuffleMet, 'raster')
         rasterShuffled = shuffle_raster(rasterMat, nSwaps);
-    
+        refBins = binary2idx(rasterShuffled, [lagBins, length(t) - lagBins], spkLim);
+
     elseif strcmp(shuffleMet, 'circshift')
         rasterShuffled = zeros(size(rasterMat));
         for iGood = 1:nGood
             shift = popShifts(iGood, iShuffle);
             rasterShuffled(iGood, :) = circshift(binRates(iGood,:), [0, shift]);
         end
+        refBins = spkBins;
     end
     
     % Initialize temporary arrays for this shuffle
@@ -226,7 +213,7 @@ for iShuffle = 1 : nShuffles
         prShuffeld = conv(prShuffeld, gk, 'same');
 
         % Calculate STPR using pre-processed spike bins
-        [stpr_tmp(idxRef,:), prc0_tmp(idxRef)] = stpr_calc(spkBins{iGood}, prShuffeld, lagBins);
+        [stpr_tmp(idxRef,:), prc0_tmp(idxRef)] = stpr_calc(refBins{iGood}, prShuffeld, lagBins);
     end
     
     % Store results in cell arrays
@@ -235,10 +222,9 @@ for iShuffle = 1 : nShuffles
     
     % Print progress every 10 shuffles
     if mod(iShuffle, 1) == 0
-        fprintf('\rShuffling progress: %d/%d', iShuffle, nShuffles);
+        fprintf('\rShuffle %d', iShuffle);  % Extra spaces to clear any longer numbers
     end
 end
-fprintf('\n'); % New line after completion
 
 % Aggregate results
 stpr_shfl = cell2padmat(stpr_cell, 3, 0);      % Concatenate along 3rd dim
@@ -333,32 +319,17 @@ function [stpr, prc0] = stpr_calc(uBins, popRate, lagBins)
 %   prc0       - Baseline-subtracted STPR at zero lag (Hz).
 %   stpr       - spike triggered population rate
 
-nBins = 2 * lagBins + 1;
-segments = zeros(length(uBins), nBins);
-validSpks = 0;
-
-for iSpk = 1:length(uBins)
-    spikeBin = uBins(iSpk);
-    startBin = spikeBin - lagBins;
-    endBin = spikeBin + lagBins;
-    
-    if startBin >= 1 && endBin <= length(popRate)
-        segments(iSpk,:) = popRate(startBin:endBin);
-        validSpks = validSpks + 1;
-    end
-end
-
-% Calculate baseline and remove from stpr
 baseline = mean(popRate);
-
-stpr = mean(segments(1:validSpks,:), 1) - baseline;
+idx = bsxfun(@plus, uBins, (-lagBins:lagBins));
+segments = popRate(idx);
+stpr = mean(segments, 1) - baseline;
 prc0 = stpr(lagBins + 1);
 
 end
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% HELPER FUNCTION: SHUFFLE RASTER MATRIX (replaced with mex c++ version)
+% HELPER FUNCTION: SHUFFLE RASTER (replaced with mex c++ version)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % function shuffledMat = shuffle_raster(rasterMat, nSwaps)
@@ -424,4 +395,37 @@ end
 % end     % EOF
 
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% HELPER FUNCTION: BINARY MATRIX TO SPIKE BIN INDICES
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+function spkBins = binary2idx(binMat, edgeLim, spkLim)
+% BINARY2IDX Converts binary matrix to cell array of spike bin indices.
+%
+% INPUT:
+%   binMat      - Binary matrix (neurons x time_bins) of spike times.
+%   edgeLim     - [min max] bin indices to include (exclusive).
+%   spkLim      - Maximum number of spikes to use per unit.
+%
+% OUTPUT:
+%   spkBins     - Cell array. spkBins{i} contains validated spike bin indices
+%                 for neuron i.
+
+nGood = size(binMat, 1);
+spkBins = cell(nGood, 1);
+
+for iGood = 1:nGood
+    % Get spike bins and validate against window edges
+    refBins = find(binMat(iGood,:) > 0);
+    refBins = refBins(refBins > edgeLim(1) & refBins <= edgeLim(2));
+    
+    % Subsample spike bins if needed
+    rng(iGood);                             % Use consistent random seed for reproducibility
+    if length(refBins) > spkLim        
+        refBins = refBins(randperm(length(refBins), spkLim));
+    end
+    spkBins{iGood} = sort(refBins(:));      % Keep bins sorted in time
+end
+
+end     % EOF
 

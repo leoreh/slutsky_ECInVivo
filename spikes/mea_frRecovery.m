@@ -2,10 +2,19 @@ function frr = mea_frRecovery(spktimes, varargin)
 % MEAFRRECOVERY Calculates firing rate recovery parameters for all neurons.
 %
 % SUMMARY:
-% This function analyzes firing rate recovery after perturbation:
-%   1. Calculates firing rates using times2rate
-%   2. Detects perturbation time from population MFR
-%   3. Calculates recovery metrics for each unit
+% This function analyzes firing rate recovery after a network-wide perturbation.
+% It uses a robust workflow to calculate metrics for each neuron:
+%   1. Firing rates are calculated and smoothed using a Savitzky-Golay filter
+%      to preserve recovery shape features (e.g., overshoots).
+%   2. The perturbation time is automatically detected from the smoothed
+%      population mean firing rate (MFR).
+%   3. Each unit's post-perturbation firing rate is fitted with a
+%      double-exponential model to capture both recovery and overshoot dynamics.
+%   4. Three key, largely independent metrics are derived from the model fit:
+%      a) Baseline Firing Rate: Pre-perturbation average rate from robust linear fit.
+%      b) Recovery Fidelity: Ratio of steady-state to baseline rate.
+%      c) Recovery Kinetics: Normalized slope and time to 90% recovery,
+%         derived from the model's primary recovery time constant.
 %
 % INPUT (Required):
 %   spktimes      - Cell array. spktimes{i} contains spike times (s) for neuron i.
@@ -13,426 +22,445 @@ function frr = mea_frRecovery(spktimes, varargin)
 % INPUT (Optional Key-Value Pairs):
 %   basepath      - Path to recording session directory {pwd}.
 %   flgSave       - Logical flag to save results to .frr.mat file {true}.
-%   flgPlot       - Logical flag to plot denoising results {false}.
+%   flgPlot       - Logical flag to generate all analysis plots {true}.
 %   winLim        - [start end] time window to analyze [s] {[0 Inf]}.
 %   spkThr        - Minimum number of spikes required per unit {300}.
-%   frThr         - Minimum baseline firing rate [Hz] {0.1}.
-%   bslThr  - Tolerance threshold for recovery (fraction of baseline) {0.1}.
-%   wavelet       - Wavelet type for denoising {'sym4'}.
-%   level         - Decomposition level for denoising {3}.
+%   binSize       - Bin size for firing rate calculation [s] {30}.
 %
 % OUTPUT:
 %   frr           - Structure containing recovery analysis results:
-%     .recovTime   - Recovery time for each unit [s].
-%     .recovSlope  - Recovery slope (Hz/min) for each unit.
-%     .steadyState - Steady state firing rate for each unit [Hz].
-%     .pertTime    - Detected perturbation time [s].
-%     .bslFr  - Baseline firing rates [Hz].
-%     .fr          - Full firing rate curves for each neuron.
-%     .t           - Time vector for rate curves [s].
-%     .info        - Analysis parameters and metadata.
+%     .bslFr         - Baseline firing rate [Hz]. NaN for bad units.
+%     .hCapacity     - Homeostatic capacity score (PCA-based composite metric).
+%     .nif           - Network Impact Factor [Hz*s]. Leave-one-out analysis
+%                      of each neuron's unique contribution to network recovery.
+%     .recovFr       - Post-recovery steady-state firing rate from model [Hz].
+%     .recovError    - Recovery error (absolute log2 fold change from baseline).
+%     .recovChange   - Recovery change (log2 fold change from baseline).
+%     .recovTime     - Time to 90% recovery [s].
+%     .recovSlope    - Initial recovery slope [Hz/min].
+%     .normSlope     - Normalized slope (% of recovery range per min).
+%     .pertOnset     - Index of detected perturbation onset (steepest decline).
+%     .recovOnset    - Index of detected recovery onset (trough).
+%     .fr            - Smoothed firing rate curves for each neuron.
+%     .frFit         - Fitted model curves for good units.
+%     .t             - Time vector for rate curves [s].
+%     .info          - Analysis parameters and metadata.
 %
 % DEPENDENCIES:
 %   times2rate.m
+%   Signal Processing Toolbox (for sgolayfilt)
+%   Optimization Toolbox (for lsqcurvefit)
 %
 % HISTORY:
-%   Aug 2024 LH - Initial version.
+%   Sep 2024 - Refactored to use robust model-fitting approach.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ARGUMENT PARSING & INITIALIZATION
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% Define input parameters and their defaults/validation functions
 p = inputParser;
 addRequired(p, 'spktimes', @iscell);
 addParameter(p, 'basepath', pwd, @ischar);
 addParameter(p, 'flgSave', true, @islogical);
-addParameter(p, 'flgPlot', false, @islogical);
-addParameter(p, 'flgDenoise', true, @islogical);
+addParameter(p, 'flgPlot', true, @islogical);
 addParameter(p, 'winLim', [0 Inf], @(x) isnumeric(x) && numel(x)==2);
 addParameter(p, 'spkThr', 300, @(x) isnumeric(x) && isscalar(x) && x>0);
-addParameter(p, 'frThr', 0.0001, @(x) isnumeric(x) && isscalar(x) && x>0);
-addParameter(p, 'bslThr', 0.1, @(x) isnumeric(x) && isscalar(x) && x>0);
+addParameter(p, 'binSize', 30, @(x) isnumeric(x) && isscalar(x) && x>0);
+addParameter(p, 'sgPolyOrder', 3, @(x) isnumeric(x) && isscalar(x) && x > 0);
+addParameter(p, 'sgFrameSec', 600, @(x) isnumeric(x) && isscalar(x) && x > 0);
 
-% Parse input arguments
 parse(p, spktimes, varargin{:});
-spktimes = p.Results.spktimes;
 basepath = p.Results.basepath;
 flgSave = p.Results.flgSave;
 flgPlot = p.Results.flgPlot;
-flgDenoise = p.Results.flgDenoise;
 winLim = p.Results.winLim;
 spkThr = p.Results.spkThr;
-frThr = p.Results.frThr;
-bslThr = p.Results.bslThr;
+binSize = p.Results.binSize;
+sgPolyOrder = p.Results.sgPolyOrder;
+sgFrameSec = p.Results.sgFrameSec;
 
-% Set basepath and get basename
 cd(basepath);
 [~, basename] = fileparts(basepath);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% TIME AXIS & INITIALIZATION
+% FIRING RATE CALCULATION & SMOOTHING
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Computes and smooths firing rates for all units:
+% 1. Calculate raw rates using fixed-width bins (times2rate)
+% 2. Apply Savitzky-Golay filter to preserve recovery features
+% 3. Filter: polynomial order=3, frame length=600s
 
-% Create time axis for binning
+% Set analysis window if not fully specified
 if isinf(winLim(2))
-    winLim(2) = max(cellfun(@(x) max(x), spktimes, 'uni', true));
+    winLim(2) = max(cellfun(@(x) max(x, [], 'omitnan'), spktimes, 'UniformOutput', true));
 end
-
-% Window spikes to analysis window
 spktimes = cellfun(@(x) x(x >= winLim(1) & x <= winLim(2)), spktimes, 'UniformOutput', false);
-nSpks = cellfun(@(x) length(x), spktimes, 'UniformOutput', true);
-uGood = find(nSpks > spkThr);
 nUnits = length(spktimes);
 
-% Initialize output arrays
-frBsl = nan(nUnits, 1);
-recovTime = nan(nUnits, 1);
-recovSlope = nan(nUnits, 1);
-frRecov = nan(nUnits, 1);
+% Calculate raw firing rates. Units are rows
+[frOrig, ~, t] = times2rate(spktimes, 'binsize', binSize, 'c2r', false);
+
+% Denoise FRs for all units to get clean traces
+fr = mea_frDenoise(frOrig, t);
+
+% Unit selection 
+nSpks = cellfun(@length, spktimes)';
+uOutlier = isoutlier(range(fr, 2), 'median', 'ThresholdFactor', 10);
+uGood = find(nSpks >= spkThr & ~uOutlier);
+nGood = length(uGood);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% FIRING RATE CALCULATION & DENOISING
+% PERTURBATION DETECTION FROM MFR
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Detects perturbation and recovery times from population activity:
+% 1. Calculate mean firing rate (MFR) across all units
+% 2. Find perturbation onset as steepest decline in MFR
+% 3. Identify recovery onset as the start of a significant upward trend
 
-% Calculate firing rates for all units
-[frOrig, ~, t] = times2rate(spktimes(uGood), 'binsize', 30, 'c2r', true);
-frOrig = frOrig';
+% Calculate MFR from the smoothed individual unit traces
+mfr = mean(fr, 1, 'omitnan');
+dmfr = diff(mfr);
 
-% First smooth with Gaussian kernel to handle sparse spikes
-kw = 3;
-gk = gausswin(kw) / sum(gausswin(kw));
+% Detect perturbation onset time from the MFR's steepest decline. Include
+% buffer from recording start
+pertBuffer = 10;
+[~, pertOnset] = min(dmfr(pertBuffer : end));
 
-% Smooth each unit
-for iUnit = 1:size(frOrig, 2)
-    frOrig(:, iUnit) = conv(frOrig(:, iUnit), gk, 'same');
-end
+% To robustly detect recovery onset, look for a sustained period
+% of MFR increase, defined as the first time the MFR derivative is
+% positive for nUp consecutive bins.
+nUp = 5;
+runsUp = conv(dmfr(pertOnset:end) > 0, ones(1, nUp), 'valid');
+longUp = find(runsUp >= nUp, 1, 'first');
 
-% Calculate population mean firing rate after smoothing
-mfrOrig = mean(frOrig, 2, 'omitnan');
-
-% Apply denoising if requested
-if flgDenoise
-    [fr, mfr] = denoise_fr(frOrig, mfrOrig, t);
+if ~isempty(longUp)
+    % Found a sustained rise. Onset is the start of this period.
+    recovDelay = longUp;
+    recovOnset = pertOnset + recovDelay - 1;
 else
-    fr = frOrig;
-    mfr = mfrOrig;
+    % Fallback: No sustained rise. Look for the *first* non-negative
+    % derivative, which indicates the activity has stopped declining.
+    recovDelay = find(dmfr(pertOnset:end) >= 0, 1, 'first');
+    recovOnset = pertOnset + recovDelay - 1;
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% PERTURBATION DETECTION
+% KINETIC MODEL FITTING
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Fits recovery model to each unit's post-perturbation data:
+% Model: y(t) = frSS - (frSS - frTrough)*exp(-kRecov*t) + aOver*t*exp(-kOver*t)
+% Parameters:
+%   frSS: steady-state firing rate [Hz]
+%   kRecov: primary recovery rate constant [1/s]
+%   aOver: overshoot amplitude [Hz/s]
+%   kOver: overshoot rate constant [1/s]
 
-% Find peaks in negative MFR (which gives us minima in original MFR)
-[peakProms, pertIdx] = findpeaks(-mfr, ...
-    'MinPeakProminence', std(mfr)/2, ... % Minimum prominence relative to std
-    'MinPeakDistance', 30, ...           % Increased minimum distance between peaks (bins)
-    'MinPeakHeight', -mean(mfr));        % Must be below mean
+% Fit model to each unit
+for iUnit = 1:nUnits
+    frFit(iUnit) = mea_frFit(fr(iUnit, :), recovOnset, pertOnset);
+end
+frFit = catfields(frFit, 'addim', true, [3, 2, 1]);
+frFit.fitCurve = squeeze(frFit.fitCurve);
 
-% If multiple peaks found, take the most prominent one
-if length(pertIdx) > 1
-    [~, maxPromIdx] = max(peakProms);
-    pertIdx = pertIdx(maxPromIdx);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% PER-UNIT RECOVERY METRICS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Calculates recovery metrics for good units:
+% 1. Recovery fidelity: steady-state / baseline rate
+% 2. Recovery time: time to 90% of baseline
+% 3. Recovery slope: initial rate of recovery
+% 4. Bad units marked with NaN in output arrays
+% Note that although we modeled the overshoot, focusing on kRecov means
+% that only the homeostatic recovery is included in the rate estimates.
+
+% Initialize output arrays with NaNs for all units
+recovFr = nan(nUnits, 1);
+recovError = nan(nUnits, 1);
+recovChange    = nan(nUnits, 1);
+recovTime     = nan(nUnits, 1);
+recovSlope    = nan(nUnits, 1);
+normSlope     = nan(nUnits, 1);
+bslFr         = nan(nUnits, 1);
+
+% Loop through good units to calculate and store metrics
+for iGood = 1:nGood
+    idxRef = uGood(iGood);
+
+    if frFit.rsquare(idxRef) > 0
+        % Extract fitted parameters for clarity
+        pFit = frFit.pFit(idxRef, :);
+        frSS = pFit(1);
+        kRecov = pFit(2);
+        frTrough = frFit.troughFr(idxRef);
+        bslFr(idxRef) = frFit.bslFr(idxRef);
+
+        % Store steady-state FR from model
+        recovFr(idxRef) = frSS;
+
+        % Recovery Error; fold change relative to to baseline
+        recovChange(idxRef) = log2(frSS / bslFr(idxRef));
+        recovError(idxRef) = abs(recovChange(idxRef));
+
+        % Metric 2: Recovery Kinetics (Time and Slope)
+        if kRecov > eps
+            % Time to 90% recovery (based on the primary exponential term)
+            recovTime(idxRef) = -log(0.1) / kRecov; % in seconds
+
+            % Normalized slope [% of recovery range per min]
+            normSlope(idxRef) = kRecov * 60 * 100;
+
+            % Initial recovery slope [Hz/min]. Note this depends on the
+            % petrubation effect size.
+            recovSlope(idxRef) = (frSS - frTrough) * kRecov * 60;
+        end
+    end
 end
 
-% If no significant peak found, use the global minimum
-if isempty(pertIdx)
-    [~, pertIdx] = min(mfr);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% IDENTIFY BAD UNITS BASED ON FIT QUALITY AND STABILITY
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Find bad units based on criteria
+
+% Define thresholds
+thrRsquare = 0.1;
+thrBslSlope = 1;    % Hz/min (equivalent to 45 degrees)
+thrPert = 0.2;      % Percent reduction from baseline
+thrRecov = 0.1;
+thrBsl = 0.001;
+
+tauRecov = 1 ./ frFit.pFit(:, 2);
+badFast = tauRecov < binSize;                
+badPert = (frFit.bslFr - frFit.troughFr) ./ frFit.bslFr < thrPert;    
+badBsl = frFit.bslFr < thrBsl;
+badRecov = recovError < thrRecov;    
+badSlope = abs(squeeze(frFit.bslFit(:, 2))) > thrBslSlope;
+badRsquare = frFit.rsquare < thrRsquare;
+badSpks = nSpks < spkThr;
+
+uBad = badFast | badPert | badBsl | badRecov | badSlope | badRsquare | badSpks | uOutlier;
+uGood = ~uBad;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% HOMEOSTATIC CAPACITY
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Creates a composite score that represents a neuron's homeostatic
+% capacitiy, a combination of recovery speed and accuracy. 
+
+% Invert recovFidelity so that higher values indicate better recovery
+% (lower error = better fidelity)
+dataVars = [zscore(-recovError(uGood)), zscore(normSlope(uGood))];
+
+% Run PCA
+[loadings, pc, ~] = pca(dataVars);
+pc = pc(:, 1);
+
+% Ensure direction is correct (high score = good recovery)
+% Both loadings should be positive for higher values to indicate better recovery
+if loadings(1, 1) < 0 || loadings(2, 1) < 0
+    pc = -pc;
 end
 
-% Get the perturbation time
-pertTime = t(pertIdx);
+hCapacity = nan(nUnits, 1);
+hCapacity(uGood) = pc;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% RECOVERY ANALYSIS
+% NETWORK IMPACT FACTOR (NIF)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Calculates each neuron's unique contribution to network MFR recovery
+% using leave-one-out analysis. NIF answers: "What is the unique,
+% indispensable contribution of each neuron to the network's MFR recovery?"
+% 1. Calculate baseline network recovery using fitted steady-state values
+% 2. For each unit, recalculate network recovery excluding that unit
+% 3. NIF = difference in recovery error (baseline - leave-one-out)
+% 4. Higher NIF = more critical unit for network recovery
 
-% Define margin bins for more robust calculations
-mrgnBins = 5;  % Number of bins to add/remove for calculations
+% Calculate baseline network recovery (simple mean across units)
+recovMfr = mean(recovFr(uGood));
+bslMfr = mean(bslFr(uGood));
+mfrError = log2(recovMfr / bslMfr);
 
-% Analyze recovery for each unit
-for iGood = 1:length(uGood)
-    iUnit = uGood(iGood);
-    
-    % Get unit's firing rate
-    uFr = fr(:, iGood);
-    
-    % Calculate baseline (pre-perturbation) firing rate with margin
-    baseIdx = t < t(pertIdx - mrgnBins);
-    frBsl(iUnit) = mean(uFr(baseIdx), 'omitnan');
-    
-    % Skip if baseline firing rate is too low
-    if frBsl(iUnit) < frThr
+% Initialize
+nif = nan(nUnits, 1);
+looBsl = nan(nUnits, 1);
+
+% Loop through each good unit for leave-one-out analysis
+for iUnit = 1:nUnits
+    if ~uGood(iUnit)
         continue
     end
     
-    % Find recovery time and calculate metrics
-    [recovTime(iUnit), recovIdx(iUnit), recovSlope(iUnit), frRecov(iUnit)] = ...
-        fit_recovery(uFr, t, pertTime, frBsl(iUnit), bslThr, mrgnBins);
+    % Remove this unit from the analysis
+    uLOO = uGood;
+    uLOO(iUnit) = false;
+    
+    % Calculate network recovery without this unit
+    recovLOO = mean(recovFr(uLOO));
+    looBsl(iUnit) = mean(bslFr(uLOO));
+    looError = log2(recovLOO / looBsl(iUnit));
+    
+    % NIF = difference in recovery error
+    nif(iUnit) = mfrError - looError;
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% PLOT RECOVERY RELATIONSHIPS
+% ORGANIZE OUTPUT & SAVE
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Packages results and generates outputs:
+% 1. Store all metrics in output structure
+% 2. Save to .frr.mat file if requested
+% 3. Generate summary plots if requested
 
-% Get valid units (those with recovery)
-validUnits = find(~isnan(recovTime) & ~isnan(recovSlope));
+% Organize output structure
+frr.fr = fr;
+frr.t = t;
+frr.bslFr = bslFr(:);
+frr.hCapacity = hCapacity;
+frr.nif = nif;
+frr.recovFr = recovFr;
+frr.looBsl = looBsl;
+frr.recovError = recovError;
+frr.recovChange = recovChange;
+frr.recovTime = recovTime;
+frr.recovSlope = recovSlope;
+frr.normSlope = normSlope;
+frr.frFit = frFit;
 
-% Create figure for recovery relationships
-figure('Name', 'Recovery Relationships', 'NumberTitle', 'off');
+frr.info.basename = basename;
+frr.info.runtime = datetime("now");
+frr.info.pertOnset = pertOnset;
+frr.info.recovOnset = recovOnset;
+frr.info.nSpks = nSpks;
+frr.info.uGood = uGood;
+frr.info.winLim = winLim;
+frr.info.spkThr = spkThr;
+frr.info.binSize = binSize;
+frr.info.sgPolyOrder = sgPolyOrder;
+frr.info.sgFrameSec = sgFrameSec;
 
-% Plot baseline vs recovery firing rate
-subplot(1,2,1);
-plot_scatterCorr(frBsl(validUnits), fr(validUnits), ...
-    'xLbl', 'Baseline Firing Rate (Hz)', 'yLbl', 'Recovery Firing Rate (Hz)');
-
-% Plot baseline vs recovery slope
-subplot(1,2,2);
-plot_scatterCorr(frBsl(validUnits), recovSlope(validUnits), ...
-    'xLbl', 'Baseline Firing Rate (Hz)', 'yLbl', 'Recovery Slope (Hz/min)');
-
-% Adjust figure
-set(gcf, 'Position', [100 100 1200 500]);
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% PLOT RECOVERY SLOPES
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% Get valid units (those with recovery)
-nSmpl = 10;
-validUnits = find(~isnan(recovTime) & ~isnan(recovSlope));
-% Select random sample
-rng(1); % For reproducibility
-smplUnits = validUnits(randperm(length(validUnits), nSmpl));
-
-% Create figure
-figure('Name', 'Recovery Slopes', 'NumberTitle', 'off');
-
-% Plot MFR for context
-subplot(2,1,1);
-plot(t/60, mfr, 'k', 'LineWidth', 1);
-hold on;
-xline(pertTime/60, 'r--', 'Perturbation');
-xlabel('Time (min)');
-ylabel('MFR (Hz)');
-title('Population Mean Firing Rate');
-
-% Plot recovery slopes
-subplot(2,1,2);
-colors = lines(length(smplUnits));
-for iUnit = 1:length(smplUnits)
-    uIdx = smplUnits(iUnit);
-    % Plot firing rate
-    plot(t/60, fr(:, uIdx), 'Color', [colors(iUnit,:), 0.3], 'LineWidth', 1);
-    hold on;
-    % Plot recovery slope
-    tRecov = [t(pertIdx), t(recovIdx(uIdx))];
-    ySlope = [fr(pertIdx, uIdx), fr(recovIdx(uIdx), uIdx)];
-    plot(tRecov/60, ySlope, '--', 'Color', colors(iUnit,:), 'LineWidth', 2);
-end
-xline(pertTime/60, 'r--', 'Perturbation');
-xlabel('Time (min)');
-ylabel('Firing Rate (Hz)');
-title(sprintf('Recovery Slopes (n=%d units)', length(smplUnits)));
-
-% Add legend with recovery times
-legStr = arrayfun(@(x) sprintf('Unit %d (%.1f min)', x, recovTime(x)/60), ...
-    smplUnits, 'UniformOutput', false);
-legend(legStr, 'Location', 'eastoutside');
-
-% Adjust figure
-set(gcf, 'Position', [100 100 1200 800]);
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% ORGANIZE OUTPUT
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% Store results
-frr.bslFr = frBsl;              % Baseline firing rates
-frr.frRecov = frRecov;          % Steady state firing rate
-frr.recovTime = recovTime;      % Recovery time for each unit
-frr.recovSlope = recovSlope;    % Recovery slope (Hz/min)
-frr.pertTime = pertTime;        % Detected perturbation time
-frr.fr = fr;                    % Full firing rate curves
-frr.t = t;                      % Time vector
-
-% Create info struct with parameters and metadata
-frr.info = struct(...
-    'nUnits', nUnits, ...
-    'winLim', winLim, ...
-    'spkThr', spkThr, ...
-    'frThr', frThr, ...
-    'bslThr', bslThr);
-
-% Save results if requested
+% Save results
 if flgSave
     save(fullfile(basepath, [basename, '.frr.mat']), 'frr', '-v7.3');
 end
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% PLOTTING
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+if flgPlot
+    plot_frr(frr);
+end
+
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% HELPER FUNCTION: DENOISE FIRING RATE
+% HELPER FUNCTION: PLOT RECOVERY RESULTS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-function [fr, mfr] = denoise_fr(frOrig, mfrOrig, t)
-% DENOISE_FR Denoises firing rate data using wavelet denoising.
-%
-% Hardcoded parameters for consistent denoising across all analyses.
+function plot_frr(frr, unitIdx)
+% PLOT_FRR Generates a 4-panel summary figure of firing rate recovery analysis.
 %
 % INPUT:
-%   frOrig      - Original firing rate matrix [time x units]
-%   mfrOrig     - Original mean firing rate vector
-%   t           - Time vector
+%   frr         - Structure containing recovery analysis results
+%   unitIdx     - Optional array of unit indices to plot. If empty or not
+%                 provided, uses frr.info.uGood.
 %
-% OUTPUT:
-%   fr          - Denoised firing rate matrix
-%   mfr         - Denoised mean firing rate vector
+% DEPENDENCIES:
+%   plot_scatterCorr.m
 
-% Hardcoded denoising parameters
-wavelet = 'sym8';
-level = 10;
-thresholdRule = 'Hard';
+% Extract data from frr structure
+t = frr.t;
+fr = frr.fr;  % Units are rows
+frFit = frr.frFit;
+uGood = find(frr.info.uGood);
 
-% Apply wavelet denoising
-fr = wdenoise(frOrig, level, 'Wavelet', wavelet, 'ThresholdRule', thresholdRule);
-mfr = wdenoise(mfrOrig, level, 'Wavelet', wavelet, 'ThresholdRule', thresholdRule);
+% Use provided unitIdx if available, otherwise use uGood
+if nargin < 2 || isempty(unitIdx)
+    unitIdx = uGood;
+end
 
-% Ensure non-negative values
-fr = max(0, fr);
-mfr = max(0, mfr);
+pertOnset = frr.info.pertOnset;
+recovOnset = frr.info.recovOnset;
+pertOnsetTime = t(frr.info.pertOnset);
+recovOnsetTime = t(frr.info.recovOnset);
+bslFr = frr.bslFr;
+recovError = frr.recovError;
+recovTime = frr.recovTime;
+recovSlope = frr.recovSlope;
+normSlope = frr.normSlope;
 
-% Always plot results
-figure('Name', 'Firing Rate Denoising', 'NumberTitle', 'off');
+nGood = length(unitIdx);
 
-% Plot MFR
-subplot(2,1,1); hold on
-h1 = plot(t/60, mfrOrig, 'k', 'LineWidth', 1);
-h2 = plot(t/60, mfr, 'r', 'LineWidth', 1.5);
-set(h1, 'Color', [0 0 0 0.3]); % Make original signal semi-transparent
-xlabel('Time (min)');
-ylabel('MFR (Hz)');
-title('Population Mean Firing Rate');
-legend([h1 h2], {'Smoothed', 'Denoised'}, 'Location', 'best');
+hndFig = figure('NumberTitle', 'off', ...
+    'Position', [100 100 1400 800], 'Color', 'w');
+txtTtl = sprintf('Firing Rate Recovery - %s', frr.info.basename);
 
-% Plot example units
-subplot(2,1,2); hold on
-nSmpl = min(5, size(fr,2));
-rng(1); % For reproducibility
-smplUnits = randperm(size(fr,2), nSmpl);
+% --- Panel 1: Example fits ---
+ax1 = subplot(2, 3, [1,2]);
+hold(ax1, 'on');
+nSmpl = min(5, nGood);
+rng(1); % for reproducibility
+smpl_locs = randperm(nGood, nSmpl);
 colors = lines(nSmpl);
 
 for i = 1:nSmpl
-    uIdx = smplUnits(i);
-    h1 = plot(t/60, frOrig(:, uIdx), 'Color', [colors(i,:) 0.3], 'LineWidth', 1);
-    h2 = plot(t/60, fr(:, uIdx), '--', 'Color', colors(i,:), 'LineWidth', 1.5);
-    set(h1, 'Color', [colors(i,:) 0.3]); % Make original signal semi-transparent
+    i_into_good_list = smpl_locs(i);
+    idxRef = unitIdx(i_into_good_list);
+    plot(ax1, t/60, fr(idxRef, :), 'Color', [colors(i,:), 0.4], 'LineWidth', 1.5);
+    plot(ax1, t/60, frFit.fitCurve(idxRef, :), 'Color', colors(i,:), 'LineWidth', 2.5, 'DisplayName', sprintf('Unit %d', idxRef));
 end
-xlabel('Time (min)');
-ylabel('Firing Rate (Hz)');
-title(sprintf('Example Units (n=%d)', nSmpl));
+xline(ax1, pertOnsetTime/60, 'k--', {'Pert. Onset'}, 'LineWidth', 1.5, 'LabelOrientation', 'horizontal');
+xline(ax1, recovOnsetTime/60, 'r--', {'Recov. Onset'}, 'LineWidth', 1.5, 'LabelOrientation', 'horizontal');
+title(ax1, txtTtl);
+xlabel(ax1, 'Time (min)');
+ylabel(ax1, 'Smoothed FR (Hz)');
+legend(ax1, 'show', 'Location', 'best');
+grid(ax1, 'on');
+box(ax1, 'on');
+xlim(ax1, [t(1)/60, t(end)/60]);
 
-% Create legend entries
-legEntries = cell(1, nSmpl*2);
-for i = 1:nSmpl
-    legEntries{i*2-1} = sprintf('Unit %d (smoothed)', smplUnits(i));
-    legEntries{i*2} = sprintf('Unit %d (denoised)', smplUnits(i));
-end
-legend(legEntries, 'Location', 'eastoutside');
+% --- Panel 2: MFR and Model Fit ---
+ax2 = subplot(2, 3, 3);
+hold(ax2, 'on');
 
-set(gcf, 'Position', [100 100 1200 800]);
+% Calculate MFR from good units only
+mfr_good = mean(fr(unitIdx, :), 1, 'omitnan');
 
-end
+% Fit model directly to MFR
+mfr_fit = mea_frFit(mfr_good, recovOnset, pertOnset);
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% HELPER FUNCTION: FIT RECOVERY
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+plot(ax2, t/60, mfr_good, 'b-', 'LineWidth', 2, 'DisplayName', 'MFR (smoothed)');
+plot(ax2, t/60, mfr_fit.fitCurve, 'r-', 'LineWidth', 2, 'DisplayName', 'MFR (model fit)');
+xline(ax2, pertOnsetTime/60, 'k--', {'Pert. Onset'}, 'LineWidth', 1.5, 'LabelOrientation', 'horizontal');
+xline(ax2, recovOnsetTime/60, 'r--', {'Recov. Onset'}, 'LineWidth', 1.5, 'LabelOrientation', 'horizontal');
+title(ax2, 'Population Mean Firing Rate');
+xlabel(ax2, 'Time (min)');
+ylabel(ax2, 'MFR (Hz)');
+legend(ax2, 'show', 'Location', 'best');
+grid(ax2, 'on');
+box(ax2, 'on');
+xlim(ax2, [t(1)/60, t(end)/60]);
 
-function [recovTime, recovIdx, recovSlope, frRecov] = fit_recovery(fr, t, pertTime, bslFr, bslThr, mrgnBins)
-% FIT_RECOVERY Finds recovery time and calculates recovery metrics.
-%
-% INPUT:
-%   fr           - Firing rate vector.
-%   t            - Time vector.
-%   pertTime     - Perturbation time.
-%   bslFr        - Baseline firing rate.
-%   bslThr       - Tolerance threshold for recovery (fraction of baseline).
-%   mrgnBins     - Number of margin bins to add/remove.
-%
-% OUTPUT:
-%   recovTime    - Time to recovery [s].
-%   recovIdx     - Index of recovery time.
-%   recovSlope   - Recovery slope [Hz/min].
-%   frRecov      - Recovery firing rate [Hz].
+% --- Panel 3: Baseline FR vs Fidelity ---
+hndAx = subplot(2, 3, 4);
+plot_scatterCorr(bslFr(unitIdx), recovError(unitIdx), ...
+    'xLbl', 'Baseline FR (Hz)', ...
+    'yLbl', 'Recovery Error (log2 fold change from baseline)', ...
+    'hndAx', hndAx);
 
-% Find perturbation index
-[~, pertIdx] = min(abs(t - pertTime));
+% --- Panel 4: Baseline FR vs Recovery Time ---
+hndAx = subplot(2, 3, 5);
+plot_scatterCorr(bslFr(unitIdx), recovTime(unitIdx)/60, ...
+    'xLbl', 'Baseline FR (Hz)', ...
+    'yLbl', 'Time to 90% Recovery (min)', ...
+    'hndAx', hndAx);
 
-% Get post-perturbation data with margin
-postIdx = t >= t(pertIdx + mrgnBins);
-recovFr = fr(postIdx);
-recovT = t(postIdx);
+% --- Panel 5: Recovery Error vs Recovery Time ---
+hndAx = subplot(2, 3, 6);
+plot_scatterCorr(recovError(unitIdx), recovTime(unitIdx)/60, ...
+    'xLbl', 'Recovery Error (log2 fold change)', ...
+    'yLbl', 'Time to 90% Recovery (min)', ...
+    'hndAx', hndAx);
 
-% Skip if not enough data points
-if sum(~isnan(recovFr)) < 10
-    recovTime = NaN;
-    recovIdx = NaN;
-    recovSlope = NaN;
-    frRecov = NaN;
-    return
-end
-
-% Calculate tolerance window
-tolLow = bslFr * (1 - bslThr);
-tolHigh = bslFr * (1 + bslThr);
-
-% Find first time firing rate returns to baseline tolerance
-inTol = recovFr >= tolLow & recovFr <= tolHigh;
-
-% Find first sustained return to baseline (at least 3 consecutive bins)
-sustainedDur = 3;
-recovFound = false;
-for i = 1:(length(inTol) - sustainedDur + 1)
-    if all(inTol(i:i + sustainedDur - 1))
-        recovIdx = find(t == recovT(i));
-        recovTime = recovT(i) - pertTime;
-        recovFound = true;
-        break
-    end
 end
 
-% If no sustained recovery found, use end of recording
-if ~recovFound
-    recovTime = t(end);
-    recovIdx = length(t);
-end
 
-% Calculate recovery slope
-pertIdxMarg = pertIdx + mrgnBins;
-recovIdxMarg = recovIdx - mrgnBins;
 
-% Ensure we have enough points for slope calculation
-if recovIdxMarg - pertIdxMarg > 2
-    x = t(pertIdxMarg:recovIdxMarg) / 60;  % Convert to minutes
-    y = fr(pertIdxMarg:recovIdxMarg);
-    % Use robust linear fit if enough points
-    [p, ~] = robustfit(x, y);
-    recovSlope = p(2);  % Slope in Hz/min
-else
-    % Use simple two-point slope if not enough points
-    recovSlope = (fr(recovIdxMarg) - fr(pertIdxMarg)) / ...
-        ((t(recovIdxMarg) - t(pertIdxMarg)) / 60);
-end
-
-% Calculate recovery firing rate
-if recovFound
-    % Use mean after recovery point
-    frRecov = mean(fr(recovIdx - mrgnBins : end), 'omitnan');
-else
-    % Use mean of last 20 bins if no recovery found
-    lastBins = 20;
-    frRecov = mean(fr(end - lastBins + 1 : end), 'omitnan');
-end
-
-end
 
