@@ -121,8 +121,6 @@ end
 
 %%% REPLACE WITH FINDPEAKS
 
-%%% Also add instability to the recovery (linear)
-
 % Overshoot amplitude: Based on max post-pert FR
 [maxFr, maxIdx] = max(frPost);
 if maxFr > frRecov
@@ -285,11 +283,11 @@ tauRecovSec = tauRecov * binSize; % Convert to seconds
 minTau = 1; 
 qualityChecks.recoveryKinetics = tauRecovSec >= minTau;
 
-% RECOVERY FAILURE
-thrRecov = -3; % log2(0.12) for minimum ~12% recovery
+% RECOVERY STRENGTH
+recovThr = 1; % log2(0.8) for ~20% reduction threshold
 frFit.recovChange = log2(frFit.frRecov / frFit.frBsl);
-frFit.recovError = abs(frFit.recovChange);
-qualityChecks.recoveryFailed = frFit.recovChange <= thrRecov;
+frFit.recovError = abs(recovChange);
+qualityChecks.recoveryFailed = frFit.recovChange < minTau;
 
 % PERTURBATION RESPONSE
 % Units should show meaningful perturbation effects (>20% reduction from baseline)

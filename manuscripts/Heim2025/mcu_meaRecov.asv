@@ -4,34 +4,43 @@
 
 % Files
 basepaths = [mcu_sessions('mea_bac')];
+% basepaths = [mcu_sessions('mea_mcuko')];
+
+
 nFiles = length(basepaths);
 vars = {'mea', 'st_metrics', 'fr'};
 v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 
 % Analysis Params
-winLim = [0 70 * 60];        
+winLim = [5 * 60 60 * 60];        
+expLim = [0, 8 * 60 * 60];
+% expLim = [0, Inf];
 
 for iFile = 1 : nFiles
 
     basepath = basepaths{iFile};
     cd(basepath);
     
+    % files = dir('*sorted*');
+    % mea = mea_orgNex('fname', files.name, 'basepath', pwd, 'forceL', false);
+    spktimes = v(iFile).mea.spktimes;
+    
+    % --- Firing Rate Recovery
+    frr = mea_frRecovery(spktimes, 'winLim', expLim,...
+        'flgSave', true, 'flgPlot', true);
+    
+    % --- Spike timing metrics
+    st = spktimes_metrics('spktimes', spktimes, 'sunits', [],...
+        'bins', winLim, 'flg_force', true, 'flg_save', true, 'flg_all', false);
+
+    % --- Bursts
+    brst = spktimes_meaBrst(spktimes, 'binsize', [], 'isiThr', 0.005,...
+        'minSpks', 2, 'flg_save', true, 'flg_force', true, 'bins', winLim);
+
     % --- Population Coupling
     % [prc] = prCoupling(v(iFile).mea.spktimes, params,...
     %     'winLim', winLim, ,'skpLim', 2000, 'flgSave', true);
     % prCoupling_plot(prc, 'basepath', basepath, 'flgSaveFig', true);
-    
-    % --- Firing Rate Recovery
-    frr = mea_frRecovery(v(iFile).mea.spktimes, 'winLim', [0, 9 * 60 * 60],...
-        'flgSave', true, 'flgPlot', false);
-    
-    % % --- Spike timing metrics
-    % st = spktimes_metrics('spktimes', v(iFile).mea.spktimes, 'sunits', [],...
-    %     'bins', winLim, 'flg_force', true, 'flg_save', true, 'flg_all', false);
-    % 
-    % % --- Bursts
-    % brst = spktimes_meaBrst(v(iFile).mea.spktimes, 'binsize', [], 'isiThr', 0.005,...
-    %     'minSpks', 2, 'flg_save', true, 'flg_force', true, 'bins', winLim);
 
 end
 
@@ -46,12 +55,13 @@ end
 basepaths = [mcu_sessions('mea_bac')];
 nFiles = length(basepaths);
 vars = {'st_metrics', 'st_brst', 'frr', 'prc'};
+vars = {'st_metrics', 'st_brst', 'frr'};
 v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 
 % Concate structs, organize vars and table
 st = catfields([v(:).st], 2);
 brst = catfields([v(:).brst], 2);
-prc = catfields([v(:).prc], 1);
+% prc = catfields([v(:).prc], 1);
 frr = catfields([v(:).frr], 1);
 
 % Select units
@@ -63,18 +73,20 @@ nUnits = sum(uGood);
 
 dataTbl = table();
 dataTbl.UnitID = (1:nUnits)';
-dataTbl.PRC = prc.prc0_z(uGood);
+% dataTbl.PRC = prc.prc0_norm(uGood);
 dataTbl.BurstRoyer = st.royer(uGood)';
 dataTbl.BurstMizuseki = st.mizuseki(uGood)';
-dataTbl.BurstSpkPct = brst.spkprct(uGood)';
-dataTbl.FrBsl = frr.frFit.bslFr(uGood);
-dataTbl.RecoveryFr = frr.recovFr(uGood);
-dataTbl.RecoverySpeed = frr.normSlope(uGood);
+dataTbl.BurstSpkPrct = brst.spkprct(uGood)';
+dataTbl.FrBsl = frr.frBsl(uGood);
+dataTbl.LooBsl = frr.looBsl(uGood);
+dataTbl.RecoveryFr = frr.frRecov(uGood);
+dataTbl.RecoverySlope = frr.normSlope(uGood);
+dataTbl.RecoveryTime = frr.recovTime(uGood);
 dataTbl.RecoveryError = frr.recovError(uGood);
 dataTbl.RecoveryChange = frr.recovChange(uGood);
 dataTbl.hCapacity = frr.hCapacity(uGood);
 dataTbl.NIF = frr.nif(uGood);
-pertDepth = (frr.bslFr - frr.frFit.troughFr) ./ frr.bslFr;
+pertDepth = (frr.frBsl - frr.frTrough) ./ frr.frBsl;
 dataTbl.PerturbationDepth = pertDepth(uGood);
 
 % Remove rows with NaN values. fitlm would do this anyway, but this
@@ -117,9 +129,10 @@ for iVar = 1:length(tblVars)
     end
 end
 
-% Now create lmTbl and apply z-scoring
+% Apply z-scoring
+varsExc = {'UnitID', 'RecoverySlope', 'RecoveryError', 'hCapacity',...
+    'RecoveryTime'};
 lmTbl = tmpTbl;
-varsExc = {'UnitID', 'RecoverySpeed', 'RecoveryError', 'hCapacity'};
 for iVar = 1:length(tblVars)
     varName = tblVars{iVar};
     if any(contains(varName, varsExc))
@@ -136,8 +149,8 @@ end
 
 % Create Formula
 varsResponse = 'RecoveryError';  
-varsResponse = 'RecoverySpeed';  
-% varsResponse = 'hCapacity';  
+varsResponse = 'RecoveryTime';  
+% varsResponse = 'RecoverySlope';  
 % varsResponse = 'NIF';  
 varsPredict = {'PRC', 'FrBsl', 'RecoveryFr', 'BurstMizuseki', 'PerturbationDepth', 'NIF'}; 
 varsPredict = {'FrBsl', 'BurstMizuseki', 'PerturbationDepth'}; 
@@ -149,11 +162,11 @@ disp(mdl);
 
 
 varsExc = {'UnitID', 'PerturbationDepth'};
-varsInc = {'hCapacity', 'RecoveryError', 'RecoverySpeed',...
+varsInc = {'hCapacity', 'RecoveryError', 'RecoverySlope',...
     'FrBsl', 'BurstMizuseki', 'PRC'};
-varsInc = {'hCapacity', 'RecoveryError', 'RecoverySpeed',...
-    'NIF'};
-hndFig = plot_tblPairs(dataTbl, 'varsExc', varsExc, 'varsInc', varsInc);
+varsInc = {'RecoveryError', 'RecoveryTime', 'FrBsl', 'BurstMizuseki', 'BurstRoyer'};
+hndFig = plot_tblPairs(dataTbl, 'varsExc', varsExc, 'varsInc', varsInc,...
+    'flgOtl', false);
 
 
 

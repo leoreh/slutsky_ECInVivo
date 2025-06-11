@@ -4,25 +4,26 @@
 
 % Files
 basepaths = [mcu_sessions('mea_bac')];
-basepaths = [mcu_sessions('mea_mcufl')];
-basepaths = [mcu_sessions('mea_mcuko')];
+% basepaths = [mcu_sessions('mea_mcuko')];
+
+
 nFiles = length(basepaths);
 vars = {'mea', 'st_metrics', 'fr'};
 v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 
 % Analysis Params
-winLim = [0 70 * 60];        
-expLim = [0, 9 * 60 * 60];
-expLim = [0, Inf];
+winLim = [5 * 60 60 * 60];        
+expLim = [0, 8 * 60 * 60];
+% expLim = [0, Inf];
 
-for iFile = 4 : nFiles
+for iFile = 1 : nFiles
 
     basepath = basepaths{iFile};
     cd(basepath);
     
-    files = dir('*sorted*');
-    mea = mea_orgNex('fname', files.name, 'basepath', pwd, 'forceL', false);
-    spktimes = mea.spktimes;
+    % files = dir('*sorted*');
+    % mea = mea_orgNex('fname', files.name, 'basepath', pwd, 'forceL', false);
+    spktimes = v(iFile).mea.spktimes;
     
     % --- Firing Rate Recovery
     frr = mea_frRecovery(spktimes, 'winLim', expLim,...
@@ -52,7 +53,6 @@ end
 
 % Files
 basepaths = [mcu_sessions('mea_bac')];
-basepaths = [mcu_sessions('mea_mcufl')];
 nFiles = length(basepaths);
 vars = {'st_metrics', 'st_brst', 'frr', 'prc'};
 vars = {'st_metrics', 'st_brst', 'frr'};
@@ -77,15 +77,16 @@ dataTbl.UnitID = (1:nUnits)';
 dataTbl.BurstRoyer = st.royer(uGood)';
 dataTbl.BurstMizuseki = st.mizuseki(uGood)';
 dataTbl.BurstSpkPrct = brst.spkprct(uGood)';
-dataTbl.FrBsl = frr.frFit.bslFr(uGood);
+dataTbl.FrBsl = frr.frBsl(uGood);
 dataTbl.LooBsl = frr.looBsl(uGood);
-dataTbl.RecoveryFr = frr.recovFr(uGood);
-dataTbl.RecoverySpeed = frr.normSlope(uGood);
+dataTbl.RecoveryFr = frr.frRecov(uGood);
+dataTbl.RecoverySlope = frr.normSlope(uGood);
+dataTbl.RecoveryTime = frr.recovTime(uGood);
 dataTbl.RecoveryError = frr.recovError(uGood);
 dataTbl.RecoveryChange = frr.recovChange(uGood);
 dataTbl.hCapacity = frr.hCapacity(uGood);
 dataTbl.NIF = frr.nif(uGood);
-pertDepth = (frr.bslFr - frr.frFit.troughFr) ./ frr.bslFr;
+pertDepth = (frr.frBsl - frr.frTrough) ./ frr.frBsl;
 dataTbl.PerturbationDepth = pertDepth(uGood);
 
 % Remove rows with NaN values. fitlm would do this anyway, but this
@@ -118,19 +119,20 @@ for iVar = 1:length(tblVars)
     
     variableData = tmpTbl.(varName);
     
-    % Check for non-negativity before log transform
-    if min(variableData) >= 0
-        s = skewness(variableData);
-        if s > skewThr
-            % dataTbl.(varName) = log1p(variableData);
-            tmpTbl.(varName) = log10(variableData + min(variableData(variableData > 0) / 2));
-        end
-    end
+    % % Check for non-negativity before log transform
+    % if min(variableData) >= 0
+    %     s = skewness(variableData);
+    %     if s > skewThr
+    %         % dataTbl.(varName) = log1p(variableData);
+    %         tmpTbl.(varName) = log10(variableData + min(variableData(variableData > 0) / 2));
+    %     end
+    % end
 end
 
-% Now create lmTbl and apply z-scoring
+% Apply z-scoring
+varsExc = {'UnitID', 'RecoverySlope', 'RecoveryError', 'hCapacity',...
+    'RecoveryTime'};
 lmTbl = tmpTbl;
-varsExc = {'UnitID', 'RecoverySpeed', 'RecoveryError', 'hCapacity'};
 for iVar = 1:length(tblVars)
     varName = tblVars{iVar};
     if any(contains(varName, varsExc))
@@ -147,8 +149,8 @@ end
 
 % Create Formula
 varsResponse = 'RecoveryError';  
-varsResponse = 'RecoverySpeed';  
-% varsResponse = 'hCapacity';  
+% varsResponse = 'RecoveryTime';  
+% varsResponse = 'RecoverySlope';  
 % varsResponse = 'NIF';  
 varsPredict = {'PRC', 'FrBsl', 'RecoveryFr', 'BurstMizuseki', 'PerturbationDepth', 'NIF'}; 
 varsPredict = {'FrBsl', 'BurstMizuseki', 'PerturbationDepth'}; 
@@ -160,9 +162,9 @@ disp(mdl);
 
 
 varsExc = {'UnitID', 'PerturbationDepth'};
-varsInc = {'hCapacity', 'RecoveryError', 'RecoverySpeed',...
+varsInc = {'hCapacity', 'RecoveryError', 'RecoverySlope',...
     'FrBsl', 'BurstMizuseki', 'PRC'};
-varsInc = {'RecoveryError', 'RecoverySpeed', 'FrBsl', 'LooBsl'};
+varsInc = {'RecoveryError', 'RecoveryTime', 'RecoverySlope', 'FrBsl', 'BurstMizuseki'};
 hndFig = plot_tblPairs(dataTbl, 'varsExc', varsExc, 'varsInc', varsInc,...
     'flgOtl', false);
 
