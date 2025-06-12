@@ -119,15 +119,18 @@ uBad = nSpks < spkThr & uOtl;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PERTURBATION DETECTION FROM MFR
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Detect perturbation onset time. Find the N largest MFR drops (most
-% negative derivative) and select the one that occurs at the lowest MFR,
-% which is characteristic of a major network state transition.
+% Detects perturbation and recovery times from population activity:
+% 1. Calculate mean firing rate (MFR) across all units
+% 2. Find perturbation onset as steepest decline in MFR
+% 3. Identify recovery onset as the start of a significant upward trend
 
 % Calculate MFR from the smoothed individual unit traces
 mfr = mean(fr(~uBad, :), 1, 'omitnan');
 dmfr = diff(mfr);
 
-% Limit the search to a pre-defined window
+% Detect perturbation onset time. Find the N largest MFR drops (most
+% negative derivative) and select the one that occurs at the lowest MFR,
+% which is characteristic of a major network state transition.
 pertWin = round([10, 100] * 60 / binSize);
 pertWin = pertWin(1) : pertWin(2);
 dmfrWin = dmfr(pertWin);
@@ -136,6 +139,7 @@ mfrWin = mfr(pertWin);
 % Find the top N most negative derivatives
 nCandidates = 10;
 [sortedDrops, sortIdx] = sort(dmfrWin, 'ascend');
+
 nTop = min(nCandidates, length(sortedDrops));
 topIdx = sortIdx(1:nTop);
 
@@ -152,9 +156,16 @@ pertOnset = pertWin(bestCandidateIdx);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Fits recovery model to each unit's post-perturbation data:
 
-% Get frFit structure template by calling mea_frFit with dummy data and
-% pre-allocate the array
-frFit = mea_frFit(zeros(100, 1), pertOnset, 'flgPlot', false, 'binSize', binSize);
+% Initialize frFit array with complete structure to ensure consistency
+% even if mea_frFit exits early
+frFit = struct('frTrough', NaN, 'recovOnset', NaN, 'model', '', 'pFit', [], ...
+    'rsquare', NaN, 'exitflag', 0, 'fitCurve', [], 'frBsl', NaN, 'bslFit', NaN, ...
+    'frRecov', NaN, 'mdlFits', [], 'gof', struct('AIC', [], 'BIC', []),...
+    'goodFit', false, 'pertDepth', [], 'recovChange', NaN, 'recovError', NaN, ...
+    'fitQlty', struct('fitR2', false, 'bslStab', false, 'recovKin', false, ...
+    'recovFail', false, 'pertResp', false, 'bslRate', false, 'recovRate', false));
+
+% Pre-allocate the array
 frFit = repmat(frFit, nUnits, 1);
 
 for iUnit = 1:nUnits
@@ -195,8 +206,8 @@ for iUnit = 1:nUnits
     end
 
     % Time to threshold recovery
-    thrRecov = 0.5;
-    recovRange = frr.frBsl(iUnit) - frr.frTrough(iUnit);
+    thrRecov = 0.9;
+    recovRange = frr.frRecov(iUnit) - frr.frTrough(iUnit);
     recovVal = frr.frTrough(iUnit) + thrRecov * recovRange;
 
     % Use individual unit's recovery onset
@@ -206,8 +217,7 @@ for iUnit = 1:nUnits
     % Convert to time relative to perturbation onset. For units that did
     % not recover, use maximum recording length
     if ~isempty(recovIdx)
-        recovTime(iUnit) = (frr.recovOnset(iUnit) + recovIdx - 1 - pertOnset) * binSize;
-        uRecov(iUnit) = true;
+        recovTime(iUnit) = (frr.recovOnset(iUnit) + recovIdx - 1) - pertOnset * binSize;
     else
         recovTime(iUnit) = t(end); % maximum value + penality (end of recording)
     end
@@ -217,6 +227,10 @@ for iUnit = 1:nUnits
 
     % Normalized slope [% of recovery range per min]
     normSlope(iUnit) = (recovSlope(iUnit) / recovRange) * 100;
+    
+    % Determine if unit recoverd its baseline
+    uRecov(iUnit) = true;
+
 
 end
 

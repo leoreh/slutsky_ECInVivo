@@ -14,7 +14,9 @@ for ipath = 1 : length(basepaths)
     if ~isempty(matches)
         mname{ipath} = matches{1};
     else
-        mname{ipath} = 'No match found';
+        % Fallback: extract the last folder name from the path
+        pathParts = strsplit(basepaths{ipath}, '\');
+        mname{ipath} = pathParts{end};
     end
 end
 

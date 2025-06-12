@@ -54,7 +54,7 @@ isiThr          = p.Results.isiThr;
 binsize         = p.Results.binsize;
 bins            = p.Results.bins;
 minSpks         = p.Results.minSpks;
-flg_save         = p.Results.flg_save;
+flg_save        = p.Results.flg_save;
 flg_all         = p.Results.flg_all;
 flg_force       = p.Results.flg_force;
 

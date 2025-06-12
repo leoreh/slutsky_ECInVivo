@@ -13,7 +13,7 @@ function hndSct = plot_scatterCorr(x, y, varargin)
 % INPUT (Optional Key-Value Pairs):
 %   xLbl        - X-axis label {''}
 %   yLbl        - Y-axis label {''}
-%   flgOtl       - Logical flag to remove outliers {false}
+%   flgOtl      - Logical flag to remove outliers {false}
 %   plotType    - Type of plot: 'scatter' or 'scatterHist' {'scatter'}
 %   hndAx       - Handle to axes for plotting {[]}
 %

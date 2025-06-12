@@ -63,8 +63,7 @@ frFit = struct('frTrough', NaN, 'recovOnset', NaN, 'model', '', 'pFit', [], ...
     'rsquare', NaN, 'exitflag', 0, 'fitCurve', [], 'frBsl', NaN, 'bslFit', NaN, ...
     'frRecov', NaN, 'mdlFits', [], 'gof', struct('AIC', [], 'BIC', []),...
     'goodFit', false, 'pertDepth', [], 'recovChange', NaN, 'recovError', NaN, ...
-    'fitQlty', struct('fitR2', false, 'bslStab', false, 'recovKin', false, ...
-    'recovFail', false, 'pertResp', false, 'bslRate', false, 'recovRate', false));
+    'qualityChecks', struct());
 
 % Hard limit on number of bins with spikes
 if sum(frVec > 0) < 10
@@ -93,8 +92,8 @@ else
     recovOnset = pertOnset + recovDelay - 1;
 end
 
-% % Override recovOnset
-% recovOnset = pertOnset + 5;
+% Override recovOnset
+recovOnset = pertOnset + 5;
 
 % Convert to relative time for fitting
 tPost = tIdx(recovOnset:end) - recovOnset;
@@ -287,23 +286,23 @@ frFit.recovOnset = recovOnset;
 % stability, perturbation response, recovery kinetics, and minimum recovery rates.
 
 % Initialize quality flags
-fitQlty = struct();
+qualityChecks = struct();
 
 % FIT QUALITY
 % R-squared threshold ensures the model explains a meaningful portion of variance
 thrRsquare = 0.1;
-fitQlty.fitR2 = frFit.rsquare >= thrRsquare;
-fitQlty.fitR2(isnan(frFit.rsquare)) = false; % Mark NaN R-squares as bad
+qualityChecks.fitQuality = frFit.rsquare >= thrRsquare;
+qualityChecks.fitQuality(isnan(frFit.rsquare)) = false; % Mark NaN R-squares as bad
 
 % BASELINE STABILITY   
 % Baseline slope should be minimal to ensure stable pre-perturbation activity
-% Use normalized slope (% change per minute) to be independent of baseline FR
-thrBslSlopeNorm = 0.5; % 10% change per minute (much more reasonable)
-if frFit.frBsl > 0
-    baselineSlopeNorm = abs(frFit.bslFit(2)) * 60 / frFit.frBsl; 
-    fitQlty.bslStab = baselineSlopeNorm <= thrBslSlopeNorm;
+% Threshold: 1 Hz/min (equivalent to ~45 degrees slope)
+thrBslSlope = 1; % Hz/min
+if ~isempty(frFit.bslFit) && length(frFit.bslFit) >= 2
+    baselineSlope = abs(frFit.bslFit(2)) * 60; % Convert to Hz/min
+    qualityChecks.baselineStability = baselineSlope <= thrBslSlope;
 else
-    fitQlty.bslStab = false;
+    qualityChecks.baselineStability = false;
 end
 
 % RECOVERY KINETICS
@@ -313,39 +312,36 @@ kRecov = frFit.pFit(2);
 tauRecov = 1 / kRecov; % Recovery time constant in bins
 tauRecovSec = tauRecov * binSize; % Convert to seconds
 minTau = 1; 
-fitQlty.recovKin = tauRecovSec >= minTau;
+qualityChecks.recoveryKinetics = tauRecovSec >= minTau;
 
 % RECOVERY FAILURE
-thrRecov = -4.6; % log2(0.01) for minimum ~1% recovery
+thrRecov = -3; % log2(0.12) for minimum ~12% recovery
 frFit.recovChange = log2(frFit.frRecov / frFit.frBsl);
 frFit.recovError = abs(frFit.recovChange);
-fitQlty.recovFail = frFit.recovChange >= thrRecov;
+qualityChecks.recoveryFailed = frFit.recovChange >= thrRecov;
 
 % PERTURBATION RESPONSE
 % Units should show meaningful perturbation effects (>20% reduction from baseline)
-thrPert = -1; % log2(0.5) for ~50% reduction threshold
+thrPert = -0.3; % log2(0.8) for ~20% reduction threshold
 frFit.pertDepth = log2(frFit.frTrough / frFit.frBsl);
-fitQlty.pertResp = frFit.pertDepth <= thrPert;
+qualityChecks.perturbationResponse = frFit.pertDepth <= thrPert;
+
 
 % BASELINE AND RECOVERY RATE
 % Units should have sufficient activity for reliable analysis
 thrFr = 0.001; % Hz
-fitQlty.bslRate = frFit.frBsl >= thrFr;
-fitQlty.recovRate = frFit.frRecov >= thrFr;
+qualityChecks.baselineRate = frFit.frBsl >= thrFr;
+qualityChecks.recoveryRate = frFit.frRecov >= thrFr;
 
 % COMBINE 
-qualityFields = fieldnames(fitQlty);
+qualityFields = fieldnames(qualityChecks);
 frFit.goodFit = true;
 for iFld = 1:length(qualityFields)
-    frFit.goodFit = frFit.goodFit && fitQlty.(qualityFields{iFld});
+    frFit.goodFit = frFit.goodFit && qualityChecks.(qualityFields{iFld});
 end
 
-% OVVERIDE AND SELECT SPECIFIC CHECKS
-frFit.goodFit = fitQlty.fitR2 & fitQlty.recovKin & fitQlty.pertResp & ...
-    fitQlty.bslRate;
-
 % Store detailed quality information for debugging
-frFit.fitQlty = fitQlty;
+frFit.qualityChecks = qualityChecks;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PLOT RESULTS (OPTIONAL)
