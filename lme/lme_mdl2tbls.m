@@ -1,4 +1,4 @@
-function lmeTbl = lme_mdl2tbl(lmeMdl)
+function lmeTbl = lme_mdl2tbls(lmeMdl)
 % ORGANIZE_LME_FOR_EXCEL Extracts key information from an LME model
 % into a single wide table suitable for Excel export.
 %
@@ -18,7 +18,7 @@ fitCrit = lmeMdl.ModelCriterion;
 lmeTbl.Fit = dataset2table(fitCrit);
 
 % Fixed effects
-% lmeTbl.Fixed = dataset2table(lmeMdl.Coefficients);
+lmeTbl.Fixed = dataset2table(lmeMdl.Coefficients);
 
 % Covariance Parameters and Error
 [~, ~, resStats] = covarianceParameters(lmeMdl);
@@ -26,7 +26,7 @@ lmeTbl.Cov = dataset2table(resStats{1});
 lmeTbl.Err = dataset2table(resStats{2});
 
 % Random effects 
-[~, ~, randStats] = randomEffects(lmeMdl, 'DFMethod', 'satterthwaite');
+[~, ~, randStats] = randomEffects(lmeMdl, 'DFMethod', 'Residual');
 lmeTbl.Rand = dataset2table(randStats);
 
 

@@ -11,12 +11,13 @@ function tbl = v2tbl(varargin)
 %                 contains data for one session/mouse.
 %   varMap      - Struct defining the mapping from desired table column names 
 %                 to their location in the struct v.
-%   groupName   - String or char array for the 'Group' label.
-%   mouseNames  - Cell array of strings with mouse names, corresponding to 
-%                 each element of v.
 %
 % INPUT (Name-Value):
-%   colIdx      - Column index or indices to select from arranged data (default: all columns).
+%   idxCol      - Column index or indices to select from arranged data (default: all columns).
+%   tagFiles    - Struct with fields corresponding to column names. Each field should contain
+%                 a cell array of values, one per file in v. Example: tagFiles.Name = {'mouse1', 'mouse2'}.
+%   tagAll      - Struct with fields corresponding to column names. Each field should contain
+%                 a single value to be applied to all files. Example: tagAll.Group = 'Control'.
 %
 % OUTPUT:
 %   tbl         - Table with all data, organized for LME analysis.
@@ -24,7 +25,10 @@ function tbl = v2tbl(varargin)
 % EXAMPLE:
 %   varMap.RecTime = 'frr.recovTime';
 %   varMap.BurstMiz = 'st.mizuseki';
-%   tbl = v2tbl(v, varMap, 'Control', mouseNames, 'colIdx', 1:5);
+%   tagFiles.Name = {'mouse1', 'mouse2', 'mouse3'};
+%   tagAll.Group = 'Control';
+%   tagAll.Day = 'Baseline';
+%   tbl = v2tbl(v, varMap, 'tagFiles', tagFiles, 'tagAll', tagAll, 'idxCol', 1:5);
 %
 % DEPENDENCIES:
 %   None
@@ -34,19 +38,19 @@ function tbl = v2tbl(varargin)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 p = inputParser;
-addOptional(p, 'v', @isstruct);
-addOptional(p, 'varMap', @isstruct);
-addOptional(p, 'groupName', @(x) ischar(x) || isstring(x));
-addOptional(p, 'mouseNames', @iscell);
-addParameter(p, 'colIdx', [], @(x) isnumeric(x) && all(x > 0));
+addParameter(p, 'v', @isstruct);
+addParameter(p, 'varMap', @isstruct);
+addParameter(p, 'idxCol', [], @(x) isnumeric(x) && all(x > 0));
+addParameter(p, 'tagFiles', struct(), @isstruct);
+addParameter(p, 'tagAll', struct(), @isstruct);
 
 parse(p, varargin{:});
 
 v = p.Results.v;
 varMap = p.Results.varMap;
-groupName = p.Results.groupName;
-mouseNames = p.Results.mouseNames;
-colIdx = p.Results.colIdx;
+idxCol = p.Results.idxCol;
+tagFiles = p.Results.tagFiles;
+tagAll = p.Results.tagAll;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % INITIALIZE VARIABLES
@@ -78,8 +82,25 @@ for iFile = 1:length(v)
     % Create a table for the current session and add metadata, including
     % unique unitID based on mouse and unit number within mouse
     sessionTable = table();    
-    sessionTable.Group = repmat(string(groupName), nUnits, 1);
-    sessionTable.Mouse = repmat(string(mouseNames{iFile}), nUnits, 1);
+    
+    % Add tagAll metadata (applied to all files)
+    tagAllFields = fieldnames(tagAll);
+    for iTag = 1:length(tagAllFields)
+        tagName = tagAllFields{iTag};
+        tagValue = tagAll.(tagName);
+        sessionTable.(tagName) = repmat(categorical({tagValue}), nUnits, 1);
+    end
+    
+    % Add tagFiles metadata (per-file specific)
+    tagFilesFields = fieldnames(tagFiles);
+    for iTag = 1:length(tagFilesFields)
+        tagName = tagFilesFields{iTag};
+        if iFile <= length(tagFiles.(tagName))
+            tagValue = tagFiles.(tagName){iFile};
+            sessionTable.(tagName) = repmat(categorical({tagValue}), nUnits, 1);
+        end
+    end
+    
     sessionTable.UnitID = uOffset + (iFile * 1000) + unitIdx;
 
     % Extract all variables based on the map
@@ -99,9 +120,9 @@ for iFile = 1:length(v)
             end
         end
         
-        % Select specific columns if colIdx is specified
-        if ~isempty(colIdx) && size(data, 2) > 1
-            data = data(:, colIdx);
+        % Select specific columns if idxCol is specified
+        if ~isempty(idxCol) && size(data, 2) > 1
+            data = data(:, idxCol);
         end
         
         sessionTable.(colName) = data;

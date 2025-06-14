@@ -80,15 +80,6 @@ pyrIdx = swv.tp(idxGood) >= 0.4;
 unitType(pyrIdx) = 1;       % pPYR
 unitType(~pyrIdx) = 2;      % pINT
 
-% % plot bad waveforms
-% wv = catfields([v.swv], 1); 
-% 
-% badWv = find(~idxGood);
-% badWv = find(isnan(swv.rtau) & idxGood);
-% hfig = figure; hAx = gca; hold on;
-% for iBad = 1 : length(badWv)
-%     plot(wv.wv(badWv(iBad), :))
-% end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % refine classification if requested

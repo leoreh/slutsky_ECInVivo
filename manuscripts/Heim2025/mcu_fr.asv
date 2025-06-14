@@ -1,9 +1,8 @@
 % mcu_fr
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% calculate fr per file
+% ANALYZE
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% uses bout times from psd (after cleaning bouts)
 
 flgEmg = false;
 
@@ -62,30 +61,49 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % -------------------------------------------------------------------------
-% Organize files
+% Organize Table
 grps = {'wt_bsl'; 'mcu_bsl'};
+grpLbls = {'Control'; 'MCU-KO'};
+unitLabels = {'pPYR', 'pINT'};
+vars = {'fr', 'units', 'st_metrics', 'st_brst'};
 
-clear grppaths
-for igrp = 1 : length(grps)
-    grppaths{igrp} = string(mcu_sessions(grps{igrp})');
+% Define variable mapping
+clear varMap tblCell v
+varMap.FR = 'fr.mfr';               % Mean firing rate
+varMap.BrRoy = 'st.royer';          % Mean firing rate
+varMap.BrPct = 'brst.spkprct';      % Mean firing rate
+varMap.UnitType = 'units.clean';    % Unit classification
+
+% Load and organize table
+for iGrp = 1 : length(grppaths)
+    basepaths = mcu_sessions(grps{iGrp});
+    nFiles = length(basepaths);
+    
+    v{iGrp} = basepaths2vars('basepaths', basepaths, 'vars', vars);    
+
+    tblCell{iGrp} = v2tbl('v', v{iGrp}, 'varMap', varMap, 'grpName',...
+        grpLbls{iGrp}, 'expNames', get_mname(basepaths), 'colIdx', 2);  
 end
+lmeData = vertcat(tblCell{:});
+
+% Clean up
+lmeData.UnitType = categorical(unitLabels(lmeData.UnitType + 1)');
+lmeData = rmmissing(lmeData);
+lmeData.Group = reordercats(lmeData.Group, grpLbls);
+lmeData.UnitType = reordercats(lmeData.UnitType, unitLabels);
 
 % -------------------------------------------------------------------------
 % FR per unit, WT vs MCU for RS vs FS 
-frml = 'FR ~ Group * UnitType + (1|Mouse)';
-varFld = '';
+lmeCfg.frml = 'BrRoy ~ Group * UnitType + (1|Exp)';
+lmeCfg.contrasts = 'all';
+lmeCfg.contrasts = [1 : 6]; 
+lmeCfg.distribution = 'Normal';
 
-% get data
-[lmeData, lmeCfg] = lme_org('grppaths', grppaths, 'frml', frml,...
-    'flgEmg', false, 'varFld', varFld);
-
-% run lme
-contrasts = 'all';
-contrasts = [1 : 6]; 
-[lmeStats, lmeCfg] = lme_analyse(lmeData, lmeCfg, 'contrasts', contrasts);
+% Fit
+[lmeStats, lmeCfg] = lme_analyse(lmeData, lmeCfg);
 
 % plot
-hFig = lme_plot(lmeData, lmeCfg.lmeMdl, 'ptype', 'bar', 'axShape', 'square'); 
+hFig = lme_plot(lmeData, lmeCfg.mdl, 'ptype', 'bar', 'axShape', 'square'); 
 
 % Update labels
 hAx = gca;
@@ -94,13 +112,13 @@ xlabel(hAx, '')
 title(hAx, '')
 hAx.Legend.Location = 'northwest';
 
-% add significance lines
+% Sig Lines
 barIdx = {[1, 2], [3, 4]};
 barLbl = {'NS', '****'};
 plot_sigLines(hAx, barIdx, barLbl, 'lineGap', 0.15)
 plot_axSize('hFig', hFig, 'szOnly', false, 'axShape', 'square', 'axHeight', 300)
 
-% save
+% Save
 altClassify = 2;
 fname = lme_frml2char(frml, 'rmRnd', true,...
     'sfx', ['_altClassify', num2str(altClassify)]);
@@ -147,7 +165,7 @@ altClassify = 3;
     'flgEmg', false, 'varFld', varFld);
 
 % select unit
-unitType = 'pPYR';
+unitType = 'pINT';
 iUnit = categorical({unitType}); 
 plotTbl = lmeData(lmeData.UnitType == iUnit, :);
 
@@ -176,8 +194,8 @@ if strcmp(unitType, 'pPYR')
         barIdx = {[2, 4], [2, 8], [1, 3], [1, 7]};
         barLbl = {'****', '****' '****', 'NS'};
     else
-        barIdx = {[3, 4], [7, 8], [1.5, 3.5], [1, 7]};
-        barLbl = {'NS', '****', '****', '*'};
+        barIdx = {[3, 4], [7, 8], [1.5, 3.5], [2, 8], [1, 7]};
+        barLbl = {'NS', '****', '****', '****', '*'};
     end
     lineOffset = 0.2;
     lineGap = 0;
@@ -186,10 +204,11 @@ else
         barIdx = {[2, 4], [2, 8], [1, 7]};
         barLbl = {'NS', 'NS', '*'};
     else
-        barIdx = {[2, 4], [1, 7], [2, 8]};
-        barLbl = {'NS', '*', 'NS'};
+        barIdx = {[2, 4], [2, 8], [1, 3], [1, 7]};
+        barLbl = {'***', '*', 'NS', '***'};
     end
-    lineOffset = 0.44;
+    lineOffset = 0.3;
+    lineGap = -0.01;
 end
 
 % plot

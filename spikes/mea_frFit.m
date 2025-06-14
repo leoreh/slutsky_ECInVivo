@@ -15,13 +15,12 @@ function frFit = mea_frFit(frVec, pertOnset, varargin)
 %
 % INPUT (Name-Value):
 %   flgPlot     - Flag to plot results {false}.
-%   binSize     - Bin size for time constant calculations [s] (default: 30 s).
 %
 % OUTPUT:
 %   frFit       - Structure containing fit results:
 %     .frTrough       - Firing rate at recovery onset (trough) [Hz].
-%     .recovOnset     - Index of recovery onset based on best fitted curve.
-%     .model      - Name of the best-fitting model ('expo', 'gomp', 'rich').
+%     .rcvOnset       - Index of recovery onset based on best fitted curve.
+%     .mdlName        - Name of the best-fitting model ('expo', 'gomp', 'rich').
 %     .pFit           - Fitted parameters for the best model.
 %     .rsquare        - R-squared goodness of fit for the best model.
 %     .exitflag       - Exit flag of the best-fitting model.
@@ -30,7 +29,7 @@ function frFit = mea_frFit(frVec, pertOnset, varargin)
 %     .fitCurve       - Complete fitted curve [baseline; perturbation; recovery].
 %     .frBsl          - Baseline firing rate from robust linear fit [Hz].
 %     .bslFit         - Robust linear fit parameters [intercept, slope].
-%     .frRecov           - Steady-state firing rate from best model [Hz].
+%     .frRcv          - Steady-state firing rate from best model [Hz].
 %     .mdlFits        - Detailed results for each model fit.
 %     .gof            - Goodness-of-fit stats (AIC, BIC) for each model.
 %     .goodFit        - Flag indicating whether the unit is considered good for fitting.
@@ -50,21 +49,19 @@ p = inputParser;
 addRequired(p, 'frVec', @isnumeric);
 addRequired(p, 'pertOnset', @(x) isnumeric(x) && isscalar(x));
 addParameter(p, 'flgPlot', false, @islogical);
-addParameter(p, 'binSize', 30, @(x) isnumeric(x) && isscalar(x) && x > 0);
 
 parse(p, frVec, pertOnset, varargin{:});
-binSize = p.Results.binSize;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % INITIALIZE OUTPUT STRUCTURE
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-frFit = struct('frTrough', NaN, 'recovOnset', NaN, 'model', '', 'pFit', [], ...
-    'rsquare', NaN, 'exitflag', 0, 'fitCurve', [], 'frBsl', NaN, 'bslFit', NaN, ...
-    'frRecov', NaN, 'mdlFits', [], 'gof', struct('AIC', [], 'BIC', []),...
-    'goodFit', false, 'pertDepth', [], 'recovChange', NaN, 'recovError', NaN, ...
-    'fitQlty', struct('fitR2', false, 'bslStab', false, 'recovKin', false, ...
-    'recovFail', false, 'pertResp', false, 'bslRate', false, 'recovRate', false));
+frFit = struct('frTrough', NaN, 'rcvOnset', NaN, 'mdlName', '', 'pFit', [], ...
+    'rsquare', NaN, 'fitCurve', [], 'frBsl', NaN, 'bslFit', NaN, ...
+    'frRcv', NaN, 'mdlFits', [], 'mdlIdx', [], 'goodFit', false, 'pertDepth', [], ...
+    'rcvChange', NaN, 'rcvErr', NaN, 'fitQlty', struct('fitR2', false, ...
+    'bslStab', false, 'rcvKin', false, 'rcvFail', false, 'pertResp', false, ...
+    'bslRate', false, 'rcvRate', false));
 
 % Hard limit on number of bins with spikes
 if sum(frVec > 0) < 10
@@ -79,43 +76,39 @@ end
 tIdx = (1:length(frVec))';
 
 % Initial guess for recovery onset using continuous derivative method
-recovOnset = length(frVec);
 dfr = diff(frVec);
 dfrPost = dfr(pertOnset:end);
 runsUp = conv(dfrPost > 0, ones(1, 5), 'valid');
 longUp = find(runsUp >= 5, 1, 'first');
 
 if ~isempty(longUp)
-    recovOnset = pertOnset + longUp - 1;
+    rcvOnset = pertOnset + longUp - 1;
 else
     % Fallback: first non-negative derivative
-    recovDelay = find(dfrPost >= 0, 1, 'first');
-    recovOnset = pertOnset + recovDelay - 1;
+    rcvDelay = find(dfrPost >= 0, 1, 'first');
+    rcvOnset = pertOnset + rcvDelay - 1;
 end
 
-% % Override recovOnset
-% recovOnset = pertOnset + 5;
-
 % Convert to relative time for fitting
-tPost = tIdx(recovOnset:end) - recovOnset;
-frPost = frVec(recovOnset:end);
+tPost = tIdx(rcvOnset:end) - rcvOnset;
+frPost = frVec(rcvOnset:end);
 
 % Recovery firing rate: Mean of last 10% of data
-frRecov = mean(frPost(round(0.9 * length(frPost)):end), 'omitnan');
-frTrough = frVec(recovOnset);
+frRcv = mean(frPost(round(0.9 * length(frPost)):end), 'omitnan');
+frTrough = frVec(rcvOnset);
 
 % Recovery kinetics: Based on time to 50% recovery, or last bin if no clear recovery
-recovFr = frTrough + 0.5 * (frRecov - frTrough);
-recovIdx = find(frPost >= recovFr, 1, 'first');
-if ~isempty(recovIdx)
+rcvFr = frTrough + 0.5 * (frRcv - frTrough);
+rcvIdx = find(frPost >= rcvFr, 1, 'first');
+if ~isempty(rcvIdx)
     % Clear recovery: use time to 50% recovery
-    tHalf = tPost(recovIdx);
-    kRecov = log(2) / tHalf;
+    tHalf = tPost(rcvIdx);
+    kRcv = log(2) / tHalf;
 else
     % No clear recovery: use rate from last bin. This will be slow if the
     % unit hasn't recovered.
     lastBinFr = frPost(end);
-    kRecov = (lastBinFr - frTrough) / tPost(end);
+    kRcv = (lastBinFr - frTrough) / tPost(end);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -123,12 +116,12 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Use findpeaks to detect nPeaks significant peaks. Require 10% prominence
-minProminence = 0.2 * abs(frRecov - frTrough); 
+minProminence = 0.2 * abs(frRcv - frTrough); 
 
 [peakFr, peakTimes] = findpeaks(frPost, tPost, ...
     'NPeaks', 1, ...
     'SortStr', 'descend', ...
-    'MinPeakHeight', frRecov, ...
+    'MinPeakHeight', frRcv, ...
     'MinPeakProminence', minProminence, ...
     'MinPeakWidth', round(0.05 * length(tPost)), ...
     'MinPeakDistance', round(0.05 * length(tPost)));
@@ -137,7 +130,7 @@ nPeaks = length(peakFr);
 pkParams = struct('aOver', {}, 'kOver', {});
 for iPeak = 1:nPeaks
     % Approximate overshoot amplitude relative to recovered FR
-    overshootAmp = peakFr(iPeak) - frRecov;
+    overshootAmp = peakFr(iPeak) - frRcv;
     
     % Calculate initial parameters for the overshoot term A*t*exp(-k*t)
     % Peak of this term is at t = 1/k, value is A/(k*exp(1))
@@ -159,24 +152,24 @@ end
 % Create model struct array for base models
 mdls = struct('name', {}, 'func', {}, 'p0', {}, 'lb', {}, 'ub', {});
 
-% Model 1: Gompertz (base)
+% Model 1: Gompertz 
 mdls(1).name = "gompertz";
 mdls(1).func = @(p, tData) p(1) .* exp(log(max(p(3),eps) ./ p(1)) .* exp(-p(2) * tData));
-mdls(1).p0 = [frRecov, kRecov, frTrough];
+mdls(1).p0 = [frRcv, kRcv, frTrough];
 mdls(1).lb = [eps, 1e-6, 0];
 mdls(1).ub = [3*max(frVec), 1, max(frVec)];
 
-% Model 2: Richards (base)
+% Model 2: Richards 
 mdls(2).name = "richards";
 mdls(2).func = @(p, tData) p(1) ./ (1 + ((p(1)./max(p(3),eps)).^p(4) - 1) .* exp(-p(2)*tData)).^(1./p(4));
-mdls(2).p0 = [frRecov, kRecov, frTrough, 1];
+mdls(2).p0 = [frRcv, kRcv, frTrough, 1];
 mdls(2).lb = [eps, 1e-6, 0, 1e-3];
 mdls(2).ub = [3*max(frVec), 1, max(frVec), 100];
 
-% Model 3: Exponential (base)
+% Model 3: Exponential
 % mdls(3).name = "expo";
 % mdls(3).func = @(p, tData) p(1) - (p(1) - p(3)) .* exp(-p(2) * tData);
-% mdls(3).p0 = [frRecov, kRecov, frTrough];
+% mdls(3).p0 = [frRcv, kRcv, frTrough];
 % mdls(3).lb = [eps, 1e-6, 0];
 % mdls(3).ub = [3*max(frVec), 1, max(frVec)];
 
@@ -224,15 +217,14 @@ end
 % MODEL SELECTION & GOODNESS-OF-FIT
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-[~, bestIdx] = min(frFit.mdlFits.BIC);
-frFit.model = mdls(bestIdx).name;
-frFit.pFit = frFit.mdlFits.pFit(bestIdx, :);
-frFit.rsquare = frFit.mdlFits.rsquare(bestIdx);
-frFit.exitflag = frFit.mdlFits.exitflag(bestIdx);
+[~, frFit.mdlIdx] = min(frFit.mdlFits.BIC);
+frFit.mdlName = mdls(frFit.mdlIdx).name;
+frFit.pFit = frFit.mdlFits.pFit(frFit.mdlIdx, :);
+frFit.rsquare = frFit.mdlFits.rsquare(frFit.mdlIdx);
 
-% Update frTrough and frRecov based on the best model's fit
+% Update frTrough and frRcv based on the best model's fit
 frFit.frTrough = frFit.pFit(3);
-frFit.frRecov = frFit.pFit(1);
+frFit.frRcv = frFit.pFit(1);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % CALCULATE BASELINE WITH ROBUST LINEAR FIT
@@ -258,26 +250,26 @@ frFit.bslFit = bslFit;
 
 % Perturbation period: exponential decay
 frTrough = max([frFit.frTrough, eps]);
-tPert = tIdx(pertOnset:(recovOnset-1));
+tPert = tIdx(pertOnset:(rcvOnset-1));
 pertCurve = linspace(bslCurve(end), frTrough, length(tPert))';
 
 % Recovery period: fitted model
-recovCurve = frFit.mdlFits.recovCurve(bestIdx, :);
+rcvCurve = frFit.mdlFits.rcvCurve(frFit.mdlIdx, :);
 
 % Extend recovery curve to full data length if needed
-if length(recovCurve) < (length(frVec) - recovOnset + 1)
-    recovCurve = mdls(bestIdx).func(frFit.pFit, tIdx(recovOnset:end) - recovOnset);
+if length(rcvCurve) < (length(frVec) - rcvOnset + 1)
+    rcvCurve = mdls(frFit.mdlIdx).func(frFit.pFit, tIdx(rcvOnset:end) - rcvOnset);
 end
 
 % Combine segments
-frFit.fitCurve = [bslCurve; pertCurve; recovCurve'];
+frFit.fitCurve = [bslCurve; pertCurve; rcvCurve'];
 
 % Calculate recovery onset based on the best fitted curve
 % Find the minimum of the fitted curve (trough)
-% recovCurve = frFit.fitCurve(pertOnset:end);
-% [~, minIdx] = min(recovCurve);
-% frFit.recovOnset = pertOnset + minIdx - 1;
-frFit.recovOnset = recovOnset;
+% rcvCurve = frFit.fitCurve(pertOnset:end);
+% [~, minIdx] = min(rcvCurve);
+% frFit.rcvOnset = pertOnset + minIdx - 1;
+frFit.rcvOnset = rcvOnset;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % IDENTIFY BAD UNITS BASED ON FIT QUALITY AND STABILITY
@@ -297,11 +289,11 @@ fitQlty.fitR2(isnan(frFit.rsquare)) = false; % Mark NaN R-squares as bad
 
 % BASELINE STABILITY   
 % Baseline slope should be minimal to ensure stable pre-perturbation activity
-% Use normalized slope (% change per minute) to be independent of baseline FR
-thrBslSlopeNorm = 0.5; % 10% change per minute (much more reasonable)
+% Use normalized slope (% change per bin) to be independent of baseline FR
+thrBslSlope = 0.01; % 1% change per bin threshold
 if frFit.frBsl > 0
-    baselineSlopeNorm = abs(frFit.bslFit(2)) * 60 / frFit.frBsl; 
-    fitQlty.bslStab = baselineSlopeNorm <= thrBslSlopeNorm;
+    bslSlope = abs(frFit.bslFit(2)) / frFit.frBsl; 
+    fitQlty.bslStab = bslSlope <= thrBslSlope;
 else
     fitQlty.bslStab = false;
 end
@@ -309,20 +301,19 @@ end
 % RECOVERY KINETICS
 % Recovery time constant should be physiologically plausible
 % Too fast (< 1 bin) suggests unreliable fitting or noise
-kRecov = frFit.pFit(2);
-tauRecov = 1 / kRecov; % Recovery time constant in bins
-tauRecovSec = tauRecov * binSize; % Convert to seconds
+kRcv = frFit.pFit(2);
+tauRcv = 1 / kRcv; % Recovery time constant in bins
 minTau = 1; 
-fitQlty.recovKin = tauRecovSec >= minTau;
+fitQlty.rcvKin = tauRcv >= minTau;
 
 % RECOVERY FAILURE
-thrRecov = -4.6; % log2(0.01) for minimum ~1% recovery
-frFit.recovChange = log2(frFit.frRecov / frFit.frBsl);
-frFit.recovError = abs(frFit.recovChange);
-fitQlty.recovFail = frFit.recovChange >= thrRecov;
+thrRcv = -4.6; % log2(0.01) for minimum ~1% recovery
+frFit.rcvChange = log2(frFit.frRcv / frFit.frBsl);
+frFit.rcvErr = abs(frFit.rcvChange);
+fitQlty.rcvFail = frFit.rcvChange >= thrRcv;
 
 % PERTURBATION RESPONSE
-% Units should show meaningful perturbation effects (>20% reduction from baseline)
+% Units should show meaningful perturbation effects (>X% reduction from baseline)
 thrPert = -1; % log2(0.5) for ~50% reduction threshold
 frFit.pertDepth = log2(frFit.frTrough / frFit.frBsl);
 fitQlty.pertResp = frFit.pertDepth <= thrPert;
@@ -331,7 +322,7 @@ fitQlty.pertResp = frFit.pertDepth <= thrPert;
 % Units should have sufficient activity for reliable analysis
 thrFr = 0.001; % Hz
 fitQlty.bslRate = frFit.frBsl >= thrFr;
-fitQlty.recovRate = frFit.frRecov >= thrFr;
+fitQlty.rcvRate = frFit.frRcv >= thrFr;
 
 % COMBINE 
 qualityFields = fieldnames(fitQlty);
@@ -341,7 +332,7 @@ for iFld = 1:length(qualityFields)
 end
 
 % OVVERIDE AND SELECT SPECIFIC CHECKS
-frFit.goodFit = fitQlty.fitR2 & fitQlty.recovKin & fitQlty.pertResp & ...
+frFit.goodFit = fitQlty.fitR2 & fitQlty.rcvKin & fitQlty.pertResp & ...
     fitQlty.bslRate;
 
 % Store detailed quality information for debugging
@@ -365,19 +356,19 @@ if p.Results.flgPlot
         modelDisplayNames{iMdl} = [upper(modelName(1)), modelName(2:end)];
     end
     colors = lines(nModels);
-    tRecovIdx = tIdx(recovOnset:end);
+    tRcvIdx = tIdx(rcvOnset:end);
 
     for iMdl = 1:nModels
         if frFit.mdlFits.exitflag(iMdl) > 0
-            recovCurvePlot = frFit.mdlFits.recovCurve(iMdl, :);
-            plot(tRecovIdx, recovCurvePlot, 'Color', colors(iMdl, :), 'LineWidth', 1.5, 'DisplayName', modelDisplayNames{iMdl});
+            rcvCurvePlot = frFit.mdlFits.rcvCurve(iMdl, :);
+            plot(tRcvIdx, rcvCurvePlot, 'Color', colors(iMdl, :), 'LineWidth', 1.5, 'DisplayName', modelDisplayNames{iMdl});
         end
     end
 
     % --- Formatting ---
     % Highlight the best fit line
-    if ~isempty(frFit.model)
-        bestModelIdx = find(strcmp(frFit.mdlFits.name, frFit.model));
+    if ~isempty(frFit.mdlName)
+        bestModelIdx = find(strcmp(frFit.mdlFits.name, frFit.mdlName));
         h_all = findobj(gca, 'Type', 'line');
         h_best = findobj(h_all, 'DisplayName', modelDisplayNames{bestModelIdx});
         if ~isempty(h_best)
@@ -385,7 +376,7 @@ if p.Results.flgPlot
             uistack(h_best, 'top');
         end
         plotTitle = sprintf('Best Fit: %s (BIC: %.2f)', ...
-            frFit.model, frFit.mdlFits.BIC(bestModelIdx));
+            frFit.mdlName, frFit.mdlFits.BIC(bestModelIdx));
         title(plotTitle);
     else
         title('Firing Rate Recovery Fits');
@@ -420,7 +411,7 @@ function mdlFit = fit_mdl(fr, t, mdl)
 %     .rsquare    - R-squared goodness of fit
 %     .AIC        - Akaike Information Criterion
 %     .BIC        - Bayesian Information Criterion
-%     .recovCurve - Recovery curve from fitted model
+%     .rcvCurve   - Recovery curve from fitted model
 
 % Hardcoded optimization options
 opts = optimoptions('lsqcurvefit', 'Display', 'off', 'TolFun', 1e-6,...
@@ -454,17 +445,17 @@ if exitflag > 0
     end
     
     % Create recovery curve
-    recovCurve = frFit;
+    rcvCurve = frFit;
 else
     rsquare = NaN;
     AIC = inf;
     BIC = inf;
-    recovCurve = nan(size(t));
+    rcvCurve = nan(size(t));
 end
 
 % Create output structure
 mdlFit = struct('pFit', pFit, 'resnorm', resnorm, 'exitflag', exitflag,...
-    'rsquare', rsquare, 'AIC', AIC, 'BIC', BIC, 'recovCurve', recovCurve');
+    'rsquare', rsquare, 'AIC', AIC, 'BIC', BIC, 'rcvCurve', rcvCurve');
 
 % Transfer all fields from input model struct
 fields = fieldnames(mdl);

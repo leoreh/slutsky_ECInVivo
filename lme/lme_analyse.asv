@@ -85,24 +85,62 @@ else
     flgG = ~isempty(distribution) && ~strcmpi(distribution, 'normal');
 end
 
+% Override fitMethod and dfMethod for GLME
+if flgG
+    fitMethod = 'REMPL';
+    dfMethod = 'Residual';
+end
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % LME/GLME MODEL FITTING & SELECTION
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Check response variable distribution fit
-resVar = strtrim(strsplit(frml, '~'));
-resData = lmeData.(resVar{1});
-resSkew = skewness(resData);
-thrSkew = 1.5;
-if resSkew > thrSkew && strcmp(distribution, 'normal')
-    warning('Response variable "%s" does not fit %s distribution', ...
-        resVar{1}, distribution);
+responseVar = strtrim(strsplit(frml, '~'));
+
+% Check if response variable exists in data
+responseData = lmeData.(responseVar);
+
+% Fit different distributions and compare
+fits = struct();
+
+% Normal distribution fit
+pd_normal = fitdist(responseData, 'Normal');
+fits.normal = pd_normal.LogLikelihood;
+
+
+% Binomial distribution fit (if data is binary or proportions)
+if all(responseData >= 0 & responseData <= 1)
+    pd_binomial = fitdist(responseData, 'Binomial');
+    fits.binomial = pd_binomial.LogLikelihood;
+else
+    fits.binomial = -inf;
 end
+
+% Gamma distribution fit (if data is positive)
+if all(responseData > 0)
+    pd_gamma = fitdist(responseData, 'Gamma');
+    fits.gamma = pd_gamma.LogLikelihood;
+else
+    fits.gamma = -inf;
+end
+
+
+% Find best fitting distribution
+[~, bestFit] = max([fits.normal, fits.binomial, fits.gamma]);
+bestDist = {'normal', 'binomial', 'gamma'};
+bestDist = bestDist{bestFit};
+
+% Issue warning if requested distribution doesn't match best fit
+if ~strcmpi(distribution, bestDist)
+    warning('Response variable "%s" best fits a %s distribution, but %s was requested. Consider using distribution = ''%s''.', ...
+        responseVar, bestDist, distribution, bestDist);
+end
+  
+
 
 % Fits a single LME/GLME model using the formula provided in frml.
 if flgG
-    fitMethod = 'REMPL';
-    dfMethod = 'Residual';
     lmeMdl = fitglme(lmeData, frml, 'Distribution', distribution, 'FitMethod', fitMethod);
 else
     lmeMdl = fitlme(lmeData, frml, 'FitMethod', fitMethod);

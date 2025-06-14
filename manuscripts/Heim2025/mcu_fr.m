@@ -1,11 +1,8 @@
 % mcu_fr
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% calculate fr per file
+% ANALYZE
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% uses bout times from psd (after cleaning bouts)
-
-flgEmg = false;
 
 % go over each mouse and analyze all experiment days
 grps = [mcu_sessions('wt'), mcu_sessions('mcu')];
@@ -15,6 +12,7 @@ grps = {'mcu_bsl'; 'wt_bsl'};
 grps = {'wt_bsl_ripp'};
 
 % vars
+flgEmg = false;
 if flgEmg
     vars = {'spikes'; 'psdEmg'; 'sleep_statesEmg'};
     fnameFr = 'frEmg';
@@ -62,30 +60,54 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % -------------------------------------------------------------------------
-% Organize files
+% Organize Table
 grps = {'wt_bsl'; 'mcu_bsl'};
+lblGrp = {'Control'; 'MCU-KO'};
+lblUnit = {'pPYR', 'pINT'};
+vars = {'fr', 'units', 'st_metrics', 'st_brst'};
 
-clear grppaths
-for igrp = 1 : length(grps)
-    grppaths{igrp} = string(mcu_sessions(grps{igrp})');
+% Define variable mapping
+clear varMap tblCell v tagAll tagFiles
+varMap.FR = 'fr.mfr';               % Mean firing rate
+varMap.BrRoy = 'st.royer';          % Mean firing rate
+varMap.BrPct = 'brst.spkprct';      % Mean firing rate
+varMap.UnitType = 'units.clean';    % Unit classification
+
+% Load and organize table
+for iGrp = 1 : length(grps)
+    basepaths = mcu_sessions(grps{iGrp});
+    nFiles = length(basepaths);
+    
+    v{iGrp} = basepaths2vars('basepaths', basepaths, 'vars', vars);    
+        
+    tagAll.Group = lblGrp{iGrp};
+    tagFiles.Name = get_mname(basepaths);
+    tblCell{iGrp} = v2tbl('v', v{iGrp}, 'varMap', varMap, 'tagAll',...
+        tagAll, 'tagFiles', tagFiles, 'idxCol', 2);  
 end
+lmeData = vertcat(tblCell{:});
+
+% Clean up
+lmeData.UnitType = categorical(lblUnit(lmeData.UnitType + 1)');
+lmeData = rmmissing(lmeData);
+lmeData.Group = reordercats(lmeData.Group, lblGrp);
+lmeData.UnitType = reordercats(lmeData.UnitType, lblUnit);
 
 % -------------------------------------------------------------------------
 % FR per unit, WT vs MCU for RS vs FS 
-frml = 'FR ~ Group * UnitType + (1|Mouse)';
-varFld = '';
+clear lmeCfg
+frml = 'BrRoy ~ Group * UnitType + (1|Name)';
+lmeCfg.contrasts = 'all';
+lmeCfg.contrasts = [1 : 6]; 
+lmeCfg.distribution = 'gamma';
 
-% get data
-[lmeData, lmeCfg] = lme_org('grppaths', grppaths, 'frml', frml,...
-    'flgEmg', false, 'varFld', varFld);
-
-% run lme
-contrasts = 'all';
-contrasts = [1 : 6]; 
-[lmeStats, lmeCfg] = lme_analyse(lmeData, lmeCfg, 'contrasts', contrasts);
+% Fit
+[lmeStats, lmeMdl] = lme_analyse(lmeData, frml, lmeCfg);
 
 % plot
-hFig = lme_plot(lmeData, lmeCfg.lmeMdl, 'ptype', 'bar', 'axShape', 'square'); 
+idxRow = [2 : 6];
+hFig = lme_plot(lmeData, lmeMdl, 'lmeStats', lmeStats,...
+    'idxRow', idxRow, 'ptype', 'bar', 'axShape', 'square');
 
 % Update labels
 hAx = gca;
@@ -94,18 +116,18 @@ xlabel(hAx, '')
 title(hAx, '')
 hAx.Legend.Location = 'northwest';
 
-% add significance lines
+% Sig Lines
 barIdx = {[1, 2], [3, 4]};
 barLbl = {'NS', '****'};
 plot_sigLines(hAx, barIdx, barLbl, 'lineGap', 0.15)
 plot_axSize('hFig', hFig, 'szOnly', false, 'axShape', 'square', 'axHeight', 300)
 
-% save
+% Save
 altClassify = 2;
 fname = lme_frml2char(frml, 'rmRnd', true,...
     'sfx', ['_altClassify', num2str(altClassify)]);
 lme_save('fh', hFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
-    'lmeData', lmeData, 'lmeStats', lmeStats, 'lmeCfg', lmeCfg)
+    'lmeData', lmeData, 'lmeStats', lmeStats, 'lmeMdl', lmeMdl)
 
 
 
@@ -119,174 +141,93 @@ lme_save('fh', hFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % -------------------------------------------------------------------------
-% load data for each group
+% Load and organize data
 grps = {'wt', 'mcu'}; 
-idxRm = [2, 6];                         % remove bac on and off
-grppaths = cell(1,length(grps));       % Initialize
-for iGrp = 1 : length(grps)
+vars = {'fr', 'units'};
 
-    mNames = mcu_sessions(grps{iGrp});  
-    mPaths = strings(length(mNames), length(mcu_sessions(mNames{1})) - length(idxRm)); % preallocate
-    for imouse = 1 : length(mNames)
-        tmpPaths = mcu_sessions(mNames{imouse});
+lblGrp = {'Control'; 'MCU-KO'};
+lblDay = {'BSL'; 'BAC1'; 'BAC2'; 'BAC3'; 'WASH'};
+idxRm = [2, 6];                     % remove bac on and off
+
+% Define variable mapping for v2tbl
+clear varMap tblCell v tagAll tagFiles
+varMap.FR = 'fr.mfr';               % Mean firing rate
+varMap.UnitType = 'units.clean';    % Unit classification
+
+% Single loop over groups and mice (no day loop)
+for iGrp = 1 : length(grps)
+    mNames = mcu_sessions(grps{iGrp});
+    
+    for iMouse = 1 : length(mNames)
+        % Get all paths for this mouse and remove specified days
+        tmpPaths = mcu_sessions(mNames{iMouse});
         tmpPaths(idxRm) = [];
-        mPaths(imouse, :) = string(tmpPaths)';
+        
+        % Load data for all days for this mouse at once
+        v{iGrp, iMouse} = basepaths2vars('basepaths', tmpPaths, 'vars', vars);
+        
+        % Prepare tag structures for this mouse
+        tagAll.Group = lblGrp{iGrp};
+        tagAll.Name = mNames{iMouse}; 
+        tagFiles.Day = lblDay(1:length(tmpPaths)); 
+        
+        % Create table for this mouse using new flexible approach
+        tblCell{iGrp, iMouse} = v2tbl('v', v{iGrp, iMouse}, 'varMap', varMap, ...
+            'tagFiles', tagFiles, 'tagAll', tagAll, 'idxCol', 2);
     end
-    grppaths{iGrp} = mPaths;
 end
 
+% Combine all tables
+lmeData = vertcat(tblCell{:});
+
+% Clean up and organize
+lblUnit = {'pPYR', 'pINT'};
+lmeData.UnitType = categorical(lblUnit(lmeData.UnitType + 1)');
+lmeData = rmmissing(lmeData);
+lmeData.Group = reordercats(lmeData.Group, lblGrp);
+lmeData.UnitType = reordercats(lmeData.UnitType, lblUnit);
+lmeData.Day = reordercats(lmeData.Day, lblDay);
+
 % -------------------------------------------------------------------------
-% FR ~ Group * Day + (1|Mouse)
-frml = 'FR ~ Group * Day + (1|Mouse)'; 
-varFld = '';
-
-altClassify = 3;
-
-% get data
-[lmeData, lmeCfg] = lme_org('grppaths', grppaths, 'frml', frml,...
-    'flgEmg', false, 'varFld', varFld);
+% FR ~ Group * Day + (1|Mouse) 
 
 % select unit
 unitType = 'pINT';
 iUnit = categorical({unitType}); 
 plotTbl = lmeData(lmeData.UnitType == iUnit, :);
 
-% select state
-% stateType = 'High EMG';
-% iState = categorical({stateType}); 
-% plotTbl = plotTbl(plotTbl.State == iState, :);
-
 % normalize
-plotTbl = lme_normalize('lmeData', plotTbl, 'normVar', 'Day',...
-    'groupVars', {'Group', 'UnitType', 'State'});
+plotTbl = tbl_transform(plotTbl, 'varNorm', 'Day',...
+    'varsGrp', {'Group', 'UnitType'}, 'flgNorm', true);
 
 % run lme
-contrasts = 'all'; 
-contrasts =[1 : 19]; 
-
-frmlCompare1 = 'FR ~ Group * Day + (1|Mouse)';
-frmlCompare2 = 'FR ~ Group * Day + (Day|Mouse)';
-lmeCfg.frml = {frmlCompare1, frmlCompare2}; 
-% lmeCfg.frml = 'FR ~ Group * Day + (Day|Mouse)'; 
-[lmeStats, lmeCfg] = lme_analyse(plotTbl, lmeCfg, 'contrasts', contrasts);
-
-% add significance lines
-if strcmp(unitType, 'pPYR')
-    if altClassify == 2
-        barIdx = {[2, 4], [2, 8], [1, 3], [1, 7]};
-        barLbl = {'****', '****' '****', 'NS'};
-    else
-        barIdx = {[3, 4], [7, 8], [1.5, 3.5], [2, 8], [1, 7]};
-        barLbl = {'NS', '****', '****', '****', '*'};
-    end
-    lineOffset = 0.2;
-    lineGap = 0;
-else
-    if altClassify == 2
-        barIdx = {[2, 4], [2, 8], [1, 7]};
-        barLbl = {'NS', 'NS', '*'};
-    else
-        barIdx = {[2, 4], [2, 8], [1, 3], [1, 7]};
-        barLbl = {'***', '*', 'NS', '***'};
-    end
-    lineOffset = 0.3;
-    lineGap = -0.01;
-end
+clear lmeCfg
+frml = 'FR ~ Group * Day + (1|Name)';
+lmeCfg.contrasts = 'all'; 
+lmeCfg.distribution = 'Gamma'; 
+[lmeStats, lmeMdl] = lme_analyse(plotTbl, frml, lmeCfg);
 
 % plot
-hFig = lme_plot(plotTbl, lmeCfg.lmeMdl, 'ptype', 'bar', 'axShape', 'wide');
+idxRow = [12 : 19];
+hFig = lme_plot(plotTbl, lmeMdl, 'lmeStats', lmeStats,...
+    'idxRow', idxRow, 'ptype', 'bar', 'axShape', 'wide');
 
 % Update labels
-hAx = gca; % Renamed
+hAx = gca;
 ylabel(hAx, 'Firing Rate (% BSL)')
 xlabel(hAx, '')
 title(hAx, unitType)
 hAx.Legend.Location = 'northeast';
 
 % Assert Size
-plot_sigLines(hAx, barIdx, barLbl, 'lineGap', lineGap, 'lineOffset', lineOffset)
 plot_axSize('hFig', hFig, 'szOnly', false, 'axShape', 'wide', 'axHeight', 300);
 
 % save
-fname = lme_frml2char(lmeCfg.frmlMdl, 'rmRnd', true, 'resNew', '',...
-    'sfx', [' _', unitType, '_Norm', '_altClassify', num2str(altClassify)]);
-lme_save('fh', hFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
-    'lmeData', plotTbl, 'lmeStats', lmeStats, 'lmeCfg', lmeCfg)
-
-
-
-
-
-
-
-
-
-
-% -------------------------------------------------------------------------
-% FR ~ Group * UnitType * Day + (1|Mouse)
-frml = 'FR ~ Group * UnitType * Day + (1|Mouse)'; 
-varFld = '';
-
 altClassify = 3;
-
-% get data
-[lmeData, lmeCfg] = lme_org('grppaths', grppaths, 'frml', frml,...
-    'flgEmg', true, 'varFld', varFld);
-
-% normalize
-plotTbl = lme_normalize('lmeData', lmeData, 'normVar', 'Day',...
-    'groupVars', {'Group', 'UnitType', 'State'});
-
-% run lme
-contrasts = 'all'; 
-contrasts =[1 : 11, 16 : 19]; 
-
-frmlCompare1 = 'FR ~ Group * UnitType * Day + (1|Mouse)'; 
-frmlCompare2 = 'FR ~ Group * UnitType * Day + (Day|Mouse)'; 
-lmeCfg.frml = {frmlCompare1, frmlCompare2}; 
-% lmeCfg.frml = 'FR ~ Group * Day + (Day|Mouse)'; 
-[lmeStats, lmeCfg] = lme_analyse(plotTbl, lmeCfg, 'contrasts', contrasts);
-
-% add significance lines
-if strcmp(unitType, 'pPYR')
-    if altClassify == 2
-        barIdx = {[2, 4], [2, 8], [1, 3], [1, 7]};
-        barLbl = {'****', '****' '****', 'NS'};
-    else
-        barIdx = {[2, 4], [2, 8], [1, 3], [1, 7]};
-        barLbl = {'****', '****' '****', 'NS'};
-    end
-    lineOffset = 0.03;
-else
-    if altClassify == 2
-        barIdx = {[2, 4], [2, 8], [1, 7]};
-        barLbl = {'NS', 'NS', '*'};
-    else
-        barIdx = {[2, 4], [1, 7], [2, 8]};
-        barLbl = {'NS', '*', 'NS'};
-    end
-    lineOffset = 0.44;
-end
-
-% plot
-hFig = lme_plot(plotTbl, lmeCfg.lmeMdl, 'ptype', 'bar', 'axShape', 'wide');
-
-% Update labels
-hAx = gca; % Renamed
-ylabel(hAx, 'Firing Rate (% BSL)')
-xlabel(hAx, '')
-title(hAx, unitType)
-hAx.Legend.Location = 'northeast';
-
-% Assert Size
-plot_sigLines(hAx, barIdx, barLbl, 'lineGap', 0, 'lineOffset', lineOffset)
-plot_axSize('hFig', hFig, 'szOnly', false, 'axShape', 'wide', 'axHeight', 300);
-
-% save
-fname = lme_frml2char(lmeCfg.frmlMdl, 'rmRnd', true, 'resNew', '',...
+fname = lme_frml2char(frml, 'rmRnd', true, 'resNew', '',...
     'sfx', [' _', unitType, '_Norm', '_altClassify', num2str(altClassify)]);
 lme_save('fh', hFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
-    'lmeData', plotTbl, 'lmeStats', lmeStats, 'lmeCfg', lmeCfg)
+    'lmeData', plotTbl, 'lmeStats', lmeStats, 'lmeMdl', lmeMdl)
 
 
 
@@ -295,38 +236,5 @@ lme_save('fh', hFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
 
 
 
-
-
-
-
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% STATES
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% FR per unit, WT vs MCU across states
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-frml = 'FR ~ Group * State + (1|Mouse)'; % Renamed to avoid conflict
-
-
-% FR per unit per bout, WT vs MCU across states 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-frmlBout = 'FR ~ Group * State + (1|BoutDur) + (1|Mouse) + (1|UnitID)';
-varFieldBout = 'bouts'; % Assuming varFld should be 'bouts' for per-bout analysis
-
-% investigate relation BL and FR
-if exist('frTblBout', 'var') && ~isempty(frTblBout)
-    % [rMat, pMat, fhCorr] = mcu_FRvBL(frTblBout); % Assuming mcu_FRvBL is a custom function
-
-    % limit bouts so that distribution is the same
-    % [idxEq, fhEqBLen] = mcu_eqBLen(frTblBout); % Assuming mcu_eqBLen is a custom function
-
-    % eqTbl = frTblBout(idxEq, :);
-    % lmeEq = fitlme(eqTbl, lmeCfgBout.frml);
-    % lme_plot(eqTbl, lmeEq)
-else
-    warning('frTblBout not available for BL correlation analysis.');
-end
 
 

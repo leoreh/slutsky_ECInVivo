@@ -166,7 +166,7 @@ for iBar = 1:length(barIdx)
     % Update maxYOverall and activeLevels for stacking
     drawnow; % Ensure text extent is calculated
     txtExtent = get(th, 'Extent');
-    yTop = txtExtent(2) + txtExtent(4); % yPos + yHeight
+    yTop = yHeight + opts.lineOffset;
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

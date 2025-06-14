@@ -1,7 +1,7 @@
 function lme_save(varargin)
 
 % Saves the figure handle in specified graphic formats and also saves LME
-% analysis data (lmeData, lmeStats, lmeCfg) to XLSX and MAT files.
+% analysis data (lmeData, lmeStats, lmeMdl) to XLSX and MAT files.
 %
 % Assumes all inputs are correct and valid when used in the body of the function.
 % lmeStats is assumed to be a table.
@@ -19,7 +19,7 @@ addOptional(p, 'fname', 'figure', @ischar);
 addOptional(p, 'frmt', {'ai', 'jpg', 'svg'}, @(x) iscell(x) || ischar(x)); % Default formats, inputParser handles cell/char validation implicitly to some extent
 addOptional(p, 'lmeData', [], @(x) istable(x) || isempty(x));
 addOptional(p, 'lmeStats', [], @(x) istable(x) || isempty(x)); % Simplified: assume table or empty
-addOptional(p, 'lmeCfg', [], @(x) isstruct(x) || isempty(x));
+addOptional(p, 'lmeMdl', [], @(x) isobject(x) || isempty(x));
 
 parse(p, varargin{:});
 fh = p.Results.fh;
@@ -28,7 +28,7 @@ fname = p.Results.fname;
 frmt = p.Results.frmt;
 lmeData = p.Results.lmeData;
 lmeStats = p.Results.lmeStats; 
-lmeCfg = p.Results.lmeCfg;
+lmeMdl = p.Results.lmeMdl;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preparations
@@ -77,13 +77,13 @@ for ifrmt = 1 : nfrmts
             % Save lmeStats to Sheet 2
             writetable(lmeStats, xlsName, 'Sheet', 'LME_Stats');
             
-            % Get additional tables from the model if lmeCfg is provided
-            if ~isempty(lmeCfg) 
+            % Get additional tables from the model if lmeMdl is provided
+            if ~isempty(lmeMdl) 
                 % Get LME tables from the model
-                lmeTbl = lme_mdl2tbl(lmeCfg.lmeMdl);
+                lmeTbls = lme_mdl2tbls(lmeMdl);
                 
                 % Get field names of lmeTbl
-                tblFlds = fieldnames(lmeTbl);
+                tblFlds = fieldnames(lmeTbls);
                 
                 % Start after lmeStats (add 2 rows for gap)
                 currentRow = height(lmeStats) + 4;
@@ -91,7 +91,7 @@ for ifrmt = 1 : nfrmts
                 % Loop through each table and write to Excel
                 for iFld = 1:length(tblFlds)
                     % Get current table
-                    currTbl = lmeTbl.(tblFlds{iFld});
+                    currTbl = lmeTbls.(tblFlds{iFld});
                     
                     % Write table name as header
                     writematrix(tblFlds{iFld}, xlsName, 'Sheet', 'LME_Stats', 'Range', ['A' num2str(currentRow)]);
@@ -111,7 +111,7 @@ for ifrmt = 1 : nfrmts
             varsToSave.fh = fh;
             varsToSave.lmeData = lmeData;
             varsToSave.lmeStats = lmeStats;
-            varsToSave.lmeCfg = lmeCfg;
+            varsToSave.lmeMdl = lmeMdl;
             
             save(matName, '-struct', 'varsToSave');
     end

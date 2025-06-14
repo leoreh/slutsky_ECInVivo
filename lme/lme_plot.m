@@ -10,6 +10,8 @@ function hFig = lme_plot(lmeData, lmeMdl, varargin)
 %   ptype       string specifying plot type {'line', 'box', 'bar'}
 %   hAx         axis handle
 %   axShape     string specifying figure shape {'square', 'tall', 'wide'}
+%   idxRow      row index for significance lines
+%   lmeStats    statistics for significance lines
 %
 % OUTPUT
 %   hFig         handle to figure
@@ -26,12 +28,16 @@ addOptional(p, 'clr', []);
 addOptional(p, 'hAx', []);
 addOptional(p, 'ptype', 'line');
 addOptional(p, 'axShape', 'square');
+addOptional(p, 'idxRow', []);
+addOptional(p, 'lmeStats', []);
 
 parse(p, varargin{:})
 clr                 = p.Results.clr;
 hAx                 = p.Results.hAx;
 ptype               = p.Results.ptype;
 axShape             = p.Results.axShape;
+idxRow              = p.Results.idxRow;
+lmeStats            = p.Results.lmeStats;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preparations
@@ -56,10 +62,10 @@ end
 
 % get variables from formula
 frml = char(lmeMdl.Formula);
-[varsFxd, varRsp] = get_vars(frml);
+[varsFxd, varRsp] = lme_frml2vars(frml);
 
 % organize data for plotting based on number of variables
-[dataGrp, xVals, varLbls] = get_data(lmeData, varsFxd, varRsp);
+[dataGrp, xVals, varLbls] = lme_tbl2cell(lmeData, varsFxd, varRsp);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %  plot
@@ -124,124 +130,21 @@ end
 ylabel(varRsp)
 title(hAx, lme_frml2char(frml, 'rmRnd', false))
 
+% add significance lines if idxRow is provided
+if ~isempty(idxRow)
+
+    % Generate significance lines
+    [barIdx, barLbl] = lme_sigLines(lmeStats, lmeMdl, lmeData, 'idxRow', idxRow);
+    
+    % Add significance lines to the plot
+    if ~isempty(barIdx)
+        plot_sigLines(hAx, barIdx, barLbl);
+    end
+end
+
 % adjust figure size and aesthetics
 drawnow;
 plot_axSize('hFig', hFig, 'axShape', axShape, 'szOnly', true);
-
-end
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% local functions
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-function [varsFxd, varRsp] = get_vars(frml)
-% extract variable names from formula
-
-% get y variable (response)
-varRsp = regexp(frml, '(\w+)\s*~', 'tokens');
-varRsp = varRsp{1}{1};
-
-% get x variables (fixed effects) excluding random effects and intercept
-xStr = regexp(frml, '~\s*(.*?)\s*(\(|$)', 'tokens'); % get everything between ~ and (, or end
-xStr = xStr{1}{1}; % extract matched string
-
-% Initialize varNames as empty cell array
-varsFxd = {};
-
-% first check for interaction terms
-interactVars = regexp(xStr, '(\w+)\s*[*]\s*(\w+)', 'tokens');
-if ~isempty(interactVars)
-    % Process all interaction pairs
-    for i = 1:length(interactVars)
-        varsFxd = [varsFxd, interactVars{i}];
-    end
-    % Remove duplicates
-    varsFxd = unique(varsFxd, 'stable');
-else
-    % if no interactions, process normally
-    xStr = regexprep(xStr, '\s*1\s*\+?\s*', '');      % remove intercept term
-    xStr = regexprep(xStr, '\([^)]*\)', '');          % remove random effects
-    xVars = strtrim(strsplit(xStr, '+'));             % split by + and trim whitespace
-    varsFxd = xVars(~cellfun(@isempty, xVars));       % remove any empty cells
-end
-
-end
-
-
-function [dataGrp, xVals, varLbls] = get_data(tbl, varsFxd, varRsp)
-% organize data for plotting based on number of fixed effects
-% Returns raw data matrices grouped by variables
-
-if length(varsFxd) >= 2
-    % case: two variables - group by first var, x-axis is second var
-    var1 = varsFxd{1};
-    var2 = varsFxd{2};
-
-    % get unique values maintaining order
-    var1Vals = unique(tbl.(var1), 'stable');
-
-    % initialize outputs
-    nGrps = length(var1Vals);
-    dataGrp = cell(nGrps, 1);
-    xVals = cell(nGrps, 1);
-    varLbls = strings(nGrps, 1);
-
-    % get data for each group
-    for igrp = 1:nGrps
-        % get data for current group
-        idx = tbl.(var1) == var1Vals(igrp);
-        grpTbl = tbl(idx, :);
-
-        % get unique x values using categorical order if possible
-        if iscategorical(grpTbl.(var2))
-            xUnique = categories(grpTbl.(var2));
-        else
-            xUnique = unique(grpTbl.(var2), 'stable');
-        end
-        nX = length(xUnique);
-
-        % organize data matrix
-        dataMat = nan(nX, sum(idx));
-        for ix = 1:nX
-            xIdx = grpTbl.(var2) == xUnique{ix};
-            yVals = grpTbl.(varRsp)(xIdx);
-            dataMat(ix, 1:length(yVals)) = yVals';
-        end
-
-        % store results
-        dataGrp{igrp} = dataMat;
-        xVals{igrp} = string(xUnique);
-        varLbls{igrp} = char(var1Vals(igrp));
-    end
-
-else
-    % case: single variable
-    var1 = varsFxd{1};
-
-    % get unique values using categorical order if possible
-    if iscategorical(tbl.(var1))
-        xUnique = categories(tbl.(var1));
-    else
-        xUnique = unique(tbl.(var1), 'stable');
-    end
-    nX = length(xUnique);
-
-    % initialize data matrix
-    maxPts = max(histcounts(categorical(tbl.(var1))));
-    dataMat = nan(nX, maxPts);
-
-    % fill data matrix
-    for ix = 1:nX
-        idx = tbl.(var1) == xUnique{ix};
-        yVals = tbl.(varRsp)(idx);
-        dataMat(ix, 1:length(yVals)) = yVals';
-    end
-
-    % prepare outputs
-    dataGrp = dataMat;
-    xVals = char(xUnique);
-    varLbls = [];
-end
 
 end
 
