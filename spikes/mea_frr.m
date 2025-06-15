@@ -37,7 +37,7 @@ function frr = mea_frr(spktimes, varargin)
 %     .nif           - Network Impact Factor [Hz*s]. Leave-one-out analysis
 %                      of each neuron's unique contribution to network recovery.
 %     .rcvErr        - Recovery error (absolute log2 fold change from baseline).
-%     .rcvChange     - Recovery change (log2 fold change from baseline).
+%     .rcvGain       - Recovery gain (log2 fold change from baseline).
 %     .rcvTime       - Time to 90% recovery [s].
 %     .rcvSlope      - Initial recovery slope [Hz/min].
 %     .normSlope     - Normalized slope (% of recovery range per min).
@@ -164,12 +164,17 @@ if ~flgForce && exist(fitFile, 'file')
 else
     % Get frFit structure template by calling mea_frFit with dummy data and
     % pre-allocate the array
-    frFit = mea_frFit(zeros(100, 1), pertOnset, 'flgPlot', false, 'binSize', binSize);
+    frFit = mea_frFit(zeros(100, 1), pertOnset, 'flgPlot', false);
     frFit = repmat(frFit, nUnits, 1);
 
     for iUnit = 1:nUnits
         frFit(iUnit) = mea_frFit(fr(iUnit, :), pertOnset,...
-            'flgPlot', false, 'binSize', binSize);
+            'flgPlot', false);        
+        % hFig = gcf; hLgd = get(gca, 'Legend');
+        % hLgd.Location = "west";
+        % fname = lme_frml2char('MEA ~ fitUnit', 'rmRnd', true,...
+        %     'sfx', ['_', num2str(iUnit)]);
+        % lme_save('fh', hFig, 'fname', fname, 'frmt', {'svg', 'mat'})
     end
     frFit = catfields(frFit, 'addim', true, [3, 2, 1]);
     frFit.fitCurve = squeeze(frFit.fitCurve);
@@ -186,7 +191,7 @@ end
 uGood = frFit.goodFit & ~uBad;
 
 % Extract specific fields from frFit to the main frr structure
-frFlds = {'frBsl', 'frRcv', 'frTrough', 'fitCurve', 'rcvOnset', 'rcvErr', 'rcvChange', ...
+frFlds = {'frBsl', 'frRcv', 'frTrough', 'fitCurve', 'rcvOnset', 'rcvErr', 'rcvGain', ...
     'pertDepth', 'mdlName', 'idxMdl'};
 
 % Extract the specified fields to the top level
@@ -273,9 +278,12 @@ mf.rcvOnset = pertOnset + troughIdx - 1;
 ssWin = [length(t) - round(length(t) * 0.2) : length(t)];
 mf.frSs = mean(fr(:, ssWin), 2, 'omitnan');
 
+% Determine if units recovered based on this metric
+mf.uRcv = mf.frSs > mf.frBsl * thrRcv;
+
 % Initialize model-free metrics and post-perturbation time vector
 mf.rcvTime = nan(nUnits, 1);
-mf.spkDeficit = nan(nUnits, 1);
+mf.spkDfct = nan(nUnits, 1);
 tPost = t(pertOnset:end);
 
 for iUnit = 1:nUnits
@@ -303,8 +311,8 @@ for iUnit = 1:nUnits
     aucExp = trapz(tPost, ones(size(tPost)) * mf.frBsl(iUnit));
     aucObs = trapz(tPost, fr(iUnit, pertOnset:end));
     % mf.spkDeficit(iUnit) = (aucExp - aucObs) / aucExp;
-    mf.spkDeficit(iUnit) = log2(aucObs / aucExp);
-    if mf.spkDeficit(iUnit) == -Inf
+    mf.spkDfct(iUnit) = log2(aucObs / aucExp);
+    if mf.spkDfct(iUnit) == -Inf
         uGood(iUnit) = false;
     end
 end
@@ -319,7 +327,7 @@ end
 
 % Calculate MFR from good units and fit model
 mfr = mean(fr(~uBad, :), 1, 'omitnan');
-mfrFit = mea_frFit(mfr, pertOnset, 'flgPlot', false, 'binSize', binSize);
+mfrFit = mea_frFit(mfr, pertOnset, 'flgPlot', false);
 
 % Add additional data and metrics to the frr structure
 frr.fr = fr;
@@ -358,12 +366,12 @@ end
 % -------------------------------------------------------------------------
 % Prepare table for plotting correlations
 clear varMap
-varMap.uGood      = 'info.uGood';
-varMap.FrBsl      = 'frBsl';
-varMap.RcvTime    = 'rcvTime';
-varMap.RcvChng    = 'rcvChange';
-varMap.SpkDfct    = 'mf.spkDeficit';
-varMap.PertDepth  = 'pertDepth';
+varMap.uGood      = 'uGood';
+varMap.frBsl      = 'frBsl';
+varMap.rcvTime    = 'rcvTime';
+varMap.rcvGain    = 'rcvGain';
+varMap.spkDfct    = 'mf.spkDfct';
+varMap.pertDepth  = 'pertDepth';
 tbl = v2tbl('v', frr, 'varMap', varMap);
 dataTbl = tbl(tbl.uGood, :);
 dataTbl(:, {'uGood', 'UnitID'}) = [];
@@ -373,7 +381,7 @@ if flgPlot
     % Extract data from frr structure for plotting
     t = frr.t / 60;  % Convert to minutes once
     fr = frr.fr;
-    unitIdx = find(frr.info.uGood);
+    unitIdx = find(frr.uGood);
 
     pertOnsetTime = t(frr.info.pertOnset);
     

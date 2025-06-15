@@ -15,6 +15,8 @@ function frFit = mea_frFit(frVec, pertOnset, varargin)
 %
 % INPUT (Name-Value):
 %   flgPlot     - Flag to plot results {false}.
+%   baseMdls    - Cell array of base model names to include {'gompertz', 'richards', 'peak'}.
+%                 Options: 'gomp', 'rich', 'exp1', 'exp2'
 %
 % OUTPUT:
 %   frFit       - Structure containing fit results:
@@ -49,6 +51,7 @@ p = inputParser;
 addRequired(p, 'frVec', @isnumeric);
 addRequired(p, 'pertOnset', @(x) isnumeric(x) && isscalar(x));
 addParameter(p, 'flgPlot', false, @islogical);
+addParameter(p, 'baseMdls', {'gomp', 'rich', 'exp2'}, @iscell);
 
 parse(p, frVec, pertOnset, varargin{:});
 
@@ -59,7 +62,7 @@ parse(p, frVec, pertOnset, varargin{:});
 frFit = struct('frTrough', NaN, 'rcvOnset', NaN, 'mdlName', '', 'pFit', [], ...
     'rsquare', NaN, 'fitCurve', [], 'frBsl', NaN, 'bslFit', NaN, ...
     'frRcv', NaN, 'mdlFits', [], 'mdlIdx', [], 'goodFit', false, 'pertDepth', [], ...
-    'rcvChange', NaN, 'rcvErr', NaN, 'fitQlty', struct('fitR2', false, ...
+    'rcvGain', NaN, 'rcvErr', NaN, 'fitQlty', struct('fitR2', false, ...
     'bslStab', false, 'rcvKin', false, 'rcvFail', false, 'pertResp', false, ...
     'bslRate', false, 'rcvRate', false));
 
@@ -93,22 +96,32 @@ end
 tPost = tIdx(rcvOnset:end) - rcvOnset;
 frPost = frVec(rcvOnset:end);
 
-% Recovery firing rate: Mean of last 10% of data
-frRcv = mean(frPost(round(0.9 * length(frPost)):end), 'omitnan');
+% Recovery firing rate: Mean of last 20% of data. 
+frRcv = mean(frPost(round(0.8 * length(frPost)):end), 'omitnan');
 frTrough = frVec(rcvOnset);
+% Add lower bound for stability
+frRcv = max([frRcv, eps]);
+frTrough = max([frTrough, eps]);
 
 % Recovery kinetics: Based on time to 50% recovery, or last bin if no clear recovery
 rcvFr = frTrough + 0.5 * (frRcv - frTrough);
 rcvIdx = find(frPost >= rcvFr, 1, 'first');
 if ~isempty(rcvIdx)
-    % Clear recovery: use time to 50% recovery
-    tHalf = tPost(rcvIdx);
+    % Clear recovery: use time to 50% recovery, with upper bound for
+    % stability
+    tHalf = max([1, tPost(rcvIdx)]);
     kRcv = log(2) / tHalf;
 else
     % No clear recovery: use rate from last bin. This will be slow if the
     % unit hasn't recovered.
     lastBinFr = frPost(end);
     kRcv = (lastBinFr - frTrough) / tPost(end);
+end
+
+% Hard coded limit to neurons with FR profiles that don't fit any model
+if frTrough / frRcv > 2000
+    warning('This unit does not make sense, returning...')
+    return
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -118,7 +131,7 @@ end
 % Use findpeaks to detect nPeaks significant peaks. Require 10% prominence
 minProminence = 0.2 * abs(frRcv - frTrough); 
 
-[peakFr, peakTimes] = findpeaks(frPost, tPost, ...
+[peakFr, peakTime] = findpeaks(frPost, tPost, ...
     'NPeaks', 1, ...
     'SortStr', 'descend', ...
     'MinPeakHeight', frRcv, ...
@@ -126,60 +139,99 @@ minProminence = 0.2 * abs(frRcv - frTrough);
     'MinPeakWidth', round(0.05 * length(tPost)), ...
     'MinPeakDistance', round(0.05 * length(tPost)));
 
-nPeaks = length(peakFr);
-pkParams = struct('aOver', {}, 'kOver', {});
-for iPeak = 1:nPeaks
-    % Approximate overshoot amplitude relative to recovered FR
-    overshootAmp = peakFr(iPeak) - frRcv;
-    
-    % Calculate initial parameters for the overshoot term A*t*exp(-k*t)
-    % Peak of this term is at t = 1/k, value is A/(k*exp(1))
-    if peakTimes(iPeak) > 0
-        kOver = 1 / peakTimes(iPeak);
-        aOver = overshootAmp * kOver * exp(1);
-    else
-        kOver = 1/1800; % Default: characteristic time of 30 min
-        aOver = 0;
-    end
-    pkParams(iPeak).aOver = aOver;
-    pkParams(iPeak).kOver = kOver;
+% Approximate overshoot amplitude relative to recovered FR
+
+% Calculate initial parameters for the overshoot term A*t*exp(-k*t)
+% Peak of this term is at t = 1/k, value is A/(k*exp(1))
+if peakTime > 0
+    kOver = 1 / peakTime;
+    kFall = 1 / (max(tPost) - peakTime);
+    overshootAmp = peakFr - frRcv;
+    aOver = overshootAmp * kOver * exp(1);
+else
+    kOver = 1 / 1800; % Default: characteristic time of 30 min
+    kFall = 1 / 1800;
+    aOver = 0;
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % MODEL PREPARATION
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% BASE MODELS DESCRIPTION:
+% All models use the same parameter order: [frRcv, k, frTrough, ...]
+%   frRcv: steady-state firing rate (parameter 1)
+%   k: rate parameter (parameter 2)
+%   frTrough: trough value (parameter 3)
+%
+% Available base models:
+%   - 'exp1': Exponential recovery model
+%     y(t) = frRcv - (frRcv - frTrough) * exp(-k*t)
+%
+%   - 'gomp': Gompertz growth model
+%     y(t) = frRcv * exp(log(frTrough/frRcv) * exp(-k*t))
+%
+%   - 'rich': Richards growth model
+%     y(t) = frRcv / (1 + ((frRcv/frTrough)^a - 1) * exp(-k*t))^(1/a)
+%     Parameters: [..., a] where a is shape parameter
+%
+%   - 'exp2': Peak model with rising and falling phases
+%     Rising phase (t ≤ t_peak): frTrough + (peakFr - frTrough) * exp(k_rise * (t - t_peak))
+%     Falling phase (t > t_peak): frRcv + (peakFr - frRcv) * exp(-k_fall * (t - t_peak))
+%     Parameters: [frRcv, k_rise, frTrough, t_peak, peakFr, k_fall]
 
 % Create model struct array for base models
 mdls = struct('name', {}, 'func', {}, 'p0', {}, 'lb', {}, 'ub', {});
 
-% Model 1: Gompertz 
-mdls(1).name = "gompertz";
-mdls(1).func = @(p, tData) p(1) .* exp(log(max(p(3),eps) ./ p(1)) .* exp(-p(2) * tData));
-mdls(1).p0 = [frRcv, kRcv, frTrough];
-mdls(1).lb = [eps, 1e-6, 0];
-mdls(1).ub = [3*max(frVec), 1, max(frVec)];
-
-% Model 2: Richards 
-mdls(2).name = "richards";
-mdls(2).func = @(p, tData) p(1) ./ (1 + ((p(1)./max(p(3),eps)).^p(4) - 1) .* exp(-p(2)*tData)).^(1./p(4));
-mdls(2).p0 = [frRcv, kRcv, frTrough, 1];
-mdls(2).lb = [eps, 1e-6, 0, 1e-3];
-mdls(2).ub = [3*max(frVec), 1, max(frVec), 100];
-
-% Model 3: Exponential
-% mdls(3).name = "expo";
-% mdls(3).func = @(p, tData) p(1) - (p(1) - p(3)) .* exp(-p(2) * tData);
-% mdls(3).p0 = [frRcv, kRcv, frTrough];
-% mdls(3).lb = [eps, 1e-6, 0];
-% mdls(3).ub = [3*max(frVec), 1, max(frVec)];
+% Loop through specified base models
+for iMdl = 1:length(p.Results.baseMdls)
+    mdlName = p.Results.baseMdls{iMdl};
+    
+    switch lower(mdlName)
+        case 'gomp'
+            mdls(iMdl).name = "gomp";
+            mdls(iMdl).func = @(p, tData) p(1) .* exp(log(max(p(3),eps) ./ p(1)) .* exp(-p(2) * tData));
+            mdls(iMdl).p0 = [frRcv, kRcv, frTrough];
+            mdls(iMdl).lb = [eps, 1e-6, eps];
+            mdls(iMdl).ub = [3*max(frVec), 1, max(frVec)];
+            
+        case 'rich'
+            mdls(iMdl).name = "rich";
+            mdls(iMdl).func = @(p, tData) p(1) ./ (1 + ((p(1)./max(p(3),eps)).^p(4) - 1) .* exp(-p(2)*tData)).^(1./p(4));
+            mdls(iMdl).p0 = [frRcv, kRcv, frTrough, 1];
+            mdls(iMdl).lb = [eps, 1e-6, eps, 1e-3];
+            mdls(iMdl).ub = [3*max(frVec), 1, max(frVec), 100];
+            
+        case 'exp1'
+            mdls(iMdl).name = "exp1";
+            mdls(iMdl).func = @(p, tData) p(1) - (p(1) - p(3)) .* exp(-p(2) * tData);
+            mdls(iMdl).p0 = [frRcv, kRcv, frTrough];
+            mdls(iMdl).lb = [eps, 1e-6, eps];
+            mdls(iMdl).ub = [3*max(frVec), 1, max(frVec)];
+            
+        case 'exp2'
+            mdls(iMdl).name = "exp2";
+            mdls(iMdl).func = @(p, tData) ...
+                (tData <= p(4)) .* ... % Rising phase (exponential approach to peak)
+                (p(3) + (p(5)-p(3)) .* exp(p(2) * (tData - p(4)))) + ...
+                (tData > p(4)) .* ...  % Falling phase (exponential decay from peak)
+                (p(1) + (p(5)-p(1)) .* exp(-p(6) * (tData - p(4))));
+            mdls(iMdl).p0 = [frRcv, kOver, frTrough, peakTime, peakFr, kFall];
+            mdls(iMdl).lb = [eps, 1e-3, eps, eps, eps, 1e-3];
+            mdls(iMdl).ub = [3*max(frVec), 20, max(frVec), max(tPost), 3*max(frVec), 20];
+            
+        otherwise
+            warning('Unknown model type: %s. Skipping.', mdlName);
+            continue;
+    end
+end
 
 % If peaks were detected, create augmented models with overshoot terms
-if nPeaks > 0
+if peakTime > 0
     mdls = [mdls, mdls];
     for iMdl = length(mdls) / 2 + 1 : length(mdls)
         
         % Create new model with overshoot
-        mdls(iMdl).name = mdls(iMdl).name + "_pks";
+        mdls(iMdl).name = mdls(iMdl).name + "+PK";
         
         % Store the base model function and number of parameters
         baseFunc = mdls(iMdl).func;
@@ -190,16 +242,27 @@ if nPeaks > 0
             p(numBaseParams + 1) * tData .* exp(-p(numBaseParams + 2) * tData);
         
         % Append parameters for overshoot terms
-        mdls(iMdl).p0 = [mdls(iMdl).p0, pkParams(1).aOver, pkParams(1).kOver];
+        mdls(iMdl).p0 = [mdls(iMdl).p0, aOver, kOver];
         mdls(iMdl).lb = [mdls(iMdl).lb, 0, 1e-6];
         mdls(iMdl).ub = [mdls(iMdl).ub, 3*max(frVec), 1];
+    end
+    
+    % Remove exp2 model peak version from mdls struct
+    idxExp2 = find(strcmpi([mdls.name], "exp2+PK"));
+    if ~isempty(idxExp2)
+        mdls(idxExp2) = [];
+    end
+else
+    % Remove exp2 if no peak detected
+    idxExp2 = find(strcmpi([mdls.name], "exp2"));
+    if ~isempty(idxExp2)
+        mdls(idxExp2) = [];
     end
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PERFORM MODEL FITS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 nModels = length(mdls);
 
 % Fit each model using the helper function
@@ -290,7 +353,7 @@ fitQlty.fitR2(isnan(frFit.rsquare)) = false; % Mark NaN R-squares as bad
 % BASELINE STABILITY   
 % Baseline slope should be minimal to ensure stable pre-perturbation activity
 % Use normalized slope (% change per bin) to be independent of baseline FR
-thrBslSlope = 0.01; % 1% change per bin threshold
+thrBslSlope = 0.2; 
 if frFit.frBsl > 0
     bslSlope = abs(frFit.bslFit(2)) / frFit.frBsl; 
     fitQlty.bslStab = bslSlope <= thrBslSlope;
@@ -308,9 +371,9 @@ fitQlty.rcvKin = tauRcv >= minTau;
 
 % RECOVERY FAILURE
 thrRcv = -4.6; % log2(0.01) for minimum ~1% recovery
-frFit.rcvChange = log2(frFit.frRcv / frFit.frBsl);
-frFit.rcvErr = abs(frFit.rcvChange);
-fitQlty.rcvFail = frFit.rcvChange >= thrRcv;
+frFit.rcvGain = log2(frFit.frRcv / frFit.frBsl);
+frFit.rcvErr = abs(frFit.rcvGain);
+fitQlty.rcvFail = frFit.rcvGain >= thrRcv;
 
 % PERTURBATION RESPONSE
 % Units should show meaningful perturbation effects (>X% reduction from baseline)
@@ -342,51 +405,7 @@ frFit.fitQlty = fitQlty;
 % PLOT RESULTS (OPTIONAL)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if p.Results.flgPlot
-    figure;
-    hold on;
-    
-    % Plot raw data relative to trough
-    plot(tIdx, frVec, 'k', 'DisplayName', 'Data', 'MarkerSize', 8);
-
-    % --- Plot each successful model fit ---
-    modelDisplayNames = cell(1, nModels);
-    for iMdl = 1:nModels
-        % Capitalize first letter of model name
-        modelName = mdls(iMdl).name;
-        modelDisplayNames{iMdl} = [upper(modelName(1)), modelName(2:end)];
-    end
-    colors = lines(nModels);
-    tRcvIdx = tIdx(rcvOnset:end);
-
-    for iMdl = 1:nModels
-        if frFit.mdlFits.exitflag(iMdl) > 0
-            rcvCurvePlot = frFit.mdlFits.rcvCurve(iMdl, :);
-            plot(tRcvIdx, rcvCurvePlot, 'Color', colors(iMdl, :), 'LineWidth', 1.5, 'DisplayName', modelDisplayNames{iMdl});
-        end
-    end
-
-    % --- Formatting ---
-    % Highlight the best fit line
-    if ~isempty(frFit.mdlName)
-        bestModelIdx = find(strcmp(frFit.mdlFits.name, frFit.mdlName));
-        h_all = findobj(gca, 'Type', 'line');
-        h_best = findobj(h_all, 'DisplayName', modelDisplayNames{bestModelIdx});
-        if ~isempty(h_best)
-            set(h_best, 'LineWidth', 3);
-            uistack(h_best, 'top');
-        end
-        plotTitle = sprintf('Best Fit: %s (BIC: %.2f)', ...
-            frFit.mdlName, frFit.mdlFits.BIC(bestModelIdx));
-        title(plotTitle);
-    else
-        title('Firing Rate Recovery Fits');
-    end
-    
-    xlabel('Time from trough (bins)');
-    ylabel('Firing Rate (Hz)');
-    legend('show', 'Location', 'best');
-    grid on;
-    hold off;
+    plot_frFit_results(pertOnset, frFit, frVec, mdls);
 end
 
 end
@@ -417,8 +436,20 @@ function mdlFit = fit_mdl(fr, t, mdl)
 opts = optimoptions('lsqcurvefit', 'Display', 'off', 'TolFun', 1e-6,...
     'MaxIter', 1000, 'FunctionTolerance', 1e-6);
 
-% Perform the fit
-[pFit, resnorm, ~, exitflag] = lsqcurvefit(mdl.func, mdl.p0, t, fr(:), mdl.lb, mdl.ub, opts);
+% Perform the fit with error handling
+try
+    [pFit, resnorm, ~, exitflag] = lsqcurvefit(mdl.func, mdl.p0, t, fr(:), mdl.lb, mdl.ub, opts);
+catch ME
+    % If optimization fails due to numerical issues, return failed fit
+    if contains(ME.message, 'Inf') || contains(ME.message, 'NaN') || contains(ME.message, 'UndefAtX0')
+        pFit = mdl.p0;  % Use initial parameters
+        resnorm = inf;
+        exitflag = -1;  % Indicate failure
+    else
+        % Re-throw other errors
+        rethrow(ME);
+    end
+end
 
 % Calculate R-squared if fit was successful
 if exitflag > 0
@@ -439,6 +470,10 @@ if exitflag > 0
     if resnorm > 0
         AIC = 2*k + nData * log(resnorm / nData);
         BIC = k * log(nData) + nData * log(resnorm / nData);
+        if strcmp(mdl.name, 'exp2')
+            penality = 14 * k * log(nData);
+            BIC = BIC + penality;
+        end
     else % resnorm is 0, perfect fit
         AIC = -inf;
         BIC = -inf;
@@ -462,6 +497,82 @@ fields = fieldnames(mdl);
 for iFld = 1:length(fields)
     mdlFit.(fields{iFld}) = mdl.(fields{iFld});
 end
+
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% HELPER FUNCTION: PLOT_FRFIT_RESULTS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+function plot_frFit_results(pertOnset, frFit, frVec, mdls)
+% PLOT_FRFIT_RESULTS Helper function to plot firing rate fit results
+%
+% INPUT:
+%   pertOnset   - Index of perturbation onset
+%   frFit       - Structure containing fit results from mea_frFit
+%   frVec       - Vector of firing rate values [Hz]
+%   tIdx        - Time index vector
+%   mdls        - Model struct array used for fitting
+
+% Create figure with proper sizing
+[hFig, hAx] = plot_axSize('szOnly', false, 'axShape', 'wide', 'axHeight', 300);
+hold on;
+
+% Hard code time indices 
+tIdx = (1:length(frVec)) * 30 / 60 / 60 * 3;  
+tLimit = [0, 24];
+xlim(tLimit)
+xticks([0 : 6 : 24])
+
+% Plot raw data
+plot(tIdx, frVec, 'Color', [0.5 0.5 0.5], 'LineWidth', 0.5,...
+    'HandleVisibility', 'off');
+
+% Get successful models and sort by BIC
+mdlsGood = find(frFit.mdlFits.exitflag > 0);
+[~, sortIdx] = sort(frFit.mdlFits.BIC(mdlsGood));
+mdlsSrtd = mdlsGood(sortIdx);
+
+% Plot each successful model fit for recovery period (sorted by BIC)
+mdlNames = cell(1, length(mdlsSrtd));
+clrMdls = bone(length(sortIdx)) * 0.6;
+tRcvIdx = tIdx(frFit.rcvOnset:end);
+
+for iMdl = 1:length(mdlsSrtd)
+    mdlIdx = mdlsSrtd(iMdl);
+    rcvCurvePlot = frFit.mdlFits.rcvCurve(mdlIdx, :);
+    
+    % Capitalize first letter of model name and add BIC
+    modelName = mdls(mdlIdx).name{1};
+    bicValue = round(frFit.mdlFits.BIC(mdlIdx));
+    mdlNames{iMdl} = sprintf('%s (BIC: %d)', ...
+        [upper(modelName(1)), modelName(2:end)], bicValue);
+
+    hPlt = plot(tRcvIdx, rcvCurvePlot, '--', 'Color', [clrMdls(iMdl, :), 0.8], ...
+        'LineWidth', 2, 'DisplayName', mdlNames{iMdl}, 'HandleVisibility', 'off');
+    if iMdl == 1
+        hPlt.HandleVisibility = 'on';
+        hPlt.Color = [0, 0, 0, 1];
+        hPlt.LineWidth = 2.5;
+        hPlt.LineStyle = '-';
+    end
+end
+
+% Mark perturbation
+clrPert = [0.5, 0, 0.5, 0.5];
+yLimit = ylim;
+yText = yLimit(2);
+yLine = yLimit(2) - 0.05 * (yLimit(2) - yLimit(1)); % Line 5% below text
+plot([tIdx(pertOnset), 24], [yLine, yLine], 'Color', clrPert,...
+    'LineWidth', 4, 'HandleVisibility', 'off');
+text(tIdx(pertOnset) + 0.5, yText, 'Baclofen', 'FontName', 'Arial', 'FontSize', 16, ...
+    'Color', clrPert, 'HorizontalAlignment', 'left');
+
+% Formatting
+xlabel('Time (bins)');
+ylabel('Firing Rate (Hz)');   
+legend('show', 'Location', 'northeast');   
+plot_axSize('hFig', hFig, 'szOnly', false, 'axShape', 'wide', 'axHeight', 300);
 
 end
 

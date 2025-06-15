@@ -15,15 +15,15 @@ prcParams.shuffleMet = 'raster';
 % Files
 basepaths = [mcu_sessions('mea_bac')];
 basepaths = [mcu_sessions('mea_mcuko')];
-basepaths = [mcu_sessions('mea_mk801')];
+% basepaths = [mcu_sessions('mea_mk801')];
 
 nFiles = length(basepaths);
-vars = {'mea', 'st_metrics', 'fr'};
+vars = {'mea', 'st_metrics'};
 v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 
 % Analysis Params
 winLim = [5 * 60 60 * 60];        
-expLim = [0, 8 * 60 * 60];
+expLim = [0, 9 * 60 * 60];
 % expLim = [0, Inf];
 
 for iFile = 1 : nFiles
@@ -37,7 +37,7 @@ for iFile = 1 : nFiles
     
     % % --- Firing Rate Recovery
     frr = mea_frr(spktimes, 'winLim', expLim,...
-        'flgSave', true, 'flgPlot', true);
+        'flgSave', true, 'flgPlot', true, 'flgForce', false);
 
     % % --- Spike timing metrics
     % st = spktimes_metrics('spktimes', spktimes, 'sunits', [],...
@@ -64,20 +64,20 @@ grps = {'mea_bac'; 'mea_mcuko'};
 grpLbls = {'Control'; 'MCU-KO'};
 vars = {'frr', 'st_metrics', 'st_brst'};
 clear varMap
-varMap.uGood      = 'frr.info.uGood';
+varMap.uGood      = 'frr.uGood';
 varMap.FrBsl      = 'frr.frBsl';
-varMap.FrRec      = 'frr.frRecov';
+varMap.FrRcv      = 'frr.frRcv';
 varMap.BrMiz      = 'st.mizuseki'; 
 varMap.BrRoy      = 'st.royer';
 varMap.BrPct      = 'brst.spkprct';
 varMap.PertDepth  = 'frr.pertDepth';
-varMap.uRecov     = 'frr.uRecov';
-varMap.RecTime    = 'frr.recovTime';
-varMap.RecErr     = 'frr.recovError';
-varMap.RecChng    = 'frr.recovChange';
-varMap.RecSlope   = 'frr.normSlope';
+varMap.uRcv     = 'frr.mf.uRcv';
+varMap.RcvTime    = 'frr.rcvTime';
+varMap.RcvErr     = 'frr.rcvErr';
+varMap.RcvChng    = 'frr.rcvChange';
+varMap.RcvSlope   = 'frr.normSlope';
 varMap.SpkDfct    = 'frr.mf.spkDeficit';
-varMap.mfTime     = 'frr.mf.recovTime';
+varMap.mfTime     = 'frr.mf.rcvTime';
 
 clear tblCell
 for iGrp = 1 : length(grps)
@@ -105,17 +105,18 @@ lmeData = rmmissing(lmeData);
 % PLOT CORRELATIONS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% Corr plot. Change to gplotmatrix
-varsInc = {'FrBsl', 'BrPct', 'SpkDfct', 'RecChng', 'RecTime', 'mfTime'};
-grpVec = double(lmeData.Group == 'MCU-KO') + 1;
+% log transform predictors
+lData = tbl_transform(lmeData, 'varsInc', {'FrBsl', 'BrPct'}, 'flgZ', false,...
+    'skewThr', 1, 'varsGrp', {'Group'}, 'flgLog', true);
 
+varsInc = {'FrBsl', 'BrPct', 'SpkDfct', 'RcvChng', 'RcvTime', 'mfTime'};
 figure;
 grpIdx = lmeData.Group == 'Control';
-corrplot(gca, lmeData(grpIdx, varsInc), 'type', 'Spearman',...
+corrplot(gca, lData(grpIdx, varsInc), 'type', 'Spearman',...
     'testR', 'on');
 figure;
 grpIdx = lmeData.Group == 'MCU-KO';
-corrplot(gca, lmeData(grpIdx, varsInc), 'type', 'Spearman',...
+corrplot(gca, lData(grpIdx, varsInc), 'type', 'Spearman',...
     'testR', 'on');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -133,24 +134,21 @@ corrplot(gca, lmeData(grpIdx, varsInc), 'type', 'Spearman',...
 %  want to keep the original units of the response variables. Same goes for
 %  log transform. 
 
-% Insisted to use recChng and SpkDfct on logarithm scale so they can be
-% analyzed with fitlme. RecTime (and MF) probably still needs glme. 
+% Insisted to use rcvChng and SpkDfct on logarithm scale so they can be
+% analyzed with fitlme. RcvTime (and MF) probably still needs glme. 
 
 % BslFr is positively correlated with recovery time (model and model free).
 % This makes sense considering most units drop to zero, and thus despite
 % normalizing the target value, it is still largely influenced by BslFr. A
 % similar result is obtain for SpkDftc. Because of this, and because it
-% does not predict uRecovery, it is omitted from subsequent models
+% does not predict uRcv, it is omitted from subsequent models
 
 % -------------------------------------------------------------------------
 % PREPS
 
 % List of possible predictors
 listPrdct = {'PertDepth', 'FrBsl', 'BrPct', 'PRC', 'Group', '(1|Name)'}; 
-listRspns = {'RecErr', 'RecTime', 'RecSlope', 'SpkDfct', 'mfTime', 'uRecov', 'RecChng'}; 
-
-% Indices of units that recovered
-idxUnits = lmeData.uRecov;
+listRspns = {'RcvErr', 'RcvTime', 'RcvSlope', 'SpkDfct', 'mfTime', 'uRcv', 'RcvChng'}; 
 
 % Z score predictors
 zlData = tbl_transform(lmeData, 'varsExc', listRspns, 'flgZ', true,...
@@ -167,107 +165,32 @@ fname = lme_frml2char(frml, 'rmRnd', true);
 lme_save('fh', hFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
     'lmeData', lmeData, 'lmeMdl', mdl)
 
-lmeResults = lme_mdl2tbls(mdl);
-
 % -------------------------------------------------------------------------
 % (2) RECOVERY FIDELITY 
 % With interaction on burstiness
-% For both SpkDfct and RecErr, larger values = worse
+% For both SpkDfct and RcvErr, larger values = worse
 % recovery. Hence a negative estimate indicates better recovery. Note
-% SpkDfct correlated with recTime (makes sense)
+% SpkDfct correlated with rcvTime (makes sense)
 frml = [listRspns{7}, ' ~ PertDepth + BrPct * Group + (1|Name)'];
 mdl = fitlme(zlData, frml, 'FitMethod', 'REML');
 
 % -------------------------------------------------------------------------
-% (3) RECOVERY SPEED 
+% (3) RECOVERY TIME 
 % only units who recovered, from both groups combined
-frml = [listRspns{5}, ' ~ PertDepth + BrPct + (1|Name)'];
+idxUnits = lmeData.uRcv;
+frml = [listRspns{5}, ' ~ PertDepth + BrPct * Group + (1|Name)'];
 mdl = fitglme(zlData(idxUnits, :), frml, 'FitMethod', 'REMPL',...
-    'Distribution', 'Gamma');
+    'Distribution', 'Gamma', 'Link', 'log')
 
+idxUnits = lmeData.uRcv;
+frml = [listRspns{5}, ' ~ PertDepth + BrPct * Group + (1|Name)'];
+mdl = fitglme(zlData(idxUnits, :), frml, 'FitMethod', 'REMPL',...
+    'Distribution', 'Gamma')
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% COMPARE BASELINE VS RECOVERY
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% -------------------------------------------------------------------------
-% Load data from both groups
-grps = {'mea_bac'; 'mea_mcuko'};
-grpLbls = {'Control'; 'MCU-KO'};
-vars = {'frr', 'st_metrics', 'st_brst'};
-
-cnt = 1; clear tblCell
-for iCol = 1 : 2
-    for iGrp = 1 : length(grps)
-        basepaths = mcu_sessions(grps{iGrp});
-
-        v = basepaths2vars('basepaths', basepaths, 'vars', vars);
-        
-        % Create varMap based on time point
-        clear varMap
-        varMap.uGood      = 'frr.info.uGood';
-        varMap.BrMiz      = 'st.mizuseki'; 
-        varMap.BrRoy      = 'st.royer';
-        varMap.BrPct      = 'brst.spkprct';
-        
-        % FrBsl maps to different sources based on time point
-        if iCol == 1
-            varMap.FrBsl  = 'frr.mf.frBsl';  % Before: baseline firing rate
-        else
-            varMap.FrBsl  = 'frr.mf.frSs';   % After: steady-state firing rate
-        end
-        
-        % Prepare tag structures for v2tbl
-        tagAll.Group = grpLbls{iGrp};
-        tagFiles.Name = get_mname(basepaths);
-        
-        % Add Time column through tagAll based on time point
-        if iCol == 1
-            tagAll.Time = 'Before';
-        else
-            tagAll.Time = 'After';
-        end
-        
-        tempTbl = v2tbl('v', v, 'varMap', varMap, 'tagFiles',...
-            tagFiles, 'tagAll', tagAll, 'idxCol', iCol);
-        
-        tblCell{cnt} = tempTbl;
-        cnt = cnt + 1;
-    end
-end
-tbl = vertcat(tblCell{:});
-
-% Organize for analysis
-lmeData = tbl(tbl.uGood, :);
-lmeData.uGood = [];
-lmeData = rmmissing(lmeData);
-
-% FR per unit, WT vs MCU for RS vs FS 
-frml = 'FrBsl ~ Group * Time + (1|Name)';
-frml = 'BrPct ~ Group * Time + (1|Name)';
-
-mdl = fitglme(lmeData, frml, 'FitMethod', 'REMPL',...
-    'Distribution', 'Gamma');
-
-% run lme
-frml = 'bsl ~ Group * Time + (1|Name)';
-lmeCfg.contrasts = 'all';
-lmeCfg.distribution = 'gamma';
-[lmeStats, lmeMdl] = lme_analyse(lmeData, frml, lmeCfg);
-
-% plot
-hFig = lme_plot(lmeData, lmeMdl, 'ptype', 'bar', 'axShape', 'square');
-
-
-
-% -------------------------------------------------------------------------
-% Only baseline
-tIdx = lmeData.Time == "Before";
-frml = 'BrPct ~ Group + (1|Name)';
-mdl = fitglme(lmeData(tIdx, :), frml, 'FitMethod', 'MPL',...
-    'Distribution', 'Gamma');
-
-
+idxUnits = lmeData.uRcv;
+frml = [listRspns{5}, ' ~ PertDepth + BrPct * Group + (1|Name)'];
+mdl = fitglme(zlData(idxUnits, :), frml, 'FitMethod', 'REMPL',...
+    'Distribution', 'Normal')
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PLOT FR FIT
@@ -305,7 +228,7 @@ for iGrp = 1 : 2
 
     % Fit MFR using mea_frFit
     mfrFit = mea_frFit(mfr, idxPert, 'flgPlot', false, 'binSize', binSize);
-    [~, idxRec] = min(mfrFit.fitCurve);
+    [~, idxRcv] = min(mfrFit.fitCurve);
 
     % Create time vector in minutes
     t = (1:length(mfr)) * binSize / 60 / 60 * 3;  % Convert to minutes
@@ -315,7 +238,7 @@ for iGrp = 1 : 2
     hPtl = plot_stdShade('dataMat', (fr ./ frr.frBsl(uGood)), 'xVal', t, 'axh', hAx, ...
         'clr', clrGrp(iGrp, :) + 0.1, 'alpha', 0.5);
     set(hPtl, 'DisplayName', sprintf('%s (n=%d)', grpLbls{iGrp}, sum(uGood)));
-    plot(t(idxRec : end), mfrFit.fitCurve(idxRec : end), 'b--',...
+    plot(t(idxRcv : end), mfrFit.fitCurve(idxRcv : end), 'b--',...
         'LineWidth', 3, 'Color', clrGrp(iGrp, :) - 0.2, 'HandleVisibility', 'off');
 
 end
@@ -353,7 +276,7 @@ v = basepaths2vars('basepath', basepaths, 'vars', vars);
 
 % Combine all frr structures from control group
 frr = catfields([v(:).frr], 1);
-uGood = frr.uRecov;
+uGood = frr.uRcv;
 
 % Get perturbation onset and bin size from the first session
 idxPert = frr.info.pertOnset(1);
@@ -382,31 +305,31 @@ for iUnit = 1:length(idxSmpl)
     plot(t, fr, 'Color', [clrUnits(iUnit, :), 0.5], 'LineWidth', 0.5);
     
     % Add asterisk at recovery time
-    idxRec = round(frr.recovTime(uIdx) / binSize) + frr.recovOnset(uIdx);
-    plot(t(idxRec), fr(idxRec), 'o', 'MarkerEdgeColor', 'none',...
+    idxRcv = round(frr.rcvTime(uIdx) / binSize) + frr.rcvOnset(uIdx);
+    plot(t(idxRcv), fr(idxRcv), 'o', 'MarkerEdgeColor', 'none',...
         'MarkerFaceColor', [clrUnits(iUnit, :)], ...
         'MarkerSize', 8, 'LineWidth', 2);
 
     % Plot fit curve (only recovery portion)
     fitCurve = frr.fitCurve(uIdx, :);
-    [~, idxRec] = min(fitCurve);
-    plot(t(idxRec:end), fitCurve(idxRec:end), '--', ...
+    [~, idxRcv] = min(fitCurve);
+    plot(t(idxRcv:end), fitCurve(idxRcv:end), '--', ...
         'Color', [clrUnits(iUnit, :), 1], 'LineWidth', 2);
     
     % Add asterisk at recovery time
-    idxRec = round(frr.mf.recovTime(uIdx) / binSize) + frr.mf.recovOnset(uIdx);
-    plot(t(idxRec), fitCurve(idxRec), 'diamond', 'MarkerEdgeColor', 'none',...
+    idxRcv = round(frr.mf.rcvTime(uIdx) / binSize) + frr.mf.rcvOnset(uIdx);
+    plot(t(idxRcv), fitCurve(idxRcv), 'diamond', 'MarkerEdgeColor', 'none',...
         'MarkerFaceColor', clrUnits(iUnit, :), ...
         'MarkerSize', 8, 'LineWidth', 2);
 
     % Fill area of spk deficit
-    tRecov = t(idxPert:end);
-    frRecov = fr(idxPert:end);
-    bslLine = ones(size(tRecov)) * frr.mf.frBsl(uIdx);
-    tRecov = tRecov(:)';
-    frRecov = frRecov(:)';
+    tRcv = t(idxPert:end);
+    frRcv = fr(idxPert:end);
+    bslLine = ones(size(tRcv)) * frr.mf.frBsl(uIdx);
+    tRcv = tRcv(:)';
+    frRcv = frRcv(:)';
     bslLine = bslLine(:)';
-    fill(hAx, [tRecov, fliplr(tRecov)], [bslLine, fliplr(frRecov)],...
+    fill(hAx, [tRcv, fliplr(tRcv)], [bslLine, fliplr(frRcv)],...
         clrUnits(iUnit, :), 'FaceAlpha', 0.1, 'EdgeColor', 'none',...
         'HandleVisibility', 'off');   
 end
