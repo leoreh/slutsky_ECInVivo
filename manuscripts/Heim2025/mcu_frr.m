@@ -62,7 +62,7 @@ end
 % Load data from both groups
 grps = {'mea_bac'; 'mea_mcuko'};
 grpLbls = {'Control'; 'MCU-KO'};
-vars = {'frr', 'st_metrics', 'st_brst'};
+vars = {'frr', 'st_metrics', 'st_brst', 'prc'};
 clear varMap
 varMap.uGood      = 'frr.uGood';
 varMap.frBsl      = 'frr.frBsl';
@@ -78,6 +78,7 @@ varMap.rcvGain    = 'frr.rcvGain';
 varMap.rcvSlope   = 'frr.normSlope';
 varMap.spkDfct    = 'frr.mf.spkDfct';
 varMap.mfTime     = 'frr.mf.rcvTime';
+% varMap.prc        = 'prc.prc0_norm';
 
 clear tblCell
 for iGrp = 1 : length(grps)
@@ -110,6 +111,8 @@ lData = tbl_transform(lmeData, 'varsInc', {'frBsl', 'brPct'}, 'flgZ', false,...
     'skewThr', 1, 'varsGrp', {'Group'}, 'flgLog', true);
 
 varsInc = {'frBsl', 'brPct', 'spkDfct', 'rcvGain', 'rcvTime', 'mfTime'};
+varsInc = {'frBsl', 'brPct', 'spkDfct', 'brRoy', 'prc', 'mfTime'};
+
 figure;
 grpIdx = lmeData.Group == 'Control';
 corrplot(gca, lData(grpIdx, varsInc), 'type', 'Spearman',...
@@ -185,6 +188,84 @@ frml = [listRspns{5}, ' ~ pertDepth + brPct * Group + (1|Name)'];
 mdl = fitglme(zlData(idxUnits, :), frml, 'FitMethod', 'REMPL',...
     'Distribution', 'Gamma');
 
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% COMPARE BASELINE VS RECOVERY
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% -------------------------------------------------------------------------
+% Load data from both groups
+grps = {'mea_bac'; 'mea_mcuko'};
+grpLbls = {'Control'; 'MCU-KO'};
+vars = {'frr', 'st_metrics', 'st_brst'};
+
+cnt = 1; clear tblCell
+for iCol = 1 : 2
+    for iGrp = 1 : length(grps)
+        basepaths = mcu_sessions(grps{iGrp});
+
+        v = basepaths2vars('basepaths', basepaths, 'vars', vars);
+        
+        % Create varMap based on time point
+        clear varMap
+        varMap.uGood      = 'frr.info.uGood';
+        varMap.BrMiz      = 'st.mizuseki'; 
+        varMap.BrRoy      = 'st.royer';
+        varMap.BrPct      = 'brst.spkprct';
+        
+        % FrBsl maps to different sources based on time point
+        if iCol == 1
+            varMap.FrBsl  = 'frr.mf.frBsl';  % Before: baseline firing rate
+        else
+            varMap.FrBsl  = 'frr.mf.frSs';   % After: steady-state firing rate
+        end
+        
+        % Prepare tag structures for v2tbl
+        tagAll.Group = grpLbls{iGrp};
+        tagFiles.Name = get_mname(basepaths);
+        
+        % Add Time column through tagAll based on time point
+        if iCol == 1
+            tagAll.Time = 'Before';
+        else
+            tagAll.Time = 'After';
+        end
+        
+        tempTbl = v2tbl('v', v, 'varMap', varMap, 'tagFiles',...
+            tagFiles, 'tagAll', tagAll, 'idxCol', iCol);
+        
+        tblCell{cnt} = tempTbl;
+        cnt = cnt + 1;
+    end
+end
+tbl = vertcat(tblCell{:});
+
+% Organize for analysis
+lmeData = tbl(tbl.uGood, :);
+lmeData.uGood = [];
+lmeData = rmmissing(lmeData);
+
+% FR per unit, WT vs MCU for RS vs FS 
+frml = 'FrBsl ~ Group * Time + (1|Name)';
+frml = 'BrPct ~ Group * Time + (1|Name)';
+
+mdl = fitglme(lmeData, frml, 'FitMethod', 'REMPL',...
+    'Distribution', 'Gamma');
+
+% run lme
+frml = 'FrBsl ~ Group * Time + (1|Name)';
+lmeCfg.contrasts = 'all';
+lmeCfg.distribution = 'gamma';
+[lmeStats, lmeMdl] = lme_analyse(lmeData, frml, lmeCfg);
+
+% plot
+hFig = lme_plot(lmeData, lmeMdl, 'ptype', 'bar', 'axShape', 'square');
+
+
+
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PLOT FR FIT
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -193,7 +274,7 @@ mdl = fitglme(zlData(idxUnits, :), frml, 'FitMethod', 'REMPL',...
 % Load data from both groups
 grps = {'mea_bac'; 'mea_mcuko'};
 grpLbls = {'Control'; 'MCU-KO'};
-vars = {'frr'};
+vars = {'frr', 'st_brst'};
 
 % -------------------------------------------------------------------------
 % Figure 1: MFR with fit
@@ -210,6 +291,13 @@ for iGrp = 1 : 2
     v = basepaths2vars('basepath', basepaths, 'vars', vars);
     frr = catfields([v(:).frr], 1);
     uGood = frr.uGood;
+    
+    % Select units by burstiness
+    % brst = catfields([v(:).brst], 2);
+    % brstData = brst.spkprct(1, :);
+    % thrBrst = prctile(brstData, 20);
+    % uBrst = brstData < thrBrst;
+    % uGood = uGood & uBrst';
 
     % Calculate MFR from good units
     fr = frr.fr(uGood, :);
@@ -224,7 +312,7 @@ for iGrp = 1 : 2
     % [~, idxRcv] = min(mfrFit.fitCurve);
 
     % Create time vector in minutes
-    t = (1:length(mfr)) * binSize / 60 / 60 * 3;  % Convert to minutes
+    t = ((1:size(frr.fr, 2)) - idxPert) * binSize / 60 / 60 * 3;
     pertTime = t(idxPert);
 
     % Plot raw MFR
@@ -241,7 +329,7 @@ end
 xlabel('Time (min)');
 ylabel('MFR (% BSL)');
 legend('Location', 'southeast');
-xlim([0, 24]);
+xlim([-4, 20]);
 xticks([0 : 6 : 24])
 plot_axSize('hFig', hFig, 'szOnly', false, 'axShape', 'wide', 'axHeight', 300);
 
@@ -275,87 +363,92 @@ basepaths = mcu_sessions(grps{1});
 v = basepaths2vars('basepath', basepaths, 'vars', vars);
 
 % Combine all frr structures from control group
-frr = catfields([v(:).frr], 1);
+frr = catfields([v(:).frr], 1, true);
 uGood = frr.uRcv;
+mdlName = frr.mdlName{1};
 
 % Get perturbation onset and bin size from the first session
 idxPert = frr.info.pertOnset(1);
 binSize = frr.info.binSize(1);
 
 % Create time vector in minutes
-t = (1:size(frr.fr, 2)) * binSize / 60 / 60 * 3;  % Convert to minutes
+t = ((1:size(frr.fr, 2)) - idxPert) * binSize / 60 / 60 * 3; 
 pertTime = t(idxPert);
 
-% Select a sample of good neurons (e.g., first 10 or random selection)
-nSmp = min(5, sum(uGood));
-idxSmpl = find(uGood);
-idxSmpl = idxSmpl(randperm(length(idxSmpl), nSmp));
-idxSmpl = [67, 291, 574];
+% Plot a sample neuron
 idxSmpl = [18, 20];
+uIdx = 28;
 
 [hFig, hAx] = plot_axSize('szOnly', false, 'axShape', 'wide', 'axHeight', 300);
 clrUnits = bone(nSmp);
 hold on;
 
-% Plot each sample neuron
-for iUnit = 1:length(idxSmpl)
-    uIdx = idxSmpl(iUnit);
-        
-    % Plot raw firing rate
-    fr = frr.fr(uIdx, :);
-    plot(t, fr, 'Color', [clrUnits(iUnit, :), 0.5], 'LineWidth', 0.5,...
-        'HandleVisibility', 'off');
-    
-    % Add asterisk at recovery time
-    idxRcv = round(frr.rcvTime(uIdx) / binSize) + frr.rcvOnset(uIdx);
-    plot(t(idxRcv), fr(idxRcv), 'o', 'MarkerEdgeColor', 'none',...
-        'MarkerFaceColor', [clrUnits(iUnit, :)], ...
-        'MarkerSize', 8, 'LineWidth', 2, 'HandleVisibility', 'off');
+% Plot raw firing rate
+fr = frr.fr(uIdx, :);
+plot(t, fr, 'Color', [0.5, 0.5, 0.5], 'LineWidth', 0.5,...
+    'HandleVisibility', 'off');
 
-    % Plot fit curve (only recovery portion)
-    fitCurve = frr.fitCurve(uIdx, :);
-    [~, idxRcv] = min(fitCurve);
-    plot(t(idxRcv:end), fitCurve(idxRcv:end), '--', ...
-        'Color', [clrUnits(iUnit, :), 1], 'LineWidth', 2);
-    
-    % Add asterisk at recovery time
-    idxRcv = round(frr.mf.rcvTime(uIdx) / binSize) + frr.mf.rcvOnset(uIdx);
-    plot(t(idxRcv), fitCurve(idxRcv), 'diamond', 'MarkerEdgeColor', 'none',...
-        'MarkerFaceColor', clrUnits(iUnit, :), ...
-        'MarkerSize', 8, 'LineWidth', 2, 'HandleVisibility', 'off');
+% Plot fit curve (only recovery portion) with legend entry
+fitCurve = frr.fitCurve(uIdx, :);
+[~, idxRcv] = min(fitCurve);
+txtMdl = [upper(mdlName{uIdx}(1)), mdlName{uIdx}(2 : end)];
+plot(t(idxRcv:end), fitCurve(idxRcv:end), '-', ...
+    'Color', 'k', 'LineWidth', 2.5, ...
+    'DisplayName', sprintf('Mdl. %s', txtMdl));
 
-    % Fill area of spk deficit
-    tRcv = t(idxPert:end);
-    frRcv = fr(idxPert:end);
-    bslLine = ones(size(tRcv)) * frr.mf.frBsl(uIdx);
-    tRcv = tRcv(:)';
-    frRcv = frRcv(:)';
-    bslLine = bslLine(:)';
-    fill(hAx, [tRcv, fliplr(tRcv)], [bslLine, fliplr(frRcv)],...
-        clrUnits(iUnit, :), 'FaceAlpha', 0.1, 'EdgeColor', 'none',...
-        'HandleVisibility', 'off');   
-end
+% Add asterisk at recovery time
+idxRcv = round(frr.rcvTime(uIdx) / binSize) + frr.rcvOnset(uIdx);
+plot(t(idxRcv), fr(idxRcv), 'o', 'MarkerEdgeColor', 'none',...
+    'MarkerFaceColor', 'k', ...
+    'MarkerSize', 12, 'LineWidth', 2, ...
+    'DisplayName', sprintf('Rcv. Time: %d min',...
+    round(frr.rcvTime(uIdx) * 3 / 60)));
+
+% Add asterisk at recovery time
+idxRcv = round(frr.mf.rcvTime(uIdx) / binSize) + frr.mf.rcvOnset(uIdx);
+plot(t(idxRcv), fitCurve(idxRcv), 'diamond', 'MarkerEdgeColor', 'none',...
+    'MarkerFaceColor', 'k', ...
+    'MarkerSize', 12, 'LineWidth', 2, ...
+    'DisplayName', sprintf('Rcv. Time (mdl): %d min',...
+    round(frr.mf.rcvTime(uIdx) * 3 / 60)));
+
+% Fill area of spk deficit
+tRcv = t(idxPert:end);
+frRcv = fr(idxPert:end);
+bslLine = ones(size(tRcv)) * frr.mf.frBsl(uIdx);
+tRcv = tRcv(:)';
+frRcv = frRcv(:)';
+bslLine = bslLine(:)';
+fill(hAx, [tRcv, fliplr(tRcv)], [bslLine, fliplr(frRcv)],...
+    [0.5, 0.5, 0.5], 'FaceAlpha', 0.3, 'EdgeColor', 'none',...
+    'DisplayName', sprintf('Spk. Deficit: %.2f', frr.mf.spkDfct(uIdx)));
+
+% Create dummy plot for spike deficit legend entry
+% plot(NaN, NaN, 's', 'MarkerFaceColor', [1, 1, 1], ...
+%     'MarkerEdgeColor', 'none', 'MarkerSize', 10, ...
+%     'DisplayName', sprintf('Rcv Gain: %.2f', frr.rcvGain(uIdx)));
 
 % Formatting
 xlabel('Time (min)');
 ylabel('Firing Rate (Hz)');
-xlim([0, 24]);
+xlim([-4, 20]);
 xticks([0 : 6 : 24]);
+% ylim([0 15])
+hLgd = legend;
+hLgd.Location = "northwest";
 plot_axSize('hFig', hFig, 'szOnly', false, 'axShape', 'wide', 'axHeight', 300);
-ylim([0 100])
 
 % Mark perturbation
 clrPert = [0.5, 0, 0.5, 0.5];
 yLimit = ylim;
-yText = yLimit(2);
-yLine = yLimit(2) - 0.05 * (yLimit(2) - yLimit(1)); % Line 5% below text
+yText = 95;
+yLine = yText - 0.05 * (yLimit(2) - yLimit(1)); % Line 5% below text
 plot([pertTime, 24], [yLine, yLine], 'Color', clrPert,...
     'LineWidth', 4, 'HandleVisibility', 'off');
-text(pertTime + 0.5, yText, 'Baclofen', 'FontName', 'Arial', 'FontSize', 16, ...
+text(pertTime, yText, 'Baclofen', 'FontName', 'Arial', 'FontSize', 16, ...
     'Color', clrPert, 'HorizontalAlignment', 'left');
 
-hLgd = legend(arrayfun(@(x) sprintf('Unit %d', x), idxSmpl, 'UniformOutput', false));
-hLgd.Location = "best";
-
-fname = lme_frml2char('MEA ~ fitRcv', 'rmRnd', true);
+fname = lme_frml2char('MEA ~ fitUnit', 'rmRnd', true,...
+    'sfx', ['_', num2str(uIdx)]);
 lme_save('fh', hFig, 'fname', fname, 'frmt', {'svg', 'mat'})
+

@@ -170,11 +170,6 @@ else
     for iUnit = 1:nUnits
         frFit(iUnit) = mea_frFit(fr(iUnit, :), pertOnset,...
             'flgPlot', false);        
-        % hFig = gcf; hLgd = get(gca, 'Legend');
-        % hLgd.Location = "west";
-        % fname = lme_frml2char('MEA ~ fitUnit', 'rmRnd', true,...
-        %     'sfx', ['_', num2str(iUnit)]);
-        % lme_save('fh', hFig, 'fname', fname, 'frmt', {'svg', 'mat'})
     end
     frFit = catfields(frFit, 'addim', true, [3, 2, 1]);
     frFit.fitCurve = squeeze(frFit.fitCurve);
