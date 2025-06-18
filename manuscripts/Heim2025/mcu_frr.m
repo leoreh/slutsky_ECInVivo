@@ -289,20 +289,20 @@ for iGrp = 1 : length(grps)
     [nUnits, ~] = size(frr.fr);
     unitIDs = (1:nUnits)';
 
-    for iCol = [1 : 3]
+    for iCol = 1 : 3
 
         % Fr maps to different sources based on time point
         switch iCol
             case 1
                 varMap.Fr  = [mdlPrfx, '.frBsl'];
-                tagAll.Time = 'Baseline';
+                tagAll.Time = 'BSL';
             case 2
                 varMap.Fr  = [mdlPrfx, '.frTrough'];
-                tagAll.Time = 'Acute';
+                tagAll.Time = 'BAC 1h';
 
             case 3
                 varMap.Fr  = [mdlPrfx, '.frSs'];
-                tagAll.Time = 'Chronic';
+                tagAll.Time = 'BAC 24h';
         end
 
         % Prepare tag structures for v2tbl
@@ -324,103 +324,88 @@ end
 tbl = vertcat(tblCell{:});
 tbl = sortrows(tbl, 'Group');
 
+
+% -------------------------------------------------------------------------
+% Bursty
+
 % Organize for analysis
 lmeData = tbl(tbl.uGood, :);
 lmeData.uGood = [];
 lmeData = rmmissing(lmeData);
-% lmeData(lmeData.Time == 'Acute', :) = [];
-grpstats(lmeData, {'Group', 'Time'})
-
-% FR per unit, WT vs MCU for RS vs FS 
-varRsp = 'BrPct';
-frml = [varRsp, ' ~ Group * Time + (1|Name)'];
 
 % Normalize to baseline
 nData = tbl_transform(lmeData, 'varsInc', {varRsp}, 'flgZ', false,...
     'skewThr', 2, 'varsGrp', {'Group'}, 'varNorm', 'Time',...
     'flgLog', false, 'flgNorm', false);
-nData.Fr = nData.Fr + eps;
-nData.BrPct = nData.BrPct + eps;
-nData(nData.Time == 'Baseline', :) = [];
+nData.BrPct = nData.BrPct + min(nData.BrPct(nData.BrPct > 0)) / 2;
 
-% Debug: Check data structure and design matrix
-fprintf('Data summary after removing Baseline:\n');
-disp(grpstats(nData, {'Group', 'Time'}, {'mean', 'std', 'numel'}, 'DataVars', varRsp));
-
-% Check for any empty cells
-groupTimeCombos = unique(nData(:, {'Group', 'Time'}));
-fprintf('\nUnique Group-Time combinations:\n');
-disp(groupTimeCombos);
-
-% Check if we have enough data for the interaction
-if height(groupTimeCombos) < 4  % Need at least 4 combinations for Group*Time interaction
-    fprintf('\nWARNING: Not enough Group-Time combinations for interaction model\n');
-    fprintf('Falling back to additive model: %s ~ Group + Time + (1|Name)\n', varRsp);
-    frml = [varRsp, ' ~ Group + Time + (1|Name)'];
+% Remove unused categorical levels
+% nData(nData.Time == 'BaselBACine', :) = [];
+nData(nData.Time == 'BAC 1h', :) = [];
+if ismember('Time', nData.Properties.VariableNames)
+    actualTimeLevels = unique(nData.Time);
+    nData.Time = categorical(nData.Time, actualTimeLevels);
 end
-
-% Check data distribution
-fprintf('\nData distribution check for %s:\n', varRsp);
-fprintf('Min: %.4f, Max: %.4f, Mean: %.4f, Std: %.4f\n', ...
-    min(nData.(varRsp)), max(nData.(varRsp)), mean(nData.(varRsp)), std(nData.(varRsp)));
-
-% Check for any missing values
-fprintf('\nMissing values check:\n');
-missingVars = varfun(@(x) sum(isnan(x)), nData, 'OutputFormat', 'table');
-disp(missingVars);
-
-% Check categorical variables
-fprintf('\nCategorical variable levels:\n');
-catVars = {'Group', 'Time', 'Name'};
-for iVar = 1:length(catVars)
-    if ismember(catVars{iVar}, nData.Properties.VariableNames)
-        fprintf('%s: ', catVars{iVar});
-        cats = categories(nData.(catVars{iVar}));
-        fprintf('%s ', cats{:});
-        fprintf('\n');
-    end
-end
-
-% Check if any combination has only one observation (which can cause rank issues)
-fprintf('\nObservations per Group-Time combination:\n');
-obsCount = grpstats(nData, {'Group', 'Time'}, 'numel', 'DataVars', varRsp);
-disp(obsCount);
+grpstats(lmeData, {'Group', 'Time'});
 
 % run lme
-lmeCfg.contrasts = 'all';
+varRsp = 'BrPct';
+frml = [varRsp, ' ~ Group * Time + (1|Name)'];
+lmeCfg.contrasts = [1 : 7];
 lmeCfg.distribution = 'Gamma';
-
-try
-    [lmeStats, lmeMdl] = lme_analyse(nData, frml, lmeCfg);
-catch ME
-    fprintf('\nError with Gamma distribution: %s\n', ME.message);
-    fprintf('Trying with Normal distribution...\n');
-    
-    % Try with normal distribution
-    lmeCfg.distribution = 'Normal';
-    try
-        [lmeStats, lmeMdl] = lme_analyse(nData, frml, lmeCfg);
-    catch ME2
-        fprintf('Error with Normal distribution: %s\n', ME2.message);
-        fprintf('Trying additive model without interaction...\n');
-        
-        % Try additive model
-        frml_additive = [varRsp, ' ~ Group + Time + (1|Name)'];
-        try
-            [lmeStats, lmeMdl] = lme_analyse(nData, frml_additive, lmeCfg);
-        catch ME3
-            fprintf('Error with additive model: %s\n', ME3.message);
-            fprintf('Trying simple model with only Group...\n');
-            
-            % Try simplest model
-            frml_simple = [varRsp, ' ~ Group + (1|Name)'];
-            [lmeStats, lmeMdl] = lme_analyse(nData, frml_simple, lmeCfg);
-        end
-    end
-end
+[lmeStats, lmeMdl] = lme_analyse(nData, frml, lmeCfg);
 
 % plot
-hFig = lme_plot(nData, lmeMdl, 'ptype', 'bar', 'axShape', 'square');
+hFig = lme_plot(nData, lmeMdl, 'lmeStats', lmeStats,...
+    'ptype', 'bar', 'axShape', 'square', 'idxRow', [4, 3]);
+
+% Update labels
+hAx = gca;
+ylabel(hAx, 'Burstiness P(Spk\inBrst)', 'Interpreter', 'tex')
+xlabel(hAx, '')
+title(hAx, '')
+hAx.Legend.Location = 'southeast';
+
+plot_axSize('hFig', hFig, 'szOnly', false, 'axShape', 'square',...
+    'axHeight', 300)
+
+
+
+% -------------------------------------------------------------------------
+% Firing Rate
+
+% lmeData(lmeData.Time == 'Acute', :) = [];
+
+% Organize for analysis
+lmeData = tbl(tbl.uGood, :);
+lmeData.uGood = [];
+lmeData = rmmissing(lmeData);
+
+% Normalize to baseline
+nData = tbl_transform(lmeData, 'varsInc', {varRsp}, 'flgZ', false,...
+    'skewThr', 2, 'varsGrp', {'Group'}, 'varNorm', 'Time',...
+    'flgLog', false, 'flgNorm', true);
+nData.Fr = nData.Fr + min(nData.Fr(nData.Fr > 0)) / 2;
+
+% Remove unused categorical levels
+nData(nData.Time == 'Baseline', :) = [];
+nData(nData.Time == 'Acute', :) = [];
+if ismember('Time', nData.Properties.VariableNames)
+    actualTimeLevels = unique(nData.Time);
+    nData.Time = categorical(nData.Time, actualTimeLevels);
+end
+grpstats(lmeData, {'Group', 'Time'});
+
+% run lme
+varRsp = 'Fr';
+frml = [varRsp, ' ~ Group + (1|Name)'];
+lmeCfg.contrasts = [];
+lmeCfg.distribution = 'Gamma';
+[lmeStats, lmeMdl] = lme_analyse(nData, frml, lmeCfg);
+
+% plot
+hFig = lme_plot(nData, lmeMdl, 'lmeStats', lmeStats,...
+    'ptype', 'bar', 'axShape', 'square', 'idxRow', 2);
 
 
 

@@ -65,7 +65,7 @@ frml = char(lmeMdl.Formula);
 [varsFxd, varRsp] = lme_frml2vars(frml);
 
 % organize data for plotting based on number of variables
-[dataGrp, xVals, varLbls] = lme_tbl2cell(lmeData, varsFxd, varRsp);
+[dataGrp, xVals, varLbls] = lme_tbl2cell(lmeData, varsFxd, varRsp, 'flgCats', true);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %  plot
