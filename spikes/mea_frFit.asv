@@ -63,8 +63,8 @@ frFit = struct('frTrough', NaN, 'idxRcv', NaN, 'mdlName', '', 'pFit', [], ...
     'rsquare', NaN, 'frMdl', [], 'frBsl', NaN, 'bslFit', NaN, ...
     'frRcv', NaN, 'mdlFits', [], 'mdlIdx', [], 'goodFit', false, 'pertDepth', [], ...
     'rcvGain', NaN, 'rcvErr', NaN, 'fitQlty', struct('fitR2', false, ...
-    'bslStab', false, 'rcvKin', false, 'pertResp', false, ...
-    'bslRate', false));
+    'bslStab', false, 'rcvKin', false, 'rcvFail', false, 'pertResp', false, ...
+    'bslRate', false, 'rcvRate', false));
 
 % Hard limit on number of bins with spikes
 if sum(frVec > 0) < 10
@@ -330,10 +330,9 @@ fitQlty = struct();
 
 % FIT QUALITY
 % R-squared threshold ensures the model explains a meaningful portion of variance
-thrRsquare = 0.05;
+thrRsquare = 0.1;
 fitQlty.fitR2 = frFit.rsquare >= thrRsquare;
 fitQlty.fitR2(isnan(frFit.rsquare)) = false; % Mark NaN R-squares as bad
-fitQlty.fitR2 = true;                        % OVERRIDE
 
 % BASELINE STABILITY 
 % Baseline slope as a measure of pre-perturbation stability. Normalized to
@@ -363,9 +362,9 @@ fitQlty.pertResp = frFit.pertDepth >= thrPert;
 
 % BASELINE AND RECOVERY RATE
 % Units should have sufficient activity for reliable analysis
-thrFr = 1e-6; % Hz
+thrFr = 0.001; % Hz
 fitQlty.bslRate = frFit.frBsl >= thrFr;
-% fitQlty.rcvRate = frFit.frRcv >= thrFr;
+fitQlty.rcvRate = frFit.frRcv >= thrFr;
 
 % COMBINE 
 qualityFields = fieldnames(fitQlty);
@@ -373,6 +372,10 @@ frFit.goodFit = true;
 for iFld = 1:length(qualityFields)
     frFit.goodFit = frFit.goodFit && fitQlty.(qualityFields{iFld});
 end
+
+% OVVERIDE AND SELECT SPECIFIC CHECKS
+frFit.goodFit = fitQlty.fitR2 & fitQlty.rcvKin & fitQlty.pertResp & ...
+    fitQlty.bslRate;
 
 % Store detailed quality information for debugging
 frFit.fitQlty = fitQlty;

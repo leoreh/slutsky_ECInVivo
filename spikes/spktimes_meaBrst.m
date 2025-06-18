@@ -110,13 +110,14 @@ brst.info.input         = p.Results;
 brst.info.bins          = bins;
 brst.info.binsize       = binsize;
 brst.info.recLen        = recLen;
-brst.detect             = nan(nbins, nunits);
+
+brst.detect             = zeros(nbins, nunits);
 brst.nspks              = nan(nbins, nunits);
-brst.spkprct            = nan(nbins, nunits);
+brst.spkprct            = zeros(nbins, nunits);
 brst.brstDur            = nan(nbins, nunits);
 brst.freq               = nan(nbins, nunits);
-brst.rate               = nan(nbins, nunits);
-brst.rateNorm           = nan(nbins, nunits);
+brst.rate               = zeros(nbins, nunits);
+brst.rateNorm           = zeros(nbins, nunits);
 brst.ibi                = nan(nbins, nunits);
 brst.shortPrct          = nan(nbins, nunits);
 

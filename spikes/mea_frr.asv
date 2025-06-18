@@ -169,7 +169,7 @@ else
 
     for iUnit = 1:nUnits
         frFit(iUnit) = mea_frFit(fr(iUnit, :), idxPert,...
-            'flgPlot', false);
+            'flgPlot', true);
     end
     frFit = catfields(frFit, 'addim', true, [3, 2, 1]);
     frFit.frMdl = squeeze(frFit.frMdl);
@@ -283,26 +283,22 @@ function metrics = frr_metrics(fr, t, idxPert, uGood, binSize)
 
 % -------------------------------------------------------------------------
 % NUMERICAL FR VALUES
+mrgnBins = round(600/binSize);
 nUnits = size(fr, 1);
-winMarg = 5 * 60 / binSize;
-winDur = 60 * 60 / binSize;
 
-% Baseline FR: 1 hour window starting 5 min after recording onset
-bslStart = round(winMarg);  % 5 min in bins
-bslEnd = bslStart + round(winDur);  % 1 hour window
-bslWin = bslStart:min(bslEnd, idxPert-1);  % Ensure we don't go past perturbation
+% Baseline FR in window before perturbation (with margin)
+bslWin = 1:max(1, idxPert - mrgnBins);
 frBsl = mean(fr(:, bslWin), 2, 'omitnan');
 
-% Trough FR: 10 min window after perturbation
-troughWin = idxPert : min(length(t), idxPert + round(10 * 60 / binSize));
+% Trough / Rcv point as minimum in first 15 mins post-perturbation
+% Trough FR as the mean fr during this window
+troughWin = idxPert : min(length(t), idxPert + round(900/binSize));
 [~, idxTrough] = min(fr(:, troughWin), [], 2);
 idxRcv = idxPert + idxTrough - 1;
 frTrough = mean(fr(:, troughWin), 2, 'omitnan');
 
-% Steady state firing rate: 1 hour window ending 5 min before recording end
-ssEnd = length(t) - round(winMarg);  % 5 min before end
-ssStart = ssEnd - round(winDur);  % 1 hour window
-ssWin = max(1, ssStart):ssEnd;  % Ensure we don't go before start
+% Steady state firing rate from the last 20% of the recording
+ssWin = length(t) - round(length(t) * 0.2) : length(t);
 frSs = mean(fr(:, ssWin), 2, 'omitnan');
 
 % -------------------------------------------------------------------------
@@ -312,17 +308,11 @@ frSs = mean(fr(:, ssWin), 2, 'omitnan');
 c(1) = min(frTrough(frTrough > 0)) / 2;
 c(2) = min(frSs(frSs > 0)) / 2;
 if isempty(c(1)) || isinf(c(1)) || isnan(c(1))
-    c(1) = 1e-6;
+    c(1) = 0.0001;
 end
 if isempty(c(2)) || isinf(c(2)) || isnan(c(2))
-    c(2) = 1e-6;
+    c(2) = 0.0001;
 end
-
-% Hard code c base on inspection of entire data set. Importantly, if this
-% is not the same for model-free and model-based then I suspect artifacts
-% appear (e.g., correlations with pertDepth).
-c(1) = 0.00001;
-c(2) = 0.0001;
 
 % Perturbation Depth
 pertDepth = log2(frBsl ./ (frTrough + c(1)));
@@ -336,7 +326,7 @@ rcvGain = log2((frSs + c(2)) ./ (frTrough + c(1)));
 
 % Successful Recovery
 thrRcv = 0.5;
-uRcv = frSs >= frTrough + thrRcv * (frBsl - frTrough);
+uRcv = frSs > (frBsl * thrRcv);
 uRcv(~uGood) = false; % Only good units can be considered recovered
 
 % -------------------------------------------------------------------------
@@ -356,22 +346,24 @@ for iUnit = 1:nUnits
 
     % Recovery Kinetics (Time and Slope)
     rcvRange = frBsl(iUnit) - frTrough(iUnit);
-    rcvVal = frTrough(iUnit) + thrRcv * rcvRange;
+    if rcvRange > 0
+        rcvVal = frTrough(iUnit) + thrRcv * rcvRange;
 
-    % Use individual unit's recovery onset
-    rcvCurve = fr(iUnit, idxRcv(iUnit):end);
-    rcvIdx = find(rcvCurve >= rcvVal, 1, 'first');
+        % Use individual unit's recovery onset
+        rcvCurve = fr(iUnit, idxRcv(iUnit):end);
+        rcvIdx = find(rcvCurve >= rcvVal, 1, 'first');
 
-    if ~isempty(rcvIdx)
-        rcvTime(iUnit) = (idxRcv(iUnit) + rcvIdx - 1 - idxPert) * binSize;
-    else
-        rcvTime(iUnit) = t(end); % Max value if not recovered
-    end
+        if ~isempty(rcvIdx)
+            rcvTime(iUnit) = (idxRcv(iUnit) + rcvIdx - 1 - idxPert) * binSize;
+        else
+            rcvTime(iUnit) = t(end); % Max value if not recovered
+        end
 
-    % Find max slope during recovery [Hz/min] and normalize
-    if ~isempty(rcvCurve) && length(rcvCurve) > 1
-        rcvSlope(iUnit) = (max(diff(rcvCurve)) / binSize) * 60;
-        normSlope(iUnit) = (rcvSlope(iUnit) / rcvRange) * 100;
+        % Find max slope during recovery [Hz/min] and normalize
+        if ~isempty(rcvCurve) && length(rcvCurve) > 1
+            rcvSlope(iUnit) = (max(diff(rcvCurve)) / binSize) * 60;
+            normSlope(iUnit) = (rcvSlope(iUnit) / rcvRange) * 100;
+        end
     end
 
     % Spike deficit calculation
@@ -392,7 +384,7 @@ metrics.rcvSlope = rcvSlope;
 metrics.normSlope = normSlope;
 metrics.rcvGain = rcvGain;
 metrics.rcvErr = rcvErr;
-metrics.rcvDiff = rcvDiff;
+metrics.rcvAbs = rcvDiff;
 metrics.uRcv = uRcv;
 metrics.spkDfct = spkDfct;
 

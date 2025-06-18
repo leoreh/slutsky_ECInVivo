@@ -173,6 +173,7 @@ ti = get(hAx, 'TightInset');
 
 % Calculate figure dimensions needed to encompass the plot area and its decorations
 figWidth = axWidth + ti(1) + ti(3) + cbWidth + 15; % Add colorbar width to total figure width
+figWidth = axWidth + ti(1) + ti(3) + cbWidth; % Add colorbar width to total figure width
 figHeight = axHeight + ti(2) + ti(4);
 
 % Set figure size. Preserve original screen position (left, bottom) of the figure.
@@ -180,6 +181,12 @@ fhUnits = get(hFig, 'Units');
 set(hFig, 'Units', 'pixels');
 figPos = get(hFig, 'Position'); % To preserve screen x,y for the figure
 set(hFig, 'Position', [figPos(1), figPos(2), figWidth, figHeight]);
+
+% Position figure on 2nd screen
+monitors = get(0, 'MonitorPositions');  % Get positions of all monitors
+mnt2 = monitors(2, :);                  % Select second screen [left, bottom, width, height]
+hFig.Position = [mnt2(1) + 400, mnt2(2) + 200,...
+    figWidth, figHeight]; 
 
 % Force MATLAB to render/update the figure with its new size.
 drawnow; 
