@@ -1,4 +1,4 @@
-function [rVal, pVal, brsty] = mea_frrCorr(spktimes, rcvData, varargin)
+function [rVal, pVal, bspks] = mea_frrCorr(spktimes, rcvData, varargin)
 % MEAFRRCORR Calculates correlations between burstiness and recovery metrics.
 %
 % SUMMARY:
@@ -11,7 +11,7 @@ function [rVal, pVal, brsty] = mea_frrCorr(spktimes, rcvData, varargin)
 %
 % The analysis includes:
 %   1. Burst detection using variable ISI thresholds/bins
-%   2. Calculation of burstiness metrics (spike percent in bursts)
+%   2. Calculation of burstiness metrics (spike fraction in bursts)
 %   3. Correlation analysis with recovery metrics (spike deficit, recovery gain, etc.)
 %   4. Generation of a summary plot showing correlation patterns and burstiness distribution.
 %
@@ -31,7 +31,7 @@ function [rVal, pVal, brsty] = mea_frrCorr(spktimes, rcvData, varargin)
 % OUTPUT:
 %   rVal          - Correlation coefficients (nIsiThr x 1).
 %   pVal          - P-values for correlations (nIsiThr x 1).
-%   brsty         - Spike percent in bursts (nUnits x nIsiThr).
+%   bspks         - Spike fraction in bursts (nUnits x nIsiThr).
 
 % -------------------------------------------------------------------------
 % INPUT PARSING
@@ -83,7 +83,7 @@ nThr = length(isiThr);
 % The calculation method is determined by the `flgBin` parameter.
 
 % Calculate burstiness for each ISI threshold/bin
-brsty = zeros(nUnits, nThr);
+bspks = zeros(nUnits, nThr);
 isiThrEdges = [0; isiThr];
 for iThr = 1:nThr
     for iUnit = 1:nUnits
@@ -106,9 +106,9 @@ for iThr = 1:nThr
             'minDur', minSpks-1, 'flgPrnt', false);
         
         if ~isempty(idxBrsts)
-            % Calculate percent spikes in bursts
-            bSpks = diff(idxBrsts, 1, 2) + 1;
-            brsty(iUnit, iThr) = sum(bSpks) / nSpks(iUnit) * 100;
+            % Calculate fraction spikes in bursts
+            nBspks = diff(idxBrsts, 1, 2) + 1;
+            bspks(iUnit, iThr) = sum(nBspks) / nSpks(iUnit);
         end
     end
 end
@@ -121,11 +121,11 @@ end
 % 2. Store results in correlation matrices
 
 % Calculate correlation for all ISI thresholds at once using pairwise complete
-[rVal, pVal] = corr(brsty, rcvData, 'type', 'Spearman', 'Rows', 'pairwise');
+[rVal, pVal] = corr(bspks, rcvData, 'type', 'Spearman', 'Rows', 'pairwise');
 
 % Plotting
 if flgPlot
-    frrCorr_plot(brsty, rVal, isiThr, mfr, flgBin);
+    frrCorr_plot(bspks, rVal, isiThr, mfr, flgBin);
 end
 
 end     % EOF
@@ -134,7 +134,7 @@ end     % EOF
 % HELPER FUNCTION: FRR_CORR_PLOT
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function frrCorr_plot(brsty, rVal, isiThr, mfr, flgBin)
+function frrCorr_plot(bspks, rVal, isiThr, mfr, flgBin)
 % Create figure
 [hFig, hAx] = plot_axSize('szOnly', false, 'axShape', 'square', 'axHeight', 300);
 xVal = 1 ./ isiThr;
@@ -165,14 +165,14 @@ yline(0, '--k', 'LineWidth', 1, 'Alpha', 0.5);
 % Normalize
 binWidths = diff([0; isiThr]);
 if flgBin
-    dataMat = brsty ./ binWidths';
+    dataMat = bspks ./ binWidths';
     dataMat = dataMat ./ sum(dataMat, 2);
     yTxt = 'P(S\inB)_{ΔISI}';
     yLbl = 'Probability Density';
 else
-    dataMat = brsty;
+    dataMat = bspks;
     yTxt = 'P(S\inB)';
-    yLbl = 'Cum. Probability (%)';
+    yLbl = 'Cum. Probability';
 end
 dataMat(isinf(dataMat) | isnan(dataMat)) = 0; 
 
@@ -210,16 +210,16 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % REMARKS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% For minSpks = 2, the "percent of spikes in a burst" metric is a
+% For minSpks = 2, the "fraction of spikes in a burst" metric is a
 % mathematical tautology (approximately linear transformation) of the ISI's
 % cumulative distribution function evaluated at isiThr. It provides no new
 % information about the spike train's structure that is not already present
 % in the first-order ISI distribution itself.
-% spkPrct ~ 2 * isiHist, where isiHist:
+% spkFrac ~ 2 * isiHist, where isiHist:
 % isiHist = histcounts(isi, 'BinEdges', [0, isiThr'],...
-%     'Normalization', 'cdf') * 100 * 2;
-% The insistance on "spkPrct" is too mantain compatibility with different
+%     'Normalization', 'cdf') * 2;
+% The insistance on "spkFrac" is to maintain compatibility with different
 % minSpks
 
-% Since isiThr is logspaced, to plot the probability of a given spkPrct it
+% Since isiThr is logspaced, to plot the probability of a given spkFrac it
 % must be divided by the bin width.

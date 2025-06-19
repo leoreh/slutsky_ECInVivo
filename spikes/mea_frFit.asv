@@ -1,4 +1,4 @@
-function frFit = mea_frFit(fr, idxPert, varargin)
+function frFit = mea_frFit(frVec, idxPert, varargin)
 % MEAFRFIT Fits double-exponential recovery model to firing rate data.
 %
 % SUMMARY:
@@ -10,7 +10,7 @@ function frFit = mea_frFit(fr, idxPert, varargin)
 %      and optional overshoot components
 %
 % INPUT (Required):
-%   fr        - Vector of firing rate values [Hz] for a single unit.
+%   frVec      - Vector of firing rate values [Hz] for a single unit.
 %   idxPert   - Index of perturbation onset.
 %
 % INPUT (Name-Value):
@@ -21,7 +21,7 @@ function frFit = mea_frFit(fr, idxPert, varargin)
 % OUTPUT:
 %   frFit       - Structure containing fit results:
 %     .frTrough       - Firing rate at recovery onset (trough) [Hz].
-%     .idxTrough       - Index of recovery onset based on best fitted curve.
+%     .idxRcv       - Index of recovery onset based on best fitted curve.
 %     .mdlName        - Name of the best-fitting model ('expo', 'gomp', 'rich').
 %     .pFit           - Fitted parameters for the best model.
 %     .rsquare        - R-squared goodness of fit for the best model.
@@ -48,18 +48,18 @@ function frFit = mea_frFit(fr, idxPert, varargin)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 p = inputParser;
-addRequired(p, 'fr', @isnumeric);
+addRequired(p, 'frVec', @isnumeric);
 addRequired(p, 'idxPert', @(x) isnumeric(x) && isscalar(x));
 addParameter(p, 'flgPlot', false, @islogical);
 addParameter(p, 'baseMdls', {'gomp', 'rich', 'exp2'}, @iscell);
 
-parse(p, fr, idxPert, varargin{:});
+parse(p, frVec, idxPert, varargin{:});
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % INITIALIZE OUTPUT STRUCTURE
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-frFit = struct('frTrough', NaN, 'idxTrough', NaN, 'mdlName', '', 'pFit', [], ...
+frFit = struct('frTrough', NaN, 'idxRcv', NaN, 'mdlName', '', 'pFit', [], ...
     'rsquare', NaN, 'frMdl', [], 'frBsl', NaN, 'bslFit', NaN, ...
     'frSs', NaN, 'mdlFits', [], 'mdlIdx', [], 'goodFit', false, 'pertDepth', [], ...
     'rcvGain', NaN, 'rcvErr', NaN, 'fitQlty', struct('fitR2', false, ...
@@ -67,7 +67,7 @@ frFit = struct('frTrough', NaN, 'idxTrough', NaN, 'mdlName', '', 'pFit', [], ...
     'bslRate', false));
 
 % Hard limit on number of bins with spikes
-if sum(fr > 0) < 10
+if sum(frVec > 0) < 10
     return
 end
 
@@ -76,40 +76,46 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Time indices
-tIdx = (1:length(fr))';
+tIdx = (1:length(frVec))';
 
-% FR Trough: 20 min window after perturbation (assumes binSize = 60). The
-% idxTrough must be at least one bin after the petrubation Idx
+% Trough FR: 20 min window after perturbation (assumes binSize = 60)
 troughWin = idxPert : idxPert + 20;
-[frTrough, idxMin] = min(fr(:, troughWin), [], 2);
-idxMin = max([idxMin, 2]);
-idxTrough = idxPert + idxMin - 1;
+[frTrough, idxTrough] = min(fr(:, troughWin), [], 2);
+idxRcv = idxPert + winMarg + idxTrough - 1;
+if ~flgMdl
+    troughWin = mode(idxRcv) : mode(idxRcv) + winMarg;
+    frTrough = mean(fr(:, troughWin), 2, 'omitnan');
+end
 
-% Post-perturbation period, converted to relative time for fitting
-tPost = tIdx(idxTrough:end) - idxTrough;
-frPost = fr(idxTrough:end);
 
-% FR Recovery: Mean of last 20% of data
-frSs = mean(frPost(round(0.8 * length(frPost)):end), 'omitnan');
 
+
+
+% Initial guess for recovery onset using continuous derivative method
+dfr = diff(frVec);
+dfrPost = dfr(idxPert:end);
+runsUp = conv(dfrPost > 0, ones(1, 5), 'valid');
+longUp = find(runsUp >= 4, 1, 'first');
+
+if ~isempty(longUp)
+    idxRcv = idxPert + longUp - 1;
+else
+    % Fallback: first non-negative derivative
+    rcvDelay = find(dfrPost >= 0, 1, 'first');
+    idxRcv = idxPert + rcvDelay - 1;
+end
+
+% Convert to relative time for fitting
+tPost = tIdx(idxRcv:end) - idxRcv;
+frPost = frVec(idxRcv:end);
+
+% FR Recovery: Mean of last 20% of data. FR Trough: Min after peturbation.
 % Add lower bound for stability. Values determined by manual inspection of
 % model-free data set.
+frSs = mean(frPost(round(0.8 * length(frPost)):end), 'omitnan');
+frTrough = min(frVec(idxPert : idxRcv + 5));
 frSs = max([frSs, 1e-4]);
 frTrough = max([frTrough, 1e-5]);
-
-% % % % Initial guess for recovery onset using continuous derivative method
-% % % dfr = diff(fr);
-% % % dfrPost = dfr(idxPert:end);
-% % % runsUp = conv(dfrPost > 0, ones(1, 5), 'valid');
-% % % longUp = find(runsUp >= 4, 1, 'first');
-% % % 
-% % % if ~isempty(longUp)
-% % %     idxTrough = idxPert + longUp - 1;
-% % % else
-% % %     % Fallback: first non-negative derivative
-% % %     rcvDelay = find(dfrPost >= 0, 1, 'first');
-% % %     idxTrough = idxPert + rcvDelay - 1;
-% % % end
 
 % Recovery kinetics: Based on time to 50% recovery, or last bin if no clear recovery
 rcvFr = frTrough + 0.5 * (frSs - frTrough);
@@ -121,7 +127,8 @@ if ~isempty(rcvIdx)
     kRcv = log(2) / tHalf;
 else
     % No clear recovery: use rate from last bin (slow)
-    kRcv = (frPost(end) - frTrough) / tPost(end);
+    lastBinFr = frPost(end);
+    kRcv = (lastBinFr - frTrough) / tPost(end);
 end
 
 % Hardcoded limit to neurons with FR profiles that don't fit any model
@@ -198,21 +205,21 @@ for iMdl = 1:length(p.Results.baseMdls)
             mdls(iMdl).func = @(p, tData) p(1) .* exp(log(max(p(3),eps) ./ p(1)) .* exp(-p(2) * tData));
             mdls(iMdl).p0 = [frSs, kRcv, frTrough];
             mdls(iMdl).lb = [eps, 1e-6, eps];
-            mdls(iMdl).ub = [3*max(fr), 1, max(fr)];
+            mdls(iMdl).ub = [3*max(frVec), 1, max(frVec)];
             
         case 'rich'
             mdls(iMdl).name = "rich";
             mdls(iMdl).func = @(p, tData) p(1) ./ (1 + ((p(1)./max(p(3),eps)).^p(4) - 1) .* exp(-p(2)*tData)).^(1./p(4));
             mdls(iMdl).p0 = [frSs, kRcv, frTrough, 1];
             mdls(iMdl).lb = [eps, 1e-6, eps, 1e-3];
-            mdls(iMdl).ub = [3*max(fr), 1, max(fr), 100];
+            mdls(iMdl).ub = [3*max(frVec), 1, max(frVec), 100];
             
         case 'exp1'
             mdls(iMdl).name = "exp1";
             mdls(iMdl).func = @(p, tData) p(1) - (p(1) - p(3)) .* exp(-p(2) * tData);
             mdls(iMdl).p0 = [frSs, kRcv, frTrough];
             mdls(iMdl).lb = [eps, 1e-6, eps];
-            mdls(iMdl).ub = [3*max(fr), 1, max(fr)];
+            mdls(iMdl).ub = [3*max(frVec), 1, max(frVec)];
             
         case 'exp2'
             mdls(iMdl).name = "exp2";
@@ -223,7 +230,7 @@ for iMdl = 1:length(p.Results.baseMdls)
                 (p(1) + (p(5)-p(1)) .* exp(-p(6) * (tData - p(4))));
             mdls(iMdl).p0 = [frSs, kOver, frTrough, peakTime, peakFr, kFall];
             mdls(iMdl).lb = [eps, 1e-3, eps, eps, eps, 1e-3];
-            mdls(iMdl).ub = [3*max(fr), 20, max(fr), max(tPost), 3*max(fr), 20];
+            mdls(iMdl).ub = [3*max(frVec), 20, max(frVec), max(tPost), 3*max(frVec), 20];
             
         otherwise
             warning('Unknown model type: %s. Skipping.', mdlName);
@@ -250,7 +257,7 @@ if peakTime > 0
         % Append parameters for overshoot terms
         mdls(iMdl).p0 = [mdls(iMdl).p0, aOver, kOver];
         mdls(iMdl).lb = [mdls(iMdl).lb, 0, 1e-6];
-        mdls(iMdl).ub = [mdls(iMdl).ub, 3*max(fr), 1];
+        mdls(iMdl).ub = [mdls(iMdl).ub, 3*max(frVec), 1];
     end
     
     % Remove exp2 model peak version from mdls struct
@@ -304,25 +311,25 @@ frFit.frSs = frFit.pFit(1);
 % margin)
 mrgnBins = 10;
 bslWin = 1:max(1, idxPert - mrgnBins);
-[bslFit, ~] = robustfit(tIdx(bslWin), fr(bslWin));
-bslCurve = bslFit(1) + bslFit(2) * tIdx(1:(idxPert-2));
+[bslFit, ~] = robustfit(tIdx(bslWin), frVec(bslWin));
+bslCurve = bslFit(1) + bslFit(2) * tIdx(1:(idxPert-1));
 frFit.frBsl = mean(bslCurve);
 frFit.bslFit = bslFit;
 
 % PERTURBATION
 frTrough = max([frFit.frTrough, eps]);
-tPert = tIdx(idxPert-1:(idxTrough-1));
+tPert = tIdx(idxPert:(idxRcv-1));
 pertCurve = linspace(bslCurve(end), frTrough, length(tPert))';
 
 % RECOVERY
 rcvCurve = frFit.mdlFits.rcvCurve(frFit.mdlIdx, :);
-if length(rcvCurve) < (length(fr) - idxTrough + 1)
-    rcvCurve = mdls(frFit.mdlIdx).func(frFit.pFit, tIdx(idxTrough:end) - idxTrough);
+if length(rcvCurve) < (length(frVec) - idxRcv + 1)
+    rcvCurve = mdls(frFit.mdlIdx).func(frFit.pFit, tIdx(idxRcv:end) - idxRcv);
 end
 
 % COMBINE
 frFit.frMdl = [bslCurve; pertCurve; rcvCurve'];
-frFit.idxTrough = idxTrough;
+frFit.idxRcv = idxRcv;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % IDENTIFY BAD UNITS BASED ON FIT QUALITY AND STABILITY
@@ -387,7 +394,7 @@ frFit.fitQlty = fitQlty;
 % PLOT RESULTS (OPTIONAL)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if p.Results.flgPlot
-    plot_frFit_results(idxPert, frFit, fr, mdls);
+    plot_frFit_results(idxPert, frFit, frVec, mdls);
 end
 
 end
@@ -486,13 +493,13 @@ end
 % HELPER FUNCTION: PLOT_FRFIT_RESULTS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function plot_frFit_results(idxPert, frFit, fr, mdls)
+function plot_frFit_results(idxPert, frFit, frVec, mdls)
 % PLOT_FRFIT_RESULTS Helper function to plot firing rate fit results
 %
 % INPUT:
 %   idxPert   - Index of perturbation onset
 %   frFit       - Structure containing fit results from mea_frFit
-%   fr       - Vector of firing rate values [Hz]
+%   frVec       - Vector of firing rate values [Hz]
 %   tIdx        - Time index vector
 %   mdls        - Model struct array used for fitting
 
@@ -501,10 +508,10 @@ function plot_frFit_results(idxPert, frFit, fr, mdls)
 hold on;
 
 % Hard code time indices 
-tIdx = (1:length(fr));  
+tIdx = (1:length(frVec));  
 
 % Plot raw data
-plot(tIdx, fr, 'Color', [0.5 0.5 0.5], 'LineWidth', 0.5,...
+plot(tIdx, frVec, 'Color', [0.5 0.5 0.5], 'LineWidth', 0.5,...
     'HandleVisibility', 'off');
 
 % Get successful models and sort by BIC
@@ -515,7 +522,7 @@ mdlsSrtd = mdlsGood(sortIdx);
 % Plot each successful model fit for recovery period (sorted by BIC)
 mdlNames = cell(1, length(mdlsSrtd));
 clrMdls = bone(length(sortIdx)) * 0.6;
-tTroughIdx = tIdx(frFit.idxTrough:end);
+tRcvIdx = tIdx(frFit.idxRcv:end);
 
 for iMdl = 1:length(mdlsSrtd)
     mdlIdx = mdlsSrtd(iMdl);
@@ -527,7 +534,7 @@ for iMdl = 1:length(mdlsSrtd)
     mdlNames{iMdl} = sprintf('%s (BIC: %d)', ...
         [upper(modelName(1)), modelName(2:end)], bicValue);
 
-    hPlt = plot(tTroughIdx, rcvCurvePlot, '--', 'Color', [clrMdls(iMdl, :), 0.8], ...
+    hPlt = plot(tRcvIdx, rcvCurvePlot, '--', 'Color', [clrMdls(iMdl, :), 0.8], ...
         'LineWidth', 2, 'DisplayName', mdlNames{iMdl}, 'HandleVisibility', 'off');
     if iMdl == 1
         hPlt.HandleVisibility = 'on';

@@ -52,7 +52,7 @@ hBurst = plot_stdShade('dataMat', brsty,...
 hBurst.LineStyle = '-';
 hBurst.LineWidth = 1;
 hBurst.HandleVisibility = 'off';
-ylim([0 100])
+ylim([0 1])
 
 yyaxis left
 hCorr = plot(xVal, rVal, 'Color', [0.6, 0.6, 0.6, 0.6], 'LineWidth', 2.5);
@@ -242,3 +242,43 @@ plot_axSize('hFig', hFig, 'szOnly', false,...
 
 
 
+
+
+
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% CORRELATION BSPKS VS FR
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Load data 
+iGrp = 1; 
+grps = {'mea_bac'; 'mea_mcuko'};
+vars = {'mea', 'frr', 'st_brst'};
+basepaths = mcu_sessions(grps{iGrp});
+v = basepaths2vars('basepath', basepaths, 'vars', vars);
+nFiles = length(basepaths);
+
+% Select param
+winLim = [0, 70 * 60];     
+mdlType = 'mdlF';
+rcvFld = 'spkDfct';
+% rcvFld = 'rcvGain';
+
+% All files
+frr = catfields([v(:).frr], 1);
+uGood = frr.uGood;
+
+spktimes = catfields([v(:).mea], 2, false);
+spktimes = spktimes.spktimes(uGood);
+frBsl = frr.(mdlType).frBsl(uGood);
+isiThr = logspace(log10(0.005), 0, 20)';
+mfr = mean(frBsl, 1, 'omitnan');
+
+rcvData = frBsl;
+
+mea_frrCorr(spktimes, rcvData,...
+    'minSpks', 2, 'isiThr', isiThr,...
+    'mfr', [], 'flgPlot', true, 'flgBin', false);

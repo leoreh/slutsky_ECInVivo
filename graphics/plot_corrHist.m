@@ -51,7 +51,7 @@ addParameter(p, 'varsInc', defaultVars, @iscellstr);
 addParameter(p, 'grpIdx', [], @(x) ischar(x) || isstring(x) || isnumeric(x));
 addParameter(p, 'varsRow', {}, @iscellstr);
 addParameter(p, 'varsCol', {}, @iscellstr);
-addParameter(p, 'clrGrp', [], @(x) isnumeric(x) && size(x,2) == 4);
+addParameter(p, 'clrGrp', [], @(x) isnumeric(x));
 addParameter(p, 'thrOut', 100, @(x) isnumeric(x) && isscalar(x) && x >= 0 && x <= 100);
 
 parse(p, tbl, varargin{:});
@@ -66,6 +66,10 @@ thrOut = p.Results.thrOut;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % DATA PREPARATION
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+if size(clrGrp, 2) == 3
+    clrGrp = [clrGrp, repmat(0.5, 2, 1)];
+end
 
 % Filter to only include vars that are actually in the table
 varsInc = varsInc(ismember(varsInc, tbl.Properties.VariableNames));

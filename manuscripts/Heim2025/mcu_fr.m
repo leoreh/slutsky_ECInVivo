@@ -70,7 +70,7 @@ vars = {'fr', 'units', 'st_metrics', 'st_brst'};
 clear varMap tblCell v tagAll tagFiles
 varMap.FR = 'fr.mfr';               % Mean firing rate
 varMap.BrRoy = 'st.royer';          % Mean firing rate
-varMap.BrPct = 'brst.spkprct';      % Mean firing rate
+varMap.BrPct = 'brst.bspks';      % Mean firing rate
 varMap.UnitType = 'units.clean';    % Unit classification
 
 % Load and organize table

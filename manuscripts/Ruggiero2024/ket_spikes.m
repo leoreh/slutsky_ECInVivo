@@ -1,4 +1,3 @@
-
 [basepaths, v, nfiles] = ketInVivo_sessions('ket');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -117,7 +116,7 @@ mfr_bl = fr.mfr;
 
 iunit = 1;
 
-brstVar = ["rateNorm"; "rate"; "freq"; "spkprct"; "brstDur"; "ibi"; "detect"; "shortPrct"];    
+brstVar = ["rateNorm"; "rate"; "freq"; "bspks"; "brstDur"; "ibi"; "detect"; "shortPrct"];    
 brst = catfields([v(:).brst], 'catdef', 'long');
 for ivar = 1 : length(brstVar)
     fh = figure;

@@ -1,5 +1,3 @@
-
-
 clear params
 params.winLim = [0 60 * 60];        % Analysis window [s]
 params.binSize = 0.002;             % 1ms bins
@@ -246,15 +244,15 @@ if flg_load
 
     % brst (mea)
     brst = spktimes_meaBrst(spktimes, 'binsize', [], 'isiThr', 0.005,...
-        'minSpks', 2, 'flg_save', false, 'flg_force', true, 'bins', win);
+        'minSpks', 2, 'flgSave', false, 'flgForce', true, 'bins', win);
 
-    % Calculate percentage of ISIs below 10ms (100 Hz) for each cell
-    spkprct = zeros(1, length(spktimes));
+    % Calculate fraction of ISIs below 10ms (100 Hz) for each cell
+    bspks = zeros(1, length(spktimes));
     isiThr = 0.006;
     for iunit = 1 : length(spktimes)
         spku = spktimes{iunit}(spktimes{iunit} >= win(1) & spktimes{iunit} <= win(2));
         isi = diff(spku);
-        spkprct(iunit) = 100 * sum(isi < isiThr) / length(isi);
+        bspks(iunit) = sum(isi < isiThr) / length(isi);
     end
 
 end
@@ -271,11 +269,10 @@ end
 % figure;
 % plot(fr.strd(otl, :)')
 % st.royer(otl)
-% spkprct(otl)
+% bspks(otl)
 
 % params
-brsty = brst.spkprct;
-brsty = st.mizuseki;
+brsty = brst.bspks;
 flg_log = false;
 
 % bad units

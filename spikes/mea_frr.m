@@ -26,12 +26,12 @@ function frr = mea_frr(spktimes, varargin)
 %   flgForce      - Logical flag to force reanalysis even if frFit.mat exists {false}.
 %   winLim        - [start end] time window to analyze [s] {[0 Inf]}.
 %   spkThr        - Minimum number of spikes required per unit {300}.
-%   binSize       - Bin size for firing rate calculation [s] {30}.
+%   binSize       - Bin size for firing rate calculation [s] {60}.
 %
 % OUTPUT:
 %   frr           - Structure containing recovery analysis results:
 %     .frBsl         - Baseline firing rate [Hz]. NaN for bad units.
-%     .frRcv         - Post-recovery steady-state firing rate from model [Hz].
+%     .frSs          - Post-recovery steady-state firing rate from model [Hz].
 %     .frTrough      - Trough firing rate [Hz].
 %     .hCapacity     - Homeostatic capacity score (PCA-based composite metric).
 %     .nif           - Network Impact Factor [Hz*s]. Leave-one-out analysis
@@ -42,7 +42,7 @@ function frr = mea_frr(spktimes, varargin)
 %     .rcvSlope      - Initial recovery slope [Hz/min].
 %     .normSlope     - Normalized slope (% of recovery range per min).
 %     .idxPert       - Index of detected perturbation onset (steepest decline).
-%     .idxRcv        - Index of detected recovery onset (trough).
+%     .idxTrough     - Index of detected recovery onset (trough).
 %     .fr            - Smoothed firing rate curves for each neuron.
 %     .frMdl      - Fitted model curves for good units.
 %     .model         - Best-fitting model name for each unit.
@@ -75,8 +75,8 @@ addParameter(p, 'flgSave', true, @islogical);
 addParameter(p, 'flgPlot', true, @islogical);
 addParameter(p, 'flgForce', false, @islogical);
 addParameter(p, 'winLim', [0 Inf], @(x) isnumeric(x) && numel(x)==2);
-addParameter(p, 'spkThr', 300, @(x) isnumeric(x) && isscalar(x) && x>0);
-addParameter(p, 'binSize', 30, @(x) isnumeric(x) && isscalar(x) && x>0);
+addParameter(p, 'spkThr', 4, @(x) isnumeric(x) && isscalar(x) && x>0);
+addParameter(p, 'binSize', 60, @(x) isnumeric(x) && isscalar(x) && x>0);
 addParameter(p, 'sgPolyOrder', 3, @(x) isnumeric(x) && isscalar(x) && x > 0);
 addParameter(p, 'sgFrameSec', 600, @(x) isnumeric(x) && isscalar(x) && x > 0);
 
@@ -102,23 +102,20 @@ cd(basepath);
 % 2. Apply Savitzky-Golay filter to preserve recovery features
 % 3. Filter: polynomial order=3, frame length=600s
 
-% Set analysis window if not fully specified
+% Set analysis window, limit and threshold spikes
 if isinf(winLim(2))
     winLim(2) = max(cellfun(@(x) max(x, [], 'omitnan'), spktimes, 'UniformOutput', true));
 end
 spktimes = cellfun(@(x) x(x >= winLim(1) & x <= winLim(2)), spktimes, 'UniformOutput', false);
 nUnits = length(spktimes);
+nSpks = cellfun(@length, spktimes)';
+uBad = nSpks < spkThr;     
 
 % Calculate raw firing rates. Units are rows
-[frOrig, ~, t] = times2rate(spktimes, 'binsize', binSize, 'c2r', false);
+[frOrig, ~, t] = times2rate(spktimes, 'binsize', binSize, 'c2r', true);
 
 % Denoise FRs for all units to get clean traces
-fr = mea_frDenoise(frOrig, t);
-
-% Unit selection
-nSpks = cellfun(@length, spktimes)';
-uOtl = isoutlier(range(fr, 2), 'median', 'ThresholdFactor', 7);
-uBad = nSpks < spkThr & uOtl;
+fr = mea_frDenoise(frOrig, t, 'flgPlot', false);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PERTURBATION DETECTION FROM MFR
@@ -127,8 +124,10 @@ uBad = nSpks < spkThr & uOtl;
 % negative derivative) and select the one that occurs at the lowest MFR,
 % which is characteristic of a major network state transition.
 
-% Calculate MFR from the smoothed individual unit traces
-mfr = mean(fr(~uBad, :), 1, 'omitnan');
+% Crude outlier detection, only for cleaning the MFR before perturbation
+% detection
+uOtl = isoutlier(range(fr, 2), 'median', 'ThresholdFactor', 7);
+mfr = mean(fr(~uBad | ~uOtl, :), 1, 'omitnan');
 dmfr = diff(mfr);
 
 % Limit the search to a pre-defined window
@@ -186,7 +185,7 @@ end
 uGood = frFit.goodFit & ~uBad;
 
 % Extract specific fields from frFit to the main frr structure
-% Note: frBsl, frTrough, and frRcv (steady-state) from the model fit are
+% Note: frBsl, frTrough, and frSs (steady-state) from the model fit are
 % preserved in frFit, as they represent the outcome of the modeling process.
 % The frr_metrics function will later calculate purely numerical equivalents.
 frFlds = {'frMdl', 'mdlName', 'idxMdl'};
@@ -203,17 +202,22 @@ frr.frFit = frFit;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PER-UNIT RECOVERY METRICS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Note: although we previously extracted model-based frBsl, frRcv, etc.
+% Note: although we previously extracted model-based frBsl, frSs, etc.
 % into the frr struct, we now calculate all metrics numerically from the
 % fitted curves for consistency. The original model parameters are retained
 % within the frr.frFit structure.
 
 % Calculate model-based metrics
-frr.mdl = frr_metrics(frr.frMdl, t, idxPert, uGood, binSize);
+frr.mdl = frr_metrics(frr.frMdl, t, idxPert, uGood, binSize, true);
 
 % Calculates recovery metrics without relying on model fits, using the
 % smoothed firing rate data directly.
-frr.mdlF = frr_metrics(fr, t, idxPert, uGood, binSize);
+frr.mdlF = frr_metrics(fr, t, idxPert, uGood, binSize, false);
+
+% Hardcoded exclusion of units that weren't perturbed. Confirmed by manual
+% inspection.
+uBad = uBad | ~frr.mdlF.uPert;
+uGood(uBad) = false;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ORGANIZE OUTPUT & SAVE
@@ -232,6 +236,7 @@ frr.fr = fr;
 frr.frOrig = frOrig;
 frr.t = t;
 frr.uGood = uGood;
+frr.uBad = uBad;
 frr.mfr = mfr;
 frr.mfrFit = mfrFit;
 frr = orderfields(frr);
@@ -263,7 +268,7 @@ end     % EOF
 % HELPER FUNCTION: FRR_METRICS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function metrics = frr_metrics(fr, t, idxPert, uGood, binSize)
+function metrics = frr_metrics(fr, t, idxPert, uGood, binSize, flgMdl)
 %FRR_METRICS Calculates firing rate recovery metrics.
 %
 % This helper function calculates a set of recovery metrics from firing rate
@@ -287,62 +292,92 @@ nUnits = size(fr, 1);
 winMarg = 5 * 60 / binSize;
 winDur = 60 * 60 / binSize;
 
-% Baseline FR: 1 hour window starting 5 min after recording onset
-bslStart = round(winMarg);  % 5 min in bins
-bslEnd = bslStart + round(winDur);  % 1 hour window
-bslWin = bslStart:min(bslEnd, idxPert-1);  % Ensure we don't go past perturbation
+% FR Baseline: 1 hour window starting 5 min after recording onset, ensuring
+% we don't go past perturbation
+bslStart = round(winMarg);  
+bslEnd = bslStart + round(winDur);  
+bslWin = bslStart:min(bslEnd, idxPert-1);  
 frBsl = mean(fr(:, bslWin), 2, 'omitnan');
 
-% Trough FR: 10 min window after perturbation
-troughWin = idxPert : min(length(t), idxPert + round(10 * 60 / binSize));
-[~, idxTrough] = min(fr(:, troughWin), [], 2);
-idxRcv = idxPert + idxTrough - 1;
-frTrough = mean(fr(:, troughWin), 2, 'omitnan');
-
-% Steady state firing rate: 1 hour window ending 5 min before recording end
-ssEnd = length(t) - round(winMarg);  % 5 min before end
-ssStart = ssEnd - round(winDur);  % 1 hour window
-ssWin = max(1, ssStart):ssEnd;  % Ensure we don't go before start
+% FR Steady state: 1 hour window ending 5 min before recording end, ensuring
+% we don't go before start
+ssEnd = length(t) - round(winMarg);  
+ssStart = ssEnd - round(winDur);  
+ssWin = max(1, ssStart):ssEnd;  % Ensure 
 frSs = mean(fr(:, ssWin), 2, 'omitnan');
+
+% FR Trough: minimum in 20 min window after perturbation
+troughWin = idxPert : idxPert + round(15 * 60 / binSize);
+[frTrough, idxMin] = min(fr(:, troughWin), [], 2);
+idxTrough = idxPert + idxMin - 1;
+if ~flgMdl
+    troughWin = mode(idxTrough) : mode(idxTrough) + winMarg;
+    frTrough = mean(fr(:, troughWin), 2, 'omitnan');
+end
+
+
 
 % -------------------------------------------------------------------------
 % RECOVERY METRICS
 
 % Constanst for numerical stability
-c(1) = min(frTrough(frTrough > 0)) / 2;
-c(2) = min(frSs(frSs > 0)) / 2;
+c(1) = min(frTrough(frTrough > 0));
+c(2) = min(frSs(frSs > 0));
 if isempty(c(1)) || isinf(c(1)) || isnan(c(1))
-    c(1) = 1e-6;
+    c(1) = 1e-5;
 end
 if isempty(c(2)) || isinf(c(2)) || isnan(c(2))
-    c(2) = 1e-6;
+    c(2) = 1e-4;
 end
+% Hardcode c based on inspection of entire data set
+c(1) = 5e-5;
+c(2) = 3e-4;
+% Hardcode c based on 1 spike in an hour
+c(1) = 1 / 3600;
+c(2) = c(1);
 
-% Hard code c base on inspection of entire data set. Importantly, if this
-% is not the same for model-free and model-based then I suspect artifacts
-% appear (e.g., correlations with pertDepth).
-c(1) = 0.00001;
-c(2) = 0.0001;
+% Cap FR values used in ratios
+frBslC = max([frBsl, repmat(c(2), nUnits, 1)], [], 2);
+frTroughC = max([frTrough, repmat(c(1), nUnits, 1)], [], 2);
+frSsC = max([frSs, repmat(c(2), nUnits, 1)], [], 2);
 
 % Perturbation Depth
-pertDepth = log2(frBsl ./ (frTrough + c(1)));
+pertDepth = log2(frBslC ./ frTroughC);
+if any(pertDepth < 0)
+    idxBad = find(pertDepth < 0)';
+    warning('Problem with perturbation: %s', num2str(idxBad));
+    fprintf('\nBSL FR: %s\n', num2str(frBsl(idxBad)))
+end
 
 % Recovery Fidelity
-rcvErr = abs(log2((frSs + c(2)) ./ frBsl));
-rcvDiff = abs(frSs - frBsl + c(2));
+rcvErr = abs(log2(frSsC ./ frBslC));
+rcvDiff = abs(frSsC - frBslC);
 
-% Recovery Gain
-rcvGain = log2((frSs + c(2)) ./ (frTrough + c(1)));
+% Recovery Gain and Work. RcvGain is capped at zero for numerical stability
+% in regression models, and because the meaning of further loosing fr is
+% not of interest.
+rcvGain = log2(frSsC ./ frTroughC);
+rcvGain(rcvGain < 0) = 0;
+rcvWork = rcvGain ./ pertDepth;
 
 % Successful Recovery
-thrRcv = 0.5;
-uRcv = frSs >= frTrough + thrRcv * (frBsl - frTrough);
+% A unit is considered to have recovered if 1. It was significantly
+% perturbed and 2. its recovery is at least thrRcv% of its perturbation depth.
+thrPert = 1; 
+thrRcv = 0.67;  
+uPert = pertDepth >= thrPert;
+uRcv = uPert & (frSs >= frTrough + thrRcv * (frBsl - frTrough));
 uRcv(~uGood) = false; % Only good units can be considered recovered
+
+% uRcv = uPert & rcvWork > thrRcv;
+% frTrgt = frTrough .* (frBsl ./ frTrough) .^ thrRcv
+
 
 % -------------------------------------------------------------------------
 % RECOVERY KINETICS
 
 % Initialize 
+bslTime = nan(nUnits, 1);
 rcvTime = nan(nUnits, 1);
 rcvSlope = nan(nUnits, 1);
 normSlope = nan(nUnits, 1);
@@ -353,17 +388,30 @@ for iUnit = 1:nUnits
     if ~uGood(iUnit)
         continue;
     end
+    
+    % SPIKE DEFICIT  
+    aucExp = trapz(tPost, ones(size(tPost)) * frBsl(iUnit));
+    aucObs = trapz(tPost, fr(iUnit, idxPert:end));
+    spkDfct(iUnit) = log2(aucExp / (aucObs + 1));
 
-    % Recovery Kinetics (Time and Slope)
-    rcvRange = frBsl(iUnit) - frTrough(iUnit);
-    rcvVal = frTrough(iUnit) + thrRcv * rcvRange;
+    % KINETICS
+    rcvCurve = fr(iUnit, idxTrough(iUnit):end);
 
-    % Use individual unit's recovery onset
-    rcvCurve = fr(iUnit, idxRcv(iUnit):end);
-    rcvIdx = find(rcvCurve >= rcvVal, 1, 'first');
+    % To baseline (thrRcv% of perturbation depth)
+    bslTrgt = frTrough(iUnit) + thrRcv * (frBsl(iUnit) - frTrough(iUnit));
+    bslPnt = find(rcvCurve >= bslTrgt, 1, 'first');
+    if ~isempty(bslPnt)
+        bslTime(iUnit) = (idxTrough(iUnit) + bslPnt - 1 - idxPert) * binSize;
+    else
+        bslTime(iUnit) = t(end); % Max value if not recovered
+    end    
 
-    if ~isempty(rcvIdx)
-        rcvTime(iUnit) = (idxRcv(iUnit) + rcvIdx - 1 - idxPert) * binSize;
+    % To steady state 
+    rcvRange = frSs(iUnit) - frTrough(iUnit);
+    rcvTrgt = frTrough(iUnit) + thrRcv * rcvRange;
+    rcvPnt = find(rcvCurve >= rcvTrgt, 1, 'first');
+    if ~isempty(rcvPnt)
+        rcvTime(iUnit) = (idxTrough(iUnit) + rcvPnt - 1 - idxPert) * binSize;
     else
         rcvTime(iUnit) = t(end); % Max value if not recovered
     end
@@ -373,11 +421,6 @@ for iUnit = 1:nUnits
         rcvSlope(iUnit) = (max(diff(rcvCurve)) / binSize) * 60;
         normSlope(iUnit) = (rcvSlope(iUnit) / rcvRange) * 100;
     end
-
-    % Spike deficit calculation
-    aucExp = trapz(tPost, ones(size(tPost)) * frBsl(iUnit));
-    aucObs = trapz(tPost, fr(iUnit, idxPert:end));
-    spkDfct(iUnit) = log2(aucExp / (aucObs + 1));
 end
 
 % -------------------------------------------------------------------------
@@ -385,16 +428,19 @@ end
 metrics.frBsl = frBsl;
 metrics.frTrough = frTrough;
 metrics.frSs = frSs;
-metrics.idxRcv = idxRcv;
+metrics.idxTrough = idxTrough;
 metrics.pertDepth = pertDepth;
+metrics.bslTime = bslTime;         
 metrics.rcvTime = rcvTime;
 metrics.rcvSlope = rcvSlope;
 metrics.normSlope = normSlope;
 metrics.rcvGain = rcvGain;
+metrics.rcvWork = rcvWork;
 metrics.rcvErr = rcvErr;
 metrics.rcvDiff = rcvDiff;
-metrics.uRcv = uRcv;
 metrics.spkDfct = spkDfct;
+metrics.uRcv = uRcv;
+metrics.uPert = uPert;
 
 end
 
@@ -487,7 +533,7 @@ corrplot(hAx, dataTbl, 'Type', 'Spearman', 'TestR', 'on');
 
 % -------------------------------------------------------------------------
 % Comparison of model and model-free parameters as a sanity check
-flgSanity = true;  % Enable this to compare model vs model-free metrics
+flgSanity = false;  % Enable this to compare model vs model-free metrics
 if flgSanity
     clear varMap
     varMap.uGood    = 'uGood';

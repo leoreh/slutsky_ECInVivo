@@ -15,6 +15,8 @@ function plot_sigLines(axh, barIdx, barLbl, varargin)
 %     'txtOffset'       (default 0.005 of Y-axis range, from line to text)
 %     'fontSize'        (default get(axh, 'FontSize'))
 %     'lineGap'         (default 0.03 of Y-axis range, between stacked notations)
+%     'flgNS'           (default true) If false, skips non-significant lines
+%                       (labels containing 'ns', 'n.s.', 'p > 0.05', etc.)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ARGUMENT PARSING & INITIALIZATION
@@ -29,15 +31,43 @@ addRequired(p, 'barLbl', @iscell);
 addParameter(p, 'LineColor', 'k');
 addParameter(p, 'LineWidth', 1);
 addParameter(p, 'lineOffset', 0.1);
-addParameter(p, 'txtOffset', -0.01);
+addParameter(p, 'txtOffset', -0.02);
 addParameter(p, 'fontSize', get(axh, 'FontSize'));
 addParameter(p, 'lineGap', 0.06);
+addParameter(p, 'flgNS', true);
 
 parse(p, axh, barIdx, barLbl, varargin{:});
 opts = p.Results;
 
 if length(barIdx) ~= length(barLbl)
     error('barIdx and barLbl must have the same number of elements.');
+end
+
+% Filter out non-significant lines if flgNS is false
+if ~opts.flgNS
+    % Define patterns that indicate non-significance
+    nsPatterns = {'ns', 'n\.s\.', 'p\s*>\s*0\.05', 'p\s*>\s*0\.1', 'not\s+significant', 'n\.s'};
+    
+    % Create logical mask for significant lines
+    lgcSig = true(length(barLbl), 1);
+    for iBar = 1:length(barLbl)
+        label = lower(barLbl{iBar});
+        for iPtn = 1:length(nsPatterns)
+            if ~isempty(regexp(label, nsPatterns{iPtn}, 'once'))
+                lgcSig(iBar) = false;
+                break;
+            end
+        end
+    end
+    
+    % Filter arrays
+    barIdx = barIdx(lgcSig);
+    barLbl = barLbl(lgcSig);
+    
+    % If no significant lines remain, return early
+    if isempty(barIdx)
+        return;
+    end
 end
 
 hold(axh, 'on');

@@ -138,7 +138,7 @@ if ~isempty(idxRow)
     
     % Add significance lines to the plot
     if ~isempty(barIdx)
-        plot_sigLines(hAx, barIdx, barLbl);
+        plot_sigLines(hAx, barIdx, barLbl, 'flgNS', false);
     end
 end
 

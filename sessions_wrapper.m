@@ -221,7 +221,7 @@ nfiles = length(basepaths);
 
 % brst vars to organize and plot
 % from avg sub-struct
-brstVar = {'freq', 'dur', 'spkprct', 'ibi', 'nspks'};
+brstVar = {'freq', 'dur', 'bspks', 'ibi', 'nspks'};
 
 % fron nbrsts sub-struct
 

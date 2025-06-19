@@ -77,10 +77,10 @@ if strcmp(varFld , 'royer')
     txtY = 'Burstiness (a.u.)';
     barIdx = {[3, 4], [1, 2]};
     barLbl = {'NS', '***'};
-elseif strcmp(varFld, 'spkprct')
-    txtY = 'Burst Spikes (%)';
-    barIdx = {[1, 2], [3, 4]};
-    barLbl = {'*', 'NS'};
+elseif strcmp(varFld, 'rate')
+    txtY = 'Burstiness (a.u.)';
+    barIdx = {[3, 4], [1, 2]};
+    barLbl = {'NS', '***'};
 end
 
 % Update labels
@@ -127,7 +127,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 frml = 'Burst ~ Group * Day + (1|Mouse)';
 
-varFlds = {'royer', 'spkprct', 'rate'};
+varFlds = {'royer', 'bspks', 'rate'};
 txtUnit = {'pPYR', 'pINT'};
 
 for iFld = 1 : length(varFlds)
@@ -166,7 +166,7 @@ for iFld = 1 : length(varFlds)
                 barLbl = {'**', 'NS', 'NS'};
                 lineOffset = 0.4;
             end
-        elseif strcmp(varFld, 'spkprct')
+        elseif strcmp(varFld, 'bspks')
             txtY = 'Burst Spikes (% BSL)';
             if strcmp(char(unitType), 'pPYR')
                 barIdx = {[1, 3], [2, 8]};

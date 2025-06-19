@@ -18,10 +18,10 @@ function brst = spktimes_meaBrst(spktimes, varargin)
 %               {0.02 [s]}
 %   minSpks     numeric. minimum number of spikes for defining a burst {2}
 %   
-%   flg_all     logical. save data of each burst (true) or just mean across
-%               bursts {fale}
-%   flg_save     logical. save struct {true}
-%   flg_force   logical. flg_force analyze even if file exists {false}
+%   flgAll      logical. save data of each burst (true) or just mean across
+%               bursts {false}
+%   flgSave     logical. save struct {true}
+%   flgForce    logical. flgForce analyze even if file exists {false}
 % 
 % OUTPUT
 %   brst        struct
@@ -44,9 +44,9 @@ addParameter(p, 'isiThr', 0.02, @isnumeric)
 addParameter(p, 'binsize', 3600, @isnumeric)
 addParameter(p, 'bins', [])
 addParameter(p, 'minSpks', 2, @isnumeric)
-addParameter(p, 'flg_save', true, @islogical)
-addParameter(p, 'flg_all', false, @islogical)
-addParameter(p, 'flg_force', false, @islogical)
+addParameter(p, 'flgSave', true, @islogical)
+addParameter(p, 'flgAll', false, @islogical)
+addParameter(p, 'flgForce', false, @islogical)
 
 parse(p, varargin{:})
 basepath        = p.Results.basepath;
@@ -54,9 +54,9 @@ isiThr          = p.Results.isiThr;
 binsize         = p.Results.binsize;
 bins            = p.Results.bins;
 minSpks         = p.Results.minSpks;
-flg_save        = p.Results.flg_save;
-flg_all         = p.Results.flg_all;
-flg_force       = p.Results.flg_force;
+flgSave         = p.Results.flgSave;
+flgAll          = p.Results.flgAll;
+flgForce        = p.Results.flgForce;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preparations
@@ -92,7 +92,7 @@ end
 % load if exists
 [~, basename] = fileparts(basepath);
 brstfile = fullfile(basepath, [basename, '.st_brst.mat']);
-if exist(brstfile, 'file') && ~flg_force
+if exist(brstfile, 'file') && ~flgForce
     load(brstfile, 'brst')
     return
 end
@@ -113,7 +113,7 @@ brst.info.recLen        = recLen;
 
 brst.detect             = zeros(nbins, nunits);
 brst.nspks              = nan(nbins, nunits);
-brst.spkprct            = zeros(nbins, nunits);
+brst.bspks              = zeros(nbins, nunits);
 brst.brstDur            = nan(nbins, nunits);
 brst.freq               = nan(nbins, nunits);
 brst.rate               = zeros(nbins, nunits);
@@ -128,7 +128,7 @@ for ibin = 1 : nbins
         isi = diff(spks);
         nspks = length(spks);
 
-        % get indices of first and last spike in each burst and flg_force minSpksBrst
+        % get indices of first and last spike in each burst and flgForce minSpksBrst
         [b.idx, nbrsts] = binary2bouts('vec', isi <= isiThr,...
             'minDur', minSpks - 1, 'flgPrnt', false);
 
@@ -149,8 +149,8 @@ for ibin = 1 : nbins
         % frequency within burst
         b.freq = b.nspks ./ (b.dur);
         
-        % percent of spikes that participate in bursts
-        b.spkprct = sum(b.nspks) / nspks * 100;
+        % fraction of spikes that participate in bursts
+        b.bspks = sum(b.nspks) / nspks;
         
         % inter-burst interval
         b.ibi = b.times(2 : end, 1) - b.times(1 : end - 1, 2);
@@ -163,7 +163,7 @@ for ibin = 1 : nbins
         brst.rateNorm(ibin, iunit) = brst.rate(ibin, iunit) / (nspks / binsize(ibin));
 
         % save all burst data
-        if flg_all
+        if flgAll
             brst.all(ibin, iunit) = b;
         else
             brst.all = [];
@@ -174,7 +174,7 @@ for ibin = 1 : nbins
         brst.nspks(ibin, iunit) = mean(b.nspks);
         brst.brstDur(ibin, iunit) = mean(b.dur);
         brst.freq(ibin, iunit) = mean(b.freq);
-        brst.spkprct(ibin, iunit) = mean(b.spkprct);
+        brst.bspks(ibin, iunit) = mean(b.bspks);
         brst.ibi(ibin, iunit) = mean(b.ibi);
 
     end
@@ -184,7 +184,7 @@ end
 % save
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-if flg_save
+if flgSave
     save(brstfile, 'brst')
 end
 
