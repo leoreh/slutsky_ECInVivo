@@ -1,4 +1,4 @@
-function [rVal, pVal, bspks] = mea_frrCorr(spktimes, rcvData, varargin)
+function [rVal, pVal, bspks] = mea_frrc(spktimes, rcvData, varargin)
 % MEAFRRCORR Calculates correlations between burstiness and recovery metrics.
 %
 % SUMMARY:
@@ -136,7 +136,7 @@ end     % EOF
 
 function frrCorr_plot(bspks, rVal, isiThr, mfr, flgBin)
 % Create figure
-[hFig, hAx] = plot_axSize('szOnly', false, 'axShape', 'square', 'axHeight', 300);
+[hFig, hAx] = plot_axSize('szOnly', false, 'axShape', 'square', 'hAxeight', 300);
 xVal = 1 ./ isiThr;
 
 % Plot correlation coefficients
@@ -186,10 +186,10 @@ ylabel(yLbl, 'Interpreter', 'tex', 'Rotation', 270)
 
 % Plot burstiness using plot_stdShade
 hBurst = plot_stdShade('dataMat', dataMat,...
-    'xVal', xVal, 'axh', hAx, ...
-    'clr', clr, 'alpha', 0.5);
+    'xVal', xVal, 'hAx', hAx, ...
+    'clr', clr, 'alpha', 0.3);
 hBurst.LineStyle = '-';
-hBurst.LineWidth = 1;
+hBurst.LineWidth = 2;
 hBurst.DisplayName = yTxt;
 
 % Add mean firing rate line
@@ -203,7 +203,7 @@ end
 
 % Format figure
 plot_axSize('hFig', hFig, 'szOnly', false,...
-    'axShape', 'square', 'axHeight', 300);
+    'axShape', 'square', 'hAxeight', 300);
 
 end
 

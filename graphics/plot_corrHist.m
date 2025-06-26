@@ -94,16 +94,16 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PLOT LAYOUT ORGANIZATION
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-[plotMat, nRows, nCols] = org_tiles(varsInc, varsRow, varsCol);
+[plotMat, nRows, nCols] = org_tiles(varsInc, varsRow, varsCol, nGrps);
 
 hFig = plot_axSize('szOnly', false, 'axShape', 'square', 'axHeight', 150 * nRows);
-hTyl = tiledlayout(nRows, nCols, 'TileSpacing', 'none', 'Padding', 'tight');
+hTyl = tiledlayout(nRows, nCols, 'TileSpacing', 'tight', 'Padding', 'tight');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PLOTTING LOOP
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 hGrid = cell(nRows, nCols);
-hLgd = [];
+isTwoGrpSymm = isempty(varsRow) && isempty(varsCol) && nGrps == 2;
 
 for iRow = 1:nRows
     for iCol = 1:nCols
@@ -111,7 +111,7 @@ for iRow = 1:nRows
 
         % Skip empty tiles (e.g., upper triangle in default mode)
         if isempty(plotInfo)
-            if isempty(varsRow) && isempty(varsCol) && iCol > iRow
+            if isempty(varsRow) && isempty(varsCol) && iCol > iRow && ~isTwoGrpSymm
                 hAx = nexttile;
                 axis(hAx, 'off');
                 hGrid{iRow, iCol} = hAx;
@@ -142,11 +142,24 @@ for iRow = 1:nRows
             end
         else % scatter
             xData = tbl.(plotInfo.varX);
-            yData = tbl.(plotInfo.varY);           
-            hSct = gobjects(nGrps, 1);
-            txtLgd = cell(nGrps, 1);
+            yData = tbl.(plotInfo.varY);   
+            
+            if isTwoGrpSymm
+                if iCol < iRow % Lower triangle
+                    grpsToPlot = 1;
+                else % Upper triangle
+                    grpsToPlot = 2;
+                end
+            else
+                grpsToPlot = 1:nGrps;
+            end
+            
+            hSct = gobjects(numel(grpsToPlot), 1);
+            txtLgd = cell(numel(grpsToPlot), 1);
+            plotIdx = 0;
 
-            for iGrp = 1:nGrps
+            for iGrp = grpsToPlot
+                plotIdx = plotIdx + 1;
                 grpMask = grpData == uGrps(iGrp);
                 xGrp = xData(grpMask);
                 yGrp = yData(grpMask);
@@ -158,36 +171,33 @@ for iRow = 1:nRows
                 xGrp = xGrp(idxGood);
                 yGrp = yGrp(idxGood);
                 
-                [hSct(iGrp), txtLgd{iGrp}] = plot_sct(hAx, xGrp, yGrp, clrGrp(iGrp,:));
+                [hSct(plotIdx), txtLgd{plotIdx}] = plot_sct(hAx, xGrp, yGrp, clrGrp(iGrp,:));
             end
             
             % Create legend if there are valid plots
             valid_plots = isgraphics(hSct);
             if any(valid_plots)
-                if nGrps > 1
-                    legend(hAx, hSct(valid_plots), txtLgd(valid_plots),...
-                        'Interpreter', 'tex', 'Location', 'best');
-                else
-                    legend(hAx, hSct(valid_plots), txtLgd{valid_plots},...
-                        'Interpreter', 'tex', 'Location', 'best');
-                end
-            end
-            
-            % Store handles for the main figure legend
-            if ~isempty(hSct(valid_plots)) && isempty(hLgd)
-                hLgd = hSct(valid_plots);
+                hLgd = legend(hAx, hSct(valid_plots), txtLgd(valid_plots),...
+                    'Interpreter', 'tex', 'Location', 'south');
+                hLgd.Box = "on";
             end
 
-            % Y-axis label only for the first column of scatter plots
-            if iCol == 1
-                ylabel(hAx, plotInfo.varY, 'Interpreter', 'none');
+            % Y-axis label
+            if iCol == 1 && iRow > 1
+                ylabel(hAx, plotInfo.varY, 'Interpreter', 'tex');
+            elseif isTwoGrpSymm && iCol == nCols
+                ylabel(hAx, plotInfo.varY, 'Interpreter', 'tex');
+                set(hAx, 'YAxisLocation', 'right');
             else
                 set(hAx, 'YTickLabel', []);
             end
 
-            % X-axis label only for the bottom row of scatter plots
-            if iRow == nRows
-                xlabel(hAx, plotInfo.varX, 'Interpreter', 'none');
+            % X-axis label
+            if iRow == nRows && iCol < nCols
+                xlabel(hAx, plotInfo.varX, 'Interpreter', 'tex');
+            elseif isTwoGrpSymm && iRow == 1
+                 xlabel(hAx, plotInfo.varX, 'Interpreter', 'tex');
+                 set(hAx, 'XAxisLocation', 'top');
             else
                 set(hAx, 'XTickLabel', []);
             end
@@ -202,46 +212,29 @@ end
 % Note only one axis can be linked because linking must occur
 % simultaneously on both axis.
 
-% Create a logical mask to identify scatter plot axes from the plotMatrix
-sctMask = cellfun(@(s) ~isempty(s) && strcmp(s.type, 'scatter'), plotMat);
-
-% Link all X-axes for each column of scatter plots
-for iCol = 1:nCols
-    axes_in_col = hGrid(sctMask(:, iCol), iCol);
-    axes_to_link = [axes_in_col{:}]; % Convert from cell to array
-    if numel(axes_to_link) > 1
-        linkaxes(axes_to_link, 'x');
-    end
-end
-
-% Add a single, shared legend for the entire figure if grouping is used
-if ~isempty(grpIdx)   
-    txtLgd = cellstr(string(uGrps));   
-    hAx = nexttile(tilenum(hTyl, 1, nCols));
-    set_aesthetics(hAx);
-
-    % Create dummy data points for legend
-    hold(hAx, 'on');
-    hDummy = gobjects(nGrps, 1);
-    for iGrp = 1:nGrps
-        hDummy(iGrp) = scatter(hAx, NaN, NaN, 10, 'filled', ...
-            'MarkerFaceColor', clrGrp(iGrp, 1:3), 'MarkerFaceAlpha', clrGrp(iGrp, 4));
-    end
-    hold(hAx, 'off');
-    
-    % Create legend with dummy data
-    hLgd = legend(hAx, hDummy, txtLgd, 'Interpreter', 'none');
-    hLgd.Location = 'northwest';
-    axis(hAx, 'off');
-end
+% % Create a logical mask to identify scatter plot axes from the plotMatrix
+% sctMask = cellfun(@(s) ~isempty(s) && strcmp(s.type, 'scatter'), plotMat);
+% 
+% % Link all X-axes for each column of scatter plots
+% for iCol = 1:nCols
+%     axes_in_col = hGrid(sctMask(:, iCol), iCol);
+%     axes_to_link = [axes_in_col{:}]; % Convert from cell to array
+%     if numel(axes_to_link) > 1
+%         linkaxes(axes_to_link, 'x');
+%     end
+% end
 
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % HELPER FUNCTION: ORG_TILES
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [plotMatrix, nRows, nCols] = org_tiles(varsInc, varsRow, varsCol)
+function [plotMatrix, nRows, nCols] = org_tiles(varsInc, varsRow, varsCol, nGrps)
 % ORG_TILES Organizes the layout of plots in the tiled figure.
+    if nargin < 4
+        nGrps = 1;
+    end
+
     if isempty(varsRow) && isempty(varsCol)
         % Default case: Lower triangle of all numeric variables with histograms on the diagonal.
         nRows = length(varsInc);
@@ -256,8 +249,11 @@ function [plotMatrix, nRows, nCols] = org_tiles(varsInc, varsRow, varsCol)
                 elseif iCol < iRow
                     % Lower triangle: Scatter plot
                     plotMatrix{iRow, iCol} = struct('type', 'scatter', 'varX', varsInc{iCol}, 'varY', varsInc{iRow});
+                elseif iCol > iRow && nGrps == 2
+                    % Upper triangle: Scatter plot for second group
+                    plotMatrix{iRow, iCol} = struct('type', 'scatter', 'varX', varsInc{iCol}, 'varY', varsInc{iRow});
                 end
-                % Upper triangle remains empty
+                % Upper triangle remains empty for nGrps ~= 2
             end
         end
     else
@@ -316,13 +312,13 @@ function plot_hist(hAx, data, clr, orientation)
     
     % Add mean line
     hold(hAx, 'on');
-    meanVal = mean(data);
+    meanVal = mean(data, 'omitnan');
     if strcmp(orientation, 'vertical')
         ylims = ylim(hAx);
-        plot(hAx, [meanVal meanVal], ylims, '--', 'Color', clr(1:3), 'LineWidth', 2);
+        plot(hAx, [meanVal meanVal], ylims, '--', 'Color', clr(1:3), 'LineWidth', 3);
     else
         xlims = xlim(hAx);
-        plot(hAx, xlims, [meanVal meanVal], '--', 'Color', clr(1:3), 'LineWidth', 2);
+        plot(hAx, xlims, [meanVal meanVal], '--', 'Color', clr(1:3), 'LineWidth', 3);
     end
     
     title(hAx, '');
@@ -363,7 +359,7 @@ function set_aesthetics(hAx)
 
     set(hAx, 'FontName', fntName, 'FontSize', fntSize);
     set(hAx, 'XTickLabelRotation', 0);
-    box(hAx, 'OFF');
+    box(hAx, 'on');
     hold(hAx, 'on');
 
     hTtl = get(hAx, 'Title');

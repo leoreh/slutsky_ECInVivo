@@ -67,7 +67,7 @@ for iGrp = 1 : 2
     
     % Plot MFR + SD
     hGrp = plot_stdShade('dataMat', frMat,...
-        'xVal', t, 'axh', hAx, ...
+        'xVal', t, 'hAx', hAx, ...
         'clr', clr.grp(iGrp, :), 'alpha', 0.5);
     set(hGrp, 'DisplayName', sprintf('%s (n=%d)', grpLbls{iGrp}, sum(uGood)));
 end
@@ -75,12 +75,16 @@ end
 % Formatting
 hLgd = legend;
 hLgd.Location = 'southeast';
+hAx.FontSize = 16;
 
 % Mark perturbation and baseline
+ylim([0 140])
 plot_pert(hAx, tPert, clr.bac);
 yline(100, '--', '', 'Color', [0.5, 0.5, 0.5], 'LineWidth', 1,...
     'HandleVisibility', 'off');
-ylim([0 160])
+
+plot_axSize('hFig', hFig, 'szOnly', false, 'axShape', 'wide',...
+    'axHeight', 300, 'flgPos', true);
 
 % Save
 fname = 'MEA ~ FRtime';
@@ -147,7 +151,7 @@ for iPrc = 1 : nPrc
     % Plot MFR + SD
     frMat = (fr ./ frBslPerc) * 100;
     hPtl = plot_stdShade('dataMat', frMat,...
-        'xVal', t, 'axh', hAx, ...
+        'xVal', t, 'hAx', hAx, ...
         'clr', clrPrc(iPrc, :), 'alpha', 0.5);
 
     % Create legend text with range
@@ -163,11 +167,15 @@ end
 
 % Formatting
 hLgd = legend('Interpreter', 'tex');
-hLgd.Location = 'northwest';
-hLgd.Position(2) = hLgd.Position(2) - 0.05;
-
+if iGrp == 1
+    hLgd.Location = 'southeast';
+    % ylim([0 200]);
+else
+    hLgd.Location = 'northeast';
+    hLgd.Position(2) = hLgd.Position(2) - 0.05;
+    % ylim([0 180])
+end
 title(sprintf('%s', grpLbls{iGrp}));
-ylim([0 180]);
 
 % Mark perturbation and baseline
 plot_pert(hAx, tPert, clr.bac);
@@ -190,6 +198,9 @@ function plot_fr_fit_unit(v, t, tPert, grpLbls)
 uIdx = 28;
 uIdx = 25;
 % uIdx = 24;
+uIdx = 18;
+uIdx = 20;    
+uIdx = 40;
 
 % Combine all frr structures from control group
 frr = catfields([v{1}(:).frr], 1, true);
@@ -212,30 +223,37 @@ fitCurve = frr.frMdl(uIdx, :);
 txtMdl = [upper(mdlName{uIdx}(1)), mdlName{uIdx}(2 : end)];
 plot(t(uRcv:end), fitCurve(uRcv:end), '-', ...
     'Color', 'k', 'LineWidth', 2.5, ...
-    'DisplayName', sprintf('Model: %s.', txtMdl));
+    'DisplayName', sprintf('Model: "%s."', txtMdl));
 
 % Add asterisk at recovery time
 uRcv = round(frr.mdl.rcvTime(uIdx) / frr.info.binSize(1)) + frr.mdl.idxTrough(uIdx);
 plot(t(uRcv), fitCurve(uRcv), 'o', 'MarkerEdgeColor', 'none',...
     'MarkerFaceColor', 'k', ...
     'MarkerSize', 12, 'LineWidth', 2, ...
-    'DisplayName', sprintf('Rcv. Time_{Mdl}: %d min',...
-    round(frr.mdl.rcvTime(uIdx) * 3 / 60)));
+    'DisplayName', sprintf('Rcv. Time (hr): %.1f ',...
+    round(frr.mdl.rcvTime(uIdx) * 3 / 60 / 60)));
 
-% Add asterisk at recovery time (model-free)
-uRcv = round(frr.mdlF.rcvTime(uIdx) / frr.info.binSize(1)) + frr.mdlF.idxTrough(uIdx);
-plot(t(uRcv), fr(uRcv), 'diamond', 'MarkerEdgeColor', 'none',...
-    'MarkerFaceColor', 'k', ...
-    'MarkerSize', 12, 'LineWidth', 2, ...
-    'DisplayName', sprintf('Rcv. Time: %d min',...
-    round(frr.mdlF.rcvTime(uIdx) * 3 / 60)));
+% % Add asterisk at recovery time (model-free)
+% uRcv = round(frr.mdlF.rcvTime(uIdx) / frr.info.binSize(1)) + frr.mdlF.idxTrough(uIdx);
+% plot(t(uRcv), fr(uRcv), 'diamond', 'MarkerEdgeColor', 'none',...
+%     'MarkerFaceColor', 'k', ...
+%     'MarkerSize', 12, 'LineWidth', 2, ...
+%     'DisplayName', sprintf('Rcv. Time: %d min',...
+%     round(frr.mdlF.rcvTime(uIdx) * 3 / 60)));
 
-% Add vertical dashed line at recovery time with recovery gain
-tRcvGain = t(frr.mdl.idxTrough(uIdx));
+% Add vertical dashed line for recovery gain
+clrLn = bone(6);
+tGain = t(end) * 0.9;
 frTrough = frr.mdl.frTrough(uIdx);
 frSs = frr.mdl.frSs(uIdx);
-plot([tRcvGain, tRcvGain], [frTrough, frSs], '--', 'Color', 'k', 'LineWidth', 2, ...
+plot([tGain, tGain], [frTrough, frSs], ':', 'Color', clrLn(4, :), 'LineWidth', 3, ...
     'DisplayName', sprintf('Rcv. Gain: %.2f', frr.mdl.rcvGain(uIdx)));
+
+% Add vertical dashed line for perturbation depth
+tTrough = t(frr.mdl.idxTrough(uIdx));
+frBsl = frr.mdl.frBsl(uIdx);
+plot([tTrough, tTrough], [frTrough, frBsl], '--', 'Color', clrLn(3, :), 'LineWidth', 3, ...
+    'DisplayName', sprintf('Pert. Depth: %.2f', frr.mdl.pertDepth(uIdx)));
 
 % Fill area of spk deficit
 idxPert = frr.info.idxPert(1);
@@ -250,12 +268,21 @@ fill(hAx, [tRcv, fliplr(tRcv)], [bslLine, fliplr(frRcv)],...
     'DisplayName', sprintf('Spk. Deficit: %.2f', frr.mdl.spkDfct(uIdx)));
 
 % Formatting
+plot_axSize('hFig', hFig, 'szOnly', false, 'axShape', 'wide',...
+    'axHeight', 300, 'flgPos', true);
 hLgd = legend('interpreter', 'tex');
 hLgd.Location = "southeast";
-plot_axSize('hFig', hFig, 'szOnly', false, 'axShape', 'wide', 'axHeight', 300);
+hLgd.Location = "northwest";
+hLgd.Position(2) = hLgd.Position(2) - 0.03;
+hLgd.Position(1) = hAx.Position(1);
+hLgd.Box = 'on';
 
 % Mark perturbation
 plot_pert(hAx, tPert, clr.bac);
+
+% Save
+% fname = ['MEA ~ fitUnit_', num2str(uIdx)];
+% lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat'});
 
 
 end
@@ -278,7 +305,7 @@ function [hFig, hAx] = plot_set(yLabel)
 % Set axis formatting and create figure
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 [hFig, hAx] = plot_axSize('szOnly', false, 'axShape', 'wide', 'axHeight', 300);
-xlabel('Time (min)');
+xlabel('Time (Hr)');
 ylabel(yLabel);
 xlim([-4, 22]);
 xticks([0 : 6 : 24]);

@@ -10,7 +10,7 @@ function bh = plot_boxMean(varargin)
 %   alphaIdx    transparency values
 %   allPnts     logical, whether to plot individual points
 %   plotType    'allPnts', 'box' or 'bar'
-%   axh         axis handle
+%   hAx         axis handle
 %   grpNames    cell array of group names (optional)
 %
 % 10 jan 24 LH
@@ -24,7 +24,7 @@ addOptional(p, 'xVal', [], @isnumeric);
 addOptional(p, 'clr', [0, 0, 0]);
 addOptional(p, 'alphaIdx', []);
 addOptional(p, 'plotType', 'box', @ischar);
-addOptional(p, 'axh', []);
+addOptional(p, 'hAx', []);
 addOptional(p, 'grpNames', []);
 
 parse(p, varargin{:})
@@ -33,7 +33,7 @@ xVal = p.Results.xVal;
 clr = p.Results.clr;
 alphaIdx = p.Results.alphaIdx;
 plotType = p.Results.plotType;
-axh = p.Results.axh;
+hAx = p.Results.hAx;
 grpNames = p.Results.grpNames;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -79,11 +79,11 @@ if isscalar(alphaIdx)
 end
 
 % prepare figure axis
-if isempty(axh)
+if isempty(hAx)
     fh = figure;
-    axh = gca;
+    hAx = gca;
 end
-hold(axh, 'on')
+hold(hAx, 'on')
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % plot
@@ -103,24 +103,24 @@ for igrp = 1 : n_grps
             jitter = (grp_width/2) .* rand(length(valid_data), 1) - grp_width/4;
             xval = ones(size(valid_data)) * curr_x(isub) + jitter;
 
-            plot(axh, xval, valid_data, '.',...
+            plot(hAx, xval, valid_data, '.',...
                 'MarkerSize', 5, 'Color', clr(igrp, :),...
                 'MarkerEdgeColor', clr(igrp, :), 'HandleVisibility', 'off');
         end
 
         % add mean markers
-        bh(igrp) = plot(axh, curr_x, mean(curr_data, 2, 'omitnan'), 'kd',...
+        bh(igrp) = plot(hAx, curr_x, mean(curr_data, 2, 'omitnan'), 'kd',...
             'markerfacecolor', clr(igrp, :), 'MarkerSize', 10,...
             'HandleVisibility', 'off');
 
     elseif strcmp(plotType, 'box')
         % box plot
-        bh = boxplot(axh, curr_data', 'Positions', curr_x,...
+        bh = boxplot(hAx, curr_data', 'Positions', curr_x,...
             'PlotStyle', 'traditional', 'Whisker', 2,...
             'Labels', {}, 'Color', clr(igrp,:));
 
         % color boxes
-        bh = findobj(axh, 'Tag', 'Box');
+        bh = findobj(hAx, 'Tag', 'Box');
         bh = flipud(bh((end - size(curr_data, 1) + 1) : end));
 
         for ibox = 1:length(bh)
@@ -135,7 +135,7 @@ for igrp = 1 : n_grps
         sem = std(curr_data, [], 2, 'omitnan') ./ sqrt(n);
 
         % plot bars
-        bh(igrp) = bar(axh, curr_x, means, grp_width);
+        bh(igrp) = bar(hAx, curr_x, means, grp_width);
         bh(igrp).CData = clr(igrp,:);
         bh(igrp).FaceColor = 'flat';
         bh(igrp).FaceAlpha = alphaIdx(igrp);
@@ -152,16 +152,16 @@ end
 
 % set axis properties
 if ~isempty(grpNames)
-    legend(grpNames, 'Location', 'northwest')
+    legend(grpNames, 'Location', 'best')
 end
 
-xlim(axh, [min(xVal)-0.5, max(xVal)+0.5])
-xticks(axh, xVal)
+xlim(hAx, [min(xVal)-0.5, max(xVal)+0.5])
+xticks(hAx, xVal)
 
 % remove temporary boxplot legends
-legend_entries = findobj(axh, 'Tag', 'Box');
-for i = 1 : length(legend_entries)
-    set(legend_entries(i), 'HandleVisibility', 'off');
+hLgd = findobj(hAx, 'Tag', 'Box');
+for iLgd = 1 : length(hLgd)
+    set(hLgd(iLgd), 'HandleVisibility', 'off');
 end
 
 end

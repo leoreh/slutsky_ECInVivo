@@ -4,7 +4,10 @@ function tbl = v2tbl(varargin)
 % SUMMARY:
 % This function creates a "tidy" data table from a struct array where each
 % element typically corresponds to a recording session. It is designed to
-% prepare data for linear mixed-effects modeling (fitlme).
+% prepare data for linear mixed-effects modeling (fitlme). The function
+% automatically determines the number of rows based on the first mapped
+% variable, making it suitable for both unit-based data (e.g., neurons)
+% and event-based data (e.g., ripples, spikes).
 %
 % INPUT (Required):
 %   v           - Struct array, output of basepaths2vars. Each element v(i) 
@@ -23,12 +26,21 @@ function tbl = v2tbl(varargin)
 %   tbl         - Table with all data, organized for LME analysis.
 %
 % EXAMPLE:
+%   % For unit-based data (e.g., firing rates)
 %   varMap.RecTime = 'frr.recovTime';
 %   varMap.BurstMiz = 'st.mizuseki';
 %   tagFiles.Name = {'mouse1', 'mouse2', 'mouse3'};
 %   tagAll.Group = 'Control';
 %   tagAll.Day = 'Baseline';
 %   tbl = v2tbl(v, varMap, 'tagFiles', tagFiles, 'tagAll', tagAll, 'idxCol', 1:5);
+%
+%   % For event-based data (e.g., ripples)
+%   varMap.Freq = 'ripp.peakFreq';
+%   varMap.Amp = 'ripp.peakAmp';
+%   varMap.Dur = 'ripp.dur';
+%   tagFiles.Name = {'mouse1', 'mouse2'};
+%   tagAll.Group = 'Control';
+%   tbl = v2tbl(v, varMap, 'tagFiles', tagFiles, 'tagAll', tagAll);
 %
 % DEPENDENCIES:
 %   None
@@ -72,12 +84,20 @@ end
 
 for iFile = 1:length(v)
     
-    % Get all field sizes recursively from v(iFile) and set nUnits to the
-    % most common size that isn't 1
-    fldSz = get_fldSz(v(iFile));
-    fldSz = fldSz(fldSz ~= 1);
-    nUnits = mode(fldSz);
-    unitIdx = (1:nUnits)';
+    % Determine the number of rows based on the first mapped variable
+    % This works for both unit-based and event-based data
+    var1Path = varMap.(mapFields{1});
+    var1Path = strsplit(var1Path, '.');
+    data1 = getfield(v(iFile), var1Path{:});
+    nRows = size(data1, 1);
+    
+    % If the first dimension is 1, check the second dimension
+    if nRows == 1 && size(data1, 2) > 1
+        nRows = size(data1, 2);
+    end
+    
+    % Create row indices for this session
+    rowIdx = (1:nRows)';
 
     % Create a table for the current session and add metadata, including
     % unique unitID based on mouse and unit number within mouse
@@ -88,7 +108,7 @@ for iFile = 1:length(v)
     for iTag = 1:length(tagAllFields)
         tagName = tagAllFields{iTag};
         tagValue = tagAll.(tagName);
-        sessionTable.(tagName) = repmat(categorical({tagValue}), nUnits, 1);
+        sessionTable.(tagName) = repmat(categorical({tagValue}), nRows, 1);
     end
     
     % Add tagFiles metadata (per-file specific)
@@ -97,26 +117,26 @@ for iFile = 1:length(v)
         tagName = tagFilesFields{iTag};
         if iFile <= length(tagFiles.(tagName))
             tagValue = tagFiles.(tagName){iFile};
-            sessionTable.(tagName) = repmat(categorical({tagValue}), nUnits, 1);
+            sessionTable.(tagName) = repmat(categorical({tagValue}), nRows, 1);
         end
     end
     
-    sessionTable.UnitID = uOffset + (iFile * 1000) + unitIdx;
+    sessionTable.UnitID = uOffset + (iFile * 1000) + rowIdx;
 
     % Extract all variables based on the map
     for iVar = 1:length(mapFields)
         colName = mapFields{iVar};
         structPath = varMap.(colName);    
-        pathParts = strsplit(structPath, '.');
-        data = getfield(v(iFile), pathParts{:});
+        var1Path = strsplit(structPath, '.');
+        data = getfield(v(iFile), var1Path{:});
         
-        % Ensure data has nUnits as the first dimension (rows)
-        if size(data, 1) ~= nUnits
-            if size(data, 2) == nUnits
-                data = data'; % Transpose to make nUnits the first dimension
+        % Ensure data has nRows as the first dimension (rows)
+        if size(data, 1) ~= nRows
+            if size(data, 2) == nRows
+                data = data'; % Transpose to make nRows the first dimension
             else
                 % If neither dimension matches, try to reshape
-                data = reshape(data, nUnits, []);
+                data = reshape(data, nRows, []);
             end
         end
         
@@ -143,31 +163,6 @@ tbl = vertcat(tblCell{:});
 [~, maxID] = max(tbl.UnitID);
 uOffset = tbl.UnitID(maxID);
 
-end
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% HELPER FUNCTION: GET_FLDSZ
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-function fldSz = get_fldSz(s)
-% Recursively gets sizes of all fields in a struct, including nested structs
-    
-    fldSz = [];
-    fields = fieldnames(s);
-    
-    for iFld = 1:length(fields)
-        fieldVal = s.(fields{iFld});
-        
-        if isstruct(fieldVal)
-            % Recursively get sizes from nested struct
-            nestedSizes = get_fldSz(fieldVal);
-            fldSz = [fldSz, nestedSizes];
-        else
-            % Get size of non-struct field
-            fieldSize = size(fieldVal);
-            fldSz = [fldSz, fieldSize];
-        end
-    end
 end
 
 % EOF

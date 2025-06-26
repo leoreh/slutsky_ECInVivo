@@ -3,7 +3,7 @@ function [dataGrp, xVals, varLbls] = lme_tbl2cell(tbl, varsFxd, varRsp, varargin
 %
 % This function takes a data table and organizes it into cell arrays suitable
 % for plotting functions. For single fixed effects, it creates a data matrix.
-% For multiple fixed effects, it groups data by the first variable and creates
+% For multiple fixed effects, it groups data by the specified group variable and creates
 % separate matrices for each group.
 %
 % INPUTS:
@@ -14,11 +14,13 @@ function [dataGrp, xVals, varLbls] = lme_tbl2cell(tbl, varsFxd, varRsp, varargin
 % VARARGIN (Name-Value Pairs):
 %   'flgCats'   (Optional) Logical: Force categorical ordering for all variables.
 %                       Default is false (uses natural ordering).
+%   'grpVar'    (Optional) Char: Name of the variable to use for grouping.
+%                       If not specified, uses the first variable in varsFxd.
 %
 % OUTPUTS:
 %   dataGrp     Cell Array/Matrix: For single variable, returns data matrix.
 %               For multiple variables, returns cell array of data matrices
-%               grouped by first variable.
+%               grouped by the specified group variable.
 %   xVals       Cell Array/Char: For single variable, returns char array of levels.
 %               For multiple variables, returns cell array of level names for
 %               each group.
@@ -32,8 +34,8 @@ function [dataGrp, xVals, varLbls] = lme_tbl2cell(tbl, varsFxd, varRsp, varargin
 %   %          xVals = char array of group names
 %   %          varLbls = []
 %
-%   % Two variable case
-%   [dataGrp, xVals, varLbls] = lme_tbl2cell(dataTable, {'Group', 'Time'}, 'Response')
+%   % Two variable case with explicit group variable
+%   [dataGrp, xVals, varLbls] = lme_tbl2cell(dataTable, {'Group', 'Time'}, 'Response', 'grpVar', 'Group')
 %   % Returns: dataGrp = {[nTime x nSubjects_Group1], [nTime x nSubjects_Group2], ...}
 %   %          xVals = {timeLevels, timeLevels, ...}
 %   %          varLbls = ['Group1', 'Group2', ...]
@@ -47,6 +49,7 @@ function [dataGrp, xVals, varLbls] = lme_tbl2cell(tbl, varsFxd, varRsp, varargin
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 p = inputParser;
 addParameter(p, 'flgCats', false, @islogical);
+addParameter(p, 'grpVar', '', @ischar);
 parse(p, varargin{:});
 
 opts = p.Results;
@@ -63,22 +66,45 @@ if ~isempty(missingVars)
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% DETERMINE GROUPING VARIABLE
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+if length(varsFxd) >= 2
+    % Multiple variables case - determine which is the group variable
+    if ~isempty(opts.grpVar)
+        % Use specified group variable
+        if ~ismember(opts.grpVar, varsFxd)
+            error('Specified grpVar "%s" not found in fixed effects variables: %s', ...
+                opts.grpVar, strjoin(varsFxd, ', '));
+        end
+        grpVar = opts.grpVar;
+        xVar = setdiff(varsFxd, grpVar, 'stable');
+        xVar = xVar{1};
+    else
+        % Default: first variable is group, second is x-axis
+        grpVar = varsFxd{1};
+        xVar = varsFxd{2};
+    end
+else
+    % Single variable case
+    grpVar = '';
+    xVar = varsFxd{1};
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ORGANIZE DATA BASED ON NUMBER OF VARIABLES
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if length(varsFxd) >= 2
-    % Case: Multiple variables - group by first var, x-axis is second var
-    var1 = varsFxd{1};
-    var2 = varsFxd{2};
+    % Case: Multiple variables - group by grpVar, x-axis is xVar
 
     % Get unique values maintaining order
-    if opts.flgCats || iscategorical(tbl.(var1))
-        var1Vals = categories(categorical(tbl.(var1)));
+    if opts.flgCats || iscategorical(tbl.(grpVar))
+        grpVals = categories(categorical(tbl.(grpVar)));
     else
-        var1Vals = unique(tbl.(var1), 'stable');
+        grpVals = unique(tbl.(grpVar), 'stable');
     end
 
     % Initialize outputs
-    nGrps = length(var1Vals);
+    nGrps = length(grpVals);
     dataGrp = cell(nGrps, 1);
     xVals = cell(nGrps, 1);
     varLbls = strings(nGrps, 1);
@@ -86,21 +112,21 @@ if length(varsFxd) >= 2
     % Get data for each group
     for igrp = 1:nGrps
         % Get data for current group
-        idx = tbl.(var1) == var1Vals(igrp);
+        idx = tbl.(grpVar) == grpVals(igrp);
         grpTbl = tbl(idx, :);
 
         % Get unique x values using categorical order if possible
-        if opts.flgCats || iscategorical(grpTbl.(var2))
-            xUnique = categories(categorical(grpTbl.(var2)));
+        if opts.flgCats || iscategorical(grpTbl.(xVar))
+            xUnique = categories(categorical(grpTbl.(xVar)));
         else
-            xUnique = unique(grpTbl.(var2), 'stable');
+            xUnique = unique(grpTbl.(xVar), 'stable');
         end
         nX = length(xUnique);
 
         % Organize data matrix
         dataMat = nan(nX, sum(idx));
         for ix = 1:nX
-            xIdx = grpTbl.(var2) == xUnique{ix};
+            xIdx = grpTbl.(xVar) == xUnique{ix};
             yVals = grpTbl.(varRsp)(xIdx);
             dataMat(ix, 1:length(yVals)) = yVals';
         end
@@ -108,7 +134,7 @@ if length(varsFxd) >= 2
         % Store results
         dataGrp{igrp} = dataMat;
         xVals{igrp} = string(xUnique);
-        varLbls{igrp} = char(var1Vals(igrp));
+        varLbls{igrp} = char(grpVals(igrp));
     end
 
 else

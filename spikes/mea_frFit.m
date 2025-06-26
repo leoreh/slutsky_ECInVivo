@@ -302,7 +302,7 @@ frFit.frSs = frFit.pFit(1);
 % BASELINE
 % Fit robust linear regression to baseline period (pre-perturbation +
 % margin)
-mrgnBins = 10;
+mrgnBins = 5;
 bslWin = 1:max(1, idxPert - mrgnBins);
 [bslFit, ~] = robustfit(tIdx(bslWin), fr(bslWin));
 bslCurve = bslFit(1) + bslFit(2) * tIdx(1:(idxPert-2));

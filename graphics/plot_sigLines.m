@@ -27,13 +27,12 @@ p = inputParser;
 addRequired(p, 'axh', @(x) isa(x, 'matlab.graphics.axis.Axes'));
 addRequired(p, 'barIdx', @iscell);
 addRequired(p, 'barLbl', @iscell);
-
 addParameter(p, 'LineColor', 'k');
 addParameter(p, 'LineWidth', 1);
 addParameter(p, 'lineOffset', 0.1);
-addParameter(p, 'txtOffset', -0.02);
+addParameter(p, 'txtOffset', -0.0);
 addParameter(p, 'fontSize', get(axh, 'FontSize'));
-addParameter(p, 'lineGap', 0.06);
+addParameter(p, 'lineGap', 0.1);
 addParameter(p, 'flgNS', true);
 
 parse(p, axh, barIdx, barLbl, varargin{:});
@@ -143,9 +142,11 @@ nBars = length(barDetails);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % This section iterates through each pair of bars/midpoints specified for
 % significance notation. For each pair, it calculates coordinates,
-% determines the vertical position considering stacking, and draws the
+% determines the vertical position considering stacking and overlap, and draws the
 % horizontal line and text label.
 yTop = 0;
+drawnLines = []; % Track drawn lines for overlap detection
+
 for iBar = 1:length(barIdx)
 
     % --- Calculate x and y for the first point ---
@@ -170,12 +171,43 @@ for iBar = 1:length(barIdx)
         yCoords(2) = barDetails(barIdx{iBar}(2)).y;
     end
 
-    % determine height of line
-    if iBar == 1
-        yHeight = max([yCoords, yTop]) + opts.lineOffset;
-    else
-        yHeight = max([yCoords, yTop]) + opts.lineGap;
+    % Calculate current line's x-range
+    currentLineRange = [min(xCoords), max(xCoords)];
+    
+    % Find the highest bar beneath this line
+    barsInRange = [];
+    for i = 1:length(barDetails)
+        if barDetails(i).x >= currentLineRange(1) && barDetails(i).x <= currentLineRange(2)
+            barsInRange = [barsInRange, barDetails(i).y];
+        end
     end
+    maxBarHeight = max(barsInRange);
+    
+    % Check for overlaps with previously drawn lines
+    overlappingLines = [];
+    for i = 1:size(drawnLines, 1)
+        % Check if current line overlaps with previously drawn line
+        if ~(currentLineRange(2) < drawnLines(i, 1) || currentLineRange(1) > drawnLines(i, 2))
+            overlappingLines = [overlappingLines, drawnLines(i, 3)]; % Add height of overlapping line
+        end
+    end
+    
+    % Determine line height based on overlap logic
+    if isempty(overlappingLines)
+        % No overlap: use same height as previous line if available, otherwise calculate new height
+        if iBar == 1
+            yHeight = max([yCoords, maxBarHeight]) + opts.lineOffset;
+        else
+            yHeight = yTop; % Use same height as previous line
+        end
+    else
+        % Overlap detected: position above the highest overlapping line
+        maxOverlappingHeight = max(overlappingLines);
+        yHeight = max([maxOverlappingHeight + opts.lineGap, maxBarHeight + opts.lineOffset]);
+    end
+    
+    % Ensure minimum height based on bars beneath
+    yHeight = max(yHeight, maxBarHeight + opts.lineOffset);
 
     % Draw horizontal line
     plot(axh, xCoords, [yHeight, yHeight], ...
@@ -184,8 +216,13 @@ for iBar = 1:length(barIdx)
         'HandleVisibility', 'off');
 
     % Add text label
+    if strcmp(barLbl{iBar}, 'NS')
+        txtOffset = -0.01;
+    else
+        txtOffset = -0.2;
+    end
     textX = mean(xCoords);
-    textY = yHeight + opts.txtOffset;
+    textY = yHeight + txtOffset;
     th = text(axh, textX, textY, barLbl{iBar}, ...
         'HorizontalAlignment', 'center', ...
         'VerticalAlignment', 'bottom', ...
@@ -193,10 +230,13 @@ for iBar = 1:length(barIdx)
         'Color', opts.LineColor, ...
         'HandleVisibility', 'off');
 
-    % Update maxYOverall and activeLevels for stacking
+    % Update tracking variables
     drawnow; % Ensure text extent is calculated
     txtExtent = get(th, 'Extent');
     yTop = yHeight + opts.lineOffset;
+    
+    % Add current line to drawn lines tracking [x1, x2, height]
+    drawnLines = [drawnLines; currentLineRange, yHeight];
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

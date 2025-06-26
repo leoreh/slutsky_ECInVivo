@@ -94,7 +94,7 @@ v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 
 % Get metrics
 swv = catfields([v.swv], 2);
-st = catfields([v.st], 2);
+st = catfields([v.st], 1);
 fr = catfields([v.fr], 1);
 
 % get unit classifications
@@ -115,8 +115,8 @@ nUnits = length(unitIdx);
 
 % Default colors if not provided
 if isempty(clr)
-    clr(1, :) = [10 / 255 10 / 255 80 / 255];       % pPYR
-    clr(2, :) = [180 / 255 80 / 255 80 / 255];      % pINT
+    clr = mcu_clr();
+    clr = clr.unitType;
 end
 txtUnit = {'pPYR', 'pINT'};
 
@@ -185,7 +185,7 @@ switch plotType
 
             % plot with std shade
             hPlt(iUnit) = plot_stdShade('dataMat', wvUnit, 'xVal', xVal, ...
-                'axh', hAx, 'clr', clr(iUnit, :), 'alpha', 0.5);
+                'hAx', hAx, 'clr', clr(iUnit, :), 'alpha', 0.5);
             
             % Update legend text with unit count
             nUnitsType = sum(unitIdx == iUnit);
@@ -202,7 +202,7 @@ switch plotType
         wvUnit = wv(unitIdx == 0, :);
         if ~isempty(wvUnit) && 0
             plot_stdShade('dataMat', wvUnit, 'xVal', xVal, ...
-                'axh', hAx, 'clr', [1 0 0], 'alpha', 0.5);
+                'hAx', hAx, 'clr', [1 0 0], 'alpha', 0.5);
         end
 
     case 'scatter'

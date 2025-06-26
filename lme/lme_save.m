@@ -14,7 +14,7 @@ function lme_save(varargin)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 p = inputParser;
 addOptional(p, 'hFig', [], @(x) isa(x, 'matlab.ui.Figure') || isempty(x));
-addOptional(p, 'basepath', 'D:\OneDrive - Tel-Aviv University\PhD\Slutsky\Manuscripts\Heim2025\Graphs', @ischar);
+addOptional(p, 'savepath', 'D:\OneDrive - Tel-Aviv University\PhD\Slutsky\Manuscripts\Heim2025\Graphs', @ischar);
 addOptional(p, 'fpath', [], @(x) ischar(x) || isempty(x));
 addOptional(p, 'fname', [], @(x) ischar(x) || isempty(x));
 addOptional(p, 'frmt', {'ai', 'jpg', 'svg'}, @(x) iscell(x) || ischar(x)); 
@@ -25,7 +25,7 @@ addOptional(p, 'sheetNames', [], @(x) iscell(x) || isempty(x));
 
 parse(p, varargin{:});
 hFig = p.Results.hFig;
-basepath = p.Results.basepath;
+savepath = p.Results.savepath;
 fpath = p.Results.fpath;
 fname = p.Results.fname;
 frmt = p.Results.frmt;
@@ -45,18 +45,16 @@ end
 
 % simplify fname using frml2char 
 if isempty(fname)
-    fname = 'figure';
+    fname = lme_frml2char(fname);
 end
-fname = lme_frml2char(fname);
 
 % create new folder based on response variable if fpath is empty
 if isempty(fpath)
     resName = regexp(fname, '^[^~]+', 'match', 'once');
     resName = strtrim(resName);
-    fpath = fullfile(basepath, resName);
+    fpath = fullfile(savepath, resName);
 end
-
-mkdir(fpath); % Assumes basepath is valid and mkdir will succeed or path already exists
+mkdir(fpath);
 
 % construct full file path base (without extension)
 saveName = fullfile(fpath, fname);

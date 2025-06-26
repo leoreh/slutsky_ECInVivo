@@ -21,6 +21,8 @@ function [barIdx, barLbl] = lme_sigLines(lmeStats, lmeMdl, lmeData, varargin)
 %               Default is [0.05, 0.01, 0.001, 0.0001].
 %   'sigLbls'   (Optional) Cell Array: Labels for significance levels.
 %               Default is {'*', '**', '***', '****'}.
+%   'grpVar'    (Optional) Char: Name of the variable to use for grouping.
+%               Must match the grpVar used in lme_plot.
 %
 % OUTPUTS:
 %   barIdx      Cell array of 2-element (or 1.5-style) vectors specifying
@@ -39,6 +41,7 @@ p = inputParser;
 addParameter(p, 'idxRow', [], @isnumeric);
 addParameter(p, 'pThresh', [0.05, 0.01, 0.001, 0.0001], @isnumeric);
 addParameter(p, 'sigLbls', {'*', '**', '***', '****'}, @iscell);
+addParameter(p, 'grpVar', 'Group', @ischar);
 parse(p, varargin{:});
 opts = p.Results;
 
@@ -79,7 +82,7 @@ if length(varsFxd) < 2
     return;
 end
 
-[~, xVals, grpLbls] = lme_tbl2cell(lmeData, varsFxd, varRsp);
+[~, xVals, grpLbls] = lme_tbl2cell(lmeData, varsFxd, varRsp, 'grpVar', opts.grpVar);
 
 xLevels = xVals{1};
 grpLevels = grpLbls;

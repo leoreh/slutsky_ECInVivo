@@ -11,8 +11,6 @@ function [varsFxd, varRsp] = lme_frml2vars(frml, varargin)
 % VARARGIN (Name-Value Pairs):
 %   'flgRand'   (Optional) Logical: Whether to include intercept term.
 %                Default is false.
-%   'flgSrt'    (Optional) Logical: Whether to sort variables alphabetically.
-%                Default is true.
 %
 % OUTPUTS:
 %   varsFxd     Cell array: Names of fixed effects variables.
@@ -27,7 +25,6 @@ function [varsFxd, varRsp] = lme_frml2vars(frml, varargin)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 p = inputParser;
 addParameter(p, 'flgRand', false, @islogical);
-addParameter(p, 'flgSrt', true, @islogical);
 parse(p, varargin{:});
 
 opts = p.Results;
@@ -73,11 +70,6 @@ else
     xStr = regexprep(xStr, '\([^)]*\)', ''); % Remove random effects
     xVars = strtrim(strsplit(xStr, '+')); % Split by + and trim whitespace
     varsFxd = xVars(~cellfun(@isempty, xVars)); % Remove any empty cells
-end
-
-% Sort
-if opts.flgSrt
-    varsFxd = sort(varsFxd);
 end
 
 end 

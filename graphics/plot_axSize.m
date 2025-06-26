@@ -12,6 +12,7 @@ function [hFig, hAx] = plot_axSize(varargin)
 %   'axWidth'     - Desired width of the axes plot area in pixels.
 %   'axHeight'    - Desired height of the axes plot area in pixels.
 %   'szOnly'      - Only adjust figure size without default aesthetics
+%   'flgPos'      - If true, moves the figure to monitor 2. Default is false.
 %
 % OUTPUT:
 %   hFig          - Handle to the figure.
@@ -28,6 +29,7 @@ addParameter(p, 'axShape', 'square', @(x) ischar(x) && ismember(x, {'square', 't
 addParameter(p, 'axWidth', [], @(x) isnumeric(x));
 addParameter(p, 'axHeight', [], @(x) isnumeric(x));
 addParameter(p, 'szOnly', true, @islogical);
+addParameter(p, 'flgPos', false, @islogical);
 
 parse(p, varargin{:});
 hFig            = p.Results.hFig;
@@ -35,6 +37,7 @@ axShape         = p.Results.axShape;
 axWidth         = p.Results.axWidth;
 axHeight        = p.Results.axHeight;
 szOnly          = p.Results.szOnly;
+flgPos          = p.Results.flgPos;
 
 % Define aspect ratios and default dimension
 tallRatio = 0.62; % width/height for tall shape
@@ -182,11 +185,13 @@ set(hFig, 'Units', 'pixels');
 figPos = get(hFig, 'Position'); % To preserve screen x,y for the figure
 set(hFig, 'Position', [figPos(1), figPos(2), figWidth, figHeight]);
 
-% Position figure on 2nd screen
-monitors = get(0, 'MonitorPositions');  % Get positions of all monitors
-mnt2 = monitors(2, :);                  % Select second screen [left, bottom, width, height]
-hFig.Position = [mnt2(1) + 400, mnt2(2) + 200,...
-    figWidth, figHeight]; 
+% Position figure on 2nd screen only if flgPos is true
+if flgPos
+    monitors = get(0, 'MonitorPositions');  % Get positions of all monitors
+    mnt2 = monitors(2, :);                  % Select second screen [left, bottom, width, height]
+    hFig.Position = [mnt2(1) + 400, mnt2(2) + 200,...
+        figWidth, figHeight]; 
+end
 
 % Force MATLAB to render/update the figure with its new size.
 drawnow; 

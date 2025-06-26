@@ -11,14 +11,14 @@ function ph = plot_stdShade(varargin)
 p = inputParser;
 addOptional(p, 'dataMat', [], @isnumeric);
 addOptional(p, 'xVal', @isnumeric);
-addOptional(p, 'axh', @(x) isa(x, 'matlab.graphics.axis.Axes'));
+addOptional(p, 'hAx', @(x) isa(x, 'matlab.graphics.axis.Axes'));
 addOptional(p, 'clr', [0, 0, 1], @(x) isnumeric(x) && length(x)==3);
 addOptional(p, 'alpha', 0.5, @isnumeric);
 
 parse(p, varargin{:});
 dataMat = p.Results.dataMat;
 xVal = p.Results.xVal;
-axh = p.Results.axh;
+hAx = p.Results.hAx;
 clr = p.Results.clr;
 alpha = p.Results.alpha;
 
@@ -41,7 +41,7 @@ else
 end
 
 % ensure the axis handle is held
-axes(axh);
+axes(hAx);
 hold on;
 
 % calculate the mean and standard deviation
@@ -64,11 +64,11 @@ sData(sData == 0) = eps;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % plot the mean
-ph = plot(axh, xVal, mData, 'Color', clr, 'LineWidth', 2);
+ph = plot(hAx, xVal, mData, 'Color', clr, 'LineWidth', 2);
 
 % plot the shaded area for standard deviation
 % Check if y-axis is log scale
-if strcmp(get(axh, 'YScale'), 'log')
+if strcmp(get(hAx, 'YScale'), 'log')
     lowerBound = max(mData - sData, eps);
     upperBound = max(mData + sData, eps);
 else

@@ -59,7 +59,7 @@ v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 
 % concatenate metrics across recordings
 swv = catfields([v.swv], 2);  % waveform metrics
-st = catfields([v.st], 2);    % spike train metrics
+st = catfields([v.st], 1);    % spike train metrics
 fr = catfields([v.fr], 1);    % firing rate metrics
 
 % get number of units
@@ -76,7 +76,7 @@ nGood = sum(idxGood);
 % For non-inverted spikes, perform classification using trough-to-peak
 % pPYR: tp >= 0.4, pINT: tp < 0.4
 unitType = zeros(nGood, 1);  
-pyrIdx = swv.tp(idxGood) >= 0.4;
+pyrIdx = swv.tp(idxGood) >= 0.7;
 unitType(pyrIdx) = 1;       % pPYR
 unitType(~pyrIdx) = 2;      % pINT
 
@@ -90,7 +90,9 @@ switch altClassify
     case 2
         % Prepare feature matrix for GMM 
         mfr = fr.mfr(idxGood);
-        fet = [swv.tp(idxGood)', st.lidor(idxGood)', mfr];
+        brst = log10(st.royer(idxGood) + eps);
+        brst = st.lidor(idxGood);
+        fet = [swv.tp(idxGood)', brst];
         
         % Get refined classification using GMM
         unitType = gm2units(fet, unitType);
@@ -118,20 +120,6 @@ clean(2, idxGood) = unitType == 2;  % pINT
 unitType = zeros(nUnits, 1);
 unitType(clean(1, :)) = 1;
 unitType(clean(2, :)) = 2;
-
-% % Plot classificaiton
-% fh = figure;
-% swvFld = 'tp';
-% stFld = 'lidor';
-% hAx = subplot(1, 2, 1); hold on
-% plot_utypes('basepaths', basepaths, 'flgRaw', false,...
-%     'plotType', 'scatter3', 'swvFld', swvFld, 'stFld', stFld,...
-%     'unitIdx', unitType, 'hAx', hAx)
-% 
-% hAx = subplot(1, 2, 2); hold on
-% plot_utypes('basepaths', basepaths, 'flgRaw', false,...
-%     'plotType', 'wv', 'swvFld', swvFld, 'stFld', stFld,...
-%     'unitIdx', unitType, 'hAx', hAx)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % save updated unit struct
@@ -186,11 +174,9 @@ function typeOut = gm2units(fet, typeIn)
 %
 % OUTPUT:
 %   typeOut  (vector) Refined classification [nUnits x 1]
-%                     1 = putative pyramidal cell (pPYR)
-%                     2 = putative interneuron (pINT)
 
 % Fit GMM with 2 components using classIn as starting point
-gm = fitgmdist(fet, 2, 'RegularizationValue', 0.015, 'Start', typeIn,...
+gm = fitgmdist(fet, 2, 'RegularizationValue', 0.0537, 'Start', typeIn,...
     'CovarianceType', 'diagonal');
 
 % Get cluster assignments using the cluster method
