@@ -68,10 +68,10 @@ vars = {'fr', 'units', 'st_metrics', 'st_brst'};
 
 % Define variable mapping
 clear varMap tblCell v tagAll tagFiles
-varMap.FR = 'fr.mfr';               % Mean firing rate
-varMap.BrRoy = 'st.royer';          % Mean firing rate
-varMap.BrPct = 'brst.bspks';      % Mean firing rate
-varMap.UnitType = 'units.clean';    % Unit classification
+varMap.FR = 'fr.mfr';               
+varMap.BrRoy = 'st.royer';          
+varMap.BrPct = 'brst.bspks';        
+varMap.UnitType = 'units.clean';   
 
 % Load and organize table
 for iGrp = 1 : length(grps)
@@ -143,7 +143,7 @@ lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
 % -------------------------------------------------------------------------
 % Load and organize data
 grps = {'wt', 'mcu'}; 
-vars = {'fr', 'units'};
+vars = {'fr', 'units', 'st_metrics', 'st_brst'};
 
 lblGrp = {'Control'; 'MCU-KO'};
 lblDay = {'BSL'; 'BAC1'; 'BAC2'; 'BAC3'; 'WASH'};
@@ -152,6 +152,8 @@ idxRm = [2, 6];                     % remove bac on and off
 % Define variable mapping for v2tbl
 clear varMap tblCell v tagAll tagFiles
 varMap.FR = 'fr.mfr';               % Mean firing rate
+varMap.BrRoy = 'st.royer';          
+varMap.BrPct = 'brst.bspks';  
 varMap.UnitType = 'units.clean';    % Unit classification
 
 % Single loop over groups and mice (no day loop)
@@ -188,6 +190,8 @@ lmeData.Group = reordercats(lmeData.Group, lblGrp);
 lmeData.UnitType = reordercats(lmeData.UnitType, lblUnit);
 lmeData.Day = reordercats(lmeData.Day, lblDay);
 
+lmeData.BrRoy = lmeData.BrRoy + eps;
+
 % -------------------------------------------------------------------------
 % FR ~ Group * Day + (1|Mouse) 
 
@@ -203,21 +207,25 @@ plotTbl = tbl_transform(plotTbl, 'varNorm', 'Day',...
 % run lme
 clear lmeCfg
 frml = 'FR ~ Group * Day + (1|Name)';
+frml = 'BrRoy ~ Group * Day + (1|Name)';
 lmeCfg.contrasts = 'all'; 
 lmeCfg.distribution = 'Gamma'; 
 [lmeStats, lmeMdl] = lme_analyse(plotTbl, frml, lmeCfg);
 
 % plot
-idxRow = [12 : 19];
+idxRow = [1 : 19];
+% idxRow = [];
 hFig = lme_plot(plotTbl, lmeMdl, 'lmeStats', lmeStats,...
     'idxRow', idxRow, 'ptype', 'bar', 'axShape', 'wide');
 
 % Update labels
 hAx = gca;
 ylabel(hAx, 'Firing Rate (% BSL)')
+ylabel(hAx, 'Burstiness Index (% BSL)')
 xlabel(hAx, '')
 title(hAx, unitType)
 hAx.Legend.Location = 'northeast';
+hAx.Legend.Location = 'east';
 
 % Assert Size
 plot_axSize('hFig', hFig, 'szOnly', false, 'axShape', 'wide', 'axHeight', 300);
@@ -226,15 +234,52 @@ plot_axSize('hFig', hFig, 'szOnly', false, 'axShape', 'wide', 'axHeight', 300);
 altClassify = 3;
 fname = lme_frml2char(frml, 'rmRnd', true, 'resNew', '',...
     'sfx', [' _', unitType, '_Norm', '_altClassify', num2str(altClassify)]);
+fname = lme_frml2char(frml, 'rmRnd', true, 'resNew', 'Burst',...
+    'sfx', [' _', unitType, '_Norm', '_altClassify', num2str(altClassify)]);
 lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
     'lmeData', plotTbl, 'lmeStats', lmeStats, 'lmeMdl', lmeMdl)
 
 
 
 
+% -------------------------------------------------------------------------
+% FR ~ UnitType * Day + (1|Mouse) 
+
+% select group
+grp = 'Control';
+iGrp = categorical({grp}); 
+plotTbl = lmeData(lmeData.Group == iGrp, :);
+
+% select unit
+unitType = 'pINT';
+iUnit = categorical({unitType}); 
+plotTbl = plotTbl(plotTbl.UnitType == iUnit, :);
+
+% normalize
+% plotTbl = tbl_transform(plotTbl, 'varNorm', 'Day',...
+%     'varsGrp', {'Group', 'UnitType'}, 'flgNorm', true);
+
+% run lme
+clear lmeCfg
+frml = 'FR ~ UnitType * Day + (1|Name)';
+lmeCfg.contrasts = 'all'; 
+lmeCfg.distribution = 'Gamma'; 
+[lmeStats, lmeMdl] = lme_analyse(plotTbl, frml, lmeCfg);
+
+% plot
+idxRow = [1 : 19];
+% idxRow = [];
+hFig = lme_plot(plotTbl, lmeMdl, 'lmeStats', lmeStats,...
+    'idxRow', idxRow, 'ptype', 'bar', 'axShape', 'wide', 'grpVar', 'UnitType');
 
 
 
+
+
+% Calculate statistics for each combination of Group and Subgroup
+sem = @(x) std(x, 'omitnan') / sqrt(length(x));
+summaryTable = groupsummary(plotTbl, {'UnitType', 'Day'}, {'mean', sem}, 'FR')
+summaryTable = summaryTable(:, [1,2,4,5,3])
 
 
 

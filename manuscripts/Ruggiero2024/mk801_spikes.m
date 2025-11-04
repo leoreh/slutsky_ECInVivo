@@ -88,12 +88,12 @@ for imouse = 1 : length(mname)
 
     % get basepaths
     queryStr = [mname{imouse}, '_mk801'];
-    basepaths = mk801_chronic_sessions(queryStr);
+    basepaths = mk801_sessions(queryStr);
 
     % reload data
     varsFile = ["fr"; "fr_bins"; "datInfo"; "session"; "units"];
     varsName = ["fr"; "frBins"; "datInfo"; "session"; "units"];
-    xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
+    xlsname = 'D:\OneDrive - Tel-Aviv University\PhD\Slutsky\Data summaries\sessionList.xlsx';
     [v, basepaths] = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
         'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
         'xlsname', xlsname);

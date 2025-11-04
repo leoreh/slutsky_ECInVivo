@@ -109,7 +109,7 @@ basepaths = [mcu_sessions('wt_bsl'), mcu_sessions('wt_bsl_ripp')];
 basepaths = unique(basepaths);
 
 
-altClassify = 2;
+altClassify = 3;
 swvFld = 'tp';
 stFld = 'royer';
 hAx = plot_utypes('basepaths', basepaths, 'flgRaw', false,...
@@ -123,6 +123,14 @@ set(hAx, 'YScale', 'log')
 ylim([0.1, 100])
 plot_axSize('hFig', hFig, 'szOnly', false, 'axShape',...
     'square', 'axHeight', 300, 'flgPos', true)
+
+% Extract data
+hSct = findobj(gca, 'Type', 'scatter'); 
+iUnit = 2;
+x = hSct(iUnit).XData;
+y = hSct(iUnit).YData;
+sz = hSct(iUnit).SizeData;
+
 
 % Save
 fname = ['UnitTypes~Scatter_Alt', num2str(altClassify)];

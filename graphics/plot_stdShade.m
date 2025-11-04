@@ -1,4 +1,4 @@
-function ph = plot_stdShade(varargin)
+function [hLine, hFill] = plot_stdShade(varargin)
 
 % plots the mean and standard deviation as a shaded area of the data matrix.
 % allows specifying the color and transparency for the plot.
@@ -40,11 +40,7 @@ else
         'Neither dimension of dataMat matches length(xVal).');
 end
 
-% ensure the axis handle is held
-axes(hAx);
-hold on;
-
-% calculate the mean and standard deviation
+% calculate the mean and standard eror of mean
 mData = mean(dataMatPlot, 1, 'omitnan');
 n = sum(~isnan(dataMatPlot), 1);  % number of non-NaN points per column
 sData = std(dataMatPlot, 0, 1, 'omitnan') ./ sqrt(n);
@@ -63,8 +59,11 @@ sData(sData == 0) = eps;
 % plot
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+axes(hAx);
+hold on;
+
 % plot the mean
-ph = plot(hAx, xVal, mData, 'Color', clr, 'LineWidth', 2);
+hLine = plot(hAx, xVal, mData, 'Color', clr, 'LineWidth', 2);
 
 % plot the shaded area for standard deviation
 % Check if y-axis is log scale
@@ -81,7 +80,7 @@ xVal = xVal(:);
 upperBound = upperBound(:);
 lowerBound = lowerBound(:);
 
-fillh = fill([xVal; flipud(xVal)], [upperBound; flipud(lowerBound)], ...
+hFill = fill([xVal; flipud(xVal)], [upperBound; flipud(lowerBound)], ...
     clr, 'FaceAlpha', alpha, 'EdgeColor', 'none', 'Tag', 'sePatch',...
     'HandleVisibility', 'off');
 

@@ -174,11 +174,19 @@ end     % EOF
 %     % '*.sleep_*',...
 %     };
 % 
-% basepaths = [grppaths{1}(:); grppaths{2}(:)];
-% nPaths = length(basepaths);
 % 
-% for iPath = 1 : nPaths
-%     basepath = basepaths{iPath};
-%     cp_basepath('fNames', fNames, 'basepath', basepath,...
-%         'overwrite', false, 'verbose', true)
+% % get group basepaths
+% mice = mcu_sessions('wt');
+% nMice = length(mice);
+% 
+% for iMouse = 1 : nMice
+%     basepaths = mcu_sessions(mice{iMouse});
+%     nPaths = length(basepaths);
+%     newpath = 'D:\OneDrive - Tel-Aviv University\Data\Baclofen\Control';
+% 
+%     for iPath = 1 : nPaths
+%         basepath = basepaths{iPath};
+%         cp_basepath('fNames', fNames, 'basepath', basepath, 'newpath', newpath,...
+%             'overwrite', true, 'verbose', true)
+%     end
 % end
