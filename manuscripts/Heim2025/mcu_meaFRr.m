@@ -128,30 +128,11 @@ lmeData = tbl(tbl.uGood, :);
 lmeData.uGood = [];
 lmeData = rmmissing(lmeData);   
 
-% Convert time to min, specific for mea x3 data reduction
-lmeData.rcvTime = lmeData.rcvTime * 3 / 60 / 60;
-lmeData.bslTime = lmeData.bslTime * 3 / 60 / 60;
+% Convert time to min, specific for mea data reduction (20 min every 2
+% hours after perturbation)
+lmeData.rcvTime = lmeData.rcvTime * 6 / 60 / 60;
+lmeData.bslTime = lmeData.bslTime * 6 / 60 / 60;
 
-% -------------------------------------------------------------------------
-% NETWORK-AVERAGED MFR
-% Get indices to specific cultures.
-% Assumes fr and t are loaded from mcu_meaFRt
-% Do not run the 'line lmeData = rmmissing(lmeData);' 
-% because for the control group this removes a unit that is maintained 
-% in the fr vs time graphs
-
-bslIdx = find(t < 0);
-
-tmpTbl = lmeData(lmeData.Group == 'MCU-KO', :);
-expNames = string(unique(tmpTbl.Name));
-expFr = nan(length(t), length(expNames));
-for iName = 1 : length(expNames)
-    nameIdx = find(tmpTbl.Name == expNames(iName));
-
-    bslFr = mean(fr(nameIdx, bslIdx), "all");
-    expFr(:, iName) = mean((fr(nameIdx, :) ./ bslFr) * 100, 1);
-
-end
 
 
 % -------------------------------------------------------------------------
@@ -176,6 +157,107 @@ varsInc = {'frBsl', 'BSpks', 'pertDepth',...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PLOT CORRELATIONS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+% -------------------------------------------------------------------------
+% SELECTIVE (updated sep-25)
+lData = tbl_transform(lmeData, 'varsInc', {'frBsl', 'BSpks'}, 'flgZ', false,...
+    'skewThr', 0.1, 'varsGrp', {'Group'}, 'flgLog', true);
+clr = mcu_clr();
+
+% Remove units that didn't recover from rcvTime
+idxUnits = lmeData.uRcv;
+lData.rcvTime(~idxUnits) = nan;
+
+% Define variables now as rows and columns
+varsRow = {'spkDfct', 'rcvWork', 'rcvTime'};
+varsCol = {'BSpks', 'frBsl', 'pertDepth'};
+
+% Pretty labels in the order [cols, rows] to rename properties
+varsInc = [varsCol, varsRow];
+clear txtLbls
+txtLbls{1} = 'P(S\inB)';
+txtLbls{2} = 'Firing Rate (Hz)';
+txtLbls{3} = 'Perturbation Depth';
+txtLbls{4} = 'Spike Deficit';
+txtLbls{5} = 'Recovery Ratio';
+txtLbls{6} = 'Recovery Time (Hr)';
+
+% Restrict to included variables and rename
+lData = lData(:, ['Group', varsInc]);
+for iVar = 1 : length(varsInc)
+    lData.Properties.VariableNames(2 : end) = txtLbls;
+end
+
+% Plot with specified rows and columns
+[hFig, ~, hGrid] = plot_corrHist(lData, 'varsRow', txtLbls(4:6), ...
+    'varsCol', txtLbls(1:3), 'grpIdx', 'Group', 'clrGrp', clr.grp, 'thrOut', 100);
+plot_axSize('hFig', hFig, 'szOnly', false,...
+    'axWidth', 1200, 'axHeight', 600, 'flgPos', true);
+
+% Update BSpks x-tick labels on the rcvTime row (bottom-left scatter)
+hAx = hGrid{4, 1}; 
+xticks(hAx, [-2, -1, 0])
+xticklabels(hAx, {'0.01', '0.1', '1'});
+
+hAx = hGrid{4, 2}; 
+xticks(hAx, [-2, -1, 0, 0.477])
+xticklabels(hAx, {'0.01', '0.1', '1', '3'});
+
+[nRow, nCol] = size(hGrid);
+clear xLim yLim
+xLim = cell(nCol, 1);
+xLim{1} = [-2, 0];      % BSpks
+xLim{2} = [-1, 0.5];    % frBsl (log scale representation)
+xLim{3} = [5, 12];      % pertDepth
+yLim = cell(nRow - 1, 1);
+yLim{1} = [-4, 5];      % spkDfct
+yLim{2} = [0, 1.5];   % rcvWork
+yLim{3} = [-15, 40];      % rcvTime (hr)
+
+for iRow = 1 : nRow
+    for iCol = 1 : nCol
+        hAx = hGrid{iRow, iCol};
+        
+        % Axis limits
+        if iRow == 1
+            if ~isempty(xLim{iCol})
+                hAx.XAxis.Limits = xLim{iCol};
+            end
+        elseif iRow > 1
+            if ~isempty(xLim{iCol})
+                hAx.XAxis.Limits = xLim{iCol};
+            end
+            if ~isempty(yLim{iRow - 1})
+                hAx.YAxis.Limits = yLim{iRow - 1};
+            end
+        end
+        
+        % Graphics
+        hAx.Box = "on";
+        hAx.FontSize = 16;
+        hAx.YAxis.Label.FontSize = 20;
+        hAx.XAxis.Label.FontSize = 20;
+
+        % Legend
+        axPos = get(hAx, 'position');
+        hLgd = get(hAx, 'legend');
+        if ~isempty(hLgd)
+            hLgd.Location = 'south';
+            hLgd.Position(2) = axPos(2);
+            hLgd.Position(1) = axPos(1);
+            hLgd.Position(3) = axPos(3);
+        end
+    end
+end
+
+plot_axSize('hFig', hFig, 'szOnly', false,...
+    'axWidth', 1100, 'axHeight', 1100, 'flgPos', false);
+
+% Save
+fname = sprintf('MEA~CorrHist(Selective Rows)');
+lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat'});
+
 
 
 % -------------------------------------------------------------------------
@@ -525,7 +607,93 @@ xlabel(hAx, '')
 title(hAx, '')
 plot_axSize('hFig', hFig, 'szOnly', false, 'axShape', 'square', 'axHeight', 300)
 
+% -------------------------------------------------------------------------
+% NETWORK-AVERAGED MFR
+% Get indices to specific cultures.
+% Assumes fr and t are loaded from mcu_meaFRt
+% Do not run the 'line lmeData = rmmissing(lmeData);' 
+% because for the control group this removes a unit that is maintained 
+% in the fr vs time graphs
 
+bslIdx = find(t < 0);
+
+tmpTbl = lmeData(lmeData.Group == 'Control', :);
+expNames = string(unique(tmpTbl.Name));
+expFr = nan(length(t), length(expNames));
+for iName = 1 : length(expNames)
+    nameIdx = find(tmpTbl.Name == expNames(iName));
+
+    bslFr = mean(fr(nameIdx, bslIdx), "all");
+    expFr(:, iName) = mean((fr(nameIdx, :) ./ bslFr) * 100, 1);
+
+end
+
+
+%%% calculate the steady-state firing of each neuron normalized to the MFR
+%%% of its culture during baseline
+
+% Assuming 'lmeData' is your table with 'Name', 'frBsl', and 'frSs' columns
+
+% Find the groups for each culture
+[G, ~] = findgroups(lmeData.Name);
+
+% Calculate the mean baseline firing rate for each culture
+FrBslPerCulture = splitapply(@mean, lmeData.frBsl, G);
+
+% Map the mean of each culture back to every neuron in that culture
+meanFrBslPerNeuron = FrBslPerCulture(G);
+
+% Compute the normalized steady-state firing rate and add it as a new column
+frNorm = lmeData.frSs ./ meanFrBslPerNeuron * 100;
+
+% -- analyse and plot
+
+lmeTbl = lmeData;
+lmeTbl.frNorm = frNorm + 1e-6;
+
+lmeCfg.contrasts = 'all';
+lmeCfg.distribution = 'gamma';
+
+% Fit
+varRsp = 'frNorm';
+frml = [varRsp, ' ~ Group + (1|Name)'];
+[lmeStats, lmeMdl] = lme_analyse(lmeTbl, frml, lmeCfg);
+
+% plot
+hFig = lme_plot(lmeTbl, lmeMdl, 'lmeStats', lmeStats,...
+    'idxRow', [], 'ptype', 'bar', 'axShape', 'square');
+hAx = gca;
+
+plot_sigLines(hAx, {[1, 2]}, {'****'}, 'flgNS', true);
+
+% Update labels
+lblY = 'Firing Rate (Hz)';
+ylabel(hAx, lblY, 'interpreter', 'tex')
+xlabel(hAx, '')
+title(hAx, '')
+plot_axSize('hFig', hFig, 'szOnly', false, 'axShape', 'square', 'axHeight', 300)
+
+%%% Grab data per culture only
+
+% Step 1: Calculate the mean steady-state firing rate (frSs) for each 
+% combination of culture (Name) and experimental group (Group).
+ss_summary = groupsummary(lmeData, {'Name', 'Group'}, 'mean', 'frSs');
+
+% Step 2: Calculate the mean baseline firing rate (frBsl) for each 
+% culture (Name) as a whole.
+bsl_summary = groupsummary(lmeData, 'Name', 'mean', 'frBsl');
+
+% Step 3: Join the two summary tables based on the culture 'Name'.
+% This aligns the group-specific ss means with the overall culture bsl means.
+combined_summary = join(ss_summary, bsl_summary(:, {'Name', 'mean_frBsl'}));
+
+% Step 4: Calculate the final normalized value by dividing the mean frSs of 
+% each group by the mean frBsl of its corresponding culture.
+combined_summary.normalized_mean_fr = combined_summary.mean_frSs ./ combined_summary.mean_frBsl * 100;
+
+% Display the final result table.
+% This table shows, for each culture, the normalized mean firing rate for each group.
+disp(combined_summary);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % FR DISTRIBUTION DURING RECOVERY 
@@ -655,133 +823,6 @@ summaryTable = groupsummary(lmeData, {'Group', 'UnitType', 'Day'}, {'mean', sem}
 summaryTable = summaryTable(:, [1,2,3,5,6,4])
 
 
-% -------------------------------------------------------------------------
-% SELECTIVE (Copied) — Rows: spkDfct, rcvWork, rcvTime | Cols: BSpks, frBsl, pertDepth
-% Prepare data
-lData = tbl_transform(lmeData, 'varsInc', {'frBsl', 'BSpks'}, 'flgZ', false,...
-    'skewThr', 0.1, 'varsGrp', {'Group'}, 'flgLog', true);
-clr = mcu_clr();
 
-% Remove units that didn't recover from rcvTime
-idxUnits = lmeData.uRcv;
-lData.rcvTime(~idxUnits) = nan;
 
-% Define variables now as rows and columns
-varsRow = {'spkDfct', 'rcvWork', 'rcvTime'};
-varsCol = {'BSpks', 'frBsl', 'pertDepth'};
 
-% Pretty labels in the order [cols, rows] to rename properties
-varsInc = [varsCol, varsRow];
-clear txtLbls
-txtLbls{1} = 'P(S\inB)';
-txtLbls{2} = 'Firing Rate (Hz)';
-txtLbls{3} = 'Perturbation Depth';
-txtLbls{4} = 'Spike Deficit';
-txtLbls{5} = 'Recovery Ratio';
-txtLbls{6} = 'Recovery Time (Hr)';
-
-% Restrict to included variables and rename
-lData = lData(:, ['Group', varsInc]);
-for iVar = 1 : length(varsInc)
-    lData.Properties.VariableNames(2 : end) = txtLbls;
-end
-
-% Plot with specified rows and columns
-[hFig, ~, hGrid] = plot_corrHist(lData, 'varsRow', txtLbls(4:6), ...
-    'varsCol', txtLbls(1:3), 'grpIdx', 'Group', 'clrGrp', clr.grp, 'thrOut', 100);
-plot_axSize('hFig', hFig, 'szOnly', false,...
-    'axWidth', 1200, 'axHeight', 600, 'flgPos', true);
-
-% % Update rcvTime scatter (Row: Rcv. Time (hr), Col: Baseline P(S\inB))
-% yData = lData.(txtLbls{6});
-% xData = lData.(txtLbls{1});
-% [rho, pval] = corr(yData, xData, 'Type', 'Spearman', 'Rows', 'complete');
-% hAx = hGrid{4, 1}; % rows (3) + 1 for histogram row; col 1 for BSpks
-% scatter(hAx, xData, yData, 10, 'filled', ...
-%     'MarkerFaceColor', clr.grp(1, 1:3), 'MarkerFaceAlpha', 0.7);
-% if pval < 0.0001
-%     pStr = 'p < 0.0001';
-% else
-%     pStr = sprintf('p = %.4f', pval);
-% end
-% txtLgd = sprintf('\\rho = %.2f, %s', rho, pStr);
-% hLgd = legend(hAx, txtLgd, 'Interpreter', 'tex', 'Location', 'south');
-% hLgd.Box = "on";
-% xlabel(hAx, txtLbls{1}, 'Interpreter', 'tex', 'FontSize', 20)
-% % ylabel(hAx, 'Recovery Time')
-% % yticks(hAx, [])
-% 
-% % Update histogram for BSpks (column 1)
-% hAx = hGrid{1, 1}; 
-% histogram(hAx, xData, 'Normalization', 'pdf', ...
-%     'FaceColor', clr.grp(1, 1:3), 'FaceAlpha', 0.7, 'EdgeColor', 'none');
-% hold(hAx, 'on');
-% meanVal = mean(xData, 'omitnan');
-% yLimit = ylim(hAx);
-% plot(hAx, [meanVal meanVal], yLimit, '--', 'Color', 'k', 'LineWidth', 3);
-% title(hAx, '');
-% set(hAx, 'XTickLabel', [], 'YTickLabel', []);
-% set(hAx, 'box', 'off', 'XColor', 'none', 'YColor', 'none');
-
-% Update BSpks x-tick labels on the rcvTime row (bottom-left scatter)
-hAx = hGrid{4, 1}; 
-xticks(hAx, [-2, -1, 0])
-xticklabels(hAx, {'0.01', '0.1', '1'});
-
-hAx = hGrid{4, 2}; 
-xticks(hAx, [-2, -1, 0, 0.477])
-xticklabels(hAx, {'0.01', '0.1', '1', '3'});
-
-[nRow, nCol] = size(hGrid);
-clear xLim yLim
-xLim = cell(nCol, 1);
-xLim{1} = [-2, 0];      % BSpks
-xLim{2} = [-1, 0.5];    % frBsl (log scale representation)
-xLim{3} = [5, 12];      % pertDepth
-yLim = cell(nRow - 1, 1);
-yLim{1} = [-4, 5];      % spkDfct
-yLim{2} = [0, 1.5];   % rcvWork
-yLim{3} = [-7, 20];      % rcvTime (hr)
-
-for iRow = 1 : nRow
-    for iCol = 1 : nCol
-        hAx = hGrid{iRow, iCol};
-        
-        % Axis limits
-        if iRow == 1
-            if ~isempty(xLim{iCol})
-                hAx.XAxis.Limits = xLim{iCol};
-            end
-        elseif iRow > 1
-            if ~isempty(xLim{iCol})
-                hAx.XAxis.Limits = xLim{iCol};
-            end
-            if ~isempty(yLim{iRow - 1})
-                hAx.YAxis.Limits = yLim{iRow - 1};
-            end
-        end
-        
-        % Graphics
-        hAx.Box = "on";
-        hAx.FontSize = 16;
-        hAx.YAxis.Label.FontSize = 20;
-        hAx.XAxis.Label.FontSize = 20;
-
-        % Legend
-        axPos = get(hAx, 'position');
-        hLgd = get(hAx, 'legend');
-        if ~isempty(hLgd)
-            hLgd.Location = 'south';
-            hLgd.Position(2) = axPos(2);
-            hLgd.Position(1) = axPos(1);
-            hLgd.Position(3) = axPos(3);
-        end
-    end
-end
-
-plot_axSize('hFig', hFig, 'szOnly', false,...
-    'axWidth', 1100, 'axHeight', 1100, 'flgPos', false);
-
-% Save
-fname = sprintf('MEA~CorrHist(Selective Rows)');
-lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat'});

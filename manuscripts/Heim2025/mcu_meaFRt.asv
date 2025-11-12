@@ -215,7 +215,7 @@ uIdx = 25;
 % uIdx = 24;
 uIdx = 18;
 uIdx = 20;    
-uIdx = 40;
+% uIdx = 40;
 
 % Combine all frr structures from control group
 frr = catfields([v{1}(:).frr], 1, true);
@@ -296,7 +296,7 @@ hLgd.Box = 'on';
 plot_pert(hAx, tPert, clr.bac);
 
 % Save
-% fname = ['MEA ~ fitUnit_', num2str(uIdx)];
+% fname = ['MEA~fitUnit_', num2str(uIdx)];
 % lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat'});
 
 
@@ -311,7 +311,7 @@ yText = yLimit(2);
 yLine = yLimit(2) - 0.05 * (yLimit(2) - yLimit(1));
 plot([tPert, 48], [yLine, yLine], 'Color', clrPert,...
     'LineWidth', 4, 'HandleVisibility', 'off');
-text(tPert, yText, 'Baclofen', 'FontName', 'Arial', 'FontSize', 16, ...
+text(tPert, yText, 'BAC', 'FontName', 'Arial', 'FontSize', 16, ...
     'Color', clrPert, 'HorizontalAlignment', 'left');
 end
 

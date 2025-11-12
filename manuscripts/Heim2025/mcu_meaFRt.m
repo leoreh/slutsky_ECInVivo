@@ -211,11 +211,11 @@ function plot_fr_fit_unit(v, t, tPert, grpLbls)
 
 % Hard-coded parameters
 uIdx = 28;
-uIdx = 25;
-% uIdx = 24;
-uIdx = 18;
-uIdx = 20;    
-uIdx = 40;
+% uIdx = 25;
+uIdx = 24;
+% uIdx = 18;
+% uIdx = 20;    
+% uIdx = 40;
 
 % Combine all frr structures from control group
 frr = catfields([v{1}(:).frr], 1, true);
@@ -286,7 +286,7 @@ fill(hAx, [tRcv, fliplr(tRcv)], [bslLine, fliplr(frRcv)],...
 plot_axSize('hFig', hFig, 'szOnly', false, 'axShape', 'wide',...
     'axHeight', 300, 'flgPos', true);
 hLgd = legend('interpreter', 'tex');
-hLgd.Location = "southeast";
+% hLgd.Location = "southeast";
 hLgd.Location = "northwest";
 hLgd.Position(2) = hLgd.Position(2) - 0.03;
 hLgd.Position(1) = hAx.Position(1);
@@ -296,8 +296,8 @@ hLgd.Box = 'on';
 plot_pert(hAx, tPert, clr.bac);
 
 % Save
-% fname = ['MEA ~ fitUnit_', num2str(uIdx)];
-% lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat'});
+fname = ['MEA~fitUnit_', num2str(uIdx)];
+lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat'});
 
 
 end
@@ -311,7 +311,7 @@ yText = yLimit(2);
 yLine = yLimit(2) - 0.05 * (yLimit(2) - yLimit(1));
 plot([tPert, 48], [yLine, yLine], 'Color', clrPert,...
     'LineWidth', 4, 'HandleVisibility', 'off');
-text(tPert, yText, 'Baclofen', 'FontName', 'Arial', 'FontSize', 16, ...
+text(tPert, yText, 'BAC', 'FontName', 'Arial', 'FontSize', 16, ...
     'Color', clrPert, 'HorizontalAlignment', 'left');
 end
 

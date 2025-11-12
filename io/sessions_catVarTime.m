@@ -272,12 +272,15 @@ for isession = 1 : nsessions
         expFs(recIdx : recIdx + recLen - 1, 1 : max(nunits(:, 2))) = v(isession).fs';
     end
     
-    % cat block transitions
-    if ~isempty(v(isession).datInfo) && isfield(v(isession).datInfo, 'nsamps')
-        x_blockTrans = [x_blockTrans, cumsum(v(isession).datInfo.nsamps) / fs / ts + recIdx];
-    else
-        x_blockTrans = 0;
-    end
+    % cat block transitions. The new line stores only the transitions
+    % between files (eg, different spike sorting) and not between blocks
+    % if ~isempty(v(isession).datInfo) && isfield(v(isession).datInfo, 'nsamps')
+    %     x_blockTrans = [x_blockTrans, cumsum(v(isession).datInfo.nsamps) / fs / ts + recIdx];
+    % else
+    %     x_blockTrans = 0;
+    % end
+    
+    x_blockTrans = [x_blockTrans, recIdx];
 
 end
 
@@ -385,12 +388,10 @@ if graphics
         case 'fr'
             hold on
             plotData = movmean(expRs, 13, 1);
-            plotData = mean(plotData, 2, 'omitnan');
-            plot_stdShade('dataMat', expRs, 'xVal', x_data,...
+            plot_stdShade('dataMat', plotData, 'xVal', x_data,...
                 'hAx', hAx, 'clr', [0, 0, 1]);
 
             plotData = movmean(expFs, 13, 1);
-            plotData = mean(plotData, 2, 'omitnan');
             plot_stdShade('dataMat', plotData, 'xVal', x_data,...
                 'hAx', hAx, 'clr', [1, 0, 0]);
 
@@ -398,21 +399,7 @@ if graphics
                 sprintf('FS <= %d', max(nunits(:, 2)))})
             ylabel('MFR [Hz]')
             axis tight
-            
-            
-            
-            
-            plotData = movmean(expRs, 13, 1);
-            plotData = mean(plotData, 2, 'omitnan');
-            plot(x_data, plotData, 'LineWidth', 2)
-            hold on
-            plotData = movmean(expFs, 13, 1);
-            plotData = mean(plotData, 2, 'omitnan');
-            plot(x_data, plotData, 'LineWidth', 2)
-            legend({sprintf('RS <= %d', max(nunits(:, 1))),...
-                sprintf('FS <= %d', max(nunits(:, 2)))})
-            ylabel('MFR [Hz]')
-            axis tight
+
 
         case 'ripp'
             plot(x_data, expData)

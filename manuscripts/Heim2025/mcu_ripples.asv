@@ -101,7 +101,6 @@ varMap.peakFilt = 'peakFilt';
 varMap.peakPower = 'peakPower';
 varMap.peakEnergy = 'peakEnergy';
 varMap.peakRng = 'peakRng';
-varMap.peakRng = 'peakRng';
 
 for iGrp = 1 : length(grps)
     basepaths = mcu_sessions(grps{iGrp});
@@ -131,7 +130,7 @@ lmeData(idxBad, :) = [];
 lblY = {'Peak Frequency (Hz)', 'Peak Amplitude (µV)', 'Duration (ms)',...
     'Peak Energy (µV²)', 'Rate (SWR/s)', 'Density (%)'};
 varRsp = {'peakFreq', 'peakAmp', 'dur', 'peakEnergy', 'Rate'};
-idxVar = 5;
+idxVar = 4;
 
 % LME
 frml = [varRsp{idxVar}, ' ~ Group + (1|Name)'];
@@ -159,103 +158,100 @@ fPath = fullfile(lbl.savepath, 'Ripp');
 lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
     'lmeData', [], 'lmeStats', lmeStats, 'lmeMdl', [], 'fPath', fPath)
 
-% -------------------------------------------------------------------------
-% Calculate statistics for each combination of Group and Subgroup
-sem = @(x) std(x, 'omitnan') / sqrt(length(x));
-summaryTable = groupsummary(lmeData, {'Group'}, {'mean', sem}, 'Ripp');
-summaryTable = summaryTable(:, [1,3,4,2]);
-
-cnt = 1; clear prismCell
-for iGrp = 1 : 2
-        idx = lmeData.Group == lbl.grp{iGrp};
-        prismCell{cnt} = lmeData.(varRsp{idxVar})(idx);
-        cnt = cnt + 1;
-end
-prismData = cell2padmat(prismCell, 2);
-
+hFig = gcf;
+hAx = hFig.Children(2);
+hBar = hAx.Children;
+hBar(2).CData = clr.grp(2, :);
+hBar(4).CData = clr.grp(1, :);
+% hBar(2).FaceColor = 'flat';
+fname = 'normRates~GroupXUnitType';
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % RIPPLE SPIKES
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% FR increase during ripples
+frml = 'RippSpks ~ Group * UnitType + (1|Mouse)';
+varFld = 'normRates';
 
-% -------------------------------------------------------------------------
-% Organize lme data table
-[clr, lbl] = mcu_clr();
-clear varMap
-varMap.mrl = 'ripp.spkLfp.phase.mrl';
-varMap.frMod = 'ripp.spks.su.frModulation';
-varMap.UnitType = 'units.clean';   
+% organize for lme
+[lmeData, lmeCfg] = lme_org('grppaths', basepaths, 'frml', frml,...
+    'flgEmg', false, 'varFld', varFld, 'vCell', v);
 
-for iGrp = 1 : length(grps)
-    basepaths = mcu_sessions(grps{iGrp});
+% run lme
+contrasts = 'all';
+contrasts = [1 : 6]; % Example of specific contrasts
+[lmeStats, lmeCfg] = lme_analyse(lmeData, frml, lmeCfg, 'contrasts', contrasts);
 
-    % Prepare tag structures for this mouse
-    tagAll.Group = lbl.grp{iGrp};
-    tagFiles.Name = get_mname(basepaths);
-
-    % Create table
-    tblCell{iGrp} = v2tbl('v', v{iGrp}, 'varMap', varMap, ...
-        'tagFiles', tagFiles, 'tagAll', tagAll, 'idxCol', 1);
-end
-% Combine all tables, clean and organize
-lmeData = vertcat(tblCell{:});
-lmeData.UnitType = categorical(lbl.unit(~lmeData.UnitType + 1)');
-lmeData = rmmissing(lmeData);
-lmeData.Group = reordercats(lmeData.Group, lbl.grp);
-lmeData.UnitType = reordercats(lmeData.UnitType, lbl.unit);
-
-% -------------------------------------------------------------------------
-% Run analysis
-
-% Variables
-lblY = {'Mean Resultant Length', 'FR Modulation (a.u.)'};
-varRsp = {'mrl', 'frMod'};
-idxVar = 1;
-
-% LME
-frml = [varRsp{idxVar}, ' ~ Group * UnitType + (1|Name)'];
-lmeCfg.contrasts = [1 : 7];
-lmeCfg.distribution = 'Normal';
 [lmeStats, lmeMdl] = lme_analyse(lmeData, frml, lmeCfg);
 
-% Plot
-hFig = lme_plot(lmeData, lmeMdl, 'lmeStats', lmeStats,...
-    'idxRow', [], 'ptype', 'bar', 'axShape', 'square');
 
-% Graphics
+% plot
+hFig = lme_plot(lmeData, lmeCfg.lmeMdl, 'ptype', 'bar', 'axShape', 'square'); 
+
+% Update labels
 hAx = gca;
-[barIdx, barLbl] = lme_sigLines(lmeStats, lmeMdl, lmeData,...
-    'idxRow', [3, 6]);
-plot_sigLines(hAx, barIdx, barLbl, 'flgNS', false);
-ylabel(hAx, lblY{idxVar})
-xlabel(hAx, '');    title(hAx, '')
-plot_axSize('hFig', hFig, 'szOnly', true, 'axShape',...
-    'square', 'axHeight', 300)
-hAx.Legend.Location = 'northwest';
+ylabel(hAx, 'FR Modulation (a.u.)')
+xlabel(hAx, '')
+title(hAx, '')
+hAx.Legend.Location = 'northeast';
+
+% add significance lines
+barIdx = {[3, 4], [1, 2]};
+barLbl = {'*', 'NS'};
+plot_sigLines(hAx, barIdx, barLbl)
+plot_axSize('hFig', hFig, 'szOnly', false, 'axShape', 'square', 'axHeight', 300)
 
 % save
-fname = lme_frml2char(frml, 'rmRnd', true);
-fPath = fullfile(lbl.savepath, 'Ripp');
-lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
-    'lmeData', lmeData, 'lmeStats', lmeStats, 'lmeMdl', lmeMdl)
+fname = lme_frml2char(frml, 'rmRnd', true, 'resNew', 'Ripp', 'sfx', ['_', varFld]);
+lme_save('fh', hFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
+    'lmeData', lmeData, 'lmeStats', lmeStats, 'lmeCfg', lmeCfg)
 
 
-% -------------------------------------------------------------------------
-% Calculate statistics for each combination of Group and Subgroup
-sem = @(x) std(x, 'omitnan') / sqrt(length(x));
-summaryTable = groupsummary(lmeData, {'Group', 'UnitType'}, {'mean', sem}, 'frMod')
-summaryTable = summaryTable(:, [1,2,4,5,3])
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SPIKE RIPPLE COUPLING
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-cnt = 1; clear prismCell
-for iGrp = 1 : 2
-    for iUnit = 1 : 2
-        idx = lmeData.Group == lbl.grp{iGrp} & lmeData.UnitType == lbl.unit{iUnit};
-        prismCell{cnt} = lmeData.mrl(idx);
-        cnt = cnt + 1;
-    end
-end
-prismData = cell2padmat(prismCell, 2)';
+% Formula
+frml = 'RippSpkLfp ~ Group * UnitType + (1|Mouse)';
+
+% organize lme table for plotting
+varFld = 'mrl';
+[lmeData, lmeCfg] = lme_org('grppaths', grppaths, 'frml', frml,...
+    'flgEmg', false, 'varFld', varFld, 'vCell', vCell);
+
+% grab only significantly coupled units
+% varFld = 'mrl';
+% [sigData, ~] = lme_org('grppaths', grppaths, 'frml', frml,...
+%     'flgEmg', false, 'varFld', 'pVal', 'vCell', vCell);
+% sigIdx = sigData.RippSpkLfp < 0.05;
+% lmeData = lmeData(sigIdx, :);
+
+% run lme
+contrasts = 'all';
+contrasts = [1 : 5];
+[lmeStats, lmeCfg] = lme_analyse(lmeData, lmeCfg, 'contrasts', contrasts);
+
+% plot
+hFig = lme_plot(lmeData, lmeCfg.lmeMdl, 'ptype', 'bar', 'axShape', 'square'); 
+hAx = gca;
+ylabel(hAx, 'Mean Resultant Length'); xlabel(hAx, ''); title(hAx, '');
+hAx.Legend.Location = 'southwest';
+hAx.YTick = [0, 0.1, 0.2, 0.3];
+hAx.YLim = [0, 0.3];
+
+% add significance lines
+barIdx = {[1.5, 3.5]};
+barLbl = {'*'};
+plot_sigLines(hAx, barIdx, barLbl)
+
+% Assert Size
+plot_axSize('hFig', hFig, 'szOnly', true, 'axShape', 'square');
+
+% Save
+fname = lme_frml2char(frml, 'rmRnd', true, 'resNew', 'Ripp', 'sfx', ['_', varFld]);
+lme_save('fh', hFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
+    'lmeData', lmeData, 'lmeStats', lmeStats, 'lmeCfg', lmeCfg)
 
 
 
@@ -279,7 +275,7 @@ for iGrp = 1:length(grps)
     % normMap = cell(nMice, 1);
     % unitData = cell(nMice, 1);
 
-    nMice = length(v{iGrp});
+    nMice = length(v(iGrp));
     normMap = cell(nMice, 1);
     unitData = cell(nMice, 1);
 
@@ -339,7 +335,7 @@ timeBins = linspace(mapDur(1), mapDur(2), nBinsMap);
 % Figure Parameters
 clr = mcu_clr;
 fntSize = 16;
-txtUnit = {'RS', 'FS'};
+txtUnit = {'pPYR', 'pINT'};
 txtGrp = {'Control', 'MCU-KO'};
 
 % initialize
@@ -390,7 +386,8 @@ plot_axSize('hFig', hFig, 'szOnly', false, 'axShape', 'square');
 
 % Save
 fname = ['Ripp~FR_', txtUnit{iUnit}];
-lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat'});
+lme_save('fh', hFig, 'fname', fname, 'frmt', {'fig', 'svg'},...
+    'lmeData', table(), 'lmeStats', table(), 'lmeCfg', []) 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PLOT ripple LFP traces
@@ -411,7 +408,6 @@ for iGrp = 1:nGrp
         
         % Select ripp based on peakAmp
         idxRipp = ripp.peakAmp > 8 & ripp.peakAmp < 18;
-        idxRipp = ripp.peakAmp > 0 & ripp.peakAmp < Inf;
 
         % Get mean ripple LFP trace
         lfpMap{iMouse} = mean(ripp.maps.raw(idxRipp, :), 1, 'omitnan');
@@ -448,7 +444,8 @@ plot_axSize('hFig', hFig, 'szOnly', false, 'axShape', 'square');
 
 % Save
 fname = 'Ripp~LFP Trace';
-lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat'});
+lme_save('fh', hFig, 'fname', fname, 'frmt', {'fig', 'svg'},...
+    'lmeData', table(), 'lmeStats', table(), 'lmeCfg', []) 
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -512,12 +509,9 @@ plot_axSize('hFig', hFig, 'szOnly', false, 'axShape', 'square');
 
 % Save
 fname = ['Ripp~FRvsRand_', txtUnit{iUnit}];
-lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat'});
 
-iUnit = 2;
-hFig = gcf;
-title('FS')
-
+lme_save('fh', hFig, 'fname', fname, 'frmt', {'fig', 'svg'},...
+    'lmeData', table(), 'lmeStats', table(), 'lmeCfg', []) 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SPIKE RIPPLE COUPLING
@@ -584,7 +578,9 @@ plot_axSize('hFig', hFig, 'szOnly', true, 'axShape', 'square', 'axHeight', 300);
 
 % Save
 fname = ['Ripp~SpkPolar_', txtUnit{iUnit}];
-lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat'});
+lme_save('fh', hFig, 'fname', fname, 'frmt', {'fig', 'svg'},...
+    'lmeData', table(), 'lmeStats', table(), 'lmeCfg', []) 
+
 
 
 
@@ -597,10 +593,10 @@ prctSgn = nan(2, 2);
 % get map data
 for iGrp = 1 : 2
     for iUnit = 1 : 2
-        nMice = length(v{iGrp});
+        nMice = length(grppaths{iGrp});
         mapData = cell(nMice, 1);
         for iMouse = 1 : nMice
-            ripp = v{iGrp}(iMouse).ripp;
+            ripp = vCell{iGrp}{1}(iMouse).ripp;
             mapData{iMouse} = ripp.spkLfp.rateMap.rate;
         end
         mapData = cell2padmat(mapData, 3);
@@ -659,11 +655,13 @@ for iGrp = 1 : 2
 
         % Save
         fname = ['Ripp~SpkPhaseMap_', txtGrp{iGrp}, '_', txtUnit{iUnit}];
-        lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat'});
-
+        lme_save('fh', hFig, 'fname', fname, 'frmt', {'fig', 'svg'},...
+            'lmeData', table(), 'lmeStats', table(), 'lmeCfg', [])
 
     end
 end
+
+
 
 
 

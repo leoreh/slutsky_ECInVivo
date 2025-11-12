@@ -95,23 +95,23 @@ if flgPlot
     smplIndices = randperm(nUnits, nSmpl);
     colors = lines(nSmpl);
 
-    legHandles = gobjects(nSmpl, 1);
-    legLabels = cell(nSmpl, 1);
+    hLgd = gobjects(nSmpl, 1);
+    txtLgd = cell(nSmpl, 1);
 
-    for i = 1:nSmpl
-        idx = smplIndices(i);
+    for iSmpl = 1 : nSmpl
+        idx = smplIndices(iSmpl);
         % Plot original trace (semi-transparent)
-        plot(t/60, frOrig(idx, :), 'Color', [colors(i,:), 0.4], 'LineWidth', 1);
+        plot(t/60, frOrig(idx, :), 'Color', [colors(iSmpl,:), 0.4], 'LineWidth', 1);
         % Plot smoothed trace
-        legHandles(i) = plot(t/60, fr(idx, :), 'Color', colors(i,:), 'LineWidth', 2);
-        legLabels{i} = sprintf('Unit %d', idx);
+        hLgd(iSmpl) = plot(t/60, fr(idx, :), 'Color', colors(iSmpl,:), 'LineWidth', 2);
+        txtLgd{iSmpl} = sprintf('Unit %d', idx);
     end
 
     xlabel('Time (min)');
     ylabel('Firing Rate (Hz)');
     title(sprintf('Example Smoothed Units (n=%d)\\nSav-Gol Filter: Order %d, Frame %.1f min', ...
         nSmpl, polyOrder, frameLenSec/60));
-    legend(legHandles, legLabels, 'Location', 'eastoutside');
+    legend(hLgd, txtLgd, 'Location', 'eastoutside');
     grid on;
     box on;
     xlim([t(1)/60, t(end)/60]);

@@ -20,7 +20,7 @@ lbl.vars = {'fr', 'units', 'st_metrics', 'st_brst', 'prc'};
 
 % Labels
 lbl.grp = {'Control'; 'MCU-KO'};
-lbl.unit = {'pPYR', 'pINT'};
+lbl.unit = {'RS', 'FS'};
 lbl.day = {'BSL'; 'BAC1'; 'BAC2'; 'BAC3'; 'WASH'};
 
 % remove bac on and off

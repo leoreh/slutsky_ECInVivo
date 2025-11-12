@@ -26,31 +26,21 @@ alpha = p.Results.alpha;
 % preparations
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% Check orientation
-if size(dataMat, 2) == length(xVal)
-    % Preferred: columns = x-axis
-    dataMatPlot = dataMat;
-elseif size(dataMat, 1) == length(xVal)
-    % Transpose: rows = x-axis
-    dataMatPlot = dataMat';
+% Assure columns = x-axis
+if size(dataMat, 1) == length(xVal)
+    dataMat = dataMat';
     warning('plot_stdShade:Transposed', ...
         'Transposing dataMat so that columns correspond to x-axis values.');
-else
+
+elseif size(dataMat, 2) ~= length(xVal)
     error('plot_stdShade:DimensionMismatch', ...
         'Neither dimension of dataMat matches length(xVal).');
 end
 
 % calculate the mean and standard eror of mean
-mData = mean(dataMatPlot, 1, 'omitnan');
-n = sum(~isnan(dataMatPlot), 1);  % number of non-NaN points per column
-sData = std(dataMatPlot, 0, 1, 'omitnan') ./ sqrt(n);
-
-% omit nan values
-validIdx = ~isnan(mData) & ~isnan(sData);
-mData = mData(validIdx);
-sData = sData(validIdx);
-xVal = xVal(validIdx);
-xVal = xVal(:);
+mData = mean(dataMat, 1, 'omitnan');
+n = sum(~isnan(dataMat), 1);  % number of non-NaN points per column
+sData = std(dataMat, 0, 1, 'omitnan') ./ sqrt(n);
 
 % correct special case where std is zero
 sData(sData == 0) = eps;
@@ -62,28 +52,71 @@ sData(sData == 0) = eps;
 axes(hAx);
 hold on;
 
-% plot the mean
+% plot the mean - plot function handles NaNs correctly by default
 hLine = plot(hAx, xVal, mData, 'Color', clr, 'LineWidth', 2);
 
 % plot the shaded area for standard deviation
-% Check if y-axis is log scale
-if strcmp(get(hAx, 'YScale'), 'log')
-    lowerBound = max(mData - sData, eps);
-    upperBound = max(mData + sData, eps);
-else
-    lowerBound = mData - sData;
-    upperBound = mData + sData;
+% Identify contiguous non-NaN blocks to avoid filling across NaN gaps
+idxValid = ~isnan(mData);
+blocks = diff([0, idxValid, 0]);
+idxStart = find(blocks == 1);
+idxEnd = find(blocks == -1) - 1;
+
+hFill = gobjects(length(idxStart), 1); % pre-allocate graphics array
+
+for iBlock = 1 : length(idxStart)
+    
+    % Extract data for the current block
+    block_xVal = xVal(idxStart(iBlock) : idxEnd(iBlock));
+    block_mData = mData(idxStart(iBlock) : idxEnd(iBlock));
+    block_sData = sData(idxStart(iBlock) : idxEnd(iBlock));
+
+    % Check if y-axis is log scale
+    if strcmp(get(hAx, 'YScale'), 'log')
+        lowerBound = max(block_mData - block_sData, eps);
+        upperBound = max(block_mData + block_sData, eps);
+    else
+        lowerBound = block_mData - block_sData;
+        upperBound = block_mData + block_sData;
+    end
+    
+    % Ensure all are column vectors
+    block_xVal = block_xVal(:);
+    upperBound = upperBound(:);
+    lowerBound = lowerBound(:);
+    
+    % Plot the fill for this block
+    hFill(iBlock) = fill([block_xVal; flipud(block_xVal)], [upperBound; flipud(lowerBound)], ...
+        clr, 'FaceAlpha', alpha, 'EdgeColor', 'none', 'Tag', 'sePatch',...
+        'HandleVisibility', 'off');
 end
-
-% Ensure all are column vectors
-xVal = xVal(:);
-upperBound = upperBound(:);
-lowerBound = lowerBound(:);
-
-hFill = fill([xVal; flipud(xVal)], [upperBound; flipud(lowerBound)], ...
-    clr, 'FaceAlpha', alpha, 'EdgeColor', 'none', 'Tag', 'sePatch',...
-    'HandleVisibility', 'off');
 
 end
 
 % EOF
+
+
+
+
+% % plot the shaded area for standard deviation
+% % Check if y-axis is log scale
+% if strcmp(get(hAx, 'YScale'), 'log')
+%     lowerBound = max(mData - sData, eps);
+%     upperBound = max(mData + sData, eps);
+% else
+%     lowerBound = mData - sData;
+%     upperBound = mData + sData;
+% end
+% 
+% % Ensure all are column vectors
+% xVal = xVal(:);
+% upperBound = upperBound(:);
+% lowerBound = lowerBound(:);
+% 
+% hFill = fill([xVal; flipud(xVal)], [upperBound; flipud(lowerBound)], ...
+%     clr, 'FaceAlpha', alpha, 'EdgeColor', 'none', 'Tag', 'sePatch',...
+%     'HandleVisibility', 'off');
+% 
+% end
+% 
+% % EOF
