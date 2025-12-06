@@ -154,6 +154,14 @@ varsInc = {'frBsl', 'BSpks', 'pertDepth',...
 
 
 
+varsInc = {'frBsl', 'pertDepth'};
+[hFig, ~, hGrid] = plot_corrHist(lData(uIdx, :), 'varsInc', varsInc,...
+    'grpIdx', 'Group', 'clrGrp', clr.grp, 'thrOut', 100);
+
+uIdx = lData.frTrough > 0;
+hFig = figure;
+scatter(lData.frBsl(uIdx), lData.pertDepth(uIdx))
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PLOT CORRELATIONS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

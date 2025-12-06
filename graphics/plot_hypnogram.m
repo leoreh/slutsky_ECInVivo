@@ -9,7 +9,7 @@ function plot_hypnogram(varargin)
 %   clr             cell of colors for each state. if empty will load cfg.colors
 %   yshift          scalar. shift location of lines {1}
 %   lWidth          scalar. width of lines to plot
-%   axh             axis handle for plot
+%   hAx             axis handle for plot
 %
 %   18 jun 22 LH  
 
@@ -23,7 +23,7 @@ addOptional(p, 'sstates', [], @isnumeric);
 addOptional(p, 'clr', []);
 addOptional(p, 'yshift', 1, @isnumeric);
 addOptional(p, 'lWidth', 20, @isnumeric);
-addOptional(p, 'axh', []);
+addOptional(p, 'hAx', []);
 
 parse(p,varargin{:})
 labels          = p.Results.labels;
@@ -32,15 +32,15 @@ sstates         = p.Results.sstates;
 clr             = p.Results.clr;
 yshift          = p.Results.yshift;
 lWidth          = p.Results.lWidth;
-axh             = p.Results.axh;
+hAx             = p.Results.hAx;
 
 if isempty(boutTimes) && isempty(labels)
     error('must input boutTimes or labels')
 end
 
-if isempty(axh)
+if isempty(hAx)
     fh = figure;
-    axh = subplot(1, 1, 1);
+    hAx = subplot(1, 1, 1);
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -84,8 +84,9 @@ yLimit = ylim;
 for istate = 1 : length(sstates)
     sbouts = boutTimes{sstates(istate)};
     if ~isempty(sbouts)
-        plot(axh, sbouts', yLimit(2) * yshift * ones(size(sbouts))',...
-            'color', clr{istate}, 'LineWidth', lWidth)
+        plot(hAx, sbouts', yLimit(2) * yshift * ones(size(sbouts))',...
+            'color', clr{istate}, 'LineWidth', lWidth,...
+            'HandleVisibility', 'off')
     end
 end
 set(gca, 'ytick', [])
