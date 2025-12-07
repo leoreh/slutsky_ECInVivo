@@ -2,7 +2,7 @@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-clear all
+clear 
 
 %% ========================================================================
 %  CONFIGURATION
@@ -14,10 +14,11 @@ rng(44);            % Ensures reproducibile random numbers
 dt = 0.0001;        % Integration step (s)
 trial_dur = 2;      % Duration per trial (s)
 sense_dur = 1.0;    % Window for averaging sensed variable each trial (s)
-nTrial = 500;
+nTrial = 700;
 
 % FLAGS
 flg_graphics = true;
+flg_setpointHetero = true;
 graphics_step = 10;
 
 % NOISE (Ornstein-Uhlenbeck)
@@ -27,7 +28,7 @@ OU_sigma = 4.0;
 
 % ACTIVATION FUNCTION
 % ReLU: Gain * max(0, x - theta)
-Func_Act = @(x, g, th) g .* max(0, x - th);
+% Func_Act = @(x, g, th) g .* max(0, x - th);
 
 %% ========================================================================
 %  POPULATIONS
@@ -44,12 +45,10 @@ pop(1).r_init = 5;
 pop(1).max_rate = 100;
 
 % Plasticity
-pop(1).learningRule = 'input_centric';
-pop(1).target = 20;              % Target Input (a.u.)
-pop(1).alpha = 0.005;
+pop(1).learningRule = 'output_centric';
 
 % Perturbation
-pop(1).perturb = [150, 250, 5.0]; % [Start, End, Amp]
+pop(1).perturb = [700, 700, 10]; % [Start, End, Amp]
 
 % INHIBITORY
 pop(2).name = 'Inh';
@@ -63,11 +62,9 @@ pop(2).max_rate = 250;
 
 % Plasticity
 pop(2).learningRule = 'none';
-pop(2).target = 10;
-pop(2).alpha = 0.005;
 
 % Perturbation
-pop(2).perturb = [150, 250, 5.0]; % [Start, End, Amp]
+pop(2).perturb = [0, 0, 5.0]; % [Start, End, Amp]
 
 
 %% ========================================================================
@@ -85,7 +82,7 @@ gain    = zeros(nUnits, 1);       % Gains
 noise   = zeros(nUnits, 1);       % Noise State
 ext     = zeros(nUnits, 1);       % External Input Buffer
 
-% Build Index Maps and Populate State Vectors
+% Populate State Vectors
 cursor = 1;
 for iPop = 1:nPop
 
@@ -99,18 +96,48 @@ for iPop = 1:nPop
     gain(pop(iPop).idx)         = pop(iPop).gain;
 
     % Initialize History (For Graphics)
-    pop(iPop).hist.meanRate     = NaN(nTrial, 1);
-    pop(iPop).hist.meanTheta    = NaN(nTrial, 1);
-    pop(iPop).hist.meanSensed   = NaN(nTrial, 1);
+    pop(iPop).hist.r        = NaN(nTrial, pop(iPop).N);
+    pop(iPop).hist.theta    = NaN(nTrial, pop(iPop).N);
+    pop(iPop).hist.avg_in   = NaN(nTrial, pop(iPop).N);
 
-    % Save subset for plotting
-    nPlot = min(pop(iPop).N, 10);
-    pop(iPop).idxPlot           = round(linspace(1, pop(iPop).N, nPlot));
-    pop(iPop).hist.allRate      = NaN(nTrial, nPlot);
-    pop(iPop).hist.allTheta     = NaN(nTrial, nPlot);
+    % Select units for plotting
+    pop(iPop).idxPlot = round(linspace(1, pop(iPop).N, min(pop(iPop).N, 10)));
 
     cursor = cursor + pop(iPop).N;
 end
+
+% Determine learning rule parameters
+for iPop = 1:nPop
+    
+    pop(iPop).target = nan;
+    switch pop(iPop).learningRule
+
+        case 'input_centric'
+            
+            % homogenous setpoint
+            pop(iPop).target = pop(2).theta_init + 5;
+
+            % Lognormal targets for input drive (Median ~ Theta_Inh + 5)
+            % Sigma = 0.1 allows variation while keeping drives positive
+            if flg_setpointHetero
+                pop(iPop).target = exp(log(pop(2).theta_init + 10) + 0.1 * randn(pop(iPop).N, 1));
+            end
+
+        case 'output_centric'
+            
+            % homogenous setpoint
+            pop(iPop).target = pop(iPop).r_init;
+            
+            % Lognormal targets for firing rates (Median = r_init)
+            % Sigma = 0.5 creates a realistic heavy-tailed firing rate distribution
+            if flg_setpointHetero
+                pop(iPop).target = exp(log(pop(iPop).r_init) + 0.5 * randn(pop(iPop).N, 1));
+            end
+    end
+
+    pop(iPop).alpha = 0.005;    % Rate of learning
+end
+
 
 %% ========================================================================
 %  CONNECTIVITY
@@ -169,7 +196,7 @@ sense_start = trial_steps - sense_steps + 1;
 
 % Initialize the graphics script
 if flg_graphics
-    ifrh_graphics2;
+    ifrh_graphics;
 end
 
 for iTrial = 1:nTrial
@@ -186,11 +213,11 @@ for iTrial = 1:nTrial
 
     %  ====================================================================
     % FAST DYNAMICS (Physics Engine)
-    
+
     % Initialize noise
     noise_trial = randn(nUnits, trial_steps);
-    
-    % Initialize Accumulators for Learning Rules 
+
+    % Initialize Accumulators for Learning Rules
     sense_out = zeros(nUnits, 1);
     sense_in = zeros(nUnits, 1);
 
@@ -209,15 +236,13 @@ for iTrial = 1:nTrial
         Total_Drive = Drive_Exc - Drive_Inh + ext + noise;
 
         % Update Firing Rates (Euler)
-        % dr = (-r + Func_Act(Total_Drive, gain, theta)) ./ tau;
-        
         dr = (-r + (gain .* max(0, Total_Drive - theta))) ./ tau;
         r = r + dr * dt;
 
-        % Data Accumulation (For Homeostasis)
+        % Data Accumulation (For error calculation)
         % Only accumulate during the measurement window
         if iStep >= sense_start
-            % For Output-Centric: Track Rate
+            % For output_centric: Track Rate
             sense_out = sense_out + r;
 
             % For Input-Centric: Track Excitatory Drive + External Input
@@ -238,62 +263,90 @@ for iTrial = 1:nTrial
         popIdx = pop(iPop).idx;
 
         % Store History (For Graphics)
-        pop(iPop).hist.meanRate(iTrial) = mean(avg_out(popIdx));
-        pop(iPop).hist.meanTheta(iTrial) = mean(theta(popIdx));
-        pop(iPop).hist.allRate(iTrial,:) = avg_out(popIdx(pop(iPop).idxPlot));
-        pop(iPop).hist.allTheta(iTrial,:) = theta(popIdx(pop(iPop).idxPlot));
+        pop(iPop).hist.r(iTrial, :)       = avg_out(popIdx);
+        pop(iPop).hist.theta(iTrial, :)   = theta(popIdx);
+        pop(iPop).hist.avg_in(iTrial, :)  = avg_in(popIdx);
 
-        % Calculate Error, Apply Learning Rule and Store the regulated variable
-        % If measured > target -> Error > 0 -> Theta increases -> Rate drops
+        % Calculate Error at steady state 
         switch pop(iPop).learningRule
 
             case 'input_centric'
                 err = avg_in(popIdx) - pop(iPop).target;
-                pop(iPop).hist.meanSensed(iTrial) = mean(avg_in(popIdx));
 
             case 'output_centric'
                 err = avg_out(popIdx) - pop(iPop).target;
-                pop(iPop).hist.meanSensed(iTrial) = mean(avg_out(popIdx));
 
             case 'none'
                 err = 0;
-                pop(iPop).hist.meanSensed(iTrial) = NaN;
         end
 
-        % Update Global Thresholds
+        % Apply Learning Rule; Update Global Thresholds
+        % If measured > target -> Error > 0 -> Theta increases -> Rate drops
         theta(popIdx) = theta(popIdx) + pop(iPop).alpha * err;
     end
 
     % VISUALIZATION
     if flg_graphics && (mod(iTrial, graphics_step) == 0 || iTrial == 1)
-        ifrh_graphics2;
+        ifrh_graphics;
     end
 end
 
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Comments
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Resolution of Sign Reversal in High-Gain Inhibition Regimes
-% The stabilization of the network was achieved by refining the "sensed
-% input" variable to track exclusively excitatory drive ($Input_{sense} =
-% W_{EE}E + I_{ext}$), rather than net synaptic input ($W_{EE}E -
-% W_{EI}I$). Previously, the inclusion of the inhibitory term caused a sign
-% reversal in the homeostatic control loop. In the Inhibition-Stabilized
-% Network (ISN) regime used here — characterized by strong inhibitory
-% feedback gain — any increase in excitatory firing recruits a
-% disproportionately larger inhibitory response. Consequently, as the
-% network activity increases, the net synaptic input paradoxically
-% decreases. This inverts the error signal, causing the homeostatic rule to
-% maladaptively lower thresholds in response to perceived low input,
-% driving the network into a runaway high-activity state. Redefining the
-% sensed variable to represent metabolic cost (modeled as excitatory
-% current driving mitochondrial calcium accumulation), restores the
-% necessary monotonic relationship between network activity and the error
-% signal. This modification is biophysically justified, as mitochondrial
-% calcium uptake is primarily driven by excitatory (e.g., NMDA-mediated or
-% voltage-gated) calcium influx rather than inhibitory chloride currents,
-% and it successfully allows the homeostatic mechanism to locate and
-% maintain a stable operating point within the ISN regime.
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+%% ========================================================================
+%  NOTE: INPUT-CENTRIC SENSING IN ISN REGIMES
+%  ========================================================================
+%  1. The ISN Paradox (Why Net Input Fails):
+%     In an Inhibition-Stabilized Network (ISN), recurrent excitation is
+%     strong enough to be unstable, requiring rapid, powerful inhibitory
+%     feedback to balance it. Paradoxically, this means that as the
+%     excitatory firing rate (E) increases, it recruits such strong
+%     inhibition (I) that the *net* synaptic input (W_ee*E - W_ei*I)
+%     actually *decreases*.
+%
+%  2. Control Loop Instability:
+%     If the homeostat were to sense Net Input, this paradoxical relationship
+%     would invert the error signal. A high firing rate would be read as
+%     "low input," causing the homeostat to maladaptively lower thresholds,
+%     driving the network into a runaway high-activity state.
+%
+%  3. The Solution (Excitatory/Metabolic Sensing):
+%     To ensure a monotonic relationship between activity and the error signal,
+%     this model tracks only Excitatory Drive + External Input (W_ee*E + I_ext).
+%     This variable represents the "Metabolic Cost" or "Required Input"
+%     (Inverse Transfer Function, f^-1(E)).
+%
+%  4. Biological Basis:
+%     This maps to mitochondrial calcium accumulation. Mitochondria act as
+%     metabolic integrators, accumulating calcium primarily through
+%     excitatory influx (energy demand) rather than inhibitory currents.
+%     This allows the cell to regulate its "budget" (intrinsic excitability)
+%     against a stable metabolic setpoint, ensuring stability even in
+%     strongly coupled ISN regimes.
+%  ========================================================================
+
+
+%% ========================================================================
+%  NOTE: TRIAL STRUCTURE & TIMESCALE SEPARATION
+%  ========================================================================
+%  This simulation employs a trial-based structure to explicitly separate
+%  the fast timescales of neural dynamics (milliseconds) from the slow
+%  timescales of homeostatic plasticity.
+%
+%  1. Separation of Timescales: Each trial runs long enough for the fast
+%     neural variables (rates, potentials) to settle into a stable
+%     attractor (Fixed Point). Homeostatic adjustments to thresholds are
+%     only applied *between* trials. This prevents the slow homeostat from
+%     fighting the necessary transient dynamics of the network.
+%
+%  2. Steady-State Averaging: The error signal is calculated by averaging
+%     activity over the final 1.0s of the trial. Mathematically, this
+%     moving average acts as a low-pass filter, similar to a differential
+%     equation for calcium accumulation. By ignoring the initial transient
+%     and smoothing spiking noise, we ensure the homeostatic rule responds
+%     only to the global equilibrium state. This aligns with the proposed
+%     biological mechanism of MCU-mediated Ca2+ influx, which operates on
+%     timescales far slower than individual action potentials.
+%  ========================================================================

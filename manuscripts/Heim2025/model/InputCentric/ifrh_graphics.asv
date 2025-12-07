@@ -55,7 +55,7 @@ if ~exist('hFig', 'var') || ~isvalid(hFig)
     H.linesE  = init_lines(H.axRateE, pop(1), cfg.color.E, get_cmap, cfg.alpha_trace);
     ylabel(H.axRateE, 'Rate (Hz)', 'FontWeight', 'bold');
     title(H.axRateE, 'Excitatory Population', 'FontWeight', 'normal');
-    if strcmpi(pop(1).learningRule, 'output_centric')
+    if strcmp(ruleName, 'output centric')
         target = pop(1).target;
         if length(target) == length(unique(target))
             target = target(pop(1).idxPlot);
@@ -80,7 +80,7 @@ if ~exist('hFig', 'var') || ~isvalid(hFig)
     H.linesI  = init_lines(H.axRateI, pop(2), cfg.color.I, get_cmap, cfg.alpha_trace);
     ylabel(H.axRateI, 'Rate (Hz)', 'FontWeight', 'bold');
     title(H.axRateI, 'Inhibitory Population', 'FontWeight', 'normal');
-    if strcmpi(pop(2).learningRule, 'output_centric')
+    if strcmp(ruleName, 'output centric')
         target = pop(2).target;
         if length(target) == length(unique(target))
             target = target(pop(2).idxPlot);
@@ -105,14 +105,18 @@ if ~exist('hFig', 'var') || ~isvalid(hFig)
     ylabel(H.axInput, 'Input (a.u.)', 'FontWeight', 'bold');
     title(H.axInput, 'Sensed Drive (Exc + Ext)', 'FontWeight', 'normal');
     if strcmpi(pop(1).learningRule, 'input_centric')
-        target = pop(1).target;
-        if length(target) == length(unique(target)) && length(target) > 1
-            target = target(pop(1).idxPlot);
+        yline(H.axInput, pop(1).target, 'k--', 'LineWidth', 1.5, 'Alpha', 0.5);
+    end
+    if strcmp(ruleName, 'output centric')
+        target = pop(2).target;
+        if length(target) == length(unique(target))
+            target = target(pop(2).idxPlot);
         else
             target = unique(target);
         end
-        yline(H.axInput, target, 'k--', 'LineWidth', 1.5, 'Alpha', 0.5);
+        yline(H.axRateI, target, 'k--', 'LineWidth', 1.5, 'Alpha', 0.5);
     end
+
 
     % Histogram
     H.axHistIn = nexttile(t); hold(H.axHistIn, 'on');
