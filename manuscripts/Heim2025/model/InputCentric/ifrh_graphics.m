@@ -1,32 +1,18 @@
 %% ========================================================================
-%  IFRH GRAPHICS ENGINE
-%  ========================================================================
-%  Visualizes simulation state for ifrh.m.
-%  Features: Tiled layout, synchronized histograms, full trace visualization.
-%
-%  EXPECTS IN WORKSPACE:
-%    hFig, pop, iTrial, avg_out, avg_in, theta, etc.
-% =========================================================================
-
-%% ========================================================================
-%  CONFIGURATION
+%  IFRH GRAPHICS ENGINE (TABBED VERSION)
 %  ========================================================================
 
-% Viewport & Data Settings
-cfg.hist_bins     = 50;         % Histogram resolution
-cfg.y_padding     = 0.1;        % 10% padding for dynamic Y-limits
+% CONFIGURATION
+cfg.hist_bins     = 50;
+cfg.y_padding     = 0.1;
+cfg.fig_pos       = [50 50 1000 900]; % Slightly narrower, vertical layout
+cfg.alpha_trace   = 0.4;
+cfg.alpha_hist    = 0.5;
 
-% Visual Styling
-cfg.fig_pos       = [50 50 1400 1000];
-cfg.color.E       = [0.2 0.7 0.2]; % Green
-cfg.color.I       = [0.8 0.2 0.2]; % Red
-cfg.color.In      = [0.2 0.4 0.8]; % Blue
-cfg.color.Th      = [0.8 0.2 0.8]; % Purple
-cfg.alpha_trace   = 0.5;           % Transparency for individual traces
-cfg.alpha_hist    = 0.5;           % Transparency for histograms
+% Color Palettes for different populations (Extendable)
+pop_colors = {[0.2 0.7 0.2], [0.8 0.2 0.2], [0.2 0.2 0.2]}; % Green, Red, Black
 
-% Color Map Generator for Individual Traces
-% Generates distinct shades within the same color family
+% Color Map Generator
 get_cmap = @(base, n) [linspace(min(1, base(1)*1.5), base(1)*0.3, n)', ...
     linspace(min(1, base(2)*1.5), base(2)*0.3, n)', ...
     linspace(min(1, base(3)*1.5), base(3)*0.3, n)'];
@@ -36,255 +22,234 @@ get_cmap = @(base, n) [linspace(min(1, base(1)*1.5), base(1)*0.3, n)', ...
 %  ========================================================================
 if ~exist('hFig', 'var') || ~isvalid(hFig)
 
-    % Setup Main Figure
     hFig = figure('Name', 'IfRH Simulation Dashboard', ...
-        'Color', 'w', 'Position', cfg.fig_pos);
+        'Color', 'w', 'Position', cfg.fig_pos, ...
+        'NumberTitle', 'off');
 
-    % Use Tiled Layout for tight, clean arrangement
-    t = tiledlayout(hFig, 4, 3, 'TileSpacing', 'tight', 'Padding', 'compact');
+    % CREATE TABS
+    tabGroup = uitabgroup(hFig);
+    H = struct(); % Handle storage array
 
-    % Master Title
-    ruleName = strrep(pop(1).learningRule, '_', ' ');
-    title(t, ['Learning Rule: ' upper(ruleName)], 'FontSize', 14, 'FontWeight', 'bold');
+    % Loop through populations to create dynamic tabs
+    for i = 1:length(pop)
 
-    H = struct(); % Handle storage
+        % 1. Create Tab
+        H(i).tab = uitab(tabGroup, 'Title', pop(i).name);
 
-    % EXCITATORY POPULATION (Row 1)
-    % Time Series [Spans 2 columns]
-    H.axRateE = nexttile(t, [1 2]); hold(H.axRateE, 'on');
-    H.linesE  = init_lines(H.axRateE, pop(1), cfg.color.E, get_cmap, cfg.alpha_trace);
-    ylabel(H.axRateE, 'Rate (Hz)', 'FontWeight', 'bold');
-    title(H.axRateE, 'Excitatory Population', 'FontWeight', 'normal');
-    if strcmpi(pop(1).learningRule, 'output_centric')
-        target = pop(1).target;
-        if length(target) == length(unique(target))
-            target = target(pop(1).idxPlot);
-        else
-            target = unique(target);
+        % 2. Layout for this tab (4 Rows, 3 Columns)
+        %    Columns 1-2: Time Series | Column 3: Histogram
+        t = tiledlayout(H(i).tab, 4, 3, 'TileSpacing', 'tight', 'Padding', 'compact');
+
+        % Select Base Color
+        cBase = pop_colors{min(i, length(pop_colors))};
+
+        % --- PANEL 1: RATE ---
+        H(i).axRate = nexttile(t, [1 2]); hold(H(i).axRate, 'on');
+        H(i).lRate  = init_lines(H(i).axRate, pop(i), cBase, get_cmap, cfg.alpha_trace);
+        ylabel(H(i).axRate, 'Rate (Hz)'); title(H(i).axRate, 'Population Activity');
+        % Master Title for the Tab (Learning Rule)
+        ruleName = strrep(pop(i).learningRule, '_', ' ');
+        title(t, ['Learning Rule: ' upper(ruleName)], 'FontSize', 14, 'FontWeight', 'bold');
+
+        % Target Line (Rate)
+        if strcmpi(pop(i).learningRule, 'output_centric')
+            yline(H(i).axRate, mean(pop(i).target), 'k--', 'Target');
         end
-        yline(H.axRateE, target, 'k--', 'LineWidth', 1.5, 'Alpha', 0.5);
-    end
 
-    % Histogram [Column 3]
-    H.axHistE = nexttile(t); hold(H.axHistE, 'on');
-    H.barE = histogram(H.axHistE, 'Orientation', 'horizontal', ...
-        'FaceColor', cfg.color.E, 'FaceAlpha', cfg.alpha_hist, ...
-        'EdgeColor', 'none', 'NumBins', cfg.hist_bins);
-    % Clean up Histogram Axes (Hide Y axis as it shares scale with Time Series)
-    H.axHistE.YAxis.Visible = 'off';
-    grid(H.axHistE, 'on');
+        H(i).axHistR = nexttile(t); hold(H(i).axHistR, 'on');
+        H(i).barR = histogram(H(i).axHistR, 'Orientation', 'horizontal', ...
+            'FaceColor', cBase, 'FaceAlpha', cfg.alpha_hist, 'EdgeColor', 'none', 'NumBins', cfg.hist_bins);
+        H(i).axHistR.YAxis.Visible = 'off';
 
-    % INHIBITORY POPULATION (Row 2)
-    % Time Series
-    H.axRateI = nexttile(t, [1 2]); hold(H.axRateI, 'on');
-    H.linesI  = init_lines(H.axRateI, pop(2), cfg.color.I, get_cmap, cfg.alpha_trace);
-    ylabel(H.axRateI, 'Rate (Hz)', 'FontWeight', 'bold');
-    title(H.axRateI, 'Inhibitory Population', 'FontWeight', 'normal');
-    if strcmpi(pop(2).learningRule, 'output_centric')
-        target = pop(2).target;
-        if length(target) == length(unique(target))
-            target = target(pop(2).idxPlot);
-        else
-            target = unique(target);
+        % --- PANEL 2: SENSED INPUT (Drive) ---
+        H(i).axIn = nexttile(t, [1 2]); hold(H(i).axIn, 'on');
+        H(i).lIn  = init_lines(H(i).axIn, pop(i), [0.2 0.4 0.8], get_cmap, cfg.alpha_trace); % Blue
+        ylabel(H(i).axIn, 'Input (a.u.)'); title(H(i).axIn, 'Excitatory Drive');
+        % Target Line (Input)
+        if strcmpi(pop(i).learningRule, 'input_centric')
+            yline(H(i).axIn, mean(pop(i).target), 'k--', 'Target');
         end
-        yline(H.axRateI, target, 'k--', 'LineWidth', 1.5, 'Alpha', 0.5);
-    end
 
-    % Histogram
-    H.axHistI = nexttile(t); hold(H.axHistI, 'on');
-    H.barI = histogram(H.axHistI, 'Orientation', 'horizontal', ...
-        'FaceColor', cfg.color.I, 'FaceAlpha', cfg.alpha_hist, ...
-        'EdgeColor', 'none', 'NumBins', cfg.hist_bins);
-    H.axHistI.YAxis.Visible = 'off';
-    grid(H.axHistI, 'on');
+        H(i).axHistIn = nexttile(t); hold(H(i).axHistIn, 'on');
+        H(i).barIn = histogram(H(i).axHistIn, 'Orientation', 'horizontal', ...
+            'FaceColor', [0.2 0.4 0.8], 'FaceAlpha', cfg.alpha_hist, 'EdgeColor', 'none', 'NumBins', cfg.hist_bins);
+        H(i).axHistIn.YAxis.Visible = 'off';
 
-    % SENSED INPUT (Row 3)
-    % Time Series
-    H.axInput = nexttile(t, [1 2]); hold(H.axInput, 'on');
-    H.linesIn = init_lines(H.axInput, pop(1), cfg.color.In, get_cmap, cfg.alpha_trace);
-    ylabel(H.axInput, 'Input (a.u.)', 'FontWeight', 'bold');
-    title(H.axInput, 'Sensed Drive (Exc + Ext)', 'FontWeight', 'normal');
-    if strcmpi(pop(1).learningRule, 'input_centric')
-        target = pop(1).target;
-        if length(target) == length(unique(target)) && length(target) > 1
-            target = target(pop(1).idxPlot);
+        % --- PANEL 3: THRESHOLDS ---
+        H(i).axTh = nexttile(t, [1 2]); hold(H(i).axTh, 'on');
+        H(i).lTh  = init_lines(H(i).axTh, pop(i), [0.8 0.2 0.8], get_cmap, cfg.alpha_trace); % Purple
+        ylabel(H(i).axTh, '\theta (mV)', 'Interpreter', 'tex'); title(H(i).axTh, 'Thresholds');
+
+        H(i).axHistTh = nexttile(t); hold(H(i).axHistTh, 'on');
+        H(i).barTh = histogram(H(i).axHistTh, 'Orientation', 'horizontal', ...
+            'FaceColor', [0.8 0.2 0.8], 'FaceAlpha', cfg.alpha_hist, 'EdgeColor', 'none', 'NumBins', cfg.hist_bins);
+        H(i).axHistTh.YAxis.Visible = 'off';
+
+        % --- PANEL 4: ERROR ---
+        if ~strcmpi(pop(i).learningRule, 'none')
+            H(i).axErr = nexttile(t, [1 2]); hold(H(i).axErr, 'on');
+            % Plot individual lines + mean
+            H(i).lErr = init_lines(H(i).axErr, pop(i), [0.5 0.5 0.5], get_cmap, cfg.alpha_trace);
+            yline(H(i).axErr, 0, 'k-'); % Zero line
+            ylabel(H(i).axErr, 'Error'); title(H(i).axErr, 'Homeostatic Error (Sensed - Target)');
+            xlabel(H(i).axErr, 'Trial');
+
+            H(i).axHistErr = nexttile(t); hold(H(i).axHistErr, 'on');
+            H(i).barErr = histogram(H(i).axHistErr, 'Orientation', 'horizontal', ...
+                'FaceColor', [0.5 0.5 0.5], 'FaceAlpha', cfg.alpha_hist, 'EdgeColor', 'none', 'NumBins', cfg.hist_bins);
+            H(i).axHistErr.YAxis.Visible = 'off';
+
+            % Update linkage
+            linkaxes([H(i).axRate, H(i).axIn, H(i).axTh, H(i).axErr], 'x');
+            linkaxes([H(i).axErr, H(i).axHistErr], 'y');
+            grid(H(i).axErr, 'on');
         else
-            target = unique(target);
+            % Fill space if no error plot
+            nexttile(t, [1 2]); axis off;
+            nexttile(t); axis off;
+            linkaxes([H(i).axRate, H(i).axIn, H(i).axTh], 'x');
         end
-        yline(H.axInput, target, 'k--', 'LineWidth', 1.5, 'Alpha', 0.5);
+
+        % --- LINKING & FORMATTING ---
+        linkaxes([H(i).axRate, H(i).axHistR], 'y');
+        linkaxes([H(i).axIn,   H(i).axHistIn], 'y');
+        linkaxes([H(i).axTh,   H(i).axHistTh], 'y');
+
+        xlim(H(i).axRate, [1 max(100, length(pop(1).hist.r))]);
+        grid(H(i).axRate, 'on'); grid(H(i).axIn, 'on');
+        grid(H(i).axTh, 'on');
+        linkaxes([H(i).axRate, H(i).axIn, H(i).axTh, H(i).axErr], 'x');
+
+        % Add Perturbation Bar (only on Rate plot)
+        draw_perturbation_bar(H(i).axRate, pop(i), cBase);
     end
-
-    % Histogram
-    H.axHistIn = nexttile(t); hold(H.axHistIn, 'on');
-    H.barIn = histogram(H.axHistIn, 'Orientation', 'horizontal', ...
-        'FaceColor', cfg.color.In, 'FaceAlpha', cfg.alpha_hist, ...
-        'EdgeColor', 'none', 'NumBins', cfg.hist_bins);
-    H.axHistIn.YAxis.Visible = 'off';
-    grid(H.axHistIn, 'on');
-
-    % THRESHOLDS (Row 4)
-    % Time Series
-    H.axTheta = nexttile(t, [1 2]); hold(H.axTheta, 'on');
-    H.linesTh = init_lines(H.axTheta, pop(1), cfg.color.Th, get_cmap, cfg.alpha_trace);
-    ylabel(H.axTheta, '\theta (mV)', 'Interpreter', 'tex', 'FontWeight', 'bold');
-    xlabel(H.axTheta, 'Trial');
-    title(H.axTheta, 'Threshold Dynamics', 'FontWeight', 'normal');
-
-    % Histogram
-    H.axHistTh = nexttile(t); hold(H.axHistTh, 'on');
-    H.barTh = histogram(H.axHistTh, 'Orientation', 'horizontal', ...
-        'FaceColor', cfg.color.Th, 'FaceAlpha', cfg.alpha_hist, ...
-        'EdgeColor', 'none', 'NumBins', cfg.hist_bins);
-    H.axHistTh.YAxis.Visible = 'off';
-    xlabel(H.axHistTh, 'Count');
-    grid(H.axHistTh, 'on');
-
-    % COMMON FORMATTING & LINKS
-    all_time_axes = [H.axRateE, H.axRateI, H.axInput, H.axTheta];
-
-    % Link X-axes (Time)
-    linkaxes(all_time_axes, 'x');
-    grid(all_time_axes, 'on');
-    xlim(all_time_axes, [1 max(100, length(pop(1).hist.r))]); % Fixed X-Limit to total trials
-
-    % Link Y-axes (Time Plot <-> Histogram)
-    % This ensures the histogram is always aligned with the data traces
-    linkaxes([H.axRateE, H.axHistE], 'y');
-    linkaxes([H.axRateI, H.axHistI], 'y');
-    linkaxes([H.axInput, H.axHistIn], 'y');
-    linkaxes([H.axTheta, H.axHistTh], 'y');
-
-    % Add Perturbation Bars
-    % Only to Rate Plots, and only for the corresponding population
-    draw_perturbation_bar(H.axRateE, pop(1), [0.2 0.5 0.2]);
-    draw_perturbation_bar(H.axRateI, pop(2), [0.8 0.2 0.2]);
-
 end
 
 %% ========================================================================
-%  UPDATE ROUTINE (Runs every graphics_step)
+%  UPDATE ROUTINE
 %  ========================================================================
 if exist('iTrial', 'var') && iTrial > 1 && exist('H', 'var') && isvalid(hFig)
 
     x_vec = 1:iTrial;
 
-    % Vectorized Line Updates
+    % Loop through populations and update the graphics objects in H(i)
+    for i = 1:length(pop)
 
-    % Excitatory Rates
-    [subset_E, mean_E] = get_plot_data(pop(1).hist.r, iTrial, pop(1).idxPlot);
-    update_lines(H.linesE, x_vec, subset_E, mean_E);
-    if exist('avg_out','var'), H.barE.Data = avg_out(pop(1).idx); end
+        % 1. RATE
+        [sub_R, mean_R] = get_plot_data(pop(i).hist.r, iTrial, pop(i).idxPlot);
+        update_lines(H(i).lRate, x_vec, sub_R, mean_R);
+        H(i).barR.Data = avg_out(pop(i).idx);
+        update_ylim(H(i).axRate, sub_R, cfg.y_padding);
 
-    % Inhibitory Rates
-    [subset_I, mean_I] = get_plot_data(pop(2).hist.r, iTrial, pop(2).idxPlot);
-    update_lines(H.linesI, x_vec, subset_I, mean_I);
-    if exist('avg_out','var'), H.barI.Data = avg_out(pop(2).idx); end
+        % 2. INPUT
+        [sub_In, mean_In] = get_plot_data(pop(i).hist.avg_in, iTrial, pop(i).idxPlot);
+        update_lines(H(i).lIn, x_vec, sub_In, mean_In);
+        H(i).barIn.Data = avg_in(pop(i).idx);
+        update_ylim(H(i).axIn, sub_In, cfg.y_padding);
 
-    % Input (Sensed)
-    [subset_In, mean_In] = get_plot_data(pop(1).hist.avg_in, iTrial, pop(1).idxPlot);
-    update_lines(H.linesIn, x_vec, subset_In, mean_In);
-    if exist('avg_in','var'), H.barIn.Data = avg_in(pop(1).idx); end
+        % 3. THRESHOLD
+        [sub_Th, mean_Th] = get_plot_data(pop(i).hist.theta, iTrial, pop(i).idxPlot);
+        update_lines(H(i).lTh, x_vec, sub_Th, mean_Th);
+        H(i).barTh.Data = theta(pop(i).idx);
+        update_ylim(H(i).axTh, sub_Th, cfg.y_padding);
 
-    % Thresholds
-    [subset_Th, mean_Th] = get_plot_data(pop(1).hist.theta, iTrial, pop(1).idxPlot);
-    update_lines(H.linesTh, x_vec, subset_Th, mean_Th);
-    if exist('theta','var'), H.barTh.Data = theta(pop(1).idx); end
+        % 4. ERROR 
+        if ~strcmpi(pop(i).learningRule, 'none')
+            [sub_Err, mean_Err] = get_plot_data(pop(i).hist.err, iTrial, pop(i).idxPlot);
+            update_lines(H(i).lErr, x_vec, sub_Err, mean_Err);
+            H(i).barErr.Data = theta(pop(i).idx);
+            update_ylim(H(i).axErr, sub_Err, cfg.y_padding);
+        end
 
-
-    % Dynamic Y-Axis Scaling
-    % Update Y-Limits based on current data range with padding
-    update_ylim(H.axRateE, subset_E, cfg.y_padding);
-    update_ylim(H.axRateI, subset_I, cfg.y_padding);
-    update_ylim(H.axInput, subset_In, cfg.y_padding);
-    update_ylim(H.axTheta, subset_Th, cfg.y_padding);
-
-    drawnow limitrate;
+        drawnow limitrate;
+    end
 end
 
-%% ========================================================================
-%  HELPER FUNCTIONS
-%  ========================================================================
 
-function h = init_lines(ax, pStruct, baseColor, mapFunc, alpha)
-% Initialize plot objects for individual neurons + mean
-% Returns struct: h.indiv (array of lines), h.mean (single line)
+    %% ========================================================================
+    %  HELPER FUNCTIONS (Same as before, copy-paste them here)
+    %  ========================================================================
 
-nPlot = length(pStruct.idxPlot);
-colors = mapFunc(baseColor, nPlot);
+    function h = init_lines(ax, pStruct, baseColor, mapFunc, alpha)
+    % Initialize plot objects for individual neurons + mean
+    % Returns struct: h.indiv (array of lines), h.mean (single line)
 
-h.indiv = gobjects(nPlot, 1);
-for i = 1:nPlot
-    % Use thin lines for individuals
-    h.indiv(i) = plot(ax, NaN, NaN, 'Color', [colors(i,:) alpha], 'LineWidth', 0.5);
-end
-% Use thick, darker line for mean
-meanColor = baseColor * 0.8;
-h.mean = plot(ax, NaN, NaN, 'Color', meanColor, 'LineWidth', 3, 'DisplayName', 'Mean');
-end
+    nPlot = length(pStruct.idxPlot);
+    colors = mapFunc(baseColor, nPlot);
 
-function update_lines(hStruct, x, y_data, y_mean)
-% Vectorized update of line objects
-% 'y_data' should be (Trials x Neurons)
+    h.indiv = gobjects(nPlot, 1);
+    for i = 1:nPlot
+        % Use thin lines for individuals
+        h.indiv(i) = plot(ax, NaN, NaN, 'Color', [colors(i,:) alpha], 'LineWidth', 0.5);
+    end
+    % Use thick, darker line for mean
+    meanColor = baseColor * 0.8;
+    h.mean = plot(ax, NaN, NaN, 'Color', meanColor, 'LineWidth', 3, 'DisplayName', 'Mean');
+    end
 
-if ~isempty(hStruct.indiv)
-    % Create cell array of columns for fast set()
-    y_cells = num2cell(y_data, 1);
-    set(hStruct.indiv, 'XData', x, {'YData'}, y_cells');
-end
-set(hStruct.mean, 'XData', x, 'YData', y_mean);
-end
+    function update_lines(hStruct, x, y_data, y_mean)
+    % Vectorized update of line objects
+    % 'y_data' should be (Trials x Neurons)
 
-function [subset_data, mean_data] = get_plot_data(full_hist, iTrial, idx_plot)
-% Helper to slice history and calculate mean
-% full_hist: (nTrial x N) matrix of all neurons
-% idx_plot:  Indices of neurons to extract for individual plotting
+    if ~isempty(hStruct.indiv)
+        % Create cell array of columns for fast set()
+        y_cells = num2cell(y_data, 1);
+        set(hStruct.indiv, 'XData', x, {'YData'}, y_cells');
+    end
+    set(hStruct.mean, 'XData', x, 'YData', y_mean);
+    end
 
-% Extract valid portion up to current trial
-current_slice = full_hist(1:iTrial, :);
+    function [subset_data, mean_data] = get_plot_data(full_hist, iTrial, idx_plot)
+    % Helper to slice history and calculate mean
+    % full_hist: (nTrial x N) matrix of all neurons
+    % idx_plot:  Indices of neurons to extract for individual plotting
 
-% Calculate Mean across ALL neurons (dim 2)
-mean_data = mean(current_slice, 2, 'omitnan');
+    % Extract valid portion up to current trial
+    current_slice = full_hist(1:iTrial, :);
 
-% Extract Subset for individual traces
-if isempty(idx_plot)
-    subset_data = current_slice;
-else
-    % Ensure indices are valid
-    valid_idx = idx_plot(idx_plot <= size(full_hist, 2));
-    subset_data = current_slice(:, valid_idx);
-end
-end
+    % Calculate Mean across ALL neurons (dim 2)
+    mean_data = mean(current_slice, 2, 'omitnan');
 
-function update_ylim(ax, data, padding)
-% Dynamically updates Y-limits based on data range
-if isempty(data) || all(isnan(data(:))), return; end
+    % Extract Subset for individual traces
+    if isempty(idx_plot)
+        subset_data = current_slice;
+    else
+        % Ensure indices are valid
+        valid_idx = idx_plot(idx_plot <= size(full_hist, 2));
+        subset_data = current_slice(:, valid_idx);
+    end
+    end
 
-% Calculate bounds
-ymin = min(data(:), [], 'omitnan');
-ymax = max(data(:), [], 'omitnan');
+    function update_ylim(ax, data, padding)
+    % Dynamically updates Y-limits based on data range
+    if isempty(data) || all(isnan(data(:))), return; end
 
-if isempty(ymin) || isempty(ymax) || isnan(ymin) || isnan(ymax), return; end
-if ymin == ymax, ymax = ymin + 1e-6; end % Prevent flat limits (error)
+    % Calculate bounds
+    ymin = min(data(:), [], 'omitnan');
+    ymax = max(data(:), [], 'omitnan');
 
-% Apply padding
-range = ymax - ymin;
-if range == 0, range = 1; end
-new_lim = [ymin - range * padding, ymax + range * padding];
+    if isempty(ymin) || isempty(ymax) || isnan(ymin) || isnan(ymax), return; end
+    if ymin == ymax, ymax = ymin + 1e-6; end % Prevent flat limits (error)
 
-set(ax, 'YLim', new_lim);
-end
+    % Apply padding
+    range = ymax - ymin;
+    if range == 0, range = 1; end
+    new_lim = [ymin - range * padding, ymax + range * padding];
 
-function draw_perturbation_bar(ax, popStruct, color)
-% Adds perturbation indicators to a specific axis
-p = popStruct.perturb; % [Start, End, Amp]
-if p(3) ~= 0
+    set(ax, 'YLim', new_lim);
+    end
 
-    % Gray bar at bottom
-    line(ax, [p(1) p(2)], [0 0], 'Color', [0.7 0.7 0.7], 'LineWidth', 5);
+    function draw_perturbation_bar(ax, popStruct, color)
+    % Adds perturbation indicators to a specific axis
+    p = popStruct.perturb; % [Start, End, Amp]
+    if p(3) ~= 0
 
-    % Text label
-    text(ax, mean(p(1:2)), 0, sprintf('+%.1f', p(3)), ...
-        'Color', color, 'VerticalAlignment', 'bottom', ...
-        'HorizontalAlignment', 'center', 'FontSize', 8, 'FontWeight', 'bold');
-end
-end
+        % Gray bar at bottom
+        line(ax, [p(1) p(2)], [0 0], 'Color', [0.7 0.7 0.7], 'LineWidth', 5);
+
+        % Text label
+        text(ax, mean(p(1:2)), 0, sprintf('+%.1f', p(3)), ...
+            'Color', color, 'VerticalAlignment', 'bottom', ...
+            'HorizontalAlignment', 'center', 'FontSize', 8, 'FontWeight', 'bold');
+    end
+    end

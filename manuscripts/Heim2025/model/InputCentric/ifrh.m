@@ -2,7 +2,7 @@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-clear 
+clear
 
 %% ========================================================================
 %  CONFIGURATION
@@ -45,7 +45,7 @@ pop(1).r_init = 5;
 pop(1).max_rate = 100;
 
 % Plasticity
-pop(1).learningRule = 'output_centric';
+pop(1).learningRule = 'input_centric';
 
 % Perturbation
 pop(1).perturb = [700, 700, 10]; % [Start, End, Amp]
@@ -99,6 +99,7 @@ for iPop = 1:nPop
     pop(iPop).hist.r        = NaN(nTrial, pop(iPop).N);
     pop(iPop).hist.theta    = NaN(nTrial, pop(iPop).N);
     pop(iPop).hist.avg_in   = NaN(nTrial, pop(iPop).N);
+    pop(iPop).hist.err      = NaN(nTrial, pop(iPop).N);
 
     % Select units for plotting
     pop(iPop).idxPlot = round(linspace(1, pop(iPop).N, min(pop(iPop).N, 10)));
@@ -108,12 +109,12 @@ end
 
 % Determine learning rule parameters
 for iPop = 1:nPop
-    
+
     pop(iPop).target = nan;
     switch pop(iPop).learningRule
 
         case 'input_centric'
-            
+
             % homogenous setpoint
             pop(iPop).target = pop(2).theta_init + 5;
 
@@ -124,10 +125,10 @@ for iPop = 1:nPop
             end
 
         case 'output_centric'
-            
+
             % homogenous setpoint
             pop(iPop).target = pop(iPop).r_init;
-            
+
             % Lognormal targets for firing rates (Median = r_init)
             % Sigma = 0.5 creates a realistic heavy-tailed firing rate distribution
             if flg_setpointHetero
@@ -267,7 +268,7 @@ for iTrial = 1:nTrial
         pop(iPop).hist.theta(iTrial, :)   = theta(popIdx);
         pop(iPop).hist.avg_in(iTrial, :)  = avg_in(popIdx);
 
-        % Calculate Error at steady state 
+        % Calculate Error at steady state
         switch pop(iPop).learningRule
 
             case 'input_centric'
@@ -283,6 +284,9 @@ for iTrial = 1:nTrial
         % Apply Learning Rule; Update Global Thresholds
         % If measured > target -> Error > 0 -> Theta increases -> Rate drops
         theta(popIdx) = theta(popIdx) + pop(iPop).alpha * err;
+
+        % Store Error History (Post-Calculation)
+        pop(iPop).hist.err(iTrial, :) = err;
     end
 
     % VISUALIZATION
