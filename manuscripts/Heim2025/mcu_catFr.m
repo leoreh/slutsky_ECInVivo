@@ -1,25 +1,25 @@
-function [fr_rs_mat, fr_fs_mat, t_axis, id_rs, id_fs] = mcu_catFr()
+function [fr_rs, fr_fs, t_axis, id_rs, id_fs] = mcu_catFr()
 % MCU_CATFR - Concatenate and align firing rates from all mice
 %
 % Returns:
-%   fr_rs_mat: Matrix of RS units (Rows x Time). Aligned to perturbation.
-%   fr_fs_mat: Matrix of FS units (Rows x Time). Aligned to perturbation.
-%   t_axis:    Time vector relative to perturbation (0 = onset).
-%   id_rs:     Vector tracking Mouse ID for each row in fr_rs_mat.
-%   id_fs:     Vector tracking Mouse ID for each row in fr_fs_mat.
+%   fr_rs: Matrix of RS units (Rows x Time). Aligned to perturbation.
+%          Rows are packed by Mouse (MaxUnits per mouse).
+%   fr_fs: Matrix of FS units (Rows x Time). Aligned to perturbation.
+%   t_axis: Time vector relative to perturbation (0 = onset).
+%   id_rs: Mouse ID for each row in fr_rs.
+%   id_fs: Mouse ID for each row in fr_fs.
 
 grp = 'wt';
 mice = mcu_sessions(grp);
 vars = {'fr'; 'units'};
 
-% Initialize collections
-% We will store traces in a struct array first, then pad/matrixify
-raw_rs = struct('trace', {}, 't_start', {}, 'mouse', {});
-raw_fs = struct('trace', {}, 't_start', {}, 'mouse', {});
+% -------------------------------------------------------------------------
+% Pass 1: Stitch, Find Perturbation, Analyze Dimensions
+% -------------------------------------------------------------------------
 
-% Global time bounds (relative to perturbation)
-t_global_min = inf;
-t_global_max = -inf;
+data_store = struct();
+global_min = inf;
+global_max = -inf;
 
 flg_plot = true;
 
@@ -29,30 +29,21 @@ for iMouse = 1 : length(mice)
     basepaths = mcu_sessions(mice{iMouse});
     v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 
-    % 2. Find Perturbation Onset for the Mouse
-    % We reconstruct the "stitched" timeline for the mouse to find the global
-    % perturbation event.
-    % Extract all STRD traces (Units x Time) for each day
+    % 2. Stitch and Find Perturbation
+    % Extract all STRD traces for stitching (Unit agnostic for now)
     all_strd = {};
     for i = 1:length(v)
-        % Ensure consistent orientation (Units x Time)
         all_strd{i} = v(i).fr.strd;
     end
-
-    % Use cell2padmat to create a "chimera" matrix just for finding the mean
-    % frt_stitched: (MaxUnits x TotalTime)
     frt_stitched = cell2padmat(all_strd, 2);
 
-    % Calculate Mean FR of the mouse (averaging all units)
+    % Mean FR for perturbation detection
     mfr_mouse = mean(frt_stitched, 1, 'omitnan');
-
-    % Denoise / Smooth if necessary (following original code logic)
-    % t_dummy is just for the function call, absolute time doesn't matter yet
     t_dummy = 1:length(mfr_mouse);
     mfr_smooth = mea_frDenoise(mfr_mouse, t_dummy, 'flgPlot', false, 'frameLenSec', 300);
 
-    % Find Change Point
-    pertWin = 1 : min(3000, length(mfr_smooth)); % Use original window or bounded
+    % Find Perturbation
+    pertWin = 1 : min(3000, length(mfr_smooth));
     [pertOnset, ~] = findchangepts(mfr_smooth(pertWin), ...
         'Statistic', 'mean', 'minDistance', 5, ...
         'MaxNumChanges', 1);
@@ -62,100 +53,135 @@ for iMouse = 1 : length(mice)
         title(['Mouse ' mice{iMouse} ' Perturbation: ' num2str(pertOnset)]);
     end
 
-    % 3. Extract and Align Individual Units
-    % Iterate through days again to pull specific units
-    current_time_idx = 0;
+    % 3. Analyze Unit Counts and Time
+    curr_time = 0;
+    max_rs = 0;
+    max_fs = 0;
+    day_meta = struct();
 
-    for iFile = 1 : length(v)
+    for iDay = 1 : length(v)
+        % Identify Unit Types for this day
+        u_clean = v(iDay).units.clean;
+        % RS: Row 1 == 1
+        idx_rs = u_clean(1, :) == 1;
+        % FS: Row 2 == 1
+        idx_fs = u_clean(2, :) == 1;
 
-        % Data for this day
-        traces = v(iFile).fr.strd; % Units x Time
-        unit_types = v(iFile).units.clean; % 0=RS, 1=FS
+        n_rs = sum(idx_rs);
+        n_fs = sum(idx_fs);
 
-        [nUnits, nSamples] = size(traces);
+        max_rs = max(max_rs, n_rs);
+        max_fs = max(max_fs, n_fs);
 
-        % Time range for this file relative to perturbation
-        % Start: (Cumulative + 1) - PertOnset
-        % End:   (Cumulative + nSamples) - PertOnset
-        rel_start = (current_time_idx + 1) - pertOnset;
-        rel_end   = (current_time_idx + nSamples) - pertOnset;
+        % Time Alignment
+        traces = v(iDay).fr.strd;
+        nSamples = size(traces, 2);
 
-        % Update global bounds
-        t_global_min = min(t_global_min, rel_start);
-        t_global_max = max(t_global_max, rel_end);
+        rel_start = curr_time + 1 - pertOnset;
+        rel_end   = curr_time + nSamples - pertOnset;
 
-        % Separate Units
-        % Assume: 0 = pPYR (RS), 1 = pINT (FS)
+        global_min = min(global_min, rel_start);
+        global_max = max(global_max, rel_end);
 
-        % RS Units
-        idx_rs = unit_types(1, :) == 1;
-        if any(idx_rs)
-            rs_traces = traces(idx_rs, :);
-            n_rs = size(rs_traces, 1);
-            for u = 1:n_rs
-                new_entry.trace = rs_traces(u, :);
-                new_entry.t_start = rel_start;
-                new_entry.mouse = iMouse;
-                raw_rs(end+1) = new_entry;
-            end
-        end
+        % Store info for Pass 2
+        day_meta(iDay).fr = traces;
+        day_meta(iDay).idx_rs = idx_rs;
+        day_meta(iDay).idx_fs = idx_fs;
+        day_meta(iDay).t_start = rel_start;
 
-        % FS Units
-        idx_fs = unit_types(2, :) == 1;
-        if any(idx_fs)
-            fs_traces = traces(idx_fs, :);
-            n_fs = size(fs_traces, 1);
-            for u = 1:n_fs
-                new_entry.trace = fs_traces(u, :);
-                new_entry.t_start = rel_start;
-                new_entry.mouse = iMouse;
-                raw_fs(end+1) = new_entry;
-            end
-        end
-
-        % Advance cumulative time
-        current_time_idx = current_time_idx + nSamples;
+        curr_time = curr_time + nSamples;
     end
+
+    % Store Mouse Data
+    data_store(iMouse).days = day_meta;
+    data_store(iMouse).max_rs = max_rs;
+    data_store(iMouse).max_fs = max_fs;
 end
 
-% 4. Construct Final Matrices
-% Create time axis
-t_axis = t_global_min : t_global_max;
+% -------------------------------------------------------------------------
+% Pass 2: Construct Final Matrices
+% -------------------------------------------------------------------------
+
+t_axis = global_min : global_max;
 n_total_points = length(t_axis);
 
-% Helper to build matrix
-    function [mat, ids] = build_matrix(raw_struct)
-        n_rows = length(raw_struct);
-        mat = nan(n_rows, n_total_points);
-        ids = splitapply(@(x) x, [raw_struct.mouse], 1:n_rows)'; % Or simple extraction
-        ids = [raw_struct.mouse]';
+% Pre-allocate based on MAX rows per mouse (summed)
+total_rs_rows = sum([data_store.max_rs]);
+total_fs_rows = sum([data_store.max_fs]);
 
-        for k = 1:n_rows
-            % Find indices in the global matrix
-            % signal starts at t_start.
-            % matrix starts at t_global_min.
-            % offset = t_start - t_global_min + 1
-            offset = raw_struct(k).t_start - t_global_min + 1;
-            len = length(raw_struct(k).trace);
+fr_rs = nan(total_rs_rows, n_total_points);
+fr_fs = nan(total_fs_rows, n_total_points);
 
-            % Insert
-            mat(k, offset : offset + len - 1) = raw_struct(k).trace;
+id_rs = nan(total_rs_rows, 1);
+id_fs = nan(total_fs_rows, 1);
+
+curr_row_rs = 1;
+curr_row_fs = 1;
+
+for iMouse = 1 : length(mice)
+    d = data_store(iMouse);
+
+    % Calculate Row Ranges for this Mouse
+    if d.max_rs > 0
+        range_rs = curr_row_rs : (curr_row_rs + d.max_rs - 1);
+        id_rs(range_rs) = iMouse;
+    else
+        range_rs = [];
+    end
+
+    if d.max_fs > 0
+        range_fs = curr_row_fs : (curr_row_fs + d.max_fs - 1);
+        id_fs(range_fs) = iMouse;
+    else
+        range_fs = [];
+    end
+
+    % Fill Days
+    for iDay = 1 : length(d.days)
+        day = d.days(iDay);
+
+        % Column Indices
+        offset = day.t_start - global_min + 1;
+        col_idx = offset : (offset + size(day.fr, 2) - 1);
+
+        % Extract and Fill RS
+        if any(day.idx_rs)
+            traces = day.fr(day.idx_rs, :);
+            n = size(traces, 1);
+            if ~isempty(range_rs)
+                fr_rs(range_rs(1:n), col_idx) = traces;
+            end
+        end
+
+        % Extract and Fill FS
+        if any(day.idx_fs)
+            traces = day.fr(day.idx_fs, :);
+            n = size(traces, 1);
+            if ~isempty(range_fs)
+                fr_fs(range_fs(1:n), col_idx) = traces;
+            end
         end
     end
 
-[fr_rs_mat, id_rs] = build_matrix(raw_rs);
-[fr_fs_mat, id_fs] = build_matrix(raw_fs);
+    % Advance Row Counters
+    curr_row_rs = curr_row_rs + d.max_rs;
+    curr_row_fs = curr_row_fs + d.max_fs;
+end
 
-% Verification Plot
+% -------------------------------------------------------------------------
+% Visualization
+% -------------------------------------------------------------------------
 if flg_plot
     figure;
     subplot(2,1,1);
-    plot(t_axis, mean(fr_rs_mat, 1, 'omitnan'), 'k');
-    xline(0, 'r--'); title('Grand Average RS (n=' + string(length(id_rs)) + ')');
+    plot(t_axis, mean(fr_rs, 1, 'omitnan'), 'k');
+    xline(0, 'r--');
+    title(['Grand Average RS (Rows=' num2str(size(fr_rs,1)) ')']);
 
     subplot(2,1,2);
-    plot(t_axis, mean(fr_fs_mat, 1, 'omitnan'), 'r');
-    xline(0, 'r--'); title('Grand Average FS (n=' + string(length(id_fs)) + ')');
+    plot(t_axis, mean(fr_fs, 1, 'omitnan'), 'r');
+    xline(0, 'r--');
+    title(['Grand Average FS (Rows=' num2str(size(fr_fs,1)) ')']);
 end
 
 end
