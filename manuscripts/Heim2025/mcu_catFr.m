@@ -5,11 +5,11 @@ function [fr_rs, fr_fs, t_axis, id_rs, id_fs] = mcu_catFr()
 %   fr_rs: Matrix of RS units (Rows x Time). Aligned to perturbation.
 %          Rows are packed by Mouse (MaxUnits per mouse).
 %   fr_fs: Matrix of FS units (Rows x Time). Aligned to perturbation.
-%   t_axis: Time vector relative to perturbation (0 = onset).
-%   id_rs: Mouse ID for each row in fr_rs.
+%   t_axis: Time vector relative to perturbation (in Hours).
+%   id_rs: Mouse ID for each row in fr_rs (e.g. 96 for 'lh96').
 %   id_fs: Mouse ID for each row in fr_fs.
 
-grp = 'wt';
+grp = 'mcu';
 mice = mcu_sessions(grp);
 vars = {'fr'; 'units'};
 
@@ -24,6 +24,11 @@ global_max = -inf;
 flg_plot = true;
 
 for iMouse = 1 : length(mice)
+
+    % Get Mouse ID Number (e.g. 'lh96' -> 96)
+    mStr = mice{iMouse};
+    mNum = str2double(regexp(mStr, '\d+', 'match', 'once'));
+    if isnan(mNum), mNum = iMouse; end % Fallback
 
     % 1. Load All Data for Mouse
     basepaths = mcu_sessions(mice{iMouse});
@@ -96,13 +101,14 @@ for iMouse = 1 : length(mice)
     data_store(iMouse).days = day_meta;
     data_store(iMouse).max_rs = max_rs;
     data_store(iMouse).max_fs = max_fs;
+    data_store(iMouse).id = mNum;
 end
 
 % -------------------------------------------------------------------------
 % Pass 2: Construct Final Matrices
 % -------------------------------------------------------------------------
 
-t_axis = global_min : global_max;
+t_axis = (global_min : global_max) / 60; % Hours
 n_total_points = length(t_axis);
 
 % Pre-allocate based on MAX rows per mouse (summed)
@@ -124,14 +130,14 @@ for iMouse = 1 : length(mice)
     % Calculate Row Ranges for this Mouse
     if d.max_rs > 0
         range_rs = curr_row_rs : (curr_row_rs + d.max_rs - 1);
-        id_rs(range_rs) = iMouse;
+        id_rs(range_rs) = d.id;
     else
         range_rs = [];
     end
 
     if d.max_fs > 0
         range_fs = curr_row_fs : (curr_row_fs + d.max_fs - 1);
-        id_fs(range_fs) = iMouse;
+        id_fs(range_fs) = d.id;
     else
         range_fs = [];
     end

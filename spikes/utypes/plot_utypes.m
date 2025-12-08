@@ -1,8 +1,6 @@
 function hAx = plot_utypes(varargin)
-% PLOT_UTYPES Generates plots for cell classification based on waveform and spike metrics.
-%
-% SUMMARY:
-% This function creates visualization plots for neuronal cell classification
+
+% PLOT_UTYPES creates visualization plots for neuronal cell classification
 % based on waveform characteristics and spike train metrics. It supports two
 % types of plots:
 %   1. Waveform Plots: Displays average spike waveforms for different cell

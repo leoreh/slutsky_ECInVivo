@@ -254,26 +254,5 @@ end
 % 
 %  5. In the mouse CA1 hippocampus, the actual biological ratio is
 %     approximately 85% to 90% Pyramidal. Still, a prior of 80% pPYR units
-%     is conservative, given electrodes often have a sampling bias toward
-%     Interneurons because they have higher firing rates (making them
-%     easier to detect/sort) compared to silent Pyramidal cells.
-%  ========================================================================
-
-%% ========================================================================
-%  NOTE: FEATURE TRANSFORMATION & POOLING STRATEGY
-%  ========================================================================
-%  1. Firing rates and burst indices typically follow
-%     Log-Normal distributions. We apply a Log10 transform to normalize
-%     these inputs, satisfying the Gaussian assumption required by the GMM.
-%
-%  2. Units are pooled across all animals prior to
-%     clustering. This ensures sufficient sample size for stable covariance
-%     estimation and relies on the fact that spike duration is a conserved
-%     biophysical constant across subjects.
-%
-%  3. We explicitly avoid Z-scoring within animals.
-%     In datasets with sampling bias (e.g., an animal with only Pyramidal
-%     cells), local Z-scoring incorrectly shifts the data mean to 0,
-%     causing Pyramidal cells to be misclassified as Interneurons. Pooling
-%     preserves the absolute decision boundaries.
+%     is conservative, given
 %  ========================================================================

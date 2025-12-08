@@ -1,8 +1,6 @@
 function fetTbl = utypes_features(varargin)
-% UTYPES_FEATURES Analyzes and visualizes waveform features for neuronal units.
-%
-% SUMMARY:
-% This function calculates and visualizes various waveform features and their
+
+% UTYPES_FEATURES calculates and visualizes various waveform features and their
 % relationships for neuronal units. It computes metrics like AUC, p-values,
 % and covariances between features, and generates visualization plots.
 %
@@ -24,7 +22,7 @@ function fetTbl = utypes_features(varargin)
 %   basepaths2vars, catfields
 %
 % HISTORY:
-%   Aug 2024 (AI Assisted) 
+%   LH - Aug 2024
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments using inputParser
@@ -53,12 +51,41 @@ fr = catfields([v.fr], 1);    % firing rate metrics
 % get number of units
 nUnits = length(swv.tp);
 
+%%%
+
+% Spike times features
+varMap.mfr = 'fr.mfr';
+varMap.royer = 'st.royer';
+varMap.royer2 = 'st.royer2';
+varMap.lidor = 'st.lidor';
+varMap.mizuseki = 'st.mizuseki';
+varMap.royer = 'st.royer';
+
+% Waveform features
+varMap.tp = 'swv.tp';
+varMap.inverted = 'swv.inverted';
+varMap.tpAmp = 'swv.tpAmp';
+varMap.tpRatio = 'swv.tpRatio';
+varMap.tpSlope = 'swv.tpSlope';
+varMap.spkw = 'swv.spkw';
+varMap.asym = 'swv.asym';
+varMap.hpk = 'swv.hpk';
+varMap.tailSlope = 'swv.tailSlope';
+varMap.tailAmp = 'swv.tailAmp';
+varMap.imin = 'swv.imin';
+varMap.peakDuration = 'swv.peakDuration';
+
+
+
+
+%%%
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % initial classification using threshold (for feature analysis)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Identify non-inverted spikes
-idxGood = ~swv.inverted & ~isnan(swv.tp);  
+idxGood = ~swv.inverted & ~isnan(swv.tp);
 nGood = sum(idxGood);
 
 % For non-inverted spikes, perform classification using trough-to-peak
@@ -86,18 +113,18 @@ end
 
 % Define pairs of features to plot (indices into pltFlds)
 featurePairs = [
-    1, 2;    
-    1, 3;    
-    1, 4;    
-    1, 5;    
-    1, 6;    
-    1, 7; 
+    1, 2;
+    1, 3;
+    1, 4;
+    1, 5;
+    1, 6;
+    1, 7;
     1, 8;
-    1, 9;  
+    1, 9;
     1, 12;
     6, 7;
     2, 4;
-];
+    ];
 
 % Initialize arrays for feature metrics
 nFields = length(pltFlds);
@@ -107,10 +134,10 @@ pVals = zeros(nFields, 1);
 % Calculate metrics for each feature
 for iFld = 1:nFields
     data = swv.(pltFlds{iFld})(idxGood);
-    
+
     % Calculate AUC
     [~, ~, ~, aucVals(iFld)] = perfcurve(unitType, data, 1);
-    
+
     % Calculate p-value
     pyrData = data(unitType == 1);
     intData = data(unitType == 2);
@@ -132,18 +159,18 @@ for iPair = 1:nPairs
     fld1 = pltFlds{featurePairs(iPair, 1)};
     fld2 = pltFlds{featurePairs(iPair, 2)};
     pairNames{iPair} = sprintf('%s_vs_%s', fld1, fld2);
-    
+
     % Get data for both features
     data1 = swv.(fld1)(idxGood);
     data2 = swv.(fld2)(idxGood);
-    
+
     % Calculate covariance for each class
     pyrIdx = unitType == 1;
     intIdx = unitType == 2;
-    
+
     covPyr = cov(data1(pyrIdx), data2(pyrIdx), 'omitrows');
     covInt = cov(data1(intIdx), data2(intIdx), 'omitrows');
-    
+
     covPyrVals(iPair) = covPyr(1,2);
     covIntVals(iPair) = covInt(1,2);
 end
@@ -178,28 +205,28 @@ fetTbl.CovInt(nFields+1:end) = covIntVals;
 if flgPlot
     % Plot histograms of waveform metrics
     figure('Name', 'Waveform Metrics Distributions', 'Position', [100 100 1200 800]);
-    
+
     % Calculate layout
     nCols = 4;
     nRows = ceil(nFields / nCols);
-    
+
     % Create tiled layout
     hTile = tiledlayout(nRows, nCols, 'TileSpacing', 'tight', 'Padding', 'tight');
-    
+
     % Plot histogram for each field
     for iFld = 1:nFields
         nexttile;
-        
+
         % Get data for this field
         data = swv.(pltFlds{iFld})(idxGood);
-        
+
         % Get stored metrics
         auc = fetTbl.AUC(iFld);
         pval = fetTbl.PValue(iFld);
-        
+
         % Create histogram
         histogram(data, 30, 'Normalization', 'probability');
-        
+
         % Create title with AUC and p-value
         titleStr = sprintf('%s\nAUC=%.3f, p=%.2e', pltFlds{iFld}, auc, pval);
         title(titleStr, 'Interpreter', 'none');
@@ -207,37 +234,37 @@ if flgPlot
         ylabel('Probability');
         grid on;
     end
-    
+
     % Plot feature pairs using gscatter
     figure('Name', 'Feature Pair Relationships', 'Position', [100 100 1200 800]);
-    
+
     % Calculate layout
     nCols = 3;
     nRows = ceil(nPairs / nCols);
-    
+
     % Create tiled layout
     hTile = tiledlayout(nRows, nCols, 'TileSpacing', 'tight', 'Padding', 'tight');
-    
+
     % Plot each pair
     for iPair = 1:nPairs
         nexttile;
-        
-        % Get feature names    
+
+        % Get feature names
         fld1 = pltFlds{featurePairs(iPair, 1)};
         fld2 = pltFlds{featurePairs(iPair, 2)};
-        
+
         % Get data for both features
         data1 = swv.(fld1)(idxGood);
         data2 = swv.(fld2)(idxGood);
-        
+
         % Get stored metrics
         pairIdx = nFields + iPair;
         covPyr = fetTbl.CovPyr(pairIdx);
         covInt = fetTbl.CovInt(pairIdx);
-        
+
         % Create scatter plot colored by unitType
         gscatter(data1, data2, unitType, [0 0 1; 1 0 0], '.', [], 'off');
-        
+
         % Add labels and title with covariance information
         xlabel(fld1, 'Interpreter', 'none');
         ylabel(fld2, 'Interpreter', 'none');
@@ -245,7 +272,7 @@ if flgPlot
             fld1, fld2, covPyr, covInt);
         title(titleStr, 'Interpreter', 'none');
         grid on;
-        
+
         % Add legend only to first plot
         if iPair == 1
             legend({'pPYR', 'pINT'}, 'Location', 'best');
@@ -255,4 +282,4 @@ end
 
 end
 
-% EOF 
+% EOF

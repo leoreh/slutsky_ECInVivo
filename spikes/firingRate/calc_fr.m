@@ -123,7 +123,11 @@ if exist(asFile, 'file') || ~isempty(btimes)
     if isempty(btimes)
         load(asFile, 'ss')
         fr.states.stateNames = ss.info.names;
-        btimes = ss.bouts.times;
+        if isfield(ss, 'bouts')
+            btimes = ss.bouts.times;
+        else
+            btimes = ss.stateEpochs;
+        end
     else
         fr.states.stateNames = split(num2str(1 : length(btimes)));
     end

@@ -61,7 +61,7 @@ function swv = spkwv_metrics(varargin)
 %   29 dec 21 LH      Added time to repolarization
 %   10 feb 23 LH      Handle cases where minimum is at end of wv
 %   Aug 2024          Updated documentation and streamlined code
-% 
+%
 % TO DO:
 % complex spike index (McHugh 1996), defined as percentage of first lag
 % isi that fall between 3 ms and 15 ms and whose second spike is
@@ -96,7 +96,7 @@ flgForce    = p.Results.flgForce;
 swvFile = fullfile(basepath, [basename, '.swv_metrics.mat']);
 sessionFile = fullfile(basepath, [basename, '.session.mat']);
 
-% check if already analyzed 
+% check if already analyzed
 if exist(swvFile, 'file') && ~flgForce
     load(swvFile)
     return
@@ -125,18 +125,31 @@ fb = cwtfilterbank('SignalLength', spklength * upsamp, 'VoicesPerOctave', 32,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if isempty(wv)
+    
     % load raw waveforms using spkwv_load
     swv_raw = spkwv_load('basepath', basepath, 'fs', fs);
 
-    % perform l2norm using MATLAB's vecnorm
-    swv_raw = cellfun(@(x) x ./ vecnorm(x, 2, 1),...
-        swv_raw, 'UniformOutput', false);
+    if ~isempty(swv_raw)
+        % perform l2norm using MATLAB's vecnorm
+        swv_raw = cellfun(@(x) x ./ vecnorm(x, 2, 1),...
+            swv_raw, 'UniformOutput', false);
 
-    % get mean and std
-    wv = cellfun(@(x) [mean(x, 2)]', swv_raw, 'UniformOutput', false);
-    wv = cell2mat(wv');
-    wv_std = cellfun(@(x) [std(x, [], 2)]', swv_raw, 'UniformOutput', false);
-    wv_std = cell2mat(wv_std');
+        % get mean and std
+        wv = cellfun(@(x) [mean(x, 2)]', swv_raw, 'UniformOutput', false);
+        wv = cell2mat(wv');
+        wv_std = cellfun(@(x) [std(x, [], 2)]', swv_raw, 'UniformOutput', false);
+        wv_std = cell2mat(wv_std');
+    
+    else
+        % backup: load from spikes struct
+        spkFile = fullfile(basepath, [basename, '.spikes.cellinfo.mat']);
+        load(spkFile, 'spikes');
+        swv_raw = cellfun(@(x) x ./ vecnorm(x', 2, 1),...
+            spikes.rawWaveform', 'UniformOutput', false);
+
+        wv = cell2mat(swv_raw);
+        wv_std = cell2mat(spikes.rawWaveform_std');
+    end
 end
 
 % interpolate
@@ -166,24 +179,24 @@ tailSlope = zeros(1, nunits);
 tpAmp = nan(1, nunits);
 tailAmp = nan(1, nunits);
 imin = nan(1, nunits);
-tpRatio = nan(1, nunits);    
-peakDuration = nan(1, nunits);       
-oneMinusLeftPeak = nan(1, nunits);   
-imax_pre = nan(1, nunits);   
+tpRatio = nan(1, nunits);
+peakDuration = nan(1, nunits);
+oneMinusLeftPeak = nan(1, nunits);
+imax_pre = nan(1, nunits);
 inverted = false(1, nunits);
 
 for iunit = 1 : nunits
-    
+
     % upsampled waveform
-    w = wv_interp(iunit, :);    
-        
+    w = wv_interp(iunit, :);
+
     % spike width by inverse of max frequency in spectrum (stark et al.,
     % 2013)
     [cfs, f, ~] = cwt(w, 'FilterBank', fb);
     [~, ifreq] = max(abs(squeeze(cfs)), [], 1);
     maxf = f(ifreq(round(length(w) / 2)));
     spkw(iunit) = 1000 / maxf;
-    
+
     % check if waveforn inverted
     if abs(max(w)) > abs(min(w))
         inverted(iunit) = true;
@@ -200,7 +213,7 @@ for iunit = 1 : nunits
         imin_post = length(w);
     end
     imin_post = imin_post + imax_post;
-    
+
     if isempty(maxVal_post)
         continue
     end
@@ -208,14 +221,14 @@ for iunit = 1 : nunits
     % amplitudes
     tpAmp(iunit) = maxVal_post - minVal;                        % amplitude trough to after peak
     tailAmp(iunit) = maxVal_post - minVal_post;                 % amplitude tail
-    
+
     % trough-to-peak time (artho et al., 2004) and asymmetry (Sirota et
     % al., 2008)
     if ~isempty(imax_post)
         tp(iunit) = (imax_post - imin(iunit)) * 1000 / nfs;      % samples to ms
         if ~isempty(maxVal_pre)
             asym(iunit) = (maxVal_post - maxVal_pre) / (maxVal_post + maxVal_pre);
-            
+
             % Calculate new metrics
             tpRatio(iunit) = abs(maxVal_post) / abs(minVal);  % peak-to-trough ratio
             peakDuration(iunit) = (imax_post - imax_pre(iunit)) * 1000 / nfs;  % duration between peaks in ms
@@ -224,21 +237,21 @@ for iunit = 1 : nunits
     else
         warning('waveform may be corrupted')
     end
-    
+
     % slope peak to end (Torrado Pacheco et al., Neuron, 2021)
     tailSlope(iunit) = tailAmp(iunit) / (imin_post - imax_post);
-    
+
     % slope trough to peak (no reference)
     tpSlope(iunit) = tpAmp(iunit) / (imax_post - imin(iunit));
-    
+
     % half peak width (Medrihan et al., 2017).
     [posPk, ~, posWdth] = findpeaks(w, nfs, 'SortStr', 'descend');
     [negPk, negLocs, negWdth] = findpeaks(-w, nfs, 'SortStr', 'descend');
     pkWdth = [posWdth, negWdth];
     [~, pkIdx] = max([posPk, negPk]);
     hpk(iunit) = pkWdth(pkIdx) * 1000;
-    
-   % time for repolarization (Ardid et al., J. Neurosci., 2015;
+
+    % time for repolarization (Ardid et al., J. Neurosci., 2015;
     % https://github.com/LofNaDI). this fails for most of our
     % cells.
     decayVal = maxVal_post - 0.25 * tpAmp(iunit);
@@ -246,7 +259,7 @@ for iunit = 1 : nunits
     if ~isempty(rtau_idx)
         rtau(iunit) = x_time(imax_post + rtau_idx) - x_time(imax_post);
     end
-    
+
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -254,13 +267,13 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 swv.info.runtime = datetime("now");
-swv.info.upsamp_met = 'spline'; 
-swv.info.upsamp = upsamp; 
+swv.info.upsamp_met = 'spline';
+swv.info.upsamp = upsamp;
 swv.wv = wv;
 swv.wv_std = wv_std;
 swv.tp = tp;
 swv.tpAmp = tpAmp;
-swv.tpRatio = tpRatio;  
+swv.tpRatio = tpRatio;
 swv.tpSlope = tpSlope;
 swv.spkw = spkw;
 swv.asym = asym;
@@ -269,11 +282,11 @@ swv.rtau = rtau;
 swv.tailSlope = tailSlope;
 swv.tailAmp = tailAmp;
 swv.imin = imin;
-swv.peakDuration = peakDuration;          
-swv.oneMinusLeftPeak = oneMinusLeftPeak;  
-swv.inverted = inverted;  
+swv.peakDuration = peakDuration;
+swv.oneMinusLeftPeak = oneMinusLeftPeak;
+swv.inverted = inverted;
 
-if flgSave       
+if flgSave
     save(swvFile, 'swv')
 end
 

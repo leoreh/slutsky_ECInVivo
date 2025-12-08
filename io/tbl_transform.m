@@ -3,7 +3,7 @@ function tblOut = tbl_transform(tbl, varargin)
 %
 % SUMMARY:
 % This function transforms table columns to improve their distributional
-% properties for statistical analysis. It applies log1p transformation to
+% properties for statistical analysis. It applies log transformation to
 % highly skewed variables, z-scoring to standardize variables for
 % regression analysis, and normalization relative to reference categories.
 %

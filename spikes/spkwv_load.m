@@ -68,14 +68,20 @@ spkFile = fullfile(basepath, [basename, '.spikes.cellinfo.mat']);
 datfile = fullfile(basepath, [basename, '.dat']);
 swvRawFile = fullfile(basepath, [basename, '.swv_raw.mat']);
 
-% check if raw waveforms already extracted 
+% check if raw waveforms already extracted
 if exist(swvRawFile, 'file')
     load(swvRawFile)
     return
 end
 
 % check if dat file exists, if not force loadSpk
+loadSpk = false;
 if ~exist(datfile, 'file')
+    % check if spk files exist
+    if isempty(dir(fullfile(basepath, '*.spk.*'))) || isempty(dir(fullfile(basepath, '*.clu.*')))
+        swv_raw = {};
+        return
+    end
     loadSpk = true;
     warning('dat file not found, loading from spk files instead')
 end

@@ -1,0 +1,154 @@
+
+% wrapper. gets multiple basepaths (manually or all paths in a master
+% folder), anaylzes each session for spike times, waveforms metrices, and
+% firing rate. loads and concatenates the metrices. plots the metrices with the
+% expectation that two clusters (rs and fs) will be easily visualized.
+% next step to is to apply a classifying algorithm (e.g. GMM) on selected
+% matrices (e.g. tp, spkw, and tau_rise)
+
+%% ========================================================================
+%  DATABASE (baseline sessions)
+%  ========================================================================
+
+clear
+
+% WT
+paths{1} = {...
+    'D:\Data\lh123\lh123_221219_094508',...
+    'D:\Data\lh126\lh126_230111_091208',...
+    'D:\Data\lh119\lh119_221114_081305',...
+    'E:\Data\lh86\lh86_210227_070000',...       % OP saline
+    'E:\Data\lh87\lh87_210523_100607',...       % OP saline
+    'E:\Data\lh93\lh93_210819_221608',...       % IT saline
+    'E:\Data\lh95\lh95_210824_083300',...       % IT saline
+    'E:\Data\lh111\lh111_220823_094417',...
+    'E:\Data\lh112\lh112_220831_100435',...     % OP CNO (no effect)
+    'E:\Data\lh119\lh119_221114_081305',...     % OP ketamine (no effect)
+    'E:\Data\lh120\lh120_221113_090526',...     % OP ketamine (no effect)
+    'E:\Data\lh121\lh121_221210_090041',...     % OP ketamine (maybe effect)
+    'E:\Data\lh129\lh129_230123_095540',...     % w/ 20 min LT
+    'E:\Data\lh130\lh130_230322_084541',...     % OP MK801 (no effect)
+    'E:\Data\lh106\lh106_220512_102302',...     % IP ketmamine
+    'E:\Data\lh99\lh99_211218_090630',...       % IT Saline (8 tet OE)
+    };
+
+% WT (MCU control)
+paths{2} = {...
+    'D:\Data\lh96\lh96_220120_090157',...
+    'D:\Data\lh100\lh100_220413_111004',...
+    'D:\Data\lh107\lh107_220518_091200',...
+    'D:\Data\lh122\lh122_221223_092656',...
+    'D:\Data\lh142\lh142_231005_091832',...
+    };
+
+% MCU-KO
+paths{3} = {...
+    'D:\Data\lh132\lh132_230413_094013',...
+    'D:\Data\lh133\lh133_230413_094013',...
+    'D:\Data\lh134\lh134_230504_091744',...
+    'D:\Data\lh136\lh136_230519_090043',...
+    'D:\Data\lh140\lh140_230619_090023',...
+    'D:\Data\lh137\lh137_230516_091852',...
+    };
+
+% WT (Refaela)
+paths{4} = {...
+    'E:\Data\Colleagues\RA\hDLX_Gq_WT5\040221_0655_24hr',...
+    'E:\Data\Colleagues\RA\hDLX_Gq_WT2\200820_bslDay1',...
+    'E:\Data\Colleagues\RA\hDLX_Gq_Tg\210820_bslDay2Raw2',...
+    'E:\Data\Colleagues\RA\Bruce\bruce_140519',...
+    'E:\Data\Colleagues\RA\tg4_210730_155700',...
+    };
+
+% MCU-KO (Refaela)
+paths{5} = {...
+    'E:\Data\Colleagues\RA\MCU1',...
+    'E:\Data\Colleagues\RA\MCU2',...
+    'E:\Data\Colleagues\RA\MCU3_20211203_084720',...
+    'E:\Data\Colleagues\RA\MCU4',...
+    'E:\Data\Colleagues\RA\MCU5',...
+    };
+
+% Combine basepaths but keep track on separation of groups
+basepaths = [paths{:}];
+nPaths = length(basepaths);
+
+
+%% ========================================================================
+%  ANAYLZE (unit features)
+%  ========================================================================
+
+flgSave = true;
+
+% load vars
+vars = {'swv_metrics', 'st_metrics', 'fr', 'spikes'};
+v = basepaths2vars('basepaths', basepaths, 'vars', vars);
+
+% reference path for checking most-recent fields
+redIdx = 17;
+
+for iPath = 1 : nPaths
+
+    % files
+    basepath = basepaths{iPath};
+    [~, basename] = fileparts(basepath);
+    cd(basepath)
+
+    % firing rate
+    isempty(v(iPath).fr)
+    fr = calc_fr(v(iPath).spikes.times, 'basepath', basepath,...
+        'graphics', true, 'binsize', 60, 'saveVar', flgSave,...
+        'smet', 'GK', 'winBL', [0, Inf], 'winCalc', [0, Inf], 'forceA', needs_update_fr);
+
+    % waveform metrices
+    swv = spkwv_metrics('basepath', basepath, 'flgSave', flgSave, 'flgForce', needs_update_swv);
+
+    % Spike timing metrics
+    st = spktimes_metrics('spktimes', v(iPath).spikes.times, 'sunits', [],...
+        'bins', {[0, Inf]}, 'flgForce', needs_update_st, 'flgSave', flgSave, 'flgAll', false);
+
+end
+
+
+
+%% ========================================================================
+%  CLASSIFY
+%  ========================================================================
+
+
+
+
+
+function needs_update = check_update(basepath, file_suffix, var_name, ref_fields)
+
+needs_update = false;
+
+% Construct filename
+[~, basename] = fileparts(basepath);
+tgt_file = fullfile(basepath, [basename, '.', file_suffix]);
+
+% 1. Check if file exists
+if ~exist(tgt_file, 'file')
+    needs_update = true;
+    return
+end
+
+% 2. Check fields
+try
+    tmp = load(tgt_file);
+    if ~isfield(tmp, var_name)
+        needs_update = true;
+        return;
+    end
+    curr_fields = fieldnames(tmp.(var_name));
+
+    % Check if all reference fields are present in current file
+    missing_fields = setdiff(ref_fields, curr_fields);
+    if ~isempty(missing_fields)
+        needs_update = true;
+        fprintf('Update required for %s. Missing fields: %s\n', basename, strjoin(missing_fields, ', '));
+    end
+catch
+    needs_update = true;
+end
+end
