@@ -102,15 +102,15 @@ if ~isempty(varsGrp)
     if isstring(varsGrp)
         varsGrp = cellstr(varsGrp);
     end
-    
+
     % Find unique combinations of grouping variables
     uGrps = unique(tblOut(:, varsGrp), 'rows');
-    
+
     % Find all group indices in advance and store in cell array
     idxGrps = cell(height(uGrps), 1);
     for iGrp = 1:height(uGrps)
         uRow = uGrps(iGrp, :);
-        
+
         % Find rows matching the current unique group combination
         idxGrp = true(height(tblOut), 1);
         for iVar = 1:length(varsGrp)
@@ -129,7 +129,7 @@ end
 
 for iVar = 1:length(processVars)
     varName = processVars{iVar};
-    
+
     % Apply transformations to each group
     for iGrp = 1:length(idxGrps)
         idxGrp = idxGrps{iGrp};
@@ -144,6 +144,7 @@ for iVar = 1:length(processVars)
                     offset = min(varData(varData > 0)) / 2;
                     varData(varData == 0) = offset;
                     varData = log10(varData);
+                    fprintf('Log-transforming variable: %s (skewness=%.2f)\n', varName, s);
                 end
             end
         end
@@ -153,29 +154,29 @@ for iVar = 1:length(processVars)
             % Find rows within this group that match the reference category of varNorm
             idxRef = tblOut.(varNorm) == catRef;
             idxRefGroup = idxGrp & idxRef;
-            
+
             % Calculate the mean for the reference category within this group
             refMean = mean(tblOut.(varName)(idxRefGroup), 'omitnan');
-            
+
             % Check for issues with reference mean
             if isnan(refMean) || refMean == 0
                 if refMean == 0
-                   refMean = eps; % Avoid division by zero, result will be large
+                    refMean = eps; % Avoid division by zero, result will be large
                 end
             end
-            
-            % Calculate percentage difference from reference            
+
+            % Calculate percentage difference from reference
             % For values above reference, we want them to be >100%
             % For values below reference, we want them to be <100%
             varDiff = (varData - refMean) / abs(refMean);
             aboveRef = varData > refMean;
             normData = 100 + (aboveRef .* abs(varDiff) - ~aboveRef .* abs(varDiff)) * 100;
-            
+
             % Set the reference group to exactly 100%
             % Find which elements within the current group are reference
             idxRefInGroup = idxRef(idxGrp);
             normData(idxRefInGroup) = 100;
-            
+
             % Update varData with normalized values
             varData = normData;
         end
@@ -184,7 +185,7 @@ for iVar = 1:length(processVars)
         if flgZ
             varData = zscore(varData);
         end
-        
+
         tblOut.(varName)(idxGrp) = varData;
     end
 end

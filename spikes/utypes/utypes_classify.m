@@ -1,15 +1,15 @@
 function unitType = utypes_classify(varargin)
 
-% UTYPES_CLASSIFY classifies neuronal units into putative pyramidal cells (pPYR)
-% and putative interneurons (pINT) using a two-step approach:
-% 1. Initial classification using trough-to-peak (tp) threshold
+% UTYPES_CLASSIFY classifies neuronal units into Regular Spiking (RS) and
+% Fast Spiking (FS) types using a two-step approach:
+% 1. Initial classification using trough-to-peak (tp) threshold.
 % 2. Optional refinement using GMM clustering starting from the threshold-based
-%    classification
+%    classification.
 %
 % METHODOLOGY:
-% Method 1 (altClassify = 1): Uses simple threshold-based classification on tp
+% Method 1 (altClassify = 1): Uses simple threshold-based classification on tp.
 % Method 2 (altClassify = 2): Uses GMM clustering initialized with threshold-based
-%                            classification results
+%                            classification results.
 %
 % INPUT (Optional Key-Value Pairs):
 %   basepaths    (cell array) Full paths to recording folders. If empty,
@@ -23,11 +23,12 @@ function unitType = utypes_classify(varargin)
 %                {false}
 %   v            (struct) Data structure containing metrics. If empty,
 %                data will be loaded from basepaths. {[]}
+%   fetTbl       (table) Table containing features, if already loaded in memory
 %
 % OUTPUT:
 %   unitType     (vector) Vector of unit classifications where:
-%                1 = putative pyramidal cell (pPYR)
-%                2 = putative interneuron (pINT)
+%                1 = Regular Spiking (RS) - Typically Pyramidal
+%                2 = Fast Spiking (FS) - Typically Interneuron
 %
 % DEPENDENCIES:
 %   basepaths2vars, catfields
@@ -39,86 +40,66 @@ function unitType = utypes_classify(varargin)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments using inputParser
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% arguments using inputParser
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 p = inputParser;
-addOptional(p, 'basepaths', @(x) iscell(x));
+addOptional(p, 'fetTbl', table(), @istable);
 addOptional(p, 'altClassify', 1, @(x) ismember(x, [1, 2, 3]));
 addOptional(p, 'flgSave', false, @islogical);
-addOptional(p, 'v', []);
+addOptional(p, 'basepaths', {}, @(x) iscell(x));
+addOptional(p, 'fetSelect', {}, @iscell);
 
 parse(p, varargin{:});
-basepaths = p.Results.basepaths;
+fetTbl = p.Results.fetTbl;
 altClassify = p.Results.altClassify;
 flgSave = p.Results.flgSave;
-v = p.Results.v;
+basepaths = p.Results.basepaths;
+fetSelect = p.Results.fetSelect;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preparations
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% load vars and concatenate metrics
-if isempty(v)
-    vars = {'swv_metrics', 'st_metrics', 'fr', 'units'};
-    v = basepaths2vars('basepaths', basepaths, 'vars', vars);
-end
-
-% concatenate metrics across recordings
-swv = catfields([v.swv], 2);  % waveform metrics
-st = catfields([v.st], 1);    % spike train metrics
-fr = catfields([v.fr], 1);    % firing rate metrics
-
 % get number of units
-nUnits = length(swv.tp);
+nUnits = height(fetTbl);
+initType = fetTbl.initType;
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% initial classification using threshold
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Identify good units (those that were classified)
+idxGood = ~fetTbl.bad;
 
-% Identify non-inverted spikes
-idxGood = ~swv.inverted;
-nGood = sum(idxGood);
+% Convert categorical initType to numeric codes 1=RS, 2=FS
+unitType = zeros(size(initType));
+unitType(initType == 'RS') = 1;
+unitType(initType == 'FS') = 2;
 
-% For non-inverted spikes, perform classification using trough-to-peak
-% pPYR: tp >= 0.4, pINT: tp < 0.4
-unitType = zeros(nGood, 1);
-pyrIdx = swv.tp(idxGood) >= 0.7;
-unitType(pyrIdx) = 1;       % pPYR
-unitType(~pyrIdx) = 2;      % pINT
-
+% Define features if not provided
+if isempty(fetSelect) && altClassify > 1
+    switch altClassify
+        case 2
+            fetSelect = {'tp', 'lidor', 'mfr'};
+        case 3
+            fetSelect = {'asym', 'hpk', 'tp'};
+    end
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % refine classification if requested
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Refine classification using GMM with threshold results as starting point
-switch altClassify
-    case 2
-        % Prepare feature matrix for GMM
-        mfr = fr.mfr(idxGood);
-        brst = log10(st.royer(idxGood) + eps);
-        brst = st.lidor(idxGood);
-        fet = [swv.tp(idxGood)', brst, mfr];
+if ~isempty(fetSelect)
 
-        % Get refined classification using GMM
-        unitType = gm2units(fet, unitType);
+    % Prepare feature matrix for GMM
+    fet = fetTbl{idxGood, fetSelect};
 
-    case 3
-        % Prepare feature matrix for GMM
-        tailSlope = (swv.tailSlope(idxGood)');
-        tailSlope = asinh(tailSlope);
-        fet = [swv.tpRatio(idxGood)', swv.asym(idxGood)',...
-            swv.hpk(idxGood)', swv.tpSlope(idxGood)', swv.tp(idxGood)'];
-        fet = [swv.asym(idxGood)',...
-            swv.hpk(idxGood)', swv.tp(idxGood)'];
-        % % fet = zscore(fet);
-
-        % Get refined classification using GMM
-        unitType = gm2units(fet, unitType);
+    % Get refined classification using GMM (on good units only)
+    unitType(idxGood) = gm2units(fet, unitType(idxGood));
 end
 
 % Create clean matrix for units struct
 clean = false(2, nUnits);
-clean(1, idxGood) = unitType == 1;  % pPYR
-clean(2, idxGood) = unitType == 2;  % pINT
+clean(1, idxGood) = unitType(idxGood) == 1;  % RS
+clean(2, idxGood) = unitType(idxGood) == 2;  % FS
 
 % Update unitType to span all units
 unitType = zeros(nUnits, 1);
@@ -173,41 +154,41 @@ function typeOut = gm2units(fet, typeIn)
 % INPUT:
 %   fet      (matrix) Feature matrix for GMM [nUnits x nFeatures]
 %   typeIn   (vector) Initial classification [nUnits x 1]
-%                     1 = putative pyramidal cell (pPYR)
-%                     2 = putative interneuron (pINT)
+%                     1 = Regular Spiking (RS)
+%                     2 = Fast Spiking (FS)
 %
 % OUTPUT:
 %   typeOut  (vector) Refined classification [nUnits x 1]
 
 % Learn the cluster shapes (Means and Covariances) from the data, using
 % 'typeIn' as starting point
-gm = fitgmdist(fet, 2, 'RegularizationValue', 0.0537, 'Start', typeIn,...
+gm = fitgmdist(fet, 2, 'Start', typeIn,...
     'CovarianceType', 'diagonal');
 
-% Assign clusters to pPYR and pINT based on the initial classification
+% Assign clusters to RS and FS based on the initial classification
 clusterLabels = cluster(gm, fet);
-pyrCounts = zeros(1, 2);
+rsCounts = zeros(1, 2);
 for iUnit = 1:2
-    pyrCounts(iUnit) = sum(clusterLabels == iUnit & typeIn == 1);
+    rsCounts(iUnit) = sum(clusterLabels == iUnit & typeIn == 1);
 end
-[~, pyrIdx] = max(pyrCounts);
-intIdx = 3 - pyrIdx;
+[~, rsIdx] = max(rsCounts);
+fsIdx = 3 - rsIdx;
 
 % Apply Bayesian Priors and Reconstruct the GMM. This shifts the decision
 % boundary without distorting the cluster shapes.
 priors = zeros(1, 2);
-pyrProbability = 0.8;
-prior(pyrIdx) = pyrProbability;
-prior(intIdx) = 1 - pyrProbability;
+rsProbability = 0.8;
+priors(rsIdx) = rsProbability;
+priors(fsIdx) = 1 - rsProbability;
 gm = gmdistribution(gm.mu, gm.Sigma, priors);
 
 % Final Classification.
 % Cluster assignment is now: Maximize (Likelihood * FixedPrior)
 clusterLabels = cluster(gm, fet);
 
-% Map internal GMM components back to output format (1=pPYR, 2=pINT)
-typeOut = ones(size(typeIn));          % Initialize all as pPYR
-typeOut(clusterLabels ~= pyrIdx) = 2;  % Set non-pPYR cluster to pINT
+% Map internal GMM components back to output format (1=RS, 2=FS)
+typeOut = ones(size(typeIn));          % Initialize all as RS
+typeOut(clusterLabels ~= rsIdx) = 2;   % Set non-RS cluster to FS
 
 end
 
@@ -242,18 +223,18 @@ end
 %     small interneurons), leading to incorrect data-driven priors.
 %
 %  4. Informed Priors vs. Forcing:
-%     By fixing the Prior (e.g., setting pINT = 0.2), we do not "force"
-%     dissimilar units into the interneuron cluster. We merely adjust the
-%     decision boundary. A unit with a distinct Interneuron waveform will
+%     By fixing the Prior (e.g., setting FS = 0.2), we do not "force"
+%     dissimilar units into the FS cluster. We merely adjust the
+%     decision boundary. A unit with a distinct FS waveform will
 %     still be classified as such because its Likelihood term is high.
 %     However, for "ambiguous" units lying between clusters, the fixed Prior
 %     shifts the classification probability toward the more common cell type
-%     (Pyramidal). This reduces False Positives for the rarer class and
+%     (RS). This reduces False Positives for the rarer class and
 %     aligns the results with established histological ratios (e.g., ~80/20
-%     Pyramidal/Interneuron split).
-% 
+%     RS/FS split).
+%
 %  5. In the mouse CA1 hippocampus, the actual biological ratio is
-%     approximately 85% to 90% Pyramidal. Still, a prior of 80% pPYR units
+%     approximately 85% to 90% Pyramidal. Still, a prior of 80% RS units
 %     is conservative, given electrodes often have a sampling bias toward
 %     Interneurons because they have higher firing rates (making them
 %     easier to detect/sort) compared to silent Pyramidal cells.
@@ -272,8 +253,33 @@ end
 %     biophysical constant across subjects.
 %
 %  3. We explicitly avoid Z-scoring within animals.
-%     In datasets with sampling bias (e.g., an animal with only Pyramidal
+%     In datasets with sampling bias (e.g., an animal with only RS
 %     cells), local Z-scoring incorrectly shifts the data mean to 0,
-%     causing Pyramidal cells to be misclassified as Interneurons. Pooling
+%     causing RS cells to be misclassified as FS. Pooling
 %     preserves the absolute decision boundaries.
+%  ========================================================================
+
+%% ========================================================================
+%  NOTE: REGULARIZATION (NUMERICAL STABILITY)
+%  ========================================================================
+%  An 'RegularizationValue' can be added to the GMM to ensure
+%  mathematical stability during the Expectation-Maximization (EM) algorithm.
+%
+%  1. The Problem (Singularity):
+%     GMMs require inverting the covariance matrix to calculate the
+%     Mahalanobis distance. If features are highly correlated (redundant)
+%     or if a cluster contains very few points (collapse), the covariance
+%     matrix becomes "singular" (non-invertible), causing the code to crash.
+%
+%  2. The Solution:
+%     Regularization adds a small constant (epsilon) to the diagonal of the
+%     covariance matrix: Sigma_new = Sigma + epsilon * IdentityMatrix.
+%     This artificially inflates the variance slightly, ensuring the matrix
+%     is always Positive Definite and invertible.
+%
+%  3. The Value:
+%     This specific value is likely empirical. Standard values typically
+%     range from 0.0001 to 0.1 depending on the scale of the data.
+%     If the value is too high, it "blurs" the clusters (artificially
+%     widening them). If too low, the code may error on outliers.
 %  ========================================================================

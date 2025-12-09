@@ -28,12 +28,12 @@ function fr = calc_fr(spktimes, varargin)
 %               will be named [saveVar].mat
 %
 % OUTPUT
-%   fr          struct 
+%   fr          struct
 %
 % CALLS
 %   times2rate
 %   InIntervals (fmat)
-% 
+%
 % TO DO LIST
 %               adjust winCalc to matrix (done)
 %               apply params (e.g. gini) to states
@@ -135,7 +135,7 @@ if exist(asFile, 'file') || ~isempty(btimes)
 
     % fit btimes to winCalc and count spikes in states
     for istate = 1 : nstates
-        
+
         if isempty(btimes{istate})
             fr.states.fr{istate} = zeros(nunits, 1);
             fr.states.tstamps{istate} = 0;
@@ -154,7 +154,7 @@ if exist(asFile, 'file') || ~isempty(btimes)
             fr.states.tstamps{istate} = [];
         end
     end
-       
+
     % mean across state
     fr.states.mfr = cellfun(@(x) mean(x, 2, 'omitnan'), fr.states.fr, 'uni', false);
     fr.states.mfr = cell2padmat(fr.states.mfr, 2);
@@ -169,7 +169,7 @@ if exist(asFile, 'file') || ~isempty(btimes)
             fr.states.gain(istate, :) = nan(1, length(nunits));
         end
     end
-    
+
     % normalized ratio (mizuseki, cell rep., 2008). organized as a 3d mat
     % of all pairs.
     for istate = 1 : nstates
@@ -180,11 +180,21 @@ if exist(asFile, 'file') || ~isempty(btimes)
                 fr.states.ratio(istate, istate2, :) =...
                     ((mat1 - mat2) ./ (mat1 + mat2)) * 100;
             else
-                 fr.states.ratio(istate, istate2, :) =...
+                fr.states.ratio(istate, istate2, :) =...
                     nan(1, length(nunits));
             end
         end
     end
+else
+    % Create dummy states structure if no states defined
+    fr.states.stateNames = {};
+    fr.states.fr = {};
+    fr.states.binedges = {};
+    fr.states.tstamps = {};
+    fr.states.binidx = [];
+    fr.states.gain = [];
+    fr.states.ratio = [];
+    fr.states.mfr = [];
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -211,7 +221,7 @@ fr.mfr_std = std(bl_fr, [], 2, 'omitnan');
 fr.norm = fr.strd ./ fr.mfr;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% more params 
+% more params
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Fano factor: variability in fr relative to mfr

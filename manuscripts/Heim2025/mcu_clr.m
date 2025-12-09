@@ -3,8 +3,9 @@ function [clr, lbl] = mcu_clr()
 clr.grp = [0.2 0.2 0.2;...
     0.75 0.55 0.35];
 clr.bac = [0.5, 0, 0.5, 0.5];
-clr.unitType = [0.1, 0.1, 0.4;...   % pPYR
-    0.6, 0.2, 0.2];                 % pINT
+clr.unitType = [0.1, 0.1, 0.4;...   % RS
+    0.6, 0.2, 0.2;...               % FS
+    0.5, 0.5, 0.5];                 % Other
 
 % Variable mapping
 lbl.varMap.FR = 'fr.mfr';
@@ -20,7 +21,7 @@ lbl.vars = {'fr', 'units', 'st_metrics', 'st_brst', 'prc'};
 
 % Labels
 lbl.grp = {'Control'; 'MCU-KO'};
-lbl.unit = {'RS', 'FS'};
+lbl.unit = {'RS', 'FS', 'Other'};
 lbl.day = {'BSL'; 'BAC1'; 'BAC2'; 'BAC3'; 'WASH'};
 
 % remove bac on and off

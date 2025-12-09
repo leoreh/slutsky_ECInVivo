@@ -1,17 +1,20 @@
 function hAx = plot_utypes(varargin)
 
-% PLOT_UTYPES ensures clear visualization of neuronal unit classifications
-% (Regular Spiking-RS vs Fast Spiking-FS).
-% It supports two types of plots:
-%   1. Waveform Plots: Displays average spike waveforms for differentiated cell
-%      types with optional scaling and interpolation.
+% PLOT_UTYPES creates visualization plots for neuronal cell classification
+% based on waveform characteristics and spike train metrics. It supports two
+% types of plots:
+%   1. Waveform Plots: Displays average spike waveforms for different cell
+%      types (e.g., putative pyramidal cells vs. interneurons), with optional
+%      scaling and interpolation to standardize waveform length.
 %   2. Scatter Plots: Illustrates the separation between cell types using
-%      various metrics (e.g., tp, lidor).
+%      various metrics (e.g., trough-to-peak duration vs. burstiness index).
 %
 % METHODOLOGY:
-% Waveforms in 'wv' mode are averaged and interpolated to 32 samples.
-% Optional scaling (b2uv) converts bits to microvolts.
-% Scatter plots visualize the clustering of RS vs FS units.
+% Waveforms can be provided as raw data or pre-processed metrics. Raw
+% waveforms are averaged across spikes and interpolated to a standard length
+% (32 samples). Optional scaling (b2uv) can be applied to convert to
+% microvolts. For scatter plots, any combination of waveform and spike train
+% metrics can be used to visualize cell type separation.
 %
 % INPUT (Optional Key-Value Pairs):
 %   basepaths    (cell array) Full paths to recording folders. If empty,
@@ -28,15 +31,14 @@ function hAx = plot_utypes(varargin)
 %                If empty, uses default colors. {[]}
 %   b2uv         (numeric) Conversion factor from bits to microvolts for
 %                waveform scaling. If empty, no scaling is applied. {[]}
-%   fetTbl       (table) Table containing features for plotting. Required for
-%                scatter/scatter3 plots.
-%   xFet         (char) Field from fetTbl for x-axis. {'tp'}
-%   yFet         (char) Field from fetTbl for y-axis. {'lidor'}
-%   zFet         (char) Field from fetTbl for z-axis. {'asym'}
+%   swvFld       (char) Field from swv_metrics to use for x-axis in scatter
+%                plot (e.g., 'tp' for trough-to-peak). {'tp'}
+%   stFld        (char) Field from st_metrics to use for y-axis in scatter
+%                plot (e.g., 'lidor' for burstiness index). {'lidor'}
 %   unitIdx      (numeric) Vector of unit classifications (1 x nUnits):
 %                0 - unclassified
-%                1 - Regular Spiking (RS)
-%                2 - Fast Spiking (FS)
+%                1 - putative pyramidal cell (pPYR)
+%                2 - putative interneuron (pINT)
 %                If empty, will use units.clean from basepaths2vars. {[]}
 %   hAx          (axes handle) Optional axes handle to plot into. If empty,
 %                creates new figure and axes. {[]}
@@ -55,31 +57,25 @@ function hAx = plot_utypes(varargin)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments using inputParser
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% arguments using inputParser
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 p = inputParser;
-addOptional(p, 'fetTbl', table(), @istable);
-addOptional(p, 'basepaths', {}, @(x) iscell(x));
+addOptional(p, 'basepaths', @(x) iscell(x));
 addOptional(p, 'flgRaw', true, @islogical);
 addOptional(p, 'plotType', 'wv', @(x) ismember(lower(x), {'wv', 'scatter', 'scatter3'}));
 addOptional(p, 'clr', [], @(x) isnumeric(x) && (isempty(x) || size(x, 2) == 3));
 addOptional(p, 'b2uv', 0.195, @(x) isnumeric(x) && (isempty(x) || isscalar(x)));
-addOptional(p, 'xFet', 'tp', @ischar);
-addOptional(p, 'yFet', 'lidor', @ischar);
-addOptional(p, 'zFet', 'asym', @ischar);
+addOptional(p, 'swvFld', 'tp', @ischar);  % field from swv_metrics for x-axis
+addOptional(p, 'stFld', 'lidor', @ischar);  % field from st_metrics for y-axis
 addOptional(p, 'unitIdx', [], @(x) isnumeric(x) && (isempty(x) || isvector(x)));
 addOptional(p, 'hAx', [], @(x) isempty(x) || ishandle(x) && strcmp(get(x, 'Type'), 'axes'));
 
 parse(p, varargin{:});
-fetTbl = p.Results.fetTbl;
 basepaths = p.Results.basepaths;
 flgRaw = p.Results.flgRaw;
 plotType = lower(p.Results.plotType);
 clr = p.Results.clr;
 b2uv = p.Results.b2uv;
-xFet = p.Results.xFet;
-yFet = p.Results.yFet;
-zFet = p.Results.zFet;
+swvFld = p.Results.swvFld;
+stFld = p.Results.stFld;
 unitIdx = p.Results.unitIdx;
 hAx = p.Results.hAx;
 
@@ -87,36 +83,31 @@ hAx = p.Results.hAx;
 % preparations
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% Load data if necessary
-v = [];
-if strcmp(plotType, 'wv')
-
-    if flgRaw
-        vars = {'swv_raw'};
-    else
-        vars = {'swv_metrics'};
-    end
-
-    if isempty(unitIdx)
-        vars = [vars, {'units'}];
-    end
-
-    v = basepaths2vars('basepaths', basepaths, 'vars', vars);
-else
-
-    % Prepare data for scatter
-    szVal  = normalize(10 .^ fetTbl.mfr, "range", [10 180])';
-    xVal = fetTbl.(xFet);
-    yVal = fetTbl.(yFet);
-    zVal = fetTbl.(zFet);
+% load state vars
+vars = {'swv_metrics', 'st_metrics', 'units', 'fr'};
+if flgRaw
+    vars = [vars, {'swv_raw'}];
 end
+v = basepaths2vars('basepaths', basepaths, 'vars', vars);
+
+% Get metrics
+swv = catfields([v.swv], 2);
+st = catfields([v.st], 1);
+fr = catfields([v.fr], 1);
 
 % get unit classifications
-if isempty(unitIdx)
+if isempty(unitIdx) || isscalar(unitIdx)
+    if isscalar(unitIdx)
+        unitFld = ['clean', num2str(unitIdx)];
+    else
+        unitFld = clean;
+    end
+    % concatenate units
     units = catfields([v.units], 2);
-    unitIdx = zeros(1, size(units.clean, 2));
-    unitIdx(units.clean(1, :)) = 1;  % RS
-    unitIdx(units.clean(2, :)) = 2;  % FS
+    % convert units.clean to unitIdx
+    unitIdx = zeros(1, size(units.(unitFld), 2));
+    unitIdx(units.(unitFld)(1, :)) = 1;  % pPYR
+    unitIdx(units.(unitFld)(2, :)) = 2;  % pINT
 end
 nUnits = length(unitIdx);
 
@@ -127,7 +118,7 @@ if isempty(clr)
 end
 
 % Update legend text with unit count
-txtUnit = {'RS', 'FS'};
+txtUnit = {'pPYR', 'pINT'};
 for iUnit = 1 : 2
     nUnitsType = sum(unitIdx == iUnit);
     txtUnit{iUnit} = sprintf('%s (n=%d)', txtUnit{iUnit}, nUnitsType);
@@ -147,7 +138,7 @@ switch plotType
         % Get waveforms
         nfiles = length(v);
         swv = cell(nfiles, 1);
-
+        
         if flgRaw
             % grab raw waveforms
             swv = [v(:).swv_raw];
@@ -168,7 +159,7 @@ switch plotType
             % Fig params
             txtY = 'Norm. Amplitude (a.u.)';
         end
-
+        
         % store waveform length and interpolate all to 32 samples
         wvLen = cellfun(@length, swv, 'uni', true);
         wv32 = wvLen == 32;
@@ -176,10 +167,10 @@ switch plotType
         % Interpolate all waveforms to 32 samples
         swv = cellfun(@(x) interp1(linspace(0, 1, length(x)), x, linspace(0, 1, 32)', 'spline'),...
             swv, 'UniformOutput', false);
-
+        
         % concate
         wv = cell2padmat(swv, 2)';
-
+        
         % apply b2uv scaling
         if ~isempty(b2uv) && flgRaw
             wv(wv32, :) = wv(wv32, :) * 0.195;
@@ -200,13 +191,13 @@ switch plotType
             hPlt(iUnit) = plot_stdShade('dataMat', wvUnit, 'xVal', xVal, ...
                 'hAx', hAx, 'clr', clr(iUnit, :), 'alpha', 0.5);
         end
-
+        
         % Format axes
         xlim([xVal(1), xVal(end)])
         xlabel('Time (ms)')
         ylabel('Amplitude (a.u.)')
         legend(hAx, txtUnit(~cellfun(@isempty, txtUnit)), 'Location', 'southeast')
-
+        
         % Add non-classified units
         wvUnit = wv(unitIdx == 0, :);
         if ~isempty(wvUnit) && 1
@@ -215,6 +206,12 @@ switch plotType
         end
 
     case 'scatter'
+        
+        % Select data (manually)
+        szVal  = normalize(fr.mfr, "range", [10 180])';
+        yVal  = st.(stFld);
+        xVal  = swv.(swvFld);
+        
         for iUnit = 1 : 2
             scatter(xVal(unitIdx == iUnit), yVal(unitIdx == iUnit),...
                 szVal(unitIdx == iUnit), clr(iUnit, :),...
@@ -222,28 +219,39 @@ switch plotType
         end
 
         % Format axes
-        xlabel(xFet, 'Interpreter', 'none')
-        ylabel(yFet, 'Interpreter', 'none')
-        legend(hAx, txtUnit, 'Location', 'best')
+        % xlim([0, max(swv.(swvFld))])
+        xlabel([upper(swvFld(1)) swvFld(2:end) ' (ms)'])
+        ylabel([upper(stFld(1)) stFld(2:end) ' (a.u.)'])
+        legend(hAx, txtUnit, 'Location', 'northwest')
 
     case 'scatter3'
+        
+        % Select data (manually)
+        szVal  = normalize(fr.mfr, "range", [20 180])';
+        zVal  = st.(stFld);
+        yVal  = swv.(swvFld);
+        xVal  = swv.tp;
+
+        % Plot scatter3
         for iUnit = 1 : 2
-            idx = unitIdx == iUnit;
-            scatter3(xVal(idx),...
-                yVal(idx),...
-                zVal(idx),...
-                szVal(idx),...
+            scatter3(xVal(unitIdx == iUnit),...
+                yVal(unitIdx == iUnit),...
+                zVal(unitIdx == iUnit),...
+                szVal(unitIdx == iUnit),...
                 clr(iUnit, :), 'filled', 'MarkerFaceAlpha', 0.3)
-            hold on
         end
         view(3)  % Set 3D view
         camproj(hAx, 'perspective');
 
         % Format axes
-        xlabel(xFet, 'Interpreter', 'none')
-        ylabel(yFet, 'Interpreter', 'none')
-        zlabel(zFet, 'Interpreter', 'none')
-        legend(hAx, txtUnit, 'Location', 'best')
+        % zlim([0, max(swv.(swvFld))])
+        % ylim([min(st.(stFld)), max(st.(stFld))])
+        % xlim([0, max(fr.mfr)])
+        % zlabel(['Waveform'])
+        ylabel('Y')
+        xlabel('X')
+        zlabel('Z')
+        % legend(hAx, txtUnit, 'Location', 'northwest')
         grid on
 
 end
@@ -254,3 +262,6 @@ end
 end
 
 % EOF
+
+
+

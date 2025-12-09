@@ -1,13 +1,20 @@
-
-% wrapper. gets multiple basepaths (manually or all paths in a master
-% folder), anaylzes each session for spike times, waveforms metrices, and
-% firing rate. loads and concatenates the metrices. plots the metrices with the
-% expectation that two clusters (rs and fs) will be easily visualized.
-% next step to is to apply a classifying algorithm (e.g. GMM) on selected
-% matrices (e.g. tp, spkw, and tau_rise)
+function utypes_db
+% UTYPES_DB Systematically investigates effects of cell classification schemes
+%
+% This script loads a defined database of sessions, ensures metrics are
+% calculated (using field comparison against a reference), and compares
+% two different unit classification methods (2 and 3).
+%
+% Comparisons include:
+%   - Firing rates of pINT and pPYR populations across methods.
+%   - Unit identity stability (swaps between pPYR and pINT).
+%   - Visualizations using plot_utypes.
+%
+% HISTORY:
+%   Dec 2024 - Systematic classification testing
 
 %% ========================================================================
-%  DATABASE (baseline sessions)
+%  DATABASE
 %  ========================================================================
 
 clear
@@ -56,20 +63,18 @@ paths{4} = {...
     'E:\Data\Colleagues\RA\hDLX_Gq_WT5\040221_0655_24hr',...
     'E:\Data\Colleagues\RA\hDLX_Gq_WT2\200820_bslDay1',...
     'E:\Data\Colleagues\RA\hDLX_Gq_Tg\210820_bslDay2Raw2',...
-    'E:\Data\Colleagues\RA\Bruce\bruce_140519',...
     'E:\Data\Colleagues\RA\tg4_210730_155700',...
     };
 
 % MCU-KO (Refaela)
 paths{5} = {...
-    'E:\Data\Colleagues\RA\MCU1',...
-    'E:\Data\Colleagues\RA\MCU2',...
+    'E:\Data\Colleagues\RA\MCU1_080621_0930',...
+    'E:\Data\Colleagues\RA\MCU2_080621_0930',...
     'E:\Data\Colleagues\RA\MCU3_20211203_084720',...
-    'E:\Data\Colleagues\RA\MCU4',...
-    'E:\Data\Colleagues\RA\MCU5',...
+    'E:\Data\Colleagues\RA\MCU4_211220_0834',...
+    'E:\Data\Colleagues\RA\MCU5_220322_1906',...
     };
 
-% Combine basepaths but keep track on separation of groups
 basepaths = [paths{:}];
 nPaths = length(basepaths);
 
@@ -85,7 +90,7 @@ vars = {'swv_metrics', 'st_metrics', 'fr', 'spikes'};
 v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 
 % reference path for checking most-recent fields
-redIdx = 17;
+refIdx = 17;
 
 for iPath = 1 : nPaths
 
@@ -95,60 +100,137 @@ for iPath = 1 : nPaths
     cd(basepath)
 
     % firing rate
-    isempty(v(iPath).fr)
-    fr = calc_fr(v(iPath).spikes.times, 'basepath', basepath,...
-        'graphics', true, 'binsize', 60, 'saveVar', flgSave,...
-        'smet', 'GK', 'winBL', [0, Inf], 'winCalc', [0, Inf], 'forceA', needs_update_fr);
+    if isempty(v(iPath).fr) || ~isempty(setdiff(fieldnames(v(refIdx).fr), fieldnames(v(iPath).fr)))
+        fr = calc_fr(v(iPath).spikes.times, 'basepath', basepath,...
+            'graphics', false, 'binsize', 60, 'saveVar', flgSave,...
+            'smet', 'GK', 'winBL', [0, Inf], 'winCalc', [0, Inf], 'forceA', true);
+    end
 
     % waveform metrices
-    swv = spkwv_metrics('basepath', basepath, 'flgSave', flgSave, 'flgForce', needs_update_swv);
+    if isempty(v(iPath).swv) || ~isempty(setdiff(fieldnames(v(refIdx).swv), fieldnames(v(iPath).swv)))
+        swv = spkwv_metrics('basepath', basepath, 'flgSave', flgSave, 'flgForce', true);
+    end
 
     % Spike timing metrics
-    st = spktimes_metrics('spktimes', v(iPath).spikes.times, 'sunits', [],...
-        'bins', {[0, Inf]}, 'flgForce', needs_update_st, 'flgSave', flgSave, 'flgAll', false);
+    if isempty(v(iPath).st) || ~isempty(setdiff(fieldnames(v(refIdx).st), fieldnames(v(iPath).st)))
+        st = spktimes_metrics('spktimes', v(iPath).spikes.times, 'sunits', [],...
+            'bins', {[0, Inf]}, 'flgForce', true, 'flgSave', flgSave, 'flgAll', false);
+    end
 
 end
-
 
 
 %% ========================================================================
 %  CLASSIFY
 %  ========================================================================
 
+% Re-load data
+vars = {'swv_metrics', 'st_metrics', 'fr', 'units'};
+v = basepaths2vars('basepaths', basepaths, 'vars', vars);
+
+% Create table of features for classification
+fetTbl = utypes_features('basepaths', basepaths, 'flgPlot', false);
+
+% Classify
+unitType = utypes_classify('basepaths', basepaths, 'altClassify', 2,...
+    'flgSave', false, 'fetTbl', fetTbl);
+
+% Plot
+fh = figure;
+swvFld = 'tp';
+stFld = 'lidor';
+hAx = subplot(1, 2, 1); hold on
+plot_utypes('basepaths', basepaths, 'flgRaw', false,...
+    'plotType', 'scatter', 'swvFld', swvFld, 'stFld', stFld,...
+    'unitIdx', unitType, 'hAx', hAx)
+set(hAx, 'YScale', 'log')
+
+hAx = subplot(1, 2, 2); hold on
+plot_utypes('basepaths', basepaths, 'flgRaw', false,...
+    'plotType', 'wv', 'swvFld', swvFld, 'stFld', stFld,...
+    'unitIdx', unitType, 'hAx', hAx)
 
 
+% Initialize aggregated storage
+agg.fr = [];
+agg.type_m2 = [];
+agg.type_m3 = [];
 
+for iPath = 1:nPaths
 
-function needs_update = check_update(basepath, file_suffix, var_name, ref_fields)
-
-needs_update = false;
-
-% Construct filename
-[~, basename] = fileparts(basepath);
-tgt_file = fullfile(basepath, [basename, '.', file_suffix]);
-
-% 1. Check if file exists
-if ~exist(tgt_file, 'file')
-    needs_update = true;
-    return
-end
-
-% 2. Check fields
-try
-    tmp = load(tgt_file);
-    if ~isfield(tmp, var_name)
-        needs_update = true;
-        return;
+    if isempty(v(iPath).fr) || isempty(v(iPath).swv)
+        continue;
     end
-    curr_fields = fieldnames(tmp.(var_name));
 
-    % Check if all reference fields are present in current file
-    missing_fields = setdiff(ref_fields, curr_fields);
-    if ~isempty(missing_fields)
-        needs_update = true;
-        fprintf('Update required for %s. Missing fields: %s\n', basename, strjoin(missing_fields, ', '));
-    end
-catch
-    needs_update = true;
+    % Method 2: GMM w/ FR, Burst, TP
+    type2 = utypes_classify('v', v(iPath), 'altClassify', 2, 'flgSave', false);
+
+    % Method 3: GMM w/ Shape metrics
+    type3 = utypes_classify('v', v(iPath), 'altClassify', 3, 'flgSave', false);
+
+    % Collect Data
+    agg.fr = [agg.fr; v(iPath).fr.mfr(:)];
+    agg.type_m2 = [agg.type_m2; type2(:)];
+    agg.type_m3 = [agg.type_m3; type3(:)];
 end
+
+
+%% ========================================================================
+%  VISUALIZATION
+%  ========================================================================
+
+methods = {'Method 2 (GMM+FR)', 'Method 3 (GMM+Shape)'};
+types = [agg.type_m2, agg.type_m3];
+
+% --- Figure 1: Firing Rate Distributions ---
+figure('Name', 'FR Distributions (M2 vs M3)', 'Color', 'w', 'Position', [100 100 1000 500]);
+tiledlayout(1, 2, 'Padding', 'compact', 'TileSpacing', 'compact');
+
+% pPYR
+nexttile;
+hold on;
+groupData = [];
+groupLabels = [];
+for m = 1:2
+    idx = types(:, m) == 1; % pPYR
+    fr_vals = agg.fr(idx);
+
+    groupData = [groupData; fr_vals];
+    groupLabels = [groupLabels; repmat(m, length(fr_vals), 1)];
 end
+boxplot(groupData, groupLabels, 'Labels', methods);
+title('pPYR Firing Rates');
+ylabel('Firing Rate (Hz)');
+grid on;
+ylim([0 30]);
+
+% pINT
+nexttile;
+hold on;
+groupData = [];
+groupLabels = [];
+for m = 1:2
+    idx = types(:, m) == 2; % pINT
+    fr_vals = agg.fr(idx);
+
+    groupData = [groupData; fr_vals];
+    groupLabels = [groupLabels; repmat(m, length(fr_vals), 1)];
+end
+boxplot(groupData, groupLabels, 'Labels', methods);
+title('pINT Firing Rates');
+ylabel('Firing Rate (Hz)');
+grid on;
+
+
+% --- Figure 2: Classification Swaps ---
+figure('Name', 'Classification Consistency', 'Color', 'w', 'Position', [150 150 500 400]);
+confusionchart(confusionmat(agg.type_m2, agg.type_m3), {'pPYR', 'pINT'}, ...
+    'Title', 'M2 vs M3', 'RowSummary', 'row-normalized', 'ColumnSummary', 'column-normalized');
+
+
+% --- Figure 3 & 4: Feature Space using plot_utypes ---
+plot_utypes('basepaths', basepaths, 'unitIdx', agg.type_m2', 'plotType', 'scatter');
+title('Classification: Method 2 (GMM+FR)');
+
+plot_utypes('basepaths', basepaths, 'unitIdx', agg.type_m3', 'plotType', 'scatter');
+title('Classification: Method 3 (GMM+Shape)');

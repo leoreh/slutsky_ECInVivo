@@ -63,17 +63,16 @@ paths{4} = {...
     'E:\Data\Colleagues\RA\hDLX_Gq_WT5\040221_0655_24hr',...
     'E:\Data\Colleagues\RA\hDLX_Gq_WT2\200820_bslDay1',...
     'E:\Data\Colleagues\RA\hDLX_Gq_Tg\210820_bslDay2Raw2',...
-    'E:\Data\Colleagues\RA\Bruce\bruce_140519',...
     'E:\Data\Colleagues\RA\tg4_210730_155700',...
     };
 
 % MCU-KO (Refaela)
 paths{5} = {...
-    'E:\Data\Colleagues\RA\MCU1',...
-    'E:\Data\Colleagues\RA\MCU2',...
+    'E:\Data\Colleagues\RA\MCU1_080621_0930',...
+    'E:\Data\Colleagues\RA\MCU2_080621_0930',...
     'E:\Data\Colleagues\RA\MCU3_20211203_084720',...
-    'E:\Data\Colleagues\RA\MCU4',...
-    'E:\Data\Colleagues\RA\MCU5',...
+    'E:\Data\Colleagues\RA\MCU4_211220_0834',...
+    'E:\Data\Colleagues\RA\MCU5_220322_1906',...
     };
 
 basepaths = [paths{:}];
@@ -129,86 +128,34 @@ end
 vars = {'swv_metrics', 'st_metrics', 'fr', 'units'};
 v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 
-% Initialize aggregated storage
-agg.fr = [];
-agg.type_m2 = [];
-agg.type_m3 = [];
+% Create table of features for classification
+fetTbl = utypes_features('basepaths', basepaths, 'flgPlot', true);
 
-for iPath = 1:nPaths
+% Classify
+unitType = utypes_classify('basepaths', basepaths, 'altClassify', 3,...
+    'flgSave', false, 'fetTbl', fetTbl);
 
-    if isempty(v(iPath).fr) || isempty(v(iPath).swv)
-        continue;
-    end
 
-    % Method 2: GMM w/ FR, Burst, TP
-    type2 = utypes_classify('v', v(iPath), 'altClassify', 2, 'flgSave', false);
+%% ========================================================================
+%  INSPECT
+%  ========================================================================
 
-    % Method 3: GMM w/ Shape metrics
-    type3 = utypes_classify('v', v(iPath), 'altClassify', 3, 'flgSave', false);
+% Separation by features
+fh = figure;
+xFet = 'tp';
+yFet = 'lidor';
+zFet = 'asym';
+hAx = subplot(1, 2, 1); hold on
+plot_utypes('basepaths', basepaths, 'fetTbl', fetTbl,...
+    'plotType', 'scatter3', 'xFet', xFet, 'yFet', yFet, 'zFet', zFet,...
+    'unitIdx', unitType, 'hAx', hAx)
 
-    % Collect Data
-    agg.fr = [agg.fr; v(iPath).fr.mfr(:)];
-    agg.type_m2 = [agg.type_m2; type2(:)];
-    agg.type_m3 = [agg.type_m3; type3(:)];
-end
+hAx = subplot(1, 2, 2); hold on
+plot_utypes('basepaths', basepaths, 'flgRaw', false,...
+    'plotType', 'wv', 'unitIdx', unitType, 'hAx', hAx)
 
 
 %% ========================================================================
 %  VISUALIZATION
 %  ========================================================================
 
-methods = {'Method 2 (GMM+FR)', 'Method 3 (GMM+Shape)'};
-types = [agg.type_m2, agg.type_m3];
-
-% --- Figure 1: Firing Rate Distributions ---
-figure('Name', 'FR Distributions (M2 vs M3)', 'Color', 'w', 'Position', [100 100 1000 500]);
-tiledlayout(1, 2, 'Padding', 'compact', 'TileSpacing', 'compact');
-
-% pPYR
-nexttile;
-hold on;
-groupData = [];
-groupLabels = [];
-for m = 1:2
-    idx = types(:, m) == 1; % pPYR
-    fr_vals = agg.fr(idx);
-
-    groupData = [groupData; fr_vals];
-    groupLabels = [groupLabels; repmat(m, length(fr_vals), 1)];
-end
-boxplot(groupData, groupLabels, 'Labels', methods);
-title('pPYR Firing Rates');
-ylabel('Firing Rate (Hz)');
-grid on;
-ylim([0 30]);
-
-% pINT
-nexttile;
-hold on;
-groupData = [];
-groupLabels = [];
-for m = 1:2
-    idx = types(:, m) == 2; % pINT
-    fr_vals = agg.fr(idx);
-
-    groupData = [groupData; fr_vals];
-    groupLabels = [groupLabels; repmat(m, length(fr_vals), 1)];
-end
-boxplot(groupData, groupLabels, 'Labels', methods);
-title('pINT Firing Rates');
-ylabel('Firing Rate (Hz)');
-grid on;
-
-
-% --- Figure 2: Classification Swaps ---
-figure('Name', 'Classification Consistency', 'Color', 'w', 'Position', [150 150 500 400]);
-confusionchart(confusionmat(agg.type_m2, agg.type_m3), {'pPYR', 'pINT'}, ...
-    'Title', 'M2 vs M3', 'RowSummary', 'row-normalized', 'ColumnSummary', 'column-normalized');
-
-
-% --- Figure 3 & 4: Feature Space using plot_utypes ---
-plot_utypes('basepaths', basepaths, 'unitIdx', agg.type_m2', 'plotType', 'scatter');
-title('Classification: Method 2 (GMM+FR)');
-
-plot_utypes('basepaths', basepaths, 'unitIdx', agg.type_m3', 'plotType', 'scatter');
-title('Classification: Method 3 (GMM+Shape)');

@@ -1,26 +1,30 @@
 function fetTbl = utypes_features(varargin)
 
-% UTYPES_FEATURES calculates waveform features to classify neuronal units.
-% It computes metrics, distributions, and basic classification for Regular Spiking (RS)
-% vs Fast Spiking (FS) units, creating a table of features for further analysis.
+% UTYPES_FEATURES calculates and visualizes various waveform features and their
+% relationships for neuronal units. It computes metrics like AUC, p-values,
+% and covariances between features, and generates visualization plots.
 %
 % INPUT (Optional Key-Value Pairs):
 %   basepaths    (cell array) Full paths to recording folders. If empty,
 %                uses current directory.
 %   flgPlot      (logical) Flag to generate visualization plots
 %                {true}
-%   v            (struct) Pre-loaded data structure.
 %
 % OUTPUT:
 %   fetTbl       (table) Table containing data for each unit:
 %                - UnitID: Unique unit identifier
-%                - initType: Classification (1=RS, 2=FS) based on TP duration
-%                - bad: Boolean flag for bad units (inverted or nan tp)
 %                - Feature columns...
+%
+% DEPENDENCIES:
+%   basepaths2vars, v2tbl, tbl_transform
+%
+% HISTORY:
+%   LH - Aug 2024
+%   Refactored Dec 2025 to use v2tbl and tbl_transform
 
-%% ========================================================================
-%  ARGUMENTS
-%  ========================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% arguments using inputParser
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 p = inputParser;
 addOptional(p, 'basepaths', {}, @(x) iscell(x));
 addOptional(p, 'flgPlot', true, @islogical);
@@ -72,6 +76,8 @@ varMap.asym = 'swv.asym';
 varMap.hpk = 'swv.hpk';
 varMap.tailSlope = 'swv.tailSlope';
 varMap.tailAmp = 'swv.tailAmp';
+% varMap.imin = 'swv.imin';
+% varMap.peakDuration = 'swv.peakDuration';
 
 % Create table using v2tbl
 fetTbl = v2tbl('v', v, 'varMap', varMap, 'tagFiles', tagFiles);
@@ -80,25 +86,23 @@ fetTbl = v2tbl('v', v, 'varMap', varMap, 'tagFiles', tagFiles);
 %  PRELIMINARY CLASSIFICATION
 %  ========================================================================
 
-% Identify bad units (inverted or missing tp)
-fetTbl.bad = fetTbl.inverted | isnan(fetTbl.tp);
-idxGood = ~fetTbl.bad;
 
+% Identify non-inverted spikes
+idxGood = fetTbl.inverted == 0 & ~isnan(fetTbl.tp);
 if sum(idxGood) == 0
     warning('No good units found (non-inverted).');
     return;
 end
 
 % For non-inverted spikes, perform classification using trough-to-peak
-% RS: tp >= 0.4 ms (Regular Spiking, typically Pyramidal)
-% FS: tp < 0.4 ms (Fast Spiking, typically Interneuron)
-initType = zeros(height(fetTbl), 1);
-initType(idxGood & (fetTbl.tp >= 0.4)) = 1;  % RS
-initType(idxGood & (fetTbl.tp < 0.4)) = 2;   % FS
+% pPYR: tp >= 0.4, pINT: tp < 0.4
+unitType = zeros(height(fetTbl), 1);
+unitType(idxGood & (fetTbl.tp >= 0.4)) = 1;  % pPYR
+unitType(idxGood & (fetTbl.tp < 0.4)) = 2;   % pINT
 
-% Create a categorical variable for plotting and storage
-fetTbl.initType = categorical(initType, [0 1 2], {'Other', 'RS', 'FS'});
-fetTbl.UnitType = fetTbl.initType; % Alias for compatibility if needed, using initType primarily
+% Create a categorical variable for plotting
+fetTbl.UnitType = categorical(unitType, [0 1 2], {'Other', 'pPYR', 'pINT'});
+
 
 %% ========================================================================
 %  TRANSFORM SKEWED FEATURES
@@ -106,7 +110,7 @@ fetTbl.UnitType = fetTbl.initType; % Alias for compatibility if needed, using in
 
 % Define features to plot (numeric columns excluding tags)
 pltFlds = fetTbl.Properties.VariableNames;
-excludedFields = {'UnitID', 'inverted', 'Name', 'Group', 'UnitType', 'initType', 'bad'};
+excludedFields = {'UnitID', 'inverted', 'Name', 'Group', 'UnitType'};
 numericIdx = varfun(@isnumeric, fetTbl, 'OutputFormat', 'uniform');
 pltFlds = pltFlds(numericIdx & ~ismember(pltFlds, excludedFields));
 
@@ -114,9 +118,9 @@ pltFlds = pltFlds(numericIdx & ~ismember(pltFlds, excludedFields));
 % Note: Using varsInc to limit transformation to features only
 fetTbl = tbl_transform(fetTbl, 'flgLog', true, 'varsInc', pltFlds);
 
-%% ========================================================================
-%  PLOT
-%  ========================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% calculate metrics and plot
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if flgPlot
     % Plot histograms of waveform metrics
@@ -134,14 +138,14 @@ if flgPlot
         data = fetTbl.(fieldName)(idxGood);
 
         % Simple classification based metrics
-        rsData = data(initType(idxGood) == 1);
-        fsData = data(initType(idxGood) == 2);
+        pyrData = data(unitType(idxGood) == 1);
+        intData = data(unitType(idxGood) == 2);
 
-        % Calculate ROC/AUC for RS vs FS separation power of this feature
+        % Calculate ROC/AUC for pPYR vs pINT separation power of this feature
         % (Just as a metric of how different they are)
-        [~,~,~,auc] = perfcurve(initType(idxGood), data, 1);
-        if ~isempty(rsData) && ~isempty(fsData)
-            pVal = ranksum(rsData, fsData);
+        [~,~,~,auc] = perfcurve(unitType(idxGood), data, 1);
+        if ~isempty(pyrData) && ~isempty(intData)
+            pVal = ranksum(pyrData, intData);
         else
             pVal = NaN;
         end
@@ -151,39 +155,25 @@ if flgPlot
         grid on;
     end
 
-    % Define colors:
-    % Categories in initType: {'Other', 'RS', 'FS'} -> Indices: 1, 2, 3
-    % mcu_clr order: Row 1 = RS, Row 2 = FS, Row 3 = Other
-    clr = mcu_clr();
-    clr = clr.unitType;
 
-    % Reorder to match categorical indices [Other; RS; FS]
-    clrGrp = [clr(3, :); clr(1, :); clr(2, :)];
-    % Add alpha
-    clrGrp = [clrGrp, repmat(0.5, 3, 1)];
-
+    % Define variables to include 
+    
     % Waveform features
-    % varsInc = {'tp', 'tpAmp', 'tpRatio', 'tpSlope', 'spkw', 'asym',...
-    %     'hpk', 'tailSlope', 'tailAmp'};
-    % plot_corrHist(fetTbl(idxGood, :), 'varsInc', varsInc, 'grpIdx', 'UnitType', ...
-    %     'clrGrp', clrGrp);
-    %
-    % % Spiking Features
-    % varsInc = {'mfr', 'royer', 'royer2', 'lidor', 'mizuseki'};
-    % plot_corrHist(fetTbl(idxGood, :), 'varsInc', varsInc, 'grpIdx', 'UnitType', ...
-    %     'clrGrp', clrGrp);
-    %
-    % % Selected
-    % varsRow = {'tp', 'asym', 'hpk', 'tpAmp'};
-    % varsCol = {'mfr', 'lidor'};
-    % plot_corrHist(fetTbl(idxGood, :), 'varsRow', varsRow, 'varsCol', varsCol,...
-    %     'grpIdx', 'UnitType', 'clrGrp', clrGrp);
+    varsInc = {'tp', 'tpAmp', 'tpRatio', 'tpSlope', 'spkw', 'asym',...
+        'hpk', 'tailSlope', 'tailAmp'};
+    plot_corrHist(fetTbl(idxGood, :), 'varsInc', varsInc, 'grpIdx', 'UnitType', ...
+        'clrGrp', [0 0 1 0.5; 1 0 0 0.5]); 
 
+    % Spiking Features
+    varsInc = {'mfr', 'royer', 'royer2', 'lidor', 'mizuseki'};
+    plot_corrHist(fetTbl(idxGood, :), 'varsInc', varsInc, 'grpIdx', 'UnitType', ...
+        'clrGrp', [0 0 1 0.5; 1 0 0 0.5]); 
+    
     % Selected
-    varsRow = {'tp', 'asym', 'hpk'};
-    varsCol = {'mfr', 'lidor', 'tpAmp'};
+    varsRow = {'tp', 'asym', 'hpk', 'tpAmp'};
+    varsCol = {'mfr', 'royer', 'royer2', 'lidor'};
     plot_corrHist(fetTbl(idxGood, :), 'varsRow', varsRow, 'varsCol', varsCol,...
-        'grpIdx', 'UnitType', 'clrGrp', clrGrp);
+        'grpIdx', 'UnitType', 'clrGrp', [0 0 1 0.5; 1 0 0 0.5]); 
 
 end
 
@@ -198,7 +188,7 @@ end
 %  waveform-based classification predicts other physiological properties.
 %
 %  1. Ground Truth:
-%     The classification labels (RS vs. FS) are defined
+%     The classification labels (Pyramidal vs. Interneuron) are defined
 %     solely by the Trough-to-Peak (TP) waveform duration.
 %
 %  2. Interpretation of AUC:
@@ -206,7 +196,7 @@ end
 %     align with these waveform labels.
 %     - AUC ≈ 1.0 or 0.0: Strong Correlation. The feature is an effective
 %       predictor. (Note: Values < 0.5 simply indicate an inverse
-%       relationship, e.g., Higher Rate = Lower Probability of RS).
+%       relationship, e.g., Higher Rate = Lower Probability of Pyramidal).
 %     - AUC ≈ 0.5: Random Chance. The feature provides no discriminative
 %       information for this classification.
 %  ========================================================================
