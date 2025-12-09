@@ -19,6 +19,8 @@ function hAx = plot_utypes(varargin)
 %   flgRaw       (logical) Flag to use raw waveforms instead of pre-processed
 %                metrics. If true, waveforms are averaged and interpolated.
 %                {true}
+%   flgOther     (logical) Flag to include "Other" (unclassified) units in plots.
+%                {false}
 %   plotType     (char) Type of plot to generate:
 %                'wv' - Waveform plot
 %                'scatter' - Scatter plot of cell separation
@@ -61,6 +63,7 @@ p = inputParser;
 addOptional(p, 'fetTbl', table(), @istable);
 addOptional(p, 'basepaths', {}, @(x) iscell(x));
 addOptional(p, 'flgRaw', true, @islogical);
+addOptional(p, 'flgOther', false, @islogical);
 addOptional(p, 'plotType', 'wv', @(x) ismember(lower(x), {'wv', 'scatter', 'scatter3'}));
 addOptional(p, 'clr', [], @(x) isnumeric(x) && (isempty(x) || size(x, 2) == 3));
 addOptional(p, 'b2uv', 0.195, @(x) isnumeric(x) && (isempty(x) || isscalar(x)));
@@ -74,6 +77,7 @@ parse(p, varargin{:});
 fetTbl = p.Results.fetTbl;
 basepaths = p.Results.basepaths;
 flgRaw = p.Results.flgRaw;
+flgOther = p.Results.flgOther;
 plotType = lower(p.Results.plotType);
 clr = p.Results.clr;
 b2uv = p.Results.b2uv;
@@ -120,6 +124,11 @@ if isempty(unitIdx)
 end
 nUnits = length(unitIdx);
 
+% Map 'Other' (0) to 3 if requested
+if flgOther
+    unitIdx(unitIdx == 0) = 3;
+end
+
 % Default colors if not provided
 if isempty(clr)
     clr = mcu_clr();
@@ -128,7 +137,11 @@ end
 
 % Update legend text with unit count
 txtUnit = {'RS', 'FS'};
-for iUnit = 1 : 2
+if flgOther
+    txtUnit{3} = 'Other';
+end
+
+for iUnit = 1 : length(txtUnit)
     nUnitsType = sum(unitIdx == iUnit);
     txtUnit{iUnit} = sprintf('%s (n=%d)', txtUnit{iUnit}, nUnitsType);
 end
@@ -189,7 +202,7 @@ switch plotType
         xVal = [-15 : 16] / 20000 * 1000;
 
         % Plot waveforms
-        for iUnit = 1 : 2
+        for iUnit = 1 : length(txtUnit)
             % grab average per unit type
             wvUnit = wv(unitIdx == iUnit, :);
             if isempty(wvUnit)
@@ -207,15 +220,8 @@ switch plotType
         ylabel('Amplitude (a.u.)')
         legend(hAx, txtUnit(~cellfun(@isempty, txtUnit)), 'Location', 'southeast')
 
-        % Add non-classified units
-        wvUnit = wv(unitIdx == 0, :);
-        if ~isempty(wvUnit) && 1
-            plot_stdShade('dataMat', wvUnit, 'xVal', xVal, ...
-                'hAx', hAx, 'clr', [1 0 0], 'alpha', 0.5);
-        end
-
     case 'scatter'
-        for iUnit = 1 : 2
+        for iUnit = 1 : length(txtUnit)
             scatter(xVal(unitIdx == iUnit), yVal(unitIdx == iUnit),...
                 szVal(unitIdx == iUnit), clr(iUnit, :),...
                 'filled', 'MarkerFaceAlpha', 0.5)
@@ -227,7 +233,7 @@ switch plotType
         legend(hAx, txtUnit, 'Location', 'best')
 
     case 'scatter3'
-        for iUnit = 1 : 2
+        for iUnit = 1 : length(txtUnit)
             idx = unitIdx == iUnit;
             scatter3(xVal(idx),...
                 yVal(idx),...

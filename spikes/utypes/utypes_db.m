@@ -84,6 +84,7 @@ nPaths = length(basepaths);
 %  ========================================================================
 
 flgSave = true;
+flgAnalyze = false;
 
 % load vars
 vars = {'swv_metrics', 'st_metrics', 'fr', 'spikes'};
@@ -92,33 +93,34 @@ v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 % reference path for checking most-recent fields
 refIdx = 17;
 
-for iPath = 1 : nPaths
+if flgAnalyze
+    for iPath = 1 : nPaths
 
-    % files
-    basepath = basepaths{iPath};
-    [~, basename] = fileparts(basepath);
-    cd(basepath)
+        % files
+        basepath = basepaths{iPath};
+        [~, basename] = fileparts(basepath);
+        cd(basepath)
 
-    % firing rate
-    if isempty(v(iPath).fr) || ~isempty(setdiff(fieldnames(v(refIdx).fr), fieldnames(v(iPath).fr)))
-        fr = calc_fr(v(iPath).spikes.times, 'basepath', basepath,...
-            'graphics', false, 'binsize', 60, 'saveVar', flgSave,...
-            'smet', 'GK', 'winBL', [0, Inf], 'winCalc', [0, Inf], 'forceA', true);
+        % firing rate
+        if isempty(v(iPath).fr) || ~isempty(setdiff(fieldnames(v(refIdx).fr), fieldnames(v(iPath).fr)))
+            fr = calc_fr(v(iPath).spikes.times, 'basepath', basepath,...
+                'graphics', false, 'binsize', 60, 'saveVar', flgSave,...
+                'smet', 'GK', 'winBL', [0, Inf], 'winCalc', [0, Inf], 'forceA', true);
+        end
+
+        % waveform metrices
+        if isempty(v(iPath).swv) || ~isempty(setdiff(fieldnames(v(refIdx).swv), fieldnames(v(iPath).swv)))
+            swv = spkwv_metrics('basepath', basepath, 'flgSave', flgSave, 'flgForce', true);
+        end
+
+        % Spike timing metrics
+        if isempty(v(iPath).st) || ~isempty(setdiff(fieldnames(v(refIdx).st), fieldnames(v(iPath).st)))
+            st = spktimes_metrics('spktimes', v(iPath).spikes.times, 'sunits', [],...
+                'bins', {[0, Inf]}, 'flgForce', true, 'flgSave', flgSave, 'flgAll', false);
+        end
+
     end
-
-    % waveform metrices
-    if isempty(v(iPath).swv) || ~isempty(setdiff(fieldnames(v(refIdx).swv), fieldnames(v(iPath).swv)))
-        swv = spkwv_metrics('basepath', basepath, 'flgSave', flgSave, 'flgForce', true);
-    end
-
-    % Spike timing metrics
-    if isempty(v(iPath).st) || ~isempty(setdiff(fieldnames(v(refIdx).st), fieldnames(v(iPath).st)))
-        st = spktimes_metrics('spktimes', v(iPath).spikes.times, 'sunits', [],...
-            'bins', {[0, Inf]}, 'flgForce', true, 'flgSave', flgSave, 'flgAll', false);
-    end
-
 end
-
 
 %% ========================================================================
 %  CLASSIFY
@@ -129,12 +131,12 @@ vars = {'swv_metrics', 'st_metrics', 'fr', 'units'};
 v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 
 % Create table of features for classification
-fetTbl = utypes_features('basepaths', basepaths, 'flgPlot', true);
+fetTbl = utypes_features('basepaths', basepaths, 'flgPlot', true, 'v', v);
 
 % Classify
 unitType = utypes_classify('basepaths', basepaths, 'altClassify', 3,...
     'flgSave', false, 'fetTbl', fetTbl);
-
+fetTbl.unitType = unitType;
 
 %% ========================================================================
 %  INSPECT
@@ -146,16 +148,38 @@ xFet = 'tp';
 yFet = 'lidor';
 zFet = 'asym';
 hAx = subplot(1, 2, 1); hold on
-plot_utypes('basepaths', basepaths, 'fetTbl', fetTbl,...
+plot_utypes('basepaths', basepaths, 'fetTbl', fetTbl, 'flgOther', true,...
     'plotType', 'scatter3', 'xFet', xFet, 'yFet', yFet, 'zFet', zFet,...
     'unitIdx', unitType, 'hAx', hAx)
 
-hAx = subplot(1, 2, 2); hold on
-plot_utypes('basepaths', basepaths, 'flgRaw', false,...
-    'plotType', 'wv', 'unitIdx', unitType, 'hAx', hAx)
-
-
 %% ========================================================================
-%  VISUALIZATION
+%  VISUALIZATION (MFR vs File)
 %  ========================================================================
 
+% Colors
+[clr, lbl] = mcu_clr();
+clr = clr.unitType; % [RS; FS; Other]
+
+figure('Name', 'MFR vs File', 'Position', [100 100 1200 600]);
+hold on
+
+% Prepare data: Map 0 (Other) to 3 for indexing
+uType = fetTbl.unitType;
+uType(uType == 0) = 3;
+yVal = fetTbl.mfr;
+xVal = categorical(fetTbl.Name);
+
+% Plot loop (RS, FS, Other)
+txtUnit = {'RS', 'FS', 'Other'};
+for i = 1:3
+    idx = uType == i;
+    if ~any(idx), continue; end
+
+    swarmchart(xVal(idx), yVal(idx), 10, clr(i, :), 'filled', ...
+        'MarkerFaceAlpha', 0.6, 'XJitterWidth', 0.6);
+end
+
+ylabel('MFR (log_{10} Hz)', 'Interpreter', 'tex');
+title('Mean Firing Rate by Session');
+legend(lbl.unit, 'Location', 'bestoutside');
+grid on

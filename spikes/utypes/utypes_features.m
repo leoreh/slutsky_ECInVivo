@@ -151,39 +151,37 @@ if flgPlot
         grid on;
     end
 
-    % Define colors:
+    % Define colors
     % Categories in initType: {'Other', 'RS', 'FS'} -> Indices: 1, 2, 3
     % mcu_clr order: Row 1 = RS, Row 2 = FS, Row 3 = Other
+    % Since only good units are plotted, no need to reorder.
     clr = mcu_clr();
     clr = clr.unitType;
-
-    % Reorder to match categorical indices [Other; RS; FS]
-    clrGrp = [clr(3, :); clr(1, :); clr(2, :)];
     % Add alpha
-    clrGrp = [clrGrp, repmat(0.5, 3, 1)];
+    clr = [clr, repmat(0.5, 3, 1)];
 
     % Waveform features
     % varsInc = {'tp', 'tpAmp', 'tpRatio', 'tpSlope', 'spkw', 'asym',...
     %     'hpk', 'tailSlope', 'tailAmp'};
     % plot_corrHist(fetTbl(idxGood, :), 'varsInc', varsInc, 'grpIdx', 'UnitType', ...
-    %     'clrGrp', clrGrp);
+    %     'clrGrp', clr);
     %
     % % Spiking Features
     % varsInc = {'mfr', 'royer', 'royer2', 'lidor', 'mizuseki'};
     % plot_corrHist(fetTbl(idxGood, :), 'varsInc', varsInc, 'grpIdx', 'UnitType', ...
-    %     'clrGrp', clrGrp);
+    %     'clrGrp', clr);
     %
     % % Selected
     % varsRow = {'tp', 'asym', 'hpk', 'tpAmp'};
     % varsCol = {'mfr', 'lidor'};
     % plot_corrHist(fetTbl(idxGood, :), 'varsRow', varsRow, 'varsCol', varsCol,...
-    %     'grpIdx', 'UnitType', 'clrGrp', clrGrp);
+    %     'grpIdx', 'UnitType', 'clrGrp', clr);
 
     % Selected
     varsRow = {'tp', 'asym', 'hpk'};
     varsCol = {'mfr', 'lidor', 'tpAmp'};
     plot_corrHist(fetTbl(idxGood, :), 'varsRow', varsRow, 'varsCol', varsCol,...
-        'grpIdx', 'UnitType', 'clrGrp', clrGrp);
+        'grpIdx', 'UnitType', 'clrGrp', clr);
 
 end
 
