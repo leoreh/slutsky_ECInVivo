@@ -47,7 +47,9 @@ end
 % Get mouse names for table
 tagFiles = struct();
 if ~isempty(basepaths)
-    tagFiles.Name = get_mname(basepaths);
+    tagFiles.Mouse = get_mname(basepaths);
+    [~, fileNames] = fileparts(basepaths);
+    tagFiles.File = fileNames;
 elseif isfield(v, 'name')
     warning('Basepaths not provided; Mouse names might be missing in table.');
 end
@@ -98,7 +100,7 @@ initType(idxGood & (fetTbl.tp < 0.4)) = 2;   % FS
 
 % Create a categorical variable for plotting and storage
 fetTbl.initType = categorical(initType, [0 1 2], {'Other', 'RS', 'FS'});
-fetTbl.UnitType = fetTbl.initType; % Alias for compatibility if needed, using initType primarily
+fetTbl.unitType = fetTbl.initType; % Alias for compatibility if needed, using initType primarily
 
 %% ========================================================================
 %  TRANSFORM SKEWED FEATURES
@@ -181,7 +183,7 @@ if flgPlot
     varsRow = {'tp', 'asym', 'hpk'};
     varsCol = {'mfr', 'lidor', 'tpAmp'};
     plot_corrHist(fetTbl(idxGood, :), 'varsRow', varsRow, 'varsCol', varsCol,...
-        'grpIdx', 'UnitType', 'clrGrp', clr);
+        'grpIdx', 'unitType', 'clrGrp', clr);
 
 end
 

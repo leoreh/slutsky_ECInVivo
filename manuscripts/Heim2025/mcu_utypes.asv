@@ -46,13 +46,13 @@ fetTbl = utypes_features('basepaths', {basepaths{:}}, 'flgPlot', true);
 
 % Classify
 fetSelect = {'asym', 'hpk', 'tp', 'lidor', 'mfr'};
-fetSelect = {'asym', 'hpk', 'tp', 'lidor'};
-rsPrior = 0.99;
-regVal = 0.01;
+fetSelect = {'asym', 'hpk', 'tp', 'lidor', 'mfr'};
+rsPrior = 0.95;
+regVal = 0.02;
 unitType = utypes_classify('basepaths', {basepaths{:}}, 'altClassify', 3,...
     'flgSave', false, 'fetTbl', fetTbl,...
     'fetSelect', fetSelect, 'regVal', regVal, 'rsPrior', rsPrior);
-fetTbl.unitType = categorical(unitType, [0, 1, 2], {'Other', 'RS', 'FS'});
+fetTbl.unitType = unitType;
 
 % Separation by features
 hFig = figure;

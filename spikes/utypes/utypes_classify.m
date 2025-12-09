@@ -21,9 +21,13 @@ function unitType = utypes_classify(varargin)
 %                {1}
 %   flgSave      (logical) Flag to save classification results
 %                {false}
+%   flgPlot      (logical) Flag to plot classification results
+%                {false}
 %   v            (struct) Data structure containing metrics. If empty,
 %                data will be loaded from basepaths. {[]}
 %   fetTbl       (table) Table containing features, if already loaded in memory
+%   rsPrior      (numeric) Prior probability of RS unit. {0.9}
+%   regVal       (numeric) Regularization value for GMM covariance. {0.01}
 %
 % OUTPUT:
 %   unitType     (vector) Vector of unit classifications where:
@@ -40,29 +44,30 @@ function unitType = utypes_classify(varargin)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments using inputParser
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% arguments using inputParser
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 p = inputParser;
 addOptional(p, 'fetTbl', table(), @istable);
 addOptional(p, 'altClassify', 1, @(x) ismember(x, [1, 2, 3]));
 addOptional(p, 'flgSave', false, @islogical);
+addOptional(p, 'flgPlot', false, @islogical);
 addOptional(p, 'basepaths', {}, @(x) iscell(x));
 addOptional(p, 'fetSelect', {}, @iscell);
+addOptional(p, 'rsPrior', 0.9, @isnumeric);
+addOptional(p, 'regVal', 0.01, @isnumeric);
 
 parse(p, varargin{:});
 fetTbl = p.Results.fetTbl;
 altClassify = p.Results.altClassify;
 flgSave = p.Results.flgSave;
+flgPlot = p.Results.flgPlot;
 basepaths = p.Results.basepaths;
 fetSelect = p.Results.fetSelect;
+rsPrior = p.Results.rsPrior;
+regVal = p.Results.regVal;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preparations
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% GMM fit params (see comments at end)
-rsPrior = 0.95;      % Probability of RS unit (vs Fs unit). 
-regVal = 0.01;      % Regularization value
 
 % get number of units
 nUnits = height(fetTbl);
@@ -81,9 +86,10 @@ if isempty(fetSelect) && altClassify > 1
     switch altClassify
         case 2
             fetSelect = {'tp', 'lidor', 'mfr'};
-            % fetSelect = {'asym', 'hpk', 'tp', 'lidor', 'mfr'};
+            fetSelect = {'asym', 'hpk', 'tp', 'lidor', 'mfr'};
         case 3
             fetSelect = {'asym', 'hpk', 'tp', 'lidor'};
+            fetSelect = {'asym', 'hpk', 'tp'};
     end
 end
 
@@ -105,6 +111,7 @@ end
 clean = false(2, nUnits);
 clean(1, idxGood) = unitType(idxGood) == 1;  % RS
 clean(2, idxGood) = unitType(idxGood) == 2;  % FS
+fetTbl.unitType = categorical(unitType, [0, 1, 2], {'Other', 'RS', 'FS'});
 
 % Update unitType to span all units
 unitType = zeros(nUnits, 1);
@@ -141,6 +148,17 @@ if flgSave
         % Save updated units structure
         save(uFile, 'units');
     end
+end
+
+if flgPlot
+    clr = mcu_clr;
+    cfg.xVar = 'tp';
+    cfg.yVar = 'lidor';
+    cfg.szVar = 'mfr';
+    cfg.grpVar = 'unitType';
+    cfg.clr = clr.unitType([3 : -1 : 1], :);
+    cfg.alpha = 0.4;
+    plot_tblGUI(fetTbl, 'cfg', cfg)
 end
 
 end

@@ -58,7 +58,7 @@ paths{3} = {...
     'D:\Data\lh137\lh137_230516_091852',...
     };
 
-% WT (Refaela)
+% Refaela (WT & Tg)
 paths{4} = {...
     'E:\Data\Colleagues\RA\raWT5Gq\raWT5Gq_040221_0655',...
     'E:\Data\Colleagues\RA\raWT2Gq\raWT2Gq_200820_bslDay1',...
@@ -74,6 +74,9 @@ paths{5} = {...
     'E:\Data\Colleagues\RA\raMCU4\raMCU4_211220_0834',...
     'E:\Data\Colleagues\RA\raMCU5\raMCU5_220322_1906',...
     };
+
+% WT (Bac Washout)
+% paths{6} = mcu_sessions('wt_wsh');
 
 basepaths = [paths{:}];
 nPaths = length(basepaths);
@@ -137,7 +140,8 @@ fetTbl = utypes_features('basepaths', basepaths, 'flgPlot', false, 'v', v);
 % Classify
 unitType = utypes_classify('basepaths', basepaths, 'altClassify', 2,...
     'flgSave', false, 'fetTbl', fetTbl);
-fetTbl.unitType = unitType;
+fetTbl.unitType = categorical(unitType, [0, 1, 2], {'Other', 'RS', 'FS'});
+
 
 %% ========================================================================
 %  INSPECT
@@ -158,19 +162,6 @@ plot_utypes('basepaths', basepaths, 'fetTbl', fetTbl, 'flgOther', true,...
 %  VISUALIZATION (MFR vs File)
 %  ========================================================================
 
-% Colors
-[clr, lbl] = mcu_clr();
-clr = clr.unitType; % [RS; FS; Other]
-
-frLim = [-2.5 2];
-
-figure('Name', 'FR vs File', 'Position', [100 100 1600 800]);
-
-% Prepare data: Map 0 (Other) to 3 for indexing
-uType = fetTbl.unitType;
-uType(uType == 0) = 3;
-yVal = fetTbl.mfr;
-
 % Define Groups based on 'paths' structure
 grpIdx = cell(length(paths), 1);
 lastIdx = 0;
@@ -179,10 +170,24 @@ for iUnit = 1:length(paths)
     grpIdx{iUnit} = lastIdx + (1:nFiles);
     lastIdx = lastIdx + nFiles;
 end
-grpNames = {'WT', 'WT (MCU)', 'MCU-KO', 'WT (Ref)', 'MCU-KO (Ref)'};
+grpNames = {'WT (Older)', 'WT (MCU Control)', 'MCU-KO', 'Refaela', 'Refaela (MCU-KO)'};
 nGroups = length(paths);
 
+
+% Prepare data: Map 0 (Other) to 3 for indexing
+uType = fetTbl.unitType;
+uType(uType == 0) = 3;
+yVal = fetTbl.mfr;
+
+
+% Organize figure
+figure('Name', 'FR vs File', 'Position', [100 100 1600 800]);
 hTile = tiledlayout(3, nGroups, 'TileSpacing', 'tight', 'Padding', 'tight');
+
+% Colors
+[clr, lbl] = mcu_clr();
+clr = clr.unitType; % [RS; FS; Other]
+frLim = [-2.5 2];
 
 % Iterate Groups (Columns)
 axSwarm = gobjects(1, nGroups);
@@ -197,20 +202,15 @@ for iGrp = 1:nGroups
     currNames = get_mname(currBase);
 
     % Filter Table for this Group
-    inGroup = ismember(fetTbl.Name, currNames);
-
-    subY = yVal(inGroup);
-
-    % Remove unused categories so swarmchart only shows files in this group
-    subX = removecats(fetTbl.Name(inGroup));
-
+    inGroup = ismember(fetTbl.Mouse, currNames);
     subType = uType(inGroup);
+    subY = yVal(inGroup);
+    subX = removecats(fetTbl.Mouse(inGroup));
 
     % --- Top Plot: Swarm (FR vs File) ---
     axSwarm(iGrp) = nexttile(iGrp);
     hold on
 
-    % Plot loop (RS, FS, Other)
     for iUnit = 1:3
         unitIdx = subType == iUnit;
         if ~any(unitIdx)
@@ -228,34 +228,12 @@ for iGrp = 1:nGroups
         set(gca, 'YTickLabel', []);
     end
     ylim(frLim);
-
     title(grpNames{iGrp}, 'Interpreter', 'none');
     xtickangle(45);
     grid on
 
-    % --- Middle Plot: Input for Box Plot ---
-    axBox(iGrp) = nexttile(iGrp + nGroups);
-
-    % Prepare data (Rows for plot_boxMean)
-    rsData = subY(subType == 1)';
-    fsData = subY(subType == 2)';
-
-    if isempty(rsData), rsData = nan; end
-    if isempty(fsData), fsData = nan; end
-
-    plot_boxMean({rsData; fsData}, 1, clr([1,2], :), 0.5, 'box', axBox(iGrp), {'RS', 'FS'});
-
-    if iGrp == 1
-        ylabel('FR (log_{10} Hz)', 'Interpreter', 'tex');
-    else
-        ylabel('');
-        set(gca, 'YTickLabel', []);
-    end
-    ylim(frLim);
-    grid on
-
-    % --- Bottom Plot: Distribution (FR) ---
-    axHist(iGrp) = nexttile(iGrp + 2*nGroups);
+    % --- Middle Plot: Distribution (FR) ---
+    axHist(iGrp) = nexttile(iGrp + nGroups);
     hold on
 
     % Histogram for RS and FS
@@ -266,18 +244,12 @@ for iGrp = 1:nGroups
         unitIdx = subType == iUnit;
         nCounts(iUnit) = sum(unitIdx);
 
-        if ~any(unitIdx)
-            continue;
-        end
-
-        currData = subY(unitIdx);
-
         % Histogram (FR on X-axis)
-        hHist(iUnit) = histogram(currData, 'BinWidth', 0.2, 'FaceColor', clr(iUnit,:), ...
+        hHist(iUnit) = histogram(subY(unitIdx), 'BinWidth', 0.2, 'FaceColor', clr(iUnit,:), ...
             'FaceAlpha', 0.4, 'EdgeColor', 'none', 'Normalization', 'probability');
 
         % Mean Line
-        xline(nanmean(currData), '--', 'Color', clr(iUnit,:), 'LineWidth', 1.5, ...
+        xline(nanmean(subY(unitIdx)), '--', 'Color', clr(iUnit,:), 'LineWidth', 1.5, ...
             'HandleVisibility', 'off');
     end
 
@@ -296,11 +268,53 @@ for iGrp = 1:nGroups
     else
         ylabel('Prob.');
     end
-
     xlim(frLim);
+    grid on
+
+    % --- Bottom Plot: Box Plot (RS vs FS) ---
+    axBox(iGrp) = nexttile(iGrp + 2*nGroups);
+
+    rsData = 10 .^ subY(subType == 1)';
+    fsData = 10 .^ subY(subType == 2)';
+
+    % T-Test
+    if ~isempty(rsData) && ~isempty(fsData)
+        [~, p] = ttest2(rsData, fsData);
+        titleStr = sprintf('RS vs FS (p=%.1e)', p);
+    else
+        titleStr = 'RS vs FS';
+    end
+
+    % Plot
+    hold(axBox(iGrp), 'on');
+    xJit = 0.5;
+
+    if ~isempty(rsData)
+        swarmchart(axBox(iGrp), ones(size(rsData)), rsData, 10, clr(1, :), 'filled', ...
+            'MarkerFaceAlpha', 0.6, 'XJitterWidth', xJit);
+    end
+
+    if ~isempty(fsData)
+        swarmchart(axBox(iGrp), 2*ones(size(fsData)), fsData, 10, clr(2, :), 'filled', ...
+            'MarkerFaceAlpha', 0.6, 'XJitterWidth', xJit);
+    end
+
+    xlim(axBox(iGrp), [0.5, 2.5]);
+    xticks(axBox(iGrp), [1, 2]);
+    xticklabels(axBox(iGrp), {'RS', 'FS'});
+
+    if iGrp == 1
+        ylabel(axBox(iGrp), 'FR (Hz)', 'Interpreter', 'tex');
+    else
+        ylabel(axBox(iGrp), '');
+        set(axBox(iGrp), 'YTickLabel', []);
+    end
+    % ylim(frLim);
+    title(titleStr, 'FontWeight', 'normal', 'Interpreter', 'none');
     grid on
 end
 
 % Formatting
-linkaxes([axSwarm, axBox], 'y');
+% linkaxes([axSwarm, axBox], 'y');
+linkaxes([axSwarm], 'y');
 linkaxes(axHist, 'xy');

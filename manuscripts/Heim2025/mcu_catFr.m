@@ -1,4 +1,4 @@
-function [fr_rs, fr_fs, t_axis, id_rs, id_fs] = mcu_catFr()
+function [fr_rs, fr_fs, t_axis, id_rs, id_fs] = mcu_catFr(fetTbl)
 % MCU_CATFR - Concatenate and align firing rates from all mice
 %
 % Returns:
@@ -9,7 +9,9 @@ function [fr_rs, fr_fs, t_axis, id_rs, id_fs] = mcu_catFr()
 %   id_rs: Mouse ID for each row in fr_rs (e.g. 96 for 'lh96').
 %   id_fs: Mouse ID for each row in fr_fs.
 
-grp = 'mcu';
+if nargin < 1, fetTbl = []; end
+
+grp = 'wt';
 mice = mcu_sessions(grp);
 vars = {'fr'; 'units'};
 
@@ -21,7 +23,7 @@ data_store = struct();
 global_min = inf;
 global_max = -inf;
 
-flg_plot = true;
+flgPlot = true;
 
 for iMouse = 1 : length(mice)
 
@@ -53,9 +55,9 @@ for iMouse = 1 : length(mice)
         'Statistic', 'mean', 'minDistance', 5, ...
         'MaxNumChanges', 1);
 
-    if flg_plot
+    if flgPlot
         figure; plot(mfr_smooth); hold on; xline(pertOnset, 'r');
-        title(['Mouse ' mice{iMouse} ' Perturbation: ' num2str(pertOnset)]);
+        title(['Mouse ' mice{iMouse}]);
     end
 
     % 3. Analyze Unit Counts and Time
@@ -66,17 +68,25 @@ for iMouse = 1 : length(mice)
 
     for iDay = 1 : length(v)
         % Identify Unit Types for this day
-        u_clean = v(iDay).units.clean;
-        % RS: Row 1 == 1
-        idx_rs = u_clean(1, :) == 1;
-        % FS: Row 2 == 1
-        idx_fs = u_clean(2, :) == 1;
+        if ~isempty(fetTbl)
+            [~, fName] = fileparts(basepaths{iDay});
 
-        n_rs = sum(idx_rs);
-        n_fs = sum(idx_fs);
+            % Find rows for this file
+            isMatch = string(fetTbl.File) == string(fName);
+            subTbl = fetTbl(isMatch, :);
 
-        max_rs = max(max_rs, n_rs);
-        max_fs = max(max_fs, n_fs);
+            % Extract types. Assume order matches v(iDay)
+            idx_rs = (subTbl.unitType == 1)';
+            idx_fs = (subTbl.unitType == 2)';
+
+        else
+            u_clean = v(iDay).units.clean;
+            idx_rs = u_clean(1, :) == 1; % RS: Row 1 == 1
+            idx_fs = u_clean(2, :) == 1; % FS: Row 2 == 1
+        end
+
+        max_rs = max(max_rs, sum(idx_rs));
+        max_fs = max(max_fs, sum(idx_fs));
 
         % Time Alignment
         traces = v(iDay).fr.strd;
@@ -177,7 +187,7 @@ end
 % -------------------------------------------------------------------------
 % Visualization
 % -------------------------------------------------------------------------
-if flg_plot
+if flgPlot
     figure;
     subplot(2,1,1);
     plot(t_axis, mean(fr_rs, 1, 'omitnan'), 'k');
