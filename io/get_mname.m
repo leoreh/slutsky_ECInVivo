@@ -16,7 +16,7 @@ for ipath = 1 : length(basepaths)
     else
         % Fallback: extract the last folder name from the path
         pathParts = strsplit(basepaths{ipath}, '\');
-        mname{ipath} = pathParts{end};
+        mname{ipath} = pathParts{end - 1};
     end
 end
 

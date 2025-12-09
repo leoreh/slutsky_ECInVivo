@@ -60,19 +60,19 @@ paths{3} = {...
 
 % WT (Refaela)
 paths{4} = {...
-    'E:\Data\Colleagues\RA\hDLX_Gq_WT5\040221_0655_24hr',...
-    'E:\Data\Colleagues\RA\hDLX_Gq_WT2\200820_bslDay1',...
-    'E:\Data\Colleagues\RA\hDLX_Gq_Tg\210820_bslDay2Raw2',...
-    'E:\Data\Colleagues\RA\tg4_210730_155700',...
+    'E:\Data\Colleagues\RA\raWT5Gq\raWT5Gq_040221_0655',...
+    'E:\Data\Colleagues\RA\raWT2Gq\raWT2Gq_200820_bslDay1',...
+    'E:\Data\Colleagues\RA\raTgGq\raTgGq_210820',...
+    'E:\Data\Colleagues\RA\raTg4\raTg4_210730_155700',...
     };
 
 % MCU-KO (Refaela)
 paths{5} = {...
-    'E:\Data\Colleagues\RA\MCU1_080621_0930',...
-    'E:\Data\Colleagues\RA\MCU2_080621_0930',...
-    'E:\Data\Colleagues\RA\MCU3_20211203_084720',...
-    'E:\Data\Colleagues\RA\MCU4_211220_0834',...
-    'E:\Data\Colleagues\RA\MCU5_220322_1906',...
+    'E:\Data\Colleagues\RA\raMCU1\raMCU1_080621_0930',...
+    'E:\Data\Colleagues\RA\raMCU2\raMCU2_080621_0930',...
+    'E:\Data\Colleagues\RA\raMCU3\raMCU3_20211203_084720',...
+    'E:\Data\Colleagues\RA\raMCU4\raMCU4_211220_0834',...
+    'E:\Data\Colleagues\RA\raMCU5\raMCU5_220322_1906',...
     };
 
 basepaths = [paths{:}];
@@ -86,14 +86,15 @@ nPaths = length(basepaths);
 flgSave = true;
 flgAnalyze = false;
 
-% load vars
-vars = {'swv_metrics', 'st_metrics', 'fr', 'spikes'};
-v = basepaths2vars('basepaths', basepaths, 'vars', vars);
-
-% reference path for checking most-recent fields
-refIdx = 17;
-
 if flgAnalyze
+
+    % load vars
+    vars = {'swv_metrics', 'st_metrics', 'fr', 'spikes'};
+    v = basepaths2vars('basepaths', basepaths, 'vars', vars);
+
+    % reference path for checking most-recent fields
+    refIdx = 17;
+
     for iPath = 1 : nPaths
 
         % files
@@ -131,10 +132,10 @@ vars = {'swv_metrics', 'st_metrics', 'fr', 'units'};
 v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 
 % Create table of features for classification
-fetTbl = utypes_features('basepaths', basepaths, 'flgPlot', true, 'v', v);
+fetTbl = utypes_features('basepaths', basepaths, 'flgPlot', false, 'v', v);
 
 % Classify
-unitType = utypes_classify('basepaths', basepaths, 'altClassify', 3,...
+unitType = utypes_classify('basepaths', basepaths, 'altClassify', 2,...
     'flgSave', false, 'fetTbl', fetTbl);
 fetTbl.unitType = unitType;
 
@@ -143,14 +144,14 @@ fetTbl.unitType = unitType;
 %  ========================================================================
 
 % Separation by features
-fh = figure;
+hFig = figure;
+hAx = gca;
 xFet = 'tp';
 yFet = 'lidor';
 zFet = 'asym';
-hAx = subplot(1, 2, 1); hold on
 plot_utypes('basepaths', basepaths, 'fetTbl', fetTbl, 'flgOther', true,...
-    'plotType', 'scatter3', 'xFet', xFet, 'yFet', yFet, 'zFet', zFet,...
-    'unitIdx', unitType, 'hAx', hAx)
+    'plotType', 'scatter', 'xFet', xFet, 'yFet', yFet, 'zFet', zFet,...
+    'unitType', unitType, 'hAx', hAx);
 
 
 %% ========================================================================
@@ -161,7 +162,9 @@ plot_utypes('basepaths', basepaths, 'fetTbl', fetTbl, 'flgOther', true,...
 [clr, lbl] = mcu_clr();
 clr = clr.unitType; % [RS; FS; Other]
 
-figure('Name', 'MFR vs File', 'Position', [100 100 1600 800]);
+frLim = [-2.5 2];
+
+figure('Name', 'FR vs File', 'Position', [100 100 1600 800]);
 
 % Prepare data: Map 0 (Other) to 3 for indexing
 uType = fetTbl.unitType;
@@ -179,11 +182,11 @@ end
 grpNames = {'WT', 'WT (MCU)', 'MCU-KO', 'WT (Ref)', 'MCU-KO (Ref)'};
 nGroups = length(paths);
 
-hTile = tiledlayout(2, nGroups, 'TileSpacing', 'tight', 'Padding', 'tight');
+hTile = tiledlayout(3, nGroups, 'TileSpacing', 'tight', 'Padding', 'tight');
 
 % Iterate Groups (Columns)
-hSwarm = []; % For legend
 axSwarm = gobjects(1, nGroups);
+axBox = gobjects(1, nGroups);
 axHist = gobjects(1, nGroups);
 
 for iGrp = 1:nGroups
@@ -199,82 +202,105 @@ for iGrp = 1:nGroups
     subY = yVal(inGroup);
 
     % Remove unused categories so swarmchart only shows files in this group
-    if iscategorical(fetTbl.Name)
-        subX = removecats(fetTbl.Name(inGroup));
-    else
-        subX = removecats(categorical(fetTbl.Name(inGroup)));
-    end
+    subX = removecats(fetTbl.Name(inGroup));
 
     subType = uType(inGroup);
 
-    % --- Top Plot: Swarm (MFR vs File) ---
+    % --- Top Plot: Swarm (FR vs File) ---
     axSwarm(iGrp) = nexttile(iGrp);
     hold on
 
     % Plot loop (RS, FS, Other)
-    pHandles = gobjects(1,3);
     for iUnit = 1:3
         unitIdx = subType == iUnit;
         if ~any(unitIdx)
             continue;
         end
 
-        pHandles(iUnit) = swarmchart(subX(unitIdx), subY(unitIdx), 10, clr(iUnit, :), 'filled', ...
+        swarmchart(subX(unitIdx), subY(unitIdx), 10, clr(iUnit, :), 'filled', ...
             'MarkerFaceAlpha', 0.6, 'XJitterWidth', 0.6);
     end
 
     if iGrp == 1
-        ylabel('MFR (log_{10} Hz)', 'Interpreter', 'tex');
-        hSwarm = pHandles; % Save handles for legend
+        ylabel('FR (log_{10} Hz)', 'Interpreter', 'tex');
     else
         ylabel('');
         set(gca, 'YTickLabel', []);
     end
+    ylim(frLim);
 
     title(grpNames{iGrp}, 'Interpreter', 'none');
     xtickangle(45);
     grid on
 
-    % --- Bottom Plot: Distribution (MFR) ---
-    axHist(iGrp) = nexttile(iGrp + nGroups);
+    % --- Middle Plot: Input for Box Plot ---
+    axBox(iGrp) = nexttile(iGrp + nGroups);
+
+    % Prepare data (Rows for plot_boxMean)
+    rsData = subY(subType == 1)';
+    fsData = subY(subType == 2)';
+
+    if isempty(rsData), rsData = nan; end
+    if isempty(fsData), fsData = nan; end
+
+    plot_boxMean({rsData; fsData}, 1, clr([1,2], :), 0.5, 'box', axBox(iGrp), {'RS', 'FS'});
+
+    if iGrp == 1
+        ylabel('FR (log_{10} Hz)', 'Interpreter', 'tex');
+    else
+        ylabel('');
+        set(gca, 'YTickLabel', []);
+    end
+    ylim(frLim);
+    grid on
+
+    % --- Bottom Plot: Distribution (FR) ---
+    axHist(iGrp) = nexttile(iGrp + 2*nGroups);
     hold on
 
     % Histogram for RS and FS
+    hHist = gobjects(1, 2);
+    nCounts = zeros(1, 2);
+
     for iUnit = 1:2
         unitIdx = subType == iUnit;
+        nCounts(iUnit) = sum(unitIdx);
+
         if ~any(unitIdx)
             continue;
         end
 
         currData = subY(unitIdx);
 
-        % Histogram (MFR on X-axis)
-        histogram(currData, 'BinWidth', 0.2, 'FaceColor', clr(iUnit,:), ...
-            'FaceAlpha', 0.4, 'EdgeColor', 'none');
+        % Histogram (FR on X-axis)
+        hHist(iUnit) = histogram(currData, 'BinWidth', 0.2, 'FaceColor', clr(iUnit,:), ...
+            'FaceAlpha', 0.4, 'EdgeColor', 'none', 'Normalization', 'probability');
 
         % Mean Line
-        xline(nanmean(currData), '--', 'Color', clr(iUnit,:), 'LineWidth', 1.5);
+        xline(nanmean(currData), '--', 'Color', clr(iUnit,:), 'LineWidth', 1.5, ...
+            'HandleVisibility', 'off');
     end
 
-    if iGrp == 1
-        ylabel('Count');
-        xlabel('MFR (log_{10} Hz)');
-    else
-        ylabel('');
-        xlabel('');
-        set(gca, 'YTickLabel', []);
+    % Legend for this distribution
+    legTxt = {sprintf('RS (n=%d)', nCounts(1)), sprintf('FS (n=%d)', nCounts(2))};
+    % Filter for existing handles
+    hasH = isgraphics(hHist);
+    if any(hasH)
+        legend(hHist(hasH), legTxt(hasH), 'Location', 'northeast', 'FontSize', 8);
     end
+
+    xlabel('FR (log_{10} Hz)', 'Interpreter', 'tex');
+    if iGrp > 1
+        ylabel('');
+        set(gca, 'YTickLabel', []);
+    else
+        ylabel('Prob.');
+    end
+
+    xlim(frLim);
     grid on
 end
 
 % Formatting
-linkaxes(axSwarm, 'y');
+linkaxes([axSwarm, axBox], 'y');
 linkaxes(axHist, 'xy');
-
-if any(isgraphics(hSwarm))
-    % Filter out empty handles
-    validH = hSwarm(isgraphics(hSwarm));
-    validL = lbl.unit(isgraphics(hSwarm));
-    lgd = legend(validH, validL, 'Orientation', 'horizontal');
-    lgd.Layout.Tile = 'North';
-end

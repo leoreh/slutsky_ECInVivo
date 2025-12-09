@@ -60,6 +60,10 @@ fetSelect = p.Results.fetSelect;
 % preparations
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% GMM fit params (see comments at end)
+rsPrior = 0.95;      % Probability of RS unit (vs Fs unit). 
+regVal = 0.01;      % Regularization value
+
 % get number of units
 nUnits = height(fetTbl);
 initType = fetTbl.initType;
@@ -77,8 +81,9 @@ if isempty(fetSelect) && altClassify > 1
     switch altClassify
         case 2
             fetSelect = {'tp', 'lidor', 'mfr'};
+            % fetSelect = {'asym', 'hpk', 'tp', 'lidor', 'mfr'};
         case 3
-            fetSelect = {'asym', 'hpk', 'tp'};
+            fetSelect = {'asym', 'hpk', 'tp', 'lidor'};
     end
 end
 
@@ -93,7 +98,7 @@ if ~isempty(fetSelect)
     fet = fetTbl{idxGood, fetSelect};
 
     % Get refined classification using GMM (on good units only)
-    unitType(idxGood) = gm2units(fet, unitType(idxGood));
+    unitType(idxGood) = gm2units(fet, unitType(idxGood), rsPrior, regVal);
 end
 
 % Create clean matrix for units struct
@@ -144,7 +149,7 @@ end
 % HELPER FUNCTIONS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function typeOut = gm2units(fet, typeIn)
+function typeOut = gm2units(fet, typeIn, rsPrior, regVal)
 % GM2UNITS Refines unit classification using Gaussian Mixture Model
 %
 % This helper function performs GMM clustering to refine the initial unit
@@ -162,7 +167,7 @@ function typeOut = gm2units(fet, typeIn)
 
 % Learn the cluster shapes (Means and Covariances) from the data, using
 % 'typeIn' as starting point
-gm = fitgmdist(fet, 2, 'Start', typeIn,...
+gm = fitgmdist(fet, 2, 'Start', typeIn, 'RegularizationValue', regVal,...
     'CovarianceType', 'diagonal');
 
 % Assign clusters to RS and FS based on the initial classification
@@ -177,9 +182,8 @@ fsIdx = 3 - rsIdx;
 % Apply Bayesian Priors and Reconstruct the GMM. This shifts the decision
 % boundary without distorting the cluster shapes.
 priors = zeros(1, 2);
-rsProbability = 0.8;
-priors(rsIdx) = rsProbability;
-priors(fsIdx) = 1 - rsProbability;
+priors(rsIdx) = rsPrior;
+priors(fsIdx) = 1 - rsPrior;
 gm = gmdistribution(gm.mu, gm.Sigma, priors);
 
 % Final Classification.

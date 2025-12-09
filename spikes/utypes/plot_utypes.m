@@ -35,7 +35,7 @@ function hAx = plot_utypes(varargin)
 %   xFet         (char) Field from fetTbl for x-axis. {'tp'}
 %   yFet         (char) Field from fetTbl for y-axis. {'lidor'}
 %   zFet         (char) Field from fetTbl for z-axis. {'asym'}
-%   unitIdx      (numeric) Vector of unit classifications (1 x nUnits):
+%   unitType     (numeric) Vector of unit classifications (1 x nUnits):
 %                0 - unclassified
 %                1 - Regular Spiking (RS)
 %                2 - Fast Spiking (FS)
@@ -50,8 +50,8 @@ function hAx = plot_utypes(varargin)
 %   basepaths2vars, catfields, cell2padmat, plot_axSize, plot_stdShade
 %
 % HISTORY:
-%   Aug 2024 (AI Assisted) - Added unitIdx input option, modified to use
-%                            unitIdx instead of units.clean
+%   Aug 2024 (AI Assisted) - Added unitType input option, modified to use
+%                            unitType instead of units.clean
 %   Aug 2024 (AI Assisted) - Added hAx input/output option
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -70,7 +70,7 @@ addOptional(p, 'b2uv', 0.195, @(x) isnumeric(x) && (isempty(x) || isscalar(x)));
 addOptional(p, 'xFet', 'tp', @ischar);
 addOptional(p, 'yFet', 'lidor', @ischar);
 addOptional(p, 'zFet', 'asym', @ischar);
-addOptional(p, 'unitIdx', [], @(x) isnumeric(x) && (isempty(x) || isvector(x)));
+addOptional(p, 'unitType', [], @(x) isnumeric(x) && (isempty(x) || isvector(x)));
 addOptional(p, 'hAx', [], @(x) isempty(x) || ishandle(x) && strcmp(get(x, 'Type'), 'axes'));
 
 parse(p, varargin{:});
@@ -84,7 +84,7 @@ b2uv = p.Results.b2uv;
 xFet = p.Results.xFet;
 yFet = p.Results.yFet;
 zFet = p.Results.zFet;
-unitIdx = p.Results.unitIdx;
+unitType = p.Results.unitType;
 hAx = p.Results.hAx;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -101,7 +101,7 @@ if strcmp(plotType, 'wv')
         vars = {'swv_metrics'};
     end
 
-    if isempty(unitIdx)
+    if isempty(unitType)
         vars = [vars, {'units'}];
     end
 
@@ -116,17 +116,17 @@ else
 end
 
 % get unit classifications
-if isempty(unitIdx)
+if isempty(unitType)
     units = catfields([v.units], 2);
-    unitIdx = zeros(1, size(units.clean, 2));
-    unitIdx(units.clean(1, :)) = 1;  % RS
-    unitIdx(units.clean(2, :)) = 2;  % FS
+    unitType = zeros(1, size(units.clean, 2));
+    unitType(units.clean(1, :)) = 1;  % RS
+    unitType(units.clean(2, :)) = 2;  % FS
 end
-nUnits = length(unitIdx);
+nUnits = length(unitType);
 
 % Map 'Other' (0) to 3 if requested
 if flgOther
-    unitIdx(unitIdx == 0) = 3;
+    unitType(unitType == 0) = 3;
 end
 
 % Default colors if not provided
@@ -142,7 +142,7 @@ if flgOther
 end
 
 for iUnit = 1 : length(txtUnit)
-    nUnitsType = sum(unitIdx == iUnit);
+    nUnitsType = sum(unitType == iUnit);
     txtUnit{iUnit} = sprintf('%s (n=%d)', txtUnit{iUnit}, nUnitsType);
 end
 
@@ -154,6 +154,7 @@ end
 if isempty(hAx)
     [~, hAx] = plot_axSize('szOnly', false);
 end
+hold on
 
 switch plotType
     case 'wv'
@@ -204,7 +205,7 @@ switch plotType
         % Plot waveforms
         for iUnit = 1 : length(txtUnit)
             % grab average per unit type
-            wvUnit = wv(unitIdx == iUnit, :);
+            wvUnit = wv(unitType == iUnit, :);
             if isempty(wvUnit)
                 continue
             end
@@ -222,8 +223,9 @@ switch plotType
 
     case 'scatter'
         for iUnit = 1 : length(txtUnit)
-            scatter(xVal(unitIdx == iUnit), yVal(unitIdx == iUnit),...
-                szVal(unitIdx == iUnit), clr(iUnit, :),...
+            unitIdx = unitType == iUnit;
+            scatter(xVal(unitIdx), yVal(unitIdx),...
+                szVal(unitIdx), clr(iUnit, :),...
                 'filled', 'MarkerFaceAlpha', 0.5)
         end
 
@@ -234,13 +236,12 @@ switch plotType
 
     case 'scatter3'
         for iUnit = 1 : length(txtUnit)
-            idx = unitIdx == iUnit;
-            scatter3(xVal(idx),...
-                yVal(idx),...
-                zVal(idx),...
-                szVal(idx),...
+            unitIdx = unitType == iUnit;
+            scatter3(xVal(unitIdx),...
+                yVal(unitIdx),...
+                zVal(unitIdx),...
+                szVal(unitIdx),...
                 clr(iUnit, :), 'filled', 'MarkerFaceAlpha', 0.3)
-            hold on
         end
         view(3)  % Set 3D view
         camproj(hAx, 'perspective');
