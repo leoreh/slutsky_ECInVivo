@@ -152,6 +152,7 @@ plot_utypes('basepaths', basepaths, 'fetTbl', fetTbl, 'flgOther', true,...
     'plotType', 'scatter3', 'xFet', xFet, 'yFet', yFet, 'zFet', zFet,...
     'unitIdx', unitType, 'hAx', hAx)
 
+
 %% ========================================================================
 %  VISUALIZATION (MFR vs File)
 %  ========================================================================
@@ -160,26 +161,120 @@ plot_utypes('basepaths', basepaths, 'fetTbl', fetTbl, 'flgOther', true,...
 [clr, lbl] = mcu_clr();
 clr = clr.unitType; % [RS; FS; Other]
 
-figure('Name', 'MFR vs File', 'Position', [100 100 1200 600]);
-hold on
+figure('Name', 'MFR vs File', 'Position', [100 100 1600 800]);
 
 % Prepare data: Map 0 (Other) to 3 for indexing
 uType = fetTbl.unitType;
 uType(uType == 0) = 3;
 yVal = fetTbl.mfr;
-xVal = categorical(fetTbl.Name);
 
-% Plot loop (RS, FS, Other)
-txtUnit = {'RS', 'FS', 'Other'};
-for i = 1:3
-    idx = uType == i;
-    if ~any(idx), continue; end
+% Define Groups based on 'paths' structure
+grpIdx = cell(length(paths), 1);
+lastIdx = 0;
+for iUnit = 1:length(paths)
+    nFiles = length(paths{iUnit});
+    grpIdx{iUnit} = lastIdx + (1:nFiles);
+    lastIdx = lastIdx + nFiles;
+end
+grpNames = {'WT', 'WT (MCU)', 'MCU-KO', 'WT (Ref)', 'MCU-KO (Ref)'};
+nGroups = length(paths);
 
-    swarmchart(xVal(idx), yVal(idx), 10, clr(i, :), 'filled', ...
-        'MarkerFaceAlpha', 0.6, 'XJitterWidth', 0.6);
+hTile = tiledlayout(2, nGroups, 'TileSpacing', 'tight', 'Padding', 'tight');
+
+% Iterate Groups (Columns)
+hSwarm = []; % For legend
+axSwarm = gobjects(1, nGroups);
+axHist = gobjects(1, nGroups);
+
+for iGrp = 1:nGroups
+
+    % Identify files in this group
+    currPathIdx = grpIdx{iGrp};
+    currBase = basepaths(currPathIdx);
+    currNames = get_mname(currBase);
+
+    % Filter Table for this Group
+    inGroup = ismember(fetTbl.Name, currNames);
+
+    subY = yVal(inGroup);
+
+    % Remove unused categories so swarmchart only shows files in this group
+    if iscategorical(fetTbl.Name)
+        subX = removecats(fetTbl.Name(inGroup));
+    else
+        subX = removecats(categorical(fetTbl.Name(inGroup)));
+    end
+
+    subType = uType(inGroup);
+
+    % --- Top Plot: Swarm (MFR vs File) ---
+    axSwarm(iGrp) = nexttile(iGrp);
+    hold on
+
+    % Plot loop (RS, FS, Other)
+    pHandles = gobjects(1,3);
+    for iUnit = 1:3
+        unitIdx = subType == iUnit;
+        if ~any(unitIdx)
+            continue;
+        end
+
+        pHandles(iUnit) = swarmchart(subX(unitIdx), subY(unitIdx), 10, clr(iUnit, :), 'filled', ...
+            'MarkerFaceAlpha', 0.6, 'XJitterWidth', 0.6);
+    end
+
+    if iGrp == 1
+        ylabel('MFR (log_{10} Hz)', 'Interpreter', 'tex');
+        hSwarm = pHandles; % Save handles for legend
+    else
+        ylabel('');
+        set(gca, 'YTickLabel', []);
+    end
+
+    title(grpNames{iGrp}, 'Interpreter', 'none');
+    xtickangle(45);
+    grid on
+
+    % --- Bottom Plot: Distribution (MFR) ---
+    axHist(iGrp) = nexttile(iGrp + nGroups);
+    hold on
+
+    % Histogram for RS and FS
+    for iUnit = 1:2
+        unitIdx = subType == iUnit;
+        if ~any(unitIdx)
+            continue;
+        end
+
+        currData = subY(unitIdx);
+
+        % Histogram (MFR on X-axis)
+        histogram(currData, 'BinWidth', 0.2, 'FaceColor', clr(iUnit,:), ...
+            'FaceAlpha', 0.4, 'EdgeColor', 'none');
+
+        % Mean Line
+        xline(nanmean(currData), '--', 'Color', clr(iUnit,:), 'LineWidth', 1.5);
+    end
+
+    if iGrp == 1
+        ylabel('Count');
+        xlabel('MFR (log_{10} Hz)');
+    else
+        ylabel('');
+        xlabel('');
+        set(gca, 'YTickLabel', []);
+    end
+    grid on
 end
 
-ylabel('MFR (log_{10} Hz)', 'Interpreter', 'tex');
-title('Mean Firing Rate by Session');
-legend(lbl.unit, 'Location', 'bestoutside');
-grid on
+% Formatting
+linkaxes(axSwarm, 'y');
+linkaxes(axHist, 'xy');
+
+if any(isgraphics(hSwarm))
+    % Filter out empty handles
+    validH = hSwarm(isgraphics(hSwarm));
+    validL = lbl.unit(isgraphics(hSwarm));
+    lgd = legend(validH, validL, 'Orientation', 'horizontal');
+    lgd.Layout.Tile = 'North';
+end

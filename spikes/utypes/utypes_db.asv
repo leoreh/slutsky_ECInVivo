@@ -84,6 +84,7 @@ nPaths = length(basepaths);
 %  ========================================================================
 
 flgSave = true;
+flgAnalyze = false;
 
 % load vars
 vars = {'swv_metrics', 'st_metrics', 'fr', 'spikes'};
@@ -92,33 +93,34 @@ v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 % reference path for checking most-recent fields
 refIdx = 17;
 
-for iPath = 1 : nPaths
+if flgAnalyze
+    for iPath = 1 : nPaths
 
-    % files
-    basepath = basepaths{iPath};
-    [~, basename] = fileparts(basepath);
-    cd(basepath)
+        % files
+        basepath = basepaths{iPath};
+        [~, basename] = fileparts(basepath);
+        cd(basepath)
 
-    % firing rate
-    if isempty(v(iPath).fr) || ~isempty(setdiff(fieldnames(v(refIdx).fr), fieldnames(v(iPath).fr)))
-        fr = calc_fr(v(iPath).spikes.times, 'basepath', basepath,...
-            'graphics', false, 'binsize', 60, 'saveVar', flgSave,...
-            'smet', 'GK', 'winBL', [0, Inf], 'winCalc', [0, Inf], 'forceA', true);
+        % firing rate
+        if isempty(v(iPath).fr) || ~isempty(setdiff(fieldnames(v(refIdx).fr), fieldnames(v(iPath).fr)))
+            fr = calc_fr(v(iPath).spikes.times, 'basepath', basepath,...
+                'graphics', false, 'binsize', 60, 'saveVar', flgSave,...
+                'smet', 'GK', 'winBL', [0, Inf], 'winCalc', [0, Inf], 'forceA', true);
+        end
+
+        % waveform metrices
+        if isempty(v(iPath).swv) || ~isempty(setdiff(fieldnames(v(refIdx).swv), fieldnames(v(iPath).swv)))
+            swv = spkwv_metrics('basepath', basepath, 'flgSave', flgSave, 'flgForce', true);
+        end
+
+        % Spike timing metrics
+        if isempty(v(iPath).st) || ~isempty(setdiff(fieldnames(v(refIdx).st), fieldnames(v(iPath).st)))
+            st = spktimes_metrics('spktimes', v(iPath).spikes.times, 'sunits', [],...
+                'bins', {[0, Inf]}, 'flgForce', true, 'flgSave', flgSave, 'flgAll', false);
+        end
+
     end
-
-    % waveform metrices
-    if isempty(v(iPath).swv) || ~isempty(setdiff(fieldnames(v(refIdx).swv), fieldnames(v(iPath).swv)))
-        swv = spkwv_metrics('basepath', basepath, 'flgSave', flgSave, 'flgForce', true);
-    end
-
-    % Spike timing metrics
-    if isempty(v(iPath).st) || ~isempty(setdiff(fieldnames(v(refIdx).st), fieldnames(v(iPath).st)))
-        st = spktimes_metrics('spktimes', v(iPath).spikes.times, 'sunits', [],...
-            'bins', {[0, Inf]}, 'flgForce', true, 'flgSave', flgSave, 'flgAll', false);
-    end
-
 end
-
 
 %% ========================================================================
 %  CLASSIFY
@@ -129,108 +131,131 @@ vars = {'swv_metrics', 'st_metrics', 'fr', 'units'};
 v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 
 % Create table of features for classification
-fetTbl = utypes_features('basepaths', basepaths, 'flgPlot', false);
+fetTbl = utypes_features('basepaths', basepaths, 'flgPlot', true, 'v', v);
 
 % Classify
-unitType = utypes_classify('basepaths', basepaths, 'altClassify', 2,...
+unitType = utypes_classify('basepaths', basepaths, 'altClassify', 3,...
     'flgSave', false, 'fetTbl', fetTbl);
-
-% Plot
-fh = figure;
-swvFld = 'tp';
-stFld = 'lidor';
-hAx = subplot(1, 2, 1); hold on
-plot_utypes('basepaths', basepaths, 'flgRaw', false,...
-    'plotType', 'scatter', 'swvFld', swvFld, 'stFld', stFld,...
-    'unitIdx', unitType, 'hAx', hAx)
-set(hAx, 'YScale', 'log')
-
-hAx = subplot(1, 2, 2); hold on
-plot_utypes('basepaths', basepaths, 'flgRaw', false,...
-    'plotType', 'wv', 'swvFld', swvFld, 'stFld', stFld,...
-    'unitIdx', unitType, 'hAx', hAx)
-
-
-% Initialize aggregated storage
-agg.fr = [];
-agg.type_m2 = [];
-agg.type_m3 = [];
-
-for iPath = 1:nPaths
-
-    if isempty(v(iPath).fr) || isempty(v(iPath).swv)
-        continue;
-    end
-
-    % Method 2: GMM w/ FR, Burst, TP
-    type2 = utypes_classify('v', v(iPath), 'altClassify', 2, 'flgSave', false);
-
-    % Method 3: GMM w/ Shape metrics
-    type3 = utypes_classify('v', v(iPath), 'altClassify', 3, 'flgSave', false);
-
-    % Collect Data
-    agg.fr = [agg.fr; v(iPath).fr.mfr(:)];
-    agg.type_m2 = [agg.type_m2; type2(:)];
-    agg.type_m3 = [agg.type_m3; type3(:)];
-end
-
+fetTbl.unitType = unitType;
 
 %% ========================================================================
-%  VISUALIZATION
+%  INSPECT
 %  ========================================================================
 
-methods = {'Method 2 (GMM+FR)', 'Method 3 (GMM+Shape)'};
-types = [agg.type_m2, agg.type_m3];
+% Separation by features
+fh = figure;
+xFet = 'tp';
+yFet = 'lidor';
+zFet = 'asym';
+hAx = subplot(1, 2, 1); hold on
+plot_utypes('basepaths', basepaths, 'fetTbl', fetTbl, 'flgOther', true,...
+    'plotType', 'scatter3', 'xFet', xFet, 'yFet', yFet, 'zFet', zFet,...
+    'unitIdx', unitType, 'hAx', hAx)
 
-% --- Figure 1: Firing Rate Distributions ---
-figure('Name', 'FR Distributions (M2 vs M3)', 'Color', 'w', 'Position', [100 100 1000 500]);
-tiledlayout(1, 2, 'Padding', 'compact', 'TileSpacing', 'compact');
+%% ========================================================================
+%  VISUALIZATION (MFR vs File)
+%  ========================================================================
 
-% pPYR
-nexttile;
-hold on;
-groupData = [];
-groupLabels = [];
-for m = 1:2
-    idx = types(:, m) == 1; % pPYR
-    fr_vals = agg.fr(idx);
+% Colors
+[clr, lbl] = mcu_clr();
+clr = clr.unitType; % [RS; FS; Other]
 
-    groupData = [groupData; fr_vals];
-    groupLabels = [groupLabels; repmat(m, length(fr_vals), 1)];
+figure('Name', 'MFR vs File', 'Position', [100 100 1600 800]);
+
+% Prepare data: Map 0 (Other) to 3 for indexing
+uType = fetTbl.unitType;
+uType(uType == 0) = 3;
+yVal = fetTbl.mfr;
+
+% Define Groups based on 'paths' structure
+grpIdx = cell(length(paths), 1);
+lastIdx = 0;
+for i = 1:length(paths)
+    nFiles = length(paths{i});
+    grpIdx{i} = lastIdx + (1:nFiles);
+    lastIdx = lastIdx + nFiles;
 end
-boxplot(groupData, groupLabels, 'Labels', methods);
-title('pPYR Firing Rates');
-ylabel('Firing Rate (Hz)');
-grid on;
-ylim([0 30]);
+grpNames = {'WT', 'WT (MCU)', 'MCU-KO', 'WT (Ref)', 'MCU-KO (Ref)'};
+nGroups = length(paths);
 
-% pINT
-nexttile;
-hold on;
-groupData = [];
-groupLabels = [];
-for m = 1:2
-    idx = types(:, m) == 2; % pINT
-    fr_vals = agg.fr(idx);
+hTile = tiledlayout(2, nGroups, 'TileSpacing', 'tight', 'Padding', 'tight');
 
-    groupData = [groupData; fr_vals];
-    groupLabels = [groupLabels; repmat(m, length(fr_vals), 1)];
+% Iterate Groups (Columns)
+hSwarm = []; % For legend
+for iGrp = 1:nGroups
+
+    % Identify files in this group
+    currPathIdx = grpIdx{iGrp};
+    currBase = basepaths(currPathIdx);
+
+    % Get variable names for filtering
+    % note: fetTbl.Name contains just the basename
+    currNames = cell(size(currBase));
+    for k = 1:length(currBase)
+        [~, currNames{k}] = fileparts(currBase{k});
+    end
+
+    % Filter Table for this Group
+    inGroup = ismember(fetTbl.Name, currNames);
+    if ~any(inGroup), continue; end
+
+    subY = yVal(inGroup);
+    subX = categorical(fetTbl.Name(inGroup));
+    subType = uType(inGroup);
+
+    % --- Top Plot: Swarm (MFR vs File) ---
+    nexttile(iGrp);
+    hold on
+
+    % Plot loop (RS, FS, Other)
+    pHandles = gobjects(1,3);
+    for i = 1:3
+        idx = subType == i;
+        if ~any(idx), continue; end
+
+        pHandles(i) = swarmchart(subX(idx), subY(idx), 10, clr(i, :), 'filled', ...
+            'MarkerFaceAlpha', 0.6, 'XJitterWidth', 0.6);
+    end
+
+    if iGrp == 1
+        ylabel('MFR (log_{10} Hz)', 'Interpreter', 'tex');
+        hSwarm = pHandles; % Save handles for legend
+    else
+        ylabel('');
+        set(gca, 'YTickLabel', []);
+    end
+
+    title(grpNames{iGrp}, 'Interpreter', 'none');
+    grid on
+
+    % --- Bottom Plot: Distribution (MFR) ---
+    nexttile(iGrp + nGroups);
+    hold on
+
+    % Histogram for RS and FS
+    for i = 1:2
+        idx = subType == i;
+        if ~any(idx), continue; end
+
+        histogram(subY(idx), 'BinWidth', 0.2, 'FaceColor', clr(i,:), ...
+            'FaceAlpha', 0.4, 'EdgeColor', 'none', 'Orientation', 'horizontal');
+    end
+
+    if iGrp == 1
+        xlabel('Count');
+    else
+        xlabel('');
+        set(gca, 'YTickLabel', []);
+    end
+    grid on
 end
-boxplot(groupData, groupLabels, 'Labels', methods);
-title('pINT Firing Rates');
-ylabel('Firing Rate (Hz)');
-grid on;
 
-
-% --- Figure 2: Classification Swaps ---
-figure('Name', 'Classification Consistency', 'Color', 'w', 'Position', [150 150 500 400]);
-confusionchart(confusionmat(agg.type_m2, agg.type_m3), {'pPYR', 'pINT'}, ...
-    'Title', 'M2 vs M3', 'RowSummary', 'row-normalized', 'ColumnSummary', 'column-normalized');
-
-
-% --- Figure 3 & 4: Feature Space using plot_utypes ---
-plot_utypes('basepaths', basepaths, 'unitIdx', agg.type_m2', 'plotType', 'scatter');
-title('Classification: Method 2 (GMM+FR)');
-
-plot_utypes('basepaths', basepaths, 'unitIdx', agg.type_m3', 'plotType', 'scatter');
-title('Classification: Method 3 (GMM+Shape)');
+% Formatting
+linkaxes(findobj(gcf, 'Type', 'axes'), 'y');
+if any(isgraphics(hSwarm))
+    % Filter out empty handles
+    validH = hSwarm(isgraphics(hSwarm));
+    validL = lbl.unit(isgraphics(hSwarm));
+    lgd = legend(validH, validL, 'Orientation', 'horizontal');
+    lgd.Layout.Tile = 'North';
+end
