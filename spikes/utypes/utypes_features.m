@@ -157,8 +157,8 @@ if flgPlot
     % Categories in initType: {'Other', 'RS', 'FS'} -> Indices: 1, 2, 3
     % mcu_clr order: Row 1 = RS, Row 2 = FS, Row 3 = Other
     % Since only good units are plotted, no need to reorder.
-    clr = mcu_clr();
-    clr = clr.unitType;
+    cfg = mcu_cfg();
+    clr = cfg.clr.unitType;
     % Add alpha
     clr = [clr, repmat(0.5, 3, 1)];
 

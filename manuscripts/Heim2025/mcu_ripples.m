@@ -7,16 +7,16 @@
 % % -------------------------------------------------------------------------
 % basepaths = [mcu_sessions('wt_bsl_ripp'), mcu_sessions('mcu_bsl')];
 % nfiles = length(basepaths);
-% 
+%
 % v = basepaths2vars('basepaths', basepaths, 'vars', {'session'});
-% 
+%
 % for ifile = 1 : nfiles
 %     basepath = basepaths{ifile};
 %     cd(basepath)
 %     [~, basename] = fileparts(basepath);
-% 
+%
 %     rippCh = v(ifile).session.channelTags.Ripple;
-% 
+%
 %     ripp = ripp_wrapper('basepath', pwd, 'rippCh', rippCh,...
 %         'limState', 4, 'flgRefine', true, 'flgGraphics', true,...
 %         'flgSaveVar', true, 'flgSaveFig', true);
@@ -43,7 +43,7 @@ for iGrp = 1 : length(grps)
         idxWin = round(size(mapData, 2) / 2);
         idxWin = [idxWin - 5 : idxWin + 5];
         ripp.peakRng = range(mapData(:, idxWin), 2);
-        
+
         % Calculate peakEnergy using RMS
         ripp.peakEnergy = sqrt(mean(mapData(:, idxWin).^2, 2)).^2;
         ripp = orderfields(ripp);
@@ -82,7 +82,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % -------------------------------------------------------------------------
-% Load data 
+% Load data
 grps = {'wt_bsl_ripp'; 'mcu_bsl'};
 vars = {'ripp', 'units', 'session'};
 for iGrp = 1 : length(grps)
@@ -92,7 +92,7 @@ end
 
 % -------------------------------------------------------------------------
 % Organize lme data table
-[clr, lbl] = mcu_clr();
+cfg = mcu_cfg();
 clear varMap
 varMap.peakFreq = 'peakFreq';
 varMap.peakAmp = 'peakAmp';
@@ -107,7 +107,7 @@ for iGrp = 1 : length(grps)
     basepaths = mcu_sessions(grps{iGrp});
 
     % Prepare tag structures for this mouse
-    tagAll.Group = lbl.grp{iGrp};
+    tagAll.Group = cfg.lbl.grp{iGrp};
     tagFiles.Name = get_mname(basepaths);
 
     % Create table
@@ -117,7 +117,7 @@ end
 % Combine all tables, clean and organize
 lmeData = vertcat(tblCell{:});
 lmeData = rmmissing(lmeData);
-lmeData.Group = reordercats(lmeData.Group, lbl.grp);
+lmeData.Group = reordercats(lmeData.Group, cfg.lbl.grp);
 
 % Hard code exclusion of weak ripples, validated by manual inspection
 idxBad = lmeData.peakAmp <= 8;
@@ -155,7 +155,7 @@ plot_axSize('hFig', hFig, 'szOnly', true, 'axShape',...
 
 % save
 fname = lme_frml2char(frml, 'rmRnd', true);
-fPath = fullfile(lbl.savepath, 'Ripp');
+fPath = fullfile(cfg.savepath, 'Ripp');
 lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
     'lmeData', [], 'lmeStats', lmeStats, 'lmeMdl', [], 'fPath', fPath)
 
@@ -167,9 +167,9 @@ summaryTable = summaryTable(:, [1,3,4,2]);
 
 cnt = 1; clear prismCell
 for iGrp = 1 : 2
-        idx = lmeData.Group == lbl.grp{iGrp};
-        prismCell{cnt} = lmeData.(varRsp{idxVar})(idx);
-        cnt = cnt + 1;
+    idx = lmeData.Group == cfg.lbl.grp{iGrp};
+    prismCell{cnt} = lmeData.(varRsp{idxVar})(idx);
+    cnt = cnt + 1;
 end
 prismData = cell2padmat(prismCell, 2);
 
@@ -181,17 +181,17 @@ prismData = cell2padmat(prismCell, 2);
 
 % -------------------------------------------------------------------------
 % Organize lme data table
-[clr, lbl] = mcu_clr();
+[cfg] = mcu_cfg();
 clear varMap
 varMap.mrl = 'ripp.spkLfp.phase.mrl';
 varMap.frMod = 'ripp.spks.su.frModulation';
-varMap.UnitType = 'units.clean';   
+varMap.UnitType = 'units.clean';
 
 for iGrp = 1 : length(grps)
     basepaths = mcu_sessions(grps{iGrp});
 
     % Prepare tag structures for this mouse
-    tagAll.Group = lbl.grp{iGrp};
+    tagAll.Group = cfg.lbl.grp{iGrp};
     tagFiles.Name = get_mname(basepaths);
 
     % Create table
@@ -200,10 +200,10 @@ for iGrp = 1 : length(grps)
 end
 % Combine all tables, clean and organize
 lmeData = vertcat(tblCell{:});
-lmeData.UnitType = categorical(lbl.unit(~lmeData.UnitType + 1)');
+lmeData.UnitType = categorical(cfg.lbl.unit(~lmeData.UnitType + 1)');
 lmeData = rmmissing(lmeData);
-lmeData.Group = reordercats(lmeData.Group, lbl.grp);
-lmeData.UnitType = reordercats(lmeData.UnitType, lbl.unit);
+lmeData.Group = reordercats(lmeData.Group, cfg.lbl.grp);
+lmeData.UnitType = reordercats(lmeData.UnitType, cfg.lbl.unit);
 
 % -------------------------------------------------------------------------
 % Run analysis
@@ -236,7 +236,7 @@ hAx.Legend.Location = 'northwest';
 
 % save
 fname = lme_frml2char(frml, 'rmRnd', true);
-fPath = fullfile(lbl.savepath, 'Ripp');
+fPath = fullfile(cfg.savepath, 'Ripp');
 lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
     'lmeData', lmeData, 'lmeStats', lmeStats, 'lmeMdl', lmeMdl)
 
@@ -250,7 +250,7 @@ summaryTable = summaryTable(:, [1,2,4,5,3])
 cnt = 1; clear prismCell
 for iGrp = 1 : 2
     for iUnit = 1 : 2
-        idx = lmeData.Group == lbl.grp{iGrp} & lmeData.UnitType == lbl.unit{iUnit};
+        idx = lmeData.Group == cfg.lbl.grp{iGrp} & lmeData.UnitType == cfg.lbl.unit{iUnit};
         prismCell{cnt} = lmeData.mrl(idx);
         cnt = cnt + 1;
     end
@@ -293,10 +293,10 @@ for iGrp = 1:length(grps)
         ctrlMap = squeeze(mean(ripp.spks.su.ctrlMap, 2, 'omitnan'));
 
         % Calculate unit FR params
-        ctrlAvg = mean(ctrlMap, 2, 'omitnan'); 
+        ctrlAvg = mean(ctrlMap, 2, 'omitnan');
 
         % Use std of per-trial control rates for z-scoring
-        ctrlRates = mean(ripp.spks.su.ctrlMap, 3, 'omitnan'); 
+        ctrlRates = mean(ripp.spks.su.ctrlMap, 3, 'omitnan');
         ctrlSD = std(ctrlRates, [], 2, 'omitnan');
         ctrlSD(ctrlSD == 0) = 1; % Avoid division by zero
 
@@ -331,13 +331,14 @@ for iGrp = 1:length(grps)
     unitGrp{iGrp} = cell2padmat(unitData, 1);
 end
 
-% Get time bins 
+% Get time bins
 mapDur = ripp.spks.info.mapDur * 1000;
 nBinsMap = ripp.spks.info.nBinsMap;
 timeBins = linspace(mapDur(1), mapDur(2), nBinsMap);
 
 % Figure Parameters
-clr = mcu_clr;
+cfg = mcu_cfg();
+clr = cfg.clr;
 fntSize = 16;
 txtUnit = {'RS', 'FS'};
 txtGrp = {'Control', 'MCU-KO'};
@@ -360,7 +361,7 @@ if flgRvrs
 else
     grpOrdr = 1 : nGrp;
 end
-for iGrp = grpOrdr 
+for iGrp = grpOrdr
     % Get data for current unit type and group
     unitIdx = unitGrp{iGrp} == iUnit;
     pethData = normGrp{iGrp}(unitIdx, :);
@@ -408,7 +409,7 @@ for iGrp = 1:nGrp
     for iMouse = 1:nMice
         mData = v{iGrp}(iMouse);
         ripp = mData.ripp;
-        
+
         % Select ripp based on peakAmp
         idxRipp = ripp.peakAmp > 8 & ripp.peakAmp < 18;
         idxRipp = ripp.peakAmp > 0 & ripp.peakAmp < Inf;
@@ -416,16 +417,17 @@ for iGrp = 1:nGrp
         % Get mean ripple LFP trace
         lfpMap{iMouse} = mean(ripp.maps.raw(idxRipp, :), 1, 'omitnan');
     end
-    lfpGrp{iGrp} = cell2padmat(lfpMap, 1); 
+    lfpGrp{iGrp} = cell2padmat(lfpMap, 1);
 end
 
-% Get time bins 
+% Get time bins
 mapDur = ripp.spks.info.mapDur * 1000;
 nBinsMap = ripp.spks.info.nBinsMap;
 timeBins = linspace(mapDur(1), mapDur(2), nBinsMap);
 
 % initialize
-[clr, lbl] = mcu_clr();
+[cfg] = mcu_cfg();
+clr = cfg.clr;
 [hFig, hAx] = plot_axSize('szOnly', false);
 
 % Plot each group in reverse order so Control appears on top
@@ -434,7 +436,7 @@ clear hPlt
 for iGrp = nGrp : -1 : 1 % Use a different loop variable
     hPlt(iGrp) = plot_stdShade('hAx', hAx, 'dataMat', lfpGrp{iGrp},...
         'alpha', 0.3, 'clr', clr.grp(iGrp, :), 'xVal', timeBins);
-    hPlt(iGrp).DisplayName = lbl.grp{iGrp}; % Assign DisplayName for legend
+    hPlt(iGrp).DisplayName = cfg.lbl.grp{iGrp}; % Assign DisplayName for legend
 end
 
 % Graphics
@@ -443,7 +445,7 @@ ylabel(hAx, 'LFP (µV)')
 xlabel(hAx, 'Time (ms)')
 xlim(hAx, [-50 50])
 ylim(hAx, [-45, 45])
-legend(hPlt, lbl.grp, 'Location', 'southwest');
+legend(hPlt, cfg.lbl.grp, 'Location', 'southwest');
 plot_axSize('hFig', hFig, 'szOnly', false, 'axShape', 'square');
 
 % Save
@@ -464,13 +466,13 @@ frml = 'RippSpks ~ Group * UnitType + (1|Mouse)';
 rippFr = lmeData.RippSpks;
 [lmeData, ~] = lme_org('grppaths', grppaths, 'frml', frml,...
     'flgEmg', false, 'varFld', 'ctrlRates', 'vCell', vCell);
-lmeData = addvars(lmeData, rippFr, 'After', 'UnitID'); 
+lmeData = addvars(lmeData, rippFr, 'After', 'UnitID');
 lmeData.Properties.VariableNames{'RippSpks'} = 'randFr';
 lmeData = movevars(lmeData, 'rippFr', 'Before', 'randFr');
 
 % Figure Parameters
 clr(1, :) = [0.3 0.3 0.3];          % Control
-clr(2, :) = [0.784 0.667 0.392];    % MCU-KO 
+clr(2, :) = [0.784 0.667 0.392];    % MCU-KO
 fntSize = 16;
 txtUnit = {'pPYR', 'pINT'};
 txtGrp = {'Control', 'MCU-KO'};
@@ -536,12 +538,12 @@ pVal = lmeData.RippSpkLfp;
 [lmeData, ~] = lme_org('grppaths', grppaths, 'frml', frml,...
     'flgEmg', false, 'varFld', 'theta', 'vCell', vCell);
 lmeData.Properties.VariableNames{'RippSpkLfp'} = 'Theta';
-lmeData = addvars(lmeData, MRL, 'After', 'Theta'); 
-lmeData = addvars(lmeData, pVal, 'After', 'MRL'); 
+lmeData = addvars(lmeData, MRL, 'After', 'Theta');
+lmeData = addvars(lmeData, pVal, 'After', 'MRL');
 
 % Figure Parameters
 clr(1, :) = [0.3 0.3 0.3];          % Control
-clr(2, :) = [0.784 0.667 0.392];    % MCU-KO 
+clr(2, :) = [0.784 0.667 0.392];    % MCU-KO
 fntSize = 16; FntName = 'Arial';
 txtUnit = {'pPYR', 'pINT'};
 txtGrp = {'Control', 'MCU-KO'};
@@ -562,8 +564,8 @@ for iGrp = 1 : nGrp
 
     % Plot units, colored by type if population info is available.
     hPlt = polarscatter(grpTbl.Theta, grpTbl.MRL, 50, ...
-                       clr(iGrp, :), 'filled', ...
-                       'MarkerFaceAlpha', 0.3);
+        clr(iGrp, :), 'filled', ...
+        'MarkerFaceAlpha', 0.3);
     hold on;
 end
 rlim([0 0.6])
@@ -615,7 +617,7 @@ for iGrp = 1 : 2
         idxUnit = grpTbl.UnitType == categorical(txtUnit(iUnit));
         idxSgn = grpTbl.RippSpkLfp < 0.05;
         idxMap = idxUnit & idxSgn;
-        
+
         % store number of significant units
         nSgn(iGrp, iUnit) = sum(idxUnit & idxSgn);
         prctSgn(iGrp, iUnit) = sum(idxUnit & idxSgn) / sum(idxUnit) * 100;

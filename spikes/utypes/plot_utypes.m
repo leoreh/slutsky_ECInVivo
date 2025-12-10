@@ -1,5 +1,7 @@
 function hAx = plot_utypes(varargin)
 
+% LARGELY REPLACED BY plot_tblGUI
+
 % PLOT_UTYPES ensures clear visualization of neuronal unit classifications
 % (Regular Spiking-RS vs Fast Spiking-FS).
 % It supports two types of plots:
@@ -130,8 +132,8 @@ end
 
 % Default colors if not provided
 if isempty(clr)
-    clr = mcu_clr();
-    clr = clr.unitType;
+    cfg = mcu_cfg();
+    clr = cfg.clr.unitType;
 end
 
 % Update legend text with unit count

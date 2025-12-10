@@ -24,7 +24,7 @@ for iPath = 1 : nPaths
 
     % waveform metrices
     % swv = spkwv_metrics('basepath', basepath, 'flgSave', true, 'flgForce', true);
-    
+
     % Spike timing metrics
     st = spktimes_metrics('spktimes', v(iPath).spikes.times, 'sunits', [],...
         'bins', {[0, Inf]}, 'flgForce', true, 'flgSave', true, 'flgAll', false);
@@ -32,14 +32,14 @@ for iPath = 1 : nPaths
 end
 
 
-% get all files in study
-basepaths = mcu_sessions('all');
-nPaths = length(basepaths);
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Reclassify units
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% get all files in study
+basepaths = mcu_sessions('all');
+nPaths = length(basepaths);
 
 % Create table of features for classification
 fetTbl = utypes_features('basepaths', {basepaths{:}}, 'flgPlot', true);
@@ -49,10 +49,16 @@ fetSelect = {'asym', 'hpk', 'tp', 'lidor', 'mfr'};
 fetSelect = {'asym', 'hpk', 'tp', 'lidor'};
 rsPrior = 0.99;
 regVal = 0.01;
-unitType = utypes_classify('basepaths', {basepaths{:}}, 'altClassify', 3,...
+uTbl = utypes_classify('basepaths', {basepaths{:}}, ...
     'flgSave', false, 'fetTbl', fetTbl,...
     'fetSelect', fetSelect, 'regVal', regVal, 'rsPrior', rsPrior);
-fetTbl.unitType = categorical(unitType, [0, 1, 2], {'Other', 'RS', 'FS'});
+fetTbl.unitType = uTbl.unitType;
+
+% Convert to double for compatibility
+unitType = double(fetTbl.unitType) - 1;
+unitType(fetTbl.unitType=='Other') = 0;
+unitType(fetTbl.unitType=='RS') = 1;
+unitType(fetTbl.unitType=='FS') = 2;
 
 % Separation by features
 hFig = figure;
@@ -120,7 +126,7 @@ plot_axSize('hFig', hFig, 'szOnly', false, 'axShape',...
     'square', 'axHeight', 300, 'flgPos', true)
 
 % Extract data
-hSct = findobj(gca, 'Type', 'scatter'); 
+hSct = findobj(gca, 'Type', 'scatter');
 iUnit = 2;
 x = hSct(iUnit).XData;
 y = hSct(iUnit).YData;
@@ -130,7 +136,7 @@ sz = hSct(iUnit).SizeData;
 % Save
 fname = ['UnitTypes~Scatter_Alt', num2str(altClassify)];
 lme_save('hFig', hFig, 'fname', fname, 'frmt', {'mat', 'svg'},...
-    'lmeData', [], 'lmeStats', []) 
+    'lmeData', [], 'lmeStats', [])
 
 
 hAx = plot_utypes('basepaths', basepaths, 'flgRaw', false,...
@@ -150,7 +156,7 @@ hAx.Legend.ItemTokenSize = [14 10];
 % Save
 fname = ['UnitTypes~Wv_Alt', num2str(altClassify)];
 lme_save('hFig', hFig, 'fname', fname, 'frmt', {'mat', 'svg'},...
-    'lmeData', [], 'lmeStats', []) 
+    'lmeData', [], 'lmeStats', [])
 
 
 
@@ -172,7 +178,7 @@ lme_save('hFig', hFig, 'fname', fname, 'frmt', {'mat', 'svg'},...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % get all files in study
-basepaths = mcu_sessions('all');  
+basepaths = mcu_sessions('all');
 nPaths = length(basepaths);
 
 fNames = {...

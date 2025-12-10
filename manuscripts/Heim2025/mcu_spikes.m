@@ -1,6 +1,6 @@
 function mcu_spikes(alt, lmeData)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% MCU_SPIKES - Analyze MCU spike data
+% MCU_SPIKES - Analyze in vivo MCU spike data
 %
 % Inputs:
 %   alt - Analysis type: 1 for baseline, 2 for baclofen
@@ -28,10 +28,10 @@ end
 
 switch alt
     case 1
-        % BASELINE 
+        % BASELINE
         run_bsl(lmeData);
     case 2
-        % BACLOFEN 
+        % BACLOFEN
         run_bac(lmeData);
     otherwise
         error('Invalid alt value');
@@ -93,8 +93,8 @@ plot_axSize('hFig', hFig, 'szOnly', false, 'axShape', 'square', 'axHeight', 300)
 % Save
 fname = lme_frml2char(frml, 'rmRnd', true, 'resNew', '');
 % fname = [fname, '_uAlt', num2str(2)];
-[~, lbl] = mcu_clr();
-fPath = fullfile(lbl.savepath, fPrfx);
+[cfg] = mcu_cfg();
+fPath = fullfile(cfg.savepath, fPrfx);
 lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
     'lmeData', lmeData, 'lmeStats', lmeStats, 'lmeMdl', lmeMdl, 'fPath', fPath)
 
@@ -175,8 +175,8 @@ end
 fname = lme_frml2char(frml, 'rmRnd', true, 'resNew', '',...
     'sfx', [' _', unitType, '_Norm']);
 fname = [fname, '_uAlt', num2str(2)];
-[~, lbl] = mcu_clr();
-fPath = fullfile(lbl.savepath, fPrfx);
+[cfg] = mcu_cfg();
+fPath = fullfile(cfg.savepath, fPrfx);
 lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
     'lmeData', plotTbl, 'lmeStats', lmeStats, 'lmeMdl', lmeMdl, 'fPath', fPath);
 
@@ -189,8 +189,8 @@ end
 function lmeData = load_data(alt)
 
 % Get labels and parameters
-[~, lbl] = mcu_clr();
-lbl.varMap.UnitType = 'units.clean';
+[cfg] = mcu_cfg();
+cfg.varMap.UnitType = 'units.clean';
 
 % Parse additional parameters
 if alt == 2
@@ -207,11 +207,11 @@ if alt == 1
     for iGrp = 1 : length(grps)
         basepaths = mcu_sessions(grps{iGrp});
         nFiles = length(basepaths);
-        v{iGrp} = basepaths2vars('basepaths', basepaths, 'vars', lbl.vars);
+        v{iGrp} = basepaths2vars('basepaths', basepaths, 'vars', cfg.vars);
 
-        tagAll.Group = lbl.grp{iGrp};
+        tagAll.Group = cfg.lbl.grp{iGrp};
         tagFiles.Name = get_mname(basepaths);
-        tblCell{iGrp} = v2tbl('v', v{iGrp}, 'varMap', lbl.varMap, 'tagAll',...
+        tblCell{iGrp} = v2tbl('v', v{iGrp}, 'varMap', cfg.varMap, 'tagAll',...
             tagAll, 'tagFiles', tagFiles, 'idxCol', 2);
     end
 
@@ -228,15 +228,15 @@ elseif alt == 2
             tmpPaths(idxRm) = [];
 
             % Load data for all days for this mouse at once
-            v{iGrp, iMouse} = basepaths2vars('basepaths', tmpPaths, 'vars', lbl.vars);
+            v{iGrp, iMouse} = basepaths2vars('basepaths', tmpPaths, 'vars', cfg.vars);
 
             % Prepare tag structures for this mouse
-            tagAll.Group = lbl.grp{iGrp};
+            tagAll.Group = cfg.lbl.grp{iGrp};
             tagAll.Name = mNames{iMouse};
-            tagFiles.Day = lbl.day(1:length(tmpPaths));
+            tagFiles.Day = cfg.lbl.day(1:length(tmpPaths));
 
             % Create table for this mouse using new flexible approach
-            tblCell{iGrp, iMouse} = v2tbl('v', v{iGrp, iMouse}, 'varMap', lbl.varMap, ...
+            tblCell{iGrp, iMouse} = v2tbl('v', v{iGrp, iMouse}, 'varMap', cfg.varMap, ...
                 'tagFiles', tagFiles, 'tagAll', tagAll, 'idxCol', 2);
         end
     end
@@ -246,14 +246,14 @@ end
 lmeData = vertcat(tblCell{:});
 
 % Clean up and organize
-lmeData.UnitType = categorical(lbl.unit(lmeData.UnitType + 1)');
+lmeData.UnitType = categorical(cfg.lbl.unit(lmeData.UnitType + 1)');
 lmeData = rmmissing(lmeData);
-lmeData.Group = reordercats(lmeData.Group, lbl.grp);
-lmeData.UnitType = reordercats(lmeData.UnitType, lbl.unit);
+lmeData.Group = reordercats(lmeData.Group, cfg.lbl.grp);
+lmeData.UnitType = reordercats(lmeData.UnitType, cfg.lbl.unit);
 
 % Additional cleanup for baclofen data
 if alt == 2
-    lmeData.Day = reordercats(lmeData.Day, lbl.day);
+    lmeData.Day = reordercats(lmeData.Day, cfg.lbl.day);
     lmeData.BRoy = lmeData.BRoy + min(lmeData.BRoy(lmeData.BRoy > 0)) / 2;
     lmeData.BSpks = lmeData.BSpks + min(lmeData.BSpks(lmeData.BSpks > 0)) / 2;
     lmeData.BMiz = lmeData.BMiz + min(lmeData.BMiz(lmeData.BMiz > 0)) / 2;
@@ -264,15 +264,15 @@ end
 
 
 % % -------------------------------------------------------------------------
-% % PLOT CORRELATIONS 
+% % PLOT CORRELATIONS
 % % Prepare data
 % varsInc = {'FR', 'BSpks', 'BRoy', 'BMiz'};
 % lData = tbl_transform(lmeData, 'varsInc', varsInc, 'flgZ', false,...
 %     'skewThr', 0.1, 'varsGrp', {'Group'}, 'flgLog', true);
-% clr = mcu_clr();
-% 
+% cfg = mcu_cfg();
+%
 % varsInc = [varsInc, {'BLidor', 'PRC'}];
 % [hFig, ~, hGrid] = plot_corrHist(lData, 'varsInc', varsInc,...
-%     'grpIdx', 'Group', 'clrGrp', clr.grp, 'thrOut', 100);
+%     'grpIdx', 'Group', 'clrGrp', cfg.clr.grp, 'thrOut', 100);
 % plot_axSize('hFig', hFig, 'szOnly', false,...
 %     'axWidth', 1200, 'axHeight', 600, 'flgPos', true);

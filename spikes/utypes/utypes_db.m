@@ -138,9 +138,17 @@ v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 fetTbl = utypes_features('basepaths', basepaths, 'flgPlot', false, 'v', v);
 
 % Classify
-unitType = utypes_classify('basepaths', basepaths, 'altClassify', 2,...
+% Classify
+uTbl = utypes_classify('basepaths', basepaths, 'fetSelect', 1,...
     'flgSave', false, 'fetTbl', fetTbl);
-fetTbl.unitType = categorical(unitType, [0, 1, 2], {'Other', 'RS', 'FS'});
+fetTbl.unitType = uTbl.unitType;
+
+% Convert to double for compatibility with legacy plotting
+unitType = double(fetTbl.unitType) - 1; % 0=Other, 1=RS, 2=FS (Assuming categories are Other, RS, FS)
+unitType(fetTbl.unitType=='Other') = 0;
+unitType(fetTbl.unitType=='RS') = 1;
+unitType(fetTbl.unitType=='FS') = 2;
+
 
 
 %% ========================================================================
@@ -185,8 +193,8 @@ figure('Name', 'FR vs File', 'Position', [100 100 1600 800]);
 hTile = tiledlayout(3, nGroups, 'TileSpacing', 'tight', 'Padding', 'tight');
 
 % Colors
-[clr, lbl] = mcu_clr();
-clr = clr.unitType; % [RS; FS; Other]
+[cfg] = mcu_cfg();
+clr = cfg.clr.unitType; % [RS; FS; Other]
 frLim = [-2.5 2];
 
 % Iterate Groups (Columns)

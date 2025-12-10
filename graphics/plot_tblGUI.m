@@ -191,13 +191,18 @@ else, set(guiData.ddGrp, 'Value', idxG + 1); end
 
 % Position interactive buttons lower down
 guiData.btnSelect = uicontrol('Parent', hFig, 'Style', 'pushbutton', ...
-    'String', 'Select & Assign Group', ...
-    'Units', 'normalized', 'Position', [ctlX, 0.40, ctlW, 0.06], ...
+    'String', 'Select Group', ...
+    'Units', 'normalized', 'Position', [ctlX, 0.40, ctlW, 0.05], ...
     'Callback', @onSelectRegion, 'FontWeight', 'bold');
 
-uicontrol('Parent', hFig, 'Style', 'text', ...
-    'String', 'Instruction: Click "Select", draw polygon, double-click to finish.', ...
+guiData.btnSelectDot = uicontrol('Parent', hFig, 'Style', 'pushbutton', ...
+    'String', 'Select Dot', ...
     'Units', 'normalized', 'Position', [ctlX, 0.34, ctlW, 0.05], ...
+    'Callback', @onSelectDot, 'FontWeight', 'bold');
+
+uicontrol('Parent', hFig, 'Style', 'text', ...
+    'String', 'Instruction: Use "Select Group" (Polygon) or "Select Dot" (Double-click to assign) to update groups.', ...
+    'Units', 'normalized', 'Position', [ctlX, 0.25, ctlW, 0.08], ...
     'HorizontalAlignment', 'left', 'ForegroundColor', [0.4 0.4 0.4], ...
     'FontSize', 8);
 
@@ -330,11 +335,16 @@ onUpdatePlot(hFig, []);
             cIdx = mod(iG-1, size(colors,1)) + 1;
             cG = colors(cIdx, :);
 
+            % Count points
+            nPoints = sum(idx);
+            lbl = sprintf('%s (n=%d)', string(grpLabels{iG}), nPoints);
+
             % Scatter
             % Storing handle for legend
             scatter(data.hAxScatter, xG, yG, szG, cG, 'filled', ...
-                'DisplayName', string(grpLabels{iG}), ...
-                'MarkerFaceAlpha', data.defAlpha);
+                'DisplayName', lbl, ...
+                'MarkerFaceAlpha', data.defAlpha, ...
+                'HitTest', 'off', 'PickableParts', 'none'); % Optimization
 
             % Hist X
             histogram(data.hAxHistX, xG, 30, 'FaceColor', cG, ...
@@ -382,28 +392,102 @@ onUpdatePlot(hFig, []);
         hold(data.hAxHistY, 'off');
 
         % Update Enable state of "Assign Group"
-        if isGrpActive
-            set(data.btnSelect, 'Enable', 'on', 'String', 'Select & Assign Group');
+        isReady = isGrpActive;
+        if isReady
+            set(data.btnSelect, 'Enable', 'on', 'String', 'Select Group');
+            set(data.btnSelectDot, 'Enable', 'on', 'String', 'Select Dot');
         else
-            set(data.btnSelect, 'Enable', 'off', 'String', 'Select (Select Group Var First)');
+            set(data.btnSelect, 'Enable', 'off', 'String', 'Select Group');
+            set(data.btnSelectDot, 'Enable', 'off', 'String', 'Select Dot');
         end
     end
 
     function onSelectRegion(src, ~)
         data = guidata(src);
-
-        % Ensure we are targeting the scatter plot
         ax = data.hAxScatter;
-
-        % Use drawpolygon (R2018b+)
         roi = drawpolygon(ax);
 
         if isempty(roi.Position)
-            delete(roi);
-            return;
+            delete(roi); return;
         end
 
-        % Find points inside
+        % Standard processing...
+        processSelection(src, data, roi, false);
+    end
+
+    function onSelectDot(src, ~)
+        data = guidata(src);
+        ax = data.hAxScatter;
+
+        % Wait for user to create a point
+        hPoint = drawpoint(ax, 'Label', 'Target');
+
+        if isempty(hPoint.Position)
+            delete(hPoint); return;
+        end
+
+        % Snap to nearest point
+        snapToData(hPoint, data);
+
+        % Add listener for double click
+        addlistener(hPoint, 'ROIClicked', @(roiSrc, evt) onDotDoubleClick(roiSrc, evt, src));
+
+        % Add listener for move to re-snap
+        addlistener(hPoint, 'MovingROI', @(roiSrc, evt) snapToData(roiSrc, data));
+
+        % Instruction
+        title(ax, 'Double-click the point to assign group...', 'Color', 'r');
+    end
+
+    function snapToData(hPoint, data)
+        pos = hPoint.Position;
+
+        idxX = get(data.ddX, 'Value');
+        idxY = get(data.ddY, 'Value');
+        xName = data.numericVars{idxX};
+        yName = data.numericVars{idxY};
+
+        xData = data.tbl.(xName);
+        yData = data.tbl.(yName);
+
+        % Simple Euclidean distance (Consider normalizing if axes differ widely)
+        % For better UX, normalize by axis range
+        ax = data.hAxScatter;
+        xlims = ax.XLim; ylims = ax.YLim;
+
+        xNorm = (xData - xlims(1)) / diff(xlims);
+        yNorm = (yData - ylims(1)) / diff(ylims);
+        pNorm = [(pos(1)-xlims(1))/diff(xlims), (pos(2)-ylims(1))/diff(ylims)];
+
+        distSq = (xNorm - pNorm(1)).^2 + (yNorm - pNorm(2)).^2;
+        [~, minIdx] = min(distSq);
+
+        newPos = [xData(minIdx), yData(minIdx)];
+
+        % Update position only if effectively different to avoid loop
+        if sum((hPoint.Position - newPos).^2) > 1e-10
+            hPoint.Position = newPos;
+        end
+
+        % Store index in UserData of the ROI
+        hPoint.UserData = minIdx;
+    end
+
+    function onDotDoubleClick(hPoint, evt, guiSrc)
+        if strcmp(evt.SelectionType, 'double')
+            data = guidata(guiSrc);
+            idx = hPoint.UserData;
+
+            % Process single point selection logic
+            processSelectionIdx(guiSrc, data, idx);
+
+            delete(hPoint);
+            % Restore title
+            title(data.hAxScatter, '');
+        end
+    end
+
+    function processSelection(src, data, roi, isSinglePoint)
         idxX = get(data.ddX, 'Value');
         idxY = get(data.ddY, 'Value');
         xName = data.numericVars{idxX};
@@ -421,12 +505,22 @@ onUpdatePlot(hFig, []);
             return;
         end
 
+        assignGroup(src, data, inPoints, nSelected);
+        delete(roi);
+    end
+
+    function processSelectionIdx(src, data, idx)
+        inPoints = false(height(data.tbl), 1);
+        inPoints(idx) = true;
+        assignGroup(src, data, inPoints, 1);
+    end
+
+    function assignGroup(src, data, inPoints, nSelected)
         % Prompt for Group Assignment
         idxGrp = get(data.ddGrp, 'Value');
         grpItems = get(data.ddGrp, 'String');
         grpName = grpItems{idxGrp};
 
-        % We need the categories of the target group
         currentGrpCol = data.tbl.(grpName);
         if iscategorical(currentGrpCol)
             cats = categories(currentGrpCol);
@@ -447,29 +541,20 @@ onUpdatePlot(hFig, []);
             if iscategorical(currentGrpCol)
                 data.tbl.(grpName)(inPoints) = selectedCat;
             elseif islogical(currentGrpCol)
-                % Convert string selection back to logical
                 if strcmpi(selectedCat, 'true'), val = true; else, val = false; end
                 data.tbl.(grpName)(inPoints) = val;
             else
                 data.tbl.(grpName)(inPoints) = selectedCat;
             end
 
-            % Update GUI Data
             guidata(src, data);
-
-            % Refresh Plot
             onUpdatePlot(src, []);
-
-            fprintf('Updated %d points in variable "%s" to "%s".\n', ...
-                nSelected, grpName, string(selectedCat));
+            fprintf('Updated %d points.\n', nSelected);
         end
-
-        delete(roi);
     end
 
     function onSaveTable(src, ~)
         data = guidata(src);
-        % Assign to base workspace
         assignin('base', 'fetTbl_mod', data.tbl);
         msgbox('Table saved to workspace as "fetTbl_mod".', 'Saved');
     end

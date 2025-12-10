@@ -26,7 +26,7 @@ vars = {'mea', 'st_metrics'};
 v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 
 % Analysis Params
-bslLim = [5 70] * 60;        
+bslLim = [5 70] * 60;
 ssLim = [7 * 60, 9 * 60 - 5] * 60;
 troughLim = [4 * 60 + 10, 4.5 * 60] * 60;
 stWin = {bslLim, ssLim, troughLim};
@@ -38,11 +38,11 @@ for iFile = 1 : nFiles
 
     basepath = basepaths{iFile};
     cd(basepath);
-    
+
     % files = dir('*sorted*');
     % mea = mea_orgNex('fname', files.name, 'basepath', pwd, 'forceL', false);
     spktimes = v(iFile).mea.spktimes;
-    
+
     % % --- Firing Rate Recovery
     frr = mea_frr(spktimes, 'winLim', expLim,...
         'flgSave', true, 'flgPlot', false, 'flgForce', false);
@@ -50,7 +50,7 @@ for iFile = 1 : nFiles
     % % --- Spike timing metrics
     % st = spktimes_metrics('spktimes', spktimes, 'sunits', [],...
     %     'bins', stWin, 'flg_force', true, 'flg_save', true, 'flg_all', false);
-    % 
+    %
     % % --- Bursts
     % brst = spktimes_meaBrst(spktimes, 'binsize', [], 'isiThr', 0.02,...
     %     'minSpks', 2, 'flgSave', true, 'flgForce', true, 'bins', stWin);
@@ -77,8 +77,8 @@ mdlPrfx = 'frr.mdlF';
 clear varMap
 varMap.uGood      = 'frr.uGood';
 varMap.frBsl      = [mdlPrfx, '.frBsl'];
-varMap.frSs       = [mdlPrfx, '.frSs'];  
-varMap.frTrough   = [mdlPrfx, '.frTrough'];  
+varMap.frSs       = [mdlPrfx, '.frSs'];
+varMap.frTrough   = [mdlPrfx, '.frTrough'];
 varMap.pertDepth  = [mdlPrfx, '.pertDepth'];
 varMap.uRcv       = [mdlPrfx, '.uRcv'];
 varMap.uPert      = [mdlPrfx, '.uPert'];
@@ -109,14 +109,14 @@ varMap.bslTime    = 'frr.mdl.bslTime';
 clear tblCell
 for iGrp = 1 : length(grps)
     basepaths = mcu_sessions(grps{iGrp});
-    
+
     % Load data for this group
     v = basepaths2vars('basepaths', basepaths, 'vars', vars);
-    
+
     % Prepare tag structures for v2tbl
     tagAll.Group = grpLbls{iGrp};
     tagFiles.Name = get_mname(basepaths);
-    
+
     % Create table using new flexible approach
     tblCell{iGrp} = v2tbl('v', v, 'varMap', varMap,...
         'tagFiles', tagFiles, 'tagAll', tagAll, 'idxCol', 1);
@@ -126,7 +126,7 @@ tbl = vertcat(tblCell{:});
 % Organize for analysis
 lmeData = tbl(tbl.uGood, :);
 lmeData.uGood = [];
-lmeData = rmmissing(lmeData);   
+lmeData = rmmissing(lmeData);
 
 % Convert time to min, specific for mea data reduction (20 min every 2
 % hours after perturbation)
@@ -139,7 +139,8 @@ lmeData.bslTime = lmeData.bslTime * 6 / 60 / 60;
 
 lData = tbl_transform(lmeData, 'varsInc', {'frBsl', 'BSpks'}, 'flgZ', false,...
     'skewThr', 0.1, 'varsGrp', {'Group'}, 'flgLog', true);
-clr = mcu_clr();
+clr = mcu_cfg();
+clr = clr.clr;
 
 % Remove units that didn't recover from rcvTime
 idxUnits = lmeData.uRcv;
@@ -171,7 +172,8 @@ scatter(lData.frBsl(uIdx), lData.pertDepth(uIdx))
 % SELECTIVE (updated sep-25)
 lData = tbl_transform(lmeData, 'varsInc', {'frBsl', 'BSpks'}, 'flgZ', false,...
     'skewThr', 0.1, 'varsGrp', {'Group'}, 'flgLog', true);
-clr = mcu_clr();
+clr = mcu_cfg();
+clr = clr.clr;
 
 % Remove units that didn't recover from rcvTime
 idxUnits = lmeData.uRcv;
@@ -204,11 +206,11 @@ plot_axSize('hFig', hFig, 'szOnly', false,...
     'axWidth', 1200, 'axHeight', 600, 'flgPos', true);
 
 % Update BSpks x-tick labels on the rcvTime row (bottom-left scatter)
-hAx = hGrid{4, 1}; 
+hAx = hGrid{4, 1};
 xticks(hAx, [-2, -1, 0])
 xticklabels(hAx, {'0.01', '0.1', '1'});
 
-hAx = hGrid{4, 2}; 
+hAx = hGrid{4, 2};
 xticks(hAx, [-2, -1, 0, 0.477])
 xticklabels(hAx, {'0.01', '0.1', '1', '3'});
 
@@ -226,7 +228,7 @@ yLim{3} = [-15, 40];      % rcvTime (hr)
 for iRow = 1 : nRow
     for iCol = 1 : nCol
         hAx = hGrid{iRow, iCol};
-        
+
         % Axis limits
         if iRow == 1
             if ~isempty(xLim{iCol})
@@ -240,7 +242,7 @@ for iRow = 1 : nRow
                 hAx.YAxis.Limits = yLim{iRow - 1};
             end
         end
-        
+
         % Graphics
         hAx.Box = "on";
         hAx.FontSize = 16;
@@ -269,11 +271,12 @@ lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat'});
 
 
 % -------------------------------------------------------------------------
-% SELECTIVE 
+% SELECTIVE
 % Prepare data
 lData = tbl_transform(lmeData, 'varsInc', {'frBsl', 'BSpks'}, 'flgZ', false,...
     'skewThr', 0.1, 'varsGrp', {'Group'}, 'flgLog', true);
-clr = mcu_clr();
+clr = mcu_cfg();
+clr = clr.clr;
 
 % Remove units that didn't recover from rcvTime
 idxUnits = lmeData.uRcv;
@@ -303,7 +306,7 @@ xData = lData.(txtLbls{4});
 [rho, pval] = corr(yData, xData, 'Type', 'Spearman', 'Rows', 'complete');
 hAx = hGrid{2, 3};
 hSct = scatter(hAx, xData, yData, 10, 'filled', ...
-    'MarkerFaceColor', clr.grp(1, 1:3), 'MarkerFaceAlpha', 0.7);   
+    'MarkerFaceColor', clr.grp(1, 1:3), 'MarkerFaceAlpha', 0.7);
 if pval < 0.0001
     pStr = 'p < 0.0001';
 else
@@ -317,7 +320,7 @@ ylabel(hAx, '')
 yticks(hAx, [])
 
 % Update rcvTime histogram
-hAx = hGrid{1, 3}; 
+hAx = hGrid{1, 3};
 histogram(hAx, xData, 'Normalization', 'pdf', ...
     'FaceColor', clr.grp(1, 1:3), 'FaceAlpha', 0.7, 'EdgeColor', 'none');
 hold(hAx, 'on');
@@ -329,7 +332,7 @@ set(hAx, 'XTickLabel', [], 'YTickLabel', []);
 set(hAx, 'box', 'off', 'XColor', 'none', 'YColor', 'none');
 
 % Update BSpks labels
-hAx = hGrid{2, 1}; 
+hAx = hGrid{2, 1};
 yticks(hAx, [-2, -1, 0])
 yticklabels(hAx, {'0.01', '0.1', '1'});
 
@@ -345,19 +348,19 @@ yLim{2} = [-3, 0];
 for iRow = 1 : nRow
     for iCol = 1 : nCol
         hAx = hGrid{iRow, iCol};
-        
+
         % Axis limits
         if iCol < nCol
             if ~isempty(axLim{iRow})
                 hAx.XAxis.Limits = xLim{iCol};
             end
-        end       
-        if iRow > 1
-             if ~isempty(axLim{iRow})
-                hAx.YAxis.Limits = yLim{iRow};
-             end
         end
-        
+        if iRow > 1
+            if ~isempty(axLim{iRow})
+                hAx.YAxis.Limits = yLim{iRow};
+            end
+        end
+
         % Graphics
         hAx.Box = "on";
         hAx.FontSize = 16;
@@ -454,7 +457,7 @@ for iRow = 1 : nRow
             % Add space for legend
             hAx.YAxis.Limits = [axLim{iRow}(1) - 0.5, axLim{iRow}(2)];
         end
-        
+
         % Graphics
         hAx.Box = "on";
         hAx.FontSize = 16;
@@ -497,10 +500,10 @@ lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat'});
 % I only apply z score when using contineous predictors for easier
 % interpretation. with only grouping variables (when means are compared) I
 % want to keep the original units of the response variables. Same goes for
-% log transform. 
+% log transform.
 
 % Insisted to use rcvGain and spkDfct on logarithm scale so they can be
-% analyzed with fitlme. rcvTime (and MF) probably still needs glme. 
+% analyzed with fitlme. rcvTime (and MF) probably still needs glme.
 
 % BslFr is positively correlated with recovery time (model and model free).
 % This makes sense considering most units drop to zero, and thus despite
@@ -518,10 +521,10 @@ lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat'});
 % A discripency between model-based and model-free parameters is that in
 % the latter there is no correlation between frBsl and pertDepth because
 % many values are clamped to c. Hence pertDepth should only be from the
-% model. 
+% model.
 
 % Recovery time includes units that reached their threshold value but
-% didn't manage to maintain it, i.e. 
+% didn't manage to maintain it, i.e.
 
 % -------------------------------------------------------------------------
 % PREPS
@@ -531,8 +534,8 @@ idxUnits = lmeData.uRcv;
 lmeMdl = {};
 
 % List of possible predictors
-listPrdct = {'pertDepth', 'frBsl', 'BSpks', 'PRC', 'Group', '(1|Name)', 'brBsl'}; 
-listRspns = {'uRcv', 'rcvGain', 'rcvWork', 'rcvErr', 'bslTime', 'spkDfct', 'rcvSlope'}; 
+listPrdct = {'pertDepth', 'frBsl', 'BSpks', 'PRC', 'Group', '(1|Name)', 'brBsl'};
+listRspns = {'uRcv', 'rcvGain', 'rcvWork', 'rcvErr', 'bslTime', 'spkDfct', 'rcvSlope'};
 
 % Z score predictors
 zlData = tbl_transform(lmeData, 'varsExc', listRspns, 'flgZ', true,...
@@ -546,24 +549,24 @@ lmeMdl{end + 1} = fitglme(zlData, frml, 'FitMethod', 'REMPL',...
     'Distribution', 'Binomial');
 
 % -------------------------------------------------------------------------
-% RECOVERY WORK 
+% RECOVERY WORK
 frml = [listRspns{3}, ' ~ frBsl + BSpks * Group + (1|Name)'];
 lmeMdl{end + 1} = fitlme(zlData, frml, 'FitMethod', 'REML');
 
 % -------------------------------------------------------------------------
-% RECOVERY TIME 
+% RECOVERY TIME
 % only units who recovered, from both groups combined
 frml = [listRspns{5}, ' ~ frBsl + BSpks + (1|Name)'];
 lmeMdl{end + 1} = fitglme(zlData(idxUnits, :), frml, 'FitMethod', 'REMPL',...
     'Distribution', 'Gamma');
 
 % -------------------------------------------------------------------------
-% SPIKE DEFICIT 
+% SPIKE DEFICIT
 frml = [listRspns{6}, ' ~ pertDepth + frBsl + BSpks * Group + (1|Name)'];
 lmeMdl{end + 1} = fitlme(zlData, frml, 'FitMethod', 'REML');
 
 % % -------------------------------------------------------------------------
-% % RECOVERY ERROR 
+% % RECOVERY ERROR
 % % only units who recovered, from both groups combined
 % frml = [listRspns{4}, ' ~ pertDepth + BSpks + frBsl + Group + (1|Name)'];
 % lmeMdl{end + 1} = fitglme(zlData(idxUnits, :), frml, 'FitMethod', 'REMPL',...
@@ -590,7 +593,7 @@ grpIdx = find(lmeData.Group == 'MCU-KO');
 lmeTbl = lmeData;
 lmeTbl.frNorm = (lmeData.frSs ./ lmeData.frBsl * 100) - 100;
 
-% Add constant so gamma can be used 
+% Add constant so gamma can be used
 lmeTbl.BSpks = lmeTbl.frNorm + 1e-6;
 
 lmeCfg.contrasts = 'all';
@@ -619,8 +622,8 @@ plot_axSize('hFig', hFig, 'szOnly', false, 'axShape', 'square', 'axHeight', 300)
 % NETWORK-AVERAGED MFR
 % Get indices to specific cultures.
 % Assumes fr and t are loaded from mcu_meaFRt
-% Do not run the 'line lmeData = rmmissing(lmeData);' 
-% because for the control group this removes a unit that is maintained 
+% Do not run the 'line lmeData = rmmissing(lmeData);'
+% because for the control group this removes a unit that is maintained
 % in the fr vs time graphs
 
 bslIdx = find(t < 0);
@@ -683,11 +686,11 @@ plot_axSize('hFig', hFig, 'szOnly', false, 'axShape', 'square', 'axHeight', 300)
 
 %%% Grab data per culture only
 
-% Step 1: Calculate the mean steady-state firing rate (frSs) for each 
+% Step 1: Calculate the mean steady-state firing rate (frSs) for each
 % combination of culture (Name) and experimental group (Group).
 ss_summary = groupsummary(lmeData, {'Name', 'Group'}, 'mean', 'frSs');
 
-% Step 2: Calculate the mean baseline firing rate (frBsl) for each 
+% Step 2: Calculate the mean baseline firing rate (frBsl) for each
 % culture (Name) as a whole.
 bsl_summary = groupsummary(lmeData, 'Name', 'mean', 'frBsl');
 
@@ -695,7 +698,7 @@ bsl_summary = groupsummary(lmeData, 'Name', 'mean', 'frBsl');
 % This aligns the group-specific ss means with the overall culture bsl means.
 combined_summary = join(ss_summary, bsl_summary(:, {'Name', 'mean_frBsl'}));
 
-% Step 4: Calculate the final normalized value by dividing the mean frSs of 
+% Step 4: Calculate the final normalized value by dividing the mean frSs of
 % each group by the mean frBsl of its corresponding culture.
 combined_summary.normalized_mean_fr = combined_summary.mean_frSs ./ combined_summary.mean_frBsl * 100;
 
@@ -704,7 +707,7 @@ combined_summary.normalized_mean_fr = combined_summary.mean_frSs ./ combined_sum
 disp(combined_summary);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% FR DISTRIBUTION DURING RECOVERY 
+% FR DISTRIBUTION DURING RECOVERY
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 basepaths = mcu_sessions('mea_bac');
 vars = {'frr', 'st_brst'};
@@ -738,7 +741,7 @@ end
 legend
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% SLOPE VS BURSTINESS 
+% SLOPE VS BURSTINESS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 clearvars -except clr
 basepaths = mcu_sessions('mea_bac');
@@ -779,7 +782,7 @@ grid on;
 lmeCfg.contrasts = 'all';
 lmeCfg.distribution = 'Gamma';
 
-% Add constant to burstiness so gamma can be used 
+% Add constant to burstiness so gamma can be used
 lmeTbl = lmeData;
 lmeTbl.BSpks = lmeTbl.BSpks + 1e-6;
 

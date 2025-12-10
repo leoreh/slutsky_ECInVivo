@@ -1,76 +1,67 @@
-function unitType = utypes_classify(varargin)
+function uTbl = utypes_classify(varargin)
 
-% UTYPES_CLASSIFY classifies neuronal units into Regular Spiking (RS) and
-% Fast Spiking (FS) types using a two-step approach:
-% 1. Initial classification using trough-to-peak (tp) threshold.
-% 2. Optional refinement using GMM clustering starting from the threshold-based
-%    classification.
+% UTYPES_CLASSIFY classifies units into Regular Spiking (RS) and Fast
+% Spiking (FS) types using a Gaussian Mixture Model (GMM). It returns a
+% table containing the classification results and the features used for
+% classification.
 %
 % METHODOLOGY:
-% Method 1 (altClassify = 1): Uses simple threshold-based classification on tp.
-% Method 2 (altClassify = 2): Uses GMM clustering initialized with threshold-based
-%                            classification results.
+% The function refines an initial classification (typically threshold-based
+% from utypes_features) using GMM clustering on selected features.
 %
 % INPUT (Optional Key-Value Pairs):
 %   basepaths    (cell array) Full paths to recording folders. If empty,
 %                uses current directory.
-%   altClassify  (numeric) Classification method to use:
-%                1 - Threshold-based classification using tp
-%                2 - GMM-based classification using multiple metrics, initialized
-%                    with threshold-based results
+%   fetSelect    (numeric or cell) Features to use for GMM classification.
+%                If numeric:
+%                   1 - {'asym', 'hpk', 'tp', 'lidor', 'mfr'}
+%                   2 - {'asym', 'hpk', 'tp'}
+%                If cell array: List of feature names to use.
+%                If empty: No GMM refinement is performed (returns initial).
 %                {1}
 %   flgSave      (logical) Flag to save classification results
 %                {false}
 %   flgPlot      (logical) Flag to plot classification results
 %                {false}
-%   v            (struct) Data structure containing metrics. If empty,
-%                data will be loaded from basepaths. {[]}
-%   fetTbl       (table) Table containing features, if already loaded in memory
+%   fetTbl       (table) Table containing features.
 %   rsPrior      (numeric) Prior probability of RS unit. {0.9}
 %   regVal       (numeric) Regularization value for GMM covariance. {0.01}
 %
 % OUTPUT:
-%   unitType     (vector) Vector of unit classifications where:
-%                1 = Regular Spiking (RS) - Typically Pyramidal
-%                2 = Fast Spiking (FS) - Typically Interneuron
-%
-% DEPENDENCIES:
-%   basepaths2vars, catfields
+%   uTbl         (table) Table containing the features used for classification
+%                and the final 'unitType' column.
 %
 % HISTORY:
 %   LH - Aug 2024
 %   Based in part on Oghazian et al., Front. Biomedical Tech., 2021
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% arguments using inputParser
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ========================================================================
+%  ARGUMENTS
+%  ========================================================================
 
 p = inputParser;
 addOptional(p, 'fetTbl', table(), @istable);
-addOptional(p, 'altClassify', 1, @(x) ismember(x, [1, 2, 3]));
+addOptional(p, 'fetSelect', 1, @(x) iscell(x) || isnumeric(x));
 addOptional(p, 'flgSave', false, @islogical);
 addOptional(p, 'flgPlot', false, @islogical);
 addOptional(p, 'basepaths', {}, @(x) iscell(x));
-addOptional(p, 'fetSelect', {}, @iscell);
 addOptional(p, 'rsPrior', 0.9, @isnumeric);
 addOptional(p, 'regVal', 0.01, @isnumeric);
 
 parse(p, varargin{:});
 fetTbl = p.Results.fetTbl;
-altClassify = p.Results.altClassify;
+fetSelectInput = p.Results.fetSelect;
 flgSave = p.Results.flgSave;
 flgPlot = p.Results.flgPlot;
 basepaths = p.Results.basepaths;
-fetSelect = p.Results.fetSelect;
 rsPrior = p.Results.rsPrior;
 regVal = p.Results.regVal;
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% preparations
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ========================================================================
+%  PREPARATIONS
+%  ========================================================================
 
 % get number of units
-nUnits = height(fetTbl);
 initType = fetTbl.initType;
 
 % Identify good units (those that were classified)
@@ -81,21 +72,25 @@ unitType = zeros(size(initType));
 unitType(initType == 'RS') = 1;
 unitType(initType == 'FS') = 2;
 
-% Define features if not provided
-if isempty(fetSelect) && altClassify > 1
-    switch altClassify
-        case 2
-            fetSelect = {'tp', 'lidor', 'mfr'};
+% Handle fetSelect presets
+if isnumeric(fetSelectInput)
+    switch fetSelectInput
+        case 1
             fetSelect = {'asym', 'hpk', 'tp', 'lidor', 'mfr'};
-        case 3
-            fetSelect = {'asym', 'hpk', 'tp', 'lidor'};
+        case 2
             fetSelect = {'asym', 'hpk', 'tp'};
+        otherwise
+            fetSelect = {};
     end
+elseif iscell(fetSelectInput)
+    fetSelect = fetSelectInput;
+else
+    fetSelect = {};
 end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% refine classification if requested
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ========================================================================
+%  REFINE CLASSIFICATION
+%  ========================================================================
 
 % Refine classification using GMM with threshold results as starting point
 if ~isempty(fetSelect)
@@ -107,65 +102,37 @@ if ~isempty(fetSelect)
     unitType(idxGood) = gm2units(fet, unitType(idxGood), rsPrior, regVal);
 end
 
-% Create clean matrix for units struct
-clean = false(2, nUnits);
-clean(1, idxGood) = unitType(idxGood) == 1;  % RS
-clean(2, idxGood) = unitType(idxGood) == 2;  % FS
+% Assign to table
 fetTbl.unitType = categorical(unitType, [0, 1, 2], {'Other', 'RS', 'FS'});
 
-% Update unitType to span all units
-unitType = zeros(nUnits, 1);
-unitType(clean(1, :)) = 1;
-unitType(clean(2, :)) = 2;
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% save updated unit struct
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-if flgSave
-    startIdx = 1;
-    for iPath = 1 : length(basepaths)
-        basepath = basepaths{iPath};
-        [~, basename] = fileparts(basepath);
-        uFile = fullfile(basepath, [basename, '.units.mat']);
-
-        % Get number of units for this recording
-        units = v(iPath).units;
-        nUnits = size(units.clean, 2);
-        uIdx = startIdx : startIdx + nUnits - 1;
-        startIdx = uIdx(end) + 1;
-
-        % Add new classification field
-        fieldName = sprintf('clean%d', altClassify);
-        units.(fieldName) = false(2, nUnits);
-        units.(fieldName)(:, :) = clean(:, uIdx);
-
-        % Place altClassify3 as default
-        if altClassify == 3
-            units.clean = clean(:, uIdx);
-        end
-
-        % Save updated units structure
-        save(uFile, 'units');
-    end
-end
+%% ========================================================================
+%  PLOT & SAVE
+%  ========================================================================
 
 if flgPlot
-    clr = mcu_clr;
+    mcuCfg = mcu_cfg;
     cfg.xVar = 'tp';
     cfg.yVar = 'lidor';
     cfg.szVar = 'mfr';
     cfg.grpVar = 'unitType';
-    cfg.clr = clr.unitType([3 : -1 : 1], :);
+    cfg.clr = mcuCfg.clr.unitType([3 : -1 : 1], :);
     cfg.alpha = 0.4;
     plot_tblGUI(fetTbl, 'cfg', cfg)
 end
 
+% Create output table with only used features and unitType
+varsToKeep = unique([fetSelect(:)', {'unitType'}], 'stable');
+uTbl = fetTbl(:, varsToKeep);
+
+if flgSave
+    push_units(basepaths, uTbl);
 end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% HELPER FUNCTIONS
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+end
+
+%% ========================================================================
+%  HELPER FUNCTIONS
+%  ========================================================================
 
 function typeOut = gm2units(fet, typeIn, rsPrior, regVal)
 % GM2UNITS Refines unit classification using Gaussian Mixture Model
@@ -214,9 +181,71 @@ typeOut(clusterLabels ~= rsIdx) = 2;   % Set non-RS cluster to FS
 
 end
 
-% EOF
+function push_units(basepaths, fetTbl)
+% PUSH_UNITS Saves classification results to units.mat files.
+%
+%   push_units(basepaths, fetTbl)
+%
+%   Moves existing units.mat to 'bkup' folder and creates a new units.mat
+%   containing only classification fields:
+%       - clean: (2 x nUnits) logical array (Row 1: RS, Row 2: FS)
+%       - type:  (nUnits x 1) double array (0: Other, 1: RS, 2: FS)
+%       - date:  datetime of creation
+%
+%   INPUT:
+%       basepaths - Cell array of recording folder paths
+%       fetTbl    - Table containing 'unitType' and 'File' columns
+%
 
+if ~iscell(basepaths), basepaths = {basepaths}; end
 
+for iPath = 1 : length(basepaths)
+    basepath = basepaths{iPath};
+    [~, basename] = fileparts(basepath);
+    uFile = fullfile(basepath, [basename, '.units.mat']);
+
+    % Find units belonging to this file
+    % Assumes fetTbl has 'File' column matching basename
+    fFiles = string(fetTbl.File);
+    uIdx = (fFiles == string(basename));
+
+    % Get subset of unitTypes
+    subTypes = fetTbl.unitType(uIdx);
+    nUnits = length(subTypes);
+
+    % Construct 'clean' (Row 1: RS, Row 2: FS)
+    clean = false(2, nUnits);
+    clean(1, :) = (subTypes == 'RS');
+    clean(2, :) = (subTypes == 'FS');
+
+    % Construct 'type' (0=Other, 1=RS, 2=FS)
+    type = zeros(nUnits, 1);
+    type(subTypes == 'RS') = 1;
+    type(subTypes == 'FS') = 2;
+
+    % Prepare structure to save
+    units = struct();
+    units.clean = clean;
+    units.type = type;
+    units.date = datetime('now');
+
+    % Handle Backup
+    if exist(uFile, 'file')
+        bkupDir = fullfile(basepath, 'bkup');
+        if ~exist(bkupDir, 'dir')
+            mkdir(bkupDir);
+        end
+        % Backup with timestamp: units_YYMMDD_hhmmss.mat
+        ts = datestr(now, 'yymmdd_HHMMSS');
+        movefile(uFile, fullfile(bkupDir, ['units_', ts, '.mat']));
+    end
+
+    % Save new file
+    save(uFile, 'units');
+    fprintf('Saved units for %s\n', basename);
+end
+
+end
 
 %% ========================================================================
 %  NOTE: BAYESIAN PRIORS & POPULATION RATIO ENFORCEMENT
@@ -304,4 +333,3 @@ end
 %     range from 0.0001 to 0.1 depending on the scale of the data.
 %     If the value is too high, it "blurs" the clusters (artificially
 %     widening them). If too low, the code may error on outliers.
-%  ========================================================================

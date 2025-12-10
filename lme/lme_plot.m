@@ -47,8 +47,8 @@ lmeStats            = p.Results.lmeStats;
 
 % organize colors
 if isempty(clr)
-    clr = mcu_clr();
-    clr = clr.grp;
+    cfg = mcu_cfg();
+    clr = cfg.clr.grp;
 end
 clrAlpha = 0.3;
 
@@ -110,7 +110,7 @@ switch ptype
             xticklabels(xVals)
             xlim([1-0.2, length(xVals)+0.2])
         end
-        
+
 
     case {'box', 'bar', 'allPnts'}
         if length(varsFxd) >= 2
@@ -151,7 +151,7 @@ if ~isempty(idxRow)
 
     % Generate significance lines
     [barIdx, barLbl] = lme_sigLines(lmeStats, lmeMdl, lmeData, 'idxRow', idxRow, 'grpVar', grpVar);
-    
+
     % Add significance lines to the plot
     if ~isempty(barIdx)
         plot_sigLines(hAx, barIdx, barLbl, 'flgNS', false);

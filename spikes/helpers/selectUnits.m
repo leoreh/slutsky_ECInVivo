@@ -1,5 +1,7 @@
 function units = selectUnits(varargin)
 
+% REPLACED BY utypes_classify
+
 % selects specific units of a session based on multiple params. arranges
 % the units in two logical rows (rs; fs) and saves it in the session info
 % struct (ce format) and as a separate file. 

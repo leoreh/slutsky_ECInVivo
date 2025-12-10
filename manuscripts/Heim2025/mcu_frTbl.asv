@@ -1,0 +1,226 @@
+function [tAxis, frTbl] = mcu_frTbl(fetTbl)
+% MCU_FRTBL - Create a table of firing rates aligned to perturbation
+%
+% Usage:
+%   [tAxis, frTbl] = mcu_frTbl(fetTbl)
+%
+% Inputs:
+%   fetTbl (optional) - Table containing unit metadata. If provided, the
+%                       function assumes that for each file, the rows in
+%                       fetTbl correspond 1-to-1 with the unit order in
+%                       the loaded firing rate data.
+%                       Must contain: Mouse, File.
+%                       If empty, defaults to processing all 'wt' mice.
+%
+% Outputs:
+%   tAxis  - Time vector relative to perturbation (in Hours).
+%   frTbl  - Table where each row is a unit.
+%
+% See also: MCU_CATFR, MEAS_FRDENOISE
+
+%% 1. Setup
+if nargin < 1, fetTbl = []; end
+
+if isempty(fetTbl)
+    grp = 'wt';
+    mice = mcu_sessions(grp);
+    useFetTbl = false;
+else
+    % Use mice present in the table
+    mice = cellstr(unique(fetTbl.Mouse));
+    useFetTbl = true;
+end
+
+vars = {'fr'; 'units'};
+rows = {}; % Collector for table rows
+global_min = inf;
+global_max = -inf;
+
+%% 2. Iterate Mice
+for iMouse = 1 : length(mice)
+
+    mouseName = mice{iMouse};
+
+    % 1. Load All Data for Mouse
+    basepaths = mcu_sessions(mouseName);
+    v = basepaths2vars('basepaths', basepaths, 'vars', vars);
+
+    % 2. Stitch and Find Perturbation (Per Mouse)
+    % Extract all STRD traces for stitching (Unit agnostic)
+    all_strd = {};
+    for i = 1:length(v)
+        all_strd{i} = v(i).fr.strd;
+    end
+    frt_stitched = cell2padmat(all_strd, 2);
+
+    % Mean FR for perturbation detection
+    mfr_mouse = mean(frt_stitched, 1, 'omitnan');
+    t_dummy = 1:length(mfr_mouse);
+    % Denoise mean to find pert
+    mfr_smooth = mea_frDenoise(mfr_mouse, t_dummy, 'flgPlot', false, 'frameLenSec', 300);
+
+    % Find Perturbation
+    % Limit search to first 3000 pts (arbitrary as per mcu_catFr) or length
+    pertWin = 1 : min(3000, length(mfr_smooth));
+    [pertOnset, ~] = findchangepts(mfr_smooth(pertWin), ...
+        'Statistic', 'mean', 'minDistance', 5, ...
+        'MaxNumChanges', 1);
+
+    % 3. Iterate Days/Files
+    curr_time = 0;
+
+    for iDay = 1 : length(v)
+        [~, fileName] = fileparts(basepaths{iDay});
+
+        % Data for this day
+        if ~isfield(v(iDay).fr, 'strd'), continue; end
+        traces = v(iDay).fr.strd;
+        traceLen = size(traces, 2);
+
+        % Determine Rows to process
+        if useFetTbl
+            % Find rows in fetTbl corresponding to this File
+            isMatch = string(fetTbl.File) == string(fileName);
+            dayRows = fetTbl(isMatch, :);
+
+            % If table has entries for this file, assume they match the
+            % data order exactly (1st row is 1st unit in traces, etc.)
+            nToProcess = height(dayRows);
+
+
+
+        else
+            % Use all valid units
+            nUnits = size(traces, 1);
+            nToProcess = nUnits;
+
+            % Create a dummy table row for metadata
+            dayRows = table();
+            dayRows.Mouse = repmat({mouseName}, nUnits, 1);
+            dayRows.File = repmat({fileName}, nUnits, 1);
+            dayRows.UnitID = (1:nUnits)'; % Dummy ID
+
+            % Attempt to determine type if possible
+            if isfield(v(iDay), 'units') && isfield(v(iDay).units, 'clean')
+                u_clean = v(iDay).units.clean;
+                ut = zeros(nUnits, 1);
+                % Assuming row 1 is RS, row 2 is FS in clean
+                if size(u_clean, 1) >= 1, ut(u_clean(1,:)==1) = 1; end
+                if size(u_clean, 1) >= 2, ut(u_clean(2,:)==1) = 2; end
+                dayRows.unitType = ut;
+                dayRows.initType = ut;
+            else
+                dayRows.unitType = nan(nUnits, 1);
+            end
+        end
+
+        % Process each unit
+        for k = 1:nToProcess
+            % Assumption: Table row k corresponds to Trace k
+            uIdx = k;
+
+            if uIdx > size(traces, 1), continue; end
+
+            % Get Metadata Row
+            uMeta = dayRows(k, :);
+
+            % 1. Get FR
+            raw_fr = traces(uIdx, :);
+
+            % 2. Denoise
+            % Use same parameters as mcu_catFr default for mean, applied to unit
+            dn_fr = mea_frDenoise(raw_fr, 1:length(raw_fr), ...
+                'flgPlot', false, 'frameLenSec', 300);
+
+            % 3. Calculate Timing
+            % pertOnset is global index.
+            % curr_time is global index of start of this file (0-based accumulator)
+            % file_start_global = curr_time + 1
+            % Align such that 0 is pertOnset.
+
+            rel_start_idx = (curr_time + 1) - pertOnset;
+            rel_end_idx   = (curr_time + traceLen) - pertOnset;
+
+            % Update Global Bounds (in indices)
+            global_min = min(global_min, rel_start_idx);
+            global_max = max(global_max, rel_end_idx);
+
+            % pertOnset (relative to unit's firing rate)
+            % Index of perturbation in the FR vector.
+            % unit_pert = pertOnset - curr_time
+            unit_pert_idx = pertOnset - curr_time;
+
+            % Store in row
+            uMeta.pertOnset = unit_pert_idx / 60; % In Hours
+            uMeta.FR = {dn_fr};
+
+            % Store placement info for later alignment
+            uMeta.tmp_rel_start_idx = rel_start_idx;
+            uMeta.tmp_len = traceLen;
+
+            rows{end+1} = uMeta;
+        end
+
+        curr_time = curr_time + traceLen;
+    end
+end
+
+%% 3. Construct Table
+if isempty(rows)
+    frTbl = table();
+    tAxis = [];
+    return;
+end
+
+% Vertcat all one-row tables
+frTbl = vertcat(rows{:});
+
+%% 4. Construct Final Time Axis & Align
+if isinf(global_min)
+    tAxis = [];
+    frTbl.FR_aligned = cell(height(frTbl), 1);
+    return;
+end
+
+tAxis = (global_min : global_max) / 60; % Hours
+nPoints = length(tAxis);
+
+% Preallocate aligned FR
+fr_aligned = cell(height(frTbl), 1);
+
+for i = 1:height(frTbl)
+    % Get data
+    fr = frTbl.FR{i};
+    rel_start = frTbl.tmp_rel_start_idx(i);
+
+    % Identify bounds in tAxis
+    % tAxis[1] corresponds to global_min
+    % rel_start corresponds to index: rel_start - global_min + 1
+
+    start_idx = rel_start - global_min + 1;
+    end_idx = start_idx + length(fr) - 1;
+
+    % Create NaN vector
+    aligned_vec = nan(1, nPoints);
+
+    % Check bounds (sanity check)
+    if start_idx < 1 || end_idx > nPoints
+        warning('Alignment out of bounds for unit %d', i);
+        % Handle intersection
+        target_idx = max(1, start_idx) : min(nPoints, end_idx);
+        src_idx = (target_idx - start_idx) + 1;
+        aligned_vec(target_idx) = fr(src_idx);
+    else
+        aligned_vec(start_idx : end_idx) = fr;
+    end
+
+    fr_aligned{i} = aligned_vec;
+end
+
+frTbl.FR_aligned = fr_aligned;
+
+% Cleanup temporary fields
+frTbl.tmp_rel_start_idx = [];
+frTbl.tmp_len = [];
+
+end
