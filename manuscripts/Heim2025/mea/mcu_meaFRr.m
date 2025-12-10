@@ -19,8 +19,8 @@ prcParams.spkLim = 2000;
 prcParams.shuffleMet = 'raster';
 
 % Files
-% basepaths = [mcu_sessions('mea_mk801')];
-basepaths = [mcu_sessions('mea_bac'), mcu_sessions('mea_mcuko')];
+% basepaths = mcu_basepaths('mea_mk801');
+basepaths = [mcu_basepaths('mea_bac'), mcu_basepaths('mea_mcuko')];
 nFiles = length(basepaths);
 vars = {'mea', 'st_metrics'};
 v = basepaths2vars('basepaths', basepaths, 'vars', vars);
@@ -108,7 +108,7 @@ varMap.bslTime    = 'frr.mdl.bslTime';
 
 clear tblCell
 for iGrp = 1 : length(grps)
-    basepaths = mcu_sessions(grps{iGrp});
+    basepaths = mcu_basepaths(grps{iGrp});
 
     % Load data for this group
     v = basepaths2vars('basepaths', basepaths, 'vars', vars);
@@ -709,7 +709,7 @@ disp(combined_summary);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % FR DISTRIBUTION DURING RECOVERY
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-basepaths = mcu_sessions('mea_bac');
+basepaths = mcu_basepaths('mea_bac');
 vars = {'frr', 'st_brst'};
 v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 
@@ -744,7 +744,7 @@ legend
 % SLOPE VS BURSTINESS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 clearvars -except clr
-basepaths = mcu_sessions('mea_bac');
+basepaths = mcu_basepaths('mea_bac');
 vars = {'frr', 'st_brst'};
 v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 

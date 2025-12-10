@@ -1,33 +1,45 @@
-function [basepaths, v] = mcu_sessions(queryStr)
+function [basepaths, v] = mcu_basepaths(queryStr)
 
 if strcmp(queryStr, 'mcu')
 
-    basepaths = {...
+    mice = {...
         'lh132',...
         'lh133',...
         'lh134',...
         'lh136',...
         'lh140',...
-        };
+        };  
+    basepaths = [];
+    for iMOuse = 1:length(mice)
+        basepaths = [basepaths, mcu_basepaths(mice{iMOuse})];
+    end
 
 elseif strcmp(queryStr, 'wt')
 
-    basepaths = {...
+    mice = {...
         'lh96',...
         'lh100',...
         'lh107',...
         'lh122',...
         'lh142',...
         };
+    basepaths = [];
+    for iMOuse = 1:length(mice)
+        basepaths = [basepaths, mcu_basepaths(mice{iMOuse})];
+    end
 
 elseif strcmp(queryStr, 'eeg')
 
-    basepaths = {...
+    mice = {...
         'lh96',...
         'lh105',...
         'lh106',...
         };
-            % 'lh100',...
+    basepaths = [];
+    for iMOuse = 1:length(mice)
+        basepaths = [basepaths, mcu_basepaths(mice{iMOuse})];
+    end
+    % 'lh100',...
 
 elseif strcmp(queryStr, 'mcu_bsl')
 
@@ -86,7 +98,28 @@ elseif strcmp(queryStr, 'wt_wsh')
         'E:\Data\lh107\lh107_220524_091100',...
         'E:\Data\lh122\lh122_221230_090102',...
         'E:\Data\lh142\lh142_231011_092620',...
-%         'E:\Data\lh99\lh99_220124_090128',...
+        %         'E:\Data\lh99\lh99_220124_090128',...
+        };
+
+elseif strcmp(queryStr, 'wt_old')
+
+    basepaths = {...
+        'D:\Data\lh123\lh123_221219_094508',...
+        'D:\Data\lh126\lh126_230111_091208',...
+        'D:\Data\lh119\lh119_221114_081305',...
+        'E:\Data\lh86\lh86_210227_070000',...       % OP saline
+        'E:\Data\lh87\lh87_210523_100607',...       % OP saline
+        'E:\Data\lh93\lh93_210819_221608',...       % IT saline
+        'E:\Data\lh95\lh95_210824_083300',...       % IT saline
+        'E:\Data\lh111\lh111_220823_094417',...
+        'E:\Data\lh112\lh112_220831_100435',...     % OP CNO (no effect)
+        'E:\Data\lh119\lh119_221114_081305',...     % OP ketamine (no effect)
+        'E:\Data\lh120\lh120_221113_090526',...     % OP ketamine (no effect)
+        'E:\Data\lh121\lh121_221210_090041',...     % OP ketamine (maybe effect)
+        'E:\Data\lh129\lh129_230123_095540',...     % w/ 20 min LT
+        'E:\Data\lh130\lh130_230322_084541',...     % OP MK801 (no effect)
+        'E:\Data\lh106\lh106_220512_102302',...     % IP ketmamine
+        'E:\Data\lh99\lh99_211218_090630',...       % IT Saline (8 tet OE)
         };
 
 elseif strcmp(queryStr, 'wt_bac_on')
@@ -268,19 +301,14 @@ elseif strcmp(queryStr, 'all')
     grps = {'wt', 'mcu'};
     basepaths = [];
     for iGrp = 1 : length(grps)
-        mNames = mcu_sessions(grps{iGrp});
-        mPaths = strings(length(mNames), length(mcu_sessions(mNames{1}))); % preallocate
-        for imouse = 1 : length(mNames)
-            tmpPaths = mcu_sessions(mNames{imouse});
-            mPaths(imouse, :) = string(tmpPaths)';
-        end
-        basepaths = [basepaths; mPaths(:)];
+        % Now mcu_basepaths returns paths directly for 'wt' and 'mcu'
+        basepaths = [basepaths, mcu_basepaths(grps{iGrp})];
     end
 
     % add baseline sessions
     grps = {'wt_bsl', 'mcu_bsl', 'wt_bsl_ripp'};
     for iGrp = 1 : length(grps)
-        basepaths = [basepaths; string(mcu_sessions(grps{iGrp}))'];
+        basepaths = [basepaths, mcu_basepaths(grps{iGrp})];
     end
     basepaths = unique(basepaths);
 
@@ -315,7 +343,7 @@ elseif strcmp(queryStr, 'prePost')
         'E:\Data\lh122\lh122_221223_092656',...
         'E:\Data\lh122\lh122_221230_090102',...
         'E:\Data\lh122\lh122_221231_090112',...
-        'E:\Data\lh122\lh122_230101_090144',...
+        'E:\Data\lh122\lh123_010144',...
         };
 
     basepaths{6} = {...
@@ -335,18 +363,19 @@ end
 
 % Replace E:\\ with D:\\ in basepaths
 if iscell(basepaths)
-    for iPath = 1:numel(basepaths)
-        if iscell(basepaths{iPath}) % Handles cases like 'prePost'
-            for j = 1:numel(basepaths{iPath})
-                if ischar(basepaths{iPath}{j})
-                    basepaths{iPath}{j} = strrep(basepaths{iPath}{j}, 'E:\', 'D:\');
+    for iMOuse = 1:numel(basepaths)
+        if iscell(basepaths{iMOuse}) % Handles cases like 'prePost'
+            for j = 1:numel(basepaths{iMOuse})
+                if ischar(basepaths{iMOuse}{j})
+                    basepaths{iMOuse}{j} = strrep(basepaths{iMOuse}{j}, 'E:\', 'D:\');
                 end
             end
-        elseif ischar(basepaths{iPath}) % Handles other cases
-            basepaths{iPath} = strrep(basepaths{iPath}, 'E:\', 'D:\');
+        elseif ischar(basepaths{iMOuse}) % Handles other cases
+            basepaths{iMOuse} = strrep(basepaths{iMOuse}, 'E:\', 'D:\');
         end
     end
 end
 
+basepaths = natsort(basepaths);
 
 end

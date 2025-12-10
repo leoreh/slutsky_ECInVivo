@@ -1,188 +1,212 @@
-function [tAxis, frTbl] = mcu_frTbl(fetTbl)
-% MCU_FRTBL - Create a table of firing rates aligned to perturbation
+function [tAxis, frTbl] = mcu_frTbl(basepaths, varargin)
+% MCU_FRTBL Create a table of firing rates aligned to perturbation
 %
-% Usage:
-%   [tAxis, frTbl] = mcu_frTbl(fetTbl)
+%   [tAxis, frTbl] = mcu_frTbl(basepaths)
+%   [tAxis, frTbl] = mcu_frTbl(..., 'uTbl', uTbl)
+%   [tAxis, frTbl] = mcu_frTbl(..., 'flgPlot', true)
 %
-% Inputs:
-%   fetTbl (optional) - Table containing unit metadata. If provided, the
-%                       function assumes that for each file, the rows in
-%                       fetTbl correspond 1-to-1 with the unit order in
-%                       the loaded firing rate data.
-%                       Must contain: Mouse, File.
-%                       If empty, defaults to processing all 'wt' mice.
+%   Refactored to use mcu_detectPert for detection and alignment.
+%   Combines data from multiple mice into a single global time axis.
 %
-% Outputs:
-%   tAxis  - Time vector relative to perturbation (in Hours).
-%   frTbl  - Table where each row is a unit.
+% INPUTS:
+%   basepaths (cell) - List of recording session paths.
+%   uTbl      (table)- Optional. If provided, joins with the created table.
+%   flgPlot   (log)  - Resules plotting.
 %
-% See also: MCU_CATFR, MEAS_FRDENOISE
+% OUTPUTS:
+%   tAxis     (vec)  - Global time axis in Hours (0 = Perturbation).
+%   frTbl     (tbl)  - Table with metadata and 'FRt' column (aligned matrix).
+%
+% See also: MCU_DETECTPERT, CATFRTIME, V2TBL
 
 %% ========================================================================
-%  SETUP
+%  ARGUMENTS
 %  ========================================================================
-if nargin < 1, fetTbl = []; end
 
-if isempty(fetTbl)
-    grp = 'wt';
-    mice = mcu_sessions(grp);
-    useFetTbl = false;
+p = inputParser;
+addRequired(p, 'basepaths', @iscell);
+addOptional(p, 'uTbl', table(), @istable);
+addOptional(p, 'flgPlot', true, @islogical);
+parse(p, basepaths, varargin{:});
+
+uTbl = p.Results.uTbl;
+flgPlot = p.Results.flgPlot;
+
+% Sort basepaths naturally
+basepaths = natsort(basepaths);
+
+%% ========================================================================
+%  CREATE TABLE
+%  ========================================================================
+
+if isempty(uTbl)
+    % Create table for all basepaths at once
+    v = basepaths2vars('basepaths', basepaths, 'vars', {'units'});
+
+    varMap.unitType = 'units.type';
+    tagFiles.Mouse = get_mname(basepaths);
+    [~, fNames] = fileparts(basepaths);
+    tagFiles.File = fNames;
+
+    frTbl = v2tbl('v', v, 'varMap', varMap, 'tagFiles', tagFiles);
 else
-    % Use mice present in the table
-    mice = cellstr(unique(fetTbl.Mouse));
-    useFetTbl = true;
+    frTbl = uTbl;
 end
 
-vars = {'fr'};
-rows = {}; % Collector for table rows
-global_min = inf;
-global_max = -inf;
+%% ========================================================================
+%  PROCESS BY MOUSE
+%  ========================================================================
+
+mice = unique(get_mname(basepaths));
+nMice = length(mice);
+mData = struct();
+
+for iMouse = 1:nMice
+    mName = string(mice(iMouse));
+    myPaths = basepaths(contains(basepaths, mName));
+
+    % Perturbation Detection & Alignment
+    [frMat, tMouse, ~] = mcu_detectPert(myPaths);
+
+    mData(iMouse).frMat = frMat;
+    mData(iMouse).tAxis = tMouse;
+    mData(iMouse).name  = mName;
+end
 
 %% ========================================================================
-%  ITERATE MICE
+%  GLOBAL ALIGNMENT
 %  ========================================================================
-for iMouse = 1 : length(mice)
 
-    mouseName = mice{iMouse};
+% Determine Global Time Range
+minT = inf;
+maxT = -inf;
+dt = [];
 
-    % Load All Data for Mouse
-    basepaths = mcu_sessions(mouseName);
-    v = basepaths2vars('basepaths', basepaths, 'vars', vars);
+for iMouse = 1:nMice
+    t = mData(iMouse).tAxis;
+    minT = min(minT, min(t));
+    maxT = max(maxT, max(t));
 
-    % Stitch and Find Perturbation (Per Mouse)
-    % Extract all STRD traces for stitching (Unit agnostic)
-    all_strd = {};
-    for i = 1:length(v)
-        if isfield(v(i).fr, 'strd')
-            all_strd{i} = v(i).fr.strd;
-        else
-            all_strd{i} = [];
-        end
-    end
-    frt_stitched = cell2padmat(all_strd, 2);
-
-
-    % Mean FR for perturbation detection
-    mfr_mouse = mean(frt_stitched, 1, 'omitnan');
-    t_dummy = 1:length(mfr_mouse);
-    % Denoise mean to find pert
-    mfr_smooth = mea_frDenoise(mfr_mouse, t_dummy, 'flgPlot', false, 'frameLenSec', 300);
-
-    % Find Perturbation
-    % Limit search to first 3000 pts (arbitrary as per mcu_catFr) or length
-    pertWin = 1 : min(3000, length(mfr_smooth));
-    [pertOnset, ~] = findchangepts(mfr_smooth(pertWin), ...
-        'Statistic', 'mean', 'minDistance', 5, ...
-        'MaxNumChanges', 1);
-
-    % Iterate Days/Files
-    curr_time = 0;
-
-    for iDay = 1 : length(v)
-        [~, fileName] = fileparts(basepaths{iDay});
-
-        % Data for this day
-        traces = v(iDay).fr.strd;
-        traceLen = size(traces, 2);
-
-        % Determine Rows to process
-        % Find rows in fetTbl corresponding to this File
-        isMatch = string(fetTbl.File) == string(fileName);
-        dayRows = fetTbl(isMatch, :);
-        nToProcess = height(dayRows);
-
-        % Process each unit
-        for iUnit = 1:nToProcess
-            % Assumption: Table row k corresponds to Trace k
-            uIdx = iUnit;
-            if uIdx > size(traces, 1), continue; end
-
-            % Get Metadata Row
-            uMeta = dayRows(iUnit, :);
-
-            % Get FR & Denoise
-            raw_fr = traces(uIdx, :);
-            dn_fr = mea_frDenoise(raw_fr, 1:length(raw_fr), ...
-                'flgPlot', false, 'frameLenSec', 300);
-
-            % Calculate Timing
-            rel_start_idx = (curr_time + 1) - pertOnset;
-            rel_end_idx   = (curr_time + traceLen) - pertOnset;
-
-            % Update Global Bounds (in indices)
-            global_min = min(global_min, rel_start_idx);
-            global_max = max(global_max, rel_end_idx);
-
-            % pertOnset (relative to unit's firing rate)
-            unit_pert_idx = pertOnset - curr_time;
-
-            % Store in row
-            uMeta.pertOnset = unit_pert_idx / 60; % In Hours
-            uMeta.FR = {dn_fr};
-
-            % Store placement info for later alignment
-            uMeta.tmp_rel_start_idx = rel_start_idx;
-            uMeta.tmp_len = traceLen;
-
-            rows{end+1} = uMeta;
-        end
-
-        curr_time = curr_time + traceLen;
+    if isempty(dt) && length(t) > 1
+        dt = t(2) - t(1);
     end
 end
 
-%% ========================================================================
-%  CONSTRUCT TABLE
-%  ========================================================================
-if isempty(rows)
-    frTbl = table();
-    tAxis = [];
-    return;
+% Create Global Axis
+tAxis = minT : dt : maxT;
+nBins = length(tAxis);
+
+% Align Data to Global Axis
+nTotalUnits = height(frTbl);
+frTbl.FRt = nan(nTotalUnits, nBins);
+
+for iMouse = 1:nMice
+    mName = mData(iMouse).name;
+    fr = mData(iMouse).frMat;
+    t = mData(iMouse).tAxis;
+
+    % Find Start Index in Global Grid
+    [~, idxStart] = min(abs(tAxis - t(1)));
+
+    [nUnits, nTimeMouse] = size(fr);
+    alignedMat = nan(nUnits, nBins);
+
+    idxEnd = min(nBins, idxStart + nTimeMouse - 1);
+    lenFill = idxEnd - idxStart + 1;
+    alignedMat(:, idxStart:idxEnd) = fr(:, 1:lenFill);
+
+    % Assign to Table
+    % Direct assignment assuming unique mouse names
+    mIdx = frTbl.Mouse == mName;
+    frTbl.FRt(mIdx, :) = alignedMat;
 end
 
-% Vertcat all one-row tables
-frTbl = vertcat(rows{:});
-
 %% ========================================================================
-%  CONSTRUCT FINAL TIME AXIS & ALIGN
+%  PLOT
 %  ========================================================================
-if isinf(global_min)
-    tAxis = [];
-    frTbl.FR_aligned = [];
-    return;
+
+if flgPlot
+    mice = unique(frTbl.Mouse);
+    nMice = length(mice);
+    cfg = mcu_cfg();
+
+    hFig = figure('Name', 'Firing Rate vs Time', 'NumberTitle', 'off', ...
+        'Position', [100 100 1000 800]);
+
+    tabgp = uitabgroup(hFig);
+
+    for iMouse = 1:nMice
+        mName = string(mice(iMouse));
+        tab = uitab(tabgp, 'Title', mName);
+
+        % Get data for this mouse
+        mIdx = frTbl.Mouse == mName;
+        subTbl = frTbl(mIdx, :);
+
+        % RS Units (Type 1)
+        ax1 = subplot(2, 1, 1, 'Parent', tab);
+        plot_unitType(ax1, tAxis, subTbl, 1, cfg.clr.unitType(1, :));
+        title(ax1, sprintf('%s - RS Units', mName), 'Interpreter', 'none');
+
+        % FS Units (Type 2)
+        ax2 = subplot(2, 1, 2, 'Parent', tab);
+        plot_unitType(ax2, tAxis, subTbl, 2, cfg.clr.unitType(2, :));
+        title(ax2, sprintf('%s - FS Units', mName), 'Interpreter', 'none');
+
+        linkaxes([ax1, ax2], 'xy');
+    end
+    
+    axis tight
+
 end
 
-tAxis = (global_min : global_max) / 60; % Hours
-nPoints = length(tAxis);
+end
 
-% Preallocate aligned FR as a Matrix (Rows x Time)
-% nUnits x nPoints
-fr_aligned = nan(height(frTbl), nPoints);
+% EoF
 
-for i = 1:height(frTbl)
-    % Get data
-    fr = frTbl.FR{i};
-    rel_start = frTbl.tmp_rel_start_idx(i);
+%% ========================================================================
+%  HELPER: PLOT FR vs TIME
+%  ========================================================================
 
-    % Identify bounds in tAxis
-    start_idx = rel_start - global_min + 1;
-    end_idx = start_idx + length(fr) - 1;
+function plot_unitType(ax, tAxis, tbl, typeVal, clr)
+hold(ax, 'on');
 
-    % Check bounds (sanity check)
-    if start_idx < 1 || end_idx > nPoints
-        warning('Alignment out of bounds for unit %d', i);
-        target_idx = max(1, start_idx) : min(nPoints, end_idx);
-        src_idx = (target_idx - start_idx) + 1;
-        fr_aligned(i, target_idx) = fr(src_idx);
+% Handle unitType (categorical or double)
+if iscategorical(tbl.unitType)
+    % Map numeric to category if needed, or assume caller knows logic
+    % But here we passed 1/2. Let's see if 1 maps to 'RS' or 'FS'.
+    % from utypes_classify: 1=RS, 2=FS.
+    % Categories: {'Other', 'RS', 'FS'} -> 0, 1, 2?
+    % Actually categorical usually matches indices or string values.
+    % if categorical is {'Other', 'RS', 'FS'}, 'RS'==1? NO.
+    % undefined=0, Other=?, RS=?, FS=?
+    % Safest is to use the label strings if categorical.
+    if typeVal == 1
+        isType = tbl.unitType == 'RS';
+    elseif typeVal == 2
+        isType = tbl.unitType == 'FS';
     else
-        fr_aligned(i, start_idx : end_idx) = fr;
+        isType = false(height(tbl),1);
     end
+else
+    isType = tbl.unitType == typeVal;
 end
 
-frTbl.FR_aligned = fr_aligned;
+frData = tbl.FRt(isType, :);
 
-% Cleanup temporary fields
-frTbl.tmp_rel_start_idx = [];
-frTbl.tmp_len = [];
+if ~isempty(frData)
+    % Plot All Traces (Light Gray)
+    plot(ax, tAxis, frData', 'Color', [0.7 0.7 0.7 0.2]);
+
+    % Plot Mean (Blue)
+    meanFR = mean(frData, 1, 'omitnan');
+    plot(ax, tAxis, meanFR, 'Color', clr, 'LineWidth', 2, ...
+        'DisplayName', 'Mean FR');
+end
+
+xlabel(ax, 'Time (Hours)');
+ylabel(ax, 'Firing Rate (Hz)');
+grid(ax, 'on');
+xline(ax, 0, '--k', 'Perturbation');
 
 end

@@ -7,8 +7,8 @@ params.nShuffles = 1000;            % Number of shuffles
 params.spkLim = 1000;
 params.shuffleMet = 'raster';
 
-basepaths = [mcu_sessions('wt_bsl'), mcu_sessions('mcu_bsl')];
-basepaths = [mcu_sessions('mea_bac')];
+basepaths = [mcu_basepaths('wt_bsl'), mcu_basepaths('mcu_bsl')];
+basepaths = [mcu_basepaths('mea_bac')];
 nFiles = length(basepaths);
 vars = {'spikes', 'st_metrics', 'fr', 'units'};
 v = basepaths2vars('basepaths', basepaths, 'vars', vars);
@@ -46,7 +46,7 @@ cnt = 1;
 for iUnit = 1 : 2
 
     subplot(1, 2, cnt);
-    unitIdx = units.clean(iUnit, :); 
+    unitIdx = units.clean(iUnit, :);
     x = st.royer(unitIdx);
     % x = fr.mfr(unitIdx);
     y = prc.prc0_norm(unitIdx);
@@ -71,15 +71,15 @@ grps = {'wt_bsl'; 'mcu_bsl'};
 
 clear grppaths
 for igrp = 1 : length(grps)
-    grppaths{igrp} = string(mcu_sessions(grps{igrp})');
+    grppaths{igrp} = string(mcu_basepaths(grps{igrp})');
 end
 grppaths{1}(end) = [];
 grppaths{1} = [grppaths{1}; "D:\Data\lh123\lh123_221219_094508";
-"D:\Data\lh126\lh126_230111_091208"];
+    "D:\Data\lh126\lh126_230111_091208"];
 
 
 % -------------------------------------------------------------------------
-% FR per unit, WT vs MCU for RS vs FS 
+% FR per unit, WT vs MCU for RS vs FS
 frml = 'PRC ~ Group * UnitType + (1|Mouse)';
 varFld = 'prc0_norm';
 
@@ -89,11 +89,11 @@ varFld = 'prc0_norm';
 
 % run lme
 contrasts = 'all';
-contrasts = [1 : 6]; 
+contrasts = [1 : 6];
 [lmeStats, lmeCfg] = lme_analyse(lmeData, lmeCfg, 'contrasts', contrasts);
 
 % plot
-hFig = lme_plot(lmeData, lmeCfg.lmeMdl, 'ptype', 'bar', 'axShape', 'square'); 
+hFig = lme_plot(lmeData, lmeCfg.lmeMdl, 'ptype', 'bar', 'axShape', 'square');
 
 % Update labels
 hAx = gca;

@@ -5,7 +5,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % go over each mouse and analyze all experiment days
-grps = [mcu_sessions('wt'), mcu_sessions('mcu')];
+grps = [unique(get_mname(mcu_basepaths('wt'))), unique(get_mname(mcu_basepaths('mcu')))];
 vars = {'spikes'};
 
 % iterate
@@ -13,7 +13,7 @@ for igrp = 1 : length(grps)
 
     % get group basepaths
     queryStr = grps{igrp};
-    basepaths = mcu_sessions(queryStr);
+    basepaths = mcu_basepaths(queryStr);
     nfiles = length(basepaths);
 
     % load state vars
@@ -47,7 +47,7 @@ grps = {'wt_bsl'; 'mcu_bsl'};
 
 clear grppaths
 for igrp = 1 : length(grps)
-    grppaths{igrp} = string(mcu_sessions(grps{igrp})');
+    grppaths{igrp} = string(mcu_basepaths(grps{igrp})');
 end
 
 
@@ -113,10 +113,10 @@ idxRm = [2, 6];                         % remove bac on and off
 grappaths = cell(1,length(grps));       % Initialize
 for igrpBac = 1 : length(grps)
 
-    mNames = mcu_sessions(grps{igrpBac});
-    mPaths = strings(length(mNames), length(mcu_sessions(mNames{1})) - length(idxRm)); % preallocate
+    mNames = unique(get_mname(mcu_basepaths(grps{igrpBac})));
+    mPaths = strings(length(mNames), length(mcu_basepaths(mNames{1})) - length(idxRm)); % preallocate
     for imouse = 1 : length(mNames)
-        basepaths = mcu_sessions(mNames{imouse});
+        basepaths = mcu_basepaths(mNames{imouse});
         basepaths(idxRm) = [];
         mPaths(imouse, :) = string(basepaths)';
     end

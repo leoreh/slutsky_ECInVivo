@@ -2,13 +2,14 @@
 
 mname = 'mcu_bsl';
 vars = ["spikes"; "units"; "session"; "swv_metrics"];
-[basepaths, v] = mcu_sessions(mname, vars);
+basepaths = mcu_basepaths(mname);
+v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 nfiles = length(basepaths);
 
 % mono synaptic interactions (spike transmission gain)
 for ifile = 1 : nfiles
-    
-    % recording params   
+
+    % recording params
     basepath = basepaths{ifile};
     [~, basename] = fileparts(basepath);
     cd(basepath)
@@ -17,9 +18,9 @@ for ifile = 1 : nfiles
     stg = calc_stgs('spktimes', v(ifile).spikes.times, 'basepath', pwd,...
         'winCalc', [0, Inf], 'saveVar', true, 'mancur', false,...
         'forceA', true, 'fs', fs);
-    
+
     mancur_stg('stg', stg)
-    
+
     % cell explorer
     mono_res = ce_MonoSynConvClick(v(ifile).spikes,...
         'includeInhibitoryConnections', true, 'bout', [0 4 * 60 * 60]);
@@ -32,5 +33,5 @@ for ifile = 1 : nfiles
     mono_res
 
     cpair = [93, 54];
-    
+
 end

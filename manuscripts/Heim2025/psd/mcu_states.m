@@ -5,7 +5,7 @@
 
 % create lfp file
 LFPfromDat('basepath', basepath, 'cf', 450, 'chunksize', 5e6,...
-    'nchans', nchans, 'fsOut', 1250, 'fsIn', fs)    
+    'nchans', nchans, 'fsOut', 1250, 'fsIn', fs)
 
 
 % create emg signal from accelerometer data
@@ -28,7 +28,7 @@ otl = get_otlSpec('basepath', pwd, 'saveVar', true,...
 
 % manually create labels. At this point, I manually classify at least 1
 % hour of data for calibrating the signal and for future examination of the
-% classification accuracy. 
+% classification accuracy.
 labelsmanfile = [basename, '.sleep_labelsMan.mat'];
 AccuSleep_viewer(sSig, labels, labelsmanfile)
 
@@ -73,7 +73,7 @@ ssEmg = as_emg('basepath', basepath, 'flgInspct', false,...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 queryStr = 'wt_bsl';
-basepaths = [mcu_sessions(queryStr)];
+basepaths = mcu_basepaths(queryStr);
 nfiles = length(basepaths);
 
 % select session
@@ -115,8 +115,8 @@ AccuSleep_viewer(sSig, labels, fname_labelsMan)
 % reclassify states automatically
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-basepaths = [mcu_sessions('wt_wsh'), mcu_sessions('mcu_wsh')];
-% basepaths = [mcu_sessions('lh100')];
+basepaths = [mcu_basepaths('wt_wsh'); mcu_basepaths('mcu_wsh')];
+% basepaths = mcu_basepaths('lh100');
 nfiles = length(basepaths);
 
 for ifile = 1 : nfiles
@@ -152,7 +152,7 @@ for ifile = 1 : nfiles
         'saveVar', true, 'forceA', true, 'netfile', netfile,...
         'graphics', true, 'calData', []);
 
-    
+
 end
 
 
@@ -161,11 +161,11 @@ end
 % find spec outliers in each file
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mice = [mcu_sessions('mcu')];
+mice = unique(get_mname(mcu_basepaths('mcu')));
 for imouse = 1 : length(mice)
 
     mname = mice{imouse};
-    basepaths = mcu_sessions(mname);
+    basepaths = mcu_basepaths(mname);
     nfiles = length(basepaths);
 
     for ifile = 1 : nfiles
@@ -181,7 +181,7 @@ end
 % recalculate state bouts (accusleep)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mice = [mcu_sessions('mcu')];
+mice = unique(get_mname(mcu_basepaths('mcu')));
 vars = ["sleep_states"];
 cfg = as_loadConfig();
 minDur = 5;
@@ -190,7 +190,8 @@ interDur = 3;
 for imouse = 1 : length(mice)
 
     mname = mice{imouse};
-    [basepaths, v] = [mcu_sessions(mname, vars)];
+    basepaths = mcu_basepaths(mname);
+    v = basepaths2vars('basepaths', basepaths, 'vars', vars);
     nfiles = length(basepaths);
     mpath = fileparts(basepaths{1});
 
@@ -231,7 +232,7 @@ end
 % calculate state bouts (emg)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mice = [mcu_sessions('mcu')];
+mice = unique(get_mname(mcu_basepaths('mcu')));
 cfg = as_loadConfig('flgEmg', true);
 minDur = 5;
 interDur = 3;
@@ -239,7 +240,7 @@ interDur = 3;
 for imouse = 1 : length(mice)
 
     mname = mice{imouse};
-    [basepaths] = [mcu_sessions(mname)];
+    basepaths = mcu_basepaths(mname);
     nfiles = length(basepaths);
     mpath = fileparts(basepaths{1});
 
@@ -270,7 +271,7 @@ end
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% LME 
+% LME
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % load data for each group
@@ -279,9 +280,9 @@ idx_rmDays = [];              % remove bac on and off
 clear grppaths
 for igrp = 1 : length(grps)
 
-    mnames = mcu_sessions(grps(igrp));  
+    mnames = unique(get_mname(mcu_basepaths(grps{igrp})));
     for imouse = 1 : length(mnames)
-        basepaths = mcu_sessions(mnames{imouse});
+        basepaths = mcu_basepaths(mnames{imouse});
         basepaths(idx_rmDays) = [];
         grppaths{igrp}(imouse, :) = string(basepaths)';
     end
@@ -370,7 +371,7 @@ grps = {'wt_wsh'; 'mcu_wsh'};
 
 clear grppaths
 for igrp = 1 : length(grps)
-    grppaths{igrp} = string(mcu_sessions(grps{igrp})');
+    grppaths{igrp} = string(mcu_basepaths(grps{igrp})');
 end
 
 % organize for lme
@@ -395,7 +396,7 @@ grph_save('fh', fh, 'fname', [char(lme.Formula), '_AS'], 'frmt', {'ai', 'jpg'})
 % compare mcu and wt during baseline
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% can use states either from accusleep or emg 
+% can use states either from accusleep or emg
 flg_emg = true;
 
 % can use bouts after cleaning and merging or original
@@ -406,8 +407,8 @@ flg_clean = true;
 
 % load data
 clear basepaths
-basepaths{1} = [mcu_sessions('wt_bsl')];
-basepaths{2} = [mcu_sessions('mcu_bsl')];
+basepaths{1} = mcu_basepaths('wt_bsl');
+basepaths{2} = mcu_basepaths('mcu_bsl');
 basepaths{2}(end) = [];
 nfiles = max(cellfun(@length, basepaths));
 
@@ -432,9 +433,9 @@ for igrp = 1 : 2
     nfiles = length(basepaths{igrp});
     ss_sfx = fieldnames(v);
 
-    ss = catfields([v(:).(ss_sfx{1})], 1, true);   
-    for ifile = 1 : nfiles        
-        
+    ss = catfields([v(:).(ss_sfx{1})], 1, true);
+    for ifile = 1 : nfiles
+
         if flg_clean
             btimes = ss.bouts.times(ifile, sstates);
         else
@@ -513,7 +514,7 @@ end
 
 varPsd = '.psdEMG.mat';
 
-mNames = [{mcu_sessions('wt'), mcu_sessions('mcu')}];
+mNames = [{unique(get_mname(mcu_basepaths('wt')))}, {unique(get_mname(mcu_basepaths('mcu')))}];
 nGrp = length(mNames);
 
 clear b
@@ -525,7 +526,7 @@ for iGrp = 1 : nGrp
     clear boutStats bMouse
     for iMouse = 1 : nMice
         mName = grpMice{iMouse};
-        mPaths = mcu_sessions(mName);
+        mPaths = mcu_basepaths(mName);
         nFiles = length(mPaths);
 
         for ifile = 1
@@ -574,7 +575,7 @@ for iState = 1:nStates
             durs = squeeze(b{iGrp}.dur(:, iState, iBoutType, :));
             durs = durs(:);
             durs = durs(~isnan(durs) & durs > 0); % remove NaN/zero
-            
+
             % Plot histogram
             h = histogram(durs, 'BinWidth', 2, ...
                 'EdgeColor', groupColors{iGrp}, ...

@@ -7,7 +7,7 @@ params.nShuffles = 1000;             % Number of shuffles
 params.flg_par = false;
 params.spkLim = 2000;
 
-basepaths = [mcu_sessions('wt_bsl'), mcu_sessions('mcu_bsl')];
+basepaths = [mcu_basepaths('wt_bsl'); mcu_basepaths('mcu_bsl')];
 nFiles = length(basepaths);
 vars = {'spikes'};
 v = basepaths2vars('basepaths', basepaths, 'vars', vars);
@@ -38,11 +38,11 @@ grps = {'wt_bsl'; 'mcu_bsl'};
 
 clear grppaths
 for igrp = 1 : length(grps)
-    grppaths{igrp} = string(mcu_sessions(grps{igrp})');
+    grppaths{igrp} = string(mcu_basepaths(grps{igrp})');
 end
 
 % -------------------------------------------------------------------------
-% FR per unit, WT vs MCU for RS vs FS 
+% FR per unit, WT vs MCU for RS vs FS
 frml = 'PRC ~ Group * UnitType + (1|Mouse)';
 varFld = 'z0';
 
@@ -52,11 +52,11 @@ varFld = 'z0';
 
 % run lme
 contrasts = 'all';
-contrasts = [1 : 6]; 
+contrasts = [1 : 6];
 [lmeStats, lmeCfg] = lme_analyse(lmeData, lmeCfg, 'contrasts', contrasts);
 
 % plot
-hFig = lme_plot(lmeData, lmeCfg.lmeMdl, 'ptype', 'bar', 'axShape', 'square'); 
+hFig = lme_plot(lmeData, lmeCfg.lmeMdl, 'ptype', 'bar', 'axShape', 'square');
 
 % Update labels
 hAx = gca;
@@ -127,8 +127,8 @@ for iUnit = 1 : 2
     x = prc.z0;
 
     subplot(2,2,iUnit);
-plot_scatterCorr(prc.stpr0, frr.bslFr, ...
-    'xLbl', 'Baseline Firing Rate (Hz)', 'yLbl', 'Recovery Firing Rate (Hz)');
+    plot_scatterCorr(prc.stpr0, frr.bslFr, ...
+        'xLbl', 'Baseline Firing Rate (Hz)', 'yLbl', 'Recovery Firing Rate (Hz)');
 
 end
 
@@ -206,7 +206,7 @@ if flg_load
 
     % load all files
     vars = {'mea', 'fr'};
-    basepaths = mcu_sessions('mea_bac');
+    basepaths = mcu_basepaths('mea_bac');
     v = basepaths2vars('basepaths', basepaths, 'vars', vars);
     nFiles = length(basepaths);
 

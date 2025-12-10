@@ -205,7 +205,7 @@ if alt == 1
     grps = {'wt_bsl'; 'mcu_bsl'};
 
     for iGrp = 1 : length(grps)
-        basepaths = mcu_sessions(grps{iGrp});
+        basepaths = mcu_basepaths(grps{iGrp});
         nFiles = length(basepaths);
         v{iGrp} = basepaths2vars('basepaths', basepaths, 'vars', cfg.vars);
 
@@ -220,11 +220,11 @@ elseif alt == 2
     grps = {'wt', 'mcu'};
 
     for iGrp = 1 : length(grps)
-        mNames = mcu_sessions(grps{iGrp});
+        mNames = unique(get_mname(mcu_basepaths(grps{iGrp})));
 
         for iMouse = 1 : length(mNames)
             % Get all paths for this mouse and remove specified days
-            tmpPaths = mcu_sessions(mNames{iMouse});
+            tmpPaths = mcu_basepaths(mNames{iMouse});
             tmpPaths(idxRm) = [];
 
             % Load data for all days for this mouse at once

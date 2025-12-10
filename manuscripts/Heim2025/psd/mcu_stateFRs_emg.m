@@ -6,7 +6,8 @@
 % load data
 mname = 'wt_bsl';
 vars = ["sleep_states"; "session"; "units"; "spikes"; "psdEmg"];
-[basepaths, v] = mcu_sessions(mname, vars);
+basepaths = mcu_basepaths(mname);
+v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 nfiles = length(basepaths);
 
 % params
@@ -62,7 +63,8 @@ for igrp = 1 : length(mname)
 
     % load data
     vars = ["frEmg"; "units"];
-    [basepaths, v] = mcu_sessions(mname{igrp}, vars);
+    basepaths = mcu_basepaths(mname{igrp});
+    v = basepaths2vars('basepaths', basepaths, 'vars', vars);
     nfiles = length(basepaths);
 
     % firing rate
@@ -76,8 +78,8 @@ for igrp = 1 : length(mname)
         boutCell{ifile} = tmp;
 
         % get mfr across state bouts per unit
-        unitCell{ifile} = v(ifile).fr.states.mfr(unitIdx, :);        
-        
+        unitCell{ifile} = v(ifile).fr.states.mfr(unitIdx, :);
+
     end
     boutGrp{igrp} = cell2padmat(boutCell, 3);
     unitGrp{igrp} = cell2padmat(unitCell, 3);
@@ -136,7 +138,7 @@ ftarget = [0.5 : 0.5 : 100];
 
 % files
 mname = 'lh107';
-basepaths = [mcu_sessions(mname)];
+basepaths = mcu_basepaths(mname);
 nfiles = length(basepaths);
 
 for ifile = 1 : nfiles
@@ -149,7 +151,7 @@ for ifile = 1 : nfiles
     bouts = as_bouts('minDur', minDur, 'interDur',...
         interDur, 'flgEmg', true, 'graphics', graphics, 'nbins', 2);
     boutTimes = bouts.times;
-    
+
     % calc psd according to emg state separation
     psd = psd_states('basepath', basepath, 'sstates', [1, 2],...
         'sig', [], 'fs', fs, 'saveVar', saveVar,...

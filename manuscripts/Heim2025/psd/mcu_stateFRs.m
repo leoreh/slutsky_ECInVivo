@@ -6,7 +6,8 @@
 % load data
 mname = 'mcu_wsh';
 vars = ["sleep_states"; "session"; "units"; "spikes"; "psd"];
-[basepaths, v] = mcu_sessions(mname, vars);
+basepaths = mcu_basepaths(mname);
+v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 nfiles = length(basepaths);
 
 % params
@@ -61,7 +62,8 @@ for igrp = 1 : length(mname)
 
     % load data
     vars = ["fr"; "units"];
-    [basepaths, v] = mcu_sessions(mname{igrp}, vars);
+    basepaths = mcu_basepaths(mname{igrp});
+    v = basepaths2vars('basepaths', basepaths, 'vars', vars);
     nfiles = length(basepaths);
 
     % firing rate
@@ -75,8 +77,8 @@ for igrp = 1 : length(mname)
         boutCell{ifile} = tmp;
 
         % get mfr across state bouts per unit
-        unitCell{ifile} = v(ifile).fr.states.mfr(unitIdx, :);        
-        
+        unitCell{ifile} = v(ifile).fr.states.mfr(unitIdx, :);
+
     end
     boutGrp{igrp} = cell2padmat(boutCell, 3);
     unitGrp{igrp} = cell2padmat(unitCell, 3);
@@ -134,7 +136,8 @@ for igrp = 1 : ngrp
 
     % load data
     vars = ["units"];
-    [basepaths, v] = mcu_sessions(mname{igrp}, vars);
+    basepaths = mcu_basepaths(mname{igrp});
+    v = basepaths2vars('basepaths', basepaths, 'vars', vars);
     nfiles = length(basepaths);
 
     % nunits
@@ -171,13 +174,14 @@ for igrp = 1 : ngrp
 
     % load data
     vars = ["fr"; "units"];
-    [basepaths, v] = mcu_sessions(mname{igrp}, vars);
+    basepaths = mcu_basepaths(mname{igrp});
+    v = basepaths2vars('basepaths', basepaths, 'vars', vars);
     nfiles = length(basepaths);
 
     % firing rate
     for ifile = 1 : nfiles
         for iunit = 1 : 2
-            unitIdx = v(ifile).units.clean(iunit, :);           
+            unitIdx = v(ifile).units.clean(iunit, :);
             mfr(igrp, ifile, iunit) = mean(v(ifile).fr.mfr(unitIdx));
         end
     end

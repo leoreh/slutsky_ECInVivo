@@ -21,7 +21,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % grab mice with eeg signals
-mNames = [mcu_sessions('eeg')];
+mNames = unique(get_mname(mcu_basepaths('eeg')));
 nMice = length(mNames);
 
 % import toolbox for filtering
@@ -31,7 +31,7 @@ import iosr.dsp.*
 for iMouse = 1 : nMice
 
     queryStr = mNames{iMouse};
-    basepaths = mcu_sessions(queryStr);
+    basepaths = mcu_basepaths(queryStr);
     nfiles = length(basepaths);
     mpath = fileparts(basepaths{1});
 
@@ -61,8 +61,8 @@ for iMouse = 1 : nMice
             eeg = double(bz_LoadBinary(eegName, 'duration', Inf,...
                 'frequency', 1250, 'nchannels', 2, 'start', 0,...
                 'channels', 2, 'downsample', 1));
-            
-            
+
+
 
             tstamps_sig = [1 : length(emg)] / fs;
 
@@ -73,9 +73,9 @@ for iMouse = 1 : nMice
             filtRatio = eegCf / (fs / 2);
             eeg = iosr.dsp.sincFilter(eeg, filtRatio);
         else
-        
+
             eegName = [basename, '.lfp'];
-            
+
             ch = [2 : 8];
             dur = Inf;
             start = 0;
@@ -112,11 +112,11 @@ for iMouse = 1 : nMice
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% create EMG epochs 
+% create EMG epochs
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % This is also the opportunity to get rid of bad episodes in the rocording.
 % This seems only necassary for lh100. This means lh100 EEG bouts will no
-% longer correspond to LFP bouts. 
+% longer correspond to LFP bouts.
 
 % However, due to the removal of outlier bouts, which is done based on the
 % PSDs, the population of EMG and LFP bouts are expected to be different
@@ -127,7 +127,7 @@ end
 % is blind to bout duration
 
 % for lh100, perhaps better to limit existing bouts manually rather than
-% recalculating them. 
+% recalculating them.
 
 % just a reference - no use as of now
 interDur = 3;
@@ -143,11 +143,11 @@ for ifile = 1 : nfiles
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% calculate EEG PSD per bout 
+% calculate EEG PSD per bout
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % grab mice with eeg signals
-mNames = [mcu_sessions('eeg')];
+mNames = unique(get_mname(mcu_basepaths('eeg')));
 nMice = length(mNames);
 
 % params
@@ -157,7 +157,7 @@ ftarget = [1 : 0.5 : 100];
 for iMouse = 4 : nMice
 
     queryStr = mNames{iMouse};
-    basepaths = mcu_sessions(queryStr);
+    basepaths = mcu_basepaths(queryStr);
     nfiles = length(basepaths);
     mpath = fileparts(basepaths{1});
 
@@ -174,7 +174,7 @@ for iMouse = 4 : nMice
         % load lfp signal
         eeg = load(sigfile, 'eeg');
         fs = 1250;
-        
+
         % get bout times from emg states
         load(statesfile)
         if strcmp(queryStr, 'lh100')
@@ -189,7 +189,7 @@ for iMouse = 4 : nMice
             'sig', eeg.eeg, 'fs', fs, 'saveVar', false,...
             'graphics', false, 'forceA', true, 'ftarget', ftarget,...
             'flgEmg', true, 'btimes', btimes, 'flgOtl', true);
-        
+
         % save
         save(psdEEGfile, "psd");
 
@@ -204,8 +204,8 @@ end
 
 
 flgEeg = false;
-mNames = [mcu_sessions('eeg')];
-mNames = [mcu_sessions('wt'), mcu_sessions('mcu')];
+mNames = [unique(get_mname(mcu_basepaths('eeg')))];
+mNames = [unique(get_mname(mcu_basepaths('wt'))); unique(get_mname(mcu_basepaths('mcu')))];
 
 if flgEeg
     varPsd = '.psdEMG_eeg.mat';
@@ -220,7 +220,7 @@ nMice = length(mNames);
 
 for iMouse = 1 : nMice
     mName = mNames{iMouse};
-    mPaths = mcu_sessions(mName);
+    mPaths = mcu_basepaths(mName);
     nFiles = length(mPaths);
 
     for ifile = 1 : nFiles
@@ -228,7 +228,7 @@ for iMouse = 1 : nMice
         [~, basename] = fileparts(basepath);
         original_path = pwd;
         cd(basepath);
-        
+
         psdFile = fullfile(basepath, [basename, varPsd]);
         f1ffile = fullfile(basepath, [basename, varF1f]);
 
@@ -239,7 +239,7 @@ for iMouse = 1 : nMice
 
         freqs = psd.info.faxis;
         nStates = size(psd.psd, 1);
-        
+
         clear f1f f1fBout f1fState
         for iState = 1 : nStates
             psdState = psd.bouts.psd{iState};
@@ -251,21 +251,21 @@ for iMouse = 1 : nMice
             nBoutGrps = length(boutMasks);
             % nBoutGrps = 1;
 
-            for iBoutGrp = 1 : nBoutGrps 
+            for iBoutGrp = 1 : nBoutGrps
                 psdAvg = mean(psdState(boutMasks{iBoutGrp}, :), 1);
-                
+
                 f1fBout(iBoutGrp) = fooof_calc(psdAvg, freqs, ...
-                                  'f_range', fRange, ...
-                                  'flg_plot', false, ...
-                                  'saveVar', false); 
+                    'f_range', fRange, ...
+                    'flg_plot', false, ...
+                    'saveVar', false);
             end
             f1fState(iState) = catfields(f1fBout, 1);
         end
         f1f = catfields(f1fState, 'addim', [], [3, 1, 2], true);
-           
+
         save(f1ffile, 'f1f', '-v7.3');
-        cd(original_path); 
-    end 
+        cd(original_path);
+    end
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -274,7 +274,7 @@ end
 
 flgEeg = false;
 mGrp = 'wt';            % 'wt' / 'mcu' / 'eeg'
-mNames = mcu_sessions(mGrp);
+mNames = unique(get_mname(mcu_basepaths(mGrp)));
 nMice = length(mNames);
 
 if flgEeg
@@ -291,11 +291,11 @@ clear f1f f1fMouse
 idx_rmDays = [2, 6];              % remove bac on and off
 for iMouse = 1 : nMice
     mName = mNames{iMouse};
-    mPaths = mcu_sessions(mName);
+    mPaths = mcu_basepaths(mName);
     mPaths(idx_rmDays) = [];
     nFiles = length(mPaths);
-    
-    v = basepaths2vars('basepaths', mPaths, 'vars', vars);    
+
+    v = basepaths2vars('basepaths', mPaths, 'vars', vars);
     f1fMouse(iMouse) = catfields([v(:).f1f], 'addim', [], [4, 1, 2, 3]);
 
 end
@@ -312,12 +312,12 @@ fh = fooof_plotGrp(f1f, 1, 4, 3);
 
 % don't forget lh100. maybe this means bouts needs to be saved within f1f
 % struct (separate eeg from lfp)
-% find a way to track boutStats per file. 
+% find a way to track boutStats per file.
 % perhaps also solve spec outliers.
 % they do seem meaningful and bleed to nearby timebins. maybe recalculate
-% in 2-3s windows. 
+% in 2-3s windows.
 
-% one struct for handeling states. start only with emg. 
+% one struct for handeling states. start only with emg.
 % original separation.
 % spec outliers - create new bouts
 % in psd_states, update this states structure
@@ -377,9 +377,9 @@ idx_rmDays = [2, 6];              % remove bac on and off
 clear grppaths
 for iGrp = 1 : length(grps)
 
-    mNames = mcu_sessions(grps(iGrp)); 
+    mNames = unique(get_mname(mcu_basepaths(grps{iGrp})));
     for iMouse = 1 : length(mNames)
-        basepaths = mcu_sessions(mNames{iMouse});
+        basepaths = mcu_basepaths(mNames{iMouse});
         basepaths(idx_rmDays) = [];
         grppaths{iGrp}(iMouse, :) = string(basepaths)';
     end

@@ -5,7 +5,7 @@
 
 % % run the analysis on multiple sessions
 % % -------------------------------------------------------------------------
-% basepaths = [mcu_sessions('wt_bsl_ripp'), mcu_sessions('mcu_bsl')];
+% basepaths = mcu_basepaths('all');
 % nfiles = length(basepaths);
 %
 % v = basepaths2vars('basepaths', basepaths, 'vars', {'session'});
@@ -27,7 +27,7 @@
 % Re-run only part of the analysis pipeline (e.g., ripp_spks)
 % Assumes data was already loaded
 for iGrp = 1 : length(grps)
-    basepaths = mcu_sessions(grps{iGrp});
+    basepaths = mcu_basepaths(grps{iGrp});
     for ifile = 1 : length(basepaths)
 
         % File
@@ -86,7 +86,7 @@ end
 grps = {'wt_bsl_ripp'; 'mcu_bsl'};
 vars = {'ripp', 'units', 'session'};
 for iGrp = 1 : length(grps)
-    basepaths = mcu_sessions(grps{iGrp});
+    basepaths = mcu_basepaths(grps{iGrp});
     v{iGrp} = basepaths2vars('basepaths', basepaths, 'vars', vars);
 end
 
@@ -104,7 +104,7 @@ varMap.peakRng = 'peakRng';
 varMap.peakRng = 'peakRng';
 
 for iGrp = 1 : length(grps)
-    basepaths = mcu_sessions(grps{iGrp});
+    basepaths = mcu_basepaths(grps{iGrp});
 
     % Prepare tag structures for this mouse
     tagAll.Group = cfg.lbl.grp{iGrp};
@@ -188,7 +188,7 @@ varMap.frMod = 'ripp.spks.su.frModulation';
 varMap.UnitType = 'units.clean';
 
 for iGrp = 1 : length(grps)
-    basepaths = mcu_sessions(grps{iGrp});
+    basepaths = mcu_basepaths(grps{iGrp});
 
     % Prepare tag structures for this mouse
     tagAll.Group = cfg.lbl.grp{iGrp};

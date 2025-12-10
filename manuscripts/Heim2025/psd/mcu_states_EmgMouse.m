@@ -12,7 +12,7 @@ end
 % state bouts by emg
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-basepaths = [mcu_sessions(mname)];
+basepaths = mcu_basepaths(mname);
 nfiles = length(basepaths);
 mpath = fileparts(basepaths{1});
 
@@ -33,7 +33,8 @@ end
 
 % load ssEmg structs
 vars = ["sleep_statesEmg"];
-[~, v] = [mcu_sessions(mname, vars)];
+basepaths = mcu_basepaths(mname);
+v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 ssEmg = catfields([v(:).ssEmg], 'addim', true);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -41,7 +42,7 @@ ssEmg = catfields([v(:).ssEmg], 'addim', true);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if graphics
-    
+
     % organize data
     boutTimes = squeeze(ssEmg.bouts.times);
 
@@ -75,7 +76,7 @@ if graphics
         xticklabels(string(xval / 3600))
         xlabel('Time (hr)')
     end
-    
+
     figpath = fullfile(mpath, 'graphics', 'sleepState');
     mkdir(figpath)
     figname = fullfile(figpath, [mname, '_hypnogramEmg.png']);
@@ -145,7 +146,7 @@ if graphics
     axis tight
     ylabel('State Duration (%)')
     xlabel('Session No.')
-    
+
     figpath = fullfile(mpath, 'graphics', 'sleepState');
     mkdir(figpath)
     figname = fullfile(figpath, [mname, '_boutTimesEmg.png']);

@@ -117,16 +117,27 @@ if flgPlot
     cfg.grpVar = 'unitType';
     cfg.clr = mcuCfg.clr.unitType([3 : -1 : 1], :);
     cfg.alpha = 0.4;
-    plot_tblGUI(fetTbl, 'cfg', cfg)
+
+    hFig = plot_tblGUI(fetTbl, 'cfg', cfg);
+
+    if flgSave
+        % Clear any existing fetTbl_mod from workspace to avoid false positives
+        evalin('base', 'if exist(''fetTbl_mod'', ''var''), clear fetTbl_mod; end');
+        waitfor(hFig);
+
+        % Check if 'fetTbl_mod' was saved to workspace and only then save
+        if evalin('base', 'exist(''fetTbl_mod'', ''var'')')
+            fetTbl = evalin('base', 'fetTbl_mod');
+            evalin('base', 'clear fetTbl_mod');
+            push_units(basepaths, fetTbl);
+        end
+    end
 end
 
 % Create output table with only used features and unitType
 varsToKeep = unique([fetSelect(:)', {'unitType'}], 'stable');
 uTbl = fetTbl(:, varsToKeep);
 
-if flgSave
-    push_units(basepaths, uTbl);
-end
 
 end
 
@@ -222,6 +233,7 @@ for iPath = 1 : length(basepaths)
     type = zeros(nUnits, 1);
     type(subTypes == 'RS') = 1;
     type(subTypes == 'FS') = 2;
+    type = categorical(type, [0, 1, 2], {'Other', 'RS', 'FS'});
 
     % Prepare structure to save
     units = struct();

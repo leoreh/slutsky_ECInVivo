@@ -1,7 +1,7 @@
 function mcu_meaFRrc(v, alt)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % MEA Firing Rate Recovery Correlation Analysis
-% 
+%
 % Inputs:
 %   v - cell array of data structures (if empty, loads data automatically)
 %   alt - analysis option:
@@ -14,7 +14,7 @@ function mcu_meaFRrc(v, alt)
 if isempty(v)
     grps = {'mea_bac'; 'mea_mcuko'};
     vars = {'mea', 'frr', 'st_brst'};
-    basepaths = mcu_sessions(grps{1}); % Only control group
+    basepaths = mcu_basepaths(grps{1}); % Only control group
     v = {basepaths2vars('basepath', basepaths, 'vars', vars)};
 end
 
@@ -24,8 +24,8 @@ switch alt
         plot_corr_vs_burstiness(v);
     case 2
         plot_corr_vs_disi(v);
-    % case 3
-    %     plot_corr_per_file(v);
+        % case 3
+        %     plot_corr_per_file(v);
     otherwise
         error('Invalid alt option. Use 1, 2, or 3.');
 end
@@ -203,7 +203,7 @@ else
     yTxt = 'P(S\inB)';
     yLbl = 'P(S\inB) Cum. Prob.';
 end
-dataMat(isinf(dataMat) | isnan(dataMat)) = 0; 
+dataMat(isinf(dataMat) | isnan(dataMat)) = 0;
 
 % Add right y-axis for histogram data
 yyaxis right
@@ -240,25 +240,25 @@ end
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % % Plot correlation per file with burstiness distribution
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% 
+%
 % % Set parameters
 % mdlType = 'mdlF';
 % rcvFld = 'spkDfct';
 % flgBin = false;
 % nFiles = length(v{1});
-% 
+%
 % % Get data
 % frr = catfields([v{1}(:).frr], 1);
 % uGood = frr.uGood;
 % spktimesAll = catfields([v{1}(:).mea], 2, false).spktimes(uGood);
 % rcvDataAll = frr.(mdlType).(rcvFld)(uGood);
 % frBslAll = frr.(mdlType).frBsl(uGood);
-% 
+%
 % % Initialize arrays
 % rVal = nan(20, nFiles);
 % mfr = nan(1, nFiles);
 % bspks = cell(1, nFiles);
-% 
+%
 % % Calculate per file
 % for iFile = 1 : nFiles
 %     frr = v{1}(iFile).frr;
@@ -266,14 +266,14 @@ end
 %     spktimes = v{1}(iFile).mea.spktimes(uGood);
 %     rcvData = frr.(mdlType).(rcvFld)(uGood);
 %     mfr(iFile) = mean(frr.(mdlType).frBsl(uGood), 1, 'omitnan');
-% 
+%
 %     [rVal(:, iFile), ~, bspks{iFile}] = mea_frrc(spktimes, rcvData,...
 %         'mfr', mfr(iFile), 'flgPlot', false, 'flgBin', flgBin);
 % end
-% 
+%
 % % Define ISI thresholds
 % isiThr = logspace(-2.3, 1, 20)';
-% 
+%
 % % Prepare burstiness data
 % dataMat = zeros(size(rVal));
 % for iFile = 1:nFiles
@@ -281,7 +281,7 @@ end
 %         dataMat(:, iFile) = mean(bspks{iFile}, 1, 'omitnan');
 %     end
 % end
-% 
+%
 % % Plot using helper function
 % [hFig, hAx] = plot_frrc(rVal, dataMat, mfr, isiThr, flgBin);
 

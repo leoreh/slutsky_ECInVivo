@@ -75,8 +75,6 @@ paths{5} = {...
     'E:\Data\Colleagues\RA\raMCU5\raMCU5_220322_1906',...
     };
 
-% WT (Bac Washout)
-% paths{6} = mcu_sessions('wt_wsh');
 
 basepaths = [paths{:}];
 nPaths = length(basepaths);
@@ -138,32 +136,9 @@ v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 fetTbl = utypes_features('basepaths', basepaths, 'flgPlot', false, 'v', v);
 
 % Classify
-% Classify
-uTbl = utypes_classify('basepaths', basepaths, 'fetSelect', 1,...
-    'flgSave', false, 'fetTbl', fetTbl);
-fetTbl.unitType = uTbl.unitType;
-
-% Convert to double for compatibility with legacy plotting
-unitType = double(fetTbl.unitType) - 1; % 0=Other, 1=RS, 2=FS (Assuming categories are Other, RS, FS)
-unitType(fetTbl.unitType=='Other') = 0;
-unitType(fetTbl.unitType=='RS') = 1;
-unitType(fetTbl.unitType=='FS') = 2;
-
-
-
-%% ========================================================================
-%  INSPECT
-%  ========================================================================
-
-% Separation by features
-hFig = figure;
-hAx = gca;
-xFet = 'tp';
-yFet = 'lidor';
-zFet = 'asym';
-plot_utypes('basepaths', basepaths, 'fetTbl', fetTbl, 'flgOther', true,...
-    'plotType', 'scatter', 'xFet', xFet, 'yFet', yFet, 'zFet', zFet,...
-    'unitType', unitType, 'hAx', hAx);
+fetSelect = {'asym', 'hpk', 'tp'};
+uTbl = utypes_classify('basepaths', basepaths, 'fetSelect', fetSelect,...
+    'flgSave', true, 'fetTbl', fetTbl, 'flgPlot', true);
 
 
 %% ========================================================================
@@ -182,11 +157,9 @@ grpNames = {'WT (Older)', 'WT (MCU Control)', 'MCU-KO', 'Refaela', 'Refaela (MCU
 nGroups = length(paths);
 
 
-% Prepare data: Map 0 (Other) to 3 for indexing
-uType = fetTbl.unitType;
-uType(uType == 0) = 3;
-yVal = fetTbl.mfr;
-
+% Prepare data
+uType = uTbl.unitType;
+yVal = uTbl.mfr;
 
 % Organize figure
 figure('Name', 'FR vs File', 'Position', [100 100 1600 800]);
@@ -195,6 +168,7 @@ hTile = tiledlayout(3, nGroups, 'TileSpacing', 'tight', 'Padding', 'tight');
 % Colors
 [cfg] = mcu_cfg();
 clr = cfg.clr.unitType; % [RS; FS; Other]
+unitLbl = cfg.lbl.unit;
 frLim = [-2.5 2];
 
 % Iterate Groups (Columns)
@@ -220,7 +194,7 @@ for iGrp = 1:nGroups
     hold on
 
     for iUnit = 1:3
-        unitIdx = subType == iUnit;
+        unitIdx = subType == unitLbl{iUnit};
         if ~any(unitIdx)
             continue;
         end
@@ -249,7 +223,7 @@ for iGrp = 1:nGroups
     nCounts = zeros(1, 2);
 
     for iUnit = 1:2
-        unitIdx = subType == iUnit;
+        unitIdx = subType == unitLbl{iUnit};
         nCounts(iUnit) = sum(unitIdx);
 
         % Histogram (FR on X-axis)
@@ -263,6 +237,7 @@ for iGrp = 1:nGroups
 
     % Legend for this distribution
     legTxt = {sprintf('RS (n=%d)', nCounts(1)), sprintf('FS (n=%d)', nCounts(2))};
+    
     % Filter for existing handles
     hasH = isgraphics(hHist);
     if any(hasH)
@@ -282,8 +257,8 @@ for iGrp = 1:nGroups
     % --- Bottom Plot: Box Plot (RS vs FS) ---
     axBox(iGrp) = nexttile(iGrp + 2*nGroups);
 
-    rsData = 10 .^ subY(subType == 1)';
-    fsData = 10 .^ subY(subType == 2)';
+    rsData = 10 .^ subY(subType == 'RS')';
+    fsData = 10 .^ subY(subType == 'FS')';
 
     % T-Test
     if ~isempty(rsData) && ~isempty(fsData)

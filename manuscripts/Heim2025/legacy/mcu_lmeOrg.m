@@ -1,7 +1,7 @@
 function [lme_tbl, lme_cfg] = mcu_lmeOrg(grppaths, frml, flg_emg, var_field, var_idx, vCell)
 
 % organizes data from multiple sessions into format compatible with lme
-% analysis. loads data according to mcu_sessions and arranges in a table.
+% analysis. loads data according to mcu_basepaths and arranges in a table.
 % data can be firing rate or burstiness, determined by the formula.
 %
 % INPUT
@@ -18,7 +18,7 @@ function [lme_tbl, lme_cfg] = mcu_lmeOrg(grppaths, frml, flg_emg, var_field, var
 %   lme_cfg    struct with metadata and analysis parameters
 %
 % CALLS
-%   mcu_sessions
+%   mcu_basepaths
 %   basepaths2vars
 %   catfields
 %
@@ -110,14 +110,14 @@ elseif contains(frml, 'FOOOF ~')
     end
 
 elseif contains(frml, 'RippSpks ~')
-    vars = {'ripp'; 'units'}; 
+    vars = {'ripp'; 'units'};
     yName = 'RippSpks';
     if isempty(var_field)
         var_field = 'frModulation';
     end
 
 elseif contains(frml, 'Ripp ~')
-    vars = {'ripp'}; 
+    vars = {'ripp'};
     yName = 'Ripp';
     if isempty(var_field)
         var_field = 'peakAmp';
@@ -157,7 +157,7 @@ for igrp = 1 : ngrps
         end
 
         % Extract data
-        u_day{iday} = org_units(v);                                         % units 
+        u_day{iday} = org_units(v);                                         % units
         blen_day{iday} = org_blen(v, frml);                                 % bout length (fixed / random effect)
 
         if contains(frml, 'FR ~')
@@ -174,10 +174,10 @@ for igrp = 1 : ngrps
 
         elseif contains(frml, 'FOOOF ~')
             data_day{iday} = org_1of(v, var_field, var_idx);                % psd fooof parameter
-        
-        elseif contains(frml, 'RippSpks ~') 
+
+        elseif contains(frml, 'RippSpks ~')
             data_day{iday} = org_rippSpks(v, var_field);                      % ripple FR increase
-        
+
         elseif contains(frml, 'Ripp ~')
             data_day{iday} = org_ripp(v, var_field);                        % specified ripple property
             u_day = cell(1, ndays);
@@ -204,7 +204,7 @@ for igrp = 1 : ngrps
         for imouse = 1 : nmice
             for iday = 1 : ndays
                 % Get unit types for this mouse/day [max_nunits_grp x 1]
-                unit_types_curr = squeeze(uCell{igrp}(imouse, iday, 1:max_nunits_grp, 1, 1)); 
+                unit_types_curr = squeeze(uCell{igrp}(imouse, iday, 1:max_nunits_grp, 1, 1));
                 valid_unit_indices = find(unit_types_curr > 0); % Indices of units with assigned type
 
                 if ~isempty(valid_unit_indices)
@@ -257,7 +257,7 @@ for igrp = 1 : ngrps
                     for ibout = 1 : nbouts
                         % Get data for existing units [n_exist_units x 1]
                         data_exist_units = squeeze(dataCell{igrp}(imouse, iday, unit_indices_exist, istate, ibout));
-                        
+
                         idx_valid_data = ~isnan(data_exist_units); % Mask for non-NaN data among existing units
                         nvalid = sum(idx_valid_data);
 
@@ -278,7 +278,7 @@ for igrp = 1 : ngrps
                             lbl_state(idx_range) = str_state{istate};
                             lbl_mouse(idx_range) = mnames{igrp}{imouse};
                             lbl_day(idx_range) = str_day{iday};
-                            
+
                             % Assign unit type labels based on the type value (1 or 2)
                             unit_types_valid = actual_unit_types(idx_valid_data);
                             lbl_unit(idx_range) = str_unit(unit_types_valid);
@@ -289,7 +289,7 @@ for igrp = 1 : ngrps
                                 1000 * (imouse - 1) + ...
                                 10000 * (iday - 1) + ...
                                 100000 * (igrp - 1);
-                            
+
                             % Update counter
                             idx_curr = idx_curr + nvalid;
                         end
@@ -297,12 +297,12 @@ for igrp = 1 : ngrps
                 else % Handle non-unit specific data (LFP, etc.) or case where flg_hasUnits is false
                     nunits_loop = 1; % Treat as single "unit"
                     for iunit_dummy = 1 : nunits_loop % Loop once
-                       for ibout = 1 : nbouts
+                        for ibout = 1 : nbouts
                             % Get data (assuming unit dim is singleton or irrelevant)
                             curr_data = squeeze(dataCell{igrp}(imouse, iday, 1, istate, ibout)); % Access first 'unit' index
                             idx_valid = ~isnan(curr_data);
                             nvalid = sum(idx_valid);
-                            
+
                             if nvalid > 0
                                 idx_range = idx_curr : (idx_curr + nvalid - 1);
                                 vec_data(idx_range) = curr_data(idx_valid);
@@ -323,7 +323,7 @@ for igrp = 1 : ngrps
                                 % Update counter
                                 idx_curr = idx_curr + nvalid;
                             end
-                       end % end ibout
+                        end % end ibout
                     end % end iunit_dummy
                 end % end if flg_hasUnits
             end % end iday loop
@@ -547,11 +547,11 @@ unit_data_mouse = cell(nmice, 1);
 for imouse = 1 : nmice
     clean_mouse = units.clean(:, :, imouse); % [2 x Nunits_mouse]
     nunits_mouse = size(clean_mouse, 2);
-    
+
     unit_type_vec_mouse = zeros(1, nunits_mouse); % Row vector for types
     unit_type_vec_mouse(clean_mouse(1,:)) = 1;    % Type 1 (PYR)
     unit_type_vec_mouse(clean_mouse(2,:)) = 2;    % Type 2 (PV)
-    
+
     % Reshape to [1 x 1 x nunits_mouse x 1 x 1] for consistent padding later
     unit_data_mouse{imouse} = reshape(unit_type_vec_mouse, [1, 1, nunits_mouse, 1, 1]);
 end
@@ -662,11 +662,11 @@ rippMat = nan(nmice, nRipp);
 % Randomly sample without replacement, specifically from ripples during
 % nrem
 for imouse = 1 : nmice
-        rippTmp = v(imouse).ripp.(var_field);
-        idxState = find(v(imouse).ripp.states.idx(:, 4));
-        idxTmp = randperm(length(idxState), nRipp);
-        idxRipp = idxState(idxTmp);
-        rippMat(imouse, :) = rippTmp(idxRipp);
+    rippTmp = v(imouse).ripp.(var_field);
+    idxState = find(v(imouse).ripp.states.idx(:, 4));
+    idxTmp = randperm(length(idxState), nRipp);
+    idxRipp = idxState(idxTmp);
+    rippMat(imouse, :) = rippTmp(idxRipp);
 end
 
 % Permute to [mouse x 1 x 1 x 1 x ripple]

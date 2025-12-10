@@ -14,7 +14,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 queryStr = 'lh142';
-basepaths = [mcu_sessions(queryStr)];
+basepaths = mcu_basepaths(queryStr);
 
 % load data
 varsFile = ["sleep_states"; "datInfo"; "session"];
@@ -63,7 +63,7 @@ for ifile = 1 : nfiles
         'sig', sig, 'fs', fs, 'saveVar', saveVar,...
         'graphics', true, 'forceA', true, 'ftarget', ftarget,...
         'emgThr', [], 'flgEmg', false);
-    
+
     % calc psd according to emg state separation
     psd = psd_states('basepath', basepath, 'sstates', [1, 2],...
         'sig', sig, 'fs', fs, 'saveVar', saveVar,...
@@ -94,7 +94,7 @@ for igrp = 1 : 2
     clear boutStats tmpStats mStats
     for imouse = 1 : length(mnames)
         queryStr = mnames{imouse};
-        basepaths = [mcu_sessions(queryStr)];
+        basepaths = mcu_basepaths(queryStr);
         if ~strcmp(queryStr, 'lh137')
             basepaths = basepaths([1, length(basepaths)]);
         end
@@ -113,9 +113,9 @@ for igrp = 1 : 2
 
             % process labels
             labels = v(ifile).ss.labels;
-%             labels(labels == 3) = 4;
-%             labels(labels == 6) = 5;
-%             labels(labels == 2) = 1;
+            %             labels(labels == 3) = 4;
+            %             labels(labels == 6) = 5;
+            %             labels(labels == 2) = 1;
 
             [~, tmpStats(imouse, ifile)] = as_bouts('labels', labels,...
                 'minDur', minDur, 'interDur', interDur,...

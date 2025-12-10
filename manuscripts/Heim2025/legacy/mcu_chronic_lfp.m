@@ -122,10 +122,10 @@ freq = psd.info.faxis{1};
 setMatlabGraphics(true)
 
 % files
-basepaths = [mcu_sessions('wt_bsl')];
+basepaths = mcu_basepaths('wt_bsl');
 idx_wt = length(basepaths);
 idx_mcu = idx_wt + 1;
-basepaths = [basepaths, mcu_sessions('mcu_bsl')];
+basepaths = [basepaths; mcu_basepaths('mcu_bsl')];
 varsFile = ["fr"; "sleep_states"; "datInfo"; "session"; "units"];
 varsName = ["fr"; "ss"; "datInfo"; "session"; "units"];
 xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
@@ -142,7 +142,7 @@ snames = v(1).ss.info.names(sstates);
 % get bout stats
 clear prctDur boutLen totDur
 for ifile = 1 : nfiles
-    
+
     % timebins for calculating stats
     if nbins == 4
         timebins = v(ifile).session.general.timebins;
@@ -150,9 +150,9 @@ for ifile = 1 : nfiles
         nlabels = length(v(ifile).ss.labels);
         timebins = n2chunks('n', nlabels, 'nchunks', nbins);
     end
-    
+
     labels = v(ifile).ss.labels;
-    stSwitch = [6, 5; 3, 4; 2, 1]; 
+    stSwitch = [6, 5; 3, 4; 2, 1];
 
     for i_sw = 1 : size(stSwitch, 1)
         labels(labels == stSwitch(i_sw, 1)) = stSwitch(i_sw, 2);
@@ -168,22 +168,22 @@ for ifile = 1 : nfiles
 end
 
 % graphics
-for ibin = 1 : nbins  
-    
+for ibin = 1 : nbins
+
     fh = figure;
     tlayout = [3, 3];
     th = tiledlayout(tlayout(1), tlayout(2));
     th.TileSpacing = 'tight';
     th.Padding = 'none';
-    
+
     nbouts = cellfun(@(x) sum(~isnan(x(:, ibin))), boutLen, 'UniformOutput', true);
 
-    for istate = 1 : length(sstates)  
-        
+    for istate = 1 : length(sstates)
+
         % state duration (%)
         axh = nexttile(th, istate, [1, 1]);
         hold on
-        
+
         dataMat = prctDur;
         dataMat = cell2nanmat({dataMat(1 : idx_wt, ibin, istate),...
             dataMat(idx_mcu : end, ibin, istate)}, 2);
@@ -202,7 +202,7 @@ for ibin = 1 : nbins
         plot_boxMean('dataMat', dataMat, 'clr', 'kr', 'allPnts', true)
         ylabel('Bout Length (s)');
         title(axh, snames(istate))
-        
+
         % nbouts per mouse
         axh = nexttile(th, istate + 2 * length(sstates), [1, 1]);
         hold on
@@ -257,7 +257,7 @@ end
 % (2) difference between delta (and other bands) between low and high emg
 % (3) accusleep recovers its ability to classify states
 % (4) plot emg vs. delta theta for bouts accusleep classified as AW and
-% NREM and measure distance 
+% NREM and measure distance
 
 % -------------------------------------------------------------------------
 % state duration for each day as automatically classified
@@ -355,7 +355,7 @@ for imouse = 1 : nmice
     fh = figure;
     figAlt = 2;         % 1 - delta / theta; 2 - pca
     for ifile = 1 : nfiles
-        
+
         % grab data, ALT1 - from sSig (1s bins)
         basepath = v(ifile).session.general.basePath;
         cd(basepath)
@@ -364,7 +364,7 @@ for imouse = 1 : nmice
         load([basename, '.sleep_sig.mat'], 'spec');
         load([basename, '.sleep_sig.mat'], 'spec_freq');
         load([basename, '.sleep_sig.mat'], 'emg_rms');
-        
+
         % grab data, ALT2 - calculate / load (5s bins)
         % ch = 4;
         % spec = squeeze(v(ifile).spec.s(:, :, ch));
@@ -408,7 +408,7 @@ for imouse = 1 : nmice
         axh = nexttile;
         sz = 20;
         falpha = 0.2;
-        
+
         if figAlt == 1
             % ALT 1 - emg and delta / theta
             scatter(sRatio(highIdx), emg_rms(highIdx),...
@@ -452,9 +452,9 @@ end
 % lh122 (t3)
 
 % files
-basepaths = [mcu_sessions('wt_bsl')];
+basepaths = mcu_basepaths('wt_bsl');
 mname = 'lh122';
-basepaths = [mcu_sessions(mname)];
+basepaths = mcu_basepaths(mname);
 
 % load data
 varsFile = ["sleep_states"; "datInfo"; "session"];
@@ -499,7 +499,7 @@ for ifile = 1 : nfiles
     emg = load(sleepfile, 'emg_rms');
     emg = emg.emg_rms;
     load(sleepfile, 'fs');
-    
+
     % load spectrogram
     s = load(sleepfile, 'spec');
     load(sleepfile, 'spec_freq')
@@ -508,12 +508,12 @@ for ifile = 1 : nfiles
     otl = get_specOutliers('basepath', basepath, 'saveVar', true,...
         'flgCalc', false, 'flgForce', false, 'graphics', true);
 
-    % calc psd according to as state separation 
+    % calc psd according to as state separation
     psd = psd_states('basepath', basepath, 'sstates', sstates,...
         'sig', sig, 'fs', fs, 'saveVar', saveVar,...
         'graphics', graphics, 'forceA', true, 'ftarget', ftarget,...
         'emgThr', [], 'flgEmg', false, 'timeWin', timeWin);
-    
+
     % calc psd accordign to emg state separation
     psdEmg = psd_states('basepath', basepath, 'sstates', [1, 2],...
         'ch', [], 'fs', [], 'saveVar', true,...
@@ -522,7 +522,7 @@ for ifile = 1 : nfiles
 
     % graphics ------------------------------------------------------------
     if graphics
-        
+
         fh = figure; clear axh;
         setMatlabGraphics(true)
         set(fh, 'WindowState','maximized');
@@ -530,7 +530,7 @@ for ifile = 1 : nfiles
         th = tiledlayout(tlayout(1), tlayout(2));
         th.TileSpacing = 'tight';
         th.Padding = 'none';
-        title(th, basename, 'interpreter', 'none')        
+        title(th, basename, 'interpreter', 'none')
 
         % superposition of state hypnogram and emg-states
         axh(1) = nexttile(th, 1, [1, 3]); cla; hold on
@@ -547,7 +547,7 @@ for ifile = 1 : nfiles
         xticklabels(string(xval / 3600))
         xlabel('Time (h)')
         title(axh(1), 'Hypnogram')
-        
+
         % histogram of emg values
         axh(2) = nexttile(th, 4, [1, 1]);
         hold on
@@ -562,7 +562,7 @@ for ifile = 1 : nfiles
         xlabel('EMG')
         ylabel('Counts')
         title(axh(2), 'EMG Distribution')
-       
+
         % spectrogram
         axh(3) = nexttile(th, 5, [1, 3]); cla
         hold on
@@ -593,7 +593,7 @@ for ifile = 1 : nfiles
         ylabel('PSD [mV^2/Hz]')
         title(axh(4), 'Average PSD')
         legend({'WAKE', 'NREM', 'High-EMG', 'Low-EMG'})
-     
+
         % AS state clusters in feature space
         axh(5) = nexttile(th, 9, [1, 1]); cla; hold on
         pcMat = psd.bouts.pc;
@@ -624,7 +624,7 @@ for ifile = 1 : nfiles
                 text(-0.75, yTickVals(istate), num2str(meanSil, '%.3f'));
             end
         end
-        
+
         % EMG state clusters in feature space
         axh(7) = nexttile(th, 11, [1, 1]); cla; hold on
         pcMat = psdEmg.bouts.pc;
@@ -651,9 +651,9 @@ for ifile = 1 : nfiles
         yTickVals = yticks;
         for istate = 1 : 2
             meanSil = mean(psdEmg.bouts.sil(stateIdx == istate));
-            text(-0.75, yTickVals(istate), num2str(meanSil, '%.3f')); 
+            text(-0.75, yTickVals(istate), num2str(meanSil, '%.3f'));
         end
-       
+
         if saveFig
             figpath = fullfile(basepath, 'graphics', 'sleepState');
             mkdir(figpath)
@@ -685,7 +685,7 @@ end
 
 % files
 mname = 'lh132';
-basepaths = [mcu_sessions(mname)];
+basepaths = mcu_basepaths(mname);
 
 % load data
 varsFile = ["fr"; "sleep_states"; "datInfo"; "session"; "psd"; "psdEmg"];
@@ -725,7 +725,8 @@ end
 % files
 mname = 'wt_wsh';
 vars = ["session"; "psd"];
-[basepaths, v] = mcu_sessions(mname, vars);
+basepaths = mcu_basepaths(mname);
+v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 nfiles = length(basepaths);
 
 psd = catfields([v(:).psd], 'addim', true);
@@ -754,7 +755,8 @@ for igrp = 1 : ngrp
 
     % load data
     vars = ["psd"];
-    [basepaths, v] = mcu_sessions(mname{igrp}, vars);
+    basepaths = mcu_basepaths(mname{igrp});
+    v = basepaths2vars('basepaths', basepaths, 'vars', vars);
     nfiles = length(basepaths);
 
     % nunits

@@ -1,7 +1,7 @@
 function mcu_meaFRt(v, alt)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % MEA Firing Rate Time Analysis
-% 
+%
 % Inputs:
 %   v - cell array of data structures (if empty, loads data automatically)
 %   alt - analysis option:
@@ -16,9 +16,9 @@ grpLbls = {'Control'; 'MCU-KO'};
 if isempty(v)
     grps = {'mea_bac'; 'mea_mcuko'};
     vars = {'frr', 'st_brst'};
-    
+
     for iGrp = 1 : 2
-        basepaths = mcu_sessions(grps{iGrp});
+        basepaths = mcu_basepaths(grps{iGrp});
         v{iGrp} = basepaths2vars('basepath', basepaths, 'vars', vars);
     end
 end
@@ -64,7 +64,7 @@ for iGrp = 1 : 2
     % Cat data
     frr = catfields([v{iGrp}(:).frr], 1);
     uGood = frr.uGood;
-    
+
     % Calculate normalized firing rates
     fr = frr.fr(uGood, :);
     frBsl = frr.mdlF.frBsl(uGood);
@@ -123,7 +123,7 @@ else
 end
 
 % Create percentiles
-alpha = 1.5; 
+alpha = 1.5;
 p = linspace(0, 1, nPrc + 1).^alpha;
 percEdges = prctile(grpData, 100 * (1 - p));
 percEdges = sort(percEdges);
@@ -166,7 +166,7 @@ for iPrc = 1 : nPrc
     hPtl = plot_stdShade('dataMat', frMat,...
         'xVal', t, 'hAx', hAx, ...
         'clr', clrPrc(iPrc, :), 'alpha', 0.5);
-    
+
     [mean(frMat, 1)', std(frMat, [], 1)', repmat(size(frMat, 1), size(frMat, 2), 1)]
 
     % Create legend text with range
@@ -214,7 +214,7 @@ uIdx = 28;
 % uIdx = 25;
 uIdx = 24;
 % uIdx = 18;
-% uIdx = 20;    
+% uIdx = 20;
 % uIdx = 40;
 
 % Combine all frr structures from control group

@@ -5,7 +5,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 session = CE_sessionTemplate(pwd, 'viaGUI', false,...
-    'forceDef', true, 'forceL', true, 'saveVar', true);      
+    'forceDef', true, 'forceL', true, 'saveVar', true);
 basepath = session.general.basePath;
 nchans = session.extracellular.nChannels;
 fs = session.extracellular.sr;
@@ -27,7 +27,7 @@ load([basename, '.sleep_sig.mat'], 'fs');
 % sig = lowpass(sig1, 100 , fs);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% detect 
+% detect
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % see Gelinas (Buzsaki), Nat. Med., 2016 for a different pipeline
@@ -72,7 +72,7 @@ plot(edWv')
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% go over mice 
+% go over mice
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % params
@@ -83,7 +83,7 @@ fs = 1250;
 
 % files
 mname = 'wt_bsl';
-basepaths = [mcu_sessions(mname)];
+basepaths = mcu_basepaths(mname);
 nfiles = length(basepaths);
 
 % inspect
@@ -108,10 +108,10 @@ end
 
 % files
 mname = 'mcu_bsl';
-basepaths = [mcu_sessions(mname)];
+basepaths = mcu_basepaths(mname);
 nfiles = length(basepaths);
 
-% analyze 
+% analyze
 stateIdx = cell(nfiles, 1);
 for ifile = 1 : nfiles
 
@@ -157,10 +157,10 @@ ylim([0 12])
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% analyze ied 
+% analyze ied
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% params 
+% params
 sstates = [1 : 5];
 fs = 1250;
 

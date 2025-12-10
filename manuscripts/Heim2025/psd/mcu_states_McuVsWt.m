@@ -5,7 +5,7 @@
 % organize and load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-basepaths = [mcu_sessions('wt_bsl'), mcu_sessions('mcu_bsl')];
+basepaths = [mcu_basepaths('wt_bsl'); mcu_basepaths('mcu_bsl')];
 nfiles = length(basepaths);
 mnames = get_mname(basepaths);
 
@@ -46,7 +46,7 @@ for ifile = 1 : nfiles
     [bouts] = as_bouts('labels', labels,...
         'minDur', minDur, 'interDur', interDur);
 
-    % save bckup of original ss struct 
+    % save bckup of original ss struct
     ssOrig = v(ifile).ss;
     mkdir(fullfile(basepath, 'ss'))
     ctime = datetime('now', 'Format', 'yyMMdd_HHmmss');
@@ -54,7 +54,7 @@ for ifile = 1 : nfiles
     bkupFile = fullfile(basepath, 'ss', bkupName);
     save(bkupFile, 'ss')
 
-    % save updated ss struct 
+    % save updated ss struct
     ssFile = fullfile(basepath, [basename, '.sleep_states.mat']);
     ss.labels = labels;
     ss.bouts = bouts;
@@ -69,8 +69,8 @@ end
 
 % reload data
 clear basepaths
-basepaths{1} = [mcu_sessions('wt_bsl')];
-basepaths{2} = [mcu_sessions('mcu_bsl')];
+basepaths{1} = mcu_basepaths('wt_bsl');
+basepaths{2} = mcu_basepaths('mcu_bsl');
 
 % initialize
 boutLen = nan(2, nfiles, length(sstates));
@@ -81,11 +81,11 @@ for igrp = 1 : 2
         ["sleep_states"]);
     nfiles = length(basepaths{igrp});
     ss = catfields([v(:).ss], 1, true);
-    
-    for ifile = 1 : nfiles        
+
+    for ifile = 1 : nfiles
         boutLen(igrp, ifile, :) = mean(cell2padmat(ss.bouts.boutLen(ifile, sstates), 2), 'omitnan');
-        prctDur(igrp, ifile, :) = ss.bouts.prctDur(ifile, sstates);    
-    end    
+        prctDur(igrp, ifile, :) = ss.bouts.prctDur(ifile, sstates);
+    end
 end
 
 

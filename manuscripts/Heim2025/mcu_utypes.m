@@ -6,7 +6,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % get all files in study
-basepaths = mcu_sessions('all');
+basepaths = mcu_basepaths('all');
 nPaths = length(basepaths);
 
 % vars
@@ -38,38 +38,24 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % get all files in study
-basepaths = mcu_sessions('all');
+basepaths = mcu_basepaths('all');
 nPaths = length(basepaths);
 
 % Create table of features for classification
-fetTbl = utypes_features('basepaths', {basepaths{:}}, 'flgPlot', true);
+fetTbl = utypes_features('basepaths', {basepaths{:}}, 'flgPlot', false);
 
 % Classify
-fetSelect = {'asym', 'hpk', 'tp', 'lidor', 'mfr'};
-fetSelect = {'asym', 'hpk', 'tp', 'lidor'};
-rsPrior = 0.99;
+fetSelect = {'asym', 'hpk', 'tp'};
+rsPrior = 0.97;
 regVal = 0.01;
 uTbl = utypes_classify('basepaths', {basepaths{:}}, ...
     'flgSave', false, 'fetTbl', fetTbl,...
-    'fetSelect', fetSelect, 'regVal', regVal, 'rsPrior', rsPrior);
-fetTbl.unitType = uTbl.unitType;
+    'fetSelect', fetSelect, 'regVal', regVal, 'rsPrior', rsPrior,...
+    'flgPlot', true, 'flgSave', false);
 
-% Convert to double for compatibility
-unitType = double(fetTbl.unitType) - 1;
-unitType(fetTbl.unitType=='Other') = 0;
-unitType(fetTbl.unitType=='RS') = 1;
-unitType(fetTbl.unitType=='FS') = 2;
 
-% Separation by features
-hFig = figure;
-hAx = gca;
-xFet = 'tp';
-yFet = 'lidor';
-zFet = 'asym';
-plot_utypes('basepaths', {basepaths{:}}, 'fetTbl', fetTbl, 'flgOther', true,...
-    'plotType', 'scatter', 'xFet', xFet, 'yFet', yFet, 'zFet', zFet,...
-    'unitType', unitType, 'hAx', hAx);
-
+basepaths = [mcu_basepaths('wt'), mcu_basepaths('mcu')];
+[tAxis, frTbl] = mcu_frTbl(basepaths);
 
 
 
@@ -96,17 +82,17 @@ varFld = 'tp';
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % get all files in study
-basepaths = mcu_sessions('all');
+basepaths = mcu_basepaths('all');
 nPaths = length(basepaths);
 
 % Get only WT basepaths
-mNames = mcu_sessions('wt');
+mNames = unique(get_mname(mcu_basepaths('wt')));
 clear mPaths
 for iMouse = 1 : length(mNames)
-    mPaths(iMouse, :) = string(mcu_sessions(mNames{iMouse}))';
+    mPaths(iMouse, :) = string(mcu_basepaths(mNames{iMouse}))';
 end
 basepaths = mPaths(:);
-basepaths = [mcu_sessions('wt_bsl'), mcu_sessions('wt_bsl_ripp')];
+basepaths = [mcu_basepaths('wt_bsl'), mcu_basepaths('wt_bsl_ripp')];
 basepaths = unique(basepaths);
 
 
@@ -178,7 +164,7 @@ lme_save('hFig', hFig, 'fname', fname, 'frmt', {'mat', 'svg'},...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % get all files in study
-basepaths = mcu_sessions('all');
+basepaths = mcu_basepaths('all');
 nPaths = length(basepaths);
 
 fNames = {...

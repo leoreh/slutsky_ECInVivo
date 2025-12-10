@@ -1,7 +1,7 @@
 function [psd_data, psd_cfg] = mcu_psdOrg(expDsgn, flg_emg)
 
 % organizes psd data from multiple sessions into format compatible with
-% fieldtrip's ft_freqstatistics. loads data according to mcu_sessions and
+% fieldtrip's ft_freqstatistics. loads data according to mcu_basepaths and
 % arranges in cells according to specified dimorder (e.g., subj x freq x time)
 %
 % INPUT
@@ -12,7 +12,7 @@ function [psd_data, psd_cfg] = mcu_psdOrg(expDsgn, flg_emg)
 %               processing
 %
 % CALLS
-%   mcu_sessions
+%   mcu_basepaths
 %   basepaths2vars
 %   as_loadConfig
 %
@@ -26,7 +26,7 @@ psd_cfg.expDsgn = expDsgn;
 switch psd_cfg.expDsgn
 
     case 1
-        grps = mcu_sessions('wt');
+        grps = unique(get_mname(mcu_basepaths('wt')));
         psd_cfg.fmt = '{state}[mouse x freq x time]';
         flg_emg = true;
         nstates = 2;
@@ -69,10 +69,10 @@ psdCell = cell(1, numel(grps));
 switch expDsgn
 
     case 1                      % '{state}[mouse x freq x time]'
-        
-        % load data for each group, in this case mouse 
+
+        % load data for each group, in this case mouse
         for igrp = 1 : ngrps
-            basepaths = mcu_sessions(grps{igrp});
+            basepaths = mcu_basepaths(grps{igrp});
             [psdCell{igrp}, psdInfo] = load_psd(basepaths, vars, flg_norm);
         end
 
@@ -90,11 +90,11 @@ switch expDsgn
         end
 
     case {2, 3}                      % '{gen}[state x freq x mouse]'
-        
+
         % load data for each genotype group
         psd_data = cell(1, ngrps);
         for igrp = 1 : ngrps
-            basepaths = mcu_sessions(grps{igrp});
+            basepaths = mcu_basepaths(grps{igrp});
             [psd_data{igrp}, psdInfo] = load_psd(basepaths, vars, flg_norm);
         end
 

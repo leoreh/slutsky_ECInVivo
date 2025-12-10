@@ -12,7 +12,7 @@ function [fr_rs, fr_fs, t_axis, id_rs, id_fs] = mcu_catFr(fetTbl)
 if nargin < 1, fetTbl = []; end
 
 grp = 'wt';
-mice = mcu_sessions(grp);
+mice = unique(get_mname(mcu_basepaths(grp)));
 vars = {'fr'; 'units'};
 
 % -------------------------------------------------------------------------
@@ -33,7 +33,7 @@ for iMouse = 1 : length(mice)
     if isnan(mNum), mNum = iMouse; end % Fallback
 
     % 1. Load All Data for Mouse
-    basepaths = mcu_sessions(mice{iMouse});
+    basepaths = mcu_basepaths(mice{iMouse});
     v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 
     % 2. Stitch and Find Perturbation

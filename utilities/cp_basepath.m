@@ -19,7 +19,7 @@ function cp_basepath(varargin)
 %   fNames       (cell array) Cell array of file patterns to copy. Can include
 %                wildcards (e.g., '*.clu.1', '*.session.mat*'). Each pattern
 %                will be expanded to match all files in the session directory.
-%   basepath     (char) Full path to the session directory (e.g., 
+%   basepath     (char) Full path to the session directory (e.g.,
 %                'E:\Data\lh140\lh140_230624_090049')
 %   newpath      (char) New base path where files will be copied to. If empty,
 %                uses 'D:\Data'. {[]}
@@ -28,7 +28,7 @@ function cp_basepath(varargin)
 %
 % OUTPUT:
 %   None. Files are copied to the new location.
-% 
+%
 % EXAMPLE:      See end of function
 %
 % DEPENDENCIES:
@@ -97,7 +97,7 @@ for iPattern = 1:length(fNames)
     % Get all files matching the pattern
     pattern = fullfile(basepath, fNames{iPattern});
     files = dir(pattern);
-    
+
     % Add full paths to the list
     if ~isempty(files)
         cpFiles = [cpFiles; {files.name}'];
@@ -146,7 +146,7 @@ if verbose && ~isempty(cmdout)
     end
 end
 
-end     % EOF 
+end     % EOF
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % EXAMPLE CALL
@@ -173,20 +173,16 @@ end     % EOF
 %     % '*.lfp',...
 %     % '*.sleep_*',...
 %     };
-% 
-% 
+%
+%
 % % get group basepaths
-% mice = mcu_sessions('wt');
-% nMice = length(mice);
-% 
-% for iMouse = 1 : nMice
-%     basepaths = mcu_sessions(mice{iMouse});
-%     nPaths = length(basepaths);
-%     newpath = 'D:\OneDrive - Tel-Aviv University\Data\Baclofen\Control';
-% 
-%     for iPath = 1 : nPaths
-%         basepath = basepaths{iPath};
-%         cp_basepath('fNames', fNames, 'basepath', basepath, 'newpath', newpath,...
-%             'overwrite', true, 'verbose', true)
-%     end
+% basepaths = mcu_basepaths('wt');
+% nPaths = length(basepaths);
+%
+% newpath = 'D:\OneDrive - Tel-Aviv University\Data\Baclofen\Control';
+%
+% for iPath = 1 : nPaths
+%     basepath = basepaths{iPath};
+%     cp_basepath('fNames', fNames, 'basepath', basepath, 'newpath', newpath,...
+%         'overwrite', true, 'verbose', true)
 % end

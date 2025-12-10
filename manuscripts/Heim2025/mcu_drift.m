@@ -7,7 +7,7 @@ clear drft2 drft
 for igrp = 1 : ngrp
 
     % load data
-    basepaths = mcu_sessions(queryStr{igrp});
+    basepaths = mcu_basepaths(queryStr{igrp});
     nfiles = length(basepaths);
 
     % go over files
@@ -49,7 +49,7 @@ set(fh, 'DefaultAxesFontSize', 16);
 yLimit = [0, round(max(drft.drate, [], 'all') * 100) / 100];
 tbias = 1;
 for iunit = 1 : 2
-    for istate = 1 
+    for istate = 1
         axh = nexttile(th, tbias, [1, 1]); cla; hold on
         dataMat = squeeze(drft.drate(iunit, istate, :, :));
         plot_boxMean('dataMat', dataMat, 'plotType', 'bar',...

@@ -23,9 +23,9 @@ mdlPrfx = 'frr.mdlF';
 cnt = 1;
 clear tblCell
 for iGrp = 1 : length(grps)
-    basepaths = mcu_sessions(grps{iGrp});
+    basepaths = mcu_basepaths(grps{iGrp});
     v = basepaths2vars('basepaths', basepaths, 'vars', vars);
-   
+
     % Create consistent UnitIDs for this group (reset between groups). Use
     % frr for grabbing the number of units.
     frr = catfields([v(:).frr], 1);
@@ -54,7 +54,7 @@ for iGrp = 1 : length(grps)
 
         tempTbl = v2tbl('v', v, 'varMap', varMap, 'tagFiles',...
             tagFiles, 'tagAll', tagAll, 'idxCol', iCol);
-        
+
         % Override the UnitID to ensure consistency across time points
         % Add group offset to make UnitIDs unique between groups
         groupOffset = (iGrp - 1) * 10000;  % 10000 units per group

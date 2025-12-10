@@ -5,7 +5,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % go over each mouse and analyze all experiment days
-grps = [mcu_sessions('wt'), mcu_sessions('mcu')];
+grps = [unique(get_mname(mcu_basepaths('wt'))); unique(get_mname(mcu_basepaths('mcu')))];
 
 % go over baseline for wt vs. mcu. during experiment, only psdEmg should be
 % calculated
@@ -20,7 +20,7 @@ ftarget = [1 : 0.5 : 100];
 for igrp = 1 : length(grps)
 
     queryStr = grps{igrp};
-    basepaths = mcu_sessions(queryStr);
+    basepaths = mcu_basepaths(queryStr);
     nfiles = length(basepaths);
     mpath = fileparts(basepaths{1});
 
@@ -63,7 +63,7 @@ grps = {'wt_bsl'; 'mcu_bsl'};
 flg_emg = false;
 
 % go over each mouse and analyze all experiment days
-grps = [mcu_sessions('wt'), mcu_sessions('mcu')];
+grps = [unique(get_mname(mcu_basepaths('wt'))); unique(get_mname(mcu_basepaths('mcu')))];
 flg_emg = true;
 
 % vars
@@ -79,7 +79,7 @@ end
 for igrp = 1 : length(grps)
 
     queryStr = grps{igrp};
-    basepaths = mcu_sessions(queryStr);
+    basepaths = mcu_basepaths(queryStr);
     nfiles = length(basepaths);
     mpath = fileparts(basepaths{1});
     v = basepaths2vars('basepaths', basepaths, 'vars', vars);
@@ -90,14 +90,14 @@ for igrp = 1 : length(grps)
         basepath = basepaths{ifile};
         [~, basename] = fileparts(basepath);
         cd(basepath)
-       
+
         % psd params
         psd = v(ifile).psd;
         freqs = psd.info.faxis;
         sstates = psd.info.sstates;
         nstates = length(sstates);
         clr = psd.info.clr;
-        
+
 
         % -----------------------------------------------------------------
         % create n PSDs per state by averaging k bouts (random sampling)
@@ -122,7 +122,7 @@ for igrp = 1 : length(grps)
                 psd_avg{istate}(ipsd, :) = mean(sampled_psds, 1);
             end
         end
-     
+
         % -----------------------------------------------------------------
         % calculate fooof
         psd_1of = psd_fooof(psd_avg, freqs,...
@@ -151,7 +151,7 @@ grps = {'wt_bsl'; 'mcu_bsl'};
 
 clear grppaths
 for igrp = 1 : length(grps)
-    grppaths{igrp} = string(mcu_sessions(grps{igrp})');
+    grppaths{igrp} = string(mcu_basepaths(grps{igrp})');
 end
 grppaths{2}(end) = [];
 
@@ -177,9 +177,9 @@ idx_rmDays = [];              % remove bac on and off
 clear grppaths
 for igrp = 1 : length(grps)
 
-    mnames = mcu_sessions(grps(igrp));  
+    mnames = unique(get_mname(mcu_basepaths(grps{igrp})));
     for imouse = 1 : length(mnames)
-        basepaths = mcu_sessions(mnames{imouse});
+        basepaths = mcu_basepaths(mnames{imouse});
         basepaths(idx_rmDays) = [];
         grppaths{igrp}(imouse, :) = string(basepaths)';
     end
@@ -220,9 +220,9 @@ idx_rmDays = [2, 6];              % remove bac on and off
 clear grppaths
 for igrp = 1 : length(grps)
 
-    mnames = mcu_sessions(grps(igrp));  
+    mnames = unique(get_mname(mcu_basepaths(grps{igrp})));
     for imouse = 1 : length(mnames)
-        basepaths = mcu_sessions(mnames{imouse});
+        basepaths = mcu_basepaths(mnames{imouse});
         basepaths(idx_rmDays) = [];
         grppaths{igrp}(imouse, :) = string(basepaths)';
     end
@@ -264,7 +264,7 @@ freqs = squeeze(psd_1of_mouse(imouse).freqs(1, :, 1));
 % select params
 fooof_param = 'residuals';
 
-% prepare colors 
+% prepare colors
 rgb_variants = rgbVariants([0.9, 0.1, 1], ndays);
 
 % open figure
@@ -385,23 +385,23 @@ set(fh, 'DefaultAxesFontSize', 16);
 
 for igrp = 1 : 2
 
-% psd per state
-axh = nexttile(th, igrp, [1, 1]); cla; hold on
+    % psd per state
+    axh = nexttile(th, igrp, [1, 1]); cla; hold on
 
-psd_grp = cell(1, 2);
-for istate = 1 : 2
-    psd_grp{istate} = squeeze(psd_data{igrp}(istate, :, :));
-end
+    psd_grp = cell(1, 2);
+    for istate = 1 : 2
+        psd_grp{istate} = squeeze(psd_data{igrp}(istate, :, :));
+    end
 
-% analyze psd difference between groups for this state
-[stats, ~, tbl_stats] = mcu_psdCBPT(psd_grp, psd_cfg);
-fpath = 'C:\Users\Leore\Downloads';
-writetable(tbl_stats, fullfile(fpath, 'cbpt_results.xlsx'), 'Sheet', grpnames{igrp});
+    % analyze psd difference between groups for this state
+    [stats, ~, tbl_stats] = mcu_psdCBPT(psd_grp, psd_cfg);
+    fpath = 'C:\Users\Leore\Downloads';
+    writetable(tbl_stats, fullfile(fpath, 'cbpt_results.xlsx'), 'Sheet', grpnames{igrp});
 
-mcu_psdPlot(stats, psd_grp, psd_cfg, 'axh', axh, 'ptype', 'freq',...
-    'clr', psd_cfg.clr{istate})
+    mcu_psdPlot(stats, psd_grp, psd_cfg, 'axh', axh, 'ptype', 'freq',...
+        'clr', psd_cfg.clr{istate})
 
-title(axh, grpnames{igrp})
+    title(axh, grpnames{igrp})
 
 end
 
@@ -531,9 +531,9 @@ idx_rmDays = [];              % remove bac on and off
 clear grppaths
 for igrp = 1 : length(grps)
 
-    mnames = mcu_sessions(grps(igrp));  
+    mnames = unique(get_mname(mcu_basepaths(grps(igrp))));
     for imouse = 1 : length(mnames)
-        basepaths = mcu_sessions(mnames{imouse});
+        basepaths = mcu_basepaths(mnames{imouse});
         basepaths(idx_rmDays) = [];
         grppaths{igrp}(imouse, :) = string(basepaths)';
     end
@@ -553,7 +553,7 @@ plot_tbl = lme_tbl(lme_tbl.State == istate, :);
 % % select group
 % igrp = categorical({'WT'});
 % plot_tbl = plot_tbl(plot_tbl.Group == igrp, :);
-% 
+%
 % % update formula
 % lme_cfg.frml = 'Band ~ Day + (1|Mouse) + (1|Day)';
 
@@ -582,7 +582,7 @@ prism_data = fh2prism(fh);
 grps = {'wt_bsl', 'mcu_bsl'};
 clear grppaths
 for igrp = 1 : length(grps)
-    grppaths{igrp} = string(mcu_sessions(grps{igrp})');
+    grppaths{igrp} = string(mcu_basepaths(grps{igrp})');
 end
 
 

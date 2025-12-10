@@ -5,7 +5,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % go over each mouse and analyze all experiment days
-grps = [mcu_sessions('wt'), mcu_sessions('mcu')];
+grps = [unique(get_mname(mcu_basepaths('wt'))), unique(get_mname(mcu_basepaths('mcu')))];
 
 % go over baseline for wt vs. mcu. during experiment, only psdEmg should be
 grps = {'mcu_bsl'; 'wt_bsl'};
@@ -26,9 +26,9 @@ for igrp = 1 : length(grps)
 
     % get group basepaths
     queryStr = grps{igrp};
-    grppaths = mcu_sessions(queryStr);
+    grppaths = mcu_basepaths(queryStr);
     nfiles = length(grppaths);
-    
+
     % load state vars
     v = basepaths2vars('basepaths', grppaths, 'vars', vars);
 
@@ -38,7 +38,7 @@ for igrp = 1 : length(grps)
         basepath = grppaths{ifile};
         [~, basename] = fileparts(basepath);
         cd(basepath)
-        
+
         % bout time
         % Ensure v(ifile).psd and subsequent fields exist before accessing btimes
         if isfield(v(ifile), 'psd') && isfield(v(ifile).psd, 'bouts') && isfield(v(ifile).psd.bouts, 'times')
@@ -51,7 +51,7 @@ for igrp = 1 : length(grps)
         fr = calc_fr(v(ifile).spikes.times, 'basepath', basepath,...
             'graphics', false, 'binsize', 60, 'saveVar', fnameFr, 'forceA', true,...
             'smet', 'none', 'winBL', [0, Inf], 'winCalc', [0, Inf],...
-            'btimes', btimes);             
+            'btimes', btimes);
     end
 end
 
@@ -68,22 +68,22 @@ vars = {'fr', 'units', 'st_metrics', 'st_brst'};
 
 % Define variable mapping
 clear varMap tblCell v tagAll tagFiles
-varMap.FR = 'fr.mfr';               
-varMap.BrRoy = 'st.royer';          
-varMap.BrPct = 'brst.bspks';        
-varMap.UnitType = 'units.clean';   
+varMap.FR = 'fr.mfr';
+varMap.BrRoy = 'st.royer';
+varMap.BrPct = 'brst.bspks';
+varMap.UnitType = 'units.clean';
 
 % Load and organize table
 for iGrp = 1 : length(grps)
-    basepaths = mcu_sessions(grps{iGrp});
+    basepaths = mcu_basepaths(grps{iGrp});
     nFiles = length(basepaths);
-    
-    v{iGrp} = basepaths2vars('basepaths', basepaths, 'vars', vars);    
-        
+
+    v{iGrp} = basepaths2vars('basepaths', basepaths, 'vars', vars);
+
     tagAll.Group = lblGrp{iGrp};
     tagFiles.Name = get_mname(basepaths);
     tblCell{iGrp} = v2tbl('v', v{iGrp}, 'varMap', varMap, 'tagAll',...
-        tagAll, 'tagFiles', tagFiles, 'idxCol', 2);  
+        tagAll, 'tagFiles', tagFiles, 'idxCol', 2);
 end
 lmeData = vertcat(tblCell{:});
 
@@ -94,11 +94,11 @@ lmeData.Group = reordercats(lmeData.Group, lblGrp);
 lmeData.UnitType = reordercats(lmeData.UnitType, lblUnit);
 
 % -------------------------------------------------------------------------
-% FR per unit, WT vs MCU for RS vs FS 
+% FR per unit, WT vs MCU for RS vs FS
 clear lmeCfg
 frml = 'BrRoy ~ Group * UnitType + (1|Name)';
 lmeCfg.contrasts = 'all';
-lmeCfg.contrasts = [1 : 6]; 
+lmeCfg.contrasts = [1 : 6];
 lmeCfg.distribution = 'gamma';
 
 % Fit
@@ -142,7 +142,7 @@ lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
 
 % -------------------------------------------------------------------------
 % Load and organize data
-grps = {'wt', 'mcu'}; 
+grps = {'wt', 'mcu'};
 vars = {'fr', 'units', 'st_metrics', 'st_brst'};
 
 lblGrp = {'Control'; 'MCU-KO'};
@@ -152,27 +152,27 @@ idxRm = [2, 6];                     % remove bac on and off
 % Define variable mapping for v2tbl
 clear varMap tblCell v tagAll tagFiles
 varMap.FR = 'fr.mfr';               % Mean firing rate
-varMap.BrRoy = 'st.royer';          
-varMap.BrPct = 'brst.bspks';  
+varMap.BrRoy = 'st.royer';
+varMap.BrPct = 'brst.bspks';
 varMap.UnitType = 'units.clean';    % Unit classification
 
 % Single loop over groups and mice (no day loop)
 for iGrp = 1 : length(grps)
-    mNames = mcu_sessions(grps{iGrp});
-    
+    mNames = unique(get_mname(mcu_basepaths(grps{iGrp})));
+
     for iMouse = 1 : length(mNames)
         % Get all paths for this mouse and remove specified days
-        tmpPaths = mcu_sessions(mNames{iMouse});
+        tmpPaths = mcu_basepaths(mNames{iMouse});
         tmpPaths(idxRm) = [];
-        
+
         % Load data for all days for this mouse at once
         v{iGrp, iMouse} = basepaths2vars('basepaths', tmpPaths, 'vars', vars);
-        
+
         % Prepare tag structures for this mouse
         tagAll.Group = lblGrp{iGrp};
-        tagAll.Name = mNames{iMouse}; 
-        tagFiles.Day = lblDay(1:length(tmpPaths)); 
-        
+        tagAll.Name = mNames{iMouse};
+        tagFiles.Day = lblDay(1:length(tmpPaths));
+
         % Create table for this mouse using new flexible approach
         tblCell{iGrp, iMouse} = v2tbl('v', v{iGrp, iMouse}, 'varMap', varMap, ...
             'tagFiles', tagFiles, 'tagAll', tagAll, 'idxCol', 2);
@@ -193,11 +193,11 @@ lmeData.Day = reordercats(lmeData.Day, lblDay);
 lmeData.BrRoy = lmeData.BrRoy + eps;
 
 % -------------------------------------------------------------------------
-% FR ~ Group * Day + (1|Mouse) 
+% FR ~ Group * Day + (1|Mouse)
 
 % select unit
 unitType = 'pINT';
-iUnit = categorical({unitType}); 
+iUnit = categorical({unitType});
 plotTbl = lmeData(lmeData.UnitType == iUnit, :);
 
 % normalize
@@ -208,8 +208,8 @@ plotTbl = tbl_transform(plotTbl, 'varNorm', 'Day',...
 clear lmeCfg
 frml = 'FR ~ Group * Day + (1|Name)';
 frml = 'BrRoy ~ Group * Day + (1|Name)';
-lmeCfg.contrasts = 'all'; 
-lmeCfg.distribution = 'Gamma'; 
+lmeCfg.contrasts = 'all';
+lmeCfg.distribution = 'Gamma';
 [lmeStats, lmeMdl] = lme_analyse(plotTbl, frml, lmeCfg);
 
 % plot
@@ -243,16 +243,16 @@ lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
 
 
 % -------------------------------------------------------------------------
-% FR ~ UnitType * Day + (1|Mouse) 
+% FR ~ UnitType * Day + (1|Mouse)
 
 % select group
 grp = 'Control';
-iGrp = categorical({grp}); 
+iGrp = categorical({grp});
 plotTbl = lmeData(lmeData.Group == iGrp, :);
 
 % select unit
 unitType = 'pINT';
-iUnit = categorical({unitType}); 
+iUnit = categorical({unitType});
 plotTbl = plotTbl(plotTbl.UnitType == iUnit, :);
 
 % normalize
@@ -262,8 +262,8 @@ plotTbl = plotTbl(plotTbl.UnitType == iUnit, :);
 % run lme
 clear lmeCfg
 frml = 'FR ~ UnitType * Day + (1|Name)';
-lmeCfg.contrasts = 'all'; 
-lmeCfg.distribution = 'Gamma'; 
+lmeCfg.contrasts = 'all';
+lmeCfg.distribution = 'Gamma';
 [lmeStats, lmeMdl] = lme_analyse(plotTbl, frml, lmeCfg);
 
 % plot
