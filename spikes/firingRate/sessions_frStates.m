@@ -1,6 +1,6 @@
 function frTiles = sessions_frStates(mname, varargin)
 
-% arranges 
+% arranges
 %
 % INPUT:
 %   mname           string. mouse name to analyze
@@ -14,7 +14,7 @@ function frTiles = sessions_frStates(mname, varargin)
 %
 % TO DO LIST:
 %
-% 20 oct 22 LH  
+% 20 oct 22 LH
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -48,8 +48,8 @@ else
 end
 varsName = ["ss"; "datInfo"; "session"; "psd"; "spikes";...
     "fr"; "units"];
-[v, basepaths] = getSessionVars('mname', mname, 'varsFile', varsFile,...
-    'varsName', varsName);
+basepaths = xls2basepaths('mname', mname);
+v = basepaths2vars('basepaths', basepaths, 'vars', varsFile);
 nfiles = length(basepaths);
 
 % get params for psd file or use defaults. this is for emg states only
@@ -68,20 +68,20 @@ end
 % organize cell array of state ratio (nfiles x unitType x ntiles)
 dataMat = cell(nfiles, 2, ntiles);
 for ifile = 1 : nfiles
-    
+
     basepath = basepaths{ifile};
     cd(basepath)
     [~, basename] = fileparts(basepath);
-    
+
     if flgAnalyze
-        
+
         % get window from psd
         if ~isempty(v(ifile).psd)
             wins = v(ifile).psd.info.wins;
         else
             wins = [0, Inf];
         end
-        
+
         if flgEmg
 
             % load emg data
@@ -115,7 +115,7 @@ for ifile = 1 : nfiles
     % organize cell array of state ratio
     for iunit = 1 : 2
         units = v(ifile).units.clean(iunit, :);
-        
+
         % get a cell array of indices according to mfr percentiles per unit
         % type
         [~, tileIdx] = vec2tileMat(v(ifile).fr.mfr, ntiles, units);

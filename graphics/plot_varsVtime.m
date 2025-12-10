@@ -10,10 +10,9 @@ basepath = 'F:\Data\lh100\lh100_220403_100052';
 % load data
 varsFile = ["fr"; "spikes"; "datInfo"; "session";...
     "units"; "sleep_states"];
-varsName = ["fr"; "spikes"; "datInfo"; "session";...
-    "units"; "ss"];
-v = getSessionVars('basepaths', {basepath}, 'varsFile', varsFile,...
-    'varsName', varsName);
+v = basepaths2vars('basepaths', {basepath}, 'vars', varsFile);
+if isfield(v, 'SleepState'), [v.ss] = v.SleepState; v = rmfield(v, 'SleepState'); end
+if isfield(v, 'sleep_states'), [v.ss] = v.sleep_states; v = rmfield(v, 'sleep_states'); end
 
 % session params
 nchans = v.session.extracellular.nChannels;
@@ -76,7 +75,7 @@ winStart(4, 1) = [3.8];           % relative to window 3
 winStart(1, 2) = v.session.general.timepnt + 130 * 60;
 winStart(2, 2) = [1050];
 winStart(3, 2) = [1140];
-winStart(4, 2) = [1];           
+winStart(4, 2) = [1];
 
 nwin = size(winStart, 2);
 
@@ -95,14 +94,14 @@ set(fh, 'renderer', 'Painters')
 % plot
 clear ypush
 for iwin = 1 : nwin
-    
-    % win 
+
+    % win
     winLim = [winStart(:, iwin)'; winStart(:, iwin)' + winDur]';
 
     % hypnogram -----------------------------------------------------------
     axh(iwin) = nexttile(iwin);
     hold on
-    
+
     % limit state bouts to window
     sbouts = cell(1, length(sstates));
     for istate = 1 : length(sstates)
@@ -143,10 +142,10 @@ for iwin = 1 : nwin
     xlim(winLim(2, :))
 
     % raster plot ---------------------------------------------------------
-    % axis 
+    % axis
     axh(iwin + nwin * 3) = nexttile(iwin + nwin * 3);
     hold on
-    
+
     % add marking of narrow window
     yLimit = ylim;
     plot(winLim(4, :) + winStart(3, iwin), [0, 0], 'k', 'LineWidth', 2)
@@ -154,24 +153,24 @@ for iwin = 1 : nwin
     % arrange units
     [~, unitsIdx] = sortrows(v.units.clean', 'descend');
     nunits = sum(v.units.clean, 2);
-    
+
     % plot all units in blue
     spktimes = cellfun(@(x) [x(InIntervals(x, winLim(1, :)))  - winStart(1, iwin)]',...
         v.spikes.times, 'uni', false)';
-    spktimes = spktimes(unitsIdx(1 : sum(nunits)));   
+    spktimes = spktimes(unitsIdx(1 : sum(nunits)));
     LineFormat.Color = [0.1 0.1 0.8];
     lineFormat.LineWidth = 2;
     plotSpikeRaster(spktimes,...
         'PlotType', 'vertline', 'LineFormat', LineFormat);
-    
-    % plot fs units in red    
+
+    % plot fs units in red
     LineFormat.Color = [0.8 0.1 0.1];
     for iunit = 1 : nunits(1)
         spktimes{iunit} = 0;
-    end  
+    end
     plotSpikeRaster(spktimes,...
-        'PlotType', 'vertline', 'LineFormat', LineFormat);    
-    
+        'PlotType', 'vertline', 'LineFormat', LineFormat);
+
     % axis params
     ylabel('Unit #')
     xlim(winLim(3, :))
@@ -183,7 +182,7 @@ for iwin = 1 : nwin
         'frequency', fs, 'nchannels', nchans, 'start', winStart(3, iwin),...
         'channels', [13 : 16], 'downsample', fs / fs_raw));
     raw_tstamps = [1 : size(raw, 1)] / fs_raw + winStart(3, iwin);
-    
+
     % plot
     axh(iwin + nwin * 4) = nexttile(iwin + nwin * 4);
     if ~exist('ypush', 'var')

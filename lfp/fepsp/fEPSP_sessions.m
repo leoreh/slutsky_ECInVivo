@@ -18,7 +18,7 @@ mname = 'lh76';     % mouse name
 colName = 'Session';
 
 % string array of variables to load
-vars = ["session.mat";...
+vars = ["session";...
     "fepsp"];
 
 % column name of logical values for each session. only if true than session
@@ -32,10 +32,12 @@ ncond = ["spktimes"];
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% %%%%%%%%%%%%%%%%%
 % load data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-if ~exist('varArray', 'var') && ~forceL
-    [varArray, dirnames, mousepath] = getSessionVars('vars', vars,...
-        'pcond', pcond, 'ncond', ncond, 'sortDir', false, 'dirnames', [],...
-        'xlsname', xlsname, 'mname', mname);
+if ~exist('v', 'var') && ~forceL
+    basepaths = xls2basepaths('xlsname', xlsname, 'mname', mname, ...
+        'pcond', pcond, 'ncond', ncond);
+    [~, dirnames] = cellfun(@fileparts, basepaths, 'uni', false);
+    mousepath = fileparts(basepaths{1});
+    v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 end
 nsessions = length(dirnames);
 
@@ -55,13 +57,13 @@ ngrp = length(spkgrp);
 if forceA
     close all
     for i = 1 : nsessions
-        
+
         % file
         basepath = char(fullfile(mousepath, dirnames(i)));
         cd(basepath)
-        
-        fepsp = varArray{i, 2}.fepsp;
-        
+
+        fepsp = v(i).fepsp;
+
         % fepsp
         intens = [];
         fepsp = fEPSPfromDat('basepath', basepath, 'fname', '', 'nchans', nchans,...
@@ -69,10 +71,10 @@ if forceA
             'force', true, 'extension', 'dat', 'recSystem', 'oe',...
             'protocol', 'stp', 'anaflag', true, 'inspect', false, 'fsIn', fs,...
             'cf', 0);
-        
-%         fepsp = fEPSP_analysis('fepsp', fepsp, 'basepath', basepath,...
-%             'force', true);
-  
+
+        %         fepsp = fEPSP_analysis('fepsp', fepsp, 'basepath', basepath,...
+        %             'force', true);
+
     end
 end
 
@@ -83,10 +85,10 @@ end
 % intensities throughout sessions
 intens = [50];
 for i = 1 : nsessions
-    if isempty(varArray{i, 2})
+    if isempty(v(i).fepsp)
         continue
     end
-    fepsp = varArray{i, 2}.fepsp;
+    fepsp = v(i).fepsp;
     intens = sort(unique([intens, fepsp.intens]));
 end
 
@@ -113,7 +115,7 @@ switch protocol
         ampcell = cell(1, nsessions);
         iomat = nan(length(intens), nsessions);
         for i = 1 : nsessions
-            fepsp = varArray{i, 2}.fepsp;
+            fepsp = v(i).fepsp;
             sintens = sort(fepsp.intens);
             [~, ia] = intersect(sintens, si);
             [~, ib] = intersect(intens, si);
@@ -129,15 +131,15 @@ switch protocol
             end
             iomat(ic, i) = mean(cell2nanmat(fepsp.(dataVar)), 'omitnan');
         end
-        
+
     case 'stp'
         wvmat = nan(ngrp, nsessions, size(fepsp.traceAvg, 3));
         ampmat = nan(nsessions, length(fepsp.ampNorm));
         for i = 1 : nsessions
-            fepsp = varArray{i, 2}.fepsp;
+            fepsp = v(i).fepsp;
             fac{i} = max(squeeze(fepsp.ampNorm(grp, : ,:))');
             if isempty(si)
-                    [~, ia] = max(fac{i});
+                [~, ia] = max(fac{i});
             end
             wvmat(:, i, :) = fepsp.traceAvg(:, ia, :);
             ampmat(i, :) = squeeze(fepsp.ampNorm(grp, ia, :));
@@ -181,12 +183,12 @@ if p
     ylabel('Voltage [V]')
     legend(sessionDate(ss))
     box off
-    
+
     subplot(2, 1, 2)
     switch protocol
         case 'io'
             ampmat = cell2nanmat(ampcell);
-%                         boxplot(ampmat, 'PlotStyle', 'traditional');
+            %                         boxplot(ampmat, 'PlotStyle', 'traditional');
             bar(nanmean(ampmat))
             bh = findobj(gca, 'Tag', 'Box');
             if length(bh) == length(clr)
@@ -210,10 +212,10 @@ if p
     end
     y = ylim;
     %     ylim([0 y(2)]);
-    
+
     box off
     suptitle([mname ' T#' num2str(grp) ' @ ' num2str(si) 'uA'])
-    
+
     if saveFig
         figname = fullfile(mousepath, 'fepspSessions');
         % print(fh, figname, '-dpdf', '-bestfit', '-painters');
@@ -286,7 +288,7 @@ if p
         [~, ib] = intersect(sintens, si);
         swv = squeeze(mean(f{ss}.wv{i, ib}, 1));
         samp = f{ss}.ampcell{i, ib};
-        
+
         subplot(1 ,2 ,1)
         plot(tstamps, swv)
         axis tight
@@ -294,7 +296,7 @@ if p
         ylabel('Amplitude [mV]')
         legend
         box off
-        
+
         subplot(1, 2, 2)
         plot(1 : length(samp), samp)
         xlabel('Stim #')
@@ -310,11 +312,11 @@ p = 0;
 if p
     fh = figure;
     for i = 1 : nsessions
-        
+
         basepath = char(fullfile(mousepath, dirnames(i)));
         cd(basepath)
-        fepsp = varArray{i, 2}.fepsp;
-        
+        fepsp = v(i).fepsp;
+
         [~, stimidx] = min(abs(fepsp.tstamps - 0));
         margin = fepsp.info.fs * 1 / 1000;
         stimidx = [stimidx - margin : stimidx + margin];
@@ -330,7 +332,7 @@ if p
                 'MarkerEdgeColor', 'none');
         end
         axis tight
-        
+
         % linear correlation and regression
         x = [stimArt{:}]';
         y = [fepsp.ampcell{:}]';
@@ -340,20 +342,20 @@ if p
         ssresid = sum((y - yfit).^2);
         sstot = (length(y) - 1) * var(y);
         rsq = 1 - ssresid / sstot;
-        
+
         % plot regression
         plot(x, yfit, 'k', 'LineWidth', 1)
-        
+
         ylabel('fEPSP Amplitude [mV]')
         xlabel('Sti. Artifact Amplitude [mV]')
         legend(split(num2str(fepsp.intens)))
         title(sprintf('%s\nR = %.2f; p = %.4f\ncoef = %.2f, const = %.2f, rsq = %.2f',...
             dirnames(i), r(2, 1), p(2, 1), b(1), b(2), rsq))
-        
+
         traces = [fepsp.traces{:}];
         traces = traces(1 : 750, :);
         sigRms(i) = mean(rms(traces));
-        
+
         k = 0;
         for j = 1 : length(fepsp.intens)
             idx = length(fepsp.ampcell{j});
@@ -361,6 +363,6 @@ if p
             k = k + idx;
         end
         fepsp.stimArt = stimArt;
-%         save([dirnames{i}, '.fepsp.mat'], 'fepsp')
+        %         save([dirnames{i}, '.fepsp.mat'], 'fepsp')
     end
 end

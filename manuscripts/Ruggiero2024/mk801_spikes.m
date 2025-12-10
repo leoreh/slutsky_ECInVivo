@@ -9,13 +9,12 @@ mname = 'lh96';
 varsFile = ["fr"; "datInfo"; "session"; "units"];
 varsName = ["fr"; "datInfo"; "session"; "units"];
 xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
-[v, basepaths] = getSessionVars('mname', mname, 'varsFile', varsFile,...
-    'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
-    'xlsname', xlsname);
+basepaths = xls2basepaths('xlsname', xlsname, 'mname', mname, 'pcond', ["tempflag"], 'ncond', [""]);
+v = basepaths2vars('basepaths', basepaths, 'vars', varsFile);
 nfiles = length(basepaths);
 
 
-% fr in time bins 
+% fr in time bins
 for ifile = 1 : nfiles
 
     % file
@@ -30,7 +29,7 @@ for ifile = 1 : nfiles
     % add timebins to datInfo
     [timebins, timepnt] = metaInfo_timebins('reqPnt', [], 'nbins', 4);
     timebins / 60 / 60
-    
+
     plot_FRtime_session('basepath', basepath)
 
     % mfr by states in time bins
@@ -94,9 +93,7 @@ for imouse = 1 : length(mname)
     varsFile = ["fr"; "fr_bins"; "datInfo"; "session"; "units"];
     varsName = ["fr"; "frBins"; "datInfo"; "session"; "units"];
     xlsname = 'D:\OneDrive - Tel-Aviv University\PhD\Slutsky\Data summaries\sessionList.xlsx';
-    [v, basepaths] = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
-        'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
-        'xlsname', xlsname);
+    v = basepaths2vars('basepaths', basepaths, 'vars', varsFile);
     nfiles = length(basepaths);
 
     % organize in cell array
@@ -108,7 +105,7 @@ for imouse = 1 : length(mname)
 
                 unitIdx = v(ifile).units.clean(iunit, :);
 
-                for istate = 1 : length(sstates)                                      
+                for istate = 1 : length(sstates)
                     mfr{cnt, istate, iunit} = v(ifile).frBins(ibin).states.mfr(unitIdx, sstates(istate));
                 end
                 mfr{cnt, length(sstates) + 1, iunit} = v(ifile).frBins(ibin).mfr(unitIdx);
@@ -128,7 +125,7 @@ end
 timebins = [-30 : 6 : 84];
 tIdx = find(ismember(timebins, [-12, 12, 42, 54]));
 
-% to prism: mfr in bins 
+% to prism: mfr in bins
 iunit = 1;
 istate = 3;
 mfrcat{istate, iunit}
@@ -180,9 +177,7 @@ for imouse = 1 : length(mname)
     varsFile = ["fr"; "fr_bins"; "datInfo"; "session"; "units"];
     varsName = ["fr"; "frBins"; "datInfo"; "session"; "units"];
     xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
-    [v, basepaths] = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
-        'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
-        'xlsname', xlsname);
+    v = basepaths2vars('basepaths', basepaths, 'vars', varsFile);
     nfiles = length(basepaths);
 
     % organize in cell array
@@ -194,7 +189,7 @@ for imouse = 1 : length(mname)
 
                 unitIdx = v(ifile).units.clean(iunit, :);
 
-                for istate = 1 : length(sstates)                                      
+                for istate = 1 : length(sstates)
                     data = v(ifile).frBins(ibin).states.fr{istate}(unitIdx, :);
                     mfr{cnt, istate, iunit} = data(:);
                 end
@@ -223,7 +218,7 @@ end
 timebins = [-30 : 6 : 84];
 tIdx = find(ismember(timebins, [-12, 12, 42, 54]));
 
-% to prism: mfr in bins 
+% to prism: mfr in bins
 iunit = 1;
 istate = 1;
 mfrcat{istate, iunit};
@@ -236,13 +231,13 @@ for ibin = 1 : 4
     axh = nexttile(th, ibin, [1, 1]); cla; hold on
     data = dists{tIdx(ibin), iunit};
     plot(xi, data, 'LineWidth', 1);
-    
+
     plot(xi, mean(data, 1, 'omitnan'), 'k', 'LineWidth', 3)
-    
+
     title(axh, lgdTxt{ibin})
     xlabel('log MFR (Hz)')
     ylabel('No. Units (Hz)')
-%     ylim([0 1])
+    %     ylim([0 1])
 end
 
 % graphics
@@ -287,14 +282,12 @@ for imouse = 1 : length(mname)
     varsFile = ["spikes"; "datInfo"; "session"; "units"];
     varsName = ["spikes"; "datInfo"; "session"; "units"];
     xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
-    [v, basepaths] = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
-        'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
-        'xlsname', xlsname);
+    v = basepaths2vars('basepaths', basepaths, 'vars', varsFile);
     nfiles = length(basepaths);
 
     for ifile = 1 : nfiles
         basepath = char(basepaths{ifile});
-        
+
         unitIdx = v(ifile).units.clean(iunit, :);
 
         % firing rate
@@ -307,7 +300,7 @@ for imouse = 1 : length(mname)
         fr = calc_fr(v(ifile).spikes.times, 'basepath', basepath,...
             'graphics', false, 'binsize', binsize, 'saveVar', false, 'forceA', true,...
             'smet', 'none', 'winBL', winBL, 'winCalc', [0, Inf]);
-        
+
         data = fr.strd(unitIdx, :);
         [m, n] = size(data);
         if n < recLen
@@ -323,7 +316,7 @@ for imouse = 1 : length(mname)
         frMat{ifile} = data;
 
     end
-    
+
     % organize in mat
     catMat{imouse} = cell2nanmat(frMat, 2);
 
@@ -354,16 +347,14 @@ sstates = [1 : 6];
 mname = {'lh122'; 'lh123'; 'lh126'; 'lh129'; 'lh130'};
 clear mfr
 for imouse = 1 : length(mname)
-    
+
     queryStr = [mname{imouse}, '_mk801'];
     basepaths = mk801_chronic_sessions(queryStr);
-    
+
     varsFile = ["fr"; "datInfo"; "session"; "units"];
     varsName = ["fr"; "datInfo"; "session"; "units"];
     xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
-    [v, basepaths] = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
-        'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
-        'xlsname', xlsname);
+    v = basepaths2vars('basepaths', basepaths, 'vars', varsFile);
     nfiles = length(basepaths);
 
     fr = catfields([v(:).fr], 'catdef', 'cell');
@@ -395,9 +386,7 @@ for imouse = 1 : length(mname)
     varsFile = ["fr"; "fr_bins"; "datInfo"; "session"; "units"];
     varsName = ["fr"; "frBins"; "datInfo"; "session"; "units"];
     xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
-    [v, basepaths] = getSessionVars('mname', mname{imouse}, 'varsFile', varsFile,...
-        'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
-        'xlsname', xlsname);
+    v = basepaths2vars('basepaths', basepaths, 'vars', varsFile);
     nfiles = length(basepaths);
 
 
@@ -424,9 +413,7 @@ for imouse = 1 : length(mname)
     varsFile = ["fr"; "fr_bins"; "datInfo"; "session"; "units"];
     varsName = ["fr"; "frBins"; "datInfo"; "session"; "units"];
     xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
-    [v, basepaths] = getSessionVars('mname', mname{imouse}, 'varsFile', varsFile,...
-        'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
-        'xlsname', xlsname);
+    v = basepaths2vars('basepaths', basepaths, 'vars', varsFile);
     nfiles = length(basepaths);
 
 
@@ -462,9 +449,8 @@ for imouse = 1 : length(mname)
     varsFile = ["fr"; "datInfo"; "session"; "units"];
     varsName = ["fr"; "datInfo"; "session"; "units"];
     xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
-    [v, basepaths] = getSessionVars('mname', mname{imouse}, 'varsFile', varsFile,...
-        'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
-        'xlsname', xlsname);
+    basepaths = xls2basepaths('xlsname', xlsname, 'mname', mname{imouse}, 'pcond', ["tempflag"], 'ncond', [""]);
+    v = basepaths2vars('basepaths', basepaths, 'vars', varsFile);
     nfiles = length(basepaths);
 
     % organize in cell array
@@ -502,9 +488,7 @@ basepaths = [...
 varsFile = ["fr"; "fr_bins"; "datInfo"; "session"; "units"];
 varsName = ["fr"; "frBins"; "datInfo"; "session"; "units"];
 xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
-[v, ~] = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
-    'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
-    'xlsname', xlsname);
+v = basepaths2vars('basepaths', basepaths, 'vars', varsFile);
 nfiles = length(basepaths);
 
 
@@ -556,7 +540,7 @@ for ifile = 1 : nfiles
         for istate = 1 : 2
             mfr(1, ifile, iunit, istate) =...
                 mean(v(ifile).frBins(1).states.mfr(unitIdx, sstates(istate)), 'omitnan')
-             mfr(2, ifile, iunit, istate) =...
+            mfr(2, ifile, iunit, istate) =...
                 mean(v(ifile).frBins(3).states.mfr(unitIdx, sstates(istate)), 'omitnan')
         end
     end
@@ -597,7 +581,7 @@ prismSfr = movmean([std(frMat, [], 2, 'omitnan') / sqrt(size(frMat, 2));...
     std(frMat2, [], 2, 'omitnan') / sqrt(size(frMat, 2))], npt);
 nunits = [ones(1, length(frMat)) * size(frMat, 2), ones(1, length(frMat2)) * size(frMat2, 2)];
 xData = [1 : (length(frMat) + length(frMat2))] / 60 - 24
- 
+
 % -------------------------------------------------------------------------
 % mfr in bins
 
@@ -605,9 +589,7 @@ xData = [1 : (length(frMat) + length(frMat2))] / 60 - 24
 varsFile = ["fr"; "fr_bins"; "datInfo"; "session"; "units"];
 varsName = ["fr"; "frBins"; "datInfo"; "session"; "units"];
 xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
-[v, ~] = getSessionVars('basepaths', sort(basepaths(:)), 'varsFile', varsFile,...
-    'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
-    'xlsname', xlsname);
+v = basepaths2vars('basepaths', sort(basepaths(:)), 'vars', varsFile);
 
 % mfr per mouse between baseline and acute
 iunit = 2;
@@ -616,7 +598,7 @@ for ifile = 1 : nfiles
 
     unitIdx = v(ifile).units.clean(iunit, :);
     tmp(ifile) = mean(v(ifile).frBins(1).mfr(unitIdx));
-    
+
 end
 mfr = [tmp(1 : 2 : end); tmp(2 : 2 : end)]';
 
@@ -650,11 +632,11 @@ for imouse = 1 : length(mname)
     varsFile = ["session"; "cell_metrics"; "units"];
     varsName = ["session"; "cm"; "units"];
     xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
-    [v, basepaths] = getSessionVars('mname', mname{imouse}, 'varsFile', varsFile,...
-        'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
-        'xlsname', xlsname);
+    basepaths = xls2basepaths('xlsname', xlsname, 'mname', mname{imouse}, 'pcond', ["tempflag"], 'ncond', [""]);
+    v = basepaths2vars('basepaths', basepaths, 'vars', varsFile);
+    if isfield(v, 'cell_metrics'), [v.cm] = v.cell_metrics; v = rmfield(v, 'cell_metrics'); end
     nfiles = length(basepaths);
-    
+
     for ifile = 1
         basepath = basepaths{ifile};
         cd(basepath)
@@ -701,16 +683,16 @@ uclu = unique(clu);
 spks2snip = 1000;
 
 for iunit = 1 : 2
-    
+
     % randomly select a subset of spikes
     cluId = spikes.cluID(spikes.UID == unitIdx(iunit));
 
     cluidx = find(clu == cluId);
     randidx = randperm(length(cluidx), min([length(cluidx), spks2snip]));
     cluidx = cluidx(randidx)
-    
+
     wv{iunit} = spk(:, :, cluidx) * 0.195;
-    
+
 end
 
 iunit = 2
@@ -732,7 +714,7 @@ end
 % vertical
 %
 % INPUT
-%   wv          average waveform [nchans x nsamps] 
+%   wv          average waveform [nchans x nsamps]
 %   wv_std      std of waveform [nchams x nsamps]
 %   clr         color of plot
 %   orient      channels horizontal {horz} or vertical (vert)
@@ -750,14 +732,12 @@ basepaths = mk801_chronic_sessions('bsl');
 varsFile = ["session"; "fr"; "sr"; "units"];
 varsName = ["session"; "fr"; "sr"; "units"];
 xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
-[v, basepaths] = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
-    'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
-    'xlsname', xlsname);
+v = basepaths2vars('basepaths', basepaths, 'vars', varsFile);
 nfiles = length(basepaths);
 
 mfr = []; msr = [];
 for ifile = 1 : nfiles
-    
+
     unitIdx = v(ifile).units.clean(1, :);
     mfr = [mfr; v(ifile).fr.mfr(unitIdx)];
     msr = [msr; v(ifile).sr.mfr];

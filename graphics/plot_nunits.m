@@ -8,7 +8,7 @@ function [rs, fs] = plot_nunits(varargin)
 %                   basepaths from the sessionList.xlsx file
 %   saveFig         logical
 %
-% 26 12 22 LH      
+% 26 12 22 LH
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -32,11 +32,10 @@ saveFig         = p.Results.saveFig;
 varsFile = ["units"];
 varsName = ["units"];
 if isempty(basepaths)
-    [v, basepaths] = getSessionVars('mname', mname, 'varsFile', varsFile,...
-        'varsName', varsName, 'pcond', ["tempflag"]);
+    basepaths = xls2basepaths('mname', mname, 'pcond', ["tempflag"]);
+    v = basepaths2vars('basepaths', basepaths, 'vars', varsFile);
 else
-    [v, ~] = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
-        'varsName', varsName, 'pcond', ["tempflag"]);
+    v = basepaths2vars('basepaths', basepaths, 'vars', varsFile);
 end
 nfiles = length(basepaths);
 for ifile = 1 : nfiles
@@ -66,7 +65,7 @@ if nfiles == 1
     nunits = v(1).units.nunits;
     rs = nunits(1, :);
     fs = nunits(2, :);
-    
+
     subplot(1, 2, 1)
     bh = bar(nunits', 'stacked');
     bh(1).FaceColor = clr(1, :);
@@ -84,11 +83,11 @@ if nfiles == 1
     xticklabels({'RS', 'FS', 'Other'})
 
     sgtitle(basenames{1})
-    
+
 else
     figpath = fullfile(mousepath, 'graphics');
     figname = fullfile(figpath, [mname, '_nunits']);
-    
+
     % organize matrix [session (rows) x tetrode (columns)]
     units = catfields([v(:).units]);
     units = units.nunits;
@@ -98,7 +97,7 @@ else
         fs(:, igrp) = units([2 : 3 : end], igrp);
         other(:, igrp) = units([3 : 3 : end], igrp);
     end
-    
+
     yLimit = [0, max([sum(rs, 2); sum(fs, 2)])];
 
     subplot(1, 2, 1)

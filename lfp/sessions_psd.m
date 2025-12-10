@@ -81,12 +81,10 @@ varsName = ["psd"; "session"];
 
 % load
 if isempty(basepaths)
-    [v, basepaths] = getSessionVars('mname', mname, 'varsFile', varsFile,...
-        'varsName', varsName);
-else
-    [v, basepaths] = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
-        'varsName', varsName);
+    basepaths = xls2basepaths('mname', mname, 'pcond', ["tempflag"],...
+        'ncond', [""]);
 end
+v = basepaths2vars('basepaths', basepaths, 'vars', varsFile);
 nfiles = length(basepaths);
 
 % get mouse name
@@ -115,7 +113,7 @@ timepnt = nan(nfiles, 1);               % currently not implemented
 cnt = 1;
 
 for ifile = 1 : nfiles
-    
+
     % create timebins
     if isfield(v(ifile).session.general, 'timepnt')
         timepnt(ifile) = v(ifile).session.general.timepnt;
@@ -123,16 +121,16 @@ for ifile = 1 : nfiles
         timepnt(ifile) = nan;
     end
     recLen = floor(v(ifile).session.general.duration);
-    timebins(ifile, :, :) = n2chunks('n', recLen, 'nchunks', nbins, 'pnts', []); 
-    
+    timebins(ifile, :, :) = n2chunks('n', recLen, 'nchunks', nbins, 'pnts', []);
+
     for ibin = 1 : nbins
         for istate = 1 : nstates
-            
+
             % get indices to bouts in timebins
             boutTimes = v(ifile).psd.bouts.boutTimes{istate};
             boutIdx = boutTimes(:, 1) > timebins(ifile, ibin, 1) &...
                 boutTimes(:, 2) < timebins(ifile, ibin, 2);
-            
+
             % recalculate mean psd
             psdMat(cnt, istate, :) =...
                 mean(v(ifile).psd.bouts.clean{istate}(boutIdx, :), 1);

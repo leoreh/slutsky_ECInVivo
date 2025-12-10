@@ -111,8 +111,7 @@ varsFile = ["fr"; "units"];
 varsName = ["fr"; "units"];
 
 % load data
-v = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
-    'varsName', varsName, 'pcond', ["tempflag"]);
+v = basepaths2vars('basepaths', basepaths, 'vars', varsFile);
 nfiles = length(basepaths);
 
 
@@ -129,7 +128,7 @@ thrWin = 10;
 minUnits = 2;       % minimum no. of units for drift calculation
 
 % go over files
-clear drft3 
+clear drft3
 for ifile = 1 : nfiles
 
     % file params
@@ -139,7 +138,7 @@ for ifile = 1 : nfiles
 
     % time stamps
     tstamps = v(ifile).fr.tstamps;
-    
+
     clear drft2
     for sunit = 1 : 2       % rs / fs
 
@@ -188,9 +187,9 @@ set(fh, 'DefaultAxesFontSize', 16);
 tbias = 0;
 for sunit = 1 : 2
     tbias = tbias + sunit;
-    
+
     dataMat = squeeze(drate(:, sunit, :));
-    
+
     axh = nexttile(th, tbias, [1, 1]); cla; hold on
     plot(unitVec, dataMat)
     xlim([unitVec(1), unitVec(end)])
@@ -213,7 +212,7 @@ end
 % 130   5
 % 87    12
 
-% 10 units      
+% 10 units
 cntIdx = find(unitVec == 10);
 dataMat = squeeze(drate(cntIdx, :, [2, 3, 5]));
 fh = figure;
@@ -255,12 +254,11 @@ varsFile = ["fr"; "units"];
 varsName = ["fr"; "units"];
 
 % load data
-v = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
-    'varsName', varsName, 'pcond', ["tempflag"]);
+v = basepaths2vars('basepaths', basepaths, 'vars', varsFile);
 nfiles = length(basepaths);
 
 % -------------------------------------------------------------------------
-% analyze drift 
+% analyze drift
 
 clear drft1 drft
 for ifile = 1 : nfiles

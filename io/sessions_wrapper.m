@@ -9,9 +9,14 @@ mname = 'lh107';
 varsFile = ["cell_metrics"; "sleep_states"; "datInfo"; "session"; "units"];
 varsName = ["cm"; "ss"; "datInfo"; "session"; "units"];
 xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
-[v, basepaths] = getSessionVars('mname', mname, 'varsFile', varsFile,...
-    'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
+basepaths = xls2basepaths('mname', mname, 'pcond', ["tempflag"], 'ncond', [""],...
     'xlsname', xlsname);
+v = basepaths2vars('basepaths', basepaths, 'vars', varsFile);
+
+% rename fields to match legacy
+if isfield(v, 'cell_metrics'), [v.cm] = v.cell_metrics; v = rmfield(v, 'cell_metrics'); end
+if isfield(v, 'SleepState'), [v.ss] = v.SleepState; v = rmfield(v, 'SleepState'); end
+if isfield(v, 'st_metrics'), [v.st] = v.st_metrics; v = rmfield(v, 'st_metrics'); end
 nfiles = length(basepaths);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -118,8 +123,10 @@ bands = sessions_psd('lh122', 'flgNormBand', true, 'flgAnalyze', false);
 % load vars from each session
 varsFile = ["session"; "spec"; "sleep_states"];
 varsName = ["session"; "spec"; "ss"];
-[v, ~] = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
-    'varsName', varsName);
+v = basepaths2vars('basepaths', basepaths, 'vars', varsFile);
+
+% rename fields
+if isfield(v, 'SleepState'), [v.ss] = v.SleepState; v = rmfield(v, 'SleepState'); end
 nfiles = length(basepaths);
 
 sstates = [1, 4];
@@ -189,9 +196,9 @@ for imouse = 1 : length(mname)
     varsFile = ["fr"; "units"];
     varsName = ["fr"; "units"];
     xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
-    [v, basepaths] = getSessionVars('mname', mname{imouse}, 'varsFile', varsFile,...
-        'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
+    basepaths = xls2basepaths('mname', mname{imouse}, 'pcond', ["tempflag"], 'ncond', [""],...
         'xlsname', xlsname);
+    v = basepaths2vars('basepaths', basepaths, 'vars', varsFile);
     nfiles = length(basepaths);
 
     fr = catfields([v(:).fr], 'catdef', 'cell');
@@ -215,8 +222,10 @@ cell2nanmat(fr_gain)'
 % load vars from each session
 varsFile = ["datInfo"; "session"; "st_metrics"; "units"];
 varsName = ["datInfo"; "session"; "st"; "units"];
-[v, ~] = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
-    'varsName', varsName);
+v = basepaths2vars('basepaths', basepaths, 'vars', varsFile);
+
+% rename fields
+if isfield(v, 'st_metrics'), [v.st] = v.st_metrics; v = rmfield(v, 'st_metrics'); end
 nfiles = length(basepaths);
 
 % brst vars to organize and plot

@@ -13,7 +13,7 @@ grp = [2 : 4];                  % which tetrodes to plot
 suFlag = true;                  % plot only su or all units
 stateIdx = [1, 4];
 % include only units with fr greater / lower than. 1st row RS 2nd row FS
-frBoundries = [0.2 Inf; 0.2 Inf];  
+frBoundries = [0.2 Inf; 0.2 Inf];
 cellType = ["RS"; "FS"];
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -21,15 +21,20 @@ cellType = ["RS"; "FS"];
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 [cfg_colors, cfg_names, ~] = as_loadConfig([]);
-[varArray, ~, mousepath] = getSessionVars('dirnames', string(basename));
-assignVars(varArray, 1)
+vars = ["spikes"; "cell_metrics"; "fr"; "datInfo"; "session"];
+v = basepaths2vars('basepaths', {basepath}, 'vars', vars);
+spikes = v.spikes;
+cm = v.cell_metrics;
+fr = v.fr;
+datInfo = v.datInfo;
+session = v.session;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % select time bins
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % time bins are created in binsize steps from a specific point of interest
 % or from the center of the recording <csec(end) / 2> to the start and end
-% of the recording. thus, binsize = Inf will yield two time bins. 
+% of the recording. thus, binsize = Inf will yield two time bins.
 
 fs = session.extracellular.sr;
 binsize = 3 * 60 * 60;      % hr in [s]
@@ -73,13 +78,13 @@ for itype = 1 : 2
         subplot(2, length(stateIdx), count)
         mfrMat = mfrCell{itype, istate};
         plot(mfrMat')
-        
+
         if length(timebins) == 2
             pval  = signrank(mfrMat(:, 1), mfrMat(:, 2));
         else
             pval = friedman(mfrMat, 1, 'off');
         end
-        
+
         xlim([1 - 0.5, length(timebins) + 0.5])
         xticks(1 : length(timebins))
         set(gca, 'box', 'off', 'TickLength', [0 0])
@@ -93,22 +98,22 @@ end
 % gain
 fh = figure;
 for itype = 1 : 2
-        subplot(2, 1, itype)
-        gainMat = gainCell{itype};
-        plot(gainMat')
-        
-        if length(timebins) == 2
-            pval  = signrank(gainMat(:, 1), gainMat(:, 2));
-        else
-            pval = friedman(gainMat, 1, 'off');
-        end
-        
-        xlim([1 - 0.5, length(timebins) + 0.5])
-        xticks(1 : length(timebins))
-        set(gca, 'box', 'off', 'TickLength', [0 0])
-        ylabel('Gain Factor [%]')
-        title(sprintf('%s; p = %.2f',...
-            cellType{itype}, pval))
+    subplot(2, 1, itype)
+    gainMat = gainCell{itype};
+    plot(gainMat')
+
+    if length(timebins) == 2
+        pval  = signrank(gainMat(:, 1), gainMat(:, 2));
+    else
+        pval = friedman(gainMat, 1, 'off');
+    end
+
+    xlim([1 - 0.5, length(timebins) + 0.5])
+    xticks(1 : length(timebins))
+    set(gca, 'box', 'off', 'TickLength', [0 0])
+    ylabel('Gain Factor [%]')
+    title(sprintf('%s; p = %.2f',...
+        cellType{itype}, pval))
 end
 
 

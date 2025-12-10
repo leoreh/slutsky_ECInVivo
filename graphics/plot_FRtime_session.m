@@ -41,15 +41,14 @@ cd(basepath)
 % load data
 varsFile = ["session"; "fr.mat"; "datInfo"; "sr.mat";];
 varsName = ["session"; "fr"; "datInfo"; "sr"];
-v = getSessionVars('basepaths', {basepath}, 'varsFile', varsFile,...
-    'varsName', varsName);
+v = basepaths2vars('basepaths', {basepath}, 'vars', varsName);
 
 % distribute vars
 % assignVars = structvars(v);
-session = v.session;     
-fr = v.fr;               
-datInfo = v.datInfo;     
-sr = v.sr; 
+session = v.session;
+fr = v.fr;
+datInfo = v.datInfo;
+sr = v.sr;
 
 if ~isempty(session)
     fs = session.extracellular.sr;
@@ -113,9 +112,9 @@ if isempty(fr) | muFlag
     xlabel('Time [h]')
     lgh = legend(split(num2str(grp)));
     figname = 'sr_time';
-    
+
 else
-    
+
     % ---------------------------------------------------------------------
     % individual cells on a log scale
     for iunit = 1 : size(units, 1)
@@ -143,8 +142,8 @@ else
         set(gca, 'box', 'off')
         legend(sprintf('%s = %d su',...
             unitChar{iunit}, sum(units(iunit, :))))
-    end    
-  
+    end
+
     % ---------------------------------------------------------------------
     % mean per cell class on a linear scale
     sb3 = subplot(3, 1, 3);
@@ -166,21 +165,21 @@ else
         set(ax.YAxis(1), 'color', 'b')
         set(ax.YAxis(2), 'color', 'r')
     end
-    
+
     data = fr.(dataType)(units(2, :), :);
     data(~isfinite(data)) = nan;
     data = mean(data, 1, 'omitnan');
     plot(xidx, data, 'r', 'LineWidth', 2)
     axis tight
-    
+
     ylim([0 15])
-    yLimit = ylim;   
+    yLimit = ylim;
     plot([tidx'; tidx'], yLimit, '--k')
     xlabel('Time [h]')
     set(gca, 'box', 'off')
     linkaxes([sb{1}, sb{2}, sb3], 'x')
     figname = 'fr_time';
-    
+
 end
 
 if saveFig

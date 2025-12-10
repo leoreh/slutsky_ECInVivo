@@ -94,9 +94,7 @@ sleepfile = fullfile(basepath, [basename, '.sleep_sig.mat']);
 
 % load session vars
 varsFile = ["datInfo"; "session"];
-varsName = ["datInfo"; "session"];
-v = getSessionVars('basepaths', {basepath}, 'varsFile', varsFile,...
-    'varsName', varsName);
+v = basepaths2vars('basepaths', {basepath}, 'vars', varsFile);
 
 % state params
 if flgEmg

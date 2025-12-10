@@ -35,9 +35,8 @@ g.stgfile = fullfile(basepath, [basename, '.stg.mat']);
 
 % load
 vars = ["swv_metrics"; "units"; "session"];
-varsName = ["swv"; "units"; "session"];
-[v, basepaths] = getSessionVars('basepaths', {basepath}, 'varsFile', vars,...
-    'varsName', varsName);
+v = basepaths2vars('basepaths', {basepath}, 'vars', vars);
+if isfield(v, 'swv_metrics'), [v.swv] = v.swv_metrics; v = rmfield(v, 'swv_metrics'); end
 if isempty(stg)
     load(g.stgfile)
 end
@@ -157,7 +156,7 @@ updateDisplay();
                     g.synType = g.stg.synIdx(g.currentIdx, 3);
                 end
                 updateDisplay();
-                
+
             case 5      % save
                 saveStg()
         end
@@ -199,7 +198,7 @@ updateDisplay();
     function closeRequest(src, event)
         selection = questdlg('Do you want to save changes before closing?', ...
             'Close Request Function', 'Yes', 'No', 'Cancel', 'Yes');
-        
+
         switch selection
             case 'Yes'
                 saveStg();

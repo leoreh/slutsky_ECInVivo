@@ -20,9 +20,8 @@ basepaths = mcu_basepaths(queryStr);
 varsFile = ["sleep_states"; "datInfo"; "session"];
 varsName = ["ss"; "datInfo"; "session"];
 xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
-[v, basepaths] = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
-    'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
-    'xlsname', xlsname);
+v = basepaths2vars('basepaths', basepaths, 'vars', varsFile);
+if isfield(v, 'sleep_states'), [v.ss] = v.sleep_states; v = rmfield(v, 'sleep_states'); end
 nfiles = length(basepaths);
 
 % flags
@@ -103,9 +102,8 @@ for igrp = 1 : 2
         varsFile = ["sleep_states"; "datInfo"; "session"];
         varsName = ["ss"; "datInfo"; "session"];
         xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
-        [v, basepaths] = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
-            'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
-            'xlsname', xlsname);
+        v = basepaths2vars('basepaths', basepaths, 'vars', varsFile);
+        if isfield(v, 'sleep_states'), [v.ss] = v.sleep_states; v = rmfield(v, 'sleep_states'); end
         nfiles = length(basepaths);
 
         % get bouts stats

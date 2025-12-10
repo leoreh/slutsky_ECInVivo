@@ -22,9 +22,9 @@ varsFile = ["fr"; "sr"; "sleep_states";...
 varsName = ["fr"; "sr"; "ss"; "datInfo"; "session";...
     "units"; "psd"];
 xlsname = 'D:\OneDrive - Tel-Aviv University\PhD\Slutsky\Data summaries\sessionList.xlsx';
-[v, basepaths] = getSessionVars('mname', mname, 'varsFile', varsFile,...
-    'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
-    'xlsname', xlsname);
+basepaths = xls2basepaths('xlsname', xlsname, 'mname', mname, 'pcond', ["tempflag"], 'ncond', [""]);
+v = basepaths2vars('basepaths', basepaths, 'vars', varsFile);
+if isfield(v, 'sleep_states'), [v.ss] = v.sleep_states; v = rmfield(v, 'sleep_states'); end
 nfiles = length(basepaths);
 
 
@@ -132,9 +132,8 @@ basepaths = [basepaths; mcu_basepaths('mcu_bsl')];
 varsFile = ["fr"; "sleep_states"; "datInfo"; "session"; "units"];
 varsName = ["fr"; "ss"; "datInfo"; "session"; "units"];
 xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
-[v, basepaths] = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
-    'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
-    'xlsname', xlsname);
+v = basepaths2vars('basepaths', basepaths, 'vars', varsFile);
+if isfield(v, 'sleep_states'), [v.ss] = v.sleep_states; v = rmfield(v, 'sleep_states'); end
 nfiles = length(basepaths);
 
 % params
@@ -278,9 +277,9 @@ for imouse = 1 : nmice
     varsFile = ["sleep_states"; "datInfo"; "session"];
     varsName = ["ss"; "datInfo"; "session"];
     xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
-    [v, basepaths] = getSessionVars('mname', mname{imouse}, 'varsFile', varsFile,...
-        'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
-        'xlsname', xlsname);
+    basepaths = xls2basepaths('xlsname', xlsname, 'mname', mname{imouse}, 'pcond', ["tempflag"], 'ncond', [""]);
+    v = basepaths2vars('basepaths', basepaths, 'vars', varsFile);
+    if isfield(v, 'sleep_states'), [v.ss] = v.sleep_states; v = rmfield(v, 'sleep_states'); end
     nfiles = length(basepaths);
 
     stateDur = nan(nfiles * nbins, 3);
@@ -350,9 +349,9 @@ for imouse = 1 : nmice
     varsFile = ["sleep_states"; "session"; 'spec'];
     varsName = ["ss"; "session"; 'spec'];
     xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
-    [v, basepaths] = getSessionVars('mname', mname{imouse}, 'varsFile', varsFile,...
-        'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
-        'xlsname', xlsname);
+    basepaths = xls2basepaths('xlsname', xlsname, 'mname', mname{imouse}, 'pcond', ["tempflag"], 'ncond', [""]);
+    v = basepaths2vars('basepaths', basepaths, 'vars', varsFile);
+    if isfield(v, 'sleep_states'), [v.ss] = v.sleep_states; v = rmfield(v, 'sleep_states'); end
     nfiles = length(basepaths);
 
     fh = figure;
@@ -463,9 +462,8 @@ basepaths = [mcu_basepaths(mname)];
 varsFile = ["sleep_states"; "datInfo"; "session"];
 varsName = ["ss"; "datInfo"; "session"];
 xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
-[v, basepaths] = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
-    'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
-    'xlsname', xlsname);
+v = basepaths2vars('basepaths', basepaths, 'vars', varsFile);
+if isfield(v, 'sleep_states'), [v.ss] = v.sleep_states; v = rmfield(v, 'sleep_states'); end
 nfiles = length(basepaths);
 
 % flags
@@ -694,9 +692,8 @@ basepaths = [mcu_basepaths(mname)];
 varsFile = ["fr"; "sleep_states"; "datInfo"; "session"; "psd"; "psdEmg"];
 varsName = ["fr"; "ss"; "datInfo"; "session"; "psd"; "psdEmg"];
 xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
-[v, basepaths] = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
-    'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
-    'xlsname', xlsname);
+v = basepaths2vars('basepaths', basepaths, 'vars', varsFile);
+if isfield(v, 'sleep_states'), [v.ss] = v.sleep_states; v = rmfield(v, 'sleep_states'); end
 nfiles = length(basepaths);
 
 % TO DO LIST psd_states

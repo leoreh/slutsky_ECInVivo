@@ -7,7 +7,7 @@ function recRep_plot(varargin)
 % INPUT:
 %   basepath    char. path to session folder {pwd}
 %   panels2plot string array. determines which plots to include and in what
-%               order. can be "spec", "emg", "hypnogram", "raster", "raw" 
+%               order. can be "spec", "emg", "hypnogram", "raster", "raw"
 %   tlayout     vector of 2 elements descrbigin the tiled layout
 %   panelTiles  cell describing the spread of panels across tiles
 %   th          handle of tile layout
@@ -27,12 +27,12 @@ function recRep_plot(varargin)
 %   xOffset     numeric. value to add to adjustT
 %
 % OUTPUT
-% 
+%
 % CALLS
 %
 % TO DO LIST
 %
-% 05 mar 24 LH  
+% 05 mar 24 LH
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -82,10 +82,12 @@ cd(basepath)
 [~, basename] = fileparts(basepath);
 
 % load data
-varsFile = ["spikes"; "session"; "units"; "sleep_states"];
-varsName = ["spikes"; "session"; "units"; "ss"];
-v = getSessionVars('basepaths', {basepath}, 'varsFile', varsFile,...
-    'varsName', varsName);
+vars1 = ["session"; "fr"; "datInfo"];
+v = basepaths2vars('basepaths', {basepath}, 'vars', vars1);
+v2 = basepaths2vars('basepaths', {basepath}, 'vars', ["sr"]);
+if isfield(v2, 'fr'), v.sr = v2.fr; elseif isfield(v2, 'sr'), v.sr = v2.sr; end
+if isfield(v, 'SleepState'), [v.ss] = v.SleepState; v = rmfield(v, 'SleepState'); end
+if isfield(v, 'sleep_states'), [v.ss] = v.sleep_states; v = rmfield(v, 'sleep_states'); end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % params
@@ -109,7 +111,7 @@ fs_raw = v.session.extracellular.sr;
 recDur = floor(v.session.general.duration);
 if fs_raw == 20000
     bit2uv = 0.195;      % oe
-else    
+else
     bit2uv = 1;          % tdt
 end
 
@@ -211,7 +213,7 @@ for ipanel = 1 : npanels
             set(axh(ipanel), 'YDir', 'normal')
             hold on
 
-        case 'raw'           
+        case 'raw'
             raw = double(bz_LoadBinary([basename, '.dat'], 'duration', xDur(ipanel) * 3,...
                 'frequency', fs_raw, 'nchannels', nchans, 'start', xStart(ipanel) - xDur(ipanel),...
                 'channels', rawCh, 'downsample', 1)) * bit2uv;
@@ -247,7 +249,7 @@ for ipanel = 1 : npanels
     else
         xUnits = 0.1;
     end
-    
+
     % adjust xticks and labels according to real time
     if adjustT
         tickStart = xStart(ipanel) - xDur(ipanel);
@@ -280,7 +282,7 @@ for ipanel = 1 : npanels
 end
 
 % x-link panels that have the same duration and start time
-linkedPanels = {}; 
+linkedPanels = {};
 cnt = 1;
 identifiers = strings(npanels, 1);
 for i = 1:npanels
@@ -288,8 +290,8 @@ for i = 1:npanels
 end
 [uIdentifiers, ~, ic] = unique(identifiers, 'stable');
 for i = 1:length(uIdentifiers)
-    idx = find(ic == i);  
-    if length(idx) > 1  
+    idx = find(ic == i);
+    if length(idx) > 1
         linkedPanels{cnt} = idx;
         cnt = cnt + 1;
     end
@@ -338,15 +340,15 @@ if saveFig
     export_fig(figname, '-pdf', 'renderer', 'painters')
 end
 
-end 
+end
 
 % EOF
 
 function updateLine(ax_handle, ~, line_handle)
-    
-    xLimit = ax_handle.XLim;  
-    
-    % update line position to span the current x-axis limits
-    set(line_handle, 'XData', xLimit);
+
+xLimit = ax_handle.XLim;
+
+% update line position to span the current x-axis limits
+set(line_handle, 'XData', xLimit);
 
 end

@@ -39,6 +39,8 @@ end
 
 % get all files in study
 basepaths = mcu_basepaths('all');
+basepaths = [mcu_basepaths('wt'), mcu_basepaths('wt')];
+
 nPaths = length(basepaths);
 
 % Create table of features for classification

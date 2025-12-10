@@ -8,16 +8,16 @@ function [emg, spec, boutTimes] = recRep_prep(varargin)
 % INPUT:
 %   basepath    char. path to session folder {pwd}
 %   panels2plot string array. determines which plots to include and in what
-%               order. can be "spec", "emg", "hypnogram", "raster", "raw" 
+%               order. can be "spec", "emg", "hypnogram", "raster", "raw"
 %   fs_eeg      numeric. sampling frequency for downsampling eeg
 %
 % OUTPUT
-% 
+%
 % CALLS
 %
 % TO DO LIST
 %
-% 05 mar 24 LH  
+% 05 mar 24 LH
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -46,13 +46,9 @@ cd(basepath)
 
 % load data
 varsFile = ["session"; "units"; "sleep_statesEmg"];
-varsName = ["session"; "units"; "ssEmg"];
-v = getSessionVars('basepaths', {basepath}, 'varsFile', varsFile,...
-    'varsName', varsName);
-
-if any(contains(varsName, 'Emg'))
-    v.ss = v.ssEmg;
-end
+v = basepaths2vars('basepaths', {basepath}, 'vars', varsFile);
+if isfield(v, 'sleep_statesEmg'), [v.ssEmg] = v.sleep_statesEmg; v = rmfield(v, 'sleep_statesEmg'); end
+if isfield(v, 'ssEmg'), v.ss = v.ssEmg; end
 
 % sleep signals
 filename = fullfile(basepath, [basename, '.sleep_sig.mat']);

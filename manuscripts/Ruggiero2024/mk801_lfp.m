@@ -19,14 +19,14 @@ varsFile = ["fr"; "sr"; "sleep_states";...
 varsName = ["fr"; "sr"; "ss"; "datInfo"; "session";...
     "units"; "psd"];
 xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
-[v, basepaths] = getSessionVars('mname', mname, 'varsFile', varsFile,...
-    'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
-    'xlsname', xlsname);
+basepaths = xls2basepaths('xlsname', xlsname, 'mname', mname, 'pcond', ["tempflag"], 'ncond', [""]);
+v = basepaths2vars('basepaths', basepaths, 'vars', varsFile);
+if isfield(v, 'sleep_states'), [v.ss] = v.sleep_states; v = rmfield(v, 'sleep_states'); end
 nfiles = length(basepaths);
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% average bands and psd from multiple mice 
+% average bands and psd from multiple mice
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 mname = {'lh96', 'lh107', 'lh122'};
@@ -36,7 +36,7 @@ flgNormBand = true;
 
 clear bands powdb
 for imouse = 1 : length(mname)
-  
+
     [bands(imouse, :, :, :), powdb(imouse, :, :, :)] =...
         sessions_psd(mname{imouse}, 'flgNormBand', flgNormBand,...
         'flgAnalyze', false, 'flgNormTime', flgNormTime,...
@@ -69,8 +69,8 @@ psd = catfields([v(:).psd], 'catdef', 'cell', 'force', false);
 
 % ORGANIZE: statePsd is a matrix of frequency (rows) x session (column)
 % depicting the psd for the selected state
-clear statePsd 
-istate = 4;    
+clear statePsd
+istate = 4;
 for ifile = 1 : nfiles
 
     statePsd(:, ifile) = squeeze(psd.psd{ifile}(1, istate, :));
@@ -91,7 +91,7 @@ for ifile = 1 : nfiles
     rippMfr = v(ifile).ripp.spks.su.rippMap(unitIdx, :, :);
     rippMfr = squeeze(mean(mean(rippMfr, 2), 3));
     randMfr = v(ifile).ripp.spks.su.randMap(unitIdx, :, :);
-    randMfr = squeeze(mean(mean(randMfr, 2), 3));    
+    randMfr = squeeze(mean(mean(randMfr, 2), 3));
     rippGain{ifile} = (rippMfr - randMfr) ./ (rippMfr + randMfr);
 
 end
@@ -112,9 +112,8 @@ nfiles = length(basepaths);
 varsFile = ["sleep_states"; "datInfo"; "session"];
 varsName = ["ss"; "datInfo"; "session"];
 xlsname = 'D:\Google Drive\PhD\Slutsky\Data Summaries\sessionList.xlsx';
-[v, basepaths] = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
-    'varsName', varsName, 'pcond', ["tempflag"], 'ncond', [""],...
-    'xlsname', xlsname);
+v = basepaths2vars('basepaths', basepaths, 'vars', varsFile);
+if isfield(v, 'sleep_states'), [v.ss] = v.sleep_states; v = rmfield(v, 'sleep_states'); end
 
 % check states
 for ifile = 1 : nfiles
@@ -135,7 +134,7 @@ end
 % plot hynogram
 fh = figure;
 for ifile = 1 : nfiles
-    
+
     sb = subplot(nfiles, 1, ifile);
     plot_hypnogram('boutTimes', v(ifile).ss.boutTimes, 'axh', sb)
 

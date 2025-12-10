@@ -2,8 +2,8 @@ function [expData, info] = sessions_catVarTime(varargin)
 
 % concatenates a variable from different sessions. assumes sessions are
 % contineous. concatenates according to the time of day extracted from
-% basenames. 
-% 
+% basenames.
+%
 % INPUT
 %   basepaths       cell of chars to recording sessions
 %   mname           char of mouse name. if basepaths is empty will get
@@ -13,7 +13,7 @@ function [expData, info] = sessions_catVarTime(varargin)
 %   saveFig         logical {true}
 %   markRecTrans    logical {false}. add vertical lines on the transition
 %                   between recordings
-%   dataPreset      string or cell of string depicting the variable to cat. 
+%   dataPreset      string or cell of string depicting the variable to cat.
 %                   can be any combination of 'sr', 'spec', 'fr', 'ripp',
 %                   'emg_rms', 'bands', 'srsu', 'hypnogram',
 %                   'hypnogram_emg', or 'spec_eeg'
@@ -21,14 +21,14 @@ function [expData, info] = sessions_catVarTime(varargin)
 %                   for 'spec'  represents channel
 %                   for 'bands' represents channel
 %                   for 'srsu'  represents unittype (1 = rs; 2 = fs)
-%   hAx             handle to plot axis      
-% 
+%   hAx             handle to plot axis
+%
 % EXAMPLE
 % mname = 'lh96';
 % [srData, tidx, tidxLabels] = sessions_catVarTime('mname', mname, 'dataPreset', 'both', 'graphics', false);
-% 
+%
 % TO DO LIST
-% 
+%
 % UPDATES
 %   12 feb 22       added ripples
 %   18 apr 24       organized time info
@@ -79,7 +79,7 @@ if iscell(dataPreset)
             'basepaths', basepaths, 'dataPreset', dataPreset{idata},...
             'graphics', graphics, 'hAx', sb(idata), 'dataAlt', dataAlt,...
             'xTicksBinsize', xTicksBinsize, 'markRecTrans', markRecTrans);
-        
+
         if idata < length(dataPreset)
             set(sb(idata), 'xticklabels', {[]})
             xlabel('')
@@ -103,11 +103,14 @@ varsFile = ["units"; "datInfo"; "session"; string(dataPreset)];
 varsName = ["units"; "datInfo"; "session"; string(dataPreset)];
 
 if isempty(basepaths)
-    [v, basepaths] = getSessionVars('mname', mname, 'varsFile', varsFile,...
-        'varsName', varsName, 'pcond', ["tempflag"]);
-else
-    [v, ~] = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
-        'varsName', varsName, 'pcond', ["tempflag"]);
+    basepaths = xls2basepaths('mname', mname, 'pcond', ["tempflag"]);
+end
+v = basepaths2vars('basepaths', basepaths, 'vars', varsFile);
+
+% rename fields
+if strcmp(dataPreset, 'sr') && isfield(v, 'fr') && ~isfield(v, 'sr')
+    [v.sr] = v.fr;
+    v = rmfield(v, 'fr');
 end
 
 [~, basenames] = cellfun(@fileparts, basepaths, 'uni', false);
@@ -121,7 +124,7 @@ nsessions = length(basepaths);
 fs = v(1).session.extracellular.sr;
 
 switch dataPreset
-    case 'spec'       
+    case 'spec'
         for isession = 1 : nsessions
             if ndims(v(isession).spec.s) == 3
                 v(isession).data = squeeze(v(isession).spec.s(:, :, dataAlt))';
@@ -129,10 +132,10 @@ switch dataPreset
                 v(isession).data = v(isession).spec.s';
             end
         end
-        ts = v(isession).spec.info.winstep;     % sampling period [s]            
+        ts = v(isession).spec.info.winstep;     % sampling period [s]
         faxis = v(isession).spec.freq;
-    
-    case 'spec_eeg'       
+
+    case 'spec_eeg'
         for isession = 1 : nsessions
             if ndims(v(isession).spec_eeg.s) == 3
                 v(isession).data = squeeze(v(isession).spec_eeg.s(:, :, 1))';
@@ -140,7 +143,7 @@ switch dataPreset
                 v(isession).data = v(isession).spec_eeg.s';
             end
         end
-        ts = v(isession).spec_eeg.info.winstep;     % sampling period [s]            
+        ts = v(isession).spec_eeg.info.winstep;     % sampling period [s]
         faxis = v(isession).spec_eeg.freq;
 
     case 'bands'
@@ -152,7 +155,7 @@ switch dataPreset
             v(isession).data = yval;
         end
         ts = spec.info.winstep;                          % sampling period [s]
-    
+
     case 'hypnogram'
         for isession = 1 : nsessions
             filename = fullfile(basepaths{isession},...
@@ -183,8 +186,8 @@ switch dataPreset
             v(isession).data = emg_rms;
         end
         cfg = as_loadConfig();
-        ts = cfg.boutLen;                              % sampling period [s]        
-    
+        ts = cfg.boutLen;                              % sampling period [s]
+
     case 'sr'
         for isession = 1 : nsessions
             v(isession).data = v(isession).sr.strd;
@@ -192,7 +195,7 @@ switch dataPreset
         ts = v(1).sr.info.binsize;                      % sampling period [s]
         grp = 1 : v(1).session.extracellular.nSpikeGroups;
         grp = dataAlt;
-  
+
     case 'srsu'
         for isession = 1 : nsessions
             v(isession).data = v(isession).srsu(dataAlt).strd;
@@ -221,14 +224,14 @@ switch dataPreset
                 nan(max(nunits(:, 2)) - nunits(isession, 2),...
                 datasz(isession, 2))];
         end
-        ts = v(1).fr.info.binsize;          % sampling period [s]        
-        
+        ts = v(1).fr.info.binsize;          % sampling period [s]
+
     case 'ripp'
-         for isession = 1 : nsessions
+        for isession = 1 : nsessions
             v(isession).data = v(isession).ripp.rate.rate';
         end
-        ts = mode(diff(v(isession).ripp.rate.binedges{1}));                 
-        
+        ts = mode(diff(v(isession).ripp.rate.binedges{1}));
+
     otherwise
         sprintf('\nno such data preset\n')
 end
@@ -241,7 +244,7 @@ ncol = size(v(1).data, 1);
 
 % initialize data mat for all sessions based on the time from the first to
 % the last session, and the sampling frequency of the variable. assumes the
-% recordings are contineous. 
+% recordings are contineous.
 t_recStart = cellfun(@guessDateTime, basenames, 'uni', true);
 t_expStart = t_recStart(1) - max([0, diff(timeofday([zt0, t_recStart(1)]))]);
 t_expEnd = guessDateTime(basenames{end});
@@ -250,7 +253,7 @@ if isstr(lastDur)
     lastDur = str2num(lastDur);
 end
 t_expEnd = t_expEnd + seconds(lastDur);
-expLen = ceil(seconds(t_expEnd - t_expStart) / ts); 
+expLen = ceil(seconds(t_expEnd - t_expStart) / ts);
 expData = nan(expLen, ncol);
 expRs = nan(expLen, ncol);
 expFs = nan(expLen, ncol);
@@ -258,20 +261,20 @@ expFs = nan(expLen, ncol);
 % initialize
 x_blockTrans = [];
 for isession = 1 : nsessions
-    
+
     % find index to dataMat according to recording start
     recIdx = round(max([1, seconds(t_recStart(isession) - t_expStart) / ts]));
     recData = v(isession).data;
     recLen = length(recData);
-    
+
     % insert recording data to experiment data
     expData(recIdx : recIdx + recLen - 1, :) = recData';
-    
+
     if strcmp(dataPreset, 'fr')
         expRs(recIdx : recIdx + recLen - 1, 1 : max(nunits(:, 1))) = v(isession).rs';
         expFs(recIdx : recIdx + recLen - 1, 1 : max(nunits(:, 2))) = v(isession).fs';
     end
-    
+
     % cat block transitions. The new line stores only the transitions
     % between files (eg, different spike sorting) and not between blocks
     % if ~isempty(v(isession).datInfo) && isfield(v(isession).datInfo, 'nsamps')
@@ -279,7 +282,7 @@ for isession = 1 : nsessions
     % else
     %     x_blockTrans = 0;
     % end
-    
+
     x_blockTrans = [x_blockTrans, recIdx];
 
 end
@@ -329,7 +332,7 @@ info.t_expEnd = t_expEnd;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if graphics
-    
+
     if isempty(hAx)
         hFig = figure;
         set(hFig, 'WindowState','maximized');
@@ -340,7 +343,7 @@ if graphics
     end
     switch dataPreset
         case {'spec', 'spec_eeg'}
-            
+
             % take a sample of the spectrogram to help initialize the colormap
             sampleBins = randperm(expLen, round(expLen / 10));
             specSample = reshape(expData(sampleBins, :), 1, length(sampleBins) * length(faxis));
@@ -359,32 +362,32 @@ if graphics
             expData = movmean(expData, 33, 1);
             plot(x_data, expData, 'lineWidth', 2.5);
             ylabel('Spectral Power [dB]')
-            
+
             for iband = 1 : length(spec.bands.bandFreqs)
                 lgd{iband} = sprintf('%s [%d-%d Hz]',...
                     spec.bands.bandNames{iband}, floor(spec.bands.bandFreqs(iband, 1)),...
                     spec.bands.bandFreqs(iband, 2));
             end
             legend(lgd{1 : end}, 'location', 'northeast')
-        
+
         case {'hypnogram', 'hypnogram_emg'}
             plot_hypnogram('labels', expData, 'hAx', hAx,...
                 'clr', cfg.colors, 'sstates', sstates)
             pbaspect([30, 1, 1])
 
-        case 'emg_rms'            
+        case 'emg_rms'
             % plot
             expData = movmean(expData, 33, 1);
             plot(x_data, expData);
             ylabel('EMG RMS')
-            
+
         case {'sr', 'srsu'}
             expData = movmean(expData, 13, 1);
             plot(x_data, expData(:, grp))
             ylabel('MU FR [Hz]')
             legend(split(num2str(grp)))
             axis tight
-            
+
         case 'fr'
             hold on
             plotData = movmean(expRs, 13, 1);
@@ -406,7 +409,7 @@ if graphics
             ylabel('Ripple Rate [Hz]')
             axis tight
     end
-    
+
     % plot block transitions
     axis tight
     xticks(x_ticks)
@@ -417,7 +420,7 @@ if graphics
         hold on
         plot([x_blockTrans; x_blockTrans] * ts, ylim, '--k', 'HandleVisibility', 'off')
     end
-    
+
     if saveFig
         mousepath = fileparts(basepaths{1});
         [~, mname] = fileparts(mousepath);
@@ -427,7 +430,7 @@ if graphics
         figname = fullfile(figpath, figname);
         savefig(gcf, figname, 'compact')
     end
-    
+
 end
 
 end

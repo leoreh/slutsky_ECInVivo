@@ -8,7 +8,7 @@ if strcmp(queryStr, 'mcu')
         'lh134',...
         'lh136',...
         'lh140',...
-        };  
+        };
     basepaths = [];
     for iMOuse = 1:length(mice)
         basepaths = [basepaths, mcu_basepaths(mice{iMOuse})];
@@ -121,7 +121,7 @@ elseif strcmp(queryStr, 'wt_old')
         'E:\Data\lh106\lh106_220512_102302',...     % IP ketmamine
         'E:\Data\lh99\lh99_211218_090630',...       % IT Saline (8 tet OE)
         };
-    
+
     % basepaths = [basepaths, mcu_basepaths('wt_bsl')];
 
 elseif strcmp(queryStr, 'wt_bac_on')
@@ -294,8 +294,7 @@ elseif strcmp(queryStr, 'ra')
 
 elseif contains(queryStr, 'lh')
     xlsname = 'D:\OneDrive - Tel-Aviv University\PhD\Slutsky\Data summaries\sessionList.xlsx';
-    [~, basepaths] = getSessionVars('mname', queryStr, 'varsFile', ["session"],...
-        'varsName', ["session"], 'pcond', ["tempflag"], 'ncond', [""],...
+    basepaths = xls2basepaths('mname', queryStr, 'pcond', ["tempflag"], 'ncond', [""],...
         'xlsname', xlsname);
 
 elseif strcmp(queryStr, 'all')

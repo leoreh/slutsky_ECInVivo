@@ -36,10 +36,9 @@ graphics    = p.Results.graphics;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % load vars
+% load vars
 varsFile = ["fr"; "units"];
-varsName = ["fr"; "units"];
-[v, ~] = getSessionVars('basepaths', {basepath}, 'varsFile', varsFile,...
-    'varsName', varsName);
+v = basepaths2vars('basepaths', {basepath}, 'vars', varsFile);
 [~, basename] = fileparts(basepath);
 
 % select params
@@ -67,7 +66,7 @@ dataMat = cell2nanmat(frTiles, 2);
 eqLine = 10 .^ [floor(log10(min(stateMfr(stateMfr(:) ~= 0)))),...
     ceil(log10(max(stateMfr(:))))];
 
-% ignore zeros 
+% ignore zeros
 idxInf = isinf(log10(x)) | isinf(log10(y));
 
 mdl = fitlm(log10(x(~idxInf)), log10(y(~idxInf)));

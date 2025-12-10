@@ -46,13 +46,13 @@ winsize = 3600;
 thrLin = 0;
 thrFr = 0.005;
 thrWin = 0;
-timeAlt = 1;    
+timeAlt = 1;
 
 % load data
+% load data
 varsFile = ["fr"; "units"; "sleep_states"];
-varsName = ["fr"; "units"; "ss"];
-v = getSessionVars('basepaths', {basepath}, 'varsFile', varsFile,...
-    'varsName', varsName, 'pcond', ["tempflag"]);
+v = basepaths2vars('basepaths', {basepath}, 'vars', varsFile);
+if isfield(v, 'SleepState'), [v.ss] = v.SleepState; v = rmfield(v, 'SleepState'); end
 
 % state params
 sstates = [1, 4];       % selected states for calculating drift
@@ -79,7 +79,7 @@ for iunit = 1 : 2
 
     % calc drift per state
     for istate = 1 : length(sstates)
-        
+
         stateIdx = InIntervals(v.fr.tstamps, boutTimes{istate});
         fr_mat = v.fr.strd(unitIdx, stateIdx);
 

@@ -21,8 +21,8 @@ basepaths{3} = 'G:\lh87\lh87_210523_100607';
 basepaths{4} = 'G:\lh81\lh81_210206_044300';
 
 % load
-varArray = getSessionVars('dirnames', basepaths, 'mousepath', [],...
-    'sortDir', false);
+vars = ["st_metrics"; "spikes"; "cell_metrics"; "fr"];
+v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 
 % initialize
 for imetric = 1 : nmetrics
@@ -33,7 +33,10 @@ fr_wake = []; fr_nrem = []; stimes = [];
 
 % cat
 for isession = 1 : length(basepaths)
-    assignVars(varArray, isession)
+    st = v(isession).st_metrics;
+    spikes = v(isession).spikes;
+    cm = v(isession).cell_metrics;
+    fr = v(isession).fr;
     for imetric = 1 : nmetrics
         st_cat.(st_metrics{imetric}) = [st_cat.(st_metrics{imetric});...
             st.(st_metrics{imetric})];
@@ -54,17 +57,17 @@ fh = figure;
 xLimit = [5 * 1e-2 5 * 1e1];
 for imetric = 1 : nmetrics
     subplot(nsub(1), nsub(2), imetric)
-    
+
     % data
     pyr_x = fr_wake(pyrUnits);
     pyr_y = st_cat.(st_metrics{imetric})(pyrUnits, 1);
     int_x = fr_wake(intUnits);
-    int_y = st_cat.(st_metrics{imetric})(intUnits, 1);    
+    int_y = st_cat.(st_metrics{imetric})(intUnits, 1);
     if any(strcmp(st_metrics{imetric}, {'royer', 'mizuseki', 'cv'}))
         pyr_y = log10(pyr_y);
         int_y = log10(int_y);
     end
-    
+
     % corr and linfit
     [pyr_r, pyr_p] = corr(log10(pyr_x), pyr_y);
     [int_r, int_p] = corr(log10(int_x), int_y);
@@ -72,7 +75,7 @@ for imetric = 1 : nmetrics
     pyr_y2 = polyval(pyr_lf, log10(pyr_x));
     int_lf = polyfit(log10(int_x), int_y, 1);
     int_y2 = polyval(int_lf, log10(int_x));
-    
+
     % plot
     scatter(pyr_x, pyr_y, 20, 'b', 'filled')
     hold on
@@ -98,13 +101,13 @@ for imetric = 1 : nmetrics
     subplot(nsub(1), nsub(2), imetric)
     pyr_x = st_cat.(st_metrics{imetric})(pyrUnits, 1); % wake
     pyr_y = st_cat.(st_metrics{imetric})(pyrUnits, 2); % nrem
-    int_x = st_cat.(st_metrics{imetric})(intUnits, 1); 
-    int_y = st_cat.(st_metrics{imetric})(intUnits, 2); 
+    int_x = st_cat.(st_metrics{imetric})(intUnits, 1);
+    int_y = st_cat.(st_metrics{imetric})(intUnits, 2);
     sz = log10(fr_wake) * 30;
     sz(sz < 8) = 8;
     scatter(pyr_x, pyr_y, sz(pyrUnits), 'b', 'filled')
     hold on
-    scatter(int_x, int_y, sz(intUnits), 'r', 'filled')  
+    scatter(int_x, int_y, sz(intUnits), 'r', 'filled')
     if any(strcmp(st_metrics{imetric}, {'royer', 'mizuseki', 'doublets'}))
         set(gca, 'YScale', 'log', 'XScale', 'log')
     end

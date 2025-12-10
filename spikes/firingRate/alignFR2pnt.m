@@ -47,15 +47,22 @@ else
 end
 
 % load vars from each session
-varsFile = ["fr"; "sr"; "datInfo"; "session"; "units"];
-varsName = ["fr"; "sr"; "datInfo"; "session"; "units"];
-v = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
-    'varsName', varsName);
+if suFlag
+    varsFile = ["fr"; "datInfo"; "session"; "units"];
+else
+    varsFile = ["sr"; "datInfo"; "session"; "units"];
+end
+v = basepaths2vars('basepaths', basepaths, 'vars', varsFile);
+
+if ~suFlag && isfield(v, 'fr') && ~isfield(v, 'sr')
+    [v.sr] = v.fr;
+    v = rmfield(v, 'fr');
+end
 nsessions = length(basepaths);
 
 % go over each session and find the index to fr.strd mat
 for isession = 1 : nsessions
-    
+
     % get time indices
     if isempty(timeIdx)
         timepnt = v(isession).session.general.timepnt;
@@ -64,7 +71,7 @@ for isession = 1 : nsessions
     end
     [~, alignIdx(isession)] = min(abs(v(isession).(dataStruct).tstamps - timepnt));
     tLen(isession) = length(v(isession).(dataStruct).tstamps);
-    
+
     % get unit indices
     if ~isempty(iunit)
         units{isession} = v(isession).units.clean(iunit, :);

@@ -180,8 +180,8 @@ hold on
 % load session data from entire experiment
 varsFile = ["datInfo"; "session"];
 varsName = ["datInfo"; "session"];
-[v, basepaths] = getSessionVars('mname', mname, 'varsFile', varsFile,...
-    'varsName', varsName, 'pcond', ["tempflag"]);
+basepaths = xls2basepaths('mname', mname, 'pcond', ["tempflag"]);
+v = basepaths2vars('basepaths', basepaths, 'vars', varsFile);
 
 % get time point of op on / off. this can be very specific for each mouse
 recStart(1) = xt(2);
@@ -197,7 +197,7 @@ switch mname
     case 'lh96'
         xLabels = string([-30 : 6 : 6 * length(newTicks) - 30]);
         xLimit = [newTicks(2), newTicks(26)];
-    
+
     case 'lh133'
         xLabels = string([-24 : 6 : 6 * length(newTicks) - 30]);
         xLimit = [newTicks(1), newTicks(25)];
@@ -213,7 +213,7 @@ xlim(xLimit)
 plot([t_on, t_on], yLimit, '--r', 'LineWidth', 2)
 plot([t_off, t_off], yLimit, '--r', 'LineWidth', 2)
 
-% add horizontal lines on fr experiment graph 
+% add horizontal lines on fr experiment graph
 for ifile = 1 : 2
     xwin = [xStart{ifile}(1), xStart{ifile}(1) + xDur(1)] + recStart(ifile);
     plot(axh, xwin, [0, 0], 'b', 'LineWidth', 10);
@@ -233,7 +233,7 @@ end
 
 % plot
 for ifile = 1 : 2
-       
+
     % get time point of interest
     basepath = fname{ifile};
     cd(basepath)

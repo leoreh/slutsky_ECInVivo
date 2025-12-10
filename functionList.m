@@ -1,9 +1,9 @@
-% example calls for frequently used functions 
+% example calls for frequently used functions
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % general boolean arguments
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-forceA = false;     % force analyze 
+forceA = false;     % force analyze
 forceL = false;     % force save
 saveFig = false;
 graphics = false;
@@ -13,7 +13,7 @@ saveVar = false;
 % session info (cell explorer foramt)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 session = CE_sessionTemplate(pwd, 'viaGUI', false,...
-    'forceDef', true, 'forceL', true, 'saveVar', true);      
+    'forceDef', true, 'forceL', true, 'saveVar', true);
 basepath = session.general.basePath;
 nchans = session.extracellular.nChannels;
 fs = session.extracellular.sr;
@@ -73,7 +73,7 @@ datInfo = preprocDat('orig_files', orig_files, 'mapch', 1 : 18,...
 
 % create lfp file
 LFPfromDat('basepath', basepath, 'cf', 450, 'chunksize', 5e6,...
-    'nchans', nchans, 'fsOut', 1250, 'fsIn', fs)    
+    'nchans', nchans, 'fsOut', 1250, 'fsIn', fs)
 
 % load lfp
 lfp = getLFP('basepath', basepath, 'ch', [spkpgrp{:}], 'chavg', {},...
@@ -202,7 +202,7 @@ sr = firingRate(spktimes, 'basepath', basepath,...
     'graphics', true, 'binsize', 60, 'saveVar', 'sr', 'smet', 'none',...
     'winBL', [0 Inf], 'forceA', true);
 
-% create ns files 
+% create ns files
 dur = [];
 t = [];
 spktimes2ns('basepath', basepath, 'fs', fs,...
@@ -210,7 +210,7 @@ spktimes2ns('basepath', basepath, 'fs', fs,...
     'dur', dur, 't', t, 'grps', [1 : length(spkgrp)],...
     'spkFile', 'temp_wh');
 
-% create ns files 
+% create ns files
 dur = [];
 t = [];
 spktimes2ns('basepath', basepath, 'fs', fs,...
@@ -221,7 +221,7 @@ spktimes2ns('basepath', basepath, 'fs', fs,...
 % clip ns files
 nsClip('dur', -420, 't', [], 'bkup', true, 'grp', [3 : 4]);
 
-% clean clusters after sorting 
+% clean clusters after sorting
 cleanCluByFet('basepath', basepath, 'manCur', true, 'grp', [1 : 4])
 
 % cut spk from dat and realign
@@ -261,13 +261,13 @@ fr = calc_fr(spikes.times, 'basepath', basepath,...
 % select specific units
 units = selectUnits('basepath', pwd, 'grp', [1 : 4], 'saveVar', true,...
     'forceA', true, 'frBoundries', [0.05 Inf; 0.05 Inf],...
-    'spikes', spikes, 'altClean', 2, 'graphics', false);  
+    'spikes', spikes, 'altClean', 2, 'graphics', false);
 
 % cluster validation
 spikes = cluVal('spikes', spikes, 'basepath', basepath, 'saveVar', true,...
     'saveFig', false, 'force', false, 'mu', [], 'graphics', false,...
     'vis', 'on', 'spkgrp', spkgrp);
- 
+
 % spike timing metrics
 st = spktimes_metrics('spikes', spikes, 'sunits', [],...
     'bins', [0 Inf], 'forceA', true, 'saveVar', true, 'fullA', false);
@@ -306,7 +306,7 @@ sl = spklfp_wrapper('basepath', basepath, 'winCalc', winCalc,...
 % select specific units based on firing rate, cell class, etc.
 units = selectUnits('basepath', pwd, 'grp', [1 : 4], 'saveVar', true,...
     'forceA', true, 'frBoundries', [0.0 Inf; 0.0 Inf],...
-    'spikes', spikes, 'altClean', 2);  
+    'spikes', spikes, 'altClean', 2);
 
 % plot fr vs. time
 plot_FRtime_session('basepath', pwd,...
@@ -325,18 +325,18 @@ plot_FRstates_sextiles('stateMfr', fr.states.mfr(:, [1, 4])', 'units', units.cle
 % concatenate var from different sessions
 mname = 'lh136';
 for ialt = 1 : 4
-[~, info] = sessions_catVarTime('mname', mname,...
-    'dataPreset', {'spec', 'fr'}, 'graphics', true, 'dataAlt', ialt,...
-    'basepaths', {}, 'xTicksBinsize', 6, 'markRecTrans', true,...
-    'saveFig', false);
+    [~, info] = sessions_catVarTime('mname', mname,...
+        'dataPreset', {'spec', 'fr'}, 'graphics', true, 'dataAlt', ialt,...
+        'basepaths', {}, 'xTicksBinsize', 6, 'markRecTrans', true,...
+        'saveFig', false);
 end
 
-% snip segments (e.g. spikes) from binary 
+% snip segments (e.g. spikes) from binary
 [spkwv, ~] = snipFromBinary('stamps', spktimes, 'fname', datname,...
     'win', win, 'nchans', nchans, 'ch', ch, 'align_peak', 'min',...
     'precision', 'int16', 'rmv_trend', 6, 'saveVar', false,...
     'l2norm', false);
-        
+
 % convert binary vector to bouts
 bouts = binary2bouts('vec', binaryVec, 'minDur', 20, 'maxDur', 100,...
     'interDur', 30, 'exclude', false);
@@ -354,7 +354,7 @@ chunks = n2chunks('n', nsamps, 'chunksize', chunksize, 'clip', clip);
 [rate, binedges, tstamps, binidx] = times2rate(spktimes,...
     'binsize', binsize, 'winCalc', winCalc, 'c2r', true);
 
-% convert basename to date time 
+% convert basename to date time
 [~, dtFormat] = guessDateTime(dtstr);
 
 % convert timestamp to datetime based on the date time string
@@ -362,8 +362,8 @@ chunks = n2chunks('n', nsamps, 'chunksize', chunksize, 'clip', clip);
 
 % loads a list of variabels from multiple sessions and organizes them in a
 % struct
-varArray = getSessionVars('basepaths', basepaths, 'varsFile', varsFile,...
-    'varsName', varsName);
+% basepaths = xls2basepaths('xlsname', xlsname, 'mname', mname);
+v = basepaths2vars('basepaths', basepaths, 'vars', varsFile);
 
 % set matlab graphics to custom or factory defaults
 setMatlabGraphics(false)

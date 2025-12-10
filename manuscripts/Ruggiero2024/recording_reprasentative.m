@@ -14,8 +14,8 @@ varsFile = ["fr"; "spikes"; "datInfo"; "session";...
     "units"; "sleep_states"];
 varsName = ["fr"; "spikes"; "datInfo"; "session";...
     "units"; "ss"];
-v = getSessionVars('basepaths', {basepath}, 'varsFile', varsFile,...
-    'varsName', varsName);
+v = basepaths2vars('basepaths', {basepath}, 'vars', varsFile);
+if isfield(v, 'sleep_states'), [v.ss] = v.sleep_states; v = rmfield(v, 'sleep_states'); end
 
 % sleep signals
 filename = fullfile(basepath, [basename, '.sleep_sig.mat']);
@@ -39,7 +39,7 @@ rawCh = [8 : 11];
 % re-calc stuff
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% re-calc state bouts for better visualization. 
+% re-calc state bouts for better visualization.
 % LSLEEP => NREM; N/REM => REM
 minDur = [10, 5, 5, 10, 5, 5];
 minDur = 4;
@@ -87,7 +87,7 @@ winStart(4, 1) = [4.4];        % relative to window 3
 winStart(1, 2) = v.session.general.timepnt + 130 * 60;
 winStart(2, 2) = [1750];
 winStart(3, 2) = [1790];
-winStart(4, 2) = [2.7];           
+winStart(4, 2) = [2.7];
 
 nwin = size(winStart, 2);
 
@@ -105,8 +105,8 @@ th.Padding = 'none';
 % plot
 clear ypush
 for iwin = 1 : nwin
-    
-    % win 
+
+    % win
     winLim = [winStart(:, iwin)'; winStart(:, iwin)' + winDur]';
 
     % hypnogram -----------------------------------------------------------
@@ -132,7 +132,7 @@ for iwin = 1 : nwin
     specTmp.tstamps = spec.tstamps(winIdx) - winStart(1, iwin);
     plot_spec(specTmp, 'ch', 1, 'logfreq', true, 'saveFig', false,...
         'axh', axh(iwin + nwin * 1), 'xtime', 1)
-    ylim([0 20])    
+    ylim([0 20])
     yticks([1, 4, 16])
     xlabel([])
 
@@ -152,10 +152,10 @@ for iwin = 1 : nwin
     xlim(winLim(2, :))
 
     % raster plot ---------------------------------------------------------
-    % axis 
+    % axis
     axh(iwin + nwin * 3) = nexttile(iwin + nwin * 3);
     hold on
-    
+
     % add marking of narrow window
     yLimit = ylim;
     plot(winLim(4, :) + winStart(3, iwin), [0, 0], 'k', 'LineWidth', 2)
@@ -163,24 +163,24 @@ for iwin = 1 : nwin
     % arrange units
     [~, unitsIdx] = sortrows(v.units.clean', 'descend');
     nunits = sum(v.units.clean, 2);
-    
+
     % plot all units in blue
     spktimes = cellfun(@(x) [x(InIntervals(x, winLim(1, :)))  - winStart(1, iwin)]',...
         v.spikes.times, 'uni', false)';
-    spktimes = spktimes(unitsIdx(1 : sum(nunits)));   
+    spktimes = spktimes(unitsIdx(1 : sum(nunits)));
     LineFormat.Color = [0.1 0.1 0.8];
     lineFormat.LineWidth = 2;
     plotSpikeRaster(spktimes,...
         'PlotType', 'vertline', 'LineFormat', LineFormat);
-    
-    % plot fs units in red    
+
+    % plot fs units in red
     LineFormat.Color = [0.8 0.1 0.1];
     for iunit = 1 : nunits(1)
         spktimes{iunit} = 0;
-    end  
+    end
     plotSpikeRaster(spktimes,...
-        'PlotType', 'vertline', 'LineFormat', LineFormat);    
-    
+        'PlotType', 'vertline', 'LineFormat', LineFormat);
+
     % axis params
     ylabel('Unit #')
     xlim(winLim(3, :))
@@ -192,7 +192,7 @@ for iwin = 1 : nwin
         'frequency', fs, 'nchannels', nchans, 'start', winStart(3, iwin),...
         'channels', rawCh, 'downsample', fs / fs_raw));
     raw_tstamps = [1 : size(raw, 1)] / fs_raw + winStart(3, iwin);
-    
+
     % plot
     axh(iwin + nwin * 4) = nexttile(iwin + nwin * 4);
     if ~exist('ypush', 'var')
