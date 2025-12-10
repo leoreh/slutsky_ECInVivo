@@ -48,7 +48,7 @@ varRsp = 'FR';
 % varRsp = 'BRoy';
 % varRsp = 'BLidor';
 % varRsp = 'BSpks';
-varRsp = 'PRC';
+% varRsp = 'PRC';
 
 clear lmeCfg
 lmeCfg.contrasts = 'all';
@@ -91,12 +91,12 @@ hAx.Legend.Position(2) = hAx.Position(2);
 plot_axSize('hFig', hFig, 'szOnly', false, 'axShape', 'square', 'axHeight', 300)
 
 % Save
-fname = lme_frml2char(frml, 'rmRnd', true, 'resNew', '');
-% fname = [fname, '_uAlt', num2str(2)];
-[cfg] = mcu_cfg();
-fPath = fullfile(cfg.savepath, fPrfx);
-lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
-    'lmeData', lmeData, 'lmeStats', lmeStats, 'lmeMdl', lmeMdl, 'fPath', fPath)
+% fname = lme_frml2char(frml, 'rmRnd', true, 'resNew', '');
+% % fname = [fname, '_uAlt', num2str(2)];
+% [cfg] = mcu_cfg();
+% fPath = fullfile(cfg.savepath, fPrfx);
+% lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
+%     'lmeData', lmeData, 'lmeStats', lmeStats, 'lmeMdl', lmeMdl, 'fPath', fPath)
 
 end
 
@@ -190,7 +190,7 @@ function lmeData = load_data(alt)
 
 % Get labels and parameters
 [cfg] = mcu_cfg();
-cfg.varMap.UnitType = 'units.clean';
+cfg.varMap.UnitType = 'units.type';
 
 % Parse additional parameters
 if alt == 2
@@ -203,7 +203,8 @@ clear tblCell v tagAll tagFiles
 if alt == 1
     % BASELINE DATA LOADING
     grps = {'wt_bsl'; 'mcu_bsl'};
-
+    grps = {'wt_old'; 'mcu_bsl'};
+    
     for iGrp = 1 : length(grps)
         basepaths = mcu_basepaths(grps{iGrp});
         nFiles = length(basepaths);
@@ -246,10 +247,11 @@ end
 lmeData = vertcat(tblCell{:});
 
 % Clean up and organize
-lmeData.UnitType = categorical(cfg.lbl.unit(lmeData.UnitType + 1)');
 lmeData = rmmissing(lmeData);
 lmeData.Group = reordercats(lmeData.Group, cfg.lbl.grp);
 lmeData.UnitType = reordercats(lmeData.UnitType, cfg.lbl.unit);
+lmeData(lmeData.UnitType == 'Other', :) = [];
+lmeData.UnitType = removecats(lmeData.UnitType, 'Other');
 
 % Additional cleanup for baclofen data
 if alt == 2

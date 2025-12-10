@@ -43,7 +43,7 @@ if isempty(uTbl)
     % Create table for all basepaths at once
     v = basepaths2vars('basepaths', basepaths, 'vars', {'units'});
 
-    varMap.unitType = 'units.type';
+    varMap.UnitType = 'units.type';
     tagFiles.Mouse = get_mname(basepaths);
     [~, fNames] = fileparts(basepaths);
     tagFiles.File = fNames;
@@ -172,7 +172,7 @@ function plot_unitType(ax, tAxis, tbl, typeVal, clr)
 hold(ax, 'on');
 
 % Handle unitType (categorical or double)
-if iscategorical(tbl.unitType)
+if iscategorical(tbl.UnitType)
     % Map numeric to category if needed, or assume caller knows logic
     % But here we passed 1/2. Let's see if 1 maps to 'RS' or 'FS'.
     % from utypes_classify: 1=RS, 2=FS.
@@ -182,14 +182,14 @@ if iscategorical(tbl.unitType)
     % undefined=0, Other=?, RS=?, FS=?
     % Safest is to use the label strings if categorical.
     if typeVal == 1
-        isType = tbl.unitType == 'RS';
+        isType = tbl.UnitType == 'RS';
     elseif typeVal == 2
-        isType = tbl.unitType == 'FS';
+        isType = tbl.UnitType == 'FS';
     else
         isType = false(height(tbl),1);
     end
 else
-    isType = tbl.unitType == typeVal;
+    isType = tbl.UnitType == typeVal;
 end
 
 frData = tbl.FRt(isType, :);

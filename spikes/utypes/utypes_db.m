@@ -158,7 +158,7 @@ nGroups = length(paths);
 
 
 % Prepare data
-uType = uTbl.unitType;
+uType = uTbl.UnitType;
 yVal = uTbl.mfr;
 
 % Organize figure
@@ -167,7 +167,7 @@ hTile = tiledlayout(3, nGroups, 'TileSpacing', 'tight', 'Padding', 'tight');
 
 % Colors
 [cfg] = mcu_cfg();
-clr = cfg.clr.unitType; % [RS; FS; Other]
+clr = cfg.clr.UnitType; % [RS; FS; Other]
 unitLbl = cfg.lbl.unit;
 frLim = [-2.5 2];
 

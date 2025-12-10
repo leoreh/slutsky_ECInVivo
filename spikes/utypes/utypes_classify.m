@@ -29,7 +29,7 @@ function uTbl = utypes_classify(varargin)
 %
 % OUTPUT:
 %   uTbl         (table) Table containing the features used for classification
-%                and the final 'unitType' column.
+%                and the final 'UnitType' column.
 %
 % HISTORY:
 %   LH - Aug 2024
@@ -68,9 +68,9 @@ initType = fetTbl.initType;
 idxGood = ~fetTbl.bad;
 
 % Convert categorical initType to numeric codes 1=RS, 2=FS
-unitType = zeros(size(initType));
-unitType(initType == 'RS') = 1;
-unitType(initType == 'FS') = 2;
+UnitType = zeros(size(initType));
+UnitType(initType == 'RS') = 1;
+UnitType(initType == 'FS') = 2;
 
 % Handle fetSelect presets
 if isnumeric(fetSelectInput)
@@ -99,11 +99,11 @@ if ~isempty(fetSelect)
     fet = fetTbl{idxGood, fetSelect};
 
     % Get refined classification using GMM (on good units only)
-    unitType(idxGood) = gm2units(fet, unitType(idxGood), rsPrior, regVal);
+    UnitType(idxGood) = gm2units(fet, UnitType(idxGood), rsPrior, regVal);
 end
 
 % Assign to table
-fetTbl.unitType = categorical(unitType, [0, 1, 2], {'Other', 'RS', 'FS'});
+fetTbl.UnitType = categorical(UnitType, [0, 1, 2], {'Other', 'RS', 'FS'});
 
 %% ========================================================================
 %  PLOT & SAVE
@@ -114,8 +114,8 @@ if flgPlot
     cfg.xVar = 'tp';
     cfg.yVar = 'lidor';
     cfg.szVar = 'mfr';
-    cfg.grpVar = 'unitType';
-    cfg.clr = mcuCfg.clr.unitType([3 : -1 : 1], :);
+    cfg.grpVar = 'UnitType';
+    cfg.clr = mcuCfg.clr.UnitType([3 : -1 : 1], :);
     cfg.alpha = 0.4;
 
     hFig = plot_tblGUI(fetTbl, 'cfg', cfg);
@@ -134,8 +134,8 @@ if flgPlot
     end
 end
 
-% Create output table with only used features and unitType
-varsToKeep = unique([fetSelect(:)', {'unitType'}], 'stable');
+% Create output table with only used features and UnitType
+varsToKeep = unique([fetSelect(:)', {'UnitType'}], 'stable');
 uTbl = fetTbl(:, varsToKeep);
 
 
@@ -205,7 +205,7 @@ function push_units(basepaths, fetTbl)
 %
 %   INPUT:
 %       basepaths - Cell array of recording folder paths
-%       fetTbl    - Table containing 'unitType' and 'File' columns
+%       fetTbl    - Table containing 'UnitType' and 'File' columns
 %
 
 if ~iscell(basepaths), basepaths = {basepaths}; end
@@ -221,7 +221,7 @@ for iPath = 1 : length(basepaths)
     uIdx = (fFiles == string(basename));
 
     % Get subset of unitTypes
-    subTypes = fetTbl.unitType(uIdx);
+    subTypes = fetTbl.UnitType(uIdx);
     nUnits = length(subTypes);
 
     % Construct 'clean' (Row 1: RS, Row 2: FS)

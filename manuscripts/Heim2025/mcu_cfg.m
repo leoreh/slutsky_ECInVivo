@@ -11,12 +11,13 @@ cfg.clr.unitType = [0.1, 0.1, 0.4;...   % RS
 cfg.varMap.FR = 'fr.mfr';
 cfg.varMap.BRoy = 'st.royer';
 cfg.varMap.BLidor = 'st.lidor';
-cfg.varMap.BMiz = 'st.mizuseki';
-cfg.varMap.BSpks = 'brst.bspks';
-cfg.varMap.UnitType = 'units.clean';
+% cfg.varMap.BMiz = 'st.mizuseki';
+% cfg.varMap.BSpks = 'brst.bspks';
+cfg.varMap.UnitType = 'units.type';
 
 % Variables to load
-cfg.vars = {'fr', 'units', 'st_metrics', 'st_brst'};
+% cfg.vars = {'fr', 'units', 'st_metrics', 'st_brst'};
+cfg.vars = {'fr', 'units', 'st_metrics'};
 
 % Labels
 cfg.lbl.grp = {'Control'; 'MCU-KO'};

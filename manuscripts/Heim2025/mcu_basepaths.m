@@ -121,6 +121,8 @@ elseif strcmp(queryStr, 'wt_old')
         'E:\Data\lh106\lh106_220512_102302',...     % IP ketmamine
         'E:\Data\lh99\lh99_211218_090630',...       % IT Saline (8 tet OE)
         };
+    
+    % basepaths = [basepaths, mcu_basepaths('wt_bsl')];
 
 elseif strcmp(queryStr, 'wt_bac_on')
 
@@ -362,16 +364,18 @@ elseif strcmp(queryStr, 'prePost')
 end
 
 % Replace E:\\ with D:\\ in basepaths
-if iscell(basepaths)
-    for iMOuse = 1:numel(basepaths)
-        if iscell(basepaths{iMOuse}) % Handles cases like 'prePost'
-            for j = 1:numel(basepaths{iMOuse})
-                if ischar(basepaths{iMOuse}{j})
-                    basepaths{iMOuse}{j} = strrep(basepaths{iMOuse}{j}, 'E:\', 'D:\');
+if ~strcmp(queryStr, 'wt_old')
+    if iscell(basepaths)
+        for iMOuse = 1:numel(basepaths)
+            if iscell(basepaths{iMOuse}) % Handles cases like 'prePost'
+                for j = 1:numel(basepaths{iMOuse})
+                    if ischar(basepaths{iMOuse}{j})
+                        basepaths{iMOuse}{j} = strrep(basepaths{iMOuse}{j}, 'E:\', 'D:\');
+                    end
                 end
+            elseif ischar(basepaths{iMOuse}) % Handles other cases
+                basepaths{iMOuse} = strrep(basepaths{iMOuse}, 'E:\', 'D:\');
             end
-        elseif ischar(basepaths{iMOuse}) % Handles other cases
-            basepaths{iMOuse} = strrep(basepaths{iMOuse}, 'E:\', 'D:\');
         end
     end
 end
