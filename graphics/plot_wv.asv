@@ -69,8 +69,8 @@ v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 
 % Get unit classifications if not provided
 if isempty(UnitType)
-    units = catfields([v.units], 2, true);
-    UnitType = vertcat(units.type{:});
+    units = catfields([v.units], 2);
+    UnitType = units.type;
 end
 
 % Extract categories
@@ -81,7 +81,7 @@ nTypes = length(cats);
 % Default colors if not provided
 if isempty(clr)
     cfg = mcu_cfg();
-    clr = cfg.clr.unit([3 : -1 : 1], :);
+    clr = cfg.clr.unit;
 end
 
 %% ========================================================================
@@ -89,17 +89,25 @@ end
 %  ========================================================================
 
 if flgRaw
-    % Grab raw waveforms
+    % grab raw waveforms
     swv = [v(:).swv_raw];
     swv = cellfun(@(x) mean(x, 2, 'omitnan'), swv, 'uni', false);
 
     % Fig params
     txtY = 'Amplitude (µV)';
 else
-    % Grab L2 normalized waveforms
-    swv = catfields([v(:).swv], 'cell');
-    swv = cellfun(@(x) num2cell(x, 2), swv.wv, 'UniformOutput', false);
-    swv = vertcat(swv{:});
+    
+    x = catfields([v(:).swv], 'cell')
+    x.wv(:)
+
+    % Process each file separately
+    for iFile = 1 : length(basepaths)
+        % convert each unit's waveform to a cell
+        nUnits = size(v(iFile).swv.wv, 1);
+        swv{iFile} = mat2cell(v(iFile).swv.wv, ones(nUnits, 1), size(v(iFile).swv.wv, 2));
+    end
+    % concatenate all cells
+    swv = cat(1, swv{:});
 
     % Fig params
     txtY = 'Norm. Amplitude (a.u.)';

@@ -57,7 +57,10 @@ uTbl = utypes_classify('basepaths', {basepaths{:}}, ...
     'flgPlot', true, 'flgSave', false);
 
 % Plot waveforms
-plot_wv('basepaths', basepaths, 'unitType', fetTbl.unitType)
+plot_wv('basepaths', basepaths)
+
+% Plot classification
+plot_utypes('basepaths', basepaths)
 
 
 %% ========================================================================
