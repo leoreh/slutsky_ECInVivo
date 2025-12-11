@@ -1,20 +1,21 @@
 function hFig = plot_utypes(varargin)
 
-% PLOT_UTYPES Visualization of unit types using plot_tblGUI
+% PLOT_UTYPES Visualization of unit types using plot_tblScatter
 %
 % This function replaces the legacy waveform plotting. It loads unit data
-% (metrics and classification) and launches the interactive plot_tblGUI.
+% (metrics and classification) and launches the interactive plot_tblScatter.
 %
 % INPUT (Optional Key-Value Pairs):
 %   basepaths    (cell array) Full paths to recording folders.
 %   uTbl         (table) Pre-computed unit table. If provided, loading is skipped.
-%   cfg          (struct) Configuration details for plot_tblGUI.
+%   flgSave      (logical) If true, adds a "Push Units" button to save classification.
+%   cfg          (struct) Configuration details for plot_tblScatter.
 %
 % OUTPUT:
 %   hFig         (figure handle) Handle to the GUI figure.
 %
 % DEPENDENCIES:
-%   basepaths2vars, v2tbl, plot_tblGUI
+%   basepaths2vars, v2tbl, plot_tblScatter
 %
 
 %% ========================================================================
@@ -24,11 +25,13 @@ function hFig = plot_utypes(varargin)
 p = inputParser;
 addOptional(p, 'basepaths', {}, @(x) iscell(x));
 addOptional(p, 'uTbl', table(), @istable);
+addOptional(p, 'flgSave', false, @islogical);
 addOptional(p, 'cfg', struct(), @isstruct);
 
 parse(p, varargin{:});
 basepaths = p.Results.basepaths;
 uTbl = p.Results.uTbl;
+flgSave = p.Results.flgSave;
 cfg = p.Results.cfg;
 
 %% ========================================================================
@@ -86,8 +89,34 @@ end
 %  PLOT
 %  ========================================================================
 
-hFig = plot_tblGUI(uTbl, 'cfg', cfg);
+hFig = plot_tblScatter(uTbl, 'cfg', cfg);
 
+if flgSave
+    % Add Push/Save button to the figure
+    % Position it above the existing "Save Table" button in plot_tblScatter
+    uicontrol('Parent', hFig, 'Style', 'pushbutton', ...
+        'String', 'Push Units', ...
+        'Units', 'normalized', 'Position', [0.01, 0.16, 0.18, 0.05], ...
+        'Callback', @(src, evt) onPushUnits(src, basepaths));
+end
+
+end
+
+function onPushUnits(src, basepaths)
+hFig = ancestor(src, 'figure');
+data = guidata(hFig);
+
+% Access the modified table from the GUI data
+if isfield(data, 'tbl')
+    fetTbl = data.tbl;
+
+    % Call the standalone push_units function
+    push_units(basepaths, fetTbl);
+
+    msgbox('Units saved successfully!', 'Success');
+else
+    errordlg('Could not retrieve table data from GUI.', 'Error');
+end
 end
 
 % EOF

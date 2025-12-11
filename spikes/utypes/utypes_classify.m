@@ -5,10 +5,6 @@ function uTbl = utypes_classify(varargin)
 % table containing the classification results and the features used for
 % classification.
 %
-% METHODOLOGY:
-% The function refines an initial classification (typically threshold-based
-% from utypes_features) using GMM clustering on selected features.
-%
 % INPUT (Optional Key-Value Pairs):
 %   basepaths    (cell array) Full paths to recording folders. If empty,
 %                uses current directory.
@@ -118,20 +114,7 @@ if flgPlot
     cfg.clr = mcuCfg.clr.unit([3 : -1 : 1], :);
     cfg.alpha = 0.4;
 
-    hFig = plot_tblGUI(fetTbl, 'cfg', cfg);
-
-    if flgSave
-        % Clear any existing fetTbl_mod from workspace to avoid false positives
-        evalin('base', 'if exist(''fetTbl_mod'', ''var''), clear fetTbl_mod; end');
-        waitfor(hFig);
-
-        % Check if 'fetTbl_mod' was saved to workspace and only then save
-        if evalin('base', 'exist(''fetTbl_mod'', ''var'')')
-            fetTbl = evalin('base', 'fetTbl_mod');
-            evalin('base', 'clear fetTbl_mod');
-            push_units(basepaths, fetTbl);
-        end
-    end
+    plot_utypes('uTbl', fetTbl, 'cfg', cfg, 'flgSave', flgSave, 'basepaths', basepaths);
 end
 
 % Create output table with only used features and UnitType
@@ -192,72 +175,7 @@ typeOut(clusterLabels ~= rsIdx) = 2;   % Set non-RS cluster to FS
 
 end
 
-function push_units(basepaths, fetTbl)
-% PUSH_UNITS Saves classification results to units.mat files.
-%
-%   push_units(basepaths, fetTbl)
-%
-%   Moves existing units.mat to 'bkup' folder and creates a new units.mat
-%   containing only classification fields:
-%       - clean: (2 x nUnits) logical array (Row 1: RS, Row 2: FS)
-%       - type:  (nUnits x 1) double array (0: Other, 1: RS, 2: FS)
-%       - date:  datetime of creation
-%
-%   INPUT:
-%       basepaths - Cell array of recording folder paths
-%       fetTbl    - Table containing 'UnitType' and 'File' columns
-%
 
-if ~iscell(basepaths), basepaths = {basepaths}; end
-
-for iPath = 1 : length(basepaths)
-    basepath = basepaths{iPath};
-    [~, basename] = fileparts(basepath);
-    uFile = fullfile(basepath, [basename, '.units.mat']);
-
-    % Find units belonging to this file
-    % Assumes fetTbl has 'File' column matching basename
-    fFiles = string(fetTbl.File);
-    uIdx = (fFiles == string(basename));
-
-    % Get subset of unitTypes
-    subTypes = fetTbl.UnitType(uIdx);
-    nUnits = length(subTypes);
-
-    % Construct 'clean' (Row 1: RS, Row 2: FS)
-    clean = false(2, nUnits);
-    clean(1, :) = (subTypes == 'RS');
-    clean(2, :) = (subTypes == 'FS');
-
-    % Construct 'type' (0=Other, 1=RS, 2=FS)
-    type = zeros(nUnits, 1);
-    type(subTypes == 'RS') = 1;
-    type(subTypes == 'FS') = 2;
-    type = categorical(type, [0, 1, 2], {'Other', 'RS', 'FS'});
-
-    % Prepare structure to save
-    units = struct();
-    units.clean = clean;
-    units.type = type;
-    units.date = datetime('now');
-
-    % Handle Backup
-    if exist(uFile, 'file')
-        bkupDir = fullfile(basepath, 'bkup');
-        if ~exist(bkupDir, 'dir')
-            mkdir(bkupDir);
-        end
-        % Backup with timestamp: units_YYMMDD_hhmmss.mat
-        ts = datestr(now, 'yymmdd_HHMMSS');
-        movefile(uFile, fullfile(bkupDir, ['units_', ts, '.mat']));
-    end
-
-    % Save new file
-    save(uFile, 'units');
-    fprintf('Saved units for %s\n', basename);
-end
-
-end
 
 %% ========================================================================
 %  NOTE: BAYESIAN PRIORS & POPULATION RATIO ENFORCEMENT

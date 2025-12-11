@@ -1,5 +1,5 @@
-function hFig = plot_tblGUI(tbl, varargin)
-% PLOT_TBLGUI Interactive scatter plot with marginal histograms and grouping.
+function hFig = plot_tblScatter(tbl, varargin)
+% PLOT_TBLSCATTER Interactive scatter plot with marginal histograms and grouping.
 %
 %   plot_tblGUI(tbl, ...) opens a GUI to visualize the table 'tbl'.
 %   Features include variable selection, quadratic size scaling, dynamic

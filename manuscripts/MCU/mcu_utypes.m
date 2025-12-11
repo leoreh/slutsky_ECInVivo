@@ -41,8 +41,6 @@ end
 basepaths = mcu_basepaths('all');
 
 basepaths = mcu_basepaths('lh142');
-% basepaths = basepaths(5 : 7);
-
 
 % Create table of features for classification
 fetTbl = utypes_features('basepaths', {basepaths{:}}, 'flgPlot', false);
@@ -60,7 +58,8 @@ uTbl = utypes_classify('basepaths', {basepaths{:}}, ...
 plot_wv('basepaths', basepaths)
 
 % Plot classification
-plot_utypes('basepaths', basepaths)
+plot_utypes('basepaths', basepaths, 'flgSave', true)
+
 
 
 %% ========================================================================
@@ -78,7 +77,7 @@ cfgGui.szVar = 'FR';
 cfgGui.grpVar = 'UnitType';
 cfgGui.clr = cfg.clr.unit([3 : -1 : 1], :);
 cfgGui.alpha = 0.4;
-hFig = plot_tblGUI(uTbl, 'cfg', cfgGui);
+hFig = plot_tblScatter(uTbl, 'cfg', cfgGui);
 
 % Grab FR vs Time data
 [tAxis, frTbl] = mcu_frTbl(basepaths, 'uTbl', uTbl, 'flgPlot', true);
