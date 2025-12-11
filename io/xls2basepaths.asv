@@ -112,7 +112,7 @@ basepaths = cell(1, length(dirnames));
 default_path = dirpaths{1};
 
 for iPath = 1 : length(dirnames)
-    if isempty(dirpaths{iPath}) 
+    if isempty(dirpaths{iPath}) || ismissing(dirpaths{iPath})
         basepaths{iPath} = fullfile(default_path, dirnames{iPath});
     else
         basepaths{iPath} = fullfile(dirpaths{iPath}, dirnames{iPath});

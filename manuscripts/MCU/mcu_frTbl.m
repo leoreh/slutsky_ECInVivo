@@ -142,18 +142,17 @@ if flgPlot
         % Get data for this mouse
         mIdx = frTbl.Mouse == mName;
         subTbl = frTbl(mIdx, :);
+        
+        for iUnit = 1 : 2
+            hAx(iUnit) = subplot(2, 1, iUnit, 'Parent', tab);
+            uIdx = subTbl.UnitType == cfg.lbl.unit{iUnit};
+            frMat = subTbl.FRt(uIdx, :);
 
-        % RS Units (Type 1)
-        ax1 = subplot(2, 1, 1, 'Parent', tab);
-        plot_unitType(ax1, tAxis, subTbl, 1, cfg.clr.unitType(1, :));
-        title(ax1, sprintf('%s - RS Units', mName), 'Interpreter', 'none');
+            plot_unitType(hAx(iUnit), tAxis, frMat, cfg.clr.unitType(iUnit, :));
+            title(hAx(iUnit), sprintf('%s Units', cfg.lbl.unit{iUnit}), 'Interpreter', 'none');
+        end
 
-        % FS Units (Type 2)
-        ax2 = subplot(2, 1, 2, 'Parent', tab);
-        plot_unitType(ax2, tAxis, subTbl, 2, cfg.clr.unitType(2, :));
-        title(ax2, sprintf('%s - FS Units', mName), 'Interpreter', 'none');
-
-        linkaxes([ax1, ax2], 'xy');
+        linkaxes(hAx, 'xy');
     end
     
     axis tight
@@ -168,45 +167,20 @@ end
 %  HELPER: PLOT FR vs TIME
 %  ========================================================================
 
-function plot_unitType(ax, tAxis, tbl, typeVal, clr)
-hold(ax, 'on');
+function plot_unitType(hAx, tAxis, frData, clr)
 
-% Handle unitType (categorical or double)
-if iscategorical(tbl.UnitType)
-    % Map numeric to category if needed, or assume caller knows logic
-    % But here we passed 1/2. Let's see if 1 maps to 'RS' or 'FS'.
-    % from utypes_classify: 1=RS, 2=FS.
-    % Categories: {'Other', 'RS', 'FS'} -> 0, 1, 2?
-    % Actually categorical usually matches indices or string values.
-    % if categorical is {'Other', 'RS', 'FS'}, 'RS'==1? NO.
-    % undefined=0, Other=?, RS=?, FS=?
-    % Safest is to use the label strings if categorical.
-    if typeVal == 1
-        isType = tbl.UnitType == 'RS';
-    elseif typeVal == 2
-        isType = tbl.UnitType == 'FS';
-    else
-        isType = false(height(tbl),1);
-    end
-else
-    isType = tbl.UnitType == typeVal;
-end
+% Plot All Traces (Light Gray)
+hold(hAx, 'on');
+plot(hAx, tAxis, frData', 'Color', [0.7 0.7 0.7 0.2]);
 
-frData = tbl.FRt(isType, :);
+% Plot Mean (Blue)
+meanFR = mean(frData, 1, 'omitnan');
+plot(hAx, tAxis, meanFR, 'Color', clr, 'LineWidth', 2, ...
+    'DisplayName', 'Mean FR');
 
-if ~isempty(frData)
-    % Plot All Traces (Light Gray)
-    plot(ax, tAxis, frData', 'Color', [0.7 0.7 0.7 0.2]);
-
-    % Plot Mean (Blue)
-    meanFR = mean(frData, 1, 'omitnan');
-    plot(ax, tAxis, meanFR, 'Color', clr, 'LineWidth', 2, ...
-        'DisplayName', 'Mean FR');
-end
-
-xlabel(ax, 'Time (Hours)');
-ylabel(ax, 'Firing Rate (Hz)');
-grid(ax, 'on');
-xline(ax, 0, '--k', 'Perturbation');
+xlabel(hAx, 'Time (Hours)');
+ylabel(hAx, 'Firing Rate (Hz)');
+grid(hAx, 'on');
+xline(hAx, 0, '--k', 'Perturbation');
 
 end
