@@ -1,12 +1,12 @@
 % mcu_cellCalss
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% RE-ANALYZE
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ========================================================================
+%  RE-ANALYZE
+%  ========================================================================
 
 % get all files in study
-basepaths = mcu_sessions('all');
+basepaths = mcu_basepaths('all');
 nPaths = length(basepaths);
 
 % vars
@@ -24,7 +24,7 @@ for iPath = 1 : nPaths
 
     % waveform metrices
     % swv = spkwv_metrics('basepath', basepath, 'flgSave', true, 'flgForce', true);
-    
+
     % Spike timing metrics
     st = spktimes_metrics('spktimes', v(iPath).spikes.times, 'sunits', [],...
         'bins', {[0, Inf]}, 'flgForce', true, 'flgSave', true, 'flgAll', false);
@@ -32,41 +32,76 @@ for iPath = 1 : nPaths
 end
 
 
+
+%% ========================================================================
+%  RE-CLASSIFY
+%  ========================================================================
+
 % get all files in study
-basepaths = mcu_sessions('all');
+basepaths = mcu_basepaths('all');
+basepaths = [mcu_basepaths('wt'), mcu_basepaths('wt')];
+
 nPaths = length(basepaths);
 
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Reclassify units
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 % Create table of features for classification
-fetTbl = utypes_features('basepaths', {basepaths{:}}, 'flgPlot', true);
+fetTbl = utypes_features('basepaths', {basepaths{:}}, 'flgPlot', false);
 
 % Classify
-fetSelect = {'asym', 'hpk', 'tp', 'lidor', 'mfr'};
-fetSelect = {'asym', 'hpk', 'tp', 'lidor', 'mfr'};
-rsPrior = 0.95;
-regVal = 0.02;
-unitType = utypes_classify('basepaths', {basepaths{:}}, 'altClassify', 3,...
+fetSelect = {'asym', 'hpk', 'tp'};
+rsPrior = 0.97;
+regVal = 0.01;
+uTbl = utypes_classify('basepaths', {basepaths{:}}, ...
     'flgSave', false, 'fetTbl', fetTbl,...
-    'fetSelect', fetSelect, 'regVal', regVal, 'rsPrior', rsPrior);
-fetTbl.unitType = unitType;
-
-% Separation by features
-hFig = figure;
-hAx = gca;
-xFet = 'tp';
-yFet = 'lidor';
-zFet = 'asym';
-plot_utypes('basepaths', {basepaths{:}}, 'fetTbl', fetTbl, 'flgOther', true,...
-    'plotType', 'scatter', 'xFet', xFet, 'yFet', yFet, 'zFet', zFet,...
-    'unitType', unitType, 'hAx', hAx);
+    'fetSelect', fetSelect, 'regVal', regVal, 'rsPrior', rsPrior,...
+    'flgPlot', true, 'flgSave', false);
 
 
+%% ========================================================================
+%  LOAD DATA TABLE
+%  ========================================================================
 
 
+basepaths = [mcu_basepaths('wt'), mcu_basepaths('mcu')];
+
+% Metadata
+tagFiles = struct();
+tagFiles.Name = get_mname(basepaths);
+[~, fileNames] = fileparts(basepaths);
+tagFiles.File = fileNames;
+
+% Load
+cfg = mcu_cfg;
+v = basepaths2vars('basepaths', basepaths, 'vars', cfg.vars);
+
+% Table
+uTbl = v2tbl('v', v, 'varMap', cfg.varMap, 'tagAll',...
+    struct(), 'tagFiles', tagFiles, 'idxCol', []);
+
+% Group metadata
+uTbl.Group = ones(height(uTbl), 1) * 1;
+uTbl.Group(ismember(uTbl.Name, cfg.miceMCU), :) = 2;
+uTbl.Group = categorical(uTbl.Group, [1, 2], cfg.lbl.grp);
+
+% Day metadata
+fileTbl = unique(uTbl(:, {'Name', 'File'}), 'rows');
+fileGrp = findgroups(fileTbl.Name);
+dayCell = splitapply(@(x) {(1:numel(x))'}, fileTbl.File, fileGrp);
+fileTbl.Day = vertcat(dayCell{:});
+uTbl = join(uTbl, fileTbl, 'Keys', {'Name', 'File'});
+uTbl.Day = categorical(uTbl.Day, [1 : 7], cfg.lbl.day);
+
+% Reorder
+varOrder = {'Group', 'Name', 'File', 'Day', 'UnitID', 'UnitType'};
+uTbl = movevars(uTbl, varOrder, 'Before', 1);
+
+
+
+
+
+
+
+
+[tAxis, frTbl] = mcu_frTbl(basepaths);
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -90,17 +125,17 @@ varFld = 'tp';
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % get all files in study
-basepaths = mcu_sessions('all');
+basepaths = mcu_basepaths('all');
 nPaths = length(basepaths);
 
 % Get only WT basepaths
-mNames = mcu_sessions('wt');
+mNames = unique(get_mname(mcu_basepaths('wt')));
 clear mPaths
 for iMouse = 1 : length(mNames)
-    mPaths(iMouse, :) = string(mcu_sessions(mNames{iMouse}))';
+    mPaths(iMouse, :) = string(mcu_basepaths(mNames{iMouse}))';
 end
 basepaths = mPaths(:);
-basepaths = [mcu_sessions('wt_bsl'), mcu_sessions('wt_bsl_ripp')];
+basepaths = [mcu_basepaths('wt_bsl'), mcu_basepaths('wt_bsl_ripp')];
 basepaths = unique(basepaths);
 
 
@@ -120,7 +155,7 @@ plot_axSize('hFig', hFig, 'szOnly', false, 'axShape',...
     'square', 'axHeight', 300, 'flgPos', true)
 
 % Extract data
-hSct = findobj(gca, 'Type', 'scatter'); 
+hSct = findobj(gca, 'Type', 'scatter');
 iUnit = 2;
 x = hSct(iUnit).XData;
 y = hSct(iUnit).YData;
@@ -130,7 +165,7 @@ sz = hSct(iUnit).SizeData;
 % Save
 fname = ['UnitTypes~Scatter_Alt', num2str(altClassify)];
 lme_save('hFig', hFig, 'fname', fname, 'frmt', {'mat', 'svg'},...
-    'lmeData', [], 'lmeStats', []) 
+    'lmeData', [], 'lmeStats', [])
 
 
 hAx = plot_utypes('basepaths', basepaths, 'flgRaw', false,...
@@ -150,7 +185,7 @@ hAx.Legend.ItemTokenSize = [14 10];
 % Save
 fname = ['UnitTypes~Wv_Alt', num2str(altClassify)];
 lme_save('hFig', hFig, 'fname', fname, 'frmt', {'mat', 'svg'},...
-    'lmeData', [], 'lmeStats', []) 
+    'lmeData', [], 'lmeStats', [])
 
 
 
@@ -172,7 +207,7 @@ lme_save('hFig', hFig, 'fname', fname, 'frmt', {'mat', 'svg'},...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % get all files in study
-basepaths = mcu_sessions('all');  
+basepaths = mcu_basepaths('all');
 nPaths = length(basepaths);
 
 fNames = {...

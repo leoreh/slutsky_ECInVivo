@@ -133,7 +133,7 @@ end
 % Default colors if not provided
 if isempty(clr)
     cfg = mcu_cfg();
-    clr = cfg.clr.unitType;
+    clr = cfg.clr.unit;
 end
 
 % Update legend text with unit count

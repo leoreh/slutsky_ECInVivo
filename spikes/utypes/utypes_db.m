@@ -167,7 +167,7 @@ hTile = tiledlayout(3, nGroups, 'TileSpacing', 'tight', 'Padding', 'tight');
 
 % Colors
 [cfg] = mcu_cfg();
-clr = cfg.clr.UnitType; % [RS; FS; Other]
+clr = cfg.clr.unit; % [RS; FS; Other]
 unitLbl = cfg.lbl.unit;
 frLim = [-2.5 2];
 
@@ -237,7 +237,7 @@ for iGrp = 1:nGroups
 
     % Legend for this distribution
     legTxt = {sprintf('RS (n=%d)', nCounts(1)), sprintf('FS (n=%d)', nCounts(2))};
-    
+
     % Filter for existing handles
     hasH = isgraphics(hHist);
     if any(hasH)

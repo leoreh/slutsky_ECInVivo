@@ -158,7 +158,7 @@ if flgPlot
     % mcu_clr order: Row 1 = RS, Row 2 = FS, Row 3 = Other
     % Since only good units are plotted, no need to reorder.
     cfg = mcu_cfg();
-    clr = cfg.clr.unitType;
+    clr = cfg.clr.unit;
     % Add alpha
     clr = [clr, repmat(0.5, 3, 1)];
 

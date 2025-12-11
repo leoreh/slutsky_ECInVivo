@@ -115,7 +115,7 @@ if flgPlot
     cfg.yVar = 'lidor';
     cfg.szVar = 'mfr';
     cfg.grpVar = 'UnitType';
-    cfg.clr = mcuCfg.clr.UnitType([3 : -1 : 1], :);
+    cfg.clr = mcuCfg.clr.unit([3 : -1 : 1], :);
     cfg.alpha = 0.4;
 
     hFig = plot_tblGUI(fetTbl, 'cfg', cfg);

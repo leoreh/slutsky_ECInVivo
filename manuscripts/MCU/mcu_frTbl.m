@@ -1,11 +1,6 @@
 function [tAxis, frTbl] = mcu_frTbl(basepaths, varargin)
+
 % MCU_FRTBL Create a table of firing rates aligned to perturbation
-%
-%   [tAxis, frTbl] = mcu_frTbl(basepaths)
-%   [tAxis, frTbl] = mcu_frTbl(..., 'uTbl', uTbl)
-%   [tAxis, frTbl] = mcu_frTbl(..., 'flgPlot', true)
-%
-%   Refactored to use mcu_detectPert for detection and alignment.
 %   Combines data from multiple mice into a single global time axis.
 %
 % INPUTS:
@@ -117,7 +112,7 @@ for iMouse = 1:nMice
 
     % Assign to Table
     % Direct assignment assuming unique mouse names
-    mIdx = frTbl.Mouse == mName;
+    mIdx = frTbl.Name == mName;
     frTbl.FRt(mIdx, :) = alignedMat;
 end
 
@@ -126,7 +121,7 @@ end
 %  ========================================================================
 
 if flgPlot
-    mice = unique(frTbl.Mouse);
+    mice = unique(frTbl.Name);
     nMice = length(mice);
     cfg = mcu_cfg();
 
@@ -137,50 +132,49 @@ if flgPlot
 
     for iMouse = 1:nMice
         mName = string(mice(iMouse));
-        tab = uitab(tabgp, 'Title', mName);
+        hTab = uitab(tabgp, 'Title', mName);
 
         % Get data for this mouse
-        mIdx = frTbl.Mouse == mName;
+        mIdx = frTbl.Name == mName;
         subTbl = frTbl(mIdx, :);
-        
+
         for iUnit = 1 : 2
-            hAx(iUnit) = subplot(2, 1, iUnit, 'Parent', tab);
-            uIdx = subTbl.UnitType == cfg.lbl.unit{iUnit};
-            frMat = subTbl.FRt(uIdx, :);
-
-            plot_unitType(hAx(iUnit), tAxis, frMat, cfg.clr.unitType(iUnit, :));
-            title(hAx(iUnit), sprintf('%s Units', cfg.lbl.unit{iUnit}), 'Interpreter', 'none');
+            hAx(iUnit) = plot_unitFR(hTab, tAxis, subTbl, cfg, iUnit);
         end
-
-        linkaxes(hAx, 'xy');
     end
-    
+    linkaxes(hAx, 'xy');
     axis tight
 
 end
 
-end
+end     % EoF
 
-% EoF
 
 %% ========================================================================
 %  HELPER: PLOT FR vs TIME
 %  ========================================================================
 
-function plot_unitType(hAx, tAxis, frData, clr)
+function hAx = plot_unitFR(hTab, tAxis, subTbl, cfg, iUnit)
 
-% Plot All Traces (Light Gray)
-hold(hAx, 'on');
-plot(hAx, tAxis, frData', 'Color', [0.7 0.7 0.7 0.2]);
+    hAx = subplot(2, 1, iUnit, 'Parent', hTab);
+    uType = cfg.lbl.unit{iUnit};
+    uIdx = subTbl.UnitType == uType;
+    frData = subTbl.FRt(uIdx, :);
+    clr = cfg.clr.unit(iUnit, :);
 
-% Plot Mean (Blue)
-meanFR = mean(frData, 1, 'omitnan');
-plot(hAx, tAxis, meanFR, 'Color', clr, 'LineWidth', 2, ...
-    'DisplayName', 'Mean FR');
+    % Plot All Traces (Light Gray)
+    hold(hAx, 'on');
+    plot(hAx, tAxis, frData', 'Color', [0.7 0.7 0.7 0.2]);
 
-xlabel(hAx, 'Time (Hours)');
-ylabel(hAx, 'Firing Rate (Hz)');
-grid(hAx, 'on');
-xline(hAx, 0, '--k', 'Perturbation');
+    % Plot Mean (Blue)
+    meanFR = mean(frData, 1, 'omitnan');
+    plot(hAx, tAxis, meanFR, 'Color', clr, 'LineWidth', 2, ...
+        'DisplayName', 'Mean FR');
+
+    title(hAx, sprintf('%s Units', uType), 'Interpreter', 'none');
+    xlabel(hAx, 'Time (Hours)');
+    ylabel(hAx, 'Firing Rate (Hz)');
+    grid(hAx, 'on');
+    xline(hAx, 0, '--k', 'Perturbation');
 
 end

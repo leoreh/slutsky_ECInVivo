@@ -1,9 +1,9 @@
 % mcu_cellCalss
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% RE-ANALYZE
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ========================================================================
+%  RE-ANALYZE
+%  ========================================================================
 
 % get all files in study
 basepaths = mcu_basepaths('all');
@@ -33,9 +33,9 @@ end
 
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Reclassify units
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ========================================================================
+%  RE-CLASSIFY
+%  ========================================================================
 
 % get all files in study
 basepaths = mcu_basepaths('all');
@@ -56,10 +56,26 @@ uTbl = utypes_classify('basepaths', {basepaths{:}}, ...
     'flgPlot', true, 'flgSave', false);
 
 
-basepaths = [mcu_basepaths('wt'), mcu_basepaths('mcu')];
-[tAxis, frTbl] = mcu_frTbl(basepaths);
+%% ========================================================================
+%  LOAD DATA TABLE
+%  ========================================================================
 
+uTbl = mcu_unitData();
 
+% Plot scatter gui
+cfg = mcu_cfg;
+cfgGui.xVar = 'TP';
+cfgGui.yVar = 'BLidor';
+cfgGui.szVar = 'FR';
+cfgGui.grpVar = 'UnitType';
+cfgGui.clr = cfg.clr.unit([3 : -1 : 1], :);
+cfgGui.alpha = 0.4;
+hFig = plot_tblGUI(uTbl, 'cfg', cfgGui);
+
+% Grab FR vs Time data
+[tAxis, frTbl] = mcu_frTbl(basepaths, 'uTbl', uTbl, 'flgPlot', false);
+
+% Organize for Prism
 
 
 
