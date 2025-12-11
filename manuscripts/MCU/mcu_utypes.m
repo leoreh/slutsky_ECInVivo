@@ -75,7 +75,12 @@ hFig = plot_tblGUI(uTbl, 'cfg', cfgGui);
 % Grab FR vs Time data
 [tAxis, frTbl] = mcu_frTbl(basepaths, 'uTbl', uTbl, 'flgPlot', false);
 
-% Organize for Prism
+% Clean up
+frTbl = rmmissing(frTbl);
+frTbl(frTbl.UnitType == 'Other', :) = [];
+frTbl.UnitType = removecats(frTbl.UnitType, 'Other');
+
+mcu_dashboard(frTbl, tAxis, 'Supervisor_Report.html');
 
 
 

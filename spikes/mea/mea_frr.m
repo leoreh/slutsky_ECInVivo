@@ -109,13 +109,13 @@ end
 spktimes = cellfun(@(x) x(x >= winLim(1) & x <= winLim(2)), spktimes, 'UniformOutput', false);
 nUnits = length(spktimes);
 nSpks = cellfun(@length, spktimes)';
-uBad = nSpks < spkThr;     
+uBad = nSpks < spkThr;
 
 % Calculate raw firing rates. Units are rows
 [frOrig, ~, t] = times2rate(spktimes, 'binsize', binSize, 'c2r', true);
 
 % Denoise FRs for all units to get clean traces
-fr = mea_frDenoise(frOrig, t, 'flgPlot', false);
+fr = fr_denoise(frOrig, t, 'flgPlot', false);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PERTURBATION DETECTION FROM MFR
@@ -294,16 +294,16 @@ winDur = 60 * 60 / binSize;
 
 % FR Baseline: 1 hour window starting 5 min after recording onset, ensuring
 % we don't go past perturbation
-bslStart = round(winMarg);  
-bslEnd = bslStart + round(winDur);  
-bslWin = bslStart:min(bslEnd, idxPert-1);  
+bslStart = round(winMarg);
+bslEnd = bslStart + round(winDur);
+bslWin = bslStart:min(bslEnd, idxPert-1);
 frBsl = mean(fr(:, bslWin), 2, 'omitnan');
 
 % FR Steady state: 1 hour window ending 5 min before recording end, ensuring
 % we don't go before start
-ssEnd = length(t) - round(winMarg);  
-ssStart = ssEnd - round(winDur);  
-ssWin = max(1, ssStart):ssEnd;  % Ensure 
+ssEnd = length(t) - round(winMarg);
+ssStart = ssEnd - round(winDur);
+ssWin = max(1, ssStart):ssEnd;  % Ensure
 frSs = mean(fr(:, ssWin), 2, 'omitnan');
 
 % FR Trough: minimum in 20 min window after perturbation
@@ -363,8 +363,8 @@ rcvWork = rcvGain ./ pertDepth;
 % Successful Recovery
 % A unit is considered to have recovered if 1. It was significantly
 % perturbed and 2. its recovery is at least thrRcv% of its perturbation depth.
-thrPert = 1; 
-thrRcv = 0.67;  
+thrPert = 1;
+thrRcv = 0.67;
 uPert = pertDepth >= thrPert;
 uRcv = uPert & (frSs >= frTrough + thrRcv * (frBsl - frTrough));
 uRcv(~uGood) = false; % Only good units can be considered recovered
@@ -376,7 +376,7 @@ uRcv(~uGood) = false; % Only good units can be considered recovered
 % -------------------------------------------------------------------------
 % RECOVERY KINETICS
 
-% Initialize 
+% Initialize
 bslTime = nan(nUnits, 1);
 rcvTime = nan(nUnits, 1);
 rcvSlope = nan(nUnits, 1);
@@ -388,8 +388,8 @@ for iUnit = 1:nUnits
     if ~uGood(iUnit)
         continue;
     end
-    
-    % SPIKE DEFICIT  
+
+    % SPIKE DEFICIT
     aucExp = trapz(tPost, ones(size(tPost)) * frBsl(iUnit));
     aucObs = trapz(tPost, fr(iUnit, idxPert:end));
     spkDfct(iUnit) = log2(aucExp / (aucObs + 1));
@@ -404,9 +404,9 @@ for iUnit = 1:nUnits
         bslTime(iUnit) = (idxTrough(iUnit) + bslPnt - 1 - idxPert) * binSize;
     else
         bslTime(iUnit) = t(end); % Max value if not recovered
-    end    
+    end
 
-    % To steady state 
+    % To steady state
     rcvRange = frSs(iUnit) - frTrough(iUnit);
     rcvTrgt = frTrough(iUnit) + thrRcv * rcvRange;
     rcvPnt = find(rcvCurve >= rcvTrgt, 1, 'first');
@@ -430,7 +430,7 @@ metrics.frTrough = frTrough;
 metrics.frSs = frSs;
 metrics.idxTrough = idxTrough;
 metrics.pertDepth = pertDepth;
-metrics.bslTime = bslTime;         
+metrics.bslTime = bslTime;
 metrics.rcvTime = rcvTime;
 metrics.rcvSlope = rcvSlope;
 metrics.normSlope = normSlope;

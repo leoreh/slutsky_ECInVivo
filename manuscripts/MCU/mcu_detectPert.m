@@ -38,8 +38,8 @@ mfr = fillmissing(mfr, 'knn');
 %  ========================================================================
 
 % Denoise
-% Note: mea_frDenoise requires a time vector, we provide indices here.
-mfrSmooth = mea_frDenoise(mfr, 1:length(mfr), ...
+% Note: fr_denoise requires a time vector, we provide indices here.
+mfrSmooth = fr_denoise(mfr, 1:length(mfr), ...
     'flgPlot', false, 'frameLenSec', 300);
 
 % Limit search to first n bins (or length) to find onset
@@ -47,7 +47,7 @@ searchStart = 12 * 60;
 searchWin = searchStart : 96 * 60;
 
 % Define Window (e.g., 4 hours)
-win = 4 * 60; 
+win = 4 * 60;
 
 % Look Backward: Average of previous 'win' bins
 muPre = movmean(mfrSmooth(searchWin), [win 0], 'Endpoints', 'fill');

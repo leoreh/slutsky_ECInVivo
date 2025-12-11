@@ -54,6 +54,7 @@ bouts = [];
 % find start\stop times
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+vec = vec(:);
 start = find([0; diff(vec)] > 0);
 stop = find([0; diff(vec)] < 0);
 

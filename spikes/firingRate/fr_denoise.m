@@ -1,12 +1,14 @@
-function fr = mea_frDenoise(frOrig, t, varargin)
-% MEAFRDENOISE Applies Savitzky-Golay filter to smooth firing rate data.
+function fr = fr_denoise(frOrig, t, varargin)
+% FR_DENOISE Applies Savitzky-Golay filter to smooth firing rate data.
 %
 % SUMMARY:
 % This function applies a Savitzky-Golay filter to smooth firing rate data
-% while preserving important temporal features. This method is chosen for
-% its ability to smooth data while preserving the shape of important
-% features like sharp onsets/offsets, peaks, and non-monotonic trends
-% (e.g., recovery with overshoot).
+% while dealing with gaps (NaNs).
+%
+% The smoothing process follows these steps:
+%   1. Small gaps (< 5 samples) are interpolated using linear filling.
+%   2. The filter is applied to each resulting non-NaN segment separately.
+%   3. Original NaNs are restored in the final output (masking).
 %
 % INPUT (Required):
 %   frOrig       - Matrix of raw firing rate values [Hz]. Units are rows.
@@ -25,6 +27,7 @@ function fr = mea_frDenoise(frOrig, t, varargin)
 %
 % HISTORY:
 %   Sep 2024 - Extracted from mea_frRecovery.m as standalone function.
+%   Dec 2024 - Renamed to fr_denoise and added gap handling logic.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ARGUMENT PARSING & INITIALIZATION
@@ -65,17 +68,35 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Initialize
-fr = zeros(size(frOrig));
+fr = nan(size(frOrig)); % Start with NaNs
 nUnits = size(frOrig, 1);
 
 for iUnit = 1:nUnits
-    % Apply filter
-    frClean = sgolayfilt(frOrig(iUnit, :), polyOrder, frameLen);
+    
+    frUnit = frOrig(iUnit, :);
+    
+    % Grab nan indices
+    nanIdx = isnan(frUnit);
 
-    % Enforce non-negativity, as polynomial fits can sometimes dip below zero
-    frClean(frClean < 0) = 0;
+    % Fill small gaps (< 5 samples)
+    frUnit = fillmissing(frUnit, 'linear', 'MaxGap', 4);
 
-    fr(iUnit, :) = frClean;
+    % Identify non-NaN segments
+    bouts = binary2bouts('vec', ~nanIdx);
+    bouts(:, 2) = bouts(:, 2) - 1;
+    
+    for iBout = 1 : size(bouts, 1)
+        boutIdx = bouts(iBout, 1) : bouts(iBout, 2);
+        if length(boutIdx) >= frameLen
+            frUnit(boutIdx) = sgolayfilt(frUnit(boutIdx), polyOrder, frameLen);
+        end
+    end
+    
+    % Enforce non-negativity, restore nan, and fill
+    frUnit(frUnit < 0) = 0;
+    frUnit(nanIdx) = NaN;
+    fr(iUnit, :) = frUnit;
+
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -117,4 +138,4 @@ if flgPlot
     xlim([t(1)/60, t(end)/60]);
 end
 
-end 
+end
