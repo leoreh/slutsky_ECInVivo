@@ -82,7 +82,7 @@ for iUnit = 1:nUnits
     frUnit = fillmissing(frUnit, 'linear', 'MaxGap', 4);
 
     % Identify non-NaN segments
-    bouts = binary2bouts('vec', ~nanIdx);
+    bouts = binary2bouts('vec', ~isnan(frUnit));
     bouts(:, 2) = bouts(:, 2) - 1;
     
     for iBout = 1 : size(bouts, 1)

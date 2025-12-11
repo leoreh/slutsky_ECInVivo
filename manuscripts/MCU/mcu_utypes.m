@@ -39,9 +39,10 @@ end
 
 % get all files in study
 basepaths = mcu_basepaths('all');
-basepaths = [mcu_basepaths('wt'), mcu_basepaths('wt')];
 
-nPaths = length(basepaths);
+basepaths = mcu_basepaths('lh142');
+% basepaths = basepaths(5 : 7);
+
 
 % Create table of features for classification
 fetTbl = utypes_features('basepaths', {basepaths{:}}, 'flgPlot', false);
@@ -55,11 +56,15 @@ uTbl = utypes_classify('basepaths', {basepaths{:}}, ...
     'fetSelect', fetSelect, 'regVal', regVal, 'rsPrior', rsPrior,...
     'flgPlot', true, 'flgSave', false);
 
+% Plot waveforms
+plot_wv('basepaths', basepaths, 'unitType', fetTbl.unitType)
+
 
 %% ========================================================================
 %  LOAD DATA TABLE
 %  ========================================================================
 
+basepaths = [mcu_basepaths('wt'), mcu_basepaths('mcu')];
 uTbl = mcu_unitData();
 
 % Plot scatter gui
@@ -73,14 +78,14 @@ cfgGui.alpha = 0.4;
 hFig = plot_tblGUI(uTbl, 'cfg', cfgGui);
 
 % Grab FR vs Time data
-[tAxis, frTbl] = mcu_frTbl(basepaths, 'uTbl', uTbl, 'flgPlot', false);
+[tAxis, frTbl] = mcu_frTbl(basepaths, 'uTbl', uTbl, 'flgPlot', true);
 
 % Clean up
-frTbl = rmmissing(frTbl);
-frTbl(frTbl.UnitType == 'Other', :) = [];
-frTbl.UnitType = removecats(frTbl.UnitType, 'Other');
+dataTbl = frTbl;
+dataTbl(dataTbl.UnitType == 'Other', :) = [];
+dataTbl.UnitType = removecats(dataTbl.UnitType, 'Other');
 
-mcu_dashboard(frTbl, tAxis, 'Supervisor_Report.html');
+mcu_dashboard(dataTbl, tAxis, 'Supervisor_Report.html');
 
 
 

@@ -37,7 +37,7 @@ addParameter(p, 'exclude', false, @islogical)
 addParameter(p, 'minDur', [], @isnumeric)
 addParameter(p, 'maxDur', [], @isnumeric)
 addParameter(p, 'interDur', [], @isnumeric)
-addParameter(p, 'flgPrnt', true, @islogical)
+addParameter(p, 'flgPrnt', false, @islogical)
 
 parse(p, varargin{:})
 vec         = p.Results.vec;

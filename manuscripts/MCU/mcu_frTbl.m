@@ -65,7 +65,7 @@ for iMouse = 1:nMice
 
     % denoise frMat
     frMat = fr_denoise(frMat, 1:size(frMat, 2), ...
-        'flgPlot', false, 'frameLenSec', 300);
+        'flgPlot', false, 'frameLenSec', 60);
 
     mData(iMouse).frMat = frMat;
     mData(iMouse).tAxis = tMouse;
@@ -146,6 +146,7 @@ if flgPlot
             hAx(iUnit) = plot_unitFR(hTab, tAxis, subTbl, cfg, iUnit);
         end
     end
+    
     linkaxes(hAx, 'xy');
     axis tight
 
@@ -171,8 +172,8 @@ hold(hAx, 'on');
 plot(hAx, tAxis, frData', 'Color', [0.7 0.7 0.7 0.2]);
 
 % Plot Mean (Blue)
-meanFR = mean(frData, 1, 'omitnan');
-plot(hAx, tAxis, meanFR, 'Color', clr, 'LineWidth', 2, ...
+mfr = mean(frData, 1, 'omitnan');
+plot(hAx, tAxis, mfr, 'Color', clr, 'LineWidth', 2, ...
     'DisplayName', 'Mean FR');
 
 title(hAx, sprintf('%s Units', uType), 'Interpreter', 'none');
@@ -180,5 +181,7 @@ xlabel(hAx, 'Time (Hours)');
 ylabel(hAx, 'Firing Rate (Hz)');
 grid(hAx, 'on');
 xline(hAx, 0, '--k', 'Perturbation');
+ylim(hAx, [0, ceil(max(mfr))]);
+xticks(-4 * 24 : 24 : 6 * 24)
 
 end
