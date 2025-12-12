@@ -62,7 +62,7 @@ for iMouse = 1:nMice
 
     % Perturbation Detection & Alignment
     frMat = cat_fr(myPaths);
-    [~, tMouse] = mcu_detectPert(frMat, 'flgPlot', true);
+    [~, tMouse] = mcu_detectPert(frMat, 'flgPlot', false);
 
     % denoise frMat
     frMat = fr_denoise(frMat, tMouse, ...

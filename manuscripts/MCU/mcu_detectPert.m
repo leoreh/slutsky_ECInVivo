@@ -41,8 +41,8 @@ binSize = p.Results.binSize;
 flgPlot = p.Results.flgPlot;
 
 % Constants
-srchStart = 20;      
-srchEnd = 96;      
+srchStart = 20;
+srchEnd = 96;
 winDropCheck = 30;      % Minutes to check for lowest point after drop
 bslDur = 4;             % Hours to calculate baseline prior to searchStart
 nCandidates = 10;       % Number of steep drops to evaluate
@@ -87,11 +87,7 @@ srchWin = srchStart:srchEnd;
 candidateIdx = srchWin(locs); % Map back to original indices
 
 if isempty(candidateIdx)
-    warning('mcu:detectPert', 'No drops detected. Defaulting to middle.');
-    pertIdx = round(size(frMat, 2) / 2);
-    tAxis = get_tAxis(frMat, pertIdx, binSize);
-    debugData = struct('popMed', mfrSm);
-    return;
+    error('mcu:detectPert', 'No drops detected');
 end
 
 % Select the candidate that results in the *lowest absolute firing rate*
@@ -188,8 +184,12 @@ end
 %  CONSTRUCT OUTPUT
 %  ========================================================================
 
-tAxis = get_tAxis(frMat, pertIdx, binSize);
+% Time axis
+nBins = size(frMat, 2);
+dt_min = binSize / 60;
+tAxis = ((1:nBins) - pertIdx) * dt_min / 60;
 
+% Detection data
 debugData.popMed = mfrSm;
 debugData.candidates = candidateIdx;
 debugData.anchorIdx = anchorIdx;
@@ -203,47 +203,50 @@ debugData.tangentPoint = [xAnchor, yAnchor];
 %  ========================================================================
 
 if flgPlot
-    figure('Name', 'Perturbation Detection', 'Color', 'w', 'Position', [100 100 1000 600]);
-    t = (1:length(mfr)) * (binSize/60); % Minutes absolute
 
+    hFig = figure('Name', 'Perturbation Detection', ...
+        'Color', 'w', 'Position', [100 100 1000 600]);
     hold on;
-    % Plot Population Median
-    plot(t, mfrSm, 'k-', 'LineWidth', 1.5, 'DisplayName', 'Pop. Median');
 
-    % Plot Baseline
+    % Population Median
+    plot(tAxis, mfrSm, 'k-', 'LineWidth', 1.5, 'DisplayName', 'Pop. Median');
+
+    % Baseline
     yline(baselineVal, 'b--', 'LineWidth', 1, 'DisplayName', 'Baseline');
 
-    % Plot Candidates
-    plot(t(candidateIdx), mfrSm(candidateIdx), 'ro', ...
+    % Candidates
+    plot(tAxis(candidateIdx), mfrSm(candidateIdx), 'ro', ...
         'MarkerFaceColor', 'r', 'MarkerSize', 4, 'DisplayName', 'Candidates');
 
-    % Plot Anchor
-    plot(t(anchorIdx), mfrSm(anchorIdx), 'ks', ...
+    % Anchor
+    plot(tAxis(anchorIdx), mfrSm(anchorIdx), 'ks', ...
         'MarkerFaceColor', 'y', 'MarkerSize', 8, 'DisplayName', 'Anchor');
 
-    % Plot Tangent Line
+    % Tangent Line
     % Determine range for line plotting (e.g. +/- 30 mins)
     winTan = round(30 * 60 / binSize);
     xRng = [pertIdx - winTan, anchorIdx + winTan];
     yC = yAnchor + slope * (xRng - xAnchor);
-    plot(xRng * (binSize/60), yC, 'g-', 'LineWidth', 1, 'DisplayName', 'Tangent');
+    plot((xRng - pertIdx) * dt_min, yC, 'g-', 'LineWidth', 1, 'DisplayName', 'Tangent');
 
-    % Plot Detected Onset
-    xline(t(pertIdx), 'r-', 'LineWidth', 2, 'DisplayName', 'Detected Onset');
+    % Detected Onset
+    xline(tAxis(pertIdx), 'r--', 'LineWidth', 2, 'DisplayName', 'Detected Onset');
 
     title(sprintf('Perturbation Detection (Consistency=%.1f%%)', pctDecr));
     xlabel('Time (min)');
     ylabel('Median FR (Hz)');
+
+    % Derivative on right axis
+    yyaxis right
+    plot(tAxis(1:length(mfrD)), mfrD, '-', 'Color', [0.5 0.5 0.5, 0.3], ...
+        'LineWidth', 1, 'DisplayName', 'Derivative');
+    ylabel('Derivative');
+    hAx = gca;
+    hAx.YAxis(2).Color = [0.5 0.5 0.5];
+    
     legend('Location', 'best');
     grid on;
 end
 
-end
+end     % EOF
 
-function tAxis = get_tAxis(frMat, pertIdx, binSize)
-nBins = size(frMat, 2);
-dt_min = binSize / 60;
-tAxis = ((1:nBins) - pertIdx) * dt_min;
-end
-
-% EOF

@@ -120,6 +120,9 @@ fr = fr_denoise(frOrig, t, 'flgPlot', false);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PERTURBATION DETECTION FROM MFR
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%
+% REPLACE WITH MCU_DETECTPERT
+%%
 % Detect perturbation onset time. Find the N largest MFR drops (most
 % negative derivative) and select the one that occurs at the lowest MFR,
 % which is characteristic of a major network state transition.

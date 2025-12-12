@@ -122,7 +122,7 @@ varsToKeep = unique([fetSelect(:)', {'UnitType'}], 'stable');
 uTbl = fetTbl(:, varsToKeep);
 
 
-end
+end     % EOF
 
 %% ========================================================================
 %  HELPER FUNCTIONS

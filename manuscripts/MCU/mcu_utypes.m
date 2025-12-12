@@ -58,7 +58,7 @@ uTbl = utypes_classify('basepaths', {basepaths{:}}, ...
 plot_wv('basepaths', basepaths)
 
 % Plot classification
-plot_utypes('basepaths', basepaths(5 : 7), 'flgSave', true)
+plot_utypes('basepaths', basepaths, 'flgSave', true)
 
 
 
@@ -88,10 +88,10 @@ dataTbl = frTbl;
 dataTbl(dataTbl.UnitType == 'Other', :) = [];
 dataTbl.UnitType = removecats(dataTbl.UnitType, 'Other');
 
-mcu_dashboard(dataTbl, tAxis, 'Supervisor_Report.html');
+% mcu_dashboard(dataTbl, tAxis, 'Supervisor_Report.html');
 
 
-tblGUI_xy(tAxis, frTbl)
+tblGUI_xy(tAxis, dataTbl)
 
 
 
