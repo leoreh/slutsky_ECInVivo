@@ -31,12 +31,14 @@ addParameter(p, 'yVar', [], @(x) ischar(x) || isstring(x) || isempty(x));
 addParameter(p, 'tileFlow', 'vertical', @(x) permember(x, {'flow', 'vertical', 'horizontal'}));
 addParameter(p, 'SelectionCallback', [], @(x) isempty(x) || isa(x, 'function_handle'));
 addParameter(p, 'Parent', [], @(x) isempty(x) || isgraphics(x));
+addParameter(p, 'GroupByCallback', [], @(x) isempty(x) || isa(x, 'function_handle'));
 parse(p, varargin{:});
 
 yVar = p.Results.yVar;
 tileFlow = p.Results.tileFlow;
 hParent = p.Results.Parent;
 selCbk = p.Results.SelectionCallback;
+grpCbk = p.Results.GroupByCallback;
 
 % Auto-select yVar if empty
 if isempty(yVar)
@@ -100,7 +102,9 @@ guiData.tileInfo = []; % To store axis info for highlighting
 guiData.hlHandles = []; % To store highlight line handles
 guiData.hlHandles = []; % To store highlight line handles
 guiData.highlightFcn = @highlightTraces; % Expose function
+guiData.setGroupVarFcn = @setGroupVar;   % Expose function
 guiData.selCbk = selCbk;
+guiData.grpCbk = grpCbk;
 
 %% ========================================================================
 %  LAYOUT
@@ -167,10 +171,8 @@ guiData.pnlGrpBy = uipanel('Parent', hPanel, 'BorderType', 'none', ...
     'Units', 'normalized', 'Position', [0.05, 0.10, 0.9, currY - 0.10]);
 
 % Update Button
-guiData.btnUpdate = uicontrol('Parent', hPanel, 'Style', 'pushbutton', ...
-    'String', 'Update Plot', ...
-    'Units', 'normalized', 'Position', [0.05, 0.02, 0.9, 0.05], ...
-    'Callback', @onUpdatePlot, 'FontWeight', 'bold', 'FontSize', 10);
+% Update Button - REMOVED for auto-update
+% guiData.btnUpdate = ...
 
 
 hContainer.UserData = guiData;
@@ -190,11 +192,54 @@ onUpdatePlot(hContainer, []);
     function onPlotByChange(src, ~)
         data = hContainer.UserData;
         populateCheckboxes(src, data, data.ddPlotBy, data.pnlPlotBy, 'chkPlotBy');
+        onUpdatePlot(src, []);
     end
 
     function onGrpByChange(src, ~)
         data = hContainer.UserData;
         populateCheckboxes(src, data, data.ddGrpBy, data.pnlGrpBy, 'chkGrpBy');
+
+        idx = get(data.ddGrpBy, 'Value');
+        items = get(data.ddGrpBy, 'String');
+        varName = items{idx};
+
+        if ~isempty(data.grpCbk)
+            % Gather all cats
+            populateCheckboxes(src, data, data.ddGrpBy, data.pnlGrpBy, 'chkGrpBy'); % Refresh data
+            data = hContainer.UserData; % Reload
+
+            if isempty(data.chkGrpBy)
+                activeCats = {};
+            else
+                allCats = arrayfun(@(x) string(get(x, 'String')), data.chkGrpBy);
+                activeCats = cellstr(allCats);
+            end
+
+            data.grpCbk(varName, activeCats, hContainer);
+        end
+
+        onUpdatePlot(src, []);
+    end
+
+    function onFilterChange(~, ~)
+        data = hContainer.UserData;
+        idx = get(data.ddGrpBy, 'Value');
+        items = get(data.ddGrpBy, 'String');
+        varName = items{idx};
+
+        onUpdatePlot(hContainer, []); % Update Local
+
+        % Broadcast
+        if ~isempty(data.grpCbk)
+            if isempty(data.chkGrpBy)
+                activeCats = {};
+            else
+                selectedIdx = arrayfun(@(x) get(x, 'Value'), data.chkGrpBy);
+                allCats = arrayfun(@(x) string(get(x, 'String')), data.chkGrpBy);
+                activeCats = cellstr(allCats(logical(selectedIdx)));
+            end
+            data.grpCbk(varName, activeCats, hContainer);
+        end
     end
 
     function populateCheckboxes(src, data, hDD, hPanel, storeField)
@@ -220,11 +265,13 @@ onUpdatePlot(hContainer, []);
             h = 1 / max(10, nCats + 1); % Simple spacing
 
             w = 0.9;
+            chkHandles = gobjects(1, nCats); % Initialize
             for iVar = 1:nCats
                 yPos = 1 - iVar*h;
                 chkHandles(iVar) = uicontrol('Parent', hPanel, 'Style', 'checkbox', ...
                     'String', cats{iVar}, 'Units', 'normalized', ...
-                    'Position', [0, yPos, w, h], 'Value', 1); % Default Select All
+                    'Position', [0, yPos, w, h], 'Value', 1, ...
+                    'Callback', @onFilterChange); % Auto-update & Sync
             end
         end
 
@@ -506,6 +553,39 @@ onUpdatePlot(hContainer, []);
 
         catch ME
             warning('Error in line click: %s', ME.message);
+        end
+    end
+
+    function setGroupVar(varName, activeCats)
+        data = hContainer.UserData;
+        items = get(data.ddGrpBy, 'String');
+        idx = find(strcmp(items, varName));
+
+        needsUpdate = false;
+
+        % 1. Change Variable
+        if ~isempty(idx) && idx ~= get(data.ddGrpBy, 'Value')
+            set(data.ddGrpBy, 'Value', idx);
+            % Update checkboxes Manually
+            populateCheckboxes(hContainer, data, data.ddGrpBy, data.pnlGrpBy, 'chkGrpBy');
+            data = hContainer.UserData;
+            needsUpdate = true;
+        end
+
+        % 2. Apply Filters
+        if exist('activeCats', 'var') && isfield(data, 'chkGrpBy') && ~isempty(data.chkGrpBy)
+            for i = 1:length(data.chkGrpBy)
+                catStr = get(data.chkGrpBy(i), 'String');
+                val = ismember(catStr, activeCats);
+                if get(data.chkGrpBy(i), 'Value') ~= val
+                    set(data.chkGrpBy(i), 'Value', val);
+                    needsUpdate = true;
+                end
+            end
+        end
+
+        if needsUpdate
+            onUpdatePlot(hContainer, []);
         end
     end
 

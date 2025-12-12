@@ -43,7 +43,7 @@ basepaths = mcu_basepaths('all');
 basepaths = mcu_basepaths('lh142');
 
 % Create table of features for classification
-fetTbl = utypes_features('basepaths', {basepaths{:}}, 'flgPlot', false);
+fetTbl = utypes_features('basepaths', {basepaths{:}}, 'flgPlot', true);
 
 % Classify
 fetSelect = {'asym', 'hpk', 'tp'};

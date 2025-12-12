@@ -30,10 +30,12 @@ function hFig = tblGUI_scatHist(tbl, varargin)
 %  ========================================================================
 p = inputParser;
 addRequired(p, 'tbl', @istable);
-addOptional(p, 'varsExclude', {'UnitID', 'Name', 'Mouse', 'File'}, @iscell);
-addOptional(p, 'cfg', struct(), @isstruct);
+addParameter(p, 'varsExclude', {'UnitID', 'Name', 'Mouse', 'File'}, @iscell);
+addParameter(p, 'cfg', struct(), @isstruct);
 addParameter(p, 'Parent', [], @(x) isempty(x) || isgraphics(x));
 addParameter(p, 'SelectionCallback', [], @(x) isempty(x) || isa(x, 'function_handle'));
+addParameter(p, 'GroupByCallback', [], @(x) isempty(x) || isa(x, 'function_handle'));
+
 parse(p, tbl, varargin{:});
 
 tbl = p.Results.tbl;
@@ -41,6 +43,7 @@ varsExclude = p.Results.varsExclude;
 cfg = p.Results.cfg;
 hParent = p.Results.Parent;
 selCbk = p.Results.SelectionCallback;
+grpCbk = p.Results.GroupByCallback;
 
 %% ========================================================================
 %  INITIALIZATION
@@ -102,8 +105,11 @@ guiData.defClr = defClr;
 guiData.defAlpha = defAlpha;
 guiData.defClr = defClr;
 guiData.selCbk = selCbk;
+guiData.grpCbk = grpCbk; % Populated from varargin
 guiData.highlightFcn = @highlightPoints; % Expose function
+guiData.setGroupVarFcn = @setGroupVar;   % Expose function
 guiData.hHighlight = []; % Store handle for external highlight
+guiData.chkGrp = [];     % Checkbox handles
 
 
 %% ========================================================================
@@ -144,8 +150,8 @@ linkaxes([guiData.hAxScatter, guiData.hAxHistY], 'y');
 
 % Controls start from top aligned with HistX top approximately
 % HistX top is at: startY + scatterH + 0.02 + 0.15 = ~0.82 if default values
-% Let's position controls from top down.
-ctlTop = axHistXPos(2) + axHistXPos(4); % Top of Hist X
+% Let's use more vertical space
+ctlTop = 0.95;
 ctlH = 0.04;
 ctlGap = 0.01;
 ctlW = panelW - 0.02;
@@ -188,7 +194,7 @@ uicontrol('Parent', hContainer, 'Style', 'text', 'String', 'Group Variable:', ..
 guiData.ddGrp = uicontrol('Parent', hContainer, 'Style', 'popupmenu', ...
     'String', [{'None'}, catVars], 'Units', 'normalized', ...
     'Position', [ctlX, currGrpTop - ctlH, ctlW, ctlH], ...
-    'Callback', @onUpdatePlot);
+    'Callback', @onGrpChange);
 
 % Set initial dropdown values
 set(guiData.ddX, 'Value', find(strcmp(numericVars, curX)));
@@ -207,25 +213,35 @@ else, set(guiData.ddGrp, 'Value', idxG + 1); end
 % -- Buttons --
 
 % Position interactive buttons lower down
+% Position interactive buttons lower down
+% Checkbox Panel need more space.
+% Buttons at 0.20
+% -- Layout Logic Check --
+% Group Dropdown is at [ctlX, currGrpTop - ctlH, ctlW, ctlH]
+% Panel should start below it.
+grpDDBottom = currGrpTop - ctlH;
+panelTop = grpDDBottom - 0.02; % Gap
+panelBottom = 0.30;
+panelH = panelTop - panelBottom;
+
+guiData.pnlGrp = uipanel('Parent', hContainer, 'BorderType', 'none', ...
+    'Units', 'normalized', 'Position', [ctlX, panelBottom, ctlW, panelH]);
+
+% -- Buttons --
+
 guiData.btnSelect = uicontrol('Parent', hContainer, 'Style', 'pushbutton', ...
     'String', 'Select Group', ...
-    'Units', 'normalized', 'Position', [ctlX, 0.40, ctlW, 0.05], ...
+    'Units', 'normalized', 'Position', [ctlX, 0.22, ctlW, 0.05], ...
     'Callback', @onSelectRegion, 'FontWeight', 'bold');
 
 guiData.btnSelectDot = uicontrol('Parent', hContainer, 'Style', 'pushbutton', ...
     'String', 'Select Dot', ...
-    'Units', 'normalized', 'Position', [ctlX, 0.34, ctlW, 0.05], ...
+    'Units', 'normalized', 'Position', [ctlX, 0.16, ctlW, 0.05], ...
     'Callback', @onSelectDot, 'FontWeight', 'bold');
-
-uicontrol('Parent', hContainer, 'Style', 'text', ...
-    'String', 'Instruction: Use "Select Group" (Polygon) or "Select Dot" (Double-click to assign) to update groups.', ...
-    'Units', 'normalized', 'Position', [ctlX, 0.25, ctlW, 0.08], ...
-    'HorizontalAlignment', 'left', 'ForegroundColor', [0.4 0.4 0.4], ...
-    'FontSize', 8);
 
 guiData.btnSave = uicontrol('Parent', hContainer, 'Style', 'pushbutton', ...
     'String', 'Save Table to Workspace', ...
-    'Units', 'normalized', 'Position', [ctlX, 0.10, ctlW, 0.06], ...
+    'Units', 'normalized', 'Position', [ctlX, 0.05, ctlW, 0.06], ...
     'Callback', @onSaveTable);
 
 % Store guidata
@@ -233,12 +249,98 @@ hContainer.UserData = guiData;
 % Return handle to container
 hFig = hContainer;
 
+% Initial State (Populate Checkboxes)
+onGrpChange(hContainer);
+
 % Initial Plot
 onUpdatePlot(hContainer, []);
 
 %% ====================================================================
 %  CALLBACKS
 %  ====================================================================
+
+    function onGrpChange(src, ~)
+        data = hContainer.UserData;
+        % Update checkboxes
+        populateCheckboxes(data);
+
+        % Trigger Callback
+        idxGrp = get(data.ddGrp, 'Value');
+        grpItems = get(data.ddGrp, 'String');
+        grpName = grpItems{idxGrp};
+
+
+        if ~isempty(data.grpCbk)
+            % For new group var, we enable ALL categories by default (implied by populate)
+            % But we should gather them to be explicit.
+            % populateCheckboxes(data) updated data.chkGrp.
+            data = hContainer.UserData; % Reload
+
+            if isempty(data.chkGrp)
+                activeCats = {};
+            else
+                allCats = arrayfun(@(x) string(get(x, 'String')), data.chkGrp);
+                activeCats = cellstr(allCats);
+            end
+
+            data.grpCbk(grpName, activeCats, hContainer);
+        end
+
+        onUpdatePlot(src, []);
+    end
+
+    function onFilterChange(~, ~)
+        data = hContainer.UserData;
+        idxGrp = get(data.ddGrp, 'Value');
+        grpItems = get(data.ddGrp, 'String');
+        grpName = grpItems{idxGrp};
+
+        fprintf('Filter Change: %s\n', grpName);
+
+        onUpdatePlot(hContainer, []); % Update local
+
+        % Broadcast
+        if ~isempty(data.grpCbk)
+            if isempty(data.chkGrp)
+                activeCats = {};
+            else
+                selectedIdx = arrayfun(@(x) get(x, 'Value'), data.chkGrp);
+                allCats = arrayfun(@(x) string(get(x, 'String')), data.chkGrp);
+                activeCats = cellstr(allCats(logical(selectedIdx)));
+            end
+            data.grpCbk(grpName, activeCats, hContainer);
+        end
+    end
+
+    function populateCheckboxes(data)
+        delete(data.pnlGrp.Children);
+        idxGrp = get(data.ddGrp, 'Value');
+        grpItems = get(data.ddGrp, 'String');
+        grpName = grpItems{idxGrp};
+
+        if strcmp(grpName, 'None')
+            data.chkGrp = [];
+        else
+            raw = data.tbl.(grpName);
+            if islogical(raw), raw = categorical(raw); end
+            if ~iscategorical(raw), raw = categorical(raw); end
+            cats = categories(raw);
+            cats = cats(ismember(cats, unique(raw)));
+
+            nCats = length(cats);
+            h = 1 / max(10, nCats + 1);
+            w = 0.9;
+            data.chkGrp = gobjects(1, nCats); % Initialize to clear old handles
+            for i = 1:nCats
+                yPos = 1 - i*h;
+                data.chkGrp(i) = uicontrol('Parent', data.pnlGrp, 'Style', 'checkbox', ...
+                    'String', cats{i}, 'Units', 'normalized', ...
+                    'Position', [0, yPos, w, h], 'Value', 1, ...
+                    'Callback', @onFilterChange);
+            end
+        end
+        hContainer.UserData = data;
+    end
 
     function onUpdatePlot(~, ~)
         data = hContainer.UserData;
@@ -309,6 +411,20 @@ onUpdatePlot(hContainer, []);
 
             groups = rawGrp;
             grpLabels = categories(groups);
+            % Adjust groups based on checkboxes
+            if isGrpActive && ~isempty(data.chkGrp)
+                selectedIdx = arrayfun(@(x) get(x, 'Value'), data.chkGrp);
+                allCats = arrayfun(@(x) string(get(x, 'String')), data.chkGrp);
+                activeCats = cellstr(allCats(logical(selectedIdx)));
+
+                fprintf('Active Cats: %d selected\n', length(activeCats));
+
+                % Filter grpLabels
+                grpLabels = intersect(grpLabels, activeCats, 'stable');
+
+                fprintf('Filtered grpLabels: %d\n', length(grpLabels));
+            end
+
             isGrpActive = true;
         else
             isGrpActive = false;
@@ -600,6 +716,43 @@ onUpdatePlot(hContainer, []);
         data = hContainer.UserData;
         assignin('base', 'fetTbl_mod', data.tbl);
         msgbox('Table saved to workspace as "fetTbl_mod".', 'Saved');
+    end
+
+    function setGroupVar(varName, activeCats)
+        % External setter for group variable and filters
+        % varName: char/string
+        % activeCats: cellstr (optional, if missing assume all or don't change?)
+        % Ideally if missing, we preserve or reset. Here we assume passed from sync so it exists.
+
+        data = hContainer.UserData;
+        grpItems = get(data.ddGrp, 'String');
+        idx = find(strcmp(grpItems, varName));
+
+        needsUpdate = false;
+
+        % 1. Change Variable
+        if ~isempty(idx) && idx ~= get(data.ddGrp, 'Value')
+            set(data.ddGrp, 'Value', idx);
+            populateCheckboxes(data);
+            data = hContainer.UserData; % Reload new checkboxes
+            needsUpdate = true;
+        end
+
+        % 2. Apply Filters (Checkboxes)
+        if exist('activeCats', 'var') && ~isempty(data.chkGrp)
+            for i = 1:length(data.chkGrp)
+                catStr = get(data.chkGrp(i), 'String');
+                val = ismember(catStr, activeCats);
+                if get(data.chkGrp(i), 'Value') ~= val
+                    set(data.chkGrp(i), 'Value', val);
+                    needsUpdate = true;
+                end
+            end
+        end
+
+        if needsUpdate
+            onUpdatePlot(hContainer, []);
+        end
     end
 
     function highlightPoints(indices)

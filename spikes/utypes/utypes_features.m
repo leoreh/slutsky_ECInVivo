@@ -32,7 +32,7 @@ flgPlot = p.Results.flgPlot;
 v = p.Results.v;
 
 %% ========================================================================
-%  CREAT TABLE
+%  CREATE TABLE
 %  ========================================================================
 
 % load state vars and concatenate metrics
@@ -92,15 +92,15 @@ if sum(idxGood) == 0
 end
 
 % For non-inverted spikes, perform classification using trough-to-peak
-% RS: tp >= 0.4 ms (Regular Spiking, typically Pyramidal)
-% FS: tp < 0.4 ms (Fast Spiking, typically Interneuron)
+% RS: tp >= 0.4 ms (Regular Spiking, Pyramidal)
+% FS: tp < 0.4 ms (Fast Spiking, Interneuron)
 initType = zeros(height(fetTbl), 1);
 initType(idxGood & (fetTbl.tp >= 0.4)) = 1;  % RS
 initType(idxGood & (fetTbl.tp < 0.4)) = 2;   % FS
 
 % Create a categorical variable for plotting and storage
 fetTbl.initType = categorical(initType, [0 1 2], {'Other', 'RS', 'FS'});
-fetTbl.unitType = fetTbl.initType; % Alias for compatibility if needed, using initType primarily
+fetTbl.UnitType = fetTbl.initType; % Alias for compatibility if needed, using initType primarily
 
 %% ========================================================================
 %  TRANSFORM SKEWED FEATURES
@@ -183,7 +183,7 @@ if flgPlot
     varsRow = {'tp', 'asym', 'hpk'};
     varsCol = {'mfr', 'lidor', 'tpAmp'};
     plot_corrHist(fetTbl(idxGood, :), 'varsRow', varsRow, 'varsCol', varsCol,...
-        'grpIdx', 'unitType', 'clrGrp', clr);
+        'grpIdx', 'UnitType', 'clrGrp', clr);
 
 end
 

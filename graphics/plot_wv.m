@@ -33,6 +33,7 @@ addOptional(p, 'b2uv', 0.195, @(x) isnumeric(x) && (isempty(x) || isscalar(x)));
 addOptional(p, 'UnitType', [], @(x) iscategorical(x) || isnumeric(x));
 addParameter(p, 'Parent', [], @(x) isempty(x) || isgraphics(x));
 addParameter(p, 'SelectionCallback', [], @(x) isempty(x) || isa(x, 'function_handle'));
+addParameter(p, 'GroupByCallback', [], @(x) isempty(x) || isa(x, 'function_handle'));
 
 parse(p, varargin{:});
 basepaths = p.Results.basepaths;
@@ -41,6 +42,7 @@ b2uv = p.Results.b2uv;
 UnitType = p.Results.UnitType;
 hParent = p.Results.Parent;
 selCbk = p.Results.SelectionCallback;
+grpCbk = p.Results.GroupByCallback;
 
 %% ========================================================================
 %  LOAD DATA
@@ -137,7 +139,7 @@ xVal = linspace(-0.75, 0.8, 32);
 
 % Launch GUI
 hFig = tblGUI_xy(xVal, wvTbl, 'yVar', 'Waveform', 'Parent', hParent, ...
-    'SelectionCallback', selCbk);
+    'SelectionCallback', selCbk, 'GroupByCallback', grpCbk);
 
 end
 

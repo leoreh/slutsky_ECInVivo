@@ -3,12 +3,12 @@ function hFig = utypes_gui(varargin)
 % UTYPES_GUI Interactive visualization of unit types.
 %
 % This GUI provides a comprehensive view of neuronal unit classification,
-% featuring three synchronized tabs:
+% featuring three synchronized WINDOWS:
 %   1. Scatter Plot: Feature distribution visualization (e.g. TP vs Lidor).
 %   2. Traces: Functional responses or firing rate traces over time.
 %   3. Waveforms: Average spike waveforms.
 %
-% Selection in any tab is propagated to the others.
+% Selection AND Grouping are synchronized across all windows.
 %
 % INPUT (Optional Key-Value Pairs):
 %   basepaths    (cell array) Full paths to recording folders.
@@ -18,7 +18,7 @@ function hFig = utypes_gui(varargin)
 %   tAxis        (numeric) Time axis for the Traces tab.
 %
 % OUTPUT:
-%   hFig         (figure handle) Handle to the GUI figure.
+%   hFig         (figure handle) Handle to the Scatter Plot figure (main).
 %
 % DEPENDENCIES:
 %   basepaths2vars, v2tbl, tblGUI_scatHist, tblGUI_xy, plot_wv
@@ -94,127 +94,146 @@ if ~isfield(cfg, 'clr')
 end
 
 %% ========================================================================
-%  PLOT
+%  PLOT - 3 Separate Figure Windows
 %  ========================================================================
 
-% Main Figure
-hFig = figure('Name', 'Unit Types GUI', 'NumberTitle', 'off', ...
-    'Position', [50, 50, 1400, 900], 'MenuBar', 'none', 'ToolBar', 'figure');
+screenSz = get(0, 'ScreenSize');
+% width = screenSz(3); height = screenSz(4);
+% Define positions
+posScat = [50, 400, 800, 600];
+posTrace = [900, 550, 700, 450];
+posWv = [900, 50, 700, 450];
 
-hTabGroup = uitabgroup(hFig);
-hTabScat = uitab(hTabGroup, 'Title', 'Scatter');
-hTabTraces = uitab(hTabGroup, 'Title', 'Traces');
-hTabWv = uitab(hTabGroup, 'Title', 'Waveforms');
+% Initialize handles to prevent callback errors during creation
+hFigScat = [];
+hFigTrace = [];
+hFigWv = [];
+guiReady = false;
 
-% --- TAB 1: SCATTER ---
-% Callback: When Scatter selects, update Traces and Waveforms
+% --- WINDOW 1: SCATTER ---
+hTabScat = figure('Name', 'Scatter Plot', 'NumberTitle', 'off', ...
+    'Position', posScat, 'MenuBar', 'none', 'ToolBar', 'figure');
+
 cbkScat = @(indices) onSelect(indices, 'scatter');
+cbkGrp = @(varName, activeCats, src) onGroupChange(varName, activeCats, src);
 
 hFigScat = tblGUI_scatHist(uTbl, 'cfg', cfg, ...
-    'Parent', hTabScat, 'SelectionCallback', cbkScat);
+    'Parent', hTabScat, 'SelectionCallback', cbkScat, ...
+    'GroupByCallback', cbkGrp); % Passed to tblGUI_scatHist if modified
 
-% --- TAB 2: TRACES ---
+% --- WINDOW 2: TRACES ---
 hFigTrace = [];
 if ~isempty(tAxis)
-    % Callback: When Traces selects, update Scatter and Waveforms
+    hTabTraces = figure('Name', 'Traces', 'NumberTitle', 'off', ...
+        'Position', posTrace, 'MenuBar', 'none', 'ToolBar', 'figure');
+
     cbkTrace = @(indices) onSelect(indices, 'traces');
 
     hFigTrace = tblGUI_xy(tAxis, uTbl, 'Parent', hTabTraces, 'yVar', [], ...
-        'SelectionCallback', cbkTrace);
-else
-    uicontrol('Parent', hTabTraces, 'Style', 'text', 'String', 'No time axis provided.', ...
-        'Units', 'normalized', 'Position', [0.4 0.5 0.2 0.05]);
+        'SelectionCallback', cbkTrace, 'GroupByCallback', cbkGrp);
 end
 
-% --- TAB 3: WAVEFORMS ---
-% Callback: When Waveforms selects, update Scatter and Traces
+% --- WINDOW 3: WAVEFORMS ---
+hTabWv = figure('Name', 'Waveforms', 'NumberTitle', 'off', ...
+    'Position', posWv, 'MenuBar', 'none', 'ToolBar', 'figure');
+
 cbkWv = @(indices) onSelect(indices, 'waveforms');
 
-% We need to pass basepaths to plot_wv to let it load waveforms if not in uTbl
-% Or passing uTbl if plot_wv supports it?
-% plot_wv refactor: inputs basepaths, prepares wvTbl.
-% We want proper linking. plot_wv generates a NEW table (wvTbl).
-% Logic check: uTbl and wvTbl must match rows.
-% Since both load from same basepaths (presumably), rows should match order if sorted same.
-% But to be safe, we rely on the fact they come from same source.
-% We pass basepaths to plot_wv.
 [~, hFigWv] = plot_wv('basepaths', basepaths, 'UnitType', uTbl.UnitType, ...
-    'Parent', hTabWv, 'SelectionCallback', cbkWv);
-% Note: plot_wv call to tblGUI_xy inside needs access to 'SelectionCallback'.
-% The refactored plot_wv in step 61 did NOT add 'SelectionCallback' to its parser
-% or pass it to tblGUI_xy. I missed that in the plan for plot_wv,
-% but tblGUI_xy supports it. I need to update plot_wv quickly or just rely on
-% modifying plot_wv to pass varargin or explicit arg.
-% Actually, plot_wv does parse varargin, but doesn't explicitly look for 'SelectionCallback'.
-% However, tblGUI_xy is called at the end. I can modify plot_wv to accept it
-% or better, since I can't easily modify plot_wv mid-stream here without another tool call,
-% I will assume I will fix plot_wv in a moment.
-% FOR NOW: I will pass it, expecting to add support to plot_wv.
+    'Parent', hTabWv, 'SelectionCallback', cbkWv, 'GroupByCallback', cbkGrp);
 
-% Button for Saving
+% -------------------------------------------------------------------------
+
+% Button for Saving (on Scatter)
 if flgSave
-    % Add Push/Save button to the figure (Scatter tab container)
-    uicontrol('Parent', hTabScat, 'Style', 'pushbutton', ...
+    uicontrol('Parent', hTabScat, 'Style', 'pushbutton', ... % hFigScat is container
         'String', 'Push Units', ...
-        'Units', 'normalized', 'Position', [0.01, 0.16, 0.18, 0.05], ...
+        'Units', 'normalized', 'Position', [0.01, 0.11, 0.18, 0.05], ...
         'Callback', @(src, evt) onPushUnits(src, basepaths, hFigScat));
+end
+
+hFig = hFigScat; % Return main handle
+guiReady = true; % Enable callbacks
+
+% Force initial sync to Scatter's Config
+% Get initial Grp from Scatter user data if available
+try
+    d = hFigScat.UserData;
+    idx = get(d.ddGrp, 'Value');
+    items = get(d.ddGrp, 'String');
+    initGrp = items{idx};
+
+    % Gather initial categories
+    if isfield(d, 'chkGrp') && ~isempty(d.chkGrp)
+        selectedIdx = arrayfun(@(x) get(x, 'Value'), d.chkGrp);
+        allCats = arrayfun(@(x) string(get(x, 'String')), d.chkGrp);
+        activeCats = cellstr(allCats(logical(selectedIdx)));
+        onGroupChange(initGrp, activeCats, hFigScat);
+    end
+catch
 end
 
 
 %% ========================================================================
-%  COORDINATOR CALLBACK
+%  COORDINATOR CALLBACKS
 %  ========================================================================
 
     function onSelect(indices, sourceName)
-        % indices: logical array of selected units
-
+        if ~guiReady, return; end
+        % Sync Selection
         fprintf('Selection from: %s\n', sourceName);
 
-        % 1. Update Scatter (if not source)
-        if ~strcmp(sourceName, 'scatter') && ~isempty(hFigScat)
+        targetFigs = {hFigScat, hFigTrace, hFigWv};
+        targetNames = {'scatter', 'traces', 'waveforms'};
+
+        for i = 1:length(targetFigs)
+            h = targetFigs{i};
+            name = targetNames{i};
+
+            if isempty(h) || ~isvalid(h) || strcmp(sourceName, name), continue; end
+
             try
-                data = hFigScat.UserData;
+                data = h.UserData;
                 if isfield(data, 'highlightFcn')
                     data.highlightFcn(indices);
                 end
             catch
             end
         end
+    end
 
-        % 2. Update Traces (if not source)
-        if ~strcmp(sourceName, 'traces') && ~isempty(hFigTrace)
+    function onGroupChange(varName, activeCats, srcHandle)
+        if ~guiReady, return; end
+        % Sync Grouping Variable
+        fprintf('Group Change to: %s\n', varName);
+
+        targetFigs = {hFigScat, hFigTrace, hFigWv};
+
+        for i = 1:length(targetFigs)
+            h = targetFigs{i};
+            if isempty(h) || ~isvalid(h), continue; end
+
+            % Skip if this handle is the source (or contains the source)
+            % srcHandle might be the container or a child of it.
+            % But 'h' is the figure/container stored.
+            if h == srcHandle, continue; end
+
             try
-                data = hFigTrace.UserData;
-                if isfield(data, 'highlightFcn')
-                    data.highlightFcn(indices);
+                data = h.UserData;
+                if isfield(data, 'setGroupVarFcn')
+                    data.setGroupVarFcn(varName, activeCats);
                 end
             catch
             end
         end
-
-        % 3. Update Waveforms (if not source)
-        if ~strcmp(sourceName, 'waveforms') && ~isempty(hFigWv)
-            try
-                data = hFigWv.UserData;
-                if isfield(data, 'highlightFcn')
-                    data.highlightFcn(indices);
-                end
-            catch
-            end
-        end
-
     end
 
 end
 
 function onPushUnits(src, basepaths, hContainer)
-% hContainer passed explicitly
 data = hContainer.UserData;
-
-% Access the modified table from the GUI data
 if isfield(data, 'tbl')
     fetTbl = data.tbl;
-    % Call the standalone push_units function
     push_units(basepaths, fetTbl);
     msgbox('Units saved successfully!', 'Success');
 else

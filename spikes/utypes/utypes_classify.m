@@ -114,12 +114,11 @@ if flgPlot
     cfg.clr = mcuCfg.clr.unit([3 : -1 : 1], :);
     cfg.alpha = 0.4;
 
-    plot_utypes('uTbl', fetTbl, 'cfg', cfg, 'flgSave', flgSave, 'basepaths', basepaths);
+    utypes_gui('uTbl', fetTbl, 'cfg', cfg, 'flgSave', flgSave, 'basepaths', basepaths);
 end
 
 % Create output table with only used features and UnitType
-varsToKeep = unique([fetSelect(:)', {'UnitType'}], 'stable');
-uTbl = fetTbl(:, varsToKeep);
+uTbl = fetTbl;
 
 
 end     % EOF
@@ -128,7 +127,7 @@ end     % EOF
 %  HELPER FUNCTIONS
 %  ========================================================================
 
-function typeOut = gm2units(fet, typeIn, rsPrior, regVal)
+function UnitType = gm2units(fet, typeIn, rsPrior, regVal)
 % GM2UNITS Refines unit classification using Gaussian Mixture Model
 %
 % This helper function performs GMM clustering to refine the initial unit
@@ -170,8 +169,8 @@ gm = gmdistribution(gm.mu, gm.Sigma, priors);
 clusterLabels = cluster(gm, fet);
 
 % Map internal GMM components back to output format (1=RS, 2=FS)
-typeOut = ones(size(typeIn));          % Initialize all as RS
-typeOut(clusterLabels ~= rsIdx) = 2;   % Set non-RS cluster to FS
+UnitType = ones(size(typeIn));          % Initialize all as RS
+UnitType(clusterLabels ~= rsIdx) = 2;   % Set non-RS cluster to FS
 
 end
 
