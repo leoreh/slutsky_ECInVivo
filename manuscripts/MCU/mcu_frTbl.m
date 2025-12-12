@@ -65,8 +65,7 @@ for iMouse = 1:nMice
     [~, tMouse] = mcu_detectPert(frMat, 'flgPlot', false);
 
     % denoise frMat
-    frMat = fr_denoise(frMat, tMouse, ...
-        'flgPlot', false, 'frameLenSec', 60);
+    frMat = fr_denoise(frMat, 'flgPlot', false, 'frameLen', 60);
 
     mData(iMouse).frMat = frMat;
     mData(iMouse).tAxis = tMouse;

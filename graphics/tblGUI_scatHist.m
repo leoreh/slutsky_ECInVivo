@@ -32,11 +32,15 @@ p = inputParser;
 addRequired(p, 'tbl', @istable);
 addOptional(p, 'varsExclude', {'UnitID', 'Name', 'Mouse', 'File'}, @iscell);
 addOptional(p, 'cfg', struct(), @isstruct);
+addParameter(p, 'Parent', [], @(x) isempty(x) || isgraphics(x));
+addParameter(p, 'SelectionCallback', [], @(x) isempty(x) || isa(x, 'function_handle'));
 parse(p, tbl, varargin{:});
 
 tbl = p.Results.tbl;
 varsExclude = p.Results.varsExclude;
 cfg = p.Results.cfg;
+hParent = p.Results.Parent;
+selCbk = p.Results.SelectionCallback;
 
 %% ========================================================================
 %  INITIALIZATION
@@ -76,8 +80,15 @@ if isfield(cfg, 'alpha') && isnumeric(cfg.alpha), defAlpha = cfg.alpha; end
 if isfield(cfg, 'clr') && size(cfg.clr,2)==3, defClr = cfg.clr; end
 
 % Figure Setup
-hFig = figure('Name', 'Table Visualizer', 'NumberTitle', 'off', ...
-    'Position', [100, 100, 1000, 700], 'MenuBar', 'none', 'ToolBar', 'figure');
+% Figure Setup
+if isempty(hParent)
+    hContainer = figure('Name', 'Table Visualizer', 'NumberTitle', 'off', ...
+        'Position', [100, 100, 1000, 700], 'MenuBar', 'none', 'ToolBar', 'figure');
+    hFig = hContainer;
+else
+    hContainer = hParent;
+    hFig = ancestor(hContainer, 'figure');
+end
 
 % Data storage in figure handle for callbacks
 guiData = struct();
@@ -88,6 +99,7 @@ guiData.pointHandles = []; % To store scatter handles
 guiData.polyRoi = [];      % To store polygon ROI
 guiData.defAlpha = defAlpha;
 guiData.defClr = defClr;
+guiData.selCbk = selCbk;
 
 %% ========================================================================
 %  LAYOUT
@@ -113,9 +125,9 @@ axHistXPos   = [startX, startY + scatterH + 0.02, scatterW, 0.15];
 % Right Histogram (Y dist)
 axHistYPos   = [startX + scatterW + 0.02, startY, 0.15, scatterH];
 
-guiData.hAxScatter = axes('Parent', hFig, 'Position', axScatterPos);
-guiData.hAxHistX   = axes('Parent', hFig, 'Position', axHistXPos);
-guiData.hAxHistY   = axes('Parent', hFig, 'Position', axHistYPos);
+guiData.hAxScatter = axes('Parent', hContainer, 'Position', axScatterPos);
+guiData.hAxHistX   = axes('Parent', hContainer, 'Position', axHistXPos);
+guiData.hAxHistY   = axes('Parent', hContainer, 'Position', axHistYPos);
 
 % Link axes for zooming
 linkaxes([guiData.hAxScatter, guiData.hAxHistX], 'x');
@@ -135,40 +147,40 @@ ctlW = panelW - 0.02;
 ctlX = 0.01;
 
 % X Var
-uicontrol('Parent', hFig, 'Style', 'text', 'String', 'X Variable:', ...
+uicontrol('Parent', hContainer, 'Style', 'text', 'String', 'X Variable:', ...
     'Units', 'normalized', 'Position', [ctlX, ctlTop - ctlH, ctlW, ctlH*0.7], ...
     'HorizontalAlignment', 'left', 'FontWeight', 'bold');
-guiData.ddX = uicontrol('Parent', hFig, 'Style', 'popupmenu', ...
+guiData.ddX = uicontrol('Parent', hContainer, 'Style', 'popupmenu', ...
     'String', numericVars, 'Units', 'normalized', ...
     'Position', [ctlX, ctlTop - 2*ctlH, ctlW, ctlH], ...
     'Callback', @onUpdatePlot);
 
 % Y Var
 currYTop = ctlTop - 2*ctlH - ctlGap - ctlH;
-uicontrol('Parent', hFig, 'Style', 'text', 'String', 'Y Variable:', ...
+uicontrol('Parent', hContainer, 'Style', 'text', 'String', 'Y Variable:', ...
     'Units', 'normalized', 'Position', [ctlX, currYTop, ctlW, ctlH*0.7], ...
     'HorizontalAlignment', 'left', 'FontWeight', 'bold');
-guiData.ddY = uicontrol('Parent', hFig, 'Style', 'popupmenu', ...
+guiData.ddY = uicontrol('Parent', hContainer, 'Style', 'popupmenu', ...
     'String', numericVars, 'Units', 'normalized', ...
     'Position', [ctlX, currYTop - ctlH, ctlW, ctlH], ...
     'Callback', @onUpdatePlot);
 
 % Size Var
 currSizeTop = currYTop - ctlH - ctlGap - ctlH;
-uicontrol('Parent', hFig, 'Style', 'text', 'String', 'Size Variable:', ...
+uicontrol('Parent', hContainer, 'Style', 'text', 'String', 'Size Variable:', ...
     'Units', 'normalized', 'Position', [ctlX, currSizeTop, ctlW, ctlH*0.7], ...
     'HorizontalAlignment', 'left', 'FontWeight', 'bold');
-guiData.ddSize = uicontrol('Parent', hFig, 'Style', 'popupmenu', ...
+guiData.ddSize = uicontrol('Parent', hContainer, 'Style', 'popupmenu', ...
     'String', [{'None'}, numericVars], 'Units', 'normalized', ...
     'Position', [ctlX, currSizeTop - ctlH, ctlW, ctlH], ...
     'Callback', @onUpdatePlot);
 
 % Group Var
 currGrpTop = currSizeTop - ctlH - ctlGap - ctlH;
-uicontrol('Parent', hFig, 'Style', 'text', 'String', 'Group Variable:', ...
+uicontrol('Parent', hContainer, 'Style', 'text', 'String', 'Group Variable:', ...
     'Units', 'normalized', 'Position', [ctlX, currGrpTop, ctlW, ctlH*0.7], ...
     'HorizontalAlignment', 'left', 'FontWeight', 'bold');
-guiData.ddGrp = uicontrol('Parent', hFig, 'Style', 'popupmenu', ...
+guiData.ddGrp = uicontrol('Parent', hContainer, 'Style', 'popupmenu', ...
     'String', [{'None'}, catVars], 'Units', 'normalized', ...
     'Position', [ctlX, currGrpTop - ctlH, ctlW, ctlH], ...
     'Callback', @onUpdatePlot);
@@ -190,39 +202,41 @@ else, set(guiData.ddGrp, 'Value', idxG + 1); end
 % -- Buttons --
 
 % Position interactive buttons lower down
-guiData.btnSelect = uicontrol('Parent', hFig, 'Style', 'pushbutton', ...
+guiData.btnSelect = uicontrol('Parent', hContainer, 'Style', 'pushbutton', ...
     'String', 'Select Group', ...
     'Units', 'normalized', 'Position', [ctlX, 0.40, ctlW, 0.05], ...
     'Callback', @onSelectRegion, 'FontWeight', 'bold');
 
-guiData.btnSelectDot = uicontrol('Parent', hFig, 'Style', 'pushbutton', ...
+guiData.btnSelectDot = uicontrol('Parent', hContainer, 'Style', 'pushbutton', ...
     'String', 'Select Dot', ...
     'Units', 'normalized', 'Position', [ctlX, 0.34, ctlW, 0.05], ...
     'Callback', @onSelectDot, 'FontWeight', 'bold');
 
-uicontrol('Parent', hFig, 'Style', 'text', ...
+uicontrol('Parent', hContainer, 'Style', 'text', ...
     'String', 'Instruction: Use "Select Group" (Polygon) or "Select Dot" (Double-click to assign) to update groups.', ...
     'Units', 'normalized', 'Position', [ctlX, 0.25, ctlW, 0.08], ...
     'HorizontalAlignment', 'left', 'ForegroundColor', [0.4 0.4 0.4], ...
     'FontSize', 8);
 
-guiData.btnSave = uicontrol('Parent', hFig, 'Style', 'pushbutton', ...
+guiData.btnSave = uicontrol('Parent', hContainer, 'Style', 'pushbutton', ...
     'String', 'Save Table to Workspace', ...
     'Units', 'normalized', 'Position', [ctlX, 0.10, ctlW, 0.06], ...
     'Callback', @onSaveTable);
 
 % Store guidata
-guidata(hFig, guiData);
+hContainer.UserData = guiData;
+% Return handle to container
+hFig = hContainer;
 
 % Initial Plot
-onUpdatePlot(hFig, []);
+onUpdatePlot(hContainer, []);
 
 %% ====================================================================
 %  CALLBACKS
 %  ====================================================================
 
-    function onUpdatePlot(src, ~)
-        data = guidata(src);
+    function onUpdatePlot(~, ~)
+        data = hContainer.UserData;
         tbl = data.tbl;
 
         % Get selections
@@ -402,8 +416,8 @@ onUpdatePlot(hFig, []);
         end
     end
 
-    function onSelectRegion(src, ~)
-        data = guidata(src);
+    function onSelectRegion(~, ~)
+        data = hContainer.UserData;
         ax = data.hAxScatter;
         roi = drawpolygon(ax);
 
@@ -412,31 +426,33 @@ onUpdatePlot(hFig, []);
         end
 
         % Standard processing...
-        processSelection(src, data, roi, false);
+        % Standard processing...
+        processSelection(hContainer, data, roi, false);
     end
 
-    function onSelectDot(src, ~)
-        data = guidata(src);
+    function onSelectDot(~, ~)
+        data = hContainer.UserData;
         ax = data.hAxScatter;
 
         % Wait for user to create a point
+        delete(findobj(ax, 'Type', 'images.roi.Point')); % Clear previous points
         hPoint = drawpoint(ax, 'Label', 'Target');
 
         if isempty(hPoint.Position)
             delete(hPoint); return;
         end
 
-        % Snap to nearest point
+        % Snap to nearest point & Highlight
         snapToData(hPoint, data);
 
         % Add listener for double click
-        addlistener(hPoint, 'ROIClicked', @(roiSrc, evt) onDotDoubleClick(roiSrc, evt, src));
+        addlistener(hPoint, 'ROIClicked', @(roiSrc, evt) onDotDoubleClick(roiSrc, evt, hContainer));
 
         % Add listener for move to re-snap
         addlistener(hPoint, 'MovingROI', @(roiSrc, evt) snapToData(roiSrc, data));
 
         % Instruction
-        title(ax, 'Double-click the point to assign group...', 'Color', 'r');
+        title(ax, 'Double-click to assign group. Drag to browse traces.', 'Color', 'r');
     end
 
     function snapToData(hPoint, data)
@@ -471,15 +487,22 @@ onUpdatePlot(hFig, []);
 
         % Store index in UserData of the ROI
         hPoint.UserData = minIdx;
+
+        % Trigger Callback immediately for single click/drag highlighting
+        inPoints = false(height(data.tbl), 1);
+        inPoints(minIdx) = true;
+        if isfield(data, 'selCbk') && ~isempty(data.selCbk)
+            data.selCbk(inPoints);
+        end
     end
 
-    function onDotDoubleClick(hPoint, evt, guiSrc)
+    function onDotDoubleClick(hPoint, evt, ~)
         if strcmp(evt.SelectionType, 'double')
-            data = guidata(guiSrc);
+            data = hContainer.UserData;
             idx = hPoint.UserData;
 
             % Process single point selection logic
-            processSelectionIdx(guiSrc, data, idx);
+            processSelectionIdx(hContainer, data, idx);
 
             delete(hPoint);
             % Restore title
@@ -505,6 +528,16 @@ onUpdatePlot(hFig, []);
             return;
         end
 
+        % Only trigger callback if NOT polygon selection (as per user request)
+        if isSinglePoint
+            % Trigger selCbk logic is removed from here and handled in snapToData or processSelectionIdx
+            % Actually, user said polygon shouldn't affect traces.
+            % So we simply do NOT call selCbk here.
+            if ~isempty(data.selCbk)
+                data.selCbk(inPoints);
+            end
+        end
+
         assignGroup(src, data, inPoints, nSelected);
         delete(roi);
     end
@@ -512,6 +545,11 @@ onUpdatePlot(hFig, []);
     function processSelectionIdx(src, data, idx)
         inPoints = false(height(data.tbl), 1);
         inPoints(idx) = true;
+
+        if ~isempty(data.selCbk)
+            data.selCbk(inPoints);
+        end
+
         assignGroup(src, data, inPoints, 1);
     end
 
@@ -547,14 +585,14 @@ onUpdatePlot(hFig, []);
                 data.tbl.(grpName)(inPoints) = selectedCat;
             end
 
-            guidata(src, data);
+            hContainer.UserData = data;
             onUpdatePlot(src, []);
             fprintf('Updated %d points.\n', nSelected);
         end
     end
 
-    function onSaveTable(src, ~)
-        data = guidata(src);
+    function onSaveTable(~, ~)
+        data = hContainer.UserData;
         assignin('base', 'fetTbl_mod', data.tbl);
         msgbox('Table saved to workspace as "fetTbl_mod".', 'Saved');
     end

@@ -57,8 +57,7 @@ uTbl = utypes_classify('basepaths', {basepaths{:}}, ...
 % Plot waveforms
 plot_wv('basepaths', basepaths)
 
-% Plot classification
-plot_utypes('basepaths', basepaths, 'flgSave', true)
+
 
 
 
@@ -68,17 +67,10 @@ plot_utypes('basepaths', basepaths, 'flgSave', true)
 %  ========================================================================
 
 basepaths = [mcu_basepaths('wt'), mcu_basepaths('mcu')];
-uTbl = mcu_unitData();
+basepaths = mcu_basepaths('lh142');
+uTbl = mcu_unitData(basepaths);
 
-% Plot scatter gui
-cfg = mcu_cfg;
-cfgGui.xVar = 'TP';
-cfgGui.yVar = 'BLidor';
-cfgGui.szVar = 'FR';
-cfgGui.grpVar = 'UnitType';
-cfgGui.clr = cfg.clr.unit([3 : -1 : 1], :);
-cfgGui.alpha = 0.4;
-hFig = tblGUI_scatHist(uTbl, 'cfg', cfgGui);
+
 
 % Grab FR vs Time data
 [tAxis, frTbl] = mcu_frTbl(basepaths, 'uTbl', uTbl, 'flgPlot', true);
@@ -88,12 +80,11 @@ dataTbl = frTbl;
 dataTbl(dataTbl.UnitType == 'Other', :) = [];
 dataTbl.UnitType = removecats(dataTbl.UnitType, 'Other');
 
-% mcu_dashboard(dataTbl, tAxis, 'Supervisor_Report.html');
 
 
-tblGUI_xy(tAxis, dataTbl)
-
-
+% Plot classification
+plot_utypes('basepaths', basepaths, 'tAxis', tAxis, 'uTbl', frTbl, ...
+    'flgSave', true)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % LME

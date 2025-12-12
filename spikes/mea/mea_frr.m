@@ -115,7 +115,8 @@ uBad = nSpks < spkThr;
 [frOrig, ~, t] = times2rate(spktimes, 'binsize', binSize, 'c2r', true);
 
 % Denoise FRs for all units to get clean traces
-fr = fr_denoise(frOrig, t, 'flgPlot', false);
+sgFrameLen = round(sgFrameSec / binSize);
+fr = fr_denoise(frOrig, 'flgPlot', false, 'frameLen', sgFrameLen);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PERTURBATION DETECTION FROM MFR

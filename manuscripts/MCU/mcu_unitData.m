@@ -1,9 +1,11 @@
-function uTbl = mcu_unitData()
+function uTbl = mcu_unitData(basepaths)
 
 % MCU_UNITDATA Loads and processes unit data for the MCU project.
 
 % Load Data
-basepaths = [mcu_basepaths('wt'), mcu_basepaths('mcu')];
+if nargin < 1 || isempty(basepaths)
+    basepaths = [mcu_basepaths('wt'), mcu_basepaths('mcu')];
+end
 
 % Metadata
 tagFiles = struct();

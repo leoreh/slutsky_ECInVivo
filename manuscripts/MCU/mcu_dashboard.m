@@ -14,6 +14,9 @@ function mcu_dashboard(frTbl, tAxis, varargin)
 % OUTPUTS:
 %   None. Saves a file to disk.
 %
+% EXAMPLE:
+%   mcu_dashboard(dataTbl, tAxis, 'Supervisor_Report.html');
+% 
 % See also: MCU_FRTBL
 
 %% ========================================================================

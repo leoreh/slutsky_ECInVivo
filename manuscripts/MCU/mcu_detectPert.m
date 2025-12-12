@@ -21,7 +21,7 @@ function [pertIdx, tAxis, debugData] = mcu_detectPert(frMat, varargin)
 %
 % OUTPUTS:
 %   pertIdx      (double) Index of the perturbation onset (1-based).
-%   tAxis        (double) Time axis vector (in Minutes), zero-centered at
+%   tAxis        (double) Time axis vector (in hours), zero-centered at
 %                the perturbation onset.
 %   debugData    (struct) Intermediate data for debugging/plotting.
 %
@@ -61,8 +61,7 @@ winBsl    = round(bslDur * 3600 / binSize);
 mfr = median(frMat, 1, 'omitnan');
 
 % Denoise the trace
-mfrSm = fr_denoise(mfr, 1 : length(mfr), ...
-    'flgPlot', false, 'frameLenSec', 60);
+mfrSm = fr_denoise(mfr, 'flgPlot', false, 'frameLen', 60);
 
 % Calculate Derivative and smooth
 smoothWin = round(300 / binSize); % 5 min smoothing
@@ -243,7 +242,7 @@ if flgPlot
     ylabel('Derivative');
     hAx = gca;
     hAx.YAxis(2).Color = [0.5 0.5 0.5];
-    
+
     legend('Location', 'best');
     grid on;
 end

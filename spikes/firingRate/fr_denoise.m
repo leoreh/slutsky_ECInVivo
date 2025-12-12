@@ -1,4 +1,4 @@
-function fr = fr_denoise(frOrig, t, varargin)
+function fr = fr_denoise(frOrig, varargin)
 % FR_DENOISE Applies Savitzky-Golay filter to smooth firing rate data.
 %
 % SUMMARY:
@@ -11,13 +11,12 @@ function fr = fr_denoise(frOrig, t, varargin)
 %   3. Original NaNs are restored in the final output (masking).
 %
 % INPUT (Required):
-%   frOrig       - Matrix of raw firing rate values [Hz]. Units are rows.
-%   t            - Time vector corresponding to firing rate data [s].
+%   frOrig       - Matrix of raw firing rate values. Units are rows.
 %
 % INPUT (Optional Key-Value Pairs):
 %   flgPlot      - Logical flag to generate smoothing visualization {false}.
 %   polyOrder    - Polynomial order for Savitzky-Golay filter {3}.
-%   frameLenSec  - Frame length for Savitzky-Golay filter [s] {600}.
+%   frameLen     - Frame length for filter in samples {60}.
 %
 % OUTPUT:
 %   fr           - Matrix of smoothed firing rate values [Hz]. Same size as frOrig.
@@ -35,23 +34,22 @@ function fr = fr_denoise(frOrig, t, varargin)
 
 p = inputParser;
 addRequired(p, 'frOrig', @isnumeric);
-addRequired(p, 't', @isnumeric);
 addParameter(p, 'flgPlot', false, @islogical);
 addParameter(p, 'polyOrder', 3, @(x) isnumeric(x) && isscalar(x) && x > 0);
-addParameter(p, 'frameLenSec', 600, @(x) isnumeric(x) && isscalar(x) && x > 0);
+addParameter(p, 'frameLen', 60, @(x) isnumeric(x) && isscalar(x) && x > 0);
 
-parse(p, frOrig, t, varargin{:});
+parse(p, frOrig, varargin{:});
 flgPlot = p.Results.flgPlot;
 polyOrder = p.Results.polyOrder;
-frameLenSec = p.Results.frameLenSec;
+frameLen = p.Results.frameLen;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % FILTER PARAMETER SETUP
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Calculate the filter frame length in number of bins (samples)
-dt = mean(diff(t)); % Average sampling interval
-frameLen = round(frameLenSec / dt);
+% dt = mean(diff(t)); % Average sampling interval
+% frameLen = round(frameLenSec / dt);
 
 % Savitzky-Golay filter requires an odd frame length.
 if mod(frameLen, 2) == 0
@@ -72,9 +70,9 @@ fr = nan(size(frOrig)); % Start with NaNs
 nUnits = size(frOrig, 1);
 
 for iUnit = 1:nUnits
-    
+
     frUnit = frOrig(iUnit, :);
-    
+
     % Grab nan indices
     nanIdx = isnan(frUnit);
 
@@ -84,14 +82,14 @@ for iUnit = 1:nUnits
     % Identify non-NaN segments
     bouts = binary2bouts('vec', ~isnan(frUnit));
     bouts(:, 2) = bouts(:, 2) - 1;
-    
+
     for iBout = 1 : size(bouts, 1)
         boutIdx = bouts(iBout, 1) : bouts(iBout, 2);
         if length(boutIdx) >= frameLen
             frUnit(boutIdx) = sgolayfilt(frUnit(boutIdx), polyOrder, frameLen);
         end
     end
-    
+
     % Enforce non-negativity, restore nan, and fill
     frUnit(frUnit < 0) = 0;
     frUnit(nanIdx) = NaN;
@@ -119,23 +117,25 @@ if flgPlot
     hLgd = gobjects(nSmpl, 1);
     txtLgd = cell(nSmpl, 1);
 
+    t = 1:size(frOrig, 2);
+
     for iSmpl = 1 : nSmpl
         idx = smplIndices(iSmpl);
         % Plot original trace (semi-transparent)
-        plot(t/60, frOrig(idx, :), 'Color', [colors(iSmpl,:), 0.4], 'LineWidth', 1);
+        plot(t, frOrig(idx, :), 'Color', [colors(iSmpl,:), 0.4], 'LineWidth', 1);
         % Plot smoothed trace
-        hLgd(iSmpl) = plot(t/60, fr(idx, :), 'Color', colors(iSmpl,:), 'LineWidth', 2);
+        hLgd(iSmpl) = plot(t, fr(idx, :), 'Color', colors(iSmpl,:), 'LineWidth', 2);
         txtLgd{iSmpl} = sprintf('Unit %d', idx);
     end
 
-    xlabel('Time (min)');
-    ylabel('Firing Rate (Hz)');
-    title(sprintf('Example Smoothed Units (n=%d)\\nSav-Gol Filter: Order %d, Frame %.1f min', ...
-        nSmpl, polyOrder, frameLenSec/60));
+    xlabel('Time (Samples)');
+    ylabel('Firing Rate');
+    title(sprintf('Example Smoothed Units (n=%d)\\nSav-Gol Filter: Order %d, Frame %d Smpls', ...
+        nSmpl, polyOrder, frameLen));
     legend(hLgd, txtLgd, 'Location', 'eastoutside');
     grid on;
     box on;
-    xlim([t(1)/60, t(end)/60]);
+    xlim([t(1), t(end)]);
 end
 
 end
