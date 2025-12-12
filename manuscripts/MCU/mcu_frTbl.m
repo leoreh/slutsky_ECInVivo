@@ -61,10 +61,11 @@ for iMouse = 1:nMice
     myPaths = basepaths(contains(basepaths, mName));
 
     % Perturbation Detection & Alignment
-    [frMat, tMouse, ~] = mcu_detectPert(myPaths);
+    frMat = cat_fr(myPaths);
+    [frMat, tMouse, ~] = mcu_detectPert(frMat);
 
     % denoise frMat
-    frMat = fr_denoise(frMat, 1:size(frMat, 2), ...
+    frMat = fr_denoise(frMat, tMouse, ...
         'flgPlot', false, 'frameLenSec', 60);
 
     mData(iMouse).frMat = frMat;
@@ -143,13 +144,12 @@ if flgPlot
         subTbl = frTbl(mIdx, :);
 
         for iUnit = 1 : 2
-            hAx(iUnit) = plot_unitFR(hTab, tAxis, subTbl, cfg, iUnit);
+            hAx(iMouse, iUnit) = plot_unitFR(hTab, tAxis, subTbl, cfg, iUnit);
         end
-    end
-    
-    linkaxes(hAx, 'xy');
-    axis tight
 
+        linkaxes(hAx(iMouse, :), 'xy');
+        axis tight
+    end
 end
 
 end     % EoF

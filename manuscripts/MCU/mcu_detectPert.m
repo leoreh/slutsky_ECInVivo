@@ -1,4 +1,4 @@
-function [frMat, tAxis, pertIdx] = mcu_detectPert(basepaths)
+function [frMat, tAxis, pertIdx] = mcu_detectPert(frMat)
 
 % MCU_DETECTPERT Detects perturbation onset and returns aligned time axis.
 %
@@ -6,7 +6,7 @@ function [frMat, tAxis, pertIdx] = mcu_detectPert(basepaths)
 %   [pertIdx, tAxis] = mcu_detectPert(basepaths)
 %
 % INPUTS:
-%   basepaths    (cell array) Full paths to recording folders.
+%   frMat        (double) Firing rate matrix of units x samples 
 %
 % OUTPUTS:
 %   pertIdx      (double) Index of the perturbation onset relative to the
@@ -16,26 +16,13 @@ function [frMat, tAxis, pertIdx] = mcu_detectPert(basepaths)
 %
 % See also: CATFRTIME, MCU_FRTBL
 
-%% ========================================================================
-%  GET CONCATENATED FIRING RATES
-%  ========================================================================
-
-% Concatenate data
-frMat = cat_fr(basepaths);
-
-%% ========================================================================
-%  CALCULATE POPULATION MEAN
-%  ========================================================================
-
-% Calculate mean firing rate across all units (rows)
-mfr = mean(frMat, 1, 'omitnan');
-
-% Handle NaNs (e.g. gaps in recording) by filling with 0 or interpolating
-mfr = fillmissing(mfr, 'knn');
 
 %% ========================================================================
 %  DETECT PERTURBATION ONSET
 %  ========================================================================
+
+% Calculate mean firing rate across all units (rows)
+mfr = mean(frMat, 1, 'omitnan');
 
 % Denoise
 % Note: fr_denoise requires a time vector, we provide indices here.
@@ -43,7 +30,7 @@ mfrSmooth = fr_denoise(mfr, 1:length(mfr), ...
     'flgPlot', false, 'frameLenSec', 300);
 
 % Limit search to first n bins (or length) to find onset
-searchStart = 12 * 60;
+searchStart = 24 * 60;
 searchWin = searchStart : 96 * 60;
 
 % Define Window (e.g., 4 hours)

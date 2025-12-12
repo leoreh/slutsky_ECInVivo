@@ -58,7 +58,8 @@ uTbl = utypes_classify('basepaths', {basepaths{:}}, ...
 plot_wv('basepaths', basepaths)
 
 % Plot classification
-plot_utypes('basepaths', basepaths, 'flgSave', true)
+plot_utypes('basepaths', basepaths(5 : 7), 'flgSave', true)
+
 
 
 
@@ -77,7 +78,7 @@ cfgGui.szVar = 'FR';
 cfgGui.grpVar = 'UnitType';
 cfgGui.clr = cfg.clr.unit([3 : -1 : 1], :);
 cfgGui.alpha = 0.4;
-hFig = plot_tblScatter(uTbl, 'cfg', cfgGui);
+hFig = tblGUI_scatHist(uTbl, 'cfg', cfgGui);
 
 % Grab FR vs Time data
 [tAxis, frTbl] = mcu_frTbl(basepaths, 'uTbl', uTbl, 'flgPlot', true);
@@ -88,6 +89,9 @@ dataTbl(dataTbl.UnitType == 'Other', :) = [];
 dataTbl.UnitType = removecats(dataTbl.UnitType, 'Other');
 
 mcu_dashboard(dataTbl, tAxis, 'Supervisor_Report.html');
+
+
+tblGUI_xy(tAxis, frTbl)
 
 
 

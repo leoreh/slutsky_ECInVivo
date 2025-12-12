@@ -1,7 +1,7 @@
-function hFig = plot_tblScatter(tbl, varargin)
-% PLOT_TBLSCATTER Interactive scatter plot with marginal histograms and grouping.
+function hFig = tblGUI_scatHist(tbl, varargin)
+% TBLGUI_SCATHIST Interactive scatter plot with marginal histograms and grouping.
 %
-%   plot_tblGUI(tbl, ...) opens a GUI to visualize the table 'tbl'.
+%   tblGUI_scatHist(tbl, ...) opens a GUI to visualize the table 'tbl'.
 %   Features include variable selection, quadratic size scaling, dynamic
 %   grouping, and region-based group assignment.
 %
@@ -22,7 +22,7 @@ function hFig = plot_tblScatter(tbl, varargin)
 %
 %   EXAMPLE:
 %       cfg = struct('xVar','tp', 'yVar','mfr', 'szVar','pVal', 'grpVar','initType');
-%       plot_tblGUI(fetTbl, 'cfg', cfg);
+%       tblGUI_scatHist(fetTbl, 'cfg', cfg);
 %
 
 %% ========================================================================

@@ -1,21 +1,21 @@
 function hFig = plot_utypes(varargin)
 
-% PLOT_UTYPES Visualization of unit types using plot_tblScatter
+% PLOT_UTYPES Visualization of unit types using tblGUI_scatHist
 %
 % This function replaces the legacy waveform plotting. It loads unit data
-% (metrics and classification) and launches the interactive plot_tblScatter.
+% (metrics and classification) and launches the interactive tblGUI_scatHist.
 %
 % INPUT (Optional Key-Value Pairs):
 %   basepaths    (cell array) Full paths to recording folders.
 %   uTbl         (table) Pre-computed unit table. If provided, loading is skipped.
 %   flgSave      (logical) If true, adds a "Push Units" button to save classification.
-%   cfg          (struct) Configuration details for plot_tblScatter.
+%   cfg          (struct) Configuration details for tblGUI_scatHist.
 %
 % OUTPUT:
 %   hFig         (figure handle) Handle to the GUI figure.
 %
 % DEPENDENCIES:
-%   basepaths2vars, v2tbl, plot_tblScatter
+%   basepaths2vars, v2tbl, tblGUI_scatHist
 %
 
 %% ========================================================================
@@ -89,11 +89,11 @@ end
 %  PLOT
 %  ========================================================================
 
-hFig = plot_tblScatter(uTbl, 'cfg', cfg);
+hFig = tblGUI_scatHist(uTbl, 'cfg', cfg);
 
 if flgSave
     % Add Push/Save button to the figure
-    % Position it above the existing "Save Table" button in plot_tblScatter
+    % Position it above the existing "Save Table" button in tblGUI_scatHist
     uicontrol('Parent', hFig, 'Style', 'pushbutton', ...
         'String', 'Push Units', ...
         'Units', 'normalized', 'Position', [0.01, 0.16, 0.18, 0.05], ...
