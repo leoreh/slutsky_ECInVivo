@@ -1,32 +1,26 @@
-function hAx = plot_wv(varargin)
+function [wvTbl, hFig] = plot_wv(varargin)
 
-% PLOT_WV displays average spike waveforms for differentiated cell types.
-% It visualizes average spike waveforms for Regular Spiking (RS) vs
-% Fast Spiking (FS) units with optional scaling and interpolation.
+% PLOT_WV displays average spike waveforms using tblGUI_xy.
+% It loads waveform data, prepares a table, and launches the interactive GUI.
 %
 % INPUT (Optional Key-Value Pairs):
 %   basepaths    (cell array) Full paths to recording folders. If empty,
 %                uses current directory.
 %   flgRaw       (logical) Flag to use raw waveforms instead of pre-processed
-%                metrics. If true, waveforms are averaged and interpolated.
+%                metrics. If true, waveforms are interpolated and scaled.
 %                {false}
-%   flgOther     (logical) Flag to include "Other" (unclassified) units in plots.
-%                {false}
-%   clr          (numeric matrix) Nx3 matrix of RGB colors for each cell type.
-%                If empty, uses default colors. {[]}
 %   b2uv         (numeric) Conversion factor from bits to microvolts for
-%                waveform scaling. If empty, no scaling is applied. {0.195}
-%   UnitType     (categorical) Vector of unit classifications (1 x nUnits).
-%                Uses categories for legend.
-%                If empty: Attempts to load 'units.type' from data. {[]}
-%   hAx          (axes handle) Optional axes handle to plot into. If empty,
-%                creates new figure and axes. {[]}
+%                raw waveforms. {0.195}
+%   UnitType     (categorical) Vector of unit classifications. If empty,
+%                loads 'units.type'. {[]}
 %
 % OUTPUT:
-%   hAx          (axes handle) Handle to the axes containing the plot.
+%   wvTbl        (table) The created data table with waveforms.
+%   hFig         (handle) Handle to the GUI figure.
 %
 % DEPENDENCIES:
-%   basepaths2vars, catfields, cell2padmat, plot_axSize, plot_stdShade, mcu_cfg
+%   basepaths2vars, v2tbl, tblGUI_xy
+%
 
 %% ========================================================================
 %  ARGUMENTS
@@ -35,146 +29,117 @@ function hAx = plot_wv(varargin)
 p = inputParser;
 addOptional(p, 'basepaths', {}, @(x) iscell(x));
 addOptional(p, 'flgRaw', false, @islogical);
-addOptional(p, 'flgOther', false, @islogical);
-addOptional(p, 'clr', [], @(x) isnumeric(x) && (isempty(x) || size(x, 2) == 3));
 addOptional(p, 'b2uv', 0.195, @(x) isnumeric(x) && (isempty(x) || isscalar(x)));
 addOptional(p, 'UnitType', [], @(x) iscategorical(x) || isnumeric(x));
-addOptional(p, 'hAx', [], @(x) isempty(x) || ishandle(x) && strcmp(get(x, 'Type'), 'axes'));
+addParameter(p, 'Parent', [], @(x) isempty(x) || isgraphics(x));
+addParameter(p, 'SelectionCallback', [], @(x) isempty(x) || isa(x, 'function_handle'));
 
 parse(p, varargin{:});
 basepaths = p.Results.basepaths;
 flgRaw = p.Results.flgRaw;
-flgOther = p.Results.flgOther;
-clr = p.Results.clr;
 b2uv = p.Results.b2uv;
 UnitType = p.Results.UnitType;
-hAx = p.Results.hAx;
+hParent = p.Results.Parent;
+selCbk = p.Results.SelectionCallback;
 
 %% ========================================================================
-%  PARAMS
+%  LOAD DATA
 %  ========================================================================
 
-% Load data
+% Determine variables to load
 if flgRaw
-    vars = {'swv_raw'};
+    vars = {'swv_raw', 'units'};
 else
-    vars = {'swv_metrics'};
-end
-
-if isempty(UnitType)
-    vars = [vars, {'units'}];
+    vars = {'swv_metrics', 'units'};
 end
 
 v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 
-% Get unit classifications if not provided
+%% ========================================================================
+%  PREP METADATA
+%  ========================================================================
+
+% Prepare table metadata (Mouse, File, UnitID)
+tagFiles = struct();
+tagFiles.Mouse = get_mname(basepaths);
+[~, fNames] = fileparts(basepaths);
+tagFiles.File = fNames;
+
+% Create base table using v2tbl
+% We initially just want the structure, metadata and UnitID
+% We will manually added the waveform because v2tbl handles scalar/string columns best
+% or we can try to map it if we can. But manual is safer for matrix columns.
+% Actually, v2tbl might not handle 'swv_raw' which is a cell of matrices well if we map it directly.
+% So we'll use v2tbl to get the backbone.
+
+varMap = struct();
+varMap.UnitType = 'units.type';
+wvTbl = v2tbl('v', v, 'varMap', varMap, 'tagFiles', tagFiles);
+
+% Handle UnitType
 if isempty(UnitType)
     units = catfields([v.units], 2, true);
-    UnitType = vertcat(units.type{:});
-end
-
-% Extract categories
-cats = categories(UnitType);
-txtUnit = cats;
-nTypes = length(cats);
-
-% Default colors if not provided
-if isempty(clr)
-    cfg = mcu_cfg();
-    clr = cfg.clr.unit([3 : -1 : 1], :);
+    if isfield(units, 'type') && ~isempty(units.type)
+        wvTbl.UnitType = vertcat(units.type{:});
+    else
+        wvTbl.UnitType = repmat(categorical({'Unknown'}), height(wvTbl), 1);
+    end
+else
+    wvTbl.UnitType = UnitType(:);
 end
 
 %% ========================================================================
-%  PREP DATA
+%  PROCESS WAVEFORMS
 %  ========================================================================
 
 if flgRaw
     % Grab raw waveforms
     swv = [v(:).swv_raw];
-    swv = cellfun(@(x) mean(x, 2, 'omitnan'), swv, 'uni', false);
+    % Mean across spikes for each unit if it is a matrix [samples x nSpikes]
+    % Usually swv_raw is { [nSamp x nSpikes], ... } per unit?
+    % Or cell array of units where each is a mean?
+    % Checking previous code: swv = [v(:).swv_raw]; swv = cellfun(@(x) mean(x, 2, 'omitnan'), swv, 'uni', false);
+    % So it assumes cell array of matrices.
 
-    % Fig params
-    txtY = 'Amplitude (µV)';
+    swv = cellfun(@(x) mean(x, 2, 'omitnan'), swv, 'uni', false);
 else
-    % Grab L2 normalized waveforms
+    % Grab L2 normalized waveforms from metrics
     swv = catfields([v(:).swv], 'cell');
     swv = cellfun(@(x) num2cell(x, 2), swv.wv, 'UniformOutput', false);
     swv = vertcat(swv{:});
 
-    % Fig params
-    txtY = 'Norm. Amplitude (a.u.)';
 end
 
-wvLen = cellfun(@length, swv, 'uni', true);
-wv32 = wvLen == 32;
+% Ensure column vector
+swv = swv(:);
 
-% Interpolate all waveforms to 32 samples
+% Interpolate to 32 points
 swv = cellfun(@(x) interp1(linspace(0, 1, length(x)), x, linspace(0, 1, 32)', 'spline'),...
     swv, 'UniformOutput', false);
 
-% concate
+% Convert to Matrix [nUnits x nSamples]
 wv = cell2padmat(swv, 2)';
 
-% apply b2uv scaling
-if ~isempty(b2uv) && flgRaw
-    wv(wv32, :) = wv(wv32, :) * 0.195;
+% Apply Scaling if Raw
+if flgRaw && ~isempty(b2uv)
+    wv = wv * b2uv;
 end
 
-% waveform params
-xVal = [-15 : 16] / 20000 * 1000;
+% Assign to Table
+wvTbl.Waveform = wv;
 
 %% ========================================================================
 %  PLOT
 %  ========================================================================
 
-% Create or use figure/axes
-if isempty(hAx)
-    [~, hAx] = plot_axSize('szOnly', false);
-end
-hold on
+% Time Axis (ms). Assumes 20kHz sampling
+xVal = linspace(-0.75, 0.8, 32);
 
-lblTxt = {};
-for iType = 1 : nTypes
-
-    % Check if we should skip 'Other'
-    if ~flgOther && strcmp(cats{iType}, 'Other')
-        continue;
-    end
-
-    % Logic mask for this group
-    unitIdx = UnitType == cats{iType};
-
-    % Map to color (linear mapping)
-    if iType <= size(clr, 1)
-        uClr = clr(iType, :);
-    else
-        uClr = [0 0 0];
-    end
-
-    nUnitsType = sum(unitIdx);
-    if nUnitsType == 0
-        continue;
-    end
-
-    % grab average per unit type
-    wvUnit = wv(unitIdx, :);
-    if isempty(wvUnit)
-        continue
-    end
-
-    % plot with std shade
-    plot_stdShade('dataMat', wvUnit, 'xVal', xVal, ...
-        'hAx', hAx, 'clr', uClr, 'alpha', 0.5);
-
-    lblTxt{end+1} = sprintf('%s (n=%d)', txtUnit{iType}, nUnitsType);
-end
-
-% Format axes
-xlim([xVal(1), xVal(end)])
-xlabel('Time (ms)')
-ylabel(txtY)
-legend(hAx, lblTxt, 'Location', 'southeast')
+% Launch GUI
+hFig = tblGUI_xy(xVal, wvTbl, 'yVar', 'Waveform', 'Parent', hParent, ...
+    'SelectionCallback', selCbk);
 
 end
+
 
 % EOF

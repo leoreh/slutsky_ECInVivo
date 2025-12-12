@@ -29,12 +29,14 @@ function hFig = tblGUI_xy(xVec, dataTbl, varargin)
 p = inputParser;
 addParameter(p, 'yVar', [], @(x) ischar(x) || isstring(x) || isempty(x));
 addParameter(p, 'tileFlow', 'vertical', @(x) permember(x, {'flow', 'vertical', 'horizontal'}));
+addParameter(p, 'SelectionCallback', [], @(x) isempty(x) || isa(x, 'function_handle'));
 addParameter(p, 'Parent', [], @(x) isempty(x) || isgraphics(x));
 parse(p, varargin{:});
 
 yVar = p.Results.yVar;
 tileFlow = p.Results.tileFlow;
 hParent = p.Results.Parent;
+selCbk = p.Results.SelectionCallback;
 
 % Auto-select yVar if empty
 if isempty(yVar)
@@ -96,7 +98,9 @@ guiData.chkGrpBy = [];  % Handles for checkboxes
 guiData.colors = lines(20); % Pre-define colors
 guiData.tileInfo = []; % To store axis info for highlighting
 guiData.hlHandles = []; % To store highlight line handles
+guiData.hlHandles = []; % To store highlight line handles
 guiData.highlightFcn = @highlightTraces; % Expose function
+guiData.selCbk = selCbk;
 
 %% ========================================================================
 %  LAYOUT
@@ -357,8 +361,20 @@ onUpdatePlot(hContainer, []);
 
                 % Plot
                 % Light individual lines (High transparency) 0.05
-                plot(hAx, data.xVec, subY', 'Color', [clr, 0.05],...
+                % Assign ButtonDownFcn for interactivity
+                % We need to map each line to its global index
+                % Since we are plotting a matrix, 'plot' returns a vector of handles
+
+                hLines = plot(hAx, data.xVec, subY', 'Color', [clr, 0.05],...
                     'LineWidth', 0.5, 'HandleVisibility', 'off');
+
+                % Assign global indices to UserData of lines
+                % finalIdx is logical global mask. find(finalIdx) gives indices
+                globIndices = find(finalIdx);
+                for iL = 1:length(hLines)
+                    hLines(iL).UserData = globIndices(iL);
+                    hLines(iL).ButtonDownFcn = @(s,e) onLineClick(s, e, hContainer);
+                end
 
                 % Bold mean line
                 mfr = mean(subY, 1, 'omitnan');
@@ -464,6 +480,33 @@ onUpdatePlot(hContainer, []);
         end
 
         hContainer.UserData = data;
+    end
+
+    function onLineClick(srcLine, ~, hFigContainer)
+        % Callback for line click
+        % Highlighting internally + Trigger external callback
+
+        try
+            data = hFigContainer.UserData;
+            idx = srcLine.UserData;
+
+            % 1. Internal Highlight
+            highlightTraces(idx);
+
+            % 2. External Callback
+            if ~isempty(data.selCbk)
+                % Pass logical array or index? Standardizing on logical usually safer
+                % but index is fine too. Let's send logical to be consistent.
+                inPoints = false(height(data.dataTbl), 1);
+                inPoints(idx) = true;
+                data.selCbk(inPoints);
+            end
+
+            fprintf('Selected Trace Index: %d\n', idx);
+
+        catch ME
+            warning('Error in line click: %s', ME.message);
+        end
     end
 
 end

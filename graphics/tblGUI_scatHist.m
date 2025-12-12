@@ -99,7 +99,12 @@ guiData.pointHandles = []; % To store scatter handles
 guiData.polyRoi = [];      % To store polygon ROI
 guiData.defAlpha = defAlpha;
 guiData.defClr = defClr;
+guiData.defAlpha = defAlpha;
+guiData.defClr = defClr;
 guiData.selCbk = selCbk;
+guiData.highlightFcn = @highlightPoints; % Expose function
+guiData.hHighlight = []; % Store handle for external highlight
+
 
 %% ========================================================================
 %  LAYOUT
@@ -595,6 +600,45 @@ onUpdatePlot(hContainer, []);
         data = hContainer.UserData;
         assignin('base', 'fetTbl_mod', data.tbl);
         msgbox('Table saved to workspace as "fetTbl_mod".', 'Saved');
+    end
+
+    function highlightPoints(indices)
+        % External highlight function
+        % indices: logical or linear indices of points to highlight
+        data = hContainer.UserData;
+
+        % Remove existing highlight
+        if isfield(data, 'hHighlight') && ~isempty(data.hHighlight)
+            delete(data.hHighlight);
+        end
+        data.hHighlight = [];
+
+        idxX = get(data.ddX, 'Value');
+        idxY = get(data.ddY, 'Value');
+        xName = data.numericVars{idxX};
+        yName = data.numericVars{idxY};
+
+        xData = data.tbl.(xName);
+        yData = data.tbl.(yName);
+
+        % Extract selected points
+        selX = xData(indices);
+        selY = yData(indices);
+
+        if isempty(selX), return; end
+
+        hold(data.hAxScatter, 'on');
+
+        % Plot selection halo (e.g. Red Circle)
+        % We use a distinct marker style
+        data.hHighlight = plot(data.hAxScatter, selX, selY, 'o', ...
+            'Color', 'r', 'LineWidth', 2, 'MarkerSize', 10, ...
+            'PickableParts', 'none', 'HitTest', 'off', ...
+            'DisplayName', 'Selected');
+
+        hold(data.hAxScatter, 'off');
+
+        hContainer.UserData = data;
     end
 
 end

@@ -70,21 +70,20 @@ basepaths = [mcu_basepaths('wt'), mcu_basepaths('mcu')];
 basepaths = mcu_basepaths('lh142');
 uTbl = mcu_unitData(basepaths);
 
-
-
 % Grab FR vs Time data
-[tAxis, frTbl] = mcu_frTbl(basepaths, 'uTbl', uTbl, 'flgPlot', true);
+[tAxis, frTbl] = mcu_frTbl(basepaths, 'uTbl', uTbl, 'flgPlot', false);
+
+% Plot classification
+utypes_gui('basepaths', basepaths, 'tAxis', tAxis, 'uTbl', frTbl, ...
+    'flgSave', true)
+
+
 
 % Clean up
 dataTbl = frTbl;
 dataTbl(dataTbl.UnitType == 'Other', :) = [];
 dataTbl.UnitType = removecats(dataTbl.UnitType, 'Other');
 
-
-
-% Plot classification
-plot_utypes('basepaths', basepaths, 'tAxis', tAxis, 'uTbl', frTbl, ...
-    'flgSave', true)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % LME
