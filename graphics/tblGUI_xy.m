@@ -1,7 +1,7 @@
-function hFig = tblGUI_xy(xVec, dataTbl, yVar)
+function hFig = tblGUI_xy(xVec, dataTbl, varargin)
 % TBLGUI_XY Interactive visualization of Table variables against a vector.
 %
-%   hFig = tblGUI_xy(xVec, dataTbl, yVar) plots column 'yVar' from 'dataTbl'
+%   hFig = tblGUI_xy(xVec, dataTbl, varargin) plots column 'yVar' from 'dataTbl'
 %   against 'xVec'.
 %   - "Plot By": Splits data into separate tiles (subplots).
 %   - "Group By": Groups data within each tile by color.
@@ -9,9 +9,13 @@ function hFig = tblGUI_xy(xVec, dataTbl, yVar)
 %   INPUTS:
 %       xVec    (numeric)  Vector for X-axis.
 %       dataTbl (table)    Data table containing variables to plot.
-%       yVar    (char/str) Name of the column in dataTbl to plot.
+%
+%   OPTIONAL KEY-VALUE PAIRS:
+%       'yVar'             (char/str) Name of the column in dataTbl to plot.
 %                          If empty, auto-selects a numeric column matching
 %                          xVec dimensions.
+%       'tileFlow'         (char) Layout of tiles: 'flow',
+%                          'vertical' (1 column), or 'horizontal' (1 row).
 %
 %   OUTPUT:
 %       hFig    (handle)   Figure handle.
@@ -22,20 +26,30 @@ function hFig = tblGUI_xy(xVec, dataTbl, yVar)
 %  ARGUMENTS
 %  ========================================================================
 
-if nargin < 3, yVar = []; end
+p = inputParser;
+addRequired(p, 'xVec', @isnumeric);
+addRequired(p, 'dataTbl', @istable);
+addOptional(p, 'yVar', [], @(x) ischar(x) || isstring(x) || isempty(x));
+addParameter(p, 'tileFlow', 'vertical', @(x) permember(x, {'flow', 'vertical', 'horizontal'}));
+parse(p, xVec, dataTbl, varargin{:});
+
+xVec = p.Results.xVec;
+dataTbl = p.Results.dataTbl;
+yVar = p.Results.yVar;
+tileFlow = p.Results.tileFlow;
 
 % Auto-select yVar if empty
 if isempty(yVar)
     varNames = dataTbl.Properties.VariableNames;
     xLen = length(xVec);
 
-    for i = 1:length(varNames)
-        raw = dataTbl.(varNames{i});
+    for iVar = 1:length(varNames)
+        raw = dataTbl.(varNames{iVar});
         if isnumeric(raw) && size(raw, 2) == xLen
-            yVar = varNames{i};
+            yVar = varNames{iVar};
             break;
         elseif iscell(raw) && length(raw) > 0 && length(raw{1}) == xLen
-            yVar = varNames{i};
+            yVar = varNames{iVar};
             break;
         end
     end
@@ -71,6 +85,7 @@ guiData.xVec = xVec;
 guiData.dataTbl = dataTbl;
 guiData.yVar = yVar;
 guiData.catVars = catVars;
+guiData.tileFlow = tileFlow;
 guiData.chkPlotBy = []; % Handles for checkboxes
 guiData.chkGrpBy = [];  % Handles for checkboxes
 guiData.colors = lines(20); % Pre-define colors
@@ -80,7 +95,7 @@ guiData.colors = lines(20); % Pre-define colors
 %  ========================================================================
 
 % Side Panel for Controls (Left)
-panelW = 0.2;
+panelW = 0.1;
 % Create Left Panel
 hPanel = uipanel('Parent', hFig, 'Units', 'normalized', ...
     'Position', [0, 0, panelW, 1]);
@@ -93,13 +108,14 @@ hPanelRight = uipanel('Parent', hFig, 'Units', 'normalized', ...
 % Parent tiledlayout to the RIGHT PANEL to avoid bleeding
 guiData.hLayout = tiledlayout(hPanelRight, 'flow', ...
     'TileSpacing', 'tight', 'Padding', 'compact');
+guiData.hPanelRight = hPanelRight; % Store parent panel for layout recreation
 
 % --- Controls in Side Panel ---
 ctlH = 0.03;
 ctlGap = 0.01;
 currY = 0.95;
 
-% 1. PLOT BY (Tiles)
+% PLOT BY (Tiles)
 uicontrol('Parent', hPanel, 'Style', 'text', 'String', 'Plot By (Tiles):', ...
     'Units', 'normalized', 'Position', [0.05, currY, 0.9, ctlH], ...
     'HorizontalAlignment', 'left', 'FontWeight', 'bold');
@@ -122,7 +138,7 @@ uicontrol('Parent', hPanel, 'Style', 'text', 'String', '------------------------
     'HorizontalAlignment', 'center', 'ForegroundColor', [0.5 0.5 0.5]);
 currY = currY - ctlH - ctlGap;
 
-% 2. GROUP BY (Colors)
+% GROUP BY (Colors)
 uicontrol('Parent', hPanel, 'Style', 'text', 'String', 'Group By (Colors):', ...
     'Units', 'normalized', 'Position', [0.05, currY, 0.9, ctlH], ...
     'HorizontalAlignment', 'left', 'FontWeight', 'bold');
@@ -191,10 +207,10 @@ onUpdatePlot(hFig, []);
             h = 1 / max(10, nCats + 1); % Simple spacing
 
             w = 0.9;
-            for i = 1:nCats
-                yPos = 1 - i*h;
-                chkHandles(i) = uicontrol('Parent', hPanel, 'Style', 'checkbox', ...
-                    'String', cats{i}, 'Units', 'normalized', ...
+            for iVar = 1:nCats
+                yPos = 1 - iVar*h;
+                chkHandles(iVar) = uicontrol('Parent', hPanel, 'Style', 'checkbox', ...
+                    'String', cats{iVar}, 'Units', 'normalized', ...
                     'Position', [0, yPos, w, h], 'Value', 1); % Default Select All
             end
         end
@@ -205,9 +221,13 @@ onUpdatePlot(hFig, []);
 
     function onUpdatePlot(src, ~)
         data = guidata(src);
-        delete(data.hLayout.Children);
 
-        % 1. Determine Tile Splits (Plot By)
+        % Manage Layout based on Arrangement
+        % If layout type changes, we might need to be careful, but just
+        % configuring it here is fine.
+        nTiles = 1; % Temporary default
+
+        % Determine Tile Splits (Plot By)
         idxPB = get(data.ddPlotBy, 'Value');
         varPB = data.catVars{idxPB};
 
@@ -227,8 +247,15 @@ onUpdatePlot(hFig, []);
                 catsPB = cellstr(allCats(logical(selectedIdx)));
             end
         end
+        nTiles = length(catsPB);
 
-        % 2. Determine Line Groups (Group By)
+        % Recreate layout to support different arrangements
+        delete(data.hLayout);
+        data.hLayout = tiledlayout(data.hPanelRight, data.tileFlow, ...
+            'TileSpacing', 'tight', 'Padding', 'compact');
+        guidata(src, data); 
+
+        % Determine Line Groups (Group By)
         idxGB = get(data.ddGrpBy, 'Value');
         varGB = data.catVars{idxGB};
 
@@ -287,7 +314,7 @@ onUpdatePlot(hFig, []);
                 % Filter Data for Group AND Tile
                 if strcmp(varGB, 'None')
                     idxGrp = true(height(data.dataTbl), 1);
-                    clr = 'k';
+                    clr = [0, 0, 0];
                 else
                     rawColG = data.dataTbl.(varGB);
                     if islogical(rawColG), rawColG = categorical(rawColG); end
@@ -310,22 +337,13 @@ onUpdatePlot(hFig, []);
                 end
 
                 % Plot
-                % Light individual lines (High transparency)
-                if ismatrix(clr) && size(clr,1)==1
-                    % clrArgs = {clr, 0.05};
-                else
-                    % clrArgs = {'k', 0.05};
-                end
-
-                if isnumeric(clr)
-                    plot(hAx, data.xVec, subY', 'Color', [clr, 0.05], 'HandleVisibility', 'off');
-                else
-                    plot(hAx, data.xVec, subY', 'Color', [0 0 0 0.05], 'HandleVisibility', 'off');
-                end
+                % Light individual lines (High transparency) 0.05
+                plot(hAx, data.xVec, subY', 'Color', [clr, 0.05],...
+                    'LineWidth', 0.5, 'HandleVisibility', 'off');
 
                 % Bold mean line
                 mfr = mean(subY, 1, 'omitnan');
-                plot(hAx, data.xVec, mfr, 'Color', clr, 'LineWidth', 2.5, ...
+                plot(hAx, data.xVec, mfr, 'Color', clr, 'LineWidth', 2, ...
                     'DisplayName', sprintf('%s (n=%d)', catGrp, sum(finalIdx)));
 
                 % Update Ranges for Y Lim
@@ -364,4 +382,8 @@ onUpdatePlot(hFig, []);
 
     end
 
+end
+
+function tf = permember(str, allowed)
+tf = any(strcmpi(str, allowed));
 end

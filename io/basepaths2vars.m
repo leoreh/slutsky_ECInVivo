@@ -1,10 +1,10 @@
 function v = basepaths2vars(varargin)
 % Loads specified variables from multiple directories and organizes them in a struct array.
-% 
+%
 % INPUT:
 %   basepaths - cell array of directory paths.
 %   vars      - string array of .mat file names (without extensions) to load.
-% 
+%
 % OUTPUT:
 %   v - struct array with fields corresponding to variables inside the .mat files.
 %
@@ -20,10 +20,12 @@ function v = basepaths2vars(varargin)
 p = inputParser;
 addParameter(p, 'basepaths', {});
 addParameter(p, 'vars', string([]));
+addParameter(p, 'flgPrnt', false, @islogical);
 parse(p, varargin{:});
 
 basepaths = p.Results.basepaths;
 vars = p.Results.vars;
+flgPrnt = p.Results.flgPrnt;
 
 npaths = length(basepaths);
 
@@ -39,38 +41,37 @@ clear v
 for ipath = 1 : npaths
     filepath = basepaths{ipath};
     if ~exist(filepath, 'dir')
-        warning('%s does not exist, skipping...', filepath)
+        if flgPrnt, warning('%s does not exist, skipping...', filepath), end
         continue
     end
     cd(filepath)
-    
+
     for ifile = 1:length(vars)
         filename = dir(['*', vars{ifile}, '*.mat']);
-        
+
         if length(filename) > 1
-            warning('Multiple files with the name %s. Using first one %s.',...
-                vars{ifile}, filename(1).name);
+            if flgPrnt, warning('Multiple files with the name %s. Using first one %s.', vars{ifile}, filename(1).name); end
             filename = filename(1).name;
         elseif isempty(filename)
-            warning('No %s file in %s, skipping...', vars{ifile}, filepath)
+            if flgPrnt, warning('No %s file in %s, skipping...', vars{ifile}, filepath), end
             v(ipath).(vars{ifile}) = [];
             continue
         else
             filename = filename(1).name;
         end
-        
+
         % Load the file and dynamically assign the variable
         temp = load(filename);
-        
+
         % Automatically detect variable name
         varNames = fieldnames(temp);
-        if length(varNames) == 1
+        if isscalar(varNames)
             v(ipath).(varNames{1}) = temp.(varNames{1});
         elseif any(strcmp(varNames, vars{ifile}))
             v(ipath).(vars{ifile}) = temp.(vars{ifile});
         else
             % Default to the first variable if multiple exist
-            warning('Multiple variables in %s. Using first one.', filename)
+            if flgPrnt, warning('Multiple variables in %s. Using first one.', filename), end
             v(ipath).(vars{ifile}) = temp.(varNames{1});
         end
     end

@@ -57,11 +57,13 @@ winBsl    = round(bslDur * 3600 / binSize);
 %  ========================================================================
 
 % Calculate Robust Population State. Use median to be resistant to
-% single-unit outliers.
-mfr = median(frMat, 1, 'omitnan');
+% single-unit outliers. Denoise individual traces before averaging.
+mfr = median(fr_denoise(frMat, 1 : size(frMat, 1), ...
+    'flgPlot', false, 'frameLenSec', 60), 1, 'omitnan');
+% mfr = median(frMat, 1, 'omitnan');
 
 % Denoise the trace
-mfrSm = fr_denoise(mfr, 1 : length(mfr), ...
+mfrSm = fr_denoise(mfrSm, t : length(mfrSm), ...
     'flgPlot', false, 'frameLenSec', 60);
 
 % Calculate Derivative and smooth
