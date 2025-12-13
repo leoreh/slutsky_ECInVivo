@@ -1,11 +1,32 @@
-function uTbl = mcu_unitData(basepaths)
+function uTbl = mcu_unitTbl(varargin)
 
-% MCU_UNITDATA Loads and processes unit data for the MCU project.
+% MCU_UNITTBL Loads and processes unit data for the MCU project.
+%
+% INPUT (Optional Key-Value Pairs):
+%   basepaths    (cell array) Full paths to recording folders. If empty,
+%                loads defaults.
+%
+% OUTPUT:
+%   uTbl         (table) Unit table with metadata.
+%
 
-% Load Data
-if nargin < 1 || isempty(basepaths)
+%% ========================================================================
+%  ARGUMENTS
+%  ========================================================================
+
+p = inputParser;
+addOptional(p, 'basepaths', {}, @(x) iscell(x));
+
+parse(p, varargin{:});
+basepaths = p.Results.basepaths;
+
+if isempty(basepaths)
     basepaths = [mcu_basepaths('wt'), mcu_basepaths('mcu')];
 end
+
+%% ========================================================================
+%  LOAD DATA
+%  ========================================================================
 
 % Metadata
 tagFiles = struct();
@@ -20,6 +41,10 @@ v = basepaths2vars('basepaths', basepaths, 'vars', cfg.vars);
 % Table
 uTbl = v2tbl('v', v, 'varMap', cfg.varMap, 'tagAll',...
     struct(), 'tagFiles', tagFiles, 'idxCol', []);
+
+%% ========================================================================
+%  PROCESS METADATA
+%  ========================================================================
 
 % Group metadata
 uTbl.Group = ones(height(uTbl), 1) * 1;
@@ -42,10 +67,5 @@ uTbl = movevars(uTbl, varOrder, 'Before', 1);
 uTbl.Group = reordercats(uTbl.Group, cfg.lbl.grp);
 uTbl.UnitType = reordercats(uTbl.UnitType, cfg.lbl.unit);
 uTbl.Day = reordercats(uTbl.Day, cfg.lbl.day);
-
-% Clean up
-% uTbl = rmmissing(uTbl);
-% uTbl(uTbl.UnitType == 'Other', :) = [];
-% uTbl.UnitType = removecats(uTbl.UnitType, 'Other');
 
 end

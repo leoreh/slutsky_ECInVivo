@@ -1,16 +1,15 @@
-function [tAxis, frTbl] = mcu_frTbl(basepaths, varargin)
+function [tAxis, tblUnit] = mcu_frTbl(basepaths, varargin)
 
 % MCU_FRTBL Create a table of firing rates aligned to perturbation
 %   Combines data from multiple mice into a single global time axis.
 %
 % INPUTS:
 %   basepaths (cell) - List of recording session paths.
-%   uTbl      (table)- Optional. If provided, joins with the created table.
-%   flgPlot   (log)  - Resules plotting.
+%   flgPlot   (log)  - Results plotting. {true}
 %
 % OUTPUTS:
 %   tAxis     (vec)  - Global time axis in Hours (0 = Perturbation).
-%   frTbl     (tbl)  - Table with metadata and 'FRt' column (aligned matrix).
+%   tblUnit   (tbl)  - Table with metadata and 'FRt' column (aligned matrix).
 %
 % See also: MCU_DETECTPERT, CATFRTIME, V2TBL
 
@@ -20,33 +19,22 @@ function [tAxis, frTbl] = mcu_frTbl(basepaths, varargin)
 
 p = inputParser;
 addRequired(p, 'basepaths', @iscell);
-addOptional(p, 'uTbl', table(), @istable);
 addOptional(p, 'flgPlot', true, @islogical);
 parse(p, basepaths, varargin{:});
 
-uTbl = p.Results.uTbl;
 flgPlot = p.Results.flgPlot;
 
 % Sort basepaths naturally
 basepaths = natsort(basepaths);
 
+% Firing rate binsize [s]
+binSize = 60;   
+
 %% ========================================================================
 %  CREATE TABLE
 %  ========================================================================
 
-if isempty(uTbl)
-    % Create table for all basepaths at once
-    v = basepaths2vars('basepaths', basepaths, 'vars', {'units'});
-
-    varMap.UnitType = 'units.type';
-    tagFiles.Name = get_mname(basepaths);
-    [~, fNames] = fileparts(basepaths);
-    tagFiles.File = fNames;
-
-    frTbl = v2tbl('v', v, 'varMap', varMap, 'tagFiles', tagFiles);
-else
-    frTbl = uTbl;
-end
+tblUnit = mcu_unitTbl('basepaths', basepaths);
 
 %% ========================================================================
 %  PROCESS BY MOUSE
@@ -58,17 +46,38 @@ mData = struct();
 
 for iMouse = 1:nMice
     mName = string(mice(iMouse));
-    myPaths = basepaths(contains(basepaths, mName));
+    mPaths = basepaths(contains(basepaths, mName));
+    
+    % Grab first 5 files and detect perutrbation
+    frBac = cat_fr(mPaths(1 : 5));
+    [~, tMouse] = mcu_detectPert(frBac, 'flgPlot', false);
+    
+    % Remove NaN samples before the perturbation. No need to adhere to
+    % absolute time of day for baseline data. 
+    idxRm = all(isnan(frBac(:, tMouse < 0)), 1);
+    frBac(:, idxRm) = [];
+    
+    % Update time vector
+    tMouse(1 : sum(idxRm)) = [];
+
+    % Grab last 2 files (bac off and washout)
+    frWsh = cat_fr(mPaths(6 : 7));
+    
+    % Combine matrices
+    nUnits = size(frBac, 1) + size(frWsh, 1);
+    frMat = nan(nUnits, 7 * 24 * binSize)
+
+    figure;
+    plot(tMouse, mean(frBac, 1, 'omitnan'))
 
     % Perturbation Detection & Alignment
-    frMat = cat_fr(myPaths);
-    [~, tMouse] = mcu_detectPert(frMat, 'flgPlot', true);
+    frBac = cat_fr(mPaths);
+    [~, tMouse] = mcu_detectPert(frBac, 'flgPlot', false);
 
     % denoise frMat
-    frMat = fr_denoise(frMat, tMouse, ...
-        'flgPlot', false, 'frameLenSec', 60);
+    frBac = fr_denoise(frBac, 'flgPlot', false, 'frameLen', 60);
 
-    mData(iMouse).frMat = frMat;
+    mData(iMouse).frMat = frBac;
     mData(iMouse).tAxis = tMouse;
     mData(iMouse).name  = mName;
 end
@@ -97,8 +106,8 @@ tAxis = minT : dt : maxT;
 nBins = length(tAxis);
 
 % Align Data to Global Axis
-nTotalUnits = height(frTbl);
-frTbl.FRt = nan(nTotalUnits, nBins);
+nTotalUnits = height(tblUnit);
+tblUnit.FRt = nan(nTotalUnits, nBins);
 
 for iMouse = 1:nMice
     mName = mData(iMouse).name;
@@ -117,8 +126,8 @@ for iMouse = 1:nMice
 
     % Assign to Table
     % Direct assignment assuming unique mouse names
-    mIdx = frTbl.Name == mName;
-    frTbl.FRt(mIdx, :) = alignedMat;
+    mIdx = tblUnit.Name == mName;
+    tblUnit.FRt(mIdx, :) = alignedMat;
 end
 
 %% ========================================================================
@@ -126,62 +135,7 @@ end
 %  ========================================================================
 
 if flgPlot
-    mice = unique(frTbl.Name);
-    nMice = length(mice);
-    cfg = mcu_cfg();
-
-    hFig = figure('Name', 'Firing Rate vs Time', 'NumberTitle', 'off', ...
-        'Position', [100 100 1000 800]);
-
-    tabgp = uitabgroup(hFig);
-
-    for iMouse = 1:nMice
-        mName = string(mice(iMouse));
-        hTab = uitab(tabgp, 'Title', mName);
-
-        % Get data for this mouse
-        mIdx = frTbl.Name == mName;
-        subTbl = frTbl(mIdx, :);
-
-        for iUnit = 1 : 2
-            hAx(iMouse, iUnit) = plot_unitFR(hTab, tAxis, subTbl, cfg, iUnit);
-        end
-
-        linkaxes(hAx(iMouse, :), 'xy');
-        axis tight
-    end
+    tblGUI_xy(tAxis, tblUnit, 'yVar', 'FRt');
 end
-
-end     % EoF
-
-
-%% ========================================================================
-%  HELPER: PLOT FR vs TIME
-%  ========================================================================
-
-function hAx = plot_unitFR(hTab, tAxis, subTbl, cfg, iUnit)
-
-hAx = subplot(2, 1, iUnit, 'Parent', hTab);
-uType = cfg.lbl.unit{iUnit};
-uIdx = subTbl.UnitType == uType;
-frData = subTbl.FRt(uIdx, :);
-clr = cfg.clr.unit(iUnit, :);
-
-% Plot All Traces (Light Gray)
-hold(hAx, 'on');
-plot(hAx, tAxis, frData', 'Color', [0.7 0.7 0.7 0.2]);
-
-% Plot Mean (Blue)
-mfr = mean(frData, 1, 'omitnan');
-plot(hAx, tAxis, mfr, 'Color', clr, 'LineWidth', 2, ...
-    'DisplayName', 'Mean FR');
-
-title(hAx, sprintf('%s Units', uType), 'Interpreter', 'none');
-xlabel(hAx, 'Time (Hours)');
-ylabel(hAx, 'Firing Rate (Hz)');
-grid(hAx, 'on');
-xline(hAx, 0, '--k', 'Perturbation');
-ylim(hAx, [0, ceil(max(mfr))]);
-xticks(-4 * 24 : 24 : 6 * 24)
 
 end

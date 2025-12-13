@@ -2,13 +2,12 @@ function frMat = cat_fr(basepaths)
 
 %   CAT_FR concatenates firing rate matrices from different recording
 %   sessions with respect to the absolute time of day. It stacks different
-%   units from different sessions onto different rows of the final matrix,
-%   without separating RS and FS units.
+%   units from different sessions onto different rows of the final matrix.
 %
 %   Rows 1 : nUnits(1) are for the units from session 1,
 %   Rows nUnits(1) + 1 : nUnits(1) + nUnits(2) are for session 2, etc.
 %
-% INPUT (Optional Key-Value Pairs):
+% INPUT:
 %   basepaths    (cell array) Full paths to recording folders.
 %
 % OUTPUT:

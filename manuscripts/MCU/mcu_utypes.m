@@ -21,6 +21,10 @@ for iPath = 1 : nPaths
     basepath = basepaths{iPath};
     [~, basename] = fileparts(basepath);
     cd(basepath)
+    
+    fr = calc_fr(spikes.times, 'basepath', basepath,...
+        'graphics', false, 'binsize', 60, 'saveVar', true,...
+        'smet', 'GK', 'winBL', [0, Inf], 'winCalc', [0, Inf], 'forceA', true);
 
     % waveform metrices
     % swv = spkwv_metrics('basepath', basepath, 'flgSave', true, 'flgForce', true);
@@ -39,50 +43,34 @@ end
 
 % get all files in study
 basepaths = mcu_basepaths('all');
-
-basepaths = mcu_basepaths('lh142');
-
-% Create table of features for classification
-fetTbl = utypes_features('basepaths', {basepaths{:}}, 'flgPlot', true);
+basepaths = [mcu_basepaths('wt'), mcu_basepaths('mcu')];
 
 % Classify
-fetSelect = {'asym', 'hpk', 'tp'};
+fetSelect = {'Asym', 'Hpk', 'TP'};
 rsPrior = 0.97;
 regVal = 0.01;
-uTbl = utypes_classify('basepaths', {basepaths{:}}, ...
-    'flgSave', false, 'fetTbl', fetTbl,...
-    'fetSelect', fetSelect, 'regVal', regVal, 'rsPrior', rsPrior,...
-    'flgPlot', true, 'flgSave', false);
-
-% Plot waveforms
-plot_wv('basepaths', basepaths)
+tblUnit = utypes_classify('basepaths', basepaths, ...
+    'fetSelect', fetSelect, 'regVal', regVal, ...
+    'rsPrior', rsPrior, 'flgPlot', false);
 
 
-
-
-
-
-%% ========================================================================
-%  LOAD DATA TABLE
-%  ========================================================================
-
+% Inspect
 basepaths = [mcu_basepaths('wt'), mcu_basepaths('mcu')];
-basepaths = mcu_basepaths('lh142');
-uTbl = mcu_unitData(basepaths);
+basepaths = [mcu_basepaths('mcu')];
 
 % Grab FR vs Time data
-[tAxis, frTbl] = mcu_frTbl(basepaths, 'uTbl', uTbl, 'flgPlot', false);
+[tAxis, tblUnit] = mcu_frTbl(basepaths, 'flgPlot', true);
 
 % Plot classification
-utypes_gui('basepaths', basepaths, 'tAxis', tAxis, 'uTbl', frTbl, ...
-    'flgSave', true)
-
-
+utypes_gui('basepaths', basepaths, 'tAxis', tAxis, 'tblUnit', tblUnit)
 
 % Clean up
-dataTbl = frTbl;
+dataTbl = tblUnit;
 dataTbl(dataTbl.UnitType == 'Other', :) = [];
 dataTbl.UnitType = removecats(dataTbl.UnitType, 'Other');
+
+
+hFig = tblGUI_xy(tAxis, tblUnit)
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

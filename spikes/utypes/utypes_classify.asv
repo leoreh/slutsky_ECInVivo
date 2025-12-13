@@ -136,13 +136,19 @@ tblUnit.UnitType = categorical(UnitType, [1, 2, 3], {'RS', 'FS', 'Other'});
 %  ========================================================================
 
 idxNumeric = varfun(@isnumeric, tblUnit, 'OutputFormat', 'uniform');
-nVar = length(idxNumeric);
-varAuc = zeros(nVar, 1);
+nCol = length(idxNumeric);
+colAuc = zeros(nCol, 1);
 UnitType = double(tblUnit.UnitType(idxGood));
 
-for iVar = 1:nVar
-    if idxNumeric(iVar) 
-        [~,~,~,varAuc(iVar)] = perfcurve(UnitType, tblUnit{idxGood, iVar}, 1);
+for iCol = 1:nCol
+    if idxNumeric(nCol) > 0
+    fieldName = pltFlds{iCol};
+    data = tblUnit.(fieldName)(idxGood);
+    groups = InitType(idxGood);
+
+    % Calculate AUC
+    [~,~,~,colAuc(iCol)] = perfcurve(groups, data, 1);
+
     end
 end
 
@@ -151,7 +157,15 @@ end
 %  ========================================================================
 
 if flgPlot
-    utypes_gui('tblUnit', tblUnit, 'basepaths', basepaths);
+    mcuCfg = mcu_cfg;
+    cfg.xVar = 'TP';
+    cfg.yVar = 'BLidor';
+    cfg.szVar = 'FR';
+    cfg.grpVar = 'UnitType';
+    cfg.clr = mcuCfg.clr.unit;
+    cfg.alpha = 0.4;
+
+    utypes_gui('tblUnit', tblUnit, 'cfg', cfg, 'basepaths', basepaths);
 end
 
 end
