@@ -2,6 +2,9 @@ function [tAxis, tblUnit] = mcu_frTbl(basepaths, varargin)
 
 % MCU_FRTBL Create a table of firing rates aligned to perturbation
 %   Combines data from multiple mice into a single global time axis.
+%   Alignment Strategy:
+%     1. Files 1-5: Aligned such that Perturbation Onset = t(0).
+%     2. Files 6-7: Aligned such that Start of File 6 = t(144h).
 %
 % INPUTS:
 %   basepaths (cell) - List of recording session paths.
@@ -27,8 +30,6 @@ flgPlot = p.Results.flgPlot;
 % Sort basepaths naturally
 basepaths = natsort(basepaths);
 
-% Firing rate binsize [s]
-binSize = 60;   
 
 %% ========================================================================
 %  CREATE TABLE
@@ -37,105 +38,84 @@ binSize = 60;
 tblUnit = mcu_unitTbl('basepaths', basepaths);
 
 %% ========================================================================
+%  GLOBAL TIME AXIS
+%  ========================================================================
+
+% Define Global Axis Range. We create a contiguous axis that covers the min
+% to max of the entire experiment, even if the middle is empty (NaNs).
+
+binSize = 60;           % Firing rate binsize [s]
+minT = -48;             % Start check 24h before pert
+maxW = 216;             % End check 8 days later
+dt = binSize / 3600;    % [hr]
+
+tAxis = minT : dt : maxW;
+nBinsTotal = length(tAxis);
+
+% Initialize mat
+tblUnit.FRt = nan(height(tblUnit), nBinsTotal);
+
+
+%% ========================================================================
 %  PROCESS BY MOUSE
 %  ========================================================================
 
 mice = unique(get_mname(basepaths));
 nMice = length(mice);
-mData = struct();
+unitCount = 1;
 
 for iMouse = 1:nMice
     mName = string(mice(iMouse));
     mPaths = basepaths(contains(basepaths, mName));
-    
-    % Grab first 5 files and detect perutrbation
-    frBac = cat_fr(mPaths(1 : 5));
-    [~, tMouse] = mcu_detectPert(frBac, 'flgPlot', false);
+
+    % --- Phase 1: Baclofen ---
+    paths = mPaths(1:5);
+    frMat = cat_fr(paths);
+
+    % Detect Perturbation (returns index relative to start of frBac)
+    [pertIdx, tMouse] = mcu_detectPert(frMat, 'flgPlot', false);
     
     % Remove NaN samples before the perturbation. No need to adhere to
-    % absolute time of day for baseline data. 
-    idxRm = all(isnan(frBac(:, tMouse < 0)), 1);
-    frBac(:, idxRm) = [];
-    
-    % Update time vector
-    tMouse(1 : sum(idxRm)) = [];
+    % absolute time of day for baseline data. Update pertIdx to the shorter
+    % matrix
+    idxRm = all(isnan(frMat(:, tMouse < 0)), 1);
+    frMat(:, idxRm) = [];
+    [nUnits, nBins] = size(frMat);
+    pertIdx = pertIdx - sum(idxRm);
 
-    % Grab last 2 files (bac off and washout)
-    frWsh = cat_fr(mPaths(6 : 7));
-    
-    % Combine matrices
-    nUnits = size(frBac, 1) + size(frWsh, 1);
-    frMat = nan(nUnits, 7 * 24 * binSize)
+    % Map to Global Axis: t=0 is at pertIdx
+    tStart = (1 - pertIdx) * dt;
 
-    figure;
-    plot(tMouse, mean(frBac, 1, 'omitnan'))
+    % Find index in tAxis corresponding to peturbation onset and fill
+    % matrix
+    [~, idxStart] = min(abs(tAxis - tStart));
+    idxEnd = min(nBinsTotal, idxStart + nBins - 1);
+    tblUnit.FRt(unitCount : unitCount + nUnits - 1, idxStart : idxEnd) = frMat;
+    unitCount = unitCount + nUnits;
 
-    % Perturbation Detection & Alignment
-    frBac = cat_fr(mPaths);
-    [~, tMouse] = mcu_detectPert(frBac, 'flgPlot', false);
+    % --- Phase 2: Washout ---
+    paths = mPaths(6:7);
+    frMat = cat_fr(paths);
+    [nUnits, nBins] = size(frMat);
 
-    % denoise frMat
-    frBac = fr_denoise(frBac, 'flgPlot', false, 'frameLen', 60);
+    % Alignment: Start of File 6 defined as t = 144 hours (Day 6 Start)
+    tStart = 144;
+    [~, idxStart] = min(abs(tAxis - tStart));
+    idxEnd = min(nBinsTotal, idxStart + nBins - 1);
+    tblUnit.FRt(unitCount : unitCount + nUnits - 1, idxStart : idxEnd) = frMat;
+    unitCount = unitCount + nUnits;
 
-    mData(iMouse).frMat = frBac;
-    mData(iMouse).tAxis = tMouse;
-    mData(iMouse).name  = mName;
 end
 
-%% ========================================================================
-%  GLOBAL ALIGNMENT
-%  ========================================================================
-
-% Determine Global Time Range
-minT = inf;
-maxT = -inf;
-dt = [];
-
-for iMouse = 1:nMice
-    t = mData(iMouse).tAxis;
-    minT = min(minT, min(t));
-    maxT = max(maxT, max(t));
-
-    if isempty(dt) && length(t) > 1
-        dt = t(2) - t(1);
-    end
-end
-
-% Create Global Axis
-tAxis = minT : dt : maxT;
-nBins = length(tAxis);
-
-% Align Data to Global Axis
-nTotalUnits = height(tblUnit);
-tblUnit.FRt = nan(nTotalUnits, nBins);
-
-for iMouse = 1:nMice
-    mName = mData(iMouse).name;
-    fr = mData(iMouse).frMat;
-    t = mData(iMouse).tAxis;
-
-    % Find Start Index in Global Grid
-    [~, idxStart] = min(abs(tAxis - t(1)));
-
-    [nUnits, nTimeMouse] = size(fr);
-    alignedMat = nan(nUnits, nBins);
-
-    idxEnd = min(nBins, idxStart + nTimeMouse - 1);
-    lenFill = idxEnd - idxStart + 1;
-    alignedMat(:, idxStart:idxEnd) = fr(:, 1:lenFill);
-
-    % Assign to Table
-    % Direct assignment assuming unique mouse names
-    mIdx = tblUnit.Name == mName;
-    tblUnit.FRt(mIdx, :) = alignedMat;
-end
 
 %% ========================================================================
 %  PLOT
 %  ========================================================================
 
 if flgPlot
+
     tblGUI_xy(tAxis, tblUnit, 'yVar', 'FRt');
+
 end
 
 end
