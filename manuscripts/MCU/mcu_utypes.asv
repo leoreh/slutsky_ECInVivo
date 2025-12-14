@@ -21,6 +21,10 @@ for iPath = 1 : nPaths
     basepath = basepaths{iPath};
     [~, basename] = fileparts(basepath);
     cd(basepath)
+    
+    fr = calc_fr(spikes.times, 'basepath', basepath,...
+        'graphics', false, 'binsize', 60, 'saveVar', true,...
+        'smet', 'GK', 'winBL', [0, Inf], 'winCalc', [0, Inf], 'forceA', true);
 
     % waveform metrices
     % swv = spkwv_metrics('basepath', basepath, 'flgSave', true, 'flgForce', true);
@@ -39,69 +43,37 @@ end
 
 % get all files in study
 basepaths = mcu_basepaths('all');
-basepaths = [mcu_basepaths('wt'), mcu_basepaths('wt')];
-
-nPaths = length(basepaths);
-
-% Create table of features for classification
-fetTbl = utypes_features('basepaths', {basepaths{:}}, 'flgPlot', false);
-
-% Classify
-fetSelect = {'asym', 'hpk', 'tp'};
-rsPrior = 0.97;
-regVal = 0.01;
-uTbl = utypes_classify('basepaths', {basepaths{:}}, ...
-    'flgSave', false, 'fetTbl', fetTbl,...
-    'fetSelect', fetSelect, 'regVal', regVal, 'rsPrior', rsPrior,...
-    'flgPlot', true, 'flgSave', false);
-
-
-%% ========================================================================
-%  LOAD DATA TABLE
-%  ========================================================================
-
-
 basepaths = [mcu_basepaths('wt'), mcu_basepaths('mcu')];
 
-% Metadata
-tagFiles = struct();
-tagFiles.Name = get_mname(basepaths);
-[~, fileNames] = fileparts(basepaths);
-tagFiles.File = fileNames;
-
-% Load
-cfg = mcu_cfg;
-v = basepaths2vars('basepaths', basepaths, 'vars', cfg.vars);
-
-% Table
-uTbl = v2tbl('v', v, 'varMap', cfg.varMap, 'tagAll',...
-    struct(), 'tagFiles', tagFiles, 'idxCol', []);
-
-% Group metadata
-uTbl.Group = ones(height(uTbl), 1) * 1;
-uTbl.Group(ismember(uTbl.Name, cfg.miceMCU), :) = 2;
-uTbl.Group = categorical(uTbl.Group, [1, 2], cfg.lbl.grp);
-
-% Day metadata
-fileTbl = unique(uTbl(:, {'Name', 'File'}), 'rows');
-fileGrp = findgroups(fileTbl.Name);
-dayCell = splitapply(@(x) {(1:numel(x))'}, fileTbl.File, fileGrp);
-fileTbl.Day = vertcat(dayCell{:});
-uTbl = join(uTbl, fileTbl, 'Keys', {'Name', 'File'});
-uTbl.Day = categorical(uTbl.Day, [1 : 7], cfg.lbl.day);
-
-% Reorder
-varOrder = {'Group', 'Name', 'File', 'Day', 'UnitID', 'UnitType'};
-uTbl = movevars(uTbl, varOrder, 'Before', 1);
+% Classify
+fetSelect = {'Asym', 'Hpk', 'TP'};
+rsPrior = 0.97;
+regVal = 0.01;
+tblUnit = utypes_classify('basepaths', basepaths, ...
+    'fetSelect', fetSelect, 'regVal', regVal, ...
+    'rsPrior', rsPrior, 'flgPlot', false);
 
 
+% Inspect
+basepaths = [mcu_basepaths('wt'), mcu_basepaths('mcu')];
+
+% Grab FR vs Time data
+[tAxis, tblUnit] = mcu_frTbl(basepaths, 'flgPlot', true);
+
+% Plot classification
+utypes_gui('basepaths', basepaths, 'tAxis', tAxis, 'tblUnit', tblUnit)
+
+% Clean up
+dataTbl = tblUnit;
+dataTbl(dataTbl.UnitType == 'Other', :) = [];
+dataTbl.UnitType = removecats(dataTbl.UnitType, 'Other');
 
 
+hFig = tblGUI_xy(tAxis, tblUnit);
 
-
-
-
-[tAxis, frTbl] = mcu_frTbl(basepaths);
+% Grab to prism
+idxUnits = tblUnit.UnitType == 'RS' & tblUnit.Group == 'Control';
+frMat = tblUnit.FRt(idxUnits, :);
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

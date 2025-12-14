@@ -54,9 +54,12 @@ tblUnit = utypes_classify('basepaths', basepaths, ...
     'rsPrior', rsPrior, 'flgPlot', false);
 
 
+%% ========================================================================
+%  INSPECT
+%  ========================================================================
+
 % Inspect
 basepaths = [mcu_basepaths('wt'), mcu_basepaths('mcu')];
-basepaths = [mcu_basepaths('mcu')];
 
 % Grab FR vs Time data
 [tAxis, tblUnit] = mcu_frTbl(basepaths, 'flgPlot', true);
@@ -64,146 +67,11 @@ basepaths = [mcu_basepaths('mcu')];
 % Plot classification
 utypes_gui('basepaths', basepaths, 'tAxis', tAxis, 'tblUnit', tblUnit)
 
-% Clean up
-dataTbl = tblUnit;
-dataTbl(dataTbl.UnitType == 'Other', :) = [];
-dataTbl.UnitType = removecats(dataTbl.UnitType, 'Other');
+
+hFig = tblGUI_xy(tAxis, tblUnit);
+
+% Grab to prism
+idxUnits = tblUnit.UnitType == 'FS' & tblUnit.Group == 'Control';
+frMat = tblUnit.FRt(idxUnits, :)';
 
 
-hFig = tblGUI_xy(tAxis, tblUnit)
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% LME
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% Formula
-frml = 'SWV ~ Group * UnitType + (1|Mouse)';
-
-% organize for lme
-varFld = 'tp';
-[lmeData, lmeCfg] = lme_org('grppaths', grppaths, 'frml', frml,...
-    'flgEmg', false, 'varFld', varFld);
-
-
-
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Plot classification
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% get all files in study
-basepaths = mcu_basepaths('all');
-nPaths = length(basepaths);
-
-% Get only WT basepaths
-mNames = unique(get_mname(mcu_basepaths('wt')));
-clear mPaths
-for iMouse = 1 : length(mNames)
-    mPaths(iMouse, :) = string(mcu_basepaths(mNames{iMouse}))';
-end
-basepaths = mPaths(:);
-basepaths = [mcu_basepaths('wt_bsl'), mcu_basepaths('wt_bsl_ripp')];
-basepaths = unique(basepaths);
-
-
-altClassify = 3;
-swvFld = 'tp';
-stFld = 'royer';
-hAx = plot_utypes('basepaths', basepaths, 'flgRaw', false,...
-    'plotType', 'scatter', 'swvFld', swvFld, 'stFld', stFld,...
-    'unitIdx', altClassify);
-hFig = gcf;
-xlabel(hAx, 'Trough-to-Peak (ms)')
-ylabel(hAx, 'Burstiness Index')
-axis tight
-set(hAx, 'YScale', 'log')
-ylim([0.1, 100])
-plot_axSize('hFig', hFig, 'szOnly', false, 'axShape',...
-    'square', 'axHeight', 300, 'flgPos', true)
-
-% Extract data
-hSct = findobj(gca, 'Type', 'scatter');
-iUnit = 2;
-x = hSct(iUnit).XData;
-y = hSct(iUnit).YData;
-sz = hSct(iUnit).SizeData;
-
-
-% Save
-fname = ['UnitTypes~Scatter_Alt', num2str(altClassify)];
-lme_save('hFig', hFig, 'fname', fname, 'frmt', {'mat', 'svg'},...
-    'lmeData', [], 'lmeStats', [])
-
-
-hAx = plot_utypes('basepaths', basepaths, 'flgRaw', false,...
-    'plotType', 'wv', 'swvFld', swvFld, 'stFld', stFld,...
-    'unitIdx', altClassify);
-hFig = gcf;
-xlabel(hAx, 'Time (ms)')
-ylabel(hAx, 'Amplitude (a.u.)')
-yticks(hAx, [])
-ylim([-0.75, 0.1])
-xlim([-0.5, 0.5])
-hAx.Legend.Location = 'southwest';
-plot_axSize('hFig', hFig, 'szOnly', false, 'axShape', 'tall', 'axHeight', 300)
-% hAx.Legend.FontSize = 16;
-hAx.Legend.ItemTokenSize = [14 10];
-
-% Save
-fname = ['UnitTypes~Wv_Alt', num2str(altClassify)];
-lme_save('hFig', hFig, 'fname', fname, 'frmt', {'mat', 'svg'},...
-    'lmeData', [], 'lmeStats', [])
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Create copy of files
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% get all files in study
-basepaths = mcu_basepaths('all');
-nPaths = length(basepaths);
-
-fNames = {...
-    '*.acceleration.mat',...
-    '*.datInfo*',...
-    '*.cell_metrics*',...
-    '*.fr.mat',...
-    '*.frEmg.mat',...
-    '*.nrs',...
-    '*.ripp.*',...
-    '*.session.mat*',...
-    '*.spikes.*',...
-    '*.spktimes.mat',...
-    '*.sr.mat',...
-    '*.st_*',...
-    '*.swv_metrics*',...
-    '*.swv_raw*',...
-    '*.units.mat',...
-    '*.xml',...
-    '*.sleep_states*',...
-    '*.sleep_labelsMan*',...
-    % '*.lfp',...
-    % '*.sleep_*',...
-    };
-
-for iPath = 1 : nPaths
-    basepath = basepaths{iPath};
-    cp_basepath('fNames', fNames, 'basepath', basepath,...
-        'overwrite', false, 'verbose', true)
-end

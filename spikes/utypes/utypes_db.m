@@ -128,17 +128,12 @@ end
 %  CLASSIFY
 %  ========================================================================
 
-% Re-load data
-vars = {'swv_metrics', 'st_metrics', 'fr', 'units'};
-v = basepaths2vars('basepaths', basepaths, 'vars', vars);
-
-% Create table of features for classification
-fetTbl = utypes_features('basepaths', basepaths, 'flgPlot', false, 'v', v);
-
-% Classify
-fetSelect = {'asym', 'hpk', 'tp'};
-uTbl = utypes_classify('basepaths', basepaths, 'fetSelect', fetSelect,...
-    'flgSave', true, 'fetTbl', fetTbl, 'flgPlot', true);
+fetSelect = {'Asym', 'Hpk', 'TP'};
+rsPrior = 0.97;
+regVal = 0.01;
+tblUnit = utypes_classify('basepaths', basepaths, ...
+    'fetSelect', fetSelect, 'regVal', regVal, ...
+    'rsPrior', rsPrior, 'flgPlot', false);
 
 
 %% ========================================================================

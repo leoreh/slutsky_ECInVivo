@@ -46,7 +46,7 @@ tblUnit = mcu_unitTbl('basepaths', basepaths);
 
 binSize = 60;           % Firing rate binsize [s]
 minT = -48;             % Start check 24h before pert
-maxW = 216;             % End check 8 days later
+maxW = 146;             % End check 8 days later
 dt = binSize / 3600;    % [hr]
 
 tAxis = minT : dt : maxW;
@@ -60,8 +60,7 @@ tblUnit.FRt = nan(height(tblUnit), nBinsTotal);
 %  PROCESS BY MOUSE
 %  ========================================================================
 
-mice = unique(get_mname(basepaths));
-mice = natsort(mice);
+mice = natsort(unique(get_mname(basepaths)));
 nMice = length(mice);
 unitCount = 1;
 
@@ -69,13 +68,13 @@ for iMouse = 1:nMice
     mName = string(mice(iMouse));
     mPaths = basepaths(contains(basepaths, mName));
 
-    % --- Phase 1: Baclofen ---
+    % --- BASELINE + BACLOFEN ---
     paths = mPaths(1:5);
     frMat = cat_fr(paths);
 
     % Detect Perturbation (returns index relative to start of frBac)
     [pertIdx, tMouse] = mcu_detectPert(frMat, 'flgPlot', false);
-    
+
     % Remove NaN samples before the perturbation. No need to adhere to
     % absolute time of day for baseline data. Update pertIdx to the shorter
     % matrix
@@ -94,13 +93,13 @@ for iMouse = 1:nMice
     tblUnit.FRt(unitCount : unitCount + nUnits - 1, idxStart : idxEnd) = frMat;
     unitCount = unitCount + nUnits;
 
-    % --- Phase 2: Washout ---
+    % --- WASHOUT ---
     paths = mPaths(6:7);
     frMat = cat_fr(paths);
     [nUnits, nBins] = size(frMat);
 
-    % Alignment: Start of File 6 defined as t = 144 hours (Day 6 Start)
-    tStart = 144;
+    % Alignment: Fixed start 4 days after perturbation onset
+    tStart = 96;
     [~, idxStart] = min(abs(tAxis - tStart));
     idxEnd = min(nBinsTotal, idxStart + nBins - 1);
     tblUnit.FRt(unitCount : unitCount + nUnits - 1, idxStart : idxEnd) = frMat;
@@ -108,6 +107,9 @@ for iMouse = 1:nMice
 
 end
 
+    
+% --- DENOISE ---
+tblUnit.FRt = fr_denoise(tblUnit.FRt, 'flgPlot', false, 'frameLen', 60);
 
 %% ========================================================================
 %  PLOT

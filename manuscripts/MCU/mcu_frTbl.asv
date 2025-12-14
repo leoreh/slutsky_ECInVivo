@@ -60,7 +60,7 @@ tblUnit.FRt = nan(height(tblUnit), nBinsTotal);
 %  PROCESS BY MOUSE
 %  ========================================================================
 
-mice = unique(get_mname(basepaths));
+mice = natsort(unique(get_mname(basepaths)));
 nMice = length(mice);
 unitCount = 1;
 
@@ -68,13 +68,13 @@ for iMouse = 1:nMice
     mName = string(mice(iMouse));
     mPaths = basepaths(contains(basepaths, mName));
 
-    % --- Phase 1: Baclofen ---
+    % --- BASELINE + BACLOFEN ---
     paths = mPaths(1:5);
     frMat = cat_fr(paths);
 
     % Detect Perturbation (returns index relative to start of frBac)
     [pertIdx, tMouse] = mcu_detectPert(frMat, 'flgPlot', false);
-    
+
     % Remove NaN samples before the perturbation. No need to adhere to
     % absolute time of day for baseline data. Update pertIdx to the shorter
     % matrix
@@ -93,7 +93,7 @@ for iMouse = 1:nMice
     tblUnit.FRt(unitCount : unitCount + nUnits - 1, idxStart : idxEnd) = frMat;
     unitCount = unitCount + nUnits;
 
-    % --- Phase 2: Washout ---
+    % --- WASHOUT ---
     paths = mPaths(6:7);
     frMat = cat_fr(paths);
     [nUnits, nBins] = size(frMat);
@@ -104,6 +104,9 @@ for iMouse = 1:nMice
     idxEnd = min(nBinsTotal, idxStart + nBins - 1);
     tblUnit.FRt(unitCount : unitCount + nUnits - 1, idxStart : idxEnd) = frMat;
     unitCount = unitCount + nUnits;
+    
+    % --- DENOISE ---
+    tblUnit.FRt = fr_denoise(tblUnit.FRt, 'flgPlot', false, 'frameLen', 60);
 
 end
 

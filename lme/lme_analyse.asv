@@ -847,31 +847,3 @@ end     % EOF
 %     across models with different fixed effects. Do NOT use AIC/BIC from
 %     these methods.
 %  ========================================================================
-
-
-%% ========================================================================
-%  NOTE: HANDLING ZEROS
-%  ========================================================================
-%  Addresses the constraint that Log-link, Gamma, and Log-Normal models are
-%  undefined for y = 0. A common heuristic is transforming y -> log(y + c).
-%
-%  1. The "Half-Minimum" Heuristic:
-%     Commonly, c is set to min(y > 0) / 2. This creates a floor for the
-%     data, allowing log-transformation (or Gamma fitting) while preserving
-%     the rank order of observations.
-%
-%  2. Statistical Implications & Risks:
-%     - Sensitivity: The estimated coefficients (elasticities) for small y
-%       are highly sensitive to the arbitrary choice of c.
-%     - Bias: It introduces a "hard floor" (artificial curvature) in the
-%       Mean-Variance relationship, potentially violating model assumptions.
-%     - Scale Invariance: The transformation is not scale-invariant (e.g.,
-%       adding 0.5 yields different results if y is measured in ms vs sec).
-%
-%  3. Best Practices:
-%     - Sensitivity Analysis: If using a shift, verify results are robust 
-%       to changes in c (e.g., test c = min(y) and c = min(y)/10).
-%     - Modern Alternatives: If zeros are prevalent, prefer distributions
-%       that handle zeros naturally (e.g., Tweedie, Poisson/PPML) to avoid
-%       arbitrary shifts entirely.
-%  ========================================================================

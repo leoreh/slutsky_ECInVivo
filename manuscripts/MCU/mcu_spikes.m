@@ -1,10 +1,10 @@
-function mcu_spikes(alt, lmeData)
+function mcu_spikes(alt, tblUnit)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % MCU_SPIKES - Analyze in vivo MCU spike data
 %
 % Inputs:
 %   alt - Analysis type: 1 for baseline, 2 for baclofen
-%   lmeData - Optional pre-loaded data. If empty, data will be loaded
+%   tblUnit - Optional pre-loaded data. If empty, data will be loaded
 %
 % Usage:
 %   mcu_spikes(1)  % Run baseline analysis, load data automatically
@@ -13,12 +13,12 @@ function mcu_spikes(alt, lmeData)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Load data if not provided
-if nargin < 2 || isempty(lmeData)
+if nargin < 2 || isempty(tblUnit)
     switch alt
         case 1
-            lmeData = load_data(alt);
+            tblUnit = load_data(alt);
         case 2
-            lmeData = load_data(alt);
+            tblUnit = load_data(alt);
     end
 end
 
@@ -29,10 +29,10 @@ end
 switch alt
     case 1
         % BASELINE
-        run_bsl(lmeData);
+        run_bsl(tblUnit);
     case 2
         % BACLOFEN
-        run_bac(lmeData);
+        run_bac(tblUnit);
     otherwise
         error('Invalid alt value');
 end
@@ -41,7 +41,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % BASELINE
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function run_bsl(lmeData)
+function run_bsl(tblUnit)
 
 % Select Params
 varRsp = 'FR';
@@ -50,10 +50,10 @@ varRsp = 'FR';
 % varRsp = 'BSpks';
 % varRsp = 'PRC';
 
-clear lmeCfg
-lmeCfg.contrasts = 'all';
-lmeCfg.contrasts = [1 : 9];
-lmeCfg.distribution = 'Normal';
+clear cfgLme
+cfgLme.contrasts = 'all';
+cfgLme.contrasts = [1 : 9];
+cfgLme.distribution = 'Normal';
 if strcmp(varRsp, 'FR')
     fPrfx = 'FR';
     lblY = 'Firing Rate (Hz)';
@@ -70,13 +70,13 @@ end
 
 % Fit
 frml = [varRsp, ' ~ Group * UnitType + (1|Name)'];
-[lmeStats, lmeMdl] = lme_analyse(lmeData, frml, lmeCfg);
+[lmeStats, lmeMdl] = lme_analyse(tblUnit, frml, cfgLme);
 
 % plot
-hFig = lme_plot(lmeData, lmeMdl, 'lmeStats', lmeStats,...
+hFig = lme_plot(tblUnit, lmeMdl, 'lmeStats', lmeStats,...
     'idxRow', [], 'ptype', 'bar', 'axShape', 'square');
 hAx = gca;
-[barIdx, barLbl] = lme_sigLines(lmeStats, lmeMdl, lmeData,...
+[barIdx, barLbl] = lme_sigLines(lmeStats, lmeMdl, tblUnit,...
     'idxRow', idxRow);
 plot_sigLines(hAx, barIdx, barLbl, 'flgNS', true);
 
@@ -96,66 +96,66 @@ plot_axSize('hFig', hFig, 'szOnly', false, 'axShape', 'square', 'axHeight', 300)
 % [cfg] = mcu_cfg();
 % fPath = fullfile(cfg.savepath, fPrfx);
 % lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
-%     'lmeData', lmeData, 'lmeStats', lmeStats, 'lmeMdl', lmeMdl, 'fPath', fPath)
+%     'tblUnit', tblUnit, 'lmeStats', lmeStats, 'lmeMdl', lmeMdl, 'fPath', fPath)
 
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % BACLOFEN
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function run_bac(lmeData)
+function run_bac(tblUnit)
 
 % Select Params
-unitType = 'pINT';
+unitType = 'FS';
 varRsp = 'FR';
 % varRsp = 'BRoy';
 % varRsp = 'BLidor';
 
-clear lmeCfg
-lmeCfg.contrasts = 'all';
-lmeCfg.distribution = 'Gamma';
+clear cfgLme
+cfgLme.contrasts = 'all';
+cfgLme.distribution = 'Gamma';
 idxRow = [];
 if strcmp(varRsp, 'FR')
     lblRsp = 'Firing Rate (% BSL)';
     fPrfx = 'FR';
-    if strcmp(unitType, 'pINT')
-        lmeCfg.contrasts = [1 : 19];
+    if strcmp(unitType, 'FS')
+        cfgLme.contrasts = [1 : 19];
         idxRow = [12, 16, 18, 6, 7];
     else
-        lmeCfg.contrasts = [1 : 19, 21];
+        cfgLme.contrasts = [1 : 19, 21];
         idxRow = [12 : 15, 20, 6, 18];
     end
 elseif strcmp(varRsp, 'BRoy')
     fPrfx = 'Burst';
     lblRsp = 'Burstiness Index (% BSL)';
     if strcmp(unitType, 'pPYR')
-        lmeCfg.contrasts = [1 : 19];
+        cfgLme.contrasts = [1 : 19];
         idxRow = [4, 7, 16, 18];
     else
         idxRow = [1];
     end
 end
 if strcmp(varRsp, 'BLidor')
-    lmeCfg.distribution = 'Normal';
+    cfgLme.distribution = 'Normal';
 end
 
 % Organize
 iUnit = categorical({unitType});
-plotTbl = lmeData(lmeData.UnitType == iUnit, :);
-plotTbl = tbl_transform(plotTbl, 'varNorm', 'Day',...
+tblLme = tblUnit(tblUnit.UnitType == iUnit, :);
+tblLme = tbl_transform(tblLme, 'varNorm', 'Day',...
     'varsGrp', {'Group', 'UnitType'}, 'flgNorm', true);
 
 % run lme
 frml = [varRsp, ' ~ Group * Day + (Day|Name)'];
-[lmeStats, lmeMdl] = lme_analyse(plotTbl, frml, lmeCfg);
+[lmeStats, lmeMdl] = lme_analyse(tblLme, frml, cfgLme);
 
 % plot
-hFig = lme_plot(plotTbl, lmeMdl, 'lmeStats', lmeStats,...
+hFig = lme_plot(tblLme, lmeMdl, 'lmeStats', lmeStats,...
     'idxRow', [], 'ptype', 'bar', 'axShape', 'wide');
 hAx = gca;
 
 % Generate significance lines
-[barIdx, barLbl] = lme_sigLines(lmeStats, lmeMdl, lmeData,...
+[barIdx, barLbl] = lme_sigLines(lmeStats, lmeMdl, tblUnit,...
     'idxRow', idxRow);
 plot_sigLines(hAx, barIdx, barLbl, 'flgNS', true);
 
@@ -178,7 +178,7 @@ fname = [fname, '_uAlt', num2str(2)];
 [cfg] = mcu_cfg();
 fPath = fullfile(cfg.savepath, fPrfx);
 lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
-    'lmeData', plotTbl, 'lmeStats', lmeStats, 'lmeMdl', lmeMdl, 'fPath', fPath);
+    'tblUnit', tblLme, 'lmeStats', lmeStats, 'lmeMdl', lmeMdl, 'fPath', fPath);
 
 end
 
@@ -186,81 +186,31 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % LOAD_DATA - Unified data loading function
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function lmeData = load_data(alt)
+function tblUnit = load_data()
 
-% Get labels and parameters
-[cfg] = mcu_cfg();
-cfg.varMap.UnitType = 'units.type';
+basepaths = [mcu_basepaths('wt'), mcu_basepaths('mcu')];
 
-% Parse additional parameters
-if alt == 2
-    idxRm = [2, 6];
-end
+% Load table
+tblUnit = mcu_unitTbl('basepaths', basepaths);
 
-% Initialize
-clear tblCell v tagAll tagFiles
+% Remove bad units
+tblUnit(tblUnit.UnitType == 'Other', :) = [];
+tblUnit.UnitType = removecats(tblUnit.UnitType, 'Other');
 
-if alt == 1
-    % BASELINE DATA LOADING
-    grps = {'wt_bsl'; 'mcu_bsl'};
-    grps = {'wt_old'; 'mcu_bsl'};
-    
-    for iGrp = 1 : length(grps)
-        basepaths = mcu_basepaths(grps{iGrp});
-        nFiles = length(basepaths);
-        v{iGrp} = basepaths2vars('basepaths', basepaths, 'vars', cfg.vars);
+% Remove bac on / off
+tblUnit(tblUnit.Day == 'BAC_ON', :) = [];
+tblUnit(tblUnit.Day == 'BAC_OFF', :) = [];
+tblUnit.Day = removecats(tblUnit.Day, {'BAC_ON', 'BAC_OFF'});
 
-        tagAll.Group = cfg.lbl.grp{iGrp};
-        tagFiles.Name = get_mname(basepaths);
-        tblCell{iGrp} = v2tbl('v', v{iGrp}, 'varMap', cfg.varMap, 'tagAll',...
-            tagAll, 'tagFiles', tagFiles, 'idxCol', 2);
-    end
+% Assert minimum value > zero
 
-elseif alt == 2
-    % BACLOFEN DATA LOADING
-    grps = {'wt', 'mcu'};
 
-    for iGrp = 1 : length(grps)
-        mNames = unique(get_mname(mcu_basepaths(grps{iGrp})));
 
-        for iMouse = 1 : length(mNames)
-            % Get all paths for this mouse and remove specified days
-            tmpPaths = mcu_basepaths(mNames{iMouse});
-            tmpPaths(idxRm) = [];
+tblUnit.BRoy = tblUnit.BRoy + min(tblUnit.BRoy(tblUnit.BRoy > 0)) / 2;
+tblUnit.BSpks = tblUnit.BSpks + min(tblUnit.BSpks(tblUnit.BSpks > 0)) / 2;
+tblUnit.BMiz = tblUnit.BMiz + min(tblUnit.BMiz(tblUnit.BMiz > 0)) / 2;
+tblUnit.FR = tblUnit.FR + min(tblUnit.FR(tblUnit.FR > 0)) / 2;
 
-            % Load data for all days for this mouse at once
-            v{iGrp, iMouse} = basepaths2vars('basepaths', tmpPaths, 'vars', cfg.vars);
-
-            % Prepare tag structures for this mouse
-            tagAll.Group = cfg.lbl.grp{iGrp};
-            tagAll.Name = mNames{iMouse};
-            tagFiles.Day = cfg.lbl.day(1:length(tmpPaths));
-
-            % Create table for this mouse using new flexible approach
-            tblCell{iGrp, iMouse} = v2tbl('v', v{iGrp, iMouse}, 'varMap', cfg.varMap, ...
-                'tagFiles', tagFiles, 'tagAll', tagAll, 'idxCol', 2);
-        end
-    end
-end
-
-% Combine all tables
-lmeData = vertcat(tblCell{:});
-
-% Clean up and organize
-lmeData = rmmissing(lmeData);
-lmeData.Group = reordercats(lmeData.Group, cfg.lbl.grp);
-lmeData.UnitType = reordercats(lmeData.UnitType, cfg.lbl.unit);
-lmeData(lmeData.UnitType == 'Other', :) = [];
-lmeData.UnitType = removecats(lmeData.UnitType, 'Other');
-
-% Additional cleanup for baclofen data
-if alt == 2
-    lmeData.Day = reordercats(lmeData.Day, cfg.lbl.day);
-    lmeData.BRoy = lmeData.BRoy + min(lmeData.BRoy(lmeData.BRoy > 0)) / 2;
-    lmeData.BSpks = lmeData.BSpks + min(lmeData.BSpks(lmeData.BSpks > 0)) / 2;
-    lmeData.BMiz = lmeData.BMiz + min(lmeData.BMiz(lmeData.BMiz > 0)) / 2;
-    lmeData.FR = lmeData.FR + min(lmeData.FR(lmeData.FR > 0)) / 2;
-end
 
 end
 
@@ -269,7 +219,7 @@ end
 % % PLOT CORRELATIONS
 % % Prepare data
 % varsInc = {'FR', 'BSpks', 'BRoy', 'BMiz'};
-% lData = tbl_transform(lmeData, 'varsInc', varsInc, 'flgZ', false,...
+% lData = tbl_transform(tblUnit, 'varsInc', varsInc, 'flgZ', false,...
 %     'skewThr', 0.1, 'varsGrp', {'Group'}, 'flgLog', true);
 % cfg = mcu_cfg();
 %
