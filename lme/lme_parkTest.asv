@@ -2,9 +2,8 @@ function stats = lme_parkTest(tbl, frml)
 % LME_PARKTEST Performs the Park Test to determine the Mean-Variance relationship.
 %
 %   STATS = LME_PARKTEST(TBL, FRML, VARARGIN) estimates a provisional
-%   Generalized Linear Mixed Model (GLME) and performs the Modified Park
-%   Test to determine the appropriate distribution family. If lambda ~ 2,
-%   compares Gamma vs log-normal approaches. 
+%   Generalized Linear Mixed Model (GLME) and performs the Modified Park Test
+%   to determine the appropriate distribution family.
 %
 %   INPUTS:
 %       tbl         - (table) Table containing the variables.
@@ -22,7 +21,9 @@ function stats = lme_parkTest(tbl, frml)
 p = inputParser;
 addRequired(p, 'tbl', @istable);
 addRequired(p, 'frml', @(x) ischar(x) || isa(x, 'classreg.regr.LinearFormula'));
+
 parse(p, tbl, frml);
+
 
 
 %% ========================================================================
@@ -259,27 +260,4 @@ end
 %  log-residuals are heteroscedastic (variance differs significantly
 %  between groups), favor the **Gamma** %  model to ensure unbiased
 %  estimation of the mean effects.
-%  ========================================================================
-
-
-%% ========================================================================
-%  NOTE: PARK TEST VS. AIC 
-%  ========================================================================
-%  When diagnostics (Park Test) and performance metrics (AIC) disagree, 
-%  the AIC should take precedence as it measures the overall quality of the 
-%  prediction for the entire dataset. 
-% 
-%  Example from firing rate data: Following the heuristic of Manning &
-%  Mullahy (2001), high kurtosis (~11) typically favors the Log-Normal
-%  model to improve estimator efficiency. However, the AIC comparison
-%  overwhelmingly favored the Gamma model (Delta AIC > 1000).
-%
-%  This discrepancy is explained by the shape of the data distribution. The 
-%  firing rate histogram exhibits a monotonic decay from zero (Exponential 
-%  shape), which is a native shape for the Gamma family (when shape 
-%  parameter <= 1). In contrast, the Log-Normal distribution forces the 
-%  probability density to approach zero as the value approaches zero (a 
-%  "hump" shape). Transforming this specific monotonic data to the log 
-%  scale likely introduced severe distortion, fitting the "body" of the data 
-%  poorly despite stabilizing the variance of the "tails." 
 %  ========================================================================

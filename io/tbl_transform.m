@@ -172,11 +172,6 @@ for iVar = 1:length(processVars)
             aboveRef = varData > refMean;
             normData = 100 + (aboveRef .* abs(varDiff) - ~aboveRef .* abs(varDiff)) * 100;
 
-            % Set the reference group to exactly 100%
-            % Find which elements within the current group are reference
-            idxRefInGroup = idxRef(idxGrp);
-            normData(idxRefInGroup) = 100;
-
             % Update varData with normalized values
             varData = normData;
         end

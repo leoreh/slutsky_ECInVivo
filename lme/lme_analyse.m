@@ -15,8 +15,8 @@ function [lmeStats, lmeMdl] = lme_analyse(lmeData, frml, lmeCfg, varargin)
 %                     .correction - Multiple comparison correction for Simple/Marginal effects.
 %                     .fitMethod - Method for `fitlme`/`fitglme`.
 %                     .dfMethod - Method for degrees of freedom estimation.
-%                     .distribution - Distribution of the response variable.
-%                     .flgG - Force GLME (true/false). If present, overrides distribution logic.
+%                     .dist - Distribution of the response variable.
+%                     .flgG - Force GLME (true/false). If present, overrides dist logic.
 %   ...             (Optional) Name-value pairs for any of the above fields (varargin takes precedence over lmeCfg).
 %
 % OUTPUTS:
@@ -53,7 +53,7 @@ addParameter(p, 'contrasts', [], @(x) true);
 addParameter(p, 'correction', [], @(x) true);
 addParameter(p, 'fitMethod', [], @(x) true);
 addParameter(p, 'dfMethod', [], @(x) true);
-addParameter(p, 'distribution', [], @(x) true);
+addParameter(p, 'dist', [], @(x) true);
 addParameter(p, 'flgG', [], @(x) true);
 parse(p, lmeData, frml, lmeCfg, varargin{:});
 
@@ -73,39 +73,44 @@ frml = char(p.Results.frml); % Ensure frml is char
 contrastReq = getVal('contrasts', 'all');
 correctionMethod = getVal('correction', 'holm');
 correctionMethod = lower(char(correctionMethod));  % Ensure lowercase for switch statement
-fitMethod = getVal('fitMethod', 'REML');
+fitMethod = getVal('fitMethod', 'Laplace');
 dfMethod = getVal('dfMethod', 'Satterthwaite');
-distribution = getVal('distribution', 'normal');
+dist = getVal('dist', 'normal');
 flgG = getVal('flgG', []);
 
 % Determine if using GLME
 if ~isempty(flgG)
     flgG = logical(flgG);
 else
-    flgG = ~isempty(distribution) && ~strcmpi(distribution, 'normal');
+    flgG = ~isempty(dist) && ~strcmpi(dist, 'normal');
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % LME/GLME MODEL FITTING & SELECTION
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% Check response variable distribution fit
+% Check response variable dist fit
 resVar = strtrim(strsplit(frml, '~'));
 resData = lmeData.(resVar{1});
 resSkew = skewness(resData);
 thrSkew = 1.5;
-if resSkew > thrSkew && strcmp(distribution, 'normal')
-    warning('Response variable "%s" does not fit %s distribution', ...
-        resVar{1}, distribution);
+if resSkew > thrSkew && strcmp(dist, 'normal')
+    warning('Response variable "%s" does not fit %s dist', ...
+        resVar{1}, dist);
 end
 
 % Fits a single LME/GLME model using the formula provided in frml.
 if flgG
-    fitMethod = 'REMPL';
     dfMethod = 'Residual';
-    lmeMdl = fitglme(lmeData, frml, 'Distribution', distribution, 'FitMethod', fitMethod);
+    if strcmp(dist, 'Normal')
+        link = 'Identity';
+    else
+        link = 'Log';
+    end
+    lmeMdl = fitglme(lmeData, frml, 'Distribution', dist,...
+        'FitMethod', 'Laplace', 'link', link);
 else
-    lmeMdl = fitlme(lmeData, frml, 'FitMethod', fitMethod);
+    lmeMdl = fitlme(lmeData, frml, 'FitMethod', 'REML');
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -566,17 +571,17 @@ end     % EOF
 %  NOTE: G/LME
 %  ========================================================================
 % The choice between using LME and GLME is determined exclusively by
-% the distribution of the response variable. LME is used when the
-% response variable is continuous and follows a normal distribution, or can
+% the dist of the response variable. LME is used when the
+% response variable is continuous and follows a normal dist, or can
 % be transformed to approximate one. GLME (Generalized Linear
 % Mixed-Effects Model) is required when the response variable does not
-% follow a normal distribution.
+% follow a normal dist.
 
 % The decision to transform predictor variables is a separate consideration
 % from the choice of model and is applicable to both LME and GLME.
-% Predictors should be log-transformed when their distribution is highly
+% Predictors should be log-transformed when their dist is highly
 % skewed. The purpose of this transformation is twofold: it makes the
-% predictor's distribution more symmetric, and more importantly, it can
+% predictor's dist more symmetric, and more importantly, it can
 % linearize a non-linear relationship between the predictor and the
 % response. By converting an exponential or power-law relationship into a
 % linear one, the log-transformed predictor better satisfies the
@@ -584,7 +589,7 @@ end     % EOF
 % disproportionate influence of extreme data points and often leads to a
 % more accurate and stable model fit.
 %
-% Z-scoring predictors is performed not to address distribution shape but
+% Z-scoring predictors is performed not to address dist shape but
 % to standardize variables onto a common scale. This is particularly useful
 % when predictors are measured in different units (e.g., firing rate in Hz,
 % time in seconds). After z-scoring, the predictors model coefficients are
@@ -594,7 +599,7 @@ end     % EOF
 
 % TLDR: Z-score and log-transform contineous variables only when they are
 % predictors. As response variables, adjust the model to their
-% distribution.
+% dist.
 %  ========================================================================
 
 

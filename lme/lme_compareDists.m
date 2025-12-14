@@ -1,17 +1,16 @@
-function tblStats = lme_compareDists(tbl, frml)
+function stats = lme_compareDists(tbl, frml)
 % LME_COMPAREDISTS Compares GLME fits across multiple distributions.
 %
-%   TBLSTATS = LME_COMPAREDISTS(TBL, FRML) fits Generalized Linear
+%   stats = LME_COMPAREDISTS(TBL, FRML) fits Generalized Linear
 %   Mixed Models using four common distributions (Normal, Poisson, Gamma,
 %   InverseGaussian) and returns a table of fit statistics.
 %
 %   INPUTS:
 %       tbl         - (table) Table containing the variables.
 %       frml        - (char/formula) Model definition.
-%       fitMethod   - (char) Fit method for fitglme. {'REMPL'}
 %
 %   OUTPUTS:
-%       tblStats    - (table) Summary of model performance (AIC, BIC, etc.).
+%       stats       - (table) Summary of model performance (AIC, BIC, etc.).
 %
 
 %% ========================================================================
@@ -21,7 +20,6 @@ function tblStats = lme_compareDists(tbl, frml)
 p = inputParser;
 addRequired(p, 'tbl', @istable);
 addRequired(p, 'frml', @(x) ischar(x) || isa(x, 'classreg.regr.LinearFormula'));
-
 parse(p, tbl, frml);
 
 
@@ -40,16 +38,16 @@ nMdl = length(dists);
 links = {'Identity', 'Identity', 'Log', 'Log', 'Log'};
 
 % Output table
-tblStats = table();
-tblStats.Distribution = dists(:);
-tblStats.Link = links(:);
-tblStats.AIC = nan(nMdl, 1);
-tblStats.BIC = nan(nMdl, 1);
-tblStats.LogLikelihood = nan(nMdl, 1);
-tblStats.R2_Ordinary = nan(nMdl, 1);
-tblStats.R2_Adjusted = nan(nMdl, 1);
-tblStats.Converged = false(nMdl, 1);
-tblStats.ErrorMsg = repmat({''}, nMdl, 1);
+stats = table();
+stats.Distribution = dists(:);
+stats.Link = links(:);
+stats.AIC = nan(nMdl, 1);
+stats.BIC = nan(nMdl, 1);
+stats.LogLikelihood = nan(nMdl, 1);
+stats.R2_Ordinary = nan(nMdl, 1);
+stats.R2_Adjusted = nan(nMdl, 1);
+stats.Converged = false(nMdl, 1);
+stats.ErrorMsg = repmat({''}, nMdl, 1);
 
 
 %% ========================================================================
@@ -65,8 +63,8 @@ yRaw = tbl.(respVar);
 fitMethod = 'Laplace';
 
 for iMdl = 1:nMdl
-    curDist = tblStats.Distribution{iMdl};
-    curLink = tblStats.Link{iMdl};
+    curDist = stats.Distribution{iMdl};
+    curLink = stats.Link{iMdl};
 
     try
         % -----------------------------------------------------------------
@@ -103,12 +101,12 @@ for iMdl = 1:nMdl
             bicRaw = -2*llRaw + (k2/2)*log(nObs);
 
             % Store
-            tblStats.AIC(iMdl) = aicRaw;
-            tblStats.BIC(iMdl) = bicRaw;
-            tblStats.LogLikelihood(iMdl) = llRaw;
-            tblStats.R2_Ordinary(iMdl) = mdl.Rsquared.Ordinary;
-            tblStats.R2_Adjusted(iMdl) = mdl.Rsquared.Adjusted;
-            tblStats.Converged(iMdl) = true;
+            stats.AIC(iMdl) = aicRaw;
+            stats.BIC(iMdl) = bicRaw;
+            stats.LogLikelihood(iMdl) = llRaw;
+            stats.R2_Ordinary(iMdl) = mdl.Rsquared.Ordinary;
+            stats.R2_Adjusted(iMdl) = mdl.Rsquared.Adjusted;
+            stats.Converged(iMdl) = true;
 
             % -----------------------------------------------------------------
             % STANDARD GLME (Normal, Poisson, Gamma, IG)
@@ -119,23 +117,23 @@ for iMdl = 1:nMdl
                 'Link', curLink, ...
                 'FitMethod', fitMethod);
 
-            tblStats.AIC(iMdl) = mdl.ModelCriterion.AIC;
-            tblStats.BIC(iMdl) = mdl.ModelCriterion.BIC;
-            tblStats.LogLikelihood(iMdl) = mdl.LogLikelihood;
-            tblStats.R2_Ordinary(iMdl) = mdl.Rsquared.Ordinary;
-            tblStats.R2_Adjusted(iMdl) = mdl.Rsquared.Adjusted;
-            tblStats.Converged(iMdl) = true;
+            stats.AIC(iMdl) = mdl.ModelCriterion.AIC;
+            stats.BIC(iMdl) = mdl.ModelCriterion.BIC;
+            stats.LogLikelihood(iMdl) = mdl.LogLikelihood;
+            stats.R2_Ordinary(iMdl) = mdl.Rsquared.Ordinary;
+            stats.R2_Adjusted(iMdl) = mdl.Rsquared.Adjusted;
+            stats.Converged(iMdl) = true;
         end
 
     catch ME
         % Handle Errors
-        tblStats.ErrorMsg{iMdl} = ME.message;
+        stats.ErrorMsg{iMdl} = ME.message;
     end
 end
 
 % Sort by AIC (Low to High) - Best model first
-[~, sortIdx] = sort(tblStats.AIC);
-tblStats = tblStats(sortIdx, :);
+[~, sortIdx] = sort(stats.AIC);
+stats = stats(sortIdx, :);
 
 end
 

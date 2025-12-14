@@ -106,79 +106,34 @@ end
 function run_bac(tblUnit)
 
 % Select Params
-unitType = 'FS';
+unitType = 'RS';
 varRsp = 'FR';
 % varRsp = 'BRoy';
 % varRsp = 'BLidor';
 
+% Configuration
 clear cfgLme
 cfgLme.contrasts = 'all';
-cfgLme.distribution = 'Gamma';
-idxRow = [];
-if strcmp(varRsp, 'FR')
-    lblRsp = 'Firing Rate (% BSL)';
-    fPrfx = 'FR';
-    if strcmp(unitType, 'FS')
-        cfgLme.contrasts = [1 : 19];
-        idxRow = [12, 16, 18, 6, 7];
-    else
-        cfgLme.contrasts = [1 : 19, 21];
-        idxRow = [12 : 15, 20, 6, 18];
-    end
-elseif strcmp(varRsp, 'BRoy')
-    fPrfx = 'Burst';
-    lblRsp = 'Burstiness Index (% BSL)';
-    if strcmp(unitType, 'pPYR')
-        cfgLme.contrasts = [1 : 19];
-        idxRow = [4, 7, 16, 18];
-    else
-        idxRow = [1];
-    end
-end
-if strcmp(varRsp, 'BLidor')
-    cfgLme.distribution = 'Normal';
-end
+cfgLme.dist = 'Gamma';
+cfgLme.contrasts = [1 : 19];
 
-% Organize
+% Select data and normalize to baseline
 iUnit = categorical({unitType});
 tblLme = tblUnit(tblUnit.UnitType == iUnit, :);
 tblLme = tbl_transform(tblLme, 'varNorm', 'Day',...
-    'varsGrp', {'Group', 'UnitType'}, 'flgNorm', true);
+    'varsGrp', {'Name', 'UnitType'}, 'flgNorm', true);
+
+% Check best model
+statsPark = lme_parkTest(tblLme, frml);
+statsDist = lme_compareDists(tblLme, frml);
 
 % run lme
 frml = [varRsp, ' ~ Group * Day + (Day|Name)'];
 [lmeStats, lmeMdl] = lme_analyse(tblLme, frml, cfgLme);
 
-% plot
-hFig = lme_plot(tblLme, lmeMdl, 'lmeStats', lmeStats,...
-    'idxRow', [], 'ptype', 'bar', 'axShape', 'wide');
-hAx = gca;
+hFig = tblGUI_bar(tblLme, 'yVar', 'FR', 'xVar', 'Day', 'grpVar', 'Group');
 
-% Generate significance lines
-[barIdx, barLbl] = lme_sigLines(lmeStats, lmeMdl, tblUnit,...
-    'idxRow', idxRow);
-plot_sigLines(hAx, barIdx, barLbl, 'flgNS', true);
 
-% Graphics
-ylabel(hAx, lblRsp)
-xlabel(hAx, '')
-title(hAx, unitType)
-plot_axSize('hFig', hFig, 'szOnly', false, 'axShape', 'wide', 'axHeight', 300);
-hAx.Legend.Location = 'northeast';
-hAx.Legend.Position(1) = hAx.Position(1) + hAx.Position(3) - hAx.Legend.Position(3);
-hAx.Legend.Position(2) = hAx.Position(2);
-if strcmp(unitType, 'pINT')
-    hAx.Legend.Visible = "off";
-end
-
-% save
-fname = lme_frml2char(frml, 'rmRnd', true, 'resNew', '',...
-    'sfx', [' _', unitType, '_Norm']);
-fname = [fname, '_uAlt', num2str(2)];
-[cfg] = mcu_cfg();
-fPath = fullfile(cfg.savepath, fPrfx);
-lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
-    'tblUnit', tblLme, 'lmeStats', lmeStats, 'lmeMdl', lmeMdl, 'fPath', fPath);
 
 end
 
@@ -203,28 +158,17 @@ tblUnit(tblUnit.Day == 'BAC_OFF', :) = [];
 tblUnit.Day = removecats(tblUnit.Day, {'BAC_ON', 'BAC_OFF'});
 
 % Assert minimum value > zero
-
-
-
-tblUnit.BRoy = tblUnit.BRoy + min(tblUnit.BRoy(tblUnit.BRoy > 0)) / 2;
-tblUnit.BSpks = tblUnit.BSpks + min(tblUnit.BSpks(tblUnit.BSpks > 0)) / 2;
-tblUnit.BMiz = tblUnit.BMiz + min(tblUnit.BMiz(tblUnit.BMiz > 0)) / 2;
-tblUnit.FR = tblUnit.FR + min(tblUnit.FR(tblUnit.FR > 0)) / 2;
+vars = tblUnit.Properties.VariableNames;
+for iVar = 1:numel(vars)
+    if isnumeric(tblUnit.(vars{iVar}))
+        if any(tblUnit.(vars{iVar}) == 0)
+            halfMin = min(tblUnit.(vars{iVar})(tblUnit.(vars{iVar}) > 0)) / 2;
+            tblUnit.(vars{iVar}) = tblUnit.(vars{iVar}) + halfMin;
+            fprintf('Warning: %s contained zeros. Added half-min value (%.5f).\n', vars{iVar}, halfMin);
+        end
+    end
+end
 
 
 end
 
-
-% % -------------------------------------------------------------------------
-% % PLOT CORRELATIONS
-% % Prepare data
-% varsInc = {'FR', 'BSpks', 'BRoy', 'BMiz'};
-% lData = tbl_transform(tblUnit, 'varsInc', varsInc, 'flgZ', false,...
-%     'skewThr', 0.1, 'varsGrp', {'Group'}, 'flgLog', true);
-% cfg = mcu_cfg();
-%
-% varsInc = [varsInc, {'BLidor', 'PRC'}];
-% [hFig, ~, hGrid] = plot_corrHist(lData, 'varsInc', varsInc,...
-%     'grpIdx', 'Group', 'clrGrp', cfg.clr.grp, 'thrOut', 100);
-% plot_axSize('hFig', hFig, 'szOnly', false,...
-%     'axWidth', 1200, 'axHeight', 600, 'flgPos', true);
