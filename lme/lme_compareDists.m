@@ -1,7 +1,7 @@
-function tblStats = lme_compareDists(tbl, frml, varargin)
+function tblStats = lme_compareDists(tbl, frml)
 % LME_COMPAREDISTS Compares GLME fits across multiple distributions.
 %
-%   TBLSTATS = LME_COMPAREDISTS(TBL, FRML, VARARGIN) fits Generalized Linear
+%   TBLSTATS = LME_COMPAREDISTS(TBL, FRML) fits Generalized Linear
 %   Mixed Models using four common distributions (Normal, Poisson, Gamma,
 %   InverseGaussian) and returns a table of fit statistics.
 %
@@ -21,24 +21,28 @@ function tblStats = lme_compareDists(tbl, frml, varargin)
 p = inputParser;
 addRequired(p, 'tbl', @istable);
 addRequired(p, 'frml', @(x) ischar(x) || isa(x, 'classreg.regr.LinearFormula'));
-addOptional(p, 'fitMethod', 'REMPL', @ischar);
 
-parse(p, tbl, frml, varargin{:});
-fitMethod = p.Results.fitMethod;
+parse(p, tbl, frml);
 
 
 %% ========================================================================
-%  INITIALIZE 
+%  INITIALIZE
 %  ========================================================================
 
 % List of distributions to test
-dists = {'Normal', 'Poisson', 'Gamma', 'InverseGaussian'};
+dists = {'Normal', 'Log-Normal', 'Poisson', 'Gamma', 'InverseGaussian'};
 nMdl = length(dists);
 
+% Common canonical/standard links
+% Normal -> Identity
+% Log-Normal -> Identity (on log data)
+% Others -> Log (Enforced as per best practice for positive biological data)
+links = {'Identity', 'Identity', 'Log', 'Log', 'Log'};
 
+% Output table
 tblStats = table();
 tblStats.Distribution = dists(:);
-tblStats.Link = repmat({''}, nMdl, 1); % To be filled from defaults
+tblStats.Link = links(:);
 tblStats.AIC = nan(nMdl, 1);
 tblStats.BIC = nan(nMdl, 1);
 tblStats.LogLikelihood = nan(nMdl, 1);
@@ -52,28 +56,76 @@ tblStats.ErrorMsg = repmat({''}, nMdl, 1);
 %  RUN FITS
 %  ========================================================================
 
+% Parse response variable for Log-Normal / Jacobian Check
+respVar = strtrim(strsplit(frml, '~'));
+respVar = respVar{1};
+yRaw = tbl.(respVar);
+
+% Hardcoded for Model Comparison
+fitMethod = 'Laplace';
+
 for iMdl = 1:nMdl
     curDist = tblStats.Distribution{iMdl};
+    curLink = tblStats.Link{iMdl};
 
     try
-        % Fit Model (Use default/canonical link for each distribution)
-        mdl = fitglme(tbl, frml, ...
-            'Distribution', curDist, ...
-            'FitMethod', fitMethod);
+        % -----------------------------------------------------------------
+        % LOG-NORMAL (Special Case)
+        % -----------------------------------------------------------------
+        if strcmp(curDist, 'Log-Normal')
 
-        % Extract Stats
-        if ischar(mdl.Link)
-            tblStats.Link{iMdl} = mdl.Link;
-        elseif isstruct(mdl.Link) || isobject(mdl.Link)
-            tblStats.Link{iMdl} = mdl.Link.Name;
+            % Fit Normal GLME on log(y)
+            logFrml = ['log(' respVar ') ~ ' extractAfter(frml, '~')];
+
+            mdl = fitglme(tbl, logFrml, ...
+                'Distribution', 'Normal', ...
+                'Link', 'Identity', ...
+                'FitMethod', fitMethod);
+
+            % Extract Raw LogLikelihood (of log-data)
+            llLog = mdl.LogLikelihood;
+
+            % Jacobian Correction
+            % LL_raw = LL_log - sum(log(y))
+            % This converts the density from log-scale back to raw-scale
+            sumLogY = nansum(log(yRaw));
+            llRaw = llLog - sumLogY;
+
+            % Recalculate ICs on raw scale
+            % Back-calculate k (num params) from AIC and LL
+            % AIC = -2*LL + 2*k  =>  2*k = AIC + 2*LL
+            aicLog = mdl.ModelCriterion.AIC;
+            k2 = aicLog + 2*llLog; % 2*k
+
+            nObs = mdl.NumObservations;
+
+            aicRaw = -2*llRaw + k2;
+            bicRaw = -2*llRaw + (k2/2)*log(nObs);
+
+            % Store
+            tblStats.AIC(iMdl) = aicRaw;
+            tblStats.BIC(iMdl) = bicRaw;
+            tblStats.LogLikelihood(iMdl) = llRaw;
+            tblStats.R2_Ordinary(iMdl) = mdl.Rsquared.Ordinary;
+            tblStats.R2_Adjusted(iMdl) = mdl.Rsquared.Adjusted;
+            tblStats.Converged(iMdl) = true;
+
+            % -----------------------------------------------------------------
+            % STANDARD GLME (Normal, Poisson, Gamma, IG)
+            % -----------------------------------------------------------------
+        else
+            mdl = fitglme(tbl, frml, ...
+                'Distribution', curDist, ...
+                'Link', curLink, ...
+                'FitMethod', fitMethod);
+
+            tblStats.AIC(iMdl) = mdl.ModelCriterion.AIC;
+            tblStats.BIC(iMdl) = mdl.ModelCriterion.BIC;
+            tblStats.LogLikelihood(iMdl) = mdl.LogLikelihood;
+            tblStats.R2_Ordinary(iMdl) = mdl.Rsquared.Ordinary;
+            tblStats.R2_Adjusted(iMdl) = mdl.Rsquared.Adjusted;
+            tblStats.Converged(iMdl) = true;
         end
-
-        tblStats.AIC(iMdl) = mdl.ModelCriterion.AIC;
-        tblStats.BIC(iMdl) = mdl.ModelCriterion.BIC;
-        tblStats.LogLikelihood(iMdl) = mdl.LogLikelihood;
-        tblStats.R2_Ordinary(iMdl) = mdl.Rsquared.Ordinary;
-        tblStats.R2_Adjusted(iMdl) = mdl.Rsquared.Adjusted;
-        tblStats.Converged(iMdl) = true;
 
     catch ME
         % Handle Errors
@@ -92,12 +144,12 @@ end
 %  NOTE: FIT STATS
 %  ========================================================================
 %
-%  1. LogLikelihood (LogLik):
+%  LogLikelihood (LogLik):
 %     The log-probability of the data given the model. Higher (less negative)
 %     is better. However, it always increases with more parameters, so it
 %     cannot be used alone to compare models with different complexities.
 %
-%  2. Information Criteria (AIC & BIC):
+%  Information Criteria (AIC & BIC):
 %     These balance model fit (LogLik) against complexity (number of
 %     parameters). LOWER is better.
 %     - AIC (Akaike): Optimizes for predictive accuracy.
@@ -106,7 +158,7 @@ end
 %     For model selection, a difference > 2 is positive evidence, and > 10
 %     is very strong evidence.
 %
-%  3. R-Squared (R2):
+%  R-Squared (R2):
 %     Represents the proportion of variance explained by the model.
 %     - Ordinary: Variance explained by Fixed + Random effects.
 %     - Adjusted: Adjusted for number of coefficients (penalizes overfitting).
@@ -135,11 +187,11 @@ end
 
 
 %% ========================================================================
-%  NOTE: LINK FUNCTIONS 
+%  NOTE: LINK FUNCTIONS
 %  ========================================================================
 %  A GLM specifies the relationship between the Mean Response (mu) and the
 %  linear predictor (X*beta) via a Link Function g(mu) = X*beta.
-% 
+%
 %  While statistical software defaults to "canonical" links for
 %  computational simplicity—such as the Reciprocal link for Gamma
 %  distributions - these defaults often contradict the physical reality of

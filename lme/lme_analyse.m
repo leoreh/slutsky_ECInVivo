@@ -559,6 +559,7 @@ end     % EOF
 % 'Residual Error', denoted as 'epsilon', accounts for the
 % remaining, unexplained variability or random noise in the data that isn't
 % captured by either the fixed or the random effects structure.
+%  ========================================================================
 
 
 %% ========================================================================
@@ -594,6 +595,7 @@ end     % EOF
 % TLDR: Z-score and log-transform contineous variables only when they are
 % predictors. As response variables, adjust the model to their
 % distribution.
+%  ========================================================================
 
 
 %% ========================================================================
@@ -630,6 +632,7 @@ end     % EOF
 % of differences". A significant interaction term indicates that the effect
 % of FactorA is not constant but depends on the specific level of FactorB
 % (and vice-versa).
+%  ========================================================================
 
 
 %% ========================================================================
@@ -688,6 +691,7 @@ end     % EOF
 % conditional effects). Analyzing subject-specific deviations would require
 % examining the estimated random effects ('b') themselves, e.g. using
 % `randomEffects(lme)`.
+%  ========================================================================
 
 
 %% ========================================================================
@@ -712,6 +716,8 @@ end     % EOF
 % `fitlme`/`fitglme` would need to be called with `'DummyVarCoding',
 % 'effects'`. This function currently uses default dummy coding to simplify
 % H-vector construction for simple/marginal effects.
+%  ========================================================================
+
 
 %**************************************************************************
 % Estimate +/ SE
@@ -737,6 +743,7 @@ end     % EOF
 % assessing statistical significance, as it forms the denominator in the
 % t-statistic calculation (t = Estimate / SE) and is used to construct
 % confidence intervals around the `Estimate`.
+%  ========================================================================
 
 
 %% ========================================================================
@@ -749,33 +756,43 @@ end     % EOF
 % For rows of type 'ANOVA', this is the F-statistic obtained from the
 % `anova(lme)` function, testing the overall significance of the
 % interaction term in the model.
+%  ========================================================================
 
 
 %% ========================================================================
-%  NOTE: DEGREES OF FREEDOM
+%  NOTE: DEGREES OF FREEDOM (DF)
 %  ========================================================================
-% The `DF` column reports the degrees of freedom associated with the test
-% statistic. For t-tests ('Coeff', 'Simple', 'Marginal'), this is a single
-% value representing the denominator degrees of freedom. For F-tests
-% ('ANOVA'), this column displays the numerator and denominator degrees of
-% freedom as a string '[DF1, DF2]'. DF1 relates to the number of parameters
-% associated with the effect being tested, and DF2 relates to the residual
-% or error degrees of freedom. The default in this function is to estimate
-% DFs using Satterthwaite approximations. This is important for
-% hierarchical data, because observations within the same group (e.g.,
-% subject) are not independent, reducing the effective degrees of freedom.
-% The default method in `fitlme` often overestimates DFs by treating random
-% effects as if they were fixed effects, and calculating DFs as the number
-% of observations minus the number of parameters, leading to overly
-% optimistic p-values. Satterthwaite's method provides a more accurate
-% approximation by accounting for the hierarchical structure of the data,
-% the uncertainty in variance component estimates, and the actual
-% dependencies between observations. This is particularly important in
-% unbalanced designs or when the number of higher-level units (e.g.,
-% subjects) is small relative to the total number of observations. While
-% Satterthwaite's method may yield smaller DFs than the default method, it
-% provides more reliable statistical inference by better reflecting the
-% true uncertainty in the parameter estimates.
+%  The `DF` column reports the degrees of freedom associated with the test
+%  statistic, which reflects the amount of independent information available
+%  to estimate the variability.
+%
+%  Interpretation of the Output:
+%     - For t-tests ('Coeff', 'Simple', 'Marginal'): This is a single value
+%       representing the denominator degrees of freedom (DF_den).
+%     - For F-tests ('ANOVA'): This displays '[DF1, DF2]'. DF1 is the
+%       numerator DF (parameters in the effect), and DF2 is the denominator
+%       DF (error/residual).
+%
+%  The Importance of Satterthwaite (for LME):
+%     In hierarchical data, observations within the same group (e.g.,
+%     subject) are not independent. The default 'Residual' method
+%     calculates DF as simply (Total Observations - Number of Parameters).
+%     This ignores the correlation structure, drastically overestimating
+%     the DF and leading to "optimistic" (false positive) p-values.
+%
+%     Satterthwaite's approximation corrects for this by estimating the
+%     "effective" degrees of freedom based on the variance components. It
+%     is essential for unbalanced designs or small sample sizes (e.g., few
+%     subjects), providing a more conservative and reliable inference.
+%
+%  Limitation in GLME (Gamma/Poisson/Log-Normal):
+%     MATLAB's `fitglme` does NOT support Satterthwaite approximations
+%     because exact finite-sample distributions do not exist for
+%     generalized models. For these models, the DF is calculated using the
+%     'Residual' method or treated as infinite (Z-tests). Consequently,
+%     p-values in GLMEs are based on asymptotic assumptions and should be
+%     interpreted with this limitation in mind.
+%  ========================================================================
 
 
 %% ========================================================================
@@ -817,18 +834,19 @@ end     % EOF
 % true effects, making it suitable for more exploratory analyses where
 % controlling the proportion of false findings is deemed acceptable, rather
 % than strictly preventing any single false positive.
+%  ========================================================================
 
 
 %% ========================================================================
-%  NOTE: FITMETHOD 
+%  NOTE: FITMETHOD
 %  ========================================================================
 %  Specifies the objective function maximized to estimate model parameters.
 %  The choice depends on whether the goal is Model Selection (comparing
 %  different fixed effects) or Parameter Estimation (accurate variances).
 %
-%  1. Maximum Likelihood (ML) & Integral Approximation:
+%  Maximum Likelihood (ML) & Integral Approximation:
 %     - LME: 'ML'
-%     - GLME: 'Laplace' 
+%     - GLME: 'Laplace'
 %
 %     These methods approximate the true marginal likelihood of the data.
 %     MANDATORY for comparing models with *different fixed effects* or
@@ -836,7 +854,7 @@ end     % EOF
 %     However, variance components (random effects) are biased downwards in
 %     finite samples.
 %
-%  2. Restricted / Pseudo-Likelihood:
+%  Restricted / Pseudo-Likelihood:
 %     - LME: 'REML'  (Restricted Maximum Likelihood)
 %     - GLME: 'REMPL' (Restricted Pseudo-Likelihood) or 'MPL'
 %
@@ -855,7 +873,7 @@ end     % EOF
 %  Addresses the constraint that Log-link, Gamma, and Log-Normal models are
 %  undefined for y = 0. A common heuristic is transforming y -> log(y + c).
 %
-%  1. The "Half-Minimum" Heuristic:
+%  The "Half-Minimum" Heuristic:
 %     Commonly, c is set to min(y > 0) / 2. This creates a floor for the
 %     data, allowing log-transformation (or Gamma fitting) while preserving
 %     the rank order of observations.
@@ -869,7 +887,7 @@ end     % EOF
 %       adding 0.5 yields different results if y is measured in ms vs sec).
 %
 %  3. Best Practices:
-%     - Sensitivity Analysis: If using a shift, verify results are robust 
+%     - Sensitivity Analysis: If using a shift, verify results are robust
 %       to changes in c (e.g., test c = min(y) and c = min(y)/10).
 %     - Modern Alternatives: If zeros are prevalent, prefer distributions
 %       that handle zeros naturally (e.g., Tweedie, Poisson/PPML) to avoid

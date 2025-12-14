@@ -12,7 +12,6 @@ function stats = lme_parkTest(tbl, frml, varargin)
 %       dist        - (char) Provisional distribution. {'Gamma'}
 %       link        - (char) Provisional link function. {'Log'}
 %       fitMethod   - (char) Fit method for fitglme. {'REMPL'}
-%       flgPlot     - (logical) Whether to plot the Park Test results. {true}
 %
 %   OUTPUTS:
 %       stats       - (struct) Structure containing Park Test results.
@@ -28,13 +27,11 @@ addRequired(p, 'frml', @(x) ischar(x) || isa(x, 'classreg.regr.LinearFormula'));
 addOptional(p, 'dist', 'Gamma', @ischar);
 addOptional(p, 'link', 'Log', @ischar);
 addOptional(p, 'fitMethod', 'REMPL', @ischar);
-addOptional(p, 'flgPlot', true, @islogical);
 
 parse(p, tbl, frml, varargin{:});
 dist = p.Results.dist;
 link = p.Results.link;
 fitMethod = p.Results.fitMethod;
-flgPlot = p.Results.flgPlot;
 
 
 %% ========================================================================
