@@ -9,20 +9,18 @@ function hFig = tblGUI_scatHist(tbl, varargin)
 %       tbl         (table) The data table to visualize.
 %
 %   OPTIONAL KEY-VALUE PAIRS:
-%       'cfg'         (struct) Initial configuration structure with fields:
-%                     - xVar:   (string) Initial X variable name
-%                     - yVar:   (string) Initial Y variable name
-%                     - szVar:  (string) Initial Size variable name
-%                     - grpVar: (string) Initial Group variable name
-%                     - clr:    (m x 3)  RGB color matrix for groups
-%                     - alpha:  (scalar) Marker transparency (0-1)
+%       'xVar'    (string) Initial X variable name
+%       'yVar'    (string) Initial Y variable name
+%       'szVar'   (string) Initial Size variable name
+%       'grpVar'  (string) Initial Group variable name
+%       'clr'     (m x 3)  RGB color matrix for groups
+%       'alpha'   (scalar) Marker transparency (0-1)
 %
 %       'varsExclude' (cell) List of variable names to exclude from dropdowns.
 %                     Default: {'UnitID', 'Name', 'Mouse', 'File'}.
 %
 %   EXAMPLE:
-%       cfg = struct('xVar','tp', 'yVar','mfr', 'szVar','pVal', 'grpVar','initType');
-%       tblGUI_scatHist(fetTbl, 'cfg', cfg);
+%       tblGUI_scatHist(fetTbl, 'xVar', 'tp', 'yVar', 'mfr');
 %
 
 %% ========================================================================
@@ -31,7 +29,12 @@ function hFig = tblGUI_scatHist(tbl, varargin)
 p = inputParser;
 addRequired(p, 'tbl', @istable);
 addParameter(p, 'varsExclude', {'UnitID', 'Name', 'Mouse', 'File'}, @iscell);
-addParameter(p, 'cfg', struct(), @isstruct);
+addParameter(p, 'xVar', '', @(x) ischar(x) || isstring(x) || isempty(x));
+addParameter(p, 'yVar', '', @(x) ischar(x) || isstring(x) || isempty(x));
+addParameter(p, 'szVar', '', @(x) ischar(x) || isstring(x) || isempty(x));
+addParameter(p, 'grpVar', '', @(x) ischar(x) || isstring(x) || isempty(x));
+addParameter(p, 'alpha', 0.6, @isnumeric);
+addParameter(p, 'clr', [], @(x) isempty(x) || size(x,2)==3);
 addParameter(p, 'Parent', [], @(x) isempty(x) || isgraphics(x));
 addParameter(p, 'SelectionCallback', [], @(x) isempty(x) || isa(x, 'function_handle'));
 addParameter(p, 'GroupByCallback', [], @(x) isempty(x) || isa(x, 'function_handle'));
@@ -40,10 +43,17 @@ parse(p, tbl, varargin{:});
 
 tbl = p.Results.tbl;
 varsExclude = p.Results.varsExclude;
-cfg = p.Results.cfg;
 hParent = p.Results.Parent;
 selCbk = p.Results.SelectionCallback;
 grpCbk = p.Results.GroupByCallback;
+
+% Inputs
+xVarIn = p.Results.xVar;
+yVarIn = p.Results.yVar;
+szVarIn = p.Results.szVar;
+grpVarIn = p.Results.grpVar;
+alphaIn = p.Results.alpha;
+clrIn = p.Results.clr;
 
 %% ========================================================================
 %  INITIALIZATION
@@ -65,22 +75,20 @@ if isempty(numericVars)
     error('Input table must contain at least one numeric variable.');
 end
 
-% Defaults (Prioritize cfg, then heuristics)
+% Defaults (Prioritize Inputs, then heuristics)
 curX = numericVars{1};
 curY = numericVars{min(2, length(numericVars))};
 curSize = 'None';
 curGrp = '';
 if ~isempty(catVars), curGrp = catVars{1}; end
-defAlpha = 0.6;
-defClr = [];
+defAlpha = alphaIn;
+defClr = clrIn;
 
-% Apply cfg overrides if present
-if isfield(cfg, 'xVar') && ismember(cfg.xVar, numericVars), curX = cfg.xVar; end
-if isfield(cfg, 'yVar') && ismember(cfg.yVar, numericVars), curY = cfg.yVar; end
-if isfield(cfg, 'szVar') && ismember(cfg.szVar, numericVars), curSize = cfg.szVar; end
-if isfield(cfg, 'grpVar') && ismember(cfg.grpVar, catVars), curGrp = cfg.grpVar; end
-if isfield(cfg, 'alpha') && isnumeric(cfg.alpha), defAlpha = cfg.alpha; end
-if isfield(cfg, 'clr') && size(cfg.clr,2)==3, defClr = cfg.clr; end
+% Apply overrides
+if ~isempty(xVarIn) && ismember(xVarIn, numericVars), curX = xVarIn; end
+if ~isempty(yVarIn) && ismember(yVarIn, numericVars), curY = yVarIn; end
+if ~isempty(szVarIn) && ismember(szVarIn, numericVars), curSize = szVarIn; end
+if ~isempty(grpVarIn) && ismember(grpVarIn, catVars), curGrp = grpVarIn; end
 
 % Figure Setup
 % Figure Setup

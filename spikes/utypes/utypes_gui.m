@@ -51,16 +51,16 @@ end
 %  ========================================================================
 
 % Hardcoded Configuration for scatter plot
-cfg = struct();
-cfg.xVar = 'TP';
-cfg.yVar = 'BLidor';
-cfg.szVar = 'FR';
-cfg.grpVar = 'UnitType';
-cfg.alpha = 0.5;
+% Hardcoded Configuration for scatter plot
+xVar = 'TP';
+yVar = 'BLidor';
+szVar = 'FR';
+grpVar = 'UnitType';
+dotAlpha = 0.5;
 
 % Colors from mcu_cfg
-cfgMcu = mcu_cfg();
-cfg.clr = cfgMcu.clr.unit;
+cfg = mcu_cfg();
+clr = cfg.clr.unit;
 
 %% ========================================================================
 %  PLOT
@@ -83,7 +83,9 @@ hTabScat = figure('Name', 'Scatter Plot', 'NumberTitle', 'off', ...
 cbkScat = @(indices) onSelect(indices, 'scatter');
 cbkGrp = @(varName, activeCats, src) onGroupChange(varName, activeCats, src);
 
-hFigScat = tblGUI_scatHist(tblUnit, 'cfg', cfg, ...
+hFigScat = tblGUI_scatHist(tblUnit, ...
+    'xVar', xVar, 'yVar', yVar, 'szVar', szVar, 'grpVar', grpVar, ...
+    'clr', clr, 'alpha', dotAlpha, ...
     'Parent', hTabScat, 'SelectionCallback', cbkScat, ...
     'GroupByCallback', cbkGrp);
 

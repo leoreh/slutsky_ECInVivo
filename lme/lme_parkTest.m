@@ -110,6 +110,9 @@ end
 % If Lambda ~ 2, the variance structure supports both Gamma and Log-Normal.
 % We decide based on Kurtosis of log-residuals and Sample Size.
 
+kurtLog = [];
+minDF = [];
+lmeLog = [];
 if is2
     try
         % Fit Log-Normal Model (LMM on log(y))
@@ -144,9 +147,6 @@ if is2
 
     catch ME
         warning('lme_parkTest:Phase2Error', 'Could not perform Gamma vs Log-Normal check: %s', ME.message);
-        kurtLog = [];
-        minDF = [];
-        lmeLog = [];
     end
 end
 

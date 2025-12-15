@@ -62,7 +62,7 @@ tblUnit = utypes_classify('basepaths', basepaths, ...
 basepaths = [mcu_basepaths('wt'), mcu_basepaths('mcu')];
 
 % Grab FR vs Time data
-[tAxis, tblUnit] = mcu_frTbl(basepaths, 'flgPlot', true);
+[tAxis, tblUnit] = mcu_frTbl(basepaths, 'flgPlot', false);
 
 % Plot classification
 utypes_gui('basepaths', basepaths, 'tAxis', tAxis, 'tblUnit', tblUnit)
