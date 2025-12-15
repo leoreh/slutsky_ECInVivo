@@ -134,7 +134,7 @@ tblLme(idxBad, :) = [];
 
 % Variables
 lblY = {'Peak Frequency (Hz)', 'Peak Amplitude (µV)', 'Duration (ms)',...
-    'Peak Energy (µV²)', 'Rate (SWR/s)', 'Density (%)'};
+    'Peak Energy (µV²)'};
 varRsp = {'peakFreq', 'peakAmp', 'dur', 'peakEnergy', 'Rate'};
 idxVar = 5;
 
@@ -194,11 +194,66 @@ prismData = cell2padmat(prismCell, 2);
 
 % -------------------------------------------------------------------------
 % Organize lme data table
+
+% Pre-process: extract NREM rate (state 4) to a dedicated field
+for iGrp = 1:length(v)
+    for iFile = 1:length(v{iGrp})
+        % Check if states analysis exists and has NREM (state 4)
+            v{iGrp}(iFile).ripp.rateNrem = v{iGrp}(iFile).ripp.states.rate{4};
+            v{iGrp}(iFile).ripp.densNrem = v{iGrp}(iFile).ripp.states.density{4};
+    end
+end
+
+% Organize table
 cfg = mcu_cfg();
 clear varMap
-varMap.states.rate = 'peakFreq';
+varMap.Rate = 'rateNrem';
+varMap.Density = 'densNrem';
+
+for iGrp = 1 : length(grps)
+    basepaths = mcu_basepaths(grps{iGrp});
+
+    % Prepare tag structures for this mouse
+    tagAll.Group = cfg.lbl.grp{iGrp};
+    tagFiles.Name = get_mname(basepaths);
+
+    % Create table
+    tblCell{iGrp} = v2tbl('v', [v{iGrp}(:).ripp], 'varMap', varMap, ...
+        'tagFiles', tagFiles, 'tagAll', tagAll, 'idxCol', 1);
+end
+% Combine all tables, clean and organize
+tblLme = vertcat(tblCell{:});
+tblLme = rmmissing(tblLme);
+tblLme.Group = reordercats(tblLme.Group, cfg.lbl.grp);
+
+% Assert non-zero
+tblLme = tbl_transform(tblLme, 'flg0', true);
 
 
+% -------------------------------------------------------------------------
+% Run analysis
+
+
+% Variables
+lblY = {'Rate (SWR/s)', 'Density (% NREM)'};
+varRsp = {'Rate', 'Density'};
+idxVar = 1;
+
+% LME
+frml = [varRsp{idxVar}, ' ~ Group + (1|Name)'];
+lmeCfg.contrasts = 'all';
+
+% Check best model
+statsPark = lme_parkTest(tblLme, frml);
+statsDist = lme_compareDists(tblLme, frml);
+
+lmeCfg.distribution = 'Normal';
+[lmeStats, lmeMdl] = lme_analyse(tblLme, frml, lmeCfg);
+
+
+% Plot
+
+hFig = tblGUI_scatHist(tblLme);
 
 
 

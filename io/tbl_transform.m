@@ -49,6 +49,7 @@ addParameter(p, 'flgZ', false, @islogical);
 addParameter(p, 'flgLog', false, @islogical);
 addParameter(p, 'flgNorm', false, @islogical);
 addParameter(p, 'skewThr', 2, @(x) isnumeric(x) && isscalar(x) && x > 0);
+addParameter(p, 'flg0', false, @islogical);
 
 parse(p, tbl, varargin{:});
 
@@ -60,6 +61,7 @@ flgZ = p.Results.flgZ;
 flgLog = p.Results.flgLog;
 flgNorm = p.Results.flgNorm;
 skewThr = p.Results.skewThr;
+flg0 = p.Results.flg0;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % INITIALIZE VARIABLES
@@ -135,21 +137,27 @@ for iVar = 1:length(processVars)
         idxGrp = idxGrps{iGrp};
         varData = tblOut.(varName)(idxGrp);
 
+        % Assert non-zero (for positive variables)
+        if flg0
+            if any(varData == 0) && all(varData >= 0)
+                c = min(varData(varData > 0)) / 2;
+                varData = varData + c;
+            end
+        end
+
+        % Apply log10 transformation
         if flgLog
-            % Check for non-negativity before log transform
-            if min(varData) >= 0
+            % Check for non-negativity
+            if min(varData) > 0
                 s = skewness(varData);
                 if s > skewThr
-                    % Apply log10 transformation with offset only to zero values
-                    offset = min(varData(varData > 0)) / 2;
-                    varData(varData == 0) = offset;
                     varData = log10(varData);
                     fprintf('Log-transforming variable: %s (skewness=%.2f)\n', varName, s);
                 end
             end
         end
 
-        % Apply normalization (after log transform, before z-scoring)
+        % Apply normalization
         if flgNorm
             % Find rows within this group that match the reference category of varNorm
             idxRef = tblOut.(varNorm) == catRef;
