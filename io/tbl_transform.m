@@ -16,6 +16,7 @@ function tblOut = tbl_transform(tbl, varargin)
 %                  If provided, only these variables will be transformed (overrides varsExc).
 %   flgZ        - Logical flag to apply z-scoring {true}.
 %   flgLog      - Logical flag to apply log transformation to skewed variables {true}.
+%   logBase     - Numeric or 'e'. Base for log transformation {10}.
 %   flgLogit    - Logical flag to apply logit transformation {false}.
 %   flgNorm     - Logical flag to apply normalization relative to reference category {false}.
 %   skewThr     - Skewness threshold for log transformation {2}.
@@ -47,12 +48,13 @@ addRequired(p, 'tbl', @istable);
 addParameter(p, 'varsExc', [], @(x) iscell(x) || isempty(x));
 addParameter(p, 'varsInc', [], @(x) iscell(x) || isempty(x));
 addParameter(p, 'varsGrp', [], @(x) iscell(x) || isempty(x));
-addParameter(p, 'varNorm', '', @ischar);
 addParameter(p, 'flgZ', false, @islogical);
+addParameter(p, 'varNorm', '', @ischar);
 addParameter(p, 'flgLog', false, @islogical);
+addParameter(p, 'logBase', 10, @(x) (isnumeric(x) && isscalar(x) && x > 0) || (ischar(x) && strcmp(x, 'e')));
 addParameter(p, 'flgLogit', false, @islogical);
 addParameter(p, 'flgNorm', false, @islogical);
-addParameter(p, 'skewThr', 2, @(x) isnumeric(x) && isscalar(x) && x > 0);
+addParameter(p, 'skewThr', 2, @(x) isnumeric(x) && isscalar(x));
 addParameter(p, 'flg0', false, @islogical);
 addParameter(p, 'verbose', false, @islogical);
 
@@ -64,6 +66,7 @@ varsGrp = p.Results.varsGrp;
 varNorm = p.Results.varNorm;
 flgZ = p.Results.flgZ;
 flgLog = p.Results.flgLog;
+logBase = p.Results.logBase;
 flgLogit = p.Results.flgLogit;
 flgNorm = p.Results.flgNorm;
 skewThr = p.Results.skewThr;
@@ -157,7 +160,7 @@ for iVar = 1:length(processVars)
     varData = tblOut.(varName);
 
     % ---------------------------------------
-    % 1. Global Analysis (Logit, Log & Offset)
+    % Global Analysis (Logit, Log & Offset)
     % ---------------------------------------
     % Decisions for log transformation and offset must be made globally
     % to ensure the variable remains consistent across groups.
@@ -187,9 +190,18 @@ for iVar = 1:length(processVars)
         % Only consider positive skewness for log transform
         s = skewness(varData(~isnan(varData)));
         if s > skewThr
-            varData = log10(varData);
+
+            % Determine base
+            if ischar(logBase) && strcmp(logBase, 'e')
+                varData = log(varData);
+                baseStr = 'Ln';
+            else
+                varData = log(varData) ./ log(logBase);
+                baseStr = sprintf('Log%.1f', logBase);
+            end
+
             if verbose
-                fprintf('[%s] Applying Log10 (Skew=%.2f)\n', varName, s);
+                fprintf('[%s] Applying %s (Skew=%.2f)\n', varName, baseStr, s);
             end
         end
     end
@@ -198,7 +210,7 @@ for iVar = 1:length(processVars)
     tblOut.(varName) = varData;
 
     % ---------------------------------------
-    % 2. Group-wise Operations (Norm & Z)
+    % Group-wise Operations (Norm & Z)
     % ---------------------------------------
 
     for iGrp = 1:length(idxGrps)

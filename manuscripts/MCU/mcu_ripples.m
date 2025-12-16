@@ -268,6 +268,10 @@ tblLme = vertcat(tblCell{:});
 tblLme.Group = reordercats(tblLme.Group, cfg.lbl.grp);
 tblLme.UnitType = reordercats(tblLme.UnitType, cfg.lbl.unit);
 
+% Remove bad units
+tblLme(tblLme.UnitType == 'Other', :) = [];
+tblLme.UnitType = removecats(tblLme.UnitType, 'Other');
+
 % Assert non-zero for mrl (fr modulation included negative values by
 % definition)
 tblLme = tbl_transform(tblLme, 'flg0', true, 'verbose', true, ...
@@ -282,70 +286,29 @@ varRsp = {'MRL', 'frMod'};
 idxVar = 1;
 
 % Plot
-hFig = tblGUI_scatHist(tblLme);
+% hFig = tblGUI_scatHist(tblLme);
 
 % Formula
-frml = [varRsp{idxVar}, ' ~ Group + (1|Name)'];
+frml = [varRsp{idxVar}, ' ~ Group * UnitType + (1|Name)'];
 
 % Check best model
-statsPark = lme_parkTest(tblLme, frml);
-statsDist = lme_compareDists(tblLme, frml);
+statsPark = lme_parkTest(tblLme, frml)
+statsDist = lme_compareDists(tblLme, frml)
 
-% Comparisons reveals that for MRL, log-normal is best (see comment at end)
 
 % Run LME
 cfgLme.dist = 'Normal';
 [lmeStats, lmeMdl] = lme_analyse(tblLme, frml, cfgLme);
 
 % Plot
-hFig = tblGUI_bar(tblLme, 'yVar', varRsp{idxVar});
+hFig = tblGUI_bar(tblLme, 'yVar', varRsp{idxVar}, 'xVar', 'UnitType', ...
+    'grpVar', 'Group');
 
 % Prism
 [prismMat] = tbl2prism(tblLme, 'yVar', varRsp{idxVar});
 
-% LME
-frml = [varRsp{idxVar}, ' ~ Group * UnitType + (1|Name)'];
-cfgLme.contrasts = [1 : 7];
-cfgLme.distribution = 'Normal';
-[lmeStats, lmeMdl] = lme_analyse(tblLme, frml, cfgLme);
-
-% Plot
-hFig = lme_plot(tblLme, lmeMdl, 'lmeStats', lmeStats,...
-    'idxRow', [], 'ptype', 'bar', 'axShape', 'square');
-
-% Graphics
-hAx = gca;
-[barIdx, barLbl] = lme_sigLines(lmeStats, lmeMdl, tblLme,...
-    'idxRow', [3, 6]);
-plot_sigLines(hAx, barIdx, barLbl, 'flgNS', false);
-ylabel(hAx, lblY{idxVar})
-xlabel(hAx, '');    title(hAx, '')
-plot_axSize('hFig', hFig, 'szOnly', true, 'axShape',...
-    'square', 'axHeight', 300)
-hAx.Legend.Location = 'northwest';
-
-% save
-fname = lme_frml2char(frml, 'rmRnd', true);
-fPath = fullfile(cfg.savepath, 'Ripp');
-lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
-    'lmeData', tblLme, 'lmeStats', lmeStats, 'lmeMdl', lmeMdl)
 
 
-% -------------------------------------------------------------------------
-% Calculate statistics for each combination of Group and Subgroup
-sem = @(x) std(x, 'omitnan') / sqrt(length(x));
-summaryTable = groupsummary(tblLme, {'Group', 'UnitType'}, {'mean', sem}, 'frMod')
-summaryTable = summaryTable(:, [1,2,4,5,3])
-
-cnt = 1; clear prismCell
-for iGrp = 1 : 2
-    for iUnit = 1 : 2
-        idx = tblLme.Group == cfg.lbl.grp{iGrp} & tblLme.UnitType == cfg.lbl.unit{iUnit};
-        prismCell{cnt} = tblLme.mrl(idx);
-        cnt = cnt + 1;
-    end
-end
-prismData = cell2padmat(prismCell, 2)';
 
 
 
@@ -764,41 +727,3 @@ end
 
 
 
-
-
-%% ========================================================================
-%  NOTE: STATISTICAL HANDLING OF MRL (BOUNDED DATA)
-%  ========================================================================
-%  Mean Resultant Length (MRL) quantifies phase locking strength and is
-%  mathematically bounded on the interval [0, 1]. This bounded nature
-%  presents specific challenges for standard Linear Mixed Models (LME).
-%
-%  1. The "Leakage" Problem (Normal Distribution):
-%     Standard LME assumes the response variable is normally distributed and
-%     unbounded (-Inf to +Inf). When applied to MRL data, which is often
-%     clustered near zero (e.g., 0.1 - 0.3), a Normal model will inevitably
-%     predict impossible negative values (probability mass "leaking" below
-%     zero). This severely penalizes model performance metrics (like AIC)
-%     and invalidates the assumption of Gaussian residuals.
-%
-%  2. Variance Scaling (Park Test Results):
-%     Diagnostic tests (Park Test) typically reveal a Lambda coefficient
-%     between 0.5 and 1.0 for MRL data. This indicates that variance is not
-%     constant (homoscedastic) but scales with the mean. As locking strength
-%     increases from 0, variability initially grows. This heteroscedasticity
-%     violates the core assumption of the standard Normal LME.
-%
-%  3. Solution: Logit-Normal Model
-%     To respect the [0, 1] boundaries and stabilize variance, the optimal
-%     approach is to apply a Logit transformation before modeling:
-%
-%         y_logit = log( y / (1 - y) )
-%
-%     This maps the bounded interval [0, 1] to the unbounded real line
-%     (-Inf, +Inf). A standard Normal LME can then be fit to 'y_logit'
-%     without violating boundary or variance assumptions.
-%
-%     *Implementation Note:* If the data contains exact 0s or 1s, they must
-%     be slightly offset (e.g., +/- eps or 1e-6) to avoid +/- Inf results
-%     during transformation.
-%  ========================================================================

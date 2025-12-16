@@ -2,8 +2,8 @@ function stats = lme_compareDists(tbl, frml)
 % LME_COMPAREDISTS Compares GLME fits across multiple distributions.
 %
 %   stats = LME_COMPAREDISTS(TBL, FRML) fits Generalized Linear
-%   Mixed Models using four common distributions (Normal, Poisson, Gamma,
-%   InverseGaussian) and returns a table of fit statistics.
+%   mixed models using five common distributions (Normal, Log-Normal,
+%   Logit-Normal, Poisson, Gamma, and InverseGaussian) and returns a table of fit statistics.
 %
 %   INPUTS:
 %       tbl         - (table) Table containing the variables.
@@ -28,18 +28,18 @@ parse(p, tbl, frml);
 %  ========================================================================
 
 % List of distributions to test
-dists = {'Normal', 'Log-Normal', 'Poisson', 'Gamma', 'InverseGaussian'};
-nMdl = length(dists);
+mdls = {'Normal', 'Log-Normal', 'Logit-Normal', 'Poisson', 'Gamma', 'InverseGaussian'};
+nMdl = length(mdls);
 
 % Common canonical/standard links
 % Normal -> Identity
-% Log-Normal -> Identity (on log data)
+% Log/Logit-Normal -> Identity (on transformed data)
 % Others -> Log (Enforced as per best practice for positive biological data)
-links = {'Identity', 'Identity', 'Log', 'Log', 'Log'};
+links = {'Identity', 'Identity', 'Identity', 'Log', 'Log', 'Log'};
 
 % Output table
 stats = table();
-stats.Distribution = dists(:);
+stats.Model = mdls(:);
 stats.Link = links(:);
 stats.AIC = nan(nMdl, 1);
 stats.BIC = nan(nMdl, 1);
@@ -49,84 +49,118 @@ stats.R2_Adjusted = nan(nMdl, 1);
 stats.Converged = false(nMdl, 1);
 stats.ErrorMsg = repmat({''}, nMdl, 1);
 
+% Hardcoded for Model Comparison
+fitMethod = 'Laplace';
+
+% Parse response variable
+varResp = strtrim(strsplit(frml, '~'));
+varResp = varResp{1};
+yRaw = tbl.(varResp);           % Store raw values before transformations
+
+%% ========================================================================
+%  VALIDATION
+%  ========================================================================
+
+% Check for non-positive values
+nZeros = sum(tbl.(varResp) == 0);
+pctZeros = nZeros / length(tbl.(varResp));
+isNeg = any(tbl.(varResp) < 0);
+
+if isNeg
+    error(['Response variable "%s" contains negative values.', ...
+        'Cannot fit Log-Normal, Gamma, or Poisson.'], varResp);
+end
+
+% Assert non-zeros
+if nZeros > 0
+    warning(['Response variable "%s" has %.1f%% zeros.', ...
+        'Results may be unstable.'], varResp, pctZeros*100);
+
+    tbl = tbl_transform(tbl, 'flg0', true, 'verbose', false, ...
+        'varsInc', {varResp});
+end
+
+
 
 %% ========================================================================
 %  RUN FITS
 %  ========================================================================
 
-% Parse response variable for Log-Normal / Jacobian Check
-respVar = strtrim(strsplit(frml, '~'));
-respVar = respVar{1};
-yRaw = tbl.(respVar);
-
-% Hardcoded for Model Comparison
-fitMethod = 'Laplace';
-
 for iMdl = 1:nMdl
-    curDist = stats.Distribution{iMdl};
-    curLink = stats.Link{iMdl};
+
+    % loop variables
+    mdl = stats.Model{iMdl};
+    dist = mdl;
+    link = stats.Link{iMdl};
+    mdlTbl = tbl;
+    mdlFrml = frml;
+    jcb = 0;
 
     try
-        % -----------------------------------------------------------------
-        % LOG-NORMAL (Special Case)
-        % -----------------------------------------------------------------
-        if strcmp(curDist, 'Log-Normal')
 
-            % Fit Normal GLME on log(y)
-            logFrml = ['log(' respVar ') ~ ' extractAfter(frml, '~')];
+        % TRANSFORMATIONS
+        if strcmp(dist, 'Log-Normal')
 
-            mdl = fitglme(tbl, logFrml, ...
-                'Distribution', 'Normal', ...
-                'Link', 'Identity', ...
-                'FitMethod', fitMethod);
+            % Ensure Natural Log for comparison
+            mdlTbl = tbl_transform(tbl, 'flgLog', true, 'logBase', 'e', ...
+                'verbose', false, 'skewThr', -Inf);
+            dist = 'Normal';
 
-            % Extract Raw LogLikelihood (of log-data)
-            llLog = mdl.LogLikelihood;
+            % Jacobian Correction: LL_raw = LL_ln - sum(ln(y))
+            % Use original y values (stored in yRaw, or retrieve from tbl)
+            jcb = -sum(log(yRaw), 'omitnan');
 
-            % Jacobian Correction
-            % LL_raw = LL_log - sum(log(y))
-            % This converts the density from log-scale back to raw-scale
-            sumLogY = nansum(log(yRaw));
-            llRaw = llLog - sumLogY;
+        elseif strcmp(dist, 'Logit-Normal')
 
-            % Recalculate ICs on raw scale
-            % Back-calculate k (num params) from AIC and LL
-            % AIC = -2*LL + 2*k  =>  2*k = AIC + 2*LL
-            aicLog = mdl.ModelCriterion.AIC;
-            k2 = aicLog + 2*llLog; % 2*k
+            mdlTbl = tbl_transform(tbl, 'flgLogit', true, 'verbose', false);
+            dist = 'Normal';
+
+            % Jacobian Correction: LL_raw = LL_logit - sum(ln(y*(1-y)))
+            % Clip for stability (consistent with tbl_transform)
+            yVal = max(eps, min(1-eps, yRaw));
+            jcb = -sum(log(yVal .* (1 - yVal)), 'omitnan');
+        end
+
+
+        % RUN FIT
+        mdl = fitglme(mdlTbl, mdlFrml, ...
+            'Distribution', dist, ...
+            'Link', link, ...
+            'FitMethod', fitMethod);
+
+
+        % STATISTICS
+
+        % Raw stats from model
+        ll = mdl.LogLikelihood;
+        aic = mdl.ModelCriterion.AIC;
+        bic = mdl.ModelCriterion.BIC;
+
+        % Apply Jacobian Correction (converts back to raw scale)
+        if jcb ~= 0
+
+            % We need k (num params) to recalculate AIC/BIC
+            % AIC_mdl = -2*LL_mdl + 2*k  =>  2*k = AIC_mdl + 2*LL_mdl
+            k2 = aic + 2*ll;
+
+            ll = ll + jcb; % Corrected LogLikelihood
 
             nObs = mdl.NumObservations;
 
-            aicRaw = -2*llRaw + k2;
-            bicRaw = -2*llRaw + (k2/2)*log(nObs);
-
-            % Store
-            stats.AIC(iMdl) = aicRaw;
-            stats.BIC(iMdl) = bicRaw;
-            stats.LogLikelihood(iMdl) = llRaw;
-            stats.R2_Ordinary(iMdl) = mdl.Rsquared.Ordinary;
-            stats.R2_Adjusted(iMdl) = mdl.Rsquared.Adjusted;
-            stats.Converged(iMdl) = true;
-
-            % -----------------------------------------------------------------
-            % STANDARD GLME (Normal, Poisson, Gamma, IG)
-            % -----------------------------------------------------------------
-        else
-            mdl = fitglme(tbl, frml, ...
-                'Distribution', curDist, ...
-                'Link', curLink, ...
-                'FitMethod', fitMethod);
-
-            stats.AIC(iMdl) = mdl.ModelCriterion.AIC;
-            stats.BIC(iMdl) = mdl.ModelCriterion.BIC;
-            stats.LogLikelihood(iMdl) = mdl.LogLikelihood;
-            stats.R2_Ordinary(iMdl) = mdl.Rsquared.Ordinary;
-            stats.R2_Adjusted(iMdl) = mdl.Rsquared.Adjusted;
-            stats.Converged(iMdl) = true;
+            aic = -2*ll + k2;
+            bic = -2*ll + (k2/2)*log(nObs);
         end
 
+
+        % Store
+        stats.AIC(iMdl) = aic;
+        stats.BIC(iMdl) = bic;
+        stats.LogLikelihood(iMdl) = ll;
+        stats.R2_Ordinary(iMdl) = mdl.Rsquared.Ordinary;
+        stats.R2_Adjusted(iMdl) = mdl.Rsquared.Adjusted;
+        stats.Converged(iMdl) = true;
+
     catch ME
-        % Handle Errors
         stats.ErrorMsg{iMdl} = ME.message;
     end
 end
@@ -135,7 +169,7 @@ end
 [~, sortIdx] = sort(stats.AIC);
 stats = stats(sortIdx, :);
 
-end
+end     % EOF
 
 
 %% ========================================================================
