@@ -16,6 +16,7 @@ function tblOut = tbl_transform(tbl, varargin)
 %                  If provided, only these variables will be transformed (overrides varsExc).
 %   flgZ        - Logical flag to apply z-scoring {true}.
 %   flgLog      - Logical flag to apply log transformation to skewed variables {true}.
+%   flgLogit    - Logical flag to apply logit transformation {false}.
 %   flgNorm     - Logical flag to apply normalization relative to reference category {false}.
 %   skewThr     - Skewness threshold for log transformation {2}.
 %   varsGrp     - Cell array of categorical variable names defining groups for
@@ -49,6 +50,7 @@ addParameter(p, 'varsGrp', [], @(x) iscell(x) || isempty(x));
 addParameter(p, 'varNorm', '', @ischar);
 addParameter(p, 'flgZ', false, @islogical);
 addParameter(p, 'flgLog', false, @islogical);
+addParameter(p, 'flgLogit', false, @islogical);
 addParameter(p, 'flgNorm', false, @islogical);
 addParameter(p, 'skewThr', 2, @(x) isnumeric(x) && isscalar(x) && x > 0);
 addParameter(p, 'flg0', false, @islogical);
@@ -62,6 +64,7 @@ varsGrp = p.Results.varsGrp;
 varNorm = p.Results.varNorm;
 flgZ = p.Results.flgZ;
 flgLog = p.Results.flgLog;
+flgLogit = p.Results.flgLogit;
 flgNorm = p.Results.flgNorm;
 skewThr = p.Results.skewThr;
 flg0 = p.Results.flg0;
@@ -154,11 +157,18 @@ for iVar = 1:length(processVars)
     varData = tblOut.(varName);
 
     % ---------------------------------------
-    % 1. Global Analysis (Log & Offset)
+    % 1. Global Analysis (Logit, Log & Offset)
     % ---------------------------------------
-    % Decisions for log transformation and offset must be made GLOBALLY
+    % Decisions for log transformation and offset must be made globally
     % to ensure the variable remains consistent across groups.
 
+    if flgLogit
+        varData = max(eps, min(1 - eps, varData));
+        varData = log(varData ./ (1 - varData));
+        if verbose
+            fprintf('[%s] Applying Logit\n', varName);
+        end
+    end
 
     % Assert non-zero (for positive variables) if explicitly asked, or if
     % log transform is needed
@@ -257,4 +267,38 @@ end     % EOF
 %     1. Positive Domain: If Ref=10 and x=15, result is 150% (Increase).
 %     2. Negative Domain: If Ref=-10 and x=-5, result is 150% (Increase).
 %     3. Zero Crossing: If Ref=-5 and x=5, result is 300%.
+%  ========================================================================
+
+
+%% ========================================================================
+%  NOTE: LOG VS. LOGIT
+%  ========================================================================
+%  Transforming the response variable is often necessary to satisfy the
+%  assumption of normally distributed residuals in LME. The choice between
+%  Log and Logit depends strictly on the domain boundaries of your data.
+%
+%  The Log Transform ( y -> log(y) ) is appropriate for magnitude data such
+%  as Power, Energy, Duration, or Firing Rate, where the domain is positive
+%  and theoretically unbounded [0, +Inf). These variables often exhibit a
+%  multiplicative variance structure where variance grows with the mean,
+%  along with a heavy right tail. The log function compresses this tail and
+%  stabilizes the variance, mapping the data to (-Inf, +Inf). Note that
+%  this transform is undefined for y <= 0, often requiring a shift if zeros
+%  exist in the dataset.
+%
+%  The Logit Transform ( y -> log( y / (1-y) ) ) is required for data that
+%  represents a bounded proportion or index, such as phase locking strength
+%  (MRL) or probabilities, which are strictly bounded between [0, 1]. Such
+%  data often exhibits variance compression near the boundaries, where
+%  variance shrinks as y approaches 0 or 1. A simple Log transform only
+%  fixes the lower bound but ignores the upper bound. The Logit transform
+%  stretches both boundaries to infinity, effectively mapping the interval
+%  [0, 1] to the whole real line (-Inf, +Inf). Implementing this requires
+%  clipping exact 0s and 1s (e.g., to 0.001 and 0.999) to avoid infinite
+%  values.
+%
+%  As a general decision rule, if your data can theoretically go to infinity
+%  (e.g., Energy), use the Log transform. If your data represents a
+%  strength of locking or index capped at 1 (e.g., Mean Resultant Length),
+%  use the Logit transform.
 %  ========================================================================
