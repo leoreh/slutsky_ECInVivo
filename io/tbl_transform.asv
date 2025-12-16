@@ -159,29 +159,49 @@ for iVar = 1:length(processVars)
     % Decisions for log transformation and offset must be made GLOBALLY
     % to ensure the variable remains consistent across groups.
 
-
-    % Assert non-zero (for positive variables) if explicitly asked, or if
-    % log transform is needed
-    if flg0 || flgLog
-        if any(varData == 0) && all(varData >= 0)
-            c = min(varData(varData > 0)) / 2;
-            varData = varData + c;
-            if verbose
-                fprintf('[%s] Adding Offset %.4f\n', varName, c);
-            end
-        end
-    end
+    doLog = false;
+    offsetVal = 0;
 
     if flgLog
         % Check skewness on the pooled data (ignoring NaNs)
         % Only consider positive skewness for log transform
-        s = skewness(varData(~isnan(varData)));
-        if s > skewThr
-            varData = log10(varData);
-            if verbose
-                fprintf('[%s] Applying Log10 (Skew=%.2f)\n', varName, s);
+        varDataClean = varData(~isnan(varData));
+        if ~isempty(varDataClean)
+            s = skewness(varDataClean);
+            if s > skewThr 
+                doLog = true;
             end
         end
+    end
+    
+    % Assert non-zero (for positive variables) if explicitly asked, or if
+    % log transform is needed
+    if flg0 || flgLog
+        % Calculate offset if zeros exist and we need to log or explicitly asked
+        if any(varData == 0) && all(varData >= 0)
+            c = min(varData(varData > 0)) / 2;
+            varData = varData + c;
+            if verbose
+                fprintf('[%s] Adding Offset %.4f\n', varName, offsetVal);
+            end
+        end
+
+
+
+    end
+
+    if verbose
+        if doLog, fprintf('[%s] Applying Log10 (Skew=%.2f)\n', varName, s); end
+        if offsetVal > 0, fprintf('[%s] Adding Offset %.4f\n', varName, offsetVal); end
+    end
+
+    % Apply Global Transformations
+    if offsetVal > 0
+        varData = varData + offsetVal;
+    end
+
+    if doLog
+        varData = log10(varData);
     end
 
     % Write back global changes before group-wise operations
@@ -203,7 +223,7 @@ for iVar = 1:length(processVars)
 
             % Calculate the mean for the reference category within this group
             refMean = mean(tblOut.(varName)(idxRefGroup), 'all', 'omitnan');
-
+            
             % Check for issues with reference mean
             if refMean == 0
                 refMean = eps; % Avoid division by zero, result will be large
@@ -213,10 +233,12 @@ for iVar = 1:length(processVars)
                     varName, iGrp);
                 continue
             end
-
-            % Normalize
+            
+            % For values above reference, we want them to be >100%
+            % For values below reference, we want them to be <100%
             varDiff = (varData - refMean) / abs(refMean);
-            normData = 100 + varDiff * 100;
+            aboveRef = varData > refMean;
+            normData = 100 + (aboveRef .* abs(varDiff) - ~aboveRef .* abs(varDiff)) * 100;
 
             % Update varData with normalized values
             varData = normData;
@@ -234,27 +256,3 @@ end
 
 end     % EOF
 
-
-%% ========================================================================
-%  NOTE: NORMALIZATION
-%  ========================================================================
-%  When `flgNorm` is true, this function standardizes values relative to a
-%  specified reference group (e.g., 'Baseline' or 'Control'). The goal is
-%  to express data as a percentage of the reference mean, where 100%
-%  represents parity with the baseline.
-%
-%  The "Number Line" Approach:
-%     Standard percent change formulas often fail when dealing with negative
-%     values (e.g., calculating growth from -10 to -5). A simple ratio
-%     can yield misleading signs. To resolve this, this function utilizes
-%     the absolute value of the reference mean in the denominator:
-%
-%         Normalized = 100 + ((x - refMean) / abs(refMean)) * 100
-%
-%     This approach preserves the directionality of the change along the
-%     real number line, regardless of the sign of the data:
-%
-%     1. Positive Domain: If Ref=10 and x=15, result is 150% (Increase).
-%     2. Negative Domain: If Ref=-10 and x=-5, result is 150% (Increase).
-%     3. Zero Crossing: If Ref=-5 and x=5, result is 300%.
-%  ========================================================================

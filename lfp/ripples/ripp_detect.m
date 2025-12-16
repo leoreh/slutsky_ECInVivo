@@ -161,7 +161,7 @@ if isempty(sig)
         sig = mean(sig, 2);
     end
 end
-    
+
 % Adjust recording window if loaded duration is shorter than requested
 actualDur = size(sig,1)/fs;
 if actualDur < loadDur - 1/fs
@@ -174,7 +174,7 @@ timestamps = recWin(1) + (0:length(sig)-1)' / fs;
 
 % Validate EMG length if provided
 if ~isempty(emg) && length(emg) ~= length(sig)
-     error('EMG length (%d) does not match LFP length (%d).', length(emg), length(sig));
+    error('EMG length (%d) does not match LFP length (%d).', length(emg), length(sig));
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -251,14 +251,14 @@ contPowDur = nan(nEvents, 1);
 contPowAvg = nan(nEvents, 1);
 avgFreq = nan(nEvents, 1);
 
-% EMG 
-if ~isempty(emg) 
-    
+% EMG
+if ~isempty(emg)
+
     % calculate EMG RMS per event
     for iEvent = 1:nEvents
         emgRms(iEvent) = rms(emg(eventSamples(iEvent, 1) : eventSamples(iEvent, 2)));
     end
-    
+
     % Apply EMG exclusion
     idxDiscard = idxDiscard | (emgRms > prctile(emgRms, thr(5)));
 end
@@ -266,13 +266,13 @@ end
 % Remove events with high average frequency, potentially indicative of EMG
 % artifacts. The frequency threshold is dynamically determined based on
 % events coinciding with high EMG activity.
-if ~isempty(emg)  
-    
+if ~isempty(emg)
+
     % Calculate mean instantaneous frequency per event
     for iEvent = 1:nEvents
         avgFreq(iEvent) = mean(sigFreq(eventSamples(iEvent, 1) : eventSamples(iEvent, 2)), 'omitnan');
     end
-    
+
     % calculate the median mean frequency during events of high emg
     emgIdx = emgRms > prctile(emgRms, 99);
     thrFreq = mean(avgFreq(emgIdx));
@@ -281,7 +281,7 @@ end
 
 % Apply Peak Power and Continuous Duration Thresholds
 for iEvent = 1:nEvents
-    
+
     % Skip previously discarded events
     if idxDiscard(iEvent)
         continue
@@ -292,7 +292,7 @@ for iEvent = 1:nEvents
 
     % Check peak power threshold (minimum and maximum)
     peakPower(iEvent) = max(eventPow);
-    if peakPower(iEvent) < thr(2) || peakPower(iEvent) > thr(4) 
+    if peakPower(iEvent) < thr(2) || peakPower(iEvent) > thr(4)
         idxDiscard(iEvent) = true;
         continue;
     end
@@ -386,6 +386,13 @@ peakFreq = ripp.maps.freq(:, centerBin);               % Frequency at peak time
 peakFilt = ripp.maps.filt(:, centerBin);               % Filtered LFP value at peak time
 maxFreq = max(ripp.maps.freq, [], 2, 'omitnan');       % Max frequency during ripple map window
 
+% Calculate range of filtered LFP around peak (+/- 5 samples)
+idxWin = centerBin + (-5 : 5);
+ripp.peakRng = range(ripp.maps.filt(:, idxWin), 2);
+
+% Calculate peakEnergy using Mean Square (RMS^2) of filtered LFP around peak
+ripp.peakEnergy = mean(ripp.maps.filt(:, idxWin).^2, 2);
+
 % Calculate Autocorrelogram (ACG)
 [ripp.acg.data, ripp.acg.t] = CCG(peakTime, ones(nEvents, 1),...
     'binSize', 0.01, 'duration', 1);                   % 1s ACG, 10ms bins
@@ -409,19 +416,19 @@ clear sig sigFilt sigAmp sigPhase sigFreq timestamps r ir eventFilt peakIdx;
 % continuous power length) to suggest potentially refined threshold and
 % duration parameters based on percentiles of the detected events.
 
-% Suggest power thresholds 
-ripp.info.thrData(1) = prctile(contPowAvg, 1);   
-ripp.info.thrData(2) = prctile(peakPower, 10);  
-ripp.info.thrData(3) = prctile(contPowAvg, 10); 
-ripp.info.thrData(4) = prctile(peakPower, 99) * 2; 
+% Suggest power thresholds
+ripp.info.thrData(1) = prctile(contPowAvg, 1);
+ripp.info.thrData(2) = prctile(peakPower, 10);
+ripp.info.thrData(3) = prctile(contPowAvg, 10);
+ripp.info.thrData(4) = prctile(peakPower, 99) * 2;
 ripp.info.thrData(5) = thr(5); % Keep original EMG threshold suggestion
 ripp.info.thrData = round(ripp.info.thrData, 1);
 
-% Suggest duration limits 
+% Suggest duration limits
 ripp.info.limDurData = limDur; % Start with original limits
-ripp.info.limDurData(4) = round(prctile(contPowDur, 5) / fs * 1000); 
+ripp.info.limDurData(4) = round(prctile(contPowDur, 5) / fs * 1000);
 
-% Suggest passband limits 
+% Suggest passband limits
 ripp.info.passbandData = [prctile(avgFreq, 2), prctile(peakFreq, 99.9)];
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -431,7 +438,7 @@ ripp.info.passbandData = [prctile(avgFreq, 2), prctile(peakFreq, 99.9)];
 % and metadata, saves the structure to a .ripp.mat file, optionally creates
 % .res and .clu files for NeuroScope, and generates summary plots if requested.
 
-% Populate Output Structure 
+% Populate Output Structure
 ripp                = workspace2struct(ripp);
 ripp.info           = workspace2struct(ripp.info);
 
@@ -441,10 +448,10 @@ ripp.info.runtime   = datetime("now");
 ripp.contPowDur     = contPowDur / fs * 1000;
 ripp.dur            = ripp.dur * 1000;         % covert to ms
 
-% Save Results 
+% Save Results
 if flgSaveVar
-    save(rippfile, 'ripp', '-v7.3'); 
-    
+    save(rippfile, 'ripp', '-v7.3');
+
     % Create .res and .clu files for NeuroScope visualization
     % Note: This currently assumes recWin(1) = 0 for correct sample
     % alignment. In addition, for tdt (non-integer fsSpks), there is a
@@ -488,64 +495,113 @@ end % END FUNCTION ripp_detect
 function ripp = ripp_initialize()
 % Creates the initial ripp structure with all fields set to default/empty.
 
-    ripp = struct();
-    % Event Timing & Core Properties
-    ripp.times              = []; % Nx2 matrix, [start end] times in seconds
-    ripp.dur                = []; % Nx1 vector, duration of ripples in (ms)
-    ripp.peakTime           = []; % Nx1 vector, time of ripple peak (min of filtered LFP) in seconds
-    ripp.peakFilt           = []; % Nx1 vector, value of filtered LFP at peak time
-    ripp.peakPower          = []; % Nx1 vector, value of detection signal (z-score) at its peak within the event
-    ripp.peakAmp            = []; % Nx1 vector, LFP envelope amplitude at peakTime
-    ripp.peakFreq           = []; % Nx1 vector, instantaneous frequency at peakTime [Hz]
-    ripp.maxFreq            = []; % Nx1 vector, maximum instantaneous frequency within map window [Hz]
-    ripp.emgRms             = []; % Nx1 vector, RMS of EMG during ripple (NaN if EMG not provided/used)
-    ripp.contPowDur         = []; % Nx1 vector, length of longest continuous period above thr(3) [ms]
-    ripp.contPowAvg         = []; % Nx1 vector, average detection signal during longest continuous period above thr(3)
+ripp = struct();
+% Event Timing & Core Properties
+ripp.times              = []; % Nx2 matrix, [start end] times in seconds
+ripp.dur                = []; % Nx1 vector, duration of ripples in (ms)
+ripp.peakTime           = []; % Nx1 vector, time of ripple peak (min of filtered LFP) in seconds
+ripp.peakFilt           = []; % Nx1 vector, value of filtered LFP at peak time
+ripp.peakPower          = []; % Nx1 vector, value of detection signal (z-score) at its peak within the event
+ripp.peakAmp            = []; % Nx1 vector, LFP envelope amplitude at peakTime
+ripp.peakEnergy         = []; % Nx1 vector, energy (mean squared amplitude) of filtered LFP around peak
+ripp.peakRng            = []; % Nx1 vector, range of filtered LFP around peak
+ripp.peakFreq           = []; % Nx1 vector, instantaneous frequency at peakTime [Hz]
+ripp.maxFreq            = []; % Nx1 vector, maximum instantaneous frequency within map window [Hz]
+ripp.emgRms             = []; % Nx1 vector, RMS of EMG during ripple (NaN if EMG not provided/used)
+ripp.contPowDur         = []; % Nx1 vector, length of longest continuous period above thr(3) [ms]
+ripp.contPowAvg         = []; % Nx1 vector, average detection signal during longest continuous period above thr(3)
 
-    % Info substruct (Metadata)
-    ripp.info               = struct();
-    ripp.info.basename      = '';
-    ripp.info.rippCh        = [];
-    ripp.info.limDur        = []; % [minRippDur maxRippDur minInterRipp minContPowerDur] in ms
-    ripp.info.limDurData    = []; % Suggested duration limits based on detected data in ms
-    ripp.info.recWin        = []; % [start end] analysis window in seconds
-    ripp.info.runtime       = []; % datetime object
-    ripp.info.thr           = []; % [detect peak cont artifact emgPercentile] thresholds used
-    ripp.info.thrData       = []; % Suggested thresholds based on detected data 
-    ripp.info.fs            = []; % LFP sampling rate in Hz
-    ripp.info.fsSpks        = []; % Spike sampling rate in Hz
-    ripp.info.passband      = []; % [low high] filter passband in Hz
-    ripp.info.passbandData  = []; % [low high] filter passband in Hz
-    ripp.info.detectAlt     = []; % Detection method: 1=Amp, 2=SqSig, 3=TEO
-    ripp.info.movLen        = []; % Moving window size for adaptive threshold in seconds
-    ripp.info.bit2uv        = []; % bit2uv conversion factor used
+% Info substruct (Metadata)
+ripp.info               = struct();
+ripp.info.basename      = '';
+ripp.info.rippCh        = [];
+ripp.info.limDur        = []; % [minRippDur maxRippDur minInterRipp minContPowerDur] in ms
+ripp.info.limDurData    = []; % Suggested duration limits based on detected data in ms
+ripp.info.recWin        = []; % [start end] analysis window in seconds
+ripp.info.runtime       = []; % datetime object
+ripp.info.thr           = []; % [detect peak cont artifact emgPercentile] thresholds used
+ripp.info.thrData       = []; % Suggested thresholds based on detected data
+ripp.info.fs            = []; % LFP sampling rate in Hz
+ripp.info.fsSpks        = []; % Spike sampling rate in Hz
+ripp.info.passband      = []; % [low high] filter passband in Hz
+ripp.info.passbandData  = []; % [low high] filter passband in Hz
+ripp.info.detectAlt     = []; % Detection method: 1=Amp, 2=SqSig, 3=TEO
+ripp.info.movLen        = []; % Moving window size for adaptive threshold in seconds
+ripp.info.bit2uv        = []; % bit2uv conversion factor used
 
-    % Maps substruct (Peri-Event Averages)
-    ripp.maps               = struct();
-    ripp.maps.durWin        = [-75 75] / 1000; % Default map window [-0.075 +0.075] seconds
-    ripp.maps.raw           = []; % Map of raw LFP signal
-    ripp.maps.filt          = []; % Map of filtered LFP signal
-    ripp.maps.amp           = []; % Map of LFP amplitude envelope
-    ripp.maps.phase         = []; % Map of LFP phase
-    ripp.maps.freq          = []; % Map of instantaneous LFP frequency
+% Maps substruct (Peri-Event Averages)
+ripp.maps               = struct();
+ripp.maps.durWin        = [-75 75] / 1000; % Default map window [-0.075 +0.075] seconds
+ripp.maps.raw           = []; % Map of raw LFP signal
+ripp.maps.filt          = []; % Map of filtered LFP signal
+ripp.maps.amp           = []; % Map of LFP amplitude envelope
+ripp.maps.phase         = []; % Map of LFP phase
+ripp.maps.freq          = []; % Map of instantaneous LFP frequency
 
-    % Rate substruct
-    ripp.rate               = struct();
-    ripp.rate.rate          = []; % Instantaneous ripple rate vector [Hz]
-    ripp.rate.binedges      = []; % Bin edges for rate calculation [s]
-    ripp.rate.timestamps    = []; % Timestamps for rate calculation [s]
-    ripp.rate.binsize       = []; % binsize for rate calculation [s]
+% Rate substruct
+ripp.rate               = struct();
+ripp.rate.rate          = []; % Instantaneous ripple rate vector [Hz]
+ripp.rate.binedges      = []; % Bin edges for rate calculation [s]
+ripp.rate.timestamps    = []; % Timestamps for rate calculation [s]
+ripp.rate.binsize       = []; % binsize for rate calculation [s]
 
-    % ACG substruct (Autocorrelogram)
-    ripp.acg                = struct();
-    ripp.acg.data           = []; % ACG counts per bin
-    ripp.acg.t              = []; % Time lags for ACG [s]
+% ACG substruct (Autocorrelogram)
+ripp.acg                = struct();
+ripp.acg.data           = []; % ACG counts per bin
+ripp.acg.t              = []; % Time lags for ACG [s]
 
-    % Correlations substruct
-    ripp.corr               = struct();
-    ripp.corr.AmpFreq       = NaN; % Correlation between peak Amplitude and peak Frequency
-    ripp.corr.DurFreq       = NaN; % Correlation between Duration and peak Frequency
-    ripp.corr.DurAmp        = NaN; % Correlation between Duration and peak Amplitude
+% Correlations substruct
+ripp.corr               = struct();
+ripp.corr.AmpFreq       = NaN; % Correlation between peak Amplitude and peak Frequency
+ripp.corr.DurFreq       = NaN; % Correlation between Duration and peak Frequency
+ripp.corr.DurAmp        = NaN; % Correlation between Duration and peak Amplitude
 
-end
-% EOF
+end     % EOF
+
+
+%% ========================================================================
+%  NOTE: PEAK AMPLITUDE VS. PEAK POWER (Z-SCORE)
+%  ========================================================================
+%  In ripple analysis, distinguishing between "Raw Magnitude" and
+%  "Statistical Magnitude" is critical
+%
+%  1. Peak Amplitude (peakAmp) & Energy (peakEnergy):
+%     These metrics represent the *physical* strength of the oscillation.
+%     - 'peakAmp' is the envelope amplitude in microvolts (uV).
+%     - 'peakEnergy' is the squared amplitude or RMS power (uV^2).
+%     These values reflect the absolute magnitude of the synchronous
+%     population firing. If a manipulation (like MCU-KO) increases neuronal
+%     excitability or recruitment, these raw metrics will increase directly.
+%
+%  2. Peak Power (peakPower):
+%     In the context of this detection algorithm, 'peakPower' is a Z-SCORE.
+%     It does not measure absolute energy. Instead, it measures the
+%     *Signal-to-Noise Ratio* (SNR) relative to the local background:
+%
+%         peakPower = (RawAmp - BaselineMean) / BaselineSD
+%
+%     This metric quantifies how much the ripple "pops out" from the
+%     background activity. It is a measure of detection reliability, not
+%     physiological strength.
+%
+%  THE "SNR PARADOX":
+%     It is possible for ripples to become physically much larger (higher
+%     peakAmp) while their Z-score (peakPower) remains unchanged. This
+%     occurs if the background "noise" (BaselineSD) increases proportionally
+%     with the signal.
+%
+%     Biologically, this may indicate a global increase in network gain.
+%     The network is "noisier" or more active even during non-ripple
+%     periods (higher baseline high-frequency activity), so the larger
+%     ripples do not stand out any more clearly against this louder
+%     background than smaller ripples do against a quiet background.
+%
+%  DECISION RULE:
+%     - Use 'peakAmp' or 'peakEnergy' to test hypotheses about **Event
+%       Magnitude** (e.g., "Does the manipulation make ripples stronger?").
+%     - Use 'peakPower' (Z-score) to test hypotheses about **Event
+%       Saliency** or detection quality (e.g., "Are ripples harder to detect
+%       in this group?").
+%  ========================================================================
+
+

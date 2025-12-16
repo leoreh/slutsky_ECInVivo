@@ -1,7 +1,5 @@
 
-%% ========================================================================
 %  MCU_SPIKES - Analyze in vivo MCU spike data
-%  ========================================================================
 
 %% ========================================================================
 %  LOAD_DATA 
@@ -21,17 +19,8 @@ tblUnit(tblUnit.Day == 'BAC_ON', :) = [];
 tblUnit(tblUnit.Day == 'BAC_OFF', :) = [];
 tblUnit.Day = removecats(tblUnit.Day, {'BAC_ON', 'BAC_OFF'});
 
-% Assert minimum value > zero
-vars = tblUnit.Properties.VariableNames;
-for iVar = 1:numel(vars)
-    if isnumeric(tblUnit.(vars{iVar}))
-        if any(tblUnit.(vars{iVar}) == 0)
-            halfMin = min(tblUnit.(vars{iVar})(tblUnit.(vars{iVar}) > 0)) / 2;
-            tblUnit.(vars{iVar}) = tblUnit.(vars{iVar}) + halfMin;
-            fprintf('Warning: %s contained zeros. Added half-min value (%.5f).\n', vars{iVar}, halfMin);
-        end
-    end
-end
+% Assert no zero values
+tblLme = tbl_transform(tblLme, 'flg0', true, 'verbose', true);
 
 
 %% ========================================================================

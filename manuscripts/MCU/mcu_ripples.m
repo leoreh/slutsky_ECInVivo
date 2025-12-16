@@ -81,17 +81,30 @@ end
 
 
 %% ========================================================================
-%  LOAD & ORGANIZE
+%  LOAD RIPP STRUCTS 
 %  ========================================================================
 
-% -------------------------------------------------------------------------
-% Load data
 grps = {'wt_bsl_ripp'; 'mcu_bsl'};
 vars = {'ripp', 'units', 'session'};
 for iGrp = 1 : length(grps)
     basepaths = mcu_basepaths(grps{iGrp});
     v{iGrp} = basepaths2vars('basepaths', basepaths, 'vars', vars);
 end
+
+
+%% ========================================================================
+%  NOTE: NREM RIPPLES 
+%  ========================================================================
+%  Currently, all rippels are analyzed irrespective of states. To limit by
+%  states, must grab:
+%  v{1}(1).ripp.states.idx(, :)
+% 
+%  However, rate of ripples are limited to NREM. 
+
+
+%% ========================================================================
+%  RIPPLE PARAMETERS (Per Ripple)
+%  ========================================================================
 
 % -------------------------------------------------------------------------
 % Organize lme data table
@@ -126,70 +139,36 @@ tblLme.Group = reordercats(tblLme.Group, cfg.lbl.grp);
 idxBad = tblLme.peakAmp <= 8;
 tblLme(idxBad, :) = [];
 
-
-
-%% ========================================================================
-%  RIPPLE PARAMETERS
-%  ========================================================================
+% Plot
+hFig = tblGUI_scatHist(tblLme);
 
 % Variables
 lblY = {'Peak Frequency (Hz)', 'Peak Amplitude (µV)', 'Duration (ms)',...
     'Peak Energy (µV²)'};
 varRsp = {'peakFreq', 'peakAmp', 'dur', 'peakEnergy', 'Rate'};
-idxVar = 5;
+idxVar = 3;
 
-% LME
+% Formula
 frml = [varRsp{idxVar}, ' ~ Group + (1|Name)'];
-lmeCfg.contrasts = 'all';
-
 
 % Check best model
-statsPark = lme_parkTest(tblLme, frml);
-statsDist = lme_compareDists(tblLme, frml);
+statsPark = lme_parkTest(tblLme, frml)
+statsDist = lme_compareDists(tblLme, frml)
 
-
-lmeCfg.distribution = 'Normal';
-[lmeStats, lmeMdl] = lme_analyse(tblLme, frml, lmeCfg);
+% Run LME
+cfgLme.contrasts = 'all';
+cfgLme.dist = 'Gamma';
+[lmeStats, lmeMdl] = lme_analyse(tblLme, frml, cfgLme);
 
 % Plot
-hFig = lme_plot(tblLme, lmeMdl, 'lmeStats', lmeStats,...
-    'idxRow', [], 'ptype', 'bar', 'axShape', 'tall');
+hFig = tblGUI_bar(tblLme, 'yVar', varRsp{idxVar});
 
-% Graphics
-hAx = gca;
-[barIdx, barLbl] = lme_sigLines(lmeStats, lmeMdl, tblLme,...
-    'idxRow', [1, 2]);
-plot_sigLines(hAx, {[1, 2]}, {'*'}, 'flgNS', true);
-ylabel(hAx, lblY{idxVar})
-xlabel(hAx, '');    title(hAx, '')
-plot_axSize('hFig', hFig, 'szOnly', true, 'axShape',...
-    'tall', 'axHeight', 300)
-
-% save
-fname = lme_frml2char(frml, 'rmRnd', true);
-fPath = fullfile(cfg.savepath, 'Ripp');
-lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
-    'lmeData', [], 'lmeStats', lmeStats, 'lmeMdl', [], 'fPath', fPath)
-
-% -------------------------------------------------------------------------
-% Calculate statistics for each combination of Group and Subgroup
-sem = @(x) std(x, 'omitnan') / sqrt(length(x));
-summaryTable = groupsummary(tblLme, {'Group'}, {'mean', sem}, 'Ripp');
-summaryTable = summaryTable(:, [1,3,4,2]);
-
-cnt = 1; clear prismCell
-for iGrp = 1 : 2
-    idx = tblLme.Group == cfg.lbl.grp{iGrp};
-    prismCell{cnt} = tblLme.(varRsp{idxVar})(idx);
-    cnt = cnt + 1;
-end
-prismData = cell2padmat(prismCell, 2);
-
-
+% Prism
+[prismMat] = tbl2prism(tblLme, 'yVar', varRsp{idxVar});
 
 
 %% ========================================================================
-%  RIPPLE RATE / DENSITY
+%  RIPPLE RATE / DENSITY (Per NREM Bout)
 %  ========================================================================
 
 % -------------------------------------------------------------------------
@@ -227,7 +206,7 @@ tblLme = rmmissing(tblLme);
 tblLme.Group = reordercats(tblLme.Group, cfg.lbl.grp);
 
 % Assert non-zero
-tblLme = tbl_transform(tblLme, 'flg0', true);
+tblLme = tbl_transform(tblLme, 'flg0', true, 'verbose', true);
 
 
 % -------------------------------------------------------------------------
@@ -239,36 +218,37 @@ lblY = {'Rate (SWR/s)', 'Density (% NREM)'};
 varRsp = {'Rate', 'Density'};
 idxVar = 1;
 
-% LME
+% Formula
 frml = [varRsp{idxVar}, ' ~ Group + (1|Name)'];
-lmeCfg.contrasts = 'all';
 
 % Check best model
-statsPark = lme_parkTest(tblLme, frml);
-statsDist = lme_compareDists(tblLme, frml);
+% statsPark = lme_parkTest(tblLme, frml);
+% statsDist = lme_compareDists(tblLme, frml);
 
-lmeCfg.distribution = 'Normal';
-[lmeStats, lmeMdl] = lme_analyse(tblLme, frml, lmeCfg);
-
+% Run LME
+cfgLme.contrasts = 'all';
+cfgLme.dist = 'Normal';
+[lmeStats, lmeMdl] = lme_analyse(tblLme, frml, cfgLme);
 
 % Plot
+hFig = tblGUI_bar(tblLme, 'yVar', varRsp{idxVar});
 
-hFig = tblGUI_scatHist(tblLme);
+% Prism
+[prismMat] = tbl2prism(tblLme, 'yVar', varRsp{idxVar});
+
 
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% RIPPLE SPIKES
+% RIPPLE SPIKES (Per Unit)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-
-% -------------------------------------------------------------------------
-% Organize lme data table
+% Organize data table
 [cfg] = mcu_cfg();
 clear varMap
-varMap.mrl = 'ripp.spkLfp.phase.mrl';
+varMap.MRL = 'ripp.spkLfp.phase.mrl';
 varMap.frMod = 'ripp.spks.su.frModulation';
-varMap.UnitType = 'units.clean';
+varMap.UnitType = 'units.type';
 
 for iGrp = 1 : length(grps)
     basepaths = mcu_basepaths(grps{iGrp});
@@ -283,24 +263,51 @@ for iGrp = 1 : length(grps)
 end
 % Combine all tables, clean and organize
 tblLme = vertcat(tblCell{:});
-tblLme.UnitType = categorical(cfg.lbl.unit(~tblLme.UnitType + 1)');
-tblLme = rmmissing(tblLme);
+
+% Assert category order
 tblLme.Group = reordercats(tblLme.Group, cfg.lbl.grp);
 tblLme.UnitType = reordercats(tblLme.UnitType, cfg.lbl.unit);
+
+% Assert non-zero for mrl (fr modulation included negative values by
+% definition)
+tblLme = tbl_transform(tblLme, 'flg0', true, 'verbose', true, ...
+    'varsInc', {'MRL'});
 
 % -------------------------------------------------------------------------
 % Run analysis
 
 % Variables
 lblY = {'Mean Resultant Length', 'FR Modulation (a.u.)'};
-varRsp = {'mrl', 'frMod'};
+varRsp = {'MRL', 'frMod'};
 idxVar = 1;
+
+% Plot
+hFig = tblGUI_scatHist(tblLme);
+
+% Formula
+frml = [varRsp{idxVar}, ' ~ Group + (1|Name)'];
+
+% Check best model
+statsPark = lme_parkTest(tblLme, frml);
+statsDist = lme_compareDists(tblLme, frml);
+
+% Comparisons reveals that for MRL, log-normal is best (see comment at end)
+
+% Run LME
+cfgLme.dist = 'Normal';
+[lmeStats, lmeMdl] = lme_analyse(tblLme, frml, cfgLme);
+
+% Plot
+hFig = tblGUI_bar(tblLme, 'yVar', varRsp{idxVar});
+
+% Prism
+[prismMat] = tbl2prism(tblLme, 'yVar', varRsp{idxVar});
 
 % LME
 frml = [varRsp{idxVar}, ' ~ Group * UnitType + (1|Name)'];
-lmeCfg.contrasts = [1 : 7];
-lmeCfg.distribution = 'Normal';
-[lmeStats, lmeMdl] = lme_analyse(tblLme, frml, lmeCfg);
+cfgLme.contrasts = [1 : 7];
+cfgLme.distribution = 'Normal';
+[lmeStats, lmeMdl] = lme_analyse(tblLme, frml, cfgLme);
 
 % Plot
 hFig = lme_plot(tblLme, lmeMdl, 'lmeStats', lmeStats,...
@@ -693,7 +700,7 @@ for iGrp = 1 : 2
 
         % get unit indices
         frml = 'RippSpkLfp ~ Group * UnitType + (1|Mouse)';
-        [tblLme, lmeCfg] = lme_org('grppaths', grppaths, 'frml', frml,...
+        [tblLme, cfgLme] = lme_org('grppaths', grppaths, 'frml', frml,...
             'flgEmg', false, 'varFld', 'pVal', 'vCell', vCell);
         idxGrp = tblLme.Group == categorical(txtGrp(iGrp));
         grpTbl = tblLme(idxGrp, :);
@@ -757,3 +764,41 @@ end
 
 
 
+
+
+%% ========================================================================
+%  NOTE: STATISTICAL HANDLING OF MRL (BOUNDED DATA)
+%  ========================================================================
+%  Mean Resultant Length (MRL) quantifies phase locking strength and is
+%  mathematically bounded on the interval [0, 1]. This bounded nature
+%  presents specific challenges for standard Linear Mixed Models (LME).
+%
+%  1. The "Leakage" Problem (Normal Distribution):
+%     Standard LME assumes the response variable is normally distributed and
+%     unbounded (-Inf to +Inf). When applied to MRL data, which is often
+%     clustered near zero (e.g., 0.1 - 0.3), a Normal model will inevitably
+%     predict impossible negative values (probability mass "leaking" below
+%     zero). This severely penalizes model performance metrics (like AIC)
+%     and invalidates the assumption of Gaussian residuals.
+%
+%  2. Variance Scaling (Park Test Results):
+%     Diagnostic tests (Park Test) typically reveal a Lambda coefficient
+%     between 0.5 and 1.0 for MRL data. This indicates that variance is not
+%     constant (homoscedastic) but scales with the mean. As locking strength
+%     increases from 0, variability initially grows. This heteroscedasticity
+%     violates the core assumption of the standard Normal LME.
+%
+%  3. Solution: Logit-Normal Model
+%     To respect the [0, 1] boundaries and stabilize variance, the optimal
+%     approach is to apply a Logit transformation before modeling:
+%
+%         y_logit = log( y / (1 - y) )
+%
+%     This maps the bounded interval [0, 1] to the unbounded real line
+%     (-Inf, +Inf). A standard Normal LME can then be fit to 'y_logit'
+%     without violating boundary or variance assumptions.
+%
+%     *Implementation Note:* If the data contains exact 0s or 1s, they must
+%     be slightly offset (e.g., +/- eps or 1e-6) to avoid +/- Inf results
+%     during transformation.
+%  ========================================================================
