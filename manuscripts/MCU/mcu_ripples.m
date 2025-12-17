@@ -106,8 +106,7 @@ end
 %  RIPPLE PARAMETERS (Per Ripple)
 %  ========================================================================
 
-% -------------------------------------------------------------------------
-% Organize lme data table
+% Organize data table
 cfg = mcu_cfg();
 clear varMap
 varMap.peakFreq = 'peakFreq';
@@ -117,7 +116,7 @@ varMap.peakFilt = 'peakFilt';
 varMap.peakPower = 'peakPower';
 varMap.peakEnergy = 'peakEnergy';
 varMap.peakRng = 'peakRng';
-varMap.peakRng = 'peakRng';
+varMap.idxNREM = 'states.idx';
 
 for iGrp = 1 : length(grps)
     basepaths = mcu_basepaths(grps{iGrp});
@@ -128,7 +127,7 @@ for iGrp = 1 : length(grps)
 
     % Create table
     tblCell{iGrp} = v2tbl('v', [v{iGrp}(:).ripp], 'varMap', varMap, ...
-        'tagFiles', tagFiles, 'tagAll', tagAll, 'idxCol', 1);
+        'tagFiles', tagFiles, 'tagAll', tagAll, 'idxCol', 4);
 end
 % Combine all tables, clean and organize
 tblLme = vertcat(tblCell{:});
@@ -139,14 +138,20 @@ tblLme.Group = reordercats(tblLme.Group, cfg.lbl.grp);
 idxBad = tblLme.peakAmp <= 8;
 tblLme(idxBad, :) = [];
 
+% Include only ripples that occured during NREM
+idxBad = tblLme.idxNREM == 0;
+tblLme(idxBad, :) = [];
+
 % Plot
 hFig = tblGUI_scatHist(tblLme);
+
+% -------------------------------------------------------------------------
 
 % Variables
 lblY = {'Peak Frequency (Hz)', 'Peak Amplitude (µV)', 'Duration (ms)',...
     'Peak Energy (µV²)'};
 varRsp = {'peakFreq', 'peakAmp', 'dur', 'peakEnergy', 'Rate'};
-idxVar = 3;
+idxVar = 4;
 
 % Formula
 frml = [varRsp{idxVar}, ' ~ Group + (1|Name)'];
@@ -157,7 +162,7 @@ statsDist = lme_compareDists(tblLme, frml)
 
 % Run LME
 cfgLme.contrasts = 'all';
-cfgLme.dist = 'Gamma';
+cfgLme.dist = 'InverseGaussian';
 [lmeStats, lmeMdl] = lme_analyse(tblLme, frml, cfgLme);
 
 % Plot
@@ -238,10 +243,9 @@ hFig = tblGUI_bar(tblLme, 'yVar', varRsp{idxVar});
 
 
 
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% RIPPLE SPIKES (Per Unit)
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ========================================================================
+%  RIPPLE SPIKES (Per Unit)
+%  ========================================================================
 
 % Organize data table
 [cfg] = mcu_cfg();
@@ -283,7 +287,7 @@ tblLme = tbl_transform(tblLme, 'flg0', true, 'verbose', true, ...
 % Variables
 lblY = {'Mean Resultant Length', 'FR Modulation (a.u.)'};
 varRsp = {'MRL', 'frMod'};
-idxVar = 1;
+idxVar = 2;
 
 % Plot
 % hFig = tblGUI_scatHist(tblLme);
@@ -309,6 +313,81 @@ hFig = tblGUI_bar(tblLme, 'yVar', varRsp{idxVar}, 'xVar', 'UnitType', ...
 
 
 
+
+
+%% ========================================================================
+%  FR RIPP VS RAND
+%  ========================================================================
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% PLOT firing rate in ripples vs random
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Re-use frml from RippSpks section or define if not available
+frml = 'RippSpks ~ Group * UnitType + (1|Mouse)';
+
+% organize lme table for plotting
+[tblLme, ~] = lme_org('grppaths', grppaths, 'frml', frml,...
+    'flgEmg', false, 'varFld', 'rippRates', 'vCell', vCell);
+rippFr = tblLme.RippSpks;
+[tblLme, ~] = lme_org('grppaths', grppaths, 'frml', frml,...
+    'flgEmg', false, 'varFld', 'ctrlRates', 'vCell', vCell);
+tblLme = addvars(tblLme, rippFr, 'After', 'UnitID');
+tblLme.Properties.VariableNames{'RippSpks'} = 'randFr';
+tblLme = movevars(tblLme, 'rippFr', 'Before', 'randFr');
+
+% Figure Parameters
+clr(1, :) = [0.3 0.3 0.3];          % Control
+clr(2, :) = [0.784 0.667 0.392];    % MCU-KO
+fntSize = 16;
+txtUnit = {'pPYR', 'pINT'};
+txtGrp = {'Control', 'MCU-KO'};
+
+% initialize
+[hFig, hAx] = plot_axSize('szOnly', false);
+
+% Plot each group
+nGrp = length(vCell);
+iUnit = 1;
+clear hSct
+for iGrp = 1 : nGrp % Use different loop var
+    idxTbl = tblLme.UnitType == categorical(txtUnit(iUnit)) &...
+        tblLme.Group == categorical(txtGrp(iGrp));
+    grpTbl = tblLme(idxTbl, :);
+    hSct(iGrp) = scatter(grpTbl.randFr, grpTbl.rippFr, 40, ...
+        clr(iGrp, :), 'filled', ...
+        'MarkerFaceAlpha', 0.5);
+    hSct(iGrp).AlphaData = ones(sum(idxTbl), 1) * 0.9;  % Set a single alpha value for all points
+    hSct(iGrp).MarkerFaceAlpha = 'flat';
+end
+
+set(hAx, 'XScale', 'log', 'YScale', 'log')
+eqLim = [0.005, 100];
+xlim(eqLim)
+ylim(eqLim)
+plot(hAx, eqLim, eqLim, '--k', 'LineWidth', 2, 'HandleVisibility', 'off')
+tickVals = get(hAx, 'YTick');
+xticks(tickVals)
+
+% Update labels
+ylabel(hAx, 'FR in SWR (Hz)')
+xlabel(hAx, 'FR in Random (Hz)')
+title(hAx, txtUnit{iUnit})
+legend(hSct, txtGrp, 'Location', 'southeast');
+
+% Assert Size
+plot_axSize('hFig', hFig, 'szOnly', false, 'axShape', 'square');
+
+% Save
+fname = ['Ripp~FRvsRand_', txtUnit{iUnit}];
+lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat'});
+
+iUnit = 2;
+hFig = gcf;
+title('FS')
 
 
 
@@ -506,72 +585,6 @@ fname = 'Ripp~LFP Trace';
 lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat'});
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% PLOT firing rate in ripples vs random
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% Re-use frml from RippSpks section or define if not available
-frml = 'RippSpks ~ Group * UnitType + (1|Mouse)';
-
-% organize lme table for plotting
-[tblLme, ~] = lme_org('grppaths', grppaths, 'frml', frml,...
-    'flgEmg', false, 'varFld', 'rippRates', 'vCell', vCell);
-rippFr = tblLme.RippSpks;
-[tblLme, ~] = lme_org('grppaths', grppaths, 'frml', frml,...
-    'flgEmg', false, 'varFld', 'ctrlRates', 'vCell', vCell);
-tblLme = addvars(tblLme, rippFr, 'After', 'UnitID');
-tblLme.Properties.VariableNames{'RippSpks'} = 'randFr';
-tblLme = movevars(tblLme, 'rippFr', 'Before', 'randFr');
-
-% Figure Parameters
-clr(1, :) = [0.3 0.3 0.3];          % Control
-clr(2, :) = [0.784 0.667 0.392];    % MCU-KO
-fntSize = 16;
-txtUnit = {'pPYR', 'pINT'};
-txtGrp = {'Control', 'MCU-KO'};
-
-% initialize
-[hFig, hAx] = plot_axSize('szOnly', false);
-
-% Plot each group
-nGrp = length(vCell);
-iUnit = 1;
-clear hSct
-for iGrp = 1 : nGrp % Use different loop var
-    idxTbl = tblLme.UnitType == categorical(txtUnit(iUnit)) &...
-        tblLme.Group == categorical(txtGrp(iGrp));
-    grpTbl = tblLme(idxTbl, :);
-    hSct(iGrp) = scatter(grpTbl.randFr, grpTbl.rippFr, 40, ...
-        clr(iGrp, :), 'filled', ...
-        'MarkerFaceAlpha', 0.5);
-    hSct(iGrp).AlphaData = ones(sum(idxTbl), 1) * 0.9;  % Set a single alpha value for all points
-    hSct(iGrp).MarkerFaceAlpha = 'flat';
-end
-
-set(hAx, 'XScale', 'log', 'YScale', 'log')
-eqLim = [0.005, 100];
-xlim(eqLim)
-ylim(eqLim)
-plot(hAx, eqLim, eqLim, '--k', 'LineWidth', 2, 'HandleVisibility', 'off')
-tickVals = get(hAx, 'YTick');
-xticks(tickVals)
-
-% Update labels
-ylabel(hAx, 'FR in SWR (Hz)')
-xlabel(hAx, 'FR in Random (Hz)')
-title(hAx, txtUnit{iUnit})
-legend(hSct, txtGrp, 'Location', 'southeast');
-
-% Assert Size
-plot_axSize('hFig', hFig, 'szOnly', false, 'axShape', 'square');
-
-% Save
-fname = ['Ripp~FRvsRand_', txtUnit{iUnit}];
-lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat'});
-
-iUnit = 2;
-hFig = gcf;
-title('FS')
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
