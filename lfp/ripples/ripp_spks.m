@@ -274,6 +274,8 @@ for iunit = 1:nunits
     spks.su.frGain(iunit) = diffRate / sdCtrlRate;         % X-score
     spks.su.frModulation(iunit) = diffRate / sumRate;      % Modulation index
     spks.su.frPrct(iunit) = diffRate / meanCtrlRate * 100; % Percent change
+    spks.su.frRipp(iunit) = meanRippRate;
+    spks.su.frRand(iunit) = meanCtrlRate;
 
 end % Unit loop
 
@@ -421,6 +423,8 @@ spks.su.sigMod = [];      % [nUnits x 1] Logical flag for significant modulation
 spks.su.frGain = [];      % [nUnits x 1] Mean z-scored firing rate during ripples
 spks.su.frModulation = [];% [nUnits x 1] Modulation index ((Ripp-Ctrl)/(Ripp+Ctrl))
 spks.su.frPrct = [];      % [nUnits x 1] Percent change relative to control rate
+spks.su.frRipp = [];      % [nUnits x 1] Mean firing rate during ripples (Hz)
+spks.su.frRand = [];      % [nUnits x 1] Mean firing rate during control events (Hz)
 spks.su.rippMap = [];     % [nUnits x N_ripples x nBinsMap] PETH map of SU spike counts
 spks.su.ctrlMap = [];     % [nUnits x N_controls x nBinsMap] PETH map of SU spike counts
 

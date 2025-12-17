@@ -414,6 +414,8 @@ prismMat = [mean(lfpGrp{iGrp}, 1, 'omitnan')', ...
 %% ========================================================================
 %  RIPPLE PETH
 %  ========================================================================
+
+
 % Create a mean normalized SU PETH for RS and FS units from all mice of
 % a group and create a figure the superimposes WT and MCU-KO (separately
 % for RS and FS units.
@@ -544,17 +546,14 @@ lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat'});
 % Prism
 xVal = timeBins;
 iGrp = 2;
-unitIdx = unitGrp{iGrp} == iUnit;
-pethData = normGrp{iGrp}(unitIdx, :);
-prismMat = [mean(pethData, 1, 'omitnan')', ...
-    std(pethData, 1, 'omitnan')', ...
-    repmat(size(pethData, 1), length(xVal), 1)];
+prismMat = [mean(lfpGrp{iGrp}, 1, 'omitnan')', ...
+    std(lfpGrp{iGrp}, 1, 'omitnan')', ...
+    repmat(size(lfpGrp{iGrp}, 1), length(xVal), 1)];
 
 
-
-%% ========================================================================
-%  SPIKE RIPPLE COUPLING
-%  ========================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SPIKE RIPPLE COUPLING
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Formula
 frml = 'RippSpkLfp ~ Group * UnitType + (1|Mouse)';
