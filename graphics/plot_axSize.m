@@ -176,7 +176,7 @@ ti = get(hAx, 'TightInset');
 
 % Calculate figure dimensions needed to encompass the plot area and its decorations
 figWidth = axWidth + ti(1) + ti(3) + cbWidth + 15; % Add colorbar width to total figure width
-figWidth = axWidth + ti(1) + ti(3) + cbWidth; % Add colorbar width to total figure width
+% figWidth = axWidth + ti(1) + ti(3) + cbWidth; % Add colorbar width to total figure width
 figHeight = axHeight + ti(2) + ti(4);
 
 % Set figure size. Preserve original screen position (left, bottom) of the figure.

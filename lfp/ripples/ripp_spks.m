@@ -55,6 +55,7 @@ function ripp = ripp_spks(ripp, varargin)
 %
 %%% consider adding phase locking
 % https://www.sciencedirect.com/science/article/pii/S2352289521000357#sec2
+% can use spklfp_calc (see mcu_ripples)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ARGUMENT PARSING & VALIDATION
@@ -336,7 +337,7 @@ if flgGraphics
     ripp_plotSpks(ripp, 'basepath', basepath, 'flgSaveFig', true);
 end
 
-end % End of main function ripp_spks
+end     % EOF
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % HELPER FUNCTIONS
@@ -430,4 +431,3 @@ spks.su.ctrlMap = [];     % [nUnits x N_controls x nBinsMap] PETH map of SU spik
 
 end % End of spks_initialize
 
-% EOF

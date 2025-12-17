@@ -92,15 +92,6 @@ for iGrp = 1 : length(grps)
 end
 
 
-%% ========================================================================
-%  NOTE: NREM RIPPLES
-%  ========================================================================
-%  Currently, all rippels are analyzed irrespective of states. To limit by
-%  states, must grab:
-%  v{1}(1).ripp.states.idx(, :)
-%
-%  However, rate of ripples are limited to NREM.
-
 
 %% ========================================================================
 %  RIPPLE PARAMETERS (Per Ripple)
@@ -175,9 +166,6 @@ hFig = tblGUI_bar(tblLme, 'yVar', varRsp{idxVar});
 %% ========================================================================
 %  RIPPLE RATE / DENSITY (Per NREM Bout)
 %  ========================================================================
-
-% -------------------------------------------------------------------------
-% Organize lme data table
 
 % Pre-process: extract NREM rate (state 4) to a dedicated field
 for iGrp = 1:length(v)
@@ -268,11 +256,13 @@ end
 
 [cfg] = mcu_cfg();
 clear varMap
-varMap.MRL = 'ripp.spkLfp.phase.mrl';
+varMap.UnitType = 'units.type';
 varMap.frMod = 'ripp.spks.su.frModulation';
 varMap.FRripp = 'ripp.spks.su.FRripp';
 varMap.FRrand = 'ripp.spks.su.FRrand';
-varMap.UnitType = 'units.type';
+varMap.MRL = 'ripp.spkLfp.phase.mrl';
+varMap.pVal = 'ripp.spkLfp.phase.pVal';
+varMap.Theta = 'ripp.spkLfp.phase.theta';
 
 for iGrp = 1 : length(grps)
     basepaths = mcu_basepaths(grps{iGrp});
@@ -319,9 +309,8 @@ idxVar = 2;
 frml = [varRsp{idxVar}, ' ~ Group * UnitType + (1|Name)'];
 
 % Check best model
-statsPark = lme_parkTest(tblLme, frml)
-statsDist = lme_compareDists(tblLme, frml)
-
+% statsPark = lme_parkTest(tblLme, frml)
+% statsDist = lme_compareDists(tblLme, frml)
 
 % Run LME
 cfgLme.dist = 'Normal';
@@ -336,6 +325,50 @@ idxRow = tblLme.UnitType == 'RS' & tblLme.Group == 'Control';
 [tblLme.FRripp(idxRow, :), tblLme.FRrand(idxRow, :)];
 
 
+
+%% ========================================================================
+%  POLAR PLOT
+%  ========================================================================
+
+% Figure Parameters
+hFig = figure;
+fntSize = 16; FntName = 'Arial';
+txtUnit = cfg.lbl.unit;
+txtGrp = cfg.lbl.grp;
+
+% Plot each group
+nGrp = length(grps);
+iUnit = 1;
+for iGrp = 1 : nGrp
+    % Get specific data from table
+    idxUnit = tblLme.UnitType == categorical(txtUnit(iUnit));
+    idxGrp = tblLme.Group == categorical(txtGrp(iGrp));
+    idxSgn = tblLme.pVal < 0.05;
+    idxTbl = idxUnit & idxGrp & idxSgn;
+    grpTbl = tblLme(idxTbl, :);
+
+    % Plot units, colored by type if population info is available.
+    hPlt = polarscatter(grpTbl.Theta, grpTbl.MRL, 50, ...
+        cfg.clr.grp(iGrp, :), 'filled', ...
+        'MarkerFaceAlpha', 0.3);
+    hold on;
+end
+rlim([0 0.6])
+rticks(0 : 0.3 : 1)
+thetaticks(0:90:270)
+hAx = gca;
+hAx.ThetaAxisUnits = 'degrees';
+hAx.GridAlpha = 0.2;
+legend(txtGrp, 'Location', 'northwest', 'Interpreter', 'none');
+set(hAx, 'FontName', 'Arial', 'FontSize', fntSize);
+set(hFig, 'Color', 'w');
+
+% Assert Size
+plot_axSize('hFig', hFig, 'szOnly', true, 'axShape', 'square', 'axHeight', 300);
+
+% Save
+fname = ['Ripp~SpkPolar_', txtUnit{iUnit}];
+lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat'});
 
 
 
@@ -356,7 +389,7 @@ for iGrp = 1:nGrp
     for iMouse = 1:nMice
         mData = v{iGrp}(iMouse);
         ripp = mData.ripp;
-        
+
         % Select NREM ripples
         idxNREM = ripp.states.idx(:, 4);
 
@@ -552,151 +585,80 @@ prismMat = [mean(pethData, 1, 'omitnan')', ...
 
 
 
+
+
+
+
 %% ========================================================================
-%  SPIKE RIPPLE COUPLING
+%  RATE-PHASE MAP
 %  ========================================================================
 
-% Formula
-frml = 'RippSpkLfp ~ Group * UnitType + (1|Mouse)';
-
-% organize lme table for plotting
-[tblLme, ~] = lme_org('grppaths', grppaths, 'frml', frml,...
-    'flgEmg', false, 'varFld', 'mrl', 'vCell', vCell);
-MRL = tblLme.RippSpkLfp;
-[tblLme, ~] = lme_org('grppaths', grppaths, 'frml', frml,...
-    'flgEmg', false, 'varFld', 'pVal', 'vCell', vCell);
-pVal = tblLme.RippSpkLfp;
-[tblLme, ~] = lme_org('grppaths', grppaths, 'frml', frml,...
-    'flgEmg', false, 'varFld', 'theta', 'vCell', vCell);
-tblLme.Properties.VariableNames{'RippSpkLfp'} = 'Theta';
-tblLme = addvars(tblLme, MRL, 'After', 'Theta');
-tblLme = addvars(tblLme, pVal, 'After', 'MRL');
-
-% Figure Parameters
-clr(1, :) = [0.3 0.3 0.3];          % Control
-clr(2, :) = [0.784 0.667 0.392];    % MCU-KO
-fntSize = 16; FntName = 'Arial';
-txtUnit = {'pPYR', 'pINT'};
-txtGrp = {'Control', 'MCU-KO'};
-
-% initialize
-hFig = figure;
-
-% Plot each group
-nGrp = length(vCell);
-iUnit = 2;
-for iGrp = 1 : nGrp
-    % Get specific data from table
-    idxUnit = tblLme.UnitType == categorical(txtUnit(iUnit));
-    idxGrp = tblLme.Group == categorical(txtGrp(iGrp));
-    idxSgn = tblLme.pVal < 0.05;
-    idxTbl = idxUnit & idxGrp & idxSgn;
-    grpTbl = tblLme(idxTbl, :);
-
-    % Plot units, colored by type if population info is available.
-    hPlt = polarscatter(grpTbl.Theta, grpTbl.MRL, 50, ...
-        clr(iGrp, :), 'filled', ...
-        'MarkerFaceAlpha', 0.3);
-    hold on;
-end
-rlim([0 0.6])
-rticks(0 : 0.3 : 1)
-thetaticks(0:90:270)
-hAx = gca;
-hAx.ThetaAxisUnits = 'degrees';
-hAx.GridAlpha = 0.2;
-title(txtUnit{iUnit});
-legend(txtGrp, 'Location', 'northwest', 'Interpreter', 'none');
-set(hAx, 'FontName', 'Arial', 'FontSize', fntSize);
-set(hFig, 'Color', 'w');
-hTtl = get(hAx, 'Title');
-set(hTtl, 'FontName', FntName, 'FontSize', fntSize + 4, 'FontWeight', 'bold');
-
-% Assert Size
-plot_axSize('hFig', hFig, 'szOnly', true, 'axShape', 'square', 'axHeight', 300);
-
-% Save
-fname = ['Ripp~SpkPolar_', txtUnit{iUnit}];
-lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat'});
-
-
-
-% Plot rate map
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-nSgn = nan(2, 2);
-prctSgn = nan(2, 2);
+% Select
+flgCbar = false;
+iGrp = 1;
+iUnit = 1;
 
 % get map data
-for iGrp = 1 : 2
-    for iUnit = 1 : 2
-        nMice = length(v{iGrp});
-        mapData = cell(nMice, 1);
-        for iMouse = 1 : nMice
-            ripp = v{iGrp}(iMouse).ripp;
-            mapData{iMouse} = ripp.spkLfp.rateMap.rate;
-        end
-        mapData = cell2padmat(mapData, 3);
-        rateMap = ripp.spkLfp.rateMap;
-
-        % get unit indices
-        frml = 'RippSpkLfp ~ Group * UnitType + (1|Mouse)';
-        [tblLme, cfgLme] = lme_org('grppaths', grppaths, 'frml', frml,...
-            'flgEmg', false, 'varFld', 'pVal', 'vCell', vCell);
-        idxGrp = tblLme.Group == categorical(txtGrp(iGrp));
-        grpTbl = tblLme(idxGrp, :);
-        idxUnit = grpTbl.UnitType == categorical(txtUnit(iUnit));
-        idxSgn = grpTbl.RippSpkLfp < 0.05;
-        idxMap = idxUnit & idxSgn;
-
-        % store number of significant units
-        nSgn(iGrp, iUnit) = sum(idxUnit & idxSgn);
-        prctSgn(iGrp, iUnit) = sum(idxUnit & idxSgn) / sum(idxUnit) * 100;
-
-        % Plot Mean Power-Phase Rate Map (averaged across cells).
-        % This 2D heatmap shows the average firing rate of neurons as a function of
-        % LFP phase (x-axis) and LFP power (y-axis). The phase axis is duplicated
-        % (0 to 4*pi) to visualize cyclic nature. A cosine wave is overlaid as a phase reference.
-
-        % Figure Parameters
-        clr(1, :) = [0.3 0.3 0.3];          % Control
-        clr(2, :) = [0.784 0.667 0.392];    % MCU-KO
-        fntSize = 16;
-        txtUnit = {'pPYR', 'pINT'};
-        txtGrp = {'Control', 'MCU-KO'};
-
-        % initialize
-        [hFig, hAx] = plot_axSize('szOnly', false);
-
-        mapAvg = mean(mapData(:, :, idxMap), 3, 'omitnan'); % Average rate map across units.
-        imagesc(hAx, rateMap.phaseBins, rateMap.powBins, mapAvg);
-        hold on
-        % Overlay cosine wave for phase reference.
-        plot(hAx, linspace(0, 2*pi, 100), ...
-            cos(linspace(0, 2*pi, 100)) * (range(rateMap.powBins)/4) + mean(rateMap.powBins), ...
-            'k--', 'LineWidth', 0.5);
-        axis xy
-        hCb = colorbar;
-        hCb.Label.String = 'Firing Rate (Hz)';
-        colormap(hAx, "pink")
-        ylim(hAx, [min(rateMap.powBins), max(rateMap.powBins)])
-        xlim([0 2 * pi])
-        xticks(0:pi/2:2*pi)
-        hAx.XTickLabel = {'0', '90', '180', '270', '360'};
-        xlabel('Phase (°)')
-        ylabel('LFP Power (z-score)');
-        title([txtGrp{iGrp}, ': ', txtUnit{iUnit}]);
-
-        % Assert Size
-        plot_axSize('hFig', hFig, 'szOnly', false, 'axShape', 'square', 'axHeight', 300);
-
-        % Save
-        fname = ['Ripp~SpkPhaseMap_', txtGrp{iGrp}, '_', txtUnit{iUnit}];
-        lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat'});
-
-
-    end
+nSgn = nan(2, 2);
+prctSgn = nan(2, 2);
+nMice = length(v{iGrp});
+mapData = cell(nMice, 1);
+for iMouse = 1 : nMice
+    ripp = v{iGrp}(iMouse).ripp;
+    mapData{iMouse} = ripp.spkLfp.rateMap.rate;
 end
+mapData = cell2padmat(mapData, 3);
+rateMap = ripp.spkLfp.rateMap;
+
+% get unit indices
+idxGrp = tblLme.Group == categorical(txtGrp(iGrp));
+grpTbl = tblLme(idxGrp, :);
+idxUnit = grpTbl.UnitType == categorical(txtUnit(iUnit));
+idxSgn = grpTbl.pVal < 0.05;
+idxMap = idxUnit & idxSgn;
+
+% store number of significant units
+nSgn(iGrp, iUnit) = sum(idxUnit & idxSgn);
+prctSgn(iGrp, iUnit) = sum(idxUnit & idxSgn) / sum(idxUnit) * 100;
+
+% Plot Mean Power-Phase Rate Map (averaged across cells).
+% This 2D heatmap shows the average firing rate of neurons as a function of
+% LFP phase (x-axis) and LFP power (y-axis). The phase axis is duplicated
+% (0 to 4*pi) to visualize cyclic nature. A cosine wave is overlaid as a phase reference.
+
+
+[hFig, hAx] = plot_axSize('szOnly', false);
+
+mapAvg = mean(mapData(:, :, idxMap), 3, 'omitnan'); % Average rate map across units.
+imagesc(hAx, rateMap.phaseBins, rateMap.powBins, mapAvg);
+hold on
+% Overlay cosine wave for phase reference.
+plot(hAx, linspace(0, 2*pi, 100), ...
+    cos(linspace(0, 2*pi, 100)) * (range(rateMap.powBins)/4) + mean(rateMap.powBins), ...
+    'k--', 'LineWidth', 0.5);
+axis xy
+if flgCbar
+    hCb = colorbar;
+    hCb.Label.String = 'Firing Rate (Hz)';
+end
+colormap(hAx, "pink")
+clim([0 12])
+ylim(hAx, [min(rateMap.powBins), max(rateMap.powBins)])
+xlim([0 2 * pi])
+xticks(0:pi/2:2*pi)
+hAx.XTickLabel = {'0', '90', '180', '270', '360'};
+xlabel('Phase (°)')
+ylabel('LFP Power (z-score)');
+title([cfg.lbl.grp{iGrp}]);
+hTtl = get(hAx, 'Title');
+set(hTtl, 'FontSize', 18, 'FontWeight', 'bold');
+
+% Assert Size
+plot_axSize('hFig', hFig, 'szOnly', false, 'axWidth', 232, 'axHeight', 300);
+
+% Save
+fname = ['Ripp~SpkPhaseMap_', cfg.lbl.grp{iGrp}, '_', cfg.lbl.unit{iUnit}];
+lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat'});
 
 
 
