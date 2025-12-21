@@ -52,7 +52,7 @@ for iFile = 1 : nFiles
     %     'bins', stWin, 'flg_force', true, 'flg_save', true, 'flg_all', false);
     %
     % % --- Bursts
-    % brst = spktimes_meaBrst(spktimes, 'binsize', [], 'isiThr', 0.02,...
+    % brst = brst_mea(spktimes, 'binsize', [], 'isiThr', 0.02,...
     %     'minSpks', 2, 'flgSave', true, 'flgForce', true, 'bins', stWin);
 
     % % --- Population Coupling
@@ -115,7 +115,7 @@ for iGrp = 1 : length(grps)
 
     % Prepare tag structures for v2tbl
     tagAll.Group = grpLbls{iGrp};
-    tagFiles.Name = get_mname(basepaths);
+    tagFiles.Name = get_mname(basepaths, 0);
 
     % Create table using new flexible approach
     tblCell{iGrp} = v2tbl('v', v, 'varMap', varMap,...
@@ -139,15 +139,15 @@ lmeData.bslTime = lmeData.bslTime * 6 / 60 / 60;
 
 lData = tbl_transform(lmeData, 'varsInc', {'frBsl', 'BSpks'}, 'flgZ', false,...
     'skewThr', 0.1, 'varsGrp', {'Group'}, 'flgLog', true);
-clr = mcu_cfg();
-clr = clr.clr;
+cfg = mcu_cfg();
+clr = cfg.clr;
 
 % Remove units that didn't recover from rcvTime
 idxUnits = lmeData.uRcv;
-lData.rcvTime(~idxUnits) = nan;
-lData.bslTime(~idxUnits) = nan;
+lData(~idxUnits, :) = [];
+% lData.bslTime(~idxUnits) = [];
 
-
+% Plot
 varsInc = {'frBsl', 'BSpks', 'pertDepth',...
     'spkDfct', 'rcvWork', 'rcvTime', 'bslTime'};
 [hFig, ~, hGrid] = plot_corrHist(lData, 'varsInc', varsInc,...
@@ -155,13 +155,16 @@ varsInc = {'frBsl', 'BSpks', 'pertDepth',...
 
 
 
-varsInc = {'frBsl', 'pertDepth'};
-[hFig, ~, hGrid] = plot_corrHist(lData(uIdx, :), 'varsInc', varsInc,...
-    'grpIdx', 'Group', 'clrGrp', clr.grp, 'thrOut', 100);
+% GUI
+hFig = tblGUI_scatHist(lData, 'xVar', 'Bspks', 'yVar', 'rcvTime', ...
+    'grpVar', 'Group');
 
-uIdx = lData.frTrough > 0;
-hFig = figure;
-scatter(lData.frBsl(uIdx), lData.pertDepth(uIdx))
+
+% Prism
+idx = idxUnits & lmeData.Group == 'Control';
+prismMat = [lmeData.BSpks(idx), lmeData.rcvTime(idx)];
+prismMat = [lmeData.frBsl(idx), lmeData.rcvTime(idx)];
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PLOT CORRELATIONS

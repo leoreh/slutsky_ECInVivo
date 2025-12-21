@@ -193,12 +193,6 @@ end
 if flgClip
     clipboard('copy', char(strOut));
     fprintf('Copied to clipboard.\n');
-    if isTwoWay
-        fprintf('Paste into Prism "Grouped" table (Row Labels + Data).\n');
-        fprintf('Ensure "Number of subcolumns" in Prism is set to at least %d.\n', maxRep);
-    else
-        fprintf('Paste into Prism "Column" table.\n');
-    end
 end
 
 end

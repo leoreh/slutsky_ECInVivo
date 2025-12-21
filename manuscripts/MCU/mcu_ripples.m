@@ -148,8 +148,8 @@ idxVar = 4;
 frml = [varRsp{idxVar}, ' ~ Group + (1|Name)'];
 
 % Check best model
-statsPark = lme_parkTest(tblLme, frml)
-statsDist = lme_compareDists(tblLme, frml)
+% statsPark = lme_parkTest(tblLme, frml)
+% statsDist = lme_compareDists(tblLme, frml)
 
 % Run LME
 cfgLme.contrasts = 'all';
@@ -298,7 +298,7 @@ tblLme = tbl_transform(tblLme, 'flg0', true, 'verbose', true, ...
 hFig = tblGUI_scatHist(tblLme);
 
 % -------------------------------------------------------------------------
-% Run analysis
+% LME
 
 % Variables
 lblY = {'Mean Resultant Length', 'FR Modulation (a.u.)'};
@@ -659,6 +659,7 @@ plot_axSize('hFig', hFig, 'szOnly', false, 'axWidth', 232, 'axHeight', 300);
 % Save
 fname = ['Ripp~SpkPhaseMap_', cfg.lbl.grp{iGrp}, '_', cfg.lbl.unit{iUnit}];
 lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat'});
+
 
 
 

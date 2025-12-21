@@ -128,8 +128,8 @@ nUnits = length(spktimes);
 stpr = zeros(nUnits, nBins);
 prc0_z = nan(nUnits, 1);      % Renamed from z0
 prc0 = nan(nUnits, 1);
-prc0_shfl = nan(nUnits, nShuffles);
-stpr_shfl = zeros(nUnits, nBins);
+% prc0_shfl = nan(nUnits, nShuffles);
+% stpr_shfl = zeros(nUnits, nBins);
 prc0_norm = nan(nUnits, 1);   % Median-normalized coupling
 
 % Generate all random shifts once. popShifts(i,j) is the shift for the i-th
@@ -427,5 +427,5 @@ for iGood = 1:nGood
     spkBins{iGood} = sort(refBins(:));      % Keep bins sorted in time
 end
 
-end     % EOF
+end     
 

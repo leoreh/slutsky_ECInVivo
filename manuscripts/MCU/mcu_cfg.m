@@ -1,7 +1,8 @@
 function cfg = mcu_cfg()
 
-cfg.miceWT = {'lh96', 'lh100', 'lh107', 'lh122', 'lh142'};
-cfg.miceMCU = {'lh132', 'lh133', 'lh134', 'lh136', 'lh140'};
+cfg.miceWT = {'lh96', 'lh100', 'lh107', 'lh122', 'lh142', 'lh119', ...
+    'lh123', 'lh126'};
+cfg.miceMCU = {'lh132', 'lh133', 'lh134', 'lh136', 'lh140', 'lh137'};
 
 % Colors
 cfg.clr.grp = [0.2 0.2 0.2;...

@@ -7,7 +7,7 @@ function bouts = as_bouts(varargin)
 %
 % INPUT:
 %   labels          numeric. see as_classify 
-%   minDur          numeric. minimum duration of an bout. 
+%   minDur          numeric. minimum duration of a bout. 
 %                   if length(minDur) == nstates than a different minimum
 %                   duration will be applied to each state
 %   interDur        numeric. combine bouts separated by <= interDur

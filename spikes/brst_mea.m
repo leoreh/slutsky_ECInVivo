@@ -1,4 +1,4 @@
-function brst = spktimes_meaBrst(spktimes, varargin) 
+function brst = brst_mea(spktimes, varargin)
 
 % calculates burstiness stats per unit in timebins. based on analysis done
 % for mea recordings
@@ -17,22 +17,22 @@ function brst = spktimes_meaBrst(spktimes, varargin)
 %   isiThr      numeric. minimum inter-spike interval for defining a burst
 %               {0.02 [s]}
 %   minSpks     numeric. minimum number of spikes for defining a burst {2}
-%   
+%
 %   flgAll      logical. save data of each burst (true) or just mean across
 %               bursts {false}
 %   flgSave     logical. save struct {true}
 %   flgForce    logical. flgForce analyze even if file exists {false}
-% 
+%
 % OUTPUT
 %   brst        struct
 %
 % CALLS
 %   binary2bouts
 %   n2chunks
-% 
+%
 % TO DO LIST
 %
-% 05 feb 22 LH      
+% 05 feb 22 LH
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -123,7 +123,7 @@ brst.shortPrct          = nan(nbins, nunits);
 
 for ibin = 1 : nbins
     for iunit = 1 : nunits
-        
+
         spks = spktimes{iunit}(InIntervals(spktimes{iunit}, bins{ibin}));
         isi = diff(spks);
         nspks = length(spks);
@@ -138,23 +138,23 @@ for ibin = 1 : nbins
 
         % number of spikes per burst
         b.nspks = diff(b.idx, 1, 2) + 1;
-        
+
         % start and stop times per burst
         b.times = spks(b.idx(:, 1));
         b.times(:, 2) = spks(b.idx(:, 2));
-        
+
         % burst duration [s]
-        b.dur = diff(b.times, 1, 2); 
-        
+        b.dur = diff(b.times, 1, 2);
+
         % frequency within burst
         b.freq = b.nspks ./ (b.dur);
-        
+
         % fraction of spikes that participate in bursts
         b.bspks = sum(b.nspks) / nspks;
-        
+
         % inter-burst interval
         b.ibi = b.times(2 : end, 1) - b.times(1 : end - 1, 2);
-        
+
         % percent bursts that pass the min spks criterion
         brst.shortPrct(ibin, iunit) =  (nbrsts.dur / nbrsts.detect) * 100;
 

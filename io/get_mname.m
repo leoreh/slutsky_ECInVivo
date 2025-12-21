@@ -1,6 +1,10 @@
-function mname = get_mname(basepaths)
+function mname = get_mname(basepaths, partIdx)
 
 % returns the mouse names from an array of basepaths
+
+if nargin < 2 || isempty(partIdx)
+    partIdx = 1;
+end
 
 mname = cell(size(basepaths));
 
@@ -16,7 +20,7 @@ for ipath = 1 : length(basepaths)
     else
         % Fallback: extract the last folder name from the path
         pathParts = strsplit(basepaths{ipath}, '\');
-        mname{ipath} = pathParts{end - 1};
+        mname{ipath} = pathParts{end - partIdx};
     end
 end
 

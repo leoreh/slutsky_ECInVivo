@@ -73,11 +73,11 @@ for ifile = 1 : nfiles
     bintxt = {'AW-BSL'; 'AW-KET'; 'NREM-BSL'; 'NREM-KET'; 'BSL'; 'KET'};
 
     % spike timing metrics
-%     st = spktimes_metrics('spikes', v(ifile).spikes, 'sunits', [],...
-%         'bins', bins, 'forceA', true, 'saveVar', true, 'fullA', false);
+    %     st = spktimes_metrics('spikes', v(ifile).spikes, 'sunits', [],...
+    %         'bins', bins, 'forceA', true, 'saveVar', true, 'fullA', false);
 
     % brst (mea)
-    brst = spktimes_meaBrst(v(ifile).spikes.times, 'binsize', [], 'isiThr', 0.05,...
+    brst = brst_mea(v(ifile).spikes.times, 'binsize', [], 'isiThr', 0.05,...
         'minSpks', 2, 'saveVar', true, 'force', true, 'bins', bins);
 end
 
@@ -116,7 +116,7 @@ mfr_bl = fr.mfr;
 
 iunit = 1;
 
-brstVar = ["rateNorm"; "rate"; "freq"; "bspks"; "brstDur"; "ibi"; "detect"; "shortPrct"];    
+brstVar = ["rateNorm"; "rate"; "freq"; "bspks"; "brstDur"; "ibi"; "detect"; "shortPrct"];
 brst = catfields([v(:).brst], 'catdef', 'long');
 for ivar = 1 : length(brstVar)
     fh = figure;
@@ -126,7 +126,7 @@ for ivar = 1 : length(brstVar)
     ylabel(brstVar{ivar})
 end
 
-spkVar = ["royer"; "lidor"; "doublets"; "mizuseki"; "lvr"];    
+spkVar = ["royer"; "lidor"; "doublets"; "mizuseki"; "lvr"];
 st = catfields([v(:).st], 'catdef', 'long');
 for ivar = 1 : length(spkVar)
     fh = figure;
@@ -244,11 +244,11 @@ plot_boxMean('dataMat', ydata, 'clr', 'k')
 
 fh = figure;
 for iunit = 1 : 2
-    
+
     % firing rate median
     medFr = median(mfr_bl(units.clean(iunit, :)));
     yLimit = ceil([0 prctile(stateMfr(:, units.clean(iunit, :)), 98 ,'all')]);
-    
+
     % high firing units
     subplot(2, 2, iunit + iunit - 1)
     medUnits = units.clean(iunit, :) & (mfr_bl > medFr)';
@@ -264,7 +264,7 @@ for iunit = 1 : 2
     xticklabels(cfg.names)
     title(sprintf('High MFR %s = %d', unitChar{iunit}, sum(medUnits)))
     ylim(yLimit)
-    
+
     % low firing units
     subplot(2, 2, iunit + 1 + iunit - 1)
     medUnits = units.clean(iunit, :) & (mfr_bl < medFr)';
@@ -280,7 +280,7 @@ for iunit = 1 : 2
     xticklabels(cfg.names)
     title(sprintf('Low MFR %s = %d', unitChar{iunit}, sum(medUnits)))
     ylim(yLimit)
-    
+
 end
 
 
@@ -299,7 +299,7 @@ for ifile = 1 : nfiles
 
     chg_tmp = nan(sum(unitsClean), length(tbins));
     for ibin = 1 : length(tbins)
-        chg_tmp(:, ibin) = v(ifile).frBins(tbins(ibin)).mfr(unitsClean);   
+        chg_tmp(:, ibin) = v(ifile).frBins(tbins(ibin)).mfr(unitsClean);
     end
     chg_raw = [chg_raw; chg_tmp];
 end
@@ -345,7 +345,7 @@ units = catfields([v.units], 'catdef', 'long', 'force', false);
 [frMat, timeIdx] = alignFR2pnt('basepaths', basepaths, 'dataType', 'strd');
 
 % list of all units per session
-iunit = 2; 
+iunit = 2;
 if iunit == 1
     unitChar = 'rs';
 else
@@ -381,7 +381,7 @@ stateMfr = []; gainf = []; sratio = [];
 for ifile = 1 : nfiles
     frBins = catfields(v(ifile).frBins, 'catdef', 'addim', 'force', false);
     stateMfr = [stateMfr; frBins.states.mfr];
-    gainf = [gainf; squeeze(frBins.states.gain(4, :, :))];      
+    gainf = [gainf; squeeze(frBins.states.gain(4, :, :))];
     sratio = [sratio; squeeze(frBins.states.ratio(4, 1, :, :))];
 end
 stateMfr = stateMfr(units.clean(iunit, :), istate, ibin);
@@ -394,7 +394,7 @@ inj_wake = squeeze(stateMfr(:, 1, 2));
 bsl_nrem = squeeze(stateMfr(:, 2, 1));
 inj_nrem = squeeze(stateMfr(:, 2, 2));
 
-% divide units by prctiles (median) according to wake 
+% divide units by prctiles (median) according to wake
 tiles = prctile(bsl_wake, [1 / ntiles : 1 / ntiles : 1 - 1 / ntiles] * 100);
 tiles = [0, tiles, Inf];
 unitsTile = false(ntiles, length(bsl_wake));
@@ -405,7 +405,7 @@ end
 % state mfr
 stateMat = [bsl_wake, inj_wake, bsl_nrem, inj_nrem];
 
-% precent change 
+% precent change
 for itile = 1 : ntiles
     sunits = unitsTile(itile, :);
     chgCell{itile} = inj_wake(sunits) ./ bsl_wake(sunits);
@@ -416,7 +416,7 @@ chgMat = cell2nanmat(chgCell, 2) * 100;
 % corrected gain factor
 clear gaint
 gaint(:, 1) = (bsl_nrem - bsl_wake)' ./ max([bsl_nrem, bsl_wake]');
-gaint(:, 2) = (inj_nrem - inj_wake)' ./ max([inj_nrem, inj_wake]'); 
+gaint(:, 2) = (inj_nrem - inj_wake)' ./ max([inj_nrem, inj_wake]');
 
 
 % gain factor
