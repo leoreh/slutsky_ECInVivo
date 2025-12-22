@@ -1,7 +1,7 @@
-function push_units(basepaths, fetTbl)
-% PUSH_UNITS Saves classification results to units.mat files.
+function utypes_push(basepaths, fetTbl)
+% UTYPES_PUSH Saves classification results to units.mat files.
 %
-%   push_units(basepaths, fetTbl)
+%   utypes_push(basepaths, fetTbl)
 %
 %   Moves existing units.mat to 'bkup' folder and creates a new units.mat
 %   containing only classification fields:

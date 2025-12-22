@@ -107,4 +107,4 @@ if flgPlot
     hFig = tblGUI_xy(xVal, tblWv, 'yVar', 'Waveform');
 end
 
-end
+end     % EOF

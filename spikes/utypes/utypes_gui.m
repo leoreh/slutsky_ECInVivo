@@ -194,7 +194,7 @@ function onPushUnits(src, basepaths, hContainer)
 data = hContainer.UserData;
 if isfield(data, 'tbl')
     fetTbl = data.tbl;
-    push_units(basepaths, fetTbl);
+    utypes_push(basepaths, fetTbl);
     msgbox('Units saved successfully!', 'Success');
 else
     errordlg('Could not retrieve table data from GUI.', 'Error');

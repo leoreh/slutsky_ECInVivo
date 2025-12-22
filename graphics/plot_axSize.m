@@ -30,6 +30,7 @@ addParameter(p, 'axWidth', [], @(x) isnumeric(x));
 addParameter(p, 'axHeight', [], @(x) isnumeric(x));
 addParameter(p, 'szOnly', true, @islogical);
 addParameter(p, 'flgPos', false, @islogical);
+addParameter(p, 'flgFullscreen', false, @islogical);
 
 parse(p, varargin{:});
 hFig            = p.Results.hFig;
@@ -38,6 +39,7 @@ axWidth         = p.Results.axWidth;
 axHeight        = p.Results.axHeight;
 szOnly          = p.Results.szOnly;
 flgPos          = p.Results.flgPos;
+flgFullscreen   = p.Results.flgFullscreen;
 
 % Define aspect ratios and default dimension
 tallRatio = 0.62; % width/height for tall shape
@@ -89,7 +91,7 @@ if ~szOnly
 
     hLgnd = get(hAx, 'Legend');
     set(hLgnd, 'FontName', 'Arial', 'FontSize', fntSize);
-    
+
     hCb = findobj(hFig, 'Type', 'Colorbar');
     set(hCb, 'FontName', 'Arial', 'FontSize', fntSize);
     hCbLbl = get(hCb, 'Label');
@@ -109,21 +111,21 @@ elseif ~isempty(axWidth) && isempty(axHeight)
     switch axShape
         case 'square'
             axHeight = axWidth;
-        case 'tall'  
+        case 'tall'
             axHeight = axWidth / tallRatio;
-        case 'wide' 
+        case 'wide'
             axHeight = axWidth / wideRatio;
     end
 elseif ~isempty(axHeight) && isempty(axWidth)
     switch axShape
         case 'square'
             axWidth = axHeight;
-        case 'tall' 
+        case 'tall'
             axWidth = axHeight * tallRatio;
         case 'wide'
             axWidth = axHeight * wideRatio;
     end
-else 
+else
     % Neither axWidth nor axHeight provided explicitly, use axShape for
     % default plot area
     switch axShape
@@ -146,7 +148,7 @@ if ~isempty(hCb)
     cbUnits = get(hCb, 'Units');
     set(hCb, 'Units', 'pixels');
     cbPos = get(hCb, 'Position');
-    
+
     % Get colorbar label to account for its width
     hCbLbl = get(hCb, 'Label');
     if ~isempty(hCbLbl)
@@ -169,10 +171,10 @@ axWidth = axWidth - cbWidth;
 set(hAx, 'Position', [1, 1, axWidth, axHeight]);
 
 % Force MATLAB to render/update the layout based on current properties.
-drawnow; 
+drawnow;
 
 % Get TightInset: [left, bottom, right, top] margins in pixels
-ti = get(hAx, 'TightInset'); 
+ti = get(hAx, 'TightInset');
 
 % Calculate figure dimensions needed to encompass the plot area and its decorations
 figWidth = axWidth + ti(1) + ti(3) + cbWidth + 15; % Add colorbar width to total figure width
@@ -185,16 +187,23 @@ set(hFig, 'Units', 'pixels');
 figPos = get(hFig, 'Position'); % To preserve screen x,y for the figure
 set(hFig, 'Position', [figPos(1), figPos(2), figWidth, figHeight]);
 
-% Position figure on 2nd screen only if flgPos is true
+% Position figure on 2nd screen
 if flgPos
     monitors = get(0, 'MonitorPositions');  % Get positions of all monitors
-    mnt2 = monitors(2, :);                  % Select second screen [left, bottom, width, height]
-    hFig.Position = [mnt2(1) + 400, mnt2(2) + 200,...
-        figWidth, figHeight]; 
+    % Check if 2nd monitor exists
+    if size(monitors, 1) > 1
+        mnt = monitors(2, :);      % Select second screen [left, bottom, width, height]
+    else
+        mnt = monitors(1, :);      % Fallback to first screen
+    end
+
+    % flgPos case: Offset position on target monitor
+    hFig.Position = [mnt(1) + 400, mnt(2) + 200,...
+        figWidth, figHeight];
 end
 
 % Force MATLAB to render/update the figure with its new size.
-drawnow; 
+drawnow;
 
 % Position the axes within the now-resized figure
 set(hAx, 'Position', [ti(1), ti(2), axWidth, axHeight]);
@@ -213,4 +222,9 @@ end
 set(hFig, 'Units', fhUnits);
 set(hAx, 'Units', axUnits);
 
-end % EOF
+% Set to cover the entire target monitor
+if flgFullscreen
+    hFig.WindowState = 'maximized';
+end
+
+end     % EOF
