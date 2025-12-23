@@ -1,6 +1,6 @@
 
 %% ========================================================================
-%  BURST PARAMS
+%  SELECT BURST PARAMS
 %  ========================================================================
 
 basepaths = [mcu_basepaths('mea_bac')];
@@ -10,28 +10,27 @@ nFiles = length(basepaths);
 
 mea = catfields([v(:).mea], 2);
 spktimes = mea.spktimes;
-spktimes = v(1).mea.spktimes;
 
-% isiVal = brst_isiValley(spktimes, 'nSpks', 3);
+% ISI VALLEY AS THRESHOLD
+isiVal = brst_isiValley(spktimes, 'nSpks', 3);
 
-isiVal = 0.05;
-brst = brst_maxInt(spktimes, ...
-    'minSpks', 3, ...
-    'maxISI_start', isiVal, ...
-    'maxISI_end', isiVal * 2, ...
-    'minDur', 0.015, ...
-    'minIBI', 0.1, ...
-    'flgForce', true, 'flgSave', false, 'flgPlot', true);
 
-dyn = brst_dynamics(brst, spktimes, 'binSize', 60, 'kernelSD', 300, ...
-    'flgPlot', true);
+
+
 
 %% ========================================================================
-%  FIRING RATE
+%  ANALYSIS
 %  ========================================================================
 
-expLim = [0, 9 * 60]  * 60;
-% expLim = [0, Inf];
+% Files
+basepaths = [mcu_basepaths('mea_bac')];
+vars = {'mea'};
+v = basepaths2vars('basepaths', basepaths, 'vars', vars);
+
+% Params
+isiVal = 0.05;
+winExp = [0, 9 * 60]  * 60;
+binSize = 60;
 
 close all
 for iFile = 1 : nFiles
@@ -39,10 +38,31 @@ for iFile = 1 : nFiles
     basepath = basepaths{iFile};
     cd(basepath);
 
+    % Organize raw spike times
+    % files = dir('*sorted*');
+    % mea = mea_orgNex('fname', files.name, 'basepath', pwd, 'forceL', false);
     spktimes = v(iFile).mea.spktimes;
+    
+    % Limit to experimental window
+    spktimes = cellfun(@(x) x(x >= winExp(1) & x <= winExp(2)), ...
+        spktimes, 'UniformOutput', false);
 
-    fr = mea_frPrep(spktimes, 'winLim', expLim, 'flgSave', true, ...
-        'flgPlot', true);
+    % Firing rate
+    fr = mea_frPrep(spktimes, 'binSize', binSize, ...
+        'flgSave', true, 'flgPlot', false);
+    
+    % Burst detection
+    brst = brst_maxInt(spktimes, ...
+        'minSpks', 3, ...
+        'maxISI_start', isiVal, ...
+        'maxISI_end', isiVal * 2, ...
+        'minDur', 0.015, ...
+        'minIBI', 0.1, ...
+        'flgForce', true, 'flgSave', true, 'flgPlot', false);
+    
+    % Burst temporal dynamics
+    dyn = brst_dynamics(brst, spktimes, 'binSize', 60, 'kernelSD', 300, ...
+                'binSize', binSize, 'flgSave', true, 'flgPlot', true);
 
 end
 
@@ -111,7 +131,7 @@ bslLim = [5 70] * 60;
 ssLim = [7 * 60, 9 * 60 - 5] * 60;
 troughLim = [4 * 60 + 10, 4.5 * 60] * 60;
 stWin = {bslLim, ssLim, troughLim};
-expLim = [0, 9 * 60]  * 60;
+winExp = [0, 9 * 60]  * 60;
 
 % expLim = [0, Inf];
 

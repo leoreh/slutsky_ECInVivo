@@ -9,11 +9,13 @@ function dyn = brst_dynamics(brst, spktimes, varargin)
 %       brst        - (struct) Output from brst_maxInt.m
 %       spktimes    - (cell) Spike times per unit.
 %       varargin    - (param/value) Optional parameters:
-%                     'binSize'   : (num) Time bin size {1} (s)
-%                     'kernelSD'  : (num) Gaussian kernel sigma {5} (s)
+%                     'binSize'   : (num) Time bin size {60} (s)
+%                     'kernelSD'  : (num) Gaussian kernel sigma {300} (s)
 %                     'smoothWin' : (num) Smoothing window {10} (events)
 %                     'ibiPct'    : (num) Percentile for masking gap {99}
 %                     'flgPlot'   : (log) Plot dynamics {true}
+%                     'flgSave'   : (log) Save result as brstDyn {false}
+%                     'basepath'  : (char) Base path for saving {pwd}
 %
 %   OUTPUTS:
 %       dyn         - (struct) Dynamics structure.
@@ -39,11 +41,13 @@ function dyn = brst_dynamics(brst, spktimes, varargin)
 p = inputParser;
 addRequired(p, 'brst', @isstruct);
 addRequired(p, 'spktimes', @iscell);
-addParameter(p, 'binSize', 1, @isnumeric);
-addParameter(p, 'kernelSD', 5, @isnumeric);
+addParameter(p, 'binSize', 60, @isnumeric);
+addParameter(p, 'kernelSD', 300, @isnumeric);
 addParameter(p, 'smoothWin', 10, @isnumeric);
 addParameter(p, 'ibiPct', 95, @isnumeric);
 addParameter(p, 'flgPlot', true, @islogical);
+addParameter(p, 'flgSave', false, @islogical);
+addParameter(p, 'basepath', pwd, @ischar);
 
 parse(p, brst, spktimes, varargin{:});
 binSize   = p.Results.binSize;
@@ -51,6 +55,8 @@ kernelSD  = p.Results.kernelSD;
 smoothWin = p.Results.smoothWin;
 ibiPct    = p.Results.ibiPct;
 flgPlot   = p.Results.flgPlot;
+flgSave   = p.Results.flgSave;
+basepath  = p.Results.basepath;
 
 
 %% ========================================================================
@@ -148,7 +154,9 @@ for iUnit = 1:nUnits
     % Apply to all props
     tTimes = b_struct.times(:, 1);
 
-    % Note: Removed single-burst specific block as requested.
+    if length(tTimes) < 2
+        continue
+    end
 
     % Process Properties
     dyn.dur(iUnit, :)   = proc_prop(b_struct.dur, tTimes, t, smoothWin, maskThresh);
@@ -174,6 +182,20 @@ if flgPlot
     % If tblGUI_xy accepts yVar optional, we can default to 'rate' or let user pick.
     % We launch it with 'rate' as default.
     tblGUI_xy(dyn.time, tbl, 'yVar', 'rate');
+end
+
+
+
+
+%% ========================================================================
+%  SAVE
+%  ========================================================================
+
+if flgSave
+    [~, basename] = fileparts(basepath);
+    dynfile = fullfile(basepath, [basename, '.brstDyn.mat']);
+    brstDyn = dyn; %#ok<NASGU>
+    save(dynfile, 'brstDyn');
 end
 
 end     % EOF

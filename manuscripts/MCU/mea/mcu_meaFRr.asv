@@ -23,6 +23,10 @@ brst = brst_maxInt(spktimes, ...
     'minIBI', 0.1, ...
     'flgForce', true, 'flgSave', false, 'flgPlot', true);
 
+
+
+
+
 dyn = brst_dynamics(brst, spktimes, 'binSize', 60, 'kernelSD', 300, ...
     'flgPlot', true);
 
@@ -31,20 +35,38 @@ dyn = brst_dynamics(brst, spktimes, 'binSize', 60, 'kernelSD', 300, ...
 %  ========================================================================
 
 expLim = [0, 9 * 60]  * 60;
-expLim = [0, Inf];
+% expLim = [0, Inf];
 
+close all
 for iFile = 1 : nFiles
 
     basepath = basepaths{iFile};
     cd(basepath);
 
+    % Organize raw spike times
+    % files = dir('*sorted*');
+    % mea = mea_orgNex('fname', files.name, 'basepath', pwd, 'forceL', false);
     spktimes = v(iFile).mea.spktimes;
 
+    % Firing rate
     fr = mea_frPrep(spktimes, 'winLim', expLim, 'flgSave', true, ...
         'flgPlot', true);
+    
+    % Bursts
+    isiVal = 0.05;
+    brst = brst_maxInt(spktimes, ...
+        'minSpks', 3, ...
+        'maxISI_start', 0.05, ...
+        'maxISI_end', isiVal * 2, ...
+        'minDur', 0.015, ...
+        'minIBI', 0.1, ...
+        'flgForce', true, 'flgSave', false, 'flgPlot', true);
+
 
 end
 
+
+fr = mea_tAlign(basepaths, 'flgSave', true);
 
 % Load data 
 grps = {'mea_bac'; 'mea_mcuko'};
@@ -57,7 +79,7 @@ varMap.fr = 'fr.fr';
 
 
 clear tblCell
-for iGrp = 1 : length(grps)
+for iGrp = 1
 
     % Load data for this group
     basepaths = mcu_basepaths(grps{iGrp});
@@ -69,14 +91,11 @@ for iGrp = 1 : length(grps)
 
     % Create table using new flexible approach
     tblCell{iGrp} = v2tbl('v', v, 'varMap', varMap,...
-        'tagFiles', tagFiles, 'tagAll', tagAll, 'idxCol', 1);
+        'tagFiles', tagFiles, 'tagAll', tagAll);
 end
 tbl = vertcat(tblCell{:});
 
-% Organize for analysis
-lmeData = tbl(tbl.uGood, :);
-lmeData.uGood = [];
-lmeData = rmmissing(lmeData);
+tblGUI_xy(v(10).fr.t / 3600, tbl);
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

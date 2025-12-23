@@ -57,7 +57,6 @@ function [chunks] = n2chunks(varargin)
 % 14 Dec 21 LH  Fixed clipping issues, especially with multiple clips in one chunk.
 % 12 Jan 22 LH  Added 'pnts' functionality to align chunks with specific timepoints.
 % 08 Sep 22 LH  Noted dependency on SubtractIntervals for 'clip'.
-% [Current Date] [Your Initials] Updated comments for clarity and consistency.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments

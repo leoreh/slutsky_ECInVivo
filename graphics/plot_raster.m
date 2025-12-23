@@ -190,7 +190,7 @@ end
 %  FORMATTING
 %  ========================================================================
 
-set(hAx, 'YDir', 'reverse');
+set(hAx, 'YDir', 'normal');
 set(hAx, 'TickDir', 'out');
 
 if ~isempty(xLim)

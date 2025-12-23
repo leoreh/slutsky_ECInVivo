@@ -86,7 +86,7 @@ uGood = nSpks >= spkThr;
 %  ========================================================================
 
 % Use original data for detection, masking bad units
-[idxPert, tAxis] = mcu_detectPert(frOrig(uGood, :), 'binSize', binSize, ...
+[idxPert, ~] = mcu_detectPert(frOrig(uGood, :), 'binSize', binSize, ...
     'srchStart', 1, 'srchEnd', 3, 'flgPlot', flgPlot, 'frameLen', 10);
 
 

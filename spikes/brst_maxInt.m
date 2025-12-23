@@ -61,7 +61,7 @@ flgForce     = p.Results.flgForce;
 
 % Load if exists
 [~, basename] = fileparts(basepath);
-brstfile = fullfile(basepath, [basename, '.mi_brst.mat']);
+brstfile = fullfile(basepath, [basename, '.brst.mat']);
 
 if exist(brstfile, 'file') && ~flgForce && ~flgPlot
     load(brstfile, 'brst');
