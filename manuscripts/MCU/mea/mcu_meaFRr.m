@@ -1,3 +1,40 @@
+
+%% ========================================================================
+%  BURST PARAMS
+%  ========================================================================
+
+basepaths = [mcu_basepaths('mea_bac')];
+vars = {'mea', 'frr'};
+v = basepaths2vars('basepaths', basepaths, 'vars', vars);
+
+mea = catfields([v(:).mea], 2);
+spktimes = mea.spktimes;
+spktimes = v(1).mea.spktimes;
+
+% isiVal = brst_isiValley(spktimes, 'nSpks', 3);
+
+isiVal = 0.05;
+brst = brst_maxInt(spktimes, ...
+    'minSpks', 3, ...
+    'maxISI_start', isiVal, ...
+    'maxISI_end', isiVal * 2, ...
+    'minDur', 0.015, ...
+    'minIBI', 0.1, ...
+    'flgForce', true, 'flgSave', false, 'flgPlot', true);
+
+dyn = brst_dynamics(brst, spktimes, 'binSize', 60, 'kernelSD', 300, ...
+    'flgPlot', true);
+
+%% ========================================================================
+%  FIRING RATE
+%  ========================================================================
+
+expLim = [0, 9 * 60]  * 60;
+expLim = [0, Inf];
+fr = mea_frPrep(spktimes, 'winLim', expLim);
+
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ANALYZE
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -44,8 +81,8 @@ for iFile = 1 : nFiles
     spktimes = v(iFile).mea.spktimes;
 
     % % --- Firing Rate Recovery
-    frr = mea_frr(spktimes, 'winLim', expLim,...
-        'flgSave', true, 'flgPlot', false, 'flgForce', false);
+    % frr = mea_frr(spktimes, 'winLim', expLim,...
+    %     'flgSave', true, 'flgPlot', false, 'flgForce', false);
 
     % % --- Spike timing metrics
     % st = spktimes_metrics('spktimes', spktimes, 'sunits', [],...
@@ -56,8 +93,7 @@ for iFile = 1 : nFiles
     %     'minSpks', 2, 'flgSave', true, 'flgForce', true, 'bins', stWin);
     
     % --- Bursts
-    brst = brst_maxInt(spktimes, 'maxISI_start', 0.17, 'maxISI_end', 0.03,...
-        'minSpks', 3, 'minIBI', 0.2, 'minDur', 0.01,...
+    brst = brst_maxInt(spktimes,...
         'flgForce', true, 'flgSave', false, 'flgPlot', true);
 
     % % --- Population Coupling

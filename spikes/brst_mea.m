@@ -1,5 +1,7 @@
 function brst = brst_mea(spktimes, varargin)
 
+% LARGELY REPLACED BY BRST_MAXINT
+
 % calculates burstiness stats per unit in timebins. based on analysis done
 % for mea recordings
 %
@@ -69,7 +71,7 @@ if isempty(binsize) || binsize > recLen
 end
 if isempty(bins)
     bins = n2chunks('n', recLen, 'chunksize', binsize, 'overlap', [1 0]);
-    bins(1) = 0; bins(end - 1, 2) = recLen; bins(end, :) = [];
+    bins(1) = 0; bins(size(bins, 1), 2) = recLen;
 end
 
 % convert bins to cell

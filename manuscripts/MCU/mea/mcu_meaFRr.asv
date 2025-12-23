@@ -1,3 +1,39 @@
+
+%% ========================================================================
+%  BURST PARAMS
+%  ========================================================================
+
+basepaths = [mcu_basepaths('mea_bac')];
+vars = {'mea'};
+v = basepaths2vars('basepaths', basepaths, 'vars', vars);
+
+mea = catfields([v(:).mea], 2);
+spktimes = mea.spktimes;
+spktimes = v(1).mea.spktimes;
+spktimes = {sort(vertcat(mea.spktimes{:}))};
+
+isiVal = brst_isiValley(spktimes, 'nSpks', 3);
+isiVal = 0.02;
+brst = brst_maxInt(spktimes, ...
+    'minSpks', 3, ...
+    'maxISI_start', isiVal, ...
+    'maxISI_end', isiVal * 2, ...
+    'minDur', 0.015, ...
+    'minIBI', 0.2, ...
+    'flgForce', true, 'flgSave', false, 'flgPlot', true);
+
+isiVal = 0.02;
+brst = brst_maxInt(spktimes, ...
+    'minSpks', 2, ...
+    'maxISI_start', isiVal, ...
+    'maxISI_end', isiVal, ...
+    'minDur', 0, ...
+    'minIBI', 0, ...
+    'flgForce', true, 'flgSave', false, 'flgPlot', true);
+
+brst2 = brst_mea(spktimes, 'binsize', [], 'isiThr', 0.02,...
+    'minSpks', 2, 'flgSave', false, 'flgForce', true, 'bins', []);
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ANALYZE
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -44,8 +80,8 @@ for iFile = 1 : nFiles
     spktimes = v(iFile).mea.spktimes;
 
     % % --- Firing Rate Recovery
-    frr = mea_frr(spktimes, 'winLim', expLim,...
-        'flgSave', true, 'flgPlot', false, 'flgForce', false);
+    % frr = mea_frr(spktimes, 'winLim', expLim,...
+    %     'flgSave', true, 'flgPlot', false, 'flgForce', false);
 
     % % --- Spike timing metrics
     % st = spktimes_metrics('spktimes', spktimes, 'sunits', [],...
@@ -56,19 +92,8 @@ for iFile = 1 : nFiles
     %     'minSpks', 2, 'flgSave', true, 'flgForce', true, 'bins', stWin);
     
     % --- Bursts
-    brst = brst_maxInt(spktimes, 'maxISI_start', 0.17, 'maxISI_end', 0.03,...
-        'minSpks', 2, 'minIBI', 0.2, 'minDur', 0.01, 'flgForce', true, 'bins', stWin);
-
-%   varargin    Name-value pairs for parameters:
-%       'basepath'      char. fullpath to recording folder {pwd}
-%       'maxISI_start'  numeric. Max ISI allowed at start of burst {0.1 [s]}
-%       'maxISI_end'    numeric. Max ISI allowed within a burst {0.2 [s]}
-%       'minIBI'        numeric. Minimum Inter-Burst Interval {0.2 [s]}
-%       'minDur'        numeric. Minimum burst duration {0.05 [s]}
-%       'minSpks'       numeric. Minimum number of spikes in a burst {5}
-%       'flgSave'       logical. Save struct to file {true}
-%       'flgForce'      logical. Analyze even if file exists {false}
-
+    brst = brst_maxInt(spktimes,...
+        'flgForce', true, 'flgSave', false, 'flgPlot', true);
 
     % % --- Population Coupling
     % [prc] = prCoupling(spktimes, prcParams, 'flgSave', true);

@@ -33,16 +33,18 @@ function [pertIdx, tAxis, debugData] = mcu_detectPert(frMat, varargin)
 
 p = inputParser;
 addRequired(p, 'frMat', @isnumeric);
-addParameter(p, 'binSize', 60, @isnumeric); % Default 60 seconds
+addParameter(p, 'binSize', 60, @isnumeric); 
+addParameter(p, 'srchStart', 20, @isnumeric); 
+addParameter(p, 'srchEnd', 96, @isnumeric);
 addParameter(p, 'flgPlot', false, @islogical);
 
 parse(p, frMat, varargin{:});
 binSize = p.Results.binSize;
+srchStart = p.Results.srchStart;
+srchEnd = p.Results.srchEnd;
 flgPlot = p.Results.flgPlot;
 
 % Constants
-srchStart = 20;
-srchEnd = 96;
 winDropCheck = 30;      % Minutes to check for lowest point after drop
 bslDur = 4;             % Hours to calculate baseline prior to searchStart
 nCandidates = 10;       % Number of steep drops to evaluate
@@ -203,8 +205,8 @@ debugData.tangentPoint = [xAnchor, yAnchor];
 
 if flgPlot
 
-    hFig = figure('Name', 'Perturbation Detection', ...
-        'Color', 'w', 'Position', [100 100 1000 600]);
+    [hFig, hAx] = plot_axSize('szOnly', false, 'flgFullscreen', true, ...
+        'flgPos', true);
     hold on;
 
     % Population Median
@@ -220,6 +222,10 @@ if flgPlot
     % Anchor
     plot(tAxis(anchorIdx), mfrSm(anchorIdx), 'ks', ...
         'MarkerFaceColor', 'y', 'MarkerSize', 8, 'DisplayName', 'Anchor');
+    
+    % Save axis limits
+    xLim = xlim;
+    yLim = ylim;
 
     % Tangent Line
     % Determine range for line plotting (e.g. +/- 30 mins)
@@ -234,6 +240,8 @@ if flgPlot
     title(sprintf('Perturbation Detection (Consistency=%.1f%%)', pctDecr));
     xlabel('Time (min)');
     ylabel('Median FR (Hz)');
+    xlim(xLim);
+    ylim(yLim);
 
     % Derivative on right axis
     yyaxis right

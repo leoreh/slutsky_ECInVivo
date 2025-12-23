@@ -3,6 +3,7 @@ function hFig = tblGUI_xy(xVec, dataTbl, varargin)
 %
 %   hFig = tblGUI_xy(xVec, dataTbl, varargin) plots column 'yVar' from 'dataTbl'
 %   against 'xVec'.
+%   - "Y Var": Select which variable to plot on Y-axis.
 %   - "Plot By": Splits data into separate tiles (subplots).
 %   - "Group By": Groups data within each tile by color.
 %
@@ -11,9 +12,8 @@ function hFig = tblGUI_xy(xVec, dataTbl, varargin)
 %       dataTbl (table)    Data table containing variables to plot.
 %
 %   OPTIONAL KEY-VALUE PAIRS:
-%       'yVar'             (char/str) Name of the column in dataTbl to plot.
-%                          If empty, auto-selects a numeric column matching
-%                          xVec dimensions.
+%       'yVar'             (char/str) Initial variable to plot.
+%                          If empty, auto-selects first suitable variable.
 %       'tileFlow'         (char) Layout of tiles: 'flow',
 %                          'vertical' (1 column), or 'horizontal' (1 row).
 %
@@ -34,50 +34,51 @@ addParameter(p, 'Parent', [], @(x) isempty(x) || isgraphics(x));
 addParameter(p, 'GroupByCallback', [], @(x) isempty(x) || isa(x, 'function_handle'));
 parse(p, varargin{:});
 
-yVar = p.Results.yVar;
+initialYVar = p.Results.yVar;
 tileFlow = p.Results.tileFlow;
 hParent = p.Results.Parent;
 selCbk = p.Results.SelectionCallback;
 grpCbk = p.Results.GroupByCallback;
 
-% Auto-select yVar if empty
-if isempty(yVar)
-    varNames = dataTbl.Properties.VariableNames;
-    xLen = length(xVec);
+% Find all variables that match xVec dimensions (Potential Y-Vars)
+xLen = length(xVec);
+yVars = {};
+varNames = dataTbl.Properties.VariableNames;
 
-    for iVar = 1:length(varNames)
-        raw = dataTbl.(varNames{iVar});
-        if isnumeric(raw) && size(raw, 2) == xLen
-            yVar = varNames{iVar};
-            break;
-        elseif iscell(raw) && length(raw) > 0 && length(raw{1}) == xLen
-            yVar = varNames{iVar};
-            break;
-        end
+for iVar = 1:length(varNames)
+    raw = dataTbl.(varNames{iVar});
+    if isnumeric(raw) && size(raw, 2) == xLen
+        yVars{end+1} = varNames{iVar}; %#ok<AGROW>
+    elseif iscell(raw) && length(raw) > 0 && length(raw{1}) == xLen
+        yVars{end+1} = varNames{iVar}; %#ok<AGROW>
     end
-
-    if isempty(yVar)
-        error('No suitable variable found in table matching xVec length.');
-    end
-    fprintf('Auto-selected yVar: %s\n', yVar);
 end
 
-if ~ismember(yVar, dataTbl.Properties.VariableNames)
-    error('Variable "%s" not found in table.', yVar);
+if isempty(yVars)
+    error('No suitable variable found in table matching xVec length.');
 end
+
+% Auto-select yVar if empty or invalid
+if isempty(initialYVar) || ~ismember(initialYVar, yVars)
+    yVar = yVars{1};
+    if ~isempty(initialYVar)
+        warning('Requested yVar "%s" not suitable. Defaulting to "%s".', initialYVar, yVar);
+    end
+else
+    yVar = initialYVar;
+end
+
 
 %% ========================================================================
 %  INITIALIZATION
 %  ========================================================================
 
-% Identify potential grouping variables
+% Identify potential grouping variables (Categorical/String/Logical)
 allVars = dataTbl.Properties.VariableNames;
 catVars = allVars(varfun(@(x) iscategorical(x) || isstring(x) || islogical(x),...
     dataTbl, 'OutputFormat', 'uniform'));
 catVars = [{'None'}, catVars];
 
-% Figure Setup
-% Use explicit pixels to act nicely on screens
 % Figure Setup
 if isempty(hParent)
     hContainer = figure('Name', sprintf('XY Plot: %s', yVar), 'NumberTitle', 'off', ...
@@ -93,18 +94,19 @@ guiData = struct();
 guiData.xVec = xVec;
 guiData.dataTbl = dataTbl;
 guiData.yVar = yVar;
+guiData.yVars = yVars; % List of available Y variables
 guiData.catVars = catVars;
 guiData.tileFlow = tileFlow;
-guiData.chkPlotBy = []; % Handles for checkboxes
-guiData.chkGrpBy = [];  % Handles for checkboxes
-guiData.colors = lines(20); % Pre-define colors
-guiData.tileInfo = []; % To store axis info for highlighting
-guiData.hlHandles = []; % To store highlight line handles
-guiData.hlHandles = []; % To store highlight line handles
-guiData.highlightFcn = @highlightTraces; % Expose function
-guiData.setGroupVarFcn = @setGroupVar;   % Expose function
+guiData.chkPlotBy = [];
+guiData.chkGrpBy = [];
+guiData.colors = lines(20);
+guiData.tileInfo = [];
+guiData.hlHandles = [];
+guiData.highlightFcn = @highlightTraces;
+guiData.setGroupVarFcn = @setGroupVar;
 guiData.selCbk = selCbk;
 guiData.grpCbk = grpCbk;
+
 
 %% ========================================================================
 %  LAYOUT
@@ -112,26 +114,39 @@ guiData.grpCbk = grpCbk;
 
 % Side Panel for Controls (Left)
 panelW = 0.1;
-% Create Left Panel
 hPanel = uipanel('Parent', hContainer, 'Units', 'normalized', ...
     'Position', [0, 0, panelW, 1]);
 
-% Create Right Panel for Plots
+% Main Plotting Area (Right)
 hPanelRight = uipanel('Parent', hContainer, 'Units', 'normalized', ...
     'Position', [panelW, 0, 1-panelW, 1], 'BorderType', 'none');
 
-% Main Plotting Area (Right)
-% Parent tiledlayout to the RIGHT PANEL to avoid bleeding
 guiData.hLayout = tiledlayout(hPanelRight, 'flow', ...
     'TileSpacing', 'tight', 'Padding', 'compact');
-guiData.hPanelRight = hPanelRight; % Store parent panel for layout recreation
+guiData.hPanelRight = hPanelRight;
 
 % --- Controls in Side Panel ---
 ctlH = 0.03;
 ctlGap = 0.01;
 currY = 0.95;
 
-% PLOT BY (Tiles)
+% 1. Y VARIABLE SELECTION
+uicontrol('Parent', hPanel, 'Style', 'text', 'String', 'Y Variable:', ...
+    'Units', 'normalized', 'Position', [0.05, currY, 0.9, ctlH], ...
+    'HorizontalAlignment', 'left', 'FontWeight', 'bold');
+currY = currY - ctlH;
+
+valY = find(strcmp(yVars, yVar), 1);
+if isempty(valY), valY = 1; end
+
+guiData.ddYVar = uicontrol('Parent', hPanel, 'Style', 'popupmenu', ...
+    'String', yVars, 'Value', valY, ...
+    'Units', 'normalized', 'Position', [0.05, currY, 0.9, ctlH], ...
+    'Callback', @onYVarChange);
+currY = currY - ctlH - ctlGap*2; % Extra gap
+
+
+% 2. PLOT BY (Tiles)
 uicontrol('Parent', hPanel, 'Style', 'text', 'String', 'Plot By (Tiles):', ...
     'Units', 'normalized', 'Position', [0.05, currY, 0.9, ctlH], ...
     'HorizontalAlignment', 'left', 'FontWeight', 'bold');
@@ -154,7 +169,7 @@ uicontrol('Parent', hPanel, 'Style', 'text', 'String', '------------------------
     'HorizontalAlignment', 'center', 'ForegroundColor', [0.5 0.5 0.5]);
 currY = currY - ctlH - ctlGap;
 
-% GROUP BY (Colors)
+% 3. GROUP BY (Colors)
 uicontrol('Parent', hPanel, 'Style', 'text', 'String', 'Group By (Colors):', ...
     'Units', 'normalized', 'Position', [0.05, currY, 0.9, ctlH], ...
     'HorizontalAlignment', 'left', 'FontWeight', 'bold');
@@ -170,13 +185,9 @@ currY = currY - ctlH - ctlGap;
 guiData.pnlGrpBy = uipanel('Parent', hPanel, 'BorderType', 'none', ...
     'Units', 'normalized', 'Position', [0.05, 0.10, 0.9, currY - 0.10]);
 
-% Update Button
-% Update Button - REMOVED for auto-update
-% guiData.btnUpdate = ...
-
 
 hContainer.UserData = guiData;
-hFig = hContainer; % Use container as handle return
+hFig = hContainer;
 
 % Initial State
 onPlotByChange(hFig, []);
@@ -188,6 +199,26 @@ onUpdatePlot(hContainer, []);
 %% ========================================================================
 %  CALLBACKS
 %  ========================================================================
+
+    function onYVarChange(src, ~)
+        data = hContainer.UserData;
+        idx = get(src, 'Value');
+        items = get(src, 'String');
+
+        newVar = items{idx};
+
+        if ~strcmp(data.yVar, newVar)
+            data.yVar = newVar;
+            hContainer.UserData = data;
+
+            % Update Figure Name if standalone
+            if strcmp(hContainer.Type, 'figure')
+                set(hContainer, 'Name', sprintf('XY Plot: %s', newVar));
+            end
+
+            onUpdatePlot(hContainer, []);
+        end
+    end
 
     function onPlotByChange(src, ~)
         data = hContainer.UserData;
@@ -266,10 +297,10 @@ onUpdatePlot(hContainer, []);
 
             w = 0.9;
             chkHandles = gobjects(1, nCats); % Initialize
-            for iVar = 1:nCats
-                yPos = 1 - iVar*h;
-                chkHandles(iVar) = uicontrol('Parent', hPanel, 'Style', 'checkbox', ...
-                    'String', cats{iVar}, 'Units', 'normalized', ...
+            for kVar = 1:nCats
+                yPos = 1 - kVar*h;
+                chkHandles(kVar) = uicontrol('Parent', hPanel, 'Style', 'checkbox', ...
+                    'String', cats{kVar}, 'Units', 'normalized', ...
                     'Position', [0, yPos, w, h], 'Value', 1, ...
                     'Callback', @onFilterChange); % Auto-update & Sync
             end
@@ -281,11 +312,6 @@ onUpdatePlot(hContainer, []);
 
     function onUpdatePlot(~, ~)
         data = hContainer.UserData;
-
-        % Manage Layout based on Arrangement
-        % If layout type changes, we might need to be careful, but just
-        % configuring it here is fine.
-        nTiles = 1; % Temporary default
 
         % Determine Tile Splits (Plot By)
         idxPB = get(data.ddPlotBy, 'Value');
@@ -309,7 +335,7 @@ onUpdatePlot(hContainer, []);
         end
         nTiles = length(catsPB);
 
-        % Recreate layout to support different arrangements
+        % Recreate layout
         delete(data.hLayout);
         data.hLayout = tiledlayout(data.hPanelRight, data.tileFlow, ...
             'TileSpacing', 'tight', 'Padding', 'compact');
@@ -340,7 +366,12 @@ onUpdatePlot(hContainer, []);
             end
         end
 
-        % Retrieve Data
+        % Retrieve Data (Dynamic based on Selection)
+        if ~ismember(data.yVar, data.dataTbl.Properties.VariableNames)
+            % Fallback if var missing
+            warning('Selected variable %s not in table. Resetting.', data.yVar);
+            return;
+        end
         yRaw = data.dataTbl.(data.yVar);
         isMatrix = isnumeric(yRaw);
 
@@ -408,15 +439,10 @@ onUpdatePlot(hContainer, []);
 
                 % Plot
                 % Light individual lines (High transparency) 0.05
-                % Assign ButtonDownFcn for interactivity
-                % We need to map each line to its global index
-                % Since we are plotting a matrix, 'plot' returns a vector of handles
-
                 hLines = plot(hAx, data.xVec, subY', 'Color', [clr, 0.05],...
                     'LineWidth', 0.5, 'HandleVisibility', 'off');
 
                 % Assign global indices to UserData of lines
-                % finalIdx is logical global mask. find(finalIdx) gives indices
                 globIndices = find(finalIdx);
                 for iL = 1:length(hLines)
                     hLines(iL).UserData = globIndices(iL);
@@ -437,7 +463,7 @@ onUpdatePlot(hContainer, []);
             % Aesthetics
             grid(hAx, 'on');
             title(hAx, catTile, 'Interpreter', 'none');
-            axis(hAx, 'tight'); % Set X tightly
+            axis(hAx, 'tight');
 
             % Apply Y-Limits based on Means
             if hasData && ~isinf(tileMeanMin) && ~isinf(tileMeanMax)
