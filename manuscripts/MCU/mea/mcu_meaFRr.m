@@ -4,8 +4,9 @@
 %  ========================================================================
 
 basepaths = [mcu_basepaths('mea_bac')];
-vars = {'mea', 'frr'};
+vars = {'mea'};
 v = basepaths2vars('basepaths', basepaths, 'vars', vars);
+nFiles = length(basepaths);
 
 mea = catfields([v(:).mea], 2);
 spktimes = mea.spktimes;
@@ -30,9 +31,52 @@ dyn = brst_dynamics(brst, spktimes, 'binSize', 60, 'kernelSD', 300, ...
 %  ========================================================================
 
 expLim = [0, 9 * 60]  * 60;
-expLim = [0, Inf];
-fr = mea_frPrep(spktimes, 'winLim', expLim);
+% expLim = [0, Inf];
 
+close all
+for iFile = 1 : nFiles
+
+    basepath = basepaths{iFile};
+    cd(basepath);
+
+    spktimes = v(iFile).mea.spktimes;
+
+    fr = mea_frPrep(spktimes, 'winLim', expLim, 'flgSave', true, ...
+        'flgPlot', true);
+
+end
+
+
+fr = mea_tAlign(basepaths, 'flgSave', true);
+
+% Load data 
+grps = {'mea_bac'; 'mea_mcuko'};
+grpLbls = {'Control'; 'MCU-KO'};
+vars = {'mea', 'fr'};
+
+clear varMap
+varMap.uGood = 'fr.uGood';
+varMap.fr = 'fr.fr';
+
+
+clear tblCell
+for iGrp = 1
+
+    % Load data for this group
+    basepaths = mcu_basepaths(grps{iGrp});
+    v = basepaths2vars('basepaths', basepaths, 'vars', vars);
+
+    % Prepare tag structures for v2tbl
+    tagAll.Group = grpLbls{iGrp};
+    tagFiles.Name = get_mname(basepaths, 0);
+
+    % Create table using new flexible approach
+    tblCell{iGrp} = v2tbl('v', v, 'varMap', varMap,...
+        'tagFiles', tagFiles, 'tagAll', tagAll);
+end
+tbl = vertcat(tblCell{:});
+
+tblGUI_xy(v(10).fr.t / 3600, tbl);
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

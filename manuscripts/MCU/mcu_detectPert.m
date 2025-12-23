@@ -36,12 +36,14 @@ addRequired(p, 'frMat', @isnumeric);
 addParameter(p, 'binSize', 60, @isnumeric); 
 addParameter(p, 'srchStart', 20, @isnumeric); 
 addParameter(p, 'srchEnd', 96, @isnumeric);
+addParameter(p, 'frameLen', 60, @isnumeric);
 addParameter(p, 'flgPlot', false, @islogical);
 
 parse(p, frMat, varargin{:});
 binSize = p.Results.binSize;
 srchStart = p.Results.srchStart;
 srchEnd = p.Results.srchEnd;
+frameLen = p.Results.frameLen;
 flgPlot = p.Results.flgPlot;
 
 % Constants
@@ -63,7 +65,7 @@ winBsl    = round(bslDur * 3600 / binSize);
 mfr = median(frMat, 1, 'omitnan');
 
 % Denoise the trace
-mfrSm = fr_denoise(mfr, 'flgPlot', false, 'frameLen', 60);
+mfrSm = fr_denoise(mfr, 'flgPlot', false, 'frameLen', frameLen);
 
 % Calculate Derivative and smooth
 smoothWin = round(300 / binSize); % 5 min smoothing

@@ -6,33 +6,78 @@
 basepaths = [mcu_basepaths('mea_bac')];
 vars = {'mea'};
 v = basepaths2vars('basepaths', basepaths, 'vars', vars);
+nFiles = length(basepaths);
 
 mea = catfields([v(:).mea], 2);
 spktimes = mea.spktimes;
 spktimes = v(1).mea.spktimes;
-spktimes = {sort(vertcat(mea.spktimes{:}))};
 
-isiVal = brst_isiValley(spktimes, 'nSpks', 3);
-isiVal = 0.02;
+% isiVal = brst_isiValley(spktimes, 'nSpks', 3);
+
+isiVal = 0.05;
 brst = brst_maxInt(spktimes, ...
     'minSpks', 3, ...
     'maxISI_start', isiVal, ...
     'maxISI_end', isiVal * 2, ...
     'minDur', 0.015, ...
-    'minIBI', 0.2, ...
+    'minIBI', 0.1, ...
     'flgForce', true, 'flgSave', false, 'flgPlot', true);
 
-isiVal = 0.02;
-brst = brst_maxInt(spktimes, ...
-    'minSpks', 2, ...
-    'maxISI_start', isiVal, ...
-    'maxISI_end', isiVal, ...
-    'minDur', 0, ...
-    'minIBI', 0, ...
-    'flgForce', true, 'flgSave', false, 'flgPlot', true);
+dyn = brst_dynamics(brst, spktimes, 'binSize', 60, 'kernelSD', 300, ...
+    'flgPlot', true);
 
-brst2 = brst_mea(spktimes, 'binsize', [], 'isiThr', 0.02,...
-    'minSpks', 2, 'flgSave', false, 'flgForce', true, 'bins', []);
+%% ========================================================================
+%  FIRING RATE
+%  ========================================================================
+
+expLim = [0, 9 * 60]  * 60;
+expLim = [0, Inf];
+
+for iFile = 1 : nFiles
+
+    basepath = basepaths{iFile};
+    cd(basepath);
+
+    spktimes = v(iFile).mea.spktimes;
+
+    fr = mea_frPrep(spktimes, 'winLim', expLim, 'flgSave', true, ...
+        'flgPlot', true);
+
+end
+
+
+% Load data 
+grps = {'mea_bac'; 'mea_mcuko'};
+grpLbls = {'Control'; 'MCU-KO'};
+vars = {'mea', 'fr'};
+
+clear varMap
+varMap.uGood = 'fr.uGood';
+varMap.fr = 'fr.fr';
+
+
+clear tblCell
+for iGrp = 1 : length(grps)
+
+    % Load data for this group
+    basepaths = mcu_basepaths(grps{iGrp});
+    v = basepaths2vars('basepaths', basepaths, 'vars', vars);
+
+    % Prepare tag structures for v2tbl
+    tagAll.Group = grpLbls{iGrp};
+    tagFiles.Name = get_mname(basepaths, 0);
+
+    % Create table using new flexible approach
+    tblCell{iGrp} = v2tbl('v', v, 'varMap', varMap,...
+        'tagFiles', tagFiles, 'tagAll', tagAll, 'idxCol', 1);
+end
+tbl = vertcat(tblCell{:});
+
+% Organize for analysis
+lmeData = tbl(tbl.uGood, :);
+lmeData.uGood = [];
+lmeData = rmmissing(lmeData);
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ANALYZE

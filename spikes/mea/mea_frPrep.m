@@ -86,8 +86,8 @@ uGood = nSpks >= spkThr;
 %  ========================================================================
 
 % Use original data for detection, masking bad units
-idxPert = mcu_detectPert(frOrig(uGood, :), 'binSize', binSize, ...
-    'srchStart', 1, 'srchEnd', 10, 'flgPlot', flgPlot);
+[idxPert, tAxis] = mcu_detectPert(frOrig(uGood, :), 'binSize', binSize, ...
+    'srchStart', 1, 'srchEnd', 3, 'flgPlot', flgPlot, 'frameLen', 10);
 
 
 %% ========================================================================
@@ -115,10 +115,10 @@ tSec = tIdx * binSize;
 t = zeros(size(tSec));
 
 % Pre-perturbation
-t(tIdx < 0) = tSec(tIdx < 0) * 3;
+t(tIdx <= 0) = tSec(tIdx <= 0) * 3;
 
 % Post-perturbation (including 0)
-t(tIdx >= 0) = tSec(tIdx >= 0) * 6;
+t(tIdx > 0) = tSec(tIdx > 0) * 6;
 
 
 %% ========================================================================

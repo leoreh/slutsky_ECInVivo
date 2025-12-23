@@ -14,6 +14,9 @@ function fr = mea_frPrep(spktimes, varargin)
 %       spkThr      - (double) Minimum spikes required per unit. {4}
 %       sgPolyOrder - (double) Polynomial order for denoising. {3}
 %       sgFrameSec  - (double) Frame length for denoising in seconds. {600}
+%       flgSave     - (logical) Whether to save the output struct. {false}
+%       flgPlot     - (logical) Whether to plot perturbation detection. {false}
+%       basepath    - (char) Base path for saving files. {pwd}
 %
 %   OUTPUTS:
 %       fr          - (struct) Structure containing:
@@ -36,6 +39,9 @@ addParameter(p, 'winLim', [0 Inf], @isnumeric);
 addParameter(p, 'spkThr', 4, @isnumeric);
 addParameter(p, 'sgPolyOrder', 3, @isnumeric);
 addParameter(p, 'sgFrameSec', 600, @isnumeric);
+addParameter(p, 'flgSave', false, @islogical);
+addParameter(p, 'flgPlot', false, @islogical);
+addParameter(p, 'basepath', pwd, @ischar);
 
 parse(p, spktimes, varargin{:});
 binSize = p.Results.binSize;
@@ -43,6 +49,9 @@ winLim = p.Results.winLim;
 spkThr = p.Results.spkThr;
 sgPolyOrder = p.Results.sgPolyOrder;
 sgFrameSec = p.Results.sgFrameSec;
+flgSave = p.Results.flgSave;
+flgPlot = p.Results.flgPlot;
+basepath = p.Results.basepath;
 
 
 %% ========================================================================
@@ -77,15 +86,8 @@ uGood = nSpks >= spkThr;
 %  ========================================================================
 
 % Use original data for detection, masking bad units
-frForDetect = frOrig;
-frForDetect(~uGood, :) = NaN;
-
-if any(uGood)
-    idxPert = mcu_detectPert(frOrig(uGood, :), 'binSize', binSize, ...
-        'srchStart', 4, 'srchEnd', 20, 'flgPlot', true);
-else
-    idxPert = 1;
-end
+[idxPert, tAxis] = mcu_detectPert(frOrig(uGood, :), 'binSize', binSize, ...
+    'srchStart', 1, 'srchEnd', 10, 'flgPlot', flgPlot);
 
 
 %% ========================================================================
@@ -93,7 +95,7 @@ end
 %  ========================================================================
 
 sgFrameLen = round(sgFrameSec / binSize);
-frSm = fr_denoise(frOrig, 'flgPlot', false, 'frameLen', sgFrameLen);
+frSm = fr_denoise(frOrig, 'flgPlot', false, 'frameLen', 60);
 
 
 %% ========================================================================
@@ -104,22 +106,22 @@ frSm = fr_denoise(frOrig, 'flgPlot', false, 'frameLen', sgFrameLen);
 nBins = size(frSm, 2);
 tIdx = (1:nBins) - idxPert;
 
-% Convert to initial physical time (seconds) assuming continuous bursts
-t_sec_rec = tIdx * binSize;
+% Convert to initial physical time (seconds) assuming continuous
+tSec = tIdx * binSize;
 
 % Apply corrections based on recording protocol:
 % - Baseline: 20 min saved every hour (3x scaling)
 % - Post-Perturbation: 20 min saved every two hours (6x scaling)
-t = zeros(size(t_sec_rec));
+t = zeros(size(tSec));
 
 % Pre-perturbation
-maskPre = tIdx < 0;
-t(maskPre) = t_sec_rec(maskPre) * 3;
+t(tIdx <= 0) = tSec(tIdx <= 0) * 3;
 
 % Post-perturbation (including 0)
-maskPost = tIdx >= 0;
-t(maskPost) = t_sec_rec(maskPost) * 6;
+t(tIdx > 0) = tSec(tIdx > 0) * 6;
 
+figure, plot(tIdx / 60, mean(frSm, 1, 'omitnan'))
+figure, plot(tAxis, mean(frOrig, 1, 'omitnan'))
 
 %% ========================================================================
 %  OUTPUT STRUCT
@@ -136,5 +138,10 @@ fr.info.spkThr = spkThr;
 fr.info.sgPolyOrder = sgPolyOrder;
 fr.info.sgFrameSec = sgFrameSec;
 fr.info.correctionNote = 'Time scaled x3 (pre) and x6 (post) relative to idxPert';
+
+if flgSave
+    [~, basename] = fileparts(basepath);
+    save(fullfile(basepath, [basename, '.fr.mat']), 'fr', '-v7.3');
+end
 
 end

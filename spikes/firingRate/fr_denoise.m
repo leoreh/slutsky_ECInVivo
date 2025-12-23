@@ -78,6 +78,10 @@ for iUnit = 1:nUnits
 
     % Fill small gaps (< 5 samples)
     frUnit = fillmissing(frUnit, 'linear', 'MaxGap', 4);
+    
+    if all(isnan(frUnit))
+        continue
+    end
 
     % Identify non-NaN segments
     bouts = binary2bouts('vec', ~isnan(frUnit));
