@@ -60,14 +60,11 @@ basepath = p.Results.basepath;
 
 % Filter Spikes
 if isinf(winLim(2))
-    if isempty(spktimes)
-        maxSpk = 0;
-    else
-        maxSpk = max(cellfun(@(x) max(x, [], 'omitnan'), spktimes));
-    end
+    maxSpk = max(cellfun(@(x) max([0; x(:)]), spktimes));
     winLim(2) = maxSpk;
 end
-spktimes = cellfun(@(x) x(x >= winLim(1) & x <= winLim(2)), spktimes, 'UniformOutput', false);
+spktimes = cellfun(@(x) x(x >= winLim(1) & x <= winLim(2)), spktimes, ...
+    'UniformOutput', false);
 
 % Identify good units
 if ~isempty(spktimes)

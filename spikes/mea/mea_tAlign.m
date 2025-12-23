@@ -48,25 +48,52 @@ refPath = varMap.(refVar);
 
 % Determine the maximum pre- and post-perturbation durations
 for iFile = 1:length(v)
-    % Access reference variable using helper logic (simple field access)
-    % Support nested struct access if needed (e.g. 'mea.fr')
+
+    % Access reference variable
+    % We need to find the 'info' struct. If refPath points to a field inside
+    % a struct (e.g. 'fr.fr'), we assume 'info' is a sibling (e.g. 'fr.info').
+    % If refPath is the struct itself (e.g. 'fr'), then 'info' is a child.
+
     try
-        dataRef = getFieldFromPath(v(iFile), refPath);
+        [val, parent] = getFieldAndParent(v(iFile), refPath);
     catch
-        continue; % Skip if ref var missing
+        continue;
     end
 
-    if isempty(dataRef), continue; end
+    if isempty(val), continue; end
+    iInfo = [];
+    nBins = 0;
+
+    % Strategies to find info
+    if isstruct(val) && isfield(val, 'info')
+        iInfo = val.info;
+        if isfield(val, 'fr')
+            nBins = size(val.fr, 2);
+        else
+            % Fallback if no .fr field but is struct
+            warning('Reference variable is a struct but lacks .fr field.');
+            % Try to guess size from largest numeric field? no, unsafe.
+            continue;
+        end
+    elseif isstruct(parent) && isfield(parent, 'info')
+        iInfo = parent.info;
+        % If var is specific (e.g. fr.fr), use its size
+        nBins = size(val, 2);
+    end
+
+    if isempty(iInfo)
+        warning('Could not find info struct for file %d via reference %s', iFile, refVar);
+        continue;
+    end
 
     % Check consistency of binSize
     if isempty(binSize)
-        binSize = dataRef.info.binSize;
-    elseif dataRef.info.binSize ~= binSize
-        warning('Bin size mismatch in file %d. Expected %f, got %f.', iFile, binSize, dataRef.info.binSize);
+        binSize = iInfo.binSize;
+    elseif iInfo.binSize ~= binSize
+        warning('Bin size mismatch in file %d. Expected %f, got %f.', iFile, binSize, iInfo.binSize);
     end
 
-    idxPert = dataRef.info.idxPert;
-    nBins = size(dataRef.fr, 2); % Assumes .fr field exists in reference
+    idxPert = iInfo.idxPert;
 
     nPre = idxPert - 1;
     nPost = nBins - idxPert;
@@ -119,27 +146,39 @@ varKeys = fieldnames(varMap);
 
 for iFile = 1:length(v)
 
-    % Calculates padding required for this file
-    % We need to access the reference again to know this file's specific offset
+    % --- Get Alignment Info for this File ---
     try
-        dataRef = getFieldFromPath(v(iFile), refPath);
+        [val, parent] = getFieldAndParent(v(iFile), refPath);
     catch
         continue;
     end
 
-    if isempty(dataRef), continue; end
+    if isempty(val), continue; end
 
-    idxPert = dataRef.info.idxPert;
-    nBinsRef = size(dataRef.fr, 2);
+    % Find info again (same logic as above)
+    iInfo = [];
+    nBinsRef = 0;
 
+    if isstruct(val) && isfield(val, 'info')
+        iInfo = val.info;
+        if isfield(val, 'fr')
+            nBinsRef = size(val.fr, 2);
+        end
+    elseif isstruct(parent) && isfield(parent, 'info')
+        iInfo = parent.info;
+        nBinsRef = size(val, 2);
+    end
+
+    if isempty(iInfo) || nBinsRef == 0, continue; end
+
+    idxPert = iInfo.idxPert;
     nPre = idxPert - 1;
     padPre = maxPre - nPre;
-
     currentPost = nBinsRef - idxPert;
     padPost = maxPost - currentPost;
 
 
-    % Now iterate over all variables to align
+    % --- Align All Variables ---
     for iKey = 1:length(varKeys)
         key = varKeys{iKey};
         path = varMap.(key);
@@ -152,39 +191,40 @@ for iFile = 1:length(v)
 
         if isempty(data), continue; end
 
-        % Iterate fields of the variable struct
-        flds = fieldnames(data);
-        for iFld = 1:length(flds)
-            fldName = flds{iFld};
-            val = data.(fldName);
+        % Logic based on data type
+        if isnumeric(data)
+            % If numeric, check dimensions against reference bins
+            if size(data, 2) == nBinsRef
+                nRows = size(data, 1);
+                valAligned = [nan(nRows, padPre), data, nan(nRows, padPost)];
+                v(iFile) = setFieldFromPath(v(iFile), path, valAligned);
+            end
 
-            % Check name first to prioritize time vector replacement
-            if strcmp(fldName, 't') || strcmp(fldName, 'time')
-                % Replace time vector
-                data.(fldName) = tGlobal;
+        elseif isstruct(data)
+            % If struct, iterate fields (Legacy / Whole-Struct Mode)
+            flds = fieldnames(data);
+            for iFld = 1:length(flds)
+                fldName = flds{iFld};
+                val = data.(fldName);
 
-                % Check if it matches reference bins (numeric matrix)
-                % Dims: (nUnits x nBins) or (1 x nBins)
-            elseif isnumeric(val) && ~isempty(val) && size(val, 2) == nBinsRef
+                % Check name first to prioritize time vector replacement
+                if strcmp(fldName, 't') || strcmp(fldName, 'time')
+                    data.(fldName) = tGlobal;
 
-                nRows = size(val, 1);
+                elseif isnumeric(val) && ~isempty(val) && size(val, 2) == nBinsRef
+                    nRows = size(val, 1);
+                    valAligned = [nan(nRows, padPre), val, nan(nRows, padPost)];
+                    data.(fldName) = valAligned;
 
-                % Pad
-                valAligned = [nan(nRows, padPre), val, nan(nRows, padPost)];
-                data.(fldName) = valAligned;
-
-            elseif strcmp(fldName, 'info')
-                % Update info if it's the reference variable
-                if strcmp(key, refVar)
+                elseif strcmp(fldName, 'info') && strcmp(key, refVar)
                     data.info.idxPert = globalIdxPert;
                     data.info.tAlign = true;
                 end
             end
+
+            % Update struct in v
+            v(iFile) = setFieldFromPath(v(iFile), path, data);
         end
-
-        % Put data back into v
-        v(iFile) = setFieldFromPath(v(iFile), path, data);
-
     end
 end
 
@@ -198,6 +238,17 @@ function val = getFieldFromPath(s, path)
 parts = strsplit(path, '.');
 val = s;
 for i = 1:length(parts)
+    val = val.(parts{i});
+end
+end
+
+function [val, parent] = getFieldAndParent(s, path)
+% Returns value and its immediate parent
+parts = strsplit(path, '.');
+val = s;
+parent = [];
+for i = 1:length(parts)
+    parent = val;
     val = val.(parts{i});
 end
 end

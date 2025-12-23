@@ -121,7 +121,7 @@ for ifile = 1 : nfiles
         timepnt(ifile) = nan;
     end
     recLen = floor(v(ifile).session.general.duration);
-    timebins(ifile, :, :) = n2chunks('n', recLen, 'nchunks', nbins, 'pnts', []);
+    timebins(ifile, :, :) = n2chunks('n', recLen, 'nchunks', nbins);
 
     for ibin = 1 : nbins
         for istate = 1 : nstates

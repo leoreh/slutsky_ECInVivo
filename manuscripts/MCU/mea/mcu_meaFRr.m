@@ -1,12 +1,11 @@
 
 %% ========================================================================
-%  SELECT BURST PARAMS
+%  INSPECT BURST PARAMS
 %  ========================================================================
 
 basepaths = [mcu_basepaths('mea_bac')];
 vars = {'mea'};
 v = basepaths2vars('basepaths', basepaths, 'vars', vars);
-nFiles = length(basepaths);
 
 mea = catfields([v(:).mea], 2);
 spktimes = mea.spktimes;
@@ -19,13 +18,14 @@ isiVal = brst_isiValley(spktimes, 'nSpks', 3);
 
 
 %% ========================================================================
-%  ANALYSIS
+%  PER FILE ANALYSIS
 %  ========================================================================
 
 % Files
-basepaths = [mcu_basepaths('mea_bac')];
-vars = {'mea'};
+basepaths = [mcu_basepaths('mea_bac'), mcu_basepaths('mea_mcuko')];
+vars = {'mea', 'fr'};
 v = basepaths2vars('basepaths', basepaths, 'vars', vars);
+nFiles = length(basepaths);
 
 % Params
 isiVal = 0.05;
@@ -34,7 +34,8 @@ binSize = 60;
 
 close all
 for iFile = 1 : nFiles
-
+    
+    % File
     basepath = basepaths{iFile};
     cd(basepath);
 
@@ -48,66 +49,93 @@ for iFile = 1 : nFiles
         spktimes, 'UniformOutput', false);
 
     % Firing rate
-    fr = mea_frPrep(spktimes, 'binSize', binSize, ...
-        'flgSave', true, 'flgPlot', false);
+    % fr = mea_frPrep(spktimes, 'binSize', binSize, ...
+    %     'flgSave', true, 'flgPlot', true);
     
     % Burst detection
-    brst = brst_maxInt(spktimes, ...
-        'minSpks', 3, ...
-        'maxISI_start', isiVal, ...
-        'maxISI_end', isiVal * 2, ...
-        'minDur', 0.015, ...
-        'minIBI', 0.1, ...
-        'flgForce', true, 'flgSave', true, 'flgPlot', false);
-    
+    % brst = brst_maxInt(spktimes, ...
+    %     'minSpks', 3, ...
+    %     'maxISI_start', isiVal, ...
+    %     'maxISI_end', isiVal * 2, ...
+    %     'minDur', 0.015, ...
+    %     'minIBI', 0.1, ...
+    %     'flgForce', true, 'flgSave', true, 'flgPlot', false);
+
     % Burst temporal dynamics
-    dyn = brst_dynamics(brst, spktimes, 'binSize', 60, 'kernelSD', 300, ...
-                'binSize', binSize, 'flgSave', true, 'flgPlot', true);
-
+    % dyn = brst_dynamics(brst, spktimes, 'binSize', 60, 'kernelSD', 300, ...
+    %     'binSize', binSize, 'flgSave', true, 'flgPlot', false); 
+    
+    rcv = mea_frRecovery(v(iFile).fr.t, v(iFile).fr.fr, ...
+        'binSize', binSize, 'flgSave', true);
+   
 end
 
 
-fr = mea_tAlign(basepaths, 'flgSave', true);
 
-% Load data 
-grps = {'mea_bac'; 'mea_mcuko'};
-grpLbls = {'Control'; 'MCU-KO'};
-vars = {'mea', 'fr'};
+%% ========================================================================
+%  PREP TABLE
+%  ========================================================================
 
-clear varMap
-varMap.uGood = 'fr.uGood';
+%  ALIGN TEMPORAL DATA
+
+% Load
+basepaths = [mcu_basepaths('mea_bac'), mcu_basepaths('mea_mcuko')];
+vars = {'fr', 'brstDyn', 'brst', 'rcv'};
+v = basepaths2vars('basepaths', basepaths, 'vars', vars);
+nFiles = length(basepaths);
+
+% Cfg
+cfg = mcu_cfg;
+
+% Vars to align
 varMap.fr = 'fr.fr';
+varMap.bRate = 'brstDyn.rate';
+varMap.bDur = 'brstDyn.dur';
+varMap.bFreq = 'brstDyn.freq';
+varMap.bIBI = 'brstDyn.ibi';
+varMap.bFrac = 'brstDyn.bfrac';
+
+% Align
+[v, t] = mea_tAlign(v, 'varMap', varMap);
+
+% Unit vars
+varMap.uGood = 'fr.uGood';
+varMap.uRcv = 'rcv.uRcv';
+varMap.uPert = 'rcv.uPert';
+
+% Additional non-temporal vars
+varMap
 
 
-clear tblCell
-for iGrp = 1
 
-    % Load data for this group
-    basepaths = mcu_basepaths(grps{iGrp});
-    v = basepaths2vars('basepaths', basepaths, 'vars', vars);
+% Tag structures
+tagFiles.Name = get_mname(basepaths, 0);
+tagFiles.Group = repmat(cfg.lbl.grp(1), 1, nFiles);
+tagFiles.Group(contains(tagFiles.Name, 'KO')) = cfg.lbl.grp(2);
 
-    % Prepare tag structures for v2tbl
-    tagAll.Group = grpLbls{iGrp};
-    tagFiles.Name = get_mname(basepaths, 0);
+% Table
+tbl = v2tbl('v', v, 'varMap', varMap,...
+    'tagFiles', tagFiles, 'tagAll', tagAll);
 
-    % Create table using new flexible approach
-    tblCell{iGrp} = v2tbl('v', v, 'varMap', varMap,...
-        'tagFiles', tagFiles, 'tagAll', tagAll);
-end
-tbl = vertcat(tblCell{:});
+% Clean bad units
+tbl(~tbl.uPert, :) = [];
+tbl(~tbl.uGood, :) = [];
 
-tblGUI_xy(v(10).fr.t / 3600, tbl);
+% Plot time gui
+tblGUI_xy(t / 3600, tbl);
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% ANALYZE
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%%%
-% IMPORTANT 01-NOV-25
-% MAX MIA RECORDINGS SKIP EVERY OTHER HOUR ONCE RECORDING STARTS
 
-%%%
+
+
+
+
+
+
+%% ========================================================================
+%  LEGACY
+%  ========================================================================
 
 % PRC Params
 clear prcParams
@@ -118,6 +146,11 @@ prcParams.winStpr = 1.0;               % 1s window
 prcParams.nShuffles = 1000;            % Number of shuffles
 prcParams.spkLim = 2000;
 prcParams.shuffleMet = 'raster';
+
+% --- Population Coupling
+[prc] = prCoupling(spktimes, prcParams, 'flgSave', true);
+prCoupling_plot(prc, 'basepath', basepath, 'flgSaveFig', true);
+
 
 % Files
 % basepaths = mcu_basepaths('mea_mk801');
@@ -159,10 +192,9 @@ for iFile = 1 : nFiles
     % --- Bursts
     brst = brst_maxInt(spktimes,...
         'flgForce', true, 'flgSave', false, 'flgPlot', true);
+    
+    
 
-    % % --- Population Coupling
-    % [prc] = prCoupling(spktimes, prcParams, 'flgSave', true);
-    % prCoupling_plot(prc, 'basepath', basepath, 'flgSaveFig', true);
 
 end
 
@@ -603,7 +635,7 @@ lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat'});
 % Since the primary question concerns genotypes, only test interactions
 % between predictors and group (rather then between predictors). Due to
 % collinearity, I only use BSpks as a measure of brustiness because it is
-% the only one not correlation with bslFr.
+% the only one not correlated with bslFr.
 
 % I only apply z score when using contineous predictors for easier
 % interpretation. with only grouping variables (when means are compared) I

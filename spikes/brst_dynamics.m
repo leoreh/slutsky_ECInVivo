@@ -73,8 +73,11 @@ for iUnit = 1:nUnits
     end
 end
 
-% Time vector
-t = 0 : binSize : ceil(maxTime);
+% Time vector (excluding tail)
+chunks = n2chunks('n', maxTime, 'chunksize', binSize, 'lastChunk', 'exclude');
+t = chunks(:, 1)' - 1;            % Bin starts
+t_edges = [t, chunks(end, 2)];    % Bin edges
+
 nTime = length(t);
 
 % Initialize Matrices (nUnits x nTime)
@@ -111,7 +114,7 @@ for iUnit = 1:nUnits
 
     % Burst Rate
     onsets = b_struct.times(:, 1);
-    bCounts = histcounts(onsets, [t, inf]);
+    bCounts = histcounts(onsets, t_edges);
     % conv produces row vector if bCounts is row
     rawRate = conv(bCounts, kernel, 'same') / binSize;
     dyn.rate(iUnit, :) = rawRate;
@@ -125,9 +128,9 @@ for iUnit = 1:nUnits
     end
     st_burst = st(isBurstSpike);
 
-    allCounts = histcounts(st, [t, inf]);
+    allCounts = histcounts(st, t_edges);
     densAll = conv(allCounts, kernel, 'same') / binSize;
-    brstCounts = histcounts(st_burst, [t, inf]);
+    brstCounts = histcounts(st_burst, t_edges);
     densBrst = conv(brstCounts, kernel, 'same') / binSize;
 
     frac = zeros(size(densAll));
