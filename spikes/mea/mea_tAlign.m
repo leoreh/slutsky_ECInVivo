@@ -1,115 +1,131 @@
-function [v, tGlobal] = mea_tAlign(v, varargin)
+function [v, tGlobal] = mea_tAlign(v, varMap, pertMap, flgEdge)
 % MEA_TALIGN Aligns firing rate matrices and other variables to perturbation onset.
 %
-%   [v, t] = MEA_TALIGN(v, ...) receives a struct array 'v' (output of
-%   basepaths2vars) and aligns specified variables such that the
-%   perturbation index (idxPert) is identical across all files. It also
-%   returns a global time vector 't'.
+%   [v, t] = MEA_TALIGN(v, varMap, pertMap, flgEdge) receives a struct array
+%   'v' and aligns specified variables such that the perturbation index
+%   (idxPert) is identical across all files. It also returns a global time
+%   vector 't'.
 %
 %   INPUTS:
 %       v           - (struct array) Data structure containing variables to align.
-%
-%   OPTIONAL (Key-Value Pairs):
 %       varMap      - (struct) Mapping of variable names to align.
 %                     Fields are arbitrary names, values are paths in 'v'.
 %                     Example: varMap.fr = 'mea.fr'; varMap.dyn = 'dyn';
-%                     Default: assumes 'fr' exists in v.
-%       refVar      - (char) Key in varMap to use as reference for idxPert.
-%                     Default: 'fr'.
+%       pertMap     - (char) Path to the perturbation index variable in 'v'.
+%                     Example: 'fr.info.idxPert'.
+%       flgEdge     - (logical, optional)
+%                     If true (default): Intersection alignment. Clips data to
+%                     the latest start and earliest end times across all files.
+%                     Values before the latest start or after the earliest end
+%                     are discarded.
+%                     If false: Union alignment. Pads shorter files with NaNs
+%                     to match the earliest start and latest end times.
 %
 %   OUTPUTS:
 %       v           - (struct array) Updated struct with aligned fields.
 %       tGlobal     - (vector) Global time vector [seconds].
 %
-%   See also: MVP_FRPREP, BASEPATHS2VARS
+%   See also: MEA_FRPREP, BASEPATHS2VARS
+
+if nargin < 4 || isempty(flgEdge)
+    flgEdge = true;
+end
 
 %% ========================================================================
-%  ARGUMENTS
-%  ========================================================================
-
-p = inputParser;
-addRequired(p, 'v', @isstruct);
-addParameter(p, 'varMap', struct('fr', 'fr'), @isstruct);
-addParameter(p, 'refVar', 'fr', @ischar);
-
-parse(p, v, varargin{:});
-varMap = p.Results.varMap;
-refVar = p.Results.refVar;
-
-
-%% ========================================================================
-%  ANALYZE ALIGNMENT
+%  ANALYZE ALIGNMENT DIMENSIONS
 %  ========================================================================
 
 maxPre = 0;
 maxPost = 0;
+minPre = inf;
+minPost = inf;
 binSize = [];
-refPath = varMap.(refVar);
 
-% Determine the maximum pre- and post-perturbation durations
+% Determine the pre- and post-perturbation durations for all files
 for iFile = 1:length(v)
 
-    % Access reference variable
-    % We need to find the 'info' struct. If refPath points to a field inside
-    % a struct (e.g. 'fr.fr'), we assume 'info' is a sibling (e.g. 'fr.info').
-    % If refPath is the struct itself (e.g. 'fr'), then 'info' is a child.
-
-    try
-        [val, parent] = getFieldAndParent(v(iFile), refPath);
-    catch
+    % Access perturbation index
+    idxPert = getFieldFromPath(v(iFile), pertMap);
+    if isempty(idxPert)
+        warning('Could not find idxPert for file %d at %s', iFile, pertMap);
         continue;
     end
 
-    if isempty(val), continue; end
-    iInfo = [];
-    nBins = 0;
-
-    % Strategies to find info
-    if isstruct(val) && isfield(val, 'info')
-        iInfo = val.info;
-        if isfield(val, 'fr')
-            nBins = size(val.fr, 2);
-        else
-            % Fallback if no .fr field but is struct
-            warning('Reference variable is a struct but lacks .fr field.');
-            % Try to guess size from largest numeric field? no, unsafe.
-            continue;
-        end
-    elseif isstruct(parent) && isfield(parent, 'info')
-        iInfo = parent.info;
-        % If var is specific (e.g. fr.fr), use its size
-        nBins = size(val, 2);
-    end
-
-    if isempty(iInfo)
-        warning('Could not find info struct for file %d via reference %s', iFile, refVar);
-        continue;
-    end
-
-    % Check consistency of binSize
+    % Attempt to find binSize (assume sibling of idxPert)
     if isempty(binSize)
-        binSize = iInfo.binSize;
-    elseif iInfo.binSize ~= binSize
-        warning('Bin size mismatch in file %d. Expected %f, got %f.', iFile, binSize, iInfo.binSize);
+        parts = strsplit(pertMap, '.');
+        if length(parts) > 1
+            infoPath = strjoin(parts(1:end-1), '.');
+            iInfo = getFieldFromPath(v(iFile), infoPath);
+            if isstruct(iInfo) && isfield(iInfo, 'binSize')
+                binSize = iInfo.binSize;
+            end
+        end
     end
 
-    idxPert = iInfo.idxPert;
+    % Determine nBins from the first valid numeric variable in varMap
+    nBins = 0;
+    varKeys = fieldnames(varMap);
+    for k = 1:length(varKeys)
+        path = varMap.(varKeys{k});
+        val = getFieldFromPath(v(iFile), path);
 
-    nPre = idxPert - 1;
-    nPost = nBins - idxPert;
-
-    if nPre > maxPre
-        maxPre = nPre;
+        if isnumeric(val) && ~isempty(val)
+            nBins = size(val, 2);
+            break;
+        elseif isstruct(val)
+            % Try to find existing numeric fields inside struct (e.g. .fr)
+            flds = fieldnames(val);
+            for f=1:length(flds)
+                dd = val.(flds{f});
+                if isnumeric(dd) && ~isempty(dd) && size(dd, 2) > 1
+                    nBins = size(dd, 2);
+                    break;
+                end
+            end
+            if nBins > 0, break; end
+        end
     end
 
-    if nPost > maxPost
-        maxPost = nPost;
+    if nBins == 0
+        warning('Could not determine nBins for file %d', iFile);
+        continue;
     end
+
+    % Logic:
+    % pre-pert bins: 1 to (idxPert - 1) -> Count is idxPert - 1
+    % post-pert bins: idxPert to nBins  -> Count is nBins - idxPert + 1 (Wait)
+    % Convention: idxPert is the index of the perturbation bin (t=0 or first post bin).
+    % Usually idxPert is the first bin of the "post" epoch.
+    % So Pre bins = idxPert - 1.
+    % Post bins = nBins - idxPert + 1. (Including the perturbation bin itself).
+    % Let's stick to simple "bins before" and "bins including/after".
+
+    currentPre = idxPert - 1;
+    currentPost = nBins - idxPert + 1; % Include the pert bin in post count for convenience
+
+    if currentPre > maxPre, maxPre = currentPre; end
+    if currentPost > maxPost, maxPost = currentPost; end
+
+    if currentPre < minPre, minPre = currentPre; end
+    if currentPost < minPost, minPost = currentPost; end
 end
 
-% Calculate global dimensions
-globalNBins = maxPre + 1 + maxPost;
-globalIdxPert = maxPre + 1;
+% Set Target Dimensions based on flgEdge
+if flgEdge
+    % INTERSECTION: Smallest common window
+    targetPre = minPre;
+    targetPost = minPost;
+else
+    % UNION: Largest window
+    targetPre = maxPre;
+    targetPost = maxPost;
+end
+
+% Global Total Bins
+globalNBins = targetPre + targetPost;
+% Global Index of Perturbation
+globalIdxPert = targetPre + 1;
 
 
 %% ========================================================================
@@ -118,24 +134,23 @@ globalIdxPert = maxPre + 1;
 
 if isempty(binSize)
     tGlobal = [];
-    warning('No valid reference data found.');
-    return;
+    warning('No valid binSize found. Cannot create global time vector.');
+else
+    % Create 0-centered index vector
+    tIdx = (1:globalNBins) - globalIdxPert;
+
+    % Convert to initial physical time (seconds)
+    tSec = tIdx * binSize;
+
+    % Apply corrections (matching logic in mea_frPrep)
+    tGlobal = zeros(size(tSec));
+
+    % Pre-perturbation (x3 scaling)
+    tGlobal(tIdx < 0) = tSec(tIdx < 0) * 3;
+
+    % Post-perturbation (x6 scaling)
+    tGlobal(tIdx >= 0) = tSec(tIdx >= 0) * 6;
 end
-
-% Create 0-centered index vector
-tIdx = (1:globalNBins) - globalIdxPert;
-
-% Convert to initial physical time (seconds)
-tSec = tIdx * binSize;
-
-% Apply corrections (matching logic in mea_frPrep)
-tGlobal = zeros(size(tSec));
-
-% Pre-perturbation (x3 scaling)
-tGlobal(tIdx < 0) = tSec(tIdx < 0) * 3;
-
-% Post-perturbation (x6 scaling)
-tGlobal(tIdx >= 0) = tSec(tIdx >= 0) * 6;
 
 
 %% ========================================================================
@@ -146,62 +161,83 @@ varKeys = fieldnames(varMap);
 
 for iFile = 1:length(v)
 
-    % --- Get Alignment Info for this File ---
-    try
-        [val, parent] = getFieldAndParent(v(iFile), refPath);
-    catch
-        continue;
-    end
+    % Get idxPert
+    idxPert = getFieldFromPath(v(iFile), pertMap);
+    if isempty(idxPert), continue; end
 
-    if isempty(val), continue; end
-
-    % Find info again (same logic as above)
-    iInfo = [];
+    % Need reference nBins for this file to know where it ends
+    % (Re-detect nBinsRef same way as above)
     nBinsRef = 0;
-
-    if isstruct(val) && isfield(val, 'info')
-        iInfo = val.info;
-        if isfield(val, 'fr')
-            nBinsRef = size(val.fr, 2);
+    for k = 1:length(varKeys)
+        path = varMap.(varKeys{k});
+        val = getFieldFromPath(v(iFile), path);
+        if isnumeric(val) && ~isempty(val)
+            nBinsRef = size(val, 2);
+            break;
+        elseif isstruct(val)
+            flds = fieldnames(val);
+            for f=1:length(flds)
+                dd = val.(flds{f});
+                if isnumeric(dd) && ~isempty(dd) && size(dd, 2) > 1
+                    nBinsRef = size(dd, 2);
+                    break;
+                end
+            end
+            if nBinsRef > 0, break; end
         end
-    elseif isstruct(parent) && isfield(parent, 'info')
-        iInfo = parent.info;
-        nBinsRef = size(val, 2);
     end
 
-    if isempty(iInfo) || nBinsRef == 0, continue; end
+    if nBinsRef == 0, continue; end
 
-    idxPert = iInfo.idxPert;
-    nPre = idxPert - 1;
-    padPre = maxPre - nPre;
-    currentPost = nBinsRef - idxPert;
-    padPost = maxPost - currentPost;
+    % Calculate extraction indices relative to THIS file's idxPert
+    % We want [idxPert - targetPre, ..., idxPert + targetPost - 1]
+    % (Note: targetPost included bin 0 so -1 if we just sum counts)
+
+    startIdx = idxPert - targetPre;
+    endIdx = idxPert + targetPost - 1;
+
+    % If flgEdge=false (UNION), these indices might be Out Of Bounds.
+    % We need to pad.
+
+    padLeft = 0;
+    padRight = 0;
+    validStart = startIdx;
+    validEnd = endIdx;
+
+    if startIdx < 1
+        padLeft = 1 - startIdx;
+        validStart = 1;
+    end
+
+    if endIdx > nBinsRef
+        padRight = endIdx - nBinsRef;
+        validEnd = nBinsRef;
+    end
 
 
     % --- Align All Variables ---
     for iKey = 1:length(varKeys)
         key = varKeys{iKey};
         path = varMap.(key);
-
-        try
-            data = getFieldFromPath(v(iFile), path);
-        catch
-            continue;
-        end
+        data = getFieldFromPath(v(iFile), path);
 
         if isempty(data), continue; end
 
-        % Logic based on data type
         if isnumeric(data)
-            % If numeric, check dimensions against reference bins
+            % If numeric, check dimensions
             if size(data, 2) == nBinsRef
+                % Slice valid part
+                valSlice = data(:, validStart:validEnd);
+
+                % Pad
                 nRows = size(data, 1);
-                valAligned = [nan(nRows, padPre), data, nan(nRows, padPost)];
+                valAligned = [nan(nRows, padLeft), valSlice, nan(nRows, padRight)];
+
                 v(iFile) = setFieldFromPath(v(iFile), path, valAligned);
             end
 
         elseif isstruct(data)
-            % If struct, iterate fields (Legacy / Whole-Struct Mode)
+            % If struct, iterate fields
             flds = fieldnames(data);
             for iFld = 1:length(flds)
                 fldName = flds{iFld};
@@ -212,13 +248,17 @@ for iFile = 1:length(v)
                     data.(fldName) = tGlobal;
 
                 elseif isnumeric(val) && ~isempty(val) && size(val, 2) == nBinsRef
+
+                    valSlice = val(:, validStart:validEnd);
                     nRows = size(val, 1);
-                    valAligned = [nan(nRows, padPre), val, nan(nRows, padPost)];
+                    valAligned = [nan(nRows, padLeft), valSlice, nan(nRows, padRight)];
+
                     data.(fldName) = valAligned;
 
-                elseif strcmp(fldName, 'info') && strcmp(key, refVar)
-                    data.info.idxPert = globalIdxPert;
-                    data.info.tAlign = true;
+                elseif isstruct(val) && isfield(val, 'idxPert')
+                    % Update idxPert
+                    data.(fldName).idxPert = globalIdxPert;
+                    data.(fldName).tAlign = true;
                 end
             end
 
@@ -238,18 +278,12 @@ function val = getFieldFromPath(s, path)
 parts = strsplit(path, '.');
 val = s;
 for i = 1:length(parts)
-    val = val.(parts{i});
-end
-end
-
-function [val, parent] = getFieldAndParent(s, path)
-% Returns value and its immediate parent
-parts = strsplit(path, '.');
-val = s;
-parent = [];
-for i = 1:length(parts)
-    parent = val;
-    val = val.(parts{i});
+    if isstruct(val) && isfield(val, parts{i})
+        val = val.(parts{i});
+    else
+        val = [];
+        return;
+    end
 end
 end
 
@@ -262,6 +296,9 @@ function s = setFieldRecursive(s, parts, val)
 if length(parts) == 1
     s.(parts{1}) = val;
 else
+    if ~isfield(s, parts{1})
+        s.(parts{1}) = struct();
+    end
     s.(parts{1}) = setFieldRecursive(s.(parts{1}), parts(2:end), val);
 end
 end

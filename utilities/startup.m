@@ -7,7 +7,9 @@
 %
 % 18 nov 19 LH
 
-matlabpath(pathdef)
+if ~isdeployed
+    matlabpath(pathdef)
+end
 
 % command line formatting
 format compact
@@ -25,9 +27,6 @@ clc
 if feature('IsDebugMode')
     dbquit all
 end
-
-% change garphics defaults to more aesthethic 
-setMatlabGraphics(true)
 
 % Get rid of warning about directory already existing:
 % "Warning: Directory already exists."

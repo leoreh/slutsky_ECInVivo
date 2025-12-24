@@ -28,7 +28,7 @@ function hFig = tblGUI_scatHist(tbl, varargin)
 %  ========================================================================
 p = inputParser;
 addRequired(p, 'tbl', @istable);
-addParameter(p, 'varsExclude', {'UnitID', 'Name', 'Mouse', 'File'}, @iscell);
+addParameter(p, 'varsExclude', {'UnitID', 'Mouse', 'File'}, @iscell);
 addParameter(p, 'xVar', '', @(x) ischar(x) || isstring(x) || isempty(x));
 addParameter(p, 'yVar', '', @(x) ischar(x) || isstring(x) || isempty(x));
 addParameter(p, 'szVar', '', @(x) ischar(x) || isstring(x) || isempty(x));

@@ -1,7 +1,7 @@
-function brst = brst_maxInt(spktimes, varargin)
-% BRST_MAXINT Detects bursts using the Max Interval method.
+function brst = brst_detect(spktimes, varargin)
+% BRST_DETECT Detects bursts using the Max Interval method.
 %
-%   brst = BRST_MAXINT(SPKTIMES, ...) implements the Max Interval burst
+%   brst = BRST_DETECT(SPKTIMES, ...) implements the Max Interval burst
 %   detection algorithm, defined by fixed thresholds for inter-spike
 %   intervals (ISIs) and burst properties.
 %
@@ -23,9 +23,9 @@ function brst = brst_maxInt(spktimes, varargin)
 %                     'flgForce'     : (log) Analyze even if exists {false}
 %
 %   OUTPUTS:
-%       brst        - (struct) Burst statistics and event data.
-%                     Fields: detect, nspks, brstDur, freq, bspks, ibi, all.
-%                     (All vector fields are nUnits x 1 column vectors)
+%       brst        - (struct) Burst event data.
+%                     Fields: all (cell array of structs per unit).
+%                     Brst.info contains run parameters.
 %
 
 %% ========================================================================
@@ -71,17 +71,10 @@ end
 nunits = length(spktimes);
 
 % Initialize output structure
-% CHANGED: Ensure column vectors (nUnits x 1)
 brst.info.runtime   = datetime("now");
 brst.info.algorithm = 'MaxInterval';
 brst.info.input     = p.Results;
 
-brst.detect         = zeros(nunits, 1);
-brst.nspks          = nan(nunits, 1);
-brst.brstDur        = nan(nunits, 1);
-brst.freq           = nan(nunits, 1);
-brst.bspks          = zeros(nunits, 1);
-brst.ibi            = nan(nunits, 1);
 brst.all            = cell(nunits, 1);
 
 % For plotting
@@ -233,14 +226,6 @@ for iunit = 1 : nunits
         b_struct.ibi(2:end) = fl_times(2:end, 1) - fl_times(1:end-1, 2);
     end
 
-    total_spikes_in_bursts = sum(b_struct.nspks);
-
-    brst.detect(iunit)  = nb;
-    brst.nspks(iunit)   = mean(b_struct.nspks);
-    brst.brstDur(iunit) = mean(b_struct.dur);
-    brst.freq(iunit)    = mean(b_struct.freq);
-    brst.bspks(iunit)   = total_spikes_in_bursts / length(st);
-    brst.ibi(iunit)     = mean(b_struct.ibi, 'omitnan');
     brst.all{iunit}     = b_struct;
 end
 
@@ -327,7 +312,7 @@ end     % EOF
 %  ========================================================================
 
 %% ========================================================================
-%  NOTE: MINIMUM SPIKE COUNT (minSpks)
+%  NOTE: MINSPKS
 %  ========================================================================
 % The choice of `minSpks = 3` is a structural requirement that ensures
 % detected events possess a true internal frequency. A two-spike event
@@ -428,19 +413,6 @@ end     % EOF
 %  ========================================================================
 
 %% ========================================================================
-%  NOTE: PARAMETER DIVERSITY
-%  ========================================================================
-% The default Max Interval (MI) threshold of 170ms (~6 Hz) used in
-% Cotterill et al. (2016) was optimized for mouse RGCs and human iPSC
-% networks, which exhibit significantly lower burst prevalence and higher
-% variability than rodent hippocampal cultures.
-%
-% In hippocampal preparations, the "natural valley" separating bursts
-% from tonic activity typically occurs at a much higher frequency
-% (e.g., ~76 Hz or 13ms).
-%  ========================================================================
-
-%% ========================================================================
 %  NOTE: BRST_MEA
 %  ========================================================================
 %  This function can be configured to replicate the behavior of standard
@@ -456,3 +428,65 @@ end     % EOF
 %    brst = brst_maxInt(spktimes, 'maxISI_start', 0.02, 'maxISI_end', 0.02, ...
 %           'minIBI', 0, 'minDur', 0, 'minSpks', 2);
 %  ========================================================================
+
+%% ========================================================================
+%  NOTE: STRUCTURAL (EVENT-BASED) VS. KINETIC (DENSITY) ANALYSIS
+%  ========================================================================
+%  Analyzing burst data requires choosing between two distinct methods:
+%  structural analysis, which focuses on individual events, and kinetic
+%  analysis, which focuses on continuous time-varying density. Choosing
+%  between them determines whether the resulting data reflects the physical
+%  shape of a burst or the prevailing state of the neuronal network over
+%  time.
+%
+%  STRUCTURAL ANALYSIS (EVENT-BASED)
+%  Structural analysis treats every detected burst as a single,
+%  equivalent data point regardless of when it occurs. This
+%  method is used to calculate the physical geometry of bursts, such as
+%  average duration, spikes per burst, and internal frequency.
+%  Because each event carries the same weight, this approach provides
+%  the most accurate measurement of how a burst is built.
+%
+%  * Measures physical burst shape.
+%  * Weights every burst equally.
+%  * Best for baseline characterization.
+%  * Ignores time between events.
+%
+%  KINETIC ANALYSIS (DENSITY-BASED)
+%  Kinetic analysis converts discrete bursts into a continuous time-series
+%  using Gaussian kernels and interpolation. This transforms
+%  burst events into a "state estimate" that exists for every time bin
+%  of the recording. This approach is necessary for comparing
+%  bursting behavior directly to firing rate recovery or other
+%  time-varying signals on a synchronized global grid.
+%
+%  * Measures time-varying network state.
+%  * Weights events by duration.
+%  * Synchronizes units across time.
+%  * Best for recovery modeling.
+%
+%  THE DURATION BIAS IN KINETIC METRICS
+%  A significant difference between these methods is how they handle
+%  burst length. Kinetic analysis samples property values from a
+%  continuous trace. A long burst occupies more time bins than
+%  a short burst, meaning it contributes more to the final average
+%  value. While this is helpful for measuring the "total
+%  impact" of bursting on a network, it is mathematically biased if the
+%  goal is to measure the average physical size of individual events.
+%
+%  * Long bursts dominate density.
+%  * Short bursts are diluted.
+%  * Creates time-weighted state estimates.
+%
+%  STATE MASKING AND SILENCE
+%  Kinetic analysis uses adaptive masking based on the Inter-Burst Interval
+%  (IBI) to handle periods where a unit stops bursting. If a unit is silent
+%  for longer than its expected interval, the density trace becomes NaN.
+%  This allows statistical models to identify that the bursting "state" has
+%  ended, whereas structural analysis simply runs out of events to average.
+%
+%  * Identifies burst-state dropout.
+%  * Prevents zero-duration artifacts.
+%  * Uses adaptive IBI percentiles.
+%  ========================================================================
+
