@@ -341,15 +341,8 @@ for iFile = 1 : nFiles
     
     % % --- Bursts
     % brst = brst_mea(spktimes, 'binsize', [], 'isiThr', 0.02,...
-    %     'minSpks', 2, 'flgSave', true, 'flgForce', true, 'bins', stWin);
+    %     'minSpks', 2, 'flgSave', true, 'flgForce', true, 'bins', stWin);    
     
-    % --- Bursts
-    brst = brst_maxInt(spktimes,...
-        'flgForce', true, 'flgSave', false, 'flgPlot', true);
-    
-    
-
-
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

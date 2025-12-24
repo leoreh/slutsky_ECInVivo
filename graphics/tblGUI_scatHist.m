@@ -162,26 +162,36 @@ linkaxes([guiData.hAxScatter, guiData.hAxHistY], 'y');
 ctlTop = 0.95;
 ctlH = 0.04;
 ctlGap = 0.01;
-ctlW = panelW - 0.02;
+ctlW = panelW - 0.02;     % Full width for labels/some controls
+ctlW_Half = ctlW / 2 - 0.005; % Half width for split controls
 ctlX = 0.01;
+ctlX_Right = ctlX + ctlW_Half + 0.01;
 
 % X Var
-uicontrol('Parent', hContainer, 'Style', 'text', 'String', 'X Variable:', ...
+uicontrol('Parent', hContainer, 'Style', 'text', 'String', 'X Variable / Scale:', ...
     'Units', 'normalized', 'Position', [ctlX, ctlTop - ctlH, ctlW, ctlH*0.7], ...
     'HorizontalAlignment', 'left', 'FontWeight', 'bold');
 guiData.ddX = uicontrol('Parent', hContainer, 'Style', 'popupmenu', ...
     'String', numericVars, 'Units', 'normalized', ...
-    'Position', [ctlX, ctlTop - 2*ctlH, ctlW, ctlH], ...
+    'Position', [ctlX, ctlTop - 2*ctlH, ctlW_Half, ctlH], ...
+    'Callback', @onUpdatePlot);
+guiData.ddXScale = uicontrol('Parent', hContainer, 'Style', 'popupmenu', ...
+    'String', {'Linear', 'Log'}, 'Units', 'normalized', ...
+    'Position', [ctlX_Right, ctlTop - 2*ctlH, ctlW_Half, ctlH], ...
     'Callback', @onUpdatePlot);
 
 % Y Var
 currYTop = ctlTop - 2*ctlH - ctlGap - ctlH;
-uicontrol('Parent', hContainer, 'Style', 'text', 'String', 'Y Variable:', ...
+uicontrol('Parent', hContainer, 'Style', 'text', 'String', 'Y Variable / Scale:', ...
     'Units', 'normalized', 'Position', [ctlX, currYTop, ctlW, ctlH*0.7], ...
     'HorizontalAlignment', 'left', 'FontWeight', 'bold');
 guiData.ddY = uicontrol('Parent', hContainer, 'Style', 'popupmenu', ...
     'String', numericVars, 'Units', 'normalized', ...
-    'Position', [ctlX, currYTop - ctlH, ctlW, ctlH], ...
+    'Position', [ctlX, currYTop - ctlH, ctlW_Half, ctlH], ...
+    'Callback', @onUpdatePlot);
+guiData.ddYScale = uicontrol('Parent', hContainer, 'Style', 'popupmenu', ...
+    'String', {'Linear', 'Log'}, 'Units', 'normalized', ...
+    'Position', [ctlX_Right, currYTop - ctlH, ctlW_Half, ctlH], ...
     'Callback', @onUpdatePlot);
 
 % Size Var
@@ -420,17 +430,17 @@ onUpdatePlot(hContainer, []);
             groups = rawGrp;
             grpLabels = categories(groups);
             % Adjust groups based on checkboxes
-            if isGrpActive && ~isempty(data.chkGrp)
-                selectedIdx = arrayfun(@(x) get(x, 'Value'), data.chkGrp);
-                allCats = arrayfun(@(x) string(get(x, 'String')), data.chkGrp);
-                activeCats = cellstr(allCats(logical(selectedIdx)));
+            if ~isempty(data.chkGrp)
+                % FIX: Check valid handles
+                validH = isgraphics(data.chkGrp);
+                if any(validH)
+                    selectedIdx = arrayfun(@(x) get(x, 'Value'), data.chkGrp(validH));
+                    allCats = arrayfun(@(x) string(get(x, 'String')), data.chkGrp(validH));
+                    activeCats = cellstr(allCats(logical(selectedIdx)));
 
-                fprintf('Active Cats: %d selected\n', length(activeCats));
-
-                % Filter grpLabels
-                grpLabels = intersect(grpLabels, activeCats, 'stable');
-
-                fprintf('Filtered grpLabels: %d\n', length(grpLabels));
+                    % Filter grpLabels
+                    grpLabels = intersect(grpLabels, activeCats, 'stable');
+                end
             end
 
             isGrpActive = true;
@@ -517,6 +527,19 @@ onUpdatePlot(hContainer, []);
         % Add 5% padding
         dx = diff(xLim); if dx==0, dx=1; end
         dy = diff(yLim); if dy==0, dy=1; end
+
+        % --- SCALE UPDATE ---
+        scaleX = 'linear';
+        if get(data.ddXScale, 'Value') == 2, scaleX = 'log'; end
+        scaleY = 'linear';
+        if get(data.ddYScale, 'Value') == 2, scaleY = 'log'; end
+
+        set(data.hAxScatter, 'XScale', scaleX, 'YScale', scaleY);
+        set(data.hAxHistX, 'XScale', scaleX, 'YScale', 'linear'); % Hist Y is counts
+        set(data.hAxHistY, 'XScale', 'linear', 'YScale', scaleY); % Hist X is counts (Orientation horizontal swaps this?)
+        % Wait, for HistY (Horizontal orientation):
+        % Y-axis matches scatter Y (so log if scatter is log)
+        % X-axis is counts (always linear usually)
 
         xlim(data.hAxScatter, [xLim(1)-0.05*dx, xLim(2)+0.05*dx]);
         ylim(data.hAxScatter, [yLim(1)-0.05*dy, yLim(2)+0.05*dy]);
