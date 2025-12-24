@@ -10,7 +10,7 @@ function frFit = mea_frFit(fr, t, varargin)
 %       t           - (vector) Time vector [1 x Time]. Zero aligned to perturbation.
 %
 %   OPTIONAL (Key-Value Pairs):
-%       FilterLen   - (double) Frame length for denoising filter. {[]}
+%       FilterLen   - (double) Frame length for denoising filter. {60}
 %       flgSave     - (logical) Whether to save results. {false}
 %       flgPlot     - (logical) Whether to plot results. {false}
 %       basepath    - (char) Base path for saving. {pwd}
@@ -37,7 +37,7 @@ function frFit = mea_frFit(fr, t, varargin)
 p = inputParser;
 addRequired(p, 'fr', @isnumeric);
 addRequired(p, 't', @isnumeric);
-addParameter(p, 'FilterLen', [], @isnumeric);
+addParameter(p, 'FilterLen', 60, @isnumeric);
 addParameter(p, 'flgSave', false, @islogical);
 addParameter(p, 'flgPlot', false, @islogical);
 addParameter(p, 'basepath', pwd, @ischar);
@@ -264,9 +264,7 @@ if flgPlot
     % Plot
     for iPlot = 1:length(uPlot)
         idx = uPlot(iPlot);
-        plot_frFit(t / 3600, frSm(idx, :), frFit.mdlFits{idx}, ...
-            idxPert, frFit.idxTrough(idx));
-        title(sprintf('Unit #%d', idx))
+        plot_frFit(t / 3600, frSm(idx, :), frFit.mdlFits{idx}, idxPert, frFit.idxTrough(idx));
     end
 end
 
@@ -486,7 +484,7 @@ for iMdl = 1:length(mdlsSrtd)
     displayName = sprintf('%s (BIC: %d)', modelName, bicValue);
 
     hPlt = plot(tTrough, rcvCurvePlot, '--', 'Color', [clrMdls(iMdl, :), 0.8], ...
-        'LineWidth', 2, 'DisplayName', displayName, 'HandleVisibility', 'on');
+        'LineWidth', 2, 'DisplayName', displayName, 'HandleVisibility', 'off');
 
     if iMdl == 1
         hPlt.HandleVisibility = 'on';
@@ -499,15 +497,14 @@ end
 % Mark perturbation
 cfg = mcu_cfg;
 cfg.clr.bac
-xline(t(idxPert), '--', 'Color', cfg.clr.bac, ...
-    'LineWidth', 2, 'HandleVisibility', 'off');
+clrPert = [0.5, 0, 0.5, 0.5];
+xline(t(idxPert), '--', 'Color', clrPert, 'LineWidth', 2, 'HandleVisibility', 'off');
 
 % Formatting
 xlim tight
 xlabel('Time [s]');
 ylabel('Firing Rate (Hz)');
 legend('show', 'Location', 'northeast');
-title('Unit Fit')
 plot_axSize('hFig', hFig, 'szOnly', false, 'axShape', 'wide', 'axHeight', 300);
 
 end

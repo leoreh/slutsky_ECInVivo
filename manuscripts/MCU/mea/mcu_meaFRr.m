@@ -44,40 +44,44 @@ for iFile = 1 : nFiles
     basepath = basepaths{iFile};
     cd(basepath);
 
-    % Organize raw spike times
-    % files = dir('*sorted*');
-    % mea = mea_orgNex('fname', files.name, 'basepath', pwd, 'forceL', false);
-    spktimes = v(iFile).mea.spktimes;
-    
-    % Limit to experimental window
-    spktimes = cellfun(@(x) x(x >= winExp(1) & x <= winExp(2)), ...
-        spktimes, 'UniformOutput', false);
+    % % Organize raw spike times
+    % % files = dir('*sorted*');
+    % % mea = mea_orgNex('fname', files.name, 'basepath', pwd, 'forceL', false);
+    % spktimes = v(iFile).mea.spktimes;
+    % 
+    % % Limit to experimental window
+    % spktimes = cellfun(@(x) x(x >= winExp(1) & x <= winExp(2)), ...
+    %     spktimes, 'UniformOutput', false);
 
-    % Firing rate
+    % % Firing rate
     % fr = mea_frPrep(spktimes, 'binSize', binSize, ...
     %     'flgSave', true, 'flgPlot', true);
     
-    % Burst detection
-    brst = brst_detect(spktimes, ...
-        'minSpks', 3, ...
-        'maxISI_start', isiVal, ...
-        'maxISI_end', isiVal * 2, ...
-        'minDur', 0.015, ...
-        'minIBI', 0.1, ...
-        'flgForce', true, 'flgSave', true, 'flgPlot', false);
+    % % Burst detection
+    % brst = brst_detect(spktimes, ...
+    %     'minSpks', 3, ...
+    %     'maxISI_start', isiVal, ...
+    %     'maxISI_end', isiVal * 2, ...
+    %     'minDur', 0.015, ...
+    %     'minIBI', 0.1, ...
+    %     'flgForce', true, 'flgSave', true, 'flgPlot', false);
+    % 
+    % % Burst temporal dynamics
+    % dyn = brst_dynamics(brst, spktimes, 'binSize', 60, 'kernelSD', 300, ...
+    %     'binSize', binSize, 'flgSave', true, 'flgPlot', false); 
+    % 
+    % % Burst statistics
+    % stats = brst_stats(brst, spktimes, 'winCalc', winCalc, ...
+    %     'flgSave', true);
+    % 
+    % % FR recovery
+    % rcv = mea_frRecovery(v(iFile).fr.t, v(iFile).fr.fr, ...
+    %     'binSize', binSize, 'flgSave', true);
+    % 
+    % FR model fit
+    frFit = mea_frFit(v(iFile).fr.fr, v(iFile).fr.t, 'FilterLen', [], ...
+        'flgPlot', false, 'flgSave', true);
 
-    % Burst temporal dynamics
-    dyn = brst_dynamics(brst, spktimes, 'binSize', 60, 'kernelSD', 300, ...
-        'binSize', binSize, 'flgSave', true, 'flgPlot', false); 
-    
-    % Burst statistics
-    stats = brst_stats(brst, spktimes, 'winCalc', winCalc, ...
-        'flgSave', true);
-    
-    % FR Recovery
-    rcv = mea_frRecovery(v(iFile).fr.t, v(iFile).fr.fr, ...
-        'binSize', binSize, 'flgSave', true);
-   
 end
 
 
@@ -342,7 +346,7 @@ for iFile = 1 : nFiles
     % % --- Bursts
     % brst = brst_mea(spktimes, 'binsize', [], 'isiThr', 0.02,...
     %     'minSpks', 2, 'flgSave', true, 'flgForce', true, 'bins', stWin);    
-    
+
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

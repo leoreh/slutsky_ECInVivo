@@ -490,7 +490,17 @@ onUpdatePlot(hContainer, []);
 
             % Count points
             nPoints = sum(idx);
-            lbl = sprintf('%s (n=%d)', string(grpLabels{iG}), nPoints);
+
+            % Correlation
+            [rho, pval] = corr(xG, yG, 'Type', 'Spearman', 'Rows', 'complete');
+            if pval < 0.0001
+                pStr = 'p<0.0001';
+            else
+                pStr = sprintf('p=%.4f', pval);
+            end
+            statsStr = sprintf('\\rho=%.2f, %s', rho, pStr);
+
+            lbl = sprintf('%s (n=%d, %s)', string(grpLabels{iG}), nPoints, statsStr);
 
             % Scatter
             % Storing handle for legend
@@ -514,7 +524,7 @@ onUpdatePlot(hContainer, []);
         ylabel(data.hAxScatter, yName, 'Interpreter', 'none');
 
         if isGrpActive
-            legend(data.hAxScatter, 'Location', 'best', 'Interpreter', 'none');
+            legend(data.hAxScatter, 'Location', 'best', 'Interpreter', 'tex');
         end
 
         % Update Axis Limits (Fit to data with padding)
