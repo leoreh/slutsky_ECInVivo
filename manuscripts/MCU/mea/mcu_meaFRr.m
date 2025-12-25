@@ -42,20 +42,21 @@ for iFile = 1 : nFiles
     
     % File
     basepath = basepaths{iFile};
+    [~, basename] = fileparts(basepath);
     cd(basepath);
 
-    % % Organize raw spike times
-    % % files = dir('*sorted*');
-    % % mea = mea_orgNex('fname', files.name, 'basepath', pwd, 'forceL', false);
-    % spktimes = v(iFile).mea.spktimes;
-    % 
-    % % Limit to experimental window
-    % spktimes = cellfun(@(x) x(x >= winExp(1) & x <= winExp(2)), ...
-    %     spktimes, 'UniformOutput', false);
+    % Organize raw spike times
+    % files = dir('*sorted*');
+    % mea = mea_orgNex('fname', files.name, 'basepath', pwd, 'forceL', false);
+    spktimes = v(iFile).mea.spktimes;
 
-    % % Firing rate
+    % Limit to experimental window
+    spktimes = cellfun(@(x) x(x >= winExp(1) & x <= winExp(2)), ...
+        spktimes, 'UniformOutput', false);
+
+    % Firing rate
     % fr = mea_frPrep(spktimes, 'binSize', binSize, ...
-    %     'flgSave', true, 'flgPlot', true);
+    %     'flgSave', true, 'flgPlot', false);
     
     % % Burst detection
     % brst = brst_detect(spktimes, ...
@@ -75,120 +76,49 @@ for iFile = 1 : nFiles
     %     'flgSave', true);
     % 
     % % FR recovery
-    % rcv = mea_frRecovery(v(iFile).fr.t, v(iFile).fr.fr, ...
-    %     'binSize', binSize, 'flgSave', true);
-    % 
-    % FR model fit
+    rcv = mea_frRecovery(v(iFile).fr.t, v(iFile).fr.fr, ...
+        'idxTrough', v(iFile).fr.info.idxTrough, ...
+        'binSize', binSize, 'flgSave', true, 'flgPlot', false);
+    
+    % FR model fit an recovery
     frFit = mea_frFit(v(iFile).fr.fr, v(iFile).fr.t, 'FilterLen', [], ...
+        'idxTrough', v(iFile).fr.info.idxTrough, ...
         'flgPlot', false, 'flgSave', true);
+    
+    rcvMdl = mea_frRecovery(v(iFile).fr.t, frFit.frMdl, ...
+        'idxTrough', v(iFile).fr.info.idxTrough, ...
+        'binSize', binSize, 'flgSave', false, 'flgPlot', false);
+    save(fullfile(basepath, [basename, '.frRcv_mdl.mat']), 'rcvMdl', '-v7.3');
 
 end
 
 
 
 %% ========================================================================
-%  TABLE TIME
+%  LOAD TABLE
 %  ========================================================================
 
-% TEMPORAL DYNAMICS
-
-% Load
-basepaths = [mcu_basepaths('mea_bac'), mcu_basepaths('mea_mcuko')];
-vars = {'mea', 'fr', 'brstDyn', 'brst', 'rcv', 'stats'};
-v = basepaths2vars('basepaths', basepaths, 'vars', vars);
-nFiles = length(basepaths);
-
-% Cfg
-cfg = mcu_cfg;
-
-% Vars to align
-varMap = struct();
-varMap.frt = 'fr.fr';
-varMap.btRate = 'brstDyn.rate';
-varMap.btDur = 'brstDyn.dur';
-varMap.btFreq = 'brstDyn.freq';
-varMap.btIBI = 'brstDyn.ibi';
-varMap.btFrac = 'brstDyn.bfrac';
-
-% Align
-[v, t] = mea_tAlign(v, varMap, 'fr.info.idxPert', true);
-xVec = t / 3600;
-
-% Unit vars
-varMap.uGood = 'fr.uGood';
-varMap.uRcv = 'rcv.uRcv';
-varMap.uPert = 'rcv.uPert';
-
-% Tag structures
-tagFiles.Name = get_mname(basepaths, 0);
-tagFiles.Group = repmat(cfg.lbl.grp(1), 1, nFiles);
-tagFiles.Group(contains(tagFiles.Name, 'KO')) = cfg.lbl.grp(2);
-
-% Table
-tblT = v2tbl('v', v, 'varMap', varMap, 'tagFiles', tagFiles);
-
-% Clean bad units
-tblT(~tblT.uPert, :) = [];
-tblT(~tblT.uGood, :) = [];
+tbl = mea_tbl();
 
 
-%  STATS
 
-% Unit vars
-varMap = struct();
-varMap.uGood = 'fr.uGood';
-varMap.uRcv = 'rcv.uRcv';
-varMap.uPert = 'rcv.uPert';
-
-% Non-temporal vars
-varMap.bRate = 'stats.rate';
-varMap.bDur = 'stats.brstDur';
-varMap.bFreq = 'stats.freq';
-varMap.bIBI = 'stats.ibi';
-varMap.bFrac = 'stats.bspks';
-
-varMap.fr = 'rcv.frBsl';
-varMap.frSs = 'rcv.frSs';
-varMap.spkDfct = 'rcv.spkDfct';
-varMap.rcvTime = 'rcv.rcvTime';
-varMap.spktimes = 'mea.spktimes';
-
-% Tag structures
-tagFiles.Name = get_mname(basepaths, 0);
-tagFiles.Group = repmat(cfg.lbl.grp(1), 1, nFiles);
-tagFiles.Group(contains(tagFiles.Name, 'KO')) = cfg.lbl.grp(2);
-
-% Table
-tbl = v2tbl('v', v, 'varMap', varMap, 'tagFiles', tagFiles, 'idxCol', 1);
-
-% Clean bad units
-tbl(~tbl.uPert, :) = [];
-tbl(~tbl.uGood, :) = [];
-
-% JOIN TABLES
-tbl = outerjoin(tbl, tblT, 'MergeKeys', true);
-
-% Limit spktimes 
-winExp = [0, 9 * 60]  * 60;
-tbl.spktimes = cellfun(@(x) x(x >= winExp(1) & x <= winExp(2)), ...
-    tbl.spktimes, 'UniformOutput', false);
-
+% -------------------------------------------------------------------------
 % PLOTS
 guiVars = {'Name', 'Group', 'UnitID', 'frt', 'btRate', 'btDur', 'btFreq', 'btIBI', 'btFrac'};
-tblGUI_xy(xVec, tbl(:, guiVars));
+tblGUI_xy(xVec, tblNorm(:, guiVars));
 
-guiVars = {'Name', 'Group', 'UnitID', 'bRate', 'bDur', 'bFreq', 'bIBI', 'bFrac', 'fr', 'frSs', 'spkDfct', 'rcvTime'};
-tblGUI_scatHist(tbl(:, guiVars), 'xVar', 'fr', 'yVar', 'bFrac', 'grpVar', 'Group');
+guiVars = {'Name', 'Group', 'uRcv', 'UnitID', 'bRate', 'bDur', 'bSpks', 'bFreq', 'bIBI', 'bFrac', 'fr', 'frSs', 'spkDfct', 'rcvTime'};
+tblGUI_scatHist(tbl(:, guiVars), 'xVar', 'bFrac', 'yVar', 'rcvTime', 'grpVar', 'Group');
 
 tblGUI_bar(tbl(:, guiVars), 'yVar', 'bFrac', 'xVar', 'Group');
 
 guiVars = {'Name', 'Group', 'UnitID', 'spktimes'};
 tblGUI_raster(tbl(:, guiVars), 'grpVar', 'Name', 'grpVal', 'ctrl1')
 
-% Save for app
-% edit mea_guiApp.m
+% SAVE FOR APP
 % save("C:\Users\User\Downloads\tbl", 'tbl');
 % save("C:\Users\User\Downloads\xVec", 'xVec');
+% edit mea_guiApp.m
 
 
 %% ========================================================================

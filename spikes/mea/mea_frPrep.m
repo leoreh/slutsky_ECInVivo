@@ -84,7 +84,7 @@ uGood = nSpks >= spkThr;
 
 % Use original data for detection, masking bad units
 [idxPert, ~] = mcu_detectPert(frOrig(uGood, :), 'binSize', binSize, ...
-    'srchStart', 1, 'srchEnd', 3, 'flgPlot', flgPlot, 'frameLen', 10);
+    'srchStart', 1, 'srchEnd', 3, 'flgPlot', false, 'frameLen', 10);
 
 
 %% ========================================================================
@@ -93,6 +93,15 @@ uGood = nSpks >= spkThr;
 
 sgFrameLen = round(sgFrameSec / binSize);
 frSm = fr_denoise(frOrig, 'flgPlot', false, 'frameLen', sgFrameLen);
+
+
+%% ========================================================================
+%  DETECT RECOVERY TROUGH
+%  ========================================================================
+
+% Use global population recovery detection
+[idxTrough, ~, ~] = mcu_detectTrough(frSm(uGood, :), idxPert, ...
+    'binSize', binSize, 'marginMin', 10, 'flgPlot', false);
 
 
 %% ========================================================================
@@ -132,6 +141,7 @@ fr.info.winLim = winLim;
 fr.info.spkThr = spkThr;
 fr.info.sgPolyOrder = sgPolyOrder;
 fr.info.sgFrameSec = sgFrameSec;
+fr.info.idxTrough = idxTrough;
 fr.info.correctionNote = 'Time scaled x3 (pre) and x6 (post) relative to idxPert';
 
 if flgSave
@@ -139,4 +149,28 @@ if flgSave
     save(fullfile(basepath, [basename, '.fr.mat']), 'fr', '-v7.3');
 end
 
+
+%% ========================================================================
+%  GRAPHICS
+%  ========================================================================
+
+if flgPlot
+
+    plot_axSize('szOnly', false, 'axShape', 'wide', 'axHeight', 300);
+    hold on;
+
+    plot(fr.t, mean(fr.fr, 1, 'omitnan'), ...
+        'k-', 'LineWidth', 1.5, 'DisplayName', 'MFR');
+
+    xline(fr.t(fr.info.idxTrough), 'r-', 'LineWidth', 2, ...
+        'DisplayName', 'Trough');
+
+    xline(fr.t(fr.info.idxPert), 'b-', 'LineWidth', 2, ...
+        'DisplayName', 'Perturbation');
+
+    xlabel('Time (hr)');
+    ylabel('FR (Hz)');
+    legend('show');
 end
+
+end     % EOF

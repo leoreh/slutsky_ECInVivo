@@ -37,6 +37,7 @@ function frFit = mea_frFit(fr, t, varargin)
 p = inputParser;
 addRequired(p, 'fr', @isnumeric);
 addRequired(p, 't', @isnumeric);
+addParameter(p, 'idxTrough', [], @isnumeric);
 addParameter(p, 'FilterLen', [], @isnumeric);
 addParameter(p, 'flgSave', false, @islogical);
 addParameter(p, 'flgPlot', false, @islogical);
@@ -44,6 +45,7 @@ addParameter(p, 'basepath', pwd, @ischar);
 addParameter(p, 'baseMdls', {'gomp', 'rich', 'exp2'}, @iscell);
 
 parse(p, fr, t, varargin{:});
+idxTrough = p.Results.idxTrough;
 FilterLen = p.Results.FilterLen;
 flgSave = p.Results.flgSave;
 flgPlot = p.Results.flgPlot;
@@ -111,11 +113,8 @@ for iUnit = 1:nUnits
     % Time indices for fitting (relative to start)
     tIdx = (1:nTime)';
 
-    % Trough: Min in 20 min window after perturbation
-    troughWin = idxPert : min(nTime, idxPert + 20);
-    [frMinVal, idxMin] = min(frUnit(troughWin));
-    idxMin = max([idxMin, 2]); % Ensure at least 1 bin after pert
-    idxTrough = idxPert + idxMin - 1;
+    % Get Trough Value (at the detected index)
+    frMinVal = frUnit(idxTrough);
 
     % Post-perturbation data
     tPost = tIdx(idxTrough:end) - idxTrough;
@@ -196,8 +195,9 @@ for iUnit = 1:nUnits
     bslCurve = bslBeta(1) + bslBeta(2) * tIdx(1:(idxPert-2));
 
     % Perturbation Drop (Linear Interp)
+    % Connect Baseline End to Recovery Start
     tPert = tIdx(idxPert-1:(idxTrough-1));
-    frTroughFinal = bestMdl.pFit(3); % Parameter 3 is always trough in base models
+    frTroughFinal = max(bestMdl.pFit(3), eps); % Parameter 3 is always trough in base models
     pertCurve = linspace(bslCurve(end), frTroughFinal, length(tPert))';
 
     % Recovery Curve
@@ -235,7 +235,7 @@ for iUnit = 1:nUnits
     frFit.fitQlty(iUnit) = qlty.details;
 
     if peakLoc > 0
-        frFit.overshootTime(iUnit) = peakLoc / 60; 
+        frFit.overshootTime(iUnit) = peakLoc / 60;
         frFit.overShootFr(iUnit) = peakFr;
     end
 
@@ -256,10 +256,27 @@ end
 %  ========================================================================
 
 if flgPlot
-    
+
     % Select random units (prefer good fits)
     uGoodIdx = find(frFit.goodFit);
-    uPlot = uGoodIdx(randperm(length(uGoodIdx), 5));
+    nGood = length(uGoodIdx);
+
+    if nGood >= 5
+        uPlot = uGoodIdx(randperm(nGood, 5));
+    else
+        % Take all good units
+        uPlot = uGoodIdx;
+
+        % Fill up with bad units if needed
+        uBadIdx = find(~frFit.goodFit);
+        nBad = length(uBadIdx);
+        nReq = 5 - nGood;
+
+        if nBad > 0
+            uAdd = uBadIdx(randperm(nBad, min(nReq, nBad)));
+            uPlot = [uPlot; uAdd];
+        end
+    end
 
     % Plot
     for iPlot = 1:length(uPlot)
@@ -458,23 +475,11 @@ clrMdls = bone(length(sortIdx)) * 0.6;
 
 % Time vector for trough to end
 tTrough = t(idxTrough:end);
-if isempty(tTrough), return; end
-% NOTE: The fit was done on tPost = tIdx(idxTrough:end) - idxTrough;
-% fitRes.rcvCurve contains the fitted values for the tPost window.
-% So we plot (t(idxTrough:end), rcvCurve)
 
 for iMdl = 1:length(mdlsSrtd)
     mdlIdx = mdlsSrtd(iMdl);
-    rcvCurvePlot = fitRes(mdlIdx).rcvCurve;
-
-    % Check length
-    if length(rcvCurvePlot) ~= length(tTrough)
-        % This might happen if 't' passed here differs from 't' used in fit?
-        % Should be consistent if passed correctly.
-        continue
-    end
-
     modelName = fitRes(mdlIdx).name;
+    rcvCurve = fitRes(mdlIdx).rcvCurve;
     bicValue = round(fitRes(mdlIdx).BIC);
 
     % Capitalize
@@ -485,7 +490,7 @@ for iMdl = 1:length(mdlsSrtd)
 
     displayName = sprintf('%s (BIC: %d)', modelName, bicValue);
 
-    hPlt = plot(tTrough, rcvCurvePlot, '--', 'Color', [clrMdls(iMdl, :), 0.8], ...
+    hPlt = plot(tTrough, rcvCurve, '--', 'Color', [clrMdls(iMdl, :), 0.8], ...
         'LineWidth', 2, 'DisplayName', displayName, 'HandleVisibility', 'on');
 
     if iMdl == 1
@@ -498,7 +503,6 @@ end
 
 % Mark perturbation
 cfg = mcu_cfg;
-cfg.clr.bac
 xline(t(idxPert), '--', 'Color', cfg.clr.bac, ...
     'LineWidth', 2, 'HandleVisibility', 'off');
 
@@ -511,3 +515,5 @@ title('Unit Fit')
 plot_axSize('hFig', hFig, 'szOnly', false, 'axShape', 'wide', 'axHeight', 300);
 
 end
+
+

@@ -1,0 +1,158 @@
+function [idxTrough, tAxis, debugData] = mcu_detectTrough(frMat, idxPert, varargin)
+% MCU_DETECTTROUGH Detects global onset of recovery (end of silence).
+%
+%   [idxTrough, tAxis, debugData] = MCU_DETECTTROUGH(frMat, idxPert) calculates
+%   the population median and finds the "wake-up" point after the perturbation
+%   where activity consistently rises above a threshold.
+%
+%   INPUTS:
+%       frMat       - (matrix) Firing rate matrix [Units x Time].
+%       idxPert     - (scalar) Index of perturbation onset.
+%
+%   OPTIONAL (Key-Value Pairs):
+%       binSize     - (double) Bin size in seconds. {60}
+%       marginMin   - (double) Margin in minutes to skip after pert. {10}
+%       flgPlot     - (logical) Whether to plot results. {false}
+%
+%   OUTPUTS:
+%       idxTrough   - (scalar) Global index of recovery onset.
+%       tAxis       - (vector) Time axis vector (hours).
+%       debugData   - (struct) Intermediate data for debugging.
+%
+%   See also: MCU_DETECTPERT, MEA_FRFIT
+
+%% ========================================================================
+%  ARGUMENTS
+%  ========================================================================
+
+p = inputParser;
+addRequired(p, 'frMat', @isnumeric);
+addRequired(p, 'idxPert', @isnumeric);
+addParameter(p, 'binSize', 60, @isnumeric);
+addParameter(p, 'marginMin', 30, @isnumeric);
+addParameter(p, 'flgPlot', false, @islogical);
+
+parse(p, frMat, idxPert, varargin{:});
+binSize = p.Results.binSize;
+marginMin = p.Results.marginMin;
+flgPlot = p.Results.flgPlot;
+
+%% ========================================================================
+%  DETECTION LOGIC
+%  ========================================================================
+
+% Population Trend (Median) - more robust to outliers
+mfr = median(frMat, 1, 'omitnan');
+
+% Baseline (until idxPert - margin)
+marginBins = round(marginMin * 60 / binSize);
+frBsl = median(mfr(1 : idxPert - marginBins), 'omitnan');
+
+% Apply margin after perturbation to avoid transient drops
+srchStart = idxPert + marginBins;
+
+if srchStart >= length(mfr)
+    error('Something went wrong')
+end
+
+postWin = mfr(srchStart:end);
+
+% Define Threshold
+% Find minimal activity level (floor) in the post-perturbation window
+% Use 5th percentile to avoid outlier zeros
+floorVal = prctile(postWin, 1);
+
+% Threshold: 10% of recovery range, bounded by absolute min
+thr = max(floorVal + 0.1 * (frBsl - floorVal), floorVal + 0.1);
+
+% Find "Wake-up" Point
+% Look for first point where:
+%   a) Value > Threshold
+%   b) Stays > Threshold (or > 0.8*Threshold) for a window (e.g., 5 bins)
+nBins = length(postWin);
+winSize = 5;
+isAbove = postWin > thr;
+
+idxRcvRel = [];
+
+for iBin = 1 : (nBins - winSize)
+    if isAbove(iBin)
+        % Check if sustained
+        if mean(postWin(iBin : iBin+winSize)) > thr * 0.8
+            idxRcvRel = iBin;
+            break;
+        end
+    end
+end
+
+% Refine Trough (Backtrack)
+if isempty(idxRcvRel)
+    % No recovery found: use minimum in the window
+    [~, idxMin] = min(postWin);
+    idxRcvRel = idxMin;
+else
+    % Walk back from the "wake-up" point to find where the rise started.
+    % We travel backwards until the signal drops close to the floor level.
+    % Stop when fr <= floorVal + small_tolerance OR derivative is small/negative
+
+    backtrackTol = floorVal; % Tight tolerance near floor
+
+    % Default to start of search window if we can't find a better point
+    newIdx = 1;
+
+    for iBin = idxRcvRel : -1 : 2
+        currVal = postWin(iBin);
+        prevVal = postWin(iBin-1);
+
+        % If we hit the floor level (or close to it)
+        if currVal <= backtrackTol
+            newIdx = iBin;
+            break;
+        end
+    end
+    idxRcvRel = newIdx;
+end
+
+% Convert back to global index
+idxTrough = srchStart + idxRcvRel - 1;
+
+
+%% ========================================================================
+%  OUTPUT & PLOT
+%  ========================================================================
+
+% Time axis (hours)
+nBinsTotal = length(mfr);
+dt_hr = binSize / 3600;
+tAxis = ((1:nBinsTotal) - idxPert) * dt_hr;
+
+debugData.frPop = mfr;
+debugData.frBsl = frBsl;
+debugData.thr = thr;
+debugData.floorVal = floorVal;
+
+if flgPlot
+    plot_axSize('szOnly', false, 'axShape', 'wide', 'axHeight', 300);
+    hold on;
+
+    plot(tAxis, mfr, 'k-', 'LineWidth', 1.5, 'DisplayName', 'Median FR');
+    yline(frBsl, 'b--', 'DisplayName', 'Baseline');
+    yline(thr, 'g:', 'DisplayName', 'Threshold');
+
+    tTrough = tAxis(idxTrough);
+    xline(tTrough, 'r-', 'LineWidth', 2, 'DisplayName', 'Detected Trough');
+
+    tPert = tAxis(idxPert);
+    xline(tPert, '--', 'Color', [0.5 0.5 0.5], 'DisplayName', 'Perturbation');
+
+    % Mark Margin
+    tMargin = tAxis(srchStart);
+    xline(tMargin, ':', 'Color', [0.5 0.5 0.5], 'DisplayName', 'Search Start');
+
+    title('Population Recovery Detection');
+    xlabel('Time (hr)');
+    ylabel('Median FR (Hz)');
+    legend('show');
+end
+
+end     % EOF

@@ -177,10 +177,10 @@ for iUnit = 1:nUnits
     if ~isempty(bslPnt)
         absIdx = idxTrough + bslPnt - 1;
         bslIdx(iUnit) = absIdx;
-        bslTime(iUnit) = t(absIdx) - t(idxTrough);
+        bslTime(iUnit) = t(absIdx) - t(idxPert);
     else
         bslIdx(iUnit) = length(t);
-        bslTime(iUnit) = t(end) - t(idxTrough);
+        bslTime(iUnit) = t(end) - t(idxPert);
     end
 
     % Steady-state target
@@ -190,10 +190,10 @@ for iUnit = 1:nUnits
     if ~isempty(rcvPnt)
         absIdx = idxTrough + rcvPnt - 1;
         rcvIdx(iUnit) = absIdx;
-        rcvTime(iUnit) = t(absIdx) - t(idxTrough);
+        rcvTime(iUnit) = t(absIdx) - t(idxPert);
     else
         rcvIdx(iUnit) = length(t);
-        rcvTime(iUnit) = t(end) - t(idxTrough);
+        rcvTime(iUnit) = t(end) - t(idxPert);
     end
 
     % SLOPE
@@ -243,117 +243,120 @@ if flgPlot
     goodIdx = find(uGood);
     nPlot = min(6, length(goodIdx));
 
-    % Use current random stream to shuffle, but don't reseed if not needed
-    rng('shuffle'); % Optional: user might want reproducibility
-    shuffledIdx = goodIdx(randperm(length(goodIdx)));
-    plotIdx = shuffledIdx(1:nPlot);
+    if nPlot > 0
+        % Use current random stream to shuffle, but don't reseed if not needed
+        % rng('shuffle'); % Optional: user might want reproducibility
+        shuffledIdx = goodIdx(randperm(length(goodIdx)));
+        plotIdx = shuffledIdx(1:nPlot);
+        plotIdx = [32, 44, 45, 38, 26, 12];
 
-    figure('Position', [100, 100, 1200, 800], 'Name', 'MEA Recovery Metrics');
-    nRows = ceil(nPlot/2);
+        figure('Position', [100, 100, 1200, 800], 'Name', 'MEA Recovery Metrics');
+        nRows = ceil(nPlot/2);
 
-    % Convert time to Hours for plotting
-    tHr = t / 3600;
+        % Convert time to Hours for plotting
+        tHr = t / 3600;
 
-    for iPlot = 1:nPlot
-        uIdx = plotIdx(iPlot);
-        subplot(nRows, 2, iPlot);
-        hold on;
+        for i = 1:nPlot
+            uIdx = plotIdx(i);
+            subplot(nRows, 2, i);
+            hold on;
 
-        % FR TRACE
-        plot(tHr, frMat(uIdx, :), 'Color', [0.7 0.7 0.7], 'LineWidth', 1, ...
-            'DisplayName', 'Raw FR');
+            % FR TRACE
+            plot(tHr, frMat(uIdx, :), 'Color', [0.7 0.7 0.7], 'LineWidth', 1, ...
+                'DisplayName', 'Raw FR');
 
-        % FR BASELINE
-        plot(tHr(bslWin), repmat(frBsl(uIdx), size(bslWin)), ...
-            'Color', [0 0.4470 0.7410], 'LineWidth', 2, 'DisplayName', 'Baseline');
+            % FR BASELINE
+            plot(tHr(bslWin), repmat(frBsl(uIdx), size(bslWin)), ...
+                'Color', [0 0.4470 0.7410], 'LineWidth', 2, 'DisplayName', 'Baseline');
 
-        % FR TROUGH
-        plot(tHr(troughWin), repmat(frTrough(uIdx), size(troughWin)), ...
-            'Color', [0.8500 0.3250 0.0980], 'LineWidth', 2, 'DisplayName', 'Trough');
+            % FR TROUGH
+            plot(tHr(troughWin), repmat(frTrough(uIdx), size(troughWin)), ...
+                'Color', [0.8500 0.3250 0.0980], 'LineWidth', 2, 'DisplayName', 'Trough');
 
-        % FR STEADY STATE
-        plot(tHr(ssWin), repmat(frSs(uIdx), size(ssWin)), ...
-            'Color', [0.4660 0.6740 0.1880], 'LineWidth', 2, 'DisplayName', 'Steady State');
+            % FR STEADY STATE
+            plot(tHr(ssWin), repmat(frSs(uIdx), size(ssWin)), ...
+                'Color', [0.4660 0.6740 0.1880], 'LineWidth', 2, 'DisplayName', 'Steady State');
 
 
-        % PERTURBATION DEPTH
-        plot([tHr(idxTrough), tHr(idxTrough)], [frTrough(uIdx), frBsl(uIdx)], ...
-            '--', 'Color', [0.8500 0.3250 0.0980], 'LineWidth', 2, ...
-            'DisplayName', 'Pert. Depth');
+            % PERTURBATION DEPTH
+            plot([tHr(idxTrough), tHr(idxTrough)], [frTrough(uIdx), frBsl(uIdx)], ...
+                '--', 'Color', [0.8500 0.3250 0.0980], 'LineWidth', 2, ...
+                'DisplayName', 'Pert. Depth');
 
-        % RECOVERY GAIN
-        idxSSCenter = round(mean(ssWin));
-        plot([tHr(idxSSCenter), tHr(idxSSCenter)], [frTrough(uIdx), frSs(uIdx)], ...
-            '--', 'Color', [0.4660 0.6740 0.1880], 'LineWidth', 2, ...
-            'DisplayName', 'Rcv. Gain');
+            % RECOVERY GAIN
+            idxSSCenter = round(mean(ssWin));
+            plot([tHr(idxSSCenter), tHr(idxSSCenter)], [frTrough(uIdx), frSs(uIdx)], ...
+                '--', 'Color', [0.4660 0.6740 0.1880], 'LineWidth', 2, ...
+                'DisplayName', 'Rcv. Gain');
 
-        % RECOVERY TIME
-        if ~isnan(rcvIdx(uIdx))
-            % use stored index for plotting x coordinate to be exact
-            tRcvPlot = tHr(rcvIdx(uIdx));
+            % RECOVERY TIME
+            if ~isnan(rcvIdx(uIdx))
+                % use stored index for plotting x coordinate to be exact
+                tRcvPlot = tHr(rcvIdx(uIdx));
 
-            % rcvTime (metric) for display
-            tRcvValHr = rcvTime(uIdx) / 3600;
+                % rcvTime (metric) for display
+                tRcvValHr = rcvTime(uIdx) / 3600;
 
-            plot(tRcvPlot, frMat(uIdx, rcvIdx(uIdx)), 'p', 'MarkerSize', 10, ...
-                'MarkerEdgeColor', 'k', 'MarkerFaceColor', 'g', ...
-                'DisplayName', sprintf('RcvTime (vs Trough): %.2f hr', tRcvValHr));
-        end
+                plot(tRcvPlot, frMat(uIdx, rcvIdx(uIdx)), 'p', 'MarkerSize', 10, ...
+                    'MarkerEdgeColor', 'k', 'MarkerFaceColor', 'g', ...
+                    'DisplayName', sprintf('RcvTime: %.2f hr', tRcvValHr));
+            end
 
-        % BASELINE TIME
-        if ~isnan(bslIdx(uIdx))
-            % use stored index for plotting x coordinate to be exact
-            tRcvPlot = tHr(bslIdx(uIdx));
+            % BASELINE TIME
+            if ~isnan(bslIdx(uIdx))
+                % use stored index for plotting x coordinate to be exact
+                tRcvPlot = tHr(bslIdx(uIdx));
 
-            % rcvTime (metric) for display
-            tBslValHr = bslTime(uIdx) / 3600;
+                % rcvTime (metric) for display
+                tBslValHr = bslTime(uIdx) / 3600;
 
-            plot(tRcvPlot, frMat(uIdx, bslIdx(uIdx)), 'p', 'MarkerSize', 10, ...
-                'MarkerEdgeColor', 'k', 'MarkerFaceColor', 'b', ...
-                'DisplayName', sprintf('BslTime (vs Trough): %.2f hr', tBslValHr));
-        end
+                plot(tRcvPlot, frMat(uIdx, bslIdx(uIdx)), 'p', 'MarkerSize', 10, ...
+                    'MarkerEdgeColor', 'k', 'MarkerFaceColor', 'b', ...
+                    'DisplayName', sprintf('BslTime: %.2f hr', tBslValHr));
+            end
 
-        % SPIKE DEFICIT
-        % Deficit is calculated from idxPert to end
-        idxPost = idxPert:length(t);
-        if ~isempty(idxPost)
-            tPostHr = tHr(idxPost);
-            frObs = frMat(uIdx, idxPost);
-            % Expected is Baseline
-            frExp = ones(size(frObs)) * frBsl(uIdx);
+            % SPIKE DEFICIT
+            % Deficit is calculated from idxPert to end
+            idxPost = idxPert:length(t);
+            if ~isempty(idxPost)
+                tPostHr = tHr(idxPost);
+                frObs = frMat(uIdx, idxPost);
+                % Expected is Baseline
+                frExp = ones(size(frObs)) * frBsl(uIdx);
 
-            % Fill area between Baseline and Observed
-            xFill = [tPostHr, fliplr(tPostHr)];
-            yFill = [frExp, fliplr(frObs)];
-            fill(xFill, yFill, [0.5 0.5 0.5], 'FaceAlpha', 0.1, 'EdgeColor', 'none', ...
-                'DisplayName', sprintf('SpkDfct: %.2f', spkDfct(uIdx)));
-        end
+                % Fill area between Baseline and Observed
+                xFill = [tPostHr, fliplr(tPostHr)];
+                yFill = [frExp, fliplr(frObs)];
+                fill(xFill, yFill, [0.5 0.5 0.5], 'FaceAlpha', 0.1, 'EdgeColor', 'none', ...
+                    'DisplayName', sprintf('SpkDfct: %.2f', spkDfct(uIdx)));
+            end
 
-        % TEXT
-        % Perturbation Depth
-        text(tHr(idxTrough), mean([frTrough(uIdx), frBsl(uIdx)]), ...
-            sprintf(' %.2f', pertDepth(uIdx)), ...
-            'VerticalAlignment', 'middle', 'HorizontalAlignment', 'left', ...
-            'FontSize', 8, 'Color', [0.8500 0.3250 0.0980], 'FontWeight', 'bold');
+            % 6. Add Text Annotations
+            % Perturbation Depth -> Next to vertical line
+            text(tHr(idxTrough), mean([frTrough(uIdx), frBsl(uIdx)]), ...
+                sprintf(' %.2f', pertDepth(uIdx)), ...
+                'VerticalAlignment', 'middle', 'HorizontalAlignment', 'left', ...
+                'FontSize', 8, 'Color', [0.8500 0.3250 0.0980], 'FontWeight', 'bold');
 
-        % Recovery Gain
-        text(tHr(idxSSCenter), mean([frTrough(uIdx), frSs(uIdx)]), ...
-            sprintf(' %.2f', rcvGain(uIdx)), ...
-            'VerticalAlignment', 'middle', 'HorizontalAlignment', 'right', ...
-            'FontSize', 8, 'Color', [0.4660 0.6740 0.1880], 'FontWeight', 'bold');
+            % Recovery Gain -> Next to vertical line
+            text(tHr(idxSSCenter), mean([frTrough(uIdx), frSs(uIdx)]), ...
+                sprintf(' %.2f', rcvGain(uIdx)), ...
+                'VerticalAlignment', 'middle', 'HorizontalAlignment', 'right', ...
+                'FontSize', 8, 'Color', [0.4660 0.6740 0.1880], 'FontWeight', 'bold');
 
-        % FORMATTING
-        xlabel('Time (Hr)');
-        ylabel('Rate (Hz)');
-        title(sprintf('Unit %d', uIdx));
-        grid on;
-        axis tight;
-        xline(0, '-', 'LabelVerticalAlignment', 'bottom', 'HandleVisibility', 'off');
+            % 7. Formatting
+            xlabel('Time (Hr)');
+            ylabel('Rate (Hz)');
+            title(sprintf('Unit %d', uIdx));
+            grid on;
+            axis tight;
+            xline(0, '-', 'Pert.', 'LabelVerticalAlignment', 'bottom', 'HandleVisibility', 'off');
 
-        if iPlot == 1
-            legend('Location', 'best', 'NumColumns', 2, 'FontSize', 7);
+            if i == 1
+                legend('Location', 'best', 'NumColumns', 2, 'FontSize', 7);
+            end
         end
     end
 end
 
-end     % EOF
+end

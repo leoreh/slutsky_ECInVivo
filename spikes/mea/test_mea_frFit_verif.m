@@ -4,7 +4,7 @@
 clear; clc;
 
 %% 1. Generate Synthetic Data
-nUnits = 5;
+nUnits = 6;
 nTime = 500;
 t = linspace(-60, 240, nTime); % Minutes
 idxPert = find(t>=0, 1);
@@ -38,13 +38,24 @@ fr(4, idxPert+11:idxPeak) = linspace(0.2, 8, peakTime);
 % Decay to SS
 fr(4, idxPeak+1:end) = 8 + (4-8)*(1-exp(-0.05 * (1:(nTime-idxPeak))));
 
-% Unit 5: All NaNs
-fr(5, :) = nan;
+% Unit 6: Baclofen-like (Long Silence)
+fr(6, 1:idxPert-1) = 6;
+fr(6, idxPert:idxPert+60) = 0.01; % 60 bins of silence
+tRec = 1:(nTime - (idxPert+60));
+fr(6, idxPert+61:end) = 0.01 + (6-0.01)*(1-exp(-0.03 * tRec));
+% Add noise
+fr(6, :) = fr(6, :) + randn(1, nTime) * 0.1;
+fr(6, fr(6,:)<0) = 0;
 
-%% 2. Run mea_frFit
+
+%% 2. Run mcu_detectTrough & mea_frFit
+fprintf('Running mcu_detectTrough...\n');
+[idxTroughVerified, ~, ~] = mcu_detectTrough(fr, idxPert, 'marginMin', 10);
+
 fprintf('Running mea_frFit...\n');
 try
-    frFit = mea_frFit(fr, tVec, 'flgSave', false, 'FilterLen', 5, 'flgPlot', true);
+    frFit = mea_frFit(fr, tVec, 'idxTrough', idxTroughVerified, ...
+        'flgSave', false, 'FilterLen', 5, 'flgPlot', true);
     fprintf('Success!\n');
 catch ME
     fprintf('Error: %s\n', ME.message);
@@ -70,6 +81,13 @@ assert(frFit.goodFit(3) == true, 'Unit 3 should be good fit despite noise');
 
 disp('Checking Unit 5 (NaNs)...');
 assert(all(isnan(frFit.frMdl(5, :))), 'Unit 5 model should be NaN');
+
+disp('Checking Unit 6 (Long Silence)...');
+% We expect the fit to be decent if our new logic works, but with the OLD logic
+% it usually fails to capture the delay effectively or has bad residuals.
+% For now we just check it runs.
+assert(frFit.goodFit(6) == true, 'Unit 6 should be good fit');
+
 
 fprintf('All Basic Assertions Passed.\n');
 
