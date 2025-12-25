@@ -29,7 +29,6 @@ varMap.btIBI = 'brstDyn.ibi';
 varMap.btFrac = 'brstDyn.bfrac';
 varMap.caCyto = 'ca.cyto';
 varMap.caMito = 'ca.mito';
-varMap.caMitoIn = 'ca.mitoIn';
 
 % Align
 [v, t] = mea_tAlign(v, varMap, 'fr.info.idxPert', true);
@@ -110,9 +109,8 @@ tbl.rcvTime = tbl.rcvTime / 3600;
 winBsl = [1 : v(1).fr.info.idxPert - 5];
 cytoBsl = mean(tbl.caCyto(:, winBsl), 2, 'omitnan');
 mitoBsl = mean(tbl.caMito(:, winBsl), 2, 'omitnan');
-mitoInBsl = mean(tbl.caMitoIn(:, winBsl), 2, 'omitnan');
 
-tbl = addvars(tbl, cytoBsl, mitoBsl, mitoInBsl);
+tbl = addvars(tbl, cytoBsl, mitoBsl);
 
 
 end     % EOF

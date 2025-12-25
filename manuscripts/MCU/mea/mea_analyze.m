@@ -115,7 +115,7 @@ tblGUI_xy(xVec, tbl(:, guiVars));
 
 guiVars = {'Name', 'Group', 'uRcv', 'UnitID', 'bRate', 'bDur', 'bSpks', ...
     'bFreq', 'bIBI', 'bFrac', 'fr', 'frSs', 'spkDfct', 'rcvTime', ...
-    'cytoBsl', 'mitoBsl', 'mitoInBsl'};
+    'cytoBsl', 'mitoBsl'};
 tblGUI_scatHist(tbl(:, guiVars), 'xVar', 'bFrac', 'yVar', 'rcvTime', 'grpVar', 'Group');
 
 tblGUI_bar(tbl(:, guiVars), 'yVar', 'bFrac', 'xVar', 'Group');
