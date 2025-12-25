@@ -98,14 +98,13 @@ end
 %  LOAD TABLE
 %  ========================================================================
 
-tbl = mea_tbl();
-
+[tbl, xVec] = mea_tbl();
 
 
 % -------------------------------------------------------------------------
 % PLOTS
 guiVars = {'Name', 'Group', 'UnitID', 'frt', 'btRate', 'btDur', 'btFreq', 'btIBI', 'btFrac'};
-tblGUI_xy(xVec, tblNorm(:, guiVars));
+tblGUI_xy(xVec, tbl(:, guiVars));
 
 guiVars = {'Name', 'Group', 'uRcv', 'UnitID', 'bRate', 'bDur', 'bSpks', 'bFreq', 'bIBI', 'bFrac', 'fr', 'frSs', 'spkDfct', 'rcvTime'};
 tblGUI_scatHist(tbl(:, guiVars), 'xVar', 'bFrac', 'yVar', 'rcvTime', 'grpVar', 'Group');

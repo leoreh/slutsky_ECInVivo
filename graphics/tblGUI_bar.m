@@ -85,6 +85,7 @@ guiData.numericVars = numericVars;
 guiData.catVars = catVars;
 % Prepend 'None' for Group
 guiData.grpVars = [{'None'}, catVars];
+guiData.chkGrp = [];     % Checkbox handles
 
 %% ========================================================================
 %  LAYOUT
@@ -141,7 +142,14 @@ currY = currY - ctlH;
 guiData.ddGrp = uicontrol('Parent', hPanelControl, 'Style', 'popupmenu', ...
     'String', guiData.grpVars, 'Units', 'normalized', ...
     'Position', [ctlX, currY, ctlW, ctlH], ...
-    'Callback', @onUpdatePlot);
+    'Position', [ctlX, currY, ctlW, ctlH], ...
+    'Callback', @onGrpChange);
+
+% Panel for Checkboxes
+guiData.pnlGrp = uipanel('Parent', hPanelControl, 'BorderType', 'none', ...
+    'Units', 'normalized', 'Position', [ctlX, 0.05, ctlW, currY - 0.06]);
+
+
 
 % Set Init Values
 set(guiData.ddY, 'Value', find(strcmp(numericVars, curY)));
@@ -154,9 +162,10 @@ if isempty(idxGrp), idxGrp = 1; end % Default None
 set(guiData.ddGrp, 'Value', idxGrp);
 
 hContainer.UserData = guiData;
+guiData.pnlGrp.Parent = hPanelControl; % Ensure parentage just in case, though handled in constructor
 
-% Initial Plot
-onUpdatePlot(hContainer, []);
+% Initial Population & Plot
+onGrpChange(hContainer, []);
 
 %% ========================================================================
 %  CALLBACKS
@@ -196,8 +205,22 @@ onUpdatePlot(hContainer, []);
         if hasGrp
             grpData = tblIn.(grpName);
             if ~iscategorical(grpData), grpData = categorical(grpData); end
+
+            % Initial categories from data
             gCats = categories(grpData);
-            gCats = gCats(ismember(gCats, unique(grpData(~isnan(yData))))); % prune unused
+            gCats = gCats(ismember(gCats, unique(grpData(~isnan(yData)))));
+
+            % Filter by Checkboxes
+            if ~isempty(data.chkGrp)
+                validH = isgraphics(data.chkGrp);
+                if any(validH)
+                    selectedIdx = arrayfun(@(x) get(x, 'Value'), data.chkGrp(validH));
+                    allCats = arrayfun(@(x) string(get(x, 'String')), data.chkGrp(validH));
+                    activeCats = cellstr(allCats(logical(selectedIdx)));
+
+                    gCats = intersect(gCats, activeCats, 'stable');
+                end
+            end
         else
             gCats = {'All'};
         end
@@ -266,6 +289,47 @@ onUpdatePlot(hContainer, []);
 
         % Colors (use lines default)
         % if user passed cfg.clr, could use it, but simplified to lines() for now to match default behavior
+        % if user passed cfg.clr, could use it, but simplified to lines() for now to match default behavior
+    end
+
+    function onGrpChange(src, ~)
+        data = hContainer.UserData;
+        populateCheckboxes(data);
+        onUpdatePlot(src, []);
+    end
+
+    function onFilterChange(~, ~)
+        onUpdatePlot(hContainer, []);
+    end
+
+    function populateCheckboxes(data)
+        delete(data.pnlGrp.Children);
+        idxGrp = get(data.ddGrp, 'Value');
+        grpItems = get(data.ddGrp, 'String');
+        grpName = grpItems{idxGrp};
+
+        if strcmp(grpName, 'None')
+            data.chkGrp = [];
+        else
+            raw = data.tbl.(grpName);
+            if islogical(raw), raw = categorical(raw); end
+            if ~iscategorical(raw), raw = categorical(raw); end
+            cats = categories(raw);
+            cats = cats(ismember(cats, unique(raw))); % Show only existing
+
+            nCats = length(cats);
+            h = 1 / max(10, nCats + 1);
+            w = 1;
+            data.chkGrp = gobjects(1, nCats);
+            for i = 1:nCats
+                yPos = 1 - i*h;
+                data.chkGrp(i) = uicontrol('Parent', data.pnlGrp, 'Style', 'checkbox', ...
+                    'String', cats{i}, 'Units', 'normalized', ...
+                    'Position', [0, yPos, w, h], 'Value', 1, ...
+                    'Callback', @onFilterChange);
+            end
+        end
+        hContainer.UserData = data;
     end
 
 end

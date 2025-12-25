@@ -1,4 +1,4 @@
-function tbl = mea_tbl()
+function [tbl, xVec] = mea_tbl()
 % MEA_TBL loads data from MCU-KO and CONTROL experiments in mea and
 % organizes it in a table 
 
