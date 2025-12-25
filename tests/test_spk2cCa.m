@@ -3,7 +3,7 @@
 
 % 1. Setup Synthetic Data
 dt = 0.001; % 1 ms
-T  = 60;    % 60 seconds (1 minute) to match default binSize
+T  = 65;    % 65 seconds (>= 60s binSize)
 t  = 0:dt:T;
 
 % Unit 1: Sparse firing (2 Hz)
@@ -52,6 +52,25 @@ if ~isempty(mCa.total)
         fprintf('PASS: Bursty unit accumulation is significantly higher.\n');
     else
         error('FAIL: Bursty unit accumulation is not significantly higher.');
+    end
+
+    % 5. Verify Save
+    fprintf('Testing flgSave...\n');
+    savePath = fullfile(pwd, 'test_spk2cCa_output');
+    if ~exist(savePath, 'dir')
+        mkdir(savePath);
+    end
+    mCa_saved = spk2cCa(spktimes, 'dt', dt, 'binSize', 60, 'flgPlot', false, ...
+        'flgSave', true, 'basepath', savePath);
+
+    % Check file existence
+    expectedFile = fullfile(savePath, 'test_spk2cCa_output.mCa.mat');
+    if exist(expectedFile, 'file')
+        fprintf('PASS: Output file created correctly.\n');
+        delete(expectedFile);
+        rmdir(savePath);
+    else
+        error('FAIL: Output file not found.');
     end
 end
 

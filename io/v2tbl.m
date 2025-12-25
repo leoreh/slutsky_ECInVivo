@@ -10,9 +10,9 @@ function tbl = v2tbl(varargin)
 % and event-based data (e.g., ripples, spikes).
 %
 % INPUT (Required):
-%   v           - Struct array, output of basepaths2vars. Each element v(i) 
+%   v           - Struct array, output of basepaths2vars. Each element v(i)
 %                 contains data for one session/mouse.
-%   varMap      - Struct defining the mapping from desired table column names 
+%   varMap      - Struct defining the mapping from desired table column names
 %                 to their location in the struct v.
 %
 % INPUT (Name-Value):
@@ -55,6 +55,7 @@ addParameter(p, 'varMap', @isstruct);
 addParameter(p, 'idxCol', [], @(x) isnumeric(x) && all(x > 0));
 addParameter(p, 'tagFiles', struct(), @isstruct);
 addParameter(p, 'tagAll', struct(), @isstruct);
+addParameter(p, 'uOffset', [], @(x) isempty(x) || (isnumeric(x) && isscalar(x)));
 
 parse(p, varargin{:});
 
@@ -63,6 +64,7 @@ varMap = p.Results.varMap;
 idxCol = p.Results.idxCol;
 tagFiles = p.Results.tagFiles;
 tagAll = p.Results.tagAll;
+runOffset = p.Results.uOffset;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % INITIALIZE VARIABLES
@@ -78,31 +80,40 @@ if isempty(uOffset)
     uOffset = 0;
 end
 
+% Determine the offset to use for this run
+if ~isempty(runOffset)
+    % User provided an explicit offset (e.g., 0 for deterministic behavior)
+    runOffset = runOffset;
+else
+    % Use the persistent counter (default behavior)
+    runOffset = uOffset;
+end
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % PROCESS EACH SESSION/MOUSE
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 for iFile = 1:length(v)
-    
+
     % Determine the number of rows based on the first mapped variable
     % This works for both unit-based and event-based data
     var1Path = varMap.(mapFields{1});
     var1Path = strsplit(var1Path, '.');
     data1 = getfield(v(iFile), var1Path{:});
     nRows = size(data1, 1);
-    
+
     % If the first dimension is 1, check the second dimension
     if nRows == 1 && size(data1, 2) > 1
         nRows = size(data1, 2);
     end
-    
+
     % Create row indices for this session
     rowIdx = (1:nRows)';
 
     % Create a table for the current session and add metadata, including
     % unique unitID based on mouse and unit number within mouse
-    sessionTable = table();    
-    
+    sessionTable = table();
+
     % Add tagAll metadata (applied to all files)
     tagAllFields = fieldnames(tagAll);
     for iTag = 1:length(tagAllFields)
@@ -110,7 +121,7 @@ for iFile = 1:length(v)
         tagValue = tagAll.(tagName);
         sessionTable.(tagName) = repmat(categorical({tagValue}), nRows, 1);
     end
-    
+
     % Add tagFiles metadata (per-file specific)
     tagFilesFields = fieldnames(tagFiles);
     for iTag = 1:length(tagFilesFields)
@@ -120,16 +131,16 @@ for iFile = 1:length(v)
             sessionTable.(tagName) = repmat(categorical({tagValue}), nRows, 1);
         end
     end
-    
-    sessionTable.UnitID = uOffset + (iFile * 1000) + rowIdx;
+
+    sessionTable.UnitID = runOffset + (iFile * 1000) + rowIdx;
 
     % Extract all variables based on the map
     for iVar = 1:length(mapFields)
         colName = mapFields{iVar};
-        structPath = varMap.(colName);    
+        structPath = varMap.(colName);
         var1Path = strsplit(structPath, '.');
         data = getfield(v(iFile), var1Path{:});
-        
+
         % Ensure data has nRows as the first dimension (rows)
         if size(data, 1) ~= nRows
             if size(data, 2) == nRows
@@ -139,12 +150,12 @@ for iFile = 1:length(v)
                 data = reshape(data, nRows, []);
             end
         end
-        
+
         % Select specific columns if idxCol is specified
         if ~isempty(idxCol) && size(data, 2) > 1
             data = data(:, idxCol);
         end
-        
+
         sessionTable.(colName) = data;
     end
 
@@ -160,8 +171,10 @@ end
 tbl = vertcat(tblCell{:});
 
 % Update the global offset for the next time this function is called
-[~, maxID] = max(tbl.UnitID);
-uOffset = tbl.UnitID(maxID);
+if ~isempty(tbl)
+    [~, maxID] = max(tbl.UnitID);
+    uOffset = tbl.UnitID(maxID);
+end
 
 end
 
