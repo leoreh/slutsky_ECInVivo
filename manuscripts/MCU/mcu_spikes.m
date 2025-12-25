@@ -83,7 +83,7 @@ clear cfgLme
 cfgLme.dist = 'Gamma';
 
 % Fit
-frml = [varRsp, ' ~ Group + (1|Name)'];
+frml = [varRsp, ' ~ Group + FR + (1|Name)'];
 [lmeStats, lmeMdl] = lme_analyse(tblLme, frml, cfgLme);
 
 % Plot

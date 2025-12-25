@@ -53,12 +53,12 @@ end
 nUnits = length(times);
 
 % Get max time across all units if winCalc is empty
-maxTimes = max(cellfun(@(x) max([0; x(:)]), times));
+maxTime = max(cellfun(@(x) max([0; x(:)]), times));
 if isempty(winCalc)
-    winCalc = [0, maxTimes];
+    winCalc = [0, maxTime];
 end
 if isinf(winCalc(end))
-    winCalc(end) = maxTimes;
+    winCalc(end) = maxTime;
 end
 nWin = size(winCalc, 1);
 

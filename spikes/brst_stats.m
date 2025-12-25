@@ -59,12 +59,7 @@ nUnits = length(brst.all);
 % Handle winCalc
 if isempty(winCalc)
     % Determine max time from spktimes
-    maxTime = 0;
-    for i = 1:length(spktimes)
-        if ~isempty(spktimes{i})
-            maxTime = max(maxTime, max(spktimes{i}));
-        end
-    end
+    maxTime = max(cellfun(@(x) max([0; x(:)]), spktimes));
     winCalc = [0, maxTime];
 end
 

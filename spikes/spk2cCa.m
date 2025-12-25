@@ -1,0 +1,207 @@
+function mCa = spk2cCa(spktimes, varargin)
+% SPK2CCA Converts spike times to continuous mitochondrial calcium accumulation.
+%
+%   mCa = SPK2CCA(SPKTIMES, ...) calculates the Virtual Mitochondrial Calcium
+%   Accumulation (Psi_mCa) metric by convolving spike trains with a cytosolic
+%   decay kernel and passing the result through a Hill equation.
+%
+%   INPUTS:
+%       spktimes    - (cell) Spike times per unit (in seconds).
+%       varargin    - (param/value) Optional parameters:
+%                     'winCalc' : (num) Limit analysis window (s)
+%                     'dt'      : (num) Time step for discretization {0.001} (s)
+%                     'tau'     : (num) Cytosolic decay time constant {0.150} (s)
+%                     'n'       : (num) Hill coefficient {2.7}
+%                     'Kd'      : (num) Dissociation constant {3.0} (USE)
+%                     'binSize' : (num) Output bin size {60} (s)
+%                     'flgPlot' : (log) Plot results per unit {true}
+%
+%   OUTPUTS:
+%       mCa         - (struct) Mitochondiral Calcium structure.
+%                     .time     : (1 x nBins) Time vector (bin centers).
+%                     .cyto     : (nUnits x nBins) Cytosolic Calcium (C), averaged.
+%                     .mito     : (nUnits x nBins) Mitochondrial Flux (J), averaged.
+%                     .total    : (nUnits x nBins) Integrated Flux (Psi_mCa), summed * dt.
+%                     .params   : (struct) Parameters used.
+%
+%   See also: BRST_DYNAMICS, N2CHUNKS
+
+%% ========================================================================
+%  ARGUMENTS
+%  ========================================================================
+
+p = inputParser;
+addRequired(p, 'spktimes', @iscell);
+addParameter(p, 'winCalc', [], @isnumeric);
+addParameter(p, 'dt', 0.001, @isnumeric);
+addParameter(p, 'tau', 0.150, @isnumeric);
+addParameter(p, 'n', 2.7, @isnumeric);
+addParameter(p, 'Kd', 3.0, @isnumeric);
+addParameter(p, 'binSize', 60, @isnumeric);
+addParameter(p, 'flgPlot', true, @islogical);
+
+parse(p, spktimes, varargin{:});
+winCalc = p.Results.winCalc;
+binSize = p.Results.binSize;
+flgPlot = p.Results.flgPlot;
+params  = p.Results;
+
+%% ========================================================================
+%  INITIALIZE
+%  ========================================================================
+
+nUnits = length(spktimes);
+
+% Limit analysis to window
+if ~isempty(winCalc)
+    spktimes = cellfun(@(x) x(x >= winCalc(1) & x <= winCalc(2)), ...
+        spktimes, 'UniformOutput', false);
+end
+
+% Determine global time range
+maxTime = max(cellfun(@(x) max([0; x(:)]), spktimes));
+if ~isempty(winCalc)
+    if winCalc(2) > maxTime
+        winCalc(2) = maxTime;
+    end
+    maxTime = min(maxTime, winCalc(2));
+end
+
+% Add a small buffer to the end to allow decay
+buffer = params.tau * 5;
+maxTime = maxTime + buffer;
+
+% Time vector (High Resolution)
+t = 0:params.dt:maxTime;
+
+% Use n2chunks to split duration
+chunks = n2chunks('n', maxTime, 'chunksize', binSize, 'lastChunk', 'exclude');
+edges = [chunks(:,1)-1, chunks(:,2)];
+edges = unique(edges(:))';
+tBins = edges(1:end-1) + diff(edges)/2;
+nBins = length(tBins);
+
+% Initialize Matrices (nUnits x nBins)
+mCa.time   = tBins;
+mCa.cyto   = zeros(nUnits, nBins);
+mCa.mito   = zeros(nUnits, nBins);
+mCa.total  = zeros(nUnits, nBins);
+mCa.params = p.Results;
+
+%% ========================================================================
+%  COMPUTE LOOP
+%  ========================================================================
+
+for iUnit = 1:nUnits
+
+    st = spktimes{iUnit};
+
+    if isempty(st)
+        continue;
+    end
+
+    [cyto, mito, total] = spk2mca(st, t, edges, params, flgPlot, iUnit);
+
+    mCa.cyto(iUnit, :)  = cyto;
+    mCa.mito(iUnit, :)  = mito;
+    mCa.total(iUnit, :) = total;
+
+end
+
+end
+
+%% ========================================================================
+%  HELPER: COMPUTE UNIT DYNAMICS
+%  ========================================================================
+
+function [cyto, mito, total] = spk2mca(st, t, edges, params, flgPlot, uid)
+% SPK2MCA Helper to calculate calcium dynamics for a single unit.
+
+nTime = length(t);
+dt = params.dt;
+tau = params.tau;
+n = params.n;
+Kd = params.Kd;
+
+% Discretize
+% Convert spike times to indices
+stIdx = round(st / dt) + 1;
+stIdx(stIdx > nTime) = [];
+stIdx(stIdx < 1) = [];
+
+if isempty(stIdx)
+    cyto = zeros(1, length(edges)-1);
+    mito = zeros(1, length(edges)-1);
+    total = zeros(1, length(edges)-1);
+    return;
+end
+
+S = zeros(1, nTime);
+for iTime = 1:length(stIdx)
+    S(stIdx(iTime)) = S(stIdx(iTime)) + 1;
+end
+
+% Cytosolic Calcium (C)
+kLen = ceil(5 * tau / dt);
+kT = (0:kLen-1) * dt;
+kernel = exp(-kT / tau);
+
+C = conv(S, kernel);
+C = C(1:nTime);
+
+% Mitochondrial Flux (J)
+C_n = C .^ n;
+Kd_n = Kd ^ n;
+J = C_n ./ (Kd_n + C_n);
+
+% Binning
+binIdx = discretize(t, edges);
+valid = ~isnan(binIdx);
+cyto = accumarray(binIdx(valid)', C(valid)', [], @mean)';
+mito = accumarray(binIdx(valid)', J(valid)', [], @mean)';
+total = accumarray(binIdx(valid)', J(valid)', [], @sum)' * dt;
+
+% Plotting
+if flgPlot
+    plot_mca_unit(t, st, C, J, uid, Kd);
+end
+
+end
+
+%% ========================================================================
+%  HELPER: PLOTTING
+%  ========================================================================
+
+function plot_mca_unit(t, st, C, J, uid, Kd)
+% PLOT_MCA_UNIT Plot high-res dynamics for a single unit.
+
+figure('Name', sprintf('Unit %d Dynamics', uid), 'Color', 'w', 'NumberTitle', 'off');
+tlo = tiledlayout(3, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
+
+% Raster
+ax1 = nexttile(tlo);
+plot_raster({st}, 'hAx', ax1, 'plotType', 'vertline');
+title(ax1, sprintf('Unit %d Raster', uid));
+ylabel(ax1, 'Spikes');
+grid(ax1, 'on');
+
+% Cyto
+ax2 = nexttile(tlo);
+plot(ax2, t, C, 'b-', 'LineWidth', 1.5);
+yline(ax2, Kd, 'k--', 'Kd');
+title(ax2, 'Cytosolic Calcium (C)');
+ylabel(ax2, 'Conc. (USE)');
+grid(ax2, 'on');
+
+% Mito
+ax3 = nexttile(tlo);
+plot(ax3, t, J, 'r-', 'LineWidth', 1.5);
+title(ax3, 'Mitochondrial Flux (J)');
+xlabel(ax3, 'Time (s)');
+ylabel(ax3, 'Flux');
+grid(ax3, 'on');
+
+linkaxes([ax1, ax2, ax3], 'x');
+xlim(ax1, [0, max(t)]);
+
+end
