@@ -35,7 +35,7 @@ addRequired(p, 'spktimes', @iscell);
 addParameter(p, 'winCalc', [], @isnumeric);
 addParameter(p, 'binSize', 60, @isnumeric);
 addParameter(p, 'dt', 0.001, @isnumeric);
-addParameter(p, 'tauC', 0.1, @isnumeric);
+addParameter(p, 'tauC', 0.05, @isnumeric);
 addParameter(p, 'tauM', 20, @isnumeric);
 addParameter(p, 'n', 10, @isnumeric);
 addParameter(p, 'Kd', 20, @isnumeric);
@@ -117,8 +117,8 @@ parfor iUnit = 1:nUnits
 
     [c, m] = transfer_fn(st, single(t), edges, params, false, iUnit);
 
-    cytoMat(iUnit, :)   = c;
-    mitoMat(iUnit, :)   = m;
+    cytoMat(iUnit, :)   = zscore(c);
+    mitoMat(iUnit, :)   = zscore(m);
 
 end
 
@@ -187,11 +187,8 @@ Kd_n = Kd ^ n;
 J = C_n ./ (Kd_n + C_n);
 
 % % Mitochondrial Concentration (M)
-% % Recursive Filter Implementation (Unity Gain)
-% % Steady state: y = (1-alpha)*x + alpha*y -> y(1-alpha) = x(1-alpha) -> y=x
 % alphaM = exp(-dt / params.tauM);
 % M = filter(1 - alphaM, [1 -alphaM], J);
-% mito = accumarray(binIdx(valid)', M(valid)', [nBins 1], @(x) x(end))';
 
 % Binning
 binIdx = discretize(t, edges);

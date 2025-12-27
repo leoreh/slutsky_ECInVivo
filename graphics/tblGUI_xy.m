@@ -439,7 +439,7 @@ onUpdatePlot(hContainer, []);
 
                 % Plot
                 % Light individual lines (High transparency) 0.05
-                hLines = plot(hAx, data.xVec, subY', 'Color', [clr, 0.05],...
+                hLines = plot(hAx, data.xVec, subY', 'Color', [clr, 0.005],...
                     'LineWidth', 0.5, 'HandleVisibility', 'off');
 
                 % Assign global indices to UserData of lines

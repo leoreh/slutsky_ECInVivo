@@ -91,10 +91,8 @@ for iFile = 1 : nFiles
     % save(fullfile(basepath, [basename, '.frRcv_mdl.mat']), 'rcvMdl', '-v7.3');
         
     % Tranfer function spikes to Ca2+
-    tic
     ca = spk2ca(spktimes, 'winCalc', [0, Inf], ...
-        'flgPlot', true, 'flgSave', true);
-    toc
+        'flgPlot', false, 'flgSave', true);
 
 end
 
@@ -104,13 +102,37 @@ end
 %  LOAD TABLE
 %  ========================================================================
 
-[tbl, xVec] = mea_tbl(basepaths(1));
+[tbl, xVec] = mea_tbl(basepaths);
+
+winBsl = [1 : v(1).fr.info.idxPert - 5];
+
+tbl.caCytoZ = (tbl.caCyto - mean(tbl.caCyto(:, winBsl), 2, 'omitnan')) ./ ...
+    std(tbl.caCyto(:, winBsl), [], 2, 'omitnan');
+
+
+mitoLog = log10(tbl.caMito + eps);
+mitoAvg = mean(mitoLog(:, winBsl), 'all', 'omitnan');
+mitoSd = std(mitoLog(:, winBsl), [], 'all', 'omitnan');
+tbl.caMitoZ = (mitoLog - mitoAvg) / mitoSd;
+
+% 
+% tbl.caMitoZ = (tbl.caMito - mean(tbl.caMito(:, winBsl), 2, 'omitnan')) ./ ...
+%     std(tbl.caMito(:, winBsl), [], 2, 'omitnan');
+
+tblNorm = tbl_tNorm(tbl, {'frt', 'caMitoZ'}, [winBsl(1), winBsl(2)]);
+tbl.frtN = tblNorm.frt;
+tbl.caMitoZN = tblNorm.caMitoZ;
+
+% tblNorm = tbl_tNorm(tbl, {'frt', 'btRate', 'btDur', 'btFreq', 'btIBI', 'btFrac'}, ...
+%     winNorm, {'Name'});
+
+tblGUI_xy(xVec, tbl);
 
 
 % -------------------------------------------------------------------------
 % PLOTS
 guiVars = {'Name', 'Group', 'UnitID', 'frt', 'btRate', ...
-    'btDur', 'btFreq', 'btIBI', 'btFrac', 'caCyto', 'caMito'};
+    'btDur', 'btFreq', 'btIBI', 'btFrac', 'caCyto', 'caMito', 'caCytoZ', 'caMitoZ'};
 tblGUI_xy(xVec, tbl(:, guiVars));
 
 guiVars = {'Name', 'Group', 'uRcv', 'UnitID', 'bRate', 'bDur', 'bSpks', ...

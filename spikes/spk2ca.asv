@@ -21,8 +21,7 @@ function ca = spk2ca(spktimes, varargin)
 %       ca         - (struct) Mitochondiral Calcium structure.
 %                     .time     : (1 x nBins) Time vector (bin centers).
 %                     .cyto     : (nUnits x nBins) Cytosolic Calcium (C), averaged.
-%                     .mitoIn   : (nUnits x nBins) Integrated Flux (Psi_mCa), summed * dt.
-%                     .mito     : (nUnits x nBins) Matrix Calcium (M), averaged.
+%                     .mito     : ((nUnits x nBins) Integrated Flux (Psi_mCa), summed * dt.
 %                     .params   : (struct) Parameters used.
 %
 %   See also: BRST_DYNAMICS, N2CHUNKS
@@ -36,10 +35,10 @@ addRequired(p, 'spktimes', @iscell);
 addParameter(p, 'winCalc', [], @isnumeric);
 addParameter(p, 'binSize', 60, @isnumeric);
 addParameter(p, 'dt', 0.001, @isnumeric);
-addParameter(p, 'tauC', 0.1, @isnumeric);
+addParameter(p, 'tauC', 0.05, @isnumeric);
 addParameter(p, 'tauM', 20, @isnumeric);
-addParameter(p, 'n', 4, @isnumeric);
-addParameter(p, 'Kd', 8, @isnumeric);
+addParameter(p, 'n', 10, @isnumeric);
+addParameter(p, 'Kd', 20, @isnumeric);
 addParameter(p, 'flgPlot', false, @islogical);
 addParameter(p, 'flgSave', false, @islogical);
 addParameter(p, 'basepath', pwd, @ischar);
@@ -74,7 +73,7 @@ if ~isempty(winCalc)
 end
 
 % Add a small buffer to the end to allow decay
-buffer = params.tauM * 5;
+buffer = params.tauC * 5;
 calcTime = maxTime + buffer;
 
 % Time vector (High Resolution)
@@ -90,10 +89,8 @@ nBins = length(tBins);
 % Initialize Matrices (nUnits x nBins)
 ca.time   = tBins;
 ca.cyto   = zeros(nUnits, nBins);
-ca.mitoIn = zeros(nUnits, nBins);
 ca.mito   = zeros(nUnits, nBins);
 ca.params = p.Results;
-
 
 
 %% ========================================================================
@@ -101,7 +98,6 @@ ca.params = p.Results;
 %  ========================================================================
 
 cytoMat   = zeros(nUnits, nBins);
-mitoInMat = zeros(nUnits, nBins);
 mitoMat   = zeros(nUnits, nBins);
 
 if isempty(gcp('nocreate'))
@@ -119,16 +115,17 @@ parfor iUnit = 1:nUnits
         continue;
     end
 
-    [c, mIn, m] = transfer_fn(st, single(t), edges, params, false, iUnit);
+    [c, m] = transfer_fn(st, single(t), edges, params, false, iUnit);
+    
+figure
+plot(tBins, log10(zscore(m) + eps))
 
     cytoMat(iUnit, :)   = c;
-    mitoInMat(iUnit, :) = mIn;
     mitoMat(iUnit, :)   = m;
 
 end
 
 ca.cyto   = cytoMat;
-ca.mitoIn = mitoInMat;
 ca.mito   = mitoMat;
 
 %% ========================================================================
@@ -156,7 +153,7 @@ end     % EOF
 %  HELPER: COMPUTE UNIT DYNAMICS
 %  ========================================================================
 
-function [cyto, mitoIn, mito] = transfer_fn(st, t, edges, params, flgPlot, uid)
+function [cyto, mito] = transfer_fn(st, t, edges, params, flgPlot, uid)
 % SPK2MCA Helper to calculate calcium dynamics for a single unit.
 
 nTime = length(t);
@@ -173,7 +170,6 @@ stIdx(stIdx < 1) = [];
 
 if isempty(stIdx)
     cyto = zeros(1, nBins);
-    mitoIn = zeros(1, nBins);
     mito = zeros(1, nBins);
     return;
 end
@@ -189,27 +185,27 @@ alphaC = exp(-dt / params.tauC);
 C = filter(1, [1 -alphaC], S);
 
 % Mitochondrial Flux (J)
-C = C .^ n;
+C_n = C .^ n;
 Kd_n = Kd ^ n;
-J = C ./ (Kd_n + C);
+J = C_n ./ (Kd_n + C_n);
 
-% Mitochondrial Concentration (M)
-% Recursive Filter Implementation (Unity Gain)
-% Steady state: y = (1-alpha)*x + alpha*y -> y(1-alpha) = x(1-alpha) -> y=x
-alphaM = exp(-dt / params.tauM);
-M = filter(1 - alphaM, [1 -alphaM], J);
+% % Mitochondrial Concentration (M)
+% % Recursive Filter Implementation (Unity Gain)
+% % Steady state: y = (1-alpha)*x + alpha*y -> y(1-alpha) = x(1-alpha) -> y=x
+% alphaM = exp(-dt / params.tauM);
+% M = filter(1 - alphaM, [1 -alphaM], J);
+% mito = accumarray(binIdx(valid)', M(valid)', [nBins 1], @(x) x(end))';
 
 % Binning
 binIdx = discretize(t, edges);
 valid = ~isnan(binIdx);
 
 cyto = accumarray(binIdx(valid)', C(valid)', [nBins 1], @mean)';
-mitoIn = accumarray(binIdx(valid)', J(valid)', [nBins 1], @sum)' * dt;
-mito = accumarray(binIdx(valid)', M(valid)', [nBins 1], @(x) x(end))';
+mito = accumarray(binIdx(valid)', J(valid)', [nBins 1], @sum)' * dt;
 
 % Plotting
 if flgPlot
-    plot_spk2ca(t, st, C, J, M, uid, Kd);
+    plot_spk2ca(t, st, C, J, uid, Kd);
 end
 
 end
@@ -218,7 +214,7 @@ end
 %  HELPER: PLOTTING
 %  ========================================================================
 
-function plot_spk2ca(t, st, C, J, M, uid, Kd)
+function plot_spk2ca(t, st, C, J, uid, Kd)
 % PLOT_MCA_UNIT Plot high-res dynamics for a single unit.
 
 figure('Name', sprintf('Unit %d Dynamics', uid), 'Color', 'w', 'NumberTitle', 'off');
@@ -246,15 +242,7 @@ title(ax3, 'Mitochondrial Influx (J)');
 ylabel(ax3, 'Flux');
 grid(ax3, 'on');
 
-% Mito Conc
-ax4 = nexttile(hTile);
-plot(ax4, t, M, 'm-', 'LineWidth', 1.5);
-title(ax4, 'Matrix Calcium (M)');
-xlabel(ax4, 'Time (s)');
-ylabel(ax4, 'Conc.');
-grid(ax4, 'on');
-
-linkaxes([ax1, ax2, ax3, ax4], 'x');
+linkaxes([ax1, ax2, ax3], 'x');
 xlim(ax1, [0, max(t)]);
 
 end
