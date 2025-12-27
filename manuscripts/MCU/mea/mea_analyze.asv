@@ -91,10 +91,8 @@ for iFile = 1 : nFiles
     % save(fullfile(basepath, [basename, '.frRcv_mdl.mat']), 'rcvMdl', '-v7.3');
         
     % Tranfer function spikes to Ca2+
-    tic
     ca = spk2ca(spktimes, 'winCalc', [0, Inf], ...
-        'flgPlot', true, 'flgSave', true);
-    toc
+        'flgPlot', false, 'flgSave', true);
 
 end
 
@@ -104,13 +102,20 @@ end
 %  LOAD TABLE
 %  ========================================================================
 
-[tbl, xVec] = mea_tbl(basepaths(1));
+[tbl, xVec, basepaths, v] = mea_tbl();
+
+winBsl = [1, v(1).fr.info.idxPert - 5];
+tblNorm = tbl_tNorm(tbl, 'winNorm', winBsl, 'Method', 'zscore');
+
+tblNorm = tbl_tranform(tbl, 'flgLog', true);
+
+tblGUI_xy(xVec, tbl);
 
 
 % -------------------------------------------------------------------------
 % PLOTS
 guiVars = {'Name', 'Group', 'UnitID', 'frt', 'btRate', ...
-    'btDur', 'btFreq', 'btIBI', 'btFrac', 'caCyto', 'caMito'};
+    'btDur', 'btFreq', 'btIBI', 'btFrac', 'caCyto', 'caMito', 'caCytoZ', 'caMitoZ'};
 tblGUI_xy(xVec, tbl(:, guiVars));
 
 guiVars = {'Name', 'Group', 'uRcv', 'UnitID', 'bRate', 'bDur', 'bSpks', ...

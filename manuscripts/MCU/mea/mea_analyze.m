@@ -102,31 +102,17 @@ end
 %  LOAD TABLE
 %  ========================================================================
 
-[tbl, xVec] = mea_tbl(basepaths);
+[tbl, xVec, basepaths, v] = mea_tbl();
 
-winBsl = [1 : v(1).fr.info.idxPert - 5];
+winBsl = [1, v(1).fr.info.idxPert - 5];
 
-tbl.caCytoZ = (tbl.caCyto - mean(tbl.caCyto(:, winBsl), 2, 'omitnan')) ./ ...
-    std(tbl.caCyto(:, winBsl), [], 2, 'omitnan');
+tblNorm = tbl;
+tblNorm.frt = log10(tblNorm.frt + eps);
+tblNorm.caMito = log10(tblNorm.caMito + eps);
+tblNorm = tbl_tNorm(tblNorm, 'winNorm', winBsl, 'Method', 'zscore');
 
 
-mitoLog = log10(tbl.caMito + eps);
-mitoAvg = mean(mitoLog(:, winBsl), 'all', 'omitnan');
-mitoSd = std(mitoLog(:, winBsl), [], 'all', 'omitnan');
-tbl.caMitoZ = (mitoLog - mitoAvg) / mitoSd;
-
-% 
-% tbl.caMitoZ = (tbl.caMito - mean(tbl.caMito(:, winBsl), 2, 'omitnan')) ./ ...
-%     std(tbl.caMito(:, winBsl), [], 2, 'omitnan');
-
-tblNorm = tbl_tNorm(tbl, {'frt', 'caMitoZ'}, [winBsl(1), winBsl(2)]);
-tbl.frtN = tblNorm.frt;
-tbl.caMitoZN = tblNorm.caMitoZ;
-
-% tblNorm = tbl_tNorm(tbl, {'frt', 'btRate', 'btDur', 'btFreq', 'btIBI', 'btFrac'}, ...
-%     winNorm, {'Name'});
-
-tblGUI_xy(xVec, tbl);
+tblGUI_xy(xVec, tblNorm);
 
 
 % -------------------------------------------------------------------------

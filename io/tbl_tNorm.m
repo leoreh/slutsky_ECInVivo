@@ -1,100 +1,140 @@
-function tblOut = tbl_tNorm(tbl, varsInc, winNorm, varsGrp)
+function tblOut = tbl_tNorm(tbl, varargin)
 % TBL_TNORM Normalizes vector columns in a table to a specific window.
 %
 % SUMMARY:
-% This function takes a table containing vector columns (either as matrices
-% or cell arrays of vectors) and normalizes them. Normalization is performed
-% by dividing the vector by the mean value within a specified window index.
-% This can be done row-by-row (each row normalized to its own baseline) or
-% group-wise (each row normalized to the group's grand mean baseline).
+% This function transforms table columns (vectors/matrices) by normalizing
+% them based on statistics calculated from a specific window. It supports
+% both row-wise and group-wise normalization using MATLAB's native
+% NORMALIZE function.
 %
-% INPUT:
-%   tbl         - Input table.
-%   varsInc     - Cell array of variable names (strings) to normalize.
-%                  Columns must be numeric matrices (N x M) or cell arrays
-%                  of numeric vectors.
-%   winNorm     - 2-element numeric vector [startIndex, endIndex] defining
-%                  the normalization window (inclusive, 1-based indices).
-%   varsGrp     - (Optional) Cell array of categorical variable names for
-%                  grouping.
-%                  * If EMPTY (default): Row-wise normalization. Each row
-%                    is divided by mean(rowVector(winNorm)).
-%                  * If SPECIFIED: Group-wise normalization. Each row in a
-%                    group is divided by the GRAND MEAN of all vectors in
-%                    that group within the window.
+% INPUT (Required):
+%   tbl         - Input table to be transformed.
+%
+% INPUT (Optional Key-Value Pairs):
+%   varsInc     - Cell array of variable names to include in normalization {[]}.
+%                  If provided, only these variables will be processed.
+%                  Variables must be numeric matrices.
+%   varsGrp     - Cell array of categorical variable names defining groups for
+%                  separate transformation {[]}. If provided, normalization
+%                  statistics (e.g., mean, std) are calculated per group.
+%   winNorm     - 2-element numeric vector [Start, End] defining the
+%                  normalization window indices {[]}. If empty, the entire
+%                  vector is used.
+%   Method      - String defining the normalization method {'percentage'}.
+%                  Options:
+%                  'percentage' - Divide by mean ( x / mean(win) )
+%                  'zscore'     - Subtract mean, divide by std ( (x-mu)/sigma )
+%                  'center'     - Subtract mean ( x - mu )
+%                  'scale'      - Divide by std ( x / sigma )
+%                  'range'      - Scale to range ( (x-min)/(max-min) )
 %
 % OUTPUT:
-%   tblOut      - Table with normalized columns.
+%   tblOut      - Transformed table with the same structure as input.
 %
 % EXAMPLE:
-%   % Row-wise normalization of 'LFP' to first 100 points
-%   tbl = tbl_tNorm(tbl, {'LFP'}, [1, 100], {});
-%
-%   % Group-wise normalization of 'FiringRate' by 'Genotype'
-%   tbl = tbl_tNorm(tbl, {'FiringRate'}, [1, 300], {'Genotype'});
+%   tbl = tbl_tNorm(tbl, 'varsInc', {'LFP'}, 'winNorm', [1, 100]);
+%   tbl = tbl_tNorm(tbl, 'varsInc', {'FR'}, 'varsGrp', {'Genotype'}, 'Method', 'zscore');
 %
 % DEPENDENCIES:
 %   None
 %
-%   See also: TBL_TRANSFORM
+%   See also: TBL_TRANSFORM, NORMALIZE
 
 %% ========================================================================
 %  ARGUMENTS
 %  ========================================================================
 
-if nargin < 4
-    varsGrp = {};
-end
+p = inputParser;
+p.KeepUnmatched = true;
+addRequired(p, 'tbl', @istable);
+addParameter(p, 'varsInc', [], @(x) iscell(x) || ischar(x) || isstring(x) || isempty(x));
+addParameter(p, 'varsGrp', [], @(x) iscell(x) || ischar(x) || isstring(x) || isempty(x));
+addParameter(p, 'winNorm', [], @(x) isnumeric(x) && (isempty(x) || numel(x)==2));
+addParameter(p, 'Method', 'percentage', @(x) ischar(x) || isstring(x));
 
-% Input validation
-if ~istable(tbl)
-    error('Input "tbl" must be a table.');
-end
+parse(p, tbl, varargin{:});
 
-if isstring(varsInc)
-    varsInc = cellstr(varsInc);
-end
-if ~iscell(varsInc)
-    error('"varsInc" must be a cell array of strings.');
-end
+varsInc = p.Results.varsInc;
+varsGrp = p.Results.varsGrp;
+winNorm = p.Results.winNorm;
+method = p.Results.Method;
 
-if ~isnumeric(winNorm) || numel(winNorm) ~= 2
-    error('"winNorm" must be a 2-element numeric vector [start, end].');
-end
+% Handle unmatched arguments for normalize
+unmatched = p.Unmatched;
+normArgs = reshape([fieldnames(unmatched), struct2cell(unmatched)]', 1, []);
 
-if isstring(varsGrp)
-    varsGrp = cellstr(varsGrp);
-end
-if ~iscell(varsGrp)
-    error('"varsGrp" must be a cell array of strings (or empty for row-wise).');
-end
+% Standardize cell arrays
+if ischar(varsInc) || isstring(varsInc), varsInc = cellstr(varsInc); end
+if ischar(varsGrp) || isstring(varsGrp), varsGrp = cellstr(varsGrp); end
+
+
+%% ========================================================================
+%  INITIALIZATION
+%  ========================================================================
 
 tblOut = tbl;
+tblVars = tbl.Properties.VariableNames;
 
-% Start/End indices
-idxStart = winNorm(1);
-idxEnd = winNorm(2);
+% Determine variables to process
+if ~isempty(varsInc)
+    processVars = varsInc;
+else
+    processVars = tblVars;
+end
+
+% Filter to only valid variables (present in table)
+idxExist = ismember(processVars, tblVars);
+if any(~idxExist)
+    warning('Some variables in varsInc were not found in the table.');
+    processVars = processVars(idxExist);
+end
+
+% Filter to only numeric variables
+validIdx = false(size(processVars));
+for iVar = 1:numel(processVars)
+    v = processVars{iVar};
+    val = tbl.(v);
+    if isnumeric(val)
+        validIdx(iVar) = true;
+    end
+end
+processVars = processVars(validIdx);
 
 
 %% ========================================================================
 %  GROUP INDICES
 %  ========================================================================
 
+% Check if group-based transformation is requested
 if ~isempty(varsGrp)
     % Find unique combinations of grouping variables
-    try
-        uGrps = unique(tblOut(:, varsGrp), 'rows');
-    catch ME
-        error('Failed to group by varsGrp. Ensure columns exist and are categorical/numeric. Msg: %s', ME.message);
-    end
+    uGrps = unique(tblOut(:, varsGrp), 'rows');
 
-    % Map each row to a group index
-    [~, loc] = ismember(tblOut(:, varsGrp), uGrps, 'rows');
-    % loc contains index of uGrps for each row in tbl
+    % Find all group indices in advance
+    idxGrps = cell(height(uGrps), 1);
+    for iGrp = 1:height(uGrps)
+        uRow = uGrps(iGrp, :);
+
+        % Find rows matching the current unique group combination
+        idxGrp = true(height(tblOut), 1);
+        for iVar = 1:length(varsGrp)
+            v = varsGrp{iVar};
+            colData = tblOut.(v);
+            val = uRow.(v);
+
+            % Handle string vs numeric comparison
+            if isstring(colData) || iscategorical(colData)
+                % For string/categorical
+                idxGrp = idxGrp & (colData == val);
+            else
+                % Numeric
+                idxGrp = idxGrp & (colData == val);
+            end
+        end
+        idxGrps{iGrp} = idxGrp;
+    end
 else
-    % No grouping -> Row-wise operations don't need group indices in the same way,
-    % but we handle logic differently below.
-    loc = [];
+    idxGrps = {};
 end
 
 
@@ -102,137 +142,116 @@ end
 %  TRANSFORM
 %  ========================================================================
 
-for iVar = 1:length(varsInc)
-    varName = varsInc{iVar};
+for iVar = 1:length(processVars)
+    varName = processVars{iVar};
+    varData = tblOut.(varName);
 
-    if ~ismember(varName, tbl.Properties.VariableNames)
-        warning('Variable "%s" not found in table. Skipping.', varName);
-        continue;
+    % Determine Window Indices
+    wS = 1; wE = inf;
+    if ~isempty(winNorm)
+        wS = max(1, winNorm(1));
+        wE = winNorm(2);
     end
 
-    dataRaw = tblOut.(varName);
+    % ---------------------------------------
+    % Case 1: Row-wise Normalization (Default)
+    % ---------------------------------------
+    if isempty(idxGrps)
 
-    % Determine data type (Matrix or Cell Array)
-    isCell = iscell(dataRaw);
+        % Vectorized Matrix Operation
+        nC = size(varData, 2);
+        currE = min(nC, wE);
 
-    if ~isCell && ~isnumeric(dataRaw)
-        warning('Variable "%s" is neither numeric matrix nor cell array. Skipping.', varName);
-        continue;
-    end
+        if currE >= wS
+            winMat = varData(:, wS:currE);
 
-    % ---------------------------------------------------------
-    % LOGIC BRANCH 1: ROW-WISE NORMALIZATION (varsGrp is empty)
-    % ---------------------------------------------------------
-    if isempty(varsGrp)
+            % Calculate Row-wise Stats
+            mu = mean(winMat, 2, 'omitnan');
+            sig = std(winMat, 0, 2, 'omitnan');
+            mn = min(winMat, [], 2, 'omitnan');
+            mx = max(winMat, [], 2, 'omitnan');
 
-        if isCell
-            % Cell Array of Vectors
-            dataNew = dataRaw;
-            for iRow = 1:height(tblOut)
-                vec = dataRaw{iRow};
-                if isempty(vec) || length(vec) < idxEnd
-                    % Handle short/empty vectors if necessary
-                    continue;
-                end
+            [C, S] = getNormParams(method, mu, sig, mx, mn);
 
-                blVal = mean(vec(idxStart:idxEnd), 'all', 'omitnan');
-
-                % Avoid division by zero
-                if blVal == 0, blVal = eps; end
-
-                dataNew{iRow} = vec ./ blVal;
-            end
-            tblOut.(varName) = dataNew;
-
-        else
-            % Numeric Matrix (N x M)
-            % Check bounds
-            if size(dataRaw, 2) < idxEnd
-                warning('Variable "%s" width (%d) is smaller than window end (%d).', ...
-                    varName, size(dataRaw, 2), idxEnd);
-            end
-
-            % Calculate baseline for each row
-            % winNorm indices apply to columns
-            colsIdx = max(1, idxStart) : min(size(dataRaw, 2), idxEnd);
-            blVals = mean(dataRaw(:, colsIdx), 2, 'omitnan');
-
-            % Handle zeros
-            blVals(blVals == 0) = eps;
-
-            % Divide
-            tblOut.(varName) = dataRaw ./ blVals;
+            varData = normalize(varData, 2, 'center', C, 'scale', S, normArgs{:});
         end
 
-        % ---------------------------------------------------------
-        % LOGIC BRANCH 2: GROUP-WISE NORMALIZATION
-        % ---------------------------------------------------------
+        tblOut.(varName) = varData;
+
     else
+        % ---------------------------------------
+        % Case 2: Group-wise Normalization
+        % ---------------------------------------
 
-        dataNew = dataRaw; % Initialize output structure
+        for iGrp = 1:length(idxGrps)
+            idxGrp = idxGrps{iGrp};
+            grpData = varData(idxGrp, :);
 
-        nGrps = height(uGrps);
+            % Extract Pooled Window Data
+            nC = size(grpData, 2);
+            currE = min(nC, wE);
+            allWinVals = [];
 
-        for iGrp = 1:nGrps
-            % Rows belonging to this group
-            idxRows = (loc == iGrp);
-
-            if ~any(idxRows), continue; end
-
-            % Extract all baseline data for this group to calculate ONE Grand Mean
-            allBlValues = [];
-
-            if isCell
-                % Extract relevant window from each cell in the group
-                groupCells = dataRaw(idxRows);
-                for k = 1:length(groupCells)
-                    vec = groupCells{k};
-                    if ~isempty(vec) && length(vec) >= idxEnd
-                        allBlValues = [allBlValues, vec(idxStart:idxEnd)]; %#ok<AGROW>
-                    elseif ~isempty(vec) && length(vec) >= idxStart
-                        % Partial overlap
-                        allBlValues = [allBlValues, vec(idxStart:end)]; %#ok<AGROW>
-                    end
-                end
-            else
-                % Matrix: Extract submatrix
-                groupMat = dataRaw(idxRows, :);
-                colsIdx = max(1, idxStart) : min(size(groupMat, 2), idxEnd);
-                if ~isempty(colsIdx)
-                    % Flatten the windowed part of the matrix
-                    allBlValues = groupMat(:, colsIdx);
-                    allBlValues = allBlValues(:);
-                end
+            if currE >= wS
+                subMat = grpData(:, wS:currE);
+                allWinVals = subMat(:);
             end
 
-            % Calculate Grand Mean
-            grandMean = mean(allBlValues, 'all', 'omitnan');
+            % Calculate Group Stats
+            [mu, sig, mx, mn] = getStats(allWinVals);
 
-            if isempty(grandMean) || isnan(grandMean) || grandMean == 0
-                grandMean = eps;
-            end
+            % Determine Normalization Params
+            [C, S] = getNormParams(method, mu, sig, mx, mn);
 
-            % Normalize rows in this group by the Grand Mean
-            if isCell
-                % Apply to each cell individually
-                currCells = dataRaw(idxRows);
-                for k = 1:length(currCells)
-                    if ~isempty(currCells{k})
-                        currCells{k} = currCells{k} ./ grandMean;
-                    end
-                end
-                dataNew(idxRows) = currCells;
-            else
-                % Matrix division
-                dataNew(idxRows, :) = dataRaw(idxRows, :) ./ grandMean;
-            end
-
+            % Apply Normalize to Group Rows
+            varData(idxGrp, :) = normalize(varData(idxGrp, :), 2, 'center', C, 'scale', S, normArgs{:});
         end
 
-        tblOut.(varName) = dataNew;
-
+        tblOut.(varName) = varData;
     end
+end
 
 end
 
-end     % EOF
+%% ========================================================================
+%  HELPER FUNCTIONS
+%  ========================================================================
+
+function [mu, sig, mx, mn] = getStats(vals)
+% Calculates basic stats ignoring NaNs
+vals = vals(~isnan(vals));
+if isempty(vals)
+    mu = NaN; sig = NaN; mx = NaN; mn = NaN;
+else
+    mu = mean(vals);
+    sig = std(vals);
+    mx = max(vals);
+    mn = min(vals);
+end
+end
+
+function [C, S] = getNormParams(method, mu, sig, mx, mn)
+% Map method to Center/Scale parameters
+switch lower(method)
+    case 'percentage'
+        C = 0;
+        S = mu;
+    case 'zscore'
+        C = mu;
+        S = sig;
+    case 'center'
+        C = mu;
+        S = 1;
+    case 'scale'
+        C = 0;
+        S = sig;
+    case 'range'
+        C = mn;
+        S = mx - mn;
+    otherwise
+        C = mu;
+        S = sig;
+end
+
+S(S == 0) = eps;
+end

@@ -1,4 +1,4 @@
-function [tbl, xVec] = mea_tbl(basepaths)
+function [tbl, xVec, basepaths, v] = mea_tbl(basepaths)
 % MEA_TBL loads data from MCU-KO and CONTROL experiments in mea and
 % organizes it in a table 
 
@@ -6,7 +6,7 @@ function [tbl, xVec] = mea_tbl(basepaths)
 %  LOAD
 %  ========================================================================
 
-if isempty(basepaths)
+if nargin < 1 || isempty(basepaths)
     basepaths = [mcu_basepaths('mea_bac'), mcu_basepaths('mea_mcuko')];
 end
 
