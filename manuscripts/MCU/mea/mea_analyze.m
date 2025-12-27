@@ -102,18 +102,24 @@ end
 %  LOAD TABLE
 %  ========================================================================
 
-[tbl, xVec, basepaths, v] = mea_tbl();
+[tbl, xVec, ~, v] = mea_tbl();
 
-winBsl = [1, v(1).fr.info.idxPert - 5];
-
+% Log
 tblNorm = tbl;
-tblNorm.frt = log10(tblNorm.frt + eps);
-tblNorm.caMito = log10(tblNorm.caMito + eps);
-tblNorm = tbl_tNorm(tblNorm, 'winNorm', winBsl, 'Method', 'zscore');
+% tblNorm.frt = log10(tblNorm.frt + eps);
+tblNorm.caMito = log10(tblNorm.caMito + 1e-6);
+
+% Normalize to baseline
+winBsl = [1, v(1).fr.info.idxPert - 5];
+tblNorm = tbl_tNorm(tblNorm, 'winNorm', winBsl, 'Method', 'percentage');
 
 
-tblGUI_xy(xVec, tblNorm);
+tblGUI_xy(xVec, tblNorm, 'tileVar', 'Group', 'yVar', 'caMito');
 
+
+varsInc = {'frt', 'caMito'};
+winCalc = [winBsl; length(xVec) - winBsl(2), length(xVec)];
+mea_compRcv(tblNorm, varsInc, winCalc)
 
 % -------------------------------------------------------------------------
 % PLOTS

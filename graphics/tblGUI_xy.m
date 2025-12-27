@@ -29,12 +29,16 @@ function hFig = tblGUI_xy(xVec, dataTbl, varargin)
 p = inputParser;
 addParameter(p, 'yVar', [], @(x) ischar(x) || isstring(x) || isempty(x));
 addParameter(p, 'tileFlow', 'vertical', @(x) permember(x, {'flow', 'vertical', 'horizontal'}));
+addParameter(p, 'tileVar', [], @(x) ischar(x) || isstring(x) || isempty(x));
+addParameter(p, 'grpVar', [], @(x) ischar(x) || isstring(x) || isempty(x));
 addParameter(p, 'SelectionCallback', [], @(x) isempty(x) || isa(x, 'function_handle'));
 addParameter(p, 'Parent', [], @(x) isempty(x) || isgraphics(x));
 addParameter(p, 'GroupByCallback', [], @(x) isempty(x) || isa(x, 'function_handle'));
 parse(p, varargin{:});
 
 initialYVar = p.Results.yVar;
+initialTileVar = p.Results.tileVar;
+initialGrpVar = p.Results.grpVar;
 tileFlow = p.Results.tileFlow;
 hParent = p.Results.Parent;
 selCbk = p.Results.SelectionCallback;
@@ -152,8 +156,16 @@ uicontrol('Parent', hPanel, 'Style', 'text', 'String', 'Plot By (Tiles):', ...
     'HorizontalAlignment', 'left', 'FontWeight', 'bold');
 currY = currY - ctlH;
 
+% Find index for tileVar
+valPlotBy = 1; % Default to 'None' (first item)
+if ~isempty(initialTileVar)
+    idx = find(strcmp(catVars, initialTileVar));
+    if ~isempty(idx), valPlotBy = idx; end
+end
+
 guiData.ddPlotBy = uicontrol('Parent', hPanel, 'Style', 'popupmenu', ...
-    'String', catVars, 'Units', 'normalized', ...
+    'String', catVars, 'Value', valPlotBy, ...
+    'Units', 'normalized', ...
     'Position', [0.05, currY, 0.9, ctlH], ...
     'Callback', @onPlotByChange);
 currY = currY - ctlH - ctlGap;
@@ -175,8 +187,16 @@ uicontrol('Parent', hPanel, 'Style', 'text', 'String', 'Group By (Colors):', ...
     'HorizontalAlignment', 'left', 'FontWeight', 'bold');
 currY = currY - ctlH;
 
+% Find index for grpVar
+valGrpBy = 1; % Default to 'None'
+if ~isempty(initialGrpVar)
+    idx = find(strcmp(catVars, initialGrpVar));
+    if ~isempty(idx), valGrpBy = idx; end
+end
+
 guiData.ddGrpBy = uicontrol('Parent', hPanel, 'Style', 'popupmenu', ...
-    'String', catVars, 'Units', 'normalized', ...
+    'String', catVars, 'Value', valGrpBy, ...
+    'Units', 'normalized', ...
     'Position', [0.05, currY, 0.9, ctlH], ...
     'Callback', @onGrpByChange);
 currY = currY - ctlH - ctlGap;

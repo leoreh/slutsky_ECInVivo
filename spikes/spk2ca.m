@@ -117,8 +117,8 @@ parfor iUnit = 1:nUnits
 
     [c, m] = transfer_fn(st, single(t), edges, params, false, iUnit);
 
-    cytoMat(iUnit, :)   = zscore(c);
-    mitoMat(iUnit, :)   = zscore(m);
+    cytoMat(iUnit, :)   = (c);
+    mitoMat(iUnit, :)   = (m);
 
 end
 
