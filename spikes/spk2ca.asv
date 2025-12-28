@@ -115,13 +115,10 @@ parfor iUnit = 1:nUnits
         continue;
     end
 
-    [c, m] = transfer_fn(st, single(t), edges, params, false, iUnit);
-    
-figure
-plot(tBins, log10(zscore(m) + eps))
+    [c, m] = transfer_fn(st, single(t), edges, params, true, iUnit);
 
-    cytoMat(iUnit, :)   = c;
-    mitoMat(iUnit, :)   = m;
+    cytoMat(iUnit, :)   = (c);
+    mitoMat(iUnit, :)   = (m);
 
 end
 
@@ -189,23 +186,24 @@ C_n = C .^ n;
 Kd_n = Kd ^ n;
 J = C_n ./ (Kd_n + C_n);
 
-% % Mitochondrial Concentration (M)
-% % Recursive Filter Implementation (Unity Gain)
-% % Steady state: y = (1-alpha)*x + alpha*y -> y(1-alpha) = x(1-alpha) -> y=x
-% alphaM = exp(-dt / params.tauM);
-% M = filter(1 - alphaM, [1 -alphaM], J);
-% mito = accumarray(binIdx(valid)', M(valid)', [nBins 1], @(x) x(end))';
+% Mitochondrial Concentration (M)
+alphaM = exp(-dt / params.tauM);
+M = filter(1 - alphaM, [1 -alphaM], J);
 
 % Binning
 binIdx = discretize(t, edges);
 valid = ~isnan(binIdx);
 
 cyto = accumarray(binIdx(valid)', C(valid)', [nBins 1], @mean)';
-mito = accumarray(binIdx(valid)', J(valid)', [nBins 1], @sum)' * dt;
+% mito = accumarray(binIdx(valid)', J(valid)', [nBins 1], @sum)' * dt;
+% mito = accumarray(binIdx(valid)', M(valid)', [nBins 1], @(x) x(end))';
+mito = accumarray(binIdx(valid)', M(valid)', [nBins 1], @max)';
 
 % Plotting
 if flgPlot
-    plot_spk2ca(t, st, C, J, uid, Kd);
+    % Calculate tBins for plotting
+    tBins = edges(1:end-1) + diff(edges)/2;
+    plot_spk2ca(t, st, C, M, tBins, cyto, mito, uid, Kd);
 end
 
 end
@@ -214,8 +212,31 @@ end
 %  HELPER: PLOTTING
 %  ========================================================================
 
-function plot_spk2ca(t, st, C, J, uid, Kd)
+function plot_spk2ca(t, st, C, J, tBins, cyto, mito, uid, Kd)
 % PLOT_MCA_UNIT Plot high-res dynamics for a single unit.
+
+% HARD CODE LIMIT
+winLim = [0, Inf] * 3600;
+
+% Filter Data (High Res)
+idx = t >= winLim(1) & t <= winLim(2);
+if ~any(idx)
+    return;
+end
+
+t = t(idx);
+C = C(idx);
+J = J(idx);
+
+% Filter Spikes
+st = st(st >= winLim(1) & st <= winLim(2));
+
+% Filter Binned Data
+idxBin = tBins >= winLim(1) & tBins <= winLim(2);
+tBins = tBins(idxBin);
+cyto = cyto(idxBin);
+mito = mito(idxBin);
+
 
 figure('Name', sprintf('Unit %d Dynamics', uid), 'Color', 'w', 'NumberTitle', 'off');
 hTile = tiledlayout(4, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
@@ -242,8 +263,21 @@ title(ax3, 'Mitochondrial Influx (J)');
 ylabel(ax3, 'Flux');
 grid(ax3, 'on');
 
-linkaxes([ax1, ax2, ax3], 'x');
-xlim(ax1, [0, max(t)]);
+% Combined (Binned)
+ax4 = nexttile(hTile);
+yyaxis(ax4, 'left');
+plot(ax4, tBins, cyto, 'b-', 'LineWidth', 1);
+ylabel(ax4, 'Cyto (Mean)');
+
+yyaxis(ax4, 'right');
+plot(ax4, tBins, mito, 'r-', 'LineWidth', 1);
+ylabel(ax4, 'Mito (Sum)');
+
+title(ax4, 'Binned Dynamics');
+grid(ax4, 'on');
+
+linkaxes([ax1, ax2, ax3, ax4], 'x');
+xlim(ax1, [min(t), max(t)]);
 
 end
 

@@ -92,7 +92,7 @@ for iFile = 1 : nFiles
         
     % Tranfer function spikes to Ca2+
     ca = spk2ca(spktimes, 'winCalc', [0, Inf], ...
-        'flgPlot', false, 'flgSave', true);
+        'flgPlot', false, 'flgSave', false);
 
 end
 

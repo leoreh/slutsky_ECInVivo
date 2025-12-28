@@ -1,0 +1,338 @@
+function sim = spk2ca_sim(varargin)
+% SPK2CA_SIM Simulation framework for mitochondrial calcium dynamics.
+%
+%   sim = SPK2CA_SIM(...) performs a parametric sweep of the mitochondrial
+%   calcium transfer function to evaluate the sensitivity of matrix accumulation
+%   to 'Tonic' vs. 'Phasic' firing patterns.
+%
+%   It sweeps 2 dimensions:
+%   1. Mean Firing Rate (sweep_rate)
+%   2. Dissociation Constant (sweep_Kd)
+%   (Hill Coefficient 'n' is fixed at 4)
+%   (Cytosolic Decay 'tauC' is fixed at 0.1s)
+%
+%   INPUTS:
+%       varargin    - (param/value) Optional parameters:
+%                     'sweep_rate'    : (vec) Mean firing rates (Hz) { [2 5 10 20] }
+%                     'sweep_Kd'      : (vec) Vector of Kd values {1:2:50}
+%                     'n'             : (num) Fixed Hill coefficient {4}
+%                     'tauC'          : (num) Fixed Cytosolic Decay {0.1}
+%                     'burstFreq'     : (num) Intra-burst frequency (Hz) {100}
+%                     'spikesPerBurst': (num) Number of spikes per burst {10}
+%                     'tauM'          : (num) Matrix decay (s) {20}
+%                     'dt'            : (num) Simulation time step (s) {0.001}
+%                     'dur'           : (num) Simulation duration (s) {60}
+%                     'flgPlot'       : (log) Plot results {true}
+%
+%   OUTPUTS:
+%       sim         - (struct) Simulation results.
+%                     .curve_Sel  : (nKd x nRate) Selectivity Curves.
+%                     .curve_Gain : (nKd x nRate) Gain Curves.
+%                     .best_params : Cell array (1 x nRate) of stats.
+%                     .params   : Parameters used.
+%
+%   EXAMPLE:
+%       sim = spk2ca_sim('sweep_rate', [0.1, 1, 10], 'sweep_Kd',  logspace(-1, log10(30), 50));
+%
+%   See also: SPK2CA, PLOT_RASTER
+
+%% ========================================================================
+%  ARGUMENTS
+%  ========================================================================
+
+p = inputParser;
+addParameter(p, 'sweep_rate', [0.1, 0.5, 1, 5, 10], @isnumeric);
+addParameter(p, 'sweep_Kd', 1:1:50, @isnumeric);    % Range
+addParameter(p, 'n', 4, @isnumeric);                % Fixed
+addParameter(p, 'tauC', 0.1, @isnumeric);           % Fixed
+addParameter(p, 'burstFreq', 50, @isnumeric);       % Hz
+addParameter(p, 'spikesPerBurst', 4, @isnumeric);   % Count
+addParameter(p, 'tauM', 20, @isnumeric);            % s (Integration window)
+addParameter(p, 'dt', 0.001, @isnumeric);           % s (High Res)
+addParameter(p, 'dur', 300, @isnumeric);             % s
+addParameter(p, 'flgPlot', true, @islogical);
+
+parse(p, varargin{:});
+params = p.Results;
+
+% Validate Dimensions
+nRate = length(params.sweep_rate);
+nKd   = length(params.sweep_Kd);
+
+%% ========================================================================
+%  INITIALIZE OUTPUTS
+%  ========================================================================
+
+curve_Sel  = nan(nKd, nRate, 'single');
+curve_Gain = nan(nKd, nRate, 'single');
+best_params = cell(1, nRate);
+
+% Prepare Simulation Time
+t = 0:params.dt:params.dur;
+nTime = length(t);
+alphaM = exp(-params.dt / params.tauM);
+filtB_M = (1 - alphaM);
+
+% Constants
+alphaC = exp(-params.dt / params.tauC);
+
+% Steady State Window
+idxSS = t > (params.dur - 30); % Last 30s
+if ~any(idxSS), idxSS = t > params.dur/2; end
+
+fprintf('Starting Sweep [n=%d, TauC=%.2f, %d Rates, %d Kds]...\n', ...
+    params.n, params.tauC, nRate, nKd);
+
+%% ========================================================================
+%  SWEEP LOOP (Rate -> Kd)
+%  ========================================================================
+
+for iR = 1:nRate
+    currRate = params.sweep_rate(iR);
+
+    % --- 1. Generate Spike Trains (Tonic vs Phasic) ---
+    if params.spikesPerBurst * currRate > params.burstFreq
+        fprintf('Skipping Rate=%.2f Hz: Duty cycle > 1.\n', currRate);
+        continue;
+    end
+
+    [st_tonic, st_phasic] = gen_trains(currRate, params.spikesPerBurst, params.burstFreq, params.dur);
+
+    % Convert to Binary Vectors
+    S_tonic = spk2vec(st_tonic, t, params.dt);
+    S_phasic = spk2vec(st_phasic, t, params.dt);
+
+    % --- 2. Calculate Cytosolic Calcium (C) ---
+    C_tonic  = filter(1, [1, -alphaC], S_tonic);
+    C_phasic = filter(1, [1, -alphaC], S_phasic);
+
+    % Fixed n vectors
+    Ct_n = C_tonic .^ params.n;
+    Cp_n = C_phasic .^ params.n;
+
+    vec_sel  = zeros(1, nKd, 'single');
+    vec_gain = zeros(1, nKd, 'single');
+
+    for iK = 1:nKd
+        kVal = params.sweep_Kd(iK);
+        Kn = kVal ^ params.n;
+
+        % Transfer Function J
+        J_tonic = Ct_n ./ (Ct_n + Kn);
+        J_phasic = Cp_n ./ (Cp_n + Kn);
+
+        % Matrix M (Low Pass)
+        M_tonic = filter(filtB_M, [1, -alphaM], J_tonic);
+        M_phasic = filter(filtB_M, [1, -alphaM], J_phasic);
+
+        mSS_t = mean(M_tonic(idxSS));
+        mSS_p = mean(M_phasic(idxSS));
+
+        % Metrics
+        vec_gain(iK) = mSS_p / (mSS_t + eps);
+        vec_sel(iK)  = (mSS_p - mSS_t) / (mSS_p + mSS_t + eps);
+    end
+
+    curve_Sel(:, iR) = vec_sel;
+    curve_Gain(:, iR) = vec_gain;
+
+    % Find Sweet Spot (Min Kd > 95% Max Selectivity)
+    maxSel = max(vec_sel);
+    thresh = 0.95 * maxSel;
+    idx = find(vec_sel >= thresh, 1, 'first');
+
+    % Handle case where no Kd meets threshold (e.g., all selectivity is low)
+    if isempty(idx)
+        [~, idx] = max(vec_sel); % Fallback to max selectivity
+    end
+
+    bestKd = params.sweep_Kd(idx);
+    bestGain = vec_gain(idx);
+
+    % Store
+    bs.sel = vec_sel(idx); % Store specific selectivity at this Kd
+    bs.Kd  = bestKd;
+    bs.gain = bestGain;
+    bs.st_tonic = st_tonic;
+    bs.st_phasic = st_phasic;
+    bs.rate_lbl = currRate;
+
+    best_params{1, iR} = bs;
+end
+fprintf('Sweep Complete.\n');
+
+sim.curve_Sel = curve_Sel;
+sim.curve_Gain = curve_Gain;
+sim.best_params = best_params;
+sim.params = params;
+
+%% ========================================================================
+%  VISUALIZATION
+%  =======================================================================
+
+if params.flgPlot
+    plot_results(sim, t, alphaM, filtB_M);
+end
+
+end
+
+%% ========================================================================
+%  HELPER: PLOTTING
+%  ========================================================================
+
+function plot_results(sim, t, alphaM, filtB_M)
+
+p = sim.params;
+nRate = length(p.sweep_rate);
+
+% --- Figure 1: Line Plots (Sensitivity) ---
+f1 = figure('Name', 'Sensitivity Curves', 'Color', 'w', 'Position', [50 50 1200 500]);
+tl = tiledlayout(1, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
+
+% Colors for Rates
+clrs = parula(nRate);
+
+% 1. Selectivity vs Kd
+ax1 = nexttile(tl);
+hold(ax1, 'on');
+for iR = 1:nRate
+    plot(ax1, p.sweep_Kd, sim.curve_Sel(:, iR), '-', 'Color', clrs(iR,:), 'LineWidth', 1.5);
+end
+xlabel('Kd (Dissociation Constant)'); ylabel('Selectivity Index');
+title('Selectivity vs Kd');
+grid on;
+
+% 2. Gain vs Kd
+ax2 = nexttile(tl);
+hold(ax2, 'on');
+lbls = cell(1, nRate);
+for iR = 1:nRate
+    plot(ax2, p.sweep_Kd, sim.curve_Gain(:, iR), '-', 'Color', clrs(iR,:), 'LineWidth', 1.5);
+    lbls{iR} = sprintf('R=%.1g Hz', p.sweep_rate(iR));
+end
+xlabel('Kd (Dissociation Constant)'); ylabel('Gain (Phasic/Tonic)');
+title('Gain vs Kd');
+grid on;
+legend(ax2, lbls, 'Location', 'bestoutside');
+
+
+% --- Figure 2: Dynamics Explorer (Tabs) ---
+f2 = figure('Name', 'Dynamics Explorer', 'Color', 'w', 'Position', [100 100 1000 700]);
+tg = uitabgroup(f2);
+
+for iR = 1:nRate
+    bs = sim.best_params{1, iR};
+    if isempty(bs), continue; end
+
+    % Format: R=0.1
+    tabStr = sprintf('Rate=%.2g Hz', bs.rate_lbl);
+    tab = uitab(tg, 'Title', tabStr);
+
+    % Layout: 2x2. Col1=Tonic, Col2=Phasic
+    tl = tiledlayout(tab, 2, 2, 'TileSpacing', 'compact');
+
+    % Re-Simulate Traces at Sweet Spot
+    S_t = spk2vec(bs.st_tonic, t, p.dt);
+    S_p = spk2vec(bs.st_phasic, t, p.dt);
+
+    alphaC = exp(-p.dt / p.tauC);
+    Ct = filter(1, [1, -alphaC], S_t);
+    Cp = filter(1, [1, -alphaC], S_p);
+
+    kVal = bs.Kd;
+    Kn = kVal ^ p.n;
+
+    Jt = (Ct.^p.n) ./ (Ct.^p.n + Kn);
+    Jp = (Cp.^p.n) ./ (Cp.^p.n + Kn);
+
+    Mt = filter(filtB_M, [1, -alphaM], Jt);
+    Mp = filter(filtB_M, [1, -alphaM], Jp);
+
+    % Full Window
+    win = [t(1), t(end)];
+
+    % --- Col 1: TONIC ---
+    % 1. Raster
+    ax1 = nexttile(tl, 1);
+    plot_raster({bs.st_tonic}, 'hAx', ax1, 'plotType', 'vertline', 'xLim', win);
+    title(ax1, 'Tonic Raster');
+
+    % 2. Ca Dynamics
+    ax2 = nexttile(tl, 3);
+    yyaxis(ax2, 'left');
+    plot(t, Ct, 'b-', 'LineWidth', 0.5);
+    ylabel('Cyto (Blue)');
+    set(ax2, 'ycolor', 'b');
+    yline(kVal, 'k--', 'Kd');
+
+    yyaxis(ax2, 'right');
+    plot(t, Mt, 'r-', 'LineWidth', 1.5);
+    ylabel('Mito (Red, Log)');
+    set(ax2, 'ycolor', 'r');
+    set(ax2, 'YScale', 'log'); % LOG SCALE
+
+    xlabel('Time (s)');
+    grid on;
+    title(ax2, sprintf('Tonic (Sel=%.2f)', bs.sel));
+
+    % --- Col 2: PHASIC ---
+    % 1. Raster
+    ax3 = nexttile(tl, 2);
+    plot_raster({bs.st_phasic}, 'hAx', ax3, 'plotType', 'vertline', 'clr', 'r', 'xLim', win);
+    title(ax3, 'Phasic Raster');
+
+    % 2. Ca Dynamics
+    ax4 = nexttile(tl, 4);
+    yyaxis(ax4, 'left');
+    plot(t, Cp, 'b-', 'LineWidth', 0.5);
+    ylabel('Cyto (Blue)');
+    set(ax4, 'ycolor', 'b');
+    yline(kVal, 'k--', 'Kd');
+
+    yyaxis(ax4, 'right');
+    plot(t, Mp, 'r-', 'LineWidth', 1.5);
+    ylabel('Mito (Red, Log)');
+    set(ax4, 'ycolor', 'r');
+    set(ax4, 'YScale', 'log'); % LOG SCALE
+
+    xlabel('Time (s)');
+    grid on;
+    title(ax4, sprintf('Phasic (Kd=%.1f)', bs.Kd));
+
+    linkaxes([ax1, ax3, ax2, ax4], 'x');
+    xlim(ax2, win);
+
+end
+
+end
+
+
+%% ========================================================================
+%  HELPER: GENERATE TRAINS
+%  ========================================================================
+function [st_tonic, st_phasic] = gen_trains(meanRate, spkBurst, burstFreq, dur)
+% 1. Tonic
+tonic_isi = 1 / meanRate;
+st_tonic = 0:tonic_isi:dur;
+
+% 2. Phasic
+t_cycle = spkBurst / meanRate;
+b_isi = 1 / burstFreq;
+b_dur = (spkBurst - 1) * b_isi;
+one_burst = 0:b_isi:b_dur;
+
+n_cycles = floor(dur / t_cycle);
+st_phasic = [];
+for i = 0:(n_cycles-1)
+    st_phasic = [st_phasic, one_burst + (i * t_cycle)]; %#ok<AGROW>
+end
+end
+
+function S = spk2vec(st, t, dt)
+nTime = length(t);
+idx = round(st / dt) + 1;
+idx(idx > nTime) = [];
+idx(idx < 1) = [];
+S = zeros(1, nTime, 'single');
+S(idx) = 1;
+end
