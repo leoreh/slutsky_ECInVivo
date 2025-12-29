@@ -34,6 +34,7 @@ addParameter(p, 'grpVar', [], @(x) ischar(x) || isstring(x) || isempty(x));
 addParameter(p, 'SelectionCallback', [], @(x) isempty(x) || isa(x, 'function_handle'));
 addParameter(p, 'Parent', [], @(x) isempty(x) || isgraphics(x));
 addParameter(p, 'GroupByCallback', [], @(x) isempty(x) || isa(x, 'function_handle'));
+addParameter(p, 'xLbl', 'Time / X', @(x) ischar(x) || isstring(x));
 parse(p, varargin{:});
 
 initialYVar = p.Results.yVar;
@@ -43,6 +44,7 @@ tileFlow = p.Results.tileFlow;
 hParent = p.Results.Parent;
 selCbk = p.Results.SelectionCallback;
 grpCbk = p.Results.GroupByCallback;
+xLbl = p.Results.xLbl;
 
 % Find all variables that match xVec dimensions (Potential Y-Vars)
 xLen = length(xVec);
@@ -110,6 +112,7 @@ guiData.highlightFcn = @highlightTraces;
 guiData.setGroupVarFcn = @setGroupVar;
 guiData.selCbk = selCbk;
 guiData.grpCbk = grpCbk;
+guiData.xLbl = xLbl;
 
 
 %% ========================================================================
@@ -499,7 +502,7 @@ onUpdatePlot(hContainer, []);
             hold(hAx, 'off');
         end
 
-        xlabel(data.hLayout, 'Time / X');
+        xlabel(data.hLayout, data.xLbl);
         ylabel(data.hLayout, data.yVar, 'Interpreter', 'none');
         title(data.hLayout, sprintf('%s Plot By: %s | Group By: %s', data.yVar, varPB, varGB), 'Interpreter', 'none');
 

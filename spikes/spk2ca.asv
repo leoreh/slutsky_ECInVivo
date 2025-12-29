@@ -33,12 +33,12 @@ function ca = spk2ca(spktimes, varargin)
 p = inputParser;
 addRequired(p, 'spktimes', @iscell);
 addParameter(p, 'winCalc', [], @isnumeric);
-addParameter(p, 'binSize', 60, @isnumeric);
+addParameter(p, 'binSize', 1, @isnumeric);
 addParameter(p, 'dt', 0.001, @isnumeric);
 addParameter(p, 'tauC', 0.05, @isnumeric);
 addParameter(p, 'tauM', 20, @isnumeric);
-addParameter(p, 'n', 10, @isnumeric);
-addParameter(p, 'Kd', 20, @isnumeric);
+addParameter(p, 'n', 4, @isnumeric);
+addParameter(p, 'Kd', 10, @isnumeric);
 addParameter(p, 'flgPlot', false, @islogical);
 addParameter(p, 'flgSave', false, @islogical);
 addParameter(p, 'basepath', pwd, @ischar);
@@ -115,10 +115,53 @@ parfor iUnit = 1:nUnits
         continue;
     end
 
-    [c, m] = transfer_fn(st, single(t), edges, params, true, iUnit);
+    nTime = length(t);
+    dt = params.dt;
+    n = params.n;
+    Kd = single(params.Kd);
+    nBins = length(edges) - 1;
 
-    cytoMat(iUnit, :)   = (c);
-    mitoMat(iUnit, :)   = (m);
+    % Discretize
+    % Convert spike times to indices
+    stIdx = round(st / dt) + 1;
+    stIdx(stIdx > nTime) = [];
+    stIdx(stIdx < 1) = [];
+
+    S = zeros(1, nTime, 'single');
+    for iTime = 1:length(stIdx)
+        S(stIdx(iTime)) = S(stIdx(iTime)) + 1;
+    end
+
+    % Cytosolic Calcium (C)
+    % Recursive Filter Implementation
+    alphaC = exp(-dt / params.tauC);
+    C = filter(1, [1 -alphaC], S);
+
+    % Mitochondrial Flux (J)
+    C_n = C .^ n;
+    Kd_n = Kd ^ n;
+    J = C_n ./ (Kd_n + C_n);
+
+    % Mitochondrial Concentration (M)
+    alphaM = exp(-dt / params.tauM);
+    M = filter(1 - alphaM, [1 -alphaM], J);
+
+    % Binning
+    binIdx = discretize(t, edges);
+    valid = ~isnan(binIdx);
+
+    cytoMat(iUnit, :) = accumarray(binIdx(valid)', C(valid)', [nBins 1], @mean)';
+    mitoMat(iUnit, :) = accumarray(binIdx(valid)', M(valid)', [nBins 1], @max)';
+
+    % Plotting
+    if false
+        
+        plot_spkVmito(st, tBins, edges, ...
+            cytoMat(iUnit, :), mitoMat(iUnit, :), iUnit)
+
+        plot_spk2ca(t, st, C, M, tBins, ...
+            cytoMat(iUnit, :), mitoMat(iUnit, :), iUnit, Kd);
+    end
 
 end
 
@@ -131,6 +174,8 @@ ca.mito   = mitoMat;
 
 if flgPlot
     tbl = struct2table(rmfield(ca, {'time', 'params'}));
+    tbl.UID = categorical([1 : size(tbl.mito, 1)])';
+    tbl.mitoN = log10(tbl.mito + eps);
     tblGUI_xy(ca.time, tbl, 'yVar', 'mito');
 end
 
@@ -147,66 +192,58 @@ end     % EOF
 
 
 %% ========================================================================
-%  HELPER: COMPUTE UNIT DYNAMICS
+%  HELPER: PLOT SPIKING PARAMETERS VS MITO
 %  ========================================================================
 
-function [cyto, mito] = transfer_fn(st, t, edges, params, flgPlot, uid)
-% SPK2MCA Helper to calculate calcium dynamics for a single unit.
+function plot_spkVmito(st, tBins, edges, cyto, mito, uid)
+% PLOT_SPKVMITO Plots bin-wise spiking parameters vs mito/cyto signals.
+%
+%   Derives Rate, MinISI, and CV for each bin and launches tblGUI_scatHist.
 
-nTime = length(t);
-dt = params.dt;
-n = params.n;
-Kd = single(params.Kd);
-nBins = length(edges) - 1;
+nBins = length(tBins);
 
-% Discretize
-% Convert spike times to indices
-stIdx = round(st / dt) + 1;
-stIdx(stIdx > nTime) = [];
-stIdx(stIdx < 1) = [];
+% Initialize
+rate   = nan(nBins, 1);
+minISI = nan(nBins, 1);
+cv     = nan(nBins, 1);
 
-if isempty(stIdx)
-    cyto = zeros(1, nBins);
-    mito = zeros(1, nBins);
-    return;
+for iBin = 1:nBins
+    % Define bin window
+    tOn = edges(iBin);
+    tOff = edges(iBin+1);
+
+    % Find spikes
+    s = st(st >= tOn & st < tOff);
+    dur = tOff - tOn;
+
+    % Rate
+    rate(iBin) = numel(s) / dur;
+
+    % ISI Metrics
+    if numel(s) > 1
+        isi = diff(s);
+        minISI(iBin) = min(isi);
+        cv(iBin) = std(isi) / mean(isi);
+    end
 end
 
-S = zeros(1, nTime, 'single');
-for iTime = 1:length(stIdx)
-    S(stIdx(iTime)) = S(stIdx(iTime)) + 1;
-end
+% Create Table
+tbl = table();
+tbl.Time   = tBins(:);
+tbl.Rate   = rate;
+tbl.MinISI = minISI;
+tbl.CV     = cv;
+tbl.Cyto   = cyto(:);
+tbl.Mito   = mito(:);
 
-% Cytosolic Calcium (C)
-% Recursive Filter Implementation
-alphaC = exp(-dt / params.tauC);
-C = filter(1, [1 -alphaC], S);
-
-% Mitochondrial Flux (J)
-C_n = C .^ n;
-Kd_n = Kd ^ n;
-J = C_n ./ (Kd_n + C_n);
-
-% Mitochondrial Concentration (M)
-alphaM = exp(-dt / params.tauM);
-M = filter(1 - alphaM, [1 -alphaM], J);
-
-% Binning
-binIdx = discretize(t, edges);
-valid = ~isnan(binIdx);
-
-cyto = accumarray(binIdx(valid)', C(valid)', [nBins 1], @mean)';
-% mito = accumarray(binIdx(valid)', J(valid)', [nBins 1], @sum)' * dt;
-% mito = accumarray(binIdx(valid)', M(valid)', [nBins 1], @(x) x(end))';
-mito = accumarray(binIdx(valid)', M(valid)', [nBins 1], @max)';
-
-% Plotting
-if flgPlot
-    % Calculate tBins for plotting
-    tBins = edges(1:end-1) + diff(edges)/2;
-    plot_spk2ca(t, st, C, M, tBins, cyto, mito, uid, Kd);
-end
+% Launch GUI
+% We set 'Mito' as the default Y variable, and 'Rate' as X.
+hFig = tblGUI_scatHist(tbl, 'xVar', 'Rate', 'yVar', 'Mito');
+set(hFig, 'Name', sprintf('Unit %d Spk vs Mito', uid));
 
 end
+
+
 
 %% ========================================================================
 %  HELPER: PLOTTING
@@ -402,3 +439,5 @@ end
 %  3. Leaky Integration: It correctly preserves the 30-second decay (tauM)
 %     as a bridge across continuous experimental phases.
 %% ========================================================================
+
+

@@ -1,39 +1,42 @@
 function sim = spk2ca_sim(varargin)
-% SPK2CA_SIM Simulation framework for mitochondrial calcium dynamics.
+% SPK2CA_SIM Parametric simulation of mitochondrial calcium selectivity.
 %
-%   sim = SPK2CA_SIM(...) performs a parametric sweep of the mitochondrial
-%   calcium transfer function to evaluate the sensitivity of matrix accumulation
-%   to 'Tonic' vs. 'Phasic' firing patterns.
-%
-%   PLOTS:
-%   1. Parameter Sensitivity: Selectivity vs Kd (Tiled by TauC).
-%   2. Summary (if vector TauC): Selectivity/Gain vs TauC (Lines = Rate).
-%   3. Dynamics Explorer: Detailed Traces at Optimal Parameters.
+%   sim = SPK2CA_SIM(...) performs a sweep of biophysical parameters to evaluate
+%   the selectivity of mitochondrial calcium accumulation to 'Tonic' vs. 'Phasic'
+%   firing patterns.
 %
 %   INPUTS:
 %       varargin    - (param/value) Optional parameters:
-%                     'sweep_rate'    : (vec) Mean firing rates (Hz)
-%                     'sweep_Kd'      : (vec) vector of Kd values
-%                     'tauC'          : (num) Cytosolic Decay (Scalar or Vec)
-%                     'n'             : (num) Fixed Hill coefficient {4}
-%                     'burstFreq'     : (num) Intra-burst frequency (Hz)
-%                     'spikesPerBurst': (num) Number of spikes per burst
+%                     'sweep_rate'    : (vec) Mean firing rates (Hz) { [0.1 0.5 1 5 10] }
+%                     'sweep_Kd'      : (vec) Dissociation constants { logspace(-1, log10(20), 50) }
+%                     'tauC'          : (vec) Cytosolic decay time constants (s) {0.1}
+%                     'burstFreq'     : (num) Intra-burst frequency (Hz) {100}
+%                     'spikesPerBurst': (num) Number of spikes per burst {8}
+%                     'n'             : (num) Hill coefficient {4}
+%                     'tauM'          : (num) Matrix decay time constant {20} (s)
+%                     'dt'            : (num) Simulation time step {0.001} (s)
+%                     'dur'           : (num) Simulation duration {300} (s)
+%                     'flgPlot'       : (log) Plot results {true}
 %
-%   EXAMPLE:
-%       sim = spk2ca_sim('tauC', logspace(-2, 0, 20));
-%       sim = spk2ca_sim('tauC', [0.1]);
+%   OUTPUTS:
+%       sim         - (struct) Simulation results structure.
+%                     .T        : (table) Results table (Rate, TauC, Selectivity, Gain).
+%                     .res      : (struct) Summary matrices and optimal parameters.
+%                     .params   : (struct) Input parameters.
 %
-%   See also: SPK2CA, PLOT_RASTER
+%   See also: SPK2CA, TBLGUI_XY, PLOT_AXSIZE
 
-%% Arguments
+%% ========================================================================
+%  ARGUMENTS
+%  ========================================================================
 
 p = inputParser;
 addParameter(p, 'sweep_rate', [0.1, 0.5, 1, 5, 10], @isnumeric);
-addParameter(p, 'sweep_Kd', logspace(-1, log10(20), 50), @isnumeric);
-addParameter(p, 'n', 4, @isnumeric);
-addParameter(p, 'tauC', 0.1, @isnumeric);
+addParameter(p, 'sweep_Kd', logspace(-1, 1, 20), @isnumeric);
+addParameter(p, 'tauC', logspace(-2, 0, 20), @isnumeric);
 addParameter(p, 'burstFreq', 100, @isnumeric);
 addParameter(p, 'spikesPerBurst', 8, @isnumeric);
+addParameter(p, 'n', 4, @isnumeric);
 addParameter(p, 'tauM', 20, @isnumeric);
 addParameter(p, 'dt', 0.001, @isnumeric);
 addParameter(p, 'dur', 300, @isnumeric);
@@ -47,67 +50,84 @@ nRate = length(par.sweep_rate);
 nKd   = length(par.sweep_Kd);
 nTau  = length(par.tauC);
 
-%% Initialize
+%% ========================================================================
+%  INITIALIZE
+%  ========================================================================
 
-res.selCurves = cell(nTau, 1);  % Each cell: [nKd x nRate]
-res.peakSel   = zeros(nTau, nRate);
-res.peakGain  = zeros(nTau, nRate);
+% Initialization for Table
+nTotal = nRate * nTau;
+cRate  = cell(nTotal, 1);
+cTau   = cell(nTotal, 1);
+cSel   = cell(nTotal, 1);
+cGain  = cell(nTotal, 1);
+cnt    = 0;
+
+% Summary containers
+res.peakSel    = zeros(nTau, nRate);
+res.peakGain   = zeros(nTau, nRate);
 res.bestParams = cell(nTau, nRate);
 
-% Time Vector
+% Simulation Vectors
 t = 0:par.dt:par.dur;
 alphaM = exp(-par.dt / par.tauM);
 filtBM = (1 - alphaM);
 
+% Steady State Window
 idxSS = t > (par.dur - 30);
 if ~any(idxSS), idxSS = t > par.dur/2; end
 
 fprintf('Starting Sweep [n=%d, %d Taus, %d Rates, %d Kds]...\n', ...
     par.n, nTau, nRate, nKd);
 
-%% Sweep Loop
+%% ========================================================================
+%  COMPUTE LOOP
+%  ========================================================================
 
 for iT = 1:nTau
-    curTau = par.tauC(iT);
-    alphaC = exp(-par.dt / curTau);
-
-    selMap = zeros(nKd, nRate, 'single');
+    currTau = par.tauC(iT);
+    alphaC = exp(-par.dt / currTau);
 
     for iR = 1:nRate
-        curRate = par.sweep_rate(iR);
+        currRate = par.sweep_rate(iR);
+        cnt = cnt + 1;
 
-        % Generate Trains
-        if par.spikesPerBurst * curRate > par.burstFreq
-            fprintf('Skipping R=%.1f: Duty Cycle > 1\n', curRate);
+        % 1. Generate Spike Times
+        if par.spikesPerBurst * currRate > par.burstFreq
+            % Invalid (Duty Cycle > 1)
+            cRate{cnt} = sprintf('%.3g Hz', currRate);
+            cTau{cnt}  = sprintf('%.3g s', currTau);
+            cSel{cnt}  = nan(1, nKd);
+            cGain{cnt} = nan(1, nKd);
             continue;
         end
-        [stT, stP] = gen_trains(curRate, par.spikesPerBurst, par.burstFreq, par.dur);
 
-        % Convert to Vector
+        [stT, stP] = gen_spktimes(currRate, par.spikesPerBurst, par.burstFreq, par.dur);
+
+        % 2. Convert to Binary Vector
         sT = spk2vec(stT, t, par.dt);
         sP = spk2vec(stP, t, par.dt);
 
-        % Cytosolic Ca
+        % 3. Cytosolic Calcium (Linear Filter)
         cT = filter(1, [1, -alphaC], sT);
         cP = filter(1, [1, -alphaC], sP);
 
-        % Fixed Hill Powers
+        % Pre-calculate Powers (Hill)
         cTn = cT .^ par.n;
         cPn = cP .^ par.n;
 
-        % Kd Sweep
-        vSel  = zeros(nKd, 1);
-        vGain = zeros(nKd, 1);
+        % 4. Kd Sweep
+        vSel  = zeros(1, nKd);
+        vGain = zeros(1, nKd);
 
         for iK = 1:nKd
             valK = par.sweep_Kd(iK);
             Kn = valK ^ par.n;
 
-            % Flux
+            % Mitochondrial Flux (Hill Equation)
             jT = cTn ./ (cTn + Kn);
             jP = cPn ./ (cPn + Kn);
 
-            % Matrix Ca
+            % Matrix Accumulation (Integration)
             mT = filter(filtBM, [1, -alphaM], jT);
             mP = filter(filtBM, [1, -alphaM], jP);
 
@@ -118,101 +138,111 @@ for iT = 1:nTau
             vGain(iK) = ssP / (ssT + eps);
             vSel(iK)  = (ssP - ssT) / (ssP + ssT + eps);
         end
-        selMap(:, iR) = vSel;
 
-        % Optimal Kd (Min val > 95% Peak)
+        % Handle NaNs
+        vSel(isnan(vSel)) = 0;
+
+        % 5. Store Results
+        cRate{cnt} = sprintf('%.3g Hz', currRate);
+        cTau{cnt}  = sprintf('%.3g s', currTau);
+        cSel{cnt}  = vSel;
+        cGain{cnt} = vGain;
+
+        % Find Optimal Kd (95% Threshold)
         peakVal = max(vSel);
         thresh = 0.95 * peakVal;
         idxOpt = find(vSel >= thresh, 1, 'first');
         if isempty(idxOpt), [~, idxOpt] = max(vSel); end
 
-        best.Kd = par.sweep_Kd(idxOpt);
-        best.sel = vSel(idxOpt);
+        best.Kd   = par.sweep_Kd(idxOpt);
+        best.sel  = vSel(idxOpt);
         best.gain = vGain(idxOpt);
-        best.stT = stT;
-        best.stP = stP;
-        best.rate = curRate;
-        best.tau = curTau;
+        best.stT  = stT;
+        best.stP  = stP;
+        best.rate = currRate;
+        best.tau  = currTau;
 
         res.bestParams{iT, iR} = best;
-        res.peakSel(iT, iR) = peakVal;
-        res.peakGain(iT, iR) = best.gain;
+        res.peakSel(iT, iR)    = peakVal;
+        res.peakGain(iT, iR)   = best.gain;
     end
-
-    res.selCurves{iT} = selMap;
 end
 
-sim.res = res;
-sim.par = par;
+% Construct Simulation Table
+T = table(cRate, cTau, cSel, cGain, 'VariableNames', {'Rate', 'TauC', 'Selectivity', 'Gain'});
+T.Rate = categorical(T.Rate);
+T.TauC = categorical(T.TauC);
+T.Rate = reordercats(T.Rate, natsort(unique(cRate)));
+T.TauC = reordercats(T.TauC, unique(cTau));
+
+sim.T      = T;
+sim.res    = res;
+sim.params = par;
+
 fprintf('Done.\n');
 
-%% Visualization
+%% ========================================================================
+%  VISUALIZATION
+%  ========================================================================
 
 if par.flgPlot
     plot_results(sim, t, alphaM, filtBM);
 end
 
-end
+end     % EOF
 
-%% Helper: Plotting
+%% ========================================================================
+%  HELPER FUNCTIONS
+%  ========================================================================
+
 function plot_results(sim, t, alphaM, filtBM)
-par = sim.par;
+par = sim.params;
 res = sim.res;
-nTau = length(par.tauC);
+T   = sim.T;
+nTau  = length(par.tauC);
 nRate = length(par.sweep_rate);
+clrs  = parula(nRate);
 
-clrs = parula(nRate);
+% --- Fig 1: Parameter Sensitivity (Interactive GUI) ---
+% Plots Selectivity vs Kd. Tiles by TauC, Groups by Rate.
+tblGUI_xy(par.sweep_Kd, T, ...
+    'yVar', 'Selectivity', ...
+    'grpVar', 'Rate', ...
+    'tileVar', 'none', ...
+    'xLbl', 'Kd');
 
-% --- Fig 1: Parameter Sensitivity (Always On) ---
-f1 = figure('Name', 'Sensitivity', 'Color', 'w', 'Position', [50 300 300*max(1,nTau) 400]);
-tl1 = tiledlayout(1, nTau, 'TileSpacing', 'compact', 'Padding', 'compact');
-
-for iT = 1:nTau
-    ax = nexttile(tl1); hold on;
-    selMap = res.selCurves{iT};
-
-    for iR = 1:nRate
-        if all(selMap(:, iR)==0), continue; end
-        plot(ax, par.sweep_Kd, selMap(:, iR), '-', 'Color', clrs(iR,:), 'LineWidth', 1.5);
-    end
-    title(sprintf('TauC = %.3g s', par.tauC(iT)));
-    xlabel('Kd'); ylabel('Selectivity');
-    grid on;
-    if iT == 1
-        lgd = legend(arrayfun(@(x) sprintf('R=%.3g', x), par.sweep_rate, 'UniformOutput', false));
-        lgd.Location = 'best';
-    end
-end
-
-% --- Fig 2: Summary (If Multi-Tau) ---
+% --- Fig 2: Summary Analysis (Only if Multi-Tau) ---
 if nTau > 1
-    f2 = figure('Name', 'TauC Analysis', 'Color', 'w', 'Position', [50 50 800 400]);
-    tl2 = tiledlayout(1, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
+    [f2, ~] = plot_axSize('axShape', 'wide', 'axWidth', 800, 'hFig', []);
+    set(f2, 'Name', 'TauC Analysis');
+
+    tl2 = tiledlayout(f2, 1, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
 
     % Panel A: Selectivity vs Tau (Lines=Rate)
-    axA = nexttile(tl2); hold on;
+    axA = nexttile(tl2); hold(axA, 'on');
     for iR = 1:nRate
         plot(axA, par.tauC, res.peakSel(:, iR), 'o-', 'Color', clrs(iR,:), 'LineWidth', 1.5);
     end
-    title('Peak Selectivity vs TauC');
-    xlabel('TauC (s)'); ylabel('Max Selectivity');
-    grid on;
+    title(axA, 'Peak Selectivity vs TauC');
+    xlabel(axA, 'TauC (s)'); ylabel(axA, 'Max Selectivity');
+    grid(axA, 'on');
 
     % Panel B: Gain vs Tau (Lines=Rate)
-    axB = nexttile(tl2); hold on;
+    axB = nexttile(tl2); hold(axB, 'on');
     for iR = 1:nRate
         plot(axB, par.tauC, res.peakGain(:, iR), 's-', 'Color', clrs(iR,:), 'LineWidth', 1.5);
     end
-    title('Gain at Max Selectivity');
-    xlabel('TauC (s)'); ylabel('Gain (P/T)');
-    grid on;
+    title(axB, 'Gain at Max Selectivity');
+    xlabel(axB, 'TauC (s)'); ylabel(axB, 'Gain (P/T)');
+    grid(axB, 'on');
 
     l2 = legend(axB, arrayfun(@(x) sprintf('R=%.3g', x), par.sweep_rate, 'UniformOutput', false));
     l2.Location = 'bestoutside';
 end
 
 % --- Fig 3: Dynamics Explorer ---
-f3 = figure('Name', 'Dynamics', 'Color', 'w', 'Position', [660 50 800 600]);
+[f3, ~] = plot_axSize('axShape', 'wide', 'axWidth', 800, 'hFig', []);
+set(f3, 'Name', 'Dynamics Explorer');
 tg = uitabgroup(f3);
 
 for iT = 1:nTau
@@ -224,7 +254,7 @@ for iT = 1:nTau
         tab = uitab(tg, 'Title', titleStr);
         tl = tiledlayout(tab, 2, 2, 'Padding', 'compact');
 
-        % Re-Simulate Optimal Trace
+        % Re-Simulate
         sT = spk2vec(bs.stT, t, par.dt);
         sP = spk2vec(bs.stP, t, par.dt);
 
@@ -245,9 +275,9 @@ for iT = 1:nTau
         title(axT1, 'Tonic');
 
         axT2 = nexttile(tl, 3);
-        yyaxis(axT2, 'left'); plot(t, cT, 'b-'); ylabel('Cyto', 'Color', 'b');
+        yyaxis(axT2, 'left'); plot(t, cT, 'b-'); ylabel('Cyto (Blue)');
         set(axT2, 'YColor', 'b');
-        yyaxis(axT2, 'right'); plot(t, mT, 'r-'); ylabel('Mito (Log)', 'Color', 'r');
+        yyaxis(axT2, 'right'); plot(t, mT, 'r-'); ylabel('Mito (Log, Red)');
         set(axT2, 'YColor', 'r', 'YScale', 'log');
         title(axT2, sprintf('Tonic Response (Sel=%.2f)', bs.sel));
         grid(axT2, 'on');
@@ -271,11 +301,11 @@ end
 end
 
 
-function [stT, stP] = gen_trains(meanRate, nSpk, freq, dur)
-% Tonic
+function [stT, stP] = gen_spktimes(meanRate, nSpk, freq, dur)
+% Tonic (Regular)
 stT = 0:(1/meanRate):dur;
 
-% Phasic
+% Phasic (Bursts)
 period = nSpk / meanRate;
 bIsi   = 1/freq;
 bDur   = (nSpk-1)*bIsi;

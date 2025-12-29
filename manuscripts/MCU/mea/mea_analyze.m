@@ -92,7 +92,7 @@ for iFile = 1 : nFiles
         
     % Tranfer function spikes to Ca2+
     ca = spk2ca(spktimes, 'winCalc', [0, Inf], ...
-        'flgPlot', false, 'flgSave', false);
+        'flgPlot', false, 'flgSave', true);
 
 end
 
@@ -102,7 +102,27 @@ end
 %  LOAD TABLE
 %  ========================================================================
 
-[tbl, xVec, ~, v] = mea_tbl();
+[tbl, xVec, ~, v] = mea_tbl(basepaths, v);
+
+tblGUI_xy(xVec([1 : 32395]), tbl, 'tileVar', 'Group', 'yVar', 'caMito');
+
+tblGUI_scatHist(tbl, 'xVar', 'bFrac', 'yVar', 'rcvTime', 'grpVar', 'Group');
+
+%%
+% higher ss firing correlated with greater burstiness, including change to
+% burst params
+%%
+
+varsInc = {'caMito'};
+winBsl = [1, v(1).fr.info.idxPert - 5] * 60;
+winCalc = [winBsl; length(xVec) - winBsl(2), length(xVec)];
+mea_compRcv(tbl, varsInc, winCalc)
+
+
+varsInc = {'frt'};
+winBsl = [1, v(1).fr.info.idxPert - 5];
+winCalc = [winBsl; length(xVec) - winBsl(2), length(xVec)];
+mea_compRcv(tbl, varsInc, winCalc)
 
 % Log
 tblNorm = tbl;
@@ -124,12 +144,11 @@ mea_compRcv(tblNorm, varsInc, winCalc)
 % -------------------------------------------------------------------------
 % PLOTS
 guiVars = {'Name', 'Group', 'UnitID', 'frt', 'btRate', ...
-    'btDur', 'btFreq', 'btIBI', 'btFrac', 'caCyto', 'caMito', 'caCytoZ', 'caMitoZ'};
+    'btDur', 'btFreq', 'btIBI', 'btFrac'};
 tblGUI_xy(xVec, tbl(:, guiVars));
 
 guiVars = {'Name', 'Group', 'uRcv', 'UnitID', 'bRate', 'bDur', 'bSpks', ...
-    'bFreq', 'bIBI', 'bFrac', 'fr', 'frSs', 'spkDfct', 'rcvTime', ...
-    'cytoBsl', 'mitoBsl'};
+    'bFreq', 'bIBI', 'bFrac', 'fr', 'frSs', 'spkDfct', 'rcvTime'};
 tblGUI_scatHist(tbl(:, guiVars), 'xVar', 'bFrac', 'yVar', 'rcvTime', 'grpVar', 'Group');
 
 tblGUI_bar(tbl(:, guiVars), 'yVar', 'bFrac', 'xVar', 'Group');

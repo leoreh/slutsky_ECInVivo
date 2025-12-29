@@ -82,6 +82,7 @@ for iVar = 1:length(varsInc)
 
         name = sprintf('%s_W%d', varName, iWin);
         tblOut.(name) = sd ./ mu;
+        % tblOut.(name) = sum(winData, 2, 'omitnan');
 
         if iWin == 1
             name1 = name;
