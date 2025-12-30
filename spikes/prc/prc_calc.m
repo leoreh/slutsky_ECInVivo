@@ -179,19 +179,13 @@ parfor iShuffle = 1 : nShuffles
     stpr_tmp = zeros(nUnits, nBins);
     prc0_tmp = nan(nUnits, 1);
 
-    % Calculate global population rate for this shuffle
-    popShfl = sum(rasterShuffled, 1, 'omitnan');
-    popShfl = conv(popShfl / binSize, gk, 'same');
-
     % Calculate STPR for each unit relative to shuffled population rate
     for iGood = 1:nGood
         idxRef = uGood(iGood);
 
-        % Calculate unit smoothed rate
+        % Calculate unit smoothed rate and LOO Population Rate
         ur = conv(rasterShuffled(iGood, :) / binSize, gk, 'same');
-
-        % LOO Population Rate
-        pr = popShfl - ur;
+        pr = popRate - ur;
 
         % Calculate STPR using pre-processed spike bins
         [stpr_tmp(idxRef,:), prc0_tmp(idxRef)] = stpr_calc(refBins{iGood}, pr, lagBins);
@@ -365,3 +359,59 @@ elseif strcmp(mode, 'update')
 end
 end
 
+%% ========================================================================
+%  NOTE: MARKOV CHAIN MONTE CARLO (MCMC)
+%  ========================================================================
+%  While traditional shuffling resets to the observed data for every
+%  iteration, MCMC treats the null distribution as a continuous space to
+%  be explored. The 'Burn-In' transition achieves high entropy, while
+%  subsequent steps maintain that entropy with minimal displacement.
+%
+%  * Burn-In: Decouples the matrix from the original spike timing.
+%  * Mixing Step: Navigates the space of all possible permutations.
+%  * Stationarity: Preserves row/column marginals throughout the chain.
+%  * Efficiency: Reduces O(N) overhead to O(k) per sample.
+%
+%  JUSTIFICATION FOR REDUCED INTER-SHUFFLE SWAPS
+%  Using the end-state of Shuffle(i) as the starting-state for Shuffle(i+1)
+%  is a standard practice in computational statistics (Metropolis-Hastings)
+%  for the following reasons:
+%
+%  1. Entropy Persistence: Once the matrix reaches a randomized state,
+%     it does not 're-order' itself. Subsequent swaps merely explore
+%     alternative configurations within the same null manifold.
+%  2. Computational Economy: It avoids the redundant 're-melting' of the
+%     original data structure, focusing resources on sampling rather than
+%     initialization.
+%  3. Independent Sampling: Provided the mixing step is sufficient (e.g.,
+%     swaps >= total spikes / 10), the resulting STPR distributions
+%     remain statistically independent for Z-scoring purposes.
+%% ========================================================================
+
+%% ========================================================================
+%  NOTE: INVARIANCE OF GLOBAL POPULATION RATE (COLUMN SUMS)
+%  ========================================================================
+%  The 2x2 edge-swap algorithm (shuffle_raster.cpp) is a doubly-constrained
+%  randomization. While it redistributes spikes across time, it strictly
+%  preserves both the Row Sums (unit firing rates) and the Column Sums
+%  (instantaneous population counts).
+%
+%  * Column Sums: sum(rasterMat, 1) == sum(rasterShuffled, 1)
+%  * Linearity: conv(A + B, G) == conv(A, G) + conv(B, G)
+%  * Determinism: Global rate depends only on the aggregate bin counts.
+%
+%  JUSTIFICATION FOR PRE-CALCULATING THE GLOBAL SMOOTHED RATE
+%  Because the total number of spikes in every time bin (dt) remains
+%  constant across all possible shuffled iterations, the 'Global
+%  Population Rate' is an invariant property of the session.
+%
+%  1. Computational Efficiency: Calculating the global convolution once
+%     outside the parfor loop reduces redundant O(N) operations by a factor
+%     equal to nShuffles (e.g., 1000x fewer convolutions).
+%  2. LOO Validity: The Leave-One-Out (LOO) population rate remains valid
+%     by subtracting the shuffled unit's smoothed rate from the fixed
+%     global rate: PR_loo = Global_fixed - Unit_shuffled.
+%  3. Mathematical Identity: Since the sum of all units is constant,
+%     the sum of the smoothed signals is also constant, ensuring the
+%     null distribution is centered correctly.
+%% ========================================================================

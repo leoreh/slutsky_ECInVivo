@@ -7,7 +7,7 @@ params.nShuffles = 100;            % Number of shuffles
 params.spkLim = 1000;
 
 basepaths = [mcu_basepaths('wt_bsl'), mcu_basepaths('mcu_bsl')];
-basepaths = [mcu_basepaths('mea_bac')];
+% basepaths = [mcu_basepaths('mea_bac')];
 nFiles = length(basepaths);
 vars = {'spikes', 'st_metrics', 'fr', 'units'};
 v = basepaths2vars('basepaths', basepaths, 'vars', vars);
