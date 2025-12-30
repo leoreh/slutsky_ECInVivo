@@ -85,10 +85,10 @@ box off;
 subplot(3, 3, [4, 5]);
 hold on;
 colors = lines(nExUnits);
-for i = 1:nExUnits
-    unit = exUnits(i);
-    plot(tStpr, prc.stpr(unit,:), 'Color', colors(i,:), 'LineWidth', 1);
-    plot(tStpr, prc.stpr_shfl(unit,:), '--', 'Color', colors(i,:), 'LineWidth', 0.5);
+for iUnit = 1:nExUnits
+    unit = exUnits(iUnit);
+    plot(tStpr, prc.stpr(unit,:), 'Color', colors(iUnit,:), 'LineWidth', 1);
+    plot(tStpr, prc.stpr_shfl(unit,:), '--', 'Color', colors(iUnit,:), 'LineWidth', 0.5);
 end
 xline(0, '--k');
 xlabel('Time [s]');
@@ -116,35 +116,47 @@ plot_scatterCorr(prc.prc0, prc.prc0_norm, 'xLbl', 'Raw STPR at Zero Lag', ...
     'yLbl', 'Population Coupling (Z-score)', 'flgOtl', true);
 title('STPR vs. Coupling Strength');
 
-% --- Shuffled distribution for example units ---
+% --- Population Shuffle Overlay ---
 subplot(3, 3, 6);
 hold on;
-for i = 1:nExUnits
-    unit = exUnits(i);
-    histogram(prc.prc0_shfl(unit,:), 20, 'Normalization', 'probability',...
-        'FaceColor', colors(i,:), 'EdgeColor', 'none', 'FaceAlpha', 0.6);
-    xline(prc.prc0(unit), '--', 'Color', colors(i,:), 'LineWidth', 1);
-end
-xlabel('STPR at Zero Lag');
-ylabel('Probability');
-title('Shuffled Distributions');
+% Histogram of Data (Actual Population Coupling)
+h1 = histogram(prc.prc0, 30, 'Normalization', 'pdf', ...
+    'FaceColor', [0.85 0.325 0.098], 'EdgeColor', 'none', 'FaceAlpha', 0.6);
+% Histogram of Null Distribution (All Shuffles)
+h2 = histogram(prc.prc0_shfl(:), 30, 'Normalization', 'pdf', ...
+    'FaceColor', [0.5 0.5 0.5], 'EdgeColor', 'none', 'FaceAlpha', 0.4);
+
+xlabel('STPR at Zero Lag (Hz)');
+ylabel('Probability Density');
+title('Population Shuffle Overlay');
+legend([h1, h2], {'Data', 'Null'}, 'Location', 'best', 'Box', 'off');
 box off;
 
-% --- Summary statistics and parameters ---
+% --- MCMC Chain Stability ---
 subplot(3, 3, 9);
 hold on;
-% Create text box with summary statistics
-stats = {
-    sprintf('Total Units: %d', nUnits),
-    sprintf('Mean Coupling: %.2f', mean(prc.prc0_norm, 'omitnan')),
-    sprintf('Median Coupling: %.2f', median(prc.prc0_norm, 'omitnan')),
-    sprintf('STPR Window: %.1f s', winStpr),
-    sprintf('Shuffles: %d', nShuffles),
-    sprintf('Bin Size: %.3f s', prc.info.binSize),
-    sprintf('Gaussian HW: %.3f s', prc.info.gkHw)
+% Calculate mean metric across units for each shuffle iteration
+% prc0_shfl is (nUnits x nShuffles)
+mean_shfl_trace = mean(prc.prc0_shfl, 1, 'omitnan');
+mean_data_val = mean(prc.prc0, 'omitnan');
+
+plot(mean_shfl_trace, 'Color', [0.5 0.5 0.5], 'LineWidth', 0.5);
+yline(mean_data_val, '--r', 'Data Mean', 'LabelHorizontalAlignment', 'left', 'FontSize', 8);
+
+xlabel('Shuffle Iteration');
+ylabel('Mean STPR(0) [Hz]');
+title('MCMC Stability');
+grid on; box off;
+
+% Add stats as annotation in subplot 3 (Scatter) or overlay on stability plot
+% Let's overlay compact stats on the stability plot
+statsText = {
+    sprintf('N=%d', nUnits),
+    sprintf('Iter=%d', nShuffles)
     };
-text(0.1, 0.5, stats, 'Units', 'normalized', 'FontName', 'Consolas');
-axis off;
+text(0.95, 0.95, statsText, 'Units', 'normalized', ...
+    'HorizontalAlignment', 'right', 'VerticalAlignment', 'top', ...
+    'BackgroundColor', 'none', 'FontSize', 8);
 
 % Adjust figure layout
 set(gcf, 'Position', [100, 100, 1200, 1000]);

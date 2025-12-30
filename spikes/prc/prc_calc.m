@@ -190,7 +190,7 @@ parfor iChain = 1:nChains
         if iShuffle == 1
             iSwaps = nSwaps;
         else
-            iSwaps = nUnits;
+            iSwaps = nUnits * 5;
         end
 
         % Shuffle
@@ -252,7 +252,7 @@ if any(maskSdZero)
 end
 
 % Median Normalization
-prc0_norm = prc0 ./ abs(shflMed);
+prc0_norm = prc0 ./ median(shflMed, 'omitnan');
 
 % Handle zero median cases
 maskMedZero = abs(shflMed) < eps;
@@ -474,3 +474,34 @@ end
 %     from its original phase), additional swaps consume CPU cycles
 %     without further altering the null distribution variance.
 %% ========================================================================
+
+
+%% ========================================================================
+%  NOTE: SESSION SCALING: THE GLOBAL NOISE ANCHOR
+%  ========================================================================
+%  While individual neurons exhibit a wide range of population coupling,
+%  their significance cannot be assessed in isolation. Population coupling
+%  is a 'Relative Metric'—the strength of a single unit's coordination
+%  relative to the session-wide 'Noise Floor' of the network.
+%
+%  * Unit Peak (prc0): Quantifies individual 'Chorister' strength.
+%  * Shuffled Median: Quantifies the 'Stochastic Baseline' of the session.
+%  * Session Scalar: Prevents mathematical instability from near-zero medians.
+%  * Normalization: Transforms raw Hz into a universal coupling index.
+%
+%  JUSTIFICATION FOR SESSION-WIDE MEDIAN NORMALIZATION
+%  Normalizing by the median magnitude of all shuffled STPR values in a
+%  recording, rather than by unit-specific shuffled values, is a critical
+%  'Stability Anchor' for the following reasons:
+%
+%  1. Mathematical Continuity: It avoids division by unit-specific shuffled
+%     medians that approach zero, which would otherwise flip signs and
+%     create artificial outliers.
+%  2. Biological Comparison: It provides a stable denominator for the
+%     entire recording, ensuring that the diverse coupling of FS and RS
+%     units is preserved in its true relative scale.
+%  3. Cross-Session Pooling: It standardizes coupling strength across
+%     different experiments, animals, and cortical states by accounting for
+%     session-specific population rate variability.
+%% ========================================================================
+
