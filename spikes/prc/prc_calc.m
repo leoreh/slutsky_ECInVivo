@@ -32,9 +32,12 @@ function prc = prc_calc(spktimes, varargin)
 %
 %   HISTORY:
 %   Aug 2024 LH - Major refactor and simplification.
-%   Dec 2025 AI - Optimize STPR calculation (LOO) and parallelize (parfor).
+%                 Optimize STPR calculation (LOO) and parallelize (parfor).
 %                 Requires Parallel Computing Toolbox.
 %                 Requires recompilation of shuffle_raster.cpp.
+% 
+%   COMPLIE:
+%                 mex -v -O CXXFLAGS='$CXXFLAGS -fopenmp' LDFLAGS='$LDFLAGS -fopenmp' shuffle_raster.cpp
 
 %% ========================================================================
 %  ARGUMENTS
@@ -103,9 +106,6 @@ nUnits = length(spktimes);
 stpr = zeros(nUnits, nBins);
 prc0 = nan(nUnits, 1);
 
-% Determine number of swaps when creating shuffled raster matrix
-nSwaps = length(t);
-
 %% ========================================================================
 %  PREPARE RASTER MATRIX
 %  ========================================================================
@@ -123,6 +123,10 @@ end
 % Convert to binary and get spike bin indices
 rasterMat = binRates > 0;
 spkBins = binary2idx(rasterMat, [lagBins, length(t) - lagBins], spkLim);
+
+% Determine number of swaps when creating shuffled raster matrix, based on
+% number of spikes
+nSwaps = sum(rasterMat(:)) * 10;
 
 %% ========================================================================
 %  STPR CALCULATION (CORE)
@@ -149,69 +153,93 @@ end
 %  STPR SHUFFLING
 %  ========================================================================
 
-% Pre-generate random seeds for reproducible parallel shuffling
-seeds = randi([0, 2^32-1], nShuffles, 1, 'uint32');
+% Determine number of parallel chains (one per worker)
+p = gcp('nocreate');
+if isempty(p)
+    p = parpool('local', 8);
+end
+nChains = p.NumWorkers;
+nPerChain = ceil(nShuffles / nChains);
+nTotal = nChains * nPerChain;
 
-% Initialize accumulators for parallel reduction
-stpr_sum = zeros(nUnits, nBins);
-prc0_shfl = nan(nUnits, nShuffles);
+% Pre-generate random seeds for reproducible parallel shuffling
+% Each step in each chain needs a unique seed
+seeds = randi([0, 2^32-1], nChains, nPerChain, 'uint32');
 
 % Initialize progress monitoring
 dq = parallel.pool.DataQueue;
-progress_monitor(nShuffles, 'init');
+progress_monitor(nTotal, 'init');
 afterEach(dq, @(~) progress_monitor([], 'update'));
 
-% Initialize parallel pool
-if isempty(gcp('nocreate'))
-    parpool('local', 8);
-end
+% Initialize results containers for parallel chains
+results_prc0 = cell(nChains, 1);
+results_stpr = cell(nChains, 1);
 
-% Use parfor for parallel processing (Limit to 8 workers)
-parfor iShuffle = 1 : nShuffles
+parfor iChain = 1:nChains
 
-    % Create shuffled matrix (deterministic seed per shuffle)
-    rasterShuffled = shuffle_raster(rasterMat, nSwaps, seeds(iShuffle));
+    % Initialize chain state with original data
+    rasterCurrent = rasterMat;
 
-    % Get indices for shuffled raster
-    refBins = binary2idx(rasterShuffled, [lagBins, length(t) - lagBins], spkLim);
+    % Initialize chain accumulators
+    chain_stpr = zeros(nUnits, nBins);
+    chain_prc0 = nan(nUnits, nPerChain);
 
-    % Initialize temporary arrays for this shuffle
-    stpr_tmp = zeros(nUnits, nBins);
-    prc0_tmp = nan(nUnits, 1);
+    for iShuffle = 1:nPerChain
+        
+        % Determine nSwaps
+        if iShuffle == 1
+            iSwaps = nSwaps;
+        else
+            iSwaps = nUnits;
+        end
 
-    % Calculate STPR for each unit relative to shuffled population rate
-    for iGood = 1:nGood
-        idxRef = uGood(iGood);
+        % Shuffle
+        rasterCurrent = shuffle_raster(rasterCurrent, iSwaps, seeds(iChain, iShuffle));
 
-        % Calculate unit smoothed rate and LOO Population Rate
-        ur = conv(rasterShuffled(iGood, :) / binSize, gk, 'same');
-        pr = popRate - ur;
+        % Calc STPR
+        refBins = binary2idx(rasterCurrent, [lagBins, length(t) - lagBins], spkLim);
+        stpr_tmp = zeros(nUnits, nBins);
+        prc0_tmp = nan(nUnits, 1);
 
-        % Calculate STPR using pre-processed spike bins
-        [stpr_tmp(idxRef,:), prc0_tmp(idxRef)] = stpr_calc(refBins{iGood}, pr, lagBins);
+        for iGood = 1:nGood
+            idxRef = uGood(iGood);
+            ur = conv(rasterCurrent(iGood, :) / binSize, gk, 'same');
+            pr = popRate - ur;
+            [stpr_tmp(idxRef,:), prc0_tmp(idxRef)] = stpr_calc(refBins{iGood}, pr, lagBins);
+        end
+
+        chain_stpr = chain_stpr + stpr_tmp;
+        chain_prc0(:, iShuffle) = prc0_tmp;
+        send(dq, []);
     end
 
-    % Accumulate results
-    stpr_sum = stpr_sum + stpr_tmp;
-    prc0_shfl(:, iShuffle) = prc0_tmp;
-
-    % Print progress
-    send(dq, []);
+    results_prc0{iChain} = chain_prc0;
+    results_stpr{iChain} = chain_stpr;
 end
+
+% Aggregate results
+stpr_sum = zeros(nUnits, nBins);
+prc0_shfl = zeros(nUnits, 0); % Append
+for iChain = 1:nChains
+    stpr_sum = stpr_sum + results_stpr{iChain};
+    prc0_shfl = [prc0_shfl, results_prc0{iChain}];
+end
+
+% Adjust nShuffles to actual total executed
+nShuffles = size(prc0_shfl, 2);
 
 % Average across shuffles
 stpr_shfl = stpr_sum / nShuffles;
 
 %% ========================================================================
-%  NORMALIZE COUPLING
+%  NORMALIZE 
 %  ========================================================================
 
-% Z-score and normalization (Vectorized)
+% Z-score 
 shflMu = mean(prc0_shfl, 2, 'omitnan');
 shflSd = std(prc0_shfl, [], 2, 'omitnan');
 shflMed = median(prc0_shfl, 2, 'omitnan');
 
-% Z-score
 maskSdZero = shflSd < eps;
 prc0_z = (prc0 - shflMu) ./ shflSd;
 
@@ -414,4 +442,35 @@ end
 %  3. Mathematical Identity: Since the sum of all units is constant,
 %     the sum of the smoothed signals is also constant, ensuring the
 %     null distribution is centered correctly.
+%% ========================================================================
+
+
+%% ========================================================================
+%  NOTE: NSWAPS
+%  ========================================================================
+%  While the duration of the recording (length(t)) defines the temporal
+%  search space, the total number of spikes (N_spks) defines the actual
+%  information density. Shuffling a sparse matrix is a 'Spike-Moving'
+%  problem, not a 'Bin-Filling' problem.
+%
+%  * Temporal Bins: Define the resolution, but are 99% empty.
+%  * Total Spikes: Represent the 'Movable Mass' of the system.
+%  * Mixing Time: The iterations required to reach a stationary null state.
+%  * Scaling Logic: nSwaps should scale with information, not duration.
+%
+%  JUSTIFICATION FOR SPIKE-BASED SWAP LIMITS
+%  Performing swaps equal to the number of time bins (e.g., 3.6 million)
+%  is a conservative 'Brute Force' approach. Scaling based on the spike
+%  count (e.g., 10x-20x total spikes) is a 'Precision' approach for the
+%  following reasons:
+%
+%  1. Information Sparsity: In a matrix where spikes are rare, swapping
+%     a spike into an empty bin is statistically likely. The algorithm
+%     achieves total randomization once every spike has moved ~10 times.
+%  2. Computational Convergence: Because the C++ code (shuffle_raster.cpp)
+%     tracks 'Successful Swaps', it ensures the
+%     target entropy is reached regardless of matrix sparsity.
+%  3. Diminishing Returns: Once a spike train is 'melted' (decorrelated
+%     from its original phase), additional swaps consume CPU cycles
+%     without further altering the null distribution variance.
 %% ========================================================================

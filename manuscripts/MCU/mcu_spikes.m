@@ -28,7 +28,7 @@ tblLme = tbl_transform(tblUnit, 'flg0', true, 'verbose', true);
 
 uIdx = tblLme.UnitType == 'RS';
 tblGUI_scatHist(tblLme(uIdx, :))
-hFig = tblGUI_bar(tblLme(uIdx, :));
+hFig = tblGUI_bar(tblLme);
 
 
 %% ========================================================================
