@@ -6,7 +6,10 @@
 %  ========================================================================
 
 basepaths = [mcu_basepaths('wt'), mcu_basepaths('mcu')];
+basepaths = [mcu_basepaths('wt_bsl'), mcu_basepaths('mcu_bsl')];
 cfg = mcu_cfg();
+
+
 
 % Load table
 tblUnit = mcu_unitTbl('basepaths', basepaths);
@@ -22,6 +25,10 @@ tblUnit.Day = removecats(tblUnit.Day, {'BAC_ON', 'BAC_OFF'});
 
 % Assert no zero values
 tblLme = tbl_transform(tblUnit, 'flg0', true, 'verbose', true);
+
+uIdx = tblLme.UnitType == 'RS';
+tblGUI_scatHist(tblLme(uIdx, :))
+hFig = tblGUI_bar(tblLme(uIdx, :));
 
 
 %% ========================================================================

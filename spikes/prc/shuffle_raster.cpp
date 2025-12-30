@@ -4,6 +4,7 @@
 #include <vector>
 #include <utility>   // For std::pair, std::swap
 #include <algorithm> // For std::swap
+#include <chrono>    // For high_resolution_clock
 
 // Fast RNG implementation (xoshiro256++)
 class Xoshiro256PP {
@@ -110,9 +111,9 @@ public:
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
     // --- Input and Output Checks ---
-    if (nrhs < 1 || nrhs > 2) {
+    if (nrhs < 1 || nrhs > 3) {
         mexErrMsgIdAndTxt("shuffle_raster_mex:invalidNumInputs",
-                          "Must have 1 or 2 inputs: rasterMat and optional nSwaps");
+                          "Must have 1 to 3 inputs: rasterMat, optional nSwaps, optional seed");
     }
     if (nlhs > 1) {
         mexErrMsgIdAndTxt("shuffle_raster_mex:invalidNumOutputs",
@@ -143,6 +144,17 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
         nSwaps = static_cast<mwSize>(nSwaps_double);
     }
 
+    // --- Get Seed ---
+    bool use_explicit_seed = false;
+    uint64_t explicit_seed = 0;
+    if (nrhs > 2) {
+        if (!mxIsNumeric(prhs[2]) || mxGetNumberOfElements(prhs[2]) != 1) {
+             mexErrMsgIdAndTxt("shuffle_raster_mex:seedInvalid", "Seed must be a numeric scalar.");
+        }
+        explicit_seed = static_cast<uint64_t>(mxGetScalar(prhs[2]));
+        use_explicit_seed = true;
+    }
+
     // --- Early Exit for Trivial Cases ---
     if (nUnits < 2 || nBins < 2 || nSwaps == 0) {
         plhs[0] = mxDuplicateArray(rasterMat);
@@ -170,7 +182,21 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
     }
 
     // --- Initialize Random Number Generator ---
-    Xoshiro256PP rng;
+    uint64_t seed;
+    if (use_explicit_seed) {
+        seed = explicit_seed;
+    } else {
+        // Use random_device combined with high_resolution_clock for robust seeding
+        std::random_device rd;
+        seed = (static_cast<uint64_t>(rd()) << 32) | rd();
+        
+        // Mix in time-based entropy to ensure MinGW/Windows non-determinism
+        auto now = std::chrono::high_resolution_clock::now();
+        uint64_t time_entropy = now.time_since_epoch().count();
+        seed ^= time_entropy;
+    }
+    
+    Xoshiro256PP rng(seed);
 
     mwSize successful_swaps = 0;
     // Set a limit on attempts to avoid infinite loops in pathological cases

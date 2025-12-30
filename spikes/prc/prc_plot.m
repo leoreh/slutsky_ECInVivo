@@ -1,64 +1,54 @@
-function prCoupling_plot(prc, varargin)
-% PRCOUPLING_PLOT Generates summary plots for population coupling analysis.
+function prc_plot(prc, varargin)
+% PRC_PLOT Generates summary plots for population coupling analysis.
 %
-% SUMMARY:
-% This function takes the output structure from prCoupling.m and creates a
-% figure summarizing key aspects of population coupling analysis. It visualizes:
-%   - Distribution of z-scored population coupling (prc0_norm) across units
-%   - Raw STPR curves for all units, sorted by coupling strength
-%   - Comparison of actual vs shuffled STPR values at zero lag
-%   - Relationship between raw STPR and z-scored coupling
-%   - Population-averaged STPR and shuffled STPR curves
-%   - Example unit STPR curves with shuffled distributions
-%   - Summary statistics and analysis parameters
+%   PRC_PLOT(PRC, ...) creates a summary figure visualizing the population
+%   coupling analysis results, including STPR curves, shuffled distributions,
+%   and coupling strength metrics.
 %
-% INPUT:
-%   prc             Structure containing population coupling results from
-%                   prCoupling.m. Must include fields:
-%                     .prc0_norm: Z-scored population coupling
-%                     .prc0: Raw STPR at zero lag
-%                     .stpr: Full STPR curves
-%                     .stpr_shfl: Shuffled STPR curves
-%                     .prc0_shfl: Shuffled STPR values at zero lag
-%                     .t: Time vector for STPR curves
-%                     .info: Analysis parameters
-%   basepath        (Optional) Path to recording session directory {pwd}
-%   flgSaveFig      (Optional) Logical flag to save the figure {true}
+%   INPUTS:
+%       prc         - (struct) Output from prc_calc.m containing:
+%                     .prc0_norm : Z-scored population coupling
+%                     .prc0      : Raw STPR at zero lag
+%                     .stpr      : Full STPR curves
+%                     .stpr_shfl : Shuffled STPR curves
+%                     .prc0_shfl : Shuffled STPR values at zero lag
+%                     .t         : Time vector for STPR curves
+%                     .info      : Analysis parameters
+%       varargin    - (param/value) Optional parameters:
+%                     'basepath' : (char) Path to recording session directory {pwd}
+%                     'flgSave'  : (log) Save figure to disk {true}
 %
-% OUTPUT:
-%   None. Generates and optionally saves a figure.
+%   OUTPUTS:
+%       None. Generates and optionally saves a figure.
 %
-% DEPENDENCIES:
-%   setMatlabGraphics (custom)
-%   plot_stdshade (custom)
-%   plot_scatterCorr (custom)
+%   See also: PRC_CALC, PLOT_STDSHADE, PLOT_SCATTERCORR
 %
-% HISTORY:
+%   HISTORY:
 %   Aug 2024 LH - Created and updated
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% ARGUMENT PARSING & INITIALIZATION
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ========================================================================
+%  ARGUMENTS
+%  ========================================================================
 
 % Define input parameters and their defaults
 p = inputParser;
 addRequired(p, 'prc', @isstruct);
 addParameter(p, 'basepath', pwd, @ischar);
-addParameter(p, 'flgSaveFig', true, @islogical);
+addParameter(p, 'flgSave', true, @islogical);
 
 % Parse input arguments
 parse(p, prc, varargin{:});
 prc = p.Results.prc;
 basepath = p.Results.basepath;
-flgSaveFig = p.Results.flgSaveFig;
+flgSave = p.Results.flgSave;
 
 % Set basepath and get basename
 cd(basepath);
 [~, basename] = fileparts(basepath);
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% PREPARATIONS & PARAMETER EXTRACTION
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ========================================================================
+%  PREPARATIONS
+%  ========================================================================
 
 % Extract key parameters
 nUnits = length(prc.prc0_norm);
@@ -74,12 +64,11 @@ tStpr = (-lagBins:lagBins) * prc.info.binSize;
 nExUnits = min(5, nUnits);
 exUnits = round(linspace(1, nUnits, nExUnits));
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% GRAPHICS GENERATION
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ========================================================================
+%  GRAPHICS GENERATION
+%  ========================================================================
 
 % Set up figure with consistent graphics settings
-setMatlabGraphics(true);
 fh = figure('Name', [basename '_populationCoupling'], 'NumberTitle', 'off');
 
 % --- Raw STPR curves for all units ---
@@ -153,7 +142,7 @@ stats = {
     sprintf('Shuffles: %d', nShuffles),
     sprintf('Bin Size: %.3f s', prc.info.binSize),
     sprintf('Gaussian HW: %.3f s', prc.info.gkHw)
-};
+    };
 text(0.1, 0.5, stats, 'Units', 'normalized', 'FontName', 'Consolas');
 axis off;
 
@@ -161,10 +150,10 @@ axis off;
 set(gcf, 'Position', [100, 100, 1200, 1000]);
 
 % Save figure if requested
-if flgSaveFig
+if flgSave
     figFile = fullfile(basepath, [basename, '.prc.fig']);
     savefig(fh, figFile);
     fprintf('Saved figure to %s\n', figFile);
 end
 
-end 
+end

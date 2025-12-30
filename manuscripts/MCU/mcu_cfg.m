@@ -14,7 +14,7 @@ cfg.clr.unit = [0.1, 0.1, 0.4;...   % RS
 
 % Variables to load
 % cfg.vars = {'fr', 'units', 'st_metrics', 'st_brst'};
-cfg.vars = {'fr', 'units', 'st_metrics', 'swv_metrics'};
+cfg.vars = {'fr', 'units', 'st_metrics', 'swv_metrics', 'prc'};
 
 % Variable mapping
 cfg.varMap.FR = 'fr.mfr';
@@ -26,6 +26,7 @@ cfg.varMap.UnitType = 'units.type';
 cfg.varMap.TP = 'swv.tp';
 cfg.varMap.Asym = 'swv.asym';
 cfg.varMap.Hpk = 'swv.hpk';
+cfg.varMap.PRC = 'prc.prc0_norm';
 
 % Labels
 cfg.lbl.grp = {'Control'; 'MCU-KO'};

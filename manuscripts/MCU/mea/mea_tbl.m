@@ -21,7 +21,7 @@ cfg = mcu_cfg;
 % -------------------------------------------------------------------------
 % TEMPORAL DYNAMICS
 
-flgMito = false;
+flgMito = true;
 
 if flgMito
 
