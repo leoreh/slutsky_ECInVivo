@@ -88,21 +88,12 @@ end
 t = winLim(1):binSize:winLim(2);
 
 % Define Gaussian kernel for Population Rate (12 ms)
-gkHwPop = 0.012;
-sigmaBinsPop = gkHwPop / binSize;
-gkWPop = ceil(3 * sigmaBinsPop);
-gkTPop = -gkWPop:gkWPop;
-gkPop = normpdf(gkTPop, 0, sigmaBinsPop);
-gkPop = gkPop / sum(gkPop);
-
-% Define Gaussian kernel for Unit Rate (12/sqrt(2) ms)
-gkHwUnit = 0.012 / sqrt(2);
-sigmaBinsUnit = gkHwUnit / binSize;
-gkWUnit = ceil(3 * sigmaBinsUnit);
-gkTUnit = -gkWUnit:gkWUnit;
-gkUnit = normpdf(gkTUnit, 0, sigmaBinsUnit);
-gkUnit = gkUnit / sum(gkUnit);
-
+gkHw = 0.012;
+sigmaBins = gkHw / binSize;
+gkW = ceil(3 * sigmaBins);
+gkT = -gkW:gkW;
+gk = normpdf(gkT, 0, sigmaBins);
+gk = gk / sum(gk);
 
 % Calculate STPR window parameters
 lagBins = round((winStpr / 2) / binSize);
@@ -183,13 +174,13 @@ nSwaps = sum(rasterMat(:)) * 10;
 
 % Calculate and smooth global population rate
 popRate = sum(rasterMat, 1, 'omitnan');
-popRate = conv(popRate / binSize, gkPop, 'same');
+popRate = conv(popRate / binSize, gk, 'same');
 
 for iGood = 1:nGood
     idxRef = uGood(iGood);
 
     % Calculate unit smoothed rate
-    ur = conv(rasterMat(iGood, :) / binSize, gkUnit, 'same');
+    ur = conv(rasterMat(iGood, :) / binSize, gk, 'same');
 
     % Calculate LOO population rate: Global - Unit
     pr = popRate - ur;
@@ -255,7 +246,7 @@ parfor iChain = 1:nChains
 
         for iGood = 1:nGood
             idxRef = uGood(iGood);
-            ur = conv(rasterCurrent(iGood, :) / binSize, gkUnit, 'same');
+            ur = conv(rasterCurrent(iGood, :) / binSize, gk, 'same');
             pr = popRate - ur;
             [stpr_tmp(idxRef,:), prc0_tmp(idxRef), pk_tmp(idxRef)] = stpr_calc(refBins{iGood}, pr, lagBins, idxPk);
         end
@@ -358,8 +349,7 @@ prc.info = struct(...
     'spkThr', spkThr, ...
     'spkLim', spkLim, ...
     'binSize', binSize, ...
-    'gkHwPop', gkHwPop, ...
-    'gkHwUnit', gkHwUnit, ...
+    'gkHw', gkHw, ...
     'winStpr', winStpr, ...
     'nShuffles', nShuffles);
 
@@ -586,24 +576,25 @@ end
 
 
 %% ========================================================================
-%  NOTE: ASYMMETRIC SMOOTHING
+%  STA VS. INTEGRAL METHOD
 %  ========================================================================
-%  While many correlation analyses use identical smoothing for both
-%  signals, the population coupling methodology explicitly employs
-%  asymmetric kernels to differentiate between global state fluctuations
-%  and local spike timing.
+%  A common point of confusion in implementing the Okun method (2015) is 
+%  the application of the 12/sqrt(2) ms kernel. While the paper defines 
+%  coupling as an integral of two smoothed signals, this script uses a 
+%  discrete spike-triggered average (STA). These two methods are 
+%  mathematically identical due to Gaussian convolution identities.
 %
-%  * Population Rate (popRate): 12 ms sigma (half-width).
-%  * Individual Unit (ur): 12/sqrt(2) ms sigma (~8.48 ms).
-%  * Effective stPR Resolution: ~14.7 ms (geometric sum).
+%  The "Kernel Trick" explained:
+%  The paper smoothed both the unit and the population with a kernel of 
+%  sigma = 12/sqrt(2) ms. Mathematically, the correlation of two signals 
+%  each smoothed by sigma is identical to smoothing one signal by 
+%  sigma * sqrt(2) and sampling it at the raw spike times of the other.
 %
-%  This dual-width approach presented in both Okun et al.
-%  (2015) and Doost et al. (2025) ensures:
+%  Effective Resolution Calculation:
+%  * Individual sigma: 12/sqrt(2) ms
+%  * Combined sigma: sqrt( (12/sqrt(2))^2 + (12/sqrt(2))^2 ) = 12 ms
 %
-%  1. Global State Definition: The 12 ms kernel provides a robust
-%     estimate of the local network state (popRate), reducing noise
-%     contributions from low-quality units or MUA.
-%  2. Local Spike Fidelity: The sharper 12/sqrt(2) ms kernel preserves
-%     the temporal precision of the reference unit's firing, preventing
-%     the loss of 'Chorister' synchronization.
+%  By smoothing the population rate with a single 12 ms Gaussian kernel 
+%  and performing an STA on the raw unit spikes, we achieve the exact 
+%  12 ms effective resolution required by the original methodology.
 %% ========================================================================

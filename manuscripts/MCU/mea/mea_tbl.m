@@ -12,7 +12,8 @@ end
 nFiles = length(basepaths);
 
 if nargin < 2 || isempty(v)
-    vars = {'mea', 'fr', 'brstDyn', 'brst', 'frRcv', 'frRcv_mdl', 'stats', 'ca'};
+    vars = {'mea', 'fr', 'brstDyn', 'brst', 'frRcv', 'frRcv_mdl', ...
+        'stats', 'ca', 'prc'};
     v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 end
 
@@ -21,7 +22,7 @@ cfg = mcu_cfg;
 % -------------------------------------------------------------------------
 % TEMPORAL DYNAMICS
 
-flgMito = true;
+flgMito = false;
 
 if flgMito
 
@@ -99,6 +100,9 @@ varMap.rcvTime = 'rcvMdl.rcvTime';
 varMap.rcvErr = 'rcvMdl.rcvErr';
 varMap.rcvDiff = 'rcvMdl.rcvDiff';
 varMap.spktimes = 'mea.spktimes';
+
+% PRC
+varMap.prc = 'prc.prc0_z';
 
 % Table
 tbl = v2tbl('v', v, 'varMap', varMap, 'tagFiles', tagFiles, ...

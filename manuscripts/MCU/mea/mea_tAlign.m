@@ -1,10 +1,9 @@
-function [v, tGlobal] = mea_tAlign(v, varMap, pertMap, flgEdge)
+function [v, tGlobal] = mea_tAlign(v, varMap, pertMap, varargin)
 % MEA_TALIGN Aligns firing rate matrices and other variables to perturbation onset.
 %
-%   [v, t] = MEA_TALIGN(v, varMap, pertMap, flgEdge) receives a struct array
-%   'v' and aligns specified variables such that the perturbation index
-%   (idxPert) is identical across all files. It also returns a global time
-%   vector 't'.
+%   [v, t] = MEA_TALIGN(v, varMap, pertMap, ...) receives a struct array 'v'
+%   and aligns specified variables such that the perturbation index (idxPert)
+%   is identical across all files. It also returns a global time vector 't'.
 %
 %   INPUTS:
 %       v           - (struct array) Data structure containing variables to align.
@@ -13,13 +12,11 @@ function [v, tGlobal] = mea_tAlign(v, varMap, pertMap, flgEdge)
 %                     Example: varMap.fr = 'mea.fr'; varMap.dyn = 'dyn';
 %       pertMap     - (char) Path to the perturbation index variable in 'v'.
 %                     Example: 'fr.info.idxPert'.
-%       flgEdge     - (logical, optional)
-%                     If true (default): Intersection alignment. Clips data to
-%                     the latest start and earliest end times across all files.
-%                     Values before the latest start or after the earliest end
-%                     are discarded.
-%                     If false: Union alignment. Pads shorter files with NaNs
-%                     to match the earliest start and latest end times.
+%       varargin    - (param/value) Optional parameters:
+%                     'binSize' : (num) Time bin size in seconds {60}
+%                     'flgEdge' : (log) Alignment mode {true}
+%                                 true  : Intersection (clip to smallest window)
+%                                 false : Union (pad to largest window)
 %
 %   OUTPUTS:
 %       v           - (struct array) Updated struct with aligned fields.
@@ -27,9 +24,20 @@ function [v, tGlobal] = mea_tAlign(v, varMap, pertMap, flgEdge)
 %
 %   See also: MEA_FRPREP, BASEPATHS2VARS
 
-if nargin < 4 || isempty(flgEdge)
-    flgEdge = true;
-end
+%% ========================================================================
+%  ARGUMENTS
+%  ========================================================================
+
+p = inputParser;
+addRequired(p, 'v', @isstruct);
+addRequired(p, 'varMap', @isstruct);
+addRequired(p, 'pertMap', @ischar);
+addParameter(p, 'binSize', 60, @isnumeric);
+addParameter(p, 'flgEdge', true, @islogical);
+
+parse(p, v, varMap, pertMap, varargin{:});
+binSize = p.Results.binSize;
+flgEdge = p.Results.flgEdge;
 
 %% ========================================================================
 %  ANALYZE ALIGNMENT DIMENSIONS
@@ -39,35 +47,24 @@ maxPre = 0;
 maxPost = 0;
 minPre = inf;
 minPost = inf;
-binSize = [];
 
 % Determine the pre- and post-perturbation durations for all files
 for iFile = 1:length(v)
 
     % Access perturbation index
     idxPert = getFieldFromPath(v(iFile), pertMap);
+
     if isempty(idxPert)
         warning('Could not find idxPert for file %d at %s', iFile, pertMap);
         continue;
     end
 
-    % Attempt to find binSize (assume sibling of idxPert)
-    if isempty(binSize)
-        parts = strsplit(pertMap, '.');
-        if length(parts) > 1
-            infoPath = strjoin(parts(1:end-1), '.');
-            iInfo = getFieldFromPath(v(iFile), infoPath);
-            if isstruct(iInfo) && isfield(iInfo, 'binSize')
-                binSize = iInfo.binSize;
-            end
-        end
-    end
-
     % Determine nBins from the first valid numeric variable in varMap
     nBins = 0;
     varKeys = fieldnames(varMap);
-    for k = 1:length(varKeys)
-        path = varMap.(varKeys{k});
+
+    for iVar = 1:length(varKeys)
+        path = varMap.(varKeys{iVar});
         val = getFieldFromPath(v(iFile), path);
 
         if isnumeric(val) && ~isempty(val)
@@ -76,7 +73,7 @@ for iFile = 1:length(v)
         elseif isstruct(val)
             % Try to find existing numeric fields inside struct (e.g. .fr)
             flds = fieldnames(val);
-            for f=1:length(flds)
+            for f = 1:length(flds)
                 dd = val.(flds{f});
                 if isnumeric(dd) && ~isempty(dd) && size(dd, 2) > 1
                     nBins = size(dd, 2);
@@ -93,22 +90,16 @@ for iFile = 1:length(v)
     end
 
     % Logic:
-    % pre-pert bins: 1 to (idxPert - 1) -> Count is idxPert - 1
-    % post-pert bins: idxPert to nBins  -> Count is nBins - idxPert + 1 (Wait)
-    % Convention: idxPert is the index of the perturbation bin (t=0 or first post bin).
-    % Usually idxPert is the first bin of the "post" epoch.
-    % So Pre bins = idxPert - 1.
-    % Post bins = nBins - idxPert + 1. (Including the perturbation bin itself).
-    % Let's stick to simple "bins before" and "bins including/after".
+    % Pre-pert bins: 1 to (idxPert - 1)
+    % Post-pert bins: idxPert to nBins (including pert bin)
 
     currentPre = idxPert - 1;
-    currentPost = nBins - idxPert + 1; % Include the pert bin in post count for convenience
+    currentPost = nBins - idxPert + 1;
 
-    if currentPre > maxPre, maxPre = currentPre; end
-    if currentPost > maxPost, maxPost = currentPost; end
-
-    if currentPre < minPre, minPre = currentPre; end
-    if currentPost < minPost, minPost = currentPost; end
+    maxPre = max(maxPre, currentPre);
+    maxPost = max(maxPost, currentPost);
+    minPre = min(minPre, currentPre);
+    minPost = min(minPost, currentPost);
 end
 
 % Set Target Dimensions based on flgEdge
@@ -132,25 +123,20 @@ globalIdxPert = targetPre + 1;
 %  CREATE GLOBAL TIME VECTOR
 %  ========================================================================
 
-if isempty(binSize)
-    tGlobal = [];
-    warning('No valid binSize found. Cannot create global time vector.');
-else
-    % Create 0-centered index vector
-    tIdx = (1:globalNBins) - globalIdxPert;
+% Create 0-centered index vector
+tIdx = (1:globalNBins) - globalIdxPert;
 
-    % Convert to initial physical time (seconds)
-    tSec = tIdx * binSize;
+% Convert to initial physical time (seconds)
+tSec = tIdx * binSize;
 
-    % Apply corrections (matching logic in mea_frPrep)
-    tGlobal = zeros(size(tSec));
+% Apply corrections (matching logic in mea_frPrep)
+tGlobal = zeros(size(tSec));
 
-    % Pre-perturbation (x3 scaling)
-    tGlobal(tIdx < 0) = tSec(tIdx < 0) * 3;
+% Pre-perturbation (x3 scaling from legacy code)
+tGlobal(tIdx < 0) = tSec(tIdx < 0) * 3;
 
-    % Post-perturbation (x6 scaling)
-    tGlobal(tIdx >= 0) = tSec(tIdx >= 0) * 6;
-end
+% Post-perturbation (x6 scaling from legacy code)
+tGlobal(tIdx >= 0) = tSec(tIdx >= 0) * 6;
 
 
 %% ========================================================================
@@ -166,17 +152,17 @@ for iFile = 1:length(v)
     if isempty(idxPert), continue; end
 
     % Need reference nBins for this file to know where it ends
-    % (Re-detect nBinsRef same way as above)
     nBinsRef = 0;
-    for k = 1:length(varKeys)
-        path = varMap.(varKeys{k});
+    for iVar = 1:length(varKeys)
+        path = varMap.(varKeys{iVar});
         val = getFieldFromPath(v(iFile), path);
+
         if isnumeric(val) && ~isempty(val)
             nBinsRef = size(val, 2);
             break;
         elseif isstruct(val)
             flds = fieldnames(val);
-            for f=1:length(flds)
+            for f = 1:length(flds)
                 dd = val.(flds{f});
                 if isnumeric(dd) && ~isempty(dd) && size(dd, 2) > 1
                     nBinsRef = size(dd, 2);
@@ -190,30 +176,11 @@ for iFile = 1:length(v)
     if nBinsRef == 0, continue; end
 
     % Calculate extraction indices relative to THIS file's idxPert
-    % We want [idxPert - targetPre, ..., idxPert + targetPost - 1]
-    % (Note: targetPost included bin 0 so -1 if we just sum counts)
-
     startIdx = idxPert - targetPre;
     endIdx = idxPert + targetPost - 1;
 
-    % If flgEdge=false (UNION), these indices might be Out Of Bounds.
-    % We need to pad.
-
-    padLeft = 0;
-    padRight = 0;
-    validStart = startIdx;
-    validEnd = endIdx;
-
-    if startIdx < 1
-        padLeft = 1 - startIdx;
-        validStart = 1;
-    end
-
-    if endIdx > nBinsRef
-        padRight = endIdx - nBinsRef;
-        validEnd = nBinsRef;
-    end
-
+    % Helper function to pad and slice
+    [padLeft, padRight, validStart, validEnd] = getPadding(startIdx, endIdx, nBinsRef);
 
     % --- Align All Variables ---
     for iKey = 1:length(varKeys)
@@ -224,20 +191,14 @@ for iFile = 1:length(v)
         if isempty(data), continue; end
 
         if isnumeric(data)
-            % If numeric, check dimensions
+            % Check dimensions
             if size(data, 2) == nBinsRef
-                % Slice valid part
-                valSlice = data(:, validStart:validEnd);
-
-                % Pad
-                nRows = size(data, 1);
-                valAligned = [nan(nRows, padLeft), valSlice, nan(nRows, padRight)];
-
-                v(iFile) = setFieldFromPath(v(iFile), path, valAligned);
+                dataAligned = sliceAndPad(data, validStart, validEnd, padLeft, padRight);
+                v(iFile) = setFieldFromPath(v(iFile), path, dataAligned);
             end
 
         elseif isstruct(data)
-            % If struct, iterate fields
+            % Iterate fields
             flds = fieldnames(data);
             for iFld = 1:length(flds)
                 fldName = flds{iFld};
@@ -249,10 +210,7 @@ for iFile = 1:length(v)
 
                 elseif isnumeric(val) && ~isempty(val) && size(val, 2) == nBinsRef
 
-                    valSlice = val(:, validStart:validEnd);
-                    nRows = size(val, 1);
-                    valAligned = [nan(nRows, padLeft), valSlice, nan(nRows, padRight)];
-
+                    valAligned = sliceAndPad(val, validStart, validEnd, padLeft, padRight);
                     data.(fldName) = valAligned;
 
                 elseif isstruct(val) && isfield(val, 'idxPert')
@@ -270,9 +228,32 @@ end
 
 end
 
-% =========================================================================
-% HELPER FUNCTIONS
-% =========================================================================
+%% ========================================================================
+%  HELPER FUNCTIONS
+%  ========================================================================
+
+function [padLeft, padRight, validStart, validEnd] = getPadding(startIdx, endIdx, nBinsRef)
+padLeft = 0;
+padRight = 0;
+validStart = startIdx;
+validEnd = endIdx;
+
+if startIdx < 1
+    padLeft = 1 - startIdx;
+    validStart = 1;
+end
+
+if endIdx > nBinsRef
+    padRight = endIdx - nBinsRef;
+    validEnd = nBinsRef;
+end
+end
+
+function valAligned = sliceAndPad(data, validStart, validEnd, padLeft, padRight)
+valSlice = data(:, validStart:validEnd);
+nRows = size(data, 1);
+valAligned = [nan(nRows, padLeft), valSlice, nan(nRows, padRight)];
+end
 
 function val = getFieldFromPath(s, path)
 parts = strsplit(path, '.');

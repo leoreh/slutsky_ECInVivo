@@ -1,8 +1,8 @@
-function tOut = spktimes_clip(tIn, bouts, recDur)
+function tOut = spktimes_clip(tIn, bouts, recDur, minLen)
 % SPKTIMES_CLIP Limits spike times to specific bouts and shifts times.
 %
-%   SPKTIMES = SPKTIMES_CLIP(SPKTIMES, BOUTS, RECDUR) restricts the given
-%   cell array of spike times (or multi-unit times) to the intervals
+%   SPKTIMES = SPKTIMES_CLIP(SPKTIMES, BOUTS, RECDUR, MINLEN) restricts the
+%   given cell array of spike times (or multi-unit times) to the intervals
 %   defined in BOUTS. Time segments are then concatenated to strictly match
 %   the duration RECDUR.
 %
@@ -10,13 +10,20 @@ function tOut = spktimes_clip(tIn, bouts, recDur)
 %       spktimes    - (cell) Spike times per unit (in seconds) [nUnits x 1]
 %       bouts       - (mat) Start and end times of bouts [nBouts x 2]
 %       recDur      - (num) Target total duration (in seconds)
+%       minLen      - (num) Minimum length of bouts to use (default: 60)
 %
 %   OUTPUTS:
 %       spktimes    - (cell) Shifted spike times [nUnits x 1]
 
+if nargin < 4, minLen = 60; end
+
 %% ========================================================================
 %  CLIP BOUTS
 %  ========================================================================
+
+% Filter by min length
+durs = bouts(:, 2) - bouts(:, 1);
+bouts = bouts(durs >= minLen, :);
 
 % Calculate durations
 durs = bouts(:, 2) - bouts(:, 1);
@@ -43,7 +50,7 @@ offsets = [0; cumsum(finalDurs(1:end-1))];
 
 % Apply to spktimes
 nUnits = length(tIn);
-tOut = cell(nUnits, 1); 
+tOut = cell(nUnits, 1);
 nBouts = size(validBouts, 1);
 
 for iUnit = 1:nUnits

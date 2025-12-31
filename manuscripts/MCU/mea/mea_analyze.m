@@ -108,6 +108,8 @@ tblGUI_xy(xVec([1 : 32395]), tbl, 'tileVar', 'Group', 'yVar', 'caMito');
 
 tblGUI_scatHist(tbl, 'xVar', 'bFrac', 'yVar', 'rcvTime', 'grpVar', 'Group');
 
+tblGUI_bar(tbl, 'xVar', 'Group', 'yVar', 'PRC');
+
 %%
 % higher ss firing correlated with greater burstiness, including change to
 % burst params

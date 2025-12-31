@@ -73,8 +73,6 @@ for iFile = 1
         spktimes, 'UniformOutput', false);
 
     % --- 2. Calculate Calcium (1s bins) ---
-    % reuse spk2ca but enforce binSize = 1
-    % ca = spk2ca(spktimes, 'binSize', 1, 'winCalc', winLim, 'flgPlot', false);
     ca = v(iFile).ca;
 
     % --- ALIGNMENT TO GLOBAL GRID ---
