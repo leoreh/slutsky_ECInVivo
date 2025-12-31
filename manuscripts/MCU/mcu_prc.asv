@@ -1,0 +1,112 @@
+clear params
+params.winLim = [0 60 * 60];        % Analysis window [s]
+params.binSize = 0.001;             % 1ms bins
+params.gkHw = 0.012;                % 12ms sigma
+params.winStpr = 1.0;               % 1s window
+params.nShuffles = 100;             % Number of shuffles
+params.spkLim = Inf;
+
+basepaths = [mcu_basepaths('wt_bsl'), mcu_basepaths('mcu_bsl')];
+% basepaths = [mcu_basepaths('mea_bac')];
+nFiles = length(basepaths);
+vars = {'spikes', 'st_metrics', 'fr', 'units', 'spktimes', 'session', 'sleep_states'};
+v = basepaths2vars('basepaths', basepaths, 'vars', vars);
+
+idxState = 4; % NREM
+recDur = 60 * 60;
+
+for iFile = 1 : nFiles
+
+    % File
+    basepath = basepaths{iFile};
+    cd(basepath);
+
+    % State
+    bouts = v(iFile).ss.bouts.times{4};
+    boutLen = v(iFile).ss.bouts.boutLen{4};
+
+    fs = v(iFile).session.extracellular.sr;
+    mutimes = cellfun(@(x) x / fs, v(iFile).spktimes, 'uni', false);
+    spktimes = v(iFile).spikes.times;
+
+    % Restrict to bouts
+    [v(iFile).spikes.times, mutimes] = restrict_to_intervals(spktimes, mutimes, bouts, recDur);
+
+    tic
+    prc = prc_calc(v(iFile).spikes.times, ...
+        params, ...
+        'mutimes', mutimes, ...
+        'flgSave', true);
+    toc
+
+    prc_plot(prc, 'basepath', basepath, 'flgSave', true);
+
+end
+
+
+
+
+%% ========================================================================
+%  HELPER: RESTRICT TO INTERVALS
+%  ========================================================================
+
+function [spktimes, mutimes] = restrict_to_intervals(spktimes, mutimes, bouts, recDur)
+% RESTRICT_TO_INTERVALS Limits spikes to specific bouts and shifts times.
+
+% Calculate durations
+durs = bouts(:,2) - bouts(:,1);
+cumDur = cumsum(durs);
+
+% Find how many bouts needed
+idxEnd = find(cumDur >= recDur, 1);
+
+% Clip valid intervals to recDur
+validBouts = bouts(1:idxEnd, :);
+
+% If we found a crossover point (and have enough data), clip the last valid bout
+    % Calculate how much overflow we have
+    overflow = cumDur(idxEnd) - recDur;
+    % Shorten the last bout by the overflow amount
+    validBouts(end, 2) = validBouts(end, 2) - overflow;
+end
+
+% Recalculate durations for shifting
+finalDurs = validBouts(:,2) - validBouts(:,1);
+startOffsets = [0; cumsum(finalDurs(1:end-1))];
+
+% Apply to spktimes
+spktimes = shift_spikes(spktimes, validBouts, startOffsets);
+mutimes = shift_spikes(mutimes, validBouts, startOffsets);
+
+end
+
+function timesOut = shift_spikes(timesIn, bouts, offsets)
+% SHIFT_SPIKES Helper to shift spike times based on new offsets.
+
+nUnits = length(timesIn);
+timesOut = cell(nUnits, 1);
+nBouts = size(bouts, 1);
+
+for i = 1:nUnits
+    spks = timesIn{i};
+    newSpks = cell(nBouts, 1);
+
+    for j = 1:nBouts
+        t1 = bouts(j, 1);
+        t2 = bouts(j, 2);
+        offset = offsets(j);
+
+        % Extract
+        mask = spks >= t1 & spks < t2;
+        chunk = spks(mask);
+
+        % Shift
+        chunk = chunk - t1 + offset;
+
+        % Append
+        newSpks{j} = chunk(:);
+    end
+    timesOut{i} = cell2mat(newSpks);
+end
+
+end

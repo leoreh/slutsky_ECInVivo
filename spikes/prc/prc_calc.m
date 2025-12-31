@@ -25,6 +25,10 @@ function prc = prc_calc(spktimes, varargin)
 %                     .prc0       : (nUnits x 1) Raw, baseline-subtracted STPR at zero lag.
 %                     .stpr       : (nUnits x nBins) Full STPR curves.
 %                     .prc0_shfl  : (nUnits x nShuffles) Distribution of STPR(0).
+%                     .pk         : (nUnits x 1) Peak STPR within +/- 100ms.
+%                     .pk_z       : (nUnits x 1) Z-scored peak STPR.
+%                     .pk_norm    : (nUnits x 1) Normalized peak STPR.
+%                     .pk_shfl    : (nUnits x nShuffles) Distribution of peak STPR.
 %                     .t          : (1 x nBins) Time vector for STPR curves.
 %                     .info       : (struct) Analysis parameters.
 %
@@ -35,7 +39,7 @@ function prc = prc_calc(spktimes, varargin)
 %                 Optimize STPR calculation (LOO) and parallelize (parfor).
 %                 Requires Parallel Computing Toolbox.
 %                 Requires recompilation of shuffle_raster.cpp.
-% 
+%
 %   COMPLIE:
 %                 mex -v -O CXXFLAGS='$CXXFLAGS -fopenmp' LDFLAGS='$LDFLAGS -fopenmp' shuffle_raster.cpp
 
@@ -55,6 +59,7 @@ addParameter(p, 'winStpr', 1.0, @(x) isnumeric(x) && isscalar(x) && x>0);
 addParameter(p, 'nShuffles', 1000, @(x) isnumeric(x) && isscalar(x));
 addParameter(p, 'spkThr', 100, @(x) isnumeric(x) && isscalar(x) && x>0);
 addParameter(p, 'spkLim', Inf, @(x) isnumeric(x) && isscalar(x) && x>0);
+addParameter(p, 'mutimes', {}, @iscell);
 
 % Parse input arguments
 parse(p, spktimes, varargin{:});
@@ -68,6 +73,7 @@ winStpr = p.Results.winStpr;
 nShuffles = p.Results.nShuffles;
 spkThr = p.Results.spkThr;
 spkLim = p.Results.spkLim;
+mutimes = p.Results.mutimes;
 
 % Set basepath and get basename
 cd(basepath);
@@ -78,6 +84,10 @@ cd(basepath);
 %  ========================================================================
 
 % Create time axis for binning
+if isinf(winLim(2))
+    maxTime = max(cellfun(@(x) max([0; x(:)]), mutimes));
+    winLim(2) = ceil(maxTime);
+end
 t = winLim(1):binSize:winLim(2);
 
 % Define Gaussian kernel for smoothing
@@ -87,9 +97,15 @@ gkT = -gkW:gkW;
 gk = normpdf(gkT, 0, sigmaBins);
 gk = gk / sum(gk);
 
+
 % Calculate STPR window parameters
 lagBins = round((winStpr / 2) / binSize);
 nBins = 2 * lagBins + 1;
+
+% Calculate Peak window parameters
+winPk = 0.100;
+nBinsPk = round(winPk / binSize);
+idxPk = (-nBinsPk:nBinsPk); % Relative to center
 
 %% ========================================================================
 %  SPIKE WINDOWING & INITIALIZATION
@@ -103,8 +119,10 @@ nGood = length(uGood);
 nUnits = length(spktimes);
 
 % Initialize output arrays at full size
+% Initialize output arrays at full size
 stpr = zeros(nUnits, nBins);
 prc0 = nan(nUnits, 1);
+pk = nan(nUnits, 1);
 
 %% ========================================================================
 %  PREPARE RASTER MATRIX
@@ -123,6 +141,31 @@ end
 % Convert to binary and get spike bin indices
 rasterMat = binRates > 0;
 spkBins = binary2idx(rasterMat, [lagBins, length(t) - lagBins], spkLim);
+
+% Process mutimes if provided
+if ~isempty(mutimes)
+
+    % Collect all spikes for filtering
+    allSpks = cell2mat(spktimes(:));
+
+    % Window mutimes
+    mutimes = cellfun(@(x) x(x >= winLim(1) & x <= winLim(2)), ...
+        mutimes, 'UniformOutput', false);
+
+    % Filter out sorted spikes from mutimes and bin
+    nMu = length(mutimes);
+    muRates = zeros(nMu, length(t));
+
+    for iMu = 1:nMu
+        % Remove spikes that are already in sorted units
+        muClean = setdiff(mutimes{iMu}, allSpks);
+        muRates(iMu, :) = histcounts(muClean, [t, t(end) + binSize]);
+    end
+
+    % Append to rasterMat. These rows are part of popRate & shuffle, but
+    % not indexed by uGood loop
+    rasterMat = [rasterMat; muRates > 0];
+end
 
 % Determine number of swaps when creating shuffled raster matrix, based on
 % number of spikes
@@ -146,7 +189,7 @@ for iGood = 1:nGood
     pr = popRate - ur;
 
     % Calculate STPR using pre-processed spike bins
-    [stpr(idxRef, :), prc0(idxRef)] = stpr_calc(spkBins{iGood}, pr, lagBins);
+    [stpr(idxRef, :), prc0(idxRef), pk(idxRef)] = stpr_calc(spkBins{iGood}, pr, lagBins, idxPk);
 end
 
 %% ========================================================================
@@ -173,6 +216,7 @@ afterEach(dq, @(~) progress_monitor([], 'update'));
 
 % Initialize results containers for parallel chains
 results_prc0 = cell(nChains, 1);
+results_pk = cell(nChains, 1);
 results_stpr = cell(nChains, 1);
 
 parfor iChain = 1:nChains
@@ -183,14 +227,15 @@ parfor iChain = 1:nChains
     % Initialize chain accumulators
     chain_stpr = zeros(nUnits, nBins);
     chain_prc0 = nan(nUnits, nPerChain);
+    chain_pk = nan(nUnits, nPerChain);
 
     for iShuffle = 1:nPerChain
-        
+
         % Determine nSwaps
         if iShuffle == 1
             iSwaps = nSwaps;
         else
-            iSwaps = nUnits * 5;
+            iSwaps = size(rasterCurrent, 1) * 5;
         end
 
         % Shuffle
@@ -200,29 +245,34 @@ parfor iChain = 1:nChains
         refBins = binary2idx(rasterCurrent, [lagBins, length(t) - lagBins], spkLim);
         stpr_tmp = zeros(nUnits, nBins);
         prc0_tmp = nan(nUnits, 1);
+        pk_tmp = nan(nUnits, 1);
 
         for iGood = 1:nGood
             idxRef = uGood(iGood);
             ur = conv(rasterCurrent(iGood, :) / binSize, gk, 'same');
             pr = popRate - ur;
-            [stpr_tmp(idxRef,:), prc0_tmp(idxRef)] = stpr_calc(refBins{iGood}, pr, lagBins);
+            [stpr_tmp(idxRef,:), prc0_tmp(idxRef), pk_tmp(idxRef)] = stpr_calc(refBins{iGood}, pr, lagBins, idxPk);
         end
 
         chain_stpr = chain_stpr + stpr_tmp;
         chain_prc0(:, iShuffle) = prc0_tmp;
+        chain_pk(:, iShuffle) = pk_tmp;
         send(dq, []);
     end
 
     results_prc0{iChain} = chain_prc0;
+    results_pk{iChain} = chain_pk;
     results_stpr{iChain} = chain_stpr;
 end
 
 % Aggregate results
 stpr_sum = zeros(nUnits, nBins);
 prc0_shfl = zeros(nUnits, 0); % Append
+pk_shfl = zeros(nUnits, 0);   % Append
 for iChain = 1:nChains
     stpr_sum = stpr_sum + results_stpr{iChain};
     prc0_shfl = [prc0_shfl, results_prc0{iChain}];
+    pk_shfl = [pk_shfl, results_pk{iChain}];
 end
 
 % Adjust nShuffles to actual total executed
@@ -232,35 +282,46 @@ nShuffles = size(prc0_shfl, 2);
 stpr_shfl = stpr_sum / nShuffles;
 
 %% ========================================================================
-%  NORMALIZE 
+%  NORMALIZE
 %  ========================================================================
 
-% Z-score 
+% Median Normalization
+shflMed = median(prc0_shfl, 'all', 'omitnan');
+prc0_norm = prc0 ./ shflMed;
+
+% Z-score
 shflMu = mean(prc0_shfl, 2, 'omitnan');
 shflSd = std(prc0_shfl, [], 2, 'omitnan');
-shflMed = median(prc0_shfl, 2, 'omitnan');
-
-maskSdZero = shflSd < eps;
 prc0_z = (prc0 - shflMu) ./ shflSd;
 
-% Handle zero std dev cases
+% Handle zero std dev cases. If std is 0, check if value equals mean (0
+% Z-score) or not (NaN)
+maskSdZero = shflSd < eps;
 if any(maskSdZero)
-    % If std is 0, check if value equals mean (0 Z-score) or not (NaN)
+    warning('zero std')
     isMean = abs(prc0 - shflMu) < eps;
     prc0_z(maskSdZero & isMean) = 0;
     prc0_z(maskSdZero & ~isMean) = NaN;
 end
 
-% Median Normalization
-prc0_norm = prc0 ./ median(shflMed, 'omitnan');
+% --- Peak Metrics ---
 
-% Handle zero median cases
-maskMedZero = abs(shflMed) < eps;
-if any(maskMedZero)
-    isZero = abs(prc0) < eps;
-    prc0_norm(maskMedZero & isZero) = 0;
-    prc0_norm(maskMedZero & ~isZero) = NaN;
+% Median Normalization
+shflMedPk = median(pk_shfl, 'all', 'omitnan');
+pk_norm = pk ./ shflMedPk;
+
+% Z-score
+shflMuPk = mean(pk_shfl, 2, 'omitnan');
+shflSdPk = std(pk_shfl, [], 2, 'omitnan');
+pk_z = (pk - shflMuPk) ./ shflSdPk;
+
+maskSdZeroPk = shflSdPk < eps;
+if any(maskSdZeroPk)
+    isMean = abs(pk - shflMuPk) < eps;
+    pk_z(maskSdZeroPk & isMean) = 0;
+    pk_z(maskSdZeroPk & ~isMean) = NaN;
 end
+
 
 %% ========================================================================
 %  ORGANIZE OUTPUT
@@ -271,6 +332,10 @@ prc.prc0 = prc0;               % Raw STPR at zero lag
 prc.prc0_z = prc0_z;           % Z-scored population coupling
 prc.prc0_norm = prc0_norm;     % Median-normalized population coupling
 prc.prc0_shfl = prc0_shfl;     % Shuffled STPR values
+prc.pk = pk;
+prc.pk_z = pk_z;
+prc.pk_norm = pk_norm;
+prc.pk_shfl = pk_shfl;
 prc.stpr = stpr;               % Full STPR curves
 prc.stpr_shfl = stpr_shfl;
 prc.spkBins = spkBins;
@@ -281,6 +346,7 @@ prc.info = struct(...
     'runtime', datetime("now"), ...
     'nUnits', nUnits, ...
     'nGood', nGood, ...        % Number of good units
+    'nMutimes', length(mutimes), ... % Number of multi-unit channels
     'uGood', uGood, ...        % Indices of good units
     'winLim', winLim, ...
     'spkThr', spkThr, ...
@@ -302,23 +368,29 @@ end     % EOF
 %  HELPER: CALCULATE STPR
 %  ========================================================================
 
-function [stpr, prc0] = stpr_calc(uBins, popRate, lagBins)
+
+function [stpr, prc0, pk] = stpr_calc(uBins, popRate, lagBins, idxPk)
 % CALC_STPR Calculates spike-triggered average of population rate.
 %
 % INPUT:
 %   uBins       - Vector of bin indices where reference neuron spiked.
 %   popRate     - Population firing rate (Hz).
 %   lagBins     - Number of bins for STPR window.
+%   idxPk       - Indices relative to center for peak search.
 %
 % OUTPUT:
 %   prc0       - Baseline-subtracted STPR at zero lag (Hz).
 %   stpr       - spike triggered population rate
+%   pk         - Peak STPR within window.
 
 baseline = mean(popRate);
 idx = bsxfun(@plus, uBins, (-lagBins:lagBins));
 segments = popRate(idx);
 stpr = mean(segments, 1) - baseline;
-prc0 = stpr(lagBins + 1);
+
+ctr = lagBins + 1;
+prc0 = stpr(ctr);
+pk = max(stpr(ctr + idxPk));
 
 end
 

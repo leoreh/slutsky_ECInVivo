@@ -131,7 +131,7 @@ end
 fetSelect = {'Asym', 'Hpk', 'TP'};
 rsPrior = 0.97;
 regVal = 0.01;
-tblUnit = utypes_classify('basepaths', basepaths, ...
+uTbl = utypes_classify('basepaths', basepaths, ...
     'fetSelect', fetSelect, 'regVal', regVal, ...
     'rsPrior', rsPrior, 'flgPlot', false);
 
@@ -154,7 +154,7 @@ nGroups = length(paths);
 
 % Prepare data
 uType = uTbl.UnitType;
-yVal = uTbl.mfr;
+yVal = uTbl.FR;
 
 % Organize figure
 figure('Name', 'FR vs File', 'Position', [100 100 1600 800]);
@@ -179,10 +179,10 @@ for iGrp = 1:nGroups
     currNames = get_mname(currBase);
 
     % Filter Table for this Group
-    inGroup = ismember(fetTbl.Mouse, currNames);
+    inGroup = ismember(uTbl.Mouse, currNames);
     subType = uType(inGroup);
     subY = yVal(inGroup);
-    subX = removecats(fetTbl.Mouse(inGroup));
+    subX = removecats(uTbl.Mouse(inGroup));
 
     % --- Top Plot: Swarm (FR vs File) ---
     axSwarm(iGrp) = nexttile(iGrp);

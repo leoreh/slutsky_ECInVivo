@@ -27,6 +27,7 @@ cfg.varMap.TP = 'swv.tp';
 cfg.varMap.Asym = 'swv.asym';
 cfg.varMap.Hpk = 'swv.hpk';
 cfg.varMap.PRC = 'prc.prc0_norm';
+cfg.varMap.PRCz = 'prc.prc0_z';
 
 % Labels
 cfg.lbl.grp = {'Control'; 'MCU-KO'};

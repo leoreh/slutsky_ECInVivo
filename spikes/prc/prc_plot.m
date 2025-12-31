@@ -25,6 +25,7 @@ function prc_plot(prc, varargin)
 %
 %   HISTORY:
 %   Aug 2024 LH - Created and updated
+%   Dec 2025    - Improved labels, added normalized histogram, consistent styling
 
 %% ========================================================================
 %  ARGUMENTS
@@ -64,6 +65,10 @@ tStpr = (-lagBins:lagBins) * prc.info.binSize;
 nExUnits = min(5, nUnits);
 exUnits = round(linspace(1, nUnits, nExUnits));
 
+% Graphics settings
+cData = [0.85 0.325 0.098]; % Red/Orange for Actual Data
+cNull = [0.5 0.5 0.5];      % Gray for Shuffled/Null
+
 %% ========================================================================
 %  GRAPHICS GENERATION
 %  ========================================================================
@@ -71,68 +76,76 @@ exUnits = round(linspace(1, nUnits, nExUnits));
 % Set up figure with consistent graphics settings
 fh = figure('Name', [basename '_populationCoupling'], 'NumberTitle', 'off');
 
-% --- Raw STPR curves for all units ---
+% --- 1,2: HEAT MAP: STPR curves for all units ---
 subplot(3, 3, [1, 2]);
-imagesc(tStpr, 1:nUnits, prc.stpr(sortIdx,:));
+imagesc(tStpr, 1:nUnits, prc.stpr(sortIdx, :));
 colormap('jet');
-colorbar;
+color = colorbar;
+color.Label.String = 'Rate [Hz]';
 xlabel('Time [s]');
-ylabel('Unit (sorted by coupling)');
+ylabel('Unit (sorted)');
 title('STPR Curves');
 box off;
 
-% --- Example unit STPR curves ---
+% --- 3: SCATTER: Correlation between raw STPR and z-score ---
+subplot(3, 3, 3);
+plot_scatterCorr(prc.prc0, prc.prc0_norm, ...
+    'xLbl', 'Raw STPR(0) [Hz]', ...
+    'yLbl', 'Norm. Coupling [z-score]', ...
+    'flgOtl', true);
+title('Raw vs. Normalized');
+box off;
+
+% --- 4,5: LINE: Example unit STPR curves ---
 subplot(3, 3, [4, 5]);
 hold on;
 colors = lines(nExUnits);
 for iUnit = 1:nExUnits
     unit = exUnits(iUnit);
-    plot(tStpr, prc.stpr(unit,:), 'Color', colors(iUnit,:), 'LineWidth', 1);
-    plot(tStpr, prc.stpr_shfl(unit,:), '--', 'Color', colors(iUnit,:), 'LineWidth', 0.5);
+    plot(tStpr, prc.stpr(unit, :), 'Color', colors(iUnit, :), 'LineWidth', 1.2);
+    plot(tStpr, prc.stpr_shfl(unit, :), '--', 'Color', colors(iUnit, :), 'LineWidth', 0.5);
 end
 xline(0, '--k');
 xlabel('Time [s]');
-ylabel('Population Rate [Hz]');
-title('Example Unit STPR');
-legend(arrayfun(@(x) sprintf('Unit %d', x), exUnits, 'UniformOutput', false),...
-    'Location', 'best', 'Box', 'off');
+ylabel('Pop. Rate [Hz]');
+title('Example STPR (Solid: Data, Dashed: Shuff)');
 box off;
 
-% --- Population-averaged STPR curves ---
-subplot(3, 3, [7, 8]);
-hold on;
-plot_stdShade(prc.stpr, tStpr, gca, [0 0 0], 0.3);  % Actual data
-plot_stdShade(prc.stpr_shfl, tStpr, gca, [1 0 0], 0.3);  % Shuffled data
-xline(0, '--k');
-xlabel('Time [s]');
-ylabel('Population Rate [Hz]');
-title('Population-Averaged STPR');
-legend('Actual', 'Shuffled', 'Location', 'best');
-box off;
-
-% --- Correlation between raw STPR and z-score ---
-subplot(3, 3, 3);
-plot_scatterCorr(prc.prc0, prc.prc0_norm, 'xLbl', 'Raw STPR at Zero Lag', ...
-    'yLbl', 'Population Coupling (Z-score)', 'flgOtl', true);
-title('STPR vs. Coupling Strength');
-
-% --- Population Shuffle Overlay ---
+% --- 6: HIST: Normalized Coupling Distribution (Data vs Null) ---
 subplot(3, 3, 6);
 hold on;
-% Histogram of Data (Actual Population Coupling)
-h1 = histogram(prc.prc0, 30, 'Normalization', 'pdf', ...
-    'FaceColor', [0.85 0.325 0.098], 'EdgeColor', 'none', 'FaceAlpha', 0.6);
-% Histogram of Null Distribution (All Shuffles)
-h2 = histogram(prc.prc0_shfl(:), 30, 'Normalization', 'pdf', ...
-    'FaceColor', [0.5 0.5 0.5], 'EdgeColor', 'none', 'FaceAlpha', 0.4);
 
-xlabel('STPR at Zero Lag (Hz)');
-ylabel('Probability Density');
-title('Population Shuffle Overlay');
+% Normalize shuffled distribution by its own median (scalar per session)
+% This puts both Data and Null on the same "median-fold" scale
+shflMed = median(prc.prc0_shfl, 'all', 'omitnan');
+distData = prc.prc0_norm;           % This is prc.prc0 / shflMed
+distNull = prc.prc0_shfl(:) / shflMed;
+
+% Compare distributions
+h1 = histogram(distData, 30, 'Normalization', 'pdf', ...
+    'FaceColor', cData, 'EdgeColor', 'none', 'FaceAlpha', 0.6);
+h2 = histogram(distNull, 30, 'Normalization', 'pdf', ...
+    'FaceColor', cNull, 'EdgeColor', 'none', 'FaceAlpha', 0.4);
+
+xlabel('Norm. Coupling (x Median)');
+ylabel('Prob. Density');
+title('Coupling Strength');
 legend([h1, h2], {'Data', 'Null'}, 'Location', 'best', 'Box', 'off');
 box off;
 
-% --- MCMC Chain Stability ---
+% --- 7,8: SHADED: Population-averaged STPR curves ---
+subplot(3, 3, [7, 8]);
+hold on;
+plot_stdShade(prc.stpr, tStpr, gca, cData, 0.3);        % Actual data
+plot_stdShade(prc.stpr_shfl, tStpr, gca, cNull, 0.3);   % Shuffled data
+xline(0, '--k');
+xlabel('Time [s]');
+ylabel('Pop. Rate [Hz]');
+title('Population Limit (Mean \pm STD)');
+legend({'Data', 'Null'}, 'Location', 'best', 'Box', 'off');
+box off;
+
+% --- 9: LINE: MCMC Chain Stability ---
 subplot(3, 3, 9);
 hold on;
 % Calculate mean metric across units for each shuffle iteration
@@ -140,16 +153,17 @@ hold on;
 mean_shfl_trace = mean(prc.prc0_shfl, 1, 'omitnan');
 mean_data_val = mean(prc.prc0, 'omitnan');
 
-plot(mean_shfl_trace, 'Color', [0.5 0.5 0.5], 'LineWidth', 0.5);
-yline(mean_data_val, '--r', 'Data Mean', 'LabelHorizontalAlignment', 'left', 'FontSize', 8);
+plot(mean_shfl_trace, 'Color', cNull, 'LineWidth', 0.8);
+yline(mean_data_val, '--', 'Color', cData, 'Label', 'Data Mean', ...
+    'LabelHorizontalAlignment', 'left', 'FontSize', 8, 'LineWidth', 1.5);
 
 xlabel('Shuffle Iteration');
 ylabel('Mean STPR(0) [Hz]');
 title('MCMC Stability');
 grid on; box off;
 
-% Add stats as annotation in subplot 3 (Scatter) or overlay on stability plot
-% Let's overlay compact stats on the stability plot
+% --- STATS ANNOTATION ---
+% Overlay compact stats on the stability plot
 statsText = {
     sprintf('N=%d', nUnits),
     sprintf('Iter=%d', nShuffles)
@@ -168,4 +182,4 @@ if flgSave
     fprintf('Saved figure to %s\n', figFile);
 end
 
-end
+end     % EOF
