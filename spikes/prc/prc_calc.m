@@ -12,7 +12,6 @@ function prc = prc_calc(spktimes, varargin)
 %                     'flgSave'    : (log) Save results to .prc.mat file {true}
 %                     'winLim'     : (vec) Time window to analyze [start end] {[0 Inf]} (s)
 %                     'binSize'    : (num) Bin size for spike trains {0.001} (s)
-%                     'gkHw'       : (num) Gaussian kernel half-width (sigma) {0.012} (s)
 %                     'winStpr'    : (num) Total width of STPR window {1.0} (s)
 %                     'nShuffles'  : (num) Number of shuffles for null distribution {1000}
 %                     'spkThr'     : (num) Min spikes required. Fewer -> NaN {100}
@@ -54,7 +53,6 @@ addParameter(p, 'basepath', pwd, @ischar);
 addParameter(p, 'flgSave', true, @islogical);
 addParameter(p, 'winLim', [0 Inf], @(x) isnumeric(x) && numel(x)==2);
 addParameter(p, 'binSize', 0.001, @(x) isnumeric(x) && isscalar(x) && x>0);
-addParameter(p, 'gkHw', 0.012, @(x) isnumeric(x) && isscalar(x) && x>0);
 addParameter(p, 'winStpr', 1.0, @(x) isnumeric(x) && isscalar(x) && x>0);
 addParameter(p, 'nShuffles', 1000, @(x) isnumeric(x) && isscalar(x));
 addParameter(p, 'spkThr', 100, @(x) isnumeric(x) && isscalar(x) && x>0);
@@ -68,7 +66,6 @@ basepath = p.Results.basepath;
 flgSave = p.Results.flgSave;
 winLim = p.Results.winLim;
 binSize = p.Results.binSize;
-gkHw = p.Results.gkHw;
 winStpr = p.Results.winStpr;
 nShuffles = p.Results.nShuffles;
 spkThr = p.Results.spkThr;
@@ -90,12 +87,21 @@ if isinf(winLim(2))
 end
 t = winLim(1):binSize:winLim(2);
 
-% Define Gaussian kernel for smoothing
-sigmaBins = gkHw / binSize;
-gkW = ceil(3 * sigmaBins);
-gkT = -gkW:gkW;
-gk = normpdf(gkT, 0, sigmaBins);
-gk = gk / sum(gk);
+% Define Gaussian kernel for Population Rate (12 ms)
+gkHwPop = 0.012;
+sigmaBinsPop = gkHwPop / binSize;
+gkWPop = ceil(3 * sigmaBinsPop);
+gkTPop = -gkWPop:gkWPop;
+gkPop = normpdf(gkTPop, 0, sigmaBinsPop);
+gkPop = gkPop / sum(gkPop);
+
+% Define Gaussian kernel for Unit Rate (12/sqrt(2) ms)
+gkHwUnit = 0.012 / sqrt(2);
+sigmaBinsUnit = gkHwUnit / binSize;
+gkWUnit = ceil(3 * sigmaBinsUnit);
+gkTUnit = -gkWUnit:gkWUnit;
+gkUnit = normpdf(gkTUnit, 0, sigmaBinsUnit);
+gkUnit = gkUnit / sum(gkUnit);
 
 
 % Calculate STPR window parameters
@@ -177,13 +183,13 @@ nSwaps = sum(rasterMat(:)) * 10;
 
 % Calculate and smooth global population rate
 popRate = sum(rasterMat, 1, 'omitnan');
-popRate = conv(popRate / binSize, gk, 'same');
+popRate = conv(popRate / binSize, gkPop, 'same');
 
 for iGood = 1:nGood
     idxRef = uGood(iGood);
 
     % Calculate unit smoothed rate
-    ur = conv(rasterMat(iGood, :) / binSize, gk, 'same');
+    ur = conv(rasterMat(iGood, :) / binSize, gkUnit, 'same');
 
     % Calculate LOO population rate: Global - Unit
     pr = popRate - ur;
@@ -249,7 +255,7 @@ parfor iChain = 1:nChains
 
         for iGood = 1:nGood
             idxRef = uGood(iGood);
-            ur = conv(rasterCurrent(iGood, :) / binSize, gk, 'same');
+            ur = conv(rasterCurrent(iGood, :) / binSize, gkUnit, 'same');
             pr = popRate - ur;
             [stpr_tmp(idxRef,:), prc0_tmp(idxRef), pk_tmp(idxRef)] = stpr_calc(refBins{iGood}, pr, lagBins, idxPk);
         end
@@ -352,7 +358,8 @@ prc.info = struct(...
     'spkThr', spkThr, ...
     'spkLim', spkLim, ...
     'binSize', binSize, ...
-    'gkHw', gkHw, ...
+    'gkHwPop', gkHwPop, ...
+    'gkHwUnit', gkHwUnit, ...
     'winStpr', winStpr, ...
     'nShuffles', nShuffles);
 
@@ -549,7 +556,7 @@ end
 
 
 %% ========================================================================
-%  NOTE: SESSION SCALING: THE GLOBAL NOISE ANCHOR
+%  NOTE: SESSION SCALING
 %  ========================================================================
 %  While individual neurons exhibit a wide range of population coupling,
 %  their significance cannot be assessed in isolation. Population coupling
@@ -577,3 +584,26 @@ end
 %     session-specific population rate variability.
 %% ========================================================================
 
+
+%% ========================================================================
+%  NOTE: ASYMMETRIC SMOOTHING
+%  ========================================================================
+%  While many correlation analyses use identical smoothing for both
+%  signals, the population coupling methodology explicitly employs
+%  asymmetric kernels to differentiate between global state fluctuations
+%  and local spike timing.
+%
+%  * Population Rate (popRate): 12 ms sigma (half-width).
+%  * Individual Unit (ur): 12/sqrt(2) ms sigma (~8.48 ms).
+%  * Effective stPR Resolution: ~14.7 ms (geometric sum).
+%
+%  This dual-width approach presented in both Okun et al.
+%  (2015) and Doost et al. (2025) ensures:
+%
+%  1. Global State Definition: The 12 ms kernel provides a robust
+%     estimate of the local network state (popRate), reducing noise
+%     contributions from low-quality units or MUA.
+%  2. Local Spike Fidelity: The sharper 12/sqrt(2) ms kernel preserves
+%     the temporal precision of the reference unit's firing, preventing
+%     the loss of 'Chorister' synchronization.
+%% ========================================================================

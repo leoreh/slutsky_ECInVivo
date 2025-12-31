@@ -286,10 +286,6 @@ onGrpChange(hContainer, []);
         end
 
         grid(ax, 'on');
-
-        % Colors (use lines default)
-        % if user passed cfg.clr, could use it, but simplified to lines() for now to match default behavior
-        % if user passed cfg.clr, could use it, but simplified to lines() for now to match default behavior
     end
 
     function onGrpChange(src, ~)

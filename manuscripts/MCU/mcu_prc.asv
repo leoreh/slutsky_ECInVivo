@@ -1,19 +1,19 @@
+
+
 clear params
-params.winLim = [0 60 * 60];        % Analysis window [s]
+params.winLim = [0 Inf];        % Analysis window [s]
 params.binSize = 0.001;             % 1ms bins
-params.gkHw = 0.012;                % 12ms sigma
 params.winStpr = 1.0;               % 1s window
-params.nShuffles = 100;             % Number of shuffles
+params.nShuffles = 50;             % Number of shuffles
 params.spkLim = Inf;
 
 basepaths = [mcu_basepaths('wt_bsl'), mcu_basepaths('mcu_bsl')];
-% basepaths = [mcu_basepaths('mea_bac')];
 nFiles = length(basepaths);
 vars = {'spikes', 'st_metrics', 'fr', 'units', 'spktimes', 'session', 'sleep_states'};
 v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 
 idxState = 4; % NREM
-recDur = 60 * 60;
+recDur = 30 * 60;
 
 for iFile = 1 : nFiles
 
@@ -22,24 +22,30 @@ for iFile = 1 : nFiles
     cd(basepath);
 
     % State
-    bouts = v(iFile).ss.bouts.times{4};
-    boutLen = v(iFile).ss.bouts.boutLen{4};
+    bouts = v(iFile).ss.bouts.times{idxState};
 
     fs = v(iFile).session.extracellular.sr;
     mutimes = cellfun(@(x) x / fs, v(iFile).spktimes, 'uni', false);
-    spktimes = v(iFile).spikes.times;
+    spktimes = v(iFile).spikes.times';
 
     % Restrict to bouts
-    [v(iFile).spikes.times, mutimes] = restrict_to_intervals(spktimes, mutimes, bouts, recDur);
+    spktimes = spktimes_clip(spktimes, bouts, recDur);
+    mutimes = spktimes_clip(mutimes, bouts, recDur);
 
     tic
     prc = prc_calc(v(iFile).spikes.times, ...
         params, ...
         'mutimes', mutimes, ...
-        'flgSave', true);
+        'flgSave', false);
     toc
 
-    prc_plot(prc, 'basepath', basepath, 'flgSave', true);
+    rs = mean(prc.prc0_norm(v(iFile).units.type == 'RS'), 'omitnan')
+    fs = mean(prc.prc0_norm(v(iFile).units.type == 'FS'), 'omitnan')
+
+    rs = median(prc.pk_norm(v(iFile).units.type == 'RS'), 'omitnan')
+    fs = median(prc.pk_norm(v(iFile).units.type == 'FS'), 'omitnan')
+
+    prc_plot(prc, 'basepath', basepath, 'flgSave', false);
 
 end
 
@@ -47,66 +53,37 @@ end
 
 
 %% ========================================================================
-%  HELPER: RESTRICT TO INTERVALS
+%  MEA
 %  ========================================================================
 
-function [spktimes, mutimes] = restrict_to_intervals(spktimes, mutimes, bouts, recDur)
-% RESTRICT_TO_INTERVALS Limits spikes to specific bouts and shifts times.
+clear params
+recDur = 70 * 60;
+params.winLim = [0 recDur];         % Analysis window [s]
+params.binSize = 0.001;             % 1ms bins
+params.winStpr = 1.0;               % 1s window
+params.nShuffles = 50;              % Number of shuffles
+params.spkLim = Inf;
 
-% Calculate durations
-durs = bouts(:,2) - bouts(:,1);
-cumDur = cumsum(durs);
+basepaths = [mcu_basepaths('mea_bac'), mcu_basepaths('mea_mcuko')];
 
-% Find how many bouts needed
-idxEnd = find(cumDur >= recDur, 1);
+nFiles = length(basepaths);
+vars = {'mea'};
+v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 
-% Clip valid intervals to recDur
-validBouts = bouts(1:idxEnd, :);
 
-% If we found a crossover point (and have enough data), clip the last valid bout
-    % Calculate how much overflow we have
-    overflow = cumDur(idxEnd) - recDur;
-    % Shorten the last bout by the overflow amount
-    validBouts(end, 2) = validBouts(end, 2) - overflow;
-end
+for iFile = 2 : nFiles
 
-% Recalculate durations for shifting
-finalDurs = validBouts(:,2) - validBouts(:,1);
-startOffsets = [0; cumsum(finalDurs(1:end-1))];
+    % File
+    basepath = basepaths{iFile};
+    cd(basepath);
 
-% Apply to spktimes
-spktimes = shift_spikes(spktimes, validBouts, startOffsets);
-mutimes = shift_spikes(mutimes, validBouts, startOffsets);
+    tic
+    prc = prc_calc(v(iFile).mea.spktimes, ...
+        params, ...
+        'flgSave', true);
+    toc
 
-end
-
-function timesOut = shift_spikes(timesIn, bouts, offsets)
-% SHIFT_SPIKES Helper to shift spike times based on new offsets.
-
-nUnits = length(timesIn);
-timesOut = cell(nUnits, 1);
-nBouts = size(bouts, 1);
-
-for i = 1:nUnits
-    spks = timesIn{i};
-    newSpks = cell(nBouts, 1);
-
-    for j = 1:nBouts
-        t1 = bouts(j, 1);
-        t2 = bouts(j, 2);
-        offset = offsets(j);
-
-        % Extract
-        mask = spks >= t1 & spks < t2;
-        chunk = spks(mask);
-
-        % Shift
-        chunk = chunk - t1 + offset;
-
-        % Append
-        newSpks{j} = chunk(:);
-    end
-    timesOut{i} = cell2mat(newSpks);
-end
+    prc_plot(prc, 'basepath', basepath, 'flgSave', true);
 
 end
+
