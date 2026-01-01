@@ -1,7 +1,7 @@
 function ca = spk2ca(spktimes, varargin)
-% SPK2CCA Converts spike times to continuous mitochondrial calcium accumulation.
+% SPK2CA Converts spike times to continuous mitochondrial calcium accumulation.
 %
-%   ca = SPK2CCA(SPKTIMES, ...) calculates the Virtual Mitochondrial Calcium
+%   ca = SPK2CA(SPKTIMES, ...) calculates the Virtual Mitochondrial Calcium
 %   Accumulation (Psi_mCa) metric by convolving spike trains with a cytosolic
 %   decay kernel and passing the result through a Hill equation.
 %
@@ -39,6 +39,7 @@ addParameter(p, 'tauC', 0.1, @isnumeric);
 addParameter(p, 'tauM', 20, @isnumeric);
 addParameter(p, 'n', 4, @isnumeric);
 addParameter(p, 'Kd', 10, @isnumeric);
+addParameter(p, 'isiGain', 0, @isnumeric);
 addParameter(p, 'flgPlot', false, @islogical);
 addParameter(p, 'flgSave', false, @islogical);
 addParameter(p, 'basepath', pwd, @ischar);
@@ -121,40 +122,22 @@ parfor iUnit = 1:nUnits
     Kd = single(params.Kd);
     nBins = length(edges) - 1;
 
-    % Discretize
-    % Convert spike times to indices
-    stIdx = round(st / dt) + 1;
-    stIdx(stIdx > nTime) = [];
-    stIdx(stIdx < 1) = [];
-
-    S = zeros(1, nTime, 'single');
-    for iTime = 1:length(stIdx)
-        S(stIdx(iTime)) = S(stIdx(iTime)) + 1;
-    end
-
     % Cytosolic Calcium (C)
-    % Recursive Filter Implementation
-    alphaC = exp(-dt / params.tauC);
-    C = filter(1, [1 -alphaC], S);
+    % Uses spk2cyto to handle discretization, ISI gain, and filtering
+    C = spk2cyto(st, 't', t, 'dt', dt, 'tauC', params.tauC, 'isiGain', params.isiGain);
 
     % Mitochondrial Flux (J)
-    C_n = C .^ n;
-    Kd_n = Kd ^ n;
-    J = C_n ./ (Kd_n + C_n);
-
-    % Mitochondrial Concentration (M)
-    alphaM = exp(-dt / params.tauM);
-    M = filter(1 - alphaM, [1 -alphaM], J);
+    M = cyto2mito(C, 'Kd', Kd, 'n', n, 'dt', dt);
 
     % Binning
     binIdx = discretize(t, edges);
     valid = ~isnan(binIdx);
 
     cytoMat(iUnit, :) = accumarray(binIdx(valid)', C(valid)', [nBins 1], @mean)';
-    mitoMat(iUnit, :) = accumarray(binIdx(valid)', M(valid)', [nBins 1], @max)';
+    mitoMat(iUnit, :) = accumarray(binIdx(valid)', M(valid)', [nBins 1], @mean)';
 
     % Plotting
-    if false       
+    if false
         plot_spkVmito(st, tBins, edges, ...
             cytoMat(iUnit, :), mitoMat(iUnit, :), iUnit)
 
@@ -180,9 +163,6 @@ end
 
 if flgSave
     [~, basename] = fileparts(basepath);
-    if isempty(basename)
-        basename = 'mCa_results';
-    end
     saveFile = fullfile(basepath, [basename, '.ca.mat']);
     save(saveFile, 'ca');
 end
@@ -295,7 +275,7 @@ grid(ax2, 'on');
 % Mito Flux
 ax3 = nexttile(hTile);
 plot(ax3, t, J, 'r-', 'LineWidth', 1.5);
-title(ax3, 'Mitochondrial Influx (J)');
+title(ax3, 'Mitochondrial Caclium (M)');
 ylabel(ax3, 'Flux');
 grid(ax3, 'on');
 

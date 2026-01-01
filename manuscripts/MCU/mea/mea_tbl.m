@@ -22,43 +22,18 @@ cfg = mcu_cfg;
 % -------------------------------------------------------------------------
 % TEMPORAL DYNAMICS
 
-flgMito = false;
+% Vars to align
+varMap = struct();
+varMap.frt = 'fr.fr';
+varMap.btRate = 'brstDyn.rate';
+varMap.btDur = 'brstDyn.dur';
+varMap.btFreq = 'brstDyn.freq';
+varMap.btIBI = 'brstDyn.ibi';
+varMap.btFrac = 'brstDyn.bfrac';
 
-if flgMito
-
-    % % Calculate Ca2+ stats per unit during windows
-    % winBsl = [1 : v(1).fr.info.idxPert - 5];
-    % cytoBsl = mean(tbl.caCyto(:, winBsl), 2, 'omitnan');
-    % mitoBsl = mean(tbl.caMito(:, winBsl), 2, 'omitnan');
-    %
-    % tbl = addvars(tbl, cytoBsl, mitoBsl);
-
-    varMap = struct();
-    varMap.caCyto = 'ca.cyto';
-    varMap.caMito = 'ca.mito';
-    xVec = v(1).ca.time / 3600;
-    
-    for iFile = 1 : nFiles
-        v(iFile).ca.cyto = v(iFile).ca.cyto(:, [1 : 32395]);
-        v(iFile).ca.mito = v(iFile).ca.mito(:, [1 : 32395]);
-        v(iFile).ca.time = v(iFile).ca.time(:, [1 : 32395]);
-    end
-
-else
-    % Vars to align
-    varMap = struct();
-    varMap.frt = 'fr.fr';
-    varMap.btRate = 'brstDyn.rate';
-    varMap.btDur = 'brstDyn.dur';
-    varMap.btFreq = 'brstDyn.freq';
-    varMap.btIBI = 'brstDyn.ibi';
-    varMap.btFrac = 'brstDyn.bfrac';
-    
-    % Align
-    [v, t] = mea_tAlign(v, varMap, 'fr.info.idxPert', true);
-    xVec = t / 3600;
-
-end
+% Align
+[v, t] = mea_tAlign(v, varMap, 'fr.info.idxPert', true);
+xVec = t / 3600;
 
 % Unit vars
 varMap.uGood = 'fr.uGood';

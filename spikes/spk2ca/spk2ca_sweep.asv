@@ -1,0 +1,256 @@
+function results = spk2ca_sweep(basepaths)
+% SPK2CA_SWEEP Performs parameter sweep (Kd, n) on real MEA data.
+%
+%   results = SPK2CA_SWEEP(BASEPATHS) loads spiking data from the given
+%   basepaths and iterates through a range of Hill coefficients (n) and
+%   dissociation constants (Kd). For each combination, it calculates the
+%   Steady-State to Baseline ratio of mitochondrial calcium.
+%
+%   The goal is to find parameters that minimize the log-ratio (drift)
+%   between baseline and steady-state periods, optimizing for 'recovery'
+%   accuracy.
+%
+%   INPUTS:
+%       basepaths   - (cell) List of recording directories.
+%
+%   OUTPUTS:
+%       results     - (struct) Sweep results.
+%                     .tbl      : (table) Unit-wise results.
+%                     .sweep_Kd : (vec) Tested Kd values.
+%                     .sweep_n  : (vec) Tested n values.
+%                     .errMat   : (n x Kd) Population error matrix.
+%
+%   See also: SPK2CA, SPK2CA_SIM
+
+
+
+%% ========================================================================
+%  LOAD AND PREPARE DATA
+%  ========================================================================
+
+basepaths = mcu_basepaths('mea_bac');
+basepaths = basepaths(2);
+vars = {'mea', 'fr'};
+v = basepaths2vars('basepaths', basepaths, 'vars', vars, 'flgPrnt', false);
+
+% TABLE
+varMap = struct();
+varMap.uGood = 'fr.uGood';
+varMap.frt = 'fr.fr';
+varMap.spktimes = 'mea.spktimes';
+tagFiles.Name = get_mname(basepaths, 0);
+tagFiles.Group = repmat(cfg.lbl.grp(1), 1, nFiles);
+tagFiles.Group(contains(tagFiles.Name, 'KO')) = cfg.lbl.grp(2);
+tbl = v2tbl('v', v, 'varMap', varMap, 'tagFiles', tagFiles, ...
+    'uOffset', 0);
+tbl(~tbl.uGood, :) = [];
+
+% Limit spktimes to experiment
+winExp = [0, 9 * 60]  * 60;
+tbl.spktimes = cellfun(@(x) x(x >= winExp(1) & x <= winExp(2)), ...
+    tbl.spktimes, 'UniformOutput', false);
+
+% Time vector (1 ms resolution)
+maxTime = max(cellfun(@(x) max([0; x(:)]), tbl.spktimes));
+tVec = 0:dt:maxTime;
+
+% Time vector  (1 s resolution)
+chunks = n2chunks('n', maxTime, 'chunksize', binSize, 'lastChunk', 'exclude');
+edges = [chunks(:,1)-1, chunks(:,2)];
+edges = unique(edges(:))';
+tBins = edges(1:end-1) + diff(edges)/2;
+nBins = length(tBins);
+binIdx = discretize(tVec, edges);
+valid = ~isnan(binIdx);
+
+% Time vector (1 min resolution)
+% Here, FR traces are not aligned perfectly to perturbation.
+xVec = v(1).fr.t / 3600;
+
+
+%% ========================================================================
+%  PARAMETER SWEEP
+%  ========================================================================
+
+% Parameter Spaces
+sweep_Kd = logspace(-1, 1, 25);
+sweep_n  = [2, 3, 4, 5, 6, 8];
+
+nKd = length(sweep_Kd);
+nN  = length(sweep_n);
+nUnits = size(tbl, 1);
+
+% Constants
+isiGain  = 0;
+tauC     = 0.1;
+tauM     = 20;
+dt       = 0.001;
+
+% Windows (Indices)
+idxZero = find(xVec >= 0, 1);
+winBsl = [1, idxZero - 8];
+winCalc = [winBsl; length(xVec) - winBsl(2), length(xVec)];
+winCalcS = winCalc * 60;
+
+% Pre-allocate Result Containers
+resMat = zeros(nUnits, nKd, nN);
+
+% Initialize parpool
+if isempty(gcp('nocreate'))
+    parpool('local');
+end
+dq = parallel.pool.DataQueue;
+afterEach(dq, @(msg) fprintf('%s', msg));
+fprintf('Starting Sweep [%d Units x %d Params]...\n', nUnits, nKd*nN);
+
+parfor iUnit = 1:nUnits
+
+    % Compute Cytosolic Calcium ONCE per Unit. Only tauC matters here.
+    st = tbl.spktimes{iUnit};
+    C = spk2cyto(st, 't', tVec, 'dt', dt, 'tauC', tauC, 'isiGain', isiGain);
+
+    for iKd = 1 : nKd
+        for iN = 1 : nN
+
+            % Mito Integration
+            M = cyto2mito(C, 'n', sweep_n(iN), 'Kd', sweep_Kd(iKd), ...
+                'dt', dt, 'tauM', tauM, 'flgVmax', true);
+            
+            % Downsample to 1 s
+            mito = accumarray(binIdx(valid)', M(valid)', [nBins 1], @mean)';
+
+            % Mean in windows
+            valWin = mean(val(:, winCalc(1, 1) : winCalc(1, 2)), 2, 'omitnan');
+            valWin(:, 2)  = mean(val(:, winCalc(2, 1) : winCalc(2, 2)), 2, 'omitnan');
+
+            % Add floor to prevent log(0)
+            if any(valWin(:) == 0) && all(valWin(:) >= 0)
+                c = min(valWin(valWin > 0)) / 2;
+                valWin = valWin + c;
+                if verbose
+                    fprintf('[%s] Adding Offset %.4f\n', varName, c);
+                end
+            end
+
+            % Calculate Log Ratio (Log Fold Change)
+            valRcv = abs(log(valWin(:, 2) ./ valWin(:, 1)));
+
+
+        end
+    end
+end
+
+if isempty(gcp('nocreate'))
+    parpool('local');
+end
+dq = parallel.pool.DataQueue;
+afterEach(dq, @(msg) fprintf('%s', msg));
+
+fprintf('Starting Sweep [%d Units x %d Params]...\n', nUnits, nKd*nN);
+
+parfor iUnit = 1:nUnits
+
+    u = rawUnits(iUnit);
+    st = u.st;
+    tP = u.tPert;
+    dur = u.dur;
+
+    % Define Windows relative to Experiment
+    % BSL: 10 mins before pert -> Just before pert
+    % SS:  Last 10 mins of recording
+
+    wBsl = [0, tP - 60]; % From start to 1 min before pert
+    if wBsl(2) < wBsl(1) + 60, wBsl = [0, tP]; end % Fallback
+
+    wSs  = [dur - 600, dur]; % Last 10 mins
+    if wSs(1) < tP + 600, wSs = [tP + 600, dur]; end % Ensure sufficient recovery
+
+    % Clip analysis to needed range to save time?
+    % spk2ca handles this efficiently, but let's be safe.
+    maxT = dur;
+
+    % Generate Time Vector for this unit
+    % We need high res for accurate integration
+    tVec = 0:dt:maxT;
+
+    % Compute Cytosolic Calcium ONCE per Unit (Kd/n independent)
+    % Only tauC matters here.
+    C = spk2cyto(st, 't', tVec, 'dt', dt, 'tauC', tauC, 'isiGain', isiGain);
+
+    % Indices for Windows
+    idxBsl = tVec >= wBsl(1) & tVec <= wBsl(2);
+    idxSs  = tVec >= wSs(1)  & tVec <= wSs(2);
+
+    % Inner Loop: Parameters
+    uRes = zeros(nKd, nN);
+
+    for iN = 1:nN
+        currN = sweep_n(iN);
+
+        for iK = 1:nKd
+            currKd = sweep_Kd(iK);
+
+            % Mito Integration
+            % Note: cyto2mito is fast enough to run in loop
+            M = cyto2mito(C, 'n', currN, 'Kd', currKd, ...
+                'dt', dt, 'tauM', tauM, 'flgVmax', true);
+
+            % Measure
+            mBsl = mean(M(idxBsl));
+            mSs  = mean(M(idxSs));
+
+            % Log Ratio (Error Metric)
+            % Ideally 0 (Perfect Recovery)
+            % Add epsilon to avoid log(0)
+            offset = 1e-6;
+            val = abs(log((mSs + offset) / (mBsl + offset)));
+
+            uRes(iK, iN) = val;
+        end
+    end
+
+    resMat(iUnit, :, :) = uRes;
+
+    if mod(iUnit, 10) == 0
+        send(dq, '.');
+    end
+end
+fprintf('\nDone.\n');
+
+%% ========================================================================
+%  AGGREGATE & VISUALIZE
+%  ========================================================================
+
+% Mean Error across Population
+meanErr = squeeze(mean(resMat, 1, 'omitnan')); % Kd x N
+
+% Find Best
+[minErr, idxMin] = min(meanErr(:));
+[bestK_idx, bestN_idx] = ind2sub(size(meanErr), idxMin);
+
+bestKd = sweep_Kd(bestK_idx);
+bestN  = sweep_n(bestN_idx);
+
+fprintf('Optimal Parameters:\n');
+fprintf('Kd = %.4f\n', bestKd);
+fprintf('n  = %d\n', bestN);
+fprintf('Mean Abs LogRatio = %.4f\n', minErr);
+
+results.resMat = resMat;
+results.errMat = meanErr;
+results.Kd     = sweep_Kd;
+results.n      = sweep_n;
+results.opt.Kd = bestKd;
+results.opt.n  = bestN;
+
+% Visualization
+figure('Name', 'Parameter Sweep: Recovery Accuracy', 'Color', 'w');
+imagesc(sweep_n, 1:nKd, meanErr);
+set(gca, 'YTick', 1:nKd, 'YTickLabel', arrayfun(@(x) sprintf('%.2f', x), sweep_Kd, 'UniformOutput', false));
+xlabel('Hill Coeff (n)');
+ylabel('Dissociation Const (Kd)');
+title(sprintf('Mean LogRatio Error (Opt: Kd=%.2f, n=%d)', bestKd, bestN));
+colorbar;
+axis xy;
+
+end

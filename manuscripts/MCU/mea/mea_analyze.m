@@ -38,7 +38,7 @@ winTrough = [4 * 60 + 10, 4.5 * 60] * 60;
 winCalc = [winBsl; winSs; winTrough];
 
 close all
-for iFile = 1 : nFiles
+for iFile = 2 : nFiles
     
     % File
     basepath = basepaths{iFile};
@@ -92,7 +92,7 @@ for iFile = 1 : nFiles
         
     % Tranfer function spikes to Ca2+
     ca = spk2ca(spktimes, 'winCalc', [0, Inf], ...
-        'flgPlot', false, 'flgSave', true);
+        'flgPlot', true, 'flgSave', true);
 
 end
 
@@ -133,6 +133,8 @@ tblNorm.caMito = log10(tblNorm.caMito + 1e-6);
 
 % Normalize to baseline
 winBsl = [1, v(1).fr.info.idxPert - 5];
+winCalc = [winBsl; length(xVec) - winBsl(2), length(xVec)];
+
 tblNorm = tbl_tNorm(tblNorm, 'winNorm', winBsl, 'Method', 'percentage');
 
 
@@ -140,7 +142,6 @@ tblGUI_xy(xVec, tblNorm, 'tileVar', 'Group', 'yVar', 'caMito');
 
 
 varsInc = {'frt', 'caMito'};
-winCalc = [winBsl; length(xVec) - winBsl(2), length(xVec)];
 mea_compRcv(tblNorm, varsInc, winCalc)
 
 % -------------------------------------------------------------------------
