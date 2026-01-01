@@ -142,7 +142,7 @@ end
 val    = mean(J(win(1):win(2)));
 influx = val * gainIn;
 
-% Return Vmax as n times the influx
-Vmax = 2 * influx;
+% Return Vmax as 3 times the influx
+Vmax = 3 * influx;
 
 end

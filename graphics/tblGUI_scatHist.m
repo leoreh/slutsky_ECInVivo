@@ -116,6 +116,7 @@ guiData.selCbk = selCbk;
 guiData.grpCbk = grpCbk; % Populated from varargin
 guiData.highlightFcn = @highlightPoints; % Expose function
 guiData.setGroupVarFcn = @setGroupVar;   % Expose function
+guiData.setXYVarsFcn   = @setXYVars;     % Expose function
 guiData.hHighlight = []; % Store handle for external highlight
 guiData.chkGrp = [];     % Checkbox handles
 
@@ -190,9 +191,10 @@ guiData.ddY = uicontrol('Parent', hContainer, 'Style', 'popupmenu', ...
     'Position', [ctlX, currYTop - ctlH, ctlW_Half, ctlH], ...
     'Callback', @onUpdatePlot);
 guiData.ddYScale = uicontrol('Parent', hContainer, 'Style', 'popupmenu', ...
-    'String', {'Linear', 'Log'}, 'Units', 'normalized', ...
+    'String', {'Linear', 'Log', 'X-Linked'}, 'Units', 'normalized', ...
     'Position', [ctlX_Right, currYTop - ctlH, ctlW_Half, ctlH], ...
     'Callback', @onUpdatePlot);
+
 
 % Size Var
 currSizeTop = currYTop - ctlH - ctlGap - ctlH;
@@ -523,37 +525,74 @@ onUpdatePlot(hContainer, []);
         xlabel(data.hAxScatter, xName, 'Interpreter', 'none');
         ylabel(data.hAxScatter, yName, 'Interpreter', 'none');
 
+        % --- SCALE DETERMINATION ---
         if isGrpActive
             legend(data.hAxScatter, 'Location', 'best', 'Interpreter', 'tex');
         end
 
-        % Update Axis Limits (Fit to data with padding)
-        validX = xData(~isnan(xData) & ~isinf(xData));
-        validY = yData(~isnan(yData) & ~isinf(yData));
-
-        if isempty(validX), xLim = [0 1]; else, xLim = [min(validX), max(validX)]; end
-        if isempty(validY), yLim = [0 1]; else, yLim = [min(validY), max(validY)]; end
-
-        % Add 5% padding
-        dx = diff(xLim); if dx==0, dx=1; end
-        dy = diff(yLim); if dy==0, dy=1; end
-
-        % --- SCALE UPDATE ---
         scaleX = 'linear';
         if get(data.ddXScale, 'Value') == 2, scaleX = 'log'; end
-        scaleY = 'linear';
-        if get(data.ddYScale, 'Value') == 2, scaleY = 'log'; end
+
+        yScaleVal = get(data.ddYScale, 'Value');
+        isLinked = (yScaleVal == 3);
+
+        if isLinked
+            scaleY = scaleX;
+        else
+            scaleY = 'linear';
+            if yScaleVal == 2, scaleY = 'log'; end
+        end
 
         set(data.hAxScatter, 'XScale', scaleX, 'YScale', scaleY);
-        set(data.hAxHistX, 'XScale', scaleX, 'YScale', 'linear'); % Hist Y is counts
-        set(data.hAxHistY, 'XScale', 'linear', 'YScale', scaleY); % Hist X is counts (Orientation horizontal swaps this?)
-        % Wait, for HistY (Horizontal orientation):
-        % Y-axis matches scatter Y (so log if scatter is log)
-        % X-axis is counts (always linear usually)
+        set(data.hAxHistX, 'XScale', scaleX, 'YScale', 'linear');
+        set(data.hAxHistY, 'XScale', 'linear', 'YScale', scaleY);
 
-        xlim(data.hAxScatter, [xLim(1)-0.05*dx, xLim(2)+0.05*dx]);
-        ylim(data.hAxScatter, [yLim(1)-0.05*dy, yLim(2)+0.05*dy]);
+        % --- LIMIT CALCULATION (Scale Aware) ---
+        % Filter for X
+        if strcmp(scaleX, 'log')
+            vX = xData(~isnan(xData) & ~isinf(xData) & xData > 0);
+            if isempty(vX), xLim = [0.1 1]; else, xLim = [min(vX), max(vX)]; end
+        else
+            vX = xData(~isnan(xData) & ~isinf(xData));
+            if isempty(vX), xLim = [0 1]; else, xLim = [min(vX), max(vX)]; end
+        end
 
+        % Filter for Y
+        if strcmp(scaleY, 'log')
+            vY = yData(~isnan(yData) & ~isinf(yData) & yData > 0);
+            if isempty(vY), yLim = [0.1 1]; else, yLim = [min(vY), max(vY)]; end
+        else
+            vY = yData(~isnan(yData) & ~isinf(yData));
+            if isempty(vY), yLim = [0 1]; else, yLim = [min(vY), max(vY)]; end
+        end
+
+        if isLinked
+            jointMin = min(xLim(1), yLim(1));
+            jointMax = max(xLim(2), yLim(2));
+            xLim = [jointMin, jointMax];
+            yLim = [jointMin, jointMax];
+        end
+
+        % --- APPLY PADDING ---
+        % X
+        if strcmp(scaleX, 'log')
+            logMin = log10(xLim(1)); logMax = log10(xLim(2));
+            span = logMax - logMin; if span==0, span=1; end
+            xlim(data.hAxScatter, [10^(logMin - 0.05*span), 10^(logMax + 0.05*span)]);
+        else
+            span = diff(xLim); if span==0, span=1; end
+            xlim(data.hAxScatter, [xLim(1) - 0.05*span, xLim(2) + 0.05*span]);
+        end
+
+        % Y
+        if strcmp(scaleY, 'log')
+            logMin = log10(yLim(1)); logMax = log10(yLim(2));
+            span = logMax - logMin; if span==0, span=1; end
+            ylim(data.hAxScatter, [10^(logMin - 0.05*span), 10^(logMax + 0.05*span)]);
+        else
+            span = diff(yLim); if span==0, span=1; end
+            ylim(data.hAxScatter, [yLim(1) - 0.05*span, yLim(2) + 0.05*span]);
+        end
         grid(data.hAxScatter, 'on');
         data.hAxHistX.XAxis.Visible = 'off';
         data.hAxHistX.YAxis.Visible = 'off';
@@ -789,6 +828,37 @@ onUpdatePlot(hContainer, []);
                     needsUpdate = true;
                 end
             end
+        end
+
+        if needsUpdate
+            onUpdatePlot(hContainer, []);
+        end
+    end
+
+    function setXYVars(xName, yName)
+        % External setter for X and Y variables
+        data = hContainer.UserData;
+
+        idxX = find(strcmp(data.numericVars, xName));
+        idxY = find(strcmp(data.numericVars, yName));
+
+        if isempty(idxX) || isempty(idxY)
+            warning('Variables %s or %s not found in numericVars.', xName, yName);
+            return;
+        end
+
+        % Only update if changed
+        currX = get(data.ddX, 'Value');
+        currY = get(data.ddY, 'Value');
+
+        needsUpdate = false;
+        if idxX ~= currX
+            set(data.ddX, 'Value', idxX);
+            needsUpdate = true;
+        end
+        if idxY ~= currY
+            set(data.ddY, 'Value', idxY);
+            needsUpdate = true;
         end
 
         if needsUpdate
