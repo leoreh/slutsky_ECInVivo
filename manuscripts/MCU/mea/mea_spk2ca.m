@@ -66,17 +66,17 @@ tagFiles.Group = repmat(cfg.lbl.grp(1), 1, nFiles);
 tagFiles.Group(contains(tagFiles.Name, 'KO')) = cfg.lbl.grp(2);
 
 % Table
-tbl = v2tbl('v', v, 'varMap', varMap, 'tagFiles', tagFiles, ...
+tblt = v2tbl('v', v, 'varMap', varMap, 'tagFiles', tagFiles, ...
     'uOffset', 0);
 
 % -------------------------------------------------------------------------
 % COMBINE & CLEAN
 
 % Clean bad units
-% tbl(~tbl.uPert, :) = [];
-tbl(~tbl.uGood, :) = [];
-tbl.UnitID = categorical(tbl.UnitID);
-tblt = tbl;
+tblt(~tblt.uPert, :) = [];
+tblt(~tblt.uGood, :) = [];
+tblt.UnitID = categorical(tblt.UnitID);
+
 
 %% ========================================================================
 %  LOG RATIO ANALYSIS
@@ -133,8 +133,8 @@ end
 %  ========================================================================
 
 % Plot Results
-yVar = 'caMito_LR';
-tblGUI_scatHist(tbl, 'grpVar', 'Group', 'yVar', yVar);
+% yVar = 'caMito_LR';
+% tblGUI_scatHist(tbl, 'grpVar', 'Group', 'yVar', yVar);
 
 % experiments = categories(tbl.Name);
 % idxExp = tbl.Name == experiments(2);

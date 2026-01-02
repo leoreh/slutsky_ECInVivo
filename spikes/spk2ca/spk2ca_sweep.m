@@ -1,10 +1,10 @@
-function spk2ca_sweep()
-% SPK2CA_SWEEP Performs parameter sweep (Kd, n) on real MEA data.
+function results = spk2ca_sweep()
+% SPK2CA_SWEEP Performs parameter sweep (Kd, n, Vmax) on real MEA data.
 %
 %   results = SPK2CA_SWEEP(BASEPATHS) loads spiking data from the given
-%   basepaths and iterates through a range of Hill coefficients (n) and
-%   dissociation constants (Kd). For each combination, it calculates the
-%   Steady-State to Baseline ratio of mitochondrial calcium.
+%   basepaths and iterates through a range of Hill coefficients (n),
+%   dissociation constants (Kd), and Vmax values. For each combination,
+%   it calculates the Steady-State to Baseline ratio of mitochondrial calcium.
 %
 %   The goal is to find parameters that minimize the log-ratio (drift)
 %   between baseline and steady-state periods, optimizing for 'recovery'
@@ -18,7 +18,9 @@ function spk2ca_sweep()
 %                     .tbl      : (table) Unit-wise results.
 %                     .sweep_Kd : (vec) Tested Kd values.
 %                     .sweep_n  : (vec) Tested n values.
-%                     .errMat   : (n x Kd) Population error matrix.
+%                     .sweep_V  : (cell) Tested Vmax values.
+%                     .errMat   : (Kd x n x Vmax) Population error matrix.
+%                     .sigMat   : (nUnits x Kd x n x Vmax x nBins) Binned signals.
 %
 %   See also: SPK2CA, SPK2CA_SIM
 
@@ -46,7 +48,7 @@ tbl = v2tbl('v', v, 'varMap', varMap, 'tagFiles', tagFiles, ...
     'uOffset', 0);
 tbl.UnitID = categorical(tbl.UnitID);
 tbl(~tbl.uGood, :) = [];
-% tbl(~tbl.uPert, :) = [];
+tbl(~tbl.uPert, :) = [];
 
 % Limit spktimes to experiment
 winExp = [0, 9 * 60]  * 60;
@@ -59,35 +61,32 @@ spktimes = cellfun(@(x) x(x >= winExp(1) & x <= winExp(2)), ...
 
 % 1 ms resolution
 dt = 0.001;
-maxTime = max(cellfun(@(x) max([0; x(:)]), tbl.spktimes));
+maxTime = max(cellfun(@(x) max([0; x(:)]), spktimes));
 tVec = 0:dt:maxTime;
 
-% 1 s resolution
-binSize  = 1;
+% 1 min resolution (for signal storage)
+binSize  = 60;
 chunks = n2chunks('n', maxTime, 'chunksize', binSize, 'lastChunk', 'exclude');
 edges = [chunks(:,1)-1, chunks(:,2)];
 edges = unique(edges(:))';
 tBins = edges(1:end-1) + diff(edges)/2;
 nBins = length(tBins);
-binIdx = discretize(tVec, edges);
-valid = ~isnan(binIdx);
-binIdx = binIdx(valid);
 
-% 1 min resolution
-% Here, FR traces are not aligned perfectly to perturbation.
+% For plotting/comparison logic (FR traces)
 xVec = v(1).fr.t / 3600;
-
 
 %% ========================================================================
 %  PARAMETER SWEEP
 %  ========================================================================
 
 % Parameter Spaces
-Kd = [0.1, 1, 4, 10, 20];
-n  = [2.7, 6];
+Kd = [1, 4, 10, 20];
+n  = [2.7, 5, 10];
+Vmax = {1e-8, 1e-5, 1e-2, []}; % Empty means auto-estimated
 
 nKd = length(Kd);
 nN  = length(n);
+nVmax = length(Vmax);
 nUnits = size(tbl, 1);
 
 % Constants
@@ -95,15 +94,16 @@ isiGain  = 0;
 tauC     = 0.1;
 tauM     = 20;
 
-% Windows (Indices)
+% Windows (Indices for Steady State / Baseline calculation)
 idxZero = find(xVec >= 0, 1);
 winBsl = [1, idxZero - 8];
 winSs = [length(xVec) - winBsl(2), length(xVec) - 1];
-winCalc = [winBsl; winSs] * 60 * 1000;
 
 % Pre-allocate
-% resMat is (nUnits x 2 x nKd x nN). Dimension 2: 1=Baseline, 2=SteadyState
-resMat = zeros(nUnits, 2, nKd, nN);
+% resMat is (nUnits x 2 x nKd x nN x nVmax). Dimension 2: 1=Baseline, 2=SteadyState
+% sigMat is (nUnits x nKd x nN x nVmax x nBins)
+resMat = zeros(nUnits, 2, nKd, nN, nVmax);
+sigMat = zeros(nUnits, nKd, nN, nVmax, nBins);
 
 % Initialize parpool
 if isempty(gcp('nocreate'))
@@ -111,7 +111,7 @@ if isempty(gcp('nocreate'))
 end
 dq = parallel.pool.DataQueue;
 afterEach(dq, @(msg) fprintf('%s', msg));
-fprintf('Starting Sweep [%d Units x %d Params]...\n', nUnits, nKd*nN);
+fprintf('Starting Sweep [%d Units x %d Params]...\n', nUnits, nKd*nN*nVmax);
 
 parfor iUnit = 1:nUnits
 
@@ -119,22 +119,91 @@ parfor iUnit = 1:nUnits
     st = spktimes{iUnit};
     C = spk2cyto(st, 't', tVec, 'dt', dt, 'tauC', tauC, 'isiGain', isiGain);
 
-    tmpRes = zeros(2, nKd, nN);
+    % Prepare bin indices for this unit (same for all params)
+    binIdx = discretize(tVec, edges);
+    valid = ~isnan(binIdx);
+    bi = binIdx(valid);
+
+    tmpRes = zeros(2, nKd, nN, nVmax);
+    tmpSig = zeros(nKd, nN, nVmax, nBins);
+
     for iKd = 1 : nKd
         for iN = 1 : nN
+            for iV = 1 : nVmax
 
-            % Mito Integration
-            M = cyto2mito(C, 'n', n(iN), 'Kd', Kd(iKd), ...
-                'dt', dt, 'tauM', tauM);
+                % Mito Integration
+                M = cyto2mito(C, 'n', n(iN), 'Kd', Kd(iKd), ...
+                    'dt', dt, 'tauM', tauM, 'Vmax', Vmax{iV});
 
-            % Mean in windows
-            tmpRes(1, iKd, iN) = mean(M(winCalc(1, 1) : winCalc(1, 2)), 'omitnan');
-            tmpRes(2, iKd, iN) = mean(M(winCalc(2, 1) : winCalc(2, 2)), 'omitnan');
+                % Binning (Mean per minute)
+                Mt = accumarray(bi(:), M(valid), [nBins, 1], @mean);
+                tmpSig(iKd, iN, iV, :) = Mt;
+
+                % Mean in windows (for error calculation)
+                tmpRes(1, iKd, iN, iV) = mean(Mt(winBsl(1) : winBsl(2)), 'omitnan');
+                tmpRes(2, iKd, iN, iV) = mean(Mt(winSs(1) : winSs(2)), 'omitnan');
+            end
         end
     end
-    resMat(iUnit, :, :, :) = tmpRes;
+
+    resMat(iUnit, :, :, :, :) = tmpRes;
+    sigMat(iUnit, :, :, :, :) = tmpSig;
     send(dq, sprintf('Unit %d / %d processed.\n', iUnit, nUnits));
 end
+
+
+
+%% ========================================================================
+%  INTERACTIVE GUI prep
+%  ========================================================================
+
+% Flatten results into table columns for GUI
+for iKd = 1 : nKd
+    for iN = 1 : nN
+        for iV = 1 : nVmax
+
+            currV = Vmax{iV};
+            if isempty(currV)
+                strV = 'Auto';
+            else
+                strV = sprintf('%g', currV);
+                strV = strrep(strV, '.', 'p');
+                strV = strrep(strV, '-', 'n'); % Handle scientific notation e.g. 1e-4
+            end
+
+            suffix = sprintf('_K%g_n%g_V%s', Kd(iKd), n(iN), strV);
+            suffix = strrep(suffix, '.', 'p');
+
+            % Add Binned Signal Trace (nUnits x nBins) for visualization
+            % Variable naming: Mito_K*_n*_V*
+            traceName = ['Mito' suffix];
+            % Ensure we squeeze to get (nUnits x nBins). sigMat is 5D.
+            % (Vector based indexing preferred if dimensions were ambiguous but here fixed)
+            tbl.(traceName) = squeeze(sigMat(:, iKd, iN, iV, :));
+
+            tbl.(['mBsl' suffix]) = resMat(:, 1, iKd, iN, iV);
+            tbl.(['mSs' suffix])  = resMat(:, 2, iKd, iN, iV);
+        end
+    end
+end
+
+% Combine with tblu from mea_spk2ca (assuming it exists in workspace or re-derived)
+tblPlot = outerjoin(tbl, tblu, 'MergeKeys', true);
+tblPlot = outerjoin(tblt, tblPlot, 'MergeKeys', true);
+
+% Remove units with low mito (using the most permissive check across params)
+% This is just for visualization/cleanliness
+clipIdx = find(squeeze(any(any(any(any(resMat < 1e-30, 2), 3), 4), 5)));
+tblPlot(clipIdx, :) = [];
+
+spk2ca_gui(tblPlot, Kd, n, Vmax)
+
+tblGUI_scatHist(tblPlot);
+
+
+% Mito traces
+uIdx = randperm(size(tblPlot, 1), 10);
+tblGUI_xy(tBins, tblPlot(:, :));
 
 
 %% ========================================================================
@@ -151,71 +220,42 @@ offFr = median(frBsl(frBsl > 0)) * 0.01;
 logFr = abs(log((frSs + offFr) ./ (frBsl + offFr)));
 
 % 2. MITOCHONDRIAL SWEEP ANALYSIS
-errMat = zeros(nKd, nN);
-riiMat = zeros(nKd, nN); % Recovery Improvement Index
+errMat = zeros(nKd, nN, nVmax);
+riiMat = zeros(nKd, nN, nVmax); % Recovery Improvement Index
 
 for iKd = 1:nKd
     for iN = 1:nN
-        % Extract data: (nUnits x 2)
-        currDat = resMat(:, :, iKd, iN);
-        mBsl = currDat(:, 1);
-        mSs  = currDat(:, 2);
+        for iV = 1:nVmax
+            % Extract data: (nUnits x 2)
+            currDat = resMat(:, :, iKd, iN, iV);
+            mBsl = currDat(:, 1);
+            mSs  = currDat(:, 2);
 
-        % Define dynamic offset (1% of median baseline for this param set)
-        % This prevents low-signal regimes from appearing artificially accurate
-        offMito = median(mBsl(mBsl > 0), 'omitnan') * 0.01;
-        if isnan(offMito) || offMito == 0, offMito = eps; end
+            % Define dynamic offset (1% of median baseline for this param set)
+            offMito = median(mBsl(mBsl > 0), 'omitnan') * 0.01;
+            if isnan(offMito) || offMito == 0, offMito = eps; end
 
-        % SNR Mask: Only analyze units with signal significantly above the floor
-        % This filters out the "vanishing signal" artifact at high Kd/n
-        uValid = mBsl > (offMito * 10); 
-        
-        if sum(uValid) < (nUnits * 0.1)
-            errMat(iKd, iN) = NaN; % Insufficient signal for reliable analysis
-            continue;
+            % SNR Mask
+            uValid = mBsl > (offMito * 10);
+
+            if sum(uValid) < (nUnits * 0.1)
+                errMat(iKd, iN, iV) = NaN;
+                continue;
+            end
+
+            % Log Ratio for Mito
+            logMito = abs(log((mSs + offMito) ./ (mBsl + offMito)));
+
+            % Recovery Improvement Index (RII)
+            rii = logFr(uValid) - logMito(uValid);
+
+            % Store Median Absolute Error
+            errMat(iKd, iN, iV) = median(logMito(uValid), 'omitnan');
+            riiMat(iKd, iN, iV) = median(rii, 'omitnan');
         end
-
-        % Log Ratio for Mito
-        logMito = abs(log((mSs + offMito) ./ (mBsl + offMito)));
-
-        % Recovery Improvement Index (RII)
-        % Positive values mean Mito is more homeostatic than FR
-        rii = logFr(uValid) - logMito(uValid);
-
-        % Store Median Absolute Error for valid units
-        errMat(iKd, iN) = median(logMito(uValid), 'omitnan');
-        riiMat(iKd, iN) = median(rii, 'omitnan');
     end
 end
 
-
-
-%% ========================================================================
-%  INTERACTIVE GUI
-%  ========================================================================
-
-% Flatten results into table columns for GUI
-for iKd = 1 : nKd
-    for iN = 1 : nN
-        % Create standard variable names
-        suffix = sprintf('_K%g_n%g', Kd(iKd), n(iN));
-        suffix = strrep(suffix, '.', 'p'); % Safety for decimals
-
-        tbl.(['mBsl' suffix]) = resMat(:, 1, iKd, iN);
-        tbl.(['mSs' suffix])  = resMat(:, 2, iKd, iN);
-    end
-end
-
-% Combine with tblu from mea_spk2ca
-tblPlot = outerjoin(tbl, tblu, 'MergeKeys', true);
-
-% Remove units with low mito
-clipIdx = find(squeeze(any(any(any(resMat < 1e-20, 2), 3), 4)));
-tblPlot(clipIdx, :) = [];
-
-spk2ca_gui(tblPlot, Kd, n)
-
-tblGUI_scatHist(tblPlot);
 
 
 %% ========================================================================
@@ -224,44 +264,75 @@ tblGUI_scatHist(tblPlot);
 
 figure('Name', 'Parameter Sweep Results', 'Color', 'w', 'NumberTitle', 'off');
 
-% Plot Heatmap (Transpose for n-rows, Kd-cols)
-% Note: errMat is (Kd x n), so errMat' is (n x Kd) for (y, x) plotting.
-valMat = errMat';
-valMat = riiMat';
-imagesc(Kd, n, valMat);
-hCbar = colorbar;
-hCbar.Label.String = 'Error (Log Ratio)';
-colormap('parula');
-axis xy;
+% Create tabs if multiple Vmax, or just subplots
+tgroup = uitabgroup(gcf);
 
-% Aesthetics
-title('Parameter Sweep Error');
-xlabel('Dissociation Constant (Kd)');
-ylabel('Hill Coefficient (n)');
-set(gca, 'XTick', Kd, 'YTick', n);
-set(gca, 'FontSize', 12, 'LineWidth', 1.2);
+for iV = 1 : nVmax
+    currV = Vmax{iV};
+    if isempty(currV)
+        tabTitle = 'Vmax: Auto';
+    else
+        tabTitle = sprintf('Vmax: %g', currV);
+    end
 
-% Overlay Values
-minVal = min(valMat(:));
-maxVal = max(valMat(:));
-rangeVal = maxVal - minVal;
+    tab = uitab(tgroup, 'Title', tabTitle);
+    ax = axes('Parent', tab);
 
-for iN = 1:nN
-    for iKd = 1:nKd
-        val = valMat(iN, iKd);
+    % Plot Heatmap (Transpose for n-rows, Kd-cols)
+    % errMat is (Kd x n x Vmax), so take page iV and transpose
+    valMat = errMat(:, :, iV)';
 
-        % Contrast Logic for Parula (Low=Dark, High=Light)
-        if val < (minVal + rangeVal * 0.5)
-            txtColor = 'w';
-        else
-            txtColor = 'k';
+    imagesc(ax, Kd, n, valMat);
+    hCbar = colorbar(ax);
+    hCbar.Label.String = 'RII (Pos = Better)';
+    colormap(ax, 'parula');
+    axis(ax, 'xy');
+
+    % Aesthetics
+    title(ax, ['Recovery Improvement Index - ' tabTitle]);
+    xlabel(ax, 'Dissociation Constant (Kd)');
+    ylabel(ax, 'Hill Coefficient (n)');
+    set(ax, 'XTick', Kd, 'YTick', n);
+    set(ax, 'FontSize', 12, 'LineWidth', 1.2);
+
+    % Overlay Values
+    minVal = min(valMat(:), [], 'omitnan');
+    maxVal = max(valMat(:), [], 'omitnan');
+    if isempty(minVal), minVal = 0; end
+    if isempty(maxVal), maxVal = 1; end
+    rangeVal = maxVal - minVal;
+
+    for iN_idx = 1:nN
+        for iKd_idx = 1:nKd
+            val = valMat(iN_idx, iKd_idx);
+            if isnan(val), continue; end
+
+            % Contrast Logic
+            if val < (minVal + rangeVal * 0.5)
+                txtColor = 'w';
+            else
+                txtColor = 'k';
+            end
+
+            text(ax, Kd(iKd_idx), n(iN_idx), sprintf('%.2f', val), ...
+                'HorizontalAlignment', 'center', ...
+                'Color', txtColor, 'FontWeight', 'bold');
         end
-
-        text(Kd(iKd), n(iN), sprintf('%.2f', val), ...
-            'HorizontalAlignment', 'center', ...
-            'Color', txtColor, 'FontWeight', 'bold');
     end
 end
 
+%% ========================================================================
+%  OUTPUT PACKAGING
+%  ========================================================================
+
+results.tbl      = tbl;
+results.sweep_Kd = Kd;
+results.sweep_n  = n;
+results.sweep_V  = Vmax;
+results.errMat   = errMat;
+results.riiMat   = riiMat;
+results.sigMat   = sigMat;
+results.tBins    = tBins;
 
 end % EOF
+
