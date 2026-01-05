@@ -113,7 +113,7 @@ for iVar = 1 : length(tblVars)
         end
 
         % Calculate Log Ratio (Log Fold Change)
-        valRcv = abs(log(valWin(:, 2) ./ valWin(:, 1)));
+        valRcv = (log(valWin(:, 2) ./ valWin(:, 1)));
 
         % Save as new column in the table
         tblu.([varName, '_bsl']) = valWin(:, 1);

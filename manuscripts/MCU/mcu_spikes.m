@@ -2,33 +2,22 @@
 %  MCU_SPIKES - Analyze in vivo MCU spike data
 
 %% ========================================================================
-%  LOAD_DATA 
+%  LOAD_DATA
 %  ========================================================================
 
 basepaths = [mcu_basepaths('wt'), mcu_basepaths('mcu')];
 basepaths = [mcu_basepaths('wt_bsl'), mcu_basepaths('mcu_bsl')];
 cfg = mcu_cfg();
 
-
-
 % Load table
-tblUnit = mcu_unitTbl('basepaths', basepaths);
-
-% Remove bad units
-tblUnit(tblUnit.UnitType == 'Other', :) = [];
-tblUnit.UnitType = removecats(tblUnit.UnitType, 'Other');
-
-% Remove bac on / off
-tblUnit(tblUnit.Day == 'BAC_ON', :) = [];
-tblUnit(tblUnit.Day == 'BAC_OFF', :) = [];
-tblUnit.Day = removecats(tblUnit.Day, {'BAC_ON', 'BAC_OFF'});
+tblUnit = mcu_tblVivo('basepaths', basepaths, 'flgClean', true);
 
 % Assert no zero values
 tblLme = tbl_transform(tblUnit, 'flg0', true, 'verbose', true);
 
 uIdx = tblLme.UnitType == 'RS';
 tblGUI_scatHist(tblLme(uIdx, :))
-hFig = tblGUI_bar(tblLme);
+hFig = tblGUI_bar(tblLme(uIdx, :));
 
 
 %% ========================================================================
@@ -76,21 +65,22 @@ iGrp = 1;
 % Select Params
 varRsp = 'FR';
 varRsp = 'BRoy';
+varRsp = 'PRC';
 
 % Select data
 tblLme = tblUnit(tblUnit.Day == 'BSL', :);
 tblLme = tblLme(tblLme.UnitType == 'RS', :);
 
 % Check best model
-statsPark = lme_parkTest(tblLme, frml);
-statsDist = lme_compareDists(tblLme, frml);
+% statsPark = lme_parkTest(tblLme, frml);
+% statsDist = lme_compareDists(tblLme, frml);
 
 % Configuration
 clear cfgLme
-cfgLme.dist = 'Gamma';
+cfgLme.dist = 'Normal';
 
 % Fit
-frml = [varRsp, ' ~ Group + FR + (1|Name)'];
+frml = [varRsp, ' ~ Group  + (1|Name)'];
 [lmeStats, lmeMdl] = lme_analyse(tblLme, frml, cfgLme);
 
 % Plot
@@ -149,31 +139,31 @@ v = basepaths2vars('basepaths', basepaths(idxFiles), 'vars', vars);
 % close all
 for iFile = 1 : length(idxFiles)
 
-% Transpose
-spktimes = cellfun(@(x) x', ...
-    v(iFile).spikes.times, 'uni', false)';
+    % Transpose
+    spktimes = cellfun(@(x) x', ...
+        v(iFile).spikes.times, 'uni', false)';
 
-% Select only RS
-spktimes = spktimes(v(iFile).units.type == 'RS');
+    % Select only RS
+    spktimes = spktimes(v(iFile).units.type == 'RS');
 
-% Plot
-[hFig, hAx] = plot_axSize('szOnly', false,...
-    'axWidth', 600, 'axHeight', 300, 'flgPos', true);
+    % Plot
+    [hFig, hAx] = plot_axSize('szOnly', false,...
+        'axWidth', 600, 'axHeight', 300, 'flgPos', true);
 
-[~, hPlt] = plot_raster(spktimes, 'PlotType', 'vertline', ...
-    'lineHeight', 0.7, ...
-    'lineWidth', 0.35, ...
-    'hAx', hAx, ...
-    'clr', [0 0 0], ...
-    'xLim', winPlot, ...
-    'spkDur', 0.0005);
+    [~, hPlt] = plot_raster(spktimes, 'PlotType', 'vertline', ...
+        'lineHeight', 0.7, ...
+        'lineWidth', 0.35, ...
+        'hAx', hAx, ...
+        'clr', [0 0 0], ...
+        'xLim', winPlot, ...
+        'spkDur', 0.0005);
 
-xlim([10 15])
-xlabel('Time (s)')
-ylabel('Unit No.')
-set(gca, 'YDir', 'normal');
+    xlim([10 15])
+    xlabel('Time (s)')
+    ylabel('Unit No.')
+    set(gca, 'YDir', 'normal');
 
-[hFig, hAx] = plot_axSize('hFig', hFig, 'szOnly', false,...
-    'axWidth', 600, 'axHeight', 300, 'flgPos', true);
+    [hFig, hAx] = plot_axSize('hFig', hFig, 'szOnly', false,...
+        'axWidth', 600, 'axHeight', 300, 'flgPos', true);
 
 end

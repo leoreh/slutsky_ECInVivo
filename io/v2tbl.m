@@ -139,7 +139,12 @@ for iFile = 1:length(v)
         colName = mapFields{iVar};
         structPath = varMap.(colName);
         var1Path = strsplit(structPath, '.');
-        data = getfield(v(iFile), var1Path{:});
+        try
+            data = getfield(v(iFile), var1Path{:});
+        catch
+            warning('v2tbl:VarNotFound', 'Variable %s not found in file %d. Filling with NaN.', structPath, iFile);
+            data = nan(nRows, 1);
+        end
 
         % Ensure data has nRows as the first dimension (rows)
         if size(data, 1) ~= nRows

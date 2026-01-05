@@ -602,6 +602,13 @@ onUpdatePlot(hContainer, []);
         linkaxes([data.hAxScatter, data.hAxHistX], 'x');
         linkaxes([data.hAxScatter, data.hAxHistY], 'y');
 
+        if isLinked
+            % Add equality line
+            lms = xlim(data.hAxScatter);
+            plot(data.hAxScatter, lms, lms, 'k--', 'LineWidth', 1, ...
+                'HitTest', 'off', 'PickableParts', 'none', 'HandleVisibility', 'off');
+        end
+
         hold(data.hAxScatter, 'off');
         hold(data.hAxHistX, 'off');
         hold(data.hAxHistY, 'off');

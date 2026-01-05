@@ -1,0 +1,37 @@
+function dim = get_dim(Y, dim_type, fractional_dim)
+
+% Compute dimensionality of the activity in matrix Y (of size NxT)
+% dim_type: PR = Participation Ratio dimensionality
+%           threshold = dim based on threshold on cumulative variance
+%           explained (default = 0.8)
+%
+% fractional_dim: boolean variable; true = normalize dim by the number of
+% active neurons
+
+mY = mean(Y,2);
+Yz = mY == 0;
+Ynz = Y;
+Ynz(Yz,:) = [];
+if size(Ynz,1) < 2
+    dim = 0;
+else
+    [~,~,latent] = pca(Ynz);
+    spec = latent / sum(latent);
+    spec = cumsum(spec);
+    I = find(spec > .8);
+    thresh_dim = I(1);
+    PR_dim = sum(latent)^2 / sum(latent.^2);
+
+    if fractional_dim
+        thresh_dim = thresh_dim / size(Ynz,1);
+        PR_dim = PR_dim / size(Ynz,1);
+    end
+
+    switch lower(dim_type
+        case 'PR'
+            dim = PR_dim;
+        case 'thr'
+            dim = thresh_dim;
+    end
+end
+

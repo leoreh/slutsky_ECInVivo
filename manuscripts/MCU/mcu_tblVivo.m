@@ -1,10 +1,13 @@
-function uTbl = mcu_unitTbl(varargin)
+function [uTbl, basepaths, v] = mcu_tblVivo(varargin)
 
-% MCU_UNITTBL Loads and processes unit data for the MCU project.
+% MCU_TBLVIVO Loads and processes unit data for the MCU project.
 %
 % INPUT (Optional Key-Value Pairs):
 %   basepaths    (cell array) Full paths to recording folders. If empty,
 %                loads defaults.
+%   v            (struct) Pre-loaded data structure.
+%   varMap       (struct) Variable mapping for table creation.
+%   flgClean     (logical) Remove bad units and bac on / off.
 %
 % OUTPUT:
 %   uTbl         (table) Unit table with metadata.
@@ -16,9 +19,15 @@ function uTbl = mcu_unitTbl(varargin)
 
 p = inputParser;
 addOptional(p, 'basepaths', {}, @(x) iscell(x));
+addOptional(p, 'v', [], @isstruct);
+addOptional(p, 'varMap', [], @isstruct);
+addOptional(p, 'flgClean', false, @islogical);
 
 parse(p, varargin{:});
 basepaths = p.Results.basepaths;
+v = p.Results.v;
+varMap = p.Results.varMap;
+flgClean = p.Results.flgClean;
 
 if isempty(basepaths)
     basepaths = [mcu_basepaths('wt'), mcu_basepaths('mcu')];
@@ -36,10 +45,17 @@ tagFiles.File = fileNames;
 
 % Load
 cfg = mcu_cfg;
-v = basepaths2vars('basepaths', basepaths, 'vars', cfg.vars);
+if isempty(v)
+    v = basepaths2vars('basepaths', basepaths, 'vars', cfg.vars);
+end
+
+% Set varMap
+if isempty(varMap)
+    varMap = cfg.varMap;
+end
 
 % Table
-uTbl = v2tbl('v', v, 'varMap', cfg.varMap, 'tagAll',...
+uTbl = v2tbl('v', v, 'varMap', varMap, 'tagAll',...
     struct(), 'tagFiles', tagFiles, 'idxCol', []);
 
 %% ========================================================================
@@ -68,4 +84,15 @@ uTbl.Group = reordercats(uTbl.Group, cfg.lbl.grp);
 uTbl.UnitType = reordercats(uTbl.UnitType, cfg.lbl.unit);
 uTbl.Day = reordercats(uTbl.Day, cfg.lbl.day);
 
+if flgClean
+    % Remove bad units
+    uTbl(uTbl.UnitType == 'Other', :) = [];
+    uTbl.UnitType = removecats(uTbl.UnitType, 'Other');
+
+    % Remove bac on / off
+    uTbl(uTbl.Day == 'BAC_ON', :) = [];
+    uTbl(uTbl.Day == 'BAC_OFF', :) = [];
+    uTbl.Day = removecats(uTbl.Day, {'BAC_ON', 'BAC_OFF'});
 end
+
+end     % EOF

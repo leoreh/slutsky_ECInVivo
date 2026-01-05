@@ -67,7 +67,7 @@ end
 
 if isempty(chunksize)       % one large chunk
     chunks = [1 n];
-else                        % load file in chunks
+else                        
     % Standard chunk generation
     nchunks = ceil(n / chunksize);
     chunks = [1 : chunksize : chunksize * nchunks;...

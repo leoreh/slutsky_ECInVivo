@@ -205,6 +205,45 @@ tblGUI_scatHist(tblPlot);
 uIdx = randperm(size(tblPlot, 1), 10);
 tblGUI_xy(tBins, tblPlot(:, :));
 
+figure;
+x = tblPlot.frt_rcv;
+median(x)
+mean(x)
+histogram(x)
+
+
+
+%% ========================================================================
+%  M / FR TRACES
+%  ========================================================================
+
+% Create separate table for Ratio traces
+tblRatio = tblPlot;
+vars = tblRatio.Properties.VariableNames;
+
+frVec = tblRatio.frt;
+nBins = length(tBins);
+
+for i = 1:numel(vars)
+    currVar = vars{i};
+    currDat = tblRatio.(currVar);
+
+    % Check if variable is a time trace (matches tBins length)
+    isTrace = isnumeric(currDat) && size(currDat, 2) == nBins;
+
+    % processing
+    if isTrace && ~strcmp(currVar, 'frt')
+        % Divide by Firing Rate (add eps for stability)
+        tblRatio.(currVar) = currDat ./ (frVec + eps);
+    end
+end
+
+% Visualize
+tblGUI_xy(tBins, tblRatio);
+
+
+
+
 
 %% ========================================================================
 %  ERROR

@@ -35,7 +35,7 @@ basepaths = natsort(basepaths);
 %  CREATE TABLE
 %  ========================================================================
 
-tblUnit = mcu_unitTbl('basepaths', basepaths);
+tblUnit = mcu_tblVivo('basepaths', basepaths);
 
 %% ========================================================================
 %  GLOBAL TIME AXIS
@@ -107,7 +107,7 @@ for iMouse = 1:nMice
 
 end
 
-    
+
 % --- DENOISE ---
 tblUnit.FRt = fr_denoise(tblUnit.FRt, 'flgPlot', false, 'frameLen', 60);
 

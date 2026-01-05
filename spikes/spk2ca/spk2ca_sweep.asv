@@ -61,7 +61,7 @@ spktimes = cellfun(@(x) x(x >= winExp(1) & x <= winExp(2)), ...
 
 % 1 ms resolution
 dt = 0.001;
-maxTime = max(cellfun(@(x) max([0; x(:)]), tbl.spktimes));
+maxTime = max(cellfun(@(x) max([0; x(:)]), spktimes));
 tVec = 0:dt:maxTime;
 
 % 1 min resolution (for signal storage)
@@ -80,9 +80,9 @@ xVec = v(1).fr.t / 3600;
 %  ========================================================================
 
 % Parameter Spaces
-Kd = [0.1, 1, 4, 10, 20];
-n  = [2.7, 6];
-Vmax = {1e-7, 1e-5, 1e-3, []}; % Empty means auto-estimated
+Kd = [1, 4, 10, 20];
+n  = [2.7, 5, 10];
+Vmax = {1e-8, 1e-5, 1e-2, []}; % Empty means auto-estimated
 
 nKd = length(Kd);
 nN  = length(n);
@@ -98,7 +98,6 @@ tauM     = 20;
 idxZero = find(xVec >= 0, 1);
 winBsl = [1, idxZero - 8];
 winSs = [length(xVec) - winBsl(2), length(xVec) - 1];
-winCalc = [winBsl; winSs] * 60 * 1000; % Convert to ms for indexing M vector
 
 % Pre-allocate
 % resMat is (nUnits x 2 x nKd x nN x nVmax). Dimension 2: 1=Baseline, 2=SteadyState
@@ -138,19 +137,83 @@ parfor iUnit = 1:nUnits
 
                 % Binning (Mean per minute)
                 Mt = accumarray(bi(:), M(valid), [nBins, 1], @mean);
-                tmpSig(iKd, iN, iV, :) = binnedM;
+                tmpSig(iKd, iN, iV, :) = Mt;
 
                 % Mean in windows (for error calculation)
-                tmpRes(1, iKd, iN, iV) = mean(M(winCalc(1, 1) : winCalc(1, 2)), 'omitnan');
-                tmpRes(2, iKd, iN, iV) = mean(M(winCalc(2, 1) : winCalc(2, 2)), 'omitnan');
-
+                tmpRes(1, iKd, iN, iV) = mean(Mt(winBsl(1) : winBsl(2)), 'omitnan');
+                tmpRes(2, iKd, iN, iV) = mean(Mt(winSs(1) : winSs(2)), 'omitnan');
             end
         end
     end
+
     resMat(iUnit, :, :, :, :) = tmpRes;
     sigMat(iUnit, :, :, :, :) = tmpSig;
     send(dq, sprintf('Unit %d / %d processed.\n', iUnit, nUnits));
 end
+
+
+
+%% ========================================================================
+%  INTERACTIVE GUI prep
+%  ========================================================================
+
+% Flatten results into table columns for GUI
+for iKd = 1 : nKd
+    for iN = 1 : nN
+        for iV = 1 : nVmax
+
+            currV = Vmax{iV};
+            if isempty(currV)
+                strV = 'Auto';
+            else
+                strV = sprintf('%g', currV);
+                strV = strrep(strV, '.', 'p');
+                strV = strrep(strV, '-', 'n'); % Handle scientific notation e.g. 1e-4
+            end
+
+            suffix = sprintf('_K%g_n%g_V%s', Kd(iKd), n(iN), strV);
+            suffix = strrep(suffix, '.', 'p');
+
+            % Add Binned Signal Trace (nUnits x nBins) for visualization
+            % Variable naming: Mito_K*_n*_V*
+            traceName = ['Mito' suffix];
+            % Ensure we squeeze to get (nUnits x nBins). sigMat is 5D.
+            % (Vector based indexing preferred if dimensions were ambiguous but here fixed)
+            tbl.(traceName) = squeeze(sigMat(:, iKd, iN, iV, :));
+
+            tbl.(['mBsl' suffix]) = resMat(:, 1, iKd, iN, iV);
+            tbl.(['mSs' suffix])  = resMat(:, 2, iKd, iN, iV);
+        end
+    end
+end
+
+% Combine with tblu from mea_spk2ca (assuming it exists in workspace or re-derived)
+tblPlot = outerjoin(tbl, tblu, 'MergeKeys', true);
+tblPlot = outerjoin(tblt, tblPlot, 'MergeKeys', true);
+
+% Remove units with low mito (using the most permissive check across params)
+% This is just for visualization/cleanliness
+clipIdx = find(squeeze(any(any(any(any(resMat < 1e-30, 2), 3), 4), 5)));
+tblPlot(clipIdx, :) = [];
+
+spk2ca_gui(tblPlot, Kd, n, Vmax)
+
+tblGUI_scatHist(tblPlot);
+
+
+% Mito traces
+uIdx = randperm(size(tblPlot, 1), 10);
+tblGUI_xy(tBins, tblPlot(:, :));
+
+figure;
+x = tblPlot.frt_rcv;
+median(x)
+mean(x)
+histogram(x)
+
+
+% M
+
 
 
 %% ========================================================================
@@ -206,46 +269,6 @@ end
 
 
 %% ========================================================================
-%  INTERACTIVE GUI prep
-%  ========================================================================
-
-% Flatten results into table columns for GUI
-for iKd = 1 : nKd
-    for iN = 1 : nN
-        for iV = 1 : nVmax
-
-            currV = Vmax{iV};
-            if isempty(currV)
-                strV = 'Auto';
-            else
-                strV = sprintf('%g', currV);
-                strV = strrep(strV, '.', 'p');
-                strV = strrep(strV, '-', 'n'); % Handle scientific notation e.g. 1e-4
-            end
-
-            suffix = sprintf('_K%g_n%g_V%s', Kd(iKd), n(iN), strV);
-            suffix = strrep(suffix, '.', 'p');
-
-            tbl.(['mBsl' suffix]) = resMat(:, 1, iKd, iN, iV);
-            tbl.(['mSs' suffix])  = resMat(:, 2, iKd, iN, iV);
-        end
-    end
-end
-
-% Combine with tblu from mea_spk2ca (assuming it exists in workspace or re-derived)
-% Since tbl is derived from 'v' here and verified against original code, we proceed with tbl.
-
-% Remove units with low mito (using the most permissive check across params)
-% This is just for visualization/cleanliness
-clipIdx = find(squeeze(any(any(any(any(resMat < 1e-20, 2), 3), 4), 5)));
-tblPlot = tbl;
-tblPlot(clipIdx, :) = [];
-
-% Note: not calling local gui/plot functions automatically to keep it clean.
-% tblGUI_scatHist(tblPlot);
-
-
-%% ========================================================================
 %  HEATMAP: PARAMETER SWEEP RESULTS
 %  ========================================================================
 
@@ -267,7 +290,7 @@ for iV = 1 : nVmax
 
     % Plot Heatmap (Transpose for n-rows, Kd-cols)
     % errMat is (Kd x n x Vmax), so take page iV and transpose
-    valMat = riiMat(:, :, iV)';
+    valMat = errMat(:, :, iV)';
 
     imagesc(ax, Kd, n, valMat);
     hCbar = colorbar(ax);

@@ -15,8 +15,6 @@ isiVal = brst_isiValley(spktimes, 'nSpks', 3);
 
 
 
-
-
 %% ========================================================================
 %  PER FILE ANALYSIS
 %  ========================================================================
@@ -38,98 +36,87 @@ winTrough = [4 * 60 + 10, 4.5 * 60] * 60;
 winCalc = [winBsl; winSs; winTrough];
 
 close all
-for iFile = 2 : nFiles
-    
+for iFile = 1 : nFiles
+
     % File
     basepath = basepaths{iFile};
     [~, basename] = fileparts(basepath);
     cd(basepath);
 
     % Organize raw spike times
-    % files = dir('*sorted*');
-    % mea = mea_orgNex('fname', files.name, 'basepath', pwd, 'forceL', false);
-    spktimes = v(iFile).mea.spktimes;
+    files = dir('*sorted*');
+    mea = mea_orgNex('fname', files.name, 'basepath', basepath, ...
+        'flgForce', true, 'flgSave', true, 'flgPlot', false);
 
     % Limit to experimental window
+    % spktimes = v(iFile).mea.spktimes;
+    spktimes = mea.spktimes;
+    lastspike = max(cellfun(@max, spktimes, 'uni', true));
     spktimes = cellfun(@(x) x(x >= winExp(1) & x <= winExp(2)), ...
         spktimes, 'UniformOutput', false);
 
     % Firing rate
-    % fr = mea_frPrep(spktimes, 'binSize', binSize, ...
-    %     'flgSave', true, 'flgPlot', false);
-    
-    % % Burst detection
-    % brst = brst_detect(spktimes, ...
-    %     'minSpks', 3, ...
-    %     'maxISI_start', isiVal, ...
-    %     'maxISI_end', isiVal * 2, ...
-    %     'minDur', 0.015, ...
-    %     'minIBI', 0.1, ...
-    %     'flgForce', true, 'flgSave', true, 'flgPlot', false);
-    % 
-    % % Burst temporal dynamics
-    % dyn = brst_dynamics(brst, spktimes, 'binSize', 60, 'kernelSD', 300, ...
-    %     'binSize', binSize, 'flgSave', true, 'flgPlot', false); 
-    % 
-    % % Burst statistics
-    % stats = brst_stats(brst, spktimes, 'winCalc', winCalc, ...
-    %     'flgSave', true);
-    % 
-    % % FR recovery
-    % rcv = mea_frRecovery(v(iFile).fr.t, v(iFile).fr.fr, ...
-    %     'idxTrough', v(iFile).fr.info.idxTrough, ...
-    %     'binSize', binSize, 'flgSave', true, 'flgPlot', false);
-    % 
-    % % FR model fit an recovery
-    % frFit = mea_frFit(v(iFile).fr.fr, v(iFile).fr.t, 'FilterLen', [], ...
-    %     'idxTrough', v(iFile).fr.info.idxTrough, ...
-    %     'flgPlot', false, 'flgSave', true);
-    % 
-    % rcvMdl = mea_frRecovery(v(iFile).fr.t, frFit.frMdl, ...
-    %     'idxTrough', v(iFile).fr.info.idxTrough, ...
-    %     'binSize', binSize, 'flgSave', false, 'flgPlot', false);
-    % save(fullfile(basepath, [basename, '.frRcv_mdl.mat']), 'rcvMdl', '-v7.3');
-        
-    % Tranfer function spikes to Ca2+
-    ca = spk2ca(spktimes, 'winCalc', [0, Inf], ...
+    fr = mea_frPrep(spktimes, 'binSize', binSize, ...
+        'flgSave', true, 'flgPlot', true);
+
+    % Burst detection
+    brst = brst_detect(spktimes, ...
+        'minSpks', 3, ...
+        'maxISI_start', isiVal, ...
+        'maxISI_end', isiVal * 2, ...
+        'minDur', 0.015, ...
+        'minIBI', 0.1, ...
+        'flgForce', true, 'flgSave', true, 'flgPlot', true);
+
+    % Burst temporal dynamics
+    dyn = brst_dynamics(brst, spktimes, 'binSize', 60, 'kernelSD', 300, ...
+        'binSize', binSize, 'flgSave', true, 'flgPlot', true);
+
+    % Burst statistics
+    stats = brst_stats(brst, spktimes, 'winCalc', winCalc, ...
+        'flgSave', true);
+
+    % FR recovery
+    % fr = v(iFile).fr;
+    rcv = mea_frRecovery(fr.t, fr.fr, ...
+        'idxTrough', fr.info.idxTrough, ...
+        'binSize', binSize, 'flgSave', true, 'flgPlot', true);
+
+    % FR model fit an recovery
+    frFit = mea_frFit(fr.fr, fr.t, 'FilterLen', [], ...
+        'idxTrough', fr.info.idxTrough, ...
         'flgPlot', true, 'flgSave', true);
+    rcvMdl = mea_frRecovery(fr.t, frFit.frMdl, ...
+        'idxTrough', fr.info.idxTrough, ...
+        'binSize', binSize, 'flgSave', false, 'flgPlot', false);
+    save(fullfile(basepath, [basename, '.frRcv_mdl.mat']), 'rcvMdl', '-v7.3');
+
+    % Tranfer function spikes to Ca2+
+    % ca = spk2ca(spktimes, 'winCalc', [0, Inf], ...
+    %     'flgPlot', true, 'flgSave', true);
 
 end
 
+% Dimensionality
+% mcu_dim('type', 'vitro')
 
 
 %% ========================================================================
 %  LOAD TABLE
 %  ========================================================================
 
-[tbl, xVec, ~, v] = mea_tbl(basepaths, v);
-
-tblGUI_xy(xVec([1 : 32395]), tbl, 'tileVar', 'Group', 'yVar', 'caMito');
+[tbl, xVec, ~, v] = mcu_tblMea();
 
 tblGUI_scatHist(tbl, 'xVar', 'bFrac', 'yVar', 'rcvTime', 'grpVar', 'Group');
-
-tblGUI_bar(tbl, 'xVar', 'Group', 'yVar', 'PRC');
-
-%%
-% higher ss firing correlated with greater burstiness, including change to
-% burst params
-%%
-
-varsInc = {'caMito'};
-winBsl = [1, v(1).fr.info.idxPert - 5] * 60;
-winCalc = [winBsl; length(xVec) - winBsl(2), length(xVec)];
-mea_compRcv(tbl, varsInc, winCalc)
+tblGUI_bar(tbl, 'xVar', 'Group', 'yVar', 'prc');
 
 
-varsInc = {'frt'};
-winBsl = [1, v(1).fr.info.idxPert - 5];
-winCalc = [winBsl; length(xVec) - winBsl(2), length(xVec)];
-mea_compRcv(tbl, varsInc, winCalc)
+
+
 
 % Log
 tblNorm = tbl;
 % tblNorm.frt = log10(tblNorm.frt + eps);
-tblNorm.caMito = log10(tblNorm.caMito + 1e-6);
 
 % Normalize to baseline
 winBsl = [1, v(1).fr.info.idxPert - 5];
@@ -138,7 +125,7 @@ winCalc = [winBsl; length(xVec) - winBsl(2), length(xVec)];
 tblNorm = tbl_tNorm(tblNorm, 'winNorm', winBsl, 'Method', 'percentage');
 
 
-tblGUI_xy(xVec, tblNorm, 'tileVar', 'Group', 'yVar', 'caMito');
+tblGUI_xy(xVec, tblNorm, 'tileVar', 'Group', 'yVar', 'fr');
 
 
 varsInc = {'frt', 'caMito'};
@@ -269,131 +256,12 @@ end
 %  LEGACY
 %  ========================================================================
 
-% PRC Params
-clear prcParams
-prcParams.winLim = [0 70 * 60];        % Analysis window [s]
-prcParams.binSize = 0.001;             % 1ms bins
-prcParams.gkHw = 0.012;                % 12ms sigma
-prcParams.winStpr = 1.0;               % 1s window
-prcParams.nShuffles = 1000;            % Number of shuffles
-prcParams.spkLim = 2000;
-prcParams.shuffleMet = 'raster';
-
-% --- Population Coupling
-[prc] = prCoupling(spktimes, prcParams, 'flgSave', true);
-prCoupling_plot(prc, 'basepath', basepath, 'flgSaveFig', true);
-
-
-% Files
-% basepaths = mcu_basepaths('mea_mk801');
-basepaths = [mcu_basepaths('mea_bac'), mcu_basepaths('mea_mcuko')];
-nFiles = length(basepaths);
-vars = {'mea', 'st_metrics'};
-v = basepaths2vars('basepaths', basepaths, 'vars', vars);
-
-% Analysis Params
-winBsl = [5 70] * 60;
-winSs = [7 * 60, 9 * 60 - 5] * 60;
-winTrough = [4 * 60 + 10, 4.5 * 60] * 60;
-winCalc = {winBsl, winSs, winTrough};
-winExp = [0, 9 * 60]  * 60;
-
-% expLim = [0, Inf];
-
-for iFile = 1 : nFiles
-
-    basepath = basepaths{iFile};
-    cd(basepath);
-
-    % files = dir('*sorted*');
-    % mea = mea_orgNex('fname', files.name, 'basepath', pwd, 'forceL', false);
-    spktimes = v(iFile).mea.spktimes;
-
-    % % --- Firing Rate Recovery
-    % frr = mea_frr(spktimes, 'winLim', expLim,...
-    %     'flgSave', true, 'flgPlot', false, 'flgForce', false);
-
-    % % --- Spike timing metrics
-    % st = spktimes_metrics('spktimes', spktimes, 'sunits', [],...
-    %     'bins', stWin, 'flg_force', true, 'flg_save', true, 'flg_all', false);
-    
-    % % --- Bursts
-    % brst = brst_mea(spktimes, 'binsize', [], 'isiThr', 0.02,...
-    %     'minSpks', 2, 'flgSave', true, 'flgForce', true, 'bins', stWin);    
-
-end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % TABLE PREPARATION
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% Load data from both groups
-grps = {'mea_bac'; 'mea_mcuko'};
-grpLbls = {'Control'; 'MCU-KO'};
-vars = {'frr', 'st_brst'};
 
-% Choose between model-based (mdl) or model-free (mdlF) metrics
-mdlPrfx = 'frr.mdl';
-mdlPrfx = 'frr.mdlF';
-
-clear varMap
-varMap.uGood      = 'frr.uGood';
-varMap.frBsl      = [mdlPrfx, '.frBsl'];
-varMap.frSs       = [mdlPrfx, '.frSs'];
-varMap.frTrough   = [mdlPrfx, '.frTrough'];
-varMap.pertDepth  = [mdlPrfx, '.pertDepth'];
-varMap.uRcv       = [mdlPrfx, '.uRcv'];
-varMap.uPert      = [mdlPrfx, '.uPert'];
-varMap.rcvTime    = [mdlPrfx, '.rcvTime'];
-varMap.bslTime    = [mdlPrfx, '.bslTime'];
-varMap.rcvErr     = [mdlPrfx, '.rcvErr'];
-varMap.rcvGain    = [mdlPrfx, '.rcvGain'];
-varMap.rcvWork    = [mdlPrfx, '.rcvWork'];
-varMap.rcvSlope   = [mdlPrfx, '.normSlope'];
-varMap.spkDfct    = [mdlPrfx, '.spkDfct'];
-varMap.rcvDiff    = [mdlPrfx, '.rcvDiff'];
-varMap.rcvFit     = ['frr.frFit.rsquare'];
-varMap.BSpks      = 'brst.bspks';
-varMap.brBsl      = 'brst.rate';
-% varMap.BMiz      = 'st.mizuseki';    % keeping st_metrics removes many rows
-% varMap.BRoy      = 'st.royer';
-% varMap.prc        = 'prc.prc0_norm';
-
-% Specific overrides
-varMap.pertDepth  = 'frr.mdlF.pertDepth';
-varMap.uRcv       = 'frr.mdlF.uRcv';
-varMap.spkDfct    = 'frr.mdlF.spkDfct';
-varMap.rcvGain    = 'frr.mdlF.rcvGain';
-varMap.rcvWork    = 'frr.mdl.rcvWork';
-varMap.rcvTime    = 'frr.mdl.rcvTime';
-varMap.bslTime    = 'frr.mdl.bslTime';
-
-clear tblCell
-for iGrp = 1 : length(grps)
-    basepaths = mcu_basepaths(grps{iGrp});
-
-    % Load data for this group
-    v = basepaths2vars('basepaths', basepaths, 'vars', vars);
-
-    % Prepare tag structures for v2tbl
-    tagAll.Group = grpLbls{iGrp};
-    tagFiles.Name = get_mname(basepaths, 0);
-
-    % Create table using new flexible approach
-    tblCell{iGrp} = v2tbl('v', v, 'varMap', varMap,...
-        'tagFiles', tagFiles, 'tagAll', tagAll, 'idxCol', 1);
-end
-tbl = vertcat(tblCell{:});
-
-% Organize for analysis
-lmeData = tbl(tbl.uGood, :);
-lmeData.uGood = [];
-lmeData = rmmissing(lmeData);
-
-% Convert time to min, specific for mea data reduction (20 min every 2
-% hours after perturbation)
-lmeData.rcvTime = lmeData.rcvTime * 6 / 60 / 60;
-lmeData.bslTime = lmeData.bslTime * 6 / 60 / 60;
 
 
 

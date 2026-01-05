@@ -30,7 +30,7 @@ tAxis = p.Results.tAxis;
 
 % If table empty, create preliminary table
 if isempty(tblUnit)
-    tblUnit = mcu_unitTbl(basepaths);
+    tblUnit = mcu_tblVivo(basepaths);
 end
 
 % Add Waveform column

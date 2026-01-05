@@ -44,6 +44,9 @@ flgPlot = p.Results.flgPlot;
 % Population Trend (Median) - more robust to outliers
 mfr = median(frMat, 1, 'omitnan');
 
+% Denoise the trace
+mfr = fr_denoise(mfr, 'flgPlot', false, 'frameLen', 10);
+
 % Baseline (until idxPert - margin)
 marginBins = round(marginMin * 60 / binSize);
 frBsl = median(mfr(1 : idxPert - marginBins), 'omitnan');
@@ -59,7 +62,7 @@ postWin = mfr(srchStart:end);
 
 % Define Threshold
 % Find minimal activity level (floor) in the post-perturbation window
-% Use 5th percentile to avoid outlier zeros
+% Use Xth percentile to avoid outlier zeros
 floorVal = prctile(postWin, 1);
 
 % Threshold: 10% of recovery range, bounded by absolute min
@@ -95,7 +98,7 @@ else
     % We travel backwards until the signal drops close to the floor level.
     % Stop when fr <= floorVal + small_tolerance OR derivative is small/negative
 
-    backtrackTol = floorVal; % Tight tolerance near floor
+    backtrackTol = floorVal; 
 
     % Default to start of search window if we can't find a better point
     newIdx = 1;
