@@ -17,10 +17,7 @@ Many repositories served as invaluable references for the code presented here, i
 6. https://github.com/zekebarger/AccuSleep
 7. https://github.com/IoSR-Surrey/MatlabToolbox
 
-Most dependencies are resolved locally within the slutskycode library, except:
-1. https://github.com/open-ephys/analysis-tools
-2. https://github.com/petersenpeter/CellExplorer
-3. https://github.com/altmany/export_fig
+Most dependencies are resolved locally within the slutskycode library.
 
 The library requires MATLAB r2019b or newer.
 
@@ -43,9 +40,4 @@ Convert the raw data to flat binaries with *tdt2dat.m* (for TDT tanks) or *prepr
 On a linux distribution (or Windows wsl) - cluster the spikes with klustakwik version 1 and manually inspect the clusters with klusters (neurosuite).<br>
 In Matalb - Use *fixSpkAndRes.m* to realign spikes in a cluster after merging. Use *cleanCluByFet.m* to remove spikes from a cluster based on their distance in feature space.
 
-##### Spikes
-Load and visualize the clusters with *Cell Explorer*. Use *spktimesMetrics.m* and *spkwvMetrics.m* to analyze the temporal firing patterns and waveform parameters of the clusters, respectively. These metrices will be added to the *cell_metrics* struct of Cell Explorer so they can be visualized in their GUI.<br>
-Note: the .spk files contain the waveform from the whitened data. the *spikes* struct from Cell Explorer contains the waveforms from the raw data (detrended).
 
-##### LFP
-Create an LFP flat binary from the raw data with *LFPfromDat.m*. Analyze burst-suppression (*getBS.m*), inter-ictal spikes (*getIIS.m*), ripples (*getRipples.m*), etc.<br> Analyze sleep states with a neural network from AccuSleep.
