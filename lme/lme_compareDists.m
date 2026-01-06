@@ -22,7 +22,6 @@ addRequired(p, 'tbl', @istable);
 addRequired(p, 'frml', @(x) ischar(x) || isa(x, 'classreg.regr.LinearFormula'));
 parse(p, tbl, frml);
 
-
 %% ========================================================================
 %  INITIALIZE
 %  ========================================================================
@@ -67,7 +66,7 @@ pctZeros = nZeros / length(tbl.(varResp));
 isNeg = any(tbl.(varResp) < 0);
 
 if isNeg
-    error(['Response variable "%s" contains negative values.', ...
+    warning(['Response variable "%s" contains negative values.', ...
         'Cannot fit Log-Normal, Gamma, or Poisson.'], varResp);
 end
 
@@ -101,9 +100,9 @@ for iMdl = 1:nMdl
         % TRANSFORMATIONS
         if strcmp(dist, 'Log-Normal')
 
-            % Ensure Natural Log for comparison
-            mdlTbl = tbl_transform(tbl, 'flgLog', true, 'logBase', 'e', ...
-                'verbose', false, 'skewThr', -Inf);
+            % Log-Transform predictors AND Response
+            mdlTbl = tbl_transform(tbl, 'logBase', 'e', ...
+                'verbose', false, 'skewThr', -Inf, 'varsInc', {varResp});
             dist = 'Normal';
 
             % Jacobian Correction: LL_raw = LL_ln - sum(ln(y))
@@ -112,7 +111,14 @@ for iMdl = 1:nMdl
 
         elseif strcmp(dist, 'Logit-Normal')
 
-            mdlTbl = tbl_transform(tbl, 'flgLogit', true, 'verbose', false);
+            % Check Domain: Logit is only valid for values in [0, 1]
+            if max(yRaw) > 1 || min(yRaw) < 0
+                stats.ErrorMsg{iMdl} = sprintf('Data range [%.2f, %.2f] invalid for Logit [0, 1]', min(yRaw), max(yRaw));
+                continue;
+            end
+
+            mdlTbl = tbl_transform(tbl, 'logBase', 'logit', 'verbose', false, ...
+                'varsInc', {varResp});
             dist = 'Normal';
 
             % Jacobian Correction: LL_raw = LL_logit - sum(ln(y*(1-y)))
@@ -271,8 +277,8 @@ end     % EOF
 %% ========================================================================
 %  NOTE: MODULATION INDEX (MI) VS. LOG-RATIO
 %  ========================================================================
-%  When quantifying firing rate changes (e.g., Ripple vs. Random periods), 
-%  the choice of metric significantly impacts the statistical validity 
+%  When quantifying firing rate changes (e.g., Ripple vs. Random periods),
+%  the choice of metric significantly impacts the statistical validity
 %  of the subsequent Linear Mixed-Effects (LME) analysis.
 %
 %  1. The Modulation Index (MI):
@@ -297,9 +303,9 @@ end     % EOF
 %     fitting a Generalized Linear Mixed Model (GLMM) directly to the raw
 %     firing rates (e.g., using Gamma or Inverse Gaussian distributions),
 %     one preserves the inherent mean-variance relationship of the data
-%    . This approach accounts for the "multiplicative" nature 
-%     of neural spiking while avoiding the information loss and potential 
-%     biases (like the "retransformation problem") associated with 
+%    . This approach accounts for the "multiplicative" nature
+%     of neural spiking while avoiding the information loss and potential
+%     biases (like the "retransformation problem") associated with
 %     collapsing observations into a single ratio.
 %
 %  DECISION RULE: Use the Modulation Index (MI) primarily for visualization
@@ -307,4 +313,32 @@ end     % EOF
 %  **Log-Ratio** for simplicity of insference, or a **GLMM on raw rates**
 %  (Gamma/InvGauss) to ensure the most accurate and unbiased population
 %  estimates.
+%  ========================================================================
+
+%% ========================================================================
+%  NOTE: LOGIT-NORMAL ARTIFACT
+%  ========================================================================
+%  The 'Logit-Normal' model may occasionally appear as the "best" fit
+%  (lowest AIC) for some data (eg, raw firing rate), even when the data is
+%  not naturally bounded between 0 and 1.
+%
+%  1. Why it happens:
+%     The Logit transformation, ln(y / (1 - y)), is strictly designed for
+%     proportions or indices bounded by [0, 1] (e.g., Modulation Index).
+%     If raw firing rates (which can exceed 1 Hz) are passed to this
+%     transform, the results are mathematically invalid. The extremely low
+%     AIC typically arises because the Jacobian correction used to equate
+%     scales becomes numerically unstable or produces nonsensical
+%     likelihoods when the data range violates the (0, 1) constraint.
+%
+%  2. The "Scaling" Trap:
+%     If the firing rate data was normalized (e.g., divided by the maximum
+%     rate) to fit the 0-1 range, the Logit-Normal model might "win" because
+%     the logit transform aggressively expands the tails near 0 and 1.
+%     However, this creates a "humped" distribution assumption that rarely
+%     matches the monotonic decay (Exponential/Gamma shape) of typical
+%     neural spiking data.
+%
+%  TLDR: If the data is not a proportion, the Logit-Normal AIC is a
+%  mathematical ghost. Move to the next distribution in the list.
 %  ========================================================================

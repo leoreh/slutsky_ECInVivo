@@ -72,8 +72,10 @@ varMap.fr = 'rcv.frBsl';
 varMap.frSs = 'rcv.frSs';
 varMap.spkDfct = 'rcv.spkDfct';
 varMap.rcvTime = 'rcvMdl.rcvTime';
+varMap.rcvGain = 'rcv.rcvGain';
 varMap.rcvErr = 'rcvMdl.rcvErr';
 varMap.rcvDiff = 'rcvMdl.rcvDiff';
+varMap.pertDepth = 'rcvMdl.pertDepth';
 varMap.spktimes = 'mea.spktimes';
 
 % PRC

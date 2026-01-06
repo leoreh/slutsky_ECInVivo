@@ -1,17 +1,16 @@
-function [lmeMdl, lmeStats, lmeInfo, lmeTbl] = lme_analyse(tbl, frml, varargin)
+function [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tbl, frml, varargin)
 % LME_ANALYSE Wrapper for LME/GLME analysis pipeline.
 %
 %   [STATS, MDL, INFO] = LME_ANALYSE(TBL, FRML, ...) orchestrates the full
 %   analysis workflow:
 %
 %   Distribution Selection: If 'dist' is not provided, runs
-%   LME_COMPAREDISTS to select the best distribution via AIC and
-%   LME_PARKTEST to allow for Gamma/Log-Normal checks.
+%   LME_COMPAREDISTS to select the best distribution via AIC.
 %   Transformation:
-%       - Predictors: Automatically Log-transforms skewed continuous
-%         predictors and Z-scores all continuous predictors.
 %       - Response: Applies Log or Logit transforms if required by dist.
 %         Adds offset for Zero-inflated data if Gamma/Log is selected.
+%       - Predictors: Automatically Log-transforms skewed continuous
+%         predictors and Z-scores all continuous predictors.
 %   Fitting: Calls LME_FIT to fit the model.
 %   Analysis: Calls LME_EFFECTS to generate ANOVA and contrasts.
 %
@@ -26,7 +25,6 @@ function [lmeMdl, lmeStats, lmeInfo, lmeTbl] = lme_analyse(tbl, frml, varargin)
 %       lmeStats    - (table) Statistical results (ANOVA, Effects).
 %       lmeMdl      - (object) Fitted model object.
 %       lmeInfo     - (struct) Metadata (dist used, transforms applied).
-%       lmeTbl      - (table) with data actually used for the model
 %
 %   See also: LME_FIT, LME_EFFECTS, LME_COMPAREDISTS, TBL_TRANSFORM
 
@@ -45,7 +43,7 @@ addParameter(p, 'dist', '', @ischar);
 addParameter(p, 'contrasts', 'all');
 addParameter(p, 'correction', 'holm', @ischar);
 addParameter(p, 'dfMethod', 'Satterthwaite', @ischar);
-parse(p, lmeTbl, frml, varargin{:});
+parse(p, tbl, frml, varargin{:});
 
 dist = p.Results.dist;
 frml = char(frml);
@@ -60,30 +58,16 @@ lmeInfo.distInput = dist;
 %  ========================================================================
 
 % Vars
-[varsFxd, respVar, varsRnd] = lme_frml2vars(frml);
-
-% Extract actual grouping variables from random effect terms (e.g., '(1|Name)' -> 'Name')
-varsGrp = {};
-if ~isempty(varsRnd)
-    for iRand = 1:length(varsRnd)
-        tokens = regexp(varsRnd{iRand}, '\|([^)]+)\)', 'tokens');
-        varsGrp = [varsGrp; strtrim(tokens{1}{1})];
-    end
-end
-varsGrp = unique(varsGrp);
-
-% Truncate Table
-vars = unique([respVar; varsFxd; varsGrp]);
-lmeTbl = tbl(:, vars);
+[varsFxd, respVar, ~] = lme_frml2vars(frml);
 
 % PREDICTOR TRANSFORMATION
 % Identify numeric/continuous predictors (exclude categorical)
-isNum = cellfun(@(x) isnumeric(lmeTbl.(x)) && ~iscategorical(lmeTbl.(x)), varsFxd);
+isNum = cellfun(@(x) isnumeric(tbl.(x)) && ~iscategorical(tbl.(x)), varsFxd);
 varsCont = varsFxd(isNum);
 
 if ~isempty(varsCont)
     fprintf('[LME_ANALYSE] Transforming Predictors (Log10[Skew>2] + Z-Score)\n');
-    lmeTbl = tbl_transform(lmeTbl, 'varsInc', varsCont, ...
+    tbl = tbl_transform(tbl, 'varsInc', varsCont, ...
         'logBase', 10, 'skewThr', 2, ...
         'flgZ', true, ...
         'verbose', true);
@@ -94,15 +78,13 @@ end
 %  DISTRIBUTION SELECTION
 %  ========================================================================
 
-wMsg = ['stats:classreg:regr:lmeutils:StandardGeneralizedLinearMixedModel:',...
-    'Message_PosteriorModeLineSearch'];
-warning('off', wMsg);
+warning('off', 'stats:classreg:regr:lmeutils:StandardGeneralizedLinearMixedModel:Message_PosteriorModeLineSearch');
 
 if isempty(dist)
     fprintf('[LME_ANALYSE] Auto-selecting distribution...\n');
 
-    parkStats = lme_parkTest(lmeTbl, frml);
-    compStats = lme_compareDists(lmeTbl, frml);
+    parkStats = lme_parkTest(tbl, frml);
+    compStats = lme_compareDists(tbl, frml);
 
     % Pick best model (lowest AIC)
     bestModel = compStats.Model{1};
@@ -116,7 +98,7 @@ end
 
 lmeInfo.distSelected = dist;
 
-warning('on', wMsg);
+warning('on', 'stats:classreg:regr:lmeutils:StandardGeneralizedLinearMixedModel:Message_PosteriorModeLineSearch');
 
 
 %% ========================================================================
@@ -127,7 +109,7 @@ switch lower(dist)
     case 'log-normal'
         % Transform: Log(y), Dist: Normal
         fprintf('[LME_ANALYSE] Transforming Response: Log-Normal -> Log(Y)\n');
-        lmeTbl = tbl_transform(lmeTbl, 'varsInc', {respVar}, ...
+        tbl = tbl_transform(tbl, 'varsInc', {respVar}, ...
             'logBase', 'e', ...
             'verbose', true);
         dist = 'Normal';
@@ -135,14 +117,14 @@ switch lower(dist)
     case 'logit-normal'
         % Transform: Logit(y), Dist: Normal
         fprintf('[LME_ANALYSE] Transforming Response: Logit-Normal -> Logit(Y)\n');
-        lmeTbl = tbl_transform(lmeTbl, 'varsInc', {respVar}, ...
+        tbl = tbl_transform(tbl, 'varsInc', {respVar}, ...
             'logBase', 'logit', ...
             'verbose', true);
         dist = 'Normal';
 
     case {'gamma', 'poisson', 'inversegaussian'}
         fprintf('[LME_ANALYSE] Zero-inflation detected for %s. Adding offset.\n', dist);
-        lmeTbl = tbl_transform(lmeTbl, 'varsInc', {respVar}, ...
+        tbl = tbl_transform(tbl, 'varsInc', {respVar}, ...
             'flg0', true, 'verbose', true);
 end
 
@@ -150,14 +132,14 @@ lmeInfo.distFinal = dist;
 
 
 %% ========================================================================
-%  MODEL FITTING
+%  4. MODEL FITTING
 %  ========================================================================
 
-lmeMdl = lme_fit(lmeTbl, frml, 'dist', dist);
+lmeMdl = lme_fit(tbl, frml, 'dist', dist);
 
 
 %% ========================================================================
-%  EFFECTS ANALYSIS
+%  5. EFFECTS ANALYSIS
 %  ========================================================================
 
 lmeStats = lme_effects(lmeMdl, ...
@@ -167,43 +149,3 @@ lmeStats = lme_effects(lmeMdl, ...
 
 
 end     % EOF
-
-
-
-%% ========================================================================
-%  NOTE: LOG BASE SELECTION
-%  ========================================================================
-%  When fitting a Log-Normal model - transforming the response variable and
-%  using a Gaussian distribution - the choice of logarithmic base (Base e
-%  vs. Base 10) is mathematically equivalent but dictates the
-%  interpretation of the fixed effects (beta).
-%
-%  1. Natural Log (Base e, ln): The Statistical Standard
-%     In scientific research and LME modeling, the natural logarithm is the
-%     nearly universal standard.
-%
-%     - Fractional Interpretation: For small values, the coefficient (beta)
-%       represents the approximate percentage change in the response variable.
-%       For example, a beta of 0.06 translates to a 6% increase in y per
-%       unit increase in x.
-%     - Mathematical Elegance: The derivative of ln(y) is 1/y, simplifying the
-%       likelihood estimation and the recovery of geometric means via the
-%       exponential function `exp()`.
-%
-%  2. Common Log (Base 10, log10): The Engineering Standard
-%     Base 10 is preferred when data spans several orders of magnitude or when
-%     the physical scale is historically logarithmic (e.g., Decibels).
-%
-%     - Order of Magnitude: A change of 1 on the log10 scale represents a
-%       ten-fold increase in the raw units.
-%     - Interpretation: Unlike natural logs, beta coefficients are not directly
-%       interpretable as percentage changes; a 0.01 shift corresponds to a 
-%       2.3% increase, making mental approximation less intuitive.
-% 
-%  3. Technical Selection in LME:
-%     If the goal is to satisfy the assumption of normality for `fitlme`,
-%     base e is the technically superior choice because it aligns with the
-%     standard reporting of "percentage effects" in biological and
-%     physiological literature.
-%  ========================================================================
-

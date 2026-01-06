@@ -1,75 +1,95 @@
-function [varsFxd, varRsp] = lme_frml2vars(frml, varargin)
-% LME_FRML2VARS Extracts fixed effects and response variable names from LME formula.
+function [varsFxd, varRsp, varsRand] = lme_frml2vars(frml)
+% LME_FRML2VARS Extracts fixed effects, random effects, and response variable.
 %
-% This function parses a linear mixed-effects model formula string to extract
-% the response variable and fixed effects variables, handling interaction terms
-% and removing random effects and intercept terms.
+%   [VARSFXD, VARRSP, VARSRAND] = LME_FRML2VARS(FRML) parses a Linear
+%   Mixed-Effects (LME) model formula string. It separates the Response
+%   Variable (Y), the Fixed Effects Predictors (X), and the Random Effects
+%   Terms (Z).
 %
-% INPUTS:
-%   frml        (Required) Char/String: LME formula (e.g., 'Y ~ A * B + (1|Subject)').
+%   INPUTS:
+%       frml        - (char/string) LME formula (e.g., 'Y ~ A * B + (1|Subject)').
 %
-% VARARGIN (Name-Value Pairs):
-%   'flgRand'   (Optional) Logical: Whether to include intercept term.
-%                Default is false.
+%   OUTPUTS:
+%       varsFxd     - (cell) Names of Fixed Effects variables (e.g., {'A', 'B'}).
+%       varRsp      - (char) Name of the Response variable (e.g., 'Y').
+%       varsRand    - (cell) Random Effects terms (e.g., {'(1|Subject)'}).
 %
-% OUTPUTS:
-%   varsFxd     Cell array: Names of fixed effects variables.
-%   varRsp      Char: Name of the response variable.
+%   EXAMPLES:
+%       [vf, vr, vz] = lme_frml2vars('Spikes ~ Depth + (1|Mouse)');
+%       % vf = {'Depth'}, vr = 'Spikes', vz = {'(1|Mouse)'}
 %
-% EXAMPLES:
-%   [varsFxd, varRsp] = lme_frml2vars('Y ~ A * B + (1|Subject)')
-%   % Returns: varsFxd = {'A', 'B'}, varRsp = 'Y'
+%   See also: REGEXP, STRTRIM, UNIQUE
+%
+%   250106 Refactored for tidy separation of effects.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% ARGUMENT PARSING
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-p = inputParser;
-addParameter(p, 'flgRand', false, @islogical);
-parse(p, varargin{:});
+%% ========================================================================
+%  ARGUMENTS
+%  ========================================================================
 
-opts = p.Results;
-frml = char(frml); % Ensure char format
+% Ensure char format
+frml = char(frml);
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% EXTRACT RESPONSE VARIABLE
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Get response variable (everything before ~)
-varRsp = regexp(frml, '(\w+)\s*~', 'tokens');
+%% ========================================================================
+%  EXTRACT RESPONSE VARIABLE
+%  ========================================================================
+
+% Get response variable (everything before the tilde ~)
+varRsp = regexp(frml, '^\s*(\w+)\s*~', 'tokens', 'once');
+
 if isempty(varRsp)
-    error('Invalid formula format. Expected format: "Response ~ Predictors"');
+    error('lme_frml2vars:InvalidFormula', ...
+        'Invalid formula format. Expected "Response ~ Predictors"');
 end
-varRsp = varRsp{1}{1};
+varRsp = varRsp{1};
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% EXTRACT FIXED EFFECTS
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Get everything between ~ and ( or end of string
-xStr = regexp(frml, '~\s*(.*?)\s*(\(|$)', 'tokens');
-if isempty(xStr)
-    error('Invalid formula format. No fixed effects found.');
-end
-xStr = xStr{1}{1}; % Extract matched string
 
-% Initialize varsFxd as empty cell array
+%% ========================================================================
+%  EXTRACT RANDOM EFFECTS
+%  ========================================================================
+
+% Regex to find terms grouped by parentheses containing a pipe |
+% Matches: (ValidMatlabVar | ValidMatlabVar) or similar structures
+regexRand = '\([^)]+\|[^)]+\)';
+varsRand = regexp(frml, regexRand, 'match');
+
+% Remove random effects from the formula string to isolate fixed effects
+xStr = regexprep(frml, ['^\s*\w+\s*~|' regexRand], '');
+
+
+%% ========================================================================
+%  EXTRACT FIXED EFFECTS
+%  ========================================================================
+
+% Initialize
 varsFxd = {};
 
-% First check for interaction terms (A * B format)
+if isempty(strtrim(xStr))
+    % Case: Only Intercept or Empty Fixed Effects
+    return;
+end
+
+% Check for interaction terms (A * B format)
 interactVars = regexp(xStr, '(\w+)\s*[*]\s*(\w+)', 'tokens');
+
 if ~isempty(interactVars)
     % Process all interaction pairs
     for iVar = 1:length(interactVars)
         varsFxd = [varsFxd, interactVars{iVar}];
     end
-    % Remove duplicates while preserving order
-    varsFxd = unique(varsFxd, 'stable');
 else
-    % If no interactions, process normally
-    if ~opts.flgRand
-        xStr = regexprep(xStr, '\s*1\s*\+?\s*', ''); % Remove intercept term
-    end
-    xStr = regexprep(xStr, '\([^)]*\)', ''); % Remove random effects
-    xVars = strtrim(strsplit(xStr, '+')); % Split by + and trim whitespace
-    varsFxd = xVars(~cellfun(@isempty, xVars)); % Remove any empty cells
+    % No interactions: standard additive model
+
+    % Split by '+'
+    xVars = strtrim(strsplit(xStr, '+'));
+
+    % Remove '1' (Intercept)
+    xVars(strcmp(xVars, '1')) = [];
+
+    % Filter empty cells
+    varsFxd = xVars(~cellfun(@isempty, xVars));
 end
 
-end 
+% Remove duplicates (e.g. from A*B -> A and B) and sort
+varsFxd = unique(varsFxd, 'stable');
+
+end     % EOF

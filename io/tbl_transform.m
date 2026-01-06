@@ -1,43 +1,57 @@
 function tblOut = tbl_transform(tbl, varargin)
-% TBL_TRANSFORM Applies log transformations, z-scoring, and normalization to table columns.
+% TBL_TRANSFORM Applies log/logit transformations, z-scoring, and normalization.
 %
-% SUMMARY:
-% This function transforms table columns to improve their distributional
-% properties for statistical analysis. It applies log transformation to
-% highly skewed variables, z-scoring to standardise variables for
-% regression analysis, and normalization relative to reference categories.
+%   TBLOUT = TBL_TRANSFORM(TBL, ...) transforms table columns to improve their
+%   distributional properties for statistical analysis. It applies log or
+%   logit transformations to highly skewed variables, z-scoring to
+%   standardize variables, and normalization relative to a reference
+%   category.
 %
-% INPUT (Required):
-%   tbl         - Input table to be transformed.
+%   INPUTS:
+%       tbl         - (table) Input data table.
+%       varargin    - (param/value) Optional parameters:
 %
-% INPUT (Optional Key-Value Pairs):
-%   varsExc     - Cell array of variable names to exclude from transformations {[]}.
-%   varsInc     - Cell array of variable names to include in transformations {[]}.
-%                  If provided, only these variables will be transformed (overrides varsExc).
-%   flgZ        - Logical flag to apply z-scoring {true}.
-%   flgLog      - Logical flag to apply log transformation to skewed variables {true}.
-%   logBase     - Numeric or 'e'. Base for log transformation {10}.
-%   flgLogit    - Logical flag to apply logit transformation {false}.
-%   flgNorm     - Logical flag to apply normalization relative to reference category {false}.
-%   skewThr     - Skewness threshold for log transformation {2}.
-%   varsGrp     - Cell array of categorical variable names defining groups for
-%                  separate transformation {[]}. If provided, transformations are
-%                  applied separately within each group combination.
-%   varNorm     - String. The name of the categorical variable whose reference
-%                  category mean will be used for normalization (required if flgNorm=true).
+%           SELECTION:
+%           'varsInc' : (cell) Variables to transform {[]}. Overrides varsExc.
+%           'varsExc' : (cell) Variables to exclude from transform {[]}.
+%           'varsGrp' : (cell) Categorical variables defining groups for
+%                       separate transformation operations {[]}.
 %
-% OUTPUT:
-%   tblOut      - Transformed table with the same structure as input.
+%           TRANSFORMATION:
+%           'flgZ'    : (logical) Z-score variables {true}.
+%           'logBase' : (mix) Transformation mode {[]}:
+%                       - [] or empty: No transformation.
+%                       - 'logit': Logit transform log(y/(1-y)).
+%                       - 'e': Natural Log transform log(y).
+%                       - (numeric): Log transform with specific base.
+%           'skewThr' : (numeric) Skewness threshold for auto-log {2}.
+%           'flg0'    : (logical) Add offset if zero-inflated {false}.
 %
-% EXAMPLE:
-%   tblOut = tbl_transform(tbl, 'varsExc', {'UnitID', 'Group'}, 'flgZ', true);
-%   tblOut = tbl_transform(tbl, 'varsGrp', {'Group', 'State'}, 'flgZ', true);
-%   tblOut = tbl_transform(tbl, 'flgNorm', true, 'varNorm', 'Day', 'varsGrp', {'Group', 'State'});
+%           NORMALIZATION:
+%           'varNorm' : (char) Grouping variable for normalization. If
+%                       provided, normalizes values relative to the mean of
+%                       the first category (Reference).
 %
-% DEPENDENCIES:
-%   None
+%           MISC:
+%           'verbose' : (logical) Print actions {false}.
 %
-%   See also: LME_ANALYSE
+%   OUTPUTS:
+%       tblOut      - (table) Transformed table.
+%
+%   EXAMPLES:
+%       % Z-score only
+%       tbl = tbl_transform(tbl, 'flgZ', true);
+%
+%       % Log10 transform skewed variables
+%       tbl = tbl_transform(tbl, 'logBase', 10, 'flgZ', false);
+%
+%       % Logit transform (for proportions)
+%       tbl = tbl_transform(tbl, 'logBase', 'logit');
+%
+%       % Normalize 'FR' relative to 'Day' baseline
+%       tbl = tbl_transform(tbl, 'varNorm', 'Day', 'varsInc', {'FR'});
+%
+%   See also: LME_ANALYSE, LME_TBLPREP
 
 %% ========================================================================
 %  ARGUMENTS
@@ -45,32 +59,34 @@ function tblOut = tbl_transform(tbl, varargin)
 
 p = inputParser;
 addRequired(p, 'tbl', @istable);
-addParameter(p, 'varsExc', [], @(x) iscell(x) || isempty(x));
+
+% Selection
 addParameter(p, 'varsInc', [], @(x) iscell(x) || isempty(x));
+addParameter(p, 'varsExc', [], @(x) iscell(x) || isempty(x));
 addParameter(p, 'varsGrp', [], @(x) iscell(x) || isempty(x));
-addParameter(p, 'flgZ', false, @islogical);
-addParameter(p, 'varNorm', '', @ischar);
-addParameter(p, 'flgLog', false, @islogical);
-addParameter(p, 'logBase', 10, @(x) (isnumeric(x) && isscalar(x) && x > 0) || (ischar(x) && strcmp(x, 'e')));
-addParameter(p, 'flgLogit', false, @islogical);
-addParameter(p, 'flgNorm', false, @islogical);
-addParameter(p, 'skewThr', 2, @(x) isnumeric(x) && isscalar(x));
+
+% Transformation
+addParameter(p, 'flgZ', true, @islogical);
+addParameter(p, 'logBase', [], @(x) isempty(x) || isnumeric(x) || ischar(x));
+addParameter(p, 'skewThr', 2, @isnumeric);
 addParameter(p, 'flg0', false, @islogical);
+
+% Normalization
+addParameter(p, 'varNorm', '', @ischar);
+
+% Misc
 addParameter(p, 'verbose', false, @islogical);
 
 parse(p, tbl, varargin{:});
 
-varsExc = p.Results.varsExc;
 varsInc = p.Results.varsInc;
+varsExc = p.Results.varsExc;
 varsGrp = p.Results.varsGrp;
-varNorm = p.Results.varNorm;
 flgZ = p.Results.flgZ;
-flgLog = p.Results.flgLog;
 logBase = p.Results.logBase;
-flgLogit = p.Results.flgLogit;
-flgNorm = p.Results.flgNorm;
 skewThr = p.Results.skewThr;
 flg0 = p.Results.flg0;
+varNorm = p.Results.varNorm;
 verbose = p.Results.verbose;
 
 
@@ -78,52 +94,39 @@ verbose = p.Results.verbose;
 %  INITIALIZATION
 %  ========================================================================
 
-% Get all variable names from the table
+% Get all variable names
 tblVars = tbl.Properties.VariableNames;
 tblOut = tbl;
 
-% Determine which variables to process
+% Determine variables to process
 if ~isempty(varsInc)
-    % Include only specified variables (takes precedence over varsExc)
     processVars = varsInc;
 elseif ~isempty(varsExc)
-    % Exclude specified variables
     excludeIdx = ismember(tblVars, varsExc);
     processVars = tblVars(~excludeIdx);
 else
-    % Process all variables
     processVars = tblVars;
 end
 
-% Filter to only numeric variables
+% Filter to numeric only
 numericIdx = cellfun(@(x) isnumeric(tbl.(x)), processVars);
 processVars = processVars(numericIdx);
 
-% Validation for Grouping and Normalization variables
-if ~isempty(varsGrp)
-    % Ensure varsGrp is cellstr
-    if isstring(varsGrp)
-        varsGrp = cellstr(varsGrp);
-    end
+% Check Normalization
+flgNorm = ~isempty(varNorm);
+catRef = [];
 
+if flgNorm
     if ismember(varNorm, varsGrp)
         error('varNorm "%s" cannot be included in varsGrp', varNorm);
     end
-end
-
-% Warning for redundant transformations
-if flgNorm && flgZ
-    warning('Z-scoring will overwrite the scale set by normalization.');
-end
-
-% Get reference category (assuming first category is reference)
-catRef = [];
-if flgNorm
-    if isempty(varNorm)
-        error('flgNorm is true but varNorm is not specified.');
-    end
+    % Get reference category (first one)
     catRef = categories(tblOut.(varNorm));
     catRef = catRef{1};
+end
+
+if flgNorm && flgZ
+    warning('Z-scoring will overwrite the scale set by normalization.');
 end
 
 
@@ -131,17 +134,15 @@ end
 %  GROUP INDICES
 %  ========================================================================
 
-% Check if group-based transformation is requested
 if ~isempty(varsGrp)
-    % Find unique combinations of grouping variables
-    uGrps = unique(tblOut(:, varsGrp), 'rows');
+    % Ensure cellstr
+    if isstring(varsGrp), varsGrp = cellstr(varsGrp); end
 
-    % Find all group indices in advance and store in cell array
+    uGrps = unique(tblOut(:, varsGrp), 'rows');
     idxGrps = cell(height(uGrps), 1);
+
     for iGrp = 1:height(uGrps)
         uRow = uGrps(iGrp, :);
-
-        % Find rows matching the current unique group combination
         idxGrp = true(height(tblOut), 1);
         for iVar = 1:length(varsGrp)
             idxGrp = idxGrp & (tblOut.(varsGrp{iVar}) == uRow.(varsGrp{iVar}));
@@ -149,7 +150,6 @@ if ~isempty(varsGrp)
         idxGrps{iGrp} = idxGrp;
     end
 else
-    % Single group (all data)
     idxGrps = {true(height(tblOut), 1)};
 end
 
@@ -162,13 +162,15 @@ for iVar = 1:length(processVars)
     varName = processVars{iVar};
     varData = tblOut.(varName);
 
-    % ---------------------------------------
-    % Global Analysis (Logit, Log & Offset)
-    % ---------------------------------------
-    % Decisions for log transformation and offset must be made globally
-    % to ensure the variable remains consistent across groups.
+    % --- Global Analysis (Log/Logit/Offset) ---
 
-    if flgLogit
+    % Determine Transformation Mode
+    isLogit = ischar(logBase) && strcmpi(logBase, 'logit');
+    isLog = (isnumeric(logBase) && ~isempty(logBase)) || ...
+        (ischar(logBase) && strcmpi(logBase, 'e'));
+
+    % Logit Transform
+    if isLogit
         varData = max(eps, min(1 - eps, varData));
         varData = log(varData ./ (1 - varData));
         if verbose
@@ -176,10 +178,10 @@ for iVar = 1:length(processVars)
         end
     end
 
-    % Assert non-zero (for positive variables) if explicitly asked, or if
-    % log transform is needed
-    if flg0 || flgLog
-        if any(varData == 0) && all(varData >= 0)
+    % Offset (Zero-Inflation)
+    % Add offset if requested OR if we are about to log-transform
+    if flg0 || isLog
+        if any(varData(:) == 0) && all(varData(:) >= 0)
             c = min(varData(varData > 0)) / 2;
             varData = varData + c;
             if verbose
@@ -188,134 +190,61 @@ for iVar = 1:length(processVars)
         end
     end
 
-    if flgLog
-        % Check skewness on the pooled data (ignoring NaNs)
-        % Only consider positive skewness for log transform
+    % Log Transform (Conditional on Skewness)
+    if isLog
+        % Check skewness on pooled data
         s = skewness(varData(~isnan(varData)));
-        if s > skewThr
 
-            % Determine base
-            if ischar(logBase) && strcmp(logBase, 'e')
+        if s > skewThr
+            if ischar(logBase) && strcmpi(logBase, 'e')
                 varData = log(varData);
                 baseStr = 'Ln';
             else
                 varData = log(varData) ./ log(logBase);
                 baseStr = sprintf('Log%.1f', logBase);
             end
-
             if verbose
                 fprintf('[%s] Applying %s (Skew=%.2f)\n', varName, baseStr, s);
             end
         end
     end
 
-    % Write back global changes before group-wise operations
+    % Write back global changes
     tblOut.(varName) = varData;
 
-    % ---------------------------------------
-    % Group-wise Operations (Norm & Z)
-    % ---------------------------------------
+    % --- Group-wise Operations (Norm & Z) ---
 
     for iGrp = 1:length(idxGrps)
         idxGrp = idxGrps{iGrp};
-        varData = tblOut.(varName)(idxGrp);
+        dataGrp = tblOut.(varName)(idxGrp);
 
-        % Normalize relative to reference category
+        % Normalization
         if flgNorm
-            % Find rows within this group that match the reference category of varNorm
             idxRef = tblOut.(varNorm) == catRef;
             idxRefGroup = idxGrp & idxRef;
 
-            % Calculate the mean for the reference category within this group
             refMean = mean(tblOut.(varName)(idxRefGroup), 'all', 'omitnan');
 
-            % Check for issues with reference mean
-            if refMean == 0
-                refMean = eps; % Avoid division by zero, result will be large
-            end
+            if refMean == 0, refMean = eps; end
+
             if isnan(refMean)
-                warning('[%s] Group %d RefMean is NaN. Skipping norm.\n', ...
-                    varName, iGrp);
-                continue
+                warning('[%s] Group %d RefMean is NaN. Skipping norm.\n', varName, iGrp);
+            else
+                % Use "Number Line" normalization
+                varDiff = (dataGrp - refMean) / abs(refMean);
+                dataGrp = 100 + varDiff * 100;
             end
-
-            % Normalize
-            varDiff = (varData - refMean) / abs(refMean);
-            normData = 100 + varDiff * 100;
-
-            % Update varData with normalized values
-            varData = normData;
         end
 
-        % Apply Z-scoring
+        % Z-Scoring
         if flgZ
-            varData = (varData - mean(varData, 'omitnan')) ./ std(varData, 'omitnan');
+            dataGrp = (dataGrp - mean(dataGrp, 'omitnan')) ./ ...
+                std(dataGrp, 'omitnan');
         end
 
-        % Update the table column for this group
-        tblOut.(varName)(idxGrp) = varData;
+        % Update Table
+        tblOut.(varName)(idxGrp) = dataGrp;
     end
 end
 
 end     % EOF
-
-
-%% ========================================================================
-%  NOTE: NORMALIZATION
-%  ========================================================================
-%  When `flgNorm` is true, this function standardizes values relative to a
-%  specified reference group (e.g., 'Baseline' or 'Control'). The goal is
-%  to express data as a percentage of the reference mean, where 100%
-%  represents parity with the baseline.
-%
-%  The "Number Line" Approach:
-%     Standard percent change formulas often fail when dealing with negative
-%     values (e.g., calculating growth from -10 to -5). A simple ratio
-%     can yield misleading signs. To resolve this, this function utilizes
-%     the absolute value of the reference mean in the denominator:
-%
-%         Normalized = 100 + ((x - refMean) / abs(refMean)) * 100
-%
-%     This approach preserves the directionality of the change along the
-%     real number line, regardless of the sign of the data:
-%
-%     1. Positive Domain: If Ref=10 and x=15, result is 150% (Increase).
-%     2. Negative Domain: If Ref=-10 and x=-5, result is 150% (Increase).
-%     3. Zero Crossing: If Ref=-5 and x=5, result is 300%.
-%  ========================================================================
-
-
-%% ========================================================================
-%  NOTE: LOG VS. LOGIT
-%  ========================================================================
-%  Transforming the response variable is often necessary to satisfy the
-%  assumption of normally distributed residuals in LME. The choice between
-%  Log and Logit depends strictly on the domain boundaries of your data.
-%
-%  The Log Transform ( y -> log(y) ) is appropriate for magnitude data such
-%  as Power, Energy, Duration, or Firing Rate, where the domain is positive
-%  and theoretically unbounded [0, +Inf). These variables often exhibit a
-%  multiplicative variance structure where variance grows with the mean,
-%  along with a heavy right tail. The log function compresses this tail and
-%  stabilizes the variance, mapping the data to (-Inf, +Inf). Note that
-%  this transform is undefined for y <= 0, often requiring a shift if zeros
-%  exist in the dataset.
-%
-%  The Logit Transform ( y -> log( y / (1-y) ) ) is required for data that
-%  represents a bounded proportion or index, such as phase locking strength
-%  (MRL) or probabilities, which are strictly bounded between [0, 1]. Such
-%  data often exhibits variance compression near the boundaries, where
-%  variance shrinks as y approaches 0 or 1. A simple Log transform only
-%  fixes the lower bound but ignores the upper bound. The Logit transform
-%  stretches both boundaries to infinity, effectively mapping the interval
-%  [0, 1] to the whole real line (-Inf, +Inf). Implementing this requires
-%  clipping exact 0s and 1s (e.g., to 0.001 and 0.999) to avoid infinite
-%  values.
-%
-%  As a general decision rule, if your data can theoretically go to
-%  infinity (e.g., Energy), use the Log transform. If your data represents
-%  a strength of locking or index capped at 1 (e.g., Mean Resultant
-%  Length), use the Logit transform.
-%  ========================================================================
-
-

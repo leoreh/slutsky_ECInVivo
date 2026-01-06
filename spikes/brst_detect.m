@@ -12,11 +12,11 @@ function brst = brst_detect(spktimes, varargin)
 %       spktimes    - (cell) Spike times per unit (e.g., {unit1, unit2}).
 %                     Times should be in seconds.
 %       varargin    - (param/value) Optional parameters:
-%                     'maxISI_start' : (num) Max ISI to start burst {0.013s}
-%                     'maxISI_end'   : (num) Max ISI within burst {0.022s}
-%                     'minIBI'       : (num) Min Inter-Burst Interval {0.05s}
-%                     'minDur'       : (num) Min burst duration {0.015s}
-%                     'minSpks'      : (num) Min spikes in burst {3}
+%                     'maxISI_start' : (num) Max ISI to start burst 
+%                     'maxISI_end'   : (num) Max ISI within burst 
+%                     'minIBI'       : (num) Min Inter-Burst Interval 
+%                     'minDur'       : (num) Min burst duration 
+%                     'minSpks'      : (num) Min spikes in burst 
 %                     'flgPlot'      : (log) Plot raster with bursts {false}
 %                     'basepath'     : (char) Recording path {pwd}
 %                     'flgSave'      : (log) Save to file {true}

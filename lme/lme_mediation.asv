@@ -1,0 +1,285 @@
+function res = lme_mediation(tbl, xVar, mVar, yVar, randEff, varargin)
+% LME_MEDIATION Performs a causal legacy Mediation Analysis using Mixed-Effects Models.
+%
+%   RES = LME_MEDIATION(TBL, XVAR, MVAR, YVAR, RANDEFF, ...) conducts a
+%   4-step mediation analysis to investigate whether a Mediator variable
+%   (M) accounts for the relationship between an Independent variable (X)
+%   and a Dependent variable (Y), while accounting for random
+%   effects/hierarchical structure.
+%
+%   The function utilizes the Baron & Kenny (1986) steps adapted for
+%   Mixed-Effects Models.
+%
+%   INPUTS:
+%       tbl         - (table) Data table containing all variables.
+%       xVar        - (char) Name of the Independent Variable (Treatment).
+%       mVar        - (char) Name of the Mediator Variable (Mechanism).
+%       yVar        - (char) Name of the Outcome Variable (Response).
+%       randEff     - (char) Random effects structure (e.g., '(1|Name)').
+%       varargin    - (param/value) Optional parameters:
+%                     'distM' : (char) Distribution for Mediator {'Normal'}.
+%                               'Gamma', 'InverseGaussian', 'Poisson', etc.
+%                     'distY' : (char) Distribution for Outcome {'Normal'}.
+%                               'Binomial', etc.
+%                     'verbose': (logical) Print results to command window {true}.
+%
+%   OUTPUTS:
+%       res         - (struct) Results structure containing:
+%                     .mdlA   : Model for Path A (X -> M).
+%                     .mdlC   : Model for Path C (X -> Y, Total).
+%                     .mdlBC  : Model for Path B & C' (X+M -> Y).
+%                     .paths  : Table of coefficients and p-values.
+%
+%   EXAMPLE:
+%       res = lme_mediation(data, 'Group', 'bFrac', 'uRcv', '(1|MouseID)', ...
+%             'distM', 'Gamma', 'distY', 'Binomial');
+%
+%   See also: LME_FIT, LME_ANALYSE, FITGLME
+
+%% ========================================================================
+%  ARGUMENTS
+%  ========================================================================
+
+p = inputParser;
+addRequired(p, 'tbl', @istable);
+addRequired(p, 'xVar', @ischar);
+addRequired(p, 'mVar', @ischar);
+addRequired(p, 'yVar', @ischar);
+addRequired(p, 'randEff', @ischar);
+addParameter(p, 'distM', 'Normal', @ischar);
+addParameter(p, 'distY', 'Normal', @ischar);
+addParameter(p, 'verbose', true, @islogical);
+
+parse(p, tbl, xVar, mVar, yVar, randEff, varargin{:});
+
+distM = p.Results.distM;
+distY = p.Results.distY;
+flgVerbose = p.Results.verbose;
+
+% Ensure variable names are safe
+xVar = char(xVar);
+mVar = char(mVar);
+yVar = char(yVar);
+
+
+%% ========================================================================
+%  PRE-PROCESSING
+%  ========================================================================
+
+
+%% ========================================================================
+%  1. PATH A: X -> M (MEDIATOR MODEL)
+%  ========================================================================
+%  Does the Independent Variable (X) significantly predict the Mediator (M)?
+
+tblLme = tbl_transform(tbl, 'flg0', true, 'flgZ', false, ...
+    'verbose', true, 'varsInc', {mVar});
+
+frmlA = sprintf('%s ~ %s + %s', mVar, xVar, randEff);
+mdlA = lme_fit(tblLme, frmlA, 'dist', distM);
+
+% Extract Coeffs (Assume X is the 2nd coefficient usually, or find by name)
+[betaA, pA] = get_coeff(mdlA, xVar);
+
+
+%% ========================================================================
+%  2. PATH C: X -> Y (TOTAL EFFECT MODEL)
+%  ========================================================================
+%  Does X predict Y without the mediator? (Establishes there is an effect to mediate)
+
+frmlC = sprintf('%s ~ %s + %s', yVar, xVar, randEff);
+mdlC = lme_fit(tblLme, frmlC, 'dist', distY);
+
+[betaC, pC] = get_coeff(mdlC, xVar);
+
+
+%% ========================================================================
+%  3. PATH B & C': X + M -> Y (OUTCOME MODEL)
+%  ========================================================================
+%  Does M predict Y when X is controlled (Path B)?
+%  Does the effect of X on Y decrease/vanish when M is added (Path C')?
+
+tblLme = tbl_transform(tbl, 'flg0', true, 'flgLog', true, 'flgZ', true, ...
+    'verbose', true, 'varsInc', {mVar});
+
+frmlBC = sprintf('%s ~ %s + %s + %s', yVar, xVar, mVar, randEff);
+mdlBC = lme_fit(tblLme, frmlBC, 'dist', distY);
+
+[betaB, pB]       = get_coeff(mdlBC, mVar);
+[betaC_prime, pC_prime] = get_coeff(mdlBC, xVar);
+
+
+%% ========================================================================
+%  RESULTS PACKAGING
+%  ========================================================================
+
+res.mdlA  = mdlA;
+res.mdlC  = mdlC;
+res.mdlBC = mdlBC;
+
+% Create Summary Table
+RowNames = {'Path A (X->M)'; 'Path B (M->Y|X)'; 'Path C (Total X->Y)'; 'Path C'' (Direct X->Y|M)'};
+Variable  = {xVar; mVar; xVar; xVar};
+Estimate  = [betaA; betaB; betaC; betaC_prime];
+PValue    = [pA; pB; pC; pC_prime];
+
+res.paths = table(Variable, Estimate, PValue, 'RowNames', RowNames);
+
+
+%% ========================================================================
+%  DISPLAY
+%  ========================================================================
+
+if flgVerbose
+    fprintf('\n=======================================================\n');
+    fprintf(' MEDIATION ANALYSIS: %s -> %s -> %s\n', xVar, mVar, yVar);
+    fprintf('=======================================================\n');
+    fprintf('%-25s | Beta = %8.3f | p = %8.3e\n', 'Path A (X -> M)', betaA, pA);
+    fprintf('%-25s | Beta = %8.3f | p = %8.3e\n', 'Path B (M -> Y)', betaB, pB);
+    fprintf('%-25s | Beta = %8.3f | p = %8.3e\n', 'Path C (Total)', betaC, pC);
+    fprintf('%-25s | Beta = %8.3f | p = %8.3e\n', 'Path C'' (Direct)', betaC_prime, pC_prime);
+    fprintf('-------------------------------------------------------\n');
+
+    % Interpretation heuristic
+    if pA < 0.05 && pB < 0.05
+        if pC_prime > 0.05
+            fprintf('RESULT: Full Mediation suggested.\n');
+            fprintf('(X affects M, M affects Y, Direct X->Y is n.s.)\n');
+        elseif abs(betaC_prime) < abs(betaC)
+            fprintf('RESULT: Partial Mediation suggested.\n');
+            fprintf('(Direct effect reduced but remains significant.)\n');
+        else
+            fprintf('RESULT: Inconsistent Mediation/Suppression.\n');
+        end
+    else
+        fprintf('RESULT: No Mediation (Path A or B is not significant).\n');
+    end
+    fprintf('=======================================================\n');
+end
+
+end
+
+%% ========================================================================
+%  HELPER: GET COEFFICIENT
+%  ========================================================================
+function [est, pval] = get_coeff(mdl, varName)
+% Robustly extracts coefficient for a variable (Main Effect)
+% Handles 'Group' becoming 'Group_KO' in the table row names.
+
+allNames = mdl.Coefficients.Name;
+% Find row containing varName (simple heuristic for dummy coded vars)
+% Prefers exact match, then 'VarName_Level' match.
+idx = find(strcmp(allNames, varName));
+if isempty(idx)
+    % Try finding partial match (e.g., 'Group_KO')
+    % We assume the variable of interest is the first non-interaction match
+    idx = find(contains(allNames, varName) & ~contains(allNames, ':'));
+end
+
+if isempty(idx)
+    est = NaN;
+    pval = NaN;
+    warning('Variable %s not found in model coefficients.', varName);
+else
+    % If multiple (e.g., multi-level factor), take the first one (often Level 2 vs Ref)
+    % Ideally, user supplies specific contrast, but this is a simplified wrapper.
+    est  = mdl.Coefficients.Estimate(idx(1));
+    pval = mdl.Coefficients.pValue(idx(1));
+end
+
+end
+
+
+%% ========================================================================
+%  NOTE: MEDIATION ANALYSIS (BARON & KENNY)
+%  ========================================================================
+% Mediation analysis is a statistical method used to elucidate the mechanism
+% or "pathway" through which an independent variable (X) influences a
+% dependent variable (Y). It posits that X influences a third variable, the
+% mediator (M), which in turn influences Y.
+%
+% 1. The Four Conditions (Baron & Kenny, 1986):
+%    To establish mediation, four conditions typically need to be met:
+%
+%    Path A (X -> M): Use LME/GLME to show X significantly predicts M.
+%        Formula: M ~ X + (1|Covariates)
+%        Interpretation: The treatment must affect the proposed mechanism.
+%
+%    Path C (Total Effect, X -> Y): Use LME/GLME to show X predicts Y.
+%        Formula: Y ~ X + (1|Covariates)
+%        Interpretation: There is an effect to be mediated.
+%
+%    Path B (M -> Y | X): Use LME/GLME to show M predicts Y when controlling for X.
+%        Formula: Y ~ X + M + (1|Covariates)
+%        Interpretation: The mechanism affects the outcome independent of the treatment.
+%
+%    Path C' (Direct Effect, X -> Y | M): In the same model as Path B, the
+%    effect of X on Y should act as follows:
+%        - Full Mediation: Path C' is no longer significant.
+%        - Partial Mediation: Path C' is smaller than Path C but still significant.
+%
+% 2. Mixed-Effects Context:
+%    Standard mediation relies on OLS regression (General Linear Model).
+%    However, in physiological experiments with hierarchical data (cells
+%    nested within animals), we MUST use Mixed-Effects Models. Ignoring
+%    clustering typically leads to Type I errors (false positives) for Path A
+%    and Path C. This function wraps `fitglme` to perform these steps
+%    correctly while respecting the random effects structure.
+%
+% 3. Causality Warning:
+%    Mediation is a statistical test of correlations, not a proof of
+%    causality. Even if all paths are significant, M could be a correlate
+%    of the true cause, or Y could cause M (reverse causality). Strong
+%    causal claims require experimental manipulation of the mediator (e.g.,
+%    blocking bFrac directly) rather than just statistical adjustment.
+%
+% ========================================================================
+
+%% ========================================================================
+%  NOTE: INTERPRETATION OF COEFFICIENTS
+%  ========================================================================
+% - Total Effect (Path C): The overall impact of X on Y.
+% - Direct Effect (Path C'): The impact of X on Y that is NOT seemingly
+%   due to M.
+% - Indirect Effect (A * B): The portion of the effect passing through M.
+%
+% Significance Testing:
+% The Sobel test is a common method to test the significance of the
+% indirect efffect (A*B). However, it assumes normal sampling distributions
+% which often doesn't hold for the product of coefficients. Bootstrapping
+% is the modern gold standard but is computationally expensive for GLMEs.
+% This function relies on the joint significance logic of Paths A and B.
+%
+% ========================================================================
+
+%% ========================================================================
+%  NOTE: COMPETITIVE MEDIATION (SUPPRESSION)
+%  ========================================================================
+% The analysis may reveal a phenomenon known as Competitive Mediation (or
+% Suppression) where the Direct Effect (C') is larger in magnitude than the
+% Total Effect (C).
+%
+% 1. Mechanism:
+%    This occurs when the two pathways work in opposite directions:
+%    - Direct Path: The Treatment (X) has a negative impact on the Outcome (Y).
+%    - Indirect Path: The Treatment (X) increases the Mediator (M), and the
+%      Mediator (M) has a positive impact on the Outcome (Y).
+%
+% 2. Interpretation:
+%    In this scenario, the Mediator acts as a "suppressor" variable. It
+%    "hides" a portion of the Treatment's negative effect by providing a
+%    compensatory boost. When you control for the Mediator in the model
+%    (Path C'), the "pure" negative impact of the Treatment becomes more
+%    pronounced (larger beta) because the masking effect is removed.
+%
+% 3. Impact on Feature Importance:
+%    Competitive mediation can make Importance Analysis (Ablation) confusing.
+%    - Information Overlap: The model sees X and M pulling predictions in
+%      opposite directions.
+%    - Accuracy Sensitivity: Removing the "negative" predictor (X) might be
+%      partially offset by the "positive" predictor (M) remaining, leading
+%      to a deceptively small drop in accuracy.
+%    - Conclusion: In these cases, Likelihood Ratio Tests (LRT) or p-values
+%      are often more reliable metrics of feature relevance than simple
+%      prediction accuracy.
+% ========================================================================

@@ -67,7 +67,7 @@ varMap.TailSlope = 'swv.tailSlope';
 varMap.TailAmp = 'swv.tailAmp';
 
 tblUnit = v2tbl('v', v, 'varMap', varMap, 'tagFiles', tagFiles);
-tblUnit = tbl_transform(tblUnit, 'flgLog', true);
+tblUnit = tbl_transform(tblUnit, 'logBase', 10);
 
 
 %% ========================================================================
@@ -141,7 +141,7 @@ varAuc = zeros(nVar, 1);
 UnitType = double(tblUnit.UnitType(idxGood));
 
 for iVar = 1:nVar
-    if idxNumeric(iVar) 
+    if idxNumeric(iVar)
         [~,~,~,varAuc(iVar)] = perfcurve(UnitType, tblUnit{idxGood, iVar}, 1);
     end
 end
