@@ -62,11 +62,11 @@ varMap.uPert = 'rcv.uPert';
 
 % Bursts
 varMap.bRate = 'stats.rate';
-varMap.bDur = 'stats.brstDur';
+varMap.bDur = 'stats.dur';
 varMap.bFreq = 'stats.freq';
 varMap.bIBI = 'stats.ibi';
-varMap.bFrac = 'stats.bspks';
-varMap.bSpks = 'stats.nspks';
+varMap.pBspk = 'stats.pBspk';
+varMap.nBspk = 'stats.nBspk';
 
 % FR
 varMap.fr = 'rcv.frBsl';
@@ -97,11 +97,11 @@ varMap.uPert = 'rcv.uPert';
 
 % Bursts
 varMap.bRateSS = 'stats.rate';
-varMap.bDurSS = 'stats.brstDur';
+varMap.bDurSS = 'stats.dur';
 varMap.bFreqSS = 'stats.freq';
 varMap.bIBISS = 'stats.ibi';
-varMap.bFracSS = 'stats.bspks';
-varMap.bSpksSS = 'stats.nspks';
+varMap.pBspkSS = 'stats.pBspk';
+varMap.nBspkSS = 'stats.nBspk';
 
 % Table
 tbl2 = v2tbl('v', v, 'varMap', varMap, 'tagFiles', tagFiles, ...
@@ -117,6 +117,8 @@ tbl = outerjoin(tbl, tbl2, 'MergeKeys', true);
 % Clean bad units
 tbl(~tbl.uPert, :) = [];
 tbl(~tbl.uGood, :) = [];
+tbl = removevars(tbl, 'uGood');
+tbl = removevars(tbl, 'uPert');
 
 % Limit spktimes
 winExp = [0, 9 * 60]  * 60;
@@ -126,10 +128,10 @@ tbl.spktimes = cellfun(@(x) x(x >= winExp(1) & x <= winExp(2)), ...
 % Convert time to hours
 tbl.rcvTime = tbl.rcvTime / 3600;
 
-% Manually add raw rcvErr
-tbl.rcvErr = log2((tbl.frSs + 1 / 3600) ./ (tbl.fr + 1 / 3600));
-tbl.rcvFrac = log2((tbl.bFracSS + 1e-6) ./ (tbl.bFrac + 1e-6));
-tbl.rcvDur = log2((tbl.bDurSS + 1e-6) ./ (tbl.bDur + 1e-6));
+% % Manually add raw rcvErr
+% tbl.rcvErr = log2((tbl.frSs + 1 / 3600) ./ (tbl.fr + 1 / 3600));
+% tbl.rcvFrac = log2((tbl.bFracSS + 1e-6) ./ (tbl.bFrac + 1e-6));
+% tbl.rcvDur = log2((tbl.bDurSS + 1e-6) ./ (tbl.bDur + 1e-6));
 
 
 

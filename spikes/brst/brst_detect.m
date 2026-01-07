@@ -12,77 +12,84 @@ function brst = brst_detect(spktimes, varargin)
 %       spktimes    - (cell) Spike times per unit (e.g., {unit1, unit2}).
 %                     Times should be in seconds.
 %       varargin    - (param/value) Optional parameters:
-%                     'maxISI_start' : (num) Max ISI to start burst 
-%                     'maxISI_end'   : (num) Max ISI within burst 
-%                     'minIBI'       : (num) Min Inter-Burst Interval 
-%                     'minDur'       : (num) Min burst duration 
-%                     'minSpks'      : (num) Min spikes in burst 
-%                     'flgPlot'      : (log) Plot raster with bursts {false}
-%                     'basepath'     : (char) Recording path {pwd}
-%                     'flgSave'      : (log) Save to file {true}
-%                     'flgForce'     : (log) Analyze even if exists {false}
+%                     'isiStart'  : (num) Max ISI to start burst {0.013}
+%                     'isiEnd'    : (num) Max ISI within burst {0.02}
+%                     'minIbi'    : (num) Min Inter-Burst Interval {0.05}
+%                     'minDur'    : (num) Min burst duration {0.015}
+%                     'minSpks'   : (num) Min spikes in burst {3}
+%                     'flgPlot'   : (log) Plot raster with bursts {false}
+%                     'basepath'  : (char) Recording path {pwd}
+%                     'flgSave'   : (log) Save to file {true}
+%                     'flgForce'  : (log) Analyze even if exists {false}
 %
 %   OUTPUTS:
 %       brst        - (struct) Burst event data.
-%                     Fields: all (cell array of structs per unit).
-%                     Brst.info contains run parameters.
+%                     .times    : (nUnits x 1 cell) Burst start/end times
+%                     .nBspk    : (nUnits x 1 cell) Count of spikes per burst
+%                     .dur      : (nUnits x 1 cell) Duration of bursts (s)
+%                     .freq     : (nUnits x 1 cell) Intra-burst frequency (Hz)
+%                     .ibi      : (nUnits x 1 cell) Pre-burst interval (s)
+%                     .spktimes : (nUnits x 1 cell) Spike times within bursts
+%                     .params   : (struct) Parameters used
 %
+%   See also: BRST_DYNAMICS, BRST_STATS
 
 %% ========================================================================
 %  ARGUMENTS
 %  ========================================================================
 
 p = inputParser;
+addRequired(p, 'spktimes', @iscell);
 addParameter(p, 'basepath', pwd, @ischar);
-addParameter(p, 'maxISI_start', 0.013, @isnumeric);
-addParameter(p, 'maxISI_end', 0.02, @isnumeric);
-addParameter(p, 'minIBI', 0.05, @isnumeric);
+addParameter(p, 'isiStart', 0.013, @isnumeric);
+addParameter(p, 'isiEnd', 0.02, @isnumeric);
+addParameter(p, 'minIbi', 0.05, @isnumeric);
 addParameter(p, 'minDur', 0.015, @isnumeric);
 addParameter(p, 'minSpks', 3, @isnumeric);
 addParameter(p, 'flgPlot', false, @islogical);
 addParameter(p, 'flgSave', true, @islogical);
 addParameter(p, 'flgForce', false, @islogical);
 
-parse(p, varargin{:});
-basepath     = p.Results.basepath;
-maxISI_start = p.Results.maxISI_start;
-maxISI_end   = p.Results.maxISI_end;
-minIBI       = p.Results.minIBI;
-minDur       = p.Results.minDur;
-minSpks      = p.Results.minSpks;
-flgPlot      = p.Results.flgPlot;
-flgSave      = p.Results.flgSave;
-flgForce     = p.Results.flgForce;
+parse(p, spktimes, varargin{:});
+basepath  = p.Results.basepath;
+isiStart  = p.Results.isiStart;
+isiEnd    = p.Results.isiEnd;
+minIbi    = p.Results.minIbi;
+minDur    = p.Results.minDur;
+minSpks   = p.Results.minSpks;
+flgPlot   = p.Results.flgPlot;
+flgSave   = p.Results.flgSave;
+flgForce  = p.Results.flgForce;
+params    = p.Results;
 
 
 %% ========================================================================
-%  PREPARATIONS
+%  INITIALIZE
 %  ========================================================================
 
-% Load if exists
+% Check existence
 [~, basename] = fileparts(basepath);
-brstfile = fullfile(basepath, [basename, '.brst.mat']);
+saveFile = fullfile(basepath, [basename, '.brst.mat']);
 
-if exist(brstfile, 'file') && ~flgForce && ~flgPlot
-    load(brstfile, 'brst');
+if exist(saveFile, 'file') && ~flgForce && ~flgPlot
+    load(saveFile, 'brst');
     return;
 end
 
 nUnits = length(spktimes);
 
-% Initialize output structure
-brst.info.runtime   = datetime("now");
-brst.info.algorithm = 'MaxInterval';
-brst.info.input     = p.Results;
-
-brst.all            = cell(nUnits, 1);
-
-% For plotting
-spktimes_bursts = cell(nUnits, 1);
+% Initialize Output
+brst.times    = cell(nUnits, 1);
+brst.nBspk    = cell(nUnits, 1);
+brst.dur      = cell(nUnits, 1);
+brst.freq     = cell(nUnits, 1);
+brst.ibi      = cell(nUnits, 1);
+brst.spktimes = cell(nUnits, 1);
+brst.params   = params;
 
 
 %% ========================================================================
-%  DETECTION
+%  COMPUTE LOOP
 %  ========================================================================
 
 for iUnit = 1 : nUnits
@@ -94,100 +101,96 @@ for iUnit = 1 : nUnits
 
     % Ensure column vector
     st = st(:);
-    uISI = diff(st);
-    nSpks = length(st);
+    isi = diff(st);
+    nBspk = length(st);
 
     % ---------------------------------------------------------------------
-    % Phase 1: Core Burst Detection
+    % Burst Detection
     % ---------------------------------------------------------------------
 
-    raw_bursts_idx = [];
+    bspkIdx = [];
     inBurst = false;
-    currentBurstStartIdx = -1;
+    iStart = -1;
 
-    k = 1;
-    while k < nSpks
+    iSpk = 1;
+    while iSpk < nBspk
         if ~inBurst
             % Start criteria
-            if uISI(k) <= maxISI_start
+            if isi(iSpk) <= isiStart
                 inBurst = true;
-                currentBurstStartIdx = k;
-                k = k + 1;
+                iStart = iSpk;
+                iSpk = iSpk + 1;
             else
-                k = k + 1;
+                iSpk = iSpk + 1;
             end
         else
             % Continuation criteria
-            if uISI(k) <= maxISI_end
-                k = k + 1;
+            if isi(iSpk) <= isiEnd
+                iSpk = iSpk + 1;
             else
                 % End of burst
-                currentBurstEndIdx = k;
-                raw_bursts_idx = [raw_bursts_idx; currentBurstStartIdx, currentBurstEndIdx]; %#ok<AGROW>
+                bspkIdx = [bspkIdx; iStart, iSpk]; 
                 inBurst = false;
-                k = k + 1;
+                iSpk = iSpk + 1;
             end
         end
     end
 
     % Close last burst if active
     if inBurst
-        raw_bursts_idx = [raw_bursts_idx; currentBurstStartIdx, nSpks]; %#ok<AGROW>
+        bspkIdx = [bspkIdx; iStart, nBspk]; 
     end
 
-    if isempty(raw_bursts_idx)
+    if isempty(bspkIdx)
         continue;
     end
 
     % ---------------------------------------------------------------------
-    % Phase 2: Merge Bursts
+    % Merge Bursts
     % ---------------------------------------------------------------------
 
-    merged_bursts_idx = [];
-    if size(raw_bursts_idx, 1) > 0
-        curr_start = raw_bursts_idx(1, 1);
-        curr_end   = raw_bursts_idx(1, 2);
+    mrgIdx = [];
+    prevStart = bspkIdx(1, 1);
+    prevEnd   = bspkIdx(1, 2);
+    for ib = 2:size(bspkIdx, 1)        
+        currStart = bspkIdx(ib, 1);
+        currEnd   = bspkIdx(ib, 2);
 
-        for b = 2:size(raw_bursts_idx, 1)
-            next_start = raw_bursts_idx(b, 1);
-            next_end   = raw_bursts_idx(b, 2);
+        % IBI: Time between end of previous and start of next
+        tEnd   = st(prevEnd);
+        tStart = st(currStart);
+        currIbi = tStart - tEnd;
 
-            % IBI: Time between end of previous and start of next
-            t_end   = st(curr_end);
-            t_start = st(next_start);
-            ibi     = t_start - t_end;
-
-            if ibi < minIBI
-                % Merge
-                curr_end = next_end;
-            else
-                % Commit & Start New
-                merged_bursts_idx = [merged_bursts_idx; curr_start, curr_end]; %#ok<AGROW>
-                curr_start = next_start;
-                curr_end   = next_end;
-            end
+        if currIbi < minIbi
+            % Merge
+            prevEnd = currEnd;
+        else
+            % Commit & Start New
+            mrgIdx = [mrgIdx; prevStart, prevEnd]; 
+            prevStart = currStart;
+            prevEnd   = currEnd;
         end
-        merged_bursts_idx = [merged_bursts_idx; curr_start, curr_end]; %#ok<AGROW>
     end
+    mrgIdx = [mrgIdx; prevStart, prevEnd];
 
     % ---------------------------------------------------------------------
-    % Phase 3: Filter (Duration & nSpikes)
+    % Filter (Duration & nSpikes)
     % ---------------------------------------------------------------------
 
-    final_bursts_idx = [];
-    for b = 1:size(merged_bursts_idx, 1)
-        s_idx = merged_bursts_idx(b, 1);
-        e_idx = merged_bursts_idx(b, 2);
+    finIdx = [];
+    for ib = 1:size(mrgIdx, 1)
+        currStart = mrgIdx(ib, 1);
+        currEnd = mrgIdx(ib, 2);
 
-        n_spks = e_idx - s_idx + 1;
-        dur    = st(e_idx) - st(s_idx);
+        n = currEnd - currStart + 1;
+        d = st(currEnd) - st(currStart);
 
-        if n_spks >= minSpks && dur >= minDur
-            final_bursts_idx = [final_bursts_idx; s_idx, e_idx]; %#ok<AGROW>
+        if n >= minSpks && d >= minDur
+            finIdx = [finIdx; currStart, currEnd]; 
         end
     end
 
-    if isempty(final_bursts_idx)
+    if isempty(finIdx)
         continue;
     end
 
@@ -195,43 +198,44 @@ for iUnit = 1 : nUnits
     % Collect Statistics
     % ---------------------------------------------------------------------
 
-    nb = size(final_bursts_idx, 1);
+    nb = size(finIdx, 1);
+    bTimes = zeros(nb, 2);
+    bNspks = zeros(nb, 1);
+    bDur   = zeros(nb, 1);
+    bFreq  = zeros(nb, 1);
+    bIbi   = nan(nb, 1);
+    bSt    = [];
 
-    b_struct.times = zeros(nb, 2);
-    b_struct.nspks = zeros(nb, 1);
-    b_struct.dur   = zeros(nb, 1);
-    b_struct.freq  = zeros(nb, 1);
-    b_struct.ibi   = nan(nb, 1);
+    for ib = 1:nb
+        currStart = finIdx(ib, 1);
+        currEnd = finIdx(ib, 2);
 
-    % For IBI calc
-    fl_times = zeros(nb, 2);
+        bTimes(ib, :) = [st(currStart), st(currEnd)];
+        bNspks(ib)    = currEnd - currStart + 1;
+        bDur(ib)      = st(currEnd) - st(currStart);
+        bFreq(ib)     = bNspks(ib) / bDur(ib);
 
-    for b = 1:nb
-        s_idx = final_bursts_idx(b, 1);
-        e_idx = final_bursts_idx(b, 2);
-
-        b_struct.times(b, :) = [st(s_idx), st(e_idx)];
-        b_struct.nspks(b)    = e_idx - s_idx + 1;
-        b_struct.dur(b)      = st(e_idx) - st(s_idx);
-        b_struct.freq(b)     = b_struct.nspks(b) / b_struct.dur(b);
-
-        fl_times(b, :) = [st(s_idx), st(e_idx)];
-
-        if flgPlot
-            spktimes_bursts{iUnit} = [spktimes_bursts{iUnit}; st(s_idx:e_idx)]; %#ok<AGROW>
-        end
+        bChunk = st(currStart:currEnd);
+        bSt = [bSt; bChunk]; 
     end
 
+    % IBI Calculation
     if nb > 1
-        b_struct.ibi(2:end) = fl_times(2:end, 1) - fl_times(1:end-1, 2);
+        bIbi(2:end) = bTimes(2:end, 1) - bTimes(1:end-1, 2);
     end
 
-    brst.all{iUnit}     = b_struct;
+    brst.times{iUnit}    = bTimes;
+    brst.nBspk{iUnit}    = bNspks;
+    brst.dur{iUnit}      = bDur;
+    brst.freq{iUnit}     = bFreq;
+    brst.ibi{iUnit}      = bIbi;
+    brst.spktimes{iUnit} = bSt;
+
 end
 
 
 %% ========================================================================
-%  PLOTTING
+%  PLOT & SAVE
 %  ========================================================================
 
 if flgPlot
@@ -239,14 +243,14 @@ if flgPlot
     [hFig, hAx] = plot_axSize('szOnly', false, 'flgFullscreen', true, ...
         'flgPos', true);
     winPlot = [10, 20];
-    lnHeight = 0.8;
-    lnWidth = 0.8;
+    lnH = 0.8;
+    lnW = 0.8;
 
     % Plot all spikes
     clr = [0.6 0.6 0.6];
-    [hAx, hPlt] = plot_raster(spktimes, 'PlotType', 'vertline', ...
-        'lineHeight', lnHeight, ...
-        'lineWidth', lnWidth, ...
+    [hAx, ~] = plot_raster(spktimes, 'PlotType', 'vertline', ...
+        'lineHeight', lnH, ...
+        'lineWidth', lnW, ...
         'hAx', hAx, ...
         'clr', clr, ...
         'xLim', winPlot);
@@ -254,9 +258,9 @@ if flgPlot
 
     % Plot burst spikes in color (Red)
     clr = [1 0 0];
-    [hAx, hPlt] = plot_raster(spktimes_bursts, 'PlotType', 'vertline', ...
+    plot_raster(brst.spktimes, 'PlotType', 'vertline', ...
         'lineHeight', 0.8, ...
-        'lineWidth', lnWidth, ...
+        'lineWidth', lnW, ...
         'hAx', hAx, ...
         'clr', clr, ...
         'xLim', winPlot);
@@ -267,13 +271,8 @@ if flgPlot
 
 end
 
-
-%% ========================================================================
-%  SAVE
-%  ========================================================================
-
 if flgSave
-    save(brstfile, 'brst');
+    save(saveFile, 'brst');
 end
 
 end     % EOF
@@ -489,4 +488,3 @@ end     % EOF
 %  * Prevents zero-duration artifacts.
 %  * Uses adaptive IBI percentiles.
 %  ========================================================================
-
