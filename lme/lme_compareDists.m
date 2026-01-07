@@ -228,35 +228,6 @@ end     % EOF
 
 
 %% ========================================================================
-%  NOTE: LINK FUNCTIONS
-%  ========================================================================
-%  A GLM specifies the relationship between the Mean Response (mu) and the
-%  linear predictor (X*beta) via a Link Function g(mu) = X*beta.
-%
-%  While statistical software defaults to "canonical" links for
-%  computational simplicity—such as the Reciprocal link for Gamma
-%  distributions - these defaults often contradict the physical reality of
-%  biological data.
-
-%  The Canonical links for Gamma/InvGauss imply that as X increases, Y
-%  decreases hyperbolically (1/X). This is rarely the true biological
-%  mechanism. Most positive data (like RT) follows a multiplicative process
-%  (e.g., "a 10% increase"), which implies an Exponential trend. This
-%  corresponds to the LOG LINK: log(mu) = X*beta.
-
-%  Therefore, the Log link is the scientifically appropriate choice for
-%  Gamma, Inverse Gaussian, and Poisson distributions as it models these
-%  exponential trends. In contrast, the Normal distribution uses the
-%  Identity link by default, representing the standard assumption of
-%  additive, linear effects. By enforcing the Log link across the
-%  heavy-tailed distributions while keeping Identity for the Normal
-%  distribution, we ensure that the AIC comparison properly tests the
-%  variance structure (distribution) rather than inadvertently penalizing a
-%  plausible distribution for using an implausible hyperbolic trend.
-%  ========================================================================
-
-
-%% ========================================================================
 %  NOTE: JACOBIAN CORRECTION
 %  ========================================================================
 %  Comparing a Log-Normal model fitlme(tbl, 'log(y) ~ ...') directly to a
@@ -276,47 +247,6 @@ end     % EOF
 %  and using a generalized distribution.
 %  ========================================================================
 
-
-%% ========================================================================
-%  NOTE: MODULATION INDEX (MI) VS. LOG-RATIO
-%  ========================================================================
-%  When quantifying firing rate changes (e.g., Ripple vs. Random periods),
-%  the choice of metric significantly impacts the statistical validity
-%  of the subsequent Linear Mixed-Effects (LME) analysis.
-%
-%  1. The Modulation Index (MI):
-%     Defined as (FR_a - FR_b) / (FR_a + FR_b). This metric is a standard
-%     "normalized difference" in neuroscience because it is intuitive and
-%     controls for the absolute firing rate of a neuron. However, it
-%     presents challenges for LME models. Because it is strictly bounded
-%     between [-1, 1], it violates the assumption of normality, especially
-%     near the boundaries. Analyzing MI typically requires rescaling the
-%     data to (0, 1) and employing a Logit-Normal model.
-%
-%  2. The Log-Ratio (LR):
-%     Defined as ln(FR_a / FR_b). This is often the statistically preferred
-%     alternative to the MI. Unlike the MI, the Log-Ratio is not bounded
-%     and is naturally symmetric around zero, which often results in
-%     residuals that better approximate a Normal distribution. This
-%     symmetry aligns with the "Log Link" philosophy, as it models
-%     multiplicative processes on a linear scale.
-%
-%  3. The GLMM Approach (Raw Rates):
-%     The most rigorous method is to avoid index-based metrics entirely. By
-%     fitting a Generalized Linear Mixed Model (GLMM) directly to the raw
-%     firing rates (e.g., using Gamma or Inverse Gaussian distributions),
-%     one preserves the inherent mean-variance relationship of the data
-%    . This approach accounts for the "multiplicative" nature
-%     of neural spiking while avoiding the information loss and potential
-%     biases (like the "retransformation problem") associated with
-%     collapsing observations into a single ratio.
-%
-%  DECISION RULE: Use the Modulation Index (MI) primarily for visualization
-%  and consistency with literature. For LME modeling, favor the
-%  **Log-Ratio** for simplicity of insference, or a **GLMM on raw rates**
-%  (Gamma/InvGauss) to ensure the most accurate and unbiased population
-%  estimates.
-%  ========================================================================
 
 %% ========================================================================
 %  NOTE: LOGIT-NORMAL ARTIFACT

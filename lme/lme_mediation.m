@@ -168,3 +168,98 @@ else
 end
 
 end
+
+
+%% ========================================================================
+%  NOTE: MEDIATION ANALYSIS 
+%  ========================================================================
+% Mediation analysis is a statistical method used to elucidate the mechanism
+% or "pathway" through which an independent variable (X) influences a
+% dependent variable (Y). It posits that X influences a third variable, the
+% mediator (M), which in turn influences Y.
+%
+% 1. The Four Conditions (Baron & Kenny, 1986):
+%    To establish mediation, four conditions typically need to be met:
+%
+%    Path A (X -> M): Use LME/GLME to show X significantly predicts M.
+%        Formula: M ~ X + (1|Covariates)
+%        Interpretation: The treatment must affect the proposed mechanism.
+%
+%    Path C (Total Effect, X -> Y): Use LME/GLME to show X predicts Y.
+%        Formula: Y ~ X + (1|Covariates)
+%        Interpretation: There is an effect to be mediated.
+%
+%    Path B (M -> Y | X): Use LME/GLME to show M predicts Y when controlling for X.
+%        Formula: Y ~ X + M + (1|Covariates)
+%        Interpretation: The mechanism affects the outcome independent of the treatment.
+%
+%    Path C' (Direct Effect, X -> Y | M): In the same model as Path B, the
+%    effect of X on Y should act as follows:
+%        - Full Mediation: Path C' is no longer significant.
+%        - Partial Mediation: Path C' is smaller than Path C but still significant.
+%
+% 2. Mixed-Effects Context:
+%    Standard mediation relies on OLS regression (General Linear Model).
+%    However, in physiological experiments with hierarchical data (cells
+%    nested within animals), we MUST use Mixed-Effects Models. Ignoring
+%    clustering typically leads to Type I errors (false positives) for Path A
+%    and Path C. This function wraps `fitglme` to perform these steps
+%    correctly while respecting the random effects structure.
+%
+% 3. Causality Warning:
+%    Mediation is a statistical test of correlations, not a proof of
+%    causality. Even if all paths are significant, M could be a correlate
+%    of the true cause, or Y could cause M (reverse causality). Strong
+%    causal claims require experimental manipulation of the mediator (e.g.,
+%    blocking bFrac directly) rather than just statistical adjustment.
+%
+% ========================================================================
+
+%% ========================================================================
+%  NOTE: INTERPRETATION OF COEFFICIENTS
+%  ========================================================================
+% - Total Effect (Path C): The overall impact of X on Y.
+% - Direct Effect (Path C'): The impact of X on Y that is NOT seemingly
+%   due to M.
+% - Indirect Effect (A * B): The portion of the effect passing through M.
+%
+% Significance Testing:
+% The Sobel test is a common method to test the significance of the
+% indirect efffect (A*B). However, it assumes normal sampling distributions
+% which often doesn't hold for the product of coefficients. Bootstrapping
+% is the modern gold standard but is computationally expensive for GLMEs.
+% This function relies on the joint significance logic of Paths A and B.
+%
+% ========================================================================
+
+%% ========================================================================
+%  NOTE: COMPETITIVE MEDIATION (SUPPRESSION)
+%  ========================================================================
+% The analysis may reveal a phenomenon known as Competitive Mediation (or
+% Suppression) where the Direct Effect (C') is larger in magnitude than the
+% Total Effect (C).
+%
+% 1. Mechanism:
+%    This occurs when the two pathways work in opposite directions:
+%    - Direct Path: The Treatment (X) has a negative impact on the Outcome (Y).
+%    - Indirect Path: The Treatment (X) increases the Mediator (M), and the
+%      Mediator (M) has a positive impact on the Outcome (Y).
+%
+% 2. Interpretation:
+%    In this scenario, the Mediator acts as a "suppressor" variable. It
+%    "hides" a portion of the Treatment's negative effect by providing a
+%    compensatory boost. When you control for the Mediator in the model
+%    (Path C'), the "pure" negative impact of the Treatment becomes more
+%    pronounced (larger beta) because the masking effect is removed.
+%
+% 3. Impact on Feature Importance:
+%    Competitive mediation can make Importance Analysis (Ablation) confusing.
+%    - Information Overlap: The model sees X and M pulling predictions in
+%      opposite directions.
+%    - Accuracy Sensitivity: Removing the "negative" predictor (X) might be
+%      partially offset by the "positive" predictor (M) remaining, leading
+%      to a deceptively small drop in accuracy.
+%    - Conclusion: In these cases, Likelihood Ratio Tests (LRT) or p-values
+%      are often more reliable metrics of feature relevance than simple
+%      prediction accuracy.
+% ========================================================================

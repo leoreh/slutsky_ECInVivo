@@ -181,40 +181,4 @@ end     % EOF
 
 
 
-%% ========================================================================
-%  NOTE: LOG BASE SELECTION
-%  ========================================================================
-%  When fitting a Log-Normal model - transforming the response variable and
-%  using a Gaussian distribution - the choice of logarithmic base (Base e
-%  vs. Base 10) is mathematically equivalent but dictates the
-%  interpretation of the fixed effects (beta).
-%
-%  1. Natural Log (Base e, ln): The Statistical Standard
-%     In scientific research and LME modeling, the natural logarithm is the
-%     nearly universal standard.
-%
-%     - Fractional Interpretation: For small values, the coefficient (beta)
-%       represents the approximate percentage change in the response variable.
-%       For example, a beta of 0.06 translates to a 6% increase in y per
-%       unit increase in x.
-%     - Mathematical Elegance: The derivative of ln(y) is 1/y, simplifying the
-%       likelihood estimation and the recovery of geometric means via the
-%       exponential function `exp()`.
-%
-%  2. Common Log (Base 10, log10): The Engineering Standard
-%     Base 10 is preferred when data spans several orders of magnitude or when
-%     the physical scale is historically logarithmic (e.g., Decibels).
-%
-%     - Order of Magnitude: A change of 1 on the log10 scale represents a
-%       ten-fold increase in the raw units.
-%     - Interpretation: Unlike natural logs, beta coefficients are not directly
-%       interpretable as percentage changes; a 0.01 shift corresponds to a
-%       2.3% increase, making mental approximation less intuitive.
-%
-%  3. Technical Selection in LME:
-%     If the goal is to satisfy the assumption of normality for `fitlme`,
-%     base e is the technically superior choice because it aligns with the
-%     standard reporting of "percentage effects" in biological and
-%     physiological literature.
-%  ========================================================================
 

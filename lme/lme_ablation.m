@@ -375,7 +375,6 @@ end     % EOF
 %  - Negative Delta: The variable may be inducing noise/overfitting.
 %  ========================================================================
 
-
 %% ========================================================================
 %  NOTE: EVALUATING BINARY CLASSIFICATION PERFORMANCE
 %  ========================================================================
@@ -443,6 +442,40 @@ end     % EOF
 % threshold selection.
 %% ========================================================================
 
+%% ========================================================================
+%  NOTE: METRICS FOR CONTINUOUS SCALES
+%  ========================================================================
+%  Transitioning from binary classification (e.g., Recovery T/F) to
+%  continuous regression (e.g., Recovery Time, Firing Rate) requires
+%  different metrics. "Accuracy" and "ROC" are invalid because there is no
+%  categorical threshold.
+%
+%  1. Primary Metric: Coefficient of Determination (R-Squared)
+%     Represents the proportion of variance explained by the model.
+%     - Marginal R2: Explained by Fixed Effects only (e.g., predictors).
+%     - Conditional R2: Explained by Fixed + Random Effects (e.g., animal).
+%
+%  2. Error Metrics (RMSE / MAE)
+%     Quantifies the absolute error in physiological units (e.g., Hz).
+%     - RMSE (Root Mean Square): Penalizes large outliers heavily.
+%     - MAE (Mean Absolute): Linear penalty, more robust to outliers.
+%
+%  3. Ablation Analysis (Delta R2)
+%     To rank feature importance, calculate "Delta R2":
+%        Delta = R2_Full_Model - R2_Reduced_Model
+%     - Large Positive Delta: Variable is a critical driver.
+%     - Near Zero Delta: Variable is redundant.
+%
+%  4. Model Selection (AIC / BIC)
+%     Used to balance goodness-of-fit with complexity.
+%     - Penalizes overfitting (adding variables that don't help much).
+%     - Lower is better.
+%
+%  5. Standardized Coefficients (Beta)
+%     If predictors are Z-scored, Beta represents the "Effect Size" in
+%     standard deviations.
+%     - Beta = 0.5 -> 1 SD increase in X leads to 0.5 SD increase in Y.
+%  ========================================================================
 
 %% ========================================================================
 %  NOTE: COLLINEARITY
