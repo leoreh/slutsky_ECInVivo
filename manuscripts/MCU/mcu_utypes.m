@@ -30,8 +30,11 @@ for iPath = 1 : nPaths
     % swv = spkwv_metrics('basepath', basepath, 'flgSave', true, 'flgForce', true);
 
     % Spike timing metrics
-    st = spktimes_metrics('spktimes', v(iPath).spikes.times, 'sunits', [],...
-        'bins', {[0, Inf]}, 'flgForce', true, 'flgSave', true, 'flgAll', false);
+    % st = spktimes_metrics('spktimes', v(iPath).spikes.times, 'sunits', [],...
+    %     'bins', {[0, Inf]}, 'flgForce', true, 'flgSave', true, 'flgAll', false);
+
+    
+
 
 end
 

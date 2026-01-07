@@ -21,16 +21,16 @@ isiVal = brst_isiValley(spktimes, 'nSpks', 3);
 
 % Files
 basepaths = [mcu_basepaths('mea_bac'), mcu_basepaths('mea_mcuko')];
-vars = {'mea', 'fr'};
+vars = {'mea', 'fr', 'frFit'};
 v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 nFiles = length(basepaths);
 
 % Params
-isiVal = 0.015;
+isiVal = 0.02;
 binSize = 60;
 
 winExp = [0, 9 * 60]  * 60;
-winBsl = [1, 70] * 60;
+winBsl = [0, 70] * 60;
 winSs = [7 * 60, 9 * 60 - 5] * 60;
 winTrough = [4 * 60 + 10, 4.5 * 60] * 60;
 winCalc = [winBsl; winSs; winTrough];
@@ -53,42 +53,48 @@ for iFile = 1 : nFiles
     lastspike = max(cellfun(@max, spktimes, 'uni', true));
     spktimes = cellfun(@(x) x(x >= winExp(1) & x <= winExp(2)), ...
         spktimes, 'UniformOutput', false);
+    
+    % % Network stats
+    % frNet = fr_network(spktimes, 'flgSave', true, 'winLim', [0, 15] * 60);
+    % drft = drift_file(spktimes, 'flgSave', false, 'winLim', winBsl, ...
+    %     'binSize', 5 * 60, 'winSize', 20 * 60, 'flgPlot', true);
 
     % % Firing rate
     % fr = mea_frPrep(spktimes, 'binSize', binSize, ...
     %     'flgSave', true, 'flgPlot', true);
 
-    % Burst detection
-    brst = brst_detect(spktimes, ...
-        'minSpks', 3, ...
-        'isiStart', isiVal, ...
-        'isiEnd', isiVal * 2, ...
-        'minDur', 0.005, ...
-        'minIBI', 0.1, ...
-        'flgForce', true, 'flgSave', true, 'flgPlot', false);
+    % % Burst detection
+    % brst = brst_detect(spktimes, ...
+    %     'minSpks', 3, ...
+    %     'isiStart', isiVal, ...
+    %     'isiEnd', isiVal * 2, ...
+    %     'minDur', 0.005, ...
+    %     'minIBI', 0.1, ...
+    %     'flgForce', true, 'flgSave', true, 'flgPlot', false);
 
-    % Burst temporal dynamics
-    dyn = brst_dynamics(brst, spktimes, 'binSize', 60, 'ksd', 300, ...
+    % % Burst temporal dynamics
+    % dyn = brst_dynamics(brst, spktimes, 'binSize', 60, 'ksd', 300, ...
+    %     'binSize', binSize, 'flgSave', true, 'flgPlot', false);
+
+    % % Burst statistics
+    % stats = brst_stats(brst, spktimes, 'winCalc', winCalc, ...
+    %     'flgSave', true);
+
+    % FR recovery
+    fr = v(iFile).fr;
+    rcv = mea_frRcv(fr.t, fr.fr, ...
+        'idxTrough', fr.info.idxTrough, ...
         'binSize', binSize, 'flgSave', true, 'flgPlot', false);
 
-    % Burst statistics
-    stats = brst_stats(brst, spktimes, 'winCalc', winCalc, ...
-        'flgSave', true);
-
-    % % FR recovery
-    % % fr = v(iFile).fr;
-    % rcv = mea_frRecovery(fr.t, fr.fr, ...
-    %     'idxTrough', fr.info.idxTrough, ...
-    %     'binSize', binSize, 'flgSave', true, 'flgPlot', true);
-
-    % % FR model fit an recovery
+    % FR model fit an recovery
     % frFit = mea_frFit(fr.fr, fr.t, 'FilterLen', [], ...
     %     'idxTrough', fr.info.idxTrough, ...
     %     'flgPlot', true, 'flgSave', true);
-    % rcvMdl = mea_frRecovery(fr.t, frFit.frMdl, ...
-    %     'idxTrough', fr.info.idxTrough, ...
-    %     'binSize', binSize, 'flgSave', false, 'flgPlot', false);
-    % save(fullfile(basepath, [basename, '.frRcv_mdl.mat']), 'rcvMdl', '-v7.3');
+    frFit = v(iFile).frFit;
+    rcvMdl = mea_frRcv(fr.t, frFit.frMdl, ...
+        'idxTrough', fr.info.idxTrough, ...
+        'binSize', binSize, 'flgSave', false, 'flgPlot', false);
+    save(fullfile(basepath, [basename, '.frRcv_mdl.mat']), 'rcvMdl', '-v7.3');
 
     % Tranfer function spikes to Ca2+
     % ca = spk2ca(spktimes, 'winCalc', [0, Inf], ...
@@ -96,15 +102,14 @@ for iFile = 1 : nFiles
 
 end
 
-% Dimensionality
-% mcu_dim('type', 'vitro')
 
 
 %% ========================================================================
 %  LOAD TABLE
 %  ========================================================================
 
-[tbl, xVec, basepaths, v] = mcu_tblMea(basepaths, v);
+presets = {'time', 'steadyState', 'frNet', 'rcv'};
+[tbl, xVec, basepaths, v] = mcu_tblMea('presets', presets(3 : 4));
 
 
 %% ========================================================================
@@ -114,9 +119,9 @@ end
 
 tblGUI_xy(xVec, tbl);
 
-tblGUI_scatHist(tbl, 'xVar', 'bFrac', 'yVar', 'rcvTime', 'grpVar', 'Group');
+tblGUI_scatHist(tbl, 'xVar', 'pBspk', 'yVar', 'rcvTime', 'grpVar', 'Group');
 
-tblGUI_bar(tbl, 'yVar', 'bFrac', 'xVar', 'Group');
+tblGUI_bar(tbl, 'yVar', 'pBspk', 'xVar', 'Group');
 
 tblGUI_raster(tbl, 'grpVar', 'Name', 'grpVal', 'ctrl1')
 
@@ -148,6 +153,34 @@ lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
     'lmeData', [], 'lmeStats', lmeStats, 'lmeMdl', lmeMdl)
 
 
+
+
+
+%% ========================================================================
+%  COLLAPSE PER FILE 
+%  ========================================================================
+
+
+cfg = mcu_cfg();
+
+% Variable names
+varsTbl = tbl.Properties.VariableNames;
+isNum = cellfun(@(x) isnumeric(tbl.(x)) && ~iscategorical(tbl.(x)), varsTbl);
+varsNum = varsTbl(isNum);
+
+% Select Units
+tblLme = tbl;
+tblLme(:, "UnitID") = [];
+tblLme(:, "uRcv") = [];
+
+% Baseline Table
+varsTbl = tblLme.Properties.VariableNames;
+tblLme = groupsummary(tblLme, {'Name', 'Group'}, 'mean', ...
+    vartype("numeric"));
+tblLme(:, "GroupCount") = [];
+tblLme.Properties.VariableNames = varsTbl;
+
+tblGUI_scatHist(tblLme, 'xVar', 'dim', 'yVar', 'Rcv', 'grpVar', 'Group');
 
 
 

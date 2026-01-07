@@ -66,7 +66,8 @@ xlsfile = dir(xlsname);
 if isempty(xlsfile)
     error('Excel file not found at: %s', xlsname);
 end
-sessionInfo = readtable(fullfile(xlsfile.folder, xlsfile.name), 'sheet', mname);
+sessionInfo = readtable(fullfile(xlsfile.folder, xlsfile.name), ...
+    'sheet', mname, 'VariableNamingRule', 'preserve');
 nrows = size(sessionInfo, 1);
 
 % Select rows based on conditions

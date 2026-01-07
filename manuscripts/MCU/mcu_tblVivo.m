@@ -1,4 +1,4 @@
-function [uTbl, basepaths, v] = mcu_tblVivo(varargin)
+function [tbl, basepaths, v] = mcu_tblVivo(varargin)
 
 % MCU_TBLVIVO Loads and processes unit data for the MCU project.
 %
@@ -8,9 +8,10 @@ function [uTbl, basepaths, v] = mcu_tblVivo(varargin)
 %   v            (struct) Pre-loaded data structure.
 %   varMap       (struct) Variable mapping for table creation.
 %   flgClean     (logical) Remove bad units and bac on / off.
+%   presets      (cell) List of data types to include ('swv', 'prc', 'frNet').
 %
 % OUTPUT:
-%   uTbl         (table) Unit table with metadata.
+%   Tbl          (table) Unit table with metadata.
 %
 
 %% ========================================================================
@@ -18,24 +19,96 @@ function [uTbl, basepaths, v] = mcu_tblVivo(varargin)
 %  ========================================================================
 
 p = inputParser;
-addOptional(p, 'basepaths', {}, @(x) iscell(x));
-addOptional(p, 'v', [], @isstruct);
-addOptional(p, 'varMap', [], @isstruct);
-addOptional(p, 'flgClean', false, @islogical);
+addParameter(p, 'basepaths', {}, @iscell);
+addParameter(p, 'v', [], @isstruct);
+addParameter(p, 'varMap', [], @isstruct);
+addParameter(p, 'flgClean', false, @islogical);
+addParameter(p, 'presets', {}, @iscell);
 
 parse(p, varargin{:});
 basepaths = p.Results.basepaths;
-v = p.Results.v;
-varMap = p.Results.varMap;
-flgClean = p.Results.flgClean;
+v         = p.Results.v;
+varMap    = p.Results.varMap;
+flgClean  = p.Results.flgClean;
+presets   = p.Results.presets;
 
-if isempty(basepaths)
-    basepaths = [mcu_basepaths('wt'), mcu_basepaths('mcu')];
-end
 
 %% ========================================================================
 %  LOAD DATA
 %  ========================================================================
+
+% Set varMap
+cfg = mcu_cfg;
+if isempty(varMap)
+    varMap = cfg.varMap;
+end
+vars = cfg.vars;
+
+% Presets
+if ismember('swv', presets)
+    vars = [vars, 'swv_metrics'];
+    varMap.wv_tp = 'swv.tp';
+    varMap.wv_asym = 'swv.asym';
+    varMap.wv_hpk = 'swv.hpk';
+end
+
+if ismember('brst', presets)
+    vars = [vars, 'brstStats'];
+    varMap.bRate     = 'stats.rate';
+    varMap.bDur      = 'stats.dur';
+    varMap.bFreq     = 'stats.freq';
+    varMap.bIBI      = 'stats.ibi';
+    varMap.pBspk     = 'stats.pBspk';
+    varMap.nBspk     = 'stats.nBspk';
+end
+
+if ismember('prc', presets)
+    vars = [vars, 'prc'];
+    varMap.PRC = 'prc.prc0_norm';
+end
+
+if ismember('frNet', presets)
+    vars = [vars, 'drift', 'frNet'];
+    varMap.drift = 'drft.drftExp';
+    varMap.dim   = 'frNet.dimExp';
+    varMap.mcc   = 'frNet.mccExp';
+    varMap.cc    = 'frNet.ccExp';
+end
+
+% Load
+if isempty(basepaths)
+    basepaths = [mcu_basepaths('wt'), mcu_basepaths('mcu')];
+end
+if isempty(v)
+    v = basepaths2vars('basepaths', basepaths, 'vars', vars);
+end
+
+% Post-process frNet expansion
+if ismember('frNet', presets) 
+    for iFile = 1:length(v)
+        if ~isfield(v(iFile), 'frNet') || isempty(v(iFile).frNet)
+            continue;
+        end
+
+        nUnits = length(v(iFile).units.type);
+        
+        % Expand Drift (take 1st chunk/index)
+        valDrft = v(iFile).drft.drate;
+        v(iFile).drft.drftExp = repmat(valDrft, nUnits, 1);
+
+        % Expand Dimensionality 
+        valDim = v(iFile).frNet.dim(1);
+        v(iFile).frNet.dimExp = repmat(valDim, nUnits, 1);
+
+        % Expand Mean Correlation
+        valMcc = v(iFile).frNet.mcc(1);
+        v(iFile).frNet.mccExp = repmat(valMcc, nUnits, 1);
+
+        % Compute Unit-Specific Correlation (mean of row in CC matrix)
+        ccMat = v(iFile).frNet.cc{1};
+        v(iFile).frNet.ccExp = mean(ccMat, 2, 'omitnan');
+    end
+end
 
 % Metadata
 tagFiles = struct();
@@ -43,19 +116,8 @@ tagFiles.Name = get_mname(basepaths);
 [~, fileNames] = fileparts(basepaths);
 tagFiles.File = fileNames;
 
-% Load
-cfg = mcu_cfg;
-if isempty(v)
-    v = basepaths2vars('basepaths', basepaths, 'vars', cfg.vars);
-end
-
-% Set varMap
-if isempty(varMap)
-    varMap = cfg.varMap;
-end
-
 % Table
-uTbl = v2tbl('v', v, 'varMap', varMap, 'tagAll',...
+tbl = v2tbl('v', v, 'varMap', varMap, 'tagAll',...
     struct(), 'tagFiles', tagFiles, 'idxCol', []);
 
 %% ========================================================================
@@ -63,36 +125,37 @@ uTbl = v2tbl('v', v, 'varMap', varMap, 'tagAll',...
 %  ========================================================================
 
 % Group metadata
-uTbl.Group = ones(height(uTbl), 1) * 1;
-uTbl.Group(ismember(uTbl.Name, cfg.miceMCU), :) = 2;
-uTbl.Group = categorical(uTbl.Group, [1, 2], cfg.lbl.grp);
+tbl.Group = ones(height(tbl), 1) * 1;
+tbl.Group(ismember(tbl.Name, cfg.miceMCU), :) = 2;
+tbl.Group = categorical(tbl.Group, [1, 2], cfg.lbl.grp);
 
 % Day metadata
-fileTbl = unique(uTbl(:, {'Name', 'File'}), 'rows');
+fileTbl = unique(tbl(:, {'Name', 'File'}), 'rows');
 fileGrp = findgroups(fileTbl.Name);
 dayCell = splitapply(@(x) {(1:numel(x))'}, fileTbl.File, fileGrp);
 fileTbl.Day = vertcat(dayCell{:});
-uTbl = join(uTbl, fileTbl, 'Keys', {'Name', 'File'});
-uTbl.Day = categorical(uTbl.Day, [1 : 7], cfg.lbl.day);
+tbl = join(tbl, fileTbl, 'Keys', {'Name', 'File'});
+tbl.Day = categorical(tbl.Day, [1 : 7], cfg.lbl.day);
 
 % Reorder columns
 varOrder = {'Group', 'Name', 'File', 'Day', 'UnitID', 'UnitType'};
-uTbl = movevars(uTbl, varOrder, 'Before', 1);
+tbl = movevars(tbl, varOrder, 'Before', 1);
 
 % Assert category order
-uTbl.Group = reordercats(uTbl.Group, cfg.lbl.grp);
-uTbl.UnitType = reordercats(uTbl.UnitType, cfg.lbl.unit);
-uTbl.Day = reordercats(uTbl.Day, cfg.lbl.day);
+tbl.Group = reordercats(tbl.Group, cfg.lbl.grp);
+tbl.UnitType = reordercats(tbl.UnitType, cfg.lbl.unit);
+tbl.Day = reordercats(tbl.Day, cfg.lbl.day);
+tbl.UnitID = categorical(tbl.UnitID);
 
 if flgClean
     % Remove bad units
-    uTbl(uTbl.UnitType == 'Other', :) = [];
-    uTbl.UnitType = removecats(uTbl.UnitType, 'Other');
+    tbl(tbl.UnitType == 'Other', :) = [];
+    tbl.UnitType = removecats(tbl.UnitType, 'Other');
 
     % Remove bac on / off
-    uTbl(uTbl.Day == 'BAC_ON', :) = [];
-    uTbl(uTbl.Day == 'BAC_OFF', :) = [];
-    uTbl.Day = removecats(uTbl.Day, {'BAC_ON', 'BAC_OFF'});
+    tbl(tbl.Day == 'BAC_ON', :) = [];
+    tbl(tbl.Day == 'BAC_OFF', :) = [];
+    tbl.Day = removecats(tbl.Day, {'BAC_ON', 'BAC_OFF'});
 end
 
 end     % EOF

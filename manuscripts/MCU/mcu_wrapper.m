@@ -1,0 +1,129 @@
+
+%% ========================================================================
+%  PER FILE ANALYSIS
+%  ========================================================================
+
+% get all files in study
+basepaths = mcu_basepaths('all');
+% basepaths = [mcu_basepaths('wt_bsl'), mcu_basepaths('mcu_bsl')];
+nFiles = length(basepaths);
+
+% vars
+vars = {'spikes', 'units'};
+
+% load state vars
+v = basepaths2vars('basepaths', basepaths, 'vars', vars);
+
+
+for iFile = 1 : nFiles
+    
+    % file
+    basepath = basepaths{iFile};
+    [~, basename] = fileparts(basepath);
+    cd(basepath)
+    
+    % Spktimes, maybe limit to unit type and vigilance state
+    spktimes = v(iFile).spikes.times;
+    % uType = v(iFile).units.type;
+    % spktimes = spktimes(uType == "RS");
+
+    % FR network stats during Baseline
+    % winBsl = [300, 315] * 60;
+    % frNet = fr_network(spktimes, 'flgSave', true, 'winLim', winBsl);
+    
+    % winLim = [0, Inf] * 60 * 60;
+    % drft = drift_file(spktimes, 'flgSave', true, 'winLim', winLim, ...
+    %     'binSize', 1200, 'winSize', [], 'flgPlot', true);
+    
+    % Burst detection
+    isiVal = 0.02;
+    brst = brst_detect(spktimes, ...
+        'minSpks', 3, ...
+        'isiStart', isiVal, ...
+        'isiEnd', isiVal * 2, ...
+        'minDur', 0.005, ...
+        'minIBI', 0.05, ...
+        'flgForce', true, 'flgSave', true, 'flgPlot', false);
+
+    % Burst statistics
+    stats = brst_stats(brst, spktimes, 'winCalc', [], ...
+        'flgSave', true);
+
+end
+
+
+%% ========================================================================
+%  LOAD
+%  ========================================================================
+
+% Grab only BSL and BAC3 (1st and 5th recording day)
+basepaths = [mcu_basepaths('wt'), mcu_basepaths('mcu')];
+fileMouse = findgroups(get_mname(basepaths));
+[~, idxMouse] = unique(fileMouse, 'stable');
+idxMouse = sort([idxMouse; idxMouse + 4]);
+basepaths = basepaths(idxMouse);
+
+presets = {'frNet', 'brst'};
+[tbl, basepaths, ~] = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
+tbl.Day(tbl.Day == "BAC_ON") = "BAC3";
+
+hFig = tblGUI_bar(tbl, 'xVar', 'Group', 'yVar', 'drift');
+tblGUI_scatHist(tbl, 'xVar', 'fr', 'yVar', 'pBspk', 'grpVar', 'Group');
+
+
+
+%% ========================================================================
+%  COLLAPSE UNIT TABLE BY DAY
+%  ========================================================================
+
+cfg = mcu_cfg();
+
+% Variable names
+varsTbl = tbl.Properties.VariableNames;
+isNum = cellfun(@(x) isnumeric(tbl.(x)) && ~iscategorical(tbl.(x)), varsTbl);
+varsNum = varsTbl(isNum);
+
+% Select Units
+tblRs = tbl(tbl.UnitType == "RS", :);
+tblRs(:, "UnitID") = [];
+tblRs(:, "File") = [];
+tblRs(:, "UnitType") = [];
+
+% Baseline Table
+tblBsl = tblRs(tblRs.Day == "BSL", :);
+varsTbl = tblBsl.Properties.VariableNames;
+tblBsl = groupsummary(tblBsl, {'Group', 'Name', 'Day'}, 'mean', ...
+    vartype("numeric"));
+tblBsl(:, "GroupCount") = [];
+tblBsl.Properties.VariableNames = varsTbl;
+
+% SteadyState Table
+tblSs = tblRs(tblRs.Day == "BAC3", :);
+tblSs = groupsummary(tblSs, {'Group', 'Name', 'Day'}, 'mean', ...
+    vartype("numeric"));
+tblSs(:, "GroupCount") = [];
+tblSs.Properties.VariableNames = varsTbl;
+
+% FR Recovery
+tblLme = tblBsl;
+tblLme.Rcv = (tblSs.FR ./ tblBsl.FR) * 100;
+
+
+
+
+
+%% ========================================================================
+%  REGRESSION
+%  ========================================================================
+
+tblGUI_scatHist(tblLme, 'xVar', 'dim', 'yVar', 'Rcv', 'grpVar', 'Group');
+
+
+nFolds = height(tblLme) - 2;
+nReps = 4;
+
+% Recovery
+varsFxd  = {'drift', 'dim', 'bRoy', 'FR', 'Group'};
+frml = sprintf('Rcv ~ %s', strjoin(varsFxd, ' + '));
+res = lme_ablation(tblLme, frml, 'nFolds', nFolds, 'nReps', nReps);
+mdl = lme_analyse(tblLme, frml);

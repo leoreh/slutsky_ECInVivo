@@ -1,58 +1,75 @@
-function drft = drift_plot(drft, axh)
-
-% plots PV correlations and drift. see drift_calc
+function drift_plot(drft, ax)
+% DRIFT_PLOT Plots population drift statistics.
 %
-% INPUT:
-%   drift           struct. see drift_calc
-%   axh             axis handle. if empty will create new figure
+%   DRIFT_PLOT(DRFT, AX) plots the correlation decay over time lags,
+%   overlaid with the linear fit.
 %
-% DEPENDENCIES:
-%   none
+%   INPUTS:
+%       drft        - (struct) Output from drift_calc.m
+%       ax          - (axes) Optional axes handle.
 %
-% 22 may 24 LH      based on Lee's code
+%   See also: DRIFT_CALC, FR_NETWORK
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% preparations
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ========================================================================
+%  ARGUMENTS
+%  ========================================================================
 
-if nargin < 2
-    axh = [];
+if nargin < 2 || isempty(ax)
+    figure('Color', 'w', 'Name', 'Drift Analysis');
+    ax = gca;
 end
 
-if isempty(axh)
-    setMatlabGraphics(true)
-    fh = figure;
-    set(fh, 'WindowState', 'maximized');
-    tlayout = [1, 2];
-    th = tiledlayout(tlayout(1), tlayout(2));
-    th.TileSpacing = 'tight';
-    th.Padding = 'none';
-    set(fh, 'DefaultAxesFontSize', 16);
+%% ========================================================================
+%  PLOT
+%  ========================================================================
+
+% Prepare Data
+m_corr = drft.m_corr;
+dt_corr = drft.dt_corr;
+lin_coef = drft.lin_coef;
+xVal = 1:length(m_corr);
+
+hold(ax, 'on');
+
+% 1. Plot Individual Correlations (Grey Dots)
+% -------------------------------------------
+% Unwrap cell array for plotting
+for i = 1:length(dt_corr)
+    vals = dt_corr{i};
+    if ~isempty(vals)
+        plot(ax, repmat(i, size(vals)), vals, '.', ...
+            'Color', [0.7 0.7 0.7], 'MarkerSize', 8);
+    end
 end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% plot
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 2. Plot Mean Correlation (Black Dots)
+% -------------------------------------
+plot(ax, xVal, m_corr, 'o', ...
+    'MarkerFaceColor', 'k', 'MarkerEdgeColor', 'w', 'MarkerSize', 8);
 
-xval = [1 : length(drft.m_corr)];
-
-hold on
-plot(xval, drft.dt_corr, '.', 'Color', [.5 .5 .5]);
-plot(xval, drft.m_corr, '.k', 'MarkerSize', 15);
-plot(xval, drft.lin_coef(2) + drft.lin_coef(1) * xval,'b');
-
-xticks([1 : 3600 / drft.info.winsize : xval(end)]);
-xticklabels(1 : xval(end)); 
-
-title(sprintf('%Drift Rate = %.3f', drft.drate),...
-    'interpreter', 'none', 'FontSize', 20);
-xlabel(sprintf('\x394 Time [h]'))
-ylabel('PV correlation');
-axis tight
-
-
-
+% 3. Plot Linear Fit (Red Line)
+% -----------------------------
+if ~isempty(lin_coef) && ~any(isnan(lin_coef))
+    yFit = polyval(lin_coef, xVal);
+    plot(ax, xVal, yFit, '-', 'Color', '#D95319', 'LineWidth', 2);
 end
 
-% EOF
+% Aesthetics
+% ----------
+grid(ax, 'on');
+set(ax, 'Box', 'off', 'TickDir', 'out', 'LineWidth', 1.2, 'FontSize', 12);
 
+xlabel(ax, 'Time Lag (Windows)');
+ylabel(ax, 'PV Correlation');
+
+titleStr = 'Population Drift';
+if ~isempty(drft.drate)
+    titleStr = sprintf('Drift Rate: %.4f / win', drft.drate);
+end
+title(ax, titleStr, 'FontWeight', 'bold');
+
+ylim(ax, [0 1.05]);
+xlim(ax, [0.5, length(m_corr) + 0.5]);
+
+
+end     % EOF

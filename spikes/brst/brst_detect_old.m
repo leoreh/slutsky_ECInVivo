@@ -92,125 +92,105 @@ brst.params   = params;
 %  COMPUTE LOOP
 %  ========================================================================
 
-% Initialize parallel pool if needed
-if isempty(gcp('nocreate'))
-    parpool('local', 6);
-end
-dq = parallel.pool.DataQueue;
-afterEach(dq, @(msg) fprintf('%s\n', msg));
-
-% Temporary cell arrays for parfor slicing
-bTimes    = cell(nUnits, 1);
-bNspks    = cell(nUnits, 1);
-bDur      = cell(nUnits, 1);
-bFreq     = cell(nUnits, 1);
-bIbi      = cell(nUnits, 1);
-bSpktimes = cell(nUnits, 1);
-
-parfor iUnit = 1 : nUnits
+for iUnit = 1 : nUnits
 
     st = spktimes{iUnit};
-
-    % Ensure column vector 
-    st = st(:);
-    nSpk = length(st);
-    isi = diff(st);
-    
-    % Identify intervals smaller than isiEnd
-    isEnd = isi <= isiEnd;
-
-    % Skip if not enough spikes
-    if isempty(st) || length(st) < minSpks || ~any(isEnd)
+    if isempty(st) || length(st) < minSpks
         continue;
     end
+
+    % Ensure column vector
+    st = st(:);
+    isi = diff(st);
+    nBspk = length(st);
 
     % ---------------------------------------------------------------------
     % Burst Detection
     % ---------------------------------------------------------------------
 
-    % Find connected components (potential bursts)
-    % Pad with 0 to detect edges
-    edges = diff([0; isEnd; 0]);
+    bspkIdx = [];
+    inBurst = false;
+    iStart = -1;
 
-    % Start indices (in isi vector)
-    bStartIsi = find(edges == 1);
-    % End indices (in isi vector)
-    bEndIsi   = find(edges == -1) - 1;
-
-    nPot = length(bStartIsi);
-    validStarts = false(nPot, 1);
-
-    % Refine start times: Must start with isi <= isiStart
-    % Trim leading ISIs in the group that are > isiStart
-    for iPot = 1:nPot
-        idxStart = bStartIsi(iPot);
-        idxEnd   = bEndIsi(iPot);
-
-        % Find first ISI in this group that meets Start criteria
-        % Indices relative to the group
-        chunk   = isi(idxStart:idxEnd);
-        validIs = find(chunk <= isiStart, 1, 'first');
-
-        if ~isempty(validIs)
-            % Update start index to the first valid start ISI
-            bStartIsi(iPot) = idxStart + validIs - 1;
-            validStarts(iPot) = true;
+    iSpk = 1;
+    while iSpk < nBspk
+        if ~inBurst
+            % Start criteria
+            if isi(iSpk) <= isiStart
+                inBurst = true;
+                iStart = iSpk;
+                iSpk = iSpk + 1;
+            else
+                iSpk = iSpk + 1;
+            end
+        else
+            % Continuation criteria
+            if isi(iSpk) <= isiEnd
+                iSpk = iSpk + 1;
+            else
+                % End of burst
+                bspkIdx = [bspkIdx; iStart, iSpk]; 
+                inBurst = false;
+                iSpk = iSpk + 1;
+            end
         end
     end
 
-    bStartIsi = bStartIsi(validStarts);
-    bEndIsi   = bEndIsi(validStarts);
-
-    if isempty(bStartIsi)
-        continue;
+    % Close last burst if active
+    if inBurst
+        bspkIdx = [bspkIdx; iStart, nBspk]; 
     end
 
-    % Convert ISI indices to Spike indices
-    % If ISI k is the start, then Spike k is the first spike of the burst.
-    % If ISI m is the end, then Spike m+1 is the last spike of the burst.
-    spkStart = bStartIsi;
-    spkEnd   = bEndIsi + 1;
+    if isempty(bspkIdx)
+        continue;
+    end
 
     % ---------------------------------------------------------------------
     % Merge Bursts
     % ---------------------------------------------------------------------
 
+    mrgIdx = [];
+    prevStart = bspkIdx(1, 1);
+    prevEnd   = bspkIdx(1, 2);
+    for ib = 2:size(bspkIdx, 1)        
+        currStart = bspkIdx(ib, 1);
+        currEnd   = bspkIdx(ib, 2);
 
-    % Calculate IBIs: Time diff between Start of Next and End of Curr
-    tEnd   = st(spkEnd(1:end-1));
-    tStart = st(spkStart(2:end));
-    currIbi = tStart - tEnd;
+        % IBI: Time between end of previous and start of next
+        tEnd   = st(prevEnd);
+        tStart = st(currStart);
+        currIbi = tStart - tEnd;
 
-    shouldMerge = currIbi < minIbi;
-
-    if any(shouldMerge)
-        % Identify groups of bursts to merge
-
-        % Keep a start if it is the first one (idx 1) OR the previous merge was false.
-        keepStart = [true; ~shouldMerge];
-
-        % Keep an end if it is the last one (idx end) OR the next merge is false.
-        keepEnd   = [~shouldMerge; true];
-
-        spkStart = spkStart(keepStart);
-        spkEnd   = spkEnd(keepEnd);
+        if currIbi < minIbi
+            % Merge
+            prevEnd = currEnd;
+        else
+            % Commit & Start New
+            mrgIdx = [mrgIdx; prevStart, prevEnd]; 
+            prevStart = currStart;
+            prevEnd   = currEnd;
+        end
     end
+    mrgIdx = [mrgIdx; prevStart, prevEnd];
 
     % ---------------------------------------------------------------------
     % Filter (Duration & nSpikes)
     % ---------------------------------------------------------------------
 
-    dur = st(spkEnd) - st(spkStart);
-    n   = spkEnd - spkStart + 1;
+    finIdx = [];
+    for ib = 1:size(mrgIdx, 1)
+        currStart = mrgIdx(ib, 1);
+        currEnd = mrgIdx(ib, 2);
 
-    isVld = (n >= minSpks) & (dur >= minDur);
+        n = currEnd - currStart + 1;
+        d = st(currEnd) - st(currStart);
 
-    spkStart = spkStart(isVld);
-    spkEnd   = spkEnd(isVld);
-    dur      = dur(isVld);
-    n        = n(isVld);
+        if n >= minSpks && d >= minDur
+            finIdx = [finIdx; currStart, currEnd]; 
+        end
+    end
 
-    if isempty(spkStart)
+    if isempty(finIdx)
         continue;
     end
 
@@ -218,67 +198,40 @@ parfor iUnit = 1 : nUnits
     % Collect Statistics
     % ---------------------------------------------------------------------
 
-    nb = length(spkStart);
+    nb = size(finIdx, 1);
+    bTimes = zeros(nb, 2);
+    bNspks = zeros(nb, 1);
+    bDur   = zeros(nb, 1);
+    bFreq  = zeros(nb, 1);
+    bIbi   = nan(nb, 1);
+    bSt    = [];
 
-    % Frequency
-    freq = n ./ dur;
-
-    % Pre-burst IBI
-    % By definition, the first burst has NaN IBI if we look at previous burst
-    ibiVal = nan(nb, 1);
-    if nb > 1
-        tS = st(spkStart(2:end));
-        tE = st(spkEnd(1:end-1));
-        ibiVal(2:end) = tS - tE;
-    end
-
-    % Times
-    timesVal = [st(spkStart), st(spkEnd)];
-
-    % Collect all spikes in bursts (Vertical concatenation of chunks)
-    % Efficient way:
-    % index list.
-    % We want to extract st(spkStart(i):spkEnd(i)) for all i.
-    % Since spkStart/End are indices, we can generate a global index vector.
-
-    % Create range indices
-    % E.g. starts=[1, 10], ends=[3, 12]. len=[3, 3].
-    % We want [1,2,3, 10,11,12].
-
-    % Use run-length decoding trick or simple loop (loop is fine for this part)
-    % But let's be vectorized if possible.
-    % cumLen = [0; cumsum(n)];
-    % idx = zeros(cumLen(end), 1);
-    % ... this is getting complicated for little gain over a simple cat loop.
-    % Actually, since we are inside parfor, this simple loop is fast enough.
-
-    bSpks = cell(nb, 1);
     for ib = 1:nb
-        bSpks{ib} = st(spkStart(ib):spkEnd(ib));
-    end
-    bSpks = vertcat(bSpks{:});
+        currStart = finIdx(ib, 1);
+        currEnd = finIdx(ib, 2);
 
-    % Store in temps
-    bTimes{iUnit}    = timesVal;
-    bNspks{iUnit}    = n;
-    bDur{iUnit}      = dur;
-    bFreq{iUnit}     = freq;
-    bIbi{iUnit}      = ibiVal;
-    bSpktimes{iUnit} = bSpks;
+        bTimes(ib, :) = [st(currStart), st(currEnd)];
+        bNspks(ib)    = currEnd - currStart + 1;
+        bDur(ib)      = st(currEnd) - st(currStart);
+        bFreq(ib)     = bNspks(ib) / bDur(ib);
 
-    % Periodic update
-    if mod(iUnit, 5) == 0
-        send(dq, sprintf('Processed Unit %d / %d', iUnit, nUnits));
+        bChunk = st(currStart:currEnd);
+        bSt = [bSt; bChunk]; 
     end
+
+    % IBI Calculation
+    if nb > 1
+        bIbi(2:end) = bTimes(2:end, 1) - bTimes(1:end-1, 2);
+    end
+
+    brst.times{iUnit}    = bTimes;
+    brst.nBspk{iUnit}    = bNspks;
+    brst.dur{iUnit}      = bDur;
+    brst.freq{iUnit}     = bFreq;
+    brst.ibi{iUnit}      = bIbi;
+    brst.spktimes{iUnit} = bSt;
+
 end
-
-% Assign back to structure
-brst.times    = bTimes;
-brst.nBspk    = bNspks;
-brst.dur      = bDur;
-brst.freq     = bFreq;
-brst.ibi      = bIbi;
-brst.spktimes = bSpktimes;
 
 
 %% ========================================================================

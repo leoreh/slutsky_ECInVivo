@@ -40,22 +40,21 @@ flgPlot = p.Results.flgPlot;
 %  PRE-PROCESSING
 %  ========================================================================
 
-% Remove silent neurons (rows with no activity)
+% Remove silent neurons (rows with no activity) for calculation
+% But keep track of indices to maintain output size
+nUnits = size(Y, 1);
 mY = mean(Y, 2);
-silentIdx = mY == 0;
-Y(silentIdx, :) = [];
-
-[nUnits, ~] = size(Y);
+validIdx = mY > 0;
 
 % Safety check
-if nUnits < 2
+if sum(validIdx) < 2
     mcc = NaN;
-    cc = [];
+    cc = nan(nUnits, nUnits);
     return;
 end
 
-% zscore(Y, 0, 2) operates along the second dimension (time)
-Z = zscore(Y, 0, 2);
+% zscore only valid units
+Z = zscore(Y(validIdx, :), 0, 2);
 
 
 %% ========================================================================
@@ -64,9 +63,15 @@ Z = zscore(Y, 0, 2);
 
 % cov expects observations in rows and variables in columns.
 % We want correlation between neurons (variables), so transpose.
-cc = cov(Z');
-cc = cc - diag(diag(cc));
-mcc = mean(cc(:));
+ccValid = cov(Z');
+ccValid = ccValid - diag(diag(ccValid));
+
+% Calculate mean correlation from the valid sub-matrix
+mcc = mean(ccValid(:));
+
+% Reconstruct full matrix
+cc = nan(nUnits, nUnits);
+cc(validIdx, validIdx) = ccValid;
 
 
 %% ========================================================================
@@ -74,26 +79,18 @@ mcc = mean(cc(:));
 %  ========================================================================
 
 if flgPlot
-    plot_corr(cc, mcc);
+    figure;
+    imagesc(cc);
+    colorbar;
+    axis square;
+    title(['Mean Corr: ' num2str(mcc, '%.3f')]);
+    xlabel('Neuron ID');
+    ylabel('Neuron ID');
+    set(gca, 'TickDir', 'out');
 end
 
 end     % EOF
 
-
-function plot_corr(cc, mcc)
-
-figure;
-imagesc(cc);
-colorbar;
-axis square;
-title(['Mean Corr: ' num2str(mcc, '%.3f')]);
-xlabel('Neuron ID');
-ylabel('Neuron ID');
-
-% Improve aesthetics if desired
-set(gca, 'TickDir', 'out');
-
-end
 
 
 %% ========================================================================

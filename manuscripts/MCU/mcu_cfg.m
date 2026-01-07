@@ -13,29 +13,17 @@ cfg.clr.unit = [0.1, 0.1, 0.4;...   % RS
     0.5, 0.5, 0.5];                 % Other
 
 % Variables to load
-% cfg.vars = {'fr', 'units', 'st_metrics', 'st_brst'};
-cfg.vars = {'fr', 'units', 'st_metrics', 'swv_metrics', 'prc'};
+cfg.vars = {'fr', 'units', 'st_metrics'};
 
 % Variable mapping
 cfg.varMap.FR = 'fr.mfr';
-cfg.varMap.BRoy = 'st.royer';
-cfg.varMap.BLidor = 'st.lidor';
-% cfg.varMap.BMiz = 'st.mizuseki';
-% cfg.varMap.BSpks = 'brst.bspks';
+cfg.varMap.bRoy = 'st.royer';
 cfg.varMap.UnitType = 'units.type';
-cfg.varMap.TP = 'swv.tp';
-cfg.varMap.Asym = 'swv.asym';
-cfg.varMap.Hpk = 'swv.hpk';
-cfg.varMap.PRC = 'prc.prc0_norm';
-cfg.varMap.PRCz = 'prc.prc0_z';
 
 % Labels
 cfg.lbl.grp = {'Control'; 'MCU-KO'};
 cfg.lbl.unit = {'RS', 'FS', 'Other'};
 cfg.lbl.day = {'BSL'; 'BAC_ON'; 'BAC1'; 'BAC2'; 'BAC3'; 'BAC_OFF'; 'WASH'};
-
-% remove bac on and off
-cfg.idxRm = [2, 6];
 
 % Save figures path
 cfg.savepath = 'D:\OneDrive - Tel-Aviv University\PhD\Slutsky\Manuscripts\Heim2025\Graphs';
