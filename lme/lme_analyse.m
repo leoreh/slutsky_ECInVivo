@@ -45,7 +45,7 @@ addParameter(p, 'dist', '', @ischar);
 addParameter(p, 'contrasts', 'all');
 addParameter(p, 'correction', 'holm', @ischar);
 addParameter(p, 'dfMethod', 'Satterthwaite', @ischar);
-parse(p, lmeTbl, frml, varargin{:});
+parse(p, tbl, frml, varargin{:});
 
 dist = p.Results.dist;
 frml = char(frml);
@@ -60,7 +60,7 @@ lmeInfo.distInput = dist;
 %  ========================================================================
 
 % Vars
-[varsFxd, respVar, varsRnd] = lme_frml2vars(frml);
+[varsFxd, varResp, varsRnd] = lme_frml2vars(frml);
 
 % Extract actual grouping variables from random effect terms (e.g., '(1|Name)' -> 'Name')
 varsGrp = {};
@@ -73,7 +73,7 @@ end
 varsGrp = unique(varsGrp);
 
 % Truncate Table
-vars = unique([respVar; varsFxd; varsGrp]);
+vars = unique([{varResp}, varsFxd, varsGrp]);
 lmeTbl = tbl(:, vars);
 
 % PREDICTOR TRANSFORMATION
@@ -101,17 +101,28 @@ warning('off', wMsg);
 if isempty(dist)
     fprintf('[LME_ANALYSE] Auto-selecting distribution...\n');
 
-    parkStats = lme_parkTest(lmeTbl, frml);
-    compStats = lme_compareDists(lmeTbl, frml);
+    % Check for Binomial (Binary) Response
+    uResp = unique(lmeTbl.(varResp));
+    isBinomial = islogical(lmeTbl.(varResp)) || ...
+        (length(uResp) == 2 && all(ismember(uResp, [0, 1])));
 
-    % Pick best model (lowest AIC)
-    bestModel = compStats.Model{1};
-    fprintf('[LME_ANALYSE] Selected: %s (AIC diff to 2nd: %.1f)\n', ...
-        bestModel, compStats.AIC(2) - compStats.AIC(1));
+    if isBinomial
+        fprintf('[LME_ANALYSE] Detected Binary Response -> Distribution: Binomial\n');
+        dist = 'Binomial';
+    else
 
-    dist = bestModel;
-    lmeInfo.compStats = compStats;
-    lmeInfo.parkStats = parkStats;
+        parkStats = lme_parkTest(lmeTbl, frml);
+        compStats = lme_compareDists(lmeTbl, frml);
+
+        % Pick best model (lowest AIC)
+        bestModel = compStats.Model{1};
+        fprintf('[LME_ANALYSE] Selected: %s (AIC diff to 2nd: %.1f)\n', ...
+            bestModel, compStats.AIC(2) - compStats.AIC(1));
+
+        dist = bestModel;
+        lmeInfo.compStats = compStats;
+        lmeInfo.parkStats = parkStats;
+    end
 end
 
 lmeInfo.distSelected = dist;
@@ -127,7 +138,7 @@ switch lower(dist)
     case 'log-normal'
         % Transform: Log(y), Dist: Normal
         fprintf('[LME_ANALYSE] Transforming Response: Log-Normal -> Log(Y)\n');
-        lmeTbl = tbl_transform(lmeTbl, 'varsInc', {respVar}, ...
+        lmeTbl = tbl_transform(lmeTbl, 'varsInc', {varResp}, ...
             'logBase', 'e', ...
             'verbose', true);
         dist = 'Normal';
@@ -135,14 +146,14 @@ switch lower(dist)
     case 'logit-normal'
         % Transform: Logit(y), Dist: Normal
         fprintf('[LME_ANALYSE] Transforming Response: Logit-Normal -> Logit(Y)\n');
-        lmeTbl = tbl_transform(lmeTbl, 'varsInc', {respVar}, ...
+        lmeTbl = tbl_transform(lmeTbl, 'varsInc', {varResp}, ...
             'logBase', 'logit', ...
             'verbose', true);
         dist = 'Normal';
 
     case {'gamma', 'poisson', 'inversegaussian'}
         fprintf('[LME_ANALYSE] Zero-inflation detected for %s. Adding offset.\n', dist);
-        lmeTbl = tbl_transform(lmeTbl, 'varsInc', {respVar}, ...
+        lmeTbl = tbl_transform(lmeTbl, 'varsInc', {varResp}, ...
             'flg0', true, 'verbose', true);
 end
 
@@ -197,9 +208,9 @@ end     % EOF
 %     - Order of Magnitude: A change of 1 on the log10 scale represents a
 %       ten-fold increase in the raw units.
 %     - Interpretation: Unlike natural logs, beta coefficients are not directly
-%       interpretable as percentage changes; a 0.01 shift corresponds to a 
+%       interpretable as percentage changes; a 0.01 shift corresponds to a
 %       2.3% increase, making mental approximation less intuitive.
-% 
+%
 %  3. Technical Selection in LME:
 %     If the goal is to satisfy the assumption of normality for `fitlme`,
 %     base e is the technically superior choice because it aligns with the

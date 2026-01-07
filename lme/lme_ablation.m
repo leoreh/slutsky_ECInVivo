@@ -1,32 +1,34 @@
-function res = lme_ablation(tbl, frml, lmeCfg, varargin)
+function res = lme_ablation(tbl, frml, varargin)
 % LME_ABLATION Performs feature ablation analysis on a LME/GLME model.
 %
-%   RES = LME_ABLATION(TBL, FRML, LMECFG, ...)
-%   Performs repeated stratified cross-validation to rank feature importance
-%   by iteratively removing predictors from the model formula and measuring
-%   the drop in performance (Balanced Accuracy and AUC).
+%   RES = LME_ABLATION(TBL, FRML, ...)
+%   Performs repeated cross-validation to rank feature importance by
+%   iteratively removing predictors from the model formula and measuring the
+%   drop in performance.
+%
+%   MODES:
+%       - Classification (Binomial): Uses Balanced Accuracy & AUC.
+%       - Regression (Continuous): Uses RMSE & R-Squared.
 %
 % INPUTS:
-%   tbl             (Required) Table: Data for the model.
+%   tbl             (Required) Table: Raw data table.
 %   frml            (Required) Char: Full model formula.
-%   lmeCfg          (Optional) Struct: Configuration options.
-%                     .dist - Distribution (default 'Binomial').
 %   ...             (Optional) Name-Value Pairs:
+%                     'dist'    - Distribution (default auto-select).
 %                     'nFolds'  - Number of CV folds (default 5).
 %                     'nReps'   - Number of CV repetitions (default 5).
 %                     'flgPlot' - Plot results (default true).
 %
 % OUTPUTS:
 %   res             Struct containing:
-%                     .acc       - Matrix (nTotal x nVars+1) of Bal. Acc.
-%                     .auc       - Matrix (nTotal x nVars+1) of AUCs.
-%                     .roc       - Cell array (nVars+1) of ROC curves.
-%                     .varsAb    - List of ablated variables (1st is 'None').
-%                     .impMat    - Matrix of Delta Balanced Accuracy.
-%                     .impMatAUC - Matrix of Delta AUC.
+%                     .vars     - List of models (Full, No Var1, ...).
+%                     .perfPrim - Matrix of primary metric (BACC or RMSE).
+%                     .perfSec  - Matrix of secondary metric (AUC or R2).
+%                     .impPrim  - Delta Primary Metric.
+%                     .vif      - Variance Inflation Factors.
 %
 % DEPENDENCIES:
-%   lme_frml2vars, cvpartition, fitglme, predict, perfcurve.
+%   lme_fit, lme_frml2vars, cvpartition.
 
 %% ========================================================================
 %  INPUT PARSING
@@ -34,22 +36,36 @@ function res = lme_ablation(tbl, frml, lmeCfg, varargin)
 p = inputParser;
 addRequired(p, 'tbl', @istable);
 addRequired(p, 'frml', @ischar);
-addOptional(p, 'lmeCfg', struct());
+addParameter(p, 'dist', '', @ischar);
 addParameter(p, 'nFolds', 5, @isnumeric);
 addParameter(p, 'nReps', 5, @isnumeric);
 addParameter(p, 'flgPlot', true, @islogical);
-parse(p, tbl, frml, lmeCfg, varargin{:});
+parse(p, tbl, frml, varargin{:});
 
+distInput = p.Results.dist;
 nFolds = p.Results.nFolds;
 nReps = p.Results.nReps;
 flgPlot = p.Results.flgPlot;
 
-% Extract Dist
-if isfield(lmeCfg, 'dist') && ~isempty(lmeCfg.dist)
-    dist = lmeCfg.dist;
+% Run LME_ANALYSE to prepare data and select distribution
+fprintf('[LME_ABLATION] Running initial analysis to prepare data...\n');
+[~, ~, lmeInfo, lmeTbl] = lme_analyse(tbl, frml, 'dist', distInput);
+dist = lmeInfo.distFinal;
+
+% Determine Mode
+isBinomial = strcmpi(dist, 'Binomial');
+if isBinomial
+    metricPrim = 'Balanced Accuracy';
+    metricSec  = 'AUC';
+    modeStr = 'Classification';
 else
-    dist = 'Binomial'; % Default context
+    metricPrim = 'RMSE';
+    metricSec  = 'R-Squared';
+    modeStr = 'Regression';
 end
+
+fprintf('[LME_ABLATION] Mode: %s (Dist: %s)\n', modeStr, dist);
+
 
 %% ========================================================================
 %  PREPARATION
@@ -58,71 +74,73 @@ end
 % Extract variables from formula
 [varsFxd, varRsp, varsRand] = lme_frml2vars(frml);
 
-% Extract Random Effects (Generic)
+% Extract Random Effects String
 if isempty(varsRand)
     randStr = '';
 else
     randStr = [' + ' strjoin(varsRand, ' + ')];
 end
 
-% Add 'None' to denote the Full Model (no ablation)
-% varsIter will be our column mapping: [Full Model, No Var1, No Var2, ...]
+% varsIter: [Full Model, No Var1, No Var2, ...]
 varsIter = [{'None'}, varsFxd];
-
-% Common Grid for ROC Interpolation
-xGrid = linspace(0, 1, 100);
 
 % Storage
 nTotal = nReps * nFolds;
-nVars  = length(varsFxd);       % Number of actual predictors
-nCols  = length(varsIter);      % Columns = Full + nVars
+nCols  = length(varsIter);
 
-res.vars  = varsIter;           % Column Labels
-res.acc   = nan(nTotal, nCols); % Balanced Accuracy
-res.auc   = nan(nTotal, nCols); % AUC
-res.roc   = cell(nCols, 1);     % ROC Curves (interpolated)
+res.vars   = varsIter;
+res.perfPrim = nan(nTotal, nCols); % BACC or RMSE
+res.perfSec  = nan(nTotal, nCols); % AUC or R2
+res.roc    = cell(nCols, 1);     % ROC (Binomial only)
+xGrid      = linspace(0, 1, 100); % Common grid for ROC
 
 for iCol = 1:nCols
     res.roc{iCol} = nan(nTotal, length(xGrid));
 end
 
-% Initialize Stratified Partition
-cvp = cvpartition(tbl.(varRsp), 'KFold', nFolds, 'Stratify', true);
+% Initialize CV Partition
+if isBinomial
+    cvp = cvpartition(lmeTbl.(varRsp), 'KFold', nFolds, 'Stratify', true);
+else
+    cvp = cvpartition(height(lmeTbl), 'KFold', nFolds);
+end
+
 
 %% ========================================================================
 %  VIF (COLLINEARITY)
 %  ========================================================================
 
-% Filter: Select only numeric variables from the predictor list
-isNum = varfun(@isnumeric, tbl(:, varsFxd), 'OutputFormat', 'uniform');
+% Calculate VIF on transformed predictors
+isNum = varfun(@isnumeric, lmeTbl(:, varsFxd), 'OutputFormat', 'uniform');
 varsVif = varsFxd(isNum);
 
 if isempty(varsVif)
     res.vif = table();
 else
-    % Extract data matrix
-    X = table2array(tbl(:, varsVif));
+    X = table2array(lmeTbl(:, varsVif));
+    R = corrcoef(X, 'Rows', 'pairwise');
 
-    % Correlation matrix
-    R = corrcoef(X);
+    % Handle singular matrix
+    if rcond(R) < 1e-12
+        vifVal = nan(1, length(varsVif));
+        warning('Predictors are perfectly collinear. VIF calculation skipped.');
+    else
+        vifVal = diag(inv(R))';
+    end
 
-    % VIF = diagonal of inverse correlation matrix
-    vifVal = diag(inv(R))';
-
-    % Store
     res.vif = table(varsVif(:), vifVal(:), 'VariableNames', {'Predictor', 'VIF'});
 end
+
 
 %% ========================================================================
 %  ABLATION LOOP
 %  ========================================================================
 
-fprintf('Starting Ablation Analysis (%d Reps, %d Folds)...\n', nReps, nFolds);
+fprintf('Starting Ablation (%d Reps, %d Folds)...\n', nReps, nFolds);
 
 cnt = 0;
 for iRep = 1 : nReps
 
-    % Re-partition for new random splits (after first rep)
     if iRep > 1
         cvp = repartition(cvp);
     end
@@ -130,70 +148,101 @@ for iRep = 1 : nReps
     for iFold = 1 : nFolds
         cnt = cnt + 1;
 
-        tblTrn = tbl(training(cvp, iFold), :);
-        tblTst = tbl(test(cvp, iFold), :);
+        trainIdx = training(cvp, iFold);
+        testIdx  = test(cvp, iFold);
+
+        tblTrn = lmeTbl(trainIdx, :);
+        tblTst = lmeTbl(testIdx, :);
         yTrue  = tblTst.(varRsp);
 
-        % Iterate: Full Model first (iVar=1), then remove each variable
+        % Iterate Models
         for iVar = 1 : length(varsIter)
 
-            varRem = varsIter{iVar}; % Variable to remove ('None' = Full)
+            varRem = varsIter{iVar};
 
             % Construct Formula
-            % Remove current variable from list
             varsCurr = varsFxd;
-            varsCurr(strcmp(varsCurr, varRem)) = [];
-            % Rebuild formula: Response ~ Fixed + Random
-            currFrml = sprintf('%s ~ %s%s', varRsp, strjoin(varsCurr, ' + '), randStr);
+            if ~strcmp(varRem, 'None')
+                varsCurr(strcmp(varsCurr, varRem)) = [];
+            end
 
-            % Fit Model
-            mdl = fitglme(tblTrn, currFrml, 'Distribution', dist);
+            if isempty(varsCurr)
+                currFrml = sprintf('%s ~ 1%s', varRsp, randStr);
+            else
+                currFrml = sprintf('%s ~ %s%s', varRsp, strjoin(varsCurr, ' + '), randStr);
+            end
 
-            % Predict
+            % Fit Model (Use lme_fit)
+            mdl = lme_fit(tblTrn, currFrml, 'dist', dist);
             yProb = predict(mdl, tblTst);
-            
-            % Metrics: AUC & ROC
-            [x, y, T, aucCurr] = perfcurve(yTrue, yProb, 1);
 
-            % Find Youden's Index (J = Sensitivity + Specificity - 1)
-            J = y - x;
-            [~, idxJ] = max(J);
-            optThresh = T(idxJ);
+            if isBinomial
+                % --- CLASSIFICATION METRICS ---
+                [x, y, T, aucCurr] = perfcurve(yTrue, yProb, 1);
 
-            % Apply Optimal Threshold
-            yPred = double(yProb >= optThresh);
+                % Optimal Threshold (Youden)
+                J = y - x;
+                [~, idxJ] = max(J);
+                optThresh = T(idxJ);
+                yPred = double(yProb >= optThresh);
 
-            % Metrics: Balanced Accuracy (at Optimal Threshold)
-            tp = sum(yTrue == 1 & yPred == 1);
-            tn = sum(yTrue == 0 & yPred == 0);
-            sens = tp / max(sum(yTrue == 1), eps);
-            spec = tn / max(sum(yTrue == 0), eps);
-            accCurr = mean([sens, spec]);
+                % Balanced Accuracy
+                tp = sum(yTrue == 1 & yPred == 1);
+                tn = sum(yTrue == 0 & yPred == 0);
+                sens = tp / max(sum(yTrue == 1), eps);
+                spec = tn / max(sum(yTrue == 0), eps);
+                valPrim = mean([sens, spec]); % BACC
+                valSec  = aucCurr;            % AUC
 
-            % Robust Interpolation for ROC
-            [uX, idxUni] = unique(x);
-            rocCurr = interp1(uX, y(idxUni), xGrid, 'linear', 'extrap');
+                % ROC Interp
+                [uX, idxUni] = unique(x);
+                rocCurr = interp1(uX, y(idxUni), xGrid, 'linear', 'extrap');
+                res.roc{iVar}(cnt, :) = rocCurr;
 
-            % Store Results
-            res.acc(cnt, iVar)   = accCurr;
-            res.auc(cnt, iVar)   = aucCurr;
-            res.roc{iVar}(cnt, :) = rocCurr;
+            else
+                % --- REGRESSION METRICS ---
+                % RMSE
+                rmse = sqrt(mean((yTrue - yProb).^2));
 
+                % R-Squared
+                sst = sum((yTrue - mean(yTrue)).^2);
+                sse = sum((yTrue - yProb).^2);
+                r2 = 1 - (sse / sst);
+
+                valPrim = rmse;
+                valSec  = r2;
+            end
+
+            % Store
+            res.perfPrim(cnt, iVar) = valPrim;
+            res.perfSec(cnt, iVar)  = valSec;
         end
         fprintf('.');
     end
     fprintf('\n');
 end
 
-% Calculate Feature Importance (Delta)
-% Delta = Full Model (Col 1) - Ablated Model (Col i)
-% Matrix will have size (nTotal x nVars), corresponding to varsFxd
-res.dacc      = res.acc(:,1) - res.acc(:, 2:end);
-res.dauc      = res.auc(:,1) - res.auc(:, 2:end);
+% Calculate Deltas (Interpretation depends on metric)
+% For BACC/AUC/R2: Higher is better -> Delta = Full - Reduced (Positive = Important)
+% For RMSE: Lower is better -> Delta = Reduced - Full (Positive = Important, removing it increased error)
 
-% Plotting
+if strcmp(metricPrim, 'RMSE')
+    % RMSE: Importance = Error(Reduced) - Error(Full)
+    res.impPrim = res.perfPrim(:, 2:end) - res.perfPrim(:, 1);
+else
+    % BACC/AUC/R2: Importance = Score(Full) - Score(Reduced)
+    res.impPrim = res.perfPrim(:, 1) - res.perfPrim(:, 2:end);
+end
+
+% Secondary Metric Deltas (AUC / R-Squared -> Higher is better)
+res.impSec = res.perfSec(:, 1) - res.perfSec(:, 2:end);
+
+
+%% ========================================================================
+%  PLOTTING
+%  ========================================================================
 if flgPlot
-    plot_ablation(res);
+    plot_ablation(res, metricPrim, metricSec, isBinomial);
 end
 
 end     % EOF
@@ -202,71 +251,80 @@ end     % EOF
 %% ========================================================================
 %  HELPER: PLOTTING
 %  ========================================================================
-function plot_ablation(res)
+function plot_ablation(res, labPrim, labSec, isBinomial)
 
 varsFxd = res.vars(2 : end);
 nVars  = length(varsFxd);
 
-figure('Color', 'w', 'Name', 'Feature Importance & ROC', 'Position', [50 100 1300 400]);
-t = tiledlayout(1, 4, 'TileSpacing', 'compact', 'Padding', 'compact');
+figure('Color', 'w', 'Name', 'Feature Ablation', 'Position', [100 100 1200 400]);
+t = tiledlayout(1, 3 + isBinomial, 'TileSpacing', 'compact', 'Padding', 'compact');
 
-% 1. Feature Importance (Balanced Accuracy)
+% 1. Primary Importance
 nexttile;
-muImp = mean(res.dacc, 1);
-semImp = std(res.dacc, 0, 1) / sqrt(size(res.dacc, 1));
-b = bar(muImp);
-b.FaceColor = 'k'; b.FaceAlpha = 0.5;
+muImp = mean(res.impPrim, 1, 'omitnan');
+semImp = std(res.impPrim, 0, 1, 'omitnan') / sqrt(size(res.impPrim, 1));
+bar(muImp, 'FaceColor', 'k', 'FaceAlpha', 0.5);
 hold on;
 errorbar(1:nVars, muImp, semImp, 'k.', 'LineWidth', 1.5);
 xticks(1:nVars); xticklabels(varsFxd);
-ylabel('\Delta Balanced Accuracy');
-title('Importance (BACC)');
+ylabel(['\Delta ' labPrim]);
+title(['Importance (' labPrim ')']);
 grid on;
 
-% 2. Feature Importance (AUC)
+% 2. Secondary Importance
 nexttile;
-muImpAUC = mean(res.dauc, 1);
-semImpAUC = std(res.dauc, 0, 1) / sqrt(size(res.dauc, 1));
-b = bar(muImpAUC);
-b.FaceColor = 'b'; b.FaceAlpha = 0.5;
+muImpSec = mean(res.impSec, 1, 'omitnan');
+semImpSec = std(res.impSec, 0, 1, 'omitnan') / sqrt(size(res.impSec, 1));
+bar(muImpSec, 'FaceColor', 'b', 'FaceAlpha', 0.5);
 hold on;
-errorbar(1:nVars, muImpAUC, semImpAUC, 'k.', 'LineWidth', 1.5);
+errorbar(1:nVars, muImpSec, semImpSec, 'k.', 'LineWidth', 1.5);
 xticks(1:nVars); xticklabels(varsFxd);
-ylabel('\Delta AUC');
-title('Importance (AUC)');
+ylabel(['\Delta ' labSec]);
+title(['Importance (' labSec ')']);
 grid on;
 
-% 3. ROC Curves (Comparisons)
-nexttile([1, 2]);
+% 3. Model Comparison (Raw Values)
+nexttile;
+data = res.perfPrim;
+labels = res.vars;
+ylab = labPrim;
+% Inline scatter_raw logic
+nCols = size(data, 2);
 hold on;
-clrs = lines(nVars);
-
-% Plot Full Model First (Black)
-xGrid = linspace(0, 1, 100);
-yMeanFull = mean(res.roc{1}, 1);
-plot(xGrid, yMeanFull, 'k-', 'LineWidth', 3, 'DisplayName', 'Full Model');
-
-% Plot Reduced Models (Colored)
-% Note: res.roc has columns [Full, No Var1, No Var2...]
-% So index i+1 corresponds to removing varsAb{i}
-for iVar = 1:nVars
-    yMeanRed = mean(res.roc{iVar+1}, 1);
-    plot(xGrid, yMeanRed, '-', 'Color', clrs(iVar,:), 'LineWidth', 2, ...
-        'DisplayName', sprintf('No %s', varsFxd{iVar}));
+for iCol = 1:nCols
+    x = iCol + randn(size(data,1), 1) * 0.05;
+    scatter(x, data(:,iCol), 15, 'filled', 'MarkerFaceAlpha', 0.3);
+    plot([iCol-0.2, iCol+0.2], [mean(data(:,iCol), 'omitnan'), mean(data(:,iCol), 'omitnan')], 'k-', 'LineWidth', 2);
 end
-
-% Formatting
-plot([0 1], [0 1], 'k--', 'HandleVisibility','off');
-xlabel('False Positive Rate');
-ylabel('True Positive Rate');
-title(sprintf('Model Comparison (Full AUC = %.2f)', mean(res.auc(:,1))));
-legend('Location', 'best');
+xticks(1:nCols); xticklabels(labels);
+ylabel(ylab);
+title('Model Performance');
 grid on;
 
+
+% 4. ROC (Binomial Only)
+if isBinomial
+    nexttile;
+    hold on;
+    clrs = lines(nVars);
+    xGrid = linspace(0, 1, 100);
+
+    % Full
+    yMeanFull = mean(res.roc{1}, 1, 'omitnan');
+    plot(xGrid, yMeanFull, 'k-', 'LineWidth', 3, 'DisplayName', 'Full');
+
+    for iCol = 1:nVars
+        yMeanRed = mean(res.roc{iCol+1}, 1, 'omitnan');
+        plot(xGrid, yMeanRed, '-', 'Color', clrs(iCol,:), 'LineWidth', 1.5, ...
+            'DisplayName', ['w/o ' varsFxd{iCol}]);
+    end
+    plot([0 1], [0 1], 'k:', 'HandleVisibility', 'off');
+    xlabel('FPR'); ylabel('TPR');
+    title('ROC Curves');
+    legend('Location', 'best');
 end
 
-
-
+end     % EOF
 
 
 %% ========================================================================
@@ -316,6 +374,7 @@ end
 %  - Zero Delta: The variable is redundant.
 %  - Negative Delta: The variable may be inducing noise/overfitting.
 %  ========================================================================
+
 
 %% ========================================================================
 %  NOTE: EVALUATING BINARY CLASSIFICATION PERFORMANCE

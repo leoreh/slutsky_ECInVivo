@@ -66,7 +66,7 @@ addParameter(p, 'varsExc', [], @(x) iscell(x) || isempty(x));
 addParameter(p, 'varsGrp', [], @(x) iscell(x) || isempty(x));
 
 % Transformation
-addParameter(p, 'flgZ', true, @islogical);
+addParameter(p, 'flgZ', false, @islogical);
 addParameter(p, 'logBase', [], @(x) isempty(x) || isnumeric(x) || ischar(x));
 addParameter(p, 'skewThr', 2, @isnumeric);
 addParameter(p, 'flg0', false, @islogical);

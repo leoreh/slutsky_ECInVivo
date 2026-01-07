@@ -79,6 +79,9 @@ if nZeros > 0
         'varsInc', {varResp});
 end
 
+% Update yRaw after potential transformations (offsets)
+yRaw = tbl.(varResp);
+
 
 
 %% ========================================================================
@@ -100,7 +103,7 @@ for iMdl = 1:nMdl
         % TRANSFORMATIONS
         if strcmp(dist, 'Log-Normal')
 
-            % Log-Transform predictors AND Response
+            % Log-Transform Response
             mdlTbl = tbl_transform(tbl, 'logBase', 'e', ...
                 'verbose', false, 'skewThr', -Inf, 'varsInc', {varResp});
             dist = 'Normal';

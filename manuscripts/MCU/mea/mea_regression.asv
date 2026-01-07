@@ -1,74 +1,3 @@
-%
-%
-%
-% % -------------------------------------------------------------------------
-% % STEADY-STATE FIRING
-%
-% frml = 'frSs ~ fr + bSpks + Group + (1|Name)';
-% % mdl = fitglme(zlData, frml, 'Distribution', 'Gamma', 'Link', 'Log');
-% mdl = fitlme(zlData, frml);
-%
-% frSs_fit = 10 .^ (fitted(mdl));
-% frSs_fit = 2 .^ (fitted(mdl)) * 100;
-%
-% tblFit = tbl;
-% tblFit.rcvFr_fit = frSs_fit;
-% tblFit.rcvFr = log2(tblFit.frSs ./ tblFit.fr) * 100;
-%
-%
-%
-%
-% % -------------------------------------------------------------------------
-% % RECOVERY PROBABILITY
-% iPr = [1, 2, 3, 5, 6];
-% frml = sprintf('%s ~ %s', listRspns{1}, strjoin(listPrdct([iPr]), ' + '));
-% lmeMdl = fitglme(zlData, frml, 'FitMethod', 'REMPL',...
-%     'Distribution', 'Binomial');
-%
-% tblFit = tbl;
-% tblFit.uRcv_Fit = fitted(mdl);
-%
-% tblGUI_scatHist(tblFit, 'xVar', 'bFrac', 'yVar', 'uRcv_Fit', 'grpVar', 'Group');
-% tblGUI_bar(tblFit, 'yVar', 'bFrac', 'xVar', 'uRcv_Fit', 'grpVar', 'Group');
-%
-%
-%
-%
-%
-%
-% % -------------------------------------------------------------------------
-% % RECOVERY TIME
-% % only units who recovered, from both groups combined
-% iPr = [1, 2, 3, 5, 6];
-% frml = sprintf('%s ~ %s', listRspns{4}, strjoin(listPrdct([iPr]), ' + '));
-% lmeMdl{end + 1} = fitglme(zlData(idxUnits, :), frml, 'FitMethod', 'REMPL',...
-%     'Distribution', 'Gamma');
-%
-% % -------------------------------------------------------------------------
-% % SPIKE DEFICIT
-% iPr = [1, 2, 3, 5, 6];
-% frml = sprintf('%s ~ %s', listRspns{5}, strjoin(listPrdct([iPr]), ' + '));
-% lmeMdl{end + 1} = fitlme(zlData, frml, 'FitMethod', 'REML');
-%
-% % -------------------------------------------------------------------------
-% % RECOVERY ERROR
-% % only units who recovered, from both groups combined
-% iPr = [1, 2, 3, 5, 6];
-% frml = sprintf('%s ~ %s', listRspns{2}, strjoin(listPrdct([iPr]), ' + '));
-% lmeMdl = fitglme(zlData, frml, 'FitMethod', 'REMPL',...
-%     'Distribution', 'Gamma');
-%
-%
-%
-% % -------------------------------------------------------------------------
-% % SAVE MODELS
-% fname = 'MEA~frrMdl';
-% for iMdl = 1 : length(lmeMdl)
-%     sheetNames = {'LME_Data', lmeMdl{iMdl}.ResponseName};
-%     lme_save('fname', fname, 'frmt', {'mat', 'xlsx'},...
-%         'lmeData', lmeData, 'lmeMdl', lmeMdl{iMdl}, 'sheetNames', sheetNames)
-% end
-
 
 %% ========================================================================
 %  LOAD AND PREP
@@ -85,181 +14,49 @@
 % -------------------------------------------------------------------------
 % PREPS
 
+tblLme = tbl;
+tblLme.Genotype = tblLme.Group == "Control";
+
 % Recovered units
 idxUnits = tbl.uRcv;
-lmeMdl = {};
 
 % List of possible predictors
 listPrdct = {'pertDepth', 'fr', 'bFrac', 'Group', '(1|Name)'};
-listRspns = {'uRcv', 'rcvGain', 'rcvErr', 'rcvTime', 'spkDfct', 'rcvSlope'};
-
-% Assert zero
-zlData = tbl_transform(tbl, 'flg0', true, 'verbose', true);
-
-% Z score predictors
-zlData = tbl_transform(zlData, 'varsExc', listRspns, 'flgZ', true,...
-    'skewThr', 2, 'varsGrp', {'Group'}, 'flgLog', true, 'verbose', true);
+listRspns = {'uRcv', 'rcvGain', 'rcvErr', 'rcvTime', 'spkDfct', 'rcvSlope', 'Genotype'};
 
 
 %% ========================================================================
 %  ABLATION
 %  ========================================================================
 
-% Settings
-nFolds  = 5;
-nReps   = 5; % Repeat CV
-varsAb  = {'fr', 'bFrac', 'Group'};
-xGrid   = linspace(0, 1, 100); % Common grid for ROC interpolation
+nFolds = 4;
+nReps = 4;
 
-% Storage
-impMat      = nan(nReps * nFolds, length(varsAb)); % BACC
-impMatAUC   = nan(nReps * nFolds, length(varsAb)); % AUC
-rocFull     = nan(nReps * nFolds, length(xGrid));  % Full Model ROCs (Interp)
+% Recovery Probability
+varsFxd  = {'pertDepth', 'bFrac', 'fr', 'Group'};
+frml = sprintf('uRcv ~ %s + (1|Name)', strjoin(varsFxd, ' + '));
+res = lme_ablation(tblLme, frml, 'nFolds', nFolds, 'nReps', nReps);
 
-% Storage for Reduced Models ROCs (Cell array of matrices)
-rocRed = cell(length(varsAb), 1);
-for i = 1:length(varsAb), rocRed{i} = nan(nReps * nFolds, length(xGrid)); end
+% Steady-state firing
+varsFxd  = {'pertDepth', 'bFrac', 'Group'};
+frml = sprintf('frSs ~ %s + (1|Name)', strjoin(varsFxd, ' + '));
+res = lme_ablation(tblLme, frml, 'nFolds', nFolds, 'nReps', nReps);
 
-ctr = 0;
+% Others
+varsFxd  = {'pertDepth', 'fr', 'bFrac', 'Group'};
+frml = sprintf('spkDfct ~ %s + (1|Name)', strjoin(varsFxd, ' + '));
+res = lme_ablation(tblLme, frml, 'nFolds', nFolds, 'nReps', nReps);
 
-fprintf('Starting Ablation Analysis (%d Reps, %d Folds)...\n', nReps, nFolds);
-
-% Initialize Stratified Partition
-cvp = cvpartition(zlData.uRcv, 'KFold', nFolds, 'Stratify', true);
-
-for iRep = 1 : nReps
-
-    % Re-partition for new random splits
-    if iRep > 1
-        cvp = repartition(cvp);
-    end
-
-    for iFold = 1 : nFolds
-        ctr = ctr + 1;
-
-        idxTrn = training(cvp, iFold);
-        idxTst = test(cvp, iFold);
-
-        tblTrn = zlData(idxTrn, :);
-        tblTst = zlData(idxTst, :);
-
-        % 1. Full Model
-        % -----------------------------------------------------------------
-        frmlFull = sprintf('uRcv ~ %s + (1|Name)', strjoin(varsAb, ' + '));
-        mdlFull = fitglme(tblTrn, frmlFull, 'Distribution', 'Binomial');
-
-        % Predict
-        yTrue = tblTst.uRcv;
-        yProb = predict(mdlFull, tblTst);
-        yPred = double(yProb >= 0.5);
-
-        % Metrics: Balanced Accuracy
-        tp = sum(yTrue == 1 & yPred == 1);
-        tn = sum(yTrue == 0 & yPred == 0);
-        sens = tp / max(sum(yTrue == 1), eps);
-        spec = tn / max(sum(yTrue == 0), eps);
-        accFull = mean([sens, spec]);
-
-        % Metrics: AUC & ROC Interp
-        [~, y, ~, aucFull(ctr)] = perfcurve(yTrue, yProb, 1, ...
-            'XVals', xGrid, 'UseNearest', 'off');
-        rocFull(ctr, :) = y(:)';
-
-        % 2. Ablated Models
-        % -----------------------------------------------------------------
-        for iVar = 1 : length(varsAb)
-
-            % Remove one variable
-            varsCurr = varsAb;
-            varsCurr(iVar) = [];
-
-            frmlRed = sprintf('uRcv ~ %s + (1|Name)', strjoin(varsCurr, ' + '));
-            mdlRed = fitglme(tblTrn, frmlRed, 'Distribution', 'Binomial');
-
-            % Predict
-            yProbR = predict(mdlRed, tblTst);
-            yPredR = double(yProbR >= 0.5);
-
-            % Metrics: Balanced Accuracy
-            tp = sum(yTrue == 1 & yPredR == 1);
-            tn = sum(yTrue == 0 & yPredR == 0);
-            sens = tp / max(sum(yTrue == 1), eps);
-            spec = tn / max(sum(yTrue == 0), eps);
-            accRed = mean([sens, spec]);
-
-            % Metrics: AUC
-            [~, y, ~, aucRed] = perfcurve(yTrue, yProbR, 1, ...
-                'XVals', xGrid, 'UseNearest', 'off');
-            rocRed{iVar}(ctr, :) = y(:)';
-
-            % Delta (Contribution)
-            impMat(ctr, iVar) = accFull - accRed;
-            impMatAUC(ctr, iVar) = aucFull(ctr) - aucRed;
-
-        end
-        fprintf('.');
-    end
-    fprintf('\n');
-end
+% Predict Genotype
+varsFxd  = {'pertDepth', 'bFrac', 'fr'};
+frml = sprintf('Genotype ~ %s', strjoin(varsFxd, ' + '));
+res = lme_ablation(tblLme, frml, 'nFolds', nFolds, 'nReps', nReps);
 
 
-%% ========================================================================
-%  ABLATION (FEATURE IMPORTANCE)
-%  ========================================================================
-% -------------------------------------------------------------------------
-figure('Color', 'w', 'Name', 'Feature Importance & ROC', 'Position', [50 100 1300 400]);
-t = tiledlayout(1, 4, 'TileSpacing', 'compact', 'Padding', 'compact');
 
-% 1. Feature Importance (Balanced Accuracy)
-nexttile;
-muImp = mean(impMat, 1);
-semImp = std(impMat, 0, 1) / sqrt(size(impMat, 1));
-b = bar(muImp);
-b.FaceColor = 'k'; b.FaceAlpha = 0.5;
-hold on;
-errorbar(1:length(varsAb), muImp, semImp, 'k.', 'LineWidth', 1.5);
-xticks(1:length(varsAb)); xticklabels(varsAb);
-ylabel('\Delta Balanced Accuracy');
-title('Importance (BACC)');
-grid on;
 
-% 2. Feature Importance (AUC)
-nexttile;
-muImpAUC = mean(impMatAUC, 1);
-semImpAUC = std(impMatAUC, 0, 1) / sqrt(size(impMatAUC, 1));
-b = bar(muImpAUC);
-b.FaceColor = 'b'; b.FaceAlpha = 0.5;
-hold on;
-errorbar(1:length(varsAb), muImpAUC, semImpAUC, 'k.', 'LineWidth', 1.5);
-xticks(1:length(varsAb)); xticklabels(varsAb);
-ylabel('\Delta AUC');
-title('Importance (AUC)');
-grid on;
+res = lme_mediation(tblLme, 'bFrac', 'Genotype', 'uRcv', '(1|Name)');
 
-% 3. ROC Curves (Comparisons)
-nexttile([1, 2]);
-hold on;
-clrs = lines(length(varsAb));
-
-% Reduced Models (Colored)
-lgdEntries = [];
-for iVar = 1 : length(varsAb)
-    legStr = sprintf('No %s', varsAb{iVar});
-    h = plot(xGrid, mean(rocRed{iVar}, 1, 'omitnan'), ...
-        'Color', clrs(iVar, :), 'LineWidth', 1.5, 'DisplayName', legStr);
-    lgdEntries = [lgdEntries, h];
-end
-
-% Full Model (Bold Black) - Plot last to be on top
-hFull = plot(xGrid, mean(rocFull, 1), 'k-', 'LineWidth', 3, 'DisplayName', 'Full Model');
-lgdEntries = [hFull, lgdEntries];
-
-plot([0 1], [0 1], 'k--', 'HandleVisibility', 'off');
-xlabel('False Positive Rate');
-ylabel('True Positive Rate');
-title(sprintf('Model Comparisons (Mean AUC = %.2f)', mean(aucFull)));
-legend(lgdEntries, 'Location', 'southeast', 'FontSize', 10);
-grid on;
 
 
 %% ========================================================================
@@ -343,239 +140,6 @@ grid on;
 %     - Log-transforming before Z-scoring is a common "best practice."
 %  ========================================================================
 
-
-%% ========================================================================
-%  NOTE: ABLATION ANALYSIS
-%  ========================================================================
-% To perform an ablation analysis technically, you must iteratively compare
-% the predictive performance of a "Full Model" containing all variables
-% against several "Reduced Models," each missing exactly one predictor. The
-% primary metric to track is **Balanced Accuracy**, which prevents
-% performance inflation if your dataset has an unequal number of recovered
-% versus non-recovered units. This process requires a cross-validation loop
-% to ensure that the accuracy reflects the model's ability to generalize to
-% unseen data, rather than just fitting the noise in your current table.
-%
-% Practically, you should write a loop that modifies your `frml` string for
-% each iteration. In each pass, you remove one fixed effect (e.g., `fr` or
-% `Group`), fit the model using your `lme_analyse` wrapper, and calculate
-% the accuracy on a held-out test set. The resulting "Delta Accuracy" for a
-% specific variable is the difference between the full model's accuracy and
-% that reduced model's accuracy. This value directly quantifies the unique
-% information that the specific predictor—whether unit-level like firing
-% rate or network-level like dimensionality—contributes to the prediction
-% of unit recovery.
-%
-%  1. Partition Data:
-%     Use `cvpartition` to create training/test sets (e.g., 5-fold).
-%
-%  2. Full Model Baseline:
-%     Fit `fitglme` using the complete formula.
-%     Predict outcomes on the test set.
-%     Calculate Balanced Accuracy (Bacc_Full).
-%
-%  3. Iterative Ablation:
-%     Loop through each fixed effect in your formula.
-%     Create a 'Reduced Formula' by removing one term.
-%     Fit and calculate Bacc_Reduced.
-%
-%  4. Delta Calculation:
-%     Delta_Acc = Bacc_Full - Bacc_Reduced.
-%
-%  BALANCED ACCURACY:
-%  Standard accuracy is misleading if 80% of units recovered.
-%  Balanced Accuracy = (Sensitivity + Specificity) / 2.
-%
-%  INTERPRETING THE OUTPUT:
-%  - Positive Delta: The variable is essential.
-%  - Zero Delta: The variable is redundant.
-%  - Negative Delta: The variable may be inducing noise/overfitting.
-%  ========================================================================
-
-%% ========================================================================
-%  NOTE: EVALUATING BINARY CLASSIFICATION PERFORMANCE
-%  ========================================================================
-% In physiological research, the evaluation of binary classification
-% models—such as predicting whether a single unit will recover from a
-% homeostatic perturbation—requires metrics that account for both the
-% predictive power of the model and the underlying distribution of the
-% data. While "Accuracy" is the most intuitive metric, it is often the
-% least informative in biological systems characterized by class imbalance.
-%
-% Raw accuracy is defined as the total number of correct predictions
-% divided by the total number of observations. While mathematically
-% straightforward, this metric fails to distinguish between the model's
-% ability to identify a biological phenomenon (e.g., unit recovery) and its
-% tendency to predict the more frequent outcome. In a dataset where 90% of
-% units naturally recover, a null model that predicts "recovery" for every
-% unit will achieve 90% accuracy without capturing any physiological
-% insight. Consequently, raw accuracy is rarely a sufficient benchmark for
-% models involving skewed biological states.
-%
-% Balanced accuracy addresses the limitations of raw accuracy by
-% calculating the arithmetic mean of sensitivity (the true positive rate)
-% and specificity (the true negative rate). By normalizing correct
-% predictions by the total number of samples within each specific class,
-% this metric provides an unbiased assessment of performance. Even if one
-% class is significantly larger than the other, balanced accuracy requires
-% the model to perform well on both the "recovered" and "unrecovered"
-% cohorts to achieve a high score.
-% Balanced accuracy is a "point-in-time" metric; it requires you to convert
-% a continuous probability into a discrete binary classification (0 or 1)
-% by applying a specific threshold, typically 0.5.
-%
-% The ROC Curve: Threshold-Independent Performance
-% The Receiver Operating Characteristic (ROC) curve is a graphical
-% representation of a classifier's performance across all possible decision
-% thresholds. In a logistic regression model, the output is a continuous
-% probability between zero and one; a "threshold" is the point at which we
-% decide a probability constitutes a positive prediction (e.g., 0.5). The
-% ROC curve plots the True Positive Rate against the False Positive Rate as
-% this threshold varies. This visualization reveals the trade-offs between
-% sensitivity and specificity, showing how many "false alarms" (false
-% positives) must be tolerated to achieve a specific level of "detection"
-% (true positives).
-%
-% AUC: The Global Scalar of Separability The Area Under the Curve (AUC)
-% provides a single scalar value that summarizes the entire ROC curve. the
-% AUC is calculated by integrating the ROC curve. Conceptually, the AUC is
-% equivalent to the Wilcoxon-Mann-Whitney U statistic; it represents the
-% probability that the model will assign a higher recovery probability to a
-% randomly selected "recovered" unit than to a randomly selected
-% "unrecovered" unit. An AUC of 0.5 indicates performance no better than
-% chance, while an AUC of 1.0 represents a perfect classifier. Unlike
-% accuracy or balanced accuracy, which depend on a fixed decision
-% threshold, the AUC evaluates the model's fundamental ability to separate
-% the two physiological states regardless of where the cutoff is set.
-%
-% Technical Selection of Metrics
-% The choice between these metrics depends on the goal of the analysis.
-% Balanced accuracy is the preferred metric for reporting how well a
-% specific, implemented classifier performs in a real-world predictive
-% task. In contrast, the AUC is the gold standard for comparing the
-% intrinsic quality of different models or features—such as comparing the
-% predictive weight of firing rates versus network dimensionality—because
-% it is immune to the biases introduced by class distribution and arbitrary
-% threshold selection.
-
-
-
-%% ========================================================================
-%  NOTE: COLLINEARITY
-%  ========================================================================
-% Collinearity, or multicollinearity, occurs when two or more independent
-% predictors in your model are highly correlated with one another. In
-% physiological datasets, this is a common challenge because many
-% metrics—such as mean firing rate, burst fraction, and network
-% dimensionality—often capture overlapping aspects of the same underlying
-% neural state. Technically, collinearity means that one predictor can be
-% linearly predicted from the others with a high degree of accuracy, which
-% violates the assumption that each predictor provides unique information
-% to the model.
-%
-% While collinearity does not necessarily reduce the overall predictive
-% power of the model, it severely compromises the interpretability of
-% individual coefficients. In a mixed-effects framework, high collinearity
-% inflates the standard errors of the fixed effects, making it difficult to
-% achieve statistical significance even for variables with strong
-% biological effects. Furthermore, the estimated coefficients become highly
-% unstable; small changes in your dataset can cause the sign of a
-% coefficient to flip from positive to negative, leading to erroneous
-% physiological conclusions.
-%
-% To assess whether you need to intervene, you should calculate the
-% Variance Inflation Factor (VIF) for each continuous predictor. The VIF
-% quantifies how much the variance of an estimated coefficient is increased
-% due to collinearity. A general rule of thumb in the literature is that a
-% VIF exceeding 5 to 10 indicates problematic redundancy. Additionally,
-% generating a pairwise correlation matrix of your predictors before
-% running `fitglme` provides a direct visual assessment of which variables
-% are "tracking" each other too closely.
-%
-%  Impact:
-%     - Unstable coefficient estimates (Beta).
-%     - High sensitivity to outliers.
-%     - Masked significance of predictors.
-%
-% See:
-% https://www.mathworks.com/help/econ/time-series-regression-ii-collinearity-and-estimator-variance.html
-%
-%  If VIF analysis reveals severe redundancy between variables (e.g., fr
-%  and dimensionality), consider the following technical steps:
-%
-%  1. Variable Removal:
-%     Drop the less biologically relevant predictor.
-%
-%  2. Dimensionality Reduction (PCA):
-%     Combine correlated metrics into one.
-%     Use the first Principal Component (PC1).
-%
-%  3. Feature Centering:
-%     Standardizing continuous variables reduces collinearity.
-%     Particularly helpful for interaction terms.
-%  ========================================================================
-
-%% ========================================================================
-%  NOTE: STEPWISE SELECTION
-%  ========================================================================
-%  MATLAB's built-in `stepwiseglm` does NOT support random effects.
-%
-% While MATLAB’s `stepwisefit` and `stepwiseglm` are standard tools for
-% automated model selection, they are technically incompatible with your
-% current analytical framework. These functions are designed for
-% fixed-effects models and cannot accommodate the random-effects structure
-% (`1|Name`) required for hierarchical physiological data. Using them would
-% require you to ignore the non-independence of units within a culture,
-% which significantly inflates Type I error rates and invalidates your
-% statistical inferences.
-%
-% The `stepwiseglm` function operates by iteratively adding or removing
-% predictors based on a specific criterion, such as -values, Akaike
-% Information Criterion (AIC), or Bayesian Information Criterion (BIC).
-% However, this "greedy" search algorithm is strictly limited to the
-% `GeneralizedLinearModel` class. Because your recovery analysis requires a
-% `GeneralizedLinearMixedModel` to account for mouse-specific or
-% culture-specific variance, you cannot use these built-in automated
-% routines. Furthermore, stepwise selection is frequently criticized in
-% high-impact literature for -value bias, as it performs multiple hidden
-% comparisons that are not reflected in the final model's output.
-%
-% There is a fundamental theoretical difference between the stepwise
-% approach and the ablation analysis performed by Atsmon or Parks. Stepwise
-% selection is a **search strategy** intended to find the most parsimonious
-% model (the "best" subset of predictors). In contrast, ablation analysis
-% is a **diagnostic tool** used to quantify the "predictive weight" of each
-% variable within a pre-defined physiological hypothesis. While stepwise
-% might tell you which variables to keep, ablation tells you how much
-% information is lost if a variable is removed, which is the metric used to
-% generate "Importance" or "Delta Accuracy" plots.
-%
-% To achieve an effect similar to stepwise selection while maintaining your
-% random-effects structure, you must perform manual model comparison using
-% the `compare` function in MATLAB. This allows you to test whether a model
-% with a specific predictor is statistically superior to one without it
-% using a Likelihood Ratio Test (LRT). However, for the specific "Delta
-% Accuracy" goal you described, the manual loop strategy remains the
-% superior technical path.
-%
-%  To technically determine if a predictor (e.g., 'Group') should be
-%  included in your GLME, compare nested models:
-%
-%  - Model 1: uRcv ~ fr + bFrac + (1|Name)
-%  - Model 2: uRcv ~ fr + bFrac + Group + (1|Name)
-%
-%  [~, p, stats] = compare(Mdl1, Mdl2);
-%
-%  If p < 0.05, the added predictor significantly improves the model fit
-%  beyond what is expected by chance.
-%
-%  Ablation is a Machine Learning approach, not a Likelihood approach.
-%  1. Purpose: To rank feature importance, not just "significance."
-%  2. Performance Metric: Usually "Delta Balanced Accuracy" or "Delta AUC."
-%  3. Implementation Requirement: Must be done via a custom loop to
-%     preserve the `fitglme` random-effect structure in every iteration.
-%  ========================================================================
-
 %% ========================================================================
 %  NOTE: DATA SPECIFICS
 %  ========================================================================
@@ -599,4 +163,114 @@ grid on;
 %
 % Recovery time includes units that reached their threshold value but
 % didn't manage to maintain it.
+% 
+% Predicting Genotype is only meaningful without the random effect of Name.
 %  ========================================================================
+
+
+
+
+
+
+
+
+%
+% When transitioning from binary classification (recovered vs. not
+% recovered) to continuous variables (e.g., firing rate magnitude or
+% recovery time), the mathematical objective shifts from predicting a
+% probability to minimizing a residual error. Metrics like Accuracy, ROC,
+% and AUC are technically invalid for continuous data because there is no
+% discrete "correct" or "incorrect" threshold. Instead, we utilize
+% regression metrics that quantify the distance between the observed
+% physiological data and the model’s predictions.
+%
+% ### Coefficient of Determination () and Explained Variance
+%
+% The primary metric for continuous response variables is , which
+% represents the proportion of the total variance in your data (e.g.,
+% variance in firing rates across all neurons) that is explained by your
+% predictors. In the context of Mixed-Effects Models (), we distinguish
+% between **Marginal **, which accounts only for fixed effects like
+% genotype or dimensionality, and **Conditional **, which accounts for both
+% fixed and random effects (e.g., the variance explained by the specific
+% animal or culture).
+%
+% ### Error-Based Metrics: RMSE and MAE
+%
+% While  provides a relative measure of fit, error-based metrics provide an
+% absolute measure in the original physiological units (e.g., Hz).
+%
+% * Root Mean Square Error (RMSE)
+% * Mean Absolute Error (MAE)
+% * Mean Squared Error (MSE)
+% * Residual Sum of Squares (RSS)
+%
+% RMSE is particularly useful because it penalizes large outliers more
+% heavily than MAE, making it a sensitive indicator of model failure in
+% highly variable neural recordings. If your model predicts a firing rate
+% of 10 Hz but the unit fires at 15 Hz, the RMSE quantifies that 5 Hz
+% discrepancy across the entire dataset.
+%
+% ### Ablation Analysis via Delta
+%
+% The "Importance" or ablation analysis you implemented for binary data
+% remains technically valid for continuous data by replacing "Accuracy"
+% with "." To rank the importance of a predictor like `bFrac` or
+% `pertDepth`, you calculate the ****. This is the difference between the
+% of the full model and the  of a model where that specific predictor has
+% been removed. A large  indicates that the variable is a critical driver
+% of the physiological response, whereas a  near zero suggests the variable
+% provides redundant information.
+%
+% ### Information Criteria: AIC and BIC
+%
+% For continuous models, scientists often supplement  with Information
+% Criteria, such as the Akaike Information Criterion (AIC) or the Bayesian
+% Information Criterion (BIC). These metrics evaluate the "quality" of the
+% model by balancing the goodness of fit against the number of predictors
+% used. Technically, these metrics penalize "overfitting"; if adding a new
+% network metric (like dimensionality) does not significantly improve the
+% fit, the AIC/BIC will increase, signaling that the simpler model is more
+% biologically parsimonious.
+%
+% ### Standardized Coefficients as Effect Size
+%
+% In addition to global metrics, the **Standardized Beta Coefficient** ()
+% serves as a practical measure of "accuracy" or impact for individual
+% variables. When your predictors are Z-scored, the  value tells you
+% exactly how many standard deviations the firing rate changes for every
+% one-standard-deviation increase in the predictor. This allows you to
+% directly compare the "strength" of different biological factors, even if
+% they have different units (e.g., comparing the effect of "burst fraction"
+% vs. "genotype").
+%
+% ### Summary of Differences
+%
+% | Metric Type | Binary (Classification) | Continuous (Regression) | | ---
+% | --- | --- | | **Primary Metric** | Balanced Accuracy / AUC |
+% (Marginal/Conditional) | | **Error Metric** | Log-Loss / Cross-Entropy |
+% RMSE / MAE | | **Ablation Target** |  Accuracy |  | | **Visualization** |
+% ROC / Confusion Matrix | Predicted vs. Observed Plot |
+
+
+% Cross-Validation for Continuous PhysiologyFor continuous variables, we
+% transition from calculating accuracy to calculating predictive error.
+% When you apply your model to a test set, the predict function generates a
+% numerical value (e.g., an expected firing rate in Hz) rather than a
+% probability. We then compare these predicted values ($\hat{y}$) to the
+% actual observed values ($y$) using metrics that quantify "distance"
+% rather than "correctness."A critical metric in this context is the
+% Predictive $R^2$ (sometimes denoted as $Q^2$). While a standard $R^2$
+% tells you how well the model describes the data it has already seen
+% (estimation), the Predictive $R^2$ tells you how much variance the model
+% can explain in a completely new animal or culture (prediction). This is
+% the "next level" of validation required for high-impact physiological
+% manuscripts.Implementing Ablation for Continuous ResponsesYou can perform
+% the exact same ablation analysis you used for binary recovery by
+% substituting "Accuracy" with the Mean Squared Error (MSE) or Coefficient
+% of Determination ($R^2$) calculated on the test set.Fit the Full
+% Model.Predict on Test Set.Calculate $R^2_{test}$.Ablate one
+% predictor.Recalculate $\Delta R^2_{test}$.This $\Delta R^2_{test}$ is the
+% continuous equivalent of your $\Delta$ Accuracy. It identifies which
+% biological feature provides the most unique information for determining
+% the magnitude of a unit's firing rate recovery.

@@ -1,74 +1,3 @@
-%
-%
-%
-% % -------------------------------------------------------------------------
-% % STEADY-STATE FIRING
-%
-% frml = 'frSs ~ fr + bSpks + Group + (1|Name)';
-% % mdl = fitglme(zlData, frml, 'Distribution', 'Gamma', 'Link', 'Log');
-% mdl = fitlme(zlData, frml);
-%
-% frSs_fit = 10 .^ (fitted(mdl));
-% frSs_fit = 2 .^ (fitted(mdl)) * 100;
-%
-% tblFit = tbl;
-% tblFit.rcvFr_fit = frSs_fit;
-% tblFit.rcvFr = log2(tblFit.frSs ./ tblFit.fr) * 100;
-%
-%
-%
-%
-% % -------------------------------------------------------------------------
-% % RECOVERY PROBABILITY
-% iPr = [1, 2, 3, 5, 6];
-% frml = sprintf('%s ~ %s', listRspns{1}, strjoin(listPrdct([iPr]), ' + '));
-% lmeMdl = fitglme(zlData, frml, 'FitMethod', 'REMPL',...
-%     'Distribution', 'Binomial');
-%
-% tblFit = tbl;
-% tblFit.uRcv_Fit = fitted(mdl);
-%
-% tblGUI_scatHist(tblFit, 'xVar', 'bFrac', 'yVar', 'uRcv_Fit', 'grpVar', 'Group');
-% tblGUI_bar(tblFit, 'yVar', 'bFrac', 'xVar', 'uRcv_Fit', 'grpVar', 'Group');
-%
-%
-%
-%
-%
-%
-% % -------------------------------------------------------------------------
-% % RECOVERY TIME
-% % only units who recovered, from both groups combined
-% iPr = [1, 2, 3, 5, 6];
-% frml = sprintf('%s ~ %s', listRspns{4}, strjoin(listPrdct([iPr]), ' + '));
-% lmeMdl{end + 1} = fitglme(zlData(idxUnits, :), frml, 'FitMethod', 'REMPL',...
-%     'Distribution', 'Gamma');
-%
-% % -------------------------------------------------------------------------
-% % SPIKE DEFICIT
-% iPr = [1, 2, 3, 5, 6];
-% frml = sprintf('%s ~ %s', listRspns{5}, strjoin(listPrdct([iPr]), ' + '));
-% lmeMdl{end + 1} = fitlme(zlData, frml, 'FitMethod', 'REML');
-%
-% % -------------------------------------------------------------------------
-% % RECOVERY ERROR
-% % only units who recovered, from both groups combined
-% iPr = [1, 2, 3, 5, 6];
-% frml = sprintf('%s ~ %s', listRspns{2}, strjoin(listPrdct([iPr]), ' + '));
-% lmeMdl = fitglme(zlData, frml, 'FitMethod', 'REMPL',...
-%     'Distribution', 'Gamma');
-%
-%
-%
-% % -------------------------------------------------------------------------
-% % SAVE MODELS
-% fname = 'MEA~frrMdl';
-% for iMdl = 1 : length(lmeMdl)
-%     sheetNames = {'LME_Data', lmeMdl{iMdl}.ResponseName};
-%     lme_save('fname', fname, 'frmt', {'mat', 'xlsx'},...
-%         'lmeData', lmeData, 'lmeMdl', lmeMdl{iMdl}, 'sheetNames', sheetNames)
-% end
-
 
 %% ========================================================================
 %  LOAD AND PREP
@@ -85,43 +14,44 @@
 % -------------------------------------------------------------------------
 % PREPS
 
+tblLme = tbl;
+tblLme.Genotype = tblLme.Group == "Control";
+
 % Recovered units
 idxUnits = tbl.uRcv;
-lmeMdl = {};
 
 % List of possible predictors
 listPrdct = {'pertDepth', 'fr', 'bFrac', 'Group', '(1|Name)'};
-listRspns = {'uRcv', 'rcvGain', 'rcvErr', 'rcvTime', 'spkDfct', 'rcvSlope'};
-
-% Assert zero
-tblLme = tbl_transform(tbl, 'flg0', true, 'verbose', true);
-
-% Z score predictors
-tblLme = tbl_transform(tblLme, 'varsExc', listRspns, 'flgZ', true,...
-    'skewThr', 2, 'logBase', 10, 'verbose', true);
+listRspns = {'uRcv', 'rcvGain', 'rcvErr', 'rcvTime', 'spkDfct', 'rcvSlope', 'Genotype'};
 
 
 %% ========================================================================
 %  ABLATION
 %  ========================================================================
 
-varsAb  = {'pertDepth', 'bFrac', 'fr', 'Group'};
-frml = sprintf('uRcv ~ %s + (1|Name)', strjoin(varsAb, ' + '));
+nFolds = 4;
+nReps = 10;
 
-% frml = sprintf('Genotype ~ %s', strjoin(varsAb, ' + '));
-% zlData.Genotype = zlData.Group == "Control";
+% Recovery 
+varsFxd  = {'pertDepth', 'bFrac', 'fr', 'Group'};
+frml = sprintf('uRcv ~ %s + (1|Name)', strjoin(varsFxd, ' + '));
+res = lme_ablation(tblLme, frml, 'nFolds', nFolds, 'nReps', nReps);
+mdl = lme_analyse(tblLme, frml);
 
-res = lme_ablation(tblLme, frml, [], 'nFolds', 4, 'nReps', 10);
+% Steady-state firing (w/o fr, which is too predictive)
+varsFxd  = {'pertDepth', 'bFrac', 'Group'};
+frml = sprintf('frSs ~ %s + (1|Name)', strjoin(varsFxd, ' + '));
+res = lme_ablation(tblLme, frml, 'nFolds', nFolds, 'nReps', nReps);
+
+% Predict Genotype
+varsFxd  = {'pertDepth', 'bFrac', 'fr'};
+frml = sprintf('Genotype ~ %s', strjoin(varsFxd, ' + '));
+res = lme_ablation(tblLme, frml, 'nFolds', nFolds, 'nReps', nReps);
 
 
-frml = 'spkDfct ~ pertDepth + bFrac + fr + (1|Name)';
-lme_analyse(tblLme, frml)
 
-tblLme.Group = tblLme.Group == "Control";
-
-
-res = lme_mediation(tbl, 'Group', 'bFrac', 'uRcv', '(1|Name)', ...
-    'distY', 'Binomial')
+frml = sprintf('uRcv ~ %s + (1|Name)', strjoin(varsFxd, ' + '));
+res = lme_mediation(tblLme, frml, 'Group', 'bFrac');
 
 
 
@@ -229,6 +159,8 @@ res = lme_mediation(tbl, 'Group', 'bFrac', 'uRcv', '(1|Name)', ...
 %
 % Recovery time includes units that reached their threshold value but
 % didn't manage to maintain it.
+% 
+% Predicting Genotype is only meaningful without the random effect of Name.
 %  ========================================================================
 
 

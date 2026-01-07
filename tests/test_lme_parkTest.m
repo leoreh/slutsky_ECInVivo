@@ -87,6 +87,37 @@ try
     fprintf('PASS (Ran successfully)\n');
 catch ME
     fprintf('FAIL (%s)\n', ME.message);
-end
+
+    % Y = 2*M + noise (so Y = 10*X + noise via M)
+    grp = repmat([0; 1], 25, 1);       % 50 samples
+    xVar = grp;
+    mVar = 5 * xVar + randn(50, 1);
+    yVar = 2 * mVar + randn(50, 1);
+    subject = repmat((1:10)', 5, 1);  % Random effect
+
+    tblMed = table(grp, mVar, yVar, subject);
+    tblMed.grp = categorical(tblMed.grp);
+
+    try
+        frml = 'yVar ~ grp + (1|subject)';
+        res = lme_mediation(tblMed, frml, 'grp', 'mVar', 'verbose', false);
+
+        % Check Path A (X->M)
+        pA = res.paths.PValue(1);
+
+        % Check Path B (M->Y)
+        pB = res.paths.PValue(2);
+
+        % Check Sobel
+        pSobel = res.paths.PValue(5);
+
+        if pA < 0.05 && pB < 0.05 && pSobel < 0.05
+            fprintf('PASS (Significant Mediation Detected)\n');
+        else
+            fprintf('FAIL (Expected significant mediation, got pSobel=%.3f)\n', pSobel);
+        end
+    catch ME
+        fprintf('FAIL (%s)\n', ME.message);
+    end
 
 end
