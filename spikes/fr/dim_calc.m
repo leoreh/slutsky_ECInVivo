@@ -5,7 +5,7 @@ function dim = dim_calc(Y, varargin)
 %   activity matrix Y (Neurons x Time).
 %
 %   INPUTS:
-%       Y           - (matrix) Activity Matrix (N x T). See Note.
+%       Y           - (matrix) Activity Matrix (Neurons x Time).
 %       varargin    - (param/value) Optional parameters:
 %                     'method'     : (char) 'PR' (Participation Ratio) or
 %                                    'thr' (Variance Explained) {'PR'}

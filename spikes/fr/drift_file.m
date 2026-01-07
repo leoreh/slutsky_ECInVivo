@@ -5,7 +5,7 @@ function drft = drift_file(varargin)
 %
 % INPUT:
 %   basepath        string. path to recording folder {pwd}
-%   boutTimes     cell of n x 2 mats. each cell describes the bouts of
+%   boutTimes       cell of n x 2 mats. each cell describes the bouts of
 %                   a state (s). if empty will try to load from
 %                   sleep_states.mat and will only analyze aw and nrem
 %   graphics        logical. plot {false}
