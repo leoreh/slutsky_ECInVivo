@@ -87,17 +87,13 @@ stats.info.winCalc = winCalc;
 for iUnit = 1:nUnits
 
     b_struct = brst.all{iUnit};
-    st = spktimes{iUnit};
 
-    if isempty(st)
+    if isempty(spktimes{iUnit})
         continue;
-        % stats initialized to 0/NaN already
     end
 
     % If no bursts detected for unit, b_struct might be empty or fields empty
     if isempty(b_struct) || isempty(b_struct.times)
-        % No bursts detected at all
-        % detect=0, rate=0, bspks=0, others NaN. (Already set)
         continue;
     end
 
@@ -112,14 +108,6 @@ for iUnit = 1:nUnits
         tStart = winCalc(iWin, 1);
         tEnd   = winCalc(iWin, 2);
         wDur   = tEnd - tStart;
-
-        % Filter bursts in this window (based on Start Time)
-        % Using >= tStart and < tEnd (standard binning)
-        % Check strict inequality handling? User didn't specify.
-        % Using [Start, End] inclusive logic usually safer for single windows
-        % but standard is [ ).
-        % Defaulting to: Start >= tStart & Start <= tEnd
-
         idx = (bStarts >= tStart) & (bStarts <= tEnd);
 
         if ~any(idx)
@@ -149,8 +137,9 @@ for iUnit = 1:nUnits
         % Here it should be "spikes in bursts in window" / "total spikes in window".
 
         % Spikes in window
-        st_idx = (st >= tStart) & (st <= tEnd);
-        nStWin = sum(st_idx);
+        st = spktimes{iUnit};
+        st = (st >= tStart) & (st <= tEnd);
+        nStWin = sum(st);
 
         if nStWin > 0
             % Bursts contributing to this window:
@@ -213,12 +202,6 @@ end     % EOF
 %  unit based on its current rate. The final metric is reported as a
 %  percentage of this prediction, where 100% signifies a spike pattern
 %  identical to a WT unit at that specific rate.
-%
-%  * Maps expected physiological states.
-%  * Corrects for non-proportional scaling.
-%  * Isolates rate-independent genotype effects.
-%  * Benchmarks against WT population.
-%  * Validates drug-induced pattern shifts.
 %
 %  By utilizing this method, a researcher can conclude that a change in
 %  bursting is a fundamental alteration of the neuron's signaling

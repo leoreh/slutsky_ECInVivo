@@ -1,6 +1,6 @@
 function brst = brst_mea(spktimes, varargin)
 
-% LARGELY REPLACED BY BRST_MAXINT
+% LARGELY REPLACED BY BRST_DETECT
 
 % calculates burstiness stats per unit in timebins. based on analysis done
 % for mea recordings

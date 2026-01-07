@@ -68,26 +68,26 @@ if exist(brstfile, 'file') && ~flgForce && ~flgPlot
     return;
 end
 
-nunits = length(spktimes);
+nUnits = length(spktimes);
 
 % Initialize output structure
 brst.info.runtime   = datetime("now");
 brst.info.algorithm = 'MaxInterval';
 brst.info.input     = p.Results;
 
-brst.all            = cell(nunits, 1);
+brst.all            = cell(nUnits, 1);
 
 % For plotting
-spktimes_bursts = cell(nunits, 1);
+spktimes_bursts = cell(nUnits, 1);
 
 
 %% ========================================================================
-%  RUN DETECTION
+%  DETECTION
 %  ========================================================================
 
-for iunit = 1 : nunits
+for iUnit = 1 : nUnits
 
-    st = spktimes{iunit};
+    st = spktimes{iUnit};
     if isempty(st) || length(st) < minSpks
         continue;
     end
@@ -218,7 +218,7 @@ for iunit = 1 : nunits
         fl_times(b, :) = [st(s_idx), st(e_idx)];
 
         if flgPlot
-            spktimes_bursts{iunit} = [spktimes_bursts{iunit}; st(s_idx:e_idx)]; %#ok<AGROW>
+            spktimes_bursts{iUnit} = [spktimes_bursts{iUnit}; st(s_idx:e_idx)]; %#ok<AGROW>
         end
     end
 
@@ -226,7 +226,7 @@ for iunit = 1 : nunits
         b_struct.ibi(2:end) = fl_times(2:end, 1) - fl_times(1:end-1, 2);
     end
 
-    brst.all{iunit}     = b_struct;
+    brst.all{iUnit}     = b_struct;
 end
 
 
