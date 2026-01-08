@@ -31,10 +31,14 @@ function rcv = mea_frRcv(t, frMat, varargin)
 %                                     (Positive value indicates rate reduction).
 %                       .rcvErr     - Recovery Error: Absolute log2 ratio of Steady-State / Baseline.
 %                                     (0 indicates perfect recovery).
+%                       .rcvBsl     - Recovery Percentage: Ratio of Steady-State / Baseline in percent.
+%                                     (100% indicates full recovery).
+%                       .rcvDiff    - Recovery Difference: Absolute difference between Steady-State and Baseline rates [Hz].
 %                       .rcvGain    - Recovery Gain: Log2 ratio of Steady-State / Trough.
 %                                     (Indicates amount of recovery from trough).
 %                       .rcvWork    - Recovery Work: Ratio of Recovery Gain to Perturbation Depth.
-%                       .rcvTime    - Recovery Time [s]: Time from trough to reach 67% recovery.
+%                       .bslTime    - Baseline Recovery Time [s]: Time from trough to reach 67% of the distance to Baseline.
+%                       .rcvTime    - Steady-State Recovery Time [s]: Time from trough to reach 67% of the distance to Steady-State.
 %                       .rcvSlope   - Recovery Slope [Hz/min]: Maximum slope during recovery.
 %                       .normSlope  - Normalized Slope [%/min]: Slope normalized by recovery range.
 %                       .spkDfct    - Spike Deficit: Log2 ratio of Expected vs Observed AUC.
@@ -298,7 +302,7 @@ if flgPlot
     rng('shuffle');
     shuffledIdx = goodIdx(randperm(length(goodIdx)));
     plotIdx = shuffledIdx(1:nPlot);
-    
+
     % Overwrite random for comparison of raw with model
     plotIdx = [1 : 6];
 

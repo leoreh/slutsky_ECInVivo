@@ -18,9 +18,10 @@ function [varsFxd, varRsp, varsRand] = lme_frml2vars(frml)
 %       [vf, vr, vz] = lme_frml2vars('Spikes ~ Depth + (1|Mouse)');
 %       % vf = {'Depth'}, vr = 'Spikes', vz = {'(1|Mouse)'}
 %
-%   See also: REGEXP, STRTRIM, UNIQUE
+%   See also: LME_ANALYSE, REGEXP, UNIQUE
 %
 %   250106 Refactored for tidy separation of effects.
+%   260108 Revised extraction logic to support complex formulas.
 
 %% ========================================================================
 %  ARGUMENTS
@@ -29,18 +30,20 @@ function [varsFxd, varRsp, varsRand] = lme_frml2vars(frml)
 % Ensure char format
 frml = char(frml);
 
+
 %% ========================================================================
 %  EXTRACT RESPONSE VARIABLE
 %  ========================================================================
 
 % Get response variable (everything before the tilde ~)
-varRsp = regexp(frml, '^\s*(\w+)\s*~', 'tokens', 'once');
+% Matches start of string, valid var name, followed by ~
+tokens = regexp(frml, '^\s*([a-zA-Z_]\w*)\s*~', 'tokens', 'once');
 
-if isempty(varRsp)
+if isempty(tokens)
     error('lme_frml2vars:InvalidFormula', ...
-        'Invalid formula format. Expected "Response ~ Predictors"');
+        'Invalid formula format or missing response variable. Expected "Response ~ Predictors"');
 end
-varRsp = varRsp{1};
+varRsp = tokens{1};
 
 
 %% ========================================================================
@@ -52,44 +55,38 @@ varRsp = varRsp{1};
 regexRand = '\([^)]+\|[^)]+\)';
 varsRand = regexp(frml, regexRand, 'match');
 
-% Remove random effects from the formula string to isolate fixed effects
-xStr = regexprep(frml, ['^\s*\w+\s*~|' regexRand], '');
+% Ensure column vector
+if isempty(varsRand)
+    varsRand = {};
+else
+    varsRand = varsRand(:)';
+end
 
 
 %% ========================================================================
 %  EXTRACT FIXED EFFECTS
 %  ========================================================================
 
-% Initialize
-varsFxd = {};
+% 1. Remove Response variable and Tilde from the formula
+% (We use the regex derived from parsing to be precise)
+rhs = regexprep(frml, '^\s*[a-zA-Z_]\w*\s*~', '');
 
-if isempty(strtrim(xStr))
-    % Case: Only Intercept or Empty Fixed Effects
-    return;
-end
+% 2. Remove Random Effects terms
+rhs = regexprep(rhs, regexRand, '');
 
-% Check for interaction terms (A * B format)
-interactVars = regexp(xStr, '(\w+)\s*[*]\s*(\w+)', 'tokens');
+% 3. Extract Variable Names
+% Find all valid Matlab identifiers in the remaining string
+% This handles A+B, A*B, A:B, etc.
+rawVars = regexp(rhs, '[a-zA-Z_]\w*', 'match');
 
-if ~isempty(interactVars)
-    % Process all interaction pairs
-    for iVar = 1:length(interactVars)
-        varsFxd = [varsFxd, interactVars{iVar}];
-    end
+if isempty(rawVars)
+    varsFxd = {};
 else
-    % No interactions: standard additive model
+    % Remove duplicates and sort
+    varsFxd = unique(rawVars);
 
-    % Split by '+'
-    xVars = strtrim(strsplit(xStr, '+'));
-
-    % Remove '1' (Intercept)
-    xVars(strcmp(xVars, '1')) = [];
-
-    % Filter empty cells
-    varsFxd = xVars(~cellfun(@isempty, xVars));
+    % Ensure row vector
+    varsFxd = varsFxd(:)';
 end
-
-% Remove duplicates (e.g. from A*B -> A and B) and sort
-varsFxd = unique(varsFxd, 'stable');
 
 end     % EOF

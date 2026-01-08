@@ -108,6 +108,7 @@ else
     varMap.frSs      = 'rcv.frSs';
     varMap.uRcv      = 'rcv.uRcv';
     varMap.rcvTime   = 'rcvMdl.rcvTime';
+    varMap.rcvWork   = 'rcv.rcvWork';
     varMap.rcvBsl    = 'rcv.rcvBsl';
     varMap.spkDfct   = 'rcv.spkDfct';
     varMap.pertDepth = 'rcv.pertDepth';

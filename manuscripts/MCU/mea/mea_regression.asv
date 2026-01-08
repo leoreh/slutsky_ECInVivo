@@ -22,32 +22,23 @@ listRspns = {'uRcv', 'rcvBsl', 'rcvTime', 'spkDfct', 'Genotype', 'frSs', 'rcvWor
 %  ABLATION
 %  ========================================================================
 
-nFolds = 10;
-nReps = 10;
+nFolds = 5;
+nReps = 5;
 
 % Recovery
 frml = 'frSs ~ frTrough + fr * Group + pBspk * Group + (1|Name)';
 
 res = lme_ablation(tblLme, frml, 'nFolds', nFolds, 'nReps', nReps);
 
-frml = 'frSs ~ frTrough + fr * Group + pBspk * Group + (1|Name)';
-[mdl, ~, ~, ~] = lme_analyse(tblLme2, frml);
+[mdl, ~, ~, tblMdl] = lme_analyse(tblLme, frml)
 
-skewness(tblLme.pBspk)
-tblLme2 = tbl_transform(tblLme, 'varsInc', {'pBspk'}, ...
-    'logBase', 'logit', 'skewThr', 2, ...
-    'flgZ', false, ...
-    'verbose', true);
-
-
-
-[pd, grp, pBspk_pred] = partialDependence(mdl, {'Group', 'fr'});
+[pd, grp, pBspk_pred] = partialDependence(mdl, {'fr', 'Group'}, "NumObservationsToSample",2);
 
 hFig = figure;
 plot(pBspk_pred, pd)
 
 
-plotPartialDependence(mdl, {'Group', 'fr'})
+plotPartialDependence(mdl, {'Group', 'pBspk'})
 plotPartialDependence(mdl, {'fr'}, 'Conditional','centered')
 
 % Predict Genotype (w/o Name as random effect)
@@ -103,9 +94,6 @@ res = lme_ablation(tblLme, frml, 'nFolds', nFolds, 'nReps', nReps);
 % 
 % Burstiness shows stronger predictive capacity when frTrough is provided
 % instead of pertDepth
-% 
-% Burstiness shows stronger predictive capacity when NOT log- or
-% logit-transformed. It's skeweness is only ~1.6 so it's okay. 
 %  ========================================================================
 
 

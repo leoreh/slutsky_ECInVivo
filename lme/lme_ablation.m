@@ -72,14 +72,7 @@ fprintf('[LME_ABLATION] Mode: %s (Dist: %s)\n', modeStr, dist);
 %  ========================================================================
 
 % Extract variables from formula
-[varsFxd, varRsp, varsRand] = lme_frml2vars(frml);
-
-% Extract Random Effects String
-if isempty(varsRand)
-    randStr = '';
-else
-    randStr = [' + ' strjoin(varsRand, ' + ')];
-end
+[varsFxd, varRsp, ~] = lme_frml2vars(frml);
 
 % varsIter: [Full Model, No Var1, No Var2, ...]
 varsIter = [{'None'}, varsFxd];
@@ -158,19 +151,10 @@ for iRep = 1 : nReps
         % Iterate Models
         for iVar = 1 : length(varsIter)
 
-            varRem = varsIter{iVar};
+            varRmv = varsIter{iVar};
 
             % Construct Formula
-            varsCurr = varsFxd;
-            if ~strcmp(varRem, 'None')
-                varsCurr(strcmp(varsCurr, varRem)) = [];
-            end
-
-            if isempty(varsCurr)
-                currFrml = sprintf('%s ~ 1%s', varRsp, randStr);
-            else
-                currFrml = sprintf('%s ~ %s%s', varRsp, strjoin(varsCurr, ' + '), randStr);
-            end
+            currFrml = lme_frml2rmv(frml, varRmv);
 
             % Fit Model (Use lme_fit)
             mdl = lme_fit(tblTrn, currFrml, 'dist', dist);
@@ -531,6 +515,54 @@ end     % EOF
 %     Standardizing continuous variables reduces collinearity.
 %     Particularly helpful for interaction terms.
 %  ========================================================================
+
+%% ========================================================================
+%  NOTE: RESIDUALIZATION (FEATURE DECOUPLING)
+%  ========================================================================
+% Residualization is a statistical technique used to isolate the unique
+% variance of a predictor by "stripping away" its association with another
+% variable. In neural data, it is frequently proposed when two metrics -
+% such as firing rate (FR) and burst fraction (pBspk)— - are suspected of
+% being mathematically or biologically coupled. The goal is to create a
+% "purified" version of a metric that represents only the variance that
+% cannot be explained by a primary driver.
+%
+% 1. Technical Implementation:
+%    To residualize Burstiness (B) against Firing Rate (FR):
+%    - Step A: Fit a linear regression model: B ~ FR.
+%    - Step B: Extract the residuals (observed B - predicted B).
+%    - Step C: Use these residuals as the new predictor in your GLME.
+%    The resulting "Residualized Burstiness" is, by definition, perfectly
+%    uncorrelated () with Firing Rate.
+%
+% 2. Theoretical Utility:
+%    Residualization is technically valid in two specific scenarios:
+%    - Severe Collinearity: When VIF > 5-10, making it impossible for the
+%      model to distinguish between two predictors.
+%    - Hierarchical Hypothesis Testing: When you want to force the model to
+%      assign all shared variance to a "nuisance" variable first, testing
+%      if the secondary variable has any remaining incremental value.
+%
+% 3. Why Residualization is Discouraged in This Context:
+%    - Loss of Physiological Meaning: A residualized metric is an abstract
+%      statistical construct. "Burstiness beyond what is expected for a
+%      given FR" is difficult to interpret biologically and cannot be
+%      compared across different experimental datasets.
+%    - Low Redundancy (VIF < 1.5): If the raw correlation between FR and
+%      pBspk is already low and the VIF is near 1, residualization is
+%      mathematically redundant. The model is already capable of
+%      partitioning the variance accurately.
+%    - Altering the Null Hypothesis: Residualization changes the coefficient
+%      of the primary variable (FR). It effectively "over-adjusts" the model,
+%      potentially leading to Type I errors if the shared variance was
+%      biologically meaningful.
+%    - Masking the Interaction: If your hypothesis is that bursts are
+%      "ineffective" in a specific Group (MCU-KO), residualization can
+%      suppress the very interaction you seek to find. The "ineffectiveness"
+%      is best captured by a `pBspk * Group` interaction term, which
+%      directly models how the relationship between burstiness and
+%      recovery changes across conditions.
+%% ========================================================================
 
 %% ========================================================================
 %  NOTE: STEPWISE SELECTION

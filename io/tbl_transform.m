@@ -240,6 +240,8 @@ for iVar = 1:length(processVars)
         if flgZ
             dataGrp = (dataGrp - mean(dataGrp, 'omitnan')) ./ ...
                 std(dataGrp, 'omitnan');
+            fprintf('[%s] Applying Z-Score\n', varName);
+
         end
 
         % Update Table

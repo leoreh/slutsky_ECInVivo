@@ -14,7 +14,7 @@ tblPlot = tbl;
 %  ========================================================================
 %  Cluster units into percentiles based on a specific variable
 
-varClu = 'fr';
+varClu = 'pBspk';
 nClu   = 3;         % Number of clusters (percentiles)
 alpha  = 2;       % Scaling factor for percentile spacing
 
@@ -69,8 +69,8 @@ winNorm = [1, find(xVec >= 0, 1) - 1];
 
 tblVars = tbl.Properties.VariableNames;
 tVars = tblVars(contains(tblVars, 't_'));
-% tblPlot = tbl_tNorm(tblPlot, 'varsInc', tVars, 'winNorm', winNorm, ...
-%     'Method', 'percentage', 'varsGrp', {});
+tblPlot = tbl_tNorm(tblPlot, 'varsInc', tVars, 'winNorm', winNorm, ...
+    'Method', 'percentage', 'varsGrp', {'Name'});
 
 % Convert Ratio to Percentage
 % tblPlot.t_fr = tblPlot.t_fr * 100;
@@ -94,13 +94,18 @@ for iVar = 1:length(tVars)
     % centering is automatic in pca()
     [~, score] = pca(dataClean);
 
-    % Detect Outliers in Score Space (Top 3 PCs)
+    % 3. Detect Outliers in Score Space (Top 3 PCs)
     % Use Mahalanobis distance to find units far from the cluster center
-    otlVar = all(isoutlier(score(:, 1:3), 'median', 'ThresholdFactor', 100), 2);
+
+    otlVar = isoutlier(score(:, 1:3), 'mahalanobis');
     otl = otl | otlVar;
 end
-fprintf('Removed %d units.\n', sum(otl));
-tblPlot(otl, :) = [];
+
+
+if any(otl)
+    fprintf('Removed %d units with anomalous dynamics (PCA-Outliers).\n', sum(otl));
+    tblPlot(otl, :) = [];
+end
 
 
 
