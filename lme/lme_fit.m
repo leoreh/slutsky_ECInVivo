@@ -62,7 +62,7 @@ if flgG
 
     % Default FitMethod for GLME
     if isempty(fitMethod)
-        fitMethod = 'Laplace';
+        fitMethod = 'REMPL';
     end
 
     mdl = fitglme(tbl, frml, ...

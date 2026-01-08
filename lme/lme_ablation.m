@@ -93,9 +93,11 @@ end
 
 % Initialize CV Partition
 if isBinomial
-    cvp = cvpartition(lmeTbl.(varRsp), 'KFold', nFolds, 'Stratify', true);
+    cvp = cvpartition(lmeTbl.(varRsp), 'KFold', nFolds, ...
+        'Stratify', true, lmeTbl.Name);
 else
-    cvp = cvpartition(height(lmeTbl), 'KFold', nFolds);
+    cvp = cvpartition(height(lmeTbl), 'KFold', nFolds, ...
+        lmeTbl.Name);
 end
 
 

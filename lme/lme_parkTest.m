@@ -59,7 +59,7 @@ isSparse = pctZeros >= 0.05;
 if isSkewed && ~isSparse
     % --- Gamma Candidate ---
     dist = 'Gamma';
-    fitMet = 'REMPL';
+    fitMet = 'Laplace';
 
     % Handle Zeros (if < 5%)
     if nZeros > 0
@@ -75,7 +75,7 @@ if isSkewed && ~isSparse
 else
     % --- Normal Candidate ---
     dist = 'Normal';
-    fitMet = 'REML';
+    fitMet = 'ML';
 end
 
 %  PROVISIONAL FIT
