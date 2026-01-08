@@ -129,6 +129,9 @@ for iVar = 1:length(processVars)
     varName = processVars{iVar};
     varData = tblOut.(varName);
 
+    % Clamp window end to data size
+    wE = min(size(varData, 2), wE);
+
     % ---------------------------------------
     % Case 1: Row-wise Normalization
     % ---------------------------------------
