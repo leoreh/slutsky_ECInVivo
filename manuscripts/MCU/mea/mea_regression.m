@@ -5,14 +5,12 @@
 
 presets = {'rcv'};
 [tbl, xVec, basepaths, v] = mcu_tblMea('presets', presets);
+tblLme = tbl;
 
 % tblGUI_xy(xVec, tbl);
 % tblGUI_scatHist(tbl, 'xVar', 'pBspk', 'yVar', 'rcvTime', 'grpVar', 'Group');
 % tblGUI_bar(tbl, 'yVar', 'pBspk', 'xVar', 'Group');
 % tblGUI_raster(tbl, 'grpVar', 'Name', 'grpVal', 'ctrl1')
-
-
-tblLme = tbl;
 
 % List of possible predictors
 listPrdct = {'pertDepth', 'fr', 'pBspk', 'Group', '(1|Name)'};
@@ -22,13 +20,16 @@ listRspns = {'uRcv', 'rcvBsl', 'rcvTime', 'spkDfct', 'Genotype', 'frSs', 'rcvWor
 %  ABLATION
 %  ========================================================================
 
-nFolds = 10;
-nReps = 10;
+nFolds = 3;
+nReps = 3;
 
 % Recovery
 frml = 'frSs ~ frTrough + fr * Group + pBspk * Group + (1|Name)';
 
 res = lme_ablation(tblLme, frml, 'nFolds', nFolds, 'nReps', nReps);
+
+[uniqueNames, firstIdx] = unique(tblLme.Name, 'stable');
+groupLabels = tblLme.Group(firstIdx);
 
 frml = 'frSs ~ frTrough + fr * Group + pBspk * Group + (1|Name)';
 [mdl, ~, ~, ~] = lme_analyse(tblLme, frml);

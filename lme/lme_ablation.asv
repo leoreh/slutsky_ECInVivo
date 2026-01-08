@@ -705,7 +705,5 @@ end     % EOF
 %     - Step B: Create a stratified 'cvpartition' on those unique Names.
 %     - Step C: Map the partitioned Names back to the original table rows 
 %       inside the cross-validation loop.
-%
-%  This approach is toptimal for testing if predictors (pBspk, fr, etc.)
-%  can generalize to a completely new, unseen animal or culture.
+
 %  ========================================================================
