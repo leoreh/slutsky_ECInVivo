@@ -31,7 +31,7 @@ frml = 'frSs ~ frTrough + fr * Group + pBspk * Group + (1|Name)';
 res = lme_ablation(tblLme, frml, 'nFolds', nFolds, 'nReps', nReps);
 
 frml = 'frSs ~ frTrough + fr * Group + pBspk * Group + (1|Name)';
-[mdl, ~, ~, ~] = lme_analyse(tblLme2, frml);
+[mdl, ~, ~, ~] = lme_analyse(tblLme, frml);
 
 skewness(tblLme.pBspk)
 tblLme2 = tbl_transform(tblLme, 'varsInc', {'pBspk'}, ...

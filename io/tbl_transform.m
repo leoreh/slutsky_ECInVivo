@@ -25,7 +25,9 @@ function tblOut = tbl_transform(tbl, varargin)
 %                       - 'e': Natural Log transform log(y).
 %                       - (numeric): Log transform with specific base.
 %           'skewThr' : (numeric) Skewness threshold for auto-log {2}.
-%           'flg0'    : (logical) Add offset if zero-inflated {false}.
+%           'flg0'    : (logical) Force offset for zero-values {false}.
+%                       Note: Offset is automatically added if a variable is
+%                       log-transformed and contains zeros.
 %
 %           NORMALIZATION:
 %           'varNorm' : (char) Grouping variable for normalization. If
@@ -129,6 +131,11 @@ if flgNorm && flgZ
     warning('Z-scoring will overwrite the scale set by normalization.');
 end
 
+% Determine Transformation Mode (Global)
+isLogit = ischar(logBase) && strcmpi(logBase, 'logit');
+isLog   = (isnumeric(logBase) && ~isempty(logBase)) || ...
+    (ischar(logBase) && strcmpi(logBase, 'e'));
+
 
 %% ========================================================================
 %  GROUP INDICES
@@ -164,12 +171,12 @@ for iVar = 1:length(processVars)
 
     % --- Global Analysis (Log/Logit/Offset) ---
 
-    % Determine Transformation Mode
-    isLogit = ischar(logBase) && strcmpi(logBase, 'logit');
-    isLog = (isnumeric(logBase) && ~isempty(logBase)) || ...
-        (ischar(logBase) && strcmpi(logBase, 'e'));
+    % Initialize flags for this variable
+    doLog    = false;
+    doOffset = flg0; % Start with user preference (true/false)
+    baseStr  = '';
 
-    % Logit Transform
+    % 1. Logit Transform
     if isLogit
         varData = max(eps, min(1 - eps, varData));
         varData = log(varData ./ (1 - varData));
@@ -178,9 +185,30 @@ for iVar = 1:length(processVars)
         end
     end
 
-    % Offset (Zero-Inflation)
-    % Add offset if requested OR if we are about to log-transform
-    if flg0 || isLog
+    % 2. Check Skewness for Log Transform
+    if isLog
+        % Check skewness on pooled data (excluding NaNs)
+        s = skewness(varData(~isnan(varData)));
+
+        if s > skewThr
+            doLog = true;
+            doOffset = true; % Log requires handling zeros, so enforce offset
+
+            if ischar(logBase) && strcmpi(logBase, 'e')
+                baseStr = 'Ln';
+            else
+                baseStr = sprintf('Log%.1f', logBase);
+            end
+
+            if verbose
+                fprintf('[%s] Skew=%.2f. Log transform enabled.\n', ...
+                    varName, s);
+            end
+        end
+    end
+
+    % 3. Apply Offset (Zero-Inflation) if needed
+    if doOffset
         if any(varData(:) == 0) && all(varData(:) >= 0)
             c = min(varData(varData > 0)) / 2;
             varData = varData + c;
@@ -190,22 +218,16 @@ for iVar = 1:length(processVars)
         end
     end
 
-    % Log Transform (Conditional on Skewness)
-    if isLog
-        % Check skewness on pooled data
-        s = skewness(varData(~isnan(varData)));
+    % 4. Apply Log Transform
+    if doLog
+        if ischar(logBase) && strcmpi(logBase, 'e')
+            varData = log(varData);
+        else
+            varData = log(varData) ./ log(logBase);
+        end
 
-        if s > skewThr
-            if ischar(logBase) && strcmpi(logBase, 'e')
-                varData = log(varData);
-                baseStr = 'Ln';
-            else
-                varData = log(varData) ./ log(logBase);
-                baseStr = sprintf('Log%.1f', logBase);
-            end
-            if verbose
-                fprintf('[%s] Applying %s (Skew=%.2f)\n', varName, baseStr, s);
-            end
+        if verbose
+            fprintf('[%s] Applying %s\n', varName, baseStr);
         end
     end
 
@@ -240,12 +262,17 @@ for iVar = 1:length(processVars)
         if flgZ
             dataGrp = (dataGrp - mean(dataGrp, 'omitnan')) ./ ...
                 std(dataGrp, 'omitnan');
-            fprintf('[%s] Applying Z-Score\n', varName);
-
         end
 
         % Update Table
         tblOut.(varName)(idxGrp) = dataGrp;
+    end
+
+    if flgNorm && verbose
+        fprintf('[%s] Applying Normalization\n', varName);
+    end
+    if flgZ && verbose
+        fprintf('[%s] Applying Z-Score\n', varName);
     end
 end
 
