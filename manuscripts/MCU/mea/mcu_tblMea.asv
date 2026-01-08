@@ -111,7 +111,7 @@ else
     varMap.rcvBsl    = 'rcv.rcvBsl';
     varMap.spkDfct   = 'rcv.spkDfct';
     varMap.pertDepth = 'rcv.pertDepth';
-    varMap.uPert     = 'rcv.uPert';
+    varMap.uPert     = 'rcvMdl.uPert';
 end
 
 varMap.bRate     = 'stats.rate';
@@ -244,7 +244,7 @@ tbl = removevars(tbl, 'uPert');
 tbl(~tbl.uGood, :) = [];
 tbl = removevars(tbl, 'uGood');
 
-tbl.UnitID = categorical(tbl.UnitID);
+tbl.unit
 
 % Post-Process Time
 tbl.rcvTime = tbl.rcvTime / 3600;

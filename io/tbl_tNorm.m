@@ -3,34 +3,39 @@ function tblOut = tbl_tNorm(tbl, varargin)
 %
 %   tblOut = TBL_TNORM(tbl, ...) normalizes numeric variables in 'tbl' using
 %   statistics (mean, std, min, max) calculated from a specified window
-%   ('winNorm'). The function calculates the center (C) and scale (S)
-%   parameters from the window and applies them to the entire vector using
-%   MATLAB's normalize function: (x - C) / S.
+%   ('winNorm').
 %
-%   You can pass additional arguments supported by NORMALIZE (e.g., 'Type')
-%   as unmatched key-value pairs.
+%   This function serves as a wrapper for MATLAB's native NORMALIZE,
+%   calculating the Center (C) and Scale (S) parameters from a baseline
+%   window and applying them to the full data.
 %
 %   INPUTS:
 %       tbl         - (table) Input table.
 %
 %   OPTIONAL KEY-VALUE PAIRS:
 %       'varsInc'   - (cell/char) Variables to include. Default: All numeric.
-%       'varsGrp'   - (cell/char) Variables to group by. Stats are calculated
-%                     per group (pooled) but applied to individual rows.
+%       'varsGrp'   - (cell/char) Variables to group by. If provided,
+%                     baseline stats are calculated from the pooled window
+%                     of the entire group and applied to all units in that group.
+%                     This is useful for normalizing clusters to their
+%                     group mean.
 %       'winNorm'   - (1x2 double) [Start End] indices for the baseline window.
 %                     Stats are calculated from this window. Default: Full vector.
-%       'Method'    - (char) Normalization method {'percentage'}:
-%                     'percentage' : x / mean(win)     (C=0, S=mu)
-%                     'zscore'     : (x - mu)/sigma    (C=mu, S=sigma)
-%                     'center'     : x - mu            (C=mu, S=1)
-%                     'scale'      : x / sigma         (C=0, S=sigma)
-%                     'range'      : (x - min)/range   (C=min, S=max-min)
+%       'Method'    - (char) Normalization method {'percentage'}.
+%                     Options match MATLAB's NORMALIZE where applicable, plus
+%                     'percentage':
+%                     'percentage' : x / mean(win)
+%                     'zscore'     : (x - mean(win)) / std(win)
+%                     'center'     : x - mean(win)
+%                     'scale'      : x / std(win)
+%                     'range'      : (x - min(win)) / (max(win) - min(win))
 %
 %   EXAMPLE:
 %       % Normalize 'LFP' column to baseline (indices 1-100) as percentage:
 %       tbl = tbl_tNorm(tbl, 'varsInc', 'LFP', 'winNorm', [1, 100], 'Method', 'percentage');
 %
 %       % Z-score 'FR' by 'Genotype' group using baseline stats:
+%       % Each unit is normalized by the MEAN and STD of the whole group's baseline.
 %       tbl = tbl_tNorm(tbl, 'varsInc', 'FR', 'varsGrp', 'Genotype', ...
 %                       'winNorm', [1, 500], 'Method', 'zscore');
 %
@@ -71,22 +76,20 @@ if ischar(varsGrp) || isstring(varsGrp), varsGrp = cellstr(varsGrp); end
 tblOut = tbl;
 tblVars = tbl.Properties.VariableNames;
 
-% 1. Determine Variables
+% Determine Variables
 if isempty(varsInc)
     processVars = tblVars;
 else
-    % Only keep variables that exist in the table
+    % Filter vars that exist
     processVars = varsInc(ismember(varsInc, tblVars));
-    if length(processVars) < length(varsInc)
-        warning('Some requested variables were not found in the table.');
-    end
 end
 
-% 2. Filter Numeric Variables Only
+% Filter Numeric Variables Only
+% Check first row to see if it is numeric
 isNum = cellfun(@(x) isnumeric(tblOut.(x)), processVars);
 processVars = processVars(isNum);
 
-% 3. Window Check
+% Window Indices
 wS = 1; wE = inf;
 if ~isempty(winNorm)
     wS = max(1, winNorm(1));
@@ -99,22 +102,12 @@ end
 %  ========================================================================
 
 if ~isempty(varsGrp)
-    uGrps = unique(tblOut(:, varsGrp), 'rows');
+    [uGrps, ~, ic] = unique(tblOut(:, varsGrp), 'rows');
     nGrps = height(uGrps);
+    % ic contains the group index for each row, avoiding manual loop matching
     idxGrps = cell(nGrps, 1);
-
-    for iGrp = 1:nGrps
-        uRow = uGrps(iGrp, :);
-
-        % Initialize index filter
-        idxGrp = true(height(tblOut), 1);
-
-        % Filter matching rows (Works for numeric, string, categorical)
-        for iVar = 1:length(varsGrp)
-            v = varsGrp{iVar};
-            idxGrp = idxGrp & (tblOut.(v) == uRow.(v));
-        end
-        idxGrps{iGrp} = idxGrp;
+    for i = 1:nGrps
+        idxGrps{i} = (ic == i);
     end
 else
     idxGrps = {};
@@ -130,15 +123,15 @@ for iVar = 1:length(processVars)
     varData = tblOut.(varName);
 
     % ---------------------------------------
-    % Case 1: Row-wise Normalization
+    % Case 1: Row-wise Normalization (Default)
     % ---------------------------------------
     if isempty(idxGrps)
 
-        % Extract Window Data for Stats
+        % Extract Window
         winMat = varData(:, wS:wE);
 
-        % Calculate Params (Row-wise -> Dim 2)
-        [C, S] = getNormParams(winMat, method, 2);
+        % Calculate Row-wise Params
+        [C, S] = norm_params(winMat, method);
 
         % Apply Normalize
         varData = normalize(varData, 2, 'center', C, 'scale', S, normArgs{:});
@@ -147,17 +140,21 @@ for iVar = 1:length(processVars)
         % Case 2: Group-wise Normalization
         % ---------------------------------------
     else
-        for iGrp = 1:length(idxGrps)
+        for iGrp = 1:nGrps
             idx = idxGrps{iGrp};
             grpData = varData(idx, :);
 
-            % Extract Pooled Window Data
+            % Extract Pooled Window for Group
             subMat = grpData(:, wS:wE);
+            
+            % Calculate Params
+            % Here we treat all samples in the window as part of the
+            % baseline distribution. C and S will be scalars.
+            [C, S] = norm_params([subMat(:)]', method);
 
-            % Calculate Params (Pooled -> Dim 1/Vector)
-            [C, S] = getNormParams(subMat(:), method, 1);
-
-            % Apply Normalize to Group Rows (using scalar/pooled stats)
+            % Apply Normalize to Group Rows
+            % Using scalar C and S, normalize applies them to each element
+            % effectively centering/scaling each unit by the group baseline.
             varData(idx, :) = normalize(grpData, 2, 'center', C, 'scale', S, normArgs{:});
         end
     end
@@ -167,52 +164,52 @@ end
 
 end
 
+
 %% ========================================================================
 %  HELPER FUNCTION
 %  ========================================================================
 
-function [C, S] = getNormParams(vals, method, dim)
-% Calculates Center (C) and Scale (S) parameters based on the method.
-% 'vals' is the data window used for statistics. 'dim' specifies operation.
+function [C, S] = norm_params(vals, method)
+% Calculates Center (C) and Scale (S) parameters.
+% vals: Data to calculate stats on.
 
-% Ignore NaNs for statistics
 switch lower(method)
     case 'percentage'
-        mu = mean(vals, dim, 'omitnan');
+        mu = mean(vals, 2, 'omitnan');
         C = 0;
         S = mu;
 
     case 'zscore'
-        mu = mean(vals, dim, 'omitnan');
-        sig = std(vals, 0, dim, 'omitnan');
+        mu = mean(vals, 2, 'omitnan');
+        sig = std(vals, 0, 2, 'omitnan');
         C = mu;
         S = sig;
 
     case 'center'
-        mu = mean(vals, dim, 'omitnan');
+        mu = mean(vals, 2, 'omitnan');
         C = mu;
         S = 1;
 
     case 'scale'
-        sig = std(vals, 0, dim, 'omitnan');
+        sig = std(vals, 0, 2, 'omitnan');
         C = 0;
         S = sig;
 
     case 'range'
-        mn = min(vals, [], dim, 'omitnan');
-        mx = max(vals, [], dim, 'omitnan');
+        mn = min(vals, [], 2, 'omitnan');
+        mx = max(vals, [], 2, 'omitnan');
         C = mn;
         S = mx - mn;
 
     otherwise
-        % Default to zscore-like behavior if unknown
-        mu = mean(vals, dim, 'omitnan');
-        sig = std(vals, 0, dim, 'omitnan');
+        % Default to zscore
+        mu = mean(vals, 2, 'omitnan');
+        sig = std(vals, 0, 2, 'omitnan');
         C = mu;
         S = sig;
 end
 
-% Prevent division by zero
+% Safety for division by zero
 S(S == 0) = eps;
 
 end

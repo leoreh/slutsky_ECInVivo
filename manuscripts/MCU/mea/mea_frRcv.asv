@@ -175,8 +175,9 @@ rcvWork = rcvGain ./ pertDepth;
 
 % Perturbed Units
 % Significant perturbation AND "dead-zone" lower then frBsl
-frDead = mean(frMat(:, idxPert : idxTrough), 2, 'omitnan');
-uPert = pertDepth >= thrPert & frDead < frBsl;
+frDeamean(frMat(:, troughWin), 2, 'omitnan');
+bslEnd : idxTrough
+uPert = pertDepth >= thrPert;
 
 % Recoverd Units
 % Significant perturbation AND reached 67% of recovery range

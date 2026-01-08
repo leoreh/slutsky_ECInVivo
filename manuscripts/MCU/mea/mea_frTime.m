@@ -4,43 +4,34 @@
 %  Script to load MEA data, cluster units by baseline firing rate, normalize
 %  temporal dynamics, and visualize using tblGUI_xy.
 
-%% ========================================================================
-%  LOAD
-%  ========================================================================
-clear; clc;
-
-% Load table with temporal dynamics ('time' preset)
+% Load
 % [tbl, xVec, basepaths, v] = mcu_tblMea('presets', {'time'});
-
-% Correct time vector (Max data skips every other hour after perturbation)
-% Reference: manuscripts/MCU/mea/obsolete/mcu_meaFRt.m
-xVec(xVec > 0) = xVec(xVec > 0) * 2;
+tblPlot = tbl;
 
 
 %% ========================================================================
 %  CLUSTERS
 %  ========================================================================
-%  Cluster units into percentiles based on a specific variable (fr)
+%  Cluster units into percentiles based on a specific variable
 
+varClu = 'fr';      
 nClu   = 3;         % Number of clusters (percentiles)
-varClu = 'fr';      % Variable to cluster by ('fr' = Baseline Firing Rate)
-alpha  = 1.5;       % Scaling factor for percentile spacing
+alpha  = 2;       % Scaling factor for percentile spacing
 
 % Initialize Cluster Label Column
-tbl.cluLbl = strings(height(tbl), 1);
+tblPlot.cluLbl = strings(height(tblPlot), 1);
 
 % Get Unique Groups
-grps = unique(tbl.Group);
+grps = unique(tblPlot.Group);
 
 for iGrp = 1:length(grps)
 
-    idxGrp = tbl.Group == grps(iGrp);
+    idxGrp = tblPlot.Group == grps(iGrp);
 
     % Extract Data for Clustering
-    grpData = tbl.(varClu)(idxGrp);
+    grpData = tblPlot.(varClu)(idxGrp);
 
     % Calculate Percentile Edges
-    % Logic adapted from mcu_meaFRt.m
     p = linspace(0, 1, nClu + 1) .^ alpha;
     percEdges = prctile(grpData, 100 * (1 - p));
     percEdges = sort(percEdges);
@@ -57,31 +48,29 @@ for iGrp = 1:length(grps)
         end
 
         % Create Label
-        lbl = sprintf('P%d (%.1f-%.1f Hz)', iClu, edgeLo, edgeHi);
+        lbl = sprintf('P%d (%.1f-%.1f)', iClu, edgeLo, edgeHi);
 
         % Map back to full table
-        % Find indices in full table that match group AND cluster
-        % (Subset of idxGrp)
         idxGlobal = find(idxGrp);
-        tbl.cluLbl(idxGlobal(idxClu)) = lbl;
+        tblPlot.cluLbl(idxGlobal(idxClu)) = lbl;
     end
 end
 
 % Convert to categorical for GUI grouping
-tbl.cluLbl = categorical(tbl.cluLbl);
+tblPlot.cluLbl = categorical(tblPlot.cluLbl);
 
 %% ========================================================================
 %  NORMALIZE
 %  ========================================================================
-
-%  Normalize traces to baseline percentage
+%  Normalize traces to baseline percentage using tbl_tNorm
 
 % Define Baseline Window (Indices where Time < 0)
 winNorm = [1, find(xVec >= 0, 1) - 1];
 
-% Normalize using tbl_tNorm
-tbl = tbl_tNorm(tbl, 'varsInc', {'t_fr'}, 'winNorm', winNorm, ...
-    'Method', 'percentage', 'varsGrp', 'Name');
+tblVars = tbl.Properties.VariableNames;
+tVars = tblVars(contains(tblVars, 't_'));
+tblPlot = tbl_tNorm(tblPlot, 'varsInc', tVars, 'winNorm', winNorm, ...
+    'Method', 'percentage', 'varsGrp', {});
 
 % Convert Ratio to Percentage
 % tbl.t_fr = tbl.t_fr * 100;
@@ -90,7 +79,7 @@ tbl = tbl_tNorm(tbl, 'varsInc', {'t_fr'}, 'winNorm', winNorm, ...
 %  PLOT
 %  ========================================================================
 
-tblGUI_xy(xVec, tbl, ...
+tblGUI_xy(xVec, tblPlot, ...
     'yVar', 't_fr', ...
     'grpVar', 'cluLbl', ...    % Group lines by Cluster
     'tileVar', 'Group', ...    % Separate tiles by Group (Control vs KO)
