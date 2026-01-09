@@ -24,8 +24,7 @@ nFolds = 3;
 nReps = 2;
 
 % Recovery
-frml = 'frSs ~ frTrough + fr * Group + pBspk * Group + (1|Name)';
-
+frml = 'frSs ~ frTrough + fr * Group + pBspk + (1|Name)';
 
 res = lme_ablation(tblLme, frml, 'nReps', nReps, 'dist', 'Gamma');
 
@@ -33,12 +32,7 @@ res = lme_ablation(tblLme, frml, 'nReps', nReps, 'dist', 'Gamma');
 groupLabels = tblLme.Group(firstIdx);
 
 frml = 'frSs ~ frTrough + fr * Group + pBspk * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, tblMdl] = lme_analyse(tblLme, frml);
-
-lmeMdl = lme_fit(tblMdl, frml, 'dist', 'Gamma', 'fitMethod', 'REMPL');
-
-[lmeMdl, lmeStats, lmeInfo, tblMdl] = lme_analyse(tblLme, frml, 'dist', 'log-normal');
-
+[mdl, ~, ~, ~] = lme_analyse(tblLme, frml);
 
 skewness(tblLme.pBspk)
 tblLme2 = tbl_transform(tblLme, 'varsInc', {'pBspk'}, ...

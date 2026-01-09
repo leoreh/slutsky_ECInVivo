@@ -71,10 +71,10 @@ if ~isempty(varsRnd)
     end
 end
 varsGrp = unique(varsGrp);
+varsFxd = unique(varsFxd);
 
 % Truncate Table
-vars = unique([{varResp}, varsFxd, varsGrp]);
-lmeTbl = tbl(:, vars);
+lmeTbl = tbl(:, [{varResp}, varsFxd, varsGrp]);
 
 % PREDICTOR TRANSFORMATION
 % Identify numeric/continuous predictors (exclude categorical)

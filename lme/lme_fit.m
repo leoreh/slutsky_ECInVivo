@@ -14,7 +14,7 @@ function mdl = lme_fit(tbl, frml, varargin)
 %                     'link'      : (char) Link function. Auto-selected if empty.
 %                     'fitMethod' : (char) Fitting method.
 %                                   'REML' (default for LME), 'ML'.
-%                                   'Laplace' (default for GLME).
+%                                   'Laplace', REMPL (default for GLME).
 %
 %   OUTPUTS:
 %       mdl         - (object) Fitted GeneralizedLinearMixedModel or LinearMixedModel.
