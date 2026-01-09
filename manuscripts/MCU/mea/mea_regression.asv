@@ -22,7 +22,7 @@ listRspns = {'uRcv', 'rcvBsl', 'rcvTime', 'spkDfct', 'Genotype', 'frSs', 'rcvWor
 
 
 % Recovery
-frml = 'frSs ~ frTrough + fr * Group + pBspk * Group + (1|Name)';
+frml = 'frSs ~ frTrough + fr * Group + pBspk : Group + (1|Name)';
 
 res = lme_ablation(tblLme, frml, 'dist', 'log-normal');
 
@@ -63,7 +63,7 @@ tblCtrl = tblLme(tblLme.Group == "Control", :);
 tblCtrl(:, 'Group') = [];
 frml = 'frSs ~ frTrough + fr + pBspk + (1|Name)';
 
-res = lme_ablation(tblCtrl, frml, 'dist', 'gamma');
+res = lme_ablation(tblCtrl, frml, 'dist', 'log-normal');
 
 
 varsFxd  = {'pertDepth', 'fr', 'pBspk'};

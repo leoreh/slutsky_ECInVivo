@@ -223,6 +223,7 @@ for iVar = 1:numel(procVars)
     % Update Table (Intermediate)
     tblOut.(var) = data;
 
+
     % --- Calculate Group Stats (Norm/Z) ---
     % Store stats in a table: [GroupVals, Mean, SD, RefMean]
     nGrps = max(grpIdx);
@@ -302,6 +303,10 @@ function [tblOut, params] = apply_transform(tbl, tmpl, verbose)
 params = tmpl; % Return same params
 tblOut = tbl;
 
+varsGrp = tmpl.varsGrp;
+varNorm = tmpl.varNorm;
+catRef  = tmpl.catRef;
+
 % Available vars in table
 tblVars = tbl.Properties.VariableNames;
 
@@ -310,7 +315,6 @@ procVars = fieldnames(tmpl.varList);
 procVars = procVars(ismember(procVars, tblVars));
 
 % Match Groups
-varsGrp = tmpl.varsGrp;
 if ~isempty(varsGrp)
 
     % Pick the stats table from the first var to get group definitions

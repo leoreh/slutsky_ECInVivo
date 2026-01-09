@@ -79,21 +79,16 @@ for i = 1:numel(terms)
         subAtoms = strtrim(strsplit(t, '*'));
         allAtoms = [allAtoms, subAtoms];
 
-        % Generate all pairwise/higher-order interactions (simplified: just A:B for now)
-        % For A*B*C, strict expansion is complex.
-        % We will simplify checking: if '*' exists, it implies full factorial.
-        % However, specifically for ablation, we usually care about the highest order
-        % term or specific listed interactions.
-        % Let's synthesize the standard interaction form 'A:B' for output.
+        % Generate standard interaction form 'A:B'
         if numel(subAtoms) > 1
-            % Create A:B string
             varsIntr{end+1} = strjoin(sort(subAtoms), ':');
         end
 
     elseif contains(t, ':')
         % Explicit interaction: A:B
+        % Do NOT add to allAtoms (Fixed Effects).
+        % Because A:B does not imply A or B is a Main Effect.
         subAtoms = strtrim(strsplit(t, ':'));
-        allAtoms = [allAtoms, subAtoms];
 
         % Store exact interaction term (sorted for consistency)
         varsIntr{end+1} = strjoin(sort(subAtoms), ':');

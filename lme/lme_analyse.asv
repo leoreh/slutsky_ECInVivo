@@ -62,7 +62,7 @@ lmeInfo.distInput = dist;
 %  ========================================================================
 
 % Vars
-[varsFxd, varResp, varsRnd, intrTerms] = lme_frml2vars(frml);
+[varsFxd, varResp, varsRnd, varsIntr] = lme_frml2vars(frml);
 
 % Extract actual grouping variables from random effect terms
 varsGrp = {};
@@ -77,20 +77,21 @@ varsFxd = unique(varsFxd);
 
 % Extract variables from interaction terms (varsIntr)
 % varsIntr contains strings like 'A:B'. We need 'A' and 'B'.
-varsIntr = {};
-if ~isempty(intrTerms)
-    for iIntr = 1:length(intrTerms)
-        atoms = strtrim(strsplit(intrTerms{iIntr}, ':'));
-        varsIntr = [varsIntr, atoms];
+varsFromIntr = {};
+if ~isempty(varsIntr)
+    for iIntr = 1:length(varsIntr)
+        atoms = strtrim(strsplit(varsIntr{iIntr}, ':'));
+        varsFromIntr = [varsFromIntr, atoms];
     end
 end
-varsIntr = unique(varsIntr(:));
+varsFromIntr = unique(varsFromIntr(:));
 
 % Combine all required columns (Response + Fixed + Interaction + Random Groups)
-varsTbl = unique([varsFxd(:); varsIntr(:); varsGrp(:); {varResp}]);
+varsAll = unique([varsFxd(:); varsFromIntr(:); varsGrp(:); {varResp}]);
 
 % Truncate Table
-lmeTbl = tbl(:, varsTbl);
+lmeTbl = tbl(:, varsAll);
+varsTbl = lmeTbl.Properties.VariableNames;
 
 % PREDICTOR TRANSFORMATION
 % Identify numeric/continuous predictors (exclude categorical)
@@ -101,12 +102,10 @@ if ~isempty(varsNum)
     if verbose
         fprintf('[LME_ANALYSE] Transforming Predictors (Log10[Skew>2] + Z-Score)\n');
     end
-    [lmeTbl, transParams] = tbl_transform(lmeTbl, 'varsInc', varsNum, ...
+    lmeTbl = tbl_transform(lmeTbl, 'varsInc', varsNum, ...
         'logBase', 10, 'skewThr', 2, ...
         'flgZ', true, ...
         'verbose', verbose);
-
-    lmeInfo.transParams = transParams;
 end
 
 

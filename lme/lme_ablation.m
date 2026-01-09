@@ -41,7 +41,7 @@ addParameter(p, 'nReps', 5, @isnumeric);
 addParameter(p, 'flgPlot', true, @islogical);
 parse(p, tbl, frml, varargin{:});
 
-distInput = p.Results.dist;
+dist = p.Results.dist;
 nReps = p.Results.nReps;
 flgPlot = p.Results.flgPlot;
 
@@ -50,11 +50,11 @@ flgPlot = p.Results.flgPlot;
 %  ========================================================================
 
 % Run LME_ANALYSE to prepare data and select distribution (Global Check)
-% We keep tblLme (Global) for TESTING and VIF analysis.
-% We create tblRaw for TRAINING to ensure independent Z-scoring.
 fprintf('[LME_ABLATION] Running initial analysis to prepare data...\n');
-[~, ~, lmeInfo, tblLme] = lme_analyse(tbl, frml, 'dist', distInput);
-dist = lmeInfo.distFinal;
+[~, ~, lmeInfo, tblLme] = lme_analyse(tbl, frml, 'dist', dist);
+
+% Update dist
+dist = lmeInfo.distSelected;
 
 % Determine Mode
 flgBinomial = strcmpi(dist, 'Binomial');
@@ -69,12 +69,8 @@ else
 end
 fprintf('[LME_ABLATION] Mode: %s (Dist: %s)\n', modeStr, dist);
 
-% Extract variables from formula
+% Extract variables from formula and add full model as first iteration
 [varsFxd, varRsp, ~, varsIntr] = lme_frml2vars(frml);
-
-% varsIter: [Full Model, No Var1, No Var2, ..., No Int1, No Int2]
-% We simply concat main effects and interactions.
-% lme_frml2rmv will handle the logic of what to remove for each string.
 varsIter = [{'None'}, varsFxd, varsIntr];
 
 
@@ -133,29 +129,30 @@ for iRep = 1 : nTotal
     trainIdx = matTrn(:, iRep);
     testIdx  = ~trainIdx;
 
-    % 1. Train on RAW Data (Correct Z-Scoring per fold)
+    % Train Data (Raw)
     tblTrn = tbl(trainIdx, :);
-
-    % 2. Test on GLOBAL LME Data (Accepting minor scale mismatch)
-    tblTst = tblLme(testIdx, :);
-    yTrue  = tblTst.(varRsp);
 
     % Iterate Models (Variables to remove)
     for iVar = 1 : length(varsIter)
 
-        % Construct Formula
         varRmv = varsIter{iVar};
         currFrml = lme_frml2rmv(frml, varRmv);
 
-        % Fit Model using LME_ANALYSE (handles Z-scoring)
+        % Train and Get Params
         try
-            [mdl, ~] = lme_analyse(tblTrn, currFrml, ...
+            [mdl, ~, infoTrn] = lme_analyse(tblTrn, currFrml, ...
                 'dist', dist, 'verbose', false);
 
+            % Test: Apply EXACT same transformations as Training
+            tblTst = tbl(testIdx, :); % Start with RAW data
+            tblTst = tbl_transform(tblTst, 'template', infoTrn.transParams);
+
+            yTrue = tblTst.(varRsp);
             yProb = predict(mdl, tblTst);
+
         catch ME
             warning('Fit failed for %s (Iter %d): %s', varRmv, iRep, ME.message);
-            yProb = nan(size(yTrue));
+            yProb = nan(size(yTrue)); % Ensure yProb is defined for metrics
         end
 
         % --- METRICS CALCULATION ---
@@ -208,20 +205,23 @@ for iRep = 1 : nTotal
 end
 fprintf('\n');
 
-% Calculate Deltas (Interpretation depends on metric)
-% For BACC/AUC/R2: Higher is better -> Delta = Full - Reduced (Positive = Important)
-% For RMSE: Lower is better -> Delta = Reduced - Full (Positive = Important, removing it increased error)
+% Calculate Deltas (Percentage Change relative to Full Model)
+% Index 1 is always 'None' (Full Model)
+basePrim = res.perfPrim(:, 1);
+baseSec  = res.perfSec(:, 1);
 
 if strcmp(metricPrim, 'RMSE')
-    % RMSE: Importance = Error(Reduced) - Error(Full)
-    res.impPrim = res.perfPrim(:, 2:end) - res.perfPrim(:, 1);
+    % RMSE: importance = % Increase in Error (Lower is better)
+    % (Reduced - Full) / Full * 100
+    res.impPrim = (res.perfPrim(:, 2:end) - basePrim) ./ basePrim * 100;
 else
-    % BACC/AUC/R2: Importance = Score(Full) - Score(Reduced)
-    res.impPrim = res.perfPrim(:, 1) - res.perfPrim(:, 2:end);
+    % BACC/AUC/R2: importance = % Drop in Performance (Higher is better)
+    % (Full - Reduced) / Full * 100
+    res.impPrim = (basePrim - res.perfPrim(:, 2:end)) ./ basePrim * 100;
 end
 
-% Secondary Metric Deltas (AUC / R-Squared -> Higher is better)
-res.impSec = res.perfSec(:, 1) - res.perfSec(:, 2:end);
+% Secondary Metric Deltas (AUC / R2 -> Higher is better)
+res.impSec = (baseSec - res.perfSec(:, 2:end)) ./ baseSec * 100;
 
 
 %% ========================================================================
@@ -245,7 +245,6 @@ hasGroup = ismember('Group', tbl.Properties.VariableNames);
 
 if hasName && hasGroup
     % --- Exhaustive Leave-One-Pair-Out (Deterministic) ---
-    % Logic:
     % 1. Identify all unique subjects and their groups.
     % 2. Generate every possible combination of ONE subject from EACH group.
     %    (e.g., 5 Ctrl * 5 KO = 25 unique test sets).
@@ -327,7 +326,7 @@ bar(muImp, 'FaceColor', 'k', 'FaceAlpha', 0.5);
 hold on;
 errorbar(1:nVars, muImp, semImp, 'k.', 'LineWidth', 1.5);
 xticks(1:nVars); xticklabels(varsFxd);
-ylabel(['\Delta ' labPrim]);
+ylabel(['% \Delta ' labPrim]);
 title(['Importance (' labPrim ')']);
 grid on;
 
@@ -339,7 +338,7 @@ bar(muImpSec, 'FaceColor', 'b', 'FaceAlpha', 0.5);
 hold on;
 errorbar(1:nVars, muImpSec, semImpSec, 'k.', 'LineWidth', 1.5);
 xticks(1:nVars); xticklabels(varsFxd);
-ylabel(['\Delta ' labSec]);
+ylabel(['% \Delta ' labSec]);
 title(['Importance (' labSec ')']);
 grid on;
 
@@ -348,12 +347,15 @@ nexttile;
 data = res.perfPrim;
 labels = res.vars;
 ylab = labPrim;
-% Inline scatter_raw logic
-nCols = size(data, 2);
+% Connecting Lines for paired observations
+plot(1:size(data,2), data', '-', 'Color', [0.7 0.7 0.7 0.3], 'LineWidth', 0.5);
 hold on;
+
+% Inline scatter_raw logic (Means + Scatters)
+nCols = size(data, 2);
 for iCol = 1:nCols
     x = iCol + randn(size(data,1), 1) * 0.05;
-    scatter(x, data(:,iCol), 15, 'filled', 'MarkerFaceAlpha', 0.3);
+    scatter(x, data(:,iCol), 15, 'filled', 'MarkerFaceAlpha', 0.8);
     plot([iCol-0.2, iCol+0.2], [mean(data(:,iCol), 'omitnan'), mean(data(:,iCol), 'omitnan')], 'k-', 'LineWidth', 2);
 end
 xticks(1:nCols); xticklabels(labels);
