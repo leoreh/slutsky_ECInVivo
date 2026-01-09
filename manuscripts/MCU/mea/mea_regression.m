@@ -20,42 +20,28 @@ listRspns = {'uRcv', 'rcvBsl', 'rcvTime', 'spkDfct', 'Genotype', 'frSs', 'rcvWor
 %  ABLATION
 %  ========================================================================
 
-nFolds = 3;
-nReps = 2;
 
 % Recovery
 frml = 'frSs ~ frTrough + fr * Group + pBspk * Group + (1|Name)';
 
-
-res = lme_ablation(tblLme, frml, 'nReps', nReps, 'dist', 'Gamma');
+res = lme_ablation(tblLme, frml, 'dist', 'log-normal');
 
 [uniqueNames, firstIdx] = unique(tblLme.Name, 'stable');
 groupLabels = tblLme.Group(firstIdx);
 
-frml = 'frSs ~ frTrough + fr * Group + pBspk * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, tblMdl] = lme_analyse(tblLme, frml);
-
-lmeMdl = lme_fit(tblMdl, frml, 'dist', 'Gamma', 'fitMethod', 'REMPL');
-
 [lmeMdl, lmeStats, lmeInfo, tblMdl] = lme_analyse(tblLme, frml, 'dist', 'log-normal');
 
 
-skewness(tblLme.pBspk)
-tblLme2 = tbl_transform(tblLme, 'varsInc', {'pBspk'}, ...
-    'logBase', 'logit', 'skewThr', 2, ...
-    'flgZ', false, ...
-    'verbose', true);
 
 
 
-[pd, grp, pBspk_pred] = partialDependence(mdl, {'Group', 'fr'});
+
+[pd, grp, pBspk_pred] = partialDependence(mdl, {'Group', 'pBspk'});
 
 hFig = figure;
 plot(pBspk_pred, pd)
 
-
-plotPartialDependence(mdl, {'Group', 'fr'})
-plotPartialDependence(mdl, {'fr'}, 'Conditional','centered')
+plotPartialDependence(mdl, {'Group', 'pBspk'})
 
 % Predict Genotype (w/o Name as random effect)
 tblLme.Genotype = tblLme.Group == "Control";
@@ -64,14 +50,7 @@ frml = sprintf('Genotype ~ %s', strjoin(varsFxd, ' + '));
 res = lme_ablation(tblLme, frml, 'nFolds', nFolds, 'nReps', nReps);
 
 
-frml = 'frSs ~ pertDepth + fr + pBspk * Group + (1|Name)';
-[mdl, ~, ~, ~] = lme_analyse(tblLme, frml)
 
-
-frml = 'rcvWork ~ fr + pBspk * Group';
-mdl = fitglm(tblLme, frml);
-plotSlice(mdl)
-plotInteraction(mdl,'Group','pBspk')
 
 
 
@@ -81,6 +60,11 @@ res = lme_mediation(tblLme, frml, 'Group', 'pBspk');
 
 % Limit tbl to control
 tblCtrl = tblLme(tblLme.Group == "Control", :);
+tblCtrl(:, 'Group') = [];
+frml = 'frSs ~ frTrough + fr + pBspk + (1|Name)';
+
+res = lme_ablation(tblCtrl, frml, 'dist', 'log-normal');
+
 
 varsFxd  = {'pertDepth', 'fr', 'pBspk'};
 frml = sprintf('rcvBsl ~ %s + (1|Name)', strjoin(varsFxd, ' + '));
@@ -113,6 +97,8 @@ res = lme_ablation(tblLme, frml, 'nFolds', nFolds, 'nReps', nReps);
 % 
 % Burstiness shows stronger predictive capacity when NOT log- or
 % logit-transformed. It's skeweness is only ~1.6 so it's okay. 
+% 
+% Gamma distribution fails to converge in the ablation analysis
 %  ========================================================================
 
 

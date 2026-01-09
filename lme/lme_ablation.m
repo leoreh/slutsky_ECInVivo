@@ -49,7 +49,9 @@ flgPlot = p.Results.flgPlot;
 %  PREPARATION
 %  ========================================================================
 
-% Run LME_ANALYSE to prepare data and select distribution
+% Run LME_ANALYSE to prepare data and select distribution (Global Check)
+% We keep tblLme (Global) for TESTING and VIF analysis.
+% We create tblRaw for TRAINING to ensure independent Z-scoring.
 fprintf('[LME_ABLATION] Running initial analysis to prepare data...\n');
 [~, ~, lmeInfo, tblLme] = lme_analyse(tbl, frml, 'dist', distInput);
 dist = lmeInfo.distFinal;
@@ -68,10 +70,12 @@ end
 fprintf('[LME_ABLATION] Mode: %s (Dist: %s)\n', modeStr, dist);
 
 % Extract variables from formula
-[varsFxd, varRsp, ~] = lme_frml2vars(frml);
+[varsFxd, varRsp, ~, varsIntr] = lme_frml2vars(frml);
 
-% varsIter: [Full Model, No Var1, No Var2, ...]
-varsIter = [{'None'}, varsFxd];
+% varsIter: [Full Model, No Var1, No Var2, ..., No Int1, No Int2]
+% We simply concat main effects and interactions.
+% lme_frml2rmv will handle the logic of what to remove for each string.
+varsIter = [{'None'}, varsFxd, varsIntr];
 
 
 %% ========================================================================
@@ -129,7 +133,10 @@ for iRep = 1 : nTotal
     trainIdx = matTrn(:, iRep);
     testIdx  = ~trainIdx;
 
-    tblTrn = tblLme(trainIdx, :);
+    % 1. Train on RAW Data (Correct Z-Scoring per fold)
+    tblTrn = tbl(trainIdx, :);
+
+    % 2. Test on GLOBAL LME Data (Accepting minor scale mismatch)
     tblTst = tblLme(testIdx, :);
     yTrue  = tblTst.(varRsp);
 
@@ -140,10 +147,11 @@ for iRep = 1 : nTotal
         varRmv = varsIter{iVar};
         currFrml = lme_frml2rmv(frml, varRmv);
 
-        % Fit Model (Use lme_fit)
-        % Note: We suppress output or warnings if needed, but lme_fit is clean.
+        % Fit Model using LME_ANALYSE (handles Z-scoring)
         try
-            mdl = lme_fit(tblTrn, currFrml, 'dist', dist);
+            [mdl, ~] = lme_analyse(tblTrn, currFrml, ...
+                'dist', dist, 'verbose', false);
+
             yProb = predict(mdl, tblTst);
         catch ME
             warning('Fit failed for %s (Iter %d): %s', varRmv, iRep, ME.message);
@@ -236,53 +244,45 @@ hasName  = ismember('Name', tbl.Properties.VariableNames);
 hasGroup = ismember('Group', tbl.Properties.VariableNames);
 
 if hasName && hasGroup
-    % --- Stratified Grouped Random Subsampling (Balanced Coverage) ---
+    % --- Exhaustive Leave-One-Pair-Out (Deterministic) ---
     % Logic:
-    % 1. Determine nFolds per repetition based on the largest group size (maxSub).
-    %    This ensures one full sweep covers every subject in the largest group.
-    % 2. For smaller groups, subjects are cycled to ensure every fold
-    %    has a valid test subject.
+    % 1. Identify all unique subjects and their groups.
+    % 2. Generate every possible combination of ONE subject from EACH group.
+    %    (e.g., 5 Ctrl * 5 KO = 25 unique test sets).
+    % 3. Each combination becomes a Test Fold.
+    % Note: Only works for two groups currently
 
     [uNames, idxFirst] = unique(tbl.Name, 'stable');
     nameGrps = tbl.Group(idxFirst);
     uGrps = unique(nameGrps);
 
-    % Determine Max Group size (nFolds)
-    nFolds = 2;
+    % Collect subjects by group
+    grpSubjects = cell(numel(uGrps), 1);
     for iGrp = 1:numel(uGrps)
-        grpNames = uNames(nameGrps == uGrps(iGrp));
-        nSub = numel(grpNames);
-        nFolds = max(nFolds, nSub);
+        grpSubjects{iGrp} = uNames(nameGrps == uGrps(iGrp));
     end
 
-    nTotal = nReps * nFolds;
+    % Generate Cartesian Product of subjects (1 from each group)
+    for iGrp = 2:numel(uGrps)
+        currSub = grpSubjects{iGrp};
+        nOld = size(grpSubjects{1}, 1);
+        nNew = numel(currSub);
+
+        tmpOld = repmat(grpSubjects{1}, nNew, 1);
+        tmpNew = repelem(currSub, nOld, 1);
+        combos = [tmpOld, tmpNew];
+    end
+
+    nTotal = size(combos, 1);
+    fprintf('[LME_ABLATION] Found %d unique test combinations.\n', nTotal);
+
     matTrn = true(height(tbl), nTotal);
 
-    for iRep = 1 : nReps
-        testNames = cell(nFolds, 1);
+    for iRep = 1 : nTotal
+        testNames = combos(iRep, :); % 1xGroups
 
-        for iGrp = 1 : numel(uGrps)
-
-            grpNames = uNames(nameGrps == uGrps(iGrp));
-            nSub = numel(grpNames);
-
-            % Cyclic Permutation
-            shuffled = grpNames(randperm(nSub));
-            nRepeats = ceil(nFolds / nSub);
-            extended = repmat(shuffled, nRepeats, 1);
-            seq = extended(1:nFolds);
-
-            % Append to folds
-            for iFold = 1 : nFolds
-                testNames{iFold} = [testNames{iFold}; seq(iFold)];
-            end
-        end
-
-        % Assign to Matrix
-        idxBase = (iRep - 1) * nFolds;
-        for iFold = 1 : nFolds
-            matTrn(:, idxBase + iFold) = ~ismember(tbl.Name, testNames{iFold});
-        end
+        % Defines TEST set (Leave-These-Out)
+        matTrn(:, iRep) = ~ismember(tbl.Name, testNames);
     end
 
 else
@@ -764,23 +764,70 @@ end     % EOF
 %     estimation.
 %
 %  3. COMBINATORICS AND REPETITIONS
-%     With 5 Control and 5 MCU-KO cultures (N=10), a 5-fold scheme
-%     places exactly 1 pair (1 Ctrl + 1 KO) into each test set.
-%     - Total Unique Partitions: There are 120 (5!) unique ways to organize
-%       these 10 cultures into 5 balanced folds.
-%     - Strategy: Using nReps (e.g., 10-20) allows the script to sample
-%       from these 120 combinations, providing stable error bars for
-%       feature importance (Delta Accuracy).
+%     With 5 Control and 5 MCU-KO cultures (N=10), there are exactly 25
+%     unique combinations of (1 Ctrl + 1 KO) test pairs. Because the
+%     training set is defined as "everyone else," each test pair is linked
+%     to a unique, deterministic training set.
+%
+%     - Exhaustive Search: Instead of random shuffling, we generate all 25
+%       combinations (Cartesian product) to serve as the test sets.
+%     - Completeness: This removes sampling noise and ensures the results
+%       represent the true, complete distribution of the model's predictive
+%       power across the cohort.
 %
 %  4. TECHNICAL IMPLEMENTATION
-%     Because MATLAB's 'cvpartition' does not support simultaneous
-%     grouping and stratification, the solution requires:
 %     - Step A: Extract unique Names and their Group assignments.
-%     - Step B: Create a stratified 'cvpartition' on those unique Names.
-%     - Step C: Map the partitioned Names back to the original table rows
-%       inside the cross-validation loop.
+%     - Step B: specific 'cvpartition' is NOT used. Instead, we generate
+%       indices for every possible combination of one-subject-per-group.
+%     - Step C: The number of iterations is automatically set to the total
+%       number of combinations (e.g., 25), ignoring 'nReps'.
 %
 %  This approach is optimal for testing if predictors (pBspk, fr, etc.)
 %  can generalize to a completely new, unseen animal or culture.
 %  ========================================================================
 
+%% ========================================================================
+%  NOTE: NUMERICAL ROBUSTNESS VS. MODEL FIT
+%  ========================================================================
+%  In hierarchical modeling, a conflict often arises between the "Best
+%  Fitting" model (lowest AIC) and the "Most Robust" model for
+%  cross-validation. While AIC measures relative information loss on a
+%  static dataset, it does not guarantee the numerical stability of the
+%  Iteratively Reweighted Least Squares (IRLS) algorithm when data is
+%  partitioned.
+%
+%  1. The Gamma/Log-Link Sensitivity:
+%     The Gamma distribution with a Log link is frequently selected by AIC
+%     for firing rate data. However, this combination is highly sensitive
+%     to data perturbations. In Leave-One-Experiment-Out (LOEO) schemes,
+%     removing a single culture can leave the training set with an
+%     unconstrained slope. This causes the pseudo-likelihood weights to
+%     explode, leading to numerical model collapse (RMSE > 10^70).
+%
+%  2. The Log-Normal Stability:
+%     Modeling log-transformed data using a Gaussian distribution (Log-Normal)
+%     is often the superior choice for ablation analysis.
+%     - Uses closed-form mathematical solutions.
+%     - Avoids iterative weight scaling issues.
+%     - Provides stable out-of-sample predictions.
+%     - Aligns with neurophysiological theory.
+%
+%  3. Justification for Overriding AIC:
+%     An AIC-driven selection should be overridden when the primary
+%     analytical goal is feature ranking rather than population
+%     description. Numerical stability is a prerequisite for interpretable
+%     importance metrics. If a Gamma model fails to converge in any
+%     cross-validation fold, its global AIC advantage is invalidated for
+%     that specific task.
+%
+%  4. Practical Recommendations:
+%     - Report p-values using Gamma.
+%     - Use Log-Normal for importance.
+%     - Verify convergence in every fold.
+%     - Z-score inside the CV loop.
+%     - Monitor for badly scaled weights.
+%
+%  By prioritizing numerical robustness during ablation, you ensure that
+%  "Importance" reflects biological signal rather than the failure
+%  of a specific link function's convergence algorithm.
+%  ========================================================================

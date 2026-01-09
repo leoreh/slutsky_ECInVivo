@@ -1,39 +1,26 @@
 function newFrml = lme_frml2rmv(frml, varRmv)
-% LME_FRML2RMV Reconstructs a formula after removing a specific variable.
+% LME_FRML2RMV Reconstructs a formula after removing a specific variable or term.
 %
 %   NEWFRML = LME_FRML2RMV(FRML, varRmv)
-%    parses the input formula FRML, removes the specified variable varRmv
-%   from all terms (handling interactions and nested structures), and returns
-%   the reconstructed formula string NEWFRML.
-%
-%   This is critical for ablation analysis where removing a main effect (e.g.,
-%   'Group') from an interaction term ('fr * Group') should result in the
-%   retention of the partner variable ('fr'), rather than removing the entire
-%   interaction term or leaving a dangling operator.
+%   Removes a specific term from the LME formula.
 %
 %   LOGIC:
-%       1. Interaction Terms (A * B):
-%          - Removing A leaves B.
-%          - Removing B leaves A.
-%       2. Explicit Interactions (A : B):
-%          - Removing A removes the entire term (A:B requires A).
-%       3. Main Effects (A):
-%          - Removing A removes the term.
+%       1. If varRmv is a Main Effect (e.g., 'A'):
+%          - Remove 'A' everywhere.
+%          - Remove any interaction checking 'A' (e.g., 'A:B').
+%          - effectively: remove if contains 'A'.
+%
+%       2. If varRmv is an Interaction (e.g., 'A:B'):
+%          - Remove ONLY the interaction term 'A:B'.
+%          - Main effects 'A' and 'B' are preserved.
 %
 %   INPUTS:
-%       frml        - (char) Original LME formula.
-%       varRmv    - (char) Name of the variable to remove.
+%       frml      - (char) Original LME formula.
+%       varRmv    - (char) Name of the variable or interaction to remove.
+%                   Can be 'A', 'Group', 'A:B', or 'A:C'.
 %
 %   OUTPUTS:
-%       newFrml     - (char) New formula with the variable removed.
-%
-%   EXAMPLES:
-%       f = 'y ~ A * B + (1|S)';
-%       lme_frml2rmv(f, 'A') -> 'y ~ B + (1|S)'
-%       lme_frml2rmv(f, 'B') -> 'y ~ A + (1|S)'
-%
-%       f = 'y ~ A + A:B + (1|S)';
-%       lme_frml2rmv(f, 'A') -> 'y ~ (1|S)'  (A:B depends on A)
+%       newFrml   - (char) Reconstructed formula string.
 %
 %   See also: LME_ABLATION, LME_FRML2VARS
 
@@ -44,79 +31,108 @@ function newFrml = lme_frml2rmv(frml, varRmv)
 frml = char(frml);
 varRmv = char(varRmv);
 
-% 1. Separate Random Effects and Response
+% 1. Parse Formula Components
+% We need to expand everything to explicit terms (A + B + A:B) to handle
+% removal safely.
 [~, varRsp, varsRand] = lme_frml2vars(frml);
 
-% 2. Extract the Fixed Effects string (between ~ and random effects)
-% Use lme_frml2vars logic to isolate the RHS, then strip random effects
+% Get RHS (Fixed Effects)
 rhs = regexprep(frml, '^\s*[a-zA-Z_]\w*\s*~', '');
-regexRand = '\([^)]+\|[^)]+\)';
-fixedStr = regexprep(rhs, regexRand, '');
+rhs = regexprep(rhs, '\([^)]+\|[^)]+\)', ''); % Remove random effects
 
-% 3. Split by '+' to get individual terms
-% Handle potential whitespace
-terms = strtrim(strsplit(fixedStr, '+'));
-terms(strcmp(terms, '')) = []; % Remove empty
-
+% Split into raw terms
+rawTerms = strtrim(strsplit(rhs, '+'));
+rawTerms(strcmp(rawTerms, '')) = [];
 
 %% ========================================================================
-%  PROCESS TERMS
+%  EXPAND TERMS (Convert A*B to A + B + A:B)
 %  ========================================================================
+expandedTerms = {};
 
-newTerms = {};
+for i = 1:numel(rawTerms)
+    t = rawTerms{i};
 
-for iVar = 1:length(terms)
-    term = terms{iVar};
+    if contains(t, '*')
+        % Expand A*B -> A, B, A:B
+        atoms = strtrim(strsplit(t, '*'));
 
-    % Check for Interaction (*)
-    if contains(term, '*')
-        % "Product" interaction: A * B -> A + B + A:B
-        % Rule: Remove varRmv from the list of atoms.
-        % If A * B * C and we remove B, we get A * C.
-        atoms = strtrim(strsplit(term, '*'));
-        atoms(strcmp(atoms, varRmv)) = [];
+        % Add single atoms
+        expandedTerms = [expandedTerms, atoms];
 
-        if ~isempty(atoms)
-            newTerms{end+1} = strjoin(atoms, ' * ');
+        % Add interaction (sorted A:B)
+        if numel(atoms) > 1
+            expandedTerms{end+1} = strjoin(sort(atoms), ':');
         end
 
-        % Check for Explicit Interaction (:)
-    elseif contains(term, ':')
-        % "Colon" interaction: A : B
-        % Rule: If varRmv is present, the specific interaction is invalid.
-        atoms = strtrim(strsplit(term, ':'));
-        if ~any(strcmp(atoms, varRmv))
-            newTerms{end+1} = term;
-        end
+    elseif contains(t, ':')
+        % Already explicit interaction, just normalize sort
+        atoms = strtrim(strsplit(t, ':'));
+        expandedTerms{end+1} = strjoin(sort(atoms), ':');
 
-        % Main Effect / Single Variable
     else
-        if ~strcmp(term, varRmv)
-            newTerms{end+1} = term;
+        % Main effect
+        expandedTerms{end+1} = t;
+    end
+end
+
+expandedTerms = unique(expandedTerms); % Remove duplicates
+
+%% ========================================================================
+%  FILTER TERMS
+%  ========================================================================
+finalTerms = {};
+
+% Determine Removal Mode
+isInteractionRmv = contains(varRmv, ':') || contains(varRmv, '*');
+
+if isInteractionRmv
+    % Mode: Remove Specific Interaction logic
+    % Normalize varRmv to sorted colon format
+    atomsRmv = strtrim(strsplit(varRmv, {':', '*'}));
+    normRmv = strjoin(sort(atomsRmv), ':');
+
+    for i = 1:numel(expandedTerms)
+        t = expandedTerms{i};
+        % Keep valid terms
+        if ~strcmp(t, normRmv)
+            finalTerms{end+1} = t;
+        end
+    end
+
+else
+    % Mode: Remove Main Effect logic
+    % Remove the variable AND any interaction containing it
+    for i = 1:numel(expandedTerms)
+        t = expandedTerms{i};
+
+        % Check if this term contains the variable
+        % We split term into atoms to check exact match
+        termAtoms = strtrim(strsplit(t, ':'));
+
+        if ~ismember(varRmv, termAtoms)
+            finalTerms{end+1} = t;
         end
     end
 end
 
-
 %% ========================================================================
-%  RECONSTRUCT FORMULA
+%  RECONSTRUCT
 %  ========================================================================
 
-% 1. Fixed Effects Part
-if isempty(newTerms)
+% Fixed Effects
+if isempty(finalTerms)
     fixedPart = '1';
 else
-    fixedPart = strjoin(newTerms, ' + ');
+    fixedPart = strjoin(finalTerms, ' + ');
 end
 
-% 2. Random Effects Part
+% Random Effects
 if isempty(varsRand)
     randPart = '';
 else
     randPart = [' + ' strjoin(varsRand, ' + ')];
 end
 
-% 3. Combine
 newFrml = sprintf('%s ~ %s%s', varRsp, fixedPart, randPart);
 
 end

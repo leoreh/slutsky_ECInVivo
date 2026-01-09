@@ -45,9 +45,11 @@ addParameter(p, 'dist', '', @ischar);
 addParameter(p, 'contrasts', 'all');
 addParameter(p, 'correction', 'holm', @ischar);
 addParameter(p, 'dfMethod', 'Satterthwaite', @ischar);
+addParameter(p, 'verbose', true, @islogical);
 parse(p, tbl, frml, varargin{:});
 
 dist = p.Results.dist;
+verbose = p.Results.verbose;
 frml = char(frml);
 
 % Run Info Storage
@@ -82,11 +84,13 @@ isNum = cellfun(@(x) isnumeric(lmeTbl.(x)) && ~iscategorical(lmeTbl.(x)), varsFx
 varsCont = varsFxd(isNum);
 
 if ~isempty(varsCont)
-    fprintf('[LME_ANALYSE] Transforming Predictors (Log10[Skew>2] + Z-Score)\n');
+    if verbose
+        fprintf('[LME_ANALYSE] Transforming Predictors (Log10[Skew>2] + Z-Score)\n');
+    end
     lmeTbl = tbl_transform(lmeTbl, 'varsInc', varsCont, ...
         'logBase', 10, 'skewThr', 2, ...
         'flgZ', true, ...
-        'verbose', true);
+        'verbose', verbose);
 end
 
 
@@ -99,7 +103,9 @@ wMsg = ['stats:classreg:regr:lmeutils:StandardGeneralizedLinearMixedModel:',...
 warning('off', wMsg);
 
 if isempty(dist)
-    fprintf('[LME_ANALYSE] Auto-selecting distribution...\n');
+    if verbose
+        fprintf('[LME_ANALYSE] Auto-selecting distribution...\n');
+    end
 
     % Check for Binomial (Binary) Response
     uResp = unique(lmeTbl.(varResp));
@@ -107,7 +113,9 @@ if isempty(dist)
         (length(uResp) == 2 && all(ismember(uResp, [0, 1])));
 
     if isBinomial
-        fprintf('[LME_ANALYSE] Detected Binary Response -> Distribution: Binomial\n');
+        if verbose
+            fprintf('[LME_ANALYSE] Detected Binary Response -> Distribution: Binomial\n');
+        end
         dist = 'Binomial';
     else
 
@@ -116,8 +124,10 @@ if isempty(dist)
 
         % Pick best model (lowest AIC)
         bestModel = compStats.Model{1};
-        fprintf('[LME_ANALYSE] Selected: %s (AIC diff to 2nd: %.1f)\n', ...
-            bestModel, compStats.AIC(2) - compStats.AIC(1));
+        if verbose
+            fprintf('[LME_ANALYSE] Selected: %s (AIC diff to 2nd: %.1f)\n', ...
+                bestModel, compStats.AIC(2) - compStats.AIC(1));
+        end
 
         dist = bestModel;
         lmeInfo.compStats = compStats;
@@ -137,24 +147,30 @@ warning('on', wMsg);
 switch lower(dist)
     case 'log-normal'
         % Transform: Log(y), Dist: Normal
-        fprintf('[LME_ANALYSE] Transforming Response: Log-Normal -> Log(Y)\n');
+        if verbose
+            fprintf('[LME_ANALYSE] Transforming Response: Log-Normal -> Log(Y)\n');
+        end
         lmeTbl = tbl_transform(lmeTbl, 'varsInc', {varResp}, ...
             'logBase', 'e', ...
-            'verbose', true);
+            'verbose', verbose);
         dist = 'Normal';
 
     case 'logit-normal'
         % Transform: Logit(y), Dist: Normal
-        fprintf('[LME_ANALYSE] Transforming Response: Logit-Normal -> Logit(Y)\n');
+        if verbose
+            fprintf('[LME_ANALYSE] Transforming Response: Logit-Normal -> Logit(Y)\n');
+        end
         lmeTbl = tbl_transform(lmeTbl, 'varsInc', {varResp}, ...
             'logBase', 'logit', ...
-            'verbose', true);
+            'verbose', verbose);
         dist = 'Normal';
 
     case {'gamma', 'poisson', 'inversegaussian'}
-        fprintf('[LME_ANALYSE] Zero-inflation detected for %s. Adding offset.\n', dist);
+        if verbose
+            fprintf('[LME_ANALYSE] Zero-inflation detected for %s. Adding offset.\n', dist);
+        end
         lmeTbl = tbl_transform(lmeTbl, 'varsInc', {varResp}, ...
-            'flg0', true, 'verbose', true);
+            'flg0', true, 'verbose', verbose);
 end
 
 lmeInfo.distFinal = dist;
