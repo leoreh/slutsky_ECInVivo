@@ -96,6 +96,7 @@ lmeTbl = tbl(:, varsTbl);
 % Identify numeric/continuous predictors (exclude categorical)
 isNum = cellfun(@(x) isnumeric(lmeTbl.(x)) && ~iscategorical(lmeTbl.(x)), varsTbl);
 varsNum = varsTbl(isNum);
+varsNum = setdiff(varsNum, varResp); % Exclude Response from Predictor Z-Scoring
 
 if ~isempty(varsNum)
     if verbose
@@ -107,6 +108,10 @@ if ~isempty(varsNum)
         'verbose', verbose);
 
     lmeInfo.transParams = transParams;
+else
+    lmeInfo.transParams = struct();
+    lmeInfo.transParams.varList = struct();
+    lmeInfo.transParams.varsGrp = {}; % Initialize if empty
 end
 
 
@@ -166,9 +171,11 @@ switch lower(dist)
         if verbose
             fprintf('[LME_ANALYSE] Transforming Response: Log-Normal -> Log(Y)\n');
         end
-        lmeTbl = tbl_transform(lmeTbl, 'varsInc', {varResp}, ...
+        [lmeTbl, pResp] = tbl_transform(lmeTbl, 'varsInc', {varResp}, ...
             'logBase', 'e', ...
             'verbose', verbose);
+        % Merge Response Params
+        lmeInfo.transParams.varList.(varResp) = pResp.varList.(varResp);
         dist = 'Normal';
 
     case 'logit-normal'
@@ -176,17 +183,22 @@ switch lower(dist)
         if verbose
             fprintf('[LME_ANALYSE] Transforming Response: Logit-Normal -> Logit(Y)\n');
         end
-        lmeTbl = tbl_transform(lmeTbl, 'varsInc', {varResp}, ...
+        [lmeTbl, pResp] = tbl_transform(lmeTbl, 'varsInc', {varResp}, ...
             'logBase', 'logit', ...
             'verbose', verbose);
+        % Merge Response Params
+        lmeInfo.transParams.varList.(varResp) = pResp.varList.(varResp);
         dist = 'Normal';
 
     case {'gamma', 'poisson', 'inversegaussian'}
         if verbose
             fprintf('[LME_ANALYSE] Zero-inflation detected for %s. Adding offset.\n', dist);
         end
-        lmeTbl = tbl_transform(lmeTbl, 'varsInc', {varResp}, ...
+        [lmeTbl, pResp] = tbl_transform(lmeTbl, 'varsInc', {varResp}, ...
             'flg0', true, 'verbose', verbose);
+        if isfield(pResp, 'varList') && isfield(pResp.varList, varResp)
+            lmeInfo.transParams.varList.(varResp) = pResp.varList.(varResp);
+        end
 end
 
 lmeInfo.distFinal = dist;

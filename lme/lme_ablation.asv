@@ -180,6 +180,11 @@ for iRep = 1 : nTotal
             res.roc{iVar}(iRep, :) = rocCurr;
 
         else                % REGRESSION
+            
+            % Back transform respon
+            if infoTrn.transParams.varList.(varRsp).doLog
+                
+            end
 
             % RMSE
             rmse = sqrt(mean((yTrue - yProb).^2));

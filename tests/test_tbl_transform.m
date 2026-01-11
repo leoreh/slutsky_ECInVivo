@@ -1,134 +1,232 @@
+% test_tbl_transform.m
+% Comprehensive test suite for io/tbl_transform.m
+% Verifies: Fit Mode, Apply Mode, Inverse Mode, Logic Flows, and Edge Cases.
 
-function test_tbl_transform()
+root = 'd:\Code\slutsky_ECInVivo';
+addpath(fullfile(root, 'io'));
 
-% Create sample data
-rng(42);
-n = 100;
-Group = [repmat({'A'}, n/2, 1); repmat({'B'}, n/2, 1)];
-Day = [repmat({'D1'}, n/4, 1); repmat({'D2'}, n/4, 1); repmat({'D1'}, n/4, 1); repmat({'D2'}, n/4, 1)];
-ValNormal = randn(n, 1) + 10; % Normal distribution
-ValSkewed = exp(randn(n, 1)); % Log-normal (skewed)
-ValLogit = rand(n, 1); % Proportion [0, 1]
+fprintf('===================================================\n');
+fprintf('TEST: tbl_transform.m (Comprehensive)\n');
+fprintf('===================================================\n');
 
-% Add some NaNs
-ValNormal(1) = NaN;
-ValSkewed(5) = NaN;
-ValLogit(10) = NaN;
+nFail = 0;
 
-tbl = table(Group, Day, ValNormal, ValSkewed, ValLogit);
-tbl.Group = categorical(tbl.Group);
-tbl.Day = categorical(tbl.Day);
-
-fprintf('Running tests for tbl_transform...\n');
-
-%% Test 1: Normalization Logic
-% Normalization should make the reference group mean = 100
-fprintf('\nTest 1: Normalization Logic... ');
+%% 1. Scenario: Basic Log + Z-Score (Fit -> Apply -> Inverse)
+fprintf('\n--- Scenario 1: Basic Log + Z-Score (Fit -> Apply -> Inverse) ---\n');
 try
-    % Old: 'flgNorm', true, 'varNorm', 'Group'
-    % New: 'varNorm', 'Group' (implies normalization)
-    tblNorm = tbl_transform(tbl, 'varNorm', 'Group', 'varsGrp', {'Day'}, 'flgZ', false, 'logBase', []);
+    % Generate Data (Lognormal)
+    rng(1);
+    dataTrn = exp(randn(100, 1) * 0.5 + 2); % Mean ~ exp(2.125)
+    dataTst = exp(randn(50, 1) * 0.5 + 2);
 
-    % Check if Group A (Ref) has mean 100 within Day D1
-    idxRef = tblNorm.Group == 'A' & tblNorm.Day == 'D1';
-    meanRef = mean(tblNorm.ValNormal(idxRef), 'omitnan');
+    T_Trn = table(dataTrn, 'VariableNames', {'X'});
+    T_Tst = table(dataTst, 'VariableNames', {'X'});
 
-    if abs(meanRef - 100) < 1e-4
-        fprintf('PASS\n');
+    % A. FIT
+    fprintf('Step A: Fitting Training Data...\n');
+    % Force Log by setting skewThr to -Inf (or 0)
+    [T_Trn_Out, params] = tbl_transform(T_Trn, 'logBase', 'e', 'flgZ', true, 'skewThr', 0, 'verbose', false);
+
+    % Check Z-scoring on Logged Data
+    logData = log(T_Trn.X);
+    mu = mean(logData);
+    sigma = std(logData);
+
+    expectedZ = (logData - mu) / sigma;
+    diff = max(abs(T_Trn_Out.X - expectedZ));
+
+    if diff < 1e-10
+        fprintf('[PASS] Fit: Output matches manual Z-score of Log data.\n');
     else
-        fprintf('FAIL (Mean is %.4f, expected 100)\n', meanRef);
+        fprintf('[FAIL] Fit: Output mismatch (Diff = %.4e)\n', diff); nFail=nFail+1;
     end
+
+    % B. APPLY
+    fprintf('Step B: Applying to Test Data...\n');
+    [T_Tst_Out, ~] = tbl_transform(T_Tst, 'template', params);
+
+    % Should use TRAINING mu/sigma
+    logDataTst = log(T_Tst.X);
+    expectedZTst = (logDataTst - mu) / sigma; % Uses TRN mu/sigma
+
+    diffTst = max(abs(T_Tst_Out.X - expectedZTst));
+    if diffTst < 1e-10
+        fprintf('[PASS] Apply: Test data transformed using Training stats.\n');
+    else
+        fprintf('[FAIL] Apply: Output mismatch (Diff = %.4e)\n', diffTst); nFail=nFail+1;
+    end
+
+    % C. INVERSE (Test Data)
+    fprintf('Step C: Inverse Transform (Recovery)...\n');
+    T_Tst_Rec = tbl_transform(T_Tst_Out, 'template', params, 'flgInv', true);
+
+    recDiff = max(abs(T_Tst.X - T_Tst_Rec.X));
+    if recDiff < 1e-10
+        fprintf('[PASS] Inverse: Recovered original data (Diff = %.4e).\n', recDiff);
+    else
+        fprintf('[FAIL] Inverse: Recovery failed (Diff = %.4e).\n', recDiff); nFail=nFail+1;
+    end
+
 catch ME
-    fprintf('ERROR: %s\n', ME.message);
+    fprintf('[ERROR] Scenario 1 Crashed: %s\n', ME.message);
+    disp(ME.stack(1));
+    nFail=nFail+1;
 end
 
-%% Test 2: Log Transformation (Base 10)
-fprintf('Test 2: Log10 Transformation... ');
 
+%% 2. Scenario: Logit Transform (Probabilities)
+fprintf('\n--- Scenario 2: Logit Transform ---\n');
 try
-    % Force highly skewed data
-    tbl.ValSkewed = 10.^randn(n,1);
+    % Data: Probabilities [0, 1]
+    % Include edge cases close to 0/1 to test clamping
+    X = [0.01; 0.5; 0.99; 0.000001; 0.999999];
+    T = table(X);
 
-    % Old: 'flgLog', true
-    % New: 'logBase', 10
-    tblLog = tbl_transform(tbl, 'logBase', 10, 'flgZ', false, 'skewThr', 0.5, 'varsInc', {'ValSkewed'});
+    [T_Out, params] = tbl_transform(T, 'logBase', 'logit', 'flgZ', false);
 
-    % Check if log was applied (values should be small)
-    if max(tblLog.ValSkewed) < 15
-        fprintf('PASS (Log likely applied)\n');
+    % Check logic
+    % logit(p) = log(p/(1-p))
+    expected = log(X ./ (1 - X));
+    diff = max(abs(T_Out.X - expected));
+
+    if diff < 1e-10
+        fprintf('[PASS] Logit: Transformation correct.\n');
     else
-        fprintf('FAIL (Max value %.4f too high, log not applied)\n', max(tblLog.ValSkewed));
+        fprintf('[FAIL] Logit: Mismatch (Diff = %.4e)\n', diff); nFail=nFail+1;
     end
+
+    % Inverse
+    T_Rec = tbl_transform(T_Out, 'template', params, 'flgInv', true);
+    diffInv = max(abs(T.X - T_Rec.X));
+
+    if diffInv < 1e-10
+        fprintf('[PASS] Logit Inverse: Correct recovery.\n', diffInv);
+    else
+        fprintf('[FAIL] Logit Inverse: Recovery failed (Diff = %.4e)\n', diffInv); nFail=nFail+1;
+    end
+
 catch ME
-    fprintf('ERROR: %s\n', ME.message);
+    fprintf('[ERROR] Scenario 2 Crashed: %s\n', ME.message); nFail=nFail+1;
 end
 
-%% Test 3: Log Transformation (Base e)
-fprintf('Test 3: Log_e Transformation... ');
+%% 3. Scenario: Offset Handling (Log(0))
+fprintf('\n--- Scenario 3: Offset Handling (Log(0)) ---\n');
 try
-    tbl.ValSkewed = exp(randn(n, 1));
-    tblLogE = tbl_transform(tbl, 'logBase', 'e', 'flgZ', false, 'skewThr', -Inf, 'varsInc', {'ValSkewed'});
+    X = [0; 2; 10];
+    T = table(X);
 
-    % If x = e^y, then ln(x) = y. Mean of y should be close to 0, std close to 1
-    if abs(mean(tblLogE.ValSkewed, 'omitnan')) < 0.5
-        fprintf('PASS\n');
+    % Auto-detect skew? No, force log.
+    % Should detect 0 and add offset.
+    [T_Out, params] = tbl_transform(T, 'logBase', 'e', 'flgZ', false, 'skewThr', 0);
+
+    c = params.varList.X.offset;
+    if c > 0
+        fprintf('[PASS] Offset: Detected 0, added offset %.4f.\n', c);
     else
-        fprintf('FAIL (Mean=%.4f) \n', mean(tblLogE.ValSkewed, 'omitnan'));
+        fprintf('[FAIL] Offset: Did NOT add offset to 0-containing data.\n'); nFail=nFail+1;
     end
+
+    % Check Values: log(X + c)
+    expected = log(X + c);
+    diff = max(abs(T_Out.X - expected));
+    if diff < 1e-10
+        fprintf('[PASS] Offset+Log: Values match.\n');
+    else
+        fprintf('[FAIL] Offset+Log: Mismatch.\n'); nFail=nFail+1;
+    end
+
+    % Inverse
+    T_Rec = tbl_transform(T_Out, 'template', params, 'flgInv', true);
+    diffInv = max(abs(T.X - T_Rec.X));
+    if diffInv < 1e-10
+        fprintf('[PASS] Offset Inverse: Correct recovery.\n');
+    else
+        fprintf('[FAIL] Offset Inverse: Recovery failed (Diff = %.4e).\n', diffInv); nFail=nFail+1;
+    end
+
 catch ME
-    fprintf('ERROR: %s\n', ME.message);
+    fprintf('[ERROR] Scenario 3 Crashed: %s\n', ME.message); nFail=nFail+1;
 end
 
-%% Test 4: Logit Transformation
-fprintf('Test 4: Logit Transformation... ');
+%% 4. Scenario: Grouped Normalization
+fprintf('\n--- Scenario 4: Grouped Normalization ---\n');
 try
-    % Old: 'flgLogit', true
-    % New: 'logBase', 'logit'
-    tblLogit = tbl_transform(tbl, 'logBase', 'logit', 'flgZ', false, 'varsInc', {'ValLogit'});
+    Group = {'A'; 'A'; 'A'; 'B'; 'B'; 'B'};
+    Val   = [10; 10; 10; 20; 20; 20];
+    T = table(Group, Val);
+    T.Group = categorical(T.Group);
 
-    % Check range (logits map [0,1] to [-inf, inf])
-    % Just check if values changed and are roughly symmetric
-    if min(tblLogit.ValLogit) < 0 && max(tblLogit.ValLogit) > 0
-        fprintf('PASS\n');
-    else
-        fprintf('FAIL (Range=[%.2f, %.2f]) \n', min(tblLogit.ValLogit), max(tblLogit.ValLogit));
+    % 1. Error Check: varNorm included in varsGrp
+    try
+        tbl_transform(T, 'varsGrp', 'Group', 'varNorm', 'Group');
+        fprintf('[FAIL] Did not catch invalid varsGrp/varNorm overlap.\n'); nFail=nFail+1;
+    catch
+        fprintf('[PASS] Correctly errored on overlapping varsGrp/varNorm (Conflict).\n');
     end
+
+    % 2. Correct Usage: Global Norm relative to Group A
+    [T_Norm2, pNorm2] = tbl_transform(T, 'varsGrp', [], 'varNorm', 'Group', 'flgZ', false);
+
+    if all(T_Norm2.Val(1:3) == 100) && all(T_Norm2.Val(4:6) == 200)
+        fprintf('[PASS] Normalization (Global) works as expected.\n');
+    else
+        fprintf('[FAIL] Normalization failed. A=%.1f (Exp 100), B=%.1f (Exp 200).\n', ...
+            mean(T_Norm2.Val(1:3)), mean(T_Norm2.Val(4:6)));
+        nFail=nFail+1;
+    end
+
+    % INVERSE Norm
+    T_Rec2 = tbl_transform(T_Norm2, 'template', pNorm2, 'flgInv', true);
+    if max(abs(T_Rec2.Val - T.Val)) < 1e-10
+        fprintf('[PASS] Normalization Inverse works.\n');
+    else
+        fprintf('[FAIL] Norm Inverse failed.\n'); nFail=nFail+1;
+    end
+
 catch ME
-    fprintf('ERROR: %s\n', ME.message);
+    fprintf('[ERROR] Scenario 4 Crashed: %s\n', ME.message); nFail=nFail+1;
 end
 
-%% Test 5: Z-scoring
-fprintf('Test 5: Z-scoring... ');
-tblZ = tbl_transform(tbl, 'flgZ', true, 'logBase', [], 'varNorm', '');
-meanZ = mean(tblZ.ValNormal, 'omitnan');
-stdZ = std(tblZ.ValNormal, 'omitnan');
+%% 5. Scenario: Norm + Z-Score (Conflict Resolution)
+fprintf('\n--- Scenario 5: Norm + Z-Score (Conflict Resolution) ---\n');
+try
+    % Data: [10, 20]. Mean 15, SD 7.07.
+    % Requested: Norm + Z.
+    % Expectation: Norm disabled. Z applied to raw data.
 
-if abs(meanZ) < 1e-4 && abs(stdZ - 1) < 1e-4
-    fprintf('PASS\n');
+    Val = [10; 20];
+    T = table(Val);
+
+    [T_Out, params] = tbl_transform(T, 'varNorm', 'Dummy', 'flgZ', true, 'verbose', false);
+
+    % Check Norm is disabled
+    if isfield(params.varList.Val, 'flgNorm') && ~params.varList.Val.flgNorm
+        fprintf('[PASS] Conflict: Norm was correctly disabled when Z is enabled.\n');
+    else
+        fprintf('[FAIL] Conflict: Norm was NOT disabled.\n'); nFail=nFail+1;
+    end
+
+    % Check Z values
+    mu = 15; sigma = std([10; 20]); % 7.0711 creates z=[-0.7071, 0.7071]
+    expected = ([10;20] - mu) / sigma;
+
+    diff = max(abs(T_Out.Val - expected));
+    if diff < 1e-10
+        fprintf('[PASS] Z-Score applied correctly on raw data.\n');
+    else
+        fprintf('[FAIL] Z-Score mismatch.\n'); nFail=nFail+1;
+    end
+
+catch ME
+    fprintf('[ERROR] Scenario 5 Crashed: %s\n', ME.message); nFail=nFail+1;
+end
+
+%% Final Report
+fprintf('\n==================\n');
+if nFail == 0
+    fprintf('ALL TESTS PASSED.\n');
 else
-    fprintf('FAIL (Mean=%.4f, Std=%.4f)\n', meanZ, stdZ);
+    fprintf('%d TESTS FAILED.\n', nFail);
 end
+fprintf('==================\n');
 
-%% Test 6: Z-scoring per Group
-fprintf('Test 6: Z-scoring per Group... ');
-tblZG = tbl_transform(tbl, 'flgZ', true, 'varsGrp', {'Group'}, 'logBase', []);
-
-idxA = tblZG.Group == 'A';
-meanA = mean(tblZG.ValNormal(idxA), 'omitnan');
-stdA = std(tblZG.ValNormal(idxA), 'omitnan');
-
-if abs(meanA) < 1e-4 && abs(stdA - 1) < 1e-4
-    fprintf('PASS\n');
-else
-    fprintf('FAIL (Group A Mean=%.4f, Std=%.4f)\n', meanA, stdA);
-end
-
-%% Test 7: NaN Handling
-fprintf('Test 7: NaN Handling... ');
-if any(isnan(tblZ.ValNormal))
-    fprintf('PASS (NaNs preserved)\n');
-else
-    fprintf('FAIL (NaNs lost or filled)\n');
-end
-
-end

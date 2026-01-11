@@ -55,6 +55,7 @@ fprintf('[LME_ABLATION] Running initial analysis to prepare data...\n');
 
 % Update dist
 dist = lmeInfo.distSelected;
+distFinal = lmeInfo.distFinal;
 
 % Determine Mode
 flgBinomial = strcmpi(dist, 'Binomial');
@@ -90,6 +91,64 @@ else
     vifVal = diag(inv(R))';
     res.vif = table(varsVif(:), vifVal(:), 'VariableNames', {'Predictor', 'VIF'});
 end
+
+
+%% ========================================================================
+%  MODEL COMPARISON (LIKELIHOOD RATIO TEST)
+%  ========================================================================
+%  Compare Full Model vs. Reduced Models on the ENTIRE dataset to get
+%  statistical significance (p-values) for each predictor.
+
+fprintf('[LME_ABLATION] Running statistical model comparison...\n');
+
+% Determine Fit Method for Comparison
+%    - LME: Use 'ML' (Maximum Likelihood) to compare fixed effects.
+%    - GLME: Use 'Laplace'
+if flgBinomial || ~strcmpi(distFinal, 'Normal')
+    % Generalized: Use Laplace for accurate Likelihood approximation
+    fitMet = 'Laplace';
+else
+    % Linear: Use ML to compare models with different Fixed Effects
+    fitMet = 'ML';
+end
+
+% Initialize Stats Storage
+nVars = length(varsIter);
+statNames = {'Predictor', 'AIC', 'BIC', 'LogLik', 'LRStat', 'pValue', 'DeltaAIC'};
+statsData = cell(nVars, 7);
+
+% Fit Full Model
+mdlFull = lme_fit(tblLme, frml, 'dist', distFinal, 'fitMethod', fitMet);
+
+% Iterate Ablations
+for iVar = 1:nVars
+    varRmv = varsIter{iVar};
+
+    if strcmp(varRmv, 'None')
+        % Full Model Baseline
+        statsData(iVar, :) = {varRmv, mdlFull.ModelCriterion.AIC, ...
+            mdlFull.ModelCriterion.BIC, mdlFull.LogLikelihood, ...
+            NaN, NaN, 0};
+    else
+        % Reduced Model
+        currFrml = lme_frml2rmv(frml, varRmv);
+        mdlRed = lme_fit(tblLme, currFrml, 'dist', distFinal, 'fitMethod', fitMet);
+
+        % Compare: Reduced (H0) vs Full (H1)
+        % Returns table, we extract pValue and LRStat
+        cmpTbl = compare(mdlRed, mdlFull);
+        lrStat = cmpTbl.LRStat(2);
+        pVal   = cmpTbl.pValue(2);
+        dAIC   = mdlRed.ModelCriterion.AIC - mdlFull.ModelCriterion.AIC;
+
+        statsData(iVar, :) = {varRmv, mdlRed.ModelCriterion.AIC, ...
+            mdlRed.ModelCriterion.BIC, mdlRed.LogLikelihood, ...
+            lrStat, pVal, dAIC};
+    end
+end
+
+% Convert to Table
+res.stats = cell2table(statsData, 'VariableNames', statNames);
 
 
 %% ========================================================================
@@ -180,6 +239,14 @@ for iRep = 1 : nTotal
             res.roc{iVar}(iRep, :) = rocCurr;
 
         else                % REGRESSION
+
+            % Back transform response values
+            pVar = infoTrn.transParams.varList.(varRsp);
+            if pVar.doLog
+                c = pVar.offset;
+                yTrue = exp(yTrue) - c;
+                yProb = exp(yProb) - c;
+            end
 
             % RMSE
             rmse = sqrt(mean((yTrue - yProb).^2));
@@ -832,4 +899,93 @@ end     % EOF
 %  By prioritizing numerical robustness during ablation, you ensure that
 %  "Importance" reflects biological signal rather than the failure
 %  of a specific link function's convergence algorithm.
+%  ========================================================================
+
+
+%% ========================================================================
+%  NOTE: LOG VS. LINEAR PERFORMANCE METRICS
+%  ========================================================================
+%  When performing ablation analysis on variables that require
+%  log-transformation (e.g., Firing Rate, which is often Log-Normal), the
+%  choice of scale for metric calculation (RMSE, R-Squared) fundamentally
+%  alters the "importance" ranking of predictors.
+%
+%  1. LOG-SPACE METRICS (RELATIVE ERROR):
+%     Calculating RMSE/R2 on log-transformed values treats errors as
+%     proportional changes (fold-changes).
+%     - Impact: An error in predicting 0.1 Hz vs 0.2 Hz is penalized as
+%       heavily as an error in predicting 10 Hz vs 20 Hz.
+%     - Interpretation: This "democratizes" the data, giving equal weight
+%       to low-firing and high-firing units. Importance reflects the
+%       model's ability to capture the underlying biological mechanism
+%       across the entire population range.
+%
+%  2. LINEAR-SPACE METRICS (ABSOLUTE ERROR):
+%     Back-transforming (exp(y)) before calculating metrics shifts the
+%     focus to absolute magnitudes.
+%     - Impact: An error of 10 Hz on a high-firing unit becomes
+%       catastrophic to the RMSE, while a 100% error on a 0.1 Hz unit
+%       (Error = 0.1) becomes mathematically negligible.
+%     - Interpretation: This "oligarchic" approach allows high-magnitude
+%       outliers to dominate the error sum. Importance reflects which
+%       variables are best at predicting the "peaks" or high-value states.
+%
+%  3. WHY FEATURE IMPORTANCE SHIFTS:
+%     If a variable (e.g., 'pBspk') loses importance in linear-space but
+%     was critical in log-space, it means that variable was primarily
+%     useful for fine-tuning the predictions of low-magnitude units.
+%     Conversely, variables that gain importance in linear-space are the
+%     primary drivers of the highest-magnitude observations.
+%
+%  RECOMMENDATION:
+%  - Use LOG-metrics to characterize biological "States" and "Rules."
+%  - Use LINEAR-metrics to characterize "Real-world" predictive accuracy
+%    in physiological units (Hz).
+% ========================================================================
+
+
+%% ========================================================================
+%  NOTE: WALD TEST VS. LIKELIHOOD RATIO TEST
+%  ========================================================================
+%  The p-values from `lme_analyse` (Wald Test) and `lme_ablation`
+%  (Likelihood Ratio Test) are nearly identical. This is a fundamental
+%  property of statistical theory, not a redundancy error.
+%
+%  1. ASYMPTOTIC EQUIVALENCE:
+%     - The Wald Test estimates the curvature of the Likelihood surface at
+%       the peak (Maximum Likelihood Estimate) assuming a perfect quadratic
+%       shape.
+%     - The LRT measures the actual drop in height of the Likelihood
+%       surface when a variable is removed.
+%     - For large sample sizes and "well-behaved" data, the Likelihood
+%       surface approximates a perfect parabola. In this scenario, the
+%       curvature at the peak (Wald) perfectly predicts the drop in height
+%       (LRT), causing the p-values to converge.
+%
+%  2. WHY USE ABLATION (LRT) IF THEY ARE EQUAL?
+%     Despite the numerical similarity, the ablation loop provides distinct
+%     advantages required for rigorous model selection:
+%
+%     - Metric of Information (AIC/BIC):
+%       Wald p-values only indicate non-zero significance. They do not
+%       quantify *how much* information a variable adds. Ablation allows
+%       you to rank variables by Delta-AIC (e.g., Variable A adds 50 bits
+%       of information vs. Variable B's 2 bits).
+%
+%     - Categorical Variables (ANOVA):
+%       `lme_analyse` outputs separate p-values for every level of a
+%       Group (e.g., Level 2 vs 1, Level 3 vs 1). Ablation removes the
+%       entire factor to provide a single, holistic p-value for "Group"
+%       existence.
+%
+%     - Robustness & Stability:
+%       Identical results are a diagnostic "Health Check." If Wald and LRT
+%       diverged significantly, it would indicate a non-quadratic
+%       likelihood surface, separation issues (in Binomial models), or
+%       small-sample bias. Their convergence confirms your model is stable.
+%
+%  3. SUMMARY:
+%     "Identical" results confirm the model is mathematically robust. Use
+%     Wald for quick significance checks; use Ablation for information
+%     ranking (AIC) and variable importance.
 %  ========================================================================

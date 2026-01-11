@@ -7,10 +7,6 @@
 %
 % 18 nov 19 LH
 
-if ~isdeployed
-    matlabpath(pathdef)
-end
-
 % command line formatting
 format compact
 format long g
@@ -19,14 +15,10 @@ dbstop if error
 % clear workspace and command window
 diary('off')
 close all
-clear all
+clear
 close('all')
 clc
-
-% exist debugging mode
-if feature('IsDebugMode')
-    dbquit all
-end
+fprintf('MATLAB initialized: %s\n', datestr(now));
 
 % Get rid of warning about directory already existing:
 % "Warning: Directory already exists."

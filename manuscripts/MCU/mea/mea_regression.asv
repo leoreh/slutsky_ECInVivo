@@ -3,7 +3,7 @@
 %  LOAD AND PREP
 %  ========================================================================
 
-presets = {'rcv'};
+presets = {'rcv', 'spktimes'};
 [tbl, xVec, basepaths, v] = mcu_tblMea('presets', presets);
 tblLme = tbl;
 
@@ -11,6 +11,11 @@ tblLme = tbl;
 % tblGUI_scatHist(tbl, 'xVar', 'pBspk', 'yVar', 'rcvTime', 'grpVar', 'Group');
 % tblGUI_bar(tbl, 'yVar', 'pBspk', 'xVar', 'Group');
 % tblGUI_raster(tbl, 'grpVar', 'Name', 'grpVal', 'ctrl1')
+
+    
+tbl.pBspk(tbl.Group == 'MCU-KO')   
+tbl.frSs(tbl.Group == 'MCU-KO')   
+
 
 % List of possible predictors
 listPrdct = {'pertDepth', 'fr', 'pBspk', 'Group', '(1|Name)'};
@@ -22,26 +27,31 @@ listRspns = {'uRcv', 'rcvBsl', 'rcvTime', 'spkDfct', 'Genotype', 'frSs', 'rcvWor
 
 
 % Recovery
-frml = 'frSs ~ frTrough + fr * Group + pBspk : Group + (1|Name)';
+frml = 'frSs ~ frTrough + fr * Group + pBspk * Group + (1|Name)';
+
+frml = 'frSs ~ frTrough + fr * Group + pBspk + Group + pBspk : Group + (1|Name)';
 
 res = lme_ablation(tblLme, frml, 'dist', 'log-normal');
+
+
 
 [uniqueNames, firstIdx] = unique(tblLme.Name, 'stable');
 groupLabels = tblLme.Group(firstIdx);
 
 [lmeMdl, lmeStats, lmeInfo, tblMdl] = lme_analyse(tblLme, frml, 'dist', 'log-normal');
 
+vars = {'Group', 'pBspk'};
+[pdRes, hFig] = lme_pd(lmeMdl, vars, 'transParams', lmeInfo.transParams);
+
+tblGUI_scatHist(tblMdl, 'xVar', 'pBspk', 'yVar', 'frSs', 'grpVar', 'Group');
 
 
 
-
-
-[pd, grp, pBspk_pred] = partialDependence(mdl, {'Group', 'pBspk'});
-
-hFig = figure;
-plot(pBspk_pred, pd)
 
 plotPartialDependence(mdl, {'Group', 'pBspk'})
+[pd, grp, pBspk_pred] = partialDependence(mdl, {'Group', 'pBspk'});
+hFig = figure;
+plot(pBspk_pred, pd)
 
 % Predict Genotype (w/o Name as random effect)
 tblLme.Genotype = tblLme.Group == "Control";

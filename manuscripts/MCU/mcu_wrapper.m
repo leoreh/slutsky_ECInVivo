@@ -67,7 +67,7 @@ presets = {'frNet', 'brst'};
 [tbl, basepaths, ~] = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
 tbl.Day(tbl.Day == "BAC_ON") = "BAC3";
 
-hFig = tblGUI_bar(tbl, 'xVar', 'Group', 'yVar', 'drift');
+tblGUI_bar(tbl, 'xVar', 'Group', 'yVar', 'drift');
 tblGUI_scatHist(tbl, 'xVar', 'fr', 'yVar', 'pBspk', 'grpVar', 'Group');
 
 
@@ -75,8 +75,6 @@ tblGUI_scatHist(tbl, 'xVar', 'fr', 'yVar', 'pBspk', 'grpVar', 'Group');
 %% ========================================================================
 %  COLLAPSE UNIT TABLE BY DAY
 %  ========================================================================
-
-cfg = mcu_cfg();
 
 % Variable names
 varsTbl = tbl.Properties.VariableNames;
@@ -109,6 +107,7 @@ tblLme = tblBsl;
 tblLme.Rcv = (tblSs.FR ./ tblBsl.FR) * 100;
 
 
+tblGUI_scatHist(tblLme, 'xVar', 'dim', 'yVar', 'Rcv', 'grpVar', 'Group');
 
 
 
@@ -116,14 +115,3 @@ tblLme.Rcv = (tblSs.FR ./ tblBsl.FR) * 100;
 %  REGRESSION
 %  ========================================================================
 
-tblGUI_scatHist(tblLme, 'xVar', 'dim', 'yVar', 'Rcv', 'grpVar', 'Group');
-
-
-nFolds = height(tblLme) - 2;
-nReps = 4;
-
-% Recovery
-varsFxd  = {'drift', 'dim', 'bRoy', 'FR', 'Group'};
-frml = sprintf('Rcv ~ %s', strjoin(varsFxd, ' + '));
-res = lme_ablation(tblLme, frml, 'nFolds', nFolds, 'nReps', nReps);
-mdl = lme_analyse(tblLme, frml);
