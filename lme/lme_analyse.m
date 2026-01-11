@@ -28,7 +28,7 @@ function [lmeMdl, lmeStats, lmeInfo, lmeTbl] = lme_analyse(tbl, frml, varargin)
 %       lmeInfo     - (struct) Metadata (dist used, transforms applied).
 %       lmeTbl      - (table) with data actually used for the model
 %
-%   See also: LME_FIT, LME_EFFECTS, LME_COMPAREDISTS, TBL_TRANSFORM
+%   See also: LME_FIT, LME_EFFECTS, LME_COMPAREDISTS, TBL_TRANS
 
 %% ========================================================================
 %  ARGUMENTS
@@ -102,7 +102,7 @@ if ~isempty(varsNum)
     if verbose
         fprintf('[LME_ANALYSE] Transforming Predictors (Log10[Skew>2] + Z-Score)\n');
     end
-    [lmeTbl, transParams] = tbl_transform(lmeTbl, 'varsInc', varsNum, ...
+    [lmeTbl, transParams] = tbl_trans(lmeTbl, 'varsInc', varsNum, ...
         'logBase', 10, 'skewThr', 2, ...
         'flgZ', true, ...
         'verbose', verbose);
@@ -110,7 +110,7 @@ if ~isempty(varsNum)
     lmeInfo.transParams = transParams;
 else
     lmeInfo.transParams = struct();
-    lmeInfo.transParams.varList = struct();
+    lmeInfo.transParams.varsTrans = struct();
     lmeInfo.transParams.varsGrp = {}; % Initialize if empty
 end
 
@@ -171,11 +171,11 @@ switch lower(dist)
         if verbose
             fprintf('[LME_ANALYSE] Transforming Response: Log-Normal -> Log(Y)\n');
         end
-        [lmeTbl, pResp] = tbl_transform(lmeTbl, 'varsInc', {varResp}, ...
+        [lmeTbl, pResp] = tbl_trans(lmeTbl, 'varsInc', {varResp}, ...
             'logBase', 'e', ...
             'verbose', verbose);
         % Merge Response Params
-        lmeInfo.transParams.varList.(varResp) = pResp.varList.(varResp);
+        lmeInfo.transParams.varsTrans.(varResp) = pResp.varsTrans.(varResp);
         dist = 'Normal';
 
     case 'logit-normal'
@@ -183,21 +183,21 @@ switch lower(dist)
         if verbose
             fprintf('[LME_ANALYSE] Transforming Response: Logit-Normal -> Logit(Y)\n');
         end
-        [lmeTbl, pResp] = tbl_transform(lmeTbl, 'varsInc', {varResp}, ...
+        [lmeTbl, pResp] = tbl_trans(lmeTbl, 'varsInc', {varResp}, ...
             'logBase', 'logit', ...
             'verbose', verbose);
         % Merge Response Params
-        lmeInfo.transParams.varList.(varResp) = pResp.varList.(varResp);
+        lmeInfo.transParams.varsTrans.(varResp) = pResp.varsTrans.(varResp);
         dist = 'Normal';
 
     case {'gamma', 'poisson', 'inversegaussian'}
         if verbose
             fprintf('[LME_ANALYSE] Zero-inflation detected for %s. Adding offset.\n', dist);
         end
-        [lmeTbl, pResp] = tbl_transform(lmeTbl, 'varsInc', {varResp}, ...
+        [lmeTbl, pResp] = tbl_trans(lmeTbl, 'varsInc', {varResp}, ...
             'flg0', true, 'verbose', verbose);
-        if isfield(pResp, 'varList') && isfield(pResp.varList, varResp)
-            lmeInfo.transParams.varList.(varResp) = pResp.varList.(varResp);
+        if isfield(pResp, 'varsTrans') && isfield(pResp.varsTrans, varResp)
+            lmeInfo.transParams.varsTrans.(varResp) = pResp.varsTrans.(varResp);
         end
 end
 

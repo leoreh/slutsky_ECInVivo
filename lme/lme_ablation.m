@@ -204,7 +204,7 @@ for iRep = 1 : nTotal
 
             % Test: Apply EXACT same transformations as Training
             tblTst = tbl(testIdx, :); % Start with RAW data
-            tblTst = tbl_transform(tblTst, 'template', infoTrn.transParams);
+            tblTst = tbl_trans(tblTst, 'template', infoTrn.transParams);
 
             yTrue = tblTst.(varRsp);
             yProb = predict(mdl, tblTst);
@@ -241,8 +241,8 @@ for iRep = 1 : nTotal
         else                % REGRESSION
 
             % Back transform response values
-            pVar = infoTrn.transParams.varList.(varRsp);
-            if pVar.doLog
+            pVar = infoTrn.transParams.varsTrans.(varRsp);
+            if ~isempty(pVar.logBase)
                 c = pVar.offset;
                 yTrue = exp(yTrue) - c;
                 yProb = exp(yProb) - c;

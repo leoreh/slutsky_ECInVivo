@@ -1,7 +1,7 @@
-function [tblOut, transParams] = tbl_transform(tbl, varargin)
-% TBL_TRANSFORM Applies log/logit transformations, z-scoring, and normalization.
+function [tblOut, transParams] = tbl_trans(tbl, varargin)
+% TBL_TRANS Applies log/logit transformations, z-scoring, and normalization.
 %
-%   [TBLOUT, PARAMS] = TBL_TRANSFORM(TBL, ...) transforms table columns to
+%   [TBLOUT, PARAMS] = TBL_TRANS(TBL, ...) transforms table columns to
 %   improve their distributional properties for statistical modeling.
 %
 %   MODES:
@@ -56,13 +56,13 @@ function [tblOut, transParams] = tbl_transform(tbl, varargin)
 %
 %   EXAMPLES:
 %       % 1. FIT: Transform Training Data
-%       [tblTrn, P] = tbl_transform(dataTrn, 'flgZ', true, 'logBase', 10);
+%       [tblTrn, P] = tbl_trans(dataTrn, 'flgZ', true, 'logBase', 10);
 %
 %       % 2. APPLY: Transform Test Data (using Training stats)
-%       tblTst = tbl_transform(dataTst, 'template', P);
+%       tblTst = tbl_trans(dataTst, 'template', P);
 %
 %       % 3. INVERSE: Recover Original Data
-%       tblRec = tbl_transform(tblTst, 'template', P, 'flgInv', true);
+%       tblRec = tbl_trans(tblTst, 'template', P, 'flgInv', true);
 %
 %   See also: LME_ANALYSE, LME_ABLATION
 
@@ -95,6 +95,42 @@ parse(p, tbl, varargin{:});
 tmpl    = p.Results.template;
 flgInv  = p.Results.flgInv;
 verbose = p.Results.verbose;
+varsInc = p.Results.varsInc;
+varsExc = p.Results.varsExc;
+
+
+%% ========================================================================
+%  CENTRALIZED VARIABLE SELECTION (procVars)
+%  ========================================================================
+
+tblVars = tbl.Properties.VariableNames;
+
+if isempty(tmpl)
+    % --- FIT MODE CANDIDATES ---
+    % Candidates are all numeric, non-categorical variables in the table.
+    isNum = varfun(@(x) isnumeric(x) & ~iscategorical(x), tbl, 'OutputFormat', 'uniform');
+    candidates = tblVars(isNum);
+else
+    % --- APPLY / INVERSE MODE CANDIDATES ---
+    % Candidates are variables present in both the Template and the Table.
+    varsTmpl = fieldnames(tmpl.varsTrans);
+    candidates = varsTmpl(ismember(varsTmpl, tblVars));
+end
+
+% --- FILTERING (varsInc / varsExc) ---
+if ~isempty(varsInc)
+    % Whitelist: Only process variables in varsInc (that are also candidates)
+    varsTrans = candidates(ismember(candidates, varsInc));
+elseif ~isempty(varsExc)
+    % Blacklist: Process candidates NOT in varsExc
+    varsTrans = candidates(~ismember(candidates, varsExc));
+else
+    % Default: Process all candidates
+    varsTrans = candidates;
+end
+
+% Ensure cell array of strings
+if ischar(varsTrans), varsTrans = {varsTrans}; end
 
 
 %% ========================================================================
@@ -103,17 +139,18 @@ verbose = p.Results.verbose;
 
 if isempty(tmpl)
     % --- FIT MODE ---
-    if verbose, fprintf('[TBL_TRANSFORM] Fit Mode \n'); end
-    [tblOut, transParams] = trans_fit(tbl, p.Results);
+    if verbose, fprintf('[TBL_TRANS] Fit Mode \n'); end
+    % Note: varsTrans is passed explicitly
+    [tblOut, transParams] = trans_fit(tbl, p.Results, varsTrans);
 else
     if flgInv
         % --- INVERSE MODE ---
-        if verbose, fprintf('[TBL_TRANSFORM] Inverse Mode \n'); end
-        [tblOut, transParams] = trans_inv(tbl, tmpl, verbose);
+        if verbose, fprintf('[TBL_TRANS] Inverse Mode \n'); end
+        [tblOut, transParams] = trans_inv(tbl, tmpl, p.Results, varsTrans);
     else
         % --- APPLY MODE ---
-        if verbose, fprintf('[TBL_TRANSFORM] Apply Mode \n'); end
-        [tblOut, transParams] = trans_apply(tbl, tmpl, verbose);
+        if verbose, fprintf('[TBL_TRANS] Apply Mode \n'); end
+        [tblOut, transParams] = trans_apply(tbl, tmpl, p.Results, varsTrans);
     end
 end
 
@@ -123,44 +160,26 @@ end     % EOF
 %% ========================================================================
 %  CORE: FIT PARAMETERS & TRANSFORM
 %  ========================================================================
-function [tblOut, params] = trans_fit(tbl, args)
+function [tblOut, params] = trans_fit(tbl, args, varsTrans)
 
 % Parse Settings
-varsInc = args.varsInc;
-varsExc = args.varsExc;
 varsGrp = args.varsGrp;
 if ischar(varsGrp) || isstring(varsGrp)
     varsGrp = cellstr(varsGrp);
 end
 
 flgZ    = args.flgZ;
-logBase = args.logBase;
+argLogBase = args.logBase; % Arg
 skewThr = args.skewThr;
 flg0    = args.flg0;
 varNorm = args.varNorm;
 verbose = args.verbose;
 
 % Conflict Resolution: Z-Score vs Norm
-% If Z-scoring is requested, it overrides Normalization because they conflict
-% (Z creates 0-mean unit-variance, Norm creates 100-mean relative scale).
 if flgZ && ~isempty(varNorm)
-    warning('tbl_transform:Conflict', 'Z-scoring is enabled. Normalization (varNorm) will be IGNORED.');
+    warning('tbl_trans:Conflict', 'Z-scoring is enabled. Normalization (varNorm) will be IGNORED.');
     varNorm = ''; % Disable Norm
 end
-
-% Identify Variables
-tblVars = tbl.Properties.VariableNames;
-if ~isempty(varsInc)
-    procVars = varsInc;
-elseif ~isempty(varsExc)
-    procVars = tblVars(~ismember(tblVars, varsExc));
-else
-    procVars = tblVars;
-end
-
-% Filter Numeric
-isNum = cellfun(@(x) isnumeric(tbl.(x)) && ~iscategorical(tbl.(x)), procVars);
-procVars = procVars(isNum);
 
 % Normalization Ref
 flgNorm = ~isempty(varNorm);
@@ -175,20 +194,11 @@ end
 
 % Output Structure
 params = struct();
+params.varsTrans = struct(); % Stores individual var params
 params.varsGrp = varsGrp;
 params.varNorm = varNorm;
 params.catRef  = catRef;
-params.varList = struct(); % Stores individual var params
 tblOut = tbl;
-
-% Log Transformation Mode
-isLogit = ischar(logBase) && strcmpi(logBase, 'logit');
-isLog   = (isnumeric(logBase) && ~isempty(logBase)) || ...
-    (ischar(logBase) && strcmpi(logBase, 'e'));
-baseVal = [];
-if isnumeric(logBase) && ~isempty(logBase)
-    baseVal = logBase;
-end
 
 % Identify Groups (for Stats Calculation)
 if ~isempty(varsGrp)
@@ -199,37 +209,45 @@ else
 end
 
 % Process Each Variable
-for iVar = 1:numel(procVars)
-    var  = procVars{iVar};
+for iVar = 1:numel(varsTrans)
+    var  = varsTrans{iVar};
     data = tblOut.(var);
 
     % --- 1. Determine Log/Offset Settings (Global) ---
-    doLog = false;
-    doOffset = flg0;
-    c = 0; % Offset value
+    % Default: Use argument logBase
+    currLogBase = argLogBase;
+    doOffset    = flg0;
+    c           = 0; % Offset value
+
+    % Logic:
+    % - If 'logit': Always apply
+    % - If 'e' or numeric: Check Skewness. If skew > thr, KEEP currLogBase. If not, set to [].
+    % - If [] (none): Do nothing.
+
+    doLogit = ischar(currLogBase) && strcmpi(currLogBase, 'logit');
+    doLog   = (isnumeric(currLogBase) && ~isempty(currLogBase)) || ...
+        (ischar(currLogBase) && strcmpi(currLogBase, 'e'));
 
     % Logit Checks
-    if isLogit
-        % Clamp for stability but DON'T apply yet to check 0s?
-        % Actually, if data is [0, 1], Logit needs clamping.
+    if doLogit
         data = max(eps, min(1-eps, data));
         data = log(data ./ (1 - data));
         if verbose, fprintf('[%s] Applied Logit.\n', var); end
-    end
-
-    % Log Checks (Skewness)
-    if isLog
+    elseif doLog
+        % Log Checks (Skewness)
         s = skewness(data(~isnan(data)));
         if s > skewThr
-            doLog = true;
             doOffset = true; % Check offset if log enabled
             if verbose, fprintf('[%s] Skew %.2f > %.1f. Log enabled.\n', var, s, skewThr); end
+        else
+            % Disable log if skew not met
+            currLogBase = [];
+            doLog = false;
         end
     end
 
     % Calculate Offset (Before Log)
-    if doOffset
-        % Only add offset if there are zeros AND no negative values
+    if doOffset && doLog
         if any(data(:) == 0) && all(data(:) >= 0)
             c = min(data(data > 0)) / 2; % Half of min non-zero
             data = data + c;
@@ -239,10 +257,10 @@ for iVar = 1:numel(procVars)
 
     % Apply Log
     if doLog
-        if isempty(baseVal) % 'e'
+        if ischar(currLogBase) && strcmpi(currLogBase, 'e')
             data = log(data);
-        else
-            data = log(data) ./ log(baseVal);
+        elseif isnumeric(currLogBase) && ~isempty(currLogBase)
+            data = log(data) ./ log(currLogBase);
         end
     end
 
@@ -250,9 +268,6 @@ for iVar = 1:numel(procVars)
     tblOut.(var) = data;
 
     % --- 2. Calculate Statistics (Group-wise) ---
-    % Calculate Mean/SD on the 'Intermediate' data (Logged/Offset).
-    % If we Z-score, we use these stats.
-
     nGrps = max(grpIdx);
     stats = table();
     if ~isempty(varsGrp), stats = uGrps; end
@@ -277,8 +292,6 @@ for iVar = 1:numel(procVars)
     end
 
     % --- 3. Apply Group Transformations (Z-Score OR Norm) ---
-    % Note: Norm and Z are mutually exclusive due to earlier check.
-
     for iGrp = 1:nGrps
         idxK = (grpIdx == iGrp);
         vals = tblOut.(var)(idxK);
@@ -298,11 +311,10 @@ for iVar = 1:numel(procVars)
             mu = stats.Mean(iGrp);
             sigma = stats.SD(iGrp);
 
-            % Handle constant columns
             if sigma ~= 0
                 vals = (vals - mu) / sigma;
             else
-                vals = vals - mu; % Center only if const
+                vals = vals - mu;
             end
         end
 
@@ -311,15 +323,13 @@ for iVar = 1:numel(procVars)
 
     % Save Parameters
     pVar = struct();
-    pVar.isLogit  = isLogit;
-    pVar.doLog    = doLog;
-    pVar.logBase  = logBase;
+    pVar.logBase  = currLogBase; % Now sole source of truth
     pVar.offset   = c;
     pVar.flgNorm  = flgNorm;
     pVar.flgZ     = flgZ;
     pVar.stats    = stats;
 
-    params.varList.(var) = pVar;
+    params.varsTrans.(var) = pVar;
 end
 
 end
@@ -328,51 +338,24 @@ end
 %% ========================================================================
 %  CORE: APPLY TRANSFORMATION
 %  ========================================================================
-function [tblOut, params] = trans_apply(tbl, tmpl, verbose)
+function [tblOut, params] = trans_apply(tbl, tmpl, args, varsTrans) %#ok<INUSD>
 
 params = tmpl; % Stats from template
 tblOut = tbl;
 
 % Match Groups
-varsGrp = tmpl.varsGrp;
-if ~isempty(varsGrp)
-    fns = fieldnames(tmpl.varList);
-    if isempty(fns)
-        % Fallback if no variables were transformed?
-        % We need uGrps to map groups. If no vars, we rely on implicit logic or return empty?
-        % Actually, if no vars, we can't transform anything.
-        % But we might still need to handle the table pass-through?
-        % For now, error or fallback.
-        warning('tbl_transform:NoVars', 'Template contains no variable parameters.');
-        idxGrp = ones(height(tblOut), 1);
-    else
-        pFirst = tmpl.varList.(fns{1});
-        uGrps  = pFirst.stats(:, varsGrp);
+idxGrp = match_grp(tbl, tmpl);
 
-        [~, idxGrp] = ismember(tblOut(:, varsGrp), uGrps, 'rows');
-
-        if any(idxGrp == 0)
-            warning('tbl_transform:NewGroups', ...
-                '%d rows have groups not seen in Template. Results will be NaN.', ...
-                sum(idxGrp==0));
-        end
-    end
-else
-    idxGrp = ones(height(tblOut), 1);
-end
-
-% Process Vars
-procVars = fieldnames(tmpl.varList);
-procVars = procVars(ismember(procVars, tbl.Properties.VariableNames));
-
-for iVar = 1:numel(procVars)
-    var = procVars{iVar};
-    pVar = tmpl.varList.(var);
+for iVar = 1:numel(varsTrans)
+    var = varsTrans{iVar};
+    pVar = tmpl.varsTrans.(var);
     data = tblOut.(var);
+
+    lb = pVar.logBase;
 
     % --- 1. Global Transforms ---
     % Logit
-    if pVar.isLogit
+    if ischar(lb) && strcmpi(lb, 'logit')
         data = max(eps, min(1-eps, data));
         data = log(data ./ (1 - data));
     end
@@ -383,14 +366,11 @@ for iVar = 1:numel(procVars)
     end
 
     % Log
-    if pVar.doLog
-        baseVal = [];
-        if isnumeric(pVar.logBase) && ~isempty(pVar.logBase), baseVal = pVar.logBase; end
-
-        if isempty(baseVal)
+    if (isnumeric(lb) && ~isempty(lb)) || (ischar(lb) && strcmpi(lb, 'e'))
+        if ischar(lb) % 'e'
             data = log(data);
         else
-            data = log(data) ./ log(baseVal);
+            data = log(data) ./ log(lb);
         end
     end
 
@@ -434,44 +414,19 @@ end
 %% ========================================================================
 %  CORE: INVERSE TRANSFORM
 %  ========================================================================
-function [tblOut, params] = trans_inv(tbl, tmpl, verbose)
+function [tblOut, params] = trans_inv(tbl, tmpl, args, varsTrans)
+
+verbose = args.verbose;
 
 params = tmpl;
 tblOut = tbl;
 
 % Match Groups
-varsGrp = tmpl.varsGrp;
-tblVars = tbl.Properties.VariableNames;
+idxGrp = match_grp(tbl, tmpl);
 
-if ~isempty(varsGrp) && all(ismember(varsGrp, tblVars))
-    fns = fieldnames(tmpl.varList);
-    if isempty(fns)
-        warning('tbl_transform:NoVarsInv', 'Template contains no variable parameters.');
-        idxGrp = ones(height(tblOut), 1);
-    else
-        pFirst = tmpl.varList.(fns{1});
-        uGrps  = pFirst.stats(:, varsGrp);
-        [~, idxGrp] = ismember(tblOut(:, varsGrp), uGrps, 'rows');
-
-        if any(idxGrp == 0)
-            warning('tbl_transform:UnknownGroups', 'Unknown groups in Inverse. Using default stats.');
-            idxGrp(idxGrp==0) = 1;
-        end
-    end
-else
-    if ~isempty(varsGrp)
-        warning('tbl_transform:MissingGroups', 'Grouping vars missing. Using default stats.');
-    end
-    idxGrp = ones(height(tblOut), 1);
-end
-
-% Process Vars
-procVars = fieldnames(tmpl.varList);
-procVars = procVars(ismember(procVars, tblVars));
-
-for iVar = 1:numel(procVars)
-    var = procVars{iVar};
-    pVar = tmpl.varList.(var);
+for iVar = 1:numel(varsTrans)
+    var = varsTrans{iVar};
+    pVar = tmpl.varsTrans.(var);
     data = tblOut.(var);
 
     stats = pVar.stats;
@@ -500,15 +455,14 @@ for iVar = 1:numel(procVars)
 
     % --- Step 2: Reverse Global Transforms ---
 
-    % Reverse Log
-    if pVar.doLog
-        baseVal = [];
-        if isnumeric(pVar.logBase) && ~isempty(pVar.logBase), baseVal = pVar.logBase; end
+    lb = pVar.logBase;
 
-        if isempty(baseVal)
+    % Reverse Log
+    if (isnumeric(lb) && ~isempty(lb)) || (ischar(lb) && strcmpi(lb, 'e'))
+        if ischar(lb)
             data = exp(data);
         else
-            data = baseVal .^ data;
+            data = lb .^ data;
         end
     end
 
@@ -518,13 +472,56 @@ for iVar = 1:numel(procVars)
     end
 
     % Reverse Logit
-    if pVar.isLogit
+    if ischar(lb) && strcmpi(lb, 'logit')
         % y = log(p / (1-p)) -> p = 1 / (1 + exp(-y))
         data = 1 ./ (1 + exp(-data));
     end
 
     tblOut.(var) = data;
     if verbose, fprintf('[%s] Applied Inverse Transform.\n', var); end
+end
+
+end
+
+
+%% ========================================================================
+%  HELPER: MATCH GROUPS
+%  ========================================================================
+function idxGrp = match_grp(tbl, tmpl)
+% Calculates group indices for Apply/Inverse modes by matching against template.
+
+varsGrp = tmpl.varsGrp;
+tblVars = tbl.Properties.VariableNames;
+
+if ~isempty(varsGrp)
+    % Ensure grouping vars exist in table
+    if all(ismember(varsGrp, tblVars))
+        fns = fieldnames(tmpl.varsTrans);
+        if isempty(fns)
+            % Should rarely happen if we have groups
+            warning('tbl_trans:NoVars', 'Template contains no variable parameters to retrieve groups from.');
+            idxGrp = ones(height(tbl), 1);
+        else
+            % Retrieve unique groups from the statistics of the first variable
+            pFirst = tmpl.varsTrans.(fns{1});
+            uGrps  = pFirst.stats(:, varsGrp);
+
+            % Match rows
+            [~, idxGrp] = ismember(tbl(:, varsGrp), uGrps, 'rows');
+
+            % Handle unknown groups
+            if any(idxGrp == 0)
+                error('tbl_trans:NewGroups', ...
+                    '%d rows have groups not seen in Template. Using default (NaN or 1).', ...
+                    sum(idxGrp==0));
+            end
+        end
+    else
+        warning('tbl_trans:MissingGroups', 'Grouping variables missing in table. Using default group.');
+        idxGrp = ones(height(tbl), 1);
+    end
+else
+    idxGrp = ones(height(tbl), 1);
 end
 
 end

@@ -3,7 +3,7 @@
 %  LOAD AND PREP
 %  ========================================================================
 
-presets = {'rcv', 'spktimes'};
+presets = {'rcv'};
 [tbl, xVec, basepaths, v] = mcu_tblMea('presets', presets);
 tblLme = tbl;
 
@@ -29,14 +29,8 @@ listRspns = {'uRcv', 'rcvBsl', 'rcvTime', 'spkDfct', 'Genotype', 'frSs', 'rcvWor
 % Recovery
 frml = 'frSs ~ frTrough + fr * Group + pBspk * Group + (1|Name)';
 
-frml = 'frSs ~ frTrough + fr * Group + pBspk + Group + pBspk : Group + (1|Name)';
-
 res = lme_ablation(tblLme, frml, 'dist', 'log-normal');
 
-
-
-[uniqueNames, firstIdx] = unique(tblLme.Name, 'stable');
-groupLabels = tblLme.Group(firstIdx);
 
 [lmeMdl, lmeStats, lmeInfo, tblMdl] = lme_analyse(tblLme, frml, 'dist', 'log-normal');
 

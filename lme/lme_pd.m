@@ -1,4 +1,4 @@
-function [pdRes, hFig] = lme_pd(mdl, vars, varargin)
+function [tblPlot, hFig] = lme_pd(mdl, vars, varargin)
 % LME_PD Plots Partial Dependence (Marginal Effects) for LME/GLME models.
 %
 %   [PDRES, HFIG] = LME_PD(MDL, VARS, ...)
@@ -16,7 +16,7 @@ function [pdRes, hFig] = lme_pd(mdl, vars, varargin)
 %                     'confLvl'      - Confidence Level (default 0.95).
 %                     'clr'          - Color matrix or 'auto'.
 %                     'transParams'  - (struct) Transformation parameters from
-%                                      LME_ANALYSE / TBL_TRANSFORM. If provided,
+%                                      LME_ANALYSE / TBL_TRANS. If provided,
 %                                      predictions and grid values are back-
 %                                      transformed to original units.
 %
@@ -42,11 +42,11 @@ addParameter(p, 'transParams', [], @(x) isempty(x) || isstruct(x));
 
 parse(p, mdl, vars, varargin{:});
 
-hAx     = p.Results.hAx;
-nGrid   = p.Results.nGrid;
-confLvl = p.Results.confLvl;
-clr     = p.Results.clr;
-transP  = p.Results.transParams;
+hAx             = p.Results.hAx;
+nGrid           = p.Results.nGrid;
+confLvl         = p.Results.confLvl;
+clr             = p.Results.clr;
+transParams     = p.Results.transParams;
 
 % Ensure vars is cell
 if ischar(vars), vars = {vars}; end
@@ -70,65 +70,44 @@ alpha = 1 - confLvl;
 [yPred, yCI] = predict(mdl, tblGrid, 'Conditional', false, ...
     'Prediction', 'curve', 'Alpha', alpha);
 
+%% ========================================================================
+%  BACK TRANSFORM
+%  ========================================================================
+
 % 3. Back-Transform (to Original Space)
 %    If transParams are provided, we invert the transformations.
-%    We use 'tbl_transform' in 'inverse' mode.
+%    We do this by adding the predicted columns to the table and transforming
+%    the entire table in one pass.
 
-plotGrid = tblGrid; % Copy for plotting
-yPredPlot = yPred;
-yCIPlot   = yCI;
+tblPlot = tblGrid;
+respName = mdl.ResponseName;
+predName = [respName '_pred'];
+lowerName = [respName '_lower'];
+upperName = [respName '_upper'];
 
-if ~isempty(transP)
+% Add Prediction Columns
+tblPlot.(respName)  = yPred;
+tblPlot.(predName)  = yPred;
+tblPlot.(lowerName) = yCI(:, 1);
+tblPlot.(upperName) = yCI(:, 2);
 
-    % A. PREDICTORS
-    % table `plotGrid` already has all predictors and grouping vars.
-    plotGrid = tbl_transform(plotGrid, 'template', transP, 'flgInv', true);
+tblPlot.(predName)(tblPlot.Group == 'Control')
+% % % [pd] = partialDependence(mdl, {'Group', 'pBspk'});
 
-    % B. RESPONSE
-    % predictions are a vector. to use tbl_transform, we must wrap them
-    % in a table. Crucially, we must include the GROUPING variables
-    % from `plotGrid` so that `tbl_transform` can look up the correct
-    % group-specific stats (if Z-scoring/Norm was grouped).
 
-    respName = mdl.ResponseName;
-    if isfield(transP.varList, respName)
+if ~isempty(transParams)
 
-        % Identify grouping vars needed
-        varsGrp = transP.varsGrp;
-
-        % Create Temp Table: [Groups | Response | CI_L | CI_U]
-        % We actually handle Main Prediction and Bounds separately or together?
-        % Simpler to do one by one or create 3 columns if they are same var?
-        % tbl_transform expects specific variable names.
-
-        % Strategy: Create a table with 'respName' and reuse it 3 times
-        % or just do it once if we trust the loop.
-
-        % Construct base table with Groups
-        tblRspBase = table();
-        if ~isempty(varsGrp)
-            % Copy grouping columns from grid
-            tblRspBase = plotGrid(:, varsGrp);
-        else
-            % Dummy col to ensure height matches
-            tblRspBase = table((1:height(plotGrid))');
-        end
-
-        % Helper to invert a vector treated as 'respName'
-        batch_inv = @(vec) local_inv_vec(vec, respName, tblRspBase, transP);
-
-        yPredPlot    = batch_inv(yPredPlot);
-        yCIPlot(:,1) = batch_inv(yCIPlot(:,1));
-        yCIPlot(:,2) = batch_inv(yCIPlot(:,2));
+    % Duplicate transformation parameters for the new prediction columns
+    if isfield(transParams.varsTrans, respName)
+        pResp = transParams.varsTrans.(respName);
+        transParams.varsTrans.(predName)  = pResp;
+        transParams.varsTrans.(lowerName) = pResp;
+        transParams.varsTrans.(upperName) = pResp;
     end
+
+    % Back-transform everything
+    tblPlot = tbl_trans(tblPlot, 'template', transParams, 'flgInv', true);
 end
-
-
-% Store results
-pdRes = plotGrid;
-pdRes.Pred  = yPredPlot;
-pdRes.Lower = yCIPlot(:, 1);
-pdRes.Upper = yCIPlot(:, 2);
 
 
 %% ========================================================================
@@ -154,7 +133,7 @@ if isscalar(varsPlot)
     isXNum = isNum(1);
 
     % Dummy Grouping
-    gIds = ones(height(pdRes), 1);
+    gIds = ones(height(tblPlot), 1);
     gLbls = {'All'};
     nGrps = 1;
 else
@@ -170,32 +149,30 @@ else
         xName = var1; grpName = var2; isXNum = isNum(1);
     end
 
-    [gIds, gLbls] = findgroups(pdRes.(grpName));
+    [gIds, gLbls] = findgroups(tblPlot.(grpName));
     nGrps = length(gLbls);
 end
 
 % Colors
 if isempty(clr)
-    try
-        cfg = mcu_cfg();
-        if nGrps == 2, clr = cfg.clr.grp; else, clr = lines(nGrps); end
-    catch
+    cfg = mcu_cfg();
+    if nGrps == 2
+        clr = cfg.clr.grp;
+    else
         clr = lines(nGrps);
     end
 end
-if size(clr,1) < nGrps, clr = lines(nGrps); end
-
 
 % Plot Loop
 for iG = 1:nGrps
     idx = (gIds == iG);
-    subTbl = pdRes(idx, :);
+    subTbl = tblPlot(idx, :);
 
     % Extract Data
     xData = subTbl.(xName);
-    y     = subTbl.Pred;
-    yL    = subTbl.Lower;
-    yU    = subTbl.Upper;
+    y     = subTbl.(predName);
+    yL    = subTbl.(lowerName);
+    yU    = subTbl.(upperName);
 
     c = clr(iG, :);
     dispName = string(gLbls(iG));
@@ -251,8 +228,11 @@ if ~isempty(grpName)
 end
 title(hAx, 'Partial Dependence', 'FontWeight', 'normal');
 
+if ~isempty(transParams.varsTrans.(respName).logBase)
+    set(hAx, 'YScale', 'log')
 end
 
+end         % EOF
 
 %% ========================================================================
 %  HELPER: GENERATE GRID
@@ -325,22 +305,7 @@ tblGrid = table(tblArgs{:}, 'VariableNames', predVars);
 end
 
 
-%% ========================================================================
-%  HELPER: VECTOR INVERSE (WRAPPER)
-%  ========================================================================
-function vecOut = local_inv_vec(vecIn, varName, tblBase, transP)
-% Wraps a vector into a table to use tbl_transform
 
-T = tblBase;
-T.(varName) = vecIn; % Add data column
-
-% Transform
-T_Out = tbl_transform(T, 'template', transP, 'flgInv', true);
-
-% Extract
-vecOut = T_Out.(varName);
-
-end
 
 
 %% ========================================================================
@@ -378,4 +343,25 @@ end
 %     represent the predicted outcome for an "average" unit as we vary
 %     only the target variable(s). All other predictors are held fixed at
 %     their global mean or mode.
+% 
+%  4. MATLAB'S PARTIALDEPENDENCE
+%       - This function (LME_PD) calculates the "Conditional Expectation":
+%         It fixes all other predictors to their Mean (or Mode) and
+%         predicts the response for a hypothetical "average" subject. This
+%         is effectively an "Individual Conditional Expectation" (ICE)
+%         profile centered at the mean.
+%       - MATLAB's partialDependence calculates the "Marginal Expectation":
+%         It integrates (averages) out the other predictors by making
+%         predictions for every data point in the original dataset
+%         (replacing the target variable with grid values) and averaging
+%         the results.
+%
+%     Difference:
+%       - For linear models without interactions, they are often identical.
+%       - For Non-Linear models (GLME) or models with Interactions,
+%         f(Mean(X)) != Mean(f(X)).
+%
+%     Use this function if you want to see the model's behavior for a
+%     specifically defined "typical" instance. Use partialDependence if you
+%     want the aggregate population-averaged effect.
 %  ========================================================================

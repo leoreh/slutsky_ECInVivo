@@ -67,7 +67,7 @@ varMap.TailSlope = 'swv.tailSlope';
 varMap.TailAmp = 'swv.tailAmp';
 
 tblUnit = v2tbl('v', v, 'varMap', varMap, 'tagFiles', tagFiles);
-tblUnit = tbl_transform(tblUnit, 'logBase', 10);
+tblUnit = tbl_trans(tblUnit, 'logBase', 10);
 
 
 %% ========================================================================

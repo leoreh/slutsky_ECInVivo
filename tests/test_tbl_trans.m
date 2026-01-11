@@ -1,12 +1,13 @@
-% test_tbl_transform.m
-% Comprehensive test suite for io/tbl_transform.m
+function test_tbl_trans()
+% test_tbl_trans.m
+% Comprehensive test suite for io/tbl_trans.m
 % Verifies: Fit Mode, Apply Mode, Inverse Mode, Logic Flows, and Edge Cases.
 
-root = 'd:\Code\slutsky_ECInVivo';
+root = fileparts(fileparts(mfilename('fullpath'))); % d:\Code\slutsky_ECInVivo
 addpath(fullfile(root, 'io'));
 
 fprintf('===================================================\n');
-fprintf('TEST: tbl_transform.m (Comprehensive)\n');
+fprintf('TEST: tbl_trans.m (Comprehensive)\n');
 fprintf('===================================================\n');
 
 nFail = 0;
@@ -25,7 +26,19 @@ try
     % A. FIT
     fprintf('Step A: Fitting Training Data...\n');
     % Force Log by setting skewThr to -Inf (or 0)
-    [T_Trn_Out, params] = tbl_transform(T_Trn, 'logBase', 'e', 'flgZ', true, 'skewThr', 0, 'verbose', false);
+    [T_Trn_Out, params] = tbl_trans(T_Trn, 'logBase', 'e', 'flgZ', true, 'skewThr', 0, 'verbose', false);
+
+    % Check Params structure
+    if ~isfield(params, 'varsTrans')
+        fprintf('[FAIL] Structure missing "varsTrans" field.\n'); nFail=nFail+1;
+    end
+
+    % Check Log Setting
+    if isfield(params.varsTrans.X, 'logBase') && strcmp(params.varsTrans.X.logBase, 'e')
+        % OK
+    else
+        fprintf('[FAIL] logBase not recorded correctly.\n'); nFail=nFail+1;
+    end
 
     % Check Z-scoring on Logged Data
     logData = log(T_Trn.X);
@@ -43,7 +56,7 @@ try
 
     % B. APPLY
     fprintf('Step B: Applying to Test Data...\n');
-    [T_Tst_Out, ~] = tbl_transform(T_Tst, 'template', params);
+    [T_Tst_Out, ~] = tbl_trans(T_Tst, 'template', params);
 
     % Should use TRAINING mu/sigma
     logDataTst = log(T_Tst.X);
@@ -58,7 +71,7 @@ try
 
     % C. INVERSE (Test Data)
     fprintf('Step C: Inverse Transform (Recovery)...\n');
-    T_Tst_Rec = tbl_transform(T_Tst_Out, 'template', params, 'flgInv', true);
+    T_Tst_Rec = tbl_trans(T_Tst_Out, 'template', params, 'flgInv', true);
 
     recDiff = max(abs(T_Tst.X - T_Tst_Rec.X));
     if recDiff < 1e-10
@@ -82,7 +95,7 @@ try
     X = [0.01; 0.5; 0.99; 0.000001; 0.999999];
     T = table(X);
 
-    [T_Out, params] = tbl_transform(T, 'logBase', 'logit', 'flgZ', false);
+    [T_Out, params] = tbl_trans(T, 'logBase', 'logit', 'flgZ', false);
 
     % Check logic
     % logit(p) = log(p/(1-p))
@@ -95,12 +108,18 @@ try
         fprintf('[FAIL] Logit: Mismatch (Diff = %.4e)\n', diff); nFail=nFail+1;
     end
 
+    if strcmp(params.varsTrans.X.logBase, 'logit')
+        fprintf('[PASS] Logit: Param recorded correctly.\n');
+    else
+        fprintf('[FAIL] Logit: Param mismatch.\n'); nFail=nFail+1;
+    end
+
     % Inverse
-    T_Rec = tbl_transform(T_Out, 'template', params, 'flgInv', true);
+    T_Rec = tbl_trans(T_Out, 'template', params, 'flgInv', true);
     diffInv = max(abs(T.X - T_Rec.X));
 
     if diffInv < 1e-10
-        fprintf('[PASS] Logit Inverse: Correct recovery.\n', diffInv);
+        fprintf('[PASS] Logit Inverse: Correct recovery.\n');
     else
         fprintf('[FAIL] Logit Inverse: Recovery failed (Diff = %.4e)\n', diffInv); nFail=nFail+1;
     end
@@ -117,9 +136,9 @@ try
 
     % Auto-detect skew? No, force log.
     % Should detect 0 and add offset.
-    [T_Out, params] = tbl_transform(T, 'logBase', 'e', 'flgZ', false, 'skewThr', 0);
+    [T_Out, params] = tbl_trans(T, 'logBase', 'e', 'flgZ', false, 'skewThr', 0);
 
-    c = params.varList.X.offset;
+    c = params.varsTrans.X.offset;
     if c > 0
         fprintf('[PASS] Offset: Detected 0, added offset %.4f.\n', c);
     else
@@ -136,7 +155,7 @@ try
     end
 
     % Inverse
-    T_Rec = tbl_transform(T_Out, 'template', params, 'flgInv', true);
+    T_Rec = tbl_trans(T_Out, 'template', params, 'flgInv', true);
     diffInv = max(abs(T.X - T_Rec.X));
     if diffInv < 1e-10
         fprintf('[PASS] Offset Inverse: Correct recovery.\n');
@@ -158,14 +177,14 @@ try
 
     % 1. Error Check: varNorm included in varsGrp
     try
-        tbl_transform(T, 'varsGrp', 'Group', 'varNorm', 'Group');
+        tbl_trans(T, 'varsGrp', 'Group', 'varNorm', 'Group');
         fprintf('[FAIL] Did not catch invalid varsGrp/varNorm overlap.\n'); nFail=nFail+1;
     catch
         fprintf('[PASS] Correctly errored on overlapping varsGrp/varNorm (Conflict).\n');
     end
 
     % 2. Correct Usage: Global Norm relative to Group A
-    [T_Norm2, pNorm2] = tbl_transform(T, 'varsGrp', [], 'varNorm', 'Group', 'flgZ', false);
+    [T_Norm2, pNorm2] = tbl_trans(T, 'varsGrp', [], 'varNorm', 'Group', 'flgZ', false);
 
     if all(T_Norm2.Val(1:3) == 100) && all(T_Norm2.Val(4:6) == 200)
         fprintf('[PASS] Normalization (Global) works as expected.\n');
@@ -176,7 +195,7 @@ try
     end
 
     % INVERSE Norm
-    T_Rec2 = tbl_transform(T_Norm2, 'template', pNorm2, 'flgInv', true);
+    T_Rec2 = tbl_trans(T_Norm2, 'template', pNorm2, 'flgInv', true);
     if max(abs(T_Rec2.Val - T.Val)) < 1e-10
         fprintf('[PASS] Normalization Inverse works.\n');
     else
@@ -197,10 +216,10 @@ try
     Val = [10; 20];
     T = table(Val);
 
-    [T_Out, params] = tbl_transform(T, 'varNorm', 'Dummy', 'flgZ', true, 'verbose', false);
+    [T_Out, params] = tbl_trans(T, 'varNorm', 'Dummy', 'flgZ', true, 'verbose', false);
 
-    % Check Norm is disabled
-    if isfield(params.varList.Val, 'flgNorm') && ~params.varList.Val.flgNorm
+    % Check Norm is disabled (flgNorm in param should be false or 0)
+    if isfield(params.varsTrans.Val, 'flgNorm') && ~params.varsTrans.Val.flgNorm
         fprintf('[PASS] Conflict: Norm was correctly disabled when Z is enabled.\n');
     else
         fprintf('[FAIL] Conflict: Norm was NOT disabled.\n'); nFail=nFail+1;
@@ -229,4 +248,4 @@ else
     fprintf('%d TESTS FAILED.\n', nFail);
 end
 fprintf('==================\n');
-
+end
