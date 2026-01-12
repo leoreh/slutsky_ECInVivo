@@ -10,8 +10,8 @@ function [idxTrough, tAxis, debugData] = mcu_detectTrough(frMat, idxPert, vararg
 %       idxPert     - (scalar) Index of perturbation onset.
 %
 %   OPTIONAL (Key-Value Pairs):
-%       binSize     - (double) Bin size in seconds. {60}
-%       marginMin   - (double) Margin in minutes to skip after pert. {10}
+%       binSize     - (double) Bin size in seconds. {60 s}
+%       margMin   - (double) Margin iskip after pert. {5 bins}
 %       flgPlot     - (logical) Whether to plot results. {false}
 %
 %   OUTPUTS:
@@ -29,12 +29,12 @@ p = inputParser;
 addRequired(p, 'frMat', @isnumeric);
 addRequired(p, 'idxPert', @isnumeric);
 addParameter(p, 'binSize', 60, @isnumeric);
-addParameter(p, 'marginMin', 30, @isnumeric);
+addParameter(p, 'margMin', 5, @isnumeric);
 addParameter(p, 'flgPlot', false, @islogical);
 
 parse(p, frMat, idxPert, varargin{:});
 binSize = p.Results.binSize;
-marginMin = p.Results.marginMin;
+margMin = p.Results.margMin;
 flgPlot = p.Results.flgPlot;
 
 %% ========================================================================
@@ -48,17 +48,15 @@ mfr = median(frMat, 1, 'omitnan');
 mfr = fr_denoise(mfr, 'flgPlot', false, 'frameLen', 10);
 
 % Baseline (until idxPert - margin)
-marginBins = round(marginMin * 60 / binSize);
-frBsl = median(mfr(1 : idxPert - marginBins), 'omitnan');
+margBins = round(margMin * 60 / binSize);
+frBsl = median(mfr(1 : idxPert - margBins), 'omitnan');
 
-% Apply margin after perturbation to avoid transient drops
-srchStart = idxPert + marginBins;
-
-if srchStart >= length(mfr)
-    error('Something went wrong')
-end
-
-postWin = mfr(srchStart:end);
+% Manual inspection shows FR finishes drop <10 bins (1hr abs) after pert
+% onset. Note, this type of visual inspection should be done on the same
+% trace as that which detected idxPert (eg, smoothed FR in 60s bins).
+srchStart = idxPert + 10 + margBins;
+srchEnd = srchStart + 60;
+postWin = mfr(srchStart:srchEnd);
 
 % Define Threshold
 % Find minimal activity level (floor) in the post-perturbation window

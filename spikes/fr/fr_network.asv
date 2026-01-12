@@ -58,7 +58,7 @@ params.dim.method  = 'pr';
 params.dim.thrVal  = 0.8;
 params.dim.flgFrac = false;
 
-params.corr.flgPlot = false;
+params.corr.flgPlot = true;
 params.corr.nShuffles = nShuffles;
 
 % Handle winLim
@@ -80,6 +80,7 @@ end
 nChunks = size(chunks, 1);
 nUnits = length(spktimes);
 
+% Initialize Output
 % Initialize Output
 frNet.time    = chunks;
 frNet.dim     = nan(nChunks, 1);
@@ -125,6 +126,7 @@ for iChunk = 1:nChunks
         'thrVal', params.dim.thrVal, ...
         'flgFrac', params.dim.flgFrac);
 
+    % Correlations
     % Correlations
     resCorr = fr_corr(frMat, ...
         'nShuffles', params.corr.nShuffles, ...

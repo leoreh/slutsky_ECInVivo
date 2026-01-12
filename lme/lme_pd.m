@@ -231,6 +231,10 @@ title(hAx, 'Partial Dependence', 'FontWeight', 'normal');
 if ~isempty(transParams.varsTrans.(respName).logBase)
     set(hAx, 'YScale', 'log')
 end
+if ~isempty(transParams.varsTrans.(xName).logBase)
+    set(hAx, 'XScale', 'log')
+end
+
 
 end         % EOF
 
@@ -309,7 +313,7 @@ end
 
 
 %% ========================================================================
-%  NOTES
+%  NOTE: BACKGROUND
 %  ========================================================================
 %  1. VARIABLES & DIMENSIONS
 %     This function currently supports only 1 or 2 varying variables.
@@ -324,14 +328,14 @@ end
 %     and generate multiple plots.
 %
 %  2. NEGATIVE VALUES & TRANSFORMATIONS
-%     If you see values like -0.7 to 3.2 for a probability 'pBspk', it is
-%     likely because the variable was Log (or Logit) transformed and/or
-%     Z-scored during the preprocessing logic in 'lme_analyse'. The model
-%     estimates coefficients in this *transformed* space.
-%     To see the plot in natural units (0 to 1), you must back-transform
-%     the X-axis and Y-axis. This function now supports a 'transParams'
-%     inputs (available from 'lmeInfo'). If provided, the grid and
-%     predictions will be automatically mapped back to the original scale.
+%     Values like -0.7 to 3.2 for a probability 'pBspk', are likely
+%     because the variable was Log (or Logit) transformed and/or Z-scored
+%     during the preprocessing logic in 'lme_analyse'. The model estimates
+%     coefficients in this *transformed* space. To see the plot in natural
+%     units (0 to 1), you must back-transform the X-axis and Y-axis. This
+%     function now supports a 'transParams' inputs (available from
+%     'lmeInfo'). If provided, the grid and predictions will be
+%     automatically mapped back to the original scale.
 %
 %     Does this distort the CI?
 %     No. Transforming the CI endpoints (Lower/Upper) is a statistically
@@ -343,14 +347,16 @@ end
 %     represent the predicted outcome for an "average" unit as we vary
 %     only the target variable(s). All other predictors are held fixed at
 %     their global mean or mode.
-% 
-%  4. MATLAB'S PARTIALDEPENDENCE
-%       - This function (LME_PD) calculates the "Conditional Expectation":
+
+%% ========================================================================
+%  NOTE: PARTIALDEPENDENCE
+%  ========================================================================
+%  - This function (LME_PD) calculates the "Conditional Expectation":
 %         It fixes all other predictors to their Mean (or Mode) and
 %         predicts the response for a hypothetical "average" subject. This
 %         is effectively an "Individual Conditional Expectation" (ICE)
 %         profile centered at the mean.
-%       - MATLAB's partialDependence calculates the "Marginal Expectation":
+%  - MATLAB's partialDependence calculates the "Marginal Expectation":
 %         It integrates (averages) out the other predictors by making
 %         predictions for every data point in the original dataset
 %         (replacing the target variable with grid values) and averaging
@@ -364,4 +370,29 @@ end
 %     Use this function if you want to see the model's behavior for a
 %     specifically defined "typical" instance. Use partialDependence if you
 %     want the aggregate population-averaged effect.
+
+%% ========================================================================
+%  NOTE: RESIDUAL PLOT
+%  ========================================================================
+%     While LME_PD shows the *fitted model* (the theoretical curves), it
+%     does not show the raw data. To validate that a complex interaction
+%     (e.g., Group * pBspk) is actually supported by the data and not just
+%     an artifact of the model fitting process, use a "Partial Residual
+%     Plot" (Added Variable Plot).
+%
+%     Method:
+%       1. Fit a "Reduced Model" that EXCLUDES the variable of interest and
+%          its interactions.
+%          e.g., if checking pBspk * Group, fit: Response ~ Covariates + (1|ID).
+%       2. Calculate the Residuals from this reduced model. These residuals
+%          contain the variance that was *not* explained by the covariates,
+%          so they effectively isolate the "Added Effect" of the excluded variables.
+%       3. Plot these Residuals vs. the Variable of Interest (pBspk), colored
+%          by Group.
+%
+%     Interpretation:
+%       - If the interaction is real, you will see distinct slopes for each
+%         group in the scatter plot of residuals.
+%       - This provides a "sanity check" that the smooth curves in LME_PD
+%         correspond to visible trends in the noisy raw data.
 %  ========================================================================

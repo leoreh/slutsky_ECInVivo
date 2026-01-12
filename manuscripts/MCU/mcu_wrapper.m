@@ -5,7 +5,7 @@
 
 % get all files in study
 basepaths = mcu_basepaths('all');
-% basepaths = [mcu_basepaths('wt_bsl'), mcu_basepaths('mcu_bsl')];
+basepaths = [mcu_basepaths('wt_bsl'), mcu_basepaths('mcu_bsl')];
 nFiles = length(basepaths);
 
 % vars
@@ -28,26 +28,26 @@ for iFile = 1 : nFiles
     % spktimes = spktimes(uType == "RS");
 
     % FR network stats during Baseline
-    % winBsl = [300, 315] * 60;
-    % frNet = fr_network(spktimes, 'flgSave', true, 'winLim', winBsl);
+    winBsl = [300, 315] * 60;
+    frNet = fr_network(spktimes, 'flgSave', true, 'winLim', winBsl);
     
     % winLim = [0, Inf] * 60 * 60;
     % drft = drift_file(spktimes, 'flgSave', true, 'winLim', winLim, ...
     %     'binSize', 1200, 'winSize', [], 'flgPlot', true);
     
-    % Burst detection
-    isiVal = 0.02;
-    brst = brst_detect(spktimes, ...
-        'minSpks', 3, ...
-        'isiStart', isiVal, ...
-        'isiEnd', isiVal * 2, ...
-        'minDur', 0.005, ...
-        'minIBI', 0.05, ...
-        'flgForce', true, 'flgSave', true, 'flgPlot', false);
+    % % Burst detection
+    % isiVal = 0.02;
+    % brst = brst_detect(spktimes, ...
+    %     'minSpks', 3, ...
+    %     'isiStart', isiVal, ...
+    %     'isiEnd', isiVal * 2, ...
+    %     'minDur', 0.005, ...
+    %     'minIBI', 0.05, ...
+    %     'flgForce', true, 'flgSave', true, 'flgPlot', false);
 
-    % Burst statistics
-    stats = brst_stats(brst, spktimes, 'winCalc', [], ...
-        'flgSave', true);
+    % % Burst statistics
+    % stats = brst_stats(brst, spktimes, 'winCalc', [], ...
+    %     'flgSave', true);
 
 end
 
@@ -67,8 +67,11 @@ presets = {'frNet', 'brst'};
 [tbl, basepaths, ~] = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
 tbl.Day(tbl.Day == "BAC_ON") = "BAC3";
 
-tblGUI_bar(tbl, 'xVar', 'Group', 'yVar', 'drift');
-tblGUI_scatHist(tbl, 'xVar', 'fr', 'yVar', 'pBspk', 'grpVar', 'Group');
+tblPlot = tbl;
+tblPlot = tbl_trans(tblPlot, 'flg0', true);
+
+tblGUI_bar(tblPlot, 'xVar', 'Group', 'yVar', 'conn');
+tblGUI_scatHist(tblPlot, 'xVar', 'fr', 'yVar', 'pBspk', 'grpVar', 'Group');
 
 
 

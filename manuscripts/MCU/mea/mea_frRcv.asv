@@ -14,7 +14,9 @@ function rcv = mea_frRcv(t, frMat, varargin)
 %   OPTIONAL (Key-Value Pairs):
 %       idxTrough   - (double) Index of the trough center around which the
 %                     trough window is defined.
-%       uGood       - (logical) Vector indicating valid "good" units. {Default: all true}
+%       uGood       - (logical) Vector indicating valid "good" units. This subset
+%                     is used to decide if the bias correction constant 'c'
+%                     should be added to all units. {Default: all true}
 %       binSize     - (double) Bin size of the firing rate in seconds. {Default: 60}
 %       flgSave     - (logical) Whether to save the output struct to disk. {Default: false}
 %       basepath    - (char) Base path for saving output files. {Default: pwd}
@@ -91,9 +93,9 @@ end
 %  ========================================================================
 
 % Constants
-c = 1 / 3600;           % 1 spike per hour (~0.0002 Hz, min FR recorded ~0.004 Hz)
-thrPert = 1.00;         % Threshold for significant perturbation (50% reduction)
-thrRcv = 0.5;           % Threshold for recovery (linear fraction of range)
+c = 1 / 3600;           % 1 spike per hour
+thrPert = 1;            % Threshold for significant perturbation (log2 fold - 50% reduction)
+thrRcv = 0.67;          % Threshold for recovery (linear fraction of range)
 
 % Find perturbation index (t=0)
 idxPert = find(t >= -1e-9, 1, 'first');
@@ -174,15 +176,15 @@ rcvGain(rcvGain < 0) = 0; % Clamp negative gain to 0
 rcvWork = rcvGain ./ pertDepth;
 
 % Perturbed Units
-uPert = pertDepth >= thrPert;
+% Significant perturbation AND "dead-zone" lower then frBsl. In frPrep
+% idxTrough is forced >10 bins after idxPert
+frDead = mean(frMat(:, idxPert + winMarg : idxTrough), 2, 'omitnan');
+uPert = pertDepth >= thrPert & frDead < frBsl;
 
 % Recoverd Units
-% Significant perturbation AND reached thr% of recovery range
+% Significant perturbation AND reached 67% of recovery range
 uRcv = uPert & (frSs >= frTrough + thrRcv * (frBsl - frTrough));
-
-% Assert uGood on unit indices
-uRcv(~uGood) = false; 
-uPert(~uGood) = false; 
+uRcv(~uGood) = false; % Valid only for good units
 
 
 %% ========================================================================

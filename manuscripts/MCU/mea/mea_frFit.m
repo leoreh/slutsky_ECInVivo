@@ -139,11 +139,6 @@ for iUnit = 1:nUnits
         kRcv = (frPost(end) - frTroughEst) / max(tPost(end), 1);
     end
 
-    % Sanity Check
-    if frTroughEst / frSsEst > 2000
-        continue;
-    end
-
     % ---------------------------------------------------------------------
     % PEAK DETECTION (OVERSHOOT)
     % ---------------------------------------------------------------------

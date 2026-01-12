@@ -3,21 +3,21 @@
 %  LOAD AND PREP
 %  ========================================================================
 
-presets = {'rcv'};
+presets = {'rcv', 'frNet'};
 [tbl, xVec, basepaths, v] = mcu_tblMea('presets', presets);
 tblLme = tbl;
 
+% Clean units that were not perturbed
+tblLme(~tblLme.uPert, :) = [];
+tblLme = removevars(tblLme, 'uPert');
+
 % tblGUI_xy(xVec, tbl);
-% tblGUI_scatHist(tbl, 'xVar', 'pBspk', 'yVar', 'rcvTime', 'grpVar', 'Group');
+% tblGUI_scatHist(tbl, 'xVar', 'pBspk', 'yVar', 'conn', 'grpVar', 'Group');
 % tblGUI_bar(tbl, 'yVar', 'pBspk', 'xVar', 'Group');
 % tblGUI_raster(tbl, 'grpVar', 'Name', 'grpVal', 'ctrl1')
 
-    
-tbl.pBspk(tbl.Group == 'MCU-KO')   
-tbl.frSs(tbl.Group == 'MCU-KO')   
 
-
-% List of possible predictors
+% List of possible vars
 listPrdct = {'pertDepth', 'fr', 'pBspk', 'Group', '(1|Name)'};
 listRspns = {'uRcv', 'rcvBsl', 'rcvTime', 'spkDfct', 'Genotype', 'frSs', 'rcvWork'};
 
@@ -32,24 +32,34 @@ frml = 'frSs ~ frTrough + fr * Group + pBspk * Group + (1|Name)';
 res = lme_ablation(tblLme, frml, 'dist', 'log-normal');
 
 
-
-[uniqueNames, firstIdx] = unique(tblLme.Name, 'stable');
-groupLabels = tblLme.Group(firstIdx);
-
+frml = 'frSs ~ frTrough + fr * Group + pBspk * Group + conn * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo, tblMdl] = lme_analyse(tblLme, frml, 'dist', 'log-normal');
 
+% Partial Dependence
 vars = {'Group', 'pBspk'};
-[pdRes, hFig] = lme_pd(lmeMdl, vars, 'transParams', lmeInfo.transParams);
+hFig = plot_axSize('flgFullscreen', true, 'flgPos', true);
+hAx = nexttile;
+[pdRes, hFig] = lme_pd(lmeMdl, vars, 'transParams', lmeInfo.transParams, ...
+    'hAx', hAx);
+
+% Partial Residuals
+hAx = nexttile;
+[pdRes, hFig] = lme_pr(lmeMdl, vars, 'transParams', lmeInfo.transParams, ...
+    'hAx', hAx);
+
+
+
+
 
 tblGUI_scatHist(tblMdl, 'xVar', 'pBspk', 'yVar', 'frSs', 'grpVar', 'Group');
 
 
 
 
-plotPartialDependence(mdl, {'Group', 'pBspk'})
-[pd, grp, pBspk_pred] = partialDependence(mdl, {'Group', 'pBspk'});
-hFig = figure;
-plot(pBspk_pred, pd)
+%% ========================================================================
+%  OTHER
+%  ========================================================================
+
 
 % Predict Genotype (w/o Name as random effect)
 tblLme.Genotype = tblLme.Group == "Control";
@@ -62,7 +72,7 @@ res = lme_ablation(tblLme, frml, 'nFolds', nFolds, 'nReps', nReps);
 
 
 
-% Medation
+% Mediation
 frml = sprintf('uRcv ~ %s + (1|Name)', strjoin(varsFxd, ' + '));
 res = lme_mediation(tblLme, frml, 'Group', 'pBspk');
 
@@ -95,17 +105,17 @@ res = lme_ablation(tblLme, frml, 'nFolds', nFolds, 'nReps', nReps);
 % didn't manage to maintain it.
 %
 % Predicting Genotype is only meaningful without the random effect of Name.
-% 
+%
 % If rcvBsl is the response and fr is a predictor, the results are exactly
 % the same as when frSs is the response and fr is not a predictor
 % (obvsiouly)
-% 
+%
 % Burstiness shows stronger predictive capacity when frTrough is provided
 % instead of pertDepth
-% 
+%
 % Burstiness shows stronger predictive capacity when NOT log- or
-% logit-transformed. It's skeweness is only ~1.6 so it's okay. 
-% 
+% logit-transformed. It's skeweness is only ~1.6 so it's okay.
+%
 % Gamma distribution fails to converge in the ablation analysis
 %  ========================================================================
 

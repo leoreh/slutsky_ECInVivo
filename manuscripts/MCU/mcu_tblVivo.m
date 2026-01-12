@@ -73,6 +73,7 @@ if ismember('frNet', presets)
     varMap.dim   = 'frNet.dimExp';
     varMap.mcc   = 'frNet.mccExp';
     varMap.cc    = 'frNet.ccExp';
+    varMap.funcon  = 'frNet.corr.funcon';
 end
 
 % Load
@@ -103,10 +104,6 @@ if ismember('frNet', presets)
         % Expand Mean Correlation
         valMcc = v(iFile).frNet.mcc(1);
         v(iFile).frNet.mccExp = repmat(valMcc, nUnits, 1);
-
-        % Compute Unit-Specific Correlation (mean of row in CC matrix)
-        ccMat = v(iFile).frNet.cc{1};
-        v(iFile).frNet.ccExp = mean(ccMat, 2, 'omitnan');
     end
 end
 

@@ -219,7 +219,7 @@ if ismember('frNet', presets)
     mapNet = struct();
     mapNet.dim = 'frNet.dimExp';
     mapNet.mcc = 'frNet.mccExp';
-    mapNet.funcon  = 'frNet.corr.funcon';
+    mapNet.conn  = 'frNet.corr.funcon';
 
     tblNet = v2tbl('v', v, 'varMap', mapNet, 'tagFiles', tagFiles, ...
         'idxCol', [], 'uOffset', 0);
@@ -233,6 +233,10 @@ end
 %  CLEAN & POST-PROCESS
 %  ========================================================================
 
+% Clean Unit Flags
+tbl(~tbl.uPert, :) = [];
+tbl = removevars(tbl, 'uPert');
+
 tbl(~tbl.uGood, :) = [];
 tbl = removevars(tbl, 'uGood');
 
@@ -243,7 +247,7 @@ tbl.rcvTime = tbl.rcvTime / 3600;
 
 % Post-Process spktimes
 if ismember('spktimes', presets)
-    winExp = [0, 33600];
+    winExp = [0, 9 * 60] * 60;
     tbl.spktimes = cellfun(@(x) x(x >= winExp(1) & x <= winExp(2)), ...
         tbl.spktimes, 'UniformOutput', false);
 end

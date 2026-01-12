@@ -111,7 +111,7 @@ fprintf('[MEA_FRPREP]: %d of %d units excluded from recording\n', ...
 
 % Use global population recovery detection
 [idxTrough, ~, ~] = mcu_detectTrough(frSm(uGood, :), idxPert, ...
-    'binSize', binSize, 'margMin', 5, 'flgPlot', false);
+    'binSize', binSize, 'marginMin', 10, 'flgPlot', false);
 
 
 %% ========================================================================
@@ -167,40 +167,44 @@ end
 if flgPlot
 
     hFig = figure();
-    hTl = tiledlayout(2, 1);
+    hTl = tiledlayout(1, 1);
+    hAx = nexttile;
+    hAx1 = gca;
+    hold(hAx1, 'on');
 
-    for iTile = 1 : 2
-        
-        hAx(iTile) = nexttile;
-        hold(hAx(iTile), 'on');
+    % Plot Abs Time (Hours)
+    plot(hAx1, fr.t / 3600, mean(fr.fr(fr.uGood, :), 1, 'omitnan'), ...
+        'k-', 'LineWidth', 1.5, 'DisplayName', 'MFR (Hz)');
 
-        if iTile == 1
-            % Plot Abs Time (Hours)
-            xVec = fr.t / 3600;
-            xlabel(hAx(iTile), 'Abs. Time (hr)');
+    xline(hAx1, fr.t(fr.info.idxTrough) / 3600, 'r-', 'LineWidth', 2, ...
+        'DisplayName', 'Trough');
 
-        else
-            % Plot Rec time (bins)
-            xVec = [1:size(fr.fr, 2)] - fr.info.idxPert;
-            xlabel(hAx(iTile), 'Rec. Time (Bins)');
-        end
+    xline(hAx1, fr.t(fr.info.idxPert) / 3600, 'b-', 'LineWidth', 2, ...
+        'DisplayName', 'Perturbation');
 
+    xlabel(hAx1, 'Time (hr)');
+    ylabel(hAx1, 'FR (Hz)');
+    legend(hAx1, 'show', 'Location', 'best');
+    axis tight
+    
+    % Create Axes for Bins (Top)
+    hAx2 = axes('Position', hAx1.Position, 'XAxisLocation', 'top', ...
+        'YAxisLocation', 'right', 'Color', 'none');
+    hAx2.YAxis.Visible = 'off';
+    hold(hAx2, 'on');
 
-        plot(hAx(iTile), xVec, mean(fr.fr(fr.uGood, :), 1, 'omitnan'), ...
-            'k-', 'LineWidth', 1.5, 'DisplayName', 'MFR (Hz)');
+    % Plot Bins
+    uIdx = find(fr.uGood);
+    uIdx = uIdx([1 : 6]);
+    plot(hAx2, 1:size(fr.fr, 2), fr.fr(uIdx, :), ...
+        'LineStyle', '--', 'LineWidth', 0.5);
+    xlabel(hAx2, 'Time (Bins)');
+    xlim(hAx2, [1, size(fr.fr, 2)]);
 
-        xline(hAx(iTile), xVec(fr.info.idxTrough), 'r-', 'LineWidth', 2, ...
-            'DisplayName', 'Trough');
+    % Link Y-axes (ensures scaling matches)
+    linkaxes([hAx1, hAx2], 'y');
 
-        xline(hAx(iTile), xVec(fr.info.idxPert), 'b-', 'LineWidth', 2, ...
-            'DisplayName', 'Perturbation');
-
-        ylabel(hAx(iTile), 'FR (Hz)');
-        legend(hAx(iTile), 'show', 'Location', 'best');
-        xlim(hAx(iTile), [xVec(1), xVec(end)])
-
-    end
-
+    axis tight
 end
 
 end     % EOF
