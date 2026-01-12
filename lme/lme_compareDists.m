@@ -75,7 +75,7 @@ if nZeros > 0
     warning(['Response variable "%s" has %.1f%% zeros.', ...
         'Results may be unstable.'], varResp, pctZeros*100);
 
-    tbl = tbl_transform(tbl, 'flg0', true, 'verbose', false, ...
+    tbl = tbl_trans(tbl, 'flg0', true, 'verbose', false, ...
         'varsInc', {varResp});
 end
 
@@ -104,7 +104,7 @@ for iMdl = 1:nMdl
         if strcmp(dist, 'Log-Normal')
 
             % Log-Transform Response
-            mdlTbl = tbl_transform(tbl, 'logBase', 'e', ...
+            mdlTbl = tbl_trans(tbl, 'logBase', 'e', ...
                 'verbose', false, 'skewThr', -Inf, 'varsInc', {varResp});
             dist = 'Normal';
 
@@ -120,12 +120,12 @@ for iMdl = 1:nMdl
                 continue;
             end
 
-            mdlTbl = tbl_transform(tbl, 'logBase', 'logit', 'verbose', false, ...
+            mdlTbl = tbl_trans(tbl, 'logBase', 'logit', 'verbose', false, ...
                 'varsInc', {varResp});
             dist = 'Normal';
 
             % Jacobian Correction: LL_raw = LL_logit - sum(ln(y*(1-y)))
-            % Clip for stability (consistent with tbl_transform)
+            % Clip for stability (consistent with tbl_trans)
             yVal = max(eps, min(1-eps, yRaw));
             jcb = -sum(log(yVal .* (1 - yVal)), 'omitnan');
         end

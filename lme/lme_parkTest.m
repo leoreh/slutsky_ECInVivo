@@ -9,7 +9,7 @@ function stats = lme_parkTest(tbl, frml)
 %
 %   The function automatically inspects the response variable's skewness and
 %   sparseness to select an appropriate provisional distribution (Normal vs.
-%   Gamma) and handles zero-inflation via `tbl_transform` if required.
+%   Gamma) and handles zero-inflation via `tbl_trans` if required.
 %
 %   INPUTS:
 %       tbl         - (table) Data table containing variables.
@@ -65,7 +65,7 @@ if isSkewed && ~isSparse
     if nZeros > 0
         warning('Response "%s" has %.1f%% zeros. Applying offset.', ...
             varResp, pctZeros*100);
-        tbl = tbl_transform(tbl, 'flg0', true, 'varsInc', {varResp}, ...
+        tbl = tbl_trans(tbl, 'flg0', true, 'varsInc', {varResp}, ...
             'flgZ', false, 'verbose', false);
 
         % Update yRaw for consistency
@@ -154,9 +154,9 @@ stats.minDF = NaN;
 
 if strcmp(dist, 'Gamma')
     % 1. Fit Log-Normal Model (LME on log(y))
-    % Use tbl_transform to ensure log applied correctly
+    % Use tbl_trans to ensure log applied correctly
     % Note: We use 'e' base for mathematical consistency with Log-Normal definition
-    tblLog = tbl_transform(tbl, 'logBase', 'e', 'varsInc', {varResp}, ...
+    tblLog = tbl_trans(tbl, 'logBase', 'e', 'varsInc', {varResp}, ...
         'flgZ', false, 'verbose', false);
 
     mdlLog = lme_fit(tblLog, frml, 'dist', 'Normal');

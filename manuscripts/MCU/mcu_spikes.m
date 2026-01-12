@@ -13,7 +13,7 @@ cfg = mcu_cfg();
 tblUnit = mcu_tblVivo('basepaths', basepaths, 'flgClean', true);
 
 % Assert no zero values
-tblLme = tbl_transform(tblUnit, 'flg0', true, 'verbose', true);
+tblLme = tbl_trans(tblUnit, 'flg0', true, 'verbose', true);
 
 uIdx = tblLme.UnitType == 'RS';
 tblGUI_scatHist(tblLme(uIdx, :))

@@ -10,11 +10,11 @@
 %     if t_abs > 14400
 %           t_rec = 4800 + (t_abs - 14400) / 6
 %           t_abs = 14400 + (t_rec - 4800) * 6
-% 
-% According to spktimes (last recorded spike), recordings are ~34804s. 
+%
+% According to spktimes (last recorded spike), recordings are ~34804s.
 %   - Perturbation should occur at t_rec = 4800s = 80min
 %   - Recording duration should be 14400 + 30000 * 6 (t_abs = 54hr)
-% 
+%
 % To calculate X hr (t_abs) in spktimes (t_rec):
 %   - X = 52; 4800 + (X * 3600 - 14400) / 6
 %   - winExp = [0, 33600];
@@ -26,13 +26,23 @@
 % all others (Last spktime @ 33807s). PertDetect shows this stems from a
 % shorter baseline (by ~16-17 min). Hence, for all recordings window length
 % is 60 bins (~3hr abs)
-% 
+%
 % When calculating steady-state, same length (nBins) is taken for average
 % stats, even though this represents x2 absolute time. Position of windows
 % (bsl, trough, ss) determined per file, according to the window in
 % mea_frRcv
+%
+% MCU-KO are perturbed less then Control (uPert: 90%  vs 95%). However, bsl
+% FR is also higher (though not significant).
 % 
-% MCU-KO are perturbed less then Control (uPert: 90%  vs 95%)
+% MCU-KO3, uID 6. Because high FR, can distort summary plots but still, do
+% no exclude because interesting dynamics: extremely fast recovery
+% following gradual descent. 
+% 
+% Inspecting BSL vs Trough FR per unit shows they are linearly correlated
+% in log space, meaning the effect of BAC is a constant percentage of BSL
+% FR. Indeed, perturbation depth is very weakly correlated with BSL FR.
+
 
 %% ========================================================================
 %  NOTE: CLEANING UNITS
@@ -76,7 +86,7 @@ for iFile = 1 : nFiles
     lastspike = max(cellfun(@max, spktimes, 'uni', true));
     spktimes = cellfun(@(x) x(x >= winExp(1) & x <= winExp(2)), ...
         spktimes, 'UniformOutput', false);
-    
+
     % Network stats
     frNet = fr_network(spktimes, 'flgSave', true, 'winLim', [0, 15] * 60);
     % % drft = drift_file(spktimes, 'flgSave', false, 'winLim', winBsl, ...
@@ -85,7 +95,7 @@ for iFile = 1 : nFiles
     % % Firing rate
     % fr = mea_frPrep(spktimes, 'binSize', binSize, ...
     %     'flgSave', true, 'flgPlot', true);
-    
+
     % FR recovery
     fr = v(iFile).fr;
     rcv = mea_frRcv(fr.t, fr.fr, ...
@@ -134,18 +144,9 @@ end
 presets = {'time', 'steadyState', 'frNet', 'rcv', 'spktimes'};
 [tbl, xVec, basepaths, v] = mcu_tblMea('presets', presets([1, 3 : 5]));
 
-idxGrp = tbl.Group == 'MCU-KO';
-sum(~tbl.uPert(idxGrp)) / sum(idxGrp)
+[tbl, xVec, ~, ~] = mcu_tblMea('presets', presets([1, 3 : 5]), ...
+    'basepaths', basepaths(8));
 
-uIdx = tbl.fr < 0.01;
-
-[~, idxPert] = min(abs(xVec - 0));
-winDead = idxPert + 5 : idxPert + 10;
-frDead = mean(tbl.t_fr(:, winDead), 2, 'omitnan');
-uIdx = frDead > tbl.fr;
-
-figure
-plot(xVec, tbl.t_fr(uIdx, :))
 
 %% ========================================================================
 %  PLOTS
@@ -154,7 +155,7 @@ plot(xVec, tbl.t_fr(uIdx, :))
 
 tblGUI_xy(xVec, tbl);
 
-tblGUI_scatHist(tbl, 'xVar', 'pBspk', 'yVar', 'rcvTime', 'grpVar', 'Group');
+tblGUI_scatHist(tbl, 'xVar', 'pBspk', 'yVar', 'pertDepth', 'grpVar', 'Group');
 
 tblGUI_bar(tbl, 'yVar', 'pBspk', 'xVar', 'Group');
 
@@ -162,7 +163,12 @@ tblGUI_raster(tbl, 'grpVar', 'Name', 'grpVal', 'mcu-ko2')
 
 
 
+sort(tbl.frTrough)
+find(tbl.frTrough > 10)
 
+uIdx = 6;
+figure
+plot(xVec, tbl.t_fr(uIdx, :))
 
 %% ========================================================================
 %  LME - SPIKING
@@ -171,7 +177,7 @@ tblGUI_raster(tbl, 'grpVar', 'Name', 'grpVal', 'mcu-ko2')
 tblLme = tbl;
 
 % Fit
-varRsp = 'fr';
+varRsp = 'frTrough';
 frml = [varRsp, ' ~ Group + (1|Name)'];
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tbl, frml);
 
@@ -192,7 +198,7 @@ lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
 
 
 %% ========================================================================
-%  COLLAPSE PER FILE 
+%  COLLAPSE PER FILE
 %  ========================================================================
 
 
@@ -245,7 +251,7 @@ isiVal = brst_isiValley(spktimes, 'nSpks', 3);
 
 % -------------------------------------------------------------------------
 % SELECTIVE (updated sep-25)
-lData = tbl_transform(lmeData, 'varsInc', {'frBsl', 'BSpks'}, 'flgZ', false,...
+lData = tbl_trans(lmeData, 'varsInc', {'frBsl', 'BSpks'}, 'flgZ', false,...
     'skewThr', 0.1, 'varsGrp', {'Group'}, 'logBase', 10);
 clr = mcu_cfg();
 clr = clr.clr;

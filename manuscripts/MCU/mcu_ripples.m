@@ -199,7 +199,7 @@ tblLme = rmmissing(tblLme);
 tblLme.Group = reordercats(tblLme.Group, cfg.lbl.grp);
 
 % Assert non-zero
-tblLme = tbl_transform(tblLme, 'flg0', true, 'verbose', true);
+tblLme = tbl_trans(tblLme, 'flg0', true, 'verbose', true);
 
 
 % -------------------------------------------------------------------------
@@ -291,7 +291,7 @@ tblLme.UnitType = removecats(tblLme.UnitType, 'Other');
 
 % Assert non-zero for mrl (fr modulation included negative values by
 % definition)
-tblLme = tbl_transform(tblLme, 'flg0', true, 'verbose', true, ...
+tblLme = tbl_trans(tblLme, 'flg0', true, 'verbose', true, ...
     'varsInc', {'MRL'});
 
 % Plot

@@ -14,9 +14,7 @@ function rcv = mea_frRcv(t, frMat, varargin)
 %   OPTIONAL (Key-Value Pairs):
 %       idxTrough   - (double) Index of the trough center around which the
 %                     trough window is defined.
-%       uGood       - (logical) Vector indicating valid "good" units. This subset
-%                     is used to decide if the bias correction constant 'c'
-%                     should be added to all units. {Default: all true}
+%       uGood       - (logical) Vector indicating valid "good" units. {Default: all true}
 %       binSize     - (double) Bin size of the firing rate in seconds. {Default: 60}
 %       flgSave     - (logical) Whether to save the output struct to disk. {Default: false}
 %       basepath    - (char) Base path for saving output files. {Default: pwd}
@@ -93,9 +91,9 @@ end
 %  ========================================================================
 
 % Constants
-c = 1 / 3600;           % 1 spike per hour
-thrPert = 1;            % Threshold for significant perturbation (log2 fold - 50% reduction)
-thrRcv = 0.67;          % Threshold for recovery (linear fraction of range)
+c = 1 / 3600;           % 1 spike per hour (~0.0002 Hz, min FR recorded ~0.004 Hz)
+thrPert = 1.00;         % Threshold for significant perturbation (50% reduction)
+thrRcv = 0.5;           % Threshold for recovery (linear fraction of range)
 
 % Find perturbation index (t=0)
 idxPert = find(t >= -1e-9, 1, 'first');
@@ -153,9 +151,30 @@ troughWin = troughStart : troughEnd;
 frTrough = mean(frMat(:, troughWin), 2, 'omitnan');
 
 % Conditional Bias Correction (Trough)
-if any(frTrough(uGood) < c)
-    frTrough = frTrough + c;
+flgCens = true;
+if flgCens
+    
+    minTrough = 1 / ((troughEnd - troughStart) * binSize);
+    
+    frTmp = frTrough(uGood);
+    frTmp(frTmp < minTrough + eps) = minTrough;
+    
+    tbl = table();
+    tbl.frBsl = frBsl;
+    tbl.frTrough = frTmp;
+    tbl.censMask = frTmp == minTrough;
+
+    frml = 'frTrough ~ frBsl';
+    
+    [frTrough, info] = mea_lmcens(tbl, frml);
+
+else
+    if any(frTrough(uGood) < c)
+        frTrough = frTrough + c;
+    end
 end
+
+
 
 
 %% ========================================================================
@@ -176,15 +195,15 @@ rcvGain(rcvGain < 0) = 0; % Clamp negative gain to 0
 rcvWork = rcvGain ./ pertDepth;
 
 % Perturbed Units
-% Significant perturbation AND "dead-zone" lower then frBsl. In frPrep
-% idxTrough is forced >10 bins after idxPert
-frDead = mean(frMat(:, idxPert + winMarg : idxTrough), 2, 'omitnan');
-uPert = pertDepth >= thrPert & frDead < frBsl;
+uPert = pertDepth >= thrPert;
 
 % Recoverd Units
-% Significant perturbation AND reached 67% of recovery range
+% Significant perturbation AND reached thr% of recovery range
 uRcv = uPert & (frSs >= frTrough + thrRcv * (frBsl - frTrough));
-uRcv(~uGood) = false; % Valid only for good units
+
+% Assert uGood on unit indices
+uRcv(~uGood) = false; 
+uPert(~uGood) = false; 
 
 
 %% ========================================================================
@@ -399,3 +418,38 @@ if flgPlot
 end
 
 end     % EOF
+
+
+
+%% ========================================================================
+%  NOTE: THEORETICAL VS. OBSERVED MINIMUM & CENSORING STRATEGY
+%  ========================================================================
+%  OBSERVATION
+%   The calculated Theoretical Minimum firing rate (1 spike / window duration)
+%   is often orders of magnitude higher than the absolute minimum non-zero
+%   value observed in the data trace.
+%
+%  EXPLANATION: SMOOTHING ARTIFACTS
+%   This discrepancy confirms that the input firing rate matrix (frMat) has
+%   undergone temporal smoothing. While biological spiking is discrete,
+%   smoothing filters redistribute this energy into continuous curves. The
+%   extremely low values observed in the data (e.g., 1e-6 Hz) represent the
+%   asymptotic tails of these smoothing kernels ("fractional spikes") rather
+%   than physical firing events.
+%
+%  STRATEGY: WHERE TO APPLY THRESHOLDS
+%   Crucially, one must NOT apply a hard threshold (cap) during the pre-
+%   processing or denoising stages (e.g., mea_frPrep or fr_denoise). Doing
+%   so would be destructive. Because smoothing spreads a single spike across
+%   multiple bins, the peak value in any single bin is often lower than
+%   1/binSize. A pre-processing cap would erroneously erase these valid,
+%   isolated spiking events.
+%
+%  IMPLICATION FOR ANALYSIS
+%   The correct approach is to handle these values only during the aggregation
+%   stage (mea_frRcv). When averaging over a specific window (e.g., Trough),
+%   any mean rate falling below the resolution limit of that specific window
+%   (1 / WindowDuration) should be treated as "Censored" (Left-Censored at
+%   Limit L) for the purpose of Tobit regression, rather than deleted or
+%   clamped continuously in the raw trace.
+%  ========================================================================

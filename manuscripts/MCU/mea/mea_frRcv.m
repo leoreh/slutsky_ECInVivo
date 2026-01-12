@@ -151,9 +151,30 @@ troughWin = troughStart : troughEnd;
 frTrough = mean(frMat(:, troughWin), 2, 'omitnan');
 
 % Conditional Bias Correction (Trough)
-if any(frTrough(uGood) < c)
-    frTrough = frTrough + c;
+flgCens = true;
+if flgCens
+    
+    minTrough = 1 / ((troughEnd - troughStart) * binSize);
+    
+    frTmp = frTrough(uGood);
+    frTmp(frTmp < minTrough + eps) = minTrough;
+    
+    tbl = table();
+    tbl.frBsl = frBsl;
+    tbl.frTrough = frTmp;
+    tbl.censMask = frTmp == minTrough;
+
+    frml = 'frTrough ~ frBsl';
+    
+    [frTrough, info] = mea_lmcens(tbl, frml);
+
+else
+    if any(frTrough(uGood) < c)
+        frTrough = frTrough + c;
+    end
 end
+
+
 
 
 %% ========================================================================
@@ -397,3 +418,38 @@ if flgPlot
 end
 
 end     % EOF
+
+
+
+%% ========================================================================
+%  NOTE: THEORETICAL VS. OBSERVED MINIMUM & CENSORING STRATEGY
+%  ========================================================================
+%  OBSERVATION
+%   The calculated Theoretical Minimum firing rate (1 spike / window duration)
+%   is often orders of magnitude higher than the absolute minimum non-zero
+%   value observed in the data trace.
+%
+%  EXPLANATION: SMOOTHING ARTIFACTS
+%   This discrepancy confirms that the input firing rate matrix (frMat) has
+%   undergone temporal smoothing. While biological spiking is discrete,
+%   smoothing filters redistribute this energy into continuous curves. The
+%   extremely low values observed in the data (e.g., 1e-6 Hz) represent the
+%   asymptotic tails of these smoothing kernels ("fractional spikes") rather
+%   than physical firing events.
+%
+%  STRATEGY: WHERE TO APPLY THRESHOLDS
+%   Crucially, one must NOT apply a hard threshold (cap) during the pre-
+%   processing or denoising stages (e.g., mea_frPrep or fr_denoise). Doing
+%   so would be destructive. Because smoothing spreads a single spike across
+%   multiple bins, the peak value in any single bin is often lower than
+%   1/binSize. A pre-processing cap would erroneously erase these valid,
+%   isolated spiking events.
+%
+%  IMPLICATION FOR ANALYSIS
+%   The correct approach is to handle these values only during the aggregation
+%   stage (mea_frRcv). When averaging over a specific window (e.g., Trough),
+%   any mean rate falling below the resolution limit of that specific window
+%   (1 / WindowDuration) should be treated as "Censored" (Left-Censored at
+%   Limit L) for the purpose of Tobit regression, rather than deleted or
+%   clamped continuously in the raw trace.
+%  ========================================================================

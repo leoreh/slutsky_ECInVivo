@@ -39,7 +39,7 @@ winCalc = [winBsl; winSs; winTrough];
 
 close all
 for iFile = 1 : nFiles
-    
+
     % File
     basepath = basepaths{iFile};
     [~, basename] = fileparts(basepath);
@@ -57,7 +57,7 @@ for iFile = 1 : nFiles
     % Firing rate
     % fr = mea_frPrep(spktimes, 'binSize', binSize, ...
     %     'flgSave', true, 'flgPlot', false);
-    
+
     % % Burst detection
     % brst = brst_detect(spktimes, ...
     %     'minSpks', 3, ...
@@ -66,25 +66,25 @@ for iFile = 1 : nFiles
     %     'minDur', 0.015, ...
     %     'minIBI', 0.1, ...
     %     'flgForce', true, 'flgSave', true, 'flgPlot', false);
-    % 
+    %
     % % Burst temporal dynamics
     % dyn = brst_dynamics(brst, spktimes, 'binSize', 60, 'kernelSD', 300, ...
-    %     'binSize', binSize, 'flgSave', true, 'flgPlot', false); 
-    % 
+    %     'binSize', binSize, 'flgSave', true, 'flgPlot', false);
+    %
     % % Burst statistics
     % stats = brst_stats(brst, spktimes, 'winCalc', winCalc, ...
     %     'flgSave', true);
-    % 
+    %
     % % FR recovery
     rcv = mea_frRecovery(v(iFile).fr.t, v(iFile).fr.fr, ...
         'idxTrough', v(iFile).fr.info.idxTrough, ...
         'binSize', binSize, 'flgSave', true, 'flgPlot', false);
-    
+
     % FR model fit an recovery
     frFit = mea_frFit(v(iFile).fr.fr, v(iFile).fr.t, 'FilterLen', [], ...
         'idxTrough', v(iFile).fr.info.idxTrough, ...
         'flgPlot', false, 'flgSave', true);
-    
+
     rcvMdl = mea_frRecovery(v(iFile).fr.t, frFit.frMdl, ...
         'idxTrough', v(iFile).fr.info.idxTrough, ...
         'binSize', binSize, 'flgSave', false, 'flgPlot', false);
@@ -172,7 +172,7 @@ listPrdct = {'pertDepth', 'frBsl', 'BSpks', 'PRC', 'Group', '(1|Name)', 'brBsl'}
 listRspns = {'uRcv', 'rcvGain', 'rcvWork', 'rcvErr', 'bslTime', 'spkDfct', 'rcvSlope'};
 
 % Z score predictors
-zlData = tbl_transform(lmeData, 'varsExc', listRspns, 'flgZ', true,...
+zlData = tbl_trans(lmeData, 'varsExc', listRspns, 'flgZ', true,...
     'skewThr', 2, 'varsGrp', {'Group'}, 'flgLog', true);
 
 % -------------------------------------------------------------------------
@@ -271,10 +271,10 @@ for iFile = 1 : nFiles
     % % --- Spike timing metrics
     % st = spktimes_metrics('spktimes', spktimes, 'sunits', [],...
     %     'bins', stWin, 'flg_force', true, 'flg_save', true, 'flg_all', false);
-    
+
     % % --- Bursts
     % brst = brst_mea(spktimes, 'binsize', [], 'isiThr', 0.02,...
-    %     'minSpks', 2, 'flgSave', true, 'flgForce', true, 'bins', stWin);    
+    %     'minSpks', 2, 'flgSave', true, 'flgForce', true, 'bins', stWin);
 
 end
 
@@ -354,7 +354,7 @@ lmeData.bslTime = lmeData.bslTime * 6 / 60 / 60;
 
 % -------------------------------------------------------------------------
 
-lData = tbl_transform(lmeData, 'varsInc', {'frBsl', 'BSpks'}, 'flgZ', false,...
+lData = tbl_trans(lmeData, 'varsInc', {'frBsl', 'BSpks'}, 'flgZ', false,...
     'skewThr', 0.1, 'varsGrp', {'Group'}, 'flgLog', true);
 cfg = mcu_cfg();
 clr = cfg.clr;
@@ -390,7 +390,7 @@ prismMat = [lmeData.frBsl(idx), lmeData.rcvTime(idx)];
 
 % -------------------------------------------------------------------------
 % SELECTIVE (updated sep-25)
-lData = tbl_transform(lmeData, 'varsInc', {'frBsl', 'BSpks'}, 'flgZ', false,...
+lData = tbl_trans(lmeData, 'varsInc', {'frBsl', 'BSpks'}, 'flgZ', false,...
     'skewThr', 0.1, 'varsGrp', {'Group'}, 'flgLog', true);
 clr = mcu_cfg();
 clr = clr.clr;
@@ -493,7 +493,7 @@ lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat'});
 % -------------------------------------------------------------------------
 % SELECTIVE
 % Prepare data
-lData = tbl_transform(lmeData, 'varsInc', {'frBsl', 'BSpks'}, 'flgZ', false,...
+lData = tbl_trans(lmeData, 'varsInc', {'frBsl', 'BSpks'}, 'flgZ', false,...
     'skewThr', 0.1, 'varsGrp', {'Group'}, 'flgLog', true);
 clr = mcu_cfg();
 clr = clr.clr;
@@ -614,7 +614,7 @@ lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat'});
 % -------------------------------------------------------------------------
 % ALL VARS
 % Prepare data
-lData = tbl_transform(lmeData, 'varsInc', {'frBsl', 'BSpks'}, 'flgZ', false,...
+lData = tbl_trans(lmeData, 'varsInc', {'frBsl', 'BSpks'}, 'flgZ', false,...
     'skewThr', 0.1, 'varsGrp', {'Group'}, 'flgLog', true);
 
 varsInc = {'frBsl', 'BSpks', 'pertDepth',...
