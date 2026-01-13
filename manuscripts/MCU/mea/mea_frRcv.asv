@@ -125,9 +125,11 @@ bslWin = bslStart : bslEnd;
 frBsl = mean(frMat(:, bslWin), 2, 'omitnan');
 
 % Conditional Bias Correction (Baseline)
-if any(frBsl(uGood) < c)
-    warning('[MEA_FRRCV] %d units have BSL FR < c', sum(frBsl(uGood) < c))
-    frBsl = frBsl + c;
+frMin = 1 / length(bslWin) * binSize;
+frCens = frBsl(uGood) < frMin;
+if any(frCens)
+    warning('[MEA_FRRCV] %d units have BSL FR < detection minimum', sum(frCens))
+    frBsl(frCens) = frMin;
 end
 
 % Steady State Rate
@@ -139,15 +141,19 @@ ssWin = ssStart : ssEnd;
 frSs = mean(frMat(:, ssWin), 2, 'omitnan');
 
 % Conditional Bias Correction (Steady State)
-if any(frSs(uGood) < c)
-    frSs = frSs + c;
+frMin = 1 / length(ssWin) * binSize;
+frCens = frSs(uGood) < frMin;
+if any(frCens)
+    warning('[MEA_FRRCV] %d units have SS FR < detection minimum', sum(frCens))
+    frSs(frCens) = frMin;
 end
+
 
 % Trough Rate
 % -------------------------------------------------------------------------
 % Window: 20 bins (2hr abs) starting 5 bins (30 min abs) before idxTrough
 troughStart = max(idxPert, idxTrough - winMarg);
-troughEnd = idxTrough + 15;
+troughEnd = troughStart + 20;
 troughWin = troughStart : troughEnd;
 frTrough = mean(frMat(:, troughWin), 2, 'omitnan');
 
@@ -296,6 +302,7 @@ rcv.spkDfct     = spkDfct;
 rcv.uRcv        = uRcv;
 rcv.uPert       = uPert;
 
+rcv.info.idxPert    = idxPert;
 rcv.info.idxTrough  = idxTrough;
 rcv.info.winTrough  = [troughStart, troughEnd] * 60;
 rcv.info.winBsl     = [bslStart, bslEnd] * 60;

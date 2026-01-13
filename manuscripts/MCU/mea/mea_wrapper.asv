@@ -150,13 +150,12 @@ presets = {'time', 'steadyState', 'frNet', 'rcv', 'spktimes'};
 %  PLOTS
 %  ========================================================================
 
-frMin = 1 / (20 * 60);
-tblLme = tbl;
-tblLme.censMask = tbl.frTrough < frMin + 1e-9;
-frml = 'frTrough ~ fr';
 
-[frTroughRcv, ~] = mea_lmCens(tblLme, frml, 'censVar', 'censMask');
+sum(tbl.pBspk == 0) / numel(tbl.pBspk == 0) 
 
+
+
+sum(tbl.frTrough <= 1 / (20 * 60)) / numel(tbl.frTrough <= 1 / (20 * 60))
 
 
 tblGUI_xy(xVec, tbl);

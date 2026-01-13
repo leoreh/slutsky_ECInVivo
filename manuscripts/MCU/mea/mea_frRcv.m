@@ -91,7 +91,6 @@ end
 %  ========================================================================
 
 % Constants
-c = 1 / 3600;           % 1 spike per hour (~0.0002 Hz, min FR recorded ~0.004 Hz)
 thrPert = 1.00;         % Threshold for significant perturbation (50% reduction)
 thrRcv = 0.5;           % Threshold for recovery (linear fraction of range)
 
@@ -125,9 +124,11 @@ bslWin = bslStart : bslEnd;
 frBsl = mean(frMat(:, bslWin), 2, 'omitnan');
 
 % Conditional Bias Correction (Baseline)
-if any(frBsl(uGood) < c)
-    warning('[MEA_FRRCV] %d units have BSL FR < c', sum(frBsl(uGood) < c))
-    frBsl = frBsl + c;
+frMin = 1 / (length(bslWin) * binSize);
+frCens = frBsl < frMin;
+if any(frCens)
+    warning('[MEA_FRRCV] %d units have BSL FR < detection minimum', sum(frCens))
+    frBsl(frCens) = frMin;
 end
 
 % Steady State Rate
@@ -139,41 +140,52 @@ ssWin = ssStart : ssEnd;
 frSs = mean(frMat(:, ssWin), 2, 'omitnan');
 
 % Conditional Bias Correction (Steady State)
-if any(frSs(uGood) < c)
-    frSs = frSs + c;
+frMin = 1 / (length(ssWin) * binSize);
+frCens = frSs < frMin;
+if any(frCens)
+    warning('[MEA_FRRCV] %d units have SS FR < detection minimum', sum(frCens))
+    frSs(frCens) = frMin;
 end
 
 % Trough Rate
 % -------------------------------------------------------------------------
-% Window: 20 bins (2hr abs) starting 5 bins (30 min abs) before idxTrough
+% Window: 60 bins (6hr abs) starting 5 bins (30 min abs) before idxTrough
 troughStart = max(idxPert, idxTrough - winMarg);
-troughEnd = idxTrough + 15;
+troughEnd = troughStart + winDur;
 troughWin = troughStart : troughEnd;
 frTrough = mean(frMat(:, troughWin), 2, 'omitnan');
 
 % Conditional Bias Correction (Trough)
-% Censored Regression
+frMin = 1 / (length(troughWin) * binSize);
+frCens = frTrough < frMin;
+if any(frCens)
+    warning('[MEA_FRRCV] %d units have Trough FR < detection minimum', sum(frCens))
+    frTrough(frCens) = frMin;
+end
+
+
+% Censored Regression (Obsolete)
 % -------------------------------------------------------------------------
 % Calculate Theoretical Minimum (Limit of Detection)
 % We clamp all smoothed values below this limit to 'frMin' and flag them
 % as censored. This ensures the Tobit model treats them as "At or Below Limit".
-
-troughDur = length(troughWin) * binSize;
-frMin = 1 / troughDur;
-
-% Create Censoring Mask & Clamp
-censMask = frTrough < (frMin + 1e-9); % Epsilon for float tolerance
-frTrough(censMask) = frMin;
-
-tbl = table();
-tbl.frBsl = frBsl(uGood);
-tbl.frTrough = frTrough(uGood);
-tbl.censMask = censMask(uGood); 
-frml = 'frTrough ~ frBsl';
-
-% Run Tobit Imputation
-[frTroughRcv, ~] = mea_lmCens(tbl, frml, 'censVar', 'censMask');
-frTrough(uGood) = frTroughRcv;
+% 
+% troughDur = length(troughWin) * binSize;
+% frMin = 1 / troughDur;
+% 
+% % Create Censoring Mask & Clamp
+% censMask = frTrough < (frMin + 1e-9); % Epsilon for float tolerance
+% frTrough(censMask) = frMin;
+% 
+% tbl = table();
+% tbl.frBsl = frBsl(uGood);
+% tbl.frTrough = frTrough(uGood);
+% tbl.censMask = censMask(uGood); 
+% frml = 'frTrough ~ frBsl';
+% 
+% % Run Tobit Imputation
+% [frTroughRcv, ~] = mea_lmCens(tbl, frml, 'censVar', 'censMask');
+% frTrough(uGood) = frTroughRcv;
 
 
 %% ========================================================================
@@ -296,6 +308,7 @@ rcv.spkDfct     = spkDfct;
 rcv.uRcv        = uRcv;
 rcv.uPert       = uPert;
 
+rcv.info.idxPert    = idxPert;
 rcv.info.idxTrough  = idxTrough;
 rcv.info.winTrough  = [troughStart, troughEnd] * 60;
 rcv.info.winBsl     = [bslStart, bslEnd] * 60;
@@ -418,39 +431,5 @@ end
 
 end     % EOF
 
-
-
-%% ========================================================================
-%  NOTE: THEORETICAL VS. OBSERVED MINIMUM & CENSORING STRATEGY
-%  ========================================================================
-%  OBSERVATION
-%   The calculated Theoretical Minimum firing rate (1 spike / window duration)
-%   is often orders of magnitude higher than the absolute minimum non-zero
-%   value observed in the data trace.
-%
-%  EXPLANATION: SMOOTHING ARTIFACTS
-%   This discrepancy confirms that the input firing rate matrix (frMat) has
-%   undergone temporal smoothing. While biological spiking is discrete,
-%   smoothing filters redistribute this energy into continuous curves. The
-%   extremely low values observed in the data (e.g., 1e-6 Hz) represent the
-%   asymptotic tails of these smoothing kernels ("fractional spikes") rather
-%   than physical firing events.
-%
-%  STRATEGY: WHERE TO APPLY THRESHOLDS
-%   Crucially, one must NOT apply a hard threshold (cap) during the pre-
-%   processing or denoising stages (e.g., mea_frPrep or fr_denoise). Doing
-%   so would be destructive. Because smoothing spreads a single spike across
-%   multiple bins, the peak value in any single bin is often lower than
-%   1/binSize. A pre-processing cap would erroneously erase these valid,
-%   isolated spiking events.
-%
-%  IMPLICATION FOR ANALYSIS
-%   The correct approach is to handle these values only during the aggregation
-%   stage (mea_frRcv). When averaging over a specific window (e.g., Trough),
-%   any mean rate falling below the resolution limit of that specific window
-%   (1 / WindowDuration) should be treated as "Censored" (Left-Censored at
-%   Limit L) for the purpose of Tobit regression, rather than deleted or
-%   clamped continuously in the raw trace.
-%  ========================================================================
 
 

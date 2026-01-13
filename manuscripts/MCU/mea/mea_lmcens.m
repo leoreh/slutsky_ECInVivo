@@ -24,6 +24,14 @@ function [yPred, info] = mea_lmCens(tbl, frml, varargin)
 %       info        - (struct) Model object and stats.
 %
 %   See also: FITLMCENS, TBL_TRANS, MEA_FRRCV
+% 
+%   EXAMPLE:
+% frMin = 1 / (20 * 60);
+% tblLme = tbl;
+% tblLme.censMask = tbl.frTrough < frMin + 1e-9;
+% frml = 'frTrough ~ fr';
+% [frTroughRcv, ~] = mea_lmCens(tblLme, frml, 'censVar', 'censMask');
+
 
 %% ========================================================================
 %  ARGUMENTS
