@@ -214,17 +214,22 @@ if flgPlot
     % Determine log-scale
     edges = 50;
     if contains(lower(dist), 'log')
-        edgeMin = (log10(min(yRaw(yRaw>0))));
+        edgeMin = (log10(min(yPred)));
         edgeMax = (log10(max(yPred)));
         edges = logspace(edgeMin, edgeMax, edges);
         set(gca, 'XScale', 'log');
     end
 
+    histogram(yRaw, edges, 'Normalization', 'pdf', 'DisplayStyle', 'bar', ...
+        'EdgeColor', 'none', 'FaceColor', 'r', 'FaceAlpha', 0.2, 'LineWidth', 2, 'DisplayName', 'Raw');
     histogram(yRaw, edges, 'Normalization', 'pdf', 'DisplayStyle', 'stairs', ...
-        'EdgeColor', 'r', 'LineWidth', 2, 'DisplayName', 'Raw');
+        'EdgeColor', 'r', 'LineWidth', 1, 'HandleVisibility', 'off');
+
+    histogram(yPred, edges, 'Normalization', 'pdf', 'DisplayStyle', 'bar', ...
+        'EdgeColor', 'none', 'FaceColor', 'b', 'FaceAlpha', 0.2, 'LineWidth', 2, 'DisplayName', 'Raw');
     histogram(yPred, edges, 'Normalization', 'pdf', 'DisplayStyle', 'stairs', ...
-        'EdgeColor', 'b', 'LineWidth', 2, 'DisplayName', 'Rehab');
-    
+        'EdgeColor', 'b', 'LineWidth', 1, 'HandleVisibility', 'off');
+
     xlim([edgeMin, edgeMax])
     xlabel(varResp);
     ylabel('PDF');
@@ -417,4 +422,47 @@ end         % EOF
 %       strategy is statistically superior. It ensures that the
 %       rehabilitation of silenced units is calibrated to the local
 %       experimental conditions rather than a global average.
+%  ========================================================================
+
+
+%% ========================================================================
+%  NOTE: ANALYSIS EFFICACY
+%  ========================================================================
+%  OBSERVATION: MARGINAL UTILITY OF SOPHISTICATED IMPUTATION
+%
+%   Comparison of the standard "Clamping" approach against the sophisticated
+%   "Tobit Censored Imputation" reveals negligible differences in the final
+%   data distribution. As seen in the diagnostic plots, the imputed values
+%   (Blue) deviate minimally from the censored/clamped threshold (Red). The
+%   reconstructed distribution remains a "spike" near the detection limit rather
+%   than expanding into a Gaussian tail.
+%
+%  DIAGNOSIS: PREDICTION ALIGNMENT
+%
+%   The magnitude of the Tobit correction depends on the distance between the
+%   detection threshold (L) and the model's predicted latent mean (Mu).
+%   Imputation is most aggressive when the model predicts a unit "should" be
+%   firing well below the threshold based on population trends.
+%
+%   In this dataset, the censored units are exclusively low-baseline neurons.
+%   The regression line (Population Slope) correctly predicts that low-baseline
+%   units should have trough rates near the detection limit. Because the
+%   Predicted Mean (Mu) is effectively equal to the Threshold (L), the
+%   Conditional Expectation term approaches zero.
+%
+%   The model has statistically determined that these units are not "deeply
+%   suppressed" into a theoretical abyss, but are simply "just barely" silent.
+%   Therefore, the simple clamp is a statistically accurate approximation of
+%   the latent reality.
+%
+%  CONCLUSION: YAK SHAVING
+%
+%   The implementation of `mea_lmCens` is mathematically correct but empirically
+%   unnecessary for this specific biological phenotype. The complexity of
+%   maintaining the Tobit pipeline outweighs the <0.1 log-unit precision gain.
+%
+%   Recommended Actions:
+%   1.  Revert to standard bias-correction (Clamping to constant 'c').
+%   2.  To improve resolution without statistical inference, increase the
+%       integration window width for the Trough period in `mea_frRcv`.
 %  ========================================================================

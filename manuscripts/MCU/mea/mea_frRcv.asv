@@ -146,7 +146,7 @@ end
 % Trough Rate
 % -------------------------------------------------------------------------
 % Window: 20 bins (2hr abs) starting 5 bins (30 min abs) before idxTrough
-troughStart = max(1, idxTrough - winMarg);
+troughStart = max(idxPert, idxTrough - winMarg);
 troughEnd = idxTrough + 15;
 troughWin = troughStart : troughEnd;
 frTrough = mean(frMat(:, troughWin), 2, 'omitnan');
@@ -452,3 +452,5 @@ end     % EOF
 %   Limit L) for the purpose of Tobit regression, rather than deleted or
 %   clamped continuously in the raw trace.
 %  ========================================================================
+
+

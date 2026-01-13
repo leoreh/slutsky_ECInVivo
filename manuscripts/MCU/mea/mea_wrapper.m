@@ -53,6 +53,7 @@
 %     FR ~ 50 Hz. Removed in frRcv.Other units that not perturbed are
 %     technically fine (captured by uPert)
 
+
 %% ========================================================================
 %  PER FILE ANALYSIS
 %  ========================================================================
@@ -87,14 +88,14 @@ for iFile = 1 : nFiles
     spktimes = cellfun(@(x) x(x >= winExp(1) & x <= winExp(2)), ...
         spktimes, 'UniformOutput', false);
 
-    % Network stats
-    frNet = fr_network(spktimes, 'flgSave', true, 'winLim', [0, 15] * 60);
-    % % drft = drift_file(spktimes, 'flgSave', false, 'winLim', winBsl, ...
-    % %     'binSize', 5 * 60, 'winSize', 20 * 60, 'flgPlot', true);
+    % % Network stats
+    % frNet = fr_network(spktimes, 'flgSave', true, 'winLim', [0, 15] * 60);
+    % drft = drift_file(spktimes, 'flgSave', false, 'winLim', winBsl, ...
+    %     'binSize', 5 * 60, 'winSize', 20 * 60, 'flgPlot', true);
 
-    % Firing rate
-    fr = mea_frPrep(spktimes, 'binSize', binSize, ...
-        'flgSave', true, 'flgPlot', false);
+    % % Firing rate
+    % fr = mea_frPrep(spktimes, 'binSize', binSize, ...
+    %     'flgSave', true, 'flgPlot', false);
 
     % FR recovery
     fr = v(iFile).fr;
@@ -143,9 +144,6 @@ end
 
 presets = {'time', 'steadyState', 'frNet', 'rcv', 'spktimes'};
 [tbl, xVec, basepaths, v] = mcu_tblMea('presets', presets([1, 3 : 4]));
-
-[tbl, xVec, ~, ~] = mcu_tblMea('presets', presets([1, 3 : 5]), ...
-    'basepaths', basepaths(8));
 
 
 %% ========================================================================
