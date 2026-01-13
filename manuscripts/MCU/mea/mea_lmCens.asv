@@ -335,31 +335,6 @@ end         % EOF
 %   low-baseline units.
 %  ========================================================================
 
-%% ========================================================================
-%  NOTE: PREDICT VS. CONDITIONAL EXPECTATION
-%  ========================================================================
-%   Why do we manually calculate imputation values instead of using the
-%   standard 'predict' method of the 'fitlmcens' object?
-%
-%   1.  THE LIMITATION OF STANDARD PREDICTION
-%       The standard `predict` function returns the unconditional mean of
-%       the latent variable (the linear predictor $X\beta + Zb$). This
-%       value represents where a neuron "would be" on average based on the
-%       population parameters, ignoring the specific knowledge that this
-%       particular observation was censored.
-%
-%       For a silenced neuron, the unconditional mean might actually lie
-%       above the detection threshold (especially if the model has high
-%       variance). Using this value would contradict the observed reality
-%       that the neuron did not fire.
-%
-%   2.  THE NECESSITY OF CONDITIONAL EXPECTATION
-%       Our goal is "Data Rehabilitation"—reconstructing the most likely
-%       value for a specific silenced unit given that we know it fell below
-%       the threshold $L$. This requires the Conditional Expectation:
-%
-%       $$ E[y \mid y < L] = \mu - \sigma \cdot \lambda(\alpha) $$
-%
 %       Where:
 %       -   $\mu$: The unconditional mean ($X\beta$).
 %       -   $\sigma$: The scale parameter of the model.
@@ -375,46 +350,3 @@ end         % EOF
 %       -   Accounts for the probability mass of the "missing" tail.
 %       -   Provides a more accurate reconstruction of the silenced phenotype
 %           than the population average.
-%  ========================================================================
-
-
-%% ========================================================================
-%  NOTE: POOLING VS. PER-FILE
-%  ========================================================================
-%   1.  ABSENCE OF MIXED EFFECTS IN CENSORED MODELS
-%       MATLAB's `fitlmcens` function fits a Censored Linear Regression
-%       model using Maximum Likelihood Estimation. Unlike standard LME
-%       tools (`fitlme`), `fitlmcens` does not support Random Effects.
-%       Consequently, it is not possible to include a random intercept term
-%       (e.g., `(1|FileID)`) to explicitly model batch-to-batch variability
-%       within a single global model.
-%
-%   2.  IMPLICATION FOR DATA REHABILITATION
-%       Because the model cannot mathematically account for the correlation
-%       of units within the same recording file via random effects, there
-%       are two processing strategies:
-%
-%       A.  Pooled Fitting (All Files)
-%           Fitting the model to the aggregated table of all files.
-%           This assumes a single homogeneous population. If baseline
-%           firing rates or detection thresholds vary systematically
-%           between recording sessions, pooling may yield an averaged slope
-%           that fits no single file well (Simpson's Paradox), leading to
-%           inaccurate imputation for specific batches.
-%
-%       B.  Per-File Fitting (Sequential)
-%           Applying `mea_lmcens` independently to each recording file.
-%           This implicitly treats 'FileID' as a fixed effect. It
-%           allows the regression parameters (Intercept and Slope) and the
-%           noise parameter (Sigma) to adapt to the specific signal-to-noise
-%           ratio and baseline distribution of that specific experiment.
-%
-%   3.  RECOMMENDATION
-%       For the purpose of calculating Perturbation Depth (a relative
-%       metric), preserving the within-file relationship between Baseline
-%       and Trough rates is critical. Therefore, unless the number of units
-%       per file is too low for convergence (<10-15), the Per-File fitting
-%       strategy is statistically superior. It ensures that the
-%       rehabilitation of silenced units is calibrated to the local
-%       experimental conditions rather than a global average.
-%  ========================================================================
