@@ -92,9 +92,9 @@ for iFile = 1 : nFiles
     % % drft = drift_file(spktimes, 'flgSave', false, 'winLim', winBsl, ...
     % %     'binSize', 5 * 60, 'winSize', 20 * 60, 'flgPlot', true);
 
-    % % Firing rate
-    % fr = mea_frPrep(spktimes, 'binSize', binSize, ...
-    %     'flgSave', true, 'flgPlot', true);
+    % Firing rate
+    fr = mea_frPrep(spktimes, 'binSize', binSize, ...
+        'flgSave', true, 'flgPlot', false);
 
     % FR recovery
     fr = v(iFile).fr;
@@ -142,7 +142,7 @@ end
 %  ========================================================================
 
 presets = {'time', 'steadyState', 'frNet', 'rcv', 'spktimes'};
-[tbl, xVec, basepaths, v] = mcu_tblMea('presets', presets([1, 3 : 5]));
+[tbl, xVec, basepaths, v] = mcu_tblMea('presets', presets([1, 3 : 4]));
 
 [tbl, xVec, ~, ~] = mcu_tblMea('presets', presets([1, 3 : 5]), ...
     'basepaths', basepaths(8));
@@ -151,6 +151,14 @@ presets = {'time', 'steadyState', 'frNet', 'rcv', 'spktimes'};
 %% ========================================================================
 %  PLOTS
 %  ========================================================================
+
+frMin = 1 / (20 * 60);
+tblLme = tbl;
+tblLme.censMask = tbl.frTrough < frMin + 1e-9;
+frml = 'frTrough ~ fr';
+
+[frTroughRcv, ~] = mea_lmCens(tblLme, frml, 'censVar', 'censMask');
+
 
 
 tblGUI_xy(xVec, tbl);

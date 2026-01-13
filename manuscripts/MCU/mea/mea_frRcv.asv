@@ -126,6 +126,7 @@ frBsl = mean(frMat(:, bslWin), 2, 'omitnan');
 
 % Conditional Bias Correction (Baseline)
 if any(frBsl(uGood) < c)
+    warning('[MEA_FRRCV] %d units have BSL FR < c', sum(frBsl(uGood) < c))
     frBsl = frBsl + c;
 end
 
@@ -146,35 +147,33 @@ end
 % -------------------------------------------------------------------------
 % Window: 20 bins (2hr abs) starting 5 bins (30 min abs) before idxTrough
 troughStart = max(1, idxTrough - winMarg);
-troughEnd = idxTrough + 20;
+troughEnd = idxTrough + 15;
 troughWin = troughStart : troughEnd;
 frTrough = mean(frMat(:, troughWin), 2, 'omitnan');
 
 % Conditional Bias Correction (Trough)
-flgCens = true;
-if flgCens
-    
-    minTrough = 1 / ((troughEnd - troughStart) * binSize);
-    
-    frTmp = frTrough(uGood);
-    frTmp(frTmp < minTrough + eps) = minTrough;
-    
-    tbl = table();
-    tbl.frBsl = frBsl;
-    tbl.frTrough = frTmp;
-    tbl.censMask = frTmp == minTrough;
+% Censored Regression
+% -------------------------------------------------------------------------
+% Calculate Theoretical Minimum (Limit of Detection)
+% We clamp all smoothed values below this limit to 'frMin' and flag them
+% as censored. This ensures the Tobit model treats them as "At or Below Limit".
 
-    frml = 'frTrough ~ frBsl';
-    
-    [frTrough, info] = mea_lmcens(tbl, frml);
+troughDur = length(troughWin) * binSize;
+frMin = 1 / troughDur;
 
-else
-    if any(frTrough(uGood) < c)
-        frTrough = frTrough + c;
-    end
-end
+% Create Censoring Mask & Clamp
+censMask = frTrough < (frMin + 1e-9); % Epsilon for float tolerance
+frTrough(censMask) = frMin;
 
+tbl = table();
+tbl.frBsl = frBsl(uGood);
+tbl.frTrough = frTrough(uGood);
+tbl.censMask = censMask(uGood); 
+frml = 'frTrough ~ frBsl';
 
+% Run Tobit Imputation
+[frTroughRcv, ~] = mea_lmCens(tbl, frml, 'censVar', 'censMask');
+frTrough(uGood) = frTroughRcv;
 
 
 %% ========================================================================
@@ -202,8 +201,8 @@ uPert = pertDepth >= thrPert;
 uRcv = uPert & (frSs >= frTrough + thrRcv * (frBsl - frTrough));
 
 % Assert uGood on unit indices
-uRcv(~uGood) = false; 
-uPert(~uGood) = false; 
+uRcv(~uGood) = false;
+uPert(~uGood) = false;
 
 
 %% ========================================================================
