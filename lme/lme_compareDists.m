@@ -54,7 +54,6 @@ fitMethod = 'Laplace';
 % Parse response variable
 varResp = strtrim(strsplit(frml, '~'));
 varResp = varResp{1};
-yRaw = tbl.(varResp);           % Store raw values before transformations
 
 %% ========================================================================
 %  VALIDATION

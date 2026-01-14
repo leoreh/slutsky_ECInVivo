@@ -213,7 +213,7 @@ for iVar = 1:numel(varsTrans)
     var  = varsTrans{iVar};
     data = tblOut.(var);
 
-    % --- 1. Determine Log/Offset Settings (Global) ---
+    % --- DETERMINE LOG/OFFSET (Global) ---
     % Default: Use argument logBase
     currLogBase = argLogBase;
     doOffset    = flg0;
@@ -230,7 +230,8 @@ for iVar = 1:numel(varsTrans)
 
     % Logit Checks
     if doLogit
-        data = max(eps, min(1-eps, data));
+        N = length(data);
+        data = (data * (N - 1) + 0.5) / N;
         data = log(data ./ (1 - data));
         if verbose, fprintf('[%s] Applied Logit.\n', var); end
     elseif doLog
@@ -247,7 +248,7 @@ for iVar = 1:numel(varsTrans)
     end
 
     % Calculate Offset (Before Log)
-    if doOffset && doLog
+    if doOffset || doLog
         if any(data(:) == 0) && all(data(:) >= 0)
             c = min(data(data > 0)) / 2; % Half of min non-zero
             data = data + c;
@@ -267,7 +268,7 @@ for iVar = 1:numel(varsTrans)
     % Update Table (Transformation applied)
     tblOut.(var) = data;
 
-    % --- 2. Calculate Statistics (Group-wise) ---
+    % --- CALC GROUP STATS ---
     nGrps = max(grpIdx);
     stats = table();
     if ~isempty(varsGrp), stats = uGrps; end
@@ -291,7 +292,7 @@ for iVar = 1:numel(varsTrans)
         end
     end
 
-    % --- 3. Apply Group Transformations (Z-Score OR Norm) ---
+    % --- APPLY GROUP TRANS (Z-Score OR Norm) ---
     for iGrp = 1:nGrps
         idxK = (grpIdx == iGrp);
         vals = tblOut.(var)(idxK);
@@ -353,10 +354,11 @@ for iVar = 1:numel(varsTrans)
 
     lb = pVar.logBase;
 
-    % --- 1. Global Transforms ---
-    % Logit
+    % --- GLOBAL TRANS ---
+    % Logit using Smithson & Verkuilen (2006) Squeeze transformation
     if ischar(lb) && strcmpi(lb, 'logit')
-        data = max(eps, min(1-eps, data));
+        N = length(data);
+        data = (data * (N - 1) + 0.5) / N;      
         data = log(data ./ (1 - data));
     end
 
@@ -374,7 +376,7 @@ for iVar = 1:numel(varsTrans)
         end
     end
 
-    % --- 2. Group Transforms ---
+    % --- GROUP TRANS ---
     stats = pVar.stats;
 
     vecMean = nan(height(tbl), 1);

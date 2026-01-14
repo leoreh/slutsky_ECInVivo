@@ -63,7 +63,7 @@ fileMouse = findgroups(get_mname(basepaths));
 idxMouse = sort([idxMouse; idxMouse + 4]);
 basepaths = basepaths(idxMouse);
 
-presets = {'frNet', 'brst'};
+presets = {'frNet', 'brst', 'prc'};
 [tbl, basepaths, ~] = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
 tbl.Day(tbl.Day == "BAC_ON") = "BAC3";
 

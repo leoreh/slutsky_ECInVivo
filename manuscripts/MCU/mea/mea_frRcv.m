@@ -115,77 +115,29 @@ spkDfct   = nan(nUnits, 1);
 winMarg = round(5 * 60 / binSize);
 winDur  = round(60 * 60 / binSize);
 
+% Pseudocount
+c = 1 / (winDur * binSize);             
+
 % Baseline Rate
-% -------------------------------------------------------------------------
-% Window: 60 bins (3hr abs) ending 5 bins (30min) before perturbation
+% 60 bins (3hr abs) ending 5 bins (30min) before perturbation
 bslEnd = idxPert - winMarg;
 bslStart = max(1, bslEnd - winDur);
 bslWin = bslStart : bslEnd;
-frBsl = mean(frMat(:, bslWin), 2, 'omitnan');
-
-% Conditional Bias Correction (Baseline)
-frMin = 1 / (length(bslWin) * binSize);
-frCens = frBsl < frMin;
-if any(frCens)
-    warning('[MEA_FRRCV] %d units have BSL FR < detection minimum', sum(frCens))
-    frBsl(frCens) = frMin;
-end
+frBsl = mean(frMat(:, bslWin), 2, 'omitnan') + c;
 
 % Steady State Rate
-% -------------------------------------------------------------------------
-% Window: 60 bins (6hr abs) ending 5 bins (30min) before end of recording
+% 60 bins (6hr abs) ending 5 bins (30min) before end of recording
 ssEnd = length(t) - winMarg;
 ssStart = ssEnd - winDur;
 ssWin = ssStart : ssEnd;
-frSs = mean(frMat(:, ssWin), 2, 'omitnan');
-
-% Conditional Bias Correction (Steady State)
-frMin = 1 / (length(ssWin) * binSize);
-frCens = frSs < frMin;
-if any(frCens)
-    warning('[MEA_FRRCV] %d units have SS FR < detection minimum', sum(frCens))
-    frSs(frCens) = frMin;
-end
+frSs = mean(frMat(:, ssWin), 2, 'omitnan') + c;
 
 % Trough Rate
-% -------------------------------------------------------------------------
-% Window: 60 bins (6hr abs) starting 5 bins (30 min abs) before idxTrough
+% 60 bins (6hr abs) starting 5 bins (30 min abs) before idxTrough
 troughStart = max(idxPert, idxTrough - winMarg);
 troughEnd = troughStart + winDur;
 troughWin = troughStart : troughEnd;
-frTrough = mean(frMat(:, troughWin), 2, 'omitnan');
-
-% Conditional Bias Correction (Trough)
-frMin = 1 / (length(troughWin) * binSize);
-frCens = frTrough < frMin;
-if any(frCens)
-    warning('[MEA_FRRCV] %d units have Trough FR < detection minimum', sum(frCens))
-    frTrough(frCens) = frMin;
-end
-
-
-% Censored Regression (Obsolete)
-% -------------------------------------------------------------------------
-% Calculate Theoretical Minimum (Limit of Detection)
-% We clamp all smoothed values below this limit to 'frMin' and flag them
-% as censored. This ensures the Tobit model treats them as "At or Below Limit".
-% 
-% troughDur = length(troughWin) * binSize;
-% frMin = 1 / troughDur;
-% 
-% % Create Censoring Mask & Clamp
-% censMask = frTrough < (frMin + 1e-9); % Epsilon for float tolerance
-% frTrough(censMask) = frMin;
-% 
-% tbl = table();
-% tbl.frBsl = frBsl(uGood);
-% tbl.frTrough = frTrough(uGood);
-% tbl.censMask = censMask(uGood); 
-% frml = 'frTrough ~ frBsl';
-% 
-% % Run Tobit Imputation
-% [frTroughRcv, ~] = mea_lmCens(tbl, frml, 'censVar', 'censMask');
-% frTrough(uGood) = frTroughRcv;
+frTrough = mean(frMat(:, troughWin), 2, 'omitnan') + c;
 
 
 %% ========================================================================

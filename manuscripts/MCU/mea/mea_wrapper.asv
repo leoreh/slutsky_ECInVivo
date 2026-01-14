@@ -69,7 +69,6 @@ isiVal = 0.05;
 binSize = 60;
 winExp = [0, 33600];
 
-close all
 for iFile = 1 : nFiles
 
     % File
@@ -101,35 +100,35 @@ for iFile = 1 : nFiles
     fr = v(iFile).fr;
     rcv = mea_frRcv(fr.t, fr.fr, ...
         'idxTrough', fr.info.idxTrough, ...
-        'binSize', binSize, 'flgSave', true, 'flgPlot', true);
-
-    % FR model fit an recovery
-    frFit = mea_frFit(fr.fr, fr.t, 'FilterLen', [], ...
-        'idxTrough', fr.info.idxTrough, ...
-        'flgPlot', false, 'flgSave', true);
-    % frFit = v(iFile).frFit;
-    rcvMdl = mea_frRcv(fr.t, frFit.frMdl, ...
-        'idxTrough', fr.info.idxTrough, ...
-        'binSize', binSize, 'flgSave', false, 'flgPlot', false);
-    save(fullfile(basepath, [basename, '.frRcv_mdl.mat']), 'rcvMdl', '-v7.3');
-
-    % Burst detection
-    brst = brst_detect(spktimes, ...
-        'minSpks', 3, ...
-        'isiStart', isiVal, ...
-        'isiEnd', isiVal * 2, ...
-        'minDur', 0.005, ...
-        'minIBI', 0.1, ...
-        'flgForce', true, 'flgSave', true, 'flgPlot', false);
-
-    % Burst temporal dynamics
-    dyn = brst_dynamics(brst, spktimes, 'binSize', 60, 'ksd', 300, ...
         'binSize', binSize, 'flgSave', true, 'flgPlot', false);
 
-    % Burst statistics
-    winCalc = [rcv.info.winBsl; rcv.info.winTrough; rcv.info.winSs];
-    stats = brst_stats(brst, spktimes, 'winCalc', winCalc, ...
-        'flgSave', true);
+    % % FR model fit an recovery
+    % frFit = mea_frFit(fr.fr, fr.t, 'FilterLen', [], ...
+    %     'idxTrough', fr.info.idxTrough, ...
+    %     'flgPlot', false, 'flgSave', true);
+    % % frFit = v(iFile).frFit;
+    % rcvMdl = mea_frRcv(fr.t, frFit.frMdl, ...
+    %     'idxTrough', fr.info.idxTrough, ...
+    %     'binSize', binSize, 'flgSave', false, 'flgPlot', false);
+    % save(fullfile(basepath, [basename, '.frRcv_mdl.mat']), 'rcvMdl', '-v7.3');
+    % 
+    % % Burst detection
+    % brst = brst_detect(spktimes, ...
+    %     'minSpks', 3, ...
+    %     'isiStart', isiVal, ...
+    %     'isiEnd', isiVal * 2, ...
+    %     'minDur', 0.005, ...
+    %     'minIBI', 0.1, ...
+    %     'flgForce', true, 'flgSave', true, 'flgPlot', false);
+    % 
+    % % Burst temporal dynamics
+    % dyn = brst_dynamics(brst, spktimes, 'binSize', 60, 'ksd', 300, ...
+    %     'binSize', binSize, 'flgSave', true, 'flgPlot', false);
+    % 
+    % % Burst statistics
+    % winCalc = [rcv.info.winBsl; rcv.info.winTrough; rcv.info.winSs];
+    % stats = brst_stats(brst, spktimes, 'winCalc', winCalc, ...
+    %     'flgSave', true);
 
     % Tranfer function spikes to Ca2+
     % ca = spk2ca(spktimes, 'winCalc', [0, Inf], ...
@@ -146,21 +145,21 @@ presets = {'time', 'steadyState', 'frNet', 'rcv', 'spktimes'};
 [tbl, xVec, basepaths, v] = mcu_tblMea('presets', presets([1, 3 : 4]));
 
 
+% MESSAROUND
+
+tblLme = tbl;
+
+
+
+
 %% ========================================================================
 %  PLOTS
 %  ========================================================================
 
 
-sum(tbl.pBspk == 0) / numel(tbl.pBspk == 0) 
-
-
-
-sum(tbl.frTrough <= 1 / (20 * 60)) / numel(tbl.frTrough <= 1 / (20 * 60))
-
-
 tblGUI_xy(xVec, tbl);
 
-tblGUI_scatHist(tbl, 'xVar', 'pBspk', 'yVar', 'pertDepth', 'grpVar', 'Group');
+tblGUI_scatHist(tbl, 'xVar', 'fr', 'yVar', 'pertDepth', 'grpVar', 'Group');
 
 tblGUI_bar(tbl, 'yVar', 'pBspk', 'xVar', 'Group');
 
@@ -168,12 +167,6 @@ tblGUI_raster(tbl, 'grpVar', 'Name', 'grpVal', 'mcu-ko2')
 
 
 
-sort(tbl.frTrough)
-find(tbl.frTrough > 10)
-
-uIdx = 6;
-figure
-plot(xVec, tbl.t_fr(uIdx, :))
 
 %% ========================================================================
 %  LME - SPIKING

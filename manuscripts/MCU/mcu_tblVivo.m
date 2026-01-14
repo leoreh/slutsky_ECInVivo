@@ -72,7 +72,6 @@ if ismember('frNet', presets)
     varMap.drift = 'drft.drftExp';
     varMap.dim   = 'frNet.dimExp';
     varMap.mcc   = 'frNet.mccExp';
-    varMap.cc    = 'frNet.ccExp';
     varMap.funcon  = 'frNet.corr.funcon';
 end
 

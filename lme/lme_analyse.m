@@ -12,8 +12,8 @@ function [lmeMdl, lmeStats, lmeInfo, lmeTbl] = lme_analyse(tbl, frml, varargin)
 %         predictors and Z-scores all continuous predictors.
 %       - Response: Applies Log or Logit transforms if required by dist.
 %         Adds offset for Zero-inflated data if Gamma/Log is selected.
-%   Fitting: Calls LME_FIT to fit the model.
-%   Analysis: Calls LME_EFFECTS to generate ANOVA and contrasts.
+%   LME_FIT to fit the model.
+%   LME_EFFECTS to generate ANOVA and contrasts.
 %
 %   INPUTS:
 %       tbl         - (table) Data table.
@@ -58,7 +58,7 @@ lmeInfo.distInput = dist;
 
 
 %% ========================================================================
-%  PRE-PROCESSING & TRANSFORMATION
+%  PREDICTOR TRANSFORMATION
 %  ========================================================================
 
 % Vars
@@ -92,7 +92,6 @@ varsTbl = unique([varsFxd(:); varsIntr(:); varsGrp(:); {varResp}]);
 % Truncate Table
 lmeTbl = tbl(:, varsTbl);
 
-% PREDICTOR TRANSFORMATION
 % Identify numeric/continuous predictors (exclude categorical)
 isNum = cellfun(@(x) isnumeric(lmeTbl.(x)) && ~iscategorical(lmeTbl.(x)), varsTbl);
 varsNum = varsTbl(isNum);
@@ -100,7 +99,7 @@ varsNum = setdiff(varsNum, varResp); % Exclude Response from Predictor Z-Scoring
 
 if ~isempty(varsNum)
     if verbose
-        fprintf('[LME_ANALYSE] Transforming Predictors (Log10[Skew>2] + Z-Score)\n');
+        fprintf('[LME_ANALYSE] Transforming Predictors\n');
     end
     [lmeTbl, transParams] = tbl_trans(lmeTbl, 'varsInc', varsNum, ...
         'logBase', 10, 'skewThr', 2, ...
@@ -162,7 +161,7 @@ warning('on', wMsg);
 
 
 %% ========================================================================
-%  FINAL RESPONSE TRANSFORMATION
+%  RESPONSE TRANSFORMATION
 %  ========================================================================
 
 switch lower(dist)

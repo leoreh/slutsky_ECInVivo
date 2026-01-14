@@ -63,8 +63,8 @@ rhs = regexprep(frml, '^\s*[a-zA-Z_]\w*\s*~', '');
 rhs = regexprep(rhs, regexRand, '');
 
 % 2. Split into terms by '+' to analyze structure
-terms = strtrim(strsplit(rhs, '+'));
-terms(strcmp(terms, '')) = [];
+% 2. Expand terms (handling parentheses and interactions)
+terms = expand_frml(rhs);
 
 % 3. Process terms to find Atoms and Interactions
 allAtoms = {};
@@ -113,3 +113,98 @@ else
 end
 
 end     % EOF
+
+%% ========================================================================
+%  HELPER FUNCTIONS
+%  ========================================================================
+
+function terms = expand_frml(str)
+% Recursively expands formula string into additive terms
+% e.g. '(A+B)*C' -> {'A*C', 'B*C'}
+
+str = strtrim(str);
+if isempty(str), terms = {}; return; end
+
+% 1. Split by top-level '+'
+parts = split_balanced(str, '+');
+
+terms = {};
+for i = 1:numel(parts)
+    p = strtrim(parts{i});
+    if isempty(p), continue; end
+
+    % 2. Handle Multiplication/Distribution
+    factors = split_balanced(p, '*');
+
+    if numel(factors) == 1
+        % No multiplication at this level
+        % Check for surrounding parens: (A+B)
+        if startsWith(p, '(') && endsWith(p, ')') && is_enclosed(p)
+            % Strip parens and recurse
+            inner = p(2:end-1);
+            terms = [terms, expand_frml(inner)]; %#ok<AGROW>
+        else
+            % Atom or Interaction (A:B) or plain var
+            terms{end+1} = p; %#ok<AGROW>
+        end
+    else
+        % Distribute factors: (A+B)*C -> expand(A+B) X expand(C)
+        expandedFactors = cell(size(factors));
+        for k = 1:numel(factors)
+            expandedFactors{k} = expand_frml(factors{k});
+        end
+
+        % Cartesian product of expanded factors
+        prodTerms = expandedFactors{1};
+        for k = 2:numel(factors)
+            nextSet = expandedFactors{k};
+            newProd = {};
+            for x = 1:numel(prodTerms)
+                for y = 1:numel(nextSet)
+                    newProd{end+1} = [prodTerms{x} '*' nextSet{y}]; %#ok<AGROW>
+                end
+            end
+            prodTerms = newProd;
+        end
+        terms = [terms, prodTerms]; %#ok<AGROW>
+    end
+end
+end
+
+function parts = split_balanced(str, delim)
+% Splits string by delimiter, respecting parentheses
+parts = {};
+current = '';
+parenLvl = 0;
+
+for i = 1:length(str)
+    c = str(i);
+    if c == '('
+        parenLvl = parenLvl + 1;
+    elseif c == ')'
+        parenLvl = parenLvl - 1;
+    end
+
+    if c == delim && parenLvl == 0
+        parts{end+1} = current; %#ok<AGROW>
+        current = '';
+    else
+        current = [current c]; %#ok<AGROW>
+    end
+end
+parts{end+1} = current;
+end
+
+function tf = is_enclosed(str)
+% Checks if (A...B) is truly enclosed or just A starts with ( and B ends with )
+% e.g. (A)+(B) -> False
+%      (A+B)   -> True
+if ~startsWith(str, '(') || ~endsWith(str, ')'), tf = false; return; end
+count = 0;
+for i = 1:length(str)-1
+    if str(i) == '(', count = count + 1; end
+    if str(i) == ')', count = count - 1; end
+    if count == 0, tf = false; return; end % Closed before end
+end
+tf = true;
+end

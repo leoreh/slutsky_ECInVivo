@@ -5,17 +5,25 @@
 
 presets = {'rcv', 'frNet'};
 [tbl, xVec, basepaths, v] = mcu_tblMea('presets', presets);
+
+% tblGUI_xy(xVec, tbl);
+% tblGUI_scatHist(tbl, 'xVar', 'pBspk', 'yVar', 'funcon', 'grpVar', 'Group');
+% tblGUI_bar(tbl, 'yVar', 'pBspk', 'xVar', 'Group');
+% tblGUI_raster(tbl, 'grpVar', 'Name', 'grpVal', 'ctrl1')
+
 tblLme = tbl;
 
 % Clean units that were not perturbed
 tblLme(~tblLme.uPert, :) = [];
 tblLme = removevars(tblLme, 'uPert');
 
-% tblGUI_xy(xVec, tbl);
-% tblGUI_scatHist(tbl, 'xVar', 'pBspk', 'yVar', 'conn', 'grpVar', 'Group');
-% tblGUI_bar(tbl, 'yVar', 'pBspk', 'xVar', 'Group');
-% tblGUI_raster(tbl, 'grpVar', 'Name', 'grpVal', 'ctrl1')
+% Add logit pBspk
+% tblTrans = tbl_trans(tblLme, 'varsInc', {'pBspk'}, 'logBase', 'logit');
+% tblLme.pBspk_trans = tblTrans.pBspk;
+% tblLme.pBspk_on = tblLme.pBspk > 0;
 
+% Exclude non-bursting
+% tblLme = tblLme(tblLme.pBspk > 0, :);
 
 % List of possible vars
 listPrdct = {'pertDepth', 'fr', 'pBspk', 'Group', '(1|Name)'};
@@ -25,18 +33,25 @@ listRspns = {'uRcv', 'rcvBsl', 'rcvTime', 'spkDfct', 'Genotype', 'frSs', 'rcvWor
 %  ABLATION
 %  ========================================================================
 
-
 % Recovery
-frml = 'frSs ~ frTrough + fr * Group + pBspk * Group + (1|Name)';
+frml = 'frSs ~ (frTrough + fr + pBspk) * Group + (1|Name)';
 
 res = lme_ablation(tblLme, frml, 'dist', 'log-normal');
 
-
-frml = 'frSs ~ frTrough + fr * Group + pBspk * Group + conn * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo, tblMdl] = lme_analyse(tblLme, frml, 'dist', 'log-normal');
 
+
+
+tblGUI_scatHist(tblLme, 'xVar', 'pBspk', 'yVar', 'frSs', 'grpVar', 'Group');
+
+
+
+
+
+
+
 % Partial Dependence
-vars = {'Group', 'pBspk'};
+vars = {'Group', 'pBspk_trans'};
 hFig = plot_axSize('flgFullscreen', true, 'flgPos', true);
 hAx = nexttile;
 [pdRes, hFig] = lme_pd(lmeMdl, vars, 'transParams', lmeInfo.transParams, ...
