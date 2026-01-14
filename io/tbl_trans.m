@@ -358,7 +358,7 @@ for iVar = 1:numel(varsTrans)
     % Logit using Smithson & Verkuilen (2006) Squeeze transformation
     if ischar(lb) && strcmpi(lb, 'logit')
         N = length(data);
-        data = (data * (N - 1) + 0.5) / N;      
+        data = (data * (N - 1) + 0.5) / N;
         data = log(data ./ (1 - data));
     end
 
@@ -475,8 +475,16 @@ for iVar = 1:numel(varsTrans)
 
     % Reverse Logit
     if ischar(lb) && strcmpi(lb, 'logit')
-        % y = log(p / (1-p)) -> p = 1 / (1 + exp(-y))
+        % 1. Sigmoid: y = log(p / (1-p)) -> p = 1 / (1 + exp(-y))
         data = 1 ./ (1 + exp(-data));
+
+        % 2. Reverse "Squeeze" (Smithson & Verkuilen)
+        % Forward: y' = (y(N-1) + 0.5) / N
+        % Inverse: y  = (y' * N - 0.5) / (N - 1)
+        N = length(data);
+        if N > 1
+            data = (data * N - 0.5) / (N - 1);
+        end
     end
 
     tblOut.(var) = data;

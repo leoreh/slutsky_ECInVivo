@@ -1,9 +1,10 @@
 function stats = lme_compareDists(tbl, frml)
 % LME_COMPAREDISTS Compares GLME fits across multiple distributions.
 %
-%   stats = LME_COMPAREDISTS(TBL, FRML) fits Generalized Linear
-%   mixed models using five common distributions (Normal, Log-Normal,
-%   Logit-Normal, Poisson, Gamma, and InverseGaussian) and returns a table of fit statistics.
+%   stats = LME_COMPAREDISTS(TBL, FRML) fits Generalized Linear mixed
+%   models using five common distributions (Normal, Log-Normal,
+%   Logit-Normal, Poisson, Gamma, and InverseGaussian) and returns a table
+%   of fit statistics.
 %
 %   INPUTS:
 %       tbl         - (table) Table containing the variables.

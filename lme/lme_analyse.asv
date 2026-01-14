@@ -4,10 +4,10 @@ function [lmeMdl, lmeStats, lmeInfo, lmeTbl] = lme_analyse(tbl, frml, varargin)
 %   [STATS, MDL, INFO] = LME_ANALYSE(TBL, FRML, ...) orchestrates the full
 %   analysis workflow:
 %
-%   LME_VIF to examine collinearity between numeric predictors  
-%   LME_COMPAREDISTS to select the best distribution via AIC
+%   Distribution Selection: If 'dist' is not provided, runs
+%   LME_COMPAREDISTS to select the best distribution via AIC and
 %   LME_PARKTEST to allow for Gamma/Log-Normal checks.
-%   TBL_TRANS:
+%   Transformation:
 %       - Predictors: Automatically Log-transforms skewed continuous
 %         predictors and Z-scores all continuous predictors.
 %       - Response: Applies Log or Logit transforms if required by dist.
@@ -118,7 +118,12 @@ end
 %  ========================================================================
 if numel(varsNum) >= 2
     if verbose; fprintf('[LME_ANALYSE] Checking Collinearity (VIF)...\n'); end
-    lmeInfo.vif = lme_vif(lmeTbl, frml);
+    lmeInfo.vif = lme_vif(lmeTbl, varsNum);
+
+    % Check for high VIF
+    if any(lmeInfo.vif.VIF > 5)
+        warning('Some predictors have VIF > 5\n');
+    end
 else
     lmeInfo.vif = table();
 end
