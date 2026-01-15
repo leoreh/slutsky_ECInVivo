@@ -34,12 +34,14 @@ listRspns = {'uRcv', 'rcvBsl', 'rcvTime', 'spkDfct', 'Genotype', 'frSs', 'rcvWor
 %  ========================================================================
 
 % Recovery
-frml = 'frSs ~ (frTrough + fr + pBspk + funcon) * Group + (1|Name)';
+frml = 'frSs ~ (fr + pBspk) * Group + (1|Name)';
 
 res = lme_ablation(tblLme, frml, 'dist', 'log-normal');
 
 [lmeMdl, lmeStats, lmeInfo, tblMdl] = lme_analyse(tblLme, frml, 'dist', 'log-normal');
 
+
+[lmeMdl, lmeStats, lmeInfo, tblMdl] = lme_analyse(tblLme, frml, 'flgPlot', true);
 
 
 tblGUI_scatHist(tblLme, 'xVar', 'pBspk', 'yVar', 'frSs', 'grpVar', 'Group');
@@ -49,9 +51,8 @@ tblGUI_scatHist(tblLme, 'xVar', 'pBspk', 'yVar', 'frSs', 'grpVar', 'Group');
 
 
 
-
 % Partial Dependence
-vars = {'Group', 'pBspk_trans'};
+vars = {'Group', 'pBspk'};
 hFig = plot_axSize('flgFullscreen', true, 'flgPos', true);
 hAx = nexttile;
 [pdRes, hFig] = lme_pd(lmeMdl, vars, 'transParams', lmeInfo.transParams, ...

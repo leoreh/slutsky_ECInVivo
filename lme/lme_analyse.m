@@ -4,7 +4,7 @@ function [lmeMdl, lmeStats, lmeInfo, lmeTbl] = lme_analyse(tbl, frml, varargin)
 %   [STATS, MDL, INFO] = LME_ANALYSE(TBL, FRML, ...) orchestrates the full
 %   analysis workflow:
 %
-%   LME_VIF to examine collinearity between numeric predictors  
+%   LME_VIF to examine collinearity between numeric predictors
 %   LME_COMPAREDISTS to select the best distribution via AIC
 %   LME_PARKTEST to allow for Gamma/Log-Normal checks.
 %   TBL_TRANS:
@@ -14,6 +14,7 @@ function [lmeMdl, lmeStats, lmeInfo, lmeTbl] = lme_analyse(tbl, frml, varargin)
 %         Adds offset for Zero-inflated data if Gamma/Log is selected.
 %   LME_FIT to fit the model.
 %   LME_EFFECTS to generate ANOVA and contrasts.
+%   LME_PLOTRES to plot residuals
 %
 %   INPUTS:
 %       tbl         - (table) Data table.
@@ -21,6 +22,7 @@ function [lmeMdl, lmeStats, lmeInfo, lmeTbl] = lme_analyse(tbl, frml, varargin)
 %       varargin    - (param/value) Optional parameters:
 %                     'dist'        : (char) Force distribution. If empty, auto-selects.
 %                     'contrasts', 'correction', 'dfMethod': See LME_EFFECTS.
+%                     'flgPlot'
 %
 %   OUTPUTS:
 %       lmeStats    - (table) Statistical results (ANOVA, Effects).
@@ -40,6 +42,7 @@ addRequired(p, 'frml', @(x) ischar(x) || isstring(x));
 
 % Wrapper Options
 addParameter(p, 'dist', '', @ischar);
+addParameter(p, 'flgPlot', false, @islogical);
 
 % Pass-through Options (LME_EFFECTS)
 addParameter(p, 'contrasts', 'all');
@@ -50,6 +53,7 @@ parse(p, tbl, frml, varargin{:});
 
 dist = p.Results.dist;
 verbose = p.Results.verbose;
+flgPlot = p.Results.flgPlot;
 frml = char(frml);
 
 % Run Info Storage
@@ -149,7 +153,7 @@ if isempty(dist)
         dist = 'Binomial';
     else
 
-        parkStats = lme_parkTest(lmeTbl, frml);
+        parkStats = lme_parkTest(lmeTbl, frml, 'flgPlot', flgPlot);
         compStats = lme_compareDists(lmeTbl, frml);
 
         % Pick best model (lowest AIC)
@@ -218,6 +222,10 @@ lmeInfo.distFinal = dist;
 %  ========================================================================
 
 lmeMdl = lme_fit(lmeTbl, frml, 'dist', dist);
+
+if flgPlot
+    lme_plotRes(lmeMdl, 'Name', 'LME Analyse Diagnostics');
+end
 
 
 %% ========================================================================

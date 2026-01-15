@@ -1,4 +1,4 @@
-function stats = lme_parkTest(tbl, frml)
+function stats = lme_parkTest(tbl, frml, varargin)
 % LME_PARKTEST Performs the Park Test to determine the Mean-Variance relationship.
 %
 %   STATS = LME_PARKTEST(TBL, FRML) estimates a provisional Mixed-Effects Model
@@ -31,7 +31,10 @@ function stats = lme_parkTest(tbl, frml)
 p = inputParser;
 addRequired(p, 'tbl', @istable);
 addRequired(p, 'frml', @(x) ischar(x) || isstring(x));
-parse(p, tbl, frml);
+addParameter(p, 'flgPlot', false, @islogical);
+parse(p, tbl, frml, varargin{:});
+
+flgPlot = p.Results.flgPlot;
 
 
 %% ========================================================================
@@ -153,12 +156,10 @@ stats.KurtosisLog = NaN;
 stats.minDF = NaN;
 
 if strcmp(dist, 'Gamma')
+    
     % Fit Log-Normal Model (LME on log(y))
-    % Use tbl_trans to ensure log applied correctly
-    % Note: We use 'e' base for mathematical consistency with Log-Normal definition
     tblLog = tbl_trans(tbl, 'logBase', 'e', 'varsInc', {varResp}, ...
         'flgZ', false, 'verbose', false);
-
     mdlLog = lme_fit(tblLog, frml, 'dist', 'Normal');
 
     % Check Residual Kurtosis
@@ -194,6 +195,54 @@ stats.MdlPark = mdlPark;
 
 fprintf('Park Test: Lambda = %.2f [%.2f, %.2f] -> Recommend: %s\n', ...
     lambdaEst, lambdaCi(1), lambdaCi(2), recStr);
+
+
+%% ========================================================================
+%  VISUALIZATION
+%  ========================================================================
+
+if flgPlot
+    figure('Color', 'w', 'Name', 'Park Test: Mean-Variance Relationship');
+
+    % Data for Plotting
+    % X: Log Predictions (parkX)
+    % Y: Log Squared Residuals (log(resSq))
+    % Note: parkX is already log(yHat(isValid))
+
+    xPlot = parkX;
+    yPlot = log(tblPark.ResSq);
+
+    scatter(xPlot, yPlot, 30, 'k', 'filled', 'MarkerFaceAlpha', 0.5);
+    hold on;
+
+    % Regression Line (Gamma GLM with Log Link)
+    % E[ResSq] = exp(alpha + lambda * log(yHat))
+    % => log(E[ResSq]) = alpha + lambda * log(yHat)
+    % This is linear in log-log space.
+
+    % Create a smooth range for the line
+    xLine = linspace(min(xPlot), max(xPlot), 100)';
+
+    % Predict from mdlPark
+    % mdlPark expects input 'LogPred'
+    yPred_Gamma = predict(mdlPark, table(xLine, 'VariableNames', {'LogPred'}));
+
+    % Convert prediction to log-scale for the plot
+    yLine = log(yPred_Gamma);
+
+    plot(xLine, yLine, 'r-', 'LineWidth', 2);
+
+    % Aesthetics
+    grid on;
+    xlabel('Log(Predicted Means)');
+    ylabel('Log(Squared Residuals)');
+    title({sprintf('Park Test: \\lambda = %.2f (95%% CI: [%.2f, %.2f])', ...
+        lambdaEst, lambdaCi(1), lambdaCi(2)); ...
+        sprintf('Recommendation: %s', recStr)});
+
+    legend({'Observed', 'Fitted Trend'}, 'Location', 'best');
+    set(gca, 'FontSize', 12);
+end
 
 end     % EOF
 

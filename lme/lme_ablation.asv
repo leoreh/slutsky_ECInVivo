@@ -102,35 +102,35 @@ nVars = length(varsIter);
 statNames = {'Predictor', 'AIC', 'BIC', 'LogLik', 'LRStat', 'pValue', 'DeltaAIC'};
 statsData = cell(nVars, 7);
 
-% % Fit Full Model
-% mdlFull = lme_fit(tblLme, frml, 'dist', distFinal, 'fitMethod', fitMet);
+% Fit Full Model
+mdlFull = lme_fit(tblLme, frml, 'dist', distFinal, 'fitMethod', fitMet);
 
-% % Iterate Ablations
-% for iVar = 1:nVars
-%     varRmv = varsIter{iVar};
-%
-%     if strcmp(varRmv, 'None')
-%         % Full Model Baseline
-%         statsData(iVar, :) = {varRmv, mdlFull.ModelCriterion.AIC, ...
-%             mdlFull.ModelCriterion.BIC, mdlFull.LogLikelihood, ...
-%             NaN, NaN, 0};
-%     else
-%         % Reduced Model
-%         currFrml = lme_frml2rmv(frml, varRmv);
-%         mdlRed = lme_fit(tblLme, currFrml, 'dist', distFinal, 'fitMethod', fitMet);
-%
-%         % Compare: Reduced (H0) vs Full (H1)
-%         % Returns table, we extract pValue and LRStat
-%         cmpTbl = compare(mdlRed, mdlFull);
-%         lrStat = cmpTbl.LRStat(2);
-%         pVal   = cmpTbl.pValue(2);
-%         dAIC   = mdlRed.ModelCriterion.AIC - mdlFull.ModelCriterion.AIC;
-%
-%         statsData(iVar, :) = {varRmv, mdlRed.ModelCriterion.AIC, ...
-%             mdlRed.ModelCriterion.BIC, mdlRed.LogLikelihood, ...
-%             lrStat, pVal, dAIC};
-%     end
-% end
+% Iterate Ablations
+for iVar = 1:nVars
+    varRmv = varsIter{iVar};
+
+    if strcmp(varRmv, 'None')
+        % Full Model Baseline
+        statsData(iVar, :) = {varRmv, mdlFull.ModelCriterion.AIC, ...
+            mdlFull.ModelCriterion.BIC, mdlFull.LogLikelihood, ...
+            NaN, NaN, 0};
+    else
+        % Reduced Model
+        currFrml = lme_frml2rmv(frml, varRmv);
+        mdlRed = lme_fit(tblLme, currFrml, 'dist', distFinal, 'fitMethod', fitMet);
+
+        % Compare: Reduced (H0) vs Full (H1)
+        % Returns table, we extract pValue and LRStat
+        cmpTbl = compare(mdlRed, mdlFull);
+        lrStat = cmpTbl.LRStat(2);
+        pVal   = cmpTbl.pValue(2);
+        dAIC   = mdlRed.ModelCriterion.AIC - mdlFull.ModelCriterion.AIC;
+
+        statsData(iVar, :) = {varRmv, mdlRed.ModelCriterion.AIC, ...
+            mdlRed.ModelCriterion.BIC, mdlRed.LogLikelihood, ...
+            lrStat, pVal, dAIC};
+    end
+end
 
 % Convert to Table
 res.stats = cell2table(statsData, 'VariableNames', statNames);
@@ -227,8 +227,7 @@ for iRep = 1 : nTotal
 
             % Back transform response values
             pVar = infoTrn.transParams.varsTrans.(varRsp);
-            flgRaw = false;
-            if ~isempty(pVar.logBase) && ~flgRaw
+            if ~isempty(pVar.logBase)
                 c = pVar.offset;
                 yTrue = exp(yTrue) - c;
                 yProb = exp(yProb) - c;
@@ -368,8 +367,8 @@ function plot_ablation(res, labPrim, labSec, flgBinomial)
 varsFxd = res.vars(2 : end);
 nVars  = length(varsFxd);
 
-figure('Color', 'w', 'Name', 'Feature Ablation', 'Position', [100 100 1600 400]);
-t = tiledlayout(1, 4, 'TileSpacing', 'compact', 'Padding', 'compact');
+figure('Color', 'w', 'Name', 'Feature Ablation', 'Position', [100 100 1200 400]);
+t = tiledlayout(1, 3 + flgBinomial, 'TileSpacing', 'compact', 'Padding', 'compact');
 
 % 1. Primary Importance
 nexttile;
@@ -395,7 +394,7 @@ ylabel(['% \Delta ' labSec]);
 title(['Importance (' labSec ')']);
 grid on;
 
-% 3. Model Comparison (Raw Values - Primary)
+% 3. Model Comparison (Raw Values)
 nexttile;
 data = res.perfPrim;
 labels = res.vars;
@@ -413,13 +412,12 @@ for iCol = 1:nCols
 end
 xticks(1:nCols); xticklabels(labels);
 ylabel(ylab);
-title(['Model Performance (' labPrim ')']);
+title('Model Performance');
 grid on;
 
-% 4. Fourth Plot (ROC or Raw Secondary)
-nexttile;
+% 4. ROC (Binomial Only)
 if flgBinomial
-    % ROC (Binomial Only)
+    nexttile;
     hold on;
     clrs = lines(nVars);
     xGrid = linspace(0, 1, 100);
@@ -437,27 +435,6 @@ if flgBinomial
     xlabel('FPR'); ylabel('TPR');
     title('ROC Curves');
     legend('Location', 'best');
-else
-    % Raw Secondary Metric (e.g. R-Squared)
-    data = res.perfSec;
-    labels = res.vars;
-    ylab = labSec;
-
-    % Connecting Lines for paired observations
-    plot(1:size(data,2), data', '-', 'Color', [0.7 0.7 0.7 0.3], 'LineWidth', 0.5);
-    hold on;
-
-    % Inline scatter_raw logic (Means + Scatters)
-    nCols = size(data, 2);
-    for iCol = 1:nCols
-        x = iCol + randn(size(data,1), 1) * 0.05;
-        scatter(x, data(:,iCol), 15, 'filled', 'MarkerFaceAlpha', 0.8);
-        plot([iCol-0.2, iCol+0.2], [mean(data(:,iCol), 'omitnan'), mean(data(:,iCol), 'omitnan')], 'k-', 'LineWidth', 2);
-    end
-    xticks(1:nCols); xticklabels(labels);
-    ylabel(ylab);
-    title(['Model Performance (' labSec ')']);
-    grid on;
 end
 
 end     % EOF
@@ -468,11 +445,74 @@ end     % EOF
 
 
 %% ========================================================================
-%  NOTES
+%  NOTE: STEPWISE SELECTION
 %  ========================================================================
 %  MATLAB's built-in `stepwiseglm` does NOT support random effects.
 %
+% While MATLAB’s `stepwisefit` and `stepwiseglm` are standard tools for
+% automated model selection, they are technically incompatible with your
+% current analytical framework. These functions are designed for
+% fixed-effects models and cannot accommodate the random-effects structure
+% (`1|Name`) required for hierarchical physiological data. Using them would
+% require you to ignore the non-independence of units within a culture,
+% which significantly inflates Type I error rates and invalidates your
+% statistical inferences.
+%
+% The `stepwiseglm` function operates by iteratively adding or removing
+% predictors based on a specific criterion, such as -values, Akaike
+% Information Criterion (AIC), or Bayesian Information Criterion (BIC).
+% However, this "greedy" search algorithm is strictly limited to the
+% `GeneralizedLinearModel` class. Because your recovery analysis requires a
+% `GeneralizedLinearMixedModel` to account for mouse-specific or
+% culture-specific variance, you cannot use these built-in automated
+% routines. Furthermore, stepwise selection is frequently criticized in
+% high-impact literature for -value bias, as it performs multiple hidden
+% comparisons that are not reflected in the final model's output.
+%
+% There is a fundamental theoretical difference between the stepwise
+% approach and the ablation analysis performed by Atsmon or Parks. Stepwise
+% selection is a **search strategy** intended to find the most parsimonious
+% model (the "best" subset of predictors). In contrast, ablation analysis
+% is a **diagnostic tool** used to quantify the "predictive weight" of each
+% variable within a pre-defined physiological hypothesis. While stepwise
+% might tell you which variables to keep, ablation tells you how much
+% information is lost if a variable is removed, which is the metric used to
+% generate "Importance" or "Delta Accuracy" plots.
+%
+% To achieve an effect similar to stepwise selection while maintaining your
+% random-effects structure, you must perform manual model comparison using
+% the `compare` function in MATLAB. This allows you to test whether a model
+% with a specific predictor is statistically superior to one without it
+% using a Likelihood Ratio Test (LRT). However, for the specific "Delta
+% Accuracy" goal you described, the manual loop strategy remains the
+% superior technical path.
+%
+%  To technically determine if a predictor (e.g., 'Group') should be
+%  included in your GLME, compare nested models:
+%
+%  - Model 1: uRcv ~ fr + bFrac + (1|Name)
+%  - Model 2: uRcv ~ fr + bFrac + Group + (1|Name)
+%
+%  [~, p, stats] = compare(Mdl1, Mdl2);
+%
+%  If p < 0.05, the added predictor significantly improves the model fit
+%  beyond what is expected by chance.
+%
+%  Ablation is a Machine Learning approach, not a Likelihood approach.
+%  1. Purpose: To rank feature importance, not just "significance."
+%  2. Performance Metric: Usually "Delta Balanced Accuracy" or "Delta AUC."
+%  3. Implementation Requirement: Must be done via a custom loop to
+%     preserve the `fitglme` random-effect structure in every iteration.
+%  ========================================================================
+
+
+
+
+
+
+%% ========================================================================
 %  NOTE: STRATIFIED GROUPED K-FOLD
+%  ========================================================================
 %  In hierarchical physiological datasets (e.g., units nested within
 %  cultures/animals), standard cross-validation strategies often lead to
 %  two critical failures that invalidate ablation results:

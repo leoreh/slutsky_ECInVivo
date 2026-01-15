@@ -53,7 +53,7 @@ verbose     = p.Results.verbose;
 % Ensure vars is cell
 if ischar(vars), vars = {vars}; end
 if length(vars) > 2
-    error('LME_PR:MaxVars', 'Can only visualize up to 2 variables.');
+    error('[LME_PR] Can only visualize up to 2 variables.');
 end
 
 %% ========================================================================
@@ -62,15 +62,15 @@ end
 
 if verbose, fprintf('[LME_PR] Fitting Reduced Model...\n'); end
 
-% 1. Get Original Formula & Data
+% Original Formula & Data
 origFrml = char(mdl.Formula);
 tblRes   = mdl.Variables;
 
-% 2. Determine Reduced Formula
-%    We iterate through 'vars' and remove each one from the formula.
+% Determine Reduced Formula
+% We iterate through 'vars' and remove each one from the formula.
 redFrml = origFrml;
-for i = 1:length(vars)
-    redFrml = lme_frml2rmv(redFrml, vars{i});
+for iVar = 1:length(vars)
+    redFrml = lme_frml2rmv(redFrml, vars{iVar});
 end
 
 if verbose
@@ -78,22 +78,17 @@ if verbose
     fprintf('   Reduced:  %s\n', redFrml);
 end
 
-% 3. Determine Distribution
-try
-    dist = mdl.Distribution;
-    if isobject(dist) % Handle newer MATLAB versions/GLME objects
-        dist = char(dist.Name);
-    end
-catch
-    % Fallback for older LME objects which assume Normal
-    dist = 'Normal';
+% Determine Distribution
+dist = mdl.Distribution;
+if isobject(dist) % Handle newer MATLAB versions/GLME objects
+    dist = char(dist.Name);
 end
 
-% 4. Fit Reduced Model
+% Fit Reduced Model
 mdlRed = lme_fit(tblRes, redFrml, 'dist', dist);
 
-% 5. Calculate Residuals
-%    Residual = Observed - Predicted(Reduced)
+% Calculate Residuals
+% Residual = Observed - Predicted(Reduced)
 tblRes.Resid = residuals(mdlRed, 'ResidualType', 'Raw');
 
 
@@ -101,16 +96,10 @@ tblRes.Resid = residuals(mdlRed, 'ResidualType', 'Raw');
 %  BACK TRANSFORM
 %  ========================================================================
 
-
-%% ========================================================================
-%  BACK TRANSFORM & DATA PREP
-%  ========================================================================
-
 tblFit = tblRes; % Keep transformed data for fitting the "Trend Line"
 
 if ~isempty(transParams)
-    if verbose, fprintf('[LME_PR] Back-transforming predictors for plot...\n'); end
-    % Back-transform the data used for SCATTER points
+    if verbose, fprintf('[LME_PR] Back-transforming predictors\n'); end
     tblPlot = tbl_trans(tblRes, 'template', transParams, 'flgInv', true);
 else
     tblPlot = tblRes;
@@ -147,7 +136,7 @@ else
     var1 = varsPlot{1};
     var2 = varsPlot{2};
 
-    % Heuristic: If one is Categorical, it becomes the GROUPING variable.
+    % Heuristic: If one is Categorical, it becomes the Grouping variable.
     % If both Continuous, the second one is Grouping.
     if ~isNum(1) && isNum(2)
         xName = var2; grpName = var1; isXNum = true;
@@ -161,14 +150,10 @@ end
 
 % Colors
 if isempty(clr)
-    try
-        cfg = mcu_cfg();
-        if nGrps == 2
-            clr = cfg.clr.grp;
-        else
-            clr = lines(nGrps);
-        end
-    catch
+    cfg = mcu_cfg();
+    if nGrps == 2
+        clr = cfg.clr.grp;
+    else
         clr = lines(nGrps);
     end
 end
@@ -192,11 +177,11 @@ for iG = 1:nGrps
         xPlot = categorical(xPlot);
     end
 
-    % 1. Scatter Points (Back-Transformed X)
+    % Scatter Points (Back-Transformed X)
     scatter(hAx, xPlot, yData, 20, c, 'filled', ...
         'MarkerFaceAlpha', 0.4, 'HandleVisibility', 'off');
 
-    % 2. Fit Line (in Transformed Space)
+    % Fit Line (in Transformed Space)
     if isXNum
         % Fit Linear Trend on TRANSFORMED data (y ~ x_trans + c)
         lm = fitlm(xFit, yData);
