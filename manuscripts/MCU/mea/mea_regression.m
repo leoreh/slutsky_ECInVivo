@@ -34,9 +34,9 @@ listRspns = {'uRcv', 'rcvBsl', 'rcvTime', 'spkDfct', 'Genotype', 'frSs', 'rcvWor
 %  ========================================================================
 
 % Recovery
-frml = 'frSs ~ (fr + pBspk) * Group + (1|Name)';
+frml = 'frSs ~ (fr + pBspk + frTrough + funcon) * Group + (1|Name)';
 
-res = lme_ablation(tblLme, frml, 'dist', 'log-normal');
+res = lme_ablation(tblLme, frml, 'dist', 'log-normal', 'flgBkTrans', true);
 
 [lmeMdl, lmeStats, lmeInfo, tblMdl] = lme_analyse(tblLme, frml, 'dist', 'log-normal');
 
