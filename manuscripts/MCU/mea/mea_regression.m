@@ -34,34 +34,42 @@ listRspns = {'uRcv', 'rcvBsl', 'rcvTime', 'spkDfct', 'Genotype', 'frSs', 'rcvWor
 %  ========================================================================
 
 % Recovery
-frml = 'frSs ~ (fr + pBspk + frTrough + funcon) * Group + (1|Name)';
+frml = 'frSs ~ (fr + pBspk_trans + frTrough + funcon) * Group + (1|Name)';
 
-res = lme_ablation(tblLme, frml, 'dist', 'log-normal', 'flgBkTrans', false);
+abl = lme_ablation(tblLme, frml, 'dist', 'log-normal', 'flgBkTrans', false);
 
 [lmeMdl, lmeStats, lmeInfo, tblMdl] = lme_analyse(tblLme, frml, 'dist', 'log-normal');
-
-
-[lmeMdl, lmeStats, lmeInfo, tblMdl] = lme_analyse(tblLme, frml, 'flgPlot', true);
 
 
 tblGUI_scatHist(tblLme, 'xVar', 'pBspk', 'yVar', 'frSs', 'grpVar', 'Group');
 
 
+frml = 'frSs ~ (fr + pBspk_trans + frTrough + funcon) * Group + (pBspk_trans|Name)';
+[lmeMdl, lmeStats, lmeInfo, tblMdl] = lme_analyse(tblLme, frml, 'dist', 'log-normal');
 
+figure
+plotPartialDependence(lmeMdl, "pBspk_trans", "Conditional", "centered")
+
+
+
+plotPartialDependence(lmeMdl, {'pBspk_trans', 'Group'});
+
+
+vars = ["pBspk_trans", "Group"];
 
 
 % PLOT INTERACTION
-vars = {'Group', 'pBspk'};
+vars = {'pBspk_trans', 'Group'};
 hFig = plot_axSize('flgFullscreen', true, 'flgPos', true);
 
 % Partial Residuals
 hAx = nexttile;
-[pdRes, hFig] = lme_pr(lmeMdl, vars, 'transParams', [], ...
+[prRes, hFig] = lme_pr(lmeMdl, vars, 'transParams', [], ...
     'hAx', hAx);
 
 % Partial Dependence
 hAx = nexttile;
-[pdRes, hFig] = lme_pd(lmeMdl, vars, 'transParams', lmeInfo.transParams, ...
+[pdRes, hFig] = lme_pd(lmeMdl, vars, 'transParams', [], ...
     'hAx', hAx);
 
 

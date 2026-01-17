@@ -1,38 +1,25 @@
-function [hFig, tblMdl] = lme_pr(mdl, vars, varargin)
+function [hFig, tblRes] = lme_pr(mdl, vars, varargin)
 % LME_PR Plots Partial Residuals (Added Variable Plot) for LME models.
 %
 %   [HFIG, TBLRES] = LME_PR(MDL, VARS, ...)
-%   Visualizes the partial residuals of a model to check for non-linearity
-%   or validate interaction terms.
 %
-%   METHOD:
-%       1. Create a "Reduced Model" by removing the specified variable(s)
-%          and their interactions from the original formula.
-%       2. Calculate the Residuals of this reduced model.
-%       3. Plot these Residuals against the variable of interest.
+%   ASSUMPTIONS:
+%       - VARS contains 1 or 2 variable names.
+%       - If 2 variables are provided, the 2nd is assumed to be Categorical (Grouping).
 %
 %   INPUTS:
-%       mdl         - (Required) Fitted LME/GLME object.
-%       vars        - (Required) Cell array of 1 or 2 variable names to
-%                     visualize/remove.
-%                     - 1 Var: Plot residuals vs Var.
-%                     - 2 Vars: Plot residuals vs Var1, grouped by Var2.
-%       ...         - (Optional) Name-Value Pairs:
-%                     'hAx'          - Axis handle to plot into.
-%                     'clr'          - Color matrix or 'auto'.
-%                     'transParams'  - (struct) Transformation parameters from
-%                                      LME_ANALYSE / TBL_TRANS. If provided,
-%                                      predictors are back-transformed.
-%                     'verbose' - (logical) Print progress.
+%       mdl         - (Required) Fitted LME object.
+%       vars        - (Required) Cell array of 1 or 2 variable names.
+%       varargin    - (Optional) 'hAx', 'clr', 'transParams', 'verbose'.
 %
 %   OUTPUTS:
 %       hFig        - Figure handle.
-%       tblRes      - Table containing the data and calculated residuals.
+%       tblRes      - Table with data and residuals.
 %
-%   See also: LME_PD, LME_FIT, LME_FRML2RMV
+%   See also: LME_ANALYSE, LME_FIT, TBL_TRANS
 
 %% ========================================================================
-%  ARGUMENT PARSING
+%  ARGUMENTS
 %  ========================================================================
 
 p = inputParser;
@@ -42,7 +29,6 @@ addParameter(p, 'hAx', [], @(x) isempty(x) || isgraphics(x));
 addParameter(p, 'clr', [], @(x) isempty(x) || isnumeric(x));
 addParameter(p, 'transParams', [], @(x) isempty(x) || isstruct(x));
 addParameter(p, 'verbose', true, @islogical);
-
 parse(p, mdl, vars, varargin{:});
 
 hAx         = p.Results.hAx;
@@ -50,59 +36,40 @@ clr         = p.Results.clr;
 transParams = p.Results.transParams;
 verbose     = p.Results.verbose;
 
-
 %% ========================================================================
-%  PREPARATIONS
+%  PREPARATION
 %  ========================================================================
 
 % Ensure vars is cell
 if ischar(vars), vars = {vars}; end
-if length(vars) > 2
-    error('[LME_PR] Can only visualize up to 2 variables.');
+
+% Identify Variables (Assumption: Var1=X, Var2=Group)
+varX = vars{1};
+if length(vars) == 2
+    varGrp = vars{2};
+else
+    varGrp = [];
 end
 
-% Original Formula & Data
-origFrml = char(mdl.Formula);
-tblMdl   = mdl.Variables;
+% Data & Groups
+tblMdl = mdl.Variables;
+if ~isempty(varGrp)
+    [grpIds, grpNames] = findgroups(tblMdl.(varGrp));
+    nGrps = length(grpNames);
+else
+    grpIds = ones(height(tblMdl), 1);
+    grpNames = {'All'};
+    nGrps = 1;
+end
 
-% Open figure
+% Graphic Handles
 if isempty(hAx)
-    hFig = figure('Color', 'w', 'Name', 'Partial Residual Plot');
+    hFig = figure('Color', 'w', 'Name', 'Partial Residuals');
     hAx = axes('Parent', hFig);
 else
     hFig = ancestor(hAx, 'figure');
 end
 hold(hAx, 'on');
-
-% Identify X and Grouping
-varsPlot = vars;
-isNum    = cellfun(@(x) isnumeric(tblMdl.(x)) && ~iscategorical(tblMdl.(x)), varsPlot);
-
-if isscalar(varsPlot)
-    % 1D Case
-    xName = varsPlot{1};
-    grpName = [];
-    isXNum = isNum(1);
-
-    grpIds = ones(height(tblMdl), 1);
-    grpLbls = {'All'};
-    nGrps = 1;
-else
-    % 2D Case
-    var1 = varsPlot{1};
-    var2 = varsPlot{2};
-
-    % Heuristic: If one is Categorical, it becomes the Grouping variable.
-    % If both Continuous, the second one is Grouping.
-    if ~isNum(1) && isNum(2)
-        xName = var2; grpName = var1; isXNum = true;
-    else
-        xName = var1; grpName = var2; isXNum = isNum(1);
-    end
-
-    [grpIds, grpLbls] = findgroups(tblMdl.(grpName));
-    nGrps = length(grpLbls);
-end
 
 % Colors
 if isempty(clr)
@@ -118,126 +85,111 @@ end
 %  FIT REDUCED MODEL
 %  ========================================================================
 
-if verbose, fprintf('[LME_PR] Fitting Reduced Model...\n'); end
+if verbose, fprintf('[LME_PR] Fitting reduced model...\n'); end
 
-% Determine Reduced Formula
-% We iterate through 'vars' and remove each one from the formula.
-redFrml = origFrml;
+% Remove variables from formula
+redFrml = char(mdl.Formula);
 for iVar = 1:length(vars)
     redFrml = lme_frml2rmv(redFrml, vars{iVar});
 end
 
-if verbose
-    fprintf('   Original: %s\n', origFrml);
-    fprintf('   Reduced:  %s\n', redFrml);
-end
-
-% Determine Distribution
-if isa(mdl, 'LinearMixedModel')
-    dist = 'normal';
-elseif isa(mdl, 'GeneralizedLinearMixedModel')
+% Fit & Residuals
+dist = 'Normal';
+if isa(mdl, 'GeneralizedLinearMixedModel')
     dist = mdl.Distribution;
 end
-
-% Fit Reduced Model
 mdlRed = lme_fit(tblMdl, redFrml, 'dist', dist);
-
-% Calculate Residuals
-% Residual = Observed - Predicted(Reduced)
 tblMdl.Resid = residuals(mdlRed, 'ResidualType', 'Raw');
 
-
 %% ========================================================================
-%  BACK TRANSFORM
+%  FIT TREND LINES
 %  ========================================================================
+%  We fit y ~ x in the TRANSFORMED space, then back-transform the grid.
 
-tblFit = tblMdl; % Keep transformed data for fitting the "Trend Line"
+trends = struct();
 
-if ~isempty(transParams)
-    if verbose, fprintf('[LME_PR] Back-transforming predictors\n'); end
-    tblPlot = tbl_trans(tblMdl, 'template', transParams, 'flgInv', true);
-else
-    tblPlot = tblMdl;
+for iVar = 1:nGrps
+    grpIdx = (grpIds == iVar);
+    xData = tblMdl.(varX)(grpIdx);
+    yData = tblMdl.Resid(grpIdx);
+
+    % Fit (only if numeric)
+    lm = fitlm(xData, yData);
+
+    % Predict on Grid (Transformed Space)
+    xGrid = linspace(min(xData), max(xData), 100)';
+    yGrid = predict(lm, xGrid);
+
+    trends(iVar).xGrid = xGrid;
+    trends(iVar).yGrid = yGrid;
 end
 
+%% ========================================================================
+%  BACK TRANFORM
+%  ========================================================================
+
+if ~isempty(transParams)
+    if verbose, fprintf('[LME_PR] Back-transforming...\n'); end
+
+    % Data Points
+    tblRes = tbl_trans(tblMdl, 'template', transParams, 'flgInv', true);
+
+    % Trend Lines (Only X needs back-transform)
+    if isfield(transParams.varsTrans, varX)
+        for iVar = 1:nGrps
+            tmpTbl = table(trends(iVar).xGrid, 'VariableNames', {varX});
+            tmpTbl = tbl_trans(tmpTbl, 'template', transParams, 'varsInc', {varX}, 'flgInv', true);
+            trends(iVar).xGrid = tmpTbl.(varX);
+        end
+    end
+else
+    tblRes = tblMdl;
+end
 
 %% ========================================================================
 %  PLOT
 %  ========================================================================
 
-% Plot Loop
-for iGrp = 1:nGrps
-    
-    grpIdx = (grpIds == iGrp);
-    dispName = string(grpLbls(iGrp));
-    subFit  = tblFit(grpIdx, :);  % For Fitting (Transformed)
-    subPlot = tblPlot(grpIdx, :); % For Plotting (Original)
+for iVar = 1:nGrps
+    grpIdx = (grpIds == iVar);
+    xData = tblRes.(varX)(grpIdx);
+    yData = tblRes.Resid(grpIdx); 
 
-    % Extract Data
-    xFit  = subFit.(xName);
-    xPlot = subPlot.(xName);
-    yData = subPlot.Resid; % Residuals are same in both (created after fit)
+    % Scatter
+    if isnumeric(xData)
+        scatter(hAx, xData, yData, 20, clr(iVar,:), 'filled', 'MarkerFaceAlpha', 0.4, ...
+            'HandleVisibility', 'off');
 
-    % Pre-process for Scatter
-    if ~isnumeric(xPlot) && ~islogical(xPlot) && ~iscategorical(xPlot)
-        xPlot = categorical(xPlot);
-    end
-
-    % Scatter Points (Back-Transformed X)
-    scatter(hAx, xPlot, yData, 20, clr(iGrp, :), 'filled', ...
-        'MarkerFaceAlpha', 0.4, 'HandleVisibility', 'off');
-
-    % Fit Line (in Transformed Space)
-    if isXNum
-        % Fit Linear Trend on TRANSFORMED data (y ~ x_trans + c)
-        lm = fitlm(xFit, yData);
-
-        % Generate Grid in Transformed Space
-        xGridTrans = linspace(min(xFit), max(xFit), 100)';
-        yPred = predict(lm, xGridTrans);
-
-        % Back-Transform X-Grid for Plotting
-        if ~isempty(transParams) && isfield(transParams.varsTrans, xName)
-            % Create dummy table for inversion
-            tmp = table(xGridTrans, 'VariableNames', {xName});
-            tmp = tbl_trans(tmp, 'template', transParams, 'varsInc', {xName}, 'flgInv', true);
-            xGridOrign = tmp.(xName);
-        else
-            xGridOrign = xGridTrans;
-        end
-
-        plot(hAx, xGridOrign, yPred, '-', 'Color', clr(iGrp, :), 'LineWidth', 2, ...
-            'DisplayName', dispName);
+        % Trend Line
+        plot(hAx, trends(iVar).xGrid, trends(iVar).yGrid, '-', 'Color', clr(iVar,:), ...
+            'LineWidth', 2, 'DisplayName', string(grpNames(iVar)));
     else
-        % Categorical X: Plot Mean of Residuals
-        xCats = double(categorical(xPlot));
-        uCats = unique(xCats);
+        % Categorical Jitter? Or just points.
+        % If categorical, xData is categorical array.
+        % We can just plot means usually, but scatter is nice.
+        % Let's keep it simple as requested.
 
-        % Calculate Means
-        yMeans = splitapply(@mean, yData, findgroups(xPlot));
-
-        % Plot connecting line
-        plot(hAx, uCats, yMeans, 'o-', 'Color', clr(iGrp, :), 'LineWidth', 2, ...
-            'MarkerFaceColor', 'w', 'DisplayName', dispName);
-
-        xticklabels(hAx, categories(categorical(xPlot)));
+        % Mean Line
+        plot(hAx, trends(iVar).xGrid, trends(iVar).yGrid, 'o-', 'Color', clr(iVar,:), ...
+            'LineWidth', 2, 'MarkerFaceColor', 'w', 'DisplayName', string(grpNames(iVar)));
     end
 end
 
-% Labels & Aesthetics
-xlabel(hAx, xName, 'Interpreter', 'none');
+% Decoration
+xlabel(hAx, varX, 'Interpreter', 'none');
 ylabel(hAx, sprintf('Residuals (%s | Reduced)', mdl.ResponseName), 'Interpreter', 'none');
-title(hAx, 'Partial Residual Plot', 'FontWeight', 'normal');
 grid(hAx, 'on');
+title(hAx, 'Partial Residuals');
 
-if ~isempty(grpName)
-    lgd = legend(hAx, 'Location', 'best', 'Interpreter', 'none');
-    title(lgd, grpName);
+if nGrps > 1
+    legend(hAx, 'Location', 'best', 'Interpreter', 'none');
 end
 
-if ~isempty(transParams) && isfield(transParams.varsTrans, xName) ...
-        && ~isempty(transParams.varsTrans.(xName).logBase)
-    set(hAx, 'XScale', 'log')
+% Log Scale check
+if ~isempty(transParams) && isfield(transParams.varsTrans, varX) ...
+        && isfield(transParams.varsTrans.(varX), 'logBase') ...
+        && ~isempty(transParams.varsTrans.(varX).logBase)
+    set(hAx, 'XScale', 'log');
 end
 
-end         % EOF
+end
