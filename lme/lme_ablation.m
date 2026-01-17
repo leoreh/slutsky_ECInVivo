@@ -1,4 +1,4 @@
-function res = lme_ablation(tbl, frml, varargin)
+function abl = lme_ablation(tbl, frml, varargin)
 % LME_ABLATION Performs feature ablation analysis on a LME/GLME model.
 %
 %   RES = LME_ABLATION(TBL, FRML, ...)
@@ -21,7 +21,7 @@ function res = lme_ablation(tbl, frml, varargin)
 %                     'flgBkTrans : Back transform response before calculating metrics (default true).
 %
 %   OUTPUTS:
-%       res         - (struct) Results structure. Fields depend on Mode.
+%       abl         - (struct) Results structure. Fields depend on Mode.
 %
 %   DEPENDENCIES:
 %       lme_fit, lme_frml2vars, cvpartition.
@@ -52,7 +52,7 @@ flgBkTrans = p.Results.flgBkTrans;
 % Run LME_ANALYSE to prepare data and select distribution
 fprintf('[LME_ABLATION] Running initial analysis to prepare data...\n');
 [~, ~, lmeInfo, tblLme] = lme_analyse(tbl, frml, 'dist', dist);
-res.vif = lmeInfo.vif;
+abl.vif = lmeInfo.vif;
 
 % Determine Mode
 dist = lmeInfo.distSelected;
@@ -112,7 +112,6 @@ for iRep = 1 : nTotal
     % Data Split
     trainIdx = matTrn(:, iRep);
     testIdx  = ~trainIdx;
-    tblTrn = tbl(trainIdx, :);      
 
     for iVar = 1 : nCols
         varRmv = vars{iVar};
@@ -127,7 +126,6 @@ for iRep = 1 : nTotal
         % data actually used by the model.
         tblTst = tbl(testIdx, :);
         tblTst = tbl_trans(tblTst, 'template', infoTrn.transParams);
-
         yTrue = tblTst.(varRsp);
         yPred = predict(mdl, tblTst);
 
@@ -166,15 +164,34 @@ for iRep = 1 : nTotal
             % Null Model (Training Mean) for SST
             yTrn = tblTrn.(varRsp);
 
-            % Back-transform if requested. Note this is a "naive"
-            % transformation (doesn't account for bias).
+            % Back-transform if requested.
             if flgBkTrans
                 pVar = infoTrn.transParams.varsTrans.(varRsp);
                 if ~isempty(pVar) && ~isempty(pVar.logBase)
+
+                    % yTrue and yTrn can be "naivey" re-transformed since they
+                    % are exact values, not statistical estimates
                     c = pVar.offset;
                     yTrue = exp(yTrue) - c;
-                    yPred = exp(yPred) - c;
                     yTrn = exp(yTrn) - c;
+
+                    % yPred is re-transformed using parametric or
+                    % aparemtric correction. Since mdl.residuals is
+                    % generated on conditional predictions, is do not
+                    % contained random variance and thus we reclaculte
+                    % residuals
+                    yPred_trn = predict(mdl, tblTrn, 'Conditional', false);
+                    yTrue_trn = tblTrn.(varRsp);
+                    resMarg = yTrue_trn - yPred_trn;
+
+                    % Parametric Correction (Log-Normal Assumption)
+                    % correctionFct = exp(var(resMarg, 'omitnan') / 2);
+
+                    % Aparemtric Correction (Duan's Smearing Estimator)
+                    correctionFct = mean(exp(resMarg), 'omitnan');
+
+                    % Adjusted Prediction
+                    yPred = exp(yPred) .* correctionFct - c;
                 end
             end
 
@@ -203,44 +220,44 @@ fprintf('\n');
 %  ORGANIZE
 %  ========================================================================
 
-res.vars = vars;
-res.flgBkTrans = flgBkTrans;
+abl.vars = vars;
+abl.flgBkTrans = flgBkTrans;
 
 if flgClass
     % --- CLASSIFICATION RESULTS ---
-    res.bacc = matBACC;
-    res.auc  = matAUC;
-    res.roc  = rocData;
+    abl.bacc = matBACC;
+    abl.auc  = matAUC;
+    abl.roc  = rocData;
 
     % Importance (% Drop)
     muBACC = mean(matBACC, 1, 'omitnan');
     muAUC  = mean(matAUC, 1, 'omitnan');
 
-    res.impBACC = (muBACC(1) - muBACC(2:end)) ./ muBACC(1) * 100;
-    res.impAUC  = (muAUC(1)  - muAUC(2:end))  ./ muAUC(1)  * 100;
+    abl.impBACC = (muBACC(1) - muBACC(2:end)) ./ muBACC(1) * 100;
+    abl.impAUC  = (muAUC(1)  - muAUC(2:end))  ./ muAUC(1)  * 100;
 
 else
     % --- REGRESSION RESULTS ---
-    res.rmse = rmse;
-    res.r2   = r2;
-    res.sse  = sse;
-    res.sst  = sst;
-    res.foldSz = foldSz;
+    abl.rmse = rmse;
+    abl.r2   = r2;
+    abl.sse  = sse;
+    abl.sst  = sst;
+    abl.foldSz = foldSz;
 
     % Pooled Metrics
     sumSSE = sum(sse, 1, 'omitnan');
     sumSST = sum(sst, 1, 'omitnan');
     sumN   = sum(foldSz, 'omitnan');
 
-    res.pRMSE = sqrt(sumSSE ./ sumN);
-    res.pR2   = 1 - (sumSSE ./ sumSST);
+    abl.pRMSE = sqrt(sumSSE ./ sumN);
+    abl.pR2   = 1 - (sumSSE ./ sumSST);
 
     % Importance
     % RMSE (% Increase)
-    res.dRMSE = (res.pRMSE(2:end) - res.pRMSE(1)) ./ res.pRMSE(1) * 100;
+    abl.dRMSE = (abl.pRMSE(2:end) - abl.pRMSE(1)) ./ abl.pRMSE(1) * 100;
 
     % R2 (Difference)
-    res.dR2 = res.pR2(1) - res.pR2(2:end);
+    abl.dR2 = abl.pR2(1) - abl.pR2(2:end);
 
 end
 
@@ -251,9 +268,9 @@ end
 
 if flgPlot
     if flgClass
-        plot_ablationClass(res);
+        plot_ablationClass(abl);
     else
-        plot_ablationReg(res);
+        plot_ablationReg(abl);
     end
 end
 
@@ -264,9 +281,9 @@ end         % EOF
 %% ========================================================================
 %  HELPER: PLOT REGRESSION
 %  ========================================================================
-function plot_ablationReg(res)
+function plot_ablationReg(abl)
 
-varsFxd = res.vars(2:end);
+varsFxd = abl.vars(2:end);
 nVars = length(varsFxd);
 
 hFIg = figure('Color', 'w', 'Name', 'Ablation (Regression)', ...
@@ -275,7 +292,7 @@ hTl = tiledlayout(1, 3, 'TileSpacing', 'compact', 'Padding', 'compact');
 
 % Importance RMSE
 nexttile;
-bar(res.dRMSE, 'FaceColor', 'k', 'FaceAlpha', 0.5);
+bar(abl.dRMSE, 'FaceColor', 'k', 'FaceAlpha', 0.5);
 xticks(1:nVars); xticklabels(varsFxd);
 ylabel('% \Delta RMSE (%)');
 title('Pooled RMSE');
@@ -283,11 +300,11 @@ grid on;
 
 % Importance R2 (Raw Values + Baseline)
 nexttile;
-bar(res.pR2, 'FaceColor', 'b', 'FaceAlpha', 0.5);
+bar(abl.pR2, 'FaceColor', 'b', 'FaceAlpha', 0.5);
 hold on;
-yline(res.pR2(1), 'k--', 'LineWidth', 1.5, 'Alpha', 0.6);
+yline(abl.pR2(1), 'k--', 'LineWidth', 1.5, 'Alpha', 0.6);
 
-xticks(1:length(res.vars)); xticklabels(res.vars);
+xticks(1:length(abl.vars)); xticklabels(abl.vars);
 ylabel('R^2 (Pooled)');
 title('Pooled R^2');
 grid on;
@@ -295,8 +312,8 @@ grid on;
 % RMSE Distribution
 nexttile;
 
-foldSz = res.foldSz;
-nCols = size(res.rmse, 2);
+foldSz = abl.foldSz;
+nCols = size(abl.rmse, 2);
 
 % Scale bubble sizes (min 20, max 100)
 minSz = 20; maxSz = 100;
@@ -304,25 +321,25 @@ sz = (foldSz - min(foldSz(:))) ./ (max(foldSz(:)) - min(foldSz(:)));
 sz = minSz + sz * (maxSz - minSz);
 
 % Connect lines (light gray)
-plot(1:nCols, res.rmse', '-', 'Color', [0.7 0.7 0.7 0.3], 'LineWidth', 0.5);
+plot(1:nCols, abl.rmse', '-', 'Color', [0.7 0.7 0.7 0.3], 'LineWidth', 0.5);
 hold on;
 
 for iCol = 1:nCols
     % Jitter x-axis for visibility
-    x = iCol + randn(size(res.rmse, 1), 1) * 0.05;
+    x = iCol + randn(size(abl.rmse, 1), 1) * 0.05;
 
     % Bubble Plot (Weighted by Fold Size)
-    scatter(x, res.rmse(:, iCol), sz(:, 1), 'filled', ...
+    scatter(x, abl.rmse(:, iCol), sz(:, 1), 'filled', ...
         'MarkerFaceColor', [0 0.4470 0.7410], ...
         'MarkerFaceAlpha', 0.4);
 
     % Weighted Average Line
-    plot([iCol-0.3, iCol+0.3], [res.pRMSE(iCol), res.pRMSE(iCol)], ...
+    plot([iCol-0.3, iCol+0.3], [abl.pRMSE(iCol), abl.pRMSE(iCol)], ...
         'k-', 'LineWidth', 2.5);
 end
 
-xticks(1:nCols); xticklabels(res.vars);
-if res.flgBkTrans
+xticks(1:nCols); xticklabels(abl.vars);
+if abl.flgBkTrans
     ylabel('RMSE (Hz)');
 else
     ylabel('RMSE log(Hz)');
@@ -336,9 +353,9 @@ end
 %% ========================================================================
 %  HELPER: PLOT CLASSIFICATION
 %  ========================================================================
-function plot_ablationClass(res)
+function plot_ablationClass(abl)
 
-varsFxd = res.vars(2:end);
+varsFxd = abl.vars(2:end);
 nVars = length(varsFxd);
 
 figure('Color', 'w', 'Name', 'Ablation (Classification)', ...
@@ -347,8 +364,8 @@ t = tiledlayout(1, 4, 'TileSpacing', 'compact', 'Padding', 'compact');
 
 % 1. Importance BACC
 nexttile;
-mu = mean(res.impBACC, 1, 'omitnan');
-se = std(res.impBACC, 0, 1, 'omitnan') ./ sqrt(size(res.impBACC, 1));
+mu = mean(abl.impBACC, 1, 'omitnan');
+se = std(abl.impBACC, 0, 1, 'omitnan') ./ sqrt(size(abl.impBACC, 1));
 bar(mu, 'FaceColor', 'k', 'FaceAlpha', 0.5); hold on;
 errorbar(1:nVars, mu, se, 'k.', 'LineWidth', 1.5);
 xticks(1:nVars); xticklabels(varsFxd);
@@ -358,8 +375,8 @@ grid on;
 
 % 2. Importance AUC
 nexttile;
-mu = mean(res.impAUC, 1, 'omitnan');
-se = std(res.impAUC, 0, 1, 'omitnan') ./ sqrt(size(res.impAUC, 1));
+mu = mean(abl.impAUC, 1, 'omitnan');
+se = std(abl.impAUC, 0, 1, 'omitnan') ./ sqrt(size(abl.impAUC, 1));
 bar(mu, 'FaceColor', 'b', 'FaceAlpha', 0.5); hold on;
 errorbar(1:nVars, mu, se, 'k.', 'LineWidth', 1.5);
 xticks(1:nVars); xticklabels(varsFxd);
@@ -369,7 +386,7 @@ grid on;
 
 % 3. BACC Distribution
 nexttile;
-plot_dist(res.bacc, res.vars, 'BACC');
+plot_dist(abl.bacc, abl.vars, 'BACC');
 
 % 4. ROC Curves
 nexttile;
@@ -378,11 +395,11 @@ clrs = lines(nVars);
 xGrid = linspace(0, 1, 100);
 
 % Full
-yMeanFull = mean(res.roc{1}, 1, 'omitnan');
+yMeanFull = mean(abl.roc{1}, 1, 'omitnan');
 plot(xGrid, yMeanFull, 'k-', 'LineWidth', 3, 'DisplayName', 'Full');
 
 for i = 1:nVars
-    yMean = mean(res.roc{i+1}, 1, 'omitnan');
+    yMean = mean(abl.roc{i+1}, 1, 'omitnan');
     plot(xGrid, yMean, '-', 'Color', clrs(i, :), 'LineWidth', 1.5, ...
         'DisplayName', ['w/o ' varsFxd{i}]);
 end
