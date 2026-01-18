@@ -13,7 +13,6 @@ function frNet = fr_network(spktimes, varargin)
 %                     'winSize'    : (num) Size of chunks to split winLim into.
 %                                    If empty, uses reduced winLim as one chunk.
 %                     'binSize'    : (num) Bin size for FR calc {0.1}
-%                     'nShuffles'  : (int) Shuffles for corr noise est {10}
 %                     'basepath'   : (char) Base path for saving {pwd}
 %                     'flgSave'    : (log) Save result as frNet struct {false}
 %
@@ -38,7 +37,6 @@ addRequired(p, 'spktimes', @iscell);
 addParameter(p, 'winLim', [], @isnumeric);
 addParameter(p, 'winSize', [], @isnumeric);
 addParameter(p, 'binSize', 0.1, @isnumeric);
-addParameter(p, 'nShuffles', 10, @isnumeric);
 addParameter(p, 'basepath', pwd, @ischar);
 addParameter(p, 'flgSave', false, @islogical);
 
@@ -46,7 +44,6 @@ parse(p, spktimes, varargin{:});
 winLim    = p.Results.winLim;
 winSize   = p.Results.winSize;
 binSize   = p.Results.binSize;
-nShuffles = p.Results.nShuffles;
 basepath  = p.Results.basepath;
 flgSave   = p.Results.flgSave;
 
@@ -59,8 +56,11 @@ params.dim.method  = 'pr';
 params.dim.thrVal  = 0.8;
 params.dim.flgFrac = false;
 
-params.corr.flgPlot = false;
-params.corr.nShuffles = nShuffles;
+% Hardcoded Parameters for CORR
+params.corr.flgPlot = true;
+params.corr.nShuffles = 40;
+params.corr.zMet = 'shuffle';
+
 
 % Handle winLim
 if isempty(winLim)
@@ -130,7 +130,8 @@ for iChunk = 1:nChunks
     % Correlations
     resCorr = fr_corr(frMat, ...
         'nShuffles', params.corr.nShuffles, ...
-        'flgPlot', params.corr.flgPlot);
+        'flgPlot', params.corr.flgPlot, ...
+        'zMet', params.corr.zMet);
 
     frNet.mcc(iChunk)    = resCorr.mcc;
     frNet.mccRaw(iChunk) = resCorr.mccRaw;
