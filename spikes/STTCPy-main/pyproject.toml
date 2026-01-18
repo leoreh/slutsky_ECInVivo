@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = "STTCPy"
+version = "1.0.0"
+authors = [
+  { name="Aditi Aravind", email="aravinds.aditi@gmail.com" },
+]
+description = 'Calculate STTC for large datasets of spiking time-series.'
+readme = "README.md"
+requires-python = ">=3.6"
+dependencies = [
+    "numpy",
+    "scipy>=1.10.0"
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: OS Independent",
+]
+
+
+
+[project.urls]
+Homepage = "https://github.com/aditiaravind/STTCPy"

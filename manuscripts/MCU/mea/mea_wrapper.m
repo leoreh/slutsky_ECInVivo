@@ -87,8 +87,8 @@ for iFile = 1 : nFiles
     spktimes = cellfun(@(x) x(x >= winExp(1) & x <= winExp(2)), ...
         spktimes, 'UniformOutput', false);
 
-    % % Network stats
-    % frNet = fr_network(spktimes, 'flgSave', true, 'winLim', [0, 15] * 60);
+    % Network stats
+    frNet = fr_network(spktimes, 'flgSave', false, 'winLim', [0, 15] * 60);
     % drft = drift_file(spktimes, 'flgSave', false, 'winLim', winBsl, ...
     %     'binSize', 5 * 60, 'winSize', 20 * 60, 'flgPlot', true);
 

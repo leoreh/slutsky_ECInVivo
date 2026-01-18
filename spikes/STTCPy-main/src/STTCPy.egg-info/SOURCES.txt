@@ -1,0 +1,11 @@
+README.md
+pyproject.toml
+src/STTCPy/__init__.py
+src/STTCPy/cpu_main.py
+src/STTCPy/gpu_main.py
+src/STTCPy/helpers.py
+src/STTCPy.egg-info/PKG-INFO
+src/STTCPy.egg-info/SOURCES.txt
+src/STTCPy.egg-info/dependency_links.txt
+src/STTCPy.egg-info/requires.txt
+src/STTCPy.egg-info/top_level.txt

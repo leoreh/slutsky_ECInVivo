@@ -23,6 +23,7 @@ function frNet = fr_network(spktimes, varargin)
 %                     .dim        : (nChunks x 1) Dimensionality.
 %                     .mcc        : (nChunks x 1) Denoised Mean Correlation.
 %                     .mccRaw     : (nChunks x 1) Raw Mean Correlation.
+%                     .funcon     : (nChunks x nUnits) Mean Functional Connectivity.
 %                     .corr       : (nChunks x 1) Struct array of detailed corr stats.
 %                     .info       : Info and parameters.
 %
@@ -85,6 +86,7 @@ frNet.time    = chunks;
 frNet.dim     = nan(nChunks, 1);
 frNet.mcc     = nan(nChunks, 1);
 frNet.mccRaw  = nan(nChunks, 1);
+frNet.funcon  = nan(nChunks, nUnits);
 frNet.corr    = struct([]); % Will be array of structs
 
 % Info
@@ -132,6 +134,7 @@ for iChunk = 1:nChunks
 
     frNet.mcc(iChunk)    = resCorr.mcc;
     frNet.mccRaw(iChunk) = resCorr.mccRaw;
+    frNet.funcon(iChunk, :) = resCorr.funcon;
 
     % Store full result in struct array (grow it)
     if iChunk == 1
