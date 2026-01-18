@@ -112,7 +112,7 @@ tblLme.Rcv = (tblSs.FR ./ tblBsl.FR) * 100;
 
 tblGUI_scatHist(tblLme, 'xVar', 'dim', 'yVar', 'Rcv', 'grpVar', 'Group');
 
-tblLme.Rcv
+tblLme.
 
 %% ========================================================================
 %  REGRESSION

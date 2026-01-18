@@ -256,6 +256,9 @@ else
     % RMSE (% Increase)
     abl.dRMSE = (abl.pRMSE(2:end) - abl.pRMSE(1)) ./ abl.pRMSE(1) * 100;
 
+    % RMSE (% Increase per Fold)
+    abl.dRMSE_fold = (rmse(:, 2:end) - rmse(:, 1)) ./ rmse(:, 1) * 100;
+
     % R2 (Difference)
     abl.dR2 = abl.pR2(1) - abl.pR2(2:end);
 
@@ -292,7 +295,12 @@ hTl = tiledlayout(1, 3, 'TileSpacing', 'compact', 'Padding', 'compact');
 
 % Importance RMSE
 nexttile;
-bar(abl.dRMSE, 'FaceColor', 'k', 'FaceAlpha', 0.5);
+mu = abl.dRMSE;
+se = std(abl.dRMSE_fold, 0, 1, 'omitnan') ./ sqrt(size(abl.dRMSE_fold, 1));
+
+bar(mu, 'FaceColor', 'k', 'FaceAlpha', 0.5); hold on;
+errorbar(1:nVars, mu, se, 'k.', 'LineWidth', 1.5);
+
 xticks(1:nVars); xticklabels(varsFxd);
 ylabel('% \Delta RMSE (%)');
 title('Pooled RMSE');

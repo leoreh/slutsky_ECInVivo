@@ -249,7 +249,7 @@ for iVar = 1:numel(varsTrans)
 
     % Calculate Offset (Before Log)
     if doOffset || doLog
-        if any(data(:) == 0) && all(data(:) >= 0)
+        if any(data(~isnan(data)) == 0) && all(data(~isnan(data)) >= 0)
             c = min(data(data > 0)) / 2; % Half of min non-zero
             data = data + c;
             if verbose, fprintf('[%s] Added Offset %.4f.\n', var, c); end

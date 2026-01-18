@@ -32,11 +32,6 @@ tblGUI_bar(tblLme(uIdx, :));
 unitType = 'RS';
 varRsp = 'funcon';
 
-% Configuration
-clear cfgLme
-cfgLme.dist = 'Gamma';
-cfgLme.contrasts = 1 : 19;
-
 % Select data
 tblLme = tblLme(tblLme.UnitType == unitType, :);
 

@@ -20,7 +20,12 @@ tblLme = removevars(tblLme, 'uPert');
 % Add logit pBspk
 tblTrans = tbl_trans(tblLme, 'varsInc', {'pBspk'}, 'logBase', 'logit');
 tblLme.pBspk_trans = tblTrans.pBspk;
-% tblLme.pBspk_on = tblLme.pBspk > 0;
+
+
+
+tblGUI_scatHist(tblLme, 'xVar', 'pBspk', 'yVar', 'funcon', 'grpVar', 'Group');
+grpIdx = tblLme.Group == "MCU-KO";
+tblLme(grpIdx, {'pBspk_trans', 'funcon'})
 
 % Exclude non-bursting
 % tblLme = tblLme(tblLme.pBspk > 0, :);
@@ -49,13 +54,9 @@ frml = 'frSs ~ (fr + pBspk_trans + frTrough + funcon) * Group + (pBspk_trans|Nam
 
 figure
 plotPartialDependence(lmeMdl, "pBspk_trans", "Conditional", "centered")
-
-
-
 plotPartialDependence(lmeMdl, {'pBspk_trans', 'Group'});
 
 
-vars = ["pBspk_trans", "Group"];
 
 
 % PLOT INTERACTION
@@ -72,7 +73,13 @@ hAx = nexttile;
 [pdRes, hFig] = lme_pd(lmeMdl, vars, 'transParams', [], ...
     'hAx', hAx);
 
+grpIdx = pdRes.Group == "MCU-KO";
+pdRes(grpIdx, {'frSs_pred', 'frSs_upper', 'frSs_lower'})
 
+grpIdx = pdRes.Group == "MCU-KO";
+pdRes(grpIdx, {'pBspk_trans'})
+
+[tblPrism.frSs_pred, tblPrism.frSs_pred
 
 
 
