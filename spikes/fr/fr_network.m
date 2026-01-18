@@ -53,7 +53,7 @@ flgSave   = p.Results.flgSave;
 
 % Hardcoded Parameters for DIM
 params.dim.method  = 'pr';
-params.dim.thrVal  = 0.8;
+params.dim.thrSig  = 0.8;
 params.dim.flgFrac = false;
 
 % Hardcoded Parameters for CORR
@@ -124,18 +124,17 @@ for iChunk = 1:nChunks
     % Dimensionality
     frNet.dim(iChunk) = dim_calc(frMat, ...
         'method', params.dim.method, ...
-        'thrVal', params.dim.thrVal, ...
+        'thrVal', params.dim.thrSig, ...
         'flgFrac', params.dim.flgFrac);
 
     % Correlations
     resCorr = fr_corr(frMat, ...
         'nShuffles', params.corr.nShuffles, ...
-        'flgPlot', params.corr.flgPlot, ...
-        'zMet', params.corr.zMet);
+        'flgPlot', params.corr.flgPlot);
 
-    frNet.mcc(iChunk)    = resCorr.mcc;
-    frNet.mccRaw(iChunk) = resCorr.mccRaw;
-    frNet.funcon(iChunk, :) = resCorr.funcon;
+    % frNet.mcc(iChunk)    = resCorr.mcc;
+    % frNet.mccRaw(iChunk) = resCorr.mccRaw;
+    % frNet.funcon(iChunk, :) = resCorr.funcon;
 
     % Store full result in struct array (grow it)
     if iChunk == 1
