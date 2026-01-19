@@ -57,8 +57,8 @@ params.dim.thrSig  = 0.8;
 params.dim.flgFrac = false;
 
 % Hardcoded Parameters for CORR
-params.corr.flgPlot = true;
-params.corr.nShuffles = 40;
+params.corr.flgPlot = false;
+params.corr.nShuffles = 100;
 params.corr.zMet = 'shuffle';
 
 
@@ -82,12 +82,8 @@ nChunks = size(chunks, 1);
 nUnits = length(spktimes);
 
 % Initialize Output
-frNet.time    = chunks;
+frNet.tWin    = chunks;
 frNet.dim     = nan(nChunks, 1);
-frNet.mcc     = nan(nChunks, 1);
-frNet.mccRaw  = nan(nChunks, 1);
-frNet.funcon  = nan(nChunks, nUnits);
-frNet.corr    = struct([]); % Will be array of structs
 
 % Info
 frNet.info.input   = p.Results;
@@ -128,22 +124,16 @@ for iChunk = 1:nChunks
         'flgFrac', params.dim.flgFrac);
 
     % Correlations
-    resCorr = fr_corr(frMat, ...
+    frNet.corr(iChunk) = fr_corr(frMat, ...
         'nShuffles', params.corr.nShuffles, ...
         'flgPlot', params.corr.flgPlot);
 
-    % frNet.mcc(iChunk)    = resCorr.mcc;
-    % frNet.mccRaw(iChunk) = resCorr.mccRaw;
-    % frNet.funcon(iChunk, :) = resCorr.funcon;
-
-    % Store full result in struct array (grow it)
-    if iChunk == 1
-        frNet.corr = resCorr;
-    else
-        frNet.corr(iChunk) = resCorr;
-    end
-
 end
+
+frNet.corr = catfields([frNet.corr(:)], 'addim', true, [], true);
+
+
+
 
 % Save
 if flgSave

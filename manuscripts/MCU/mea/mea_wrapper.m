@@ -88,7 +88,9 @@ for iFile = 1 : nFiles
         spktimes, 'UniformOutput', false);
 
     % Network stats
-    frNet = fr_network(spktimes, 'flgSave', false, 'winLim', [0, 15] * 60);
+    winLim  = [0, 45] * 60;
+    frNet = fr_network(spktimes, 'flgSave', true, 'winLim', winLim, ...
+        'winSize', 15 * 60);
     % drft = drift_file(spktimes, 'flgSave', false, 'winLim', winBsl, ...
     %     'binSize', 5 * 60, 'winSize', 20 * 60, 'flgPlot', true);
 
@@ -96,11 +98,11 @@ for iFile = 1 : nFiles
     % fr = mea_frPrep(spktimes, 'binSize', binSize, ...
     %     'flgSave', true, 'flgPlot', false);
 
-    % FR recovery
-    fr = v(iFile).fr;
-    rcv = mea_frRcv(fr.t, fr.fr, ...
-        'idxTrough', fr.info.idxTrough, ...
-        'binSize', binSize, 'flgSave', true, 'flgPlot', false);
+    % % FR recovery
+    % fr = v(iFile).fr;
+    % rcv = mea_frRcv(fr.t, fr.fr, ...
+    %     'idxTrough', fr.info.idxTrough, ...
+    %     'binSize', binSize, 'flgSave', true, 'flgPlot', false);
 
     % % FR model fit an recovery
     % frFit = mea_frFit(fr.fr, fr.t, 'FilterLen', [], ...
@@ -142,7 +144,7 @@ end
 %  ========================================================================
 
 presets = {'time', 'steadyState', 'frNet', 'rcv', 'spktimes'};
-[tbl, xVec, basepaths, v] = mcu_tblMea('presets', presets([1, 3 : 4]));
+[tbl, xVec, basepaths, v] = mcu_tblMea('presets', presets([3]));
 
 
 

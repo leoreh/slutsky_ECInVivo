@@ -87,8 +87,9 @@ for iFile = 1 : nFiles
     spktimes = cellfun(@(x) x(x >= winExp(1) & x <= winExp(2)), ...
         spktimes, 'UniformOutput', false);
 
-    % % Network stats
-    % frNet = fr_network(spktimes, 'flgSave', true, 'winLim', [0, 15] * 60);
+    % Network stats
+    winLim  = [0, 15; ]
+    frNet = fr_network(spktimes, 'flgSave', false, 'winLim', [0, 15] * 60);
     % drft = drift_file(spktimes, 'flgSave', false, 'winLim', winBsl, ...
     %     'binSize', 5 * 60, 'winSize', 20 * 60, 'flgPlot', true);
 
@@ -145,12 +146,6 @@ presets = {'time', 'steadyState', 'frNet', 'rcv', 'spktimes'};
 [tbl, xVec, basepaths, v] = mcu_tblMea('presets', presets([1, 3 : 4]));
 
 
-% MESSAROUND
-
-tblLme = tbl;
-
-
-
 
 %% ========================================================================
 %  PLOTS
@@ -175,7 +170,7 @@ tblGUI_raster(tbl, 'grpVar', 'Name', 'grpVal', 'mcu-ko2')
 tblLme = tbl;
 
 % Fit
-varRsp = 'frTrough';
+varRsp = 'funcon';
 frml = [varRsp, ' ~ Group + (1|Name)'];
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tbl, frml);
 

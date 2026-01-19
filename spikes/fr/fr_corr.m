@@ -84,7 +84,6 @@ r = r - diag(diag(r));
 
 % Raw Statistics
 rOffDiag = r(eye(nUnits) == 0);
-
 cc.raw.mcc = mean(rOffDiag);
 funcon = sum(abs(r), 2) ./ (nUnits - 1);
 
@@ -150,14 +149,17 @@ cc.noise.limit = mean(allNoiseVals) + std(allNoiseVals) * thrSig;   % Global noi
 z = (r - noiseAvg) ./ noiseStd;
 z = z - diag(diag(z));
 
-% Save Results
+% Stats
 maskOffDiag = true(nUnits) & ~eye(nUnits);
 cc.shuffle.mcc = mean(z(maskOffDiag));
-cc.shuffle.funcon = sum(abs(z), 2) ./ (nUnits - 1);
+funcon = sum(abs(z), 2) ./ (nUnits - 1);
 
 % Expand
 cc.shuffle.ccmat = nan(nUnitsRaw);
 cc.shuffle.ccmat(validIdx, validIdx) = z;
+
+cc.shuffle.funcon = nan(nUnitsRaw, 1);
+cc.shuffle.funcon(validIdx) = funcon;
 
 
 %% ========================================================================
@@ -167,7 +169,7 @@ cc.shuffle.ccmat(validIdx, validIdx) = z;
 
 % maskSig = abs(r) > cc.noise.limit;
 maskSig = abs(z) > thrSig;
-rSig = r .* maskSig; 
+rSig = r .* maskSig;
 
 % Compute Mean
 valsSig = r(maskSig);
@@ -182,14 +184,15 @@ end
 
 % Save Results
 cc.fisher.mcc = mccFisher;
-cc.fisher.funcon = sum(abs(rSig), 2) ./ (nUnits - 1);
+funcon = sum(abs(rSig), 2) ./ (nUnits - 1);
 
 % Expand
 cc.fisher.ccmat = nan(nUnitsRaw);
 cc.fisher.ccmat(validIdx, validIdx) = rSig;
 cc.fisher.mask = false(nUnitsRaw);
 cc.fisher.mask(validIdx, validIdx) = maskSig;
-
+cc.fisher.funcon = nan(nUnitsRaw, 1);
+cc.fisher.funcon(validIdx) = funcon;
 
 %% ========================================================================
 %  PLOT
@@ -197,37 +200,51 @@ cc.fisher.mask(validIdx, validIdx) = maskSig;
 
 if flgPlot
     figure('Color', 'w', 'Position', [100 100 1400 500]);
+    t = tiledlayout(1, 4, 'TileSpacing', 'compact', 'Padding', 'compact');
 
     % Raw + Noise Dist
-    subplot(1, 4, 1);
+    nexttile;
     hold on;
-    histogram(allNoiseVals, 50, 'Normalization', 'pdf', 'DisplayStyle', 'stairs', 'DisplayName', 'Noise', 'LineWidth', 1.5);
-    histogram(rOffDiag, 50, 'Normalization', 'pdf', 'DisplayStyle', 'stairs', 'DisplayName', 'Data', 'LineWidth', 1.5);
-    xline(cc.noise.limit, 'r--', 'Thr'); xline(-cc.noise.limit, 'r--', 'Thr');
+    % Noise: Filled light gray to be distinct but not overpowering
+    histogram(allNoiseVals, 100, 'Normalization', 'pdf', ...
+        'FaceColor', [0.8 0.8 0.8], 'EdgeColor', 'none', 'DisplayName', 'Noise');
+    % Data: Stair plot to see overlaps
+    histogram(rOffDiag, 50, 'Normalization', 'pdf', ...
+        'DisplayStyle', 'stairs', 'LineWidth', 1.5, 'DisplayName', 'Data');
+
+    % Intelligent Zoom: Focus on 99.5th percentile of data
+    % This fixes the issue where x-axis spans [-1,1] when data is tiny.
+    limitX = max(prctile(abs(rOffDiag), 99.5), prctile(abs(allNoiseVals), 99.9));
+    if limitX < 1e-6 || isnan(limitX), limitX = 0.5; end
+    xlim([-limitX, limitX] * 1.1);
+
     legend('Location', 'best');
     axis square;
-    title(['Distributions (Thr: ' num2str(thrSig) '\sigma)']);
-    xlabel('CV (Pearson r)');
+    title('Distributions');
+    xlabel('Pearson r');
 
     % Raw Matrix
-    subplot(1, 4, 2);
+    nexttile;
     imagesc(cc.raw.ccmat, [-0.5 0.5]);
     title(['Raw (mcc: ' num2str(cc.raw.mcc, '%.2f') ')']);
     axis square; colorbar;
+    xlabel('Neuron ID');
 
     % Shuffle Z Matrix
-    subplot(1, 4, 3);
+    nexttile;
     imagesc(cc.shuffle.ccmat, [-5 10]); % Z-score range
     title(['Shuffle Z (mcc: ' num2str(cc.shuffle.mcc, '%.2f') ')']);
     axis square; colorbar;
+    xlabel('Neuron ID');
 
     % Fisher Masked Matrix
-    subplot(1, 4, 4);
+    nexttile;
     imagesc(cc.fisher.ccmat, [-0.5 0.5]);
     title(['Fisher Z (mcc: ' num2str(cc.fisher.mcc, '%.2f') ')']);
     axis square; colorbar;
+    xlabel('Neuron ID');
 
-    sgtitle('Functional Connectivity Analysis');
+    title(t, 'Functional Connectivity Analysis');
 end
 
 end     % EOF
