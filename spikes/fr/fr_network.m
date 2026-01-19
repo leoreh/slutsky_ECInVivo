@@ -53,13 +53,16 @@ flgSave   = p.Results.flgSave;
 %  INITIALIZE
 %  ========================================================================
 
+flgPlot = false;
+
 % Hardcoded Parameters for DIM
 params.dim.method  = 'pr';
 params.dim.thrSig  = 0.8;
 params.dim.flgFrac = false;
+params.dim.flgPlot = flgPlot;
 
 % Hardcoded Parameters for CORR
-params.corr.flgPlot = false;
+params.corr.flgPlot = flgPlot;
 params.corr.nShuffles = 100;
 params.corr.zMet = 'shuffle';
 
@@ -123,7 +126,8 @@ for iChunk = 1:nChunks
     frNet.dim(iChunk) = dim_calc(frMat, ...
         'method', params.dim.method, ...
         'thrVal', params.dim.thrSig, ...
-        'flgFrac', params.dim.flgFrac);
+        'flgFrac', params.dim.flgFrac, ...
+        'flgPlot', params.dim.flgPlot);
 
     % Correlations
     frNet.corr(iChunk) = fr_corr(frMat, ...
@@ -133,9 +137,6 @@ for iChunk = 1:nChunks
 end
 
 frNet.corr = catfields([frNet.corr(:)], 'addim', true, [], true);
-
-
-
 
 % Save
 if flgSave

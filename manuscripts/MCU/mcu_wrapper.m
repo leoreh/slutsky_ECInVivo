@@ -5,7 +5,7 @@
 
 % get all files in study
 basepaths = mcu_basepaths('all');
-% basepaths = [mcu_basepaths('wt_bsl'), mcu_basepaths('mcu_bsl')];
+basepaths = [mcu_basepaths('wt_bsl'), mcu_basepaths('mcu_bsl')];
 nFiles = length(basepaths);
 
 % vars
@@ -92,7 +92,7 @@ fileMouse = findgroups(get_mname(basepaths));
 idxMouse = sort([idxMouse; idxMouse + 4]);
 basepaths = basepaths(idxMouse);
 
-presets = {'frNet', 'brst', 'prc'};
+presets = {'brst', 'prc'};
 [tbl, basepaths, ~] = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
 tbl.Day(tbl.Day == "BAC_ON") = "BAC3";
 
@@ -176,7 +176,7 @@ for iFile = 1 : nFiles
     uIdx = uType == "RS";
 
     % FR network stats
-    frNet = fr_network(spktimes, 'flgSave', true, 'winLim', [], ...
+    frNet = fr_network(spktimes, 'flgSave', false, 'winLim', [], ...
         'winSize', winSize);
     mcc = frNet.corr.shuffle.mcc;
     funcon = mean(frNet.corr.shuffle.funcon(uIdx, :), 'omitnan');
@@ -254,3 +254,75 @@ tblGUI_scatHist(tbl, 'xVar', 'mfr', 'yVar', 'dim', 'grpVar', 'Group');
 frml = 'dim ~ (funcon + mfr + pBspk) * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tbl, frml);
 
+
+
+
+
+
+%% ========================================================================
+%  DIM VS RCV
+%  ========================================================================
+
+% get all files in study
+basepaths = [mcu_basepaths('wt_bsl'), mcu_basepaths('mcu_bsl')];
+nFiles = length(basepaths);
+
+% vars
+vars = {'spikes', 'units'};
+
+% load state vars
+v = basepaths2vars('basepaths', basepaths, 'vars', vars);
+
+for iFile = 1 : nFiles
+
+    % file
+    basepath = basepaths{iFile};
+    [~, basename] = fileparts(basepath);
+    cd(basepath)
+    
+    % Spktimes
+    spktimes = v(iFile).spikes.times;
+    
+    % Unit Filter. DIM and MCC on all units. MFR, PBSPK, DRIFT, FUNCON only on RS
+    uType = v(iFile).units.type;
+    uIdx = uType == "RS";
+    spktimes = spktimes(uIdx);
+
+    nUnits = length(spktimes);
+
+    % Unit Filter. DIM and MCC on all units. MFR, PBSPK, DRIFT, FUNCON only on RS
+    uType = v(iFile).units.type;
+    uIdx = uType == "RS";
+
+    % FR network stats during Baseline
+    winBsl = [300, 315] * 60;
+    chunks = winBsl;
+    tStart = chunks(1, 1);
+    tEnd   = chunks(1, 2);
+
+    % Create Firing Rate Matrix
+    binSize = 0.1;
+    t = tStart : binSize : tEnd;
+    nBins = length(t) - 1;
+    frMat = nan(nUnits, nBins);
+
+    for iUnit = 1:nUnits
+        st = spktimes{iUnit};
+        st = st(st >= tStart & st <= tEnd);
+        counts = histcounts(st, t);
+        frMat(iUnit, :) = counts ./ binSize;
+    end
+
+    % Dimensionality
+    dim(iFile) = dim_calc(frMat, ...
+        'method', 'pr', ...
+        'thrVal', 0.8, ...
+        'flgFrac', false, ...
+        'flgPlot', true);   
+
+end
+
+
+tblLme.dim = dim([1 : 9, 11])';
+
+tblGUI_scatHist(tblLme, 'xVar', 'dim', 'yVar', 'Rcv', 'grpVar', 'Group');

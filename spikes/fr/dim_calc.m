@@ -24,11 +24,13 @@ addRequired(p, 'frMat', @isnumeric);
 addParameter(p, 'method', 'PR', @ischar);
 addParameter(p, 'thrVal', 0.8, @isnumeric);
 addParameter(p, 'flgFrac', false, @islogical);
+addParameter(p, 'flgPlot', false, @islogical);
 
 parse(p, frMat, varargin{:});
 method = p.Results.method;
 thrVal = p.Results.thrVal;
 flgFrac = p.Results.flgFrac;
+flgPlot = p.Results.flgPlot;
 
 
 %% ========================================================================
@@ -40,7 +42,12 @@ mY = mean(frMat, 2);
 silentIdx = mY == 0;
 frMat(silentIdx, :) = [];
 
-[nUnits, ~] = size(frMat);
+% Assert frMat orientation. Heurestic; more observations then variables
+[nTime, nUnits] = size(frMat);
+if nUnits > nTime
+    frMat = frMat';
+    [nTime, nUnits] = size(frMat);
+end
 
 % Safety check for low dimensionality
 if nUnits < 2
@@ -57,7 +64,7 @@ end
 
 switch lower(method)
     case 'pr'       % Participation Ratio (PR)
-                
+
         dim = sum(eigVals)^2 / sum(eigVals.^2);
 
     case 'thr'      % Variance Explained Threshold
@@ -69,6 +76,118 @@ end
 
 if flgFrac
     dim = dim / nUnits;
+end
+
+
+%% ========================================================================
+%  VISUALIZATION
+%  ========================================================================
+
+if flgPlot
+
+    % Re-calculate PCA for visualization (scores needed)
+    [~, score, ~, ~, explained] = pca(frMat);
+
+    % Prepare figure
+    figure('Color', 'w', 'Name', 'Dimensionality Analysis', ...
+        'NumberTitle', 'off', 'Position', [100, 100, 1200, 900]);
+    tiledlayout(2, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
+
+    % ---------------------------------------------------------------------
+    % Scree Plot (Pareto)
+    % ---------------------------------------------------------------------
+    nexttile;
+    hold on;
+    yyaxis left
+    bar(1:min(nUnits, 20), explained(1:min(nUnits, 20)), ...
+        'FaceColor', [0.2 0.2 0.5], 'EdgeColor', 'none', 'FaceAlpha', 0.7);
+    ylabel('Variance Explained (%)');
+
+    yyaxis right
+    plot(cumsum(explained), 'k-o', 'LineWidth', 2, 'MarkerFaceColor', 'w');
+    yline(thrVal*100, 'r--', sprintf('Threshold (%.0f%%)', thrVal*100), ...
+        'LabelHorizontalAlignment', 'left', 'LineWidth', 1.5);
+    ylabel('Cumulative Variance (%)');
+
+    xlabel('Principal Component');
+    title({'Scree Plot', sprintf('Estimated Dim: %.2f', dim)});
+    grid on;
+    box on;
+    xlim([0.5, min(nUnits, 20) + 0.5]);
+
+    % ---------------------------------------------------------------------
+    % Manifold Projection (3D)
+    % ---------------------------------------------------------------------
+    nexttile;
+    % Create time vector for coloring
+    timeColors = parula(nTime);
+
+    plot3(score(:,1), score(:,2), score(:,3), 'Color', [0.8 0.8 0.8 0.5]); % Trace
+    hold on;
+    scatter3(score(:,1), score(:,2), score(:,3), 20, timeColors, 'filled');
+
+    xlabel(sprintf('PC1 (%.1f%%)', explained(1)));
+    ylabel(sprintf('PC2 (%.1f%%)', explained(2)));
+    zlabel(sprintf('PC3 (%.1f%%)', explained(3)));
+    title('Neural Manifold (First 3 PCs)');
+    grid on;
+    view(3);
+    axis tight;
+
+    % ---------------------------------------------------------------------
+    % Saturation Curve (Subsampling)
+    % ---------------------------------------------------------------------
+    nexttile;
+
+    nSteps = 10;
+    subSampleSizes = unique(round(linspace(2, nUnits, nSteps)));
+    nBoots = 5;
+    dimCurve = zeros(length(subSampleSizes), 2); % Mean, Std
+
+    for iSub = 1:length(subSampleSizes)
+        k = subSampleSizes(iSub);
+        currDims = zeros(nBoots, 1);
+
+        for iBoot = 1:nBoots
+            % Randomly select k neurons
+            randIdx = randperm(nUnits, k);
+            subMat = frMat(randIdx, :);
+
+            % Recalculate dim for this subset (using same method)
+            % Pass flgPlot=false to avoid recursion/plotting
+            currDims(iBoot) = dim_calc(subMat, 'method', method, 'thrVal', thrVal, ...
+                'flgFrac', flgFrac, 'flgPlot', false);
+        end
+        dimCurve(iSub, 1) = mean(currDims);
+        dimCurve(iSub, 2) = std(currDims);
+    end
+
+    errorbar(subSampleSizes, dimCurve(:,1), dimCurve(:,2), 'k-o', ...
+        'LineWidth', 2, 'MarkerFaceColor', 'w', 'CapSize', 0);
+    xlabel('Number of Neurons');
+    ylabel('Estimated Dimensionality');
+    title('Saturation Curve (Subsampling)');
+    grid on;
+    axis tight;
+
+    % ---------------------------------------------------------------------
+    % Raw Data Correlation
+    % ---------------------------------------------------------------------
+    nexttile;
+
+    % Calculate correlation matrix
+    C = corr(frMat);
+    imagesc(C);
+    colormap(gca, jet);
+    colorbar;
+    clim([-1 1]);
+
+    title('Neuron Correlation Matrix');
+    xlabel('Neuron ID');
+    ylabel('Neuron ID');
+    axis square;
+
+    sgtitle('Dimensionality Analysis Summary', 'FontSize', 14, 'FontWeight', 'bold');
 end
 
 end     % EOF
@@ -100,7 +219,7 @@ end     % EOF
 % The 'PR' method provides a continuous estimate of dimensionality that is
 % less sensitive to arbitrary thresholds. It is defined mathematically as:
 %                       sum(lambda)^2 / sum(lambda^2)
-% 
+%
 % If all variance is concentrated in a single dimension, PR = 1. If
 % variance is spread equally across all  dimensions, PR = N. In neural
 % data, PR often yields a non-integer value that represents the "effective"
