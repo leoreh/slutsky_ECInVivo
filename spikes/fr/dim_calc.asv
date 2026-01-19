@@ -53,7 +53,7 @@ end
 %  CALC
 %  ========================================================================
 
-[~, ~, eigVals] = pca(frMat);
+[~, ~, eigVals] = pca(frMat');
 
 switch lower(method)
     case 'pr'       % Participation Ratio (PR)

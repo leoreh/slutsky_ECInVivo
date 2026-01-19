@@ -16,12 +16,12 @@ v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 
 
 for iFile = 1 : nFiles
-    
+
     % file
     basepath = basepaths{iFile};
     [~, basename] = fileparts(basepath);
     cd(basepath)
-    
+
     % Spktimes, maybe limit to unit type and vigilance state
     spktimes = v(iFile).spikes.times;
     % uType = v(iFile).units.type;
@@ -29,12 +29,12 @@ for iFile = 1 : nFiles
 
     % FR network stats during Baseline
     winBsl = [300, 315] * 60;
-    frNet = fr_network(spktimes, 'flgSave', true, 'winLim', winBsl);
-    
+    frNet = fr_network(spktimes, 'flgSave', false, 'winLim', winBsl);
+
     % winLim = [0, Inf] * 60 * 60;
     % drft = drift_file(spktimes, 'flgSave', true, 'winLim', winLim, ...
     %     'binSize', 1200, 'winSize', [], 'flgPlot', true);
-    
+
     % % Burst detection
     % isiVal = 0.02;
     % brst = brst_detect(spktimes, ...
@@ -157,32 +157,34 @@ vars = {'spikes', 'units', 'brst'};
 % load state vars
 v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 
+% Initialize
+vPseudo = struct();
+winSize = 15 * 60;
 
 for iFile = 1 : nFiles
-    
+
     % file
     basepath = basepaths{iFile};
     [~, basename] = fileparts(basepath);
     cd(basepath)
     
-    % Decide if limit to unit type
-    uType = v(iFile).units.type;
-    uIdx = uType == "RS";
-    uIdx = true(length(uType), 1);
-
     % Spktimes
     spktimes = v(iFile).spikes.times;
-    spktimes = spktimes(uIdx);
+
+    % Unit Filter. DIM and MCC on all units. MFR, PBSPK, DRIFT, FUNCON only on RS
+    uType = v(iFile).units.type;
+    uIdx = uType == "RS";
 
     % FR network stats
-    winSize = 15 * 60;
-    frNet = fr_network(spktimes, 'flgSave', false, 'winLim', [], ...
+    frNet = fr_network(spktimes, 'flgSave', true, 'winLim', [], ...
         'winSize', winSize);
     mcc = frNet.corr.shuffle.mcc;
+    funcon = mean(frNet.corr.shuffle.funcon(uIdx, :), 'omitnan');
     dim = frNet.dim;
 
-    % FR matrix 
-    [nUnits, nWin] = size(frNet.corr.shuffle.funcon);
+    % FR matrix
+    nWin = size(frNet.tWin, 1);
+    nUnits = length(spktimes);
     winEdges = [frNet.tWin(:, 1); frNet.tWin(end, 2)];
     frMat = nan(nUnits, nWin);
     for iUnit = 1:nUnits
@@ -197,14 +199,58 @@ for iFile = 1 : nFiles
         'thrFr', 0.005, ...
         'thrLin', [], ...
         'limUnit', []);
-    dtCorr = [drft.dt_corr{1}; nan];     
+    dtCorr = [drft.dt_corr{1}; nan];
 
     % Burst statistics
-    brst = v(iFile).brst;    
-    stats = brst_stats(brst, v(iFile).spikes.times, 'winCalc', frNet.tWin, ...
+    brst = v(iFile).brst;
+    stats = brst_stats(brst, spktimes, 'winCalc', frNet.tWin, ...
         'flgSave', false);
-    
     pBspk = mean(stats.pBspk(uIdx, :), 1, 'omitnan')';
 
+    % Store
+    vPseudo(iFile).mfr      = mfr;
+    vPseudo(iFile).mcc      = mcc;
+    vPseudo(iFile).funcon   = funcon;
+    vPseudo(iFile).dim      = dim;
+    vPseudo(iFile).pBspk    = pBspk;
+    vPseudo(iFile).dtCorr   = dtCorr;
+    iFile
 end
+
+% Metadata tags
+tagFiles = struct();
+tagFiles.Name = get_mname(basepaths);
+[~, fileNames] = fileparts(basepaths);
+tagFiles.File = fileNames;
+
+% Variable Map
+varMap = struct();
+varMap.mfr      = 'mfr';
+varMap.mcc      = 'mcc';
+varMap.dim      = 'dim';
+varMap.pBspk    = 'pBspk';
+varMap.dtCorr   = 'dtCorr';
+varMap.funcon   = 'funcon';
+
+% Create Table
+tbl = v2tbl('v', vPseudo, 'varMap', varMap, 'tagFiles', tagFiles);
+
+% Add Group
+cfg = mcu_cfg;
+tbl.Group = ones(height(tbl), 1) * 1;
+tbl.Group(ismember(tbl.Name, cfg.miceMCU), :) = 2;
+tbl.Group = categorical(tbl.Group, [1, 2], cfg.lbl.grp);
+
+% Reorder columns
+tbl = movevars(tbl, {'Group', 'Name', 'File'}, 'Before', 1);
+
+% Logit pBspk
+tbl = tbl_trans(tbl, 'varsInc', {'pBspk'}, 'logBase', 'logit');
+
+% Visualize
+tblGUI_scatHist(tbl, 'xVar', 'mfr', 'yVar', 'dim', 'grpVar', 'Group');
+
+% Analysis
+frml = 'dim ~ (funcon + mfr + pBspk) * Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tbl, frml);
 
