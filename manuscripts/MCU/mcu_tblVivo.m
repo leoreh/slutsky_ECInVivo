@@ -103,7 +103,7 @@ if ismember('frNet', presets)
         valDim = v(iFile).frNet.dim(1);
         v(iFile).frNet.dimExp = repmat(valDim, nUnits, 1);
 
-        % Expand Mean Correlation
+        % Expand Mean Correlation       
         valMcc = v(iFile).frNet.corr.(zMet).mcc(1);
         v(iFile).frNet.mccExp = repmat(valMcc, nUnits, 1);
     end

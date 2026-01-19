@@ -107,8 +107,7 @@ for iChunk = 1:nChunks
     for iUnit = 1:nUnits
         st = spktimes{iUnit};
         st = st(st >= tStart & st <= tEnd);
-        counts = histcounts(st, tVec);
-        frMat(iUnit, :) = counts ./ binSize;
+        frMat(iUnit, :) = histcounts(st, tVec, 'Normalization', 'countdensity');
     end
 
     % Calculate Drift

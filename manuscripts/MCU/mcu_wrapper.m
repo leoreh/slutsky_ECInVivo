@@ -5,7 +5,7 @@
 
 % get all files in study
 basepaths = mcu_basepaths('all');
-basepaths = [mcu_basepaths('wt_bsl'), mcu_basepaths('mcu_bsl')];
+% basepaths = [mcu_basepaths('wt_bsl'), mcu_basepaths('mcu_bsl')];
 nFiles = length(basepaths);
 
 % vars
@@ -141,9 +141,70 @@ tblLme.Rcv = (tblSs.FR ./ tblBsl.FR) * 100;
 
 tblGUI_scatHist(tblLme, 'xVar', 'dim', 'yVar', 'Rcv', 'grpVar', 'Group');
 
-tblLme.Rcv
+
 
 %% ========================================================================
-%  REGRESSION
+%  PSEUDOREPLICATION
 %  ========================================================================
+
+% get all files in study
+basepaths = [mcu_basepaths('wt_bsl'), mcu_basepaths('mcu_bsl')];
+nFiles = length(basepaths);
+
+% vars
+vars = {'spikes', 'units', 'brst'};
+
+% load state vars
+v = basepaths2vars('basepaths', basepaths, 'vars', vars);
+
+
+for iFile = 1 : nFiles
+    
+    % file
+    basepath = basepaths{iFile};
+    [~, basename] = fileparts(basepath);
+    cd(basepath)
+    
+    % Decide if limit to unit type
+    uType = v(iFile).units.type;
+    uIdx = uType == "RS";
+    uIdx = true(length(uType), 1);
+
+    % Spktimes
+    spktimes = v(iFile).spikes.times;
+    spktimes = spktimes(uIdx);
+
+    % FR network stats
+    winSize = 15 * 60;
+    frNet = fr_network(spktimes, 'flgSave', false, 'winLim', [], ...
+        'winSize', winSize);
+    mcc = frNet.corr.shuffle.mcc;
+    dim = frNet.dim;
+
+    % FR matrix 
+    [nUnits, nWin] = size(frNet.corr.shuffle.funcon);
+    winEdges = [frNet.tWin(:, 1); frNet.tWin(end, 2)];
+    frMat = nan(nUnits, nWin);
+    for iUnit = 1:nUnits
+        frMat(iUnit, :) = histcounts(spktimes{iUnit}, winEdges, ...
+            'Normalization', 'countdensity');
+    end
+    frMat = frMat(uIdx, :);
+    mfr = mean(frMat, 1, 'omitnan')';
+
+    % Drift (similarity)
+    drft = drift_calc(frMat, 'flgPlot', false, ...
+        'thrFr', 0.005, ...
+        'thrLin', [], ...
+        'limUnit', []);
+    dtCorr = [drft.dt_corr{1}; nan];     
+
+    % Burst statistics
+    brst = v(iFile).brst;    
+    stats = brst_stats(brst, v(iFile).spikes.times, 'winCalc', frNet.tWin, ...
+        'flgSave', false);
+    
+    pBspk = mean(stats.pBspk(uIdx, :), 1, 'omitnan')';
+
+end
 

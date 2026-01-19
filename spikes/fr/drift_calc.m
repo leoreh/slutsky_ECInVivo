@@ -63,8 +63,7 @@ end
 %  COMPUTE: POPULATION VECTORS
 %  ========================================================================
 
-% 1. Filter Units by FR Threshold
-% -------------------------------
+% Filter Units by FR Threshold
 % Identify units with low average activity across windows (or max?)
 % Usually we want units active within specific windows, but for global
 % filtering:
@@ -72,16 +71,14 @@ meanUnitFr = mean(frMat, 2);
 validUnits = meanUnitFr > thrFr;
 pv = frMat(validUnits, :);
 
-% 2. Subsample Units
-% ------------------
+% Subsample Units
 currUnits = size(pv, 1);
 if ~isempty(limUnit) && limUnit < currUnits
     unitIdx = randsample(currUnits, limUnit);
     pv = pv(unitIdx, :);
 end
 
-% 3. Normalize to Unit Vector (L2 Norm)
-% -------------------------------------
+% Normalize to Unit Vector (L2 Norm)
 % Each column becomes a unit vector
 for iWin = 1:nWin
     v = pv(:, iWin);
@@ -98,13 +95,11 @@ end
 %  COMPUTE: CORRELATIONS & DRIFT
 %  ========================================================================
 
-% 1. Pairwise Correlations
-% ------------------------
+% Pairwise Correlations
 % pv is [Units x Win], corr(pv) gives [Win x Win]
 pv_corr = corr(pv);
 
-% 2. Organize by Time Lag (dt)
-% ----------------------------
+% Organize by Time Lag (dt)
 dt_corr = cell(nCorr, 1);
 maxLag = nCorr;
 
@@ -122,8 +117,7 @@ m_corr = cellfun(@(x) mean(x, 'omitnan'), dt_corr);
 drft.dt_corr = dt_corr;
 drft.m_corr  = m_corr;
 
-% 3. Linear Fit (Drift Rate)
-% --------------------------
+% Linear Fit (Drift Rate)
 xAxis = (1:nCorr)';
 yData = m_corr(:);
 
