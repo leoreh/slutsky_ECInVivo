@@ -12,8 +12,8 @@ function cc = fr_corr(spkmat, varargin)
 %       - Good for: Filtering out burst-driven artifacts.
 %
 %   2. FISHER Z (Magnitude):
-%       - Uses a Global Noise Threshold (Mean + K*Std).
-%       - Masks correlations below threshold.
+%       - Uses a Z-Score Threshold (Standard Deviations above noise mean).
+%       - Masks correlations where |Z| < thrSig.
 %       - Metric: Pearson Correlation (r).
 %       - Good for: Quantifying coupling strength of established links.
 %
@@ -21,7 +21,7 @@ function cc = fr_corr(spkmat, varargin)
 %       spkmat      - (matrix) Activity Matrix (Neurons x Time).
 %       varargin    - (param/value) Optional parameters:
 %                     'nShuffles'     : (int) Number of shuffles for noise est {10}
-%                     'thrSig'        : (num) SD multiplier for global threshold {2}
+%                     'thrSig'        : (num) Z-score threshold for Fisher masking {2}
 %                     'flgPlot'       : (log) Plot correlation matrix {false}
 %
 %   OUTPUTS:

@@ -69,10 +69,13 @@ end
 
 if ismember('frNet', presets)
     vars = [vars, 'drift', 'frNet'];
+    zMet = 'shuffle';
     varMap.drift = 'drft.drftExp';
     varMap.dim   = 'frNet.dimExp';
     varMap.mcc   = 'frNet.mccExp';
-    varMap.funcon  = 'frNet.corr.funcon';
+    varMap.funcon_shf  = ['frNet.corr.', zMet, '.funcon'];
+    varMap.funcon_fish  = ['frNet.corr.', 'fisher', '.funcon'];
+    varMap.funcon_raw  = ['frNet.corr.', 'raw', '.funcon'];
 end
 
 % Load
@@ -101,7 +104,7 @@ if ismember('frNet', presets)
         v(iFile).frNet.dimExp = repmat(valDim, nUnits, 1);
 
         % Expand Mean Correlation
-        valMcc = v(iFile).frNet.mcc(1);
+        valMcc = v(iFile).frNet.corr.(zMet).mcc(1);
         v(iFile).frNet.mccExp = repmat(valMcc, nUnits, 1);
     end
 end

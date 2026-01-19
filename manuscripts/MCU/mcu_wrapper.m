@@ -51,9 +51,38 @@ for iFile = 1 : nFiles
 
 end
 
+%% ========================================================================
+%  INSPECT BASELINE
+%  ========================================================================
+
+presets = {'frNet', 'brst'};
+basepaths = [mcu_basepaths('wt_bsl'), mcu_basepaths('mcu_bsl')];
+tbl = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
+
+% Logit pBspk
+tbl = tbl_trans(tbl, 'varsInc', {'pBspk'}, 'logBase', 'logit');
+
+% Limit units
+tblPlot = tbl;
+uIdx = tblPlot.UnitType == 'RS';
+tblPlot = tblPlot(uIdx, :);
+
+tblGUI_bar(tblPlot, 'xVar', 'Group', 'yVar', 'funcon');
+
+tblGUI_scatHist(tblPlot, 'xVar', 'pBspk', 'yVar', 'funcon_fish', 'grpVar', 'Group');
+
+
+
+% LME
+varRsp = 'funcon_shf';
+varRsp = 'funcon_fish';
+frml = [varRsp, ' ~ Group  + (1|Name)'];
+[lmeMdl, lmeStats, lmeInfo, tblMdl] = lme_analyse(tblPlot, frml);
+
+
 
 %% ========================================================================
-%  LOAD
+%  INSPECT RECOVERY
 %  ========================================================================
 
 % Grab only BSL and BAC3 (1st and 5th recording day)

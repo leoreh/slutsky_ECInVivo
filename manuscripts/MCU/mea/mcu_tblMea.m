@@ -222,6 +222,7 @@ if ismember('frNet', presets)
     mapNet.mcc = 'frNet.mccExp';
     mapNet.funcon_shf  = ['frNet.corr.', zMet, '.funcon'];
     mapNet.funcon_fish  = ['frNet.corr.', 'fisher', '.funcon'];
+    mapNet.funcon_raw  = ['frNet.corr.', 'raw', '.funcon'];
 
     tblNet = v2tbl('v', v, 'varMap', mapNet, 'tagFiles', tagFiles, ...
         'idxCol', 1, 'uOffset', 0);
@@ -249,9 +250,6 @@ if ismember('spktimes', presets)
     tbl.spktimes = cellfun(@(x) x(x >= winExp(1) & x <= winExp(2)), ...
         tbl.spktimes, 'UniformOutput', false);
 end
-
-% Logit pBspk
-tbl = tbl_trans(tbl, 'varsInc', {'pBspk'}, 'logBase', 'logit');
 
 
 end     % EOF

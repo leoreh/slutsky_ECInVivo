@@ -146,6 +146,8 @@ end
 presets = {'time', 'steadyState', 'frNet', 'rcv', 'spktimes'};
 [tbl, xVec, basepaths, v] = mcu_tblMea('presets', presets([3]));
 
+% Logit pBspk
+tbl = tbl_trans(tbl, 'varsInc', {'pBspk'}, 'logBase', 'logit');
 
 
 %% ========================================================================

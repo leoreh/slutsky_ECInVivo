@@ -17,13 +17,15 @@ function frNet = fr_network(spktimes, varargin)
 %                     'flgSave'    : (log) Save result as frNet struct {false}
 %
 %   OUTPUTS:
+%   OUTPUTS:
 %       frNet       - (struct) Network statistics structure:
-%                     .time       : (nChunks x 2) Time windows used.
+%                     .tWin       : (nChunks x 2) Time windows used.
 %                     .dim        : (nChunks x 1) Dimensionality.
-%                     .mcc        : (nChunks x 1) Denoised Mean Correlation.
-%                     .mccRaw     : (nChunks x 1) Raw Mean Correlation.
-%                     .funcon     : (nChunks x nUnits) Mean Functional Connectivity.
-%                     .corr       : (nChunks x 1) Struct array of detailed corr stats.
+%                     .corr       : (nChunks x 1) Struct array containing:
+%                                   .raw     : Raw correlation stats.
+%                                   .noise   : Noise statistics.
+%                                   .shuffle : Shuffle-based Z-score metrics.
+%                                   .fisher  : Fisher-transformed masked metrics.
 %                     .info       : Info and parameters.
 %
 %   See also: DIM_CALC, FR_CORR, N2CHUNKS
