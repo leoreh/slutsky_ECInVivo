@@ -3,10 +3,10 @@ function [bouts, nbouts] = binary2bouts(varargin)
 % gets a binary vector and returns the start \ stop times of bouts. can be
 % used for BS, ripples, anesthesia states etc. accounts for inter-bout
 % interval and duration. note that bout defines start including idx and
-% stop not including idx [). this is for legacy purposes. 
-% 
+% stop not including idx [). this is for legacy purposes.
+%
 % INPUT
-%       vec         binary vector 
+%       vec         binary vector
 %       exclude     logical. exclude incomplete events (1) or not {0}.
 %       minDur      minimum duration of bout
 %       maxDur      maximum duration of bout
@@ -18,12 +18,12 @@ function [bouts, nbouts] = binary2bouts(varargin)
 %                   columns represent the start and end of each event [samps]
 %       nbouts     struct with fields describing number of bouts detected
 %                   in each step
-%     
+%
 % EXAMPLE
 %       see aneStates.m or getBS.m
 %       bouts = binary2bouts('vec', binaryVec, 'minDur', minDur, 'maxDur', [],...
 %           'interDur', interDur, 'exclude', false);
-% 
+%
 % 14 jan 19 LH      updates:
 % 05 feb 22         nbouts and flgPrnt
 
@@ -115,27 +115,18 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if ~isempty(interDur)
-    iei = bouts(2 : end, 1) - bouts(1 : end - 1, 2);     
-    while min(iei) < interDur
-        temp = [];
-        event = bouts(1, :);
-        for i = 2 : nbouts.detect
-            if bouts(i, 1) - event(2) < interDur
-                event = [event(1) bouts(i, 2)];
-            else
-                temp = [temp; event];
-                event = bouts(i, :);
-            end
-        end
-        temp = [temp; event];
-        bouts = temp;
-        iei = bouts(2 : end, 1) - bouts(1 : end - 1, 2);
-    end
-    
+    iei = bouts(2 : end, 1) - bouts(1 : end - 1, 2);
+
+    % vectorized merge logic
+    isStart = [true; iei >= interDur];
+    isStop = [iei >= interDur; true];
+
+    bouts = [bouts(isStart, 1), bouts(isStop, 2)];
+
     % correct last bout to end of recording
     if length(vec) - bouts(end, end) < interDur
         bouts(end, end) = length(vec);
-    end    
+    end
 end
 
 nbouts.merge = size(bouts, 1);

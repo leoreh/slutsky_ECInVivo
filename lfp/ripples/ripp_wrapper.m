@@ -115,10 +115,15 @@ if isempty(rippCh)
     end
 end
 
-% Handle bit2uv default logic (TDT vs OE)
-if isempty(bit2uv) || round(fsSpk) == 24414
-    bit2uv = 1;
+% Handle bit2uv logic (TDT vs OE)
+if isempty(bit2uv)
+    if round(fsSpk) == 24414
+        bit2uv = 1;      % Default for TDT
+    else
+        bit2uv = 0.195;  % Default for Intan/OE
+    end
 end
+
 
 % EMG
 load([basename, '.sleep_sig.mat'], 'emg');

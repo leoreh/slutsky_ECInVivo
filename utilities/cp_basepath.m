@@ -1,19 +1,11 @@
 function cp_basepath(varargin)
 % CP_BASEPATH Copies files from a session directory to a new location.
 %
-% SUMMARY:
 % This function copies files from a single session directory to a new location
 % while maintaining the mouse/session directory structure. For example, files
 % from 'E:\Data\lh140\lh140_230624_090049\*.clu.1' will be copied to
 % 'D:\Data\lh140\lh140_230624_090049\*.clu.1'. Uses PowerShell's robocopy
 % for faster file operations.
-%
-% METHODOLOGY:
-% The function extracts the mouse name and session name from the basepath,
-% creates corresponding directories in the new location, and copies the files
-% while maintaining the original structure. Supports wildcard patterns in
-% filenames (e.g., '*.clu.1', '*.session.mat*'). Uses robocopy for efficient
-% file copying.
 %
 % INPUT (Optional Key-Value Pairs):
 %   fNames       (cell array) Cell array of file patterns to copy. Can include

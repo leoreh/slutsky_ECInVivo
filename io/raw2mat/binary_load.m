@@ -211,9 +211,6 @@ end
 % close file
 fclose(f);
 
-% Apply bit2uv conversion after all data is loaded and matrix is finalized
-    data = double(data) * bit2uv; 
-
 end % EOF
 
 % ---------------------------------------------------------------------------------------------------------

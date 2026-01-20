@@ -86,7 +86,7 @@ axis tight;
 
 % --- Average Ripple Waveform ---
 sb2 = subplot(3, 3, 3);
-plot_stdShade('axh', sb2, 'dataMat', ripp.maps.filt', 'alpha', 0.3,...
+plot_stdShade('hAx', sb2, 'dataMat', ripp.maps.filt', 'alpha', 0.3,...
     'clr', [0 0 0], 'xVal', xMap); % Mean +/- std of filtered LFP
 xlabel('Time relative to peak [s]');
 ylabel('Filtered LFP (norm.)'); % Assuming maps are normalized or z-scored

@@ -427,23 +427,23 @@ if nValid == 0
     return;
 end
 
-% Create a ragged array using Run-Length Encoding logic
-spkInEvent = endIdx(validEvents) - startIdx(validEvents) + 1;
+% Create a ragged array using Run-Length Encoding logic to avoid loops
+runLengths = endIdx(validEvents) - startIdx(validEvents) + 1;
 
 % Create event ID vector: repeated event indices
-eventIds = repelem(validEvents, spkInEvent);
+eventIds = repelem(validEvents, runLengths);
 
 % Create global spike index vector
 
 % Pre-allocate index vector
-totalSpikes = sum(spkInEvent);
+totalSpikes = sum(runLengths);
 spkEventIdx = zeros(totalSpikes, 1);
 currentPos = 1;
 
 % This loop is strictly for index generation and is very fast (millions of iters/sec)
 for iEvent = 1:nValid
     eventIdx = validEvents(iEvent);
-    nSpks = spkInEvent(iEvent);
+    nSpks = runLengths(iEvent);
     spkEventIdx(currentPos : currentPos + nSpks - 1) = startIdx(eventIdx) : endIdx(eventIdx);
     currentPos = currentPos + nSpks;
 end
@@ -451,17 +451,31 @@ end
 % Extract all relevant spikes
 spkEventTimes = spikeTimes(spkEventIdx);
 
+% Retrieve corresponding event times
+allEventTimes = eventTimes(eventIds);
+
 % Calculate relative times
-relTimes = spkEventTimes - eventTimes(eventIds);
+relTimes = spkEventTimes - allEventTimes;
 
 % Bin the relative times
 edges = linspace(mapDur(1), mapDur(2), nBinsMap + 1);
 bins = discretize(relTimes, edges);
 
-% Accumulate counts into the matrix
-% Rows = Events, Cols = Bins
-% Note: size(syncMap) is nEvents x nBinsMap
-syncMap = accumarray([eventIds, bins], 1, [nEvents, nBinsMap]);
+% Handle potential NaNs (rare precision issues)
+validBins = ~isnan(bins);
+if any(validBins)
+    % Accumulate counts into the matrix
+    % Rows = Events, Cols = Bins
+    % We use linear indexing for accumulation
+
+    % Filter valid
+    eventIds = eventIds(validBins);
+    bins = bins(validBins);
+
+    % Accumulate
+    % Note: size(syncMap) is nEvents x nBinsMap
+    syncMap = accumarray([eventIds, bins], 1, [nEvents, nBinsMap]);
+end
 
 end % End of sync_spksMap
 

@@ -119,7 +119,7 @@ if ~isempty(ripp.spks.mu)
     % Mean MU PETH during ripples
     sb2 = subplot(4, 3, 2); hold on; cla;
     ydata = ripp.spks.mu.rippMap;
-    plot_stdShade('axh', sb2, 'dataMat', ydata', 'alpha', 0.3, 'clr', [0 0 0], 'xVal', xMap);
+    plot_stdShade('hAx', sb2, 'dataMat', ydata', 'alpha', 0.3, 'clr', [0 0 0], 'xVal', xMap);
     axis tight;
     yLimit = ylim; % Store y-limit for consistent scaling with control plot
     yLimit(1) = 0;
@@ -132,7 +132,7 @@ if ~isempty(ripp.spks.mu)
     % Mean MU PETH during control events
     sb3 = subplot(4, 3, 5); hold on; cla;
     ydata = ripp.spks.mu.ctrlMap;
-    plot_stdShade('axh', sb3, 'dataMat', ydata', 'alpha', 0.3, 'clr', [0.5 0.5 0.5], 'xVal', xMap);
+    plot_stdShade('hAx', sb3, 'dataMat', ydata', 'alpha', 0.3, 'clr', [0.5 0.5 0.5], 'xVal', xMap);
     ylim(yLimit) % Apply same y-limit
     xlim([xMap(1), xMap(end)])
     xlabel('Time [s]');
@@ -173,7 +173,7 @@ if ~isempty(ripp.spks.su)
     sb6 = subplot(4, 3, 8); hold on; cla
     if flgUnits
         ydata = normSpking(idxRS, :);
-        plot_stdShade('axh', sb6, 'dataMat', ydata', 'alpha', 0.3, 'clr', unitClr(1, :), 'xVal', xMap);
+        plot_stdShade('hAx', sb6, 'dataMat', ydata', 'alpha', 0.3, 'clr', unitClr(1, :), 'xVal', xMap);
         title(sprintf('RS Units (n=%d)', sum(idxRS)));
         ylim([0 1]); 
     end
@@ -185,7 +185,7 @@ if ~isempty(ripp.spks.su)
     sb7 = subplot(4, 3, 11); hold on;
     if flgUnits
         ydata = normSpking(idxFS, :);
-        plot_stdShade('axh', sb7, 'dataMat', ydata', 'alpha', 0.3, 'clr', unitClr(2, :), 'xVal', xMap);
+        plot_stdShade('hAx', sb7, 'dataMat', ydata', 'alpha', 0.3, 'clr', unitClr(2, :), 'xVal', xMap);
         title(sprintf('FS Units (n=%d)', sum(idxFS)));
         ylim([0 1]); 
     end
