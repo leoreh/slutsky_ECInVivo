@@ -1,6 +1,7 @@
 function ripp = ripp_states(ripp, boutTimes, varargin)
 % RIPP_STATES Analyzes ripple events in relation to vigilance states.
 %
+% SUMMARY:
 % This function calculates ripple rates and densities within different
 % vigilance states.
 %
@@ -14,11 +15,13 @@ function ripp = ripp_states(ripp, boutTimes, varargin)
 %
 % OUTPUT:
 %   ripp                Input structure with .states field added.
+%   * Saves 'basename.rippStates.mat' containing 'rippStates' struct.
 %
 % DEPENDENCIES: 
+%   basepaths2vars
 %   InIntervals
 %   times2rate
-%   as_loadConfig.
+% as_loadConfig.
 
 %% ========================================================================
 %  ARGUMENTS
