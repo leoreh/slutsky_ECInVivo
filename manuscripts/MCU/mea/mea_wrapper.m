@@ -173,8 +173,8 @@ tblGUI_raster(tbl, 'grpVar', 'Name', 'grpVal', 'mcu-ko2')
 tblLme = tbl;
 
 % Fit
-varRsp = 'funcon';
-frml = [varRsp, ' ~ Group + (1|Name)'];
+varRsp = 'funcon_shf';
+frml = [varRsp, ' ~ Group * pBspk + (1|Name)'];
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tbl, frml);
 
 % Plot
@@ -209,6 +209,7 @@ varsNum = varsTbl(isNum);
 tblLme = tbl;
 tblLme(:, "UnitID") = [];
 tblLme(:, "uRcv") = [];
+tblLme(:, "uPert") = [];
 
 % Baseline Table
 varsTbl = tblLme.Properties.VariableNames;

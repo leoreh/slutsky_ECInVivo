@@ -4,23 +4,24 @@
 %  RE-ANALYZE
 %  ========================================================================
 
-% run the analysis on multiple sessions
-% -------------------------------------------------------------------------
+% % run the analysis on multiple sessions
+% % -------------------------------------------------------------------------
 % basepaths = mcu_basepaths('all');
-basepaths = [mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl')];
-nfiles = length(basepaths);
-
-v = basepaths2vars('basepaths', basepaths, 'vars', {'session'});
-
-for iFile = 1 : nfiles
-    basepath = basepaths{iFile};
-    cd(basepath)
-    [~, basename] = fileparts(basepath);
-
-    ripp = ripp_wrapper('basepath', pwd, 'rippCh', [],...
-        'limState', 4, 'flgRefine', true, 'flgGraphics', true,...
-        'flgSaveVar', false, 'flgSaveFig', false);
-end
+% nfiles = length(basepaths);
+%
+% v = basepaths2vars('basepaths', basepaths, 'vars', {'session'});
+%
+% for ifile = 1 : nfiles
+%     basepath = basepaths{ifile};
+%     cd(basepath)
+%     [~, basename] = fileparts(basepath);
+%
+%     rippCh = v(ifile).session.channelTags.Ripple;
+%
+%     ripp = ripp_wrapper('basepath', pwd, 'rippCh', rippCh,...
+%         'limState', 4, 'flgRefine', true, 'flgGraphics', true,...
+%         'flgSaveVar', true, 'flgSaveFig', true);
+% end
 
 
 % -------------------------------------------------------------------------
@@ -28,15 +29,15 @@ end
 % Assumes data was already loaded
 for iGrp = 1 : length(grps)
     basepaths = mcu_basepaths(grps{iGrp});
-    for iFile = 1 : length(basepaths)
+    for ifile = 1 : length(basepaths)
 
         % File
-        basepath = basepaths{iFile};
+        basepath = basepaths{ifile};
         [~, basename] = fileparts(basepath);
         cd(basepath)
 
         % Get the preloaded ripple structure
-        ripp = v{iGrp}(iFile).ripp;
+        ripp = v{iGrp}(ifile).ripp;
 
         % Calculate range of filtered lfp
         mapData = ripp.maps.filt;
@@ -72,7 +73,7 @@ for iGrp = 1 : length(grps)
         % ripp.spkLfp = spkLfp;
 
         % Update the preloaded variable structure and save
-        v{iGrp}(iFile).ripp = ripp;
+        v{iGrp}(ifile).ripp = ripp;
         save(fullfile(basepath, [basename, '.ripp.mat']), 'ripp', '-v7.3')
     end
 end
@@ -87,7 +88,7 @@ grps = {'wt_bsl_ripp'; 'mcu_bsl'};
 vars = {'ripp', 'units', 'session'};
 for iGrp = 1 : length(grps)
     basepaths = mcu_basepaths(grps{iGrp});
-    vRipp{iGrp} = basepaths2vars('basepaths', basepaths, 'vars', vars);
+    v{iGrp} = basepaths2vars('basepaths', basepaths, 'vars', vars);
 end
 
 
@@ -116,7 +117,7 @@ for iGrp = 1 : length(grps)
     tagFiles.Name = get_mname(basepaths);
 
     % Create table
-    tblCell{iGrp} = v2tbl('v', [vRipp{iGrp}(:).ripp], 'varMap', varMap, ...
+    tblCell{iGrp} = v2tbl('v', [v{iGrp}(:).ripp], 'varMap', varMap, ...
         'tagFiles', tagFiles, 'tagAll', tagAll, 'idxCol', 4);
 end
 % Combine all tables, clean and organize

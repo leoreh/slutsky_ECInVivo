@@ -11,6 +11,8 @@ function dim = dim_calc(frMat, varargin)
 %                                    'thr' (Variance Explained) {'PR'}
 %                     'thrVal'     : (num) Var explained cutoff (0-1) {0.8}
 %                     'flgFrac'    : (log) Normalize by N neurons {false}
+%                     'flgPlot'    : (log) Generate visualization {false}
+%                     'flgStable'  : (log) Sqrt + Z-score transform {false}
 %
 %   OUTPUTS:
 %       dim         - (scalar) Effective dimensionality.
@@ -25,12 +27,14 @@ addParameter(p, 'method', 'PR', @ischar);
 addParameter(p, 'thrVal', 0.8, @isnumeric);
 addParameter(p, 'flgFrac', false, @islogical);
 addParameter(p, 'flgPlot', false, @islogical);
+addParameter(p, 'flgStable', false, @islogical);
 
 parse(p, frMat, varargin{:});
 method = p.Results.method;
 thrVal = p.Results.thrVal;
 flgFrac = p.Results.flgFrac;
 flgPlot = p.Results.flgPlot;
+flgStable = p.Results.flgStable;
 
 
 %% ========================================================================
@@ -47,6 +51,11 @@ frMat(silentIdx, :) = [];
 if nUnits > nTime
     frMat = frMat';
     [nTime, nUnits] = size(frMat);
+end
+
+if flgStable
+    frMat = sqrt(frMat);
+    % frMat = zscore(frMat);
 end
 
 % Safety check for low dimensionality

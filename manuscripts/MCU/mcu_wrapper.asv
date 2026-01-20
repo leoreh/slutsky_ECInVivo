@@ -9,7 +9,7 @@ basepaths = [mcu_basepaths('wt_bsl'), mcu_basepaths('mcu_bsl')];
 nFiles = length(basepaths);
 
 % vars
-vars = {'spikes', 'units'};
+vars = {'spikes', 'units', 'frNet'};
 
 % load state vars
 v = basepaths2vars('basepaths', basepaths, 'vars', vars);
@@ -59,11 +59,12 @@ presets = {'frNet', 'brst'};
 basepaths = [mcu_basepaths('wt_bsl'), mcu_basepaths('mcu_bsl')];
 tbl = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
 
-% Logit pBspk
-tbl = tbl_trans(tbl, 'varsInc', {'pBspk'}, 'logBase', 'logit');
+% Transform burst metrics
+tblPlot = tbl;
+tblPlot = tbl_trans(tblPlot, 'varsInc', {'pBspk'}, 'logBase', 'logit', 'verbose', true);
+tblPlot = tbl_trans(tblPlot, 'varsInc', {'bRoy'}, 'logBase', 10, 'verbose', true);
 
 % Limit units
-tblPlot = tbl;
 uIdx = tblPlot.UnitType == 'RS';
 tblPlot = tblPlot(uIdx, :);
 
@@ -75,10 +76,25 @@ tblGUI_scatHist(tblPlot, 'xVar', 'pBspk', 'yVar', 'funcon_fish', 'grpVar', 'Grou
 
 % LME
 varRsp = 'funcon_shf';
-varRsp = 'funcon_fish';
-frml = [varRsp, ' ~ Group  + (1|Name)'];
+frml = [varRsp, ' ~ Group * pBspk + (1|Name)'];
 [lmeMdl, lmeStats, lmeInfo, tblMdl] = lme_analyse(tblPlot, frml);
 
+
+
+% PLOT INTERACTION
+vars = {'pBspk', 'Group'};
+hFig = plot_axSize('flgFullscreen', true, 'flgPos', true);
+
+% Partial Residuals
+hAx = nexttile;
+[prRes, hFig] = lme_pr(lmeMdl, vars, 'transParams', [], ...
+    'hAx', hAx);
+
+% Partial Dependence
+hAx = nexttile;
+vars = {'Group'};
+[pdRes, hFig] = lme_pd(lmeMdl, vars, 'transParams', [], ...
+    'hAx', hAx);
 
 
 %% ========================================================================
@@ -92,15 +108,22 @@ fileMouse = findgroups(get_mname(basepaths));
 idxMouse = sort([idxMouse; idxMouse + 4]);
 basepaths = basepaths(idxMouse);
 
-presets = {'brst', 'prc'};
+presets = {'brst', 'prc', 'frNet'};
 [tbl, basepaths, ~] = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
 tbl.Day(tbl.Day == "BAC_ON") = "BAC3";
 
-tblPlot = tbl;
-tblPlot = tbl_trans(tblPlot, 'flg0', true);
 
-tblGUI_bar(tblPlot, 'xVar', 'Group', 'yVar', 'conn');
-tblGUI_scatHist(tblPlot, 'xVar', 'fr', 'yVar', 'pBspk', 'grpVar', 'Group');
+tblPlot = tbl;
+
+% tblPlot = tbl_trans(tblPlot, 'flg0', true, 'verbose', true);
+
+% Transform burst metrics
+tblPlot = tbl_trans(tblPlot, 'varsInc', {'pBspk'}, 'logBase', 'logit', 'verbose', true);
+tblPlot = tbl_trans(tblPlot, 'varsInc', {'bRoy'}, 'logBase', 10, 'verbose', true);
+tblPlot = tblPlot(tblPlot.UnitType == "RS", :);
+
+tblGUI_bar(tblPlot, 'xVar', 'Group', 'yVar', 'funcon_shf');
+tblGUI_scatHist(tblPlot, 'xVar', 'pBspk', 'yVar', 'funcon_shf', 'grpVar', 'Group');
 
 
 
@@ -108,13 +131,15 @@ tblGUI_scatHist(tblPlot, 'xVar', 'fr', 'yVar', 'pBspk', 'grpVar', 'Group');
 %  COLLAPSE UNIT TABLE BY DAY
 %  ========================================================================
 
+statType = 'mean';
+
 % Variable names
-varsTbl = tbl.Properties.VariableNames;
-isNum = cellfun(@(x) isnumeric(tbl.(x)) && ~iscategorical(tbl.(x)), varsTbl);
+varsTbl = tblPlot.Properties.VariableNames;
+isNum = cellfun(@(x) isnumeric(tblPlot.(x)) && ~iscategorical(tblPlot.(x)), varsTbl);
 varsNum = varsTbl(isNum);
 
 % Select Units
-tblRs = tbl(tbl.UnitType == "RS", :);
+tblRs = tblPlot(tblPlot.UnitType == "RS", :);
 tblRs(:, "UnitID") = [];
 tblRs(:, "File") = [];
 tblRs(:, "UnitType") = [];
@@ -122,14 +147,14 @@ tblRs(:, "UnitType") = [];
 % Baseline Table
 tblBsl = tblRs(tblRs.Day == "BSL", :);
 varsTbl = tblBsl.Properties.VariableNames;
-tblBsl = groupsummary(tblBsl, {'Group', 'Name', 'Day'}, 'mean', ...
+tblBsl = groupsummary(tblBsl, {'Group', 'Name', 'Day'}, statType, ...
     vartype("numeric"));
 tblBsl(:, "GroupCount") = [];
 tblBsl.Properties.VariableNames = varsTbl;
 
 % SteadyState Table
 tblSs = tblRs(tblRs.Day == "BAC3", :);
-tblSs = groupsummary(tblSs, {'Group', 'Name', 'Day'}, 'mean', ...
+tblSs = groupsummary(tblSs, {'Group', 'Name', 'Day'}, statType, ...
     vartype("numeric"));
 tblSs(:, "GroupCount") = [];
 tblSs.Properties.VariableNames = varsTbl;
@@ -152,7 +177,7 @@ basepaths = [mcu_basepaths('wt_bsl'), mcu_basepaths('mcu_bsl')];
 nFiles = length(basepaths);
 
 % vars
-vars = {'spikes', 'units', 'brst'};
+vars = {'spikes', 'units', 'brst', 'frNet'};
 
 % load state vars
 v = basepaths2vars('basepaths', basepaths, 'vars', vars);
@@ -175,12 +200,15 @@ for iFile = 1 : nFiles
     uType = v(iFile).units.type;
     uIdx = uType == "RS";
 
-    % FR network stats
+    % Calculate Dim
     frNet = fr_network(spktimes, 'flgSave', false, 'winLim', [], ...
         'winSize', winSize);
+    dim = frNet.dim;
+    
+    % Grab funcon from pre-calculated struct
+    frNet = v(iFile).frNet;
     mcc = frNet.corr.shuffle.mcc;
     funcon = mean(frNet.corr.shuffle.funcon(uIdx, :), 'omitnan');
-    dim = frNet.dim;
 
     % FR matrix
     nWin = size(frNet.tWin, 1);
@@ -214,7 +242,6 @@ for iFile = 1 : nFiles
     vPseudo(iFile).dim      = dim;
     vPseudo(iFile).pBspk    = pBspk;
     vPseudo(iFile).dtCorr   = dtCorr;
-    iFile
 end
 
 % Metadata tags
@@ -284,9 +311,9 @@ for iFile = 1 : nFiles
     spktimes = v(iFile).spikes.times;
     
     % Unit Filter. DIM and MCC on all units. MFR, PBSPK, DRIFT, FUNCON only on RS
-    uType = v(iFile).units.type;
-    uIdx = uType == "RS";
-    spktimes = spktimes(uIdx);
+    % uType = v(iFile).units.type;
+    % uIdx = uType == "RS";
+    % spktimes = spktimes(uIdx);
 
     nUnits = length(spktimes);
 
@@ -317,7 +344,8 @@ for iFile = 1 : nFiles
     dim(iFile) = dim_calc(frMat, ...
         'method', 'pr', ...
         'thrVal', 0.8, ...
-        'flgFrac', false, ...
+        'flgFrac', true, ...
+        'flgStable', true, ...
         'flgPlot', false);   
 
 end

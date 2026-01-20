@@ -74,7 +74,7 @@ addParameter(p, 'flgRefine', true, @islogical);
 addParameter(p, 'flgGraphics', true, @islogical);
 addParameter(p, 'flgSaveVar', true, @islogical);
 addParameter(p, 'flgSaveFig', true, @islogical);
-addParameter(p, 'bit2uv', 0.195, @(x) isnumeric(x) && isscalar(x));
+addParameter(p, 'bit2uv', [], @(x) isempty(x) || (isnumeric(x) && isscalar(x)));
 
 parse(p, varargin{:});
 basepath        = p.Results.basepath;
@@ -103,6 +103,7 @@ fprintf('--- Starting Ripple Analysis Pipeline for %s ---\n', basename);
 sessionfile = fullfile(basepath, [basename, '.session.mat']);
 load(sessionfile, 'session');
 fs = session.extracellular.srLfp;
+fsSpk = session.extracellular.sr;
 nchans = session.extracellular.nChannels;
 
 % Get ripple channels
@@ -112,6 +113,11 @@ if isempty(rippCh)
     else
         rippCh = 1;
     end
+end
+
+% Handle bit2uv default logic (TDT vs OE)
+if isempty(bit2uv) || round(fsSpk) == 24414
+    bit2uv = 1;
 end
 
 % EMG
@@ -147,7 +153,7 @@ if flgRefine
     ripp = ripp_detect('basepath', basepath, 'sig', sig(winIdx), 'emg', emg(winIdx),...
         'rippCh', [], 'recWin', [0 Inf], 'thr', thrTmp, 'passband', passband,...
         'limDur', limDurTmp, 'detectAlt', detectAlt, 'bit2uv', bit2uv, ...
-        'flgGraphics', false, 'flgSaveVar', true);
+        'flgGraphics', false, 'flgSaveVar', false);
 
     % Use suggested parameters, adjusting thresholds
     thr = round(ripp.info.thrData * refineFactor, 1);
