@@ -35,8 +35,8 @@ function ripp = ripp_states(ripp, varargin)
 %                         ripp.rate.rate: Overall ripple rate vector.
 %                         ripp.rate.tstamps: Timestamps for overall rate.
 %   basepath            (Optional) Path to recording session directory {pwd}.
-%   flgGraphics         (Optional) Logical flag to plot results {true}.
-%   flgSaveVar          (Optional) Logical flag to save/update the ripp
+%   flgPlot             (Optional) Logical flag to plot results {true}.
+%   flgSave             (Optional) Logical flag to save/update the ripp
 %                       structure in a .ripp.mat file {true}.
 %   flgSaveFig          (Optional) Logical flag to save the plot {true}.
 %
@@ -79,15 +79,15 @@ function ripp = ripp_states(ripp, varargin)
 p = inputParser;
 addRequired(p, 'ripp', @isstruct); % Require the ripple structure as input
 addParameter(p, 'basepath', pwd, @ischar);
-addParameter(p, 'flgGraphics', true, @islogical);
-addParameter(p, 'flgSaveVar', true, @islogical);
+addParameter(p, 'flgPlot', true, @islogical);
+addParameter(p, 'flgSave', true, @islogical);
 addParameter(p, 'flgSaveFig', true, @islogical);
 
 parse(p, ripp, varargin{:}); % Pass 'ripp' directly to parse
 ripp                = p.Results.ripp; % Retrieve ripp from parsed results
 basepath            = p.Results.basepath;
-flgGraphics         = p.Results.flgGraphics;
-flgSaveVar          = p.Results.flgSaveVar;
+flgPlot             = p.Results.flgPlot;
+flgSave             = p.Results.flgSave;
 flgSaveFig          = p.Results.flgSaveFig;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -184,12 +184,12 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Save updated ripp structure
-if flgSaveVar
+if flgSave
     save(rippfile, 'ripp', '-v7.3');
 end
 
 % Plotting
-if flgGraphics
+if flgPlot
     
     % Use custom config for colors 
     cfg = as_loadConfig([]);

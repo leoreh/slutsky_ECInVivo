@@ -18,8 +18,8 @@ for iFile = 1 : nfiles
     [~, basename] = fileparts(basepath);
 
     ripp = ripp_wrapper('basepath', pwd, 'rippCh', [],...
-        'limState', 4, 'flgRefine', true, 'flgGraphics', true,...
-        'flgSaveVar', false, 'flgSaveFig', false);
+        'limState', 4, 'flgRefine', true, 'flgPlot', true,...
+        'flgSave', true, 'flgSaveFig', true);
 end
 
 

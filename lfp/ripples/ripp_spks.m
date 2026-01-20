@@ -29,8 +29,8 @@ function ripp = ripp_spks(ripp, varargin)
 %                       If 'limState' is used, requires:
 %                         states.idx: Logical matrix/cell identifying ripples within states.
 %   basepath            (Optional) Path to recording session directory {pwd}.
-%   flgGraphics         (Optional) Logical flag to plot results {true}.
-%   flgSaveVar          (Optional) Logical flag to save/update the ripp
+%   flgPlot             (Optional) Logical flag to plot results {true}.
+%   flgSave             (Optional) Logical flag to save/update the ripp
 %                       structure in a .mat file {true}.
 %   limState            (Optional) Numeric index (e.g., 1-5) specifying a
 %                       vigilance state (from sleep_states.mat) to restrict
@@ -52,10 +52,6 @@ function ripp = ripp_spks(ripp, varargin)
 % 06 Aug 24 LH - Major refactor: Changed control event selection, state-limiting application, naming conventions.
 % 05 Aug 24 LH - Refactored from rippleSpks.m, integrated bz_getRipSpikes logic,
 %                added state-matching, spike gain calculation, and stats.
-%
-%%% consider adding phase locking
-% https://www.sciencedirect.com/science/article/pii/S2352289521000357#sec2
-% can use spklfp_calc (see mcu_ripples)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ARGUMENT PARSING & VALIDATION
@@ -64,14 +60,14 @@ function ripp = ripp_spks(ripp, varargin)
 % inputParser. It sets default values and validates input types.
 p = inputParser;
 addOptional(p, 'basepath', pwd);
-addOptional(p, 'flgGraphics', true, @islogical);
-addOptional(p, 'flgSaveVar', true, @islogical);
+addOptional(p, 'flgPlot', true, @islogical);
+addOptional(p, 'flgSave', true, @islogical);
 addOptional(p, 'limState', [], @(x) isempty(x) || (isnumeric(x) && isscalar(x)));
 
 parse(p, varargin{:});
 basepath        = p.Results.basepath;
-flgGraphics     = p.Results.flgGraphics;
-flgSaveVar      = p.Results.flgSaveVar;
+flgPlot         = p.Results.flgPlot;
+flgSave         = p.Results.flgSave;
 limState        = p.Results.limState;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -117,20 +113,14 @@ end
 
 % params
 fsSpk = v.session.extracellular.sr;
-fsLfp = ripp.info.fs;
 rippTimes = ripp.times;             % Ripple start/end times
 rippPeakTime = ripp.peakTime;       % Ripple peak times
 rippDur = ripp.dur / 1000;          % Ripple durations (s)
 nRipples = size(rippTimes, 1);
 
-% Peri-event map parameters. Use ripple mapDur if already defined,
-% otherwise default
-if isfield(ripp.maps, 'mapDur')
-    mapDur = ripp.maps.mapDur;
-else
-    mapDur = [-0.075 0.075];
-end
-nBinsMap = floor(fsLfp * diff(mapDur) / 2) * 2 + 1;     % Ensure odd number of bins
+% Peri-event map parameters (hard-coded).
+mapDur = [-0.075 0.075];
+nBinsMap = floor(1250 * diff(mapDur) / 2) * 2 + 1;     % Ensure odd number of bins
 
 % Analysis window
 recWin = ripp.info.recWin;
@@ -357,12 +347,12 @@ spks.info.nBinsMap = nBinsMap;
 ripp.spks = spks;
 
 % save
-if flgSaveVar
+if flgSave
     save(rippfile, 'ripp', '-v7.3');
 end
 
 % graphics
-if flgGraphics
+if flgPlot
     ripp_plotSpks(ripp, 'basepath', basepath, 'flgSaveFig', true);
 end
 

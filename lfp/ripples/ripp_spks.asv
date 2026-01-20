@@ -29,8 +29,8 @@ function ripp = ripp_spks(ripp, varargin)
 %                       If 'limState' is used, requires:
 %                         states.idx: Logical matrix/cell identifying ripples within states.
 %   basepath            (Optional) Path to recording session directory {pwd}.
-%   flgGraphics         (Optional) Logical flag to plot results {true}.
-%   flgSaveVar          (Optional) Logical flag to save/update the ripp
+%   flgPlot             (Optional) Logical flag to plot results {true}.
+%   flgSave             (Optional) Logical flag to save/update the ripp
 %                       structure in a .mat file {true}.
 %   limState            (Optional) Numeric index (e.g., 1-5) specifying a
 %                       vigilance state (from sleep_states.mat) to restrict
@@ -52,10 +52,6 @@ function ripp = ripp_spks(ripp, varargin)
 % 06 Aug 24 LH - Major refactor: Changed control event selection, state-limiting application, naming conventions.
 % 05 Aug 24 LH - Refactored from rippleSpks.m, integrated bz_getRipSpikes logic,
 %                added state-matching, spike gain calculation, and stats.
-%
-%%% consider adding phase locking
-% https://www.sciencedirect.com/science/article/pii/S2352289521000357#sec2
-% can use spklfp_calc (see mcu_ripples)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ARGUMENT PARSING & VALIDATION
@@ -64,14 +60,14 @@ function ripp = ripp_spks(ripp, varargin)
 % inputParser. It sets default values and validates input types.
 p = inputParser;
 addOptional(p, 'basepath', pwd);
-addOptional(p, 'flgGraphics', true, @islogical);
-addOptional(p, 'flgSaveVar', true, @islogical);
+addOptional(p, 'flgPlot', true, @islogical);
+addOptional(p, 'flgSave', true, @islogical);
 addOptional(p, 'limState', [], @(x) isempty(x) || (isnumeric(x) && isscalar(x)));
 
 parse(p, varargin{:});
 basepath        = p.Results.basepath;
-flgGraphics     = p.Results.flgGraphics;
-flgSaveVar      = p.Results.flgSaveVar;
+flgPlot         = p.Results.flgPlot;
+flgSave         = p.Results.flgSave;
 limState        = p.Results.limState;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -357,12 +353,12 @@ spks.info.nBinsMap = nBinsMap;
 ripp.spks = spks;
 
 % save
-if flgSaveVar
+if flgSave
     save(rippfile, 'ripp', '-v7.3');
 end
 
 % graphics
-if flgGraphics
+if flgPlot
     ripp_plotSpks(ripp, 'basepath', basepath, 'flgSaveFig', true);
 end
 
@@ -427,23 +423,23 @@ if nValid == 0
     return;
 end
 
-% Create a ragged array using Run-Length Encoding logic to avoid loops
-runLengths = endIdx(validEvents) - startIdx(validEvents) + 1;
+% Create a ragged array using Run-Length Encoding logic
+spkInEvent = endIdx(validEvents) - startIdx(validEvents) + 1;
 
 % Create event ID vector: repeated event indices
-eventIds = repelem(validEvents, runLengths);
+eventIds = repelem(validEvents, spkInEvent);
 
 % Create global spike index vector
 
 % Pre-allocate index vector
-totalSpikes = sum(runLengths);
+totalSpikes = sum(spkInEvent);
 spkEventIdx = zeros(totalSpikes, 1);
 currentPos = 1;
 
 % This loop is strictly for index generation and is very fast (millions of iters/sec)
 for iEvent = 1:nValid
     eventIdx = validEvents(iEvent);
-    nSpks = runLengths(iEvent);
+    nSpks = spkInEvent(iEvent);
     spkEventIdx(currentPos : currentPos + nSpks - 1) = startIdx(eventIdx) : endIdx(eventIdx);
     currentPos = currentPos + nSpks;
 end
@@ -451,31 +447,17 @@ end
 % Extract all relevant spikes
 spkEventTimes = spikeTimes(spkEventIdx);
 
-% Retrieve corresponding event times
-allEventTimes = eventTimes(eventIds);
-
 % Calculate relative times
-relTimes = spkEventTimes - allEventTimes;
+relTimes = spkEventTimes - eventTimes(eventIds);
 
 % Bin the relative times
 edges = linspace(mapDur(1), mapDur(2), nBinsMap + 1);
 bins = discretize(relTimes, edges);
 
-% Handle potential NaNs (rare precision issues)
-validBins = ~isnan(bins);
-if any(validBins)
-    % Accumulate counts into the matrix
-    % Rows = Events, Cols = Bins
-    % We use linear indexing for accumulation
-
-    % Filter valid
-    eventIds = eventIds(validBins);
-    bins = bins(validBins);
-
-    % Accumulate
-    % Note: size(syncMap) is nEvents x nBinsMap
-    syncMap = accumarray([eventIds, bins], 1, [nEvents, nBinsMap]);
-end
+% Accumulate counts into the matrix
+% Rows = Events, Cols = Bins
+% Note: size(syncMap) is nEvents x nBinsMap
+syncMap = accumarray([eventIds, bins], 1, [nEvents, nBinsMap]);
 
 end % End of sync_spksMap
 

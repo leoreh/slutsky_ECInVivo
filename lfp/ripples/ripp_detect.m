@@ -19,8 +19,8 @@ function ripp = ripp_detect(varargin)
 %   fs              (Optional) LFP sampling frequency [Hz]. If empty, loads from session info.
 %   rippCh          (Optional) Channel(s) to load/average for ripple detection {uses session info}.
 %   recWin          (Optional) [start end] time window to analyze [s] {[0 Inf]}.
-%   flgGraphics     (Optional) Logical flag to plot results {true}.
-%   flgSaveVar      (Optional) Logical flag to save results to .ripp.mat file {true}.
+%   flgPlot         (Optional) Logical flag to plot results {true}.
+%   flgSave         (Optional) Logical flag to save results to .ripp.mat file {true}.
 %   thr             (Optional) Numeric 5-element vector for thresholds {[1.5, 2.5, 2, 200, 100]}:
 %                     thr(1): Initial detection (std above local mean).
 %                     thr(2): Peak power (std above local mean).
@@ -61,8 +61,8 @@ addParameter(p, 'emg', [], @isnumeric);      % EMG signal input (must match sig)
 addParameter(p, 'recWin', [0 Inf], @(x) isnumeric(x) && numel(x)==2);
 addParameter(p, 'rippCh', [], @isnumeric);    % Ripple channel(s) if loading LFP
 addParameter(p, 'fs', [], @isnumeric);        % Sampling rate
-addParameter(p, 'flgGraphics', true, @islogical);
-addParameter(p, 'flgSaveVar', true, @islogical);
+addParameter(p, 'flgPlot', true, @islogical);
+addParameter(p, 'flgSave', true, @islogical);
 addParameter(p, 'thr', [1.5, 2.5, 2, 200, 100], @(x) isnumeric(x) && numel(x)==5);
 addParameter(p, 'passband', [100 300], @(x) isnumeric(x) && numel(x)==2);
 addParameter(p, 'limDur', [20, 300, 20, 10], @(x) isnumeric(x) && numel(x)==4);
@@ -77,8 +77,8 @@ emg         = p.Results.emg;
 recWin      = p.Results.recWin;
 rippCh      = p.Results.rippCh;
 fs          = p.Results.fs;
-flgGraphics = p.Results.flgGraphics;
-flgSaveVar  = p.Results.flgSaveVar;
+flgPlot     = p.Results.flgPlot;
+flgSave     = p.Results.flgSave;
 thr         = p.Results.thr;
 passband    = p.Results.passband;
 limDur      = p.Results.limDur;
@@ -449,7 +449,7 @@ ripp.contPowDur     = contPowDur / fs * 1000;
 ripp.dur            = ripp.dur * 1000;         % covert to ms
 
 % Save Results
-if flgSaveVar
+if flgSave
     save(rippfile, 'ripp', '-v7.3');
 
     % Create .res and .clu files for NeuroScope visualization
@@ -481,7 +481,7 @@ if flgSaveVar
 end
 
 % Plot Graphics
-if flgGraphics
+if flgPlot
     ripp_plot(ripp, 'basepath', basepath, 'flgSaveFig', true);
 end
 

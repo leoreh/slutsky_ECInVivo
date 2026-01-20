@@ -30,8 +30,8 @@ function ripp = ripp_wrapper(varargin)
 %   limState        Vigilance state index to limit ripp_spks statistics {[4]}.
 %   flgRefine       Logical flag to run ripp_detect twice, using suggested
 %                   parameters from the first run {true}.
-%   flgGraphics     Master flag to enable/disable ALL plotting {true}.
-%   flgSaveVar      Master flag to save/update ripp.mat at each step {true}.
+%   flgPlot     Master flag to enable/disable ALL plotting {true}.
+%   flgSave      Master flag to save/update ripp.mat at each step {true}.
 %   flgSaveFig      Master flag to save ALL generated figures {true}.
 %   bit2uv          Conversion factor from bits to microvolts {0.195}.
 %
@@ -71,8 +71,8 @@ addParameter(p, 'passband', [100 300], @(x) isnumeric(x) && numel(x)==2);
 addParameter(p, 'detectAlt', 3, @(x) isnumeric(x) && isscalar(x) && ismember(x, [1, 2, 3]));
 addParameter(p, 'limState', [], @(x) isempty(x) || (isnumeric(x) && isscalar(x)));
 addParameter(p, 'flgRefine', true, @islogical);
-addParameter(p, 'flgGraphics', true, @islogical);
-addParameter(p, 'flgSaveVar', true, @islogical);
+addParameter(p, 'flgPlot', true, @islogical);
+addParameter(p, 'flgSave', true, @islogical);
 addParameter(p, 'flgSaveFig', true, @islogical);
 addParameter(p, 'bit2uv', [], @(x) isempty(x) || (isnumeric(x) && isscalar(x)));
 
@@ -85,8 +85,8 @@ passband        = p.Results.passband;
 detectAlt       = p.Results.detectAlt;
 limState        = p.Results.limState;
 flgRefine       = p.Results.flgRefine;
-flgGraphics     = p.Results.flgGraphics;
-flgSaveVar      = p.Results.flgSaveVar;
+flgPlot         = p.Results.flgPlot;
+flgSave      = p.Results.flgSave;
 flgSaveFig      = p.Results.flgSaveFig;
 bit2uv          = p.Results.bit2uv;
 
@@ -115,7 +115,7 @@ if isempty(rippCh)
     end
 end
 
-% Handle bit2uv logic (TDT vs OE)
+% Handle bit2uv logic 
 if isempty(bit2uv)
     if round(fsSpk) == 24414
         bit2uv = 1;      % Default for TDT
@@ -158,7 +158,7 @@ if flgRefine
     ripp = ripp_detect('basepath', basepath, 'sig', sig(winIdx), 'emg', emg(winIdx),...
         'rippCh', [], 'recWin', [0 Inf], 'thr', thrTmp, 'passband', passband,...
         'limDur', limDurTmp, 'detectAlt', detectAlt, 'bit2uv', bit2uv, ...
-        'flgGraphics', false, 'flgSaveVar', false);
+        'flgPlot', false, 'flgSave', false);
 
     % Use suggested parameters, adjusting thresholds
     thr = round(ripp.info.thrData * refineFactor, 1);
@@ -169,13 +169,13 @@ end
 ripp = ripp_detect('basepath', basepath, 'sig', sig, 'emg', emg,...
     'rippCh', [], 'recWin', [0 Inf], 'thr', thr, 'passband', passband,...
     'limDur', limDur, 'detectAlt', detectAlt, 'bit2uv', bit2uv, ...
-    'flgGraphics', false, 'flgSaveVar', flgSaveVar);
+    'flgPlot', false, 'flgSave', flgSave);
 
 % update channel info
 ripp.info.rippCh = rippCh;
 
 % Plot detection results
-if flgGraphics
+if flgPlot
     fprintf('Running ripp_plot...\n');
     ripp_plot(ripp, 'basepath', basepath, 'flgSaveFig', flgSaveFig);
 end
@@ -184,18 +184,18 @@ end
 % RIPPLE STATE ANALYSIS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 fprintf('Running ripp_states...\n');
-ripp = ripp_states(ripp, 'basepath', basepath, 'flgGraphics', flgGraphics, ...
-    'flgSaveVar', flgSaveVar, 'flgSaveFig', flgSaveFig);
+ripp = ripp_states(ripp, 'basepath', basepath, 'flgPlot', flgPlot, ...
+    'flgSave', flgSave, 'flgSaveFig', flgSaveFig);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % RIPPLE SPIKE ANALYSIS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 fprintf('Running ripp_spks...\n');
 ripp = ripp_spks(ripp, 'basepath', basepath, 'limState', limState,...
-    'flgGraphics', false, 'flgSaveVar', flgSaveVar);
+    'flgPlot', false, 'flgSave', flgSave);
 
 % Plot spike analysis
-if flgGraphics
+if flgPlot
     ripp_plotSpks(ripp, 'basepath', basepath, 'flgSaveFig', flgSaveFig);
 end
 
@@ -211,14 +211,14 @@ sig = filterLFP(sig, 'fs', fs, 'type', 'butter', 'dataOnly', true,...
 
 ripp.spkLfp = spklfp_calc('basepath', basepath, 'lfpTimes', ripp.times,...
     'ch', ripp.info.rippCh, 'fRange', fRange, 'sig', sig,... 
-    'flgSave', false, 'flgGraphics', false, 'flgStl', false);
+    'flgSave', false, 'flgPlot', false, 'flgStl', false);
 
-if flgGraphics
+if flgPlot
     spklfp_plot(ripp.spkLfp)
 end
 
 % Save the updated ripp structure 
-if flgSaveVar
+if flgSave
     save(fullfile(basepath, [basename, '.ripp.mat']), 'ripp', '-v7.3');
 end
 
