@@ -26,7 +26,6 @@ addParameter(p, 'emg', [], @isnumeric);
 addParameter(p, 'basepath', pwd, @ischar);
 addParameter(p, 'thr', [1.5, 2.5, 2, 200, 50], @isnumeric);
 addParameter(p, 'limDur', [15, 300, 20, 10], @isnumeric);
-addParameter(p, 'detectAlt', 3, @isnumeric);
 addParameter(p, 'flgPlot', true, @islogical);
 addParameter(p, 'flgSave', true, @islogical);
 

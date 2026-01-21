@@ -28,6 +28,7 @@ addParameter(p, 'flgSave', false, @islogical);
 addParameter(p, 'flgSaveFig', false, @islogical);
 addParameter(p, 'bit2uv', [], @isnumeric);
 addParameter(p, 'zMet', 'nrem', @ischar);
+addParameter(p, 'mapDur', [-0.075 0.075], @isnumeric);
 parse(p, varargin{:});
 
 basepath = p.Results.basepath;
@@ -43,7 +44,9 @@ flgSaveFig = p.Results.flgSaveFig;
 bit2uv = p.Results.bit2uv;
 limState = p.Results.limState;
 flgGui = p.Results.flgGui;
+flgGui = p.Results.flgGui;
 zMet = p.Results.zMet;
+mapDur = p.Results.mapDur;
 
 %% ========================================================================
 %  SETUP
@@ -152,24 +155,13 @@ rippSig = ripp_sigPrep(lfp, fs, ...
 %  ========================================================================
 
 % Detect
-ripp = ripp_detect(rippSig, fs, ...
-    'emg', emg, ...
-    'limDur', limDur, ...
-    'basepath', basepath, ...
+ripp = ripp_times(rippSig, fs, ...
     'thr', thr, ...
-    'flgPlot', false, ...
-    'flgSave', flgSave);
+    'limDur', limDur);
 
 % Get non-ripple intervals of matched duration.
 recDur = length(lfp) / fs;
 ctrlTimes = ripp_ctrlTimes(ripp.times, recDur);
-
-
-if flgGui
-    ripp_gui(ripp.times, ripp.peakTime, rippSig, muTimes, fs, thr, emg, ...
-        'basepath', basepath);
-end
-
 
 
 %% ========================================================================
@@ -178,31 +170,63 @@ end
 
 rippStates = ripp_states(ripp.times, ripp.peakTime, boutTimes, ...
     'basepath', basepath, ...
-    'flgPlot', flgPlot, ...
+    'flgPlot', false, ...
     'flgSave', flgSave, ...
     'flgSaveFig', flgSaveFig);
 
-% Filter Ripples by State if requested
-rippTimes = ripp.times;
-peakTime = ripp.peakTime;
-% if ~isempty(limState)
-%     stateIdx = ripp.states.idx(:, limState);
-%     rippTimes = ripp.times(stateIdx, :);
-%     peakTime = ripp.peakTime(stateIdx);
-%     fprintf('Limiting analysis to State %d\n', limState);
-% end
+
+%% ========================================================================
+%  QUALITY ASSURANCE
+%  ========================================================================
+
+% Calculate spkGain (z-score relative to control) per ripple from MUA
+rippRates = times2rate(muTimes, 'winCalc', ripp.times, 'binsize', Inf);
+ctrlRates = times2rate(muTimes, 'winCalc', ctrlTimes, 'binsize', Inf);
+spkGain = (mean(rippRates, 1, 'omitnan') - ...
+    mean(ctrlRates, 'all', 'omitnan')) ./ ...
+    std(ctrlRates, [], 'all', 'omitnan');
+
+qa = ripp_qa(ripp, rippSig, 'emg', emg, 'spkGain', spkGain);
+
+
+% Compare good and bad
+if flgGui
+    ripp_gui(ripp.times, ripp.peakTime, rippSig, muTimes, fs, thr, emg, ...
+        'basepath', basepath);
+end
 
 
 %% ========================================================================
 %  SPIKES
 %  ========================================================================
 
-% Run Analysis
-rippSpks = ripp_spks(rippTimes, spkTimes, peakTime, ctrlTimes, ...
-    'muTimes', muTimes, ...
+% SU
+fprintf('Analyzing Single Units...\n');
+rippSpks.su = ripp_spks(ripp.times, spkTimes, ripp.peakTime, ctrlTimes, ...
     'basepath', basepath, ...
-    'flgPlot', flgPlot, ...
-    'flgSave', flgSave);
+    'mapDur', mapDur, ...
+    'flgSave', false);
+
+% MU
+fprintf('Analyzing Multi-Unit Activity...\n');
+if ~isempty(muTimes)
+    rippSpks.mu = ripp_spks(ripp.times, muTimes, ripp.peakTime, ctrlTimes, ...
+        'basepath', basepath, ...
+        'mapDur', mapDur, ...
+        'flgSave', false);
+else
+    rippSpks.mu = [];
+end
+
+if flgSave
+    rippSpksFile = fullfile(basepath, [basename, '.rippSpks.mat']);
+    save(rippSpksFile, 'rippSpks', '-v7.3');
+end
+
+if flgPlot
+    ripp_plotSpks(rippSpks, 'basepath', basepath, ...
+        'mapDur', mapDur, 'flgSaveFig', flgSaveFig);
+end
 
 
 
@@ -210,12 +234,6 @@ rippSpks = ripp_spks(rippTimes, spkTimes, peakTime, ctrlTimes, ...
 %  SPK-LFP
 %  ========================================================================
 fprintf('Running spklfp coupling...\n');
-fRange = [80 250];
-% sig is not available anymore as vector, extract from rippSig or re-filter?
-% rippSig.filt is [100 300]. Here we want [120 200].
-% So we re-filter raw lfp.
-sig = filterLFP(lfp, 'fs', fs, 'type', 'butter', 'dataOnly', true, ...
-    'order', 3, 'passband', fRange, 'graphics', false);
 
 spkLfp = spklfp_calc('basepath', basepath, ...
     'lfpTimes', ripp.times, ...
@@ -228,23 +246,28 @@ spkLfpFile = fullfile(basepath, [basename, '.rippSpkLfp.mat']);
 save(spkLfpFile, 'spkLfp', '-v7.3');
 
 
+
+
 %% ========================================================================
-%  Finalize and Save
+%  NEUOROSCOPE
 %  ========================================================================
 
-% NeuroScope Files
 % Revert times to absolute for saving/Neuroscope
 ripp.times = ripp.times + win(1);
 ripp.peakTime = ripp.peakTime + win(1);
 
 % NeuroScope Files
 if flgSave
-
     % Convert to samples (NeuroScope uses acquisition rate fsSpk)
     rippSamps = round(ripp.times * fsSpk);
     peakSamps = round(ripp.peakTime * fsSpk);
     ripp2ns(rippSamps, peakSamps, 'basepath', basepath);
 end
+
+
+%% ========================================================================
+%  FINALIZE
+%  ========================================================================
 
 fprintf('--- Ripple Analysis Pipeline Completed for %s ---\n', basename);
 

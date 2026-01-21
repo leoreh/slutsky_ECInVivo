@@ -22,11 +22,13 @@ p = inputParser;
 addRequired(p, 'rippSpks', @isstruct);
 addParameter(p, 'basepath', pwd, @ischar);
 addParameter(p, 'flgSaveFig', true, @islogical);
+addParameter(p, 'mapDur', [], @isnumeric);
 parse(p, rippSpks, varargin{:});
 
 rippSpks = p.Results.rippSpks;
 basepath = p.Results.basepath;
 flgSaveFig = p.Results.flgSaveFig;
+mapDur = p.Results.mapDur;
 
 %% ========================================================================
 %  INITIALIZATION
@@ -45,13 +47,19 @@ else
     flgUnits = false;
 end
 
-% Params
-mapDur = rippSpks.info.mapDur;
-nbinsMap = rippSpks.info.nBinsMap;
-xMap = linspace(mapDur(1), mapDur(2), nbinsMap);
-nUnits = length(rippSpks.su.pVal);
-nRipples = size(rippSpks.mu.rippMap, 1); % Estimate directly from map
+% Determine nBins from data
+nBinsMap = size(rippSpks.su.rippMap, 3);
+nRipp = size(rippSpks.su.rippMap, 2);
 
+if isempty(mapDur)
+    xMap = 1:nBinsMap;
+    lx = 'Samples';
+else
+    xMap = linspace(mapDur(1), mapDur(2), nBinsMap);
+    lx = 'Time [s]';
+end
+
+nUnits = length(rippSpks.su.pVal);
 unitClr = [0 0 1; 1 0 0];
 
 %% ========================================================================
@@ -64,9 +72,9 @@ if ~isempty(rippSpks.mu) && ~isempty(rippSpks.mu.rippMap)
 
     % PETH Map
     subplot(4, 3, [1, 4]);
-    nPlot = min([100, nRipples]);
-    if nRipples > 0
-        randIdx = randperm(nRipples, nPlot);
+    nPlot = min([100, nRipp]);
+    if nRipp > 0
+        randIdx = randperm(nRipp, nPlot);
         mapData = rippSpks.mu.rippMap(randIdx, :);
         PlotColorMap(mapData, 'x', xMap, 'bar', 'on');
     end
@@ -76,18 +84,18 @@ if ~isempty(rippSpks.mu) && ~isempty(rippSpks.mu.rippMap)
 
     % Mean PETH (Ripple)
     sb2 = subplot(4, 3, 2); hold on;
-    ydata = rippSpks.mu.rippMap;
+    ydata = squeeze(rippSpks.mu.rippMap);
     plot_stdShade('hAx', sb2, 'dataMat', ydata', 'alpha', 0.3, 'clr', [0 0 0], 'xVal', xMap);
     axis tight;
     yLimit = ylim; yLimit(1) = 0; ylim(yLimit);
-    xlabel('Time [s]'); ylabel('MU Spikes'); title('Ripple'); box off;
+    xlabel(lx); ylabel('MU Spikes'); title('Ripple'); box off;
 
     % Mean PETH (Control)
     sb3 = subplot(4, 3, 5); hold on;
-    ydata = rippSpks.mu.ctrlMap;
+    ydata = squeeze(rippSpks.mu.ctrlMap);
     plot_stdShade('hAx', sb3, 'dataMat', ydata', 'alpha', 0.3, 'clr', [0.5 0.5 0.5], 'xVal', xMap);
     ylim(yLimit); xlim([xMap(1), xMap(end)]);
-    xlabel('Time [s]'); ylabel('MU Spikes'); title('Control'); box off;
+    xlabel(lx); ylabel('MU Spikes'); title('Control'); box off;
 
     % Histogram
     subplot(4, 3, [3, 6]); hold on;
@@ -110,7 +118,7 @@ if ~isempty(rippSpks.su) && ~isempty(rippSpks.su.rippMap)
     normSpking = ydata ./ maxPerUnit;
 
     PlotColorMap(normSpking, 'x', xMap, 'bar', 'on');
-    xlabel('Time [s]'); ylabel('Unit #'); title('Norm. Mean SU PETH');
+    xlabel(lx); ylabel('Unit #'); title('Norm. Mean SU PETH');
 
     % RS Units
     sb6 = subplot(4, 3, 8); hold on;
@@ -120,7 +128,7 @@ if ~isempty(rippSpks.su) && ~isempty(rippSpks.su.rippMap)
         title(sprintf('RS Units (n=%d)', sum(idxRS)));
         ylim([0 1]);
     end
-    xlabel('Time [s]'); ylabel('Norm. FR'); box off; axis tight;
+    xlabel(lx); ylabel('Norm. FR'); box off; axis tight;
 
     % FS Units
     sb7 = subplot(4, 3, 11); hold on;
@@ -130,7 +138,7 @@ if ~isempty(rippSpks.su) && ~isempty(rippSpks.su.rippMap)
         title(sprintf('FS Units (n=%d)', sum(idxFS)));
         ylim([0 1]);
     end
-    xlabel('Time [s]'); ylabel('Norm. FR'); box off; axis tight;
+    xlabel(lx); ylabel('Norm. FR'); box off; axis tight;
 
     % Scatter
     subplot(4, 3, [9, 12]);

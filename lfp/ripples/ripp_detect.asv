@@ -1,4 +1,4 @@
-function ripp = ripp_detect(sig, fs, varargin)
+function ripp = ripp_detect(rippSig, fs, varargin)
 % RIPP_DETECT Detects hippocampal ripple events from LFP data.
 %
 % SUMMARY:
@@ -7,9 +7,9 @@ function ripp = ripp_detect(sig, fs, varargin)
 % based on power/duration/EMG, and calculates event properties.
 %
 % INPUT:
-%   sig             Numeric vector of LFP data (filtered).
+%   rippSig         Structure with fields: lfp, filt, amp, freq, z, emg.
 %   fs              Sampling frequency [Hz].
-%   varargin        'emg', 'basepath', 'thr', 'limDur', 'detectAlt', 'flgPlot', 'flgSave'.
+%   varargin        'basepath', 'thr', 'limDur', 'detectAlt', 'flgPlot', 'flgSave'.
 %
 % OUTPUT:
 %   ripp            Structure (times, peakTime, info, maps, etc).
@@ -20,92 +20,55 @@ function ripp = ripp_detect(sig, fs, varargin)
 %  ARGUMENTS
 %  ========================================================================
 p = inputParser;
-addRequired(p, 'sig', @isnumeric);
+addRequired(p, 'rippSig', @isstruct);
 addRequired(p, 'fs', @isnumeric);
 addParameter(p, 'emg', [], @isnumeric);
 addParameter(p, 'basepath', pwd, @ischar);
-addParameter(p, 'thr', [1.5, 2.5, 2, 200, 100], @isnumeric);
+addParameter(p, 'thr', [1.5, 2.5, 2, 200, 50], @isnumeric);
 addParameter(p, 'limDur', [15, 300, 20, 10], @isnumeric);
-addParameter(p, 'detectAlt', 3, @isnumeric);
 addParameter(p, 'flgPlot', true, @islogical);
 addParameter(p, 'flgSave', true, @islogical);
 
-parse(p, sig, fs, varargin{:});
-sig         = p.Results.sig;
+parse(p, rippSig, fs, varargin{:});
+rippSig     = p.Results.rippSig;
 fs          = p.Results.fs;
 emg         = p.Results.emg;
 basepath    = p.Results.basepath;
 thr         = p.Results.thr;
 limDur      = p.Results.limDur;
-detectAlt   = p.Results.detectAlt;
 flgPlot     = p.Results.flgPlot;
 flgSave     = p.Results.flgSave;
 
-ripp = ripp_initialize();
 
 
 %% ========================================================================
 %  SETUP
 %  ========================================================================
+
+% Initialize
+ripp = struct();
+ripp.times = []; ripp.dur = []; ripp.peakTime = [];
+ripp.info = struct();
+ripp.maps = struct('durWin', [-0.075 0.075]);
+ripp.rate = struct();
+ripp.acg = struct();
+
+% File
 cd(basepath);
 [~, basename] = fileparts(basepath);
 rippfile = fullfile(basepath, [basename, '.ripp.mat']);
 
-timestamps = (0:length(sig)-1)' / fs;
+timestamps = (0:length(rippSig.lfp)-1)' / fs;
 ripp.rate.binsize = 60;
 
 % Duration limits to samples
 limDur_Samples = round(limDur / 1000 * fs);
-movLen = round(10 * fs);
-
-if ~isempty(emg) && length(emg) ~= length(sig)
-    error('EMG length (%d) does not match Signal length (%d).', length(emg), length(sig));
-end
-
-
-%% ========================================================================
-%  SIGNAL PROCESSING
-%  ========================================================================
-sigH = hilbert(sig);
-sigAmp = abs(sigH);
-sigPhase = angle(sigH);
-sigUnwrapped = unwrap(sigPhase);
-
-% Instantaneous Frequency
-dt = 1/fs;
-d0 = diff(medfilt1(sigUnwrapped, 12)) ./ dt;
-t_diff = timestamps(1:end-1) + dt/2;
-d1 = interp1(t_diff, d0, timestamps(2:end-1), 'linear', 'extrap');
-sigFreq = [d0(1); d1; d0(end)] / (2 * pi);
-
-% Detection Signal
-switch detectAlt
-    case 1 % Smoothed Amp
-        baseSignal = sigAmp;
-        winSmooth = round(0.005 * fs);
-    case 2 % Smoothed Sq
-        baseSignal = sig .^ 2;
-        winSmooth = round(0.010 * fs);
-    case 3 % Smoothed TEO
-        sPad = [sig(1); sig; sig(end)];
-        baseSignal = sPad(2:end-1).^2 - sPad(1:end-2) .* sPad(3:end);
-        baseSignal(baseSignal < 0) = 0;
-        winSmooth = round(0.005 * fs);
-end
-baseSignal = smoothdata(baseSignal, 'gaussian', winSmooth);
-
-% Adaptive Threshold
-localMean = movmean(baseSignal, movLen);
-localStd = movstd(baseSignal, movLen);
-stdFloor = 1e-6 * mean(localStd, 'omitnan');
-localStd(localStd < stdFloor) = stdFloor;
-sigDetect = (baseSignal - localMean) ./ localStd;
 
 
 %% ========================================================================
 %  DETECTION
 %  ========================================================================
-eventSamples = binary2bouts('vec', sigDetect > thr(1), 'minDur', limDur_Samples(1),...
+eventSamples = binary2bouts('vec', rippSig.z > thr(1), 'minDur', limDur_Samples(1),...
     'maxDur', limDur_Samples(2), 'interDur', limDur_Samples(3));
 nEvents = size(eventSamples, 1);
 
@@ -117,34 +80,34 @@ contPowAvg = nan(nEvents, 1);
 avgFreq = nan(nEvents, 1);
 
 % EMG Exclusion
-if ~isempty(emg)
-    for iEvent = 1:nEvents
-        idx = eventSamples(iEvent,1):eventSamples(iEvent,2);
-        emgRms(iEvent) = rms(emg(idx));
-    end
-    idxDiscard = idxDiscard | (emgRms > prctile(emgRms, thr(5)));
-end
+% if ~isempty(emg)
+%     for iEvent = 1:nEvents
+%         idx = eventSamples(iEvent,1):eventSamples(iEvent,2);
+%         emgRms(iEvent) = rms(emg(idx));
+%     end
+%     idxDiscard = idxDiscard | (emgRms > prctile(emgRms, thr(5)));
+% end
 
 % Frequency Exclusion
-if ~isempty(emg)
-    for iEvent = 1:nEvents
-        idx = eventSamples(iEvent,1):eventSamples(iEvent,2);
-        avgFreq(iEvent) = mean(sigFreq(idx), 'omitnan');
-    end
-
-    highEmgIdx = emgRms > prctile(emgRms, 99);
-    if any(highEmgIdx)
-        thrFreq = mean(avgFreq(highEmgIdx));
-        idxDiscard = idxDiscard | (avgFreq > thrFreq);
-    end
-end
+% if ~isempty(emg)
+%     for iEvent = 1:nEvents
+%         idx = eventSamples(iEvent,1):eventSamples(iEvent,2);
+%         avgFreq(iEvent) = mean(rippSig.freq(idx), 'omitnan');
+%     end
+% 
+%     highEmgIdx = emgRms > prctile(emgRms, 99);
+%     if any(highEmgIdx)
+%         thrFreq = mean(avgFreq(highEmgIdx));
+%         idxDiscard = idxDiscard | (avgFreq > thrFreq);
+%     end
+% end
 
 % Power and Continuity thresholds
 for iEvent = 1:nEvents
     if idxDiscard(iEvent), continue; end
 
     idx = eventSamples(iEvent,1):eventSamples(iEvent,2);
-    evtPow = sigDetect(idx);
+    evtPow = rippSig.z(idx);
 
     % Peak Power
     peakPower(iEvent) = max(evtPow);
@@ -199,7 +162,7 @@ end
 peakSample = zeros(nEvents, 1);
 for iEvent = 1:nEvents
     idx = eventSamples(iEvent,1):eventSamples(iEvent,2);
-    [~, peakRel] = min(sig(idx));
+    [~, peakRel] = min(rippSig.filt(idx));
     peakSample(iEvent) = eventSamples(iEvent,1) + peakRel - 1;
 end
 
@@ -212,17 +175,17 @@ nbinsMap = floor(fs * diff(ripp.maps.durWin) / 2) * 2 + 1;
 centerBin = ceil(nbinsMap / 2);
 mapArgs = {'durations', ripp.maps.durWin, 'nbins', nbinsMap, 'smooth', 0};
 
-[r, ir] = Sync([timestamps sig], peakTime, 'durations', ripp.maps.durWin);
+[r, ir] = Sync([timestamps rippSig.filt], peakTime, 'durations', ripp.maps.durWin);
 ripp.maps.raw = SyncMap(r, ir, mapArgs{:});
 ripp.maps.filt = ripp.maps.raw;
 
-[r, ir] = Sync([timestamps sigAmp], peakTime, 'durations', ripp.maps.durWin);
+[r, ir] = Sync([timestamps rippSig.amp], peakTime, 'durations', ripp.maps.durWin);
 ripp.maps.amp = SyncMap(r, ir, mapArgs{:});
 
-[r, ir] = Sync([timestamps sigPhase], peakTime, 'durations', ripp.maps.durWin);
+[r, ir] = Sync([timestamps rippSig.sigPhase], peakTime, 'durations', ripp.maps.durWin);
 ripp.maps.phase = SyncMap(r, ir, mapArgs{:});
 
-[r, ir] = Sync([timestamps sigFreq], peakTime, 'durations', ripp.maps.durWin);
+[r, ir] = Sync([timestamps rippSig.freq], peakTime, 'durations', ripp.maps.durWin);
 ripp.maps.freq = SyncMap(r, ir, mapArgs{:});
 
 % Store Properties
@@ -256,11 +219,6 @@ ripp.info.thrData(4) = prctile(peakPower, 99) * 2;
 ripp.info.thrData(5) = thr(5);
 ripp.info.thrData = round(ripp.info.thrData, 1);
 
-% Note: avgFreq calculated only when EMG present in original.
-% Assuming here if available it's used.
-ripp.info.passbandData = [prctile(avgFreq, 2), prctile(ripp.peakFreq, 99.9)];
-
-
 %% ========================================================================
 %  FINALIZE
 %  ========================================================================
@@ -277,15 +235,4 @@ end
 
 end
 
-% -------------------------------------------------------------------------
-% Helper: Initialize
-% -------------------------------------------------------------------------
-function ripp = ripp_initialize()
-ripp = struct();
-ripp.times = []; ripp.dur = []; ripp.peakTime = [];
-ripp.info = struct();
-ripp.maps = struct('durWin', [-0.075 0.075]);
-ripp.rate = struct();
-ripp.acg = struct();
-% No corr substruct as requested
-end
+

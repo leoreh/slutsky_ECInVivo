@@ -28,6 +28,7 @@ addParameter(p, 'flgSave', false, @islogical);
 addParameter(p, 'flgSaveFig', false, @islogical);
 addParameter(p, 'bit2uv', [], @isnumeric);
 addParameter(p, 'zMet', 'nrem', @ischar);
+addParameter(p, 'mapDur', [-0.075 0.075], @isnumeric);
 parse(p, varargin{:});
 
 basepath = p.Results.basepath;
@@ -43,7 +44,9 @@ flgSaveFig = p.Results.flgSaveFig;
 bit2uv = p.Results.bit2uv;
 limState = p.Results.limState;
 flgGui = p.Results.flgGui;
+flgGui = p.Results.flgGui;
 zMet = p.Results.zMet;
+mapDur = p.Results.mapDur;
 
 %% ========================================================================
 %  SETUP
@@ -73,7 +76,7 @@ if ~isempty(v.spktimes)
     muTimes = cellfun(@(x) x / fsSpk, v.spktimes, 'uni', false);
     muTimes = cellfun(@(x) x - win(1), muTimes, 'Uni', false);
     muTimes = cellfun(@(x) x(x >= 0 & x <= sigDur), muTimes, 'Uni', false);
-    muTimes = sort(vertcat(muTimes{:}));
+    muTimes = {sort(vertcat(muTimes{:}))};
 else
     muTimes = [];
 end
@@ -152,20 +155,18 @@ rippSig = ripp_sigPrep(lfp, fs, ...
 %  ========================================================================
 
 % Detect
-ripp = ripp_detect(rippSig, fs, ...
-    'emg', emg, ...
-    'limDur', limDur, ...
-    'basepath', basepath, ...
+ripp = ripp_times(rippSig, fs, ...
     'thr', thr, ...
-    'flgPlot', false, ...
-    'flgSave', flgSave);
+    'limDur', limDur);
 
+% Get non-ripple intervals of matched duration.
+recDur = length(lfp) / fs;
+ctrlTimes = ripp_ctrlTimes(ripp.times, recDur);
 
 if flgGui
     ripp_gui(ripp.times, ripp.peakTime, rippSig, muTimes, fs, thr, emg, ...
         'basepath', basepath);
 end
-
 
 
 %% ========================================================================
@@ -174,7 +175,7 @@ end
 
 rippStates = ripp_states(ripp.times, ripp.peakTime, boutTimes, ...
     'basepath', basepath, ...
-    'flgPlot', flgPlot, ...
+    'flgPlot', false, ...
     'flgSave', flgSave, ...
     'flgSaveFig', flgSaveFig);
 
@@ -193,14 +194,46 @@ peakTime = ripp.peakTime;
 %  SPIKES
 %  ========================================================================
 
-% Run Analysis
-rippSpks = ripp_spks(rippTimes, spkTimes, peakTime, ...
-    'muTimes', muTimes, ...
+% SU
+fprintf('Analyzing Single Units...\n');
+rippSpks.su = ripp_spks(rippTimes, spkTimes, peakTime, ctrlTimes, ...
     'basepath', basepath, ...
-    'flgPlot', flgPlot, ...
+    'mapDur', mapDur, ...
+    'flgSave', false);
+
+% MU
+fprintf('Analyzing Multi-Unit Activity...\n');
+if ~isempty(muTimes)
+    rippSpks.mu = ripp_spks(rippTimes, muTimes, peakTime, ctrlTimes, ...
+        'basepath', basepath, ...
+        'mapDur', mapDur, ...
+        'flgSave', false);
+else
+    rippSpks.mu = [];
+end
+
+if flgSave
+    rippSpksFile = fullfile(basepath, [basename, '.rippSpks.mat']);
+    save(rippSpksFile, 'rippSpks', '-v7.3');
+end
+
+if flgPlot
+    ripp_plotSpks(rippSpks, 'basepath', basepath, ...
+        'mapDur', mapDur, 'flgSaveFig', flgSaveFig);
+end
+
+
+qa = ripp_qa(ripp, rippSig, 'emg', emg, 'rippSpks', rippSpks);
+
+
+
+ripp = ripp_detect(rippSig, fs, ...
+    'emg', emg, ...
+    'limDur', limDur, ...
+    'basepath', basepath, ...
+    'thr', thr, ...
+    'flgPlot', false, ...
     'flgSave', flgSave);
-
-
 
 %% ========================================================================
 %  SPK-LFP
