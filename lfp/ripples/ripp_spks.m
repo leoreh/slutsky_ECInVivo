@@ -1,4 +1,4 @@
-function rippSpks = ripp_spks(rippTimes, spkTimes, peakTimes, varargin)
+function rippSpks = ripp_spks(rippTimes, spkTimes, peakTimes, ctrlTimes, varargin)
 % RIPP_SPKS Analyzes spiking activity relative to ripple events.
 %
 % SUMMARY:
@@ -9,6 +9,7 @@ function rippSpks = ripp_spks(rippTimes, spkTimes, peakTimes, varargin)
 %   rippTimes       [N x 2] start/end times (s).
 %   spkTimes        {Nunits x 1} spike times (s).
 %   peakTimes       [N x 1] ripple peak times (s).
+%   ctrlTimes       [N x 2] control event times (s).
 %   varargin        'muTimes' (cell array), 'basepath', 'flgPlot', 'flgSave'.
 %
 % OUTPUT:
@@ -24,16 +25,18 @@ p = inputParser;
 addRequired(p, 'rippTimes', @isnumeric);
 addRequired(p, 'spkTimes', @iscell);
 addRequired(p, 'peakTimes', @isnumeric);
+addRequired(p, 'ctrlTimes', @isnumeric);
 addParameter(p, 'muTimes', [], @isnumeric);
 addParameter(p, 'basepath', pwd, @ischar);
 addParameter(p, 'flgPlot', true, @islogical);
 addParameter(p, 'flgSave', true, @islogical);
 addParameter(p, 'mapDur', [-0.075 0.075], @isnumeric);
-parse(p, rippTimes, spkTimes, peakTimes, varargin{:});
+parse(p, rippTimes, spkTimes, peakTimes, ctrlTimes, varargin{:});
 
 rippTimes = p.Results.rippTimes;
 spkTimes = p.Results.spkTimes;
 peakTimes = p.Results.peakTimes;
+ctrlTimes = p.Results.ctrlTimes;
 muTimes = p.Results.muTimes;
 basepath = p.Results.basepath;
 flgPlot = p.Results.flgPlot;
@@ -49,7 +52,6 @@ rippSpksFile = fullfile(basepath, [basename, '.rippSpks.mat']);
 
 nUnits = length(spkTimes);
 nRipples = size(rippTimes, 1);
-rippDur = rippTimes(:, 2) - rippTimes(:, 1);
 
 % Map Params
 fsLfp = 1250;
@@ -57,7 +59,6 @@ nBinsMap = floor(fsLfp * diff(mapDur) / 2) * 2 + 1;
 
 % Output Struct
 rippSpks = struct();
-rippSpks.info.recWin = [0 Inf];
 rippSpks.info.mapDur = mapDur;
 rippSpks.info.nBinsMap = nBinsMap;
 rippSpks.su = struct('pVal', nan(nUnits, 1), 'sigMod', false(nUnits, 1), ...
@@ -66,105 +67,49 @@ rippSpks.su = struct('pVal', nan(nUnits, 1), 'sigMod', false(nUnits, 1), ...
     'rippMap', [], 'ctrlMap', []);
 rippSpks.mu = struct('rippMap', [], 'ctrlMap', []);
 
-%% ========================================================================
-%  CONTROL EVENTS
-%  ========================================================================
-% Finds non-ripple intervals of matched duration (Linear Scavenger).
-
-recEnd = max([max(rippTimes(:)); 100]) + 10;
-buffer = max(rippDur);
-intervalsExclude = rippTimes + [-buffer, buffer];
-intervalsInclude = [0, recEnd];
-intervalsCtrl = SubtractIntervals(intervalsInclude, intervalsExclude);
-
-% Filter short
-% Note: Using ripple max dur as minimum requirement for control blocks
-durIdx = diff(intervalsCtrl, 1, 2) < max(rippDur);
-intervalsCtrl(durIdx, :) = [];
-
-if isempty(intervalsCtrl)
-    warning('No valid control intervals found.');
-    ctrlTimes = nan(nRipples, 2);
-else
-    % Match Events
-    nRipples = length(rippDur);
-    ctrlTimes = nan(nRipples, 2);
-    nFree = size(intervalsCtrl, 1);
-
-    maxDist = 4 * 60 * 60;
-    padding = 0.1;
-    currentFreeIdx = 1;
-    lastEndTime = -inf;
-
-    for iRipp = 1:nRipples
-        needed = rippDur(iRipp);
-        while currentFreeIdx <= nFree
-            blockStart = intervalsCtrl(currentFreeIdx, 1);
-            blockEnd = intervalsCtrl(currentFreeIdx, 2);
-            t_start = max(blockStart, lastEndTime + padding);
-
-            if t_start + needed <= blockEnd
-                if blockStart < peakTimes(iRipp) - maxDist
-                    currentFreeIdx = currentFreeIdx + 1;
-                    continue;
-                end
-                ctrlTimes(iRipp, :) = [t_start, t_start + needed];
-                lastEndTime = t_start + needed;
-                break;
-            else
-                currentFreeIdx = currentFreeIdx + 1;
-            end
-        end
-    end
-end
-
-rippSpks.info.ctrlTimes = ctrlTimes;
-
 
 %% ========================================================================
 %  SU ANALYSIS
 %  ========================================================================
 fprintf('Analyzing %d Single Units...\n', nUnits);
 
-if nUnits > 0
-    % Firing Rates
-    rippRates = times2rate(spkTimes, 'winCalc', rippTimes, 'binsize', Inf);
-    ctrlRates = times2rate(spkTimes, 'winCalc', ctrlTimes, 'binsize', Inf);
+% Firing Rates
+rippRates = times2rate(spkTimes, 'winCalc', rippTimes, 'binsize', Inf);
+ctrlRates = times2rate(spkTimes, 'winCalc', ctrlTimes, 'binsize', Inf);
 
-    rippSpks.su.rippRates = rippRates;
-    rippSpks.su.ctrlRates = ctrlRates;
+rippSpks.su.rippRates = rippRates;
+rippSpks.su.ctrlRates = ctrlRates;
 
-    % Maps & Stats
-    rippSpks.su.rippMap = nan(nUnits, nRipples, nBinsMap);
-    rippSpks.su.ctrlMap = nan(nUnits, nRipples, nBinsMap);
+% Maps & Stats
+rippSpks.su.rippMap = nan(nUnits, nRipples, nBinsMap);
+rippSpks.su.ctrlMap = nan(nUnits, nRipples, nBinsMap);
 
-    for iUnit = 1:nUnits
-        % Stats
-        rRate = rippRates(iUnit, :);
-        cRate = ctrlRates(iUnit, :);
+for iUnit = 1:nUnits
+    % Stats
+    rRate = rippRates(iUnit, :);
+    cRate = ctrlRates(iUnit, :);
 
-        if any(~isnan(rRate)) && any(~isnan(cRate))
-            [pVal, h] = signrank(rRate, cRate);
-            rippSpks.su.pVal(iUnit) = pVal;
-            rippSpks.su.sigMod(iUnit) = h;
+    if any(~isnan(rRate)) && any(~isnan(cRate))
+        [pVal, h] = signrank(rRate, cRate);
+        rippSpks.su.pVal(iUnit) = pVal;
+        rippSpks.su.sigMod(iUnit) = h;
 
-            mC = mean(cRate, 'omitnan');
-            sdC = std(cRate, 0, 'omitnan');
-            mR = mean(rRate, 'omitnan');
+        mC = mean(cRate, 'omitnan');
+        sdC = std(cRate, 0, 'omitnan');
+        mR = mean(rRate, 'omitnan');
 
-            rippSpks.su.frGain(iUnit) = (mR - mC) / sdC;
-            rippSpks.su.frModulation(iUnit) = (mR - mC) / (mR + mC);
-            rippSpks.su.frPrct(iUnit) = (mR - mC) / mC * 100;
-            rippSpks.su.frRipp(iUnit) = mR;
-            rippSpks.su.frRand(iUnit) = mC;
-        end
-
-        % Maps
-        rippSpks.su.rippMap(iRipp, :, :) = sync_spksMap(spkTimes{iRipp}, ...
-            peakTimes, mapDur, nBinsMap);
-        rippSpks.su.ctrlMap(iRipp, :, :) = sync_spksMap(spkTimes{iRipp}, ...
-            diff(ctrlTimes, 1, 2) / 2, mapDur, nBinsMap);
+        rippSpks.su.frGain(iUnit) = (mR - mC) / sdC;
+        rippSpks.su.frModulation(iUnit) = (mR - mC) / (mR + mC);
+        rippSpks.su.frPrct(iUnit) = (mR - mC) / mC * 100;
+        rippSpks.su.frRipp(iUnit) = mR;
+        rippSpks.su.frRand(iUnit) = mC;
     end
+
+    % Maps
+    rippSpks.su.rippMap(iRipp, :, :) = sync_spksMap(spkTimes{iRipp}, ...
+        peakTimes, mapDur, nBinsMap);
+    rippSpks.su.ctrlMap(iRipp, :, :) = sync_spksMap(spkTimes{iRipp}, ...
+        diff(ctrlTimes, 1, 2) / 2, mapDur, nBinsMap);
 end
 
 
@@ -194,7 +139,7 @@ if flgSave
 end
 
 if flgPlot
-     ripp_plotSpks(rippSpks)
+    ripp_plotSpks(rippSpks)
 end
 
 end     % EOF

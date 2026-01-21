@@ -73,7 +73,7 @@ if ~isempty(v.spktimes)
     muTimes = cellfun(@(x) x / fsSpk, v.spktimes, 'uni', false);
     muTimes = cellfun(@(x) x - win(1), muTimes, 'Uni', false);
     muTimes = cellfun(@(x) x(x >= 0 & x <= sigDur), muTimes, 'Uni', false);
-    muTimes = sort(vertcat(muTimes{:}));
+    muTimes = {sort(vertcat(muTimes{:}))};
 else
     muTimes = [];
 end
@@ -160,6 +160,10 @@ ripp = ripp_detect(rippSig, fs, ...
     'flgPlot', false, ...
     'flgSave', flgSave);
 
+% Get non-ripple intervals of matched duration.
+recDur = length(lfp) / fs;
+ctrlTimes = ripp_ctrlTimes(ripp.times, recDur);
+
 
 if flgGui
     ripp_gui(ripp.times, ripp.peakTime, rippSig, muTimes, fs, thr, emg, ...
@@ -194,7 +198,7 @@ peakTime = ripp.peakTime;
 %  ========================================================================
 
 % Run Analysis
-rippSpks = ripp_spks(rippTimes, spkTimes, peakTime, ...
+rippSpks = ripp_spks(rippTimes, spkTimes, peakTime, ctrlTimes, ...
     'muTimes', muTimes, ...
     'basepath', basepath, ...
     'flgPlot', flgPlot, ...
