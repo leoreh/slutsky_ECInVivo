@@ -10,7 +10,7 @@
 basepaths = [mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl')];
 nFiles = length(basepaths);
 
-for iFile = 1 : nfiles
+for iFile = 1 : nFiles
     basepath = basepaths{iFile};
     cd(basepath)
     [~, basename] = fileparts(basepath);

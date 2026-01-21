@@ -24,8 +24,8 @@ addRequired(p, 'sig', @isnumeric);
 addRequired(p, 'fs', @isnumeric);
 addParameter(p, 'emg', [], @isnumeric);
 addParameter(p, 'basepath', pwd, @ischar);
-addParameter(p, 'thr', [1.5, 2.5, 2, 200, 100], @isnumeric);
-addParameter(p, 'limDur', [20, 300, 20, 10], @isnumeric);
+addParameter(p, 'thr', [1.5, 2.5, 2, 200, 50], @isnumeric);
+addParameter(p, 'limDur', [15, 300, 20, 10], @isnumeric);
 addParameter(p, 'detectAlt', 3, @isnumeric);
 addParameter(p, 'flgPlot', true, @islogical);
 addParameter(p, 'flgSave', true, @islogical);
@@ -91,6 +91,14 @@ switch detectAlt
         baseSignal = sPad(2:end-1).^2 - sPad(1:end-2) .* sPad(3:end);
         baseSignal(baseSignal < 0) = 0;
         winSmooth = round(0.005 * fs);
+    case 4 % Rectified + Lowpass (Fernandez-Ruiz 2019)
+        % Rectify (Absolute value)
+        rectSig = abs(sig);
+        % Low-pass filter at 55 Hz
+        lpFreq = 55;
+        [b_lp, a_lp] = butter(4, lpFreq / (fs / 2), 'low');
+        baseSignal = filtfilt(b_lp, a_lp, rectSig);
+        winSmooth = 0; % No additional smoothing needed
 end
 baseSignal = smoothdata(baseSignal, 'gaussian', winSmooth);
 

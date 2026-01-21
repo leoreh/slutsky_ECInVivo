@@ -16,11 +16,12 @@ function ripp = ripp_wrapper(varargin)
 p = inputParser;
 addParameter(p, 'basepath', pwd, @ischar);
 addParameter(p, 'rippCh', [], @isnumeric);
-addParameter(p, 'thr', [1, 2.5, 1.2, 200, 100], @isnumeric);
-addParameter(p, 'limDur', [20, 300, 20, 10], @isnumeric);
+addParameter(p, 'thr', [1, 2.5, 1.2, 200, 50], @isnumeric);
+addParameter(p, 'limDur', [15, 300, 20, 10], @isnumeric);
 addParameter(p, 'passband', [100 300], @isnumeric);
 addParameter(p, 'detectAlt', 3, @isnumeric);
 addParameter(p, 'limState', [], @isnumeric);
+addParameter(p, 'flgGui', false, @islogical);
 addParameter(p, 'flgRefine', true, @islogical);
 addParameter(p, 'flgPlot', true, @islogical);
 addParameter(p, 'flgSave', false, @islogical);
@@ -40,6 +41,7 @@ flgSaveFig = p.Results.flgSaveFig;
 flgRefine = p.Results.flgRefine;
 bit2uv = p.Results.bit2uv;
 limState = p.Results.limState;
+flgGui = p.Results.flgGui;
 
 %% ========================================================================
 %  SETUP
@@ -81,16 +83,25 @@ load([basename, '.sleep_sig.mat'], 'emg');
 
 % Load LFP
 fname = fullfile(basepath, [basename, '.lfp']);
-sig = binary_load(fname, 'duration', Inf, 'fs', fs, 'nCh', nchans,...
+lfp = binary_load(fname, 'duration', Inf, 'fs', fs, 'nCh', nchans,...
     'start', 0, 'ch', rippCh, 'downsample', 1, 'bit2uv', bit2uv);
 
-if size(sig, 2) > 1
-    sig = mean(sig, 2);
+if size(lfp, 2) > 1
+    lfp = mean(lfp, 2);
+end
+
+if flgGui
+    rippTimes = ripp.times;
+    peakTime = ripp.peakTime;
+    spkTimes = v.spikes.times;
+    spkTimes = v.spktimes;
+    ripp_gui(rippTimes, peakTime, lfp, spkTimes, fs, emg, thr, ...
+        'detectAlt', detectAlt, 'basepath', basepath);
 end
 
 
 % Filter LFP for detection
-sig = filterLFP(sig, 'fs', fs, 'type', 'butter', 'dataOnly', true,...
+sig = filterLFP(lfp, 'fs', fs, 'type', 'butter', 'dataOnly', true,...
     'order', 5, 'passband', passband, 'graphics', false);
 
 
@@ -117,6 +128,7 @@ end
 % Detection Phase
 ripp = ripp_detect(sig, fs, ...
     'emg', emg, ...
+    'limDur', limDur, ...
     'basepath', basepath, ...
     'thr', thr, ...
     'detectAlt', detectAlt, ...
@@ -186,7 +198,7 @@ rippSpks = ripp_spks(rippTimes, spkTimes, peakTime, ...
 %  ========================================================================
 fprintf('Running spklfp coupling...\n');
 fRange = [120 200];
-sig = filterLFP(sig, 'fs', fs, 'type', 'butter', 'dataOnly', true, ...
+sig = filterLFP(sigRaw, 'fs', fs, 'type', 'butter', 'dataOnly', true, ...
     'order', 3, 'passband', fRange, 'graphics', false);
 
 spkLfp = spklfp_calc('basepath', basepath, 'lfpTimes', ripp.times, ...
@@ -203,8 +215,8 @@ end
 fprintf('--- Ripple Analysis Pipeline Completed for %s ---\n', basename);
 
 % Put together all ripp structs
-% ripp.spks = rippSpks;
-% ripp.spkLfp = spkLfp;
+ripp.spks = rippSpks;
+ripp.spkLfp = spkLfp;
 
 
 end
