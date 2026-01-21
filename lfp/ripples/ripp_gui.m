@@ -1,4 +1,4 @@
-function hFig = ripp_gui(rippTimes, peakTimes, lfp, spktimes, fs, emg, thr, varargin)
+function hFig = ripp_gui(rippTimes, peakTimes, rippSig, spktimes, fs, thr, varargin)
 % RIPP_GUI Interactive visualization of detected ripples.
 %
 % SUMMARY:
@@ -34,16 +34,15 @@ function hFig = ripp_gui(rippTimes, peakTimes, lfp, spktimes, fs, emg, thr, vara
 p = inputParser;
 addRequired(p, 'rippTimes', @isnumeric);
 addRequired(p, 'peakTimes', @isnumeric);
-addRequired(p, 'lfp', @isnumeric);
+addRequired(p, 'rippSig', @isstruct);
 addRequired(p, 'spktimes', @iscell);
 addRequired(p, 'fs', @isnumeric);
-addRequired(p, 'emg', @isnumeric);
 addRequired(p, 'thr', @isnumeric);
 addParameter(p, 'basepath', pwd, @ischar);
 addParameter(p, 'detectAlt', 3, @isnumeric);
 addParameter(p, 'winPlot', 0.5, @isnumeric); % +/- window in seconds
 
-parse(p, rippTimes, peakTimes, lfp, spktimes, fs, emg, thr, varargin{:});
+parse(p, rippTimes, peakTimes, rippSig, spktimes, fs, thr, varargin{:});
 
 basepath = p.Results.basepath;
 detectAlt = p.Results.detectAlt;
@@ -55,36 +54,11 @@ winPlot = p.Results.winPlot;
 
 fprintf('Initializing Ripple GUI... Pre-processing signals...\n');
 
-% 1. Filter LFP (100-300 Hz)
-sigFilt = filterLFP(lfp, 'fs', fs, 'type', 'butter', 'dataOnly', true, ...
-    'order', 5, 'passband', [100 300], 'graphics', false);
-
-% 2. Calculate Detection Signal (Replicating ripp_detect)
-sigH = hilbert(sigFilt);
-sigAmp = abs(sigH);
-
-switch detectAlt
-    case 1 % Smoothed Amp
-        baseSignal = sigAmp;
-        winSmooth = round(0.005 * fs);
-    case 2 % Smoothed Sq
-        baseSignal = sigFilt .^ 2;
-        winSmooth = round(0.010 * fs);
-    case 3 % Smoothed TEO
-        sPad = [sigFilt(1); sigFilt; sigFilt(end)];
-        baseSignal = sPad(2:end-1).^2 - sPad(1:end-2) .* sPad(3:end);
-        baseSignal(baseSignal < 0) = 0;
-        winSmooth = round(0.005 * fs);
-end
-baseSignal = smoothdata(baseSignal, 'gaussian', winSmooth);
-
-% Adaptive Threshold (Z-Score)
-movLen = round(10 * fs);
-localMean = movmean(baseSignal, movLen);
-localStd = movstd(baseSignal, movLen);
-stdFloor = 1e-6 * mean(localStd, 'omitnan');
-localStd(localStd < stdFloor) = stdFloor;
-sigDetect = (baseSignal - localMean) ./ localStd;
+% Extract from rippSig
+lfp = rippSig.lfp;
+sigFilt = rippSig.filt;
+sigDetect = rippSig.z;
+emg = rippSig.emg;
 
 % Time Vector
 timestamps = (0:length(lfp)-1)' / fs;
@@ -130,31 +104,38 @@ hPanNav.BorderType = 'none';
 hFlow = uiflowcontainer('v0', 'Parent', hPanNav, 'FlowDirection', 'LeftToRight', 'Margin', 5);
 
 % Prev Button
-uicontrol('Parent', hFlow, 'Style', 'pushbutton', 'String', '<', ...
-    'Callback', @(s,e) navStep(-1), 'WidthLimits', [30 30]);
+% Prev Button
+hBtnPrev = uicontrol('Parent', hFlow, 'Style', 'pushbutton', 'String', '<', ...
+    'Callback', @(s,e) navStep(-1));
+set(hBtnPrev, 'WidthLimits', [30 30]);
 
 % Edit Box (Event Index)
+% Edit Box (Event Index)
 guiData.hEditIdx = uicontrol('Parent', hFlow, 'Style', 'edit', ...
-    'String', '1', 'Callback', @onEditIdx, 'WidthLimits', [50 60], ...
+    'String', '1', 'Callback', @onEditIdx, ...
     'BackgroundColor', 'w');
+set(guiData.hEditIdx, 'WidthLimits', [50 60]);
 
 % Total Count Text
 guiData.hTxtTotal = uicontrol('Parent', hFlow, 'Style', 'text', ...
     'String', sprintf('/ %d', guiData.nEvents), ...
-    'WidthLimits', [60 80], 'HorizontalAlignment', 'left', ...
-    'VerticalAlignment', 'middle');
+    'HorizontalAlignment', 'left');
+set(guiData.hTxtTotal, 'WidthLimits', [60 80]);
 
 % Next Button
-uicontrol('Parent', hFlow, 'Style', 'pushbutton', 'String', '>', ...
-    'Callback', @(s,e) navStep(1), 'WidthLimits', [30 30]);
+% Next Button
+hBtnNext = uicontrol('Parent', hFlow, 'Style', 'pushbutton', 'String', '>', ...
+    'Callback', @(s,e) navStep(1));
+set(hBtnNext, 'WidthLimits', [30 30]);
 
 % Spacer
-uicontrol('Parent', hFlow, 'Style', 'text', 'String', '', 'WidthLimits', [20 20]);
+% Spacer
+hSpacer = uicontrol('Parent', hFlow, 'Style', 'text', 'String', '');
+set(hSpacer, 'WidthLimits', [20 20]);
 
 % Time Info Text
 guiData.hTxtTime = uicontrol('Parent', hFlow, 'Style', 'text', ...
-    'String', 't = 0.000 s', 'HorizontalAlignment', 'left', ...
-    'VerticalAlignment', 'middle');
+    'String', 't = 0.000 s', 'HorizontalAlignment', 'left');
 
 % Bottom Panel (Plots)
 hPanPlot = uipanel(guiData.grid);

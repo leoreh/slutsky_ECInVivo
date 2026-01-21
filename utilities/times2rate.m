@@ -11,7 +11,7 @@ function [r, binEdges, binCents] = times2rate(times, varargin)
 %   OPTIONAL (Key-Value Pairs):
 %       'winCalc'   - (num) [M x 2] matrix defining M time windows [start, end].
 %                     Default: [0, max_time_across_all_units].
-%       'binSize'   - (num) Size of bins. Default: 60.
+%       'binsize'   - (num) Size of bins. Default: 60.
 %                     If Inf, each 'winCalc' interval is a single bin.
 %       'c2r'       - (log) True to convert counts to rate. Default: true.
 %

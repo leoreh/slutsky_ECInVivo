@@ -18,11 +18,11 @@ addParameter(p, 'basepath', pwd, @ischar);
 addParameter(p, 'rippCh', [], @isnumeric);
 addParameter(p, 'thr', [1, 2.5, 1.2, 200, 50], @isnumeric);
 addParameter(p, 'limDur', [15, 300, 20, 10], @isnumeric);
+addParameter(p, 'win', [0, Inf], @isnumeric);
 addParameter(p, 'passband', [100 300], @isnumeric);
 addParameter(p, 'detectAlt', 3, @isnumeric);
 addParameter(p, 'limState', [], @isnumeric);
 addParameter(p, 'flgGui', false, @islogical);
-addParameter(p, 'flgRefine', true, @islogical);
 addParameter(p, 'flgPlot', true, @islogical);
 addParameter(p, 'flgSave', false, @islogical);
 addParameter(p, 'flgSaveFig', false, @islogical);
@@ -34,11 +34,11 @@ rippCh = p.Results.rippCh;
 thr = p.Results.thr;
 limDur = p.Results.limDur;
 passband = p.Results.passband;
+win = p.Results.win;
 detectAlt = p.Results.detectAlt;
 flgPlot = p.Results.flgPlot;
 flgSave = p.Results.flgSave;
 flgSaveFig = p.Results.flgSaveFig;
-flgRefine = p.Results.flgRefine;
 bit2uv = p.Results.bit2uv;
 limState = p.Results.limState;
 flgGui = p.Results.flgGui;
@@ -55,10 +55,19 @@ fprintf('--- Ripple Analysis for %s ---\n', basename);
 vars = {'session', 'spikes', 'spktimes', 'sleep_states'};
 v = basepaths2vars('basepaths', {basepath}, 'vars', vars);
 
-% Load Session
+% Session params
 fs = v.session.extracellular.srLfp;
 fsSpk = v.session.extracellular.sr;
 nchans = v.session.extracellular.nChannels;
+
+% Prep SU & MU spktimes (for spk analysis)
+if ~isempty(v.spktimes)
+    mutimes = cellfun(@(x) x / fsSpk, v.spktimes, 'uni', false);
+else
+    mutimes = [];
+end
+spkTimes = v.spikes.times;
+
 
 % Ripple channel in LFP
 if isempty(rippCh)
@@ -78,42 +87,62 @@ if isempty(bit2uv)
     end
 end
 
-% Load EMG
-load([basename, '.sleep_sig.mat'], 'emg');
+%% ========================================================================
+%  LOAD SIGNALS
+%  ========================================================================
 
 % Load LFP
 fname = fullfile(basepath, [basename, '.lfp']);
-lfp = binary_load(fname, 'duration', Inf, 'fs', fs, 'nCh', nchans,...
-    'start', 0, 'ch', rippCh, 'downsample', 1, 'bit2uv', bit2uv);
+if isinf(win(2))
+    sigDur = Inf;
+else
+    sigDur = win(2) - win(1);
+end
+
+lfp = binary_load(fname, 'duration', sigDur, 'fs', fs, 'nCh', nchans,...
+    'start', win(1), 'ch', rippCh, 'downsample', 1, 'bit2uv', bit2uv);
 
 if size(lfp, 2) > 1
     lfp = mean(lfp, 2);
 end
 
-% Prep SU & MU spktimes (for spk analysis)
-if ~isempty(v.spktimes)
-    mutimes = cellfun(@(x) x / fsSpk, v.spktimes, 'uni', false);
-else
-    mutimes = [];
-end
-spkTimes = v.spikes.times;
+% Load EMG
+load([basename, '.sleep_sig.mat'], 'emg');
 
-% Prep boutTimes (for state analysis)
-try
-    boutTimes = v.ss.bouts.times;
-catch
-    boutTimes = [];
+% Handle Window
+if win(1) > 0 || ~isinf(win(2))
+    % EMG
+    s1 = round(win(1) * fs) + 1;
+    if isinf(win(2))
+        emg = emg(s1:end);
+    else
+        s2 = min(length(emg), round(win(2) * fs));
+        emg = emg(s1:s2);
+    end
+
+    % Spikes / Bouts (Shift to relative time)
+    spkTimes = spkTimes - win(1);
+    spkTimes = spkTimes(spkTimes >= 0 & spkTimes <= sigDur);
+
+    mutimes = cellfun(@(x) x - win(1), mutimes, 'Uni', false);
+    mutimes = cellfun(@(x) x(x >= 0 & x <= sigDur), mutimes, 'Uni', false);
+
+
 end
 
 
-if flgGui
-    rippTimes = ripp.times;
-    peakTime = ripp.peakTime;
-    spkTimes = v.spikes.times;
-    spkTimes = v.spktimes;
-    ripp_gui(rippTimes, peakTime, lfp, spkTimes, fs, emg, thr, ...
-        'detectAlt', detectAlt, 'basepath', basepath);
-end
+
+
+
+
+% if flgGui
+%     rippTimes = ripp.times;
+%     peakTime = ripp.peakTime;
+%     spkTimes = v.spikes.times;
+%     spkTimes = v.spktimes;
+%     ripp_gui(rippTimes, peakTime, lfp, spkTimes, fs, emg, thr, ...
+%         'detectAlt', detectAlt, 'basepath', basepath);
+% end
 
 
 
@@ -136,7 +165,6 @@ ripp = ripp_detect(sig, fs, ...
     'detectAlt', detectAlt, ...
     'flgPlot', flgPlot, ...
     'flgSave', flgSave);
-
 
 
 
@@ -181,7 +209,7 @@ rippSpks = ripp_spks(rippTimes, spkTimes, peakTime, ...
 %  ========================================================================
 fprintf('Running spklfp coupling...\n');
 fRange = [120 200];
-sig = filterLFP(sigRaw, 'fs', fs, 'type', 'butter', 'dataOnly', true, ...
+sig = filterLFP(lfp, 'fs', fs, 'type', 'butter', 'dataOnly', true, ...
     'order', 3, 'passband', fRange, 'graphics', false);
 
 spkLfp = spklfp_calc('basepath', basepath, 'lfpTimes', ripp.times, ...
@@ -200,7 +228,13 @@ end
 %  ========================================================================
 
 % NeuroScope Files
+% Revert times to absolute for saving/Neuroscope
+ripp.times = ripp.times + win(1);
+ripp.peakTime = ripp.peakTime + win(1);
+
+% NeuroScope Files
 if flgSave
+
     % Convert to samples (NeuroScope uses acquisition rate fsSpk)
     rippSamps = round(ripp.times * fsSpk);
     peakSamps = round(ripp.peakTime * fsSpk);
