@@ -95,8 +95,7 @@ xlim(mapDur);
 
 % --- Frequency Map ---
 sb3 = subplot(3, 3, 4);
-PlotColorMap(ripp.maps.freq(ripp_idx, :), 'x', xMap, 'bar','on', ...
-    'cutoffs', ripp.info.passband); % Passband from ripp.info
+PlotColorMap(ripp.maps.freq(ripp_idx, :), 'x', xMap, 'bar','on'); 
 ylabel(sprintf('Ripple # (rand %d)', plotNumRipples));
 xlabel('Time relative to peak [s]');
 title('Instantaneous Frequency');

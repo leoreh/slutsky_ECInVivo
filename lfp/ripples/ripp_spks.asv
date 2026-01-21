@@ -1,47 +1,48 @@
-function rippSpks = ripp_spks(rippTimes, spkTimes, varargin)
+function rippSpks = ripp_spks(rippTimes, spkTimes, peakTimes, varargin)
 % RIPP_SPKS Analyzes spiking activity relative to ripple events.
 %
 % SUMMARY:
-% Calculates firing rates, modulation indices, and statistical significance
-% of single-unit (SU) and multi-unit (MU) activity during ripples compared
-% to matched control periods.
+% Analyzes single-unit (SU) and multi-unit (MU) activity during ripples.
+% Calculates rates, modulation statistics, and generates PETH maps.
 %
-% INPUTS:
-%   rippTimes       [N x 2] Ripple start and end times (seconds).
-%   spkTimes        {nUnits x 1} Cell array of spike times (seconds).
-%   varargin        (Optional) Key-Value pairs:
-%                   'muTimes': {Ntet x 1} Cell array of MU spike times (s).
-%                   'basepath': Path to save output (default: pwd).
-%                   'flgPlot': Plot results (default: true).
-%                   'flgSave': Save 'rippSpks' struct (default: true).
-%                   'mapDur': Window for PETH maps (default: [-0.075 0.075]).
+% INPUT:
+%   rippTimes       [N x 2] start/end times (s).
+%   spkTimes        {Nunits x 1} spike times (s).
+%   peakTimes       [N x 1] ripple peak times (s).
+%   varargin        'muTimes' (cell array), 'basepath', 'flgPlot', 'flgSave'.
 %
 % OUTPUT:
-%   rippSpks        Structure containing analysis results (su, mu, info).
-%   * Saves 'basename.rippSpks.mat' containing 'rippSpks' struct.
+%   rippSpks        Structure of results.
+%   * Saves 'basename.rippSpks.mat'.
 %
-% DEPENDENCIES: SubtractIntervals, Restrict, times2rate, match_events (local).
+% DEPENDENCIES: SubtractIntervals, Restrict, times2rate.
 
-%% ARGUMENT PARSING
+%% ========================================================================
+%  ARGUMENTS
+%  ========================================================================
 p = inputParser;
 addRequired(p, 'rippTimes', @isnumeric);
 addRequired(p, 'spkTimes', @iscell);
+addRequired(p, 'peakTimes', @isnumeric);
 addParameter(p, 'muTimes', {}, @iscell);
 addParameter(p, 'basepath', pwd, @ischar);
 addParameter(p, 'flgPlot', true, @islogical);
 addParameter(p, 'flgSave', true, @islogical);
 addParameter(p, 'mapDur', [-0.075 0.075], @isnumeric);
-parse(p, rippTimes, spkTimes, varargin{:});
+parse(p, rippTimes, spkTimes, peakTimes, varargin{:});
 
 rippTimes = p.Results.rippTimes;
 spkTimes = p.Results.spkTimes;
+peakTimes = p.Results.peakTimes;
 muTimes = p.Results.muTimes;
 basepath = p.Results.basepath;
 flgPlot = p.Results.flgPlot;
 flgSave = p.Results.flgSave;
 mapDur = p.Results.mapDur;
 
-%% INITIALIZATION
+%% ========================================================================
+%  INITIALIZATION
+%  ========================================================================
 cd(basepath);
 [~, basename] = fileparts(basepath);
 rippSpksFile = fullfile(basepath, [basename, '.rippSpks.mat']);
@@ -49,38 +50,35 @@ rippSpksFile = fullfile(basepath, [basename, '.rippSpks.mat']);
 nUnits = length(spkTimes);
 nRipples = size(rippTimes, 1);
 rippDur = rippTimes(:, 2) - rippTimes(:, 1);
-rippPeakTime = rippTimes(:, 1) + rippDur / 2; % Approx peak if not provided
 
-% Map Parameters
-fsLfp = 1250; % Default for map bins
+% Map Params
+fsLfp = 1250;
 nBinsMap = floor(fsLfp * diff(mapDur) / 2) * 2 + 1;
 
-% Initialize Output Struct
+% Output Struct
 rippSpks = struct();
-rippSpks.info.recWin = [0 Inf]; % No session, assume Inf
+rippSpks.info.recWin = [0 Inf];
 rippSpks.info.mapDur = mapDur;
 rippSpks.info.nBinsMap = nBinsMap;
-
 rippSpks.su = struct('pVal', nan(nUnits, 1), 'sigMod', false(nUnits, 1), ...
     'frGain', nan(nUnits, 1), 'frModulation', nan(nUnits, 1), ...
     'frPrct', nan(nUnits, 1), 'frRipp', nan(nUnits, 1), 'frRand', nan(nUnits, 1), ...
     'rippMap', [], 'ctrlMap', []);
-
 rippSpks.mu = struct('rippMap', [], 'ctrlMap', []);
 
+%% ========================================================================
+%  CONTROL EVENTS
+%  ========================================================================
+% Finds non-ripple intervals of matched duration (Linear Scavenger).
 
-%% CONTROL EVENT GENERATION
-% "Vectorized Linear Scavenger" - Finds non-ripple intervals of matched duration.
-% Assumes we can look anywhere in the "recording" (approx by max ripple time + buffer).
-
-recEnd = max([max(rippTimes(:)), 100]) + 10; % Heuristic end
+recEnd = max([max(rippTimes(:)); 100]) + 10;
 buffer = max(rippDur);
 intervalsExclude = rippTimes + [-buffer, buffer];
-intervalsInclude = [0, recEnd]; % Simple full window
-
+intervalsInclude = [0, recEnd];
 intervalsCtrl = SubtractIntervals(intervalsInclude, intervalsExclude);
 
-% Filter short intervals
+% Filter short
+% Note: Using ripple max dur as minimum requirement for control blocks
 durIdx = diff(intervalsCtrl, 1, 2) < max(rippDur);
 intervalsCtrl(durIdx, :) = [];
 
@@ -88,149 +86,133 @@ if isempty(intervalsCtrl)
     warning('No valid control intervals found.');
     ctrlTimes = nan(nRipples, 2);
 else
-    ctrlTimes = match_events(rippDur, intervalsCtrl, rippPeakTime);
+    % Match Events
+    nRipples = length(rippDur);
+    ctrlTimes = nan(nRipples, 2);
+    nFree = size(intervalsCtrl, 1);
+
+    maxDist = 4 * 60 * 60;
+    padding = 0.1;
+    currentFreeIdx = 1;
+    lastEndTime = -inf;
+
+    for iRipp = 1:nRipples
+        needed = rippDur(iRipp);
+        while currentFreeIdx <= nFree
+            blockStart = intervalsCtrl(currentFreeIdx, 1);
+            blockEnd = intervalsCtrl(currentFreeIdx, 2);
+            t_start = max(blockStart, lastEndTime + padding);
+
+            if t_start + needed <= blockEnd
+                if blockStart < peakTimes(iRipp) - maxDist
+                    currentFreeIdx = currentFreeIdx + 1;
+                    continue;
+                end
+                ctrlTimes(iRipp, :) = [t_start, t_start + needed];
+                lastEndTime = t_start + needed;
+                break;
+            else
+                currentFreeIdx = currentFreeIdx + 1;
+            end
+        end
+    end
 end
 
 rippSpks.info.ctrlTimes = ctrlTimes;
-rippSpks.info.ctrlPeakTime = ctrlTimes(:,1) + diff(ctrlTimes,1,2)/2;
 
 
-%% SU ANALYSIS
+%% ========================================================================
+%  SU ANALYSIS
+%  ========================================================================
 fprintf('Analyzing %d Single Units...\n', nUnits);
 
 if nUnits > 0
-    % 1. Firing Rates
+    % Firing Rates
     rippRates = times2rate(spkTimes, 'winCalc', rippTimes, 'binsize', Inf);
     ctrlRates = times2rate(spkTimes, 'winCalc', ctrlTimes, 'binsize', Inf);
 
     rippSpks.su.rippRates = rippRates;
     rippSpks.su.ctrlRates = ctrlRates;
 
-    % 2. Maps (PETH)
+    % Maps & Stats
     rippSpks.su.rippMap = nan(nUnits, nRipples, nBinsMap);
     rippSpks.su.ctrlMap = nan(nUnits, nRipples, nBinsMap);
 
-    for i = 1:nUnits
+    for iRipp = 1:nUnits
         % Stats
-        rRate = rippRates(i, :);
-        cRate = ctrlRates(i, :);
+        rRate = rippRates(iRipp, :);
+        cRate = ctrlRates(iRipp, :);
 
         if any(~isnan(rRate)) && any(~isnan(cRate))
             [pVal, h] = signrank(rRate, cRate);
-            rippSpks.su.pVal(i) = pVal;
-            rippSpks.su.sigMod(i) = h;
+            rippSpks.su.pVal(iRipp) = pVal;
+            rippSpks.su.sigMod(iRipp) = h;
 
             mC = mean(cRate, 'omitnan');
             sdC = std(cRate, 0, 'omitnan');
             mR = mean(rRate, 'omitnan');
 
-            rippSpks.su.frGain(i) = (mR - mC) / sdC;
-            rippSpks.su.frModulation(i) = (mR - mC) / (mR + mC);
-            rippSpks.su.frPrct(i) = (mR - mC) / mC * 100;
-            rippSpks.su.frRipp(i) = mR;
-            rippSpks.su.frRand(i) = mC;
+            rippSpks.su.frGain(iRipp) = (mR - mC) / sdC;
+            rippSpks.su.frModulation(iRipp) = (mR - mC) / (mR + mC);
+            rippSpks.su.frPrct(iRipp) = (mR - mC) / mC * 100;
+            rippSpks.su.frRipp(iRipp) = mR;
+            rippSpks.su.frRand(iRipp) = mC;
         end
 
         % Maps
-        rippSpks.su.rippMap(i, :, :) = sync_spksMap(spkTimes{i}, rippPeakTime, mapDur, nBinsMap);
-        rippSpks.su.ctrlMap(i, :, :) = sync_spksMap(spkTimes{i}, rippSpks.info.ctrlPeakTime, mapDur, nBinsMap);
+        rippSpks.su.rippMap(iRipp, :, :) = sync_spksMap(spkTimes{iRipp}, ...
+            peakTimes, mapDur, nBinsMap);
+        rippSpks.su.ctrlMap(iRipp, :, :) = sync_spksMap(spkTimes{iRipp}, ...
+            diff(ctrlTimes, 1, 2) / 2, mapDur, nBinsMap);
     end
 end
 
 
-%% MU ANALYSIS
+%% ========================================================================
+%  MU ANALYSIS
+%  ========================================================================
 if ~isempty(muTimes)
     fprintf('Analyzing Multi-Unit Activity...\n');
-    allMu = sort(vertcat(muTimes{:}));
-    rippSpks.mu.rippMap = sync_spksMap(allMu, rippPeakTime, mapDur, nBinsMap);
-    rippSpks.mu.ctrlMap = sync_spksMap(allMu, rippSpks.info.ctrlPeakTime, mapDur, nBinsMap);
+    muSpks = sort(vertcat(muTimes{:}));
+    rippSpks.mu.rippMap = sync_spksMap(muSpks, peakTimes, mapDur, nBinsMap);
+    rippSpks.mu.ctrlMap = sync_spksMap(muSpks, diff(ctrlTimes, 1, 2) / 2, mapDur, nBinsMap);
 else
     rippSpks.mu = [];
 end
 
 
-%% SAVE
+%% ========================================================================
+%  SAVE & PLOT
+%  ========================================================================
 if flgSave
     save(rippSpksFile, 'rippSpks', '-v7.3');
     fprintf('Saved: %s\n', rippSpksFile);
 end
 
-
-%% PLOT
 if flgPlot
-    % Create temporary composite struct for existing plotter if needed,
-    % or implementing a simple local plotter to avoid dependency on old 'ripp' struct format.
-    % Assuming plot_rippleSpks can handle this structure or we should call it carefully.
-    % The user asked for "extreme organization", which implies using the modular output.
-    % I will use a local helper plotter here to ensure it works with *this* struct.
-
-    plot_rippSpks_local(rippSpks, nRipples, basename, basepath, true);
-end
 
 end
 
-% -------------------------------------------------------------------------
-% HELPER: Match Control Events (Linear Scavenger)
-% -------------------------------------------------------------------------
-function ctrlTimes = match_events(rippDur, intervalsCtrl, rippPeakTime)
-nRipples = length(rippDur);
-ctrlTimes = nan(nRipples, 2);
-nFree = size(intervalsCtrl, 1);
+end     % EOF
 
-maxDist = 4 * 60 * 60;
-padding = 0.1;
-currentFreeIdx = 1;
-lastEndTime = -inf;
 
-for i = 1:nRipples
-    needed = rippDur(i);
-    while currentFreeIdx <= nFree
-        blockStart = intervalsCtrl(currentFreeIdx, 1);
-        blockEnd = intervalsCtrl(currentFreeIdx, 2);
-        t_start = max(blockStart, lastEndTime + padding);
-
-        if t_start + needed <= blockEnd
-            if blockStart < rippPeakTime(i) - maxDist
-                currentFreeIdx = currentFreeIdx + 1;
-                continue;
-            end
-            ctrlTimes(i, :) = [t_start, t_start + needed];
-            lastEndTime = t_start + needed;
-            break;
-        else
-            currentFreeIdx = currentFreeIdx + 1;
-        end
-    end
-end
-end
-
-% -------------------------------------------------------------------------
-% HELPER: Sync Map
-% -------------------------------------------------------------------------
+%% ========================================================================
+%  HELPER: SYNC MAP
+%  ========================================================================
 function syncMap = sync_spksMap(spikeTimes, eventTimes, mapDur, nBinsMap)
+
 nEvents = length(eventTimes);
 syncMap = zeros(nEvents, nBinsMap);
 
 if isempty(spikeTimes) || isempty(eventTimes), return; end
 spikeTimes = sort(spikeTimes(:));
-
-% Handle NaNs in eventTimes
-valid = ~isnan(eventTimes);
-eventTimes = eventTimes(valid);
-origIdx = find(valid);
-
-if isempty(eventTimes), return; end
-
-% Vectorized Binning
-% (Standard histogram relative to each event)
-% For large data, accumarray is faster.
+eventTimes = eventTimes(:);
 
 winStart = eventTimes + mapDur(1);
 winEnd = eventTimes + mapDur(2);
 
-% Find spikes per window (using searchsorted / discretize logic)
-% Edges: ... s1, s2, s3 ...
 searchEdges = [-inf; spikeTimes; inf];
+
 startIdx = discretize(winStart, searchEdges);
 [~, endBin] = histc(winEnd, searchEdges);
 endIdx = endBin - 1;
@@ -257,47 +239,10 @@ edges = linspace(mapDur(1), mapDur(2), nBinsMap+1);
 bins = discretize(relTimes, edges);
 
 validBin = ~isnan(bins);
-% Map back to original indices (origIdx)
-finalEvtIds = origIdx(evtIds(validBin));
+finalEvtIds = evtIds(validBin);
 finalBins = bins(validBin);
 
 syncMap = accumarray([finalEvtIds, finalBins], 1, [nEvents, nBinsMap]);
-end
 
-% -------------------------------------------------------------------------
-% HELPER: Plotting
-% -------------------------------------------------------------------------
-function plot_rippSpks_local(spks, nRipples, basename, basepath, saveFig)
-setMatlabGraphics(true);
-fh = figure('Name', [basename '_rippSpks'], 'NumberTitle', 'off');
 
-% SU Modulation
-subplot(2,2,1);
-[~, idx] = sort(spks.su.frGain, 'descend');
-imagesc(spks.su.frGain(idx)); colorbar;
-title('SU Gain (Sorted)'); ylabel('Unit');
-
-% SU Volcano
-subplot(2,2,2);
-plot(spks.su.frGain, -log10(spks.su.pVal), 'k.', 'MarkerSize', 10);
-hold on;
-sig = spks.su.sigMod;
-plot(spks.su.frGain(sig), -log10(spks.su.pVal(sig)), 'r.', 'MarkerSize', 10);
-xlabel('Gain (Z)'); ylabel('-log10(p)'); title('Modulation Significance');
-
-% PETH (Average)
-subplot(2,2,3);
-if ~isempty(spks.mu) && ~isempty(spks.mu.rippMap)
-    t = linspace(spks.info.mapDur(1), spks.info.mapDur(2), spks.info.nBinsMap);
-    plot(t, mean(spks.mu.rippMap, 1)*1250, 'k', 'LineWidth', 1.5);
-    hold on;
-    plot(t, mean(spks.mu.ctrlMap, 1)*1250, 'color', [0.5 0.5 0.5]);
-    title('MU PETH'); xlabel('Time (s)'); xlim([-0.05 0.05]);
-end
-
-if saveFig
-    figDir = fullfile(basepath, 'graphics');
-    if ~exist(figDir, 'dir'), mkdir(figDir); end
-    saveas(fh, fullfile(figDir, [basename '_ripp_spks.png']));
-end
 end

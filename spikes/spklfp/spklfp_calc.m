@@ -65,7 +65,7 @@ function [spkLfp] = spklfp_calc(varargin)
 %               channel from 'session.mat' or channel 1}
 %   bit2uv      (numeric) Conversion factor from bits to microvolts for LFP
 %               loading. {0.195}
-%   flgGraphics (logical) Flag to generate and save summary plots. {true}
+%   flgPlot     (logical) Flag to generate and save summary plots. {true}
 %   flgSave     (logical) Flag to save the output 'spkLfp' structure. {true}
 %   flgStl      (logical) Flag to compute and include spike-triggered LFP. {false}
 %   powThr      (numeric) STD above mean power in band to define high-power
@@ -112,7 +112,7 @@ addParameter(p, 'fRange', [0 0]);
 addParameter(p, 'lfpTimes', [], @isnumeric)
 addParameter(p, 'ch', [], @isnumeric)
 addParameter(p, 'bit2uv', 0.195, @isnumeric);
-addParameter(p, 'flgGraphics', true, @islogical)
+addParameter(p, 'flgPlot', true, @islogical)
 addParameter(p, 'flgSave', true, @islogical)
 addParameter(p, 'flgStl', false, @islogical)
 addParameter(p, 'powThr', [], @isnumeric);
@@ -126,7 +126,7 @@ fRange          = p.Results.fRange;
 lfpTimes        = p.Results.lfpTimes;
 ch              = p.Results.ch;
 bit2uv          = p.Results.bit2uv;
-flgGraphics     = p.Results.flgGraphics;
+flgPlot         = p.Results.flgPlot;
 flgSave         = p.Results.flgSave;
 flgStl          = p.Results.flgStl;
 powThr          = p.Results.powThr;
@@ -467,10 +467,10 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Graphics (OPTIONAL)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% This section generates and saves summary plots if 'flgGraphics' is true,
+% This section generates and saves summary plots if 'flgPlot' is true,
 % using the 'spklfp_plot' function.
 
-if flgGraphics 
+if flgPlot 
     spklfp_plot(spkLfp); % Generate plots from results structure.
 end
 

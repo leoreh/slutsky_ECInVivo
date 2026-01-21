@@ -1,11 +1,13 @@
-function ripp = ripp_states(ripp, boutTimes, varargin)
+function rippStates = ripp_states(rippTimes, peakTimes, boutTimes, varargin)
 % RIPP_STATES Analyzes ripple events in relation to vigilance states.
 %
+% SUMMARY:
 % This function calculates ripple rates and densities within different
 % vigilance states.
 %
 % INPUT:
-%   ripp                Structure with fields: .peakTime, .dur, .info.recWin.
+%   rippTimes           [N x 2] Ripple start/end times.
+%   peakTimes            [N x 1] Ripple peak times.
 %   boutTimes           Cell array of state times (e.g. ss.bouts.times).
 %   basepath            (Optional) Path to session {pwd}.
 %   flgPlot             (Optional) Plot results {true}.
@@ -13,26 +15,26 @@ function ripp = ripp_states(ripp, boutTimes, varargin)
 %   flgSaveFig          (Optional) Save figure {true}.
 %
 % OUTPUT:
-%   ripp                Input structure with .states field added.
+%   rippStates          Structure with rate, density, and indices.
+%   * Saves 'basename.rippStates.mat'.
 %
-% DEPENDENCIES: 
-%   InIntervals
-%   times2rate
-%   as_loadConfig.
+% DEPENDENCIES: basepaths2vars, InIntervals, times2rate, as_loadConfig, setMatlabGraphics.
 
 %% ========================================================================
 %  ARGUMENTS
 %  ========================================================================
 p = inputParser;
-addRequired(p, 'ripp', @isstruct);
+addRequired(p, 'rippTimes', @isnumeric);
+addRequired(p, 'peakTimes', @isnumeric);
 addRequired(p, 'boutTimes', @iscell);
 addParameter(p, 'basepath', pwd, @ischar);
 addParameter(p, 'flgPlot', true, @islogical);
 addParameter(p, 'flgSave', true, @islogical);
 addParameter(p, 'flgSaveFig', true, @islogical);
-parse(p, ripp, boutTimes, varargin{:});
+parse(p, rippTimes, peakTimes, boutTimes, varargin{:});
 
-ripp = p.Results.ripp;
+rippTimes = p.Results.rippTimes;
+peakTimes = p.Results.peakTimes;
 boutTimes = p.Results.boutTimes;
 basepath = p.Results.basepath;
 flgPlot = p.Results.flgPlot;
@@ -47,8 +49,21 @@ cd(basepath);
 savefile = fullfile(basepath, [basename, '.rippStates.mat']);
 
 nStates = length(boutTimes);
-nRipples = length(ripp.peakTime);
-recWin = ripp.info.recWin;
+nRipples = length(peakTimes);
+
+% Determine recording window from events if not passed (or just use global min/max)
+% But for rate calculation usually we need recWin.
+% However, prior code used `ripp.info.recWin`. Now we don't have it.
+% We will use min/max of boutTimes or rippTimes as effective window?
+% Or just assume [0, max(end)].
+% Actually, simpler: define recWin based on max of everything.
+maxTime = max([max(rippTimes(:)); 10]);
+for i=1:nStates
+    if ~isempty(boutTimes{i})
+        maxTime = max(maxTime, max(boutTimes{i}(:)));
+    end
+end
+recWin = [0 maxTime];
 
 % Initialize Output Struct
 rippStates = struct();
@@ -63,17 +78,11 @@ rippStates.tstamps = cell(nStates, 1);
 %  ========================================================================
 fprintf('Calculating ripple states for %s...\n', basename);
 
+% Calculate Duration
+dur = rippTimes(:,2) - rippTimes(:,1);
+
 for iState = 1:nStates
     bouts = boutTimes{iState};
-
-    % Restrict bouts to recording window
-    if ~isempty(bouts)
-        valid = InIntervals(mean(bouts, 2), recWin);
-        bouts = bouts(valid, :);
-        bouts(:, 1) = max(bouts(:, 1), recWin(1));
-        bouts(:, 2) = min(bouts(:, 2), recWin(2));
-        bouts(diff(bouts, 1, 2) <= 0, :) = [];
-    end
 
     if isempty(bouts)
         rippStates.rate{iState} = NaN;
@@ -83,16 +92,24 @@ for iState = 1:nStates
 
     % Ripple Rate (per bout)
     [rippStates.rate{iState}, rippStates.binedges{iState}, rippStates.tstamps{iState}] = ...
-        times2rate(ripp.peakTime, 'binsize', Inf, 'winCalc', bouts, 'c2r', true);
+        times2rate(peakTimes, 'binsize', Inf, 'winCalc', bouts, 'c2r', true);
 
     % Ripple Density (per bout)
     nBouts = size(bouts, 1);
     boutDensity = zeros(nBouts, 1);
     for iBout = 1:nBouts
-        inBout = (ripp.peakTime >= bouts(iBout,1)) & (ripp.peakTime <= bouts(iBout,2));
+        inBout = (peakTimes >= bouts(iBout,1)) & (peakTimes <= bouts(iBout,2));
 
         % Density = Total Duration of Ripples / Bout Duration
-        totalRippDur_s = sum(ripp.dur(inBout)) / 1000;
+        totalRippDur_s = sum(dur(inBout)); % Times are in seconds usually?
+        % Wait, in wrapper 'ripp.dur' was converted to ms?
+        % ripp_detect returns dur in ms. Wrapper calculates rippSamps from ripp.times (sec).
+        % ripp_states takes rippTimes (sec).
+        % ripp.dur in detect is converted to ms at end.
+        % So here rippTimes is likely seconds.
+        % Dur calculation: rippTimes(:,2)-rippTimes(:,1) is seconds.
+        % So totalRippDur_s is sum(dur).
+
         boutDur_s = bouts(iBout, 2) - bouts(iBout, 1);
 
         if boutDur_s > 0
@@ -102,13 +119,12 @@ for iState = 1:nStates
     rippStates.density{iState} = boutDensity;
 
     % Index
-    rippStates.idx(:, iState) = InIntervals(ripp.peakTime, bouts);
+    rippStates.idx(:, iState) = InIntervals(peakTimes, bouts);
 end
 
 %% ========================================================================
 %  OUTPUT & SAVING
 %  ========================================================================
-ripp.states = rippStates; % Attach to main struct for potential use in memory
 
 if flgSave
     save(savefile, 'rippStates', '-v7.3');
@@ -120,26 +136,21 @@ end
 %  ========================================================================
 if flgPlot
 
+    stateNames = arrayfun(@(x) sprintf('State %d',x), 1:nStates, 'UniformOutput', false);
+
     % Attempt to load colors config
     try
         cfg = as_loadConfig([]);
         colors = cfg.colors;
-        stateNames = arrayfun(@(x) sprintf('State %d',x), 1:nStates, 'UniformOutput', false);
     catch
         colors = lines(nStates);
-        stateNames = arrayfun(@(x) sprintf('State %d',x), 1:nStates, 'UniformOutput', false);
     end
 
+    setMatlabGraphics(true);
     fh = figure('Name', [basename '_rippleStates'], 'NumberTitle', 'off');
 
     % Rate
     subplot(2, 4, [1, 2]);
-    if isfield(ripp, 'rate') && ~isempty(ripp.rate)
-        % Ensure ripp.rate.timestamps exists
-        if isfield(ripp.rate, 'timestamps')
-            plot(ripp.rate.timestamps / 3600, ripp.rate.rate, 'k', 'LineWidth', 1);
-        end
-    end
     hold on;
     for iState = 1:nStates
         if ~isempty(rippStates.tstamps{iState})

@@ -32,6 +32,7 @@ basepath = p.Results.basepath;
 rippCh = p.Results.rippCh;
 thr = p.Results.thr;
 limDur = p.Results.limDur;
+passband = p.Results.passband;
 detectAlt = p.Results.detectAlt;
 flgPlot = p.Results.flgPlot;
 flgSave = p.Results.flgSave;
@@ -88,6 +89,11 @@ if size(sig, 2) > 1
 end
 
 
+% Filter LFP for detection
+sig = filterLFP(sig, 'fs', fs, 'type', 'butter', 'dataOnly', true,...
+    'order', 5, 'passband', passband, 'graphics', false);
+
+
 %% ========================================================================
 %  DETECT
 %  ========================================================================
@@ -96,28 +102,34 @@ if flgRefine
     winIdx = 1 : min(length(sig), 3 * 60 * 60 * fs);
     thrTmp = [1, 2.5, 1.2, 200, 50];
 
-    rippTmp = ripp_detect('basepath', basepath, 'sig', sig(winIdx), 'emg', emg(winIdx),...
-        'fs', fs, 'rippCh', rippCh, 'recWin', [0 Inf], 'thr', thrTmp, ...
-        'detectAlt', detectAlt, 'flgPlot', false, 'flgSave', false);
+    % Call ripp_detect with filtered signal subset
+    rippTmp = ripp_detect(sig(winIdx), fs, ...
+        'emg', emg(winIdx), ...
+        'basepath', basepath, ...
+        'thr', thrTmp, ...
+        'detectAlt', detectAlt, ...
+        'flgPlot', false, 'flgSave', false);
 
     thr = round(rippTmp.info.thrData * 0.8, 1);
     thr(5) = 50;
-    limDur = rippTmp.info.limDurData;
 end
 
-% Detection
-ripp = ripp_detect('basepath', basepath, ...
-    'sig', sig, ...
+% Detection Phase
+ripp = ripp_detect(sig, fs, ...
     'emg', emg, ...
-    'fs', fs, ...
-    'rippCh', rippCh, ...
-    'recWin', [0 Inf], ...
+    'basepath', basepath, ...
     'thr', thr, ...
-    'limDur', limDur, ...
     'detectAlt', detectAlt, ...
     'flgPlot', flgPlot, ...
-    'flgSave', flgSave, ...
-    'bit2uv', bit2uv);
+    'flgSave', flgSave);
+
+% NeuroScope Files
+if flgSave
+    % Convert to samples (NeuroScope uses acquisition rate fsSpk)
+    rippSamps = round(ripp.times * fsSpk);
+    peakSamps = round(ripp.peakTime * fsSpk);
+    ripp2ns(rippSamps, peakSamps, 'basepath', basepath);
+end
 
 
 %% ========================================================================
@@ -130,18 +142,22 @@ catch
     boutTimes = [];
 end
 
-ripp = ripp_states(ripp, boutTimes, ...
+rippStates = ripp_states(ripp.times, ripp.peakTime, boutTimes, ...
     'basepath', basepath, ...
     'flgPlot', flgPlot, ...
     'flgSave', flgSave, ...
     'flgSaveFig', flgSaveFig);
 
+ripp.states = rippStates;
+
 
 % Filter Ripples by State if requested
 rippTimes = ripp.times;
+peakTime = ripp.peakTime;
 if ~isempty(limState)
     stateIdx = ripp.states.idx(:, limState);
     rippTimes = ripp.times(stateIdx, :);
+    peakTime = ripp.peakTime(stateIdx);
     fprintf('Limiting analysis to State %d\n', limState);
 end
 
@@ -159,34 +175,36 @@ end
 spkTimes = v.spikes.times;
 
 % Run Analysis
-rippSpks = ripp_spks(rippTimes, spkTimes, ...
-    'basepath', basepath, ...
+rippSpks = ripp_spks(rippTimes, spkTimes, peakTime, ...
     'muTimes', mutimes, ...
+    'basepath', basepath, ...
     'flgPlot', flgPlot, ...
     'flgSave', flgSave);
-
 
 %% ========================================================================
 %  SPK-LFP
 %  ========================================================================
 fprintf('Running spklfp coupling...\n');
 fRange = [120 200];
-sigFilt = filterLFP(sig, 'fs', fs, 'type', 'butter', 'dataOnly', true, ...
+sig = filterLFP(sig, 'fs', fs, 'type', 'butter', 'dataOnly', true, ...
     'order', 3, 'passband', fRange, 'graphics', false);
 
-ripp.spkLfp = spklfp_calc('basepath', basepath, 'lfpTimes', ripp.times, ...
-    'ch', ripp.info.rippCh, 'fRange', fRange, 'sig', sigFilt, ...
+spkLfp = spklfp_calc('basepath', basepath, 'lfpTimes', ripp.times, ...
+    'sig', sig, ...
     'flgSave', false, 'flgPlot', false, 'flgStl', false);
 
-if flgPlot
-    spklfp_plot(ripp.spkLfp);
-end
+spkLfpFile = fullfile(basepath, [basename, '.rippSpkLfp.mat']);
+save(spkLfpFile, 'spkLfp', '-v7.3');
 
-% Final Save (Core struct updates like spkLfp)
-if flgSave
-    save(fullfile(basepath, [basename, '.ripp.mat']), 'ripp', '-v7.3');
+if flgPlot
+    spklfp_plot(spkLfp);
 end
 
 fprintf('--- Ripple Analysis Pipeline Completed for %s ---\n', basename);
+
+% Put together all ripp structs
+% ripp.spks = rippSpks;
+% ripp.spkLfp = spkLfp;
+
 
 end

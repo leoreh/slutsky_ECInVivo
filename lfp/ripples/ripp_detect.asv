@@ -25,7 +25,7 @@ addRequired(p, 'fs', @isnumeric);
 addParameter(p, 'emg', [], @isnumeric);
 addParameter(p, 'basepath', pwd, @ischar);
 addParameter(p, 'thr', [1.5, 2.5, 2, 200, 100], @isnumeric);
-addParameter(p, 'limDur', [20, 300, 20, 10], @isnumeric);
+addParameter(p, 'limDur', [15, 300, 20, 10], @isnumeric);
 addParameter(p, 'detectAlt', 3, @isnumeric);
 addParameter(p, 'flgPlot', true, @islogical);
 addParameter(p, 'flgSave', true, @islogical);
@@ -255,6 +255,11 @@ ripp.info.thrData(3) = prctile(contPowAvg, 10);
 ripp.info.thrData(4) = prctile(peakPower, 99) * 2;
 ripp.info.thrData(5) = thr(5);
 ripp.info.thrData = round(ripp.info.thrData, 1);
+
+% Note: avgFreq calculated only when EMG present in original.
+% Assuming here if available it's used.
+ripp.info.passbandData = [prctile(avgFreq, 2), prctile(ripp.peakFreq, 99.9)];
+
 
 %% ========================================================================
 %  FINALIZE

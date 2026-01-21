@@ -8,9 +8,7 @@
 % -------------------------------------------------------------------------
 % basepaths = mcu_basepaths('all');
 basepaths = [mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl')];
-nfiles = length(basepaths);
-
-v = basepaths2vars('basepaths', basepaths, 'vars', {'session'});
+nFiles = length(basepaths);
 
 for iFile = 1 : nfiles
     basepath = basepaths{iFile};
@@ -21,6 +19,10 @@ for iFile = 1 : nfiles
         'limState', 4, 'flgRefine', true, 'flgPlot', true,...
         'flgSave', true, 'flgSaveFig', true);
 end
+
+
+
+
 
 
 % -------------------------------------------------------------------------
