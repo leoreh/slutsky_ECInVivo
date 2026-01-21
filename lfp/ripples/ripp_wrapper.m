@@ -17,16 +17,17 @@ p = inputParser;
 addParameter(p, 'basepath', pwd, @ischar);
 addParameter(p, 'rippCh', [], @isnumeric);
 addParameter(p, 'thr', [1, 2.5, 1.2, 200, 50], @isnumeric);
-addParameter(p, 'limDur', [15, 300, 20, 10], @isnumeric);
+addParameter(p, 'limDur', [15, 300, 30, 10], @isnumeric);
 addParameter(p, 'win', [0, Inf], @isnumeric);
-addParameter(p, 'passband', [100 300], @isnumeric);
-addParameter(p, 'detectAlt', 3, @isnumeric);
+addParameter(p, 'passband', [80 250], @isnumeric);
+addParameter(p, 'detectMet', 4, @isnumeric);
 addParameter(p, 'limState', [], @isnumeric);
 addParameter(p, 'flgGui', false, @islogical);
 addParameter(p, 'flgPlot', true, @islogical);
 addParameter(p, 'flgSave', false, @islogical);
 addParameter(p, 'flgSaveFig', false, @islogical);
 addParameter(p, 'bit2uv', [], @isnumeric);
+addParameter(p, 'zMet', 'nrem', @ischar);
 parse(p, varargin{:});
 
 basepath = p.Results.basepath;
@@ -35,13 +36,14 @@ thr = p.Results.thr;
 limDur = p.Results.limDur;
 passband = p.Results.passband;
 win = p.Results.win;
-detectAlt = p.Results.detectAlt;
+detectMet = p.Results.detectMet;
 flgPlot = p.Results.flgPlot;
 flgSave = p.Results.flgSave;
 flgSaveFig = p.Results.flgSaveFig;
 bit2uv = p.Results.bit2uv;
 limState = p.Results.limState;
 flgGui = p.Results.flgGui;
+zMet = p.Results.zMet;
 
 %% ========================================================================
 %  SETUP
@@ -68,11 +70,12 @@ end
 
 % Prep MU spktimes
 if ~isempty(v.spktimes)
-    mutimes = cellfun(@(x) x / fsSpk, v.spktimes, 'uni', false);
-    mutimes = cellfun(@(x) x - win(1), mutimes, 'Uni', false);
-    mutimes = cellfun(@(x) x(x >= 0 & x <= sigDur), mutimes, 'Uni', false);
+    muTimes = cellfun(@(x) x / fsSpk, v.spktimes, 'uni', false);
+    muTimes = cellfun(@(x) x - win(1), muTimes, 'Uni', false);
+    muTimes = cellfun(@(x) x(x >= 0 & x <= sigDur), muTimes, 'Uni', false);
+    muTimes = sort(vertcat(muTimes{:}));
 else
-    mutimes = [];
+    muTimes = [];
 end
 
 % Prep SU spktimes
@@ -83,9 +86,12 @@ spkTimes = cellfun(@(x) x(x >= 0 & x <= sigDur), spkTimes, 'Uni', false);
 % Prep boutTimes (for state analysis)
 try
     boutTimes = v.ss.bouts.times;
-    boutTimes = boutTimes - win(1);
+    boutTimes = cellfun(@(x) x - win(1), boutTimes, 'UniformOutput', false);
+    boutTimes = cellfun(@(x) x(x(:,2)>0 & x(:,1)<sigDur, :), boutTimes, 'UniformOutput', false);
+    nremTimes = boutTimes{4};
 catch
     boutTimes = [];
+    nremTimes = [];
 end
 
 % Ripple channel in LFP
@@ -136,9 +142,9 @@ if length(emg) ~= length(lfp)
 end
 
 % Prepare Signals
-rippSig = ripp_sigPrep(lfp, fs, 'emg', emg, ...
-    'detectAlt', detectAlt, 'passband', passband);
-
+rippSig = ripp_sigPrep(lfp, fs, ...
+    'detectMet', detectMet, 'passband', passband, ...
+    'zMet', zMet, 'nremTimes', nremTimes);
 
 
 %% ========================================================================
@@ -147,20 +153,18 @@ rippSig = ripp_sigPrep(lfp, fs, 'emg', emg, ...
 
 % Detect
 ripp = ripp_detect(rippSig, fs, ...
+    'emg', emg, ...
     'limDur', limDur, ...
     'basepath', basepath, ...
     'thr', thr, ...
-    'detectAlt', detectAlt, ...
     'flgPlot', false, ...
     'flgSave', flgSave);
 
 
 if flgGui
-    ripp_gui(ripp.times, ripp.peakTime, rippSig, spkTimes, fs, thr, ...
-        'detectAlt', detectAlt, 'basepath', basepath);
+    ripp_gui(ripp.times, ripp.peakTime, rippSig, muTimes, fs, thr, emg, ...
+        'basepath', basepath);
 end
-
-
 
 
 
@@ -168,25 +172,21 @@ end
 %  STATES
 %  ========================================================================
 
-
-
 rippStates = ripp_states(ripp.times, ripp.peakTime, boutTimes, ...
     'basepath', basepath, ...
     'flgPlot', flgPlot, ...
     'flgSave', flgSave, ...
     'flgSaveFig', flgSaveFig);
 
-ripp.states = rippStates;
-
 % Filter Ripples by State if requested
 rippTimes = ripp.times;
 peakTime = ripp.peakTime;
-if ~isempty(limState)
-    stateIdx = ripp.states.idx(:, limState);
-    rippTimes = ripp.times(stateIdx, :);
-    peakTime = ripp.peakTime(stateIdx);
-    fprintf('Limiting analysis to State %d\n', limState);
-end
+% if ~isempty(limState)
+%     stateIdx = ripp.states.idx(:, limState);
+%     rippTimes = ripp.times(stateIdx, :);
+%     peakTime = ripp.peakTime(stateIdx);
+%     fprintf('Limiting analysis to State %d\n', limState);
+% end
 
 
 %% ========================================================================
@@ -195,32 +195,34 @@ end
 
 % Run Analysis
 rippSpks = ripp_spks(rippTimes, spkTimes, peakTime, ...
-    'muTimes', mutimes, ...
+    'muTimes', muTimes, ...
     'basepath', basepath, ...
     'flgPlot', flgPlot, ...
     'flgSave', flgSave);
+
+
 
 %% ========================================================================
 %  SPK-LFP
 %  ========================================================================
 fprintf('Running spklfp coupling...\n');
-fRange = [120 200];
+fRange = [80 250];
 % sig is not available anymore as vector, extract from rippSig or re-filter?
 % rippSig.filt is [100 300]. Here we want [120 200].
 % So we re-filter raw lfp.
 sig = filterLFP(lfp, 'fs', fs, 'type', 'butter', 'dataOnly', true, ...
     'order', 3, 'passband', fRange, 'graphics', false);
 
-spkLfp = spklfp_calc('basepath', basepath, 'lfpTimes', ripp.times, ...
-    'sig', sig, ...
-    'flgSave', false, 'flgPlot', false, 'flgStl', false);
+spkLfp = spklfp_calc('basepath', basepath, ...
+    'lfpTimes', ripp.times, ...
+    'sig', rippSig.filt, ...
+    'flgSave', false, ...
+    'flgPlot', flgPlot, ...
+    'flgStl', false);
 
 spkLfpFile = fullfile(basepath, [basename, '.rippSpkLfp.mat']);
 save(spkLfpFile, 'spkLfp', '-v7.3');
 
-if flgPlot
-    spklfp_plot(spkLfp);
-end
 
 %% ========================================================================
 %  Finalize and Save
@@ -243,6 +245,7 @@ end
 fprintf('--- Ripple Analysis Pipeline Completed for %s ---\n', basename);
 
 % Put together all ripp structs
+ripp.states = rippStates;
 ripp.spks = rippSpks;
 ripp.spkLfp = spkLfp;
 

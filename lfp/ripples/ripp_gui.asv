@@ -62,11 +62,11 @@ sigDetect = rippSig.z;
 timestamps = (0:length(lfp)-1)' / fs;
 
 % Calculate fixed y-limits 
-valPrctile = [0.1, 99.9];
-yLims.raw = prctile(lfp, valPrctile);
-yLims.filt = prctile(sigFilt, valPrctile);
-yLims.det = prctile(sigDetect, valPrctile);
-yLims.emg = prctile(emg, valPrctile);
+prctileV
+yLims.raw = prctile(lfp, [5 95]);
+yLims.filt = prctile(sigFilt, [5 95]);
+yLims.det = prctile(sigDetect, [5 95]);
+yLims.emg = prctile(emg, [5 95]);
 
 
 %% ========================================================================

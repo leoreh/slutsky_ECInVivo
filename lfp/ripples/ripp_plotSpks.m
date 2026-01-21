@@ -38,13 +38,9 @@ unitsfile = fullfile(basepath, [basename, '.units.mat']);
 % Load Units (RS/FS)
 if exist(unitsfile, 'file')
     load(unitsfile, 'units');
-    if isfield(units, 'clean') && size(units.clean, 1) >= 2
-        flgUnits = true;
-        idxRS = units.clean(1, :);
-        idxFS = units.clean(2, :);
-    else
-        flgUnits = false;
-    end
+    flgUnits = true;
+    idxRS = units.type == 'RS';
+    idxFS = units.type == 'FS';
 else
     flgUnits = false;
 end
@@ -61,7 +57,6 @@ unitClr = [0 0 1; 1 0 0];
 %% ========================================================================
 %  PLOTTING
 %  ========================================================================
-setMatlabGraphics(true);
 fh = figure('Name', [basename '_rippSpks'], 'NumberTitle', 'off');
 
 % --- MU Plots ---
@@ -122,7 +117,7 @@ if ~isempty(rippSpks.su) && ~isempty(rippSpks.su.rippMap)
     if flgUnits && ~isempty(idxRS)
         ydata = normSpking(idxRS, :);
         plot_stdShade('hAx', sb6, 'dataMat', ydata', 'alpha', 0.3, 'clr', unitClr(1,:), 'xVal', xMap);
-        title(sprintf('RS Units (n=%d)', length(idxRS)));
+        title(sprintf('RS Units (n=%d)', sum(idxRS)));
         ylim([0 1]);
     end
     xlabel('Time [s]'); ylabel('Norm. FR'); box off; axis tight;
@@ -132,7 +127,7 @@ if ~isempty(rippSpks.su) && ~isempty(rippSpks.su.rippMap)
     if flgUnits && ~isempty(idxFS)
         ydata = normSpking(idxFS, :);
         plot_stdShade('hAx', sb7, 'dataMat', ydata', 'alpha', 0.3, 'clr', unitClr(2,:), 'xVal', xMap);
-        title(sprintf('FS Units (n=%d)', length(idxFS)));
+        title(sprintf('FS Units (n=%d)', sum(idxFS)));
         ylim([0 1]);
     end
     xlabel('Time [s]'); ylabel('Norm. FR'); box off; axis tight;

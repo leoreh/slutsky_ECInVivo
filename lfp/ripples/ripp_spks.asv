@@ -24,7 +24,7 @@ p = inputParser;
 addRequired(p, 'rippTimes', @isnumeric);
 addRequired(p, 'spkTimes', @iscell);
 addRequired(p, 'peakTimes', @isnumeric);
-addParameter(p, 'muTimes', {}, @iscell);
+addParameter(p, 'muTimes', [], @isnumeric);
 addParameter(p, 'basepath', pwd, @ischar);
 addParameter(p, 'flgPlot', true, @islogical);
 addParameter(p, 'flgSave', true, @islogical);
@@ -173,13 +173,19 @@ end
 %  ========================================================================
 if ~isempty(muTimes)
     fprintf('Analyzing Multi-Unit Activity...\n');
-    muSpks = sort(vertcat(muTimes{:}));
-    rippSpks.mu.rippMap = sync_spksMap(muSpks, peakTimes, mapDur, nBinsMap);
-    rippSpks.mu.ctrlMap = sync_spksMap(muSpks, diff(ctrlTimes, 1, 2) / 2, mapDur, nBinsMap);
+    rippSpks.mu.rippMap = sync_spksMap(muTimes, peakTimes, mapDur, nBinsMap);
+    rippSpks.mu.ctrlMap = sync_spksMap(muTimes, diff(ctrlTimes, 1, 2) / 2, mapDur, nBinsMap);
 else
     rippSpks.mu = [];
 end
 
+if ~isempty(rippSpks.mu)
+    ctrlRates = times2rate(spkTimes, 'winCalc', ctrlTimes, 'binsize', Inf);
+
+    cRate = mean(rippSpks.mu.ctrlMap, 2, 'omitnan');
+    cMu = 
+    cSigma
+end
 
 %% ========================================================================
 %  SAVE & PLOT
@@ -190,7 +196,7 @@ if flgSave
 end
 
 if flgPlot
-
+     ripp_plotSpks(rippSpks)
 end
 
 end     % EOF

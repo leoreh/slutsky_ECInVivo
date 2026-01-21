@@ -22,7 +22,7 @@ function ripp = ripp_detect(rippSig, fs, varargin)
 p = inputParser;
 addRequired(p, 'rippSig', @isstruct);
 addRequired(p, 'fs', @isnumeric);
-addParameter(p, 'emg', [], @isnumeric); 
+addParameter(p, 'emg', [], @isnumeric);
 addParameter(p, 'basepath', pwd, @ischar);
 addParameter(p, 'thr', [1.5, 2.5, 2, 200, 50], @isnumeric);
 addParameter(p, 'limDur', [15, 300, 20, 10], @isnumeric);
@@ -65,17 +65,11 @@ ripp.rate.binsize = 60;
 % Duration limits to samples
 limDur_Samples = round(limDur / 1000 * fs);
 
-% Extract Signals from Struct
-sig         = rippSig.filt;
-sigDetect   = rippSig.z;
-sigFreq     = rippSig.freq;
-sigAmp      = rippSig.amp;
-sigPhase    = rippSig.sigPhase;
 
 %% ========================================================================
 %  DETECTION
 %  ========================================================================
-eventSamples = binary2bouts('vec', sigDetect > thr(1), 'minDur', limDur_Samples(1),...
+eventSamples = binary2bouts('vec', rippSig.z > thr(1), 'minDur', limDur_Samples(1),...
     'maxDur', limDur_Samples(2), 'interDur', limDur_Samples(3));
 nEvents = size(eventSamples, 1);
 
@@ -87,34 +81,34 @@ contPowAvg = nan(nEvents, 1);
 avgFreq = nan(nEvents, 1);
 
 % EMG Exclusion
-if ~isempty(emg)
-    for iEvent = 1:nEvents
-        idx = eventSamples(iEvent,1):eventSamples(iEvent,2);
-        emgRms(iEvent) = rms(emg(idx));
-    end
-    idxDiscard = idxDiscard | (emgRms > prctile(emgRms, thr(5)));
-end
+% if ~isempty(emg)
+%     for iEvent = 1:nEvents
+%         idx = eventSamples(iEvent,1):eventSamples(iEvent,2);
+%         emgRms(iEvent) = rms(emg(idx));
+%     end
+%     idxDiscard = idxDiscard | (emgRms > prctile(emgRms, thr(5)));
+% end
 
 % Frequency Exclusion
-if ~isempty(emg)
-    for iEvent = 1:nEvents
-        idx = eventSamples(iEvent,1):eventSamples(iEvent,2);
-        avgFreq(iEvent) = mean(sigFreq(idx), 'omitnan');
-    end
-
-    highEmgIdx = emgRms > prctile(emgRms, 99);
-    if any(highEmgIdx)
-        thrFreq = mean(avgFreq(highEmgIdx));
-        idxDiscard = idxDiscard | (avgFreq > thrFreq);
-    end
-end
+% if ~isempty(emg)
+%     for iEvent = 1:nEvents
+%         idx = eventSamples(iEvent,1):eventSamples(iEvent,2);
+%         avgFreq(iEvent) = mean(rippSig.freq(idx), 'omitnan');
+%     end
+% 
+%     highEmgIdx = emgRms > prctile(emgRms, 99);
+%     if any(highEmgIdx)
+%         thrFreq = mean(avgFreq(highEmgIdx));
+%         idxDiscard = idxDiscard | (avgFreq > thrFreq);
+%     end
+% end
 
 % Power and Continuity thresholds
 for iEvent = 1:nEvents
     if idxDiscard(iEvent), continue; end
 
     idx = eventSamples(iEvent,1):eventSamples(iEvent,2);
-    evtPow = sigDetect(idx);
+    evtPow = rippSig.z(idx);
 
     % Peak Power
     peakPower(iEvent) = max(evtPow);
@@ -169,7 +163,7 @@ end
 peakSample = zeros(nEvents, 1);
 for iEvent = 1:nEvents
     idx = eventSamples(iEvent,1):eventSamples(iEvent,2);
-    [~, peakRel] = min(sig(idx));
+    [~, peakRel] = min(rippSig.filt(idx));
     peakSample(iEvent) = eventSamples(iEvent,1) + peakRel - 1;
 end
 
@@ -182,17 +176,17 @@ nbinsMap = floor(fs * diff(ripp.maps.durWin) / 2) * 2 + 1;
 centerBin = ceil(nbinsMap / 2);
 mapArgs = {'durations', ripp.maps.durWin, 'nbins', nbinsMap, 'smooth', 0};
 
-[r, ir] = Sync([timestamps sig], peakTime, 'durations', ripp.maps.durWin);
+[r, ir] = Sync([timestamps rippSig.filt], peakTime, 'durations', ripp.maps.durWin);
 ripp.maps.raw = SyncMap(r, ir, mapArgs{:});
 ripp.maps.filt = ripp.maps.raw;
 
-[r, ir] = Sync([timestamps sigAmp], peakTime, 'durations', ripp.maps.durWin);
+[r, ir] = Sync([timestamps rippSig.amp], peakTime, 'durations', ripp.maps.durWin);
 ripp.maps.amp = SyncMap(r, ir, mapArgs{:});
 
-[r, ir] = Sync([timestamps sigPhase], peakTime, 'durations', ripp.maps.durWin);
+[r, ir] = Sync([timestamps rippSig.sigPhase], peakTime, 'durations', ripp.maps.durWin);
 ripp.maps.phase = SyncMap(r, ir, mapArgs{:});
 
-[r, ir] = Sync([timestamps sigFreq], peakTime, 'durations', ripp.maps.durWin);
+[r, ir] = Sync([timestamps rippSig.freq], peakTime, 'durations', ripp.maps.durWin);
 ripp.maps.freq = SyncMap(r, ir, mapArgs{:});
 
 % Store Properties

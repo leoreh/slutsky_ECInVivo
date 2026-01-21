@@ -24,7 +24,7 @@ p = inputParser;
 addRequired(p, 'rippTimes', @isnumeric);
 addRequired(p, 'spkTimes', @iscell);
 addRequired(p, 'peakTimes', @isnumeric);
-addParameter(p, 'muTimes', {}, @iscell);
+addParameter(p, 'muTimes', [], @isnumeric);
 addParameter(p, 'basepath', pwd, @ischar);
 addParameter(p, 'flgPlot', true, @islogical);
 addParameter(p, 'flgSave', true, @islogical);
@@ -138,25 +138,25 @@ if nUnits > 0
     rippSpks.su.rippMap = nan(nUnits, nRipples, nBinsMap);
     rippSpks.su.ctrlMap = nan(nUnits, nRipples, nBinsMap);
 
-    for iRipp = 1:nUnits
+    for iUnit = 1:nUnits
         % Stats
-        rRate = rippRates(iRipp, :);
-        cRate = ctrlRates(iRipp, :);
+        rRate = rippRates(iUnit, :);
+        cRate = ctrlRates(iUnit, :);
 
         if any(~isnan(rRate)) && any(~isnan(cRate))
             [pVal, h] = signrank(rRate, cRate);
-            rippSpks.su.pVal(iRipp) = pVal;
-            rippSpks.su.sigMod(iRipp) = h;
+            rippSpks.su.pVal(iUnit) = pVal;
+            rippSpks.su.sigMod(iUnit) = h;
 
             mC = mean(cRate, 'omitnan');
             sdC = std(cRate, 0, 'omitnan');
             mR = mean(rRate, 'omitnan');
 
-            rippSpks.su.frGain(iRipp) = (mR - mC) / sdC;
-            rippSpks.su.frModulation(iRipp) = (mR - mC) / (mR + mC);
-            rippSpks.su.frPrct(iRipp) = (mR - mC) / mC * 100;
-            rippSpks.su.frRipp(iRipp) = mR;
-            rippSpks.su.frRand(iRipp) = mC;
+            rippSpks.su.frGain(iUnit) = (mR - mC) / sdC;
+            rippSpks.su.frModulation(iUnit) = (mR - mC) / (mR + mC);
+            rippSpks.su.frPrct(iUnit) = (mR - mC) / mC * 100;
+            rippSpks.su.frRipp(iUnit) = mR;
+            rippSpks.su.frRand(iUnit) = mC;
         end
 
         % Maps
@@ -173,13 +173,17 @@ end
 %  ========================================================================
 if ~isempty(muTimes)
     fprintf('Analyzing Multi-Unit Activity...\n');
-    muSpks = sort(vertcat(muTimes{:}));
-    rippSpks.mu.rippMap = sync_spksMap(muSpks, peakTimes, mapDur, nBinsMap);
-    rippSpks.mu.ctrlMap = sync_spksMap(muSpks, diff(ctrlTimes, 1, 2) / 2, mapDur, nBinsMap);
+    rippSpks.mu.rippMap = sync_spksMap(muTimes, peakTimes, mapDur, nBinsMap);
+    rippSpks.mu.ctrlMap = sync_spksMap(muTimes, diff(ctrlTimes, 1, 2) / 2, mapDur, nBinsMap);
 else
     rippSpks.mu = [];
 end
 
+if ~isempty(rippSpks.mu)
+    rippRatesMU = times2rate(muTimes, 'winCalc', rippTimes, 'binsize', Inf);
+    ctrlRatesMU = times2rate(muTimes, 'winCalc', ctrlTimes, 'binsize', Inf);
+    rippSpks.mu.muGain = (rippRatesMU - mean(ctrlRatesMU, 'omitnan')) ./ std(ctrlRatesMU, 'omitnan');
+end
 
 %% ========================================================================
 %  SAVE & PLOT
@@ -190,7 +194,7 @@ if flgSave
 end
 
 if flgPlot
-
+     ripp_plotSpks(rippSpks)
 end
 
 end     % EOF

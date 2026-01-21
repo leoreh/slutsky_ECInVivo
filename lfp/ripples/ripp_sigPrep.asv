@@ -92,6 +92,7 @@ switch zMet
     case 'nrem'
         % Global mean/std based on NREM times
 
+        % Create mask for NREM
         mask = false(size(baseSignal));
         nremSamp = round(nremTimes * fs) + 1;
         nSamples = length(baseSignal);
