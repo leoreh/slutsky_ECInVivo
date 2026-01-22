@@ -164,10 +164,10 @@ ripp.ctrlTimes = ripp_ctrlTimes(ripp.times);
 % Calculate MUA spkGain (z-score relative to control) per ripple 
 rippRates = times2rate(muTimes, 'winCalc', ripp.times, 'binsize', Inf);
 ctrlRates = times2rate(muTimes, 'winCalc', ripp.ctrlTimes, 'binsize', Inf);
-spkGain = (rippRates - mean(ctrlRates, 'all', 'omitnan')) ./ ...
+ripp.spkGain = (rippRates - mean(ctrlRates, 'all', 'omitnan')) ./ ...
     std(ctrlRates, [], 'all', 'omitnan');
 
-goodIdx = ripp_qa(ripp, rippSig, 'emg', emg, 'spkGain', spkGain);
+goodIdx = ripp_qa(ripp, rippSig, 'emg', emg, 'spkGain', ripp.spkGain);
 
 % Compare good and bad
 if flgGui
@@ -199,7 +199,7 @@ fprintf('Kept %d / %d events after QA.\n', sum(goodIdx), nEvents);
 
 ripp = ripp_params(rippSig, ripp);
 
-maps = ripp_maps(rippSig, ripp.peakTime, fs);
+rippMaps = ripp_maps(rippSig, ripp.peakTime, fs);
 
  
 
@@ -263,6 +263,13 @@ if flgPlot
     tbl.mua = rippSpks.mu.rippRates';
     tblGUI_scatHist(tbl, 'xVar', 'dur', 'yVar', 'amp', 'grpVar', 'Group');
     tblGUI_bar(tbl, 'yVar', 'dur', 'xVar', 'state');
+
+    tblMap = struct2table(rmfield(rippMaps, {'tstamps'}));
+    tblVars = tblMap.Properties.VariableNames;
+    tblVars = strcat('t_', tblVars);
+    tblMap.Properties.VariableNames = tblVars;
+    tbl = [tbl, tblMap];
+    tblGUI_xy(rippMaps.tstamps, tbl, 'yVar', 't_z', 'grpVar', 'states');
 
 
     ripp_plotSpks(rippSpks, rippPeth, ...

@@ -1,5 +1,5 @@
-function maps = ripp_maps(rippSig, peakTime, fs, varargin)
-% RIPP_MAPS Generates Peri-Event Time Histograms (maps) for continuous signals.
+function rippMaps = ripp_maps(rippSig, peakTime, fs, varargin)
+% RIPP_MAPS Generates Peri-Event Time Histograms (rippMaps) for continuous signals.
 %
 % SUMMARY:
 %   Extracts windowed signal traces around ripple peaks using fast 
@@ -12,7 +12,7 @@ function maps = ripp_maps(rippSig, peakTime, fs, varargin)
 %   varargin    - 'win' (default [-0.1 0.1]), 'basepath', 'flgSave'
 %
 % OUTPUT:
-%   maps        - Struct with fields corresponding to rippSig fields.
+%   rippMaps    - Struct with fields corresponding to rippSig fields.
 %                 Each field is [nEvents x nSamples].
 
 % =========================================================================
@@ -37,8 +37,8 @@ flgSave = p.Results.flgSave;
 [~, basename] = fileparts(basepath);
 mapFile = fullfile(basepath, [basename, '.rippMaps.mat']);
 
-maps = struct();
-maps.tstamps = linspace(win(1), win(2), round(diff(win)*fs)+1);
+rippMaps = struct();
+rippMaps.tstamps = linspace(win(1), win(2), round(diff(win)*fs)+1);
 nSamps = length(rippSig.lfp);
 nEvents = length(peakTime);
 
@@ -78,15 +78,15 @@ for iFld = 1:length(fields)
         rawMap(~validMask) = NaN;
     end
     
-    maps.(fn) = rawMap;
+    rippMaps.(fn) = rawMap;
 end
 
 % =========================================================================
 %  SAVE
 % =========================================================================
 if flgSave
-    save(mapFile, 'maps', '-v7.3');
-    fprintf('Saved heavy maps to: %s\n', mapFile);
+    save(mapFile, 'rippMaps', '-v7.3');
+    fprintf('Saved heavy rippMaps to: %s\n', mapFile);
 end
 
 end
