@@ -24,6 +24,7 @@ addParameter(p, 'detectMet', 4, @isnumeric);
 addParameter(p, 'flgGui', false, @islogical);
 addParameter(p, 'flgPlot', true, @islogical);
 addParameter(p, 'flgSave', false, @islogical);
+addParameter(p, 'flgQA', true, @islogical);
 addParameter(p, 'flgSaveFig', false, @islogical);
 addParameter(p, 'bit2uv', [], @isnumeric);
 addParameter(p, 'zMet', 'nrem', @ischar);
@@ -39,10 +40,10 @@ win = p.Results.win;
 detectMet = p.Results.detectMet;
 flgPlot = p.Results.flgPlot;
 flgSave = p.Results.flgSave;
+flgQA = p.Results.flgQA;
 flgSaveFig = p.Results.flgSaveFig;
 bit2uv = p.Results.bit2uv;
 flgGui = p.Results.flgGui;
-
 zMet = p.Results.zMet;
 mapDur = p.Results.mapDur;
 
@@ -158,51 +159,12 @@ ripp.ctrlTimes = ripp_ctrlTimes(ripp.times);
 
 
 %% ========================================================================
-%  QUALITY ASSURANCE
-%  ========================================================================
-
-% Calculate MUA spkGain (z-score relative to control) per ripple 
-rippRates = times2rate(muTimes, 'winCalc', ripp.times, 'binsize', Inf);
-ctrlRates = times2rate(muTimes, 'winCalc', ripp.ctrlTimes, 'binsize', Inf);
-ripp.spkGain = (rippRates - mean(ctrlRates, 'all', 'omitnan')) ./ ...
-    std(ctrlRates, [], 'all', 'omitnan');
-
-goodIdx = ripp_qa(ripp, rippSig, 'emg', emg, 'spkGain', ripp.spkGain);
-
-% Compare good and bad
-if flgGui
-    ripp_gui(ripp.times(goodIdx, :), ripp.peakTime(goodIdx), rippSig, muTimes, fs, thr, emg, ...
-        'basepath', basepath);
-
-    ripp_gui(ripp.times(~goodIdx, :), ripp.peakTime(~goodIdx), rippSig, muTimes, fs, thr, emg, ...
-        'basepath', basepath);
-end
-
-% Filter structure
-fnames = fieldnames(ripp);
-nEvents = length(goodIdx);
-for iField = 1:length(fnames)
-    fn = fnames{iField};
-    
-    % Check if first dimension matches nEvents
-    if size(ripp.(fn), 1) == nEvents
-        ripp.(fn) = ripp.(fn)(goodIdx, :);
-    end
-end
-fprintf('Kept %d / %d events after QA.\n', sum(goodIdx), nEvents);
-
-
-%% ========================================================================
 %  PARAMS & MAPS
 %  ========================================================================
 
-
 ripp = ripp_params(rippSig, ripp);
-
-rippMaps = ripp_maps(rippSig, ripp.peakTime, fs);
-
+rippMaps = ripp_maps(rippSig, ripp.peakTime, fs, 'mapDur', mapDur);
  
-
 %% ========================================================================
 %  STATES
 %  ========================================================================
@@ -210,31 +172,11 @@ rippMaps = ripp_maps(rippSig, ripp.peakTime, fs);
 ripp.state = ripp_states(ripp.times, ripp.peakTime, boutTimes, ...
     'basepath', basepath, ...
     'flgPlot', false, ...
-    'flgSave', flgSave);
+    'flgSave', false);
 
 if flgSave
     rippFile = fullfile(basepath, [basename, '.ripp.mat']);
     save(rippFile, 'ripp', '-v7.3');
-end
-
-%% ========================================================================
-%  SPIKE STATS
-%  ========================================================================
-
-% SU
-fprintf('Analyzing Spike Stats...\n');
-rippSpks.su = ripp_spks(spkTimes, ripp.times, ripp.ctrlTimes, ...
-    'basepath', basepath, ...
-    'flgSave', false);
-
-% MU
-rippSpks.mu = ripp_spks(muTimes, ripp.times, ripp.ctrlTimes, ...
-    'basepath', basepath, ...
-    'flgSave', false);
-
-if flgSave
-    rippSpksFile = fullfile(basepath, [basename, '.rippSpks.mat']);
-    save(rippSpksFile, 'rippSpks', '-v7.3');
 end
 
 
@@ -244,8 +186,12 @@ end
 
 fprintf('Creating Spike PETH...\n');
 
-rippPeth.su = ripp_spkPeth(spkTimes, ripp.peakTime, ripp.ctrlTimes, 'flgSave', false);
-rippPeth.mu = ripp_spkPeth(muTimes, ripp.peakTime, ripp.ctrlTimes, 'flgSave', false);
+rippPeth.su = ripp_spkPeth(spkTimes, ripp.peakTime, ripp.ctrlTimes, ...
+    'flgSave', false, ...
+    'mapDur', mapDur);
+rippPeth.mu = ripp_spkPeth(muTimes, ripp.peakTime, ripp.ctrlTimes, ...
+    'flgSave', false, ...
+    'mapDur', mapDur);
 
 if flgSave
     spkPethFile = fullfile(basepath, [basename, '.rippPeth.mat']);
@@ -254,29 +200,125 @@ end
 
 
 %% ========================================================================
-%  PLOTS
+%  QUALITY ASSURANCE
 %  ========================================================================
 
-if flgPlot
+% Calculate Instantaneous Rates (Events x Units)
+% 'binsize', Inf -> Returns one rate per event
+rippRates = times2rate(muTimes, 'winCalc', ripp.times, 'binsize', Inf);
+ctrlRates = times2rate(muTimes, 'winCalc', ripp.ctrlTimes, 'binsize', Inf);
 
-    tbl = struct2table(rmfield(ripp, {'info', 'times'}));
-    tbl.mua = rippSpks.mu.rippRates';
-    tblGUI_scatHist(tbl, 'xVar', 'dur', 'yVar', 'amp', 'grpVar', 'Group');
-    tblGUI_bar(tbl, 'yVar', 'dur', 'xVar', 'state');
+% Calculate MUA spkGain (z-score relative to control) per ripple 
+ripp.spkGain = [(rippRates - mean(ctrlRates, 'all', 'omitnan')) ./ ...
+    std(ctrlRates, [], 'all', 'omitnan')]';
 
+% Good ripples increase spiking activity
+ripp.goodSpk = ripp.spkGain > 0;
+
+if flgGui
+    
+    % MEAN TRACES
+        
+    % Build table
+    tbl = struct2table(rmfield(ripp, {'info', 'times', 'ctrlTimes'}));
+    
+    % Add maps
     tblMap = struct2table(rmfield(rippMaps, {'tstamps'}));
     tblVars = tblMap.Properties.VariableNames;
     tblVars = strcat('t_', tblVars);
     tblMap.Properties.VariableNames = tblVars;
     tbl = [tbl, tblMap];
-    tblGUI_xy(rippMaps.tstamps, tbl, 'yVar', 't_z', 'grpVar', 'states');
+    
+    % Add PETH
+    tbl.suPETH = squeeze(mean(rippPeth.su.ripp, 1, 'omitnan'));
+    tbl.muPETH = squeeze(rippPeth.mu.ripp);
 
+    % Plot    
+    tblGUI_xy(rippPeth.mu.tstamps, tbl, 'yVar', 't_z', 'grpVar', 'states');
 
-    ripp_plotSpks(rippSpks, rippPeth, ...
-        'basepath', basepath, ...
-        'flgSaveFig', flgSaveFig);
+    % PER TRACE
+    ripp_gui(ripp.times, ripp.peakTime, rippSig, muTimes, fs, thr, emg, ...
+        'basepath', basepath);
 end
 
+% Filter good ripples
+if flgQA
+    stateIdx = ripp.state == 'QWAKE' | ripp.state == 'LSLEEP' | ripp.state == 'NREM';
+    goodIdx = stateIdx & ripp.goodSpk;
+else
+    goodIdx = true(length(ripp.state), 1);
+end
+ripp.goodIdx = goodIdx;
+
+% Filter ripp (not saved, only for subsequent analysis)
+fnames = fieldnames(ripp);
+nRipp = length(goodIdx);
+for iField = 1:length(fnames)
+    fn = fnames{iField};
+    
+    % Check if first dimension matches nEvents
+    if size(ripp.(fn), 1) == nRipp
+        ripp.(fn) = ripp.(fn)(goodIdx, :);
+    end
+end
+fprintf('Kept %d / %d events after QA.\n', sum(goodIdx), nRipp);
+
+% Filter rippPeth (not saved, only for plotting)
+fnames = fieldnames(rippPeth.su);
+nRipp = length(goodIdx);
+for iField = 1:length(fnames)
+    fn = fnames{iField};
+    
+    % Check if first dimension matches nEvents
+    if size(rippPeth.su.(fn), 2) == nRipp
+        rippPeth.su.(fn) = rippPeth.su.(fn)(:, goodIdx, :);
+    end
+
+    % Check if first dimension matches nEvents
+    if size(rippPeth.mu.(fn), 2) == nRipp
+        rippPeth.mu.(fn) = rippPeth.mu.(fn)(:, goodIdx, :);
+    end
+end
+
+% Recalculate states
+ripp.state = ripp_states(ripp.times, ...
+    ripp.peakTime, ...
+    boutTimes, ...
+    'basepath', basepath, ...
+    'flgPlot', false, ...
+    'flgSave', true);
+
+
+%% ========================================================================
+%  SPIKE STATS
+%  ========================================================================
+
+% SU
+fprintf('Analyzing Spike Stats...\n');
+rippSpks.su = ripp_spks(spkTimes, ...
+    ripp.times, ...
+    ripp.ctrlTimes, ...
+    'basepath', basepath, ...
+    'flgSave', false);
+
+% MU
+rippSpks.mu = ripp_spks(muTimes, ...
+    ripp.times, ...
+    ripp.ctrlTimes, ...
+    'basepath', basepath, ...
+    'flgSave', false);
+
+if flgSave
+    rippSpksFile = fullfile(basepath, [basename, '.rippSpks.mat']);
+    save(rippSpksFile, 'rippSpks', '-v7.3');
+end
+
+% Plot spikes
+if flgPlot 
+    ripp_plotSpks(rippSpks, rippPeth, ...
+        'basepath', basepath, ...
+        'flgSaveFig', flgSaveFig);  
+end
 
 
 %% ========================================================================

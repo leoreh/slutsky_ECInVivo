@@ -112,7 +112,11 @@ guiData.highlightFcn = @highlightTraces;
 guiData.setGroupVarFcn = @setGroupVar;
 guiData.selCbk = selCbk;
 guiData.grpCbk = grpCbk;
+guiData.selCbk = selCbk;
+guiData.grpCbk = grpCbk;
 guiData.xLbl = xLbl;
+guiData.chkShowTraces = [];
+guiData.chkShowSEM = [];
 
 
 %% ========================================================================
@@ -206,7 +210,26 @@ currY = currY - ctlH - ctlGap;
 
 % Container for Group By Checkboxes
 guiData.pnlGrpBy = uipanel('Parent', hPanel, 'BorderType', 'none', ...
-    'Units', 'normalized', 'Position', [0.05, 0.10, 0.9, currY - 0.10]);
+    'Units', 'normalized', 'Position', [0.05, 0.12, 0.9, currY - 0.12]);
+
+% Separator
+currY = 0.11;
+uicontrol('Parent', hPanel, 'Style', 'text', 'String', '--- Plot Options ---', ...
+    'Units', 'normalized', 'Position', [0.05, currY, 0.9, ctlH], ...
+    'HorizontalAlignment', 'center', 'ForegroundColor', [0.5 0.5 0.5]);
+currY = currY - ctlH;
+
+% 4. Plot Options (Traces / SEM)
+guiData.chkShowTraces = uicontrol('Parent', hPanel, 'Style', 'checkbox', ...
+    'String', 'Show Traces', ...
+    'Units', 'normalized', 'Position', [0.05, currY, 0.9, ctlH], ...
+    'Value', 0, 'Callback', @onUpdatePlot); % Default OFF
+currY = currY - ctlH;
+
+guiData.chkShowSEM = uicontrol('Parent', hPanel, 'Style', 'checkbox', ...
+    'String', 'Show SEM', ...
+    'Units', 'normalized', 'Position', [0.05, currY, 0.9, ctlH], ...
+    'Value', 1, 'Callback', @onUpdatePlot); % Default ON
 
 
 hContainer.UserData = guiData;
@@ -400,6 +423,10 @@ onUpdatePlot(hContainer, []);
 
         axHandles = []; % Store axes for linking
 
+        % Plot Options
+        showTraces = get(data.chkShowTraces, 'Value');
+        showSEM = get(data.chkShowSEM, 'Value');
+
         % --- RENDER LOOP ---
         for iTile = 1:length(catsPB)
             catTile = catsPB{iTile};
@@ -445,8 +472,12 @@ onUpdatePlot(hContainer, []);
                     if ~iscategorical(rawColG), rawColG = categorical(rawColG); end
                     idxGrp = (rawColG == catGrp);
 
-                    % Cycle colors
-                    cIdx = mod(iGrp-1, size(data.colors,1)) + 1;
+                    % Cycle colors based on ORIGINAL index in allCats
+                    % This ensures color stability when checking/unchecking boxes
+                    idxInAll = find(strcmp(allCats, catGrp), 1);
+                    if isempty(idxInAll), idxInAll = iGrp; end
+
+                    cIdx = mod(idxInAll-1, size(data.colors,1)) + 1;
                     clr = data.colors(cIdx, :);
                 end
 
@@ -462,14 +493,37 @@ onUpdatePlot(hContainer, []);
 
                 % Plot
                 % Light individual lines (High transparency) 0.05
-                hLines = plot(hAx, data.xVec, subY', 'Color', [clr, 0.005],...
-                    'LineWidth', 0.5, 'HandleVisibility', 'off');
+                if showTraces
+                    hLines = plot(hAx, data.xVec, subY', 'Color', [clr, 0.05],...
+                        'LineWidth', 0.5, 'HandleVisibility', 'off');
 
-                % Assign global indices to UserData of lines
-                globIndices = find(finalIdx);
-                for iL = 1:length(hLines)
-                    hLines(iL).UserData = globIndices(iL);
-                    hLines(iL).ButtonDownFcn = @(s,e) onLineClick(s, e, hContainer);
+                    % Assign global indices to UserData of lines
+                    globIndices = find(finalIdx);
+                    for iL = 1:length(hLines)
+                        hLines(iL).UserData = globIndices(iL);
+                        hLines(iL).ButtonDownFcn = @(s,e) onLineClick(s, e, hContainer);
+                    end
+                end
+
+                % SEM Shading
+                if showSEM &&  sum(finalIdx) > 1
+                    % calculate the mean and standard eror of mean
+                    n = sum(~isnan(subY), 1);  % number of non-NaN points per column
+                    sData = std(subY, 0, 1, 'omitnan') ./ sqrt(n);
+                    sData(sData == 0) = eps;
+
+                    mData = mean(subY, 1, 'omitnan');
+
+                    % Calculate Bounds
+                    lowerBound = mData - sData;
+                    upperBound = mData + sData;
+
+                    % Draw Shade
+                    xConf = [data.xVec(:); flipud(data.xVec(:))];
+                    yConf = [upperBound(:); flipud(lowerBound(:))];
+
+                    fill(hAx, xConf, yConf, clr, 'FaceAlpha', 0.2, ...
+                        'EdgeColor', 'none', 'HandleVisibility', 'off');
                 end
 
                 % Bold mean line
@@ -601,7 +655,7 @@ onUpdatePlot(hContainer, []);
             fprintf('Selected Trace Index: %d\n', idx);
 
         catch ME
-            warning('Error in line click: %s', ME.message);
+            warning(ME.identifier, '%s', ME.message);
         end
     end
 

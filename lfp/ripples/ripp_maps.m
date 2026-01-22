@@ -9,7 +9,7 @@ function rippMaps = ripp_maps(rippSig, peakTime, fs, varargin)
 %   rippSig     - Struct with fields (.lfp, .filt, .amp, etc.)
 %   peakTime    - [N x 1] Times of ripple peaks [s]
 %   fs          - Sampling rate [Hz]
-%   varargin    - 'win' (default [-0.1 0.1]), 'basepath', 'flgSave'
+%   varargin    - 'mapDur' (default [-0.1 0.1]), 'basepath', 'flgSave'
 %
 % OUTPUT:
 %   rippMaps    - Struct with fields corresponding to rippSig fields.
@@ -22,12 +22,12 @@ p = inputParser;
 addRequired(p, 'rippSig', @isstruct);
 addRequired(p, 'peakTime', @isnumeric);
 addRequired(p, 'fs', @isnumeric);
-addParameter(p, 'win', [-0.1 0.1], @isnumeric);
+addParameter(p, 'mapDur', [-0.1 0.1], @isnumeric);
 addParameter(p, 'basepath', pwd, @ischar);
 addParameter(p, 'flgSave', true, @islogical);
 parse(p, rippSig, peakTime, fs, varargin{:});
 
-win = p.Results.win;
+mapDur = p.Results.mapDur;
 basepath = p.Results.basepath;
 flgSave = p.Results.flgSave;
 
@@ -38,7 +38,7 @@ flgSave = p.Results.flgSave;
 mapFile = fullfile(basepath, [basename, '.rippMaps.mat']);
 
 rippMaps = struct();
-rippMaps.tstamps = linspace(win(1), win(2), round(diff(win)*fs)+1);
+rippMaps.tstamps = linspace(mapDur(1), mapDur(2), round(diff(mapDur)*fs)+1);
 nSamps = length(rippSig.lfp);
 nEvents = length(peakTime);
 
@@ -46,7 +46,7 @@ nEvents = length(peakTime);
 peakSamps = round(peakTime * fs) + 1;
 
 % Create a relative window vector
-winSamps = round(win(1)*fs) : round(win(2)*fs);
+winSamps = round(mapDur(1)*fs) : round(mapDur(2)*fs);
 
 % Broadcast to create a full matrix of indices [nEvents x nWindowSize]
 % This creates the indices for EVERY sample of EVERY ripple in one step.
