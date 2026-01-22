@@ -174,11 +174,6 @@ ripp.state = ripp_states(ripp.times, ripp.peakTime, boutTimes, ...
     'flgPlot', false, ...
     'flgSave', false);
 
-if flgSave
-    rippFile = fullfile(basepath, [basename, '.ripp.mat']);
-    save(rippFile, 'ripp', '-v7.3');
-end
-
 
 %% ========================================================================
 %  SPIKE MAPS
@@ -241,14 +236,20 @@ if flgGui
         'basepath', basepath);
 end
 
-% Filter good ripples
+% Select good ripples
 if flgQA
-    stateIdx = ripp.state == 'QWAKE' | ripp.state == 'LSLEEP' | ripp.state == 'NREM';
-    goodIdx = stateIdx & ripp.goodSpk;
+    ripp.stateIdx = ripp.state == 'QWAKE' | ripp.state == 'LSLEEP' | ripp.state == 'NREM';
+    goodIdx = ripp.stateIdx & ripp.goodSpk;
 else
     goodIdx = true(length(ripp.state), 1);
 end
 ripp.goodIdx = goodIdx;
+
+% Save full ripp struct (w/ "bad" ripples)
+if flgSave
+    rippFile = fullfile(basepath, [basename, '.ripp.mat']);
+    save(rippFile, 'ripp', '-v7.3');
+end
 
 % Filter ripp (not saved, only for subsequent analysis)
 fnames = fieldnames(ripp);

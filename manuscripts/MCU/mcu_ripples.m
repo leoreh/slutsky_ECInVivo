@@ -27,70 +27,15 @@ end
 
 
 
-% -------------------------------------------------------------------------
-% Re-run only part of the analysis pipeline (e.g., ripp_spks)
-% Assumes data was already loaded
-for iGrp = 1 : length(grps)
-    basepaths = mcu_basepaths(grps{iGrp});
-    for iFile = 1 : length(basepaths)
-
-        % File
-        basepath = basepaths{iFile};
-        [~, basename] = fileparts(basepath);
-        cd(basepath)
-
-        % Get the preloaded ripple structure
-        ripp = v{iGrp}(iFile).ripp;
-
-        % Calculate range of filtered lfp
-        mapData = ripp.maps.filt;
-        idxWin = round(size(mapData, 2) / 2);
-        idxWin = [idxWin - 5 : idxWin + 5];
-        ripp.peakRng = range(mapData(:, idxWin), 2);
-
-        % Calculate peakEnergy using RMS
-        ripp.peakEnergy = sqrt(mean(mapData(:, idxWin).^2, 2)).^2;
-        ripp = orderfields(ripp);
-
-        % % Re-run ripp_spks
-        % ripp = ripp_spks(ripp, 'basepath', basepath, 'limState', 4,...
-        %     'flgGraphics', true, 'flgSaveVar', true);
-
-        % Re-run state analysis
-        % ripp = ripp_states(ripp, 'basepath', basepath, 'flgGraphics', false, ...
-        %     'flgSaveVar', true, 'flgSaveFig', true);
-
-        % plot detection
-        % ripp_plot(ripp, 'basepath', basepath, 'flgSaveFig', false);
-
-        % Plot spikes
-        % ripp_plotSpks(ripp, 'basepath', basepath, 'flgSaveFig', false);
-
-        % phase coupling
-        % ripp = v(ifile).ripp;
-        % lfpTimes = ripp.times;
-        % rippCh = v(ifile).session.channelTags.Ripple;
-        % spkLfp = spklfp_calc('basepath', basepath, 'lfpTimes', lfpTimes,...
-        %     'ch', rippCh, 'fRange', [120 200],...
-        %     'flgSave', false, 'flgGraphics', true, 'flgStl', false);
-        % ripp.spkLfp = spkLfp;
-
-        % Update the preloaded variable structure and save
-        v{iGrp}(iFile).ripp = ripp;
-        save(fullfile(basepath, [basename, '.ripp.mat']), 'ripp', '-v7.3')
-    end
-end
-
-
 %% ========================================================================
-%  LOAD RIPP STRUCTS
+%  LOAD TABLE
 %  ========================================================================
 
 % RIPPLE SPIKES
 basepaths = [mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl')];
 nFiles = length(basepaths);
 
-presets = {'rippSpks'};
+presets = {'ripp'};
 tbl = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
 
 % Plot

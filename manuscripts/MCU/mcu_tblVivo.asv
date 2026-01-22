@@ -87,8 +87,14 @@ if ismember('frNet', presets)
 end
 
 if ismember('ripp', presets)
-    vars = ['ripp'];
-    
+    vars = {'ripp'};
+    varMap = struct();
+    varMap.dur          = 'ripp.dur';
+    varMap.peakAmp      = 'ripp.peakAmp';
+    varMap.peakFreq     = 'ripp.peakFreq';
+    varMap.peakFilt     = 'ripp.peakFilt';
+    varMap.peakEnergy   = 'ripp.peakEnergy';
+    varMap.state        = 'ripp.state';
 end
 
 % Load
@@ -156,14 +162,20 @@ tbl = join(tbl, fileTbl, 'Keys', {'Name', 'File'});
 tbl.Day = categorical(tbl.Day, [1 : 7], cfg.lbl.day);
 
 % Reorder columns
-varOrder = {'Group', 'Name', 'File', 'Day', 'UnitID', 'UnitType'};
+tblVars = tbl.Properties.VariableNames;
+if any(contains(tblVars, "UnitType"))
+    varOrder = {'Group', 'Name', 'File', 'Day', 'UnitID', 'UnitType'};
+    tbl.UnitType = reordercats(tbl.UnitType, cfg.lbl.unit);
+else
+    varOrder = {'Group', 'Name', 'File', 'Day', 'UnitID'};
+end
 tbl = movevars(tbl, varOrder, 'Before', 1);
 
 % Assert category order
 tbl.Group = reordercats(tbl.Group, cfg.lbl.grp);
-tbl.UnitType = reordercats(tbl.UnitType, cfg.lbl.unit);
 tbl.Day = reordercats(tbl.Day, cfg.lbl.day);
 tbl.UnitID = categorical(tbl.UnitID);
+if any(contains(tblVars, "UnitType"))
 
 if flgClean
     % Remove bad units

@@ -16,7 +16,7 @@ for iFile = 1 : nFiles
     [~, basename] = fileparts(basepath);
     tic
     ripp = ripp_wrapper('basepath', pwd, ...
-        'win', [0 4] * 3600, ...
+        'win', [0 6] * 3600, ...
         'rippCh', [], ...
         'flgPlot', false, ...
         'flgSave', true, ...
@@ -25,69 +25,10 @@ for iFile = 1 : nFiles
 end
 
 
-tbl = struct2table(rmfield(ripp, {'info', 'times'}));
-tblGUI_scatHist(tbl, 'xVar', 'dur', 'yVar', 'amp', 'grpVar', 'Group');
-
-
-
-
-% -------------------------------------------------------------------------
-% Re-run only part of the analysis pipeline (e.g., ripp_spks)
-% Assumes data was already loaded
-for iGrp = 1 : length(grps)
-    basepaths = mcu_basepaths(grps{iGrp});
-    for iFile = 1 : length(basepaths)
-
-        % File
-        basepath = basepaths{iFile};
-        [~, basename] = fileparts(basepath);
-        cd(basepath)
-
-        % Get the preloaded ripple structure
-        ripp = v{iGrp}(iFile).ripp;
-
-        % Calculate range of filtered lfp
-        mapData = ripp.maps.filt;
-        idxWin = round(size(mapData, 2) / 2);
-        idxWin = [idxWin - 5 : idxWin + 5];
-        ripp.peakRng = range(mapData(:, idxWin), 2);
-
-        % Calculate peakEnergy using RMS
-        ripp.peakEnergy = sqrt(mean(mapData(:, idxWin).^2, 2)).^2;
-        ripp = orderfields(ripp);
-
-        % % Re-run ripp_spks
-        % ripp = ripp_spks(ripp, 'basepath', basepath, 'limState', 4,...
-        %     'flgGraphics', true, 'flgSaveVar', true);
-
-        % Re-run state analysis
-        % ripp = ripp_states(ripp, 'basepath', basepath, 'flgGraphics', false, ...
-        %     'flgSaveVar', true, 'flgSaveFig', true);
-
-        % plot detection
-        % ripp_plot(ripp, 'basepath', basepath, 'flgSaveFig', false);
-
-        % Plot spikes
-        % ripp_plotSpks(ripp, 'basepath', basepath, 'flgSaveFig', false);
-
-        % phase coupling
-        % ripp = v(ifile).ripp;
-        % lfpTimes = ripp.times;
-        % rippCh = v(ifile).session.channelTags.Ripple;
-        % spkLfp = spklfp_calc('basepath', basepath, 'lfpTimes', lfpTimes,...
-        %     'ch', rippCh, 'fRange', [120 200],...
-        %     'flgSave', false, 'flgGraphics', true, 'flgStl', false);
-        % ripp.spkLfp = spkLfp;
-
-        % Update the preloaded variable structure and save
-        v{iGrp}(iFile).ripp = ripp;
-        save(fullfile(basepath, [basename, '.ripp.mat']), 'ripp', '-v7.3')
-    end
-end
 
 
 %% ========================================================================
-%  LOAD RIPP STRUCTS
+%  LOAD TABLE
 %  ========================================================================
 
 % RIPPLE SPIKES

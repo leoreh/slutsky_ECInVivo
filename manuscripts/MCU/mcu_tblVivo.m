@@ -62,14 +62,6 @@ if ismember('brst', presets)
     varMap.nBspk     = 'stats.nBspk';
 end
 
-if ismember('rippSpks', presets)
-    vars = [vars, 'rippSpks', 'rippSpkLfp'];
-    varMap.rippGain = 'rippSpks.su.frGain';
-    varMap.rippMod = 'rippSpks.su.frModulation';
-    varMap.rippMRL = 'spkLfp.phase.mrl';
-    varMap.rippTheta = 'spkLfp.phase.theta';
-end
-
 if ismember('prc', presets)
     vars = [vars, 'prc'];
     varMap.PRC = 'prc.prc0_norm';
@@ -86,15 +78,23 @@ if ismember('frNet', presets)
     varMap.funcon_raw  = 'frNet.funcon_raw';
 end
 
+if ismember('rippSpks', presets)
+    vars = [vars, 'rippSpks', 'rippSpkLfp'];
+    varMap.rippGain = 'rippSpks.su.frGain';
+    varMap.rippMod = 'rippSpks.su.frModulation';
+    varMap.rippMRL = 'spkLfp.phase.mrl';
+    varMap.rippTheta = 'spkLfp.phase.theta';
+end
+
 if ismember('ripp', presets)
-    vars = {'ripp', 'rippStates'};
+    vars = {'ripp'};
     varMap = struct();
     varMap.dur          = 'ripp.dur';
-    varMap.peakAmp      = 'ripp.peakAmp';
-    varMap.peakFreq     = 'ripp.peakFreq';
-    varMap.peakFilt     = 'ripp.peakFilt';
-    varMap.peakEnergy   = 'ripp.peakEnergy';
-    % varMap.state =
+    varMap.amp          = 'ripp.amp';
+    varMap.freq         = 'ripp.freq';
+    varMap.energy       = 'ripp.energy';
+    varMap.state        = 'ripp.state';
+    
 end
 
 % Load
@@ -165,7 +165,6 @@ tbl.Day = categorical(tbl.Day, [1 : 7], cfg.lbl.day);
 tblVars = tbl.Properties.VariableNames;
 if any(contains(tblVars, "UnitType"))
     varOrder = {'Group', 'Name', 'File', 'Day', 'UnitID', 'UnitType'};
-    tbl.UnitType = reordercats(tbl.UnitType, cfg.lbl.unit);
 else
     varOrder = {'Group', 'Name', 'File', 'Day', 'UnitID'};
 end
@@ -175,6 +174,9 @@ tbl = movevars(tbl, varOrder, 'Before', 1);
 tbl.Group = reordercats(tbl.Group, cfg.lbl.grp);
 tbl.Day = reordercats(tbl.Day, cfg.lbl.day);
 tbl.UnitID = categorical(tbl.UnitID);
+if any(contains(tblVars, "UnitType"))
+    tbl.UnitType = reordercats(tbl.UnitType, cfg.lbl.unit);
+end
 
 if flgClean
     % Remove bad units
