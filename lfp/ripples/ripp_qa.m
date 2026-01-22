@@ -1,4 +1,4 @@
-function qa = ripp_qa(ripp, rippSig, varargin)
+function goodIdx = ripp_qa(ripp, rippSig, varargin)
 % RIPP_QA Quality assurance for ripple detection.
 %
 % SUMMARY:
@@ -11,12 +11,7 @@ function qa = ripp_qa(ripp, rippSig, varargin)
 %   varargin        'rippSpks' (struct), 'thrEmg', 'thrGain'.
 %
 % OUTPUT:
-%   qa              Structure with fields:
-%                   .goodIdx    (logical nEvents x 1) Combined accepted events.
-%                   .badIdx     (struct of logicals) Individual exclusion flags.
-%                   .metrics    (struct) Calculated QA metrics per event.
-%
-% DEPENDENCIES: (None standard)
+%   goodIdx         (logical nEvents x 1) Combined accepted events.
 
 %% ========================================================================
 %  ARGUMENTS
@@ -24,11 +19,11 @@ function qa = ripp_qa(ripp, rippSig, varargin)
 p = inputParser;
 addRequired(p, 'ripp', @isstruct);
 addRequired(p, 'rippSig', @isstruct);
-addParameter(p, 'spkGain', [], @isstruct);
-addParameter(p, 'emg', [], @isnumeric); % Percentile threshold
-addParameter(p, 'thrEmg', 90, @isnumeric); % Percentile threshold
-addParameter(p, 'thrGain', 0, @isnumeric); % Z-score threshold
-addParameter(p, 'fs', 1250, @isnumeric);    % Needed for sample conversion if not using ripp.times implicitly
+addParameter(p, 'spkGain', [], @isnumeric);
+addParameter(p, 'emg', [], @isnumeric);        
+addParameter(p, 'thrEmg', 2, @isnumeric);       
+addParameter(p, 'thrGain', 0, @isnumeric);      
+addParameter(p, 'fs', 1250, @isnumeric);        % Needed for sample conversion if not using ripp.times implicitly
 
 parse(p, ripp, rippSig, varargin{:});
 ripp        = p.Results.ripp;
@@ -44,25 +39,16 @@ fs          = p.Results.fs;
 %  ========================================================================
 nEvents = size(ripp.times, 1);
 
-qa = struct();
-qa.goodIdx = true(nEvents, 1);
-qa.badIdx = struct();
-qa.badIdx.emg = false(nEvents, 1);
-qa.badIdx.freq = false(nEvents, 1);
-qa.badIdx.gain = false(nEvents, 1);
+badIdx = struct();
+badIdx.emg = false(nEvents, 1);
+badIdx.freq = false(nEvents, 1);
+badIdx.gain = false(nEvents, 1);
 
-qa.metrics = struct();
-qa.metrics.emgRms = nan(nEvents, 1);
-qa.metrics.avgFreq = nan(nEvents, 1);
-qa.metrics.rippGain = nan(nEvents, 1);
-
-% Timestamps for signal indexing
-timestamps = (0:length(rippSig.lfp)-1)' / fs;
 % Convert times to samples for faster indexing (ensure bounds)
 evtStart = round(ripp.times(:,1) * fs) + 1;
 evtEnd = round(ripp.times(:,2) * fs) + 1;
 evtStart = max(1, evtStart);
-evtEnd = min(length(timestamps), evtEnd);
+evtEnd = min(length(rippSig.lfp), evtEnd);
 
 %% ========================================================================
 %  EMG EXCLUSION
@@ -70,17 +56,22 @@ evtEnd = min(length(timestamps), evtEnd);
 % Logic: Calculate RMS of EMG during ripple event.
 % Exclude if > percentile threshold (relative to detected events distribution).
 
+emgRms = nan(nEvents, 1);
 if ~isempty(emg)
     for iEvent = 1:nEvents
         idx = evtStart(iEvent):evtEnd(iEvent);
-        qa.metrics.emgRms(iEvent) = rms(emg(idx));
+        emgRms(iEvent) = rms(emg(idx));
     end
 
-    threshVal = prctile(qa.metrics.emgRms, thrEmg);
-    qa.badIdx.emg = qa.metrics.emgRms > threshVal;
+    % Z-Score Method
+    mu = mean(emgRms, 'omitnan');
+    sigma = std(emgRms, 'omitnan');
+    threshVal = mu + thrEmg * sigma;
 
-    fprintf('QA: %d events flagged for High EMG (> prctile %d).\n', ...
-        sum(qa.badIdx.emg), thrEmg);
+    badIdx.emg = emgRms > threshVal;
+
+    fprintf('QA: %d events flagged for High EMG (> %.2f std, Z-Score).\n', ...
+        sum(badIdx.emg), thrEmg);
 else
     warning('RIPP_QA: No EMG signal provided. Skipping EMG exclusion.');
 end
@@ -92,28 +83,25 @@ end
 % Calculate mean frequency of these high-noise events.
 % Exclude ANY event with frequency higher than this noise-floor frequency.
 
-if isfield(rippSig, 'freq') && ~isempty(rippSig.freq)
-    for iEvent = 1:nEvents
-        idx = evtStart(iEvent):evtEnd(iEvent);
-        qa.metrics.avgFreq(iEvent) = mean(rippSig.freq(idx), 'omitnan');
-    end
+% for iEvent = 1:nEvents
+%     idx = evtStart(iEvent):evtEnd(iEvent);
+%     qa.metrics.avgFreq(iEvent) = mean(rippSig.freq(idx), 'omitnan');
+% end
+%
+% % Only proceed if we have valid EMG metrics to define "High EMG"
+% if ~all(isnan(qa.metrics.emgRms))
+%     highEmgThresh = prctile(qa.metrics.emgRms, 99);
+%     highEmgIdx = qa.metrics.emgRms > highEmgThresh;
+%
+%     if any(highEmgIdx)
+%         thrFreq = mean(qa.metrics.avgFreq(highEmgIdx));
+%         badIdx.freq = qa.metrics.avgFreq > thrFreq;
+%
+%         fprintf('QA: %d events flagged for High Freq (> %.1f Hz).\n', ...
+%             sum(badIdx.freq), thrFreq);
+%     end
+% end
 
-    % Only proceed if we have valid EMG metrics to define "High EMG"
-    if ~all(isnan(qa.metrics.emgRms))
-        highEmgThresh = prctile(qa.metrics.emgRms, 99);
-        highEmgIdx = qa.metrics.emgRms > highEmgThresh;
-
-        if any(highEmgIdx)
-            thrFreq = mean(qa.metrics.avgFreq(highEmgIdx));
-            qa.badIdx.freq = qa.metrics.avgFreq > thrFreq;
-
-            fprintf('QA: %d events flagged for High Freq (> %.1f Hz).\n', ...
-                sum(qa.badIdx.freq), thrFreq);
-        end
-    end
-else
-    warning('RIPP_QA: No Frequency signal provided. Skipping Frequency exclusion.');
-end
 
 %% ========================================================================
 %  GAIN EXCLUSION
@@ -122,17 +110,17 @@ end
 
 if ~isempty(spkGain)
 
-    qa.badIdx.gain = spkGain < thrGain;
-    qa.badIdx.gain = qa.badIdx.gain(:);
+    badIdx.gain = spkGain < thrGain;
+    badIdx.gain = badIdx.gain(:);
 
     fprintf('QA: %d events flagged for Low Gain (< %.2f).\n', ...
-        sum(qa.badIdx.gain), thrGain);
+        sum(badIdx.gain), thrGain);
 end
 
 %% ========================================================================
 %  FINALIZE
 %  ========================================================================
 % Combine exclusions
-qa.goodIdx = ~(qa.badIdx.emg | qa.badIdx.freq | qa.badIdx.gain);
+goodIdx = ~(badIdx.emg | badIdx.freq | badIdx.gain);
 
 end

@@ -53,12 +53,15 @@ end
 nUnits = length(times);
 
 % Get max time across all units if winCalc is empty
-maxTime = max(cellfun(@(x) max([0; x(:)]), times));
 if isempty(winCalc)
-    winCalc = [0, maxTime];
+    winCalc = [0, Inf];
 end
+maxTime = max(cellfun(@(x) max([0; x(:)]), times));
 if isinf(winCalc(end))
     winCalc(end) = maxTime;
+end
+if winCalc(1) < 0
+    winCalc(1) = 0;
 end
 nWin = size(winCalc, 1);
 
@@ -66,28 +69,32 @@ nWin = size(winCalc, 1);
 %% ========================================================================
 %  DEFINE BINS
 %  ========================================================================
-
 % Accumulate effective bin edges from all windows
-binEdges = zeros(0, 2);
 
-for iWin = 1:nWin
-    winStart = winCalc(iWin, 1);
-    winEnd   = winCalc(iWin, 2);
-    winDur   = winEnd - winStart;
+if isinf(binSize)
+    binEdges = winCalc;
+else
+    binEdges = zeros(0, 2);
 
-    if winDur <= binSize
-        edges = [0, winDur];
-    else
-        % Use n2chunks to split duration
-        % 'exclude' ensures we only keep full bins (dropping tail)
-        chunks = n2chunks('n', winDur, 'chunksize', binSize, 'lastChunk', 'exclude');
+    for iWin = 1:nWin
+        winStart = winCalc(iWin, 1);
+        winEnd   = winCalc(iWin, 2);
+        winDur   = winEnd - winStart;
 
-        % Convert chunks (1-based integer intervals) to 0-based time offsets
-        edges = [chunks(:,1)-1, chunks(:,2)];
+        if winDur <= binSize
+            edges = [0, winDur];
+        else
+            % Use n2chunks to split duration
+            % 'exclude' ensures we only keep full bins (dropping tail)
+            chunks = n2chunks('n', winDur, 'chunksize', binSize, 'lastChunk', 'exclude');
+
+            % Convert chunks (1-based integer intervals) to 0-based time offsets
+            edges = [chunks(:,1)-1, chunks(:,2)];
+        end
+
+        % Adjust for window start and append
+        binEdges = [binEdges; edges + winStart];
     end
-
-    % Adjust for window start and append
-    binEdges = [binEdges; edges + winStart];
 end
 
 nBins   = size(binEdges, 1);

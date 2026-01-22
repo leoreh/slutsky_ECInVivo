@@ -14,17 +14,15 @@ for iFile = 1 : nFiles
     basepath = basepaths{iFile};
     cd(basepath)
     [~, basename] = fileparts(basepath);
-
+    tic
     ripp = ripp_wrapper('basepath', pwd, ...
-        'win', [0 2 * 60 * 60], ...
+        'win', [0 4] * 3600, ...
         'rippCh', [], ...
-        'limState', 4, ...
-        'flgPlot', true, ...
-        'flgSave', false, ...
+        'flgPlot', false, ...
+        'flgSave', true, ...
         'flgSaveFig', true);
+    toc
 end
-
-
 
 
 
@@ -82,6 +80,36 @@ for iGrp = 1 : length(grps)
         save(fullfile(basepath, [basename, '.ripp.mat']), 'ripp', '-v7.3')
     end
 end
+
+
+%% ========================================================================
+%  LOAD RIPP STRUCTS
+%  ========================================================================
+
+% RIPPLE SPIKES
+basepaths = [mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl')];
+nFiles = length(basepaths);
+
+presets = {'rippSpks'};
+tbl = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
+
+% Plot
+tblPlot = tbl(tbl.UnitType == 'RS', :);
+tblGUI_bar(tbl, 'xVar', 'Group', 'yVar', 'rippMRL');
+tblGUI_scatHist(tblPlot, 'xVar', 'rippMos', 'yVar', 'rippGain', 'grpVar', 'Group');
+
+
+% RIPPLE PARAMS
+basepaths = [mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl')];
+nFiles = length(basepaths);
+
+presets = {'ripp'};
+tbl = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
+
+% Plot
+tblGUI_bar(tbl, 'xVar', 'Group', 'yVar', 'dur');
+tblGUI_scatHist(tbl, 'xVar', 'dur', 'yVar', 'peakAmp', 'grpVar', 'Group');
+
 
 
 

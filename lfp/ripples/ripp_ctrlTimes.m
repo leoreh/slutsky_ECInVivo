@@ -1,114 +1,176 @@
-function ctrlTimes = ripp_ctrlTimes(rippTimes, recDur, varargin)
+function ctrlTimes = ripp_ctrlTimes(rippTimes, varargin)
 % RIPP_CTRLTIMES Finds non-ripple intervals of matched duration.
 %
 % SUMMARY:
-%   Generates control events for ripple analysis by finding non-ripple periods
-%   of identical duration to the detected ripples. It attempts to find these
-%   periods as close as possible to the original ripple event (within maxDist),
-%   avoiding other ripples.
+%   Generates control events (matched duration) in non-ripple periods.
+%   Uses a fast, vectorized approach to merge exclusion zones and linear
+%   allocation to place control events.
+%
+% ALGORITHM:
+%   1. Define Exclusion Zones: Ripple times +/- padding.
+%   2. Merge Overlaps: Consolidate overlapping exclusions into single blocks.
+%   3. Find Gaps: Invert merged exclusions to find 'Available Intervals'.
+%   4. Linear Allocation: Iterate through ripples and place a matched control
+%      event in the first available gap that satisfies constraints.
 %
 % INPUTS:
 %   rippTimes   - (N x 2) Start and end times of ripples [s].
 %   recDur      - (Num) Duration of the recording [s].
-%   varargin    - 'maxDist' (default 4*3600), 'padding' (default 0.1).
+%   varargin    - 'maxDist' (default 4h), 'padding' (default 0.1s).
 %
 % OUTPUT:
 %   ctrlTimes   - (N x 2) Start and end times of control events [s].
-%
-% DEPENDENCIES: SubtractIntervals
-%
 
 %% ========================================================================
-%  ARGUMENTS
+%  INITIALIZATION
 %  ========================================================================
 p = inputParser;
 addRequired(p, 'rippTimes', @isnumeric);
-addRequired(p, 'recDur', @isnumeric);
-addParameter(p, 'maxDist', 4 * 60 * 60, @isnumeric); % 4 Hours
+addParameter(p, 'recDur', [], @isnumeric);
+addParameter(p, 'maxDist', 4 * 60 * 60, @isnumeric); 
 addParameter(p, 'padding', 0.1, @isnumeric);
-parse(p, rippTimes, recDur, varargin{:});
+addParameter(p, 'flgPlot', false, @islogical);
+parse(p, rippTimes, varargin{:});
 
+recDur = p.Results.recDur;
 maxDist = p.Results.maxDist;
 padding = p.Results.padding;
+flgPlot = p.Results.flgPlot;
 
-%% ========================================================================
-%  FIND CONTROL INTERVALS
-%  ========================================================================
-
-nRipples = size(rippTimes, 1);
-if nRipples == 0
-    ctrlTimes = [];
-    return;
+% If recDur empty, assume recording terminates with last ripple
+if isempty(recDur)
+    recDur = max(rippTimes(:));
 end
 
+% Ripple Durations
+nRipp = size(rippTimes, 1);
 rippDur = rippTimes(:, 2) - rippTimes(:, 1);
-buffer = max(rippDur);
 
-% Define available time (Rec - Ripples +/- buffer)
-intervalsExclude = rippTimes + [-buffer, buffer];
-intervalsInclude = [0, recDur];
-intervalsCtrl = SubtractIntervals(intervalsInclude, intervalsExclude);
+%% ========================================================================
+%  FIND AVAILABLE GAPS (Vectorized)
+%  ========================================================================
 
-% Filter short intervals
-% Note: Using ripple max dur as minimum requirement for control blocks
-durIdx = diff(intervalsCtrl, 1, 2) < max(rippDur);
-intervalsCtrl(durIdx, :) = [];
+% Define Exclusion Zones (Ripples + Padding)
+excl = [rippTimes(:,1) - padding, rippTimes(:,2) + padding];
 
-if isempty(intervalsCtrl)
-    warning('No valid control intervals found.');
-    ctrlTimes = nan(nRipples, 2);
+% Crop to Recording Limits
+excl(excl(:, 1) < 0, 1) = 0;
+excl(excl(:, 2) > recDur, 1) = recDur;
+
+% Fast Merge of Overlapping Exclusions
+% Identifies continuous blocks of "unavailable" time.
+cumMaxEnds = cummax(excl(:, 2));
+isNewBlock = [true; excl(2:end, 1) > cumMaxEnds(1:end-1)];
+
+mergedStarts = excl(isNewBlock, 1);
+mergedEnds   = [cumMaxEnds(isNewBlock(2:end)); cumMaxEnds(end)];
+mergedExcl   = [mergedStarts, mergedEnds];
+
+% Invert to Find Gaps (Available Time)
+% Gaps are the spaces between the end of one block and start of the next.
+gapStarts = [0; mergedExcl(:,2)];
+gapEnds   = [mergedExcl(:,1); recDur];
+gaps      = [gapStarts, gapEnds];
+
+% Filter Invalid Gaps
+% Remove gaps with negative duration (overlaps) or too short for ANY ripple.
+gaps(diff(gaps, [], 2) < min(rippDur), :) = [];
+nGaps = size(gaps, 1);
+
+if isempty(gaps)
+    warning('No valid control intervals found (Recording too saturated).');
+    ctrlTimes = nan(nRipp, 2);
     return;
 end
 
 %% ========================================================================
-%  MATCH EVENTS
+%  ALLOCATE CONTROL EVENTS
 %  ========================================================================
 
-ctrlTimes = nan(nRipples, 2);
-nFree = size(intervalsCtrl, 1);
+ctrlTimes = nan(nRipp, 2);
 
-currentFreeIdx = 1;
-lastEndTime = -inf;
+currGap = 1;            % Index of current gap being filled
+tCursor = gaps(1, 1);   % Current placement cursor within the gap
 
-for iRipp = 1:nRipples
-
-    needed = rippDur(iRipp);
-
-    % Save current index to avoid re-scanning from 0, but allow looking ahead
-    tempIdx = currentFreeIdx;
-
-    while tempIdx <= nFree
-        blockStart = intervalsCtrl(tempIdx, 1);
-        blockEnd = intervalsCtrl(tempIdx, 2);
-
-        % Candidates must be after last assigned control event + padding
-        t_start = max(blockStart, lastEndTime + padding);
-
-        if t_start + needed <= blockEnd
-            % Check distance condition
-            % If the block is too far IN THE PAST from the ripple, we should skip it
-
-            refTime = mean(rippTimes(iRipp, :));
-
-            % If we found a valid time:
-            if t_start < refTime - maxDist
-                % This block is too old for this ripple (and likely future ones)
-                % Move main index forward
-                currentFreeIdx = currentFreeIdx + 1;
-                tempIdx = currentFreeIdx;
-                continue;
+for iRipp = 1:nRipp
+    
+    neededDur = rippDur(iRipp);
+    refTime = mean(rippTimes(iRipp, :));
+    
+    % --- Find Valid Gap ---
+    while currGap <= nGaps
+        gapEnd = gaps(currGap, 2);
+        
+        % Check 1: Is this gap "too old"? (maxDist constraint)
+        % If the gap ended hours ago relative to this ripple, skip it.
+        if gapEnd < (refTime - maxDist)
+            currGap = currGap + 1;
+            if currGap <= nGaps
+                tCursor = gaps(currGap, 1);
             end
-
-            ctrlTimes(iRipp, :) = [t_start, t_start + needed];
-            lastEndTime = t_start + needed;
-            break;
-
-        else
-            % This block is not suitable (too short remaining after t_start)
-            % Move to next block
-            tempIdx = tempIdx + 1;
+            continue;
         end
+        
+        % Check 2: Does the ripple fit in the remaining space?
+        if tCursor + neededDur > gapEnd
+            % Doesn't fit. Move to next gap.
+            currGap = currGap + 1;
+            if currGap <= nGaps
+                tCursor = gaps(currGap, 1);
+            end
+            continue;
+        end
+        
+        % If we are here, it fits and is valid.
+        break; 
+    end
+    
+    % --- Assign Control Event ---
+    if currGap <= nGaps
+        ctrlTimes(iRipp, :) = [tCursor, tCursor + neededDur];
+        
+        % Advance cursor + padding for the NEXT control event
+        tCursor = tCursor + neededDur + padding;
     end
 end
 
-end     % EOF
+%% ========================================================================
+%  PLOT
+%  ========================================================================
+
+if flgPlot
+
+    hFig = figure;
+
+    % Ripples
+    nRipp = size(rippTimes, 1);
+    xRipp = [rippTimes'; nan(1, nRipp)] / 3600; 
+    
+    % Controls 
+    nCtrl = size(ctrlTimes, 1);
+    xCtrl = [ctrlTimes'; nan(1, nCtrl)] / 3600;
+    
+    % Y value
+    yVal = repmat([1; 1; nan], nRipp, 1);
+
+    % Plot
+    figure('Color', 'w', 'Name', 'Ripple vs Control Check');
+    
+    % Plot Ripples in Red
+    hRipp = plot(xRipp(:), yVal, 'Color', [0.8 0.2 0.2], 'LineWidth', 15); hold on;
+    
+    % Plot Controls in Black
+    hCtrl = plot(xCtrl(:), yVal - 0.1, 'k', 'LineWidth', 15);
+    
+    % Formatting
+    ylim([0 2]);
+    xlabel('Time (hr)');
+    title(sprintf('Event Timing Check (N=%d)', nRipp));
+    set(gca, 'TickDir', 'out', 'Box', 'off', 'YDir', 'normal');
+    
+    % Add legend
+    legend([hRipp, hCtrl], {'Ripples', 'Control Events'}, 'Location', 'best');
+end
+
+
+end         % EOF

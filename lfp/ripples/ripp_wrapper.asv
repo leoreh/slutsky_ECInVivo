@@ -21,7 +21,6 @@ addParameter(p, 'limDur', [15, 300, 30, 10], @isnumeric);
 addParameter(p, 'win', [0, Inf], @isnumeric);
 addParameter(p, 'passband', [80 250], @isnumeric);
 addParameter(p, 'detectMet', 4, @isnumeric);
-addParameter(p, 'limState', [], @isnumeric);
 addParameter(p, 'flgGui', false, @islogical);
 addParameter(p, 'flgPlot', true, @islogical);
 addParameter(p, 'flgSave', false, @islogical);
@@ -42,9 +41,8 @@ flgPlot = p.Results.flgPlot;
 flgSave = p.Results.flgSave;
 flgSaveFig = p.Results.flgSaveFig;
 bit2uv = p.Results.bit2uv;
-limState = p.Results.limState;
 flgGui = p.Results.flgGui;
-flgGui = p.Results.flgGui;
+
 zMet = p.Results.zMet;
 mapDur = p.Results.mapDur;
 
@@ -72,14 +70,10 @@ else
 end
 
 % Prep MU spktimes
-if ~isempty(v.spktimes)
-    muTimes = cellfun(@(x) x / fsSpk, v.spktimes, 'uni', false);
-    muTimes = cellfun(@(x) x - win(1), muTimes, 'Uni', false);
-    muTimes = cellfun(@(x) x(x >= 0 & x <= sigDur), muTimes, 'Uni', false);
-    muTimes = {sort(vertcat(muTimes{:}))};
-else
-    muTimes = [];
-end
+muTimes = cellfun(@(x) x / fsSpk, v.spktimes, 'uni', false);
+muTimes = cellfun(@(x) x - win(1), muTimes, 'Uni', false);
+muTimes = cellfun(@(x) x(x >= 0 & x <= sigDur), muTimes, 'Uni', false);
+muTimes = {sort(vertcat(muTimes{:}))};
 
 % Prep SU spktimes
 spkTimes = v.spikes.times;
@@ -151,7 +145,7 @@ rippSig = ripp_sigPrep(lfp, fs, ...
 
 
 %% ========================================================================
-%  DETECT
+%  PRELIMINARY DETECTION
 %  ========================================================================
 
 % Detect
@@ -160,91 +154,127 @@ ripp = ripp_times(rippSig, fs, ...
     'limDur', limDur);
 
 % Get non-ripple intervals of matched duration.
-recDur = length(lfp) / fs;
-ctrlTimes = ripp_ctrlTimes(ripp.times, recDur);
+ripp.ctrlTimes = ripp_ctrlTimes(ripp.times);
 
+
+%% ========================================================================
+%  QUALITY ASSURANCE
+%  ========================================================================
+
+% Calculate MUA spkGain (z-score relative to control) per ripple 
+rippRates = times2rate(muTimes, 'winCalc', ripp.times, 'binsize', Inf);
+ctrlRates = times2rate(muTimes, 'winCalc', ripp.ctrlTimes, 'binsize', Inf);
+spkGain = (rippRates - mean(ctrlRates, 'all', 'omitnan')) ./ ...
+    std(ctrlRates, [], 'all', 'omitnan');
+
+goodIdx = ripp_qa(ripp, rippSig, 'emg', emg, 'spkGain', spkGain);
+
+% Compare good and bad
 if flgGui
-    ripp_gui(ripp.times, ripp.peakTime, rippSig, muTimes, fs, thr, emg, ...
+    ripp_gui(ripp.times(goodIdx, :), ripp.peakTime(goodIdx), rippSig, muTimes, fs, thr, emg, ...
+        'basepath', basepath);
+
+    ripp_gui(ripp.times(~goodIdx, :), ripp.peakTime(~goodIdx), rippSig, muTimes, fs, thr, emg, ...
         'basepath', basepath);
 end
 
+% Filter structure
+fnames = fieldnames(ripp);
+nEvents = length(goodIdx);
+for iField = 1:length(fnames)
+    fn = fnames{iField};
+    
+    % Check if first dimension matches nEvents
+    if size(ripp.(fn), 1) == nEvents
+        ripp.(fn) = ripp.(fn)(goodIdx, :);
+    end
+end
+fprintf('Kept %d / %d events after QA.\n', sum(goodIdx), nEvents);
+
+
+%% ========================================================================
+%  PARAMS & MAPS
+%  ========================================================================
+
+
+ripp = ripp_params(rippSig, ripp);
+
+maps = ripp_maps(rippSig, ripp.peakTime, fs);
+
+ 
 
 %% ========================================================================
 %  STATES
 %  ========================================================================
 
-rippStates = ripp_states(ripp.times, ripp.peakTime, boutTimes, ...
+ripp.state = ripp_states(ripp.times, ripp.peakTime, boutTimes, ...
     'basepath', basepath, ...
     'flgPlot', false, ...
-    'flgSave', flgSave, ...
-    'flgSaveFig', flgSaveFig);
+    'flgSave', flgSave);
 
-% Filter Ripples by State if requested
-rippTimes = ripp.times;
-peakTime = ripp.peakTime;
-% if ~isempty(limState)
-%     stateIdx = ripp.states.idx(:, limState);
-%     rippTimes = ripp.times(stateIdx, :);
-%     peakTime = ripp.peakTime(stateIdx);
-%     fprintf('Limiting analysis to State %d\n', limState);
-% end
-
+if flgSave
+    rippFile = fullfile(basepath, [basename, '.ripp.mat']);
+    save(rippFile, 'ripp', '-v7.3');
+end
 
 %% ========================================================================
-%  SPIKES
+%  SPIKE STATS
 %  ========================================================================
 
 % SU
-fprintf('Analyzing Single Units...\n');
-rippSpks.su = ripp_spks(rippTimes, spkTimes, peakTime, ctrlTimes, ...
+fprintf('Analyzing Spike Stats...\n');
+rippSpks.su = ripp_spks(spkTimes, ripp.times, ripp.ctrlTimes, ...
     'basepath', basepath, ...
-    'mapDur', mapDur, ...
     'flgSave', false);
 
 % MU
-fprintf('Analyzing Multi-Unit Activity...\n');
-if ~isempty(muTimes)
-    rippSpks.mu = ripp_spks(rippTimes, muTimes, peakTime, ctrlTimes, ...
-        'basepath', basepath, ...
-        'mapDur', mapDur, ...
-        'flgSave', false);
-else
-    rippSpks.mu = [];
-end
+rippSpks.mu = ripp_spks(muTimes, ripp.times, ripp.ctrlTimes, ...
+    'basepath', basepath, ...
+    'flgSave', false);
 
 if flgSave
     rippSpksFile = fullfile(basepath, [basename, '.rippSpks.mat']);
     save(rippSpksFile, 'rippSpks', '-v7.3');
 end
 
+
+%% ========================================================================
+%  SPIKE MAPS
+%  ========================================================================
+
+fprintf('Creating Spike Maps...\n');
+
+rippPeth.su = ripp_spkMaps(spkTimes, ripp.peakTime, ripp.ctrlTimes, 'flgSave', false);
+rippPeth.mu = ripp_spkMaps(muTimes, ripp.peakTime, ripp.ctrlTimes, 'flgSave', false);
+
+if flgSave
+    spkPethFile = fullfile(basepath, [basename, '.rippPeth.mat']);
+    save(spkPethFile, 'rippPeth', '-v7.3');
+end
+
+
+%% ========================================================================
+%  PLOTS
+%  ========================================================================
+
 if flgPlot
+    
+    tbl = struct2table(rmfield(ripp, {'info', 'times'}));
+    tbl.mua = rippSpks.mu.rippRates';
+    tblGUI_scatHist(tbl, 'xVar', 'dur', 'yVar', 'amp', 'grpVar', 'Group');
+    tblGUI_bar(tbl, 'yVar', 'dur', 'xVar', 'state');
+
+    
     ripp_plotSpks(rippSpks, 'basepath', basepath, ...
         'mapDur', mapDur, 'flgSaveFig', flgSaveFig);
 end
 
 
-qa = ripp_qa(ripp, rippSig, 'emg', emg, 'rippSpks', rippSpks);
-
-
-
-ripp = ripp_detect(rippSig, fs, ...
-    'emg', emg, ...
-    'limDur', limDur, ...
-    'basepath', basepath, ...
-    'thr', thr, ...
-    'flgPlot', false, ...
-    'flgSave', flgSave);
 
 %% ========================================================================
 %  SPK-LFP
 %  ========================================================================
 fprintf('Running spklfp coupling...\n');
-fRange = [80 250];
-% sig is not available anymore as vector, extract from rippSig or re-filter?
-% rippSig.filt is [100 300]. Here we want [120 200].
-% So we re-filter raw lfp.
-sig = filterLFP(lfp, 'fs', fs, 'type', 'butter', 'dataOnly', true, ...
-    'order', 3, 'passband', fRange, 'graphics', false);
 
 spkLfp = spklfp_calc('basepath', basepath, ...
     'lfpTimes', ripp.times, ...
@@ -258,29 +288,27 @@ save(spkLfpFile, 'spkLfp', '-v7.3');
 
 
 %% ========================================================================
-%  Finalize and Save
+%  NEUOROSCOPE
 %  ========================================================================
 
-% NeuroScope Files
 % Revert times to absolute for saving/Neuroscope
 ripp.times = ripp.times + win(1);
 ripp.peakTime = ripp.peakTime + win(1);
 
 % NeuroScope Files
 if flgSave
-
     % Convert to samples (NeuroScope uses acquisition rate fsSpk)
     rippSamps = round(ripp.times * fsSpk);
     peakSamps = round(ripp.peakTime * fsSpk);
     ripp2ns(rippSamps, peakSamps, 'basepath', basepath);
 end
 
-fprintf('--- Ripple Analysis Pipeline Completed for %s ---\n', basename);
 
-% Put together all ripp structs
-ripp.states = rippStates;
-ripp.spks = rippSpks;
-ripp.spkLfp = spkLfp;
+%% ========================================================================
+%  FINALIZE
+%  ========================================================================
+
+fprintf('--- Ripple Analysis Pipeline Completed for %s ---\n', basename);
 
 
 end

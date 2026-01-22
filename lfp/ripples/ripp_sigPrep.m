@@ -104,7 +104,6 @@ switch zMet
             end
         end
 
-        % Check if we have enough data
         mu = mean(baseSignal(mask), 'omitnan');
         sigma = std(baseSignal(mask), 'omitnan');
 

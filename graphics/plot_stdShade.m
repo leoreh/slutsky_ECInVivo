@@ -14,6 +14,7 @@ addOptional(p, 'xVal', @isnumeric);
 addOptional(p, 'hAx', @(x) isa(x, 'matlab.graphics.axis.Axes'));
 addOptional(p, 'clr', [0, 0, 1], @(x) isnumeric(x) && length(x)==3);
 addOptional(p, 'alpha', 0.5, @isnumeric);
+addOptional(p, 'varbose', false, @islogical);
 
 parse(p, varargin{:});
 dataMat = p.Results.dataMat;
@@ -21,6 +22,8 @@ xVal = p.Results.xVal;
 hAx = p.Results.hAx;
 clr = p.Results.clr;
 alpha = p.Results.alpha;
+varbose = p.Results.varbose;
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % preparations
@@ -29,8 +32,7 @@ alpha = p.Results.alpha;
 % Assure columns = x-axis
 if size(dataMat, 1) == length(xVal)
     dataMat = dataMat';
-    warning('plot_stdShade:Transposed', ...
-        'Transposing dataMat so that columns correspond to x-axis values.');
+    if varbose; warning('[STDSHADE]: Transposing dataMat'); end
 
 elseif size(dataMat, 2) ~= length(xVal)
     error('plot_stdShade:DimensionMismatch', ...

@@ -55,8 +55,10 @@ bouts = [];
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 vec = vec(:);
+% 'start' is the first index of the bout (inclusive)
+% 'stop' is the LAST index of the bout (inclusive)
 start = find([0; diff(vec)] > 0);
-stop = find([0; diff(vec)] < 0);
+stop = find([0; diff(vec)] < 0) - 1;
 
 if isempty(start) && isempty(stop)
     if unique(vec) == 1
@@ -115,7 +117,8 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if ~isempty(interDur)
-    iei = bouts(2 : end, 1) - bouts(1 : end - 1, 2);
+    % IEI = Start(Next) - Stop(Prev) - 1
+    iei = bouts(2 : end, 1) - bouts(1 : end - 1, 2) - 1;
 
     % vectorized merge logic
     isStart = [true; iei >= interDur];
@@ -124,6 +127,7 @@ if ~isempty(interDur)
     bouts = [bouts(isStart, 1), bouts(isStop, 2)];
 
     % correct last bout to end of recording
+    % If gap to end is small, extend? (Legacy logic assumption: check gap from stop to end)
     if length(vec) - bouts(end, end) < interDur
         bouts(end, end) = length(vec);
     end
@@ -144,7 +148,7 @@ end
 % discard events by duration
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-dur = bouts(:, 2) - bouts(:, 1);
+dur = bouts(:, 2) - bouts(:, 1) + 1;
 if ~isempty(maxDur)
     idxMax = dur > maxDur;
 else

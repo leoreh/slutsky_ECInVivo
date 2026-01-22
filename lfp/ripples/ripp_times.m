@@ -35,11 +35,17 @@ limDur      = p.Results.limDur;
 %% ========================================================================
 %  SETUP
 %  ========================================================================
+
+% Initialize
 ripp = struct();
 ripp.times = [];
 ripp.peakTime = [];
+ripp.info.fs = fs;
+ripp.info.thr = thr;
+ripp.info.limDur = limDur;
 
-timestamps = (0:length(rippSig.lfp)-1)' / fs;
+% Signal timestamps
+tstamps = (0:length(rippSig.lfp)-1)' / fs;
 
 % Duration limits in samples
 limDur_Samples = round(limDur / 1000 * fs);
@@ -53,7 +59,6 @@ eventSamples = binary2bouts('vec', rippSig.z > thr(1), 'minDur', limDur_Samples(
 nEvents = size(eventSamples, 1);
 
 idxDiscard = false(nEvents, 1);
-emgRms = nan(nEvents, 1);
 peakPower = nan(nEvents, 1);
 contPowDur = nan(nEvents, 1);
 contPowAvg = nan(nEvents, 1);
@@ -115,7 +120,7 @@ for iEvent = 1:nEvents
     peakSample(iEvent) = eventSamples(iEvent,1) + peakRel - 1;
 end
 
-ripp.peakTime = timestamps(peakSample);
-ripp.times = timestamps(eventSamples);
+ripp.peakTime = tstamps(peakSample);
+ripp.times = tstamps(eventSamples);
 
 end

@@ -21,7 +21,6 @@ addParameter(p, 'limDur', [15, 300, 30, 10], @isnumeric);
 addParameter(p, 'win', [0, Inf], @isnumeric);
 addParameter(p, 'passband', [80 250], @isnumeric);
 addParameter(p, 'detectMet', 4, @isnumeric);
-addParameter(p, 'limState', [], @isnumeric);
 addParameter(p, 'flgGui', false, @islogical);
 addParameter(p, 'flgPlot', true, @islogical);
 addParameter(p, 'flgSave', false, @islogical);
@@ -42,9 +41,8 @@ flgPlot = p.Results.flgPlot;
 flgSave = p.Results.flgSave;
 flgSaveFig = p.Results.flgSaveFig;
 bit2uv = p.Results.bit2uv;
-limState = p.Results.limState;
 flgGui = p.Results.flgGui;
-flgGui = p.Results.flgGui;
+
 zMet = p.Results.zMet;
 mapDur = p.Results.mapDur;
 
@@ -72,14 +70,10 @@ else
 end
 
 % Prep MU spktimes
-if ~isempty(v.spktimes)
-    muTimes = cellfun(@(x) x / fsSpk, v.spktimes, 'uni', false);
-    muTimes = cellfun(@(x) x - win(1), muTimes, 'Uni', false);
-    muTimes = cellfun(@(x) x(x >= 0 & x <= sigDur), muTimes, 'Uni', false);
-    muTimes = {sort(vertcat(muTimes{:}))};
-else
-    muTimes = [];
-end
+muTimes = cellfun(@(x) x / fsSpk, v.spktimes, 'uni', false);
+muTimes = cellfun(@(x) x - win(1), muTimes, 'Uni', false);
+muTimes = cellfun(@(x) x(x >= 0 & x <= sigDur), muTimes, 'Uni', false);
+muTimes = {sort(vertcat(muTimes{:}))};
 
 % Prep SU spktimes
 spkTimes = v.spikes.times;
@@ -151,7 +145,7 @@ rippSig = ripp_sigPrep(lfp, fs, ...
 
 
 %% ========================================================================
-%  DETECT
+%  PRELIMINARY DETECTION
 %  ========================================================================
 
 % Detect
@@ -160,72 +154,120 @@ ripp = ripp_times(rippSig, fs, ...
     'limDur', limDur);
 
 % Get non-ripple intervals of matched duration.
-recDur = length(lfp) / fs;
-ctrlTimes = ripp_ctrlTimes(ripp.times, recDur);
-
-
-%% ========================================================================
-%  STATES
-%  ========================================================================
-
-rippStates = ripp_states(ripp.times, ripp.peakTime, boutTimes, ...
-    'basepath', basepath, ...
-    'flgPlot', false, ...
-    'flgSave', flgSave, ...
-    'flgSaveFig', flgSaveFig);
+ripp.ctrlTimes = ripp_ctrlTimes(ripp.times);
 
 
 %% ========================================================================
 %  QUALITY ASSURANCE
 %  ========================================================================
 
-% Calculate spkGain (z-score relative to control) per ripple from MUA
+% Calculate MUA spkGain (z-score relative to control) per ripple 
 rippRates = times2rate(muTimes, 'winCalc', ripp.times, 'binsize', Inf);
-ctrlRates = times2rate(muTimes, 'winCalc', ctrlTimes, 'binsize', Inf);
-spkGain = (mean(rippRates, 1, 'omitnan') - ...
-    mean(ctrlRates, 'all', 'omitnan')) ./ ...
+ctrlRates = times2rate(muTimes, 'winCalc', ripp.ctrlTimes, 'binsize', Inf);
+spkGain = (rippRates - mean(ctrlRates, 'all', 'omitnan')) ./ ...
     std(ctrlRates, [], 'all', 'omitnan');
 
-qa = ripp_qa(ripp, rippSig, 'emg', emg, 'spkGain', spkGain);
-
+goodIdx = ripp_qa(ripp, rippSig, 'emg', emg, 'spkGain', spkGain);
 
 % Compare good and bad
 if flgGui
-    ripp_gui(ripp.times, ripp.peakTime, rippSig, muTimes, fs, thr, emg, ...
+    ripp_gui(ripp.times(goodIdx, :), ripp.peakTime(goodIdx), rippSig, muTimes, fs, thr, emg, ...
+        'basepath', basepath);
+
+    ripp_gui(ripp.times(~goodIdx, :), ripp.peakTime(~goodIdx), rippSig, muTimes, fs, thr, emg, ...
         'basepath', basepath);
 end
 
+% Filter structure
+fnames = fieldnames(ripp);
+nEvents = length(goodIdx);
+for iField = 1:length(fnames)
+    fn = fnames{iField};
+    
+    % Check if first dimension matches nEvents
+    if size(ripp.(fn), 1) == nEvents
+        ripp.(fn) = ripp.(fn)(goodIdx, :);
+    end
+end
+fprintf('Kept %d / %d events after QA.\n', sum(goodIdx), nEvents);
+
 
 %% ========================================================================
-%  SPIKES
+%  PARAMS & MAPS
+%  ========================================================================
+
+
+ripp = ripp_params(rippSig, ripp);
+
+maps = ripp_maps(rippSig, ripp.peakTime, fs);
+
+ 
+
+%% ========================================================================
+%  STATES
+%  ========================================================================
+
+ripp.state = ripp_states(ripp.times, ripp.peakTime, boutTimes, ...
+    'basepath', basepath, ...
+    'flgPlot', false, ...
+    'flgSave', flgSave);
+
+if flgSave
+    rippFile = fullfile(basepath, [basename, '.ripp.mat']);
+    save(rippFile, 'ripp', '-v7.3');
+end
+
+%% ========================================================================
+%  SPIKE STATS
 %  ========================================================================
 
 % SU
-fprintf('Analyzing Single Units...\n');
-rippSpks.su = ripp_spks(ripp.times, spkTimes, ripp.peakTime, ctrlTimes, ...
+fprintf('Analyzing Spike Stats...\n');
+rippSpks.su = ripp_spks(spkTimes, ripp.times, ripp.ctrlTimes, ...
     'basepath', basepath, ...
-    'mapDur', mapDur, ...
     'flgSave', false);
 
 % MU
-fprintf('Analyzing Multi-Unit Activity...\n');
-if ~isempty(muTimes)
-    rippSpks.mu = ripp_spks(ripp.times, muTimes, ripp.peakTime, ctrlTimes, ...
-        'basepath', basepath, ...
-        'mapDur', mapDur, ...
-        'flgSave', false);
-else
-    rippSpks.mu = [];
-end
+rippSpks.mu = ripp_spks(muTimes, ripp.times, ripp.ctrlTimes, ...
+    'basepath', basepath, ...
+    'flgSave', false);
 
 if flgSave
     rippSpksFile = fullfile(basepath, [basename, '.rippSpks.mat']);
     save(rippSpksFile, 'rippSpks', '-v7.3');
 end
 
+
+%% ========================================================================
+%  SPIKE MAPS
+%  ========================================================================
+
+fprintf('Creating Spike PETH...\n');
+
+rippPeth.su = ripp_spkPeth(spkTimes, ripp.peakTime, ripp.ctrlTimes, 'flgSave', false);
+rippPeth.mu = ripp_spkPeth(muTimes, ripp.peakTime, ripp.ctrlTimes, 'flgSave', false);
+
+if flgSave
+    spkPethFile = fullfile(basepath, [basename, '.rippPeth.mat']);
+    save(spkPethFile, 'rippPeth', '-v7.3');
+end
+
+
+%% ========================================================================
+%  PLOTS
+%  ========================================================================
+
 if flgPlot
-    ripp_plotSpks(rippSpks, 'basepath', basepath, ...
-        'mapDur', mapDur, 'flgSaveFig', flgSaveFig);
+
+    tbl = struct2table(rmfield(ripp, {'info', 'times'}));
+    tbl.mua = rippSpks.mu.rippRates';
+    tblGUI_scatHist(tbl, 'xVar', 'dur', 'yVar', 'amp', 'grpVar', 'Group');
+    tblGUI_bar(tbl, 'yVar', 'dur', 'xVar', 'state');
+
+
+    ripp_plotSpks(rippSpks, rippPeth, ...
+        'basepath', basepath, ...
+        'flgSaveFig', flgSaveFig);
 end
 
 
@@ -244,8 +286,6 @@ spkLfp = spklfp_calc('basepath', basepath, ...
 
 spkLfpFile = fullfile(basepath, [basename, '.rippSpkLfp.mat']);
 save(spkLfpFile, 'spkLfp', '-v7.3');
-
-
 
 
 %% ========================================================================
@@ -270,11 +310,6 @@ end
 %  ========================================================================
 
 fprintf('--- Ripple Analysis Pipeline Completed for %s ---\n', basename);
-
-% Put together all ripp structs
-ripp.states = rippStates;
-ripp.spks = rippSpks;
-ripp.spkLfp = spkLfp;
 
 
 end
