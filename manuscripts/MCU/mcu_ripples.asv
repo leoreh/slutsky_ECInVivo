@@ -125,11 +125,10 @@ for iFile = 1 : nFiles
     [~, basename] = fileparts(basepath);
     tic
     ripp = ripp_wrapper('basepath', pwd, ...
-        'win', [0 Inf] * 3600, ...
+        'win', [0 inf] * 3600, ...
         'rippCh', [], ...
         'flgPlot', false, ...
-        'flgSave', true, ...
-        'flgSaveFig', true);
+        'flgSave', false);
     toc
 end
 
@@ -175,7 +174,7 @@ presets = {'ripp'};
 tblt = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
 
 % RIPPLE TRACES
-vars = {'rippMaps'};
+vars = {'rippMaps', 'rippPeth'};
 vt = basepaths2vars('basepaths', basepaths, 'vars', vars);
 
 rippMaps = catfields([vt(:).rippMaps], 1);

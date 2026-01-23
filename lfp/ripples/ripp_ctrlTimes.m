@@ -18,11 +18,13 @@ function ctrlTimes = ripp_ctrlTimes(rippTimes, varargin)
 %   INPUTS:
 %       rippTimes   - (Mat) [N x 2] Start and end times of ripples [s].
 %       varargin    - Parameter/Value pairs:
-%           'recDur'  - (Num) Total recording duration [s]. (Default: max(rippTimes)).
-%           'maxDist' - (Num) Max temporal distance allowed for a control event
+%           'vldTimes' - (Mat) [M x 2] Intervals allowed for control events.
+%                             If empty, the entire recording is allowed.
+%           'recDur'   - (Num) Total recording duration [s]. (Default: max(rippTimes)).
+%           'maxDist'  - (Num) Max temporal distance allowed for a control event
 %                             relative to its ripple [s]. (Default: 4 hours).
-%           'padding' - (Num) Separation from ripple boundaries [s]. (Default: 0.1).
-%           'flgPlot' - (Log) Validate with a visual plot? (Default: false).
+%           'padding'  - (Num) Separation from ripple boundaries [s]. (Default: 0.1).
+%           'flgPlot'  - (Log) Validate with a visual plot? (Default: false).
 %
 %   OUTPUTS:
 %       ctrlTimes   - (Mat) [N x 2] Start and end times of control events [s].
@@ -38,12 +40,14 @@ function ctrlTimes = ripp_ctrlTimes(rippTimes, varargin)
 %  ========================================================================
 p = inputParser;
 addRequired(p, 'rippTimes', @isnumeric);
+addParameter(p, 'vldTimes', [], @isnumeric);
 addParameter(p, 'recDur', [], @isnumeric);
-addParameter(p, 'maxDist', 4 * 60 * 60, @isnumeric);
+addParameter(p, 'maxDist', 1 * 3600, @isnumeric);
 addParameter(p, 'padding', 0.1, @isnumeric);
 addParameter(p, 'flgPlot', false, @islogical);
 parse(p, rippTimes, varargin{:});
 
+vldTimes = p.Results.vldTimes;
 recDur = p.Results.recDur;
 maxDist = p.Results.maxDist;
 padding = p.Results.padding;
@@ -51,7 +55,11 @@ flgPlot = p.Results.flgPlot;
 
 % If recDur empty, assume recording terminates with last ripple
 if isempty(recDur)
-    recDur = max(rippTimes(:));
+    if ~isempty(vldTimes)
+        recDur = max([rippTimes(:); vldTimes(:)]);
+    else
+        recDur = max(rippTimes(:));
+    end
 end
 
 % Ripple Durations
@@ -59,11 +67,46 @@ nRipp = size(rippTimes, 1);
 rippDur = rippTimes(:, 2) - rippTimes(:, 1);
 
 %% ========================================================================
-%  FIND AVAILABLE GAPS (Vectorized)
+%  FIND AVAILABLE GAPS 
 %  ========================================================================
 
 % Define Exclusion Zones (Ripples + Padding)
 excl = [rippTimes(:,1) - padding, rippTimes(:,2) + padding];
+
+% Handle Inclusion Intervals
+if ~isempty(vldTimes)
+    
+    % Sort and Merge Inclusions
+    incOrd = sortrows(vldTimes);
+    if size(incOrd, 1) > 1
+        % Determine where a new block starts
+        % A new block starts if the current start is > previous cumulative max end
+        cumMaxEndsInc = cummax(incOrd(:, 2));
+        isNewBlockInc = [true; incOrd(2:end, 1) > cumMaxEndsInc(1:end-1)];
+        mergedInc = [incOrd(isNewBlockInc, 1), [cumMaxEndsInc(isNewBlockInc(2:end)); cumMaxEndsInc(end)]];
+    else
+        mergedInc = incOrd;
+    end
+
+    % Invert Inclusions relative to RecDur to get "Invalid Zones"
+    invExcl = [];
+    if mergedInc(1, 1) > 0
+        invExcl = [invExcl; 0, mergedInc(1, 1)];
+    end
+    
+    % Gaps between inclusions
+    if size(mergedInc, 1) > 1
+        invExcl = [invExcl; mergedInc(1:end-1, 2), mergedInc(2:end, 1)];
+    end
+    
+    % Gap from last inclusion to end
+    if mergedInc(end, 2) < recDur
+        invExcl = [invExcl; mergedInc(end, 2), recDur];
+    end
+
+    % Add to Exclusions
+    excl = [excl; invExcl];
+end
 
 % Crop to Recording Limits
 excl(excl(:, 1) < 0, 1) = 0;

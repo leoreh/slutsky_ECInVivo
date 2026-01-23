@@ -1,10 +1,10 @@
-function phase = spklfp_phase(sig, spkTimes, fs, varargin)
-% SPKLFP_PHASE Calculates high-accuracy phase coupling between Spikes and LFP.
+function spkPhase = spklfp_phase(sig, spkTimes, fs, varargin)
+% SPKLFP_PHASE Calculates high-accuracy spkPhase coupling between Spikes and LFP.
 %
-%   phase = SPKLFP_PHASE(sig, spkTimes, fs, varargin)
+%   spkPhase = SPKLFP_PHASE(sig, spkTimes, fs, varargin)
 %
 %   SUMMARY:
-%       Quantifies the phase preference of spiking activity relative to an LFP oscillation.
+%       Quantifies the spkPhase preference of spiking activity relative to an LFP oscillation.
 %       Outputs include circular statistics (Mean Angle, Vector Length) and
 %       bias-corrected Pairwise Phase Consistency (PPC) metrics.
 %
@@ -22,8 +22,8 @@ function phase = spklfp_phase(sig, spkTimes, fs, varargin)
 %           'verbose'   - (Log) Print progress? {true}.
 %
 %   OUTPUTS:
-%       phase       - (Struct) Results with [1 x N_units] fields:
-%           .theta      - Mean phase angle [rad].
+%       spkPhase       - (Struct) Results with [1 x N_units] fields:
+%           .theta      - Mean spkPhase angle [rad].
 %           .mrl        - Mean Resultant Length (0-1).
 %           .ppc0       - Standard PPC (All-to-All). Unbiased by N, biased by bursts.
 %           .ppc1       - Between-Trial PPC. Unbiased by N AND bursts. (Req lfpTimes).
@@ -37,7 +37,7 @@ function phase = spklfp_phase(sig, spkTimes, fs, varargin)
 %       None.
 %
 %   REFERENCES:
-%       Vinck et al. (2012) "Improved measures of phase-coupling..."
+%       Vinck et al. (2012) "Improved measures of spkPhase-coupling..."
 %
 %   HISTORY:
 %       Updated: 23 Jan 2026
@@ -51,10 +51,9 @@ addRequired(p, 'sig', @isnumeric);
 addRequired(p, 'spkTimes', @iscell);
 addRequired(p, 'fs', @isnumeric);
 addParameter(p, 'lfpTimes', [], @isnumeric);
-addParameter(p, 'nPerms', 1000, @isnumeric);
+addParameter(p, 'nPerms', 0, @isnumeric);
 addParameter(p, 'minSpks', 10, @isnumeric);
 addParameter(p, 'sigOffset', 0, @isnumeric);
-addParameter(p, 'verbose', true, @islogical);
 
 parse(p, sig, spkTimes, fs, varargin{:});
 
@@ -62,7 +61,6 @@ lfpTimes = p.Results.lfpTimes;
 nPerms = p.Results.nPerms;
 minSpks = p.Results.minSpks;
 sigOffset = p.Results.sigOffset;
-verbose = p.Results.verbose;
 
 %% ========================================================================
 %  PREP SIGNAL
@@ -122,18 +120,17 @@ end
 nUnits = length(spkTimes);
 
 % Initialize Output Structure
-phase = struct();
-phase.theta = nan(1, nUnits);
-phase.mrl = nan(1, nUnits);
-phase.ppc0 = nan(1, nUnits);
-phase.ppc1 = nan(1, nUnits);
-phase.ppc2 = nan(1, nUnits);
-phase.kappa = nan(1, nUnits);
-phase.pval = nan(1, nUnits);
-phase.zScore = nan(1, nUnits);
-phase.nSpks = zeros(1, nUnits);
-phase.spkPh = cell(1, nUnits);
-
+spkPhase = struct();
+spkPhase.theta = nan(nUnits, 1);
+spkPhase.mrl = nan(nUnits, 1);
+spkPhase.ppc0 = nan(nUnits, 1);
+spkPhase.ppc1 = nan(nUnits, 1);
+spkPhase.ppc2 = nan(nUnits, 1);
+spkPhase.kappa = nan(nUnits, 1);
+spkPhase.pval = nan(nUnits, 1);
+spkPhase.zScore = nan(nUnits, 1);
+spkPhase.nSpks = zeros(nUnits, 1);
+spkPhase.spkPh = cell(nUnits, 1);
 
 
 for iUnit = 1:nUnits
@@ -159,7 +156,7 @@ for iUnit = 1:nUnits
     spkIdxs = spkIdxs(isVal);
 
     nSpks = length(relSpks);
-    phase.nSpks(iUnit) = nSpks;
+    spkPhase.nSpks(iUnit) = nSpks;
 
     if nSpks < minSpks
         continue;
@@ -173,27 +170,25 @@ for iUnit = 1:nUnits
     % Reconstruct Phase
     % These are complex unit vectors: z = exp(i*theta)
     zSpks = rI + 1i * iI;
+    
     % Normalize to unit magnitude (interp1 might shrink amplitude slightly)
     zSpks = zSpks ./ abs(zSpks);
 
-    phase.spkPh{iUnit} = angle(zSpks);
+    spkPhase.spkPh{iUnit} = angle(zSpks);
 
     % 5. Observed Stats (MRL & PPC)
 
     % A. Mean Resultant Length (MRL) and Angle
     grandSum = sum(zSpks);
     R = abs(grandSum) / nSpks;
-    phase.mrl(iUnit) = R;
-    phase.theta(iUnit) = mod(angle(grandSum), 2*pi);
+    spkPhase.mrl(iUnit) = R;
+    spkPhase.theta(iUnit) = mod(angle(grandSum), 2*pi);
 
     % B. PPC Calculation
     % We need trial IDs for each spike to compute per-trial sums
     spkTrialIDs = trialIdxMap(spkIdxs);
 
     % Group sums by trial
-    % Use accumarray for speed: indices must be positive integers
-    % spkTrialIDs contains 0? No, isVal check ensures it corresponds to isValidSamp (true),
-    % where trialIdxMap is populated (>=1).
     if numTrials > 0 && ~isempty(spkTrialIDs)
         % Vectors per trial S_i
         trialZSums = accumarray(spkTrialIDs, zSpks, [numTrials 1]);
@@ -207,7 +202,7 @@ for iUnit = 1:nUnits
         % --- PPC0 (All-to-All) ---
         % Formula: (|S|^2 - N) / (N*(N-1))
         if nSpks > 1
-            phase.ppc0(iUnit) = (abs(grandSum)^2 - nSpks) / (nSpks * (nSpks - 1));
+            spkPhase.ppc0(iUnit) = (abs(grandSum)^2 - nSpks) / (nSpks * (nSpks - 1));
         end
 
         % --- PPC1 (Between-Trial) ---
@@ -222,26 +217,11 @@ for iUnit = 1:nUnits
 
             denom = N_sq - ni_sq_sum;
             if denom > 0
-                phase.ppc1(iUnit) = (S_sq - Si_sq_sum) / denom;
+                spkPhase.ppc1(iUnit) = (S_sq - Si_sq_sum) / denom;
             end
 
             % --- PPC2 (Bias-Corrected Between-Trial) ---
-            % FieldTrip Formula: (S*conj(S) - SS) / (dof * (dof-1))?
-            % Wait, FieldTrip uses dof as "Trial Count" (dofS) for the weighted case?
-            % Actually, looking at lines 398 in ft_spiketriggeredspectrum_stat:
-            % out = (S*S' - SS) / (dofS * (dofS-1))
-            % Where dofS is the SUM OF WEIGHTS (number of trials?).
-            % This implies PPC2 in FieldTrip is a "Trial-Based Average".
-            % Let's stick to the Vinck 2012 definition if ambiguous,
-            % but FieldTrip's code is the golden reference you asked for.
 
-            % Re-reading FieldTrip line 389:
-            % For PPC2: dofS is incremented by 1 per trial.
-            % So dofS = Number of Trials.
-            % S   = sum( m_i ) where m_i = y_i / n_i  (Mean vector of trial i)
-            % SS  = sum( m_i * m_i' )
-
-            % Implementing FieldTrip PPC2 Logic specifically:
             % Calculate Mean Vector per trial
             m_i = trialZSums ./ trialNSpks;
 
@@ -250,7 +230,7 @@ for iUnit = 1:nUnits
             J = nActiveTrials;
 
             if J > 1
-                phase.ppc2(iUnit) = (abs(S_ppc2)^2 - SS_ppc2) / (J * (J - 1));
+                spkPhase.ppc2(iUnit) = (abs(S_ppc2)^2 - SS_ppc2) / (J * (J - 1));
             end
         end
     end
@@ -263,7 +243,7 @@ for iUnit = 1:nUnits
     else
         k = 1 / (R^3 - 4 * R^2 + 3 * R);
     end
-    phase.kappa(iUnit) = k;
+    spkPhase.kappa(iUnit) = k;
 
     % 6. Permutation Test
     % Based on MRL (equivalent significance to PPC for testing H0)
@@ -275,11 +255,11 @@ for iUnit = 1:nUnits
         zSumP = sum(exp(1i * randPh), 1);
         permMRL = abs(zSumP) / nSpks;
 
-        phase.pval(iUnit) = mean(permMRL >= R);
+        spkPhase.pval(iUnit) = mean(permMRL >= R);
 
         muPerm = mean(permMRL);
         sigPerm = std(permMRL);
-        phase.zScore(iUnit) = (R - muPerm) / sigPerm;
+        spkPhase.zScore(iUnit) = (R - muPerm) / sigPerm;
     end
 end
 

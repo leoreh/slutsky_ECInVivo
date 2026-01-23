@@ -26,6 +26,7 @@ function rippSpks = ripp_spks(spkTimes, rippTimes, ctrlTimes, varargin)
 %           .frMod     - Modulation Index ((Ripp - Ctrl) / (Ripp + Ctrl)).
 %           .pVal      - P-value from significance test.
 %           .sigMod    - Boolean significance flag (p < 0.05).
+%           .pFire     - Probability of participation (fraction of ripples with spikes).
 %
 %   DEPENDENCIES:
 %       times2rate.
@@ -63,11 +64,16 @@ rippSpks.frZ = nan(nUnits, 1);
 rippSpks.frMod = nan(nUnits, 1);
 rippSpks.frRipp = nan(nUnits, 1);
 rippSpks.frRand = nan(nUnits, 1);
+rippSpks.pFire  = nan(nUnits, 1);
 
 % Calculate Instantaneous Rates (Events x Units)
 % 'binsize', Inf -> Returns one rate per event
 rippSpks.rippRates = times2rate(spkTimes, 'winCalc', rippTimes, 'binsize', Inf);
 rippSpks.ctrlRates = times2rate(spkTimes, 'winCalc', ctrlTimes, 'binsize', Inf);
+
+% Calculate Probability of Participation
+% Fraction of events where the unit fired at least one spike
+rippSpks.pFire = mean(rippSpks.rippRates > 0, 2, 'omitnan');
 
 % Per Unit Statistics
 for iUnit = 1:nUnits
@@ -118,9 +124,6 @@ end
 % =========================================================================
 if flgSave
     save(savefile, 'rippSpks', '-v7.3');
-    if flgSave
-        save(savefile, 'rippSpks', '-v7.3');
-    end
 end
 
 end

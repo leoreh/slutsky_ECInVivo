@@ -23,9 +23,7 @@ function ripp = ripp_wrapper(varargin)
 %           'rippCh'     - (Num)  Zero-indexed channel ID for ripple detection.
 %                                 If empty, tries to load from session tags.
 %           'thr'        - (Vec)  Detection thresholds [start, peak, cont, max, min_cont].
-%                                 Default: [1, 2.5, 1.2, 200, 50].
 %           'limDur'     - (Vec)  Duration limits [min, max, inter, min_cont_dur] (ms).
-%                                 Default: [15, 300, 30, 10].
 %           'win'        - (Vec)  Time window to analyze [start end] (s). Default: [0 Inf].
 %           'passband'   - (Vec)  Filtering frequency band [min max] (Hz). Default: [80 250].
 %           'detectMet'  - (Num)  Detection method ID (see ripp_sigPrep). Default: 4.
@@ -66,8 +64,8 @@ function ripp = ripp_wrapper(varargin)
 p = inputParser;
 addParameter(p, 'basepath', pwd, @ischar);
 addParameter(p, 'rippCh', [], @isnumeric);
-addParameter(p, 'thr', [1, 2.5, 1.2, 200, 50], @isnumeric);
-addParameter(p, 'limDur', [15, 300, 30, 10], @isnumeric);
+addParameter(p, 'thr', [1, 3.5, 2, 200, 50], @isnumeric);
+addParameter(p, 'limDur', [15, 300, 20, 10], @isnumeric);
 addParameter(p, 'win', [0, Inf], @isnumeric);
 addParameter(p, 'passband', [80 250], @isnumeric);
 addParameter(p, 'detectMet', 4, @isnumeric);
@@ -76,7 +74,6 @@ addParameter(p, 'flgPlot', true, @islogical);
 addParameter(p, 'flgSave', false, @islogical);
 addParameter(p, 'flgQA', true, @islogical);
 addParameter(p, 'bit2uv', [], @isnumeric);
-addParameter(p, 'zMet', 'nrem', @ischar);
 addParameter(p, 'zMet', 'nrem', @ischar);
 addParameter(p, 'mapDur', [-0.05 0.05], @isnumeric);
 addParameter(p, 'verbose', true, @islogical);
@@ -106,7 +103,7 @@ cd(basepath);
 [~, basename] = fileparts(basepath);
 
 if verbose, fprintf('[RIPP]: Starting pipeline for %s...\n', basename); end
-if verbose, fprintf('[RIPP]: Loading data (LFP, Spikes, States)...\n'); end
+if verbose, fprintf('[RIPP]: Loading data...\n'); end
 
 % Load Session & Data
 vars = {'session', 'spikes', 'spktimes', 'sleep_states'};
@@ -141,10 +138,12 @@ try
     boutTimes = cellfun(@(x) x - win(1), boutTimes, 'UniformOutput', false);
     boutTimes = cellfun(@(x) x(x(:,2)>0 & x(:,1)<sigDur, :), boutTimes, 'UniformOutput', false);
     nremTimes = boutTimes{4}; % Assuming standard 4th cell is NREM
+    vldTimes = vertcat(boutTimes{2}, boutTimes{3}, boutTimes{4});
 catch
     warning('Could not load sleep states.');
     boutTimes = [];
     nremTimes = [];
+    vldTimes = [];
 end
 
 % Ripple channel in LFP
@@ -180,6 +179,11 @@ if size(lfp, 2) > 1
     lfp = mean(lfp, 2);
 end
 
+% Prepare Signals (Filter, Hilbert, Z-Score)
+rippSig = ripp_sigPrep(lfp, fs, ...
+    'detectMet', 3, 'passband', passband, ...
+    'zMet', zMet, 'nremTimes', nremTimes);
+
 % EMG
 load([basename, '.sleep_sig.mat'], 'emg');
 
@@ -194,12 +198,6 @@ end
 if length(emg) ~= length(lfp)
     error('EMG and LFP do not fit')
 end
-
-% Prepare Signals (Filter, Hilbert, Z-Score)
-rippSig = ripp_sigPrep(lfp, fs, ...
-    'detectMet', detectMet, 'passband', passband, ...
-    'zMet', zMet, 'nremTimes', nremTimes);
-
 
 %% ========================================================================
 %  PRELIMINARY DETECTION
@@ -220,11 +218,42 @@ ripp.state = ripp_states(ripp.times, ripp.peakTime, boutTimes, ...
     'flgPlot', false, ...
     'flgSave', false);
 
-
 %% ========================================================================
 %  QUALITY ASSURANCE
 %  ========================================================================
 
+emgAbs = abs(emg);
+
+% Ripple EMG
+nRipp = length(ripp.times);
+ripp.emg = nan(nRipp, 1);
+for iRipp = 1:nRipp
+    bStart = max(1, round(ripp.times(iRipp,1) * fs));
+    bEnd = min(length(emg), round(ripp.times(iRipp,2) * fs));
+    ripp.emg(iRipp) = mean(emgAbs(bStart : bEnd));
+end
+
+% NREM Mask
+nremMask = false(size(emg));
+for iBout = 1:size(nremTimes, 1)
+    bStart = max(1, round(nremTimes(iBout,1) * fs));
+    bEnd = min(length(emg), round(nremTimes(iBout,2) * fs));
+    nremMask(bStart : bEnd) = true;
+end
+nremAmp = emgAbs(nremMask);
+
+% Z-Score against NREM Baseline
+ripp.emg = (ripp.emg - mean(nremAmp, 'omitnan')) / std(nremAmp, 'omitnan');
+
+% Define Quite Events 
+emgIdx = ripp.emg < 2; 
+
+if verbose
+    fprintf('[RIPP]: %d / %d events marked as High EMG.\n', ...
+        sum(~emgIdx), length(emgIdx));
+end
+
+% SPIKE GAIN
 % Calculate Instantaneous Rates (Events x Units)
 % 'binsize', Inf -> Returns one rate per event
 rippRates = times2rate(muTimes, 'winCalc', ripp.times, 'binsize', Inf);
@@ -245,6 +274,17 @@ else
     goodIdx = true(nRipp, 1);
 end
 
+if verbose
+    fprintf('[RIPP]: QA Filter - Kept %d / %d events.\n', sum(goodIdx), nRipp);
+end
+
+
+% Save in Struct for plotting
+ripp.gainIdx = gainIdx;
+ripp.stateIdx = stateIdx;
+ripp.emgIdx = emgIdx;
+
+
 % Filter Ripp Struct
 fnames = fieldnames(ripp);
 for iField = 1:length(fnames)
@@ -256,12 +296,17 @@ for iField = 1:length(fnames)
     end
 end
 
-if verbose
-    fprintf('[RIPP]: QA Filter - Kept %d / %d events.\n', sum(goodIdx), nRipp);
+% Inspect detection
+if flgGui
+    ripp_gui(ripp.times, ripp.peakTime, rippSig, muTimes, fs, thr, emg, ...
+        'basepath', basepath);
 end
 
 % Re-Generate Control Intervals
-ripp.ctrlTimes = ripp_ctrlTimes(ripp.times);
+% Limit to the same states we kept (QWAKE, LSLEEP, NREM)
+ripp.ctrlTimes = ripp_ctrlTimes(ripp.times, ...
+    'vldTimes', vldTimes, ...
+    'flgPlot', false);
 
 
 %% ========================================================================
@@ -274,7 +319,7 @@ if verbose, fprintf('[RIPP]: Generating Maps...\n'); end
     ripp.peakTime, ...
     boutTimes, ...
     'basepath', basepath, ...
-    'flgPlot', false, ...
+    'flgPlot', flgPlot, ...
     'flgSave', true);
 
 % Params
@@ -301,7 +346,7 @@ rippPeth.mu = ripp_spkPeth(muTimes, ripp.peakTime, ripp.ctrlTimes, ...
 %% ========================================================================
 %  SPIKE STATS
 %  ========================================================================
-if verbose, fprintf('[RIPP]: Spike Stats and Coupling...\n'); end
+if verbose, fprintf('[RIPP]: Spike Stats and LFP-Coupling...\n'); end
 
 % STATS - SU
 rippSpks.su = ripp_spks(spkTimes, ...
@@ -319,7 +364,7 @@ rippSpks.mu = ripp_spks(muTimes, ...
 
 % SPK-LFP
 spkLfp = spklfp_phase(rippSig.filt, spkTimes, fs, ...
-    'lfpTimes', rippTimes, ...
+    'lfpTimes', ripp.times, ...
     'nPerms', 0);
 
 
@@ -372,6 +417,7 @@ if flgPlot
 end
 
 if flgGui
+    if verbose, fprintf('[RIPP]: Launching GUIs...\n'); end
 
     % MEAN TRACES
 
@@ -393,7 +439,6 @@ if flgGui
     tblGUI_xy(rippPeth.mu.tstamps, tbl, 'yVar', 't_z', 'grpVar', 'states');
 
     % PER TRACE
-    if verbose, fprintf('[RIPP]: Launching Interactive GUI...\n'); end
     ripp_gui(ripp.times, ripp.peakTime, rippSig, muTimes, fs, thr, emg, ...
         'basepath', basepath);
 end

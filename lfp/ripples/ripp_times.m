@@ -13,10 +13,10 @@ function ripp = ripp_times(rippSig, fs, varargin)
 %       fs          - (Num)    Sampling frequency [Hz].
 %       varargin    - Parameter/Value pairs:
 %           'thr'    - (Vec) Thresholds [Start, Peak, Cont, Max, Min_Cont].
-%                            1: Start Trigger   (Z > 1.5)
-%                            2: Peak Threshold  (Z > 2.5)
-%                            3: Continuity Thr  (Z > 2.0) - must stay above this for...
-%                            4: Max Threshold   (Z < 200) - artifact rejection.
+%                            1: Start Trigger   (Z > thr)
+%                            2: Peak Threshold  (Z > thr)
+%                            3: Continuity Thr  (Z > thr) - must stay above this for...
+%                            4: Max Threshold   (Z < thr) - artifact rejection.
 %                            5: Min Cont Duration (ms) - time detection must obey Thr3.
 %           'limDur' - (Vec) Duration limits [Min, Max, Inter, MinCont] (ms).
 %                            1: Min Event Duration [15]

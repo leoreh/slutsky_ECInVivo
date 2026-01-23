@@ -88,16 +88,21 @@ switch detectMet
         sPad = [rippSig.filt(1); rippSig.filt; rippSig.filt(end)];
         baseSignal = sPad(2:end-1).^2 - sPad(1:end-2) .* sPad(3:end);
         baseSignal(baseSignal < 0) = 0; % TEO should be positive
-        winSmooth = round(0.015 * fs);
+        winSmooth = round(0.005 * fs);
 
     case 4 % Rectified, clipped, & Lowpass Filter
         rectSig = abs(rippSig.filt);
         
         % Calculate "Robust" SD based on MAD for clipping
         clipVal = 4 * median(rectSig) / 0.6745;
+
         rectSig(rectSig > clipVal) = clipVal;
 
-        % Smooth the clipped signal
+% 5. NOW Smooth the clipped signal
+[b_lp, a_lp] = butter(4, lpFreq / (fs / 2), 'low');
+baseSignal = filtfilt(b_lp, a_lp, rectSig);
+
+
         lpFreq = 55;
         [b_lp, a_lp] = butter(4, lpFreq / (fs / 2), 'low');
         baseSignal = filtfilt(b_lp, a_lp, rectSig);
