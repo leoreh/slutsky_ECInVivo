@@ -80,8 +80,8 @@ end
 
 if ismember('rippSpks', presets)
     vars = [vars, 'rippSpks', 'rippSpkLfp'];
-    varMap.rippGain = 'rippSpks.su.frGain';
-    varMap.rippMod = 'rippSpks.su.frModulation';
+    varMap.rippZ = 'rippSpks.su.frZ';
+    varMap.rippMod = 'rippSpks.su.frMod';
     varMap.rippMRL = 'spkLfp.phase.mrl';
     varMap.rippTheta = 'spkLfp.phase.theta';
 end
@@ -94,7 +94,18 @@ if ismember('ripp', presets)
     varMap.freq         = 'ripp.freq';
     varMap.energy       = 'ripp.energy';
     varMap.state        = 'ripp.state';
-    
+    varMap.goodIdx      = 'ripp.goodIdx';
+    varMap.spkGain      = 'ripp.spkGain';
+end
+
+if ismember('rippMaps', presets)
+    vars = [vars, 'rippMaps'];
+    varMap = struct();
+    varMap.t_lfp        = 'rippMaps.lfp';
+    varMap.t_filt       = 'rippMaps.filt';
+    varMap.t_amp        = 'rippMaps.amp';
+    varMap.t_freq       = 'rippMaps.freq';
+    varMap.t_z          = 'rippMaps.z';
 end
 
 % Load

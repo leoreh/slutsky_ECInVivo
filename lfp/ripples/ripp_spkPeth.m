@@ -6,10 +6,10 @@ function maps = ripp_spkPeth(spkTimes, peakTimes, ctrlTimes, varargin)
 %   Uses fast vectorized binning (discretize/accumarray) for performance.
 %
 % INPUT:
-%   spkTimes    - {Nunits x 1} Cell array of spike times [s].
+%   spkTimes    - {Nunits x 1} Spike times [s].
 %   peakTimes   - [N x 1] Ripple peak times [s] (Map centers).
 %   ctrlTimes   - [N x 2] Control start/end [s].
-%   varargin    - 'basepath', 'mapDur' (default [-0.075 0.075]), 'flgSave'.
+%   varargin    - 'basepath', 'mapDur', 'flgSave'.
 %
 % OUTPUT:
 %   maps        - Structure containing:
@@ -27,7 +27,7 @@ addRequired(p, 'spkTimes', @iscell);
 addRequired(p, 'peakTimes', @isnumeric);
 addRequired(p, 'ctrlTimes', @isnumeric);
 addParameter(p, 'basepath', pwd, @ischar);
-addParameter(p, 'mapDur', [-0.075 0.075], @isnumeric);
+addParameter(p, 'mapDur', [-0.05 0.05], @isnumeric);
 addParameter(p, 'flgSave', false, @islogical);
 parse(p, spkTimes, peakTimes, ctrlTimes, varargin{:});
 

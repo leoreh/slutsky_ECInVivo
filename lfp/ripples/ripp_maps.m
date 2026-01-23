@@ -9,7 +9,7 @@ function rippMaps = ripp_maps(rippSig, peakTime, fs, varargin)
 %   rippSig     - Struct with fields (.lfp, .filt, .amp, etc.)
 %   peakTime    - [N x 1] Times of ripple peaks [s]
 %   fs          - Sampling rate [Hz]
-%   varargin    - 'mapDur' (default [-0.1 0.1]), 'basepath', 'flgSave'
+%   varargin    - 'mapDur', 'basepath', 'flgSave'
 %
 % OUTPUT:
 %   rippMaps    - Struct with fields corresponding to rippSig fields.
@@ -22,7 +22,7 @@ p = inputParser;
 addRequired(p, 'rippSig', @isstruct);
 addRequired(p, 'peakTime', @isnumeric);
 addRequired(p, 'fs', @isnumeric);
-addParameter(p, 'mapDur', [-0.1 0.1], @isnumeric);
+addParameter(p, 'mapDur', [-0.05 0.05], @isnumeric);
 addParameter(p, 'basepath', pwd, @ischar);
 addParameter(p, 'flgSave', true, @islogical);
 parse(p, rippSig, peakTime, fs, varargin{:});

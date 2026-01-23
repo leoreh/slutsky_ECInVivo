@@ -28,7 +28,7 @@ addParameter(p, 'flgQA', true, @islogical);
 addParameter(p, 'flgSaveFig', false, @islogical);
 addParameter(p, 'bit2uv', [], @isnumeric);
 addParameter(p, 'zMet', 'nrem', @ischar);
-addParameter(p, 'mapDur', [-0.075 0.075], @isnumeric);
+addParameter(p, 'mapDur', [-0.05 0.05], @isnumeric);
 parse(p, varargin{:});
 
 basepath = p.Results.basepath;
@@ -327,12 +327,9 @@ end
 %  ========================================================================
 fprintf('Running spklfp coupling...\n');
 
-spkLfp = spklfp_calc('basepath', basepath, ...
-    'lfpTimes', ripp.times, ...
-    'sig', rippSig.filt, ...
-    'flgSave', false, ...
-    'flgPlot', flgPlot, ...
-    'flgStl', false);
+spkLfp = spklfp_phase(rippSig.filt, spkTimes, fs, ...
+    'lfpTimes', rippTimes, ...
+    'nPerms', 0);
 
 spkLfpFile = fullfile(basepath, [basename, '.rippSpkLfp.mat']);
 save(spkLfpFile, 'spkLfp', '-v7.3');

@@ -1,5 +1,114 @@
 
 
+
+
+%% ========================================================================
+%  SPKLFP
+%  ========================================================================
+
+% run the analysis on multiple sessions
+% -------------------------------------------------------------------------
+% basepaths = mcu_basepaths('all');
+basepaths = [mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl')];
+nFiles = length(basepaths);
+
+% Load vars
+vars = {'session', 'spikes', 'ripp', 'rippMaps'};
+
+v = basepaths2vars('basepaths', basepaths, 'vars', vars);
+
+win = [0 4] * 3600;
+passband = [80, 250];
+
+clear phaseCell
+for iFile = 1 : nFiles
+    
+    tic
+
+    basepath = basepaths{iFile};
+    cd(basepath)
+    [~, basename] = fileparts(basepath);
+    
+    if isinf(win(2))
+        sigDur = Inf;
+    else
+        sigDur = win(2) - win(1);
+    end
+
+    % Prep SU spktimes
+    spkTimes = v(iFile).spikes.times;
+    spkTimes = cellfun(@(x) x - win(1), spkTimes, 'Uni', false);
+    spkTimes = cellfun(@(x) x(x >= 0 & x <= sigDur), spkTimes, 'Uni', false);
+
+    % Prep rippTimes
+    ripp = v(iFile).ripp;
+    rippTimes = ripp.times;
+
+    ampIdx = ripp.amp > 150;
+    durIdx = ripp.dur > 80;
+    goodIdx = ripp.goodIdx;
+    stateIdx = ripp.state == 'QWAKE' | ripp.state == 'LSLEEP' | ripp.state == 'NREM';
+    goodIdx = stateIdx;
+    
+    rippTimes = v(iFile).ripp.times(goodIdx, :);
+    rippTimes = rippTimes - win(1);
+    rippTimes = rippTimes(rippTimes(:,2) > 0 & rippTimes(:,1) < sigDur, :);
+
+    % Session params
+    fs = v(iFile).session.extracellular.srLfp;
+    fsSpk = v(iFile).session.extracellular.sr;
+    nchans = v(iFile).session.extracellular.nChannels;
+    
+    % Ripple channel in LFP
+    if isfield(v(iFile).session.channelTags, 'Ripple')
+        rippCh = v(iFile).session.channelTags.Ripple;
+    else
+        rippCh = 1;
+    end
+
+    % Handle bit2uv
+    if round(fsSpk) == 24414
+        bit2uv = 1;
+    else
+        bit2uv = 0.195;
+    end
+
+    % LFP
+    fname = fullfile(basepath, [basename, '.lfp']);
+    lfp = binary_load(fname, 'duration', sigDur, 'fs', fs, 'nCh', nchans,...
+        'start', win(1), 'ch', rippCh, 'downsample', 1, 'bit2uv', bit2uv);
+    if size(lfp, 2) > 1
+        lfp = mean(lfp, 2);
+    end
+    
+    % Filter
+    filt = filterLFP(lfp, 'fs', fs, 'type', 'butter', 'dataOnly', true,...
+    'order', 5, 'passband', passband, 'graphics', false);
+
+    phaseCell(iFile) = spklfp_phase(filt, spkTimes, fs, ...
+        'lfpTimes', rippTimes, ...
+        'nPerms', 0);
+    toc
+    iFile
+end
+
+phase = catfields([phaseCell(:)], 2);
+
+
+funcon = [];
+for iFile = 1 : nFiles
+    basepath = basepaths{iFile};
+    cd(basepath)
+    [~, basename] = fileparts(basepath);
+
+    load([basename, '.rippSpks.mat'])
+    cc = fr_corr(rippSpks.su.rippRates, 'nShuffles', 50, 'flgPlot', false);
+    funcon = [funcon; cc.shuffle.funcon];
+end
+
+
+
+
 %% ========================================================================
 %  RE-ANALYZE
 %  ========================================================================
@@ -16,7 +125,7 @@ for iFile = 1 : nFiles
     [~, basename] = fileparts(basepath);
     tic
     ripp = ripp_wrapper('basepath', pwd, ...
-        'win', [0 6] * 3600, ...
+        'win', [0 Inf] * 3600, ...
         'rippCh', [], ...
         'flgPlot', false, ...
         'flgSave', true, ...
@@ -35,13 +144,27 @@ end
 basepaths = [mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl')];
 nFiles = length(basepaths);
 
-presets = {'rippSpks'};
+presets = {'rippSpks', 'brst'};
 tbl = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
+
+tbl.funcon = funcon;
+tbl.theta = phase.theta';
+tbl.mrl = phase.mrl';
+tbl.ppc0 = phase.ppc0';
+tbl.ppc1 = phase.ppc1';
+tbl.ppc2 = phase.ppc2';
 
 % Plot
 tblPlot = tbl(tbl.UnitType == 'RS', :);
-tblGUI_bar(tbl, 'xVar', 'Group', 'yVar', 'rippMRL');
+tblGUI_bar(tblPlot, 'xVar', 'Group', 'yVar', 'mrl');
 tblGUI_scatHist(tblPlot, 'xVar', 'rippMos', 'yVar', 'rippGain', 'grpVar', 'Group');
+
+tblPlot(tblPlot.Name == 'lh137', :) = [];
+tblPlot.Name = removecats(tblPlot.Name, {'lh137'});
+
+% Run LME
+frml = 'funcon ~ Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblPlot, frml);
 
 
 % RIPPLE PARAMS
@@ -49,12 +172,41 @@ basepaths = [mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl')];
 nFiles = length(basepaths);
 
 presets = {'ripp'};
-tbl = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
+tblt = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
+
+% RIPPLE TRACES
+vars = {'rippMaps'};
+vt = basepaths2vars('basepaths', basepaths, 'vars', vars);
+
+rippMaps = catfields([vt(:).rippMaps], 1);
+tblMap = struct2table(rmfield(rippMaps, {'tstamps'}));
+tblVars = tblMap.Properties.VariableNames;
+tblVars = strcat('t_', tblVars);
+tblMap.Properties.VariableNames = tblVars;
+
+tblMap = [tblt, tblMap];
+
+
+% Add PETH
+tbl.suPETH = squeeze(mean(rippPeth.su.ripp, 1, 'omitnan'));
+tbl.muPETH = squeeze(rippPeth.mu.ripp);
+
+tblPlot = tblt(tblt.goodIdx, :);
+
 
 % Plot
-tblGUI_bar(tbl, 'xVar', 'Group', 'yVar', 'dur');
-tblGUI_scatHist(tbl, 'xVar', 'dur', 'yVar', 'peakAmp', 'grpVar', 'Group');
+tblGUI_xy(vt(1).rippMaps.tstamps, tblPlot, 'yVar', 't_z', 'grpVar', 'states');
 
+% Plot
+tblGUI_bar(tblPlot, 'xVar', 'Group', 'yVar', 'dur');
+tblGUI_scatHist(tblt, 'xVar', 'dur', 'yVar', 'peakAmp', 'grpVar', 'Group');
+
+
+% Formula
+
+% Run LME
+frml = ['freq ~ Group + (1|Name)'];
+[lmeStats, lmeMdl] = lme_analyse(tblPlot, frml);
 
 
 
@@ -184,10 +336,6 @@ idxVar = 1;
 
 % Formula
 frml = [varRsp{idxVar}, ' ~ Group + (1|Name)'];
-
-% Check best model
-% statsPark = lme_parkTest(tblLme, frml);
-% statsDist = lme_compareDists(tblLme, frml);
 
 % Run LME
 cfgLme.contrasts = 'all';
