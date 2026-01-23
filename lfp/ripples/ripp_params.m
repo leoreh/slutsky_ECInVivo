@@ -1,27 +1,33 @@
 function ripp = ripp_params(rippSig, ripp)
-% RIPP_PARAMS Calculates specific ripple parameters (Amp, Freq, Energy).
+% RIPP_PARAMS Calculates physiological parameters for ripple events.
 %
-% SUMMARY:
-%   Calculates "Best Practice" parameters for each ripple event:
-%     1. Peak Amplitude: Instantaneous amplitude at the peak.
-%     2. Mean Frequency: Average frequency over the full event dur.
-%     3. Total Energy:   Sum of squared signal over the full event dur.
+%   ripp = RIPP_PARAMS(rippSig, ripp)
 %
-% INPUTS:
-%   rippSig     - Structure with fields: .filt (filtered LFP), .amp (envelope),
-%                 and .freq (instantaneous frequency).
-%   ripp.times   - (N x 2) Ripple start and end times [s].
-%   ripp.peakTime   - (N x 1) Ripple peak times [s].
-%   fs          - (Num) Sampling frequency [Hz].
+%   SUMMARY:
+%       Computes "Best Practice" parameters for each event using the
+%       pre-processed signals.
+%       1. Duration: Exact time difference (End - Start).
+%       2. Peak Amplitude: Envelope amplitude at the peak index.
+%       3. Mean Frequency: Average instantaneous frequency (Hz).
+%       4. Total Energy: Sum of squared filtered signal (Integrated Power).
 %
-% OUTPUT:
-%   ripp      - Structure with fields:
-%                 .amp       (N x 1) [uV]
-%                 .freq      (N x 1) [Hz]
-%                 .energy    (N x 1) [uV^2]
-%                 .dur       (N x 1) [ms]
+%   INPUTS:
+%       rippSig     - (Struct) Signal structure (requires .filt, .amp, .freq).
+%       ripp        - (Struct) Event structure with .times and .peakTime.
+%                              Must contain .info.fs.
 %
-% DEPENDENCIES: None.
+%   OUTPUTS:
+%       ripp        - (Struct) Updated structure with new fields:
+%                       .amp       (N x 1) [uV]
+%                       .freq      (N x 1) [Hz]
+%                       .energy    (N x 1) [uV^2]
+%                       .dur       (N x 1) [ms]
+%
+%   DEPENDENCIES:
+%       None.
+%
+%   HISTORY:
+%       Updated: 23 Jan 2026
 
 %% ========================================================================
 %  ARGUMENTS & SETUP
@@ -52,32 +58,32 @@ peakSamps = max(1, min(nSamples, peakSamps));
 %  ========================================================================
 
 for iEvent = 1:nEvents
-    
+
     % Duration (ms)
     % Calculated directly from timestamps for precision
     ripp.dur(iEvent) = (ripp.times(iEvent, 2) - ripp.times(iEvent, 1)) * 1000;
-    
+
     % Peak Amplitude (uV)
     % Instantaneous amplitude of the envelope at the exact peak index
     ripp.amp(iEvent) = rippSig.amp(peakSamps(iEvent));
-    
+
     % Define the full event dur window
     idxDur = startSamps(iEvent) : endSamps(iEvent);
-    
+
     % Check for valid window indices
     if isempty(idxDur), continue; end
-    
+
     % Mean Frequency (Hz)
     % Average of the instantaneous frequency across the entire event
     if isfield(rippSig, 'freq')
         ripp.freq(iEvent) = mean(rippSig.freq(idxDur), 'omitnan');
     end
-    
+
     % Total Energy (uV^2)
     % Sum of the squared filtered signal over the dur.
     % This represents the total integrated power of the event.
     ripp.energy(iEvent) = sum(rippSig.filt(idxDur) .^ 2, 'omitnan');
-    
+
 end
 
 end     % EOF

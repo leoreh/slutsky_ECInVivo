@@ -1,31 +1,42 @@
 function hFig = ripp_gui(rippTimes, peakTimes, rippSig, spktimes, fs, thr, emg, varargin)
 % RIPP_GUI Interactive visualization of detected ripples.
 %
-% SUMMARY:
-%   Displays a 5-panel view of each ripple event:
-%   1. Raw LFP
-%   2. Filtered LFP (100-300Hz)
-%   3. Detection Signal (z-scored)
-%   4. EMG
-%   5. Spike Raster
+%   hFig = RIPP_GUI(rippTimes, peakTimes, rippSig, spktimes, fs, thr, emg, varargin)
 %
-%   Navigation: Left/Right Arrows or 'a'/'d' keys.
-%   Controls: interactive Event Index box, Total Count, Time Info.
+%   SUMMARY:
+%       Displays a 5-panel view of each ripple event allowing for manual inspection.
+%       Panels:
+%           1. Raw LFP
+%           2. Filtered LFP (100-300Hz)
+%           3. Detection Signal (Z-scored) with Thresholds
+%           4. EMG Trace
+%           5. Spike Raster (All units)
 %
-% INPUTS:
-%   rippTimes   - (N x 2) Ripple start/end times [s].
-%   peakTimes   - (N x 1) Ripple peak times [s].
-%   lfp         - (Vec) Raw LFP signal.
-%   spktimes    - (Cell) Spike times for raster.
-%   fs          - (Num) LFP sampling rate [Hz].
-%   emg         - (Vec) EMG signal.
-%   thr         - (Vec) Thresholds used [start, peak, cont...].
-%   varargin    - Optional: 'basepath', 'winPlot' (default 0.5s).
+%       Controls:
+%           - [<] [>] Buttons or Left/Right Arrow Keys to navigate.
+%           - 'a' / 'd' Keys also navigate.
+%           - Edit Box to jump to specific Event ID.
 %
-% OUTPUT:
-%   hFig        - Figure handle.
+%   INPUTS:
+%       rippTimes   - (Mat)    [N x 2] start/end times [s].
+%       peakTimes   - (Vec)    [N x 1] peak times [s].
+%       rippSig     - (Struct) Signal structure (.lfp, .filt, .z).
+%       spktimes    - (Cell)   Spike times {N_units x 1}.
+%       fs          - (Num)    Sampling rate [Hz].
+%       thr         - (Vec)    Detection thresholds used (for display).
+%       emg         - (Vec)    EMG signal vector.
+%       varargin    - Parameter/Value pairs:
+%           'basepath' - (Char) Report title/path context.
+%           'winPlot'  - (Num)  Window size +/- seconds. (Default: 0.5s).
 %
-% DEPENDENCIES: filterLFP, plot_raster, setMatlabGraphics.
+%   OUTPUTS:
+%       hFig        - (Handle) Figure handle.
+%
+%   DEPENDENCIES:
+%       plot_raster.
+%
+%   HISTORY:
+%       Updated: 23 Jan 2026
 
 %% ========================================================================
 %  ARGUMENTS
@@ -51,7 +62,7 @@ winPlot = p.Results.winPlot;
 %  PRE-PROCESSING
 %  ========================================================================
 
-fprintf('Initializing Ripple GUI... Pre-processing signals...\n');
+
 
 % Extract from rippSig
 lfp = rippSig.lfp;
@@ -61,7 +72,7 @@ sigDetect = rippSig.z;
 % Time Vector
 timestamps = (0:length(lfp)-1)' / fs;
 
-% Calculate fixed y-limits 
+% Calculate fixed y-limits
 valPrctile = [0.1, 99.9];
 yLims.raw = prctile(lfp, valPrctile);
 yLims.filt = prctile(sigFilt, valPrctile);
@@ -143,7 +154,7 @@ set(hSpacer, 'WidthLimits', [20 20]);
 guiData.hTxtTime = uicontrol('Parent', hFlow, 'Style', 'text', ...
     'String', 't = 0.000 s', 'HorizontalAlignment', 'left');
 
-% Bottom Panel (Plots)
+% Bottom Panel (Data Plots)
 hPanPlot = uipanel(guiData.grid);
 hPanPlot.BorderType = 'none';
 guiData.tiled = tiledlayout(hPanPlot, 5, 1, 'TileSpacing', 'tight', 'Padding', 'compact');

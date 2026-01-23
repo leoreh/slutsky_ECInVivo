@@ -1,23 +1,32 @@
 function maps = ripp_spkPeth(spkTimes, peakTimes, ctrlTimes, varargin)
-% RIPP_SPKMAPS Generates spike PETH maps for ripples and control events.
+% RIPP_SPKPETH Generates Per-Event Time Histograms (PETH) for spikes.
 %
-% SUMMARY:
-%   Calculates 3D maps (Unit x Event x Time) for ripples and controls.
-%   Uses fast vectorized binning (discretize/accumarray) for performance.
+%   maps = RIPP_SPKPETH(spkTimes, peakTimes, ctrlTimes, varargin)
 %
-% INPUT:
-%   spkTimes    - {Nunits x 1} Spike times [s].
-%   peakTimes   - [N x 1] Ripple peak times [s] (Map centers).
-%   ctrlTimes   - [N x 2] Control start/end [s].
-%   varargin    - 'basepath', 'mapDur', 'flgSave'.
+%   SUMMARY:
+%       Calculates 3D Spike Maps (Unit x Event x Time) for both Ripple and Control events.
+%       Uses fast vectorized binning (discretize/accumarray) for efficiency.
 %
-% OUTPUT:
-%   maps        - Structure containing:
-%       .ripp     (Nunits x Nripples x Nbins)
-%       .ctrl     (Nunits x Ncontrols x Nbins)
-%       .bins     (Time vector for x-axis)
+%   INPUTS:
+%       spkTimes    - (Cell) {N_units x 1} Spike times [s].
+%       peakTimes   - (Vec)  [N x 1] Ripple peak times [s] (Alignment Point).
+%       ctrlTimes   - (Mat)  [N x 2] Control start/end [s]. (Aligned to center).
+%       varargin    - Parameter/Value pairs:
+%           'mapDur'   - (Vec)  Window [pre post] in seconds. (Default: [-0.05 0.05]).
+%           'basepath' - (Char) Save location.
+%           'flgSave'  - (Log)  Save output? (Default: false).
 %
-% DEPENDENCIES: None.
+%   OUTPUTS:
+%       maps        - (Struct) PETH Structure:
+%           .ripp      - (N_units x N_ripples  x N_bins) Spike count map.
+%           .ctrl      - (N_units x N_controls x N_bins) Spike count map.
+%           .tstamps   - (Vec) Time vector for the x-axis.
+%
+%   DEPENDENCIES:
+%       None.
+%
+%   HISTORY:
+%       Updated: 23 Jan 2026
 
 %% ========================================================================
 %  ARGUMENTS
@@ -66,7 +75,9 @@ maps.tstamps = timeBins;
 %% ========================================================================
 %  GENERATE MAPS
 %  ========================================================================
-fprintf('Generating Spike Maps for %d units...\n', nUnits);
+% ========================================================================
+%  GENERATE MAPS
+%  ========================================================================
 
 for iUnit = 1:nUnits
     unitSpks = spkTimes{iUnit};
@@ -87,7 +98,9 @@ end
 %  ========================================================================
 if flgSave
     save(savefile, 'maps', '-v7.3');
-    fprintf('Saved spike maps: %s\n', savefile);
+    if flgSave
+        save(savefile, 'maps', '-v7.3');
+    end
 end
 
 end

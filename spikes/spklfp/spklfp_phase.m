@@ -1,44 +1,46 @@
 function phase = spklfp_phase(sig, spkTimes, fs, varargin)
 % SPKLFP_PHASE Calculates high-accuracy phase coupling between Spikes and LFP.
 %
-% SUMMARY:
-%   Quantifies the phase preference of spiking activity relative to an LFP oscillation.
-%   Supports the Pairwise Phase Consistency (PPC) suite (Vinck et al., 2012),
-%   providing unbiased estimates of phase locking robust to sample size and bursting.
+%   phase = SPKLFP_PHASE(sig, spkTimes, fs, varargin)
 %
-% INPUTS:
-%   sig         - (Vec) Filtered LFP signal (single channel).
-%   spkTimes    - (Cell) Spike times for N units [s].
-%   fs          - (Num) Sampling frequency [Hz].
+%   SUMMARY:
+%       Quantifies the phase preference of spiking activity relative to an LFP oscillation.
+%       Outputs include circular statistics (Mean Angle, Vector Length) and
+%       bias-corrected Pairwise Phase Consistency (PPC) metrics.
 %
-% OPTIONAL KEY-VALUE PAIRS:
-%   'lfpTimes'  - (Mat) [N x 2] Valid analysis intervals [s].
-%                 **CRITICAL FOR PPC1/PPC2**: Each interval is treated as a
-%                 separate "Trial". Spikes within the same interval are assumed
-%                 to be dependent (bursts), while spikes across intervals are independent.
-%   'nPerms'    - (Num) Number of permutations for statistical testing. {1000}
-%   'minSpks'   - (Num) Minimum number of spikes required to analyze a unit. {10}
-%   'sigOffset' - (Num) Time offset of the signal start relative to 0 [s]. {0}
-%   'verbose'   - (Log) Print progress. {true}
+%   INPUTS:
+%       sig         - (Vec)  Filtered LFP signal (single channel).
+%       spkTimes    - (Cell) {N_units x 1} Spike times for N units [s].
+%       fs          - (Num)  Sampling frequency [Hz].
+%       varargin    - Parameter/Value pairs:
+%           'lfpTimes'  - (Mat) [N x 2] Valid analysis intervals [s].
+%                         *Critical for PPC1/PPC2*: Defines "trials" for
+%                         between-trial consistency (minimizing burst bias).
+%           'nPerms'    - (Num) Number of permutations for statistical testing. {1000}.
+%           'minSpks'   - (Num) Min spikes required to analyze a unit. {10}.
+%           'sigOffset' - (Num) Time offset of signal start [s]. {0}.
+%           'verbose'   - (Log) Print progress? {true}.
 %
-% OUTPUT:
-%   phase       - Structure with fields (1 x nUnits):
-%     .theta      - Mean phase angle [rad].
-%     .mrl        - Mean Resultant Length (0-1).
-%     .ppc0       - Standard PPC (All-to-All). Unbiased by N, but biased by bursts.
-%     .ppc1       - Between-Trial PPC. Unbiased by N AND bursts. (Requires lfpTimes).
-%     .ppc2       - Weighted Between-Trial PPC. (Requires lfpTimes).
-%     .kappa      - Von Mises concentration parameter.
-%     .pval       - Empirical p-value from permutation test.
-%     .zScore     - Z-score of MRL relative to permutation distribution.
-%     .spkPh      - Cell array of phases for each valid spike.
-%     .nSpks      - Number of valid spikes used.
+%   OUTPUTS:
+%       phase       - (Struct) Results with [1 x N_units] fields:
+%           .theta      - Mean phase angle [rad].
+%           .mrl        - Mean Resultant Length (0-1).
+%           .ppc0       - Standard PPC (All-to-All). Unbiased by N, biased by bursts.
+%           .ppc1       - Between-Trial PPC. Unbiased by N AND bursts. (Req lfpTimes).
+%           .ppc2       - Weighted Between-Trial PPC. (Req lfpTimes).
+%           .kappa      - Von Mises concentration parameter.
+%           .pval       - Empirical p-value from permutation test.
+%           .zScore     - Z-score of MRL relative to permutation distribution.
+%           .spkPh      - Cell array of phases for each valid spike.
 %
-% REFERENCES:
-%   Vinck et al. (2012) "Improved measures of phase-coupling..."
-%   FieldTrip implementation: ft_spiketriggeredspectrum_stat.m
+%   DEPENDENCIES:
+%       None.
 %
-% 22 Jan 2026 - Added FieldTrip-verified PPC0/1/2 logic.
+%   REFERENCES:
+%       Vinck et al. (2012) "Improved measures of phase-coupling..."
+%
+%   HISTORY:
+%       Updated: 23 Jan 2026
 
 %% ========================================================================
 %  ARGUMENTS
@@ -132,9 +134,7 @@ phase.zScore = nan(1, nUnits);
 phase.nSpks = zeros(1, nUnits);
 phase.spkPh = cell(1, nUnits);
 
-if verbose
-    fprintf('analyzing phase coupling for %d units (%d perms)...\n', nUnits, nPerms);
-end
+
 
 for iUnit = 1:nUnits
 

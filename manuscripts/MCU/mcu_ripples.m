@@ -175,7 +175,7 @@ presets = {'ripp'};
 tblt = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
 
 % RIPPLE TRACES
-vars = {'rippMaps'};
+vars = {'rippMaps', 'rippPeth'};
 vt = basepaths2vars('basepaths', basepaths, 'vars', vars);
 
 rippMaps = catfields([vt(:).rippMaps], 1);

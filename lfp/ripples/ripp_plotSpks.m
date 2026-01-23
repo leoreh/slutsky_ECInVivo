@@ -1,29 +1,34 @@
 function ripp_plotSpks(rippSpks, spkPeth, varargin)
 % RIPP_PLOTSPKS Visualizes ripple-modulated spiking activity.
 %
-% SUMMARY:
-%   Generates a comprehensive summary figure of Multi-Unit (MU) and
-%   Single-Unit (SU) activity modulated by ripples.
-%   Visualizations include:
-%     - Peri-Event Time Histograms (PETH) maps.
-%     - Mean PETH traces (Ripple vs Control, RS vs FS).
-%     - Spike count distributions and modulation scatter plots.
+%   RIPP_PLOTSPKS(rippSpks, spkPeth, varargin)
 %
-% INPUTS:
-%   rippSpks    - Structure containing spike statistics (from ripp_spks.m).
-%                 Fields: .su, .mu (each with .frRipp, .frRand, .pVal, etc.)
-%   spkPeth     - Structure containing PETH maps (from ripp_spkMaps.m).
-%                 Fields: .su, .mu (each with .ripp, .ctrl, .tstamps).
-%   varargin    - 'basepath' (default: pwd)
-%                 - 'flgSaveFig' (default: true)
+%   SUMMARY:
+%       Generates a comprehensive summary figure:
+%       Row 1 (MUA):
+%           - PETH Heatmap (Events x Time).
+%           - Mean Rates (Ripple vs Control) with SEM shading.
+%           - Spike Count Probability Distribution.
+%       Row 2 (SUA):
+%           - Normalized PETH Heatmap (Units x Time) sorted by peak latency.
+%           - Population Mean Response (Split by Cell Type if available).
+%           - Modulation Scatter Plot (Baseline FR vs Ripple FR).
 %
-% OUTPUT:
-%   None. Generates and optionally saves a figure.
+%   INPUTS:
+%       rippSpks    - (Struct) Stats from ripp_spks.m (.frRipp, .frRand, etc).
+%       spkPeth     - (Struct) Maps from ripp_spkPeth.m (.ripp, .ctrl).
+%       varargin    - Parameter/Value pairs:
+%           'basepath'   - (Char) Save location.
+%           'flgSaveFig' - (Log)  Save generated figure? (Default: true).
 %
-% DEPENDENCIES:
-%   - setMatlabGraphics (optional, for style)
-%   - PlotColorMap
-%   - plot_stdShade
+%   OUTPUTS:
+%       None. Generates and saves a figure.
+%
+%   DEPENDENCIES:
+%       PlotColorMap, plot_stdShade.
+%
+%   HISTORY:
+%       Updated: 23 Jan 2026
 %
 
 %% ========================================================================
@@ -257,7 +262,9 @@ if flgSaveFig
     figFile = fullfile(figDir, [basename, '_ripp_spks.png']);
     saveas(hFig, figFile);
 
-    fprintf('Saved figure to: %s\n', figFile);
+    figFile = fullfile(figDir, [basename, '_ripp_spks.png']);
+    saveas(hFig, figFile);
+end
 end
 
 end

@@ -1,20 +1,33 @@
 function ripp2ns(rippSamps, peakSamps, varargin)
-% RIPP2NS Generates NeuroScope .res and .clu files for ripple events.
+% RIPP2NS Generates NeuroScope-compatible .res and .clu files.
 %
-% SUMMARY:
-%   Creates .res and .clu files compatible with NeuroScope visualization.
-%   Events are stored as: Start (1), End (2), Peak (3).
+%   RIPP2NS(rippSamps, peakSamps, varargin)
 %
-% INPUTS:
-%   rippSamps   - (N x 2) Matrix of ripple start and end samples.
-%   peakSamps   - (N x 1) Vector of ripple peak samples.
-%   varargin    - (param/value) Optional parameters:
-%                 'basepath'  : (char) Session path (default: pwd).
+%   SUMMARY:
+%       Exports ripple events to the NeuroScope format for external visualization.
+%       Creates two files:
+%           - .res.X: Event timestamps (in samples).
+%           - .clu.X: Event Cluster IDs.
 %
-% OUTPUTS:
-%   None. Writes .res and .clu files to disk.
+%       Mapping:
+%           Cluster 1: Ripple Start
+%           Cluster 2: Ripple End
+%           Cluster 3: Ripple Peak
 %
-% DEPENDENCIES: None
+%   INPUTS:
+%       rippSamps   - (Mat) [N x 2] Start/End indices (Sample count).
+%       peakSamps   - (Vec) [N x 1] Peak indices (Sample count).
+%       varargin    - Parameter/Value pairs:
+%           'basepath' - (Char) Target directory. (Default: pwd).
+%
+%   OUTPUTS:
+%       None. Saves files to disk.
+%
+%   DEPENDENCIES:
+%       None.
+%
+%   HISTORY:
+%       Updated: 23 Jan 2026
 
 %% ========================================================================
 %  ARGUMENTS
@@ -43,7 +56,7 @@ nEvents = length(peakSamps);
 %  GENERATE FILES
 %  ========================================================================
 
-fprintf('Generating NeuroScope files for %d events...\n', nEvents);
+
 
 % Combine all samples
 allSamps = [rippSamps(:, 1); rippSamps(:, 2); peakSamps];
@@ -69,6 +82,6 @@ fprintf(fid, '%d\n', 3); % Number of clusters/classes
 fprintf(fid, '%d\n', clu);
 fclose(fid);
 
-fprintf('Saved: %s\n', resfile);
+
 
 end     % EOF

@@ -1,20 +1,34 @@
 function [stateIdx, rippStates] = ripp_states(rippTimes, peakTimes, boutTimes, varargin)
-% RIPP_STATES Analyzes ripple events in relation to vigilance states.
+% RIPP_STATES Classifies ripples by vigilance state and computes bout statistics.
 %
-% SUMMARY:
-% Calculates ripple rates and densities for every individual vigilance bout.
-% Outputs a categorical index of states per ripple and a summary table per bout.
+%   [stateIdx, rippStates] = RIPP_STATES(rippTimes, peakTimes, boutTimes, varargin)
 %
-% INPUT:
-%   rippTimes   - [N x 2] Ripple start/end times.
-%   peakTimes   - [N x 1] Ripple peak times.
-%   boutTimes   - Cell array of state times.
+%   SUMMARY:
+%       1. Assigns a vigilance state to each ripple based on its peak time.
+%       2. Calculates Ripple Rate (Hz) and Density (duration/duration) for
+%          every individual sleep bout.
+%       3. Aggregates this into a summary table.
 %
-% OUTPUT:
-%   stateIdx    - [N_ripples x 1] Categorical array indicating state per ripple.
-%   rippStates  - Table with columns: Rate, Density, Duration, State, Start, End.
+%   INPUTS:
+%       rippTimes   - (Mat)  [N x 2] Ripple start/end times [s].
+%       peakTimes   - (Vec)  [N x 1] Ripple peak times [s].
+%       boutTimes   - (Cell) {N_states x 1} Cell array of [Start End] matrices.
+%                            Typically {Wake, NREM, REM, ...}.
+%       varargin    - Parameter/Value pairs:
+%           'basepath' - (Char) Save location. (Default: pwd).
+%           'flgPlot'  - (Log)  Generate summary figures? (Default: true).
+%           'flgSave'  - (Log)  Save .rippStates.mat? (Default: true).
 %
-% DEPENDENCIES: basepaths2vars, InIntervals, as_loadConfig.
+%   OUTPUTS:
+%       stateIdx    - (Cat)   [N_ripples x 1] Categorical array of states.
+%       rippStates  - (Table) Summary table with rows per bout:
+%                             [Rate, Density, Duration, State, Start, End].
+%
+%   DEPENDENCIES:
+%       basepaths2vars, InIntervals, as_loadConfig.
+%
+%   HISTORY:
+%       Updated: 23 Jan 2026
 
 % ========================================================================
 %  ARGUMENTS
@@ -46,7 +60,7 @@ nStates = length(boutTimes);
 nRipples = length(peakTimes);
 
 % Initialize Categorical Index
-stateIdx = categorical(nan(nRipples, 1)); 
+stateIdx = categorical(nan(nRipples, 1));
 
 % Load State Config (Colors/Names)
 try
@@ -66,7 +80,9 @@ end
 % ========================================================================
 %  CALCULATION (PER BOUT)
 %  ========================================================================
-fprintf('Calculating ripple statistics per bout for %s...\n', basename);
+% ========================================================================
+%  CALCULATION (PER BOUT)
+%  ========================================================================
 
 rippDur = rippTimes(:,2) - rippTimes(:,1);
 tblState = cell(nStates, 1);
@@ -75,7 +91,7 @@ stateCounts = zeros(nStates, 1);
 for iState = 1:nStates
     bouts = boutTimes{iState};
     nBouts = size(bouts, 1);
-    
+
     % Skip table generation if state is empty
     if nBouts == 0
         continue;
@@ -87,30 +103,30 @@ for iState = 1:nStates
         stateIdx(inState) = stateNames{iState};
         stateCounts(iState) = sum(inState);
     end
-    
+
     % Pre-allocate vectors for this state
     rate = nan(nBouts, 1);
     density = nan(nBouts, 1);
     boutDur = bouts(:, 2) - bouts(:, 1);
-    
+
     % Iterate Bouts to calculate Rate/Density
     for iBout = 1:nBouts
         tStart = bouts(iBout, 1);
         tEnd   = bouts(iBout, 2);
-        
+
         % Find ripples in this specific bout
         idxBout = peakTimes >= tStart & peakTimes <= tEnd;
-        
+
         count = sum(idxBout);
         durSum = sum(rippDur(idxBout));
-        
+
         % Rate (Hz) = Count / Bout Duration
         rate(iBout) = count / boutDur(iBout);
-        
+
         % Density (fraction) = Total Ripple Duration / Bout Duration
         density(iBout) = durSum / boutDur(iBout);
     end
-    
+
     % Create Table for this state
     tblState{iState} = table(rate, density, boutDur, ...
         repmat(categorical(stateNames(iState)), nBouts, 1), ...
@@ -127,17 +143,19 @@ rippStates = vertcat(tblState{:});
 
 if flgSave
     save(savefile, 'rippStates', '-v7.3');
-    fprintf('Saved: %s\n', savefile);
+    if flgSave
+        save(savefile, 'rippStates', '-v7.3');
+    end
 end
 
 % ========================================================================
 %  PLOTTING
 %  ========================================================================
-if flgPlot 
+if flgPlot
 
     fh = figure('Name', [basename '_rippleStates'], 'NumberTitle', 'off');
     tiledlayout(2, 4, 'Padding', 'compact', 'TileSpacing', 'compact');
-    
+
     T = rippStates;
     plotColors = vertcat(colors{:});
 
@@ -163,17 +181,17 @@ if flgPlot
     nexttile([1, 2]);
     if sum(stateCounts) > 0
         hPie = pie(stateCounts);
-        
+
         % Apply Colors to Pie Chart
         % pie returns text/patch objects. Patches are at odd indices (1,3,5...)
         cnt = 1;
         for k = 1:2:length(hPie)
-           if cnt <= length(colors)
-               hPie(k).FaceColor = colors{cnt};
-               cnt = cnt + 1;
-           end
+            if cnt <= length(colors)
+                hPie(k).FaceColor = colors{cnt};
+                cnt = cnt + 1;
+            end
         end
-        
+
         legend(stateNames, 'Location', 'bestoutside');
         title('Ripple Count Distribution');
     end

@@ -1,14 +1,64 @@
 function ripp = ripp_wrapper(varargin)
-% RIPP_WRAPPER Master function to run the complete ripple analysis pipeline.
+% RIPP_WRAPPER Master function to execute the complete SWR analysis pipeline.
 %
-% SUMMARY:
-%   1. ripp_detect -> basename.ripp.mat
-%   2. ripp_states -> basename.rippStates.mat
-%   3. ripp_spks   -> basename.rippSpks.mat (with optional State restriction)
-%   4. spklfp_calc -> (part of ripp struct in memory, optional save?)
+%   ripp = RIPP_WRAPPER(varargin)
 %
-% OUTPUT:
-%   ripp - Combined structure for convenience (in memory).
+%   SUMMARY:
+%       Coordinates the detection, analysis, and visualization of Sharp-Wave Ripples (SWR).
+%       The pipeline proceeds in the following steps:
+%       1.  Data Loading: Loads LFP, Spikes, and State data.
+%       2.  Signal Prep: Filters LFP and calculates envelopes/z-scores (ripp_sigPrep).
+%       3.  Detection: Identifies candidate events based on thresholds (ripp_times).
+%       4.  Parameterization: Calculates stats like Amp/Freq/Energy (ripp_params).
+%       5.  Maps: Generates peri-event LFP maps (ripp_maps).
+%       6.  States: Classifies events by vigilance state (ripp_states).
+%       7.  Spiking: Analyzes SU/MU modulation and generates PETHs (ripp_spks, ripp_spkPeth).
+%       8.  Phasing: Calculates Spike-LFP coupling (spklfp_phase).
+%       9.  Quality Assurance: Filters events based on spiking gain (optional).
+%       10. Visualization: Runs the interactive GUI (ripp_gui) and saves plots.
+%
+%   INPUTS:
+%       varargin - Parameter/Value pairs:
+%           'basepath'   - (Char) Base directory of the session (default: pwd).
+%           'rippCh'     - (Num)  Zero-indexed channel ID for ripple detection.
+%                                 If empty, tries to load from session tags.
+%           'thr'        - (Vec)  Detection thresholds [start, peak, cont, max, min_cont].
+%                                 Default: [1, 2.5, 1.2, 200, 50].
+%           'limDur'     - (Vec)  Duration limits [min, max, inter, min_cont_dur] (ms).
+%                                 Default: [15, 300, 30, 10].
+%           'win'        - (Vec)  Time window to analyze [start end] (s). Default: [0 Inf].
+%           'passband'   - (Vec)  Filtering frequency band [min max] (Hz). Default: [80 250].
+%           'detectMet'  - (Num)  Detection method ID (see ripp_sigPrep). Default: 4.
+%           'zMet'       - (Char) Z-scoring method ('adaptive', 'nrem'). Default: 'nrem'.
+%           'mapDur'     - (Vec)  Window for PETH/Maps [pre post] (s). Default: [-0.05 0.05].
+%           'bit2uv'     - (Num)  Conversion factor. Auto-detects Intan/OpenEphys if empty.
+%           'flgGui'     - (Log)  Open the interactive GUI? Default: false.
+%           'flgPlot'    - (Log)  Generate summary plots? Default: true.
+%           'flgSave'    - (Log)  Save output .mat files? Default: false.
+%           'flgQA'      - (Log)  Filter "bad" ripples (no spike gain)? Default: true.
+%           'verbose'    - (Log)  Print progress steps? Default: true.
+%
+%   OUTPUTS:
+%       ripp         - (Struct) Combined structure containing all analysis results:
+%           .times       - Event start/end times.
+%           .peakTime    - Event peak times.
+%           .amp,.freq   - Event parameters.
+%           .state       - Vigilance state per event.
+%           .spkGain     - MUA gain per event.
+%
+%   files saved (if flgSave=true):
+%       basename.ripp.mat
+%       basename.rippStates.mat
+%       basename.rippSpks.mat
+%       basename.rippPeth.mat
+%       basename.rippSpkLfp.mat
+%
+%   DEPENDENCIES:
+%       ripp_sigPrep, ripp_times, ripp_params, ripp_maps, ripp_states,
+%       ripp_spks, ripp_spkPeth, ripp_plotSpks, spklfp_phase, ripp_gui.
+%
+%   HISTORY:
+%       Updated: 23 Jan 2026
 
 %% ========================================================================
 %  ARGUMENTS
@@ -25,44 +75,47 @@ addParameter(p, 'flgGui', false, @islogical);
 addParameter(p, 'flgPlot', true, @islogical);
 addParameter(p, 'flgSave', false, @islogical);
 addParameter(p, 'flgQA', true, @islogical);
-addParameter(p, 'flgSaveFig', false, @islogical);
 addParameter(p, 'bit2uv', [], @isnumeric);
 addParameter(p, 'zMet', 'nrem', @ischar);
+addParameter(p, 'zMet', 'nrem', @ischar);
 addParameter(p, 'mapDur', [-0.05 0.05], @isnumeric);
+addParameter(p, 'verbose', true, @islogical);
+% Parse Inputs
 parse(p, varargin{:});
 
-basepath = p.Results.basepath;
-rippCh = p.Results.rippCh;
-thr = p.Results.thr;
-limDur = p.Results.limDur;
-passband = p.Results.passband;
-win = p.Results.win;
-detectMet = p.Results.detectMet;
-flgPlot = p.Results.flgPlot;
-flgSave = p.Results.flgSave;
-flgQA = p.Results.flgQA;
-flgSaveFig = p.Results.flgSaveFig;
-bit2uv = p.Results.bit2uv;
-flgGui = p.Results.flgGui;
-zMet = p.Results.zMet;
-mapDur = p.Results.mapDur;
+basepath    = p.Results.basepath;
+rippCh      = p.Results.rippCh;
+thr         = p.Results.thr;
+limDur      = p.Results.limDur;
+passband    = p.Results.passband;
+win         = p.Results.win;
+detectMet   = p.Results.detectMet;
+flgPlot     = p.Results.flgPlot;
+flgSave     = p.Results.flgSave;
+flgQA       = p.Results.flgQA;
+bit2uv      = p.Results.bit2uv;
+flgGui      = p.Results.flgGui;
+zMet        = p.Results.zMet;
+mapDur      = p.Results.mapDur;
+verbose     = p.Results.verbose;
 
 %% ========================================================================
 %  SETUP
 %  ========================================================================
-
 cd(basepath);
 [~, basename] = fileparts(basepath);
-fprintf('--- Ripple Analysis for %s ---\n', basename);
 
-% Load vars
+if verbose, fprintf('[RIPP]: Starting pipeline for %s...\n', basename); end
+if verbose, fprintf('[RIPP]: Loading data (LFP, Spikes, States)...\n'); end
+
+% Load Session & Data
 vars = {'session', 'spikes', 'spktimes', 'sleep_states'};
 v = basepaths2vars('basepaths', {basepath}, 'vars', vars);
 
-% Session params
-fs = v.session.extracellular.srLfp;
-fsSpk = v.session.extracellular.sr;
-nchans = v.session.extracellular.nChannels;
+% Session Parameters
+fs      = v.session.extracellular.srLfp;
+fsSpk   = v.session.extracellular.sr;
+nchans  = v.session.extracellular.nChannels;
 
 if isinf(win(2))
     sigDur = Inf;
@@ -70,24 +123,26 @@ else
     sigDur = win(2) - win(1);
 end
 
-% Prep MU spktimes
+% Prepare Multi-Unit (MU) Spike Times
+% Flatten all units into a single sorted vector for MUA analysis
 muTimes = cellfun(@(x) x / fsSpk, v.spktimes, 'uni', false);
 muTimes = cellfun(@(x) x - win(1), muTimes, 'Uni', false);
 muTimes = cellfun(@(x) x(x >= 0 & x <= sigDur), muTimes, 'Uni', false);
 muTimes = {sort(vertcat(muTimes{:}))};
 
-% Prep SU spktimes
+% Prepare Single-Unit (SU) Spike Times
 spkTimes = v.spikes.times;
 spkTimes = cellfun(@(x) x - win(1), spkTimes, 'Uni', false);
 spkTimes = cellfun(@(x) x(x >= 0 & x <= sigDur), spkTimes, 'Uni', false);
 
-% Prep boutTimes (for state analysis)
+% Prepare Bout Times (for State Analysis)
 try
     boutTimes = v.ss.bouts.times;
     boutTimes = cellfun(@(x) x - win(1), boutTimes, 'UniformOutput', false);
     boutTimes = cellfun(@(x) x(x(:,2)>0 & x(:,1)<sigDur, :), boutTimes, 'UniformOutput', false);
-    nremTimes = boutTimes{4};
+    nremTimes = boutTimes{4}; % Assuming standard 4th cell is NREM
 catch
+    warning('Could not load sleep states.');
     boutTimes = [];
     nremTimes = [];
 end
@@ -101,18 +156,19 @@ if isempty(rippCh)
     end
 end
 
-% Handle bit2uv
+% Handle Voltage Conversion
 if isempty(bit2uv)
     if round(fsSpk) == 24414
-        bit2uv = 1;
+        bit2uv = 1;     % TDT/Tucker?
     else
-        bit2uv = 0.195;
+        bit2uv = 0.195; % Intan
     end
 end
 
 %% ========================================================================
 %  LOAD SIGNALS
 %  ========================================================================
+if verbose, fprintf('[RIPP]: Pre-processing signals...\n'); end
 
 % LFP
 fname = fullfile(basepath, [basename, '.lfp']);
@@ -139,7 +195,7 @@ if length(emg) ~= length(lfp)
     error('EMG and LFP do not fit')
 end
 
-% Prepare Signals
+% Prepare Signals (Filter, Hilbert, Z-Score)
 rippSig = ripp_sigPrep(lfp, fs, ...
     'detectMet', detectMet, 'passband', passband, ...
     'zMet', zMet, 'nremTimes', nremTimes);
@@ -148,50 +204,21 @@ rippSig = ripp_sigPrep(lfp, fs, ...
 %% ========================================================================
 %  PRELIMINARY DETECTION
 %  ========================================================================
+if verbose, fprintf('[RIPP]: Thresholding candidate events...\n'); end
 
-% Detect
+% Detect Candidate Events
 ripp = ripp_times(rippSig, fs, ...
     'thr', thr, ...
     'limDur', limDur);
 
-% Get non-ripple intervals of matched duration.
-ripp.ctrlTimes = ripp_ctrlTimes(ripp.times);
+% Preliminary Control Intervals (matched duration)
+ctrlTimes = ripp_ctrlTimes(ripp.times);
 
-
-%% ========================================================================
-%  PARAMS & MAPS
-%  ========================================================================
-
-ripp = ripp_params(rippSig, ripp);
-rippMaps = ripp_maps(rippSig, ripp.peakTime, fs, 'mapDur', mapDur);
- 
-%% ========================================================================
-%  STATES
-%  ========================================================================
-
+% States
 ripp.state = ripp_states(ripp.times, ripp.peakTime, boutTimes, ...
     'basepath', basepath, ...
     'flgPlot', false, ...
     'flgSave', false);
-
-
-%% ========================================================================
-%  SPIKE MAPS
-%  ========================================================================
-
-fprintf('Creating Spike PETH...\n');
-
-rippPeth.su = ripp_spkPeth(spkTimes, ripp.peakTime, ripp.ctrlTimes, ...
-    'flgSave', false, ...
-    'mapDur', mapDur);
-rippPeth.mu = ripp_spkPeth(muTimes, ripp.peakTime, ripp.ctrlTimes, ...
-    'flgSave', false, ...
-    'mapDur', mapDur);
-
-if flgSave
-    spkPethFile = fullfile(basepath, [basename, '.rippPeth.mat']);
-    save(spkPethFile, 'rippPeth', '-v7.3');
-end
 
 
 %% ========================================================================
@@ -201,162 +228,177 @@ end
 % Calculate Instantaneous Rates (Events x Units)
 % 'binsize', Inf -> Returns one rate per event
 rippRates = times2rate(muTimes, 'winCalc', ripp.times, 'binsize', Inf);
-ctrlRates = times2rate(muTimes, 'winCalc', ripp.ctrlTimes, 'binsize', Inf);
+ctrlRates = times2rate(muTimes, 'winCalc', ctrlTimes, 'binsize', Inf);
 
-% Calculate MUA spkGain (z-score relative to control) per ripple 
+% Calculate MUA Spike Gain per Ripple
+% Gain = (Ripple Rate - Mean Control Rate) / Std Control Rate
 ripp.spkGain = [(rippRates - mean(ctrlRates, 'all', 'omitnan')) ./ ...
-    std(ctrlRates, [], 'all', 'omitnan')]';
+    std(ctrlRates, [], 'all', 'omitnan')]'; %#ok<*NBRAK1>
 
-% Good ripples increase spiking activity
-ripp.goodSpk = ripp.spkGain > 0;
-
-if flgGui
-    
-    % MEAN TRACES
-        
-    % Build table
-    tbl = struct2table(rmfield(ripp, {'info', 'times', 'ctrlTimes'}));
-    
-    % Add maps
-    tblMap = struct2table(rmfield(rippMaps, {'tstamps'}));
-    tblVars = tblMap.Properties.VariableNames;
-    tblVars = strcat('t_', tblVars);
-    tblMap.Properties.VariableNames = tblVars;
-    tbl = [tbl, tblMap];
-    
-    % Add PETH
-    tbl.suPETH = squeeze(mean(rippPeth.su.ripp, 1, 'omitnan'));
-    tbl.muPETH = squeeze(rippPeth.mu.ripp);
-
-    % Plot    
-    tblGUI_xy(rippPeth.mu.tstamps, tbl, 'yVar', 't_z', 'grpVar', 'states');
-
-    % PER TRACE
-    ripp_gui(ripp.times, ripp.peakTime, rippSig, muTimes, fs, thr, emg, ...
-        'basepath', basepath);
-end
-
-% Select good ripples
+% Select "Good" Ripples by State AND Spike Gain
+nRipp = length(ripp.spkGain);
 if flgQA
-    ripp.stateIdx = ripp.state == 'QWAKE' | ripp.state == 'LSLEEP' | ripp.state == 'NREM';
-    goodIdx = ripp.stateIdx & ripp.goodSpk;
+    stateIdx = ripp.state == 'QWAKE' | ripp.state == 'LSLEEP' | ripp.state == 'NREM';
+    gainIdx = ripp.spkGain > 0;
+    goodIdx = stateIdx & gainIdx;
 else
-    goodIdx = true(length(ripp.state), 1);
-end
-ripp.goodIdx = goodIdx;
-
-% Save full ripp struct (w/ "bad" ripples)
-if flgSave
-    rippFile = fullfile(basepath, [basename, '.ripp.mat']);
-    save(rippFile, 'ripp', '-v7.3');
+    goodIdx = true(nRipp, 1);
 end
 
-% Filter ripp (not saved, only for subsequent analysis)
+% Filter Ripp Struct
 fnames = fieldnames(ripp);
-nRipp = length(goodIdx);
 for iField = 1:length(fnames)
     fn = fnames{iField};
-    
+
     % Check if first dimension matches nEvents
     if size(ripp.(fn), 1) == nRipp
         ripp.(fn) = ripp.(fn)(goodIdx, :);
     end
 end
-fprintf('Kept %d / %d events after QA.\n', sum(goodIdx), nRipp);
 
-% Filter rippPeth (not saved, only for plotting)
-fnames = fieldnames(rippPeth.su);
-nRipp = length(goodIdx);
-for iField = 1:length(fnames)
-    fn = fnames{iField};
-    
-    % Check if first dimension matches nEvents
-    if size(rippPeth.su.(fn), 2) == nRipp
-        rippPeth.su.(fn) = rippPeth.su.(fn)(:, goodIdx, :);
-    end
-
-    % Check if first dimension matches nEvents
-    if size(rippPeth.mu.(fn), 2) == nRipp
-        rippPeth.mu.(fn) = rippPeth.mu.(fn)(:, goodIdx, :);
-    end
+if verbose
+    fprintf('[RIPP]: QA Filter - Kept %d / %d events.\n', sum(goodIdx), nRipp);
 end
 
-% Recalculate states
-ripp.state = ripp_states(ripp.times, ...
+% Re-Generate Control Intervals
+ripp.ctrlTimes = ripp_ctrlTimes(ripp.times);
+
+
+%% ========================================================================
+%  STATES, PARAMS, MAPS
+%  ========================================================================
+if verbose, fprintf('[RIPP]: Generating Maps...\n'); end
+
+% States
+[ripp.state, ~] = ripp_states(ripp.times, ...
     ripp.peakTime, ...
     boutTimes, ...
     'basepath', basepath, ...
     'flgPlot', false, ...
     'flgSave', true);
 
+% Params
+ripp = ripp_params(rippSig, ripp);
+
+% Maps
+rippMaps = ripp_maps(rippSig, ripp.peakTime, fs, 'mapDur', mapDur);
+
+
+%% ========================================================================
+%  SPIKES
+%  ========================================================================
+if verbose, fprintf('[RIPP]: Generating Spike PETHs...\n'); end
+
+% PETH
+rippPeth.su = ripp_spkPeth(spkTimes, ripp.peakTime, ripp.ctrlTimes, ...
+    'flgSave', false, ...
+    'mapDur', mapDur);
+rippPeth.mu = ripp_spkPeth(muTimes, ripp.peakTime, ripp.ctrlTimes, ...
+    'flgSave', false, ...
+    'mapDur', mapDur);
+
 
 %% ========================================================================
 %  SPIKE STATS
 %  ========================================================================
+if verbose, fprintf('[RIPP]: Spike Stats and Coupling...\n'); end
 
-% SU
-fprintf('Analyzing Spike Stats...\n');
+% STATS - SU
 rippSpks.su = ripp_spks(spkTimes, ...
     ripp.times, ...
     ripp.ctrlTimes, ...
     'basepath', basepath, ...
     'flgSave', false);
 
-% MU
+% STATS - MU
 rippSpks.mu = ripp_spks(muTimes, ...
     ripp.times, ...
     ripp.ctrlTimes, ...
     'basepath', basepath, ...
     'flgSave', false);
 
-if flgSave
-    rippSpksFile = fullfile(basepath, [basename, '.rippSpks.mat']);
-    save(rippSpksFile, 'rippSpks', '-v7.3');
-end
-
-% Plot spikes
-if flgPlot 
-    ripp_plotSpks(rippSpks, rippPeth, ...
-        'basepath', basepath, ...
-        'flgSaveFig', flgSaveFig);  
-end
-
-
-%% ========================================================================
-%  SPK-LFP
-%  ========================================================================
-fprintf('Running spklfp coupling...\n');
-
+% SPK-LFP
 spkLfp = spklfp_phase(rippSig.filt, spkTimes, fs, ...
     'lfpTimes', rippTimes, ...
     'nPerms', 0);
 
-spkLfpFile = fullfile(basepath, [basename, '.rippSpkLfp.mat']);
-save(spkLfpFile, 'spkLfp', '-v7.3');
-
 
 %% ========================================================================
-%  NEUOROSCOPE
+%  SAVE
 %  ========================================================================
 
 % Revert times to absolute for saving/Neuroscope
 ripp.times = ripp.times + win(1);
 ripp.peakTime = ripp.peakTime + win(1);
 
-% NeuroScope Files
 if flgSave
+    if verbose, fprintf('[RIPP]: Saving output files...\n'); end
+
+    % RIPP
+    rippFile = fullfile(basepath, [basename, '.ripp.mat']);
+    save(rippFile, 'ripp', '-v7.3');
+
+    % NEUROSCOPE
     % Convert to samples (NeuroScope uses acquisition rate fsSpk)
     rippSamps = round(ripp.times * fsSpk);
     peakSamps = round(ripp.peakTime * fsSpk);
     ripp2ns(rippSamps, peakSamps, 'basepath', basepath);
+
+    % PETH
+    spkPethFile = fullfile(basepath, [basename, '.rippPeth.mat']);
+    save(spkPethFile, 'rippPeth', '-v7.3');
+
+    % SPKLFP
+    spkLfpFile = fullfile(basepath, [basename, '.rippSpkLfp.mat']);
+    save(spkLfpFile, 'spkLfp', '-v7.3');
+
+    % RIPPSPKS
+    rippSpksFile = fullfile(basepath, [basename, '.rippSpks.mat']);
+    save(rippSpksFile, 'rippSpks', '-v7.3');
+
 end
 
 
 %% ========================================================================
-%  FINALIZE
+%  PLOT
 %  ========================================================================
 
-fprintf('--- Ripple Analysis Pipeline Completed for %s ---\n', basename);
-
-
+% Plot spikes
+if flgPlot
+    if verbose, fprintf('[RIPP]: Generating Summary Plot...\n'); end
+    ripp_plotSpks(rippSpks, rippPeth, ...
+        'basepath', basepath, ...
+        'flgSaveFig', true);
 end
+
+if flgGui
+
+    % MEAN TRACES
+
+    % Build table
+    tbl = struct2table(rmfield(ripp, {'info', 'times', 'ctrlTimes'}));
+
+    % Add maps
+    tblMap = struct2table(rmfield(rippMaps, {'tstamps'}));
+    tblVars = tblMap.Properties.VariableNames;
+    tblVars = strcat('t_', tblVars);
+    tblMap.Properties.VariableNames = tblVars;
+    tbl = [tbl, tblMap];
+
+    % Add PETH
+    tbl.suPETH = squeeze(mean(rippPeth.su.ripp, 1, 'omitnan'));
+    tbl.muPETH = squeeze(rippPeth.mu.ripp);
+
+    % Plot
+    tblGUI_xy(rippPeth.mu.tstamps, tbl, 'yVar', 't_z', 'grpVar', 'states');
+
+    % PER TRACE
+    if verbose, fprintf('[RIPP]: Launching Interactive GUI...\n'); end
+    ripp_gui(ripp.times, ripp.peakTime, rippSig, muTimes, fs, thr, emg, ...
+        'basepath', basepath);
+end
+
+if verbose, fprintf('[RIPP]: Pipeline Completed for %s.\n', basename); end
+
+
+end     % EOF

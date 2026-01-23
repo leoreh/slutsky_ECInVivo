@@ -1,21 +1,40 @@
 function ripp = ripp_times(rippSig, fs, varargin)
 % RIPP_TIMES Preliminary detection of hippocampal ripple events.
 %
-% SUMMARY:
-% Detects potential ripple events based on thresholding the Z-scored signal.
-% Applies duration and power constraints. Returns times and peak times.
+%   ripp = RIPP_TIMES(rippSig, fs, varargin)
 %
-% INPUT:
-%   rippSig         Structure with fields: lfp, filt, amp, freq, z
-%   fs              Sampling frequency [Hz].
-%   varargin        'thr', 'limDur'
+%   SUMMARY:
+%       Detects potential ripple events by thresholding the Z-scored signal.
+%       Applies duration, power, and continuity constraints.
 %
-% OUTPUT:
-%   ripp            Structure with fields:
-%                   .times      (nEvents x 2) start and end times [s]
-%                   .peakTime   (nEvents x 1) peak time [s]
+%   INPUTS:
+%       rippSig     - (Struct) Signal structure from ripp_sigPrep.
+%                              Must contain .z (Z-scored) and .filt fields.
+%       fs          - (Num)    Sampling frequency [Hz].
+%       varargin    - Parameter/Value pairs:
+%           'thr'    - (Vec) Thresholds [Start, Peak, Cont, Max, Min_Cont].
+%                            1: Start Trigger   (Z > 1.5)
+%                            2: Peak Threshold  (Z > 2.5)
+%                            3: Continuity Thr  (Z > 2.0) - must stay above this for...
+%                            4: Max Threshold   (Z < 200) - artifact rejection.
+%                            5: Min Cont Duration (ms) - time detection must obey Thr3.
+%           'limDur' - (Vec) Duration limits [Min, Max, Inter, MinCont] (ms).
+%                            1: Min Event Duration [15]
+%                            2: Max Event Duration [300]
+%                            3: Min Inter-Event Interval [20] (merge if closer)
+%                            4: Min Continuity Duration [10]
 %
-% DEPENDENCIES: binary2bouts
+%   OUTPUTS:
+%       ripp        - (Struct) Detection results:
+%           .times      - (N x 2) Start and End times [s].
+%           .peakTime   - (N x 1) Peak times [s].
+%           .info       - (Struct) Parameters used (.thr, .limDur, .fs).
+%
+%   DEPENDENCIES:
+%       binary2bouts
+%
+%   HISTORY:
+%       Updated: 23 Jan 2026
 
 %% ========================================================================
 %  ARGUMENTS
@@ -53,7 +72,8 @@ limDur_Samples = round(limDur / 1000 * fs);
 %% ========================================================================
 %  DETECTION
 %  ========================================================================
-% Initial bout detection
+% 1. Initial Bout Detection
+% Find all intervals where signal exceeds Start Threshold (Thr 1)
 eventSamples = binary2bouts('vec', rippSig.z > thr(1), 'minDur', limDur_Samples(1),...
     'maxDur', limDur_Samples(2), 'interDur', limDur_Samples(3));
 nEvents = size(eventSamples, 1);
@@ -63,7 +83,8 @@ peakPower = nan(nEvents, 1);
 contPowDur = nan(nEvents, 1);
 contPowAvg = nan(nEvents, 1);
 
-% Power and Continuity thresholds
+% 2. Power and Continuity Validation
+% Iterate through candidate events to enforce Peak and Continuity thresholds
 for iEvent = 1:nEvents
     if idxDiscard(iEvent), continue; end
 
@@ -101,6 +122,8 @@ end
 % Cleanup discarded events
 eventSamples(idxDiscard, :) = [];
 
+% Check for Empty Results
+
 % (Unused stats are cleared implicitly by not returning them, but we keep the logic consistent)
 nEvents = size(eventSamples, 1);
 
@@ -112,7 +135,9 @@ end
 %% ========================================================================
 %  FINALIZE TIMES
 %  ========================================================================
-% Peak Finding
+
+% 3. Find Exact Peak Times
+% Locate the minimum (trough) of the filtered LFP within each event window
 peakSample = zeros(nEvents, 1);
 for iEvent = 1:nEvents
     idx = eventSamples(iEvent,1):eventSamples(iEvent,2);
