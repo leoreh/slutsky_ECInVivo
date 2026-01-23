@@ -72,7 +72,7 @@ ctrlRates = ctrlCounts ./ durCtrl;
 
 % METRICS 
 % Mean Rates
-frRipp = mean(rippRates, 2, 'omitnan'); 
+frRipp = mean(rippRates, 2, 'omitnan'); % [nUnits x 1]
 frRand = mean(ctrlRates, 2, 'omitnan');
 sdRand = std(ctrlRates, [], 2, 'omitnan');
 
