@@ -125,10 +125,10 @@ for iFile = 1 : nFiles
     [~, basename] = fileparts(basepath);
     tic
     ripp = ripp_wrapper('basepath', pwd, ...
-        'win', [0 4] * 3600, ...
+        'win', [0 12] * 3600, ...
         'rippCh', [], ...
         'flgPlot', false, ...
-        'flgSave', false);
+        'flgSave', true);
     toc
 end
 
@@ -146,13 +146,6 @@ nFiles = length(basepaths);
 presets = {'rippSpks', 'brst'};
 tbl = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
 
-tbl.funcon = funcon;
-tbl.theta = phase.theta';
-tbl.mrl = phase.mrl';
-tbl.ppc0 = phase.ppc0';
-tbl.ppc1 = phase.ppc1';
-tbl.ppc2 = phase.ppc2';
-
 % Plot
 tblPlot = tbl(tbl.UnitType == 'RS', :);
 tblGUI_bar(tblPlot, 'xVar', 'Group', 'yVar', 'mrl');
@@ -167,8 +160,6 @@ frml = 'funcon ~ Group + (1|Name)';
 
 
 % RIPPLE PARAMS
-basepaths = [mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl')];
-nFiles = length(basepaths);
 
 presets = {'ripp'};
 tblt = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
@@ -182,24 +173,25 @@ tblMap = struct2table(rmfield(rippMaps, {'tstamps'}));
 tblVars = tblMap.Properties.VariableNames;
 tblVars = strcat('t_', tblVars);
 tblMap.Properties.VariableNames = tblVars;
-
 tblMap = [tblt, tblMap];
 
 
 % Add PETH
-tbl.suPETH = squeeze(mean(rippPeth.su.ripp, 1, 'omitnan'));
-tbl.muPETH = squeeze(rippPeth.mu.ripp);
+rippPeth = catfields([vt(:).rippPeth], 2);
+tblMap.suPETH = squeeze(mean(rippPeth.su.ripp, 1, 'omitnan'));
+tblMap.muPETH = squeeze(rippPeth.mu.ripp);
 
-tblPlot = tblt(tblt.goodIdx, :);
-
-
-% Plot
-tblGUI_xy(vt(1).rippMaps.tstamps, tblPlot, 'yVar', 't_z', 'grpVar', 'states');
 
 % Plot
-tblGUI_bar(tblPlot, 'xVar', 'Group', 'yVar', 'dur');
-tblGUI_scatHist(tblt, 'xVar', 'dur', 'yVar', 'peakAmp', 'grpVar', 'Group');
+tblGUI_xy(vt(1).rippPeth.su.tstamps, tblMap, 'yVar', 't_z', 'grpVar', 'states');
 
+% Plot
+tblGUI_bar(tblMap, 'xVar', 'Group', 'yVar', 'dur');
+tblGUI_scatHist(tblMap, 'xVar', 'dur', 'yVar', 'peakAmp', 'grpVar', 'Group');
+
+
+tblSum = groupsummary(tblt, {'Group', 'Name'}, 'mean', ...
+    vartype("numeric"));
 
 % Formula
 

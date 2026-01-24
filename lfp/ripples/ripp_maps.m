@@ -54,7 +54,6 @@ mapFile = fullfile(basepath, [basename, '.rippMaps.mat']);
 rippMaps = struct();
 rippMaps.tstamps = linspace(mapDur(1), mapDur(2), round(diff(mapDur)*fs)+1);
 nSamps = length(rippSig.lfp);
-nEvents = length(peakTime);
 
 % Convert peak times to samples
 peakSamps = round(peakTime * fs) + 1;
@@ -100,9 +99,6 @@ end
 % =========================================================================
 if flgSave
     save(mapFile, 'rippMaps', '-v7.3');
-    if flgSave
-        save(mapFile, 'rippMaps', '-v7.3');
-    end
 end
 
 end

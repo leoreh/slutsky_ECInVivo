@@ -141,9 +141,6 @@ rippStates = vertcat(tblState{:});
 
 if flgSave
     save(savefile, 'rippStates', '-v7.3');
-    if flgSave
-        save(savefile, 'rippStates', '-v7.3');
-    end
 end
 
 % =========================================================================

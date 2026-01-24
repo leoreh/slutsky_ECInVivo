@@ -246,11 +246,11 @@ nremAmp = emgAbs(nremMask);
 ripp.emg = (ripp.emg - mean(nremAmp, 'omitnan')) / std(nremAmp, 'omitnan');
 
 % Define Quite Events 
-emgIdx = ripp.emg < 1; 
+idxEmg = ripp.emg < 2; 
 
 if verbose
     fprintf('[RIPP]: %d / %d events marked as High EMG.\n', ...
-        sum(~emgIdx), length(emgIdx));
+        sum(~idxEmg), length(idxEmg));
 end
 
 % SPIKE GAIN
@@ -267,23 +267,21 @@ ripp.spkGain = [(rippRates - mean(ctrlRates, 'all', 'omitnan')) ./ ...
 % Select "Good" Ripples by State AND Spike Gain
 nRipp = length(ripp.spkGain);
 if flgQA
-    stateIdx = ripp.state == 'QWAKE' | ripp.state == 'LSLEEP' | ripp.state == 'NREM';
-    gainIdx = ripp.spkGain > 0;
-    goodIdx = stateIdx & gainIdx;
+    idxState = ripp.state == 'QWAKE' | ripp.state == 'LSLEEP' | ripp.state == 'NREM';
+    idxGain = ripp.spkGain > 0;
+    idxGood = idxState & idxGain;
 else
-    goodIdx = true(nRipp, 1);
+    idxGood = true(nRipp, 1);
 end
 
 if verbose
-    fprintf('[RIPP]: QA Filter - Kept %d / %d events.\n', sum(goodIdx), nRipp);
+    fprintf('[RIPP]: QA Filter - Kept %d / %d events.\n', sum(idxGood), nRipp);
 end
 
-
-% Save in Struct for plotting
-ripp.gainIdx = gainIdx;
-ripp.stateIdx = stateIdx;
-ripp.emgIdx = emgIdx;
-
+% Save in Struct for plotting (if not filtered)
+ripp.idxGain = idxGain;
+ripp.idxState = idxState;
+ripp.idxEmg = idxEmg;
 
 % Filter Ripp Struct
 fnames = fieldnames(ripp);
@@ -292,14 +290,8 @@ for iField = 1:length(fnames)
 
     % Check if first dimension matches nEvents
     if size(ripp.(fn), 1) == nRipp
-        ripp.(fn) = ripp.(fn)(goodIdx, :);
+        ripp.(fn) = ripp.(fn)(idxGood, :);
     end
-end
-
-% Inspect detection
-if flgGui
-    ripp_gui(ripp.times, ripp.peakTime, rippSig, muTimes, fs, thr, emg, ...
-        'basepath', basepath);
 end
 
 % Re-Generate Control Intervals
@@ -348,19 +340,14 @@ rippPeth.mu = ripp_spkPeth(muTimes, ripp.peakTime, ripp.ctrlTimes, ...
 %  ========================================================================
 if verbose, fprintf('[RIPP]: Spike Stats and LFP-Coupling...\n'); end
 
-% STATS - SU
-rippSpks.su = ripp_spks(spkTimes, ...
+% Firing Metrics
+rippSpks = ripp_spks(spkTimes, ...
     ripp.times, ...
     ripp.ctrlTimes, ...
     'basepath', basepath, ...
     'flgSave', false);
 
-% STATS - MU
-rippSpks.mu = ripp_spks(muTimes, ...
-    ripp.times, ...
-    ripp.ctrlTimes, ...
-    'basepath', basepath, ...
-    'flgSave', false);
+
 
 % SPK-LFP
 spkLfp = spklfp_phase(rippSig.filt, spkTimes, fs, ...

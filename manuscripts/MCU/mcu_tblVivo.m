@@ -80,10 +80,19 @@ end
 
 if ismember('rippSpks', presets)
     vars = [vars, 'rippSpks', 'rippSpkLfp'];
-    varMap.rippZ = 'rippSpks.su.frZ';
-    varMap.rippMod = 'rippSpks.su.frMod';
-    varMap.rippMRL = 'spkLfp.phase.mrl';
-    varMap.rippTheta = 'spkLfp.phase.theta';
+    varMap.rippZ = 'rippSpks.frZ';
+    varMap.rippMod = 'rippSpks.frMod';
+    varMap.pFire = 'rippSpks.pFire';
+    varMap.spkCount = 'rippSpks.spkCount';
+    varMap.rankMean = 'rippSpks.rankMean';
+    varMap.rankVar = 'rippSpks.rankVar';
+    varMap.frActive = 'rippSpks.frActive';
+
+    varMap.rippTheta = 'spkLfp.theta';
+    varMap.rippMrl = 'spkLfp.mrl';
+    varMap.ppc0 = 'spkLfp.ppc0';
+    varMap.ppc1 = 'spkLfp.ppc1';
+    varMap.ppc2 = 'spkLfp.ppc2';
 end
 
 if ismember('ripp', presets)
@@ -94,8 +103,8 @@ if ismember('ripp', presets)
     varMap.freq         = 'ripp.freq';
     varMap.energy       = 'ripp.energy';
     varMap.state        = 'ripp.state';
-    varMap.goodIdx      = 'ripp.goodIdx';
     varMap.spkGain      = 'ripp.spkGain';
+    varMap.fracUnits    = 'ripp.fracUnits';
 end
 
 if ismember('rippMaps', presets)
