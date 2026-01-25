@@ -267,7 +267,7 @@ ripp.spkGain = [(rippRates - mean(ctrlRates, 'all', 'omitnan')) ./ ...
 % Select "Good" Ripples by State AND Spike Gain
 nRipp = length(ripp.spkGain);
 if flgQA
-    idxState = ripp.state == 'QWAKE' | ripp.state == 'LSLEEP' | ripp.state == 'NREM';
+    idxState = ismember(v(iFile).rippStates.State, {'QWAKE', 'LSLEEP', 'NREM'});
     idxGain = ripp.spkGain > 0;
     idxGood = idxState & idxGain;
 else

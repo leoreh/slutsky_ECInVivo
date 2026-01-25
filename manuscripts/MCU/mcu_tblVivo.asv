@@ -103,8 +103,8 @@ if ismember('ripp', presets)
     varMap.freq         = 'ripp.freq';
     varMap.energy       = 'ripp.energy';
     varMap.state        = 'ripp.state';
-    varMap.goodIdx      = 'ripp.goodIdx';
     varMap.spkGain      = 'ripp.spkGain';
+    varMap.fracUnits    = 'ripp.fracUnits';
 end
 
 if ismember('rippMaps', presets)
@@ -115,6 +115,15 @@ if ismember('rippMaps', presets)
     varMap.t_amp        = 'rippMaps.amp';
     varMap.t_freq       = 'rippMaps.freq';
     varMap.t_z          = 'rippMaps.z';
+end
+
+if ismember('rippStates', presets)
+    vars = {'rippStates'};
+    varMap = struct();
+    varMap.Rate         = 'rippStates.Rate';
+    varMap.Density      = 'rippStates.Density';
+    varMap.Duration     = 'rippStates.Duration';
+    varMap.State        = 'rippStates.State';
 end
 
 % Load
@@ -153,6 +162,16 @@ if ismember('frNet', presets)
 
     end
 end
+
+% Post-process ripp states
+if ismember('rippStates', presets) 
+    for iFile = 1:length(v)
+
+        badIdx = v(iFile).rippStates.State == 'WAKE' | v(iFile).rippStates.State == 'N/REM' | v(iFile).rippStates.State == 'REM';
+        v(iFile).rippStates(badIdx, :) = [];       
+    end
+end
+
 
 % Metadata
 tagFiles = struct();

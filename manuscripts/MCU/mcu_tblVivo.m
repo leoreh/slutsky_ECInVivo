@@ -117,6 +117,15 @@ if ismember('rippMaps', presets)
     varMap.t_z          = 'rippMaps.z';
 end
 
+if ismember('rippStates', presets)
+    vars = {'rippStates'};
+    varMap = struct();
+    varMap.Rate         = 'rippStates.Rate';
+    varMap.Density      = 'rippStates.Density';
+    varMap.Duration     = 'rippStates.Duration';
+    varMap.State        = 'rippStates.State';
+end
+
 % Load
 if isempty(basepaths)
     basepaths = [mcu_basepaths('wt'), mcu_basepaths('mcu')];
@@ -153,6 +162,15 @@ if ismember('frNet', presets)
 
     end
 end
+
+% Post-process ripp states
+if ismember('rippStates', presets) 
+    for iFile = 1:length(v)
+        badIdx = ismember(v(iFile).rippStates.State, {'WAKE', 'N/REM', 'REM'});
+        v(iFile).rippStates(badIdx, :) = [];
+    end
+end
+
 
 % Metadata
 tagFiles = struct();

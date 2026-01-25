@@ -151,7 +151,6 @@ guiData.hAxHistY   = axes('Parent', hContainer, 'Position', axHistYPos);
 
 % Link axes for zooming
 linkaxes([guiData.hAxScatter, guiData.hAxHistX], 'x');
-linkaxes([guiData.hAxScatter, guiData.hAxHistY], 'y');
 
 %% ========================================================================
 %  CONTROLS
@@ -457,6 +456,62 @@ onUpdatePlot(hContainer, []);
         xData = tbl.(xName);
         yData = tbl.(yName);
 
+        % --- Scales & Limits ---
+        scaleX = 'linear';
+        if get(data.ddXScale, 'Value') == 2, scaleX = 'log'; end
+
+        yScaleVal = get(data.ddYScale, 'Value');
+        isLinked  = (yScaleVal == 3);
+
+        if isLinked
+            scaleY = scaleX;
+        else
+            scaleY = 'linear';
+            if yScaleVal == 2, scaleY = 'log'; end
+        end
+
+        % Calculate Limits (for Bins)
+        xLim = calcLimits(xData, scaleX);
+        if xLim(1) >= xLim(2)
+            if strcmp(scaleX, 'log'), xLim = [xLim(1)/1.1, xLim(1)*1.1];
+            else,                     xLim = [xLim(1)-0.5, xLim(1)+0.5]; end
+        end
+
+        yLim = calcLimits(yData, scaleY);
+        if yLim(1) >= yLim(2)
+            if strcmp(scaleY, 'log'), yLim = [yLim(1)/1.1, yLim(1)*1.1];
+            else,                     yLim = [yLim(1)-0.5, yLim(1)+0.5]; end
+        end
+
+        if isLinked
+            jointMin = min(xLim(1), yLim(1));
+            jointMax = max(xLim(2), yLim(2));
+            xLim = [jointMin, jointMax];
+            yLim = [jointMin, jointMax];
+        end
+
+        % Calculate Global Bin Edges
+        nBins = 30;
+        if strcmp(scaleX, 'log')
+            % Ensure positive for log
+            if xLim(1) <= 0, xLim(1) = min(xData(xData>0)); if isempty(xLim(1)), xLim(1)=0.1; end; end
+            xEdges = logspace(log10(xLim(1)), log10(xLim(2)), nBins);
+        else
+            xEdges = linspace(xLim(1), xLim(2), nBins);
+        end
+
+        if strcmp(scaleY, 'log')
+            if yLim(1) <= 0, yLim(1) = min(yData(yData>0)); if isempty(yLim(1)), yLim(1)=0.1; end; end
+            yEdges = logspace(log10(yLim(1)), log10(yLim(2)), nBins);
+        else
+            yEdges = linspace(yLim(1), yLim(2), nBins);
+        end
+
+        % Set Axis Scales Immediately
+        set(data.hAxScatter, 'XScale', scaleX, 'YScale', scaleY);
+        set(data.hAxHistX,   'XScale', scaleX, 'YScale', 'linear');
+        set(data.hAxHistY,   'XScale', 'linear', 'YScale', scaleY);
+
         % --- Drawing ---
         cla(data.hAxScatter);
         cla(data.hAxHistX);
@@ -511,13 +566,10 @@ onUpdatePlot(hContainer, []);
                 'HitTest', 'off', 'PickableParts', 'none');
 
             % Histogram X
-            histogram(data.hAxHistX, xG, 30, 'FaceColor', cG, ...
-                'EdgeColor', 'none', 'Normalization', 'count', 'FaceAlpha', 0.5);
+            plot_histPdf(data.hAxHistX, xG, xEdges, cG, scaleX, 'vertical');
 
             % Histogram Y (Horizontal)
-            histogram(data.hAxHistY, yG, 30, 'FaceColor', cG, ...
-                'EdgeColor', 'none', 'Normalization', 'count', 'FaceAlpha', 0.5, ...
-                'Orientation', 'horizontal');
+            plot_histPdf(data.hAxHistY, yG, yEdges, cG, scaleY, 'horizontal');
         end
 
         % Labels & Aesthetics
@@ -528,37 +580,10 @@ onUpdatePlot(hContainer, []);
             legend(data.hAxScatter, 'Location', 'best', 'Interpreter', 'tex');
         end
 
-        % --- Scales & Limits ---
-        scaleX = 'linear';
-        if get(data.ddXScale, 'Value') == 2, scaleX = 'log'; end
-
-        yScaleVal = get(data.ddYScale, 'Value');
-        isLinked  = (yScaleVal == 3);
-
+        % Equality Line
         if isLinked
-            scaleY = scaleX;
-        else
-            scaleY = 'linear';
-            if yScaleVal == 2, scaleY = 'log'; end
-        end
-
-        set(data.hAxScatter, 'XScale', scaleX, 'YScale', scaleY);
-        set(data.hAxHistX,   'XScale', scaleX, 'YScale', 'linear');
-        set(data.hAxHistY,   'XScale', 'linear', 'YScale', scaleY);
-
-        % Limits Calculation
-        xLim = calcLimits(xData, scaleX);
-        yLim = calcLimits(yData, scaleY);
-
-        if isLinked
-            jointMin = min(xLim(1), yLim(1));
-            jointMax = max(xLim(2), yLim(2));
-            xLim = [jointMin, jointMax];
-            yLim = [jointMin, jointMax];
-
-            % Equality Line
-            lms = xLim; % Approximation, updated by loop below if needed
-            plot(data.hAxScatter, lms, lms, 'k--', 'LineWidth', 1, ...
+            % Re-plot equality line since we cleared axes
+            plot(data.hAxScatter, xLim, xLim, 'k--', 'LineWidth', 1, ...
                 'HitTest', 'off', 'PickableParts', 'none', 'HandleVisibility', 'off');
         end
 
@@ -572,7 +597,6 @@ onUpdatePlot(hContainer, []);
         data.hAxHistY.YAxis.Visible = 'off';
 
         linkaxes([data.hAxScatter, data.hAxHistX], 'x');
-        linkaxes([data.hAxScatter, data.hAxHistY], 'y');
 
         hold(data.hAxScatter, 'off');
         hold(data.hAxHistX, 'off');
@@ -888,6 +912,46 @@ onUpdatePlot(hContainer, []);
 
         data.hHighlight = data.hAxHighlight; % Fix naming
         hContainer.UserData = data;
+    end
+
+    function plot_histPdf(ax, val, edges, c, scale, orient)
+        % Helper to plot histogram with KDE overlay
+
+        % Filter data
+        val = val(~isnan(val) & ~isinf(val));
+        if isempty(val), return; end
+
+        % Histogram
+        histogram(ax, val, 'BinEdges', edges, 'FaceColor', c, ...
+            'EdgeColor', 'none', 'FaceAlpha', 0.2, 'Normalization', 'pdf', ...
+            'DisplayStyle', 'bar', 'Orientation', orient);
+
+        % KDE Overlay
+        if length(val) < 2, return; end
+
+        pts = linspace(min(edges), max(edges), 200);
+
+        if strcmp(scale, 'log')
+            val = val(val > 0);
+            if length(val) < 2, return; end
+
+            % Log-KDE: Estimate on log10(x), then transform PDF density back
+            [f_log, ~] = ksdensity(log10(val), log10(pts));
+            f = f_log ./ (pts * log(10));
+        else
+            % Linear-KDE
+            [f, ~] = ksdensity(val, pts);
+        end
+
+        % Check for NaNs
+        if all(isnan(f)), return; end
+
+        % Plot Curve
+        if strcmp(orient, 'vertical')
+            plot(ax, pts, f, 'Color', c, 'LineWidth', 2);
+        else
+            plot(ax, f, pts, 'Color', c, 'LineWidth', 2);
+        end
     end
 
 end

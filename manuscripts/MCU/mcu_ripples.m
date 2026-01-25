@@ -136,33 +136,64 @@ end
 
 
 %% ========================================================================
-%  LOAD TABLE
+%  RATE & DENSITY (STATE-DEPENDENT) 
 %  ========================================================================
 
-% RIPPLE SPIKES
 basepaths = [mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl')];
 nFiles = length(basepaths);
 
-presets = {'rippSpks', 'brst'};
-tbl = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
+% RIPPLE STATES
+presets = {'rippStates'};
+tblStates = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
 
-% Plot
-tblPlot = tbl(tbl.UnitType == 'RS', :);
-tblGUI_bar(tblPlot, 'xVar', 'Group', 'yVar', 'mrl');
-tblGUI_scatHist(tblPlot, 'xVar', 'rippMos', 'yVar', 'rippGain', 'grpVar', 'Group');
+% NREM Only
+tblPlot = tblStates(tblStates.State == 'NREM', :);
 
-tblPlot(tblPlot.Name == 'lh137', :) = [];
-tblPlot.Name = removecats(tblPlot.Name, {'lh137'});
+tblGUI_bar(tblPlot, 'xVar', 'Group', 'yVar', 'Density');
+tblGUI_scatHist(tblPlot, 'xVar', 'Density', 'yVar', 'Rate', 'grpVar', 'Group');
 
 % Run LME
-frml = 'funcon ~ Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblPlot, frml);
+frml = 'Density ~ (Duration + Rate) * Group + (1|Name)';
+[lmeMdl, lmeStates, lmeInfo] = lme_analyse(tblPlot, frml);
 
 
-% RIPPLE PARAMS
+
+%% ========================================================================
+%  RIPP SPIKES
+%  ========================================================================
+
+presets = {'rippSpks'};
+tbl = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
+
+% Select
+tblPlot = tbl(tbl.UnitType == 'RS', :);
+% tblPlot(tblPlot.Name == 'lh137', :) = [];
+% tblPlot.Name = removecats(tblPlot.Name, {'lh137'});
+
+% Plot
+tblGUI_bar(tblPlot, 'xVar', 'Group', 'yVar', 'rippZ');
+tblGUI_scatHist(tblPlot, 'xVar', 'bRoy', 'yVar', 'pFire', 'grpVar', 'Group');
+
+% LME
+frml = 'spkCount ~ Group + (1|Name)';
+[lmeMdl, lmeStates, lmeInfo] = lme_analyse(tblPlot, frml, 'dist', 'log-normal');
+
+% Summary
+tblSum = groupsummary(tblPlot, {'Group', 'Name'}, 'mean', ...
+    vartype("numeric"));
+
+
+%% ========================================================================
+%  RIPPLE PARAMS
+%  ========================================================================
 
 presets = {'ripp'};
-tblt = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
+tblRipp = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
+
+% Plot
+tblGUI_bar(tblRipp, 'xVar', 'Group', 'yVar', 'dur');
+tblGUI_scatHist(tblRipp, 'xVar', 'dur', 'yVar', 'peakAmp', 'grpVar', 'Group');
+
 
 % RIPPLE TRACES
 vars = {'rippMaps', 'rippPeth'};
@@ -173,7 +204,7 @@ tblMap = struct2table(rmfield(rippMaps, {'tstamps'}));
 tblVars = tblMap.Properties.VariableNames;
 tblVars = strcat('t_', tblVars);
 tblMap.Properties.VariableNames = tblVars;
-tblMap = [tblt, tblMap];
+tblMap = [tblRipp, tblMap];
 
 
 % Add PETH
@@ -185,19 +216,22 @@ tblMap.muPETH = squeeze(rippPeth.mu.ripp);
 % Plot
 tblGUI_xy(vt(1).rippPeth.su.tstamps, tblMap, 'yVar', 't_z', 'grpVar', 'states');
 
-% Plot
-tblGUI_bar(tblMap, 'xVar', 'Group', 'yVar', 'dur');
-tblGUI_scatHist(tblMap, 'xVar', 'dur', 'yVar', 'peakAmp', 'grpVar', 'Group');
 
 
-tblSum = groupsummary(tblt, {'Group', 'Name'}, 'mean', ...
+tblSum = groupsummary(tblRipp, {'Group', 'Name'}, 'mean', ...
     vartype("numeric"));
+
+
+% Prism
+tblSum = groupsummary(tblMap(:, {'Group', 't_lfp'}), {'Group'}, {'mean', 'std'}, ...
+    vartype("numeric"));
+tblSum.mean_t_lfp'
+
+repmat(tblSum.GroupCount(2), 127, 1)
 
 % Formula
 
-% Run LME
-frml = ['freq ~ Group + (1|Name)'];
-[lmeStats, lmeMdl] = lme_analyse(tblPlot, frml);
+
 
 
 
