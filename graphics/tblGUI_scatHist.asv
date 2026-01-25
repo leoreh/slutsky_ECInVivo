@@ -579,7 +579,7 @@ onUpdatePlot(hContainer, []);
             % Scatter Plot
             scatAlpha = data.defAlpha;
             if isDisc
-                scatAlpha = scatAlpha * 0.1;
+                scatAlpha = scatAlpha * 0.3;
                 szG = szG * 0.3;
             end
 

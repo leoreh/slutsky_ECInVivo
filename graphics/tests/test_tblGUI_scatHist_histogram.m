@@ -70,6 +70,45 @@ if isempty(hLinesY)
     error('KDE lines not found in Y axis');
 end
 
+% 4. Test Discretize Feature
+disp('Testing Discretize Feature...');
+% Enable Discretize
+set(data.chkDisc, 'Value', 1);
+% Trigger update
+cbk = get(data.chkDisc, 'Callback');
+cbk(data.chkDisc, []);
+
+% Check for ErrorBars
+hErr = findall(data.hAxScatter, 'Type', 'errorbar');
+if isempty(hErr)
+    error('ErrorBars not found after enabling Discretize');
+end
+fprintf('Found %d ErrorBar objects.\n', length(hErr));
+
+% Check Scatter Transparency
+hScat = findobj(data.hAxScatter, 'Type', 'scatter');
+if isempty(hScat), error('Scatter plot missing'); end
+
+% Scatter has Multiple objects (one per group), check first one
+alphaVal = hScat(1).MarkerFaceAlpha;
+% Original default is in data.defAlpha (0.6). We expect 0.6 * 0.3 = 0.18
+expectedAlpha = data.defAlpha * 0.3;
+if abs(alphaVal - expectedAlpha) > 0.05
+    error('Scatter Alpha %.2f does not match expected %.2f', alphaVal, expectedAlpha);
+end
+
+% 5. Test Deactivation (Cleanup)
+disp('Testing Deactivation (Cleanup)...');
+set(data.chkDisc, 'Value', 0);
+cbk(data.chkDisc, []);
+
+hErr = findall(data.hAxScatter, 'Type', 'errorbar');
+if ~isempty(hErr)
+    error('ErrorBars PERSISTED after disabling Discretize! Found %d.', length(hErr));
+else
+    disp('ErrorBars successfully removed.');
+end
+
 fprintf('Verification Passed!\n');
 close(hFig);
 end

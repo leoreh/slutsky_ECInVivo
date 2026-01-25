@@ -148,6 +148,7 @@ tblStates = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
 
 % NREM Only
 tblPlot = tblStates(tblStates.State == 'NREM', :);
+tblPlot = tblStates;
 
 tblGUI_bar(tblPlot, 'xVar', 'Group', 'yVar', 'Density');
 tblGUI_scatHist(tblPlot, 'xVar', 'Density', 'yVar', 'Rate', 'grpVar', 'Group');
@@ -192,8 +193,10 @@ tblRipp = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
 
 % Plot
 tblGUI_bar(tblRipp, 'xVar', 'Group', 'yVar', 'dur');
-tblGUI_scatHist(tblRipp, 'xVar', 'dur', 'yVar', 'peakAmp', 'grpVar', 'Group');
+tblGUI_scatHist(tblRipp, 'xVar', 'dur', 'yVar', 'amp', 'grpVar', 'Group');
 
+figure;
+histogram2(tblRipp.dur, tblRipp.amp)
 
 % RIPPLE TRACES
 vars = {'rippMaps', 'rippPeth'};
