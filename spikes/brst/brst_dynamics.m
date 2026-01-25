@@ -324,3 +324,64 @@ end
 %  values across the population while correctly identifying periods where
 %  the unit has dropped out of the bursting state.
 %  ========================================================================
+
+%% ========================================================================
+%  NOTE: STRUCTURAL (EVENT-BASED) VS. KINETIC (DENSITY) ANALYSIS
+%  ========================================================================
+%  Analyzing burst data requires choosing between two distinct methods:
+%  structural analysis, which focuses on individual events, and kinetic
+%  analysis, which focuses on continuous time-varying density. Choosing
+%  between them determines whether the resulting data reflects the physical
+%  shape of a burst or the prevailing state of the neuronal network over
+%  time.
+%
+%  STRUCTURAL ANALYSIS (EVENT-BASED)
+%  Structural analysis treats every detected burst as a single,
+%  equivalent data point regardless of when it occurs. This
+%  method is used to calculate the physical geometry of bursts, such as
+%  average duration, spikes per burst, and internal frequency.
+%  Because each event carries the same weight, this approach provides
+%  the most accurate measurement of how a burst is built.
+%
+%  * Measures physical burst shape.
+%  * Weights every burst equally.
+%  * Best for baseline characterization.
+%  * Ignores time between events.
+%
+%  KINETIC ANALYSIS (DENSITY-BASED)
+%  Kinetic analysis converts discrete bursts into a continuous time-series
+%  using Gaussian kernels and interpolation. This transforms
+%  burst events into a "state estimate" that exists for every time bin
+%  of the recording. This approach is necessary for comparing
+%  bursting behavior directly to firing rate recovery or other
+%  time-varying signals on a synchronized global grid.
+%
+%  * Measures time-varying network state.
+%  * Weights events by duration.
+%  * Synchronizes units across time.
+%  * Best for recovery modeling.
+%
+%  THE DURATION BIAS IN KINETIC METRICS
+%  A significant difference between these methods is how they handle
+%  burst length. Kinetic analysis samples property values from a
+%  continuous trace. A long burst occupies more time bins than
+%  a short burst, meaning it contributes more to the final average
+%  value. While this is helpful for measuring the "total
+%  impact" of bursting on a network, it is mathematically biased if the
+%  goal is to measure the average physical size of individual events.
+%
+%  * Long bursts dominate density.
+%  * Short bursts are diluted.
+%  * Creates time-weighted state estimates.
+%
+%  STATE MASKING AND SILENCE
+%  Kinetic analysis uses adaptive masking based on the Inter-Burst Interval
+%  (IBI) to handle periods where a unit stops bursting. If a unit is silent
+%  for longer than its expected interval, the density trace becomes NaN.
+%  This allows statistical models to identify that the bursting "state" has
+%  ended, whereas structural analysis simply runs out of events to average.
+%
+%  * Identifies burst-state dropout.
+%  * Prevents zero-duration artifacts.
+%  * Uses adaptive IBI percentiles.
+%  ========================================================================

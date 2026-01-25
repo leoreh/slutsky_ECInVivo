@@ -588,99 +588,14 @@ onUpdatePlot(hContainer, []);
                 'MarkerFaceAlpha', scatAlpha, ...
                 'HitTest', 'off', 'PickableParts', 'none');
 
-            % Binned Stats Calculation (Store for later)
+            % Binned Stats Calculation
             if isDisc
                 isAdapt = get(data.chkAdapt, 'Value');
-                if isAdapt
-                    % --- Adaptive Binning (Equal points per bin) ---
-                    % Calculate edges based on percentiles of THIS group's X data
-                    % We want nBins from 0 to 100 percentile
-                    pcts = linspace(0, 100, 16);
-                    edges = prctile(xG, pcts);
-                    edges = unique(edges); % Handle duplicate values
 
-                    if length(edges) >= 2 % Need at least one bin
-                        binIdx = discretize(xG, edges);
-                        validBins = ~isnan(binIdx);
+                sStruct = calcBinnedStats(xG, yG, cG, isAdapt, xEdges, scaleX);
 
-                        if any(validBins)
-                            xBins = binIdx(validBins);
-                            yVals = yG(validBins);
-                            xVals = xG(validBins); % Need X values for centers
-
-                            uBins = unique(xBins);
-                            numBins = length(uBins);
-
-                            bMeds = nan(1, numBins);
-                            bLow  = nan(1, numBins);
-                            bHigh = nan(1, numBins);
-                            bCenters = nan(1, numBins);
-
-                            for i = 1:numBins
-                                iB = uBins(i);
-                                inBin = (xBins == iB);
-                                if sum(inBin) >= 5
-                                    p = prctile(yVals(inBin), [10, 50, 90]);
-                                    bLow(i)   = p(1);
-                                    bMeds(i)  = p(2);
-                                    bHigh(i)  = p(3);
-                                    % Center is median X of points in bin
-                                    bCenters(i) = median(xVals(inBin), 'omitnan');
-                                end
-                            end
-
-                            % Prepare struct
-                            sStruct.centers = bCenters;
-                            sStruct.meds    = bMeds;
-                            sStruct.neg     = bMeds - bLow;
-                            sStruct.pos     = bHigh - bMeds;
-                            sStruct.color   = cG;
-                            statsData{end+1} = sStruct; %#ok<AGROW>
-                        end
-                    end
-
-                else
-                    % --- Fixed Binning (Uniform/Log) ---
-                    binIdx = discretize(xG, xEdges);
-                    validBins = ~isnan(binIdx);
-
-                    if any(validBins)
-                        % Calculate Centers
-                        if strcmp(scaleX, 'log')
-                            % Geometric Mean for Log
-                            logEdges = log10(xEdges);
-                            logCenters = (logEdges(1:end-1) + logEdges(2:end)) / 2;
-                            centers = 10.^logCenters;
-                        else
-                            centers = (xEdges(1:end-1) + xEdges(2:end)) / 2;
-                        end
-
-                        % Calculate Stats (10, 50, 90 Percentiles)
-                        xBins = binIdx(validBins);
-                        yVals = yG(validBins);
-
-                        bMeds = nan(size(centers));
-                        bLow  = nan(size(centers));
-                        bHigh = nan(size(centers));
-
-                        for iB = 1:length(centers)
-                            inBin = (xBins == iB);
-                            if sum(inBin) >= 5
-                                p = prctile(yVals(inBin), [10, 50, 90]);
-                                bLow(iB)   = p(1);
-                                bMeds(iB)  = p(2);
-                                bHigh(iB)  = p(3);
-                            end
-                        end
-
-                        % Store
-                        sStruct.centers = centers;
-                        sStruct.meds    = bMeds;
-                        sStruct.neg     = bMeds - bLow;
-                        sStruct.pos     = bHigh - bMeds;
-                        sStruct.color   = cG;
-                        statsData{end+1} = sStruct; %#ok<AGROW>
-                    end
+                if ~isempty(sStruct)
+                    statsData{end+1} = sStruct; %#ok<AGROW>
                 end
             end
 
@@ -763,7 +678,7 @@ onUpdatePlot(hContainer, []);
             v = vec(~isnan(vec) & ~isinf(vec));
             if isempty(v), lims = [0 1]; else, lims = [min(v), max(v)]; end
         end
-    end
+    end % EOF calcLimits
 
 % --- Helper: Apply Padding ---
     function applyPaddedLimits(ax, xL, yL, sX, sY)
@@ -785,7 +700,113 @@ onUpdatePlot(hContainer, []);
             span = diff(yL); if span==0, span=1; end
             ylim(ax, [yL(1) - 0.05*span, yL(2) + 0.05*span]);
         end
-    end
+    end % EOF applyPaddedLimits
+
+% --- Helper: Binned Stats Calculation ---
+    function sStruct = calcBinnedStats(xG, yG, cG, isAdapt, xEdges, scaleX)
+        % CALCBINNEDSTATS Calculates binned statistics (median, error bars).
+        %
+        %   Can use fixed edges (xEdges) or adaptive binning based on
+        %   percentiles.
+
+        sStruct = [];
+        if isempty(xG) || isempty(yG), return; end
+
+        % Data filtering
+        % We already filtered loop-wise, but good to be safe if reusing
+        valid = ~isnan(xG) & ~isnan(yG);
+        xG = xG(valid);
+        yG = yG(valid);
+        if isempty(xG), return; end
+
+        % 1. Strategy Setup
+        if isAdapt
+            % --- Adaptive: Edges based on quantiles ---
+            % 16 bins for adaptive (0:100 linspace)
+            pcts  = linspace(0, 100, 16);
+            edges = unique(prctile(xG, pcts));
+
+            if length(edges) < 2, return; end
+
+            % Discretize
+            binIdx = discretize(xG, edges);
+
+            % We will iterate over the bins that actually exist
+            uBins      = unique(binIdx(~isnan(binIdx)))';
+            nBinSlots  = length(uBins);
+
+            % For adaptive, we must calculate centers from data
+            useDataCtr = true;
+            preCenters = [];
+
+        else
+            % --- Fixed: Uniform/Log Edges ---
+            edges = xEdges;
+
+            % Discretize
+            binIdx = discretize(xG, edges);
+
+            % Pre-calculate centers
+            if strcmp(scaleX, 'log')
+                logEdges   = log10(edges);
+                logCenters = (logEdges(1:end-1) + logEdges(2:end)) / 2;
+                preCenters = 10.^logCenters;
+            else
+                preCenters = (edges(1:end-1) + edges(2:end)) / 2;
+            end
+
+            % We iterate over ALL defined bins for fixed timeline
+            uBins      = 1:length(preCenters);
+            nBinSlots  = length(uBins);
+            useDataCtr = false;
+        end
+
+        % 2. Calculate Stats Loop
+        bMeds = nan(1, nBinSlots);
+        bLow  = nan(1, nBinSlots);
+        bHigh = nan(1, nBinSlots);
+        bCtrs = nan(1, nBinSlots);
+
+        hasData = false;
+
+        for iB = 1:nBinSlots
+            currBinIdx = uBins(iB);
+
+            % Identify points in bin
+            inBin = (binIdx == currBinIdx);
+            nIn   = sum(inBin);
+
+            if nIn >= 5
+                hasData = true;
+
+                % Y-Stats
+                ySub = yG(inBin);
+                p    = prctile(ySub, [10, 50, 90]);
+
+                bLow(iB)  = p(1);
+                bMeds(iB) = p(2);
+                bHigh(iB) = p(3);
+
+                % X-Center
+                if useDataCtr
+                    xSub      = xG(inBin);
+                    bCtrs(iB) = median(xSub, 'omitnan');
+                else
+                    bCtrs(iB) = preCenters(currBinIdx);
+                end
+            end
+        end
+
+        % 3. Package Result
+        if hasData
+            sStruct.centers = bCtrs;
+            sStruct.meds    = bMeds;
+            sStruct.neg     = bMeds - bLow;
+            sStruct.pos     = bHigh - bMeds;
+            sStruct.color   = cG;
+        end
+
+    end % EOF calcBinnedStats
 
     function onSelectRegion(~, ~)
         % Polygon selection tool
