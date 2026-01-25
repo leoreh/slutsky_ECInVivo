@@ -60,7 +60,7 @@
 
 % Files
 basepaths = [mcu_basepaths('mea_bac'), mcu_basepaths('mea_mcuko')];
-vars = {'mea', 'fr', 'frFit'};
+vars = {'mea', 'fr', 'frFit', 'brst', 'rcv'};
 v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 nFiles = length(basepaths);
 
@@ -87,10 +87,10 @@ for iFile = 1 : nFiles
     spktimes = cellfun(@(x) x(x >= winExp(1) & x <= winExp(2)), ...
         spktimes, 'UniformOutput', false);
 
-    % Network stats
-    winLim  = [0, 45] * 60;
-    frNet = fr_network(spktimes, 'flgSave', true, 'winLim', winLim, ...
-        'winSize', 15 * 60);
+    % % Network stats
+    % winLim  = [0, 45] * 60;
+    % frNet = fr_network(spktimes, 'flgSave', true, 'winLim', winLim, ...
+    %     'winSize', 15 * 60);
     % drft = drift_file(spktimes, 'flgSave', false, 'winLim', winBsl, ...
     %     'binSize', 5 * 60, 'winSize', 20 * 60, 'flgPlot', true);
 
@@ -123,14 +123,16 @@ for iFile = 1 : nFiles
     %     'minIBI', 0.1, ...
     %     'flgForce', true, 'flgSave', true, 'flgPlot', false);
     % 
-    % % Burst temporal dynamics
-    % dyn = brst_dynamics(brst, spktimes, 'binSize', 60, 'ksd', 300, ...
-    %     'binSize', binSize, 'flgSave', true, 'flgPlot', false);
-    % 
-    % % Burst statistics
-    % winCalc = [rcv.info.winBsl; rcv.info.winTrough; rcv.info.winSs];
-    % stats = brst_stats(brst, spktimes, 'winCalc', winCalc, ...
-    %     'flgSave', true);
+    % Burst temporal dynamics
+    rcv = v(iFile).rcv;
+    brst = v(iFile).brst;
+    dyn = brst_dynamics(brst, spktimes, 'binSize', 60, 'ksd', 300, ...
+        'binSize', binSize, 'flgSave', true, 'flgPlot', false);
+
+    % Burst statistics
+    winCalc = [rcv.info.winBsl; rcv.info.winTrough; rcv.info.winSs];
+    stats = brst_stats(brst, spktimes, 'winCalc', winCalc, ...
+        'flgSave', true);
 
     % Tranfer function spikes to Ca2+
     % ca = spk2ca(spktimes, 'winCalc', [0, Inf], ...
@@ -144,7 +146,7 @@ end
 %  ========================================================================
 
 presets = {'time', 'steadyState', 'frNet', 'rcv', 'spktimes'};
-[tbl, xVec, basepaths, v] = mcu_tblMea('presets', presets([3]));
+[tbl, xVec, basepaths, v] = mcu_tblMea('presets', presets([1]));
 
 % Logit pBspk
 tbl = tbl_trans(tbl, 'varsInc', {'pBspk'}, 'logBase', 'logit');
@@ -162,8 +164,6 @@ tblGUI_scatHist(tbl, 'xVar', 'fr', 'yVar', 'pertDepth', 'grpVar', 'Group');
 tblGUI_bar(tbl, 'yVar', 'pBspk', 'xVar', 'Group');
 
 tblGUI_raster(tbl, 'grpVar', 'Name', 'grpVal', 'mcu-ko2')
-
-
 
 
 %% ========================================================================

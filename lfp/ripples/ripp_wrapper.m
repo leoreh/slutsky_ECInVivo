@@ -68,7 +68,7 @@ addParameter(p, 'thr', [1, 3.5, 2, 200, 50], @isnumeric);
 addParameter(p, 'limDur', [15, 300, 20, 10], @isnumeric);
 addParameter(p, 'win', [0, Inf], @isnumeric);
 addParameter(p, 'passband', [80 250], @isnumeric);
-addParameter(p, 'detectMet', 4, @isnumeric);
+addParameter(p, 'detectMet', 3, @isnumeric);
 addParameter(p, 'flgGui', false, @islogical);
 addParameter(p, 'flgPlot', true, @islogical);
 addParameter(p, 'flgSave', false, @islogical);
@@ -106,7 +106,7 @@ if verbose, fprintf('[RIPP]: Starting pipeline for %s...\n', basename); end
 if verbose, fprintf('[RIPP]: Loading data...\n'); end
 
 % Load Session & Data
-vars = {'session', 'spikes', 'spktimes', 'sleep_states'};
+vars = {'session', 'spikes', 'spktimes', 'sleep_states', 'brst'};
 v = basepaths2vars('basepaths', {basepath}, 'vars', vars);
 
 % Session Parameters
@@ -131,6 +131,7 @@ muTimes = {sort(vertcat(muTimes{:}))};
 spkTimes = v.spikes.times;
 spkTimes = cellfun(@(x) x - win(1), spkTimes, 'Uni', false);
 spkTimes = cellfun(@(x) x(x >= 0 & x <= sigDur), spkTimes, 'Uni', false);
+nUnits = length(spkTimes);
 
 % Prepare Bout Times (for State Analysis)
 try
@@ -181,7 +182,7 @@ end
 
 % Prepare Signals (Filter, Hilbert, Z-Score)
 rippSig = ripp_sigPrep(lfp, fs, ...
-    'detectMet', 3, 'passband', passband, ...
+    'detectMet', detectMet, 'passband', passband, ...
     'zMet', zMet, 'nremTimes', nremTimes);
 
 % EMG
@@ -267,7 +268,7 @@ ripp.spkGain = [(rippRates - mean(ctrlRates, 'all', 'omitnan')) ./ ...
 % Select "Good" Ripples by State AND Spike Gain
 nRipp = length(ripp.spkGain);
 if flgQA
-    idxState = ismember(v(iFile).rippStates.State, {'QWAKE', 'LSLEEP', 'NREM'});
+    idxState = ismember(ripp.state, {'QWAKE', 'LSLEEP', 'NREM'});
     idxGain = ripp.spkGain > 0;
     idxGood = idxState & idxGain;
 else
@@ -294,17 +295,17 @@ for iField = 1:length(fnames)
     end
 end
 
-% Re-Generate Control Intervals
-% Limit to the same states we kept (QWAKE, LSLEEP, NREM)
-ripp.ctrlTimes = ripp_ctrlTimes(ripp.times, ...
-    'vldTimes', vldTimes, ...
-    'flgPlot', false);
-
 
 %% ========================================================================
 %  STATES, PARAMS, MAPS
 %  ========================================================================
 if verbose, fprintf('[RIPP]: Generating Maps...\n'); end
+
+% Re-Generate Control Intervals
+% Limit to the same states we kept (QWAKE, LSLEEP, NREM)
+ripp.ctrlTimes = ripp_ctrlTimes(ripp.times, ...
+    'vldTimes', vldTimes, ...
+    'flgPlot', false);
 
 % States
 [ripp.state, ~] = ripp_states(ripp.times, ...
@@ -341,14 +342,43 @@ rippPeth.mu = ripp_spkPeth(muTimes, ripp.peakTime, ripp.ctrlTimes, ...
 if verbose, fprintf('[RIPP]: Spike Stats and LFP-Coupling...\n'); end
 
 % Firing Metrics
-rippSpks = ripp_spks(spkTimes, ...
+rippSpks.tot = ripp_spks(spkTimes, ...
     ripp.times, ...
     ripp.ctrlTimes, ...
-    'basepath', basepath, ...
     'flgSave', false);
 
+% Analyze single and burst FR metrics
+if ~isempty(v.brst)
+
+    % Prepare single and burst spktimes
+    brstTimes = v.brst.spktimes';
+    brstTimes = cellfun(@(x) x - win(1), brstTimes, 'Uni', false);
+    brstTimes = cellfun(@(x) x(x >= 0 & x <= sigDur), brstTimes, 'Uni', false);
+
+    singleTimes = cell(1, nUnits);
+    for iUnit = 1:nUnits
+        singleTimes{iUnit} = setdiff(spkTimes{iUnit}, brstTimes{iUnit});
+    end
+
+    % Run ripp_spks
+    rippSpks.burst = ripp_spks(brstTimes, ...
+        ripp.times, ...
+        ripp.ctrlTimes, ...
+        'flgSave', false);
+
+    % Analyze single and burst FR metrics
+    rippSpks.single = ripp_spks(singleTimes, ...
+        ripp.times, ...
+        ripp.ctrlTimes, ...
+        'flgSave', false);
+
+else
+    rippSpks.burst = [];
+    rippSpks.single = [];
+end
+
 % Add fracUnits to ripp struct
-ripp.fracUnits = rippSpks.fracUnits;
+ripp.fracUnits = rippSpks.tot.fracUnits;
 
 % SPK-LFP
 spkLfp = spklfp_phase(rippSig.filt, spkTimes, fs, ...
@@ -399,7 +429,7 @@ end
 % Plot spikes
 if flgPlot
     if verbose, fprintf('[RIPP]: Generating Summary Plot...\n'); end
-    ripp_plotSpks(rippSpks, rippPeth, ...
+    ripp_plotSpks(rippSpks.tot, rippPeth, ...
         'basepath', basepath, ...
         'flgSaveFig', true);
 end

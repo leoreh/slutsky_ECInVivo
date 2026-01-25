@@ -14,9 +14,9 @@ tblPlot = tbl;
 %  ========================================================================
 %  Cluster units into percentiles based on a specific variable
 
-varClu = 'fr';
-nClu   = 3;         % Number of clusters (percentiles)
-alpha  = 2;       % Scaling factor for percentile spacing
+varClu = 'pBspk';
+nClu   = 1;         % Number of clusters (percentiles)
+alpha  = 2;         % Scaling factor for percentile spacing
 
 % Initialize Cluster Label Column
 tblPlot.cluLbl = strings(height(tblPlot), 1);

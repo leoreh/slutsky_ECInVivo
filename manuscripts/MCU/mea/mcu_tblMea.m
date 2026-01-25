@@ -115,12 +115,15 @@ else
     varMap.uPert     = 'rcv.uPert';
 end
 
-varMap.bRate     = 'stats.rate';
+varMap.bRate     = 'stats.eventRate';
 varMap.bDur      = 'stats.dur';
 varMap.bFreq     = 'stats.freq';
 varMap.bIBI      = 'stats.ibi';
 varMap.pBspk     = 'stats.pBspk';
 varMap.nBspk     = 'stats.nBspk';
+varMap.frTot     = 'stats.frTot';
+varMap.frBspk    = 'stats.frBspk';
+varMap.frSspk    = 'stats.frSspk';
 
 % Spike Times
 % -----------
@@ -149,7 +152,7 @@ tbl = v2tbl('v', v, 'varMap', varMap, 'tagFiles', tagFiles, ...
 % ---------------------------------
 if ismember('steadyState', presets)
     mapSS = struct();
-    mapSS.ss_bRate = 'stats.rate';
+    mapSS.ss_bRate = 'stats.eventRate';
     mapSS.ss_bDur  = 'stats.dur';
     mapSS.ss_bFreq = 'stats.freq';
     mapSS.ss_bIBI  = 'stats.ibi';
@@ -171,12 +174,15 @@ if ismember('time', presets)
     % Create a map for alignment
     mapDyn = struct();
     mapDyn.t_fr    = 'fr.fr';
-    mapDyn.t_bRate = 'brstDyn.rate';
+    mapDyn.t_bRate = 'brstDyn.eventRate';
     mapDyn.t_bDur  = 'brstDyn.dur';
     mapDyn.t_bFreq = 'brstDyn.freq';
     mapDyn.t_bIBI  = 'brstDyn.ibi';
     mapDyn.t_pBspk = 'brstDyn.pBspk';
     mapDyn.t_nBspk = 'brstDyn.nBspk';
+    mapDyn.t_frTot = 'brstDyn.frTot';
+    mapDyn.t_frBspk = 'brstDyn.frBspk';
+    mapDyn.t_frSspk = 'brstDyn.frSspk';
 
     % Align dynamics
     [v, t] = mea_tAlign(v, mapDyn, 'fr.info.idxPert');

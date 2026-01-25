@@ -17,13 +17,16 @@ function stats = brst_stats(brst, spktimes, varargin)
 %   OUTPUTS:
 %       stats       - (struct) Burst statistics structure.
 %                     Fields are matrices of size [nUnits x nWin]:
-%                     .nb       : Number of bursts
-%                     .rate     : Burst rate (Hz) (Count / Window Duration)
-%                     .dur      : Mean burst duration (s)
-%                     .freq     : Mean intra-burst frequency (Hz)
-%                     .ibi      : Mean inter-burst interval (s)
-%                     .nBspk    : Mean spikes per burst
-%                     .pBspk    : Porbability of spikes in bursts (0-1)
+%                     .nb         : Number of bursts
+%                     .eventRate  : Burst event rate (Hz) (Count / Window Duration)
+%                     .frTot      : Total firing rate (Hz)
+%                     .frBspk     : Burst spike firing rate (Hz)
+%                     .frSspk     : Single spike firing rate (Hz)
+%                     .dur        : Mean burst duration (s)
+%                     .freq       : Mean intra-burst frequency (Hz)
+%                     .ibi        : Mean inter-burst interval (s)
+%                     .nBspk      : Mean spikes per burst
+%                     .pBspk      : Probability of spikes in bursts (0-1)
 %                     .winCalc  : The time windows used [nWin x 2]
 %
 %   NOTES:
@@ -67,13 +70,16 @@ end
 nWin = size(winCalc, 1);
 
 % Initialize Output Matrices [nUnits x nWin]
-stats.nb      = zeros(nUnits, nWin);
-stats.rate    = zeros(nUnits, nWin);
-stats.nBspk   = nan(nUnits, nWin);
-stats.dur = nan(nUnits, nWin);
-stats.freq    = nan(nUnits, nWin);
-stats.ibi     = nan(nUnits, nWin);
-stats.pBspk   = zeros(nUnits, nWin);
+stats.nb        = zeros(nUnits, nWin);
+stats.eventRate = zeros(nUnits, nWin);
+stats.frTot     = zeros(nUnits, nWin);
+stats.frBspk    = zeros(nUnits, nWin);
+stats.frSspk    = zeros(nUnits, nWin);
+stats.pBspk     = zeros(nUnits, nWin);
+stats.nBspk     = nan(nUnits, nWin);
+stats.dur       = nan(nUnits, nWin);
+stats.freq      = nan(nUnits, nWin);
+stats.ibi       = nan(nUnits, nWin);
 
 % Info
 stats.info.input   = p.Results;
@@ -111,10 +117,10 @@ for iUnit = 1:nUnits
             continue;
         end
 
-        % Count & Rate
+        % Count & Event Rate
         nb = sum(bIdx);
         stats.nb(iUnit, iWin) = nb;
-        stats.rate(iUnit, iWin) = nb / wDur;
+        stats.eventRate(iUnit, iWin) = nb / wDur;
 
         % Structural Means
         stats.nBspk(iUnit, iWin)   = mean(nBspk(bIdx));
@@ -122,17 +128,28 @@ for iUnit = 1:nUnits
         stats.freq(iUnit, iWin)    = mean(freq(bIdx));
         stats.ibi(iUnit, iWin)     = mean(ibi(bIdx), 'omitnan');
 
-        % Burst Spike Fraction
+        % Firing Rates & Partitioning
         % Spikes in window
         stIdx = (st >= wStart) & (st <= wEnd);
         nst = sum(stIdx);
 
+        frTot = nst / wDur;
+        stats.frTot(iUnit, iWin) = frTot;
+
         if nst > 0
             bSpks = sum(nBspk(bIdx));
-            stats.pBspk(iUnit, iWin) = bSpks / nst;
+            frBspk = bSpks / wDur;
+
+            stats.frBspk(iUnit, iWin) = frBspk;
+            stats.pBspk(iUnit, iWin)  = bSpks / nst;
         else
-            stats.pBspk(iUnit, iWin) = NaN;
+            frBspk = 0;
+            stats.frBspk(iUnit, iWin) = 0;
+            stats.pBspk(iUnit, iWin)  = NaN;
         end
+
+        % Single Spike Rate
+        stats.frSspk(iUnit, iWin) = frTot - frBspk;
 
     end
 end

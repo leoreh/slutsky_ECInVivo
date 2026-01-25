@@ -87,11 +87,11 @@ pFire    = mean(rippCounts > 0, 2, 'omitnan');
 
 % Modulation Metrics
 frZ = (frRipp - frRand) ./ sdRand;
-frZ(sdRand == 0) = NaN; % Avoid infs
+frZ(sdRand < eps) = NaN; % Avoid infs
 
 frSum = frRipp + frRand;
 frMod = (frRipp - frRand) ./ frSum;
-frMod(frSum == 0) = NaN;
+frMod(frSum < eps) = NaN;
 
 % Conditional Rate
 % Captures "Hypersynchrony" independent of "Reliability" (Intensity when

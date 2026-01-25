@@ -87,11 +87,11 @@ pFire    = mean(rippCounts > 0, 2, 'omitnan');
 
 % Modulation Metrics
 frZ = (frRipp - frRand) ./ sdRand;
-frZ(sdRand == 0) = NaN; % Avoid infs
+frZ(sdRand < eps) = NaN; % Avoid infs
 
 frSum = frRipp + frRand;
 frMod = (frRipp - frRand) ./ frSum;
-frMod(frSum == 0) = NaN;
+frMod(frSum < eps) = NaN;
 
 % Conditional Rate
 % Captures "Hypersynchrony" independent of "Reliability" (Intensity when
@@ -109,7 +109,7 @@ pVal = nan(nUnits, 1);
 flgPair = size(rippRates, 2) == size(ctrlRates, 2);
 
 % Pre-calculate nanflag to speed up loop skip
-goodIdx = ~all(isnan(rippRates), 2) & ~all(isnan(ctrlRates), 2);
+goodIdx = ~all(isnan(rippRates), 2) & sum(rippCounts, 2) > 0;
 
 for iUnit = 1:nUnits
     if ~goodIdx(iUnit), continue; end
@@ -189,7 +189,7 @@ scores = ones(size(ranks)) * 0.5;
 
 % Normalize Rank (0 to 1) -> Rank / Count
 partCounts = countsPerRipp(ic);
-scores = ranks ./ partCounts;
+scores(partCounts > 1) = (ranks(partCounts > 1) - 1) ./ (partCounts(partCounts > 1) - 1);
 
 % Aggregate per Unit
 rankMean = accumarray(partUnits, scores, [nUnits 1], @mean, NaN);

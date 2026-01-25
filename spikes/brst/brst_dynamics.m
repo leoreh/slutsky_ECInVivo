@@ -19,15 +19,16 @@ function dyn = brst_dynamics(brst, spktimes, varargin)
 %
 %   OUTPUTS:
 %       dyn         - (struct) Dynamics structure.
-%                     .time     : (1 x nTime) Time vector.
-%                     .rate     : (nUnits x nTime) Burst rate (Hz).
-%                     .pBspk    : (nUnits x nTime) Burst fraction.
-%                     .densSpk  : (nUnits x nTime) Spike Density (Firing Rate).
-%                     .densBrst : (nUnits x nTime) Burst Spike Density.
-%                     .dur      : (nUnits x nTime) Duration (s).
-%                     .nBspk    : (nUnits x nTime) Spikes per burst.
-%                     .freq     : (nUnits x nTime) Intra-burst freq (Hz).
-%                     .ibi      : (nUnits x nTime) Inter-burst interval (s).
+%                     .time       : (1 x nTime) Time vector.
+%                     .eventRate  : (nUnits x nTime) Burst event rate (Hz).
+%                     .frTot      : (nUnits x nTime) Total firing rate (Hz).
+%                     .frBspk     : (nUnits x nTime) Burst spike firing rate (Hz).
+%                     .frSspk     : (nUnits x nTime) Single spike firing rate (Hz).
+%                     .pBspk      : (nUnits x nTime) Burst fraction (0-1).
+%                     .dur        : (nUnits x nTime) Duration (s).
+%                     .nBspk      : (nUnits x nTime) Spikes per burst.
+%                     .freq       : (nUnits x nTime) Intra-burst freq (Hz).
+%                     .ibi        : (nUnits x nTime) Inter-burst interval (s).
 %
 %   NOTE:
 %   Properties (.dur, .nBspk, etc) are interpolated to the global time
@@ -76,25 +77,30 @@ tEdges = [t, chunks(end, 2)];     % Bin edges
 nBins = length(t);
 
 % Initialize Matrices (nUnits x nTime)
-dyn.time     = t;
-dyn.rate     = zeros(nUnits, nBins);
-dyn.pBspk    = zeros(nUnits, nBins);
-dyn.nBspk    = nan(nUnits, nBins);
-dyn.densSpk  = zeros(nUnits, nBins);
-dyn.densBrst = zeros(nUnits, nBins);
+dyn.time        = t;
+dyn.eventRate   = zeros(nUnits, nBins);
+dyn.frTot       = zeros(nUnits, nBins);
+dyn.frBspk      = zeros(nUnits, nBins);
+dyn.frSspk      = zeros(nUnits, nBins);
+dyn.pBspk       = zeros(nUnits, nBins);
+dyn.nBspk       = nan(nUnits, nBins);
+
 dyn.dur      = nan(nUnits, nBins);
 dyn.freq     = nan(nUnits, nBins);
 dyn.ibi      = nan(nUnits, nBins);
 
+% Kernel
+kRng = -3*ksd : binSize : 3*ksd;
+kd = normpdf(kRng, 0, ksd);
+kd = kd / sum(kd);
+
+% Edge Effect Correction Vector
+% Normalized kernel convolution with unity vector reveals boundary loss
+kCorr = conv(ones(1, nBins), kd, 'same');
 
 %% ========================================================================
 %  COMPUTE DYNAMICS
 %  ========================================================================
-
-% Create Gaussian Kernel
-kRng = -3*ksd : binSize : 3*ksd;
-kd = normpdf(kRng, 0, ksd);
-kd = kd / sum(kd);
 
 for iUnit = 1:nUnits
 
@@ -116,26 +122,46 @@ for iUnit = 1:nUnits
     % Density Estimation (Continuous)
     % ---------------------------------------------------------------------
 
-    % Burst Rate
+    % Burst Event Rate
     bStart = bTimes(:, 1);
     bCounts = histcounts(bStart, tEdges);
-    dyn.rate(iUnit, :) = conv(bCounts, kd, 'same') / binSize;
+    dyn.eventRate(iUnit, :) = (conv(bCounts, kd, 'same') ./ kCorr) / binSize;
 
-    % Burst Densities
+    % Burst Densities (Firing Rates)
     spkCounts = histcounts(st, tEdges);
-    densSpk = conv(spkCounts, kd, 'same') / binSize;
+    frTot = (conv(spkCounts, kd, 'same') ./ kCorr) / binSize;
 
     brstCounts = histcounts(bst, tEdges);
-    densBrst = conv(brstCounts, kd, 'same') / binSize;
+    frBspk = (conv(brstCounts, kd, 'same') ./ kCorr) / binSize;
 
-    dyn.densSpk(iUnit, :)  = densSpk;
-    dyn.densBrst(iUnit, :) = densBrst;
+    % Single Spike Density
+    frSspk = frTot - frBspk;
+
+    % Store
+    dyn.frTot(iUnit, :)  = frTot;
+    dyn.frBspk(iUnit, :) = frBspk;
+    dyn.frSspk(iUnit, :) = frSspk;
 
     % Probability of spikes in bursts
-    pBspk = zeros(size(densSpk));
-    mask = densSpk > 1e-6;
-    pBspk(mask) = densBrst(mask) ./ densSpk(mask);
+    pBspk = zeros(size(frTot));
+    mask = frTot > 1e-6;
+    pBspk(mask) = frBspk(mask) ./ frTot(mask);
     dyn.pBspk(iUnit, :) = pBspk;
+
+    % Validation
+    % frSspk + frBspk = frTot
+    if max(abs((frSspk + frBspk) - frTot)) > 1e-6
+        warning('brst_dynamics:ValidationFailed', ...
+            'Unit %d: frSspk + frBspk does not equal frTot', iUnit);
+    end
+
+    % frTot * (1 - pBspk) = frSspk
+    % (Only checking on mask where frTot > 0)
+    err = abs((frTot(mask) .* (1 - pBspk(mask))) - frSspk(mask));
+    if max(err) > 1e-6
+        warning('brst_dynamics:Validation2Failed', ...
+            'Unit %d: frTot * (1 - pBspk) != frSspk', iUnit);
+    end
 
 
     % ---------------------------------------------------------------------
@@ -168,7 +194,7 @@ end
 
 if flgPlot
     tbl = struct2table(rmfield(dyn, 'time'));
-    tblGUI_xy(dyn.time, tbl, 'yVar', 'rate');
+    tblGUI_xy(dyn.time, tbl, 'yVar', 'eventRate');
 end
 
 
@@ -323,6 +349,19 @@ end
 %  and subsequent masking then allow us to align these "active state"
 %  values across the population while correctly identifying periods where
 %  the unit has dropped out of the bursting state.
+%  ========================================================================
+%
+%  %% ========================================================================
+%  NOTE: EDGE EFFECT CORRECTION
+%  ========================================================================
+%  Convolution with a Gaussian kernel assumes zero-padding outside the
+%  signal boundaries. This causes rate estimates to artificially drop at
+%  the start and end of the recording because the kernel "sees" zeros where
+%  there is simply no data. To correct this, we calculate a normalization
+%  vector (kCorr) by convolving the kernel with a vector of ones. Dividing
+%  the raw convolution by this vector compensates for the missing mass at
+%  the edges, ensuring the rate estimate remains accurate throughout the
+%  entire timeline without altering the smoothed shape in the center.
 %  ========================================================================
 
 %% ========================================================================
