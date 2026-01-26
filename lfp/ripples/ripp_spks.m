@@ -18,27 +18,15 @@ function rippSpks = ripp_spks(spkTimes, rippTimes, ctrlTimes, varargin)
 %       varargin    - Parameter/Value pairs:
 %           'basepath' - (Char) Save location. (Default: pwd).
 %           'flgSave'  - (Log)  Save output? (Default: true).
+%           'peakTime' - (Vec)  [N x 1] Peak times of ripples [s].
+%           'unitType' - (Cat)  [N_units x 1] Categorical array of unit types.
 %
 %   OUTPUTS:
-%       rippSpks    - (Struct) Stats structure with [N_units x 1] fields:
-%           .frRipp    - Mean Firing Rate during Ripples (Hz).
-%           .frRand    - Mean Firing Rate during Control (Hz).
-%           .frZ       - Z-scored modulation ((Ripp - Ctrl) / StdCtrl).
-%           .frMod     - Modulation Index ((Ripp - Ctrl) / (Ripp + Ctrl)).
-%           .pVal      - P-value from significance test.
-%           .h0        - Boolean significance flag (p < 0.05).
-%           .pFire     - Probability of participation (fraction of ripples with spikes).
-%           .spkCount  - Mean number of spikes per ripple.
-%           .rankMean  - Mean normalized rank order (0=Leader, 1=Follower).
-%           .rankVar   - Variance of rank order.
-%           .frActive  - Mean firing rate during active ripples (Hypersynchrony).
-%           .fracUnits - (nRipples x 1) Fraction of units participating in each ripple.
-%
-%   DEPENDENCIES:
-%       times2rate.
+%       rippSpks    - (Struct) Stats structure with [N_units x 1] fields.
 %
 %   HISTORY:
-%       Updated: 23 Jan 2026
+%       Updated: 26 Jan 2026
+%
 
 % =========================================================================
 %  ARGUMENTS
@@ -49,10 +37,14 @@ addRequired(p, 'rippTimes', @isnumeric);
 addRequired(p, 'ctrlTimes', @isnumeric);
 addParameter(p, 'basepath', pwd, @ischar);
 addParameter(p, 'flgSave', true, @islogical);
+addParameter(p, 'peakTime', [], @isnumeric);
+addParameter(p, 'unitType', [], @(x) iscategorical(x) || iscell(x));
 parse(p, spkTimes, rippTimes, ctrlTimes, varargin{:});
 
-basepath = p.Results.basepath;
-flgSave = p.Results.flgSave;
+basepath  = p.Results.basepath;
+flgSave   = p.Results.flgSave;
+peakTime  = p.Results.peakTime;
+unitType  = p.Results.unitType;
 
 [~, basename] = fileparts(basepath);
 savefile = fullfile(basepath, [basename, '.rippSpks.mat']);
@@ -75,15 +67,14 @@ ctrlCounts = times2rate(spkTimes, 'winCalc', ctrlTimes, 'binsize', Inf, 'c2r', f
 rippRates = rippCounts ./ durRipp;
 ctrlRates = ctrlCounts ./ durCtrl;
 
-% METRICS
 % Mean Rates
 frRipp = mean(rippRates, 2, 'omitnan');
 frRand = mean(ctrlRates, 2, 'omitnan');
 sdRand = std(ctrlRates, [], 2, 'omitnan');
 
 % Spike Count Stats
-spkCount = mean(rippCounts, 2, 'omitnan');
-pFire    = mean(rippCounts > 0, 2, 'omitnan');
+cRipp = mean(rippCounts, 2, 'omitnan');
+pFire = mean(rippCounts > 0, 2, 'omitnan');
 
 % Modulation Metrics
 frZ = (frRipp - frRand) ./ sdRand;
@@ -93,16 +84,19 @@ frSum = frRipp + frRand;
 frMod = (frRipp - frRand) ./ frSum;
 frMod(frSum < eps) = NaN;
 
-% Conditional Rate
-% Captures "Hypersynchrony" independent of "Reliability" (Intensity when
-% Active). Essentially equal to frRipp ./ pFire.
+% Conditional Rate / Count (intensity when active).
+% Essentially equal to frRipp ./ pFire.
 % Prepare matrix with NaNs where rate is 0 (inactive)
 activeMat = rippRates;
 activeMat(activeMat == 0) = NaN;
 frActive = mean(activeMat, 2, 'omitnan');
 
+activeMat = rippCounts;
+activeMat(activeMat == 0) = NaN;
+cActive = mean(activeMat, 2, 'omitnan');
+
 % =========================================================================
-%  STATISTICAL SIGNIFICANCE
+%  STATISTICAL TEST
 % =========================================================================
 
 pVal = nan(nUnits, 1);
@@ -123,104 +117,180 @@ end
 h0 = pVal < 0.05;
 
 % =========================================================================
-%  RANK ORDER
+%  ASYMMETRY (PER UNIT)
 % =========================================================================
 
-% Flatten Spike Times for Vectorized Ops
-allSpks  = [];
-allUnits = [];
-for iUnit = 1:nUnits
-    if ~isempty(spkTimes{iUnit})
-        allSpks  = [allSpks; spkTimes{iUnit}(:)]; %#ok<AGROW>
-        allUnits = [allUnits; repmat(iUnit, length(spkTimes{iUnit}), 1)]; %#ok<AGROW>
+if ~isempty(peakTime)
+    % Define Intervals
+    timesMid = peakTime;
+    timesPre  = [rippTimes(:,1), timesMid];
+    timesPost = [timesMid, rippTimes(:,2)];
+
+    % Durations
+    durPre  = timesPre(:,2) - timesPre(:,1);
+    durPost = timesPost(:,2) - timesPost(:,1);
+
+    % Spike Counts (all units)
+    cPre  = times2rate(spkTimes, 'winCalc', timesPre, 'binsize', Inf, 'c2r', false);
+    cPost = times2rate(spkTimes, 'winCalc', timesPost, 'binsize', Inf, 'c2r', false);
+
+    % Rates
+    frPre  = sum(cPre, 2) ./ sum(durPre);
+    frPost = sum(cPost, 2) ./ sum(durPost);
+
+    % Asymmetry Index (Unit)
+    % (Pre - Post) / (Pre + Post)
+    frSum = frPre + frPost;
+    asym = (frPre - frPost) ./ frSum;
+    asym(frSum < eps) = NaN;
+else
+    frPre  = nan(nUnits, 1);
+    frPost = nan(nUnits, 1);
+    asym = nan(nUnits, 1);
+end
+
+% =========================================================================
+%  PER RIPPLE / UNITTYPE
+% =========================================================================
+
+% Initialize Output Containers
+rankMean   = nan(nUnits, 1);
+rankVar    = nan(nUnits, 1);
+timesFirst = cell(nUnits, 1);
+timesLate  = cell(nUnits, 1);
+
+% Prepare Iteration (Global vs Types)
+if isempty(unitType)
+    iterNames = {'Global'};
+    iterMasks = {true(nUnits, 1)};
+else
+    uTypes = unique(unitType);
+    uTypes(isundefined(uTypes)) = [];
+    uTypes(uTypes == 'Other') = [];
+
+    iterNames = cellstr(uTypes);
+    iterMasks = cell(length(uTypes), 1);
+    for iType = 1:length(uTypes)
+        iterMasks{iType} = unitType == uTypes(iType);
     end
 end
 
-% Map Spikes to Ripples
-% Create edges for discretize: [Start1, End1, Start2, End2, ...]
-rippEdges = reshape(rippTimes', [], 1);
-binIdx    = discretize(allSpks, rippEdges);
+% Initialize Events Structure
+rippSpks.events = struct();
 
-% Keep only spikes inside ripple intervals (odd bins)
-inRipp = mod(binIdx, 2) == 1;
+% Loop
+for iIter = 1:length(iterNames)
+    currName = iterNames{iIter};
+    currMask = iterMasks{iIter};
 
-relSpks  = allSpks(inRipp);
-relUnits = allUnits(inRipp);
-relRipp  = (binIdx(inRipp) + 1) / 2; % Convert bin index to Ripple ID
+    if sum(currMask) == 0, continue; end
 
-% Identify First Spike per Unit per Ripple
-% Sort by RippleID then Timestamp to ensure 'unique' picks the first one
-[~, sortIdx] = sortrows([relRipp, relSpks]);
-srtdRipp  = relRipp(sortIdx);
-srtdUnits = relUnits(sortIdx);
-srtdSpks  = relSpks(sortIdx);
+    % --- Rank & Timing ---
+    subSpks = spkTimes(currMask);
+    [subMean, subVar, subFirst, subLate] = ripp_rankOrder(subSpks, rippTimes);
 
-% Unique rows of [RippleID, UnitID] will return the first occurrence (lowest time)
-% because we just sorted by time.
-[~, firstIdx] = unique([srtdRipp, srtdUnits], 'rows', 'first');
+    % Fill Global Arrays
+    rankMean(currMask)   = subMean;
+    rankVar(currMask)    = subVar;
+    timesFirst(currMask) = subFirst;
+    timesLate(currMask)  = subLate;
 
-% Keep only first spikes
-partRipp  = srtdRipp(firstIdx);
-partUnits = srtdUnits(firstIdx);
-partTimes = srtdSpks(firstIdx);
+    % --- Population Stats (Per Ripple) ---
 
-% Calculate Ranks
-% Sort again by RippleID (primary) and Time (secondary) to establish rank
-[~, rankSortIdx] = sortrows([partRipp, partTimes]);
-partRipp  = partRipp(rankSortIdx);
-partUnits = partUnits(rankSortIdx);
+    % Counts for this subset
+    subCounts = rippCounts(currMask, :);
 
-% Get number of participants per ripple
-[~, ~, ic] = unique(partRipp);
-countsPerRipp = accumarray(ic, 1);
+    % Fraction Participation
+    % (Active Units in Group / Total Units in Group)
+    nActive = sum(subCounts > 0, 1); % [1 x nRipp]
+    nTotal  = sum(currMask);
+    currFrac = (nActive ./ nTotal)';
 
-% Calculate Rank (1-based index within each ripple group)
-% Find start index of each ripple group in the sorted list
-[~, grpStartIdx] = unique(partRipp, 'first');
+    % Asymmetry (Per Ripple)
+    currAsym = nan(1, size(rippTimes, 1));
+    if ~isempty(peakTime)
+        subPre  = cPre(currMask, :);
+        subPost = cPost(currMask, :);
 
-% Expand group start index to every element
-startIndices = grpStartIdx(ic);
+        ratePre  = sum(subPre, 1) ./ durPre';
+        ratePost = sum(subPost, 1) ./ durPost';
 
-% Rank = current_index - start_index + 1
-ranks = (1:length(partRipp))' - startIndices + 1;
+        frSum = ratePre + ratePost;
+        currAsym = (ratePre - ratePost) ./ frSum;
+        currAsym(frSum < eps) = NaN;
+    end
 
-% Default to 0.5 (neutral) for single-participant ripples to avoid NaN
-scores = ones(size(ranks)) * 0.5;
+    % --- Store Results ---
+    fn = matlab.lang.makeValidName(currName);
+    rippSpks.events.(fn).frac = currFrac;
+    rippSpks.events.(fn).asym = currAsym';
+end
 
-% Normalize Rank (0 to 1) -> Rank / Count
-partCounts = countsPerRipp(ic);
-scores(partCounts > 1) = (ranks(partCounts > 1) - 1) ./ (partCounts(partCounts > 1) - 1);
 
-% Aggregate per Unit
-rankMean = accumarray(partUnits, scores, [nUnits 1], @mean, NaN);
-rankVar  = accumarray(partUnits, scores, [nUnits 1], @var,  NaN);
+% =========================================================================
+%  CENTER OF MASS (COM)
+% =========================================================================
+% Average time of spikes relative to ripple peak (within +/- 30 ms)
 
-% Fraction of Units Participating per Ripple
-nRipp = size(rippTimes, 1);
-countsAllRipp = accumarray(partRipp, 1, [nRipp 1]);
-fracUnits = countsAllRipp / nUnits;
+com = nan(nUnits, 1);
+winCOM = 0.030; 
+
+if ~isempty(peakTime) 
+
+    peakTime = peakTime(:);
+    nRipp = length(peakTime);
+
+    for iUnit = 1:nUnits
+        uSpks = spkTimes{iUnit};
+        if isempty(uSpks), continue; end
+
+        % Find index of nearest peak for each spike
+        % We use interp1 with 'nearest' to map spike times to the "index" of the peak
+        idx = interp1(peakTime, 1:nRipp, uSpks, 'nearest', 'extrap');
+        nearestPeaks = peakTime(idx);
+        relTime = uSpks - nearestPeaks;
+
+        % Filter by Window
+        isValid = abs(relTime) <= winCOM;
+
+        % Calculate Mean
+        if any(isValid)
+            com(iUnit) = mean(relTime(isValid)) * 1000;     % (ms)
+        end
+    end
+end
+
 
 % =========================================================================
 %  OUTPUT & SAVE
 % =========================================================================
 
 % Pack results
+rippSpks.cRipp     = cRipp;
 rippSpks.frRipp    = frRipp;
 rippSpks.frRand    = frRand;
 rippSpks.frZ       = frZ;
 rippSpks.frMod     = frMod;
-rippSpks.spkCount  = spkCount;
 rippSpks.pFire     = pFire;
+rippSpks.frActive  = frActive;
+rippSpks.cActive   = cActive;
 rippSpks.pVal      = pVal;
-rippSpks.h0    = h0;
+rippSpks.h0        = h0;
 rippSpks.rankMean  = rankMean;
 rippSpks.rankVar   = rankVar;
-rippSpks.frActive  = frActive;
-rippSpks.fracUnits = fracUnits;
+rippSpks.com       = com;
 
+rippSpks.frPre    = frPre;
+rippSpks.frPost   = frPost;
+rippSpks.asym = asym;
 
+% Export Times
+rippSpks.times.first = timesFirst;
+rippSpks.times.late  = timesLate;
+
+% Save
 if flgSave
     save(savefile, 'rippSpks', '-v7.3');
 end
 
-end
+end     % EOF

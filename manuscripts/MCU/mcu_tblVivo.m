@@ -1,4 +1,4 @@
-function [tbl, basepaths, v] = mcu_tblVivo(varargin)
+function [tbl, basepaths, v, xVec] = mcu_tblVivo(varargin)
 
 % MCU_TBLVIVO Loads and processes unit data for the MCU project.
 %
@@ -32,6 +32,8 @@ varMap    = p.Results.varMap;
 flgClean  = p.Results.flgClean;
 presets   = p.Results.presets;
 
+% Output
+xVec = [];
 
 %% ========================================================================
 %  LOAD DATA
@@ -80,19 +82,26 @@ end
 
 if ismember('rippSpks', presets)
     vars = [vars, 'rippSpks', 'rippSpkLfp'];
-    varMap.rippZ = 'rippSpks.frZ';
-    varMap.rippMod = 'rippSpks.frMod';
-    varMap.pFire = 'rippSpks.pFire';
-    varMap.spkCount = 'rippSpks.spkCount';
-    varMap.rankMean = 'rippSpks.rankMean';
-    varMap.rankVar = 'rippSpks.rankVar';
-    varMap.frActive = 'rippSpks.frActive';
+    spkType = 'all';
+    varMap.frRipp = ['rippSpks.', spkType, '.frRipp'];
+    varMap.frRand = ['rippSpks.', spkType, '.frRand'];
+    varMap.frZ = ['rippSpks.', spkType, '.frZ'];
+    varMap.frMod = ['rippSpks.', spkType, '.frMod'];
+    varMap.pFire = ['rippSpks.', spkType, '.pFire'];
+    varMap.cRipp = ['rippSpks.', spkType, '.cRipp'];
+    varMap.rankMean = ['rippSpks.', spkType, '.rankMean'];
+    varMap.rankVar = ['rippSpks.', spkType, '.rankVar'];
+    varMap.frActive = ['rippSpks.', spkType, '.frActive'];
+    varMap.cActive = ['rippSpks.', spkType, '.cActive'];
+    varMap.frPre = ['rippSpks.', spkType, '.frPre'];
+    varMap.frPost = ['rippSpks.', spkType, '.frPost'];
+    varMap.asym = ['rippSpks.', spkType, '.asym'];
+    varMap.com = ['rippSpks.', spkType, '.com'];
 
-    varMap.rippTheta = 'spkLfp.theta';
-    varMap.rippMrl = 'spkLfp.mrl';
-    varMap.ppc0 = 'spkLfp.ppc0';
-    varMap.ppc1 = 'spkLfp.ppc1';
-    varMap.ppc2 = 'spkLfp.ppc2';
+    phaseType = 'all';
+    varMap.theta = ['spkLfp.', phaseType, '.theta'];
+    varMap.mrl = ['spkLfp.', phaseType, '.mrl'];
+    varMap.ppc = ['spkLfp.', phaseType, '.ppc1'];
 end
 
 if ismember('ripp', presets)
@@ -104,7 +113,10 @@ if ismember('ripp', presets)
     varMap.energy       = 'ripp.energy';
     varMap.state        = 'ripp.state';
     varMap.spkGain      = 'ripp.spkGain';
-    varMap.fracUnits    = 'ripp.fracUnits';
+    varMap.fracRS       = 'ripp.fracRS';
+    varMap.fracFS       = 'ripp.fracFS';
+    varMap.asymRS       = 'ripp.asymRS';
+    varMap.asymFS       = 'ripp.asymFS';
 end
 
 if ismember('rippMaps', presets)
@@ -124,6 +136,13 @@ if ismember('rippStates', presets)
     varMap.Density      = 'rippStates.Density';
     varMap.Duration     = 'rippStates.Duration';
     varMap.State        = 'rippStates.State';
+end
+
+if ismember('rippPeth', presets)
+    vars = {'units', 'rippPeth'};
+    varMap = struct();
+    varMap.UnitType = 'units.type';
+    varMap.pethSU = 'rippPeth.pethSU';
 end
 
 % Load
@@ -169,6 +188,14 @@ if ismember('rippStates', presets)
         badIdx = ismember(v(iFile).rippStates.State, {'WAKE', 'N/REM', 'REM'});
         v(iFile).rippStates(badIdx, :) = [];
     end
+end
+
+% Post-process ripp peth
+if ismember('rippPeth', presets) 
+    for iFile = 1:length(v)
+        v(iFile).rippPeth.pethSU = squeeze(mean(v(iFile).rippPeth.su.ripp, 2, 'omitnan'));
+    end
+    xVec = v(iFile).rippPeth.su.tstamps;
 end
 
 

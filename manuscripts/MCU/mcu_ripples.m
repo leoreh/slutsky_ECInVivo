@@ -1,110 +1,104 @@
 
 
-
-
 %% ========================================================================
-%  SPKLFP
+%  RE-ANALYSE SPECIFIC STEPS
 %  ========================================================================
 
-% run the analysis on multiple sessions
-% -------------------------------------------------------------------------
-% basepaths = mcu_basepaths('all');
 basepaths = [mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl')];
 nFiles = length(basepaths);
 
-% Load vars
-vars = {'session', 'spikes', 'ripp', 'rippMaps'};
-
+% Load Session & Data
+vars = {'session', 'spikes', 'brst', 'ripp', 'units'};
 v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 
-win = [0 4] * 3600;
-passband = [80, 250];
-
-clear phaseCell
+clear rippSpks
 for iFile = 1 : nFiles
-    
-    tic
 
     basepath = basepaths{iFile};
     cd(basepath)
     [~, basename] = fileparts(basepath);
     
-    if isinf(win(2))
-        sigDur = Inf;
-    else
-        sigDur = win(2) - win(1);
-    end
-
-    % Prep SU spktimes
-    spkTimes = v(iFile).spikes.times;
-    spkTimes = cellfun(@(x) x - win(1), spkTimes, 'Uni', false);
-    spkTimes = cellfun(@(x) x(x >= 0 & x <= sigDur), spkTimes, 'Uni', false);
-
-    % Prep rippTimes
     ripp = v(iFile).ripp;
-    rippTimes = ripp.times;
+    uType = v(iFile).units.type;
 
-    ampIdx = ripp.amp > 150;
-    durIdx = ripp.dur > 80;
-    goodIdx = ripp.goodIdx;
-    stateIdx = ripp.state == 'QWAKE' | ripp.state == 'LSLEEP' | ripp.state == 'NREM';
-    goodIdx = stateIdx;
-    
-    rippTimes = v(iFile).ripp.times(goodIdx, :);
-    rippTimes = rippTimes - win(1);
-    rippTimes = rippTimes(rippTimes(:,2) > 0 & rippTimes(:,1) < sigDur, :);
+    % Session Parameters
+    session = v(iFile).session;
+    fs      = session.extracellular.srLfp;
+    fsSpk   = session.extracellular.sr;
+    nchans  = session.extracellular.nChannels;
 
-    % Session params
-    fs = v(iFile).session.extracellular.srLfp;
-    fsSpk = v(iFile).session.extracellular.sr;
-    nchans = v(iFile).session.extracellular.nChannels;
-    
-    % Ripple channel in LFP
-    if isfield(v(iFile).session.channelTags, 'Ripple')
-        rippCh = v(iFile).session.channelTags.Ripple;
-    else
-        rippCh = 1;
-    end
+    % Prepare Single-Unit (SU) Spike Times
+    spkTimes = v(iFile).spikes.times;
+    nUnits = length(spkTimes);
 
-    % Handle bit2uv
-    if round(fsSpk) == 24414
-        bit2uv = 1;
-    else
-        bit2uv = 0.195;
-    end
+    % Firing Metrics
+    rippSpks.all = ripp_spks(spkTimes, ...
+        ripp.times, ...
+        ripp.ctrlTimes, ...
+        'peakTime', ripp.peakTime, ...
+        'unitType', uType, ...
+        'flgSave', false);
 
-    % LFP
-    fname = fullfile(basepath, [basename, '.lfp']);
-    lfp = binary_load(fname, 'duration', sigDur, 'fs', fs, 'nCh', nchans,...
-        'start', win(1), 'ch', rippCh, 'downsample', 1, 'bit2uv', bit2uv);
-    if size(lfp, 2) > 1
-        lfp = mean(lfp, 2);
-    end
-    
-    % Filter
-    filt = filterLFP(lfp, 'fs', fs, 'type', 'butter', 'dataOnly', true,...
-    'order', 5, 'passband', passband, 'graphics', false);
+    % Add per ripple spike metrics to ripp struct
+    ripp.fracRS = rippSpks.all.events.RS.frac;
+    ripp.asymRS = rippSpks.all.events.RS.asym;
+    ripp.fracFS = rippSpks.all.events.FS.frac;
+    ripp.asymFS = rippSpks.all.events.FS.asym;
 
-    phaseCell(iFile) = spklfp_phase(filt, spkTimes, fs, ...
-        'lfpTimes', rippTimes, ...
-        'nPerms', 0);
-    toc
-    iFile
+    % % Prepare single and burst spktimes
+    % brstTimes = v(iFile).brst.spktimes';   
+    % singleTimes = cell(1, nUnits);
+    % for iUnit = 1:nUnits
+    %     singleTimes{iUnit} = setdiff(spkTimes{iUnit}, brstTimes{iUnit});
+    % end
+    % 
+    % % Run ripp_spks
+    % rippSpks.burst = ripp_spks(brstTimes, ...
+    %     ripp.times, ...
+    %     ripp.ctrlTimes, ...
+    %     'flgSave', false);
+    % 
+    % % Analyze single and burst FR metrics
+    % rippSpks.single = ripp_spks(singleTimes, ...
+    %     ripp.times, ...
+    %     ripp.ctrlTimes, ...
+    %     'flgSave', false);
+    % 
+    % % Firing Metrics (Split Halves)
+    % % First Half (Start to Peak) vs Second Half (Peak to End)
+    % % rMid = mean(ripp.times, 2);
+    % rMid = ripp.peakTime;
+    % rt1  = [ripp.times(:,1), rMid];
+    % rt2 = [rMid, ripp.times(:,2)];
+    % 
+    % % Control Halves (Split by Midpoint)
+    % cMid = mean(ripp.ctrlTimes, 2);
+    % ct1  = [ripp.ctrlTimes(:,1), cMid];
+    % ct2 = [cMid, ripp.ctrlTimes(:,2)];
+    % 
+    % rippSpks.first = ripp_spks(spkTimes, rt1, ct1, 'flgSave', false);
+    % rippSpks.second = ripp_spks(spkTimes, rt2, ct2, 'flgSave', false);
+
+    % Save
+    rippSpksFile = fullfile(basepath, [basename, '.rippSpks.mat']);
+    rippFile = fullfile(basepath, [basename, '.ripp.mat']);
+    save(rippSpksFile, 'rippSpks', '-v7.3');
+    save(rippFile, 'ripp', '-v7.3');
+
 end
 
-phase = catfields([phaseCell(:)], 2);
 
-
-funcon = [];
-for iFile = 1 : nFiles
-    basepath = basepaths{iFile};
-    cd(basepath)
-    [~, basename] = fileparts(basepath);
-
-    load([basename, '.rippSpks.mat'])
-    cc = fr_corr(rippSpks.su.rippRates, 'nShuffles', 50, 'flgPlot', false);
-    funcon = [funcon; cc.shuffle.funcon];
-end
+% 
+% funcon = [];
+% for iFile = 1 : nFiles
+%     basepath = basepaths{iFile};
+%     cd(basepath)
+%     [~, basename] = fileparts(basepath);
+% 
+%     load([basename, '.rippSpks.mat'])
+%     cc = fr_corr(rippSpks.su.rippRates, 'nShuffles', 50, 'flgPlot', false);
+%     funcon = [funcon; cc.shuffle.funcon];
+% end
 
 
 
@@ -125,10 +119,10 @@ for iFile = 1 : nFiles
     [~, basename] = fileparts(basepath);
     tic
     ripp = ripp_wrapper('basepath', pwd, ...
-        'win', [0 2] * 3600, ...
+        'win', [0 12] * 3600, ...
         'rippCh', [], ...
         'flgPlot', false, ...
-        'flgSave', false);
+        'flgSave', true);
     toc
 end
 
@@ -136,7 +130,7 @@ end
 
 
 %% ========================================================================
-%  RATE & DENSITY (STATE-DEPENDENT) 
+%  RATE & DENSITY (STATE-DEPENDENT)
 %  ========================================================================
 
 basepaths = [mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl')];
@@ -167,21 +161,40 @@ presets = {'rippSpks'};
 tbl = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
 
 % Select
+tblPlot = tbl;
 tblPlot = tbl(tbl.UnitType == 'RS', :);
 % tblPlot(tblPlot.Name == 'lh137', :) = [];
 % tblPlot.Name = removecats(tblPlot.Name, {'lh137'});
 
 % Plot
-tblGUI_bar(tblPlot, 'xVar', 'Group', 'yVar', 'rippZ');
+tblGUI_bar(tblPlot, 'xVar', 'Group', 'yVar', 'frZ');
 tblGUI_scatHist(tblPlot, 'xVar', 'bRoy', 'yVar', 'pFire', 'grpVar', 'Group');
 
 % LME
-frml = 'spkCount ~ Group + (1|Name)';
-[lmeMdl, lmeStates, lmeInfo] = lme_analyse(tblPlot, frml, 'dist', 'log-normal');
+frml = 'asymmetry ~ Group * bRoy + (1|Name)';
+[lmeMdl, lmeStates, lmeInfo] = lme_analyse(tblPlot, frml);
 
 % Summary
 tblSum = groupsummary(tblPlot, {'Group', 'Name'}, 'mean', ...
     vartype("numeric"));
+
+
+%% ========================================================================
+%  RIPP PETH
+%  ========================================================================
+
+presets = {'rippPeth'};
+[tbl, ~, ~, xVec] = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
+
+% Select
+tblPlot = tbl;
+tblPlot = tbl(tbl.UnitType == 'RS', :);
+% tblPlot(tblPlot.Name == 'lh137', :) = [];
+% tblPlot.Name = removecats(tblPlot.Name, {'lh137'});
+
+% Plot
+tblGUI_xy(xVec, tblPlot);
+
 
 
 %% ========================================================================
@@ -195,9 +208,6 @@ tblRipp = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
 tblGUI_bar(tblRipp, 'xVar', 'Group', 'yVar', 'dur');
 tblGUI_scatHist(tblRipp, 'xVar', 'dur', 'yVar', 'amp', 'grpVar', 'Group');
 
-figure;
-histogram2(tblRipp.dur, tblRipp.amp)
-
 % RIPPLE TRACES
 vars = {'rippMaps', 'rippPeth'};
 vt = basepaths2vars('basepaths', basepaths, 'vars', vars);
@@ -209,30 +219,24 @@ tblVars = strcat('t_', tblVars);
 tblMap.Properties.VariableNames = tblVars;
 tblMap = [tblRipp, tblMap];
 
-
 % Add PETH
 rippPeth = catfields([vt(:).rippPeth], 2);
 tblMap.suPETH = squeeze(mean(rippPeth.su.ripp, 1, 'omitnan'));
 tblMap.muPETH = squeeze(rippPeth.mu.ripp);
 
-
 % Plot
 tblGUI_xy(vt(1).rippPeth.su.tstamps, tblMap, 'yVar', 't_z', 'grpVar', 'states');
 
-
-
+% Summary
 tblSum = groupsummary(tblRipp, {'Group', 'Name'}, 'mean', ...
     vartype("numeric"));
-
 
 % Prism
 tblSum = groupsummary(tblMap(:, {'Group', 't_lfp'}), {'Group'}, {'mean', 'std'}, ...
     vartype("numeric"));
-tblSum.mean_t_lfp'
-
+tblSum.mean_t_lfp';
 repmat(tblSum.GroupCount(2), 127, 1)
 
-% Formula
 
 
 
@@ -242,352 +246,12 @@ repmat(tblSum.GroupCount(2), 127, 1)
 %  LOAD RIPP STRUCTS
 %  ========================================================================
 
+vars = {'rippPeth'};
+vt = basepaths2vars('basepaths', basepaths, 'vars', vars);
+
 grps = {'wt_bsl_ripp'; 'mcu_bsl'};
 vars = {'ripp', 'units', 'session'};
-for iGrp = 1 : length(grps)
-    basepaths = mcu_basepaths(grps{iGrp});
-    vRipp{iGrp} = basepaths2vars('basepaths', basepaths, 'vars', vars);
-end
 
-
-%% ========================================================================
-%  RIPPLE PARAMETERS (Per Ripple)
-%  ========================================================================
-
-% Organize data table
-cfg = mcu_cfg();
-clear varMap
-varMap.peakFreq = 'peakFreq';
-varMap.peakAmp = 'peakAmp';
-varMap.dur = 'dur';
-varMap.peakFilt = 'peakFilt';
-varMap.peakPower = 'peakPower';
-varMap.peakEnergy = 'peakEnergy';
-varMap.peakRng = 'peakRng';
-varMap.idxNREM = 'states.idx';
-
-for iGrp = 1 : length(grps)
-    basepaths = mcu_basepaths(grps{iGrp});
-
-    % Prepare tag structures for this mouse
-    tagAll.Group = cfg.lbl.grp{iGrp};
-    tagFiles.Name = get_mname(basepaths);
-
-    % Create table
-    tblCell{iGrp} = v2tbl('v', [vRipp{iGrp}(:).ripp], 'varMap', varMap, ...
-        'tagFiles', tagFiles, 'tagAll', tagAll, 'idxCol', 4);
-end
-% Combine all tables, clean and organize
-tblLme = vertcat(tblCell{:});
-tblLme = rmmissing(tblLme);
-tblLme.Group = reordercats(tblLme.Group, cfg.lbl.grp);
-
-% Hard code exclusion of weak ripples, validated by manual inspection
-idxBad = tblLme.peakAmp <= 8;
-tblLme(idxBad, :) = [];
-
-% Include only ripples that occured during NREM
-idxBad = tblLme.idxNREM == 0;
-tblLme(idxBad, :) = [];
-
-% Plot
-hFig = tblGUI_scatHist(tblLme);
-
-% -------------------------------------------------------------------------
-
-% Variables
-lblY = {'Peak Frequency (Hz)', 'Peak Amplitude (µV)', 'Duration (ms)',...
-    'Peak Energy (µV²)'};
-varRsp = {'peakFreq', 'peakAmp', 'dur', 'peakEnergy', 'Rate'};
-idxVar = 3;
-
-% Run LME
-frml = [varRsp{idxVar}, ' ~ Group + (1|Name)'];
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLme, frml);
-
-% Plot
-tblGUI_bar(tblLme, 'yVar', varRsp{idxVar});
-tblGUI_scatHist(tblLme, 'xVar', 'peakEnergy', 'yVar', 'Duration', 'grpVar', 'Group');
-
-
-% Prism
-[prismMat] = tbl2prism(tblLme, 'yVar', varRsp{idxVar});
-
-
-%% ========================================================================
-%  RIPPLE RATE / DENSITY (Per NREM Bout)
-%  ========================================================================
-
-% Pre-process: extract NREM rate (state 4) to a dedicated field
-for iGrp = 1:length(v)
-    for iFile = 1:length(v{iGrp})
-        % Check if states analysis exists and has NREM (state 4)
-        v{iGrp}(iFile).ripp.rateNrem = v{iGrp}(iFile).ripp.states.rate{4};
-        v{iGrp}(iFile).ripp.densNrem = v{iGrp}(iFile).ripp.states.density{4};
-    end
-end
-
-% Organize table
-cfg = mcu_cfg();
-clear varMap
-varMap.Rate = 'rateNrem';
-varMap.Density = 'densNrem';
-
-for iGrp = 1 : length(grps)
-    basepaths = mcu_basepaths(grps{iGrp});
-
-    % Prepare tag structures for this mouse
-    tagAll.Group = cfg.lbl.grp{iGrp};
-    tagFiles.Name = get_mname(basepaths);
-
-    % Create table
-    tblCell{iGrp} = v2tbl('v', [v{iGrp}(:).ripp], 'varMap', varMap, ...
-        'tagFiles', tagFiles, 'tagAll', tagAll, 'idxCol', 1);
-end
-% Combine all tables, clean and organize
-tblLme = vertcat(tblCell{:});
-tblLme = rmmissing(tblLme);
-tblLme.Group = reordercats(tblLme.Group, cfg.lbl.grp);
-
-% Assert non-zero
-tblLme = tbl_trans(tblLme, 'flg0', true, 'verbose', true);
-
-
-% -------------------------------------------------------------------------
-% Run analysis
-
-
-% Variables
-lblY = {'Rate (SWR/s)', 'Density (% NREM)'};
-varRsp = {'Rate', 'Density'};
-idxVar = 1;
-
-% Formula
-frml = [varRsp{idxVar}, ' ~ Group + (1|Name)'];
-
-% Run LME
-cfgLme.contrasts = 'all';
-cfgLme.dist = 'Normal';
-[lmeStats, lmeMdl] = lme_analyse(tblLme, frml, cfgLme);
-
-% Plot
-hFig = tblGUI_bar(tblLme, 'yVar', varRsp{idxVar});
-
-% Prism
-[prismMat] = tbl2prism(tblLme, 'yVar', varRsp{idxVar});
-
-
-
-%% ========================================================================
-%  RIPPLE SPIKES (Per Unit)
-%  ========================================================================
-
-% Organize data table
-% Pre-process: extract NREM firing rates to dedicated fields
-for iGrp = 1:length(v)
-    for iFile = 1:length(v{iGrp})
-        % Get data
-        ripp = v{iGrp}(iFile).ripp;
-
-        % Get NREM state index (state 4)
-        idxNrem = ripp.states.idx(:, 4);
-
-        % Calculate mean rates Restricted to NREM
-        rippRates = ripp.spks.su.rippRates(:, idxNrem);
-        ctrlRates = ripp.spks.su.ctrlRates(:, idxNrem);
-
-        v{iGrp}(iFile).ripp.spks.su.FRripp = mean(rippRates, 2, 'omitnan');
-        v{iGrp}(iFile).ripp.spks.su.FRrand = mean(ctrlRates, 2, 'omitnan');
-    end
-end
-
-[cfg] = mcu_cfg();
-clear varMap
-varMap.UnitType = 'units.type';
-varMap.frMod = 'ripp.spks.su.frModulation';
-varMap.FRripp = 'ripp.spks.su.FRripp';
-varMap.FRrand = 'ripp.spks.su.FRrand';
-varMap.MRL = 'ripp.spkLfp.phase.mrl';
-varMap.pVal = 'ripp.spkLfp.phase.pVal';
-varMap.Theta = 'ripp.spkLfp.phase.theta';
-
-for iGrp = 1 : length(grps)
-    basepaths = mcu_basepaths(grps{iGrp});
-
-    % Prepare tag structures for this mouse
-    tagAll.Group = cfg.lbl.grp{iGrp};
-    tagFiles.Name = get_mname(basepaths);
-
-    % Create table
-    tblCell{iGrp} = v2tbl('v', v{iGrp}, 'varMap', varMap, ...
-        'tagFiles', tagFiles, 'tagAll', tagAll, 'idxCol', 1);
-end
-% Combine all tables, clean and organize
-tblLme = vertcat(tblCell{:});
-
-% Assert category order
-tblLme.Group = reordercats(tblLme.Group, cfg.lbl.grp);
-tblLme.UnitType = reordercats(tblLme.UnitType, cfg.lbl.unit);
-
-% Remove bad units
-tblLme(tblLme.UnitType == 'Other', :) = [];
-tblLme.UnitType = removecats(tblLme.UnitType, 'Other');
-% CONSIDER:
-%  - REMOVING FS
-%  - GLME DIRECTLY ON FRs WITH NEW FIXED EFFECT - EVENTTYPE
-
-% Assert non-zero for mrl (fr modulation included negative values by
-% definition)
-tblLme = tbl_trans(tblLme, 'flg0', true, 'verbose', true, ...
-    'varsInc', {'MRL'});
-
-% Plot
-hFig = tblGUI_scatHist(tblLme);
-
-% -------------------------------------------------------------------------
-% LME
-
-% Variables
-lblY = {'Mean Resultant Length', 'FR Modulation (a.u.)'};
-varRsp = {'MRL', 'frMod'};
-idxVar = 2;
-
-% Formula
-frml = [varRsp{idxVar}, ' ~ Group * UnitType + (1|Name)'];
-
-% Check best model
-% statsPark = lme_parkTest(tblLme, frml)
-% statsDist = lme_compareDists(tblLme, frml)
-
-% Run LME
-cfgLme.dist = 'Normal';
-[lmeStats, lmeMdl] = lme_analyse(tblLme, frml, cfgLme);
-
-% Plot
-hFig = tblGUI_bar(tblLme, 'yVar', varRsp{idxVar}, 'xVar', 'UnitType', ...
-    'grpVar', 'Group');
-
-% Prism
-idxRow = tblLme.UnitType == 'RS' & tblLme.Group == 'Control';
-[tblLme.FRripp(idxRow, :), tblLme.FRrand(idxRow, :)];
-
-
-
-%% ========================================================================
-%  POLAR PLOT
-%  ========================================================================
-
-% Figure Parameters
-hFig = figure;
-fntSize = 16; FntName = 'Arial';
-txtUnit = cfg.lbl.unit;
-txtGrp = cfg.lbl.grp;
-
-% Plot each group
-nGrp = length(grps);
-iUnit = 1;
-for iGrp = 1 : nGrp
-    % Get specific data from table
-    idxUnit = tblLme.UnitType == categorical(txtUnit(iUnit));
-    idxGrp = tblLme.Group == categorical(txtGrp(iGrp));
-    idxSgn = tblLme.pVal < 0.05;
-    idxTbl = idxUnit & idxGrp & idxSgn;
-    grpTbl = tblLme(idxTbl, :);
-
-    % Plot units, colored by type if population info is available.
-    hPlt = polarscatter(grpTbl.Theta, grpTbl.MRL, 50, ...
-        cfg.clr.grp(iGrp, :), 'filled', ...
-        'MarkerFaceAlpha', 0.3);
-    hold on;
-end
-rlim([0 0.6])
-rticks(0 : 0.3 : 1)
-thetaticks(0:90:270)
-hAx = gca;
-hAx.ThetaAxisUnits = 'degrees';
-hAx.GridAlpha = 0.2;
-legend(txtGrp, 'Location', 'northwest', 'Interpreter', 'none');
-set(hAx, 'FontName', 'Arial', 'FontSize', fntSize);
-set(hFig, 'Color', 'w');
-
-% Assert Size
-plot_axSize('hFig', hFig, 'szOnly', true, 'axShape', 'square', 'axHeight', 300);
-
-% Save
-fname = ['Ripp~SpkPolar_', txtUnit{iUnit}];
-lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat'});
-
-
-
-%% ========================================================================
-%  RIPPLE LFP TRACES
-%  ========================================================================
-%  NOTE: SEM is across mice (not individual ripples)
-
-% Stores matrices of ripple LFP traces for each group
-nGrp = length(grps);
-lfpGrp = cell(1, nGrp);
-
-% Process data for each group
-for iGrp = 1:nGrp
-    nMice = length(v{iGrp});
-    lfpMap = cell(nMice, 1);
-
-    for iMouse = 1:nMice
-        mData = v{iGrp}(iMouse);
-        ripp = mData.ripp;
-
-        % Select NREM ripples
-        idxNREM = ripp.states.idx(:, 4);
-
-        % Select ripp based on peakAmp
-        idxAmp = ripp.peakAmp > 8;
-
-        % Get mean ripple LFP trace
-        idxGood = idxNREM & idxAmp;
-        lfpMap{iMouse} = mean(ripp.maps.raw(idxGood, :), 1, 'omitnan');
-    end
-    lfpGrp{iGrp} = cell2padmat(lfpMap, 1);
-end
-
-% Get time bins
-mapDur = ripp.spks.info.mapDur * 1000;
-nBinsMap = ripp.spks.info.nBinsMap;
-timeBins = linspace(mapDur(1), mapDur(2), nBinsMap);
-
-% initialize
-[cfg] = mcu_cfg();
-clr = cfg.clr;
-[hFig, hAx] = plot_axSize('szOnly', false);
-
-% Plot each group in reverse order so Control appears on top
-txtLgd = cell(nGrp,1);
-clear hPlt
-for iGrp = nGrp : -1 : 1 % Use a different loop variable
-    hPlt(iGrp) = plot_stdShade('hAx', hAx, 'dataMat', lfpGrp{iGrp},...
-        'alpha', 0.3, 'clr', clr.grp(iGrp, :), 'xVal', timeBins);
-    hPlt(iGrp).DisplayName = cfg.lbl.grp{iGrp}; % Assign DisplayName for legend
-end
-
-% Graphics
-xline(hAx, 0, '--k');
-ylabel(hAx, 'LFP (µV)')
-xlabel(hAx, 'Time (ms)')
-xlim(hAx, [-50 50])
-ylim(hAx, [-45, 45])
-legend(hPlt, cfg.lbl.grp, 'Location', 'southwest');
-plot_axSize('hFig', hFig, 'szOnly', false, 'axShape', 'square');
-
-% Save
-fname = 'Ripp~LFP Trace';
-lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat'});
-
-% Prism
-xVal = timeBins;
-iGrp = 2;
-prismMat = [mean(lfpGrp{iGrp}, 1, 'omitnan')', ...
-    std(lfpGrp{iGrp}, 1, 'omitnan')', ...
-    repmat(size(lfpGrp{iGrp}, 1), length(xVal), 1)];
 
 
 
@@ -732,6 +396,51 @@ prismMat = [mean(pethData, 1, 'omitnan')', ...
 
 
 
+
+
+%% ========================================================================
+%  POLAR PLOT
+%  ========================================================================
+
+% Figure Parameters
+hFig = figure;
+fntSize = 16; FntName = 'Arial';
+txtUnit = cfg.lbl.unit;
+txtGrp = cfg.lbl.grp;
+
+% Plot each group
+nGrp = length(grps);
+iUnit = 1;
+for iGrp = 1 : nGrp
+    % Get specific data from table
+    idxUnit = tblLme.UnitType == categorical(txtUnit(iUnit));
+    idxGrp = tblLme.Group == categorical(txtGrp(iGrp));
+    idxSgn = tblLme.pVal < 0.05;
+    idxTbl = idxUnit & idxGrp & idxSgn;
+    grpTbl = tblLme(idxTbl, :);
+
+    % Plot units, colored by type if population info is available.
+    hPlt = polarscatter(grpTbl.Theta, grpTbl.MRL, 50, ...
+        cfg.clr.grp(iGrp, :), 'filled', ...
+        'MarkerFaceAlpha', 0.3);
+    hold on;
+end
+rlim([0 0.6])
+rticks(0 : 0.3 : 1)
+thetaticks(0:90:270)
+hAx = gca;
+hAx.ThetaAxisUnits = 'degrees';
+hAx.GridAlpha = 0.2;
+legend(txtGrp, 'Location', 'northwest', 'Interpreter', 'none');
+set(hAx, 'FontName', 'Arial', 'FontSize', fntSize);
+set(hFig, 'Color', 'w');
+
+% Assert Size
+plot_axSize('hFig', hFig, 'szOnly', true, 'axShape', 'square', 'axHeight', 300);
+
+% Save
+fname = ['Ripp~SpkPolar_', txtUnit{iUnit}];
+lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat'});
 
 
 

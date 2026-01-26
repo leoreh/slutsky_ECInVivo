@@ -75,9 +75,6 @@ maps.tstamps = timeBins;
 %% ========================================================================
 %  GENERATE MAPS
 %  ========================================================================
-% ========================================================================
-%  GENERATE MAPS
-%  ========================================================================
 
 for iUnit = 1:nUnits
     unitSpks = spkTimes{iUnit};
@@ -106,7 +103,7 @@ end
 end
 
 % -------------------------------------------------------------------------
-% Helper: Fast PETH Generator (Vectorized)
+% Helper: PETH Generator
 % -------------------------------------------------------------------------
 function syncMap = sync_spksMap(spikeTimes, eventTimes, mapDur, edges)
 
@@ -133,8 +130,7 @@ searchEdges = [-inf; spikeTimes; inf];
 startIdx = discretize(winStart, searchEdges);
 
 % Find last spike BEFORE window end
-% histc/discretize returns bin index.
-% We use histc here for specific edge behavior matching original code logic
+% histc returns bin index.
 [~, endBin] = histc(winEnd, searchEdges);
 endIdx = endBin - 1;
 
@@ -157,14 +153,11 @@ evtIds = repelem(validWin, spkInEvt);
 totalSpk = sum(spkInEvt);
 spkIndices = zeros(totalSpk, 1);
 
-% We need to fill spkIndices.
-% A cumsum approach allows us to do this without a loop if desired,
-% but a tight loop over valid events is often fast enough here.
-% However, to match your requested speed, we loop only over valid windows.
+% Fill spkIndices.
 curr = 1;
-for k = 1:length(validWin)
-    idx = validWin(k);
-    n = spkInEvt(k);
+for iWin = 1:length(validWin)
+    idx = validWin(iWin);
+    n = spkInEvt(iWin);
     spkIndices(curr : curr+n-1) = startIdx(idx) : endIdx(idx);
     curr = curr + n;
 end

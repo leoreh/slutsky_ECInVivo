@@ -106,13 +106,14 @@ if verbose, fprintf('[RIPP]: Starting pipeline for %s...\n', basename); end
 if verbose, fprintf('[RIPP]: Loading data...\n'); end
 
 % Load Session & Data
-vars = {'session', 'spikes', 'spktimes', 'sleep_states', 'brst'};
+vars = {'session', 'spikes', 'spktimes', 'sleep_states', 'brst', 'units'};
 v = basepaths2vars('basepaths', {basepath}, 'vars', vars);
 
 % Session Parameters
 fs      = v.session.extracellular.srLfp;
 fsSpk   = v.session.extracellular.sr;
 nchans  = v.session.extracellular.nChannels;
+uType   = v.units.type;
 
 if isinf(win(2))
     sigDur = Inf;
@@ -246,8 +247,8 @@ nremAmp = emgAbs(nremMask);
 % Z-Score against NREM Baseline
 ripp.emg = (ripp.emg - mean(nremAmp, 'omitnan')) / std(nremAmp, 'omitnan');
 
-% Define Quite Events 
-idxEmg = ripp.emg < 2; 
+% Define Quite Events
+idxEmg = ripp.emg < 2;
 
 if verbose
     fprintf('[RIPP]: %d / %d events marked as High EMG.\n', ...
@@ -339,12 +340,14 @@ rippPeth.mu = ripp_spkPeth(muTimes, ripp.peakTime, ripp.ctrlTimes, ...
 %% ========================================================================
 %  SPIKE STATS
 %  ========================================================================
-if verbose, fprintf('[RIPP]: Spike Stats and LFP-Coupling...\n'); end
+if verbose, fprintf('[RIPP]: Calculating Spike Stats...\n'); end
 
 % Firing Metrics
-rippSpks.tot = ripp_spks(spkTimes, ...
+rippSpks.all = ripp_spks(spkTimes, ...
     ripp.times, ...
     ripp.ctrlTimes, ...
+    'peakTime', ripp.peakTime, ...
+    'unitType', uType, ...
     'flgSave', false);
 
 % Analyze single and burst FR metrics
@@ -366,7 +369,6 @@ if ~isempty(v.brst)
         ripp.ctrlTimes, ...
         'flgSave', false);
 
-    % Analyze single and burst FR metrics
     rippSpks.single = ripp_spks(singleTimes, ...
         ripp.times, ...
         ripp.ctrlTimes, ...
@@ -377,11 +379,45 @@ else
     rippSpks.single = [];
 end
 
-% Add fracUnits to ripp struct
-ripp.fracUnits = rippSpks.tot.fracUnits;
+% Firing Metrics (Split Halves)
+% First Half (Start to Peak) vs Second Half (Peak to End)
+rMid = ripp.peakTime;
+rt1  = [ripp.times(:,1), rMid];
+rt2 = [rMid, ripp.times(:,2)];
+
+% Control Halves (Split by Midpoint)
+cMid = mean(ripp.ctrlTimes, 2);
+ct1  = [ripp.ctrlTimes(:,1), cMid];
+ct2 = [cMid, ripp.ctrlTimes(:,2)];
+
+rippSpks.first = ripp_spks(spkTimes, rt1, ct1, 'flgSave', false);
+rippSpks.second = ripp_spks(spkTimes, rt2, ct2, 'flgSave', false);
+
+% Add per ripple spike metrics to ripp struct
+ripp.fracRS = rippSpks.all.events.RS.frac;
+ripp.asymRS = rippSpks.all.events.RS.asym;
+ripp.fracFS = rippSpks.all.events.FS.frac;
+ripp.asymFS = rippSpks.all.events.FS.asym;
+
+
+%% ========================================================================
+%  PHASE COUPLING
+%  ========================================================================
 
 % SPK-LFP
-spkLfp = spklfp_phase(rippSig.filt, spkTimes, fs, ...
+% All Spikes
+if verbose, fprintf('[RIPP]: Calculating Spk-LFP Phase...\n'); end
+spkLfp.all = spklfp_phase(rippSig.filt, spkTimes, fs, ...
+    'lfpTimes', ripp.times, ...
+    'nPerms', 0);
+
+% First Spikes
+spkLfp.first = spklfp_phase(rippSig.filt, rippSpks.all.times.first, fs, ...
+    'lfpTimes', ripp.times, ...
+    'nPerms', 0);
+
+% Late Spikes
+spkLfp.late = spklfp_phase(rippSig.filt, rippSpks.all.times.late, fs, ...
     'lfpTimes', ripp.times, ...
     'nPerms', 0);
 
@@ -429,7 +465,7 @@ end
 % Plot spikes
 if flgPlot
     if verbose, fprintf('[RIPP]: Generating Summary Plot...\n'); end
-    ripp_plotSpks(rippSpks.tot, rippPeth, ...
+    ripp_plotSpks(rippSpks.all, rippPeth, ...
         'basepath', basepath, ...
         'flgSaveFig', true);
 end
