@@ -106,13 +106,14 @@ if verbose, fprintf('[RIPP]: Starting pipeline for %s...\n', basename); end
 if verbose, fprintf('[RIPP]: Loading data...\n'); end
 
 % Load Session & Data
-vars = {'session', 'spikes', 'spktimes', 'sleep_states', 'brst'};
+vars = {'session', 'spikes', 'spktimes', 'sleep_states', 'brst', 'units'};
 v = basepaths2vars('basepaths', {basepath}, 'vars', vars);
 
 % Session Parameters
 fs      = v.session.extracellular.srLfp;
 fsSpk   = v.session.extracellular.sr;
 nchans  = v.session.extracellular.nChannels;
+uType   = v.units.type;
 
 if isinf(win(2))
     sigDur = Inf;
@@ -345,29 +346,8 @@ if verbose, fprintf('[RIPP]: Calculating Spike Stats...\n'); end
 rippSpks.all = ripp_spks(spkTimes, ...
     ripp.times, ...
     ripp.ctrlTimes, ...
-    'flgSave', false);
-
-% Firing Metrics (Split Halves)
-% First Half (Start to Peak) vs Second Half (Peak to End)
-rippMid = mean(ripp.ctrlTimes, 2);
-rt1  = [ripp.times(:,1), ripp.peakTime];
-rippTimesSecond = [ripp.peakTime, ripp.times(:,2)];
-% rippTimesFirst  = [ripp.times(:,1), ripp.peakTime];
-% rippTimesSecond = [ripp.peakTime, ripp.times(:,2)];
-
-% Control Halves (Split by Midpoint)
-ctrlMid = mean(ripp.ctrlTimes, 2);
-ctrlTimesFirst  = [ripp.ctrlTimes(:,1), ctrlMid];
-ctrlTimesSecond = [ctrlMid, ripp.ctrlTimes(:,2)];
-
-rippSpks.first = ripp_spks(spkTimes, ...
-    rt1, ...
-    ctrlTimesFirst, ...
-    'flgSave', false);
-
-rippSpks.second = ripp_spks(spkTimes, ...
-    rippTimesSecond, ...
-    ctrlTimesSecond, ...
+    ripp.peakTime, ...
+    'unitType', uType, ...
     'flgSave', false);
 
 % Analyze single and burst FR metrics
@@ -387,11 +367,13 @@ if ~isempty(v.brst)
     rippSpks.burst = ripp_spks(brstTimes, ...
         ripp.times, ...
         ripp.ctrlTimes, ...
+        ripp.peakTime, ...
         'flgSave', false);
 
     rippSpks.single = ripp_spks(singleTimes, ...
         ripp.times, ...
         ripp.ctrlTimes, ...
+        ripp.peakTime, ...
         'flgSave', false);
 
 else
@@ -399,8 +381,23 @@ else
     rippSpks.single = [];
 end
 
-% Add fracUnits to ripp struct
-ripp.fracUnits = rippSpks.tot.fracUnits;
+% First Half (Start to Peak) vs Second Half (Peak to End)
+rMid = ripp.peakTime;
+rt1  = [ripp.times(:,1), rMid];
+rt2 = [rMid, ripp.times(:,2)];
+
+% Control Halves (Split by Midpoint)
+cMid = mean(ripp.ctrlTimes, 2);
+ct1  = [ripp.ctrlTimes(:,1), cMid];
+ct2 = [cMid, ripp.ctrlTimes(:,2)];
+
+rippSpks.first = ripp_spks(spkTimes, rt1, ct1, ripp.peakTime, 'flgSave', false);
+rippSpks.second = ripp_spks(spkTimes, rt2, ct2, ripp.peakTime, 'flgSave', false);
+
+% Add per ripple spike metrics to ripp struct
+ripp.spks = rippSpks.all.events;
+rippSpks.all = rmfield(rippSpks.all, 'events');
+
 
 %% ========================================================================
 %  PHASE COUPLING
@@ -413,15 +410,15 @@ spkLfp.all = spklfp_phase(rippSig.filt, spkTimes, fs, ...
     'lfpTimes', ripp.times, ...
     'nPerms', 0);
 
-% First Spikes
-spkLfp.first = spklfp_phase(rippSig.filt, rippSpks.tot.times.first, fs, ...
-    'lfpTimes', ripp.times, ...
-    'nPerms', 0);
-
-% Late Spikes
-spkLfp.late = spklfp_phase(rippSig.filt, rippSpks.tot.times.late, fs, ...
-    'lfpTimes', ripp.times, ...
-    'nPerms', 0);
+% % First Spikes
+% spkLfp.first = spklfp_phase(rippSig.filt, rippSpks.all.times.first, fs, ...
+%     'lfpTimes', ripp.times, ...
+%     'nPerms', 0);
+% 
+% % Late Spikes
+% spkLfp.late = spklfp_phase(rippSig.filt, rippSpks.all.times.late, fs, ...
+%     'lfpTimes', ripp.times, ...
+%     'nPerms', 0);
 
 
 %% ========================================================================
@@ -467,7 +464,7 @@ end
 % Plot spikes
 if flgPlot
     if verbose, fprintf('[RIPP]: Generating Summary Plot...\n'); end
-    ripp_plotSpks(rippSpks.tot, rippPeth, ...
+    ripp_plotSpks(rippSpks.all, rippPeth, ...
         'basepath', basepath, ...
         'flgSaveFig', true);
 end

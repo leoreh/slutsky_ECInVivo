@@ -17,67 +17,25 @@ for iFile = 1 : nFiles
     basepath = basepaths{iFile};
     cd(basepath)
     [~, basename] = fileparts(basepath);
-    
+
     ripp = v(iFile).ripp;
     uType = v(iFile).units.type;
-
-    % Session Parameters
-    session = v(iFile).session;
-    fs      = session.extracellular.srLfp;
-    fsSpk   = session.extracellular.sr;
-    nchans  = session.extracellular.nChannels;
 
     % Prepare Single-Unit (SU) Spike Times
     spkTimes = v(iFile).spikes.times;
     nUnits = length(spkTimes);
 
     % Firing Metrics
-    rippSpks.all = ripp_spks(spkTimes, ...
+    rippSpks = ripp_spks(spkTimes, ...
         ripp.times, ...
         ripp.ctrlTimes, ...
-        'peakTime', ripp.peakTime, ...
+        ripp.peakTime, ...
         'unitType', uType, ...
         'flgSave', false);
 
     % Add per ripple spike metrics to ripp struct
-    ripp.fracRS = rippSpks.all.events.RS.frac;
-    ripp.asymRS = rippSpks.all.events.RS.asym;
-    ripp.fracFS = rippSpks.all.events.FS.frac;
-    ripp.asymFS = rippSpks.all.events.FS.asym;
-
-    % % Prepare single and burst spktimes
-    % brstTimes = v(iFile).brst.spktimes';   
-    % singleTimes = cell(1, nUnits);
-    % for iUnit = 1:nUnits
-    %     singleTimes{iUnit} = setdiff(spkTimes{iUnit}, brstTimes{iUnit});
-    % end
-    % 
-    % % Run ripp_spks
-    % rippSpks.burst = ripp_spks(brstTimes, ...
-    %     ripp.times, ...
-    %     ripp.ctrlTimes, ...
-    %     'flgSave', false);
-    % 
-    % % Analyze single and burst FR metrics
-    % rippSpks.single = ripp_spks(singleTimes, ...
-    %     ripp.times, ...
-    %     ripp.ctrlTimes, ...
-    %     'flgSave', false);
-    % 
-    % % Firing Metrics (Split Halves)
-    % % First Half (Start to Peak) vs Second Half (Peak to End)
-    % % rMid = mean(ripp.times, 2);
-    % rMid = ripp.peakTime;
-    % rt1  = [ripp.times(:,1), rMid];
-    % rt2 = [rMid, ripp.times(:,2)];
-    % 
-    % % Control Halves (Split by Midpoint)
-    % cMid = mean(ripp.ctrlTimes, 2);
-    % ct1  = [ripp.ctrlTimes(:,1), cMid];
-    % ct2 = [cMid, ripp.ctrlTimes(:,2)];
-    % 
-    % rippSpks.first = ripp_spks(spkTimes, rt1, ct1, 'flgSave', false);
-    % rippSpks.second = ripp_spks(spkTimes, rt2, ct2, 'flgSave', false);
+    ripp.spks = rippSpks.all.events;
+    rippSpks = rmfield(rippSpks.all, 'events');
 
     % Save
     rippSpksFile = fullfile(basepath, [basename, '.rippSpks.mat']);
@@ -88,13 +46,73 @@ for iFile = 1 : nFiles
 end
 
 
-% 
+%% ========================================================================
+%  RE-ANALYSE PETH
+%  ========================================================================
+
+% Load Session & Data
+vars = {'rippPeth', 'units', 'ripp', 'rippSpks'};
+vPeth = basepaths2vars('basepaths', basepaths, 'vars', vars);
+
+for iFile = 1 : nFiles
+
+    basepath = basepaths{iFile};
+    cd(basepath)
+    [~, basename] = fileparts(basepath);
+
+    ripp = vPeth(iFile).ripp;
+    rippSpks = vPeth(iFile).rippSpks;
+    rippPeth = vPeth(iFile).rippPeth;
+    uType = vPeth(iFile).units.type;
+
+    pethSU = squeeze(mean(rippPeth.su.ripp, 2, 'omitnan'));
+
+
+
+    % Area Normalized
+    pethSum = sum(pethSU, 2, 'omitnan');
+    pethSum(pethSum == 0) = 1;
+    rippPeth.su.pethArea = pethSU ./ pethSum;
+
+    % Z-Score (Control Rates)
+    ctrlMap = rippPeth.su.ctrl;
+    ctrlRates = mean(ctrlMap, 3, 'omitnan');
+    ctrlSD = std(ctrlRates, [], 2, 'omitnan');
+    ctrlSD(ctrlSD == 0) = 1;
+
+    ctrlPeth = squeeze(mean(ctrlMap, 2, 'omitnan'));
+    ctrlAvg = mean(ctrlPeth, 2, 'omitnan');
+
+    rippPeth.su.pethZ = (pethSU - ctrlAvg) ./ ctrlSD;
+
+    % Update PETH
+    rippPeth.su.peth = pethSU;
+
+    % Save PETH
+    rippPethFile = fullfile(basepath, [basename, '.rippPeth.mat']);
+    save(rippPethFile, 'rippPeth', '-v7.3');
+
+    % Add per ripple spike metrics to ripp struct
+    ripp.spks = rippSpks.all.events;
+    rippSpks = rmfield(rippSpks.all, 'events');
+
+    % Save
+    rippSpksFile = fullfile(basepath, [basename, '.rippSpks.mat']);
+    rippFile = fullfile(basepath, [basename, '.ripp.mat']);
+    save(rippSpksFile, 'rippSpks', '-v7.3');
+    save(rippFile, 'ripp', '-v7.3');
+
+end
+
+
+
+%
 % funcon = [];
 % for iFile = 1 : nFiles
 %     basepath = basepaths{iFile};
 %     cd(basepath)
 %     [~, basename] = fileparts(basepath);
-% 
+%
 %     load([basename, '.rippSpks.mat'])
 %     cc = fr_corr(rippSpks.su.rippRates, 'nShuffles', 50, 'flgPlot', false);
 %     funcon = [funcon; cc.shuffle.funcon];
@@ -104,12 +122,9 @@ end
 
 
 %% ========================================================================
-%  RE-ANALYZE
+%  ANALYZE
 %  ========================================================================
 
-% run the analysis on multiple sessions
-% -------------------------------------------------------------------------
-% basepaths = mcu_basepaths('all');
 basepaths = [mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl')];
 nFiles = length(basepaths);
 
@@ -157,7 +172,7 @@ frml = 'Density ~ (Duration + Rate) * Group + (1|Name)';
 %  RIPP SPIKES
 %  ========================================================================
 
-presets = {'rippSpks'};
+presets = {'rippSpks', 'brst'};
 tbl = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
 
 % Select
@@ -168,10 +183,10 @@ tblPlot = tbl(tbl.UnitType == 'RS', :);
 
 % Plot
 tblGUI_bar(tblPlot, 'xVar', 'Group', 'yVar', 'frZ');
-tblGUI_scatHist(tblPlot, 'xVar', 'bRoy', 'yVar', 'pFire', 'grpVar', 'Group');
+tblGUI_scatHist(tblPlot, 'xVar', 'asym', 'yVar', 'bRoy', 'grpVar', 'Group');
 
 % LME
-frml = 'asymmetry ~ Group * bRoy + (1|Name)';
+frml = 'com ~ Group * bRoy + (1|Name)';
 [lmeMdl, lmeStates, lmeInfo] = lme_analyse(tblPlot, frml);
 
 % Summary
@@ -237,8 +252,9 @@ tblSum = groupsummary(tblMap(:, {'Group', 't_lfp'}), {'Group'}, {'mean', 'std'},
 tblSum.mean_t_lfp';
 repmat(tblSum.GroupCount(2), 127, 1)
 
-
-
+% LME
+frml = 'dur ~ (freq + amp) * Group + (1|Name)';
+[lmeMdl, lmeStates, lmeInfo] = lme_analyse(tblRipp, frml);
 
 
 

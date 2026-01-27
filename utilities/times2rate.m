@@ -110,27 +110,53 @@ binCents = mean(binEdges, 2);
 r = nan(nUnits, nBins);
 
 % Efficiency Strategy: "Odd Bin Trick"
-% Create a single, interleaved edges vector for histcounts.
+% Create a single, interleaved edges vector.
 histEdges = reshape(binEdges', [], 1);
 
-for iUnit = 1:nUnits
-    unitTimes = times{iUnit};
+% Check for Overlap / Non-Monotonicity
+if issorted(histEdges)
+    % --- Pathway A: Sorted, Non-Overlapping (Fastest) ---
+    for iUnit = 1:nUnits
+        unitTimes = times{iUnit};
 
-    % Skip if no spikes for this unit
-    if isempty(unitTimes)
-        continue;
+        if isempty(unitTimes), continue; end
+
+        cnts = histcounts(unitTimes, histEdges);
+        cnts = cnts(1:2:end);
+
+        if c2r
+            r(iUnit, :) = cnts(:)' ./ binDurs(:)';
+        else
+            r(iUnit, :) = cnts;
+        end
     end
+else
+    % --- Pathway B: Overlapping or Disordered (Robust) ---
+    % Use cumulative counts on unique sorted edges
+    [uniqEdges, ~, splitIdx] = unique(histEdges);
 
-    % Get counts
-    cnts = histcounts(unitTimes, histEdges);
+    % Map original start/end times to indices in uniqEdges
+    binIdx = reshape(splitIdx, 2, [])';
 
-    % Keep only our defined bins (odd-indexed intervals in the interleaved vector)
-    cnts = cnts(1:2:end);
+    for iUnit = 1:nUnits
+        unitTimes = times{iUnit};
 
-    if c2r
-        r(iUnit, :) = cnts(:)' ./ binDurs(:)';
-    else
-        r(iUnit, :) = cnts;
+        if isempty(unitTimes), continue; end
+
+        % Count in unique atomic segments
+        baseCnts = histcounts(unitTimes, uniqEdges);
+
+        % Cumulative sum (prepend 0)
+        cumCnts = [0, cumsum(baseCnts)];
+
+        % Calculate bin counts by difference: Cum(End) - Cum(Start)
+        cnts = cumCnts(binIdx(:,2)) - cumCnts(binIdx(:,1));
+
+        if c2r
+            r(iUnit, :) = cnts ./ binDurs(:)';
+        else
+            r(iUnit, :) = cnts;
+        end
     end
 end
 

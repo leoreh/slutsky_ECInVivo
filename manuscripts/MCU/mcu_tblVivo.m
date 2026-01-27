@@ -82,7 +82,7 @@ end
 
 if ismember('rippSpks', presets)
     vars = [vars, 'rippSpks', 'rippSpkLfp'];
-    spkType = 'all';
+    spkType = '';
     varMap.frRipp = ['rippSpks.', spkType, '.frRipp'];
     varMap.frRand = ['rippSpks.', spkType, '.frRand'];
     varMap.frZ = ['rippSpks.', spkType, '.frZ'];
@@ -98,7 +98,7 @@ if ismember('rippSpks', presets)
     varMap.asym = ['rippSpks.', spkType, '.asym'];
     varMap.com = ['rippSpks.', spkType, '.com'];
 
-    phaseType = 'all';
+    phaseType = '';
     varMap.theta = ['spkLfp.', phaseType, '.theta'];
     varMap.mrl = ['spkLfp.', phaseType, '.mrl'];
     varMap.ppc = ['spkLfp.', phaseType, '.ppc1'];
@@ -110,13 +110,14 @@ if ismember('ripp', presets)
     varMap.dur          = 'ripp.dur';
     varMap.amp          = 'ripp.amp';
     varMap.freq         = 'ripp.freq';
+    varMap.freqEvent    = 'ripp.freqEvent';
     varMap.energy       = 'ripp.energy';
     varMap.state        = 'ripp.state';
     varMap.spkGain      = 'ripp.spkGain';
-    varMap.fracRS       = 'ripp.fracRS';
-    varMap.fracFS       = 'ripp.fracFS';
-    varMap.asymRS       = 'ripp.asymRS';
-    varMap.asymFS       = 'ripp.asymFS';
+    varMap.skew         = 'ripp.skew';
+    varMap.frac         = 'ripp.spks.RS.frac';
+    varMap.asym         = 'ripp.spks.RS.asym';
+    varMap.com          = 'ripp.spks.RS.com';
 end
 
 if ismember('rippMaps', presets)

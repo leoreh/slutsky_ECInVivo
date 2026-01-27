@@ -106,7 +106,7 @@ if verbose, fprintf('[RIPP]: Starting pipeline for %s...\n', basename); end
 if verbose, fprintf('[RIPP]: Loading data...\n'); end
 
 % Load Session & Data
-vars = {'session', 'spikes', 'spktimes', 'sleep_states', 'brst', 'units'};
+vars = {'session', 'spikes', 'spktimes', 'sleep_states', 'units'};
 v = basepaths2vars('basepaths', {basepath}, 'vars', vars);
 
 % Session Parameters
@@ -324,7 +324,7 @@ rippMaps = ripp_maps(rippSig, ripp.peakTime, fs, 'mapDur', mapDur);
 
 
 %% ========================================================================
-%  SPIKES
+%  SPIKES PETH
 %  ========================================================================
 if verbose, fprintf('[RIPP]: Generating Spike PETHs...\n'); end
 
@@ -343,15 +343,15 @@ rippPeth.mu = ripp_spkPeth(muTimes, ripp.peakTime, ripp.ctrlTimes, ...
 if verbose, fprintf('[RIPP]: Calculating Spike Stats...\n'); end
 
 % Firing Metrics
-rippSpks.all = ripp_spks(spkTimes, ...
+rippSpks = ripp_spks(spkTimes, ...
     ripp.times, ...
     ripp.ctrlTimes, ...
-    'peakTime', ripp.peakTime, ...
+    ripp.peakTime, ...
     'unitType', uType, ...
     'flgSave', false);
 
 % Analyze single and burst FR metrics
-if ~isempty(v.brst)
+if isfield(v, 'brst')
 
     % Prepare single and burst spktimes
     brstTimes = v.brst.spktimes';
@@ -367,11 +367,13 @@ if ~isempty(v.brst)
     rippSpks.burst = ripp_spks(brstTimes, ...
         ripp.times, ...
         ripp.ctrlTimes, ...
+        ripp.peakTime, ...
         'flgSave', false);
 
     rippSpks.single = ripp_spks(singleTimes, ...
         ripp.times, ...
         ripp.ctrlTimes, ...
+        ripp.peakTime, ...
         'flgSave', false);
 
 else
@@ -379,25 +381,9 @@ else
     rippSpks.single = [];
 end
 
-% Firing Metrics (Split Halves)
-% First Half (Start to Peak) vs Second Half (Peak to End)
-rMid = ripp.peakTime;
-rt1  = [ripp.times(:,1), rMid];
-rt2 = [rMid, ripp.times(:,2)];
-
-% Control Halves (Split by Midpoint)
-cMid = mean(ripp.ctrlTimes, 2);
-ct1  = [ripp.ctrlTimes(:,1), cMid];
-ct2 = [cMid, ripp.ctrlTimes(:,2)];
-
-rippSpks.first = ripp_spks(spkTimes, rt1, ct1, 'flgSave', false);
-rippSpks.second = ripp_spks(spkTimes, rt2, ct2, 'flgSave', false);
-
 % Add per ripple spike metrics to ripp struct
-ripp.fracRS = rippSpks.all.events.RS.frac;
-ripp.asymRS = rippSpks.all.events.RS.asym;
-ripp.fracFS = rippSpks.all.events.FS.frac;
-ripp.asymFS = rippSpks.all.events.FS.asym;
+ripp.spks = rippSpks.events;
+rippSpks = rmfield(rippSpks, 'events');
 
 
 %% ========================================================================
@@ -407,19 +393,19 @@ ripp.asymFS = rippSpks.all.events.FS.asym;
 % SPK-LFP
 % All Spikes
 if verbose, fprintf('[RIPP]: Calculating Spk-LFP Phase...\n'); end
-spkLfp.all = spklfp_phase(rippSig.filt, spkTimes, fs, ...
+spkLfp = spklfp_phase(rippSig.filt, spkTimes, fs, ...
     'lfpTimes', ripp.times, ...
     'nPerms', 0);
 
-% First Spikes
-spkLfp.first = spklfp_phase(rippSig.filt, rippSpks.all.times.first, fs, ...
-    'lfpTimes', ripp.times, ...
-    'nPerms', 0);
-
-% Late Spikes
-spkLfp.late = spklfp_phase(rippSig.filt, rippSpks.all.times.late, fs, ...
-    'lfpTimes', ripp.times, ...
-    'nPerms', 0);
+% % First Spikes
+% spkLfp.first = spklfp_phase(rippSig.filt, rippSpks.times.first, fs, ...
+%     'lfpTimes', ripp.times, ...
+%     'nPerms', 0);
+% 
+% % Late Spikes
+% spkLfp.late = spklfp_phase(rippSig.filt, rippSpks.times.late, fs, ...
+%     'lfpTimes', ripp.times, ...
+%     'nPerms', 0);
 
 
 %% ========================================================================
@@ -465,7 +451,7 @@ end
 % Plot spikes
 if flgPlot
     if verbose, fprintf('[RIPP]: Generating Summary Plot...\n'); end
-    ripp_plotSpks(rippSpks.all, rippPeth, ...
+    ripp_plotSpks(rippSpks, rippPeth, ...
         'basepath', basepath, ...
         'flgSaveFig', true);
 end

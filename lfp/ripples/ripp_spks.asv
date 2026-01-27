@@ -1,7 +1,7 @@
 function rippSpks = ripp_spks(spkTimes, rippTimes, ctrlTimes, varargin)
 % RIPP_SPKS Analyzes spiking rate modulation during ripples.
 %
-%   rippSpks = RIPP_SPKS(spkTimes, rippTimes, ctrlTimes, varargin)
+%   rippSpks = RIPP_SPKS(spkTimes, rippTimes, ctrlTimes, peakTime, varargin)
 %
 %   SUMMARY:
 %       Calculates scalar modulation metrics comparing Ripple vs Control periods.
@@ -10,15 +10,16 @@ function rippSpks = ripp_spks(spkTimes, rippTimes, ctrlTimes, varargin)
 %       3. Z-Scored Gain.
 %       4. Statistical Significance (Wilcoxon Sign-Rank / Rank-Sum).
 %       5. Rank Order (Mean and Variance).
+%       6. Population Center of Mass (CoM) per event.
 %
 %   INPUTS:
 %       spkTimes    - (Cell) {N_units x 1} Spike times [s].
 %       rippTimes   - (Mat)  [N x 2] Ripple start/end times [s].
 %       ctrlTimes   - (Mat)  [N x 2] Control start/end times [s].
+%       peakTime    - (Vec)  [N x 1] Peak times of ripples [s].
 %       varargin    - Parameter/Value pairs:
 %           'basepath' - (Char) Save location. (Default: pwd).
 %           'flgSave'  - (Log)  Save output? (Default: true).
-%           'peakTime' - (Vec)  [N x 1] Peak times of ripples [s].
 %           'unitType' - (Cat)  [N_units x 1] Categorical array of unit types.
 %
 %   OUTPUTS:
@@ -33,24 +34,28 @@ function rippSpks = ripp_spks(spkTimes, rippTimes, ctrlTimes, varargin)
 % =========================================================================
 p = inputParser;
 addRequired(p, 'spkTimes', @iscell);
+addRequired(p, 'spkTimes', @iscell);
 addRequired(p, 'rippTimes', @isnumeric);
 addRequired(p, 'ctrlTimes', @isnumeric);
+addRequired(p, 'peakTime', @isnumeric);
 addParameter(p, 'basepath', pwd, @ischar);
 addParameter(p, 'flgSave', true, @islogical);
-addParameter(p, 'peakTime', [], @isnumeric);
 addParameter(p, 'unitType', [], @(x) iscategorical(x) || iscell(x));
-parse(p, spkTimes, rippTimes, ctrlTimes, varargin{:});
+parse(p, spkTimes, rippTimes, ctrlTimes, peakTime, varargin{:});
 
 basepath  = p.Results.basepath;
 flgSave   = p.Results.flgSave;
-peakTime  = p.Results.peakTime;
+peakTime  = p.Results.peakTime; 
 unitType  = p.Results.unitType;
 
 [~, basename] = fileparts(basepath);
 savefile = fullfile(basepath, [basename, '.rippSpks.mat']);
 
+% Fixed window for asym / com
+winFxd = 0.020;
+
 % =========================================================================
-%  CALCULATION
+%  FR METRICS
 % =========================================================================
 
 nUnits = length(spkTimes);
@@ -116,38 +121,64 @@ for iUnit = 1:nUnits
 end
 h0 = pVal < 0.05;
 
+
+% =========================================================================
+%  CENTER OF MASS (PER UNIT)
+% =========================================================================
+% Average time of spikes relative to ripple peak
+
+com = nan(nUnits, 1);
+com = nan(nUnits, 1);
+
+peakTime = peakTime(:);
+nRipp = length(peakTime);
+
+for iUnit = 1:nUnits
+    uSpks = spkTimes{iUnit};
+    if isempty(uSpks), continue; end
+
+    % Find index of nearest peak for each spike
+    % We use interp1 with 'nearest' to map spike times to the "index" of the peak
+    idx = interp1(peakTime, 1:nRipp, uSpks, 'nearest', 'extrap');
+    nearestPeaks = peakTime(idx);
+    relTime = uSpks - nearestPeaks;
+
+    % Filter by Window
+    isValid = abs(relTime) <= winFxd;
+
+    % Calculate Mean
+    if any(isValid)
+        com(iUnit) = mean(relTime(isValid)) * 1000;     % (ms)
+    end
+end
+
 % =========================================================================
 %  ASYMMETRY (PER UNIT)
 % =========================================================================
 
-if ~isempty(peakTime)
-    % Define Intervals
-    timesMid = peakTime;
-    timesPre  = [rippTimes(:,1), timesMid];
-    timesPost = [timesMid, rippTimes(:,2)];
+% Asymmetry (Per Unit)
+% Define Intervals (Fixed Window)
+timesMid = peakTime;
+timesPre  = [timesMid - winFxd, timesMid];
+timesPost = [timesMid, timesMid + winFxd];
 
-    % Durations
-    durPre  = timesPre(:,2) - timesPre(:,1);
-    durPost = timesPost(:,2) - timesPost(:,1);
+% Durations
+durPre  = timesPre(:,2) - timesPre(:,1);
+durPost = timesPost(:,2) - timesPost(:,1);
 
-    % Spike Counts (all units)
-    cPre  = times2rate(spkTimes, 'winCalc', timesPre, 'binsize', Inf, 'c2r', false);
-    cPost = times2rate(spkTimes, 'winCalc', timesPost, 'binsize', Inf, 'c2r', false);
+% Spike Counts (all units)
+cPre  = times2rate(spkTimes, 'winCalc', timesPre, 'binsize', Inf, 'c2r', false);
+cPost = times2rate(spkTimes, 'winCalc', timesPost, 'binsize', Inf, 'c2r', false);
 
-    % Rates
-    frPre  = sum(cPre, 2) ./ sum(durPre);
-    frPost = sum(cPost, 2) ./ sum(durPost);
+% Rates
+frPre  = sum(cPre, 2) ./ sum(durPre);
+frPost = sum(cPost, 2) ./ sum(durPost);
 
-    % Asymmetry Index (Unit)
-    % (Pre - Post) / (Pre + Post)
-    frSum = frPre + frPost;
-    asym = (frPre - frPost) ./ frSum;
-    asym(frSum < eps) = NaN;
-else
-    frPre  = nan(nUnits, 1);
-    frPost = nan(nUnits, 1);
-    asym = nan(nUnits, 1);
-end
+% Asymmetry Index (Unit)
+% (Pre - Post) / (Pre + Post)
+frSum = frPre + frPost;
+asym = (frPre - frPost) ./ frSum;
+asym(frSum < eps) = NaN;
 
 % =========================================================================
 %  PER RIPPLE / UNITTYPE
@@ -208,76 +239,55 @@ for iIter = 1:length(iterNames)
 
     % Asymmetry (Per Ripple)
     currAsym = nan(1, size(rippTimes, 1));
-    if ~isempty(peakTime)
-        subPre  = cPre(currMask, :);
-        subPost = cPost(currMask, :);
+    % Asymmetry (Per Ripple)
+    currAsym = nan(1, size(rippTimes, 1));
 
-        ratePre  = sum(subPre, 1) ./ durPre';
-        ratePost = sum(subPost, 1) ./ durPost';
+    subPre  = cPre(currMask, :);
+    subPost = cPost(currMask, :);
 
-        frSum = ratePre + ratePost;
-        currAsym = (ratePre - ratePost) ./ frSum;
-        currAsym(frSum < eps) = NaN;
+    ratePre  = sum(subPre, 1) ./ durPre';
+    ratePost = sum(subPost, 1) ./ durPost';
+
+    frSum = ratePre + ratePost;
+    currAsym = (ratePre - ratePost) ./ frSum;
+    currAsym(frSum < eps) = NaN;
+
+    % --- Center of Mass (Per Ripple) ---
+    % Calculate the center of mass of spikes relative to the ripple peak.
+    % This is done by aggregating all spikes from the current unit group.
+    currCom = nan(size(rippTimes, 1), 1);
+    % --- Center of Mass (Per Ripple) ---
+    % Calculate the center of mass of spikes relative to the ripple peak.
+    % This is done by aggregating all spikes from the current unit group.
+    currCom = nan(size(rippTimes, 1), 1);
+
+    % Collect all spikes from the current unit selection
+    grpSpks = vertcat(subSpks{:});
+
+    % Find nearest ripple peak for each spike
+    peakIdx = interp1(peakTime, 1:length(peakTime), grpSpks, 'nearest', 'extrap');
+
+    % Calculate relative time
+    tRel = grpSpks - peakTime(peakIdx);
+
+    % Filter spikes within fixed window
+    inWin = abs(tRel) <= winFxd;
+
+    if any(inWin)
+        valIdx = peakIdx(inWin);
+        valRel = tRel(inWin);
+
+        % Calculate Mean CoM per Ripple (in ms)
+        currCom = accumarray(valIdx, valRel, [length(peakTime), 1], @mean, NaN) * 1000;
     end
 
     % --- Store Results ---
     fn = matlab.lang.makeValidName(currName);
     rippSpks.events.(fn).frac = currFrac;
     rippSpks.events.(fn).asym = currAsym';
+    rippSpks.events.(fn).com  = currCom;
 end
 
-
-% =========================================================================
-%  CENTER OF MASS (COM)
-% =========================================================================
-% Average time of spikes relative to ripple peak (within +/- 30 ms)
-
-com = nan(nUnits, 1);
-winCOM = 0.030; 
-
-if ~isempty(peakTime) 
-
-    peakTime = peakTime(:);
-    nRipp = length(peakTime);
-
-    % Prepare for search
-    % Find the nearest peak for every spike.
-    for iUnit = 1:nUnits
-        uSpks = spkTimes{iUnit};
-        if isempty(uSpks), continue; end
-
-        relTime = [];
-
-        if nRipp == 1
-            % Single ripple case
-            d = uSpks - peakTime;
-            relTime = d;
-        else
-            % Multiple ripples
-            % Find index of nearest peak for each spike
-            % We use interp1 with 'nearest' to map spike times to the "index" of the peak
-            % Domain is time, Range is Index 1..N
-            % Note: peaks must be unique. If duplicates exist (rare/bad), this handles it roughly.
-
-            % To use interp1, X must be distinct. Ripples should be.
-            % But interp1 needs at least 2 points.
-
-            idx = interp1(peakTime, 1:nRipp, uSpks, 'nearest', 'extrap');
-
-            % If interp1 returns neighbors, calculate diff
-            nearestPeaks = peakTime(idx);
-            relTime = uSpks - nearestPeaks;
-        end
-
-        % Filter by Window
-        isValid = abs(relTime) <= winCOM;
-
-        % Calculate Mean
-        if any(isValid)
-            com(iUnit) = mean(relTime(isValid));
-        end
-    end
-end
 
 
 % =========================================================================
