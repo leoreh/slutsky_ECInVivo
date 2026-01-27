@@ -30,10 +30,8 @@ function ripp = ripp_wrapper(varargin)
 %           'zMet'       - (Char) Z-scoring method ('adaptive', 'nrem'). Default: 'nrem'.
 %           'mapDur'     - (Vec)  Window for PETH/Maps [pre post] (s). Default: [-0.05 0.05].
 %           'bit2uv'     - (Num)  Conversion factor. Auto-detects Intan/OpenEphys if empty.
-%           'flgGui'     - (Log)  Open the interactive GUI? Default: false.
 %           'flgPlot'    - (Log)  Generate summary plots? Default: true.
 %           'flgSave'    - (Log)  Save output .mat files? Default: false.
-%           'flgQA'      - (Log)  Filter "bad" ripples (no spike gain)? Default: true.
 %           'verbose'    - (Log)  Print progress steps? Default: true.
 %           'steps'      - (Char) Execution mode: 'all', 'spks', 'phase'.
 %                                 'all': Run full pipeline (default).
@@ -73,10 +71,8 @@ addParameter(p, 'limDur', [15, 300, 20, 10], @isnumeric);
 addParameter(p, 'win', [0, Inf], @isnumeric);
 addParameter(p, 'passband', [80 250], @isnumeric);
 addParameter(p, 'detectMet', 3, @isnumeric);
-addParameter(p, 'flgGui', false, @islogical);
 addParameter(p, 'flgPlot', true, @islogical);
 addParameter(p, 'flgSave', false, @islogical);
-addParameter(p, 'flgQA', true, @islogical);
 addParameter(p, 'bit2uv', [], @isnumeric);
 addParameter(p, 'zMet', 'nrem', @ischar);
 addParameter(p, 'mapDur', [-0.1 0.1], @isnumeric);
@@ -89,7 +85,6 @@ basepath    = p.Results.basepath;
 win         = p.Results.win;
 flgPlot     = p.Results.flgPlot;
 flgSave     = p.Results.flgSave;
-flgGui      = p.Results.flgGui;
 mapDur      = p.Results.mapDur;
 verbose     = p.Results.verbose;
 steps       = p.Results.steps;
@@ -148,10 +143,12 @@ try
     boutTimes = cellfun(@(x) x - win(1), boutTimes, 'UniformOutput', false);
     boutTimes = cellfun(@(x) x(x(:,2)>0 & x(:,1)<sigDur, :), boutTimes, 'UniformOutput', false);
     nremTimes = boutTimes{4}; % Assuming standard 4th cell is NREM
+    vldTimes = vertcat(boutTimes{2}, boutTimes{3}, boutTimes{4});
 catch
     warning('Could not load sleep states.');
     boutTimes = [];
     nremTimes = [];
+    vldTimes = [];
 end
 
 % Output Files
@@ -171,7 +168,7 @@ if doLoad
     rippSig = ripp_sigLoad(p.Results, v.session, nremTimes);
 end
 
-% Detect 
+% Detect
 if doDetect
     ripp = ripp_detect(rippSig, p.Results, boutTimes, muTimes, fs, fsSpk);
 
@@ -406,7 +403,7 @@ if flgPlot
         'flgSaveFig', true);
 end
 
-if flgGui
+if flgPlot
 
     % Per Ripple Map
     tblMap = struct2table(rmfield(rippMaps, {'tstamps', 'peth'}));
@@ -527,7 +524,6 @@ function ripp = ripp_detect(rippSig, params, boutTimes, muTimes, fs, fsSpk)
 %
 %   OUTPUTS:
 %       ripp      - (Struct) Ripple events and stats.
-%       rippMaps  - (Struct) Peri-ripple LFP maps.
 
 
 % Unpack Params
@@ -536,20 +532,9 @@ basepath = params.basepath;
 win = params.win;
 thr = params.thr;
 limDur = params.limDur;
-flgGui = params.flgGui;
 flgPlot = params.flgPlot;
 flgSave = params.flgSave;
-flgQA = params.flgQA;
-mapDur = params.mapDur;
 verbose = params.verbose;
-
-% Extract State Times
-nremTimes = [];
-vldTimes = [];
-if ~isempty(boutTimes) && length(boutTimes) >= 4
-    nremTimes = boutTimes{4};
-    vldTimes = vertcat(boutTimes{2}, boutTimes{3}, boutTimes{4});
-end
 
 % Load EMG
 % -------------------------------------------------------------------------
@@ -586,7 +571,7 @@ ripp.state = ripp_states(ripp.times, ripp.peakTime, boutTimes, ...
     'flgSave', false);
 
 % Quality Assurance
-[idxQA, met] = ripp_qa(ripp.times, nremTimes, muTimes, emg, ripp.state, fs);
+[idxQA, met] = ripp_qa(ripp.times, boutTimes{4}, muTimes, emg, ripp.state, fs);
 
 % Store
 ripp.emg = met.emg;
@@ -594,11 +579,7 @@ ripp.spkGain = met.gain;
 ripp.idxQA = idxQA;
 
 % Select "Good" Ripples
-if flgQA
-    idxGood = idxQA.good;
-else
-    idxGood = true(length(ripp.times), 1);
-end
+idxGood = idxQA.good;
 
 if verbose
     fprintf('[RIPP]: QA Kept %d / %d events.\n', sum(idxGood), length(idxGood));
@@ -615,7 +596,7 @@ end
 
 % GUI
 % -------------------------------------------------------------------------
-if flgGui
+if flgPlot
     if verbose, fprintf('[RIPP]: Launching Detection GUI...\n'); end
     ripp_gui(ripp.times, ripp.peakTime, rippSig, muTimes, fs, thr, emg, ...
         'basepath', basepath);

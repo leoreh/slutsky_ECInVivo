@@ -64,6 +64,11 @@ if ismember('brst', presets)
     varMap.nBspk     = 'stats.nBspk';
 end
 
+if ismember('spktimes', presets)
+    vars = [vars, 'spikes'];
+    varMap.spktimes = 'spikes.times';
+end
+
 if ismember('prc', presets)
     vars = [vars, 'prc'];
     varMap.PRC = 'prc.prc0_norm';

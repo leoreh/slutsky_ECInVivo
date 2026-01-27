@@ -1,64 +1,6 @@
 
 
-%% ========================================================================
-%  RE-ANALYSE SPECIFIC STEPS
-%  ========================================================================
 
-basepaths = [mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl')];
-nFiles = length(basepaths);
-
-% Load Session & Data
-vars = {'session', 'spikes', 'brst', 'ripp', 'units'};
-v = basepaths2vars('basepaths', basepaths, 'vars', vars);
-
-clear rippSpks
-for iFile = 1 : nFiles
-
-    basepath = basepaths{iFile};
-    cd(basepath)
-    [~, basename] = fileparts(basepath);
-
-    ripp = v(iFile).ripp;
-    uType = v(iFile).units.type;
-
-    % Prepare Single-Unit (SU) Spike Times
-    spkTimes = v(iFile).spikes.times;
-    nUnits = length(spkTimes);
-
-    % Firing Metrics
-    rippSpks = ripp_spks(spkTimes, ...
-        ripp.times, ...
-        ripp.ctrlTimes, ...
-        ripp.peakTime, ...
-        'unitType', uType, ...
-        'flgSave', false);
-
-    % Add per ripple spike metrics to ripp struct
-    ripp.spks = rippSpks.all.events;
-    rippSpks = rmfield(rippSpks.all, 'events');
-
-    % Save
-    rippSpksFile = fullfile(basepath, [basename, '.rippSpks.mat']);
-    rippFile = fullfile(basepath, [basename, '.ripp.mat']);
-    save(rippSpksFile, 'rippSpks', '-v7.3');
-    save(rippFile, 'ripp', '-v7.3');
-
-end
-
-
-
-
-%
-% funcon = [];
-% for iFile = 1 : nFiles
-%     basepath = basepaths{iFile};
-%     cd(basepath)
-%     [~, basename] = fileparts(basepath);
-%
-%     load([basename, '.rippSpks.mat'])
-%     cc = fr_corr(rippSpks.su.rippRates, 'nShuffles', 50, 'flgPlot', false);
-%     funcon = [funcon; cc.shuffle.funcon];
-% end
 
 
 
@@ -80,11 +22,25 @@ for iFile = 1 : nFiles
         'rippCh', [], ...
         'flgPlot', false, ...
         'flgSave', true, ...
-        'steps', 'spks');
+        'steps', 'all');
     toc
 end
 
 
+
+
+
+%
+% funcon = [];
+% for iFile = 1 : nFiles
+%     basepath = basepaths{iFile};
+%     cd(basepath)
+%     [~, basename] = fileparts(basepath);
+%
+%     load([basename, '.rippSpks.mat'])
+%     cc = fr_corr(rippSpks.su.rippRates, 'nShuffles', 50, 'flgPlot', false);
+%     funcon = [funcon; cc.shuffle.funcon];
+% end
 
 
 %% ========================================================================
@@ -167,7 +123,6 @@ frml = 'dur ~ (freq + amp) * Group + (1|Name)';
 
 
 
-
 %% ========================================================================
 %  RIPPLE MAPS
 %  ========================================================================
@@ -177,6 +132,8 @@ presets = {'rippMaps'};
 
 % Plot
 tblGUI_xy(xVec, tblMaps, 'yVar', 't_z', 'grpVar', 'states');
+
+
 
 
 

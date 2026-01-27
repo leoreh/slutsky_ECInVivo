@@ -131,14 +131,14 @@ for iChunk = 1:nChunks
         'flgStable', params.dim.flgStable, ...
         'flgPlot', params.dim.flgPlot);
 
-    % % Correlations
-    % frNet.corr(iChunk) = fr_corr(frMat, ...
-    %     'nShuffles', params.corr.nShuffles, ...
-    %     'flgPlot', params.corr.flgPlot);
+    % Correlations
+    frNet.corr(iChunk) = fr_corr(frMat, ...
+        'nShuffles', params.corr.nShuffles, ...
+        'flgPlot', params.corr.flgPlot);
 
 end
 
-% frNet.corr = catfields([frNet.corr(:)], 'addim', true, [], true);
+frNet.corr = catfields([frNet.corr(:)], 'addim', true, [], true);
 
 % Save
 if flgSave

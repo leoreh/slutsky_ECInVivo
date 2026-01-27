@@ -52,11 +52,15 @@ cfg = mcu_cfg;
 %  ========================================================================
 
 % Define Variables to Load based on Presets
-% Always include core firing stats vars
-vars = {'fr', 'rcv', 'rcv_mdl', 'stats'};
+% Always include core vars
+vars = {'fr', 'rcv', 'stats'};
 
 if ismember('time', presets)
     vars = [vars, {'brstDyn'}];
+end
+
+if ismember('rcv', presets)
+    vars = [vars, {'rcv_mdl'}];
 end
 
 if ismember('spktimes', presets)
@@ -106,12 +110,10 @@ if ismember('rcv', presets)
 else
     varMap.fr        = 'rcv.frBsl';
     varMap.frSs      = 'rcv.frSs';
+    varMap.frTrough  = 'rcv.frTrough';
     varMap.uRcv      = 'rcv.uRcv';
-    varMap.rcvTime   = 'rcvMdl.rcvTime';
-    varMap.rcvWork   = 'rcv.rcvWork';
     varMap.rcvBsl    = 'rcv.rcvBsl';
     varMap.spkDfct   = 'rcv.spkDfct';
-    varMap.pertDepth = 'rcv.pertDepth';
     varMap.uPert     = 'rcv.uPert';
 end
 
@@ -226,9 +228,9 @@ if ismember('frNet', presets)
     mapNet = struct();
     mapNet.dim = 'frNet.dimExp';
     mapNet.mcc = 'frNet.mccExp';
-    mapNet.funcon_shf  = ['frNet.corr.', zMet, '.funcon'];
-    mapNet.funcon_fish  = ['frNet.corr.', 'fisher', '.funcon'];
-    mapNet.funcon_raw  = ['frNet.corr.', 'raw', '.funcon'];
+    mapNet.funcon  = ['frNet.corr.', zMet, '.funcon'];
+    % mapNet.funcon_fish  = ['frNet.corr.', 'fisher', '.funcon'];
+    % mapNet.funcon_raw  = ['frNet.corr.', 'raw', '.funcon'];
 
     tblNet = v2tbl('v', v, 'varMap', mapNet, 'tagFiles', tagFiles, ...
         'idxCol', 1, 'uOffset', 0);
@@ -248,7 +250,9 @@ tbl = removevars(tbl, 'uGood');
 tbl.UnitID = categorical(tbl.UnitID);
 
 % Post-Process Time
-tbl.rcvTime = tbl.rcvTime / 3600;
+if ismember('rcv', presets)
+    tbl.rcvTime = tbl.rcvTime / 3600;
+end
 
 % Post-Process spktimes
 if ismember('spktimes', presets)

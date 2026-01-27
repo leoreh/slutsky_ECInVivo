@@ -122,17 +122,17 @@ for iFile = 1 : nFiles
     %     'minDur', 0.005, ...
     %     'minIBI', 0.1, ...
     %     'flgForce', true, 'flgSave', true, 'flgPlot', false);
-    % 
-    % Burst temporal dynamics
-    rcv = v(iFile).rcv;
-    brst = v(iFile).brst;
-    dyn = brst_dynamics(brst, spktimes, 'binSize', 60, 'ksd', 300, ...
-        'binSize', binSize, 'flgSave', true, 'flgPlot', false);
 
-    % Burst statistics
-    winCalc = [rcv.info.winBsl; rcv.info.winTrough; rcv.info.winSs];
-    stats = brst_stats(brst, spktimes, 'winCalc', winCalc, ...
-        'flgSave', true);
+    % % Burst temporal dynamics
+    % rcv = v(iFile).rcv;
+    % brst = v(iFile).brst;
+    % dyn = brst_dynamics(brst, spktimes, 'binSize', 60, 'ksd', 300, ...
+    %     'binSize', binSize, 'flgSave', true, 'flgPlot', false);
+
+    % % Burst statistics
+    % winCalc = [rcv.info.winBsl; rcv.info.winTrough; rcv.info.winSs];
+    % stats = brst_stats(brst, spktimes, 'winCalc', winCalc, ...
+    %     'flgSave', true);
 
     % Tranfer function spikes to Ca2+
     % ca = spk2ca(spktimes, 'winCalc', [0, Inf], ...
@@ -224,19 +224,7 @@ tblGUI_scatHist(tblLme, 'xVar', 'dim', 'yVar', 'Rcv', 'grpVar', 'Group');
 
 
 
-%% ========================================================================
-%  INSPECT BURST PARAMS
-%  ========================================================================
 
-basepaths = [mcu_basepaths('mea_bac')];
-vars = {'mea'};
-v = basepaths2vars('basepaths', basepaths, 'vars', vars);
-
-mea = catfields([v(:).mea], 2);
-spktimes = mea.spktimes;
-
-% ISI VALLEY AS THRESHOLD
-isiVal = brst_isiValley(spktimes, 'nSpks', 3);
 
 
 
