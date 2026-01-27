@@ -238,8 +238,21 @@ for iVar = 1:numel(varsTrans)
         % Log Checks (Skewness)
         s = skewness(data(~isnan(data)));
         if s > skewThr
-            doOffset = true; % Check offset if log enabled
-            if verbose, fprintf('[%s] Skew %.2f > %.1f. Log enabled.\n', var, s, skewThr); end
+            % Check if data is fundamentally negative (e.g. logit)
+            pNeg = mean(data(~isnan(data)) < 0);
+
+            if pNeg > 0.2
+                if verbose
+                    fprintf('[%s] Skew %.2f but %.0f%% negative. Log disabled.\n', ...
+                        var, s, pNeg*100);
+                end
+                currLogBase = [];
+                doLog = false;
+                doOffset = false;
+            else
+                doOffset = true; % Check offset if log enabled
+                if verbose, fprintf('[%s] Skew %.2f. Log enabled.\n', var, s); end
+            end
         else
             % Disable log if skew not met
             currLogBase = [];

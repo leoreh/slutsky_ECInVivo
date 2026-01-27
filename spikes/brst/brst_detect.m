@@ -251,7 +251,7 @@ parfor iUnit = 1 : nUnits
     bSpktimes{iUnit} = bSpks;
 
     % Periodic update
-    if mod(iUnit, 5) == 0
+    if mod(iUnit, 10) == 0
         send(dq, sprintf('Processed Unit %d / %d', iUnit, nUnits));
     end
 end
