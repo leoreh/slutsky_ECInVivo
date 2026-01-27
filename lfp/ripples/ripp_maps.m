@@ -51,15 +51,15 @@ flgSave = p.Results.flgSave;
 [~, basename] = fileparts(basepath);
 mapFile = fullfile(basepath, [basename, '.rippMaps.mat']);
 
+% Create a relative window vector
+winSamps = round(mapDur(1)*fs) : round(mapDur(2)*fs);
+
 rippMaps = struct();
-rippMaps.tstamps = linspace(mapDur(1), mapDur(2), round(diff(mapDur)*fs)+1);
+rippMaps.tstamps = winSamps / fs;
 nSamps = length(rippSig.lfp);
 
 % Convert peak times to samples
 peakSamps = round(peakTime * fs) + 1;
-
-% Create a relative window vector
-winSamps = round(mapDur(1)*fs) : round(mapDur(2)*fs);
 
 % 4. Broadcast to create Full Index Matrix
 % Creates indices for EVERY sample of EVERY ripple in one step: [nEvents x nWindowSize]

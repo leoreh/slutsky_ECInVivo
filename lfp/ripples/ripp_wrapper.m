@@ -324,20 +324,6 @@ rippMaps = ripp_maps(rippSig, ripp.peakTime, fs, 'mapDur', mapDur);
 
 
 %% ========================================================================
-%  SPIKES PETH
-%  ========================================================================
-if verbose, fprintf('[RIPP]: Generating Spike PETHs...\n'); end
-
-% PETH
-rippPeth.su = ripp_spkPeth(spkTimes, ripp.peakTime, ripp.ctrlTimes, ...
-    'flgSave', false, ...
-    'mapDur', mapDur);
-rippPeth.mu = ripp_spkPeth(muTimes, ripp.peakTime, ripp.ctrlTimes, ...
-    'flgSave', false, ...
-    'mapDur', mapDur);
-
-
-%% ========================================================================
 %  SPIKE STATS
 %  ========================================================================
 if verbose, fprintf('[RIPP]: Calculating Spike Stats...\n'); end
@@ -375,15 +361,27 @@ if isfield(v, 'brst')
         ripp.ctrlTimes, ...
         ripp.peakTime, ...
         'flgSave', false);
-
-else
-    rippSpks.burst = [];
-    rippSpks.single = [];
 end
 
 % Add per ripple spike metrics to ripp struct
 ripp.spks = rippSpks.events;
 rippSpks = rmfield(rippSpks, 'events');
+
+
+%% ========================================================================
+%  SPIKES PETH
+%  ========================================================================
+if verbose, fprintf('[RIPP]: Generating Spike PETHs...\n'); end
+
+% PETH
+rippPeth.su = ripp_spkPeth(spkTimes, ripp.peakTime, ripp.ctrlTimes, ...
+    'flgSave', false, ...
+    'mapDur', mapDur);
+rippPeth.mu = ripp_spkPeth(muTimes, ripp.peakTime, ripp.ctrlTimes, ...
+    'flgSave', false, ...
+    'mapDur', mapDur);
+
+
 
 
 %% ========================================================================
@@ -407,6 +405,8 @@ spkLfp = spklfp_phase(rippSig.filt, spkTimes, fs, ...
 %     'lfpTimes', ripp.times, ...
 %     'nPerms', 0);
 
+% Remove times cell arrays after using them for phase coupling
+rippSpks = rmfield(rippSpks, 'times');
 
 %% ========================================================================
 %  SAVE

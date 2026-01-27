@@ -36,7 +36,7 @@ presets   = p.Results.presets;
 xVec = [];
 
 %% ========================================================================
-%  VAR MAP
+%  LOAD DATA
 %  ========================================================================
 
 % Set varMap
@@ -97,8 +97,6 @@ if ismember('rippSpks', presets)
     varMap.frPost = ['rippSpks.', spkType, '.frPost'];
     varMap.asym = ['rippSpks.', spkType, '.asym'];
     varMap.com = ['rippSpks.', spkType, '.com'];
-    varMap.pethZ = ['rippSpks.', spkType, '.pethZ'];
-    varMap.pethArea = ['rippSpks.', spkType, '.pethArea'];
 
     phaseType = '';
     varMap.theta = ['spkLfp.', phaseType, '.theta'];
@@ -132,10 +130,7 @@ if ismember('rippMaps', presets)
     varMap.t_z          = 'rippMaps.z';
     varMap.rs_pethZ     = 'rippMaps.spks.RS.pethZ';
     varMap.rs_pethArea  = 'rippMaps.spks.RS.pethArea';
-    varMap.fs_pethZ     = 'rippMaps.spks.FS.pethZ';
-    varMap.fs_pethArea  = 'rippMaps.spks.FS.pethArea';
-    varMap.mu_pethZ     = 'rippMaps.spks.MU.pethZ';
-    varMap.mu_pethArea  = 'rippMaps.spks.MU.pethArea';
+
 end
 
 if ismember('rippStates', presets)
@@ -147,10 +142,14 @@ if ismember('rippStates', presets)
     varMap.State        = 'rippStates.State';
 end
 
-%% ========================================================================
-%  LOAD DATA
-%  ========================================================================
+if ismember('rippPeth', presets)
+    vars = {'units', 'rippPeth'};
+    varMap = struct();
+    varMap.UnitType = 'units.type';
+    varMap.pethSU = 'rippPeth.pethSU';
+end
 
+% Load
 if isempty(basepaths)
     basepaths = [mcu_basepaths('wt'), mcu_basepaths('mcu')];
 end
@@ -195,11 +194,14 @@ if ismember('rippStates', presets)
     end
 end
 
+% Post-process ripp peth
+if ismember('rippPeth', presets) 
+    for iFile = 1:length(v)
+        v(iFile).rippPeth.pethSU = squeeze(mean(v(iFile).rippPeth.su.ripp, 2, 'omitnan'));
+    end
+    xVec = v(iFile).rippPeth.su.tstamps;
+end
 
-
-%% ========================================================================
-%  TABLE
-%  ========================================================================
 
 % Metadata
 tagFiles = struct();
