@@ -55,10 +55,10 @@ nRipples = length(peakTimes);
 nControls = size(ctrlTimes, 1);
 
 % Define Time Bins
-% Define Time Bins (Aligned to samples matching ripp_maps)
 fs = 1250;
 winSamps = round(mapDur(1)*fs) : round(mapDur(2)*fs);
 nBins = length(winSamps);
+
 % Edges centered on these samples with 1/fs width
 edges = [winSamps - 0.5, winSamps(end) + 0.5] / fs;
 timeBins = winSamps / fs;

@@ -46,140 +46,6 @@ for iFile = 1 : nFiles
 end
 
 
-%% ========================================================================
-%  RE-ANALYSE PETH
-%  ========================================================================
-
-% Load Session & Data
-vars = {'rippPeth', 'units', 'rippMaps', 'rippSpks'};
-vPeth = basepaths2vars('basepaths', basepaths, 'vars', vars);
-
-for iFile = 1 : nFiles
-
-    basepath = basepaths{iFile};
-    cd(basepath)
-    [~, basename] = fileparts(basepath);
-
-    rippMaps = vPeth(iFile).rippMaps;
-    rippSpks = vPeth(iFile).rippSpks;
-    rippPeth = vPeth(iFile).rippPeth;
-    uType = vPeth(iFile).units.type;
-    xVec = rippPeth.su.tstamps;
-
-    pethSU = squeeze(mean(rippPeth.su.ripp, 2, 'omitnan'));
-
-    % Smooth PETH (Gaussian, 5ms)
-    dt = mode(diff(rippPeth.su.tstamps));
-    sigma = 0.005; 
-    kRng = -3*sigma : dt : 3*sigma;
-    kd = normpdf(kRng, 0, sigma);
-    kd = kd / sum(kd);
-
-    % Edge Correction Vector
-    nBins = size(pethSU, 2);
-    kCorr = conv(ones(1, nBins), kd, 'same');
-
-    pethSU = conv2(pethSU, kd, 'same') ./ kCorr;
-
-    % Area Normalized
-    pethSum = sum(pethSU, 2, 'omitnan');
-    pethSum(pethSum == 0) = 1;
-    pethArea = pethSU ./ pethSum;
-
-    % Z-Score (Control Rates)
-    ctrlMap = rippPeth.su.ctrl;
-    ctrlRates = mean(ctrlMap, 3, 'omitnan');
-    ctrlSD = std(ctrlRates, [], 2, 'omitnan');
-    ctrlSD(ctrlSD == 0) = 1;
-    ctrlPeth = squeeze(mean(ctrlMap, 2, 'omitnan'));
-    ctrlAvg = mean(ctrlPeth, 2, 'omitnan');
-    pethZ = (pethSU - ctrlAvg) ./ ctrlSD;
-
-    % Add unit PETH to rippSpks
-    rippSpks.pethZ = pethZ;
-    rippSpks.pethArea = pethArea;
-    rippSpks.pethT = rippPeth.su.tstamps;
-
-    % Population PETH
-    % Calculate the mean PETH of all units of a specific type (Population Vector)
-    % and z-score using the statistics of the control population vector.
-    popTypes = {'RS', 'FS'};
-    for iType = 1:length(popTypes)
-        currType = popTypes{iType};
-        idxType = uType == currType;
-
-        if sum(idxType) == 0
-            ripp.spks.(currType).pethZ = [];
-            continue;
-        end
-
-        % Calculate Raw Population PETH (Counts per Unit)
-        % Sum spikes across units, divide by N units
-        subRipp = rippPeth.su.ripp(idxType, :, :); % (Units x Ripples x Bins)
-        popRipp = squeeze(sum(subRipp, 1)) ./ sum(idxType); % (Ripples x Bins)
-
-        % Smooth
-        popRipp = conv2(popRipp, kd, 'same') ./ kCorr;
-
-        % Area Normalized
-        popSum = sum(popRipp, 2, 'omitnan');
-        popSum(popSum == 0) = 1;
-        popArea = popRipp ./ popSum;
-
-        % Calculate Control Statistics
-        % Mean Rate per Control Event (Population)
-        % Calculate scalar mean/sd from the distribution of control event rates
-        subCtrl = rippPeth.su.ctrl(idxType, :, :); % (Units x Controls x Bins)
-        popCtrl = squeeze(sum(subCtrl, 1)) ./ sum(idxType); % (Controls x Bins)
-        ctrlRates = mean(popCtrl, 2, 'omitnan'); % (Controls x 1)
-        mu = mean(ctrlRates, 'omitnan');
-        sigma = std(ctrlRates, 'omitnan');
-        if sigma == 0, sigma = 1; end
-
-        % Z-Score
-        popZ = (popRipp - mu) ./ sigma;
-
-        % Store
-        rippMaps.spks.(currType).pethZ = popZ;
-        rippMaps.spks.(currType).pethArea = popArea;
-    end
-
-    % Population PETH (MU)
-    % Calculate the mean PETH of Multi-Unit Activity
-    popRipp = squeeze(rippPeth.mu.ripp); % (Ripples x Bins)
-
-    % Smooth
-    popRipp = conv2(popRipp, kd, 'same') ./ kCorr;
-
-    % Area Normalized
-    popSum = sum(popRipp, 2, 'omitnan');
-    popSum(popSum == 0) = 1;
-    popArea = popRipp ./ popSum;
-
-    % Calculate Control Statistics
-    popCtrl = squeeze(rippPeth.mu.ctrl); % (Controls x Bins)
-    ctrlRates = mean(popCtrl, 2, 'omitnan'); % (Controls x 1)
-    mu = mean(ctrlRates, 'omitnan');
-    sigma = std(ctrlRates, 'omitnan');
-
-    if sigma == 0, sigma = 1; end
-
-    % Z-Score
-    popZ = (popRipp - mu) ./ sigma;
-
-    % Store
-    rippMaps.spks.MU.pethZ = popZ;
-    rippMaps.spks.MU.pethArea = popArea;
-
-    % Save
-    rippSpksFile = fullfile(basepath, [basename, '.rippSpks.mat']);
-    rippMapsFile = fullfile(basepath, [basename, '.rippMaps.mat']);
-    save(rippSpksFile, 'rippSpks', '-v7.3');
-    save(rippMapsFile, 'rippMaps', '-v7.3');
-
-end
-
-figure, plot(xVec, pethArea)
 
 
 %
@@ -213,7 +79,8 @@ for iFile = 1 : nFiles
         'win', [0 12] * 3600, ...
         'rippCh', [], ...
         'flgPlot', false, ...
-        'flgSave', true);
+        'flgSave', true, ...
+        'steps', 'spks');
     toc
 end
 
@@ -249,7 +116,7 @@ frml = 'Density ~ (Duration + Rate) * Group + (1|Name)';
 %  ========================================================================
 
 presets = {'rippSpks'};
-tbl = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
+[tbl, ~, ~, xVec] = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
 
 % Select
 tblPlot = tbl;
@@ -284,25 +151,6 @@ tblRipp = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
 tblGUI_bar(tblRipp, 'xVar', 'Group', 'yVar', 'dur');
 tblGUI_scatHist(tblRipp, 'xVar', 'dur', 'yVar', 'amp', 'grpVar', 'Group');
 
-% RIPPLE TRACES
-vars = {'rippMaps', 'rippPeth'};
-vt = basepaths2vars('basepaths', basepaths, 'vars', vars);
-
-rippMaps = catfields([vt(:).rippMaps], 1);
-tblMap = struct2table(rmfield(rippMaps, {'tstamps'}));
-tblVars = tblMap.Properties.VariableNames;
-tblVars = strcat('t_', tblVars);
-tblMap.Properties.VariableNames = tblVars;
-tblMap = [tblRipp, tblMap];
-
-% Add PETH
-rippPeth = catfields([vt(:).rippPeth], 2);
-tblMap.suPETH = squeeze(mean(rippPeth.su.ripp, 1, 'omitnan'));
-tblMap.muPETH = squeeze(rippPeth.mu.ripp);
-
-% Plot
-tblGUI_xy(vt(1).rippPeth.su.tstamps, tblMap, 'yVar', 't_z', 'grpVar', 'states');
-
 % Summary
 tblSum = groupsummary(tblRipp, {'Group', 'Name'}, 'mean', ...
     vartype("numeric"));
@@ -325,24 +173,11 @@ frml = 'dur ~ (freq + amp) * Group + (1|Name)';
 %  ========================================================================
 
 presets = {'rippMaps'};
-tblMaps = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
+[tblMaps, ~, ~, xVec] = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
 
 % Plot
 tblGUI_xy(xVec, tblMaps, 'yVar', 't_z', 'grpVar', 'states');
 
-% Summary
-tblSum = groupsummary(tblRipp, {'Group', 'Name'}, 'mean', ...
-    vartype("numeric"));
-
-% Prism
-tblSum = groupsummary(tblMap(:, {'Group', 't_lfp'}), {'Group'}, {'mean', 'std'}, ...
-    vartype("numeric"));
-tblSum.mean_t_lfp';
-repmat(tblSum.GroupCount(2), 127, 1)
-
-% LME
-frml = 'dur ~ (freq + amp) * Group + (1|Name)';
-[lmeMdl, lmeStates, lmeInfo] = lme_analyse(tblRipp, frml);
 
 
 

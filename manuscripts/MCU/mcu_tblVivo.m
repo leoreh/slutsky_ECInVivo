@@ -97,8 +97,7 @@ if ismember('rippSpks', presets)
     varMap.frPost = ['rippSpks.', spkType, '.frPost'];
     varMap.asym = ['rippSpks.', spkType, '.asym'];
     varMap.com = ['rippSpks.', spkType, '.com'];
-    varMap.pethZ = ['rippSpks.', spkType, '.pethZ'];
-    varMap.pethArea = ['rippSpks.', spkType, '.pethArea'];
+    varMap.peth = ['rippSpks.', spkType, '.peth'];
 
     phaseType = '';
     varMap.theta = ['spkLfp.', phaseType, '.theta'];
@@ -130,12 +129,9 @@ if ismember('rippMaps', presets)
     varMap.t_amp        = 'rippMaps.amp';
     varMap.t_freq       = 'rippMaps.freq';
     varMap.t_z          = 'rippMaps.z';
-    varMap.rs_pethZ     = 'rippMaps.spks.RS.pethZ';
-    varMap.rs_pethArea  = 'rippMaps.spks.RS.pethArea';
-    varMap.fs_pethZ     = 'rippMaps.spks.FS.pethZ';
-    varMap.fs_pethArea  = 'rippMaps.spks.FS.pethArea';
-    varMap.mu_pethZ     = 'rippMaps.spks.MU.pethZ';
-    varMap.mu_pethArea  = 'rippMaps.spks.MU.pethArea';
+    varMap.pethRs       = 'rippMaps.peth.RS';
+    varMap.pethFs       = 'rippMaps.peth.FS';
+    varMap.pethMu       = 'rippMaps.peth.MU';
 end
 
 if ismember('rippStates', presets)
@@ -195,7 +191,13 @@ if ismember('rippStates', presets)
     end
 end
 
-
+% Extract xVec for ripples
+if ismember('rippSpks', presets) 
+    xVec = v(1).rippSpks.tstamps;
+end
+if ismember('rippMaps', presets) 
+    xVec = v(1).rippMaps.tstamps;
+end
 
 %% ========================================================================
 %  TABLE
