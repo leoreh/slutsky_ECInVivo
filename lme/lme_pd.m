@@ -67,8 +67,15 @@ end
 %    Use 'Conditional', false to compute marginal (population-level) effects.
 %    This sets random effects to 0 (population mean).
 alpha = 1 - confLvl;
-[yPred, yCI] = predict(mdl, tblGrid, 'Conditional', false, ...
-    'Prediction', 'curve', 'Alpha', alpha);
+
+% Prepare arguments for predict
+% 'Prediction' argument is only valid for LinearMixedModel (LME), not Generalized (GLME).
+predArgs = {'Conditional', false, 'Alpha', alpha};
+if isa(mdl, 'LinearMixedModel')
+    predArgs = [predArgs, {'Prediction', 'curve'}];
+end
+
+[yPred, yCI] = predict(mdl, tblGrid, predArgs{:});
 
 %% ========================================================================
 %  BACK TRANSFORM
@@ -90,9 +97,6 @@ tblPlot.(respName)  = yPred;
 tblPlot.(predName)  = yPred;
 tblPlot.(lowerName) = yCI(:, 1);
 tblPlot.(upperName) = yCI(:, 2);
-
-tblPlot.(predName)(tblPlot.Group == 'Control')
-% % % [pd] = partialDependence(mdl, {'Group', 'pBspk'});
 
 
 if ~isempty(transParams)
@@ -228,9 +232,7 @@ if ~isempty(grpName)
 end
 title(hAx, 'Partial Dependence', 'FontWeight', 'normal');
 
-% if ~isempty(transParams.varsTrans.(respName).logBase)
-%     set(hAx, 'YScale', 'log')
-% end
+set(hAx, 'YScale', 'log')
 % if ~isempty(transParams.varsTrans.(xName).logBase)
 %     set(hAx, 'XScale', 'log')
 % end

@@ -105,17 +105,17 @@ for iUnit = 1:nUnits
         continue;
     end
 
+    % Use simpler logic: Count bursts fully contained in window.
     bStart = times(:, 1);
+    bEnd   = times(:, 2);
 
     for iWin = 1:nWin
         wStart = winCalc(iWin, 1);
         wEnd   = winCalc(iWin, 2);
         wDur   = wEnd - wStart;
 
-        bIdx = (bStart >= wStart) & (bStart <= wEnd);
-        if ~any(bIdx)
-            continue;
-        end
+        % Count Bursts Fully Contained in Window
+        bIdx = (bStart >= wStart) & (bEnd <= wEnd);
 
         % Count & Event Rate
         nb = sum(bIdx);
@@ -123,10 +123,12 @@ for iUnit = 1:nUnits
         stats.eventRate(iUnit, iWin) = nb / wDur;
 
         % Structural Means
-        stats.nBspk(iUnit, iWin)   = mean(nBspk(bIdx));
-        stats.dur(iUnit, iWin)     = mean(dur(bIdx));
-        stats.freq(iUnit, iWin)    = mean(freq(bIdx));
-        stats.ibi(iUnit, iWin)     = mean(ibi(bIdx), 'omitnan');
+        if nb > 0
+            stats.nBspk(iUnit, iWin)   = mean(nBspk(bIdx));
+            stats.dur(iUnit, iWin)     = mean(dur(bIdx));
+            stats.freq(iUnit, iWin)    = mean(freq(bIdx));
+            stats.ibi(iUnit, iWin)     = mean(ibi(bIdx), 'omitnan');
+        end
 
         % Firing Rates & Partitioning
         % Spikes in window
@@ -137,6 +139,8 @@ for iUnit = 1:nUnits
         stats.frTot(iUnit, iWin) = frTot;
 
         if nst > 0
+            % Count spikes from bursts fully contained in window
+            % Since burst is fully contained, all its spikes are in window.
             bSpks = sum(nBspk(bIdx));
             frBspk = bSpks / wDur;
 

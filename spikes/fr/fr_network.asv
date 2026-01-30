@@ -64,7 +64,8 @@ params.dim.flgStable = true;
 
 % Hardcoded Parameters for CORR
 params.corr.flgPlot = flgPlot;
-params.corr.nShuffles = 500;
+params.corr.nShuffles = 1000;
+params.corr.zMet = 'shuffle';
 
 
 % Handle winLim
@@ -76,14 +77,9 @@ end
 
 % Handle winSize / Chunks
 if ~isempty(winSize)
-    % Calculate duration
-    dur = winLim(2) - winLim(1);
-
-    % Split into chunks
-    % n2chunks returns 1-based indices, so we subtract 1 to align
-    % with 0-based time, then add winLim(1) to shift to start time.
-    chunks = n2chunks('n', dur, 'chunksize', winSize, 'lastChunk', 'exclude');
-    chunks = chunks + winLim(1) - 1;
+    % Split into chunks, excluding last incomplete one
+    chunks = n2chunks('n', winLim(2), 'chunksize', winSize, ...
+        'lastChunk', 'exclude', 'clip', [0, winLim(1); winLim(2), Inf]);
 else
     chunks = winLim;
 end
@@ -143,8 +139,11 @@ for iChunk = 1:nChunks
 end
 
 frNet.corr = catfields([frNet.corr(:)], 'addim', true, [], true);
-frNet.corr.shuffle.funconAvg = mean(frNet.corr.shuffle.funcon, 2, 'omitnan');
-frNet.corr.fisher.funconAvg = mean(frNet.corr.fisher.funcon, 2, 'omitnan');
+
+figure;
+x = frNet.corr.shuffle.funcon(:, 1);
+y = frNet.corr.shuffle.funcon(:, 2);
+scatter(x, y)
 
 % Save
 if flgSave

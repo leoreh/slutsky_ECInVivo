@@ -19,6 +19,7 @@ function abl = lme_ablation(tbl, frml, varargin)
 %                     'nReps'   : Number of CV repetitions (default 5).
 %                     'flgPlot' : Plot results (default true).
 %                     'flgBkTrans : Back transform response before calculating metrics (default true).
+%                     'partitionMode' : 'batch' (default) or 'split'.
 %
 %   OUTPUTS:
 %       abl         - (struct) Results structure. Fields depend on Mode.
@@ -34,20 +35,32 @@ p = inputParser;
 addRequired(p, 'tbl', @istable);
 addRequired(p, 'frml', @ischar);
 addParameter(p, 'dist', '', @ischar);
+addParameter(p, 'nFolds', 5, @isnumeric);
 addParameter(p, 'nReps', 5, @isnumeric);
 addParameter(p, 'flgPlot', true, @islogical);
 addParameter(p, 'flgBkTrans', false, @islogical);
+addParameter(p, 'partitionMode', 'batch', @ischar);
 parse(p, tbl, frml, varargin{:});
 
 dist = p.Results.dist;
+nFolds = p.Results.nFolds;
 nReps = p.Results.nReps;
 flgPlot = p.Results.flgPlot;
 flgBkTrans = p.Results.flgBkTrans;
+partitionMode = p.Results.partitionMode;
 
 
 %% ========================================================================
 %  PREPARATION
 %  ========================================================================
+
+hasName  = ismember('Name', tbl.Properties.VariableNames);
+hasGroup = ismember('Group', tbl.Properties.VariableNames);
+
+if strcmpi(partitionMode, 'batch') && (~hasName || ~hasGroup)
+    fprintf('[LME_ABLATION] Batch mode requires Name/Group variables. Switching to ''split'' mode.\n');
+    partitionMode = 'split';
+end
 
 % Run LME_ANALYSE to prepare data and select distribution
 fprintf('[LME_ABLATION] Running initial analysis to prepare data...\n');
@@ -70,7 +83,8 @@ vars = [{'None'}, varsFxd, varsIntr];
 %  ========================================================================
 
 fprintf('[LME_ABLATION] Generating partitions...\n');
-matTrn = get_partitions(tblLme, nReps, flgClass);
+fprintf('[LME_ABLATION] Generating partitions...\n');
+matTrn = get_partitions(tbl, nReps, nFolds, flgClass, partitionMode, varRsp);
 
 nTotal = size(matTrn, 2);
 nCols  = length(vars);
@@ -325,8 +339,13 @@ nCols = size(abl.rmse, 2);
 
 % Scale bubble sizes (min 20, max 100)
 minSz = 20; maxSz = 100;
-sz = (foldSz - min(foldSz(:))) ./ (max(foldSz(:)) - min(foldSz(:)));
-sz = minSz + sz * (maxSz - minSz);
+rangeSz = max(foldSz(:)) - min(foldSz(:));
+if rangeSz < 2
+    sz = repmat(60, size(foldSz));
+else
+    sz = (foldSz - min(foldSz(:))) ./ rangeSz;
+    sz = minSz + sz * (maxSz - minSz);
+end
 
 % Connect lines (light gray)
 plot(1:nCols, abl.rmse', '-', 'Color', [0.7 0.7 0.7 0.3], 'LineWidth', 0.5);
@@ -449,12 +468,9 @@ end
 %% ========================================================================
 %  HELPER: PARTITIONS
 %  ========================================================================
-function matTrn = get_partitions(tbl, nReps, flgClass)
+function matTrn = get_partitions(tbl, nReps, nFolds, flgClass, partitionMode, varRsp)
 
-hasName  = ismember('Name', tbl.Properties.VariableNames);
-hasGroup = ismember('Group', tbl.Properties.VariableNames);
-
-if hasName && hasGroup
+if strcmpi(partitionMode, 'batch')
     % Stratified Grouped Leave-One-Pair-Out
     [uNames, idxFirst] = unique(tbl.Name, 'stable');
     nameGrps = tbl.Group(idxFirst);
@@ -487,15 +503,16 @@ if hasName && hasGroup
 
 else
     % Standard K-Fold
-    nFolds = 5;
     nTotal = nReps * nFolds;
     matTrn = true(height(tbl), nTotal);
 
     cnt = 0;
     for iRep = 1 : nReps
         if flgClass
-            cvp = cvpartition(tbl{:, 1}, 'KFold', nFolds);
+            % Stratify by Response Class
+            cvp = cvpartition(tbl.(varRsp), 'KFold', nFolds);
         else
+            % Random Split
             cvp = cvpartition(height(tbl), 'KFold', nFolds);
         end
         for iFold = 1 : nFolds

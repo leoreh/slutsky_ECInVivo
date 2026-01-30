@@ -28,7 +28,7 @@ for iFile = 1 : nFiles
     % spktimes = spktimes(uType == "RS");
 
     % FR network stats during Baseline
-    winBsl = [300, 315] * 60;
+    winBsl = [300, 360] * 60;
     frNet = fr_network(spktimes, 'flgSave', false, 'winLim', winBsl);
 
     % winLim = [0, Inf] * 60 * 60;

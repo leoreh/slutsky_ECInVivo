@@ -50,7 +50,7 @@
 % Manual inspection of FR traces (jan 2026):
 %   - No justification for limiting bsl FR.
 %   - Immediately after bac (idxPert + 5 : idxPert + 10), two units reach
-%     FR ~ 50 Hz. Removed in frRcv.Other units that not perturbed are
+%     FR ~ 50 Hz. Removed in frRcv. Other units that not perturbed are
 %     technically fine (captured by uPert)
 
 
@@ -87,10 +87,11 @@ for iFile = 1 : nFiles
     spktimes = cellfun(@(x) x(x >= winExp(1) & x <= winExp(2)), ...
         spktimes, 'UniformOutput', false);
 
-    % % Network stats
-    % winLim  = [0, 45] * 60;
-    % frNet = fr_network(spktimes, 'flgSave', true, 'winLim', winLim, ...
-    %     'winSize', 15 * 60);
+    % Network stats
+    rcv = v(iFile).rcv;
+    winLim = rcv.info.winBsl;
+    frNet = fr_network(spktimes, 'flgSave', true, 'winLim', winLim, ...
+        'winSize', 15 * 60);
     % drft = drift_file(spktimes, 'flgSave', false, 'winLim', winBsl, ...
     %     'binSize', 5 * 60, 'winSize', 20 * 60, 'flgPlot', true);
 
@@ -124,12 +125,12 @@ for iFile = 1 : nFiles
     %     'flgForce', true, 'flgSave', true, 'flgPlot', false);
 
     % % Burst temporal dynamics
-    % rcv = v(iFile).rcv;
     % brst = v(iFile).brst;
     % dyn = brst_dynamics(brst, spktimes, 'binSize', 60, 'ksd', 300, ...
     %     'binSize', binSize, 'flgSave', true, 'flgPlot', false);
 
     % % Burst statistics
+    % rcv = v(iFile).rcv;
     % winCalc = [rcv.info.winBsl; rcv.info.winTrough; rcv.info.winSs];
     % stats = brst_stats(brst, spktimes, 'winCalc', winCalc, ...
     %     'flgSave', true);
@@ -176,6 +177,11 @@ tblLme = tbl;
 varRsp = 'funcon_shf';
 frml = [varRsp, ' ~ Group * pBspk + (1|Name)'];
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tbl, frml);
+
+% Fit
+varRsp = 'pBspk';
+frml = [varRsp, ' ~ Group * fr + (1|Name)'];
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tbl, frml, 'dist', 'logit-normal');
 
 % Plot
 hFig = tblGUI_bar(tblLme, 'yVar', varRsp, 'xVar', 'Group');

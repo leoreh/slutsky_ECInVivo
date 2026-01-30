@@ -43,6 +43,7 @@ addRequired(p, 'frml', @(x) ischar(x) || isstring(x));
 % Wrapper Options
 addParameter(p, 'dist', '', @ischar);
 addParameter(p, 'flgPlot', false, @islogical);
+addParameter(p, 'fitMethod', '', @ischar);
 
 % Pass-through Options (LME_EFFECTS)
 addParameter(p, 'contrasts', 'all');
@@ -54,6 +55,7 @@ parse(p, tbl, frml, varargin{:});
 dist = p.Results.dist;
 verbose = p.Results.verbose;
 flgPlot = p.Results.flgPlot;
+fitMethod = p.Results.fitMethod;
 frml = char(frml);
 
 % Run Info Storage
@@ -221,7 +223,7 @@ lmeInfo.distFinal = dist;
 %  MODEL FITTING
 %  ========================================================================
 
-lmeMdl = lme_fit(lmeTbl, frml, 'dist', dist);
+lmeMdl = lme_fit(lmeTbl, frml, 'dist', dist, 'fitMethod', fitMethod);
 
 if flgPlot
     lme_plotRes(lmeMdl, 'Name', 'LME Analyse Diagnostics');

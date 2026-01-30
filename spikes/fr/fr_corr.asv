@@ -108,47 +108,38 @@ maskOffDiag = true(nUnits) & ~eye(nUnits);
 nOffDiag = sum(maskOffDiag(:));
 
 % Pre-allocate noise values
-if flgPlot
-    allNoiseVals = zeros(nShuffles * nOffDiag, 1);
-else
-    allNoiseVals = 0;
-end
+allNoiseVals = zeros(nShuffles * nOffDiag, 1);
 
 for iShuff = 1:nShuffles
 
-    % 1. Generate Random Shifts (one per unit)
+    % Generate Random Shifts (one per unit)
     shifts = randi(nTime, nUnits, 1) - 1;
 
-    % 2. Create Shifted Column Indices (Vectorized)
-    % (Col + Shift - 1) mod T + 1
-    % Implicit expansion: (1 x T) + (N x 1) -> (N x T)
-    tIdx = mod((1:nTime) + shifts - 1, nTime) + 1;
+    % Create Shifted Indices 
+    % (t + shift - 1) mod T + 1
+    tIdx = mod(tIdxInitial + shifts - 1, nTime) + 1;
 
-    % 3. Convert to Linear Indices for fast extraction
-    % Linear Index = (Col - 1)*nUnits + Row
-    % Using implicit integer expansion for linear index:
-    % (tIdx - 1)*nUnits + (1:nUnits)'
-    shiftIdx = (tIdx - 1) * nUnits + (1:nUnits)';
-
+    % Convert to Linear Indices for fast extraction
+    % Row indices are fixed (1:N repeated), Col indices are shifted
+    shiftIdx = sub2ind([nUnits, nTime], repmat((1:nUnits)', 1, nTime), tIdx);
     Z_shuff = spkz(shiftIdx); % Entire matrix shifted at once
 
-    % 4. Fast Correlation (Matrix Multiplication)
+    % Fast Correlation (Matrix Multiplication)
     % Since spkz is Z-scored, Cov = (Z*Z') / (N-1)
+    % This is significantly faster than cov() which re-checks means
     rShuff = (Z_shuff * Z_shuff') ./ (nTime - 1);
 
     % Zero diagonal (Auto-correlation)
     rShuff(1:nUnits+1:end) = 0;
 
-    % Accumulate Stats
+    % Accumulate
     sumR = sumR + rShuff;
     sumR2 = sumR2 + rShuff.^2;
 
     % Store off-diagonal for global noise distribution
-    if flgPlot
-        idxStart = (iShuff - 1) * nOffDiag + 1;
-        idxEnd = iShuff * nOffDiag;
-        allNoiseVals(idxStart:idxEnd) = rShuff(maskOffDiag);
-    end
+    idxStart = (iShuff - 1) * nOffDiag + 1;
+    idxEnd = iShuff * nOffDiag;
+    allNoiseVals(idxStart:idxEnd) = rShuff(maskOffDiag);
 end
 
 % Per-Pair Noise Stats

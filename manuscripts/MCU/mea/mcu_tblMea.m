@@ -228,9 +228,9 @@ if ismember('frNet', presets)
     mapNet = struct();
     mapNet.dim = 'frNet.dimExp';
     mapNet.mcc = 'frNet.mccExp';
-    mapNet.funcon  = ['frNet.corr.', zMet, '.funcon'];
-    % mapNet.funcon_fish  = ['frNet.corr.', 'fisher', '.funcon'];
-    % mapNet.funcon_raw  = ['frNet.corr.', 'raw', '.funcon'];
+    mapNet.funcon  = ['frNet.corr.', zMet, '.funconAvg'];
+    mapNet.funcon_fish  = ['frNet.corr.', 'fisher', '.funconAvg'];
+    mapNet.funcon_raw  = ['frNet.corr.', 'raw', '.funconAvg'];
 
     tblNet = v2tbl('v', v, 'varMap', mapNet, 'tagFiles', tagFiles, ...
         'idxCol', 1, 'uOffset', 0);

@@ -3,7 +3,7 @@
 %  LOAD AND PREP
 %  ========================================================================
 
-presets = {'rcv', 'frNet'};
+presets = {'frNet'};
 [tbl, xVec, basepaths, v] = mcu_tblMea('presets', presets);
 
 % tblGUI_xy(xVec, tbl);
@@ -24,67 +24,70 @@ tblLme.pBspk_trans = tblTrans.pBspk;
 
 
 tblGUI_scatHist(tblLme, 'xVar', 'pBspk', 'yVar', 'funcon', 'grpVar', 'Group');
+tblGUI_bar(tblLme, 'yVar', 'pBspk', 'xVar', 'Group');
+
 grpIdx = tblLme.Group == "MCU-KO";
 tblLme(grpIdx, {'pBspk_trans', 'funcon'})
 
 % Exclude non-bursting
-% tblLme = tblLme(tblLme.pBspk > 0, :);
+tblLme = tblLme(tblLme.pBspk > 0, :);
 
-% List of possible vars
-listPrdct = {'pertDepth', 'fr', 'pBspk', 'Group', '(1|Name)'};
-listRspns = {'uRcv', 'rcvBsl', 'rcvTime', 'spkDfct', 'Genotype', 'frSs', 'rcvWork'};
+
 
 %% ========================================================================
 %  ABLATION
 %  ========================================================================
 
-% Recovery
-frml = 'frSs ~ (fr + pBspk_trans + frTrough + funcon) * Group + (1|Name)';
+frml = 'frSs ~ (frBspk + frSspk)';
 
-abl = lme_ablation(tblLme, frml, 'dist', 'log-normal', 'flgBkTrans', false);
+tblWt = tblLme(tblLme.Group == 'Control', :);
 
-[lmeMdl, lmeStats, lmeInfo, tblMdl] = lme_analyse(tblLme, frml, 'dist', 'log-normal');
+abl = lme_ablation(tblWt, frml, 'dist', 'gamma', ...
+    'flgBkTrans', false, 'partitionMode', 'split');
 
+tblMcu = tblLme(tblLme.Group == 'MCU-KO', :);
 
-tblGUI_scatHist(tblLme, 'xVar', 'pBspk', 'yVar', 'frSs', 'grpVar', 'Group');
+abl = lme_ablation(tblMcu, frml, 'dist', 'log-normal', ...
+    'flgBkTrans', false, 'partitionMode', 'split');
 
+%% ========================================================================
+%  Full Model
+%  ========================================================================
 
-frml = 'frSs ~ (fr + pBspk_trans + frTrough + funcon) * Group + (pBspk_trans|Name)';
-[lmeMdl, lmeStats, lmeInfo, tblMdl] = lme_analyse(tblLme, frml, 'dist', 'log-normal');
+xVar = 'pBspk';
 
-figure
-plotPartialDependence(lmeMdl, "pBspk_trans", "Conditional", "centered")
-plotPartialDependence(lmeMdl, {'pBspk_trans', 'Group'});
+frml = sprintf('frSs ~ (fr + %s) * Group + (1|Name)', xVar);
 
-
+[lmeMdl, lmeStats, lmeInfo, tblMdl] = lme_analyse(tblLme, frml, 'dist', 'gamma');
 
 
 % PLOT INTERACTION
-vars = {'pBspk_trans', 'Group'};
+vars = {xVar, 'Group'};
 hFig = plot_axSize('flgFullscreen', true, 'flgPos', true);
 
 % Partial Residuals
 hAx = nexttile;
-[prRes, hFig] = lme_pr(lmeMdl, vars, 'transParams', [], ...
+[prRes, hFig] = lme_pr(lmeMdl, vars, 'transParams', lmeInfo.transParams, ...
     'hAx', hAx);
 
 % Partial Dependence
 hAx = nexttile;
-[pdRes, hFig] = lme_pd(lmeMdl, vars, 'transParams', [], ...
+[pdRes, hFig] = lme_pd(lmeMdl, vars, 'transParams', lmeInfo.transParams, ...
     'hAx', hAx);
 
+
+
+
+
+
+% To Prism
 grpIdx = pdRes.Group == "MCU-KO";
-pdRes(grpIdx, {'frSs_pred', 'frSs_upper', 'frSs_lower'})
-
-grpIdx = pdRes.Group == "MCU-KO";
-pdRes(grpIdx, {'pBspk_trans'})
-
-[tblPrism.frSs_pred, tblPrism.frSs_pred
+[pdRes(grpIdx, {'pBspk_trans'}), ...
+    pdRes(grpIdx, {'frSs_pred', 'frSs_upper', 'frSs_lower'})]
 
 
 
 
-tblGUI_scatHist(tblMdl, 'xVar', 'pBspk', 'yVar', 'frSs', 'grpVar', 'Group');
 
 
 
@@ -102,25 +105,9 @@ res = lme_ablation(tblLme, frml, 'nFolds', nFolds, 'nReps', nReps);
 
 
 
-
-
-
 % Mediation
 frml = sprintf('uRcv ~ %s + (1|Name)', strjoin(varsFxd, ' + '));
 res = lme_mediation(tblLme, frml, 'Group', 'pBspk');
-
-% Limit tbl to control
-tblCtrl = tblLme(tblLme.Group == "Control", :);
-tblCtrl(:, 'Group') = [];
-frml = 'frSs ~ frTrough + fr + pBspk + (1|Name)';
-
-res = lme_ablation(tblCtrl, frml, 'dist', 'log-normal');
-
-
-varsFxd  = {'pertDepth', 'fr', 'pBspk'};
-frml = sprintf('rcvBsl ~ %s + (1|Name)', strjoin(varsFxd, ' + '));
-res = lme_ablation(tblLme, frml, 'nFolds', nFolds, 'nReps', nReps);
-
 
 
 
@@ -143,14 +130,8 @@ res = lme_ablation(tblLme, frml, 'nFolds', nFolds, 'nReps', nReps);
 % the same as when frSs is the response and fr is not a predictor
 % (obvsiouly)
 %
-% Burstiness shows stronger predictive capacity when frTrough is provided
-% instead of pertDepth
-%
-% Burstiness shows stronger predictive capacity when NOT log- or
-% logit-transformed. It's skeweness is only ~1.6 so it's okay.
-%
 % Gamma distribution fails to converge in the ablation analysis
-%  ========================================================================
+% =========================================================================
 
 
 
