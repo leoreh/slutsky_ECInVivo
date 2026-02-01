@@ -72,11 +72,11 @@ sData = struct('nremSpks', {}, 'nremDur', {}, 'nSpkTot', {});
 for iFile = 1:nFiles
     
     spktimes = v(iFile).spikes.times;
-    boutTimes = ints(v(iFile).ss.bouts.times{idxState});
+    boutTimes = intervals(v(iFile).ss.bouts.times{idxState});
     
     % Filter spikes: Keep only those within NREM bouts
     tic
-    spks = cellfun(@(x) RestrictInts(x, boutTimes.list), spktimes, 'uni', false);
+    spks = cellfun(@(x) RestrictInts(x, boutTimes.ints), spktimes, 'uni', false);
     toc
 
     tic
