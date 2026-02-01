@@ -75,7 +75,11 @@ varsGrp = {};
 if ~isempty(varsRnd)
     for iRand = 1:length(varsRnd)
         tokens = regexp(varsRnd{iRand}, '\|([^)]+)\)', 'tokens');
-        varsGrp = [varsGrp; strtrim(tokens{1}{1})];
+        grpTerm = strtrim(tokens{1}{1});
+        
+        % Split by ':' or '*' to handle interactions (e.g., Name:UnitID)
+        grpVars = strtrim(split(grpTerm, {':', '*'}));
+        varsGrp = [varsGrp; grpVars(:)];
     end
 end
 varsGrp = unique(varsGrp);
@@ -206,9 +210,6 @@ switch lower(dist)
         dist = 'Normal';
 
     case {'gamma', 'poisson', 'inversegaussian'}
-        if verbose
-            fprintf('[LME_ANALYSE] Zero-inflation detected for %s. Adding offset.\n', dist);
-        end
         [lmeTbl, pResp] = tbl_trans(lmeTbl, 'varsInc', {varResp}, ...
             'flg0', true, 'verbose', verbose);
         if isfield(pResp, 'varsTrans') && isfield(pResp.varsTrans, varResp)

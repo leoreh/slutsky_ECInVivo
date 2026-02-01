@@ -213,7 +213,7 @@ tblLong = stack(tblLme, {'fr', 'frSs'}, ...
 
 varRsp = 'FiringRate';
 frml = [varRsp, ' ~ Group * Epoch + (1|Name) + (1 | Name:UnitID)'];
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLong, frml, 'dist', 'gamma');
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLong, frml, 'dis');
 
 
 %% ========================================================================

@@ -11,15 +11,8 @@ spktimes = tblVivo.spktimes;
 
 % Load states
 cfgState = as_loadConfig;
-vars = {'sleep_states'};
-v = basepaths2vars('basepaths', basepaths, 'vars', vars);
-ss = catfields([v(:).ss], 1);
-boutTimes = ss.bouts.times;
-
-idxState = contains(cfgState.names, "NREM");
-
-
-
+vars = ['states'];
+v = basepaths2vars()
 winCalc = []; 
 
 % Sweeping Params

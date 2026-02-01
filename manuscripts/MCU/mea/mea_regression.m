@@ -21,13 +21,14 @@ tblLme = removevars(tblLme, 'uPert');
 tblTrans = tbl_trans(tblLme, 'varsInc', {'pBspk'}, 'logBase', 'logit');
 tblLme.pBspk_trans = tblTrans.pBspk;
 
-
-
 tblGUI_scatHist(tblLme, 'xVar', 'pBspk', 'yVar', 'funcon', 'grpVar', 'Group');
 tblGUI_bar(tblLme, 'yVar', 'pBspk', 'xVar', 'Group');
 
 grpIdx = tblLme.Group == "MCU-KO";
-tblLme(grpIdx, {'pBspk_trans', 'funcon'})
+grpIdx = tblLme.Group == "Control";
+prismData = tblLme.pBspk_trans(grpIdx);
+mean(prismData)
+sum(prismData > 0) / length(prismData)
 
 % Exclude non-bursting
 tblLme = tblLme(tblLme.pBspk > 0, :);
@@ -39,16 +40,17 @@ tblLme = tblLme(tblLme.pBspk > 0, :);
 %  ========================================================================
 
 frml = 'frSs ~ (frBspk + frSspk)';
+nRep = 10;
 
 tblWt = tblLme(tblLme.Group == 'Control', :);
 
 abl = lme_ablation(tblWt, frml, 'dist', 'gamma', ...
-    'flgBkTrans', false, 'partitionMode', 'split');
+    'flgBkTrans', false, 'partitionMode', 'split', 'nrep', nRep);
 
 tblMcu = tblLme(tblLme.Group == 'MCU-KO', :);
 
-abl = lme_ablation(tblMcu, frml, 'dist', 'log-normal', ...
-    'flgBkTrans', false, 'partitionMode', 'split');
+abl = lme_ablation(tblMcu, frml, 'dist', 'gamma', ...
+    'flgBkTrans', false, 'partitionMode', 'split', 'nrep', nRep);
 
 %% ========================================================================
 %  Full Model
@@ -62,7 +64,7 @@ frml = sprintf('frSs ~ (fr + %s) * Group + (1|Name)', xVar);
 
 
 % PLOT INTERACTION
-vars = {xVar, 'Group'};
+vars = {'fr', 'Group'};
 hFig = plot_axSize('flgFullscreen', true, 'flgPos', true);
 
 % Partial Residuals
@@ -75,14 +77,11 @@ hAx = nexttile;
 [pdRes, hFig] = lme_pd(lmeMdl, vars, 'transParams', lmeInfo.transParams, ...
     'hAx', hAx);
 
-
-
-
-
+set(gca,'XScale','log')
 
 % To Prism
-grpIdx = pdRes.Group == "MCU-KO";
-[pdRes(grpIdx, {'pBspk_trans'}), ...
+grpIdx = pdRes.Group == "Control";
+[pdRes(grpIdx, {'pBspk'}), ...
     pdRes(grpIdx, {'frSs_pred', 'frSs_upper', 'frSs_lower'})]
 
 

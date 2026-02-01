@@ -230,7 +230,7 @@ if ismember('frNet', presets)
     mapNet.mcc = 'frNet.mccExp';
     mapNet.funcon  = ['frNet.corr.', zMet, '.funconAvg'];
     mapNet.funcon_fish  = ['frNet.corr.', 'fisher', '.funconAvg'];
-    mapNet.funcon_raw  = ['frNet.corr.', 'raw', '.funconAvg'];
+    % mapNet.funcon_raw  = ['frNet.corr.', 'raw', '.funcon'];
 
     tblNet = v2tbl('v', v, 'varMap', mapNet, 'tagFiles', tagFiles, ...
         'idxCol', 1, 'uOffset', 0);

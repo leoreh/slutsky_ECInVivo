@@ -16,9 +16,9 @@ cfg.clr.unit = [0.1, 0.1, 0.4;...   % RS
 cfg.vars = {'fr', 'units', 'st_metrics'};
 
 % Variable mapping
-cfg.varMap.FR = 'fr.mfr';
+cfg.varMap.fr = 'fr.mfr';
 cfg.varMap.bRoy = 'st.royer';
-cfg.varMap.UnitType = 'units.type';
+cfg.varMap.unitType = 'units.type';
 
 % Labels
 cfg.lbl.grp = {'Control'; 'MCU-KO'};

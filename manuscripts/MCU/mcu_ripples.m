@@ -71,7 +71,7 @@ frml = 'Density ~ (Duration + Rate) * Group + (1|Name)';
 %  RIPP SPIKES
 %  ========================================================================
 
-presets = {'rippSpks'};
+presets = {'rippSpks', 'brst'};
 [tbl, ~, ~, xVec] = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
 
 % Select
@@ -80,20 +80,36 @@ tblPlot = tbl(tbl.UnitType == 'RS', :);
 % tblPlot(tblPlot.Name == 'lh137', :) = [];
 % tblPlot.Name = removecats(tblPlot.Name, {'lh137'});
 
+% Add logit pBspk
+tblTrans = tbl_trans(tblPlot, 'varsInc', {'pBspk'}, 'logBase', 'logit');
+tblPlot.pBspk_trans = tblTrans.pBspk;
+
 % Plot
 tblGUI_bar(tblPlot, 'xVar', 'Group', 'yVar', 'frZ');
 tblGUI_scatHist(tblPlot, 'xVar', 'asym', 'yVar', 'bRoy', 'grpVar', 'Group');
 tblGUI_xy(xVec, tbl);
 
 % LME
-frml = 'com ~ Group * bRoy + (1|Name)';
+frml = 'com ~ Group + (1|Name)';
 [lmeMdl, lmeStates, lmeInfo] = lme_analyse(tblPlot, frml);
 
 % Summary
 tblSum = groupsummary(tblPlot, {'Group', 'Name'}, 'mean', ...
     vartype("numeric"));
 
+% To Prism (Metrics)
+prismMat = tbl2prism(tblPlot, 'yVar', 'com', 'grpVar', 'Group');
+mean(prismMat, 1, 'omitnan');
 
+% To prism (Time)
+yVar = 'peth';
+grpIdx = tbl.Group == 'MCU-KO';
+unitIdx = tbl.unitType == 'RS';
+prismIdx = grpIdx & unitIdx;
+nUnits = sum(prismIdx);
+prismMat = [mean(tbl{prismIdx, yVar}, 1, 'omitnan')', ...
+    std(tbl{prismIdx, yVar}, [], 1, 'omitnan')', ...
+    repmat(nUnits, length(xVec), 1)];
 
 
 %% ========================================================================
@@ -111,16 +127,16 @@ tblGUI_scatHist(tblRipp, 'xVar', 'dur', 'yVar', 'amp', 'grpVar', 'Group');
 tblSum = groupsummary(tblRipp, {'Group', 'Name'}, 'mean', ...
     vartype("numeric"));
 
-% Prism
-tblSum = groupsummary(tblMap(:, {'Group', 't_lfp'}), {'Group'}, {'mean', 'std'}, ...
-    vartype("numeric"));
-tblSum.mean_t_lfp';
-repmat(tblSum.GroupCount(2), 127, 1)
-
 % LME
-frml = 'dur ~ (freq + amp) * Group + (1|Name)';
+frml = 'dur ~ (freq + amp + com) * Group + (1|Name)';
 [lmeMdl, lmeStates, lmeInfo] = lme_analyse(tblRipp, frml);
 
+frml = 'freq ~ Group + (1|Name)';
+[lmeMdl, lmeStates, lmeInfo] = lme_analyse(tblRipp, frml);
+
+% To Prism (Metrics)
+prismMat = tbl2prism(tblRipp, 'yVar', 'freq', 'grpVar', 'Group');
+mean(prismMat, 1, 'omitnan');
 
 
 %% ========================================================================
@@ -133,6 +149,13 @@ presets = {'rippMaps'};
 % Plot
 tblGUI_xy(xVec, tblMaps, 'yVar', 't_z', 'grpVar', 'states');
 
+% To prism
+yVar = 't_freq';
+grpIdx = tblMaps.Group == 'Control';
+nRipp = height(tblMaps(grpIdx, :));
+prismMat = [mean(tblMaps{grpIdx, yVar}, 1, 'omitnan')', ...
+    std(tblMaps{grpIdx, yVar}, [], 1, 'omitnan')', ...
+    repmat(nRipp, length(xVec), 1)];
 
 
 

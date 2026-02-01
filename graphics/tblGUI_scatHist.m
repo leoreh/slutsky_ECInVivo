@@ -161,10 +161,16 @@ ctlTop      = 0.96;
 ctlH        = 0.04;
 ctlGap      = 0.01;
 ctlW        = panelW - 0.02;     % Full width
-ctlW_Half   = ctlW / 2 - 0.005;  % Half width
+ctlW_Half   = ctlW / 2 - 0.005;  % Half width (2-col)
+ctlW_Third  = (ctlW - 2*ctlGap) / 3; % Third width (3-col)
 
 ctlX        = 0.01;
 ctlX_Right  = ctlX + ctlW_Half + 0.01;
+
+% 3-col positions
+ctlX_1      = ctlX;
+ctlX_2      = ctlX + ctlW_Third + ctlGap;
+ctlX_3      = ctlX + 2*(ctlW_Third + ctlGap);
 
 % --- X Variable ---
 uicontrol('Parent', hContainer, 'Style', 'text', 'String', 'X Variable / Scale:', ...
@@ -179,15 +185,22 @@ guiData.ddXScale = uicontrol('Parent', hContainer, 'Style', 'popupmenu', ...
     'Position', [ctlX_Right, ctlTop - 2*ctlH, ctlW_Half, ctlH], ...
     'Callback', @onUpdatePlot);
 
-% --- Discretize Checkbox (New Row) ---
+% --- Discretize / Adaptive / Prct (Row 3) ---
+yPosChk = ctlTop - 3*ctlH - ctlGap;
+
 guiData.chkDisc = uicontrol('Parent', hContainer, 'Style', 'checkbox', ...
-    'String', 'Discretize', 'Units', 'normalized', ...
-    'Position', [ctlX, ctlTop - 3*ctlH - ctlGap, ctlW_Half, ctlH], ...
+    'String', 'Disc', 'Units', 'normalized', ...
+    'Position', [ctlX_1, yPosChk, ctlW_Third, ctlH], ...
     'Callback', @onUpdatePlot);
 
 guiData.chkAdapt = uicontrol('Parent', hContainer, 'Style', 'checkbox', ...
-    'String', 'Adaptive', 'Units', 'normalized', ...
-    'Position', [ctlX_Right, ctlTop - 3*ctlH - ctlGap, ctlW_Half, ctlH], ...
+    'String', 'Adpt', 'Units', 'normalized', ...
+    'Position', [ctlX_2, yPosChk, ctlW_Third, ctlH], ...
+    'Callback', @onUpdatePlot);
+
+guiData.chkPrct = uicontrol('Parent', hContainer, 'Style', 'checkbox', ...
+    'String', 'Prct', 'Units', 'normalized', ...
+    'Position', [ctlX_3, yPosChk, ctlW_Third, ctlH], ...
     'Callback', @onUpdatePlot);
 
 % --- Y Variable ---
@@ -591,8 +604,9 @@ onUpdatePlot(hContainer, []);
             % Binned Stats Calculation
             if isDisc
                 isAdapt = get(data.chkAdapt, 'Value');
+                isPrct  = get(data.chkPrct, 'Value');
 
-                sStruct = calcBinnedStats(xG, yG, cG, isAdapt, xEdges, scaleX);
+                sStruct = calcBinnedStats(xG, yG, cG, isAdapt, isPrct, xEdges, scaleX);
 
                 if ~isempty(sStruct)
                     statsData{end+1} = sStruct; %#ok<AGROW>
@@ -703,7 +717,7 @@ onUpdatePlot(hContainer, []);
     end % EOF applyPaddedLimits
 
 % --- Helper: Binned Stats Calculation ---
-    function sStruct = calcBinnedStats(xG, yG, cG, isAdapt, xEdges, scaleX)
+    function sStruct = calcBinnedStats(xG, yG, cG, isAdapt, isPrct, xEdges, scaleX)
         % CALCBINNEDSTATS Calculates binned statistics (median, error bars).
         %
         %   Can use fixed edges (xEdges) or adaptive binning based on
@@ -780,12 +794,27 @@ onUpdatePlot(hContainer, []);
                 hasData = true;
 
                 % Y-Stats
+                % Y-Stats
                 ySub = yG(inBin);
-                p    = prctile(ySub, [10, 50, 90]);
-
-                bLow(iB)  = p(1);
-                bMeds(iB) = p(2);
-                bHigh(iB) = p(3);
+                
+                if isPrct
+                    % Request: If Pressed (Checked) -> Mean +/- SEM
+                    mu  = mean(ySub, 'omitnan');
+                    sd  = std(ySub, 'omitnan');
+                    nn  = sum(~isnan(ySub));
+                    sem = sd / sqrt(nn);
+                    
+                    bLow(iB)  = mu - sem;
+                    bMeds(iB) = mu;
+                    bHigh(iB) = mu + sem;
+                else
+                    % Default (Unchecked) -> Percentiles
+                    p = prctile(ySub, [10, 50, 90]);
+    
+                    bLow(iB)  = p(1);
+                    bMeds(iB) = p(2);
+                    bHigh(iB) = p(3);
+                end
 
                 % X-Center
                 if useDataCtr
