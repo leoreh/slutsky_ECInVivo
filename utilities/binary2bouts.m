@@ -127,7 +127,6 @@ if ~isempty(interDur)
     bouts = [bouts(isStart, 1), bouts(isStop, 2)];
 
     % correct last bout to end of recording
-    % If gap to end is small, extend? (Legacy logic assumption: check gap from stop to end)
     if length(vec) - bouts(end, end) < interDur
         bouts(end, end) = length(vec);
     end
