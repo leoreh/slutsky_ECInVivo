@@ -116,7 +116,7 @@ if graphics
     plot(x, [iis.thr(2) iis.thr(2)], '--r')
     scatter(iis.peakPos(idx2) / fs / 60,...
         iis.peakPower(idx2), '*');
-    bsstamps = RestrictInts(bs.stamps, [idx(1) idx(end)]);
+    bsstamps = intervals(bs.stamps).intersect(intervals([idx(1) idx(end)])).ints;
     Y = ylim;
     if ~isempty(bsstamps)
         fill([bsstamps fliplr(bsstamps)] / fs / 60, [Y(1) Y(1) Y(2) Y(2)],...

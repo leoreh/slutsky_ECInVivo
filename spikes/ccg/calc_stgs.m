@@ -110,7 +110,8 @@ if exist(stgfile) && ~forceA
 end
 
 % limit spktimes to winCalc
-funh = @(x) x(InIntervals(x, winCalc)); 
+winObj = intervals(winCalc);
+funh = @(x) winObj.restrict(x(:), 'flgShift', false); 
 spktimes = cellfun(funh, spktimes, 'uni', false);
 
 % add one spike to empty units. this is important so that

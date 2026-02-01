@@ -485,7 +485,8 @@ end
 % plot(x, [thr thr], '--r')
 % scatter(iis.peakPos(idx5) / fs / 60,...
 %     power, '*');
-bsstamps = RestrictInts(bs.stamps, [idx2(1) - 600 * fs idx2(end) + 600 * fs]);
+range = intervals([idx2(1) - 600 * fs, idx2(end) + 600 * fs]);
+bsstamps = intervals(bs.stamps).intersect(range).ints;
 bsstamps = [bsstamps(1 : end - 1, 2) bsstamps(2 : end, 1)];
 ylim(YY);
 if ~isempty(bsstamps)

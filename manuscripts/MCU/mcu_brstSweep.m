@@ -75,22 +75,11 @@ for iFile = 1:nFiles
     boutTimes = intervals(v(iFile).ss.bouts.times{idxState});
     
     % Filter spikes: Keep only those within NREM bouts
-    tic
-    spks = cellfun(@(x) RestrictInts(x, boutTimes.ints), spktimes, 'uni', false);
-    toc
-
-    tic
-    spks2 = cellfun(@(x) boutTimes.restrict(x), spktimes, 'uni', false);
-    toc
-    
+    spks = cellfun(@(x) boutTimes.restrict(x, 'flgShift', false), spktimes, 'uni', false);
 
     
     % Calculate Duration (Sum of NREM bouts)
-    if isempty(boutTimes)
-        nremDur = 0;
-    else
-        nremDur = sum(boutTimes(:,2) - boutTimes(:,1));
-    end
+    nremDur = boutTimes.dur;
     
     % Store
     sData(iFile).nremSpks = spks;
@@ -121,7 +110,7 @@ for iIsi = 1 : nIsi
             currData  = sData(iFile);
             nremDur   = currData.nremDur;
             nSpkTot   = currData.nSpkTot; % [nUnits x 1]
-            boutTimes = v(iFile).ss.bouts.times{idxState};
+            boutTimes = intervals(v(iFile).ss.bouts.times{idxState});
             
             brst = brstGrid{iFile, iIsi, iSpk};
             nb   = length(brst.times);
@@ -144,8 +133,13 @@ for iIsi = 1 : nIsi
                 end
 
                 % Filter Bursts: Keep only those fully inside NREM bouts
-                keepIdx = InIntervals(t(:,1), boutTimes) & InIntervals(t(:,2), boutTimes);
-                
+                tic
+                keepIdx = boutTimes.contains(t(:,1)) & boutTimes.contains(t(:,2));
+                toc
+                tic
+                keepIdx = InIntervals(t(:,1), boutTimes.ints) & InIntervals(t(:,2), boutTimes.ints);
+                toc
+
                 % Count Spikes in Valid Bursts
                 nBspkVals = brst.nBspk{iUnit}(keepIdx);
                 totBSpk   = sum(nBspkVals);

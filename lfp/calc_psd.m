@@ -181,13 +181,13 @@ for icell = 1 : ncells
     % ---------------------------------------------------------------------
     % ALT 2: cat bouts and calc psd once (mspectrumsegc)
     elseif alt == 2
-        dataIdx = Restrict([1 : length(sig)], bins{icell} * fs);
+        dataIdx = intervals(bins{icell} * fs).restrict((1 : length(sig))', 'flgShift', false);
         [psd(icell, :), f] = mtspectrumsegc(sig(dataIdx), window, mtspec_params, segave);
     
     % ---------------------------------------------------------------------
     % ALT 3: cat bouts and calc psd once (mspectrumc). doesn't work good. 
     elseif alt == 3
-        dataIdx = Restrict([1 : length(sig)], bins{icell} * fs);
+        dataIdx = intervals(bins{icell} * fs).restrict((1 : length(sig))', 'flgShift', false);
         [tmp, f] = mtspectrumc(sig(dataIdx), mtspec_params);
     
         % adjust the fequency domain

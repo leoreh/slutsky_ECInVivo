@@ -141,7 +141,9 @@ if exist(asFile, 'file') || ~isempty(btimes)
             fr.states.tstamps{istate} = 0;
             continue
         end
-        boutIdx = InIntervals(btimes{istate}, winCalc);
+        % Check if bouts are within winCalc (start and stop)
+        winObj = intervals(winCalc);
+        boutIdx = winObj.contains(btimes{istate}(:,1)) & winObj.contains(btimes{istate}(:,2));
         fr.states.binidx = boutIdx;     % for legacy
 
         if all(size(btimes{istate}) > 1)

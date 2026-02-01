@@ -97,7 +97,7 @@ for iState = 1:nStates
 
     % Map ripples to bouts for this state (Categorical Assignment)
     if ~isempty(bouts)
-        inState = InIntervals(peakTimes, bouts);
+        inState = intervals(bouts).contains(peakTimes);
         stateIdx(inState) = stateNames{iState};
         stateCounts(iState) = sum(inState);
     end

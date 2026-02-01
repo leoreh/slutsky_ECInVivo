@@ -143,12 +143,15 @@ end
 % calc
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% Pre-calculate interval objects for efficiency
+binObjs = cellfun(@intervals, bins, 'UniformOutput', false);
+
 % First, calculate all ACGs
 for iunit = 1 : length(sunits)
     for ibin = 1 : length(bins)
             
         % limit spktimes to window
-        spkIdx = InIntervals(spktimes{sunits(iunit)}, bins{ibin});
+        spkIdx = binObjs{ibin}.contains(spktimes{sunits(iunit)});
         st_unit = spktimes{sunits(iunit)}(spkIdx);
         nspks = length(st_unit);
         
@@ -184,7 +187,7 @@ for iunit = 1 : length(sunits)
     for ibin = 1 : length(bins)
             
         % limit spktimes to window
-        spkIdx = InIntervals(spktimes{sunits(iunit)}, bins{ibin});
+        spkIdx = binObjs{ibin}.contains(spktimes{sunits(iunit)});
         st_unit = spktimes{sunits(iunit)}(spkIdx);
         nspks = length(st_unit);
         isi = diff(st_unit);

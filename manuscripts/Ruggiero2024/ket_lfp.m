@@ -85,7 +85,7 @@ bandFreqs = [0.5, 1; 1, 4; 4, 10; 30, 60; 30, 100];
 nbands = size(bandFreqs, 1);
 bands = nan(length(sfiles), nbands, length(sstates));
 for iband = 1 : nbands
-    bandIdx = InIntervals(v(1).psdBins(1).info.freq, bandFreqs(iband, :));
+    bandIdx = intervals(bandFreqs(iband, :)).contains(v(1).psdBins(1).info.freq);
     for istate = 1 : length(sstates)
         psd_tmp = sum(psd(:, :, bandIdx, istate), 3);
         bands(:, iband, istate) = psd_tmp(:, ibin) ./ psd_tmp(:, 1);
@@ -153,7 +153,7 @@ for ifile = 1 : nfiles
         for iband = 1 : nbands
 
             % find frequency indices
-            bandIdx = InIntervals(freq, bandFreqs(iband, :));
+            bandIdx = intervals(bandFreqs(iband, :)).contains(freq);
 
             % get power in bands
             bandpow = sum(powdb(:, bandIdx, :), 2);
@@ -269,7 +269,7 @@ legend
 
 % calc bands from psd
 bandFreqs = [30, 60];
-bandIdx = InIntervals(freq, bandFreqs);
+bandIdx = intervals(bandFreqs).contains(freq);
 bands = sum(psd(:, bandIdx), 2, 'omitnan');
 
 % to prism

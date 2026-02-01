@@ -74,10 +74,12 @@ end
 % psd is a 3d array of state x freq x session.
 for iband = 1 : length(bandFreqs)
     
-    bandIdx = InIntervals(freq, bandFreqs(iband, :));
+    bandInt = intervals(bandFreqs(iband, :));
+    bandIdx = bandInt.contains(freq);
 
-    if InIntervals(freq_pli, bandFreqs(iband, :))
-        bandIdx = bandIdx & ~InIntervals(freq, freq_pli);
+    % Check if PLI frequencies fall within this band
+    if all(bandInt.contains(freq_pli))
+        bandIdx = bandIdx & ~intervals(freq_pli).contains(freq);
     end
     
     bands(iband, :, :) = sum(psdData(:, bandIdx), 2);

@@ -477,14 +477,14 @@ classdef intervals
             %   INPUTS
             %       data     - (NxM double) Matrix where Col 1 is time.
             %       flgShift - (bool) If true, shifts segments to eliminate gaps.
-            %                  Default true.
+            %                  Default false.
             %
             %   OUTPUTS
             %       dataOut  - (double) Filtered and shifted data.
             %       shifts   - (Nx4 double) [OldStart, OldStop, NewStart, NewStop]
             
             p = inputParser;
-            addParameter(p, 'flgShift', true, @(x) islogical(x) || x==0 || x==1);
+            addParameter(p, 'flgShift', false, @(x) islogical(x) || x==0 || x==1);
             parse(p, varargin{:});
             flgShift = p.Results.flgShift;
             

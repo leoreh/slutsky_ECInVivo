@@ -64,8 +64,13 @@ for ifile = 1 : nfiles
     ss = v(ifile).ss.boutTimes([1, 4]);
     cnt = 1; clear bins
     for istate = 1 : 2
-        bins{cnt} = ss{istate}(InIntervals(ss{istate}, timebins(1, :)), :);
-        bins{cnt + 1} = ss{istate}(InIntervals(ss{istate}, timebins(2, :)), :);
+        win1 = intervals(timebins(1, :));
+        mask1 = win1.contains(ss{istate}(:,1)) & win1.contains(ss{istate}(:,2));
+        bins{cnt} = ss{istate}(mask1, :);
+        
+        win2 = intervals(timebins(2, :));
+        mask2 = win2.contains(ss{istate}(:,1)) & win2.contains(ss{istate}(:,2));
+        bins{cnt + 1} = ss{istate}(mask2, :);
         cnt = cnt + 2;
     end
     bins{5} = timebins(1, :);

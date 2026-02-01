@@ -108,12 +108,14 @@ for iwin = 1 : nwin
 
     % win
     winLim = [winStart(:, iwin)'; winStart(:, iwin)' + winDur]';
+    winObj = intervals(winLim(1, :));
 
     % hypnogram -----------------------------------------------------------
     axh(iwin) = nexttile(iwin);
     hold on
     for istate = 1 : length(sstates)
-        winIdx = InIntervals(boutTimes{sstates(istate)}, winLim(1, :));
+        winIdx = winObj.contains(boutTimes{sstates(istate)}(:,1)) & ...
+                 winObj.contains(boutTimes{sstates(istate)}(:,2));
         sbouts = boutTimes{sstates(istate)}(winIdx, :);
         if ~isempty(sbouts)
             plot(sbouts' - winStart(1, iwin), 1 * ones(size(sbouts))',...
@@ -126,7 +128,7 @@ for iwin = 1 : nwin
 
     % spectrogram
     axh(iwin + nwin * 1) = nexttile(iwin + nwin * 1);
-    winIdx = InIntervals(spec.tstamps, winLim(1, :));
+    winIdx = winObj.contains(spec.tstamps);
     specTmp = spec;
     specTmp.s = spec.s(winIdx, :);
     specTmp.tstamps = spec.tstamps(winIdx) - winStart(1, iwin);
@@ -139,7 +141,7 @@ for iwin = 1 : nwin
     % emg -----------------------------------------------------------------
     axh(iwin + nwin * 2) = nexttile(iwin + nwin * 2);
     hold on
-    winIdx = InIntervals(emg_tstamps, winLim(1, :));
+    winIdx = winObj.contains(emg_tstamps);
     plot(emg_tstamps(winIdx) - winStart(1, iwin), emg(winIdx))
     ylim(yLimit_emg)
 
@@ -165,7 +167,7 @@ for iwin = 1 : nwin
     nunits = sum(v.units.clean, 2);
 
     % plot all units in blue
-    spktimes = cellfun(@(x) [x(InIntervals(x, winLim(1, :)))  - winStart(1, iwin)]',...
+    spktimes = cellfun(@(x) [x(winObj.contains(x))  - winStart(1, iwin)]',...
         v.spikes.times, 'uni', false)';
     spktimes = spktimes(unitsIdx(1 : sum(nunits)));
     LineFormat.Color = [0.1 0.1 0.8];
