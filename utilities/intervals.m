@@ -1,5 +1,5 @@
 classdef intervals
-    %INTERVALS Class for efficient manipulation of time intervals [Start, Stop].
+    % INTERVALS Class for efficient manipulation of time intervals [Start, Stop].
     %
     %   The intervals class provides a robust set of methods for managing and
     %   manipulating sets of time intervals. It supports consolidation, set
@@ -47,7 +47,7 @@ classdef intervals
     %  ====================================================================
     methods
         function obj = intervals(varargin)
-            %INTERVALS Constructor.
+            % INTERVALS Constructor.
             %
             %   obj = intervals(matrix)
             %       matrix: Nx2 matrix of [Start, Stop] times.
@@ -140,7 +140,7 @@ classdef intervals
         
         % -----------------------------------------------------------------
         function objOut = consolidate(obj, varargin)
-            %CONSOLIDATE Merge overlapping or close intervals.
+            % CONSOLIDATE Merge overlapping or close intervals.
             %
             %   objOut = obj.consolidate('maxGap', eps, 'strict', false)
             %
@@ -202,7 +202,7 @@ classdef intervals
 
         % -----------------------------------------------------------------
         function objOut = intersect(obj, query)
-            %INTERSECT Intersection of two interval sets (A & B).
+            % INTERSECT Intersection of two interval sets (A & B).
             %
             %   objOut = obj.intersect(query)
             %
@@ -252,7 +252,7 @@ classdef intervals
 
         % -----------------------------------------------------------------
         function objOut = union(obj, query)
-            %UNION Union of two interval sets (A | B).
+            % UNION Union of two interval sets (A | B).
             %
             %   objOut = obj.union(query)
             
@@ -268,7 +268,7 @@ classdef intervals
 
         % -----------------------------------------------------------------
         function [objOut, indices] = minus(obj, query, varargin)
-            %MINUS Subtract intervals (A - B).
+            % MINUS Subtract intervals (A - B).
             %
             %   [objOut, indices] = obj.minus(query)
             %
@@ -365,25 +365,92 @@ classdef intervals
     %  ====================================================================
         
         % -----------------------------------------------------------------
-        function [inInts, intIdx] = contains(obj, points)
-            %CONTAINS Check if points lie within intervals.
+        function [inInts, intIdx] = contains(obj, query)
+            % CONTAINS Check if points or intervals lie within the interval set.
             %
-            %   [inInts, intIdx] = obj.contains(points)
+            %   [inInts, intIdx] = obj.contains(query)
+            %
+            %   INPUT
+            %       query - (Nx1 double) Vector of points.
+            %               (Nx2 double) Matrix of intervals [Start, Stop].
             %
             %   OUTPUT
-            %       inInts - (logical) Nx1 Logic mask. True if point is inside.
-            %       intIdx - (double) Nx2 Matrix. List of [PointIndex, IntervalIndex].
+            %       inInts - (logical) Nx1 Mask. True if fully contained.
+            %       intIdx - (double) Index of containing interval.
+            %                * Points: [PointIndex, IntervalIndex]. Overlaps result
+            %                  in multiple rows per point.
+            %                * Intervals: [QueryIndex, IntervalIndex]. Indices 
+            %                  refer to the CONSOLIDATED interval set.
             
-            points = double(points);
-            nP = length(points);
-            inInts = false(nP, 1);
+            query = double(query);
+
+            % Standardize Input
+            % If vector len > 2 and not Nx2, treat as list of points (Nx1)
+            if isvector(query) && size(query, 2) ~= 2
+                query = query(:);
+            end
+            
+            [nQ, nCols] = size(query);
+            
+            inInts = false(nQ, 1);
             intIdx = zeros(0, 2);
             
+            if nQ == 0, return; end
             if obj.count == 0, return; end
             
+            assert(nCols == 1 || nCols == 2, 'Input must be Nx1 (Points) or Nx2 (Intervals).');
+
+            % =================================================================
+            % MODE 1: INTERVAL QUERY (Nx2)
+            % =================================================================
+            if nCols == 2
+                % Strategy:
+                %   1. Consolidate intervals to merge overlaps/touches.
+                %   2. Discretize Start times to find candidate intervals.
+                %   3. Check if Stop times fit within the candidate.
+                
+                cons = obj.consolidate(); 
+                refStart = cons.start;
+                refStop  = cons.stop;
+                
+                % Find which interval START falls into
+                % bins(i) = k implies refStart(k) <= query(i,1) < refStart(k+1)
+                bins = discretize(query(:,1), [refStart; inf]);
+                
+                % Filter valid inputs (Start time is within a consolidated range)
+                validMask = ~isnan(bins);
+                if ~any(validMask), return; end
+                
+                candIdx = bins(validMask);
+                qIndices = find(validMask);
+                
+                % Verify Stop times: query(i,2) <= refStop(k)
+                % (Start condition is already met by discretize)
+                isContained = query(validMask, 2) <= refStop(candIdx);
+                
+                % Finalize
+                finalQ = qIndices(isContained);
+                
+                inInts(finalQ) = true;
+                
+                if nargout > 1
+                    finalI = candIdx(isContained);
+                    intIdx = [finalQ, finalI];
+                end
+                
+                return;
+            end
+
+            % =================================================================
+            % MODE 2: POINT QUERY (Nx1)
+            % =================================================================
+            % (Logic: "Sweep" if overlapping, "Discretize" if disjoint)
+            
+            points = query; % Alias for clarity
+            nP = nQ;
+            
             if obj.overlap
-                % -------------------------------------------------------------
-                % Path 1: Sweep (Supports Overlaps)
+                % Path A: Sweep Algorithm (Handles Overlaps)
                 % -------------------------------------------------------------
                 n = obj.count;
                 [sortedStart, sortIdx] = sort(obj.start);
@@ -392,41 +459,41 @@ classdef intervals
                 
                 [sortedP, pSortIdx] = sort(points(:));
              
-                % Preallocation
-                estSize = nP; 
-                outP = zeros(estSize, 1);
-                outI = zeros(estSize, 1);
+                % Dynamic Preallocation
+                outP = zeros(nP, 1);
+                outI = zeros(nP, 1);
                 cntOut = 0;
                 
                 tempMask = false(nP, 1);
-                active = []; % Active Interval Indices
+                active = []; 
                 iInt = 1;
                 
                 for iP = 1:nP
                     p = sortedP(iP);
-                    origPIdx = pSortIdx(iP);
                     
-                    % Add intervals that start before p
+                    % Add intervals that have started
                     while iInt <= n && sortedStart(iInt) <= p
                         active(end+1) = iInt; %#ok<AGROW>
                         iInt = iInt + 1;
                     end
                     
                     if ~isempty(active)
-                        % Prune expired intervals
-                        validMask = sortedStop(active) >= p;
-                        active = active(validMask);
+                        % Remove intervals that have ended
+                        validActive = sortedStop(active) >= p;
+                        active = active(validActive);
                         
                         if ~isempty(active)
                             tempMask(iP) = true;
                             if nargout > 1
                                 nNew = length(active);
+                                % Grow buffer
                                 if cntOut + nNew > length(outP)
                                     newSize = max(length(outP)*2, cntOut + nNew + 1000);
+                                    % Resize
                                     outP(newSize, 1) = 0;
                                     outI(newSize, 1) = 0;
                                 end
-                                outP(cntOut+1 : cntOut+nNew) = origPIdx;
+                                outP(cntOut+1 : cntOut+nNew) = pSortIdx(iP);
                                 outI(cntOut+1 : cntOut+nNew) = origIds(active);
                                 cntOut = cntOut + nNew;
                             end
@@ -437,29 +504,27 @@ classdef intervals
                 inInts(pSortIdx) = tempMask;
                 if nargout > 1
                     intIdx = [outP(1:cntOut), outI(1:cntOut)];
+                    % Sort by point index for consistency
                     [~, sortRes] = sort(intIdx(:,1));
                     intIdx = intIdx(sortRes, :);
                 end
                 
             else
-                % -------------------------------------------------------------
-                % Path 2: Discretize (Fast, Requires No Overlaps)
+                % Path B: Discretize (Fast, No Overlaps)
                 % -------------------------------------------------------------
                 bins = discretize(points, [obj.start; inf]);
-                candIdx = bins;
+                validMask = ~isnan(bins);
                 
-                valid = ~isnan(candIdx);
-                if ~any(valid), return; end
+                if ~any(validMask), return; end
                 
-                cIdx = candIdx(valid);
-                pIndices = find(valid);
-                pValid = points(valid);
-
+                candIdx = bins(validMask);
+                pIndices = find(validMask);
+                
                 % Verify Stop Times
-                isIn = pValid <= obj.stop(cIdx);
+                isIn = points(validMask) <= obj.stop(candIdx);
                 
                 finalP = pIndices(isIn);
-                finalI = cIdx(isIn);
+                finalI = candIdx(isIn);
                 
                 inInts(finalP) = true;
                 if nargout > 1
@@ -470,7 +535,7 @@ classdef intervals
 
         % -----------------------------------------------------------------
         function [dataOut, shifts] = restrict(obj, data, varargin)
-            %RESTRICT Restrict data to intervals.
+            % RESTRICT Restrict data to intervals.
             %
             %   [dataOut, shifts] = obj.restrict(data, 'flgShift', true)
             %

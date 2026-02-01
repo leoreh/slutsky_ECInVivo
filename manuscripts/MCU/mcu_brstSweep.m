@@ -133,12 +133,7 @@ for iIsi = 1 : nIsi
                 end
 
                 % Filter Bursts: Keep only those fully inside NREM bouts
-                tic
-                keepIdx = boutTimes.contains(t(:,1)) & boutTimes.contains(t(:,2));
-                toc
-                tic
-                keepIdx = InIntervals(t(:,1), boutTimes.ints) & InIntervals(t(:,2), boutTimes.ints);
-                toc
+                keepIdx = boutTimes.contains(t);
 
                 % Count Spikes in Valid Bursts
                 nBspkVals = brst.nBspk{iUnit}(keepIdx);
