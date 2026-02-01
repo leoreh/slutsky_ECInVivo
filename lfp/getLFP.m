@@ -27,7 +27,7 @@ function lfp = getLFP(varargin)
 %   
 % DEPENDENCIES
 %   import_wcp
-%   bz_LoadBinary
+%   binary_load
 %   IOSR.DSP.SINCFILTER
 %   LFPfromDat (if extension = 'dat')
 %   rmDC
@@ -118,9 +118,9 @@ fprintf('\nworking on %s\n', loadname)
 switch extension
     case 'lfp'
         fs_orig = 1250;
-        sig = bz_LoadBinary(loadname, 'duration', diff(interval),...
-            'frequency', fs_orig, 'nchannels', nchans, 'start', interval(1),...
-            'channels', ch, 'downsample', 1);
+        sig = binary_load(loadname, 'duration', diff(interval),...
+            'fs', fs_orig, 'nCh', nchans, 'start', interval(1),...
+            'ch', ch, 'downsample', 1);
     case 'abf'
         % note abf2load cannot handles spaces in loadname
         % note abf2load requires Abf2Tmp.exe and ABFFIO.dll in basepath         
