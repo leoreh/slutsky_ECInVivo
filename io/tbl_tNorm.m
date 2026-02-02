@@ -30,6 +30,17 @@ function tblOut = tbl_tNorm(tbl, varargin)
 %                     'scale'      : x / std(win)
 %                     'range'      : (x - min(win)) / (max(win) - min(win))
 %
+%       'flgGeom'   - (bool) Use Geometric statistics (default: false).
+%                     If true, calculations are done in log-space:
+%                     'percentage' : x / geomean(win)
+%                     'zscore'     : (log(x) - mean(log(win))) / std(log(win))
+%                     'center'     : log(x) - mean(log(win))
+%                     'scale'      : log(x) / std(log(win))
+%
+%       'floorVal'  - (numeric) Min value for geometric calcs (avoid log(0)).
+%                     If empty and flgGeom=true, defaults to half the minimum
+%                     non-zero value of the entire variable.
+%
 %   EXAMPLE:
 %       % Normalize 'LFP' column to baseline (indices 1-100) as percentage:
 %       tbl = tbl_tNorm(tbl, 'varsInc', 'LFP', 'winNorm', [1, 100], 'Method', 'percentage');
@@ -52,13 +63,17 @@ addParameter(p, 'varsInc', [], @(x) iscell(x) || ischar(x) || isstring(x) || ise
 addParameter(p, 'varsGrp', [], @(x) iscell(x) || ischar(x) || isstring(x) || isempty(x));
 addParameter(p, 'winNorm', [], @(x) isnumeric(x) && (isempty(x) || numel(x)==2));
 addParameter(p, 'Method', 'percentage', @(x) ischar(x) || isstring(x));
+addParameter(p, 'flgGeom', false, @islogical);
+addParameter(p, 'floorVal', [], @(x) isnumeric(x) && (isempty(x) || isscalar(x)));
 
 parse(p, tbl, varargin{:});
 
-varsInc = p.Results.varsInc;
-varsGrp = p.Results.varsGrp;
-winNorm = p.Results.winNorm;
-method  = p.Results.Method;
+varsInc  = p.Results.varsInc;
+varsGrp  = p.Results.varsGrp;
+winNorm  = p.Results.winNorm;
+method   = p.Results.Method;
+flgGeom  = p.Results.flgGeom;
+floorVal = p.Results.floorVal;
 
 % Pass unmatched arguments to normalize
 unmatched = p.Unmatched;
@@ -122,6 +137,22 @@ for iVar = 1:length(processVars)
     varName = processVars{iVar};
     varData = tblOut.(varName);
 
+    % Determine Floor Value for Geometric Stats
+    currFloor = 0;
+    if flgGeom
+        if isempty(floorVal)
+            % Auto-calculate: Half of minimum non-zero value
+            minVal = min(varData(varData > 0), [], 'all');
+            if isempty(minVal)
+                currFloor = eps;
+            else
+                currFloor = minVal / 2;
+            end
+        else
+            currFloor = floorVal;
+        end
+    end
+
     % ---------------------------------------
     % Case 1: Row-wise Normalization (Default)
     % ---------------------------------------
@@ -129,16 +160,21 @@ for iVar = 1:length(processVars)
 
         % Extract Window
         winMat = varData(:, wS:wE);
-
+        
         % Calculate Row-wise Params
-        [C, S] = norm_params(winMat, method);
+        [C, S] = norm_params(winMat, method, flgGeom, currFloor);
 
         % Apply Normalize
+        if flgGeom & ~strcmpi(method, 'percentage')
+            % Log Output: (log(x) - muLog) / sigLog
+            % Apply floor before log
+            varData = log(max(varData, currFloor));
+        end
         varData = normalize(varData, 2, 'center', C, 'scale', S, normArgs{:});
 
-        % ---------------------------------------
-        % Case 2: Group-wise Normalization
-        % ---------------------------------------
+    % ---------------------------------------
+    % Case 2: Group-wise Normalization
+    % ---------------------------------------
     else
         for iGrp = 1:nGrps
             idx = idxGrps{iGrp};
@@ -150,11 +186,14 @@ for iVar = 1:length(processVars)
             % Calculate Params
             % Here we treat all samples in the window as part of the
             % baseline distribution. C and S will be scalars.
-            [C, S] = norm_params([subMat(:)]', method);
+            % Note: We pass vector so norm_params sees it as one distribution
+            [C, S] = norm_params([subMat(:)]', method, flgGeom, currFloor);
 
             % Apply Normalize to Group Rows
-            % Using scalar C and S, normalize applies them to each element
-            % effectively centering/scaling each unit by the group baseline.
+            if flgGeom & ~strcmpi(method, 'percentage')
+                 % Log Output
+                 grpData = log(max(grpData, currFloor));
+            end
             varData(idx, :) = normalize(grpData, 2, 'center', C, 'scale', S, normArgs{:});
         end
     end
@@ -169,47 +208,97 @@ end
 %  HELPER FUNCTION
 %  ========================================================================
 
-function [C, S] = norm_params(vals, method)
+function [C, S] = norm_params(vals, method, flgGeom, floorVal)
 % Calculates Center (C) and Scale (S) parameters.
 % vals: Data to calculate stats on.
 
-switch lower(method)
-    case 'percentage'
-        mu = mean(vals, 2, 'omitnan');
-        C = 0;
-        S = mu;
+if nargin < 3, flgGeom = false; end
+if nargin < 4, floorVal = eps; end
 
-    case 'zscore'
-        mu = mean(vals, 2, 'omitnan');
-        sig = std(vals, 0, 2, 'omitnan');
-        C = mu;
-        S = sig;
+% Geometric Logic
+if flgGeom
+    vals = max(vals, floorVal); % Cap minimum
+    
+    % Work in log space
+    logVals = log(vals);
+    
+    muLog = mean(logVals, 2, 'omitnan');
+    sigLog = std(logVals, 0, 2, 'omitnan');
+    
+    switch lower(method)
+        case 'percentage'
+            % For percentage: x / GM => C=0, S=GM
+            C = 0;
+            S = exp(muLog); % Geometric Mean
+            
+        case 'zscore'
+            % (log(x) - muLog) / sigLog
+            C = muLog;
+            S = sigLog;
+            
+        case 'center'
+            % log(x) - muLog
+            C = muLog;
+            S = 1;
+            
+        case 'scale'
+            % log(x) / sigLog
+            C = 0;
+            S = sigLog;
+            
+         case 'range'
+             % log(x) mapped? Not typical, fallback to zscore log
+             C = muLog;
+             S = sigLog;
+             
+        otherwise
+             C = muLog;
+             S = sigLog;
+    end
+    
+    % Safety
+    S(S == 0) = 1; % If S is 0 (const), avoid inf.
+    
+else
+    % Arithmetic Logic
+    switch lower(method)
+        case 'percentage'
+            mu = mean(vals, 2, 'omitnan');
+            C = 0;
+            S = mu;
 
-    case 'center'
-        mu = mean(vals, 2, 'omitnan');
-        C = mu;
-        S = 1;
+        case 'zscore'
+            mu = mean(vals, 2, 'omitnan');
+            sig = std(vals, 0, 2, 'omitnan');
+            C = mu;
+            S = sig;
 
-    case 'scale'
-        sig = std(vals, 0, 2, 'omitnan');
-        C = 0;
-        S = sig;
+        case 'center'
+            mu = mean(vals, 2, 'omitnan');
+            C = mu;
+            S = 1;
 
-    case 'range'
-        mn = min(vals, [], 2, 'omitnan');
-        mx = max(vals, [], 2, 'omitnan');
-        C = mn;
-        S = mx - mn;
+        case 'scale'
+            sig = std(vals, 0, 2, 'omitnan');
+            C = 0;
+            S = sig;
 
-    otherwise
-        % Default to zscore
-        mu = mean(vals, 2, 'omitnan');
-        sig = std(vals, 0, 2, 'omitnan');
-        C = mu;
-        S = sig;
+        case 'range'
+            mn = min(vals, [], 2, 'omitnan');
+            mx = max(vals, [], 2, 'omitnan');
+            C = mn;
+            S = mx - mn;
+
+        otherwise
+            % Default to zscore
+            mu = mean(vals, 2, 'omitnan');
+            sig = std(vals, 0, 2, 'omitnan');
+            C = mu;
+            S = sig;
+    end
+    
+    % Safety for division by zero
+    S(S == 0) = eps;
 end
-
-% Safety for division by zero
-S(S == 0) = eps;
 
 end

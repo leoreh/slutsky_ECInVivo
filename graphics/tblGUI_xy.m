@@ -115,8 +115,8 @@ guiData.grpCbk = grpCbk;
 guiData.selCbk = selCbk;
 guiData.grpCbk = grpCbk;
 guiData.xLbl = xLbl;
-guiData.chkShowTraces = [];
-guiData.chkShowSEM = [];
+guiData.ddDispersion = [];
+guiData.ddStatType = [];
 
 
 %% ========================================================================
@@ -210,26 +210,31 @@ currY = currY - ctlH - ctlGap;
 
 % Container for Group By Checkboxes
 guiData.pnlGrpBy = uipanel('Parent', hPanel, 'BorderType', 'none', ...
-    'Units', 'normalized', 'Position', [0.05, 0.12, 0.9, currY - 0.12]);
+    'Units', 'normalized', 'Position', [0.05, 0.16, 0.9, currY - 0.16]);
 
 % Separator
-currY = 0.11;
+currY = 0.15;
 uicontrol('Parent', hPanel, 'Style', 'text', 'String', '--- Plot Options ---', ...
     'Units', 'normalized', 'Position', [0.05, currY, 0.9, ctlH], ...
     'HorizontalAlignment', 'center', 'ForegroundColor', [0.5 0.5 0.5]);
 currY = currY - ctlH;
 
-% 4. Plot Options (Traces / SEM)
-guiData.chkShowTraces = uicontrol('Parent', hPanel, 'Style', 'checkbox', ...
-    'String', 'Show Traces', ...
+% 4. Plot Options (Dispersion)
+uicontrol('Parent', hPanel, 'Style', 'text', 'String', 'Dispersion:', ...
     'Units', 'normalized', 'Position', [0.05, currY, 0.9, ctlH], ...
-    'Value', 0, 'Callback', @onUpdatePlot); % Default OFF
+    'HorizontalAlignment', 'left', 'FontWeight', 'bold');
 currY = currY - ctlH;
 
-guiData.chkShowSEM = uicontrol('Parent', hPanel, 'Style', 'checkbox', ...
-    'String', 'Show SEM', ...
+guiData.ddDispersion = uicontrol('Parent', hPanel, 'Style', 'popupmenu', ...
+    'String', {'Traces', 'Spread', 'None'}, ...
     'Units', 'normalized', 'Position', [0.05, currY, 0.9, ctlH], ...
-    'Value', 1, 'Callback', @onUpdatePlot); % Default ON
+    'Value', 2, 'Callback', @onUpdatePlot); % Default to first option (Traces)
+currY = currY - ctlH - ctlGap;
+
+guiData.ddStatType = uicontrol('Parent', hPanel, 'Style', 'popupmenu', ...
+    'String', {'Arithmetic', 'Geometric', 'Median'}, ...
+    'Units', 'normalized', 'Position', [0.05, currY, 0.9, ctlH], ...
+    'Value', 1, 'Callback', @onUpdatePlot);
 
 
 hContainer.UserData = guiData;
@@ -424,8 +429,24 @@ onUpdatePlot(hContainer, []);
         axHandles = []; % Store axes for linking
 
         % Plot Options
-        showTraces = get(data.chkShowTraces, 'Value');
-        showSEM = get(data.chkShowSEM, 'Value');
+        % Plot Options
+        valDisp = get(data.ddDispersion, 'Value');
+        strDisp = get(data.ddDispersion, 'String');
+        dispMode = strDisp{valDisp}; % 'Traces', 'Spread', 'None'
+        
+        showTraces = strcmp(dispMode, 'Traces');
+        showShade = strcmp(dispMode, 'Spread');
+        
+        % Get Computation Method
+        valStat = get(data.ddStatType, 'Value');
+        strStat = get(data.ddStatType, 'String');
+        method = strStat{valStat}; % 'Arithmetic', 'Geometric', 'Median'
+
+        % Calculate global floor value for geometric mean, as a value of 1
+        % (eg, spike) per bin. Assumes xVec represents time (hr). This
+        % serves as the resolution limit / detection threshold.
+        dx = median(diff(data.xVec), 'omitnan');
+        floorVal = 1 / (dx * 3600);
 
         % --- RENDER LOOP ---
         for iTile = 1:length(catsPB)
@@ -491,8 +512,7 @@ onUpdatePlot(hContainer, []);
                     subY = cell2mat(yRaw(finalIdx));
                 end
 
-                % Plot
-                % Light individual lines (High transparency) 0.05
+                % Plot Traces
                 if showTraces
                     hLines = plot(hAx, data.xVec, subY', 'Color', [clr, 0.05],...
                         'LineWidth', 0.5, 'HandleVisibility', 'off');
@@ -505,35 +525,71 @@ onUpdatePlot(hContainer, []);
                     end
                 end
 
-                % SEM Shading
-                if showSEM &&  sum(finalIdx) > 1
-                    % calculate the mean and standard eror of mean
-                    n = sum(~isnan(subY), 1);  % number of non-NaN points per column
-                    sData = std(subY, 0, 1, 'omitnan') ./ sqrt(n);
-                    sData(sData == 0) = eps;
+                % Calculate Statistics
+                switch method
+                    case 'Geometric'
+                        % -- Geometric Mean & SEM --
+                        calcY = max(subY, floorVal);
+                        logY = log(calcY);
 
-                    mData = mean(subY, 1, 'omitnan');
+                        n = sum(~isnan(logY), 1);
+                        mLog = mean(logY, 1, 'omitnan');
+                        sLog = std(logY, 0, 1, 'omitnan') ./ sqrt(n);
 
-                    % Calculate Bounds
-                    lowerBound = mData - sData;
-                    upperBound = mData + sData;
+                        mData = exp(mLog);
+                        lowerBound = exp(mLog - sLog);
+                        upperBound = exp(mLog + sLog);
 
-                    % Draw Shade
-                    xConf = [data.xVec(:); flipud(data.xVec(:))];
-                    yConf = [upperBound(:); flipud(lowerBound(:))];
+                    case 'Median'
+                        % -- Median & IQR (25-75th percentile) --
+                        % -- Median & CI (Notch Approximation) --
+                        mData = median(subY, 1, 'omitnan');
+                        
+                        % IQR for spread estimation
+                        q1 = prctile(subY, 25, 1);
+                        q3 = prctile(subY, 75, 1);
+                        iqrVal = q3 - q1;
+                        
+                        % Notch correlation for ~95% CI of the median
+                        % 1.57 * IQR / sqrt(N)
+                        n = sum(~isnan(subY), 1);
+                        notchWidth = 1.57 * iqrVal ./ sqrt(n);
+                        
+                        lowerBound = mData - notchWidth;
+                        upperBound = mData + notchWidth;
+                        
+                    otherwise % 'Arithmetic'
+                        % -- Arithmetic Mean & SEM --
+                        n = sum(~isnan(subY), 1);
+                        mData = mean(subY, 1, 'omitnan');
+                        sData = std(subY, 0, 1, 'omitnan') ./ sqrt(n);
+                        sData(sData == 0) = eps;
 
-                    fill(hAx, xConf, yConf, clr, 'FaceAlpha', 0.2, ...
-                        'EdgeColor', 'none', 'HandleVisibility', 'off');
+                        lowerBound = mData - sData;
+                        upperBound = mData + sData;
                 end
 
-                % Bold mean line
-                mfr = mean(subY, 1, 'omitnan');
-                plot(hAx, data.xVec, mfr, 'Color', clr, 'LineWidth', 2, ...
+
+                % Shade (SEM or CI)
+                if showShade && sum(finalIdx) > 1
+                    % Draw Shade
+                    xConf = [data.xVec(:); flipud(data.xVec(:))];
+                    yConf = [upperBound(:); flipud(lowerBound(:))]; 
+
+                    validP = ~isnan(yConf);
+                    if all(validP)
+                         fill(hAx, xConf, yConf, clr, 'FaceAlpha', 0.2, ...
+                            'EdgeColor', 'none', 'HandleVisibility', 'off');
+                    end
+                end
+
+                % Mean Axis
+                plot(hAx, data.xVec, mData, 'Color', clr, 'LineWidth', 2, ...
                     'DisplayName', sprintf('%s (n=%d)', catGrp, sum(finalIdx)));
 
                 % Update Ranges for Y Lim
-                tileMeanMin = min(tileMeanMin, min(mfr));
-                tileMeanMax = max(tileMeanMax, max(mfr));
+                tileMeanMin = min(tileMeanMin, min(mData));
+                tileMeanMax = max(tileMeanMax, max(mData));
                 hasData = true;
             end
 

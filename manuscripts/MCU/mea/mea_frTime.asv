@@ -66,12 +66,12 @@ tblPlot.cluLbl = categorical(tblPlot.cluLbl);
 
 % Define Baseline Window (Indices where Time < 0)
 winNorm = [0, find(xVec >= 0, 1) - 1];
-floorVal = 1 / (median(diff(xVec)) * 3600);
+floorVal = 1 / (mea)
 
 tblVars = tbl.Properties.VariableNames;
 tVars = tblVars(contains(tblVars, 't_'));
 tblPlot = tbl_tNorm(tblPlot, 'varsInc', tVars, 'winNorm', winNorm, ...
-    'Method', 'percentage', 'flgGeom', true, 'floorVal', floorVal, 'varsGrp', {});
+    'Method', 'percentage', 'flgGeom', true, 'floorVal', 0.0028, 'varsGrp', {});
 
 % Convert Ratio to Percentage
 % tblPlot.t_fr = tblPlot.t_fr * 100;
