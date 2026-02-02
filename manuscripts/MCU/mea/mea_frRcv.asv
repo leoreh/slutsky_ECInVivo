@@ -27,7 +27,7 @@ function rcv = mea_frRcv(t, frMat, varargin)
 %                       .frAcute    - Acute mean firing rate [Hz] (Robust/Long).
 %                       .frSs       - Steady-state (Recovery) mean firing rate [Hz].
 %                       .pertDepth  - Perturbation Depth: Log2 ratio of Baseline / Acute (Robust).
-%                       .pertTrough - Perturbation Trough: Log2 ratio of Baseline / Trough (Sensitive).
+%                       .pertTrough - Perturbation Depth Trough: Log2 ratio of Baseline / Trough (Sensitive).
 %                       .rcvErr     - Recovery Error: Absolute log2 ratio of Steady-State / Baseline.
 %                                     (0 indicates perfect recovery).
 %                       .rcvBsl     - Recovery Percentage: Ratio of Steady-State / Baseline in percent.
@@ -134,15 +134,16 @@ ssWin = ssStart : ssEnd;
 frSs = mean(frMat(:, ssWin), 2, 'omitnan') + c;
 
 % Acute Rate (Robust, Long Window)
-% 60 bins (6hr abs) starting 5 bins (30 min abs) before idxTrough
+% 60 bins (1hr) starting 5 bins (30 min abs) before idxTrough
 troughStart = max(idxPert, idxTrough - winMarg);
-acuteEnd = troughStart + winDur;
+winDurAcute = winDur; % 60 min
+acuteEnd = troughStart + winDurAcute;
 acuteWin = troughStart : acuteEnd;
 frAcute = mean(frMat(:, acuteWin), 2, 'omitnan') + c;
 
 % Trough Rate (Sensitive, Short Window)
-% 10 bins (1hr abs) starting at troughStart
-winDurTrough = round(10 * 60 / binSize);
+% 15 bins (15 min) starting at troughStart
+winDurTrough = round(15 * 60 / binSize);
 troughEnd = troughStart + winDurTrough;
 troughWin = troughStart : troughEnd;
 frTrough = mean(frMat(:, troughWin), 2, 'omitnan') + c;

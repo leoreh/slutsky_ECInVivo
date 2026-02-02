@@ -24,7 +24,7 @@ function tblOut = tbl_tNorm(tbl, varargin)
 %       'Method'    - (char) Normalization method {'percentage'}.
 %                     Options match MATLAB's NORMALIZE where applicable, plus
 %                     'percentage':
-%                     'percentage' : x / mean(win)
+%                     'percentage' : x / mean(win) * 100
 %                     'zscore'     : (x - mean(win)) / std(win)
 %                     'center'     : x - mean(win)
 %                     'scale'      : x / std(win)
@@ -32,7 +32,7 @@ function tblOut = tbl_tNorm(tbl, varargin)
 %
 %       'flgGeom'   - (bool) Use Geometric statistics (default: false).
 %                     If true, calculations are done in log-space:
-%                     'percentage' : x / geomean(win)
+%                     'percentage' : x / geomean(win) * 100
 %                     'zscore'     : (log(x) - mean(log(win))) / std(log(win))
 %                     'center'     : log(x) - mean(log(win))
 %                     'scale'      : log(x) / std(log(win))
@@ -165,10 +165,14 @@ for iVar = 1:length(processVars)
         [C, S] = norm_params(winMat, method, flgGeom, currFloor);
 
         % Apply Normalize
-        if flgGeom & ~strcmpi(method, 'percentage')
-            % Log Output: (log(x) - muLog) / sigLog
-            % Apply floor before log
-            varData = log(max(varData, currFloor));
+        if flgGeom
+            % Apply floor before transforming
+            varData = max(varData, currFloor);
+            
+            if ~strcmpi(method, 'percentage')
+                % Log Output: (log(x) - muLog) / sigLog
+                varData = log(varData);
+            end
         end
         varData = normalize(varData, 2, 'center', C, 'scale', S, normArgs{:});
 
@@ -190,9 +194,14 @@ for iVar = 1:length(processVars)
             [C, S] = norm_params([subMat(:)]', method, flgGeom, currFloor);
 
             % Apply Normalize to Group Rows
-            if flgGeom & ~strcmpi(method, 'percentage')
-                 % Log Output
-                 grpData = log(max(grpData, currFloor));
+            if flgGeom
+                 % Apply floor
+                 grpData = max(grpData, currFloor);
+
+                 if ~strcmpi(method, 'percentage')
+                     % Log Output
+                     grpData = log(grpData);
+                 end
             end
             varData(idx, :) = normalize(grpData, 2, 'center', C, 'scale', S, normArgs{:});
         end
@@ -215,90 +224,51 @@ function [C, S] = norm_params(vals, method, flgGeom, floorVal)
 if nargin < 3, flgGeom = false; end
 if nargin < 4, floorVal = eps; end
 
-% Geometric Logic
+% Pre-process: Apply Geometric Transformation if needed
 if flgGeom
-    vals = max(vals, floorVal); % Cap minimum
-    
-    % Work in log space
-    logVals = log(vals);
-    
-    muLog = mean(logVals, 2, 'omitnan');
-    sigLog = std(logVals, 0, 2, 'omitnan');
-    
-    switch lower(method)
-        case 'percentage'
-            % For percentage: x / GM => C=0, S=GM
-            C = 0;
-            S = exp(muLog); % Geometric Mean
-            
-        case 'zscore'
-            % (log(x) - muLog) / sigLog
-            C = muLog;
-            S = sigLog;
-            
-        case 'center'
-            % log(x) - muLog
-            C = muLog;
-            S = 1;
-            
-        case 'scale'
-            % log(x) / sigLog
-            C = 0;
-            S = sigLog;
-            
-         case 'range'
-             % log(x) mapped? Not typical, fallback to zscore log
-             C = muLog;
-             S = sigLog;
-             
-        otherwise
-             C = muLog;
-             S = sigLog;
-    end
-    
-    % Safety
-    S(S == 0) = 1; % If S is 0 (const), avoid inf.
-    
-else
-    % Arithmetic Logic
-    switch lower(method)
-        case 'percentage'
-            mu = mean(vals, 2, 'omitnan');
-            C = 0;
-            S = mu;
-
-        case 'zscore'
-            mu = mean(vals, 2, 'omitnan');
-            sig = std(vals, 0, 2, 'omitnan');
-            C = mu;
-            S = sig;
-
-        case 'center'
-            mu = mean(vals, 2, 'omitnan');
-            C = mu;
-            S = 1;
-
-        case 'scale'
-            sig = std(vals, 0, 2, 'omitnan');
-            C = 0;
-            S = sig;
-
-        case 'range'
-            mn = min(vals, [], 2, 'omitnan');
-            mx = max(vals, [], 2, 'omitnan');
-            C = mn;
-            S = mx - mn;
-
-        otherwise
-            % Default to zscore
-            mu = mean(vals, 2, 'omitnan');
-            sig = std(vals, 0, 2, 'omitnan');
-            C = mu;
-            S = sig;
-    end
-    
-    % Safety for division by zero
-    S(S == 0) = eps;
+    vals = log(max(vals, floorVal));
 end
+
+% Calculate Base Statistics
+mu = mean(vals, 2, 'omitnan');
+sig = std(vals, 0, 2, 'omitnan');
+
+switch lower(method)
+    case 'percentage'
+        % Percentage: S depends on whether we are in Log or Linear domain
+        % Output is always Linear-ish (Ratio), so we need to inverse-log if Geom.
+        C = 0;
+        if flgGeom
+            S = exp(mu) / 100; % Geometric Mean / 100
+        else
+            S = mu / 100;      % Arithmetic Mean / 100
+        end
+
+    case 'zscore'
+        C = mu;
+        S = sig;
+
+    case 'center'
+        C = mu;
+        S = 1;
+
+    case 'scale'
+        C = 0;
+        S = sig;
+
+    case 'range'
+        mn = min(vals, [], 2, 'omitnan');
+        mx = max(vals, [], 2, 'omitnan');
+        C = mn;
+        S = mx - mn;
+
+    otherwise
+        % Default to zscore
+        C = mu;
+        S = sig;
+end
+
+% Safety for division by zero
+S(S == 0) = 1;
 
 end

@@ -8,7 +8,7 @@ presets = {'spktimes', 'rcv', 'frNet'};
 [tblFull, ~, ~, v] = mcu_tblMea('basepaths', basepaths, 'presets', presets([1, 3]));
 
 % Prepare subtable of what's needed
-tblBrst = tblFull(:, {'Name', 'Group', 'UnitID', 'fr', 'frSs', 'frTrough', ...
+tblBrst = tblFull(:, {'Name', 'Group', 'UnitID', 'fr', 'frSs', 'frAcute', ...
     'rcvBsl', 'uPert', 'spktimes', 'funcon'});
 
 % Clean units that were not perturbed

@@ -4,7 +4,7 @@
 %  ========================================================================
 
 presets = {'frNet', 'rcv', 'time'};
-[tbl, xVec, basepaths, v] = mcu_tblMea('presets', presets(1));
+[tbl, xVec, basepaths, v] = mcu_tblMea('presets', presets);
 
 % tblGUI_xy(xVec, tbl);
 % tblGUI_scatHist(tbl, 'xVar', 'pBspk', 'yVar', 'funcon', 'grpVar', 'Group');
@@ -12,6 +12,50 @@ presets = {'frNet', 'rcv', 'time'};
 % tblGUI_raster(tbl, 'grpVar', 'Name', 'grpVal', 'ctrl1')
 
 tblLme = tbl;
+
+% Clean units that were not perturbed
+tblLme(~tblLme.uPert, :) = [];
+tblLme = removevars(tblLme, 'uPert');
+
+% Clean outliers
+frml = 'frSs ~ (frBspk + frSspk)';
+tblWt = tblLme(tblLme.Group == 'Control', :);
+lmeMdl = lme_analyse(tblWt, frml, 'dist', 'gamma');
+res = residuals(lmeMdl, 'ResidualType', 'Pearson');
+otlWt = abs(res) > 5;
+sum(otlWt)
+idWt = tblWt.UnitID(otlWt);
+
+% Clean outliers
+frml = 'frSs ~ (frBspk + frSspk)';
+tblMcu = tblLme(tblLme.Group == 'MCU-KO', :);
+lmeMdl = lme_analyse(tblMcu, frml, 'dist', 'gamma');
+res = residuals(lmeMdl, 'ResidualType', 'Pearson');
+otlMcu = abs(res) > 5;
+sum(otlMcu)
+idMcu = tblMcu.UnitID(otlMcu);
+
+otlIDs = [idMcu; idWt];
+otlIdx = ismember(tblLme.UnitID, otlIDs)
+sum(otlIdx)
+
+tblLme(otlIdx, :) = [];
+
+
+frml = 'frSs ~ (fr + pBspk) * Group + (1|Name)';
+lmeMdl = lme_analyse(tblLme, frml, 'dist', 'gamma');
+res = residuals(lmeMdl, 'ResidualType', 'Pearson');
+otlIdx = abs(res) > 2;
+sum(otlIdx)
+otlIDs = tblLme.UnitID(otlIdx);
+otlNames = tblLme.Name(otlIdx);
+
+
+tblLme(otlIdx, :) = [];
+
+
+tblGUI_xy(xVec, tblLme(otlIdx, :))
+
 
 % Add logit pBspk
 tblTrans = tbl_trans(tblLme, 'varsInc', {'pBspk'}, 'logBase', 'logit');

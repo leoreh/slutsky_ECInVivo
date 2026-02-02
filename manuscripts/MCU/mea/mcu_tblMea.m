@@ -32,11 +32,13 @@ p = inputParser;
 addParameter(p, 'basepaths', {});
 addParameter(p, 'v', []);
 addParameter(p, 'presets', {});
+addParameter(p, 'flgOtl', true);
 parse(p, varargin{:});
 
 basepaths = p.Results.basepaths;
 v         = p.Results.v;
 presets   = p.Results.presets;
+flgOtl    = p.Results.flgOtl;
 
 % Default Basepaths
 if isempty(basepaths)
@@ -93,6 +95,7 @@ if ismember('rcv', presets)
     rcvFile = 'rcv';
     varMap.fr          = [rcvFile, '.frBsl'];
     varMap.frSs        = [rcvFile, '.frSs'];
+    varMap.frAcute     = [rcvFile, '.frAcute'];
     varMap.frTrough    = [rcvFile, '.frTrough'];
     varMap.pertDepth   = [rcvFile, '.pertDepth'];
     varMap.rcvErr      = [rcvFile, '.rcvErr'];
@@ -110,6 +113,7 @@ if ismember('rcv', presets)
 else
     varMap.fr        = 'rcv.frBsl';
     varMap.frSs      = 'rcv.frSs';
+    varMap.frAcute   = 'rcv.frAcute';
     varMap.frTrough  = 'rcv.frTrough';
     varMap.uRcv      = 'rcv.uRcv';
     varMap.rcvBsl    = 'rcv.rcvBsl';
@@ -259,6 +263,37 @@ if ismember('spktimes', presets)
     winExp = [0, 33600];
     tbl.spktimes = cellfun(@(x) x(x >= winExp(1) & x <= winExp(2)), ...
         tbl.spktimes, 'UniformOutput', false);
+end
+
+% Outlier Removal. Note: Manual inspection of FR traces confirmed these
+% units are unstable.
+if flgOtl
+
+    % Clean units that were not perturbed
+    tbl(~tbl.uPert, :) = [];
+    tbl = removevars(tbl, 'uPert');
+
+    % Clean residual outliers
+    frml = 'frSs ~ (frBspk + frSspk) + (1 | Name)';
+
+    % Control
+    tblWt  = tbl(tbl.Group == 'Control', :);
+    lmeMdl = lme_analyse(tblWt, frml, 'dist', 'gamma', 'verbose', false);
+    res    = residuals(lmeMdl, 'ResidualType', 'Pearson');
+    otlWt  = abs(res) > 3;
+    idWt   = tblWt.UnitID(otlWt);
+
+    % MCU-KO
+    tblMcu = tbl(tbl.Group == 'MCU-KO', :);
+    lmeMdl = lme_analyse(tblMcu, frml, 'dist', 'gamma', 'verbose', false);
+    res    = residuals(lmeMdl, 'ResidualType', 'Pearson');
+    otlMcu = abs(res) > 3;
+    idMcu  = tblMcu.UnitID(otlMcu);
+
+    % Remove
+    otlIDs = [idMcu; idWt];
+    otlIdx = ismember(tbl.UnitID, otlIDs);
+    tbl(otlIdx, :) = [];
 end
 
 
