@@ -62,6 +62,8 @@ if ismember('brst', presets)
     varMap.bIBI      = 'stats.ibi';
     varMap.pBspk     = 'stats.pBspk';
     varMap.nBspk     = 'stats.nBspk';
+    varMap.frBspk    = 'stats.frBspk';
+    varMap.frSspk    = 'stats.frSspk';
 end
 
 if ismember('spktimes', presets)

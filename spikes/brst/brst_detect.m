@@ -21,6 +21,7 @@ function brst = brst_detect(spktimes, varargin)
 %                     'basepath'  : (char) Recording path {pwd}
 %                     'flgSave'   : (log) Save to file {true}
 %                     'flgForce'  : (log) Analyze even if exists {false}
+%                     'verbose'   : (log) Print progress to command window {false}
 %
 %   OUTPUTS:
 %       brst        - (struct) Burst event data.
@@ -49,6 +50,7 @@ addParameter(p, 'minSpks', 3, @isnumeric);
 addParameter(p, 'flgPlot', false, @islogical);
 addParameter(p, 'flgSave', true, @islogical);
 addParameter(p, 'flgForce', false, @islogical);
+addParameter(p, 'verbose', false, @islogical);
 
 parse(p, spktimes, varargin{:});
 basepath  = p.Results.basepath;
@@ -60,6 +62,7 @@ minSpks   = p.Results.minSpks;
 flgPlot   = p.Results.flgPlot;
 flgSave   = p.Results.flgSave;
 flgForce  = p.Results.flgForce;
+verbose   = p.Results.verbose;
 params    = p.Results;
 
 
@@ -97,7 +100,9 @@ if isempty(gcp('nocreate'))
     parpool('local', 6);
 end
 dq = parallel.pool.DataQueue;
-afterEach(dq, @(msg) fprintf('%s\n', msg));
+if verbose
+    afterEach(dq, @(msg) fprintf('%s\n', msg));
+end
 
 % Temporary cell arrays for parfor slicing
 bTimes    = cell(nUnits, 1);
@@ -251,7 +256,7 @@ parfor iUnit = 1 : nUnits
     bSpktimes{iUnit} = bSpks;
 
     % Periodic update
-    if mod(iUnit, 10) == 0
+    if verbose && mod(iUnit, 10) == 0
         send(dq, sprintf('Processed Unit %d / %d', iUnit, nUnits));
     end
 end

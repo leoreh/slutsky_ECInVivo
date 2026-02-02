@@ -39,6 +39,7 @@ addParameter(p, 'nGrid', 100, @isnumeric);
 addParameter(p, 'confLvl', 0.95, @isnumeric);
 addParameter(p, 'clr', [], @(x) isempty(x) || isnumeric(x));
 addParameter(p, 'transParams', [], @(x) isempty(x) || isstruct(x));
+addParameter(p, 'xLims', [], @(x) isempty(x) || isnumeric(x) || iscell(x));
 
 parse(p, mdl, vars, varargin{:});
 
@@ -47,11 +48,51 @@ nGrid           = p.Results.nGrid;
 confLvl         = p.Results.confLvl;
 clr             = p.Results.clr;
 transParams     = p.Results.transParams;
+xLims           = p.Results.xLims;
 
 % Ensure vars is cell
 if ischar(vars), vars = {vars}; end
 if length(vars) > 2
     error('LME_PD:MaxVars', 'Can only visualize up to 2 variables.');
+end
+
+
+% Ensure xLims is cell and matches vars length
+if ~isempty(xLims)
+    if isnumeric(xLims)
+        xLims = {xLims};
+    end
+    if length(xLims) ~= length(vars)
+        error('LME_PD:XLimMismatch', 'Length of "xLims" must match number of "vars".');
+    end
+    
+
+
+    % --- FORWARD TRANSFORM LIMTS ---
+    % If transParams exists, we must transform the limits into the model space.
+    % We use tbl_trans directly. If grouping variables are missing, tbl_trans
+    % warns and uses the first group's stats (which is acceptable here).
+    if ~isempty(transParams)
+        for iV = 1:length(vars)
+            if isempty(xLims{iV}), continue; end
+            
+            % Create temp table
+            varName = vars{iV};
+            tTmp = table(xLims{iV}(:), 'VariableNames', {varName});
+
+            % Apply transform (Suppress "MissingGroups" warning)
+            wState = warning('off', 'tbl_trans:MissingGroups');
+            try
+                tTmp = tbl_trans(tTmp, 'template', transParams);
+            catch ME
+                warning(wState);
+                rethrow(ME);
+            end
+            warning(wState);
+            
+            xLims{iV} = tTmp.(varName);
+        end
+    end
 end
 
 
@@ -61,7 +102,7 @@ end
 
 % 1. Generate Grid (Transformed Space)
 %    We use the model's data, so this grid is in the same space as training.
-[tblGrid, varyInfo] = get_grid(mdl, vars, nGrid);
+[tblGrid, varyInfo] = get_grid(mdl, vars, nGrid, xLims);
 
 % 2. Predict (Transformed Space)
 %    Use 'Conditional', false to compute marginal (population-level) effects.
@@ -232,7 +273,7 @@ if ~isempty(grpName)
 end
 title(hAx, 'Partial Dependence', 'FontWeight', 'normal');
 
-set(hAx, 'YScale', 'log')
+% set(hAx, 'YScale', 'log')
 % if ~isempty(transParams.varsTrans.(xName).logBase)
 %     set(hAx, 'XScale', 'log')
 % end
@@ -243,10 +284,10 @@ end         % EOF
 %% ========================================================================
 %  HELPER: GENERATE GRID
 %  ========================================================================
-function [tblGrid, varyInfo] = get_grid(mdl, varsVary, nGrid)
+function [tblGrid, varyInfo] = get_grid(mdl, varsVary, nGrid, xLims)
 % GET_GRID Generates a synthetic "prediction grid" for marginal effects.
 %
-%   [GRIDTBL, VARYINFO] = GET_GRID(MDL, VARSVARY, NGRID)
+%   [GRIDTBL, VARYINFO] = GET_GRID(MDL, VARSVARY, NGRID, xLims)
 %
 %   'gridTbl' is a synthetic dataset used to probe the fitted model. It
 %   isolates the effect of specific predictors (varsVary) by holding all
@@ -256,6 +297,7 @@ function [tblGrid, varyInfo] = get_grid(mdl, varsVary, nGrid)
 %   1. Identify all predictors in the model.
 %   2. For the variables of interest (varsVary):
 %      - Create a range of values (e.g., 100 points from min to max).
+%      - IF xLims is provided for that variable, use that range instead.
 %   3. For all OTHER variables (Fixed Effects):
 %      - Fix them to a single representative value.
 %      - Continuous Vars -> Average (Mean).
@@ -276,13 +318,25 @@ data = mdl.Variables;
 for iVar = 1:length(predVars)
     name = predVars{iVar};
     raw = data.(name);
-    isVarying = ismember(name, varsVary);
+    
+    % Check if this variable is being varied
+    [isVarying, idxVary] = ismember(name, varsVary);
 
     if isVarying
         % Varying: Generate Grid
         if isnumeric(raw) && ~iscategorical(raw)
-            vals = linspace(min(raw), max(raw), nGrid)';
-            varyInfo.isNum(strcmp(varsVary, name)) = true;
+            % Determine Limits
+            if ~isempty(xLims) && ~isempty(xLims{idxVary})
+                % User override
+                lims = xLims{idxVary};
+                mn = lims(1); mx = lims(2);
+            else
+                % Data-driven
+                mn = min(raw); mx = max(raw);
+            end
+            
+            vals = linspace(mn, mx, nGrid)';
+            varyInfo.isNum(idxVary) = true;
         else
             vals = unique(raw);
         end

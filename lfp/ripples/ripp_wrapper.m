@@ -490,8 +490,8 @@ end
 
 % Load LFP
 fname = fullfile(basepath, [basename, '.lfp']);
-lfp = binary_load(fname, 'duration', sigDur, 'fs', fs, 'nCh', nchans,...
-    'start', win(1), 'ch', rippCh, 'downsample', 1, 'bit2uv', bit2uv);
+lfp = double(binary_load(fname, 'duration', sigDur, 'fs', fs, 'nCh', nchans,...
+    'start', win(1), 'ch', rippCh, 'downsample', 1, 'bit2uv', bit2uv));
 
 if size(lfp, 2) > 1
     lfp = mean(lfp, 2);

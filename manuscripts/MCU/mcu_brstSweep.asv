@@ -75,7 +75,7 @@ for iFile = 1:nFiles
     spktimes = v(iFile).spikes.times;
     boutTimes = intervals(v(iFile).ss.bouts.times{idxState});
     
-    % boutTimes = intervals([0 inf]);
+    boutTime = intervals([0 inf]);
 
     % Filter spikes: Keep only those within NREM bouts
     spks = cellfun(@(x) boutTimes.restrict(x, 'flgShift', false), spktimes, 'uni', false);
@@ -110,7 +110,7 @@ for iIsi = 1 : nIsi
             nSpkTot   = currData.nSpkTot; % [nUnits x 1]
             boutTimes = intervals(v(iFile).ss.bouts.times{idxState});
             
-            % boutTimes = intervals([0 inf]);
+            boutTime = intervals([0 inf]);
 
 
             brst = brstGrid{iFile, iIsi, iSpk};

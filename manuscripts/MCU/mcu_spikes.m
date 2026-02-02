@@ -65,7 +65,7 @@ tblLme = tblUnit(tblUnit.Day == 'BSL', :);
 tblLme = tblLme(tblLme.UnitType == 'RS', :);
 
 % Select Params
-varRsp = 'funcon';
+varRsp = 'bRoy';
 
 % Fit
 frml = [varRsp, ' ~ Group  + (1|Name)'];

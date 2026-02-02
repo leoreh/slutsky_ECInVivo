@@ -92,13 +92,14 @@ tblGUI_scatHist(tblPlot, 'xVar', 'asym', 'yVar', 'bRoy', 'grpVar', 'Group');
 tblGUI_xy(xVec, tbl);
 
 % LME
-xVar = 'pBspk';
-frml = sprintf('com ~ (fr + %s) + Group + (1|Name)', xVar);
+xVar = 'pBspk_trans';
+frml = sprintf('com ~ (%s) + Group + (1|Name)', xVar);
 [lmeMdl, lmeStates, lmeInfo] = lme_analyse(tblPlot, frml, 'dist', 'normal');
 
-
-
-
+%%
+% Finish PD
+% Show PD of only group (what would've happened if burstiness was the same)
+%%
 
 % Partial Dependence
 hFig = figure;
@@ -113,7 +114,7 @@ vars = {'Group'};
     'hAx', hAx);
 
 % To Prism
-grpIdx = pdRes.Group == "MCU-KO";
+grpIdx = pdRes.Group == "Control";
 [pdRes(grpIdx, {xVar}), ...
     pdRes(grpIdx, {'com_pred', 'com_upper', 'com_lower'})]
 
@@ -126,7 +127,7 @@ tblSum = groupsummary(tblPlot, {'Group', 'Name'}, 'mean', ...
     vartype("numeric"));
 
 % To Prism (Metrics)
-prismMat = tbl2prism(tblPlot, 'yVar', 'com', 'grpVar', 'Group');
+prismMat = tbl2prism(tblPlot, 'yVar', 'bRoy_trans', 'grpVar', 'Group');
 mean(prismMat, 1, 'omitnan');
 
 % To prism (Time)

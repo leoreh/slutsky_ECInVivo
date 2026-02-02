@@ -5,11 +5,12 @@
 
 % get all files in study
 basepaths = mcu_basepaths('all');
-basepaths = [mcu_basepaths('wt_bsl'), mcu_basepaths('mcu_bsl')];
+basepaths = unique([mcu_basepaths('wt_bsl'), mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl')]);
 nFiles = length(basepaths);
 
 % vars
 vars = {'spikes', 'units', 'frNet'};
+vars = {'sleep_states', 'spikes'};
 
 % load state vars
 v = basepaths2vars('basepaths', basepaths, 'vars', vars);
@@ -28,26 +29,33 @@ for iFile = 1 : nFiles
     % spktimes = spktimes(uType == "RS");
 
     % FR network stats during Baseline
-    winBsl = [300, 360] * 60;
-    frNet = fr_network(spktimes, 'flgSave', false, 'winLim', winBsl);
+    % winBsl = [300, 360] * 60;
+    % frNet = fr_network(spktimes, 'flgSave', false, 'winLim', winBsl);
 
     % winLim = [0, Inf] * 60 * 60;
     % drft = drift_file(spktimes, 'flgSave', true, 'winLim', winLim, ...
     %     'binSize', 1200, 'winSize', [], 'flgPlot', true);
+    
+    % Limit to state
+    boutTimes = intervals(v(iFile).ss.bouts.times{4});
+    spktimes = cellfun(@(x) boutTimes.restrict(x, 'flgShift', false), spktimes, 'uni', false);
 
-    % % Burst detection
-    % isiVal = 0.02;
-    % brst = brst_detect(spktimes, ...
-    %     'minSpks', 3, ...
-    %     'isiStart', isiVal, ...
-    %     'isiEnd', isiVal * 2, ...
-    %     'minDur', 0.005, ...
-    %     'minIBI', 0.05, ...
-    %     'flgForce', true, 'flgSave', true, 'flgPlot', false);
+    % Burst detection
+    isiVal = 0.006;
+    isiEnd = isiStart * 2;
+    minIBI = isiEnd;
+    minDur = 0;
+    brst = brst_detect(spktimes, ...
+        'minSpks', 2, ...
+        'isiStart', isiVal, ...
+        'isiEnd', isiVal * 2, ...
+        'minDur', minDur, ...
+        'minIBI', minIBI, ...
+        'flgForce', true, 'flgSave', true, 'flgPlot', false);
 
-    % % Burst statistics
-    % stats = brst_stats(brst, spktimes, 'winCalc', [], ...
-    %     'flgSave', true);
+    % Burst statistics
+    stats = brst_stats(brst, spktimes, 'winCalc', [], ...
+        'flgSave', true);
 
 end
 
