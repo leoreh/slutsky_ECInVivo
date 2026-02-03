@@ -12,11 +12,12 @@
 %  ========================================================================
 
 % Load with steady state variables
+% Load with steady state variables
 presets = {'steadyState'};
 % [tbl, xVec, basepaths, v] = mcu_tblMea('presets', presets, 'flgOtl', true);
 
 % Add logit pBspk
-tblTrans = tbl_trans(tblLme, 'varsInc', {'pBspk'}, 'logBase', 'logit');
+tblTrans = tbl_trans(tbl, 'varsInc', {'pBspk'}, 'logBase', 'logit');
 tbl.pBspk_trans = tblTrans.pBspk;
 
 %% ========================================================================
@@ -64,41 +65,10 @@ tbl.Strategy(idxQ4) = 'Sngl Comp';
 tbl.Strategy = removecats(tbl.Strategy);
 
 %% ========================================================================
-%  STATISTICS: RECOVERY MAGNITUDE & DIRECTION
+%  PLOTTING: FIGURE 1 - RAW STATE SPACE & ANGLES
 %  ========================================================================
 
-fprintf('\n================================================================\n');
-fprintf(' STATISTICS: RECOVERY VECTOR ANALYSIS\n');
-fprintf('================================================================\n');
-
-% 1. Vector Magnitude (LME)
-% -------------------------
-% Does the magnitude of change differ between groups?
-% fprintf('\n[ANALYSIS] Vector Magnitude (Radius)\n');
-% [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, 'vecR ~ Group + (1|Name)');
-
-% 2. Vector Angle (LME - Linear approximation)
-% --------------------------------------------
-% Note: Strictly speaking, angles are circular. However, if vectors are 
-% directional (e.g., mostly pointing up/left), linear LME can be a proxy. 
-% Check distribution first.
-% fprintf('\n[ANALYSIS] Vector Angle (Degrees)\n');
-% lme_analyse(tbl, 'vecDeg ~ Group + (1|Name)');
-
-% 3. Strategy Distribution (Chi-Square)
-% -------------------------------------
-fprintf('\n[ANALYSIS] Strategy Distribution (Contingency Table)\n');
-[statTbl, chi2, pVal] = crosstab(tbl.Group, tbl.Strategy);
-disp('Contingency Table (Rows=Group, Cols=Strategy):');
-disp(statTbl);
-fprintf('Chi2: %.2f, p-value: %.4g\n', chi2, pVal);
-
-
-%% ========================================================================
-%  PLOTTING: STATE SPACE TRAJECTORIES
-%  ========================================================================
-
-fig = figure('Position', [100 100 1300 1000], 'Color', 'w');
+fig1 = figure('Position', [50 100 1200 900], 'Color', 'w', 'Name', 'Raw Trajectories');
 tiledlayout(2, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
 
 % Color Palette
@@ -108,8 +78,6 @@ cMap('MCU-KO')  = [0.8 0.0 0.0]; % Red
 
 colWt = cMap('Control');
 colKo = cMap('MCU-KO');
-
-% Groups
 grps = {'Control', 'MCU-KO'};
 cols = {colWt, colKo};
 
@@ -117,16 +85,13 @@ cols = {colWt, colKo};
 maxVal = max(abs([tbl.dSngl; tbl.dBrst])) * 1.1;
 
 % Global Scaling for Plotting
-% ---------------------------
-% Size: Log-Transform Firing Rate (Standard for Log-Normal data)
-% We normalize the Size based on the global distribution (both groups)
-% so that a specific size means the same FR in both plots.
 frLog = log10(tbl.fr);
-lims  = prctile(frLog, [5 95]); % Robust limits
+lims  = prctile(frLog, [5 95]); 
 scatNorm = (frLog - lims(1)) / diff(lims);
-scatNorm(scatNorm < 0) = 0; scatNorm(scatNorm > 1) = 1; % Clamp
-tbl.scatSz = scatNorm * 30 + 5; % Range: 15 to 65 pts
+scatNorm(scatNorm < 0) = 0; scatNorm(scatNorm > 1) = 1; 
+tbl.scatSz = scatNorm * 40 + 10; 
 
+% --- ROW 1: SCATTER PLOTS ---
 for iGrp = 1:2
     nexttile;
     hold on;
@@ -140,14 +105,15 @@ for iGrp = 1:2
     xline(0, 'k--', 'LineWidth', 1);
     yline(0, 'k--', 'LineWidth', 1);
     
-    % Draw Scatter (Units)
-    % Size = Log-Scaled FR, Color = Baseline Burstiness
-    % clrData = log(subTbl.frBspk + c);
-    clrData = subTbl.pBspk_trans;
-    scatter(subTbl.dSngl, subTbl.dBrst, subTbl.scatSz, clrData, ...
+    % Equality Line (y=x)
+    plot([-maxVal maxVal], [-maxVal maxVal], 'k:', 'LineWidth', 1.5);
+    
+    % Scatter (Color = Original Burstiness)
+    % We use the transformed pBspk for clearer gradient
+    scatter(subTbl.dSngl, subTbl.dBrst, subTbl.scatSz, subTbl.pBspk_trans, ...
         'filled', 'MarkerFaceAlpha', 0.6, 'MarkerEdgeColor', 'none');
     
-    % Mean Vector (Thick Black Arrow)
+    % Mean Global Vector
     mSngl = mean(subTbl.dSngl);
     mBrst = mean(subTbl.dBrst);
     quiver(0, 0, mSngl, mBrst, 'Color', 'k', ...
@@ -160,26 +126,16 @@ for iGrp = 1:2
     ylabel('Log Fold Change (Burst)');
     title(sprintf('%s (n=%d)', grp, height(subTbl)));
     
-    % Colorbar
     colormap(gca, turbo);
-    hCbar = colorbar;
-    hCbar.Label.String = 'Baseline Burstiness (pBspk)';
-    % clim([0 1]);
+    if iGrp == 2
+        c = colorbar;
+        c.Label.String = 'Baseline Burstiness (logit)';
+    end
     
-    % Add Quadrant Labels (Optional)
-    posMarg = 0.6;
-    text(-maxVal*posMarg, maxVal*posMarg, 'Burst Comp', 'Color', [.5 .5 .5]);
-    text(maxVal*posMarg, -maxVal*posMarg, 'Sngl Comp', 'Color', [.5 .5 .5]);
-    
-    set(gca, 'FontSize', 12, 'LineWidth', 1.2);
+    set(gca, 'FontSize', 12);
 end
 
-sgtitle('Recovery State Space Trajectories');
-
-%% ========================================================================
-%  PLOTTING: POLAR HISTOGRAM (ANGLES)
-%  ========================================================================
-
+% --- ROW 2: POLAR HISTOGRAMS ---
 for iGrp = 1:2
     nexttile;
     grp = grps{iGrp};
@@ -198,6 +154,8 @@ for iGrp = 1:2
     rLim = rlim;
     polarplot([0, mAngle], [0, rLim(2)], 'Color', cols{iGrp}, 'LineWidth', 3);
 end
+
+sgtitle(fig1, 'Figure 1: Recovery State Space & Strategies');
 
 
 
