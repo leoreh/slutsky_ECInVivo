@@ -1,0 +1,6 @@
+
+% Load data
+presets = {'steadyState'};
+[tbl, xVec, basepaths, v] = mcu_tblMea('presets', presets(1));
+
+% tblGUI_scatHist(tbl, 'xVar', 'frBspk', 'yVar', 'ss_frBspk', 'grpVar', 'Group');

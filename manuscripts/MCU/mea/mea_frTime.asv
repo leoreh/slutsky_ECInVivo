@@ -5,27 +5,21 @@
 %  temporal dynamics, and visualize using tblGUI_xy.
 
 % Load
-% [tbl, xVec, basepaths, v] = mcu_tblMea('presets', {'time', 'rcv'});
+[tbl, xVec, basepaths, v] = mcu_tblMea('presets', {'time', 'rcv'});
 tblPlot = tbl;
 
 % Add logit pBspk
 tblTrans = tbl_trans(tblPlot, 'varsInc', {'pBspk'}, 'logBase', 'logit');
 tblPlot.pBspk_trans = tblTrans.pBspk;
 
-% Clean units that were not perturbed
-% tblPlot(~tblPlot.uPert, :) = [];
-% tblPlot = removevars(tblPlot, 'uPert');
-
-% tblPlot(tblPlot.uPert, :) = [];
-
 %% ========================================================================
 %  CLUSTERS
 %  ========================================================================
 %  Cluster units into percentiles based on a specific variable
 
-varClu = 'p';
-nClu   = 3;           % Number of clusters (percentiles)
-alpha  = 1;         % Scaling factor for percentile spacing
+varClu = 'pBspk';
+nClu   = 1;           % Number of clusters (percentiles)
+alpha  = 2.5;         % Scaling factor for percentile spacing
 
 % Initialize Cluster Label Column
 tblPlot.cluLbl = strings(height(tblPlot), 1);
@@ -81,35 +75,6 @@ tblVars = tblPlot.Properties.VariableNames;
 tVars = tblVars(contains(tblVars, 't_'));
 tblPlot = tbl_tNorm(tblPlot, 'varsInc', tVars, 'winNorm', winNorm, ...
     'Method', 'percentage', 'flgGeom', true, 'floorVal', floorVal, 'varsGrp', {});
-
-
-%% ========================================================================
-%  CLEAN OUTLIERS
-%  ========================================================================
-%  Remove units with anomalous temporal dynamics using PCA.
-%  Units are identified as outliers if their trajectory in PC-space
-%  deviates significantly from the population (Mahalanobis distance).
-
-% otl = false(height(tblPlot), 1);
-% for iVar = 1:length(tVars)
-%     vName = tVars{iVar};
-%     data = tblPlot.(vName);
-% 
-%     % Use nearest neighbor to fill gaps so PCA can run
-%     dataClean = fillmissing(data, 'nearest', 2);
-% 
-%     % centering is automatic in pca()
-%     [~, score] = pca(dataClean);
-% 
-%     % Detect Outliers in Score Space (Top 3 PCs)
-%     % Use Mahalanobis distance to find units far from the cluster center
-%     otlVar = all(isoutlier(score(:, 1:3), 'median', 'ThresholdFactor', 100), 2);
-%     otl = otl | otlVar;
-% end
-% fprintf('Removed %d units.\n', sum(otl));
-% tblPlot(otl, :) = [];
-
-
 
 
 %% ========================================================================

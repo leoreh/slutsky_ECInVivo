@@ -14,8 +14,8 @@ presets = {'frNet', 'rcv', 'time'};
 tblLme = tbl;
 
 % Add logit pBspk
-tblTrans = tbl_trans(tblLme, 'varsInc', {'pBspk'}, 'logBase', 'logit');
-tblLme.pBspk_trans = tblTrans.pBspk;
+% tblTrans = tbl_trans(tblLme, 'varsInc', {'pBspk'}, 'logBase', 'logit');
+% tblLme.pBspk_trans = tblTrans.pBspk;
 
 tblGUI_scatHist(tblLme, 'xVar', 'pBspk', 'yVar', 'funcon', 'grpVar', 'Group');
 tblGUI_bar(tblLme, 'yVar', 'pBspk', 'xVar', 'Group');
@@ -48,7 +48,7 @@ frml = 'frSs ~ (frBspk + frSspk)';
 nRep = 5;
 
 tblWt = tblLme(tblLme.Group == 'Control', :);
-abl = lme_ablation(tblWt, frml, 'dist', 'gamma', ...
+abl = lme_ablation(tblWt, frml, 'dist', 'log-normal', ...
     'flgBkTrans', false, 'partitionMode', 'split', 'nrep', nRep);
 
 tblMcu = tblLme(tblLme.Group == 'MCU-KO', :);

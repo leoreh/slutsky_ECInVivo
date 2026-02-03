@@ -164,6 +164,8 @@ if ismember('steadyState', presets)
     mapSS.ss_bIBI  = 'stats.ibi';
     mapSS.ss_pBspk = 'stats.pBspk';
     mapSS.ss_nBspk = 'stats.nBspk';
+    mapSS.ss_frBspk = 'stats.frBspk';
+    mapSS.ss_frSspk = 'stats.frSspk';
 
     tblSS = v2tbl('v', v, 'varMap', mapSS, 'tagFiles', tagFiles, ...
         'idxCol', 3, 'uOffset', 0);

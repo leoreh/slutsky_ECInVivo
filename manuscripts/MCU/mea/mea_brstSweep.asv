@@ -5,7 +5,7 @@
 % Load table
 basepaths = [mcu_basepaths('mea_bac'), mcu_basepaths('mea_mcuko')];
 presets = {'spktimes', 'rcv', 'frNet'};
-[tblFull, ~, ~, v] = mcu_tblMea('basepaths', basepaths, 'presets', presets([1, 3]));
+% [tblFull, ~, ~, v] = mcu_tblMea('basepaths', basepaths, 'presets', presets([1, 3]));
 
 % Prepare subtable of what's needed
 tblBrst = tblFull(:, {'Name', 'Group', 'UnitID', 'fr', 'frSs', 'frAcute', ...
@@ -21,7 +21,7 @@ idxWt = tblBrst.Group == 'Control';
 rcv = catfields([v(:).rcv], 1);
 winBsl = rcv.info.winBsl;
 winBsl = [0, min(winBsl(:, 2))];
-winBsl = [0, 4000];
+winBsl = [0, 4300];
 
 % Sweeping Params
 isiSweep = [0.005, 0.01, 0.015, 0.02, 0.03, 0.04, 0.05, 0.1];
@@ -114,8 +114,8 @@ for iIsi = 1 : length(isiSweep)
         frml = sprintf('frSs ~ %s + %s', fNameFrB, fNameFrS);
 
         % Run lightweight ablation (CV)
-        abl = lme_ablation(tblWt, frml, 'dist', 'gamma', ...
-            'nReps', 5, 'nFolds', 5, ...
+        abl = lme_ablation(tblWt, frml, 'dist', 'log-normal', ...
+            'nReps', 1, 'nFolds', 5, ...
             'flgBkTrans', false, 'partitionMode', 'split', ...
             'flgPlot', false);
 
@@ -159,24 +159,23 @@ for iIsi = 1 : length(isiSweep)
 
         % Group Effect (LME)
         % -----------------------------------------------------------------
-        % Formula: sib ~ Group + (1|Name)
-        frmlGrp = sprintf('%s ~ Group + (1|Name)', fNameSib);
+        % Formula: sib ~ Group * fr + (1|Name)
+        frmlGrp = sprintf('%s ~ Group * fr + (1|Name)', fNameSib);
         [lmeGrp, lmeStats, ~, ~] = lme_analyse(tblLme, frmlGrp, ...
-            'dist', 'logit-normal', 'fitMethod', 'ML', ...
+            'dist', 'logit-normal', ...
             'flgPlot', false, 'verbose', false);
 
         fxdGrp = lmeGrp.Coefficients;
-        idxGrp = find(strncmpi(fxdGrp.Name, 'Group', 5)); 
-        if ~isempty(idxGrp)
-            row.tStatGroup = fxdGrp.tStat(idxGrp(1));
-        else
-            row.tStatGroup = NaN;
-        end
+        idxGrp = find(strncmpi(fxdGrp.Name, 'Group', 5)); % Find 'Group_...'
+
+        if ~isempty(idxGrp), row.tStatGroup = fxdGrp.tStat(idxGrp(1)); else, row.tStatGroup = NaN; end
+
 
         % Correlation (Baseline)
         % -----------------------------------------------------------------
         row.corr = corr(tblWt.fr, tblWt.(fNameSib), ...
             'Type', 'Spearman', 'Rows', 'complete');
+
 
         % Store
         tblRes = [tblRes; struct2table(row)];
