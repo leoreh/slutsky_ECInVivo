@@ -17,11 +17,17 @@ tbl = mcu_tblVivo('basepaths', basepaths, 'flgClean', true, ...
 % Assert no zero values
 tblLme = tbl_trans(tbl, 'flg0', true, 'verbose', true);
 
+% Limit to RS units
 uIdx = tblLme.unitType == 'RS';
+tblLme = tblLme(uIdx, :);
 
-tblGUI_scatHist(tblLme(uIdx, :))
+% Indices
+idxWt = tblLme.Group == 'Control';
+idxMcu = tblLme.Group == 'MCU-KO';
 
-tblGUI_bar(tblLme(uIdx, :));
+% Plots
+tblGUI_scatHist(tblLme(idxMcu, :), 'xVar', 'fr', 'yVar', 'pBspk', 'grpVar', 'Group')
+tblGUI_bar(tblLme);
 
 
 %% ========================================================================
@@ -200,9 +206,6 @@ tblWide.dSngl = log(tblWide.frSspk_BAC3 ./ tblWide.frSspk_BSL);
 
 
 % Plot
-tblGUI_scatHist(tblWide, 'xVar', 'dBrst', 'yVar', 'dSngl', 'grpVar', 'Group');
-
-
-% Plots
 tblGUI_bar(tblWide, 'xVar', 'Group', 'yVar', 'dBrst');
-tblGUI_scatHist(tblWide, 'xVar', 'Density', 'yVar', 'Rate', 'grpVar', 'Group');
+tblGUI_scatHist(tblWide, 'xVar', 'dSngl', 'yVar', 'dBrst', 'grpVar', 'Group');
+

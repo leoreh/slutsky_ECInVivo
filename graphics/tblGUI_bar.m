@@ -142,8 +142,22 @@ currY = currY - ctlH;
 guiData.ddGrp = uicontrol('Parent', hPanelControl, 'Style', 'popupmenu', ...
     'String', guiData.grpVars, 'Units', 'normalized', ...
     'Position', [ctlX, currY, ctlW, ctlH], ...
-    'Position', [ctlX, currY, ctlW, ctlH], ...
     'Callback', @onGrpChange);
+currY = currY - ctlH - ctlGap*2;
+
+% Statistic
+uicontrol('Parent', hPanelControl, 'Style', 'text', 'String', 'Statistic:', ...
+    'Units', 'normalized', 'Position', [ctlX, currY, ctlW, ctlH], ...
+    'HorizontalAlignment', 'left', 'FontWeight', 'bold');
+currY = currY - ctlH;
+
+guiData.ddStatType = uicontrol('Parent', hPanelControl, 'Style', 'popupmenu', ...
+    'String', {'Arithmetic', 'Geometric', 'Median'}, ...
+    'Units', 'normalized', ...
+    'Position', [ctlX, currY, ctlW, ctlH], ...
+    'Value', 1, ...
+    'Callback', @onUpdatePlot);
+currY = currY - ctlH - ctlGap*2;
 
 % Panel for Checkboxes
 guiData.pnlGrp = uipanel('Parent', hPanelControl, 'BorderType', 'none', ...
@@ -225,10 +239,16 @@ onGrpChange(hContainer, []);
             gCats = {'All'};
         end
 
+        % Get Statistic
+        idxStat = get(data.ddStatType, 'Value');
+        statItems = get(data.ddStatType, 'String');
+        statType = statItems{idxStat};
+
         % Aggregate Data for Bar Plot
         % Bar expects matrix nXCats x nGroups
         meanMat = nan(length(xCats), length(gCats));
-        semMat = nan(length(xCats), length(gCats));
+        errLMat = nan(length(xCats), length(gCats));
+        errHMat = nan(length(xCats), length(gCats));
 
         for iX = 1:length(xCats)
             for iG = 1:length(gCats)
@@ -243,8 +263,38 @@ onGrpChange(hContainer, []);
                 vals = vals(~isnan(vals));
 
                 if ~isempty(vals)
-                    meanMat(iX, iG) = mean(vals);
-                    semMat(iX, iG) = std(vals) / sqrt(length(vals));
+                    n = length(vals);
+                    switch statType
+                        case 'Arithmetic'
+                            m = mean(vals);
+                            s = std(vals) / sqrt(n);
+                            meanMat(iX, iG) = m;
+                            errLMat(iX, iG) = s;
+                            errHMat(iX, iG) = s;
+
+                        case 'Geometric'
+                            vals(vals <= 0) = [];
+                            if ~isempty(vals)
+                                n = length(vals);
+                                mLog = mean(log(vals));
+                                sLog = std(log(vals)) / sqrt(n);
+                                mGeo = exp(mLog);
+                                meanMat(iX, iG) = mGeo;
+                                errLMat(iX, iG) = mGeo - exp(mLog - sLog);
+                                errHMat(iX, iG) = exp(mLog + sLog) - mGeo;
+                            end
+
+                        case 'Median'
+                            m = median(vals);
+                            q1 = prctile(vals, 25);
+                            q3 = prctile(vals, 75);
+                            iqrVal = q3 - q1;
+                            notch = 1.57 * iqrVal / sqrt(n);
+
+                            meanMat(iX, iG) = m;
+                            errLMat(iX, iG) = notch;
+                            errHMat(iX, iG) = notch;
+                    end
                 end
             end
         end
@@ -268,7 +318,7 @@ onGrpChange(hContainer, []);
             % Based on bar documentation logic for centers
             x = (1:ngroups) - groupwidth/2 + (2*i-1) * groupwidth / (2*nbars);
 
-            errorbar(ax, x, meanMat(:,i), semMat(:,i), 'k', 'linestyle', 'none');
+            errorbar(ax, x, meanMat(:,i), errLMat(:,i), errHMat(:,i), 'k', 'linestyle', 'none');
         end
 
         hold(ax, 'off');

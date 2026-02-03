@@ -44,24 +44,6 @@ tbl.dSngl = log((tbl.ss_frSspk + c) ./ (tbl.frSspk + c));
 % Convert Theta to Degrees for easier interpretation
 tbl.vecDeg = rad2deg(tbl.vecTheta);
 
-% 3. Calculate "Strategy" Categories via Quadrants
-% ------------------------------------------------
-% Q1: Indiscriminate Increase (+S, +B)
-% Q2: Burst Compensation (-S, +B) -> Expected for Control
-% Q3: Global Depression (-S, -B)
-% Q4: Single Compensation (+S, -B)
-tbl.Strategy = categorical(zeros(height(tbl), 1));
-
-idxQ1 = tbl.dSngl > 0 & tbl.dBrst > 0;
-idxQ2 = tbl.dSngl < 0 & tbl.dBrst > 0;
-idxQ3 = tbl.dSngl < 0 & tbl.dBrst < 0;
-idxQ4 = tbl.dSngl > 0 & tbl.dBrst < 0;
-
-tbl.Strategy(idxQ1) = 'Global Inc';
-tbl.Strategy(idxQ2) = 'Burst Comp';
-tbl.Strategy(idxQ3) = 'Global Dec';
-tbl.Strategy(idxQ4) = 'Sngl Comp';
-tbl.Strategy = removecats(tbl.Strategy);
 
 %% ========================================================================
 %  PLOTTING: FIGURE 1 - RAW STATE SPACE & ANGLES
