@@ -26,6 +26,12 @@ presets = {'steadyState'};
 tbl.dBrst = tbl.ss_frBspk - tbl.frBspk;
 tbl.dSngl = tbl.ss_frSspk - tbl.frSspk;
 
+% Pseudocount
+c = 1 / 3600;          
+
+tbl.dBrst = log((tbl.ss_frBspk + c) ./ (tbl.frBspk + c));
+tbl.dSngl = log((tbl.ss_frSspk + c) ./ (tbl.frSspk + c));
+
 % 2. Calculate Vector Properties (Polar Coordinates)
 % --------------------------------------------------
 % Convert Cartesian (dSngl, dBrst) to Polar (Theta, Radius)
@@ -64,16 +70,16 @@ fprintf('================================================================\n');
 % 1. Vector Magnitude (LME)
 % -------------------------
 % Does the magnitude of change differ between groups?
-fprintf('\n[ANALYSIS] Vector Magnitude (Radius)\n');
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, 'vecR ~ Group + (1|Name)');
+% fprintf('\n[ANALYSIS] Vector Magnitude (Radius)\n');
+% [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, 'vecR ~ Group + (1|Name)');
 
 % 2. Vector Angle (LME - Linear approximation)
 % --------------------------------------------
 % Note: Strictly speaking, angles are circular. However, if vectors are 
 % directional (e.g., mostly pointing up/left), linear LME can be a proxy. 
 % Check distribution first.
-fprintf('\n[ANALYSIS] Vector Angle (Degrees)\n');
-lme_analyse(tbl, 'vecDeg ~ Group + (1|Name)');
+% fprintf('\n[ANALYSIS] Vector Angle (Degrees)\n');
+% lme_analyse(tbl, 'vecDeg ~ Group + (1|Name)');
 
 % 3. Strategy Distribution (Chi-Square)
 % -------------------------------------
@@ -88,8 +94,8 @@ fprintf('Chi2: %.2f, p-value: %.4g\n', chi2, pVal);
 %  PLOTTING: STATE SPACE TRAJECTORIES
 %  ========================================================================
 
-fig = figure('Position', [100 100 1200 500], 'Color', 'w');
-tiledlayout(1, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
+fig = figure('Position', [100 100 1300 1000], 'Color', 'w');
+tiledlayout(2, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
 
 % Color Palette
 cMap = containers.Map;
@@ -106,38 +112,53 @@ cols = {colWt, colKo};
 % Max axis range for symmetry
 maxVal = max(abs([tbl.dSngl; tbl.dBrst])) * 1.1;
 
-for i = 1:2
+% Global Scaling for Plotting
+% ---------------------------
+% Size: Log-Transform Firing Rate (Standard for Log-Normal data)
+% We normalize the Size based on the global distribution (both groups)
+% so that a specific size means the same FR in both plots.
+frLog = log10(tbl.fr);
+lims  = prctile(frLog, [5 95]); % Robust limits
+scatNorm = (frLog - lims(1)) / diff(lims);
+scatNorm(scatNorm < 0) = 0; scatNorm(scatNorm > 1) = 1; % Clamp
+tbl.scatSz = scatNorm * 30 + 5; % Range: 15 to 65 pts
+
+for iGrp = 1:2
     nexttile;
     hold on;
     axis square;
     grid on;
     
-    grp = grps{i};
+    grp = grps{iGrp};
     subTbl = tbl(tbl.Group == grp, :);
     
     % Draw Axes
     xline(0, 'k--', 'LineWidth', 1);
     yline(0, 'k--', 'LineWidth', 1);
     
-    % Draw Quivers (Arrows)
-    % Origin (0,0) to (dSngl, dBrst)
-    % We use quiver(X, Y, U, V) where X,Y are origins (0,0) and U,V are components
-    nU = height(subTbl);
-    q = quiver(zeros(nU, 1), zeros(nU, 1), subTbl.dSngl, subTbl.dBrst, ...
-        'Color', [cols{i}, 0.3], 'AutoScale', 'off', 'LineWidth', 1);
+    % Draw Scatter (Units)
+    % Size = Log-Scaled FR, Color = Baseline Burstiness
+    scatter(subTbl.dSngl, subTbl.dBrst, subTbl.scatSz, subTbl.pBspk, ...
+        'filled', 'MarkerFaceAlpha', 0.6, 'MarkerEdgeColor', 'none');
     
-    % Mean Vector
+    % Mean Vector (Thick Black Arrow)
     mSngl = mean(subTbl.dSngl);
     mBrst = mean(subTbl.dBrst);
-    qM = quiver(0, 0, mSngl, mBrst, 'Color', cols{i}, ...
+    quiver(0, 0, mSngl, mBrst, 'Color', 'k', ...
         'AutoScale', 'off', 'LineWidth', 3, 'MaxHeadSize', 0.5);
     
     % Formatting
     xlim([-maxVal maxVal]);
     ylim([-maxVal maxVal]);
-    xlabel('\Delta Single Spike Rate (Hz)');
-    ylabel('\Delta Burst Spike Rate (Hz)');
-    title(sprintf('%s (n=%d)', grp, nU));
+    xlabel('Log Fold Change (Single)');
+    ylabel('Log Fold Change (Burst)');
+    title(sprintf('%s (n=%d)', grp, height(subTbl)));
+    
+    % Colorbar
+    colormap(gca, turbo);
+    c = colorbar;
+    c.Label.String = 'Baseline Burstiness (pBspk)';
+    clim([0 1]);
     
     % Add Quadrant Labels (Optional)
     text(-maxVal*0.8, maxVal*0.8, 'Burst Comp', 'Color', [.5 .5 .5]);
@@ -152,16 +173,13 @@ sgtitle('Recovery State Space Trajectories');
 %  PLOTTING: POLAR HISTOGRAM (ANGLES)
 %  ========================================================================
 
-fig2 = figure('Position', [150 150 1000 500], 'Color', 'w');
-t = tiledlayout(1, 2, 'TileSpacing', 'compact');
-
-for i = 1:2
+for iGrp = 1:2
     nexttile;
-    grp = grps{i};
+    grp = grps{iGrp};
     subTbl = tbl(tbl.Group == grp, :);
     
     % Polar Histogram
-    polarhistogram(subTbl.vecTheta, 20, 'FaceColor', cols{i}, ...
+    polarhistogram(subTbl.vecTheta, 20, 'FaceColor', cols{iGrp}, ...
         'FaceAlpha', 0.6, 'EdgeColor', 'w');
     
     title(sprintf('%s Directions', grp));
@@ -171,7 +189,7 @@ for i = 1:2
     hold on;
     mAngle = circ_mean(subTbl.vecTheta); % Requires CircStats or defined below
     rLim = rlim;
-    polarplot([0, mAngle], [0, rLim(2)], 'Color', cols{i}, 'LineWidth', 3);
+    polarplot([0, mAngle], [0, rLim(2)], 'Color', cols{iGrp}, 'LineWidth', 3);
 end
 
 

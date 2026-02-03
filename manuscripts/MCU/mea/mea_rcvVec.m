@@ -15,6 +15,10 @@
 presets = {'steadyState'};
 % [tbl, xVec, basepaths, v] = mcu_tblMea('presets', presets, 'flgOtl', true);
 
+% Add logit pBspk
+tblTrans = tbl_trans(tblLme, 'varsInc', {'pBspk'}, 'logBase', 'logit');
+tbl.pBspk_trans = tblTrans.pBspk;
+
 %% ========================================================================
 %  PRE-PROCESS: CALCULATE VECTORS
 %  ========================================================================
@@ -94,7 +98,7 @@ fprintf('Chi2: %.2f, p-value: %.4g\n', chi2, pVal);
 %  PLOTTING: STATE SPACE TRAJECTORIES
 %  ========================================================================
 
-fig = figure('Position', [100 100 1200 500], 'Color', 'w');
+fig = figure('Position', [100 100 1300 1000], 'Color', 'w');
 tiledlayout(2, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
 
 % Color Palette
@@ -112,6 +116,17 @@ cols = {colWt, colKo};
 % Max axis range for symmetry
 maxVal = max(abs([tbl.dSngl; tbl.dBrst])) * 1.1;
 
+% Global Scaling for Plotting
+% ---------------------------
+% Size: Log-Transform Firing Rate (Standard for Log-Normal data)
+% We normalize the Size based on the global distribution (both groups)
+% so that a specific size means the same FR in both plots.
+frLog = log10(tbl.fr);
+lims  = prctile(frLog, [5 95]); % Robust limits
+scatNorm = (frLog - lims(1)) / diff(lims);
+scatNorm(scatNorm < 0) = 0; scatNorm(scatNorm > 1) = 1; % Clamp
+tbl.scatSz = scatNorm * 30 + 5; % Range: 15 to 65 pts
+
 for iGrp = 1:2
     nexttile;
     hold on;
@@ -125,17 +140,17 @@ for iGrp = 1:2
     xline(0, 'k--', 'LineWidth', 1);
     yline(0, 'k--', 'LineWidth', 1);
     
-    % Draw Quivers (Arrows)
-    % Origin (0,0) to (dSngl, dBrst)
-    % We use quiver(X, Y, U, V) where X,Y are origins (0,0) and U,V are components
-    nU = height(subTbl);
-    q = quiver(zeros(nU, 1), zeros(nU, 1), subTbl.dSngl, subTbl.dBrst, ...
-        'Color', [cols{iGrp}, 0.3], 'AutoScale', 'off', 'LineWidth', 1);
+    % Draw Scatter (Units)
+    % Size = Log-Scaled FR, Color = Baseline Burstiness
+    % clrData = log(subTbl.frBspk + c);
+    clrData = subTbl.pBspk_trans;
+    scatter(subTbl.dSngl, subTbl.dBrst, subTbl.scatSz, clrData, ...
+        'filled', 'MarkerFaceAlpha', 0.6, 'MarkerEdgeColor', 'none');
     
-    % Mean Vector
+    % Mean Vector (Thick Black Arrow)
     mSngl = mean(subTbl.dSngl);
     mBrst = mean(subTbl.dBrst);
-    qM = quiver(0, 0, mSngl, mBrst, 'Color', cols{iGrp}, ...
+    quiver(0, 0, mSngl, mBrst, 'Color', 'k', ...
         'AutoScale', 'off', 'LineWidth', 3, 'MaxHeadSize', 0.5);
     
     % Formatting
@@ -143,11 +158,18 @@ for iGrp = 1:2
     ylim([-maxVal maxVal]);
     xlabel('Log Fold Change (Single)');
     ylabel('Log Fold Change (Burst)');
-    title(sprintf('%s (n=%d)', grp, nU));
+    title(sprintf('%s (n=%d)', grp, height(subTbl)));
+    
+    % Colorbar
+    colormap(gca, turbo);
+    hCbar = colorbar;
+    hCbar.Label.String = 'Baseline Burstiness (pBspk)';
+    % clim([0 1]);
     
     % Add Quadrant Labels (Optional)
-    text(-maxVal*0.8, maxVal*0.8, 'Burst Comp', 'Color', [.5 .5 .5]);
-    text(maxVal*0.8, -maxVal*0.8, 'Sngl Comp', 'Color', [.5 .5 .5]);
+    posMarg = 0.6;
+    text(-maxVal*posMarg, maxVal*posMarg, 'Burst Comp', 'Color', [.5 .5 .5]);
+    text(maxVal*posMarg, -maxVal*posMarg, 'Sngl Comp', 'Color', [.5 .5 .5]);
     
     set(gca, 'FontSize', 12, 'LineWidth', 1.2);
 end
@@ -172,19 +194,10 @@ for iGrp = 1:2
     
     % Add Mean Direction line
     hold on;
-    mAngle = circ_mean(subTbl.vecTheta); % Requires CircStats or defined below
+    mAngle = angle(sum(exp(1i * subTbl.vecTheta)));
     rLim = rlim;
     polarplot([0, mAngle], [0, rLim(2)], 'Color', cols{iGrp}, 'LineWidth', 3);
 end
 
 
-%% ========================================================================
-%  HELPER: CIRCULAR MEAN (Simple approximation if toolbox missing)
-%  ========================================================================
-function mu = circ_mean(alpha)
-    % Computes mean direction for circular data
-    % Input: alpha (radians)
-    sa = sum(sin(alpha));
-    ca = sum(cos(alpha));
-    mu = atan2(sa, ca);
-end
+
