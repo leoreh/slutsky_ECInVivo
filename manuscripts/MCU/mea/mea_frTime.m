@@ -5,7 +5,7 @@
 %  temporal dynamics, and visualize using tblGUI_xy.
 
 % Load
-% [tbl, xVec, basepaths, v] = mcu_tblMea('presets', {'time', 'rcv'});
+% [tbl, xVec, basepaths, v] = mcu_tblMea('presets', {'time', 'rcv', 'steadyState'});
 tblPlot = tbl;
 
 % Add logit pBspk
@@ -73,8 +73,8 @@ floorVal = 1 / (median(diff(xVec)) * 3600);
 
 tblVars = tblPlot.Properties.VariableNames;
 tVars = tblVars(contains(tblVars, 't_'));
-tblPlot = tbl_tNorm(tblPlot, 'varsInc', tVars, 'winNorm', winNorm, ...
-    'Method', 'percentage', 'flgGeom', true, 'floorVal', floorVal, 'varsGrp', {});
+% tblPlot = tbl_tNorm(tblPlot, 'varsInc', tVars, 'winNorm', winNorm, ...
+%     'Method', 'percentage', 'flgGeom', true, 'floorVal', floorVal, 'varsGrp', {});
 
 
 %% ========================================================================
