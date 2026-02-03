@@ -13,7 +13,7 @@
 
 % Load with steady state variables
 presets = {'steadyState'};
-% [tbl, xVec, basepaths, v] = mcu_tblMea('presets', presets, 'flgOtl', true);
+[tbl, xVec, basepaths, v] = mcu_tblMea('presets', presets, 'flgOtl', true);
 
 % Add logit pBspk
 tblTrans = tbl_trans(tbl, 'varsInc', {'pBspk'}, 'logBase', 'logit');
@@ -135,10 +135,10 @@ for iGrp = 1:2
         'filled', 'MarkerFaceAlpha', 0.6, 'MarkerEdgeColor', 'none');
     
     % Mean Global Vector
-    mSngl = mean(subTbl.dSngl);
-    mBrst = mean(subTbl.dBrst);
-    quiver(0, 0, mSngl, mBrst, 'Color', 'k', ...
-        'AutoScale', 'off', 'LineWidth', 3, 'MaxHeadSize', 0.5);
+    % mSngl = mean(subTbl.dSngl);
+    % mBrst = mean(subTbl.dBrst);
+    % quiver(0, 0, mSngl, mBrst, 'Color', 'k', ...
+    %     'AutoScale', 'off', 'LineWidth', 3, 'MaxHeadSize', 0.5);
     
     % Formatting
     xlim([-maxVal maxVal]);
@@ -177,6 +177,82 @@ for iGrp = 1:2
 end
 
 sgtitle(fig1, 'Figure 1: Recovery State Space & Strategies');
+
+
+%% ========================================================================
+%  ANALYSIS: ROTATED COORDINATES (D-METRIC)
+%  ========================================================================
+%  D = dBurst - dSingle
+%  Deviations from the identity line (y=x).
+%  D > 0: Burst Biased Strategy
+%  D = 0: Balanced Recovery
+%  D < 0: Single Biased Strategy
+
+fprintf('\n================================================================\n');
+fprintf(' STATISTICS: D-METRIC STRATEGY ANALYSIS\n');
+fprintf('================================================================\n');
+
+% 1. Calculate D
+tbl.D = tbl.dBrst - tbl.dSngl;
+
+% 2. LME Model
+% Model: D ~ Group + (1|Name)
+% Intercept represents the Control deviation from 0.
+% Group coefficient represents the shift in MCU-KO.
+frml = 'D ~ Group * (pBspk + fr) + (1|Name)';
+frml = 'D ~ Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, 'dist', 'normal');
+
+frml = 'dBrst ~ dSngl * Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
+    'dist', 'normal', 'fitMethod', 'REML');
+
+
+frml = 'dSngl ~ (fr + pBspk) * Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
+    'dist', 'normal', 'fitMethod', 'REML');
+
+frml = 'dBrst ~ (dSngl + fr + pBspk) * Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
+    'dist', 'normal', 'fitMethod', 'REML');
+
+% tblGUI_scatHist(tbl, 'xVar', 'pBspk', 'yVar', 'D', 'grpVar', 'Group');
+
+% 3. Plotting
+fig3 = figure('Position', [200 200 500 600], 'Color', 'w', 'Name', 'D-Metric Strategy');
+hold on; grid on;
+
+% Color Order
+colororder([colWt; colKo]);
+
+% Boxchart
+% We group by Group to apply separate colors
+boxchart(tbl.Group, tbl.D, 'GroupByColor', tbl.Group);
+
+% Reference Line (Null Hypothesis: Balanced Recovery)
+yline(0, 'k--', 'Balanced Strategy (y=x)', 'LineWidth', 2, 'LabelHorizontalAlignment', 'center');
+
+% Formatting
+ylabel('Strategy Metric D (\DeltaBurst - \DeltaSingle)');
+title('Recovery Strategy Bias');
+subtitle('Positive = Burst Bias | Negative = Single Bias');
+set(gca, 'FontSize', 12);
+
+% Display Stats on Plot
+pVal_Int = lmeMdl.Coefficients.pValue(1);
+pVal_Grp = lmeMdl.Coefficients.pValue(2);
+est_Int  = lmeMdl.Coefficients.Estimate(1);
+est_Grp  = lmeMdl.Coefficients.Estimate(2);
+
+% Annotate
+% Control Intercept
+txtInt = sprintf('WT Bias: %.2f (p=%.3g)', est_Int, pVal_Int);
+text(1, max(ylim)*0.95, txtInt, 'HorizontalAlignment', 'center', 'Color', colWt, 'FontWeight', 'bold');
+
+% KO Difference
+txtGrp = sprintf('KO Shift: %.2f (p=%.3g)', est_Grp, pVal_Grp);
+text(2, max(ylim)*0.95, txtGrp, 'HorizontalAlignment', 'center', 'Color', colKo, 'FontWeight', 'bold');
+
 
 
 

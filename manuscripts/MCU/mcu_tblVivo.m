@@ -239,8 +239,8 @@ tbl.Day = categorical(tbl.Day, [1 : 7], cfg.lbl.day);
 
 % Reorder columns
 tblVars = tbl.Properties.VariableNames;
-if any(contains(tblVars, "UnitType"))
-    varOrder = {'Group', 'Name', 'File', 'Day', 'UnitID', 'UnitType'};
+if any(contains(tblVars, "unitType"))
+    varOrder = {'Group', 'Name', 'File', 'Day', 'UnitID', 'unitType'};
 else
     varOrder = {'Group', 'Name', 'File', 'Day', 'UnitID'};
 end
@@ -250,14 +250,14 @@ tbl = movevars(tbl, varOrder, 'Before', 1);
 tbl.Group = reordercats(tbl.Group, cfg.lbl.grp);
 tbl.Day = reordercats(tbl.Day, cfg.lbl.day);
 tbl.UnitID = categorical(tbl.UnitID);
-if any(contains(tblVars, "UnitType"))
-    tbl.UnitType = reordercats(tbl.UnitType, cfg.lbl.unit);
+if any(contains(tblVars, "unitType"))
+    tbl.unitType = reordercats(tbl.unitType, cfg.lbl.unit);
 end
 
 if flgClean
     % Remove bad units
-    tbl(tbl.UnitType == 'Other', :) = [];
-    tbl.UnitType = removecats(tbl.UnitType, 'Other');
+    tbl(tbl.unitType == 'Other', :) = [];
+    tbl.unitType = removecats(tbl.unitType, 'Other');
 
     % Remove bac on / off
     tbl(tbl.Day == 'BAC_ON', :) = [];
