@@ -12,7 +12,6 @@
 %  ========================================================================
 
 % Load with steady state variables
-% Load with steady state variables
 presets = {'steadyState'};
 % [tbl, xVec, basepaths, v] = mcu_tblMea('presets', presets, 'flgOtl', true);
 
@@ -101,13 +100,35 @@ for iGrp = 1:2
     grp = grps{iGrp};
     subTbl = tbl(tbl.Group == grp, :);
     
-    % Draw Axes
-    xline(0, 'k--', 'LineWidth', 1);
-    yline(0, 'k--', 'LineWidth', 1);
+    % Orthogonal Regression (PCA)
+    % ---------------------------
+    % The first principal component is the line of total least squares
+    dataXY = [subTbl.dSngl, subTbl.dBrst];
+    [coeff, ~, latent] = pca(dataXY);
+    v1 = coeff(:, 1); % Direction of max variance
+    mu = mean(dataXY);
+    
+    % Calculate Slope & Intercept for plotting
+    % y - muY = m(x - muX)  =>  y = m*x + (muY - m*muX)
+    slope = v1(2) / v1(1);
+    yInt  = mu(2) - slope * mu(1);
+    
+    % Plot Regression Line
+    fLine = @(x) slope * x + yInt;
+    fplot(fLine, [-maxVal maxVal], 'k-', 'LineWidth', 2);
     
     % Equality Line (y=x)
     plot([-maxVal maxVal], [-maxVal maxVal], 'k:', 'LineWidth', 1.5);
     
+    % Quadrant Lines
+    xline(0, 'k--', 'LineWidth', 1);
+    yline(0, 'k--', 'LineWidth', 1);
+
+    % Display Slope/Angle
+    regAngle = atan2d(v1(2), v1(1));
+    text(-maxVal*0.9, maxVal*0.9, sprintf('Slope: %.2f (%.1f\\circ)', slope, regAngle), ...
+        'FontSize', 10, 'FontWeight', 'bold');
+      
     % Scatter (Color = Original Burstiness)
     % We use the transformed pBspk for clearer gradient
     scatter(subTbl.dSngl, subTbl.dBrst, subTbl.scatSz, subTbl.pBspk_trans, ...
