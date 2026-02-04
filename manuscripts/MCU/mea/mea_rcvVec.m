@@ -19,12 +19,68 @@ presets = {'steadyState'};
 tblTrans = tbl_trans(tbl, 'varsInc', {'pBspk'}, 'logBase', 'logit');
 tbl.pBspk_trans = tblTrans.pBspk;
 
+
+flgPseudo = false; % Validate "Pseudo-Tracking" (Quantile Matching) on MEA data
+flgQq = false;
+
+if flgQq
+    hFig = mcu_frQq(tbl, 'dataSet', 'mea');
+end
+
 %% ========================================================================
 %  PRE-PROCESS: CALCULATE VECTORS
 %  ========================================================================
 
 % 1. Calculate Deltas (Steady State - Baseline)
 % ---------------------------------------------
+
+if flgPseudo
+    % --- CONVERT TO LONG FORMAT ---
+    % match_qntl expects: [Group, Name, Day, vars...]
+    
+    % Baseline Table
+    varsBsl = {'fr', 'frBspk', 'frSspk', 'pBspk'};
+    tBsl = tbl(:, [{'Group', 'Name'}, varsBsl]);
+    tBsl.Day = repmat({'BSL'}, height(tBsl), 1);
+    tBsl.Day = categorical(tBsl.Day);
+
+    % Steady State Table (Rename ss_ vars)
+    varsSs = {'ss_fr', 'ss_frBspk', 'ss_frSspk', 'pBspk'}; % pBspk roughly same, or use ss_pBspk if available
+    % Note: mcu_tblMea provides ss_pBspk? Let's assume we map standard vars.
+    % Actually, let's just grab the ss columns and rename.
+    tSs = tbl(:, {'Group', 'Name', 'frSs', 'ss_frBspk', 'ss_frSspk', 'ss_pBspk'});
+    tSs = renamevars(tSs, {'frSs', 'ss_frBspk', 'ss_frSspk', 'ss_pBspk'}, ...
+                           {'fr',    'frBspk',    'frSspk',    'pBspk'});
+    tSs.Day = repmat({'BAC3'}, height(tSs), 1); % match_qntl hardcodes 'BAC3' as the 2nd day
+    tSs.Day = categorical(tSs.Day);
+
+    % Combine
+    tblLong = [tBsl; tSs];
+    
+    % --- RUN MATCHING ---
+    nBins = 80;
+    fprintf('VALIDATION: Running match_qntl on MEA data (nBins=%d)...\n', nBins);
+    tblSynth = match_qntl(tblLong, nBins, 'flgPool', true, ...
+        'vars', {'fr', 'frBspk', 'frSspk', 'pBspk'});
+    
+    % --- MAP BACK TO MEA FORMAT ---
+    % MEA Script Expects: frBspk (BSL), ss_frBspk (SteadyState)
+    
+    tbl = tblSynth;
+    
+    % Baseline Mappings
+    tbl.fr        = tbl.fr_BSL;      % For Size Scaling
+    tbl.pBspk     = tbl.pBspk_BSL;   % For Color
+    tbl.frBspk    = tbl.frBspk_BSL;
+    tbl.frSspk    = tbl.frSspk_BSL;
+    
+    % Steady State Mappings
+    tbl.ss_frBspk = tbl.frBspk_BAC3;
+    tbl.ss_frSspk = tbl.frSspk_BAC3;
+    
+    fprintf('VALIDATION: Replaced real units with %d Synthetic Units.\n', height(tbl));
+end
+
 % frBspk = Baseline Burst Rate
 % ss_frBspk = Steady State Burst Rate
 tbl.dBrst = tbl.ss_frBspk - tbl.frBspk;
@@ -35,6 +91,7 @@ c = 1 / 3600;
 
 tbl.dBrst = log((tbl.ss_frBspk + c) ./ (tbl.frBspk + c));
 tbl.dSngl = log((tbl.ss_frSspk + c) ./ (tbl.frSspk + c));
+tbl.dFr = log((tbl.frSs) ./ (tbl.fr));
 
 % 2. Calculate Vector Properties (Polar Coordinates)
 % --------------------------------------------------
@@ -113,7 +170,7 @@ for iGrp = 1:2
       
     % Scatter (Color = Original Burstiness)
     % We use the transformed pBspk for clearer gradient
-    scatter(subTbl.dSngl, subTbl.dBrst, subTbl.scatSz, subTbl.pBspk_trans, ...
+    scatter(subTbl.dSngl, subTbl.dBrst, subTbl.scatSz, subTbl.pBspk, ...
         'filled', 'MarkerFaceAlpha', 0.6, 'MarkerEdgeColor', 'none');
     
     % Mean Global Vector
@@ -125,8 +182,8 @@ for iGrp = 1:2
     % Formatting
     xlim([-maxVal maxVal]);
     ylim([-maxVal maxVal]);
-    xlabel('Log Fold Change (Single)');
-    ylabel('Log Fold Change (Burst)');
+    xlabel('Single FR Gain');
+    ylabel('Busrt FR Gain');
     title(sprintf('%s (n=%d)', grp, height(subTbl)));
     
     colormap(gca, turbo);
@@ -189,52 +246,25 @@ frml = 'dBrst ~ dSngl * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
     'dist', 'normal', 'fitMethod', 'REML');
 
-
-frml = 'dSngl ~ (fr + pBspk) * Group + (1|Name)';
+frml = 'dSngl ~ dBrst * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
     'dist', 'normal', 'fitMethod', 'REML');
 
-frml = 'dBrst ~ (dSngl + fr + pBspk) * Group + (1|Name)';
+frml = 'dSngl ~ (fr + pBspk + dBrst) * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
     'dist', 'normal', 'fitMethod', 'REML');
 
-% tblGUI_scatHist(tbl, 'xVar', 'pBspk', 'yVar', 'D', 'grpVar', 'Group');
+frml = 'dBrst ~ (fr + pBspk) * Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
+    'dist', 'normal', 'fitMethod', 'REML');
 
-% 3. Plotting
-fig3 = figure('Position', [200 200 500 600], 'Color', 'w', 'Name', 'D-Metric Strategy');
-hold on; grid on;
+frml = 'dFr ~ (dBrst + dSngl) * Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
+    'dist', 'normal', 'fitMethod', 'REML');
 
-% Color Order
-colororder([colWt; colKo]);
+frml = 'frSs ~ (fr + pBspk) * Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
+    'dist', 'gamma');
 
-% Boxchart
-% We group by Group to apply separate colors
-boxchart(tbl.Group, tbl.D, 'GroupByColor', tbl.Group);
-
-% Reference Line (Null Hypothesis: Balanced Recovery)
-yline(0, 'k--', 'Balanced Strategy (y=x)', 'LineWidth', 2, 'LabelHorizontalAlignment', 'center');
-
-% Formatting
-ylabel('Strategy Metric D (\DeltaBurst - \DeltaSingle)');
-title('Recovery Strategy Bias');
-subtitle('Positive = Burst Bias | Negative = Single Bias');
-set(gca, 'FontSize', 12);
-
-% Display Stats on Plot
-pVal_Int = lmeMdl.Coefficients.pValue(1);
-pVal_Grp = lmeMdl.Coefficients.pValue(2);
-est_Int  = lmeMdl.Coefficients.Estimate(1);
-est_Grp  = lmeMdl.Coefficients.Estimate(2);
-
-% Annotate
-% Control Intercept
-txtInt = sprintf('WT Bias: %.2f (p=%.3g)', est_Int, pVal_Int);
-text(1, max(ylim)*0.95, txtInt, 'HorizontalAlignment', 'center', 'Color', colWt, 'FontWeight', 'bold');
-
-% KO Difference
-txtGrp = sprintf('KO Shift: %.2f (p=%.3g)', est_Grp, pVal_Grp);
-text(2, max(ylim)*0.95, txtGrp, 'HorizontalAlignment', 'center', 'Color', colKo, 'FontWeight', 'bold');
-
-
-
-
+% tblGUI_scatHist(tbl, 'xVar', 'pBspk_trans', 'yVar', 'dBrst', 'grpVar', 'Group');
+% tblGUI_bar(tbl, 'yVar', 'pBspk', 'xVar', 'Group');

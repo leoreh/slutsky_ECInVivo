@@ -116,14 +116,6 @@ function tWide = proc_pair(tIn, nBins, vars)
 
     tWide = table();
 
-    % Check for both days
-    hasBsl = any(tIn.Day == 'BSL');
-    hasBac = any(tIn.Day == 'BAC3');
-
-    if ~hasBsl || ~hasBac
-        return;
-    end
-
     % Split
     tBsl = tIn(tIn.Day == 'BSL', :);
     tBac = tIn(tIn.Day == 'BAC3', :);

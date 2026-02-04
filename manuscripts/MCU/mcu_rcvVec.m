@@ -47,61 +47,7 @@ flgQq = false;
 cutoff_Z = -1.5; % User defined cut-off (Visual Inspection)
 
 if flgQq
-    idxWt = tblLme.Group == 'Control';
-    idxMcu = tblLme.Group == 'MCU-KO';
-    
-    frBsl = tblLme.fr(tblLme.Day == 'BSL' & idxWt);
-    frBac = tblLme.fr(tblLme.Day == 'BAC3' & idxWt);
-    
-    frBslMcu = tblLme.fr(tblLme.Day == 'BSL' & idxMcu);
-    
-    hFig = figure('Position', [300 300 900 900], 'Color', 'w', 'Name', 'Data Distribution Check');
-    tiledlayout(2, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
-    
-    % Log-Normality Check (The most important for cutoff)
-    nexttile;
-    hQ = qqplot(log(frBsl)); 
-    xlabel('Theoretical Normal Quantiles');
-    ylabel('Sample Log(FR) Quantiles');
-    title('Log-Normality Check (BSL Control)');
-    grid on; axis square;   
-    hQ(1).LineWidth = 1;
-
-    % Group Check (Control vs MCU)
-    nexttile;
-    hQ = qqplot(log(frBsl), log(frBslMcu));
-    xlabel('Control BSL Log(FR)');
-    ylabel('MCU BSL Log(FR)');
-    title('Group: Control vs MCU (BSL)');
-    grid on; axis square;
-    refline(1,0);
-    hQ(1).LineWidth = 1;
-    
-    % Stability Check (BSL vs BAC3)
-    nexttile;  hold on;
-    hQ = qqplot(log(frBsl), log(frBac));
-    xlabel('BSL Log(FR) Quantiles');
-    ylabel('BAC3 Log(FR) Quantiles');
-    title('Stability: BSL vs BAC3 (Control)');
-    grid on; axis square;
-    refline(1,0); 
-    hQ(1).LineWidth = 1;
-
-    % Calculate cutoff value in log space for plotting
-    logCutoff = prctile(log(frBsl), normcdf(cutoff_Z)*100);
-    yline(logCutoff, 'r--', 'Cutoff', 'LineWidth', 1.5, 'LabelVerticalAlignment', 'bottom');
-
-    % Stability Check (MCU BSL vs BAC3)
-    % Just to be thorough
-    frBacMcu = tblLme.fr(tblLme.Day == 'BAC3' & idxMcu);
-    nexttile;
-    hQ = qqplot(log(frBslMcu), log(frBacMcu));
-    xlabel('MCU BSL Log(FR)');
-    ylabel('MCU BAC3 Log(FR)');
-    title('Stability: BSL vs BAC3 (MCU)');
-    grid on; axis square;
-    refline(1,0); 
-    hQ(1).LineWidth = 1;
+   hFig = mcu_frQq(tbl, 'dataSet', 'vivo');
 end
 
 % --- FILTERING ---
