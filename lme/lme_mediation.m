@@ -54,7 +54,7 @@ if flgVerbose, fprintf('\n[LME_MEDIATION] Step 1: Total Effect (X->Y)\n'); end
 
 % Use input formula directly
 frmlC = frml;
-[mdlC, ~, infoC] = lme_analyse(tbl, frmlC, 'dist', distY);
+[mdlC, ~, infoC] = lme_analyse(tbl, frmlC, 'dist', distY, 'verbose', false);
 [betaC, pC, seC] = get_coeff(mdlC, xVar);
 
 
@@ -65,7 +65,7 @@ frmlC = frml;
 if flgVerbose, fprintf('\n[LME_MEDIATION] Step 2: Mediator Model (X->M)\n'); end
 
 frmlA = sprintf('%s ~ %s', mVar, rhs);
-[mdlA, ~, infoA] = lme_analyse(tbl, frmlA, 'dist', distM);
+[mdlA, ~, infoA] = lme_analyse(tbl, frmlA, 'dist', distM, 'verbose', false);
 [betaA, pA, seA] = get_coeff(mdlA, xVar);
 
 
@@ -80,7 +80,7 @@ if flgVerbose, fprintf('\n[LME_MEDIATION] Step 3: Outcome Model (X+M->Y)\n'); en
 frmlBC = sprintf('%s ~ %s + %s', yVar, mVar, rhs);
 
 % Reuse distY logic from Path C if it was auto-selected?
-[mdlBC, ~, infoBC] = lme_analyse(tbl, frmlBC, 'dist', distY);
+[mdlBC, ~, infoBC] = lme_analyse(tbl, frmlBC, 'dist', distY, 'verbose', false);
 
 [betaB, pB, seB] = get_coeff(mdlBC, mVar);
 [betaC_prime, pC_prime, seC_prime] = get_coeff(mdlBC, xVar);
@@ -251,15 +251,4 @@ end
 %    compensatory boost. When you control for the Mediator in the model
 %    (Path C'), the "pure" negative impact of the Treatment becomes more
 %    pronounced (larger beta) because the masking effect is removed.
-%
-% 3. Impact on Feature Importance:
-%    Competitive mediation can make Importance Analysis (Ablation) confusing.
-%    - Information Overlap: The model sees X and M pulling predictions in
-%      opposite directions.
-%    - Accuracy Sensitivity: Removing the "negative" predictor (X) might be
-%      partially offset by the "positive" predictor (M) remaining, leading
-%      to a deceptively small drop in accuracy.
-%    - Conclusion: In these cases, Likelihood Ratio Tests (LRT) or p-values
-%      are often more reliable metrics of feature relevance than simple
-%      prediction accuracy.
 % ========================================================================

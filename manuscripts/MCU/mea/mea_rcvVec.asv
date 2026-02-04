@@ -16,8 +16,9 @@ presets = {'steadyState'};
 [tbl, xVec, basepaths, v] = mcu_tblMea('presets', presets, 'flgOtl', true);
 
 % Add logit pBspk
-tblTrans = tbl_trans(tbl, 'varsInc', {'pBspk'}, 'logBase', 'logit');
+tblTrans = tbl_trans(tbl, 'varsInc', {'pBspk', 'ss_pBspk'}, 'logBase', 'logit');
 tbl.pBspk_trans = tblTrans.pBspk;
+tbl.ss_pBspk_trans = tblTrans.ss_pBspk;
 
 
 flgPseudo = false; % Validate "Pseudo-Tracking" (Quantile Matching) on MEA data
@@ -39,8 +40,8 @@ if flgPseudo
     % match_qntl expects: [Group, Name, Day, vars...]
     
     % Baseline Table
-    varsBsl = {'fr', 'frBspk', 'frSspk', 'pBspk'};
-    tBsl = tbl(:, [{'Group', 'Name'}, varsBsl]);
+    varsTbl = {'fr', 'frBspk', 'frSspk', 'pBspk'};
+    tBsl = tbl(:, [{'Group', 'Name'}, varsTbl]);
     tBsl.Day = repmat({'BSL'}, height(tBsl), 1);
     tBsl.Day = categorical(tBsl.Day);
 
@@ -92,130 +93,21 @@ c = 1 / 3600;
 tbl.dBrst = log((tbl.ss_frBspk + c) ./ (tbl.frBspk + c));
 tbl.dSngl = log((tbl.ss_frSspk + c) ./ (tbl.frSspk + c));
 tbl.dFr = log((tbl.frSs) ./ (tbl.fr));
+tbl.dpBbspk = (tbl.ss_pBspk_trans) - (tbl.pBspk_trans);
 
-% 2. Calculate Vector Properties (Polar Coordinates)
-% --------------------------------------------------
-% Convert Cartesian (dSngl, dBrst) to Polar (Theta, Radius)
-[tbl.vecTheta, tbl.vecR] = cart2pol(tbl.dSngl, tbl.dBrst);
+% tbl.dBrst = (tbl.ss_frBspk - tbl.frBspk);
+% tbl.dSngl = (tbl.ss_frSspk - tbl.frSspk);
 
-% Convert Theta to Degrees for easier interpretation
-tbl.vecDeg = rad2deg(tbl.vecTheta);
-
+% tbl.dBrst = log((tbl.frSspk + c) ./ tbl.frSs);
+% tbl.dSngl = log((tbl.ss_frSspk + c) ./ tbl.frSs);
 
 %% ========================================================================
-%  PLOTTING: FIGURE 1 - RAW STATE SPACE & ANGLES
+%  PLOTTING
 %  ========================================================================
 
-fig1 = figure('Position', [50 100 1200 900], 'Color', 'w', 'Name', 'Raw Trajectories');
-tiledlayout(2, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
+hFig = mcu_rcvSpace(tbl);
 
-% Color Palette
-cMap = containers.Map;
-cMap('Control') = [0.2 0.2 0.2]; % Dark Gray
-cMap('MCU-KO')  = [0.8 0.0 0.0]; % Red
 
-colWt = cMap('Control');
-colKo = cMap('MCU-KO');
-grps = {'Control', 'MCU-KO'};
-cols = {colWt, colKo};
-
-% Max axis range for symmetry
-maxVal = max(abs([tbl.dSngl; tbl.dBrst])) * 1.1;
-
-% Global Scaling for Plotting
-frLog = log10(tbl.fr);
-lims  = prctile(frLog, [5 95]); 
-scatNorm = (frLog - lims(1)) / diff(lims);
-scatNorm(scatNorm < 0) = 0; scatNorm(scatNorm > 1) = 1; 
-tbl.scatSz = scatNorm * 40 + 10; 
-
-% --- ROW 1: SCATTER PLOTS ---
-for iGrp = 1:2
-    nexttile;
-    hold on;
-    axis square;
-    grid on;
-    
-    grp = grps{iGrp};
-    subTbl = tbl(tbl.Group == grp, :);
-    
-    % Orthogonal Regression (PCA)
-    % ---------------------------
-    % The first principal component is the line of total least squares
-    dataXY = [subTbl.dSngl, subTbl.dBrst];
-    [coeff, ~, latent] = pca(dataXY);
-    v1 = coeff(:, 1); % Direction of max variance
-    mu = mean(dataXY);
-    
-    % Calculate Slope & Intercept for plotting
-    % y - muY = m(x - muX)  =>  y = m*x + (muY - m*muX)
-    slope = v1(2) / v1(1);
-    yInt  = mu(2) - slope * mu(1);
-    
-    % Plot Regression Line
-    fLine = @(x) slope * x + yInt;
-    fplot(fLine, [-maxVal maxVal], 'k-', 'LineWidth', 2);
-    
-    % Equality Line (y=x)
-    plot([-maxVal maxVal], [-maxVal maxVal], 'k:', 'LineWidth', 1.5);
-    
-    % Quadrant Lines
-    xline(0, 'k--', 'LineWidth', 1);
-    yline(0, 'k--', 'LineWidth', 1);
-
-    % Display Slope/Angle
-    regAngle = atan2d(v1(2), v1(1));
-    text(-maxVal*0.9, maxVal*0.9, sprintf('Slope: %.2f (%.1f\\circ)', slope, regAngle), ...
-        'FontSize', 10, 'FontWeight', 'bold');
-      
-    % Scatter (Color = Original Burstiness)
-    % We use the transformed pBspk for clearer gradient
-    scatter(subTbl.dSngl, subTbl.dBrst, subTbl.scatSz, subTbl.pBspk, ...
-        'filled', 'MarkerFaceAlpha', 0.6, 'MarkerEdgeColor', 'none');
-    
-    % Mean Global Vector
-    % mSngl = mean(subTbl.dSngl);
-    % mBrst = mean(subTbl.dBrst);
-    % quiver(0, 0, mSngl, mBrst, 'Color', 'k', ...
-    %     'AutoScale', 'off', 'LineWidth', 3, 'MaxHeadSize', 0.5);
-    
-    % Formatting
-    xlim([-maxVal maxVal]);
-    ylim([-maxVal maxVal]);
-    xlabel('Log Fold Change (Single)');
-    ylabel('Log Fold Change (Burst)');
-    title(sprintf('%s (n=%d)', grp, height(subTbl)));
-    
-    colormap(gca, turbo);
-    if iGrp == 2
-        c = colorbar;
-        c.Label.String = 'Baseline Burstiness (logit)';
-    end
-    
-    set(gca, 'FontSize', 12);
-end
-
-% --- ROW 2: POLAR HISTOGRAMS ---
-for iGrp = 1:2
-    nexttile;
-    grp = grps{iGrp};
-    subTbl = tbl(tbl.Group == grp, :);
-    
-    % Polar Histogram
-    polarhistogram(subTbl.vecTheta, 20, 'FaceColor', cols{iGrp}, ...
-        'FaceAlpha', 0.6, 'EdgeColor', 'w');
-    
-    title(sprintf('%s Directions', grp));
-    set(gca, 'FontSize', 12);
-    
-    % Add Mean Direction line
-    hold on;
-    mAngle = angle(sum(exp(1i * subTbl.vecTheta)));
-    rLim = rlim;
-    polarplot([0, mAngle], [0, rLim(2)], 'Color', cols{iGrp}, 'LineWidth', 3);
-end
-
-sgtitle(fig1, 'Figure 1: Recovery State Space & Strategies');
 
 
 %% ========================================================================
@@ -250,7 +142,7 @@ frml = 'dSngl ~ dBrst * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
     'dist', 'normal', 'fitMethod', 'REML');
 
-frml = 'dSngl ~ (fr + pBspk) * Group + (1|Name)';
+frml = 'dSngl ~ (fr + pBspk + dBrst) * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
     'dist', 'normal', 'fitMethod', 'REML');
 
@@ -258,13 +150,149 @@ frml = 'dBrst ~ (fr + pBspk) * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
     'dist', 'normal', 'fitMethod', 'REML');
 
-frml = 'dFr ~ (dBrst + dSngl + fr + pBspk) * Group + (1|Name)';
+frml = 'dFr ~ (dBrst + dSngl) * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
     'dist', 'normal', 'fitMethod', 'REML');
 
 frml = 'frSs ~ (fr + pBspk) * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-    'dist', 'normal', 'fitMethod', 'REML');
+    'dist', 'gamma');
+
+
+
+frml = 'dSngl ~ pBspk + fr + (1|Name)';
+tblWt = tbl(tbl.Group == 'Control', :);
+tblMcu = tbl(tbl.Group == 'MCU-KO', :);
+xVar = 'pBspk';
+mVar = 'dBrst';
+distM = 'normal';
+distY = 'normal';
+res = lme_mediation(tblWt, frml, xVar, mVar, 'distM', distM, 'distY', distY);
+
+
+frml = 'dSngl ~ (pBspk + fr) + Group + (1|Name)';
+xVar = 'pBspk';
+mVar = 'dBrst';
+distM = 'normal';
+distY = 'normal';
+res = lme_mediation(tbl, frml, xVar, mVar, 'distM', distM, 'distY', distY);
+
+
+sum(tbl.pBspk(tbl.Group == 'Control') == 0)
+sum(tbl.ss_pBspk(tbl.Group == 'Control') == 0)
+
+
+
+frml = 'dSngl ~ (pBspk + fr + dBrst) * Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
+    'dist', 'normal');
+
+frml = 'dBrst ~ (pBspk + fr) * Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
+    'dist', 'normal');
 
 % tblGUI_scatHist(tbl, 'xVar', 'pBspk_trans', 'yVar', 'dBrst', 'grpVar', 'Group');
 % tblGUI_bar(tbl, 'yVar', 'pBspk', 'xVar', 'Group');
+
+%% ========================================================================
+%  RESIDUAL ANALYSIS
+%  ========================================================================
+
+% Model dBrst and Extract Residuals
+frml = 'dBrst ~ (pBspk + fr) * Group + (1|Name)';
+[lmeMdl, ~, ~, ~] = lme_analyse(tbl, frml, 'dist', 'normal', 'verbose', false);
+tbl.R_burst = residuals(lmeMdl, 'ResidualType', 'Pearson');
+
+% Model dSngl and Extract Residuals
+frml = 'dSngl ~ (pBspk + fr) * Group + (1|Name)';
+[lmeMdl, ~, ~, ~] = lme_analyse(tbl, frml, 'dist', 'normal', 'verbose', false);
+tbl.R_single = residuals(lmeMdl, 'ResidualType', 'Pearson');
+
+% Correlation Analysis
+[rRes, pRes] = corr(tbl.R_burst, tbl.R_single, 'Rows', 'complete');
+frml = 'R_single ~ R_burst * Group + (1|Name)';
+[lmeMdl, ~, ~, ~] = lme_analyse(tbl, frml, 'dist', 'normal', 'verbose', false);
+
+% Visualization
+figure('Color', 'w', 'Position', [100 100 600 500]);
+hold on;
+
+groups = unique(tbl.Group);
+cols = lines(length(groups));
+
+for iGrp = 1:length(groups)
+    idx = tbl.Group == groups(iGrp);
+    xData = tbl.R_burst(idx);
+    yData = tbl.R_single(idx);
+    
+    % Scatter
+    scatter(xData, yData, 30, cols(iGrp,:), ...
+        'filled', 'MarkerEdgeColor', 'none', 'MarkerFaceAlpha', 0.3, ...
+        'HandleVisibility', 'off');
+        
+    % Group Regression Line
+    p = polyfit(xData, yData, 1);
+    xRange = linspace(min(xData), max(xData), 100);
+    yFit = polyval(p, xRange);
+    plot(xRange, yFit, 'Color', cols(iGrp,:), 'LineWidth', 2, ...
+        'DisplayName', sprintf('%s Fit', string(groups(iGrp))));
+end
+
+xlabel('dBrst Residuals');
+ylabel('dSngl Residuals');
+title('Residual Analysis');
+grid on;
+axis square;
+
+% Set Limits (Symmetric)
+maxVal = max(abs([tbl.R_burst; tbl.R_single])) * 1.1;
+xlim([-maxVal maxVal]);
+ylim([-maxVal maxVal]);
+
+
+% Reference Lines (Zero axes)
+xline(0, '--k', 'Alpha', 1, 'HandleVisibility', 'off');
+yline(0, '--k', 'Alpha', 1, 'HandleVisibility', 'off');
+
+% Equality Line (y=x)
+hEq = refline(1, 0);
+hEq.Color = [0 0 0];
+hEq.LineStyle = '--';
+
+legend('Location', 'best');
+
+%% ========================================================================
+%  CONTRIBUTION ANALYSIS: BSL vs SS
+%  ========================================================================
+%  Test if the relative contribution of burst spikes (pBspk) changes between
+%  Baseline and Steady State (SS), and if this change differs by Group.
+
+fprintf('\n================================================================\n');
+fprintf(' STATISTICS: CONTRIBUTION ANALYSIS (pBspk: BSL vs SS)\n');
+fprintf('================================================================\n');
+
+% Construct Tall Table
+
+idxGrp = tbl.Group == 'Control';
+idxGrp = true(height(tbl), 1);
+
+% Baseline
+varsTbl = {'Group', 'Name', 'frBspk', 'frSspk', 'fr'};
+tBsl = tbl(idxGrp, varsTbl);
+tBsl.Timepoint = repmat({'BSL'}, height(tBsl), 1);
+
+% Steady State
+varsSs = {'Group', 'Name', 'ss_frBspk', 'ss_frSspk', 'frSs'};
+tSs = tbl(idxGrp, varsSs);
+tSs.Properties.VariableNames = varsTbl;
+tSs.Timepoint = repmat({'SS'}, height(tSs), 1);
+
+% Concatenate
+tblLong = [tBsl; tSs];
+tblLong.Timepoint = categorical(tblLong.Timepoint, {'BSL', 'SS'});
+
+% LME Analysis
+frml = 'fr ~ (frSspk + frBspk) * Timepoint * Group + (1|Name)';
+
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tblLong, frml, ...
+    'dist', 'log-normal');
