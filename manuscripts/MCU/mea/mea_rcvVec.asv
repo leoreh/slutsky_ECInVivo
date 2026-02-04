@@ -93,10 +93,10 @@ c = 1 / 3600;
 tbl.dBrst = log((tbl.ss_frBspk + c) ./ (tbl.frBspk + c));
 tbl.dSngl = log((tbl.ss_frSspk + c) ./ (tbl.frSspk + c));
 tbl.dFr = log((tbl.frSs) ./ (tbl.fr));
-tbl.dpBbspk = (tbl.ss_pBspk_trans) - (tbl.pBspk_trans);
+tbl.dpBspk = (tbl.ss_pBspk_trans) - (tbl.pBspk_trans);
 
-% tbl.dBrst = (tbl.ss_frBspk - tbl.frBspk);
-% tbl.dSngl = (tbl.ss_frSspk - tbl.frSspk);
+tbl.dBrst = asinh(tbl.ss_frBspk - tbl.frBspk);
+tbl.dSngl = asinh(tbl.ss_frSspk - tbl.frSspk);
 
 % tbl.dBrst = log((tbl.frSspk + c) ./ tbl.frSs);
 % tbl.dSngl = log((tbl.ss_frSspk + c) ./ tbl.frSs);
@@ -107,7 +107,12 @@ tbl.dpBbspk = (tbl.ss_pBspk_trans) - (tbl.pBspk_trans);
 
 hFig = mcu_rcvSpace(tbl);
 
+%  RESIDUAL ANALYSIS
+hFig = mcu_rcvRes(tbl);
 
+
+% tblGUI_scatHist(tbl, 'xVar', 'pBspk_trans', 'yVar', 'dBrst', 'grpVar', 'Group');
+% tblGUI_bar(tbl, 'yVar', 'pBspk', 'xVar', 'Group');
 
 
 %% ========================================================================
@@ -170,12 +175,12 @@ distY = 'normal';
 res = lme_mediation(tblWt, frml, xVar, mVar, 'distM', distM, 'distY', distY);
 
 
-frml = 'dSngl ~ (pBspk + fr) + Group + (1|Name)';
-xVar = 'pBspk';
-mVar = 'dBrst';
+frml = 'dFr ~ (dpBspk) + (1|Name)';
+xVar = 'dpBspk';
+mVar = 'dSngl';
 distM = 'normal';
 distY = 'normal';
-res = lme_mediation(tbl, frml, xVar, mVar, 'distM', distM, 'distY', distY);
+res = lme_mediation(tblWt, frml, xVar, mVar, 'distM', distM, 'distY', distY);
 
 
 sum(tbl.pBspk(tbl.Group == 'Control') == 0)
@@ -191,75 +196,7 @@ frml = 'dBrst ~ (pBspk + fr) * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
     'dist', 'normal');
 
-% tblGUI_scatHist(tbl, 'xVar', 'pBspk_trans', 'yVar', 'dBrst', 'grpVar', 'Group');
-% tblGUI_bar(tbl, 'yVar', 'pBspk', 'xVar', 'Group');
 
-%% ========================================================================
-%  RESIDUAL ANALYSIS
-%  ========================================================================
-
-% Model dBrst and Extract Residuals
-frml = 'dBrst ~ (pBspk + fr) * Group + (1|Name)';
-[lmeMdl, ~, ~, ~] = lme_analyse(tbl, frml, 'dist', 'normal', 'verbose', false);
-tbl.R_burst = residuals(lmeMdl, 'ResidualType', 'Pearson');
-
-% Model dSngl and Extract Residuals
-frml = 'dSngl ~ (pBspk + fr) * Group + (1|Name)';
-[lmeMdl, ~, ~, ~] = lme_analyse(tbl, frml, 'dist', 'normal', 'verbose', false);
-tbl.R_single = residuals(lmeMdl, 'ResidualType', 'Pearson');
-
-% Correlation Analysis
-[rRes, pRes] = corr(tbl.R_burst, tbl.R_single, 'Rows', 'complete');
-frml = 'R_single ~ R_burst * Group + (1|Name)';
-[lmeMdl, ~, ~, ~] = lme_analyse(tbl, frml, 'dist', 'normal', 'verbose', false);
-
-% Visualization
-figure('Color', 'w', 'Position', [100 100 600 500]);
-hold on;
-
-groups = unique(tbl.Group);
-cols = lines(length(groups));
-
-for iGrp = 1:length(groups)
-    idx = tbl.Group == groups(iGrp);
-    xData = tbl.R_burst(idx);
-    yData = tbl.R_single(idx);
-    
-    % Scatter
-    scatter(xData, yData, 30, cols(iGrp,:), ...
-        'filled', 'MarkerEdgeColor', 'none', 'MarkerFaceAlpha', 0.3, ...
-        'HandleVisibility', 'off');
-        
-    % Group Regression Line
-    p = polyfit(xData, yData, 1);
-    xRange = linspace(min(xData), max(xData), 100);
-    yFit = polyval(p, xRange);
-    plot(xRange, yFit, 'Color', cols(iGrp,:), 'LineWidth', 2, ...
-        'DisplayName', sprintf('%s Fit', string(groups(iGrp))));
-end
-
-xlabel('dBrst Residuals');
-ylabel('dSngl Residuals');
-title('Residual Analysis');
-grid on;
-axis square;
-
-% Set Limits (Symmetric)
-maxVal = max(abs([tbl.R_burst; tbl.R_single])) * 1.1;
-xlim([-maxVal maxVal]);
-ylim([-maxVal maxVal]);
-
-
-% Reference Lines (Zero axes)
-xline(0, '--k', 'Alpha', 1, 'HandleVisibility', 'off');
-yline(0, '--k', 'Alpha', 1, 'HandleVisibility', 'off');
-
-% Equality Line (y=x)
-hEq = refline(1, 0);
-hEq.Color = [0 0 0];
-hEq.LineStyle = '--';
-
-legend('Location', 'best');
 
 %% ========================================================================
 %  CONTRIBUTION ANALYSIS: BSL vs SS
