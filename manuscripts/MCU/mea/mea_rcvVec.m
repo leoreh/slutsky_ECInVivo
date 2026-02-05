@@ -24,9 +24,6 @@ tbl.ss_pBspk_trans = tblTrans.ss_pBspk;
 flgPseudo = false; % Validate "Pseudo-Tracking" (Quantile Matching) on MEA data
 flgQq = false;
 
-if flgQq
-    hFig = mcu_frQq(tbl, 'dataSet', 'mea');
-end
 
 %% ========================================================================
 %  PRE-PROCESS: CALCULATE VECTORS
@@ -107,8 +104,13 @@ tbl.dSngl = asinh(tbl.ss_frSspk - tbl.frSspk);
 
 hFig = mcu_rcvSpace(tbl);
 
-%  RESIDUAL ANALYSIS
+% Resdidual analysis
 hFig = mcu_rcvRes(tbl);
+
+% QQ plot
+if flgQq
+    hFig = mcu_frQq(tbl, 'dataSet', 'mea');
+end
 
 
 % tblGUI_scatHist(tbl, 'xVar', 'pBspk_trans', 'yVar', 'dBrst', 'grpVar', 'Group');
@@ -159,9 +161,22 @@ frml = 'dFr ~ (dBrst + dSngl) * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
     'dist', 'normal', 'fitMethod', 'REML');
 
+
+
+%%
+frml = 'dFr ~ (dpBspk) * Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
+    'dist', 'normal', 'fitMethod', 'REML');
+% MCU-KO neurons have a significant recovery deficit that cannot be
+% explained by their change in burstiness.
+
+%%
+
 frml = 'frSs ~ (fr + pBspk) * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
     'dist', 'gamma');
+
+
 
 
 
