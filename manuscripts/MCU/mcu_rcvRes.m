@@ -167,31 +167,18 @@ function plot_scatRes(tbl, groups, cols, xVar, yVar, alphaVal)
             'MarkerFaceAlpha', alphaVal, 'MarkerEdgeColor', 'none', ...
             'HandleVisibility', 'off');
         
-        % Orthogonal Regression (PCA)
-        % Center Data
-        dataXY = [xData, yData];
-        [coeff, ~, ~] = pca(dataXY);
-        v1 = coeff(:, 1); % First Principal Component
-        mu = mean(dataXY);
-
-        % Slope & Intercept
-        slope = v1(2) / v1(1);
-        yInt  = mu(2) - slope * mu(1);
-
-        % Plot Fit (Clipped to axes)
-        fLine = @(x) slope * x + yInt;
-        fplot(fLine, [-lims, lims], 'Color', cols(iGrp, :), ...
-            'LineWidth', 2, 'HandleVisibility', 'off');
-
-        % Annotate Angle
-        regAngle = atan2d(v1(2), v1(1));
-
-        % Offset text slightly based on group index to avoid overlap
-        yTxt = lims * (0.8 - (iGrp-1)*0.1);
-        xTxt = -lims * 0.9;
-
-        text(xTxt, yTxt, sprintf('%s: %.2f (%.0f\\circ)', ...
-            char(groups(iGrp)), slope, regAngle), ...
-            'Color', cols(iGrp, :), 'FontSize', 8, 'FontWeight', 'bold');
+        % Orthogonal Regression via plot_linReg (No embedded text, manual placement)
+        Stats = plot_linReg(xData, yData, 'hAx', gca, 'type', 'ortho', ...
+            'clr', cols(iGrp, :), 'flgTxt', false);
+        
+        if ~isnan(Stats.slope)
+            % Annotate Angle with custom offset
+            yTxt = lims * (0.8 - (iGrp-1)*0.1);
+            xTxt = -lims * 0.9;
+            
+            text(xTxt, yTxt, sprintf('%s: %.2f (%.0f\\circ)', ...
+                char(groups(iGrp)), Stats.slope, Stats.angle), ...
+                'Color', cols(iGrp, :), 'FontSize', 8, 'FontWeight', 'bold');
+        end
     end
 end

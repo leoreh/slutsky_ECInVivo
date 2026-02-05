@@ -193,32 +193,18 @@ function plot_stateSpace(tbl, grp, xVar, yVar, cData, ~)
     
     % 2. Orthogonal Regression
     % ------------------------------------------------
-    dataXY = [subTbl.(xVar), subTbl.(yVar)];
+    xData = subTbl.(xVar);
+    yData = subTbl.(yVar);
     
-    % Exclude NaNs if any
-    mk = all(~isnan(dataXY), 2);
-    dataXY = dataXY(mk, :);
-    subTbl = subTbl(mk, :);
+    % Filter NaNs (plot_linReg handles it, but good to filter for scatter color too)
+    mk = ~isnan(xData) & ~isnan(yData);
+    xData = xData(mk);
+    yData = yData(mk);
     curCData = cData(strcmpi(string(tbl.Group), grp));
     curCData = curCData(mk);
     
-    if size(dataXY, 1) > 2
-        [coeff, ~, ~] = pca(dataXY);
-        v1 = coeff(:, 1); 
-        mu = mean(dataXY);
-        
-        slope = v1(2) / v1(1);
-        yInt  = mu(2) - slope * mu(1);
-        
-        % Plot Regression Line
-        fLine = @(x) slope * x + yInt;
-        fplot(fLine, [-maxVal maxVal], 'k-', 'LineWidth', 2);
-        
-        % Annotate Slope
-        regAngle = atan2d(v1(2), v1(1));
-        text(-maxVal*0.9, maxVal*0.9, sprintf('Slope: %.2f (%.1f\\circ)', slope, regAngle), ...
-            'FontSize', 10, 'FontWeight', 'bold');
-    end
+    plot_linReg(xData, yData, 'hAx', gca, 'type', 'ortho', ...
+        'clr', 'k', 'flgTxt', true);
     
     % 3. Reference Lines
     % ------------------------------------------------
@@ -230,7 +216,7 @@ function plot_stateSpace(tbl, grp, xVar, yVar, cData, ~)
     
     % 4. Scatter Plot
     % ------------------------------------------------
-    scatter(subTbl.(xVar), subTbl.(yVar), subTbl.scatSz, curCData, ...
+    scatter(xData, yData, subTbl.scatSz(mk), curCData, ...
         'filled', 'MarkerFaceAlpha', 0.6, 'MarkerEdgeColor', 'none');
     
     xlim([-maxVal maxVal]);
