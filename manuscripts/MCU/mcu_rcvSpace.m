@@ -39,24 +39,13 @@ parse(p, tbl, varargin{:});
 % Pseudocount for Log Ratios (1 spike / hour)
 c = 1 / 3600;
 
-% Check for required columns
-reqVars = {'frBspk', 'ss_frBspk', 'frSspk', 'ss_frSspk'};
-if ~all(ismember(reqVars, tbl.Properties.VariableNames))
-    error('[MCU_RCVSPACE] Table is missing required columns: %s', strjoin(reqVars, ', '));
-end
+% Log Fold Change (Relative)
+tbl.dBrst_rel = log((tbl.ss_frBspk + c) ./ (tbl.frBspk + c));
+tbl.dSngl_rel = log((tbl.ss_frSspk + c) ./ (tbl.frSspk + c));
 
-% Log Fold Change (Relative) -> "dBrst", "dSngl"
-% log(Post / Pre)
-tbl.log_Brst = log((tbl.ss_frBspk + c) ./ (tbl.frBspk + c));
-tbl.log_Sngl = log((tbl.ss_frSspk + c) ./ (tbl.frSspk + c));
-
-% Absolute Difference (Absolute) -> "sl_Brst", "sl_Sngl"
-% synLog(Post - Pre)
-tbl.abs_Brst = tbl.ss_frBspk - tbl.frBspk;
-tbl.abs_Sngl = tbl.ss_frSspk - tbl.frSspk;
-
-tbl.sl_Brst = symlog(tbl.abs_Brst);
-tbl.sl_Sngl = symlog(tbl.abs_Sngl);
+% Absolute Difference (Absolute)
+tbl.dBrst_abs = tbl.ss_frBspk - tbl.frBspk;
+tbl.dSngl_abs = tbl.ss_frSspk - tbl.frSspk;
 
 %% ========================================================================
 %  PREP
@@ -97,11 +86,11 @@ for iGrp = 1:2
     grp = grps{iGrp};
     nexttile;
     
-    plot_stateSpace(tbl, grp, 'log_Brst', 'log_Sngl', cData_Brst, cLabel_Brst);
+    plot_stateSpace(tbl, grp, 'dBrst_rel', 'dSngl_rel', cData_Brst, cLabel_Brst, false);
     
     title(sprintf('%s', grp));
-    xlabel('Burst (Log-Fold)');
-    ylabel('Single (Log-Fold)');
+    xlabel('Burst Gain (log-fold)');
+    ylabel('Single Gain (log-fold)');
     clim(clim_Brst);
 end
 c = colorbar; 
@@ -114,10 +103,10 @@ for iGrp = 1:2
     grp = grps{iGrp};
     nexttile;
     
-    plot_stateSpace(tbl, grp, 'sl_Brst', 'sl_Sngl', cData_dFr, cLabel_dFr);
+    plot_stateSpace(tbl, grp, 'dBrst_abs', 'dSngl_abs', cData_dFr, cLabel_dFr, true);
     
-    xlabel('Burst (\DeltaHz SymLog)');
-    ylabel('Single (\DeltaHz SymLog)');
+    xlabel('\Delta Burst (Hz)', 'Interpreter', 'tex');
+    ylabel('\Delta Single (Hz)', 'Interpreter', 'tex');
     clim(clim_dFr);
 end
 c = colorbar; 
@@ -136,7 +125,9 @@ end
 %  HELPER: PLOT STATE SPACE
 %  ========================================================================
 
-function plot_stateSpace(tbl, grp, xVar, yVar, cData, ~)
+function plot_stateSpace(tbl, grp, xVar, yVar, cData, ~, isSymlog)
+    
+    if nargin < 7; isSymlog = false; end
     
     subTbl = tbl(strcmpi(string(tbl.Group), grp), :);
     
@@ -154,6 +145,11 @@ function plot_stateSpace(tbl, grp, xVar, yVar, cData, ~)
     allVals = [tbl.(xVar); tbl.(yVar)];
     maxVal = max(abs(allVals)) * 1.1;
     if maxVal == 0; maxVal = 1; end
+    
+    if isSymlog
+        % Pre-calc maxVal in symlog space for limits
+        maxVal = symlog(maxVal); 
+    end
        
     % Filter NaNs
     xData = subTbl.(xVar);
@@ -162,26 +158,31 @@ function plot_stateSpace(tbl, grp, xVar, yVar, cData, ~)
     xData = xData(mk);
     yData = yData(mk);
     curCData = cData(strcmpi(string(tbl.Group), grp));
-    curCData = curCData(mk);
+    curCData = curCData(mk);    
     
+    % Scatter Plot
+    scatter(xData, yData, subTbl.scatSz(mk), curCData, ...
+        'filled', 'MarkerFaceAlpha', 0.6, 'MarkerEdgeColor', 'none');
+  
+    xlim([-maxVal maxVal]);
+    ylim([-maxVal maxVal]);
+    set(gca, 'FontSize', 12);
+
+    if isSymlog
+        symlog(gca, 'xy');
+    end
+
+    % Orthogonal Regression
+    plot_linReg(xData, yData, 'hAx', gca, 'type', 'ortho', ...
+        'clr', 'k', 'flgTxt', true);
+
     % Reference Lines
     % Identity
     plot([-maxVal maxVal], [-maxVal maxVal], 'k:', 'LineWidth', 1.5);
     % Quadrant Separators
     xline(0, 'k--', 'LineWidth', 1, 'HandleVisibility', 'off');
     yline(0, 'k--', 'LineWidth', 1, 'HandleVisibility', 'off');
-    
-    % Scatter Plot
-    scatter(xData, yData, subTbl.scatSz(mk), curCData, ...
-        'filled', 'MarkerFaceAlpha', 0.6, 'MarkerEdgeColor', 'none');
 
-    xlim([-maxVal maxVal]);
-    ylim([-maxVal maxVal]);
-    set(gca, 'FontSize', 12);
-
-    % Orthogonal Regression
-    plot_linReg(xData, yData, 'hAx', gca, 'type', 'ortho', ...
-        'clr', 'k', 'flgTxt', true);
 end
 
 

@@ -3,18 +3,15 @@ function hFig = mcu_rcvRes(tbl, varargin)
 %   relationship between Burst and Single spike recovery, independent of
 %   baseline firing rate and burstiness.
 %
-%   It calculates residuals from an LME model: 
-%       Metric ~ (pBspk + fr) * Group + (1|Name)
-%
-%   It compares two distinct perspectives in a 2-row figure:
-%       Relative Log-Fold Change
-%       Absolute Hz Change
+%   It compares two distinct perspectives in a 2x3 figure:
+%       Rows:    Relative (Log-Fold), Absolute (SymLog Hz)
+%       Columns: Allocation, Burst Prediction, Single Prediction
 %
 %   INPUTS:
 %       tbl         - (table) Data table containing:
 %                       'Group', 'Name', 'fr', 'pBspk'
-%                       'frBspk', 'ss_frBspk' (Burst Rates)
-%                       'frSspk', 'ss_frSspk' (Single Rates)
+%                       'frBspk', 'ss_frBspk', 'frSspk', 'ss_frSspk'
+%                       'pBspk_trans' (Logit transformed burstiness)
 %                       
 %   OPTIONAL (Key-Value):
 %       'flgPlot'   - (logical) Whether to generate the figure. {Default: true}
@@ -49,89 +46,155 @@ end
 % Pseudocount for Log Ratios (1 spike / hour)
 c = 1 / 3600;
 
-% 1. Relative Growth -> Log Fold Change
-% ------------------------------------------------
-% How much did it grow relative to its own baseline?
-tbl.rel_Brst = log((tbl.ss_frBspk + c) ./ (tbl.frBspk + c));
-tbl.rel_Sngl = log((tbl.ss_frSspk + c) ./ (tbl.frSspk + c));
+% --- Relative Growth (Log Fold Change) ---
+tbl.dBrst_rel = log((tbl.ss_frBspk + c) ./ (tbl.frBspk + c));
+tbl.dSngl_rel = log((tbl.ss_frSspk + c) ./ (tbl.frSspk + c));
 
-% 2. Absolute Growth (Volume) -> Delta Hz
-% ------------------------------------------------
-% How many actual spikes were added/subtracted?
-tbl.abs_Brst = tbl.ss_frBspk - tbl.frBspk;
-tbl.abs_Sngl = tbl.ss_frSspk - tbl.frSspk;
+% --- Absolute Growth (SymLog Delta Hz) ---
+tbl.dBrst_abs = tbl.ss_frBspk - tbl.frBspk;
+tbl.dSngl_abs = tbl.ss_frSspk - tbl.frSspk;
 
 
 %% ========================================================================
-%  RESIDUAL ANALYSIS
+%  ALLOCATION ANALYSIS 
 %  ========================================================================
 %  Regress out Baseline Firing Rate (fr) and Burstiness (pBspk) to see
 %  the underlying correlation between Burst and Single changes.
 
-fprintf('[MCU_RCVRES] Calculating Residuals...\n');
+fprintf('[MCU_RCVRES] Calculating Allocation Residuals...\n');
 
-% Define Base Formula
 frmlBase = ' ~ (pBspk + fr) * Group + (1|Name)';
 
-% --- A. RELATIVE RESIDUALS ---
-% Burst
-[lmeMdl, ~, ~, ~] = lme_analyse(tbl, ['rel_Brst' frmlBase], ...
-    'dist', 'normal', 'verbose', false);
-tbl.R_rel_Brst = residuals(lmeMdl, 'ResidualType', 'Pearson');
+% Relative
+mdl = lme_analyse(tbl, ['dBrst_rel' frmlBase], 'dist', 'normal', 'verbose', false);
+tbl.R_dBrst_rel = residuals(mdl, 'ResidualType', 'Pearson');
 
-% Single
-[lmeMdl, ~, ~, ~] = lme_analyse(tbl, ['rel_Sngl' frmlBase], ...
-    'dist', 'normal', 'verbose', false);
-tbl.R_rel_Sngl = residuals(lmeMdl, 'ResidualType', 'Pearson');
+mdl = lme_analyse(tbl, ['dSngl_rel' frmlBase], 'dist', 'normal', 'verbose', false);
+tbl.R_dSngl_rel = residuals(mdl, 'ResidualType', 'Pearson');
+
+% Absolute
+mdl = lme_analyse(tbl, ['dBrst_abs' frmlBase], 'dist', 'normal', 'verbose', false);
+tbl.R_dBrst_abs = residuals(mdl, 'ResidualType', 'Pearson');
+
+mdl = lme_analyse(tbl, ['dSngl_abs' frmlBase], 'dist', 'normal', 'verbose', false);
+tbl.R_dSngl_abs = residuals(mdl, 'ResidualType', 'Pearson');
 
 
-% --- B. ABSOLUTE RESIDUALS ---
-% Transform: SymLog
-% Handles negative values while compressing heavy tails (log-like behavior).
-tbl.sl_Brst = symlog(tbl.abs_Brst);
-tbl.sl_Sngl = symlog(tbl.abs_Sngl);
+%% ========================================================================
+%  PREDICTION ANALYSIS
+%  ========================================================================
+%  Does Baseline Burstiness (pBspk) predict the deviation from the 
+%  standard plasticity rule? Regress out the "Other" component.
 
-% Burst
-[lmeMdl, ~, ~, ~] = lme_analyse(tbl, ['sl_Brst' frmlBase], ...
-    'dist', 'normal', 'verbose', false);
-tbl.R_sl_Brst = residuals(lmeMdl, 'ResidualType', 'Pearson');
+fprintf('[MCU_RCVRES] Calculating Prediction Residuals...\n');
 
-% Single
-[lmeMdl, ~, ~, ~] = lme_analyse(tbl, ['sl_Sngl' frmlBase], ...
-    'dist', 'normal', 'verbose', false);
-tbl.R_sl_Sngl = residuals(lmeMdl, 'ResidualType', 'Pearson');
+% --- Relative ---
+% Burst (Control for Single)
+frml_Brst = ' ~ (fr + dSngl_rel) * Group + (1|Name)';
+mdl = lme_analyse(tbl, ['dBrst_rel' frml_Brst], 'dist', 'normal', 'verbose', false);
+tbl.P_dBrst_rel = residuals(mdl, 'ResidualType', 'Pearson');
+
+% Single (Control for Burst)
+frml_Sngl = ' ~ (fr + dBrst_rel) * Group + (1|Name)';
+mdl = lme_analyse(tbl, ['dSngl_rel' frml_Sngl], 'dist', 'normal', 'verbose', false);
+tbl.P_dSngl_rel = residuals(mdl, 'ResidualType', 'Pearson');
+
+% --- Absolute ---
+% Burst (Control for Single)
+frml_Brst = ' ~ (fr + dSngl_abs) * Group + (1|Name)';
+mdl = lme_analyse(tbl, ['dBrst_abs' frml_Brst], 'dist', 'normal', 'verbose', false);
+tbl.P_dBrst_abs = residuals(mdl, 'ResidualType', 'Pearson');
+
+% Single (Control for Burst)
+frml_Sngl = ' ~ (fr + dBrst_abs) * Group + (1|Name)';
+mdl = lme_analyse(tbl, ['dSngl_abs' frml_Sngl], 'dist', 'normal', 'verbose', false);
+tbl.P_dSngl_abs = residuals(mdl, 'ResidualType', 'Pearson');
 
 
 %% ========================================================================
 %  PLOTTING
 %  ========================================================================
 
-if flgPlot
-    hFig = figure('Color', 'w', ...
-          'Name', 'Recovery');
-    tiledlayout(1, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
+if ~flgPlot
+    return;
+end
 
-    % Shared Params
-    groups = unique(tbl.Group);
-    cfg = mcu_cfg;
-    clr = cfg.clr.grp;
-    alphaVal = 0.4;
+hFig = figure('Color', 'w', 'Name', 'Recovery: Allocation & Prediction');
+hTile = tiledlayout(2, 3, 'TileSpacing', 'compact', 'Padding', 'compact');
+
+% Definitions for Loop (Values correspond to suffixes of calculated table vars)
+rowDefs = {
+    'Relative', 'dBrst_rel',    'dSngl_rel',    'Single Gain',     'Burst Gain';
+    'Absolute', 'dBrst_abs',    'dSngl_abs',    '\Delta Single',   '\Delta Burst'
+};
+
+for iRow = 1:2
+    typeStr = rowDefs{iRow, 1};
+    sufB = rowDefs{iRow, 2}; % Suffix Burst
+    sufS = rowDefs{iRow, 3}; % Suffix Single
+    lblS = rowDefs{iRow, 4}; % Label Single
+    lblB = rowDefs{iRow, 5}; % Label Burst
     
-    % --- SUBPLOT 1: RELATIVE ---
-    nexttile;
-    hold on;
-    title({'Relative', '(Log Fold Change Residuals)'});
-    plot_scatRes(tbl, groups, clr, 'R_rel_Brst', 'R_rel_Sngl', alphaVal);
-    xlabel('Burst Residuals (Log)');
-    ylabel('Single Residuals (Log)');
+    % --- 1. Allocation (Burst vs Single) ---
+    nexttile; hold on;
+    title([typeStr ' Allocation']);
     
-    % --- SUBPLOT 2: ABSOLUTE ---
-    nexttile;
-    hold on;
-    title({'Absolute', '(SymLog \Delta Hz Residuals)'});
-    plot_scatRes(tbl, groups, clr, 'R_sl_Brst', 'R_sl_Sngl', alphaVal);
-    xlabel('Burst Residuals (SymLog)');
-    ylabel('Single Residuals (SymLog)');
+    xVar = ['R_' sufB];
+    yVar = ['R_' sufS];
+    
+    % Reference Lines
+    lims = max(abs([tbl.(xVar); tbl.(yVar)])) * 1.1;
+    plot([-lims, lims], [-lims, lims], '--k', 'HandleVisibility', 'off'); % Identity
+    xline(0, '-', 'Color', [0.8 0.8 0.8], 'HandleVisibility', 'off');
+    yline(0, '-', 'Color', [0.8 0.8 0.8], 'HandleVisibility', 'off');
+    
+    plot_grpScatter(tbl, xVar, yVar, 'ortho', lims);
+
+    if strcmpi(typeStr, 'Absolute')
+        symlog(gca, 'xy');
+        lims = symlog(lims);
+    end
+    
+    xlim([-lims, lims]); ylim([-lims, lims]);
+    xlabel(lblB, 'Interpreter', 'tex'); 
+    ylabel(lblS, 'Interpreter', 'tex');
+    
+    % --- 2. Burst Prediction ---
+    nexttile; hold on;
+    title([typeStr ' Burst Recovery']);
+    
+    yVar = ['P_' sufB];
+    xVar = 'pBspk_trans';
+    
+    yline(0, '-', 'Color', [0.8 0.8 0.8], 'HandleVisibility', 'off');
+    
+    plot_grpScatter(tbl, xVar, yVar, 'ortho', []);
+    
+    if strcmpi(typeStr, 'Absolute')
+        symlog(gca, 'y');
+    end
+
+    xlabel('Baseline Burstiness'); 
+    ylabel(lblB, 'Interpreter', 'tex');
+    
+    
+    % --- 3. Single Prediction ---
+    nexttile; hold on;
+    title([typeStr ' Single Recovery']);
+    
+    yVar = ['P_' sufS];
+    xVar = 'pBspk_trans';
+    
+    yline(0, '-', 'Color', [0.8 0.8 0.8], 'HandleVisibility', 'off');
+    
+    plot_grpScatter(tbl, xVar, yVar, 'ortho', []);
+    
+    if strcmpi(typeStr, 'Absolute')
+        symlog(gca, 'y');
+    end
+    
+    xlabel('Baseline Burstiness'); 
+    ylabel(lblS, 'Interpreter', 'tex');
 end
 
 end
@@ -140,45 +203,46 @@ end
 %  HELPER FUNCTIONS
 %  ========================================================================
 
-function plot_scatRes(tbl, groups, cols, xVar, yVar, alphaVal)
-    % PLOT_SCATTER_RESIDUALS Helper to plot scatter and orthogonal regression
+function plot_grpScatter(tbl, xVar, yVar, regType, lims)
+    % PLOT_GRPSCATTER Helper for common grouping scatter/regression logic
     
-    % 1. Equality Line (y=x)
-    lims = max(abs([tbl.(xVar); tbl.(yVar)])) * 1.1;
-    plot([-lims, lims], [-lims, lims], '--k', 'HandleVisibility', 'off');
-    
-    % 2. Zero Axes
-    xline(0, '-', 'Color', [0.8 0.8 0.8], 'HandleVisibility', 'off');
-    yline(0, '-', 'Color', [0.8 0.8 0.8], 'HandleVisibility', 'off');
+    cfg = mcu_cfg;
+    clr = cfg.clr.grp;
+    groups = unique(tbl.Group);
+    alphaVal = 0.4;
     
     axis square;
-    grid off;
-    xlim([-lims, lims]);
-    ylim([-lims, lims]);
     
-    % 3. Group Plotting
     for iGrp = 1:length(groups)
         idx = tbl.Group == groups(iGrp);
-        xData = tbl.(xVar)(idx);
-        yData = tbl.(yVar)(idx);
+        x = tbl.(xVar)(idx); 
+        y = tbl.(yVar)(idx);
+        c = clr(iGrp, :);
         
         % Scatter
-        scatter(xData, yData, 20, cols(iGrp, :), 'filled', ...
-            'MarkerFaceAlpha', alphaVal, 'MarkerEdgeColor', 'none', ...
-            'HandleVisibility', 'off');
-        
-        % Orthogonal Regression via plot_linReg (No embedded text, manual placement)
-        Stats = plot_linReg(xData, yData, 'hAx', gca, 'type', 'ortho', ...
-            'clr', cols(iGrp, :), 'flgTxt', false);
-        
-        if ~isnan(Stats.slope)
-            % Annotate Angle with custom offset
-            yTxt = lims * (0.8 - (iGrp-1)*0.1);
-            xTxt = -lims * 0.9;
+        scatter(x, y, 20, c, 'filled', 'MarkerFaceAlpha', alphaVal, ...
+            'MarkerEdgeColor', 'none', 'HandleVisibility', 'off');
             
-            text(xTxt, yTxt, sprintf('%s: %.2f (%.0f\\circ)', ...
+        % Regression
+        Stats = plot_linReg(x, y, 'hAx', gca, 'type', regType, ...
+            'clr', c, 'flgTxt', false);
+            
+        % Annotation
+        if strcmpi(regType, 'ortho') && ~isnan(Stats.slope) && ~isempty(lims)
+            % Orthogonal: Show Angle
+            txtX = -lims * 0.9;
+            txtY = lims * (0.8 - (iGrp-1)*0.15);
+            text(txtX, txtY, sprintf('%s: %.2f (%.0f\\circ)', ...
                 char(groups(iGrp)), Stats.slope, Stats.angle), ...
-                'Color', cols(iGrp, :), 'FontSize', 8, 'FontWeight', 'bold');
+                'Color', c, 'FontSize', 8, 'FontWeight', 'bold');
+                
+        elseif strcmpi(regType, 'linear') && ~isnan(Stats.pVal)
+            % Linear: Show P-Value
+            xL = xlim; yL = ylim;
+            txtX = xL(2) * 0.5;
+            txtY = yL(2) * (0.9 - (iGrp-1)*0.12);
+            text(txtX, txtY, sprintf('b=%.2f, p=%.3f', Stats.slope, Stats.pVal), ...
+                'Color', c, 'FontSize', 8, 'FontWeight', 'bold');
         end
     end
 end

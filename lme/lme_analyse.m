@@ -241,6 +241,28 @@ lmeStats = lme_effects(lmeMdl, ...
     'dfMethod', p.Results.dfMethod);
 
 
+%% ========================================================================
+%  FINALIZE INFO & DISPLAY
+%  ========================================================================
+
+% Add Metadata (AIC, Formula, FitMethod, DFMethod)
+lmeInfo.frml = frml;
+lmeInfo.dfMethod = p.Results.dfMethod;
+lmeInfo.fitMethod = fitMethod;
+lmeInfo.aic = lmeMdl.ModelCriterion.AIC;
+
+% Verbose Output
+if verbose
+    fprintf('\n_______________________________________________________\n');
+    fprintf('  LME INFO\n');
+    disp(lmeInfo);
+    fprintf('\n\n');
+    fprintf('  LME STATS\n');
+    disp(removevars(lmeStats, {'Index', 'Type', 'pAdj', 'HVec'}));
+    fprintf('\n_______________________________________________________\n');
+end
+
+
 end     % EOF
 
 

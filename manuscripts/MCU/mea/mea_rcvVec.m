@@ -3,9 +3,6 @@
 %  ========================================================================
 %  Analyzes the recovery "strategy" of neurons by decomposing firing rate
 %  recovery into Single-Spike and Burst-Spike components.
-%
-%  Calculates a vector from Baseline (0,0) to Steady State (dSingle, dBurst)
-%  and analyzes the Magnitude (Strength of change) and Angle (Strategy).
 
 %% ========================================================================
 %  LOAD DATA
@@ -21,17 +18,12 @@ tbl.pBspk_trans = tblTrans.pBspk;
 tbl.ss_pBspk_trans = tblTrans.ss_pBspk;
 
 
-flgPseudo = false; % Validate "Pseudo-Tracking" (Quantile Matching) on MEA data
-flgQq = false;
-
-
 %% ========================================================================
-%  PRE-PROCESS: CALCULATE VECTORS
+%  PSEUDO-TRACKING
 %  ========================================================================
+% Validate "Pseudo-Tracking" (Quantile Matching) on MEA data
 
-% 1. Calculate Deltas (Steady State - Baseline)
-% ---------------------------------------------
-
+flgPseudo = false; 
 if flgPseudo
     % --- CONVERT TO LONG FORMAT ---
     % match_qntl expects: [Group, Name, Day, vars...]
@@ -79,21 +71,21 @@ if flgPseudo
     fprintf('VALIDATION: Replaced real units with %d Synthetic Units.\n', height(tbl));
 end
 
-% frBspk = Baseline Burst Rate
-% ss_frBspk = Steady State Burst Rate
-tbl.dBrst = tbl.ss_frBspk - tbl.frBspk;
-tbl.dSngl = tbl.ss_frSspk - tbl.frSspk;
+%% ========================================================================
+%  PRE-PROCESS
+%  ========================================================================
 
 % Pseudocount
 c = 1 / 3600;          
 
-tbl.dBrst = log((tbl.ss_frBspk + c) ./ (tbl.frBspk + c));
-tbl.dSngl = log((tbl.ss_frSspk + c) ./ (tbl.frSspk + c));
+tbl.dBrst_rel = log((tbl.ss_frBspk + c) ./ (tbl.frBspk + c));
+tbl.dSngl_rel = log((tbl.ss_frSspk + c) ./ (tbl.frSspk + c));
 tbl.dFr = log((tbl.frSs) ./ (tbl.fr));
 tbl.dpBspk = (tbl.ss_pBspk_trans) - (tbl.pBspk_trans);
 
-tbl.absBrst = symlog(tbl.ss_frBspk - tbl.frBspk);
-tbl.absSngl = symlog(tbl.ss_frSspk - tbl.frSspk);
+tbl.dBrst_abs = (tbl.ss_frBspk - tbl.frBspk);
+tbl.dSngl_abs = (tbl.ss_frSspk - tbl.frSspk);
+
 
 %% ========================================================================
 %  PLOTTING
@@ -105,167 +97,91 @@ hFig = mcu_rcvSpace(tbl);
 hFig = mcu_rcvRes(tbl);
 
 % QQ plot
+flgQq = false;
 if flgQq
     hFig = mcu_frQq(tbl, 'dataSet', 'mea');
 end
 
 
-% tblGUI_scatHist(tbl, 'xVar', 'pBspk_trans', 'yVar', 'dBrst', 'grpVar', 'Group');
+% tblGUI_scatHist(tbl, 'xVar', 'pBspk_trans', 'yVar', 'dBrst_rel', 'grpVar', 'Group');
 % tblGUI_bar(tbl, 'yVar', 'pBspk', 'xVar', 'Group');
 
 
 %% ========================================================================
-%  ANALYSIS
+%  MEDIATION
 %  ========================================================================
 
-frml = 'dSngl ~ (dBrst) * Group + (1|Name)';
+
+% Relative
+
+frml = 'dBrst_rel ~ (pBspk + fr) * Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
+    'dist', 'normal', 'fitMethod', 'ML');
+
+
+frml = 'dSngl_rel ~ (pBspk + dBrst_rel + fr) * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
     'dist', 'normal', 'fitMethod', 'REML');
 
-% Step 1: Regress dSngl against dBrst alone (The mechanical link)
-tbl.snglRes = residuals(lmeMdl);
 
-% Step 2: Ask if Baseline Burstiness predicts these residuals
-lm_resid = fitlme(tblMcu, 'Resid_Sngl ~ pBspk + (1|Name)');
-disp(lm_resid);
+frml = 'dSngl_rel ~ pBspk + fr + (1|Name)';
+tblWt = tbl(tbl.Group == 'Control', :);
+tblMcu = tbl(tbl.Group == 'MCU-KO', :);
+xVar = 'pBspk';
+mVar = 'dBrst_rel';
+distM = 'normal';
+distY = 'normal';
+res = lme_mediation(tblMcu, frml, xVar, mVar, 'distM', distM, 'distY', distY);
 
 
-tbl.absBrst = (tbl.ss_frBspk - tbl.frBspk);
-tbl.absSngl = (tbl.ss_frSspk - tbl.frSspk);
-figure; histogram(tbl.absSngl)
 
-frml = 'absSngl ~ (absBrst) * Group + (1|Name)';
+
+
+% Absolute
+
+frml = 'dSngl_abs ~ (dBrst_abs) * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
     'dist', 'normal', 'fitMethod', 'REML', 'flgPlot', false);
 
 
-frml = 'absBrst ~ (fr + pBspk) * Group + (1|Name)';
+frml = 'dBrst_abs ~ (fr + pBspk) * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
     'dist', 'normal', 'fitMethod', 'REML');
 
-frml = 'absSngl ~ (fr + pBspk + absBrst) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-    'dist', 'normal', 'fitMethod', 'REML');
-
-
-frml = 'absSngl ~ (absBrst * pBspk_trans) * Group + (1|Name)';
+frml = 'dSngl_abs ~ (fr + pBspk + dBrst_abs) * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
     'dist', 'normal', 'fitMethod', 'REML');
 
 
-frml = 'absSngl ~ pBspk + fr + (1|Name)';
+
+
+frml = 'dSngl_abs ~ frSspk + pBspk + (1|Name)';
 tblWt = tbl(tbl.Group == 'Control', :);
 tblMcu = tbl(tbl.Group == 'MCU-KO', :);
 xVar = 'pBspk';
-mVar = 'absBrst';
+mVar = 'dBrst_abs';
 distM = 'normal';
 distY = 'normal';
-res = lme_mediation(tblMcu, frml, xVar, mVar, 'distM', distM, 'distY', distY);
+res = lme_mediation(tblWt, frml, xVar, mVar, 'distM', distM, 'distY', distY);
 
 
-frml = 'absSngl ~ (absBrst * pBspk) + (1|Name)';
+frml = 'dSngl_abs ~ (dBrst_abs * pBspk) + fr + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tblMcu, frml, ...
     'dist', 'normal', 'fitMethod', 'REML');
 
-
-
-
-frml = 'dFr ~ (pBspk) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-    'dist', 'normal', 'fitMethod', 'REML');
-% MCU-KO neurons have a significant recovery deficit that cannot be
-% explained by their change in burstiness.
-
-
-
-frml = 'dBrst ~ (pBspk + fr) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-    'dist', 'normal', 'fitMethod', 'ML');
-% MCU-KO neurons have a significant recovery deficit that cannot be
-% explained by their change in burstiness.
-
-
-
-frml = 'dSngl ~ (pBspk + fr + dBrst) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-    'dist', 'normal', 'fitMethod', 'REML');
-
-
-
-frml = 'dSngl ~ (pBspk) * dBrst * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-    'dist', 'normal', 'fitMethod', 'REML');
-
-
-frml = 'absSngl ~ (absBrst) * Group * pBspk + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-    'dist', 'normal', 'fitMethod', 'REML');
-
-frml = 'absSngl ~ (absBrst) * pBspk + (1|Name)';
+frml = 'dSngl_rel ~ (dBrst_rel * pBspk) + fr + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tblWt, frml, ...
     'dist', 'normal', 'fitMethod', 'REML');
 
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tblMcu, frml, ...
-    'dist', 'normal', 'fitMethod', 'REML');
 
 
 
 
-frml = 'dBrst ~ (pBspk + fr) + Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-    'dist', 'normal', 'fitMethod', 'REML');
-
-frml = 'dpBspk ~ (pBspk + fr + ss_pBspk) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-    'dist', 'normal', 'fitMethod', 'REML');
 
 
 
 
-frml = 'frSs ~ (fr + pBspk) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-    'dist', 'gamma');
 
-frml = 'frSs ~ (frBspk + frSspk) + Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-    'dist', 'gamma');
-
-
-frml = 'dSngl ~ (pBspk + dBrst + fr) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-    'dist', 'normal', 'fitMethod', 'REML');
-
-
-frml = 'dSngl ~ pBspk + fr + (1|Name)';
-tblWt = tbl(tbl.Group == 'Control', :);
-tblMcu = tbl(tbl.Group == 'MCU-KO', :);
-xVar = 'pBspk';
-mVar = 'dBrst';
-distM = 'normal';
-distY = 'normal';
-res = lme_mediation(tblMcu, frml, xVar, mVar, 'distM', distM, 'distY', distY);
-
-
-frml = 'dFr ~ (Group) + (1|Name)';
-xVar = 'Group';
-mVar = 'pBspk';
-distM = 'logit-normal';
-distY = 'normal';
-res = lme_mediation(tbl, frml, xVar, mVar, 'distM', distM, 'distY', distY);
-
-
-sum(tbl.pBspk(tbl.Group == 'Control') == 0)
-sum(tbl.ss_pBspk(tbl.Group == 'Control') == 0)
-
-
-
-frml = 'dSngl ~ (pBspk + fr + dBrst) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-    'dist', 'normal');
-
-frml = 'dBrst ~ (pBspk + fr) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-    'dist', 'normal');
 
 
 
