@@ -92,11 +92,8 @@ tbl.dSngl = log((tbl.ss_frSspk + c) ./ (tbl.frSspk + c));
 tbl.dFr = log((tbl.frSs) ./ (tbl.fr));
 tbl.dpBspk = (tbl.ss_pBspk_trans) - (tbl.pBspk_trans);
 
-tbl.dBrst = asinh(tbl.ss_frBspk - tbl.frBspk);
-tbl.dSngl = asinh(tbl.ss_frSspk - tbl.frSspk);
-
-% tbl.dBrst = log((tbl.frSspk + c) ./ tbl.frSs);
-% tbl.dSngl = log((tbl.ss_frSspk + c) ./ tbl.frSs);
+tbl.absBrst = symlog(tbl.ss_frBspk - tbl.frBspk);
+tbl.absSngl = symlog(tbl.ss_frSspk - tbl.frSspk);
 
 %% ========================================================================
 %  PLOTTING
@@ -118,66 +115,125 @@ end
 
 
 %% ========================================================================
-%  ANALYSIS: ROTATED COORDINATES (D-METRIC)
+%  ANALYSIS
 %  ========================================================================
-%  D = dBurst - dSingle
-%  Deviations from the identity line (y=x).
-%  D > 0: Burst Biased Strategy
-%  D = 0: Balanced Recovery
-%  D < 0: Single Biased Strategy
 
-fprintf('\n================================================================\n');
-fprintf(' STATISTICS: D-METRIC STRATEGY ANALYSIS\n');
-fprintf('================================================================\n');
-
-% 1. Calculate D
-tbl.D = tbl.dBrst - tbl.dSngl;
-
-% 2. LME Model
-% Model: D ~ Group + (1|Name)
-% Intercept represents the Control deviation from 0.
-% Group coefficient represents the shift in MCU-KO.
-frml = 'D ~ Group * (pBspk + fr) + (1|Name)';
-frml = 'D ~ Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, 'dist', 'normal');
-
-frml = 'dBrst ~ dSngl * Group + (1|Name)';
+frml = 'dSngl ~ (dBrst) * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
     'dist', 'normal', 'fitMethod', 'REML');
 
-frml = 'dSngl ~ dBrst * Group + (1|Name)';
+% Step 1: Regress dSngl against dBrst alone (The mechanical link)
+tbl.snglRes = residuals(lmeMdl);
+
+% Step 2: Ask if Baseline Burstiness predicts these residuals
+lm_resid = fitlme(tblMcu, 'Resid_Sngl ~ pBspk + (1|Name)');
+disp(lm_resid);
+
+
+tbl.absBrst = (tbl.ss_frBspk - tbl.frBspk);
+tbl.absSngl = (tbl.ss_frSspk - tbl.frSspk);
+figure; histogram(tbl.absSngl)
+
+frml = 'absSngl ~ (absBrst) * Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
+    'dist', 'normal', 'fitMethod', 'REML', 'flgPlot', false);
+
+
+frml = 'absBrst ~ (fr + pBspk) * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
     'dist', 'normal', 'fitMethod', 'REML');
 
-frml = 'dSngl ~ (fr + pBspk + dBrst) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-    'dist', 'normal', 'fitMethod', 'REML');
-
-frml = 'dBrst ~ (fr + pBspk) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-    'dist', 'normal', 'fitMethod', 'REML');
-
-frml = 'dFr ~ (dBrst + dSngl) * Group + (1|Name)';
+frml = 'absSngl ~ (fr + pBspk + absBrst) * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
     'dist', 'normal', 'fitMethod', 'REML');
 
 
+frml = 'absSngl ~ (absBrst * pBspk_trans) * Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
+    'dist', 'normal', 'fitMethod', 'REML');
 
-%%
-frml = 'dFr ~ (dpBspk) * Group + (1|Name)';
+
+frml = 'absSngl ~ pBspk + fr + (1|Name)';
+tblWt = tbl(tbl.Group == 'Control', :);
+tblMcu = tbl(tbl.Group == 'MCU-KO', :);
+xVar = 'pBspk';
+mVar = 'absBrst';
+distM = 'normal';
+distY = 'normal';
+res = lme_mediation(tblMcu, frml, xVar, mVar, 'distM', distM, 'distY', distY);
+
+
+frml = 'absSngl ~ (absBrst * pBspk) + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tblMcu, frml, ...
+    'dist', 'normal', 'fitMethod', 'REML');
+
+
+
+
+frml = 'dFr ~ (pBspk) * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
     'dist', 'normal', 'fitMethod', 'REML');
 % MCU-KO neurons have a significant recovery deficit that cannot be
 % explained by their change in burstiness.
 
-%%
+
+
+frml = 'dBrst ~ (pBspk + fr) * Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
+    'dist', 'normal', 'fitMethod', 'ML');
+% MCU-KO neurons have a significant recovery deficit that cannot be
+% explained by their change in burstiness.
+
+
+
+frml = 'dSngl ~ (pBspk + fr + dBrst) * Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
+    'dist', 'normal', 'fitMethod', 'REML');
+
+
+
+frml = 'dSngl ~ (pBspk) * dBrst * Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
+    'dist', 'normal', 'fitMethod', 'REML');
+
+
+frml = 'absSngl ~ (absBrst) * Group * pBspk + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
+    'dist', 'normal', 'fitMethod', 'REML');
+
+frml = 'absSngl ~ (absBrst) * pBspk + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tblWt, frml, ...
+    'dist', 'normal', 'fitMethod', 'REML');
+
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tblMcu, frml, ...
+    'dist', 'normal', 'fitMethod', 'REML');
+
+
+
+
+frml = 'dBrst ~ (pBspk + fr) + Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
+    'dist', 'normal', 'fitMethod', 'REML');
+
+frml = 'dpBspk ~ (pBspk + fr + ss_pBspk) * Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
+    'dist', 'normal', 'fitMethod', 'REML');
+
+
+
 
 frml = 'frSs ~ (fr + pBspk) * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
     'dist', 'gamma');
 
+frml = 'frSs ~ (frBspk + frSspk) + Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
+    'dist', 'gamma');
 
 
+frml = 'dSngl ~ (pBspk + dBrst + fr) * Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
+    'dist', 'normal', 'fitMethod', 'REML');
 
 
 frml = 'dSngl ~ pBspk + fr + (1|Name)';
@@ -187,15 +243,15 @@ xVar = 'pBspk';
 mVar = 'dBrst';
 distM = 'normal';
 distY = 'normal';
-res = lme_mediation(tblWt, frml, xVar, mVar, 'distM', distM, 'distY', distY);
+res = lme_mediation(tblMcu, frml, xVar, mVar, 'distM', distM, 'distY', distY);
 
 
-frml = 'dFr ~ (dpBspk) + (1|Name)';
-xVar = 'dpBspk';
-mVar = 'dSngl';
-distM = 'normal';
+frml = 'dFr ~ (Group) + (1|Name)';
+xVar = 'Group';
+mVar = 'pBspk';
+distM = 'logit-normal';
 distY = 'normal';
-res = lme_mediation(tblWt, frml, xVar, mVar, 'distM', distM, 'distY', distY);
+res = lme_mediation(tbl, frml, xVar, mVar, 'distM', distM, 'distY', distY);
 
 
 sum(tbl.pBspk(tbl.Group == 'Control') == 0)

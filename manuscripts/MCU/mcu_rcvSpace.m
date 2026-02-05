@@ -45,49 +45,45 @@ if ~all(ismember(reqVars, tbl.Properties.VariableNames))
     error('[MCU_RCVSPACE] Table is missing required columns: %s', strjoin(reqVars, ', '));
 end
 
-% 1. Log Fold Change (Relative) -> "dBrst", "dSngl"
-% ------------------------------------------------
+% Log Fold Change (Relative) -> "dBrst", "dSngl"
 % log(Post / Pre)
 tbl.log_Brst = log((tbl.ss_frBspk + c) ./ (tbl.frBspk + c));
 tbl.log_Sngl = log((tbl.ss_frSspk + c) ./ (tbl.frSspk + c));
 
-% 2. Absolute Difference (Absolute) -> "sl_Brst", "sl_Sngl"
-% ------------------------------------------------
+% Absolute Difference (Absolute) -> "sl_Brst", "sl_Sngl"
 % synLog(Post - Pre)
 tbl.abs_Brst = tbl.ss_frBspk - tbl.frBspk;
 tbl.abs_Sngl = tbl.ss_frSspk - tbl.frSspk;
 
-tbl.sl_Brst = synLog(tbl.abs_Brst);
-tbl.sl_Sngl = synLog(tbl.abs_Sngl);
-
-% 3. Cartesian to Polar (Based on Log Fold Change)
-% ------------------------------------------------
-% NOTE: Inverted Axis -> X = log_Brst, Y = log_Sngl
-[tbl.vecTheta, tbl.vecR] = cart2pol(tbl.log_Brst, tbl.log_Sngl);
-tbl.vecDeg = rad2deg(tbl.vecTheta);
-
+tbl.sl_Brst = symlog(tbl.abs_Brst);
+tbl.sl_Sngl = symlog(tbl.abs_Sngl);
 
 %% ========================================================================
-%  PREP: GROUPS & PALETTE
+%  PREP
 %  ========================================================================
 
 grps = {'Control', 'MCU-KO'};
 
-% Marker Size Scaling (Global)
-frLog = log10(tbl.fr);
-lims  = prctile(frLog, [5 95]);
-if diff(lims) == 0; lims = [lims(1)-0.1, lims(2)+0.1]; end
-scatNorm = (frLog - lims(1)) / diff(lims);
-scatNorm(scatNorm < 0) = 0; scatNorm(scatNorm > 1) = 1;
-tbl.scatSz = scatNorm * 40 + 10;
+% Marker Size (Fixed)
+tbl.scatSz = repmat(25, height(tbl), 1);
 
-% Color by pBspk (for scatter points)
-cData = tbl.pBspk_trans;
-cLabel = 'Burstiness (logit)';
+% Color Data
+% Row 1: Burstiness
+cData_Brst = tbl.dpBspk;
+cLabel_Brst = 'Burstiness (logit)';
+clim_Brst = [min(cData_Brst, [], 'all'), max(cData_Brst, [], 'all')];
+if diff(clim_Brst) == 0; clim_Brst = clim_Brst + [-0.1 0.1]; end
+
+% Row 2: dFr
+cData_dFr = tbl.dFr;
+cLabel_dFr = 'dFr (Fold Change)';
+clim_dFr = [min(cData_dFr, [], 'all'), max(cData_dFr, [], 'all')];
+if diff(clim_dFr) == 0; clim_dFr = clim_dFr + [-0.1 0.1]; end
+
 
 
 %% ========================================================================
-%  FIGURE 1: SCATTER PLOTS (State Space)
+%  FIGURE: SCATTER PLOTS (State Space)
 %  ========================================================================
 %   Row 1: Log Fold Change
 %   Row 2: Absolute Difference (SynLog)
@@ -101,67 +97,36 @@ for iGrp = 1:2
     grp = grps{iGrp};
     nexttile;
     
-    plot_stateSpace(tbl, grp, 'log_Brst', 'log_Sngl', cData, cLabel);
+    plot_stateSpace(tbl, grp, 'log_Brst', 'log_Sngl', cData_Brst, cLabel_Brst);
     
-    title(sprintf('%s (Log Fold)', grp));
-    xlabel('Burst Log-Fold');
-    ylabel('Single Log-Fold');
+    title(sprintf('%s', grp));
+    xlabel('Burst (Log-Fold)');
+    ylabel('Single (Log-Fold)');
+    clim(clim_Brst);
 end
+c = colorbar; 
+c.Label.String = cLabel_Brst;
+c.Label.FontWeight = 'bold';
+
 
 % --- ROW 2: ABSOLUTE DIFFERENCE ---
 for iGrp = 1:2
     grp = grps{iGrp};
     nexttile;
     
-    plot_stateSpace(tbl, grp, 'sl_Brst', 'sl_Sngl', cData, cLabel);
+    plot_stateSpace(tbl, grp, 'sl_Brst', 'sl_Sngl', cData_dFr, cLabel_dFr);
     
-    title(sprintf('%s (Abs Diff)', grp));
-    xlabel('Burst \DeltaHz (SynLog)');
-    ylabel('Single \DeltaHz (SynLog)');
+    xlabel('Burst (\DeltaHz SymLog)');
+    ylabel('Single (\DeltaHz SymLog)');
+    clim(clim_dFr);
 end
+c = colorbar; 
+c.Label.String = cLabel_dFr;
+c.Label.FontWeight = 'bold';
 
-% Add Colorbar to the last tile of each row or just once?
-% Doing it per row helps if ranges differ, but here cData is same (Burstiness).
-% Let's add it to the last tile plotted.
-c = colorbar;
-c.Label.String = cLabel;
+
+% Global Colormap
 colormap(hFigScat, turbo);
-
-
-%% ========================================================================
-%  FIGURE 2: POLAR HISTOGRAMS
-%  ========================================================================
-
-% hFigPol = figure('Position', [900 100 800 400], 'Color', 'w', ...
-%     'Name', 'Recovery Strategies: Polar');
-% tP = tiledlayout(1, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
-% 
-% for iGrp = 1:2
-%     nexttile;
-%     grp = grps{iGrp};
-%     subTbl = tbl(strcmpi(string(tbl.Group), grp), :);
-% 
-%     if isempty(subTbl); continue; end
-% 
-%     % Polar Histogram
-%     polarhistogram(subTbl.vecTheta, 20, 'FaceColor', cols{iGrp}, ...
-%         'FaceAlpha', 0.6, 'EdgeColor', 'w');
-% 
-%     title(sprintf('%s Directions', grp));
-%     set(gca, 'FontSize', 12);
-% 
-%     % Mean Direction Vector
-%     hold on;
-%     % Compute vector sum (Resultant Vector)
-%     z = sum(exp(1i * subTbl.vecTheta));
-%     mAngle = angle(z);
-% 
-%     % Scale vector for visibility (to the limit of the plot)
-%     rLim = rlim;
-%     polarplot([0, mAngle], [0, rLim(2)], 'Color', cols{iGrp}, 'LineWidth', 3);
-% end
-% 
-% sgtitle(hFigPol, 'Recovery Strategies (Log Fold Angles)');
 
 
 end
@@ -184,52 +149,41 @@ function plot_stateSpace(tbl, grp, xVar, yVar, cData, ~)
         return; 
     end
 
-    % 1. Determine Axis Limits (Symmertic)
-    % ------------------------------------------------
+    % Determine Axis Limits (Symmertic)
     % We want 0,0 in center.
     allVals = [tbl.(xVar); tbl.(yVar)];
     maxVal = max(abs(allVals)) * 1.1;
     if maxVal == 0; maxVal = 1; end
-    
-    % 2. Orthogonal Regression
-    % ------------------------------------------------
+       
+    % Filter NaNs
     xData = subTbl.(xVar);
     yData = subTbl.(yVar);
-    
-    % Filter NaNs (plot_linReg handles it, but good to filter for scatter color too)
     mk = ~isnan(xData) & ~isnan(yData);
     xData = xData(mk);
     yData = yData(mk);
     curCData = cData(strcmpi(string(tbl.Group), grp));
     curCData = curCData(mk);
     
-    plot_linReg(xData, yData, 'hAx', gca, 'type', 'ortho', ...
-        'clr', 'k', 'flgTxt', true);
-    
-    % 3. Reference Lines
-    % ------------------------------------------------
+    % Reference Lines
     % Identity
     plot([-maxVal maxVal], [-maxVal maxVal], 'k:', 'LineWidth', 1.5);
     % Quadrant Separators
     xline(0, 'k--', 'LineWidth', 1, 'HandleVisibility', 'off');
     yline(0, 'k--', 'LineWidth', 1, 'HandleVisibility', 'off');
     
-    % 4. Scatter Plot
-    % ------------------------------------------------
+    % Scatter Plot
     scatter(xData, yData, subTbl.scatSz(mk), curCData, ...
         'filled', 'MarkerFaceAlpha', 0.6, 'MarkerEdgeColor', 'none');
-    
+
     xlim([-maxVal maxVal]);
     ylim([-maxVal maxVal]);
     set(gca, 'FontSize', 12);
+
+    % Orthogonal Regression
+    plot_linReg(xData, yData, 'hAx', gca, 'type', 'ortho', ...
+        'clr', 'k', 'flgTxt', true);
 end
 
 
-function y = synLog(x)
-% SYNLOG Symmetric Log Transformation
-%
-%   This transformation behaves like log for |x| > 1 and like linear for |x| < 1.
-%   It handles negatives symmetrically and 0 gracefully.
 
-    y = sign(x) .* log10(1 + abs(x));
-end
+

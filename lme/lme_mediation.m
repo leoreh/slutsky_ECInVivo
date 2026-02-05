@@ -90,9 +90,17 @@ frmlBC = sprintf('%s ~ %s + %s', yVar, mVar, rhs);
 %  RESULTS & STATISTICS
 %  ========================================================================
 
+% ADJUSTMENT: 
+% lme_analyse automatically Z-scores predictors. 
+% Path A (X->M): M is Response (Raw). betaA = dRawM / dZX
+% Path B (M->Y): M is Predictor (Z-Scored). betaB = dRawY / dZM
+% To match units for A*B (= dRawY / dZX), we must convert betaB to raw units.
+sdM = nanstd(tbl.(mVar));
+betaB = betaB / sdM;
+seB   = seB   / sdM;
+
 % Sobel Test for Indirect Effect (A * B)
 % Z = (a*b) / sqrt(b^2*sa^2 + a^2*sb^2)
-% Valid even if variables are scaled differently (Z-invariance).
 indirectEffect = betaA * betaB;
 seIndirect = sqrt(betaB^2 * seA^2 + betaA^2 * seB^2);
 zSobel = indirectEffect / seIndirect;

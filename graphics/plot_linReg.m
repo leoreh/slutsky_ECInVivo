@@ -83,15 +83,24 @@ switch lower(regType)
         
         yEval = polyval(pPoly, xEval);
         
-        % Stats
+        % Calculate Stats
         yfit = polyval(pPoly, x);
         yresid = y - yfit;
         SSresid = sum(yresid.^2);
         SStotal = (length(y)-1) * var(y);
         R2 = 1 - SSresid/SStotal;
+
+        % Stats Structure Init
+        Stats.slope = slope;
+        Stats.intercept = intercept;
+        Stats.R2 = R2;
+        Stats.hLine = [];
+        Stats.hTxt  = [];
         
         % Plot
-        plot(hAx, xEval, yEval, '-', 'Color', clr, 'LineWidth', 2);
+        hLine = plot(hAx, xEval, yEval, '-', 'Color', clr, 'LineWidth', 2, ...
+            'HandleVisibility', 'off');
+        Stats.hLine = hLine;
         
         % Annotate
         if flgTxt
@@ -103,14 +112,11 @@ switch lower(regType)
            xPos = xLims(1) + diff(xLims) * 0.05;
            yPos = yLims(2) - diff(yLims) * 0.05;
            
-           text(xPos, yPos, txtStr, 'Color', clr, 'FontSize', 9, ...
+           hTxt = text(xPos, yPos, txtStr, 'Color', clr, 'FontSize', 9, ...
                'VerticalAlignment', 'top', 'HorizontalAlignment', 'left', ...
                'FontWeight', 'bold');
+           Stats.hTxt = hTxt;
         end
-        
-        Stats.slope = slope;
-        Stats.intercept = intercept;
-        Stats.R2 = R2;
         
     case 'ortho'
         % Orthogonal Regression (PCA)
@@ -126,8 +132,17 @@ switch lower(regType)
         % y = slope * x + yInt
         yEval = slope .* xEval + yInt;
         
+        % Stats Structure Init
+        Stats.slope = slope;
+        Stats.intercept = yInt;
+        Stats.angle = atan2d(v1(2), v1(1));
+        Stats.hLine = [];
+        Stats.hTxt  = [];
+        
         % Plot
-        plot(hAx, xEval, yEval, '-', 'Color', clr, 'LineWidth', 2);
+        hLine = plot(hAx, xEval, yEval, '-', 'Color', clr, 'LineWidth', 2, ...
+            'HandleVisibility', 'off');
+        Stats.hLine = hLine;
         
         % Annotate
         if flgTxt
@@ -140,14 +155,11 @@ switch lower(regType)
             xPos = xLims(1) + diff(xLims) * 0.05;
             yPos = yLims(2) - diff(yLims) * 0.05;
                        
-            text(xPos, yPos, txtStr, 'Color', clr, 'FontSize', 9, ...
+            hTxt = text(xPos, yPos, txtStr, 'Color', clr, 'FontSize', 9, ...
                 'VerticalAlignment', 'top', 'HorizontalAlignment', 'left', ...
                 'FontWeight', 'bold');
+            Stats.hTxt = hTxt;
         end
-        
-        Stats.slope = slope;
-        Stats.intercept = yInt;
-        Stats.angle = atan2d(v1(2), v1(1));
 end
 
 end

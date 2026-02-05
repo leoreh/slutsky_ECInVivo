@@ -86,20 +86,20 @@ tbl.R_rel_Sngl = residuals(lmeMdl, 'ResidualType', 'Pearson');
 
 
 % --- B. ABSOLUTE RESIDUALS ---
-% Transform: Inverse Hyperbolic Sine (asinh)
+% Transform: SymLog
 % Handles negative values while compressing heavy tails (log-like behavior).
-tbl.ahs_Brst = asinh(tbl.abs_Brst);
-tbl.ahs_Sngl = asinh(tbl.abs_Sngl);
+tbl.sl_Brst = symlog(tbl.abs_Brst);
+tbl.sl_Sngl = symlog(tbl.abs_Sngl);
 
 % Burst
-[lmeMdl, ~, ~, ~] = lme_analyse(tbl, ['ahs_Brst' frmlBase], ...
+[lmeMdl, ~, ~, ~] = lme_analyse(tbl, ['sl_Brst' frmlBase], ...
     'dist', 'normal', 'verbose', false);
-tbl.R_abs_Brst = residuals(lmeMdl, 'ResidualType', 'Pearson');
+tbl.R_sl_Brst = residuals(lmeMdl, 'ResidualType', 'Pearson');
 
 % Single
-[lmeMdl, ~, ~, ~] = lme_analyse(tbl, ['ahs_Sngl' frmlBase], ...
+[lmeMdl, ~, ~, ~] = lme_analyse(tbl, ['sl_Sngl' frmlBase], ...
     'dist', 'normal', 'verbose', false);
-tbl.R_abs_Sngl = residuals(lmeMdl, 'ResidualType', 'Pearson');
+tbl.R_sl_Sngl = residuals(lmeMdl, 'ResidualType', 'Pearson');
 
 
 %% ========================================================================
@@ -128,10 +128,10 @@ if flgPlot
     % --- SUBPLOT 2: ABSOLUTE ---
     nexttile;
     hold on;
-    title({'Absolute', '(asinh \Delta Hz Residuals)'});
-    plot_scatRes(tbl, groups, clr, 'R_abs_Brst', 'R_abs_Sngl', alphaVal);
-    xlabel('Burst Residuals (asinh)');
-    ylabel('Single Residuals (asinh)');
+    title({'Absolute', '(SymLog \Delta Hz Residuals)'});
+    plot_scatRes(tbl, groups, clr, 'R_sl_Brst', 'R_sl_Sngl', alphaVal);
+    xlabel('Burst Residuals (SymLog)');
+    ylabel('Single Residuals (SymLog)');
 end
 
 end

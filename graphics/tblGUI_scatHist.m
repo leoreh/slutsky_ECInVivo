@@ -122,7 +122,9 @@ guiData.highlightFcn    = @highlightPoints; % Expose function
 guiData.setGroupVarFcn  = @setGroupVar;     % Expose function
 guiData.setXYVarsFcn    = @setXYVars;       % Expose function
 guiData.hHighlight      = [];   % Store handle for external highlight
+guiData.fitHandles      = [];   % Store handles for regression lines
 guiData.chkGrp          = [];   % Checkbox handles
+guiData.hEquality       = [];   % Store handle for equality line
 
 %% ========================================================================
 %  LAYOUT
@@ -217,24 +219,34 @@ guiData.ddYScale = uicontrol('Parent', hContainer, 'Style', 'popupmenu', ...
     'Position', [ctlX_Right, currYTop - ctlH, ctlW_Half, ctlH], ...
     'Callback', @onUpdatePlot);
 
-% --- Size Variable ---
-currSizeTop = currYTop - ctlH - ctlGap - ctlH;
-uicontrol('Parent', hContainer, 'Style', 'text', 'String', 'Size Variable:', ...
-    'Units', 'normalized', 'Position', [ctlX, currSizeTop, ctlW, ctlH*0.7], ...
+% --- Fit Option (Moved up, Inline) ---
+yFit = currYTop - 2*ctlH - ctlGap;
+uicontrol('Parent', hContainer, 'Style', 'text', 'String', 'Fit:', ...
+    'Units', 'normalized', 'Position', [ctlX, yFit + ctlH*0.1, ctlW*0.3, ctlH*0.6], ...
+    'HorizontalAlignment', 'left', 'FontWeight', 'bold');
+guiData.ddFit = uicontrol('Parent', hContainer, 'Style', 'popupmenu', ...
+    'String', {'None', 'Linear', 'Ortho'}, 'Units', 'normalized', ...
+    'Position', [ctlX + ctlW*0.35, yFit, ctlW*0.65, ctlH], ...
+    'Callback', @onUpdatePlot);
+
+% --- Size Variable (Inline) ---
+ySize = yFit - ctlH - ctlGap;
+uicontrol('Parent', hContainer, 'Style', 'text', 'String', 'Size:', ...
+    'Units', 'normalized', 'Position', [ctlX, ySize + ctlH*0.1, ctlW*0.3, ctlH*0.6], ...
     'HorizontalAlignment', 'left', 'FontWeight', 'bold');
 guiData.ddSize = uicontrol('Parent', hContainer, 'Style', 'popupmenu', ...
     'String', [{'None'}, numericVars], 'Units', 'normalized', ...
-    'Position', [ctlX, currSizeTop - ctlH, ctlW, ctlH], ...
+    'Position', [ctlX + ctlW*0.35, ySize, ctlW*0.65, ctlH], ...
     'Callback', @onUpdatePlot);
 
-% --- Group Variable ---
-currGrpTop = currSizeTop - ctlH - ctlGap - ctlH;
-uicontrol('Parent', hContainer, 'Style', 'text', 'String', 'Group Variable:', ...
-    'Units', 'normalized', 'Position', [ctlX, currGrpTop, ctlW, ctlH*0.7], ...
+% --- Group Variable (Inline) ---
+yGrp = ySize - ctlH - ctlGap;
+uicontrol('Parent', hContainer, 'Style', 'text', 'String', 'Group:', ...
+    'Units', 'normalized', 'Position', [ctlX, yGrp + ctlH*0.1, ctlW*0.3, ctlH*0.6], ...
     'HorizontalAlignment', 'left', 'FontWeight', 'bold');
 guiData.ddGrp = uicontrol('Parent', hContainer, 'Style', 'popupmenu', ...
     'String', [{'None'}, catVars], 'Units', 'normalized', ...
-    'Position', [ctlX, currGrpTop - ctlH, ctlW, ctlH], ...
+    'Position', [ctlX + ctlW*0.35, yGrp, ctlW*0.65, ctlH], ...
     'Callback', @onGrpChange);
 
 % Set Initial Values
@@ -251,24 +263,29 @@ idxG = find(strcmp(catVars, curGrp));
 if isempty(idxG), set(guiData.ddGrp, 'Value', 1);
 else,             set(guiData.ddGrp, 'Value', idxG + 1); end
 
+% Fit ('None' is 1)
+set(guiData.ddFit, 'Value', 1);
+
 % --- Filter Panel ---
-grpDDBottom = currGrpTop - ctlH;
+grpDDBottom = yGrp;
 panelTop    = grpDDBottom - 0.02;
-panelBottom = 0.30;
+panelBottom = 0.20; % Adjusted for buttons
 panelH      = panelTop - panelBottom;
 
 guiData.pnlGrp = uipanel('Parent', hContainer, 'BorderType', 'none', ...
     'Units', 'normalized', 'Position', [ctlX, panelBottom, ctlW, panelH]);
 
 % --- Buttons ---
+% Side-by-side
+btnY = 0.13;
 guiData.btnSelect = uicontrol('Parent', hContainer, 'Style', 'pushbutton', ...
-    'String', 'Select Group', ...
-    'Units', 'normalized', 'Position', [ctlX, 0.22, ctlW, 0.05], ...
+    'String', 'Slct Grp', ...
+    'Units', 'normalized', 'Position', [ctlX, btnY, ctlW_Half, 0.05], ...
     'Callback', @onSelectRegion, 'FontWeight', 'bold');
 
 guiData.btnSelectDot = uicontrol('Parent', hContainer, 'Style', 'pushbutton', ...
-    'String', 'Select Dot', ...
-    'Units', 'normalized', 'Position', [ctlX, 0.16, ctlW, 0.05], ...
+    'String', 'Slct Dot', ...
+    'Units', 'normalized', 'Position', [ctlX_Right, btnY, ctlW_Half, 0.05], ...
     'Callback', @onSelectDot, 'FontWeight', 'bold');
 
 guiData.btnSave = uicontrol('Parent', hContainer, 'Style', 'pushbutton', ...
@@ -383,6 +400,7 @@ onUpdatePlot(hContainer, []);
         idxY    = get(data.ddY, 'Value');
         idxSize = get(data.ddSize, 'Value');
         idxGrp  = get(data.ddGrp, 'Value');
+        idxFit  = get(data.ddFit, 'Value');
 
         xName = data.numericVars{idxX};
         yName = data.numericVars{idxY};
@@ -539,6 +557,17 @@ onUpdatePlot(hContainer, []);
         set(data.hAxHistY,   'XScale', 'linear', 'YScale', scaleY);
 
         % --- Drawing ---
+        % Clean up previous fit lines (handled explicitly due to HandleVisibility=off)
+        if ~isempty(data.fitHandles)
+            delete(data.fitHandles(isgraphics(data.fitHandles)));
+        end
+        data.fitHandles = [];
+
+        if ~isempty(data.hEquality)
+            delete(data.hEquality(isgraphics(data.hEquality)));
+        end
+        data.hEquality = [];
+
         cla(data.hAxScatter);
         cla(data.hAxHistX);
         cla(data.hAxHistY);
@@ -600,6 +629,22 @@ onUpdatePlot(hContainer, []);
                 'DisplayName', lbl, ...
                 'MarkerFaceAlpha', scatAlpha, ...
                 'HitTest', 'off', 'PickableParts', 'none');
+            
+            % Fit Lines
+            if idxFit > 1
+                fitTypes = {'None', 'Linear', 'Ortho'};
+                curFit   = fitTypes{idxFit};
+                
+                statsFit = plot_linReg(xG, yG, 'hAx', data.hAxScatter, ...
+                    'type', curFit, 'clr', cG, 'flgTxt', false);
+                
+                % Store handles for cleanup
+                if isstruct(statsFit)
+                   if isfield(statsFit, 'hLine'), data.fitHandles = [data.fitHandles, statsFit.hLine]; end
+                   if isfield(statsFit, 'hTxt'),  data.fitHandles = [data.fitHandles, statsFit.hTxt]; end
+                end
+            end
+
 
             % Binned Stats Calculation
             if isDisc
@@ -654,7 +699,7 @@ onUpdatePlot(hContainer, []);
         % Equality Line
         if isLinked
             % Re-plot equality line since we cleared axes
-            plot(data.hAxScatter, xLim, xLim, 'k--', 'LineWidth', 1, ...
+            data.hEquality = plot(data.hAxScatter, xLim, xLim, 'k--', 'LineWidth', 1, ...
                 'HitTest', 'off', 'PickableParts', 'none', 'HandleVisibility', 'off');
         end
 
@@ -681,6 +726,9 @@ onUpdatePlot(hContainer, []);
             set(data.btnSelect, 'Enable', 'off', 'String', 'Select Group');
             set(data.btnSelectDot, 'Enable', 'off', 'String', 'Select Dot');
         end
+        
+        % Save State (including fitHandles)
+        hContainer.UserData = data;
     end
 
 % --- Helper: Limit Calculation ---
