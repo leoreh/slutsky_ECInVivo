@@ -21,10 +21,10 @@
 %  ========================================================================
 
 % Load table
-% basepaths = [mcu_basepaths('wt'), mcu_basepaths('mcu')];
-% presets = {'frNet', 'brst'};
-% tbl = mcu_tblVivo('basepaths', basepaths, 'flgClean', true, ...
-%     'presets', presets);
+basepaths = [mcu_basepaths('wt'), mcu_basepaths('mcu')];
+presets = {'frNet', 'brst'};
+tbl = mcu_tblVivo('basepaths', basepaths, 'flgClean', true, ...
+    'presets', presets);
 
 % Filter: RS units only
 tblLme = tbl(tbl.unitType == 'RS', :);
@@ -33,8 +33,7 @@ tblLme = tbl(tbl.unitType == 'RS', :);
 idxDay = ismember(tblLme.Day, {'BSL', 'BAC3'});
 tblLme = tblLme(idxDay, :);
 
-% Transform/Clean (Assert no zero values for logs)
-% Using a small epsilon or the pseudocount method later, but checking distribution here
+% Assert no zero values for logs. This is instead of a pseudocount.
 tblTrans = tbl_trans(tblLme, 'flg0', true, 'verbose', true);
 
 
@@ -45,64 +44,10 @@ tblTrans = tbl_trans(tblLme, 'flg0', true, 'verbose', true);
 %  Filter out low firing rate units that deviate from the distribution.
 
 flgQq = false;
-cutoff_Z = -3; % User defined cut-off (Visual Inspection)
+cutoff_Z = -1.5; % User defined cut-off (Visual Inspection)
 
 if flgQq
-    idxWt = tblLme.Group == 'Control';
-    idxMcu = tblLme.Group == 'MCU-KO';
-    
-    frBsl = tblLme.fr(tblLme.Day == 'BSL' & idxWt);
-    frBac = tblLme.fr(tblLme.Day == 'BAC3' & idxWt);
-    
-    frBslMcu = tblLme.fr(tblLme.Day == 'BSL' & idxMcu);
-    
-    hFig = figure('Position', [300 300 900 900], 'Color', 'w', 'Name', 'Data Distribution Check');
-    tiledlayout(2, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
-    
-    % Log-Normality Check (The most important for cutoff)
-    nexttile;
-    hQ = qqplot(log(frBsl)); 
-    hold on;
-    % Calculate cutoff value in log space for plotting
-    logCutoff = prctile(log(frBsl), normcdf(cutoff_Z)*100);
-    yline(logCutoff, 'r--', 'Cutoff', 'LineWidth', 1.5, 'LabelVerticalAlignment', 'bottom');
-    xlabel('Theoretical Normal Quantiles');
-    ylabel('Sample Log(FR) Quantiles');
-    title('Log-Normality Check (BSL Control)');
-    grid on; axis square;   
-    hQ(1).LineWidth = 1;
-
-    % Group Check (Control vs MCU)
-    nexttile;
-    hQ = qqplot(log(frBsl), log(frBslMcu));
-    xlabel('Control BSL Log(FR)');
-    ylabel('MCU BSL Log(FR)');
-    title('Group: Control vs MCU (BSL)');
-    grid on; axis square;
-    refline(1,0);
-    hQ(1).LineWidth = 1;
-
-    % Stability Check (BSL vs BAC3)
-    nexttile;
-    hQ = qqplot(log(frBsl), log(frBac));
-    xlabel('BSL Log(FR) Quantiles');
-    ylabel('BAC3 Log(FR) Quantiles');
-    title('Stability: BSL vs BAC3 (Control)');
-    grid on; axis square;
-    refline(1,0); 
-    hQ(1).LineWidth = 1;
-
-    % Stability Check (MCU BSL vs BAC3)
-    % Just to be thorough
-    frBacMcu = tblLme.fr(tblLme.Day == 'BAC3' & idxMcu);
-    nexttile;
-    hQ = qqplot(log(frBslMcu), log(frBacMcu));
-    xlabel('MCU BSL Log(FR)');
-    ylabel('MCU BAC3 Log(FR)');
-    title('Stability: BSL vs BAC3 (MCU)');
-    grid on; axis square;
-    refline(1,0); 
-    hQ(1).LineWidth = 1;
+   hFig = mcu_frQq(tbl, 'dataSet', 'vivo');
 end
 
 % --- FILTERING ---
@@ -121,19 +66,13 @@ fprintf('Cut-off FR     : %.4f Hz\n', cutoff_Hz);
 nBefore = height(tblLme);
 
 % Identify Units to keep (Must have BSL FR > cutoff)
-idxBsl = tblLme.Day == 'BSL';
-tblBsl = tblLme(idxBsl, :);
-unitsToKeep = tblBsl.Name(tblBsl.fr >= cutoff_Hz);
+goodIdx = tblLme.fr >= cutoff_Hz;
 
 % Filter original table
-% tblLme = tblLme(ismember(tblLme.Name, unitsToKeep), :);
-
-nAfter = length(unitsToKeep);
-% Assuming 2 rows per unit (BSL, BAC3)
-nUnitsRemoved = (nBefore - nAfter) / 2; 
+tblLme = tblLme(goodIdx, :);
 
 fprintf('Removed %d units (%.1f%%). Remaining: %d units\n', ...
-    nUnitsRemoved, (nBefore-nAfter)/nBefore*100, nAfter/2);
+    sum(~goodIdx), sum(~goodIdx)/length(goodIdx)*100, sum(goodIdx));
 fprintf('================================================================\n\n');
 
 
@@ -142,10 +81,13 @@ fprintf('================================================================\n\n');
 %  ========================================================================
 %  Create 'Synthetic Units' by matching BSL and BAC3 units by rank.
 
-nBins = 10; % Deciles
+nBins = 7; % Deciles
 
 % Initialize container for synthetic table
-tblSynth = match_qntl(tblLme, nBins, 'flgPool', true);
+tblSynth = match_qntl(tblLme, nBins, 'flgPool', false);
+
+% tblGUI_scatHist(tblSynth, 'xVar', 'pBspk_BSL', 'yVar', 'fr_BAC3', 'grpVar', 'Group');
+
 
 %% ========================================================================
 %  VECTOR ANALYSIS
@@ -156,11 +98,8 @@ tblSynth = match_qntl(tblLme, nBins, 'flgPool', true);
 % dBrst = log(frBspk_BAC3 / frBspk_BSL)
 % dSngl = log(frSspk_BAC3 / frSspk_BSL)
 
-% Pseudocount for log stability (minimal impact on mean data but good practice)
-c = 0;
-
-tblSynth.dBrst = log((tblSynth.frBspk_BAC3 + c) ./ (tblSynth.frBspk_BSL + c));
-tblSynth.dSngl = log((tblSynth.frSspk_BAC3 + c) ./ (tblSynth.frSspk_BSL + c));
+tblSynth.dBrst = log((tblSynth.frBspk_BAC3) ./ (tblSynth.frBspk_BSL));
+tblSynth.dSngl = log((tblSynth.frSspk_BAC3) ./ (tblSynth.frSspk_BSL));
 
 % 2. Calculate Vector Properties
 % ------------------------------

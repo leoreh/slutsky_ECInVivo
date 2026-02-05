@@ -143,12 +143,15 @@ function plot_stateSpace(tbl, grp, xVar, yVar, cData, ~, isSymlog)
     % Determine Axis Limits (Symmertic)
     % We want 0,0 in center.
     allVals = [tbl.(xVar); tbl.(yVar)];
-    maxVal = max(abs(allVals)) * 1.1;
-    if maxVal == 0; maxVal = 1; end
+    maxAbs = max(abs(allVals));
+    if maxAbs == 0; maxAbs = 1; end
     
     if isSymlog
         % Pre-calc maxVal in symlog space for limits
-        maxVal = symlog(maxVal); 
+        % Note: we apply padding AFTER transformation to ensure visual margin
+        limVal = symlog(maxAbs) * 1.1; 
+    else
+        limVal = maxAbs * 1.1;
     end
        
     % Filter NaNs
@@ -164,21 +167,32 @@ function plot_stateSpace(tbl, grp, xVar, yVar, cData, ~, isSymlog)
     scatter(xData, yData, subTbl.scatSz(mk), curCData, ...
         'filled', 'MarkerFaceAlpha', 0.6, 'MarkerEdgeColor', 'none');
   
-    xlim([-maxVal maxVal]);
-    ylim([-maxVal maxVal]);
     set(gca, 'FontSize', 12);
 
     if isSymlog
+        % 1. Transform Axes (Scatter points become SymLog)
         symlog(gca, 'xy');
+        
+        % 2. Transform Data for Regression (to match visual)
+        xReg = symlog(xData);
+        yReg = symlog(yData);
+    else
+        xReg = xData;
+        yReg = yData;
     end
+    
+    xlim([-limVal limVal]);
+    ylim([-limVal limVal]);
 
     % Orthogonal Regression
-    plot_linReg(xData, yData, 'hAx', gca, 'type', 'ortho', ...
+    % If symlog, this plots a straight line in the transformed space (visually correct)
+    % The Slope/Angle calculated will be for the transformed data.
+    plot_linReg(xReg, yReg, 'hAx', gca, 'type', 'ortho', ...
         'clr', 'k', 'flgTxt', true);
 
-    % Reference Lines
+    % Reference Lines (Visual Space)
     % Identity
-    plot([-maxVal maxVal], [-maxVal maxVal], 'k:', 'LineWidth', 1.5);
+    plot([-limVal limVal], [-limVal limVal], 'k:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
     % Quadrant Separators
     xline(0, 'k--', 'LineWidth', 1, 'HandleVisibility', 'off');
     yline(0, 'k--', 'LineWidth', 1, 'HandleVisibility', 'off');

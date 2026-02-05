@@ -144,20 +144,21 @@ for iRow = 1:2
     
     % Reference Lines
     lims = max(abs([tbl.(xVar); tbl.(yVar)])) * 1.1;
-    plot([-lims, lims], [-lims, lims], '--k', 'HandleVisibility', 'off'); % Identity
-    xline(0, '-', 'Color', [0.8 0.8 0.8], 'HandleVisibility', 'off');
-    yline(0, '-', 'Color', [0.8 0.8 0.8], 'HandleVisibility', 'off');
     
-    plot_grpScatter(tbl, xVar, yVar, 'ortho', lims);
-
     if strcmpi(typeStr, 'Absolute')
-        symlog(gca, 'xy');
         lims = symlog(lims);
     end
     
+    isSymlog = strcmpi(typeStr, 'Absolute');
+    plot_grpScatter(tbl, xVar, yVar, lims, isSymlog);
+
     xlim([-lims, lims]); ylim([-lims, lims]);
     xlabel(lblB, 'Interpreter', 'tex'); 
     ylabel(lblS, 'Interpreter', 'tex');
+     
+    plot([-lims, lims], [-lims, lims], '--k', 'HandleVisibility', 'off'); % Identity
+    xline(0, '-', 'Color', [0.8 0.8 0.8], 'HandleVisibility', 'off');
+    yline(0, '-', 'Color', [0.8 0.8 0.8], 'HandleVisibility', 'off');
     
     % --- 2. Burst Prediction ---
     nexttile; hold on;
@@ -168,16 +169,12 @@ for iRow = 1:2
     
     yline(0, '-', 'Color', [0.8 0.8 0.8], 'HandleVisibility', 'off');
     
-    plot_grpScatter(tbl, xVar, yVar, 'ortho', []);
+    isSymlog = strcmpi(typeStr, 'Absolute');
+    plot_grpScatter(tbl, xVar, yVar, [], isSymlog);
     
-    if strcmpi(typeStr, 'Absolute')
-        symlog(gca, 'y');
-    end
-
     xlabel('Baseline Burstiness'); 
     ylabel(lblB, 'Interpreter', 'tex');
-    
-    
+
     % --- 3. Single Prediction ---
     nexttile; hold on;
     title([typeStr ' Single Recovery']);
@@ -187,11 +184,8 @@ for iRow = 1:2
     
     yline(0, '-', 'Color', [0.8 0.8 0.8], 'HandleVisibility', 'off');
     
-    plot_grpScatter(tbl, xVar, yVar, 'ortho', []);
-    
-    if strcmpi(typeStr, 'Absolute')
-        symlog(gca, 'y');
-    end
+    isSymlog = strcmpi(typeStr, 'Absolute');
+    plot_grpScatter(tbl, xVar, yVar, [], isSymlog);
     
     xlabel('Baseline Burstiness'); 
     ylabel(lblS, 'Interpreter', 'tex');
@@ -203,8 +197,12 @@ end
 %  HELPER FUNCTIONS
 %  ========================================================================
 
-function plot_grpScatter(tbl, xVar, yVar, regType, lims)
+function plot_grpScatter(tbl, xVar, yVar, lims, isSymlog)
     % PLOT_GRPSCATTER Helper for common grouping scatter/regression logic
+    
+    if nargin < 5; isSymlog = false; end
+    
+    regType = 'ortho';
     
     cfg = mcu_cfg;
     clr = cfg.clr.grp;
@@ -213,35 +211,62 @@ function plot_grpScatter(tbl, xVar, yVar, regType, lims)
     
     axis square;
     
+    % 1. Plot Scatter (Raw)
     for iGrp = 1:length(groups)
         idx = tbl.Group == groups(iGrp);
         x = tbl.(xVar)(idx); 
         y = tbl.(yVar)(idx);
         c = clr(iGrp, :);
         
-        % Scatter
         scatter(x, y, 20, c, 'filled', 'MarkerFaceAlpha', alphaVal, ...
             'MarkerEdgeColor', 'none', 'HandleVisibility', 'off');
-            
+    end
+
+    % 2. Transform Axes
+    if isSymlog
+        if contains(xVar, 'pBspk')
+             symlog(gca, 'y');
+        else
+             symlog(gca, 'xy');
+        end
+    end
+
+    % 3. Plot Regression (on potentially transformed data)
+    for iGrp = 1:length(groups)
+        idx = tbl.Group == groups(iGrp);
+        x = tbl.(xVar)(idx); 
+        y = tbl.(yVar)(idx);
+        c = clr(iGrp, :);
+
+        if isSymlog
+            if contains(xVar, 'pBspk')
+                 % Only Y is symlog
+                 yReg = symlog(y);
+                 xReg = x;
+            else
+                 % Both
+                 xReg = symlog(x);
+                 yReg = symlog(y);
+            end
+        else
+            xReg = x;
+            yReg = y;
+        end
+        
         % Regression
-        Stats = plot_linReg(x, y, 'hAx', gca, 'type', regType, ...
+        Stats = plot_linReg(xReg, yReg, 'hAx', gca, 'type', regType, ...
             'clr', c, 'flgTxt', false);
             
         % Annotation
-        if strcmpi(regType, 'ortho') && ~isnan(Stats.slope) && ~isempty(lims)
-            % Orthogonal: Show Angle
-            txtX = -lims * 0.9;
-            txtY = lims * (0.8 - (iGrp-1)*0.15);
+        if ~isnan(Stats.slope)
+            % Orthogonal: Show Angle/Slope using Normalized Units (Robust to limits/symlog)
+            % Position: Top-Left
+            txtX = 0.02; 
+            txtY = 0.98 - (iGrp-1) * 0.06;
+            
             text(txtX, txtY, sprintf('%s: %.2f (%.0f\\circ)', ...
                 char(groups(iGrp)), Stats.slope, Stats.angle), ...
-                'Color', c, 'FontSize', 8, 'FontWeight', 'bold');
-                
-        elseif strcmpi(regType, 'linear') && ~isnan(Stats.pVal)
-            % Linear: Show P-Value
-            xL = xlim; yL = ylim;
-            txtX = xL(2) * 0.5;
-            txtY = yL(2) * (0.9 - (iGrp-1)*0.12);
-            text(txtX, txtY, sprintf('b=%.2f, p=%.3f', Stats.slope, Stats.pVal), ...
+                'Units', 'normalized', ...
                 'Color', c, 'FontSize', 8, 'FontWeight', 'bold');
         end
     end
