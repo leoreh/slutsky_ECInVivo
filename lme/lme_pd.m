@@ -273,7 +273,7 @@ if ~isempty(grpName)
 end
 title(hAx, 'Partial Dependence', 'FontWeight', 'normal');
 
-set(hAx, 'YScale', 'log')
+% set(hAx, 'YScale', 'log')
 % if ~isempty(transParams.varsTrans.(xName).logBase)
 %     set(hAx, 'XScale', 'log')
 % end

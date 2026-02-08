@@ -31,22 +31,6 @@ p = inputParser;
 addRequired(p, 'tbl', @istable);
 parse(p, tbl, varargin{:});
 
-
-%% ========================================================================
-%  PRE-PROCESS: CALCULATE METRICS
-%  ========================================================================
-
-% Pseudocount for Log Ratios (1 spike / hour)
-c = 1 / 3600;
-
-% Log Fold Change (Relative)
-tbl.dBrst_rel = log((tbl.ss_frBspk + c) ./ (tbl.frBspk + c));
-tbl.dSngl_rel = log((tbl.ss_frSspk + c) ./ (tbl.frSspk + c));
-
-% Absolute Difference (Absolute)
-tbl.dBrst_abs = tbl.ss_frBspk - tbl.frBspk;
-tbl.dSngl_abs = tbl.ss_frSspk - tbl.frSspk;
-
 %% ========================================================================
 %  PREP
 %  ========================================================================
@@ -59,13 +43,13 @@ tbl.scatSz = repmat(25, height(tbl), 1);
 % Color Data
 % Row 1: Burstiness
 cData_Brst = tbl.dpBspk;
-cLabel_Brst = 'Burstiness (logit)';
+cLabel_Brst = '\Delta Burstiness (log-odds)';
 clim_Brst = [min(cData_Brst, [], 'all'), max(cData_Brst, [], 'all')];
 if diff(clim_Brst) == 0; clim_Brst = clim_Brst + [-0.1 0.1]; end
 
 % Row 2: dFr
 cData_dFr = tbl.dFr;
-cLabel_dFr = 'dFr (Fold Change)';
+cLabel_dFr = '\Delta FR (Fold Change)';
 clim_dFr = [min(cData_dFr, [], 'all'), max(cData_dFr, [], 'all')];
 if diff(clim_dFr) == 0; clim_dFr = clim_dFr + [-0.1 0.1]; end
 

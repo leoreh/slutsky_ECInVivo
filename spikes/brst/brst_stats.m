@@ -27,7 +27,7 @@ function stats = brst_stats(brst, spktimes, varargin)
 %                     .ibi        : Mean inter-burst interval (s)
 %                     .nBspk      : Mean spikes per burst
 %                     .pBspk      : Probability of spikes in bursts (0-1)
-%                     .winCalc  : The time windows used [nWin x 2]
+%                     .winCalc    : The time windows used [nWin x 2]
 %
 %   NOTES:
 %       - Bursts are assigned to a window based on their START time.

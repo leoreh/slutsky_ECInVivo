@@ -23,18 +23,18 @@
 % Load table
 basepaths = [mcu_basepaths('wt'), mcu_basepaths('mcu')];
 presets = {'frNet', 'brst'};
-tbl = mcu_tblVivo('basepaths', basepaths, 'flgClean', true, ...
+tblOrig = mcu_tblVivo('basepaths', basepaths, 'flgClean', true, ...
     'presets', presets);
 
 % Filter: RS units only
-tblLme = tbl(tbl.unitType == 'RS', :);
+tblData = tblOrig(tblOrig.unitType == 'RS', :);
 
 % Filter: Only BSL and BAC3 days
-idxDay = ismember(tblLme.Day, {'BSL', 'BAC3'});
-tblLme = tblLme(idxDay, :);
+idxDay = ismember(tblData.Day, {'BSL', 'BAC3'});
+tblData = tblData(idxDay, :);
 
 % Assert no zero values for logs. This is instead of a pseudocount.
-tblTrans = tbl_trans(tblLme, 'flg0', true, 'verbose', true);
+tblData = tbl_trans(tblData, 'flg0', true, 'verbose', true);
 
 
 %% ========================================================================
@@ -44,32 +44,32 @@ tblTrans = tbl_trans(tblLme, 'flg0', true, 'verbose', true);
 %  Filter out low firing rate units that deviate from the distribution.
 
 flgQq = false;
-cutoff_Z = -1.8; % User defined cut-off (Visual Inspection)
+cutoff_z = -1.8; % User defined cut-off (Visual Inspection)
 
 if flgQq
-   hFig = mcu_frQq(tbl, 'dataSet', 'vivo', 'cutoff_Z', cutoff_Z);
+   hFig = mcu_frQq(tblData, 'dataSet', 'vivo', 'cutoff_z', cutoff_z);
 end
 
 % --- FILTERING ---
-cutoff_p = normcdf(cutoff_Z);
+cutoff_p = normcdf(cutoff_z);
 % Define threshold based on Control Baseline (canonical)
-frBslRef = tblLme.fr(tblLme.Day == 'BSL' & tblLme.Group == 'Control'); 
+frBslRef = tblData.fr(tblData.Day == 'BSL' & tblData.Group == 'Control'); 
 cutoff_Hz = prctile(frBslRef, cutoff_p * 100);
 
 fprintf('\n================================================================\n');
 fprintf(' FILTERING LOW FR UNITS\n');
 fprintf('================================================================\n');
-fprintf('Cut-off Z-score: %.2f (%.1f%%)\n', cutoff_Z, cutoff_p*100);
+fprintf('Cut-off Z-score: %.2f (%.1f%%)\n', cutoff_z, cutoff_p*100);
 fprintf('Cut-off FR     : %.4f Hz\n', cutoff_Hz);
 
 % Apply Filter
-nBefore = height(tblLme);
+nBefore = height(tblData);
 
 % Identify Units to keep (Must have BSL FR > cutoff)
-goodIdx = tblLme.fr >= cutoff_Hz;
+goodIdx = tblData.fr >= cutoff_Hz;
 
 % Filter original table
-tblLme = tblLme(goodIdx, :);
+tblData = tblData(goodIdx, :);
 
 fprintf('Removed %d units (%.1f%%). Remaining: %d units\n', ...
     sum(~goodIdx), sum(~goodIdx)/length(goodIdx)*100, sum(goodIdx));
@@ -81,39 +81,52 @@ fprintf('================================================================\n\n');
 %  ========================================================================
 %  Create 'Synthetic Units' by matching BSL and BAC3 units by rank.
 
-nBins = 7; % Deciles
+nBins = 6; % Deciles
 
 % Initialize container for synthetic table
-tblSynth = match_qntl(tblLme, nBins, 'flgPool', false);
+tbl = match_qntl(tblData, nBins, 'flgPool', false);
 
-% tblGUI_scatHist(tblSynth, 'xVar', 'pBspk_BSL', 'yVar', 'fr_BAC3', 'grpVar', 'Group');
+% Add logit pBspk
+tblTrans = tbl_trans(tbl, 'varsInc', {'pBspk', 'ss_pBspk'}, 'logBase', 'logit');
+tbl.pBspk_trans = tblTrans.pBspk;
+tbl.ss_pBspk_trans = tblTrans.ss_pBspk;
+tbl.frSs = tbl.ss_fr;
+
+% tblGUI_scatHist(tbl, 'xVar', 'pBspk_BSL', 'yVar', 'fr_BAC3', 'grpVar', 'Group');
 
 
 %% ========================================================================
-%  VECTOR ANALYSIS
+%  PRE-PROCESS
 %  ========================================================================
 
-% 1. Calculate Deltas
-% -------------------
-% dBrst = log(frBspk_BAC3 / frBspk_BSL)
-% dSngl = log(frSspk_BAC3 / frSspk_BSL)
+% Pseudocount (replaced by tbl_trans)
+c = 0;          
 
-tblSynth.dBrst = log((tblSynth.frBspk_BAC3) ./ (tblSynth.frBspk_BSL));
-tblSynth.dSngl = log((tblSynth.frSspk_BAC3) ./ (tblSynth.frSspk_BSL));
+tbl.dBrst_rel = log((tbl.ss_frBspk + c) ./ (tbl.frBspk + c));
+tbl.dSngl_rel = log((tbl.ss_frSspk + c) ./ (tbl.frSspk + c));
+tbl.dFr = log((tbl.frSs) ./ (tbl.fr));
+tbl.dpBspk = (tbl.ss_pBspk_trans) - (tbl.pBspk_trans);
 
-% 2. Calculate Vector Properties
-% ------------------------------
-[tblSynth.vecTheta, tblSynth.vecR] = cart2pol(tblSynth.dSngl, tblSynth.dBrst);
-tblSynth.vecDeg = rad2deg(tblSynth.vecTheta);
+tbl.dBrst_abs = (tbl.ss_frBspk - tbl.frBspk);
+tbl.dSngl_abs = (tbl.ss_frSspk - tbl.frSspk);
 
-% 3. Calculate Strategy Index (D)
-% -------------------------------
-tblSynth.D = tblSynth.dBrst - tblSynth.dSngl;
 
 %% ========================================================================
-%  PLOTTING: VECTOR STRATEGY
+%  PLOTTING
 %  ========================================================================
 
+hFig = mcu_rcvSpace(tbl);
+
+% Resdidual analysis
+hFig = mcu_rcvRes(tbl);
 
 
 
+
+% tblGUI_scatHist(tbl, 'xVar', 'pBspk_trans', 'yVar', 'dBrst_rel', 'grpVar', 'Group');
+% tblGUI_bar(tbl, 'yVar', 'pBspk', 'xVar', 'Group');
+
+
+%% ========================================================================
+%  MEDIATION
+%  ========================================================================

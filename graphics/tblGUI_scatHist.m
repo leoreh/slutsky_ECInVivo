@@ -1160,27 +1160,60 @@ onUpdatePlot(hContainer, []);
         % Filter data
         val = val(~isnan(val) & ~isinf(val));
         if isempty(val), return; end
+        
+        % Determine Normalization & KDE Scaling
+        if strcmp(scale, 'log')
+            % LOG SCALE:
+            % If we use 'pdf', the bar heights decay because linear bin width increases.
+            % Use 'probability' to show the FRACTION of data in each bin, which
+            % visually represents the "shape" correctly on a log axis.
+            normType = 'probability';
+            val = val(val > 0); % Strict positive for log
+            if isempty(val), return; end
+            
+            % For KDE scaling to match 'probability':
+            % The histogram height ~ count / total.
+            % The standard KDE is a PDF (integral=1).
+            % To match 'probability' bars, we must multiply the PDF by the *bin width*.
+            logEdges = log10(edges);
+            binW     = mean(diff(logEdges)); % Mean width in log10 space
+            
+        else
+            % LINEAR SCALE:
+            % Standard PDF works fine.
+            normType = 'pdf';
+        end
 
         % Histogram
         histogram(ax, val, 'BinEdges', edges, 'FaceColor', c, ...
-            'EdgeColor', 'none', 'FaceAlpha', 0.2, 'Normalization', 'pdf', ...
+            'EdgeColor', 'none', 'FaceAlpha', 0.2, 'Normalization', normType, ...
             'DisplayStyle', 'bar', 'Orientation', orient);
 
         % KDE Overlay
         if length(val) < 2, return; end
 
-        pts = linspace(min(edges), max(edges), 200);
-
         if strcmp(scale, 'log')
-            val = val(val > 0);
-            if length(val) < 2, return; end
-
-            % Log-KDE: Estimate on log10(x), then transform PDF density back
+            % Log-KDE Points
+            logMin = log10(min(edges));
+            logMax = log10(max(edges));
+            pts    = logspace(logMin, logMax, 200);
+            
+            % Estimate density on LOG10 data
+            % ksdensity(..., 'Support', 'positive') handles boundary effects better, 
+            % but standard log-transform is robust enough for visualization.
             [f_log, ~] = ksdensity(log10(val), log10(pts));
-            f = f_log ./ (pts * log(10));
+            
+            % f_log is d(Prob)/d(log10(x)).
+            % To match 'probability' histogram (which is Prob per bin),
+            % we multiply by the bin width in log10 space.
+            f = f_log * binW;
+            
         else
-            % Linear-KDE
+            % Linear-KDE Points
+            pts = linspace(min(edges), max(edges), 200);
+            
             [f, ~] = ksdensity(val, pts);
+            % f is d(Prob)/dx. Matches 'pdf' normalization directly.
         end
 
         % Check for NaNs

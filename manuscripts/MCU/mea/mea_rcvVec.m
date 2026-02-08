@@ -10,7 +10,7 @@
 
 % Load with steady state variables
 presets = {'steadyState'};
-[tbl, xVec, basepaths, v] = mcu_tblMea('presets', presets, 'flgOtl', true);
+% [tbl, xVec, basepaths, v] = mcu_tblMea('presets', presets, 'flgOtl', true);
 
 % Add logit pBspk
 tblTrans = tbl_trans(tbl, 'varsInc', {'pBspk', 'ss_pBspk'}, 'logBase', 'logit');
@@ -23,24 +23,57 @@ tbl.ss_pBspk_trans = tblTrans.ss_pBspk;
 %  ========================================================================
 % Validate "Pseudo-Tracking" (Quantile Matching) on MEA data
 
-flgPseudo = false; 
+flgPseudo = true; 
 if flgPseudo
+    
+    nBins = 50;
+
+    % --- ASSERT EQUAL DISTRIBUTIONS ---
+    cutoff_z = -1.5; % User defined cut-off (Visual Inspection)
+    % cutoff_z = -6;
+
+    hFig = mcu_rcvQq(tbl, 'var', 'frSspk', 'dataSet', 'mea', 'cutoff_z', cutoff_z);
+
+    % Define threshold based on Control Baseline
+    frRef = log(tbl.fr(tbl.Group == 'Control'));
+    mu = mean(frRef);
+    sigma = std(frRef);
+    cutoff_Hz = exp(mu + cutoff_z * sigma);
+
+    cutoff_p = normcdf(cutoff_z); % For display only
+
+    % Apply Filter
+    nBefore = height(tbl);
+
+    % Identify Units to keep (Must have BSL FR > cutoff)
+    goodIdx = tbl.fr >= cutoff_Hz;
+
+    % Filter original table
+    tbl = tbl(goodIdx, :);
+
+    fprintf('\n================================================================\n');
+    fprintf(' FILTERING LOW FR UNITS\n');
+    fprintf('================================================================\n');
+    fprintf('Cut-off Z-score: %.2f (%.1f%%)\n', cutoff_z, cutoff_p*100);
+    fprintf('Cut-off FR     : %.4f Hz\n', cutoff_Hz);
+    fprintf('Removed %d units (%.1f%%). Remaining: %d units\n', ...
+        sum(~goodIdx), sum(~goodIdx)/length(goodIdx)*100, sum(goodIdx));
+    fprintf('================================================================\n\n');
+
+
     % --- CONVERT TO LONG FORMAT ---
-    % match_qntl expects: [Group, Name, Day, vars...]
     
     % Baseline Table
-    varsTbl = {'fr', 'frBspk', 'frSspk', 'pBspk'};
+    varsTbl = {'fr', 'frBspk', 'frSspk', 'pBspk', 'pBspk_trans'};
     tBsl = tbl(:, [{'Group', 'Name'}, varsTbl]);
     tBsl.Day = repmat({'BSL'}, height(tBsl), 1);
     tBsl.Day = categorical(tBsl.Day);
 
     % Steady State Table (Rename ss_ vars)
-    varsSs = {'ss_fr', 'ss_frBspk', 'ss_frSspk', 'pBspk'}; % pBspk roughly same, or use ss_pBspk if available
-    % Note: mcu_tblMea provides ss_pBspk? Let's assume we map standard vars.
-    % Actually, let's just grab the ss columns and rename.
-    tSs = tbl(:, {'Group', 'Name', 'frSs', 'ss_frBspk', 'ss_frSspk', 'ss_pBspk'});
-    tSs = renamevars(tSs, {'frSs', 'ss_frBspk', 'ss_frSspk', 'ss_pBspk'}, ...
-                           {'fr',    'frBspk',    'frSspk',    'pBspk'});
+    varsSs = {'frSs', 'ss_frBspk', 'ss_frSspk', 'ss_pBspk', 'ss_pBspk_trans'}; 
+    tSs = tbl(:, [{'Group', 'Name'}, varsSs]);
+    tSs = renamevars(tSs, {'frSs', 'ss_frBspk', 'ss_frSspk', 'ss_pBspk', 'ss_pBspk_trans'}, ...
+                           {'fr',    'frBspk',    'frSspk',    'pBspk', 'pBspk_trans'});
     tSs.Day = repmat({'BAC3'}, height(tSs), 1); % match_qntl hardcodes 'BAC3' as the 2nd day
     tSs.Day = categorical(tSs.Day);
 
@@ -48,26 +81,11 @@ if flgPseudo
     tblLong = [tBsl; tSs];
     
     % --- RUN MATCHING ---
-    nBins = 80;
     fprintf('VALIDATION: Running match_qntl on MEA data (nBins=%d)...\n', nBins);
-    tblSynth = match_qntl(tblLong, nBins, 'flgPool', true, ...
-        'vars', {'fr', 'frBspk', 'frSspk', 'pBspk'});
+    tbl = match_qntl(tblLong, nBins, 'flgPool', true, ...
+        'var', 'fr', 'avgType', 'mean');
     
-    % --- MAP BACK TO MEA FORMAT ---
-    % MEA Script Expects: frBspk (BSL), ss_frBspk (SteadyState)
-    
-    tbl = tblSynth;
-    
-    % Baseline Mappings
-    tbl.fr        = tbl.fr_BSL;      % For Size Scaling
-    tbl.pBspk     = tbl.pBspk_BSL;   % For Color
-    tbl.frBspk    = tbl.frBspk_BSL;
-    tbl.frSspk    = tbl.frSspk_BSL;
-    
-    % Steady State Mappings
-    tbl.ss_frBspk = tbl.frBspk_BAC3;
-    tbl.ss_frSspk = tbl.frSspk_BAC3;
-    
+    tbl.frSs = tbl.ss_fr;
     fprintf('VALIDATION: Replaced real units with %d Synthetic Units.\n', height(tbl));
 end
 
@@ -96,15 +114,34 @@ hFig = mcu_rcvSpace(tbl);
 % Resdidual analysis
 hFig = mcu_rcvRes(tbl);
 
-% QQ plot
-flgQq = false;
-if flgQq
-    hFig = mcu_frQq(tbl, 'dataSet', 'mea');
-end
 
 
 % tblGUI_scatHist(tbl, 'xVar', 'pBspk_trans', 'yVar', 'dBrst_rel', 'grpVar', 'Group');
 % tblGUI_bar(tbl, 'yVar', 'pBspk', 'xVar', 'Group');
+
+
+
+%% ========================================================================
+%  Single Group Models
+%  ========================================================================
+
+idxWt = tbl.Group == 'Control';
+tblWt = tbl(idxWt, :);
+
+frml = 'dBrst_rel ~ (fr + pBspk * dSngl_rel) + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tblWt, frml, ...
+    'dist', 'normal', 'fitMethod', 'REML');
+
+frml = 'dSngl_rel ~ (fr + pBspk * dBrst_rel) + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tblWt, frml, ...
+    'dist', 'normal', 'fitMethod', 'REML');
+
+frml = 'dFr ~ (frBspk + frSspk) + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
+    'dist', 'normal', 'fitMethod', 'REML');
+
+abl = lme_ablation(tblWt, frml, 'dist', 'normal', ...
+    'flgBkTrans', false, 'partitionMode', 'split', 'nrep', 5);
 
 
 %% ========================================================================
@@ -116,22 +153,36 @@ end
 
 frml = 'dBrst_rel ~ (pBspk + fr) * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-    'dist', 'normal', 'fitMethod', 'ML');
+    'dist', 'normal', 'fitMethod', 'REML');
 
 
-frml = 'dSngl_rel ~ (pBspk + dBrst_rel + fr) * Group + (1|Name)';
+% PLOT INTERACTION
+vars = {'pBspk', 'Group'};
+hFig = plot_axSize('flgFullscreen', true, 'flgPos', true);
+
+% Partial Dependence
+hAx = nexttile;
+[pdRes, hFig] = lme_pd(lmeMdl, vars, 'transParams', lmeInfo.transParams, ...
+    'hAx', hAx);
+
+
+frml = 'dSngl_rel ~ (pBspk + fr) * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
     'dist', 'normal', 'fitMethod', 'REML');
 
 
-frml = 'dSngl_rel ~ pBspk + fr + (1|Name)';
+frml = 'dSngl_rel ~ (pBspk + fr) + (1|Name)';
 tblWt = tbl(tbl.Group == 'Control', :);
 tblMcu = tbl(tbl.Group == 'MCU-KO', :);
 xVar = 'pBspk';
 mVar = 'dBrst_rel';
 distM = 'normal';
 distY = 'normal';
-res = lme_mediation(tblMcu, frml, xVar, mVar, 'distM', distM, 'distY', distY);
+res = lme_mediation(tblWt, frml, xVar, mVar, 'distM', distM, 'distY', distY);
+
+
+
+tblMcu.frSspk
 
 
 
