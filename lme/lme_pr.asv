@@ -1,45 +1,23 @@
 function [tblRes, hFig] = lme_pr(mdl, varX, varargin)
-% LME_PR Plots Partial Residuals (CPR) or Partial Regression (AVP) for LME models.
+% LME_PR Plots Partial Residuals (CPR) or Partial Regression (AVP).
 %
 %   [HFIG, TBLRES] = LME_PR(MDL, VARX, ...)
-%
-%   This function visualizes the marginal relationship between a target predictor
-%   (VARX) and the response, after accounting for all other variables in the model.
 %
 %   MODES:
 %       'residual'   (Default) Component-Plus-Residual Plot (CPR).
 %                    Plots (Residuals + Component) vs Raw Predictor.
-%                    * Interpretation: Functional Form (Linearity).
-%                    * Units: X-axis is Raw.
-%
 %       'regression' Added Variable Plot (AVP).
 %                    Plots (Y Residuals) vs (X Residuals).
-%                    * Interpretation: Partial Correlation & Effect Size.
-%                    * Units: X-axis is Standardized (if lme_analyse was used).
-%                      The slope = The Model Coefficient (Beta).
-%
-%   EXAMPLE (Allocation Analysis):
-%       % Does Burst Recovery (dBrst) predict Single Recovery (dSngl),
-%       % controlling for baseline firing (fr) and brightness (pBspk)?
-%       
-%       frml = 'dSngl_rel ~ (dBrst_rel + pBspk + fr) * Group + (1|Name)';
-%       mdl = lme_analyse(tbl, frml, 'dist', 'normal');
-%
-%       % Visualize the Partial Regression (AVP)
-%       lme_pr(mdl, 'dBrst_rel', 'flgMode', 'regression', 'varGrp', 'Group');
-%
-%       The slopes of the pr plot will be identicle to the estimate of the
-%       model for dBrst_rel. Note that for this to work, the fit must be
-%       linear and not orthogonal. 
 %
 %   INPUTS:
 %       mdl         - (Required) Fitted LME object.
 %       varX        - (Required) Name of the target predictor (char).
 %       varargin    - (Optional) Key-Value pairs:
 %                     'varGrp'      : (char) Variable to group by (coloring).
-%                     'flgMode'     : 'residual' | 'regression'.
+%                     'flgMode'     : 'residual' | 'regression'
 %                     'distX'       : Distribution for X model (AVP only). Default: 'Normal'.
 %                     'hAx', 'clr'  : Graphics handles and colors.
+%                     'verbose'     : Logical.
 %
 %   OUTPUTS:
 %       tblRes      - Table with data and residuals.
@@ -166,8 +144,6 @@ end
 %  PLOT
 %  ========================================================================
 
-lims = max(abs([tblMdl.(varX_Plot); tblMdl.ResidY])) * 1.1;
-
 for iVar = 1:nGrps
     grpIdx = (grpIds == iVar);
     xData = tblMdl.(varX_Plot)(grpIdx);
@@ -182,16 +158,27 @@ for iVar = 1:nGrps
         
         % 2. Regression Line (Orthogonal)
         % Using plot_linReg for tidy plotting and stats
-        Stats = plot_linReg(xData, yData, 'hAx', hAx, 'type', 'linear', ...
-            'clr', c, 'flgTxt', true);
+        Stats = plot_linReg(xData, yData, 'hAx', hAx, 'type', 'ortho', ...
+            'clr', c, 'flgTxt', false);
         
         % Add Legend Entry to the Line
         if ~isempty(Stats.hLine)
             set(Stats.hLine, 'DisplayName', string(grpNames(iVar)));
         end
-       
+    
+   lims = max(abs([tbl.(xVar); tbl.(yVar)])) * 1.1;
+    
+    if strcmpi(typeStr, 'Absolute')
+        lims = symlog(lims);
+    end
+    
+    isSymlog = strcmpi(typeStr, 'Absolute');
+    plot_grpScatter(tbl, xVar, yVar, lims, isSymlog);
 
-    xlim([-lims, lims]); ylim([-lims, lims]);    
+    xlim([-lims, lims]); ylim([-lims, lims]);
+    xlabel(lblB, 'Interpreter', 'tex'); 
+    ylabel(lblS, 'Interpreter', 'tex');
+     
     plot([-lims, lims], [-lims, lims], '--k', 'HandleVisibility', 'off'); % Identity
     xline(0, '-', 'Color', [0.8 0.8 0.8], 'HandleVisibility', 'off');
     yline(0, '-', 'Color', [0.8 0.8 0.8], 'HandleVisibility', 'off');

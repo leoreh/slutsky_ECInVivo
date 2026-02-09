@@ -241,7 +241,7 @@ function plot_grpScatter(tbl, xVar, yVar, lims, isSymlog)
         % Regression
         Stats = plot_linReg(xReg, yReg, 'hAx', gca, 'type', regType, ...
             'clr', c, 'flgTxt', false);
-            
+        
         % Annotation
         if ~isnan(Stats.slope)
             % Orthogonal: Show Angle/Slope using Normalized Units (Robust to limits/symlog)

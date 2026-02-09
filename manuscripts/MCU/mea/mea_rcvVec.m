@@ -117,6 +117,13 @@ hFig = mcu_rcvSpace(tbl);
 % Resdidual analysis
 hFig = mcu_rcvRes(tbl);
 
+frml = 'dSngl_rel ~ (dBrst_rel + pBspk + fr) * Group + (1|Name)';
+lmeMdl = lme_analyse(tbl, frml, ...
+    'dist', 'normal', 'verbose', true);
+
+[tblRes, hFig] = lme_pr(lmeMdl, 'dBrst_rel', ...
+    'flgMode', 'regression', ...
+    'varGrp',  'Group');
 
 
 % tblGUI_scatHist(tbl, 'xVar', 'pBspk_trans', 'yVar', 'dBrst_rel', 'grpVar', 'Group');

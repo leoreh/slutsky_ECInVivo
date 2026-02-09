@@ -101,6 +101,12 @@ tbl.dpBspk = (tbl.ss_pBspk_trans) - (tbl.pBspk_trans);
 tbl.dBrst_abs = (tbl.ss_frBspk - tbl.frBspk);
 tbl.dSngl_abs = (tbl.ss_frSspk - tbl.frSspk);
 
+% PRISM
+
+idxGrp = tbl.Group == 'MCU-KO';
+prismVars = {'Name', 'dSngl_rel', 'dBrst_rel', 'dSngl_abs', 'dBrst_abs', 'dFr', 'dpBspk', 'pBspk', 'pBspk_trans'};
+tblPrism = tbl(idxGrp, prismVars);
+string(prismVars)
 
 %% ========================================================================
 %  PLOTTING
@@ -111,6 +117,9 @@ hFig = mcu_rcvSpace(tbl);
 % Resdidual analysis
 hFig = mcu_rcvRes(tbl);
 
+frml = 'dSngl_rel ~ (pBspk + fr) * Group + dBrst_rel + (1|Name)';
+lmeMdl = lme_analyse(tbl, frml, ...
+    'dist', 'normal', 'verbose', true);
 
 
 % tblGUI_scatHist(tbl, 'xVar', 'pBspk_trans', 'yVar', 'dBrst_rel', 'grpVar', 'Group');
@@ -264,14 +273,17 @@ tblLong = [tBsl; tSs];
 tblLong.Timepoint = categorical(tblLong.Timepoint, {'BSL', 'SS'});
 
 % LME Analysis
-frml = 'fr ~ (frSspk + frBspk) * Timepoint * Group + (1|Name)';
+frml = 'fr ~ (frSspk + frBspk) * Timepoint + (frSspk + frBspk) * Group + (1|Name)';
 
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tblLong, frml, ...
     'dist', 'log-normal');
 
 
-% Per Grou
-frml = 'fr ~ (frSspk + frBspk) * Timepoint * Group + (1|Name)';
+% Per Group
+idxGrp = tblLong.Group == 'MCU-KO';
+tblGrp = tblLong(idxGrp, :);
 
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tblLong, frml, ...
+frml = 'fr ~ (frSspk + frBspk) * Timepoint + (1|Name)';
+
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tblGrp, frml, ...
     'dist', 'log-normal');
