@@ -39,21 +39,6 @@ if ~all(ismember(reqVars, tbl.Properties.VariableNames))
     error('[MCU_RCVRES] Missing required variables in table.');
 end
 
-%% ========================================================================
-%  CALCULATE METRICS
-%  ========================================================================
-
-% Pseudocount for Log Ratios (1 spike / hour)
-c = 1 / 3600;
-
-% --- Relative Growth (Log Fold Change) ---
-tbl.dBrst_rel = log((tbl.ss_frBspk + c) ./ (tbl.frBspk + c));
-tbl.dSngl_rel = log((tbl.ss_frSspk + c) ./ (tbl.frSspk + c));
-
-% --- Absolute Growth (SymLog Delta Hz) ---
-tbl.dBrst_abs = tbl.ss_frBspk - tbl.frBspk;
-tbl.dSngl_abs = tbl.ss_frSspk - tbl.frSspk;
-
 
 %% ========================================================================
 %  ALLOCATION ANALYSIS 

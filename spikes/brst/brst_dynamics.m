@@ -46,7 +46,7 @@ p = inputParser;
 addRequired(p, 'brst', @isstruct);
 addRequired(p, 'spktimes', @iscell);
 addParameter(p, 'binSize', 60, @isnumeric);
-addParameter(p, 'ksd', 300, @isnumeric);
+addParameter(p, 'ksd', 120, @isnumeric);
 addParameter(p, 'winSm', 10, @isnumeric);
 addParameter(p, 'ibiPct', 95, @isnumeric);
 addParameter(p, 'flgPlot', true, @islogical);
@@ -107,10 +107,6 @@ for iUnit = 1:nUnits
     st = spktimes{iUnit};
     bTimes = brst.times{iUnit};
 
-    if isempty(st) || isempty(bTimes)
-        continue;
-    end
-
     % Access properties
     nBspk = brst.nBspk{iUnit};
     dur   = brst.dur{iUnit};
@@ -122,20 +118,32 @@ for iUnit = 1:nUnits
     % Density Estimation (Continuous)
     % ---------------------------------------------------------------------
 
+    % Floor of Detection (1 event per recording)
+    % Prevents zero-values for log transformations
+    c = 1 / maxTime;
+
     % Burst Event Rate
-    bStart = bTimes(:, 1);
-    bCounts = histcounts(bStart, tEdges);
-    dyn.eventRate(iUnit, :) = (conv(bCounts, kd, 'same') ./ kCorr) / binSize;
+    if isempty(bTimes)
+        bCounts = zeros(1, nBins);
+    else
+        bStart = bTimes(:, 1);
+        bCounts = histcounts(bStart, tEdges);
+    end
+    dyn.eventRate(iUnit, :) = ((conv(bCounts, kd, 'same') ./ kCorr) / binSize) + c;
 
     % Burst Densities (Firing Rates)
     spkCounts = histcounts(st, tEdges);
-    frTot = (conv(spkCounts, kd, 'same') ./ kCorr) / binSize;
+    frTot_raw = (conv(spkCounts, kd, 'same') ./ kCorr) / binSize;
+    frTot = frTot_raw + c;
 
     brstCounts = histcounts(bst, tEdges);
-    frBspk = (conv(brstCounts, kd, 'same') ./ kCorr) / binSize;
+    frBspk_raw = (conv(brstCounts, kd, 'same') ./ kCorr) / binSize;
+    frBspk = frBspk_raw + c;
 
     % Single Spike Density
-    frSspk = frTot - frBspk;
+    % Derived from raw to ensure additivity, then add c
+    frSspk_raw = frTot_raw - frBspk_raw;
+    frSspk = frSspk_raw + c;
 
     % Store
     dyn.frTot(iUnit, :)  = frTot;
@@ -143,24 +151,24 @@ for iUnit = 1:nUnits
     dyn.frSspk(iUnit, :) = frSspk;
 
     % Probability of spikes in bursts
-    pBspk = zeros(size(frTot));
-    mask = frTot > 1e-6;
-    pBspk(mask) = frBspk(mask) ./ frTot(mask);
+    pBspk = zeros(size(frTot_raw));
+    mask = frTot_raw > 1e-9;
+    pBspk(mask) = frBspk_raw(mask) ./ frTot_raw(mask);
     dyn.pBspk(iUnit, :) = pBspk;
 
-    % Validation
+    % Validation (Check Raw Values)
     % frSspk + frBspk = frTot
-    if max(abs((frSspk + frBspk) - frTot)) > 1e-6
+    if max(abs((frSspk_raw + frBspk_raw) - frTot_raw)) > 1e-6
         warning('brst_dynamics:ValidationFailed', ...
-            'Unit %d: frSspk + frBspk does not equal frTot', iUnit);
+            'Unit %d: frSspk + frBspk does not equal frTot (Raw)', iUnit);
     end
 
-    % frTot * (1 - pBspk) = frSspk
+    % frTot * (1 - pBspk) = fSspk
     % (Only checking on mask where frTot > 0)
-    err = abs((frTot(mask) .* (1 - pBspk(mask))) - frSspk(mask));
+    err = abs((frTot_raw(mask) .* (1 - pBspk(mask))) - frSspk_raw(mask));
     if max(err) > 1e-6
         warning('brst_dynamics:Validation2Failed', ...
-            'Unit %d: frTot * (1 - pBspk) != frSspk', iUnit);
+            'Unit %d: frTot * (1 - pBspk) != frSspk (Raw)', iUnit);
     end
 
 
@@ -173,7 +181,11 @@ for iUnit = 1:nUnits
     maskThr = max(maskThr, 2 * binSize);
 
     % Apply to all props
-    bStart = bTimes(:, 1);
+    if isempty(bTimes)
+        bStart = [];
+    else
+        bStart = bTimes(:, 1);
+    end
 
     if length(bStart) < 2
         continue

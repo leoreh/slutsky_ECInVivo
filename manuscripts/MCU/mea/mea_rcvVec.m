@@ -10,7 +10,7 @@
 
 % Load with steady state variables
 presets = {'steadyState'};
-% [tbl, xVec, basepaths, v] = mcu_tblMea('presets', presets, 'flgOtl', true);
+[tbl, xVec, basepaths, v] = mcu_tblMea('presets', presets, 'flgOtl', true);
 
 % Add logit pBspk
 tblTrans = tbl_trans(tbl, 'varsInc', {'pBspk', 'ss_pBspk'}, 'logBase', 'logit');
@@ -93,17 +93,20 @@ end
 %  PRE-PROCESS
 %  ========================================================================
 
-% Pseudocount
-c = 1 / 3600;          
-
-tbl.dBrst_rel = log((tbl.ss_frBspk + c) ./ (tbl.frBspk + c));
-tbl.dSngl_rel = log((tbl.ss_frSspk + c) ./ (tbl.frSspk + c));
+tbl.dBrst_rel = log((tbl.ss_frBspk) ./ (tbl.frBspk));
+tbl.dSngl_rel = log((tbl.ss_frSspk) ./ (tbl.frSspk));
 tbl.dFr = log((tbl.frSs) ./ (tbl.fr));
 tbl.dpBspk = (tbl.ss_pBspk_trans) - (tbl.pBspk_trans);
 
 tbl.dBrst_abs = (tbl.ss_frBspk - tbl.frBspk);
 tbl.dSngl_abs = (tbl.ss_frSspk - tbl.frSspk);
 
+% PRISM
+
+idxGrp = tbl.Group == 'MCU-KO';
+prismVars = {'Name', 'dSngl_rel', 'dBrst_rel', 'dSngl_abs', 'dBrst_abs', 'dFr', 'dpBspk', 'pBspk', 'pBspk_trans'};
+tblPrism = tbl(idxGrp, prismVars);
+string(prismVars)
 
 %% ========================================================================
 %  PLOTTING
@@ -267,7 +270,17 @@ tblLong = [tBsl; tSs];
 tblLong.Timepoint = categorical(tblLong.Timepoint, {'BSL', 'SS'});
 
 % LME Analysis
-frml = 'fr ~ (frSspk + frBspk) * Timepoint * Group + (1|Name)';
+frml = 'fr ~ (frSspk + frBspk) * Timepoint + (frSspk + frBspk) * Group + (1|Name)';
 
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tblLong, frml, ...
+    'dist', 'log-normal');
+
+
+% Per Group
+idxGrp = tblLong.Group == 'MCU-KO';
+tblGrp = tblLong(idxGrp, :);
+
+frml = 'fr ~ (frSspk + frBspk) * Timepoint + (1|Name)';
+
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tblGrp, frml, ...
     'dist', 'log-normal');

@@ -98,16 +98,16 @@ for iUnit = 1:nUnits
     dur   = brst.dur{iUnit};
     freq  = brst.freq{iUnit};
     ibi   = brst.ibi{iUnit};
-
-    % Check if unit has spikes
     st = spktimes{iUnit};
-    if isempty(st) || isempty(times)
-        continue;
-    end
 
-    % Use simpler logic: Count bursts fully contained in window.
-    bStart = times(:, 1);
-    bEnd   = times(:, 2);
+    % Count bursts fully contained in window.
+    if isempty(times)
+        bStart = [];
+        bEnd   = [];
+    else
+        bStart = times(:, 1);
+        bEnd   = times(:, 2);
+    end
 
     for iWin = 1:nWin
         wStart = winCalc(iWin, 1);
@@ -117,10 +117,13 @@ for iUnit = 1:nUnits
         % Count Bursts Fully Contained in Window
         bIdx = (bStart >= wStart) & (bEnd <= wEnd);
 
+        % Floor of detection (1 event per window)
+        c = 1 / wDur;
+
         % Count & Event Rate
         nb = sum(bIdx);
         stats.nb(iUnit, iWin) = nb;
-        stats.eventRate(iUnit, iWin) = nb / wDur;
+        stats.eventRate(iUnit, iWin) = (nb / wDur) + c;
 
         % Structural Means
         if nb > 0
@@ -135,8 +138,8 @@ for iUnit = 1:nUnits
         stIdx = (st >= wStart) & (st <= wEnd);
         nst = sum(stIdx);
 
-        frTot = nst / wDur;
-        stats.frTot(iUnit, iWin) = frTot;
+        frRawTot = nst / wDur;
+        stats.frTot(iUnit, iWin) = frRawTot + c;
 
         if nst > 0
             % Count spikes from bursts fully contained in window
@@ -144,16 +147,16 @@ for iUnit = 1:nUnits
             bSpks = sum(nBspk(bIdx));
             frBspk = bSpks / wDur;
 
-            stats.frBspk(iUnit, iWin) = frBspk;
+            stats.frBspk(iUnit, iWin) = frBspk + c;
             stats.pBspk(iUnit, iWin)  = bSpks / nst;
         else
             frBspk = 0;
-            stats.frBspk(iUnit, iWin) = 0;
+            stats.frBspk(iUnit, iWin) = 0 + c;
             stats.pBspk(iUnit, iWin)  = NaN;
         end
 
         % Single Spike Rate
-        stats.frSspk(iUnit, iWin) = frTot - frBspk;
+        stats.frSspk(iUnit, iWin) = (frRawTot - frBspk) + c;
 
     end
 end

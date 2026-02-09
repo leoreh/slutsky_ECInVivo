@@ -443,10 +443,11 @@ onUpdatePlot(hContainer, []);
         method = strStat{valStat}; % 'Arithmetic', 'Geometric', 'Median'
 
         % Calculate global floor value for geometric mean, as a value of 1
-        % (eg, spike) per bin. Assumes xVec represents time (hr). This
-        % serves as the resolution limit / detection threshold.
-        dx = median(diff(data.xVec), 'omitnan');
-        floorVal = 1 / (dx * 3600);
+        % (eg, spike) per recording duration. Assumes xVec represents time (hr).
+        % This serves as the resolution limit / detection threshold.
+        totalRange = range(data.xVec);
+        if totalRange == 0, totalRange = median(diff(data.xVec), 'omitnan'); end
+        floorVal = 1 / (totalRange * 3600);
 
         % --- RENDER LOOP ---
         for iTile = 1:length(catsPB)

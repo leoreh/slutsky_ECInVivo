@@ -10,7 +10,7 @@
 
 % Load with steady state variables
 presets = {'steadyState'};
-% [tbl, xVec, basepaths, v] = mcu_tblMea('presets', presets, 'flgOtl', true);
+[tbl, xVec, basepaths, v] = mcu_tblMea('presets', presets, 'flgOtl', true);
 
 % Add logit pBspk
 tblTrans = tbl_trans(tbl, 'varsInc', {'pBspk', 'ss_pBspk'}, 'logBase', 'logit');
@@ -93,11 +93,8 @@ end
 %  PRE-PROCESS
 %  ========================================================================
 
-% Pseudocount
-c = 1 / 3600;          
-
-tbl.dBrst_rel = log((tbl.ss_frBspk + c) ./ (tbl.frBspk + c));
-tbl.dSngl_rel = log((tbl.ss_frSspk + c) ./ (tbl.frSspk + c));
+tbl.dBrst_rel = log((tbl.ss_frBspk) ./ (tbl.frBspk));
+tbl.dSngl_rel = log((tbl.ss_frSspk) ./ (tbl.frSspk));
 tbl.dFr = log((tbl.frSs) ./ (tbl.fr));
 tbl.dpBspk = (tbl.ss_pBspk_trans) - (tbl.pBspk_trans);
 
@@ -182,7 +179,7 @@ res = lme_mediation(tblWt, frml, xVar, mVar, 'distM', distM, 'distY', distY);
 
 
 
-
+tblMcu.frSspk
 
 
 
@@ -267,6 +264,13 @@ tblLong = [tBsl; tSs];
 tblLong.Timepoint = categorical(tblLong.Timepoint, {'BSL', 'SS'});
 
 % LME Analysis
+frml = 'fr ~ (frSspk + frBspk) * Timepoint * Group + (1|Name)';
+
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tblLong, frml, ...
+    'dist', 'log-normal');
+
+
+% Per Grou
 frml = 'fr ~ (frSspk + frBspk) * Timepoint * Group + (1|Name)';
 
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tblLong, frml, ...
