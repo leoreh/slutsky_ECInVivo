@@ -109,6 +109,18 @@ tblPrism = tbl(idxGrp, prismVars);
 string(prismVars)
 
 %% ========================================================================
+%  STATE SPACE PCA
+%  ========================================================================
+
+mdl = lme_analyse(tbl, ['dBrst_rel' frmlBase], 'dist', 'normal', 'verbose', false);
+tbl.R_dBrst_rel = residuals(mdl, 'ResidualType', resType);
+
+mdl = lme_analyse(tbl, ['dSngl_rel' frmlBase], 'dist', 'normal', 'verbose', false);
+tbl.R_dSngl_rel = residuals(mdl, 'ResidualType', resType);
+
+
+
+%% ========================================================================
 %  PLOTTING
 %  ========================================================================
 
@@ -117,13 +129,13 @@ hFig = mcu_rcvSpace(tbl);
 % Resdidual analysis
 hFig = mcu_rcvRes(tbl);
 
-frml = 'dSngl_rel ~ (dBrst_rel + pBspk + fr) * Group + (1|Name)';
-lmeMdl = lme_analyse(tbl, frml, ...
+frml = 'dSngl_rel ~ dBrst_rel + (pBspk + fr) * Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
     'dist', 'normal', 'verbose', true);
 
 [tblRes, hFig] = lme_pr(lmeMdl, 'dBrst_rel', ...
     'flgMode', 'regression', ...
-    'varGrp',  'Group');
+    'varGrp',  'Group', 'transParams', lmeInfo.transParams);
 
 
 % tblGUI_scatHist(tbl, 'xVar', 'pBspk_trans', 'yVar', 'dBrst_rel', 'grpVar', 'Group');

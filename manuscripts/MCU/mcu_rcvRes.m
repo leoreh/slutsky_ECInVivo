@@ -39,6 +39,9 @@ if ~all(ismember(reqVars, tbl.Properties.VariableNames))
     error('[MCU_RCVRES] Missing required variables in table.');
 end
 
+% Residual type
+resType = 'Raw';
+
 
 %% ========================================================================
 %  ALLOCATION ANALYSIS 
@@ -52,17 +55,17 @@ frmlBase = ' ~ (pBspk + fr) * Group + (1|Name)';
 
 % Relative
 mdl = lme_analyse(tbl, ['dBrst_rel' frmlBase], 'dist', 'normal', 'verbose', false);
-tbl.R_dBrst_rel = residuals(mdl, 'ResidualType', 'Pearson');
+tbl.R_dBrst_rel = residuals(mdl, 'ResidualType', resType);
 
 mdl = lme_analyse(tbl, ['dSngl_rel' frmlBase], 'dist', 'normal', 'verbose', false);
-tbl.R_dSngl_rel = residuals(mdl, 'ResidualType', 'Pearson');
+tbl.R_dSngl_rel = residuals(mdl, 'ResidualType', resType);
 
 % Absolute
 mdl = lme_analyse(tbl, ['dBrst_abs' frmlBase], 'dist', 'normal', 'verbose', false);
-tbl.R_dBrst_abs = residuals(mdl, 'ResidualType', 'Pearson');
+tbl.R_dBrst_abs = residuals(mdl, 'ResidualType', resType);
 
 mdl = lme_analyse(tbl, ['dSngl_abs' frmlBase], 'dist', 'normal', 'verbose', false);
-tbl.R_dSngl_abs = residuals(mdl, 'ResidualType', 'Pearson');
+tbl.R_dSngl_abs = residuals(mdl, 'ResidualType', resType);
 
 
 %% ========================================================================
@@ -77,23 +80,23 @@ fprintf('[MCU_RCVRES] Calculating Prediction Residuals...\n');
 % Burst (Control for Single)
 frml_Brst = ' ~ (fr + dSngl_rel) * Group + (1|Name)';
 mdl = lme_analyse(tbl, ['dBrst_rel' frml_Brst], 'dist', 'normal', 'verbose', false);
-tbl.P_dBrst_rel = residuals(mdl, 'ResidualType', 'Pearson');
+tbl.P_dBrst_rel = residuals(mdl, 'ResidualType', resType);
 
 % Single (Control for Burst)
 frml_Sngl = ' ~ (fr + dBrst_rel) * Group + (1|Name)';
 mdl = lme_analyse(tbl, ['dSngl_rel' frml_Sngl], 'dist', 'normal', 'verbose', false);
-tbl.P_dSngl_rel = residuals(mdl, 'ResidualType', 'Pearson');
+tbl.P_dSngl_rel = residuals(mdl, 'ResidualType', resType);
 
 % --- Absolute ---
 % Burst (Control for Single)
 frml_Brst = ' ~ (fr + dSngl_abs) * Group + (1|Name)';
 mdl = lme_analyse(tbl, ['dBrst_abs' frml_Brst], 'dist', 'normal', 'verbose', false);
-tbl.P_dBrst_abs = residuals(mdl, 'ResidualType', 'Pearson');
+tbl.P_dBrst_abs = residuals(mdl, 'ResidualType', resType);
 
 % Single (Control for Burst)
 frml_Sngl = ' ~ (fr + dBrst_abs) * Group + (1|Name)';
 mdl = lme_analyse(tbl, ['dSngl_abs' frml_Sngl], 'dist', 'normal', 'verbose', false);
-tbl.P_dSngl_abs = residuals(mdl, 'ResidualType', 'Pearson');
+tbl.P_dSngl_abs = residuals(mdl, 'ResidualType', resType);
 
 
 %% ========================================================================

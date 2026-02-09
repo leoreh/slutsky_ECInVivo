@@ -18,20 +18,6 @@ function [tblRes, hFig] = lme_pr(mdl, varX, varargin)
 %                    * Units: X-axis is Standardized (if lme_analyse was used).
 %                      The slope = The Model Coefficient (Beta).
 %
-%   EXAMPLE (Allocation Analysis):
-%       % Does Burst Recovery (dBrst) predict Single Recovery (dSngl),
-%       % controlling for baseline firing (fr) and brightness (pBspk)?
-%       
-%       frml = 'dSngl_rel ~ (dBrst_rel + pBspk + fr) * Group + (1|Name)';
-%       mdl = lme_analyse(tbl, frml, 'dist', 'normal');
-%
-%       % Visualize the Partial Regression (AVP)
-%       lme_pr(mdl, 'dBrst_rel', 'flgMode', 'regression', 'varGrp', 'Group');
-%
-%       The slopes of the pr plot will be identicle to the estimate of the
-%       model for dBrst_rel. Note that for this to work, the fit must be
-%       linear and not orthogonal. 
-%
 %   INPUTS:
 %       mdl         - (Required) Fitted LME object.
 %       varX        - (Required) Name of the target predictor (char).
@@ -39,7 +25,23 @@ function [tblRes, hFig] = lme_pr(mdl, varX, varargin)
 %                     'varGrp'      : (char) Variable to group by (coloring).
 %                     'flgMode'     : 'residual' | 'regression'.
 %                     'distX'       : Distribution for X model (AVP only). Default: 'Normal'.
+%                     'transParams' : (struct) Output from LME_ANALYSE/TBL_TRANS.
+%                                     If provided in 'regression' mode, X-axis
+%                                     is un-standardized to Model Units.
 %                     'hAx', 'clr'  : Graphics handles and colors.
+%
+%   EXAMPLE (Spike Allocation):
+%       % Does Burst Recovery (dBrst) predict Single Recovery (dSngl),
+%       % controlling for baseline firing (fr) and brightness (pBspk)?
+%
+%       frml = 'dSngl_rel ~ (dBrst_rel + pBspk + fr) * Group + (1|Name)';
+%       mdl = lme_analyse(tbl, frml, 'dist', 'normal');
+%
+%       % Visualize the Partial Regression (AVP)
+%       lme_pr(mdl, 'dBrst_rel', 'flgMode', 'regression', 'varGrp', 'Group');
+%
+%       % The slopes of the pr plot will be identicle to the estimate of the
+%       % model for dBrst_rel (the fit must be linear and not orthogonal.
 %
 %   OUTPUTS:
 %       tblRes      - Table with data and residuals.
@@ -58,6 +60,7 @@ addRequired(p, 'varX', @ischar);
 % Optional
 addParameter(p, 'varGrp', '', @ischar);
 addParameter(p, 'flgMode', 'residual', @(x) any(validatestring(x, {'residual', 'regression'})));
+addParameter(p, 'transParams', [], @(x) isempty(x) || isstruct(x));
 addParameter(p, 'distX', 'Normal', @ischar);
 addParameter(p, 'hAx', [], @(x) isempty(x) || isgraphics(x));
 addParameter(p, 'clr', [], @(x) isempty(x) || isnumeric(x));
@@ -68,6 +71,7 @@ parse(p, mdl, varX, varargin{:});
 varGrp      = p.Results.varGrp;
 flgMode     = p.Results.flgMode;
 distX       = p.Results.distX;
+transParams = p.Results.transParams;
 hAx         = p.Results.hAx;
 clr         = p.Results.clr;
 verbose     = p.Results.verbose;
@@ -114,22 +118,22 @@ end
 %  Regress Y against everything EXCEPT the target predictor X.
 
 if verbose
-    fprintf('[LME_PR] Mode: %s. Fitting Reduced Y Model...\n', flgMode); 
+    fprintf('[LME_PR] Mode: %s. Fitting Reduced Y Model...\n', flgMode);
 end
 
-% 1. Construct Reduced Formula (Y ~ Rest)
-fullFrml = char(mdl.Formula);
-% Remove the target predictor (X) from the formula
-redFrmlY = lme_frml2rmv(fullFrml, varX);
+% Construct Reduced Formula (Y ~ Rest)
+frml = char(mdl.Formula);
 
-% 2. Fit Reduced Y Model
-% Inherit distribution from the full model
+% Remove the target predictor (X) from the formula
+frmlY = lme_frml2rmv(frml, varX);
+
+% Fit Reduced Y Model
 distY = 'Normal';
 if isa(mdl, 'GeneralizedLinearMixedModel')
     distY = mdl.Distribution;
 end
 
-mdlRedY = lme_fit(tblMdl, redFrmlY, 'dist', distY);
+mdlRedY = lme_fit(tblMdl, frmlY, 'dist', distY);
 tblMdl.ResidY = residuals(mdlRedY, 'ResidualType', 'Raw');
 
 
@@ -140,24 +144,40 @@ tblMdl.ResidY = residuals(mdlRedY, 'ResidualType', 'Raw');
 
 if strcmpi(flgMode, 'regression')
     if verbose
-        fprintf('[LME_PR] Fitting Reduced X Model (%s)...\n', distX); 
+        fprintf('[LME_PR] Fitting Reduced X Model (%s)...\n', distX);
     end
-    
-    % 1. Construct Reduced Formula (X ~ Rest)
-    % Extract the RHS of the Y-formula (which is just 'Rest')
-    rhs = extractAfter(redFrmlY, '~');
+
+    % Construct Reduced Formula (X ~ Rest)
+    rhs = extractAfter(frmlY, '~');
     frmlX = [varX ' ~ ' rhs];
-    
-    % 2. Fit Reduced X Model
-    % Use specified distribution for X (default: Normal)
+
+    % Fit Reduced X Model
     mdlRedX = lme_fit(tblMdl, frmlX, 'dist', distX);
     tblMdl.ResidX = residuals(mdlRedX, 'ResidualType', 'Raw');
-    
+
+    % Un-standardize X to Model Units
+    xUnits = 'Standardized (Z-Score)';
+    if ~isempty(transParams)
+
+        pVar = transParams.varsTrans.(varX);
+        if pVar.flgZ
+            % Multiply by SD (Intercept is 0 for residuals)
+            % This restores the mechanistic slope (Beta_raw = Beta_std / SD)
+            sigma = pVar.stats.SD(1); % Assume global Z-scoring (nGrps=1)
+            if sigma ~= 0
+                tblMdl.ResidX = tblMdl.ResidX .* sigma;
+                xUnits = 'Model Units (Centered)';
+                if verbose
+                    fprintf('[LME_PR] Un-standardizing X-axis by SD=%.4f\n', sigma);
+                end
+            end
+        end
+    end
+
     varX_Plot = 'ResidX';
-    
+
 else
     % 'residual' mode: Plot against Raw X
-    % Note: Standard diagnostic implies 'Residuals vs Predictor'
     varX_Plot = varX;
 end
 
@@ -171,38 +191,38 @@ lims = max(abs([tblMdl.(varX_Plot); tblMdl.ResidY])) * 1.1;
 for iVar = 1:nGrps
     grpIdx = (grpIds == iVar);
     xData = tblMdl.(varX_Plot)(grpIdx);
-    yData = tblMdl.ResidY(grpIdx); 
+    yData = tblMdl.ResidY(grpIdx);
 
     c = clr(iVar, :);
-    
-    if isnumeric(xData)
-        % 1. Scatter
-        scatter(hAx, xData, yData, 20, c, 'filled', 'MarkerFaceAlpha', 0.4, ...
-            'HandleVisibility', 'off', 'MarkerEdgeColor', 'none');
-        
-        % 2. Regression Line (Orthogonal)
-        % Using plot_linReg for tidy plotting and stats
-        Stats = plot_linReg(xData, yData, 'hAx', hAx, 'type', 'linear', ...
-            'clr', c, 'flgTxt', true);
-        
-        % Add Legend Entry to the Line
-        if ~isempty(Stats.hLine)
-            set(Stats.hLine, 'DisplayName', string(grpNames(iVar)));
-        end
-       
 
-    xlim([-lims, lims]); ylim([-lims, lims]);    
+    % Scatter
+    scatter(hAx, xData, yData, 20, c, 'filled', 'MarkerFaceAlpha', 0.4, ...
+        'HandleVisibility', 'off', 'MarkerEdgeColor', 'none');
+
+    % Regression Line
+    % 'linear' for Standardized AVP (to match Model Beta),
+    % 'ortho' for everything else (Mechanistic/Residuals).
+    regType = 'ortho';
+    if strcmpi(flgMode, 'regression')
+        if strcmpi(xUnits, 'Standardized (Z-Score)')
+            regType = 'linear';
+        end
+    end
+
+    % Using plot_linReg for tidy plotting and stats
+    Stats = plot_linReg(xData, yData, 'hAx', hAx, 'type', regType, ...
+        'clr', c, 'flgTxt', true);
+
+    % Add Legend Entry to the Line
+    if ~isempty(Stats.hLine)
+        set(Stats.hLine, 'DisplayName', string(grpNames(iVar)));
+    end
+
+    % Reference Lines
+    xlim([-lims, lims]); ylim([-lims, lims]);
     plot([-lims, lims], [-lims, lims], '--k', 'HandleVisibility', 'off'); % Identity
     xline(0, '-', 'Color', [0.8 0.8 0.8], 'HandleVisibility', 'off');
     yline(0, '-', 'Color', [0.8 0.8 0.8], 'HandleVisibility', 'off');
-    
-
-    else
-        % Categorical Predictor (only relevant for 'residual' mode)
-        % Scatter with Jitter (Optional, but simple mean is safer for now)
-        plot(hAx, xData, yData, 'o', 'Color', c, ...
-            'LineWidth', 2, 'DisplayName', string(grpNames(iVar)));
-    end
 end
 
 % Decoration
@@ -210,7 +230,12 @@ grid(hAx, 'on');
 box(hAx, 'on');
 
 if strcmpi(flgMode, 'regression')
-    xlabel(hAx, [varX ' | Reduced (Residuals)'], 'Interpreter', 'none');
+    if exist('xUnits', 'var')
+        lblX = sprintf('%s | %s', varX, xUnits);
+    else
+        lblX = [varX ' | Reduced (Residuals)'];
+    end
+    xlabel(hAx, lblX, 'Interpreter', 'none');
     ylabel(hAx, [mdl.ResponseName ' | Reduced (Residuals)'], 'Interpreter', 'none');
     title(hAx, 'Partial Regression (AVP)');
 else
