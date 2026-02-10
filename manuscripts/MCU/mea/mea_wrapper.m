@@ -179,7 +179,7 @@ tblGUI_raster(tbl, 'grpVar', 'Name', 'grpVal', 'mcu-ko2')
 
 
 % Fit
-varRsp = 'fr';
+varRsp = 'frBspk';
 frml = [varRsp, ' ~ Group + (1|Name)'];
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tbl, frml);
 
@@ -194,6 +194,7 @@ hFig = tblGUI_bar(tblLme, 'yVar', varRsp, 'xVar', 'Group');
 % Prism
 [prismMat] = tbl2prism(tblLme, 'yVar', varRsp, 'grpVar', 'Group');
 mean((prismMat), 'omitnan')
+mean(log10(prismMat), 'omitnan')
 
 % Save
 fname = sprintf('MEA~%s~Group', varRsp);

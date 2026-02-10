@@ -138,6 +138,7 @@ for iRow = 1:2
     end
     
     isSymlog = strcmpi(typeStr, 'Absolute');
+    isSymlog = false;
     plot_grpScatter(tbl, xVar, yVar, lims, isSymlog);
 
     xlim([-lims, lims]); ylim([-lims, lims]);
@@ -158,6 +159,7 @@ for iRow = 1:2
     yline(0, '-', 'Color', [0.8 0.8 0.8], 'HandleVisibility', 'off');
     
     isSymlog = strcmpi(typeStr, 'Absolute');
+    isSymlog = false;
     plot_grpScatter(tbl, xVar, yVar, [], isSymlog);
     
     xlabel('Baseline Burstiness'); 

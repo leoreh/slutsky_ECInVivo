@@ -280,14 +280,14 @@ if flgOtl
 
     % Control
     tblWt  = tbl(tbl.Group == 'Control', :);
-    lmeMdl = lme_analyse(tblWt, frml, 'dist', 'gamma', 'verbose', false);
+    lmeMdl = lme_analyse(tblWt, frml, 'dist', 'log-normal', 'verbose', false);
     res    = residuals(lmeMdl, 'ResidualType', 'Pearson');
     otlWt  = abs(res) > 3;
     idWt   = tblWt.UnitID(otlWt);
 
     % MCU-KO
     tblMcu = tbl(tbl.Group == 'MCU-KO', :);
-    lmeMdl = lme_analyse(tblMcu, frml, 'dist', 'gamma', 'verbose', false);
+    lmeMdl = lme_analyse(tblMcu, frml, 'dist', 'log-normal', 'verbose', false);
     res    = residuals(lmeMdl, 'ResidualType', 'Pearson');
     otlMcu = abs(res) > 3;
     idMcu  = tblMcu.UnitID(otlMcu);

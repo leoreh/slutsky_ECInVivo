@@ -129,22 +129,40 @@ for iMdl = 1:nMdl
             yVal = max(eps, min(1-eps, yRaw));
             jcb = -sum(log(yVal .* (1 - yVal)), 'omitnan');
 
-        elseif strcmp(dist, 'InverseGaussian')
-            % Inverse Gaussian fits can hang due to poor initial values near singularities.
-            % Random initialization avoids this "perfect fit" trap.
-            fitMethodArgs = [fitMethodArgs, {'StartMethod', 'random'}];
         end
 
 
         % RUN FIT
+        % Use OutputFcn to enforce a runtime timeout.
+        % This prevents 'hanging' on unstable fits without rigid data heuristics.
+        maxSecs = 1;
+        tStart = tic;
+        
+        % Anonymous function returns 'true' to stop if time exceeded
+        timeoutFcn = @(x,optimValues,state) toc(tStart) > maxSecs;
+        
+        % Pass via 'OptimizerOptions'
+        % opts = statset('Display', 'off', 'OutputFcn', timeoutFcn);
+        opts = statset('fitglme');
+        opts.OutputFcn = timeoutFcn;
+        opts.MaxIter = 5;
+        
+        opts = optimoptions('fminunc');
+opts.MaxIterations = 5;
         try
             mdl = fitglme(mdlTbl, mdlFrml, ...
                 'Distribution', dist, ...
                 'Link', link, ...
-                fitMethodArgs{:});
+                'FitMethod', fitMethod, ...
+                'OptimizerOptions', opts);
             
         catch ME
-            stats.ErrorMsg{iMdl} = ME.message;
+            % Check if failure was due to timeout
+            if toc(tStart) > maxSecs
+                stats.ErrorMsg{iMdl} = sprintf('Skipped: Timeout (>%d s).', maxSecs);
+            else
+                stats.ErrorMsg{iMdl} = ME.message;
+            end
             continue;
         end
 
