@@ -110,6 +110,7 @@ end
 %  PLOTTING
 %  ========================================================================
 
+wasHold = ishold(args.hAx);
 hold(args.hAx, 'on');
 
 hSct = gobjects(nGrps, 1);
@@ -190,7 +191,9 @@ for iGrp = 1:nGrps
     end
 end
 
-hold(args.hAx, 'off');
+if ~wasHold
+    hold(args.hAx, 'off');
+end
 
 end     % PLOT_SCAT
 

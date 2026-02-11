@@ -84,11 +84,9 @@ verbose     = p.Results.verbose;
 % Data & Groups
 tblMdl = mdl.Variables;
 if ~isempty(varGrp) && ismember(varGrp, tblMdl.Properties.VariableNames)
-    [grpIds, grpNames] = findgroups(tblMdl.(varGrp));
+    [~, grpNames] = findgroups(tblMdl.(varGrp));
     nGrps = length(grpNames);
 else
-    grpIds = ones(height(tblMdl), 1);
-    grpNames = {'All'};
     nGrps = 1;
 end
 

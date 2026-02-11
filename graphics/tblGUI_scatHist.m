@@ -437,7 +437,6 @@ onUpdatePlot(hContainer, []);
         grpName     = '';
         groups      = ones(height(tbl), 1);
         grpLabels   = {'All'};
-        isGrpActive = false;
 
         % Initialize colors container
         grpColorsMap = [];
@@ -610,38 +609,37 @@ onUpdatePlot(hContainer, []);
 
             nPoints = sum(idx);
 
-            % Correlation Stats
-            [rho, pval] = corr(xG, yG, 'Type', 'Spearman', 'Rows', 'complete');
-            if pval < 0.0001, pStr = 'p<0.0001';
-            else,             pStr = sprintf('p=%.4f', pval); end
-            statsStr = sprintf('\\rho=%.2f, %s', rho, pStr);
-
-            lbl = sprintf('%s (n=%d, %s)', string(currCat), nPoints, statsStr);
-
-            % Scatter Plot
+            % Scatter Plot Params
             scatAlpha = data.defAlpha;
             if isDisc
                 scatAlpha = scatAlpha * 0.1;
                 szG = szG * 0.3;
             end
 
-            scatter(data.hAxScatter, xG, yG, szG, cG, 'filled', ...
-                'DisplayName', lbl, ...
-                'MarkerFaceAlpha', scatAlpha, ...
-                'HitTest', 'off', 'PickableParts', 'none');
+            % Get Fit Type
+            fitTypes = {'None', 'Linear', 'Ortho'};
+            curFit   = fitTypes{idxFit};
+
+            % Prepare Label
+            lbl = sprintf('%s (n=%d)', string(currCat), nPoints);
+
+            % Plot using plot_scat
+            [hS, hF] = plot_scat([], xG, yG, ...
+                'hAx', data.hAxScatter, ...
+                'sz', szG, ...
+                'c', cG, ...
+                'alpha', scatAlpha, ...
+                'marker', 'o', ...
+                'fitType', curFit, ...
+                'flgStats', true, ... % Calculate and append stats
+                'dispName', lbl);
             
-            % Fit Lines
-            if idxFit > 1
-                fitTypes = {'None', 'Linear', 'Ortho'};
-                curFit   = fitTypes{idxFit};
-                
-                hFit = plot_lineReg(xG, yG, 'hAx', data.hAxScatter, ...
-                    'type', curFit, 'clr', cG, 'flgTxt', true);
-                
-                % Store handles for cleanup
-                if isgraphics(hFit)
-                   data.fitHandles = [data.fitHandles, hFit];
-                end
+            % Post-process Scatter (Interaction)
+            set(hS, 'HitTest', 'off', 'PickableParts', 'none');
+            
+            % Store fit handles
+            if isgraphics(hF)
+               data.fitHandles = [data.fitHandles; hF];
             end
 
 
