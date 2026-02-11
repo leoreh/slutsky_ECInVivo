@@ -1,31 +1,28 @@
-function [hHist, hKDE, hMean] = plot_hist(tbl, val, varargin)
+function [hHist, hKDE, hStat] = plot_hist(tbl, val, varargin)
 % PLOT_HIST Flexible histogram with grouping, KDE, and stats.
 %
 %   PLOT_HIST(TBL, VAL, ...) creates a histogram of variable VAL from TBL.
-%
 %   PLOT_HIST([], VAL, ...) allows passing a vector directly for VAL.
-%
 %   INPUTS:
-%       tbl         - (table) or empty.
+%       tbl         - (table) or empty [].
 %       val         - (char) Column name in tbl OR (numeric) Vector.
-%orient
+%
 %   OPTIONAL KEY-VALUE PAIRS:
-%       'g'         - (char) Grouping variable name in tbl OR (vector) grouping.
-%       'c'         - (char) Color variable name OR (matrix) RGB colors.
+%       'g'         - (char/vector) Grouping variable.
+%       'c'         - (char/vector/matrix) Color.
+%                     If Matrix (k x 3): Maps groups to colors.
+%                     If Single Color (char/1x3): Fixed color (replicated).
 %       'bins'      - (numeric) Number of bins OR Vector of edges.
 %       'orient'    - (char) 'vertical' (default) or 'horizontal'.
 %       'scale'     - (char) 'linear' (default) or 'log'.
 %       'norm'      - (char) 'pdf' (default), 'probability', 'count'.
 %       'flgKDE'    - (logical) Overlay Kernel Density Estimate (Default: false).
-%       'showMean'  - (logical) Overlay Mean line (Default: false).
-%       'showMedian'- (logical) Overlay Median line (Default: false).
+%       'flgStat'   - (logical) Overlay Mean line (Default: true).
 %       'alpha'     - (scalar) Face alpha (Default: 0.3).
 %       'hAx'       - (handle) Target axis (Default: gca).
 %
 %   OUTPUTS:
-%       hHist       - (handle) Histogram object(s).
-%       hKDE        - (handle) KDE line object(s).
-%       hMean       - (handle) Mean/Median line object(s).
+%       hHist, hKDE, hStat
 %
 %   See also: PLOT_SCAT, HISTOGRAM
 
@@ -37,7 +34,6 @@ p = inputParser;
 addRequired(p, 'tbl', @(x) istable(x) || isempty(x));
 addRequired(p, 'val', @(x) ischar(x) || isstring(x) || isnumeric(x));
 
-% Optional
 addParameter(p, 'g', [], @(x) ischar(x) || isstring(x) || isnumeric(x) || iscategorical(x));
 addParameter(p, 'c', [], @(x) ischar(x) || isstring(x) || isnumeric(x));
 addParameter(p, 'bins', [], @isnumeric);
@@ -45,74 +41,89 @@ addParameter(p, 'orient', 'vertical', @(x) any(validatestring(x, {'vertical', 'h
 addParameter(p, 'scale', 'linear', @(x) any(validatestring(x, {'linear', 'log'})));
 addParameter(p, 'norm', 'pdf', @ischar);
 addParameter(p, 'flgKDE', false, @islogical);
-addParameter(p, 'showMean', false, @islogical);
-addParameter(p, 'showMedian', false, @islogical);
+addParameter(p, 'flgStat', true, @islogical);
 addParameter(p, 'alpha', 0.3, @isnumeric);
 addParameter(p, 'hAx', [], @(x) isempty(x) || isgraphics(x));
 
 parse(p, tbl, val, varargin{:});
+args = p.Results;
 
-hAx = p.Results.hAx;
-if isempty(hAx), hAx = gca; end
-
-gIn = p.Results.g;
-cIn = p.Results.c;
-bins = p.Results.bins;
-orient = p.Results.orient;
-scl = p.Results.scale;
-normType = p.Results.norm;
-flgKDE = p.Results.flgKDE;
-flgMean = p.Results.showMean;
-flgMed = p.Results.showMedian;
-alp = p.Results.alpha;
+if isempty(args.hAx), args.hAx = gca; end
 
 %% ========================================================================
 %  DATA PREPARATION
 %  ========================================================================
 
-if istable(tbl)
-    if ischar(val) || isstring(val), vData = tbl.(val); else, vData = val; end
-    
-    if isempty(gIn)
-        gData = ones(height(tbl), 1);
-        uGrps = 1;
-        isGrp = false;
-    else
-        if ischar(gIn) || isstring(gIn)
-            gData = tbl.(gIn);
-        else
-            gData = gIn;
-        end
-        if islogical(gData), gData = categorical(gData); end
-        if ~iscategorical(gData) && ~isnumeric(gData), gData = categorical(gData); end
-        uGrps = unique(gData);
-        isGrp = true;
-    end
-    
+% --- Unified Extraction ---
+vData = extractData(tbl, args.val);
+gData = extractData(tbl, args.g);
+
+% --- Grouping ---
+if isempty(gData)
+    gData = ones(size(vData)); 
+    isGrp = false;
+    uGrps = 1;
 else
-    vData = val;
-    if isempty(gIn)
-        gData = ones(length(vData), 1);
-        uGrps = 1;
-        isGrp = false;
-    else
-        gData = gIn;
-        if islogical(gData), gData = categorical(gData); end
-        if ~iscategorical(gData) && ~isnumeric(gData), gData = categorical(gData); end
-        uGrps = unique(gData);
-        isGrp = true;
+    isGrp = true;
+    if islogical(gData) || isnumeric(gData), gData = categorical(gData); end
+    uGrps = unique(gData);
+end
+nGrps = length(uGrps);
+
+% --- Color Logic ---
+cIn = args.c;
+grpColors = [];
+
+if isempty(cIn)
+    % Auto (lines)
+    grpColors = lines(nGrps);
+else
+    % User Provided Color(s)
+    if ischar(cIn) || isstring(cIn)
+        % Fixed Color Name -> Convert to RGB
+        try 
+            cVal = validatecolor(cIn);
+            % Replicate for all groups
+            grpColors = repmat(cVal, nGrps, 1);
+        catch
+            % Fallback
+            grpColors = lines(nGrps);
+        end
+    elseif isnumeric(cIn)
+        % Matrix or Vector
+        if size(cIn, 2) == 3
+            % It is a colormap (N x 3) or single RGB color (1 x 3)
+            if size(cIn, 1) == 1
+                % Single color -> Replicate
+                grpColors = repmat(cIn, nGrps, 1);
+            elseif size(cIn, 1) < nGrps
+                % Cycle map if smaller than groups
+                grpColors = repmat(cIn, ceil(nGrps/size(cIn,1)), 1);
+            else
+                % Use map as is (or truncated)
+                grpColors = cIn;
+            end
+        else
+            % Invalid numeric format for histogram -> Fallback
+            grpColors = lines(nGrps);
+        end
     end
 end
 
-% Colors
-cMap = [];
-if isnumeric(cIn) && size(cIn, 2) == 3
-    cMap = cIn;
-elseif (ischar(cIn) || isstring(cIn))
-    try
-        cMap = validatecolor(cIn);
-    catch
-        % ignore if column name? logic here similar to plot_scat
+% --- Binning ---
+bins = args.bins;
+if isempty(bins)
+    validV = vData(~isnan(vData) & ~isinf(vData));
+    
+    if strcmp(args.scale, 'log')
+        validV = validV(validV > 0);
+        mn=min(validV);
+        mx=max(validV);
+        bins = logspace(log10(mn), log10(mx), 30);
+    else
+        mn=min(validV);
+        mx=max(validV);
+        bins = linspace(mn, mx, 30);
     end
 end
 
@@ -120,114 +131,101 @@ end
 %  PLOTTING
 %  ========================================================================
 
-hold(hAx, 'on');
+wasHold = ishold(args.hAx);
+hold(args.hAx, 'on');
 
-hHist = gobjects(length(uGrps), 1);
-hKDE  = gobjects(length(uGrps), 1);
-hMean = gobjects(length(uGrps), 1);
+hHist = gobjects(nGrps, 1);
+hKDE  = gobjects(nGrps, 1);
+hStat = gobjects(nGrps, 1);
 
-% Color cycling
-if isempty(cMap)
-    defColors = lines(length(uGrps));
-else
-    if size(cMap, 1) == 1 && length(uGrps) > 1
-        defColors = repmat(cMap, length(uGrps), 1);
-    elseif size(cMap, 1) < length(uGrps)
-        defColors = repmat(cMap, ceil(length(uGrps)/size(cMap,1)), 1);
-    else
-        defColors = cMap;
-    end
-end
-
-% Binning Strategy (Global if not provided)
-if isempty(bins)
-    % Calculate global bins to ensure alignment
-    validV = vData(~isnan(vData) & ~isinf(vData));
-    if strcmp(scl, 'log')
-        validV = validV(validV > 0);
-        if isempty(validV), mn=0.1; mx=1; else, mn=min(validV); mx=max(validV); end
-        % Logspace bins
-        bins = logspace(log10(mn), log10(mx), 30);
-    else
-        if isempty(validV), mn=0; mx=1; else, mn=min(validV); mx=max(validV); end
-        bins = linspace(mn, mx, 30);
-    end
-end
-
-% Log Scale norm Adjustment
-% If log scale, 'pdf' is often misleading visually unless using 'probability'.
-% But users might request parameter. We will respect input but adjust KDE scaling.
-% Logic from tblGUI_scatHist (plot_histPdf)
-if strcmp(scl, 'log') && strcmp(normType, 'pdf')
-    % Often we want 'probability' for log visual
-    % But let's stick to user request. If they say pdf, we give pdf.
-end
-
-
-for iG = 1:length(uGrps)
-    currGrp = uGrps(iG);
-    idx = (gData == currGrp);
-    subV = vData(idx);
+for iGrp = 1:nGrps
+    curGrp = uGrps(iGrp);
     
-    % Filter valid
+    % Index
+    if isGrp
+        grpIdx = (gData == curGrp);
+        grpName = string(curGrp);
+    else
+        grpIdx = true(size(vData));
+        grpName = 'All';
+    end
+    
+    subV = vData(grpIdx);
+    
+    % Filter Valid
     subV = subV(~isnan(subV) & ~isinf(subV));
-    if strcmp(scl, 'log')
-        subV = subV(subV > 0); 
+    if strcmp(args.scale, 'log')
+        subV = subV(subV > 0);
     end
     
     if isempty(subV), continue; end
     
-    col = defColors(iG, :);
-    
-    % Name
-    if isGrp
-        if iscategorical(currGrp) || isstring(currGrp), nm = string(currGrp); else, nm = num2str(currGrp); end
-    else
-        nm = 'All';
-    end
+    % Style
+    col = grpColors(iGrp, :);
     
     % Histogram
-    hHist(iG) = histogram(hAx, subV, ...
+    hHist(iGrp) = histogram(args.hAx, subV, ...
         'BinEdges', bins, ...
         'FaceColor', col, ...
         'EdgeColor', 'none', ...
-        'FaceAlpha', alp, ...
-        'norm', normType, ...
-        'orient', orient, ...
-        'DisplayName', nm);
+        'FaceAlpha', args.alpha, ...
+        'Normalization', args.norm, ...
+        'Orientation', args.orient, ...
+        'DisplayName', grpName);
     
     % KDE
-    if flgKDE && length(subV) > 1
-        hKDE(iG) = plotKDE(hAx, subV, bins, col, orient, scl, normType);
-        set(hKDE(iG), 'HandleVisibility', 'off');
+    if args.flgKDE && length(subV) > 1
+        hKDE(iGrp) = plotKDE(args.hAx, subV, bins, col, args.orient, args.scale, args.norm);
+        set(hKDE(iGrp), 'HandleVisibility', 'off');
     end
     
-    % Mean / Median
-    if flgMean || flgMed
-        if flgMean, statVal = mean(subV); lSty = '-'; end
-        if flgMed,  statVal = median(subV); lSty = '--'; end
+    % Stats (Mean)
+    if args.flgStat
+        statVal = mean(subV);
+        statArgs = {'LineStyle', '-', 'Color', col, 'LineWidth', 2, 'HandleVisibility', 'off'};
         
-        % Plot Line
-        if strcmp(orient, 'vertical')
-            yl = ylim(hAx);
-            hMean(iG) = plot(hAx, [statVal statVal], yl, 'LineStyle', lSty, ...
-                'Color', col, 'LineWidth', 2, 'HandleVisibility', 'off');
+        if strcmp(args.orient, 'vertical')
+            yl = ylim(args.hAx);
+            hStat(iGrp) = plot(args.hAx, [statVal statVal], yl, statArgs{:});
         else
-            xl = xlim(hAx);
-            hMean(iG) = plot(hAx, xl, [statVal statVal], 'LineStyle', lSty, ...
-                'Color', col, 'LineWidth', 2, 'HandleVisibility', 'off');
+            xl = xlim(args.hAx);
+            hStat(iGrp) = plot(args.hAx, xl, [statVal statVal], statArgs{:});
+        end
+    end
+end
+
+if ~wasHold
+    hold(args.hAx, 'off');
+end
+
+end     % PLOT_HIST
+
+
+%% ========================================================================
+%  HELPER: EXTRACTDATA
+%  ========================================================================
+
+function data = extractData(tbl, val)
+% EXTRACTDATA Unified extraction.
+    if isempty(val)
+        data = [];
+        return;
+    end
+    
+    if istable(tbl) && (ischar(val) || isstring(val))
+        if ismember(val, tbl.Properties.VariableNames)
+            data = tbl.(val);
+            return;
         end
     end
     
-end
-
-hold(hAx, 'off');
-
+    data = val;
 end
 
 %% ========================================================================
 %  HELPER: KDE
 %  ========================================================================
+
 function hLine = plotKDE(ax, val, edges, c, orient, scale, normType)
     
     % Determine points
@@ -243,26 +241,13 @@ function hLine = plotKDE(ax, val, edges, c, orient, scale, normType)
              hLine = gobjects(0); return; 
         end
         
-        % Scale transformation logic
-        % If we want 'probability' mass match:
-        % The histogram height is Prob/BinWidth (if pdf) or Prob (if probability).
-        % Standard ksdensity returns PDF (integral = 1).
-        
         if strcmp(normType, 'probability')
-            % To match probability bars (which are integral over bin), we multiply by average bin width
-            % But on log scale, bin width varies. This is tricky.
-            % Adaptation from tblGUI_scatHist strategy:
+            % Probability Adaptation
             binW = mean(diff(log10(edges))); 
-            % f_log is dP/d(log10x). 
-            % We want approx Prob per bin ~ dP * BinWidth
             f = f_log * binW;
         else
-             % Assume 'pdf'. But PDF on log axis is different.
-             % Basic visualization: just plot the log-density shape scaled to fit
-             % For now, stick to the robust tblGUI method if probability, else raw PDF
+             % PDF
              f = f_log; 
-             % This might need refinement for 'pdf' on log axis to match histogram height perfectly
-             % but is visually consistent with density.
         end
     else
         pts = linspace(min(edges), max(edges), 200);
