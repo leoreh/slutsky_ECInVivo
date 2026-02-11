@@ -1,6 +1,12 @@
 function [hFit, fitStats] = plot_lineReg(x, y, varargin)
 % PLOT_LINEREG Adds a linear or orthogonal regression line to the current axis.
 %
+%   Adapts the regression model based on the axis scale:
+%   - Linear-Linear: Fits y = mx + c (Linear).
+%   - Log-Log:       Fits log(y) = m*log(x) + c (Power Law: y = 10^c * x^m).
+%   - Semilog-Y:     Fits log(y) = mx + c (Exponential).
+%   - Semilog-X:     Fits y = m*log(x) + c (Logarithmic).
+%
 %   [hFit, fitStats] = PLOT_LINEREG(x, y) computes and plots a regression line.
 %
 %   fitStats = PLOT_LINEREG(..., 'Name', Value) specifies additional options:
@@ -42,10 +48,10 @@ if isempty(hAx), hAx = gca; end
 %  PREPARATION
 %  ========================================================================
 
-% Prepare Data (Remove NaNs)
+% Prepare Data (Remove NaNs and Infs)
 x = x(:);
 y = y(:);
-mk = ~isnan(x) & ~isnan(y);
+mk = ~isnan(x) & ~isnan(y) & ~isinf(x) & ~isinf(y);
 x = x(mk);
 y = y(mk);
 
@@ -59,16 +65,36 @@ end
 axes(hAx);
 hold(hAx, 'on');
 
-% Determine range for plotting line
+% --- Determine Scales & Transform ---
+isLogX = strcmp(hAx.XScale, 'log');
+isLogY = strcmp(hAx.YScale, 'log');
+
+% Filter for Positive Values if Log Scale
+if isLogX, mk = x > 0; x = x(mk); y = y(mk); end
+if isLogY, mk = y > 0; x = x(mk); y = y(mk); end
+
+if isempty(x) || length(x) < 2
+    return;
+end
+
+% Transform Data for Fitting
+% We fit the model in the transformed space so the line appears straight.
+if isLogX, x = log10(x); end
+if isLogY, y = log10(y); end
+
+% --- Determine Range for Plotting ---
+% Get current limits (in raw space)
 xLims = xlim(hAx);
-if all(xLims == [0 1]) && all(ylim(hAx) == [0 1]) && ~ishold(hAx)
-    % Likely empty axis, use data range
-    xRange = [min(x), max(x)];
-    margin = diff(xRange) * 0.1;
-    xEval = [min(x)-margin, max(x)+margin];
+xEvalRaw = xLims;
+
+% Generate Evaluation Points (Dense for curves)
+if isLogX
+    xEvalLog = linspace(log10(xEvalRaw(1)), log10(xEvalRaw(2)), 100);
+    xEvalFit = xEvalLog; % This is what we pass to polyval (transformed space)
+    xPlot    = 10.^xEvalLog; % This is x-coordinate for plot
 else
-    % Use current axis limits
-    xEval = xLims;
+    xEvalFit = linspace(xEvalRaw(1), xEvalRaw(2), 100);
+    xPlot    = xEvalFit;
 end
 
 %% ========================================================================
@@ -80,11 +106,12 @@ statsStr = '';
 switch lower(regType)
     case 'linear'
         % Linear Regression (Least Squares)
+        % Fits y = mx + c in the transformed space
         [pPoly, ~] = polyfit(x, y, 1);
         slope = pPoly(1);
         intercept = pPoly(2);
         
-        yEval = polyval(pPoly, xEval);
+        yEvalFit = polyval(pPoly, xEvalFit);
         
         % Calculate fitStats
         yfit = polyval(pPoly, x);
@@ -98,7 +125,7 @@ switch lower(regType)
         fitStats.R2 = R2;
         
         % Format String
-        % Slope: .2f, R2: .2f
+        % Slope in transformed space (e.g. exponent in Power Law)
         statsStr = sprintf('Slope = %.2f, R^2 = %.2f', slope, R2);
         
     case 'ortho'
@@ -111,7 +138,7 @@ switch lower(regType)
         slope = v1(2) / v1(1);
         yInt  = mu(2) - slope * mu(1);
         
-        yEval = slope .* xEval + yInt;
+        yEvalFit = slope .* xEvalFit + yInt;
         
         fitStats.slope = slope;
         fitStats.intercept = yInt;
@@ -122,8 +149,15 @@ switch lower(regType)
             fitStats.slope, fitStats.angle, char(176));
 end
 
+% Transform Y back for plotting
+if isLogY
+    yPlot = 10.^yEvalFit;
+else
+    yPlot = yEvalFit;
+end
+
 % Draw Line
-hFit = plot(hAx, xEval, yEval, '-', 'Color', clr, 'LineWidth', 2, ...
+hFit = plot(hAx, xPlot, yPlot, '-', 'Color', clr, 'LineWidth', 2, ...
     'HandleVisibility', 'on', 'DisplayName', 'Fit'); 
 
 % Update DisplayName with fitStats if requested

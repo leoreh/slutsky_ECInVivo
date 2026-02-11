@@ -106,12 +106,12 @@ tbl.dBrst_abs = (tbl.ss_frBspk - tbl.frBspk);
 tbl.dSngl_abs = (tbl.ss_frSspk - tbl.frSspk);
 tbl.dFr_abs = (tbl.frSs - tbl.fr);
 
-% Prism
-idxGrp = tbl.Group == 'MCU-KO';
-prismVars = {'Name', 'dSngl_rel', 'dBrst_rel', 'dSngl_abs', 'dBrst_abs', ...
-    'dFr', 'dpBspk', 'pBspk', 'pBspk_trans'};
-tblPrism = tbl(idxGrp, prismVars);
-string(prismVars)
+% % Prism
+% idxGrp = tbl.Group == 'MCU-KO';
+% prismVars = {'Name', 'dSngl_rel', 'dBrst_rel', 'dSngl_abs', 'dBrst_abs', ...
+%     'dFr', 'dpBspk', 'pBspk', 'pBspk_trans'};
+% tblPrism = tbl(idxGrp, prismVars);
+% string(prismVars)
 
 
 
@@ -180,7 +180,7 @@ tblRes.ResidY(idxGrp);
 %  ========================================================================
 
 % Steady-state raw values
-dist = 'gamma';
+dist = 'log-normal';
 
 frml = 'frSspk ~ (frBspk) * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
@@ -245,15 +245,15 @@ tblWt = tbl(tbl.Group == 'Control', :);
 tblMcu = tbl(tbl.Group == 'MCU-KO', :);
 xVar = 'pBspk';
 mVar = 'ss_frBspk';
-distM = 'log-normal';
-distY = 'log-normal';
-res = lme_mediation(tblMcu, frml, xVar, mVar, 'distM', distM, 'distY', distY);
+distM = 'gamma';
+distY = distM;
+res = lme_mediation(tblWt, frml, xVar, mVar, 'distM', distM, 'distY', distY);
+
+res.plot.X = tblWt.pBspk_trans;
+
+lme_mediationPlot(res)
 
 
-
-frml = 'ss_frSspk ~ (fr + pBspk + ss_frBspk) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-    'dist', 'log-normal');
 
 
 

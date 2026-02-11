@@ -41,12 +41,44 @@ distM = p.Results.distM;
 distY = p.Results.distY;
 flgVerbose = p.Results.verbose;
 
+%% ========================================================================
+%  PREP
+%  ========================================================================
+
 % Parse Formula
 [~, yVar] = lme_frml2vars(frml);
-rhs = strtrim(extractAfter(frml, '~'));
 
 
 %% ========================================================================
+%  PREP
+%  =======================================================================
+
+% Parse Formula
+[varsFxd, yVar, varsRand] = lme_frml2vars(frml);
+rhs = strtrim(extractAfter(frml, '~'));
+
+varsGrp = {};
+for iVar = 1:numel(varsRand)
+    tok = regexp(varsRand{iVar}, '\|([^)]+)\)', 'tokens', 'once');
+    if ~isempty(tok)
+        varsGrp = [varsGrp, strtrim(strsplit(tok{1}, {':', '*'}))]; %#ok<AGROW>
+    end
+end
+vars = unique([{yVar, xVar, mVar}, varsFxd, varsGrp], 'stable');
+
+% Keep only necessary columns 
+tbl = tbl(:, vars);
+
+% Remove rows with missing values (NaN/Missing)
+idxMissing = any(ismissing(tbl), 2);
+if any(idxMissing)
+    nBef = size(tbl, 1);
+    tbl = tbl(~idxMissing, :);
+    nRem = nBef - size(tbl, 1);
+    warning('LME_MEDIATION: Detected %d missing rows', nRem);
+end
+
+%  =======================================================================
 %  PATH C: X -> Y (TOTAL EFFECT)
 %  ========================================================================
 %  Does X predict Y?
@@ -72,39 +104,36 @@ frmlA = sprintf('%s ~ %s', mVar, rhs);
 %% ========================================================================
 %  PATH B & C': X + M -> Y (OUTCOME MODEL)
 %  ========================================================================
-%  Does M predict Y (Path B) controlling for X?
-%  Does X still predict Y (Path C') controlling for M?
+%  PATH B:  Does M predict Y controlling for X?
+%  PATH C': Does X still predict Y controlling for M?
 if flgVerbose, fprintf('\n[LME_MEDIATION] Step 3: Outcome Model (X+M->Y)\n'); end
 
-% --- PREPARE MEDIATOR PREDICTOR ---
-% Ensure Path B uses the same mediator scale as Path A. 
-% We use the transformation parameters from Path A (infoA) as a template
-% to apply the EXACT same transform to M in Path B.
+% --- LINK CONSISTENCY ---
+% If Path A used a non-identity Link (e.g. Log for Gamma/Poisson), 
+% then betaA is in units of Link(M).
+% For the mediation product (A*B) to be valid, M must enter Path B 
+% as a predictor on that same Link scale.
 
-mVarPred = mVar; 
-tblBC    = tbl; 
-
-if isfield(infoA, 'transParams') && ...
-   isfield(infoA.transParams, 'varsTrans') && ...
-   isfield(infoA.transParams.varsTrans, mVar)
-
-    if flgVerbose, fprintf('   -> Transforming Mediator for Path B (using Path A template)\n'); end
-    % Replicate Path A's transformation on Path B's predictor
-    % Note: infoA params for Response usually have flgZ=false, so this just
-    % applies log/offset without Z-scoring, which is perfect as lme_analyse
-    % will Z-score the predictor itself later.
-    [tblBC, ~] = tbl_trans(tblBC, 'template', infoA.transParams, ...
-        'varsInc', {mVar}, ...
-        'verbose', false);
+% If Log-Link was used but not captured as a template (Gamma/Poisson case), 
+% inject it into the template so tbl_trans can apply it to Path B.
+isLogM = isprop(mdlA, 'Link') && strcmpi(mdlA.Link.Name, 'Log');
+if isLogM
+    infoA.transParams.varsTrans.(mVar).logBase = 'e';
 end
 
-% Add M (possibly transformed) to the predictors (RHS)
-frmlBC = sprintf('%s ~ %s + %s', yVar, mVarPred, rhs);
+% Apply transformation using Template
+if isfield(infoA, 'transParams') && isfield(infoA.transParams.varsTrans, mVar)
+    if flgVerbose, fprintf('   -> Transforming Mediator for Path B (using infoA template)\n'); end
+    [tbl, ~] = tbl_trans(tbl, 'template', infoA.transParams, 'varsInc', {mVar}, 'verbose', false);
+end
+
+% Add M to the predictors (RHS)
+frmlBC = sprintf('%s ~ %s + %s', yVar, mVar, rhs);
 
 % Reuse distY logic from Path C
-[mdlBC, ~, infoBC] = lme_analyse(tblBC, frmlBC, 'dist', distY, 'verbose', false);
+[mdlBC, ~, ~, tblBC] = lme_analyse(tbl, frmlBC, 'dist', distY, 'verbose', false);
 
-[betaB, pB, seB] = get_coeff(mdlBC, mVarPred);
+[betaB, pB, seB] = get_coeff(mdlBC, mVar);
 [betaC_prime, pC_prime, seC_prime] = get_coeff(mdlBC, xVar);
 
 
@@ -117,27 +146,16 @@ frmlBC = sprintf('%s ~ %s + %s', yVar, mVarPred, rhs);
 % Path B (M->Y): betaB = d(Y)      / d(Z_TransM)
 %
 % Note: lme_analyse Z-scores predictors. 
-% tblBC.(mVar) contains Transformed M (from Path A) but NOT Z-scored.
+% tbl.(mVar) contains Transformed M (from Path A) but NOT Z-scored.
 % lme_analyse Z-scores it internally.
 %
 % To calculate Indirect Effect (A*B), we essentially need the chain rule:
 %   Effect = [d(TransM) / d(Z_X)] * [d(Y) / d(TransM)]
 %
 % We must un-Z-share betaB to convert it from d(Y)/d(Z_TransM) to d(Y)/d(TransM).
-sdM = nanstd(tblBC.(mVarPred));
+sdM = std(tbl.(mVar), 'omitnan');
 betaB = betaB / sdM;
 seB   = seB   / sdM;
-
-% Add M (possibly transformed) to the predictors (RHS)
-frmlBC = sprintf('%s ~ %s + %s', yVar, mVarPred, rhs);
-
-% Reuse distY logic from Path C
-[mdlBC, ~, infoBC] = lme_analyse(tblBC, frmlBC, 'dist', distY, 'verbose', false);
-
-[betaB, pB, seB] = get_coeff(mdlBC, mVarPred);
-[betaC_prime, pC_prime, seC_prime] = get_coeff(mdlBC, xVar);
-
-
 
 % Sobel Test for Indirect Effect (A * B)
 % Z = (a*b) / sqrt(b^2*sa^2 + a^2*sb^2)
@@ -160,6 +178,44 @@ SE        = [seA; seB; seC; seC_prime; seIndirect];
 PValue    = [pA; pB; pC; pC_prime; pSobel];
 
 res.paths = table(Variable, Estimate, SE, PValue, 'RowNames', RowNames);
+
+%% ========================================================================
+%  PLOTTING DATA
+%  ========================================================================
+
+res.data = tbl; 
+
+% --- CALCULATE PARTIAL DATA FOR PLOTTING ---
+% Strategy: Use simple vector algebra to adjust Y.
+%
+% 1. Path B Update (M -> Y | X):
+%    We want to visualize the effect of M on Y, controlling for X.
+%    Partial Residual = Residuals + Beta_B * M
+%    This is equivalent to Y_adjusted = Beta_B * M + Epsilon
+%    (Component + Residual plot)
+%
+% 2. Path C' Update (X -> Y | M):
+%    We want to visualize the effect of X on Y, controlling for M.
+%    Y_adjusted = Y - Beta_B * M
+%    (Removes the effect of M from Y, leaving X + Epsilon)
+
+rawResid = residuals(mdlBC, 'ResidualType', 'Raw');
+
+% Store Data for Plotting (Table Format)
+X = tbl.(xVar);          % X is from input table (original)
+M = tbl.(mVar);          % M is from input table (transformed if applicable)
+Y = tblBC.(yVar);        % Y from fitted table (transformed if log-normal)
+
+fitA = fitted(mdlA);     % Path A Fit (M ~ X)
+fitC = fitted(mdlC);     % Path C Fit (Y ~ X)
+
+% Partial Calculations
+% Note: betaB is already un-standardized (in units of Y / M_transformed).
+Y_part_M = rawResid + (betaB * M);             % Path B Partial (Effect of M)
+Y_part_X = Y - (betaB * M);                    % Path C' Partial (Effect of X)
+
+res.plot = table(X, M, Y, fitA, fitC, Y_part_M, Y_part_X);
+
 
 
 %% ========================================================================

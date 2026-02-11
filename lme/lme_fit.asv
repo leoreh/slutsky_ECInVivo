@@ -64,13 +64,20 @@ if flgG
     if isempty(fitMethod)
         fitMethod = 'REMPL';
     end
+    
+    % Increase max iterations
+    opts = statset('fitglme');
+    opts.PLIterations = 200;
+    opts.PLIterations = 200;
+    opts.TolX = 1e-6;
+    opts.Display = 'iter';
+    opts.PLTolerance = 1e-6;
 
     mdl = fitglme(tbl, frml, ...
         'Distribution', dist, ...
         'Link', link, ...
         'FitMethod', fitMethod, ...
-        'PLIterations', 500, ...
-        'PLTolerance', 1e-1);
+        'OptimizerOptions', opts);
 
 else
     % --- Linear Mixed-Effects Model ---

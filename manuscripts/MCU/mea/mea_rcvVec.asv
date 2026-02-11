@@ -4,6 +4,8 @@
 %  Analyzes the recovery "strategy" of neurons by decomposing firing rate
 %  recovery into Single-Spike and Burst-Spike components.
 
+%#ok<*NASGU>
+
 %% ========================================================================
 %  LOAD DATA
 %  ========================================================================
@@ -137,27 +139,27 @@ frml = 'dSngl_abs ~ dBrst_abs * Group + (1|Name)';
 %  ========================================================================
 % Partial Regression
 
-    
-    hFig = figure;
-    hTile = tiledlayout(hFig, 1, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
-    
-    hAx = nexttile;
-    frml = 'dSngl_rel ~ (pBspk * fr + dBrst_rel) * Group + (1|Name)';
-    [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-        'dist', 'normal', 'verbose', false);
-    
-    [tblRes, hFig] = lme_pr(lmeMdl, 'dBrst_rel', ...
-        'flgMode', 'regression', 'hAx', hAx, ...
-        'varGrp',  'Group', 'transParams', lmeInfo.transParams);
-    
-    hAx = nexttile;
-    frml = 'dSngl_abs ~ (pBspk * fr + dBrst_abs) * Group + (1|Name)';
-    [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-        'dist', 'normal', 'verbose', false);
-    
-    [tblRes, hFig] = lme_pr(lmeMdl, 'dBrst_abs', ...
-        'flgMode', 'regression', 'hAx', hAx, ...
-        'varGrp',  'Group', 'transParams', lmeInfo.transParams);
+
+hFig = figure;
+hTile = tiledlayout(hFig, 1, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
+
+hAx = nexttile;
+frml = 'dSngl_rel ~ (pBspk * fr + dBrst_rel) * Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
+    'dist', 'normal', 'verbose', false);
+
+[tblRes, hFig] = lme_pr(lmeMdl, 'dBrst_rel', ...
+    'flgMode', 'regression', 'hAx', hAx, ...
+    'varGrp',  'Group', 'transParams', lmeInfo.transParams);
+
+hAx = nexttile;
+frml = 'dSngl_abs ~ (pBspk * fr + dBrst_abs) * Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
+    'dist', 'normal', 'verbose', false);
+
+[tblRes, hFig] = lme_pr(lmeMdl, 'dBrst_abs', ...
+    'flgMode', 'regression', 'hAx', hAx, ...
+    'varGrp',  'Group', 'transParams', lmeInfo.transParams);
 
 % Prism
 idxGrp = tblRes.Group == 'Control';
@@ -178,7 +180,7 @@ tblRes.ResidY(idxGrp);
 %  ========================================================================
 
 % Steady-state raw values
-dist = 'gamma';
+dist = 'log-normal';
 
 frml = 'frSspk ~ (frBspk) * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
@@ -243,15 +245,15 @@ tblWt = tbl(tbl.Group == 'Control', :);
 tblMcu = tbl(tbl.Group == 'MCU-KO', :);
 xVar = 'pBspk';
 mVar = 'ss_frBspk';
-distM = 'log-normal';
-distY = 'log-normal';
-res = lme_mediation(tblMcu, frml, xVar, mVar, 'distM', distM, 'distY', distY);
+distM = 'gamma';
+distY = distM;
+res = lme_mediation(tblWt, frml, xVar, mVar, 'distM', distM, 'distY', distY);
+
+res.plot.X = tblWt.pBspk_trans;
+
+lme_mediationPlot(res)
 
 
-
-frml = 'ss_frSspk ~ (fr + pBspk + ss_frBspk) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-    'dist', 'log-normal');
 
 
 

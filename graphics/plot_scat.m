@@ -31,8 +31,8 @@ function [hSct, hFit] = plot_scat(tbl, x, y, varargin)
 
 p = inputParser;
 addRequired(p, 'tbl', @(x) istable(x) || isempty(x));
-addRequired(p, 'x', @(x) ischar(x) || isstring(x) || isnumeric(x));
-addRequired(p, 'y', @(x) ischar(x) || isstring(x) || isnumeric(x));
+addRequired(p, 'x', @(x) ischar(x) || isstring(x) || isnumeric(x) || iscategorical(x));
+addRequired(p, 'y', @(x) ischar(x) || isstring(x) || isnumeric(x) || iscategorical(x));
 
 addParameter(p, 'g', [], @(x) ischar(x) || isstring(x) || isnumeric(x) || iscategorical(x));
 addParameter(p, 'c', [], @(x) ischar(x) || isstring(x) || isnumeric(x));
