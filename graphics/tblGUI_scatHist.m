@@ -568,9 +568,9 @@ onUpdatePlot(hContainer, []);
         end
         data.hEquality = [];
 
-        cla(data.hAxScatter);
-        cla(data.hAxHistX);
-        cla(data.hAxHistY);
+        delete(allchild(data.hAxScatter));
+        delete(allchild(data.hAxHistX));
+        delete(allchild(data.hAxHistY));
 
         hold(data.hAxScatter, 'on');
         hold(data.hAxHistX, 'on');
@@ -658,10 +658,16 @@ onUpdatePlot(hContainer, []);
             end
 
             % Histogram X
-            plot_histPdf(data.hAxHistX, xG, xEdges, cG, scaleX, 'vertical');
+            if strcmp(scaleX, 'log'), normX = 'probability'; else, normX = 'pdf'; end
+            plot_hist([], xG, 'hAx', data.hAxHistX, 'bins', xEdges, 'c', cG, ...
+                'scale', scaleX, 'orient', 'vertical', 'norm', normX, ...
+                'flgKDE', true, 'flgStat', false);
 
             % Histogram Y (Horizontal)
-            plot_histPdf(data.hAxHistY, yG, yEdges, cG, scaleY, 'horizontal');
+            if strcmp(scaleY, 'log'), normY = 'probability'; else, normY = 'pdf'; end
+            plot_hist([], yG, 'hAx', data.hAxHistY, 'bins', yEdges, 'c', cG, ...
+                'scale', scaleY, 'orient', 'horizontal', 'norm', normY, ...
+                'flgKDE', true, 'flgStat', false);
         end
 
         % Plotting Loop (Pass 2: Error Bars on TOP)
@@ -1151,79 +1157,6 @@ onUpdatePlot(hContainer, []);
 
         data.hHighlight = data.hAxHighlight; % Fix naming
         hContainer.UserData = data;
-    end
-
-    function plot_histPdf(ax, val, edges, c, scale, orient)
-        % Helper to plot histogram with KDE overlay
-
-        % Filter data
-        val = val(~isnan(val) & ~isinf(val));
-        if isempty(val), return; end
-        
-        % Determine Normalization & KDE Scaling
-        if strcmp(scale, 'log')
-            % LOG SCALE:
-            % If we use 'pdf', the bar heights decay because linear bin width increases.
-            % Use 'probability' to show the FRACTION of data in each bin, which
-            % visually represents the "shape" correctly on a log axis.
-            normType = 'probability';
-            val = val(val > 0); % Strict positive for log
-            if isempty(val), return; end
-            
-            % For KDE scaling to match 'probability':
-            % The histogram height ~ count / total.
-            % The standard KDE is a PDF (integral=1).
-            % To match 'probability' bars, we must multiply the PDF by the *bin width*.
-            logEdges = log10(edges);
-            binW     = mean(diff(logEdges)); % Mean width in log10 space
-            
-        else
-            % LINEAR SCALE:
-            % Standard PDF works fine.
-            normType = 'pdf';
-        end
-
-        % Histogram
-        histogram(ax, val, 'BinEdges', edges, 'FaceColor', c, ...
-            'EdgeColor', 'none', 'FaceAlpha', 0.2, 'Normalization', normType, ...
-            'DisplayStyle', 'bar', 'Orientation', orient);
-
-        % KDE Overlay
-        if length(val) < 2, return; end
-
-        if strcmp(scale, 'log')
-            % Log-KDE Points
-            logMin = log10(min(edges));
-            logMax = log10(max(edges));
-            pts    = logspace(logMin, logMax, 200);
-            
-            % Estimate density on LOG10 data
-            % ksdensity(..., 'Support', 'positive') handles boundary effects better, 
-            % but standard log-transform is robust enough for visualization.
-            [f_log, ~] = ksdensity(log10(val), log10(pts));
-            
-            % f_log is d(Prob)/d(log10(x)).
-            % To match 'probability' histogram (which is Prob per bin),
-            % we multiply by the bin width in log10 space.
-            f = f_log * binW;
-            
-        else
-            % Linear-KDE Points
-            pts = linspace(min(edges), max(edges), 200);
-            
-            [f, ~] = ksdensity(val, pts);
-            % f is d(Prob)/dx. Matches 'pdf' normalization directly.
-        end
-
-        % Check for NaNs
-        if all(isnan(f)), return; end
-
-        % Plot Curve
-        if strcmp(orient, 'vertical')
-            plot(ax, pts, f, 'Color', c, 'LineWidth', 2);
-        else
-            plot(ax, f, pts, 'Color', c, 'LineWidth', 2);
-        end
     end
 
 end
