@@ -23,7 +23,7 @@ tbl.ss_pBspk_trans = tblTrans.ss_pBspk;
 %  ========================================================================
 % Validate "Pseudo-Tracking" (Quantile Matching) on MEA data
 
-flgPseudo = true; 
+flgPseudo = false; 
 if flgPseudo
     
     nBins = 50;
@@ -120,6 +120,15 @@ string(prismVars)
 
 hFig = mcu_rcvSpace(tbl);
 
+frml = 'dSngl_rel ~ dBrst_rel * Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
+    'dist', 'normal', 'verbose', true);
+
+frml = 'dSngl_abs ~ dBrst_abs * Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
+    'dist', 'normal', 'verbose', true);
+
+
 % tblGUI_scatHist(tbl, 'xVar', 'pBspk_trans', 'yVar', 'dBrst_rel', 'grpVar', 'Group');
 % tblGUI_bar(tbl, 'yVar', 'pBspk', 'xVar', 'Group');
 
@@ -128,192 +137,100 @@ hFig = mcu_rcvSpace(tbl);
 %  ========================================================================
 % Partial Regression
 
-
-hFig = figure;
-hTile = tiledlayout(hFig, 1, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
-
-hAx = nexttile;
-frml = 'dSngl_rel ~ dBrst_rel + (pBspk + fr) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-    'dist', 'normal', 'verbose', false);
-
-[tblRes, hFig] = lme_pr(lmeMdl, 'dBrst_rel', ...
-    'flgMode', 'regression', 'hAx', hAx, ...
-    'varGrp',  'Group', 'transParams', lmeInfo.transParams);
-
-hAx = nexttile;
-frml = 'dSngl_abs ~ dBrst_abs + (pBspk + fr) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-    'dist', 'normal', 'verbose', false);
-
-[tblRes, hFig] = lme_pr(lmeMdl, 'dBrst_abs', ...
-    'flgMode', 'regression', 'hAx', hAx, ...
-    'varGrp',  'Group', 'transParams', lmeInfo.transParams);
+    
+    hFig = figure;
+    hTile = tiledlayout(hFig, 1, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
+    
+    hAx = nexttile;
+    frml = 'dSngl_rel ~ (pBspk * fr + dBrst_rel) * Group + (1|Name)';
+    [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
+        'dist', 'normal', 'verbose', false);
+    
+    [tblRes, hFig] = lme_pr(lmeMdl, 'dBrst_rel', ...
+        'flgMode', 'regression', 'hAx', hAx, ...
+        'varGrp',  'Group', 'transParams', lmeInfo.transParams);
+    
+    hAx = nexttile;
+    frml = 'dSngl_abs ~ (pBspk * fr + dBrst_abs) * Group + (1|Name)';
+    [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
+        'dist', 'normal', 'verbose', false);
+    
+    [tblRes, hFig] = lme_pr(lmeMdl, 'dBrst_abs', ...
+        'flgMode', 'regression', 'hAx', hAx, ...
+        'varGrp',  'Group', 'transParams', lmeInfo.transParams);
 
 % Prism
-% idxGrp = tblRes.Group == 'Control';
-% tblRes.ResidY(idxGrp);
+idxGrp = tblRes.Group == 'Control';
+tblRes.ResidY(idxGrp);
 
-% Obsolete
+% % Obsolete
 % hFig = mcu_rcvRes(tbl);
 
 
 
 
 
-%% ========================================================================
-%  Single Group Models
-%  ========================================================================
 
-idxWt = tbl.Group == 'Control';
-tblWt = tbl(idxWt, :);
-
-frml = 'dBrst_rel ~ (fr + pBspk * dSngl_rel) + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tblWt, frml, ...
-    'dist', 'normal', 'fitMethod', 'REML');
-
-frml = 'dSngl_rel ~ (fr + pBspk * dBrst_rel) + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tblWt, frml, ...
-    'dist', 'normal', 'fitMethod', 'REML');
-
-frml = 'dFr ~ (frBspk + frSspk) + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-    'dist', 'normal', 'fitMethod', 'REML');
-
-abl = lme_ablation(tblWt, frml, 'dist', 'normal', ...
-    'flgBkTrans', false, 'partitionMode', 'split', 'nrep', 5);
 
 
 %% ========================================================================
-%  MEDIATION
+%  PARTIAL DEPENDENCE (LSMEANS)
 %  ========================================================================
-
-
-% Relative
-
-frml = 'dBrst_rel ~ (pBspk + fr) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-    'dist', 'normal', 'fitMethod', 'REML');
-
-
-% PLOT INTERACTION
-vars = {'pBspk', 'Group'};
-hFig = plot_axSize('flgFullscreen', true, 'flgPos', true);
-
-% Partial Dependence
-hAx = nexttile;
-[pdRes, hFig] = lme_pd(lmeMdl, vars, 'transParams', lmeInfo.transParams, ...
-    'hAx', hAx);
-
-
-frml = 'dSngl_rel ~ (pBspk + fr + dBrst_rel) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-    'dist', 'normal', 'fitMethod', 'REML');
-
-
-frml = 'dSngl_rel ~ (pBspk + fr) + (1|Name)';
-tblWt = tbl(tbl.Group == 'Control', :);
-tblMcu = tbl(tbl.Group == 'MCU-KO', :);
-xVar = 'pBspk';
-mVar = 'dBrst_rel';
-distM = 'normal';
-distY = 'normal';
-res = lme_mediation(tblWt, frml, xVar, mVar, 'distM', distM, 'distY', distY);
-
-
-
-tblMcu.frSspk
-
-
-
-
-
-% Absolute
-
-frml = 'dSngl_abs ~ (dBrst_abs) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-    'dist', 'normal', 'fitMethod', 'REML', 'flgPlot', false);
-
-
-frml = 'dBrst_abs ~ (fr + pBspk) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-    'dist', 'normal', 'fitMethod', 'REML');
-
-frml = 'dSngl_abs ~ (fr + pBspk + dBrst_abs) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-    'dist', 'normal', 'fitMethod', 'REML');
-
-frml = 'dFr_abs ~ (fr + pBspk) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-    'dist', 'normal', 'fitMethod', 'REML');
-
-c = 1 / 3600;
-tbl.spkAllocation = (tbl.dSngl_abs + c) ./ (tbl.dBrst_abs + c);
-frml = 'spkAllocation ~ (fr + pBspk) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-    'dist', 'normal', 'fitMethod', 'REML');
-
-figure;
-histogram(tbl.spkAllocation)
-
-frml = 'dSngl_abs ~ frSspk + pBspk + (1|Name)';
-tblWt = tbl(tbl.Group == 'Control', :);
-tblMcu = tbl(tbl.Group == 'MCU-KO', :);
-xVar = 'pBspk';
-mVar = 'dBrst_abs';
-distM = 'normal';
-distY = 'normal';
-res = lme_mediation(tblWt, frml, xVar, mVar, 'distM', distM, 'distY', distY);
-
-
-frml = 'dSngl_abs ~ (dBrst_abs * pBspk) + fr + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tblMcu, frml, ...
-    'dist', 'normal', 'fitMethod', 'REML');
-
-frml = 'dSngl_rel ~ (dBrst_rel * pBspk) + fr + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tblWt, frml, ...
-    'dist', 'normal', 'fitMethod', 'REML');
-
-
 
 % Steady-state raw values
+dist = 'gamma';
 
 frml = 'frSspk ~ (frBspk) * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-    'dist', 'log-normal', 'flgPlot', false);
+    'dist', dist, 'flgPlot', false);
 
 frml = 'ss_frBspk ~ (fr * pBspk) * Group + (1|Name)';
-[lmeMdl1, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-    'dist', 'gamma');
+[lmeMdl1, lmeStats, lmeInfo1, ~] = lme_analyse(tbl, frml, ...
+    'dist', dist);
 
 frml = 'ss_frSspk ~ (fr * pBspk) * Group + (1|Name)';
-[lmeMdl2, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-    'dist', 'gamma');
+[lmeMdl2, lmeStats, lmeInfo2, ~] = lme_analyse(tbl, frml, ...
+    'dist', dist);
+
+frml = 'frSs ~ (fr * pBspk) * Group + (1|Name)';
+[lmeMdl3, lmeStats, lmeInfo3, ~] = lme_analyse(tbl, frml, ...
+    'dist', dist);
 
 % ---
-% PLOT INTERACTION
-vars = {'pBspk', 'Group'};
+% Plot Interaction
 hFig = plot_axSize('flgFullscreen', true, 'flgPos', true);
 
+vars = {'pBspk', 'Group'};
 hAx = nexttile;
-[pdRes, hFig] = lme_pd(lmeMdl1, vars, 'transParams', lmeInfo.transParams, ...
+[pdRes, hFig] = lme_pd(lmeMdl1, vars, 'transParams', lmeInfo1.transParams, ...
     'hAx', hAx);
 set(gca, "YScale", "log")
 
 hAx = nexttile;
-[pdRes, hFig] = lme_pd(lmeMdl2, vars, 'transParams', lmeInfo.transParams, ...
+[pdRes, hFig] = lme_pd(lmeMdl2, vars, 'transParams', lmeInfo2.transParams, ...
+    'hAx', hAx);
+set(gca, "YScale", "log")
+
+hAx = nexttile;
+[pdRes, hFig] = lme_pd(lmeMdl3, vars, 'transParams', lmeInfo3.transParams, ...
     'hAx', hAx);
 set(gca, "YScale", "log")
 
 vars = {'fr', 'Group'};
 hAx = nexttile;
-[pdRes, hFig] = lme_pd(lmeMdl1, vars, 'transParams', lmeInfo.transParams, ...
+[pdRes, hFig] = lme_pd(lmeMdl1, vars, 'transParams', lmeInfo1.transParams, ...
     'hAx', hAx);
 set(gca, "YScale", "log")
 set(gca, "XScale", "log")
 
 hAx = nexttile;
-[pdRes, hFig] = lme_pd(lmeMdl2, vars, 'transParams', lmeInfo.transParams, ...
+[pdRes, hFig] = lme_pd(lmeMdl2, vars, 'transParams', lmeInfo2.transParams, ...
+    'hAx', hAx);
+set(gca, "YScale", "log")
+set(gca, "XScale", "log")
+
+hAx = nexttile;
+[pdRes, hFig] = lme_pd(lmeMdl3, vars, 'transParams', lmeInfo3.transParams, ...
     'hAx', hAx);
 set(gca, "YScale", "log")
 set(gca, "XScale", "log")
@@ -321,23 +238,20 @@ set(gca, "XScale", "log")
 
 
 % ---
-% frml = 'pBspk ~ fr * Group + (1|Name)';
-% [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-%     'dist', 'logit-normal');
-% tbl.pBspk_res = residuals(lmeMdl, 'ResidualType', 'Raw');
-
 frml = 'ss_frSspk ~ pBspk + fr + (1|Name)';
 tblWt = tbl(tbl.Group == 'Control', :);
 tblMcu = tbl(tbl.Group == 'MCU-KO', :);
 xVar = 'pBspk';
-mVar = 'frBspk';
+mVar = 'ss_frBspk';
 distM = 'log-normal';
 distY = 'log-normal';
 res = lme_mediation(tblMcu, frml, xVar, mVar, 'distM', distM, 'distY', distY);
 
 
 
-
+frml = 'ss_frSspk ~ (fr + pBspk + ss_frBspk) * Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
+    'dist', 'log-normal');
 
 
 

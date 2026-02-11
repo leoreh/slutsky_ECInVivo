@@ -76,13 +76,35 @@ frmlA = sprintf('%s ~ %s', mVar, rhs);
 %  Does X still predict Y (Path C') controlling for M?
 if flgVerbose, fprintf('\n[LME_MEDIATION] Step 3: Outcome Model (X+M->Y)\n'); end
 
-% Add M to the predictors (RHS)
-frmlBC = sprintf('%s ~ %s + %s', yVar, mVar, rhs);
+% --- PREPARE MEDIATOR PREDICTOR ---
+% Ensure Path B uses the same mediator scale as Path A. 
+% We use the transformation parameters from Path A (infoA) as a template
+% to apply the EXACT same transform to M in Path B.
 
-% Reuse distY logic from Path C if it was auto-selected?
-[mdlBC, ~, infoBC] = lme_analyse(tbl, frmlBC, 'dist', distY, 'verbose', false);
+mVarPred = mVar; 
+tblBC    = tbl; 
 
-[betaB, pB, seB] = get_coeff(mdlBC, mVar);
+if isfield(infoA, 'transParams') && ...
+   isfield(infoA.transParams, 'varsTrans') && ...
+   isfield(infoA.transParams.varsTrans, mVar)
+
+    if flgVerbose, fprintf('   -> Transforming Mediator for Path B (using Path A template)\n'); end
+    % Replicate Path A's transformation on Path B's predictor
+    % Note: infoA params for Response usually have flgZ=false, so this just
+    % applies log/offset without Z-scoring, which is perfect as lme_analyse
+    % will Z-score the predictor itself later.
+    [tblBC, ~] = tbl_trans(tblBC, 'template', infoA.transParams, ...
+        'varsInc', {mVar}, ...
+        'verbose', false);
+end
+
+% Add M (possibly transformed) to the predictors (RHS)
+frmlBC = sprintf('%s ~ %s + %s', yVar, mVarPred, rhs);
+
+% Reuse distY logic from Path C
+[mdlBC, ~, infoBC] = lme_analyse(tblBC, frmlBC, 'dist', distY, 'verbose', false);
+
+[betaB, pB, seB] = get_coeff(mdlBC, mVarPred);
 [betaC_prime, pC_prime, seC_prime] = get_coeff(mdlBC, xVar);
 
 
@@ -90,14 +112,32 @@ frmlBC = sprintf('%s ~ %s + %s', yVar, mVar, rhs);
 %  RESULTS & STATISTICS
 %  ========================================================================
 
-% ADJUSTMENT: 
-% lme_analyse automatically Z-scores predictors. 
-% Path A (X->M): M is Response (Raw). betaA = dRawM / dZX
-% Path B (M->Y): M is Predictor (Z-Scored). betaB = dRawY / dZM
-% To match units for A*B (= dRawY / dZX), we must convert betaB to raw units.
-sdM = nanstd(tbl.(mVar));
+% UNIT CONSISTENCY CHECK:
+% Path A (X->M): betaA = d(TransM) / d(Z_X)
+% Path B (M->Y): betaB = d(Y)      / d(Z_TransM)
+%
+% Note: lme_analyse Z-scores predictors. 
+% tblBC.(mVar) contains Transformed M (from Path A) but NOT Z-scored.
+% lme_analyse Z-scores it internally.
+%
+% To calculate Indirect Effect (A*B), we essentially need the chain rule:
+%   Effect = [d(TransM) / d(Z_X)] * [d(Y) / d(TransM)]
+%
+% We must un-Z-share betaB to convert it from d(Y)/d(Z_TransM) to d(Y)/d(TransM).
+sdM = nanstd(tblBC.(mVarPred));
 betaB = betaB / sdM;
 seB   = seB   / sdM;
+
+% Add M (possibly transformed) to the predictors (RHS)
+frmlBC = sprintf('%s ~ %s + %s', yVar, mVarPred, rhs);
+
+% Reuse distY logic from Path C
+[mdlBC, ~, infoBC] = lme_analyse(tblBC, frmlBC, 'dist', distY, 'verbose', false);
+
+[betaB, pB, seB] = get_coeff(mdlBC, mVarPred);
+[betaC_prime, pC_prime, seC_prime] = get_coeff(mdlBC, xVar);
+
+
 
 % Sobel Test for Indirect Effect (A * B)
 % Z = (a*b) / sqrt(b^2*sa^2 + a^2*sb^2)

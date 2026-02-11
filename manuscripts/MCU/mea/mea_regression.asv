@@ -20,12 +20,6 @@ tblLme = tbl;
 tblGUI_scatHist(tblLme, 'xVar', 'pBspk', 'yVar', 'funcon', 'grpVar', 'Group');
 tblGUI_bar(tblLme, 'yVar', 'pBspk', 'xVar', 'Group');
 
-grpIdx = tblLme.Group == "MCU-KO";
-grpIdx = tblLme.Group == "Control";
-prismData = tblLme.pBspk_trans(grpIdx);
-mean(prismData)
-sum(prismData > 0) / length(prismData)
-
 % Exclude non-bursting
 tblLme = tblLme(tblLme.pBspk > 0, :);
 
@@ -37,16 +31,14 @@ tblLme = tblLme(tblLme.pBspk > 0, :);
 
 
 frml = 'frSs ~ (frBspk + frSspk) * Group + (1 | Name)';
+frml = 'frSs ~ (fr + pBspk) + Group + (1 | Name)';
+
 nRep = 5;
 
-abl = lme_ablation(tblLme, frml, 'dist', 'gamma', ...
+abl = lme_ablation(tblLme, frml, 'dist', 'log-normal', ...
     'flgBkTrans', false, 'partitionMode', 'batch', 'nrep', nRep);
 
-tbl.dFr = log((tbl.frSs) ./ (tbl.fr));
-frml = 'dFr ~ (frBspk + frSspk)';
-tblWt = tbl(tbl.Group == 'Control', :);
-abl = lme_ablation(tblWt, frml, 'dist', 'normal', ...
-    'flgBkTrans', false, 'partitionMode', 'split', 'nrep', nRep);
+
 
 frml = 'frSs ~ (frBspk + frSspk)';
 nRep = 5;
@@ -56,7 +48,6 @@ abl = lme_ablation(tblWt, frml, 'dist', 'log-normal', ...
     'flgBkTrans', false, 'partitionMode', 'split', 'nrep', nRep);
 
 tblMcu = tblLme(tblLme.Group == 'MCU-KO', :);
-
 abl = lme_ablation(tblMcu, frml, 'dist', 'gamma', ...
     'flgBkTrans', false, 'partitionMode', 'split', 'nrep', nRep);
 

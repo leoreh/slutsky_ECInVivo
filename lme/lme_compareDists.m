@@ -97,7 +97,8 @@ for iMdl = 1:nMdl
     mdlTbl = tbl;
     mdlFrml = frml;
     jcb = 0;
-
+    fitMethodArgs = {};
+    
     try
 
         % TRANSFORMATIONS
@@ -130,23 +131,15 @@ for iMdl = 1:nMdl
             jcb = -sum(log(yVal .* (1 - yVal)), 'omitnan');
 
         elseif strcmp(dist, 'InverseGaussian')
-            % Inverse Gaussian fits can hang due to poor initial values near singularities.
-            % Random initialization avoids this "perfect fit" trap.
-            fitMethodArgs = [fitMethodArgs, {'StartMethod', 'random'}];
+            % (Inverse Gaussian can be unstable, handled via timeout below)
         end
 
 
         % RUN FIT
-        try
-            mdl = fitglme(mdlTbl, mdlFrml, ...
-                'Distribution', dist, ...
-                'Link', link, ...
-                fitMethodArgs{:});
-            
-        catch ME
-            stats.ErrorMsg{iMdl} = ME.message;
-            continue;
-        end
+        mdl = fitglme(mdlTbl, mdlFrml, ...
+            'Distribution', dist, ...
+            'Link', link, ...
+            'FitMethod', fitMethod);
 
 
         % STATISTICS

@@ -31,21 +31,23 @@ tblLme = tblLme(tblLme.pBspk > 0, :);
 
 
 frml = 'frSs ~ (frBspk + frSspk) * Group + (1 | Name)';
+frml = 'frSs ~ (fr + pBspk) + Group + (1 | Name)';
+
 nRep = 5;
 
-abl = lme_ablation(tblLme, frml, 'dist', 'gamma', ...
+abl = lme_ablation(tblLme, frml, 'dist', 'log-normal', ...
     'flgBkTrans', false, 'partitionMode', 'batch', 'nrep', nRep);
+
 
 
 frml = 'frSs ~ (frBspk + frSspk)';
 nRep = 5;
 
 tblWt = tblLme(tblLme.Group == 'Control', :);
-abl = lme_ablation(tblWt, frml, 'dist', 'gamma', ...
+abl = lme_ablation(tblWt, frml, 'dist', 'log-normal', ...
     'flgBkTrans', false, 'partitionMode', 'split', 'nrep', nRep);
 
 tblMcu = tblLme(tblLme.Group == 'MCU-KO', :);
-
 abl = lme_ablation(tblMcu, frml, 'dist', 'gamma', ...
     'flgBkTrans', false, 'partitionMode', 'split', 'nrep', nRep);
 
