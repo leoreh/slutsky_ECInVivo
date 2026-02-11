@@ -635,13 +635,12 @@ onUpdatePlot(hContainer, []);
                 fitTypes = {'None', 'Linear', 'Ortho'};
                 curFit   = fitTypes{idxFit};
                 
-                statsFit = plot_linReg(xG, yG, 'hAx', data.hAxScatter, ...
-                    'type', curFit, 'clr', cG, 'flgTxt', false);
+                hFit = plot_lineReg(xG, yG, 'hAx', data.hAxScatter, ...
+                    'type', curFit, 'clr', cG, 'flgTxt', true);
                 
                 % Store handles for cleanup
-                if isstruct(statsFit)
-                   if isfield(statsFit, 'hLine'), data.fitHandles = [data.fitHandles, statsFit.hLine]; end
-                   if isfield(statsFit, 'hTxt'),  data.fitHandles = [data.fitHandles, statsFit.hTxt]; end
+                if isgraphics(hFit)
+                   data.fitHandles = [data.fitHandles, hFit];
                 end
             end
 

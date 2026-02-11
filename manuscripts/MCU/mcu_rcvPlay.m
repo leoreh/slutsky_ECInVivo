@@ -123,7 +123,7 @@ for i = 1:length(groups)
         'MarkerFaceAlpha', 0.4, 'MarkerEdgeColor', 'none');
         
     % Regression Line
-    plot_linReg(x, y, 'hAx', gca, 'type', regType, 'clr', c, 'flgTxt', true);
+    plot_lineReg(x, y, 'hAx', gca, 'type', regType, 'clr', c, 'flgTxt', true);
 end
 
 xlabel('Baseline Burstiness (Logit)');

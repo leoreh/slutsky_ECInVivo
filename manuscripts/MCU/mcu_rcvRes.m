@@ -244,7 +244,7 @@ function plot_grpScatter(tbl, xVar, yVar, lims, isSymlog)
         end
         
         % Regression
-        Stats = plot_linReg(xReg, yReg, 'hAx', gca, 'type', regType, ...
+        [~, Stats] = plot_lineReg(xReg, yReg, 'hAx', gca, 'type', regType, ...
             'clr', c, 'flgTxt', false);
         
         % Annotation

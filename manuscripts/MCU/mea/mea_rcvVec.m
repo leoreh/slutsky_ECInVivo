@@ -137,27 +137,27 @@ frml = 'dSngl_abs ~ dBrst_abs * Group + (1|Name)';
 %  ========================================================================
 % Partial Regression
 
-    
-    hFig = figure;
-    hTile = tiledlayout(hFig, 1, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
-    
-    hAx = nexttile;
-    frml = 'dSngl_rel ~ (pBspk * fr + dBrst_rel) * Group + (1|Name)';
-    [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-        'dist', 'normal', 'verbose', false);
-    
-    [tblRes, hFig] = lme_pr(lmeMdl, 'dBrst_rel', ...
-        'flgMode', 'regression', 'hAx', hAx, ...
-        'varGrp',  'Group', 'transParams', lmeInfo.transParams);
-    
-    hAx = nexttile;
-    frml = 'dSngl_abs ~ (pBspk * fr + dBrst_abs) * Group + (1|Name)';
-    [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-        'dist', 'normal', 'verbose', false);
-    
-    [tblRes, hFig] = lme_pr(lmeMdl, 'dBrst_abs', ...
-        'flgMode', 'regression', 'hAx', hAx, ...
-        'varGrp',  'Group', 'transParams', lmeInfo.transParams);
+
+hFig = figure;
+hTile = tiledlayout(hFig, 1, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
+
+hAx = nexttile;
+frml = 'dSngl_rel ~ (pBspk * fr + dBrst_rel) * Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
+    'dist', 'normal', 'verbose', false);
+
+[tblRes, hFig] = lme_pr(lmeMdl, 'dBrst_rel', ...
+    'flgMode', 'regression', 'hAx', hAx, ...
+    'varGrp',  'Group', 'transParams', lmeInfo.transParams);
+
+hAx = nexttile;
+frml = 'dSngl_abs ~ (pBspk * fr + dBrst_abs) * Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
+    'dist', 'normal', 'verbose', false);
+
+[tblRes, hFig] = lme_pr(lmeMdl, 'dBrst_abs', ...
+    'flgMode', 'regression', 'hAx', hAx, ...
+    'varGrp',  'Group', 'transParams', lmeInfo.transParams);
 
 % Prism
 idxGrp = tblRes.Group == 'Control';

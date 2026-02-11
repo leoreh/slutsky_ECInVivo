@@ -171,7 +171,7 @@ function plot_stateSpace(tbl, grp, xVar, yVar, cData, ~, isSymlog)
     % Orthogonal Regression
     % If symlog, this plots a straight line in the transformed space (visually correct)
     % The Slope/Angle calculated will be for the transformed data.
-    plot_linReg(xReg, yReg, 'hAx', gca, 'type', 'ortho', ...
+    [~, Stats] = plot_lineReg(xReg, yReg, 'hAx', gca, 'type', 'ortho', ...
         'clr', 'k', 'flgTxt', true);
 
     % Reference Lines (Visual Space)

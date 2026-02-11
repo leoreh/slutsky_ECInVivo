@@ -47,7 +47,7 @@ function [tblRes, hFig] = lme_pr(mdl, varX, varargin)
 %       tblRes      - Table with data and residuals.
 %       hFig        - Figure handle.
 %
-%   See also: LME_ANALYSE, LME_FIT, PLOT_LINREG
+%   See also: LME_ANALYSE, LME_FIT, PLOT_LINEREG
 
 %% ========================================================================
 %  ARGUMENTS
@@ -188,42 +188,36 @@ end
 
 lims = max(abs([tblMdl.(varX_Plot); tblMdl.ResidY])) * 1.1;
 
-for iVar = 1:nGrps
-    grpIdx = (grpIds == iVar);
-    xData = tblMdl.(varX_Plot)(grpIdx);
-    yData = tblMdl.ResidY(grpIdx);
-
-    c = clr(iVar, :);
-
-    % Scatter
-    scatter(hAx, xData, yData, 20, c, 'filled', 'MarkerFaceAlpha', 0.4, ...
-        'HandleVisibility', 'off', 'MarkerEdgeColor', 'none');
-
-    % Regression Line
-    % 'linear' for Standardized AVP (to match Model Beta),
-    % 'ortho' for everything else (Mechanistic/Residuals).
-    regType = 'ortho';
-    if strcmpi(flgMode, 'regression')
-        if strcmpi(xUnits, 'Standardized (Z-Score)')
-            regType = 'linear';
-        end
+% Determine Regression Type
+regType = 'ortho';
+if strcmpi(flgMode, 'regression')
+    if exist('xUnits', 'var') && strcmpi(xUnits, 'Standardized (Z-Score)')
+        regType = 'linear';
     end
-
-    % Using plot_linReg for tidy plotting and stats
-    Stats = plot_linReg(xData, yData, 'hAx', hAx, 'type', regType, ...
-        'clr', c, 'flgTxt', true);
-
-    % Add Legend Entry to the Line
-    if ~isempty(Stats.hLine)
-        set(Stats.hLine, 'DisplayName', string(grpNames(iVar)));
-    end
-
-    % Reference Lines
-    xlim([-lims, lims]); ylim([-lims, lims]);
-    plot([-lims, lims], [-lims, lims], '--k', 'HandleVisibility', 'off'); % Identity
-    xline(0, '-', 'Color', [0.8 0.8 0.8], 'HandleVisibility', 'off');
-    yline(0, '-', 'Color', [0.8 0.8 0.8], 'HandleVisibility', 'off');
 end
+
+% Grouping Variable
+gArg = [];
+if ~isempty(varGrp) && ismember(varGrp, tblMdl.Properties.VariableNames)
+    gArg = tblMdl.(varGrp);
+end
+
+% Plot via plot_scat
+plot_scat(tblMdl, varX_Plot, 'ResidY', ...
+    'g', gArg, ...
+    'c', clr, ...
+    'fitType', regType, ...
+    'alpha', 0.4, ...
+    'sz', 20, ...
+    'hAx', hAx, ...
+    'flgStats', true); % Stats will trigger fit text in plot_scat -> plot_lineReg
+hold(hAx, 'on');
+
+% Reference Lines
+xlim(hAx, [-lims, lims]); ylim(hAx, [-lims, lims]);
+plot(hAx, [-lims, lims], [-lims, lims], '--k', 'HandleVisibility', 'off'); % Identity
+xline(hAx, 0, '-', 'Color', [0.8 0.8 0.8], 'HandleVisibility', 'off');
+yline(hAx, 0, '-', 'Color', [0.8 0.8 0.8], 'HandleVisibility', 'off');
 
 % Decoration
 grid(hAx, 'on');
