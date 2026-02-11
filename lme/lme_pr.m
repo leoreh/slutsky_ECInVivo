@@ -186,8 +186,6 @@ end
 %  PLOT
 %  ========================================================================
 
-lims = max(abs([tblMdl.(varX_Plot); tblMdl.ResidY])) * 1.1;
-
 % Determine Regression Type
 regType = 'ortho';
 if strcmpi(flgMode, 'regression')
@@ -214,15 +212,9 @@ plot_scat(tblMdl, varX_Plot, 'ResidY', ...
 hold(hAx, 'on');
 
 % Reference Lines
-xlim(hAx, [-lims, lims]); ylim(hAx, [-lims, lims]);
-plot(hAx, [-lims, lims], [-lims, lims], '--k', 'HandleVisibility', 'off'); % Identity
-xline(hAx, 0, '-', 'Color', [0.8 0.8 0.8], 'HandleVisibility', 'off');
-yline(hAx, 0, '-', 'Color', [0.8 0.8 0.8], 'HandleVisibility', 'off');
+plot_lineEq('hAx', hAx);
 
-% Decoration
-grid(hAx, 'on');
-box(hAx, 'on');
-
+% Labels
 if strcmpi(flgMode, 'regression')
     if exist('xUnits', 'var')
         lblX = sprintf('%s | %s', varX, xUnits);

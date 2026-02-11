@@ -4,6 +4,8 @@
 %  Analyzes the recovery "strategy" of neurons by decomposing firing rate
 %  recovery into Single-Spike and Burst-Spike components.
 
+%#ok<*NASGU>
+
 %% ========================================================================
 %  LOAD DATA
 %  ========================================================================

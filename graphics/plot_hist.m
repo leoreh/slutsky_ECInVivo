@@ -8,15 +8,15 @@ function [hHist, hKDE, hMean] = plot_hist(tbl, val, varargin)
 %   INPUTS:
 %       tbl         - (table) or empty.
 %       val         - (char) Column name in tbl OR (numeric) Vector.
-%
+%orient
 %   OPTIONAL KEY-VALUE PAIRS:
 %       'g'         - (char) Grouping variable name in tbl OR (vector) grouping.
 %       'c'         - (char) Color variable name OR (matrix) RGB colors.
 %       'bins'      - (numeric) Number of bins OR Vector of edges.
-%       'orientation' - (char) 'vertical' (default) or 'horizontal'.
+%       'orient'    - (char) 'vertical' (default) or 'horizontal'.
 %       'scale'     - (char) 'linear' (default) or 'log'.
-%       'normalization' - (char) 'pdf' (default), 'probability', 'count'.
-%       'showKDE'   - (logical) Overlay Kernel Density Estimate (Default: false).
+%       'norm'      - (char) 'pdf' (default), 'probability', 'count'.
+%       'flgKDE'    - (logical) Overlay Kernel Density Estimate (Default: false).
 %       'showMean'  - (logical) Overlay Mean line (Default: false).
 %       'showMedian'- (logical) Overlay Median line (Default: false).
 %       'alpha'     - (scalar) Face alpha (Default: 0.3).
@@ -41,10 +41,10 @@ addRequired(p, 'val', @(x) ischar(x) || isstring(x) || isnumeric(x));
 addParameter(p, 'g', [], @(x) ischar(x) || isstring(x) || isnumeric(x) || iscategorical(x));
 addParameter(p, 'c', [], @(x) ischar(x) || isstring(x) || isnumeric(x));
 addParameter(p, 'bins', [], @isnumeric);
-addParameter(p, 'orientation', 'vertical', @(x) any(validatestring(x, {'vertical', 'horizontal'})));
+addParameter(p, 'orient', 'vertical', @(x) any(validatestring(x, {'vertical', 'horizontal'})));
 addParameter(p, 'scale', 'linear', @(x) any(validatestring(x, {'linear', 'log'})));
-addParameter(p, 'normalization', 'pdf', @ischar);
-addParameter(p, 'showKDE', false, @islogical);
+addParameter(p, 'norm', 'pdf', @ischar);
+addParameter(p, 'flgKDE', false, @islogical);
 addParameter(p, 'showMean', false, @islogical);
 addParameter(p, 'showMedian', false, @islogical);
 addParameter(p, 'alpha', 0.3, @isnumeric);
@@ -58,10 +58,10 @@ if isempty(hAx), hAx = gca; end
 gIn = p.Results.g;
 cIn = p.Results.c;
 bins = p.Results.bins;
-orient = p.Results.orientation;
+orient = p.Results.orient;
 scl = p.Results.scale;
-normType = p.Results.normalization;
-flgKDE = p.Results.showKDE;
+normType = p.Results.norm;
+flgKDE = p.Results.flgKDE;
 flgMean = p.Results.showMean;
 flgMed = p.Results.showMedian;
 alp = p.Results.alpha;
@@ -154,7 +154,7 @@ if isempty(bins)
     end
 end
 
-% Log Scale Normalization Adjustment
+% Log Scale norm Adjustment
 % If log scale, 'pdf' is often misleading visually unless using 'probability'.
 % But users might request parameter. We will respect input but adjust KDE scaling.
 % Logic from tblGUI_scatHist (plot_histPdf)
@@ -192,8 +192,8 @@ for iG = 1:length(uGrps)
         'FaceColor', col, ...
         'EdgeColor', 'none', ...
         'FaceAlpha', alp, ...
-        'Normalization', normType, ...
-        'Orientation', orient, ...
+        'norm', normType, ...
+        'orient', orient, ...
         'DisplayName', nm);
     
     % KDE

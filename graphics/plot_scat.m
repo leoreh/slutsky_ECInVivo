@@ -23,7 +23,7 @@ function [hSct, hFit] = plot_scat(tbl, x, y, varargin)
 %   OUTPUTS:
 %       hSct, hFit
 %
-%   See also: PLOT_HIST, PLOT_LINEREG
+%   See also: PLOT_LINEREG
 
 %% ========================================================================
 %  ARGUMENTS
