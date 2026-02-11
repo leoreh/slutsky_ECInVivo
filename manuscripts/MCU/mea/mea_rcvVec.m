@@ -238,23 +238,31 @@ set(gca, "YScale", "log")
 set(gca, "XScale", "log")
 
 
+%% ========================================================================
+%  MEDIATION
+%  ========================================================================
 
-% ---
 frml = 'ss_frSspk ~ pBspk + fr + (1|Name)';
-tblWt = tbl(tbl.Group == 'Control', :);
-tblMcu = tbl(tbl.Group == 'MCU-KO', :);
 xVar = 'pBspk';
 mVar = 'ss_frBspk';
 distM = 'gamma';
 distY = distM;
+
+% WT
+tblWt = tbl(tbl.Group == 'Control', :);
 res = lme_mediation(tblWt, frml, xVar, mVar, 'distM', distM, 'distY', distY);
 
 res.plot.X = tblWt.pBspk_trans;
-
+res.plot.Y = log10(tblWt.frSs);
 lme_mediationPlot(res)
 
+% MCU
+tblMcu = tbl(tbl.Group == 'MCU-KO', :);
+res = lme_mediation(tblMcu, frml, xVar, mVar, 'distM', distM, 'distY', distY);
 
-
+res.plot.X = tblMcu.pBspk_trans;
+% res.plot.Y = log10(tblMcu.frSs);
+lme_mediationPlot(res)
 
 
 

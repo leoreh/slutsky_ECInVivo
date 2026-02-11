@@ -43,15 +43,11 @@ flgVerbose = p.Results.verbose;
 
 %% ========================================================================
 %  PREP
-%  ========================================================================
-
-% Parse Formula
-[~, yVar] = lme_frml2vars(frml);
-
-
-%% ========================================================================
-%  PREP
 %  =======================================================================
+
+% Determine fitMethod for Gamma distributions
+fitMethodM = ''; if strcmpi(distM, 'gamma'), fitMethodM = 'Laplace'; end
+fitMethodY = ''; if strcmpi(distY, 'gamma'), fitMethodY = 'Laplace'; end
 
 % Parse Formula
 [varsFxd, yVar, varsRand] = lme_frml2vars(frml);
@@ -86,7 +82,7 @@ if flgVerbose, fprintf('\n[LME_MEDIATION] Step 1: Total Effect (X->Y)\n'); end
 
 % Use input formula directly
 frmlC = frml;
-[mdlC, ~, infoC] = lme_analyse(tbl, frmlC, 'dist', distY, 'verbose', false);
+[mdlC, ~, infoC] = lme_analyse(tbl, frmlC, 'dist', distY, 'fitMethod', fitMethodY, 'verbose', false);
 [betaC, pC, seC] = get_coeff(mdlC, xVar);
 
 
@@ -97,7 +93,7 @@ frmlC = frml;
 if flgVerbose, fprintf('\n[LME_MEDIATION] Step 2: Mediator Model (X->M)\n'); end
 
 frmlA = sprintf('%s ~ %s', mVar, rhs);
-[mdlA, ~, infoA] = lme_analyse(tbl, frmlA, 'dist', distM, 'verbose', false);
+[mdlA, ~, infoA] = lme_analyse(tbl, frmlA, 'dist', distM, 'fitMethod', fitMethodM, 'verbose', false);
 [betaA, pA, seA] = get_coeff(mdlA, xVar);
 
 
@@ -131,7 +127,7 @@ end
 frmlBC = sprintf('%s ~ %s + %s', yVar, mVar, rhs);
 
 % Reuse distY logic from Path C
-[mdlBC, ~, ~, tblBC] = lme_analyse(tbl, frmlBC, 'dist', distY, 'verbose', false);
+[mdlBC, ~, ~, tblBC] = lme_analyse(tbl, frmlBC, 'dist', distY, 'fitMethod', fitMethodY, 'verbose', false);
 
 [betaB, pB, seB] = get_coeff(mdlBC, mVar);
 [betaC_prime, pC_prime, seC_prime] = get_coeff(mdlBC, xVar);

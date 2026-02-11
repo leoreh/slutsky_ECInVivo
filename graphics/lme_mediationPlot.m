@@ -44,7 +44,7 @@ if ~isfield(res, 'plot') || isempty(res.plot)
 end
 
 % Determine Fit Types
-fitType = 'linear'; 
+fitType = 'ortho'; 
 if ~isnumeric(res.plot.X)
     fitType = 'None'; 
 end
@@ -104,5 +104,6 @@ plot_scat([], res.plot.X, res.plot.Y, ...
 title({'Path C (Total)', getStats(pathC_Row)}, 'FontWeight', 'normal');
 xlabel('X');
 ylabel('Y');
+
 
 end

@@ -106,12 +106,12 @@ tbl.dBrst_abs = (tbl.ss_frBspk - tbl.frBspk);
 tbl.dSngl_abs = (tbl.ss_frSspk - tbl.frSspk);
 tbl.dFr_abs = (tbl.frSs - tbl.fr);
 
-% Prism
-idxGrp = tbl.Group == 'MCU-KO';
-prismVars = {'Name', 'dSngl_rel', 'dBrst_rel', 'dSngl_abs', 'dBrst_abs', ...
-    'dFr', 'dpBspk', 'pBspk', 'pBspk_trans'};
-tblPrism = tbl(idxGrp, prismVars);
-string(prismVars)
+% % Prism
+% idxGrp = tbl.Group == 'MCU-KO';
+% prismVars = {'Name', 'dSngl_rel', 'dBrst_rel', 'dSngl_abs', 'dBrst_abs', ...
+%     'dFr', 'dpBspk', 'pBspk', 'pBspk_trans'};
+% tblPrism = tbl(idxGrp, prismVars);
+% string(prismVars)
 
 
 
@@ -238,23 +238,31 @@ set(gca, "YScale", "log")
 set(gca, "XScale", "log")
 
 
+%% ========================================================================
+%  MEDIATION
+%  ========================================================================
 
-% ---
 frml = 'ss_frSspk ~ pBspk + fr + (1|Name)';
-tblWt = tbl(tbl.Group == 'Control', :);
-tblMcu = tbl(tbl.Group == 'MCU-KO', :);
 xVar = 'pBspk';
 mVar = 'ss_frBspk';
-distM = 'gamma';
+distM = 'log-normal';
 distY = distM;
+
+% WT
+tblWt = tbl(tbl.Group == 'Control', :);
 res = lme_mediation(tblWt, frml, xVar, mVar, 'distM', distM, 'distY', distY);
 
 res.plot.X = tblWt.pBspk_trans;
-
+res.plot.Y = log10(tblWt.frSs);
 lme_mediationPlot(res)
 
+% MCU
+tblMcu = tbl(tbl.Group == 'MCU-KO', :);
+res = lme_mediation(tblMcu, frml, xVar, mVar, 'distM', distM, 'distY', distY);
 
-
+res.plot.X = tblMcu.pBspk_trans;
+% res.plot.Y = log10(tblMcu.frSs);
+lme_mediationPlot(res)
 
 
 
