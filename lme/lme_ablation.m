@@ -215,6 +215,9 @@ for iRep = 1 : nTotal
             sse(iRep, iVar) = sum((yTrue - yPred).^2, 'omitnan');
             sst(iRep, iVar) = sum((yTrue - muTrn).^2, 'omitnan');
 
+            % Fold-wise R2
+            r2(iRep, iVar) = 1 - (sse(iRep, iVar) ./ sst(iRep, iVar));
+
             % Fold-wise RMSE
             rmse(iRep, iVar) = sqrt(mean((yTrue - yPred).^2, 'omitnan'));
 
@@ -275,6 +278,10 @@ else
 
     % R2 (Difference)
     abl.dR2 = abl.pR2(1) - abl.pR2(2:end);
+    
+    % R2 (Difference per fold)
+    abl.dR2_fold = abl.r2(:, 1) - abl.r2(:, 2:end);
+
 
 end
 

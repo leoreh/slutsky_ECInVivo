@@ -215,6 +215,26 @@ res.plot = table(X, M, Y, fitA, fitC, Y_part_M, Y_part_X);
 
 
 %% ========================================================================
+%  NOTE: PARTIAL RESIDUALS & LME_PR
+%  ========================================================================
+%  The Partial Residuals calculated here for Path B (Y_part_M) are conceptually
+%  identical to those produced by LME_PR in 'residual' mode (Component + Residual).
+%
+%  Formula:
+%    Y_part_M = Residuals(Y|X,M) + Beta_B * M
+%
+%  DIFFERENCE IN SCALING (X-AXIS):
+%  - Here (LME_MEDIATION): The X-axis (M) is plotted in its Raw (or Log-Transformed)
+%    units. This preserves the physical interpretation of the Mediator's scale.
+%  - LME_PR: By default, LME_PR plots against the predictor values stored in
+%    the model object. LME_ANALYSE automatically Z-scores continuous predictors.
+%    Therefore, LME_PR's X-axis will be in Standard Deviations (Z-scores).
+%
+%  To replicate this plot exactly using LME_PR, you must un-standardize the X-axis
+%  by providing the 'transParams' structure.
+%  ========================================================================
+
+%% ========================================================================
 %  DISPLAY
 %  ========================================================================
 if flgVerbose

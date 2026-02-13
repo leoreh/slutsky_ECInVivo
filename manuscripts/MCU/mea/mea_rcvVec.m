@@ -25,13 +25,13 @@ tbl.ss_pBspk_trans = tblTrans.ss_pBspk;
 %  ========================================================================
 % Validate "Pseudo-Tracking" (Quantile Matching) on MEA data
 
-flgPseudo = false; 
+flgPseudo = true; 
 if flgPseudo
     
-    nBins = 50;
+    nBins = 10;
 
     % --- ASSERT EQUAL DISTRIBUTIONS ---
-    cutoff_z = -1.5; % User defined cut-off (Visual Inspection)
+    cutoff_z = -2; % User defined cut-off (Visual Inspection)
     % cutoff_z = -6;
 
     hFig = mcu_rcvQq(tbl, 'var', 'frSspk', 'dataSet', 'mea', 'cutoff_z', cutoff_z);
@@ -84,7 +84,7 @@ if flgPseudo
     
     % --- RUN MATCHING ---
     fprintf('VALIDATION: Running match_qntl on MEA data (nBins=%d)...\n', nBins);
-    tbl = match_qntl(tblLong, nBins, 'flgPool', true, ...
+    tbl = match_qntl(tblLong, nBins, 'flgPool', false, ...
         'var', 'fr', 'avgType', 'mean');
     
     tbl.frSs = tbl.ss_fr;
@@ -144,7 +144,7 @@ hFig = figure;
 hTile = tiledlayout(hFig, 1, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
 
 hAx = nexttile;
-frml = 'dSngl_rel ~ (pBspk * fr + dBrst_rel) * Group + (1|Name)';
+frml = 'dSngl_rel ~ (pBspk + fr + dBrst_rel) * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
     'dist', 'normal', 'verbose', false);
 
@@ -153,7 +153,7 @@ frml = 'dSngl_rel ~ (pBspk * fr + dBrst_rel) * Group + (1|Name)';
     'varGrp',  'Group', 'transParams', lmeInfo.transParams);
 
 hAx = nexttile;
-frml = 'dSngl_abs ~ (pBspk * fr + dBrst_abs) * Group + (1|Name)';
+frml = 'dSngl_abs ~ (pBspk + fr + dBrst_abs) * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
     'dist', 'normal', 'verbose', false);
 
@@ -182,19 +182,15 @@ tblRes.ResidY(idxGrp);
 % Steady-state raw values
 dist = 'log-normal';
 
-frml = 'frSspk ~ (frBspk) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-    'dist', dist, 'flgPlot', false);
-
-frml = 'ss_frBspk ~ (fr * pBspk) * Group + (1|Name)';
+frml = 'ss_frBspk ~ (fr + pBspk) * Group + (1|Name)';
 [lmeMdl1, lmeStats, lmeInfo1, ~] = lme_analyse(tbl, frml, ...
     'dist', dist);
 
-frml = 'ss_frSspk ~ (fr * pBspk) * Group + (1|Name)';
+frml = 'ss_frSspk ~ (fr + pBspk) * Group + (1|Name)';
 [lmeMdl2, lmeStats, lmeInfo2, ~] = lme_analyse(tbl, frml, ...
     'dist', dist);
 
-frml = 'frSs ~ (fr * pBspk) * Group + (1|Name)';
+frml = 'frSs ~ (fr + pBspk) * Group + (1|Name)';
 [lmeMdl3, lmeStats, lmeInfo3, ~] = lme_analyse(tbl, frml, ...
     'dist', dist);
 
@@ -217,6 +213,17 @@ hAx = nexttile;
 [pdRes, hFig] = lme_pd(lmeMdl3, vars, 'transParams', lmeInfo3.transParams, ...
     'hAx', hAx);
 set(gca, "YScale", "log")
+
+
+% To Prism
+grpIdx = pdRes.Group == "Control";
+prismMat = [pdRes(grpIdx, vars(1)), ...
+    pdRes(grpIdx, {'frSs_pred', 'frSs_upper', 'frSs_lower'})];
+grpIdx = pdRes.Group == "MCU-KO";
+prismMat = [pdRes(grpIdx, vars(1)), ...
+    pdRes(grpIdx, {'frSs_pred', 'frSs_upper', 'frSs_lower'})];
+
+
 
 vars = {'fr', 'Group'};
 hAx = nexttile;
@@ -245,27 +252,68 @@ set(gca, "XScale", "log")
 frml = 'ss_frSspk ~ pBspk + fr + (1|Name)';
 xVar = 'pBspk';
 mVar = 'ss_frBspk';
-distM = 'gamma';
+distM = 'log-normal';
 distY = distM;
 
 % WT
 tblWt = tbl(tbl.Group == 'Control', :);
-res = lme_mediation(tblWt, frml, xVar, mVar, 'distM', distM, 'distY', distY);
+resWt = lme_mediation(tblWt, frml, xVar, mVar, 'distM', distM, 'distY', distY);
 
-res.plot.X = tblWt.pBspk_trans;
-res.plot.Y = log10(tblWt.frSs);
-lme_mediationPlot(res)
+resWt.plot.X = tblWt.pBspk_trans;
+lme_mediationPlot(resWt)
+
 
 % MCU
 tblMcu = tbl(tbl.Group == 'MCU-KO', :);
-res = lme_mediation(tblMcu, frml, xVar, mVar, 'distM', distM, 'distY', distY);
+resMcu = lme_mediation(tblMcu, frml, xVar, mVar, 'distM', distM, 'distY', distY);
 
-res.plot.X = tblMcu.pBspk_trans;
-% res.plot.Y = log10(tblMcu.frSs);
-lme_mediationPlot(res)
-
+resMcu.plot.X = tblMcu.pBspk_trans;
+lme_mediationPlot(resMcu)
 
 
+
+
+
+%% ========================================================================
+%  ABLATION
+%  ========================================================================
+
+frml = 'dFr ~ (dBrst_rel + dSngl_rel)';
+dist = 'normal';
+
+frml = 'frSs ~ (frBspk + frSspk) + (1 | Name)';
+% frml = 'frSs ~ (frBspk + frSspk)';
+% frml = 'frSs ~ (fr + pBspk) + (1 | Name)';
+dist = 'log-normal';
+
+nRep = 5;
+partMode = 'split';
+
+tblWt = tbl(tbl.Group == 'Control', :);
+abl = lme_ablation(tblWt, frml, 'dist', dist, ...
+    'flgBkTrans', false, 'partitionMode', partMode, 'nrep', nRep);
+
+tblMcu = tbl(tbl.Group == 'MCU-KO', :);
+abl = lme_ablation(tblMcu, frml, 'dist', dist, ...
+    'flgBkTrans', false, 'partitionMode', partMode, 'nrep', nRep);
+
+
+% With Group
+tblLme = tbl;
+
+frml = 'frSs ~ (frBspk + frSspk) * Group + (1 | Name)';
+frml = 'frSs ~ (fr + pBspk) * Group + (1 | Name)';
+
+nRep = 5;
+dist = 'log-normal';
+
+abl = lme_ablation(tblLme, frml, 'dist', dist, ...
+    'flgBkTrans', false, 'partitionMode', 'batch', 'nrep', nRep);
+
+
+% tblLme.Group = double(tbl.Group) - 1;
+% dist = 'binomial';
+% frml = 'Group ~ (frSs + fr + pBspk) + (1 | Name)';
 
 %% ========================================================================
 %  CONTRIBUTION ANALYSIS: BSL vs SS
