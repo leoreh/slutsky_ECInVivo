@@ -23,11 +23,11 @@
 % Load table
 basepaths = [mcu_basepaths('wt'), mcu_basepaths('mcu')];
 presets = {'frNet', 'brst'};
-tblOrig = mcu_tblVivo('basepaths', basepaths, 'flgClean', true, ...
+tblVivo = mcu_tblVivo('basepaths', basepaths, 'flgClean', true, ...
     'presets', presets);
 
 % Filter: RS units only
-tblData = tblOrig(tblOrig.unitType == 'RS', :);
+tblData = tblVivo(tblVivo.unitType == 'RS', :);
 
 % Filter: Only BSL and BAC3 days
 idxDay = ismember(tblData.Day, {'BSL', 'BAC3'});

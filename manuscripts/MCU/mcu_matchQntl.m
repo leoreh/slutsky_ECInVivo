@@ -1,5 +1,5 @@
-function tblSynth = match_qntl(tbl, nBins, varargin)
-% MATCH_QNTL  Perform quantile matching to create synthetic units.
+function tblSynth = mcu_matchQntl(tbl, nBins, varargin)
+% MCU_MATCHQNTL  Perform quantile matching to create synthetic units.
 %
 %   tblSynth = MATCH_QNTL(tbl, nBins, 'flgPool', true) matches units
 %   based on firing rate ranks.

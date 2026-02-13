@@ -17,9 +17,9 @@ tblPlot.pBspk_trans = tblTrans.pBspk;
 %  ========================================================================
 %  Cluster units into percentiles based on a specific variable
 
-varClu = 'pBspk';
-nClu   = 3;           % Number of clusters (percentiles)
-alpha  = 1;           % Scaling factor for percentile spacing
+varClu = 'fr';
+nClu   = 1;           % Number of clusters (percentiles)
+alpha  = 2;           % Scaling factor for percentile spacing
 
 % Initialize Cluster Label Column
 tblPlot.cluLbl = strings(height(tblPlot), 1);
@@ -76,8 +76,8 @@ floorVal = 1 / (max(xVec) * 3600);
 
 tblVars = tblPlot.Properties.VariableNames;
 tVars = tblVars(contains(tblVars, 't_'));
-tblPlot = tbl_tNorm(tblPlot, 'varsInc', tVars, 'winNorm', winNorm, ...
-    'Method', 'percentage', 'flgGeom', true, 'floorVal', floorVal, 'varsGrp', {});
+% tblPlot = tbl_tNorm(tblPlot, 'varsInc', tVars, 'winNorm', winNorm, ...
+%     'Method', 'percentage', 'flgGeom', true, 'floorVal', floorVal, 'varsGrp', {});
 
 
 %% ========================================================================
@@ -98,8 +98,11 @@ tblGUI_xy(xVec, tblPlot, ...
 
 % Loop over clusters and calculate geometric stats for each
 idxGrp = tblPlot.Group == 'Control';
-prismMat = [];
 
+% Grab raw matrix
+tblPlot.t_frTot(idxGrp, :)';
+
+prismMat = [];
 for iClu = 1:nClu
 
     % Extract Data for specific Cluster within Group
