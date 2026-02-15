@@ -42,11 +42,14 @@ for iFile = 1 : nFiles
 
     % Burst detection
     isiStart = 0.006;
+    minSpks = 2;
+    % isiStart = 0.05;
+    % minSpks = 3;
     isiEnd = isiStart * 2;
     minIBI = isiEnd;
     minDur = 0;
     brst = brst_detect(spktimes, ...
-        'minSpks', 2, ...
+        'minSpks', minSpks, ...
         'isiStart', isiStart, ...
         'isiEnd', isiEnd * 2, ...
         'minDur', minDur, ...
@@ -75,7 +78,7 @@ tblPlot = tbl_trans(tblPlot, 'varsInc', {'pBspk'}, 'logBase', 'logit', 'verbose'
 tblPlot = tbl_trans(tblPlot, 'varsInc', {'bRoy'}, 'logBase', 10, 'verbose', true);
 
 % Limit units
-uIdx = tblPlot.UnitType == 'RS';
+uIdx = tblPlot.unitType == 'RS';
 tblPlot = tblPlot(uIdx, :);
 
 tblGUI_bar(tblPlot, 'xVar', 'Group', 'yVar', 'funcon');
@@ -125,12 +128,13 @@ tbl.Day(tbl.Day == "BAC_ON") = "BAC3";
 
 tblPlot = tbl;
 
-% tblPlot = tbl_trans(tblPlot, 'flg0', true, 'verbose', true);
 
-% Transform burst metrics
-tblPlot = tbl_trans(tblPlot, 'varsInc', {'pBspk'}, 'logBase', 'logit', 'verbose', true);
-tblPlot = tbl_trans(tblPlot, 'varsInc', {'bRoy'}, 'logBase', 10, 'verbose', true);
-tblPlot = tblPlot(tblPlot.UnitType == "RS", :);
+% logit pBspk
+tblTrans = tbl_trans(tblPlot, 'varsInc', {'pBspk'}, 'logBase', 'logit');
+tbl.pBspk_trans = tblTrans.pBspk;
+
+% Filter RS
+tblPlot = tblPlot(tblPlot.unitType == "RS", :);
 
 tblGUI_bar(tblPlot, 'xVar', 'Group', 'yVar', 'funcon_shf');
 tblGUI_scatHist(tblPlot, 'xVar', 'pBspk', 'yVar', 'funcon_shf', 'grpVar', 'Group');
@@ -149,10 +153,10 @@ isNum = cellfun(@(x) isnumeric(tblPlot.(x)) && ~iscategorical(tblPlot.(x)), vars
 varsNum = varsTbl(isNum);
 
 % Select Units
-tblRs = tblPlot(tblPlot.UnitType == "RS", :);
+tblRs = tblPlot(tblPlot.unitType == "RS", :);
 tblRs(:, "UnitID") = [];
 tblRs(:, "File") = [];
-tblRs(:, "UnitType") = [];
+tblRs(:, "unitType") = [];
 
 % Baseline Table
 tblBsl = tblRs(tblRs.Day == "BSL", :);
@@ -171,7 +175,7 @@ tblSs.Properties.VariableNames = varsTbl;
 
 % FR Recovery
 tblLme = tblBsl;
-tblLme.Rcv = (tblSs.FR ./ tblBsl.FR) * 100;
+tblLme.Rcv = (tblSs.fr ./ tblBsl.fr) * 100;
 
 
 tblGUI_scatHist(tblLme, 'xVar', 'dim', 'yVar', 'Rcv', 'grpVar', 'Group');

@@ -190,14 +190,13 @@ mVar = 'ss_frBspk';
 distM = 'log-normal';
 distY = distM;
 
-
-
 % WT
 tblWt = tbl(tbl.Group == 'Control', :);
 resWt = lme_mediation(tblWt, frml, xVar, mVar, 'distM', distM, 'distY', distY);
 
 resWt.plot.X = tblWt.pBspk_trans;
 lme_mediationPlot(resWt)
+
 
 % MCU
 tblMcu = tbl(tbl.Group == 'MCU-KO', :);
@@ -207,15 +206,6 @@ resMcu.plot.X = tblMcu.pBspk_trans;
 lme_mediationPlot(resMcu)
 
 
-% X -> M
-frml = 'ss_frBspk ~ (fr + pBspk) + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tblWt, frml, ...
-    'dist', dist);
-
-% X -> Y
-frml = 'ss_frSspk ~ (fr + pBspk) + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tblWt, frml, ...
-    'dist', dist, 'verbose', true);
 
 
 
@@ -223,6 +213,8 @@ frml = 'ss_frSspk ~ (fr + pBspk) + (1|Name)';
 %  ABLATION
 %  ========================================================================
 
+frml = 'dFr ~ (dBrst_rel + dSngl_rel)';
+dist = 'normal';
 
 frml = 'frSs ~ (frBspk + frSspk) + (1 | Name)';
 % frml = 'frSs ~ (frBspk + frSspk)';

@@ -53,10 +53,10 @@ flgPool = false;
 
 if strcmp(dataSet, 'mea')
     cutoff_z = -2;
-    nBins = 10;
+    nBins = 5;
 elseif strcmp(dataSet, 'vivo')
-    cutoff_z = -1;
-    nBins = 3;
+    cutoff_z = -1.4;
+    nBins = 5;
 end
 
 hFig = mcu_rcvQq(tblRaw, 'var', 'frSspk', 'dataSet', dataSet, 'cutoff_z', cutoff_z);
@@ -86,16 +86,16 @@ fprintf('================================================================\n\n');
 % --- CONVERT TO LONG FORMAT ---
 if strcmp(dataSet, 'mea')
     % Baseline Table
-    varsTbl = {'fr', 'frBspk', 'frSspk', 'pBspk', 'pBspk_trans'};
+    varsTbl = {'fr', 'frBspk', 'frSspk', 'pBspk'};
     tBsl = tblRaw(:, [{'Group', 'Name'}, varsTbl]);
     tBsl.Day = repmat({'BSL'}, height(tBsl), 1);
     tBsl.Day = categorical(tBsl.Day);
 
     % Steady State Table (Rename ss_ vars)
-    varsSs = {'frSs', 'ss_frBspk', 'ss_frSspk', 'ss_pBspk', 'ss_pBspk_trans'};
+    varsSs = {'frSs', 'ss_frBspk', 'ss_frSspk', 'ss_pBspk'};
     tSs = tblRaw(:, [{'Group', 'Name'}, varsSs]);
-    tSs = renamevars(tSs, {'frSs', 'ss_frBspk', 'ss_frSspk', 'ss_pBspk', 'ss_pBspk_trans'}, ...
-        {'fr',    'frBspk',    'frSspk',    'pBspk', 'pBspk_trans'});
+    tSs = renamevars(tSs, {'frSs', 'ss_frBspk', 'ss_frSspk', 'ss_pBspk'}, ...
+        {'fr',    'frBspk',    'frSspk',    'pBspk'});
     tSs.Day = repmat({'BAC3'}, height(tSs), 1); % match_qntl hardcodes 'BAC3' as the 2nd day
     tSs.Day = categorical(tSs.Day);
 
