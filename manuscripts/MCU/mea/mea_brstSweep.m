@@ -8,7 +8,7 @@ presets = {'spktimes', 'rcv', 'frNet'};
 [tblFull, ~, ~, v] = mcu_tblMea('basepaths', basepaths, 'presets', presets([1, 3]));
 
 % Prepare subtable of what's needed
-tblBrst = tblFull(:, {'Name', 'Group', 'UnitID', 'fr', 'frSs', 'frAcute', ...
+tblBrst = tblFull(:, {'Name', 'Group', 'UnitID', 'fr', 'ss_fr', 'frAcute', ...
     'rcvBsl', 'spktimes', 'funcon'});
 
 % Spike times from all sessions
@@ -105,13 +105,13 @@ for iIsi = 1 : length(isiSweep)
         % -----------------------------------------------------------------
         % Predictive Power (LME) - Ablation (WT Only)
         % -----------------------------------------------------------------
-        % Formula: frSs ~ frB + frS
+        % Formula: ss_fr ~ frB + frS
 
         fNameSib = sprintf('sib_s%d_i%03d', spkThr, round(isiThr*1000));
         fNameFrB = sprintf('frB_s%d_i%03d', spkThr, round(isiThr*1000));
         fNameFrS = sprintf('frS_s%d_i%03d', spkThr, round(isiThr*1000));
 
-        frml = sprintf('frSs ~ %s + %s', fNameFrB, fNameFrS);
+        frml = sprintf('ss_fr ~ %s + %s', fNameFrB, fNameFrS);
 
         % Run lightweight ablation (CV)
         abl = lme_ablation(tblWt, frml, 'dist', 'gamma', ...
@@ -140,8 +140,8 @@ for iIsi = 1 : length(isiSweep)
         % Predictive Power (LME) - Interaction
         % -----------------------------------------------------------------
         
-        % Formula: frSs ~ (fr + sib) * Group + (1|Name)
-        frml = sprintf('frSs ~ (fr + %s) * Group + (1|Name)', fNameSib);
+        % Formula: ss_fr ~ (fr + sib) * Group + (1|Name)
+        frml = sprintf('ss_fr ~ (fr + %s) * Group + (1|Name)', fNameSib);
         [lmeMdl, ~, ~, ~] = lme_analyse(tblLme, frml, ...
             'dist', 'log-normal', 'fitMethod', 'ML', ...
             'flgPlot', false, 'verbose', false);
@@ -217,7 +217,7 @@ mat0         = table2array(mat0(:, 2:end));
 figure('Name', 'Burst Detection Optimization', 'Color', 'w', 'Position', [100 100 1200 800]);
 tiledlayout(2, 3, 'TileSpacing', 'compact');
 
-% 1. Predictive Power (frB vs frSs)
+% 1. Predictive Power (frB vs ss_fr)
 nexttile;
 heatmap(spkSweep, isiSweep, matTStat, 'ColorMap', parula);
 xlabel('Min Spikes'); ylabel('ISI Threshold (s)');

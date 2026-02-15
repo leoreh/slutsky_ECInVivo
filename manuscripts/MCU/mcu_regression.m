@@ -34,13 +34,13 @@ tbl.ss_pBspk_trans = tblTrans.ss_pBspk;
 % Relative
 tbl.dBrst_rel = log((tbl.ss_frBspk) ./ (tbl.frBspk));
 tbl.dSngl_rel = log((tbl.ss_frSspk) ./ (tbl.frSspk));
-tbl.dFr = log((tbl.frSs) ./ (tbl.fr));
+tbl.dFr = log((tbl.ss_fr) ./ (tbl.fr));
 tbl.dpBspk = (tbl.ss_pBspk_trans) - (tbl.pBspk_trans);
 
 % Absolute
 tbl.dBrst_abs = (tbl.ss_frBspk - tbl.frBspk);
 tbl.dSngl_abs = (tbl.ss_frSspk - tbl.frSspk);
-tbl.dFr_abs = (tbl.frSs - tbl.fr);
+tbl.dFr_abs = (tbl.ss_fr - tbl.fr);
 
 % % Prism
 % idxGrp = tbl.Group == 'MCU-KO';
@@ -126,7 +126,7 @@ frml = 'ss_frSspk ~ (fr + pBspk) * Group + (1|Name)';
 [lmeMdl2, lmeStats, lmeInfo2, ~] = lme_analyse(tbl, frml, ...
     'dist', dist);
 
-frml = 'frSs ~ (fr + pBspk) * Group + (1|Name)';
+frml = 'ss_fr ~ (fr + pBspk) * Group + (1|Name)';
 [lmeMdl3, lmeStats, lmeInfo3, ~] = lme_analyse(tbl, frml, ...
     'dist', dist);
 
@@ -171,14 +171,14 @@ set(gca, "XScale", "log")
 
 
 
-
 % To Prism
 grpIdx = pdRes.Group == "Control";
 prismMat = [pdRes(grpIdx, vars(1)), ...
-    pdRes(grpIdx, {'frSs_pred', 'frSs_upper', 'frSs_lower'})];
+    pdRes(grpIdx, {'ss_fr_pred', 'ss_fr_upper', 'ss_fr_lower'})];
 grpIdx = pdRes.Group == "MCU-KO";
 prismMat = [pdRes(grpIdx, vars(1)), ...
-    pdRes(grpIdx, {'frSs_pred', 'frSs_upper', 'frSs_lower'})];
+    pdRes(grpIdx, {'ss_fr_pred', 'ss_fr_upper', 'ss_fr_lower'})];
+
 
 %% ========================================================================
 %  MEDIATION
@@ -189,8 +189,6 @@ xVar = 'pBspk';
 mVar = 'ss_frBspk';
 distM = 'log-normal';
 distY = distM;
-
-
 
 % WT
 tblWt = tbl(tbl.Group == 'Control', :);
@@ -224,9 +222,9 @@ frml = 'ss_frSspk ~ (fr + pBspk) + (1|Name)';
 %  ========================================================================
 
 
-frml = 'frSs ~ (frBspk + frSspk) + (1 | Name)';
-% frml = 'frSs ~ (frBspk + frSspk)';
-% frml = 'frSs ~ (fr + pBspk) + (1 | Name)';
+frml = 'ss_fr ~ (frBspk + frSspk) + (1 | Name)';
+% frml = 'ss_fr ~ (frBspk + frSspk)';
+% frml = 'ss_fr ~ (fr + pBspk) + (1 | Name)';
 dist = 'log-normal';
 
 nRep = 5;
@@ -244,8 +242,8 @@ abl = lme_ablation(tblMcu, frml, 'dist', dist, ...
 % With Group
 tblLme = tbl;
 
-frml = 'frSs ~ (frBspk + frSspk) * Group + (1 | Name)';
-frml = 'frSs ~ (fr + pBspk) * Group + (1 | Name)';
+frml = 'ss_fr ~ (frBspk + frSspk) * Group + (1 | Name)';
+frml = 'ss_fr ~ (fr + pBspk) * Group + (1 | Name)';
 
 nRep = 5;
 dist = 'log-normal';
@@ -256,7 +254,7 @@ abl = lme_ablation(tblLme, frml, 'dist', dist, ...
 
 % tblLme.Group = double(tbl.Group) - 1;
 % dist = 'binomial';
-% frml = 'Group ~ (frSs + fr + pBspk) + (1 | Name)';
+% frml = 'Group ~ (ss_fr + fr + pBspk) + (1 | Name)';
 
 %% ========================================================================
 %  CONTRIBUTION ANALYSIS: BSL vs SS
@@ -279,7 +277,7 @@ tBsl = tbl(idxGrp, varsTbl);
 tBsl.Timepoint = repmat({'BSL'}, height(tBsl), 1);
 
 % Steady State
-varsSs = {'Group', 'Name', 'ss_frBspk', 'ss_frSspk', 'frSs'};
+varsSs = {'Group', 'Name', 'ss_frBspk', 'ss_frSspk', 'ss_fr'};
 tSs = tbl(idxGrp, varsSs);
 tSs.Properties.VariableNames = varsTbl;
 tSs.Timepoint = repmat({'SS'}, height(tSs), 1);

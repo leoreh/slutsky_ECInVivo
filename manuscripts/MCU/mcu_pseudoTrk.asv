@@ -2,7 +2,7 @@
 %  MCU PSEUDO-TRACKING
 %  ========================================================================
 % Creates pairs of synthetic "neurons" via quantile matching to validate
-% the regression analyses. 
+% the regression analyses.
 %
 % Since we cannot track the same units over days in vivo, we rank units
 % by firing rate in Baseline and BAC3 (Steady State) and pair them
@@ -14,112 +14,135 @@
 %  LOAD DATA
 %  ========================================================================
 
-flgLoad = 'vivo';
+flgLoad = false;
+dataSet = 'mea';
 
-if strcmp(flgLog, 'mea')
+if flgLoad
+    if strcmp(dataSet, 'mea')
+        presets = {'steadyState'};
+        [tblMea, xVec, basepaths, v] = mcu_tblMea('presets', presets, 'flgOtl', true);
 
-% MEA
-presets = {'steadyState'};
-[tblMea, xVec, basepaths, v] = mcu_tblMea('presets', presets, 'flgOtl', true);
+    elseif strcmp(dataSet, 'vivo')
+        basepaths = [mcu_basepaths('wt_bsl'), mcu_basepaths('mcu_bsl'), ...
+            mcu_basepaths('wt_bac3'), mcu_basepaths('mcu_bac3')];
+        basepaths(contains(basepaths, 'lh137')) = [];
+        presets = {'brst'};
+        tblVivo = mcu_tblVivo('basepaths', basepaths, 'flgClean', true, ...
+            'presets', presets);
+        tblVivo.Day(tblVivo.Day == "BAC_ON") = "BAC3";
+        tblVivo.Day = removecats(tblVivo.Day, {'BAC_ON'});
+        
+        % Filter RS
+        tblVivo = tblVivo(tblVivo.unitType == "RS", :);
+        tblVivo.unitType = [];
+        tblVivo.UnitID = [];
 
-elseif strcmp(flgLog, 'vivo')
+        % Assert no zero values (instead of a pseudocount)
+        tblVivo = tbl_trans(tblVivo, 'flg0', true, 'verbose', true);
+        
+    end
+end
 
-% Vivo
-basepaths = [mcu_basepaths('wt'), mcu_basepaths('mcu')];
-presets = {'frNet', 'brst'};
-tblVivo = mcu_tblVivo('basepaths', basepaths, 'flgClean', true, ...
-    'presets', presets);
+if strcmp(dataSet, 'mea')
+    tblRaw = tblMea;
 
-% Filter: RS units only
-tblData = tblVivo(tblVivo.unitType == 'RS', :);
-
-% Filter: Only BSL and BAC3 days
-idxDay = ismember(tblData.Day, {'BSL', 'BAC3'});
-tblData = tblData(idxDay, :);
-
-% Assert no zero values for logs. This is instead of a pseudocount.
-tblData = tbl_trans(tblData, 'flg0', true, 'verbose', true);
-
-
-
-% Add logit pBspk
-tblTrans = tbl_trans(tbl, 'varsInc', {'pBspk', 'ss_pBspk'}, 'logBase', 'logit');
-tbl.pBspk_trans = tblTrans.pBspk;
-tbl.ss_pBspk_trans = tblTrans.ss_pBspk;
-
+elseif strcmp(dataSet, 'vivo')
+    tblRaw = tblVivo;
+end
 
 %% ========================================================================
-%  PSEUDO-TRACKING
+%  ASSERT EQUAL DISTRIBUTIONS
 %  ========================================================================
-% Validate "Pseudo-Tracking" (Quantile Matching) on MEA data
 
-flgPseudo = true; 
-if flgPseudo
-    
+flgPool = true;
+
+if strcmp(dataSet, 'mea')
+    cutoff_z = -2;
+    nBins = 5;
+elseif strcmp(dataSet, 'vivo')
+    cutoff_z = -1.4;
     nBins = 10;
+end
 
-    % --- ASSERT EQUAL DISTRIBUTIONS ---
-    cutoff_z = -2; % User defined cut-off (Visual Inspection)
-    % cutoff_z = -6;
+hFig = mcu_rcvQq(tblRaw, 'var', 'frSspk', 'dataSet', dataSet, 'cutoff_z', cutoff_z);
 
-    hFig = mcu_rcvQq(tbl, 'var', 'frSspk', 'dataSet', 'mea', 'cutoff_z', cutoff_z);
+% Define threshold based on Control Baseline
+frRef = log(tblRaw.fr(tblRaw.Group == 'Control'));
+mu = mean(frRef);
+sigma = std(frRef);
+cutoff_Hz = exp(mu + cutoff_z * sigma);
+cutoff_p = normcdf(cutoff_z); 
 
-    % Define threshold based on Control Baseline
-    frRef = log(tbl.fr(tbl.Group == 'Control'));
-    mu = mean(frRef);
-    sigma = std(frRef);
-    cutoff_Hz = exp(mu + cutoff_z * sigma);
+% Filter
+nBefore = height(tblRaw);
+goodIdx = tblRaw.fr >= cutoff_Hz;
+tblRaw = tblRaw(goodIdx, :);
 
-    cutoff_p = normcdf(cutoff_z); % For display only
-
-    % Apply Filter
-    nBefore = height(tbl);
-
-    % Identify Units to keep (Must have BSL FR > cutoff)
-    goodIdx = tbl.fr >= cutoff_Hz;
-
-    % Filter original table
-    tbl = tbl(goodIdx, :);
-
-    fprintf('\n================================================================\n');
-    fprintf(' FILTERING LOW FR UNITS\n');
-    fprintf('================================================================\n');
-    fprintf('Cut-off Z-score: %.2f (%.1f%%)\n', cutoff_z, cutoff_p*100);
-    fprintf('Cut-off FR     : %.4f Hz\n', cutoff_Hz);
-    fprintf('Removed %d units (%.1f%%). Remaining: %d units\n', ...
-        sum(~goodIdx), sum(~goodIdx)/length(goodIdx)*100, sum(goodIdx));
-    fprintf('================================================================\n\n');
+fprintf('\n================================================================\n');
+fprintf(' FILTERING LOW FR UNITS\n');
+fprintf('================================================================\n');
+fprintf('Cut-off Z-score: %.2f (%.1f%%)\n', cutoff_z, cutoff_p*100);
+fprintf('Cut-off FR     : %.4f Hz\n', cutoff_Hz);
+fprintf('Removed %d units (%.1f%%). Remaining: %d units\n', ...
+    sum(~goodIdx), sum(~goodIdx)/length(goodIdx)*100, sum(goodIdx));
+fprintf('================================================================\n\n');
 
 
-    % --- CONVERT TO LONG FORMAT ---
-    
+% --- CONVERT TO LONG FORMAT ---
+if strcmp(dataSet, 'mea')
     % Baseline Table
-    varsTbl = {'fr', 'frBspk', 'frSspk', 'pBspk', 'pBspk_trans'};
-    tBsl = tbl(:, [{'Group', 'Name'}, varsTbl]);
+    varsTbl = {'fr', 'frBspk', 'frSspk', 'pBspk'};
+    tBsl = tblRaw(:, [{'Group', 'Name'}, varsTbl]);
     tBsl.Day = repmat({'BSL'}, height(tBsl), 1);
     tBsl.Day = categorical(tBsl.Day);
 
     % Steady State Table (Rename ss_ vars)
-    varsSs = {'frSs', 'ss_frBspk', 'ss_frSspk', 'ss_pBspk', 'ss_pBspk_trans'}; 
-    tSs = tbl(:, [{'Group', 'Name'}, varsSs]);
-    tSs = renamevars(tSs, {'frSs', 'ss_frBspk', 'ss_frSspk', 'ss_pBspk', 'ss_pBspk_trans'}, ...
-                           {'fr',    'frBspk',    'frSspk',    'pBspk', 'pBspk_trans'});
+    varsSs = {'ss_fr', 'ss_frBspk', 'ss_frSspk', 'ss_pBspk'};
+    tSs = tblRaw(:, [{'Group', 'Name'}, varsSs]);
+    tSs = renamevars(tSs, {'ss_fr', 'ss_frBspk', 'ss_frSspk', 'ss_pBspk'}, ...
+        {'fr',    'frBspk',    'frSspk',    'pBspk'});
     tSs.Day = repmat({'BAC3'}, height(tSs), 1); % match_qntl hardcodes 'BAC3' as the 2nd day
     tSs.Day = categorical(tSs.Day);
 
     % Combine
-    tblLong = [tBsl; tSs];
-    
-    % --- RUN MATCHING ---
-    fprintf('VALIDATION: Running match_qntl on MEA data (nBins=%d)...\n', nBins);
-    tbl = match_qntl(tblLong, nBins, 'flgPool', false, ...
-        'var', 'fr', 'avgType', 'mean');
-    
-    tbl.frSs = tbl.ss_fr;
-    fprintf('VALIDATION: Replaced real units with %d Synthetic Units.\n', height(tbl));
+    tblRaw = [tBsl; tSs];
 end
 
 %% ========================================================================
-%  PLAY 
+%  PSEUDO-TRACKING
+%  ========================================================================
+fprintf('VALIDATION: Running match_qntl (nBins=%d)...\n', nBins);
+
+tbl = mcu_matchQntl(tblRaw, nBins, 'flgPool', flgPool, ...
+    'var', 'fr', 'avgType', 'mean');
+
+
+%% ========================================================================
+%  ADD CALCS
+%  ========================================================================
+
+% logit pBspk
+tblTrans = tbl_trans(tbl, 'varsInc', {'pBspk', 'ss_pBspk'}, 'logBase', 'logit');
+tbl.pBspk_trans = tblTrans.pBspk;
+tbl.ss_pBspk_trans = tblTrans.ss_pBspk;
+
+% Relative
+tbl.dBrst_rel = log((tbl.ss_frBspk) ./ (tbl.frBspk));
+tbl.dSngl_rel = log((tbl.ss_frSspk) ./ (tbl.frSspk));
+tbl.dFr = log((tbl.ss_fr) ./ (tbl.fr));
+tbl.dpBspk = (tbl.ss_pBspk_trans) - (tbl.pBspk_trans);
+
+% Absolute
+tbl.dBrst_abs = (tbl.ss_frBspk - tbl.frBspk);
+tbl.dSngl_abs = (tbl.ss_frSspk - tbl.frSspk);
+tbl.dFr_abs = (tbl.ss_fr - tbl.fr);
+
+
+%% ========================================================================
+%  PLAY
 %  ========================================================================
 % Repeat regression analyses
+
+hFig = mcu_rcvSpace(tbl);
+
+tblGUI_scatHist(tbl, 'xVar', 'pBspk', 'yVar', 'ss_frBspk', 'grpVar', 'Group');

@@ -94,7 +94,7 @@ varMap.uGood     = 'fr.uGood';
 if ismember('rcv', presets)
     rcvFile = 'rcv';
     varMap.fr          = [rcvFile, '.frBsl'];
-    varMap.frSs        = [rcvFile, '.frSs'];
+    varMap.ss_fr        = [rcvFile, '.frSs'];
     varMap.frAcute     = [rcvFile, '.frAcute'];
     varMap.frTrough    = [rcvFile, '.frTrough'];
     varMap.pertDepth   = [rcvFile, '.pertDepth'];
@@ -112,7 +112,7 @@ if ismember('rcv', presets)
     varMap.uPert       = [rcvFile, '.uPert'];
 else
     varMap.fr        = 'rcv.frBsl';
-    varMap.frSs      = 'rcv.frSs';
+    varMap.ss_fr      = 'rcv.frSs';
     varMap.frAcute   = 'rcv.frAcute';
     varMap.frTrough  = 'rcv.frTrough';
     varMap.uRcv      = 'rcv.uRcv';
@@ -276,7 +276,7 @@ if flgOtl
     tbl = removevars(tbl, 'uPert');
 
     % Clean residual outliers
-    frml = 'frSs ~ (frBspk + frSspk) + (1 | Name)';
+    frml = 'ss_fr ~ (frBspk + frSspk) + (1 | Name)';
 
     % Control
     tblWt  = tbl(tbl.Group == 'Control', :);

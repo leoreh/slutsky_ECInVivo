@@ -11,7 +11,7 @@ function hFig = mcu_rcvQq(tbl, varargin)
 %   INPUTS:
 %       tbl         - (table) Data table.
 %                     If dataSet='vivo', must contain 'Day'.
-%                     If dataSet='mea', must contain 'ss_<var>' (or 'frSs' for 'fr').
+%                     If dataSet='mea', must contain 'ss_<var>' 
 %       varargin    - (param/value) Optional parameters:
 %                     'var'     : (char) Variable to plot (default: 'fr').
 %                     'dataSet' : (char) 'vivo' (default) or 'mea'.
@@ -58,7 +58,7 @@ if strcmpi(dataSet, 'vivo')
         error('mcu_rcvQq:missingVar', 'Vivo data requires "Day" column.');
     end
     
-    % Extract Baseline and Recovery (BAC3) for varName
+    % Extract Baseline and Recovery for varName
     vBsl = tbl.(varName)(tbl.Day == 'BSL' & idxWt);
     vBac = tbl.(varName)(tbl.Day == 'BAC3' & idxWt);
     
@@ -69,10 +69,10 @@ elseif strcmpi(dataSet, 'mea')
     
     % MEA Logic (Wide format)
     % Baseline is 'varName'
-    % SteadyState is 'ss_varName' (or 'frSs' if varName is 'fr')
+    % SteadyState is 'ss_varName' (or 'ss_fr' if varName is 'fr')
     
     if strcmp(varName, 'fr')
-        ssVarName = 'frSs';
+        ssVarName = 'ss_fr';
     else
         ssVarName = ['ss_' varName];
     end

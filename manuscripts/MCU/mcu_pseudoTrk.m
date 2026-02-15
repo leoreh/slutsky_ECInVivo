@@ -23,26 +23,30 @@ if flgLoad
         [tblMea, xVec, basepaths, v] = mcu_tblMea('presets', presets, 'flgOtl', true);
 
     elseif strcmp(dataSet, 'vivo')
-        basepaths = [mcu_basepaths('wt'), mcu_basepaths('mcu')];
-        presets = {'frNet', 'brst'};
+        basepaths = [mcu_basepaths('wt_bsl'), mcu_basepaths('mcu_bsl'), ...
+            mcu_basepaths('wt_bac3'), mcu_basepaths('mcu_bac3')];
+        basepaths(contains(basepaths, 'lh137')) = [];
+        presets = {'brst'};
         tblVivo = mcu_tblVivo('basepaths', basepaths, 'flgClean', true, ...
-            'presets', presets);  
+            'presets', presets);
+        tblVivo.Day(tblVivo.Day == "BAC_ON") = "BAC3";
+        tblVivo.Day = removecats(tblVivo.Day, {'BAC_ON'});
+        
+        % Filter RS
+        tblVivo = tblVivo(tblVivo.unitType == "RS", :);
+        tblVivo.unitType = [];
+
+        % Assert no zero values (instead of a pseudocount)
+        tblVivo = tbl_trans(tblVivo, 'flg0', true, 'verbose', true);
+        
     end
 end
 
-% Prep table
 if strcmp(dataSet, 'mea')
     tblRaw = tblMea;
 
 elseif strcmp(dataSet, 'vivo')
-    % Filter
-    tblRaw = tblVivo(tblVivo.unitType == 'RS', :);
-
-    idxDay = ismember(tblRaw.Day, {'BSL', 'BAC3'});
-    tblRaw = tblRaw(idxDay, :);
-
-    % Assert no zero values for logs (instead of a pseudocount)
-    tblRaw = tbl_trans(tblRaw, 'flg0', true, 'verbose', true);
+    tblRaw = tblVivo;
 end
 
 %% ========================================================================
@@ -55,11 +59,11 @@ if strcmp(dataSet, 'mea')
     cutoff_z = -2;
     nBins = 5;
 elseif strcmp(dataSet, 'vivo')
-    cutoff_z = -1.4;
-    nBins = 5;
+    cutoff_z = -1.0;
+    nBins = 4;
 end
 
-hFig = mcu_rcvQq(tblRaw, 'var', 'frSspk', 'dataSet', dataSet, 'cutoff_z', cutoff_z);
+% hFig = mcu_rcvQq(tblRaw, 'var', 'frSspk', 'dataSet', dataSet, 'cutoff_z', cutoff_z);
 
 % Define threshold based on Control Baseline
 frRef = log(tblRaw.fr(tblRaw.Group == 'Control'));
@@ -92,9 +96,9 @@ if strcmp(dataSet, 'mea')
     tBsl.Day = categorical(tBsl.Day);
 
     % Steady State Table (Rename ss_ vars)
-    varsSs = {'frSs', 'ss_frBspk', 'ss_frSspk', 'ss_pBspk'};
+    varsSs = {'ss_fr', 'ss_frBspk', 'ss_frSspk', 'ss_pBspk'};
     tSs = tblRaw(:, [{'Group', 'Name'}, varsSs]);
-    tSs = renamevars(tSs, {'frSs', 'ss_frBspk', 'ss_frSspk', 'ss_pBspk'}, ...
+    tSs = renamevars(tSs, {'ss_fr', 'ss_frBspk', 'ss_frSspk', 'ss_pBspk'}, ...
         {'fr',    'frBspk',    'frSspk',    'pBspk'});
     tSs.Day = repmat({'BAC3'}, height(tSs), 1); % match_qntl hardcodes 'BAC3' as the 2nd day
     tSs.Day = categorical(tSs.Day);
@@ -109,16 +113,12 @@ end
 fprintf('VALIDATION: Running match_qntl (nBins=%d)...\n', nBins);
 
 tbl = mcu_matchQntl(tblRaw, nBins, 'flgPool', flgPool, ...
-    'var', 'fr', 'avgType', 'mean');
+    'var', 'fr', 'avgType', 'geomean');
 
 
 %% ========================================================================
 %  ADD CALCS
 %  ========================================================================
-
-% Naming convention
-tbl.frSs = tbl.ss_fr;
-removevars(tbl, 'ss_fr');
 
 % logit pBspk
 tblTrans = tbl_trans(tbl, 'varsInc', {'pBspk', 'ss_pBspk'}, 'logBase', 'logit');
@@ -128,13 +128,13 @@ tbl.ss_pBspk_trans = tblTrans.ss_pBspk;
 % Relative
 tbl.dBrst_rel = log((tbl.ss_frBspk) ./ (tbl.frBspk));
 tbl.dSngl_rel = log((tbl.ss_frSspk) ./ (tbl.frSspk));
-tbl.dFr = log((tbl.frSs) ./ (tbl.fr));
+tbl.dFr = log((tbl.ss_fr) ./ (tbl.fr));
 tbl.dpBspk = (tbl.ss_pBspk_trans) - (tbl.pBspk_trans);
 
 % Absolute
 tbl.dBrst_abs = (tbl.ss_frBspk - tbl.frBspk);
 tbl.dSngl_abs = (tbl.ss_frSspk - tbl.frSspk);
-tbl.dFr_abs = (tbl.frSs - tbl.fr);
+tbl.dFr_abs = (tbl.ss_fr - tbl.fr);
 
 
 %% ========================================================================
@@ -143,3 +143,5 @@ tbl.dFr_abs = (tbl.frSs - tbl.fr);
 % Repeat regression analyses
 
 hFig = mcu_rcvSpace(tbl);
+
+tblGUI_scatHist(tbl, 'xVar', 'pBspk', 'yVar', 'ss_frBspk', 'grpVar', 'Group');

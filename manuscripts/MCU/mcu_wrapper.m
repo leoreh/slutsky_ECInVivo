@@ -114,30 +114,57 @@ vars = {'Group'};
 %  INSPECT RECOVERY
 %  ========================================================================
 
-% Grab only BSL and BAC3 (1st and 5th recording day)
-basepaths = [mcu_basepaths('wt'), mcu_basepaths('mcu')];
-fileMouse = findgroups(get_mname(basepaths));
-[~, idxMouse] = unique(fileMouse, 'stable');
-idxMouse = sort([idxMouse; idxMouse + 4]);
-basepaths = basepaths(idxMouse);
-
-presets = {'brst', 'prc', 'frNet'};
-[tbl, basepaths, ~] = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
-tbl.Day(tbl.Day == "BAC_ON") = "BAC3";
-
-
-tblPlot = tbl;
-
-
-% logit pBspk
-tblTrans = tbl_trans(tblPlot, 'varsInc', {'pBspk'}, 'logBase', 'logit');
-tbl.pBspk_trans = tblTrans.pBspk;
+% Load table
+basepaths = [mcu_basepaths('wt_bsl'), mcu_basepaths('mcu_bsl'), ...
+    mcu_basepaths('wt_bac3'), mcu_basepaths('mcu_bac3')];
+basepaths(contains(basepaths, 'lh137')) = [];
+presets = {'brst'};
+tblVivo = mcu_tblVivo('basepaths', basepaths, 'flgClean', true, ...
+    'presets', presets);
+tblVivo.Day(tblVivo.Day == "BAC_ON") = "BAC3";
+tblVivo.Day = removecats(tblVivo.Day, {'BAC_ON'});
 
 % Filter RS
-tblPlot = tblPlot(tblPlot.unitType == "RS", :);
+tblVivo = tblVivo(tblVivo.unitType == "RS", :);
+tblVivo.unitType = [];
 
-tblGUI_bar(tblPlot, 'xVar', 'Group', 'yVar', 'funcon_shf');
-tblGUI_scatHist(tblPlot, 'xVar', 'pBspk', 'yVar', 'funcon_shf', 'grpVar', 'Group');
+% logit pBspk
+tblTrans = tbl_trans(tblVivo, 'varsInc', {'pBspk'}, 'logBase', 'logit');
+tblVivo.pBspk_trans = tblTrans.pBspk;
+
+% Assert no zero values (instead of a pseudocount)
+tblVivo = tbl_trans(tblVivo, 'flg0', true, 'verbose', true);
+
+% Plot
+tblGUI_bar(tblVivo, 'xVar', 'Group', 'yVar', 'fr');
+tblGUI_scatHist(tblVivo, 'xVar', 'pBspk', 'yVar', 'fr', 'grpVar', 'Group');
+
+
+%% ========================================================================
+%  WIDE TABLE
+%  ========================================================================
+
+% Unstack (wide table)
+tblPlot = tblVivo;
+varsTbl = tblPlot.Properties.VariableNames;
+isNum = cellfun(@(x) isnumeric(tblPlot.(x)) && ~iscategorical(tblPlot.(x)), varsTbl);
+varsNum = varsTbl(isNum);
+tblPlot = unstack(tblPlot, varsNum, {'Day'});
+tblPlot.UnitID = [];
+
+% Organize column names
+varsTbl = tblPlot.Properties.VariableNames;
+varsNew = regexprep(varsTbl, '_BSL$', '');
+varsNew = regexprep(varsNew, '(.*)_BAC3$', 'ss_$1');
+tblPlot.Properties.VariableNames = varsNew;
+
+% Plot
+tblGUI_scatHist(tblPlot, 'xVar', 'ss_frBspk', 'yVar', 'ss_frSspk', 'grpVar', 'Group');
+
+% LME
+varRsp = 'ss_frSspk';
+frml = [varRsp, ' ~ Group + (1|Name)'];
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblPlot, frml, 'dist', 'gamma');
 
 
 
@@ -147,38 +174,37 @@ tblGUI_scatHist(tblPlot, 'xVar', 'pBspk', 'yVar', 'funcon_shf', 'grpVar', 'Group
 
 statType = 'mean';
 
-% Variable names
+if strcmp(statType, 'geomean')
+    fh = @stat_geomean;
+else
+    fh = statType;
+end
+
 varsTbl = tblPlot.Properties.VariableNames;
-isNum = cellfun(@(x) isnumeric(tblPlot.(x)) && ~iscategorical(tblPlot.(x)), varsTbl);
-varsNum = varsTbl(isNum);
-
-% Select Units
-tblRs = tblPlot(tblPlot.unitType == "RS", :);
-tblRs(:, "UnitID") = [];
-tblRs(:, "File") = [];
-tblRs(:, "unitType") = [];
-
-% Baseline Table
-tblBsl = tblRs(tblRs.Day == "BSL", :);
-varsTbl = tblBsl.Properties.VariableNames;
-tblBsl = groupsummary(tblBsl, {'Group', 'Name', 'Day'}, statType, ...
+tblSum = groupsummary(tblPlot, {'Group', 'Name'}, fh, ...
     vartype("numeric"));
-tblBsl(:, "GroupCount") = [];
-tblBsl.Properties.VariableNames = varsTbl;
+tblSum(:, "GroupCount") = [];
+varsTbl(contains(varsTbl, 'File')) = [];
+tblSum.Properties.VariableNames = varsTbl;
 
-% SteadyState Table
-tblSs = tblRs(tblRs.Day == "BAC3", :);
-tblSs = groupsummary(tblSs, {'Group', 'Name', 'Day'}, statType, ...
-    vartype("numeric"));
-tblSs(:, "GroupCount") = [];
-tblSs.Properties.VariableNames = varsTbl;
+% Add Recovery Metrics
 
-% FR Recovery
-tblLme = tblBsl;
-tblLme.Rcv = (tblSs.fr ./ tblBsl.fr) * 100;
+% Relative
+tblSum.dBrst_rel = log((tblSum.ss_frBspk) ./ (tblSum.frBspk));
+tblSum.dSngl_rel = log((tblSum.ss_frSspk) ./ (tblSum.frSspk));
+tblSum.dFr = log((tblSum.ss_fr) ./ (tblSum.fr));
+tblSum.dpBspk = (tblSum.ss_pBspk_trans) - (tblSum.pBspk_trans);
+
+% Absolute
+tblSum.dBrst_abs = (tblSum.ss_frBspk - tblSum.frBspk);
+tblSum.dSngl_abs = (tblSum.ss_frSspk - tblSum.frSspk);
+tblSum.dFr_abs = (tblSum.ss_fr - tblSum.fr);
+tblSum.dFr_prct = dFr_abs * 100;
 
 
-tblGUI_scatHist(tblLme, 'xVar', 'dim', 'yVar', 'Rcv', 'grpVar', 'Group');
+tblGUI_scatHist(tblSum, 'xVar', 'dBrst_rel', 'yVar', 'dSngl_rel', 'grpVar', 'Group');
+
+tblSum(:, {'Group', 'dBrst_abs', 'dSngl_abs'})
 
 
 
@@ -368,3 +394,5 @@ end
 tblLme.dim = dim([1 : 9, 11])';
 
 tblGUI_scatHist(tblLme, 'xVar', 'dim', 'yVar', 'Rcv', 'grpVar', 'Group');
+
+

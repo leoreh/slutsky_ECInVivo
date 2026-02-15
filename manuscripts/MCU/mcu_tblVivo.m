@@ -56,7 +56,7 @@ end
 
 if ismember('brst', presets)
     vars = [vars, 'brstStats'];
-    varMap.bRate     = 'stats.rate';
+    varMap.bRate     = 'stats.eventRate';
     varMap.bDur      = 'stats.dur';
     varMap.bFreq     = 'stats.freq';
     varMap.bIBI      = 'stats.ibi';
@@ -260,9 +260,11 @@ if flgClean
     tbl.unitType = removecats(tbl.unitType, 'Other');
 
     % Remove bac on / off
-    tbl(tbl.Day == 'BAC_ON', :) = [];
-    tbl(tbl.Day == 'BAC_OFF', :) = [];
-    tbl.Day = removecats(tbl.Day, {'BAC_ON', 'BAC_OFF'});
+    if any(tbl.Day == 'BAC_OFF')
+        tbl(tbl.Day == 'BAC_ON', :) = [];
+        tbl(tbl.Day == 'BAC_OFF', :) = [];
+        tbl.Day = removecats(tbl.Day, {'BAC_ON', 'BAC_OFF'});
+    end
 end
 
 end     % EOF
