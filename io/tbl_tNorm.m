@@ -167,7 +167,9 @@ for iVar = 1:length(processVars)
         % Apply Normalize
         if flgGeom
             % Apply floor before transforming
+            wasNan = isnan(varData);
             varData = max(varData, currFloor);
+            varData(wasNan) = NaN;
             
             if ~strcmpi(method, 'percentage')
                 % Log Output: (log(x) - muLog) / sigLog
@@ -196,7 +198,9 @@ for iVar = 1:length(processVars)
             % Apply Normalize to Group Rows
             if flgGeom
                  % Apply floor
+                 wasNan = isnan(grpData);
                  grpData = max(grpData, currFloor);
+                 grpData(wasNan) = NaN;
 
                  if ~strcmpi(method, 'percentage')
                      % Log Output
@@ -226,7 +230,10 @@ if nargin < 4, floorVal = eps; end
 
 % Pre-process: Apply Geometric Transformation if needed
 if flgGeom
+    % Apply Floor to Non-NaNs Only
+    wasNan = isnan(vals);
     vals = log(max(vals, floorVal));
+    vals(wasNan) = NaN; % Restore NaNs
 end
 
 % Calculate Base Statistics

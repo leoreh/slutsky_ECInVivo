@@ -35,7 +35,6 @@ if flgLoad
         % Filter RS
         tblVivo = tblVivo(tblVivo.unitType == "RS", :);
         tblVivo.unitType = [];
-        tblVivo.UnitID = [];
 
         % Assert no zero values (instead of a pseudocount)
         tblVivo = tbl_trans(tblVivo, 'flg0', true, 'verbose', true);
@@ -54,17 +53,17 @@ end
 %  ASSERT EQUAL DISTRIBUTIONS
 %  ========================================================================
 
-flgPool = true;
+flgPool = false;
 
 if strcmp(dataSet, 'mea')
     cutoff_z = -2;
     nBins = 5;
 elseif strcmp(dataSet, 'vivo')
-    cutoff_z = -1.4;
-    nBins = 10;
+    cutoff_z = -1.0;
+    nBins = 4;
 end
 
-hFig = mcu_rcvQq(tblRaw, 'var', 'frSspk', 'dataSet', dataSet, 'cutoff_z', cutoff_z);
+% hFig = mcu_rcvQq(tblRaw, 'var', 'frSspk', 'dataSet', dataSet, 'cutoff_z', cutoff_z);
 
 % Define threshold based on Control Baseline
 frRef = log(tblRaw.fr(tblRaw.Group == 'Control'));
@@ -114,7 +113,7 @@ end
 fprintf('VALIDATION: Running match_qntl (nBins=%d)...\n', nBins);
 
 tbl = mcu_matchQntl(tblRaw, nBins, 'flgPool', flgPool, ...
-    'var', 'fr', 'avgType', 'mean');
+    'var', 'fr', 'avgType', 'geomean');
 
 
 %% ========================================================================

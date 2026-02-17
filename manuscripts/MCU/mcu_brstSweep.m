@@ -178,7 +178,6 @@ for iIsi = 1 : nIsi
         r.isiThr = isiSweep(iIsi);
         
         % LME (Group Effect)
-        % LME (Group Effect)
         mdl = sprintf('%s ~ Group + (1|Name)', fPBspk);
         lme = lme_analyse(tblLme, mdl, 'dist', 'logit-normal', ...
             'flgPlot', false, 'verbose', false);

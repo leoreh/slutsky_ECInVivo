@@ -29,6 +29,7 @@ parse(p, tbl, frml);
 
 % List of distributions to test
 mdls = {'Normal', 'Log-Normal', 'Logit-Normal', 'Poisson', 'Gamma', 'InverseGaussian'};
+mdls = {'Normal', 'Log-Normal', 'Logit-Normal', 'Poisson', 'Gamma'};
 nMdl = length(mdls);
 
 % Common canonical/standard links
@@ -36,6 +37,7 @@ nMdl = length(mdls);
 % Log/Logit-Normal -> Identity (on transformed data)
 % Others -> Log (Enforced as per best practice for positive biological data)
 links = {'Identity', 'Identity', 'Identity', 'Log', 'Log', 'Log'};
+links = {'Identity', 'Identity', 'Identity', 'Log', 'Log'};
 
 % Output table
 stats = table();

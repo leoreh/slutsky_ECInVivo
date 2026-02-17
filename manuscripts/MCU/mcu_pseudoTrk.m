@@ -15,6 +15,7 @@
 %  ========================================================================
 
 flgLoad = false;
+dataSet = 'mea';
 dataSet = 'vivo';
 
 if flgLoad
@@ -63,7 +64,8 @@ elseif strcmp(dataSet, 'vivo')
     nBins = 4;
 end
 
-% hFig = mcu_rcvQq(tblRaw, 'var', 'frSspk', 'dataSet', dataSet, 'cutoff_z', cutoff_z);
+[hFig, qqData] = mcu_rcvQq(tblRaw, 'var', 'fr', 'dataSet', dataSet, 'cutoff_z', cutoff_z);
+
 
 % Define threshold based on Control Baseline
 frRef = log(tblRaw.fr(tblRaw.Group == 'Control'));
@@ -144,4 +146,4 @@ tbl.dFr_abs = (tbl.ss_fr - tbl.fr);
 
 hFig = mcu_rcvSpace(tbl);
 
-tblGUI_scatHist(tbl, 'xVar', 'pBspk', 'yVar', 'ss_frBspk', 'grpVar', 'Group');
+% tblGUI_scatHist(tbl, 'xVar', 'pBspk', 'yVar', 'ss_frBspk', 'grpVar', 'Group');

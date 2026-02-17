@@ -249,7 +249,7 @@ lmeStats = lme_effects(lmeMdl, ...
 % Add Metadata (AIC, Formula, FitMethod, DFMethod)
 lmeInfo.frml = frml;
 lmeInfo.dfMethod = p.Results.dfMethod;
-lmeInfo.fitMethod = fitMethod;
+lmeInfo.fitMethod = lmeMdl.FitMethod;
 lmeInfo.aic = lmeMdl.ModelCriterion.AIC;
 
 % Verbose Output

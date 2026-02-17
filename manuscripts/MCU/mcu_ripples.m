@@ -75,7 +75,6 @@ presets = {'rippSpks', 'brst'};
 [tbl, ~, ~, xVec] = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
 
 % Select
-tblPlot = tbl;
 tblPlot = tbl(tbl.unitType == 'RS', :);
 % tblPlot(tblPlot.Name == 'lh137', :) = [];
 % tblPlot.Name = removecats(tblPlot.Name, {'lh137'});
@@ -93,11 +92,8 @@ tblGUI_xy(xVec, tbl);
 
 % LME
 xVar = 'pBspk';
-frml = sprintf('com ~ (fr + %s) + Group + (1|Name)', xVar);
+frml = sprintf('com ~ (fr + %s) * Group + (1|Name)', xVar);
 [lmeMdl, lmeStates, lmeInfo] = lme_analyse(tblPlot, frml, 'dist', 'normal');
-
-
-
 
 
 % Partial Dependence
@@ -107,10 +103,6 @@ vars = {xVar, 'Group'};
 [pdRes, hFig] = lme_pd(lmeMdl, vars, 'transParams', lmeInfo.transParams, ...
     'hAx', hAx, 'xLims', {[0, 1], []});
 
-hAx = nexttile;
-vars = {'Group'};
-[pdRes, hFig] = lme_pd(lmeMdl, vars, 'transParams', lmeInfo.transParams, ...
-    'hAx', hAx);
 
 % To Prism
 grpIdx = pdRes.Group == "MCU-KO";
@@ -159,7 +151,7 @@ tblSum = groupsummary(tblRipp, {'Group', 'Name'}, 'mean', ...
 frml = 'dur ~ (freq + amp + com) * Group + (1|Name)';
 [lmeMdl, lmeStates, lmeInfo] = lme_analyse(tblRipp, frml);
 
-frml = 'freq ~ Group + (1|Name)';
+frml = 'dur ~ Group + (1|Name)';
 [lmeMdl, lmeStates, lmeInfo] = lme_analyse(tblRipp, frml);
 
 % To Prism (Metrics)

@@ -1,4 +1,4 @@
-function hFig = mcu_rcvQq(tbl, varargin)
+function [hFig, qqData] = mcu_rcvQq(tbl, varargin)
 % MCU_RCVQQ Performs QQ plots for distribution analysis.
 %
 %   HFIG = MCU_RCVQQ(TBL, 'var', 'fr') generates a 2x2 tiling of QQ plots 
@@ -19,6 +19,7 @@ function hFig = mcu_rcvQq(tbl, varargin)
 %
 %   OUTPUTS:
 %       hFig        - (Handle) Figure handle.
+%       qqData      - (table) Processed plot data. Col 'Data' is [x, y].
 %
 %   See also: MCU_RCVVEC, MEA_RCVVEC, QQPLOT
 %
@@ -69,7 +70,7 @@ elseif strcmpi(dataSet, 'mea')
     
     % MEA Logic (Wide format)
     % Baseline is 'varName'
-    % SteadyState is 'ss_varName' (or 'ss_fr' if varName is 'fr')
+    % SteadyState is 'ss_varName'
     
     if strcmp(varName, 'fr')
         ssVarName = 'ss_fr';
@@ -101,12 +102,19 @@ tiledlayout(2, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
 % 1. Log-Normality Check (BSL Control)
 % ------------------------------------
 nexttile;
-hQ = qqplot(log(vBsl)); 
-xlabel('Theoretical Normal Quantiles');
-ylabel(sprintf('Sample Log(%s) Quantiles', varName));
+hP = probplot('lognormal', vBsl);
+xlabel(sprintf('%s (Hz)', varName));
+ylabel('Probability');
 title(sprintf('Log-Normality Check (BSL Control)'));
 grid on; axis square;   
-hQ(1).LineWidth = 1;
+
+% Store Plot Data
+qq1.Name = "BSL Control (Log-Normal)";
+qq1.X_Label = "Data (Hz)";
+qq1.Y_Label = "Probability";
+% Convert Z-scores to Probabilities
+qq1.Data = [hP(1).XData(:), normcdf(hP(1).YData(:))];
+
 
 % 2. Group Check (Control vs MCU)
 % -------------------------------
@@ -116,8 +124,15 @@ xlabel(sprintf('Control BSL Log(%s)', varName));
 ylabel(sprintf('MCU BSL Log(%s)', varName));
 title('Group: Control vs MCU (BSL)');
 grid on; axis square;
-refline(1,0);
+refline(1,0); 
 hQ(1).LineWidth = 1;
+
+% Store Plot Data
+qq2.Name = "Group: Control vs MCU";
+qq2.X_Label = "Control Log(Val)";
+qq2.Y_Label = "MCU Log(Val)";
+qq2.Data = [hQ(1).XData(:), hQ(1).YData(:)];
+
 
 % 3. Stability Check (BSL vs Recovery Control)
 % --------------------------------------------
@@ -130,6 +145,13 @@ grid on; axis square;
 refline(1,0); 
 hQ(1).LineWidth = 1;
 
+% Store Plot Data
+qq3.Name = "Stability: Control";
+qq3.X_Label = "BSL Log(Val)";
+qq3.Y_Label = "Recovery Log(Val)";
+qq3.Data = [hQ(1).XData(:), hQ(1).YData(:)];
+
+
 % 4. Stability Check (BSL vs Recovery MCU)
 % ----------------------------------------
 nexttile;
@@ -141,6 +163,17 @@ grid on; axis square;
 refline(1,0); 
 hQ(1).LineWidth = 1;
 
+% Store Plot Data
+qq4.Name = "Stability: MCU";
+qq4.X_Label = "BSL Log(Val)";
+qq4.Y_Label = "Recovery Log(Val)";
+qq4.Data = [hQ(1).XData(:), hQ(1).YData(:)];
+
+
+% =========================================================================
+% COMPILE OUTPUT
+% =========================================================================
+qqData = struct2table([qq1; qq2; qq3; qq4], 'AsArray', true);
 
 % =========================================================================
 % ADD CUTOFF LINES
@@ -151,11 +184,12 @@ hQ(1).LineWidth = 1;
 mu = mean(log(vBsl));
 sigma = std(log(vBsl));
 logCutoff = mu + (cutoff_z * sigma);
+cutoff_Hz = exp(logCutoff);
 
 % Add Cutoff to Tile 1 (BSL Normality)
-nexttile(1); hold on;
-yline(logCutoff, 'r--', 'Cutoff', 'LineWidth', 1.5, ...
-    'LabelVerticalAlignment', 'bottom');
+% nexttile(1); hold on;
+% xline(cutoff_Hz, 'r--', 'Cutoff', 'LineWidth', 1.5, ...
+%     'LabelVerticalAlignment', 'bottom', 'LabelOrientation', 'horizontal');
 
 % Add Cutoff to Tile 2 (Control vs MCU)
 nexttile(2); hold on;

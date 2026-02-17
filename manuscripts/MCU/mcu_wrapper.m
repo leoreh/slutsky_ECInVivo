@@ -43,8 +43,8 @@ for iFile = 1 : nFiles
     % Burst detection
     isiStart = 0.006;
     minSpks = 2;
-    % isiStart = 0.05;
-    % minSpks = 3;
+    isiStart = 0.05;
+    minSpks = 3;
     isiEnd = isiStart * 2;
     minIBI = isiEnd;
     minDur = 0;
@@ -162,10 +162,12 @@ tblPlot.Properties.VariableNames = varsNew;
 tblGUI_scatHist(tblPlot, 'xVar', 'ss_frBspk', 'yVar', 'ss_frSspk', 'grpVar', 'Group');
 
 % LME
-varRsp = 'ss_frSspk';
+varRsp = 'ss_frBspk';
 frml = [varRsp, ' ~ Group + (1|Name)'];
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblPlot, frml, 'dist', 'gamma');
 
+% Prism
+[prismMat] = tbl2prism(tblPlot, 'yVar', varRsp, 'grpVar', 'Group');
 
 
 %% ========================================================================
@@ -199,12 +201,12 @@ tblSum.dpBspk = (tblSum.ss_pBspk_trans) - (tblSum.pBspk_trans);
 tblSum.dBrst_abs = (tblSum.ss_frBspk - tblSum.frBspk);
 tblSum.dSngl_abs = (tblSum.ss_frSspk - tblSum.frSspk);
 tblSum.dFr_abs = (tblSum.ss_fr - tblSum.fr);
-tblSum.dFr_prct = dFr_abs * 100;
+tblSum.dFr_prct = tblSum.dFr_abs * 100;
 
 
 tblGUI_scatHist(tblSum, 'xVar', 'dBrst_rel', 'yVar', 'dSngl_rel', 'grpVar', 'Group');
 
-tblSum(:, {'Group', 'dBrst_abs', 'dSngl_abs'})
+tblSum(:, {'Group', 'dBrst_rel', 'dSngl_rel'})
 
 
 
