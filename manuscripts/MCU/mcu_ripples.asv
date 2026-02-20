@@ -96,6 +96,7 @@ xVar = 'pBspk';
 frml = sprintf('com ~ (fr + %s) + Group + (1|Name)', xVar);
 [lmeMdl, lmeStates, lmeInfo] = lme_analyse(tblPlot, frml, 'dist', 'normal');
 
+
 % Partial Dependence
 hFig = figure;
 hAx = nexttile;
@@ -111,7 +112,7 @@ vars = {xVar, 'Group'};
 set(hAx, 'XScale', 'log')
 
 % To Prism
-grpIdx = pdRes.Group == "Control";
+grpIdx = pdRes.Group == "MCU-KO";
 [pdRes(grpIdx, {xVar}), ...
     pdRes(grpIdx, {'com_pred', 'com_upper', 'com_lower'})]
 

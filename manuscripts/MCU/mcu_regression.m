@@ -50,6 +50,14 @@ tbl.dFr_abs = (tbl.ss_fr - tbl.fr);
 % string(prismVars)
 
 
+%% ========================================================================
+%  EXCHANGE RATE
+%  ========================================================================
+% Use raw values (not standardized effects)
+
+frml = 'dSngl_abs ~ (dBrst_abs) * Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
+    'dist', 'normal', 'verbose', true);
 
 
 %% ========================================================================

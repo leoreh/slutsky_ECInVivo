@@ -43,8 +43,8 @@ for iFile = 1 : nFiles
     % Burst detection
     isiStart = 0.006;
     minSpks = 2;
-    isiStart = 0.05;
-    minSpks = 3;
+    % isiStart = 0.05;
+    % minSpks = 3;
     isiEnd = isiStart * 2;
     minIBI = isiEnd;
     minDur = 0;
