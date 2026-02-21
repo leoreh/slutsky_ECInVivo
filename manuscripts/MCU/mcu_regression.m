@@ -43,7 +43,7 @@ tbl.dSngl_abs = (tbl.ss_frSspk - tbl.frSspk);
 tbl.dFr_abs = (tbl.ss_fr - tbl.fr);
 
 % % Prism
-% idxGrp = tbl.Group == 'MCU-KO';
+idxGrp = tbl.Group == 'Control';
 % prismVars = {'Name', 'dSngl_rel', 'dBrst_rel', 'dSngl_abs', 'dBrst_abs', ...
 %     'dFr', 'dpBspk', 'pBspk', 'pBspk_trans'};
 % tblPrism = tbl(idxGrp, prismVars);
@@ -57,8 +57,11 @@ tbl.dFr_abs = (tbl.ss_fr - tbl.fr);
 
 frml = 'dSngl_abs ~ (dBrst_abs) * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-    'dist', 'normal', 'verbose', true);
+    'dist', 'normal', 'verbose', true, 'flgStnd', false);
 
+frml = 'dSngl_rel ~ dBrst_rel * Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
+    'dist', 'normal', 'verbose', true, 'flgStnd', false);
 
 %% ========================================================================
 %  PLOTTING
@@ -96,8 +99,12 @@ frml = 'dSngl_rel ~ (pBspk + fr + dBrst_rel) * Group + (1|Name)';
     'flgMode', 'regression', 'hAx', hAx, ...
     'varGrp',  'Group', 'transParams', lmeInfo.transParams);
 
+% frml = 'ResidY ~ ResidX * Group + (1|Name)';
+% [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tblRes, frml, ...
+%     'dist', 'normal', 'verbose', true, 'flgStnd', false);
+
 hAx = nexttile;
-frml = 'dSngl_abs ~ (pBspk + fr + dBrst_abs) * Group + (1|Name)';
+frml = 'dSngl_abs ~ (pBspk * fr * dBrst_abs) * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
     'dist', 'normal', 'verbose', false);
 

@@ -185,7 +185,7 @@ end
 %  ========================================================================
 
 % Determine Regression Type
-regType = 'ortho';
+regType = 'linear';
 if strcmpi(flgMode, 'regression')
     if exist('xUnits', 'var') && strcmpi(xUnits, 'Standardized (Z-Score)')
         regType = 'linear';

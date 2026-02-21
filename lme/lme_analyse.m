@@ -23,6 +23,7 @@ function [lmeMdl, lmeStats, lmeInfo, lmeTbl] = lme_analyse(tbl, frml, varargin)
 %                     'dist'        : (char) Force distribution. If empty, auto-selects.
 %                     'contrasts', 'correction', 'dfMethod': See LME_EFFECTS.
 %                     'flgPlot'
+%                     'flgStnd'     : (logical) Z-score continuous predictors {true}
 %
 %   OUTPUTS:
 %       lmeStats    - (table) Statistical results (ANOVA, Effects).
@@ -43,6 +44,7 @@ addRequired(p, 'frml', @(x) ischar(x) || isstring(x));
 % Wrapper Options
 addParameter(p, 'dist', '', @ischar);
 addParameter(p, 'flgPlot', false, @islogical);
+addParameter(p, 'flgStnd', true, @islogical);
 addParameter(p, 'fitMethod', '', @ischar);
 
 % Pass-through Options (LME_EFFECTS)
@@ -55,6 +57,7 @@ parse(p, tbl, frml, varargin{:});
 dist = p.Results.dist;
 verbose = p.Results.verbose;
 flgPlot = p.Results.flgPlot;
+flgStnd = p.Results.flgStnd;
 fitMethod = p.Results.fitMethod;
 frml = char(frml);
 
@@ -113,7 +116,7 @@ if ~isempty(varsNum)
     end
     [lmeTbl, transParams] = tbl_trans(lmeTbl, 'varsInc', varsNum, ...
         'logBase', 10, 'skewThr', 2, ...
-        'flgZ', true, ...
+        'flgZ', flgStnd, ...
         'verbose', verbose);
 
     lmeInfo.transParams = transParams;
@@ -251,6 +254,7 @@ lmeInfo.frml = frml;
 lmeInfo.dfMethod = p.Results.dfMethod;
 lmeInfo.fitMethod = lmeMdl.FitMethod;
 lmeInfo.aic = lmeMdl.ModelCriterion.AIC;
+lmeInfo.standardized = flgStnd;
 
 % Verbose Output
 if verbose

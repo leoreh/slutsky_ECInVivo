@@ -17,8 +17,8 @@ tblPlot.pBspk_trans = tblTrans.pBspk;
 %  ========================================================================
 %  Cluster units into percentiles based on a specific variable
 
-varClu = 'fr';
-nClu   = 1;           % Number of clusters (percentiles)
+varClu = 'pBspk';
+nClu   = 3;           % Number of clusters (percentiles)
 alpha  = 2;           % Scaling factor for percentile spacing
 
 % Initialize Cluster Label Column
