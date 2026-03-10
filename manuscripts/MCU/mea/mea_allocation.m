@@ -35,6 +35,9 @@ tbl.dSngl_rel = log((tbl.ss_frSspk) ./ (tbl.frSspk));
 tbl.dBrst_abs = (tbl.ss_frBspk - tbl.frBspk);
 tbl.dSngl_abs = (tbl.ss_frSspk - tbl.frSspk);
 
+% Initialize logC column
+tbl.logC_cell = nan(height(tbl), 1);
+
 
 %% ========================================================================
 %  1. RELATIVE SPACE (POWER LAW FIT)
@@ -76,6 +79,10 @@ for iGrp = 1:nGrps
     logC = mu(2) - beta * mu(1);
     C = exp(logC);
     
+    % Calculate cell-specific log(C) intercepts
+    % log(C_i) = y_i - beta * x_i
+    tbl.logC_cell(idx) = tbl.dSngl_rel(idx) - beta .* tbl.dBrst_rel(idx);
+    
     % Store
     allocModel.(grpFld).idx = idx;
     allocModel.(grpFld).beta = beta;
@@ -84,6 +91,44 @@ for iGrp = 1:nGrps
     fprintf('--- %s ---\n', grp);
     fprintf('  Scaling Exponent (beta) : %6.3f\n', beta);
     fprintf('  Vertical Shift (C)      : %6.3f\n', C);
+end
+
+%% ========================================================================
+%  1.5. BIOLOGICAL PENALTY (LINEAR CAPCAITY FUNCTION)
+%  ========================================================================
+%  Demonstrate how the static vertical shift constant (C) is actually a
+%  dynamic multiplier determined by the baseline burst probability (rho).
+
+fprintf('\n================================================================\n');
+fprintf(' 1.5. BIOLOGICAL PENALTY ON CAPACITY (C vs Pburst)\n');
+fprintf('================================================================\n');
+
+for iGrp = 1:nGrps
+    grp = grps{iGrp};
+    grpFld = strrep(grp, '-', '_');
+    
+    idx = allocModel.(grpFld).idx;
+    
+    xRho = tbl.pBspk(idx); % Base burst probability
+    yLogC = tbl.logC_cell(idx);
+    
+    % Remove invalid points
+    mk = ~isnan(xRho) & ~isnan(yLogC) & ~isinf(xRho) & ~isinf(yLogC);
+    xRho = xRho(mk);
+    yLogC = yLogC(mk);
+    
+    % Fit Linear Regression: log(C) = gamma0 + gamma1 * rho
+    lm = fitlm(xRho, yLogC);
+    gamma0 = lm.Coefficients.Estimate(1);
+    gamma1 = lm.Coefficients.Estimate(2);
+    
+    allocModel.(grpFld).gamma0 = gamma0;
+    allocModel.(grpFld).gamma1 = gamma1;
+    allocModel.(grpFld).lm_penalty = lm;
+    
+    fprintf('--- %s ---\n', grp);
+    fprintf('  Base Capacity (gamma0)  : %6.3f\n', gamma0);
+    fprintf('  Direct Penalty (gamma1) : %6.3f (%s)\n', gamma1, num2str(lm.Coefficients.pValue(2), 3));
 end
 
 
@@ -132,13 +177,27 @@ for iGrp = 1:nGrps
     meanTangent = mean(tangentDist);
     tangentOfMeanBsl = C * beta * (mean(S0) / mean(B0));
     
+    % Dynamic Theoretical Tangents
+    % dS/dB = exp(gamma0 + gamma1*rho) * beta * ((1-rho)/rho)
+    % (Using empirical S0/B0 for (1-rho)/rho part to be perfectly exact)
+    gamma0 = allocModel.(grpFld).gamma0;
+    gamma1 = allocModel.(grpFld).gamma1;
+    rho_obs = tbl.pBspk(idx);
+    rho_obs = rho_obs(mk); % Use valid subset
+    
+    dynC = exp(gamma0 + gamma1 .* rho_obs);
+    dynTangentDist = dynC .* beta .* (S0 ./ B0);
+    meanDynTangent = mean(dynTangentDist);
+    
     % Store
     allocModel.(grpFld).empiricalSlope = empiricalSlope;
     allocModel.(grpFld).tangentOfMeanBsl = tangentOfMeanBsl;
+    allocModel.(grpFld).meanDynTangent = meanDynTangent;
     
     fprintf('--- %s ---\n', grp);
     fprintf('  Empirical Fit (Orthogonal) : %6.3f\n', empiricalSlope);
-    fprintf('  Predicted Initial Tangent  : %6.3f\n', tangentOfMeanBsl);
+    fprintf('  Predicted Static Initial Tangent  : %6.3f\n', tangentOfMeanBsl);
+    fprintf('  Predicted Dynamic Initial Tangent : %6.3f\n', meanDynTangent);
     %fprintf('  Mean of Per-Cell Tangents  : %6.3f\n', meanTangent);
 end
 
@@ -148,8 +207,8 @@ end
 %  ========================================================================
 
 hFig = figure('Name', 'Proportional Spike Allocation', ...
-    'Position', [50 50 1400 450], 'Color', 'w');
-tTile = tiledlayout(1, 3, 'TileSpacing', 'compact', 'Padding', 'compact');
+    'Position', [50 50 1800 450], 'Color', 'w');
+tTile = tiledlayout(1, 4, 'TileSpacing', 'compact', 'Padding', 'compact');
 
 % --- Panel A: Relative Space (Power-law Conservation) ---
 nexttile;
@@ -162,7 +221,18 @@ title('A. Relative Space (Power Law)');
 legend('Location', 'northwest');
 
 
-% --- Panel B: Theoretical Model (Absolute Prediction) ---
+% --- Panel B: Biological Penalty (C vs Rho) ---
+nexttile;
+plot_scat(tbl, 'pBspk', 'logC_cell', 'g', 'Group', ...
+    'fitType', 'linear', 'flgStats', true, 'alpha', 0.6);
+plot_lineEq('hAx', gca, 'flgSqr', true);
+xlabel('Baseline Burst Probability (\rho)', 'Interpreter', 'tex');
+ylabel('Cell Capacity Intercept (log C)');
+title('B. Biological Penalty on Capacity');
+legend('Location', 'northeast');
+
+
+% --- Panel C: Theoretical Model (Absolute Prediction) ---
 nexttile;
 hold on;
 clrs = lines(2); % Default colors matching plot_scat Auto mode
@@ -188,9 +258,12 @@ for iGrp = 1:nGrps
     
     S0_mean = mean(tbl.frSspk(idx), 'omitnan');
     B0_mean = mean(tbl.frBspk(idx), 'omitnan');
+    rho_mean = mean(tbl.pBspk(idx), 'omitnan');
     
-    C = allocModel.(grpFld).C;
     beta = allocModel.(grpFld).beta;
+    gamma0 = allocModel.(grpFld).gamma0;
+    gamma1 = allocModel.(grpFld).gamma1;
+    dynC = exp(gamma0 + gamma1 * rho_mean);
     
     % Extrapolate delta burst range based on limits
     minDB = min(tbl.dBrst_abs(idx), [], 'omitnan');
@@ -201,11 +274,11 @@ for iGrp = 1:nGrps
     minEval = max(minDB - 0.1*dbRng, -B0_mean + 1e-4);
     dB = linspace(minEval, maxDB + 0.1*dbRng, 100); 
     
-    % Equation: dS = S0 * [C * (1 + dB/B0)^beta - 1]
-    dS_curve = S0_mean * ( C * (1 + dB ./ B0_mean).^beta - 1 );
+    % Dynamic Equation: dS = S0 * [dynC * (1 + dB/B0)^beta - 1]
+    dS_curve = S0_mean * ( dynC * (1 + dB ./ B0_mean).^beta - 1 );
     
-    % Equation: dS = T * dB   where T = C*beta*(S0/B0)
-    T = allocModel.(grpFld).tangentOfMeanBsl;
+    % Initial Tangent
+    T = allocModel.(grpFld).meanDynTangent;
     dS_tang = T .* dB;
     
     % Plot Theoretical Curve
@@ -220,17 +293,17 @@ end
 plot_lineEq('hAx', gca, 'flgSqr', true);
 xlabel('\Delta Burst (Hz)', 'Interpreter', 'tex');
 ylabel('\Delta Single (Hz)', 'Interpreter', 'tex');
-title('B. Allocation Model Prediction');
+title('C. Allocation Model Prediction');
 legend('Location', 'northwest');
 
 
-% --- Panel C: Empirical Absolute Space ---
+% --- Panel D: Empirical Absolute Space ---
 nexttile;
 plot_scat(tbl, 'dBrst_abs', 'dSngl_abs', 'g', 'Group', ...
     'fitType', 'ortho', 'flgStats', true, 'alpha', 0.6);
 plot_lineEq('hAx', gca, 'flgSqr', true);
 xlabel('\Delta Burst (Hz)', 'Interpreter', 'tex');
 ylabel('\Delta Single (Hz)', 'Interpreter', 'tex');
-title('C. Empirical Trajectories (Absolute)');
+title('D. Empirical Trajectories (Absolute)');
 legend('Location', 'northwest');
 

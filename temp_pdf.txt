@@ -1,0 +1,559 @@
+ The Mitochondrial Calcium Uniporter Couples 
+Hippocampal Burst  Firing with Homeostatic  Plasticity  
+ 
+1 Introduction  
+Mitochondria  participate in diverse physiological processes through their handling of 
+intracellular Ca2+ (1–3). The primary route of mitochondrial Ca²⁺ (mitoCa2+) influx is the 
+mitochondrial calcium uniporter (MCU)  (4, 5). MCU  is indispensable for mitoCa2+ influx 
+under  evoked , high stimulation conditions  (4–26). Importantly,  there are no compensatory 
+alternatives for  evoked mitoCa2+ uptake , which is equally impaired by acute and chronic 
+perturbations to MCU.  Notwithstanding , MCU is highly conserved across all animals (27, 28), 
+while MCU homologs have been identified in nearly all plants and metazoa (29–31). Given  its 
+singular function and ubiquitous expression, one of the most surprising findings of the 
+molecular era (30) is that MCU knockout (MCU -KO) typically results in remarkably mild 
+phenotypes. Most organisms or tissues lacking MCU exhibit no gross pathology or dysfunction  
+(6, 10, 12, 32–34), which  poses an ‘evolutionary paradox’ (30) – Why is MCU deeply 
+conserved if its absence is well -tolerated?  
+A potential answer  emerges  when perturbing MCU and subsequently challenging the 
+system beyond its resting state . Under these circumstances , the functional impairments that 
+occur collectively suggest a fundamental role of MCU in adaptation; enabling  cells, tissues, 
+and organisms to effectively cope with  various forms of physiological stress  (10, 12, 15, 31–
+37). MCU -KO in Caenorhabditis elegans  leads to impaired epidermal wound healing (32), in 
+zebrafish  to greater incidence of sinoatrial arrest (33), in Drosophila  to shortened lifespan (10), 
+in Arabidopsis thaliana  to reduced root length under low -nutrient conditions (31), and in mice 
+to a diminished capacity for sustained physical exercise (12, 34). This pattern is further 
+solidified through murine cell-type conditional MCU -KO, which in the heart leads to blunted 
+cardiac output in response to adrenergic stimulation (35), in skeletal muscle to diminished 
+sprint performance (37), in pancreatic beta -cells to impaired glucose -stimulated insulin 
+secretion (15), in the liver to exacerbated steatosis under high -fat diet conditions (36) and in 
+the brain  to impairments in  short - and long -term synaptic plasticity (11, 17–20, 22, 24, 38–43).  
+The brain has adaptive needs beyon d synaptic plasticity . To balance the continuous 
+barrage of stimuli and plastic events without succumbing to hyper - or hypo -activity , neuronal 
+networks rely heavily on homeostatic regulation  (44). Homeostasis refers to the processes that 
+stabilize  key physiological variables  within a healthy  and functional range  (45). Firing rates 
+are homeostatically regulated (46–51), and the clinical importance of firing rate homeostasis 
+(FRH)  is increasingly evident  (51–54). Still, the molecular sensors that track deviations in 
+firing remain elusive.  One possible candidate is MCU (47, 55). Due to its activation kinetics, 
+MCU preferentially responds to high-frequency burst  firing (41, 47, 56–58). Neuronal burst s 
+are a privileged mode of communication, essential for reliable synaptic transmission, the 
+induction of synaptic plasticity, and the encoding of memories (59). The selectivity of MCU 
+for burst firing and its position within the interconnected mitochondrial network  allows  
+mitoCa2+ influx  to integrate salient activity across time and space,  offering a robust 
+representation of recent cellular history.  
+To test the functional relationships between MCU, burst -firing, and FRH, we performed 
+a multi -level investigation of conditional MCU -KO in the mouse hippocampus, including long -
+term electrophysiological recordings alongside continuous pharmacological pertu rbations. 
+Ultimately, we offer a new perspective on the evolutionary paradox of MCU by establishing 
+its role in converting high-intensity signals  into long -lasting adaptive responses , in particular 
+homeostatic plasticity .    2 Results  
+We generated mice with targeted deletion of MCU  in excitatory CA1 neurons  and 
+confirmed reduced MCU mRNA expression (Figure 1Error! Reference source not 
+found. A,B). As expected, Ca2+ imaging in cultured hippocampal neurons  revealed  a deficit in  
+mitochondrial Ca2+ uptake of MCU -KO neurons, evoked  by high frequency trains of action 
+potentials  (Figure 1C). Evoked c ytosolic Ca2+ transients remained indistinguishable from 
+control  (Figure 1Error! Reference source not found. D). We then shifted our focus to calcium 
+dynamics during  spontaneous neuronal activity  (Figure 1E,I). Surprisingly, the Ca2+ transients 
+of MCU -KO neurons were fully preserved  in the mitochondrial compartment  (Figure 1F-H), 
+yet larger and more frequent in the cytosolic compartment  (Figure 1J-L). Thus, while MCU is 
+strictly required for rapid calcium uptake during intense stimulation, it can be compensated for 
+during resting states by alternative, possibly slower pathways (8, 60–63). The compensation, 
+however, involves enhanced cytosolic drive .  
+To determine if the compensatory cytosolic drive in MCU -KO stems from a 
+reconfiguration of baseline firing, we performed MEA recordings in cultured hippocampal 
+neurons. While overall firing rates remained indistinguishable from controls, MCU -KO 
+neurons exhi bited significantly higher burstiness, defined as the probability of spikes occurring 
+within bursts (Figure 2A). The same functional reorganization was observed in vivo . 
+Extracellular tetrode recordings of regular spiking, putative pyramidal cells in CA1 of freely 
+moving mice (Supp. Figure 1) revealed a shift from tonic towards phasic firing in  MCU -KO 
+neurons , with preservation of overall firing rates  (Figure 2B).  
+Given burst firing of pyramidal cells is strongly associated with sharp -wave ripples 
+(SWRs ; (64)), we hypothesized that the elevated intrinsic burstiness of MCU -KO neurons 
+would distort these network oscillations. Indeed, SWR in MCU -KO mice had an increased 
+peak amplitude  (Figure 2C), possessed a faster internal frequency (Figure 2D), and were 
+significantly shorter in duration  (Figure 2E). Furthermore, per-unit analysis of firing during 
+SWRs  revealed advanced timing of spikes in MCU -KO neurons; their spike center of mass 
+relative to the SWR peak  shifted toward s earlier, negative time lags compared  to control 
+(Figure 2F,G).  To determine whether this advanced recruitment is directly linked to the 
+transition towards phasic firing , we modeled the spike center of mass as a function of baseline 
+burstiness  and firing rate . Earlier spiking during ripples  was positively correlated with  
+burstiness ( Figure 2G), while firing rate had no significant effect ( Supp. Figure 2). This 
+relationship was conserved across genotypes , as interactions were tested and found non -
+significant (data not shown).  These observations suggest that the loss of MCU triggers a shift 
+toward phasic firing  that distorts the temporal dynamics of synchroni zed network events , 
+particularly SWRs  (65). 
+Next, we examined the role of MCU in the canonical CA3 -CA1 Schaffer collateral 
+pathway  using field excitatory postsynaptic potential (fEPSP) recordings  in acute hippocampal 
+slices  (Figure 3A). Basal synaptic transmission , measured as the  fEPSP  slope relative to  the 
+presynaptic fiber volley amplitude , was enhanced in MCU -KO slices  (Figure 3B). In addition, 
+MCU -KO slices exhibited reduced short -term synaptic plasticity , evident by a significantly 
+lower paired -pulse ratio (Figure 3C), and impaired long-term potentiation following theta -burst 
+stimulation  (Figure 3D). These findings indicate an increase in release probability (66) and 
+total excitatory drive to CA1 , which likely contribute s to the enhanced baseline burstiness and 
+cytosolic Ca2+ transients observed in MCU -KO neurons .  
+Having established the baseline phenotype of MCU deletion in CA1, we next asked how 
+this altered network copes with prolonged functional stress . To test the capacity for FRH  in the 
+intact brain,  we continuously deliver ed the GABA B receptor agonist baclofen via osmotic 
+pumps  directed at CA1 ( Figure 3E). While b aclofen suppressed the firing rate s of both control 
+and MCU -KO neurons  initially, their recovery trajectories gradually diverged  (Figure 3F).  Control mice successfully engaged homeostatic mechanisms, recovering steady -state firing 
+rates back to baseline levels  by the third day of the perturbation ( Figure 3G). In contrast, MCU -
+KO firing rates remain ed significantly depressed throughout the entire perturbation  (Figure 
+3G).  
+While all MCU -KO animals failed to recover their firing rates, we observed significant 
+heterogeneity between individual animals and hypothesized that the initial state of the network 
+predicts its capacity for FRH. Baseline mean firing rate, averaged across  units per animal, did 
+not predict recovery for either genotype  (Figure 3H). In contrast, high average burstiness at 
+baseline predicted robust recovery in control, but not MCU -KO mice (Figure 3I). These 
+findings imply that at the network level, a preference towards phasic firing is associated with 
+homeostatic resilience in a manner dependent on MCU.  
+Interestingly, while control neurons exhibited equal burstiness at baseline and steady -
+state, the homeostatic challenge with baclofen altered the firing pattern of MCU -KO neurons 
+and collapsed their compensatory state of elevated burstiness ( Figure 3J). However, these in 
+vivo findings reflect  population distributions  since  individual  unit identities  could not be 
+maintained  throughout th e recording  period . To investigate  if burstiness also carries prognostic 
+meaning  for homeostatic recovery at the single -cell level, and better understand why this 
+relationship fails in MCU -KO, we replicated the homeostatic experiment in vitro  using MEA 
+recordings , which allow tracking the same units over days with a high level of certainty.   
+Over the course of two days with baclofen, MCU -KO cultures  exhibited significantly 
+impaired FRH compared to controls  (Supp. Figure X) , confirming a deficit in homeostatic 
+plasticity that is intrinsic  to the hippocampal network . This complements our previous work 
+showing that overexpressing the MCU complex rescue s both burst -evoked mitoCa2+ transients 
+and FRH in neurons lacking the Insulin -like Growth Factor -1 Receptor (IGF -1R), an upstream 
+promoter of MCU (47). Paired with the genetic ablation presented here, these results forge a 
+definitive causal link between MCU -mediated mitoCa2+ signaling and the homeostatic 
+response to baclofen.  
+Next, we dissected per -unit firing rates into two components: single -spike firing and 
+burst -spike firin g. During the baclofen perturbation, b oth firing modes followed similar 
+trajectories over time within each genotype s (Figure 4A). Single -spike and burst -spike firing 
+gradual ly recover ed in control s but were persistently suppressed in MCU -KO networks . This 
+parallel behavior, where the two components rise and fall together, prompted us to ask whether 
+homeostatic mechanisms merely scale activity irrespective of its pattern, or if there exists a  
+coordinated exchange rate between tonic and phasic firing . 
+To visualize  how these components are co -modulated  during FRH , we plotted  the 
+absolute difference from steady -state to baseline  in single -spike firing versus  burst -spike firing  
+and fitted the data using orthogonal regression  (Figure 4B). In Control neurons, variance was 
+distributed across both axes, demonstrating a tightly coupled modulation where absolute 
+changes in burst firing are accompanied by similar abs olute changes in single -spike firing . In 
+contrast, the variance in firing rate recovery of MCU -KO neurons was almost entirely restricted 
+to the burst -firing axis . This apparent breakdown in coordination raised a critical question: does 
+the absence of MCU sever the coupling between these two firing modes, or does the coupling  
+exist but fail to successfully execute?  
+To answer this question, w e tran sitioned from the absolute to the relative domain. First, 
+we normalized each unit to its own pre -perturbation baseline, and examined the temporal 
+evolution of single -spike and burst -spike firing throughout the perturbation  (Figure 4C). This 
+relative perspective revealed temporal dynamics that were markedly different from the parallel 
+trajectories initially observed in the raw population averages ( Figure 4A). Rather than simply 
+rising and falling in tandem, the normalized trajectories exposed a strategic divergence during  the homeostatic response. Burst-spike firing of control  neurons overshot baseline levels , 
+presumably  to compensate for a recovering, yet slightly suppressed, single -spike rate.  
+To formalize this apparent relationship, w e analyzed the state -space trajectories of single - 
+and burst -spike firing gain, where gain is calculated as the log -fold ratio between  steady -state 
+and baseline  (Figure 4D). Remarkably, both genotypes obeyed a conserved , statistically 
+identical,  power -law scaling . For every 10% change in burst -firing during the perturbation , 
+control and MCU -KO neurons  exhibited a 4.3% and 3.9% change in single -spike firing, 
+respectively. To ensure that the power -law scaling between burst and single -spike recovery is 
+not a byproduct of  differences in baseline activity, we implemented a partial regression 
+analysis. Even after regressing out baseline firing rate and burstiness, the proportional 
+allocation of spikes during FRH persisted  (Supp. Figure 3C). Moreover , evaluating the log -
+fold gain of aggregate mean rates per animal in vivo  revealed  a similar  positive scaling 
+relationship between burst -spike and single -spike recovery  (Supp. Figure 3D). Together, these 
+results imply that baclofen -induced f iring rate homeostasis involves  coordinated plasticity  of 
+tonic and phasic firing , both in vitro  at the single -cell level  and in vivo  at the network  level . 
+Importantly, MCU -KO neurons follow the same power -low governing the exchange of burst - 
+and single -spikes  as control neurons , but they fail to execute it.  
+The discovery of a conserved power -law scaling in the relative domain resolves the 
+apparent decoupling observed in absolute firing rates. Because the allocation of burst - and 
+single -spikes  operates proportionally, the divergence between genotypes i n the absolute 
+domain is a mathematical consequence of the burst -dominant baseline  in MCU -KO neurons 
+relative to control neurons . Applying any proportional modulation to this baseline during a 
+homeostatic challenge will naturally force a greater  absolute change in burst spikes compared 
+to single spikes  (Supp. Note 1) . However, while this geometric relationship explains how the 
+spike deficit is allocat ed, it does not explain the deficit itself. The conserved power -law dictates 
+how burst and single spikes scale together, yet it does not guarantee that the network will 
+generate enough overall activity to restore  homeostasis. Thus, we shifted our focus from the 
+plastic adaptation  of firing patterns during FRH , to the biological capacity for executi ng 
+homeos tasis itself. Specifically, we hypothesized that  the homeostatic deficit  caused by  MCU 
+deletion is directly linke d to the compensatory  increase in phasi c firing.  
+To visualize how the initial network state influences a neuron's capacity for recovery, we 
+stratified units into subgroups based on their baseline burst probability and tracked their 
+normalized firing dynamics throughout the homeostatic challenge  (Figure 4E). In Control 
+networks, a clear prognostic hierarchy emerged: neurons entering the perturbation with a higher 
+baseline burstiness mounted the most rapid and robust homeostatic rebound. Conversely, 
+control neurons with low baseline burstiness exhibited a much more sluggish and incomplete 
+recovery. This prognostic hierarchy appeared completely inverted in MCU -KO networks, 
+where neurons exhibiting the highest initial burstiness suffered the most profound firing rate 
+depression.  
+To statistically quantify this relationship and disentangle the volume of activity from its 
+temporal pattern, we modeled steady -state firing as a function of baseline firing rate and burst 
+probability, extracting the marginal effect for each metric. Baseli ne firing rate served as a 
+consistent positive predictor of absolute steady -state activity, exhibiting no significant 
+interaction with genotype ( Supp. Figure 4A). Neurons that were more active initially simply 
+remained more active after the perturbation. In stark contrast, the marginal effect of baseline 
+burstiness exhibited profound interaction s with genotype ( Supp. Figure 4B). In Control 
+networks, higher baseline burstiness independently predicted robust recovery of single -spike, 
+burst -spike, and total firing rates. In MCU -KO networks, th ese prognostic relationship s were 
+significantly impaired, and even inverted for single -spike recovery . MCU -KO neurons with the 
+highest initial burst probability exhibited the most severe collapse in tonic firing .  While margin al effects successfully isolate the prognostic relationship  of baseline 
+burst iness  from the that of firing rate , they treat the  recovery of single and burst spikes as 
+indepe ndent  outcomes.  However, our state -space analysis demonstrated that these two firing 
+modes are coupled by a conserved allocation power -law. This interdependence raises a critical 
+mechanistic question: does the compensatory burstiness of MCU -KO neurons directly suppress 
+their capacity to recover tonic firing, or does the baseline state primarily suppress the recovery 
+of phasic fir ing, which subsequently drags down tonic firing  through their obligatory coupling? 
+To formally distinguish between a direct suppressive effect of the baseline state and an indirect 
+effect mediated by the allocation power -law, we performed a causal mediation analysis 
+evaluating the relationship between baseline burstiness , steady -state single -spike firing , and 
+steady -state burst -spike firing ( Figure 4F and Supp. Figure 4C-F). In both genotypes, baseline 
+burstiness exhibited a negative direct effect on single -spike firing and a positive indirect effect 
+mediated by burst -spike  firing . However,  the negative  direct effect was twice as strong in 
+MCU -KO neurons , effectively  outweighing the positive indirect effect. Consequently, the net 
+total effect of baseline burstiness shifted from positive in controls to negative in MCU -KO 
+neurons, resulting in a failure to recover tonic firing levels.  
+To definitively quantify the prognostic value of burst - versus single -spike firing , we 
+performed a feature ablation analysis using k -fold cross -validation, evaluating the unique out -
+of-sample variance in steady -state firing explained by each baseline firing component ( Figure 
+4G). Consistent with the privileged role of bursting in driving network plasticity, baseline 
+burst -spike firing contributed significantly more unique prognostic information than single -
+spike firing across both genotypes. However, the predictive power of burst -spike firing  was 
+significantly degraded in MCU -KO networks compared to Controls. Overall, these findings  
+establish  phasic firing as a primary feature dictating a neuron's homeostatic resilience . 
+However, they also reveal that the compensatory shift toward extreme burstiness adopted by 
+MCU -KO networks is profoundly maladaptive; rather than promoting resilience, this altered 
+baseline state suppresse s the recovery of tonic firing  and compromis es the adaptive infor mation 
+carried by phasic firing.  
+To ensure that these physiological conclusions were independent  of a specific analytical 
+approach, we confirmed our findings hold across a wide range of burst detection parameters  
+(Supp. Figure 5). A comprehensive parameter sweep of varying inter -spike interval (ISI) 
+thresholds and minimum spike counts demonstrated  that the unique prognostic value of 
+baseline burst -spike firing remains remarkably stable regardless of the specific criteria used to 
+define a burst. Furthermore, replicating our in vivo analyses using an autocorrelogram -derived 
+Burst Index or applying the MEA dataset criteria  yielded the exact same homeostatic allocation 
+rules and prognostic relationships . 
+Our physiological findings present  a complex picture regarding  the impact of MCU 
+deletion. On the one hand, MCU -KO exhibited profound impairments in synaptic and 
+homeostatic plasticity, as well as significantly shorte r SWR s – a feature directly link ed to 
+working memory impairments (65). On the other hand, baseline firing rates remained 
+remarkably stable, supported by a highly burst -dominant state. To resolve whether this altered  
+baseline state was sufficient to support complex behaviors, or if the underlying loss of plasticity 
+and long-duration SWRs would prove dominant, we subjected MCU -KO mice and their 
+littermate controls to a battery of hippocampus -dependent memory tasks . To ensure a clear 
+interpretation of these cognitive assays, we first confirmed that the mice did not exhibit baseline 
+differences in locomotor activity or anxiety -like behaviors that could otherwise confound 
+performance  (Supp. Figure 6).  
+In the novel object recognition task, control mice showed a robust preference for 
+exploring a novel object over a familiar one, whereas MCU -KO mice explored both objects 
+equally, indicating a failure to form or retrieve the memory of the familiar object ( Figure 5A,B).  A similar impairment emerged  in a social recognition paradigm, where MCU -KO mice failed 
+to preferentially investigate a novel mouse over a familiar one ( Figure 5C,D). These m emory 
+deficit s also extended to associative learning . In a contextual fear conditioning task, MCU -KO 
+mice displayed significantly less freezing behavior when re-exposed to an arena associated 
+with an electric shock , demonstrating impaired memory of the fearful environment  (Figure 5E-
+G). Crucially, these mnemonic impairments were specific to tasks reliant on the hippocampus. 
+When tested in a n auditory cued fear conditioning paradigm  – where memory for a tone does 
+not depend on hippocampal integrity  – MCU -KO mice showed freezing levels that were 
+indistinguishable from controls  (Figure 5H-J). Together, the se cognitive  deficits demonstrate 
+that MCU -mediated Ca2+ signaling is indispensable for the neural computations involved in 
+hippocampal -dependent memory . 
+ 
+ 
+   3 Figures  
+ 
+ 
+Figure 1. Elevated  cytosolic Ca2+ transients  compensate s for MCU -mediated influx  during 
+baseline activity.  
+(A) Quantification of MCU mRNA expression levels in the hippocampus of Control and MCU -KO 
+mice, expressed as a percentage relative to control levels. Individual data points represent mice (n 
+= 6). The genetic knockout resulted in significantly lower MCU mRNA e xpression (p = 0.002).  
+(B) Representative image of a neuron expressing mtGCaMP8m -jRGeCO1a  
+(C) Peak mitochondrial Ca2+ responses (mitoCa2+, ΔF/F) in Control (n = 36) and MCU -KO (n = 29) 
+neurons evoked by trains of 1, 3, 5, and 10 stimuli  at 50 Hz. Mitochondrial Ca2+ uptake was 
+significantly reduced in MCU -KO neurons compared to Controls at 3, 5, and 10 stimuli  (p < 0.001).  
+Right panel shows representative traces of mitoCa2+  responses in a Control ( top) and MCU -KO 
+(bottom ) neuron.  
+(D) Peak cytosolic Ca2+ responses (cytoCa2+, ΔF/F) in Control (n = 32) and MCU -KO (n = 45) 
+neurons evoked by trains of 1, 3, 5, and 10 stimuli  at 50 Hz. No significant difference between 
+genotypes was observed  (p = 0.78).  Right panel shows representative traces of cyto Ca2+  responses 
+in a Control ( top) and MCU -KO ( bottom ) neuron.  
+(E) Representative traces of spontaneous mitochondrial Ca2+ transients in Control and MCU -KO 
+neurons.  
+ (F) Peak amplitude (ΔF/F) of spontaneous mitochondrial Ca2+ transients was not significantly different 
+between Control (n = NN) and MCU -KO (n = NN) neurons (p = PP).  
+(G) Average rate (Hz) of spontaneous mitochondrial Ca2+ transients  was not significantly altered by 
+MCU deletion (p = PP).  
+(H) Total mitochondrial Ca2+ flux, calculated as the integrated area under the curve for spontaneous 
+events, was not altered by MCU deletion (p = PP).  
+(I) Representative traces of spontaneous cytosolic Ca2+ transients in Control and MCU -KO neurons.  
+(J) Peak amplitude (ΔF/F) of spontaneous cytosolic Ca2+ transients was significantly elevated in 
+MCU -KO (n = NN) relative to Control (n = NN) neurons (p = PP).  
+(K) Average rate (Hz) of spontaneous cytosolic Ca2+ transients  was significantly elevated in the 
+absence of MCU (p = PP).  
+(L) Total cytosolic Ca2+ accumulation was significantly elevated in the absence of MCU (p = 0.005).  
+Panel (A , F-H, J-L) analyzed using the Mann -Whitney test. Panels ( C,D) analyzed using two -way RM 
+ANOVA with Sidak's multiple comparisons test.  
+ 
+    
+Figure 2. MCU -KO increases burstiness and alters sharp -wave ripple properties.  
+(A) Firing rate  (Hz) and burstiness (P burst; logit -transformed)  of Control (black) and MCU -KO (gold) 
+neurons  during spontaneous baseline activity . Recordings from MEA in hippocampal cultures (top 
+left schematic).  Marginal histograms display the distribution for each axis, with dashed lines 
+indicating group means.  Whereas  firing rate does not differ significantly between groups (p = 0.7 5), 
+burst probability is significantly higher in MCU -KO neurons (p = 0.002 ). 
+(B) Same as (A) for tetrode recordings in CA1 of freely -moving mice (top left schematic).  Whereas  
+firing rate does not differ significantly between groups (p = 0. 45), burst probability is significantly 
+higher in MCU -KO neurons (p = 0.00 2). 
+(C) Wide -band LFP traces of SWR events aligned to the ripple peak (t = 0). Data represent mean ± 
+SEM across events. Asterisk denotes a significant increase in peak ripple amplitude (p = 0.045), 
+calculated from the bandpass -filtered signal (80 -250 Hz).  
+(D) Instantaneous frequency of SWRs, calculated via Hilbert transform of the bandpass -filtered signal. 
+MCU -KO exhibit a significantly faster oscillation frequency compared to Controls (p = 0.001).  
+(E) Probability distribution of SWR durations. MCU -KO events are significantly shorter than Controls 
+(p = 0.026).  
+(F) Modulation of per -unit firing rates during SWRs (z -scored to baseline). Traces represent mean ± 
+SEM across units.  
+(G) Probability distribution of spike timing  during SWRs, defined as the center of mass relative to the 
+SWR peak (dotted vertical line). Spiking in MCU -KO neurons is significantly advanced (shifted to 
+negative time lags) compared to Controls (p = 0.027; Table S1).  
+(H) Marginal effect of baseline burstiness on the spike center of mass during SWRs, calculated while 
+holding baseline firing rate constant at its mean. Shaded regions indicate the 95% confidence 
+intervals for the predicted means . 
+ 
+  
+Figure 3. MCU -KO impairs synaptic and homeostatic plasticity . 
+(A) Schematic illustration of the experimental setup for recording field excitatory postsynaptic 
+potentials (fEPSPs) in the CA1 region of acute hippocampal slices. A stimulating electrode is 
+placed in the Schaffer collateral pathway originating from CA3, and a  recording electrode is 
+positioned in the stratum radiatum of CA1.  
+(B) Input -output (I/O) curves showing the fEPSP slope (mV/ms) as a function of fiber volley amplitude 
+(mV) in Control (n = 5) and MCU -KO (n = 6) slices. MCU -KO slices exhibit a significantly 
+enhanced fEPSP slope for a given FV amplitude (p = 0.01), suggesting increased presynaptic 
+release.  
+(C) Paired -pulse ratio calculated as the ratio of the second fEPSP slope to the first with an inter -stimulus 
+interval of 50 ms . Individual data points represent slices. MCU -KO slices show a significantly 
+lower PPR compared to Control slices (p = 0.008), indicative of an increased probability of 
+neurotransmitter release.  
+(D) Long -term potentiation (LTP) at CA3 -CA1 synapses. The fEPSP slope is plotted as a percentage 
+of baseline over time (horizontal dashed line). Theta -burst stimulation (TBS) was delivered at t=20 
+min (vertical dashed line). MCU -KO slices exhibit significantly  impaired LTP compared to Control 
+slices (p = 0.006). TBS consisted of 5 bursts at 100 Hz for 250 ms, with a 30 -second inter -burst 
+interval.  
+(E) Methodology for long -term continuous drug delivery to CA1 in vivo . From left to right: Schematic 
+diagram illustrating the planned stereotaxic coordinates for the implants relative to Bregma. 
+Locations for EEG screw, guide cannula, tetrodes, and ground (GND) screws are indicated. 
+ Photograph of a mouse head -fixed in a stereotaxic apparatus during the surgical implantation 
+procedure. The outline highlights the osmotic pump (teal), catheter (orange), and guide cannula 
+(pink). Photograph of a mouse post -surgery, held in hand, showing t he final assembled head -
+mounted implant.  Post-mortem visualization of implant placement. Photograph of the exposed 
+mouse cranium showing the guide cannula and tetrodes at their final position. The inset provides 
+an enlarged view of the guide cannula and te trodes.  
+(F) Firing rate dynamics of Control (N  = 5; black) and MCU -KO (N  = 5; gold ) mice  during baclofen 
+perturbation  (purple bar). Data represent mean ±  SEM  across units . Breaks in the time axis mark 
+the implantation and removal of the osmotic pump.  
+(G) Firing rates of individual units averaged over  24-hour epochs (experimental days) relative to 
+baclofen onset (t=0). Horizontal bars indicate the mean. While control neurons recover steady -state 
+firing equal to baseline (48 -72 hr; p = 0.16), MCU -KO neurons remained depressed throughout the 
+perturbation (p < 0.0001). Correspondingly, the interaction between genotype and time is 
+symmetric  initially  (p = 0.30) but becomes significant at day two  (24-48 hr; p = 0.0001) and day 
+three (4 8-72 hr ; p = 0.0003) of bacl ofen treatment . Complete LME model presented in Table SX.  
+(H) Relationship between baseline firing rate and firing rate recovery, expressed as a percentage of 
+baseline. Each data point represents the aggregate mean across units per mouse . ANCOVA revealed  
+no significant effects.  
+(I) Relationship between baseline burstiness and firing rate recovery. ANCOVA revealed  a significant 
+interaction between genotype and burstiness (p = 0.001) . Dashed lines mark the 95% confidence 
+interval of a linear regression fit per group (Control: p = 0.00 9; MCU -KO: p = 0. 15). 
+(J) Burst iness (Pburst; logit-transformed)  of individual units  at baseline (BSL) and steady -state (SS ; after 
+three days of baclofen perturbation) . Horizontal bars indicate the mean. In contrast to baseline, 
+MCU -KO neurons show no difference in  burstiness compared to Controls  (p = 0.59) . 
+Panels  (B,D) analyzed using two -way RM ANOVA with Sidak's multiple comparisons test. Panel  (C) 
+analyzed using the  Mann -Whitney test.  
+ 
+ 
+ 
+ 
+   
+Figure 4. Burstiness is a prognostic marker for homeostasis.  
+(A) Temporal dynamics of single -spike firing (FR single; left) and burst -spike firing (FR burst; right) during 
+the baclofen perturbation (purple bar).  
+(B) Absolute differences in single -spike firing (ΔFR single) and burst -spike firing (ΔFR burst) between 
+steady -state (SS) and baseline (BSL). Each point represents a single unit. Dotted crosshairs mark 
+the point of no change. Solid lines depict orthogonal regression fits . The annotated angle quantifies 
+the predominant direction of rate changes  relative to the unity line (dashed), which represents a 
+proportional modulation of both components.  
+(C) Temporal dynamics of single -spike firing (solid) and burst -spike firing (dotted) during the baclofen 
+perturbation. Each neuron’s trace was normalized to its pre -perturbation baseline (dotted line). Data 
+presented as geometric mean ± SEM across the populati on. 
+(D) State space analysis of spike allocation during firing rate homeostasis for Control (left) and MCU -
+KO (right) neurons. Single -spike firing gain as a function of burst -spike firing gain, where gain is 
+calculated as the log -fold ratio between  steady -state and baseline. Solid lines depict linear 
+regression fits. Burst-spike gain significantly predicts single -spike gain (β = 0.43; p < 0.0001) with 
+no significant interaction by genotype ( β = -0.04; p = 0.22). A significant negative main effect of 
+genotype (β = -0.97; p = 0.001) shifts the trajectory  of MCU -KO neurons  vertically downward . 
+Complete LME model presented in Table SX.   
+(E) Firing rate dynamics during the baclofen perturbation for neurons stratified by baseline burstiness. 
+Control units (left) were categorized into low (< 0.1; n = 389; dotted), intermediate (0.1 -0.2; n = 
+234; dashed), and high (> 0.2; n = 78; solid) burst pro bability. MCU -KO units  (right)  were 
+categorized into low (< 0.4; n = 211), intermediate (0.4 -0.8; n = 126), and high (> 0.8; n = 42) burst 
+probability. Data are expressed as a percentage of baseline (dotted line) and presented as geometric 
+mean ± SEM.  
+ (F) Mediation analysis of the relationship between baseline burstiness and steady -state firing. A series 
+of three LME models were fitted separately for Control and MCU -KO neurons to disentangle the 
+direct effect of baseline burstiness (X; [BSL]Pburst) on singl e-spike firing (Y; [SS]FRsingle) from 
+its indirect effect mediated by burst -spike firing (M; [SS]FRburst). All models included baseline 
+firing rate as a covariate. Stacked bars represent standardized coefficients (β) for the direct (blank) 
+and indirect (st ripes) pathways. Black diamonds indicate the net total effect. Vertical lines mark the 
+SEM of each effect. In control neurons, a minimal direct effect (β = -0.278 ± 0.051, p < 0.0001) is 
+outweighed by a positive indirect effect (β = 0.528 ± 0.048, p < 0.00 01), resulting in a net positive 
+total effect (β = 0.247 ± 0.063, p < 0.0001), where higher baseline burstiness predicts robust 
+recovery of tonic firing. Conversely, MCU -KO neurons exhibit a severe negative direct effect (β = 
+-0.591 ± 0.095, p < 0.0001) th at negated the indirect coupling (β = 0.252 ± 0.08, p = 0.001), leading 
+to a net negative total effect and a collapse in tonic firing (β = -0.33 ± 0.123, p < 0.0001). Complete 
+LME models presented in Table SX.  
+(G) Feature ablation analysis, utilizing k -fold cross -validation, performed on an LME model predicting 
+steady -state firing rate from baseline firing components ([SS]FR ~ [BSL]FRburst + [BSL]FRsingle 
++ (1|Name)). The y -axis quantifies the unique variance explai ned by each predictor, calculated as 
+the absolute reduction in the out -of-sample coefficient of determination (∆R2OOS) when that term 
+is removed from the full model (Control R2OOS = 0.29; MCU -KO R2OOS = 0.26). Dots represent 
+individual cross -validation fol ds. Horizontal bars indicate the mean. FRburst contributes 
+significantly more unique information than FRsingle across both groups, and significantly more in 
+control than MCU -KO. Two -way RM ANOVA followed by Fisher’s LSD post -hoc tests.  
+   
+Figure 5. MCU -KO impairs hippocampal -dependent memory.  
+(A) Schematic of the Novel Object Recognition (NOR) task. During the learning  phase, mice explore 
+an arena containing two identical objects (one depicted for simplicity). During the test phase (after 
+a 20-minute inter -trial interval ), one object is replaced with a novel object, and exploration times 
+of both objects are recorded.  
+(B) Discrimination Index for the NOR task . Individual data points represent mice  (Control: n = 13; 
+MCU -KO: n = 12) , and horizontal bars indicate the group mean.  Whereas both groups spent equal 
+time exploring the two objects during learning (p = 0.45), c ontrol mice showed  a preference for the 
+novel object during the test phase that was completely absent  in MCU -KO mice (p = 0.004) . 
+(C) Schematic of the Social Recognition task. During the learning  phase, mice interact with a juvenile 
+conspecific mouse. During the test phase (a fter a 30 -minute inter -trial interval ), mice are re -exposed 
+to the familiar juvenile along with a novel juvenile conspecific, and interaction times are recorded.  
+(D) Discrimination Index for the Social Recognition task . Individual data points represent mice  
+(Control: n = 18; MCU -KO: n = 17) , and horizontal bars indicate the group mean.  During the 
+learning phase, both groups spent equal time exploring the two mice (p = 0.45). During the 
+recognition phase, c ontrol mice showed  a preference for the novel mouse  that was completely 
+absent  in MCU -KO mice (p = 0.004) . 
+(E) Schematic of the Contextual Fear Conditioning (CFC) task. Mice placed in a conditioning chamber 
+receive 3 electrical shock s (represented by a lightning bolt). During the test phase (after 24 hours ), 
+mice return to the same conditioning chamber, and freezing behavior is measured.  
+(F) Percentage of time spent freezing during the contextual fear memory test phase. MCU -KO mice (n 
+= 25) display significantly lower contextual freezing compared to Control mice  (n = 21; p = 0.043) . 
+ (G) Temporal dynamics of freezing behavior during the CFC test phase, presented as mean ± SEM. 
+MCU -KO mice exhibit ed reduced freezing levels compared to control  mice ( p = 0.043).  
+(H) Schematic of the Auditory Cued Fear Conditioning task. Mice placed in a conditioning chamber 
+where an auditory cue (represented by a speaker icon) is paired with electrical shocks . During the 
+test phase (after 24 hours), mice are placed in a novel context (altered visual and olfactory cues), 
+and freezing behavior is measured during the presentation of the auditory cue alone.  
+(I) Percentage of time spent freezing during the cued fear memory test in the novel context. No 
+significant difference in cued freezing was observed between Control  (n = 22)  and MCU -KO mice  
+(n = 24; p = 0.23) . 
+(J) Temporal dynamics of freezing behavior during the cued fear memory test  phase . No significant 
+difference was found between groups ( p = 0. 31) 
+Panels (B,D,G,J) analyzed using  a two-way RM ANOVA  followed by Sidak’s multiple comparisons 
+test. Panel (F) analyzed using an unpaired t test. Panel  (I) analyzed using the  Mann -Whitney tes t. 
+ 
+    
+Supp. Figure 1. Extracellular recordings from CA1 in  behaving mice. 
+(A) Representative baseline data from a control mouse.  From top to bottom: hypnogram; spectrogram; 
+EMG recordings; raster plot of RS (black) and FS (red) units; raw traces from a single tetrode. 
+Dashed lines indicate an expanded view of the section above.  
+(B) Trough -to-Peak time (ms) and Burst Index  (a.u.)  of RS and FS units from MCU -KO and Control 
+mice.  Individual data points represent neurons  with point size proportional to their  firing rate. 
+Assignment  of well -isolated clusters to RS and FS was done using a Gaussian Mixture Model 
+(GMM) based on waveform features.  FS units were excluded from this study due to low unit count.  
+(C) Representative waveform of an RS unit (top) and an FS unit (bottom) across four channels of a 
+tetrode.  
+(D) Representative autocorrelograms  of an RS unit (top) and an FS unit (bottom).  
+ 
+  
+  
+Supp. Figure 2. MCU -KO alters SWR properties.   
+(A) Marginal effect of baseline firing rate  on the spike center of mass during SWRs, calculated while 
+holding baseline burstiness  constant at its mean. Shaded regions indicate the 95% confidence 
+intervals for the predicted means . Firing rate did not significantly predict spike timing during SWR  
+(p = 0. 1; Table S X). 
+  
+  
+Supp. Figure 3. Homeostatic allocation of spikes  
+(A) Burst and single spike firing rates  in Control (black) and MCU -KO (gold) neurons during baseline  
+(BSL) . Marginal histograms display the distribution of firing rates for each axis, with dashed lines 
+indicating the group means.  
+(B) Same as (A) during steady -state (SS), after two days of baclofen.  
+(C) Partial regression plot showing the unique variance shared between  log-fold changes in single -spike 
+firing (FR single Gain ) and burst -spike firing (FR burst Gain ). To isolate the specific coupling between 
+these variables, residuals were calculated by regressing out baseline firing rate and burstiness from 
+each component. Solid lines depict linear regression fits. Dotted crosshairs mark the zero -residual 
+center. Burst-spike residual s significantly predicts single -spike residual s (β = 0.43; p < 0.0001). A 
+small  but significant interaction by genotype (β = +0.07; p = 0.035) indicates this coupling is 
+stronger in MCU -KO neurons. Because the data represents mean -centered residuals, the regression 
+lines cross exactly at zero with no main effect of genotype (β = 0; p  = 1). Complete LME model 
+presented in Table SX.  
+(D) Spike allocation in vivo . Relationship between burst -spike gain and single -spike gain, where gain 
+is calculated as the log -ratio of the average rate during steady -state relative to baseline, and the 
+average rate is the aggregate mean across units per mouse  (N = 5 animals per group). ANCOVA 
+revealed a significant main effect of burst gain ( p = 0.034) but no t of genotype ( p = 0.59) and no 
+interaction ( p = 0. 53). Consequently, a  pooled regression model confirm ed a conserved positive 
+scaling rule across mice (p = 0.006). Dashed lines mark the 95% confidence interval of the linear 
+regression fit.  
+ 
+  
+Supp. Figure 4. Burstiness but not firing rate predicts firing rate recovery  
+(A) Marginal effects of baseline firing rate  on steady -state firing, calculated while holding baseline 
+burstiness  constant at its mean . Effects are shown for single -spike firing ( left), burst -spike firing 
+(middle ), and total firing rate (right). Shaded regions indicate the 95% confidence intervals for the 
+predicted means .  
+(B) Same as (A) for the m arginal effects of baseline burstiness , calculated while holding baseline firing 
+rate constant at its mean .  
+(C) (X → M): Relationship between baseline burstiness and steady -state burst -spike firing. β derived 
+from Model 2: M ~ X + Covariates.  
+(D) (M → Y | X): Partial residual plot showing the relationship between steady -state burst -spike firing  
+(M; [SS]FR burst) and single -spike firing  (Y; [SS]FR single), adjusted for baseline firing rate and 
+burstiness ( X; [BSL]P burst). The Y -axis represents the variance in single -spike firing unexplained 
+by the baseline phenotype. β represents the standardized coefficient of FR burst from Model 1: Y ~ 
+M + X + Covariates.  
+(E) (X → Y | M): Partial residual plot showing the direct effect of baseline burstiness on steady -state 
+single -spike firing, adjusted for steady -state burst -spike firing . β represents the standardized 
+coefficient of P burst from Model 1 . 
+(F) (X → Y): The total effect ( net prognostic relationship ) of baseline burstiness on steady -state single -
+spike firing. β  derived from Model 3: Y ~ X + Covariates.  
+ 
+  
+  
+Supp. Figure 5. The impact of burstiness is stable across various detection parameters.  
+(A) Parameter sweep of burst detection criteria  in MEA recording s, including inter-spike interval (ISI) 
+threshold s (y-axis) and minimum number of spikes (x -axis).  Labels show the p ercentage of Control 
+units with zero detected bursts during baseline .   
+(B) Same as (A) showing the Spearman rank correlation coefficient between baseline firing rate and 
+burstiness in Control units.  Firing  rate was included as a covariate in all models involving 
+burstiness.  
+(C) Same as (A) showing the t -statistic for the effect of genotype on burstiness . Positive values indicate 
+significantly higher burstiness in MCU -KO neurons.  
+(D) Replication of the f eature ablation analysis  with various ISI thresholds  for detecting bursts  
+(minimum spike count fixed at 3).  Stacked bars display the unique variance (∆R2OOS) in steady -state 
+firing rate explained by baseline burst -spike firing (dotted), single -spike firing (solid gray), and 
+their shared contribution (white). Related to Figure 4G. 
+(E) Replication of the prognostic relationship between baseline burstiness and firing rate recovery in 
+vivo using alternative burst metrics.  Left: Relationship using a Burst Index derived from the spike -
+train autocorrelogram.  Right: Relationship using the same criteria for detecting bursts as in the 
+MEA dataset . Related to Figure 3J. 
+(F) Replication of the homeostatic allocation  of spikes  in vivo using the same criteria for 
+detecting bursts as in the MEA dataset. Related to  Supp. Figure 3E.  
+ 
+  
+  
+Supp. Figure 6. MCU -KO does not affect locomotor activity and anxiety -like behavior.  
+(A) Total distance traveled (m eters ) by Control (n = 25) and MCU -KO (n = 22) mice across three 
+consecutive 5 -minute Open Field sessions (OF1, OF2, OF3). Both groups traveled significantly less 
+distance across sessions, indicating habituation (p < 0.0001). However, there was no significant 
+difference in travel  distance between groups (p = 0.4 6) and no significant interaction between group 
+and session (p = 0.63).  
+(B) Total time (s econds ) spent in the center zone of the open field, an indicator of anxiety -like behavior . 
+Both groups exhibited a significant decrease in center time across sessions, reflecting habituation 
+(p < 0.0001). However, there was no significant difference between groups (p = 0.2 1) and no 
+significant interaction between group and session (p = 0.2 7). 
+(C) Total distance  (meters ) traveled by Control and MCU -KO mice during the first Open Field session 
+(OF1).  No significant difference in locomotor activity is observed between Control and MCU -KO 
+mice  (p = 0.22) .  
+(D) Total duration spent in the center zone of the open field (s)  by Control and MCU -KO mice during 
+the first Open Field session. Individual data points represent mice. No significant difference in 
+center time is observed between Control and MCU -KO mice  (p = 0.45) . 
+Panels (A,B) analyzed using  two-way RM ANOVA. Panels (C,D) analyzed using the  Mann -Whitney 
+test.  
+ 

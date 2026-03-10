@@ -219,16 +219,22 @@ resMcu = lme_mediation(tblMcu, frml, xVar, mVar, 'distM', distM, 'distY', distY)
 resMcu.plot.X = tblMcu.pBspk_trans;
 lme_mediationPlot(resMcu)
 
+% COMBINED MODELS (unstandardized)
 
 % X -> M
-frml = 'ss_frBspk ~ (fr + pBspk) + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tblWt, frml, ...
-    'dist', dist);
+frml = 'ss_frBspk ~ (fr + pBspk) * Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
+    'dist', dist, 'verbose', true, 'flgStnd', false);
 
 % X -> Y
-frml = 'ss_frSspk ~ (fr + pBspk) + (1|Name)';
+frml = 'ss_frSspk ~ (fr + pBspk) * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tblWt, frml, ...
-    'dist', dist, 'verbose', true);
+    'dist', dist, 'verbose', true, 'flgStnd', false);
+
+% X -> Y | M 
+frml = 'ss_frSspk ~ (fr + pBspk + ss_frBspk) * Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
+    'dist', 'log-normal', 'verbose', true, 'flgStnd', false);
 
 
 
