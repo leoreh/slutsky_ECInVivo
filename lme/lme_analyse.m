@@ -13,7 +13,7 @@ function [lmeMdl, lmeStats, lmeInfo, lmeTbl] = lme_analyse(tbl, frml, varargin)
 %       - Response: Applies Log or Logit transforms if required by dist.
 %         Adds offset for Zero-inflated data if Gamma/Log is selected.
 %   LME_FIT to fit the model.
-%   LME_EFFECTS to generate ANOVA and contrasts.
+%   LME_POSTHOC to generate ANOVA and contrasts.
 %   LME_PLOTRES to plot residuals
 %
 %   INPUTS:
@@ -21,7 +21,7 @@ function [lmeMdl, lmeStats, lmeInfo, lmeTbl] = lme_analyse(tbl, frml, varargin)
 %       frml        - (char/string) Model formula.
 %       varargin    - (param/value) Optional parameters:
 %                     'dist'        : (char) Force distribution. If empty, auto-selects.
-%                     'contrasts', 'correction', 'dfMethod': See LME_EFFECTS.
+%                     'contrasts', 'correction', 'dfMethod': See LME_POSTHOC.
 %                     'flgPlot'
 %                     'flgStnd'     : (logical) Z-score continuous predictors {true}
 %
@@ -31,7 +31,7 @@ function [lmeMdl, lmeStats, lmeInfo, lmeTbl] = lme_analyse(tbl, frml, varargin)
 %       lmeInfo     - (struct) Metadata (dist used, transforms applied).
 %       lmeTbl      - (table) with data actually used for the model
 %
-%   See also: LME_FIT, LME_EFFECTS, LME_COMPAREDISTS, TBL_TRANS
+%   See also: LME_FIT, LME_POSTHOC, LME_COMPAREDISTS, TBL_TRANS
 
 %% ========================================================================
 %  ARGUMENTS
@@ -47,7 +47,7 @@ addParameter(p, 'flgPlot', false, @islogical);
 addParameter(p, 'flgStnd', true, @islogical);
 addParameter(p, 'fitMethod', '', @ischar);
 
-% Pass-through Options (LME_EFFECTS)
+% Pass-through Options (LME_POSTHOC)
 addParameter(p, 'contrasts', 'all');
 addParameter(p, 'correction', 'holm', @ischar);
 addParameter(p, 'dfMethod', 'Satterthwaite', @ischar);
@@ -241,7 +241,7 @@ end
 %  EFFECTS ANALYSIS
 %  ========================================================================
 
-lmeStats = lme_effects(lmeMdl, ...
+lmeStats = lme_postHoc(lmeMdl, ...
     'contrasts', p.Results.contrasts, ...
     'correction', p.Results.correction, ...
     'dfMethod', dfMethod);

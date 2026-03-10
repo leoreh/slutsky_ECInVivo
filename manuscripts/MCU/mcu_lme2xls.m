@@ -1,5 +1,5 @@
 
-pathName = 'C:\Users\User\Downloads';
+pathName = 'D:\OneDrive - Tel-Aviv University\PhD\Slutsky\Manuscripts\MCU\Results';
 xlsName = 'mcu_suppTbl.xlsx';
 
 %% ========================================================================
@@ -15,12 +15,14 @@ presets = {'steadyState'};
 % LME FR
 frml = 'fr ~ Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tbl, frml, 'dist', 'log-normal');
-lme_save('2A (FR)', lmeMdl, lmeStats, lmeInfo, 'pathName', pathName, 'xlsName', xlsName)
+lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
+lme_save('2A (FR)', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 
 % LME P_burst
 frml = 'pBspk ~ Group * fr + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tbl, frml, 'dist', 'logit-normal');
-lme_save('2A (P_burst)', lmeMdl, lmeStats, lmeInfo, 'pathName', pathName, 'xlsName', xlsName)
+lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
+lme_save('2A (P_burst)', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 
 
 %% ========================================================================
@@ -42,10 +44,6 @@ tblLme = tbl_trans(tbl, 'flg0', true, 'verbose', true);
 uIdx = tblLme.unitType == 'RS';
 tblLme = tblLme(uIdx, :);
 
-% logit pBspk
-tblTrans = tbl_trans(tblLme, 'varsInc', {'pBspk'}, 'logBase', 'logit');
-tblLme.pBspk_trans = tblTrans.pBspk;
-
 % Remove WASH
 tblLme(tblLme.Day == 'WASH', :) = [];
 tblLme.Day = removecats(tblLme.Day, {'WASH'});
@@ -53,6 +51,6 @@ tblLme.Day = removecats(tblLme.Day, {'WASH'});
 % LME
 frml = 'fr ~ Group * Day + (Day|Name)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLme, frml, 'dist', 'gamma');
+lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
+lme_save('3H', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 
-
-lme_save(sheetName, lmeMdl, lmeStats, lmeInfo)

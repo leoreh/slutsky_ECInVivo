@@ -1,7 +1,7 @@
-function lmeStats = lme_effects(mdl, varargin)
-% LME_EFFECTS Comprehensive post-hoc analysis for LME/GLME models.
+function lmeStats = lme_postHoc(mdl, varargin)
+% LME_POSTHOC Comprehensive post-hoc analysis for LME/GLME models.
 %
-%   STATS = LME_EFFECTS(MDL, ...) analyzes a fitted Mixed-Effects Model
+%   STATS = LME_POSTHOC(MDL, ...) analyzes a fitted Mixed-Effects Model
 %   (LME or GLME). It generates an ANOVA table, extracts coefficients, and
 %   computes Simple and Marginal effects for two-way interactions.
 %   Multiple comparison correction is applied to derived effects.
@@ -20,6 +20,7 @@ function lmeStats = lme_effects(mdl, varargin)
 %       lmeStats    - (table) Results table with columns:
 %                     .Type, .Description, .Estimate, .SE, .CI95, .Statistic,
 %                     .DF, .pVal, .pAdj, .HVec.
+%
 %
 %   See also: LME_FIT, FITLME, FITGLME
 
@@ -285,19 +286,18 @@ for iDef = 1:nDefs
         case "ANOVA"
             anovaRowIdx = rowDef.OrigCoefIdx;
             stat    = anovaTbl.FStat(anovaRowIdx);
-            df1     = round(anovaTbl.DF1(anovaRowIdx));
-            df2     = round(anovaTbl.DF2(anovaRowIdx));
-            dfOut   = {mat2str([df1, df2])};
+            df1     = anovaTbl.DF1(anovaRowIdx);
+            df2     = anovaTbl.DF2(anovaRowIdx);
+            dfOut   = {[df1, df2]};
             pVal    = anovaTbl.pValue(anovaRowIdx);
 
         case "Coeff"
             origCoefIdx = rowDef.OrigCoefIdx;
             est     = lmeCoefTbl.Estimate(origCoefIdx);
             se      = lmeCoefTbl.SE(origCoefIdx);
-            ci95    = [lmeCoefTbl.Lower(origCoefIdx), lmeCoefTbl.Upper(origCoefIdx)];
-            ci95    = {mat2str(round(ci95, 2))};
+            ci95    = {[lmeCoefTbl.Lower(origCoefIdx), lmeCoefTbl.Upper(origCoefIdx)]};
             stat    = lmeCoefTbl.tStat(origCoefIdx);
-            dfOut   = {mat2str(round(lmeCoefTbl.DF(origCoefIdx)))};
+            dfOut   = {lmeCoefTbl.DF(origCoefIdx)};
             pVal    = lmeCoefTbl.pValue(origCoefIdx);
 
         case {"Simple", "Marginal"}
@@ -311,7 +311,7 @@ for iDef = 1:nDefs
             end
             se = sqrt(varContrast);
             stat = sqrt(FVal) * sign(est); % t-stat approximation
-            dfOut = {mat2str(round(dfTest))};
+            dfOut = {dfTest};
     end
     resData(iDef,:) = {rowDef.Type, rowDef.Description, est, se, ci95, stat, dfOut, pVal};
     hVecsToStore{iDef} = hVec;
@@ -326,16 +326,7 @@ lmeStats = cell2table(resData, 'VariableNames', ...
     {'Type','Description','Estimate','SE','CI95','Statistic','DF','pVal'});
 
 % Format H-Vectors
-formattedHVecs = cell(nDefs, 1);
-for iDef = 1:nDefs
-    hCont = hVecsToStore{iDef};
-    if isnumeric(hCont) && isvector(hCont)
-        formattedHVecs{iDef} = mat2str(round(hCont,3));
-    else
-        formattedHVecs{iDef} = NaN;
-    end
-end
-lmeStats.HVec = formattedHVecs;
+lmeStats.HVec = hVecsToStore;
 
 % Add Index
 lmeStats = addvars(lmeStats, (1:height(lmeStats))', 'Before', 1, 'NewVariableNames', 'Index');
@@ -345,10 +336,7 @@ if isnumeric(contrastReq) || islogical(contrastReq)
     lmeStats = lmeStats(contrastReq, :);
 end
 
-% Rounding
-vars2 = {'Estimate', 'SE', 'Statistic'};
-for i = 1:length(vars2), lmeStats.(vars2{i}) = round(lmeStats.(vars2{i}), 2); end
-lmeStats.pVal = round(lmeStats.pVal, 4);
+% Rounding Removed
 
 
 %% ========================================================================
@@ -377,7 +365,7 @@ if nCntrsts > 0 && ~strcmpi(correctionMethod, 'none')
         otherwise
             pAdj_sorted = pVal_sorted;
     end
-    pAdjFull(idxCntrsts) = round(pAdj_sorted(restoreIdx), 4);
+    pAdjFull(idxCntrsts) = pAdj_sorted(restoreIdx);
 end
 
 lmeStats = addvars(lmeStats, pAdjFull, 'After', 'pVal', 'NewVariableNames', 'pAdj');
