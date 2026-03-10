@@ -15,12 +15,12 @@ presets = {'steadyState'};
 % LME FR
 frml = 'fr ~ Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tbl, frml, 'dist', 'log-normal');
-lme_save('2A (FR)', lmeMdl, lmeStats, lmeInfo, 'pathName', pathName, 'xlsName', xlsName)
+lme_save('2A', lmeMdl, lmeStats, lmeInfo, 'pathName', pathName, 'xlsName', xlsName)
 
 % LME P_burst
 frml = 'pBspk ~ Group * fr + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tbl, frml, 'dist', 'logit-normal');
-lme_save('2A (P_burst)', lmeMdl, lmeStats, lmeInfo, 'pathName', pathName, 'xlsName', xlsName)
+lme_save('2A', lmeMdl, lmeStats, lmeInfo, 'pathName', pathName, 'xlsName', xlsName)
 
 
 %% ========================================================================

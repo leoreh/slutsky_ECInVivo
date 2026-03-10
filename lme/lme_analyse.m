@@ -60,6 +60,7 @@ flgPlot = p.Results.flgPlot;
 flgStnd = p.Results.flgStnd;
 fitMethod = p.Results.fitMethod;
 frml = char(frml);
+dfMethod = p.Results.dfMethod;
 
 % Run Info Storage
 lmeInfo = struct();
@@ -219,6 +220,7 @@ switch lower(dist)
         if isfield(pResp, 'varsTrans') && isfield(pResp.varsTrans, varResp)
             lmeInfo.transParams.varsTrans.(varResp) = pResp.varsTrans.(varResp);
         end
+        dfMethod = 'Residual'; % GLME does not support Satterthwaite
 end
 
 lmeInfo.distFinal = dist;
@@ -242,7 +244,7 @@ end
 lmeStats = lme_effects(lmeMdl, ...
     'contrasts', p.Results.contrasts, ...
     'correction', p.Results.correction, ...
-    'dfMethod', p.Results.dfMethod);
+    'dfMethod', dfMethod);
 
 
 %% ========================================================================
@@ -251,7 +253,7 @@ lmeStats = lme_effects(lmeMdl, ...
 
 % Add Metadata (AIC, Formula, FitMethod, DFMethod)
 lmeInfo.frml = frml;
-lmeInfo.dfMethod = p.Results.dfMethod;
+lmeInfo.dfMethod = dfMethod;
 lmeInfo.fitMethod = lmeMdl.FitMethod;
 lmeInfo.aic = lmeMdl.ModelCriterion.AIC;
 lmeInfo.standardized = flgStnd;
