@@ -255,15 +255,18 @@ if any(contains(tblVars, "unitType"))
 end
 
 if flgClean
-    % Remove bad units
+    % Remove bad and FS units
     tbl(tbl.unitType == 'Other', :) = [];
-    tbl.unitType = removecats(tbl.unitType, 'Other');
+    tbl(tbl.unitType == 'FS', :) = [];
+    tbl.unitType = removecats(tbl.unitType, {'Other', 'FS'});
+    tbl.unitType = [];
 
-    % Remove bac on / off
+    % Remove bac on, bac off, and washout
     if any(tbl.Day == 'BAC_OFF')
         tbl(tbl.Day == 'BAC_ON', :) = [];
         tbl(tbl.Day == 'BAC_OFF', :) = [];
-        tbl.Day = removecats(tbl.Day, {'BAC_ON', 'BAC_OFF'});
+        tbl(tbl.Day == 'WASH', :) = [];
+        tbl.Day = removecats(tbl.Day, {'BAC_ON', 'BAC_OFF', 'WASH'});
     end
 end
 

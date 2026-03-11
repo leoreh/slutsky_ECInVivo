@@ -94,7 +94,7 @@ tblGUI_xy(xVec, tbl);
 % LME
 xVar = 'pBspk';
 frml = sprintf('com ~ (fr + %s) + Group + (1|Name)', xVar);
-[lmeMdl, lmeStates, lmeInfo] = lme_analyse(tblPlot, frml, 'dist', 'normal');
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblPlot, frml, 'dist', 'normal');
 
 % Partial Dependence
 hFig = figure;
@@ -155,10 +155,10 @@ tblSum = groupsummary(tblRipp, {'Group', 'Name'}, 'mean', ...
 
 % LME
 frml = 'dur ~ (freq + amp + com) * Group + (1|Name)';
-[lmeMdl, lmeStates, lmeInfo] = lme_analyse(tblRipp, frml);
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblRipp, frml);
 
 frml = 'dur ~ Group + (1|Name)';
-[lmeMdl, lmeStates, lmeInfo] = lme_analyse(tblRipp, frml);
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblRipp, frml);
 
 % To Prism (Metrics)
 prismMat = tbl2prism(tblRipp, 'yVar', 'freq', 'grpVar', 'Group');

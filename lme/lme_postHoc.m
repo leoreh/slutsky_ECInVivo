@@ -310,6 +310,11 @@ for iDef = 1:nDefs
                 varContrast = 0;
             end
             se = sqrt(varContrast);
+            
+            % Compute 95% CI
+            tCrit = tinv(0.975, dfTest);
+            ci95 = {[est - tCrit*se, est + tCrit*se]};
+            
             stat = sqrt(FVal) * sign(est); % t-stat approximation
             dfOut = {dfTest};
     end

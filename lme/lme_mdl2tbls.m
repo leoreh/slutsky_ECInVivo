@@ -16,7 +16,8 @@ tblIdx = 1;
 % Helper function to add to structural array
     function add_tbl(titleStr, tbl, tblType)
         if nargin < 3, tblType = 'Other'; end
-        if isempty(tbl) || height(tbl) == 0, return; end
+        % Reorder columns globally before stringifying
+        tbl = reorder_columns(tbl);
         
         tbl = format_table_for_pub(tbl, tblType);
         % Convert arrays to string for export
@@ -32,7 +33,12 @@ infoNames = {};
 infoVals = {};
 if ~isempty(lmeInfo)
     if isfield(lmeInfo, 'frml'), infoNames{end+1}='Formula'; infoVals{end+1}=lmeInfo.frml; end
-    if isfield(lmeInfo, 'distFinal'), infoNames{end+1}='Distribution'; infoVals{end+1}=lmeInfo.distFinal; end
+    if isfield(lmeInfo, 'distSelected') && ~isempty(lmeInfo.distSelected)
+        distStr = regexprep(char(lmeInfo.distSelected), '(\<[a-z])', '${upper($1)}');
+        infoNames{end+1}='Distribution'; infoVals{end+1}=distStr; 
+    elseif isfield(lmeInfo, 'distFinal')
+        infoNames{end+1}='Distribution'; infoVals{end+1}=lmeInfo.distFinal; 
+    end
     if isfield(lmeInfo, 'fitMethod'), infoNames{end+1}='Fit Method'; infoVals{end+1}=lmeInfo.fitMethod; end
     if isfield(lmeInfo, 'dfMethod'), infoNames{end+1}='DF Method'; infoVals{end+1}=lmeInfo.dfMethod; end
     if isfield(lmeInfo, 'aic'), infoNames{end+1}='AIC'; infoVals{end+1}=mat2str(round(lmeInfo.aic, 2)); end
@@ -112,27 +118,7 @@ if ~isempty(lmeInfo) && isfield(lmeInfo, 'transParams') && isfield(lmeInfo.trans
     end
 end
 
-% --- 3. Fixed Effects / Coefficients (Type == "Coeff") ---
-if ~isempty(lmeStats) && ismember('Type', lmeStats.Properties.VariableNames)
-    idxCoef = lmeStats.Type == "Coeff";
-    if any(idxCoef)
-        coefTbl = lmeStats(idxCoef, :);
-        coefTbl = removevars_safely(coefTbl, {'Index', 'Type', 'HVec'});
-        add_tbl('FIXED EFFECTS (COEFFICIENTS)', coefTbl, 'Coeff');
-    end
-end
-
-% --- 4. Post-Hoc (Type == "Simple" or "Marginal") ---
-if ~isempty(lmeStats) && ismember('Type', lmeStats.Properties.VariableNames)
-    idxPost = ismember(lmeStats.Type, ["Simple", "Marginal"]);
-    if any(idxPost)
-        postTbl = lmeStats(idxPost, :);
-        postTbl = removevars_safely(postTbl, {'Index', 'Type', 'HVec'});
-        add_tbl('POST-HOC EFFECTS', postTbl, 'PostHoc');
-    end
-end
-
-% --- 5. Conditional ANOVA ---
+% --- 3. Conditional ANOVA ---
 if ~isempty(lmeStats) && ismember('Type', lmeStats.Properties.VariableNames)
     idxAnova = find(lmeStats.Type == "ANOVA");
     if ~isempty(idxAnova) && ~isempty(lmeMdl)
@@ -161,6 +147,12 @@ if ~isempty(lmeStats) && ismember('Type', lmeStats.Properties.VariableNames)
         if includeAnova
             anovaTbl = lmeStats(idxAnova, :);
             anovaTbl = removevars_safely(anovaTbl, {'Index', 'Type', 'Estimate', 'SE', 'CI95', 'HVec'});
+            
+            % Inject empty columns for alignment
+            anovaTbl.Estimate = nan(height(anovaTbl), 1);
+            anovaTbl.CI95 = repmat({''}, height(anovaTbl), 1);
+            anovaTbl.SE = nan(height(anovaTbl), 1);
+            
             add_tbl('ANOVA (OMNIBUS INTERACTION)', anovaTbl, 'ANOVA');
         end
         
@@ -176,12 +168,93 @@ if ~isempty(lmeStats) && ismember('Type', lmeStats.Properties.VariableNames)
     end
 end
 
+% --- 4. Fixed Effects / Coefficients (Type == "Coeff") ---
+if ~isempty(lmeStats) && ismember('Type', lmeStats.Properties.VariableNames)
+    idxCoef = lmeStats.Type == "Coeff";
+    if any(idxCoef)
+        coefTbl = lmeStats(idxCoef, :);
+        coefTbl = removevars_safely(coefTbl, {'Index', 'Type', 'HVec'});
+        add_tbl('FIXED EFFECTS (COEFFICIENTS)', coefTbl, 'Coeff');
+    end
+end
+
+% --- 5. Post-Hoc (Type == "Simple" or "Marginal") ---
+if ~isempty(lmeStats) && ismember('Type', lmeStats.Properties.VariableNames)
+    idxPost = ismember(lmeStats.Type, ["Simple", "Marginal"]);
+    if any(idxPost)
+        postTbl = lmeStats(idxPost, :);
+        postTbl = removevars_safely(postTbl, {'Index', 'Type', 'HVec'});
+        add_tbl('POST-HOC EFFECTS', postTbl, 'PostHoc');
+    end
+end
+
 % --- 6. Covariance & Error Parameters ---
 if ~isempty(lmeMdl)
     try
         [~, ~, resStats] = covarianceParameters(lmeMdl);
-        add_tbl('COVARIANCE PARAMETERS', dataset2table(resStats{1}), 'Other');
-        add_tbl('ERROR PARAMETERS', dataset2table(resStats{2}), 'Other');
+        
+        % Format Covariance
+        covTbl = dataset2table(resStats{1});
+        if ~isempty(covTbl)
+            descStrs = repmat({''}, height(covTbl), 1);
+            for r = 1:height(covTbl)
+                grp = ''; if ismember('Group', covTbl.Properties.VariableNames), grp = char(covTbl.Group(r)); end
+                n1 = ''; if ismember('Name1', covTbl.Properties.VariableNames), n1 = char(covTbl.Name1(r)); end
+                n2 = ''; if ismember('Name2', covTbl.Properties.VariableNames), n2 = char(covTbl.Name2(r)); end
+                
+                if strcmp(grp, 'DummyVar') || isempty(grp), grp = 'Fixed'; end
+                descStr = sprintf('Cov: %s', grp);
+                if ~isempty(n1), descStr = [descStr, ' (', n1]; end
+                if ~isempty(n2) && ~strcmp(n1, n2), descStr = [descStr, ' x ', n2]; end
+                if ~isempty(n1), descStr = [descStr, ')']; end
+                
+                descStrs{r} = descStr;
+            end
+            covTbl = addvars(covTbl, descStrs, 'Before', 1, 'NewVariableNames', 'Description');
+            covTbl = removevars_safely(covTbl, {'Group', 'Name1', 'Name2', 'Type'});
+            if ismember('StandardError', covTbl.Properties.VariableNames)
+                covTbl.Properties.VariableNames{strcmp(covTbl.Properties.VariableNames, 'StandardError')} = 'SE';
+            end
+            
+            if ismember('Lower', covTbl.Properties.VariableNames) && ismember('Upper', covTbl.Properties.VariableNames)
+                ci95List = cell(height(covTbl), 1);
+                for r = 1:height(covTbl)
+                    ci95List{r} = [covTbl.Lower(r), covTbl.Upper(r)];
+                end
+                covTbl = addvars(covTbl, ci95List, 'NewVariableNames', 'CI95');
+                covTbl = removevars_safely(covTbl, {'Lower', 'Upper'});
+            end
+            
+            add_tbl('COVARIANCE PARAMETERS', covTbl, 'Other');
+        end
+        
+        % Format Error parameters
+        errTbl = dataset2table(resStats{2});
+        if ~isempty(errTbl)
+            descStrs = repmat({''}, height(errTbl), 1);
+            for r = 1:height(errTbl)
+                n = ''; if ismember('Name', errTbl.Properties.VariableNames), n = char(errTbl.Name(r)); end
+                if isempty(n), n = 'Residual'; end
+                descStrs{r} = sprintf('Err: %s', n);
+            end
+            errTbl = addvars(errTbl, descStrs, 'Before', 1, 'NewVariableNames', 'Description');
+            errTbl = removevars_safely(errTbl, {'Name', 'Group', 'Type'});
+            if ismember('StandardError', errTbl.Properties.VariableNames)
+                errTbl.Properties.VariableNames{strcmp(errTbl.Properties.VariableNames, 'StandardError')} = 'SE';
+            end
+            
+            if ismember('Lower', errTbl.Properties.VariableNames) && ismember('Upper', errTbl.Properties.VariableNames)
+                ci95List = cell(height(errTbl), 1);
+                for r = 1:height(errTbl)
+                    ci95List{r} = [errTbl.Lower(r), errTbl.Upper(r)];
+                end
+                errTbl = addvars(errTbl, ci95List, 'NewVariableNames', 'CI95');
+                errTbl = removevars_safely(errTbl, {'Lower', 'Upper'});
+            end
+            
+            add_tbl('ERROR PARAMETERS', errTbl, 'Other');
+        end
+        
     catch
     end
 end
@@ -191,6 +264,29 @@ end % EOF
 %% ========================================================================
 %  HELPERS
 %  ========================================================================
+
+function tblOut = reorder_columns(tblIn)
+% REORDER_COLUMNS Enforces a strict global column ordering.
+globalOrder = {'Description', 'Estimate', 'CI95', 'SE', 'Statistic', 'DF', 'pVal'};
+
+currentVars = tblIn.Properties.VariableNames;
+orderedVars = {};
+
+% 1. Extract columns present in the global priority list
+for i = 1:length(globalOrder)
+    col = globalOrder{i};
+    if ismember(col, currentVars)
+        orderedVars{end+1} = col;
+    end
+end
+
+% 2. Extract remaining columns not in the priority list
+remainingVars = setdiff(currentVars, orderedVars, 'stable');
+finalVars = [orderedVars, remainingVars];
+
+% 3. Reorder
+tblOut = tblIn(:, finalVars);
+end
 
 function tbl = stringify_arrays(tbl)
 % STRINGIFY_ARRAYS converts cell arrays of numeric vectors to string

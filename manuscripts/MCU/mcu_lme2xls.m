@@ -1,6 +1,23 @@
 
+% File Names
 pathName = 'D:\OneDrive - Tel-Aviv University\PhD\Slutsky\Manuscripts\MCU\Results';
 xlsName = 'mcu_suppTbl.xlsx';
+
+% Load MEA ----------------------------------------------------------------
+presets = {'steadyState'};
+[tblMea, xVec, basepaths, v] = mcu_tblMea('presets', presets, 'flgOtl', true);
+
+% Load In Vivo ------------------------------------------------------------
+basepaths = [mcu_basepaths('wt'), mcu_basepaths('mcu')];
+presets = {'brst'};
+tblVivo = mcu_tblVivo('basepaths', basepaths, 'flgClean', true, ...
+    'presets', presets);
+
+% Assert no zero values
+tblVivo = tbl_trans(tblVivo, 'flg0', true, 'verbose', true);
+
+
+
 
 %% ========================================================================
 % FIGURE 2
@@ -8,21 +25,88 @@ xlsName = 'mcu_suppTbl.xlsx';
 
 % A -----------------------------------------------------------------------
 
-% Load
-presets = {'steadyState'};
-[tbl, xVec, basepaths, v] = mcu_tblMea('presets', presets, 'flgOtl', true);
-
 % LME FR
 frml = 'fr ~ Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tbl, frml, 'dist', 'log-normal');
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal');
 lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
 lme_save('2A (FR)', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 
 % LME P_burst
 frml = 'pBspk ~ Group * fr + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tbl, frml, 'dist', 'logit-normal');
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'logit-normal');
 lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
 lme_save('2A (P_burst)', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
+
+
+% B -----------------------------------------------------------------------
+
+% LME FR
+tblLme = tblVivo(tblVivo.Day == 'BSL', :);
+frml = 'fr ~ Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLme, frml, 'dist', 'gamma');
+lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
+lme_save('2B (FR)', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
+
+% LME P_burst
+frml = 'pBspk ~ Group * fr + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLme, frml, 'dist', 'logit-normal');
+lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
+lme_save('2B (P_burst)', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
+
+
+% C -----------------------------------------------------------------------
+basepaths = [mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl')];
+tblRipp = mcu_tblVivo('basepaths', basepaths, 'presets', {'ripp'});
+frml = 'amp ~ Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblRipp, frml, 'dist', 'log-normal');
+lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
+lme_save('2C', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
+
+
+% D -----------------------------------------------------------------------
+frml = 'freq ~ Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblRipp, frml, 'dist', 'normal');
+lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
+lme_save('2D', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
+
+
+% E -----------------------------------------------------------------------
+frml = 'dur ~ Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblRipp, frml, 'dist', 'log-normal');
+lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
+lme_save('2E', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
+
+
+% G -----------------------------------------------------------------------
+
+% Load
+presets = {'rippSpks', 'brst'};
+tblRipp = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
+
+% LME
+frml = 'com ~ (fr + pBspk) + Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblRipp, frml, 'dist', 'normal');
+lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
+lme_save('2G', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
+
+% Partial Dependence
+hFig = figure;
+hAx = nexttile;
+[pdRes, hFig] = lme_pd(lmeMdl, {'pBspk', 'Group'}, 'transParams', lmeInfo.transParams, ...
+    'hAx', hAx, 'xLims', {[0, 1], []});
+
+hAx = nexttile;
+[pdRes, hFig] = lme_pd(lmeMdl, {'fr', 'Group'}, 'transParams', lmeInfo.transParams, ...
+    'hAx', hAx);
+set(hAx, 'XScale', 'log')
+
+
+
+
+frml = 'dur ~ Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblRipp, frml, 'dist', 'log-normal');
+lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
+lme_save('2E', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 
 
 %% ========================================================================
@@ -30,23 +114,6 @@ lme_save('2A (P_burst)', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 % =========================================================================
 
 % H -----------------------------------------------------------------------
-
-% Load
-basepaths = [mcu_basepaths('wt'), mcu_basepaths('mcu')];
-presets = {'brst'};
-tbl = mcu_tblVivo('basepaths', basepaths, 'flgClean', true, ...
-    'presets', presets);
-
-% Assert no zero values
-tblLme = tbl_trans(tbl, 'flg0', true, 'verbose', true);
-
-% Limit to RS units
-uIdx = tblLme.unitType == 'RS';
-tblLme = tblLme(uIdx, :);
-
-% Remove WASH
-tblLme(tblLme.Day == 'WASH', :) = [];
-tblLme.Day = removecats(tblLme.Day, {'WASH'});
 
 % LME
 frml = 'fr ~ Group * Day + (Day|Name)';
