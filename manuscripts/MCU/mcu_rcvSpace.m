@@ -36,13 +36,13 @@ grps = {'Control', 'MCU-KO'};
 
 % Color Data
 % Row 1: Burstiness
-cData_Brst = tbl.dpBspk;
+cData_Brst = tbl.pBspkGain;
 cLabel_Brst = '\Delta Burstiness (log-odds)';
 clim_Brst = [min(cData_Brst, [], 'all'), max(cData_Brst, [], 'all')];
 if diff(clim_Brst) == 0; clim_Brst = clim_Brst + [-0.1 0.1]; end
 
-% Row 2: dFr
-cData_dFr = tbl.dFr;
+% Row 2: frGain
+cData_dFr = tbl.frGain;
 cLabel_dFr = '\Delta FR (Fold Change)';
 clim_dFr = [min(cData_dFr, [], 'all'), max(cData_dFr, [], 'all')];
 if diff(clim_dFr) == 0; clim_dFr = clim_dFr + [-0.1 0.1]; end
@@ -70,7 +70,7 @@ for iGrp = 1:2
     subCData = cData_Brst(mask);
     
     % Plot Scatter (via plot_scat)
-    plot_scat(subTbl, 'dBrst_rel', 'dSngl_rel', ...
+    plot_scat(subTbl, 'bGain', 'sGain', ...
         'c', subCData, ...
         'hAx', gca, ...
         'fitType', 'ortho', ...

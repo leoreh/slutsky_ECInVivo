@@ -100,13 +100,13 @@ frml = sprintf('com ~ (fr + %s) + Group + (1|Name)', xVar);
 hFig = figure;
 hAx = nexttile;
 vars = {xVar, 'Group'};
-[pdRes, hFig] = lme_pd(lmeMdl, vars, 'transParams', lmeInfo.transParams, ...
+[pdRes, hFig] = lme_lsmeans(lmeMdl, vars, 'transParams', lmeInfo.transParams, ...
     'hAx', hAx, 'xLims', {[0, 1], []});
 
 hAx = nexttile;
 xVar = 'fr';
 vars = {xVar, 'Group'};
-[pdRes, hFig] = lme_pd(lmeMdl, vars, 'transParams', lmeInfo.transParams, ...
+[pdRes, hFig] = lme_lsmeans(lmeMdl, vars, 'transParams', lmeInfo.transParams, ...
     'hAx', hAx);
 set(hAx, 'XScale', 'log')
 

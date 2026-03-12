@@ -1,7 +1,7 @@
-function [tblPlot, hFig] = lme_pd(mdl, vars, varargin)
-% LME_PD Plots Partial Dependence (Marginal Effects) for LME/GLME models.
+function [tblPlot, hFig] = lme_lsmeans(mdl, vars, varargin)
+% LME_LSMEANS Plots Least-Squares Means (Marginal Effects) for LME/GLME models.
 %
-%   [PDRES, HFIG] = LME_PD(MDL, VARS, ...)
+%   [PDRES, HFIG] = LME_LSMEANS(MDL, VARS, ...)
 %   Calculates and visualizes the marginal effect of one or two predictors
 %   on the response, while holding all other predictors constant (at Mean
 %   or Mode).
@@ -53,7 +53,7 @@ xLims           = p.Results.xLims;
 % Ensure vars is cell
 if ischar(vars), vars = {vars}; end
 if length(vars) > 2
-    error('LME_PD:MaxVars', 'Can only visualize up to 2 variables.');
+    error('LME_LSMEANS:MaxVars', 'Can only visualize up to 2 variables.');
 end
 
 
@@ -63,7 +63,7 @@ if ~isempty(xLims)
         xLims = {xLims};
     end
     if length(xLims) ~= length(vars)
-        error('LME_PD:XLimMismatch', 'Length of "xLims" must match number of "vars".');
+        error('LME_LSMEANS:XLimMismatch', 'Length of "xLims" must match number of "vars".');
     end
     
 
@@ -160,7 +160,7 @@ end
 %  ========================================================================
 
 if isempty(hAx)
-    hFig = figure('Color', 'w', 'Name', 'Partial Dependence');
+    hFig = figure('Color', 'w', 'Name', 'Least-Squares Means');
     hAx = axes('Parent', hFig);
 else
     hFig = ancestor(hAx, 'figure');
@@ -271,7 +271,7 @@ if ~isempty(grpName)
     lgd = legend(hAx, 'Location', 'best', 'Interpreter', 'none');
     title(lgd, grpName);
 end
-title(hAx, 'Partial Dependence', 'FontWeight', 'normal');
+title(hAx, 'Least-Squares Means', 'FontWeight', 'normal');
 
 % set(hAx, 'YScale', 'log')
 % if ~isempty(transParams.varsTrans.(xName).logBase)
@@ -295,7 +295,7 @@ function [tblGrid, varyInfo] = get_grid(mdl, varsVary, nGrid, xLims)
 %
 %   HOW IT WORKS:
 %   1. Identify all predictors in the model.
-%   2. For the variables of interest (varsVary):
+2. For the variables of interest (varsVary):
 %      - Create a range of values (e.g., 100 points from min to max).
 %      - IF xLims is provided for that variable, use that range instead.
 %   3. For all OTHER variables (Fixed Effects):
@@ -363,8 +363,3 @@ tblArgs = cellfun(@(x) x(:), outGrids, 'UniformOutput', false);
 tblGrid = table(tblArgs{:}, 'VariableNames', predVars);
 
 end
-
-
-
-
-

@@ -5,7 +5,7 @@
 %  temporal dynamics, and visualize using tblGUI_xy.
 
 % Load
-% [tbl, xVec, basepaths, v] = mcu_tblMea('presets', {'time', 'rcv', 'steadyState'});
+[tbl, xVec, basepaths, v] = mcu_tblMea('presets', {'time', 'rcv', 'steadyState'});
 tblPlot = tbl;
 
 % Add logit pBspk

@@ -39,7 +39,23 @@ if ~isempty(lmeInfo)
     elseif isfield(lmeInfo, 'distFinal')
         infoNames{end+1}='Distribution'; infoVals{end+1}=lmeInfo.distFinal; 
     end
-    if isfield(lmeInfo, 'fitMethod'), infoNames{end+1}='Fit Method'; infoVals{end+1}=lmeInfo.fitMethod; end
+    
+    if ~isempty(lmeMdl)
+        if isprop(lmeMdl, 'Link')
+            try
+                linkStr = lmeMdl.Link.Name;
+                if ischar(linkStr) || isstring(linkStr)
+                    linkStr = regexprep(char(linkStr), '(\<[a-z])', '${upper($1)}');
+                    infoNames{end+1}='Link Function'; infoVals{end+1}=linkStr;
+                end
+            catch
+            end
+        else
+            infoNames{end+1}='Link Function'; infoVals{end+1}='Identity';
+        end
+    end
+    
+    if isfield(lmeInfo, 'fitMethod'), infoNames{end+1}='Fit Method'; infoVals{end+1}=upper(lmeInfo.fitMethod); end
     if isfield(lmeInfo, 'dfMethod'), infoNames{end+1}='DF Method'; infoVals{end+1}=lmeInfo.dfMethod; end
     if isfield(lmeInfo, 'aic'), infoNames{end+1}='AIC'; infoVals{end+1}=mat2str(round(lmeInfo.aic, 2)); end
 end

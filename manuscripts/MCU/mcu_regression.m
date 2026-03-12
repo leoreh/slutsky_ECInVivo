@@ -6,7 +6,7 @@
 % Including:
 % State Space Trajectory 
 % Residuals (partial regression)
-% LSmeans (partial dependence)
+% LSmeans (least-squares means)
 % Mediation
 % Ablation
 % 
@@ -32,22 +32,16 @@ tbl.ss_pBspk_trans = tblTrans.ss_pBspk;
 %  ========================================================================
 
 % Relative
-tbl.dBrst_rel = log((tbl.ss_frBspk) ./ (tbl.frBspk));
-tbl.dSngl_rel = log((tbl.ss_frSspk) ./ (tbl.frSspk));
-tbl.dFr = log((tbl.ss_fr) ./ (tbl.fr));
-tbl.dpBspk = (tbl.ss_pBspk_trans) - (tbl.pBspk_trans);
+tbl.bGain = log((tbl.ss_frBspk) ./ (tbl.frBspk));
+tbl.sGain = log((tbl.ss_frSspk) ./ (tbl.frSspk));
+tbl.frGain = log((tbl.ss_fr) ./ (tbl.fr));
+tbl.pBspkGain = (tbl.ss_pBspk_trans) - (tbl.pBspk_trans);
 
 % Absolute
-tbl.dBrst_abs = (tbl.ss_frBspk - tbl.frBspk);
-tbl.dSngl_abs = (tbl.ss_frSspk - tbl.frSspk);
-tbl.dFr_abs = (tbl.ss_fr - tbl.fr);
+tbl.bDelta = (tbl.ss_frBspk - tbl.frBspk);
+tbl.sDelta = (tbl.ss_frSspk - tbl.frSspk);
+tbl.frDelta = (tbl.ss_fr - tbl.fr);
 
-% % Prism
-idxGrp = tbl.Group == 'Control';
-% prismVars = {'Name', 'dSngl_rel', 'dBrst_rel', 'dSngl_abs', 'dBrst_abs', ...
-%     'dFr', 'dpBspk', 'pBspk', 'pBspk_trans'};
-% tblPrism = tbl(idxGrp, prismVars);
-% string(prismVars)
 
 
 %% ========================================================================
@@ -55,11 +49,11 @@ idxGrp = tbl.Group == 'Control';
 %  ========================================================================
 % Use raw values (not standardized effects)
 
-frml = 'dSngl_abs ~ (dBrst_abs) * Group + (1|Name)';
+frml = 'sDelta ~ (bDelta) * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
     'dist', 'normal', 'verbose', true, 'flgStnd', false);
 
-frml = 'dSngl_rel ~ dBrst_rel * Group + (1|Name)';
+frml = 'sGain ~ bGain * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
     'dist', 'normal', 'verbose', true, 'flgStnd', false);
 
@@ -69,16 +63,16 @@ frml = 'dSngl_rel ~ dBrst_rel * Group + (1|Name)';
 
 hFig = mcu_rcvSpace(tbl);
 
-frml = 'dSngl_rel ~ dBrst_rel * Group + (1|Name)';
+frml = 'sGain ~ bGain * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
     'dist', 'normal', 'verbose', true);
 
-frml = 'dSngl_abs ~ dBrst_abs * Group + (1|Name)';
+frml = 'sDelta ~ bDelta * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
     'dist', 'normal', 'verbose', true);
 
 
-% tblGUI_scatHist(tbl, 'xVar', 'pBspk_trans', 'yVar', 'dBrst_rel', 'grpVar', 'Group');
+% tblGUI_scatHist(tbl, 'xVar', 'pBspk_trans', 'yVar', 'bGain', 'grpVar', 'Group');
 % tblGUI_bar(tbl, 'yVar', 'pBspk', 'xVar', 'Group');
 
 %% ========================================================================
@@ -91,11 +85,11 @@ hFig = figure;
 hTile = tiledlayout(hFig, 1, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
 
 hAx = nexttile;
-frml = 'dSngl_rel ~ (pBspk + fr + dBrst_rel) * Group + (1|Name)';
+frml = 'sGain ~ (pBspk + fr + bGain) * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
     'dist', 'normal', 'verbose', false);
 
-[tblRes, hFig] = lme_pr(lmeMdl, 'dBrst_rel', ...
+[tblRes, hFig] = lme_pr(lmeMdl, 'bGain', ...
     'flgMode', 'regression', 'hAx', hAx, ...
     'varGrp',  'Group', 'transParams', lmeInfo.transParams);
 
@@ -104,11 +98,11 @@ frml = 'dSngl_rel ~ (pBspk + fr + dBrst_rel) * Group + (1|Name)';
 %     'dist', 'normal', 'verbose', true, 'flgStnd', false);
 
 hAx = nexttile;
-frml = 'dSngl_abs ~ (pBspk * fr * dBrst_abs) * Group + (1|Name)';
+frml = 'sDelta ~ (pBspk * fr * bDelta) * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
     'dist', 'normal', 'verbose', false);
 
-[tblRes, hFig] = lme_pr(lmeMdl, 'dBrst_abs', ...
+[tblRes, hFig] = lme_pr(lmeMdl, 'bDelta', ...
     'flgMode', 'regression', 'hAx', hAx, ...
     'varGrp',  'Group', 'transParams', lmeInfo.transParams);
 
@@ -127,7 +121,7 @@ tblRes.ResidY(idxGrp);
 
 
 %% ========================================================================
-%  PARTIAL DEPENDENCE (LSMEANS)
+%  LEAST-SQUARES MEANS (LSMEANS)
 %  ========================================================================
 
 % Steady-state raw values
@@ -151,35 +145,35 @@ hFig = plot_axSize('flgFullscreen', true, 'flgPos', true);
 
 vars = {'pBspk', 'Group'};
 hAx = nexttile;
-[pdRes, hFig] = lme_pd(lmeMdl1, vars, 'transParams', lmeInfo1.transParams, ...
+[pdRes, hFig] = lme_lsmeans(lmeMdl1, vars, 'transParams', lmeInfo1.transParams, ...
     'hAx', hAx);
 set(gca, "YScale", "log")
 
 hAx = nexttile;
-[pdRes, hFig] = lme_pd(lmeMdl2, vars, 'transParams', lmeInfo2.transParams, ...
+[pdRes, hFig] = lme_lsmeans(lmeMdl2, vars, 'transParams', lmeInfo2.transParams, ...
     'hAx', hAx);
 set(gca, "YScale", "log")
 
 hAx = nexttile;
-[pdRes, hFig] = lme_pd(lmeMdl3, vars, 'transParams', lmeInfo3.transParams, ...
+[pdRes, hFig] = lme_lsmeans(lmeMdl3, vars, 'transParams', lmeInfo3.transParams, ...
     'hAx', hAx);
 set(gca, "YScale", "log")
 
 vars = {'fr', 'Group'};
 hAx = nexttile;
-[pdRes, hFig] = lme_pd(lmeMdl1, vars, 'transParams', lmeInfo1.transParams, ...
+[pdRes, hFig] = lme_lsmeans(lmeMdl1, vars, 'transParams', lmeInfo1.transParams, ...
     'hAx', hAx);
 set(gca, "YScale", "log")
 set(gca, "XScale", "log")
 
 hAx = nexttile;
-[pdRes, hFig] = lme_pd(lmeMdl2, vars, 'transParams', lmeInfo2.transParams, ...
+[pdRes, hFig] = lme_lsmeans(lmeMdl2, vars, 'transParams', lmeInfo2.transParams, ...
     'hAx', hAx);
 set(gca, "YScale", "log")
 set(gca, "XScale", "log")
 
 hAx = nexttile;
-[pdRes, hFig] = lme_pd(lmeMdl3, vars, 'transParams', lmeInfo3.transParams, ...
+[pdRes, hFig] = lme_lsmeans(lmeMdl3, vars, 'transParams', lmeInfo3.transParams, ...
     'hAx', hAx);
 set(gca, "YScale", "log")
 set(gca, "XScale", "log")

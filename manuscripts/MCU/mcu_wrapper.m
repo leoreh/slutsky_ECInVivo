@@ -106,7 +106,7 @@ hAx = nexttile;
 % Partial Dependence
 hAx = nexttile;
 vars = {'Group'};
-[pdRes, hFig] = lme_pd(lmeMdl, vars, 'transParams', [], ...
+[pdRes, hFig] = lme_lsmeans(lmeMdl, vars, 'transParams', [], ...
     'hAx', hAx);
 
 
