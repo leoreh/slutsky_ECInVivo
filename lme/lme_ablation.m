@@ -133,7 +133,7 @@ for iRep = 1 : nTotal
 
         % Train & Test
         [mdl, ~, infoTrn, tblTrn] = lme_analyse(tbl(trainIdx, :), currFrml, ...
-            'dist', dist, 'verbose', false);
+            'dist', dist, 'verbose', false, 'flgStnd', true);
 
         % Prepare Test Data (Exact same transforms as Training)
         % tbl is raw input (original units). tblTrn is the transformed

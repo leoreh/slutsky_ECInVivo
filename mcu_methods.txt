@@ -1,0 +1,423 @@
+ 1 Methods  
+1.1 Animals  
+All animal experiments were approved by the Faculty of Medical and Health Sciences 
+Ethics Committee at Tel -Aviv University (01 -19-036, 01 -19-049, 01 -19-051, TAU -MD-IL-
+2306 -142-2 and TAU -MD-IL-2306 -141-1). Mice were maintained on a 12 -hour light/12 -hour 
+dark cycle (lights on at 08:00) with ad libitum access to standard chow and water. For all in 
+vivo recording experiments, mice were individually housed in their home -cages post -surgery 
+to prevent damage to the recording apparatus by cage mates. Experiments we re conducted on 
+male and female mice aged 3 -5 months at the start of experimental procedures.  
+To generate conditional MCU -KO mice, Tg(Trpc4 -cre)383Stl ( a gift of Susumu 
+Tonegawa (MIT), MGI: 6114650)1, were crossed with B6;129S -Mcutm1.1Jmol/J (MGI: 
+5805708)2. The offspring Trpc4 -cre+/Mcufl/+ were intercrossed to generate experimental Trpc4 -
+cre+/Mcufl/fl conditional knockouts (MCU -KO) and Mcufl/fl littermates (Control), all on a ≈ 
+50:50 C57BL/6J:129S6/SvEvTac genetic background. Genotypes were confirmed by PCR 
+using genomic DNA extracted from tail biopsies. In MCU -KO, Cre expression driven by the 
+Trpc4 promoter resulted in deletion of MCU from CA1 pyramidal neurons.  
+  
+ 1.2 Transcriptomics  
+To enable nuclear labeling and subsequent RNA sequencing, mice were bilaterally 
+injected into the CA1 region of the hippocampus with pAAV1 -EF1A -DIO-mCherry -KASH -
+WPRE . Stereotaxic coordinates targeting dorsal CA1 were determined relative to Bregma (in 
+mm: 2.15 posterior ; 1.4 lateral,  1.5 dorsal )3. Following injection, a recovery period of 3 –4 
+weeks was allowed to ensure optimal viral expression and retrograde/anterograde transport.  To 
+isolate the transcriptomes of the MCU -deficient CA1 neurons, hippocampal tissues were 
+micro -dissected and a nuclear isolation protocol (such as INTACT or similar) was employed. 
+Purified tissue was homogenized in a specialized lysis buffer to liberate intact nuclei while 
+preserving the mCherry -KASH signal on the nuclear membrane.  To achieve high -purity cell -
+type specif ic enrichment, the suspension of nuclei was processed via Fluorescence -Activated 
+Cell Sorting (FACS). Using the mCherry signal, mCherry -positive nuclei (representing the 
+CA1 -specific MCU -KO population) were separated from mCherry -negative nuclei (non -Cre 
+expressing cells and glia). This step is critical for eliminating "background" RNA from the 
+surrounding tissue, ensuring that the resulting sequencing data is specific to the manipulated 
+CA1 neurons.  Total RNA was extracted from the FACS -purified mCherry+ n uclei. Library 
+preparation was performed using specialized kits for low -input or single -nucleus RNA 
+(snRNA -seq). The goal of this analysis is to identify differential gene expression (DGE) 
+resulting from the loss of MCU , specifically investigating how mitochondrial calcium 
+dysregulation impacts the transcriptional profile of hippocampal CA1 neurons.  
+  
+ 1.3 In vivo  extracellular recordings  
+1.3.1 Surgical implants  and procedure  
+Tetrodes were constructed from four twisted 17 -μm polyimide -coated platinum -iridium 
+(90% –10%) wires (California Fine Wire) and mounted in groups of four into microdrives with 
+a single turning screw and no separation between tetrodes. The electrode tips wer e plated with 
+platinum to reduce electrode impedances to between 150 –300 kΩ at 1 kHz. A 7 mm guide 
+cannula was prepared from a hypodermic stainless -steel tubing (Component Supply #HTX -
+26R) and a filler rod (Component Supply #HTX -33R) was placed in the cann ula and removed 
+only when needed to prevent clogging of the cannula.  
+Mice were anesthetized by continuous isoflurane inhalation and head fixed to a 
+stereotaxic apparatus. The animal’s eyes were covered in ointment (Duratears, Vetmarket) and 
+body temperature was maintained at 34 ºC by a heating pad (FHC, DC temperature controller). 
+Five holes were drilled in the skull: above the right and left cerebellum for ground screws, 
+above the left frontal cortex for an EEG screw (1.5 mm anterior, 1.5 mm lateral to bregma), 
+and above the righ t dorsal CA1 for the tetrode microdrive (2 mm posterior, 1.5 mm lateral to 
+bregma) and for the guide cannula (1 mm posterior, 1.5 mm lateral to bregma). All craniotomies 
+were drilled with a 0.7 mm burr except the craniotomy for the guide cannula which was drilled 
+with a 0.5 mm burr. The guide cannula was lowered 1.5 mm at an angle of 30º in the sagittal 
+plane with the tip pointing in the posterior direction. The microdrive was lowered 600 -800 µm. 
+Bipolar stainless -steel electrodes (0.127 mm diameter) were implanted in the cervical muscles 
+for EMG recor dings. All implants were secured to the skull with dental cement and to each 
+other with light curing glue to reduce the construct weight. A metal bar was secured to the head 
+construct for mounting the mice to a head fixating apparatus during stereotaxic in jections4. 
+After surgery mice were injected subcutaneously (s.c. ) with 0.125 mg/kg carprofen and 0.05 
+mg/kg buprenorphine. Mice were allowed to recover in their home cage for 5 -10 days before 
+additional handling or experimentation. During this time the animal’s weight and overall 
+wellbeing was monitored daily.   
+Following post -operative recovery, the tetrode microdrive was lowered in 25 - to 100 -
+μm increments over 24 -h intervals until CA1 stratum pyramidale was reached, typically within 
+1-3 weeks. CA1 stratum pyramidale was recognized by (1) the calculated depth of  the implant, 
+(2) ripple oscillations during NREM sleep, and (3) a high ratio of RS to FS units (see below). 
+The transition from the cortex to the white matter (low spiking activity) and from the white 
+matter to CA1 stratum oriens (high FS spiking activity ) served as depth indicators.  
+1.3.2 Drug administration  
+After reaching CA1 stratum pyramidale with the tetrodes and recording a 24 -hour 
+baseline session, mice were implanted subcutaneously with a local drug delivery apparatus 
+based on an osmotic pump (Alzet #1007D) connected to vinyl catheter tubing (Durect 
+#007760). The catheter terminated with a 5 mm 21 AWG cannula prepared from a hypod ermic 
+needle. One day before implantation, the pump, catheter and cannula were preloaded with 0.5 
+mM baclofen and primed in saline at 37℃. Six hours after lights -on, under isofl urane 
+anesthesia and stereotaxic fixation, mice were shaved and incised for pump insertion. The 
+catheter linked the pump’s flow moderator to the 21 AWG cannula, which enveloped the pre -
+implanted 26 AWG guide cannula in CA1; both were secured with dental ce ment to prevent 
+movement or leakage. Infusion proceeded at 0.5 µ L/hr. Despite priming of the drug delivery 
+system – which facilitates pump -tissue equilibration – the delay from pump implantation to 
+effective brain exposure ranged from ~1 to 12 h ours (data not shown), likely reflecting the 
+buildup of pressure needed to traverse the 26 AWG cannula. Because of this, and to avoid 
+potential confounds from the pump implantation/removal procedures, data from the days of 
+pump ‘Onset’ and ‘Offset’ were excluded from analys es. 
+ 1.3.3 Spike sorting and unit c lassification  
+Raw extracellular voltage signals were acquired at 20 kHz using an Open Ephys 
+acquisition board1 connected to Intan amplifier chips (RHD2132 for tetrode signals, RHD2216 
+for EEG/EMG signals). Data was continuously recorded throughout the seven -day experiment, 
+with every day at lights on  defining a new recording session. Spike sorting and unit clustering 
+was performed independently for every 24 -hour session.  All subsequent analyses were 
+performed in MATLAB (MathWorks, Natick, MA) using in -house scripts supported by  
+toolboxes including Chronux5, FieldTrip6, and the Buzsaki laboratory repository 
+(https://github.com/buzsakilab/buzcode).  
+The wideband signal was digitally filtered (300 -6000 Hz bandpass) and decorrelated  
+using  a spatial whitening procedure7. Spikes were detected on the whitened data as crossings  
+four standard deviations above the background noise level. Timestamps corresponding to the 
+peak of each detected event were stored, and waveform snippets (32 samples, centered 
+symmetrically around the negative peak) were extracted from the filtered, white ned data for 
+subsequent sorting. Principal Component Analysis (PCA) was employed to project the high -
+dimensional waveform data onto the first few principal components that captured the most 
+variance i n waveform shape across channels. Spikes were semi -automatically clustered in this 
+feature space using the KlustaKwik algorithm8, which utilizes a masked EM variant of 
+Gaussian mixture modeling9. Following automated clustering, all resulting clusters were 
+manually inspected and refined using the Klusters software10. This manual curation involved 
+merging potentially over -split clusters, splitting under -merged clusters, and removing clusters 
+considered noise or multi -unit activity based on visual assessment of waveform shapes, cluster 
+separation in feature space, auto - and cross -correlograms, and inter -spike interval (ISI) 
+distributions11. Clusters were defined as well -isolated single units and included in further 
+analysis only if they fulfilled (1) a refractory period violation  less than 1% of ISI < 2 ms12 and 
+(2) an isolation distance > 1013.  
+After cluster assignments were finalized, spike times determined during sorting were 
+used to re -extract waveforms from the broadband, non -whitened data. These raw waveforms 
+were individually aligned to their negative peak, L2 normalized, and detrended to m inimize 
+jitter and remove background slow fluctuations. For each cluster, the average waveform was 
+upsampled by a factor of 20 using spline interpolation to enhance temporal resolution. The 
+following parameters were calculated: (1) Trough -to-Peak Time (TP) , the duration (ms) from 
+the main trough of the waveform to the subsequent positive peak, (2) Waveform Asymmetry, 
+the difference between the amplitude of the post -trough peak and the pre -trough peak, 
+normalized by their sum, and (3) Half -Peak Width, the wi dth (ms) of the trough at half of its 
+maximal amplitude. Units exhibiting an inverted average waveform (i.e., where the largest 
+absolute deflection was positive) were excluded from further analysis. For the remaining units, 
+an initial classification to nar row and wide waveforms was performed based on a TP threshold 
+of 0.5 ms. These initial, threshold -based labels served as the starting point for refined 
+classification using a Gaussian Mixture Model (GMM). The GMM was fitted using the three 
+waveform paramete rs described above. The result was two sub -populations of units14: Regular 
+Spiking (RS), putative pyramidal cells characterized  by wide waveforms , and Fast Spiking 
+(FS), putative interneurons, characterized by narrow  waveforms . Only RS units were included 
+in subsequent analys es due to a low number of  FS units per animal.  
+1.3.4 Vigilance states  
+For processing of local field potentials (LFP), broadband neural data were low -pass 
+filtered at 450 Hz using an FFT -based sinc convolution to extract the Local Field Potential 
+(LFP). The filtered signal was subsequently downsampled to 1250 Hz, satisfying t he Nyquist 
+criterion for the frequencies of interest while reducing data size.  An EMG proxy signal was 
+derived from 3 -axis accelerometer data recorded concurrently with the electrophysiological 
+ signals and processed at 1250 Hz. Raw accelerometer readings were converted to voltage using 
+device -specific sensitivity (default: [0.03573; 0.03551; 0.03455] V/g) and zero -g bias values 
+(default: [0.49445; 0.48464; 0.51740] V), after removing the DC offse t from each axis. The 
+instantaneous magnitude of acceleration was calculated using the L2 norm . This magnitude 
+signal served as the input EMG proxy. For behavioral state classification, this signal was high -
+pass filtered at 10 Hz (sinc filter). The root me an square (RMS) of the filtered magnitude was 
+calculated for each 1 -second epoch, and its logarithm was used as the final EMG feature, 
+synchronized with the spectrogram time base.  
+Spectrograms for sleep scoring were generated  with the Chronux signal processing toolbox5; 
+window size = 5 s, step size = 1 s, tapers [3 5]). Active Wake  (AW) , Quite Wake,  Rapid Eye 
+Movement ( REM ) and non -REM (NREM)  sleep were classified in 1 s epochs as previously 
+described15. In sum, each recording session was manually scored for at least 1 hr. This data 
+was used to standardize the signals prior to classification with the AccuSleep neural network16, 
+and to measure the accuracy and precision of classification per  recording. The accuracy and 
+precision for AW, NREM, or REM was typically greater than 92% and never below 85%. State 
+transitions and artifacts (<3% of recording time) were excluded from further analysis. State 
+bouts were merged if separated by less than 4 s and excluded if their duration was less than 10s.  
+1.3.5 Sharp -wave ripples  
+Sharp -wave ripples (SWRs) were detected from the LFP signal recorded from 
+designated hippocampal CA1 channels. Raw LFP data was converted to µV. The LFP was 
+bandpass filtered (80-250 Hz)  using a 5th order Butterworth filter, applied forwards and 
+backwards to prevent phase distortion. From the filtered signal, t he instantaneous amplitude 
+and phase were obtained using the Hilbert transform.  the instantaneous frequency was derived 
+by taking the first temporal derivative  of the unwrapped instantaneous phase . A detection signal 
+was derived using the Teager Energy Operator (TEO). The TEO  is a discrete non -linear process 
+that estimates the energy of a harmonic signal by integrating both amplitude and frequency17. 
+For a discrete -time signal 𝑥(𝑛), the TEO is defined as:  
+𝛹[𝑥(𝑛)]=𝑥(𝑛)2−𝑥(𝑛−1)·𝑥(𝑛+1) 
+Equation 1. Teager Energy Operator.  
+To smooth transient discontinuities, the TEO  was convolved with a 15 ms Gaussian 
+window . To account for non -stationarity, the smoothed TEO signal was standardized using a 
+Z-score transformation . The reference mean and standard deviation (SD) were calculated from  
+periods of NREM  sleep  only. Candidate SWR events were initialized when the signal energy 
+exceeded 1 SD above baseline. To be included , the event  envelope was required to cross a peak 
+threshold of 3.5 SDs and sustain continuous power above 2 SDs for a minimum of 10 ms. 
+Events with samples exceeding 200 SDs were classified as non -physiological artifacts and 
+discarded. Candidate events shorter than 15 ms or longer than 300 m s were discarded . Events 
+occurring within an inter -event interval of less than 20 ms were merged . Because SWRs are 
+susceptible to contamination from mechanical and muscular noise, consecutive layers of 
+quality assurance were applied. First, e vents with  EMG amplitude  greater  than 2 SDs from the 
+NREM  baseline was rejected. Second, a multi -unit gain metric was computed by comparing 
+the overall spiking rate during the ripple against control intervals , and e vents without a  positive 
+multi -unit spiking gain were discarded . The vetted SWRs  were characterized  as follows . The 
+ripple peak was defined as the temporal locus of the trough in the filtered local field potential , 
+and the p eak amplitude was extracted directly from the Hilbert envelope.  Other metrices  were 
+computed within fixed temporal windows symmetrically oriented around the ripple  peak  to 
+mitigate biases due to  heterogeneous lengths . Mean ripple frequency was calculated by 
+averaging the instantaneous frequency over a 40  ms window . Peri-event time histograms  of 
+firing rates were constructed for each individual unit  by binning s pike times within a 100 ms 
+ window . The resulting histograms were averaged across all ripples for each unit and smoothed 
+using a Gaussian kernel with a SD of 1 ms. The smoothed histogram s were  z-score standardized 
+using control statistics generated from matched control intervals. To measure the timing of 
+neuronal recruitment, spike times occurring within a 40  ms window  were converted into 
+relative temporal distances. The spike center of mass (CoM ) was defined as the arithmetic 
+mean of these relative distances, with negative values indicating advanced recruitment 
+preceding the ripple peak, and positive values indicating delayed neuronal participation.  
+𝐶𝑜𝑀=1
+𝑁∑(𝑡𝑖−𝑡𝑝𝑒𝑎𝑘)𝑁
+𝑖=1 
+Equation 2. Spike Center of Mass During SRWs.  
+The spike CoM  was modeled as a function of baseline firing rate and burstiness , and 
+marginal effects were generated to determine whether shifts in recruitment timing could be 
+attributed to the intrinsic firing patterns of the neurons.   
+ 
+ 
+ 
+  
+ 1.4 Multielectrode array recordings  
+1.5 Single -unit firing a nalysis  
+1.5.1 Firing rate 
+Continuous firing rates were estimated from discrete spike times by sorting events into 
+60-second temporal bins. The raw firing rate traces were subsequently denoised using a 
+Savitzky -Golay filter, employing a third -order polynomial spanning a 10 -min slidi ng frame. 
+For in vivo recordings, statistical analysis was conducted on per -unit, per -day averages, 
+excluding days corresponding to the surgical implantation and removal of the osmotic pump. 
+For visualization (Fig. 3G), firing rate  trajectories  were aligned to the onset time of the 
+pharmacological perturbation, detected algorithmically  per-mouse . For MEA recordings, 
+which track individual units across the experiment, firing rates were averaged across specific 
+temporal windows. Baseline was defined as 3 hours before perturbation onset. The acute 
+response to baclofen was defined as 1 hour starting at perturbation onset. Steady -state was 
+defined as 6 hours starting 42 hours after perturbation onset. Units that did not reduce their 
+firing rate during the acute response by at least 50% relative to baseline were excluded. For 
+stable calculations of loga rithmic ratios, a minimal pseudocount equal to one spike per hour 
+was added to all firing rate averages. Firing rate gain was defined as the natural  logarithm of 
+the ratio between steady -state and baseline firing rates:  
+𝐺𝑎𝑖𝑛=𝑙𝑛([𝑆𝑆]𝐹𝑅
+[𝐵𝑆𝐿]𝐹𝑅) 
+As a response variable in LME models, firing rates were modeled with a gamma 
+distribution in the in vivo dataset , or log-transformed and modeled with a normal distribution 
+in the MEA dataset . In MEA , firing rates as a continuous  predictor were log -transformed prior 
+to analysis. These decisions  were guided by goodness -of-fit criteria and the skewness of the 
+firing rate di stribution.  For visualization, per-unit firing rates are presented on logarithmic 
+scales in both datasets.  
+1.5.2 Firing pattern  
+Single -unit burst firing was analyzed as discrete event s using  the maximum interval 
+algorithm18. A candidate burst is initiated when two consecutive spikes occur with an inter -
+spike interval below a predefined onset threshold. The burst is extended to include subsequent 
+contiguous spikes provided each sequential interval remains below a termination threshold. If 
+the inter -burst interval separating two proximal events is less than a minimum separation 
+threshold, the events are merged. Finally, candidate bursts must meet a minimum spike count 
+to be retained. The temporal parameters for burst detection were tailored to the physiological 
+properties of the two experimental preparations. In freely moving mice, CA1 pyramidal cells 
+fire complex spike bursts at high frequencies19, and the detection criteria included an onset 
+threshold of 6 ms, a termination threshold of 12 ms, a minimum inter -burst interval of 12 ms, 
+and a minimum of 2 spikes per burst. For dissociated hippocampal networks on MEA, the 
+detection criteria included a  50 ms onset threshold, a 100 ms termination threshold, a 200 ms 
+minimum inter -burst interval, and a minimum of 3 spikes per burst. This wider temporal 
+integration in vitro was selected to limit the percentage of non -bursting units at baseline and 
+prevent artifactual zero-inflation (Fig. S5A).  
+For each unit, burstiness was quantified as the probability of a spike participating in a 
+burst event, denoted as 𝑃𝑏𝑢𝑟𝑠𝑡 . This metric allowed partitioning the total firing rate into two 
+complementary, additive components representing the rate of spikes involved in bursts, 
+𝐹𝑅𝑏𝑢𝑟𝑠𝑡 , and the rate of isolated single spikes, 𝐹𝑅𝑠𝑖𝑛𝑔𝑙𝑒 , as: 
+ 𝐹𝑅𝑡𝑜𝑡𝑎𝑙=𝑃𝑏𝑢𝑟𝑠𝑡⋅𝐹𝑅𝑡𝑜𝑡𝑎𝑙 ⏟          
+𝐹𝑅𝑏𝑢𝑟𝑠𝑡+(1−𝑃𝑏𝑢𝑟𝑠𝑡)⋅𝐹𝑅𝑡𝑜𝑡𝑎𝑙 ⏟              
+𝐹𝑅𝑠𝑖𝑛𝑔𝑙𝑒 
+To analyze the temporal dynamics of firing rate components (Fig. 4A) , discrete burst 
+and single -spike events were transformed into continuous kinetic state estimates. 
+Asynchronous event timestamps were synchronized onto a standardized temporal grid by 
+calculating continuous probability densities using 120 s Gaussian kernel . An edge correction 
+normalization vector was applied to counteract boundary approximation artifacts. When a unit 
+did not burst for a consecutive period exceeding the 95th percentile of it s baseline inter -burst 
+interval distribution, its continuous temporal measurement was masked as mathematically 
+undefined. This prevents the projection of active bursting properties during periods of 
+prolonged silence.  
+Since burstiness and firing rate are strongly correlated independently of detection 
+parameters (Fig. S5C), all LME models containing burstiness also included total firing rate as 
+a covariate. This approach partials out rate -driven variance to strictly evaluate differences in 
+firing patterns.  Since burstiness  is a probability  and its distribution is left -skewed , as a response 
+variable it was modeled with a normal distribution after logit transformation  was applied . To 
+robustly handle boundary values20, the data was first compressed  to an open interval  using the 
+sample size , 𝑁, of all units  in the analysis :  
+𝑝′=𝑝(𝑁−1)+0.5
+𝑁 
+To investigate the relationship between initial firing patterns and homeostatic recovery  
+(Fig. 4E) , neurons were stratified into three subpopulations (low, intermediate, and high) based 
+on their baseline burstiness. The boundaries of stratification were defined using quadratically 
+spaced percentiles to accurately isolate the subgroup of heavily bursting neurons.  
+To systematically confirm our conclusions are independent of burst detection criteria, 
+a multidimensional parameter sweep was performed on the MEA dataset using onset thresholds 
+between 10 and 50 ms alongside minimum spike counts from 3 to 5. In addition, primary in 
+vivo observations were independently validated using the broader in vitro burst detection 
+criteria and a distinct stochastic approach evaluating single -unit autocorrelograms. 
+Specifically, a Burst Index was calculated as the ratio between the me an spike rate within a 3 –
+5 ms post -spike window against the mean rate within a 200 –300 ms baseline window21. A data -
+driven pseudocount, calculated as half the minimum non -zero firing rate observed across all 
+neurons within the relevant window, was added to the numerator and denominator to prevent 
+mathematical instability:  
+𝐵𝑢𝑟𝑠𝑡 𝐼𝑛𝑑𝑒𝑥=1
+Δ𝑇1⋅∑(𝐴𝐶𝐺𝑡)5
+𝑡=3+𝑐
+1
+Δ𝑇2⋅∑(𝐴𝐶𝐺𝑡)300
+𝑡=200 +𝑐 
+1.6 Statistical analysis  
+To account for the hierarchical structure of the data, such as repeated measurements 
+within individual mice or multiple single units from the same culture, statistical analyses were 
+conducted using Linear Mixed -Effects (LME) models, implemented via MATLAB' s fitlme  
+function and estimated using Restricted Maximum Likelihood (REML), or Generalized Linear 
+Mixed -Effects (GLME), implemented via MATLAB's fitglme  function and estimated using 
+Restricted Maximum Pseudo Likelihood (REMPL). The selection between these model types 
+was strictly determined by the distribution of the response variable in question. This approach 
+models the non -independence of observations by partitioning variance into fixed effects, 
+representing population -level influences, and random effect s, capturing subject -specific 
+ variability. Random effects were defined in the model formula, typically including random 
+intercepts for each experiment (e.g., mouse). When relevant, different random effect structures 
+were compared. Specifically, models with random slopes such as (Day | Mouse) were 
+considered and selected based on the lowest Bayesian Information Criterion (BIC). Fixed 
+effects included categorical predictors such as genotype  (e.g., Control vs. MCU -KO) and 
+experimental phase  (e.g., Baseline, Steady -State ), and continuous predictors such as baseline 
+firing rate and burstiness. Continuous predictors were  standardized by  z-scoring across all data 
+points in the model  to facilitate comparison of coefficients regardless of the ir original units ,. 
+Two exceptions were the state-space (Fig 4D and Fig S3C) and causal mediation analys es (Fig 
+S4C-F).  
+The chosen regression model was subject to further analysis. An F -test for the highest -
+order interaction terms was extracted from an ANOVA table. Model coefficients, representing 
+specific comparisons relative to reference levels (e.g., Control group or Baseline day), were 
+evaluated using t -tests. When significant interactions were found, or for specific a priori 
+compa risons, post -hoc contrasts representing simple effects (effect of one factor at specific 
+levels of another) or marginal effects (effect of one  factor averaged across levels of another) 
+were computed. To control for multiple comparisons arising from these derived contrasts, p -
+values were adjusted using the Holm -Bonferroni method.  
+For datasets that do not have a nested structure, such as  slice electrophysiology and 
+behavioral  assays , conventional statistical tests were employed. The selection between 
+parametric (e.g., ANOVA, t -test) and non -parametric (e.g., Mann -Whitney U test) methods for 
+these analyses was determined after assessing for assumptions of data normality and 
+homogeneit y of variance . 
+No statistical methods were used to pre -determine sample sizes; however, sample sizes 
+are comparable to those reported in relevant previous publications22. Data collection and 
+subsequent analyses were not performed blind to the experimental conditions.  In all figures, 
+statistical significance is indicated as follows: *p < 0.05 ; **p <0.01 ; ***p < 0.001 ; ****p < 
+0.0001 ; ns, not significant.  Unless otherwise stated, error bars represent mean ± SEM.  For 
+baseline -normalized  firing rate trajectories, error bars represent geometric mean ± SEM.  
+1.6.1 Marginal Effects  
+To visualize the isolated influence of specific predictors on response variables, 
+marginal effects were estimated  from the predicted population -level response  (least square s 
+means) . A synthetic grid was generated by varying the independent variable of interest across 
+its observed empirical range. Other continuous covariates were held constant at their mean 
+values , and  categorical covariates were held constant at their mode. Population -level 
+predictions and their 95% confidence intervals were computed across this synthetic space. 
+Subject -specific random effects were set to zero .  
+1.6.2 Partial Regression  
+To evaluate the coupling between single -spike and burst -spike firing gain independent 
+of baseline activity, a partial regression analysis was conducted. A n LME  model was 
+constructed to predict single -spike firing gain from burst -spike firing gain, baseline firing rate, 
+baseline burst probability, and experimental genotype. A two -way interaction between 
+genotype and each continuous predictor was included . Single -spike and burst -spike gain were 
+independently regressed against the baseline covariates and genotype to extract their respective 
+residuals. These response and predictor residuals, representing the variance unexplained by the 
+initial baseline conditio ns, were plotted against one another in an added variable plot. The slope 
+of the linear fit through these residuals visually corresponds to the partial regression coefficient 
+of each genotype . 
+  
+ 
+ 
+ou need the standardized models calculated separately per group to evaluate the relative 
+effect sizes of the pathways within each specific network. Standardizing allows you to directly 
+compare the weight of the direct negative effect against the indirect p ositive effect within the 
+knockout neurons, leading to your conclusion that the net total effect shifts to negative.  
+ 
+However, you cannot use those separate standardized models to test if the two 
+genotypes are statistically different from one another. Standardizing within groups forces their 
+individual variances to unity, masking the true physical scale differences betwee n the control 
+and knockout networks. Therefore, you must construct a combined unstandardized model that 
+includes a genotype interaction term to test whether the absolute biological slopes differ 
+between the groups. This unstandardized interaction yields th e definitive p -value proving that 
+the genetic deletion significantly altered the prognostic value of burstiness.    
+ 2 References  
+1. Okuyama, T., Kitamura, T., Roy, D.S., Itohara, S. & Tonegawa, S. Ventral CA1 
+neurons store social memory. Science  353, 1536 –1541 (2016).  
+2. Kwong, J.Q.  et al.  The Mitochondrial Calcium Uniporter Selectively Matches 
+Metabolic Output to Acute Contractile Stress in the Heart. Cell Reports  12, 15–22 
+(2015).  
+3. Paxinos, G. & Franklin, K.B.J. The Mouse Brain in Stereotaxic Coordinates , 148 (Gulf 
+Professional Publishing, 2004).  
+4. Heim, L.R., Shoob, S., de Marcas, L., Zarhin, D. & Slutsky, I. Measuring synaptic 
+transmission and plasticity with fEPSP recordings in behaving mice. STAR Protocols  
+3, 101115 (2022).  
+5. Bokil, H., Andrews, P., Kulkarni, J.E., Mehta, S. & Mitra, P. Chronux: A Platform for 
+Analyzing Neural Signals. Journal of neuroscience methods  192, 146 –151 (2010).  
+6. Oostenveld, R., Fries, P., Maris, E. & Schoffelen, J. -M. FieldTrip: Open Source 
+Software for Advanced Analysis of MEG, EEG, and Invasive Electrophysiological 
+Data. Computational Intelligence and Neuroscience  2011 , 156869 (2011).  
+7. Pachitariu, M., Steinmetz, N.A., Kadir, S.N., Carandini, M. & Harris, K.D. Fast and 
+accurate spike sorting of high -channel count probes with KiloSort. Vol. 29 (Curran 
+Associates, Inc., 2016).  
+8. Kadir, S.N., Goodman, D.F.M. & Harris, K.D. High -Dimensional Cluster Analysis 
+with the Masked EM Algorithm. Neural Computation  26, 2379 –2394 (2014).  
+9. Harris, K.D., Henze, D.A., Csicsvari, J., Hirase, H. & Buzsáki, G. Accuracy of Tetrode 
+Spike Separation as Determined by Simultaneous Intracellular and Extracellular 
+Measurements. Journal of Neurophysiology  84, 401 –414 (2000).  
+10. Hazan, L., Zugaro, M. & Buzsáki, G. Klusters, NeuroScope, NDManager: A free 
+software suite for neurophysiological data processing and visualization. Journal of 
+Neuroscience Methods  155, 207 –216 (2006).  
+11. Hill, D.N., Mehta, S.B. & Kleinfeld, D. Quality Metrics to Accompany Spike Sorting 
+of Extracellular Signals. Journal of Neuroscience  31, 8699 –8705 (2011).  
+12. Middleton, S.J.  et al.  Altered hippocampal replay is associated with memory 
+impairment in mice heterozygous for the Scn2a gene. Nature Neuroscience  21, 996 –
+1003 (2018).  
+13. Tanaka, K.Z.  et al.  The hippocampal engram maps experience but not place. Science  
+361, 392 –397 (2018).  
+14. McCormick, D.A., Connors, B.W., Lighthall, J.W. & Prince, D.A. Comparative 
+electrophysiology of pyramidal and sparsely spiny stellate neurons of the neocortex. 
+Journal of Neurophysiology  54, 782 –806 (1985).  
+15. Zarhin, D.  et al.  Disrupted neural correlates of anesthesia and sleep reveal early circuit 
+dysfunctions in Alzheimer models. Cell Reports  38(2022).  
+16. Barger, Z., Frye, C.G., Liu, D., Dan, Y. & Bouchard, K.E. Robust, automated sleep 
+scoring by a compact neural network with distributional shift correction. PLOS ONE  
+14, e0224642 (2019).  
+17. Kaiser, J.F. On a simple algorithm to calculate the 'energy' of a signal. in International 
+Conference on Acoustics, Speech, and Signal Processing 381–384 vol.1 (1990).  
+ 18. Cotterill, E., Charlesworth, P., Thomas, C.W., Paulsen, O. & Eglen, S.J. A comparison 
+of computational methods for detecting bursts in neuronal spike trains and their 
+application to human stem cell -derived neuronal networks. Journal of Neurophysiology  
+116, 306 –321 (2016).  
+19. Ranck, J.B. Studies on single neurons in dorsal hippocampal formation and septum in 
+unrestrained rats: Part I. Behavioral correlates and firing repertoires. Experimental 
+Neurology  41, 462 –531 (1973).  
+20. Smithson, M. & Verkuilen, J. A better lemon squeezer? Maximum -likelihood 
+regression with beta -distributed dependent variables. Psychological Methods  11, 54–
+71 (2006).  
+21. Royer, S.  et al.  Control of timing, rate and bursts of hippocampal place cells by 
+dendritic and somatic inhibition. Nature Neuroscience  15, 769 –775 (2012).  
+22. Hayat, H.  et al.  Reduced neural feedback signaling despite robust neuron and gamma 
+auditory responses during human sleep. Nature Neuroscience  25, 935 –943 (2022).  
+ 

@@ -129,15 +129,15 @@ dist = 'log-normal';
 
 frml = 'ss_frBspk ~ (fr + pBspk) * Group + (1|Name)';
 [lmeMdl1, lmeStats, lmeInfo1, ~] = lme_analyse(tbl, frml, ...
-    'dist', dist);
+    'dist', dist, 'flgStnd', false);
 
 frml = 'ss_frSspk ~ (fr + pBspk) * Group + (1|Name)';
 [lmeMdl2, lmeStats, lmeInfo2, ~] = lme_analyse(tbl, frml, ...
-    'dist', dist);
+    'dist', dist, 'flgStnd', false);
 
 frml = 'ss_fr ~ (fr + pBspk) * Group + (1|Name)';
 [lmeMdl3, lmeStats, lmeInfo3, ~] = lme_analyse(tbl, frml, ...
-    'dist', dist);
+    'dist', dist, 'flgStnd', false);
 
 % ---
 % Plot Interaction

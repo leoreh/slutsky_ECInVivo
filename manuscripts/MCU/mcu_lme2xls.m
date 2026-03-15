@@ -75,24 +75,28 @@ lme_save('2E', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 
 
 % G -----------------------------------------------------------------------
-presets = {'rippSpks', 'brst'};
-tblRipp = mcu_tblVivo('basepaths', basepaths, 'presets', presets, 'flgClean', true);
-frml = 'com ~ (fr + pBspk) + Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblRipp, frml, 'dist', 'normal');
+tblRipp = mcu_tblVivo('basepaths', basepaths, 'presets', {'rippSpks', 'brst'}, 'flgClean', true);
+frml = 'com ~ (fr + pBspk) * Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblRipp, frml, 'dist', 'normal', 'flgStnd', false);
 lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
 lme_save('2G', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 
+hFig = figure;
+hAx = nexttile; lme_lsmeans(lmeMdl, {'pBspk', 'Group'}, 'transParams', lmeInfo.transParams, ...
+    'hAx', hAx, 'xLims', {[0, 1], []});
+hAx = nexttile; lme_lsmeans(lmeMdl, {'fr', 'Group'}, 'transParams', lmeInfo.transParams, ...
+    'hAx', hAx); 
 
 
 %% ========================================================================
 % FIGURE 3
 % =========================================================================
 
-% H -----------------------------------------------------------------------
+% G -----------------------------------------------------------------------
 frml = 'fr ~ Group * Day + (Day|Name)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblVivo, frml, 'dist', 'gamma');
 lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
-lme_save('3H', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
+lme_save('3G', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 
 % J -----------------------------------------------------------------------
 
@@ -145,18 +149,15 @@ lme_mediationPlot(resMcu)
 
 % X -> M
 frml = 'ss_frBspk ~ (fr + pBspk) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-    'dist', dist, 'verbose', true, 'flgStnd', false);
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal', 'flgStnd', false);
 
 % X -> Y
 frml = 'ss_frSspk ~ (fr + pBspk) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tblWt, frml, ...
-    'dist', dist, 'verbose', true, 'flgStnd', false);
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal', 'flgStnd', false);
 
 % X -> Y | M 
 frml = 'ss_frSspk ~ (fr + pBspk + ss_frBspk) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-    'dist', 'log-normal', 'verbose', true, 'flgStnd', false);
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal', 'flgStnd', false);
 
 
 %% ========================================================================
@@ -177,16 +178,16 @@ lme_save('S3C', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 
 % A,B ---------------------------------------------------------------------
 frml = 'ss_frBspk ~ (fr + pBspk) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal');
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal', 'flgStnd', false);
 lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
 lme_save('S4A,B (fr_burst)', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 
 frml = 'ss_frSspk ~ (fr + pBspk) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal');
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal', 'flgStnd', false);
 lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
 lme_save('S4A,B (fr_single)', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 
 frml = 'ss_fr ~ (fr + pBspk) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal');
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal', 'flgStnd', false);
 lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
 lme_save('S4A,B (fr)', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)

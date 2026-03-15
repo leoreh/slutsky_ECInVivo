@@ -295,7 +295,7 @@ function [tblGrid, varyInfo] = get_grid(mdl, varsVary, nGrid, xLims)
 %
 %   HOW IT WORKS:
 %   1. Identify all predictors in the model.
-2. For the variables of interest (varsVary):
+%   2. For the variables of interest (varsVary):
 %      - Create a range of values (e.g., 100 points from min to max).
 %      - IF xLims is provided for that variable, use that range instead.
 %   3. For all OTHER variables (Fixed Effects):
