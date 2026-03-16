@@ -75,24 +75,28 @@ lme_save('2E', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 
 
 % G -----------------------------------------------------------------------
-presets = {'rippSpks', 'brst'};
-tblRipp = mcu_tblVivo('basepaths', basepaths, 'presets', presets, 'flgClean', true);
-frml = 'com ~ (fr + pBspk) + Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblRipp, frml, 'dist', 'normal');
+tblRipp = mcu_tblVivo('basepaths', basepaths, 'presets', {'rippSpks', 'brst'}, 'flgClean', true);
+frml = 'com ~ (fr + pBspk) * Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblRipp, frml, 'dist', 'normal', 'flgStnd', false);
 lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
 lme_save('2G', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 
+hFig = figure;
+hAx = nexttile; lme_lsmeans(lmeMdl, {'pBspk', 'Group'}, 'transParams', lmeInfo.transParams, ...
+    'hAx', hAx, 'xLims', {[0, 1], []});
+hAx = nexttile; lme_lsmeans(lmeMdl, {'fr', 'Group'}, 'transParams', lmeInfo.transParams, ...
+    'hAx', hAx); 
 
 
 %% ========================================================================
 % FIGURE 3
 % =========================================================================
 
-% H -----------------------------------------------------------------------
+% G -----------------------------------------------------------------------
 frml = 'fr ~ Group * Day + (Day|Name)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblVivo, frml, 'dist', 'gamma');
 lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
-lme_save('3H', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
+lme_save('3G', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 
 % J -----------------------------------------------------------------------
 
@@ -129,34 +133,52 @@ xVar = 'pBspk';
 mVar = 'ss_frBspk';
 distM = 'log-normal';
 distY = distM;
+transX = 
 
 % Per Group (standardized)
 tblWt = tblMea(tblMea.Group == 'Control', :);
-resWt = lme_mediation(tblWt, frml, xVar, mVar, 'distM', distM, 'distY', distY);
-resWt.plot.X = tblWt.pBspk_trans;
-lme_mediationPlot(resWt)
+[~, tmpl] = tbl_trans(tblWt, 'varsInc', {'fr', 'pBspk'}, 'logBase', 10, 'skewThr', 2, 'flgZ', true);
+tmpl.varsTrans.pBspk.logBase = 'logit';
+tmpl.varsTrans.pBspk.logBase = [];
+resWt = lme_mediation(tblWt, frml, xVar, mVar, 'distM', distM, 'distY', distY, 'transTemplate', tmpl);
+lme_save('Mediation (WT)', resWt.xlsTbls, 'pathName', pathName, 'xlsName', xlsName)
 
 tblMcu = tblMea(tblMea.Group == 'MCU-KO', :);
-resMcu = lme_mediation(tblMcu, frml, xVar, mVar, 'distM', distM, 'distY', distY);
+[~, tmpl] = tbl_trans(tblMcu, 'varsInc', {'fr', 'pBspk'}, 'logBase', 10, 'skewThr', 2, 'flgZ', true);
+tmpl.varsTrans.pBspk.logBase = 'logit';
+tmpl.varsTrans.pBspk.logBase = [];
+resMcu = lme_mediation(tblMcu, frml, xVar, mVar, 'distM', distM, 'distY', distY, 'transTemplate', tmpl);
+lme_save('Mediation (MCU)', resMcu.xlsTbls, 'pathName', pathName, 'xlsName', xlsName)
+
+resWt.plot.X = tblWt.pBspk_trans;
+resWt.plot = tbl_trans(resWt.plot, 'varsInc', {'M'}, 'logBase', 10, 'skewThr', 2, 'flgZ', false);
+lme_mediationPlot(resWt)
 resMcu.plot.X = tblMcu.pBspk_trans;
+resMcu.plot = tbl_trans(resMcu.plot, 'varsInc', {'M'}, 'logBase', 10, 'skewThr', 2, 'flgZ', false);
 lme_mediationPlot(resMcu)
 
-% Combined Models (unstandardized)
 
-% X -> M
+% Combined Models (unstandardized)
+[~, tmpl] = tbl_trans(tblMea, 'varsInc', {'fr', 'pBspk'}, 'logBase', 10, 'skewThr', 2, 'flgZ', false);
+tmpl.varsTrans.pBspk.logBase = [];
+
+% X -> M 
 frml = 'ss_frBspk ~ (fr + pBspk) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tblMea, frml, ...
-    'dist', 'log-normal', 'verbose', true, 'flgStnd', false);
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal', 'flgStnd', false, 'transTemplate', tmpl);
+lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
+lme_save('4F (X->M)', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 
 % X -> Y
 frml = 'ss_frSspk ~ (fr + pBspk) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tblMea, frml, ...
-    'dist', 'log-normal', 'verbose', true, 'flgStnd', false);
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal', 'flgStnd', false, 'transTemplate', tmpl);
+lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
+lme_save('4F (X->Y)', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 
 % X -> Y | M 
 frml = 'ss_frSspk ~ (fr + pBspk + ss_frBspk) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tblMea, frml, ...
-    'dist', 'log-normal', 'verbose', true, 'flgStnd', false);
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal', 'flgStnd', false, 'transTemplate', tmpl);
+lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
+lme_save('4F (X->Y|M)', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 
 
 %% ========================================================================
@@ -177,16 +199,19 @@ lme_save('S3C', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 
 % A,B ---------------------------------------------------------------------
 frml = 'ss_frBspk ~ (fr + pBspk) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal');
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal', 'flgStnd', false);
 lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
 lme_save('S4A,B (fr_burst)', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 
 frml = 'ss_frSspk ~ (fr + pBspk) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal');
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal', 'flgStnd', false);
 lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
 lme_save('S4A,B (fr_single)', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 
 frml = 'ss_fr ~ (fr + pBspk) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal');
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal', 'flgStnd', false);
 lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
 lme_save('S4A,B (fr)', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
+
+
+% EOF

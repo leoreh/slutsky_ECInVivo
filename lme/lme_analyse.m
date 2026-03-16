@@ -21,6 +21,7 @@ function [lmeMdl, lmeStats, lmeInfo, lmeTbl] = lme_analyse(tbl, frml, varargin)
 %       frml        - (char/string) Model formula.
 %       varargin    - (param/value) Optional parameters:
 %                     'dist'        : (char) Force distribution. If empty, auto-selects.
+%                     'transTemplate': (struct) Template to pass into tbl_trans to explicitly control transformations {[]}.
 %                     'contrasts', 'correction', 'dfMethod': See LME_POSTHOC.
 %                     'flgPlot'
 %                     'flgStnd'     : (logical) Z-score continuous predictors {true}
@@ -43,6 +44,7 @@ addRequired(p, 'frml', @(x) ischar(x) || isstring(x));
 
 % Wrapper Options
 addParameter(p, 'dist', '', @ischar);
+addParameter(p, 'transTemplate', [], @(x) isempty(x) || isstruct(x));
 addParameter(p, 'flgPlot', false, @islogical);
 addParameter(p, 'flgStnd', true, @islogical);
 addParameter(p, 'fitMethod', '', @ischar);
@@ -55,6 +57,7 @@ addParameter(p, 'verbose', true, @islogical);
 parse(p, tbl, frml, varargin{:});
 
 dist = p.Results.dist;
+transTemplate = p.Results.transTemplate;
 verbose = p.Results.verbose;
 flgPlot = p.Results.flgPlot;
 flgStnd = p.Results.flgStnd;
@@ -115,10 +118,16 @@ if ~isempty(varsNum)
     if verbose
         fprintf('[LME_ANALYSE] Transforming Predictors\n');
     end
-    [lmeTbl, transParams] = tbl_trans(lmeTbl, 'varsInc', varsNum, ...
-        'logBase', 10, 'skewThr', 2, ...
-        'flgZ', flgStnd, ...
-        'verbose', verbose);
+    
+    if ~isempty(transTemplate)
+        [lmeTbl, transParams] = tbl_trans(lmeTbl, 'template', transTemplate, ...
+            'varsInc', varsNum, 'verbose', verbose);
+    else
+        [lmeTbl, transParams] = tbl_trans(lmeTbl, 'varsInc', varsNum, ...
+            'logBase', 10, 'skewThr', 2, ...
+            'flgZ', flgStnd, ...
+            'verbose', verbose);
+    end
 
     lmeInfo.transParams = transParams;
 else

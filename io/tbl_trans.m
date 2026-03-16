@@ -262,10 +262,23 @@ for iVar = 1:numel(varsTrans)
 
     % Calculate Offset (Before Log)
     if doOffset || doLog
-        if any(data(~isnan(data)) == 0) && all(data(~isnan(data)) >= 0)
-            c = min(data(data > 0)) / 2; % Half of min non-zero
+        minVal = min(data(~isnan(data)));
+        if minVal <= 0
+            % Data has zeros or negatives. Add offset to ensure strictly positive for log.
+            if minVal < 0
+                % Real negatives (or precision errors). Shift to be positive.
+                c = abs(minVal) + 1e-6; 
+            else
+                % Only zeros. Add small positive offset.
+                posVals = data(data > 0);
+                if ~isempty(posVals)
+                    c = min(posVals) / 2;
+                else
+                    c = 1e-6;
+                end
+            end
             data = data + c;
-            if verbose, fprintf('[%s] Added Offset %.4f.\n', var, c); end
+            if verbose, fprintf('[%s] Added Offset %.4e.\n', var, c); end
         end
     end
 

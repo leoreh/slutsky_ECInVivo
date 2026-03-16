@@ -15,9 +15,10 @@ function res = lme_mediation(tbl, frml, xVar, mVar, varargin)
 %       xVar        - (char) Independent Variable (Treatment).
 %       mVar        - (char) Mediator Variable (Mechanism).
 %       varargin    - (param/value) Optional parameters:
-%                     'distM' : (char) Distribution for Mediator.
-%                     'distY' : (char) Distribution for Outcome.
-%                     'verbose': (logical, default true).
+%                     'distM'   : (char) Distribution for Mediator.
+%                     'distY'   : (char) Distribution for Outcome.
+%                     'transTemplate' : (struct) Explicit template to standardize parameters for the predictors {[]}.
+%                     'verbose' : (logical, default true).
 %
 %   OUTPUTS:
 %       res         - (struct) Results with models and path table.
@@ -34,11 +35,13 @@ addRequired(p, 'xVar', @ischar);
 addRequired(p, 'mVar', @ischar);
 addParameter(p, 'distM', '', @ischar);
 addParameter(p, 'distY', '', @ischar);
+addParameter(p, 'transTemplate', [], @(x) isempty(x) || isstruct(x));
 addParameter(p, 'verbose', true, @islogical);
 parse(p, tbl, frml, xVar, mVar, varargin{:});
 
 distM = p.Results.distM;
 distY = p.Results.distY;
+transTemplate = p.Results.transTemplate;
 flgVerbose = p.Results.verbose;
 
 %% ========================================================================
@@ -82,7 +85,7 @@ if flgVerbose, fprintf('\n[LME_MEDIATION] Step 1: Total Effect (X->Y)\n'); end
 
 % Use input formula directly
 frmlC = frml;
-[mdlC, statsC, infoC] = lme_analyse(tbl, frmlC, 'dist', distY, 'fitMethod', fitMethodY, 'verbose', false);
+[mdlC, statsC, infoC] = lme_analyse(tbl, frmlC, 'dist', distY, 'fitMethod', fitMethodY, 'transTemplate', transTemplate, 'verbose', false);
 [betaC, pC, seC, statC, dfC, ciC] = get_coeff(mdlC, xVar);
 
 
@@ -93,7 +96,7 @@ frmlC = frml;
 if flgVerbose, fprintf('\n[LME_MEDIATION] Step 2: Mediator Model (X->M)\n'); end
 
 frmlA = sprintf('%s ~ %s', mVar, rhs);
-[mdlA, statsA, infoA] = lme_analyse(tbl, frmlA, 'dist', distM, 'fitMethod', fitMethodM, 'verbose', true);
+[mdlA, statsA, infoA] = lme_analyse(tbl, frmlA, 'dist', distM, 'fitMethod', fitMethodM, 'transTemplate', transTemplate, 'verbose', true);
 [betaA, pA, seA, statA, dfA, ciA] = get_coeff(mdlA, xVar);
 
 
@@ -117,22 +120,23 @@ if isLogM
     infoA.transParams.varsTrans.(mVar).logBase = 'e';
 end
 
-% Apply transformation using Template
-if isfield(infoA, 'transParams') && isfield(infoA.transParams.varsTrans, mVar)
-    if flgVerbose, fprintf('   -> Transforming Mediator for Path B (using infoA template)\n'); end
-    [tbl, ~] = tbl_trans(tbl, 'template', infoA.transParams, 'varsInc', {mVar}, 'verbose', false);
+% Construct explicit template for Path BC
+tmplBC = transTemplate;
+if isempty(tmplBC)
+    tmplBC = struct('varsTrans', struct(), 'varsGrp', [], 'varNorm', '', 'catRef', []);
+end
+% Inject M's explicit transformation block from Path A into the Path BC template
+% NOTE: lme_analyse will apply this transformation to M as a predictor in Step 3.
+if isfield(infoA, 'transParams') && isfield(infoA.transParams, 'varsTrans') && isfield(infoA.transParams.varsTrans, mVar)
+    tmplBC.varsTrans.(mVar) = infoA.transParams.varsTrans.(mVar);
+    % tmplBC.varsTrans.(mVar).flgZ = true; % Force standardization for predictor role
 end
 
 % Add M to the predictors (RHS)
 frmlBC = sprintf('%s ~ %s + %s', yVar, mVar, rhs);
 
 % Reuse distY logic from Path C
-[mdlBC, statsBC, infoBC, tblBC] = lme_analyse(tbl, frmlBC, 'dist', distY, 'fitMethod', fitMethodY, 'verbose', true);
-
-% Inject M's transformation info from Path A into Path BC so it reflects correctly in the output table
-if isfield(infoA, 'transParams') && isfield(infoA.transParams, 'varsTrans') && isfield(infoA.transParams.varsTrans, mVar)
-    infoBC.transParams.varsTrans.(mVar) = infoA.transParams.varsTrans.(mVar);
-end
+[mdlBC, statsBC, infoBC, tblBC] = lme_analyse(tbl, frmlBC, 'dist', distY, 'fitMethod', fitMethodY, 'transTemplate', tmplBC, 'verbose', true);
 
 [betaB, pB, seB, statB, dfB, ciB] = get_coeff(mdlBC, mVar);
 [betaC_prime, pC_prime, seC_prime, statC_prime, dfC_prime, ciC_prime] = get_coeff(mdlBC, xVar);
@@ -153,8 +157,13 @@ end
 % To calculate Indirect Effect (A*B), we essentially need the chain rule:
 %   Effect = [d(TransM) / d(Z_X)] * [d(Y) / d(TransM)]
 %
-% We must un-Z-share betaB to convert it from d(Y)/d(Z_TransM) to d(Y)/d(TransM).
-sdM = std(tbl.(mVar), 'omitnan');
+% We must un-Z-score betaB to convert it from d(Y)/d(Z_TransM) to d(Y)/d(TransM).
+% We retrieve the standard deviation on the transformed scale from Path A.
+if isfield(infoA.transParams.varsTrans, mVar)
+    sdM = infoA.transParams.varsTrans.(mVar).stats.SD(1);
+else
+    sdM = 1;
+end
 betaB = betaB / sdM;
 seB   = seB   / sdM;
 ciB   = {[ciB{1}(1) / sdM, ciB{1}(2) / sdM]};
@@ -180,7 +189,7 @@ res.infoC = infoC;
 res.infoBC = infoBC;
 
 % Summary Table
-Description = string({'Path A (X->M)'; 'Path B (M->Y|X)'; 'Path C (Total X->Y)'; 'Path C'' (Direct X->Y|M)'; 'Mediation (Sobel)'});
+Description = string({'Path A (X->M)'; 'Path B (M->Y|X)'; 'Path C (Total X->Y)'; 'Path C'' (Direct X->Y|M)'; 'Sobel test (Indirect X->M->Y)'});
 Estimate    = round([betaA; betaB; betaC; betaC_prime; indirectEffect], 3);
 CI95        = {mat2str(round(ciA{1}, 2)); mat2str(round(ciB{1}, 2)); mat2str(round(ciC{1}, 2)); mat2str(round(ciC_prime{1}, 2)); mat2str(round(ciSobel{1}, 2))};
 SE          = round([seA; seB; seC; seC_prime; seIndirect], 3);
@@ -264,7 +273,7 @@ if flgVerbose
     fprintf('%-25s | Est=%8.3f | SE=%7.3f | p=%8.4f\n', 'Path C (Total)', betaC, seC, pC);
     fprintf('%-25s | Est=%8.3f | SE=%7.3f | p=%8.4f\n', 'Path C'' (Direct)', betaC_prime, seC_prime, pC_prime);
     fprintf('-------------------------------------------------------\n');
-    fprintf('%-25s | Est=%8.3f | Z =%7.3f | p=%8.4f\n', 'Sobel (Indirect)', indirectEffect, zSobel, pSobel);
+    fprintf('%-30s | Est=%8.3f | Z =%7.3f | p=%8.4f\n', 'Sobel test (Indirect X->M->Y)', indirectEffect, zSobel, pSobel);
 
     % Interpretation
     if pSobel < 0.05

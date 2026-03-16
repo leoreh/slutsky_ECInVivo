@@ -50,15 +50,15 @@ if ~isnumeric(res.plot.X)
 end
 
 % Extract Variable Names from Paths table for labeling
-rNames = res.paths.Properties.RowNames;
-pathA_Row = find(contains(rNames, 'Path A'));
-pathB_Row = find(contains(rNames, 'Path B'));
-pathC_Row = find(contains(rNames, 'Path C ('));
-pathCp_Row = find(contains(rNames, 'Path C'''));
+dTexts = res.paths.Description;
+pathA_Row = find(contains(dTexts, 'Path A'));
+pathB_Row = find(contains(dTexts, 'Path B'));
+pathC_Row = find(contains(dTexts, 'Path C ('));
+pathCp_Row = find(contains(dTexts, 'Path C'''));
 
 % Helper to get stats string
 getStats = @(rowIdx) sprintf('%c = %.3f, p = %.4f', ...
-    946, res.paths.Estimate(rowIdx), res.paths.PValue(rowIdx)); % Beta symbol
+    946, res.paths.Estimate(rowIdx), res.paths.("P-value")(rowIdx)); % Beta symbol
 
 
 %% ========================================================================

@@ -133,37 +133,48 @@ xVar = 'pBspk';
 mVar = 'ss_frBspk';
 distM = 'log-normal';
 distY = distM;
+transX = [];
 
 % Per Group (standardized)
 tblWt = tblMea(tblMea.Group == 'Control', :);
-resWt = lme_mediation(tblWt, frml, xVar, mVar, 'distM', distM, 'distY', distY);
-resWt.plot.X = tblWt.pBspk_trans;
-% lme_mediationPlot(resWt)
-lme_save('4F (WT)', resWt.xlsTbls, 'pathName', pathName, 'xlsName', xlsName)
+[~, tmpl] = tbl_trans(tblWt, 'varsInc', {'fr', 'pBspk', 'ss_frBspk'}, 'logBase', 10, 'skewThr', 2, 'flgZ', false);
+tmpl.varsTrans.pBspk.logBase = transX;
+resWt = lme_mediation(tblWt, frml, xVar, mVar, 'distM', distM, 'distY', distY, 'transTemplate', tmpl);
+lme_save('Mediation (WT)', resWt.xlsTbls, 'pathName', pathName, 'xlsName', xlsName)
 
 tblMcu = tblMea(tblMea.Group == 'MCU-KO', :);
-resMcu = lme_mediation(tblMcu, frml, xVar, mVar, 'distM', distM, 'distY', distY);
+[~, tmpl] = tbl_trans(tblMcu, 'varsInc', {'fr', 'pBspk', 'ss_frBspk'}, 'logBase', 10, 'skewThr', 2, 'flgZ', false);
+tmpl.varsTrans.pBspk.logBase = transX;
+resMcu = lme_mediation(tblMcu, frml, xVar, mVar, 'distM', distM, 'distY', distY, 'transTemplate', tmpl);
+lme_save('Mediation (MCU)', resMcu.xlsTbls, 'pathName', pathName, 'xlsName', xlsName)
+
+resWt.plot.X = tblWt.pBspk_trans;
+resWt.plot = tbl_trans(resWt.plot, 'varsInc', {'M'}, 'logBase', 10, 'skewThr', 2, 'flgZ', false);
+lme_mediationPlot(resWt)
 resMcu.plot.X = tblMcu.pBspk_trans;
-% lme_mediationPlot(resMcu)
-lme_save('4F (MCU)', resMcu.xlsTbls, 'pathName', pathName, 'xlsName', xlsName)
+resMcu.plot = tbl_trans(resMcu.plot, 'varsInc', {'M'}, 'logBase', 10, 'skewThr', 2, 'flgZ', false);
+lme_mediationPlot(resMcu)
+
 
 % Combined Models (unstandardized)
+[~, tmpl] = tbl_trans(tblMea, 'varsInc', {'fr', 'pBspk', 'ss_frBspk'}, 'logBase', 10, 'skewThr', 2, 'flgZ', false);
+tmpl.varsTrans.pBspk.logBase = transX;
 
 % X -> M 
 frml = 'ss_frBspk ~ (fr + pBspk) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal', 'flgStnd', false);
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal', 'flgStnd', false, 'transTemplate', tmpl);
 lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
 lme_save('4F (X->M)', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 
 % X -> Y
 frml = 'ss_frSspk ~ (fr + pBspk) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal', 'flgStnd', false);
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal', 'flgStnd', false, 'transTemplate', tmpl);
 lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
 lme_save('4F (X->Y)', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 
 % X -> Y | M 
 frml = 'ss_frSspk ~ (fr + pBspk + ss_frBspk) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal', 'flgStnd', false);
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal', 'flgStnd', false, 'transTemplate', tmpl);
 lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
 lme_save('4F (X->Y|M)', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 
