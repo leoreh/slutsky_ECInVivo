@@ -82,8 +82,8 @@ if flgVerbose, fprintf('\n[LME_MEDIATION] Step 1: Total Effect (X->Y)\n'); end
 
 % Use input formula directly
 frmlC = frml;
-[mdlC, ~, infoC] = lme_analyse(tbl, frmlC, 'dist', distY, 'fitMethod', fitMethodY, 'verbose', false);
-[betaC, pC, seC] = get_coeff(mdlC, xVar);
+[mdlC, statsC, infoC] = lme_analyse(tbl, frmlC, 'dist', distY, 'fitMethod', fitMethodY, 'verbose', false);
+[betaC, pC, seC, statC, dfC, ciC] = get_coeff(mdlC, xVar);
 
 
 %% ========================================================================
@@ -93,8 +93,8 @@ frmlC = frml;
 if flgVerbose, fprintf('\n[LME_MEDIATION] Step 2: Mediator Model (X->M)\n'); end
 
 frmlA = sprintf('%s ~ %s', mVar, rhs);
-[mdlA, ~, infoA] = lme_analyse(tbl, frmlA, 'dist', distM, 'fitMethod', fitMethodM, 'verbose', false);
-[betaA, pA, seA] = get_coeff(mdlA, xVar);
+[mdlA, statsA, infoA] = lme_analyse(tbl, frmlA, 'dist', distM, 'fitMethod', fitMethodM, 'verbose', true);
+[betaA, pA, seA, statA, dfA, ciA] = get_coeff(mdlA, xVar);
 
 
 %% ========================================================================
@@ -127,10 +127,15 @@ end
 frmlBC = sprintf('%s ~ %s + %s', yVar, mVar, rhs);
 
 % Reuse distY logic from Path C
-[mdlBC, ~, ~, tblBC] = lme_analyse(tbl, frmlBC, 'dist', distY, 'fitMethod', fitMethodY, 'verbose', false);
+[mdlBC, statsBC, infoBC, tblBC] = lme_analyse(tbl, frmlBC, 'dist', distY, 'fitMethod', fitMethodY, 'verbose', true);
 
-[betaB, pB, seB] = get_coeff(mdlBC, mVar);
-[betaC_prime, pC_prime, seC_prime] = get_coeff(mdlBC, xVar);
+% Inject M's transformation info from Path A into Path BC so it reflects correctly in the output table
+if isfield(infoA, 'transParams') && isfield(infoA.transParams, 'varsTrans') && isfield(infoA.transParams.varsTrans, mVar)
+    infoBC.transParams.varsTrans.(mVar) = infoA.transParams.varsTrans.(mVar);
+end
+
+[betaB, pB, seB, statB, dfB, ciB] = get_coeff(mdlBC, mVar);
+[betaC_prime, pC_prime, seC_prime, statC_prime, dfC_prime, ciC_prime] = get_coeff(mdlBC, xVar);
 
 
 %% ========================================================================
@@ -152,6 +157,7 @@ frmlBC = sprintf('%s ~ %s + %s', yVar, mVar, rhs);
 sdM = std(tbl.(mVar), 'omitnan');
 betaB = betaB / sdM;
 seB   = seB   / sdM;
+ciB   = {[ciB{1}(1) / sdM, ciB{1}(2) / sdM]};
 
 % Sobel Test for Indirect Effect (A * B)
 % Z = (a*b) / sqrt(b^2*sa^2 + a^2*sb^2)
@@ -159,21 +165,33 @@ indirectEffect = betaA * betaB;
 seIndirect = sqrt(betaB^2 * seA^2 + betaA^2 * seB^2);
 zSobel = indirectEffect / seIndirect;
 pSobel = 2 * (1 - normcdf(abs(zSobel))); % Two-tailed
+statSobel = zSobel;
+dfSobel = NaN;
+ciSobel = {[indirectEffect - 1.96*seIndirect, indirectEffect + 1.96*seIndirect]};
 
 res.mdlA  = mdlA;
 res.mdlC  = mdlC;
 res.mdlBC = mdlBC;
+res.statsA  = statsA;
+res.statsC  = statsC;
+res.statsBC = statsBC;
 res.infoA = infoA;
 res.infoC = infoC;
+res.infoBC = infoBC;
 
 % Summary Table
-RowNames = {'Path A (X->M)'; 'Path B (M->Y|X)'; 'Path C (Total X->Y)'; 'Path C'' (Direct X->Y|M)'; 'Mediation (Sobel)'};
-Variable  = {xVar; mVar; xVar; xVar; 'Indirect'};
-Estimate  = [betaA; betaB; betaC; betaC_prime; indirectEffect];
-SE        = [seA; seB; seC; seC_prime; seIndirect];
-PValue    = [pA; pB; pC; pC_prime; pSobel];
+Description = string({'Path A (X->M)'; 'Path B (M->Y|X)'; 'Path C (Total X->Y)'; 'Path C'' (Direct X->Y|M)'; 'Mediation (Sobel)'});
+Estimate    = round([betaA; betaB; betaC; betaC_prime; indirectEffect], 3);
+CI95        = {mat2str(round(ciA{1}, 2)); mat2str(round(ciB{1}, 2)); mat2str(round(ciC{1}, 2)); mat2str(round(ciC_prime{1}, 2)); mat2str(round(ciSobel{1}, 2))};
+SE          = round([seA; seB; seC; seC_prime; seIndirect], 3);
+tStatistic  = round([statA; statB; statC; statC_prime; statSobel], 2);
+DF          = [dfA; dfB; dfC; dfC_prime; dfSobel];
+PValue      = round([pA; pB; pC; pC_prime; pSobel], 4);
 
-res.paths = table(Variable, Estimate, SE, PValue, 'RowNames', RowNames);
+res.paths = table(Description, Estimate, string(CI95), SE, tStatistic, DF, PValue, ...
+    'VariableNames', {'Description', 'Estimate', 'CI95', 'SE', 't-statistic', 'DF', 'P-value'});
+
+res.xlsTbls = mediation2xls(res);
 
 %% ========================================================================
 %  PLOTTING DATA
@@ -267,7 +285,7 @@ end
 %% ========================================================================
 %  HELPER: GET COEFFICIENT
 %  ========================================================================
-function [est, pval, se] = get_coeff(mdl, varName)
+function [est, pval, se, stat, df, ci95] = get_coeff(mdl, varName)
 
 allNames = mdl.Coefficients.Name;
 idx = find(strcmp(allNames, varName));
@@ -278,13 +296,59 @@ if isempty(idx)
 end
 
 if isempty(idx)
-    est = NaN; pval = NaN; se = NaN;
+    est = NaN; pval = NaN; se = NaN; stat = NaN; df = NaN; ci95 = {[NaN, NaN]};
     warning('Variable %s not found in coefficients.', varName);
 else
     % Take first match (Reference)
     est  = mdl.Coefficients.Estimate(idx(1));
     pval = mdl.Coefficients.pValue(idx(1));
     se   = mdl.Coefficients.SE(idx(1));
+    stat = mdl.Coefficients.tStat(idx(1));
+    df   = mdl.Coefficients.DF(idx(1));
+    ci95 = {[mdl.Coefficients.Lower(idx(1)), mdl.Coefficients.Upper(idx(1))]};
+end
+
+end
+
+
+%% ========================================================================
+%  HELPER: MEDIATION TO XLS
+%  ========================================================================
+
+function medTbls = mediation2xls(res)
+% MEDIATION2XLS Formats mediation results into a structure array for lme_save.
+
+medTbls = struct('Title', {}, 'Table', {});
+
+% Main summary
+medTbls(end+1).Title = 'MEDIATION SUMMARY';
+medTbls(end).Table = res.paths;
+
+% PATH A
+medTbls(end+1).Title = 'PATH A (X->M)';
+medTbls(end).Table = table();
+tblA = lme_mdl2tbls(res.mdlA, res.statsA, res.infoA);
+for i = 1:length(tblA)
+    medTbls(end+1).Title = tblA(i).Title;
+    medTbls(end).Table = tblA(i).Table;
+end
+
+% PATH B & C'
+medTbls(end+1).Title = 'PATH B & C'' (X+M->Y)';
+medTbls(end).Table = table();
+tblBC = lme_mdl2tbls(res.mdlBC, res.statsBC, res.infoBC);
+for i = 1:length(tblBC)
+    medTbls(end+1).Title = tblBC(i).Title;
+    medTbls(end).Table = tblBC(i).Table;
+end
+
+% PATH C
+medTbls(end+1).Title = 'PATH C (Total X->Y)';
+medTbls(end).Table = table();
+tblC = lme_mdl2tbls(res.mdlC, res.statsC, res.infoC);
+for i = 1:length(tblC)
+    medTbls(end+1).Title = tblC(i).Title;
+    medTbls(end).Table = tblC(i).Table;
 end
 
 end

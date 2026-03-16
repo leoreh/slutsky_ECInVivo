@@ -138,26 +138,34 @@ distY = distM;
 tblWt = tblMea(tblMea.Group == 'Control', :);
 resWt = lme_mediation(tblWt, frml, xVar, mVar, 'distM', distM, 'distY', distY);
 resWt.plot.X = tblWt.pBspk_trans;
-lme_mediationPlot(resWt)
+% lme_mediationPlot(resWt)
+lme_save('4F (WT)', resWt.xlsTbls, 'pathName', pathName, 'xlsName', xlsName)
 
 tblMcu = tblMea(tblMea.Group == 'MCU-KO', :);
 resMcu = lme_mediation(tblMcu, frml, xVar, mVar, 'distM', distM, 'distY', distY);
 resMcu.plot.X = tblMcu.pBspk_trans;
-lme_mediationPlot(resMcu)
+% lme_mediationPlot(resMcu)
+lme_save('4F (MCU)', resMcu.xlsTbls, 'pathName', pathName, 'xlsName', xlsName)
 
 % Combined Models (unstandardized)
 
-% X -> M
+% X -> M 
 frml = 'ss_frBspk ~ (fr + pBspk) * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal', 'flgStnd', false);
+lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
+lme_save('4F (X->M)', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 
 % X -> Y
 frml = 'ss_frSspk ~ (fr + pBspk) * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal', 'flgStnd', false);
+lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
+lme_save('4F (X->Y)', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 
 % X -> Y | M 
 frml = 'ss_frSspk ~ (fr + pBspk + ss_frBspk) * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal', 'flgStnd', false);
+lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
+lme_save('4F (X->Y|M)', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 
 
 %% ========================================================================
@@ -191,3 +199,6 @@ frml = 'ss_fr ~ (fr + pBspk) * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal', 'flgStnd', false);
 lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
 lme_save('S4A,B (fr)', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
+
+
+% EOF

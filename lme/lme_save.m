@@ -61,6 +61,10 @@ for iTbl = 1:length(lmeTbls)
     tbl = tblStruct.Table;
     
     if isempty(tbl) || height(tbl) == 0
+        if ~isempty(tblStruct.Title)
+            exportData{end+1} = {tblStruct.Title};
+            exportData{end+1} = {''};
+        end
         continue;
     end
     
