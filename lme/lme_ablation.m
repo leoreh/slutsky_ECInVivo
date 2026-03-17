@@ -22,7 +22,8 @@ function abl = lme_ablation(tbl, frml, varargin)
 %                     'partitionMode' : 'batch' (default) or 'split'.
 %
 %   OUTPUTS:
-%       abl         - (struct) Results structure. Fields depend on Mode.
+%       abl         - (struct) Results structure.
+%                     - dR2     : Variance explained (incl. Shared as last element).
 %
 %   DEPENDENCIES:
 %       lme_fit, lme_frml2vars, cvpartition.
@@ -75,7 +76,7 @@ fprintf('[LME_ABLATION] Mode: %s (Dist: %s)\n', ...
 
 % Extract variables
 [varsFxd, varRsp, ~, varsIntr] = lme_frml2vars(frml);
-vars = [{'None'}, varsFxd, varsIntr];
+vars = [{'Full Model'}, varsFxd, varsIntr];
 
 
 %% ========================================================================
@@ -269,18 +270,22 @@ else
     abl.pRMSE = sqrt(sumSSE ./ sumN);
     abl.pR2   = 1 - (sumSSE ./ sumSST);
 
-    % Importance
-    % RMSE (% Increase)
-    abl.dRMSE = (abl.pRMSE(2:end) - abl.pRMSE(1)) ./ abl.pRMSE(1) * 100;
-
-    % RMSE (% Increase per Fold)
-    abl.dRMSE_fold = (rmse(:, 2:end) - rmse(:, 1)) ./ rmse(:, 1) * 100;
-
     % R2 (Difference)
-    abl.dR2 = abl.pR2(1) - abl.pR2(2:end);
-    
-    % R2 (Difference per fold)
-    abl.dR2_fold = abl.r2(:, 1) - abl.r2(:, 2:end);
+    % Note: pR2(1) is the Full model R2 (None removed).
+    uniqueR2 = abl.pR2(1) - abl.pR2(2:end);
+    uniqueR2_fld = abl.r2(:, 1) - abl.r2(:, 2:end);
+
+    % Shared Variance (Full R2 - Sum of Unique Variances)
+    sharedR2 = abl.pR2(1) - sum(uniqueR2, 'omitnan');
+    sharedR2_fld = abl.r2(:, 1) - sum(uniqueR2_fld, 2, 'omitnan');
+
+    % Store in Output Struct: [Unique_1, Unique_2, ..., Shared]
+    abl.dR2 = [uniqueR2, sharedR2];
+    abl.dR2_fold = [uniqueR2_fld, sharedR2_fld];
+
+    % RMSE (% Increase) - Do NOT pad (keep aligned with vars)
+    abl.dRMSE = (abl.pRMSE(2:end) - abl.pRMSE(1)) ./ abl.pRMSE(1) * 100;
+    abl.dRMSE_fold = (rmse(:, 2:end) - rmse(:, 1)) ./ rmse(:, 1) * 100;
 
 
 end

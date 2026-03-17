@@ -189,34 +189,28 @@ lme_save('4F (X+M->Y)', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 %  ABLATION
 %  ========================================================================
 
-
-frml = 'ss_fr ~ (frBspk + frSspk) * Group + (1 | Name)';
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal', 'flgStnd', false);
-lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
-lme_save('4F (X+M->Y)', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
-
-
 frml = 'ss_fr ~ (frBspk + frSspk)';
-
-nRep = 10;
 partMode = 'split';
-
 tblWt = tbl(tbl.Group == 'Control', :);
-abl = lme_ablation(tblWt, frml, 'dist', 'log-normal', ...
-    'flgBkTrans', false, 'partitionMode', partMode, 'nrep', nRep);
-abl.dR2
-
 tblMcu = tbl(tbl.Group == 'MCU-KO', :);
-abl = lme_ablation(tblMcu, frml, 'dist', 'log-normal', ...
-    'flgBkTrans', false, 'partitionMode', partMode, 'nrep', nRep);
 
+abl = lme_ablation(tblWt, frml, 'dist', 'log-normal', 'partitionMode', partMode, 'nrep', 10);
+ablTbl.Title = 'ABLATION SUMMARY (Pooled R2_OOS)';
+ablTbl.Table = table(abl.vars', round(abl.pR2', 4), 'VariableNames', {'Ablated_Feature', 'Ctrl'});
+abl = lme_ablation(tblMcu, frml, 'dist', 'log-normal', 'partitionMode', partMode, 'nrep', 10);
+ablTbl.Table{:, 'KO'} = round(abl.pR2', 4);
 
-% With Group
-frml = 'ss_fr ~ (frBspk + frSspk) * Group + (1 | Name)';
-nRep = 10;
-abl = lme_ablation(tblMea, frml, 'dist', 'log-normal', ...
-    'flgBkTrans', false, 'partitionMode', 'batch', 'nrep', nRep);
+headWt.Title = 'FULL MODEL: CONTROL';
+headWt.Table = [];
+headMcu.Title = 'FULL MODEL: MCU-KO';
+headMcu.Table = [];
 
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblWt, frml, 'dist', 'log-normal', 'flgStnd', false);
+tblWt = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMcu, frml, 'dist', 'log-normal', 'flgStnd', false);
+tblMcu = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
+lmeTbls = [ablTbl, headWt, tblWt, headMcu, tblMcu];
+lme_save('Ablation', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 
 
 %% ========================================================================

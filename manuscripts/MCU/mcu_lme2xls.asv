@@ -189,32 +189,28 @@ lme_save('4F (X+M->Y)', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 %  ABLATION
 %  ========================================================================
 
-
-frml = 'ss_fr ~ (frBspk + frSspk) + (1 | Name)';
 frml = 'ss_fr ~ (frBspk + frSspk)';
-dist = 'log-normal';
-
-nRep = 5;
 partMode = 'split';
-
 tblWt = tbl(tbl.Group == 'Control', :);
-abl = lme_ablation(tblWt, frml, 'dist', dist, ...
-    'flgBkTrans', false, 'partitionMode', partMode, 'nrep', nRep);
-
 tblMcu = tbl(tbl.Group == 'MCU-KO', :);
-abl = lme_ablation(tblMcu, frml, 'dist', dist, ...
-    'flgBkTrans', false, 'partitionMode', partMode, 'nrep', nRep);
 
+abl = lme_ablation(tblWt, frml, 'dist', 'log-normal', 'partitionMode', partMode, 'nrep', 10);
+ablTbl.Title = 'ABLATION SUMMARY (Pooled R2_OOS)';
+ablTbl.Table = table(abl.vars', round(abl.pR2', 4), 'VariableNames', {'Ablated_Feature', 'Ctrl'});
+abl = lme_ablation(tblMcu, frml, 'dist', 'log-normal', 'partitionMode', partMode, 'nrep', 10);
+ablTbl.Table{:, 'KO'} = round(abl.pR2', 4);
 
-% With Group
-frml = 'ss_fr ~ (frBspk + frSspk) * Group';
+medTbls = struct('Title', {}, 'Table', {});
+medTbls(1).Title = 'Full Model: Control';
+medTbls(1).Table = [];
+medTbls(2).Title = 'Mediation Summary: MCU-KO';
 
-nRep = 5;
-dist = 'log-normal';
-
-abl = lme_ablation(tblMea, frml, 'dist', dist, ...
-    'flgBkTrans', false, 'partitionMode', 'split', 'nrep', nRep);
-
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblWt, frml, 'dist', 'log-normal', 'flgStnd', false);
+tblWt = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMcu, frml, 'dist', 'log-normal', 'flgStnd', false);
+tblMcu = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
+lmeTbls = [ablTbl, tblWt, tblMcu];
+lme_save('Ablation', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 
 
 %% ========================================================================
