@@ -139,14 +139,20 @@ transX = [];
 tblWt = tblMea(tblMea.Group == 'Control', :);
 [~, tmpl] = tbl_trans(tblWt, 'varsInc', {'fr', 'pBspk', 'ss_frBspk'}, 'logBase', 10, 'skewThr', 2, 'flgZ', false);
 tmpl.varsTrans.pBspk.logBase = transX;
+tmpl.varsTrans.ss_frBspk.logBase = 'e'; % Force ln to match Path A response scaling
 resWt = lme_mediation(tblWt, frml, xVar, mVar, 'distM', distM, 'distY', distY, 'transTemplate', tmpl);
-lme_save('Mediation (WT)', resWt.xlsTbls, 'pathName', pathName, 'xlsName', xlsName)
 
 tblMcu = tblMea(tblMea.Group == 'MCU-KO', :);
 [~, tmpl] = tbl_trans(tblMcu, 'varsInc', {'fr', 'pBspk', 'ss_frBspk'}, 'logBase', 10, 'skewThr', 2, 'flgZ', false);
-tmpl.varsTrans.pBspk.logBase = transX;
 resMcu = lme_mediation(tblMcu, frml, xVar, mVar, 'distM', distM, 'distY', distY, 'transTemplate', tmpl);
-lme_save('Mediation (MCU)', resMcu.xlsTbls, 'pathName', pathName, 'xlsName', xlsName)
+
+% Consolidate Mediation Summaries into one sheet
+medTbls = struct('Title', {}, 'Table', {});
+medTbls(1).Title = 'Mediation Summary: Control';
+medTbls(1).Table = resWt.paths;
+medTbls(2).Title = 'Mediation Summary: MCU-KO';
+medTbls(2).Table = resMcu.paths;
+lme_save('Mediation', medTbls, 'pathName', pathName, 'xlsName', xlsName)
 
 resWt.plot.X = tblWt.pBspk_trans;
 resWt.plot = tbl_trans(resWt.plot, 'varsInc', {'M'}, 'logBase', 10, 'skewThr', 2, 'flgZ', false);
@@ -159,6 +165,7 @@ lme_mediationPlot(resMcu)
 % Combined Models (unstandardized)
 [~, tmpl] = tbl_trans(tblMea, 'varsInc', {'fr', 'pBspk', 'ss_frBspk'}, 'logBase', 10, 'skewThr', 2, 'flgZ', false);
 tmpl.varsTrans.pBspk.logBase = transX;
+tmpl.varsTrans.ss_frBspk.logBase = 'e'; % Force ln for consistency with mediation
 
 % X -> M 
 frml = 'ss_frBspk ~ (fr + pBspk) * Group + (1|Name)';
@@ -176,7 +183,40 @@ lme_save('4F (X->Y)', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 frml = 'ss_frSspk ~ (fr + pBspk + ss_frBspk) * Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal', 'flgStnd', false, 'transTemplate', tmpl);
 lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
-lme_save('4F (X->Y|M)', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
+lme_save('4F (X+M->Y)', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
+
+%% ========================================================================
+%  ABLATION
+%  ========================================================================
+
+
+frml = 'ss_fr ~ (frBspk + frSspk) * Group + (1 | Name)';
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal', 'flgStnd', false);
+lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
+lme_save('4F (X+M->Y)', lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
+
+
+frml = 'ss_fr ~ (frBspk + frSspk)';
+
+nRep = 10;
+partMode = 'split';
+
+tblWt = tbl(tbl.Group == 'Control', :);
+abl = lme_ablation(tblWt, frml, 'dist', 'log-normal', ...
+    'flgBkTrans', false, 'partitionMode', partMode, 'nrep', nRep);
+abl.dR2
+
+tblMcu = tbl(tbl.Group == 'MCU-KO', :);
+abl = lme_ablation(tblMcu, frml, 'dist', 'log-normal', ...
+    'flgBkTrans', false, 'partitionMode', partMode, 'nrep', nRep);
+
+
+% With Group
+frml = 'ss_fr ~ (frBspk + frSspk) * Group + (1 | Name)';
+nRep = 10;
+abl = lme_ablation(tblMea, frml, 'dist', 'log-normal', ...
+    'flgBkTrans', false, 'partitionMode', 'batch', 'nrep', nRep);
+
 
 
 %% ========================================================================

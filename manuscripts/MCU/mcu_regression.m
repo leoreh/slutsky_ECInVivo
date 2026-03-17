@@ -264,7 +264,7 @@ nRep = 5;
 dist = 'log-normal';
 
 abl = lme_ablation(tblLme, frml, 'dist', dist, ...
-    'flgBkTrans', false, 'partitionMode', 'batch', 'nrep', nRep);
+    'flgBkTrans', false, 'partitionMode', 'split', 'nrep', nRep);
 
 
 % tblLme.Group = double(tbl.Group) - 1;

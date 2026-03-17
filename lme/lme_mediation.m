@@ -148,25 +148,26 @@ frmlBC = sprintf('%s ~ %s + %s', yVar, mVar, rhs);
 
 % UNIT CONSISTENCY CHECK:
 % Path A (X->M): betaA = d(TransM) / d(Z_X)
-% Path B (M->Y): betaB = d(Y)      / d(Z_TransM)
+% Path B (M->Y): betaB = d(Y)      / d(TransM)
 %
-% Note: lme_analyse Z-scores predictors. 
-% tbl.(mVar) contains Transformed M (from Path A) but NOT Z-scored.
-% lme_analyse Z-scores it internally.
-%
-% To calculate Indirect Effect (A*B), we essentially need the chain rule:
-%   Effect = [d(TransM) / d(Z_X)] * [d(Y) / d(TransM)]
-%
-% We must un-Z-score betaB to convert it from d(Y)/d(Z_TransM) to d(Y)/d(TransM).
-% We retrieve the standard deviation on the transformed scale from Path A.
-if isfield(infoA.transParams.varsTrans, mVar)
-    sdM = infoA.transParams.varsTrans.(mVar).stats.SD(1);
-else
-    sdM = 1;
+% If Path BC was standardized, betaB is d(Y)/d(Z_TransM).
+% We must un-Z-score it to get $d(Y)/d(TransM)$.
+flgZ_M = false;
+if isfield(infoBC.transParams.varsTrans, mVar)
+    flgZ_M = infoBC.transParams.varsTrans.(mVar).flgZ;
 end
-betaB = betaB / sdM;
-seB   = seB   / sdM;
-ciB   = {[ciB{1}(1) / sdM, ciB{1}(2) / sdM]};
+
+if flgZ_M
+    % We retrieve the standard deviation on the transformed scale from Path A.
+    if isfield(infoA.transParams.varsTrans, mVar)
+        sdM = infoA.transParams.varsTrans.(mVar).stats.SD(1);
+    else
+        sdM = 1;
+    end
+    betaB = betaB / sdM;
+    seB   = seB   / sdM;
+    ciB   = {[ciB{1}(1) / sdM, ciB{1}(2) / sdM]};
+end
 
 % Sobel Test for Indirect Effect (A * B)
 % Z = (a*b) / sqrt(b^2*sa^2 + a^2*sb^2)
