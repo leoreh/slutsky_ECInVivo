@@ -181,12 +181,19 @@ for iFile = 1 : length(idxFiles)
         'spkDur', 0.0005);
 
     xlim([10 15])
-    xlabel('Time (s)')
-    ylabel('Unit No.')
     set(gca, 'YDir', 'normal');
 
     [hFig, hAx] = plot_axSize('hFig', hFig, 'szOnly', false,...
         'axWidth', 600, 'axHeight', 300, 'flgPos', true);
+
+    % Axis inner area: exactly 3.5 × 3.5 cm (excludes labels and ticks)
+    set(hAx, 'Units', 'centimeters');
+    hAx.Position(3:4) = [3.5, 3.5];
+
+    % Typography: Arial, tick labels 10 pt, axis labels 12 pt
+    set(hAx, 'FontName', 'Arial', 'FontSize', 10);
+    xlabel(hAx, 'Time (s)', 'FontName', 'Arial', 'FontSize', 12);
+    ylabel(hAx, 'Unit No.', 'FontName', 'Arial', 'FontSize', 12);
 
 end
 
