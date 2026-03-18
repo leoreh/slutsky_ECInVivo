@@ -157,9 +157,8 @@ v = basepaths2vars('basepaths', basepaths(idxFiles), 'vars', vars);
 % Config
 cfg = mcu_cfg();
 winPlot = [0, 60];
-winLim = 1;
 LineFormat.Color = [0 0 0];
-LineFormat.LineWidth = 1;
+LineFormat.LineWidth = 0.5;
 hFig = plot_axSize('szOnly', false,...
     'flgFullscreen', true, 'flgPos', false);
 hTile = tiledlayout(2, 2, 'Padding', 'compact', 'TileSpacing', 'compact');
@@ -198,7 +197,7 @@ for iFile = 1 : length(idxFiles)
     title(hAx, basepaths(idxFiles(iFile)))
 
     if iFile == 1
-        xlim([16.4 17.4])
+        xlim([16.4 17.5])
     elseif iFile == 2
         xlim([16 17])
     elseif iFile == 3

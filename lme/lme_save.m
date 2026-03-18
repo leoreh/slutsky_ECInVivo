@@ -8,6 +8,7 @@ function lme_save(sheetName, lmeTbls, varargin)
 %   Optional Parameters:
 %       pathName - Directory path (default: 'D:\OneDrive - Tel-Aviv University\PhD\Slutsky\Manuscripts\MCU\Results')
 %       xlsName  - Excel file name (default: 'mcu_suppTbl.xlsx')
+%       bkLink   - Sheet name for TOC hyperlink at row 1 (default: 'TOC')
 %       verbose  - Print progress (default: true)
 
 %% ========================================================================
@@ -24,6 +25,7 @@ defaultXls = 'mcu_suppTbl.xlsx';
 
 addParameter(p, 'pathName', defaultPath, @(x) ischar(x) || isstring(x));
 addParameter(p, 'xlsName', defaultXls, @(x) ischar(x) || isstring(x));
+addParameter(p, 'bkLink', 'TOC', @(x) ischar(x) || isstring(x));
 addParameter(p, 'verbose', true, @islogical);
 
 parse(p, sheetName, lmeTbls, varargin{:});
@@ -31,6 +33,7 @@ parse(p, sheetName, lmeTbls, varargin{:});
 sheetName = char(p.Results.sheetName);
 pathName  = char(p.Results.pathName);
 xlsName   = char(p.Results.xlsName);
+bkLink    = char(p.Results.bkLink);
 verbose   = p.Results.verbose;
 
 if isempty(pathName), pathName = pwd; end
@@ -55,6 +58,12 @@ end
 %  ========================================================================
 
 exportData = {};
+
+% Add Hyperlink to TOC
+if ~isempty(bkLink)
+    exportData{end+1} = {sprintf('=HYPERLINK("#''%s''!A1", "%s")', bkLink, bkLink)};
+    exportData{end+1} = {''}; % Empty row separator
+end
 
 for iTbl = 1:length(lmeTbls)
     tblStruct = lmeTbls(iTbl);
@@ -105,29 +114,20 @@ for iTbl = 1:length(lmeTbls)
 end
 
 %% ========================================================================
-%  APPEND LOGIC FOR EXISTING SHEETS
+%  SAFE OVERWRITE LOGIC FOR EXISTING SHEETS
 %  ========================================================================
 
-existingData = {};
+oldSize = [0, 0];
 if isfile(fullXlsPath)
     try
         % Safely get sheet names 
         sheets = sheetnames(fullXlsPath);
         if ismember(string(sheetName), sheets)
-            % Read existing sheet
+            % We read the existing sheet temporarily to find its dimensions
+            % so we can pad the new data with empty strings, preventing old 
+            % data from persisting around the edges.
             existingData = readcell(fullXlsPath, 'Sheet', sheetName, 'DateType', 'text');
-            
-            % Sanitize existingData to replace 'missing' with empty strings
-            % (prevents writecell from writing #N/A errors)
-            if ~isempty(existingData)
-                for r = 1:size(existingData, 1)
-                    for c = 1:size(existingData, 2)
-                        if ismissing(existingData{r,c})
-                            existingData{r,c} = '';
-                        end
-                    end
-                end
-            end
+            oldSize = size(existingData);
         end
     catch
         % File might be locked or unreadable
@@ -147,39 +147,22 @@ end
 maxCols = max(cellfun(@length, exportData));
 numRows = length(exportData);
 
-newDataBlock = cell(numRows, maxCols);
-newDataBlock(:) = {''};
+% Calculate the final dimensions considering the potential old sheet limits
+padRows = max(numRows, oldSize(1));
+padCols = max(maxCols, oldSize(2));
+
+finalBuffer = cell(padRows, padCols);
+finalBuffer(:) = {''};
 
 for iRow = 1:numRows
     rowLen = length(exportData{iRow});
     if rowLen > 0
-        newDataBlock(iRow, 1:rowLen) = exportData{iRow};
+        finalBuffer(iRow, 1:rowLen) = exportData{iRow};
     end
-end
-
-% Combine existing and new data if extending
-if ~isempty(existingData)
-    % Add a 2-row gap
-    gapCols = max(size(existingData, 2), size(newDataBlock, 2));
-    gapBlock = cell(2, gapCols);
-    gapBlock(:) = {''};
-    
-    % Align columns of existing data
-    if size(existingData, 2) < gapCols
-        existingData{1, gapCols} = ''; 
-    end
-    
-    % Align columns of new data
-    if size(newDataBlock, 2) < gapCols
-        newDataBlock{1, gapCols} = ''; 
-    end
-    
-    finalBuffer = [existingData; gapBlock; newDataBlock];
-else
-    finalBuffer = newDataBlock;
 end
 
 % Write via writecell
+% Padding with empty strings '' ensures any previous data in this sheet is cleared 
 writecell(finalBuffer, fullXlsPath, 'Sheet', sheetName);
 
 if verbose

@@ -114,23 +114,33 @@ for iIsi = 1 : length(isiSweep)
         fNameFrB = sprintf('frB_s%d_i%03d', spkThr, round(isiThr*1000));
         fNameFrS = sprintf('frS_s%d_i%03d', spkThr, round(isiThr*1000));
 
-        frml = sprintf('ss_fr ~ %s + %s + (1 | Name)', fNameFrB, fNameFrS);
+        frml = sprintf('ss_fr ~ %s + %s', fNameFrB, fNameFrS);
 
-        % Run lightweight ablation (CV)
-        abl = lme_ablation(tblWt, frml, 'dist', 'log-normal', ...
-            'nReps', 5, 'nFolds', 5, ...
+        % Run ablation (CV) - Control
+        ablWt = lme_ablation(tblWt, frml, 'dist', 'log-normal', ...
+            'nReps', 10, 'nFolds', 5, ...
             'flgBkTrans', false, 'partitionMode', 'split', ...
             'flgPlot', false);
 
-        % Full R2
-        row.fullR2 = abl.pR2(1);
+        idxFrB = find(strcmp(ablWt.vars(2:end), fNameFrB));
+        idxFrS = find(strcmp(ablWt.vars(2:end), fNameFrS));
+        vB = NaN; vS = NaN;
+        if ~isempty(idxFrB), vB = ablWt.dR2(idxFrB); end
+        if ~isempty(idxFrS), vS = ablWt.dR2(idxFrS); end
+        row.dR2_wt = [vB, vS, ablWt.dR2(end)];
 
-        % Extract dR2 (Unique contribution)
-        idxFrB = find(strcmp(abl.vars(2:end), fNameFrB));
-        idxFrS = find(strcmp(abl.vars(2:end), fNameFrS));
+        % Run ablation (CV) - MCU-KO
+        ablMcu = lme_ablation(tblMcu, frml, 'dist', 'log-normal', ...
+            'nReps', 10, 'nFolds', 5, ...
+            'flgBkTrans', false, 'partitionMode', 'split', ...
+            'flgPlot', false);
 
-        if ~isempty(idxFrB), row.dR2_frB = abl.dR2(idxFrB); else, row.dR2_frB = NaN; end
-        if ~isempty(idxFrS), row.dR2_frS = abl.dR2(idxFrS); else, row.dR2_frS = NaN; end
+        idxFrB = find(strcmp(ablMcu.vars(2:end), fNameFrB));
+        idxFrS = find(strcmp(ablMcu.vars(2:end), fNameFrS));
+        vB = NaN; vS = NaN;
+        if ~isempty(idxFrB), vB = ablMcu.dR2(idxFrB); end
+        if ~isempty(idxFrS), vS = ablMcu.dR2(idxFrS); end
+        row.dR2_mcu = [vB, vS, ablMcu.dR2(end)];
 
 
         % Zeros
@@ -200,7 +210,9 @@ end
 
 
 % Convert Table to Matrices for Heatmaps
-matTStat     = unstack(tblRes(:, {'spkThr', 'isiThr', 'dR2_frB'}), 'dR2_frB', 'spkThr');
+matTStat     = unstack(tblRes(:, {'spkThr', 'isiThr', 'dR2_wt'}), 'dR2_wt', 'spkThr');
+matTStat     = cell2mat(table2array(matTStat(:, 2:end)));
+matTStat     = matTStat(:, 1:3:end); % Extract Unique Burst (Component 1) for each spkThr group
 matTStatGrp  = unstack(tblRes(:, {'spkThr', 'isiThr', 'tStatGroup'}), 'tStatGroup', 'spkThr');
 matTStatInt  = unstack(tblRes(:, {'spkThr', 'isiThr', 'tStatInt'}), 'tStatInt', 'spkThr');
 matAIC       = unstack(tblRes(:, {'spkThr', 'isiThr', 'AIC'}), 'AIC', 'spkThr');
@@ -208,7 +220,6 @@ matCorr      = unstack(tblRes(:, {'spkThr', 'isiThr', 'corr'}), 'corr', 'spkThr'
 mat0         = unstack(tblRes(:, {'spkThr', 'isiThr', 'pZero'}), 'pZero', 'spkThr');
 
 % Extract matrix data (remove first col which is isiThr label)
-matTStat     = table2array(matTStat(:, 2:end));
 matTStatGrp  = table2array(matTStatGrp(:, 2:end));
 matTStatInt  = table2array(matTStatInt(:, 2:end));
 matAIC       = table2array(matAIC(:, 2:end));
@@ -261,84 +272,69 @@ title('Model Fit: AIC (Lower is Better)');
 % -------------------------------------------------------------------------
 % STACKED BAR PLOTS (Variance Partitioning)
 % -------------------------------------------------------------------------
-% Calculate Shared Variance
-% Full = UniqueA + UniqueB + Shared
-% Shared = Full - UniqueA - UniqueB
-tblRes.dR2_Shared = tblRes.fullR2 - tblRes.dR2_frB - tblRes.dR2_frS;
+
 
 % Clip negative shared variance (can happen if predictors are correlated in complex ways)
-tblRes.dR2_Shared(tblRes.dR2_Shared < 0) = 0;
+tblRes.dR2_wt(tblRes.dR2_wt(:, 3) < 0, 3) = 0;
+tblRes.dR2_mcu(tblRes.dR2_mcu(:, 3) < 0, 3) = 0;
 
 uSpk = unique(tblRes.spkThr);
 clrs = [0.8 0.3 0.3; 0.3 0.3 0.8; 0.7 0.7 0.7]; % Red (Burst), Blue (Single), Gray (Shared)
 
-figure('Name', 'Burst Sweeep - Variance Partition', 'Color', 'w', 'Position', [100 100 1200 400]);
-tiledlayout(2, 3, 'TileSpacing', 'compact');
+figure('Name', 'Burst Sweeep - Variance Partition', 'Color', 'w', 'Position', [100 100 1200 800]);
+tiledlayout(2, length(uSpk), 'TileSpacing', 'compact');
 
-for iThr = 1 : length(uSpk)
-    nexttile;
+for iGrp = 1:2
+    for iThr = 1 : length(uSpk)
+        nexttile;
 
-    idx = tblRes.spkThr == uSpk(iThr);
-    subTbl = tblRes(idx, :);
+        idx = tblRes.spkThr == uSpk(iThr);
+        subTbl = tblRes(idx, :);
 
-    % Ensure unique X-values & Sort by ISI for consistent plotting
-    [~, idxUnq] = unique(subTbl.isiThr);
-    subTbl = subTbl(idxUnq, :);
-    subTbl = sortrows(subTbl, 'isiThr');
+        % Ensure unique X-values & Sort by ISI for consistent plotting
+        [~, idxUnq] = unique(subTbl.isiThr);
+        subTbl = subTbl(idxUnq, :);
+        subTbl = sortrows(subTbl, 'isiThr');
 
-    % Data for bar
-    yData = [subTbl.dR2_frB, subTbl.dR2_frS, subTbl.dR2_Shared];
+        % Data for bar
+        if iGrp == 1
+            yData = subTbl.dR2_wt;
+            grpName = 'Control';
+        else
+            yData = subTbl.dR2_mcu;
+            grpName = 'MCU-KO';
+        end
 
-    % Evenly spaced bars (Categorical axis)
-    xData = 1:height(subTbl);
-    b = bar(xData, yData, 'stacked');
+        % Evenly spaced bars (Categorical axis)
+        xData = 1:height(subTbl);
+        b = bar(xData, yData, 'stacked');
 
-    % Colors
-    for k = 1:3, b(k).FaceColor = clrs(k, :); end
+        % Colors
+        for k = 1:3, b(k).FaceColor = clrs(k, :); end
 
-    title(sprintf('Min Spikes: %d', uSpk(iThr)));
-    xlabel('ISI Threshold (s)');
-    ylabel('R^2');
+        if iGrp == 1
+            title(sprintf('Min Spikes: %d', uSpk(iThr)));
+        else
+            title(sprintf('%s (Spikes: %d)', grpName, uSpk(iThr)));
+        end
+        
+        if iThr == 1
+            ylabel({grpName, 'R^2'});
+        end
+        if iGrp == 2
+            xlabel('ISI Threshold (s)');
+        end
 
-    xticks(xData);
-    xticklabels(string(subTbl.isiThr));
+        xticks(xData);
+        xticklabels(string(subTbl.isiThr));
 
-    if iThr == 1
-        legend({'Unique Burst', 'Unique Single', 'Shared'}, 'Location', 'northwest');
+        if iGrp == 1 && iThr == 1
+            legend({'Unique Burst', 'Unique Single', 'Shared'}, 'Location', 'northwest');
+        end
+        ylim([0 0.5]);
     end
-    ylim([0 1]);
 end
 
 
 
 
-
-
-%% ========================================================================
-%  MEA ISI VALLEY
-%  ========================================================================
-% Completely useless. No bi-modality. Also, optimization via predictive
-% power is preferred.
-
-% presets = {'spktimes'};
-% [tblMea, ~, ~, ~] = mcu_tblMea('presets', presets([1]));
-%
-% idxWt = tblMea.Group == 'Control';
-% spktimesMea = tblMea.spktimes(idxWt);
-%
-% % ISI VALLEY AS THRESHOLD
-% isiValMea = brst_isiValley(spktimesMea, 'nSpks', 3);
-
-
-%% ========================================================================
-%  IN VIVO
-%  ========================================================================
-%
-% basepaths = [mcu_basepaths('wt_bsl')];
-% [tblVivo, ~, ~, ~] = mcu_tblVivo('basepaths', basepaths, 'presets', {'spktimes'});
-%
-% idxUnit = tblVivo.UnitType == 'RS';
-% spktimesVivo = tblVivo.spktimes(idxUnit);
-%
-% % ISI VALLEY AS THRESHOLD
-% isiValVivo = brst_isiValley(spktimesVivo, 'nSpks', 2);

@@ -37,8 +37,8 @@ for iFile = 1 : nFiles
     %     'binSize', 1200, 'winSize', [], 'flgPlot', true);
     
     % Limit to state
-    boutTimes = intervals(v(iFile).ss.bouts.times{4});
-    spktimes = cellfun(@(x) boutTimes.restrict(x, 'flgShift', false), spktimes, 'uni', false);
+    % boutTimes = intervals(v(iFile).ss.bouts.times{4});
+    % spktimes = cellfun(@(x) boutTimes.restrict(x, 'flgShift', false), spktimes, 'uni', false);
 
     % Burst detection
     isiStart = 0.006;

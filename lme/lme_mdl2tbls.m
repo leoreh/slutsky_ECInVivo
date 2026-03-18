@@ -64,9 +64,11 @@ if ~isempty(lmeMdl) && isprop(lmeMdl, 'NumObservations')
     infoNames{end+1}='Observations'; infoVals{end+1}=mat2str(lmeMdl.NumObservations);
 end
 if ~isempty(infoNames)
-    Property = infoNames';
-    Value = infoVals';
-    add_tbl('MODEL INFORMATION', table(Property, Value), 'Other');
+    Info = cell(length(infoNames), 1);
+    for i = 1:length(infoNames)
+        Info{i} = sprintf('%s: %s', char(infoNames{i}), char(infoVals{i}));
+    end
+    add_tbl('MODEL INFORMATION', table(Info), 'Other');
 end
 
 % --- 2. Continuous Predictors Table ---
@@ -190,7 +192,7 @@ if ~isempty(lmeStats) && ismember('Type', lmeStats.Properties.VariableNames)
     if any(idxCoef)
         coefTbl = lmeStats(idxCoef, :);
         coefTbl = removevars_safely(coefTbl, {'Index', 'Type', 'HVec'});
-        add_tbl('FIXED EFFECTS (COEFFICIENTS)', coefTbl, 'Coeff');
+        add_tbl('FIXED EFFECTS', coefTbl, 'Coeff');
     end
 end
 
