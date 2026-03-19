@@ -150,12 +150,20 @@ if ismember('rippStates', presets)
     varMap.State        = 'rippStates.State';
 end
 
+if ismember('acg', presets)
+    % acg_narrow: narrow autocorrelogram (100 ms, 0.5 ms bins).
+    % st_metrics is already in cfg.vars; xVec is extracted post-load.
+    varMap.acg_narrow = 'st.acg_narrow';
+    varMap.acg_wide = 'st.acg_wide';
+
+end
+
 %% ========================================================================
 %  LOAD DATA
 %  ========================================================================
 
 if isempty(basepaths)
-    basepaths = [mcu_basepaths('wt'), mcu_basepaths('mcu')];
+    basepaths = [mcu_basepaths('wt'), mcu_basepaths('mcu'), mcu_basepaths('lh137')];
 end
 if isempty(v)
     v = basepaths2vars('basepaths', basepaths, 'vars', vars);
@@ -199,11 +207,17 @@ if ismember('rippStates', presets)
 end
 
 % Extract xVec for ripples
-if ismember('rippSpks', presets) 
+if ismember('rippSpks', presets)
     xVec = v(1).rippSpks.tstamps;
 end
-if ismember('rippMaps', presets) 
+if ismember('rippMaps', presets)
     xVec = v(1).rippMaps.tstamps;
+end
+
+% Extract xVec for ACG (lag axis in ms, same for every recording)
+if ismember('acg', presets)
+    xVec.narrow = v(1).st.info.acg_narrow_tstamps * 1000;   % [s] → [ms]
+    xVec.wide = v(1).st.info.acg_wide_tstamps * 1000;   % [s] → [ms]
 end
 
 %% ========================================================================
@@ -219,6 +233,7 @@ tagFiles.File = fileNames;
 % Table
 tbl = v2tbl('v', v, 'varMap', varMap, 'tagAll',...
     struct(), 'tagFiles', tagFiles, 'idxCol', []);
+
 
 %% ========================================================================
 %  PROCESS METADATA

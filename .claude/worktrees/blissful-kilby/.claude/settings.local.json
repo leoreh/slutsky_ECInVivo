@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(powershell -Command \"Remove-Item -Path ''D:\\\\Code\\\\slutsky_ECInVivo\\\\.claude\\\\worktrees\\\\blissful-kilby'' -Recurse -Force\")"
+    ]
+  }
+}

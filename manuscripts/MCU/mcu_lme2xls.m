@@ -10,9 +10,8 @@ tblTrans = tbl_trans(tblMea, 'varsInc', {'pBspk', 'ss_pBspk'}, 'logBase', 'logit
 tblMea.pBspk_trans = tblTrans.pBspk;
 
 % Load In Vivo ------------------------------------------------------------
-basepaths = [mcu_basepaths('wt'), mcu_basepaths('mcu')];
 presets = {'brst'};
-tblVivo = mcu_tblVivo('basepaths', basepaths, 'presets', presets, 'flgClean', true);
+tblVivo = mcu_tblVivo('presets', presets, 'flgClean', true);
 
 flgPlot = false;
 
@@ -34,7 +33,7 @@ frml = 'bRate ~ Group + (1|Name)';
 lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
 
 frml = 'nBspk ~ Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml);
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal');
 lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
 
 frml = 'pBspk ~ Group * fr + (1|Name)';
@@ -67,11 +66,21 @@ frml = 'pBspk ~ Group * fr + (1|Name)';
 lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
 lme_save(sheetNames{2}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 
-frml = 'bFreq ~ Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLme, frml);
+frml = 'bRate ~ Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLme, frml, 'dist', 'gamma');
 
 frml = 'nBspk ~ Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLme, frml);
+
+
+
+frml = 'frBspk ~ Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLme, frml);
+
+frml = 'frSspk ~ Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLme, frml);
+
+mean(tblLme.fr(tblLme.Group == 'Control'), 'omitnan')
 
 if flgPlot
     tblGUI_bar(tblLme, 'yVar', 'pBspk', 'xVar', 'Group');
@@ -133,11 +142,12 @@ end
 % =========================================================================
 tblIdx = 5;
 sheetNames{tblIdx} = ['S' num2str(tblIdx)];
-tblInfo{tblIdx} = 'FR during BAC';
+tblInfo{tblIdx} = 'FRH during BAC';
 dataSet{tblIdx} = 'In Vivo';
 tblPnls{tblIdx} = '3H';
 
 frml = 'fr ~ Group * Day + (Day|Name)';
+tblLme = tblVivo; tblLme(tblLme.Name == 'lh137', :) = [];
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblVivo, frml, 'dist', 'gamma');
 lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
 lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName)

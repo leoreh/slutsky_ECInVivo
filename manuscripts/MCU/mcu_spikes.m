@@ -145,10 +145,8 @@ prismMat = [mean(frMat, 2, 'omitnan'), ...
 % Files
 basepaths = [mcu_basepaths('wt'), mcu_basepaths('mcu')];
 basepaths = natsort(basepaths);
-idxFiles = [1, 5, 29, 33];
-idxFiles = [1, 5, 36, 40];
 idxFiles = [1, 5, 50, 54];
-% idxFiles = [1, 5, 57, 61];
+% idxFiles = [15, 19, 50, 54];
 
 % Load
 vars = {'spikes', 'units', 'brst'};
@@ -157,17 +155,34 @@ v = basepaths2vars('basepaths', basepaths(idxFiles), 'vars', vars);
 % Config
 cfg = mcu_cfg();
 winPlot = [0, 60];
-winLim = 1;
-LineFormat.Color = [0 0 0];
-LineFormat.LineWidth = 1;
-hFig = plot_axSize('szOnly', false,...
-    'flgFullscreen', true, 'flgPos', false);
-hTile = tiledlayout(2, 2, 'Padding', 'compact', 'TileSpacing', 'compact');
+lnW = 1;
+lnH = 1;
+
+% Exact inner axis size (cm) and surrounding white-space
+axW   = 6;  axH   = 3.5;
+lMarg = 1.8;  bMarg = 1.5;   % left / bottom margins (room for labels)
+hGap  = 2.2;  vGap  = 2.0;   % horizontal / vertical gap between tiles
+rMarg = 0.5;  tMarg = 1.2;   % right / top margins
+
+figW = lMarg + axW + hGap + axW + rMarg;
+figH = bMarg + axH + vGap + axH + tMarg;
+
+hFig = figure;
+set(hFig, 'Units', 'centimeters');
+hFig.Position(2) = 5;
+hFig.Position(3:4) = [figW, figH] * 1.4;
+
+% Bottom-left corner of each tile [x y] in cm, left-to-right / top-to-bottom
+axOrigins = [lMarg, bMarg + axH + vGap;     % (1,1) top-left
+    lMarg + axW + hGap, bMarg + axH + vGap; % (1,2) top-right
+    lMarg, bMarg;                           % (2,1) bottom-left
+    lMarg + axW + hGap, bMarg];             % (2,2) bottom-right
 
 % Plot
 for iFile = 1 : length(idxFiles)
-    
-    hAx = nexttile;
+
+    hAx = axes('Units', 'centimeters', ...
+                'Position', [axOrigins(iFile,:), axW, axH]); %#ok<LAXES>
 
     % Prep spktimes
     uIdx = v(iFile).units.type == 'RS';
@@ -177,36 +192,40 @@ for iFile = 1 : length(idxFiles)
     btimes = v(iFile).brst.spktimes(uIdx);
 
     plot_raster(spktimes, 'PlotType', 'vertline', ...
-        'lineHeight', 0.7, ...
-        'lineWidth', 0.35, ...
+        'lineHeight', lnH, ...
+        'lineWidth', lnW, ...
         'hAx', hAx, ...
         'clr', [0 0 0], ...
         'xLim', winPlot, ...
         'spkDur', 0.0005);
 
     plot_raster(btimes, 'PlotType', 'vertline', ...
-        'lineHeight', 0.7, ...
-        'lineWidth', 0.35, ...
+        'lineHeight', lnH, ...
+        'lineWidth', lnW, ...
         'hAx', hAx, ...
         'clr', [1 0 0], ...
         'xLim', winPlot, ...
         'spkDur', 0.0005);
 
-    xlabel('Time (s)')
-    ylabel('Unit No.')
     set(gca, 'YDir', 'normal');
-    title(hAx, basepaths(idxFiles(iFile)))
+    title(hAx, basepaths(idxFiles(iFile)), 'Interpreter', 'none')
 
     if iFile == 1
-        xlim([16.4 17.4])
+        xlim([18.5 19.3])
     elseif iFile == 2
-        xlim([16 17])
+        xlim([6.1 6.9])
     elseif iFile == 3
-        xlim([15 16])
+        xlim([15.2 16])
     elseif iFile == 4
-        xlim([14 15])
+        xlim([14 14.8])
     end
+
+    % Typography: Arial, tick labels 10 pt, axis labels 12 pt
+    set(hAx, 'FontName', 'Arial', 'FontSize', 10);
+    xlabel(hAx, 'Time (s)', 'FontName', 'Arial', 'FontSize', 12);
+    ylabel(hAx, 'Unit No.', 'FontName', 'Arial', 'FontSize', 12);
 end
+
 
 
 %% ========================================================================
