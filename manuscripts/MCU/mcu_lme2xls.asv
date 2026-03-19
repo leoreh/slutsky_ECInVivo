@@ -12,6 +12,8 @@ tblMea.pBspk_trans = tblTrans.pBspk;
 % Load In Vivo ------------------------------------------------------------
 presets = {'brst'};
 tblVivo = mcu_tblVivo('presets', presets, 'flgClean', true);
+tblTrans = tbl_trans(tblVivo, 'varsInc', {'pBspk'}, 'logBase', 'logit');
+tblVivo.pBspk_trans = tblTrans.pBspk;
 
 flgPlot = false;
 
@@ -29,7 +31,7 @@ frml = 'fr ~ Group + (1|Name)';
 lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
 
 frml = 'bRate ~ Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal');
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml);
 lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
 
 frml = 'nBspk ~ Group + (1|Name)';
@@ -54,7 +56,7 @@ tblIdx = 2;
 sheetNames{tblIdx} = ['S' num2str(tblIdx)];
 tblInfo{tblIdx} = 'BSL Firing';
 dataSet{tblIdx} = 'In Vivo';
-tblPnls{tblIdx} = '2B';
+tblPnls{tblIdx} = '2C-D, S2E-F';
 
 tblLme = tblVivo(tblVivo.Day == 'BSL', :);
 frml = 'fr ~ Group + (1|Name)';
@@ -70,7 +72,10 @@ frml = 'bRate ~ Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLme, frml, 'dist', 'gamma');
 
 frml = 'nBspk ~ Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLme, frml);
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLme, frml, 'dist', 'log-normal');
+
+
+tblLme.fr(tblLme.Group == 'MCU-KO')
 
 
 
@@ -80,7 +85,7 @@ frml = 'frBspk ~ Group + (1|Name)';
 frml = 'frSspk ~ Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLme, frml);
 
-tblLme.fr(tblLme.Group == 'MCU-KO')
+mean(tblLme.fr(tblLme.Group == 'Control'), 'omitnan')
 
 if flgPlot
     tblGUI_bar(tblLme, 'yVar', 'pBspk', 'xVar', 'Group');
@@ -124,7 +129,7 @@ tblPnls{tblIdx} = '2G,H';
 basepaths = [mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl')];
 tblRipp = mcu_tblVivo('basepaths', basepaths, 'presets', {'rippSpks', 'brst'}, 'flgClean', true);
 
-frml = 'com ~ (fr + pBspk) * Group + (1|Name)';
+frml = 'com ~ (fr + pBspk) + Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblRipp, frml, 'dist', 'normal', 'flgStnd', false);
 lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
 lme_save(sheetNames{4}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
