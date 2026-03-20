@@ -126,7 +126,7 @@ tblPlot = tbl_tNorm(tblPlot, 'varsInc', 'FRt', 'varsGrp', 'Name', ...
     'flgGeom', false, 'floorVal', floorVal);
 
 % Plot (Log Scale)
-hFig = tblGUI_xy(tAxis, tblPlot, 'yVar', 'FRt_log');
+hFig = tblGUI_xy(tAxis, tblPlot, 'yVar', 'FRt', 'tileVar', 'Group');
 
 % Grab to prism
 idxUnits = tbl.unitType == 'RS' & tbl.Group == 'Control';

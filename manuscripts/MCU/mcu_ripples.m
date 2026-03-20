@@ -89,7 +89,7 @@ tblPlot.bRoy_trans = tblTrans.bRoy;
 % Plot
 tblGUI_bar(tblPlot, 'xVar', 'Group', 'yVar', 'frZ');
 tblGUI_scatHist(tblPlot, 'xVar', 'asym', 'yVar', 'bRoy', 'grpVar', 'Group');
-tblGUI_xy(xVec, tbl);
+tblGUI_xy(xVec, tbl, 'grpVar', 'Group');
 
 % LME
 xVar = 'pBspk';
@@ -111,7 +111,7 @@ vars = {xVar, 'Group'};
 set(hAx, 'XScale', 'log')
 
 % To Prism
-grpIdx = pdRes.Group == "Control";
+grpIdx = pdRes.Group == "MCU-KO";
 [pdRes(grpIdx, {xVar}), ...
     pdRes(grpIdx, {'com_pred', 'com_upper', 'com_lower'})]
 
@@ -129,9 +129,8 @@ mean(prismMat, 1, 'omitnan');
 
 % To prism (Time)
 yVar = 'peth';
-grpIdx = tbl.Group == 'MCU-KO';
-unitIdx = tbl.unitType == 'RS';
-prismIdx = grpIdx & unitIdx;
+grpIdx = tbl.Group == 'Control';
+prismIdx = grpIdx;
 nUnits = sum(prismIdx);
 prismMat = [mean(tbl{prismIdx, yVar}, 1, 'omitnan')', ...
     std(tbl{prismIdx, yVar}, [], 1, 'omitnan')', ...
@@ -173,7 +172,7 @@ presets = {'rippMaps'};
 [tblMaps, ~, ~, xVec] = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
 
 % Plot
-tblGUI_xy(xVec, tblMaps, 'yVar', 't_z', 'grpVar', 'states');
+tblGUI_xy(xVec, tblMaps, 'yVar', 't_lfp', 'grpVar', 'Group');
 
 % To prism
 yVar = 't_freq';

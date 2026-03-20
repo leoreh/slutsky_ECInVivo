@@ -40,7 +40,7 @@ if isempty(basepaths)
     basepaths = [mcu_basepaths('wt'), mcu_basepaths('mcu')];
 end
 
-vars = {'swv_metrics', 'st_metrics', 'fr', 'units'};
+vars = {'swv_metrics', 'st_metrics', 'fr', 'units', 'rippSpks'};
 v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 
 % Metadata
@@ -65,6 +65,7 @@ varMap.Asym = 'swv.asym';
 varMap.Hpk = 'swv.hpk';
 varMap.TailSlope = 'swv.tailSlope';
 varMap.TailAmp = 'swv.tailAmp';
+varMap.COM = 'rippSpks.com';
 
 tblUnit = v2tbl('v', v, 'varMap', varMap, 'tagFiles', tagFiles);
 tblUnit = tbl_trans(tblUnit, 'logBase', 10);

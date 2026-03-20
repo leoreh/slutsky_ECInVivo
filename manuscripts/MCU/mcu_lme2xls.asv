@@ -56,7 +56,7 @@ tblIdx = 2;
 sheetNames{tblIdx} = ['S' num2str(tblIdx)];
 tblInfo{tblIdx} = 'BSL Firing';
 dataSet{tblIdx} = 'In Vivo';
-tblPnls{tblIdx} = '2C-D, S2E-F';
+tblPnls{tblIdx} = '2D-E, S2E-F';
 
 tblLme = tblVivo(tblVivo.Day == 'BSL', :);
 frml = 'fr ~ Group + (1|Name)';
@@ -66,26 +66,15 @@ lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
 frml = 'pBspk ~ Group * fr + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLme, frml, 'dist', 'logit-normal');
 lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
-lme_save(sheetNames{2}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 
 frml = 'bRate ~ Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLme, frml, 'dist', 'gamma');
+lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
 
 frml = 'nBspk ~ Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLme, frml, 'dist', 'log-normal');
-
-
-tblLme.fr(tblLme.Group == 'MCU-KO')
-
-
-
-frml = 'frBspk ~ Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLme, frml);
-
-frml = 'frSspk ~ Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLme, frml);
-
-mean(tblLme.fr(tblLme.Group == 'Control'), 'omitnan')
+lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
+lme_save(sheetNames{2}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 
 if flgPlot
     tblGUI_bar(tblLme, 'yVar', 'pBspk', 'xVar', 'Group');
@@ -99,7 +88,7 @@ tblIdx = 3;
 sheetNames{tblIdx} = ['S' num2str(tblIdx)];
 tblInfo{tblIdx} = 'SWR Properties';
 dataSet{tblIdx} = 'In Vivo';
-tblPnls{tblIdx} = '2C-E';
+tblPnls{tblIdx} = '2F-H';
 
 basepaths = [mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl')];
 tblRipp = mcu_tblVivo('basepaths', basepaths, 'presets', {'ripp'});
@@ -127,7 +116,7 @@ dataSet{tblIdx} = 'In Vivo';
 tblPnls{tblIdx} = '2G,H';
 
 basepaths = [mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl')];
-tblRipp = mcu_tblVivo('basepaths', basepaths, 'presets', {'rippSpks', 'brst'}, 'flgClean', true);
+[tblRipp, ~, ~, xVec] = mcu_tblVivo('basepaths', basepaths, 'presets', {'rippSpks', 'brst'}, 'flgClean', true);
 
 frml = 'com ~ (fr + pBspk) + Group + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblRipp, frml, 'dist', 'normal', 'flgStnd', false);
@@ -139,7 +128,8 @@ if flgPlot
     hAx = nexttile; lme_lsmeans(lmeMdl, {'pBspk', 'Group'}, 'transParams', lmeInfo.transParams, ...
         'hAx', hAx, 'xLims', {[0, 1], []});
     hAx = nexttile; lme_lsmeans(lmeMdl, {'fr', 'Group'}, 'transParams', lmeInfo.transParams, ...
-        'hAx', hAx);
+        'hAx', hAx); 
+    tblGUI_xy(xVec, tblRipp, 'grpVar', 'Group');
 end
 
 %% ========================================================================
