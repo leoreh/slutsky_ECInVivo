@@ -3,7 +3,7 @@ function lmeStats = lme_postHoc(mdl, varargin)
 %
 %   STATS = LME_POSTHOC(MDL, ...) analyzes a fitted Mixed-Effects Model
 %   (LME or GLME). It generates an ANOVA table, extracts coefficients, and
-%   computes Simple and Marginal effects for two-way interactions.
+%   computes Simple and Marginal effects for all n-way interactions.
 %   Multiple comparison correction is applied to derived effects.
 %
 %   INPUTS:
@@ -21,6 +21,18 @@ function lmeStats = lme_postHoc(mdl, varargin)
 %                     .Type, .Description, .Estimate, .SE, .CI95, .Statistic,
 %                     .DF, .pVal, .pAdj, .HVec.
 %
+%   NOTES:
+%       Simple effects: effect of factor Fi (non-ref vs ref) conditioned on
+%       ALL other factors in the highest-order interaction at each specific
+%       combination of their levels.
+%
+%       Marginal effects: effect of factor Fi averaged over ALL possible
+%       level combinations of the other factors in the interaction.
+%
+%       Description format:
+%         Simple  : "(ref vs lvl) at [Fj=lvlJ, Fk=lvlK]"
+%         Marginal: "(ref vs lvl) over Fj"  or  "(ref vs lvl) over [Fj, Fk]"
+%
 %
 %   See also: LME_FIT, FITLME, FITGLME
 
@@ -35,12 +47,12 @@ addParameter(p, 'correction', 'holm', @ischar);
 addParameter(p, 'dfMethod', 'Satterthwaite', @ischar);
 
 parse(p, mdl, varargin{:});
-contrastReq = p.Results.contrasts;
+contrastReq      = p.Results.contrasts;
 correctionMethod = lower(p.Results.correction);
-dfMethod = p.Results.dfMethod;
+dfMethod         = p.Results.dfMethod;
 
 % GLME does not support Satterthwaite
-if isa(mdl, 'GeneralizedLinearMixedModel') && strcmpi(dfMethod, 'Satterthwaite')
+if isa(mdl, 'GeneralizedLinearMixedModel')
     dfMethod = 'Residual';
 end
 
@@ -49,10 +61,10 @@ end
 %  ========================================================================
 
 coefNames = mdl.CoefficientNames;
-nCoefs = length(coefNames);
-coefEst = mdl.Coefficients.Estimate;
-coefMap = containers.Map(coefNames, 1:nCoefs);
-coefCov = mdl.CoefficientCovariance;
+nCoefs    = length(coefNames);
+coefEst   = mdl.Coefficients.Estimate;
+coefMap   = containers.Map(coefNames, 1:nCoefs);
+coefCov   = mdl.CoefficientCovariance;
 
 % Recalculate fixed effects details (for DF estimation if applicable)
 [~, ~, lmeCoefTbl] = fixedEffects(mdl, 'DFMethod', dfMethod);
@@ -60,16 +72,16 @@ coefCov = mdl.CoefficientCovariance;
 % Reconstruct Factor Information from Model Variables
 % This is crucial to know levels and reference levels used in Dummy Coding.
 factorInfo = struct();
-dataProps = mdl.Variables.Properties.VariableNames;
+dataProps  = mdl.Variables.Properties.VariableNames;
 frmlFactors = {};
-fixedTerms = mdl.Formula.FELinearFormula.TermNames;
+fixedTerms  = mdl.Formula.FELinearFormula.TermNames;
 
 for iPred = 1:length(mdl.PredictorNames)
     varName = mdl.PredictorNames{iPred};
     if ismember(varName, dataProps) && iscategorical(mdl.Variables.(varName))
         cats = categories(mdl.Variables.(varName));
         if ~isempty(cats)
-            factorInfo.(varName).Levels = cats;
+            factorInfo.(varName).Levels   = cats;
             factorInfo.(varName).RefLevel = cats{1}; % Assuming default dummy coding
 
             % Check if this factor is part of Fixed Effects
@@ -96,10 +108,10 @@ defIdxCounter = 0;
 % --- 1. ANOVA (Interaction Terms) ---
 % Find highest-order interaction terms using simple colon count
 anovaTbl = anova(mdl, 'DFMethod', dfMethod);
-nColons = count(string(anovaTbl.Term), ':');
+nColons  = count(string(anovaTbl.Term), ':');
 if ~isempty(nColons)
-    maxColons = max(nColons);
-    idxInteractions = find(nColons == maxColons & nColons > 0);
+    maxColons        = max(nColons);
+    idxInteractions  = find(nColons == maxColons & nColons > 0);
 
     for iAnova = 1:length(idxInteractions)
         idxTerm = idxInteractions(iAnova);
@@ -125,20 +137,20 @@ for iCoef = 1:nCoefs
 
     elseif ~contains(coefName, ':')
         % Main Effect
-        parts = strsplit(coefName, '_');
+        parts  = strsplit(coefName, '_');
         factor = parts{1};
-        level = strjoin(parts(2:end),'_');
+        level  = strjoin(parts(2:end),'_');
 
         if isfield(factorInfo, factor)
-            refLvl = factorInfo.(factor).RefLevel;
+            refLvl   = factorInfo.(factor).RefLevel;
             baseDesc = sprintf('(%s vs %s)', refLvl, level);
 
             % Add info about other factors being at Ref
             otherFactors = setdiff(frmlFactors, factor);
-            atRefDesc = '';
+            atRefDesc    = '';
             if ~isempty(otherFactors)
                 refLvlParts = cellfun(@(f) factorInfo.(f).RefLevel, otherFactors, 'Uni', false);
-                atRefDesc = [' at ' strjoin(refLvlParts, ', ')];
+                atRefDesc   = [' at ' strjoin(refLvlParts, ', ')];
             end
             desc = [baseDesc, atRefDesc];
         else
@@ -147,12 +159,12 @@ for iCoef = 1:nCoefs
 
     else
         % Interaction Coefficient
-        terms = strsplit(coefName, ':');
+        terms     = strsplit(coefName, ':');
         termDescs = cell(size(terms));
         for iTerm = 1:length(terms)
-            parts = strsplit(terms{iTerm}, '_');
+            parts  = strsplit(terms{iTerm}, '_');
             factor = parts{1};
-            level = strjoin(parts(2:end),'_');
+            level  = strjoin(parts(2:end),'_');
             if isfield(factorInfo, factor)
                 termDescs{iTerm} = sprintf('(%s vs %s)', factorInfo.(factor).RefLevel, level);
             else
@@ -171,111 +183,137 @@ for iCoef = 1:nCoefs
         'OrigCoefIdx', iCoef);
 end
 
-% --- 3. Simple & Marginal Effects (For 2-way Interactions) ---
+% --- 3. Simple & Marginal Effects (n-way interactions) ---
+% Processes the highest-order interaction term(s). For each factor in the
+% interaction, generates:
+%   Simple   — effect at every combination of all other factor levels.
+%   Marginal — effect averaged over all other factor level combinations.
 interactionTerms = mdl.Formula.FELinearFormula.TermNames(...
     contains(mdl.Formula.FELinearFormula.TermNames, ':'));
-processedInteractions = struct();
 
-for iInt = 1:length(interactionTerms)
-    factors = strsplit(interactionTerms{iInt}, ':');
-    if length(factors) ~= 2, continue; end
+if ~isempty(interactionTerms)
 
-    % Only process if both are categorical factors we tracked
-    if ~ismember(factors{1}, frmlFactors) || ~ismember(factors{2}, frmlFactors)
-        continue;
-    end
+    % Process ALL interaction terms at every order (2-way pairs, 3-way, etc.).
+    % Lower-order terms produce their own contrasts that complement higher-order ones.
+    highestTerms = interactionTerms;
 
-    intKey = strjoin(sort(factors),'_x_');
-    if isfield(processedInteractions, intKey), continue; end
-    processedInteractions.(intKey) = true;
+    processedInteractions = struct();
 
-    factorA = factors{1};
-    factorB = factors{2};
-    lvlsA = factorInfo.(factorA).Levels; refA = factorInfo.(factorA).RefLevel; nA = length(lvlsA);
-    lvlsB = factorInfo.(factorB).Levels; refB = factorInfo.(factorB).RefLevel; nB = length(lvlsB);
+    for iInt = 1:length(highestTerms)
+        factors = strsplit(highestTerms{iInt}, ':');
+        nFacs   = length(factors);
 
-    % > Simple Effects
-    % Effect of A at each level of B
-    for iLvlB = 1:nB
-        lvlB = lvlsB{iLvlB};
-        for iLvlA = 1:nA
-            lvlA = lvlsA{iLvlA};
-            if strcmp(lvlA, refA), continue; end
+        % Skip unless all factors are tracked categorical predictors
+        if ~all(cellfun(@(f) isfield(factorInfo, f), factors)), continue; end
 
-            [hVec, coefNamesInv, validH] = contrast_simple(factorA, lvlA, refA, factorB, lvlB, refB, coefMap);
+        % Avoid duplicate processing of the same factor set
+        intKey = strjoin(sort(factors), '_x_');
+        if isfield(processedInteractions, intKey), continue; end
+        processedInteractions.(intKey) = true;
 
-            if validH
-                defIdxCounter = defIdxCounter + 1;
-                desc = sprintf('(%s vs %s) at %s', refA, lvlA, lvlB);
-                intDefList(defIdxCounter) = struct('DefIdx', defIdxCounter, ...
-                    'Type', "Simple", 'Description', desc, ...
-                    'CoefCombo', {unique(coefNamesInv)}, 'HVec', {hVec}, 'OrigCoefIdx', NaN);
+        % Build per-factor info array for this interaction
+        fInfo = struct('Name', factors, 'Levels', cell(1, nFacs), 'RefLevel', cell(1, nFacs));
+        for iF = 1:nFacs
+            fInfo(iF).Levels   = factorInfo.(factors{iF}).Levels;
+            fInfo(iF).RefLevel = factorInfo.(factors{iF}).RefLevel;
+        end
+
+        % > Simple Effects
+        % For each factor Fi, generate its effect at every combination of
+        % the remaining factors' levels.
+        for iMain = 1:nFacs
+            fMain    = fInfo(iMain).Name;
+            lvlsMain = fInfo(iMain).Levels;
+            refMain  = fInfo(iMain).RefLevel;
+            condInfo = fInfo([1:iMain-1, iMain+1:nFacs]); % all other factors
+            nCond    = length(condInfo);
+
+            % Build all combinations of conditioning factor levels
+            condSets = {condInfo.Levels};
+            nLvlsCond = cellfun(@numel, condSets);
+            nCombs    = prod(nLvlsCond);
+
+            indices = cell(nCond, 1);
+            for iC = 1:nCond
+                indices{iC} = 1:nLvlsCond(iC);
             end
-        end
-    end
+            grids = cell(nCond, 1);
+            [grids{:}] = ndgrid(indices{:});
+            combMatrix  = cellfun(@(g) g(:)', grids, 'UniformOutput', false);
+            combMatrix  = cell2mat(combMatrix); % nCond x nCombs
 
-    % Effect of B at each level of A
-    for iLvlA = 1:nA
-        lvlA = lvlsA{iLvlA};
-        for iLvlB = 1:nB
-            lvlB = lvlsB{iLvlB};
-            if strcmp(lvlB, refB), continue; end
+            for iComb = 1:nCombs
 
-            [hVec, coefNamesInv, validH] = contrast_simple(factorB, lvlB, refB, factorA, lvlA, refA, coefMap);
+                % Build condFactors struct for this level combination
+                condFactors = struct('Name', {condInfo.Name}, ...
+                    'Level', repmat({''}, 1, nCond), ...
+                    'RefLevel', {condInfo.RefLevel});
+                atParts = cell(1, nCond);
+                for iC = 1:nCond
+                    condFactors(iC).Level = condSets{iC}{combMatrix(iC, iComb)};
+                    atParts{iC} = condFactors(iC).Level;
+                end
+                atDesc = strjoin(atParts, ', ');
 
-            if validH
-                defIdxCounter = defIdxCounter + 1;
-                desc = sprintf('(%s vs %s) at %s', refB, lvlB, lvlA);
-                intDefList(defIdxCounter) = struct('DefIdx', defIdxCounter, ...
-                    'Type', "Simple", 'Description', desc, ...
-                    'CoefCombo', {unique(coefNamesInv)}, 'HVec', {hVec}, 'OrigCoefIdx', NaN);
+                for iLvl = 1:length(lvlsMain)
+                    lvlMain = lvlsMain{iLvl};
+                    if strcmp(lvlMain, refMain), continue; end
+
+                    [hVec, validH] = contrast_simple_nway(fMain, lvlMain, condFactors, coefMap);
+
+                    if validH
+                        defIdxCounter = defIdxCounter + 1;
+                        desc = sprintf('(%s vs %s) at %s', refMain, lvlMain, atDesc);
+                        intDefList(defIdxCounter) = struct('DefIdx', defIdxCounter, ...
+                            'Type', "Simple", 'Description', desc, ...
+                            'CoefCombo', {{}}, 'HVec', {hVec}, 'OrigCoefIdx', NaN);
+                    end
+                end
             end
-        end
-    end
+        end % simple effects
 
-    % > Marginal Effects
-    wB = 1/nB; wA = 1/nA;
+        % > Marginal Effects
+        % For each factor Fi, generate its effect averaged uniformly over
+        % all level combinations of the remaining factors.
+        for iMain = 1:nFacs
+            fMain    = fInfo(iMain).Name;
+            lvlsMain = fInfo(iMain).Levels;
+            refMain  = fInfo(iMain).RefLevel;
+            avgInfo  = fInfo([1:iMain-1, iMain+1:nFacs]); % all other factors
 
-    % Marginal Effect of A over B
-    for iLvlA = 1:nA
-        lvlA = lvlsA{iLvlA};
-        if strcmp(lvlA, refA), continue; end
+            % Description label for the averaged factors
+            if length(avgInfo) == 1
+                overDesc = avgInfo(1).Name;
+            else
+                overDesc = sprintf('[%s]', strjoin({avgInfo.Name}, ', '));
+            end
 
-        [hVec, coefNamesInv, validH] = contrast_marginal(factorA, lvlA, factorB, lvlsB, refB, wB, coefMap);
+            for iLvl = 1:length(lvlsMain)
+                lvlMain = lvlsMain{iLvl};
+                if strcmp(lvlMain, refMain), continue; end
 
-        if validH
-            defIdxCounter = defIdxCounter + 1;
-            desc = sprintf('(%s vs %s) over %s', refA, lvlA, factorB);
-            intDefList(defIdxCounter) = struct('DefIdx', defIdxCounter, ...
-                'Type', "Marginal", 'Description', desc, ...
-                'CoefCombo', {unique(coefNamesInv)}, 'HVec', {hVec}, 'OrigCoefIdx', NaN);
-        end
-    end
+                [hVec, validH] = contrast_marginal_nway(fMain, lvlMain, avgInfo, coefMap);
 
-    % Marginal Effect of B over A
-    for iLvlB = 1:nB
-        lvlB = lvlsB{iLvlB};
-        if strcmp(lvlB, refB), continue; end
+                if validH
+                    defIdxCounter = defIdxCounter + 1;
+                    desc = sprintf('(%s vs %s) over %s', refMain, lvlMain, overDesc);
+                    intDefList(defIdxCounter) = struct('DefIdx', defIdxCounter, ...
+                        'Type', "Marginal", 'Description', desc, ...
+                        'CoefCombo', {{}}, 'HVec', {hVec}, 'OrigCoefIdx', NaN);
+                end
+            end
+        end % marginal effects
 
-        [hVec, coefNamesInv, validH] = contrast_marginal(factorB, lvlB, factorA, lvlsA, refA, wA, coefMap);
-
-        if validH
-            defIdxCounter = defIdxCounter + 1;
-            desc = sprintf('(%s vs %s) over %s', refB, lvlB, factorA);
-            intDefList(defIdxCounter) = struct('DefIdx', defIdxCounter, ...
-                'Type', "Marginal", 'Description', desc, ...
-                'CoefCombo', {unique(coefNamesInv)}, 'HVec', {hVec}, 'OrigCoefIdx', NaN);
-        end
-    end
-end
+    end % for iInt
+end % if ~isempty(interactionTerms)
 
 
 %% ========================================================================
 %  CALCULATE STATISTICS
 %  ========================================================================
 
-nDefs = length(intDefList);
-resData = cell(nDefs, 8); % Type, Desc, Est, SE, CI95, Stat, DF, pVal
+nDefs    = length(intDefList);
+resData  = cell(nDefs, 8); % Type, Desc, Est, SE, CI95, Stat, DF, pVal
 hVecsToStore = cell(nDefs, 1);
 
 for iDef = 1:nDefs
@@ -310,12 +348,12 @@ for iDef = 1:nDefs
                 varContrast = 0;
             end
             se = sqrt(varContrast);
-            
+
             % Compute 95% CI
             tCrit = tinv(0.975, dfTest);
-            ci95 = {[est - tCrit*se, est + tCrit*se]};
-            
-            stat = sqrt(FVal) * sign(est); % t-stat approximation
+            ci95  = {[est - tCrit*se, est + tCrit*se]};
+
+            stat  = sqrt(FVal) * sign(est); % t-stat approximation
             dfOut = {dfTest};
     end
     resData(iDef,:) = {rowDef.Type, rowDef.Description, est, se, ci95, stat, dfOut, pVal};
@@ -341,8 +379,6 @@ if isnumeric(contrastReq) || islogical(contrastReq)
     lmeStats = lmeStats(contrastReq, :);
 end
 
-% Rounding Removed
-
 
 %% ========================================================================
 %  MULTIPLE COMPARISON CORRECTION
@@ -350,22 +386,22 @@ end
 
 idxCntrsts = find(ismember(lmeStats.Type, ["Simple", "Marginal"]));
 pValCntrsts = lmeStats.pVal(idxCntrsts);
-nCntrsts = length(pValCntrsts);
+nCntrsts    = length(pValCntrsts);
 
 pAdjFull = nan(height(lmeStats), 1);
 
 if nCntrsts > 0 && ~strcmpi(correctionMethod, 'none')
-    [pVal_sorted, sortIdx] = sort(pValCntrsts);
-    restoreIdx(sortIdx) = 1:nCntrsts;
+    [pVal_sorted, sortIdx]  = sort(pValCntrsts);
+    restoreIdx(sortIdx)     = 1:nCntrsts;
 
     switch correctionMethod
         case 'bonferroni'
             pAdj_sorted = min(1, pVal_sorted * nCntrsts);
         case 'holm'
-            adjFactor = (nCntrsts:-1:1)';
+            adjFactor   = (nCntrsts:-1:1)';
             pAdj_sorted = min(1, cummax(pVal_sorted .* adjFactor));
         case 'fdr'
-            iRank = (1:nCntrsts)';
+            iRank       = (1:nCntrsts)';
             pAdj_sorted = min(1, cummin(pVal_sorted .* nCntrsts ./ iRank, 'reverse'));
         otherwise
             pAdj_sorted = pVal_sorted;
@@ -382,72 +418,118 @@ end % EOF
 %  HELPERS
 %  ========================================================================
 
-function [hVec, coefNamesInv, validH] = contrast_simple(fMain, lvlMain, ~, fCond, lvlCond, refCond, coefMap)
-% Effect of Main at LevelMain, conditioned on Cond at LevelCond
+function [hVec, validH] = contrast_simple_nway(fMain, lvlMain, condFactors, coefMap)
+% CONTRAST_SIMPLE_NWAY Simple effect of fMain (lvlMain vs its reference)
+% conditioned on all other factors at their specified levels.
+%
+%   condFactors - (struct array) Fields: .Name, .Level, .RefLevel.
+%
+% The contrast vector is the sum of coefficients for every non-empty subset
+% of {non-reference conditioning terms} combined with the main term. This
+% correctly marginalizes over all relevant dummy-coded interaction parameters.
 
-hVec = zeros(1, coefMap.Count);
-coefNamesInv = {};
+nCoefs = coefMap.Count;
+hVec   = zeros(1, nCoefs);
 validH = false;
 
-coefMainStr = sprintf('%s_%s', fMain, lvlMain);
-if isKey(coefMap, coefMainStr)
-    hVec(coefMap(coefMainStr)) = 1;
-    coefNamesInv{end+1} = coefMainStr;
-    validH = true;
+% --- Main coefficient: fMain_lvlMain ---
+mainStr = sprintf('%s_%s', fMain, lvlMain);
+if ~isKey(coefMap, mainStr), return; end
 
-    if ~strcmp(lvlCond, refCond)
-        % Add Interaction Term
-        coefInt = sprintf('%s_%s:%s_%s', fMain, lvlMain, fCond, lvlCond);
-        coefIntAlt = sprintf('%s_%s:%s_%s', fCond, lvlCond, fMain, lvlMain);
+hVec(coefMap(mainStr)) = 1;
+validH = true;
 
-        if isKey(coefMap, coefInt)
-            hVec(coefMap(coefInt)) = 1;
-            coefNamesInv{end+1} = coefInt;
-        elseif isKey(coefMap, coefIntAlt)
-            hVec(coefMap(coefIntAlt)) = 1;
-            coefNamesInv{end+1} = coefIntAlt;
-        else
-            validH = false; % Interaction required but missing
-        end
+% Non-reference conditioning factors (those not at their reference level)
+isNonRef   = ~strcmp({condFactors.Level}, {condFactors.RefLevel});
+nonRefCond = condFactors(isNonRef);
+nNonRef    = length(nonRefCond);
+
+% For each non-empty subset of non-reference conditioning factors, find and
+% add the corresponding interaction coefficient.
+for iSub = 1:(2^nNonRef - 1)
+    bits       = dec2bin(iSub, nNonRef) == '1';   % binary subset mask
+    subsetFacs = nonRefCond(bits);
+
+    % Build the set of coefficient name components for this subset
+    interactParts = arrayfun(@(f) sprintf('%s_%s', f.Name, f.Level), ...
+        subsetFacs, 'UniformOutput', false);
+    partStrs = [{mainStr}, interactParts];
+
+    [coefName, found] = find_coef_name(partStrs, coefMap);
+    if ~found
+        validH = false;
+        return;
     end
+    hVec(coefMap(coefName)) = 1;
 end
 end
 
-function [hVec, coefNamesInv, validH] = contrast_marginal(fMain, lvlMain, fAvg, lvlsAvg, refAvg, wAvg, coefMap)
-% Marginal Effect of Main at LevelMain, averaged over fAvg
 
-hVec = zeros(1, coefMap.Count);
-coefNamesInv = {};
+function [hVec, validH] = contrast_marginal_nway(fMain, lvlMain, avgFactors, coefMap)
+% CONTRAST_MARGINAL_NWAY Marginal effect of fMain (lvlMain vs its reference),
+% averaged uniformly over all level combinations of the other factors.
+%
+%   avgFactors - (struct array) Fields: .Name, .Levels (cell), .RefLevel.
+
+nCoefs = coefMap.Count;
+hVec   = zeros(1, nCoefs);
 validH = false;
 
-coefMainStr = sprintf('%s_%s', fMain, lvlMain);
-if isKey(coefMap, coefMainStr)
-    hVec(coefMap(coefMainStr)) = 1;
-    coefNamesInv{end+1} = coefMainStr;
+nAvg     = length(avgFactors);
+lvlSets  = {avgFactors.Levels};
+nLvlsAvg = cellfun(@numel, lvlSets);
+nCombs   = prod(nLvlsAvg);
+weight   = 1 / nCombs;
+
+% Build index grid over all level combinations
+indices = cell(nAvg, 1);
+for iA = 1:nAvg
+    indices{iA} = 1:nLvlsAvg(iA);
+end
+grids = cell(nAvg, 1);
+[grids{:}] = ndgrid(indices{:});
+combMatrix  = cellfun(@(g) g(:)', grids, 'UniformOutput', false);
+combMatrix  = cell2mat(combMatrix); % nAvg x nCombs
+
+% Accumulate weighted simple-effect contrast vectors
+for iComb = 1:nCombs
+
+    % Build condFactors for this level combination
+    condFactors = struct('Name', '', 'Level', '', 'RefLevel', '');
+    for iA = 1:nAvg
+        condFactors(iA).Name     = avgFactors(iA).Name;
+        condFactors(iA).Level    = lvlSets{iA}{combMatrix(iA, iComb)};
+        condFactors(iA).RefLevel = avgFactors(iA).RefLevel;
+    end
+
+    [hTmp, ok] = contrast_simple_nway(fMain, lvlMain, condFactors, coefMap);
+    if ~ok
+        validH = false;
+        return;
+    end
+    hVec   = hVec + weight * hTmp;
     validH = true;
+end
+end
 
-    for i = 1:length(lvlsAvg)
-        lAvg = lvlsAvg{i};
-        if strcmp(lAvg, refAvg), continue; end
 
-        coefInt = sprintf('%s_%s:%s_%s', fMain, lvlMain, fAvg, lAvg);
-        coefIntAlt = sprintf('%s_%s:%s_%s', fAvg, lAvg, fMain, lvlMain);
+function [coefName, found] = find_coef_name(partStrs, coefMap)
+% FIND_COEF_NAME Finds the coefficient name in coefMap that matches a set
+% of factor-level component strings joined by ':', regardless of the
+% ordering used internally by MATLAB when fitting the model.
+%
+%   Tries all n! permutations of partStrs, returns the first match found.
 
-        if isKey(coefMap, coefInt)
-            hVec(coefMap(coefInt)) = hVec(coefMap(coefInt)) + wAvg;
-            coefNamesInv{end+1} = coefInt;
-        elseif isKey(coefMap, coefIntAlt)
-            hVec(coefMap(coefIntAlt)) = hVec(coefMap(coefIntAlt)) + wAvg;
-            coefNamesInv{end+1} = coefIntAlt;
-        else
-            validH = false;
-            break;
-        end
+n    = length(partStrs);
+perm = perms(1:n);
+for iP = 1:size(perm, 1)
+    candidate = strjoin(partStrs(perm(iP, :)), ':');
+    if isKey(coefMap, candidate)
+        coefName = candidate;
+        found    = true;
+        return;
     end
 end
+coefName = '';
+found    = false;
 end
-
-
-
-
-

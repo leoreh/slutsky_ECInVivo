@@ -355,9 +355,8 @@ end
 
 % Global rename
 renameMap = {
-    'pVal',      'P-value';
-    'pValue',    'P-value';
-    'pAdj',      'Adj P-value';
+    'pVal',   'P-value';
+    'pValue', 'P-value';
 };
 
 for iR = 1:size(renameMap, 1)
@@ -388,8 +387,8 @@ switch tableType
         if ismember('P-value', tbl.Properties.VariableNames)
             tbl = removevars_safely(tbl, {'P-value'});
         end
-        if ismember('Adj P-value', tbl.Properties.VariableNames)
-            tbl.Properties.VariableNames{strcmp(tbl.Properties.VariableNames, 'Adj P-value')} = 'P-value (Adj.)';
+        if ismember('pAdj', tbl.Properties.VariableNames)
+            tbl.Properties.VariableNames{strcmp(tbl.Properties.VariableNames, 'pAdj')} = 'P-value (Adj.)';
         end
         if ismember('Statistic', tbl.Properties.VariableNames)
             tbl.Properties.VariableNames{strcmp(tbl.Properties.VariableNames, 'Statistic')} = 't-statistic';

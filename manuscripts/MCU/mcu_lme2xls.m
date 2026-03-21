@@ -139,7 +139,7 @@ tblIdx = 5;
 sheetNames{tblIdx} = ['S' num2str(tblIdx)];
 tblInfo{tblIdx} = 'FRH during BAC';
 dataSet{tblIdx} = 'In Vivo';
-tblPnls{tblIdx} = '3H';
+tblPnls{tblIdx} = '3G';
 
 frml = 'fr ~ Group * Day + (Day|Name)';
 tblLme = tblVivo; tblLme(tblLme.Name == 'lh137', :) = [];
@@ -152,18 +152,14 @@ lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 % =========================================================================
 tblIdx = 6;
 sheetNames{tblIdx} = ['S' num2str(tblIdx)];
-tblInfo{tblIdx} = 'SS Firing';
+tblInfo{tblIdx} = 'SS Burstiness';
 dataSet{tblIdx} = 'In Vivo';
-tblPnls{tblIdx} = '3J';
+tblPnls{tblIdx} = '3H';
 
 tblLme = tblVivo(tblVivo.Day == 'BAC3', :);
-frml = 'fr ~ Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLme, frml, 'dist', 'gamma');
-lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
-
 frml = 'pBspk ~ Group * fr + (1|Name)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLme, frml, 'dist', 'logit-normal');
-lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
+lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
 lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 
 
@@ -171,6 +167,44 @@ lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 % Table S7
 % =========================================================================
 tblIdx = 7;
+sheetNames{tblIdx} = ['S' num2str(tblIdx)];
+tblInfo{tblIdx}    = 'Spike Component x Epoch during FRH';
+dataSet{tblIdx}    = 'MEA';
+tblPnls{tblIdx}    = 'TBD';
+
+% Reshape tblMea to long format: one row per (unit × component × epoch).
+% Each unit contributes 4 rows crossing:
+%   component : {'bSpk', 'sSpk'} — burst vs. single spike firing rate
+%   epoch     : {'BSL',  'SS'}   — baseline vs. steady state
+idVars    = {'Name', 'Group', 'UnitID'};
+frVars    = {'frBspk', 'frSspk', 'ss_frBspk', 'ss_frSspk'};
+compLbls  = {'bSpk', 'sSpk', 'bSpk', 'sSpk'};
+epochLbls = {'BSL', 'BSL', 'SS', 'SS'};
+
+nBlocks = length(frVars);
+parts   = cell(nBlocks, 1);
+for iBlk = 1:nBlocks
+    t           = tblMea(:, idVars);
+    t.fr        = tblMea.(frVars{iBlk});
+    t.component = repmat(categorical({compLbls{iBlk}}),  height(t), 1);
+    t.epoch     = repmat(categorical({epochLbls{iBlk}}), height(t), 1);
+    parts{iBlk} = t;
+end
+tblLong = vertcat(parts{:});
+
+frml = 'fr ~ component * epoch * Group + (1|Name)';
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLong, frml, 'dist', 'log-normal');
+lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
+lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
+
+if flgPlot
+    tblGUI_scatHist(tblLong, 'xVar', 'fr', 'yVar', 'bRate', 'grpVar', 'Group');
+end
+
+%% ========================================================================
+% Table S8
+% =========================================================================
+tblIdx = 8;
 sheetNames{tblIdx} = ['S' num2str(tblIdx)];
 tblInfo{tblIdx} = 'Firing Gain during FRH';
 dataSet{tblIdx} = 'MEA';
@@ -188,9 +222,9 @@ lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
 lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 
 %% ========================================================================
-% Table S8
+% Table S9
 % =========================================================================
-tblIdx = 8;
+tblIdx = 9;
 sheetNames{tblIdx} = ['S' num2str(tblIdx)];
 tblInfo{tblIdx} = 'Mediation Analysis';
 dataSet{tblIdx} = 'MEA';
@@ -256,11 +290,11 @@ lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 
 
 %% ========================================================================
-% Table S9
+% Table S10
 % =========================================================================
-tblIdx = 9;
+tblIdx = 10;
 sheetNames{tblIdx} = ['S' num2str(tblIdx)];
-tblInfo{tblIdx} = 'Feature Abalation';
+tblInfo{tblIdx} = 'Feature Ablation';
 dataSet{tblIdx} = 'MEA';
 tblPnls{tblIdx} = '4G';
 

@@ -129,12 +129,38 @@ tblPlot = tbl_tNorm(tblPlot, 'varsInc', 'FRt', 'varsGrp', 'Name', ...
 hFig = tblGUI_xy(tAxis, tblPlot, 'yVar', 'FRt', 'tileVar', 'Group');
 
 % Grab to prism
-idxUnits = tbl.unitType == 'RS' & tbl.Group == 'Control';
-frMat = tbl.FRt(idxUnits, :)';
+idxUnits = tblPlot.unitType == 'RS' & tblPlot.Group == 'Control';
+frMat = tblPlot.FRt_bins(idxUnits, :)';
 
 prismMat = [mean(frMat, 2, 'omitnan'), ...
     std(frMat, [], 2, 'omitnan'), ...
     sum(~isnan(frMat), 2, 'omitnan')];
+
+
+% -------------------------------------------------------------------------
+% Binned Bar Plot (mean ± SEM per 6-hr bin, grouped by genotype)
+% -------------------------------------------------------------------------
+
+% Bin parameters
+binSizeH  = 6;                                    % Bin width [hr]
+tBinEdges = -24 : binSizeH : 72;                  % Bin edges [hr]
+tBinCents = tBinEdges(1:end-1) + binSizeH / 2;   % Bin centers [hr]
+nBins     = length(tBinCents);
+
+% Assign each tAxis point to a bin; points outside [-24, 72] yield NaN
+binIdx = discretize(tAxis, tBinEdges);
+
+% Average FRt within each temporal bin per unit → new tblPlot column
+FRt_bins = nan(height(tblPlot), nBins);
+for iBin = 1 : nBins
+    idxT = binIdx == iBin;
+    FRt_bins(:, iBin) = mean(tblPlot.FRt(:, idxT), 2, 'omitnan');
+end
+tblPlot.FRt_bins = FRt_bins;
+
+hFig = tblGUI_xy(tBinCents, tblPlot, 'yVar', 'FRt', 'tileVar', 'Group');
+
+
 
 
 
