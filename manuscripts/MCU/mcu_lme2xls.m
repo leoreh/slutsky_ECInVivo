@@ -56,7 +56,7 @@ tblIdx = 2;
 sheetNames{tblIdx} = ['S' num2str(tblIdx)];
 tblInfo{tblIdx} = 'BSL Firing';
 dataSet{tblIdx} = 'In Vivo';
-tblPnls{tblIdx} = '2D-E, S2E-F';
+tblPnls{tblIdx} = '2D-E; S2E-F';
 
 tblLme = tblVivo(tblVivo.Day == 'BSL', :);
 frml = 'fr ~ Group + (1|Name)';
@@ -170,36 +170,30 @@ tblIdx = 7;
 sheetNames{tblIdx} = ['S' num2str(tblIdx)];
 tblInfo{tblIdx}    = 'Spike Component x Epoch during FRH';
 dataSet{tblIdx}    = 'MEA';
-tblPnls{tblIdx}    = 'TBD';
+tblPnls{tblIdx}    = '4A,C,E; S4A';
 
 % Reshape tblMea to long format: one row per (unit × component × epoch).
 % Each unit contributes 4 rows crossing:
 %   component : {'bSpk', 'sSpk'} — burst vs. single spike firing rate
 %   epoch     : {'BSL',  'SS'}   — baseline vs. steady state
-idVars    = {'Name', 'Group', 'UnitID'};
-frVars    = {'frBspk', 'frSspk', 'ss_frBspk', 'ss_frSspk'};
-compLbls  = {'bSpk', 'sSpk', 'bSpk', 'sSpk'};
-epochLbls = {'BSL', 'BSL', 'SS', 'SS'};
-
-nBlocks = length(frVars);
-parts   = cell(nBlocks, 1);
-for iBlk = 1:nBlocks
-    t           = tblMea(:, idVars);
-    t.fr        = tblMea.(frVars{iBlk});
-    t.component = repmat(categorical({compLbls{iBlk}}),  height(t), 1);
-    t.epoch     = repmat(categorical({epochLbls{iBlk}}), height(t), 1);
-    parts{iBlk} = t;
-end
-tblLong = vertcat(parts{:});
+tblLong = stack(tblMea, {'frBspk', 'frSspk', 'ss_frBspk', 'ss_frSspk'}, ...
+    'NewDataVariableName', 'fr', ...
+    'IndexVariableName', 'SourceVar', ...
+    'ConstantVariables', {'Group', 'Name', 'UnitID'});
+tblLong.epoch = categorical(tblLong.SourceVar, ...
+    {'frBspk', 'frSspk', 'ss_frBspk', 'ss_frSspk'}, ...
+    {'BSL',    'BSL',    'SS',        'SS'});
+tblLong.component = categorical(tblLong.SourceVar, ...
+    {'frBspk', 'frSspk', 'ss_frBspk', 'ss_frSspk'}, ...
+    {'bSpk',   'sSpk',   'bSpk',      'sSpk'});
+tblLong.SourceVar = [];
 
 frml = 'fr ~ component * epoch * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLong, frml, 'dist', 'log-normal');
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLong, frml, 'dist', 'log-normal', ...
+    'contrasts', [1 : 9, 28 : 31, 36 : 39]);
 lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
 lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 
-if flgPlot
-    tblGUI_scatHist(tblLong, 'xVar', 'fr', 'yVar', 'bRate', 'grpVar', 'Group');
-end
 
 %% ========================================================================
 % Table S8

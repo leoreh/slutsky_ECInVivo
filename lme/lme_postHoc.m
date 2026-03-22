@@ -411,6 +411,24 @@ end
 
 lmeStats = addvars(lmeStats, pAdjFull, 'After', 'pVal', 'NewVariableNames', 'pAdj');
 
+
+%% ========================================================================
+%  ROUND OUTPUT
+%  ========================================================================
+
+lmeStats.Estimate  = round(lmeStats.Estimate, 4);
+lmeStats.SE        = round(lmeStats.SE, 4);
+lmeStats.Statistic = round(lmeStats.Statistic, 2);
+lmeStats.pVal      = round(lmeStats.pVal, 4);
+lmeStats.pAdj      = round(lmeStats.pAdj, 4);
+
+for iRow = 1:height(lmeStats)
+    val = lmeStats.CI95{iRow};
+    if isnumeric(val); lmeStats.CI95{iRow} = round(val, 4); end
+    val = lmeStats.DF{iRow};
+    if isnumeric(val); lmeStats.DF{iRow} = round(val, 1); end
+end
+
 end % EOF
 
 

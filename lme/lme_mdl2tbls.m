@@ -164,7 +164,7 @@ if ~isempty(lmeStats) && ismember('Type', lmeStats.Properties.VariableNames)
         
         if includeAnova
             anovaTbl = lmeStats(idxAnova, :);
-            anovaTbl = removevars_safely(anovaTbl, {'Index', 'Type', 'Estimate', 'SE', 'CI95', 'HVec'});
+            anovaTbl = removevars_safely(anovaTbl, {'Index', 'Type', 'Estimate', 'SE', 'CI95', 'HVec', 'pAdj'});
             
             % Inject empty columns for alignment
             anovaTbl.Estimate = nan(height(anovaTbl), 1);
@@ -181,8 +181,6 @@ if ~isempty(lmeStats) && ismember('Type', lmeStats.Properties.VariableNames)
             otherTbl = removevars_safely(otherTbl, {'Index', 'HVec'});
             add_tbl('OTHER LME EFFECTS', otherTbl, 'Other');
         end
-    elseif ~ismember('Type', lmeStats.Properties.VariableNames)
-        add_tbl('ALL LME STATISTICS', lmeStats, 'Other');
     end
 end
 
@@ -191,7 +189,7 @@ if ~isempty(lmeStats) && ismember('Type', lmeStats.Properties.VariableNames)
     idxCoef = lmeStats.Type == "Coeff";
     if any(idxCoef)
         coefTbl = lmeStats(idxCoef, :);
-        coefTbl = removevars_safely(coefTbl, {'Index', 'Type', 'HVec'});
+        coefTbl = removevars_safely(coefTbl, {'Index', 'Type', 'HVec', 'pAdj'});
         add_tbl('FIXED EFFECTS', coefTbl, 'Coeff');
     end
 end

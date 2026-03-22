@@ -270,12 +270,14 @@ lmeInfo.standardized = flgStnd;
 % Verbose Output
 if verbose
     fprintf('\n_______________________________________________________\n');
-    fprintf('  LME INFO\n');
-    disp(lmeInfo);
-    fprintf('\n\n');
-    fprintf('  LME STATS\n');
-    disp(removevars(lmeStats, {'Index', 'Type', 'pAdj', 'HVec'}));
-    fprintf('\n_______________________________________________________\n');
+    fprintf('  Formula  : %s\n', lmeInfo.frml);
+    fprintf('  Dist     : %s\n', lmeInfo.distSelected);
+    fprintf('  AIC      : %.1f\n', lmeInfo.aic);
+    fprintf('  N        : %d\n', lmeMdl.NumObservations);
+    fprintf('  Fit / DF : %s / %s\n', upper(lmeInfo.fitMethod), lmeInfo.dfMethod);
+    fprintf('\n');
+    disp(removevars(lmeStats, {'Index', 'Type', 'HVec'}));
+    fprintf('_______________________________________________________\n');
 end
 
 

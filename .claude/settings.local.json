@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc -l \"D:/Code/slutsky_ECInVivo/lme\"/*.m)",
+      "Bash(grep -l \"lme_analyse\\\\|lme_postHoc\\\\|lme_mdl2tbls\\\\|lme_save\" \"D:/Code/slutsky_ECInVivo/manuscripts/MCU/\"*.m)"
+    ]
+  }
+}
