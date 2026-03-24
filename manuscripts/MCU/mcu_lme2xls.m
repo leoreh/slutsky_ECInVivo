@@ -202,7 +202,7 @@ tblIdx = 8;
 sheetNames{tblIdx} = ['S' num2str(tblIdx)];
 tblInfo{tblIdx} = 'Firing Gain during FRH';
 dataSet{tblIdx} = 'MEA';
-tblPnls{tblIdx} = '4D, S3C';
+tblPnls{tblIdx} = '4D, S4B';
 
 tblMea.bGain = log((tblMea.ss_frBspk) ./ (tblMea.frBspk));
 tblMea.sGain = log((tblMea.ss_frSspk) ./ (tblMea.frSspk));
@@ -222,62 +222,61 @@ tblIdx = 9;
 sheetNames{tblIdx} = ['S' num2str(tblIdx)];
 tblInfo{tblIdx} = 'Mediation Analysis';
 dataSet{tblIdx} = 'MEA';
-tblPnls{tblIdx} = '4F, S4';
+tblPnls{tblIdx} = '4F, S5';
 
-frml = 'ss_frSspk ~ pBspk + fr + (1|Name)';
 xVar = 'pBspk';
 mVar = 'ss_frBspk';
-distM = 'log-normal';
-distY = distM;
-transX = [];
 
-% Per Group 
-tblWt = tblMea(tblMea.Group == 'Control', :);
-[~, tmpl] = tbl_trans(tblWt, 'varsInc', {'fr', 'pBspk', 'ss_frBspk'}, 'logBase', 10, 'skewThr', 2, 'flgZ', false);
-tmpl.varsTrans.pBspk.logBase = transX;
-tmpl.varsTrans.ss_frBspk.logBase = 'e'; % Force ln to match Path A response scaling
-resWt = lme_mediation(tblWt, frml, xVar, mVar, 'distM', distM, 'distY', distY, 'transTemplate', tmpl);
-
-tblMcu = tblMea(tblMea.Group == 'MCU-KO', :);
-[~, tmpl] = tbl_trans(tblMcu, 'varsInc', {'fr', 'pBspk', 'ss_frBspk'}, 'logBase', 10, 'skewThr', 2, 'flgZ', false);
-resMcu = lme_mediation(tblMcu, frml, xVar, mVar, 'distM', distM, 'distY', distY, 'transTemplate', tmpl);
-
-% Consolidate Summaries
-medTbls = struct('Title', {}, 'Table', {});
-medTbls(1).Title = 'MEDIATION SUMMARY: CONTROL';
-medTbls(1).Table = resWt.paths;
-medTbls(2).Title = 'MEDIATION SUMMARY: MCU-KO';
-medTbls(2).Table = resMcu.paths;
-
-% Plot
-if flgPlot
-    resWt.plot.X = tblWt.pBspk_trans;
-    resWt.plot = tbl_trans(resWt.plot, 'varsInc', {'M'}, 'logBase', 10, 'skewThr', 2, 'flgZ', false);
-    lme_mediationPlot(resWt)
-    resMcu.plot.X = tblMcu.pBspk_trans;
-    resMcu.plot = tbl_trans(resMcu.plot, 'varsInc', {'M'}, 'logBase', 10, 'skewThr', 2, 'flgZ', false);
-    lme_mediationPlot(resMcu)
-end
-
-% Combined Models
-[~, tmpl] = tbl_trans(tblMea, 'varsInc', {'fr', 'pBspk', 'ss_frBspk'}, 'logBase', 10, 'skewThr', 2, 'flgZ', false);
-tmpl.varsTrans.pBspk.logBase = transX;
+% Transformation template
+[~, tmpl] = tbl_trans(tblMea, 'varsInc', {'fr', 'pBspk', 'ss_frBspk'}, ...
+    'logBase', 10, 'skewThr', 2, 'flgZ', false);
+tmpl.varsTrans.pBspk.logBase = [];
 tmpl.varsTrans.ss_frBspk.logBase = 'e'; % Force ln for consistency with mediation
 
-frml = 'ss_frBspk ~ (fr + pBspk) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal', 'flgStnd', false, 'transTemplate', tmpl);
-lmeTbls = [medTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
+% Fit three combined models (single source of truth) ----------------------
+% Model A: M ~ X + covariates * Group
+[mdlA, statsA, infoA] = lme_analyse(tblMea, ...
+    'ss_frBspk ~ (fr + pBspk) * Group + (1|Name)', ...
+    'dist', 'log-normal', 'flgStnd', false, 'transTemplate', tmpl);
+lmeStats = lme_postHoc(mdlA, 'contrasts', 'all')
 
-frml = 'ss_frSspk ~ (fr + pBspk) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal', 'flgStnd', false, 'transTemplate', tmpl);
-lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
+% Model C: Y ~ X + covariates * Group (Total effect)
+[mdlC, statsC, infoC] = lme_analyse(tblMea, ...
+    'ss_frSspk ~ (fr + pBspk) * Group + (1|Name)', ...
+    'dist', 'log-normal', 'flgStnd', false, 'transTemplate', tmpl);
 
-frml = 'ss_frSspk ~ (fr + pBspk + ss_frBspk) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal', 'flgStnd', false, 'transTemplate', tmpl);
-lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
+% Model BC: Y ~ X + M + covariates * Group (Direct + mediator)
+[mdlBC, statsBC, infoBC] = lme_analyse(tblMea, ...
+    'ss_frSspk ~ (fr + pBspk + ss_frBspk) * Group + (1|Name)', ...
+    'dist', 'log-normal', 'flgStnd', false, 'transTemplate', tmpl);
 
-frml = 'ss_fr ~ (fr + pBspk) * Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal', 'flgStnd', false);
+% Per-group Sobel tests (from the SAME combined models) -------------------
+resMed = lme_mediation(mdlA, mdlC, mdlBC, xVar, mVar, 'grpVar', 'Group');
+
+if flgPlot
+    tblPlot = tblMea;
+    tblPlot.ss_frBspk = log10(tblPlot.ss_frBspk);
+    lme_mediationPlot(resMed, mdlA, mdlBC, tblPlot, ...
+        'xVar', 'pBspk_trans', 'mVar', 'ss_frBspk', 'grpVar', 'Group')
+end
+
+% Consolidate: mediation summaries + model details -----------------------
+nGrp = numel(resMed);
+medTbls = struct('Title', {}, 'Table', {});
+for iGrp = 1:nGrp
+    medTbls(iGrp).Title = sprintf('MEDIATION SUMMARY: %s', upper(resMed(iGrp).grpLevel));
+    medTbls(iGrp).Table = resMed(iGrp).paths;
+end
+
+lmeTbls = [medTbls, ...
+    lme_mdl2tbls(mdlA, statsA, infoA), ...
+    lme_mdl2tbls(mdlC, statsC, infoC), ...
+    lme_mdl2tbls(mdlBC, statsBC, infoBC)];
+
+% Extra model (total FR), for LSMeans
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, ...
+    'ss_fr ~ (fr + pBspk) * Group + (1|Name)', ...
+    'dist', 'log-normal', 'flgStnd', false);
 lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
 
 lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName)

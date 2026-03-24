@@ -18,40 +18,62 @@ tblPlot.pBspk_trans = tblTrans.pBspk;
 %  Cluster units into percentiles based on a specific variable
 
 varClu = 'pBspk';
+
+% --- Manual boundaries (leave empty [] to use percentile mode) ---
+% Defines fixed edges applied identically to both groups.
+% Example: [0.1, 0.25] creates 3 clusters: <0.1, 0.1-0.25, >0.25
+manualEdges = [0.05, 0.25];
+manualEdges = [];
+
+% --- Percentile mode (used when manualEdges is empty) ---
 nClu   = 3;           % Number of clusters (percentiles)
 alpha  = 2;           % Scaling factor for percentile spacing
 
 % Initialize Cluster Label Column
 tblPlot.cluLbl = strings(height(tblPlot), 1);
 
+% Build edges
+if ~isempty(manualEdges)
+    % Manual mode: same edges for all groups
+    edges = [-Inf, sort(manualEdges(:)'), Inf];
+    nClu  = length(edges) - 1;
+    useManual = true;
+else
+    useManual = false;
+end
+
 % Get Unique Groups
 grps = unique(tblPlot.Group);
 
 for iGrp = 1:length(grps)
 
-    idxGrp = tblPlot.Group == grps(iGrp);
-
-    % Extract Data for Clustering
+    idxGrp  = tblPlot.Group == grps(iGrp);
     grpData = tblPlot.(varClu)(idxGrp);
 
-    % Calculate Percentile Edges
-    p = linspace(0, 1, nClu + 1) .^ alpha;
-    percEdges = prctile(grpData, 100 * (1 - p));
-    percEdges = sort(percEdges);
+    if useManual
+        percEdges = edges;
+    else
+        % Percentile mode: edges computed per group
+        p = linspace(0, 1, nClu + 1) .^ alpha;
+        percEdges = [-Inf, prctile(grpData, 100 * (1 - p(2:end-1))), Inf];
+        percEdges = sort(percEdges);
+    end
 
     % Assign Clusters
     for iClu = 1:nClu
         edgeLo = percEdges(iClu);
         edgeHi = percEdges(iClu + 1);
 
-        if iClu == 1
-            idxClu = grpData <= edgeHi;
-        else
-            idxClu = grpData > edgeLo & grpData <= edgeHi;
-        end
+        idxClu = grpData > edgeLo & grpData <= edgeHi;
 
         % Create Label
-        lbl = sprintf('P%d (%.1f-%.1f)', iClu, edgeLo, edgeHi);
+        if isinf(edgeLo)
+            lbl = sprintf('P%d (<%.2g)', iClu, edgeHi);
+        elseif isinf(edgeHi)
+            lbl = sprintf('P%d (>%.2g)', iClu, edgeLo);
+        else
+            lbl = sprintf('P%d (%.2g-%.2g)', iClu, edgeLo, edgeHi);
+        end
 
         % Map back to full table
         idxGlobal = find(idxGrp);
@@ -76,8 +98,8 @@ floorVal = 1 / (max(xVec) * 3600);
 
 tblVars = tblPlot.Properties.VariableNames;
 tVars = tblVars(contains(tblVars, 't_'));
-% tblPlot = tbl_tNorm(tblPlot, 'varsInc', tVars, 'winNorm', winNorm, ...
-%     'Method', 'percentage', 'flgGeom', true, 'floorVal', floorVal, 'varsGrp', {});
+tblPlot = tbl_tNorm(tblPlot, 'varsInc', tVars, 'winNorm', winNorm, ...
+    'Method', 'percentage', 'flgGeom', true, 'floorVal', floorVal, 'varsGrp', {});
 
 
 %% ========================================================================
@@ -97,7 +119,7 @@ tblGUI_xy(xVec, tblPlot, ...
 %  ========================================================================
 
 % Loop over clusters and calculate geometric stats for each
-idxGrp = tblPlot.Group == 'Control';
+idxGrp = tblPlot.Group == 'MCU-KO';
 
 % Grab raw matrix
 tblPlot.t_frTot(idxGrp, :)';
