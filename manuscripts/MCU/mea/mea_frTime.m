@@ -22,8 +22,8 @@ varClu = 'pBspk';
 % --- Manual boundaries (leave empty [] to use percentile mode) ---
 % Defines fixed edges applied identically to both groups.
 % Example: [0.1, 0.25] creates 3 clusters: <0.1, 0.1-0.25, >0.25
-manualEdges = [0.05, 0.25];
-manualEdges = [];
+manualEdges = [0.2];
+% manualEdges = [];
 
 % --- Percentile mode (used when manualEdges is empty) ---
 nClu   = 3;           % Number of clusters (percentiles)
@@ -119,7 +119,7 @@ tblGUI_xy(xVec, tblPlot, ...
 %  ========================================================================
 
 % Loop over clusters and calculate geometric stats for each
-idxGrp = tblPlot.Group == 'MCU-KO';
+idxGrp = tblPlot.Group == 'Control';
 
 % Grab raw matrix
 tblPlot.t_frTot(idxGrp, :)';

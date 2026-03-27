@@ -202,7 +202,7 @@ tblIdx = 8;
 sheetNames{tblIdx} = ['S' num2str(tblIdx)];
 tblInfo{tblIdx} = 'Firing Gain during FRH';
 dataSet{tblIdx} = 'MEA';
-tblPnls{tblIdx} = '4D, S3C';
+tblPnls{tblIdx} = '4D, S4B';
 
 tblMea.bGain = log((tblMea.ss_frBspk) ./ (tblMea.frBspk));
 tblMea.sGain = log((tblMea.ss_frSspk) ./ (tblMea.frSspk));
@@ -222,7 +222,7 @@ tblIdx = 9;
 sheetNames{tblIdx} = ['S' num2str(tblIdx)];
 tblInfo{tblIdx} = 'Mediation Analysis';
 dataSet{tblIdx} = 'MEA';
-tblPnls{tblIdx} = '4F, S4';
+tblPnls{tblIdx} = '4F, S5';
 
 xVar = 'pBspk';
 mVar = 'ss_frBspk';
