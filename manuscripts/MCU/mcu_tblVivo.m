@@ -54,16 +54,16 @@ if ismember('swv', presets)
     varMap.wv_hpk = 'swv.hpk';
 end
 
-if ismember('brst', presets)
-    vars = [vars, 'brstStats'];
-    varMap.bRate     = 'stats.eventRate';
+if ismember('burst', presets)
+    vars = [vars, 'burstStats'];
+    varMap.br        = 'stats.br';
     varMap.bDur      = 'stats.dur';
     varMap.bFreq     = 'stats.freq';
     varMap.bIBI      = 'stats.ibi';
-    varMap.pBspk     = 'stats.pBspk';
-    varMap.nBspk     = 'stats.nBspk';
-    varMap.frBspk    = 'stats.frBspk';
-    varMap.frSspk    = 'stats.frSspk';
+    varMap.pBurst    = 'stats.pBurst';
+    varMap.bSize     = 'stats.bSize';
+    varMap.frBurst   = 'stats.frBurst';
+    varMap.frSingle  = 'stats.frSingle';
 end
 
 if ismember('spktimes', presets)
@@ -226,9 +226,9 @@ end
 
 % Metadata
 tagFiles = struct();
-tagFiles.Name = get_mname(basepaths);
+tagFiles.sbjID = get_mname(basepaths);
 [~, fileNames] = fileparts(basepaths);
-tagFiles.File = fileNames;
+tagFiles.fileID = fileNames;
 
 % Table
 tbl = v2tbl('v', v, 'varMap', varMap, 'tagAll',...
@@ -240,31 +240,31 @@ tbl = v2tbl('v', v, 'varMap', varMap, 'tagAll',...
 %  ========================================================================
 
 % Group metadata
-tbl.Group = ones(height(tbl), 1) * 1;
-tbl.Group(ismember(tbl.Name, cfg.miceMCU), :) = 2;
-tbl.Group = categorical(tbl.Group, [1, 2], cfg.lbl.grp);
+tbl.genotype = ones(height(tbl), 1) * 1;
+tbl.genotype(ismember(tbl.sbjID, cfg.miceMCU), :) = 2;
+tbl.genotype = categorical(tbl.genotype, [1, 2], cfg.lbl.grp);
 
 % Day metadata
-fileTbl = unique(tbl(:, {'Name', 'File'}), 'rows');
-fileGrp = findgroups(fileTbl.Name);
-dayCell = splitapply(@(x) {(1:numel(x))'}, fileTbl.File, fileGrp);
-fileTbl.Day = vertcat(dayCell{:});
-tbl = join(tbl, fileTbl, 'Keys', {'Name', 'File'});
-tbl.Day = categorical(tbl.Day, [1 : 7], cfg.lbl.day);
+fileTbl = unique(tbl(:, {'sbjID', 'fileID'}), 'rows');
+fileGrp = findgroups(fileTbl.sbjID);
+dayCell = splitapply(@(x) {(1:numel(x))'}, fileTbl.fileID, fileGrp);
+fileTbl.day = vertcat(dayCell{:});
+tbl = join(tbl, fileTbl, 'Keys', {'sbjID', 'fileID'});
+tbl.day = categorical(tbl.day, [1 : 7], cfg.lbl.day);
 
 % Reorder columns
 tblVars = tbl.Properties.VariableNames;
 if any(contains(tblVars, "unitType"))
-    varOrder = {'Group', 'Name', 'File', 'Day', 'UnitID', 'unitType'};
+    varOrder = {'genotype', 'sbjID', 'fileID', 'day', 'unitID', 'unitType'};
 else
-    varOrder = {'Group', 'Name', 'File', 'Day', 'UnitID'};
+    varOrder = {'genotype', 'sbjID', 'fileID', 'day', 'unitID'};
 end
 tbl = movevars(tbl, varOrder, 'Before', 1);
 
 % Assert category order
-tbl.Group = reordercats(tbl.Group, cfg.lbl.grp);
-tbl.Day = reordercats(tbl.Day, cfg.lbl.day);
-tbl.UnitID = categorical(tbl.UnitID);
+tbl.genotype = reordercats(tbl.genotype, cfg.lbl.grp);
+tbl.day = reordercats(tbl.day, cfg.lbl.day);
+tbl.unitID = categorical(tbl.unitID);
 if any(contains(tblVars, "unitType"))
     tbl.unitType = reordercats(tbl.unitType, cfg.lbl.unit);
 end
@@ -277,11 +277,11 @@ if flgClean
     tbl.unitType = [];
 
     % Remove bac on, bac off, and washout
-    if any(tbl.Day == 'BAC_OFF')
-        tbl(tbl.Day == 'BAC_ON', :) = [];
-        tbl(tbl.Day == 'BAC_OFF', :) = [];
-        tbl(tbl.Day == 'WASH', :) = [];
-        tbl.Day = removecats(tbl.Day, {'BAC_ON', 'BAC_OFF', 'WASH'});
+    if any(tbl.day == 'BAC_OFF')
+        tbl(tbl.day == 'BAC_ON', :) = [];
+        tbl(tbl.day == 'BAC_OFF', :) = [];
+        tbl(tbl.day == 'WASH', :) = [];
+        tbl.day = removecats(tbl.day, {'BAC_ON', 'BAC_OFF', 'WASH'});
     end
 end
 

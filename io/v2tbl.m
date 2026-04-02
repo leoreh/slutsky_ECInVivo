@@ -132,7 +132,7 @@ for iFile = 1:length(v)
         end
     end
 
-    sessionTable.UnitID = runOffset + (iFile * 1000) + rowIdx;
+    sessionTable.unitID = runOffset + (iFile * 1000) + rowIdx;
 
     % Extract all variables based on the map
     for iVar = 1:length(mapFields)
@@ -177,8 +177,8 @@ tbl = vertcat(tblCell{:});
 
 % Update the global offset for the next time this function is called
 if ~isempty(tbl)
-    [~, maxID] = max(tbl.UnitID);
-    uOffset = tbl.UnitID(maxID);
+    [~, maxID] = max(tbl.unitID);
+    uOffset = tbl.unitID(maxID);
 end
 
 end

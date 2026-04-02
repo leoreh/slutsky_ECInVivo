@@ -27,7 +27,7 @@ nIsi = length(isiSweep);
 nSpk = length(spkSweep);
 
 % Initialize Grid
-brstGrid = cell(nFiles, nIsi, nSpk);
+burstGrid = cell(nFiles, nIsi, nSpk);
 
 for iFile = 1:nFiles
     
@@ -43,7 +43,7 @@ for iFile = 1:nFiles
             minDur = 0;
             
             % Detect
-            brstGrid{iFile, iIsi, iSpk} = brst_detect(spktimes, ...
+            burstGrid{iFile, iIsi, iSpk} = burst_detect(spktimes, ...
                 'minSpks', minSpks, ...
                 'isiStart', isiStart, ...
                 'isiEnd', isiEnd, ...
@@ -98,7 +98,7 @@ for iIsi = 1 : nIsi
         
         % Dynamic Field 
         strPrm = sprintf('s%d_i%03d', spkSweep(iSpk), round(isiSweep(iIsi)*1000));
-        fPBspk = ['pBspk_', strPrm];
+        fPBspk = ['pBurst_', strPrm];
         
         vecPBspk = [];
 
@@ -113,17 +113,17 @@ for iIsi = 1 : nIsi
             % boutTimes = intervals([0 inf]);
 
 
-            brst = brstGrid{iFile, iIsi, iSpk};
-            nb   = length(brst.times);
+            burst = burstGrid{iFile, iIsi, iSpk};
+            nb   = length(burst.times);
             
             % Initialize File Stats
-            pBspk  = nan(nb, 1);
+            pBurst  = nan(nb, 1);
             
             for iUnit = 1:nb
                 % Check if bursts are fully contained in NREM
-                t = brst.times{iUnit};
+                t = burst.times{iUnit};
                 if isempty(t)
-                    pBspk(iUnit)  = 0;
+                    pBurst(iUnit)  = 0;
                     continue; 
                 end
 
@@ -131,21 +131,21 @@ for iIsi = 1 : nIsi
                 keepIdx = boutTimes.contains(t);
 
                 % Count Spikes in Valid Bursts
-                nBspkVals = brst.nBspk{iUnit}(keepIdx);
-                totBSpk   = sum(nBspkVals);
+                bSizeVals = burst.bSize{iUnit}(keepIdx);
+                totBSpk   = sum(bSizeVals);
                 
                 % Calculate Metrics
                 
                 if nSpkTot(iUnit) > 0
-                    pBspk(iUnit) = totBSpk / nSpkTot(iUnit);
+                    pBurst(iUnit) = totBSpk / nSpkTot(iUnit);
                 else
-                    pBspk(iUnit) = 0;
+                    pBurst(iUnit) = 0;
                 end
             end
              
             % Store Results (Stacking)
              % Store Results (Stacking)
-            vecPBspk = [vecPBspk; pBspk];
+            vecPBspk = [vecPBspk; pBurst];
         end
         
         % Store in Main Table
@@ -165,24 +165,24 @@ tblRes = table();
 % Filter Table
 idxRs = tblVivo.unitType == 'RS';
 tblLme = tblVivo(idxRs, :);
-idxWt = tblLme.Group == 'Control';
+idxWt = tblLme.genotype == 'Control';
 
 for iIsi = 1 : nIsi
     for iSpk = 1 : nSpk
         
         strPrm = sprintf('s%d_i%03d', spkSweep(iSpk), round(isiSweep(iIsi)*1000));
-        fPBspk = ['pBspk_', strPrm];
+        fPBspk = ['pBurst_', strPrm];
         
         r = struct();
         r.spkThr = spkSweep(iSpk);
         r.isiThr = isiSweep(iIsi);
         
         % LME (Group Effect)
-        mdl = sprintf('%s ~ Group + (1|Name)', fPBspk);
+        mdl = sprintf('%s ~ genotype + (1|sbjID)', fPBspk);
         lme = lme_analyse(tblLme, mdl, 'dist', 'logit-normal', ...
             'flgPlot', false, 'verbose', false);
         
-        idxGrp = find(strncmpi(lme.Coefficients.Name, 'Group', 5));
+        idxGrp = find(strncmpi(lme.Coefficients.Name, 'genotype', 8));
         if ~isempty(idxGrp)
             r.tStatGroup = lme.Coefficients.tStat(idxGrp(1));
         else
@@ -243,13 +243,13 @@ title('Model Fit: AIC (Lower is Better)');
 nexttile;
 heatmap(spkSweep, isiSweep, matCorrFr, 'ColorMap', parula);
 xlabel('Min Spikes'); ylabel('ISI Threshold (s)');
-title('Correlation (pBspk vs fr)');
+title('Correlation (pBurst vs fr)');
 
 % 4. Correlation (vs bRoy)
 nexttile;
 heatmap(spkSweep, isiSweep, matCorrRoy, 'ColorMap', parula);
 xlabel('Min Spikes'); ylabel('ISI Threshold (s)');
-title('Correlation (pBspk vs bRoy)');
+title('Correlation (pBurst vs bRoy)');
 
 % 5. Zero Inflation
 nexttile;
@@ -261,14 +261,14 @@ title('Percent Zeros');
 
 
 
-% tblGUI_bar(tblVivo, 'yVar', 'pBspk', 'xVar', 'Group');
+% tblGUI_bar(tblVivo, 'yVar', 'pBurst', 'xVar', 'genotype');
 
 
 
 %% ========================================================================
 %  CORRELATION: BSL BURSTINESS vs. PERTURBATION FR
 %  ========================================================================
-fprintf('[BRST_SWEEP] Starting Correlation Analysis (BSL pBspk vs BAC3 FR)...\n');
+fprintf('[BRST_SWEEP] Starting Correlation Analysis (BSL pBurst vs BAC3 FR)...\n');
 
 % -------------------------------------------------------------------------
 % 1. Load Perturbation Data (wt_bac3 & mcu_bac3)
@@ -282,7 +282,7 @@ tblBac3 = tblBac3(tblBac3.unitType == 'RS', :);
 
 % Aggregate by Mouse (Mean FR)
 % Note: We want the mean FR per mouse during Baclofen Day 3
-tblBac3Mouse = groupsummary(tblBac3, {'Name', 'Group'}, 'mean', 'fr');
+tblBac3Mouse = groupsummary(tblBac3, {'sbjID', 'genotype'}, 'mean', 'fr');
 tblBac3Mouse.Properties.VariableNames{'mean_fr'} = 'frBac3';
 tblBac3Mouse(:, 'GroupCount') = [];
 
@@ -293,14 +293,14 @@ tblBac3Mouse(:, 'GroupCount') = [];
 % -------------------------------------------------------------------------
 fprintf('[BRST_SWEEP] Aggregating Baseline Data per Mouse...\n');
 
-% Aggregate Baseline Data (All numeric variables, including pBspk columns)
+% Aggregate Baseline Data (All numeric variables, including pBurst columns)
 % This creates a single table with one row per mouse/group
-tblBslMouse = groupsummary(tblLme, {'Name', 'Group'}, 'mean', vartype('numeric'));
+tblBslMouse = groupsummary(tblLme, {'sbjID', 'genotype'}, 'mean', vartype('numeric'));
 tblBslMouse(:, 'GroupCount') = [];
 
 % Join with Perturbation Data
-% Result: Single table with 'mean_pBspk_...' and 'frBac3'
-tblCorr = innerjoin(tblBslMouse, tblBac3Mouse, 'Keys', {'Name', 'Group'});
+% Result: Single table with 'mean_pBurst_...' and 'frBac3'
+tblCorr = innerjoin(tblBslMouse, tblBac3Mouse, 'Keys', {'sbjID', 'genotype'});
 
 % Calculate FR Recovery (% of Baseline)
 tblCorr.Rcv = (tblCorr.frBac3 ./ tblCorr.mean_fr) * 100;
@@ -311,7 +311,7 @@ tblCorr.Rcv = (tblCorr.frBac3 ./ tblCorr.mean_fr) * 100;
 % -------------------------------------------------------------------------
 fprintf('[BRST_SWEEP] Plotting Correlations...\n');
 
-figure('Name', 'Burst Sweep: BSL pBspk vs BAC3 FR Recovery', 'Color', 'w', ...
+figure('Name', 'Burst Sweep: BSL pBurst vs BAC3 FR Recovery', 'Color', 'w', ...
     'Position', [100 100 1200 900]);
 tiledlayout(nSpk, nIsi, 'TileSpacing', 'compact', 'Padding', 'compact');
 
@@ -323,20 +323,20 @@ for iSpk = 1 : nSpk
         
         % Current Parameter
         strPrm = sprintf('s%d_i%03d', spkSweep(iSpk), round(isiSweep(iIsi)*1000));
-        fPBspk = ['mean_pBspk_', strPrm]; % Note: groupsummary adds 'mean_' prefix
+        fPBspk = ['mean_pBurst_', strPrm]; % Note: groupsummary adds 'mean_' prefix
         
         % Get Data Vectors
-        pBspkData = tblCorr.(fPBspk);
+        pBurstData = tblCorr.(fPBspk);
         yData = tblCorr.Rcv;
         
         % INDICES (Logic is now on rows of tblCorr, i.e., mice)
-        idxWt = tblCorr.Group == 'Control';
-        idxMcu = tblCorr.Group == 'MCU-KO';
+        idxWt = tblCorr.genotype == 'Control';
+        idxMcu = tblCorr.genotype == 'MCU-KO';
         
         % Correlations
-        [rWt, pWt] = corr(pBspkData(idxWt), yData(idxWt), ...
+        [rWt, pWt] = corr(pBurstData(idxWt), yData(idxWt), ...
             'Type', 'Spearman', 'Rows', 'complete');
-        [rMcu, pMcu] = corr(pBspkData(idxMcu), yData(idxMcu), ...
+        [rMcu, pMcu] = corr(pBurstData(idxMcu), yData(idxMcu), ...
             'Type', 'Spearman', 'Rows', 'complete');
         
         % Plot
@@ -344,9 +344,9 @@ for iSpk = 1 : nSpk
         hold on;
         
         % Scatter
-        scatter(pBspkData(idxWt), yData(idxWt), 50, 'Filled', ...
+        scatter(pBurstData(idxWt), yData(idxWt), 50, 'Filled', ...
             'MarkerFaceColor', colWt, 'MarkerEdgeColor', 'none', 'MarkerFaceAlpha', 0.6);
-        scatter(pBspkData(idxMcu), yData(idxMcu), 50, 'Filled', ...
+        scatter(pBurstData(idxMcu), yData(idxMcu), 50, 'Filled', ...
             'MarkerFaceColor', colMcu, 'MarkerEdgeColor', 'none', 'MarkerFaceAlpha', 0.6);
         
         % Lines
@@ -369,7 +369,7 @@ for iSpk = 1 : nSpk
             'FontWeight', 'normal', 'FontSize', 9);
         
         if iSpk == nSpk
-            xlabel('BSL pBspk');
+            xlabel('BSL pBurst');
         end
         if iIsi == 1
             ylabel('FR Recovery (%)');
@@ -383,4 +383,4 @@ end
 fprintf('[BRST_SWEEP] Correlation analysis complete.\n');
 
 
-% tblGUI_scatHist(tblCorr, 'xVar', 'pBspk', 'yVar', 'funcon_fish', 'grpVar', 'Group');
+% tblGUI_scatHist(tblCorr, 'xVar', 'pBurst', 'yVar', 'funcon_fish', 'grpVar', 'genotype');

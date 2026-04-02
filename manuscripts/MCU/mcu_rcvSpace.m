@@ -10,8 +10,8 @@ function hFigScat = mcu_rcvSpace(tbl, varargin)
 %
 %   INPUTS:
 %       tbl     - (table) Data table containing recovery metrics.
-%                 Must contain: 'Group', 'Name', 'fr', 'pBspk'.
-%                 Must contain for calcs: 'frBspk', 'ss_frBspk', 'frSspk', 'ss_frSspk'
+%                 Must contain: 'genotype', 'sbjID', 'fr', 'pBurst'.
+%                 Must contain for calcs: 'frBurst', 'ss_frBurst', 'frSingle', 'ss_frSingle'
 %
 %   OUTPUTS:
 %       hFigScat - (Handle) Figure handle for Scatter plots.
@@ -36,7 +36,7 @@ grps = {'Control', 'MCU-KO'};
 
 % Color Data
 % Row 1: Burstiness
-cData_Brst = tbl.pBspkGain;
+cData_Brst = tbl.pBurstGain;
 cLabel_Brst = '\Delta Burstiness (log-odds)';
 clim_Brst = [min(cData_Brst, [], 'all'), max(cData_Brst, [], 'all')];
 if diff(clim_Brst) == 0; clim_Brst = clim_Brst + [-0.1 0.1]; end
@@ -65,7 +65,7 @@ for iGrp = 1:2
     nexttile;
     
     % Filter Data
-    mask = strcmpi(string(tbl.Group), grp);
+    mask = strcmpi(string(tbl.genotype), grp);
     subTbl = tbl(mask, :);
     subCData = cData_Brst(mask);
     
@@ -97,7 +97,7 @@ for iGrp = 1:2
     nexttile;
     
     % Filter Data
-    mask = strcmpi(string(tbl.Group), grp);
+    mask = strcmpi(string(tbl.genotype), grp);
     subTbl = tbl(mask, :);
     subCData = cData_dFr(mask);
 

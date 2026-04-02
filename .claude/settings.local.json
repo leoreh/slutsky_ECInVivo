@@ -2,7 +2,14 @@
   "permissions": {
     "allow": [
       "Bash(wc -l \"D:/Code/slutsky_ECInVivo/lme\"/*.m)",
-      "Bash(grep -l \"lme_analyse\\\\|lme_postHoc\\\\|lme_mdl2tbls\\\\|lme_save\" \"D:/Code/slutsky_ECInVivo/manuscripts/MCU/\"*.m)"
+      "Bash(grep -l \"lme_analyse\\\\|lme_postHoc\\\\|lme_mdl2tbls\\\\|lme_save\" \"D:/Code/slutsky_ECInVivo/manuscripts/MCU/\"*.m)",
+      "Bash(python3:*)",
+      "Bash(python3 -c \"print\\(''hello''\\)\")",
+      "Bash(/tmp/tbl_refactor.py:*)",
+      "Bash(ls D:/Code/slutsky_ECInVivo/manuscripts/MCU/*.m D:/Code/slutsky_ECInVivo/manuscripts/MCU/mea/*.m)",
+      "Bash(python /tmp/mcu_phase2.py)",
+      "Bash(python -c \":*)",
+      "Bash(python \"C:\\\\Users\\\\User\\\\AppData\\\\Local\\\\Temp\\\\mcu_phase2.py\")"
     ]
   }
 }

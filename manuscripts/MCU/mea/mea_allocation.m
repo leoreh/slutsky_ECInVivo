@@ -28,12 +28,12 @@ presets = {'steadyState'};
 [tbl, ~, ~, ~] = mcu_tblMea('presets', presets, 'flgOtl', true);
 
 % Relative (Log-Fold Change)
-tbl.dBrst_rel = log((tbl.ss_frBspk) ./ (tbl.frBspk));
-tbl.dSngl_rel = log((tbl.ss_frSspk) ./ (tbl.frSspk));
+tbl.dBrst_rel = log((tbl.ss_frBurst) ./ (tbl.frBurst));
+tbl.dSngl_rel = log((tbl.ss_frSingle) ./ (tbl.frSingle));
 
 % Absolute Difference (Hz)
-tbl.dBrst_abs = (tbl.ss_frBspk - tbl.frBspk);
-tbl.dSngl_abs = (tbl.ss_frSspk - tbl.frSspk);
+tbl.dBrst_abs = (tbl.ss_frBurst - tbl.frBurst);
+tbl.dSngl_abs = (tbl.ss_frSingle - tbl.frSingle);
 
 % Initialize logC column
 tbl.logC_cell = nan(height(tbl), 1);
@@ -57,7 +57,7 @@ for iGrp = 1:nGrps
     grp = grps{iGrp};
     grpFld = strrep(grp, '-', '_');
     
-    idx = tbl.Group == grp;
+    idx = tbl.genotype == grp;
     
     xRel = tbl.dBrst_rel(idx);
     yRel = tbl.dSngl_rel(idx);
@@ -109,7 +109,7 @@ for iGrp = 1:nGrps
     
     idx = allocModel.(grpFld).idx;
     
-    xRho = tbl.pBspk(idx); % Base burst probability
+    xRho = tbl.pBurst(idx); % Base burst probability
     yLogC = tbl.logC_cell(idx);
     
     % Remove invalid points
@@ -152,8 +152,8 @@ for iGrp = 1:nGrps
     xAbs = tbl.dBrst_abs(idx);
     yAbs = tbl.dSngl_abs(idx);
     
-    S0 = tbl.frSspk(idx);
-    B0 = tbl.frBspk(idx);
+    S0 = tbl.frSingle(idx);
+    B0 = tbl.frBurst(idx);
     
     % Remove invalid points
     mk = ~isnan(xAbs) & ~isnan(yAbs) & ~isinf(xAbs) & ~isinf(yAbs) & ...
@@ -182,7 +182,7 @@ for iGrp = 1:nGrps
     % (Using empirical S0/B0 for (1-rho)/rho part to be perfectly exact)
     gamma0 = allocModel.(grpFld).gamma0;
     gamma1 = allocModel.(grpFld).gamma1;
-    rho_obs = tbl.pBspk(idx);
+    rho_obs = tbl.pBurst(idx);
     rho_obs = rho_obs(mk); % Use valid subset
     
     dynC = exp(gamma0 + gamma1 .* rho_obs);
@@ -212,7 +212,7 @@ tTile = tiledlayout(1, 4, 'TileSpacing', 'compact', 'Padding', 'compact');
 
 % --- Panel A: Relative Space (Power-law Conservation) ---
 nexttile;
-plot_scat(tbl, 'dBrst_rel', 'dSngl_rel', 'g', 'Group', ...
+plot_scat(tbl, 'dBrst_rel', 'dSngl_rel', 'g', 'genotype', ...
     'fitType', 'ortho', 'flgStats', true, 'alpha', 0.6);
 plot_lineEq('hAx', gca, 'flgSqr', true);
 xlabel('Burst Gain (log-fold)');
@@ -223,7 +223,7 @@ legend('Location', 'northwest');
 
 % --- Panel B: Biological Penalty (C vs Rho) ---
 nexttile;
-plot_scat(tbl, 'pBspk', 'logC_cell', 'g', 'Group', ...
+plot_scat(tbl, 'pBurst', 'logC_cell', 'g', 'genotype', ...
     'fitType', 'linear', 'flgStats', true, 'alpha', 0.6);
 plot_lineEq('hAx', gca, 'flgSqr', true);
 xlabel('Baseline Burst Probability (\rho)', 'Interpreter', 'tex');
@@ -256,9 +256,9 @@ for iGrp = 1:nGrps
     
     idx = allocModel.(grpFld).idx;
     
-    S0_mean = mean(tbl.frSspk(idx), 'omitnan');
-    B0_mean = mean(tbl.frBspk(idx), 'omitnan');
-    rho_mean = mean(tbl.pBspk(idx), 'omitnan');
+    S0_mean = mean(tbl.frSingle(idx), 'omitnan');
+    B0_mean = mean(tbl.frBurst(idx), 'omitnan');
+    rho_mean = mean(tbl.pBurst(idx), 'omitnan');
     
     beta = allocModel.(grpFld).beta;
     gamma0 = allocModel.(grpFld).gamma0;
@@ -299,7 +299,7 @@ legend('Location', 'northwest');
 
 % --- Panel D: Empirical Absolute Space ---
 nexttile;
-plot_scat(tbl, 'dBrst_abs', 'dSngl_abs', 'g', 'Group', ...
+plot_scat(tbl, 'dBrst_abs', 'dSngl_abs', 'g', 'genotype', ...
     'fitType', 'ortho', 'flgStats', true, 'alpha', 0.6);
 plot_lineEq('hAx', gca, 'flgSqr', true);
 xlabel('\Delta Burst (Hz)', 'Interpreter', 'tex');

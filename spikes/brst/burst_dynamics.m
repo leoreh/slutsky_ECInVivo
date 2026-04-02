@@ -1,12 +1,12 @@
-function dyn = brst_dynamics(brst, spktimes, varargin)
-% BRST_DYNAMICS Computes time-varying burst dynamics (Population Ready).
+function dyn = burst_dynamics(burst, spktimes, varargin)
+% BURST_DYNAMICS Computes time-varying burst dynamics (Population Ready).
 %
-%   dyn = BRST_DYNAMICS(BRST, SPKTIMES, ...) converts discrete burst events
-%   (from brst_detect) into continuous time-series using density estimation
+%   dyn = BURST_DYNAMICS(BRST, SPKTIMES, ...) converts discrete burst events
+%   (from burst_detect) into continuous time-series using density estimation
 %   (for rates) and interpolation with adaptive masking (for properties).
 %
 %   INPUTS:
-%       brst        - (struct) Output from brst_detect.m
+%       burst        - (struct) Output from burst_detect.m
 %       spktimes    - (cell) Spike times per unit.
 %       varargin    - (param/value) Optional parameters:
 %                     'binSize'   : (num) Time bin size {60} (s)
@@ -14,36 +14,36 @@ function dyn = brst_dynamics(brst, spktimes, varargin)
 %                     'winSm'     : (num) Smoothing window {10} (events)
 %                     'ibiPct'    : (num) Percentile for masking gap {99}
 %                     'flgPlot'   : (log) Plot dynamics {true}
-%                     'flgSave'   : (log) Save result as brstDyn {false}
+%                     'flgSave'   : (log) Save result as burstDyn {false}
 %                     'basepath'  : (char) Base path for saving {pwd}
 %
 %   OUTPUTS:
 %       dyn         - (struct) Dynamics structure.
 %                     .time       : (1 x nTime) Time vector.
-%                     .eventRate  : (nUnits x nTime) Burst event rate (Hz).
-%                     .frTot      : (nUnits x nTime) Total firing rate (Hz).
-%                     .frBspk     : (nUnits x nTime) Burst spike firing rate (Hz).
-%                     .frSspk     : (nUnits x nTime) Single spike firing rate (Hz).
-%                     .pBspk      : (nUnits x nTime) Burst fraction (0-1).
+%                     .br  : (nUnits x nTime) Burst event rate (Hz).
+%                     .fr      : (nUnits x nTime) Total firing rate (Hz).
+%                     .frBurst     : (nUnits x nTime) Burst spike firing rate (Hz).
+%                     .frSingle     : (nUnits x nTime) Single spike firing rate (Hz).
+%                     .pBurst      : (nUnits x nTime) Burst fraction (0-1).
 %                     .dur        : (nUnits x nTime) Duration (s).
-%                     .nBspk      : (nUnits x nTime) Spikes per burst.
+%                     .bSize      : (nUnits x nTime) Spikes per burst.
 %                     .freq       : (nUnits x nTime) Intra-burst freq (Hz).
 %                     .ibi        : (nUnits x nTime) Inter-burst interval (s).
 %
 %   NOTE:
-%   Properties (.dur, .nBspk, etc) are interpolated to the global time
+%   Properties (.dur, .bSize, etc) are interpolated to the global time
 %   grid. Periods of silence exceeding the 'ibiPct' percentile of a unit's
 %   IBI distribution are masked as NaN to distinguish "undefined" states
 %   from zero values.
 %
-%   See also: BRST_DETECT, BRST_STATS
+%   See also: BURST_DETECT, BURST_STATS
 
 %% ========================================================================
 %  ARGUMENTS
 %  ========================================================================
 
 p = inputParser;
-addRequired(p, 'brst', @isstruct);
+addRequired(p, 'burst', @isstruct);
 addRequired(p, 'spktimes', @iscell);
 addParameter(p, 'binSize', 60, @isnumeric);
 addParameter(p, 'ksd', 120, @isnumeric);
@@ -53,7 +53,7 @@ addParameter(p, 'flgPlot', true, @islogical);
 addParameter(p, 'flgSave', false, @islogical);
 addParameter(p, 'basepath', pwd, @ischar);
 
-parse(p, brst, spktimes, varargin{:});
+parse(p, burst, spktimes, varargin{:});
 binSize   = p.Results.binSize;
 ksd       = p.Results.ksd;
 winSm     = p.Results.winSm;
@@ -67,7 +67,7 @@ basepath  = p.Results.basepath;
 %  INITIALIZE
 %  ========================================================================
 
-nUnits = length(brst.times);
+nUnits = length(burst.times);
 
 % Time vector (excluding tail)
 maxTime = max(cellfun(@max, spktimes, 'uni', true));
@@ -78,12 +78,12 @@ nBins = length(t);
 
 % Initialize Matrices (nUnits x nTime)
 dyn.time        = t;
-dyn.eventRate   = zeros(nUnits, nBins);
-dyn.frTot       = zeros(nUnits, nBins);
-dyn.frBspk      = zeros(nUnits, nBins);
-dyn.frSspk      = zeros(nUnits, nBins);
-dyn.pBspk       = zeros(nUnits, nBins);
-dyn.nBspk       = nan(nUnits, nBins);
+dyn.br   = zeros(nUnits, nBins);
+dyn.fr       = zeros(nUnits, nBins);
+dyn.frBurst      = zeros(nUnits, nBins);
+dyn.frSingle      = zeros(nUnits, nBins);
+dyn.pBurst       = zeros(nUnits, nBins);
+dyn.bSize       = nan(nUnits, nBins);
 
 dyn.dur      = nan(nUnits, nBins);
 dyn.freq     = nan(nUnits, nBins);
@@ -105,14 +105,14 @@ kCorr = conv(ones(1, nBins), kd, 'same');
 for iUnit = 1:nUnits
 
     st = spktimes{iUnit};
-    bTimes = brst.times{iUnit};
+    bTimes = burst.times{iUnit};
 
     % Access properties
-    nBspk = brst.nBspk{iUnit};
-    dur   = brst.dur{iUnit};
-    freq  = brst.freq{iUnit};
-    ibi   = brst.ibi{iUnit};
-    bst   = brst.spktimes{iUnit};
+    nBspk = burst.size{iUnit};
+    dur   = burst.dur{iUnit};
+    freq  = burst.freq{iUnit};
+    ibi   = burst.ibi{iUnit};
+    bst   = burst.spktimes{iUnit};
 
     % ---------------------------------------------------------------------
     % Density Estimation (Continuous)
@@ -129,7 +129,7 @@ for iUnit = 1:nUnits
         bStart = bTimes(:, 1);
         bCounts = histcounts(bStart, tEdges);
     end
-    dyn.eventRate(iUnit, :) = ((conv(bCounts, kd, 'same') ./ kCorr) / binSize) + c;
+    dyn.br(iUnit, :) = ((conv(bCounts, kd, 'same') ./ kCorr) / binSize) + c;
 
     % Burst Densities (Firing Rates)
     spkCounts = histcounts(st, tEdges);
@@ -137,38 +137,38 @@ for iUnit = 1:nUnits
     frTot = frTot_raw + c;
 
     brstCounts = histcounts(bst, tEdges);
-    frBspk_raw = (conv(brstCounts, kd, 'same') ./ kCorr) / binSize;
-    frBspk = frBspk_raw + c;
+    frBurst_raw = (conv(brstCounts, kd, 'same') ./ kCorr) / binSize;
+    frBurst = frBurst_raw + c;
 
     % Single Spike Density
     % Derived from raw to ensure additivity, then add c
-    frSspk_raw = frTot_raw - frBspk_raw;
-    frSspk = frSspk_raw + c;
+    frSingle_raw = frTot_raw - frBurst_raw;
+    frSingle = frSingle_raw + c;
 
     % Store
-    dyn.frTot(iUnit, :)  = frTot;
-    dyn.frBspk(iUnit, :) = frBspk;
-    dyn.frSspk(iUnit, :) = frSspk;
+    dyn.fr(iUnit, :)  = frTot;
+    dyn.frBurst(iUnit, :) = frBurst;
+    dyn.frSingle(iUnit, :) = frSingle;
 
     % Probability of spikes in bursts
     pBspk = zeros(size(frTot_raw));
     mask = frTot_raw > 1e-9;
-    pBspk(mask) = frBspk_raw(mask) ./ frTot_raw(mask);
-    dyn.pBspk(iUnit, :) = pBspk;
+    pBspk(mask) = frBurst_raw(mask) ./ frTot_raw(mask);
+    dyn.pBurst(iUnit, :) = pBspk;
 
     % Validation (Check Raw Values)
-    % frSspk + frBspk = frTot
-    if max(abs((frSspk_raw + frBspk_raw) - frTot_raw)) > 1e-6
-        warning('brst_dynamics:ValidationFailed', ...
-            'Unit %d: frSspk + frBspk does not equal frTot (Raw)', iUnit);
+    % frSingle + frBurst = frTot
+    if max(abs((frSingle_raw + frBurst_raw) - frTot_raw)) > 1e-6
+        warning('burst_dynamics:ValidationFailed', ...
+            'Unit %d: frSingle + frBurst does not equal frTot (Raw)', iUnit);
     end
 
     % frTot * (1 - pBspk) = fSspk
     % (Only checking on mask where frTot > 0)
-    err = abs((frTot_raw(mask) .* (1 - pBspk(mask))) - frSspk_raw(mask));
+    err = abs((frTot_raw(mask) .* (1 - pBspk(mask))) - frSingle_raw(mask));
     if max(err) > 1e-6
-        warning('brst_dynamics:Validation2Failed', ...
-            'Unit %d: frTot * (1 - pBspk) != frSspk (Raw)', iUnit);
+        warning('burst_dynamics:Validation2Failed', ...
+            'Unit %d: frTot * (1 - pBspk) != frSingle (Raw)', iUnit);
     end
 
 
@@ -193,7 +193,7 @@ for iUnit = 1:nUnits
 
     % Process Properties
     dyn.dur(iUnit, :)   = proc_prop(dur, bStart, t, winSm, maskThr);
-    dyn.nBspk(iUnit, :) = proc_prop(nBspk, bStart, t, winSm, maskThr);
+    dyn.bSize(iUnit, :) = proc_prop(nBspk, bStart, t, winSm, maskThr);
     dyn.freq(iUnit, :)  = proc_prop(freq, bStart, t, winSm, maskThr);
     dyn.ibi(iUnit, :)   = proc_prop(ibi, bStart, t, winSm, maskThr);
 
@@ -206,7 +206,7 @@ end
 
 if flgPlot
     tbl = struct2table(rmfield(dyn, 'time'));
-    tblGUI_xy(dyn.time, tbl, 'yVar', 'eventRate');
+    tblGUI_xy(dyn.time, tbl, 'yVar', 'br');
 end
 
 
@@ -216,9 +216,9 @@ end
 
 if flgSave
     [~, basename] = fileparts(basepath);
-    dynfile = fullfile(basepath, [basename, '.brstDyn.mat']);
-    brstDyn = dyn;
-    save(dynfile, 'brstDyn');
+    dynfile = fullfile(basepath, [basename, '.burstDyn.mat']);
+    burstDyn = dyn;
+    save(dynfile, 'burstDyn');
 end
 
 end     % EOF
@@ -275,20 +275,20 @@ end
 %  NOTE: BINNED STATS VS. CONTINUOUS DYNAMICS (KINETICS)
 %  ========================================================================
 %  When analyzing temporal changes, one must choose between sliding-window
-%  statistics (brst_stats) and continuous density estimation (brst_dynamics).
+%  statistics (burst_stats) and continuous density estimation (burst_dynamics).
 %  While both track changes over time, they serve different analytical goals:
 %
 %  1. TEMPORAL RESOLUTION VS. STABILITY
 %     Binned statistics (e.g., 20-min windows) require a minimum number of
 %     events per bin to be statistically valid. If a unit fires only two
 %     bursts in 20 minutes, the mean is highly volatile. Density estimation
-%     (brst_dynamics) uses Gaussian smoothing and interpolation to provide
+%     (burst_dynamics) uses Gaussian smoothing and interpolation to provide
 %     a higher-resolution "state estimate" that is less sensitive to the
 %     exact timing of individual triggers.
 %
 %  2. THE DURATION BIAS (TIME-WEIGHTING)
-%     brst_stats treats every burst as one N. A 10s burst and a 1s burst
-%     average to 5.5s. In brst_dynamics, the 10s burst occupies 10x more
+%     burst_stats treats every burst as one N. A 10s burst and a 1s burst
+%     average to 5.5s. In burst_dynamics, the 10s burst occupies 10x more
 %     temporal bins than the 1s burst. Consequently, the "average" value
 %     of a dynamic trace is weighted by duration. Use stats for
 %     measuring the *physical shape* of events and dynamics for measuring
@@ -302,9 +302,9 @@ end
 %     regime entirely".
 %
 %  SUMMARY:
-%  - Use brst_stats for: Formal genotype comparisons (WT vs KO) and
+%  - Use burst_stats for: Formal genotype comparisons (WT vs KO) and
 %    calculating physical burst geometry across experimental phases.
-%  - Use brst_dynamics for: Visualizing the kinetic "flow" of recovery,
+%  - Use burst_dynamics for: Visualizing the kinetic "flow" of recovery,
 %    drug onset, or high-resolution population transitions.
 %  ========================================================================
 

@@ -1,7 +1,7 @@
-function isiVal = brst_isiValley(spktimes, varargin)
-% BRST_ISIVALLEY Detects the ISI valley separating bursts from non-bursts.
+function isiVal = burst_isiValley(spktimes, varargin)
+% BURST_ISIVALLEY Detects the ISI valley separating bursts from non-bursts.
 %
-%   isiValley = BRST_ISIVALLEY(SPKTIMES, ...) calculates the inter-spike
+%   isiValley = BURST_ISIVALLEY(SPKTIMES, ...) calculates the inter-spike
 %   intervals (ISIs) for all cells, aggregates them, and finds the valley
 %   in the log-log histogram (or KDE) that typically separates burst ISIs
 %   from tonic ISIs.
@@ -19,7 +19,7 @@ function isiVal = brst_isiValley(spktimes, varargin)
 %       isiVal      - (num) The ISI value (in seconds) at the valley.
 %
 %   EXAMPLE:
-%       val = brst_isiValley(spktimes, 'flgPlot', true);
+%       val = burst_isiValley(spktimes, 'flgPlot', true);
 %
 
 %% ========================================================================
@@ -72,7 +72,7 @@ isiVec(isiVec >= 10000) = [];
 
 % Validation
 if isempty(isiVec)
-    warning('brst_isiValley:NoISIs', 'No valid ISIs found.');
+    warning('burst_isiValley:NoISIs', 'No valid ISIs found.');
     isiVal = nan;
     return;
 end

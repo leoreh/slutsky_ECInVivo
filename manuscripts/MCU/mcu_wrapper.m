@@ -48,7 +48,7 @@ for iFile = 1 : nFiles
     isiEnd = isiStart * 2;
     minIBI = isiEnd;
     minDur = 0;
-    brst = brst_detect(spktimes, ...
+    burst = burst_detect(spktimes, ...
         'minSpks', minSpks, ...
         'isiStart', isiStart, ...
         'isiEnd', isiEnd * 2, ...
@@ -57,8 +57,12 @@ for iFile = 1 : nFiles
         'flgForce', true, 'flgSave', true, 'flgPlot', false);
 
     % Burst statistics
-    stats = brst_stats(brst, spktimes, 'winCalc', [], ...
+    stats = burst_stats(burst, spktimes, 'winCalc', [], ...
         'flgSave', true);
+    
+    % Burst temporal dynamics
+    dyn = burst_dynamics(burst, spktimes, 'binSize', 60, ...
+        'binSize', binSize, 'flgSave', true, 'flgPlot', false);
 
 end
 
@@ -68,34 +72,34 @@ end
 %  INSPECT BASELINE
 %  ========================================================================
 
-presets = {'frNet', 'brst'};
+presets = {'frNet', 'burst'};
 basepaths = [mcu_basepaths('wt_bsl'), mcu_basepaths('mcu_bsl')];
 tbl = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
 
 % Transform burst metrics
 tblPlot = tbl;
-tblPlot = tbl_trans(tblPlot, 'varsInc', {'pBspk'}, 'logBase', 'logit', 'verbose', true);
+tblPlot = tbl_trans(tblPlot, 'varsInc', {'pBurst'}, 'logBase', 'logit', 'verbose', true);
 tblPlot = tbl_trans(tblPlot, 'varsInc', {'bRoy'}, 'logBase', 10, 'verbose', true);
 
 % Limit units
 uIdx = tblPlot.unitType == 'RS';
 tblPlot = tblPlot(uIdx, :);
 
-tblGUI_bar(tblPlot, 'xVar', 'Group', 'yVar', 'funcon');
+tblGUI_bar(tblPlot, 'xVar', 'genotype', 'yVar', 'funcon');
 
-tblGUI_scatHist(tblPlot, 'xVar', 'pBspk', 'yVar', 'funcon_fish', 'grpVar', 'Group');
+tblGUI_scatHist(tblPlot, 'xVar', 'pBurst', 'yVar', 'funcon_fish', 'grpVar', 'genotype');
 
 
 
 % LME
 varRsp = 'funcon_shf';
-frml = [varRsp, ' ~ Group * pBspk + (1|Name)'];
+frml = [varRsp, ' ~ genotype * pBurst + (1|sbjID)'];
 [lmeMdl, lmeStats, lmeInfo, tblMdl] = lme_analyse(tblPlot, frml);
 
 
 
 % PLOT INTERACTION
-vars = {'pBspk', 'Group'};
+vars = {'pBurst', 'genotype'};
 hFig = plot_axSize('flgFullscreen', true, 'flgPos', true);
 
 % Partial Residuals
@@ -105,7 +109,7 @@ hAx = nexttile;
 
 % Partial Dependence
 hAx = nexttile;
-vars = {'Group'};
+vars = {'genotype'};
 [pdRes, hFig] = lme_lsmeans(lmeMdl, vars, 'transParams', [], ...
     'hAx', hAx);
 
@@ -118,26 +122,26 @@ vars = {'Group'};
 basepaths = [mcu_basepaths('wt_bsl'), mcu_basepaths('mcu_bsl'), ...
     mcu_basepaths('wt_bac3'), mcu_basepaths('mcu_bac3')];
 basepaths(contains(basepaths, 'lh137')) = [];
-presets = {'brst'};
+presets = {'burst'};
 tblVivo = mcu_tblVivo('basepaths', basepaths, 'flgClean', true, ...
     'presets', presets);
-tblVivo.Day(tblVivo.Day == "BAC_ON") = "BAC3";
-tblVivo.Day = removecats(tblVivo.Day, {'BAC_ON'});
+tblVivo.day(tblVivo.day == "BAC_ON") = "BAC3";
+tblVivo.day = removecats(tblVivo.day, {'BAC_ON'});
 
 % Filter RS
 tblVivo = tblVivo(tblVivo.unitType == "RS", :);
 tblVivo.unitType = [];
 
-% logit pBspk
-tblTrans = tbl_trans(tblVivo, 'varsInc', {'pBspk'}, 'logBase', 'logit');
-tblVivo.pBspk_trans = tblTrans.pBspk;
+% logit pBurst
+tblTrans = tbl_trans(tblVivo, 'varsInc', {'pBurst'}, 'logBase', 'logit');
+tblVivo.pBurst_trans = tblTrans.pBurst;
 
 % Assert no zero values (instead of a pseudocount)
 tblVivo = tbl_trans(tblVivo, 'flg0', true, 'verbose', true);
 
 % Plot
-tblGUI_bar(tblVivo, 'xVar', 'Group', 'yVar', 'fr');
-tblGUI_scatHist(tblVivo, 'xVar', 'pBspk', 'yVar', 'fr', 'grpVar', 'Group');
+tblGUI_bar(tblVivo, 'xVar', 'genotype', 'yVar', 'fr');
+tblGUI_scatHist(tblVivo, 'xVar', 'pBurst', 'yVar', 'fr', 'grpVar', 'genotype');
 
 
 %% ========================================================================
@@ -149,8 +153,8 @@ tblPlot = tblVivo;
 varsTbl = tblPlot.Properties.VariableNames;
 isNum = cellfun(@(x) isnumeric(tblPlot.(x)) && ~iscategorical(tblPlot.(x)), varsTbl);
 varsNum = varsTbl(isNum);
-tblPlot = unstack(tblPlot, varsNum, {'Day'});
-tblPlot.UnitID = [];
+tblPlot = unstack(tblPlot, varsNum, {'day'});
+tblPlot.unitID = [];
 
 % Organize column names
 varsTbl = tblPlot.Properties.VariableNames;
@@ -159,15 +163,15 @@ varsNew = regexprep(varsNew, '(.*)_BAC3$', 'ss_$1');
 tblPlot.Properties.VariableNames = varsNew;
 
 % Plot
-tblGUI_scatHist(tblPlot, 'xVar', 'ss_frBspk', 'yVar', 'ss_frSspk', 'grpVar', 'Group');
+tblGUI_scatHist(tblPlot, 'xVar', 'ss_frBurst', 'yVar', 'ss_frSingle', 'grpVar', 'genotype');
 
 % LME
-varRsp = 'ss_frBspk';
-frml = [varRsp, ' ~ Group + (1|Name)'];
+varRsp = 'ss_frBurst';
+frml = [varRsp, ' ~ genotype + (1|sbjID)'];
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblPlot, frml, 'dist', 'gamma');
 
 % Prism
-[prismMat] = tbl2prism(tblPlot, 'yVar', varRsp, 'grpVar', 'Group');
+[prismMat] = tbl2prism(tblPlot, 'yVar', varRsp, 'grpVar', 'genotype');
 
 
 %% ========================================================================
@@ -183,30 +187,30 @@ else
 end
 
 varsTbl = tblPlot.Properties.VariableNames;
-tblSum = groupsummary(tblPlot, {'Group', 'Name'}, fh, ...
+tblSum = groupsummary(tblPlot, {'genotype', 'sbjID'}, fh, ...
     vartype("numeric"));
 tblSum(:, "GroupCount") = [];
-varsTbl(contains(varsTbl, 'File')) = [];
+varsTbl(contains(varsTbl, 'fileID')) = [];
 tblSum.Properties.VariableNames = varsTbl;
 
 % Add Recovery Metrics
 
 % Relative
-tblSum.dBrst_rel = log((tblSum.ss_frBspk) ./ (tblSum.frBspk));
-tblSum.dSngl_rel = log((tblSum.ss_frSspk) ./ (tblSum.frSspk));
+tblSum.dBrst_rel = log((tblSum.ss_frBurst) ./ (tblSum.frBurst));
+tblSum.dSngl_rel = log((tblSum.ss_frSingle) ./ (tblSum.frSingle));
 tblSum.dFr = log((tblSum.ss_fr) ./ (tblSum.fr));
-tblSum.dpBspk = (tblSum.ss_pBspk_trans) - (tblSum.pBspk_trans);
+tblSum.dpBurst = (tblSum.ss_pBurst_trans) - (tblSum.pBurst_trans);
 
 % Absolute
-tblSum.dBrst_abs = (tblSum.ss_frBspk - tblSum.frBspk);
-tblSum.dSngl_abs = (tblSum.ss_frSspk - tblSum.frSspk);
+tblSum.dBrst_abs = (tblSum.ss_frBurst - tblSum.frBurst);
+tblSum.dSngl_abs = (tblSum.ss_frSingle - tblSum.frSingle);
 tblSum.dFr_abs = (tblSum.ss_fr - tblSum.fr);
 tblSum.dFr_prct = tblSum.dFr_abs * 100;
 
 
-tblGUI_scatHist(tblSum, 'xVar', 'dBrst_rel', 'yVar', 'dSngl_rel', 'grpVar', 'Group');
+tblGUI_scatHist(tblSum, 'xVar', 'dBrst_rel', 'yVar', 'dSngl_rel', 'grpVar', 'genotype');
 
-tblSum(:, {'Group', 'dBrst_rel', 'dSngl_rel'})
+tblSum(:, {'genotype', 'dBrst_rel', 'dSngl_rel'})
 
 
 
@@ -219,7 +223,7 @@ basepaths = [mcu_basepaths('wt_bsl'), mcu_basepaths('mcu_bsl')];
 nFiles = length(basepaths);
 
 % vars
-vars = {'spikes', 'units', 'brst', 'frNet'};
+vars = {'spikes', 'units', 'burst', 'frNet'};
 
 % load state vars
 v = basepaths2vars('basepaths', basepaths, 'vars', vars);
@@ -272,32 +276,32 @@ for iFile = 1 : nFiles
     dtCorr = [drft.dt_corr{1}; nan];
 
     % Burst statistics
-    brst = v(iFile).brst;
-    stats = brst_stats(brst, spktimes, 'winCalc', frNet.tWin, ...
+    burst = v(iFile).burst;
+    stats = burst_stats(burst, spktimes, 'winCalc', frNet.tWin, ...
         'flgSave', false);
-    pBspk = mean(stats.pBspk(uIdx, :), 1, 'omitnan')';
+    pBurst = mean(stats.pBurst(uIdx, :), 1, 'omitnan')';
 
     % Store
     vPseudo(iFile).mfr      = mfr;
     vPseudo(iFile).mcc      = mcc;
     vPseudo(iFile).funcon   = funcon;
     vPseudo(iFile).dim      = dim;
-    vPseudo(iFile).pBspk    = pBspk;
+    vPseudo(iFile).pBurst    = pBurst;
     vPseudo(iFile).dtCorr   = dtCorr;
 end
 
 % Metadata tags
 tagFiles = struct();
-tagFiles.Name = get_mname(basepaths);
+tagFiles.sbjID = get_mname(basepaths);
 [~, fileNames] = fileparts(basepaths);
-tagFiles.File = fileNames;
+tagFiles.fileID = fileNames;
 
 % Variable Map
 varMap = struct();
 varMap.mfr      = 'mfr';
 varMap.mcc      = 'mcc';
 varMap.dim      = 'dim';
-varMap.pBspk    = 'pBspk';
+varMap.pBurst    = 'pBurst';
 varMap.dtCorr   = 'dtCorr';
 varMap.funcon   = 'funcon';
 
@@ -306,21 +310,21 @@ tbl = v2tbl('v', vPseudo, 'varMap', varMap, 'tagFiles', tagFiles);
 
 % Add Group
 cfg = mcu_cfg;
-tbl.Group = ones(height(tbl), 1) * 1;
-tbl.Group(ismember(tbl.Name, cfg.miceMCU), :) = 2;
-tbl.Group = categorical(tbl.Group, [1, 2], cfg.lbl.grp);
+tbl.genotype = ones(height(tbl), 1) * 1;
+tbl.genotype(ismember(tbl.sbjID, cfg.miceMCU), :) = 2;
+tbl.genotype = categorical(tbl.genotype, [1, 2], cfg.lbl.grp);
 
 % Reorder columns
-tbl = movevars(tbl, {'Group', 'Name', 'File'}, 'Before', 1);
+tbl = movevars(tbl, {'genotype', 'sbjID', 'fileID'}, 'Before', 1);
 
-% Logit pBspk
-tbl = tbl_trans(tbl, 'varsInc', {'pBspk'}, 'logBase', 'logit');
+% Logit pBurst
+tbl = tbl_trans(tbl, 'varsInc', {'pBurst'}, 'logBase', 'logit');
 
 % Visualize
-tblGUI_scatHist(tbl, 'xVar', 'mfr', 'yVar', 'dim', 'grpVar', 'Group');
+tblGUI_scatHist(tbl, 'xVar', 'mfr', 'yVar', 'dim', 'grpVar', 'genotype');
 
 % Analysis
-frml = 'dim ~ (funcon + mfr + pBspk) * Group + (1|Name)';
+frml = 'dim ~ (funcon + mfr + pBurst) * genotype + (1|sbjID)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tbl, frml);
 
 
@@ -395,6 +399,6 @@ end
 
 tblLme.dim = dim([1 : 9, 11])';
 
-tblGUI_scatHist(tblLme, 'xVar', 'dim', 'yVar', 'Rcv', 'grpVar', 'Group');
+tblGUI_scatHist(tblLme, 'xVar', 'dim', 'yVar', 'Rcv', 'grpVar', 'genotype');
 
 

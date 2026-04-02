@@ -60,7 +60,7 @@
 
 % Files
 basepaths = [mcu_basepaths('mea_bac'), mcu_basepaths('mea_mcuko')];
-vars = {'mea', 'fr', 'frFit', 'brst', 'rcv'};
+vars = {'mea', 'fr', 'frFit', 'burst', 'rcv'};
 v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 nFiles = length(basepaths);
 
@@ -118,25 +118,25 @@ for iFile = 1 : nFiles
     % save(fullfile(basepath, [basename, '.frRcv_mdl.mat']), 'rcvMdl', '-v7.3');
 
     % Burst detection
-    % brst = brst_detect(spktimes, ...
-    %     'minSpks', 3, ...
-    %     'isiStart', isiStart, ...
-    %     'isiEnd', isiEnd, ...
-    %     'minDur', 0, ...
-    %     'minIBI', minIbi, ...
-    %     'flgForce', true, 'flgSave', true, 'flgPlot', false);
+    burst = burst_detect(spktimes, ...
+        'minSpks', 3, ...
+        'isiStart', isiStart, ...
+        'isiEnd', isiEnd, ...
+        'minDur', 0, ...
+        'minIBI', minIbi, ...
+        'flgForce', true, 'flgSave', true, 'flgPlot', false);
 
     % % Burst statistics
-    % rcv = v(iFile).rcv;
-    brst = v(iFile).brst;
-    % % winBsl = [0, rcv.info.winBsl(2)];
-    % winCalc = [rcv.info.winBsl; rcv.info.winTrough; rcv.info.winSs];
-    % stats = brst_stats(brst, spktimes, 'winCalc', winCalc, ...
-    %     'flgSave', true);
+    rcv = v(iFile).rcv;
+    % burst = v(iFile).burst;
+    % winBsl = [0, rcv.info.winBsl(2)];
+    winCalc = [rcv.info.winBsl; rcv.info.winTrough; rcv.info.winSs];
+    stats = burst_stats(burst, spktimes, 'winCalc', winCalc, ...
+        'flgSave', true);
 
     % Burst temporal dynamics
-    dyn = brst_dynamics(brst, spktimes, 'binSize', 60, ...
-        'binSize', binSize, 'flgSave', true, 'flgPlot', false);
+    dyn = burst_dynamics(burst, spktimes, 'binSize', 60, ...
+        'flgSave', true, 'flgPlot', false);
 
     % Tranfer function spikes to Ca2+
     % ca = spk2ca(spktimes, 'winCalc', [0, Inf], ...
@@ -150,13 +150,13 @@ end
 %  ========================================================================
 
 presets = {'time', 'steadyState', 'frNet', 'rcv', 'spktimes'};
-[tbl, xVec, basepaths, v] = mcu_tblMea('presets', presets([2]));
+[tbl, xVec, basepaths, v] = mcu_tblMea('presets', presets([5]));
 
 tblLme = tbl;
 
-% Add logit pBspk
-tblTrans = tbl_trans(tblLme, 'varsInc', {'pBspk'}, 'logBase', 'logit');
-tblLme.pBspk_trans = tblTrans.pBspk;
+% Add logit pBurst
+tblTrans = tbl_trans(tblLme, 'varsInc', {'pBurst'}, 'logBase', 'logit');
+tblLme.pBurst_trans = tblTrans.pBurst;
 
 
 %% ========================================================================
@@ -166,11 +166,11 @@ tblLme.pBspk_trans = tblTrans.pBspk;
 
 tblGUI_xy(xVec, tbl);
 
-tblGUI_scatHist(tblLme, 'xVar', 'fr', 'yVar', 'pBSpk_trans', 'grpVar', 'Group');
+tblGUI_scatHist(tblLme, 'xVar', 'fr', 'yVar', 'pBSpk_trans', 'grpVar', 'genotype');
 
-tblGUI_bar(tbl, 'yVar', 'pBspk', 'xVar', 'Group');
+tblGUI_bar(tbl, 'yVar', 'pBurst', 'xVar', 'genotype');
 
-tblGUI_raster(tbl, 'grpVar', 'Name', 'grpVal', 'mcu-ko2')
+tblGUI_raster(tbl, 'grpVar', 'sbjID', 'grpVal', 'mcu-ko2')
 
 
 %% ========================================================================
@@ -179,25 +179,25 @@ tblGUI_raster(tbl, 'grpVar', 'Name', 'grpVal', 'mcu-ko2')
 
 
 % Fit
-varRsp = 'frBspk';
-frml = [varRsp, ' ~ Group + (1|Name)'];
+varRsp = 'frBurst';
+frml = [varRsp, ' ~ genotype + (1|sbjID)'];
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tbl, frml);
 
 % Fit
-varRsp = 'pBspk';
-frml = [varRsp, ' ~ Group * fr + (1|Name)'];
+varRsp = 'pBurst';
+frml = [varRsp, ' ~ genotype * fr + (1|sbjID)'];
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLme, frml, 'dist', 'logit-normal');
 
 % Plot
-hFig = tblGUI_bar(tblLme, 'yVar', varRsp, 'xVar', 'Group');
+hFig = tblGUI_bar(tblLme, 'yVar', varRsp, 'xVar', 'genotype');
 
 % Prism
-[prismMat] = tbl2prism(tblLme, 'yVar', varRsp, 'grpVar', 'Group');
+[prismMat] = tbl2prism(tblLme, 'yVar', varRsp, 'grpVar', 'genotype');
 mean((prismMat), 'omitnan')
 mean(log10(prismMat), 'omitnan')
 
 % Save
-fname = sprintf('MEA~%s~Group', varRsp);
+fname = sprintf('MEA~%s~genotype', varRsp);
 lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat', 'xlsx'},...
     'lmeData', [], 'lmeStats', lmeStats, 'lmeMdl', lmeMdl)
 
@@ -208,7 +208,7 @@ tblLong = stack(tblLme, {'fr', 'ss_fr'}, ...
     'IndexVariableName', 'Epoch');
 
 varRsp = 'FiringRate';
-frml = [varRsp, ' ~ Group * Epoch + (1|Name) + (1 | Name:UnitID)'];
+frml = [varRsp, ' ~ genotype * Epoch + (1|sbjID) + (1 | sbjID:unitID)'];
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLong, frml, 'dist', 'gamma');
 
 
@@ -226,18 +226,34 @@ varsNum = varsTbl(isNum);
 
 % Select Units
 tblLme = tbl;
-tblLme(:, "UnitID") = [];
+tblLme(:, "unitID") = [];
 tblLme(:, "uRcv") = [];
 tblLme(:, "uPert") = [];
 
 % Baseline Table
 varsTbl = tblLme.Properties.VariableNames;
-tblLme = groupsummary(tblLme, {'Name', 'Group'}, 'mean', ...
+tblLme = groupsummary(tblLme, {'sbjID', 'genotype'}, 'mean', ...
     vartype("numeric"));
 tblLme(:, "GroupCount") = [];
 tblLme.Properties.VariableNames = varsTbl;
 
-tblGUI_scatHist(tblLme, 'xVar', 'dim', 'yVar', 'Rcv', 'grpVar', 'Group');
+tblGUI_scatHist(tblLme, 'xVar', 'dim', 'yVar', 'Rcv', 'grpVar', 'genotype');
+
+
+%% ========================================================================
+%  PLOT RASTER
+%  ========================================================================
+
+% Load table with spike times and burst spike times
+presets = {'spktimes'};
+[tbl, ~, basepaths, v] = mcu_tblMea('presets', presets);
+
+% Limit to baseline period (PLA: t_rec < 4800 s ≈ 80 min absolute)
+timeLim = [0, 4800];
+
+% Raster — Control (change grpVal to 'MCU-KO' for knockouts)
+tblGUI_raster(tbl, 'brstVar', 'brstTimes', 'timeLim', timeLim, ...
+    'grpVar', 'genotype', 'grpVal', 'Control');
 
 
 

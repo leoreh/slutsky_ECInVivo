@@ -10,7 +10,7 @@ function [tbl, xVec, basepaths, v] = mcu_tblMea(varargin)
 %       'basepaths' - (cell) List of recording folders. If empty, loads defaults.
 %       'v'         - (struct) Pre-loaded data struct.
 %       'presets'   - (cell) List of data types to include:
-%                     'time'        : Include temporal dynamics (brstDyn).
+%                     'time'        : Include temporal dynamics (burstDyn).
 %                     'spktimes'    : Include spike times (mea.spktimes).
 %                     'steadyState' : Include steady-state recovery metrics (ss_).
 %                     'frNet'       : Include network metrics (dim, mcc, cc).
@@ -58,7 +58,7 @@ cfg = mcu_cfg;
 vars = {'fr', 'rcv', 'stats'};
 
 if ismember('time', presets)
-    vars = [vars, {'brstDyn'}];
+    vars = [vars, {'burstDyn'}];
 end
 
 if ismember('rcv', presets)
@@ -66,7 +66,7 @@ if ismember('rcv', presets)
 end
 
 if ismember('spktimes', presets)
-    vars = [vars, {'mea'}];
+    vars = [vars, {'mea', 'burst'}];
 end
 
 if ismember('frNet', presets)
@@ -121,27 +121,28 @@ else
     varMap.uPert     = 'rcv.uPert';
 end
 
-varMap.bRate     = 'stats.eventRate';
+varMap.br        = 'stats.br';
 varMap.bDur      = 'stats.dur';
 varMap.bFreq     = 'stats.freq';
 varMap.bIBI      = 'stats.ibi';
-varMap.pBspk     = 'stats.pBspk';
-varMap.nBspk     = 'stats.nBspk';
-varMap.frTot     = 'stats.frTot';
-varMap.frBspk    = 'stats.frBspk';
-varMap.frSspk    = 'stats.frSspk';
+varMap.pBurst    = 'stats.pBurst';
+varMap.bSize     = 'stats.bSize';
+varMap.frTot     = 'stats.fr';
+varMap.frBurst   = 'stats.frBurst';
+varMap.frSingle  = 'stats.frSingle';
 
 % Spike Times
 % -----------
 if ismember('spktimes', presets)
-    varMap.spktimes = 'mea.spktimes';
+    varMap.spktimes  = 'mea.spktimes';
+    varMap.brstTimes = 'burst.spktimes';
 end
 
 % File Tags
 % ---------
-tagFiles.Name = get_mname(basepaths, 0);
-tagFiles.Group = repmat(cfg.lbl.grp(1), 1, nFiles);
-tagFiles.Group(contains(tagFiles.Name, 'ko')) = cfg.lbl.grp(2);
+tagFiles.sbjID = get_mname(basepaths, 0);
+tagFiles.genotype = repmat(cfg.lbl.grp(1), 1, nFiles);
+tagFiles.genotype(contains(tagFiles.sbjID, 'ko')) = cfg.lbl.grp(2);
 
 
 %% ========================================================================
@@ -158,14 +159,14 @@ tbl = v2tbl('v', v, 'varMap', varMap, 'tagFiles', tagFiles, ...
 % ---------------------------------
 if ismember('steadyState', presets)
     mapSS = struct();
-    mapSS.ss_bRate = 'stats.eventRate';
+    mapSS.ss_br    = 'stats.br';
     mapSS.ss_bDur  = 'stats.dur';
     mapSS.ss_bFreq = 'stats.freq';
     mapSS.ss_bIBI  = 'stats.ibi';
-    mapSS.ss_pBspk = 'stats.pBspk';
-    mapSS.ss_nBspk = 'stats.nBspk';
-    mapSS.ss_frBspk = 'stats.frBspk';
-    mapSS.ss_frSspk = 'stats.frSspk';
+    mapSS.ss_pBurst = 'stats.pBurst';
+    mapSS.ss_bSize  = 'stats.bSize';
+    mapSS.ss_frBurst = 'stats.frBurst';
+    mapSS.ss_frSingle = 'stats.frSingle';
 
     tblSS = v2tbl('v', v, 'varMap', mapSS, 'tagFiles', tagFiles, ...
         'idxCol', 3, 'uOffset', 0);
@@ -182,15 +183,15 @@ if ismember('time', presets)
     % Create a map for alignment
     mapDyn = struct();
     mapDyn.t_fr    = 'fr.fr';
-    mapDyn.t_bRate = 'brstDyn.eventRate';
-    mapDyn.t_bDur  = 'brstDyn.dur';
-    mapDyn.t_bFreq = 'brstDyn.freq';
-    mapDyn.t_bIBI  = 'brstDyn.ibi';
-    mapDyn.t_pBspk = 'brstDyn.pBspk';
-    mapDyn.t_nBspk = 'brstDyn.nBspk';
-    mapDyn.t_frTot = 'brstDyn.frTot';
-    mapDyn.t_frBspk = 'brstDyn.frBspk';
-    mapDyn.t_frSspk = 'brstDyn.frSspk';
+    mapDyn.t_br    = 'burstDyn.br';
+    mapDyn.t_bDur  = 'burstDyn.dur';
+    mapDyn.t_bFreq = 'burstDyn.freq';
+    mapDyn.t_bIBI  = 'burstDyn.ibi';
+    mapDyn.t_pBurst = 'burstDyn.pBurst';
+    mapDyn.t_bSize  = 'burstDyn.bSize';
+    mapDyn.t_frTot = 'burstDyn.fr';
+    mapDyn.t_frBurst = 'burstDyn.frBurst';
+    mapDyn.t_frSingle = 'burstDyn.frSingle';
 
     % Align dynamics
     [v, t] = mea_tAlign(v, mapDyn, 'fr.info.idxPert');
@@ -253,7 +254,7 @@ end
 tbl(~tbl.uGood, :) = [];
 tbl = removevars(tbl, 'uGood');
 
-tbl.UnitID = categorical(tbl.UnitID);
+tbl.unitID = categorical(tbl.unitID);
 
 % Post-Process Time
 if ismember('rcv', presets)
@@ -265,6 +266,8 @@ if ismember('spktimes', presets)
     winExp = [0, 33600];
     tbl.spktimes = cellfun(@(x) x(x >= winExp(1) & x <= winExp(2)), ...
         tbl.spktimes, 'UniformOutput', false);
+    tbl.brstTimes = cellfun(@(x) x(x >= winExp(1) & x <= winExp(2)), ...
+        tbl.brstTimes, 'UniformOutput', false);
 end
 
 % Outlier Removal. Note: Manual inspection of FR traces confirmed these
@@ -276,25 +279,25 @@ if flgOtl
     tbl = removevars(tbl, 'uPert');
 
     % Clean residual outliers
-    frml = 'ss_fr ~ (frBspk + frSspk) + (1 | Name)';
+    frml = 'ss_fr ~ (frBurst + frSingle) + (1 | sbjID)';
 
     % Control
-    tblWt  = tbl(tbl.Group == 'Control', :);
+    tblWt  = tbl(tbl.genotype == 'Control', :);
     lmeMdl = lme_analyse(tblWt, frml, 'dist', 'log-normal', 'verbose', false);
     res    = residuals(lmeMdl, 'ResidualType', 'Pearson');
     otlWt  = abs(res) > 3;
-    idWt   = tblWt.UnitID(otlWt);
+    idWt   = tblWt.unitID(otlWt);
 
     % MCU-KO
-    tblMcu = tbl(tbl.Group == 'MCU-KO', :);
+    tblMcu = tbl(tbl.genotype == 'MCU-KO', :);
     lmeMdl = lme_analyse(tblMcu, frml, 'dist', 'log-normal', 'verbose', false);
     res    = residuals(lmeMdl, 'ResidualType', 'Pearson');
     otlMcu = abs(res) > 3;
-    idMcu  = tblMcu.UnitID(otlMcu);
+    idMcu  = tblMcu.unitID(otlMcu);
 
     % Remove
     otlIDs = [idMcu; idWt];
-    otlIdx = ismember(tbl.UnitID, otlIDs);
+    otlIdx = ismember(tbl.unitID, otlIDs);
     tbl(otlIdx, :) = [];
 end
 

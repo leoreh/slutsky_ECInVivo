@@ -10,7 +10,7 @@ basepaths = [mcu_basepaths('wt_bsl'), mcu_basepaths('mcu_bsl')];
 cfg = mcu_cfg();
 
 % Load table
-presets = {'brst'};
+presets = {'burst'};
 tbl = mcu_tblVivo('basepaths', basepaths, 'flgClean', true, ...
     'presets', presets);
 
@@ -21,16 +21,16 @@ tblLme = tbl_trans(tbl, 'flg0', true, 'verbose', true);
 uIdx = tblLme.unitType == 'RS';
 tblLme = tblLme(uIdx, :);
 
-% logit pBspk
-tblTrans = tbl_trans(tblLme, 'varsInc', {'pBspk'}, 'logBase', 'logit');
-tblLme.pBspk_trans = tblTrans.pBspk;
+% logit pBurst
+tblTrans = tbl_trans(tblLme, 'varsInc', {'pBurst'}, 'logBase', 'logit');
+tblLme.pBurst_trans = tblTrans.pBurst;
 
 % Indices
-idxGrp = tblLme.Group == 'Control';
-idxGrp = tblLme.Group == 'MCU-KO';
+idxGrp = tblLme.genotype == 'Control';
+idxGrp = tblLme.genotype == 'MCU-KO';
 
 % Plots
-tblGUI_scatHist(tblLme(:, :), 'xVar', 'fr', 'yVar', 'pBspk', 'grpVar', 'Group')
+tblGUI_scatHist(tblLme(:, :), 'xVar', 'fr', 'yVar', 'pBurst', 'grpVar', 'genotype')
 tblGUI_bar(tblLme);
 
 
@@ -39,31 +39,31 @@ tblGUI_bar(tblLme);
 %  ========================================================================
 
 % Remove WASH
-tblLme(tblLme.Day == 'WASH', :) = [];
-tblLme.Day = removecats(tblLme.Day, {'WASH'});
+tblLme(tblLme.day == 'WASH', :) = [];
+tblLme.day = removecats(tblLme.day, {'WASH'});
 
-tblLme(tblLme.Day == 'BAC1', :) = [];
-tblLme.Day = removecats(tblLme.Day, {'BAC1'});
+tblLme(tblLme.day == 'BAC1', :) = [];
+tblLme.day = removecats(tblLme.day, {'BAC1'});
 
-tblLme(tblLme.Day == 'BAC2', :) = [];
-tblLme.Day = removecats(tblLme.Day, {'BAC2'});
+tblLme(tblLme.day == 'BAC2', :) = [];
+tblLme.day = removecats(tblLme.day, {'BAC2'});
 
 
 % Select Params
-varRsp = 'pBspk';
+varRsp = 'pBurst';
 
 % run lme
-frml = [varRsp, ' ~ Group * Day + (Day|Name)'];
+frml = [varRsp, ' ~ genotype * day + (day|sbjID)'];
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLme, frml, 'dist', 'logit-normal');
 
 % Plot
-hFig = tblGUI_bar(tblLme, 'yVar', varRsp, 'xVar', 'Day', 'grpVar', 'Group');
+hFig = tblGUI_bar(tblLme, 'yVar', varRsp, 'xVar', 'day', 'grpVar', 'genotype');
 
 
 % Prism
 iGrp = 1;
-[prismMat] = tbl2prism(tblLme(tblLme.Group == cfg.lbl.grp{iGrp}, :), ...
-    'yVar', varRsp, 'grpVar', 'Day');
+[prismMat] = tbl2prism(tblLme(tblLme.genotype == cfg.lbl.grp{iGrp}, :), ...
+    'yVar', varRsp, 'grpVar', 'day');
 
 
 
@@ -73,22 +73,22 @@ iGrp = 1;
 
 
 % Select data
-tblLme = tbl(tbl.Day == 'BSL', :);
+tblLme = tbl(tbl.day == 'BSL', :);
 tblLme = tblLme(tblLme.unitType == 'RS', :);
 
 % Select Params
 varRsp = 'fr';
 
 % Fit
-frml = [varRsp, ' ~ Group + (1|Name)'];
+frml = [varRsp, ' ~ genotype + (1|sbjID)'];
 [lmeMdl, lmeStats, lmeInfo, tblMdl] = lme_analyse(tblLme, frml, 'dist', 'gamma');
 
 
 % Plot
-hFig = tblGUI_bar(tblLme, 'yVar', varRsp, 'xVar', 'Group');
+hFig = tblGUI_bar(tblLme, 'yVar', varRsp, 'xVar', 'genotype');
 
 % Prism
-[prismMat] = tbl2prism(tblLme, 'yVar', varRsp, 'grpVar', 'Group');
+[prismMat] = tbl2prism(tblLme, 'yVar', varRsp, 'grpVar', 'genotype');
 
 log10(mean(prismMat, 'omitnan'))
 
@@ -119,17 +119,17 @@ tblPlot = tbl(idxUnits, :);
 % tblPlot.FRt = fr_denoise(tblPlot.FRt, 'flgPlot', false, 'frameLen', 60);
 
 % Normalize
-% We group by 'Name' (Mouse) so that all units from the same mouse are
+% We group by 'sbjID' (Mouse) so that all units from the same mouse are
 % normalized by the pooled baseline statistics of that mouse.
-tblPlot = tbl_tNorm(tblPlot, 'varsInc', 'FRt', 'varsGrp', 'Name', ...
+tblPlot = tbl_tNorm(tblPlot, 'varsInc', 'FRt', 'varsGrp', 'sbjID', ...
     'winNorm', winNorm, 'Method', 'percentage', ...
     'flgGeom', false, 'floorVal', floorVal);
 
 % Plot (Log Scale)
-hFig = tblGUI_xy(tAxis, tblPlot, 'yVar', 'FRt', 'tileVar', 'Group');
+hFig = tblGUI_xy(tAxis, tblPlot, 'yVar', 'FRt', 'tileVar', 'genotype');
 
 % Grab to prism
-idxUnits = tblPlot.unitType == 'RS' & tblPlot.Group == 'Control';
+idxUnits = tblPlot.unitType == 'RS' & tblPlot.genotype == 'Control';
 frMat = tblPlot.FRt_bins(idxUnits, :)';
 
 prismMat = [mean(frMat, 2, 'omitnan'), ...
@@ -158,7 +158,7 @@ for iBin = 1 : nBins
 end
 tblPlot.FRt_bins = FRt_bins;
 
-hFig = tblGUI_xy(tBinCents, tblPlot, 'yVar', 'FRt', 'tileVar', 'Group');
+hFig = tblGUI_xy(tBinCents, tblPlot, 'yVar', 'FRt', 'tileVar', 'genotype');
 
 
 
@@ -175,7 +175,7 @@ idxFiles = [1, 5, 50, 54];
 % idxFiles = [15, 19, 50, 54];
 
 % Load
-vars = {'spikes', 'units', 'brst'};
+vars = {'spikes', 'units', 'burst'};
 v = basepaths2vars('basepaths', basepaths(idxFiles), 'vars', vars);
 
 % Config
@@ -215,7 +215,7 @@ for iFile = 1 : length(idxFiles)
     spktimes = cellfun(@(x) x', ...
         v(iFile).spikes.times, 'uni', false)';
     spktimes = spktimes(uIdx);
-    btimes = v(iFile).brst.spktimes(uIdx);
+    btimes = v(iFile).burst.spktimes(uIdx);
 
     plot_raster(spktimes, 'PlotType', 'vertline', ...
         'lineHeight', lnH, ...
@@ -266,7 +266,7 @@ isNum = cellfun(@(x) isnumeric(tblLme.(x)) && ~iscategorical(tblLme.(x)), varsTb
 varsNum = varsTbl(isNum);
 
 % Table per day
-tblDay = groupsummary(tblLme, {'Group', 'Name', 'Day'}, statType, ...
+tblDay = groupsummary(tblLme, {'genotype', 'sbjID', 'day'}, statType, ...
     vartype("numeric"));
 
 % Replace var names
@@ -281,21 +281,21 @@ tblDay.Properties.VariableNames(isNum) = varsNum;
 %  ========================================================================
 
 % Select variables to unstack
-varsUnstack = {'frBspk', 'frSspk'};
+varsUnstack = {'frBurst', 'frSingle'};
 
 % Unstack table (Wide format)
-% Creates columns: frBspk_BSL, frBspk_BAC3, etc.
-tblWide = unstack(tblDay(:, [{'Group', 'Name', 'Day'}, varsUnstack]), ...
-    varsUnstack, 'Day');
+% Creates columns: frBurst_BSL, frBurst_BAC3, etc.
+tblWide = unstack(tblDay(:, [{'genotype', 'sbjID', 'day'}, varsUnstack]), ...
+    varsUnstack, 'day');
 
 % Calculate Log-Ratios
-% dBrst = log(frBspk_BAC3 / frBspk_BSL)
-% dSngl = log(frSspk_BAC3 / frSspk_BSL)
-tblWide.dBrst = log(tblWide.frBspk_BAC3 ./ tblWide.frBspk_BSL);
-tblWide.dSngl = log(tblWide.frSspk_BAC3 ./ tblWide.frSspk_BSL);
+% dBrst = log(frBurst_BAC3 / frBurst_BSL)
+% dSngl = log(frSingle_BAC3 / frSingle_BSL)
+tblWide.dBrst = log(tblWide.frBurst_BAC3 ./ tblWide.frBurst_BSL);
+tblWide.dSngl = log(tblWide.frSingle_BAC3 ./ tblWide.frSingle_BSL);
 
 
 % Plot
-tblGUI_bar(tblWide, 'xVar', 'Group', 'yVar', 'dBrst');
-tblGUI_scatHist(tblWide, 'xVar', 'dSngl', 'yVar', 'dBrst', 'grpVar', 'Group');
+tblGUI_bar(tblWide, 'xVar', 'genotype', 'yVar', 'dBrst');
+tblGUI_scatHist(tblWide, 'xVar', 'dSngl', 'yVar', 'dBrst', 'grpVar', 'genotype');
 

@@ -32,9 +32,9 @@ for iState = sStates
 
     % Metadata
     tagFiles = struct();
-    tagFiles.Name = get_mname(basepaths);
+    tagFiles.sbjID = get_mname(basepaths);
     [~, fileNames] = fileparts(basepaths);
-    tagFiles.File = fileNames;
+    tagFiles.fileID = fileNames;
     tagAll.State = cfg.lbl.states{iState};
 
     % Table
@@ -42,9 +42,9 @@ for iState = sStates
         tagAll, 'tagFiles', tagFiles, 'idxCol', []);
 
     % Group
-    tbl.Group = ones(height(tbl), 1) * 1;
-    tbl.Group(ismember(tbl.Name, cfg.miceMCU), :) = 2;
-    tbl.Group = categorical(tbl.Group, [1, 2], cfg.lbl.grp);
+    tbl.genotype = ones(height(tbl), 1) * 1;
+    tbl.genotype(ismember(tbl.sbjID, cfg.miceMCU), :) = 2;
+    tbl.genotype = categorical(tbl.genotype, [1, 2], cfg.lbl.grp);
 
     tblCell{iState} = tbl;
 end
@@ -52,11 +52,11 @@ end
 tblSs = vertcat(tblCell{:});
 
 % Reorder columns
-varOrder = {'Group', 'Name', 'File', 'UnitID', 'State'};
+varOrder = {'genotype', 'sbjID', 'fileID', 'unitID', 'State'};
 tblSs = movevars(tblSs, varOrder, 'Before', 1);
 
 % Plot
-hFig = tblGUI_bar(tblSs, 'yVar', 'BoutLen', 'xVar', 'State', 'GrpVar', 'Group');
+hFig = tblGUI_bar(tblSs, 'yVar', 'BoutLen', 'xVar', 'State', 'GrpVar', 'genotype');
 
 
 
@@ -64,7 +64,7 @@ hFig = tblGUI_bar(tblSs, 'yVar', 'BoutLen', 'xVar', 'State', 'GrpVar', 'Group');
 % LME
 
 % Formula
-frml = 'BoutLen ~ Group * State + (1|Name)';
+frml = 'BoutLen ~ genotype * State + (1|sbjID)';
 
 % Check best model
 % statsPark = lme_parkTest(tblSs, frml)
@@ -115,9 +115,9 @@ for iState = sStates
 
     % Metadata
     tagFiles = struct();
-    tagFiles.Name = get_mname(basepaths);
+    tagFiles.sbjID = get_mname(basepaths);
     [~, fileNames] = fileparts(basepaths);
-    tagFiles.File = fileNames;
+    tagFiles.fileID = fileNames;
     tagAll.State = cfg.lbl.states{iState};
 
     % Table
@@ -125,9 +125,9 @@ for iState = sStates
         tagAll, 'tagFiles', tagFiles, 'idxCol', iState);
 
     % Group
-    tbl.Group = ones(height(tbl), 1) * 1;
-    tbl.Group(ismember(tbl.Name, cfg.miceMCU), :) = 2;
-    tbl.Group = categorical(tbl.Group, [1, 2], cfg.lbl.grp);
+    tbl.genotype = ones(height(tbl), 1) * 1;
+    tbl.genotype(ismember(tbl.sbjID, cfg.miceMCU), :) = 2;
+    tbl.genotype = categorical(tbl.genotype, [1, 2], cfg.lbl.grp);
 
     tblCell{iState} = tbl;
 end
@@ -135,11 +135,11 @@ end
 tblSs = vertcat(tblCell{:});
 
 % Reorder columns
-varOrder = {'Group', 'Name', 'File', 'UnitID', 'State'};
+varOrder = {'genotype', 'sbjID', 'fileID', 'unitID', 'State'};
 tblSs = movevars(tblSs, varOrder, 'Before', 1);
 
 % Plot
-hFig = tblGUI_bar(tblSs, 'yVar', 'StatePrct', 'xVar', 'State', 'GrpVar', 'Group');
+hFig = tblGUI_bar(tblSs, 'yVar', 'StatePrct', 'xVar', 'State', 'GrpVar', 'genotype');
 
 
 
@@ -147,7 +147,7 @@ hFig = tblGUI_bar(tblSs, 'yVar', 'StatePrct', 'xVar', 'State', 'GrpVar', 'Group'
 % LME
 
 % Formula
-frml = 'StatePrct ~ Group * State + (1|Name)';
+frml = 'StatePrct ~ genotype * State + (1|sbjID)';
 
 % Check best model
 % statsPark = lme_parkTest(tblSs, frml)

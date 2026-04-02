@@ -58,11 +58,11 @@ tblStates = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
 tblPlot = tblStates(tblStates.State == 'NREM', :);
 tblPlot = tblStates;
 
-tblGUI_bar(tblPlot, 'xVar', 'Group', 'yVar', 'Density');
-tblGUI_scatHist(tblPlot, 'xVar', 'Density', 'yVar', 'Rate', 'grpVar', 'Group');
+tblGUI_bar(tblPlot, 'xVar', 'genotype', 'yVar', 'Density');
+tblGUI_scatHist(tblPlot, 'xVar', 'Density', 'yVar', 'Rate', 'grpVar', 'genotype');
 
 % Run LME
-frml = 'Density ~ (Duration + Rate) * Group + (1|Name)';
+frml = 'Density ~ (Duration + Rate) * genotype + (1|sbjID)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblPlot, frml);
 
 
@@ -71,55 +71,55 @@ frml = 'Density ~ (Duration + Rate) * Group + (1|Name)';
 %  RIPP SPIKES
 %  ========================================================================
 
-presets = {'rippSpks', 'brst'};
+presets = {'rippSpks', 'burst'};
 [tbl, ~, ~, xVec] = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
 
 % Select
 tblPlot = tbl;
 tblPlot = tbl(tbl.unitType == 'RS', :);
-% tblPlot(tblPlot.Name == 'lh137', :) = [];
-% tblPlot.Name = removecats(tblPlot.Name, {'lh137'});
+% tblPlot(tblPlot.sbjID == 'lh137', :) = [];
+% tblPlot.sbjID = removecats(tblPlot.sbjID, {'lh137'});
 
-% Add logit pBspk
-tblTrans = tbl_trans(tblPlot, 'varsInc', {'pBspk'}, 'logBase', 'logit');
-tblPlot.pBspk_trans = tblTrans.pBspk;
+% Add logit pBurst
+tblTrans = tbl_trans(tblPlot, 'varsInc', {'pBurst'}, 'logBase', 'logit');
+tblPlot.pBurst_trans = tblTrans.pBurst;
 tblTrans = tbl_trans(tblPlot, 'varsInc', {'bRoy'}, 'logBase', 10);
 tblPlot.bRoy_trans = tblTrans.bRoy;
 
 % Plot
-tblGUI_bar(tblPlot, 'xVar', 'Group', 'yVar', 'frZ');
-tblGUI_scatHist(tblPlot, 'xVar', 'asym', 'yVar', 'bRoy', 'grpVar', 'Group');
-tblGUI_xy(xVec, tbl, 'grpVar', 'Group');
+tblGUI_bar(tblPlot, 'xVar', 'genotype', 'yVar', 'frZ');
+tblGUI_scatHist(tblPlot, 'xVar', 'asym', 'yVar', 'bRoy', 'grpVar', 'genotype');
+tblGUI_xy(xVec, tbl, 'grpVar', 'genotype');
 
-tblPlot.burstClu = tblPlot.pBspk > 0.25;
+tblPlot.burstClu = tblPlot.pBurst > 0.25;
 tblPlot.pethNorm = normalize(tblPlot.peth, 2, "norm");
 tblPlot.pethCumSum = normalize(cumsum(tblPlot.peth, 2), 2, "range");
 tblPlot.pethCumSum = cumsum(tblPlot.peth, 2) ./ sum(tblPlot.peth, 2);
 
-tblGUI_xy(xVec, tblPlot, 'grpVar', 'Group', 'yVar', 'pethCumSum');
+tblGUI_xy(xVec, tblPlot, 'grpVar', 'genotype', 'yVar', 'pethCumSum');
 xlim([-0.05, 0.05])
 
 % LME
-xVar = 'pBspk';
-frml = sprintf('com ~ (fr + %s) + Group + (1|Name)', xVar);
+xVar = 'pBurst';
+frml = sprintf('com ~ (fr + %s) + genotype + (1|sbjID)', xVar);
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblPlot, frml, 'dist', 'normal');
 
 % Partial Dependence
 hFig = figure;
 hAx = nexttile;
-vars = {xVar, 'Group'};
+vars = {xVar, 'genotype'};
 [pdRes, hFig] = lme_lsmeans(lmeMdl, vars, 'transParams', lmeInfo.transParams, ...
     'hAx', hAx, 'xLims', {[0, 1], []});
 
 hAx = nexttile;
 xVar = 'fr';
-vars = {xVar, 'Group'};
+vars = {xVar, 'genotype'};
 [pdRes, hFig] = lme_lsmeans(lmeMdl, vars, 'transParams', lmeInfo.transParams, ...
     'hAx', hAx);
 set(hAx, 'XScale', 'log')
 
 % To Prism
-grpIdx = pdRes.Group == "MCU-KO";
+grpIdx = pdRes.genotype == "MCU-KO";
 [pdRes(grpIdx, {xVar}), ...
     pdRes(grpIdx, {'com_pred', 'com_upper', 'com_lower'})]
 
@@ -128,16 +128,16 @@ set(gca,'XScale','log')
 
 
 % Summary
-tblSum = groupsummary(tblPlot, {'Group', 'Name'}, 'mean', ...
+tblSum = groupsummary(tblPlot, {'genotype', 'sbjID'}, 'mean', ...
     vartype("numeric"));
 
 % To Prism (Metrics)
-prismMat = tbl2prism(tblPlot, 'yVar', 'com', 'grpVar', 'Group');
+prismMat = tbl2prism(tblPlot, 'yVar', 'com', 'grpVar', 'genotype');
 mean(prismMat, 1, 'omitnan');
 
 % To prism (Time)
 yVar = 'pethNorm';
-grpIdx = tblPlot.Group == 'MCU-KO';
+grpIdx = tblPlot.genotype == 'MCU-KO';
 prismIdx = grpIdx;
 nUnits = sum(prismIdx);
 prismMat = [mean(tblPlot{prismIdx, yVar}, 1, 'omitnan')', ...
@@ -153,22 +153,22 @@ presets = {'ripp'};
 tblRipp = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
 
 % Plot
-tblGUI_bar(tblRipp, 'xVar', 'Group', 'yVar', 'dur');
-tblGUI_scatHist(tblRipp, 'xVar', 'dur', 'yVar', 'amp', 'grpVar', 'Group');
+tblGUI_bar(tblRipp, 'xVar', 'genotype', 'yVar', 'dur');
+tblGUI_scatHist(tblRipp, 'xVar', 'dur', 'yVar', 'amp', 'grpVar', 'genotype');
 
 % Summary
-tblSum = groupsummary(tblRipp, {'Group', 'Name'}, 'mean', ...
+tblSum = groupsummary(tblRipp, {'genotype', 'sbjID'}, 'mean', ...
     vartype("numeric"));
 
 % LME
-frml = 'dur ~ (freq + amp + com) * Group + (1|Name)';
+frml = 'dur ~ (freq + amp + com) * genotype + (1|sbjID)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblRipp, frml);
 
-frml = 'dur ~ Group + (1|Name)';
+frml = 'dur ~ genotype + (1|sbjID)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblRipp, frml);
 
 % To Prism (Metrics)
-prismMat = tbl2prism(tblRipp, 'yVar', 'freq', 'grpVar', 'Group');
+prismMat = tbl2prism(tblRipp, 'yVar', 'freq', 'grpVar', 'genotype');
 mean(prismMat, 1, 'omitnan');
 
 
@@ -180,11 +180,11 @@ presets = {'rippMaps'};
 [tblMaps, ~, ~, xVec] = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
 
 % Plot
-tblGUI_xy(xVec, tblMaps, 'yVar', 't_lfp', 'grpVar', 'Group');
+tblGUI_xy(xVec, tblMaps, 'yVar', 't_lfp', 'grpVar', 'genotype');
 
 % To prism
 yVar = 't_freq';
-grpIdx = tblMaps.Group == 'Control';
+grpIdx = tblMaps.genotype == 'Control';
 nRipp = height(tblMaps(grpIdx, :));
 prismMat = [mean(tblMaps{grpIdx, yVar}, 1, 'omitnan')', ...
     std(tblMaps{grpIdx, yVar}, [], 1, 'omitnan')', ...
@@ -213,7 +213,7 @@ iUnit = 1;
 for iGrp = 1 : nGrp
     % Get specific data from table
     idxUnit = tblLme.UnitType == categorical(txtUnit(iUnit));
-    idxGrp = tblLme.Group == categorical(txtGrp(iGrp));
+    idxGrp = tblLme.genotype == categorical(txtGrp(iGrp));
     idxSgn = tblLme.pVal < 0.05;
     idxTbl = idxUnit & idxGrp & idxSgn;
     grpTbl = tblLme(idxTbl, :);
@@ -266,7 +266,7 @@ mapData = cell2padmat(mapData, 3);
 rateMap = ripp.spkLfp.rateMap;
 
 % get unit indices
-idxGrp = tblLme.Group == categorical(txtGrp(iGrp));
+idxGrp = tblLme.genotype == categorical(txtGrp(iGrp));
 grpTbl = tblLme(idxGrp, :);
 idxUnit = grpTbl.UnitType == categorical(txtUnit(iUnit));
 idxSgn = grpTbl.pVal < 0.05;

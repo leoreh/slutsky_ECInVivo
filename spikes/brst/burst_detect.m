@@ -1,12 +1,12 @@
-function brst = brst_detect(spktimes, varargin)
-% BRST_DETECT Detects bursts using the Max Interval method.
+function burst = burst_detect(spktimes, varargin)
+% BURST_DETECT Detects bursts using the Max Interval method.
 %
-%   brst = BRST_DETECT(SPKTIMES, ...) implements the Max Interval burst
+%   burst = BURST_DETECT(SPKTIMES, ...) implements the Max Interval burst
 %   detection algorithm, defined by fixed thresholds for inter-spike
 %   intervals (ISIs) and burst properties.
 %
 %   Default parameters were extracted by visualizing the isi histogram from
-%   WT MEA recordings (December 25, see brst_isiValley.m)
+%   WT MEA recordings (December 25, see burst_isiValley.m)
 %
 %   INPUTS:
 %       spktimes    - (cell) Spike times per unit (e.g., {unit1, unit2}).
@@ -24,7 +24,7 @@ function brst = brst_detect(spktimes, varargin)
 %                     'verbose'   : (log) Print progress to command window {false}
 %
 %   OUTPUTS:
-%       brst        - (struct) Burst event data.
+%       burst        - (struct) Burst event data.
 %                     .times    : (nUnits x 1 cell) Burst start/end times
 %                     .nBspk    : (nUnits x 1 cell) Count of spikes per burst
 %                     .dur      : (nUnits x 1 cell) Duration of bursts (s)
@@ -33,7 +33,7 @@ function brst = brst_detect(spktimes, varargin)
 %                     .spktimes : (nUnits x 1 cell) Spike times within bursts
 %                     .params   : (struct) Parameters used
 %
-%   See also: BRST_DYNAMICS, BRST_STATS
+%   See also: BURST_DYNAMICS, BURST_STATS
 
 %% ========================================================================
 %  ARGUMENTS
@@ -72,23 +72,23 @@ params    = p.Results;
 
 % Check existence
 [~, basename] = fileparts(basepath);
-saveFile = fullfile(basepath, [basename, '.brst.mat']);
+saveFile = fullfile(basepath, [basename, '.burst.mat']);
 
 if exist(saveFile, 'file') && ~flgForce && ~flgPlot
-    load(saveFile, 'brst');
+    load(saveFile, 'burst');
     return;
 end
 
 nUnits = length(spktimes);
 
 % Initialize Output
-brst.times    = cell(nUnits, 1);
-brst.nBspk    = cell(nUnits, 1);
-brst.dur      = cell(nUnits, 1);
-brst.freq     = cell(nUnits, 1);
-brst.ibi      = cell(nUnits, 1);
-brst.spktimes = cell(nUnits, 1);
-brst.params   = params;
+burst.times    = cell(nUnits, 1);
+burst.size    = cell(nUnits, 1);
+burst.dur      = cell(nUnits, 1);
+burst.freq     = cell(nUnits, 1);
+burst.ibi      = cell(nUnits, 1);
+burst.spktimes = cell(nUnits, 1);
+burst.params   = params;
 
 
 %% ========================================================================
@@ -106,7 +106,7 @@ end
 
 % Temporary cell arrays for parfor slicing
 bTimes    = cell(nUnits, 1);
-bNspks    = cell(nUnits, 1);
+bSize    = cell(nUnits, 1);
 bDur      = cell(nUnits, 1);
 bFreq     = cell(nUnits, 1);
 bIbi      = cell(nUnits, 1);
@@ -249,7 +249,7 @@ parfor iUnit = 1 : nUnits
 
     % Store in temps
     bTimes{iUnit}    = timesVal;
-    bNspks{iUnit}    = n;
+    bSize{iUnit}    = n;
     bDur{iUnit}      = dur;
     bFreq{iUnit}     = freq;
     bIbi{iUnit}      = ibiVal;
@@ -262,12 +262,12 @@ parfor iUnit = 1 : nUnits
 end
 
 % Assign back to structure
-brst.times    = bTimes;
-brst.nBspk    = bNspks;
-brst.dur      = bDur;
-brst.freq     = bFreq;
-brst.ibi      = bIbi;
-brst.spktimes = bSpktimes;
+burst.times    = bTimes;
+burst.size    = bSize;
+burst.dur      = bDur;
+burst.freq     = bFreq;
+burst.ibi      = bIbi;
+burst.spktimes = bSpktimes;
 
 
 %% ========================================================================
@@ -294,7 +294,7 @@ if flgPlot
 
     % Plot burst spikes in color (Red)
     clr = [1 0 0];
-    plot_raster(brst.spktimes, 'PlotType', 'vertline', ...
+    plot_raster(burst.spktimes, 'PlotType', 'vertline', ...
         'lineHeight', 0.8, ...
         'lineWidth', lnW, ...
         'hAx', hAx, ...
@@ -308,7 +308,7 @@ if flgPlot
 end
 
 if flgSave
-    save(saveFile, 'brst');
+    save(saveFile, 'burst');
 end
 
 end     % EOF
@@ -448,10 +448,10 @@ end     % EOF
 %  ========================================================================
 
 %% ========================================================================
-%  NOTE: BRST_MEA
+%  NOTE: BURST_MEA
 %  ========================================================================
 %  This function can be configured to replicate the behavior of standard
-%  simple threshold burst detectors (eg, brst_mea.m) by forcing the
+%  simple threshold burst detectors (eg, burst_mea.m) by forcing the
 %  two ISI thresholds to be identical and disabling the secondary filters.
 %
 %  To achieve this equivalence:
@@ -460,7 +460,7 @@ end     % EOF
 %    - Set 'minDur' to 0 (disables duration filtering).
 %
 %  Example:
-%    brst = brst_maxInt(spktimes, 'maxISI_start', 0.02, 'maxISI_end', 0.02, ...
+%    burst = burst_maxInt(spktimes, 'maxISI_start', 0.02, 'maxISI_end', 0.02, ...
 %           'minIBI', 0, 'minDur', 0, 'minSpks', 2);
 %  ========================================================================
 

@@ -39,7 +39,7 @@ addParameter(p, 'clr', [0.2 0.2 0.2], @(x) isnumeric(x) || ischar(x));
 addParameter(p, 'lineWidth', 0.5, @isnumeric);
 addParameter(p, 'markerSz', 5, @isnumeric);
 addParameter(p, 'spkDur', 0.001, @isnumeric);
-addParameter(p, 'lineHeight', 0.9, @isnumeric);
+addParameter(p, 'lineHeight', 1, @isnumeric);
 addParameter(p, 'xLim', [], @isnumeric);
 addParameter(p, 'flgLbls', true, @islogical);
 

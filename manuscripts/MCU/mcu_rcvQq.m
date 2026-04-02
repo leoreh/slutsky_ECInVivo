@@ -45,26 +45,26 @@ cutoff_z = p.Results.cutoff_z;
 %  ========================================================================
 
 % Ensure Group variable exists
-if ~ismember('Group', tbl.Properties.VariableNames)
-    error('mcu_rcvQq:missingVar', 'Table must contain "Group" column.');
+if ~ismember('genotype', tbl.Properties.VariableNames)
+    error('mcu_rcvQq:missingVar', 'Table must contain "genotype" column.');
 end
 
-idxWt = tbl.Group == 'Control';
-idxMcu = tbl.Group == 'MCU-KO';
+idxWt = tbl.genotype == 'Control';
+idxMcu = tbl.genotype == 'MCU-KO';
 
 if strcmpi(dataSet, 'vivo')
     
     % Vivo Logic (Long format with Day column)
-    if ~ismember('Day', tbl.Properties.VariableNames)
-        error('mcu_rcvQq:missingVar', 'Vivo data requires "Day" column.');
+    if ~ismember('day', tbl.Properties.VariableNames)
+        error('mcu_rcvQq:missingVar', 'Vivo data requires "day" column.');
     end
     
     % Extract Baseline and Recovery for varName
-    vBsl = tbl.(varName)(tbl.Day == 'BSL' & idxWt);
-    vBac = tbl.(varName)(tbl.Day == 'BAC3' & idxWt);
+    vBsl = tbl.(varName)(tbl.day == 'BSL' & idxWt);
+    vBac = tbl.(varName)(tbl.day == 'BAC3' & idxWt);
     
-    vBslMcu = tbl.(varName)(tbl.Day == 'BSL' & idxMcu);
-    vBacMcu = tbl.(varName)(tbl.Day == 'BAC3' & idxMcu);
+    vBslMcu = tbl.(varName)(tbl.day == 'BSL' & idxMcu);
+    vBacMcu = tbl.(varName)(tbl.day == 'BAC3' & idxMcu);
     
 elseif strcmpi(dataSet, 'mea')
     

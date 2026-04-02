@@ -8,16 +8,16 @@
 [tbl, xVec, basepaths, v] = mcu_tblMea('presets', {'time', 'rcv', 'steadyState'});
 tblPlot = tbl;
 
-% Add logit pBspk
-tblTrans = tbl_trans(tblPlot, 'varsInc', {'pBspk'}, 'logBase', 'logit');
-tblPlot.pBspk_trans = tblTrans.pBspk;
+% Add logit pBurst
+tblTrans = tbl_trans(tblPlot, 'varsInc', {'pBurst'}, 'logBase', 'logit');
+tblPlot.pBurst_trans = tblTrans.pBurst;
 
 %% ========================================================================
 %  CLUSTERS
 %  ========================================================================
 %  Cluster units into percentiles based on a specific variable
 
-varClu = 'pBspk';
+varClu = 'pBurst';
 
 % --- Manual boundaries (leave empty [] to use percentile mode) ---
 % Defines fixed edges applied identically to both groups.
@@ -43,11 +43,11 @@ else
 end
 
 % Get Unique Groups
-grps = unique(tblPlot.Group);
+grps = unique(tblPlot.genotype);
 
 for iGrp = 1:length(grps)
 
-    idxGrp  = tblPlot.Group == grps(iGrp);
+    idxGrp  = tblPlot.genotype == grps(iGrp);
     grpData = tblPlot.(varClu)(idxGrp);
 
     if useManual
@@ -109,7 +109,7 @@ tblPlot = tbl_tNorm(tblPlot, 'varsInc', tVars, 'winNorm', winNorm, ...
 tblGUI_xy(xVec, tblPlot, ...
     'yVar', 't_fr', ...
     'grpVar', 'cluLbl', ...    % Group lines by Cluster
-    'tileVar', 'Group', ...    % Separate tiles by Group (Control vs KO)
+    'tileVar', 'genotype', ...    % Separate tiles by Group (Control vs KO)
     'tileFlow', 'vertical', ...
     'xLbl', 'Time (Hours)');
 
@@ -119,7 +119,7 @@ tblGUI_xy(xVec, tblPlot, ...
 %  ========================================================================
 
 % Loop over clusters and calculate geometric stats for each
-idxGrp = tblPlot.Group == 'Control';
+idxGrp = tblPlot.genotype == 'Control';
 
 % Grab raw matrix
 tblPlot.t_frTot(idxGrp, :)';
@@ -157,7 +157,7 @@ end
 %  belonging to the same 'Name' (Animal).
 
 % % Define Grouping Variables
-% grpVars = {'Name', 'Group'};
+% grpVars = {'sbjID', 'genotype'};
 % 
 % % Identify Numeric Variables to Average (Time-Series columns & others)
 % % We specifically target time-series variables starting with 't_'
@@ -181,9 +181,9 @@ end
 % tblGUI_xy(xVec, tblPlot, ...
 %     'yVar', 't_fr', ...
 %     'grpVar', 'cluLbl', ...    % Group lines by Cluster
-%     'tileVar', 'Group', ...    % Separate tiles by Group (Control vs KO)
+%     'tileVar', 'genotype', ...    % Separate tiles by Group (Control vs KO)
 %     'tileFlow', 'vertical', ...
 %     'xLbl', 'Time (Hours)');
 % 
-% idxGrp = tblPlot.Group == 'MCU-KO';
+% idxGrp = tblPlot.genotype == 'MCU-KO';
 % prismMat = tblPlot.t_frTot(idxGrp, :)';

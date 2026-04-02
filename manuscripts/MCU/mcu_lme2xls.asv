@@ -6,14 +6,14 @@ xlsName = 'mcu_suppTbl.xlsx';
 % Load MEA ----------------------------------------------------------------
 presets = {'steadyState'};
 tblMea = mcu_tblMea('presets', presets, 'flgOtl', true);
-tblTrans = tbl_trans(tblMea, 'varsInc', {'pBspk', 'ss_pBspk'}, 'logBase', 'logit');
-tblMea.pBspk_trans = tblTrans.pBspk;
+tblTrans = tbl_trans(tblMea, 'varsInc', {'pBurst', 'ss_pBurst'}, 'logBase', 'logit');
+tblMea.pBurst_trans = tblTrans.pBurst;
 
 % Load In Vivo ------------------------------------------------------------
-presets = {'brst'};
+presets = {'burst'};
 tblVivo = mcu_tblVivo('presets', presets, 'flgClean', true);
-tblTrans = tbl_trans(tblVivo, 'varsInc', {'pBspk'}, 'logBase', 'logit');
-tblVivo.pBspk_trans = tblTrans.pBspk;
+tblTrans = tbl_trans(tblVivo, 'varsInc', {'pBurst'}, 'logBase', 'logit');
+tblVivo.pBurst_trans = tblTrans.pBurst;
 
 flgPlot = false;
 
@@ -26,26 +26,26 @@ tblInfo{tblIdx} = 'BSL Firing';
 dataSet{tblIdx} = 'MEA';
 tblPnls{tblIdx} = '1K-N';
 
-frml = 'fr ~ Group + (1|Name)';
+frml = 'fr ~ genotype + (1|sbjID)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal');
 lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
 
-frml = 'bRate ~ Group + (1|Name)';
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml);
-lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
-
-frml = 'nBspk ~ Group + (1|Name)';
+frml = 'br ~ genotype + (1|sbjID)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal');
 lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
 
-frml = 'pBspk ~ Group * fr + (1|Name)';
+frml = 'bSize ~ genotype + (1|sbjID)';
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal');
+lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
+
+frml = 'pBurst ~ genotype * fr + (1|sbjID)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'logit-normal');
 lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
 lme_save(sheetNames{1}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 
 if flgPlot
-    tblGUI_bar(tblMea, 'yVar', 'pBspk', 'xVar', 'Group');
-    tblGUI_scatHist(tblMea, 'xVar', 'fr', 'yVar', 'bRate', 'grpVar', 'Group');
+    tblGUI_bar(tblMea, 'yVar', 'pBurst', 'xVar', 'genotype');
+    tblGUI_scatHist(tblMea, 'xVar', 'fr', 'yVar', 'br', 'grpVar', 'genotype');
 end
 
 
@@ -58,27 +58,27 @@ tblInfo{tblIdx} = 'BSL Firing';
 dataSet{tblIdx} = 'In Vivo';
 tblPnls{tblIdx} = '2D-E; S2E-F';
 
-tblLme = tblVivo(tblVivo.Day == 'BSL', :);
-frml = 'fr ~ Group + (1|Name)';
+tblLme = tblVivo(tblVivo.day == 'BSL', :);
+frml = 'fr ~ genotype + (1|sbjID)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLme, frml, 'dist', 'gamma');
 lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
 
-frml = 'pBspk ~ Group * fr + (1|Name)';
+frml = 'pBurst ~ genotype * fr + (1|sbjID)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLme, frml, 'dist', 'logit-normal');
 lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
 
-frml = 'bRate ~ Group + (1|Name)';
+frml = 'br ~ genotype + (1|sbjID)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLme, frml, 'dist', 'gamma');
 lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
 
-frml = 'nBspk ~ Group + (1|Name)';
+frml = 'bSize ~ genotype + (1|sbjID)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLme, frml, 'dist', 'log-normal');
 lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
 lme_save(sheetNames{2}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 
 if flgPlot
-    tblGUI_bar(tblLme, 'yVar', 'pBspk', 'xVar', 'Group');
-    tblGUI_scatHist(tblLme, 'xVar', 'fr', 'yVar', 'bRate', 'grpVar', 'Group');
+    tblGUI_bar(tblLme, 'yVar', 'pBurst', 'xVar', 'genotype');
+    tblGUI_scatHist(tblLme, 'xVar', 'fr', 'yVar', 'br', 'grpVar', 'genotype');
 end
 
 %% ========================================================================
@@ -88,20 +88,20 @@ tblIdx = 3;
 sheetNames{tblIdx} = ['S' num2str(tblIdx)];
 tblInfo{tblIdx} = 'SWR Properties';
 dataSet{tblIdx} = 'In Vivo';
-tblPnls{tblIdx} = '2F-H';
+tblPnls{tblIdx} = '2H; S2H';
 
 basepaths = [mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl')];
 tblRipp = mcu_tblVivo('basepaths', basepaths, 'presets', {'ripp'});
 
-frml = 'amp ~ Group + (1|Name)';
+frml = 'amp ~ genotype + (1|sbjID)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblRipp, frml, 'dist', 'log-normal');
 lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
 
-frml = 'freq ~ Group + (1|Name)';
+frml = 'freq ~ genotype + (1|sbjID)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblRipp, frml, 'dist', 'normal');
 lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
 
-frml = 'dur ~ Group + (1|Name)';
+frml = 'dur ~ genotype + (1|sbjID)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblRipp, frml, 'dist', 'log-normal');
 lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
 lme_save(sheetNames{3}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
@@ -113,23 +113,27 @@ tblIdx = 4;
 sheetNames{tblIdx} = ['S' num2str(tblIdx)];
 tblInfo{tblIdx} = 'Spike COM during SWR';
 dataSet{tblIdx} = 'In Vivo';
-tblPnls{tblIdx} = '2G,H';
+tblPnls{tblIdx} = '2F; S2G';
 
 basepaths = [mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl')];
-[tblRipp, ~, ~, xVec] = mcu_tblVivo('basepaths', basepaths, 'presets', {'rippSpks', 'brst'}, 'flgClean', true);
+[tblRipp, ~, ~, xVec] = mcu_tblVivo('basepaths', basepaths, 'presets', {'rippSpks', 'burst'}, 'flgClean', true);
 
-frml = 'com ~ (fr + pBspk) + Group + (1|Name)';
+tblTrans = tbl_trans(tblRipp, 'varsInc', {'pBurst'}, 'logBase', 'logit');
+tblRipp.pBurst_trans = tblTrans.pBurst;
+
+frml = 'com ~ (fr + pBurst) + genotype + (1|sbjID)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblRipp, frml, 'dist', 'normal', 'flgStnd', false);
 lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
 lme_save(sheetNames{4}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 
 if flgPlot
     hFig = figure;
-    hAx = nexttile; lme_lsmeans(lmeMdl, {'pBspk', 'Group'}, 'transParams', lmeInfo.transParams, ...
+    hAx = nexttile; lme_lsmeans(lmeMdl, {'pBurst', 'genotype'}, 'transParams', lmeInfo.transParams, ...
         'hAx', hAx, 'xLims', {[0, 1], []});
-    hAx = nexttile; lme_lsmeans(lmeMdl, {'fr', 'Group'}, 'transParams', lmeInfo.transParams, ...
+    hAx = nexttile; lme_lsmeans(lmeMdl, {'fr', 'genotype'}, 'transParams', lmeInfo.transParams, ...
         'hAx', hAx); 
-    tblGUI_xy(xVec, tblRipp, 'grpVar', 'Group');
+    tblGUI_xy(xVec, tblRipp, 'grpVar', 'genotype');
+    tblGUI_scatHist(tblRipp, 'grpVar', 'genotype');
 end
 
 %% ========================================================================
@@ -141,8 +145,8 @@ tblInfo{tblIdx} = 'FRH during BAC';
 dataSet{tblIdx} = 'In Vivo';
 tblPnls{tblIdx} = '3G';
 
-frml = 'fr ~ Group * Day + (Day|Name)';
-tblLme = tblVivo; tblLme(tblLme.Name == 'lh137', :) = [];
+frml = 'fr ~ genotype * day + (day|sbjID)';
+tblLme = tblVivo; tblLme(tblLme.sbjID == 'lh137', :) = [];
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblVivo, frml, 'dist', 'gamma');
 lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
 lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
@@ -156,8 +160,8 @@ tblInfo{tblIdx} = 'SS Burstiness';
 dataSet{tblIdx} = 'In Vivo';
 tblPnls{tblIdx} = '3H';
 
-tblLme = tblVivo(tblVivo.Day == 'BAC3', :);
-frml = 'pBspk ~ Group * fr + (1|Name)';
+tblLme = tblVivo(tblVivo.day == 'BAC3', :);
+frml = 'pBurst ~ genotype * fr + (1|sbjID)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLme, frml, 'dist', 'logit-normal');
 lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
 lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
@@ -176,19 +180,19 @@ tblPnls{tblIdx}    = '4A,C,E; S4A';
 % Each unit contributes 4 rows crossing:
 %   component : {'bSpk', 'sSpk'} — burst vs. single spike firing rate
 %   epoch     : {'BSL',  'SS'}   — baseline vs. steady state
-tblLong = stack(tblMea, {'frBspk', 'frSspk', 'ss_frBspk', 'ss_frSspk'}, ...
+tblLong = stack(tblMea, {'frBurst', 'frSingle', 'ss_frBurst', 'ss_frSingle'}, ...
     'NewDataVariableName', 'fr', ...
     'IndexVariableName', 'SourceVar', ...
-    'ConstantVariables', {'Group', 'Name', 'UnitID'});
+    'ConstantVariables', {'genotype', 'sbjID', 'unitID'});
 tblLong.epoch = categorical(tblLong.SourceVar, ...
-    {'frBspk', 'frSspk', 'ss_frBspk', 'ss_frSspk'}, ...
+    {'frBurst', 'frSingle', 'ss_frBurst', 'ss_frSingle'}, ...
     {'BSL',    'BSL',    'SS',        'SS'});
 tblLong.component = categorical(tblLong.SourceVar, ...
-    {'frBspk', 'frSspk', 'ss_frBspk', 'ss_frSspk'}, ...
+    {'frBurst', 'frSingle', 'ss_frBurst', 'ss_frSingle'}, ...
     {'bSpk',   'sSpk',   'bSpk',      'sSpk'});
 tblLong.SourceVar = [];
 
-frml = 'fr ~ component * epoch * Group + (1|Name)';
+frml = 'fr ~ component * epoch * genotype + (1|sbjID)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLong, frml, 'dist', 'log-normal', ...
     'contrasts', [1 : 9, 28 : 31, 36 : 39]);
 lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
@@ -204,13 +208,13 @@ tblInfo{tblIdx} = 'Firing Gain during FRH';
 dataSet{tblIdx} = 'MEA';
 tblPnls{tblIdx} = '4D, S4B';
 
-tblMea.bGain = log((tblMea.ss_frBspk) ./ (tblMea.frBspk));
-tblMea.sGain = log((tblMea.ss_frSspk) ./ (tblMea.frSspk));
-frml = 'sGain ~ bGain * Group + (1|Name)';
+tblMea.bGain = log((tblMea.ss_frBurst) ./ (tblMea.frBurst));
+tblMea.sGain = log((tblMea.ss_frSingle) ./ (tblMea.frSingle));
+frml = 'sGain ~ bGain * genotype + (1|sbjID)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'normal', 'flgStnd', false);
 lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
 
-frml = 'sGain ~ (pBspk + fr + bGain) * Group + (1|Name)';
+frml = 'sGain ~ (pBurst + fr + bGain) * genotype + (1|sbjID)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tblMea, frml, 'dist', 'normal', 'flgStnd', false);
 lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
 lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
@@ -224,40 +228,40 @@ tblInfo{tblIdx} = 'Mediation Analysis';
 dataSet{tblIdx} = 'MEA';
 tblPnls{tblIdx} = '4F, S5';
 
-xVar = 'pBspk';
-mVar = 'ss_frBspk';
+xVar = 'pBurst';
+mVar = 'ss_frBurst';
 
 % Transformation template
-[~, tmpl] = tbl_trans(tblMea, 'varsInc', {'fr', 'pBspk', 'ss_frBspk'}, ...
+[~, tmpl] = tbl_trans(tblMea, 'varsInc', {'fr', 'pBurst', 'ss_frBurst'}, ...
     'logBase', 10, 'skewThr', 2, 'flgZ', false);
-tmpl.varsTrans.pBspk.logBase = [];
-tmpl.varsTrans.ss_frBspk.logBase = 'e'; % Force ln for consistency with mediation
+tmpl.varsTrans.pBurst.logBase = [];
+tmpl.varsTrans.ss_frBurst.logBase = 'e'; % Force ln for consistency with mediation
 
 % Fit three combined models (single source of truth) ----------------------
 % Model A: M ~ X + covariates * Group
 [mdlA, statsA, infoA] = lme_analyse(tblMea, ...
-    'ss_frBspk ~ (fr + pBspk) * Group + (1|Name)', ...
+    'ss_frBurst ~ (fr + pBurst) * genotype + (1|sbjID)', ...
     'dist', 'log-normal', 'flgStnd', false, 'transTemplate', tmpl);
 lmeStats = lme_postHoc(mdlA, 'contrasts', 'all')
 
 % Model C: Y ~ X + covariates * Group (Total effect)
 [mdlC, statsC, infoC] = lme_analyse(tblMea, ...
-    'ss_frSspk ~ (fr + pBspk) * Group + (1|Name)', ...
+    'ss_frSingle ~ (fr + pBurst) * genotype + (1|sbjID)', ...
     'dist', 'log-normal', 'flgStnd', false, 'transTemplate', tmpl);
 
 % Model BC: Y ~ X + M + covariates * Group (Direct + mediator)
 [mdlBC, statsBC, infoBC] = lme_analyse(tblMea, ...
-    'ss_frSspk ~ (fr + pBspk + ss_frBspk) * Group + (1|Name)', ...
+    'ss_frSingle ~ (fr + pBurst + ss_frBurst) * genotype + (1|sbjID)', ...
     'dist', 'log-normal', 'flgStnd', false, 'transTemplate', tmpl);
 
 % Per-group Sobel tests (from the SAME combined models) -------------------
-resMed = lme_mediation(mdlA, mdlC, mdlBC, xVar, mVar, 'grpVar', 'Group');
+resMed = lme_mediation(mdlA, mdlC, mdlBC, xVar, mVar, 'grpVar', 'genotype');
 
 if flgPlot
     tblPlot = tblMea;
-    tblPlot.ss_frBspk = log10(tblPlot.ss_frBspk);
+    tblPlot.ss_frBurst = log10(tblPlot.ss_frBurst);
     lme_mediationPlot(resMed, mdlA, mdlBC, tblPlot, ...
-        'xVar', 'pBspk_trans', 'mVar', 'ss_frBspk', 'grpVar', 'Group')
+        'xVar', 'pBurst_trans', 'mVar', 'ss_frBurst', 'grpVar', 'genotype')
 end
 
 % Consolidate: mediation summaries + model details -----------------------
@@ -275,7 +279,7 @@ lmeTbls = [medTbls, ...
 
 % Extra model (total FR), for LSMeans
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, ...
-    'ss_fr ~ (fr + pBspk) * Group + (1|Name)', ...
+    'ss_fr ~ (fr + pBurst) * genotype + (1|sbjID)', ...
     'dist', 'log-normal', 'flgStnd', false);
 lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
 
@@ -291,10 +295,10 @@ tblInfo{tblIdx} = 'Feature Ablation';
 dataSet{tblIdx} = 'MEA';
 tblPnls{tblIdx} = '4G';
 
-frml = 'ss_fr ~ (frBspk + frSspk)';
+frml = 'ss_fr ~ (frBurst + frSingle)';
 partMode = 'split';
-tblWt = tblMea(tblMea.Group == 'Control', :);
-tblMcu = tblMea(tblMea.Group == 'MCU-KO', :);
+tblWt = tblMea(tblMea.genotype == 'Control', :);
+tblMcu = tblMea(tblMea.genotype == 'MCU-KO', :);
 
 abl = lme_ablation(tblWt, frml, 'dist', 'log-normal', 'partitionMode', partMode, 'nrep', 10);
 ablTbl.Title = 'ABLATION SUMMARY (Pooled R2_OOS)';

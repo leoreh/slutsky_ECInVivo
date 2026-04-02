@@ -79,7 +79,7 @@ utypes_gui('basepaths', basepaths, 'tAxis', tAxis, 'tblUnit', tblUnit)
 hFig = tblGUI_xy(tAxis, tblUnit);
 
 % Grab to prism
-idxUnits = tblUnit.UnitType == 'FS' & tblUnit.Group == 'Control';
+idxUnits = tblUnit.UnitType == 'FS' & tblUnit.genotype == 'Control';
 frMat = tblUnit.FRt(idxUnits, :)';
 
 
@@ -100,11 +100,11 @@ basepaths = [mcu_basepaths('wt_bsl'), mcu_basepaths('mcu_bsl')];
 hFig = tblGUI_xy(xAcg.narrow, tblAcg, ...
     'yVar',    'acg_narrow', ...
     'tileVar', 'unitType', ...
-    'grpVar',  'Group', ...
+    'grpVar',  'genotype', ...
     'xLbl',    'Lag [ms]');
 
 
-tblAcg.acg_narrow(tblAcg.Group == 'Control')
+tblAcg.acg_narrow(tblAcg.genotype == 'Control')
 
 prismTbl = groupsummary(tblAcg, "Group", {'mean', 'std'}, 'acg_narrow');
 

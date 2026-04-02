@@ -8,15 +8,15 @@ presets = {'spktimes', 'rcv', 'frNet'};
 [tblFull, ~, ~, v] = mcu_tblMea('basepaths', basepaths, 'presets', presets([1, 3]));
 
 % Prepare subtable of what's needed
-tblBrst = tblFull(:, {'Name', 'Group', 'UnitID', 'fr', 'ss_fr', 'frAcute', ...
+tblBrst = tblFull(:, {'sbjID', 'genotype', 'unitID', 'fr', 'ss_fr', 'frAcute', ...
     'rcvBsl', 'spktimes', 'funcon'});
 
 % Spike times from all sessions
 spktimes = tblBrst.spktimes;
 
 % Control units
-idxWt = tblBrst.Group == 'Control';
-idxMcu = tblBrst.Group == 'MCU-KO';
+idxWt = tblBrst.genotype == 'Control';
+idxMcu = tblBrst.genotype == 'MCU-KO';
 
 % Baseline Window
 rcv = catfields([v(:).rcv], 1);
@@ -51,7 +51,7 @@ for iIsi = 1 : length(isiSweep)
         fNameFrS = sprintf('frS_s%d_i%03d', spkThr, round(isiThr*1000));
 
         % Burst detection
-        brst = brst_detect(spktimes, ...
+        burst = burst_detect(spktimes, ...
             'minSpks', spkThr, ...
             'isiStart', isiThr, ...
             'isiEnd', isiEnd, ...
@@ -60,13 +60,13 @@ for iIsi = 1 : length(isiSweep)
             'flgForce', true, 'flgSave', false, 'flgPlot', false);
 
         % Burst statistics
-        stats = brst_stats(brst, spktimes, 'winCalc', winBsl, ...
+        stats = burst_stats(burst, spktimes, 'winCalc', winBsl, ...
             'flgSave', false);
 
         % Store in Table
-        tblBrst.(fNameSib) = stats.pBspk;
-        tblBrst.(fNameFrB) = stats.frBspk;
-        tblBrst.(fNameFrS) = stats.frSspk;
+        tblBrst.(fNameSib) = stats.pBurst;
+        tblBrst.(fNameFrB) = stats.frBurst;
+        tblBrst.(fNameFrS) = stats.frSingle;
     end
 
     fprintf('[BRST_SWEEP] Detection: Finished ISI %.3f (%d/%d)...\n', ...
@@ -154,7 +154,7 @@ for iIsi = 1 : length(isiSweep)
         % -----------------------------------------------------------------
         
         % Formula: ss_fr ~ (fr + sib) * Group + (1|Name)
-        frml = sprintf('ss_fr ~ (fr + %s) * Group + (1|Name)', fNameSib);
+        frml = sprintf('ss_fr ~ (fr + %s) * genotype + (1|sbjID)', fNameSib);
         [lmeMdl, ~, ~, ~] = lme_analyse(tblLme, frml, ...
             'dist', 'log-normal', 'fitMethod', 'ML', ...
             'flgPlot', false, 'verbose', false);
@@ -173,13 +173,13 @@ for iIsi = 1 : length(isiSweep)
         % Group Effect (LME)
         % -----------------------------------------------------------------
         % Formula: sib ~ Group + (1|Name)
-        frmlGrp = sprintf('%s ~ Group + (1|Name)', fNameSib);
+        frmlGrp = sprintf('%s ~ genotype + (1|sbjID)', fNameSib);
         [lmeGrp, lmeStats, ~, ~] = lme_analyse(tblLme, frmlGrp, ...
             'dist', 'logit-normal', 'fitMethod', 'ML', ...
             'flgPlot', false, 'verbose', false);
 
         fxdGrp = lmeGrp.Coefficients;
-        idxGrp = find(strncmpi(fxdGrp.Name, 'Group', 5)); 
+        idxGrp = find(strncmpi(fxdGrp.Name, 'genotype', 8)); 
         if ~isempty(idxGrp)
             row.tStatGroup = fxdGrp.tStat(idxGrp(1));
         else
@@ -205,8 +205,8 @@ end
 %  PLOT RESULTS
 %  ========================================================================
 
-% tblGUI_scatHist(tblBrst, 'xVar', 'pBspk', 'yVar', 'fr', 'grpVar', 'Group');
-% tblGUI_bar(tblBrst, 'xVar', 'Group', 'yVar', 'fr');
+% tblGUI_scatHist(tblBrst, 'xVar', 'pBurst', 'yVar', 'fr', 'grpVar', 'genotype');
+% tblGUI_bar(tblBrst, 'xVar', 'genotype', 'yVar', 'fr');
 
 
 % Convert Table to Matrices for Heatmaps

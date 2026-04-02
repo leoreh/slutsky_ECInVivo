@@ -7,7 +7,7 @@ basepaths = [mcu_basepaths('mea_bac'), mcu_basepaths('mea_mcuko')];
 basepaths = [mcu_basepaths('mea_bac')];
 nFiles = length(basepaths);
 
-vars = {'mea', 'fr', 'brstDyn', 'brst', 'frRcv', 'frRcv_mdl', ...
+vars = {'mea', 'fr', 'brstDyn', 'burst', 'frRcv', 'frRcv_mdl', ...
     'stats', 'ca', 'prc'};
 v = basepaths2vars('basepaths', basepaths, 'vars', vars);
 
@@ -61,9 +61,9 @@ varMap.uRcv = 'rcv.uRcv';
 varMap.uPert = 'rcv.uPert';
 
 % Tag structures
-tagFiles.Name = get_mname(basepaths, 0);
-tagFiles.Group = repmat(cfg.lbl.grp(1), 1, nFiles);
-tagFiles.Group(contains(tagFiles.Name, 'KO')) = cfg.lbl.grp(2);
+tagFiles.sbjID = get_mname(basepaths, 0);
+tagFiles.genotype = repmat(cfg.lbl.grp(1), 1, nFiles);
+tagFiles.genotype(contains(tagFiles.sbjID, 'KO')) = cfg.lbl.grp(2);
 
 % Table
 tblt = v2tbl('v', v, 'varMap', varMap, 'tagFiles', tagFiles, ...
@@ -75,7 +75,7 @@ tblt = v2tbl('v', v, 'varMap', varMap, 'tagFiles', tagFiles, ...
 % Clean bad units
 tblt(~tblt.uPert, :) = [];
 tblt(~tblt.uGood, :) = [];
-tblt.UnitID = categorical(tblt.UnitID);
+tblt.unitID = categorical(tblt.unitID);
 
 
 %% ========================================================================
@@ -134,11 +134,11 @@ end
 
 % Plot Results
 % yVar = 'caMito_LR';
-% tblGUI_scatHist(tbl, 'grpVar', 'Group', 'yVar', yVar);
+% tblGUI_scatHist(tbl, 'grpVar', 'genotype', 'yVar', yVar);
 
-% experiments = categories(tbl.Name);
-% idxExp = tbl.Name == experiments(2);
-% tblGUI_xy(xVec, tbl, 'tileVar', 'Group', 'yVar', 'caMito');
+% experiments = categories(tbl.sbjID);
+% idxExp = tbl.sbjID == experiments(2);
+% tblGUI_xy(xVec, tbl, 'tileVar', 'genotype', 'yVar', 'caMito');
 
 
 

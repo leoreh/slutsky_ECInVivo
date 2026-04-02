@@ -5,7 +5,7 @@ function tblSynth = mcu_matchQntl(tbl, nBins, varargin)
 %   based on firing rate ranks.
 %
 %   INPUTS:
-%       tbl     - (table) Source data with vars: Group, Day, Name, and numeric data.
+%       tbl     - (table) Source data with vars: genotype, day, sbjID, and numeric data.
 %       nBins   - (int) Number of quantiles (e.g., 5, 10).
 %       varargin:
 %           'flgPool' - (bool) If true, pools all units by Group. 
@@ -39,7 +39,7 @@ avgType = p.Results.avgType;
 
 % Identify all numeric variables to process
 % Exclude metadata columns
-metaVars = {'Group', 'Name', 'Day', 'Bin', 'id', 'Timepoint'}; 
+metaVars = {'genotype', 'sbjID', 'day', 'Bin', 'id', 'Timepoint'}; 
 allVars = tbl.Properties.VariableNames;
 
 % Find numeric vars
@@ -67,24 +67,24 @@ if flgPool
     % ---------------------------------------------------------------------
     % Ignores animal identity, treats all units in a group as one population.
     
-    grps = unique(tbl.Group);
+    grps = unique(tbl.genotype);
     
     for iGrp = 1:length(grps)
         grp = char(grps(iGrp));
         
         % Filter by Group
-        tGrp = tbl(tbl.Group == grp, :);
+        tGrp = tbl(tbl.genotype == grp, :);
         
         % Process BSL/BAC3
         tRow = proc_pair(tGrp, nBins, varsToProc, sortVar, avgType);
         
         if ~isempty(tRow)
             % Add Metadata
-            tRow.Group = repmat(categorical({grp}), height(tRow), 1);
-            tRow.Name = repmat({'Pooled'}, height(tRow), 1);
+            tRow.genotype = repmat(categorical({grp}), height(tRow), 1);
+            tRow.sbjID = repmat({'Pooled'}, height(tRow), 1);
             
             % Reorder
-            tRow = movevars(tRow, {'Group', 'Name', 'Bin'}, 'Before', 1);
+            tRow = movevars(tRow, {'genotype', 'sbjID', 'Bin'}, 'Before', 1);
             
             % Append
             tblSynth = [tblSynth; tRow];
@@ -97,28 +97,28 @@ else
     % ---------------------------------------------------------------------
     % Preserves animal identity, matches units within each animal.
     
-    animals = unique(tbl.Name);
+    animals = unique(tbl.sbjID);
     
     for iAni = 1:length(animals)
         
         name = animals(iAni); 
         
         % Filter by Animal
-        tAni = tbl(ismember(tbl.Name, name), :);
+        tAni = tbl(ismember(tbl.sbjID, name), :);
         
         % Process BSL/BAC3
         tRow = proc_pair(tAni, nBins, varsToProc, sortVar, avgType);
         
         if ~isempty(tRow)
             % Get Group (First value, assume constant)
-            grp = char(tAni.Group(1));
-            
+            grp = char(tAni.genotype(1));
+
             % Add Metadata
-            tRow.Group = repmat(categorical({grp}), height(tRow), 1);
-            tRow.Name = repmat(name, height(tRow), 1);
+            tRow.genotype = repmat(categorical({grp}), height(tRow), 1);
+            tRow.sbjID = repmat(name, height(tRow), 1);
             
             % Reorder
-            tRow = movevars(tRow, {'Group', 'Name', 'Bin'}, 'Before', 1);
+            tRow = movevars(tRow, {'genotype', 'sbjID', 'Bin'}, 'Before', 1);
             
             % Append
             tblSynth = [tblSynth; tRow];
@@ -137,8 +137,8 @@ function tWide = proc_pair(tIn, nBins, vars, sortVar, avgType)
     tWide = table();
 
     % Split
-    tBsl = tIn(tIn.Day == 'BSL', :);
-    tBac = tIn(tIn.Day == 'BAC3', :);
+    tBsl = tIn(tIn.day == 'BSL', :);
+    tBac = tIn(tIn.day == 'BAC3', :);
     
     % Sort by Specified Variable (Descending)
     tBsl = sortrows(tBsl, sortVar, 'descend');
