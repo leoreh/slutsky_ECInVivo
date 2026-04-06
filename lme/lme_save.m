@@ -9,6 +9,9 @@ function lme_save(sheetName, lmeTbls, varargin)
 %       pathName - Directory path (default: 'D:\OneDrive - Tel-Aviv University\PhD\Slutsky\Manuscripts\MCU\Results')
 %       xlsName  - Excel file name (default: 'mcu_suppTbl.xlsx')
 %       bkLink   - Sheet name for TOC hyperlink at row 1 (default: 'TOC')
+%       tblInfo  - Table description, written to row 2 (default: '')
+%       dataSet  - Data set label, written to row 2 (default: '')
+%       tblPnls  - Figure panel reference, written to row 2 (default: '')
 %       verbose  - Print progress (default: true)
 
 %% ========================================================================
@@ -26,6 +29,9 @@ defaultXls = 'mcu_suppTbl.xlsx';
 addParameter(p, 'pathName', defaultPath, @(x) ischar(x) || isstring(x));
 addParameter(p, 'xlsName', defaultXls, @(x) ischar(x) || isstring(x));
 addParameter(p, 'bkLink', 'TOC', @(x) ischar(x) || isstring(x));
+addParameter(p, 'tblInfo', '', @(x) ischar(x) || isstring(x));
+addParameter(p, 'dataSet', '', @(x) ischar(x) || isstring(x));
+addParameter(p, 'tblPnls', '', @(x) ischar(x) || isstring(x));
 addParameter(p, 'verbose', true, @islogical);
 
 parse(p, sheetName, lmeTbls, varargin{:});
@@ -34,6 +40,9 @@ sheetName = char(p.Results.sheetName);
 pathName  = char(p.Results.pathName);
 xlsName   = char(p.Results.xlsName);
 bkLink    = char(p.Results.bkLink);
+tblInfo   = char(p.Results.tblInfo);
+dataSet   = char(p.Results.dataSet);
+tblPnls   = char(p.Results.tblPnls);
 verbose   = p.Results.verbose;
 
 if isempty(pathName), pathName = pwd; end
@@ -59,10 +68,23 @@ end
 
 exportData = {};
 
-% Add Hyperlink to TOC
+% Row 1: Hyperlink to TOC
 if ~isempty(bkLink)
     exportData{end+1} = {sprintf('=HYPERLINK("#''%s''!A1", "%s")', bkLink, bkLink)};
-    exportData{end+1} = {''}; % Empty row separator
+end
+
+% Row 2: Sheet metadata (description, data set, figure panels)
+if ~isempty(tblInfo) || ~isempty(dataSet) || ~isempty(tblPnls)
+    metaParts = {};
+    if ~isempty(tblInfo),  metaParts{end+1} = tblInfo; end
+    if ~isempty(dataSet),  metaParts{end+1} = dataSet; end
+    if ~isempty(tblPnls),  metaParts{end+1} = ['Fig. ' tblPnls]; end
+    exportData{end+1} = {strjoin(metaParts, '  |  ')};
+end
+
+% Empty row separator after header rows
+if ~isempty(exportData)
+    exportData{end+1} = {''};
 end
 
 for iTbl = 1:length(lmeTbls)

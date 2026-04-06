@@ -1,28 +1,28 @@
 function fr = fr_denoise(frOrig, varargin)
-% FR_DENOISE Applies Savitzky-Golay filter to smooth firing rate data.
+% FR_DENOISE Smooths firing rate data using normalized Gaussian convolution.
 %
 % SUMMARY:
-% This function applies a Savitzky-Golay filter to smooth firing rate data
-% while dealing with gaps (NaNs).
+% This function smooths firing rate data using normalized Gaussian
+% convolution, which naturally handles NaN gaps and segment edges.
 %
-% The smoothing process follows these steps:
-%   1. Small gaps (< 5 samples) are interpolated using linear filling.
-%   2. The filter is applied to each resulting non-NaN segment separately.
-%   3. Original NaNs are restored in the final output (masking).
+% NaN positions contribute zero weight in both the numerator (signal)
+% and denominator (normalization), so they are automatically excluded
+% from the local weighted average. This eliminates edge artifacts by
+% construction — a weighted average cannot produce values outside the
+% range of its inputs (no polynomial overshoot).
 %
 % INPUT (Required):
 %   frOrig       - Matrix of raw firing rate values. Units are rows.
 %
 % INPUT (Optional Key-Value Pairs):
 %   flgPlot      - Logical flag to generate smoothing visualization {false}.
-%   polyOrder    - Polynomial order for Savitzky-Golay filter {3}.
-%   frameLen     - Frame length for filter in samples {60}.
+%   frameLen     - Frame length for Gaussian kernel in samples {60}.
 %
 % OUTPUT:
 %   fr           - Matrix of smoothed firing rate values [Hz]. Same size as frOrig.
 %
 % DEPENDENCIES:
-%   Signal Processing Toolbox (for sgolayfilt)
+%   Signal Processing Toolbox (for gausswin)
 %
 % HISTORY:
 %   Sep 2024 - Extracted from mea_frRecovery.m as standalone function.
@@ -35,66 +35,57 @@ function fr = fr_denoise(frOrig, varargin)
 p = inputParser;
 addRequired(p, 'frOrig', @isnumeric);
 addParameter(p, 'flgPlot', false, @islogical);
-addParameter(p, 'polyOrder', 3, @(x) isnumeric(x) && isscalar(x) && x > 0);
 addParameter(p, 'frameLen', 60, @(x) isnumeric(x) && isscalar(x) && x > 0);
 
 parse(p, frOrig, varargin{:});
 flgPlot = p.Results.flgPlot;
-polyOrder = p.Results.polyOrder;
 frameLen = p.Results.frameLen;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% FILTER PARAMETER SETUP
+% KERNEL SETUP
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% Calculate the filter frame length in number of bins (samples)
-% dt = mean(diff(t)); % Average sampling interval
-% frameLen = round(frameLenSec / dt);
-
-% Savitzky-Golay filter requires an odd frame length.
+% ensure odd kernel length
 if mod(frameLen, 2) == 0
     frameLen = frameLen + 1;
 end
 
-% The polynomial order must be less than the frame length.
-if polyOrder >= frameLen
-    polyOrder = frameLen - 1;
-end
+% gaussian kernel
+gk = gausswin(frameLen)';
+gk = gk / sum(gk);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % APPLY FILTERING
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Initialize
-fr = nan(size(frOrig)); % Start with NaNs
+fr = nan(size(frOrig));
 nUnits = size(frOrig, 1);
 
 for iUnit = 1:nUnits
 
     frUnit = frOrig(iUnit, :);
 
-    % Grab nan indices
+    % grab nan indices
     nanIdx = isnan(frUnit);
 
-    % Fill small gaps (< 5 samples)
-    frUnit = fillmissing(frUnit, 'linear', 'MaxGap', 4);
-    
-    if all(isnan(frUnit))
+    if all(nanIdx)
         continue
     end
 
-    % Identify non-NaN segments
-    bouts = binary2bouts('vec', ~isnan(frUnit));
-    bouts(:, 2) = bouts(:, 2) - 1;
+    % fill small gaps (< 5 samples)
+    frUnit = fillmissing(frUnit, 'linear', 'MaxGap', 4);
 
-    for iBout = 1 : size(bouts, 1)
-        boutIdx = bouts(iBout, 1) : bouts(iBout, 2);
-        if length(boutIdx) >= frameLen
-            frUnit(boutIdx) = sgolayfilt(frUnit(boutIdx), polyOrder, frameLen);
-        end
-    end
+    % normalized gaussian convolution. nan positions are zeroed in both
+    % signal and weight vectors, so they are excluded from the local
+    % weighted average. division by the convolved weights corrects for
+    % partial kernel overlap at edges and near gaps.
+    frZero = frUnit;
+    frZero(isnan(frZero)) = 0;
+    wt = double(~isnan(frUnit));
+    frUnit = conv(frZero, gk, 'same') ./ conv(wt, gk, 'same');
 
-    % Enforce non-negativity, restore nan, and fill
+    % enforce non-negativity and restore original nan positions
     frUnit(frUnit < 0) = 0;
     frUnit(nanIdx) = NaN;
     fr(iUnit, :) = frUnit;
@@ -134,8 +125,8 @@ if flgPlot
 
     xlabel('Time (Samples)');
     ylabel('Firing Rate');
-    title(sprintf('Example Smoothed Units (n=%d)\\nSav-Gol Filter: Order %d, Frame %d Smpls', ...
-        nSmpl, polyOrder, frameLen));
+    title(sprintf('Example Smoothed Units (n=%d)\\nGaussian Filter: Frame %d Smpls', ...
+        nSmpl, frameLen));
     legend(hLgd, txtLgd, 'Location', 'eastoutside');
     grid on;
     box on;

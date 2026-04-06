@@ -29,10 +29,14 @@ tblIdx = 1;
     end
 
 % --- 1. Model Information ---
+% Use the formula as the section title (replaces 'MODEL INFORMATION')
+frmlStr = '';
 infoNames = {};
 infoVals = {};
 if ~isempty(lmeInfo)
-    if isfield(lmeInfo, 'frml'), infoNames{end+1}='Formula'; infoVals{end+1}=lmeInfo.frml; end
+    if isfield(lmeInfo, 'frml')
+        frmlStr = lmeInfo.frml;
+    end
     if isfield(lmeInfo, 'distSelected') && ~isempty(lmeInfo.distSelected)
         distStr = regexprep(char(lmeInfo.distSelected), '(\<[a-z])', '${upper($1)}');
         infoNames{end+1}='Distribution'; infoVals{end+1}=distStr; 
@@ -63,12 +67,19 @@ end
 if ~isempty(lmeMdl) && isprop(lmeMdl, 'NumObservations')
     infoNames{end+1}='Observations'; infoVals{end+1}=mat2str(lmeMdl.NumObservations);
 end
+
+mdlTitle = frmlStr;
+if isempty(mdlTitle), mdlTitle = 'MODEL'; end
+
 if ~isempty(infoNames)
     Info = cell(length(infoNames), 1);
     for i = 1:length(infoNames)
         Info{i} = sprintf('%s: %s', char(infoNames{i}), char(infoVals{i}));
     end
-    add_tbl('MODEL INFORMATION', table(Info), 'Other');
+    add_tbl(mdlTitle, table(Info), 'Other');
+elseif ~isempty(frmlStr)
+    % Formula exists but no info items — still emit the title row
+    add_tbl(mdlTitle, table.empty, 'Other');
 end
 
 % --- 2. Continuous Predictors Table ---

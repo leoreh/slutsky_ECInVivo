@@ -5,7 +5,7 @@
 %  temporal dynamics, and visualize using tblGUI_xy.
 
 % Load
-[tbl, xVec, basepaths, v] = mcu_tblMea('presets', {'time', 'rcv', 'steadyState'});
+% [tbl, xVec, basepaths, v] = mcu_tblMea('presets', {'time', 'rcv', 'steadyState'});
 tblPlot = tbl;
 
 % Add logit pBurst
@@ -17,71 +17,51 @@ tblPlot.pBurst_trans = tblTrans.pBurst;
 %  ========================================================================
 %  Cluster units into percentiles based on a specific variable
 
-varClu = 'pBurst';
+varClu = 'fr';
 
-% --- Manual boundaries (leave empty [] to use percentile mode) ---
-% Defines fixed edges applied identically to both groups.
-% Example: [0.1, 0.25] creates 3 clusters: <0.1, 0.1-0.25, >0.25
-manualEdges = [0.2];
-% manualEdges = [];
+% Set manualEdges to fixed inner boundaries (same for all groups).
+% Example: [0.1, 0.25] → 3 clusters: <0.1, 0.1-0.25, >0.25
+% Leave empty [] to use percentile-based clustering (nClu, alpha).
+manualEdges = [];
 
-% --- Percentile mode (used when manualEdges is empty) ---
-nClu   = 3;           % Number of clusters (percentiles)
-alpha  = 2;           % Scaling factor for percentile spacing
+nClu  = 1;    % number of clusters (percentile mode only)
+alpha = 2;    % percentile spacing exponent (percentile mode only)
 
-% Initialize Cluster Label Column
+% Initialize
 tblPlot.cluLbl = strings(height(tblPlot), 1);
-
-% Build edges
-if ~isempty(manualEdges)
-    % Manual mode: same edges for all groups
-    edges = [-Inf, sort(manualEdges(:)'), Inf];
-    nClu  = length(edges) - 1;
-    useManual = true;
-else
-    useManual = false;
-end
-
-% Get Unique Groups
 grps = unique(tblPlot.genotype);
 
 for iGrp = 1:length(grps)
+    idxGrp    = tblPlot.genotype == grps(iGrp);
+    grpData   = tblPlot.(varClu)(idxGrp);
+    idxGlobal = find(idxGrp);
 
-    idxGrp  = tblPlot.genotype == grps(iGrp);
-    grpData = tblPlot.(varClu)(idxGrp);
-
-    if useManual
-        percEdges = edges;
+    if ~isempty(manualEdges)
+        edges = [-Inf, sort(manualEdges(:)'), Inf];
     else
-        % Percentile mode: edges computed per group
-        p = linspace(0, 1, nClu + 1) .^ alpha;
-        percEdges = [-Inf, prctile(grpData, 100 * (1 - p(2:end-1))), Inf];
-        percEdges = sort(percEdges);
+        % Percentile edges computed per group; inner boundaries only
+        p     = linspace(0, 1, nClu + 1) .^ alpha;
+        pcts  = sort(prctile(grpData, 100 * p));
+        edges = [-Inf, pcts(2:end-1), Inf];
     end
 
-    % Assign Clusters
-    for iClu = 1:nClu
-        edgeLo = percEdges(iClu);
-        edgeHi = percEdges(iClu + 1);
-
+    for iClu = 1:length(edges) - 1
+        edgeLo = edges(iClu);
+        edgeHi = edges(iClu + 1);
         idxClu = grpData > edgeLo & grpData <= edgeHi;
 
-        % Create Label
         if isinf(edgeLo)
-            lbl = sprintf('P%d (<%.2g)', iClu, edgeHi);
+            lbl = sprintf('P%d (<%.2g)',       iClu, edgeHi);
         elseif isinf(edgeHi)
-            lbl = sprintf('P%d (>%.2g)', iClu, edgeLo);
+            lbl = sprintf('P%d (>%.2g)',       iClu, edgeLo);
         else
-            lbl = sprintf('P%d (%.2g-%.2g)', iClu, edgeLo, edgeHi);
+            lbl = sprintf('P%d (%.2g-%.2g)',   iClu, edgeLo, edgeHi);
         end
 
-        % Map back to full table
-        idxGlobal = find(idxGrp);
         tblPlot.cluLbl(idxGlobal(idxClu)) = lbl;
     end
 end
 
-% Convert to categorical for GUI grouping
 tblPlot.cluLbl = categorical(tblPlot.cluLbl);
 
 %% ========================================================================
@@ -97,9 +77,9 @@ winNorm = [0, find(xVec >= 0, 1) - 1];
 floorVal = 1 / (max(xVec) * 3600);
 
 tblVars = tblPlot.Properties.VariableNames;
-tVars = tblVars(contains(tblVars, 't_'));
-tblPlot = tbl_tNorm(tblPlot, 'varsInc', tVars, 'winNorm', winNorm, ...
-    'Method', 'percentage', 'flgGeom', true, 'floorVal', floorVal, 'varsGrp', {});
+tVars = tblVars(startsWith(tblVars, 't_'));
+% tblPlot = tbl_tNorm(tblPlot, 'varsInc', tVars, 'winNorm', winNorm, ...
+%     'Method', 'percentage', 'flgGeom', true, 'floorVal', floorVal, 'varsGrp', {});
 
 
 %% ========================================================================
@@ -118,36 +98,34 @@ tblGUI_xy(xVec, tblPlot, ...
 %  PRISM
 %  ========================================================================
 
-% Loop over clusters and calculate geometric stats for each
-idxGrp = tblPlot.genotype == 'Control';
-
-% Grab raw matrix
-tblPlot.t_frTot(idxGrp, :)';
+meanType = 'geometric';     % 'geometric' or 'arithmetic'
+idxGrp   = tblPlot.genotype == 'MCU-KO';
 
 prismMat = [];
-for iClu = 1:nClu
+for iClu = 1:length(edges) - 1
 
-    % Extract Data for specific Cluster within Group
-    % Note: cluLbl format is "P<d> (<num>-<num>)"
-    patLbl  = sprintf('P%d (', iClu);
-    idxClu  = contains(string(tblPlot.cluLbl), patLbl);
-    finalIdx = idxGrp & idxClu;
+    patLbl   = sprintf('P%d (', iClu);
+    idxClu   = contains(string(tblPlot.cluLbl), patLbl);
+    prismData = tblPlot.t_frTot(idxGrp & idxClu, :)';
 
-    prismData = tblPlot.t_frTot(finalIdx, :)';
+    if strcmp(meanType, 'geometric')
+        logData  = log(prismData);
+        n        = sum(~isnan(logData), 2);
+        mLog     = mean(logData, 2, 'omitnan');
+        semLog   = std(logData, 0, 2, 'omitnan') ./ sqrt(n);
+        mu       = exp(mLog);
+        lo       = exp(mLog - semLog);
+        hi       = exp(mLog + semLog);
+    else
+        n        = sum(~isnan(prismData), 2);
+        mu       = mean(prismData, 2, 'omitnan');
+        sem      = std(prismData, 0, 2, 'omitnan') ./ sqrt(n);
+        lo       = mu - sem;
+        hi       = mu + sem;
+    end
 
-    % Log-transform (floorVal already applied in tbl_tNorm)
-    logData = log(prismData);
-
-    n    = sum(~isnan(logData), 2);
-    mLog = mean(logData, 2, 'omitnan');
-    sLog = std(logData, 0, 2, 'omitnan') ./ sqrt(n);
-
-    geoMean = exp(mLog);
-    lower   = exp(mLog - sLog);
-    upper   = exp(mLog + sLog);
-
-    % Append to matrix: [Mean, Upper, Lower]
-    prismMat = [prismMat, geoMean, upper, lower];
+    % Append columns: [Mean, Upper, Lower]
+    prismMat = [prismMat, mu, hi, lo];
 end
 
 %% ========================================================================

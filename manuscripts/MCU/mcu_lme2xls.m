@@ -41,7 +41,8 @@ lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
 frml = 'pBurst ~ genotype * fr + (1|sbjID)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'logit-normal');
 lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
-lme_save(sheetNames{1}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
+lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName, ...
+    'tblInfo', tblInfo{tblIdx}, 'dataSet', dataSet{tblIdx}, 'tblPnls', tblPnls{tblIdx})
 
 if flgPlot
     tblGUI_bar(tblMea, 'yVar', 'pBurst', 'xVar', 'genotype');
@@ -74,7 +75,8 @@ lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
 frml = 'bSize ~ genotype + (1|sbjID)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLme, frml, 'dist', 'log-normal');
 lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
-lme_save(sheetNames{2}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
+lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName, ...
+    'tblInfo', tblInfo{tblIdx}, 'dataSet', dataSet{tblIdx}, 'tblPnls', tblPnls{tblIdx})
 
 if flgPlot
     tblGUI_bar(tblLme, 'yVar', 'pBurst', 'xVar', 'genotype');
@@ -104,7 +106,8 @@ lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
 frml = 'dur ~ genotype + (1|sbjID)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblRipp, frml, 'dist', 'log-normal');
 lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
-lme_save(sheetNames{3}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
+lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName, ...
+    'tblInfo', tblInfo{tblIdx}, 'dataSet', dataSet{tblIdx}, 'tblPnls', tblPnls{tblIdx})
 
 %% ========================================================================
 % Table S4
@@ -123,7 +126,8 @@ tblRipp.pBurst_trans = tblTrans.pBurst;
 frml = 'com ~ (fr + pBurst) + genotype + (1|sbjID)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblRipp, frml, 'dist', 'normal', 'flgStnd', false);
 lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
-lme_save(sheetNames{4}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
+lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName, ...
+    'tblInfo', tblInfo{tblIdx}, 'dataSet', dataSet{tblIdx}, 'tblPnls', tblPnls{tblIdx})
 
 if flgPlot
     hFig = figure;
@@ -147,8 +151,12 @@ tblPnls{tblIdx} = '3G';
 frml = 'fr ~ genotype * day + (day|sbjID)';
 tblLme = tblVivo; tblLme(tblLme.sbjID == 'lh137', :) = [];
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblVivo, frml, 'dist', 'gamma');
+lmeStats = lme_postHoc(lmeMdl, 'contrasts', [1 : 9, 12, 15, 17 : 19]);
 lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
-lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
+lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName, ...
+    'tblInfo', tblInfo{tblIdx}, 'dataSet', dataSet{tblIdx}, 'tblPnls', tblPnls{tblIdx})
+
+
 
 %% ========================================================================
 % Table S6
@@ -163,7 +171,8 @@ tblLme = tblVivo(tblVivo.day == 'BAC3', :);
 frml = 'pBurst ~ genotype * fr + (1|sbjID)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLme, frml, 'dist', 'logit-normal');
 lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
-lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
+lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName, ...
+    'tblInfo', tblInfo{tblIdx}, 'dataSet', dataSet{tblIdx}, 'tblPnls', tblPnls{tblIdx})
 
 
 %% ========================================================================
@@ -192,10 +201,11 @@ tblLong.component = categorical(tblLong.SourceVar, ...
 tblLong.SourceVar = [];
 
 frml = 'fr ~ component * epoch * genotype + (1|sbjID)';
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLong, frml, 'dist', 'log-normal', ...
-    'contrasts', [1 : 9, 28 : 31, 36 : 39]);
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLong, frml, 'dist', 'log-normal');
+lmeStats = lme_postHoc(lmeMdl, 'contrasts', [1 : 9, 32 : 39]);
 lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
-lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
+lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName, ...
+    'tblInfo', tblInfo{tblIdx}, 'dataSet', dataSet{tblIdx}, 'tblPnls', tblPnls{tblIdx})
 
 
 %% ========================================================================
@@ -209,6 +219,7 @@ tblPnls{tblIdx} = '4D, S4B';
 
 tblMea.bGain = log((tblMea.ss_frBurst) ./ (tblMea.frBurst));
 tblMea.sGain = log((tblMea.ss_frSingle) ./ (tblMea.frSingle));
+tblMea.frGain = log((tblMea.ss_fr) ./ (tblMea.fr));
 frml = 'sGain ~ bGain * genotype + (1|sbjID)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'normal', 'flgStnd', false);
 lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
@@ -216,7 +227,16 @@ lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
 frml = 'sGain ~ (pBurst + fr + bGain) * genotype + (1|sbjID)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tblMea, frml, 'dist', 'normal', 'flgStnd', false);
 lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
-lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
+lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName, ...
+    'tblInfo', tblInfo{tblIdx}, 'dataSet', dataSet{tblIdx}, 'tblPnls', tblPnls{tblIdx})
+
+frml = 'frGain ~ (pBurst + fr) * genotype  + (1|sbjID)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tblMea, frml, 'dist', 'normal', 'flgStnd', false);
+lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
+
+if flgPlot
+    tblGUI_scatHist(tblMea, 'grpVar', 'genotype');
+end
 
 %% ========================================================================
 % Table S9
@@ -250,7 +270,7 @@ lmeStats = lme_postHoc(mdlA, 'contrasts', 'all')
 
 % Model BC: Y ~ X + M + covariates * Group (Direct + mediator)
 [mdlBC, statsBC, infoBC] = lme_analyse(tblMea, ...
-    'ss_frSingle ~ (fr + pBurst + ss_frBurst) * genotype + (1|sbjID)', ...
+    'ss_frSingle ~ (fr + pBurst) * genotype + ss_frBurst + (1|sbjID)', ...
     'dist', 'log-normal', 'flgStnd', false, 'transTemplate', tmpl);
 
 % Per-group Sobel tests (from the SAME combined models) -------------------
@@ -261,6 +281,15 @@ if flgPlot
     tblPlot.ss_frBurst = log10(tblPlot.ss_frBurst);
     lme_mediationPlot(resMed, mdlA, mdlBC, tblPlot, ...
         'xVar', 'pBurst_trans', 'mVar', 'ss_frBurst', 'grpVar', 'genotype')
+
+    hFig = plot_axSize('flgFullscreen', true, 'flgPos', true);
+    hAx = nexttile;
+    [pdRes, hFig] = lme_lsmeans(mdlBC, {'pBurst', 'genotype'}, ...
+        'hAx', hAx);
+    % set(gca, "YScale", "log")
+    hAx = nexttile;
+    [pdRes, hFig] = lme_lsmeans(mdlBC, {'ss_frBurst', 'genotype'}, ...
+        'hAx', hAx);
 end
 
 % Consolidate: mediation summaries + model details -----------------------
@@ -282,7 +311,10 @@ lmeTbls = [medTbls, ...
     'dist', 'log-normal', 'flgStnd', false);
 lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
 
-lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
+lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName, ...
+    'tblInfo', tblInfo{tblIdx}, 'dataSet', dataSet{tblIdx}, 'tblPnls', tblPnls{tblIdx})
+
+
 
 
 %% ========================================================================
@@ -299,10 +331,10 @@ partMode = 'split';
 tblWt = tblMea(tblMea.genotype == 'Control', :);
 tblMcu = tblMea(tblMea.genotype == 'MCU-KO', :);
 
-abl = lme_ablation(tblWt, frml, 'dist', 'log-normal', 'partitionMode', partMode, 'nrep', 10);
+abl = lme_ablation(tblWt, frml, 'dist', 'log-normal', 'partitionMode', partMode, 'nrep', 10, 'flgPlot', flgPlot);
 ablTbl.Title = 'ABLATION SUMMARY (Pooled R2_OOS)';
 ablTbl.Table = table(abl.vars', round(abl.pR2', 4), 'VariableNames', {'Ablated_Feature', 'Ctrl'});
-abl = lme_ablation(tblMcu, frml, 'dist', 'log-normal', 'partitionMode', partMode, 'nrep', 10);
+abl = lme_ablation(tblMcu, frml, 'dist', 'log-normal', 'partitionMode', partMode, 'nrep', 10, 'flgPlot', flgPlot);
 ablTbl.Table{:, 'KO'} = round(abl.pR2', 4);
 
 headWt.Title = 'FULL MODEL: CONTROL';
@@ -316,7 +348,8 @@ tblWt = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
 tblMcu = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
 lmeTbls = [ablTbl, headWt, tblWt, headMcu, tblMcu];
 
-lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
+lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName, ...
+    'tblInfo', tblInfo{tblIdx}, 'dataSet', dataSet{tblIdx}, 'tblPnls', tblPnls{tblIdx})
 
 
 %% ========================================================================
@@ -324,7 +357,7 @@ lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName)
 % =========================================================================
 
 nTbls = length(sheetNames);
-indexData = cell(nTbls + 1, 3);
+indexData = cell(nTbls + 1, 4);
 indexData(1, :) = {'Table', 'Description', 'Data Set', 'Figure Panels'};
 
 for iTbl = 1:nTbls

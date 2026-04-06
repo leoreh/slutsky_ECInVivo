@@ -109,7 +109,7 @@ end
 
 
 % --- DENOISE ---
-tblUnit.FRt = fr_denoise(tblUnit.FRt, 'flgPlot', false, 'frameLen', 60);
+% tblUnit.FRt = fr_denoise(tblUnit.FRt, 'flgPlot', false, 'frameLen', 60);
 
 %% ========================================================================
 %  PLOT

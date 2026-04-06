@@ -231,6 +231,77 @@ frml = 'ss_frSingle ~ (fr + pBurst + ss_frBurst) * genotype + (1|sbjID)';
     'dist', 'log-normal', 'verbose', true, 'flgStnd', false);
 
 
+%% ========================================================================
+%  MEDIATION GAIN
+%  ========================================================================
+
+hFig = plot_axSize('flgFullscreen', true, 'flgPos', true);
+
+% Model
+[mdlBC, statsBC, infoBC] = lme_analyse(tblMea, ...
+    'sGain ~ (pBurst + fr + bGain) * genotype  + (1|sbjID)', ...
+    'dist', 'log-normal', 'flgStnd', false, 'transTemplate', tmpl);
+hAx = nexttile;
+[pdRes, hFig] = lme_lsmeans(mdlBC, {'bGain', 'genotype'}, ...
+    'hAx', hAx);
+
+hFig = plot_axSize('flgFullscreen', true, 'flgPos', true);
+
+% Model
+[mdlBC, statsBC, infoBC] = lme_analyse(tblMea, ...
+    'sGain ~ (pBurst + bGain) * genotype  + (1|sbjID)', ...
+    'dist', 'log-normal', 'flgStnd', false, 'transTemplate', tmpl);
+hAx = nexttile;
+[pdRes, hFig] = lme_lsmeans(mdlBC, {'pBurst', 'genotype'}, ...
+    'hAx', hAx);
+
+% Model
+[mdlBC, statsBC, infoBC] = lme_analyse(tblMea, ...
+    'bGain ~ (pBurst + fr) * genotype  + (1|sbjID)', ...
+    'dist', 'log-normal', 'flgStnd', false, 'transTemplate', tmpl);
+hAx = nexttile;
+[pdRes, hFig] = lme_lsmeans(mdlBC, {'pBurst', 'genotype'}, ...
+    'hAx', hAx);
+
+% Model
+hFig = plot_axSize('flgFullscreen', true, 'flgPos', true);
+[mdlBC, statsBC, infoBC] = lme_analyse(tblMea, ...
+    'frGain ~ (pBurst + fr) * genotype  + (1|sbjID)', ...
+    'dist', 'normal', 'flgStnd', false, 'transTemplate', tmpl);
+hAx = nexttile;
+[pdRes, hFig] = lme_lsmeans(mdlBC, {'fr', 'genotype'}, ...
+    'hAx', hAx);
+
+
+
+%%% ---
+
+hFig = plot_axSize('flgFullscreen', true, 'flgPos', true);
+
+% Model
+[mdlBC, statsBC, infoBC] = lme_analyse(tblMea, ...
+    'ss_frBurst ~ (pBurst + fr + ss_frSingle) * genotype  + (1|sbjID)', ...
+    'dist', 'log-normal', 'flgStnd', false, 'transTemplate', tmpl);
+hAx = nexttile;
+[pdRes, hFig] = lme_lsmeans(mdlBC, {'pBurst', 'genotype'}, ...
+    'hAx', hAx);
+
+% Model
+[mdlBC, statsBC, infoBC] = lme_analyse(tblMea, ...
+    'ss_frSingle ~ (pBurst + fr + ss_frBurst) * genotype  + (1|sbjID)', ...
+    'dist', 'log-normal', 'flgStnd', false, 'transTemplate', tmpl);
+hAx = nexttile;
+[pdRes, hFig] = lme_lsmeans(mdlBC, {'pBurst', 'genotype'}, ...
+    'hAx', hAx);
+
+% Model
+[mdlBC, statsBC, infoBC] = lme_analyse(tblMea, ...
+    'ss_frSingle ~ (pBurst + fr) * genotype  + (1|sbjID)', ...
+    'dist', 'log-normal', 'flgStnd', false, 'transTemplate', tmpl);
+hAx = nexttile;
+[pdRes, hFig] = lme_lsmeans(mdlBC, {'fr', 'genotype'}, ...
+    'hAx', hAx);
+
 
 %% ========================================================================
 %  ABLATION

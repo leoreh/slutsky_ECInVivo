@@ -3,8 +3,8 @@ function mcu_xlsFormat(xlsName, varargin)
 %
 %   MCU_XLSFORMAT(XLSNAME) opens the specified Excel file and applies
 %   the following formatting across all sheets: left alignment, asserting
-%   hyperlink formulas, highlighting rows with 'MODEL INFORMATION', and
-%   applying bold font to cells containing text in all capital letters.
+%   hyperlink formulas, and highlighting formula rows (containing ' ~ ')
+%   with bold font, gray background, and merged centered columns A-H.
 %
 %   Optional Parameters:
 %       pathName - Directory path (default: current directory)
@@ -53,30 +53,32 @@ try
         numRows = usedRange.Rows.Count;
         numCols = usedRange.Columns.Count;
         
+        xlHAlignCenter = -4108;
+        colorIndexLightGray = 15;
+
         for iRow = 1:numRows
+
+            % Check first cell for formula rows (contain ' ~ ')
+            cellA = get(usedRange, 'Item', iRow, 1);
+            cellAVal = cellA.Value;
+            if ischar(cellAVal) && contains(cellAVal, ' ~ ')
+                absRow = cellA.Row;
+                mergeRange = sheet.Range(sprintf('A%d:H%d', absRow, absRow));
+                mergeRange.Merge;
+                mergeRange.HorizontalAlignment = xlHAlignCenter;
+                mergeRange.Font.Bold = true;
+                mergeRange.Interior.ColorIndex = colorIndexLightGray;
+                continue;
+            end
+
+            % Cell-by-cell processing for non-formula rows
             for iCol = 1:numCols
                 cellObj = get(usedRange, 'Item', iRow, iCol);
-                cellVal = cellObj.Value;
-                
+
                 % Assert hyperlinks by forcing Excel to re-evaluate the local formula
                 cellFormula = cellObj.Formula;
                 if ischar(cellFormula) && startsWith(cellFormula, '=HYPERLINK')
                     cellObj.FormulaLocal = cellFormula;
-                end
-                
-                if ischar(cellVal)
-                    % Highlight entire row in light gray
-                    if contains(cellVal, 'MODEL INFORMATION')
-                        rowObj = cellObj.EntireRow;
-                        colorIndexLightGray = 15;
-                        rowObj.Interior.ColorIndex = colorIndexLightGray;
-                    end
-                    
-                    % Apply bold to cells that are entirely uppercase
-                    % if isequal(upper(cellVal), cellVal) && all(isletter(cellVal))
-                    %     rowObj = cellObj.EntireRow;
-                    %     rowObj.Font.Bold = true;
-                    % end
                 end
             end
         end
