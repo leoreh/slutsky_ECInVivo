@@ -13,6 +13,7 @@ function [tbl, xVec, basepaths, v] = mcu_tblMea(varargin)
 %                     'time'        : Include temporal dynamics (burstDyn).
 %                     'spktimes'    : Include spike times (mea.spktimes).
 %                     'steadyState' : Include steady-state recovery metrics (ss_).
+%                     'acute'       : Include acute-phase metrics (ac_).
 %                     'frNet'       : Include network metrics (dim, mcc, cc).
 %                     Note: Core firing stats (rate, dur, etc) are always included.
 %
@@ -173,6 +174,28 @@ if ismember('steadyState', presets)
 
     % Join
     tbl = outerjoin(tbl, tblSS, 'MergeKeys', true);
+end
+
+
+% Acute Phase Table
+% ---------------------------------
+if ismember('acute', presets)
+    mapAcute = struct();
+    mapAcute.ac_br       = 'stats.br';
+    mapAcute.ac_bDur     = 'stats.dur';
+    mapAcute.ac_bFreq    = 'stats.freq';
+    mapAcute.ac_bIBI     = 'stats.ibi';
+    mapAcute.ac_pBurst   = 'stats.pBurst';
+    mapAcute.ac_bSize    = 'stats.bSize';
+    mapAcute.ac_fr       = 'stats.fr';
+    mapAcute.ac_frBurst  = 'stats.frBurst';
+    mapAcute.ac_frSingle = 'stats.frSingle';
+
+    tblAcute = v2tbl('v', v, 'varMap', mapAcute, 'tagFiles', tagFiles, ...
+        'idxCol', 2, 'uOffset', 0);
+
+    % Join
+    tbl = outerjoin(tbl, tblAcute, 'MergeKeys', true);
 end
 
 

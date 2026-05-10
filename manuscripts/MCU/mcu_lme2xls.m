@@ -123,17 +123,21 @@ basepaths = [mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl')];
 tblTrans = tbl_trans(tblRipp, 'varsInc', {'pBurst'}, 'logBase', 'logit');
 tblRipp.pBurst_trans = tblTrans.pBurst;
 
-frml = 'com ~ (fr + pBurst) + genotype + (1|sbjID)';
+frml = 'com ~ genotype + (1|sbjID)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblRipp, frml, 'dist', 'normal', 'flgStnd', false);
 lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
+
+frml = 'com ~ (fr + pBurst) + genotype + (1|sbjID)';
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblRipp, frml, 'dist', 'normal', 'flgStnd', false);
+lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
 lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName, ...
     'tblInfo', tblInfo{tblIdx}, 'dataSet', dataSet{tblIdx}, 'tblPnls', tblPnls{tblIdx})
 
 if flgPlot
     hFig = figure;
-    hAx = nexttile; lme_lsmeans(lmeMdl, {'pBurst', 'genotype'}, 'transParams', lmeInfo.transParams, ...
+    hAx = nexttile; pdRes = lme_lsmeans(lmeMdl, {'pBurst', 'genotype'}, 'transParams', lmeInfo.transParams, ...
         'hAx', hAx, 'xLims', {[0, 1], []});
-    hAx = nexttile; lme_lsmeans(lmeMdl, {'fr', 'genotype'}, 'transParams', lmeInfo.transParams, ...
+    hAx = nexttile; pdRes = lme_lsmeans(lmeMdl, {'fr', 'genotype'}, 'transParams', lmeInfo.transParams, ...
         'hAx', hAx); 
     tblGUI_xy(xVec, tblRipp, 'grpVar', 'genotype');
     tblGUI_scatHist(tblRipp, 'grpVar', 'genotype');
@@ -148,14 +152,68 @@ tblInfo{tblIdx} = 'FRH during BAC';
 dataSet{tblIdx} = 'In Vivo';
 tblPnls{tblIdx} = '3G';
 
-frml = 'fr ~ genotype * day + (day|sbjID)';
 tblLme = tblVivo; tblLme(tblLme.sbjID == 'lh137', :) = [];
+frml = 'fr ~ genotype * day + (day|sbjID)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblVivo, frml, 'dist', 'gamma');
 lmeStats = lme_postHoc(lmeMdl, 'contrasts', [1 : 9, 12, 15, 17 : 19]);
 lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
+
 lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName, ...
     'tblInfo', tblInfo{tblIdx}, 'dataSet', dataSet{tblIdx}, 'tblPnls', tblPnls{tblIdx})
 
+% --- Distribution shape across days (per genotype) -----------------------
+% Cross-sectional quantification of the RS firing rate distribution per
+% day. Mean and median are reported in Hz for interpretability; variance
+% and IQR are computed on log10(FR), where the distribution is
+% approximately symmetric. Shape is compared against BSL with a two-
+% sample KS test on log-FR. Units are sorted independently per 24-h
+% session, so this describes the per-session population state, not
+% trajectories of the same neurons across days. Kept in the workspace
+% only (distRows) -- not written to the supp Excel file.
+
+% Reload table to include washout, then remove bad and FS units, remove bac on, bac off
+tblVivo = mcu_tblVivo('presets', presets, 'flgClean', false);
+tblLme = tblVivo; tblLme(tblLme.sbjID == 'lh137', :) = [];
+tblLme(tblLme.unitType == 'Other', :) = [];
+tblLme(tblLme.unitType == 'FS', :) = [];
+tblLme.unitType = removecats(tblLme.unitType, {'Other', 'FS'});
+tblLme.unitType = [];
+tblLme(tblLme.day == 'BAC_ON', :) = [];
+tblLme(tblLme.day == 'BAC_OFF', :) = [];
+tblLme.day = removecats(tblLme.day, {'BAC_ON', 'BAC_OFF'});
+
+logFR = log10(tblVivo.fr); logFR(isinf(logFR)) = NaN;
+grps = categories(removecats(tblVivo.genotype));
+days = categories(removecats(tblVivo.day));
+distRows = table;
+for iGrp = 1:numel(grps)
+    idxGrp = tblVivo.genotype == grps{iGrp};
+    vBslLog = logFR(idxGrp & tblVivo.day == 'BSL' & ~isnan(logFR));
+    for iDay = 1:numel(days)
+        idxDay = idxGrp & tblVivo.day == days{iDay};
+        vLog   = logFR(idxDay & ~isnan(logFR));
+        vHz    = tblVivo.fr(idxDay);
+        vHz    = vHz(~isnan(vHz) & vHz > 0);
+        if isempty(vLog), continue; end
+        if strcmp(days{iDay}, 'BSL')
+            dKS = NaN; pKS = NaN;
+        else
+            [~, pKS, dKS] = kstest2(vBslLog, vLog);
+        end
+        distRows = [distRows; table(string(grps{iGrp}), string(days{iDay}), ...
+            numel(vLog), mean(vHz), median(vHz), var(vLog), iqr(vLog), ...
+            dKS, pKS, ...
+            'VariableNames', {'Genotype','Day','n','Mean_Hz','Median_Hz', ...
+            'Variance_log','IQR_log','KS_D','KS_p'})]; %#ok<AGROW>
+    end
+end
+disp(distRows);
+
+% Number of units per day
+tblN = groupsummary(tblVivo, {'sbjID', 'genotype', 'day'});
+
+% Publication figure (thesis response R2-08): per-genotype RS FR distributions
+%   kdMat = mcu_frDist_export(tblLme, pathName)
 
 
 %% ========================================================================
@@ -174,25 +232,28 @@ lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
 lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName, ...
     'tblInfo', tblInfo{tblIdx}, 'dataSet', dataSet{tblIdx}, 'tblPnls', tblPnls{tblIdx})
 
+if flgPlot
+    tblGUI_bar(tblLme, 'yVar', 'pBurst', 'xVar', 'genotype');
+end
 
 %% ========================================================================
 % Table S7
 % =========================================================================
 tblIdx = 7;
 sheetNames{tblIdx} = ['S' num2str(tblIdx)];
-tblInfo{tblIdx}    = 'Spike Component x Epoch during FRH';
+tblInfo{tblIdx}    = 'FR Component x Time during FRH';
 dataSet{tblIdx}    = 'MEA';
-tblPnls{tblIdx}    = '4A,C,E; S4A';
+tblPnls{tblIdx}    = 'S5C';
 
-% Reshape tblMea to long format: one row per (unit × component × epoch).
+% Reshape tblMea to long format: one row per (unit × component × time).
 % Each unit contributes 4 rows crossing:
 %   component : {'bSpk', 'sSpk'} — burst vs. single spike firing rate
-%   epoch     : {'BSL',  'SS'}   — baseline vs. steady state
+%   time     : {'BSL',  'SS'}   — baseline vs. steady state
 tblLong = stack(tblMea, {'frBurst', 'frSingle', 'ss_frBurst', 'ss_frSingle'}, ...
     'NewDataVariableName', 'fr', ...
     'IndexVariableName', 'SourceVar', ...
     'ConstantVariables', {'genotype', 'sbjID', 'unitID'});
-tblLong.epoch = categorical(tblLong.SourceVar, ...
+tblLong.time = categorical(tblLong.SourceVar, ...
     {'frBurst', 'frSingle', 'ss_frBurst', 'ss_frSingle'}, ...
     {'BSL',    'BSL',    'SS',        'SS'});
 tblLong.component = categorical(tblLong.SourceVar, ...
@@ -200,13 +261,12 @@ tblLong.component = categorical(tblLong.SourceVar, ...
     {'bSpk',   'sSpk',   'bSpk',      'sSpk'});
 tblLong.SourceVar = [];
 
-frml = 'fr ~ component * epoch * genotype + (1|sbjID)';
+frml = 'fr ~ component * time * genotype + (1|sbjID)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLong, frml, 'dist', 'log-normal');
 lmeStats = lme_postHoc(lmeMdl, 'contrasts', [1 : 9, 32 : 39]);
 lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
 lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName, ...
     'tblInfo', tblInfo{tblIdx}, 'dataSet', dataSet{tblIdx}, 'tblPnls', tblPnls{tblIdx})
-
 
 %% ========================================================================
 % Table S8
@@ -215,112 +275,48 @@ tblIdx = 8;
 sheetNames{tblIdx} = ['S' num2str(tblIdx)];
 tblInfo{tblIdx} = 'Firing Gain during FRH';
 dataSet{tblIdx} = 'MEA';
-tblPnls{tblIdx} = '4D, S4B';
+tblPnls{tblIdx} = '4D, S5D';
 
 tblMea.bGain = log((tblMea.ss_frBurst) ./ (tblMea.frBurst));
 tblMea.sGain = log((tblMea.ss_frSingle) ./ (tblMea.frSingle));
 tblMea.frGain = log((tblMea.ss_fr) ./ (tblMea.fr));
+
+% Model 1: Proportional allocation (Figure 4H)
 frml = 'sGain ~ bGain * genotype + (1|sbjID)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'normal', 'flgStnd', false);
 lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
 
-frml = 'sGain ~ (pBurst + fr + bGain) * genotype + (1|sbjID)';
+% Model 2: Total FR gain vs burstiness (Figure 4K)
+frml = 'frGain ~ (pBurst + fr) * genotype  + (1|sbjID)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tblMea, frml, 'dist', 'normal', 'flgStnd', false);
 lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
 lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName, ...
     'tblInfo', tblInfo{tblIdx}, 'dataSet', dataSet{tblIdx}, 'tblPnls', tblPnls{tblIdx})
 
-frml = 'frGain ~ (pBurst + fr) * genotype  + (1|sbjID)';
-[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tblMea, frml, 'dist', 'normal', 'flgStnd', false);
+% Partial regression for proportional allocation, controlling for baseline
+% burstiness. This model tests whether the allocation coefficient (beta)
+% differs between genotypes after accounting for baseline firing pattern.
+% Serves as the statistical basis for the added-variable plot (Figure S5D).
+frml = 'sGain ~ (pBurst + bGain) * genotype + (1|sbjID)';
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, ...
+    'dist', 'normal', 'flgStnd', false);
 lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
+lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName, ...
+    'tblInfo', tblInfo{tblIdx}, 'dataSet', dataSet{tblIdx}, 'tblPnls', tblPnls{tblIdx})
 
 if flgPlot
     tblGUI_scatHist(tblMea, 'grpVar', 'genotype');
 end
 
+tblSum = tblMea(tblMea.genotype == 'Control', {'sGain', 'frGain', 'bGain'});
+sumStats = groupsummary(tblSum, [], {"mean", "std"}, {'sGain', 'frGain', 'bGain'});
+
+
+
 %% ========================================================================
 % Table S9
 % =========================================================================
 tblIdx = 9;
-sheetNames{tblIdx} = ['S' num2str(tblIdx)];
-tblInfo{tblIdx} = 'Mediation Analysis';
-dataSet{tblIdx} = 'MEA';
-tblPnls{tblIdx} = '4F, S5';
-
-xVar = 'pBurst';
-mVar = 'ss_frBurst';
-
-% Transformation template
-[~, tmpl] = tbl_trans(tblMea, 'varsInc', {'fr', 'pBurst', 'ss_frBurst'}, ...
-    'logBase', 10, 'skewThr', 2, 'flgZ', false);
-tmpl.varsTrans.pBurst.logBase = [];
-tmpl.varsTrans.ss_frBurst.logBase = 'e'; % Force ln for consistency with mediation
-
-% Fit three combined models (single source of truth) ----------------------
-% Model A: M ~ X + covariates * Group
-[mdlA, statsA, infoA] = lme_analyse(tblMea, ...
-    'ss_frBurst ~ (fr + pBurst) * genotype + (1|sbjID)', ...
-    'dist', 'log-normal', 'flgStnd', false, 'transTemplate', tmpl);
-lmeStats = lme_postHoc(mdlA, 'contrasts', 'all')
-
-% Model C: Y ~ X + covariates * Group (Total effect)
-[mdlC, statsC, infoC] = lme_analyse(tblMea, ...
-    'ss_frSingle ~ (fr + pBurst) * genotype + (1|sbjID)', ...
-    'dist', 'log-normal', 'flgStnd', false, 'transTemplate', tmpl);
-
-% Model BC: Y ~ X + M + covariates * Group (Direct + mediator)
-[mdlBC, statsBC, infoBC] = lme_analyse(tblMea, ...
-    'ss_frSingle ~ (fr + pBurst) * genotype + ss_frBurst + (1|sbjID)', ...
-    'dist', 'log-normal', 'flgStnd', false, 'transTemplate', tmpl);
-
-% Per-group Sobel tests (from the SAME combined models) -------------------
-resMed = lme_mediation(mdlA, mdlC, mdlBC, xVar, mVar, 'grpVar', 'genotype');
-
-if flgPlot
-    tblPlot = tblMea;
-    tblPlot.ss_frBurst = log10(tblPlot.ss_frBurst);
-    lme_mediationPlot(resMed, mdlA, mdlBC, tblPlot, ...
-        'xVar', 'pBurst_trans', 'mVar', 'ss_frBurst', 'grpVar', 'genotype')
-
-    hFig = plot_axSize('flgFullscreen', true, 'flgPos', true);
-    hAx = nexttile;
-    [pdRes, hFig] = lme_lsmeans(mdlBC, {'pBurst', 'genotype'}, ...
-        'hAx', hAx);
-    % set(gca, "YScale", "log")
-    hAx = nexttile;
-    [pdRes, hFig] = lme_lsmeans(mdlBC, {'ss_frBurst', 'genotype'}, ...
-        'hAx', hAx);
-end
-
-% Consolidate: mediation summaries + model details -----------------------
-nGrp = numel(resMed);
-medTbls = struct('Title', {}, 'Table', {});
-for iGrp = 1:nGrp
-    medTbls(iGrp).Title = sprintf('MEDIATION SUMMARY: %s', upper(resMed(iGrp).grpLevel));
-    medTbls(iGrp).Table = resMed(iGrp).paths;
-end
-
-lmeTbls = [medTbls, ...
-    lme_mdl2tbls(mdlA, statsA, infoA), ...
-    lme_mdl2tbls(mdlC, statsC, infoC), ...
-    lme_mdl2tbls(mdlBC, statsBC, infoBC)];
-
-% Extra model (total FR), for LSMeans
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, ...
-    'ss_fr ~ (fr + pBurst) * genotype + (1|sbjID)', ...
-    'dist', 'log-normal', 'flgStnd', false);
-lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
-
-lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName, ...
-    'tblInfo', tblInfo{tblIdx}, 'dataSet', dataSet{tblIdx}, 'tblPnls', tblPnls{tblIdx})
-
-
-
-
-%% ========================================================================
-% Table S10
-% =========================================================================
-tblIdx = 10;
 sheetNames{tblIdx} = ['S' num2str(tblIdx)];
 tblInfo{tblIdx} = 'Feature Ablation';
 dataSet{tblIdx} = 'MEA';

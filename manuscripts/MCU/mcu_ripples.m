@@ -157,8 +157,11 @@ tblGUI_bar(tblRipp, 'xVar', 'genotype', 'yVar', 'dur');
 tblGUI_scatHist(tblRipp, 'xVar', 'dur', 'yVar', 'amp', 'grpVar', 'genotype');
 
 % Summary
-tblSum = groupsummary(tblRipp, {'genotype', 'sbjID'}, 'mean', ...
-    vartype("numeric"));
+% tblSum = groupsummary(tblRipp, {'genotype', 'sbjID'}, 'mean', ...
+%     vartype("numeric"))
+% tblBsl = tblVivo(tblVivo.day == 'BSL', :);
+% tblSum = groupsummary(tblBsl, {'genotype', 'sbjID'}, 'mean', ...
+%     vartype("numeric"))
 
 % LME
 frml = 'dur ~ (freq + amp + com) * genotype + (1|sbjID)';

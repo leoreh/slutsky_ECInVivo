@@ -11,7 +11,7 @@ function utypes_push(basepaths, fetTbl)
 %
 %   INPUT:
 %       basepaths - Cell array of recording folder paths
-%       fetTbl    - Table containing 'UnitType' and 'File' columns
+%       fetTbl    - Table containing 'unitType' and 'fileID' columns
 %
 
 if ~iscell(basepaths), basepaths = {basepaths}; end
@@ -22,12 +22,12 @@ for iPath = 1 : length(basepaths)
     uFile = fullfile(basepath, [basename, '.units.mat']);
 
     % Find units belonging to this file
-    % Assumes fetTbl has 'File' column matching basename
-    fFiles = string(fetTbl.File);
+    % Assumes fetTbl has 'fileID' column matching basename
+    fFiles = string(fetTbl.fileID);
     uIdx = (fFiles == string(basename));
 
     % Get subset of unitTypes
-    subTypes = fetTbl.UnitType(uIdx);
+    subTypes = fetTbl.unitType(uIdx);
     nUnits = length(subTypes);
 
     % Construct 'clean' (Row 1: RS, Row 2: FS)

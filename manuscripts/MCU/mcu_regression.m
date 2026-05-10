@@ -83,11 +83,11 @@ frml = 'sDelta ~ bDelta * genotype + (1|sbjID)';
 
 hFig = figure;
 hTile = tiledlayout(hFig, 1, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
-
 hAx = nexttile;
-frml = 'sGain ~ (pBurst + fr + bGain) * genotype + (1|sbjID)';
+
+frml = 'sGain ~ (pBurst + bGain) * genotype + (1|sbjID)';
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
-    'dist', 'normal', 'verbose', false);
+    'dist', 'normal', 'verbose', false, 'flgStnd', false);
 
 [tblRes, hFig] = lme_pr(lmeMdl, 'bGain', ...
     'flgMode', 'regression', 'hAx', hAx, ...
@@ -192,6 +192,15 @@ prismMat = [pdRes(grpIdx, vars(1)), ...
 %% ========================================================================
 %  MEDIATION
 %  ========================================================================
+% NOTE: Formal mediation analysis was removed. The decomposition of
+% pBurst effects into component-specific paths (burst-spike vs single-spike)
+% is compositionally confounded: pBurst defines the baseline split
+% (frBurst = fr * pBurst), so any model predicting a component from pBurst
+% conflates biological effects with compositional arithmetic. The
+% localization of deficits to firing components relies instead on the
+% factorial analysis (S7), feature ablation (S10), and the allocation
+% formalization (Supp. Note 1, Equations 1-4).
+
 
 frml = 'ss_frSingle ~ pBurst + fr + (1|sbjID)';
 xVar = 'pBurst';
@@ -237,12 +246,22 @@ frml = 'ss_frSingle ~ (fr + pBurst + ss_frBurst) * genotype + (1|sbjID)';
 
 hFig = plot_axSize('flgFullscreen', true, 'flgPos', true);
 
+[mdlBC, statsBC, infoBC] = lme_analyse(tblMea, ...
+    'ss_frSingle ~ (pBurst + ss_frBurst) * genotype  + (1|sbjID)', ...
+    'dist', 'log-normal', 'flgStnd', false, 'transTemplate', tmpl);
+
+hAx = nexttile;
+[pdRes, hFig] = lme_lsmeans(mdlBC, {'pBurst', 'genotype'}, ...
+    'hAx', hAx);
+
+hFig = plot_axSize('flgFullscreen', true, 'flgPos', true);
+
 % Model
 [mdlBC, statsBC, infoBC] = lme_analyse(tblMea, ...
-    'sGain ~ (pBurst + fr + bGain) * genotype  + (1|sbjID)', ...
+    'sGain ~ (pBurst + bGain) * genotype  + (1|sbjID)', ...
     'dist', 'log-normal', 'flgStnd', false, 'transTemplate', tmpl);
 hAx = nexttile;
-[pdRes, hFig] = lme_lsmeans(mdlBC, {'bGain', 'genotype'}, ...
+[pdRes, hFig] = lme_lsmeans(mdlBC, {'pBurst', 'genotype'}, ...
     'hAx', hAx);
 
 hFig = plot_axSize('flgFullscreen', true, 'flgPos', true);
@@ -387,3 +406,240 @@ frml = 'fr ~ (frSingle + frBurst) * Timepoint + (1|sbjID)';
 
 [lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tblGrp, frml, ...
     'dist', 'log-normal');
+
+
+%% ========================================================================
+%  ENDPOINT MODEL: ACUTE BURST ACTIVITY
+%  ========================================================================
+% Tests whether burst-spike firing during the acute suppression phase
+% predicts total FR recovery, controlling for suppression depth.
+%
+%   frGain ~ acBGain * genotype + acFrGain + (1|sbjID)
+%
+% All quantities are log-ratios relative to baseline:
+%   frGain   = ln(ss_fr / fr)              Recovery endpoint (BSL -> SS)
+%   acBGain  = ln(ac_frBurst / frBurst)    Burst FR change (BSL -> Acute)
+%   acFrGain = ln(ac_fr / frTot)           Total FR change (BSL -> Acute)
+%
+% acFrGain controls for suppression depth. By identity,
+% Delta FR_burst = Delta FR + Delta P_burst, so the coefficient on
+% acBGain isolates the pattern-specific (burstiness) component:
+%   Positive -> induction command (retained bursts drive plasticity)
+%   Negative -> error signal (burst loss encodes larger error)
+
+
+% Load Data
+presets = {'steadyState', 'acute'};
+[tbl, ~, basepaths, v] = mcu_tblMea('presets', presets, 'flgOtl', true);
+
+% Log-Ratios: BSL -> SS (recovery endpoint)
+tbl.frGain = log((tbl.ss_fr) ./ (tbl.fr));
+tbl.frGain = log((tbl.ss_fr) ./ (tbl.ac_fr));
+
+% Log-Ratios: BSL -> Acute (suppression state)
+tbl.acFrGain = log((tbl.ac_fr) ./ (tbl.frTot));
+tbl.acBGain  = log((tbl.ac_frBurst) ./ (tbl.frBurst));
+% tbl.acSGain  = log((tbl.ac_frSingle) ./ (tbl.frSingle));
+
+% Endpoint Model
+frml = 'frGain ~ acBGain * genotype + acFrGain + (1|sbjID)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
+    'dist', 'normal', 'verbose', true, 'flgStnd', false);
+
+frml = 'frGain ~ (acBGain + pBurst) * genotype + acFrGain + (1|sbjID)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
+    'dist', 'normal', 'verbose', true, 'flgStnd', false);
+
+% Partial Regression (AVP) and LS-Means
+hFig = figure;
+% hTile = tiledlayout(hFig, 1, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
+
+% hAx = nexttile;
+% [tblRes, hFig] = lme_pr(lmeMdl, 'acBGain', ...
+%     'flgMode', 'regression', 'hAx', hAx, ...
+%     'varGrp', 'genotype', 'transParams', lmeInfo.transParams);
+
+hAx = nexttile;
+[pdRes, hFig] = lme_lsmeans(lmeMdl, {'acBGain', 'genotype'}, ...
+    'transParams', lmeInfo.transParams, 'hAx', hAx);
+
+
+%% ========================================================================
+%  BURST EXCESS: PROPORTIONAL ALLOCATION RESIDUAL
+%  ========================================================================
+% The proportional allocation equation (sGain = alpha + beta * bGain,
+% S8 Model 1) defines the expected burst-single coupling for any FR
+% change. acBurstExcess is the orthogonal distance from this line in
+% (acBGain, acSGain) space — positive means the neuron was burstier
+% during acute than proportional allocation predicts. By construction,
+% this variable is orthogonal to the proportional allocation confound:
+% recovery-driven changes lie ON the line and produce zero excess.
+
+% Exchange Rate Coefficients (pooled across genotypes)
+tbl.bGain = log((tbl.ss_frBurst) ./ (tbl.frBurst));
+tbl.sGain = log((tbl.ss_frSingle) ./ (tbl.frSingle));
+
+[mdlER, ~, ~, ~] = lme_analyse(tbl, 'sGain ~ bGain + (1|sbjID)', ...
+    'dist', 'normal', 'verbose', false, 'flgStnd', false);
+alpha = mdlER.Coefficients.Estimate(1);
+beta  = mdlER.Coefficients.Estimate(2);
+
+% Burst Excess (orthogonal residual from PA line)
+tbl.acSGain = log((tbl.ac_frSingle) ./ (tbl.frSingle));
+tbl.acBurstExcess = -(tbl.acSGain - alpha - beta .* tbl.acBGain) / sqrt(1 + beta^2);
+
+% Endpoint Model with Burst Excess
+frml = 'frGain ~ acBurstExcess * genotype + acFrGain + (1|sbjID)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
+    'dist', 'normal', 'verbose', true, 'flgStnd', false);
+
+% With Baseline Burstiness
+frml = 'frGain ~ (acBurstExcess + pBurst) * genotype + acFrGain + (1|sbjID)';
+[lmeMdl, lmeStats, lmeInfo, ~] = lme_analyse(tbl, frml, ...
+    'dist', 'normal', 'verbose', true, 'flgStnd', false);
+
+% Partial Regression (AVP)
+[tblRes, hFig] = lme_pr(lmeMdl, 'acBurstExcess', ...
+    'flgMode', 'regression', ...
+    'varGrp', 'genotype', 'transParams', lmeInfo.transParams);
+
+hAx = nexttile;
+[pdRes, hFig] = lme_lsmeans(lmeMdl, {'acBurstExcess', 'genotype'}, ...
+    'transParams', lmeInfo.transParams, 'hAx', hAx);
+
+
+%% ========================================================================
+%  BASELINE GAP UNDER PROPORTIONAL ALLOCATION
+%  ========================================================================
+% Does the FRH allocation rule (sGain = alpha + beta * bGain, Supp Note 1)
+% also govern the between-genotype baseline gap in firing components? If
+% MCU-KO units simply populate a higher region of the same ln(FR_single)
+% vs ln(FR_burst) curve that FRH recovery traces out, the genotype main
+% effect on FR_single dissolves once ln(FR_burst) is conditioned on. That
+% would unify baseline compensation and FRH under a single biophysical
+% rule - a sharper claim than either section currently makes alone.
+%
+% IS THIS WORTH DOING?
+% Yes, cautiously. The decomposition is free (data already in hand), and
+% either outcome is informative: a clean result merges two descriptive
+% findings into one mechanism; a failure rules out the simplest unifying
+% hypothesis. Frame the reported result as evidence, not proof.
+%
+% Three caveats worth stating in the manuscript if the test goes through:
+%
+% (1) beta_FRH is a within-unit slope across time (gain pairs per unit).
+%     Mapping it to a between-unit, between-genotype baseline contrast
+%     assumes the burst-generation nonlinearity is the same whether
+%     driven by FRH plasticity or by constitutive baseline compensation.
+%     Theoretically defensible (Supp Note 1 derives the nonlinearity
+%     from burst biophysics, not from FRH itself), not guaranteed.
+%
+% (2) A null for genotype (main or interaction) is failure-to-reject.
+%     "Consistent with beta" is weaker than "predicted by beta exactly"
+%     and cannot exclude small true offsets below power.
+%
+% (3) Compositional structure. FR_burst and FR_single partition total
+%     firing, so a cross-sectional regression of one on the other at
+%     baseline carries arithmetic coupling on top of any biophysical
+%     coupling. The test of interest (does genotype add beyond
+%     ln(FR_burst)?) remains meaningful under compositionality, but the
+%     numerical slope can differ from beta_FRH for reasons unrelated to
+%     mechanism. Hence the slope equivalence is a secondary finding; the
+%     primary claim is the genotype-term non-significance.
+%
+% MODEL (MEA baseline, per-unit, animal as random intercept):
+%   ln(FR_single) ~ ln(FR_burst) * genotype + (1 | sbjID)
+%
+%   Target pattern for "baseline gap captured by allocation rule":
+%     beta1 (ln(FR_burst) main effect)       ~ beta_FRH
+%     beta2 (genotype main effect)           ~ 0 (n.s.)
+%     beta3 (genotype x ln(FR_burst))        ~ 0 (n.s.)
+%
+% ESTIMATOR CHOICE.
+% Published FRH beta (Table S8 Model 1, Fig 4H) is OLS-in-LME. Matching
+% that estimator here is essential for apples-to-apples slope comparison
+% - OLS attenuates slopes toward zero when the predictor has measurement
+% noise, so mixing OLS (FRH) and orthogonal (baseline) would bias the
+% comparison in a predictable direction. An orthogonal (PCA) slope
+% parallel to mea_allocation.m is reported below as a robustness check,
+% but it is NOT the primary test.
+%
+% Animal-level sanity check follows because within-animal unit-level
+% clustering inflates effective n. A per-mouse aggregate regression with
+% no random effects tells us whether the same qualitative pattern holds
+% when each mouse contributes one point.
+
+% Baseline log-transformed FR components (add if missing - tbl may have
+% been overwritten by an earlier section with acute preset)
+if ~ismember('lnFrBurst', tbl.Properties.VariableNames)
+    tbl.lnFrBurst  = log(tbl.frBurst);
+    tbl.lnFrSingle = log(tbl.frSingle);
+end
+
+% Primary model: OLS-in-LME, matches FRH estimator
+frml = 'lnFrSingle ~ lnFrBurst * genotype + (1|sbjID)';
+[mdlBsl, statsBsl, infoBsl, ~] = lme_analyse(tbl, frml, ...
+    'dist', 'normal', 'verbose', true, 'flgStnd', false);
+
+% Guard: auto-log on an already-logged predictor would mangle units.
+% lme_analyse re-transforms numeric predictors when skew > skewThr (=2).
+if isfield(infoBsl.transParams.varsTrans, 'lnFrBurst') && ...
+        ~isempty(infoBsl.transParams.varsTrans.lnFrBurst.logBase)
+    warning(['[BSL allocation] lme_analyse re-logged lnFrBurst ', ...
+        '(skew exceeded threshold). Slope now in log10-per-ln units; ', ...
+        'pass a transTemplate with logBase=[] to disable.']);
+end
+
+% Reference: FRH beta (Table S8 Model 1) on the same tbl and estimator
+tbl.bGain = log((tbl.ss_frBurst) ./ (tbl.frBurst));
+tbl.sGain = log((tbl.ss_frSingle) ./ (tbl.frSingle));
+tbl.frGain = log((tbl.ss_fr) ./ (tbl.fr));
+
+frml = 'sGain ~ bGain * genotype + (1|sbjID)';
+[mdlFrh, ~, ~, ~] = lme_analyse(tbl, frml, ...
+    'dist', 'normal', 'verbose', true, 'flgStnd', false);
+
+% Slope comparison (named lookup, robust to coefficient ordering)
+betaBsl = mdlBsl.Coefficients.Estimate(strcmp(mdlBsl.Coefficients.Name, 'lnFrBurst'));
+seBsl   = mdlBsl.Coefficients.SE(strcmp(mdlBsl.Coefficients.Name, 'lnFrBurst'));
+betaFrh = mdlFrh.Coefficients.Estimate(strcmp(mdlFrh.Coefficients.Name, 'bGain'));
+seFrh   = mdlFrh.Coefficients.SE(strcmp(mdlFrh.Coefficients.Name, 'bGain'));
+
+fprintf('\n================================================================\n');
+fprintf(' BASELINE ALLOCATION vs FRH BETA\n');
+fprintf('================================================================\n');
+fprintf('  beta_BSL (baseline)  = %.3f +/- %.3f\n', betaBsl, seBsl);
+fprintf('  beta_FRH (recovery)  = %.3f +/- %.3f\n', betaFrh, seFrh);
+fprintf('  |Delta|              = %.3f\n', abs(betaBsl - betaFrh));
+
+% Animal-level sanity check: one point per mouse, no random effect
+animTbl = groupsummary(tbl, {'sbjID', 'genotype'}, 'mean', ...
+    {'lnFrBurst', 'lnFrSingle'});
+animTbl.Properties.VariableNames = regexprep( ...
+    animTbl.Properties.VariableNames, '^mean_', '');
+mdlAnim = fitlm(animTbl, 'lnFrSingle ~ lnFrBurst * genotype');
+fprintf('\n--- Animal-level sanity check (one point per mouse) ---\n');
+disp(mdlAnim.Coefficients);
+
+% Orthogonal regression robustness check (parallels mea_allocation.m).
+% Per-genotype PCA slope in (ln(FR_burst), ln(FR_single)) space.
+fprintf('\n--- Orthogonal (PCA) slopes ---\n');
+grps = categories(tbl.genotype);
+for iGrp = 1:numel(grps)
+    idx = (tbl.genotype == grps{iGrp}) & ...
+        ~isnan(tbl.lnFrBurst) & ~isnan(tbl.lnFrSingle);
+    xy  = [tbl.lnFrBurst(idx), tbl.lnFrSingle(idx)];
+    v   = pca(xy);
+    slpOrtho = v(2, 1) / v(1, 1);
+    fprintf('  %-8s: beta_ortho = %.3f (n = %d units)\n', ...
+        char(grps{iGrp}), slpOrtho, sum(idx));
+end
+
+% Visual diagnostic
+hFig = figure('Position', [100 100 650 550], 'Color', 'w', ...
+    'Name', 'Baseline allocation: ln(FRburst) vs ln(FRsingle)');
+plot_scat(tbl, 'lnFrBurst', 'lnFrSingle', 'g', 'genotype', ...
+    'fitType', 'linear', 'flgStats', true, 'alpha', 0.6);
+xlabel('ln(FR_{burst})  [ln Hz]');
+ylabel('ln(FR_{single})  [ln Hz]');
+title('Baseline component allocation');
