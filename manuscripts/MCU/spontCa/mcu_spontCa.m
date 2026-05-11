@@ -1,26 +1,48 @@
 %% mcu_spontCa.m  Spontaneous Ca2+ imaging pipeline (cyto + mito).
 %
 % PURPOSE
-%   Read NF's SpontCa.xlsx into a long-format unit-level table, detect
-%   events with a cyto-triggered scheme (one mito event per cyto event;
-%   see Atoms/MCU/MCU compensation model.md), reproduce Fig 1E,F + S1B-E,
-%   and stage the transfer-function preview.
+%   Read NF's SpontCa.xlsx into a long-format unit-level table, run
+%   detection independently per compartment, couple each mito event to a
+%   preceding cyto event post-hoc, reproduce Fig 1E,F + S1B-E, and stage
+%   the transfer-function preview.
 %
 % PIPELINE FILES (manuscripts/MCU/spontCa)
 %   spontCa_load     Excel -> long-format table; returns fs separately
 %   spontCa_detect   single-trace event detection (dF/F input)
-%   spontCa_events   table-level orchestrator (cytoTrigger | independent)
+%   spontCa_events   per-row independent detection + ETA maps
+%   spontCa_couple   mito-to-preceding-cyto coupling (cytoIndependent flag)
 %   spontCa_gui      per-cell QC viewer
 %
 % See also: MCU_TBLMEA, MEA_WRAPPER, TBLGUI_BAR, LME_ANALYSE
 
 
 %% ========================================================================
-%  LOAD & DETECT (primary: cyto-triggered mito)
+%  LOAD
 %  ========================================================================
 
 [tbl, fs] = spontCa_load();
-tbl = spontCa_events(tbl, fs);
+
+
+%% ========================================================================
+%  DETECT (per-compartment params, tune independently)
+%  ========================================================================
+% Per-compartment detection: spontCa_detect operates on a single trace, so
+% to debug a specific compartment pull a single row out of tbl and call it
+% directly. Mito starts identical to cyto so the diff is visible from a
+% single set of changes.
+
+paramsCyto = {'kThr', 3, 'minAmp', 0.02, 'minDur', 0.4, 'minIEI', 0.4};
+paramsMito = {'kThr', 3, 'minAmp', 0.02, 'minDur', 0.4, 'minIEI', 0.4};
+
+tbl = spontCa_events(tbl, fs, ...
+    'paramsCyto', paramsCyto, 'paramsMito', paramsMito);
+
+
+%% ========================================================================
+%  COUPLE (mito -> preceding cyto)
+%  ========================================================================
+
+tbl = spontCa_couple(tbl, 'thrLag', 3);
 
 
 %% ========================================================================
@@ -35,7 +57,7 @@ spontCa_gui(tbl, fs);
 %  ========================================================================
 % Per-compartment LME + bar plot over genotype. With one observation per
 % sbjID the random intercept is degenerate and the LME reduces to LM.
-% meanAmp / meanDur are computed inline.
+% meanAmp is computed inline.
 
 metrics  = {'rate', 'meanAmp', 'flux', 'fluxInt'};
 statsAll = struct();
@@ -66,30 +88,16 @@ end
 
 
 %% ========================================================================
-%  VALIDATION : independent mito detection
+%  VALIDATION : fraction of cyto-independent mito events
 %  ========================================================================
-% Mito events detected without using cyto as trigger. Orphan mito events
-% (those without a nearby cyto event) test the modelling assumption that
-% mito is predominantly cyto-driven.
+% Independent detection lets mito events stand on their own. Per cell,
+% spontCa_couple flags each mito event as cytoIndependent if no cyto event
+% precedes it within thrLag. fracIndep is the per-cell fraction; comparing
+% it across genotypes tests the "mito is predominantly cyto-driven" model.
 
-tblIndep = spontCa_events(tbl, fs, 'mode', 'independent');
-
-ids = unique(tbl.sbjID);
-cmp = table();
-cmp.sbjID         = ids;
-cmp.nCyto         = nan(length(ids), 1);
-cmp.nMito_trig    = nan(length(ids), 1);
-cmp.nMito_indep   = nan(length(ids), 1);
-for i = 1:length(ids)
-    cmp.nCyto(i)       = tbl.nEvents(tbl.sbjID == ids(i) & tbl.compartment == 'Cyto');
-    cmp.nMito_trig(i)  = tbl.nEvents(tbl.sbjID == ids(i) & tbl.compartment == 'Mito');
-    cmp.nMito_indep(i) = tblIndep.nEvents(tblIndep.sbjID == ids(i) & tblIndep.compartment == 'Mito');
-end
-fprintf('\nMito events per cell (median):\n');
-fprintf('  cyto-triggered : %d\n', median(cmp.nMito_trig));
-fprintf('  independent    : %d\n', median(cmp.nMito_indep));
-fprintf('  orphans (indep - trig, may be negative if cyto fires without mito): %d\n', ...
-    median(cmp.nMito_indep - cmp.nMito_trig));
+subM = tbl(tbl.compartment == 'Mito', ...
+    {'genotype', 'sbjID', 'fracIndep'});
+tblGUI_bar(subM, 'yVar', 'fracIndep', 'xVar', 'genotype');
 
 
 %% ========================================================================

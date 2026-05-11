@@ -2,28 +2,29 @@ function hFig = spontCa_gui(tbl, fs, varargin)
 % SPONTCA_GUI Interactive per-cell QC for the SpontCa pipeline.
 %
 %   hFig = SPONTCA_GUI(TBL, FS, ...) opens a single-cell viewer for the
-%   long-format table returned by SPONTCA_EVENTS. Layout (top to bottom):
+%   long-format table returned by SPONTCA_EVENTS + SPONTCA_COUPLE.
 %
+%   LAYOUT (top to bottom):
 %       cyto trace + cyto start/stop markers
-%       mito trace + mito start/stop markers  (x linked to cyto, near-zero gap)
-%       ETA  |  cyto dur  |  mito dur  |  cyto-mito lag
+%       mito trace + mito start/stop markers  (x linked to cyto)
+%       etaCyto | etaMito | durCyto | durMito | lag
 %
-%   Cyto and mito colors come from cfg.clr.cmp. Event START markers are
-%   drawn dashed and STOP markers dotted. The dropdown lists every cell
-%   as 'Ctrl_XX' / 'KO_YY' (genotype read from the name). Axes use manual
-%   positioning so the cyto/mito gap is ~1 px while the gap above the
-%   histogram row stays comfortable.
+%   ETA panels overlay cyto (red) and mito (green) ETAs, the first aligned
+%   on cyto starts (mapCyto), the second aligned on mito starts (mapMito).
+%   Cyto-independent mito events are drawn with reduced alpha so they stay
+%   visually distinct without changing color.
 %
 %   INPUTS:
-%       tbl     - output of SPONTCA_EVENTS, including the per-row 'map'
-%                 column and tbl.Properties.UserData.tWin.
-%       fs      - sampling rate (Hz).
+%       tbl - output of SPONTCA_EVENTS + SPONTCA_COUPLE, including the
+%             per-row 'mapCyto' / 'mapMito' columns and the per-row
+%             'cytoIndependent' / 'lag' columns on mito rows.
+%       fs  - sampling rate (Hz).
 %
 %   OPTIONAL (Name-Value):
 %       'sbjID' - (char) initial cell to display.
 %
-%   See also: SPONTCA_LOAD, SPONTCA_EVENTS, SPONTCA_DETECT, PLOT_HIST,
-%             RIPP_MAPS
+%   See also: SPONTCA_LOAD, SPONTCA_EVENTS, SPONTCA_COUPLE, SPONTCA_DETECT,
+%             PLOT_HIST
 
 %% ========================================================================
 %  ARGUMENTS
@@ -41,6 +42,9 @@ clrCyto = cfg.clr.cmp(1, :);
 clrMito = cfg.clr.cmp(2, :);
 clrLag  = [0.40, 0.40, 0.40];
 
+alphaCoup  = 0.55;  % cyto-coupled mito events
+alphaIndep = 0.25;  % cyto-independent mito events
+
 nT = size(tbl.trace, 2);
 t  = (0:nT-1) / fs;
 
@@ -56,9 +60,9 @@ end
 %  ========================================================================
 
 hFig = figure('Name', 'SpontCa QC', 'NumberTitle', 'off', 'Color', 'w', ...
-    'Units', 'pixels', 'Position', [80, 60, 1400, 900]);
+    'Units', 'pixels', 'Position', [80, 60, 1500, 900]);
 
-pW = 0.12;
+pW = 0.11;
 hSide = uipanel('Parent', hFig, 'Units', 'normalized', ...
     'Position', [0, 0, pW, 1], 'BorderType', 'none');
 hMain = uipanel('Parent', hFig, 'Units', 'normalized', ...
@@ -69,28 +73,30 @@ margL = 0.07;  margR = 0.02;
 margT = 0.06;  margB = 0.09;
 gapBig = 0.07;     % between mito trace and bottom row
 gapTiny = 0.005;   % between cyto and mito (near-zero)
-gapH = 0.045;      % horizontal between bottom-row panels
+gapH = 0.035;      % horizontal between bottom-row panels
 
 availW = 1 - margL - margR;
 hTrace = 0.20;     % each trace tile
-hRow   = 0.30;     % bottom row (ETA + 3 hists)
-nCols  = 4;
+hRow   = 0.30;     % bottom row (2 ETAs + 3 hists)
+nCols  = 5;
 panelW = (availW - (nCols - 1) * gapH) / nCols;
 
 yRow  = margB;
 yMito = yRow  + hRow   + gapBig;
 yCyto = yMito + hTrace + gapTiny;
 
-axCyto = axes('Parent', hMain, 'Position', [margL, yCyto, availW, hTrace]);
-axMito = axes('Parent', hMain, 'Position', [margL, yMito, availW, hTrace]);
-axEta  = axes('Parent', hMain, 'Position', ...
+axCyto    = axes('Parent', hMain, 'Position', [margL, yCyto, availW, hTrace]);
+axMito    = axes('Parent', hMain, 'Position', [margL, yMito, availW, hTrace]);
+axEtaCyto = axes('Parent', hMain, 'Position', ...
     [margL + 0 * (panelW + gapH), yRow, panelW, hRow]);
-axDurC = axes('Parent', hMain, 'Position', ...
+axEtaMito = axes('Parent', hMain, 'Position', ...
     [margL + 1 * (panelW + gapH), yRow, panelW, hRow]);
-axDurM = axes('Parent', hMain, 'Position', ...
+axDurC    = axes('Parent', hMain, 'Position', ...
     [margL + 2 * (panelW + gapH), yRow, panelW, hRow]);
-axLag  = axes('Parent', hMain, 'Position', ...
+axDurM    = axes('Parent', hMain, 'Position', ...
     [margL + 3 * (panelW + gapH), yRow, panelW, hRow]);
+axLag     = axes('Parent', hMain, 'Position', ...
+    [margL + 4 * (panelW + gapH), yRow, panelW, hRow]);
 
 
 %% ========================================================================
@@ -134,18 +140,22 @@ onCellChange();
         iM = find(tbl.sbjID == sName & tbl.compartment == 'Mito');
         if isempty(iC) || isempty(iM), return; end
 
-        cyTrace = tbl.trace(iC, :);
-        miTrace = tbl.trace(iM, :);
-        cyStart = tbl.start{iC};
-        cyStop  = tbl.stop{iC};
-        miStart = tbl.start{iM};
-        miStop  = tbl.stop{iM};
-        miCoup  = tbl.coupled{iM};
-        cyDur   = tbl.dur{iC};
-        miDur   = tbl.dur{iM};
-        miLag   = tbl.lag{iM};
-        cyMap   = tbl.map{iC};
-        miMap   = tbl.map{iM};
+        cyTrace   = tbl.trace(iC, :);
+        miTrace   = tbl.trace(iM, :);
+        cyStart   = tbl.start{iC};
+        cyStop    = tbl.stop{iC};
+        miStart   = tbl.start{iM};
+        miStop    = tbl.stop{iM};
+        miIndep   = tbl.cytoIndependent{iM};
+        cyDur     = tbl.dur{iC};
+        miDur     = tbl.dur{iM};
+        miLag     = tbl.lag{iM};
+        cyMapC    = tbl.mapCyto{iC};
+        miMapC    = tbl.mapCyto{iM};
+        cyMapM    = tbl.mapMito{iC};
+        miMapM    = tbl.mapMito{iM};
+
+        nIndep = sum(miIndep);
 
         % --- CYTO TRACE (TOP) ---
         cla(axCyto, 'reset');
@@ -153,12 +163,12 @@ onCellChange();
         plot(axCyto, t, cyTrace, 'Color', clrCyto, 'LineWidth', 0.7);
         axis(axCyto, 'tight');
         yL = ylim(axCyto);
-        plotMarks(axCyto, cyStart, yL, clrCyto, '--');
-        plotMarks(axCyto, cyStop,  yL, clrCyto, ':');
+        plotMarks(axCyto, cyStart, yL, clrCyto, '--', alphaCoup);
+        plotMarks(axCyto, cyStop,  yL, clrCyto, ':',  alphaCoup);
         ylabel(axCyto, 'Cyto dF/F');
         set(axCyto, 'XTickLabel', []);
-        title(axCyto, sprintf('%s | cyto %d events | mito %d / %d coupled', ...
-            sName, length(cyStart), sum(miCoup), length(miStart)), ...
+        title(axCyto, sprintf('%s | cyto %d events | mito %d events (%d independent)', ...
+            sName, length(cyStart), length(miStart), nIndep), ...
             'Interpreter', 'none');
         hold(axCyto, 'off');
 
@@ -168,54 +178,71 @@ onCellChange();
         plot(axMito, t, miTrace, 'Color', clrMito, 'LineWidth', 0.7);
         axis(axMito, 'tight');
         yL = ylim(axMito);
-        coupMask = miCoup & miDur > 0;
-        plotMarks(axMito, miStart(coupMask), yL, clrMito, '--');
-        plotMarks(axMito, miStop(coupMask),  yL, clrMito, ':');
+        mCoup = ~miIndep;
+        plotMarks(axMito, miStart(mCoup),  yL, clrMito, '--', alphaCoup);
+        plotMarks(axMito, miStop(mCoup),   yL, clrMito, ':',  alphaCoup);
+        plotMarks(axMito, miStart(miIndep), yL, clrMito, '--', alphaIndep);
+        plotMarks(axMito, miStop(miIndep),  yL, clrMito, ':',  alphaIndep);
         ylabel(axMito, 'Mito dF/F');
         xlabel(axMito, 'Time (s)');
         hold(axMito, 'off');
 
         linkaxes([axCyto, axMito], 'x');
 
-        % --- ETA (overlay cyto + mito averages, cyto-start aligned) ---
-        cla(axEta, 'reset');
-        if ~isempty(tWin) && ~isempty(cyMap)
-            hold(axEta, 'on');
-            plotMeanSEM(axEta, tWin, cyMap, clrCyto, 'Cyto');
-            plotMeanSEM(axEta, tWin, miMap, clrMito, 'Mito');
-            yL = ylim(axEta);
-            plot(axEta, [0 0], yL, 'k:', 'LineWidth', 0.8, ...
-                'HandleVisibility', 'off');
-            xlabel(axEta, 'Time from cyto start (s)');
-            ylabel(axEta, 'dF/F');
-            legend(axEta, 'Location', 'northeast', 'Box', 'off');
-            title(axEta, 'ETA', 'FontWeight', 'normal');
-            grid(axEta, 'on');
-            hold(axEta, 'off');
-        else
-            text(axEta, 0.5, 0.5, '(no events for ETA)', ...
-                'Units', 'normalized', 'HorizontalAlignment', 'center', ...
-                'Color', [0.5 0.5 0.5]);
-        end
+        % --- ETA cyto-aligned ---
+        plotEta(axEtaCyto, tWin, cyMapC, miMapC, clrCyto, clrMito, ...
+            'Cyto-aligned ETA', 'Time from cyto start (s)');
+
+        % --- ETA mito-aligned ---
+        plotEta(axEtaMito, tWin, cyMapM, miMapM, clrCyto, clrMito, ...
+            'Mito-aligned ETA', 'Time from mito start (s)');
 
         % --- HISTOGRAMS ---
         plotHistOrBlank(axDurC, cyDur(cyDur > 0), clrCyto, ...
             'Cyto event duration', 'Duration (s)');
-        plotHistOrBlank(axDurM, miDur(miDur > 0 & miCoup), clrMito, ...
+        plotHistOrBlank(axDurM, miDur(miDur > 0), clrMito, ...
             'Mito event duration', 'Duration (s)');
-        plotHistOrBlank(axLag,  miLag(~isnan(miLag)), clrLag, ...
+        plotHistOrBlank(axLag,  miLag(isfinite(miLag)), clrLag, ...
             'Cyto-Mito lag', 'Lag (s)');
     end
 
 
-    function plotMarks(ax, x, yL, clr, ls)
+    function plotMarks(ax, x, yL, clr, ls, a)
         % Batched vertical lines drawn in a single PLOT call.
         if isempty(x), return; end
         x  = x(:);
         xx = reshape([x, x, nan(length(x), 1)]', [], 1);
         yy = repmat([yL(1); yL(2); NaN], length(x), 1);
-        plot(ax, xx, yy, 'Color', [clr, 0.55], 'LineStyle', ls, ...
+        plot(ax, xx, yy, 'Color', [clr, a], 'LineStyle', ls, ...
             'LineWidth', 0.7, 'HandleVisibility', 'off');
+    end
+
+
+    function plotEta(ax, tW, mapC, mapM, clrC, clrM, ttl, xlbl)
+        cla(ax, 'reset');
+        if isempty(tW) || (isempty(mapC) && isempty(mapM))
+            text(ax, 0.5, 0.5, '(no events for ETA)', ...
+                'Units', 'normalized', 'HorizontalAlignment', 'center', ...
+                'Color', [0.5 0.5 0.5]);
+            title(ax, ttl, 'FontWeight', 'normal');
+            return;
+        end
+        hold(ax, 'on');
+        if ~isempty(mapC)
+            plotMeanSEM(ax, tW, mapC, clrC, 'Cyto');
+        end
+        if ~isempty(mapM)
+            plotMeanSEM(ax, tW, mapM, clrM, 'Mito');
+        end
+        yL = ylim(ax);
+        plot(ax, [0 0], yL, 'k:', 'LineWidth', 0.8, ...
+            'HandleVisibility', 'off');
+        xlabel(ax, xlbl);
+        ylabel(ax, 'dF/F');
+        legend(ax, 'Location', 'northeast', 'Box', 'off');
+        title(ax, ttl, 'FontWeight', 'normal');
+        grid(ax, 'on');
+        hold(ax, 'off');
     end
 
 
@@ -238,7 +265,7 @@ onCellChange();
         cla(ax, 'reset');
         if ~isempty(vals) && numel(vals) > 1
             plot_hist([], vals, 'hAx', ax, 'c', clr, ...
-                'flgKDE', true, 'flgStat', true);
+                'flgKDE', true, 'flgStat', false);
         else
             text(ax, 0.5, 0.5, '(no events)', 'Units', 'normalized', ...
                 'HorizontalAlignment', 'center', 'Color', [0.5 0.5 0.5]);
