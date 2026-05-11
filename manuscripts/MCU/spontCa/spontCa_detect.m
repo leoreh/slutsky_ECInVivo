@@ -1,43 +1,43 @@
 function ev = spontCa_detect(trace, fs, varargin)
 % SPONTCA_DETECT Detects Ca transients in a single dF/F trace.
 %
-%   ev = SPONTCA_DETECT(TRACE, FS, ...) treats each event as a local
-%   maximum followed by a decay. The event's START is the peak sample
-%   itself; the STOP is the sample where the trace returns to thrBsl
-%   while walking forward from the peak (or the next peak, whichever
-%   comes first). No walk-back, no foot, no rise concept. Duration is
-%   STOP - START, i.e. the decay length.
+%   ev = SPONTCA_DETECT(TRACE, FS, ...) detects events by their RISE: a
+%   positive crossing of the smoothed derivative on the trace. Each event
+%   is then validated by an amplitude check above a LOCAL baseline (the
+%   rolling 20th percentile over a 30-s window), and by the presence of
+%   at least one significantly negative derivative sample after the peak.
+%   Stops walk forward until the derivative flattens (three consecutive
+%   |d| < stopFlat samples). Amplitudes and integrals are reported above
+%   the local baseline so plateau pedestals do not inflate them.
 %
-%   The input is assumed to be dF/F already. No rolling baseline.
+%   Why derivative-based: at fs=3 Hz the rise of a Ca event is ~1 sample,
+%   producing one large positive d/dt; the slow decay is many samples of
+%   small negative d/dt. Plateau noise is symmetric and small in d/dt.
+%   This is the signature that separates real events from plateau noise,
+%   which amplitude thresholds on the raw trace cannot.
 %
-%   PIPELINE:
-%       1. Find local maxima ("rise stops"): samples i where
-%          trace(i) > trace(i-1) AND trace(i) >= trace(i+1). Catches
-%          impulse peaks and plateau onsets in one rule.
-%       2. Keep only peaks with trace(i) > minAmp.
-%       3. Greedy max-suppression in minIEI windows: keep the highest
-%          peak per window, drop the rest.
-%       4. Walk forward from each peak until trace <= thrBsl OR until
-%          the next surviving peak. The walk-forward end is STOP.
-%       5. Drop events whose stop - peak duration is below minDur.
+%   Why local baseline: on cells that spend long stretches on an elevated
+%   plateau, "amplitude" should mean "rise above the plateau," not "raw
+%   dF/F value." A rolling 20th percentile tracks the floor underneath
+%   plateau noise without being dragged up by the plateau itself.
 %
 %   INPUTS:
 %       trace - (1 x nT) dF/F signal
 %       fs    - (scalar) sampling rate (Hz)
 %
-%   OPTIONAL (Name-Value):
-%       'minAmp' - (num) min peak amplitude (dF/F)              {0.08}
-%       'minDur' - (num) min decay duration (stop - peak, s)    {0.4}
-%       'minIEI' - (num) min peak-to-peak distance (s)          {1.0}
-%       'thrBsl' - (num) absolute return threshold (dF/F)       {0.02}
+%   OPTIONAL (Name-Value, user-facing):
+%       'minAmp' - (num) min peak amplitude above local baseline (dF/F)  {0.05}
+%       'minIEI' - (num) min peak-to-peak distance (s)                   {1.0}
+%       'kNoise' - (num) rise-threshold multiplier of derivative noise   {3.5}
+%       'minDur' - (num) min decay duration (stop - peak, s)             {0.4}
 %
 %   OUTPUT:
 %       ev struct with fields:
-%         .start  (n x 1)  peak times (s)  -- this IS the peak
-%         .stop   (n x 1)  decay-end times (s)
-%         .amp    (n x 1)  peak amplitude (dF/F)
-%         .dur    (n x 1)  stop - start (s)
-%         .int    (n x 1)  integral over [peak, stop] (dF/F * s)
+%         .start (n x 1)  peak times (s)  -- start == peak by convention
+%         .stop  (n x 1)  decay-end times (s) (where derivative flattens)
+%         .amp   (n x 1)  peak amplitude above local baseline (dF/F)
+%         .dur   (n x 1)  stop - start (s) (decay length, not event span)
+%         .int   (n x 1)  integral above local baseline over [peak, stop]
 %
 %   See also: SPONTCA_EVENTS, SPONTCA_COUPLE, SPONTCA_LOAD
 
@@ -48,12 +48,21 @@ function ev = spontCa_detect(trace, fs, varargin)
 p = inputParser;
 addRequired(p, 'trace', @(x) isnumeric(x) && isvector(x));
 addRequired(p, 'fs',    @(x) isnumeric(x) && isscalar(x) && x > 0);
-addParameter(p, 'minAmp', 0.08, @isnumeric);
-addParameter(p, 'minDur', 0.4,  @isnumeric);
+addParameter(p, 'minAmp', 0.05, @isnumeric);
 addParameter(p, 'minIEI', 1.0,  @isnumeric);
-addParameter(p, 'thrBsl', 0.02, @isnumeric);
+addParameter(p, 'kNoise', 3.5,  @isnumeric);
+addParameter(p, 'minDur', 0.4,  @isnumeric);
 parse(p, trace, fs, varargin{:});
 P = p.Results;
+
+% Buried constants (do not expose; tune in source if you must).
+bslWin       = 30;     % rolling-baseline window (s)
+quantBsl     = 20;     % percentile for local baseline
+pkLookAhead  = 3;      % samples to search for peak after derivative crossing
+minDecaySmp  = 1;      % samples of strongly negative d/dt required after peak
+kStop        = 1.0;    % multiplier on sigma_dt for "strongly negative" test
+stopFlat     = 0.005;  % |d| below this counts as flat (dF/F per sample)
+stopK        = 3;      % consecutive flat samples to terminate the walk-forward
 
 trace = trace(:)';
 nT = length(trace);
@@ -61,49 +70,164 @@ dt = 1 / fs;
 
 
 %% ========================================================================
-%  LOCAL MAXIMA (rise stops above minAmp)
+%  EARLY RETURN
 %  ========================================================================
 
-isUp   = false(1, nT);
-isFlat = false(1, nT);
-isUp(2:end)     = trace(2:end)   > trace(1:end-1);
-isFlat(1:end-1) = trace(1:end-1) >= trace(2:end);
-isRiseStop = isUp & isFlat & (trace > P.minAmp);
-isRiseStop(isnan(trace)) = false;
-peakIdx = find(isRiseStop);
-pkVals  = trace(peakIdx);
-
-
-%% ========================================================================
-%  GREEDY MAX-SUPPRESSION (min peak distance)
-%  ========================================================================
-
-minIEISmp = max(1, round(P.minIEI * fs));
-nEv = length(peakIdx);
-if nEv > 1
-    [~, order] = sort(pkVals, 'descend');
-    keep = false(1, nEv);
-    keep(order(1)) = true;
-    for k = 2:nEv
-        cand    = peakIdx(order(k));
-        keptPos = peakIdx(keep);
-        if all(abs(cand - keptPos) >= minIEISmp)
-            keep(order(k)) = true;
-        end
-    end
-    peakIdx = peakIdx(keep);
-    [peakIdx, sortByTime] = sort(peakIdx);
-    pkVals = pkVals(keep);
-    pkVals = pkVals(sortByTime);
-    nEv = length(peakIdx);
+ev = struct('start', [], 'stop', [], 'amp', [], 'dur', [], 'int', []);
+if all(isnan(trace)) || nT < 4
+    return;
 end
 
 
 %% ========================================================================
-%  WALK FORWARD FROM PEAK (peak -> stop)
+%  DERIVATIVE WITH LIGHT SMOOTHING
 %  ========================================================================
-% Walk forward while the trace is above thrBsl. Bounded by the next
-% surviving peak so adjacent events do not share samples.
+% 3-sample boxcar on the trace stabilises the per-sample diff against
+% high-frequency noise without distorting the peak time. Compute the
+% derivative on the smoothed signal; amplitudes / integrals still use raw.
+
+traceSm = movmean(trace, 3, 'omitnan');
+d = [0, diff(traceSm)];   % per-sample dF/F change; same length as trace
+
+
+%% ========================================================================
+%  PER-CELL DERIVATIVE NOISE (MAD)
+%  ========================================================================
+% MAD on the derivative (not the trace) is robust to plateaus: slow
+% baselines contribute near-zero d, real events contribute large positive
+% spikes that the median rejects. Sigma_dt measures noise.
+
+dValid = d(~isnan(d));
+if isempty(dValid)
+    return;
+end
+sigmaD = 1.4826 * median(abs(dValid - median(dValid)));
+if sigmaD <= 0
+    sigmaD = eps;
+end
+thrRise = P.kNoise * sigmaD;
+thrNeg  = kStop * sigmaD;
+
+
+%% ========================================================================
+%  LOCAL BASELINE (rolling 20th percentile)
+%  ========================================================================
+
+bsl = rollingPercentile(trace, round(bslWin * fs), quantBsl);
+
+
+%% ========================================================================
+%  CANDIDATE RISES (leading edges of d > thrRise runs)
+%  ========================================================================
+
+isRise = d > thrRise;
+isRise(isnan(d)) = false;
+leadEdges = find(isRise & ~[false, isRise(1:end-1)]);
+
+if isempty(leadEdges)
+    return;
+end
+
+
+%% ========================================================================
+%  LOCATE PEAK (walk forward from rise onset up to pkLookAhead samples)
+%  ========================================================================
+
+nCand   = length(leadEdges);
+peakIdx = zeros(1, nCand);
+for k = 1:nCand
+    i0 = leadEdges(k);
+    iLast = min(nT, i0 + pkLookAhead);
+    bestIdx = i0;
+    bestVal = trace(i0);
+    for j = (i0 + 1):iLast
+        if isnan(trace(j))
+            break;
+        end
+        if trace(j) >= bestVal
+            bestVal = trace(j);
+            bestIdx = j;
+        else
+            break;
+        end
+    end
+    peakIdx(k) = bestIdx;
+end
+
+
+%% ========================================================================
+%  AMPLITUDE GATE (peak above local baseline)
+%  ========================================================================
+
+ampLocal = trace(peakIdx) - bsl(peakIdx);
+keep     = ampLocal >= P.minAmp;
+peakIdx  = peakIdx(keep);
+ampLocal = ampLocal(keep);
+nCand    = length(peakIdx);
+if nCand == 0
+    return;
+end
+
+
+%% ========================================================================
+%  DECAY VALIDATION (at least one strongly negative sample after peak)
+%  ========================================================================
+% Rejects step-up-and-stay candidates: a real event has a falling phase;
+% a plateau onset that just steps up to a new level does not, unless the
+% sustained activity contains its own decay phases.
+
+keep = false(1, nCand);
+for k = 1:nCand
+    rL = peakIdx(k) + 1;
+    rR = min(nT, peakIdx(k) + pkLookAhead + 3);
+    if rR < rL
+        continue;
+    end
+    seg = d(rL:rR);
+    if any(seg < -thrNeg)
+        keep(k) = true;
+    end
+end
+peakIdx  = peakIdx(keep);
+ampLocal = ampLocal(keep);
+nCand    = length(peakIdx);
+if nCand == 0
+    return;
+end
+
+
+%% ========================================================================
+%  GREEDY IEI SUPPRESSION
+%  ========================================================================
+% Sort peaks by amplitude descending, keep highest, drop any within
+% minIEI of a kept peak.
+
+minIEISmp = max(1, round(P.minIEI * fs));
+if nCand > 1
+    [~, order] = sort(ampLocal, 'descend');
+    keepFlag = false(1, nCand);
+    keepFlag(order(1)) = true;
+    for k = 2:nCand
+        candPos = peakIdx(order(k));
+        keptPos = peakIdx(keepFlag);
+        if all(abs(candPos - keptPos) >= minIEISmp)
+            keepFlag(order(k)) = true;
+        end
+    end
+    peakIdx  = peakIdx(keepFlag);
+    ampLocal = ampLocal(keepFlag);
+    [peakIdx, sortByTime] = sort(peakIdx);
+    ampLocal = ampLocal(sortByTime);
+end
+nEv = length(peakIdx);
+
+
+%% ========================================================================
+%  WALK FORWARD TO STOP (derivative flattens)
+%  ========================================================================
+% Bounded by the next surviving peak so events do not share samples.
+% Increment a counter when |d| < stopFlat; reset when above. Stop when
+% counter reaches stopK consecutive flat samples.
 
 stopIdx = zeros(1, nEv);
 for iE = 1:nEv
@@ -113,13 +237,22 @@ for iE = 1:nEv
     else
         rightBound = nT;
     end
+    flatCount = 0;
     e = pk;
     while e < rightBound
-        nxt = trace(e + 1);
-        if isnan(nxt) || nxt <= P.thrBsl
+        e1 = e + 1;
+        if isnan(d(e1))
             break;
         end
-        e = e + 1;
+        if abs(d(e1)) < stopFlat
+            flatCount = flatCount + 1;
+        else
+            flatCount = 0;
+        end
+        e = e1;
+        if flatCount >= stopK
+            break;
+        end
     end
     stopIdx(iE) = e;
 end
@@ -129,21 +262,21 @@ end
 %  MIN-DURATION FILTER
 %  ========================================================================
 
-durSmp  = stopIdx - peakIdx + 1;
-keep    = durSmp >= max(2, round(P.minDur * fs));
-peakIdx = peakIdx(keep);
-stopIdx = stopIdx(keep);
-pkVals  = pkVals(keep);
-nEv     = length(peakIdx);
+durSmp = stopIdx - peakIdx + 1;
+keep   = durSmp >= max(2, round(P.minDur * fs));
+peakIdx  = peakIdx(keep);
+stopIdx  = stopIdx(keep);
+ampLocal = ampLocal(keep);
+nEv      = length(peakIdx);
 
 
 %% ========================================================================
-%  INTEGRAL OVER [peak, stop]
+%  INTEGRAL ABOVE LOCAL BASELINE
 %  ========================================================================
 
 intg = nan(nEv, 1);
 for iE = 1:nEv
-    seg = trace(peakIdx(iE):stopIdx(iE));
+    seg = trace(peakIdx(iE):stopIdx(iE)) - bsl(peakIdx(iE):stopIdx(iE));
     seg(isnan(seg)) = 0;
     intg(iE) = trapz(seg) * dt;
 end
@@ -152,13 +285,31 @@ end
 %% ========================================================================
 %  ASSEMBLE OUTPUT
 %  ========================================================================
-% start == peak. dur = stop - start = decay length.
 
-ev = struct();
-ev.start = (peakIdx(:) - 1) * dt;
+ev.start = (peakIdx(:) - 1) * dt;   % start == peak time
 ev.stop  = (stopIdx(:) - 1) * dt;
-ev.amp   = pkVals(:);
+ev.amp   = ampLocal(:);              % amplitude above local baseline
 ev.dur   = ev.stop - ev.start;
 ev.int   = intg;
 
 end     % EOF
+
+
+%% ========================================================================
+%  HELPER: rolling percentile (centered window, NaN-tolerant, edge-shrunk)
+%  ========================================================================
+
+function out = rollingPercentile(x, winSmp, q)
+nT = length(x);
+out = nan(1, nT);
+halfWin = floor(winSmp / 2);
+for i = 1:nT
+    lo = max(1, i - halfWin);
+    hi = min(nT, i + halfWin);
+    seg = x(lo:hi);
+    seg = seg(~isnan(seg));
+    if ~isempty(seg)
+        out(i) = prctile(seg, q);
+    end
+end
+end

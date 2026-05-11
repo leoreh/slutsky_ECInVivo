@@ -31,16 +31,17 @@
 % directly. Mito starts identical to cyto so the diff is visible from a
 % single set of changes.
 
-% Detection treats each event as a local maximum followed by a decay.
-% tbl.start is the PEAK time; tbl.stop is the decay-end time; dur is the
-% decay length (stop - peak).
-%   minAmp  - peak amplitude threshold (dF/F).
-%   minDur  - minimum decay length (s).
-%   minIEI  - peak-to-peak distance; greedy max-suppression keeps the
-%             highest peak in each window.
-%   thrBsl  - absolute return threshold (dF/F) for the walk-forward stop.
-paramsCyto = {'minAmp', 0.08, 'minDur', 0.4, 'minIEI', 1.0, 'thrBsl', 0.03};
-paramsMito = {'minAmp', 0.05, 'minDur', 0.4, 'minIEI', 1.0, 'thrBsl', 0.03};
+% Detection is derivative-based with a local-baseline amplitude gate.
+% Each event is a positive derivative crossing whose peak rises above the
+% rolling 20th-percentile baseline by at least minAmp.
+%   minAmp  - peak amplitude ABOVE LOCAL BASELINE (dF/F).
+%   minIEI  - peak-to-peak distance for greedy max-suppression (s).
+%   kNoise  - rise-threshold multiplier on per-cell derivative noise.
+%   minDur  - minimum decay length, stop - peak (s).
+% Local baseline (30 s window) and integrals are computed inside the
+% detector so plateau pedestals do not inflate amplitudes or integrals.
+paramsCyto = {'minAmp', 0.05, 'minIEI', 1.0, 'kNoise', 3.5, 'minDur', 0.4};
+paramsMito = {'minAmp', 0.03, 'minIEI', 1.0, 'kNoise', 3.5, 'minDur', 0.4};
 
 tbl = spontCa_events(tbl, fs, ...
     'paramsCyto', paramsCyto, 'paramsMito', paramsMito);
