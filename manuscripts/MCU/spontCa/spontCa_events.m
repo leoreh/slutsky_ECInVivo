@@ -13,7 +13,6 @@ function tbl = spontCa_events(tbl, fs, varargin)
 %       amp      (cell)    per-event peak amp (dF/F)
 %       dur      (cell)    per-event duration (s)
 %       int      (cell)    per-event integral (dF/F * s)
-%       noise    (n x 1)   robust noise std (from SPONTCA_DETECT)
 %       nEvents  (n x 1)   event count
 %       rate     (n x 1)   events / second
 %       flux     (n x 1)   sum(amp) / recDur  (= rate * meanAmp)
@@ -60,7 +59,6 @@ dt     = 1 / fs;
 %  ALLOCATE COLUMNS
 %  ========================================================================
 
-tbl.noise    = nan(n, 1);
 tbl.start    = cell(n, 1);
 tbl.stop     = cell(n, 1);
 tbl.amp      = cell(n, 1);
@@ -98,7 +96,6 @@ for iRow = 1:n
     end
     ev = spontCa_detect(sig, fs, detArgs{:});
 
-    tbl.noise(iRow) = ev.noise;
     tbl.start{iRow} = ev.start;
     tbl.stop{iRow}  = ev.stop;
     tbl.amp{iRow}   = ev.amp;

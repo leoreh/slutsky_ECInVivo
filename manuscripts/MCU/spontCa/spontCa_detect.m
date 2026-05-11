@@ -38,7 +38,6 @@ function ev = spontCa_detect(trace, fs, varargin)
 %         .amp    (n x 1)  peak amplitude (dF/F)
 %         .dur    (n x 1)  stop - start (s)
 %         .int    (n x 1)  integral over [peak, stop] (dF/F * s)
-%         .noise  (scalar) robust noise std (diagnostic only)
 %
 %   See also: SPONTCA_EVENTS, SPONTCA_COUPLE, SPONTCA_LOAD
 
@@ -59,19 +58,6 @@ P = p.Results;
 trace = trace(:)';
 nT = length(trace);
 dt = 1 / fs;
-
-
-%% ========================================================================
-%  NOISE (diagnostic only - not used for thresholding)
-%  ========================================================================
-
-dx = diff(trace);
-dx = dx(~isnan(dx));
-if isempty(dx) || mad(dx, 1) == 0
-    sNoise = max(eps, std(trace, 'omitnan'));
-else
-    sNoise = 1.4826 * mad(dx, 1) / sqrt(2);
-end
 
 
 %% ========================================================================
@@ -174,6 +160,5 @@ ev.stop  = (stopIdx(:) - 1) * dt;
 ev.amp   = pkVals(:);
 ev.dur   = ev.stop - ev.start;
 ev.int   = intg;
-ev.noise = sNoise;
 
 end     % EOF
