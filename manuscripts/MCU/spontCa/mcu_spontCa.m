@@ -31,12 +31,16 @@
 % directly. Mito starts identical to cyto so the diff is visible from a
 % single set of changes.
 
-% minRise is now MinPeakProminence in spontCa_detect (findpeaks-based).
-% thrBsl is the return-to fraction of peak for hysteresis start/stop.
+% minRise is the left-side local rise (peak - median of pre-peak window).
+% tBase / tLead define that window: length tBase, offset back from peak
+% by tLead. thrBsl is the ABSOLUTE return threshold (dF/F) used by the
+% hysteresis start/stop walk.
 paramsCyto = {'kThr', 3, 'minAmp', 0.05, 'minRise', 0.05, ...
-              'minDur', 0.1, 'minIEI', 0.4, 'thrBsl', 0.3};
+              'minDur', 0.1, 'minIEI', 0.4, ...
+              'tBase', 1.5, 'tLead', 0.5, 'thrBsl', 0.02};
 paramsMito = {'kThr', 3, 'minAmp', 0.05, 'minRise', 0.05, ...
-              'minDur', 0.4, 'minIEI', 0.4, 'thrBsl', 0.3};
+              'minDur', 0.4, 'minIEI', 0.4, ...
+              'tBase', 1.5, 'tLead', 0.5, 'thrBsl', 0.02};
 
 tbl = spontCa_events(tbl, fs, ...
     'paramsCyto', paramsCyto, 'paramsMito', paramsMito);
