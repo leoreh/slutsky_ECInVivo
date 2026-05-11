@@ -31,8 +31,10 @@
 % directly. Mito starts identical to cyto so the diff is visible from a
 % single set of changes.
 
-paramsCyto = {'kThr', 3, 'minAmp', 0.02, 'minDur', 0.4, 'minIEI', 0.4};
-paramsMito = {'kThr', 3, 'minAmp', 0.02, 'minDur', 0.4, 'minIEI', 0.4};
+paramsCyto = {'kThr', 3, 'minAmp', 0.05, 'minDur', 0.4, 'minIEI', 0.4, ...
+              'minRise', 0.05, 'tLead', 0.5, 'tRise', 1.0};
+paramsMito = {'kThr', 3, 'minAmp', 0.05, 'minDur', 0.4, 'minIEI', 0.4, ...
+              'minRise', 0.05, 'tLead', 0.5, 'tRise', 1.0};
 
 tbl = spontCa_events(tbl, fs, ...
     'paramsCyto', paramsCyto, 'paramsMito', paramsMito);
