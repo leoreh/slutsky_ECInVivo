@@ -38,12 +38,15 @@ function ev = spontCa_detect(trace, fs, varargin)
 %       fs      - (scalar) sampling rate (Hz)
 %
 %   OPTIONAL (Name-Value):
-%       'kThr'    - (num) height in noise SDs                 {3}
-%       'minAmp'  - (num) absolute floor on peak amp (dF/F)   {0.05}
-%       'minRise' - (num) min rise above foot (dF/F)          {0.05}
-%       'minDur'  - (num) min event duration on extended span (s) {0.4}
-%       'minIEI'  - (num) min peak-to-peak distance (s)       {0.4}
-%       'thrBsl'  - (num) absolute return threshold (dF/F)    {0.02}
+%       'kThr'        - (num) height in noise SDs                 {3}
+%       'minAmp'      - (num) absolute floor on peak amp (dF/F)   {0.05}
+%       'minRise'     - (num) min rise above foot (dF/F)          {0.05}
+%       'minRiseBnd'  - (num) min rise for an event to bound a
+%                             neighbour's walk-forward and to absorb
+%                             smaller overlapping events (dF/F)   {0.10}
+%       'minDur'      - (num) min event duration on extended span (s) {0.4}
+%       'minIEI'      - (num) min peak-to-peak distance (s)       {0.4}
+%       'thrBsl'      - (num) absolute return threshold (dF/F)    {0.02}
 %
 %   OUTPUT:
 %       ev struct with fields:
@@ -67,10 +70,11 @@ addRequired(p, 'trace', @(x) isnumeric(x) && isvector(x));
 addRequired(p, 'fs',    @(x) isnumeric(x) && isscalar(x) && x > 0);
 addParameter(p, 'kThr',    3,    @isnumeric);
 addParameter(p, 'minAmp',  0.05, @isnumeric);
-addParameter(p, 'minRise', 0.05, @isnumeric);
-addParameter(p, 'minDur',  0.4,  @isnumeric);
-addParameter(p, 'minIEI',  0.4,  @isnumeric);
-addParameter(p, 'thrBsl',  0.02, @isnumeric);
+addParameter(p, 'minRise',    0.05, @isnumeric);
+addParameter(p, 'minRiseBnd', 0.10, @isnumeric);
+addParameter(p, 'minDur',     0.4,  @isnumeric);
+addParameter(p, 'minIEI',     0.4,  @isnumeric);
+addParameter(p, 'thrBsl',     0.02, @isnumeric);
 parse(p, trace, fs, varargin{:});
 P = p.Results;
 
@@ -172,16 +176,22 @@ nEv     = length(peakIdx);
 %% ========================================================================
 %  TAIL (walk forward from peak)
 %  ========================================================================
-% Stop when trace drops to or below thrBsl, OR we reach the next event's
-% foot (whichever comes first). Walks never cross into a subsequent event.
+% Stop when trace drops to or below thrBsl, OR we reach the foot of the
+% next SIGNIFICANT event (rise >= minRiseBnd). Spurious "events" on a
+% decay tail have rise just above minRise but well below minRiseBnd, so
+% they do not bound the preceding real event's walk-forward.
+
+isSig = riseAmp >= P.minRiseBnd;
 
 stopIdx = zeros(1, nEv);
 for iE = 1:nEv
     pk = peakIdx(iE);
-    if iE < nEv
-        rightBound = footIdx(iE + 1) - 1;
-    else
-        rightBound = nT;
+    rightBound = nT;
+    for jE = (iE + 1):nEv
+        if isSig(jE)
+            rightBound = footIdx(jE) - 1;
+            break;
+        end
     end
     e = pk;
     while e < rightBound
@@ -193,6 +203,34 @@ for iE = 1:nEv
     end
     stopIdx(iE) = e;
 end
+
+
+%% ========================================================================
+%  ABSORB SPURIOUS EVENTS INSIDE SIGNIFICANT-EVENT SPANS
+%  ========================================================================
+% A non-significant event whose peak lies inside a significant event's
+% extended span is absorbed (dropped). The significant event keeps its
+% own properties; the spurious one is removed entirely.
+
+sigIdx = find(isSig);
+absorb = false(1, nEv);
+for iE = 1:nEv
+    if isSig(iE), continue; end
+    for k = 1:length(sigIdx)
+        jE = sigIdx(k);
+        if peakIdx(iE) >= footIdx(jE) && peakIdx(iE) <= stopIdx(jE)
+            absorb(iE) = true;
+            break;
+        end
+    end
+end
+keep    = ~absorb;
+peakIdx = peakIdx(keep);
+footIdx = footIdx(keep);
+stopIdx = stopIdx(keep);
+pkVals  = pkVals(keep);
+riseAmp = riseAmp(keep);
+nEv     = length(peakIdx);
 
 
 %% ========================================================================

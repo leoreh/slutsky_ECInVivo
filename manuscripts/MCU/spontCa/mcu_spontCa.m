@@ -32,11 +32,13 @@
 % single set of changes.
 
 % Detection is rising-flank based. minRise is the rise from the foot
-% (last sample of the strictly-rising flank, walking back from the peak).
-% thrBsl is the ABSOLUTE return threshold (dF/F) at which stops terminate.
-paramsCyto = {'kThr', 3, 'minAmp', 0.05, 'minRise', 0.05, ...
+% (last sample of the strictly-rising flank). minRiseBnd separates
+% "significant" events (which bound their neighbours' walk-forward and
+% can absorb smaller overlapping events) from small events that survive
+% only when isolated. thrBsl is the ABSOLUTE return threshold (dF/F).
+paramsCyto = {'kThr', 3, 'minAmp', 0.05, 'minRise', 0.05, 'minRiseBnd', 0.10, ...
               'minDur', 0.1, 'minIEI', 0.4, 'thrBsl', 0.02};
-paramsMito = {'kThr', 3, 'minAmp', 0.05, 'minRise', 0.05, ...
+paramsMito = {'kThr', 3, 'minAmp', 0.05, 'minRise', 0.05, 'minRiseBnd', 0.10, ...
               'minDur', 0.4, 'minIEI', 0.4, 'thrBsl', 0.02};
 
 tbl = spontCa_events(tbl, fs, ...
