@@ -11,6 +11,8 @@ cfg.clr.bac = [0.5, 0, 0.5, 0.5];
 cfg.clr.unit = [0.1, 0.1, 0.4;...   % RS
     0.6, 0.2, 0.2;...               % FS
     0.5, 0.5, 0.5];                 % Other
+cfg.clr.cmp = [0.2, 0.6, 0.2;...    % Cyto (green)
+    0.7, 0.2, 0.2];                 % Mito (red)
 
 % Variables to load
 cfg.vars = {'fr', 'units', 'st_metrics'};
