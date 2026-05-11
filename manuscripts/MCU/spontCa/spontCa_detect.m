@@ -45,7 +45,9 @@ function ev = spontCa_detect(trace, fs, varargin)
 %                             neighbour's walk-forward and to absorb
 %                             smaller overlapping events (dF/F)   {0.10}
 %       'minDur'      - (num) min event duration on extended span (s) {0.4}
-%       'minIEI'      - (num) min peak-to-peak distance (s)       {0.4}
+%       'minIEI'      - (num) min peak-to-peak distance (s)       {1.0}
+%       'thrFoot'     - (num) walk-back foot threshold as fraction of
+%                             peak value (peak-relative)          {0.3}
 %       'thrBsl'      - (num) absolute return threshold (dF/F)    {0.02}
 %
 %   OUTPUT:
@@ -73,7 +75,8 @@ addParameter(p, 'minAmp',  0.05, @isnumeric);
 addParameter(p, 'minRise',    0.05, @isnumeric);
 addParameter(p, 'minRiseBnd', 0.10, @isnumeric);
 addParameter(p, 'minDur',     0.4,  @isnumeric);
-addParameter(p, 'minIEI',     0.4,  @isnumeric);
+addParameter(p, 'minIEI',     1.0,  @isnumeric);
+addParameter(p, 'thrFoot',    0.3,  @isnumeric);
 addParameter(p, 'thrBsl',     0.02, @isnumeric);
 parse(p, trace, fs, varargin{:});
 P = p.Results;
@@ -143,17 +146,30 @@ end
 
 
 %% ========================================================================
-%  FOOT (walk back along the rising flank)
+%  FOOT (walk back through the rising flank to a peak-relative threshold)
 %  ========================================================================
+% Walks back while the trace is above thrFoot * peak. A noise dip on the
+% rising flank does not terminate the walk - the walk continues until the
+% trace drops to a low fraction of the peak. Peak-relative is appropriate
+% here because the foot of a rise is by definition a low fraction of the
+% peak; absolute thrBsl applies to STOPS (return to baseline) instead.
 
 footIdx = zeros(1, nEv);
 for iE = 1:nEv
-    s = peakIdx(iE);
+    pk      = peakIdx(iE);
+    pkVal   = trace(pk);
+    footThr = P.thrFoot * pkVal;
+    s = pk;
     while s > 1
         prev = trace(s - 1);
-        if isnan(prev) || prev >= trace(s)
+        if isnan(prev) || prev <= footThr || prev > pkVal
             break;
         end
+        s = s - 1;
+    end
+    % Include the foot sample (one step below the threshold) so the
+    % marker sits at the start of the rise, not one sample inside it.
+    if s > 1 && ~isnan(trace(s - 1)) && trace(s - 1) <= footThr
         s = s - 1;
     end
     footIdx(iE) = s;

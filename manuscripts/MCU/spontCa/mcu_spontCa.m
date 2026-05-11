@@ -31,15 +31,21 @@
 % directly. Mito starts identical to cyto so the diff is visible from a
 % single set of changes.
 
-% Detection is rising-flank based. minRise is the rise from the foot
-% (last sample of the strictly-rising flank). minRiseBnd separates
-% "significant" events (which bound their neighbours' walk-forward and
-% can absorb smaller overlapping events) from small events that survive
-% only when isolated. thrBsl is the ABSOLUTE return threshold (dF/F).
+% Detection is rising-flank based.
+%   minRise     - minimum rise above the foot to be retained as an event.
+%   minRiseBnd  - minimum rise to be SIGNIFICANT (bounds neighbours'
+%                 walk-forward and absorbs smaller overlapping events).
+%   minIEI      - peak-to-peak distance; greedy max-suppression keeps the
+%                 highest peak in each window. Default 1.0 s avoids
+%                 noise-dip rise-stops adjacent to a real peak getting
+%                 their own markers.
+%   thrFoot     - peak-relative threshold for the walk-back foot search.
+%   thrBsl      - absolute return threshold (dF/F) for the walk-forward
+%                 stop search.
 paramsCyto = {'kThr', 3, 'minAmp', 0.05, 'minRise', 0.05, 'minRiseBnd', 0.10, ...
-              'minDur', 0.1, 'minIEI', 0.4, 'thrBsl', 0.02};
+              'minDur', 0.4, 'minIEI', 1.0, 'thrFoot', 0.3, 'thrBsl', 0.02};
 paramsMito = {'kThr', 3, 'minAmp', 0.05, 'minRise', 0.05, 'minRiseBnd', 0.10, ...
-              'minDur', 0.4, 'minIEI', 0.4, 'thrBsl', 0.02};
+              'minDur', 0.4, 'minIEI', 1.0, 'thrFoot', 0.3, 'thrBsl', 0.02};
 
 tbl = spontCa_events(tbl, fs, ...
     'paramsCyto', paramsCyto, 'paramsMito', paramsMito);
