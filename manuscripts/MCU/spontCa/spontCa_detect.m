@@ -1,65 +1,44 @@
 function ev = spontCa_detect(trace, fs, varargin)
 % SPONTCA_DETECT Detects Ca transients in a single dF/F trace.
 %
-%   ev = SPONTCA_DETECT(TRACE, FS, ...) detects events as rising flanks
-%   in the trace. Each rising flank's last sample is the peak; the first
-%   sample is the foot. No FINDPEAKS, no prominence, no trough-bounded
-%   splitting.
+%   ev = SPONTCA_DETECT(TRACE, FS, ...) treats each event as a local
+%   maximum followed by a decay. The event's START is the peak sample
+%   itself; the STOP is the sample where the trace returns to thrBsl
+%   while walking forward from the peak (or the next peak, whichever
+%   comes first). No walk-back, no foot, no rise concept. Duration is
+%   STOP - START, i.e. the decay length.
 %
-%   The input is assumed to be dF/F already (centered near zero outside
-%   events). No rolling baseline is subtracted. Noise is the robust SD of
-%   the differenced signal (Allan-Pettersson) and feeds the height floor.
+%   The input is assumed to be dF/F already. No rolling baseline.
 %
 %   PIPELINE:
-%       1. Identify rise stops: samples i where trace(i) > trace(i-1) and
-%          trace(i) >= trace(i+1). This catches both impulse peaks (the
-%          local max before a decay) and plateau onsets (the first sample
-%          of a flat top after a rise).
-%       2. Filter rise stops by absolute height: trace(i) > max(kThr *
-%          noise, minAmp).
-%       3. Enforce min peak distance (minIEI) via greedy max suppression.
-%       4. For each surviving rise stop, walk back along the rising flank
-%          while trace(s-1) < trace(s). This gives the foot of the rise -
-%          the most recent sample whose value is strictly below every
-%          subsequent sample up to the peak. The rise amplitude is
-%          peak - trace(foot).
-%       5. Drop events whose rise amplitude is below minRise. This is the
-%          true rise of THIS event, not standard FINDPEAKS prominence
-%          (which uses the higher flanking trough and breaks for
-%          asymmetric events whose decays merge into plateaus).
-%       6. Determine each event's stop: walk forward from the peak while
-%          trace > thrBsl AND we have not reached the next event's foot.
-%          This lets long decays extend through the plateau without
-%          inventing an artificial split at the inter-peak trough.
-%       7. Drop events shorter than minDur on the extended span.
+%       1. Find local maxima ("rise stops"): samples i where
+%          trace(i) > trace(i-1) AND trace(i) >= trace(i+1). Catches
+%          impulse peaks and plateau onsets in one rule.
+%       2. Keep only peaks with trace(i) > minAmp.
+%       3. Greedy max-suppression in minIEI windows: keep the highest
+%          peak per window, drop the rest.
+%       4. Walk forward from each peak until trace <= thrBsl OR until
+%          the next surviving peak. The walk-forward end is STOP.
+%       5. Drop events whose stop - peak duration is below minDur.
 %
 %   INPUTS:
-%       trace   - (1 x nT) dF/F signal
-%       fs      - (scalar) sampling rate (Hz)
+%       trace - (1 x nT) dF/F signal
+%       fs    - (scalar) sampling rate (Hz)
 %
 %   OPTIONAL (Name-Value):
-%       'kThr'        - (num) height in noise SDs                 {3}
-%       'minAmp'      - (num) absolute floor on peak amp (dF/F)   {0.05}
-%       'minRise'     - (num) min rise above foot (dF/F)          {0.05}
-%       'minRiseBnd'  - (num) min rise for an event to bound a
-%                             neighbour's walk-forward and to absorb
-%                             smaller overlapping events (dF/F)   {0.10}
-%       'minDur'      - (num) min event duration on extended span (s) {0.4}
-%       'minIEI'      - (num) min peak-to-peak distance (s)       {1.0}
-%       'thrFoot'     - (num) walk-back foot threshold as fraction of
-%                             peak value (peak-relative)          {0.3}
-%       'thrBsl'      - (num) absolute return threshold (dF/F)    {0.02}
+%       'minAmp' - (num) min peak amplitude (dF/F)              {0.08}
+%       'minDur' - (num) min decay duration (stop - peak, s)    {0.4}
+%       'minIEI' - (num) min peak-to-peak distance (s)          {1.0}
+%       'thrBsl' - (num) absolute return threshold (dF/F)       {0.02}
 %
 %   OUTPUT:
 %       ev struct with fields:
-%         .start  (n x 1)  foot times (s)
-%         .stop   (n x 1)  tail times (s)
-%         .peak   (n x 1)  peak times (s)
+%         .start  (n x 1)  peak times (s)  -- this IS the peak
+%         .stop   (n x 1)  decay-end times (s)
 %         .amp    (n x 1)  peak amplitude (dF/F)
-%         .dur    (n x 1)  duration foot-to-tail (s)
-%         .int    (n x 1)  integral over the extended span (dF/F * s)
-%         .rise   (n x 1)  peak - trace(foot) (dF/F)
-%         .noise  (scalar) robust noise std
+%         .dur    (n x 1)  stop - start (s)
+%         .int    (n x 1)  integral over [peak, stop] (dF/F * s)
+%         .noise  (scalar) robust noise std (diagnostic only)
 %
 %   See also: SPONTCA_EVENTS, SPONTCA_COUPLE, SPONTCA_LOAD
 
@@ -70,14 +49,10 @@ function ev = spontCa_detect(trace, fs, varargin)
 p = inputParser;
 addRequired(p, 'trace', @(x) isnumeric(x) && isvector(x));
 addRequired(p, 'fs',    @(x) isnumeric(x) && isscalar(x) && x > 0);
-addParameter(p, 'kThr',    3,    @isnumeric);
-addParameter(p, 'minAmp',  0.05, @isnumeric);
-addParameter(p, 'minRise',    0.05, @isnumeric);
-addParameter(p, 'minRiseBnd', 0.10, @isnumeric);
-addParameter(p, 'minDur',     0.4,  @isnumeric);
-addParameter(p, 'minIEI',     1.0,  @isnumeric);
-addParameter(p, 'thrFoot',    0.3,  @isnumeric);
-addParameter(p, 'thrBsl',     0.02, @isnumeric);
+addParameter(p, 'minAmp', 0.08, @isnumeric);
+addParameter(p, 'minDur', 0.4,  @isnumeric);
+addParameter(p, 'minIEI', 1.0,  @isnumeric);
+addParameter(p, 'thrBsl', 0.02, @isnumeric);
 parse(p, trace, fs, varargin{:});
 P = p.Results;
 
@@ -87,7 +62,7 @@ dt = 1 / fs;
 
 
 %% ========================================================================
-%  NOISE
+%  NOISE (diagnostic only - not used for thresholding)
 %  ========================================================================
 
 dx = diff(trace);
@@ -100,28 +75,21 @@ end
 
 
 %% ========================================================================
-%  RISE STOPS (peak candidates)
+%  LOCAL MAXIMA (rise stops above minAmp)
 %  ========================================================================
-% trace(i) > trace(i-1) marks "the rise hit sample i".
-% trace(i) >= trace(i+1) marks "sample i is not below the next sample".
-% Together: the rise ended at sample i, either because i is an impulse
-% peak (next sample is lower) or because i is the first sample of a
-% plateau (next sample is equal).
-
-minHeight = max(P.kThr * sNoise, P.minAmp);
 
 isUp   = false(1, nT);
 isFlat = false(1, nT);
-isUp(2:end)   = trace(2:end)   > trace(1:end-1);
+isUp(2:end)     = trace(2:end)   > trace(1:end-1);
 isFlat(1:end-1) = trace(1:end-1) >= trace(2:end);
-isRiseStop = isUp & isFlat & (trace > minHeight);
+isRiseStop = isUp & isFlat & (trace > P.minAmp);
 isRiseStop(isnan(trace)) = false;
 peakIdx = find(isRiseStop);
 pkVals  = trace(peakIdx);
 
 
 %% ========================================================================
-%  MIN PEAK DISTANCE (greedy max suppression)
+%  GREEDY MAX-SUPPRESSION (min peak distance)
 %  ========================================================================
 
 minIEISmp = max(1, round(P.minIEI * fs));
@@ -131,7 +99,7 @@ if nEv > 1
     keep = false(1, nEv);
     keep(order(1)) = true;
     for k = 2:nEv
-        cand = peakIdx(order(k));
+        cand    = peakIdx(order(k));
         keptPos = peakIdx(keep);
         if all(abs(cand - keptPos) >= minIEISmp)
             keep(order(k)) = true;
@@ -146,68 +114,18 @@ end
 
 
 %% ========================================================================
-%  FOOT (walk back through the rising flank to a peak-relative threshold)
+%  WALK FORWARD FROM PEAK (peak -> stop)
 %  ========================================================================
-% Walks back while the trace is above thrFoot * peak. A noise dip on the
-% rising flank does not terminate the walk - the walk continues until the
-% trace drops to a low fraction of the peak. Peak-relative is appropriate
-% here because the foot of a rise is by definition a low fraction of the
-% peak; absolute thrBsl applies to STOPS (return to baseline) instead.
-
-footIdx = zeros(1, nEv);
-for iE = 1:nEv
-    pk      = peakIdx(iE);
-    pkVal   = trace(pk);
-    footThr = P.thrFoot * pkVal;
-    s = pk;
-    while s > 1
-        prev = trace(s - 1);
-        if isnan(prev) || prev <= footThr || prev > pkVal
-            break;
-        end
-        s = s - 1;
-    end
-    % Include the foot sample (one step below the threshold) so the
-    % marker sits at the start of the rise, not one sample inside it.
-    if s > 1 && ~isnan(trace(s - 1)) && trace(s - 1) <= footThr
-        s = s - 1;
-    end
-    footIdx(iE) = s;
-end
-
-
-%% ========================================================================
-%  RISE FILTER
-%  ========================================================================
-
-riseAmp = pkVals - trace(footIdx);
-keep    = riseAmp >= P.minRise;
-peakIdx = peakIdx(keep);
-footIdx = footIdx(keep);
-pkVals  = pkVals(keep);
-riseAmp = riseAmp(keep);
-nEv     = length(peakIdx);
-
-
-%% ========================================================================
-%  TAIL (walk forward from peak)
-%  ========================================================================
-% Stop when trace drops to or below thrBsl, OR we reach the foot of the
-% next SIGNIFICANT event (rise >= minRiseBnd). Spurious "events" on a
-% decay tail have rise just above minRise but well below minRiseBnd, so
-% they do not bound the preceding real event's walk-forward.
-
-isSig = riseAmp >= P.minRiseBnd;
+% Walk forward while the trace is above thrBsl. Bounded by the next
+% surviving peak so adjacent events do not share samples.
 
 stopIdx = zeros(1, nEv);
 for iE = 1:nEv
     pk = peakIdx(iE);
-    rightBound = nT;
-    for jE = (iE + 1):nEv
-        if isSig(jE)
-            rightBound = footIdx(jE) - 1;
-            break;
-        end
+    if iE < nEv
+        rightBound = peakIdx(iE + 1) - 1;
+    else
+        rightBound = nT;
     end
     e = pk;
     while e < rightBound
@@ -222,54 +140,24 @@ end
 
 
 %% ========================================================================
-%  ABSORB SPURIOUS EVENTS INSIDE SIGNIFICANT-EVENT SPANS
+%  MIN-DURATION FILTER
 %  ========================================================================
-% A non-significant event whose peak lies inside a significant event's
-% extended span is absorbed (dropped). The significant event keeps its
-% own properties; the spurious one is removed entirely.
 
-sigIdx = find(isSig);
-absorb = false(1, nEv);
-for iE = 1:nEv
-    if isSig(iE), continue; end
-    for k = 1:length(sigIdx)
-        jE = sigIdx(k);
-        if peakIdx(iE) >= footIdx(jE) && peakIdx(iE) <= stopIdx(jE)
-            absorb(iE) = true;
-            break;
-        end
-    end
-end
-keep    = ~absorb;
+durSmp  = stopIdx - peakIdx + 1;
+keep    = durSmp >= max(2, round(P.minDur * fs));
 peakIdx = peakIdx(keep);
-footIdx = footIdx(keep);
 stopIdx = stopIdx(keep);
 pkVals  = pkVals(keep);
-riseAmp = riseAmp(keep);
 nEv     = length(peakIdx);
 
 
 %% ========================================================================
-%  MIN DUR
-%  ========================================================================
-
-durSmp = stopIdx - footIdx + 1;
-keep   = durSmp >= max(2, round(P.minDur * fs));
-peakIdx = peakIdx(keep);
-footIdx = footIdx(keep);
-stopIdx = stopIdx(keep);
-pkVals  = pkVals(keep);
-riseAmp = riseAmp(keep);
-nEv     = length(peakIdx);
-
-
-%% ========================================================================
-%  INTEGRAL OVER EXTENDED SPAN
+%  INTEGRAL OVER [peak, stop]
 %  ========================================================================
 
 intg = nan(nEv, 1);
 for iE = 1:nEv
-    seg = trace(footIdx(iE):stopIdx(iE));
+    seg = trace(peakIdx(iE):stopIdx(iE));
     seg(isnan(seg)) = 0;
     intg(iE) = trapz(seg) * dt;
 end
@@ -278,15 +166,14 @@ end
 %% ========================================================================
 %  ASSEMBLE OUTPUT
 %  ========================================================================
+% start == peak. dur = stop - start = decay length.
 
 ev = struct();
-ev.start = (footIdx(:) - 1) * dt;
+ev.start = (peakIdx(:) - 1) * dt;
 ev.stop  = (stopIdx(:) - 1) * dt;
-ev.peak  = (peakIdx(:) - 1) * dt;
 ev.amp   = pkVals(:);
 ev.dur   = ev.stop - ev.start;
 ev.int   = intg;
-ev.rise  = riseAmp(:);
 ev.noise = sNoise;
 
 end     % EOF
