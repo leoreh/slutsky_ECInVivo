@@ -68,12 +68,10 @@ nT = size(tbl.trace, 2);
 t  = (0:nT-1) / fs;
 dt = 1 / fs;
 
-% Detector constants mirrored from spontCa_detect so "add event" computes
-% stops with identical rules to the autodetector.
-detCfg.bslWin    = 30;
-detCfg.quantBsl  = 20;
-detCfg.stopFlat  = 0.005;
-detCfg.stopK     = 3;
+% Local-baseline constants mirrored from spontCa_detect so amp/int
+% recomputations on edit match the autodetector's conventions.
+detCfg.bslWin   = 30;
+detCfg.quantBsl = 20;
 
 curDir = fullfile(fileparts(mfilename('fullpath')), 'spontCa_curated');
 if ~exist(curDir, 'dir')
@@ -95,8 +93,8 @@ hMain = uipanel('Parent', hFig, 'Units', 'normalized', ...
     'Position', [pW, 0, 1 - pW, 1], 'BorderType', 'none');
 
 margL = 0.06;  margR = 0.02;
-margT = 0.05;  margB = 0.08;
-gapV  = 0.04;
+margT = 0.04;  margB = 0.08;
+gapV  = 0.0;
 gapH  = 0.03;
 
 availW = 1 - margL - margR;
@@ -154,26 +152,37 @@ edZoomW = uicontrol('Parent', hSide, 'Style', 'edit', 'String', '20', ...
     'Units', 'normalized', 'Position', [0.05, 0.68, 0.9, 0.04], ...
     'Callback', @onZoomWidthEdit);
 
+uicontrol('Parent', hSide, 'Style', 'text', 'String', 'Zoom center (s):', ...
+    'Units', 'normalized', 'Position', [0.05, 0.63, 0.9, 0.03], ...
+    'HorizontalAlignment', 'left');
+edZoomCenter = uicontrol('Parent', hSide, 'Style', 'edit', 'String', '0', ...
+    'Units', 'normalized', 'Position', [0.05, 0.59, 0.9, 0.04], ...
+    'Callback', @onZoomCenterEdit);
+
 uicontrol('Parent', hSide, 'Style', 'pushbutton', 'String', 'Save', ...
-    'Units', 'normalized', 'Position', [0.05, 0.58, 0.9, 0.05], ...
+    'Units', 'normalized', 'Position', [0.05, 0.49, 0.9, 0.05], ...
     'Callback', @(~,~) saveCurrent(true));
 
 lblDirty = uicontrol('Parent', hSide, 'Style', 'text', 'String', 'saved', ...
-    'Units', 'normalized', 'Position', [0.05, 0.52, 0.9, 0.04], ...
+    'Units', 'normalized', 'Position', [0.05, 0.44, 0.9, 0.04], ...
     'HorizontalAlignment', 'center', 'ForegroundColor', [0.2, 0.6, 0.2]);
 
-uicontrol('Parent', hSide, 'Style', 'pushbutton', 'String', 'Reset to auto', ...
-    'Units', 'normalized', 'Position', [0.05, 0.42, 0.9, 0.05], ...
-    'Callback', @onResetAuto);
+uicontrol('Parent', hSide, 'Style', 'pushbutton', 'String', 'Load auto', ...
+    'Units', 'normalized', 'Position', [0.05, 0.37, 0.9, 0.05], ...
+    'Callback', @onLoadAuto);
+
+uicontrol('Parent', hSide, 'Style', 'pushbutton', 'String', 'Load man', ...
+    'Units', 'normalized', 'Position', [0.05, 0.31, 0.9, 0.05], ...
+    'Callback', @onLoadMan);
 
 uicontrol('Parent', hSide, 'Style', 'text', 'String', ...
     sprintf(['Drag dashed: peak\n' ...
              'Drag dotted: stop\n' ...
              'L-click empty: add\n' ...
              'R-click line: delete\n' ...
-             'Arrows L/R: nav\n' ...
+             'Arrows L/R: window\n' ...
              'Arrows U/D: comp']), ...
-    'Units', 'normalized', 'Position', [0.05, 0.04, 0.9, 0.32], ...
+    'Units', 'normalized', 'Position', [0.05, 0.04, 0.9, 0.24], ...
     'HorizontalAlignment', 'left', 'FontAngle', 'italic', ...
     'ForegroundColor', [0.4, 0.4, 0.4]);
 
@@ -270,10 +279,21 @@ onCellChange();
     function saveCurrent(verbose)
         S = hFig.UserData;
         if isempty(S.currentCell), return; end
+        bkupDir = fullfile(curDir, 'bkup');
+        stamp   = datestr(now, 'yymmdd_HHMMSS'); %#ok<TNOW1,DATST>
         cmps = {'Cyto', 'Mito'};
         for k = 1:2
             cmp = cmps{k};
             ev = S.events.(cmp);
+            fpath = fullfile(curDir, sprintf('%s_%s.mat', S.currentCell, cmp));
+            % Back up any prior version before overwrite. Each save makes a
+            % stamped copy so curation is recoverable across sessions.
+            if exist(fpath, 'file')
+                if ~exist(bkupDir, 'dir'), mkdir(bkupDir); end
+                bkupName = sprintf('%s_%s_%s.mat', ...
+                    S.currentCell, cmp, stamp);
+                copyfile(fpath, fullfile(bkupDir, bkupName));
+            end
             cur = struct( ...
                 'sbjID',       S.currentCell, ...
                 'compartment', cmp, ...
@@ -284,7 +304,6 @@ onCellChange();
                 'dur',         ev.dur(:), ...
                 'int',         ev.int(:), ...
                 'savedAt',     datestr(now, 'yyyy-mm-dd HH:MM:SS')); %#ok<TNOW1,DATST>
-            fpath = fullfile(curDir, sprintf('%s_%s.mat', S.currentCell, cmp));
             save(fpath, 'cur');
         end
         S.dirty = false;
@@ -296,7 +315,9 @@ onCellChange();
     end
 
 
-    function onResetAuto(~, ~)
+    function onLoadAuto(~, ~)
+        % Restore the autodetector pre-fill for the current cell.
+        % Marks dirty (caller can Save to persist).
         S = hFig.UserData;
         if isempty(S.currentCell), return; end
         sName = S.currentCell;
@@ -312,8 +333,59 @@ onCellChange();
             'int',   tbl.int{iM}(:)));
         S.dirty = true;
         hFig.UserData = S;
-        saveCurrent(true);
+        setDirty(true);
         redrawAll();
+    end
+
+
+    function onLoadMan(~, ~)
+        % Load the most recent manual save for the current cell. Per
+        % compartment, prefer spontCa_curated/<sbjID>_<cmp>.mat; fall back
+        % to the newest spontCa_curated/bkup/<sbjID>_<cmp>_*.mat by file
+        % mtime. If neither exists for a compartment, leave it untouched.
+        S = hFig.UserData;
+        if isempty(S.currentCell), return; end
+        sName = S.currentCell;
+        bkupDir = fullfile(curDir, 'bkup');
+        cmps = {'Cyto', 'Mito'};
+        nLoaded = 0;
+        for k = 1:2
+            cmp = cmps{k};
+            fpath = fullfile(curDir, sprintf('%s_%s.mat', sName, cmp));
+            src = '';
+            if exist(fpath, 'file')
+                src = fpath;
+            elseif exist(bkupDir, 'dir')
+                files = dir(fullfile(bkupDir, ...
+                    sprintf('%s_%s_*.mat', sName, cmp)));
+                if ~isempty(files)
+                    [~, idx] = max([files.datenum]);
+                    src = fullfile(bkupDir, files(idx).name);
+                end
+            end
+            if isempty(src)
+                fprintf('No manual save found for %s %s\n', sName, cmp);
+                continue;
+            end
+            L = load(src, 'cur');
+            if ~isfield(L, 'cur')
+                fprintf('Skipped %s: no ''cur'' struct\n', src);
+                continue;
+            end
+            cur = L.cur;
+            S.events.(cmp) = sortEv(struct( ...
+                'start', cur.start(:), 'stop', cur.stop(:), ...
+                'amp',   cur.amp(:),   'dur',  cur.dur(:), ...
+                'int',   cur.int(:)));
+            nLoaded = nLoaded + 1;
+            fprintf('Loaded %s %s from %s\n', sName, cmp, src);
+        end
+        if nLoaded > 0
+            S.dirty = true;
+            hFig.UserData = S;
+            setDirty(true);
+            redrawAll();
+        end
     end
 
 
@@ -325,24 +397,24 @@ onCellChange();
         S = hFig.UserData;
         if isempty(S.currentCell), return; end
 
-        drawFull(axCytoFull, S.traces.Cyto, S.events.Cyto, clrCyto, ...
-            sprintf('%s | CYTO  (n=%d)', S.currentCell, ...
-            numel(S.events.Cyto.start)));
-        drawFull(axMitoFull, S.traces.Mito, S.events.Mito, clrMito, ...
-            sprintf('MITO  (n=%d)', numel(S.events.Mito.start)));
+        set(hFig, 'Name', sprintf( ...
+            'SpontCa ManCur - %s | cyto n=%d | mito n=%d', ...
+            S.currentCell, ...
+            numel(S.events.Cyto.start), numel(S.events.Mito.start)));
 
-        drawZoom(axCytoZoom, S.traces.Cyto, S.events.Cyto, clrCyto, ...
-            'CYTO zoom');
-        drawZoom(axMitoZoom, S.traces.Mito, S.events.Mito, clrMito, ...
-            'MITO zoom');
+        drawFull(axCytoFull, S.traces.Cyto, S.events.Cyto, clrCyto);
+        drawFull(axMitoFull, S.traces.Mito, S.events.Mito, clrMito);
+        drawZoom(axCytoZoom, S.traces.Cyto, S.events.Cyto, clrCyto);
+        drawZoom(axMitoZoom, S.traces.Mito, S.events.Mito, clrMito);
 
         applyZoomLims();
         drawZoomIndicator();
+        updateZoomCenterDisplay();
         highlightActive();
     end
 
 
-    function drawFull(ax, trace, ev, clr, ttl)
+    function drawFull(ax, trace, ev, clr)
         cla(ax, 'reset');
         hold(ax, 'on');
         plot(ax, t, trace, 'Color', clr, 'LineWidth', 0.7, ...
@@ -350,14 +422,15 @@ onCellChange();
         axis(ax, 'tight');
         yL = ylim(ax);
         plotMarks(ax, ev.start, yL, clr, '--', alphaLine);
-        plotMarks(ax, ev.stop,  yL, clr, ':',  alphaLine);
-        title(ax, ttl, 'Interpreter', 'none', 'FontWeight', 'normal');
-        xlabel(ax, 'Time (s)');
+        if isMitoAx(ax)
+            plotMarks(ax, ev.stop, yL, clr, ':',  alphaLine);
+        end
+        applyAxisLabels(ax);
         hold(ax, 'off');
     end
 
 
-    function drawZoom(ax, trace, ev, clr, ttl)
+    function drawZoom(ax, trace, ev, clr)
         cla(ax, 'reset');
         hold(ax, 'on');
         plot(ax, t, trace, 'Color', clr, 'LineWidth', 0.9, ...
@@ -366,22 +439,42 @@ onCellChange();
         axis(ax, 'tight');
         yL = ylim(ax);
         % Each event line is a distinct Line object tagged with role+idx so
-        % the mouse handlers can hit-test and drag it directly.
+        % the mouse handlers can hit-test and drag it directly. Cyto stop
+        % lines are suppressed (cyto stops are no longer biologically
+        % meaningful at fs=3); start lines remain editable.
+        drawStops = isMitoAx(ax);
         for iE = 1:numel(ev.start)
             line(ax, [ev.start(iE), ev.start(iE)], yL, ...
                 'Color', [clr, alphaLine], 'LineStyle', '--', ...
                 'LineWidth', 1.2, 'Tag', sprintf('startLine_%d', iE), ...
                 'UserData', struct('role', 'start', 'idx', iE), ...
                 'PickableParts', 'visible');
-            line(ax, [ev.stop(iE), ev.stop(iE)], yL, ...
-                'Color', [clr, alphaLine], 'LineStyle', ':', ...
-                'LineWidth', 1.2, 'Tag', sprintf('stopLine_%d', iE), ...
-                'UserData', struct('role', 'stop', 'idx', iE), ...
-                'PickableParts', 'visible');
+            if drawStops
+                line(ax, [ev.stop(iE), ev.stop(iE)], yL, ...
+                    'Color', [clr, alphaLine], 'LineStyle', ':', ...
+                    'LineWidth', 1.2, 'Tag', sprintf('stopLine_%d', iE), ...
+                    'UserData', struct('role', 'stop', 'idx', iE), ...
+                    'PickableParts', 'visible');
+            end
         end
-        title(ax, ttl, 'Interpreter', 'none', 'FontWeight', 'normal');
-        xlabel(ax, 'Time (s)');
+        applyAxisLabels(ax);
         hold(ax, 'off');
+    end
+
+
+    function tf = isMitoAx(ax)
+        tf = (ax == axMitoFull) || (ax == axMitoZoom);
+    end
+
+
+    function applyAxisLabels(ax)
+        % Only the mito (bottom) row carries the x-label and tick labels;
+        % the cyto (top) row sits flush above it with x-axis linked.
+        if ax == axMitoFull || ax == axMitoZoom
+            xlabel(ax, 'Time (s)');
+        else
+            set(ax, 'XTickLabel', []);
+        end
     end
 
 
@@ -408,22 +501,24 @@ onCellChange();
 
 
     function drawZoomIndicator()
+        % findall (not findobj) so HandleVisibility=off patches get deleted.
+        % Without this, every redraw leaves a stale patch behind and the
+        % rectangle accumulates into a gradient.
         xl = xlim(axCytoZoom);
         for ax = [axCytoFull, axMitoFull]
-            delete(findobj(ax, 'Tag', 'zoomRect'));
-            delete(findobj(ax, 'Tag', 'zoomEdgeL'));
-            delete(findobj(ax, 'Tag', 'zoomEdgeR'));
+            delete(findall(ax, 'Tag', 'zoomRect'));
+            delete(findall(ax, 'Tag', 'zoomEdgeL'));
+            delete(findall(ax, 'Tag', 'zoomEdgeR'));
             yL = ylim(ax);
             patch(ax, [xl(1), xl(2), xl(2), xl(1)], ...
                   [yL(1), yL(1), yL(2), yL(2)], clrRect, ...
-                  'FaceAlpha', 0.12, 'EdgeColor', 'none', ...
-                  'Tag', 'zoomRect', 'PickableParts', 'none', ...
-                  'HandleVisibility', 'off');
-            line(ax, [xl(1), xl(1)], yL, 'Color', clrRect, ...
-                'LineWidth', 1.5, 'Tag', 'zoomEdgeL', ...
+                  'FaceAlpha', 0.06, 'EdgeColor', 'none', ...
+                  'Tag', 'zoomRect', 'PickableParts', 'none');
+            line(ax, [xl(1), xl(1)], yL, 'Color', [clrRect, 0.3], ...
+                'LineWidth', 1.0, 'Tag', 'zoomEdgeL', ...
                 'PickableParts', 'visible');
-            line(ax, [xl(2), xl(2)], yL, 'Color', clrRect, ...
-                'LineWidth', 1.5, 'Tag', 'zoomEdgeR', ...
+            line(ax, [xl(2), xl(2)], yL, 'Color', [clrRect, 0.3], ...
+                'LineWidth', 1.0, 'Tag', 'zoomEdgeR', ...
                 'PickableParts', 'visible');
         end
     end
@@ -489,6 +584,7 @@ onCellChange();
             hFig.UserData = S;
             applyZoomLims();
             drawZoomIndicator();
+            updateZoomCenterDisplay();
             return;
         end
 
@@ -498,6 +594,8 @@ onCellChange();
         if ~isempty(hit) && strcmp(clickType, 'alt')
             S.events.(cmpAx) = deleteEvent(S.events.(cmpAx), iE);
             S.activeCmp = cmpAx;
+            % Clear any in-flight drag - redrawAll about to wipe handles.
+            S.drag = [];
             hFig.UserData = S;
             setDirty(true);
             redrawAll();
@@ -548,9 +646,18 @@ onCellChange();
                 set(edZoomW, 'String', sprintf('%.2f', S.zoomWidth));
                 applyZoomLims();
                 drawZoomIndicator();
+                updateZoomCenterDisplay();
 
             case 'evLine'
                 % Preview: move the line only; commit on mouse-up.
+                % isvalid guard: handle can go stale if a redrawAll
+                % fired between mouse-down and mouse-move (e.g. a
+                % delete from a right-click landed in between).
+                if ~isvalid(S.drag.hLine)
+                    S.drag = [];
+                    hFig.UserData = S;
+                    return;
+                end
                 xSnap = snapTime(xNow, fs);
                 set(S.drag.hLine, 'XData', [xSnap, xSnap]);
         end
@@ -650,6 +757,27 @@ onCellChange();
     end
 
 
+    function onZoomCenterEdit(src, ~)
+        v = str2double(get(src, 'String'));
+        S = hFig.UserData;
+        if ~isfinite(v)
+            set(src, 'String', sprintf('%.2f', S.zoomCenter));
+            return;
+        end
+        S.zoomCenter = min(max(0, v), t(end));
+        hFig.UserData = S;
+        applyZoomLims();
+        drawZoomIndicator();
+        updateZoomCenterDisplay();
+    end
+
+
+    function updateZoomCenterDisplay()
+        S = hFig.UserData;
+        set(edZoomCenter, 'String', sprintf('%.2f', S.zoomCenter));
+    end
+
+
 %% ========================================================================
 %  KEYBOARD
 %  ========================================================================
@@ -657,25 +785,24 @@ onCellChange();
     function onKeyPress(~, evt)
         S = hFig.UserData;
         if isempty(S.currentCell), return; end
+        % Step keeps a 20% overlap with the previous window so events
+        % straddling a boundary aren't missed on a fast scan.
+        stepFrac = 0.8;
         switch evt.Key
             case 'rightarrow'
-                ev = S.events.(S.activeCmp);
-                if isempty(ev.start), return; end
-                tNext = ev.start(find(ev.start > S.zoomCenter + 1e-9, 1));
-                if isempty(tNext), tNext = ev.start(end); end
-                S.zoomCenter = tNext;
+                S.zoomCenter = min(t(end), ...
+                    S.zoomCenter + stepFrac * S.zoomWidth);
                 hFig.UserData = S;
                 applyZoomLims();
                 drawZoomIndicator();
+                updateZoomCenterDisplay();
             case 'leftarrow'
-                ev = S.events.(S.activeCmp);
-                if isempty(ev.start), return; end
-                tPrev = ev.start(find(ev.start < S.zoomCenter - 1e-9, 1, 'last'));
-                if isempty(tPrev), tPrev = ev.start(1); end
-                S.zoomCenter = tPrev;
+                S.zoomCenter = max(0, ...
+                    S.zoomCenter - stepFrac * S.zoomWidth);
                 hFig.UserData = S;
                 applyZoomLims();
                 drawZoomIndicator();
+                updateZoomCenterDisplay();
             case {'uparrow', 'downarrow'}
                 if strcmp(S.activeCmp, 'Cyto')
                     S.activeCmp = 'Mito';
@@ -693,8 +820,12 @@ onCellChange();
 %  ========================================================================
 
     function ev = addEventLocal(ev, tStart, trace, bsl)
-        pkSmp = max(1, min(numel(trace), round(tStart * fs) + 1));
-        stopSmp = walkToFlatStop(trace, pkSmp, detCfg);
+        % Default stop is two samples past the start: just enough to keep
+        % the dotted line visible. The walk-forward heuristic was wrong
+        % for clicks in non-flat regions (ran off the trace end). User
+        % drags the stop afterwards if they want a wider event.
+        pkSmp   = max(1, min(numel(trace), round(tStart * fs) + 1));
+        stopSmp = min(numel(trace), pkSmp + 2);
         tStartS = (pkSmp  - 1) * dt;
         tStopS  = (stopSmp - 1) * dt;
         ampV = trace(pkSmp) - bsl(pkSmp);
@@ -760,29 +891,6 @@ ev.stop(iE)  = [];
 ev.amp(iE)   = [];
 ev.dur(iE)   = [];
 ev.int(iE)   = [];
-end
-
-
-function stopSmp = walkToFlatStop(trace, pkSmp, detCfg)
-% Mirrors spontCa_detect: walk forward from peak; |d| < stopFlat for
-% stopK consecutive samples terminates the event.
-nT = numel(trace);
-traceSm = movmean(trace, 3, 'omitnan');
-d = [0, diff(traceSm)];
-flatCount = 0;
-e = pkSmp;
-while e < nT
-    e1 = e + 1;
-    if isnan(d(e1)), break; end
-    if abs(d(e1)) < detCfg.stopFlat
-        flatCount = flatCount + 1;
-    else
-        flatCount = 0;
-    end
-    e = e1;
-    if flatCount >= detCfg.stopK, break; end
-end
-stopSmp = e;
 end
 
 

@@ -10,3 +10,7 @@ spontCa_curated/
 _diag/cellStats.csv
 _diag/eventStats.csv
 _diag/summary.md
+
+# LLM-curation pipeline outputs: regeneratable PNGs and raw subagent JSON.
+llmCur/images/
+llmCur/raw/

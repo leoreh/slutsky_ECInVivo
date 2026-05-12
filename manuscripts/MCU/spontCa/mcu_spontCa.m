@@ -44,19 +44,22 @@ paramsCyto = {'minAmp', 0.05, 'minIEI', 1.0, 'kNoise', 3.5, 'minDur', 0.4};
 paramsMito = {'minAmp', 0.03, 'minIEI', 1.0, 'kNoise', 3.5, 'minDur', 0.4};
 
 n = height(tbl);
-tbl.start = cell(n, 1);  tbl.stop = cell(n, 1);
-tbl.amp   = cell(n, 1);  tbl.dur  = cell(n, 1);  tbl.int = cell(n, 1);
+tbl.start = cell(n, 1);
+tbl.stop = cell(n, 1);
+tbl.amp = cell(n, 1);
+tbl.dur = cell(n, 1);
+tbl.int = cell(n, 1);
 for iRow = 1:n
-    sig = tbl.trace(iRow, :);
-    if all(isnan(sig)); continue; end
     if tbl.compartment(iRow) == 'Cyto'
-        ev = spontCa_detect(sig, fs, paramsCyto{:});
+        ev = spontCa_detect(tbl.trace(iRow, :), fs, paramsCyto{:});
     else
-        ev = spontCa_detect(sig, fs, paramsMito{:});
+        ev = spontCa_detect(tbl.trace(iRow, :), fs, paramsMito{:});
     end
-    tbl.start{iRow} = ev.start;  tbl.stop{iRow} = ev.stop;
-    tbl.amp{iRow}   = ev.amp;    tbl.dur{iRow}  = ev.dur;
-    tbl.int{iRow}   = ev.int;
+    tbl.start{iRow} = ev.start;
+    tbl.stop{iRow} = ev.stop;
+    tbl.amp{iRow} = ev.amp;
+    tbl.dur{iRow} = ev.dur;
+    tbl.int{iRow} = ev.int;
 end
 
 

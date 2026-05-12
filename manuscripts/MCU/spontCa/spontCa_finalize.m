@@ -12,7 +12,10 @@ function tbl = spontCa_finalize(tbl, fs, varargin)
 %      <curatedDir>/<sbjID>_<compartment>.mat (written by spontCa_manCur).
 %      If present, overwrites tbl.start / .stop / .amp / .dur / .int for
 %      that row with the curated values.
-%   2. PER-ROW AGGREGATES. nEvents, rate, flux (sum(amp)/recDur), fluxInt
+%   2. NORMALIZE CYTO STOPS. Cyto decay times are not biologically real
+%      at fs=3 (subsequent events contaminate them). Cyto stop is forced
+%      to start + 2 samples and dur/int are zeroed. Mito unchanged.
+%   3. PER-ROW AGGREGATES. nEvents, rate, flux (sum(amp)/recDur), fluxInt
 %      (time-mean of the trace).
 %   3. ETA MAPS. Per cell, mapCyto (this row's trace windowed on the
 %      cell's CYTO starts) and mapMito (windowed on the cell's MITO
@@ -127,6 +130,29 @@ if isfolder(P.curatedDir)
                 tbl.int{iRow}   = cur.int(:);
                 nCurated = nCurated + 1;
             end
+        end
+    end
+end
+
+
+%% ========================================================================
+%  NORMALIZE CYTO STOPS
+%  ========================================================================
+% At fs=3 Hz with overlapping events, cyto decay times are contaminated
+% by subsequent activity. The captured stop is not biologically real, so
+% per-event dur/int aren't either. Force cyto stop = start + 2 samples
+% (so the cell-array shapes stay consistent and downstream code that
+% indexes them doesn't crash); zero out dur/int as a "do not interpret"
+% marker. Applied AFTER curation overlay so old curation files with
+% non-placeholder cyto stops get normalised the same way. Mito unchanged.
+
+for iRow = 1:n
+    if tbl.compartment(iRow) == 'Cyto'
+        s = tbl.start{iRow};
+        if ~isempty(s)
+            tbl.stop{iRow} = s + 2 * dt;
+            tbl.dur{iRow}  = repmat(2 * dt, numel(s), 1);
+            tbl.int{iRow}  = zeros(numel(s), 1);
         end
     end
 end
