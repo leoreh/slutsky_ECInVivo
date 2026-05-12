@@ -1,17 +1,19 @@
-function llmCur_render(varargin)
-% LLMCUR_RENDER  Generate per-cell, per-window trace images for LLM-based
-% event marking.
+function spontCa_render(varargin)
+% SPONTCA_RENDER  Generate per-cell, per-window trace images for
+% LLM-based event marking.
 %
-% Splits each recording into nWindows equal-width overlapping windows and
-% renders one PNG per window showing both compartments stacked (cyto top,
-% mito bottom). No detector overlay - clean traces only so the LLM is
-% not anchored by autodetection output.
+% Splits each recording into nWindows equal-width overlapping windows
+% and renders one PNG per window showing both compartments stacked
+% (cyto top, mito bottom). No detector overlay - clean traces only so
+% the LLM is not anchored by autodetection output. Each image's title
+% encodes the absolute time range so the LLM can map pixel positions
+% back to seconds without needing a sidecar metadata file.
 %
 % USAGE
-%   llmCur_render()                       % default params, all cells
-%   llmCur_render('cells', {'Ctrl_03'})   % subset
-%   llmCur_render('nWindows', 12)         % more windows per cell
-%   llmCur_render('overwrite', true)      % re-render existing PNGs
+%   spontCa_render()                       % default params, all cells
+%   spontCa_render('cells', {'Ctrl_03'})   % subset
+%   spontCa_render('nWindows', 12)         % more windows per cell
+%   spontCa_render('overwrite', true)      % re-render existing PNGs
 %
 % OPTIONAL (Name-Value):
 %   'cells'      - cellstr of sbjIDs to render. Default: all in tbl.
@@ -21,11 +23,11 @@ function llmCur_render(varargin)
 %   'overlap'    - fractional overlap between consecutive windows.
 %                  Default 0.2.
 %   'imageWH'    - [W H] in pixels for the figure. Default [1600, 900].
-%   'outDir'     - directory to write images/<sbjID>_w<NN>.{png,json} into.
+%   'outDir'     - directory to write images/<sbjID>_w<NN>.png into.
 %                  Default: <spontCa>/llm/.
 %   'overwrite'  - re-render images that already exist. Default false.
 %
-% See also: LLMCUR_RUN, LLMCUR_ASSEMBLE, SPONTCA_LOAD, MCU_CFG
+% See also: SPONTCA_LLMCUR, SPONTCA_JSON2MAT, SPONTCA_LOAD, MCU_CFG
 
 %% ========================================================================
 %  ARGUMENTS
@@ -51,21 +53,11 @@ end
 % Default output: <spontCa>/llm/ (alongside auto/ and man/).
 thisDir = fileparts(mfilename('fullpath'));
 if isempty(P.outDir)
-    P.outDir = fullfile(fileparts(thisDir), 'llm');
+    P.outDir = fullfile(thisDir, 'llm');
 end
 P.outDir = char(P.outDir);
 imgDir = fullfile(P.outDir, 'images');
 if ~exist(imgDir, 'dir'), mkdir(imgDir); end
-
-
-%% ========================================================================
-%  LOAD
-%  ========================================================================
-
-spontCaDir = fileparts(thisDir);
-if exist(spontCaDir, 'dir') && ~contains(lower(path), lower(spontCaDir))
-    addpath(spontCaDir);
-end
 
 [tbl, fs] = spontCa_load();
 nT     = size(tbl.trace, 2);
@@ -99,7 +91,7 @@ end
 N    = round(P.nWindows);
 W    = recDur / (N - (N - 1) * P.overlap);
 step = W * (1 - P.overlap);
-fprintf('[llmCur_render] %d windows per cell (W=%.1fs, step=%.1fs, overlap=%.0f%%)\n', ...
+fprintf('[spontCa_render] %d windows per cell (W=%.1fs, step=%.1fs, overlap=%.0f%%)\n', ...
     N, W, step, 100 * P.overlap);
 
 
@@ -134,8 +126,7 @@ for iCell = 1:numel(cellsToRender)
         % Numerical safety: nudge last window to land exactly on recDur.
         if iW == N, t1 = recDur; end
 
-        pngPath  = fullfile(imgDir, sprintf('%s_w%02d.png',  sName, iW));
-        jsonPath = fullfile(imgDir, sprintf('%s_w%02d.json', sName, iW));
+        pngPath = fullfile(imgDir, sprintf('%s_w%02d.png', sName, iW));
         if exist(pngPath, 'file') && ~P.overwrite
             continue;
         end
@@ -167,21 +158,9 @@ for iCell = 1:numel(cellsToRender)
         exportgraphics(f, pngPath, 'Resolution', 100, ...
             'BackgroundColor', 'white');
         close(f);
-
-        meta = struct( ...
-            'sbjID',      sName, ...
-            'window_idx', iW, ...
-            'fs',         fs, ...
-            't_start',    t0, ...
-            't_end',      t1, ...
-            'png',        pngPath);
-        fjson = fopen(jsonPath, 'w');
-        fprintf(fjson, '%s\n', jsonencode(meta));
-        fclose(fjson);
-
         nRendered = nRendered + 1;
     end
-    fprintf('[llmCur_render] %s : %d windows rendered (of %d)\n', ...
+    fprintf('[spontCa_render] %s : %d windows rendered (of %d)\n', ...
         sName, nRendered, N);
 end
 

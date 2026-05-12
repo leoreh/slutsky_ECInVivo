@@ -1,10 +1,10 @@
-function llmCur_assemble(varargin)
-% LLMCUR_ASSEMBLE  Merge per-image LLM marks into per-cell event files.
+function spontCa_json2mat(varargin)
+% SPONTCA_JSON2MAT  Merge per-image LLM marks into per-cell event files.
 %
-% Reads <llmDir>/raw/<sbjID>_w*.json (one per rendered window, written by
-% the image-marking subagents). Deduplicates events across overlapping
-% windows, computes amp/dur/int from the trace, and writes one
-% <llmDir>/<sbjID>.mat per cell.
+% Reads <llmDir>/raw/<sbjID>_w*.json (one per rendered window, written
+% by the image-marking subagents). Deduplicates events across
+% overlapping windows, computes amp/dur/int from the trace, and writes
+% one <llmDir>/<sbjID>.mat per cell.
 %
 % File format (matches spontCa_manCur save format):
 %   cur.sbjID    char
@@ -20,9 +20,9 @@ function llmCur_assemble(varargin)
 % biologically real at fs=3); mito stops come from the LLM marks.
 %
 % USAGE
-%   llmCur_assemble()                       % all cells with raw JSONs
-%   llmCur_assemble('cells', {'Ctrl_03'})   % subset
-%   llmCur_assemble('outDir', dirPath)      % override output dir
+%   spontCa_json2mat()                       % all cells with raw JSONs
+%   spontCa_json2mat('cells', {'Ctrl_03'})   % subset
+%   spontCa_json2mat('outDir', dirPath)      % override output dir
 %
 % OPTIONAL (Name-Value):
 %   'cells'    - cellstr of sbjIDs. Default: all with raw/*.json.
@@ -32,7 +32,7 @@ function llmCur_assemble(varargin)
 %                Default: <spontCa>/llm/.
 %   'tolDedup' - cross-window dedup tolerance (s). Default 0.5.
 %
-% See also: LLMCUR_RENDER, LLMCUR_RUN, LLMCUR_COMPARE,
+% See also: SPONTCA_RENDER, SPONTCA_LLMCUR, SPONTCA_COMPARE,
 %           SPONTCA_FINALIZE, SPONTCA_MANCUR, SPONTCA_EV2TBL
 
 %% ========================================================================
@@ -52,18 +52,12 @@ if ischar(P.cells) || isstring(P.cells)
 end
 
 thisDir = fileparts(mfilename('fullpath'));
-spontCaDir = fileparts(thisDir);
-llmDir = fullfile(spontCaDir, 'llm');
+llmDir = fullfile(thisDir, 'llm');
 if isempty(P.rawDir), P.rawDir = fullfile(llmDir, 'raw'); end
 if isempty(P.outDir), P.outDir = llmDir; end
 P.rawDir = char(P.rawDir);
 P.outDir = char(P.outDir);
 if ~exist(P.outDir, 'dir'), mkdir(P.outDir); end
-
-% Ensure spontCa dir on path so spontCa_load + ev2tbl resolve.
-if exist(spontCaDir, 'dir') && ~contains(lower(path), lower(spontCaDir))
-    addpath(spontCaDir);
-end
 
 
 %% ========================================================================
@@ -172,7 +166,7 @@ for iCell = 1:numel(cellsToDo)
     bkupExisting(outPath, P.outDir);
     save(outPath, 'cur');
 
-    fprintf('[llmCur_assemble] %s : %d cyto, %d mito -> %s\n', ...
+    fprintf('[spontCa_json2mat] %s : %d cyto, %d mito -> %s\n', ...
         sName, height(events(events.compartment == 'Cyto', :)), ...
         height(events(events.compartment == 'Mito', :)), outPath);
 end

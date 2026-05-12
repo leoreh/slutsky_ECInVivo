@@ -43,49 +43,8 @@
 paramsCyto = {'minAmp', 0.05, 'minIEI', 1.0, 'kNoise', 3.5, 'minDur', 0.4};
 paramsMito = {'minAmp', 0.03, 'minIEI', 1.0, 'kNoise', 3.5, 'minDur', 0.4};
 
-n = height(tbl);
-tbl.start = cell(n, 1);
-tbl.stop = cell(n, 1);
-tbl.amp = cell(n, 1);
-tbl.dur = cell(n, 1);
-tbl.int = cell(n, 1);
-for iRow = 1:n
-    if tbl.compartment(iRow) == 'Cyto'
-        ev = spontCa_detect(tbl.trace(iRow, :), fs, paramsCyto{:});
-    else
-        ev = spontCa_detect(tbl.trace(iRow, :), fs, paramsMito{:});
-    end
-    tbl.start{iRow} = ev.start;
-    tbl.stop{iRow} = ev.stop;
-    tbl.amp{iRow} = ev.amp;
-    tbl.dur{iRow} = ev.dur;
-    tbl.int{iRow} = ev.int;
-end
-
-% Persist auto-detection per cell to spontCa/auto/<sbjID>.mat so the
-% manCur GUI's Load button can open it. Same format as man/ and llm/
-% (struct with sbjID + events table) so the three sources are
-% drop-in interchangeable.
-autoDir = fullfile(fileparts(which('spontCa_detect')), 'auto');
-if ~exist(autoDir, 'dir'), mkdir(autoDir); end
-cells = unique(cellstr(string(tbl.sbjID)), 'stable');
-for iCell = 1:numel(cells)
-    sid = cells{iCell};
-    iC = find(tbl.sbjID == sid & tbl.compartment == 'Cyto');
-    iM = find(tbl.sbjID == sid & tbl.compartment == 'Mito');
-    evCyto = struct('start', tbl.start{iC}, 'stop', tbl.stop{iC}, ...
-        'amp', tbl.amp{iC}, 'dur', tbl.dur{iC}, 'int', tbl.int{iC});
-    evMito = struct('start', tbl.start{iM}, 'stop', tbl.stop{iM}, ...
-        'amp', tbl.amp{iM}, 'dur', tbl.dur{iM}, 'int', tbl.int{iM});
-    cur = struct( ...
-        'sbjID',   sid, ...
-        'fs',      fs, ...
-        'savedAt', datestr(now, 'yyyy-mm-dd HH:MM:SS'), ... %#ok<TNOW1,DATST>
-        'source',  'auto', ...
-        'events',  [spontCa_ev2tbl(evCyto, 'Cyto'); ...
-                    spontCa_ev2tbl(evMito, 'Mito')]);
-    save(fullfile(autoDir, sprintf('%s.mat', sid)), 'cur');
-end
+tbl = spontCa_detectAll(tbl, fs, ...
+    'paramsCyto', paramsCyto, 'paramsMito', paramsMito);
 
 
 %% ========================================================================
