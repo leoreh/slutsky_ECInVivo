@@ -1,28 +1,39 @@
 function llmCur_assemble(varargin)
-% LLMCUR_ASSEMBLE  Merge per-image LLM marks into per-cell curated .mat
-% files, in the same format spontCa_manCur writes.
+% LLMCUR_ASSEMBLE  Merge per-image LLM marks into per-cell event files.
 %
-% Reads llmCur/raw/<sbjID>_w*.json (one per rendered window, written by
+% Reads <llmDir>/raw/<sbjID>_w*.json (one per rendered window, written by
 % the image-marking subagents). Deduplicates events across overlapping
-% windows, computes amp/dur/int from the trace, and writes
-% spontCa_curated/<sbjID>_<cmp>.mat. Cyto stops are forced to
-% start + 2 samples (placeholder; cyto stops are not biologically real
-% at fs=3); mito stops come straight from the LLM marks.
+% windows, computes amp/dur/int from the trace, and writes one
+% <llmDir>/<sbjID>.mat per cell.
+%
+% File format (matches spontCa_manCur save format):
+%   cur.sbjID    char
+%   cur.fs       double
+%   cur.savedAt  char timestamp
+%   cur.source   'llm'
+%   cur.events   table with columns
+%                {compartment, start, stop, amp, dur, int}
+%                - one row per event, sorted by (compartment, start)
+%                - compartment is categorical {Cyto, Mito}
+%
+% Cyto stops are placeholders (start + 2 samples; cyto stops are not
+% biologically real at fs=3); mito stops come from the LLM marks.
 %
 % USAGE
 %   llmCur_assemble()                       % all cells with raw JSONs
 %   llmCur_assemble('cells', {'Ctrl_03'})   % subset
-%   llmCur_assemble('outDir', dirPath)      % override curated output dir
+%   llmCur_assemble('outDir', dirPath)      % override output dir
 %
 % OPTIONAL (Name-Value):
-%   'cells'      - cellstr of sbjIDs to assemble. Default: all with raw.
-%   'rawDir'     - dir holding subagent JSONs.
-%                  Default: <this_file_dir>/raw/.
-%   'outDir'     - dir to write <sbjID>_<cmp>.mat into.
-%                  Default: ../spontCa_curated/ relative to this file.
-%   'tolDedup'   - cross-window dedup tolerance (s). Default 0.5.
+%   'cells'    - cellstr of sbjIDs. Default: all with raw/*.json.
+%   'rawDir'   - dir holding subagent JSONs.
+%                Default: <llmDir>/raw/ where llmDir = <spontCa>/llm/.
+%   'outDir'   - dir to write <sbjID>.mat into.
+%                Default: <spontCa>/llm/.
+%   'tolDedup' - cross-window dedup tolerance (s). Default 0.5.
 %
-% See also: LLMCUR_RENDER, LLMCUR_RUN, SPONTCA_FINALIZE, SPONTCA_MANCUR
+% See also: LLMCUR_RENDER, LLMCUR_RUN, LLMCUR_COMPARE,
+%           SPONTCA_FINALIZE, SPONTCA_MANCUR, SPONTCA_EV2TBL
 
 %% ========================================================================
 %  ARGUMENTS
@@ -41,25 +52,24 @@ if ischar(P.cells) || isstring(P.cells)
 end
 
 thisDir = fileparts(mfilename('fullpath'));
-if isempty(P.rawDir)
-    P.rawDir = fullfile(thisDir, 'raw');
-end
-if isempty(P.outDir)
-    P.outDir = fullfile(fileparts(thisDir), 'spontCa_curated');
-end
+spontCaDir = fileparts(thisDir);
+llmDir = fullfile(spontCaDir, 'llm');
+if isempty(P.rawDir), P.rawDir = fullfile(llmDir, 'raw'); end
+if isempty(P.outDir), P.outDir = llmDir; end
 P.rawDir = char(P.rawDir);
 P.outDir = char(P.outDir);
 if ~exist(P.outDir, 'dir'), mkdir(P.outDir); end
+
+% Ensure spontCa dir on path so spontCa_load + ev2tbl resolve.
+if exist(spontCaDir, 'dir') && ~contains(lower(path), lower(spontCaDir))
+    addpath(spontCaDir);
+end
 
 
 %% ========================================================================
 %  LOAD TRACES
 %  ========================================================================
 
-spontCaDir = fileparts(thisDir);
-if exist(spontCaDir, 'dir') && ~contains(lower(path), lower(spontCaDir))
-    addpath(spontCaDir);
-end
 [tbl, fs] = spontCa_load();
 dt = 1 / fs;
 nT = size(tbl.trace, 2);
@@ -74,7 +84,6 @@ if isempty(allRaw)
     error('No raw JSONs in %s', P.rawDir);
 end
 rawNames = {allRaw.name};
-% Extract sbjID = substring before "_w<NN>.json"
 sbjFromName = regexprep(rawNames, '_w\d+\.json$', '');
 rawCells    = unique(sbjFromName, 'stable');
 
@@ -102,7 +111,6 @@ for iCell = 1:numel(cellsToDo)
     bslCyto = rollingPercentile(cyTrace, round(30 * fs), 20);
     bslMito = rollingPercentile(miTrace, round(30 * fs), 20);
 
-    % Gather raw JSONs for this cell
     matches = startsWith(rawNames, [sName '_w']);
     windowFiles = rawNames(matches);
 
@@ -124,8 +132,6 @@ for iCell = 1:numel(cellsToDo)
             cyStarts = [cyStarts; mark.cyto_peaks(:)]; %#ok<AGROW>
         end
         if isfield(mark, 'mito_peaks') && ~isempty(mark.mito_peaks)
-            % Two encodings: array of structs {start, stop} or struct
-            % with fields start/stop as vectors.
             if isstruct(mark.mito_peaks)
                 if numel(mark.mito_peaks) == 1 && ...
                         numel(mark.mito_peaks.start) > 1
@@ -146,23 +152,29 @@ for iCell = 1:numel(cellsToDo)
         end
     end
 
-    % Dedup
-    [cyStarts, ~] = dedupTimes(cyStarts, [], P.tolDedup);
+    [cyStarts, ~]       = dedupTimes(cyStarts, [], P.tolDedup);
     [miStarts, miStops] = dedupTimes(miStarts, miStops, P.tolDedup);
 
-    % Build curated structs
-    curCyto = buildCyto(sName, cyStarts, cyTrace, bslCyto, fs, dt, nT);
-    curMito = buildMito(sName, miStarts, miStops, miTrace, bslMito, ...
-        fs, dt, nT);
+    evCyto = buildCytoEv(cyStarts, cyTrace, bslCyto, fs, dt, nT);
+    evMito = buildMitoEv(miStarts, miStops, miTrace, bslMito, fs, dt, nT);
 
-    % Save
-    cur = curCyto;
-    save(fullfile(P.outDir, sprintf('%s_Cyto.mat', sName)), 'cur');
-    cur = curMito;
-    save(fullfile(P.outDir, sprintf('%s_Mito.mat', sName)), 'cur');
+    events = [spontCa_ev2tbl(evCyto, 'Cyto'); ...
+              spontCa_ev2tbl(evMito, 'Mito')];
 
-    fprintf('[llmCur_assemble] %s : %d cyto, %d mito events -> %s\n', ...
-        sName, numel(curCyto.start), numel(curMito.start), P.outDir);
+    cur = struct( ...
+        'sbjID',   sName, ...
+        'fs',      fs, ...
+        'savedAt', datestr(now, 'yyyy-mm-dd HH:MM:SS'), ... %#ok<TNOW1,DATST>
+        'source',  'llm', ...
+        'events',  events);
+
+    outPath = fullfile(P.outDir, sprintf('%s.mat', sName));
+    bkupExisting(outPath, P.outDir);
+    save(outPath, 'cur');
+
+    fprintf('[llmCur_assemble] %s : %d cyto, %d mito -> %s\n', ...
+        sName, height(events(events.compartment == 'Cyto', :)), ...
+        height(events(events.compartment == 'Mito', :)), outPath);
 end
 
 end     % EOF
@@ -173,14 +185,11 @@ end     % EOF
 %  ========================================================================
 
 function [s, e] = dedupTimes(s, e, tol)
-% Sort by start time; merge entries within tol seconds (keep first).
 if isempty(s)
     return;
 end
 [s, ord] = sort(s);
-if ~isempty(e)
-    e = e(ord);
-end
+if ~isempty(e), e = e(ord); end
 keep = true(numel(s), 1);
 for k = 2:numel(s)
     if s(k) - s(find(keep(1:k-1), 1, 'last')) < tol
@@ -192,32 +201,26 @@ if ~isempty(e), e = e(keep); end
 end
 
 
-function cur = buildCyto(sName, starts, trace, bsl, fs, dt, nT)
-% Cyto: stop is placeholder (start + 2 samples), dur/int zeroed.
+function ev = buildCytoEv(starts, trace, bsl, fs, dt, nT)
+% Cyto: stop = start + 2 samples (placeholder), dur = 2*dt, int = 0.
 starts = starts(:);
 starts = starts(starts >= 0 & starts <= (nT - 1) * dt);
 n = numel(starts);
-stop = starts + 2 * dt;
 amp = zeros(n, 1);
 for k = 1:n
     smp = max(1, min(nT, round(starts(k) * fs) + 1));
     amp(k) = trace(smp) - bsl(smp);
 end
-cur = struct( ...
-    'sbjID',       sName, ...
-    'compartment', 'Cyto', ...
-    'fs',          fs, ...
-    'start',       starts, ...
-    'stop',        stop, ...
-    'amp',         amp, ...
-    'dur',         repmat(2 * dt, n, 1), ...
-    'int',         zeros(n, 1), ...
-    'savedAt',     datestr(now, 'yyyy-mm-dd HH:MM:SS')); %#ok<TNOW1,DATST>
+ev = struct( ...
+    'start', starts, ...
+    'stop',  starts + 2 * dt, ...
+    'amp',   amp, ...
+    'dur',   repmat(2 * dt, n, 1), ...
+    'int',   zeros(n, 1));
 end
 
 
-function cur = buildMito(sName, starts, stops, trace, bsl, fs, dt, nT)
-% Mito: real start AND stop, compute amp/dur/int.
+function ev = buildMitoEv(starts, stops, trace, bsl, fs, dt, nT)
 starts = starts(:);
 stops  = stops(:);
 valid = starts >= 0 & starts <= (nT - 1) * dt & ...
@@ -227,7 +230,6 @@ stops  = stops(valid);
 n = numel(starts);
 amp = zeros(n, 1);
 intg = zeros(n, 1);
-dur  = stops - starts;
 for k = 1:n
     pkSmp = max(1, min(nT, round(starts(k) * fs) + 1));
     stSmp = max(pkSmp, min(nT, round(stops(k) * fs) + 1));
@@ -236,16 +238,22 @@ for k = 1:n
     seg(isnan(seg)) = 0;
     intg(k) = trapz(seg) * dt;
 end
-cur = struct( ...
-    'sbjID',       sName, ...
-    'compartment', 'Mito', ...
-    'fs',          fs, ...
-    'start',       starts, ...
-    'stop',        stops, ...
-    'amp',         amp, ...
-    'dur',         dur, ...
-    'int',         intg, ...
-    'savedAt',     datestr(now, 'yyyy-mm-dd HH:MM:SS')); %#ok<TNOW1,DATST>
+ev = struct( ...
+    'start', starts, ...
+    'stop',  stops, ...
+    'amp',   amp, ...
+    'dur',   stops - starts, ...
+    'int',   intg);
+end
+
+
+function bkupExisting(fpath, outDir)
+if ~exist(fpath, 'file'), return; end
+bkupDir = fullfile(outDir, 'bkup');
+if ~exist(bkupDir, 'dir'), mkdir(bkupDir); end
+[~, base, ext] = fileparts(fpath);
+stamp = datestr(now, 'yymmdd_HHMMSS'); %#ok<TNOW1,DATST>
+copyfile(fpath, fullfile(bkupDir, sprintf('%s_%s%s', base, stamp, ext)));
 end
 
 

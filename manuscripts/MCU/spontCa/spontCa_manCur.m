@@ -73,10 +73,17 @@ dt = 1 / fs;
 detCfg.bslWin   = 30;
 detCfg.quantBsl = 20;
 
-curDir = fullfile(fileparts(mfilename('fullpath')), 'spontCa_curated');
-if ~exist(curDir, 'dir')
-    mkdir(curDir);
-end
+% Three sibling folders hold per-cell event files in the same format
+% (struct cur with sbjID, fs, savedAt, source, events table):
+%   auto/<sbjID>.mat   - autodetection output (written by mcu_spontCa)
+%   man/<sbjID>.mat    - user curation (written here)
+%   llm/<sbjID>.mat    - LLM curation (written by llmCur_assemble)
+% Save target is man/. Load button can open any of them via uigetfile.
+spontCaDir = fileparts(mfilename('fullpath'));
+manDir  = fullfile(spontCaDir, 'man');
+autoDir = fullfile(spontCaDir, 'auto');
+if ~exist(manDir, 'dir'),  mkdir(manDir);  end
+if ~exist(autoDir, 'dir'), mkdir(autoDir); end
 
 
 %% ========================================================================
@@ -167,13 +174,9 @@ lblDirty = uicontrol('Parent', hSide, 'Style', 'text', 'String', 'saved', ...
     'Units', 'normalized', 'Position', [0.05, 0.44, 0.9, 0.04], ...
     'HorizontalAlignment', 'center', 'ForegroundColor', [0.2, 0.6, 0.2]);
 
-uicontrol('Parent', hSide, 'Style', 'pushbutton', 'String', 'Load auto', ...
+uicontrol('Parent', hSide, 'Style', 'pushbutton', 'String', 'Load...', ...
     'Units', 'normalized', 'Position', [0.05, 0.37, 0.9, 0.05], ...
-    'Callback', @onLoadAuto);
-
-uicontrol('Parent', hSide, 'Style', 'pushbutton', 'String', 'Load man', ...
-    'Units', 'normalized', 'Position', [0.05, 0.31, 0.9, 0.05], ...
-    'Callback', @onLoadMan);
+    'Callback', @onLoad);
 
 uicontrol('Parent', hSide, 'Style', 'text', 'String', ...
     sprintf(['Drag dashed: peak\n' ...
@@ -182,7 +185,7 @@ uicontrol('Parent', hSide, 'Style', 'text', 'String', ...
              'R-click line: delete\n' ...
              'Arrows L/R: window\n' ...
              'Arrows U/D: comp']), ...
-    'Units', 'normalized', 'Position', [0.05, 0.04, 0.9, 0.24], ...
+    'Units', 'normalized', 'Position', [0.05, 0.04, 0.9, 0.30], ...
     'HorizontalAlignment', 'left', 'FontAngle', 'italic', ...
     'ForegroundColor', [0.4, 0.4, 0.4]);
 
@@ -241,8 +244,8 @@ onCellChange();
         S.bsl.Mito = rollingPercentileLocal(S.traces.Mito, ...
             round(detCfg.bslWin * fs), detCfg.quantBsl);
 
-        S.events.Cyto = loadEvForRow(S.currentCell, 'Cyto', iC);
-        S.events.Mito = loadEvForRow(S.currentCell, 'Mito', iM);
+        [S.events.Cyto, S.events.Mito] = loadEventsForCell( ...
+            S.currentCell, iC, iM);
 
         evA = S.events.(S.activeCmp);
         if ~isempty(evA.start)
@@ -258,134 +261,103 @@ onCellChange();
     end
 
 
-    function ev = loadEvForRow(sName, cmp, iRow)
-        fpath = fullfile(curDir, sprintf('%s_%s.mat', sName, cmp));
-        if exist(fpath, 'file')
-            load(fpath, 'cur');
-            ev = struct('start', cur.start(:), 'stop', cur.stop(:), ...
-                'amp', cur.amp(:), 'dur', cur.dur(:), 'int', cur.int(:));
+    function [evCyto, evMito] = loadEventsForCell(sName, iC, iM)
+        % Source precedence: man/<sName>.mat -> auto/<sName>.mat ->
+        % in-memory tbl. Reads the new events-table format.
+        manPath  = fullfile(manDir,  [sName '.mat']);
+        autoPath = fullfile(autoDir, [sName '.mat']);
+        if exist(manPath, 'file')
+            evCell = eventsFromFile(manPath);
+        elseif exist(autoPath, 'file')
+            evCell = eventsFromFile(autoPath);
         else
-            ev = struct( ...
-                'start', tbl.start{iRow}(:), ...
-                'stop',  tbl.stop{iRow}(:), ...
-                'amp',   tbl.amp{iRow}(:), ...
-                'dur',   tbl.dur{iRow}(:), ...
-                'int',   tbl.int{iRow}(:));
+            evCell = struct( ...
+                'Cyto', struct( ...
+                    'start', tbl.start{iC}(:), 'stop', tbl.stop{iC}(:), ...
+                    'amp',   tbl.amp{iC}(:),   'dur',  tbl.dur{iC}(:), ...
+                    'int',   tbl.int{iC}(:)), ...
+                'Mito', struct( ...
+                    'start', tbl.start{iM}(:), 'stop', tbl.stop{iM}(:), ...
+                    'amp',   tbl.amp{iM}(:),   'dur',  tbl.dur{iM}(:), ...
+                    'int',   tbl.int{iM}(:)));
         end
-        ev = sortEv(ev);
+        evCyto = sortEv(evCell.Cyto);
+        evMito = sortEv(evCell.Mito);
     end
 
 
     function saveCurrent(verbose)
+        % Persist current cell to man/<sName>.mat. Both compartments
+        % live in a single events table. Existing file is backed up
+        % first to man/bkup/<sName>_<stamp>.mat.
         S = hFig.UserData;
         if isempty(S.currentCell), return; end
-        bkupDir = fullfile(curDir, 'bkup');
-        stamp   = datestr(now, 'yymmdd_HHMMSS'); %#ok<TNOW1,DATST>
-        cmps = {'Cyto', 'Mito'};
-        for k = 1:2
-            cmp = cmps{k};
-            ev = S.events.(cmp);
-            fpath = fullfile(curDir, sprintf('%s_%s.mat', S.currentCell, cmp));
-            % Back up any prior version before overwrite. Each save makes a
-            % stamped copy so curation is recoverable across sessions.
-            if exist(fpath, 'file')
-                if ~exist(bkupDir, 'dir'), mkdir(bkupDir); end
-                bkupName = sprintf('%s_%s_%s.mat', ...
-                    S.currentCell, cmp, stamp);
-                copyfile(fpath, fullfile(bkupDir, bkupName));
-            end
-            cur = struct( ...
-                'sbjID',       S.currentCell, ...
-                'compartment', cmp, ...
-                'fs',          fs, ...
-                'start',       ev.start(:), ...
-                'stop',        ev.stop(:), ...
-                'amp',         ev.amp(:), ...
-                'dur',         ev.dur(:), ...
-                'int',         ev.int(:), ...
-                'savedAt',     datestr(now, 'yyyy-mm-dd HH:MM:SS')); %#ok<TNOW1,DATST>
-            save(fpath, 'cur');
+        bkupDir = fullfile(manDir, 'bkup');
+        stamp = datestr(now, 'yymmdd_HHMMSS'); %#ok<TNOW1,DATST>
+        fpath = fullfile(manDir, [S.currentCell '.mat']);
+        if exist(fpath, 'file')
+            if ~exist(bkupDir, 'dir'), mkdir(bkupDir); end
+            copyfile(fpath, fullfile(bkupDir, ...
+                sprintf('%s_%s.mat', S.currentCell, stamp)));
         end
+        events = [spontCa_ev2tbl(S.events.Cyto, 'Cyto'); ...
+                  spontCa_ev2tbl(S.events.Mito, 'Mito')];
+        cur = struct( ...
+            'sbjID',   S.currentCell, ...
+            'fs',      fs, ...
+            'savedAt', datestr(now, 'yyyy-mm-dd HH:MM:SS'), ... %#ok<TNOW1,DATST>
+            'source',  'man', ...
+            'events',  events);
+        save(fpath, 'cur');
         S.dirty = false;
         hFig.UserData = S;
         setDirty(false);
         if verbose
-            fprintf('Saved %s (cyto + mito) to %s\n', S.currentCell, curDir);
+            fprintf('Saved %s -> %s\n', S.currentCell, fpath);
         end
     end
 
 
-    function onLoadAuto(~, ~)
-        % Restore the autodetector pre-fill for the current cell.
-        % Marks dirty (caller can Save to persist).
+    function onLoad(~, ~)
+        % Open a file picker defaulting to man/, accept any .mat in
+        % the events-table format (auto/, man/, llm/). Loads into the
+        % current cell's state and marks dirty so a Save persists.
         S = hFig.UserData;
         if isempty(S.currentCell), return; end
-        sName = S.currentCell;
-        iC = find(tbl.sbjID == sName & tbl.compartment == 'Cyto');
-        iM = find(tbl.sbjID == sName & tbl.compartment == 'Mito');
-        S.events.Cyto = sortEv(struct( ...
-            'start', tbl.start{iC}(:), 'stop', tbl.stop{iC}(:), ...
-            'amp',   tbl.amp{iC}(:),   'dur',  tbl.dur{iC}(:), ...
-            'int',   tbl.int{iC}(:)));
-        S.events.Mito = sortEv(struct( ...
-            'start', tbl.start{iM}(:), 'stop', tbl.stop{iM}(:), ...
-            'amp',   tbl.amp{iM}(:),   'dur',  tbl.dur{iM}(:), ...
-            'int',   tbl.int{iM}(:)));
+        [fname, fpath] = uigetfile('*.mat', ...
+            sprintf('Load events for %s', S.currentCell), ...
+            fullfile(manDir, [S.currentCell '.mat']));
+        if isequal(fname, 0), return; end
+        fullPath = fullfile(fpath, fname);
+        try
+            evCell = eventsFromFile(fullPath);
+        catch ME
+            warndlg(sprintf('Failed to parse %s:\n%s', fname, ME.message), ...
+                'Load failed');
+            return;
+        end
+        S.events.Cyto = sortEv(evCell.Cyto);
+        S.events.Mito = sortEv(evCell.Mito);
         S.dirty = true;
         hFig.UserData = S;
         setDirty(true);
         redrawAll();
+        fprintf('Loaded %s from %s\n', S.currentCell, fullPath);
     end
 
 
-    function onLoadMan(~, ~)
-        % Load the most recent manual save for the current cell. Per
-        % compartment, prefer spontCa_curated/<sbjID>_<cmp>.mat; fall back
-        % to the newest spontCa_curated/bkup/<sbjID>_<cmp>_*.mat by file
-        % mtime. If neither exists for a compartment, leave it untouched.
-        S = hFig.UserData;
-        if isempty(S.currentCell), return; end
-        sName = S.currentCell;
-        bkupDir = fullfile(curDir, 'bkup');
-        cmps = {'Cyto', 'Mito'};
-        nLoaded = 0;
-        for k = 1:2
-            cmp = cmps{k};
-            fpath = fullfile(curDir, sprintf('%s_%s.mat', sName, cmp));
-            src = '';
-            if exist(fpath, 'file')
-                src = fpath;
-            elseif exist(bkupDir, 'dir')
-                files = dir(fullfile(bkupDir, ...
-                    sprintf('%s_%s_*.mat', sName, cmp)));
-                if ~isempty(files)
-                    [~, idx] = max([files.datenum]);
-                    src = fullfile(bkupDir, files(idx).name);
-                end
-            end
-            if isempty(src)
-                fprintf('No manual save found for %s %s\n', sName, cmp);
-                continue;
-            end
-            L = load(src, 'cur');
-            if ~isfield(L, 'cur')
-                fprintf('Skipped %s: no ''cur'' struct\n', src);
-                continue;
-            end
-            cur = L.cur;
-            S.events.(cmp) = sortEv(struct( ...
-                'start', cur.start(:), 'stop', cur.stop(:), ...
-                'amp',   cur.amp(:),   'dur',  cur.dur(:), ...
-                'int',   cur.int(:)));
-            nLoaded = nLoaded + 1;
-            fprintf('Loaded %s %s from %s\n', sName, cmp, src);
+    function evCell = eventsFromFile(fpath)
+        % Parse a .mat in the new events-table format. Returns struct
+        % with .Cyto and .Mito sub-structs (vector fields).
+        L = load(fpath, 'cur');
+        if ~isfield(L, 'cur') || ~isfield(L.cur, 'events')
+            error('spontCa_manCur:badFile', ...
+                'File missing cur.events: %s', fpath);
         end
-        if nLoaded > 0
-            S.dirty = true;
-            hFig.UserData = S;
-            setDirty(true);
-            redrawAll();
-        end
+        ev = L.cur.events;
+        evCell.Cyto = spontCa_tbl2ev(ev, 'Cyto');
+        evMito = spontCa_tbl2ev(ev, 'Mito');
+        evCell.Mito = evMito;
     end
 
 

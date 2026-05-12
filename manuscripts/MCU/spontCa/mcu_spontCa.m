@@ -62,14 +62,37 @@ for iRow = 1:n
     tbl.int{iRow} = ev.int;
 end
 
+% Persist auto-detection per cell to spontCa/auto/<sbjID>.mat so the
+% manCur GUI's Load button can open it. Same format as man/ and llm/
+% (struct with sbjID + events table) so the three sources are
+% drop-in interchangeable.
+autoDir = fullfile(fileparts(which('spontCa_detect')), 'auto');
+if ~exist(autoDir, 'dir'), mkdir(autoDir); end
+cells = unique(cellstr(string(tbl.sbjID)), 'stable');
+for iCell = 1:numel(cells)
+    sid = cells{iCell};
+    iC = find(tbl.sbjID == sid & tbl.compartment == 'Cyto');
+    iM = find(tbl.sbjID == sid & tbl.compartment == 'Mito');
+    evCyto = struct('start', tbl.start{iC}, 'stop', tbl.stop{iC}, ...
+        'amp', tbl.amp{iC}, 'dur', tbl.dur{iC}, 'int', tbl.int{iC});
+    evMito = struct('start', tbl.start{iM}, 'stop', tbl.stop{iM}, ...
+        'amp', tbl.amp{iM}, 'dur', tbl.dur{iM}, 'int', tbl.int{iM});
+    cur = struct( ...
+        'sbjID',   sid, ...
+        'fs',      fs, ...
+        'savedAt', datestr(now, 'yyyy-mm-dd HH:MM:SS'), ... %#ok<TNOW1,DATST>
+        'source',  'auto', ...
+        'events',  [spontCa_ev2tbl(evCyto, 'Cyto'); ...
+                    spontCa_ev2tbl(evMito, 'Mito')]);
+    save(fullfile(autoDir, sprintf('%s.mat', sid)), 'cur');
+end
+
 
 %% ========================================================================
 %  MANUAL CURATION (interactive)
 %  ========================================================================
-% Per-cell event-editing GUI. Opens with auto-detected events shown;
-% writes spontCa_curated/<sbjID>_<compartment>.mat per cell. Skip if not
-% curating in this session - spontCa_finalize will simply find no
-% curated files and use the auto-detected events as-is.
+% Per-cell event-editing GUI. Opens with the most recent saved version
+% for each cell (man/ if present, else auto/). Saves to spontCa/man/.
 
 spontCa_manCur(tbl, fs);
 

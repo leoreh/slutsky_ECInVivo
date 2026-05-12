@@ -2,29 +2,28 @@ function llmCur_render(varargin)
 % LLMCUR_RENDER  Generate per-cell, per-window trace images for LLM-based
 % event marking.
 %
-% For each cell, slides a fixed window (default 120 s with 20% overlap)
-% across the recording and renders one PNG per window showing both
-% compartments stacked (cyto top, mito bottom). No detector overlay -
-% clean traces only so the LLM is not anchored by autodetection output.
+% Splits each recording into nWindows equal-width overlapping windows and
+% renders one PNG per window showing both compartments stacked (cyto top,
+% mito bottom). No detector overlay - clean traces only so the LLM is
+% not anchored by autodetection output.
 %
 % USAGE
 %   llmCur_render()                       % default params, all cells
 %   llmCur_render('cells', {'Ctrl_03'})   % subset
-%   llmCur_render('windowSec', 180)       % wider windows
+%   llmCur_render('nWindows', 12)         % more windows per cell
 %   llmCur_render('overwrite', true)      % re-render existing PNGs
 %
 % OPTIONAL (Name-Value):
 %   'cells'      - cellstr of sbjIDs to render. Default: all in tbl.
-%   'windowSec'  - window width in seconds. Default 120.
-%   'overlap'    - fractional overlap with previous window. Default 0.2.
+%   'nWindows'   - number of windows per cell. Default 10. All windows
+%                  have the same width (recDur / (N - (N-1)*overlap));
+%                  the last window ends exactly at recDur.
+%   'overlap'    - fractional overlap between consecutive windows.
+%                  Default 0.2.
 %   'imageWH'    - [W H] in pixels for the figure. Default [1600, 900].
-%   'outDir'     - root output dir; PNGs go in <outDir>/images/.
-%                  Default: alongside this file.
+%   'outDir'     - directory to write images/<sbjID>_w<NN>.{png,json} into.
+%                  Default: <spontCa>/llm/.
 %   'overwrite'  - re-render images that already exist. Default false.
-%
-% OUTPUTS (under outDir/images/)
-%   <sbjID>_w<NN>.png   - rendered trace pair
-%   <sbjID>_w<NN>.json  - sidecar metadata (sbjID, fs, t_start, t_end)
 %
 % See also: LLMCUR_RUN, LLMCUR_ASSEMBLE, SPONTCA_LOAD, MCU_CFG
 
@@ -34,7 +33,8 @@ function llmCur_render(varargin)
 
 p = inputParser;
 p.addParameter('cells', {}, @(x) iscell(x) || ischar(x) || isstring(x));
-p.addParameter('windowSec', 120, @(x) isnumeric(x) && isscalar(x) && x > 0);
+p.addParameter('nWindows', 10, ...
+    @(x) isnumeric(x) && isscalar(x) && x >= 1);
 p.addParameter('overlap', 0.2, ...
     @(x) isnumeric(x) && isscalar(x) && x >= 0 && x < 1);
 p.addParameter('imageWH', [1600, 900], ...
@@ -44,13 +44,14 @@ p.addParameter('overwrite', false, @islogical);
 parse(p, varargin{:});
 P = p.Results;
 
-% Normalize cells argument
 if ischar(P.cells) || isstring(P.cells)
     P.cells = cellstr(P.cells);
 end
 
+% Default output: <spontCa>/llm/ (alongside auto/ and man/).
+thisDir = fileparts(mfilename('fullpath'));
 if isempty(P.outDir)
-    P.outDir = fileparts(mfilename('fullpath'));
+    P.outDir = fullfile(fileparts(thisDir), 'llm');
 end
 P.outDir = char(P.outDir);
 imgDir = fullfile(P.outDir, 'images');
@@ -60,10 +61,8 @@ if ~exist(imgDir, 'dir'), mkdir(imgDir); end
 %% ========================================================================
 %  LOAD
 %  ========================================================================
-% Add the parent spontCa directory to path so spontCa_load / mcu_cfg
-% resolve regardless of caller cwd.
 
-spontCaDir = fileparts(P.outDir);
+spontCaDir = fileparts(thisDir);
 if exist(spontCaDir, 'dir') && ~contains(lower(path), lower(spontCaDir))
     addpath(spontCaDir);
 end
@@ -91,14 +90,17 @@ end
 
 
 %% ========================================================================
-%  WINDOW GEOMETRY
+%  WINDOW GEOMETRY (equal-width, overlapping)
 %  ========================================================================
+% Solve W*(N - (N-1)*overlap) = recDur for window width W given a fixed
+% N. Then step = W*(1-overlap); window k spans [(k-1)*step, (k-1)*step+W].
+% Last window ends exactly at recDur.
 
-W    = P.windowSec;
+N    = round(P.nWindows);
+W    = recDur / (N - (N - 1) * P.overlap);
 step = W * (1 - P.overlap);
-nW   = max(1, ceil((recDur - W) / step) + 1);
-fprintf('[llmCur_render] %d windows per cell (W=%.0fs, step=%.0fs)\n', ...
-    nW, W, step);
+fprintf('[llmCur_render] %d windows per cell (W=%.1fs, step=%.1fs, overlap=%.0f%%)\n', ...
+    N, W, step, 100 * P.overlap);
 
 
 %% ========================================================================
@@ -126,10 +128,11 @@ for iCell = 1:numel(cellsToRender)
     miTrace = tbl.trace(iM, :);
 
     nRendered = 0;
-    for iW = 1:nW
+    for iW = 1:N
         t0 = (iW - 1) * step;
-        t1 = min(recDur, t0 + W);
-        if t0 >= recDur, break; end
+        t1 = t0 + W;
+        % Numerical safety: nudge last window to land exactly on recDur.
+        if iW == N, t1 = recDur; end
 
         pngPath  = fullfile(imgDir, sprintf('%s_w%02d.png',  sName, iW));
         jsonPath = fullfile(imgDir, sprintf('%s_w%02d.json', sName, iW));
@@ -179,7 +182,7 @@ for iCell = 1:numel(cellsToRender)
         nRendered = nRendered + 1;
     end
     fprintf('[llmCur_render] %s : %d windows rendered (of %d)\n', ...
-        sName, nRendered, nW);
+        sName, nRendered, N);
 end
 
 end     % EOF

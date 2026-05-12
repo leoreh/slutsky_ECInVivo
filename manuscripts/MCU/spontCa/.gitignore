@@ -1,5 +1,12 @@
-# Local manual-curation outputs (data, not code). Re-evaluate versioning
-# when files exist.
+# Per-cell event files: regeneratable by mcu_spontCa (auto/), produced
+# by the user via spontCa_manCur (man/), or by llmCur_assemble (llm/).
+# All are local data, not code.
+auto/
+man/
+llm/
+
+# Legacy curation dir (pre-migration). Kept locally for safety; remove
+# manually once migrated outputs in man/ are verified.
 spontCa_curated/
 
 # MATLAB editor autosaves
@@ -10,7 +17,3 @@ spontCa_curated/
 _diag/cellStats.csv
 _diag/eventStats.csv
 _diag/summary.md
-
-# LLM-curation pipeline outputs: regeneratable PNGs and raw subagent JSON.
-llmCur/images/
-llmCur/raw/

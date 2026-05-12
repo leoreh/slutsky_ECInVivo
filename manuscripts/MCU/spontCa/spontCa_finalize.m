@@ -8,10 +8,11 @@ function tbl = spontCa_finalize(tbl, fs, varargin)
 % everything needed for figures and QC.
 %
 % PIPELINE STEPS (in order):
-%   1. CURATION OVERLAY. For each row, looks for
-%      <curatedDir>/<sbjID>_<compartment>.mat (written by spontCa_manCur).
-%      If present, overwrites tbl.start / .stop / .amp / .dur / .int for
-%      that row with the curated values.
+%   1. CURATION OVERLAY. For each cell, looks for <manDir>/<sbjID>.mat
+%      (written by spontCa_manCur or llmCur_assemble). The file holds a
+%      struct cur with an events table; both compartments live in the
+%      same file. If present, overwrites tbl.start/.stop/.amp/.dur/.int
+%      for both rows of that cell with the curated values.
 %   2. NORMALIZE CYTO STOPS. Cyto decay times are not biologically real
 %      at fs=3 (subsequent events contaminate them). Cyto stop is forced
 %      to start + 2 samples and dur/int are zeroed. Mito unchanged.
@@ -90,18 +91,17 @@ function tbl = spontCa_finalize(tbl, fs, varargin)
 p = inputParser;
 addRequired(p, 'tbl', @istable);
 addRequired(p, 'fs',  @(x) isnumeric(x) && isscalar(x) && x > 0);
-addParameter(p, 'curatedDir', '', @(x) ischar(x) || isstring(x));
+addParameter(p, 'manDir', '', @(x) ischar(x) || isstring(x));
 addParameter(p, 'thrLag', 3,    @(x) isnumeric(x) && isscalar(x) && x > 0);
 addParameter(p, 'mapWin', [-1, 5], @(x) isnumeric(x) && numel(x) == 2);
 addParameter(p, 'verbose', true, @islogical);
 parse(p, tbl, fs, varargin{:});
 P = p.Results;
 
-if isempty(P.curatedDir)
-    P.curatedDir = fullfile(fileparts(mfilename('fullpath')), ...
-        'spontCa_curated');
+if isempty(P.manDir)
+    P.manDir = fullfile(fileparts(mfilename('fullpath')), 'man');
 end
-P.curatedDir = char(P.curatedDir);
+P.manDir = char(P.manDir);
 
 n      = height(tbl);
 nT     = size(tbl.trace, 2);
@@ -112,25 +112,33 @@ dt     = 1 / fs;
 %% ========================================================================
 %  CURATION OVERLAY
 %  ========================================================================
+% Loads <manDir>/<sbjID>.mat (one file per cell with both compartments
+% in cur.events). For each row in tbl, splits the events table by
+% compartment and writes back into the per-row cell-array columns.
 
-nCurated = 0;
-if isfolder(P.curatedDir)
-    for iRow = 1:n
-        sid = char(tbl.sbjID(iRow));
-        cmp = char(tbl.compartment(iRow));
-        fCur = fullfile(P.curatedDir, sprintf('%s_%s.mat', sid, cmp));
-        if isfile(fCur)
-            S = load(fCur);
-            if isfield(S, 'cur')
-                cur = S.cur;
-                tbl.start{iRow} = cur.start(:);
-                tbl.stop{iRow}  = cur.stop(:);
-                tbl.amp{iRow}   = cur.amp(:);
-                tbl.dur{iRow}   = cur.dur(:);
-                tbl.int{iRow}   = cur.int(:);
-                nCurated = nCurated + 1;
-            end
+nCuratedCells = 0;
+if isfolder(P.manDir)
+    cells = unique(cellstr(string(tbl.sbjID)), 'stable');
+    for iCell = 1:numel(cells)
+        sid = cells{iCell};
+        fCur = fullfile(P.manDir, sprintf('%s.mat', sid));
+        if ~isfile(fCur), continue; end
+        S = load(fCur, 'cur');
+        if ~isfield(S, 'cur') || ~isfield(S.cur, 'events'), continue; end
+        events = S.cur.events;
+
+        iC = find(tbl.sbjID == sid & tbl.compartment == 'Cyto');
+        iM = find(tbl.sbjID == sid & tbl.compartment == 'Mito');
+        for pair = [iC(:)', iM(:)']
+            cmp = char(tbl.compartment(pair));
+            evRows = events(events.compartment == cmp, :);
+            tbl.start{pair} = evRows.start(:);
+            tbl.stop{pair}  = evRows.stop(:);
+            tbl.amp{pair}   = evRows.amp(:);
+            tbl.dur{pair}   = evRows.dur(:);
+            tbl.int{pair}   = evRows.int(:);
         end
+        nCuratedCells = nCuratedCells + 1;
     end
 end
 
@@ -271,9 +279,10 @@ end
 
 if P.verbose
     iM = tbl.compartment == 'Mito';
-    fprintf(['[spontCa_finalize] %d/%d rows used curated events | ' ...
+    fprintf(['[spontCa_finalize] %d cells overlaid from %s | ' ...
              'thrLag=%.1f s | median fracIndep = %.2f\n'], ...
-        nCurated, n, P.thrLag, median(tbl.fracIndep(iM), 'omitnan'));
+        nCuratedCells, P.manDir, P.thrLag, ...
+        median(tbl.fracIndep(iM), 'omitnan'));
 end
 
 end     % EOF
