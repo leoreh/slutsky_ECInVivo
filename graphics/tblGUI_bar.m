@@ -8,10 +8,11 @@ function hFig = tblGUI_bar(tbl, varargin)
 %       tbl         (table) The data table to visualize.
 %
 %   OPTIONAL KEY-VALUE PAIRS:
-%   OPTIONAL KEY-VALUE PAIRS:
 %       'yVar'        (string) Initial Y variable name (Numeric)
 %       'xVar'        (string) Initial X variable name (Categorical)
 %       'grpVar'      (string) Initial Group variable name (Categorical)
+%       'mode'        (string) Initial view mode: 'bar' (default) or
+%                     'points'. Toggle at runtime via the Mode button.
 %       'Parent'      (handle) Parent container.
 %
 %   See also: TBLGUI_SCATHIST, TBLGUI_XY
@@ -25,6 +26,7 @@ addRequired(p, 'tbl', @istable);
 addParameter(p, 'yVar', '', @(x) ischar(x) || isstring(x) || isempty(x));
 addParameter(p, 'xVar', '', @(x) ischar(x) || isstring(x) || isempty(x));
 addParameter(p, 'grpVar', '', @(x) ischar(x) || isstring(x) || isempty(x));
+addParameter(p, 'mode', 'bar', @(x) ischar(x) || isstring(x));
 addParameter(p, 'Parent', [], @(x) isempty(x) || isgraphics(x));
 parse(p, tbl, varargin{:});
 
@@ -33,6 +35,13 @@ yVarIn = p.Results.yVar;
 xVarIn = p.Results.xVar;
 grpVarIn = p.Results.grpVar;
 hParent = p.Results.Parent;
+
+modeIn = lower(char(string(p.Results.mode)));
+if ~ismember(modeIn, {'bar', 'points'})
+    warning('tblGUI_bar:invalidMode', ...
+        'Invalid mode ''%s''; falling back to ''bar''.', modeIn);
+    modeIn = 'bar';
+end
 
 %% ========================================================================
 %  INITIALIZATION
@@ -86,6 +95,7 @@ guiData.catVars = catVars;
 % Prepend 'None' for Group
 guiData.grpVars = [{'None'}, catVars];
 guiData.chkGrp = [];     % Checkbox handles
+guiData.tgMode = [];     % Mode toggle button handle
 
 %% ========================================================================
 %  LAYOUT
@@ -157,6 +167,20 @@ guiData.ddStatType = uicontrol('Parent', hPanelControl, 'Style', 'popupmenu', ..
     'Position', [ctlX, currY, ctlW, ctlH], ...
     'Value', 1, ...
     'Callback', @onUpdatePlot);
+currY = currY - ctlH - ctlGap*2;
+
+% Mode Toggle (Bars vs Points)
+modeIsPoints = strcmp(modeIn, 'points');
+if modeIsPoints
+    tgLabel = 'Mode: Points';
+else
+    tgLabel = 'Mode: Bars';
+end
+guiData.tgMode = uicontrol('Parent', hPanelControl, 'Style', 'togglebutton', ...
+    'String', tgLabel, 'Units', 'normalized', ...
+    'Position', [ctlX, currY, ctlW, ctlH], ...
+    'Value', double(modeIsPoints), ...
+    'Callback', @onModeToggle);
 currY = currY - ctlH - ctlGap*2;
 
 % Panel for Checkboxes
@@ -249,6 +273,7 @@ onGrpChange(hContainer, []);
         meanMat = nan(length(xCats), length(gCats));
         errLMat = nan(length(xCats), length(gCats));
         errHMat = nan(length(xCats), length(gCats));
+        valsByCell = cell(length(xCats), length(gCats));    % Raw points per cell, for scatter mode
 
         for iX = 1:length(xCats)
             for iG = 1:length(gCats)
@@ -263,6 +288,7 @@ onGrpChange(hContainer, []);
                 vals = vals(~isnan(vals));
 
                 if ~isempty(vals)
+                    valsByCell{iX, iG} = vals;
                     n = length(vals);
                     switch statType
                         case 'Arithmetic'
@@ -301,24 +327,26 @@ onGrpChange(hContainer, []);
 
         % Plotting
         ax = data.hAx;
-        cla(ax);
+        % cla() skips children with HandleVisibility='off' (used below for
+        % legend control), so use delete(allchild(...)) to force-clear all.
+        delete(allchild(ax));
         hold(ax, 'on');
 
-        b = bar(ax, meanMat, 'grouped');
+        % Per-group colors, shared by both render modes
+        clrMat = lines(length(gCats));
 
-        % Error Bars
-        % Calculation of error bar positions for grouped bars
-        ngroups = size(meanMat, 1);
-        nbars = size(meanMat, 2);
-
-        % Calculate the center of each bar
+        % Common grouped-bar geometry (also used to place jittered points)
+        nbars = length(gCats);
         groupwidth = min(0.8, nbars/(nbars + 1.5));
 
-        for i = 1:nbars
-            % Based on bar documentation logic for centers
-            x = (1:ngroups) - groupwidth/2 + (2*i-1) * groupwidth / (2*nbars);
-
-            errorbar(ax, x, meanMat(:,i), errLMat(:,i), errHMat(:,i), 'k', 'linestyle', 'none');
+        % Dispatch to the active render mode
+        useScatter = (get(data.tgMode, 'Value') == 1);
+        if useScatter
+            [hLegend, legendCats] = renderScatter(ax, valsByCell, meanMat, ...
+                errLMat, errHMat, clrMat, groupwidth, gCats);
+        else
+            hLegend = renderBars(ax, meanMat, errLMat, errHMat, clrMat, groupwidth);
+            legendCats = gCats;
         end
 
         hold(ax, 'off');
@@ -329,13 +357,102 @@ onGrpChange(hContainer, []);
         xlabel(ax, xName, 'Interpreter', 'none');
 
         if hasGrp
-            legend(ax, gCats, 'Location', 'best', 'Interpreter', 'none');
+            if ~isempty(hLegend)
+                legend(ax, hLegend, legendCats, 'Location', 'best', 'Interpreter', 'none');
+            else
+                legend(ax, 'off');
+            end
             title(ax, sprintf('%s by %s (grouped by %s)', yName, xName, grpName), 'Interpreter', 'none');
         else
+            legend(ax, 'off');
             title(ax, sprintf('%s by %s', yName, xName), 'Interpreter', 'none');
         end
 
         grid(ax, 'on');
+    end
+
+    function hBars = renderBars(ax, meanMat, errLMat, errHMat, clrMat, groupwidth)
+        % Grouped bars with overlaid error bars.
+        % Returns the bar handles for legend assembly.
+
+        hBars = bar(ax, meanMat, 'grouped');
+        nbars = size(meanMat, 2);
+        ngroups = size(meanMat, 1);
+
+        for iG = 1:nbars
+            hBars(iG).FaceColor = clrMat(iG, :);
+
+            % Center of each bar in this group (matches bar's internal layout)
+            xCent = (1:ngroups) - groupwidth/2 + (2*iG-1) * groupwidth / (2*nbars);
+            errorbar(ax, xCent, meanMat(:,iG), errLMat(:,iG), errHMat(:,iG), ...
+                'k', 'LineStyle', 'none', 'HandleVisibility', 'off');
+        end
+    end
+
+    function [hLegend, legendCats] = renderScatter(ax, valsByCell, meanMat, ...
+            errLMat, errHMat, clrMat, groupwidth, gCats)
+        % Jittered individual points per (xCat, gCat), with the central
+        % tendency and error bars from the active Statistic overlaid as a
+        % filled diamond. One legend handle per non-empty group.
+
+        [nX, nG] = size(valsByCell);
+        nbars = nG;
+        barW = groupwidth / nbars;
+        jitterHalf = 0.35 * barW;
+
+        hLegend = gobjects(0);
+        legendCats = {};
+
+        for iG = 1:nG
+            grpClr = clrMat(iG, :);
+            grpHasData = false;
+            grpLegendHandle = gobjects(1);
+
+            for iX = 1:nX
+                vals = valsByCell{iX, iG};
+                if isempty(vals), continue; end
+
+                % Bar-center x-position (same formula as renderBars)
+                xCent = iX - groupwidth/2 + (2*iG-1) * groupwidth / (2*nbars);
+
+                % Uniform jitter in [-jitterHalf, +jitterHalf]
+                nv = numel(vals);
+                jit = (rand(nv, 1) - 0.5) * 2 * jitterHalf;
+                xJit = xCent + jit;
+
+                % First non-empty cell per group contributes the legend handle;
+                % the rest are hidden from the legend.
+                if grpHasData
+                    visFlag = 'off';
+                else
+                    visFlag = 'on';
+                end
+
+                hS = scatter(ax, xJit, vals, 20, grpClr, 'filled', ...
+                    'MarkerFaceAlpha', 0.35, 'MarkerEdgeColor', 'none', ...
+                    'HandleVisibility', visFlag);
+
+                if ~grpHasData
+                    grpLegendHandle = hS;
+                    grpHasData = true;
+                end
+
+                % Summary marker (central tendency)
+                if ~isnan(meanMat(iX, iG))
+                    plot(ax, xCent, meanMat(iX, iG), 'kd', ...
+                        'MarkerFaceColor', grpClr, 'MarkerSize', 8, ...
+                        'HandleVisibility', 'off');
+                    errorbar(ax, xCent, meanMat(iX, iG), ...
+                        errLMat(iX, iG), errHMat(iX, iG), 'k', ...
+                        'LineStyle', 'none', 'HandleVisibility', 'off');
+                end
+            end
+
+            if grpHasData
+                hLegend(end+1) = grpLegendHandle; %#ok<AGROW>
+                legendCats{end+1} = gCats{iG};   %#ok<AGROW>
+            end
+        end
     end
 
     function onGrpChange(src, ~)
@@ -345,6 +462,15 @@ onGrpChange(hContainer, []);
     end
 
     function onFilterChange(~, ~)
+        onUpdatePlot(hContainer, []);
+    end
+
+    function onModeToggle(src, ~)
+        if get(src, 'Value') == 1
+            set(src, 'String', 'Mode: Points');
+        else
+            set(src, 'String', 'Mode: Bars');
+        end
         onUpdatePlot(hContainer, []);
     end
 
