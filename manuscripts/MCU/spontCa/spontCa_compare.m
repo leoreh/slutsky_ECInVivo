@@ -43,6 +43,8 @@ if isempty(P.goldPath)
 end
 if isempty(P.testPath)
     P.testPath = fullfile(thisDir, 'llm', [sbjID '.mat']);
+else
+    P.testPath = fullfile(P.testPath, [sbjID '.mat']);
 end
 
 [goldCyto, goldMito] = loadStartsByCompartment(P.goldPath);
