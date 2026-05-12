@@ -2,16 +2,17 @@
 %
 % PURPOSE
 %   Read NF's SpontCa.xlsx into a long-format unit-level table, run
-%   detection independently per compartment, couple each mito event to a
-%   preceding cyto event post-hoc, reproduce Fig 1E,F + S1B-E, and stage
-%   the transfer-function preview.
+%   detection per row directly, optionally curate events via the manCur
+%   GUI, then finalize (curation overlay + aggregates + ETA maps +
+%   coupling). Reproduces Fig 1E,F + S1B-E and the transfer-function
+%   preview.
 %
 % PIPELINE FILES (manuscripts/MCU/spontCa)
 %   spontCa_load     Excel -> long-format table; returns fs separately
 %   spontCa_detect   single-trace event detection (dF/F input)
-%   spontCa_events   per-row independent detection + ETA maps
-%   spontCa_couple   mito-to-preceding-cyto coupling (cytoIndependent flag)
-%   spontCa_gui      per-cell QC viewer
+%   spontCa_manCur   interactive per-cell event-curation GUI
+%   spontCa_finalize curation overlay + per-row aggregates + ETA + coupling
+%   spontCa_gui      per-cell QC viewer (post-curation)
 %
 % See also: MCU_TBLMEA, MEA_WRAPPER, TBLGUI_BAR, LME_ANALYSE
 
@@ -24,34 +25,57 @@
 
 
 %% ========================================================================
-%  DETECT (per-compartment params, tune independently)
+%  DETECT (per-compartment params, tune here)
 %  ========================================================================
-% Per-compartment detection: spontCa_detect operates on a single trace, so
-% to debug a specific compartment pull a single row out of tbl and call it
-% directly. Mito starts identical to cyto so the diff is visible from a
-% single set of changes.
-
+% Detection runs inline per row so spontCa_detect is called directly with
+% no wrapper hiding it; in the debugger the row's trace and chosen params
+% are visible in scope. Outputs per-row event columns (start/stop/amp/
+% dur/int) used as a pre-fill for spontCa_manCur and aggregated by
+% spontCa_finalize.
+%
 % Detection is derivative-based with a local-baseline amplitude gate.
-% Each event is a positive derivative crossing whose peak rises above the
-% rolling 20th-percentile baseline by at least minAmp.
+% Each event is a positive derivative crossing whose peak rises above
+% the rolling 20th-percentile baseline by at least minAmp.
 %   minAmp  - peak amplitude ABOVE LOCAL BASELINE (dF/F).
 %   minIEI  - peak-to-peak distance for greedy max-suppression (s).
 %   kNoise  - rise-threshold multiplier on per-cell derivative noise.
 %   minDur  - minimum decay length, stop - peak (s).
-% Local baseline (30 s window) and integrals are computed inside the
-% detector so plateau pedestals do not inflate amplitudes or integrals.
 paramsCyto = {'minAmp', 0.05, 'minIEI', 1.0, 'kNoise', 3.5, 'minDur', 0.4};
 paramsMito = {'minAmp', 0.03, 'minIEI', 1.0, 'kNoise', 3.5, 'minDur', 0.4};
 
-tbl = spontCa_events(tbl, fs, ...
-    'paramsCyto', paramsCyto, 'paramsMito', paramsMito);
+n = height(tbl);
+tbl.start = cell(n, 1);  tbl.stop = cell(n, 1);
+tbl.amp   = cell(n, 1);  tbl.dur  = cell(n, 1);  tbl.int = cell(n, 1);
+for iRow = 1:n
+    sig = tbl.trace(iRow, :);
+    if all(isnan(sig)); continue; end
+    if tbl.compartment(iRow) == 'Cyto'
+        ev = spontCa_detect(sig, fs, paramsCyto{:});
+    else
+        ev = spontCa_detect(sig, fs, paramsMito{:});
+    end
+    tbl.start{iRow} = ev.start;  tbl.stop{iRow} = ev.stop;
+    tbl.amp{iRow}   = ev.amp;    tbl.dur{iRow}  = ev.dur;
+    tbl.int{iRow}   = ev.int;
+end
 
 
 %% ========================================================================
-%  COUPLE (mito -> preceding cyto)
+%  MANUAL CURATION (interactive)
+%  ========================================================================
+% Per-cell event-editing GUI. Opens with auto-detected events shown;
+% writes spontCa_curated/<sbjID>_<compartment>.mat per cell. Skip if not
+% curating in this session - spontCa_finalize will simply find no
+% curated files and use the auto-detected events as-is.
+
+spontCa_manCur(tbl, fs);
+
+
+%% ========================================================================
+%  FINALIZE (overlay curation + aggregates + ETA + coupling)
 %  ========================================================================
 
-tbl = spontCa_couple(tbl, 'thrLag', 3);
+tbl = spontCa_finalize(tbl, fs, 'thrLag', 3);
 
 
 %% ========================================================================
@@ -99,10 +123,8 @@ end
 %% ========================================================================
 %  VALIDATION : fraction of cyto-independent mito events
 %  ========================================================================
-% Independent detection lets mito events stand on their own. Per cell,
-% spontCa_couple flags each mito event as cytoIndependent if no cyto event
-% precedes it within thrLag. fracIndep is the per-cell fraction; comparing
-% it across genotypes tests the "mito is predominantly cyto-driven" model.
+% Per-cell fracIndep across genotypes tests the "mito is predominantly
+% cyto-driven" model.
 
 subM = tbl(tbl.compartment == 'Mito', ...
     {'genotype', 'sbjID', 'fracIndep'});

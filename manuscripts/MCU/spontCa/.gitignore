@@ -1,0 +1,12 @@
+# Local manual-curation outputs (data, not code). Re-evaluate versioning
+# when files exist.
+spontCa_curated/
+
+# MATLAB editor autosaves
+*.asv
+
+# Diagnostic outputs from _diag/run_characterize.m (CSV + .md report).
+# Re-run locally; not source code.
+_diag/cellStats.csv
+_diag/eventStats.csv
+_diag/summary.md
