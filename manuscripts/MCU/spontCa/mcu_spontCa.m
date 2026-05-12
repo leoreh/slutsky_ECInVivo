@@ -1,18 +1,19 @@
 %% mcu_spontCa.m  Spontaneous Ca2+ imaging pipeline (cyto + mito).
 %
 % PURPOSE
-%   Read NF's SpontCa.xlsx into a long-format unit-level table, run
-%   detection per row directly, optionally curate events via the manCur
-%   GUI, then finalize (curation overlay + aggregates + ETA maps +
-%   coupling). Reproduces Fig 1E,F + S1B-E and the transfer-function
-%   preview.
+%   Read NF's SpontCa.xlsx into a long-format cell table and a long-format
+%   events table, optionally curate via manCur, finalize (aggregates +
+%   ETA maps + coupling). Reproduces Fig 1E,F + S1B-E and the
+%   transfer-function preview.
 %
 % PIPELINE FILES (manuscripts/MCU/spontCa)
-%   spontCa_load     Excel -> long-format table; returns fs separately
-%   spontCa_detect   single-trace event detection (dF/F input)
-%   spontCa_manCur   interactive per-cell event-curation GUI
-%   spontCa_finalize curation overlay + per-row aggregates + ETA + coupling
-%   spontCa_gui      per-cell QC viewer (post-curation)
+%   spontCa_load        Excel -> tblCell (traces + cell metadata)
+%   spontCa_detect      single-trace event detection, returns a table
+%   spontCa_writeEvents tblEvent -> per-cell <sbjID>.mat files
+%   spontCa_readEvents  per-cell <sbjID>.mat files -> tblEvent
+%   spontCa_manCur      interactive per-cell event-curation GUI
+%   spontCa_finalize    aggregates on tblCell + coupling on tblEvent
+%   spontCa_gui         per-cell QC viewer (post-finalize)
 %
 % See also: MCU_TBLMEA, MEA_WRAPPER, TBLGUI_BAR, LME_ANALYSE
 
@@ -21,53 +22,79 @@
 %  LOAD
 %  ========================================================================
 
-[tbl, fs] = spontCa_load();
+[tblCell, fs] = spontCa_load();
 
 
 %% ========================================================================
-%  DETECT (per-compartment params, tune here)
+%  DETECT
 %  ========================================================================
-% Detection runs inline per row so spontCa_detect is called directly with
-% no wrapper hiding it; in the debugger the row's trace and chosen params
-% are visible in scope. Outputs per-row event columns (start/stop/amp/
-% dur/int) used as a pre-fill for spontCa_manCur and aggregated by
-% spontCa_finalize.
+% Per-row detection. Each call to spontCa_detect returns a table with
+% rows = events; sbjID + compartment tags are added before vertcat into
+% tblEvent. Result is written to <spontCa>/auto/<sbjID>.mat (one bare
+% events table per cell) for the manCur Load button to pick up.
 %
-% Detection is derivative-based with a local-baseline amplitude gate.
-% Each event is a positive derivative crossing whose peak rises above
-% the rolling 20th-percentile baseline by at least minAmp.
-%   minAmp  - peak amplitude ABOVE LOCAL BASELINE (dF/F).
-%   minIEI  - peak-to-peak distance for greedy max-suppression (s).
-%   kNoise  - rise-threshold multiplier on per-cell derivative noise.
-%   minDur  - minimum decay length, stop - peak (s).
+% Derivative-based detection with a local-baseline amplitude gate:
+%   minAmp - peak amplitude above local baseline (dF/F)
+%   minIEI - peak-to-peak distance for greedy max-suppression (s)
+%   kNoise - rise-threshold multiplier on per-cell derivative noise
+%   minDur - minimum decay length, stop - peak (s)
+
 paramsCyto = {'minAmp', 0.05, 'minIEI', 1.0, 'kNoise', 3.5, 'minDur', 0.4};
 paramsMito = {'minAmp', 0.03, 'minIEI', 1.0, 'kNoise', 3.5, 'minDur', 0.4};
 
-tbl = spontCa_detectAll(tbl, fs, ...
-    'paramsCyto', paramsCyto, 'paramsMito', paramsMito);
+n = height(tblCell);
+chunks = cell(n, 1);
+for iRow = 1:n
+    if tblCell.compartment(iRow) == 'Cyto'
+        rowEv = spontCa_detect(tblCell.trace(iRow, :), fs, paramsCyto{:});
+    else
+        rowEv = spontCa_detect(tblCell.trace(iRow, :), fs, paramsMito{:});
+    end
+    if height(rowEv) > 0
+        rowEv.sbjID       = repmat(tblCell.sbjID(iRow),       height(rowEv), 1);
+        rowEv.compartment = repmat(tblCell.compartment(iRow), height(rowEv), 1);
+        chunks{iRow} = rowEv;
+    end
+end
+tblEvent = vertcat(chunks{~cellfun(@isempty, chunks)});
+tblEvent = tblEvent(:, ['sbjID', 'compartment', setdiff(...
+    tblEvent.Properties.VariableNames, {'sbjID','compartment'}, 'stable')]);
+
+autoDir = fullfile(fileparts(which('spontCa_detect')), 'auto');
+spontCa_writeEvents(tblEvent, autoDir, 'backup', false);
 
 
 %% ========================================================================
 %  MANUAL CURATION (interactive)
 %  ========================================================================
-% Per-cell event-editing GUI. Opens with the most recent saved version
-% for each cell (man/ if present, else auto/). Saves to spontCa/man/.
+% Opens manCur on the in-memory tblEvent. Save writes per-cell bare
+% events tables to man/<sbjID>.mat. After closing, re-read whatever's
+% on disk in man/ (if any) and merge with the auto-detection rows for
+% cells the user didn't curate.
 
-spontCa_manCur(tbl, fs);
+spontCa_manCur(tblCell, tblEvent, fs);
+
+manDir = fullfile(fileparts(which('spontCa_detect')), 'man');
+tblEvent_man = spontCa_readEvents(manDir);
+if height(tblEvent_man) > 0
+    curatedCells = unique(tblEvent_man.sbjID);
+    tblEvent = tblEvent(~ismember(tblEvent.sbjID, curatedCells), :);
+    tblEvent = [tblEvent; tblEvent_man];
+end
 
 
 %% ========================================================================
-%  FINALIZE (overlay curation + aggregates + ETA + coupling)
+%  FINALIZE (aggregates + ETA + coupling)
 %  ========================================================================
 
-tbl = spontCa_finalize(tbl, fs, 'thrLag', 3);
+[tblCell, tblEvent] = spontCa_finalize(tblCell, tblEvent, fs, 'thrLag', 3);
 
 
 %% ========================================================================
 %  QC (per-cell viewer)
 %  ========================================================================
 
-spontCa_gui(tbl, fs);
+spontCa_gui(tblCell, tblEvent, fs);
 
 
 %% ========================================================================
@@ -75,18 +102,15 @@ spontCa_gui(tbl, fs);
 %  ========================================================================
 % Per-compartment LME + bar plot over genotype. With one observation per
 % sbjID the random intercept is degenerate and the LME reduces to LM.
-% meanAmp is computed inline.
 
 metrics  = {'rate', 'meanAmp', 'flux', 'fluxInt'};
 statsAll = struct();
 
 for c = {'Cyto', 'Mito'}
     cmp = c{1};
-    sub = tbl(tbl.compartment == cmp, ...
+    sub = tblCell(tblCell.compartment == cmp, ...
         {'genotype', 'sbjID', 'unitID', 'nEvents', 'rate', ...
-         'amp', 'flux', 'fluxInt'});
-    sub.meanAmp = cellfun(@(a) mean(a(~isnan(a))), sub.amp);
-    sub.amp     = [];
+         'meanAmp', 'flux', 'fluxInt'});
 
     for m = metrics
         varRsp = m{1};
@@ -108,10 +132,8 @@ end
 %% ========================================================================
 %  VALIDATION : fraction of cyto-independent mito events
 %  ========================================================================
-% Per-cell fracIndep across genotypes tests the "mito is predominantly
-% cyto-driven" model.
 
-subM = tbl(tbl.compartment == 'Mito', ...
+subM = tblCell(tblCell.compartment == 'Mito', ...
     {'genotype', 'sbjID', 'fracIndep'});
 tblGUI_bar(subM, 'yVar', 'fracIndep', 'xVar', 'genotype');
 
@@ -120,16 +142,15 @@ tblGUI_bar(subM, 'yVar', 'fracIndep', 'xVar', 'genotype');
 %  PREVIEW : transfer function T = flux_mito / flux_cyto per cell
 %  ========================================================================
 % Pivot to wide on (sbjID, compartment) so the ratio is one row per cell.
-% See Atoms/MCU/MCU compensation model.md.
 
-iC = find(tbl.compartment == 'Cyto');
-iM = find(tbl.compartment == 'Mito');
-assert(isequal(tbl.sbjID(iC), tbl.sbjID(iM)), ...
+iC = find(tblCell.compartment == 'Cyto');
+iM = find(tblCell.compartment == 'Mito');
+assert(isequal(tblCell.sbjID(iC), tblCell.sbjID(iM)), ...
     'Cyto/Mito rows must be aligned per cell');
 
-wide = table(tbl.sbjID(iC),     tbl.genotype(iC), ...
-             tbl.flux(iC),      tbl.flux(iM), ...
-             tbl.fluxInt(iC),   tbl.fluxInt(iM), ...
+wide = table(tblCell.sbjID(iC),     tblCell.genotype(iC), ...
+             tblCell.flux(iC),      tblCell.flux(iM), ...
+             tblCell.fluxInt(iC),   tblCell.fluxInt(iM), ...
     'VariableNames', {'sbjID', 'genotype', ...
                       'flux_cyto', 'flux_mito', ...
                       'fluxInt_cyto', 'fluxInt_mito'});

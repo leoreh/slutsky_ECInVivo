@@ -60,8 +60,15 @@ end
 
 
 function [sCyto, sMito] = loadStartsByCompartment(fpath)
-S = load(fpath, 'cur');
-events = S.cur.events;
+S = load(fpath);
+if isfield(S, 'events')
+    events = S.events;
+elseif isfield(S, 'cur') && isfield(S.cur, 'events')
+    events = S.cur.events;  % legacy v4 wrapping
+else
+    error('spontCa_compare:badFile', ...
+        'File missing events variable: %s', fpath);
+end
 sCyto = events.start(events.compartment == 'Cyto');
 sMito = events.start(events.compartment == 'Mito');
 end

@@ -1,12 +1,13 @@
-function hFig = spontCa_manCur(tbl, fs, varargin)
+function hFig = spontCa_manCur(tblCell, tblEvent, fs, varargin)
 % SPONTCA_MANCUR Per-cell manual curation GUI for SpontCa events.
 %
-%   hFig = SPONTCA_MANCUR(TBL, FS, ...) opens an interactive editor for the
-%   per-cell event lists in the long-format table TBL (output of
-%   SPONTCA_LOAD + the detection loop). The autodetector saturates against
-%   plateau noise at fs=3 Hz; this GUI produces a human-curated gold
-%   standard by allowing direct drag-edit / add / delete of events on top
-%   of the autodetector pre-fill.
+%   hFig = SPONTCA_MANCUR(tblCell, tblEvent, FS, ...) opens an interactive
+%   editor for per-cell event lists. tblCell carries the traces and cell
+%   metadata; tblEvent carries the events (one row per event, with sbjID
+%   and compartment tags). The autodetector saturates against plateau
+%   noise at fs=3 Hz; this GUI produces a human-curated gold standard
+%   by allowing direct drag-edit / add / delete of events on top of the
+%   autodetector pre-fill.
 %
 %   LAYOUT (2x2 + side panel):
 %       cyto FULL trace            | cyto ZOOM
@@ -33,13 +34,16 @@ function hFig = spontCa_manCur(tbl, fs, varargin)
 %       overrides the auto-detection pre-fill in TBL. Switching cells or
 %       hitting Save persists; switching with unsaved changes auto-saves.
 %       Both compartments are written on each save. "Reset to auto"
-%       restores tbl.start/stop/... for the current cell and re-saves.
+%       opens a file picker (defaults to man/<cell>.mat) to load any
+%       bare events-table file (auto/, man/, llm/) into the current cell.
 %
 %   INPUTS:
-%       tbl - long-format table; two rows per sbjID (Cyto and Mito).
-%             Required cols: sbjID, compartment, trace (matrix), start,
-%             stop, amp, dur, int (cells of doubles).
-%       fs  - sampling rate (Hz).
+%       tblCell  - long-format cell table; two rows per sbjID (Cyto and
+%                  Mito). Required cols: sbjID, compartment, trace.
+%       tblEvent - long-format events table. Required cols: sbjID,
+%                  compartment, start, stop, amp, dur, int. Used as the
+%                  initial state of the GUI.
+%       fs       - sampling rate (Hz).
 %
 %   OPTIONAL (Name-Value):
 %       'sbjID' - (char) initial cell to display.
@@ -51,10 +55,11 @@ function hFig = spontCa_manCur(tbl, fs, varargin)
 %  ========================================================================
 
 p = inputParser;
-addRequired(p, 'tbl', @istable);
-addRequired(p, 'fs',  @(x) isnumeric(x) && isscalar(x) && x > 0);
+addRequired(p, 'tblCell',  @istable);
+addRequired(p, 'tblEvent', @istable);
+addRequired(p, 'fs',       @(x) isnumeric(x) && isscalar(x) && x > 0);
 addParameter(p, 'sbjID', '', @(x) ischar(x) || isstring(x) || isempty(x));
-parse(p, tbl, fs, varargin{:});
+parse(p, tblCell, tblEvent, fs, varargin{:});
 initSbj = char(p.Results.sbjID);
 
 cfg     = mcu_cfg;
@@ -64,7 +69,7 @@ clrMito = clrCmp(2, :);
 clrRect = [0.15, 0.45, 0.85];
 alphaLine = 0.65;
 
-nT = size(tbl.trace, 2);
+nT = size(tblCell.trace, 2);
 t  = (0:nT-1) / fs;
 dt = 1 / fs;
 
@@ -131,7 +136,7 @@ uicontrol('Parent', hSide, 'Style', 'text', 'String', 'Cell:', ...
     'Units', 'normalized', 'Position', [0.05, 0.94, 0.9, 0.04], ...
     'HorizontalAlignment', 'left', 'FontWeight', 'bold');
 
-cellList = cellstr(string(tbl.sbjID(tbl.compartment == 'Cyto')));
+cellList = cellstr(string(tblCell.sbjID(tblCell.compartment == 'Cyto')));
 cellList = sort(cellList);
 
 ddCell = uicontrol('Parent', hSide, 'Style', 'popupmenu', ...
@@ -232,20 +237,19 @@ onCellChange();
             S = hFig.UserData;
         end
 
-        iC = find(tbl.sbjID == sName & tbl.compartment == 'Cyto');
-        iM = find(tbl.sbjID == sName & tbl.compartment == 'Mito');
+        iC = find(tblCell.sbjID == sName & tblCell.compartment == 'Cyto');
+        iM = find(tblCell.sbjID == sName & tblCell.compartment == 'Mito');
         if isempty(iC) || isempty(iM), return; end
 
         S.currentCell = char(sName);
-        S.traces.Cyto = tbl.trace(iC, :);
-        S.traces.Mito = tbl.trace(iM, :);
+        S.traces.Cyto = tblCell.trace(iC, :);
+        S.traces.Mito = tblCell.trace(iM, :);
         S.bsl.Cyto = rollingPercentileLocal(S.traces.Cyto, ...
             round(detCfg.bslWin * fs), detCfg.quantBsl);
         S.bsl.Mito = rollingPercentileLocal(S.traces.Mito, ...
             round(detCfg.bslWin * fs), detCfg.quantBsl);
 
-        [S.events.Cyto, S.events.Mito] = loadEventsForCell( ...
-            S.currentCell, iC, iM);
+        [S.events.Cyto, S.events.Mito] = loadEventsForCell(S.currentCell);
 
         evA = S.events.(S.activeCmp);
         if ~isempty(evA.start)
@@ -261,35 +265,20 @@ onCellChange();
     end
 
 
-    function [evCyto, evMito] = loadEventsForCell(sName, iC, iM)
-        % Source precedence: man/<sName>.mat -> auto/<sName>.mat ->
-        % in-memory tbl. Reads the new events-table format.
-        manPath  = fullfile(manDir,  [sName '.mat']);
-        autoPath = fullfile(autoDir, [sName '.mat']);
-        if exist(manPath, 'file')
-            evCell = eventsFromFile(manPath);
-        elseif exist(autoPath, 'file')
-            evCell = eventsFromFile(autoPath);
-        else
-            evCell = struct( ...
-                'Cyto', struct( ...
-                    'start', tbl.start{iC}(:), 'stop', tbl.stop{iC}(:), ...
-                    'amp',   tbl.amp{iC}(:),   'dur',  tbl.dur{iC}(:), ...
-                    'int',   tbl.int{iC}(:)), ...
-                'Mito', struct( ...
-                    'start', tbl.start{iM}(:), 'stop', tbl.stop{iM}(:), ...
-                    'amp',   tbl.amp{iM}(:),   'dur',  tbl.dur{iM}(:), ...
-                    'int',   tbl.int{iM}(:)));
-        end
-        evCyto = sortEv(evCell.Cyto);
-        evMito = sortEv(evCell.Mito);
+    function [evCyto, evMito] = loadEventsForCell(sName)
+        % Pull current cell's events from the in-memory tblEvent (which
+        % the caller refreshes from disk if needed). Split into Cyto /
+        % Mito sub-structs for the GUI's editing state.
+        mask = tblEvent.sbjID == sName;
+        sub  = tblEvent(mask, :);
+        evCyto = sortEv(tableToEvStruct(sub, 'Cyto'));
+        evMito = sortEv(tableToEvStruct(sub, 'Mito'));
     end
 
 
     function saveCurrent(verbose)
-        % Persist current cell to man/<sName>.mat. Both compartments
-        % live in a single events table. Existing file is backed up
-        % first to man/bkup/<sName>_<stamp>.mat.
+        % Persist current cell to man/<sName>.mat as a bare events
+        % table. Existing file is backed up first to man/bkup/.
         S = hFig.UserData;
         if isempty(S.currentCell), return; end
         bkupDir = fullfile(manDir, 'bkup');
@@ -300,15 +289,9 @@ onCellChange();
             copyfile(fpath, fullfile(bkupDir, ...
                 sprintf('%s_%s.mat', S.currentCell, stamp)));
         end
-        events = [spontCa_ev2tbl(S.events.Cyto, 'Cyto'); ...
-                  spontCa_ev2tbl(S.events.Mito, 'Mito')];
-        cur = struct( ...
-            'sbjID',   S.currentCell, ...
-            'fs',      fs, ...
-            'savedAt', datestr(now, 'yyyy-mm-dd HH:MM:SS'), ... %#ok<TNOW1,DATST>
-            'source',  'man', ...
-            'events',  events);
-        save(fpath, 'cur');
+        events = [evStructToTable(S.events.Cyto, 'Cyto'); ...
+                  evStructToTable(S.events.Mito, 'Mito')]; %#ok<NASGU>
+        save(fpath, 'events');
         S.dirty = false;
         hFig.UserData = S;
         setDirty(false);
@@ -320,8 +303,8 @@ onCellChange();
 
     function onLoad(~, ~)
         % Open a file picker defaulting to man/, accept any .mat in
-        % the events-table format (auto/, man/, llm/). Loads into the
-        % current cell's state and marks dirty so a Save persists.
+        % the bare events-table format (auto/, man/, llm/). Loads into
+        % the current cell's state and marks dirty so a Save persists.
         S = hFig.UserData;
         if isempty(S.currentCell), return; end
         [fname, fpath] = uigetfile('*.mat', ...
@@ -330,14 +313,14 @@ onCellChange();
         if isequal(fname, 0), return; end
         fullPath = fullfile(fpath, fname);
         try
-            evCell = eventsFromFile(fullPath);
+            events = eventsFromFile(fullPath);
         catch ME
             warndlg(sprintf('Failed to parse %s:\n%s', fname, ME.message), ...
                 'Load failed');
             return;
         end
-        S.events.Cyto = sortEv(evCell.Cyto);
-        S.events.Mito = sortEv(evCell.Mito);
+        S.events.Cyto = sortEv(tableToEvStruct(events, 'Cyto'));
+        S.events.Mito = sortEv(tableToEvStruct(events, 'Mito'));
         S.dirty = true;
         hFig.UserData = S;
         setDirty(true);
@@ -346,18 +329,51 @@ onCellChange();
     end
 
 
-    function evCell = eventsFromFile(fpath)
-        % Parse a .mat in the new events-table format. Returns struct
-        % with .Cyto and .Mito sub-structs (vector fields).
-        L = load(fpath, 'cur');
-        if ~isfield(L, 'cur') || ~isfield(L.cur, 'events')
+    function events = eventsFromFile(fpath)
+        % Read a bare events-table .mat file. Falls back to legacy
+        % struct-wrapped format (cur.events) for backwards compat.
+        L = load(fpath);
+        if isfield(L, 'events')
+            events = L.events;
+        elseif isfield(L, 'cur') && isfield(L.cur, 'events')
+            events = L.cur.events;
+        else
             error('spontCa_manCur:badFile', ...
-                'File missing cur.events: %s', fpath);
+                'File missing ''events'' variable: %s', fpath);
         end
-        ev = L.cur.events;
-        evCell.Cyto = spontCa_tbl2ev(ev, 'Cyto');
-        evMito = spontCa_tbl2ev(ev, 'Mito');
-        evCell.Mito = evMito;
+    end
+
+
+    function ev = tableToEvStruct(eventsTbl, compartment)
+        if isempty(eventsTbl)
+            sub = eventsTbl;
+        else
+            sub = eventsTbl(eventsTbl.compartment == compartment, :);
+        end
+        ev = struct( ...
+            'start', sub.start(:), 'stop', sub.stop(:), ...
+            'amp',   sub.amp(:),   'dur',  sub.dur(:), ...
+            'int',   sub.int(:));
+    end
+
+
+    function tbl = evStructToTable(ev, compartment)
+        n = numel(ev.start);
+        cmp = repmat(categorical({compartment}, {'Cyto', 'Mito'}), n, 1);
+        if n == 0
+            tbl = table( ...
+                categorical(strings(0,1), {'Cyto','Mito'}), ...
+                zeros(0,1), zeros(0,1), zeros(0,1), ...
+                zeros(0,1), zeros(0,1), ...
+                'VariableNames', ...
+                {'compartment','start','stop','amp','dur','int'});
+            return;
+        end
+        tbl = table( ...
+            cmp, ev.start(:), ev.stop(:), ev.amp(:), ...
+            ev.dur(:), ev.int(:), ...
+            'VariableNames', ...
+            {'compartment','start','stop','amp','dur','int'});
     end
 
 

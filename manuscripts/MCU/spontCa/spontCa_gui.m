@@ -1,8 +1,10 @@
-function hFig = spontCa_gui(tbl, fs, varargin)
+function hFig = spontCa_gui(tblCell, tblEvent, fs, varargin)
 % SPONTCA_GUI Interactive per-cell QC for the SpontCa pipeline.
 %
-%   hFig = SPONTCA_GUI(TBL, FS, ...) opens a single-cell viewer for the
-%   long-format table returned by SPONTCA_EVENTS + SPONTCA_COUPLE.
+%   hFig = SPONTCA_GUI(tblCell, tblEvent, FS, ...) opens a single-cell
+%   viewer. tblCell carries traces + per-cell aggregates (output of
+%   SPONTCA_FINALIZE); tblEvent carries per-event rows (also augmented
+%   by SPONTCA_FINALIZE with cytoEvIdx/lag/cytoIndependent).
 %
 %   LAYOUT (top to bottom):
 %       cyto trace + cyto start/stop markers
@@ -15,26 +17,28 @@ function hFig = spontCa_gui(tbl, fs, varargin)
 %   visually distinct without changing color.
 %
 %   INPUTS:
-%       tbl - output of SPONTCA_EVENTS + SPONTCA_COUPLE, including the
-%             per-row 'mapCyto' / 'mapMito' columns and the per-row
-%             'cytoIndependent' / 'lag' columns on mito rows.
-%       fs  - sampling rate (Hz).
+%       tblCell  - per-cell-compartment table after spontCa_finalize.
+%                  Must have trace, mapCyto, mapMito columns.
+%       tblEvent - per-event table after spontCa_finalize. Must include
+%                  sbjID, compartment, start, stop, dur, lag,
+%                  cytoIndependent.
+%       fs       - sampling rate (Hz).
 %
 %   OPTIONAL (Name-Value):
 %       'sbjID' - (char) initial cell to display.
 %
-%   See also: SPONTCA_LOAD, SPONTCA_EVENTS, SPONTCA_COUPLE, SPONTCA_DETECT,
-%             PLOT_HIST
+%   See also: SPONTCA_LOAD, SPONTCA_FINALIZE, SPONTCA_DETECT, PLOT_HIST
 
 %% ========================================================================
 %  ARGUMENTS
 %  ========================================================================
 
 p = inputParser;
-addRequired(p, 'tbl', @istable);
-addRequired(p, 'fs',  @(x) isnumeric(x) && isscalar(x) && x > 0);
+addRequired(p, 'tblCell',  @istable);
+addRequired(p, 'tblEvent', @istable);
+addRequired(p, 'fs',       @(x) isnumeric(x) && isscalar(x) && x > 0);
 addParameter(p, 'sbjID', '', @(x) ischar(x) || isstring(x) || isempty(x));
-parse(p, tbl, fs, varargin{:});
+parse(p, tblCell, tblEvent, fs, varargin{:});
 initSbj = char(p.Results.sbjID);
 
 cfg     = mcu_cfg;
@@ -45,11 +49,11 @@ clrLag  = [0.40, 0.40, 0.40];
 alphaCoup  = 0.55;  % cyto-coupled mito events
 alphaIndep = 0.25;  % cyto-independent mito events
 
-nT = size(tbl.trace, 2);
+nT = size(tblCell.trace, 2);
 t  = (0:nT-1) / fs;
 
-if isfield(tbl.Properties.UserData, 'tWin')
-    tWin = tbl.Properties.UserData.tWin;
+if isfield(tblCell.Properties.UserData, 'tWin')
+    tWin = tblCell.Properties.UserData.tWin;
 else
     tWin = [];
 end
@@ -107,7 +111,7 @@ uicontrol('Parent', hSide, 'Style', 'text', 'String', 'Cell:', ...
     'Units', 'normalized', 'Position', [0.05, 0.94, 0.9, 0.04], ...
     'HorizontalAlignment', 'left', 'FontWeight', 'bold');
 
-cellList = cellstr(string(tbl.sbjID(tbl.compartment == 'Cyto')));
+cellList = cellstr(string(tblCell.sbjID(tblCell.compartment == 'Cyto')));
 
 ddCell = uicontrol('Parent', hSide, 'Style', 'popupmenu', ...
     'String', cellList, ...
@@ -136,24 +140,27 @@ onCellChange();
         if isempty(items), return; end
         sName = items{get(ddCell, 'Value')};
 
-        iC = find(tbl.sbjID == sName & tbl.compartment == 'Cyto');
-        iM = find(tbl.sbjID == sName & tbl.compartment == 'Mito');
+        iC = find(tblCell.sbjID == sName & tblCell.compartment == 'Cyto');
+        iM = find(tblCell.sbjID == sName & tblCell.compartment == 'Mito');
         if isempty(iC) || isempty(iM), return; end
 
-        cyTrace   = tbl.trace(iC, :);
-        miTrace   = tbl.trace(iM, :);
-        cyStart   = tbl.start{iC};
-        cyStop    = tbl.stop{iC};
-        miStart   = tbl.start{iM};
-        miStop    = tbl.stop{iM};
-        miIndep   = tbl.cytoIndependent{iM};
-        cyDur     = tbl.dur{iC};
-        miDur     = tbl.dur{iM};
-        miLag     = tbl.lag{iM};
-        cyMapC    = tbl.mapCyto{iC};
-        miMapC    = tbl.mapCyto{iM};
-        cyMapM    = tbl.mapMito{iC};
-        miMapM    = tbl.mapMito{iM};
+        cyTrace = tblCell.trace(iC, :);
+        miTrace = tblCell.trace(iM, :);
+
+        cyMask = tblEvent.sbjID == sName & tblEvent.compartment == 'Cyto';
+        miMask = tblEvent.sbjID == sName & tblEvent.compartment == 'Mito';
+        cyStart = tblEvent.start(cyMask);
+        cyStop  = tblEvent.stop(cyMask);
+        cyDur   = tblEvent.dur(cyMask);
+        miStart = tblEvent.start(miMask);
+        miStop  = tblEvent.stop(miMask);
+        miDur   = tblEvent.dur(miMask);
+        miLag   = tblEvent.lag(miMask);
+        miIndep = tblEvent.cytoIndependent(miMask);
+        cyMapC  = tblCell.mapCyto{iC};
+        miMapC  = tblCell.mapCyto{iM};
+        cyMapM  = tblCell.mapMito{iC};
+        miMapM  = tblCell.mapMito{iM};
 
         nIndep = sum(miIndep);
 

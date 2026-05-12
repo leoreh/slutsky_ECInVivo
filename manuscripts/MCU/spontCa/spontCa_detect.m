@@ -1,8 +1,8 @@
-function ev = spontCa_detect(trace, fs, varargin)
+function evTbl = spontCa_detect(trace, fs, varargin)
 % SPONTCA_DETECT Detects Ca transients in a single dF/F trace.
 %
-%   ev = SPONTCA_DETECT(TRACE, FS, ...) detects events by their RISE: a
-%   positive crossing of the smoothed derivative on the trace. Each event
+%   evTbl = SPONTCA_DETECT(TRACE, FS, ...) detects events by their RISE:
+%   a positive crossing of the smoothed derivative on the trace. Each event
 %   is then validated by an amplitude check above a LOCAL baseline (the
 %   rolling 20th percentile over a 30-s window), and by the presence of
 %   at least one significantly negative derivative sample after the peak.
@@ -32,14 +32,14 @@ function ev = spontCa_detect(trace, fs, varargin)
 %       'minDur' - (num) min decay duration (stop - peak, s)             {0.4}
 %
 %   OUTPUT:
-%       ev struct with fields:
-%         .start (n x 1)  peak times (s)  -- start == peak by convention
-%         .stop  (n x 1)  decay-end times (s) (where derivative flattens)
-%         .amp   (n x 1)  peak amplitude above local baseline (dF/F)
-%         .dur   (n x 1)  stop - start (s) (decay length, not event span)
-%         .int   (n x 1)  integral above local baseline over [peak, stop]
+%       evTbl - table with one row per event, columns:
+%         start (s)   peak time (start == peak by convention)
+%         stop  (s)   decay-end time (where derivative flattens)
+%         amp   (dF/F) peak amplitude above local baseline
+%         dur   (s)   stop - start (decay length, not event span)
+%         int   (dF/F * s) integral above local baseline over [peak, stop]
 %
-%   See also: SPONTCA_EVENTS, SPONTCA_COUPLE, SPONTCA_LOAD
+%   See also: SPONTCA_FINALIZE, SPONTCA_LOAD, SPONTCA_MANCUR
 
 %% ========================================================================
 %  ARGUMENTS
@@ -73,7 +73,7 @@ dt = 1 / fs;
 %  EARLY RETURN
 %  ========================================================================
 
-ev = struct('start', [], 'stop', [], 'amp', [], 'dur', [], 'int', []);
+evTbl = emptyEvTbl();
 if all(isnan(trace)) || nT < 4
     return;
 end
@@ -286,13 +286,22 @@ end
 %  ASSEMBLE OUTPUT
 %  ========================================================================
 
-ev.start = (peakIdx(:) - 1) * dt;   % start == peak time
-ev.stop  = (stopIdx(:) - 1) * dt;
-ev.amp   = ampLocal(:);              % amplitude above local baseline
-ev.dur   = ev.stop - ev.start;
-ev.int   = intg;
+starts = (peakIdx(:) - 1) * dt;     % start == peak time
+stops  = (stopIdx(:) - 1) * dt;
+amps   = ampLocal(:);                % amplitude above local baseline
+durs   = stops - starts;
+evTbl  = table(starts, stops, amps, durs, intg, ...
+    'VariableNames', {'start', 'stop', 'amp', 'dur', 'int'});
 
 end     % EOF
+
+
+function tbl = emptyEvTbl()
+% Canonical empty events table (zero rows, correct column types).
+tbl = table( ...
+    zeros(0, 1), zeros(0, 1), zeros(0, 1), zeros(0, 1), zeros(0, 1), ...
+    'VariableNames', {'start', 'stop', 'amp', 'dur', 'int'});
+end
 
 
 %% ========================================================================
