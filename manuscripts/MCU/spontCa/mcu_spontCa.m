@@ -39,8 +39,12 @@
 %   kNoise - rise-threshold multiplier on per-cell derivative noise
 %   minDur - minimum decay length, stop - peak (s)
 
+% Params tuned by spontCa_tune against 4 curated cells (Ctrl_01/02/03/05).
+% Cyto: defaults already optimal (median F1=0.93 at tol=0.5).
+% Mito : tuned raises median F1 0.48 -> 0.61 (Ctrl_02 regresses 0.80 -> 0.67,
+%        but Ctrl_03/Ctrl_05 each gain >0.08; median wins).
 paramsCyto = {'minAmp', 0.05, 'minIEI', 1.0, 'kNoise', 3.5, 'minDur', 0.4};
-paramsMito = {'minAmp', 0.03, 'minIEI', 1.0, 'kNoise', 3.5, 'minDur', 0.4};
+paramsMito = {'minAmp', 0.06, 'minIEI', 0.4, 'kNoise', 3.5, 'minDur', 0.2};
 
 n = height(tblCell);
 chunks = cell(n, 1);
