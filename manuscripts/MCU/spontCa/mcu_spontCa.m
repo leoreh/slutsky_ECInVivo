@@ -6,7 +6,7 @@
 %   ETA maps + coupling). Reproduces Fig 1E,F + S1B-E and the
 %   transfer-function preview.
 %
-% PIPELINE FILES (manuscripts/MCU/spontCa)
+% PIPELINE FILES 
 %   spontCa_loadXls     Excel -> tblCell (traces + cell metadata).
 %                       Picks sheet 'f' (raw F) or 'dff' via flgRaw;
 %                       optionally drops experimenter-excluded cells.
@@ -14,10 +14,7 @@
 %   spontCa_writeEvents tblEvent -> per-cell <sbjID>.mat files
 %   spontCa_readEvents  per-cell <sbjID>.mat files -> tblEvent
 %   spontCa_manCur      interactive per-cell event-curation GUI
-%   spontCa_finalize    aggregates on tblCell + coupling on tblEvent
-%   spontCa_gui         per-cell QC viewer (post-finalize)
-%
-% See also: MCU_TBLMEA, MEA_WRAPPER, TBLGUI_BAR, LME_ANALYSE
+%   spontCa_gui         per-cell QC viewer
 
 
 %% ========================================================================
@@ -83,8 +80,7 @@ spontCa_writeEvents(tblEvent, autoDir, 'backup', false);
 spontCa_manCur(tblCell, tblEvent, fs);
 
 % COMMENTS:
-% Control_72, Control_73, and Control_76 appear exactly the same cell. Kept
-% only 72.
+% Control_72, 73, and 76 appear exactly the same cell. Kept only 72.
 
 
 %% ========================================================================
@@ -128,25 +124,109 @@ tblEvent.stop(isCyto) = nan;
 tblEvent.dur(isCyto)  = nan;
 tblEvent.int(isCyto)  = nan;
 
-% Populate tblCell with summary of events
+
+%% ========================================================================
+%  PAIR & CROSS-FLUX
+%  ========================================================================
+% Couple cyto and mito events and compute the cross-compartment flux
+% integral for each event.
+%
+%   cyto row: pairIdx  -> first mito event whose start falls within
+%                         [start, start + win_c2m], else NaN.
+%             crossInt -> integral of mito dF/F over the same window.
+%   mito row: pairIdx  -> closest preceding cyto within maxLag of mito
+%                         start (the "trigger"), else NaN.
+%             crossInt -> integral of cyto dF/F over [trigger.start,
+%                         this.stop].
+%
+% Per-event transfer:
+%   cyto row: T = crossInt / amp   (mito response per cyto attempt; s)
+%   mito row: T = crossInt / int   (cyto input per mito response; -)
+
+win_c2m = 5;        % cyto->mito response window (s)
+maxLag  = 3;        % max cyto->mito lag to be called a trigger (s)
+
+nEv = height(tblEvent);
+tblEvent.pairIdx  = nan(nEv, 1);
+tblEvent.pairLag  = nan(nEv, 1);
+tblEvent.pairFlux = nan(nEv, 1);
+tblEvent.tf        = nan(nEv, 1);
+
+cells = unique(tblEvent.sbjID);
+for iCell = 1:numel(cells)
+    sid = cells(iCell);
+    iC = find(tblCell.sbjID == sid & tblCell.compartment == 'Cyto', 1);
+    iM = find(tblCell.sbjID == sid & tblCell.compartment == 'Mito', 1);
+
+    cytoTrace = tblCell.trace(iC, :);
+    mitoTrace = tblCell.trace(iM, :);
+
+    rowsC = find(tblEvent.sbjID == sid & tblEvent.compartment == 'Cyto');
+    rowsM = find(tblEvent.sbjID == sid & tblEvent.compartment == 'Mito');
+    startsC = tblEvent.start(rowsC);
+    startsM = tblEvent.start(rowsM);
+    stopsM  = tblEvent.stop(rowsM);
+
+    % Cyto -> mito response integrated over a fixed window after each cyto.
+    for k = 1:numel(rowsC)
+        s = startsC(k);
+        i0 = max(1, round(s * fs) + 1);
+        i1 = min(nSamps, round((s + win_c2m) * fs) + 1);
+        if i1 >= i0
+            tblEvent.pairFlux(rowsC(k)) = sum(mitoTrace(i0:i1)) * dt;
+        end
+        j = find(startsM >= s & startsM <= s + win_c2m, 1, 'first');
+        if ~isempty(j)
+            tblEvent.pairIdx(rowsC(k)) = rowsM(j);
+            tblEvent.pairLag(rowsC(k)) = startsM(j) - s;
+        end
+    end
+
+    % Mito -> trigger cyto, cyto input integrated from trigger to mito stop.
+    for k = 1:numel(rowsM)
+        ms = startsM(k);
+        j = find(startsC <= ms & startsC >= ms - maxLag, 1, 'last');
+        if isempty(j), continue; end
+        trigStart = startsC(j);
+        tblEvent.pairIdx(rowsM(k)) = rowsC(j);
+        tblEvent.pairLag(rowsM(k)) = ms - trigStart;
+        i0 = max(1, round(trigStart * fs) + 1);
+        i1 = min(nSamps, round(stopsM(k) * fs) + 1);
+        if i1 >= i0
+            tblEvent.pairFlux(rowsM(k)) = sum(cytoTrace(i0:i1)) * dt;
+        end
+    end
+end
+
+% Per-event transfer ratio. cyto: response / attempt. mito: input / response.
+isC = tblEvent.compartment == 'Cyto';
+isM = tblEvent.compartment == 'Mito';
+tblEvent.tf(isC) = tblEvent.pairFlux(isC) ./ tblEvent.amp(isC);
+tblEvent.tf(isM) = tblEvent.pairFlux(isM) ./ tblEvent.int(isM);
+
+
+%% ========================================================================
+%  PER-CELL SUMMARY
+%  ========================================================================
+
 tblCell.nEvents = zeros(nRows, 1);
-tblCell.rate = zeros(nRows, 1);
-tblCell.amp = nan(nRows, 1);
-tblCell.dur = nan(nRows, 1);
-tblCell.flux = zeros(nRows, 1);
+tblCell.rate    = zeros(nRows, 1);
+tblCell.amp     = nan(nRows, 1);
+tblCell.dur     = nan(nRows, 1);
+tblCell.flux    = zeros(nRows, 1);
+tblCell.tf   = nan(nRows, 1);
 for iRow = 1:nRows
     mask = tblEvent.sbjID == tblCell.sbjID(iRow) & ...
            tblEvent.compartment == tblCell.compartment(iRow);
     tblCell.nEvents(iRow) = sum(mask);
-    tblCell.rate(iRow) = tblCell.nEvents(iRow) / recDur;
-    tblCell.amp(iRow) = mean(tblEvent.amp(mask));
-    tblCell.dur(iRow) = mean(tblEvent.dur(mask));
-    tblCell.flux(iRow) = sum(tblEvent.amp(mask)) / recDur;
+    tblCell.rate(iRow)    = tblCell.nEvents(iRow) / recDur;
+    tblCell.amp(iRow)     = mean(tblEvent.amp(mask));
+    tblCell.dur(iRow)     = mean(tblEvent.dur(mask));
+    tblCell.flux(iRow)    = sum(tblEvent.amp(mask)) / recDur;
+    tblCell.tf(iRow)   = mean(tblEvent.tf(mask), 'omitnan');
 end
 
-% Drop cells with zero events in either compartment. Requires
-% spontCa_finalize to have run earlier in the session to populate
-% tblCell.nEvents.
+% Drop cells with zero events in either compartment.
 rmvId    = unique(tblCell.sbjID(tblCell.nEvents == 0));
 tblLme   = tblCell(~ismember(tblCell.sbjID, rmvId), :);
 tblEvent = tblEvent(~ismember(tblEvent.sbjID, rmvId), :);
@@ -171,19 +251,13 @@ frml = 'meanAmp ~ genotype * compartment + (1 | sbjID)';
 frml = 'amp ~ genotype * compartment + (1 | sbjID)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblEvent, frml, 'flgPlot', false, 'verbose', true);
 
+% NOTE: currently, rate is not different between genotypes, but it could be
+% biased by small events. Rate is problematic because unlike spikes, Ca
+% transients are not binary. Need to find a solution. 
+
 tblGUI_scatHist(tblEvent, 'yVar', 'amp', 'xVar', 'dur', 'grpVar', 'compartment');
 tblGUI_scatHist(tblCell, 'yVar', 'amp', 'xVar', 'dur', 'grpVar', 'compartment');
 
-
-%% ========================================================================
-%  FINALIZE (aggregates + ETA + coupling)
-%  ========================================================================
-
-[tblCell, tblEvent] = spontCa_finalize(tblCell, tblEvent, fs, 'thrLag', 3);
-
-
-
-% Maybe best transfer is the integral of cytoCa for each mitoCa event. 
 
 %% ========================================================================
 %  QC (per-cell viewer)
@@ -194,35 +268,3 @@ spontCa_gui(tblCell, tblEvent, fs);
 
 
 
-
-%% ========================================================================
-%  VALIDATION : fraction of cyto-independent mito events
-%  ========================================================================
-% Obsolete after manual curation
-
-subM = tblCell(tblCell.compartment == 'Mito', ...
-    {'genotype', 'sbjID', 'fracIndep'});
-tblGUI_bar(subM, 'yVar', 'fracIndep', 'xVar', 'genotype');
-
-
-%% ========================================================================
-%  PREVIEW : transfer function T = flux_mito / flux_cyto per cell
-%  ========================================================================
-% Pivot to wide on (sbjID, compartment) so the ratio is one row per cell.
-
-iC = find(tblCell.compartment == 'Cyto');
-iM = find(tblCell.compartment == 'Mito');
-assert(isequal(tblCell.sbjID(iC), tblCell.sbjID(iM)), ...
-    'Cyto/Mito rows must be aligned per cell');
-
-wide = table(tblCell.sbjID(iC),     tblCell.genotype(iC), ...
-             tblCell.flux(iC),      tblCell.flux(iM), ...
-             tblCell.fluxInt(iC),   tblCell.fluxInt(iM), ...
-    'VariableNames', {'sbjID', 'genotype', ...
-                      'flux_cyto', 'flux_mito', ...
-                      'fluxInt_cyto', 'fluxInt_mito'});
-wide.T_flux    = wide.flux_mito    ./ wide.flux_cyto;
-wide.T_fluxInt = wide.fluxInt_mito ./ wide.fluxInt_cyto;
-
-tblGUI_scatHist(wide, 'xVar', 'flux_cyto',    'yVar', 'T_flux',    'grpVar', 'genotype');
-tblGUI_scatHist(wide, 'xVar', 'fluxInt_cyto', 'yVar', 'T_fluxInt', 'grpVar', 'genotype');
