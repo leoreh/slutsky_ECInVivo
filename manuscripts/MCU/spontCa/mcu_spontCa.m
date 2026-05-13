@@ -44,29 +44,29 @@ recDur = nSamps / fs;
 %   kNoise - rise-threshold multiplier on per-cell derivative noise
 %   minDur - minimum decay length, stop - peak (s)
 
-% Params tuned by spontCa_tune against 4 curated cells (Ctrl_01/02/03/05).
-paramsCyto = {'minAmp', 0.05, 'minIEI', 1.0, 'kNoise', 3.5, 'minDur', 0.4};
-paramsMito = {'minAmp', 0.06, 'minIEI', 0.4, 'kNoise', 3.5, 'minDur', 0.2};
-
-chunks = cell(nRows, 1);
-for iRow = 1:nRows
-    if tblCell.compartment(iRow) == 'Cyto'
-        rowEv = spontCa_detect(tblCell.trace(iRow, :), fs, paramsCyto{:});
-    else
-        rowEv = spontCa_detect(tblCell.trace(iRow, :), fs, paramsMito{:});
-    end
-    if height(rowEv) > 0
-        rowEv.sbjID       = repmat(tblCell.sbjID(iRow),       height(rowEv), 1);
-        rowEv.compartment = repmat(tblCell.compartment(iRow), height(rowEv), 1);
-        chunks{iRow} = rowEv;
-    end
-end
-tblEvent = vertcat(chunks{~cellfun(@isempty, chunks)});
-tblEvent = tblEvent(:, ['sbjID', 'compartment', setdiff(...
-    tblEvent.Properties.VariableNames, {'sbjID','compartment'}, 'stable')]);
-
-autoDir = fullfile(fileparts(which('spontCa_detect')), 'auto');
-spontCa_writeEvents(tblEvent, autoDir, 'backup', false);
+% % Params tuned by spontCa_tune against 4 curated cells (Ctrl_01/02/03/05).
+% paramsCyto = {'minAmp', 0.05, 'minIEI', 1.0, 'kNoise', 3.5, 'minDur', 0.4};
+% paramsMito = {'minAmp', 0.06, 'minIEI', 0.4, 'kNoise', 3.5, 'minDur', 0.2};
+% 
+% chunks = cell(nRows, 1);
+% for iRow = 1:nRows
+%     if tblCell.compartment(iRow) == 'Cyto'
+%         rowEv = spontCa_detect(tblCell.trace(iRow, :), fs, paramsCyto{:});
+%     else
+%         rowEv = spontCa_detect(tblCell.trace(iRow, :), fs, paramsMito{:});
+%     end
+%     if height(rowEv) > 0
+%         rowEv.sbjID       = repmat(tblCell.sbjID(iRow),       height(rowEv), 1);
+%         rowEv.compartment = repmat(tblCell.compartment(iRow), height(rowEv), 1);
+%         chunks{iRow} = rowEv;
+%     end
+% end
+% tblEvent = vertcat(chunks{~cellfun(@isempty, chunks)});
+% tblEvent = tblEvent(:, ['sbjID', 'compartment', setdiff(...
+%     tblEvent.Properties.VariableNames, {'sbjID','compartment'}, 'stable')]);
+% 
+% autoDir = fullfile(fileparts(which('spontCa_detect')), 'auto');
+% spontCa_writeEvents(tblEvent, autoDir, 'backup', false);
 
 
 %% ========================================================================
@@ -77,10 +77,10 @@ spontCa_writeEvents(tblEvent, autoDir, 'backup', false);
 % on disk in man/ (if any) and merge with the auto-detection rows for
 % cells the user didn't curate.
 
-spontCa_manCur(tblCell, tblEvent, fs);
-
 % COMMENTS:
 % Control_72, 73, and 76 appear exactly the same cell. Kept only 72.
+
+% spontCa_manCur(tblCell, tblEvent, fs);
 
 
 %% ========================================================================
@@ -117,52 +117,40 @@ if ~isempty(badEvents)
     tblEvent(badEvents, :)
 end
 
-% Cyto has no real decay at fs=3: stop and dur are not meaningful.
-% Cyto int is redefined as the sum over +/- 1 samples around the
-% peak (3 samples by default), giving it units of dF/F*s comparable to
-% the mito event integral.
-nSmpCyto = 1;
+% Rename int -> flux for naming consistency with cell-level.
+tblEvent = renamevars(tblEvent, 'int', 'flux');
+
+% Cyto has no real decay at fs=3: the event lives in one sample. Define
+% the event "integral" as amp * dt - units dF/F*s, dimensionally
+% consistent with the mito event integral. Stop = start (point), dur = dt
+% (one frame). 
 isCyto = tblEvent.compartment == 'Cyto';
-tblEvent.stop(isCyto) = nan;
-tblEvent.dur(isCyto)  = nan;
-cytoCells = unique(tblEvent.sbjID(isCyto));
-for iCell = 1:numel(cytoCells)
-    sid   = cytoCells(iCell);
-    iRow  = find(tblCell.sbjID == sid & tblCell.compartment == 'Cyto', 1);
-    trace = tblCell.trace(iRow, :);
-    rows  = find(isCyto & tblEvent.sbjID == sid);
-    for iEvent = 1:numel(rows)
-        r  = rows(iEvent);
-        p  = round(tblEvent.start(r) * fs) + 1;
-        i0 = max(1, p - nSmpCyto);
-        i1 = min(nSamps, p + nSmpCyto);
-        tblEvent.int(r) = sum(trace(i0:i1)) * dt;
-    end
-end
+tblEvent.stop(isCyto) = tblEvent.start(isCyto);
+tblEvent.dur(isCyto)  = dt;
+tblEvent.flux(isCyto)  = tblEvent.amp(isCyto) * dt;
 
-% Cyto amplitude filter. Set to 0 to disable. See CYTO THRESHOLD section
-% below for guidance on choosing this value from the data.
-minAmpCyto = 0.3;
-if minAmpCyto > 0
-    drop = tblEvent.compartment == 'Cyto' & tblEvent.amp < minAmpCyto;
-    fprintf('Dropped %d cyto events with amp < %g\n', sum(drop), minAmpCyto);
-    tblEvent(drop, :) = [];
-end
 
-% Drop cells with zero events in either compartment from BOTH tables, so
-% downstream sections (PAIR, SUMMARY, FIG) operate on a clean set.
+%% ========================================================================
+%  FILTER & EXCLUDE
+%  ========================================================================
+% (1) Drop sub-threshold cyto events. minAmpCyto is set by CYTO THRESHOLD
+%     section below.
+% (2) Drop cells that end up with zero events in either compartment.
+%     This cascades: a cell whose only cyto events were sub-threshold
+%     also loses its mito events from downstream analyses.
+
+minAmpCyto = 0;
+drop = tblEvent.compartment == 'Cyto' & tblEvent.amp < minAmpCyto;
+fprintf('Dropped %d cyto events with amp < %g\n', sum(drop), minAmpCyto);
+tblEvent(drop, :) = [];
+
 nCper = arrayfun(@(s) sum(tblEvent.sbjID == s & tblEvent.compartment == 'Cyto'), tblCell.sbjID);
 nMper = arrayfun(@(s) sum(tblEvent.sbjID == s & tblEvent.compartment == 'Mito'), tblCell.sbjID);
 keepCell = nCper > 0 & nMper > 0;
-fprintf('Dropped %d cells with zero events in cyto or mito\n', sum(~keepCell) / 2);
+fprintf('Dropped %d cells with zero kept events in cyto or mito\n', sum(~keepCell) / 2);
 tblCell  = tblCell(keepCell, :);
 tblEvent = tblEvent(ismember(tblEvent.sbjID, tblCell.sbjID), :);
 nRows    = height(tblCell);
-
-% Change 'int' to 'flux'. This should eventually be implemented from the
-% begninig (in _detect and per-cell files). Same regarding the definitions
-% of cyto.
-tblEvent = renamevars(tblEvent, 'int', 'flux');
 
 %% ========================================================================
 %  PAIR & CROSS-FLUX
@@ -172,18 +160,18 @@ tblEvent = renamevars(tblEvent, 'int', 'flux');
 %
 %   cyto row: pairIdx  -> first mito event whose start falls within
 %                         [start, start + win_c2m], else NaN.
-%             crossInt -> integral of mito dF/F over the same window.
+%             pairFlux -> integral of mito dF/F over the same window.
 %   mito row: pairIdx  -> closest preceding cyto within maxLag of mito
 %                         start (the "trigger"), else NaN.
-%             crossInt -> integral of cyto dF/F over [trigger.start,
+%             pairFlux -> integral of cyto dF/F over [trigger.start,
 %                         this.stop].
 %
 % Per-event transfer:
 %   cyto row: T = crossInt / amp   (mito response per cyto attempt; s)
 %   mito row: T = crossInt / int   (cyto input per mito response; -)
 
-win_c2m = 5;        % cyto->mito response window (s)
-maxLag  = 3;        % max cyto->mito lag to be called a trigger (s)
+win_c2m = 10;       % cyto -> mito response window (s)
+maxLag  = 5;        % max cyto -> mito lag to be called a trigger (s)
 
 nEv = height(tblEvent);
 tblEvent.pairIdx  = nan(nEv, 1);
@@ -237,8 +225,8 @@ for iCell = 1:numel(cells)
     end
 end
 
-% Per-event transfer ratio. Uniform across compartments now that cyto.flux
-% is defined (sum over +/- nSmpCyto samples around the peak).
+% Per-event transfer ratio. Uniform across compartments because cyto.flux
+% (= amp*dt) and mito.flux (= event integral) share units of dF/F*s.
 %   cyto row: T = mito response integral / cyto integral
 %   mito row: T = cyto input integral    / mito integral
 tblEvent.tf = tblEvent.pairFlux ./ tblEvent.flux;
@@ -254,21 +242,24 @@ tblEvent.tf(tblEvent.tf < 0) = 0;
 %  PER-CELL SUMMARY
 %  ========================================================================
 
-tblCell.nEvents = zeros(nRows, 1);
-tblCell.rate    = zeros(nRows, 1);
-tblCell.amp     = nan(nRows, 1);
-tblCell.dur     = nan(nRows, 1);
-tblCell.flux    = zeros(nRows, 1);
-tblCell.tf      = nan(nRows, 1);
+% tblEvent.flux has units of dF/F*s (event integral). tblCell.fluxRate
+% is the sum of event flux over recording duration, units dF/F per s.
+
+tblCell.nEvents  = zeros(nRows, 1);
+tblCell.rate     = zeros(nRows, 1);
+tblCell.amp      = nan(nRows, 1);
+tblCell.dur      = nan(nRows, 1);
+tblCell.fluxRate = zeros(nRows, 1);
+tblCell.tf       = nan(nRows, 1);
 for iRow = 1:nRows
     mask = tblEvent.sbjID == tblCell.sbjID(iRow) & ...
            tblEvent.compartment == tblCell.compartment(iRow);
-    tblCell.nEvents(iRow) = sum(mask);
-    tblCell.rate(iRow)    = tblCell.nEvents(iRow) / recDur;
-    tblCell.amp(iRow)     = mean(tblEvent.amp(mask));
-    tblCell.dur(iRow)     = mean(tblEvent.dur(mask));
-    tblCell.flux(iRow)    = sum(tblEvent.flux(mask)) / recDur;
-    tblCell.tf(iRow)      = mean(tblEvent.tf(mask), 'omitnan');
+    tblCell.nEvents(iRow)  = sum(mask);
+    tblCell.rate(iRow)     = tblCell.nEvents(iRow) / recDur;
+    tblCell.amp(iRow)      = mean(tblEvent.amp(mask));
+    tblCell.dur(iRow)      = mean(tblEvent.dur(mask));
+    tblCell.fluxRate(iRow) = sum(tblEvent.flux(mask)) / recDur;
+    tblCell.tf(iRow)       = mean(tblEvent.tf(mask), 'omitnan');
 end
 
 
@@ -279,23 +270,21 @@ end
 %  INSPECT RESULTS
 %  ========================================================================
 
-mode = 'event';
+mode = 'cell';
 
 if strcmp(mode, 'event')
     tbl = tblEvent;
     vars = {'amp', 'flux', 'pairFlux', 'tf'};
-
-elseif trcmp(mode, 'cell')
+elseif strcmp(mode, 'cell')
     tbl = tblCell;
-    vars = {'amp', 'flux', 'rate', 'tf'};
-
+    vars = {'amp', 'fluxRate', 'rate', 'tf'};
 end
 
-yVar = vars{1};
-xVar = vars{4};
+yVar = vars{3};
+xVar = vars{2};
 
 % Bar
-tblGUI_bar(tbl,  'yVar', yVar, 'xVar', 'compartment', 'grpVar', 'genotype');
+tblGUI_bar(tbl, 'yVar', yVar, 'xVar', 'compartment', 'grpVar', 'genotype');
 
 % Across compartments
 tblGUI_scatHist(tbl, 'yVar', yVar, 'xVar', xVar, 'grpVar', 'compartment');
@@ -307,16 +296,28 @@ tblGUI_scatHist(tbl(tbl.compartment == cmp, :), 'yVar', yVar, 'xVar', xVar, 'grp
 cmp = 'Cyto';
 tblGUI_scatHist(tbl(tbl.compartment == cmp, :), 'yVar', yVar, 'xVar', xVar, 'grpVar', 'genotype');
 
-% Cyto versus Mito
-tblSub = tbl(tbl.compartment == 'Cyto', {'sbjID', 'genotype', yVar});
-tblSub.cyto = tblSub.(yVar);
-tblSub.mito = tbl.(yVar)(tbl.compartment == 'Mito');
-tblGUI_scatHist(tblSub, 'xVar', 'mito', 'yVar','cyto', 'grpVar','genotype');
+% Cyto versus Mito. For 'cell' mode each cell has one cyto + one mito
+% row; pair them by position. For 'event' mode pair via pairIdx (cyto
+% events that have a paired mito event).
+var = 'amp';
+if strcmp(mode, 'cell')
+    isC = tbl.compartment == 'Cyto';
+    isM = tbl.compartment == 'Mito';
+    tblSub = tbl(isC, {'sbjID', 'genotype'});
+    tblSub.cyto = tbl.(var)(isC);
+    tblSub.mito = tbl.(var)(isM);
+else
+    isCyto = tbl.compartment == 'Cyto' & ~isnan(tbl.pairIdx);
+    tblSub = tbl(isCyto, {'sbjID', 'genotype'});
+    tblSub.cyto = tbl.(var)(isCyto);
+    tblSub.mito = tbl.(var)(tbl.pairIdx(isCyto));
+end
+tblGUI_scatHist(tblSub, 'xVar', 'cyto', 'yVar', 'mito', 'grpVar', 'genotype');
 
 
 %  LME
-frml = [vars{2}, ' ~ genotype * compartment + (1 | sbjID)'];
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblCell, frml, 'flgPlot', false, 'verbose', true);
+frml = [vars{1}, ' ~ genotype * compartment + (1 | sbjID)'];
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tbl, frml, 'flgPlot', false, 'verbose', true);
 
 
 
