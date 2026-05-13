@@ -26,6 +26,7 @@ if isempty(files)
     return;
 end
 
+canonVars = {'sbjID', 'compartment', 'start', 'stop', 'amp', 'dur', 'int'};
 chunks = cell(numel(files), 1);
 for k = 1:numel(files)
     [~, sid] = fileparts(files(k).name);
@@ -47,6 +48,16 @@ for k = 1:numel(files)
     else
         events.sbjID = categorical(strings(0, 1));
     end
+    % Canonicalize: drop unexpected vars, fill missing ones with NaN/<undefined>
+    missing = setdiff(canonVars, events.Properties.VariableNames);
+    for v = missing
+        if any(strcmp(v{1}, {'sbjID', 'compartment'}))
+            events.(v{1}) = categorical(strings(nE, 1));
+        else
+            events.(v{1}) = nan(nE, 1);
+        end
+    end
+    events = events(:, canonVars);
     chunks{k} = events;
 end
 chunks = chunks(~cellfun(@isempty, chunks));
