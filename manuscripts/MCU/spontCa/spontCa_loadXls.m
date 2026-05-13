@@ -13,13 +13,16 @@ function [tbl, fs] = spontCa_loadXls(varargin)
 %       unitID       (categorical) cell number from row 2 of the xlsx
 %       compartment  (categorical) 'Cyto' / 'Mito'
 %       excluded     (logical)     experimenter's flag from row 3
-%       trace        (1 x nT)      signal (raw F if flgRaw, else dF/F)
+%       trace        (1 x nT)      dF/F (see flgRaw for source)
 %
 %   OPTIONAL (Name-Value):
 %       'xlsPath'    - (char) Path to spontCa.xlsx
 %                      {default: NetaF folder \ spontCa.xlsx}
-%       'flgRaw'     - (log)  true: read sheet 'f' (raw F)
-%                             false: read sheet 'dff'                {false}
+%       'flgRaw'     - (log)  true: read sheet 'f' (raw F) and compute
+%                             dF/F here via a rolling 20th-percentile
+%                             baseline over a 30 s window;
+%                             false: read sheet 'dff' as-is (Boaz dF/F).
+%                             Either way the returned trace is dF/F.  {false}
 %       'flgExclude' - (log)  true: drop rows where excluded=true;
 %                             unitIDs are preserved (gaps remain)    {false}
 %       'verbose'    - (log)  Print progress                         {true}
@@ -169,6 +172,26 @@ tbl = table(...
     traces, ...
     'VariableNames', ...
     {'genotype', 'sbjID', 'unitID', 'compartment', 'excluded', 'trace'});
+
+% If we loaded raw F, convert to dF/F here via a rolling 20th-percentile
+% baseline (deterministic recipe; no per-cell tuning). When flgRaw is
+% false the trace is already dF/F from the 'dff' sheet.
+if flgRaw
+    bslWin   = 30;                  % baseline window (s)
+    bslQuant = 20;                  % percentile for baseline
+    winSamps = round(bslWin * fs);
+    halfWin  = floor(winSamps / 2);
+    for iR = 1:height(tbl)
+        f  = tbl.trace(iR, :);
+        f0 = zeros(1, nT);
+        for iS = 1:nT
+            i0 = max(1, iS - halfWin);
+            i1 = min(nT, iS + halfWin);
+            f0(iS) = prctile(f(i0:i1), bslQuant);
+        end
+        tbl.trace(iR, :) = (f - f0) ./ max(f0, eps);
+    end
+end
 
 nKept = nCells;
 if flgExclude

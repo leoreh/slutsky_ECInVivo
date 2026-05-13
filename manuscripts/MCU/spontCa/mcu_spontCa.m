@@ -26,31 +26,11 @@
 
 [tblCell, fs] = spontCa_loadXls('flgRaw', true, 'flgExclude', false);
 
-
-%% ========================================================================
-%  DF/F  (rolling 20th-percentile baseline)
-%  ========================================================================
-% F0(t) = 20th percentile of F over a ~30 s window centered at t.
-% dF/F(t) = (F(t) - F0(t)) / F0(t). Deterministic recipe; no per-cell tuning.
-% prctile skips NaN by default so excluded-cell rows pass through as NaN.
-
-bslWin = 30;                    % baseline window (s)
-bslQuant = 20;                  % percentile for baseline
-winSamps = round(bslWin * fs);
-halfWin = floor(winSamps / 2);
-nSamps = size(tblCell.trace, 2);
+% Params
+dt = 1 / fs;
 nRows = height(tblCell);
-
-for iRow = 1:nRows
-    f  = tblCell.trace(iRow, :);
-    f0 = zeros(1, nSamps);
-    for iSamp = 1:nSamps
-        i0 = max(1, iSamp - halfWin);
-        i1 = min(nSamps, iSamp + halfWin);
-        f0(iSamp) = prctile(f(i0:i1), bslQuant);
-    end
-    tblCell.trace(iRow, :) = (f - f0) ./ max(f0, eps);
-end
+nSamps = size(tblCell.trace, 2);
+recDur = nSamps / fs;
 
 
 %% ========================================================================
@@ -108,31 +88,70 @@ spontCa_manCur(tblCell, tblEvent, fs);
 
 
 %% ========================================================================
-%  ORGANIZE
+%  LOAD & ORGANIZE EVENTS
 %  ========================================================================
+% Build tblEvent from disk: man/<sbjID>.mat for curated cells, falling
+% back to auto/<sbjID>.mat for uncurated ones. This block stands alone -
+% no need to re-run AUTOMATIC DETECT or MANUAL CURATION as long as those
+% folders are populated.
 
-manDir = fullfile(fileparts(which('spontCa_detect')), 'man');
-tblEvent_man = spontCa_readEvents(manDir);
-if height(tblEvent_man) > 0
-    curatedCells = unique(tblEvent_man.sbjID);
-    tblEvent = tblEvent(~ismember(tblEvent.sbjID, curatedCells), :);
-    canonVars = {'sbjID', 'compartment', 'start', 'stop', 'amp', 'dur', 'int'};
-    tblEvent     = tblEvent(:,     canonVars);
-    tblEvent_man = tblEvent_man(:, canonVars);
-    tblEvent = [tblEvent; tblEvent_man];
-end
+spDir = fileparts(which('spontCa_detect'));
+tblEvent_auto = spontCa_readEvents(fullfile(spDir, 'auto'));
+tblEvent_man  = spontCa_readEvents(fullfile(spDir, 'man'));
+
+curatedCells  = unique(tblEvent_man.sbjID);
+tblEvent_auto = tblEvent_auto(~ismember(tblEvent_auto.sbjID, curatedCells), :);
+tblEvent      = [tblEvent_auto; tblEvent_man];
+tblEvent      = sortrows(tblEvent);
 
 % Attach genotype to each event row (sbjID -> genotype lookup).
 [~, idx] = ismember(tblEvent.sbjID, tblCell.sbjID);
 tblEvent.genotype = tblCell.genotype(idx);
+tblEvent = movevars(tblEvent, 'genotype', 'before', 1);
 
-% Drop cells with zero events in either compartment.
-rmvId  = unique(tblCell.sbjID(tblCell.nEvents == 0));
-TblLme = tblCell(~ismember(tblCell.sbjID, rmvId), :);
+% Sanity check - events with zero or nan amplitude
+badEvents = find(tblEvent.amp < eps | isnan(tblEvent.amp));
+if ~isempty(badEvents)
+    tblEvent(badEvents, :)
+end
+
+% Sanity check - events with unreasonable high amplitude
+badEvents = find(tblEvent.amp > 5);
+if ~isempty(badEvents)
+    tblEvent(badEvents, :)
+end
+
+% Remove stop/dur/int from cyto events. Cyto decays aren't biologically
+% real at fs=3.
+isCyto = tblEvent.compartment == 'Cyto';
+tblEvent.stop(isCyto) = nan;
+tblEvent.dur(isCyto)  = nan;
+tblEvent.int(isCyto)  = nan;
+
+% Populate tblCell with summary of events
+tblCell.nEvents = zeros(nRows, 1);
+tblCell.rate = zeros(nRows, 1);
+tblCell.amp = nan(nRows, 1);
+tblCell.dur = nan(nRows, 1);
+tblCell.flux = zeros(nRows, 1);
+for iRow = 1:nRows
+    mask = tblEvent.sbjID == tblCell.sbjID(iRow) & ...
+           tblEvent.compartment == tblCell.compartment(iRow);
+    tblCell.nEvents(iRow) = sum(mask);
+    tblCell.rate(iRow) = tblCell.nEvents(iRow) / recDur;
+    tblCell.amp(iRow) = mean(tblEvent.amp(mask));
+    tblCell.dur(iRow) = mean(tblEvent.dur(mask));
+    tblCell.flux(iRow) = sum(tblEvent.amp(mask)) / recDur;
+end
+
+% Drop cells with zero events in either compartment. Requires
+% spontCa_finalize to have run earlier in the session to populate
+% tblCell.nEvents.
+rmvId    = unique(tblCell.sbjID(tblCell.nEvents == 0));
+tblLme   = tblCell(~ismember(tblCell.sbjID, rmvId), :);
 tblEvent = tblEvent(~ismember(tblEvent.sbjID, rmvId), :);
 
-% Remove cells excluded by Neta
-% tblLme = tblCell(tblCell.excluded, :);
+
 
 
 %% ========================================================================
@@ -141,8 +160,8 @@ tblEvent = tblEvent(~ismember(tblEvent.sbjID, rmvId), :);
 % Per-compartment LME + bar plot over genotype. With one observation per
 % sbjID the random intercept is degenerate and the LME reduces to LM.
 
-tblGUI_bar(tblLme, 'yVar', 'meanAmp', 'xVar', 'compartment', 'grpVar', 'genotype');
-tblGUI_bar(tblEvent, 'yVar', 'meanAmp', 'xVar', 'compartment', 'grpVar', 'genotype');
+tblGUI_bar(tblLme, 'yVar', 'amp', 'xVar', 'compartment', 'grpVar', 'genotype');
+tblGUI_bar(tblEvent, 'yVar', 'amp', 'xVar', 'compartment', 'grpVar', 'genotype');
 
 % LME (over cells)
 frml = 'meanAmp ~ genotype * compartment + (1 | sbjID)';
@@ -152,6 +171,8 @@ frml = 'meanAmp ~ genotype * compartment + (1 | sbjID)';
 frml = 'amp ~ genotype * compartment + (1 | sbjID)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblEvent, frml, 'flgPlot', false, 'verbose', true);
 
+tblGUI_scatHist(tblEvent, 'yVar', 'amp', 'xVar', 'dur', 'grpVar', 'compartment');
+tblGUI_scatHist(tblCell, 'yVar', 'amp', 'xVar', 'dur', 'grpVar', 'compartment');
 
 
 %% ========================================================================
