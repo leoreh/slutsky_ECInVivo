@@ -117,13 +117,52 @@ if ~isempty(badEvents)
     tblEvent(badEvents, :)
 end
 
-% Remove stop/dur/int from cyto events. Cyto decays aren't biologically
-% real at fs=3.
+% Cyto has no real decay at fs=3: stop and dur are not meaningful.
+% Cyto int is redefined as the sum over +/- 1 samples around the
+% peak (3 samples by default), giving it units of dF/F*s comparable to
+% the mito event integral.
+nSmpCyto = 1;
 isCyto = tblEvent.compartment == 'Cyto';
 tblEvent.stop(isCyto) = nan;
 tblEvent.dur(isCyto)  = nan;
-tblEvent.int(isCyto)  = nan;
+cytoCells = unique(tblEvent.sbjID(isCyto));
+for iCell = 1:numel(cytoCells)
+    sid   = cytoCells(iCell);
+    iRow  = find(tblCell.sbjID == sid & tblCell.compartment == 'Cyto', 1);
+    trace = tblCell.trace(iRow, :);
+    rows  = find(isCyto & tblEvent.sbjID == sid);
+    for iEvent = 1:numel(rows)
+        r  = rows(iEvent);
+        p  = round(tblEvent.start(r) * fs) + 1;
+        i0 = max(1, p - nSmpCyto);
+        i1 = min(nSamps, p + nSmpCyto);
+        tblEvent.int(r) = sum(trace(i0:i1)) * dt;
+    end
+end
 
+% Cyto amplitude filter. Set to 0 to disable. See CYTO THRESHOLD section
+% below for guidance on choosing this value from the data.
+minAmpCyto = 0.3;
+if minAmpCyto > 0
+    drop = tblEvent.compartment == 'Cyto' & tblEvent.amp < minAmpCyto;
+    fprintf('Dropped %d cyto events with amp < %g\n', sum(drop), minAmpCyto);
+    tblEvent(drop, :) = [];
+end
+
+% Drop cells with zero events in either compartment from BOTH tables, so
+% downstream sections (PAIR, SUMMARY, FIG) operate on a clean set.
+nCper = arrayfun(@(s) sum(tblEvent.sbjID == s & tblEvent.compartment == 'Cyto'), tblCell.sbjID);
+nMper = arrayfun(@(s) sum(tblEvent.sbjID == s & tblEvent.compartment == 'Mito'), tblCell.sbjID);
+keepCell = nCper > 0 & nMper > 0;
+fprintf('Dropped %d cells with zero events in cyto or mito\n', sum(~keepCell) / 2);
+tblCell  = tblCell(keepCell, :);
+tblEvent = tblEvent(ismember(tblEvent.sbjID, tblCell.sbjID), :);
+nRows    = height(tblCell);
+
+% Change 'int' to 'flux'. This should eventually be implemented from the
+% begninig (in _detect and per-cell files). Same regarding the definitions
+% of cyto.
+tblEvent = renamevars(tblEvent, 'int', 'flux');
 
 %% ========================================================================
 %  PAIR & CROSS-FLUX
@@ -168,41 +207,47 @@ for iCell = 1:numel(cells)
     stopsM  = tblEvent.stop(rowsM);
 
     % Cyto -> mito response integrated over a fixed window after each cyto.
-    for k = 1:numel(rowsC)
-        s = startsC(k);
+    for iEvent = 1:numel(rowsC)
+        s = startsC(iEvent);
         i0 = max(1, round(s * fs) + 1);
         i1 = min(nSamps, round((s + win_c2m) * fs) + 1);
         if i1 >= i0
-            tblEvent.pairFlux(rowsC(k)) = sum(mitoTrace(i0:i1)) * dt;
+            tblEvent.pairFlux(rowsC(iEvent)) = sum(mitoTrace(i0:i1)) * dt;
         end
         j = find(startsM >= s & startsM <= s + win_c2m, 1, 'first');
         if ~isempty(j)
-            tblEvent.pairIdx(rowsC(k)) = rowsM(j);
-            tblEvent.pairLag(rowsC(k)) = startsM(j) - s;
+            tblEvent.pairIdx(rowsC(iEvent)) = rowsM(j);
+            tblEvent.pairLag(rowsC(iEvent)) = startsM(j) - s;
         end
     end
 
     % Mito -> trigger cyto, cyto input integrated from trigger to mito stop.
-    for k = 1:numel(rowsM)
-        ms = startsM(k);
+    for iEvent = 1:numel(rowsM)
+        ms = startsM(iEvent);
         j = find(startsC <= ms & startsC >= ms - maxLag, 1, 'last');
         if isempty(j), continue; end
         trigStart = startsC(j);
-        tblEvent.pairIdx(rowsM(k)) = rowsC(j);
-        tblEvent.pairLag(rowsM(k)) = ms - trigStart;
+        tblEvent.pairIdx(rowsM(iEvent)) = rowsC(j);
+        tblEvent.pairLag(rowsM(iEvent)) = ms - trigStart;
         i0 = max(1, round(trigStart * fs) + 1);
-        i1 = min(nSamps, round(stopsM(k) * fs) + 1);
+        i1 = min(nSamps, round(stopsM(iEvent) * fs) + 1);
         if i1 >= i0
-            tblEvent.pairFlux(rowsM(k)) = sum(cytoTrace(i0:i1)) * dt;
+            tblEvent.pairFlux(rowsM(iEvent)) = sum(cytoTrace(i0:i1)) * dt;
         end
     end
 end
 
-% Per-event transfer ratio. cyto: response / attempt. mito: input / response.
-isC = tblEvent.compartment == 'Cyto';
-isM = tblEvent.compartment == 'Mito';
-tblEvent.tf(isC) = tblEvent.pairFlux(isC) ./ tblEvent.amp(isC);
-tblEvent.tf(isM) = tblEvent.pairFlux(isM) ./ tblEvent.int(isM);
+% Per-event transfer ratio. Uniform across compartments now that cyto.flux
+% is defined (sum over +/- nSmpCyto samples around the peak).
+%   cyto row: T = mito response integral / cyto integral
+%   mito row: T = cyto input integral    / mito integral
+tblEvent.tf = tblEvent.pairFlux ./ tblEvent.flux;
+
+% Clip negative pairFlux / tf to zero. These are events whose cross-window
+% integrated the opposite compartment around its noise floor and came out
+% slightly below zero. They carry no biological information.
+tblEvent.pairFlux(tblEvent.pairFlux < 0) = 0;
+tblEvent.tf(tblEvent.tf < 0) = 0;
 
 
 %% ========================================================================
@@ -214,7 +259,7 @@ tblCell.rate    = zeros(nRows, 1);
 tblCell.amp     = nan(nRows, 1);
 tblCell.dur     = nan(nRows, 1);
 tblCell.flux    = zeros(nRows, 1);
-tblCell.tf   = nan(nRows, 1);
+tblCell.tf      = nan(nRows, 1);
 for iRow = 1:nRows
     mask = tblEvent.sbjID == tblCell.sbjID(iRow) & ...
            tblEvent.compartment == tblCell.compartment(iRow);
@@ -222,41 +267,91 @@ for iRow = 1:nRows
     tblCell.rate(iRow)    = tblCell.nEvents(iRow) / recDur;
     tblCell.amp(iRow)     = mean(tblEvent.amp(mask));
     tblCell.dur(iRow)     = mean(tblEvent.dur(mask));
-    tblCell.flux(iRow)    = sum(tblEvent.amp(mask)) / recDur;
-    tblCell.tf(iRow)   = mean(tblEvent.tf(mask), 'omitnan');
+    tblCell.flux(iRow)    = sum(tblEvent.flux(mask)) / recDur;
+    tblCell.tf(iRow)      = mean(tblEvent.tf(mask), 'omitnan');
 end
 
-% Drop cells with zero events in either compartment.
-rmvId    = unique(tblCell.sbjID(tblCell.nEvents == 0));
-tblLme   = tblCell(~ismember(tblCell.sbjID, rmvId), :);
-tblEvent = tblEvent(~ismember(tblEvent.sbjID, rmvId), :);
 
 
 
 
 %% ========================================================================
-%  FIG 1E,F + S1B-E
+%  INSPECT RESULTS
 %  ========================================================================
-% Per-compartment LME + bar plot over genotype. With one observation per
-% sbjID the random intercept is degenerate and the LME reduces to LM.
 
-tblGUI_bar(tblLme, 'yVar', 'amp', 'xVar', 'compartment', 'grpVar', 'genotype');
-tblGUI_bar(tblEvent, 'yVar', 'amp', 'xVar', 'compartment', 'grpVar', 'genotype');
+mode = 'event';
 
-% LME (over cells)
-frml = 'meanAmp ~ genotype * compartment + (1 | sbjID)';
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLme, frml, 'flgPlot', false, 'verbose', true);
+if strcmp(mode, 'event')
+    tbl = tblEvent;
+    vars = {'amp', 'flux', 'pairFlux', 'tf'};
 
-% LME (over events)
-frml = 'amp ~ genotype * compartment + (1 | sbjID)';
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblEvent, frml, 'flgPlot', false, 'verbose', true);
+elseif trcmp(mode, 'cell')
+    tbl = tblCell;
+    vars = {'amp', 'flux', 'rate', 'tf'};
 
-% NOTE: currently, rate is not different between genotypes, but it could be
-% biased by small events. Rate is problematic because unlike spikes, Ca
-% transients are not binary. Need to find a solution. 
+end
 
-tblGUI_scatHist(tblEvent, 'yVar', 'amp', 'xVar', 'dur', 'grpVar', 'compartment');
-tblGUI_scatHist(tblCell, 'yVar', 'amp', 'xVar', 'dur', 'grpVar', 'compartment');
+yVar = vars{1};
+xVar = vars{4};
+
+% Bar
+tblGUI_bar(tbl,  'yVar', yVar, 'xVar', 'compartment', 'grpVar', 'genotype');
+
+% Across compartments
+tblGUI_scatHist(tbl, 'yVar', yVar, 'xVar', xVar, 'grpVar', 'compartment');
+
+% Per compartment
+cmp = 'Mito';
+tblGUI_scatHist(tbl(tbl.compartment == cmp, :), 'yVar', yVar, 'xVar', xVar, 'grpVar', 'genotype');
+
+cmp = 'Cyto';
+tblGUI_scatHist(tbl(tbl.compartment == cmp, :), 'yVar', yVar, 'xVar', xVar, 'grpVar', 'genotype');
+
+% Cyto versus Mito
+tblSub = tbl(tbl.compartment == 'Cyto', {'sbjID', 'genotype', yVar});
+tblSub.cyto = tblSub.(yVar);
+tblSub.mito = tbl.(yVar)(tbl.compartment == 'Mito');
+tblGUI_scatHist(tblSub, 'xVar', 'mito', 'yVar','cyto', 'grpVar','genotype');
+
+
+%  LME
+frml = [vars{2}, ' ~ genotype * compartment + (1 | sbjID)'];
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblCell, frml, 'flgPlot', false, 'verbose', true);
+
+
+
+
+
+
+
+%% ========================================================================
+%  CYTO THRESHOLD (decision)
+%  ========================================================================
+% Compare two distributions of cyto amps in Control cells:
+%   - all cyto events (every detected cyto, regardless of triggering)
+%   - triggering cytos (those paired with a mito event via pairIdx)
+% The trigger distribution is the empirical "real cyto" distribution;
+% below its lower tail is detector noise that inflates cyto rate and
+% drags T toward zero. Pick minAmpCyto from its lower tail and set it
+% at the top of LOAD & ORGANIZE, then re-run from there.
+
+mask    = tblEvent.compartment == 'Cyto' & tblEvent.genotype == 'Control';
+ampAll  = tblEvent.amp(mask);
+ampTrig = tblEvent.amp(mask & ~isnan(tblEvent.pairIdx));
+thrSugg = prctile(ampTrig, 5);
+
+figure('Name', 'Cyto threshold (Control)', 'Color', 'w');
+hold on
+histogram(ampAll,  'Normalization', 'pdf', 'FaceAlpha', 0.4, ...
+    'DisplayName', sprintf('all cytos (n=%d)', numel(ampAll)));
+histogram(ampTrig, 'Normalization', 'pdf', 'FaceAlpha', 0.4, ...
+    'DisplayName', sprintf('triggers (n=%d)', numel(ampTrig)));
+xline(thrSugg, 'r--', sprintf('  5%% trig = %.3f', thrSugg), ...
+    'LabelOrientation', 'horizontal');
+xlabel('cyto amp (dF/F)'); ylabel('pdf');
+legend('Location', 'best');
+title(sprintf('Suggested minAmpCyto = %.3f', thrSugg));
+hold off
 
 
 %% ========================================================================
