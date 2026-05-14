@@ -42,6 +42,9 @@ addParameter(p, 'clr', [], @(x) isempty(x) || size(x,2)==3);
 addParameter(p, 'Parent', [], @(x) isempty(x) || isgraphics(x));
 addParameter(p, 'SelectionCallback', [], @(x) isempty(x) || isa(x, 'function_handle'));
 addParameter(p, 'GroupByCallback', [], @(x) isempty(x) || isa(x, 'function_handle'));
+addParameter(p, 'xScale', '', @(x) any(strcmpi(x, {'', 'linear', 'log'})));
+addParameter(p, 'yScale', '', @(x) any(strcmpi(x, {'', 'linear', 'log', 'x-linked'})));
+addParameter(p, 'fitType', '', @(x) any(strcmpi(x, {'', 'none', 'linear', 'ortho'})));
 
 parse(p, tbl, varargin{:});
 
@@ -59,6 +62,9 @@ xVarIn      = p.Results.xVar;
 yVarIn      = p.Results.yVar;
 szVarIn     = p.Results.szVar;
 grpVarIn    = p.Results.grpVar;
+xScaleIn    = p.Results.xScale;
+yScaleIn    = p.Results.yScale;
+fitTypeIn   = p.Results.fitType;
 
 %% ========================================================================
 %  INITIALIZATION
@@ -265,6 +271,21 @@ else,             set(guiData.ddGrp, 'Value', idxG + 1); end
 
 % Fit ('None' is 1)
 set(guiData.ddFit, 'Value', 1);
+
+% Optional initial X/Y scale and fit-type overrides. Default ('') keeps
+% the dropdowns at their first entry (Linear / Linear / None).
+if ~isempty(xScaleIn)
+    idx = find(strcmpi(get(guiData.ddXScale, 'String'), xScaleIn), 1);
+    if ~isempty(idx), set(guiData.ddXScale, 'Value', idx); end
+end
+if ~isempty(yScaleIn)
+    idx = find(strcmpi(get(guiData.ddYScale, 'String'), yScaleIn), 1);
+    if ~isempty(idx), set(guiData.ddYScale, 'Value', idx); end
+end
+if ~isempty(fitTypeIn)
+    idx = find(strcmpi(get(guiData.ddFit, 'String'), fitTypeIn), 1);
+    if ~isempty(idx), set(guiData.ddFit, 'Value', idx); end
+end
 
 % --- Filter Panel ---
 grpDDBottom = yGrp;

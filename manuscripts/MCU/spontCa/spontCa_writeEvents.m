@@ -3,8 +3,12 @@ function spontCa_writeEvents(tblEvent, dirPath, varargin)
 % one bare events table per cell into dirPath.
 %
 % Per-cell file: <sbjID>.mat containing a variable named `events`, a
-% table with columns {compartment, start, stop, amp, dur, int}. No
-% sbjID column (it's the filename), no metadata wrapper.
+% table with the minimal schema {compartment, start, stop}. No sbjID
+% column (it's the filename), no metadata wrapper. Any of {amp, dur,
+% int} in the input are dropped before write - these are recomputed on
+% demand in spontCa2_metrics. For Cyto rows, stop is forced to equal
+% start (events are single-sample at fs=3 Hz; baking this in keeps the
+% on-disk schema unambiguous).
 %
 % If a target file exists and 'backup' is true (default), the existing
 % file is copied to <dirPath>/bkup/<sbjID>_<stamp>.mat before overwrite.
@@ -31,6 +35,20 @@ if ~exist(dirPath, 'dir'), mkdir(dirPath); end
 if ~ismember('sbjID', tblEvent.Properties.VariableNames)
     error('spontCa_writeEvents:noSbjID', ...
         'tblEvent must have an sbjID column');
+end
+
+% Strip non-essential columns. amp/dur/int are recomputed downstream.
+dropVars = intersect(tblEvent.Properties.VariableNames, ...
+    {'amp', 'dur', 'int', 'flux'});
+if ~isempty(dropVars)
+    tblEvent = removevars(tblEvent, dropVars);
+end
+
+% Enforce single-sample cyto: stop == start.
+if all(ismember({'compartment', 'start', 'stop'}, ...
+        tblEvent.Properties.VariableNames))
+    isCyto = tblEvent.compartment == 'Cyto';
+    tblEvent.stop(isCyto) = tblEvent.start(isCyto);
 end
 
 sbjIDs = unique(tblEvent.sbjID, 'stable');

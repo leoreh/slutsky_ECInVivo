@@ -243,11 +243,13 @@ function hLine = plotKDE(ax, val, edges, c, orient, scale, normType)
         
         if strcmp(normType, 'probability')
             % Probability Adaptation
-            binW = mean(diff(log10(edges))); 
+            binW = mean(diff(log10(edges)));
             f = f_log * binW;
         else
-             % PDF
-             f = f_log; 
+            % pdf: ksdensity returns the density of log10(val), but the
+            % histogram bars (with pdf normalization) are the density of
+            % val. Convert via the Jacobian: f_x(x) = f_u(log10 x) / (x*ln10).
+            f = f_log ./ (pts * log(10));
         end
     else
         pts = linspace(min(edges), max(edges), 200);

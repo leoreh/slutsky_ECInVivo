@@ -1,366 +1,312 @@
-%% mcu_spontCa.m  Spontaneous Ca2+ imaging pipeline (cyto + mito).
+%% mcu_spontCa.m  Post-detection analyses for spontaneous Ca imaging.
 %
 % PURPOSE
-%   Read NF's SpontCa.xlsx into a long-format cell table and a long-format
-%   events table, optionally curate via manCur, finalize (aggregates +
-%   ETA maps + coupling). Reproduces Fig 1E,F + S1B-E and the
-%   transfer-function preview.
+%   Load pre-built tables produced by spontCa_detectWrapper, derive
+%   analysis metrics via spontCa2_metrics, apply selective filtering,
+%   and run summary plots + focused analyses + interactive exploration.
+%   This script does NOT touch the source Excel file - all detection,
+%   curation, and assembly happen upstream in spontCa_detectWrapper.
 %
-% PIPELINE FILES 
-%   spontCa_loadXls     Excel -> tblCell (traces + cell metadata).
-%                       Picks sheet 'f' (raw F) or 'dff' via flgRaw;
-%                       optionally drops experimenter-excluded cells.
-%   spontCa_detect      single-trace event detection, returns a table
-%   spontCa_writeEvents tblEvent -> per-cell <sbjID>.mat files
-%   spontCa_readEvents  per-cell <sbjID>.mat files -> tblEvent
-%   spontCa_manCur      interactive per-cell event-curation GUI
-%   spontCa_gui         per-cell QC viewer
+% PIPELINE
+%   spontCa_detectWrapper  loadXls -> detect -> manCur -> assemble ->
+%                          mandatory filter -> save cache/spontCa_tbl.mat.
+%   spontCa2_metrics       enrich tblEvent and tblCell with amp/dur/flux/
+%                          pairing/aggregates. Re-callable on filtered
+%                          subsets.
+%   spontCa_explore        interactive two-panel viewer.
+%   spontCa_summary        canonical 3x4 distribution + scatter figures
+%                          and the LME/OLS battery (genotype contrasts,
+%                          scaling slopes).
+%
+% SECTIONS
+%   1. LOAD
+%   2. METRICS
+%   3. FILTERING (selective)
+%   4. SUMMARY PLOTS
+%   5. FOCUSED ANALYSES (triggering, compensation, compensation model)
+%   6. INTERACTIVE EXPLORATION
 
 
 %% ========================================================================
 %  LOAD
 %  ========================================================================
-
-[tblCell, fs] = spontCa_loadXls('flgRaw', true, 'flgExclude', false);
-
-% Params
-dt = 1 / fs;
-nRows = height(tblCell);
-nSamps = size(tblCell.trace, 2);
-recDur = nSamps / fs;
-
-
-%% ========================================================================
-%  AUTOMATIC DETECT
-%  ========================================================================
-% Per-row detection. Each call to spontCa_detect returns a table with
-% rows = events; sbjID + compartment tags are added before vertcat into
-% tblEvent. Result is written to <spontCa>/auto/<sbjID>.mat (one bare
-% events table per cell) for the manCur Load button to pick up.
-%
-% Derivative-based detection with a local-baseline amplitude gate:
-%   minAmp - peak amplitude above local baseline (dF/F)
-%   minIEI - peak-to-peak distance for greedy max-suppression (s)
-%   kNoise - rise-threshold multiplier on per-cell derivative noise
-%   minDur - minimum decay length, stop - peak (s)
-
-% % Params tuned by spontCa_tune against 4 curated cells (Ctrl_01/02/03/05).
-% paramsCyto = {'minAmp', 0.05, 'minIEI', 1.0, 'kNoise', 3.5, 'minDur', 0.4};
-% paramsMito = {'minAmp', 0.06, 'minIEI', 0.4, 'kNoise', 3.5, 'minDur', 0.2};
-% 
-% chunks = cell(nRows, 1);
-% for iRow = 1:nRows
-%     if tblCell.compartment(iRow) == 'Cyto'
-%         rowEv = spontCa_detect(tblCell.trace(iRow, :), fs, paramsCyto{:});
-%     else
-%         rowEv = spontCa_detect(tblCell.trace(iRow, :), fs, paramsMito{:});
-%     end
-%     if height(rowEv) > 0
-%         rowEv.sbjID       = repmat(tblCell.sbjID(iRow),       height(rowEv), 1);
-%         rowEv.compartment = repmat(tblCell.compartment(iRow), height(rowEv), 1);
-%         chunks{iRow} = rowEv;
-%     end
-% end
-% tblEvent = vertcat(chunks{~cellfun(@isempty, chunks)});
-% tblEvent = tblEvent(:, ['sbjID', 'compartment', setdiff(...
-%     tblEvent.Properties.VariableNames, {'sbjID','compartment'}, 'stable')]);
-% 
-% autoDir = fullfile(fileparts(which('spontCa_detect')), 'auto');
-% spontCa_writeEvents(tblEvent, autoDir, 'backup', false);
-
-
-%% ========================================================================
-%  MANUAL CURATION
-%  ========================================================================
-% Opens manCur on the in-memory tblEvent. Save writes per-cell bare
-% events tables to man/<sbjID>.mat. After closing, re-read whatever's
-% on disk in man/ (if any) and merge with the auto-detection rows for
-% cells the user didn't curate.
-
-% COMMENTS:
-% Control_72, 73, and 76 appear exactly the same cell. Kept only 72.
-
-% spontCa_manCur(tblCell, tblEvent, fs);
-
-
-%% ========================================================================
-%  LOAD & ORGANIZE EVENTS
-%  ========================================================================
-% Build tblEvent from disk: man/<sbjID>.mat for curated cells, falling
-% back to auto/<sbjID>.mat for uncurated ones. This block stands alone -
-% no need to re-run AUTOMATIC DETECT or MANUAL CURATION as long as those
-% folders are populated.
+% tblCell carries per-session traces + genotype + compartment. tblEvent
+% holds the minimal per-event schema {sbjID, genotype, compartment,
+% start, stop} after the mandatory-filter pass in detectWrapper.
 
 spDir = fileparts(which('spontCa_detect'));
-tblEvent_auto = spontCa_readEvents(fullfile(spDir, 'auto'));
-tblEvent_man  = spontCa_readEvents(fullfile(spDir, 'man'));
-
-curatedCells  = unique(tblEvent_man.sbjID);
-tblEvent_auto = tblEvent_auto(~ismember(tblEvent_auto.sbjID, curatedCells), :);
-tblEvent      = [tblEvent_auto; tblEvent_man];
-tblEvent      = sortrows(tblEvent);
-
-% Attach genotype to each event row (sbjID -> genotype lookup).
-[~, idx] = ismember(tblEvent.sbjID, tblCell.sbjID);
-tblEvent.genotype = tblCell.genotype(idx);
-tblEvent = movevars(tblEvent, 'genotype', 'before', 1);
-
-% Sanity check - events with zero or nan amplitude
-badEvents = find(tblEvent.amp < eps | isnan(tblEvent.amp));
-if ~isempty(badEvents)
-    tblEvent(badEvents, :)
-end
-
-% Sanity check - events with unreasonable high amplitude
-badEvents = find(tblEvent.amp > 5);
-if ~isempty(badEvents)
-    tblEvent(badEvents, :)
-end
-
-% Rename int -> flux for naming consistency with cell-level.
-tblEvent = renamevars(tblEvent, 'int', 'flux');
-
-% Cyto has no real decay at fs=3: the event lives in one sample. Define
-% the event "integral" as amp * dt - units dF/F*s, dimensionally
-% consistent with the mito event integral. Stop = start (point), dur = dt
-% (one frame). 
-isCyto = tblEvent.compartment == 'Cyto';
-tblEvent.stop(isCyto) = tblEvent.start(isCyto);
-tblEvent.dur(isCyto)  = dt;
-tblEvent.flux(isCyto)  = tblEvent.amp(isCyto) * dt;
+load(fullfile(spDir, 'cache', 'spontCa_tbl.mat'), 'tblCell', 'tblEvent', 'fs');
 
 
 %% ========================================================================
-%  FILTER & EXCLUDE
+%  METRICS
 %  ========================================================================
-% (1) Drop sub-threshold cyto events. minAmpCyto is set by CYTO THRESHOLD
-%     section below.
-% (2) Drop cells that end up with zero events in either compartment.
-%     This cascades: a cell whose only cyto events were sub-threshold
-%     also loses its mito events from downstream analyses.
+% Recompute amp / dur / flux from traces, run cyto-mito pairing, attach
+% cell-level aggregates. aggFcn drives mean vs median collapsing of
+% per-event quantities to per-cell.
 
-minAmpCyto = 0;
-drop = tblEvent.compartment == 'Cyto' & tblEvent.amp < minAmpCyto;
-fprintf('Dropped %d cyto events with amp < %g\n', sum(drop), minAmpCyto);
-tblEvent(drop, :) = [];
+[tblCell, tblEvent] = spontCa2_metrics(tblCell, tblEvent, fs, ...
+    'aggFcn', 'mean');
 
-nCper = arrayfun(@(s) sum(tblEvent.sbjID == s & tblEvent.compartment == 'Cyto'), tblCell.sbjID);
-nMper = arrayfun(@(s) sum(tblEvent.sbjID == s & tblEvent.compartment == 'Mito'), tblCell.sbjID);
-keepCell = nCper > 0 & nMper > 0;
-fprintf('Dropped %d cells with zero kept events in cyto or mito\n', sum(~keepCell) / 2);
+
+%% ========================================================================
+%  FILTERING (SELECTIVE)
+%  ========================================================================
+% Parameter screen. Each criterion is a clearly named scalar; flip them
+% to rerun analyses on a different subset. Mandatory filtering (NaN
+% events, cells with zero events in either compartment after assembly)
+% already happened in spontCa_detectWrapper - this section is purely
+% optional analysis-time refinement.
+
+minAmpCyto   = 0.025;   % drop cyto events below this dF/F (detector noise floor)
+minNEvents   = 0;       % drop cells with fewer than this many events per compartment
+
+% --- Build event-level keep mask ---
+keepEv = true(height(tblEvent), 1);
+isCytoEv = tblEvent.compartment == 'Cyto';
+keepEv(isCytoEv & tblEvent.amp < minAmpCyto) = false;
+fprintf('FILTER: dropped %d cyto events with amp < %g\n', ...
+    sum(~keepEv), minAmpCyto);
+tblEvent = tblEvent(keepEv, :);
+
+% --- Build cell-level keep mask (cells must retain >= minNEvents per compartment) ---
+nCper = arrayfun(@(s) sum(tblEvent.sbjID == s & ...
+    tblEvent.compartment == 'Cyto'), tblCell.sbjID);
+nMper = arrayfun(@(s) sum(tblEvent.sbjID == s & ...
+    tblEvent.compartment == 'Mito'), tblCell.sbjID);
+keepCell = nCper > minNEvents & nMper > minNEvents;
+fprintf('FILTER: dropped %d cells below minNEvents=%d\n', ...
+    sum(~keepCell) / 2, minNEvents);
 tblCell  = tblCell(keepCell, :);
 tblEvent = tblEvent(ismember(tblEvent.sbjID, tblCell.sbjID), :);
-nRows    = height(tblCell);
+
+% --- Re-run metrics on the filtered tables so aggregates are consistent ---
+[tblCell, tblEvent] = spontCa2_metrics(tblCell, tblEvent, fs, ...
+    'aggFcn', 'mean');
+
+% NOTE on minAmpCyto threshold (decision aid). Triggering cytos give the
+% empirical "real cyto" amp distribution; below its lower tail is
+% detector noise. To revisit, plot histograms of all-cyto vs triggering
+% cyto amps in Control cells and pick from the lower tail:
+%   mask    = tblEvent.compartment == 'Cyto' & tblEvent.genotype == 'Control';
+%   ampAll  = tblEvent.amp(mask);
+%   ampTrig = tblEvent.amp(mask & ~isnan(tblEvent.pairIdx));
+%   thrSugg = prctile(ampTrig, 5);
+
 
 %% ========================================================================
-%  PAIR & CROSS-FLUX
+%  SUMMARY PLOTS
 %  ========================================================================
-% Couple cyto and mito events and compute the cross-compartment flux
-% integral for each event.
+% Canonical 3x4 figure (event distributions + scatters) and the LME /
+% OLS battery. spontCa_summary auto-switches modes on table identity.
+
+[hFigEv, sEv] = spontCa_summary(tblEvent);
+[hFigCl, sCl] = spontCa_summary(tblCell);
+
+% Legacy interactive triage (kept as a 1-liner reference):
+% tblGUI_bar(tblCell, 'yVar', 'fluxRate', 'xVar', 'compartment', 'grpVar', 'genotype');
+
+
+%% ========================================================================
+%  FOCUSED ANALYSES
+%  ========================================================================
+% Three questions raised after the canonical summary.
 %
-%   cyto row: pairIdx  -> first mito event whose start falls within
-%                         [start, start + win_c2m], else NaN.
-%             pairFlux -> integral of mito dF/F over the same window.
-%   mito row: pairIdx  -> closest preceding cyto within maxLag of mito
-%                         start (the "trigger"), else NaN.
-%             pairFlux -> integral of cyto dF/F over [trigger.start,
-%                         this.stop].
-%
-% Per-event transfer:
-%   cyto row: T = crossInt / amp   (mito response per cyto attempt; s)
-%   mito row: T = crossInt / int   (cyto input per mito response; -)
+% (1) TRIGGERING CYTOS. Are cyto events that triggered a mito event
+%     larger than non-triggering cyto events, and does that triggering-
+%     related shift differ by genotype?
+% (2) COMPENSATION (per-cell, log-log). Do cells with weaker per-event
+%     mito uptake compensate with larger cyto events? Tested across
+%     three aggregation metrics (amp, flux, fluxRate).
+% (3) COMPENSATION MODEL. Do Ctrl and KO cells trace a single continuous
+%     curve T = load_mito / load_cyto vs load_cyto? Tested as joint
+%     genotype null in a log-log OLS fit (per MCU compensation model).
 
-win_c2m = 10;       % cyto -> mito response window (s)
-maxLag  = 5;        % max cyto -> mito lag to be called a trigger (s)
+cfg = mcu_cfg();
+clr = cfg.clr.grp;
 
-nEv = height(tblEvent);
-tblEvent.pairIdx  = nan(nEv, 1);
-tblEvent.pairLag  = nan(nEv, 1);
-tblEvent.pairFlux = nan(nEv, 1);
-tblEvent.tf        = nan(nEv, 1);
 
-cells = unique(tblEvent.sbjID);
-for iCell = 1:numel(cells)
-    sid = cells(iCell);
-    iC = find(tblCell.sbjID == sid & tblCell.compartment == 'Cyto', 1);
-    iM = find(tblCell.sbjID == sid & tblCell.compartment == 'Mito', 1);
+% --- (1) TRIGGERING CYTOS ----------------------------------------------
+% tblEvent.triggered is set by spontCa2_metrics. LME on cyto events:
+% amp ~ triggered * genotype + (1|sbjID), log-normal.
 
-    cytoTrace = tblCell.trace(iC, :);
-    mitoTrace = tblCell.trace(iM, :);
+cytoEv = tblEvent(tblEvent.compartment == 'Cyto', :);
+[mdlTrig, stTrig, infoTrig] = lme_analyse(cytoEv, ...
+    'amp ~ triggered * genotype + (1|sbjID)', ...
+    'dist', 'Log-Normal', 'flgPlot', false, 'verbose', true, 'flgStnd', false);
 
-    rowsC = find(tblEvent.sbjID == sid & tblEvent.compartment == 'Cyto');
-    rowsM = find(tblEvent.sbjID == sid & tblEvent.compartment == 'Mito');
-    startsC = tblEvent.start(rowsC);
-    startsM = tblEvent.start(rowsM);
-    stopsM  = tblEvent.stop(rowsM);
+hFigTrig = figure('Name', 'Triggering cytos', 'Color', 'w', ...
+    'Units', 'normalized', 'Position', [0.08 0.20 0.62 0.55]);
+tlT = tiledlayout(hFigTrig, 1, 2, 'Padding', 'compact', 'TileSpacing', 'compact');
+title(tlT, 'Cyto amp split by triggering status', 'FontWeight', 'bold');
 
-    % Cyto -> mito response integrated over a fixed window after each cyto.
-    for iEvent = 1:numel(rowsC)
-        s = startsC(iEvent);
-        i0 = max(1, round(s * fs) + 1);
-        i1 = min(nSamps, round((s + win_c2m) * fs) + 1);
-        if i1 >= i0
-            tblEvent.pairFlux(rowsC(iEvent)) = sum(mitoTrace(i0:i1)) * dt;
-        end
-        j = find(startsM >= s & startsM <= s + win_c2m, 1, 'first');
-        if ~isempty(j)
-            tblEvent.pairIdx(rowsC(iEvent)) = rowsM(j);
-            tblEvent.pairLag(rowsC(iEvent)) = startsM(j) - s;
-        end
-    end
+axT1 = nexttile(tlT, 1);
+sub = cytoEv(cytoEv.genotype == 'Control', :);
+plot_hist(sub, 'amp', 'g', 'triggered', 'hAx', axT1, ...
+    'c', [0.45 0.45 0.45; 0.05 0.05 0.05], ...
+    'flgKDE', true, 'flgStat', true, 'scale', 'log');
+set(axT1, 'XScale', 'log');
+xlabel(axT1, 'cyto amp (dF/F)'); ylabel(axT1, 'pdf');
+title(axT1, sprintf('Control (n=%d)', height(sub)));
+legend(axT1, 'Location', 'best', 'Box', 'off');
 
-    % Mito -> trigger cyto, cyto input integrated from trigger to mito stop.
-    for iEvent = 1:numel(rowsM)
-        ms = startsM(iEvent);
-        j = find(startsC <= ms & startsC >= ms - maxLag, 1, 'last');
-        if isempty(j), continue; end
-        trigStart = startsC(j);
-        tblEvent.pairIdx(rowsM(iEvent)) = rowsC(j);
-        tblEvent.pairLag(rowsM(iEvent)) = ms - trigStart;
-        i0 = max(1, round(trigStart * fs) + 1);
-        i1 = min(nSamps, round(stopsM(iEvent) * fs) + 1);
-        if i1 >= i0
-            tblEvent.pairFlux(rowsM(iEvent)) = sum(cytoTrace(i0:i1)) * dt;
-        end
-    end
+axT2 = nexttile(tlT, 2);
+sub = cytoEv(cytoEv.genotype == 'MCU-KO', :);
+plot_hist(sub, 'amp', 'g', 'triggered', 'hAx', axT2, ...
+    'c', [0.90 0.75 0.55; 0.55 0.40 0.20], ...
+    'flgKDE', true, 'flgStat', true, 'scale', 'log');
+set(axT2, 'XScale', 'log');
+xlabel(axT2, 'cyto amp (dF/F)'); ylabel(axT2, 'pdf');
+title(axT2, sprintf('MCU-KO (n=%d)', height(sub)));
+legend(axT2, 'Location', 'best', 'Box', 'off');
+
+
+% --- (2) COMPENSATION (per-cell log-log) -------------------------------
+% Reshape to one row per cell with cyto/mito columns per metric, fit
+% log-log OLS with genotype interaction.
+
+isC = tblCell.compartment == 'Cyto';
+isM = tblCell.compartment == 'Mito';
+tblComp = tblCell(isC, {'sbjID', 'genotype'});
+tblComp.cytoAmp      = tblCell.amp(isC);
+tblComp.mitoAmp      = tblCell.amp(isM);
+tblComp.cytoFlux     = tblCell.flux(isC);
+tblComp.mitoFlux     = tblCell.flux(isM);
+tblComp.cytoFluxRate = tblCell.fluxRate(isC);
+tblComp.mitoFluxRate = tblCell.fluxRate(isM);
+
+metrics   = {'amp', 'flux', 'fluxRate'};
+metricLbl = {'mean per-event amp (dF/F)', ...
+             'mean per-event flux (dF/F\cdots)', ...
+             'fluxRate (dF/F/s)'};
+compRows = {};
+for iM = 1:numel(metrics)
+    m = metrics{iM};
+    xCol = ['cyto' upper(m(1)) m(2:end)];
+    yCol = ['mito' upper(m(1)) m(2:end)];
+    tblFit = tblComp;
+    tblFit.(xCol) = log(tblComp.(xCol));
+    tblFit.(yCol) = log(tblComp.(yCol));
+    mdl   = fitlm(tblFit, sprintf('%s ~ %s * genotype', yCol, xCol));
+    coefs = mdl.Coefficients;
+    nm    = string(coefs.Properties.RowNames);
+    bMain  = coefs.Estimate(nm == xCol);
+    pMain  = coefs.pValue(nm == xCol);
+    isInt  = contains(nm, xCol) & contains(nm, "genotype");
+    bInter = coefs.Estimate(isInt);
+    pInter = coefs.pValue(isInt);
+    compRows(end+1, :) = {m, bMain, pMain, bInter, pInter, ...
+        bMain + bInter, mdl.Rsquared.Ordinary};                  %#ok<*AGROW>
+end
+tblCompStats = cell2table(compRows, 'VariableNames', ...
+    {'metric', 'b_Ctrl', 'p_main', 'b_inter', 'p_inter', 'b_KO', 'R2'});
+disp(tblCompStats);
+
+hFigComp = figure('Name', 'Compensation: mito ~ cyto per cell', ...
+    'Color', 'w', 'Units', 'normalized', 'Position', [0.06 0.20 0.86 0.55]);
+tlC = tiledlayout(hFigComp, 1, 3, 'Padding', 'compact', 'TileSpacing', 'compact');
+title(tlC, 'Compensation: mito ~ cyto per cell (log-log)', 'FontWeight', 'bold');
+for iM = 1:numel(metrics)
+    m = metrics{iM};
+    xCol = ['cyto' upper(m(1)) m(2:end)];
+    yCol = ['mito' upper(m(1)) m(2:end)];
+    ax = nexttile(tlC, iM);
+    set(ax, 'XScale', 'log', 'YScale', 'log');
+    plot_scat(tblComp, xCol, yCol, 'g', 'genotype', ...
+        'hAx', ax, 'c', clr, 'fitType', 'Linear', 'flgStats', true, ...
+        'sz', 40, 'alpha', 0.7);
+    xlabel(ax, sprintf('cyto %s', metricLbl{iM}));
+    ylabel(ax, sprintf('mito %s', metricLbl{iM}));
+    rowS = tblCompStats(strcmp(tblCompStats.metric, m), :);
+    title(ax, sprintf('%s | Ctrl %+.2f, KO %+.2f, p(int)=%.3f', ...
+        m, rowS.b_Ctrl, rowS.b_KO, rowS.p_inter));
 end
 
-% Per-event transfer ratio. Uniform across compartments because cyto.flux
-% (= amp*dt) and mito.flux (= event integral) share units of dF/F*s.
-%   cyto row: T = mito response integral / cyto integral
-%   mito row: T = cyto input integral    / mito integral
-tblEvent.tf = tblEvent.pairFlux ./ tblEvent.flux;
 
-% Clip negative pairFlux / tf to zero. These are events whose cross-window
-% integrated the opposite compartment around its noise floor and came out
-% slightly below zero. They carry no biological information.
-tblEvent.pairFlux(tblEvent.pairFlux < 0) = 0;
-tblEvent.tf(tblEvent.tf < 0) = 0;
+% --- (3) COMPENSATION MODEL TEST ---------------------------------------
+% Single continuous T(load_cyto) curve across genotypes? Compensation
+% supported iff adding genotype to a pooled fit of log T ~ log load_cyto
+% does not improve it (joint F-test on all genotype-related coefficients).
+% Uses the detection-free `load` from spontCa2_metrics.
 
+isC = tblCell.compartment == 'Cyto';
+isM = tblCell.compartment == 'Mito';
+tblT = table(tblCell.sbjID(isC), tblCell.genotype(isC), ...
+    tblCell.load(isC), tblCell.load(isM), ...
+    'VariableNames', {'sbjID', 'genotype', 'loadCyto', 'loadMito'});
+ok = isfinite(tblT.loadCyto) & tblT.loadCyto > 0 & ...
+     isfinite(tblT.loadMito) & tblT.loadMito > 0;
+tblT = tblT(ok, :);
+tblT.T          = tblT.loadMito ./ tblT.loadCyto;
+tblT.logLcyto   = log(tblT.loadCyto);
+tblT.logT       = log(tblT.T);
+tblT.genotype   = setcats(tblT.genotype, {'Control', 'MCU-KO'});
 
-%% ========================================================================
-%  PER-CELL SUMMARY
-%  ========================================================================
+mdlPool = fitlm(tblT, 'logT ~ logLcyto');
+mdlGeno = fitlm(tblT, 'logT ~ logLcyto * genotype');
 
-% tblEvent.flux has units of dF/F*s (event integral). tblCell.fluxRate
-% is the sum of event flux over recording duration, units dF/F per s.
-
-tblCell.nEvents  = zeros(nRows, 1);
-tblCell.rate     = zeros(nRows, 1);
-tblCell.amp      = nan(nRows, 1);
-tblCell.dur      = nan(nRows, 1);
-tblCell.fluxRate = zeros(nRows, 1);
-tblCell.tf       = nan(nRows, 1);
-for iRow = 1:nRows
-    mask = tblEvent.sbjID == tblCell.sbjID(iRow) & ...
-           tblEvent.compartment == tblCell.compartment(iRow);
-    tblCell.nEvents(iRow)  = sum(mask);
-    tblCell.rate(iRow)     = tblCell.nEvents(iRow) / recDur;
-    tblCell.amp(iRow)      = mean(tblEvent.amp(mask));
-    tblCell.dur(iRow)      = mean(tblEvent.dur(mask));
-    tblCell.fluxRate(iRow) = sum(tblEvent.flux(mask)) / recDur;
-    tblCell.tf(iRow)       = mean(tblEvent.tf(mask), 'omitnan');
+% Build the H matrix from coefficient names so the joint test does not
+% depend on MATLAB's ordering convention (categorical before continuous).
+coefNames = mdlGeno.CoefficientNames;
+genoIdx   = find(contains(coefNames, 'genotype'));
+H = zeros(numel(genoIdx), numel(coefNames));
+for k = 1:numel(genoIdx)
+    H(k, genoIdx(k)) = 1;
 end
+[p_geno, F_geno, df1] = coefTest(mdlGeno, H);
+df2 = mdlGeno.DFE;
 
-
-
-
-
-%% ========================================================================
-%  INSPECT RESULTS
-%  ========================================================================
-
-mode = 'cell';
-
-if strcmp(mode, 'event')
-    tbl = tblEvent;
-    vars = {'amp', 'flux', 'pairFlux', 'tf'};
-elseif strcmp(mode, 'cell')
-    tbl = tblCell;
-    vars = {'amp', 'fluxRate', 'rate', 'tf'};
-end
-
-yVar = vars{3};
-xVar = vars{2};
-
-% Bar
-tblGUI_bar(tbl, 'yVar', yVar, 'xVar', 'compartment', 'grpVar', 'genotype');
-
-% Across compartments
-tblGUI_scatHist(tbl, 'yVar', yVar, 'xVar', xVar, 'grpVar', 'compartment');
-
-% Per compartment
-cmp = 'Mito';
-tblGUI_scatHist(tbl(tbl.compartment == cmp, :), 'yVar', yVar, 'xVar', xVar, 'grpVar', 'genotype');
-
-cmp = 'Cyto';
-tblGUI_scatHist(tbl(tbl.compartment == cmp, :), 'yVar', yVar, 'xVar', xVar, 'grpVar', 'genotype');
-
-% Cyto versus Mito. For 'cell' mode each cell has one cyto + one mito
-% row; pair them by position. For 'event' mode pair via pairIdx (cyto
-% events that have a paired mito event).
-var = 'amp';
-if strcmp(mode, 'cell')
-    isC = tbl.compartment == 'Cyto';
-    isM = tbl.compartment == 'Mito';
-    tblSub = tbl(isC, {'sbjID', 'genotype'});
-    tblSub.cyto = tbl.(var)(isC);
-    tblSub.mito = tbl.(var)(isM);
+fprintf('\n=== Compensation model test (per-cell T vs load_cyto) ===\n');
+fprintf('n = %d cells (%d Ctrl, %d KO).\n', height(tblT), ...
+    sum(tblT.genotype == 'Control'), sum(tblT.genotype == 'MCU-KO'));
+fprintf('\nPooled fit:  log T ~ log load_cyto\n');
+disp(mdlPool.Coefficients);
+fprintf('R^2 = %.3f\n', mdlPool.Rsquared.Ordinary);
+fprintf('\nWith-genotype fit:  log T ~ log load_cyto * genotype\n');
+disp(mdlGeno.Coefficients);
+fprintf('R^2 = %.3f\n', mdlGeno.Rsquared.Ordinary);
+fprintf('\nJoint test of genotype contribution:\n');
+fprintf('  F(%d, %d) = %.2f, p = %.4f\n', df1, df2, F_geno, p_geno);
+if p_geno >= 0.05
+    fprintf('  -> genotype does NOT improve the fit. Compensation supported.\n');
 else
-    isCyto = tbl.compartment == 'Cyto' & ~isnan(tbl.pairIdx);
-    tblSub = tbl(isCyto, {'sbjID', 'genotype'});
-    tblSub.cyto = tbl.(var)(isCyto);
-    tblSub.mito = tbl.(var)(tbl.pairIdx(isCyto));
+    fprintf('  -> genotype DOES improve the fit. Compensation rejected.\n');
 end
-tblGUI_scatHist(tblSub, 'xVar', 'cyto', 'yVar', 'mito', 'grpVar', 'genotype');
+dAIC = mdlPool.ModelCriterion.AIC - mdlGeno.ModelCriterion.AIC;
+dBIC = mdlPool.ModelCriterion.BIC - mdlGeno.ModelCriterion.BIC;
+fprintf('Delta AIC (pooled - genotype) = %+.2f (positive favors genotype)\n', dAIC);
+fprintf('Delta BIC (pooled - genotype) = %+.2f (positive favors genotype)\n', dBIC);
 
+hFigT = figure('Name', 'Compensation model: T vs load_cyto', 'Color', 'w', ...
+    'Units', 'normalized', 'Position', [0.08 0.22 0.72 0.55]);
+tlT = tiledlayout(hFigT, 1, 2, 'Padding', 'compact', 'TileSpacing', 'compact');
+title(tlT, sprintf('Compensation model: T vs load_{cyto} (joint geno p = %.3f)', p_geno), ...
+    'FontWeight', 'bold');
+axT1 = nexttile(tlT, 1);
+set(axT1, 'XScale', 'log', 'YScale', 'log');
+plot_scat(tblT, 'loadCyto', 'T', 'g', 'genotype', ...
+    'hAx', axT1, 'c', clr, 'fitType', 'Linear', 'flgStats', true, ...
+    'sz', 50, 'alpha', 0.85);
+xlabel(axT1, 'load_{cyto} (\DeltaF/F)');
+ylabel(axT1, 'T = load_{mito} / load_{cyto}');
+title(axT1, sprintf('T vs load_{cyto} (n=%d cells)', height(tblT)));
 
-%  LME
-frml = [vars{1}, ' ~ genotype * compartment + (1 | sbjID)'];
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tbl, frml, 'flgPlot', false, 'verbose', true);
-
-
-
-
-
-
-
-%% ========================================================================
-%  CYTO THRESHOLD (decision)
-%  ========================================================================
-% Compare two distributions of cyto amps in Control cells:
-%   - all cyto events (every detected cyto, regardless of triggering)
-%   - triggering cytos (those paired with a mito event via pairIdx)
-% The trigger distribution is the empirical "real cyto" distribution;
-% below its lower tail is detector noise that inflates cyto rate and
-% drags T toward zero. Pick minAmpCyto from its lower tail and set it
-% at the top of LOAD & ORGANIZE, then re-run from there.
-
-mask    = tblEvent.compartment == 'Cyto' & tblEvent.genotype == 'Control';
-ampAll  = tblEvent.amp(mask);
-ampTrig = tblEvent.amp(mask & ~isnan(tblEvent.pairIdx));
-thrSugg = prctile(ampTrig, 5);
-
-figure('Name', 'Cyto threshold (Control)', 'Color', 'w');
-hold on
-histogram(ampAll,  'Normalization', 'pdf', 'FaceAlpha', 0.4, ...
-    'DisplayName', sprintf('all cytos (n=%d)', numel(ampAll)));
-histogram(ampTrig, 'Normalization', 'pdf', 'FaceAlpha', 0.4, ...
-    'DisplayName', sprintf('triggers (n=%d)', numel(ampTrig)));
-xline(thrSugg, 'r--', sprintf('  5%% trig = %.3f', thrSugg), ...
-    'LabelOrientation', 'horizontal');
-xlabel('cyto amp (dF/F)'); ylabel('pdf');
-legend('Location', 'best');
-title(sprintf('Suggested minAmpCyto = %.3f', thrSugg));
-hold off
+axT2 = nexttile(tlT, 2);
+set(axT2, 'XScale', 'log', 'YScale', 'log');
+plot_scat(tblT, 'loadCyto', 'loadMito', 'g', 'genotype', ...
+    'hAx', axT2, 'c', clr, 'fitType', 'Linear', 'flgStats', true, ...
+    'sz', 50, 'alpha', 0.85);
+xlabel(axT2, 'load_{cyto} (\DeltaF/F)');
+ylabel(axT2, 'load_{mito} (\DeltaF/F)');
+title(axT2, 'load_{mito} vs load_{cyto}');
 
 
 %% ========================================================================
-%  QC (per-cell viewer)
+%  INTERACTIVE EXPLORATION
 %  ========================================================================
+% Two-panel viewer. Panel 1: within-compartment scatter+hist. Panel 2:
+% cross-compartment scatter+hist (one row per paired cyto-mito cell).
+% Top-bar controls switch Level (Event/Cell), Compartment (Cyto/Mito),
+% and the cross-compartment Metric.
 
-spontCa_gui(tblCell, tblEvent, fs);
-
-
-
-
+spontCa_explore(tblEvent, tblCell);

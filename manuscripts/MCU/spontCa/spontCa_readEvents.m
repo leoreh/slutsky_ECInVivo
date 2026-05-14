@@ -3,12 +3,15 @@ function tblEvent = spontCa_readEvents(dirPath)
 % into a single long-format tblEvent.
 %
 % Each <sbjID>.mat in dirPath holds a bare events table (variable name
-% `events`) with columns {compartment, start, stop, amp, dur, int}.
-% This function tags each row with its sbjID (from the filename) and
+% `events`) with the minimal schema {compartment, start, stop}. This
+% function tags each row with its sbjID (from the filename) and
 % vertcats into one tblEvent with columns
-% {sbjID, compartment, start, stop, amp, dur, int}.
+% {sbjID, compartment, start, stop}.
 %
-% Subdirectories (bkup/, images/, raw/) are ignored.
+% Legacy fields {amp, dur, int} from pre-refactor files are dropped
+% silently. amp/dur/flux are recomputed downstream in spontCa2_metrics.
+%
+% Subdirectories (bkup/, images/, raw/, bkup_premigration/) are ignored.
 %
 % USAGE
 %   tblEvent = spontCa_readEvents(manDir)
@@ -17,7 +20,7 @@ function tblEvent = spontCa_readEvents(dirPath)
 % Returns an empty (but correctly-typed) tblEvent if dirPath does not
 % exist or has no .mat files.
 %
-% See also: SPONTCA_WRITEEVENTS, SPONTCA_DETECT, SPONTCA_FINALIZE
+% See also: SPONTCA_WRITEEVENTS, SPONTCA_DETECT
 
 dirPath = char(dirPath);
 files = dir(fullfile(dirPath, '*.mat'));
@@ -26,7 +29,8 @@ if isempty(files)
     return;
 end
 
-canonVars = {'sbjID', 'compartment', 'start', 'stop', 'amp', 'dur', 'int'};
+canonVars = {'sbjID', 'compartment', 'start', 'stop'};
+legacyVars = {'amp', 'dur', 'int', 'flux'};
 chunks = cell(numel(files), 1);
 for k = 1:numel(files)
     [~, sid] = fileparts(files(k).name);
@@ -47,6 +51,11 @@ for k = 1:numel(files)
         events.sbjID = repmat(categorical({sid}), nE, 1);
     else
         events.sbjID = categorical(strings(0, 1));
+    end
+    % Drop legacy fields silently (pre-refactor schema tolerance).
+    dropV = intersect(legacyVars, events.Properties.VariableNames);
+    if ~isempty(dropV)
+        events = removevars(events, dropV);
     end
     % Canonicalize: drop unexpected vars, fill missing ones with NaN/<undefined>
     missing = setdiff(canonVars, events.Properties.VariableNames);
@@ -78,7 +87,7 @@ function tbl = emptyTblEvent()
 tbl = table( ...
     categorical(strings(0, 1)), ...
     categorical(strings(0, 1), {'Cyto', 'Mito'}), ...
-    zeros(0, 1), zeros(0, 1), zeros(0, 1), zeros(0, 1), zeros(0, 1), ...
+    zeros(0, 1), zeros(0, 1), ...
     'VariableNames', ...
-    {'sbjID', 'compartment', 'start', 'stop', 'amp', 'dur', 'int'});
+    {'sbjID', 'compartment', 'start', 'stop'});
 end
