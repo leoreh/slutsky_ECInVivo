@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find \"/d/OneDrive - Tel-Aviv University/Obsi_Vaults/Obsi_Research\" -iname \"*compensation*\" -type f 2>/dev/null | head -20)"
+    ]
+  }
+}

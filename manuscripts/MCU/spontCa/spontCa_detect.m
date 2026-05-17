@@ -3,12 +3,11 @@ function evTbl = spontCa_detect(trace, fs, varargin)
 %
 %   evTbl = SPONTCA_DETECT(TRACE, FS, ...) detects events by their RISE:
 %   a positive crossing of the smoothed derivative on the trace. Each event
-%   is then validated by an amplitude check above a LOCAL baseline (the
-%   rolling 20th percentile over a 30-s window), and by the presence of
-%   at least one significantly negative derivative sample after the peak.
-%   Stops walk forward until the derivative flattens (three consecutive
-%   |d| < stopFlat samples). Amplitudes and integrals are reported above
-%   the local baseline so plateau pedestals do not inflate them.
+%   is then validated by an amplitude check (peak >= minAmp) and by the
+%   presence of at least one significantly negative derivative sample
+%   after the peak. Stops walk forward until the derivative flattens
+%   (three consecutive |d| < stopFlat samples). Amplitudes and integrals
+%   are reported directly from the input trace.
 %
 %   Why derivative-based: at fs=3 Hz the rise of a Ca event is ~1 sample,
 %   producing one large positive d/dt; the slow decay is many samples of
@@ -16,17 +15,17 @@ function evTbl = spontCa_detect(trace, fs, varargin)
 %   This is the signature that separates real events from plateau noise,
 %   which amplitude thresholds on the raw trace cannot.
 %
-%   Why local baseline: on cells that spend long stretches on an elevated
-%   plateau, "amplitude" should mean "rise above the plateau," not "raw
-%   dF/F value." A rolling 20th percentile tracks the floor underneath
-%   plateau noise without being dragged up by the plateau itself.
+%   Note on baseline: this function does NOT subtract any rolling baseline
+%   from the trace. The caller is expected to feed in a trace where slow
+%   drift / plateaus have already been removed (e.g., the Pass B step in
+%   spontCa_detectWrapper). amp / int are read directly off the trace.
 %
 %   INPUTS:
 %       trace - (1 x nT) dF/F signal
 %       fs    - (scalar) sampling rate (Hz)
 %
 %   OPTIONAL (Name-Value, user-facing):
-%       'minAmp' - (num) min peak amplitude above local baseline (dF/F)  {0.05}
+%       'minAmp' - (num) min peak amplitude on trace (dF/F)              {0.05}
 %       'minIEI' - (num) min peak-to-peak distance (s)                   {1.0}
 %       'kNoise' - (num) rise-threshold multiplier of derivative noise   {3.5}
 %       'minDur' - (num) min decay duration (stop - peak, s)             {0.4}
@@ -35,9 +34,9 @@ function evTbl = spontCa_detect(trace, fs, varargin)
 %       evTbl - table with one row per event, columns:
 %         start (s)   peak time (start == peak by convention)
 %         stop  (s)   decay-end time (where derivative flattens)
-%         amp   (dF/F) peak amplitude above local baseline
+%         amp   (dF/F) peak amplitude on the input trace
 %         dur   (s)   stop - start (decay length, not event span)
-%         int   (dF/F * s) integral above local baseline over [peak, stop]
+%         int   (dF/F * s) integral of trace over [peak, stop]
 %
 %   See also: SPONTCA_FINALIZE, SPONTCA_LOAD, SPONTCA_MANCUR
 
@@ -56,8 +55,6 @@ parse(p, trace, fs, varargin{:});
 P = p.Results;
 
 % Buried constants (do not expose; tune in source if you must).
-bslWin       = 30;     % rolling-baseline window (s)
-quantBsl     = 20;     % percentile for local baseline
 pkLookAhead  = 3;      % samples to search for peak after derivative crossing
 minDecaySmp  = 1;      % samples of strongly negative d/dt required after peak
 kStop        = 1.0;    % multiplier on sigma_dt for "strongly negative" test
@@ -110,13 +107,6 @@ thrNeg  = kStop * sigmaD;
 
 
 %% ========================================================================
-%  LOCAL BASELINE (rolling 20th percentile)
-%  ========================================================================
-
-bsl = rollingPercentile(trace, round(bslWin * fs), quantBsl);
-
-
-%% ========================================================================
 %  CANDIDATE RISES (leading edges of d > thrRise runs)
 %  ========================================================================
 
@@ -156,10 +146,10 @@ end
 
 
 %% ========================================================================
-%  AMPLITUDE GATE (peak above local baseline)
+%  AMPLITUDE GATE
 %  ========================================================================
 
-ampLocal = trace(peakIdx) - bsl(peakIdx);
+ampLocal = trace(peakIdx);
 keep     = ampLocal >= P.minAmp;
 peakIdx  = peakIdx(keep);
 ampLocal = ampLocal(keep);
@@ -271,12 +261,12 @@ nEv      = length(peakIdx);
 
 
 %% ========================================================================
-%  INTEGRAL ABOVE LOCAL BASELINE
+%  INTEGRAL ON TRACE
 %  ========================================================================
 
 intg = nan(nEv, 1);
 for iE = 1:nEv
-    seg = trace(peakIdx(iE):stopIdx(iE)) - bsl(peakIdx(iE):stopIdx(iE));
+    seg = trace(peakIdx(iE):stopIdx(iE));
     seg(isnan(seg)) = 0;
     intg(iE) = trapz(seg) * dt;
 end
@@ -288,7 +278,7 @@ end
 
 starts = (peakIdx(:) - 1) * dt;     % start == peak time
 stops  = (stopIdx(:) - 1) * dt;
-amps   = ampLocal(:);                % amplitude above local baseline
+amps   = ampLocal(:);                % amplitude at peak (on input trace)
 durs   = stops - starts;
 evTbl  = table(starts, stops, amps, durs, intg, ...
     'VariableNames', {'start', 'stop', 'amp', 'dur', 'int'});
@@ -301,24 +291,4 @@ function tbl = emptyEvTbl()
 tbl = table( ...
     zeros(0, 1), zeros(0, 1), zeros(0, 1), zeros(0, 1), zeros(0, 1), ...
     'VariableNames', {'start', 'stop', 'amp', 'dur', 'int'});
-end
-
-
-%% ========================================================================
-%  HELPER: rolling percentile (centered window, NaN-tolerant, edge-shrunk)
-%  ========================================================================
-
-function out = rollingPercentile(x, winSmp, q)
-nT = length(x);
-out = nan(1, nT);
-halfWin = floor(winSmp / 2);
-for i = 1:nT
-    lo = max(1, i - halfWin);
-    hi = min(nT, i + halfWin);
-    seg = x(lo:hi);
-    seg = seg(~isnan(seg));
-    if ~isempty(seg)
-        out(i) = prctile(seg, q);
-    end
-end
 end

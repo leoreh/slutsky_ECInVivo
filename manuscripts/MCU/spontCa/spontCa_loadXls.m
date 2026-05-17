@@ -25,6 +25,13 @@ function [tbl, fs] = spontCa_loadXls(varargin)
 %                             Either way the returned trace is dF/F.  {false}
 %       'flgExclude' - (log)  true: drop rows where excluded=true;
 %                             unitIDs are preserved (gaps remain)    {false}
+%       'flgCorrF0'  - (log)  true: apply per-cell F0 trace correction
+%                             after the dF/F conversion. Each cell's
+%                             trace is scaled by F0_ref/F0_cell, with
+%                             F0_ref = median F0 in its compartment, so
+%                             baseline-brightness differences between
+%                             cells (and genotypes) don't bias dF/F
+%                             amplitude. Requires flgRaw=true.       {false}
 %       'verbose'    - (log)  Print progress                         {true}
 %
 %   FILE FORMAT (rows 1-indexed, both sheets):
@@ -44,12 +51,14 @@ p = inputParser;
 addParameter(p, 'xlsPath',    '',    @(x) ischar(x) || isstring(x));
 addParameter(p, 'flgRaw',     false, @islogical);
 addParameter(p, 'flgExclude', false, @islogical);
+addParameter(p, 'flgCorrF0',  false, @islogical);
 addParameter(p, 'verbose',    true,  @islogical);
 parse(p, varargin{:});
 
 xlsPath    = char(p.Results.xlsPath);
 flgRaw     = p.Results.flgRaw;
 flgExclude = p.Results.flgExclude;
+flgCorrF0  = p.Results.flgCorrF0;
 verbose    = p.Results.verbose;
 
 if isempty(xlsPath)
@@ -62,8 +71,8 @@ assert(isfile(xlsPath), 'spontCa_loadXls:fileNotFound', ...
 if flgRaw, sheetName = 'f'; else, sheetName = 'dff'; end
 
 if verbose
-    fprintf('[spontCa_loadXls] %s  sheet=%s  flgExclude=%d\n', ...
-        xlsPath, sheetName, flgExclude);
+    fprintf('[spontCa_loadXls] %s  sheet=%s  flgExclude=%d  flgCorrF0=%d\n', ...
+        xlsPath, sheetName, flgExclude, flgCorrF0);
 end
 
 
@@ -177,6 +186,11 @@ tbl = table(...
 % baseline (deterministic recipe; no per-cell tuning). When flgRaw is
 % false the trace is already dF/F from the 'dff' sheet.
 if flgRaw
+    % Per-cell median of raw F before the dF/F conversion. Used by the
+    % F0 diagnostic in detectWrapper and by the per-cell F0 trace
+    % correction below.
+    tbl.F0 = median(tbl.trace, 2, 'omitnan');
+
     bslWin   = 30;                  % baseline window (s)
     bslQuant = 20;                  % percentile for baseline
     winSamps = round(bslWin * fs);
@@ -191,7 +205,34 @@ if flgRaw
         end
         tbl.trace(iR, :) = (f - f0) ./ max(f0, eps);
     end
+
+    % Per-cell F0 trace correction (opt-in via flgCorrF0). Cells with
+    % above-median F0 in their compartment get their dF/F values scaled
+    % down (and vice-versa) so baseline brightness no longer biases
+    % dF/F amplitude across cells. Reference is the per-compartment
+    % median F0 across both genotypes (neutral - doesn't privilege one
+    % group).
+    %
+    % Caveat: this assumes the F0 difference between genotypes is
+    % technical (indicator concentration / imaging conditions). If KO
+    % has elevated resting cyto Ca2+ that drives both F0 and dF/F amp
+    % (biological), the correction removes part of the real signal.
+    % Trade-off deliberately favors conservative claims.
+    if flgCorrF0
+        for c = {'Cyto', 'Mito'}
+            rows  = tbl.compartment == c{1};
+            F0ref = median(tbl.F0(rows), 'omitnan');
+            scale = F0ref ./ tbl.F0(rows);
+            tbl.trace(rows, :) = tbl.trace(rows, :) .* scale;
+        end
+    end
 end
+
+% Clip dF/F at zero. Sub-baseline excursions are noise; keeping them
+% biases the flux integral (mito decays integrated below 0) and clutters
+% manCur display (mito return-to-baseline is hard to read on a fluctuating
+% floor). NaNs are preserved.
+tbl.trace = max(tbl.trace, 0);
 
 nKept = nCells;
 if flgExclude

@@ -32,7 +32,7 @@
 %  LOAD
 %  ========================================================================
 
-[tblCell, fs] = spontCa_loadXls('flgRaw', true, 'flgExclude', false);
+[tblCell, fs] = spontCa_loadXls('flgRaw', true, 'flgExclude', false, 'flgCorrF0', false);
 
 
 %% ========================================================================
@@ -86,8 +86,11 @@ spontCa_writeEvents(tblEvent, autoDir, 'backup', false);
 %
 % NOTES (curation log):
 %   Control_72, 73, 76 appear to be the same cell. Kept only 72.
+%   Mito events can occur even 7 s after a cyto event (Control _33). Only
+%   happened once, though.
 
 spontCa_manCur(tblCell, tblEvent, fs);
+
 
 
 %% ========================================================================
@@ -142,6 +145,8 @@ fprintf('Dropped %d cells with zero events in cyto or mito\n', ...
 tblCell  = tblCell(keepCell, :);
 tblEvent = tblEvent(ismember(tblEvent.sbjID, tblCell.sbjID), :);
 
+sum(tblCell.genotype == 'MCU-KO')
+
 
 %% ========================================================================
 %  SAVE
@@ -155,3 +160,18 @@ cachePath = fullfile(cacheDir, 'spontCa_tbl.mat');
 save(cachePath, 'tblCell', 'tblEvent', 'fs', '-v7.3');
 fprintf('Saved %d cells, %d events to %s\n', ...
     height(tblCell), height(tblEvent), cachePath);
+
+
+%% ========================================================================
+%  F0 CHECK
+%  ========================================================================
+% Visual check whether baseline brightness F0 differs systematically
+% between genotypes per compartment. dF/F = (F - F0)/F0, so a dimmer
+% baseline in one genotype mechanically inflates dF/F amps in that
+% group. If F0 looks well-separated by genotype within a compartment,
+% the dF/F-based amp comparison is partially confounded by
+% indicator-expression bias; report ΔF (no division) alongside dF/F or
+% restrict claims to slope/ratio analyses. F0 is populated by
+% spontCa_loadXls when flgRaw=true (median of raw F per cell).
+
+tblGUI_bar(tblCell, 'yVar', 'F0', 'xVar', 'compartment', 'grpVar', 'genotype');

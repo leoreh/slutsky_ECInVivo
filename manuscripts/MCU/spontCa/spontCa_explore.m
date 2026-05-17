@@ -1,74 +1,54 @@
-function hFig = spontCa_explore(tblEvent, tblCell, varargin)
+function hFig = spontCa_explore(tblEvent, tblCell, fs, varargin)
 % SPONTCA_EXPLORE  Two-panel viewer for spontCa pipeline tables.
 %
-%   hFig = spontCa_explore(tblEvent, tblCell, ...) opens a figure with a
-%   thin top control bar driving two side-by-side tblGUI_scatHist
-%   widgets:
+%   hFig = spontCa_explore(tblEvent, tblCell, fs, ...) opens a figure
+%   with a thin top control bar driving two side-by-side
+%   tblGUI_scatHist widgets.
 %
-%       Panel 1 (left)  : within-compartment scatter+hist on the source
-%                         table filtered to the selected compartment.
-%                         All numeric metrics available, including pair-
-%                         relationship metrics (pairFlux, pairAmp, tf,
-%                         pairLag). Canonical view: amp vs pairAmp.
-%
-%       Panel 2 (right) : cross-compartment scatter+hist on a wide
-%                         reshape. Each row is one paired (cyto, mito)
-%                         observation; the table has exactly two metric
-%                         columns - 'cyto' and 'mito' - both populated
-%                         from the metric chosen in the top-bar Metric
-%                         dropdown. Default X=cyto, Y=mito; changing
-%                         Metric updates both axes together.
+%       Panel 1 (left)  : within-compartment scatter+hist. X / Y / group
+%                         pickers live inside the inner widget.
+%       Panel 2 (right) : cross-compartment scatter+hist with fixed
+%                         compartment axes (X = Cyto.<P2-X-Metric>,
+%                         Y = Mito.<P2-Y-Metric>). At event level one
+%                         row per paired cyto event (partner via
+%                         pairIdx). At cell level one row per sbjID
+%                         (Cyto and Mito rows of tblCell joined on
+%                         sbjID).
 %
 %   Top-bar controls:
-%       Level       : Event | Cell                (table source)
-%       Compartment : Cyto  | Mito                (Panel 1 + Panel 2)
-%       Metric      : amp | dur | flux | ...      (Panel 2 only;
-%                                                  symmetric metrics in
-%                                                  the source table)
+%       Level        : Event | Cell
+%       Compartment  : Cyto  | Mito                (Panel 1 only)
+%       Pair filter  : All | Paired | Unpaired     (global state)
+%       P2 X-Metric  : Cyto-axis metric on Panel 2
+%       P2 Y-Metric  : Mito-axis metric on Panel 2
 %
-%   The Compartment selector drives both panels:
-%       Level = Event, Comp = Cyto -> Panel 1 = Cyto events; Panel 2 =
-%           cyto->mito pairs (focal = Cyto with valid pairIdx).
-%       Level = Event, Comp = Mito -> Panel 1 = Mito events; Panel 2 =
-%           mito->cyto pairs (focal = Mito with valid pairIdx).
-%       Level = Cell , Comp = Cyto -> Panel 1 = Cyto rows of tblCell.
-%       Level = Cell , Comp = Mito -> Panel 1 = Mito rows of tblCell.
-%       At cell level, Panel 2 always pairs by sbjID (direction free) so
-%       Compartment changes refresh Panel 1 only.
-%
-%   Symmetric-metric detection (Panel 2 + Metric dropdown):
-%       A column is treated as asymmetric when its name starts with
-%       'asymPrefix' (default 'pair') or appears in 'asymExtra' (default
-%       {'tf', 'triggered'}). Adding a future pair_<x> metric auto-
-%       flags; no per-name editing here.
-%
-%   State carried across control changes:
-%       - X / Y / group selections inside each panel.
-%       - Scale (linear/log) on each axis and fit type (None/Linear/
-%         Ortho), independently per panel.
-%       - Metric (across Compartment and Level changes, when still
-%         available in the new source table).
+%   Pair filter:
+%       Event level. Filters tblEvent by the upstream `paired` boolean
+%       set by spontCa2_metrics. 'paired' keeps paired==true,
+%       'unpaired' keeps paired==false, 'all' keeps everything.
+%       Cell level. Re-aggregates per-cell metrics from the filtered
+%       event set by calling spontCa2_metrics(mode='cellOnly'). Results
+%       cached per mode for the lifetime of the figure. Cell pairs
+%       themselves are not filtered; only the per-cell aggregates shift.
 %
 %   INPUTS
-%       tblEvent - (table) event-level table from PAIR & CROSS-FLUX in
-%                  mcu_spontCa.m.
-%       tblCell  - (table) cell-level aggregate from PER-CELL SUMMARY.
+%       tblEvent - (table) event-level table from spontCa2_metrics. Must
+%                  carry `paired` and `pairIdx`.
+%       tblCell  - (table) cell-level aggregate from spontCa2_metrics.
+%       fs       - (scalar Hz) sampling rate. Used for cell-level
+%                  re-aggregation on pair-filter change.
 %
 %   OPTIONAL KEY-VALUE PAIRS
 %       'level'       - 'event' (default) | 'cell'
 %       'compartment' - 'cyto'  (default) | 'mito'
-%       'metric'      - initial Panel-2 metric (default: 'amp' if
-%                       available, else the first symmetric metric).
-%       'asymPrefix'  - char prefix flagging asymmetric columns. Default
-%                       'pair'. Pass '' to disable prefix-based flagging.
-%       'asymExtra'   - cellstr of extra asymmetric names. Default
-%                       {'tf', 'triggered'}.
-%       'clr'         - 2x3 RGB for genotype groups. Default pulled from
-%                       mcu_cfg().clr.grp.
-%       'figPos'      - [x y w h] figure position. Default
-%                       [50 50 1800 950].
+%       'pairFilter'  - 'all'   (default) | 'paired' | 'unpaired'
+%       'xMetric'     - initial Panel-2 X metric. Default 'amp'.
+%       'yMetric'     - initial Panel-2 Y metric. Default 'amp'.
+%       'clr'         - 2x3 RGB for genotype groups.
+%       'figPos'      - [x y w h] figure position.
 %
-%   See also TBLGUI_SCATHIST, MCU_SPONTCA, MCU_CFG.
+%   See also TBLGUI_SCATHIST, MCU_SPONTCA, SPONTCA2_METRICS.
+
 
 %% ========================================================================
 %  ARGUMENTS
@@ -77,14 +57,15 @@ function hFig = spontCa_explore(tblEvent, tblCell, varargin)
 p = inputParser;
 addRequired(p, 'tblEvent', @istable);
 addRequired(p, 'tblCell',  @istable);
+addRequired(p, 'fs',       @(x) isnumeric(x) && isscalar(x) && x > 0);
 addParameter(p, 'level',       'event', @(x) any(strcmpi(x, {'event', 'cell'})));
 addParameter(p, 'compartment', 'cyto',  @(x) any(strcmpi(x, {'cyto', 'mito'})));
-addParameter(p, 'metric',      '',      @(x) ischar(x) || isstring(x));
-addParameter(p, 'asymPrefix',  'pair',  @(x) ischar(x) || isstring(x));
-addParameter(p, 'asymExtra',   {'tf', 'triggered'}, @iscell);
+addParameter(p, 'pairFilter',  'all',   @(x) any(strcmpi(x, {'all', 'paired', 'unpaired'})));
+addParameter(p, 'xMetric',     'amp',   @(x) ischar(x) || isstring(x));
+addParameter(p, 'yMetric',     'amp',   @(x) ischar(x) || isstring(x));
 addParameter(p, 'clr',         [],      @(x) isempty(x) || (isnumeric(x) && size(x,2)==3));
 addParameter(p, 'figPos',      [50, 50, 1800, 950], @(x) isnumeric(x) && numel(x)==4);
-parse(p, tblEvent, tblCell, varargin{:});
+parse(p, tblEvent, tblCell, fs, varargin{:});
 
 clr = p.Results.clr;
 if isempty(clr)
@@ -96,13 +77,6 @@ if isempty(clr)
     end
 end
 
-% Defensive: attach 'triggered' to tblEvent if the caller skipped that step.
-if ~ismember('triggered', tblEvent.Properties.VariableNames)
-    isCyto = tblEvent.compartment == 'Cyto';
-    trig = NaN(height(tblEvent), 1);
-    trig(isCyto) = ~isnan(tblEvent.pairIdx(isCyto));
-    tblEvent.triggered = categorical(trig, [0 1], {'noPair', 'triggered'});
-end
 
 %% ========================================================================
 %  FIGURE
@@ -125,20 +99,22 @@ hPnlRight = uipanel('Parent', hFig, 'BorderType', 'none', ...
     'Units', 'normalized', 'Position', [0.5 + gap, 0, 0.5 - gap, 1 - ctrlH], ...
     'BackgroundColor', get(hFig, 'Color'));
 
+
 %% ========================================================================
 %  STATE + CONTROLS
 %  ========================================================================
 
-state            = struct();
-state.tblEvent   = tblEvent;
-state.tblCell    = tblCell;
-state.clr        = clr;
-state.asymPrefix = char(p.Results.asymPrefix);
-state.asymExtra  = p.Results.asymExtra;
-state.hPnlLeft   = hPnlLeft;
-state.hPnlRight  = hPnlRight;
-state.levelOpts  = {'event', 'cell'};
-state.compOpts   = {'cyto', 'mito'};
+state              = struct();
+state.tblEvent     = tblEvent;
+state.tblCellAll   = tblCell;
+state.fs           = fs;
+state.clr          = clr;
+state.hPnlLeft     = hPnlLeft;
+state.hPnlRight    = hPnlRight;
+state.levelOpts    = {'event', 'cell'};
+state.compOpts     = {'cyto',  'mito'};
+state.pairOpts     = {'all',   'paired', 'unpaired'};
+state.cellTblCache = struct('all', tblCell, 'paired', [], 'unpaired', []);
 
 yRow = 0.25; rowH = 0.5;
 
@@ -149,49 +125,69 @@ uicontrol('Parent', hPnlCtrl, 'Style', 'text', 'String', 'Level:', ...
     'BackgroundColor', get(hFig, 'Color'));
 state.ddLevel = uicontrol('Parent', hPnlCtrl, 'Style', 'popupmenu', ...
     'String', {'Event', 'Cell'}, 'Units', 'normalized', ...
-    'Position', [0.06, yRow, 0.07, rowH], ...
+    'Position', [0.06, yRow, 0.06, rowH], ...
     'Callback', @(s, e) onLevelChange(hFig));
 
 % Compartment
 uicontrol('Parent', hPnlCtrl, 'Style', 'text', 'String', 'Compartment:', ...
-    'Units', 'normalized', 'Position', [0.15, yRow, 0.08, rowH], ...
+    'Units', 'normalized', 'Position', [0.13, yRow, 0.07, rowH], ...
     'HorizontalAlignment', 'right', 'FontWeight', 'bold', ...
     'BackgroundColor', get(hFig, 'Color'));
 state.ddComp = uicontrol('Parent', hPnlCtrl, 'Style', 'popupmenu', ...
     'String', {'Cyto', 'Mito'}, 'Units', 'normalized', ...
-    'Position', [0.24, yRow, 0.07, rowH], ...
+    'Position', [0.21, yRow, 0.06, rowH], ...
     'Callback', @(s, e) onCompChange(hFig));
 
-% Panel-2 Metric. Options are computed lazily inside refreshPanels each
-% time the source table changes (Level switch), so adding a new
-% symmetric metric to tblEvent/tblCell surfaces here automatically.
-uicontrol('Parent', hPnlCtrl, 'Style', 'text', 'String', 'P2 Metric:', ...
-    'Units', 'normalized', 'Position', [0.33, yRow, 0.07, rowH], ...
+% Pair filter
+uicontrol('Parent', hPnlCtrl, 'Style', 'text', 'String', 'Pair:', ...
+    'Units', 'normalized', 'Position', [0.28, yRow, 0.04, rowH], ...
+    'HorizontalAlignment', 'right', 'FontWeight', 'bold', ...
+    'BackgroundColor', get(hFig, 'Color'));
+state.ddPair = uicontrol('Parent', hPnlCtrl, 'Style', 'popupmenu', ...
+    'String', {'All', 'Paired', 'Unpaired'}, 'Units', 'normalized', ...
+    'Position', [0.33, yRow, 0.07, rowH], ...
+    'Callback', @(s, e) onPairChange(hFig));
+
+% Panel 2 X-metric
+uicontrol('Parent', hPnlCtrl, 'Style', 'text', 'String', 'P2 X:', ...
+    'Units', 'normalized', 'Position', [0.41, yRow, 0.04, rowH], ...
     'HorizontalAlignment', 'right', 'FontWeight', 'bold', ...
     'BackgroundColor', get(hFig, 'Color'), ...
-    'TooltipString', 'Metric loaded into Panel 2''s cyto and mito columns');
-state.ddMetric = uicontrol('Parent', hPnlCtrl, 'Style', 'popupmenu', ...
+    'TooltipString', 'Cyto-axis metric on Panel 2');
+state.ddXMetric = uicontrol('Parent', hPnlCtrl, 'Style', 'popupmenu', ...
     'String', {' '}, 'Units', 'normalized', ...
-    'Position', [0.41, yRow, 0.10, rowH], ...
+    'Position', [0.46, yRow, 0.09, rowH], ...
+    'Callback', @(s, e) onMetricChange(hFig));
+
+% Panel 2 Y-metric
+uicontrol('Parent', hPnlCtrl, 'Style', 'text', 'String', 'P2 Y:', ...
+    'Units', 'normalized', 'Position', [0.56, yRow, 0.04, rowH], ...
+    'HorizontalAlignment', 'right', 'FontWeight', 'bold', ...
+    'BackgroundColor', get(hFig, 'Color'), ...
+    'TooltipString', 'Mito-axis metric on Panel 2');
+state.ddYMetric = uicontrol('Parent', hPnlCtrl, 'Style', 'popupmenu', ...
+    'String', {' '}, 'Units', 'normalized', ...
+    'Position', [0.61, yRow, 0.09, rowH], ...
     'Callback', @(s, e) onMetricChange(hFig));
 
 % Status
 state.hStatus = uicontrol('Parent', hPnlCtrl, 'Style', 'text', 'String', '', ...
-    'Units', 'normalized', 'Position', [0.53, yRow, 0.46, rowH], ...
+    'Units', 'normalized', 'Position', [0.71, yRow, 0.28, rowH], ...
     'HorizontalAlignment', 'left', 'FontWeight', 'bold', ...
     'BackgroundColor', get(hFig, 'Color'));
 
 set(state.ddLevel, 'Value', find(strcmpi(p.Results.level,       state.levelOpts)));
 set(state.ddComp,  'Value', find(strcmpi(p.Results.compartment, state.compOpts)));
+set(state.ddPair,  'Value', find(strcmpi(p.Results.pairFilter,  state.pairOpts)));
 
-% Seed the metric list and selection. populateMetrics uses the level we
-% just picked. The initial 'metric' input is honored if it's in the list.
-state.pendingMetric = char(p.Results.metric);
+state.pendingX = char(p.Results.xMetric);
+state.pendingY = char(p.Results.yMetric);
 
 hFig.UserData = state;
 refreshPanels(hFig, 'all');
 
 end % EOF spontCa_explore
+
 
 %% ========================================================================
 %  CALLBACKS
@@ -202,58 +198,63 @@ function onLevelChange(hFig)
 end
 
 function onCompChange(hFig)
-    % At cell level, Panel 2 pairs by sbjID and doesn't depend on
-    % compartment, so only Panel 1 needs a refresh.
-    state = hFig.UserData;
-    level = state.levelOpts{get(state.ddLevel, 'Value')};
-    if strcmpi(level, 'cell')
-        refreshPanels(hFig, 'panel1');
-    else
-        refreshPanels(hFig, 'all');
-    end
+    refreshPanels(hFig, 'panel1');
+end
+
+function onPairChange(hFig)
+    refreshPanels(hFig, 'all');
 end
 
 function onMetricChange(hFig)
-    % Metric drives Panel 2 only.
     refreshPanels(hFig, 'panel2');
 end
+
 
 %% ========================================================================
 %  REFRESH
 %  ========================================================================
 
 function refreshPanels(hFig, which)
-% which: 'all' rebuilds both panels;
-%        'panel1' rebuilds only Panel 1;
-%        'panel2' rebuilds only Panel 2.
+% which: 'all' | 'panel1' | 'panel2'
 
-    state = hFig.UserData;
-    level = state.levelOpts{get(state.ddLevel, 'Value')};
-    comp  = state.compOpts {get(state.ddComp,  'Value')};
+    state    = hFig.UserData;
+    level    = state.levelOpts{get(state.ddLevel, 'Value')};
+    comp     = state.compOpts {get(state.ddComp,  'Value')};
+    pairMode = state.pairOpts {get(state.ddPair,  'Value')};
 
+    % Resolve current source tables. Panel 1 uses the filter-aware
+    % source. Panel 2 at event level always uses the full tblEvent so
+    % pairIdx values (absolute row indices) resolve correctly; at cell
+    % level it uses the filter-aware cell table.
     if strcmpi(level, 'event')
-        src = state.tblEvent;
+        srcEvent = applyPairFilter(state.tblEvent, pairMode);
+        srcCell  = [];
     else
-        src = state.tblCell;
+        srcEvent = [];
+        srcCell  = getCellTbl(hFig, pairMode);
+        state    = hFig.UserData;   % refresh after possible cache write
     end
 
-    % Refresh the Metric dropdown's option list whenever the source
-    % schema might have changed (Level switch or first render).
-    if any(strcmpi(which, {'all'}))
-        populateMetricList(hFig, src);
+    % Refresh metric option lists on full rebuilds.
+    if strcmpi(which, 'all')
+        if strcmpi(level, 'event')
+            populateMetricLists(hFig, state.tblEvent);
+        else
+            populateMetricLists(hFig, srcCell);
+        end
+        state = hFig.UserData;
     end
-    state = hFig.UserData;  % reload after populateMetricList may write
-    metricOpts = get(state.ddMetric, 'String');
-    metric     = metricOpts{get(state.ddMetric, 'Value')};
+
+    xMetric = pickMetric(state.ddXMetric);
+    yMetric = pickMetric(state.ddYMetric);
 
     % --- Panel 1 ---
     n1 = NaN;
     if any(strcmpi(which, {'all', 'panel1'}))
-        snap = readPanelState(state.hPnlLeft);
-        tbl1 = prepPanel1(src, comp);
+        snap   = readPanelState(state.hPnlLeft);
+        tbl1   = prepPanel1(srcEvent, srcCell, level, comp);
         defXY1 = pickDefaultsPanel1(level);
-
-        excl1 = idColsToHide();
+        excl1  = idColsToHide();
         [x1, y1, g1] = pickXYG(tbl1, snap.x, snap.y, snap.g, defXY1, excl1);
 
         delete(allchild(state.hPnlLeft));
@@ -264,19 +265,21 @@ function refreshPanels(hFig, which)
             'clr', state.clr, ...
             'varsExclude', excl1);
         n1 = height(tbl1);
-    elseif ~isempty(state.hPnlLeft.UserData) && isstruct(state.hPnlLeft.UserData) ...
-            && isfield(state.hPnlLeft.UserData, 'tbl')
+    elseif isstruct(state.hPnlLeft.UserData) && isfield(state.hPnlLeft.UserData, 'tbl')
         n1 = height(state.hPnlLeft.UserData.tbl);
     end
 
     % --- Panel 2 ---
     n2 = NaN;
     if any(strcmpi(which, {'all', 'panel2'}))
-        snap = readPanelState(state.hPnlRight);
-        tbl2 = prepPanel2(src, level, comp, metric);
-        defXY2 = struct('x', 'cyto', 'y', 'mito');
-
-        excl2 = idColsToHide();
+        snap   = readPanelState(state.hPnlRight);
+        if strcmpi(level, 'event')
+            tbl2 = prepPanel2(state.tblEvent, [], level, xMetric, yMetric);
+        else
+            tbl2 = prepPanel2([], srcCell, level, xMetric, yMetric);
+        end
+        defXY2 = struct('x', 'cytoX', 'y', 'mitoY');
+        excl2  = idColsToHide();
         [x2, y2, g2] = pickXYG(tbl2, snap.x, snap.y, snap.g, defXY2, excl2);
 
         delete(allchild(state.hPnlRight));
@@ -287,63 +290,63 @@ function refreshPanels(hFig, which)
             'clr', state.clr, ...
             'varsExclude', excl2);
         n2 = height(tbl2);
-    elseif ~isempty(state.hPnlRight.UserData) && isstruct(state.hPnlRight.UserData) ...
-            && isfield(state.hPnlRight.UserData, 'tbl')
+    elseif isstruct(state.hPnlRight.UserData) && isfield(state.hPnlRight.UserData, 'tbl')
         n2 = height(state.hPnlRight.UserData.tbl);
     end
 
     set(state.hStatus, 'String', sprintf( ...
-        'Level: %s | Comp: %s | Metric: %s | n1=%d  n2=%d', ...
-        level, comp, metric, n1, n2));
+        'Level: %s | Comp: %s | Pair: %s | P2: cyto.%s vs mito.%s | n1=%d  n2=%d', ...
+        level, comp, pairMode, xMetric, yMetric, n1, n2));
 
     hFig.UserData = state;
 end
 
-function populateMetricList(hFig, src)
-% Refresh ddMetric's options from the source table's symmetric metrics.
-% Preserves the current selection if still available, else falls back to
-% pendingMetric (from input args, used on first render), 'amp', or the
-% first available metric.
-    state = hFig.UserData;
-    metrics = listSymmetricMetrics(src, state.asymPrefix, state.asymExtra);
-    if isempty(metrics), metrics = {' '}; end
 
-    current = '';
-    items = get(state.ddMetric, 'String');
-    if iscell(items) && ~isempty(items) && get(state.ddMetric, 'Value') <= numel(items)
-        current = items{get(state.ddMetric, 'Value')};
+function populateMetricLists(hFig, src)
+% Both X-metric and Y-metric dropdowns share the same numeric-metric
+% list. Preserves the current selection if still available, else falls
+% back to pendingX / pendingY (used on first render), 'amp', or first.
+    state   = hFig.UserData;
+    metrics = listMetrics(src);
+
+    for ddField = {'ddXMetric', 'ddYMetric'}
+        dd = state.(ddField{1});
+        items = get(dd, 'String');
+        current = '';
+        if iscell(items) && ~isempty(items) && get(dd, 'Value') <= numel(items)
+            current = items{get(dd, 'Value')};
+        end
+        if strcmpi(ddField{1}, 'ddXMetric'),  pending = state.pendingX;
+        else,                                   pending = state.pendingY;
+        end
+
+        if ismember(current, metrics)
+            pick = current;
+        elseif ~isempty(pending) && ismember(pending, metrics)
+            pick = pending;
+        elseif ismember('amp', metrics)
+            pick = 'amp';
+        else
+            pick = metrics{1};
+        end
+        set(dd, 'String', metrics, 'Value', find(strcmp(metrics, pick), 1));
     end
 
-    pick = '';
-    if ismember(current, metrics)
-        pick = current;
-    elseif isfield(state, 'pendingMetric') && ~isempty(state.pendingMetric) ...
-            && ismember(state.pendingMetric, metrics)
-        pick = state.pendingMetric;
-    elseif ismember('amp', metrics)
-        pick = 'amp';
-    else
-        pick = metrics{1};
-    end
-
-    % Atomic set so the intermediate state (new String, old out-of-range
-    % Value) never reaches MATLAB's validator.
-    set(state.ddMetric, 'String', metrics, ...
-        'Value', find(strcmp(metrics, pick), 1));
-
-    % pendingMetric only matters on the very first render.
-    state.pendingMetric = '';
+    state.pendingX = '';
+    state.pendingY = '';
     hFig.UserData = state;
 end
+
 
 %% ========================================================================
 %  HELPERS: STATE SNAPSHOT, DEFAULTS, EXCLUSIONS
 %  ========================================================================
 
 function snap = readPanelState(hPanel)
-% Read the embedded tblGUI_scatHist's current selections (X/Y/group, X
-% scale, Y scale, fit type). Returns empty fields where unavailable.
-    snap = struct('x', '', 'y', '', 'g', '', 'xs', '', 'ys', '', 'ft', '');
+% Snap the embedded widget's current selections (X/Y/group/scales/fit).
+% xs/ys default to 'log' before the first render so initial display
+% uses log scales; once the widget exists, the user's choice is carried.
+    snap = struct('x', '', 'y', '', 'g', '', 'xs', 'log', 'ys', 'log', 'ft', '');
     if ~isgraphics(hPanel), return; end
     d = hPanel.UserData;
     if ~isstruct(d) || ~isfield(d, 'ddX') || ~isgraphics(d.ddX)
@@ -360,13 +363,11 @@ function snap = readPanelState(hPanel)
         ys = get(d.ddYScale, 'String'); snap.ys = ys{get(d.ddYScale, 'Value')};
         ft = get(d.ddFit,    'String'); snap.ft = ft{get(d.ddFit,    'Value')};
     catch
-        snap = struct('x', '', 'y', '', 'g', '', 'xs', '', 'ys', '', 'ft', '');
+        snap = struct('x', '', 'y', '', 'g', '', 'xs', 'log', 'ys', 'log', 'ft', '');
     end
 end
 
 function [x, y, g] = pickXYG(tbl, oldX, oldY, oldG, defXY, excl)
-% Validate carried selections against the new schema; fall back to
-% per-panel defaults, then let tblGUI_scatHist pick if even those fail.
     numericMask = varfun(@isnumeric, tbl, 'OutputFormat', 'uniform');
     cols        = tbl.Properties.VariableNames;
     numCols     = setdiff(cols(numericMask), excl, 'stable');
@@ -390,48 +391,83 @@ function v = pickOne(carried, fallback, allowed)
     end
 end
 
-function defXY = pickDefaultsPanel1(level)
-% Within-compartment canonical scatter: amp vs the partner metric.
-    defXY = struct();
-    defXY.x = 'amp';
-    if strcmpi(level, 'event')
-        defXY.y = 'pairAmp';
-    else
-        defXY.y = 'pairFlux';
-    end
+function defXY = pickDefaultsPanel1(~)
+% Non-pair defaults so unpaired events (NaN pairAmp / pairFlux under
+% mutual NN) still appear in the scatter.
+    defXY = struct('x', 'amp', 'y', 'flux');
 end
 
 function excl = idColsToHide()
-% Columns that should never appear in the inner widget's X/Y or group
-% dropdowns - identifiers, time indices, and the raw trace blob.
     excl = {'sbjID', 'unitID', 'excluded', 'trace', ...
             'start', 'stop', 'pairIdx'};
 end
+
+function m = pickMetric(dd)
+    items = get(dd, 'String');
+    val   = get(dd, 'Value');
+    if iscell(items) && val >= 1 && val <= numel(items)
+        m = items{val};
+    else
+        m = '';
+    end
+end
+
+
+%% ========================================================================
+%  HELPERS: PAIR FILTER + CELL CACHE
+%  ========================================================================
+
+function evt = applyPairFilter(tblEvent, mode)
+    switch lower(mode)
+        case 'paired'
+            evt = tblEvent(tblEvent.paired, :);
+        case 'unpaired'
+            evt = tblEvent(~tblEvent.paired, :);
+        otherwise
+            evt = tblEvent;
+    end
+end
+
+function tbl = getCellTbl(hFig, mode)
+% Lazy cache of cell-level aggregates per pair-filter mode. 'all' is
+% seeded at init from the input tblCell. 'paired' and 'unpaired' are
+% computed on first access via spontCa2_metrics(mode='cellOnly') on the
+% filtered event set.
+    state = hFig.UserData;
+    if isfield(state.cellTblCache, mode) && ~isempty(state.cellTblCache.(mode))
+        tbl = state.cellTblCache.(mode);
+        return;
+    end
+    evt = applyPairFilter(state.tblEvent, mode);
+    [tbl, ~] = spontCa2_metrics(state.tblCellAll, evt, state.fs, ...
+        'mode', 'cellOnly', 'aggFcn', 'mean');
+    state.cellTblCache.(mode) = tbl;
+    hFig.UserData = state;
+end
+
 
 %% ========================================================================
 %  HELPERS: METRICS + TABLE PREPARATION
 %  ========================================================================
 
-function metrics = listSymmetricMetrics(src, asymPrefix, asymExtra)
-% Numeric columns of the source table whose meaning is symmetric across
-% compartments (suitable for cyto / mito pairing in Panel 2).
+function metrics = listMetrics(src)
+% Numeric columns on src minus identifiers and the trace blob. Both
+% Panel-2 X and Y dropdowns populate from this list.
     cols  = src.Properties.VariableNames;
     isNum = varfun(@isnumeric, src, 'OutputFormat', 'uniform');
     skip  = [idColsToHide(), {'compartment'}];
-
-    metrics = cell(0, 1);
-    for iC = 1:numel(cols)
-        c = cols{iC};
-        if ~isNum(iC),                              continue; end
-        if ismember(c, skip),                       continue; end
-        if isAsym(c, asymPrefix, asymExtra),        continue; end
-        metrics{end+1, 1} = c; %#ok<AGROW>
-    end
+    metrics = setdiff(cols(isNum), skip, 'stable');
+    if isempty(metrics), metrics = {' '}; end
 end
 
-function tbl1 = prepPanel1(src, comp)
-% Filter source table to the requested compartment. No reshape; the
-% inner widget sees the table as-is.
+function tbl1 = prepPanel1(srcEvent, srcCell, level, comp)
+% Filter source table to the requested compartment. At event level the
+% source is already pair-filtered upstream in refreshPanels.
+    if strcmpi(level, 'event')
+        src = srcEvent;
+    else
+        src = srcCell;
+    end
     if strcmpi(comp, 'cyto')
         keep = src.compartment == 'Cyto';
     else
@@ -440,65 +476,39 @@ function tbl1 = prepPanel1(src, comp)
     tbl1 = src(keep, :);
 end
 
-function tbl2 = prepPanel2(src, level, comp, metric)
-% Wide reshape - one row per paired (cyto, mito) observation. Only two
-% metric columns ('cyto', 'mito'), both populated from src.(metric) on
-% the appropriate side of each pair.
+function tbl2 = prepPanel2(fullEvent, srcCell, level, xMetric, yMetric)
+% Wide layout for cross-compartment scatter. X = Cyto.<xMetric>,
+% Y = Mito.<yMetric>.
+%
+% Event level: pass the FULL event table (state.tblEvent), not the
+% pair-filtered subset. pairIdx values are absolute row indices into
+% the original tblEvent and would not resolve against a subset. Panel
+% 2 at event level is the paired-events view by construction.
+%
+% Cell level: srcCell is the (filter-aware) cell table; cyto and mito
+% rows are joined by sbjID.
 
     if strcmpi(level, 'event')
-        % Focal compartment is the selected one; partner via pairIdx.
-        if strcmpi(comp, 'cyto')
-            focalCmp = 'Cyto';
-        else
-            focalCmp = 'Mito';
-        end
-
-        isFocal     = src.compartment == focalCmp & ~isnan(src.pairIdx);
-        focalRows   = find(isFocal);
-        partnerRows = src.pairIdx(isFocal);
-
-        if strcmpi(focalCmp, 'Cyto')
-            cytoIdx = focalRows;  mitoIdx = partnerRows;
-        else
-            cytoIdx = partnerRows; mitoIdx = focalRows;
-        end
-
+        focal      = find(fullEvent.compartment == 'Cyto' & fullEvent.paired);
+        partnerIdx = fullEvent.pairIdx(focal);
         tbl2 = table();
-        tbl2.sbjID    = src.sbjID(focalRows);
-        tbl2.genotype = src.genotype(focalRows);
-        tbl2.cyto     = src.(metric)(cytoIdx);
-        tbl2.mito     = src.(metric)(mitoIdx);
-
+        tbl2.sbjID    = fullEvent.sbjID(focal);
+        tbl2.genotype = fullEvent.genotype(focal);
+        tbl2.cytoX    = fullEvent.(xMetric)(focal);
+        tbl2.mitoY    = fullEvent.(yMetric)(partnerIdx);
     else
-        % Cell level: pair Cyto and Mito rows of tblCell by sbjID.
-        isC = src.compartment == 'Cyto';
-        isM = src.compartment == 'Mito';
-        cytoTbl = src(isC, :);
-        mitoTbl = src(isM, :);
-
+        isC = srcCell.compartment == 'Cyto';
+        isM = srcCell.compartment == 'Mito';
+        cytoTbl = srcCell(isC, :);
+        mitoTbl = srcCell(isM, :);
         [~, idxM] = ismember(cytoTbl.sbjID, mitoTbl.sbjID);
         keep      = idxM > 0;
         cytoTbl   = cytoTbl(keep, :);
         mitoTbl   = mitoTbl(idxM(keep), :);
-
         tbl2 = table();
         tbl2.sbjID    = cytoTbl.sbjID;
         tbl2.genotype = cytoTbl.genotype;
-        tbl2.cyto     = cytoTbl.(metric);
-        tbl2.mito     = mitoTbl.(metric);
-    end
-end
-
-function flag = isAsym(name, prefix, explicit)
-% A column is asymmetric (excluded from Panel 2's metric list) if its
-% name starts with the configured prefix OR appears in the explicit
-% list. Both are exposed as function parameters so the naming convention
-% can evolve without editing this file.
-    flag = false;
-    if ~isempty(prefix) && startsWith(name, prefix)
-        flag = true; return;
-    end
-    if ~isempty(explicit) && ismember(name, explicit)
-        flag = true;
+        tbl2.cytoX    = cytoTbl.(xMetric);
+        tbl2.mitoY    = mitoTbl.(yMetric);
     end
 end

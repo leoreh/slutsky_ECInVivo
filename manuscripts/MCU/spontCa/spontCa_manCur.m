@@ -73,11 +73,6 @@ nT = size(tblCell.trace, 2);
 t  = (0:nT-1) / fs;
 dt = 1 / fs;
 
-% Local-baseline constants mirrored from spontCa_detect so amp/int
-% recomputations on edit match the autodetector's conventions.
-detCfg.bslWin   = 30;
-detCfg.quantBsl = 20;
-
 % Three sibling folders hold per-cell event files in the same format
 % (struct cur with sbjID, fs, savedAt, source, events table):
 %   auto/<sbjID>.mat   - autodetection output (written by mcu_spontCa)
@@ -199,15 +194,14 @@ uicontrol('Parent', hSide, 'Style', 'text', 'String', ...
 %  STATE
 %  ========================================================================
 % Held in figure UserData so callbacks can mutate it. S.events.(Cyto|Mito)
-% is a struct of column vectors. S.bsl is the rolling 20th-pct baseline
-% used for amp/int recomputation on edits, computed once per cell load.
+% is a struct of column vectors. amp / int are recomputed directly off
+% S.traces (no internal baseline subtraction).
 
 S.cellList    = cellList;
 S.currentCell = '';
 S.activeCmp   = 'Cyto';
 S.events      = struct('Cyto', emptyEv(), 'Mito', emptyEv());
 S.traces      = struct('Cyto', [], 'Mito', []);
-S.bsl         = struct('Cyto', [], 'Mito', []);
 S.zoomCenter  = 0;
 S.zoomWidth   = 20;
 S.dirty       = false;
@@ -244,10 +238,6 @@ onCellChange();
         S.currentCell = char(sName);
         S.traces.Cyto = tblCell.trace(iC, :);
         S.traces.Mito = tblCell.trace(iM, :);
-        S.bsl.Cyto = rollingPercentileLocal(S.traces.Cyto, ...
-            round(detCfg.bslWin * fs), detCfg.quantBsl);
-        S.bsl.Mito = rollingPercentileLocal(S.traces.Mito, ...
-            round(detCfg.bslWin * fs), detCfg.quantBsl);
 
         [S.events.Cyto, S.events.Mito] = loadEventsForCell(S.currentCell);
 
@@ -345,35 +335,45 @@ onCellChange();
 
 
     function ev = tableToEvStruct(eventsTbl, compartment)
+        % Minimal-schema tolerant. amp/dur/int may be absent (post-refactor
+        % per-cell files carry only {compartment, start, stop}); the GUI
+        % never displays them so NaN fill is fine.
         if isempty(eventsTbl)
             sub = eventsTbl;
         else
             sub = eventsTbl(eventsTbl.compartment == compartment, :);
         end
+        n = height(sub);
+        startV = sub.start(:);
+        stopV  = sub.stop(:);
+        nanV   = nan(n, 1);
         ev = struct( ...
-            'start', sub.start(:), 'stop', sub.stop(:), ...
-            'amp',   sub.amp(:),   'dur',  sub.dur(:), ...
-            'int',   sub.int(:));
+            'start', startV, 'stop', stopV, ...
+            'amp',   nanV,   'dur',  nanV, ...
+            'int',   nanV);
     end
 
 
     function tbl = evStructToTable(ev, compartment)
+        % Writes the minimal on-disk schema {compartment, start, stop}.
+        % amp/dur/int are recomputed downstream by spontCa2_metrics. For
+        % Cyto events, stop is forced to start (one-sample events at fs=3).
         n = numel(ev.start);
-        cmp = repmat(categorical({compartment}, {'Cyto', 'Mito'}), n, 1);
         if n == 0
             tbl = table( ...
                 categorical(strings(0,1), {'Cyto','Mito'}), ...
-                zeros(0,1), zeros(0,1), zeros(0,1), ...
                 zeros(0,1), zeros(0,1), ...
-                'VariableNames', ...
-                {'compartment','start','stop','amp','dur','int'});
+                'VariableNames', {'compartment','start','stop'});
             return;
         end
-        tbl = table( ...
-            cmp, ev.start(:), ev.stop(:), ev.amp(:), ...
-            ev.dur(:), ev.int(:), ...
-            'VariableNames', ...
-            {'compartment','start','stop','amp','dur','int'});
+        cmp = repmat(categorical({compartment}, {'Cyto', 'Mito'}), n, 1);
+        startV = ev.start(:);
+        stopV  = ev.stop(:);
+        if strcmp(compartment, 'Cyto')
+            stopV = startV;
+        end
+        tbl = table(cmp, startV, stopV, ...
+            'VariableNames', {'compartment','start','stop'});
     end
 
 
@@ -602,7 +602,7 @@ onCellChange();
         if strcmp(clickType, 'normal')
             tNew = snapTime(xClick, fs);
             S.events.(cmpAx) = addEventLocal(S.events.(cmpAx), tNew, ...
-                S.traces.(cmpAx), S.bsl.(cmpAx));
+                S.traces.(cmpAx));
             S.activeCmp = cmpAx;
             hFig.UserData = S;
             setDirty(true);
@@ -662,7 +662,6 @@ onCellChange();
                 cmp   = S.drag.cmp;
                 ev    = S.events.(cmp);
                 tr    = S.traces.(cmp);
-                bs    = S.bsl.(cmp);
                 iE    = S.drag.idx;
                 if strcmp(S.drag.role, 'start')
                     tNew = min(tNew, ev.stop(iE) - dt);
@@ -673,7 +672,7 @@ onCellChange();
                     tNew = min(tNew, t(end));
                     ev.stop(iE) = tNew;
                 end
-                ev = recomputeOneLocal(ev, iE, tr, bs);
+                ev = recomputeOneLocal(ev, iE, tr);
                 ev = sortEv(ev);
                 S.events.(cmp) = ev;
                 S.drag = [];
@@ -804,10 +803,10 @@ onCellChange();
 
 
 %% ========================================================================
-%  EVENT MUTATION (nested: needs fs, detCfg, dt in scope)
+%  EVENT MUTATION (nested: needs fs, dt in scope)
 %  ========================================================================
 
-    function ev = addEventLocal(ev, tStart, trace, bsl)
+    function ev = addEventLocal(ev, tStart, trace)
         % Default stop is two samples past the start: just enough to keep
         % the dotted line visible. The walk-forward heuristic was wrong
         % for clicks in non-flat regions (ran off the trace end). User
@@ -816,8 +815,8 @@ onCellChange();
         stopSmp = min(numel(trace), pkSmp + 2);
         tStartS = (pkSmp  - 1) * dt;
         tStopS  = (stopSmp - 1) * dt;
-        ampV = trace(pkSmp) - bsl(pkSmp);
-        seg  = trace(pkSmp:stopSmp) - bsl(pkSmp:stopSmp);
+        ampV = trace(pkSmp);
+        seg  = trace(pkSmp:stopSmp);
         seg(isnan(seg)) = 0;
         intV = trapz(seg) * dt;
         durV = tStopS - tStartS;
@@ -830,13 +829,13 @@ onCellChange();
     end
 
 
-    function ev = recomputeOneLocal(ev, iE, trace, bsl)
+    function ev = recomputeOneLocal(ev, iE, trace)
         nTrc    = numel(trace);
         pkSmp   = max(1, min(nTrc, round(ev.start(iE) * fs) + 1));
         stopSmp = max(1, min(nTrc, round(ev.stop(iE)  * fs) + 1));
         stopSmp = max(stopSmp, pkSmp);
-        ev.amp(iE) = trace(pkSmp) - bsl(pkSmp);
-        seg = trace(pkSmp:stopSmp) - bsl(pkSmp:stopSmp);
+        ev.amp(iE) = trace(pkSmp);
+        seg = trace(pkSmp:stopSmp);
         seg(isnan(seg)) = 0;
         ev.int(iE) = trapz(seg) * dt;
         ev.dur(iE) = ev.stop(iE) - ev.start(iE);
@@ -882,19 +881,3 @@ ev.int(iE)   = [];
 end
 
 
-function out = rollingPercentileLocal(x, winSmp, q)
-% Centered, NaN-tolerant rolling percentile (matches spontCa_detect's
-% internal rollingPercentile so baselines line up).
-nT = length(x);
-out = nan(1, nT);
-halfWin = floor(winSmp / 2);
-for i = 1:nT
-    lo = max(1, i - halfWin);
-    hi = min(nT, i + halfWin);
-    seg = x(lo:hi);
-    seg = seg(~isnan(seg));
-    if ~isempty(seg)
-        out(i) = prctile(seg, q);
-    end
-end
-end
