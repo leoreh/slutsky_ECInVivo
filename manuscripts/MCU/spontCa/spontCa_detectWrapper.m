@@ -145,7 +145,6 @@ fprintf('Dropped %d cells with zero events in cyto or mito\n', ...
 tblCell  = tblCell(keepCell, :);
 tblEvent = tblEvent(ismember(tblEvent.sbjID, tblCell.sbjID), :);
 
-sum(tblCell.genotype == 'MCU-KO')
 
 
 %% ========================================================================
