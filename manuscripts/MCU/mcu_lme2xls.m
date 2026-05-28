@@ -15,6 +15,11 @@ tblVivo = mcu_tblVivo('presets', presets, 'flgClean', true);
 tblTrans = tbl_trans(tblVivo, 'varsInc', {'pBurst'}, 'logBase', 'logit');
 tblVivo.pBurst_trans = tblTrans.pBurst;
 
+% Load Imaging -----------------------------------------------------------
+spDir = fileparts(which('spontCa_detect'));
+load(fullfile(spDir, 'cache', 'spontCa_tbl.mat'), 'tblCell', 'tblEvent', 'fs');
+[tblCell, tblEvent] = spontCa2_metrics(tblCell, tblEvent, fs, 'aggFcn', 'mean');
+
 flgPlot = false;
 
 %% ========================================================================
@@ -22,9 +27,52 @@ flgPlot = false;
 % =========================================================================
 tblIdx = 1;
 sheetNames{tblIdx} = ['S' num2str(tblIdx)];
+tblInfo{tblIdx} = 'Spontaneous Ca Transients';
+dataSet{tblIdx} = 'Imaging';
+tblPnls{tblIdx} = '1E-F; S1B-C';
+
+% Fig. 1E - per-event transfer function (paired cyto events)
+tblLme = tblEvent(tblEvent.compartment == 'Cyto' & tblEvent.paired, :);
+frml = 'pairAmp ~ amp * genotype + (1|sbjID)';
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLme, frml, 'dist', 'log-normal', 'flgStnd', false);
+lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
+
+% Fig. 1F - cell-level amplitude by compartment
+frml = 'amp ~ compartment * genotype + (1|sbjID)';
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblCell, frml, 'dist', 'log-normal', 'flgStnd', false);
+lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
+
+% Fig. S1B - cell-level event rate by compartment
+frml = 'rate ~ compartment * genotype + (1|sbjID)';
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblCell, frml, 'dist', 'log-normal', 'flgStnd', false);
+lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
+
+% Fig. S1C - per-event mito coupling probability (binomial GLMM)
+tblLme = tblEvent(tblEvent.compartment == 'Mito', :);
+tblLme.paired = double(tblLme.paired);
+frml = 'paired ~ genotype + (1|sbjID)';
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLme, frml, 'dist', 'binomial', 'flgStnd', false);
+lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
+
+lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName, ...
+    'tblInfo', tblInfo{tblIdx}, 'dataSet', dataSet{tblIdx}, 'tblPnls', tblPnls{tblIdx})
+
+if flgPlot
+    tblGUI_bar(tblCell, 'yVar', 'amp', 'xVar', 'compartment', 'grpVar', 'genotype');
+    tblGUI_bar(tblCell, 'yVar', 'rate', 'xVar', 'compartment', 'grpVar', 'genotype');
+    tblGUI_scatHist(tblEvent(tblEvent.compartment == 'Cyto' & tblEvent.paired, :), ...
+        'xVar', 'amp', 'yVar', 'pairAmp', 'grpVar', 'genotype');
+end
+
+
+%% ========================================================================
+% Table S2
+% =========================================================================
+tblIdx = 2;
+sheetNames{tblIdx} = ['S' num2str(tblIdx)];
 tblInfo{tblIdx} = 'BSL Firing';
 dataSet{tblIdx} = 'MEA';
-tblPnls{tblIdx} = '1K-N';
+tblPnls{tblIdx} = '1J-M';
 
 frml = 'fr ~ genotype + (1|sbjID)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblMea, frml, 'dist', 'log-normal');
@@ -51,13 +99,13 @@ end
 
 
 %% ========================================================================
-% Table S2
+% Table S3
 % =========================================================================
-tblIdx = 2;
+tblIdx = 3;
 sheetNames{tblIdx} = ['S' num2str(tblIdx)];
 tblInfo{tblIdx} = 'BSL Firing';
 dataSet{tblIdx} = 'In Vivo';
-tblPnls{tblIdx} = '2D-E; S2E-F';
+tblPnls{tblIdx} = '2D-E; S2F-G';
 
 tblLme = tblVivo(tblVivo.day == 'BSL', :);
 frml = 'fr ~ genotype + (1|sbjID)';
@@ -83,31 +131,6 @@ if flgPlot
     tblGUI_scatHist(tblLme, 'xVar', 'fr', 'yVar', 'br', 'grpVar', 'genotype');
 end
 
-%% ========================================================================
-% Table S3
-% =========================================================================
-tblIdx = 3;
-sheetNames{tblIdx} = ['S' num2str(tblIdx)];
-tblInfo{tblIdx} = 'SWR Properties';
-dataSet{tblIdx} = 'In Vivo';
-tblPnls{tblIdx} = '2H; S2H';
-
-basepaths = [mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl')];
-tblRipp = mcu_tblVivo('basepaths', basepaths, 'presets', {'ripp'});
-
-frml = 'amp ~ genotype + (1|sbjID)';
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblRipp, frml, 'dist', 'log-normal');
-lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
-
-frml = 'freq ~ genotype + (1|sbjID)';
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblRipp, frml, 'dist', 'normal');
-lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
-
-frml = 'dur ~ genotype + (1|sbjID)';
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblRipp, frml, 'dist', 'log-normal');
-lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
-lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName, ...
-    'tblInfo', tblInfo{tblIdx}, 'dataSet', dataSet{tblIdx}, 'tblPnls', tblPnls{tblIdx})
 
 %% ========================================================================
 % Table S4
@@ -143,14 +166,41 @@ if flgPlot
     tblGUI_scatHist(tblRipp, 'grpVar', 'genotype');
 end
 
+
 %% ========================================================================
 % Table S5
 % =========================================================================
 tblIdx = 5;
 sheetNames{tblIdx} = ['S' num2str(tblIdx)];
+tblInfo{tblIdx} = 'SWR Properties';
+dataSet{tblIdx} = 'In Vivo';
+tblPnls{tblIdx} = '2H; S2H';
+
+basepaths = [mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl')];
+tblRipp = mcu_tblVivo('basepaths', basepaths, 'presets', {'ripp'});
+
+frml = 'amp ~ genotype + (1|sbjID)';
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblRipp, frml, 'dist', 'log-normal');
+lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
+
+frml = 'freq ~ genotype + (1|sbjID)';
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblRipp, frml, 'dist', 'normal');
+lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
+
+frml = 'dur ~ genotype + (1|sbjID)';
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblRipp, frml, 'dist', 'log-normal');
+lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
+lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName, ...
+    'tblInfo', tblInfo{tblIdx}, 'dataSet', dataSet{tblIdx}, 'tblPnls', tblPnls{tblIdx})
+
+%% ========================================================================
+% Table S6
+% =========================================================================
+tblIdx = 6;
+sheetNames{tblIdx} = ['S' num2str(tblIdx)];
 tblInfo{tblIdx} = 'FRH during BAC';
 dataSet{tblIdx} = 'In Vivo';
-tblPnls{tblIdx} = '3G';
+tblPnls{tblIdx} = '4C';
 
 tblLme = tblVivo; tblLme(tblLme.sbjID == 'lh137', :) = [];
 frml = 'fr ~ genotype * day + (day|sbjID)';
@@ -161,69 +211,15 @@ lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
 lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName, ...
     'tblInfo', tblInfo{tblIdx}, 'dataSet', dataSet{tblIdx}, 'tblPnls', tblPnls{tblIdx})
 
-% --- Distribution shape across days (per genotype) -----------------------
-% Cross-sectional quantification of the RS firing rate distribution per
-% day. Mean and median are reported in Hz for interpretability; variance
-% and IQR are computed on log10(FR), where the distribution is
-% approximately symmetric. Shape is compared against BSL with a two-
-% sample KS test on log-FR. Units are sorted independently per 24-h
-% session, so this describes the per-session population state, not
-% trajectories of the same neurons across days. Kept in the workspace
-% only (distRows) -- not written to the supp Excel file.
-
-% Reload table to include washout, then remove bad and FS units, remove bac on, bac off
-tblVivo = mcu_tblVivo('presets', presets, 'flgClean', false);
-tblLme = tblVivo; tblLme(tblLme.sbjID == 'lh137', :) = [];
-tblLme(tblLme.unitType == 'Other', :) = [];
-tblLme(tblLme.unitType == 'FS', :) = [];
-tblLme.unitType = removecats(tblLme.unitType, {'Other', 'FS'});
-tblLme.unitType = [];
-tblLme(tblLme.day == 'BAC_ON', :) = [];
-tblLme(tblLme.day == 'BAC_OFF', :) = [];
-tblLme.day = removecats(tblLme.day, {'BAC_ON', 'BAC_OFF'});
-
-logFR = log10(tblVivo.fr); logFR(isinf(logFR)) = NaN;
-grps = categories(removecats(tblVivo.genotype));
-days = categories(removecats(tblVivo.day));
-distRows = table;
-for iGrp = 1:numel(grps)
-    idxGrp = tblVivo.genotype == grps{iGrp};
-    vBslLog = logFR(idxGrp & tblVivo.day == 'BSL' & ~isnan(logFR));
-    for iDay = 1:numel(days)
-        idxDay = idxGrp & tblVivo.day == days{iDay};
-        vLog   = logFR(idxDay & ~isnan(logFR));
-        vHz    = tblVivo.fr(idxDay);
-        vHz    = vHz(~isnan(vHz) & vHz > 0);
-        if isempty(vLog), continue; end
-        if strcmp(days{iDay}, 'BSL')
-            dKS = NaN; pKS = NaN;
-        else
-            [~, pKS, dKS] = kstest2(vBslLog, vLog);
-        end
-        distRows = [distRows; table(string(grps{iGrp}), string(days{iDay}), ...
-            numel(vLog), mean(vHz), median(vHz), var(vLog), iqr(vLog), ...
-            dKS, pKS, ...
-            'VariableNames', {'Genotype','Day','n','Mean_Hz','Median_Hz', ...
-            'Variance_log','IQR_log','KS_D','KS_p'})]; %#ok<AGROW>
-    end
-end
-disp(distRows);
-
-% Number of units per day
-tblN = groupsummary(tblVivo, {'sbjID', 'genotype', 'day'});
-
-% Publication figure (thesis response R2-08): per-genotype RS FR distributions
-%   kdMat = mcu_frDist_export(tblLme, pathName)
-
 
 %% ========================================================================
-% Table S6
+% Table S7
 % =========================================================================
-tblIdx = 6;
+tblIdx = 7;
 sheetNames{tblIdx} = ['S' num2str(tblIdx)];
 tblInfo{tblIdx} = 'SS Burstiness';
 dataSet{tblIdx} = 'In Vivo';
-tblPnls{tblIdx} = '3H';
+tblPnls{tblIdx} = 'S4D';
 
 tblLme = tblVivo(tblVivo.day == 'BAC3', :);
 frml = 'pBurst ~ genotype * fr + (1|sbjID)';
@@ -237,9 +233,9 @@ if flgPlot
 end
 
 %% ========================================================================
-% Table S7
+% Table S8
 % =========================================================================
-tblIdx = 7;
+tblIdx = 8;
 sheetNames{tblIdx} = ['S' num2str(tblIdx)];
 tblInfo{tblIdx}    = 'FR Component x Time during FRH';
 dataSet{tblIdx}    = 'MEA';
@@ -269,13 +265,13 @@ lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName, 
     'tblInfo', tblInfo{tblIdx}, 'dataSet', dataSet{tblIdx}, 'tblPnls', tblPnls{tblIdx})
 
 %% ========================================================================
-% Table S8
+% Table S9
 % =========================================================================
-tblIdx = 8;
+tblIdx = 9;
 sheetNames{tblIdx} = ['S' num2str(tblIdx)];
 tblInfo{tblIdx} = 'Firing Gain during FRH';
 dataSet{tblIdx} = 'MEA';
-tblPnls{tblIdx} = '4D, S5D';
+tblPnls{tblIdx} = '4H,K; S5D';
 
 tblMea.bGain = log((tblMea.ss_frBurst) ./ (tblMea.frBurst));
 tblMea.sGain = log((tblMea.ss_frSingle) ./ (tblMea.frSingle));
@@ -308,19 +304,17 @@ if flgPlot
     tblGUI_scatHist(tblMea, 'grpVar', 'genotype');
 end
 
-tblSum = tblMea(tblMea.genotype == 'Control', {'sGain', 'frGain', 'bGain'});
-sumStats = groupsummary(tblSum, [], {"mean", "std"}, {'sGain', 'frGain', 'bGain'});
 
 
 
 %% ========================================================================
-% Table S9
+% Table S10
 % =========================================================================
-tblIdx = 9;
+tblIdx = 10;
 sheetNames{tblIdx} = ['S' num2str(tblIdx)];
 tblInfo{tblIdx} = 'Feature Ablation';
 dataSet{tblIdx} = 'MEA';
-tblPnls{tblIdx} = '4G';
+tblPnls{tblIdx} = '4I';
 
 frml = 'ss_fr ~ (frBurst + frSingle)';
 partMode = 'split';

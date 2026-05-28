@@ -36,7 +36,6 @@ spDir = fileparts(which('spontCa_detect'));
 load(fullfile(spDir, 'cache', 'spontCa_tbl.mat'), 'tblCell', 'tblEvent', 'fs');
 
 
-
 %% ========================================================================
 %  METRICS
 %  ========================================================================
@@ -47,9 +46,7 @@ load(fullfile(spDir, 'cache', 'spontCa_tbl.mat'), 'tblCell', 'tblEvent', 'fs');
 [tblCell, tblEvent] = spontCa2_metrics(tblCell, tblEvent, fs, ...
     'aggFcn', 'mean');
 
-
 % out = spontCa_sweep(tblCell, tblEvent, fs, 'var', 'amp', 'flgPair', 'all');           
-
 
 
 %% ========================================================================
@@ -62,7 +59,7 @@ load(fullfile(spDir, 'cache', 'spontCa_tbl.mat'), 'tblCell', 'tblEvent', 'fs');
 % aggregates) is refreshed afterwards via mode='cellOnly'.
 
 [tblCell, tblEvent] = spontCa_filter(tblCell, tblEvent, ...
-    'minAmp',    [0; 0.03], ...
+    'minAmp',    [0.00; 0.00], ...
     'minSNR',    [0; 0], ...
     'minEvents', [0; 0], ...
     'flgPair',   'all');
@@ -95,19 +92,33 @@ spontCa_explore(tblEvent, tblCell, fs);
 
 % stats = spontCa_stats(tblCell, tblEvent);
 
+% To prism
+var = 'rate';
+tblPrism = tblCell(:, {'genotype', 'sbjID', 'compartment', var});
+tblWide = unstack(tblPrism, var, "compartment");
+tblWide(tblWide.genotype == 'Control', {'Mito', 'Cyto'});
 
-frml = 'ampRate ~ compartment * genotype + (1 | sbjID)';
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblCell, frml, 'dist', 'log-normal', ...
-    'flgPlot', false, 'verbose', true, 'flgStnd', false);
+
+% Coupled vs. Uncoupled events
+
+
+
+% Canonical analyses for Fig 1E, 1F, S1B live in mcu_lme2xls.m (Table S1).
+
+
+
+
 
 
 frml = 'amp ~ compartment * genotype + (1 | sbjID)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblEvent, frml, ...
     'flgPlot', false, 'verbose', true, 'flgStnd', false);
 
+
+
 v = 'amp';
 g = categories(tblEvent.genotype);
-c = ["Mito" "Cyto"];
+c = ["Mito" "Cyto"];s
 M = nan(2,6);
 for i = 1:2
     for j = 1:2
@@ -115,25 +126,6 @@ for i = 1:2
         M(i,(j-1)*3+(1:3)) = [mean(x,'omitnan'), std(x,'omitnan'), numel(x)];
     end
 end
-
-
-hFig = figure;
-
-tblLme = tblEvent;
-idx = tblLme.compartment == 'Cyto' & tblLme.paired;
-% idx = tblLme.compartment == 'Cyto';
-tblLme = tblLme(idx, :);
-
-var = 'flux';
-frml = ['fluxOther ~ ', var, ' * genotype + (1 | sbjID)'];
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLme, frml, 'dist', 'log-normal', ...
-    'flgPlot', false, 'verbose', true, 'flgStnd', false);
-
-hAx = nexttile; 
-pdRes = lme_lsmeans(lmeMdl, {var, 'genotype'}, 'transParams', lmeInfo.transParams, ...
-    'hAx', hAx);
-
-
 
 
 
@@ -167,6 +159,90 @@ frml = 'amp ~ compartment * genotype + (1 | sbjID)';
 hAx = nexttile;
 pdRes = lme_lsmeans(lmeMdl, {'amp', 'genotype'}, 'transParams', lmeInfo.transParams, ...
     'hAx', hAx);
+
+
+
+%% ========================================================================
+%  COUPLED vs UNCOUPLED EVENTS
+%  ========================================================================
+% Q (supervisor): does MCU-KO raise the fraction of mitoCa2+ events that
+% are uncoupled to cytoCa2+ events?
+%
+% Two readings of the data. (A) MCU is the dominant cyto -> mito route,
+% so its loss weakens both amplitude transfer (Fig 1E) AND the event-
+% level binding. Predicts a lower paired fraction on the Mito side in
+% KO - more solo mito events. (B) Pairing persists, magnitude shifts.
+% The 1E net slope in KO is 0.97 vs Ctrl 1.58 - flatter but still
+% positive and near unity, so the same cyto events still recruit mito
+% partners, just at smaller amplitude. Predicts equivalent paired
+% fractions across genotypes.
+%
+% Operationalization. pairFrac per cell per compartment, fit on the
+% logit scale via lme_analyse(..., 'dist', 'logit-normal'). Mito side
+% answers the supervisor; Cyto side is the symmetric check (uncoupled
+% cyto = cyto events with no mito follower). The paired flag is set
+% upstream by spontCa2_metrics from the mutual-NN partner falling
+% inside winPair.
+
+% ---- Build per-cell, per-compartment pair-fraction table ---------------
+sbjAll = unique(tblCell.sbjID);
+pfRows = table;
+for k = 1:numel(sbjAll)
+    sid = sbjAll(k);
+    rowsCell = find(tblCell.sbjID == sid);
+    if isempty(rowsCell), continue; end
+    gn = tblCell.genotype(rowsCell(1));
+    for cmp = ["Cyto", "Mito"]
+        idxEv = tblEvent.sbjID == sid & tblEvent.compartment == cmp;
+        nTot  = sum(idxEv);
+        if nTot == 0
+            pf = NaN;
+        else
+            pf = sum(idxEv & tblEvent.paired) / nTot;
+        end
+        pfRows = [pfRows; table(sid, gn, cmp, nTot, pf, ...
+            'VariableNames', {'sbjID','genotype','compartment','nEvents','pairFrac'})]; %#ok<AGROW>
+    end
+end
+pfRows.compartment = categorical(pfRows.compartment, ["Cyto", "Mito"]);
+
+% Quick descriptives by compartment x genotype.
+disp(groupsummary(pfRows, {'compartment','genotype'}, ...
+    {'mean','median','std'}, 'pairFrac'));
+
+
+% ---- LME: pairFrac ~ compartment * genotype  (logit-normal) ------------
+frml = 'pairFrac ~ compartment * genotype + (1|sbjID)';
+[lmePF, statsPF, infoPF] = lme_analyse(pfRows, frml, ...
+    'dist', 'logit-normal', 'flgPlot', false, 'verbose', true);
+
+tblLme = pfRows(pfRows.compartment == 'Mito', :);
+frml = 'pairFrac ~ genotype + (1|sbjID)';
+[lmePF, statsPF, infoPF] = lme_analyse(tblLme, frml, ...
+    'dist', 'logit-normal', 'flgPlot', false, 'verbose', true);
+
+
+% ---- Per-event GLMM (canonical for binary outcome + cell clustering) ---
+% Per-cell pairFrac throws away the discreteness of the event counts and
+% inflates per-cell variance by averaging small event counts (median 5-6
+% mito events / cell). Per-event binomial GLMM uses the event-level
+% paired/unpaired flag directly and lets (1|sbjID) absorb cell-to-cell
+% heterogeneity. This is the test the design called for.
+
+tblM = tblEvent(tblEvent.compartment == 'Mito', :);
+tblM.paired = double(tblM.paired);
+frml = 'paired ~ genotype + (1|sbjID)';
+mdlEvt = fitglme(tblM, frml, ...
+    'Distribution', 'binomial', 'Link', 'logit');
+disp(mdlEvt.Coefficients);
+
+[lmePF, statsPF, infoPF] = lme_analyse(tblM, frml, ...
+    'dist', 'binomial', 'flgPlot', false, 'verbose', true);
+
+
+% tblGUI_bar(pfRows, 'yVar', 'pairFrac', 'xVar', 'compartment', 'grpVar', 'genotype');
+
+
 
 
 %% ========================================================================
