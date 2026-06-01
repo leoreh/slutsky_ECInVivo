@@ -40,6 +40,7 @@ lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
 % Fig. 1F - cell-level amplitude by compartment
 frml = 'amp ~ compartment * genotype + (1|sbjID)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblCell, frml, 'dist', 'log-normal', 'flgStnd', false);
+lmeStats = lme_postHoc(lmeMdl, 'contrasts', [1 : 5, 8, 9]);
 lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
 
 % Fig. S1B - cell-level event rate by compartment
@@ -139,7 +140,7 @@ tblIdx = 4;
 sheetNames{tblIdx} = ['S' num2str(tblIdx)];
 tblInfo{tblIdx} = 'Spike COM during SWR';
 dataSet{tblIdx} = 'In Vivo';
-tblPnls{tblIdx} = '2F; S2G';
+tblPnls{tblIdx} = '2F; S2H,I';
 
 basepaths = [mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl')];
 [tblRipp, ~, ~, xVec] = mcu_tblVivo('basepaths', basepaths, 'presets', {'rippSpks', 'burst'}, 'flgClean', true);
@@ -174,7 +175,7 @@ tblIdx = 5;
 sheetNames{tblIdx} = ['S' num2str(tblIdx)];
 tblInfo{tblIdx} = 'SWR Properties';
 dataSet{tblIdx} = 'In Vivo';
-tblPnls{tblIdx} = '2H; S2H';
+tblPnls{tblIdx} = '2H; S2K';
 
 basepaths = [mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl')];
 tblRipp = mcu_tblVivo('basepaths', basepaths, 'presets', {'ripp'});
