@@ -37,10 +37,22 @@ frml = 'pairAmp ~ amp * genotype + (1|sbjID)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLme, frml, 'dist', 'log-normal', 'flgStnd', false);
 lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
 
+if flgPlot
+    hFig = figure;
+    hAx = nexttile;
+    pdRes = lme_lsmeans(lmeMdl, {'amp', 'genotype'}, 'transParams', lmeInfo.transParams, ...
+        'hAx', hAx);
+
+    tblGUI_bar(tblCell, 'yVar', 'amp', 'xVar', 'compartment', 'grpVar', 'genotype');
+    tblGUI_bar(tblCell, 'yVar', 'rate', 'xVar', 'compartment', 'grpVar', 'genotype');
+    tblGUI_scatHist(tblEvent(tblEvent.compartment == 'Cyto' & tblEvent.paired, :), ...
+        'xVar', 'amp', 'yVar', 'pairAmp', 'grpVar', 'genotype');
+end
+
 % Fig. 1F - cell-level amplitude by compartment
 frml = 'amp ~ compartment * genotype + (1|sbjID)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblCell, frml, 'dist', 'log-normal', 'flgStnd', false);
-lmeStats = lme_postHoc(lmeMdl, 'contrasts', [1 : 5, 8, 9]);
+lmeStats = lme_postHoc(lmeMdl, 'contrasts', [1 : 5, 9]);
 lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
 
 % Fig. S1B - cell-level event rate by compartment
@@ -57,13 +69,6 @@ lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
 
 lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName, ...
     'tblInfo', tblInfo{tblIdx}, 'dataSet', dataSet{tblIdx}, 'tblPnls', tblPnls{tblIdx})
-
-if flgPlot
-    tblGUI_bar(tblCell, 'yVar', 'amp', 'xVar', 'compartment', 'grpVar', 'genotype');
-    tblGUI_bar(tblCell, 'yVar', 'rate', 'xVar', 'compartment', 'grpVar', 'genotype');
-    tblGUI_scatHist(tblEvent(tblEvent.compartment == 'Cyto' & tblEvent.paired, :), ...
-        'xVar', 'amp', 'yVar', 'pairAmp', 'grpVar', 'genotype');
-end
 
 
 %% ========================================================================
@@ -272,7 +277,7 @@ tblIdx = 9;
 sheetNames{tblIdx} = ['S' num2str(tblIdx)];
 tblInfo{tblIdx} = 'Firing Gain during FRH';
 dataSet{tblIdx} = 'MEA';
-tblPnls{tblIdx} = '4H,K; S5D';
+tblPnls{tblIdx} = '4H,K; S5D,F';
 
 tblMea.bGain = log((tblMea.ss_frBurst) ./ (tblMea.frBurst));
 tblMea.sGain = log((tblMea.ss_frSingle) ./ (tblMea.frSingle));
