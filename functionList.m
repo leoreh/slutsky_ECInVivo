@@ -136,7 +136,7 @@ sSig = as_prepSig([basename, '.lfp'], [basename, '.emg.dat'],...
 
 % manually create labels
 labelsmanfile = [basename, '.sleep_labelsMan.mat'];
-AccuSleep_viewer(sSig, labels, labelsmanfile)
+AccuSleep_viewer(sSig, labels, [])
 
 % classify with a network
 netfile = 'D:\Code\slutsky_ECInVivo\lfp\SleepStates\AccuSleep\trainedNetworks\net_230212_103132.mat';

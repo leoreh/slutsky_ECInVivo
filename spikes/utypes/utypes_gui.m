@@ -115,10 +115,16 @@ end
 
 % -------------------------------------------------------------------------
 
-% Button for Saving (on Scatter)
+% Action buttons. tblGUI_scatHist places its Select / Save buttons in the
+% lower-left control column; re-stack them together with "Push Units" so the
+% added button does not overlap the existing ones.
+dScat = hFigScat.UserData;
+set(dScat.btnSelect,    'Position', [0.010, 0.150, 0.085, 0.045]);
+set(dScat.btnSelectDot, 'Position', [0.105, 0.150, 0.085, 0.045]);
+set(dScat.btnSave,      'Position', [0.010, 0.040, 0.180, 0.045]);
 uicontrol('Parent', hTabScat, 'Style', 'pushbutton', ...
     'String', 'Push Units', ...
-    'Units', 'normalized', 'Position', [0.01, 0.11, 0.18, 0.05], ...
+    'Units', 'normalized', 'Position', [0.010, 0.095, 0.180, 0.045], ...
     'Callback', @(src, evt) onPushUnits(src, basepaths, hFigScat));
 
 hFig = hFigScat; % Return main handle

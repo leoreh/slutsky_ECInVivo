@@ -1050,12 +1050,17 @@ onUpdatePlot(hContainer, []);
         elseif islogical(currentGrpCol)
             cats = {'false', 'true'};
         else
-            cats = unique(string(currentGrpCol));
+            cats = cellstr(unique(string(currentGrpCol)));
         end
 
+        % Size the list box to its content. The default listdlg size is a
+        % tall, mostly-empty box in which the few options are easy to miss.
+        listH = min(320, max(60, 22 * numel(cats) + 24));
         [indx, tf] = listdlg('PromptString', sprintf('Assign %d points to:', nSelected), ...
+            'Name', 'Assign Group', ...
             'SelectionMode', 'single', ...
-            'ListString', cats);
+            'ListSize', [220, listH], ...
+            'ListString', cellstr(cats));
 
         if tf
             selectedCat = cats{indx};

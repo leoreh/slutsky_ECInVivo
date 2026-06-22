@@ -11,23 +11,37 @@ function utypes_push(basepaths, fetTbl)
 %
 %   INPUT:
 %       basepaths - Cell array of recording folder paths
-%       fetTbl    - Table containing 'unitType' and 'fileID' columns
+%       fetTbl    - Table with a unit-type column (unitType or UnitType) and a
+%                   file column (fileID or File). Column names are resolved
+%                   case-insensitively.
 %
 
 if ~iscell(basepaths), basepaths = {basepaths}; end
+
+% Resolve column names (supports both schemas: unitType/UnitType and
+% fileID/File), so tables from utypes_classify and mcu_tblVivo both work.
+varNames = fetTbl.Properties.VariableNames;
+iType = find(strcmpi(varNames, 'unitType'), 1);
+iFile = find(ismember(lower(varNames), {'fileid', 'file'}), 1);
+if isempty(iType) || isempty(iFile)
+    error('utypes_push:missingCols', ...
+        ['fetTbl must contain a unit-type column (unitType/UnitType) ', ...
+        'and a file column (fileID/File).']);
+end
+typeCol = varNames{iType};
+fileCol = varNames{iFile};
 
 for iPath = 1 : length(basepaths)
     basepath = basepaths{iPath};
     [~, basename] = fileparts(basepath);
     uFile = fullfile(basepath, [basename, '.units.mat']);
 
-    % Find units belonging to this file
-    % Assumes fetTbl has 'fileID' column matching basename
-    fFiles = string(fetTbl.fileID);
+    % Find units belonging to this file (match file column to basename)
+    fFiles = string(fetTbl.(fileCol));
     uIdx = (fFiles == string(basename));
 
     % Get subset of unitTypes
-    subTypes = fetTbl.unitType(uIdx);
+    subTypes = fetTbl.(typeCol)(uIdx);
     nUnits = length(subTypes);
 
     % Construct 'clean' (Row 1: RS, Row 2: FS)
