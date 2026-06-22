@@ -3,11 +3,8 @@ function hFig = tblGUI_raster(dataTbl, varargin)
 %
 %   hFig = TBLGUI_RASTER(dataTbl, ...) plots spike rasters from 'dataTbl'.
 %   A single raster panel shows all spikes (black) with optional burst
-%   spike overlay (red). Navigation uses editable text boxes for the
-%   display window center and width.
-%
-%   - Side Panel: Filter by categorical variables, adjust view window.
-%   - Main Panel: Raster with fixed typography (Arial, 10/12 pt).
+%   spike overlay (red). Navigation uses editable boxes for the display
+%   window center and width.
 %
 %   INPUTS:
 %       dataTbl   (table)  Table containing spike times and metadata.
@@ -15,17 +12,17 @@ function hFig = tblGUI_raster(dataTbl, varargin)
 %   OPTIONAL KEY-VALUE PAIRS:
 %       'timesVar'  (char) Column name for spike times {'spktimes'}.
 %       'brstVar'   (char) Column name for burst spike times {''}.
-%                   If empty or not found, burst overlay is skipped.
 %       'grpVar'    (char) Initial grouping/filtering variable.
-%       'grpVal'    (char/cell) Initial value to filter by.
+%       'grpVal'    (char/cell) Initial value(s) to filter by.
 %       'timeLim'   (1x2 numeric) Clip spike times to [start, end] {[]}.
-%                   Applied once at initialization for speed.
-%       'Parent'    (handle) Parent container.
+%       'Parent'    (handle) uifigure or uifigure container.
 %
 %   OUTPUT:
 %       hFig      (handle) Figure handle.
 %
-%   See also: PLOT_RASTER, TBLGUI_XY
+%   Built on the shared graphics/+tblgui layer (uifigure + uigridlayout).
+%
+%   See also: PLOT_RASTER, TBLGUI_XY, TBLGUI_RASTER_EXPORT
 
 %% ========================================================================
 %  ARGUMENTS
@@ -52,9 +49,7 @@ if ~ismember(timesVar, dataTbl.Properties.VariableNames)
     error('Variable "%s" not found in table.', timesVar);
 end
 
-% Resolve burst variable
-flgBrst = ~isempty(brstVar) && ...
-    ismember(brstVar, dataTbl.Properties.VariableNames);
+flgBrst = ~isempty(brstVar) && ismember(brstVar, dataTbl.Properties.VariableNames);
 
 % Clip spike times to timeLim (applied once for speed)
 if ~isempty(timeLim)
@@ -66,47 +61,35 @@ if ~isempty(timeLim)
     end
 end
 
-
 %% ========================================================================
 %  INITIALIZATION
 %  ========================================================================
 
-% Identify categorical variables for filtering
-allVars = dataTbl.Properties.VariableNames;
-catVars = allVars(varfun(@(x) iscategorical(x) || isstring(x) || islogical(x), ...
-    dataTbl, 'OutputFormat', 'uniform'));
+[~, catVars] = tblgui.classifyVars(dataTbl);
 catVars = [{'None'}, catVars];
 
-% Auto-select grpVar if valid
 if ~isempty(initialGrpVar) && ismember(initialGrpVar, catVars)
     grpVar = initialGrpVar;
 else
     grpVar = 'None';
 end
 
-% Data extent (used for navigation defaults)
+% Data extent (navigation defaults)
 allSpks = vertcat(dataTbl.(timesVar){:});
 if isempty(allSpks)
-    tMin = 0;  tMax = 1;
+    tMin = 0; tMax = 1;
 else
-    tMin = min(allSpks);  tMax = max(allSpks);
+    tMin = min(allSpks); tMax = max(allSpks);
 end
 
-
-%% ========================================================================
-%  GUI SETUP
-%  ========================================================================
-
 if isempty(hParent)
-    hContainer = figure('Name', 'Table Raster GUI', 'NumberTitle', 'off', ...
-        'Units', 'pixels', 'Position', [100, 100, 1200, 700], 'Color', 'w');
+    hContainer = uifigure('Name', 'Table Raster GUI', 'Position', [100, 100, 1200, 700]);
     hFig = hContainer;
 else
     hContainer = hParent;
     hFig = ancestor(hContainer, 'figure');
 end
 
-% GUI State
 guiData = struct();
 guiData.dataTbl        = dataTbl;
 guiData.timesVar       = timesVar;
@@ -119,268 +102,134 @@ guiData.tMax           = tMax;
 guiData.winCenter      = (tMin + tMax) / 2;
 guiData.winWidth       = tMax - tMin;
 guiData.initialGrpVal  = initialGrpVal;
-guiData.chkGrpBy       = [];
+guiData.chkGrpBy       = gobjects(0);
 guiData.renderData     = struct();
-
 
 %% ========================================================================
 %  LAYOUT
 %  ========================================================================
 
-% --- Side Panel (Left, 15%) ---
-panelW = 0.15;
-hPanel = uipanel('Parent', hContainer, 'Units', 'normalized', ...
-    'Position', [0, 0, panelW, 1]);
+[~, gPlot, gCtrl, gActions] = tblgui.layout(hContainer, 'CtrlWidth', 200);
+guiData.hAx = uiaxes(gPlot);
 
-% --- Main Plot Panel (Right, 85%) ---
-hPanelRight = uipanel('Parent', hContainer, 'Units', 'normalized', ...
-    'Position', [panelW, 0, 1 - panelW, 1], 'BorderType', 'none', ...
-    'BackgroundColor', 'w');
+% Navigation (kept compact at the top)
+tblgui.labeledControl(gCtrl, 'label', 'Navigation:');
+guiData.edCenter = tblgui.labeledControl(gCtrl, 'editnum', 'Center (s):', ...
+    'Value', round(guiData.winCenter, 1), 'ValueChangedFcn', @onNavChange);
+guiData.edWindow = tblgui.labeledControl(gCtrl, 'editnum', 'Window (s):', ...
+    'Value', round(guiData.winWidth, 1), 'ValueChangedFcn', @onNavChange);
 
-guiData.hAx = axes('Parent', hPanelRight, 'Units', 'normalized', ...
-    'Position', [0.06, 0.1, 0.9, 0.85]);
+stepPanel = tblgui.labeledControl(gCtrl, 'panel', '', 'RowHeight', 32);
+gStep = uigridlayout(stepPanel, [1, 2], 'Padding', [0 0 0 0], 'ColumnSpacing', 4);
+uibutton(gStep, 'Text', '<', 'ButtonPushedFcn', @(~, ~) onStep(-1));
+uibutton(gStep, 'Text', '>', 'ButtonPushedFcn', @(~, ~) onStep(1));
 
+tblgui.labeledControl(gCtrl, 'button', '', 'Text', 'Show All', 'ButtonPushedFcn', @onShowAll);
 
-% --- Side Panel Controls ---
-ctlH   = 0.03;
-ctlGap = 0.01;
-currY  = 0.95;
+% Filter (expands to fill remaining control-column space)
+guiData.ddGrpBy = tblgui.labeledControl(gCtrl, 'dropdown', 'Filter By:', ...
+    'Items', catVars, 'Value', grpVar, 'ValueChangedFcn', @onGrpByChange);
+guiData.pnlGrpBy = tblgui.labeledControl(gCtrl, 'panel', '', 'RowHeight', '1x');
 
-% Section 1: Filter By
-uicontrol('Parent', hPanel, 'Style', 'text', 'String', 'Filter By:', ...
-    'Units', 'normalized', 'Position', [0.05, currY, 0.9, ctlH], ...
-    'HorizontalAlignment', 'left', 'FontWeight', 'bold');
-currY = currY - ctlH;
+% Export pinned at the bottom
+uibutton(gActions, 'Text', 'Export', 'FontWeight', 'bold', ...
+    'ButtonPushedFcn', @(~, ~) tblGUI_raster_export(hContainer));
 
-valGrp = find(strcmp(catVars, grpVar), 1);
-if isempty(valGrp), valGrp = 1; end
-
-guiData.ddGrpBy = uicontrol('Parent', hPanel, 'Style', 'popupmenu', ...
-    'String', catVars, 'Value', valGrp, ...
-    'Units', 'normalized', 'Position', [0.05, currY, 0.9, ctlH], ...
-    'Callback', @onGrpByChange);
-currY = currY - ctlH - ctlGap;
-
-% Checkbox container (dynamic height based on categories)
-guiData.pnlGrpBy = uipanel('Parent', hPanel, 'BorderType', 'none', ...
-    'Units', 'normalized', 'Position', [0.05, 0.45, 0.9, currY - 0.45]);
-
-% Section 2: Navigation
-currY = 0.40;
-uicontrol('Parent', hPanel, 'Style', 'text', 'String', 'Navigation:', ...
-    'Units', 'normalized', 'Position', [0.05, currY, 0.9, ctlH], ...
-    'HorizontalAlignment', 'left', 'FontWeight', 'bold');
-currY = currY - ctlH;
-
-% Center (s)
-uicontrol('Parent', hPanel, 'Style', 'text', 'String', 'Center (s):', ...
-    'Units', 'normalized', 'Position', [0.05, currY, 0.9, ctlH], ...
-    'HorizontalAlignment', 'left');
-currY = currY - ctlH;
-
-guiData.edCenter = uicontrol('Parent', hPanel, 'Style', 'edit', ...
-    'String', num2str(round(guiData.winCenter, 1)), ...
-    'Units', 'normalized', 'Position', [0.05, currY, 0.9, ctlH], ...
-    'BackgroundColor', 'w', 'Callback', @onNavChange);
-currY = currY - ctlH - ctlGap;
-
-% Window (s)
-uicontrol('Parent', hPanel, 'Style', 'text', 'String', 'Window (s):', ...
-    'Units', 'normalized', 'Position', [0.05, currY, 0.9, ctlH], ...
-    'HorizontalAlignment', 'left');
-currY = currY - ctlH;
-
-guiData.edWindow = uicontrol('Parent', hPanel, 'Style', 'edit', ...
-    'String', num2str(round(guiData.winWidth, 1)), ...
-    'Units', 'normalized', 'Position', [0.05, currY, 0.9, ctlH], ...
-    'BackgroundColor', 'w', 'Callback', @onNavChange);
-currY = currY - ctlH - ctlGap * 2;
-
-% Step Buttons [<] [>]
-btnW = 0.43;
-uicontrol('Parent', hPanel, 'Style', 'pushbutton', 'String', '<', ...
-    'Units', 'normalized', 'Position', [0.05, currY, btnW, ctlH], ...
-    'Callback', @(~, ~) onStep(-1));
-uicontrol('Parent', hPanel, 'Style', 'pushbutton', 'String', '>', ...
-    'Units', 'normalized', 'Position', [0.05 + btnW + 0.04, currY, btnW, ctlH], ...
-    'Callback', @(~, ~) onStep(1));
-currY = currY - ctlH - ctlGap;
-
-% Show All Button
-uicontrol('Parent', hPanel, 'Style', 'pushbutton', 'String', 'Show All', ...
-    'Units', 'normalized', 'Position', [0.05, currY, 0.9, ctlH], ...
-    'Callback', @onShowAll);
-currY = currY - ctlH - ctlGap * 3;
-
-% Export Button
-uicontrol('Parent', hPanel, 'Style', 'pushbutton', 'String', 'Export', ...
-    'Units', 'normalized', 'Position', [0.05, currY, 0.9, ctlH], ...
-    'FontWeight', 'bold', 'Callback', @(~, ~) tblGUI_raster_export(hFig));
-
-
-% --- Store State & Initialize ---
 hContainer.UserData = guiData;
 onGrpByChange(hContainer, []);
-
 
 %% ========================================================================
 %  CALLBACKS
 %  ========================================================================
 
-    % -----------------------------------------------------------------
-    % Group-By Dropdown: populate checkboxes and replot
-    % -----------------------------------------------------------------
     function onGrpByChange(~, ~)
         data = hContainer.UserData;
-        idx = get(data.ddGrpBy, 'Value');
-        varName = data.catVars{idx};
-
-        % Populate Checkboxes
-        delete(data.pnlGrpBy.Children);
-        data.chkGrpBy = [];
-
-        if ~strcmp(varName, 'None')
-            raw = data.dataTbl.(varName);
-            if islogical(raw), raw = categorical(raw); end
-            if ~iscategorical(raw), raw = categorical(raw); end
-            cats = categories(raw);
-            cats = cats(ismember(cats, unique(raw)));
-
-            % Determine initial selection
+        varName = data.ddGrpBy.Value;
+        if strcmp(varName, 'None')
+            delete(allchild(data.pnlGrpBy));
+            data.chkGrpBy = gobjects(0);
+        else
+            cats = tblgui.catList(data.dataTbl.(varName));
+            % Initial selection from grpVal (once)
             if ~isempty(data.initialGrpVal)
-                target = string(data.initialGrpVal);
-                initVal = ismember(string(cats), target);
-                if sum(initVal) == 0
-                    warning('grpVal "%s" not found in %s. Selecting all.', ...
-                        target, varName);
+                initVal = ismember(string(cats), string(data.initialGrpVal));
+                if ~any(initVal)
+                    warning('grpVal not found in %s. Selecting all.', varName);
                     initVal = true(size(cats));
                 end
                 data.initialGrpVal = [];
             else
                 initVal = true(size(cats));
             end
-
-            nCats = length(cats);
-            h = 1 / max(10, nCats + 1);
-            for k = 1 : nCats
-                yPos = 1 - k * h;
-                data.chkGrpBy(k) = uicontrol('Parent', data.pnlGrpBy, ...
-                    'Style', 'checkbox', 'String', cats{k}, ...
-                    'Units', 'normalized', 'Position', [0, yPos, 0.9, h], ...
-                    'Value', initVal(k), 'Callback', @onFilterChange);
-            end
+            data.chkGrpBy = tblgui.filterPanel(data.pnlGrpBy, cats, @onFilterChange, ...
+                'InitVal', initVal);
         end
-
         hContainer.UserData = data;
         updateActiveIndices();
         updatePlot();
     end
 
-    % -----------------------------------------------------------------
-    % Filter Checkbox: update active indices and replot
-    % -----------------------------------------------------------------
     function onFilterChange(~, ~)
         updateActiveIndices();
         updatePlot();
     end
 
-    % -----------------------------------------------------------------
-    % Navigation Text Boxes: parse center and window, then replot
-    % -----------------------------------------------------------------
     function onNavChange(~, ~)
         data = hContainer.UserData;
-
-        val = str2double(get(data.edCenter, 'String'));
-        if ~isnan(val)
-            data.winCenter = val;
-        end
-
-        val = str2double(get(data.edWindow, 'String'));
-        if ~isnan(val) && val > 0
-            data.winWidth = val;
-        end
-
+        v = data.edCenter.Value;
+        if ~isnan(v), data.winCenter = v; end
+        v = data.edWindow.Value;
+        if ~isnan(v) && v > 0, data.winWidth = v; end
         hContainer.UserData = data;
         updatePlot();
     end
 
-    % -----------------------------------------------------------------
-    % Step Buttons: shift center by half the window width
-    % -----------------------------------------------------------------
     function onStep(direction)
         data = hContainer.UserData;
         data.winCenter = data.winCenter + direction * data.winWidth / 2;
-        set(data.edCenter, 'String', num2str(round(data.winCenter, 1)));
+        data.edCenter.Value = round(data.winCenter, 1);
         hContainer.UserData = data;
         updatePlot();
     end
 
-    % -----------------------------------------------------------------
-    % Show All: reset navigation to full filtered-data extent
-    % -----------------------------------------------------------------
     function onShowAll(~, ~)
         resetNavigation();
         updatePlot();
     end
 
-    % -----------------------------------------------------------------
-    % Update Active Indices from checkbox selection
-    % -----------------------------------------------------------------
     function updateActiveIndices()
         data = hContainer.UserData;
-        idxVal = get(data.ddGrpBy, 'Value');
-        varName = data.catVars{idxVal};
-
-        if strcmp(varName, 'None')
+        varName = data.ddGrpBy.Value;
+        if strcmp(varName, 'None') || isempty(data.chkGrpBy)
             data.activeIndices = true(height(data.dataTbl), 1);
         else
-            chk = data.chkGrpBy;
-            if isempty(chk)
-                data.activeIndices = true(height(data.dataTbl), 1);
-            else
-                areSel  = arrayfun(@(x) get(x, 'Value'), chk);
-                allCats = arrayfun(@(x) string(get(x, 'String')), chk);
-                selCats = allCats(logical(areSel));
-
-                raw = data.dataTbl.(varName);
-                if islogical(raw), raw = categorical(raw); end
-                if ~iscategorical(raw), raw = categorical(raw); end
-                data.activeIndices = ismember(string(raw), selCats);
-            end
+            selCats = tblgui.selectedCats(data.chkGrpBy);
+            raw = data.dataTbl.(varName);
+            if islogical(raw) || ~iscategorical(raw), raw = categorical(raw); end
+            data.activeIndices = ismember(string(raw), selCats);
         end
         hContainer.UserData = data;
     end
 
-    % -----------------------------------------------------------------
-    % Reset Navigation: center and window to match filtered data extent
-    % -----------------------------------------------------------------
     function resetNavigation()
         data = hContainer.UserData;
         spks = data.dataTbl.(data.timesVar)(data.activeIndices);
         allT = vertcat(spks{:});
-
         if isempty(allT)
-            data.winCenter = 0;
-            data.winWidth  = 1;
+            data.winCenter = 0; data.winWidth = 1;
         else
-            tLo = min(allT);
-            tHi = max(allT);
+            tLo = min(allT); tHi = max(allT);
             data.winCenter = (tLo + tHi) / 2;
             data.winWidth  = tHi - tLo;
         end
-
-        set(data.edCenter, 'String', num2str(round(data.winCenter, 1)));
-        set(data.edWindow, 'String', num2str(round(data.winWidth, 1)));
+        data.edCenter.Value = round(data.winCenter, 1);
+        data.edWindow.Value = round(data.winWidth, 1);
         hContainer.UserData = data;
     end
 
-    % -----------------------------------------------------------------
-    % Update Plot: draw raster for active units
-    % -----------------------------------------------------------------
     function updatePlot()
         data = hContainer.UserData;
 
-        % Get filtered spike times
         spikes = data.dataTbl.(data.timesVar)(data.activeIndices);
         if data.flgBrst
             brstSpks = data.dataTbl.(data.brstVar)(data.activeIndices);
@@ -393,25 +242,18 @@ onGrpByChange(hContainer, []);
             brstSpks = brstSpks(nonEmpty);
         end
 
-        % Clear and draw
         cla(data.hAx);
         hold(data.hAx, 'on');
 
-        % All spikes (black)
         if ~isempty(spikes)
-            plot_raster(spikes, 'hAx', data.hAx, ...
-                'plotType', 'vertline', 'clr', [0 0 0]);
+            plot_raster(spikes, 'hAx', data.hAx, 'plotType', 'vertline', 'clr', [0 0 0]);
         end
-
-        % Burst spikes overlay (red)
         if data.flgBrst && any(~cellfun('isempty', brstSpks))
-            plot_raster(brstSpks, 'hAx', data.hAx, ...
-                'plotType', 'vertline', 'clr', [1 0 0]);
+            plot_raster(brstSpks, 'hAx', data.hAx, 'plotType', 'vertline', 'clr', [1 0 0]);
         end
 
         hold(data.hAx, 'off');
 
-        % X-limits from navigation
         xLo = data.winCenter - data.winWidth / 2;
         xHi = data.winCenter + data.winWidth / 2;
         xlim(data.hAx, [xLo, xHi]);
@@ -422,10 +264,10 @@ onGrpByChange(hContainer, []);
         ylabel(data.hAx, 'Unit No.', 'FontName', 'Arial', 'FontSize', 12);
 
         % Cache render data for tblGUI_raster_export
-        rd.spikes   = spikes;
-        rd.xLo      = xLo;
-        rd.xHi      = xHi;
-        rd.flgBrst  = data.flgBrst;
+        rd.spikes  = spikes;
+        rd.xLo     = xLo;
+        rd.xHi     = xHi;
+        rd.flgBrst = data.flgBrst;
         if data.flgBrst
             rd.brstSpks = brstSpks;
         else

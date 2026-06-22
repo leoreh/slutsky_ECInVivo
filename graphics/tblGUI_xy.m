@@ -13,12 +13,13 @@ function hFig = tblGUI_xy(xVec, dataTbl, varargin)
 %
 %   OPTIONAL KEY-VALUE PAIRS:
 %       'yVar'             (char/str) Initial variable to plot.
-%                          If empty, auto-selects first suitable variable.
-%       'tileFlow'         (char) Layout of tiles: 'flow',
-%                          'vertical' (1 column), or 'horizontal' (1 row).
+%       'tileFlow'         (char) 'flow', 'vertical' (1 col), 'horizontal' (1 row).
+%       'tileVar'/'grpVar' (char/str) Initial tile / group variables.
+%       'Parent'           (handle) uifigure or uifigure container.
+%       'SelectionCallback'/'GroupByCallback' (function_handle) host coordination.
+%       'xLbl'             (char/str) X-axis label.
 %
-%   OUTPUT:
-%       hFig    (handle)   Figure handle.
+%   Built on the shared graphics/+tblgui layer (uifigure + uigridlayout).
 %
 %   See also: TBLGUI_SCATHIST
 
@@ -28,7 +29,7 @@ function hFig = tblGUI_xy(xVec, dataTbl, varargin)
 
 p = inputParser;
 addParameter(p, 'yVar', [], @(x) ischar(x) || isstring(x) || isempty(x));
-addParameter(p, 'tileFlow', 'vertical', @(x) permember(x, {'flow', 'vertical', 'horizontal'}));
+addParameter(p, 'tileFlow', 'vertical', @(x) any(strcmpi(x, {'flow', 'vertical', 'horizontal'})));
 addParameter(p, 'tileVar', [], @(x) ischar(x) || isstring(x) || isempty(x));
 addParameter(p, 'grpVar', [], @(x) ischar(x) || isstring(x) || isempty(x));
 addParameter(p, 'SelectionCallback', [], @(x) isempty(x) || isa(x, 'function_handle'));
@@ -40,26 +41,26 @@ parse(p, varargin{:});
 initialYVar = p.Results.yVar;
 initialTileVar = p.Results.tileVar;
 initialGrpVar = p.Results.grpVar;
-tileFlow = p.Results.tileFlow;
+tileFlow = lower(char(p.Results.tileFlow));
 hParent = p.Results.Parent;
 selCbk = p.Results.SelectionCallback;
 grpCbk = p.Results.GroupByCallback;
 xLbl = p.Results.xLbl;
 
-% Find all variables that match xVec dimensions (Potential Y-Vars)
+% Find all variables that match xVec dimensions (potential Y vars). This is
+% specific to xy (matches a numeric matrix column or a cell of vectors to the
+% length of xVec), so it stays local rather than using tblgui.classifyVars.
 xLen = length(xVec);
 yVars = {};
 varNames = dataTbl.Properties.VariableNames;
-
 for iVar = 1:length(varNames)
     raw = dataTbl.(varNames{iVar});
     if isnumeric(raw) && size(raw, 2) == xLen
         yVars{end+1} = varNames{iVar}; %#ok<AGROW>
-    elseif iscell(raw) && length(raw) > 0 && length(raw{1}) == xLen
+    elseif iscell(raw) && ~isempty(raw) && length(raw{1}) == xLen
         yVars{end+1} = varNames{iVar}; %#ok<AGROW>
     end
 end
-
 if isempty(yVars)
     error('No suitable variable found in table matching xVec length.');
 end
@@ -71,24 +72,21 @@ if isempty(initialYVar) || ~ismember(initialYVar, yVars)
         warning('Requested yVar "%s" not suitable. Defaulting to "%s".', initialYVar, yVar);
     end
 else
-    yVar = initialYVar;
+    yVar = char(initialYVar);
 end
-
 
 %% ========================================================================
 %  INITIALIZATION
 %  ========================================================================
 
-% Identify potential grouping variables (Categorical/String/Logical)
-allVars = dataTbl.Properties.VariableNames;
-catVars = allVars(varfun(@(x) iscategorical(x) || isstring(x) || islogical(x),...
-    dataTbl, 'OutputFormat', 'uniform'));
+% Grouping/tiling variables (categorical / string / logical), 'None' first.
+[~, catVars] = tblgui.classifyVars(dataTbl);
 catVars = [{'None'}, catVars];
 
 % Figure Setup
 if isempty(hParent)
-    hContainer = figure('Name', sprintf('XY Plot: %s', yVar), 'NumberTitle', 'off', ...
-        'Units', 'pixels', 'Position', [100, 100, 1400, 800]);
+    hContainer = uifigure('Name', sprintf('XY Plot: %s', yVar), ...
+        'Position', [100, 100, 1400, 800]);
     hFig = hContainer;
 else
     hContainer = hParent;
@@ -100,151 +98,56 @@ guiData = struct();
 guiData.xVec = xVec;
 guiData.dataTbl = dataTbl;
 guiData.yVar = yVar;
-guiData.yVars = yVars; % List of available Y variables
+guiData.yVars = yVars;
 guiData.catVars = catVars;
 guiData.tileFlow = tileFlow;
-guiData.chkPlotBy = [];
-guiData.chkGrpBy = [];
-guiData.colors = lines(20);
+guiData.chkPlotBy = gobjects(0);
+guiData.chkGrpBy = gobjects(0);
 guiData.tileInfo = [];
 guiData.hlHandles = [];
 guiData.highlightFcn = @highlightTraces;
 guiData.setGroupVarFcn = @setGroupVar;
 guiData.selCbk = selCbk;
 guiData.grpCbk = grpCbk;
-guiData.selCbk = selCbk;
-guiData.grpCbk = grpCbk;
 guiData.xLbl = xLbl;
-guiData.ddDispersion = [];
-guiData.ddStatType = [];
-
 
 %% ========================================================================
 %  LAYOUT
 %  ========================================================================
 
-% Side Panel for Controls (Left)
-panelW = 0.1;
-hPanel = uipanel('Parent', hContainer, 'Units', 'normalized', ...
-    'Position', [0, 0, panelW, 1]);
+[~, gPlot, gCtrl] = tblgui.layout(hContainer, 'CtrlWidth', 190);
 
-% Main Plotting Area (Right)
-hPanelRight = uipanel('Parent', hContainer, 'Units', 'normalized', ...
-    'Position', [panelW, 0, 1-panelW, 1], 'BorderType', 'none');
-
-guiData.hLayout = tiledlayout(hPanelRight, 'flow', ...
+% Plot side: a panel hosts the tiledlayout (tiledlayout cannot parent directly
+% into a uigridlayout cell).
+guiData.hPanelRight = uipanel(gPlot, 'BorderType', 'none');
+guiData.hLayout = tiledlayout(guiData.hPanelRight, 'flow', ...
     'TileSpacing', 'tight', 'Padding', 'compact');
-guiData.hPanelRight = hPanelRight;
 
-% --- Controls in Side Panel ---
-ctlH = 0.03;
-ctlGap = 0.01;
-currY = 0.95;
-
-% 1. Y VARIABLE SELECTION
-uicontrol('Parent', hPanel, 'Style', 'text', 'String', 'Y Variable:', ...
-    'Units', 'normalized', 'Position', [0.05, currY, 0.9, ctlH], ...
-    'HorizontalAlignment', 'left', 'FontWeight', 'bold');
-currY = currY - ctlH;
-
+% Controls
 valY = find(strcmp(yVars, yVar), 1);
-if isempty(valY), valY = 1; end
+guiData.ddYVar = tblgui.labeledControl(gCtrl, 'dropdown', 'Y Variable:', ...
+    'Items', yVars, 'Value', yVars{max(valY, 1)}, 'ValueChangedFcn', @onYVarChange);
 
-guiData.ddYVar = uicontrol('Parent', hPanel, 'Style', 'popupmenu', ...
-    'String', yVars, 'Value', valY, ...
-    'Units', 'normalized', 'Position', [0.05, currY, 0.9, ctlH], ...
-    'Callback', @onYVarChange);
-currY = currY - ctlH - ctlGap*2; % Extra gap
+guiData.ddPlotBy = tblgui.labeledControl(gCtrl, 'dropdown', 'Plot By (Tiles):', ...
+    'Items', catVars, 'Value', pickCat(catVars, initialTileVar), ...
+    'ValueChangedFcn', @onPlotByChange);
+guiData.pnlPlotBy = tblgui.labeledControl(gCtrl, 'panel', '', 'RowHeight', '1x');
 
+guiData.ddGrpBy = tblgui.labeledControl(gCtrl, 'dropdown', 'Group By (Colors):', ...
+    'Items', catVars, 'Value', pickCat(catVars, initialGrpVar), ...
+    'ValueChangedFcn', @onGrpByChange);
+guiData.pnlGrpBy = tblgui.labeledControl(gCtrl, 'panel', '', 'RowHeight', '1x');
 
-% 2. PLOT BY (Tiles)
-uicontrol('Parent', hPanel, 'Style', 'text', 'String', 'Plot By (Tiles):', ...
-    'Units', 'normalized', 'Position', [0.05, currY, 0.9, ctlH], ...
-    'HorizontalAlignment', 'left', 'FontWeight', 'bold');
-currY = currY - ctlH;
-
-% Find index for tileVar
-valPlotBy = 1; % Default to 'None' (first item)
-if ~isempty(initialTileVar)
-    idx = find(strcmp(catVars, initialTileVar));
-    if ~isempty(idx), valPlotBy = idx; end
-end
-
-guiData.ddPlotBy = uicontrol('Parent', hPanel, 'Style', 'popupmenu', ...
-    'String', catVars, 'Value', valPlotBy, ...
-    'Units', 'normalized', ...
-    'Position', [0.05, currY, 0.9, ctlH], ...
-    'Callback', @onPlotByChange);
-currY = currY - ctlH - ctlGap;
-
-% Container for Plot By Checkboxes
-guiData.pnlPlotBy = uipanel('Parent', hPanel, 'BorderType', 'none', ...
-    'Units', 'normalized', 'Position', [0.05, 0.55, 0.9, currY - 0.55]);
-
-% Separator
-currY = 0.50;
-uicontrol('Parent', hPanel, 'Style', 'text', 'String', '-----------------------------', ...
-    'Units', 'normalized', 'Position', [0.05, currY, 0.9, ctlH], ...
-    'HorizontalAlignment', 'center', 'ForegroundColor', [0.5 0.5 0.5]);
-currY = currY - ctlH - ctlGap;
-
-% 3. GROUP BY (Colors)
-uicontrol('Parent', hPanel, 'Style', 'text', 'String', 'Group By (Colors):', ...
-    'Units', 'normalized', 'Position', [0.05, currY, 0.9, ctlH], ...
-    'HorizontalAlignment', 'left', 'FontWeight', 'bold');
-currY = currY - ctlH;
-
-% Find index for grpVar
-valGrpBy = 1; % Default to 'None'
-if ~isempty(initialGrpVar)
-    idx = find(strcmp(catVars, initialGrpVar));
-    if ~isempty(idx), valGrpBy = idx; end
-end
-
-guiData.ddGrpBy = uicontrol('Parent', hPanel, 'Style', 'popupmenu', ...
-    'String', catVars, 'Value', valGrpBy, ...
-    'Units', 'normalized', ...
-    'Position', [0.05, currY, 0.9, ctlH], ...
-    'Callback', @onGrpByChange);
-currY = currY - ctlH - ctlGap;
-
-% Container for Group By Checkboxes
-guiData.pnlGrpBy = uipanel('Parent', hPanel, 'BorderType', 'none', ...
-    'Units', 'normalized', 'Position', [0.05, 0.16, 0.9, currY - 0.16]);
-
-% Separator
-currY = 0.15;
-uicontrol('Parent', hPanel, 'Style', 'text', 'String', '--- Plot Options ---', ...
-    'Units', 'normalized', 'Position', [0.05, currY, 0.9, ctlH], ...
-    'HorizontalAlignment', 'center', 'ForegroundColor', [0.5 0.5 0.5]);
-currY = currY - ctlH;
-
-% 4. Plot Options (Dispersion)
-uicontrol('Parent', hPanel, 'Style', 'text', 'String', 'Dispersion:', ...
-    'Units', 'normalized', 'Position', [0.05, currY, 0.9, ctlH], ...
-    'HorizontalAlignment', 'left', 'FontWeight', 'bold');
-currY = currY - ctlH;
-
-guiData.ddDispersion = uicontrol('Parent', hPanel, 'Style', 'popupmenu', ...
-    'String', {'Traces', 'Spread', 'None'}, ...
-    'Units', 'normalized', 'Position', [0.05, currY, 0.9, ctlH], ...
-    'Value', 2, 'Callback', @onUpdatePlot); % Default to first option (Traces)
-currY = currY - ctlH - ctlGap;
-
-guiData.ddStatType = uicontrol('Parent', hPanel, 'Style', 'popupmenu', ...
-    'String', {'Arithmetic', 'Geometric', 'Median'}, ...
-    'Units', 'normalized', 'Position', [0.05, currY, 0.9, ctlH], ...
-    'Value', 1, 'Callback', @onUpdatePlot);
-
+guiData.ddDispersion = tblgui.labeledControl(gCtrl, 'dropdown', 'Dispersion:', ...
+    'Items', {'Traces', 'Spread', 'None'}, 'Value', 'Spread', 'ValueChangedFcn', @onUpdatePlot);
+guiData.ddStatType = tblgui.labeledControl(gCtrl, 'dropdown', '', ...
+    'Items', {'Arithmetic', 'Geometric', 'Median'}, 'ValueChangedFcn', @onUpdatePlot);
 
 hContainer.UserData = guiData;
-hFig = hContainer;
 
 % Initial State
-onPlotByChange(hFig, []);
-onGrpByChange(hFig, []);
-
-% Initial Plot
+onPlotByChange(hContainer, []);
+onGrpByChange(hContainer, []);
 onUpdatePlot(hContainer, []);
 
 %% ========================================================================
@@ -253,363 +156,206 @@ onUpdatePlot(hContainer, []);
 
     function onYVarChange(src, ~)
         data = hContainer.UserData;
-        idx = get(src, 'Value');
-        items = get(src, 'String');
-
-        newVar = items{idx};
-
+        newVar = src.Value;
         if ~strcmp(data.yVar, newVar)
             data.yVar = newVar;
             hContainer.UserData = data;
-
-            % Update Figure Name if standalone
             if strcmp(hContainer.Type, 'figure')
-                set(hContainer, 'Name', sprintf('XY Plot: %s', newVar));
+                hContainer.Name = sprintf('XY Plot: %s', newVar);
             end
-
             onUpdatePlot(hContainer, []);
         end
     end
 
-    function onPlotByChange(src, ~)
+    function onPlotByChange(~, ~)
         data = hContainer.UserData;
-        populateCheckboxes(src, data, data.ddPlotBy, data.pnlPlotBy, 'chkPlotBy');
-        onUpdatePlot(src, []);
+        data.chkPlotBy = populateFilter(data.ddPlotBy, data.pnlPlotBy);
+        hContainer.UserData = data;
+        onUpdatePlot(hContainer, []);
     end
 
-    function onGrpByChange(src, ~)
+    function onGrpByChange(~, ~)
         data = hContainer.UserData;
-        populateCheckboxes(src, data, data.ddGrpBy, data.pnlGrpBy, 'chkGrpBy');
-
-        idx = get(data.ddGrpBy, 'Value');
-        items = get(data.ddGrpBy, 'String');
-        varName = items{idx};
+        data.chkGrpBy = populateFilter(data.ddGrpBy, data.pnlGrpBy);
+        hContainer.UserData = data;
 
         if ~isempty(data.grpCbk)
-            % Gather all cats
-            populateCheckboxes(src, data, data.ddGrpBy, data.pnlGrpBy, 'chkGrpBy'); % Refresh data
-            data = hContainer.UserData; % Reload
-
-            if isempty(data.chkGrpBy)
-                activeCats = {};
-            else
-                allCats = arrayfun(@(x) string(get(x, 'String')), data.chkGrpBy);
-                activeCats = cellstr(allCats);
-            end
-
-            data.grpCbk(varName, activeCats, hContainer);
+            [~, allCats] = tblgui.selectedCats(data.chkGrpBy);
+            data.grpCbk(data.ddGrpBy.Value, allCats, hContainer);
         end
-
-        onUpdatePlot(src, []);
+        onUpdatePlot(hContainer, []);
     end
 
     function onFilterChange(~, ~)
         data = hContainer.UserData;
-        idx = get(data.ddGrpBy, 'Value');
-        items = get(data.ddGrpBy, 'String');
-        varName = items{idx};
-
-        onUpdatePlot(hContainer, []); % Update Local
-
-        % Broadcast
+        onUpdatePlot(hContainer, []);
         if ~isempty(data.grpCbk)
-            if isempty(data.chkGrpBy)
-                activeCats = {};
-            else
-                selectedIdx = arrayfun(@(x) get(x, 'Value'), data.chkGrpBy);
-                allCats = arrayfun(@(x) string(get(x, 'String')), data.chkGrpBy);
-                activeCats = cellstr(allCats(logical(selectedIdx)));
-            end
-            data.grpCbk(varName, activeCats, hContainer);
+            activeCats = tblgui.selectedCats(data.chkGrpBy);
+            data.grpCbk(data.ddGrpBy.Value, activeCats, hContainer);
         end
     end
 
-    function populateCheckboxes(src, data, hDD, hPanel, storeField)
-        % Clear existing
-        delete(hPanel.Children);
-
-        idx = get(hDD, 'Value');
-        varName = data.catVars{idx};
-
-        chkHandles = [];
-
+    function chk = populateFilter(dd, pnl)
+        % Build the category checkboxes for a Plot By / Group By dropdown.
+        varName = dd.Value;
         if strcmp(varName, 'None')
-            % No checkboxes needed
+            delete(allchild(pnl));
+            chk = gobjects(0);
         else
-            % Get Uniques
-            raw = data.dataTbl.(varName);
-            if islogical(raw), raw = categorical(raw); end
-            if ~iscategorical(raw), raw = categorical(raw); end
-            cats = categories(raw);
-            cats = cats(ismember(cats, unique(raw))); % Only present categories
-
-            nCats = length(cats);
-            h = 1 / max(10, nCats + 1); % Simple spacing
-
-            w = 0.9;
-            chkHandles = gobjects(1, nCats); % Initialize
-            for kVar = 1:nCats
-                yPos = 1 - kVar*h;
-                chkHandles(kVar) = uicontrol('Parent', hPanel, 'Style', 'checkbox', ...
-                    'String', cats{kVar}, 'Units', 'normalized', ...
-                    'Position', [0, yPos, w, h], 'Value', 1, ...
-                    'Callback', @onFilterChange); % Auto-update & Sync
-            end
+            cats = tblgui.catList(hContainer.UserData.dataTbl.(varName));
+            chk = tblgui.filterPanel(pnl, cats, @onFilterChange);
         end
-
-        data.(storeField) = chkHandles;
-        hContainer.UserData = data;
     end
 
     function onUpdatePlot(~, ~)
         data = hContainer.UserData;
 
-        % Determine Tile Splits (Plot By)
-        idxPB = get(data.ddPlotBy, 'Value');
-        varPB = data.catVars{idxPB};
-
-        catsPB = {'All'};
-        if ~strcmp(varPB, 'None')
-            % Get selected categories from checkboxes
-            hChk = data.chkPlotBy;
-            if isempty(hChk)
-                catsPB = {}; % Should not happen if non-None
-            else
-                selectedIdx = arrayfun(@(x) get(x, 'Value'), hChk);
-                if sum(selectedIdx) == 0
-                    msgbox('Please select at least one "Plot By" category.', 'Info');
-                    return;
-                end
-                allCats = arrayfun(@(x) string(get(x, 'String')), hChk);
-                catsPB = cellstr(allCats(logical(selectedIdx)));
+        % Tiles (Plot By)
+        varPB = data.ddPlotBy.Value;
+        if strcmp(varPB, 'None')
+            catsPB = {'All'};
+        else
+            catsPB = tblgui.selectedCats(data.chkPlotBy);
+            if isempty(catsPB)
+                tblgui.notify(hContainer, 'Select at least one "Plot By" category.', 'info');
+                return;
             end
         end
-        nTiles = length(catsPB);
 
-        % Recreate layout
+        % Recreate tiled layout
         delete(data.hLayout);
         data.hLayout = tiledlayout(data.hPanelRight, data.tileFlow, ...
             'TileSpacing', 'tight', 'Padding', 'compact');
-        hContainer.UserData = data;
-
-        % Reset Tile Info
         data.tileInfo = struct('catName', {}, 'hAx', {}, 'indices', {});
         data.hlHandles = [];
 
-        % Determine Line Groups (Group By)
-        idxGB = get(data.ddGrpBy, 'Value');
-        varGB = data.catVars{idxGB};
-
-        catsGB = {'All'};
-        if ~strcmp(varGB, 'None')
-            % Get selected categories from checkboxes
-            hChk = data.chkGrpBy;
-            if isempty(hChk)
-                catsGB = {};
-            else
-                selectedIdx = arrayfun(@(x) get(x, 'Value'), hChk);
-                if sum(selectedIdx) == 0
-                    msgbox('Please select at least one "Group By" category.', 'Info');
-                    return;
-                end
-                allCats = arrayfun(@(x) string(get(x, 'String')), hChk);
-                catsGB = cellstr(allCats(logical(selectedIdx)));
+        % Groups (Group By)
+        varGB = data.ddGrpBy.Value;
+        if strcmp(varGB, 'None')
+            catsGB = {'All'};
+            allCatsGB = {'All'};
+        else
+            [catsGB, allCatsGB] = tblgui.selectedCats(data.chkGrpBy);
+            if isempty(catsGB)
+                tblgui.notify(hContainer, 'Select at least one "Group By" category.', 'info');
+                return;
             end
         end
 
-        % Retrieve Data (Dynamic based on Selection)
+        % Stable group colors over the full category list
+        [fullClr, idxOf] = tblgui.groupColors(allCatsGB);
+
         if ~ismember(data.yVar, data.dataTbl.Properties.VariableNames)
-            % Fallback if var missing
             warning('Selected variable %s not in table. Resetting.', data.yVar);
             return;
         end
         yRaw = data.dataTbl.(data.yVar);
         isMatrix = isnumeric(yRaw);
 
-        axHandles = []; % Store axes for linking
-
-        % Plot Options
-        % Plot Options
-        valDisp = get(data.ddDispersion, 'Value');
-        strDisp = get(data.ddDispersion, 'String');
-        dispMode = strDisp{valDisp}; % 'Traces', 'Spread', 'None'
-        
+        % Plot options
+        dispMode = data.ddDispersion.Value;       % Traces / Spread / None
         showTraces = strcmp(dispMode, 'Traces');
-        showShade = strcmp(dispMode, 'Spread');
-        
-        % Get Computation Method
-        valStat = get(data.ddStatType, 'Value');
-        strStat = get(data.ddStatType, 'String');
-        method = strStat{valStat}; % 'Arithmetic', 'Geometric', 'Median'
+        showShade  = strcmp(dispMode, 'Spread');
+        method = data.ddStatType.Value;           % Arithmetic / Geometric / Median
 
-        % Calculate global floor value for geometric mean, as a value of 1
-        % (eg, spike) per recording duration. Assumes xVec represents time (hr).
-        % This serves as the resolution limit / detection threshold.
+        % Geometric floor: 1 event per recording duration (xVec assumed hr).
         totalRange = range(data.xVec);
         if totalRange == 0, totalRange = median(diff(data.xVec), 'omitnan'); end
         floorVal = 1 / (totalRange * 3600);
 
-        % --- RENDER LOOP ---
+        axHandles = [];
+
         for iTile = 1:length(catsPB)
             catTile = catsPB{iTile};
 
-            % Filter Data for Tile
             if strcmp(varPB, 'None')
                 idxTile = true(height(data.dataTbl), 1);
             else
                 rawCol = data.dataTbl.(varPB);
-                if islogical(rawCol), rawCol = categorical(rawCol); end
-                if ~iscategorical(rawCol), rawCol = categorical(rawCol); end
+                if islogical(rawCol) || ~iscategorical(rawCol), rawCol = categorical(rawCol); end
                 idxTile = (rawCol == catTile);
             end
-
             if sum(idxTile) == 0, continue; end
 
-            nexttile(data.hLayout);
-            hAx = gca;
-
-            % Store Tile Info
+            hAx = nexttile(data.hLayout);
             data.tileInfo(end+1).catName = catTile;
             data.tileInfo(end).hAx = hAx;
             data.tileInfo(end).indices = idxTile;
-
             axHandles(end+1) = hAx; %#ok<AGROW>
             hold(hAx, 'on');
 
-            tileMeanMin = inf;
-            tileMeanMax = -inf;
-            hasData = false;
+            tileMeanMin = inf; tileMeanMax = -inf; hasData = false;
 
-            % Iterate groups within tile
             for iGrp = 1:length(catsGB)
                 catGrp = catsGB{iGrp};
 
-                % Filter Data for Group AND Tile
                 if strcmp(varGB, 'None')
                     idxGrp = true(height(data.dataTbl), 1);
                     clr = [0, 0, 0];
                 else
                     rawColG = data.dataTbl.(varGB);
-                    if islogical(rawColG), rawColG = categorical(rawColG); end
-                    if ~iscategorical(rawColG), rawColG = categorical(rawColG); end
+                    if islogical(rawColG) || ~iscategorical(rawColG), rawColG = categorical(rawColG); end
                     idxGrp = (rawColG == catGrp);
-
-                    % Cycle colors based on ORIGINAL index in allCats
-                    % This ensures color stability when checking/unchecking boxes
-                    idxInAll = find(strcmp(allCats, catGrp), 1);
-                    if isempty(idxInAll), idxInAll = iGrp; end
-
-                    cIdx = mod(idxInAll-1, size(data.colors,1)) + 1;
-                    clr = data.colors(cIdx, :);
+                    clr = fullClr(idxOf(catGrp), :);
                 end
 
                 finalIdx = idxTile & idxGrp;
                 if sum(finalIdx) == 0, continue; end
 
-                % Extract Data
                 if isMatrix
                     subY = yRaw(finalIdx, :);
                 else
                     subY = cell2mat(yRaw(finalIdx));
                 end
 
-                % Plot Traces
+                % Individual traces
                 if showTraces
-                    hLines = plot(hAx, data.xVec, subY', 'Color', [clr, 0.05],...
+                    hLines = plot(hAx, data.xVec, subY', 'Color', [clr, 0.05], ...
                         'LineWidth', 0.5, 'HandleVisibility', 'off');
-
-                    % Assign global indices to UserData of lines
                     globIndices = find(finalIdx);
                     for iL = 1:length(hLines)
                         hLines(iL).UserData = globIndices(iL);
-                        hLines(iL).ButtonDownFcn = @(s,e) onLineClick(s, e, hContainer);
+                        hLines(iL).ButtonDownFcn = @(s, e) onLineClick(s, e, hContainer);
                     end
                 end
 
-                % Calculate Statistics
-                switch method
-                    case 'Geometric'
-                        % -- Geometric Mean & SEM --
-                        calcY = max(subY, floorVal);
-                        logY = log(calcY);
-
-                        n = sum(~isnan(logY), 1);
-                        mLog = mean(logY, 1, 'omitnan');
-                        sLog = std(logY, 0, 1, 'omitnan') ./ sqrt(n);
-
-                        mData = exp(mLog);
-                        lowerBound = exp(mLog - sLog);
-                        upperBound = exp(mLog + sLog);
-
-                    case 'Median'
-                        % -- Median & IQR (25-75th percentile) --
-                        % -- Median & CI (Notch Approximation) --
-                        mData = median(subY, 1, 'omitnan');
-                        
-                        % IQR for spread estimation
-                        q1 = prctile(subY, 25, 1);
-                        q3 = prctile(subY, 75, 1);
-                        iqrVal = q3 - q1;
-                        
-                        % Notch correlation for ~95% CI of the median
-                        % 1.57 * IQR / sqrt(N)
-                        n = sum(~isnan(subY), 1);
-                        notchWidth = 1.57 * iqrVal ./ sqrt(n);
-                        
-                        lowerBound = mData - notchWidth;
-                        upperBound = mData + notchWidth;
-                        
-                    otherwise % 'Arithmetic'
-                        % -- Arithmetic Mean & SEM --
-                        n = sum(~isnan(subY), 1);
-                        mData = mean(subY, 1, 'omitnan');
-                        sData = std(subY, 0, 1, 'omitnan') ./ sqrt(n);
-                        sData(sData == 0) = eps;
-
-                        lowerBound = mData - sData;
-                        upperBound = mData + sData;
+                % Central tendency and bounds
+                if strcmpi(method, 'Geometric')
+                    [mData, lowerBound, upperBound] = tblgui.groupStat(subY, method, 'Floor', floorVal);
+                else
+                    [mData, lowerBound, upperBound] = tblgui.groupStat(subY, method);
                 end
 
-
-                % Shade (SEM or CI)
+                % Shade (SEM / CI)
                 if showShade && sum(finalIdx) > 1
-                    % Draw Shade
                     xConf = [data.xVec(:); flipud(data.xVec(:))];
-                    yConf = [upperBound(:); flipud(lowerBound(:))]; 
-
-                    validP = ~isnan(yConf);
-                    if all(validP)
-                         fill(hAx, xConf, yConf, clr, 'FaceAlpha', 0.2, ...
+                    yConf = [upperBound(:); flipud(lowerBound(:))];
+                    if all(~isnan(yConf))
+                        fill(hAx, xConf, yConf, clr, 'FaceAlpha', 0.2, ...
                             'EdgeColor', 'none', 'HandleVisibility', 'off');
                     end
                 end
 
-                % Mean Axis
+                % Mean line
                 plot(hAx, data.xVec, mData, 'Color', clr, 'LineWidth', 2, ...
                     'DisplayName', sprintf('%s (n=%d)', catGrp, sum(finalIdx)));
 
-                % Update Ranges for Y Lim
                 tileMeanMin = min(tileMeanMin, min(mData));
                 tileMeanMax = max(tileMeanMax, max(mData));
                 hasData = true;
             end
 
-            % Aesthetics
             grid(hAx, 'on');
             title(hAx, catTile, 'Interpreter', 'none');
             axis(hAx, 'tight');
-
-            % Apply Y-Limits based on Means
             if hasData && ~isinf(tileMeanMin) && ~isinf(tileMeanMax)
                 yRange = tileMeanMax - tileMeanMin;
                 if yRange == 0, yRange = 1; end
                 ylim(hAx, [tileMeanMin - 0.1*yRange, tileMeanMax + 0.1*yRange]);
             end
-
             if ~strcmp(varGB, 'None')
                 legend(hAx, 'Location', 'best', 'Interpreter', 'none');
             end
-
             hold(hAx, 'off');
         end
 
@@ -617,56 +363,40 @@ onUpdatePlot(hContainer, []);
         ylabel(data.hLayout, data.yVar, 'Interpreter', 'none');
         title(data.hLayout, sprintf('%s Plot By: %s | Group By: %s', data.yVar, varPB, varGB), 'Interpreter', 'none');
 
-        % Link X axes
+        % Link X axes (drawnow first: linkaxes on uiaxes needs a render pass)
         if ~isempty(axHandles)
+            drawnow;
             linkaxes(axHandles, 'x');
         end
 
-        % Save updated data with tile info
         hContainer.UserData = data;
-
     end
 
     function highlightTraces(indices)
-        % Highlights specific traces (logical or linear indices)
         data = hContainer.UserData;
-
-        % convert to logical if numeric
         if isnumeric(indices)
             tmp = false(height(data.dataTbl), 1);
             tmp(indices) = true;
             indices = tmp;
         end
-
-        % Clear existing highlights
-        if isfield(data, 'hlHandles')
-            delete(data.hlHandles);
-        end
+        if isfield(data, 'hlHandles'), delete(data.hlHandles); end
         data.hlHandles = [];
-
-        if ~any(indices), return; end
+        if ~any(indices), hContainer.UserData = data; return; end
 
         yRaw = data.dataTbl.(data.yVar);
         isMatrix = isnumeric(yRaw);
 
-        % Loop through tiles
         for i = 1:length(data.tileInfo)
             ti = data.tileInfo(i);
-
-            % Intersection of tile indices and selected indices
             selInTile = ti.indices & indices;
-
             if ~any(selInTile), continue; end
 
-            % Get Data
             if isMatrix
                 subY = yRaw(selInTile, :);
             else
                 subY = cell2mat(yRaw(selInTile));
             end
 
-            % Get UnitID if available
-            unitIDArg = {};
             if ismember('UnitID', data.dataTbl.Properties.VariableNames)
                 uid = data.dataTbl.UnitID(selInTile);
                 if iscell(uid), uid = uid{1}; end
@@ -676,41 +406,25 @@ onUpdatePlot(hContainer, []);
                 unitIDArg = {'DisplayName', 'Selected Trace'};
             end
 
-            % Plot Highlight
             hold(ti.hAx, 'on');
-            % yellow bolder line for selection
             h = plot(ti.hAx, data.xVec, subY', 'Color', [1 1 0 0.7], 'LineWidth', 1.5, unitIDArg{:});
             data.hlHandles = [data.hlHandles; h];
             hold(ti.hAx, 'off');
-
-            legend(ti.hAx, 'show'); % Ensure legend updates
+            legend(ti.hAx, 'show');
         end
-
         hContainer.UserData = data;
     end
 
     function onLineClick(srcLine, ~, hFigContainer)
-        % Callback for line click
-        % Highlighting internally + Trigger external callback
-
         try
             data = hFigContainer.UserData;
             idx = srcLine.UserData;
-
-            % 1. Internal Highlight
             highlightTraces(idx);
-
-            % 2. External Callback
             if ~isempty(data.selCbk)
-                % Pass logical array or index? Standardizing on logical usually safer
-                % but index is fine too. Let's send logical to be consistent.
                 inPoints = false(height(data.dataTbl), 1);
                 inPoints(idx) = true;
                 data.selCbk(inPoints);
             end
-
-            fprintf('Selected Trace Index: %d\n', idx);
-
         catch ME
             warning(ME.identifier, '%s', ME.message);
         end
@@ -718,39 +432,36 @@ onUpdatePlot(hContainer, []);
 
     function setGroupVar(varName, activeCats)
         data = hContainer.UserData;
-        items = get(data.ddGrpBy, 'String');
-        idx = find(strcmp(items, varName));
+        if ~ismember(varName, data.ddGrpBy.Items), return; end
 
         needsUpdate = false;
-
-        % 1. Change Variable
-        if ~isempty(idx) && idx ~= get(data.ddGrpBy, 'Value')
-            set(data.ddGrpBy, 'Value', idx);
-            % Update checkboxes Manually
-            populateCheckboxes(hContainer, data, data.ddGrpBy, data.pnlGrpBy, 'chkGrpBy');
-            data = hContainer.UserData;
+        if ~strcmp(data.ddGrpBy.Value, varName)
+            data.ddGrpBy.Value = varName;
+            data.chkGrpBy = populateFilter(data.ddGrpBy, data.pnlGrpBy);
+            hContainer.UserData = data;
             needsUpdate = true;
         end
 
-        % 2. Apply Filters
-        if exist('activeCats', 'var') && isfield(data, 'chkGrpBy') && ~isempty(data.chkGrpBy)
-            for i = 1:length(data.chkGrpBy)
-                catStr = get(data.chkGrpBy(i), 'String');
-                val = ismember(catStr, activeCats);
-                if get(data.chkGrpBy(i), 'Value') ~= val
-                    set(data.chkGrpBy(i), 'Value', val);
+        if nargin > 1 && ~isempty(data.chkGrpBy)
+            for i = 1:numel(data.chkGrpBy)
+                val = ismember(data.chkGrpBy(i).Text, activeCats);
+                if data.chkGrpBy(i).Value ~= val
+                    data.chkGrpBy(i).Value = val;
                     needsUpdate = true;
                 end
             end
         end
 
-        if needsUpdate
-            onUpdatePlot(hContainer, []);
-        end
+        if needsUpdate, onUpdatePlot(hContainer, []); end
     end
 
 end
 
-function tf = permember(str, allowed)
-tf = any(strcmpi(str, allowed));
+function val = pickCat(catVars, requested)
+% Resolve an initial dropdown value: the requested category if present, else
+% 'None'.
+val = 'None';
+if ~isempty(requested) && ismember(char(requested), catVars)
+    val = char(requested);
+end
 end

@@ -33,7 +33,7 @@ function [hAx, hPlt] = plot_raster(spktimes, varargin)
 
 p = inputParser;
 addRequired(p, 'spktimes', @iscell);
-addParameter(p, 'hAx', [], @(x) isempty(x) || isa(x, 'matlab.graphics.axis.Axes'));
+addParameter(p, 'hAx', [], @(x) isempty(x) || isgraphics(x));
 addParameter(p, 'plotType', 'vertline', @(x) any(validatestring(x, {'vertline', 'horzline', 'scatter'})));
 addParameter(p, 'clr', [0.2 0.2 0.2], @(x) isnumeric(x) || ischar(x));
 addParameter(p, 'lineWidth', 0.5, @isnumeric);

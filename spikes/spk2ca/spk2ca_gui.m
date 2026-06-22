@@ -1,113 +1,71 @@
-function spk2ca_gui(tbl, Kd, n, Vmax)
+function hFig = spk2ca_gui(tbl, Kd, n, Vmax)
 % SPK2CA_GUI Launches the explorer for sweep results.
 %
 %   Controls the interactive scatter plot of Baseline vs Steady-State.
+%   Kd / n / Vmax dropdowns switch the displayed variable pair. Built on the
+%   shared graphics/+tblgui layer (uifigure); embeds tblGUI_scatHist.
 
-% Create Figure
-hFig = figure('Name', 'Sweep Explorer', 'Color', 'w', ...
-    'Position', [100, 100, 1200, 800], 'NumberTitle', 'off');
+% Figure
+hFig = uifigure('Name', 'Sweep Explorer', 'Position', [100, 100, 1200, 800]);
 
-% Layout: Top Controls, Bottom Plot
-hPnlCtl = uipanel('Parent', hFig, 'Position', [0 0.94 1 0.06], ...
-    'BorderType', 'none');
-hPnlPlot = uipanel('Parent', hFig, 'Position', [0 0 1 0.94], ...
-    'BorderType', 'none');
+% Layout: control strip on top, plot below
+gMain = uigridlayout(hFig, [2, 1], 'RowHeight', {40, '1x'}, ...
+    'Padding', [6 6 6 6], 'RowSpacing', 6);
 
-% Control: Kd
-uicontrol('Parent', hPnlCtl, 'Style', 'text', 'String', 'Kd:', ...
-    'Units', 'normalized', 'Position', [0.02 0.25 0.03 0.5], ...
-    'HorizontalAlignment', 'right', ...
-    'FontWeight', 'bold');
-hPopKd = uicontrol('Parent', hPnlCtl, 'Style', 'popupmenu', ...
-    'String', string(Kd), 'Units', 'normalized', ...
-    'Position', [0.06 0.25 0.06 0.5], ...
-    'Callback', @update_view);
+gCtl = uigridlayout(gMain, [1, 7], ...
+    'ColumnWidth', {35, 90, 25, 90, 50, 120, '1x'}, ...
+    'Padding', [0 0 0 0], 'ColumnSpacing', 4);
+gCtl.Layout.Row = 1;
 
-% Control: n
-uicontrol('Parent', hPnlCtl, 'Style', 'text', 'String', 'n:', ...
-    'Units', 'normalized', 'Position', [0.14 0.25 0.02 0.5], ...
-    'HorizontalAlignment', 'right', ...
-    'FontWeight', 'bold');
-hPopN = uicontrol('Parent', hPnlCtl, 'Style', 'popupmenu', ...
-    'String', string(n), 'Units', 'normalized', ...
-    'Position', [0.17 0.25 0.06 0.5], ...
-    'Callback', @update_view);
+uilabel(gCtl, 'Text', 'Kd:', 'FontWeight', 'bold', 'HorizontalAlignment', 'right');
+hPopKd = uidropdown(gCtl, 'Items', cellstr(string(Kd)), 'ItemsData', Kd, ...
+    'Value', Kd(1), 'ValueChangedFcn', @update_view);
 
-% Control: Vmax
-uicontrol('Parent', hPnlCtl, 'Style', 'text', 'String', 'Vmax:', ...
-    'Units', 'normalized', 'Position', [0.25 0.25 0.04 0.5], ...
-    'HorizontalAlignment', 'right', ...
-    'FontWeight', 'bold');
+uilabel(gCtl, 'Text', 'n:', 'FontWeight', 'bold', 'HorizontalAlignment', 'right');
+hPopN = uidropdown(gCtl, 'Items', cellstr(string(n)), 'ItemsData', n, ...
+    'Value', n(1), 'ValueChangedFcn', @update_view);
 
-% Create Vmax labels for dropdown
-strVmax = cellfun(@(x) v2str(x), Vmax, 'UniformOutput', false);
+uilabel(gCtl, 'Text', 'Vmax:', 'FontWeight', 'bold', 'HorizontalAlignment', 'right');
+strVmax = cellfun(@v2str, Vmax, 'UniformOutput', false);
+hPopVmax = uidropdown(gCtl, 'Items', strVmax, 'ItemsData', Vmax, ...
+    'Value', Vmax{1}, 'ValueChangedFcn', @update_view);
 
-hPopVmax = uicontrol('Parent', hPnlCtl, 'Style', 'popupmenu', ...
-    'String', strVmax, 'Units', 'normalized', ...
-    'Position', [0.30 0.25 0.10 0.5], ...
-    'Callback', @update_view);
+% Plot panel hosts the embedded scatter GUI
+plotPanel = uipanel(gMain, 'BorderType', 'none');
+plotPanel.Layout.Row = 2;
 
+% Initial variable pair (first parameter set)
+[xVar, yVar] = get_varnames(Kd(1), n(1), Vmax{1});
 
-% Initial Vars (First parameter set)
-kVal = Kd(1);
-nVal = n(1);
-vVal = Vmax{1};
-[xVar, yVar] = get_varnames(kVal, nVal, vVal);
+% Launch embedded scatter GUI. Its state (setters, axes) lives on plotPanel.
+tblGUI_scatHist(tbl, 'Parent', plotPanel, 'xVar', xVar, 'yVar', yVar, 'grpVar', 'Group');
+hAxScat = plotPanel.UserData.hAxScatter;
+update_title(Kd(1), n(1), Vmax{1});
 
-% Launch GUI Once
-hG = tblGUI_scatHist(tbl, 'Parent', hPnlPlot, ...
-    'xVar', xVar, 'yVar', yVar, ...
-    'grpVar', 'Group');
-
-% Store handle to update title later
-hAx = findobj(hG, 'Type', 'axes', 'Tag', '');
-update_title(kVal, nVal, vVal);
-
+%% ========================================================================
+%  CALLBACKS
+%  ========================================================================
 
     function update_view(~, ~)
+        kV = hPopKd.Value;
+        nV = hPopN.Value;
+        vV = hPopVmax.Value;
 
-        % Get Indices
-        idxKd = hPopKd.Value;
-        idxN  = hPopN.Value;
-        idxV  = hPopVmax.Value;
-
-        % Check bounds
-        if idxKd > length(Kd) || idxN > length(n) || idxV > length(Vmax), return; end
-
-        kV = Kd(idxKd);
-        nV = n(idxN);
-        vV = Vmax{idxV};
-
-        % Construct Variable Names
         [xNew, yNew] = get_varnames(kV, nV, vV);
-
-        % Update Scatter Plot via Callback
-        hG.UserData.setXYVarsFcn(xNew, yNew);
-
-        % Sync Axes
+        plotPanel.UserData.setXYVarsFcn(xNew, yNew);
         sync_axes();
-
-        % Update Title
         update_title(kV, nV, vV);
     end
 
     function sync_axes()
-        data = hG.UserData;
-        ax = data.hAxScatter;
-
-        xl = xlim(ax);
-        yl = ylim(ax);
-
-        minVal = min(xl(1), yl(1));
-        maxVal = max(xl(2), yl(2));
-
-        newLim = [minVal, maxVal];
+        ax = plotPanel.UserData.hAxScatter;
+        xl = xlim(ax); yl = ylim(ax);
+        newLim = [min(xl(1), yl(1)), max(xl(2), yl(2))];
         xlim(ax, newLim);
         ylim(ax, newLim);
     end
 
     function [xv, yv] = get_varnames(k, n_hill, vmax_val)
-
         if isempty(vmax_val)
             strV = 'Auto';
         else
@@ -115,7 +73,6 @@ update_title(kVal, nVal, vVal);
             strV = strrep(strV, '.', 'p');
             strV = strrep(strV, '-', 'n');
         end
-
         suffix = sprintf('_K%g_n%g_V%s', k, n_hill, strV);
         suffix = strrep(suffix, '.', 'p');
         xv = ['mBsl' suffix];
@@ -123,22 +80,12 @@ update_title(kVal, nVal, vVal);
     end
 
     function update_title(k, n_hill, vmax_val)
-        if ~isempty(hAx)
-            if isempty(vmax_val)
-                vStr = 'Auto';
-            else
-                vStr = sprintf('%g', vmax_val);
-            end
-            title(hAx, sprintf('Sweep: Kd=%.2f, n=%g, Vmax=%s', k, n_hill, vStr));
-        end
+        if isempty(vmax_val), vStr = 'Auto'; else, vStr = sprintf('%g', vmax_val); end
+        title(hAxScat, sprintf('Sweep: Kd=%.2f, n=%g, Vmax=%s', k, n_hill, vStr));
     end
 
     function s = v2str(val)
-        if isempty(val)
-            s = 'Auto';
-        else
-            s = sprintf('%g', val);
-        end
+        if isempty(val), s = 'Auto'; else, s = sprintf('%g', val); end
     end
 
 end

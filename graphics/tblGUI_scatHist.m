@@ -2,29 +2,24 @@ function hFig = tblGUI_scatHist(tbl, varargin)
 % TBLGUI_SCATHIST Interactive scatter plot with marginal histograms and grouping.
 %
 %   tblGUI_scatHist(tbl, ...) opens a GUI to visualize the table 'tbl'.
-%   Allows for dynamic variable selection, grouping, and interactive point
-%   selection.
+%   Allows dynamic variable selection, grouping, and interactive point
+%   selection (lasso a region, or drag a point and double-click to assign).
 %
 %   INPUTS:
 %       tbl         - (table) The data table to visualize.
 %
 %   OPTIONAL KEY-VALUE PAIRS:
-%       'xVar'      - (char) Initial X variable name.
-%       'yVar'      - (char) Initial Y variable name.
-%       'szVar'     - (char) Initial Size variable name.
-%       'grpVar'    - (char) Initial Group variable name.
+%       'xVar'/'yVar'/'szVar'/'grpVar' - (char) initial variables.
 %       'clr'       - (m x 3) RGB color matrix for groups.
 %       'alpha'     - (scalar) Marker transparency (0-1).
 %       'varsExclude' - (cell) Variables to exclude from dropdowns.
-%                     Default: {'UnitID', 'Name', 'Mouse', 'File'}.
-%       'Parent'    - (handle) Parent container (figure/panel).
-%       'SelectionCallback' - (func) Callback for point selection.
-%       'GroupByCallback'   - (func) Callback for group selection.
+%       'Parent'    - (handle) uifigure or uifigure container.
+%       'SelectionCallback'/'GroupByCallback' - (func) host coordination.
+%       'xScale'/'yScale'/'fitType' - (char) initial scale / fit.
 %
-%   EXAMPLE:
-%       tblGUI_scatHist(fetTbl, 'xVar', 'tp', 'yVar', 'mfr', 'grpVar', 'Name');
+%   Built on the shared graphics/+tblgui layer (uifigure + uigridlayout).
 %
-%   See also: LME_ANALYSE
+%   See also: LME_ANALYSE, TBLGUI_XY
 
 %% ========================================================================
 %  ARGUMENTS
@@ -38,17 +33,15 @@ addParameter(p, 'yVar', '', @(x) ischar(x) || isstring(x) || isempty(x));
 addParameter(p, 'szVar', '', @(x) ischar(x) || isstring(x) || isempty(x));
 addParameter(p, 'grpVar', '', @(x) ischar(x) || isstring(x) || isempty(x));
 addParameter(p, 'alpha', 0.6, @isnumeric);
-addParameter(p, 'clr', [], @(x) isempty(x) || size(x,2)==3);
+addParameter(p, 'clr', [], @(x) isempty(x) || size(x, 2) == 3);
 addParameter(p, 'Parent', [], @(x) isempty(x) || isgraphics(x));
 addParameter(p, 'SelectionCallback', [], @(x) isempty(x) || isa(x, 'function_handle'));
 addParameter(p, 'GroupByCallback', [], @(x) isempty(x) || isa(x, 'function_handle'));
 addParameter(p, 'xScale', '', @(x) any(strcmpi(x, {'', 'linear', 'log'})));
 addParameter(p, 'yScale', '', @(x) any(strcmpi(x, {'', 'linear', 'log', 'x-linked'})));
 addParameter(p, 'fitType', '', @(x) any(strcmpi(x, {'', 'none', 'linear', 'ortho'})));
-
 parse(p, tbl, varargin{:});
 
-% Unpack Results
 tbl         = p.Results.tbl;
 varsExclude = p.Results.varsExclude;
 hParent     = p.Results.Parent;
@@ -56,397 +49,171 @@ selCbk      = p.Results.SelectionCallback;
 grpCbk      = p.Results.GroupByCallback;
 defAlpha    = p.Results.alpha;
 defClr      = p.Results.clr;
-
-% Initial Variable Inputs
 xVarIn      = p.Results.xVar;
 yVarIn      = p.Results.yVar;
 szVarIn     = p.Results.szVar;
 grpVarIn    = p.Results.grpVar;
-xScaleIn    = p.Results.xScale;
-yScaleIn    = p.Results.yScale;
-fitTypeIn   = p.Results.fitType;
 
 %% ========================================================================
 %  INITIALIZATION
 %  ========================================================================
 
-% --- Variable Classification ---
-allVars = tbl.Properties.VariableNames;
-
-% Numeric Variables (for X, Y, Size)
-numericVars = allVars(varfun(@isnumeric, tbl, 'OutputFormat', 'uniform'));
-numericVars = setdiff(numericVars, varsExclude);
+% Scalar-per-row numerics for X/Y/Size (exclude id columns and matrices).
+[numericVars, catVars] = tblgui.classifyVars(tbl, 'Shape', 'vector', 'Exclude', varsExclude);
+catVars = setdiff(catVars, varsExclude, 'stable');
 
 if isempty(numericVars)
     error('Input table must contain at least one numeric variable.');
 end
 
-% Categorical Variables (for Grouping)
-% We treat strings and logicals as potential categories too.
-catVars = allVars(varfun(@(x) iscategorical(x) || isstring(x) || islogical(x),...
-    tbl, 'OutputFormat', 'uniform'));
-catVars = setdiff(catVars, varsExclude);
-
-% --- Defaults ---
-% Prioritize inputs, otherwise using simple heuristics (1st and 2nd vars)
+% Defaults
 curX = numericVars{1};
 curY = numericVars{min(2, length(numericVars))};
 curSize = 'None';
 curGrp  = 'None';
-
 if ~isempty(catVars), curGrp = catVars{1}; end
 
-% Apply Overrides
-if ~isempty(xVarIn) && ismember(xVarIn, numericVars),   curX = xVarIn;   end
-if ~isempty(yVarIn) && ismember(yVarIn, numericVars),   curY = yVarIn;   end
-if ~isempty(szVarIn) && ismember(szVarIn, numericVars), curSize = szVarIn; end
-if ~isempty(grpVarIn) && ismember(grpVarIn, catVars),   curGrp = grpVarIn; end
+if ~isempty(xVarIn) && ismember(xVarIn, numericVars),   curX = char(xVarIn); end
+if ~isempty(yVarIn) && ismember(yVarIn, numericVars),   curY = char(yVarIn); end
+if ~isempty(szVarIn) && ismember(szVarIn, numericVars), curSize = char(szVarIn); end
+if ~isempty(grpVarIn) && ismember(grpVarIn, catVars),   curGrp = char(grpVarIn); end
 
-% --- Figure Setup ---
+% Initial scale / fit dropdown values
+xScale0 = mapChoice(p.Results.xScale, {'linear', 'Linear'; 'log', 'Log'}, 'Linear');
+yScale0 = mapChoice(p.Results.yScale, {'linear', 'Linear'; 'log', 'Log'; 'x-linked', 'X-Linked'}, 'Linear');
+fit0    = mapChoice(p.Results.fitType, {'none', 'None'; 'linear', 'Linear'; 'ortho', 'Ortho'}, 'None');
+
+% Figure / parent
 if isempty(hParent)
-    hContainer = figure('Name', 'Table Visualizer', 'NumberTitle', 'off', ...
-        'Position', [100, 100, 1110, 900], 'MenuBar', 'none', 'ToolBar', 'figure');
+    hContainer = uifigure('Name', 'Table Visualizer', 'Position', [100, 100, 1110, 900]);
     hFig = hContainer;
 else
     hContainer = hParent;
     hFig = ancestor(hContainer, 'figure');
 end
 
-% --- Data Storage ---
-% Store state in the container's UserData
 guiData = struct();
-guiData.tbl             = tbl;
-guiData.numericVars     = numericVars;
-guiData.catVars         = catVars;
-guiData.pointHandles    = [];   % To store scatter handles
-guiData.polyRoi         = [];   % To store polygon ROI
-guiData.defAlpha        = defAlpha;
-guiData.defClr          = defClr;
-guiData.selCbk          = selCbk;
-guiData.grpCbk          = grpCbk;
-guiData.highlightFcn    = @highlightPoints; % Expose function
-guiData.setGroupVarFcn  = @setGroupVar;     % Expose function
-guiData.setXYVarsFcn    = @setXYVars;       % Expose function
-guiData.hHighlight      = [];   % Store handle for external highlight
-guiData.fitHandles      = [];   % Store handles for regression lines
-guiData.chkGrp          = [];   % Checkbox handles
-guiData.hEquality       = [];   % Store handle for equality line
+guiData.tbl          = tbl;
+guiData.numericVars  = numericVars;
+guiData.catVars      = catVars;
+guiData.defAlpha     = defAlpha;
+guiData.defClr       = defClr;
+guiData.selCbk       = selCbk;
+guiData.grpCbk       = grpCbk;
+guiData.highlightFcn   = @highlightPoints;
+guiData.setGroupVarFcn = @setGroupVar;
+guiData.setXYVarsFcn   = @setXYVars;
+guiData.hHighlight   = [];
+guiData.fitHandles   = [];
+guiData.hEquality    = [];
+guiData.chkGrp       = gobjects(0);
+guiData.pointHandles = [];
 
 %% ========================================================================
 %  LAYOUT
 %  ========================================================================
 
-% Margins and spacing
-panelW      = 0.2;  % Width of control panel
-marg        = 0.05;
-bottomMarg  = 0.1;
+[~, gPlot, gCtrl, gActions] = tblgui.layout(hContainer, 'CtrlWidth', 230);
 
-% Main Scatter: Bottom-Left (relative to plot area)
-scatterW    = 0.55;
-scatterH    = 0.68;
-startX      = panelW + marg;
-startY      = bottomMarg;
+% Plot area: 2x2 grid -> top histogram (X), scatter, right histogram (Y).
+gScat = uigridlayout(gPlot, [2, 2], 'RowHeight', {'1x', '3.5x'}, ...
+    'ColumnWidth', {'4x', '1x'}, 'Padding', [2 2 2 2], 'RowSpacing', 2, 'ColumnSpacing', 2);
+guiData.hAxHistX = uiaxes(gScat);   guiData.hAxHistX.Layout.Row = 1; guiData.hAxHistX.Layout.Column = 1;
+guiData.hAxScatter = uiaxes(gScat); guiData.hAxScatter.Layout.Row = 2; guiData.hAxScatter.Layout.Column = 1;
+guiData.hAxHistY = uiaxes(gScat);   guiData.hAxHistY.Layout.Row = 2; guiData.hAxHistY.Layout.Column = 2;
 
-axScatterPos = [startX, startY, scatterW, scatterH];
-% Top Histogram (X dist)
-axHistXPos   = [startX, startY + scatterH + 0.02, scatterW, 0.15];
-% Right Histogram (Y dist)
-axHistYPos   = [startX + scatterW + 0.02, startY, 0.15, scatterH];
+% Controls (stacked in the scrollable control column)
+guiData.ddX = tblgui.labeledControl(gCtrl, 'dropdown', 'X Variable:', ...
+    'Items', numericVars, 'Value', curX, 'ValueChangedFcn', @onUpdatePlot);
+guiData.ddXScale = tblgui.labeledControl(gCtrl, 'dropdown', 'X Scale:', ...
+    'Items', {'Linear', 'Log'}, 'Value', xScale0, 'ValueChangedFcn', @onUpdatePlot);
+guiData.ddY = tblgui.labeledControl(gCtrl, 'dropdown', 'Y Variable:', ...
+    'Items', numericVars, 'Value', curY, 'ValueChangedFcn', @onUpdatePlot);
+guiData.ddYScale = tblgui.labeledControl(gCtrl, 'dropdown', 'Y Scale:', ...
+    'Items', {'Linear', 'Log', 'X-Linked'}, 'Value', yScale0, 'ValueChangedFcn', @onUpdatePlot);
+guiData.chkDisc = tblgui.labeledControl(gCtrl, 'checkbox', '', ...
+    'Text', 'Discretize (binned)', 'ValueChangedFcn', @onUpdatePlot);
+guiData.chkAdapt = tblgui.labeledControl(gCtrl, 'checkbox', '', ...
+    'Text', 'Adaptive bins', 'ValueChangedFcn', @onUpdatePlot);
+guiData.chkPrct = tblgui.labeledControl(gCtrl, 'checkbox', '', ...
+    'Text', 'Bins: Mean +/- SEM', 'ValueChangedFcn', @onUpdatePlot);
+guiData.ddFit = tblgui.labeledControl(gCtrl, 'dropdown', 'Fit:', ...
+    'Items', {'None', 'Linear', 'Ortho'}, 'Value', fit0, 'ValueChangedFcn', @onUpdatePlot);
+guiData.ddSize = tblgui.labeledControl(gCtrl, 'dropdown', 'Size:', ...
+    'Items', [{'None'}, numericVars], 'Value', curSize, 'ValueChangedFcn', @onUpdatePlot);
+guiData.ddGrp = tblgui.labeledControl(gCtrl, 'dropdown', 'Group:', ...
+    'Items', [{'None'}, catVars], 'Value', curGrp, 'ValueChangedFcn', @onGrpChange);
+tblgui.labeledControl(gCtrl, 'label', 'Filter:');
+guiData.pnlGrp = tblgui.labeledControl(gCtrl, 'panel', '', 'RowHeight', '1x');
 
-guiData.hAxScatter = axes('Parent', hContainer, 'Position', axScatterPos);
-guiData.hAxHistX   = axes('Parent', hContainer, 'Position', axHistXPos);
-guiData.hAxHistY   = axes('Parent', hContainer, 'Position', axHistYPos);
+% Action buttons (pinned at the bottom; hosts may append here, e.g. utypes_gui)
+guiData.btnSelect = tblgui.labeledControl(gActions, 'button', '', ...
+    'Text', 'Select Group', 'ButtonPushedFcn', @onSelectRegion);
+guiData.btnSelectDot = tblgui.labeledControl(gActions, 'button', '', ...
+    'Text', 'Select Dot', 'ButtonPushedFcn', @onSelectDot);
+guiData.btnSave = tblgui.labeledControl(gActions, 'button', '', ...
+    'Text', 'Save Table to Workspace', 'ButtonPushedFcn', @onSaveTable);
+guiData.gActions = gActions;
 
-% Link axes for zooming
-linkaxes([guiData.hAxScatter, guiData.hAxHistX], 'x');
-
-%% ========================================================================
-%  CONTROLS
-%  ========================================================================
-
-% Control Panel Positioning
-ctlTop      = 0.96;
-ctlH        = 0.04;
-ctlGap      = 0.01;
-ctlW        = panelW - 0.02;     % Full width
-ctlW_Half   = ctlW / 2 - 0.005;  % Half width (2-col)
-ctlW_Third  = (ctlW - 2*ctlGap) / 3; % Third width (3-col)
-
-ctlX        = 0.01;
-ctlX_Right  = ctlX + ctlW_Half + 0.01;
-
-% 3-col positions
-ctlX_1      = ctlX;
-ctlX_2      = ctlX + ctlW_Third + ctlGap;
-ctlX_3      = ctlX + 2*(ctlW_Third + ctlGap);
-
-% --- X Variable ---
-uicontrol('Parent', hContainer, 'Style', 'text', 'String', 'X Variable / Scale:', ...
-    'Units', 'normalized', 'Position', [ctlX, ctlTop - ctlH, ctlW, ctlH*0.7], ...
-    'HorizontalAlignment', 'left', 'FontWeight', 'bold');
-guiData.ddX = uicontrol('Parent', hContainer, 'Style', 'popupmenu', ...
-    'String', numericVars, 'Units', 'normalized', ...
-    'Position', [ctlX, ctlTop - 2*ctlH, ctlW_Half, ctlH], ...
-    'Callback', @onUpdatePlot);
-guiData.ddXScale = uicontrol('Parent', hContainer, 'Style', 'popupmenu', ...
-    'String', {'Linear', 'Log'}, 'Units', 'normalized', ...
-    'Position', [ctlX_Right, ctlTop - 2*ctlH, ctlW_Half, ctlH], ...
-    'Callback', @onUpdatePlot);
-
-% --- Discretize / Adaptive / Prct (Row 3) ---
-yPosChk = ctlTop - 3*ctlH - ctlGap;
-
-guiData.chkDisc = uicontrol('Parent', hContainer, 'Style', 'checkbox', ...
-    'String', 'Disc', 'Units', 'normalized', ...
-    'Position', [ctlX_1, yPosChk, ctlW_Third, ctlH], ...
-    'Callback', @onUpdatePlot);
-
-guiData.chkAdapt = uicontrol('Parent', hContainer, 'Style', 'checkbox', ...
-    'String', 'Adpt', 'Units', 'normalized', ...
-    'Position', [ctlX_2, yPosChk, ctlW_Third, ctlH], ...
-    'Callback', @onUpdatePlot);
-
-guiData.chkPrct = uicontrol('Parent', hContainer, 'Style', 'checkbox', ...
-    'String', 'Prct', 'Units', 'normalized', ...
-    'Position', [ctlX_3, yPosChk, ctlW_Third, ctlH], ...
-    'Callback', @onUpdatePlot);
-
-% --- Y Variable ---
-currYTop = ctlTop - 3*ctlH - 2*ctlGap - ctlH;
-uicontrol('Parent', hContainer, 'Style', 'text', 'String', 'Y Variable / Scale:', ...
-    'Units', 'normalized', 'Position', [ctlX, currYTop, ctlW, ctlH*0.7], ...
-    'HorizontalAlignment', 'left', 'FontWeight', 'bold');
-guiData.ddY = uicontrol('Parent', hContainer, 'Style', 'popupmenu', ...
-    'String', numericVars, 'Units', 'normalized', ...
-    'Position', [ctlX, currYTop - ctlH, ctlW_Half, ctlH], ...
-    'Callback', @onUpdatePlot);
-guiData.ddYScale = uicontrol('Parent', hContainer, 'Style', 'popupmenu', ...
-    'String', {'Linear', 'Log', 'X-Linked'}, 'Units', 'normalized', ...
-    'Position', [ctlX_Right, currYTop - ctlH, ctlW_Half, ctlH], ...
-    'Callback', @onUpdatePlot);
-
-% --- Fit Option (Moved up, Inline) ---
-yFit = currYTop - 2*ctlH - ctlGap;
-uicontrol('Parent', hContainer, 'Style', 'text', 'String', 'Fit:', ...
-    'Units', 'normalized', 'Position', [ctlX, yFit + ctlH*0.1, ctlW*0.3, ctlH*0.6], ...
-    'HorizontalAlignment', 'left', 'FontWeight', 'bold');
-guiData.ddFit = uicontrol('Parent', hContainer, 'Style', 'popupmenu', ...
-    'String', {'None', 'Linear', 'Ortho'}, 'Units', 'normalized', ...
-    'Position', [ctlX + ctlW*0.35, yFit, ctlW*0.65, ctlH], ...
-    'Callback', @onUpdatePlot);
-
-% --- Size Variable (Inline) ---
-ySize = yFit - ctlH - ctlGap;
-uicontrol('Parent', hContainer, 'Style', 'text', 'String', 'Size:', ...
-    'Units', 'normalized', 'Position', [ctlX, ySize + ctlH*0.1, ctlW*0.3, ctlH*0.6], ...
-    'HorizontalAlignment', 'left', 'FontWeight', 'bold');
-guiData.ddSize = uicontrol('Parent', hContainer, 'Style', 'popupmenu', ...
-    'String', [{'None'}, numericVars], 'Units', 'normalized', ...
-    'Position', [ctlX + ctlW*0.35, ySize, ctlW*0.65, ctlH], ...
-    'Callback', @onUpdatePlot);
-
-% --- Group Variable (Inline) ---
-yGrp = ySize - ctlH - ctlGap;
-uicontrol('Parent', hContainer, 'Style', 'text', 'String', 'Group:', ...
-    'Units', 'normalized', 'Position', [ctlX, yGrp + ctlH*0.1, ctlW*0.3, ctlH*0.6], ...
-    'HorizontalAlignment', 'left', 'FontWeight', 'bold');
-guiData.ddGrp = uicontrol('Parent', hContainer, 'Style', 'popupmenu', ...
-    'String', [{'None'}, catVars], 'Units', 'normalized', ...
-    'Position', [ctlX + ctlW*0.35, yGrp, ctlW*0.65, ctlH], ...
-    'Callback', @onGrpChange);
-
-% Set Initial Values
-set(guiData.ddX, 'Value', find(strcmp(numericVars, curX)));
-set(guiData.ddY, 'Value', find(strcmp(numericVars, curY)));
-
-% Size ('None' is 1)
-idxSz = find(strcmp(numericVars, curSize));
-if isempty(idxSz), set(guiData.ddSize, 'Value', 1);
-else,              set(guiData.ddSize, 'Value', idxSz + 1); end
-
-% Group ('None' is 1)
-idxG = find(strcmp(catVars, curGrp));
-if isempty(idxG), set(guiData.ddGrp, 'Value', 1);
-else,             set(guiData.ddGrp, 'Value', idxG + 1); end
-
-% Fit ('None' is 1)
-set(guiData.ddFit, 'Value', 1);
-
-% Optional initial X/Y scale and fit-type overrides. Default ('') keeps
-% the dropdowns at their first entry (Linear / Linear / None).
-if ~isempty(xScaleIn)
-    idx = find(strcmpi(get(guiData.ddXScale, 'String'), xScaleIn), 1);
-    if ~isempty(idx), set(guiData.ddXScale, 'Value', idx); end
-end
-if ~isempty(yScaleIn)
-    idx = find(strcmpi(get(guiData.ddYScale, 'String'), yScaleIn), 1);
-    if ~isempty(idx), set(guiData.ddYScale, 'Value', idx); end
-end
-if ~isempty(fitTypeIn)
-    idx = find(strcmpi(get(guiData.ddFit, 'String'), fitTypeIn), 1);
-    if ~isempty(idx), set(guiData.ddFit, 'Value', idx); end
-end
-
-% --- Filter Panel ---
-grpDDBottom = yGrp;
-panelTop    = grpDDBottom - 0.02;
-panelBottom = 0.20; % Adjusted for buttons
-panelH      = panelTop - panelBottom;
-
-guiData.pnlGrp = uipanel('Parent', hContainer, 'BorderType', 'none', ...
-    'Units', 'normalized', 'Position', [ctlX, panelBottom, ctlW, panelH]);
-
-% --- Buttons ---
-% Side-by-side
-btnY = 0.13;
-guiData.btnSelect = uicontrol('Parent', hContainer, 'Style', 'pushbutton', ...
-    'String', 'Slct Grp', ...
-    'Units', 'normalized', 'Position', [ctlX, btnY, ctlW_Half, 0.05], ...
-    'Callback', @onSelectRegion, 'FontWeight', 'bold');
-
-guiData.btnSelectDot = uicontrol('Parent', hContainer, 'Style', 'pushbutton', ...
-    'String', 'Slct Dot', ...
-    'Units', 'normalized', 'Position', [ctlX_Right, btnY, ctlW_Half, 0.05], ...
-    'Callback', @onSelectDot, 'FontWeight', 'bold');
-
-guiData.btnSave = uicontrol('Parent', hContainer, 'Style', 'pushbutton', ...
-    'String', 'Save Table to Workspace', ...
-    'Units', 'normalized', 'Position', [ctlX, 0.05, ctlW, 0.06], ...
-    'Callback', @onSaveTable);
-
-% Store guidata
 hContainer.UserData = guiData;
 
-% Finalize
-hFig = hContainer;
-
-% Trigger Initial Update
+% Initial population & plot
 onGrpChange(hContainer);
 onUpdatePlot(hContainer, []);
-
 
 %% ========================================================================
 %  CALLBACKS
 %  ========================================================================
 
-    function onGrpChange(src, ~)
-        % Called when the Group Dropdown changes. Re-populates the checkbox list.
+    function onGrpChange(~, ~)
         data = hContainer.UserData;
         populateCheckboxes(data);
-
-        % Trigger External Callback
-        idxGrp   = get(data.ddGrp, 'Value');
-        grpItems = get(data.ddGrp, 'String');
-        grpName  = grpItems{idxGrp};
-
+        data = hContainer.UserData;
         if ~isempty(data.grpCbk)
-            % New group var -> Enable ALL categories by default
-            data = hContainer.UserData; % Reload
-            if isempty(data.chkGrp)
-                activeCats = {};
-            else
-                allCats = arrayfun(@(x) string(get(x, 'String')), data.chkGrp);
-                activeCats = cellstr(allCats);
-            end
-            data.grpCbk(grpName, activeCats, hContainer);
+            [~, allCats] = tblgui.selectedCats(data.chkGrp);
+            data.grpCbk(data.ddGrp.Value, allCats, hContainer);
         end
-
-        onUpdatePlot(src, []);
+        onUpdatePlot(hContainer, []);
     end
 
     function onFilterChange(~, ~)
-        % Called when a single checkbox is toggled.
         data = hContainer.UserData;
-        idxGrp   = get(data.ddGrp, 'Value');
-        grpItems = get(data.ddGrp, 'String');
-        grpName  = grpItems{idxGrp};
-
-        fprintf('Filter Change: %s\n', grpName);
         onUpdatePlot(hContainer, []);
-
-        % Trigger External Callback
         if ~isempty(data.grpCbk)
-            if isempty(data.chkGrp)
-                activeCats = {};
-            else
-                selectedIdx = arrayfun(@(x) get(x, 'Value'), data.chkGrp);
-                allCats     = arrayfun(@(x) string(get(x, 'String')), data.chkGrp);
-                activeCats  = cellstr(allCats(logical(selectedIdx)));
-            end
-            data.grpCbk(grpName, activeCats, hContainer);
+            activeCats = tblgui.selectedCats(data.chkGrp);
+            data.grpCbk(data.ddGrp.Value, activeCats, hContainer);
         end
     end
 
     function populateCheckboxes(data)
-        % Helper to fill the filter panel with checkboxes for each category.
-        delete(data.pnlGrp.Children);
-        idxGrp   = get(data.ddGrp, 'Value');
-        grpItems = get(data.ddGrp, 'String');
-        grpName  = grpItems{idxGrp};
-
+        grpName = data.ddGrp.Value;
         if strcmp(grpName, 'None')
-            data.chkGrp = [];
+            delete(allchild(data.pnlGrp));
+            data.chkGrp = gobjects(0);
         else
-            raw = data.tbl.(grpName);
-            if islogical(raw), raw = categorical(raw); end
-            if ~iscategorical(raw), raw = categorical(raw); end
-
-            % Get categories present in the data
-            cats = categories(raw);
-            cats = cats(ismember(cats, unique(raw)));
-
-            nCats = length(cats);
-            h = 1 / max(10, nCats + 1);
-            w = 0.9;
-            data.chkGrp = gobjects(1, nCats); % Initialize to clear old handles
-
-            for iCat = 1:nCats
-                yPos = 1 - iCat*h;
-                data.chkGrp(iCat) = uicontrol('Parent', data.pnlGrp, 'Style', 'checkbox', ...
-                    'String', cats{iCat}, 'Units', 'normalized', ...
-                    'Position', [0, yPos, w, h], 'Value', 1, ...
-                    'Callback', @onFilterChange);
-            end
+            cats = tblgui.catList(data.tbl.(grpName));
+            data.chkGrp = tblgui.filterPanel(data.pnlGrp, cats, @onFilterChange);
         end
         hContainer.UserData = data;
     end
 
     function onUpdatePlot(~, ~)
-        % Main plotting function.
         data = hContainer.UserData;
         tbl  = data.tbl;
 
-        % --- Retrieve Selections ---
-        idxX    = get(data.ddX, 'Value');
-        idxY    = get(data.ddY, 'Value');
-        idxSize = get(data.ddSize, 'Value');
-        idxGrp  = get(data.ddGrp, 'Value');
-        idxFit  = get(data.ddFit, 'Value');
+        xName = data.ddX.Value;
+        yName = data.ddY.Value;
 
-        xName = data.numericVars{idxX};
-        yName = data.numericVars{idxY};
-
-        % --- Size Logic (Quadratic Scaling) ---
-        if idxSize > 1
-            sizeVarItems = get(data.ddSize, 'String');
-            sizeName     = sizeVarItems{idxSize};
-            rawSz        = tbl.(sizeName);
-            rawSz        = rawSz + abs(min(rawSz)); % Shift to positive
-
-            % Robust normalization
+        % --- Size logic (quadratic scaling) ---
+        if ~strcmp(data.ddSize.Value, 'None')
+            rawSz = tbl.(data.ddSize.Value);
+            rawSz = rawSz + abs(min(rawSz));
             lims  = prctile(rawSz, [5 95]);
-            minSz = lims(1);
-            maxSz = lims(2);
-
+            minSz = lims(1); maxSz = lims(2);
             if maxSz > minSz
                 clippedSz = max(min(rawSz, maxSz), minSz);
                 normSz    = (clippedSz - minSz) / (maxSz - minSz);
-
-                % Quadratic transform (x^5 for strong contrast)
-                normSq = normSz .^ 5;
-
-                % Map to range 20-100
-                szData = 20 + 80 * normSq;
+                szData    = 20 + 80 * (normSz .^ 5);
             else
                 szData = repmat(20, length(rawSz), 1);
             end
@@ -454,138 +221,86 @@ onUpdatePlot(hContainer, []);
             szData = repmat(20, height(tbl), 1);
         end
 
-        % --- Group Logic & Colors ---
-        grpName     = '';
-        groups      = ones(height(tbl), 1);
-        grpLabels   = {'All'};
+        % --- Group logic & colors ---
+        grpName = data.ddGrp.Value;
+        groups  = ones(height(tbl), 1);
+        grpLabels = {'All'};
+        fullCatList = {};
+        idxOf = @(~) 1;
+        baseColors = lines(1);
 
-        % Initialize colors container
-        grpColorsMap = [];
-        fullCatList  = {};
-
-        grpItems = get(data.ddGrp, 'String');
-        if idxGrp > 1 % "None" is 1
-            grpName = grpItems{idxGrp};
-            rawGrp  = tbl.(grpName);
-
-            if islogical(rawGrp)
-                rawGrp = categorical(rawGrp);
-            elseif ~iscategorical(rawGrp)
-                rawGrp = categorical(rawGrp);
-            end
-
+        isGrpActive = ~strcmp(grpName, 'None');
+        if isGrpActive
+            rawGrp = tbl.(grpName);
+            if islogical(rawGrp) || ~iscategorical(rawGrp), rawGrp = categorical(rawGrp); end
             groups = rawGrp;
-            grpLabels = categories(groups);
 
-            % Generate colors based on ALL potential categories to ensure stability
-            % (Logic: If we have 3 groups A,B,C, A should always be Blue, even if B is unchecked)
-            fullCatList = categories(rawGrp);
+            fullCatList = tblgui.catList(rawGrp);            % present categories
+            [baseColors, idxOf] = tblgui.groupColors(fullCatList, 'BaseColors', data.defClr);
 
-            % Filter to only those present in data if desired, but for stability
-            % 'categories' usually returns the full definition.
-            % Let's intersect with present data to be safe against unused categories,
-            % but still take the FULL set of PRESENT data, not the FILTERED set.
-            fullCatList = fullCatList(ismember(fullCatList, unique(rawGrp)));
-            nTotalCats  = length(fullCatList);
-
-            if ~isempty(data.defClr) && size(data.defClr,1) >= nTotalCats
-                baseColors = data.defClr;
-            else
-                baseColors = lines(nTotalCats);
-            end
-
-            % Adjust 'grpLabels' based on user checkboxes (Filtering)
+            % Iterate over checkbox-selected categories (color stays stable)
             if ~isempty(data.chkGrp)
-                validH = isgraphics(data.chkGrp);
-                if any(validH)
-                    selectedIdx = arrayfun(@(x) get(x, 'Value'), data.chkGrp(validH));
-                    allCatsStr  = arrayfun(@(x) string(get(x, 'String')), data.chkGrp(validH));
-                    activeCats  = cellstr(allCatsStr(logical(selectedIdx)));
-
-                    % Filter the labels to iterate over
-                    grpLabels = intersect(grpLabels, activeCats, 'stable');
-                end
+                active = tblgui.selectedCats(data.chkGrp);
+                grpLabels = intersect(fullCatList, active, 'stable');
+            else
+                grpLabels = fullCatList;
             end
-
-            isGrpActive = true;
-        else
-            isGrpActive = false;
-            baseColors  = lines(1);
         end
 
-        % Get Data Vectors
         xData = tbl.(xName);
         yData = tbl.(yName);
+        isDisc = data.chkDisc.Value;
 
-        % Discretization Flag
-        isDisc = get(data.chkDisc, 'Value');
-
-        % --- Scales & Limits ---
+        % --- Scales & limits ---
         scaleX = 'linear';
-        if get(data.ddXScale, 'Value') == 2, scaleX = 'log'; end
-
-        yScaleVal = get(data.ddYScale, 'Value');
-        isLinked  = (yScaleVal == 3);
-
+        if strcmp(data.ddXScale.Value, 'Log'), scaleX = 'log'; end
+        isLinked = strcmp(data.ddYScale.Value, 'X-Linked');
         if isLinked
             scaleY = scaleX;
         else
             scaleY = 'linear';
-            if yScaleVal == 2, scaleY = 'log'; end
+            if strcmp(data.ddYScale.Value, 'Log'), scaleY = 'log'; end
         end
 
-        % Calculate Limits (for Bins)
         xLim = calcLimits(xData, scaleX);
         if xLim(1) >= xLim(2)
             if strcmp(scaleX, 'log'), xLim = [xLim(1)/1.1, xLim(1)*1.1];
             else,                     xLim = [xLim(1)-0.5, xLim(1)+0.5]; end
         end
-
         yLim = calcLimits(yData, scaleY);
         if yLim(1) >= yLim(2)
             if strcmp(scaleY, 'log'), yLim = [yLim(1)/1.1, yLim(1)*1.1];
             else,                     yLim = [yLim(1)-0.5, yLim(1)+0.5]; end
         end
-
         if isLinked
             jointMin = min(xLim(1), yLim(1));
             jointMax = max(xLim(2), yLim(2));
-            xLim = [jointMin, jointMax];
-            yLim = [jointMin, jointMax];
+            xLim = [jointMin, jointMax]; yLim = [jointMin, jointMax];
         end
 
-        % Calculate Global Bin Edges
+        % Global bin edges
         nBins = 30;
         if strcmp(scaleX, 'log')
-            % Ensure positive for log
-            if xLim(1) <= 0, xLim(1) = min(xData(xData>0)); if isempty(xLim(1)), xLim(1)=0.1; end; end
+            if xLim(1) <= 0, xLim(1) = min(xData(xData > 0)); if isempty(xLim(1)), xLim(1) = 0.1; end; end
             xEdges = logspace(log10(xLim(1)), log10(xLim(2)), nBins);
         else
             xEdges = linspace(xLim(1), xLim(2), nBins);
         end
-
         if strcmp(scaleY, 'log')
-            if yLim(1) <= 0, yLim(1) = min(yData(yData>0)); if isempty(yLim(1)), yLim(1)=0.1; end; end
+            if yLim(1) <= 0, yLim(1) = min(yData(yData > 0)); if isempty(yLim(1)), yLim(1) = 0.1; end; end
             yEdges = logspace(log10(yLim(1)), log10(yLim(2)), nBins);
         else
             yEdges = linspace(yLim(1), yLim(2), nBins);
         end
 
-        % Set Axis Scales Immediately
         set(data.hAxScatter, 'XScale', scaleX, 'YScale', scaleY);
         set(data.hAxHistX,   'XScale', scaleX, 'YScale', 'linear');
         set(data.hAxHistY,   'XScale', 'linear', 'YScale', scaleY);
 
         % --- Drawing ---
-        % Clean up previous fit lines (handled explicitly due to HandleVisibility=off)
-        if ~isempty(data.fitHandles)
-            delete(data.fitHandles(isgraphics(data.fitHandles)));
-        end
+        if ~isempty(data.fitHandles), delete(data.fitHandles(isgraphics(data.fitHandles))); end
         data.fitHandles = [];
-
-        if ~isempty(data.hEquality)
-            delete(data.hEquality(isgraphics(data.hEquality)));
-        end
+        if ~isempty(data.hEquality), delete(data.hEquality(isgraphics(data.hEquality))); end
         data.hEquality = [];
 
         delete(allchild(data.hAxScatter));
@@ -596,166 +311,98 @@ onUpdatePlot(hContainer, []);
         hold(data.hAxHistX, 'on');
         hold(data.hAxHistY, 'on');
 
-        % Plotting Loop
-        % Store stats for second pass
         statsData = {};
 
-        % Plotting Loop (Pass 1: Scatter & Histograms)
+        % Pass 1: scatter & histograms per group
         for iG = 1:length(grpLabels)
             if isGrpActive
                 currCat = grpLabels{iG};
-                idx     = (groups == currCat);
-
-                % Color Stability Logic:
-                % Find the index of this category in the FULL list of categories
-                [~, globalIdx] = ismember(currCat, fullCatList);
-                if globalIdx > 0
-                    cIdx = mod(globalIdx-1, size(baseColors,1)) + 1;
-                    cG   = baseColors(cIdx, :);
-                else
-                    cG = [0 0 0]; % Fallback
-                end
+                idx = (groups == currCat);
+                cG = baseColors(idxOf(currCat), :);
             else
-                idx     = true(height(tbl), 1);
+                idx = true(height(tbl), 1);
                 currCat = 'All';
-                cG      = baseColors(1, :);
+                cG = baseColors(1, :);
             end
-
             if ~any(idx), continue; end
 
-            % Extract Subset
-            xG  = xData(idx);
-            yG  = yData(idx);
-            szG = szData(idx);
-
+            xG = xData(idx); yG = yData(idx); szG = szData(idx);
             nPoints = sum(idx);
 
-            % Scatter Plot Params
             scatAlpha = data.defAlpha;
-            if isDisc
-                scatAlpha = scatAlpha * 0.1;
-                szG = szG * 0.3;
-            end
+            if isDisc, scatAlpha = scatAlpha * 0.1; szG = szG * 0.3; end
 
-            % Get Fit Type
-            fitTypes = {'None', 'Linear', 'Ortho'};
-            curFit   = fitTypes{idxFit};
-
-            % Prepare Label
+            curFit = data.ddFit.Value;
             lbl = sprintf('%s (n=%d)', string(currCat), nPoints);
 
-            % Plot using plot_scat
-            [hS, hF] = plot_scat([], xG, yG, ...
-                'hAx', data.hAxScatter, ...
-                'sz', szG, ...
-                'c', cG, ...
-                'alpha', scatAlpha, ...
-                'marker', 'o', ...
-                'fitType', curFit, ...
-                'flgStats', true, ... % Calculate and append stats
-                'dispName', lbl);
-            
-            % Post-process Scatter (Interaction)
+            [hS, hF] = plot_scat([], xG, yG, 'hAx', data.hAxScatter, ...
+                'sz', szG, 'c', cG, 'alpha', scatAlpha, 'marker', 'o', ...
+                'fitType', curFit, 'flgStats', true, 'dispName', lbl);
+
             set(hS, 'HitTest', 'off', 'PickableParts', 'none');
-            
-            % Store fit handles
-            if isgraphics(hF)
-               data.fitHandles = [data.fitHandles; hF];
-            end
+            if isgraphics(hF), data.fitHandles = [data.fitHandles; hF]; end
 
-
-            % Binned Stats Calculation
+            % Binned stats (computed pass 1, drawn pass 2)
             if isDisc
-                isAdapt = get(data.chkAdapt, 'Value');
-                isPrct  = get(data.chkPrct, 'Value');
-
-                sStruct = calcBinnedStats(xG, yG, cG, isAdapt, isPrct, xEdges, scaleX);
-
-                if ~isempty(sStruct)
-                    statsData{end+1} = sStruct; %#ok<AGROW>
-                end
+                sStruct = calcBinnedStats(xG, yG, cG, data.chkAdapt.Value, ...
+                    data.chkPrct.Value, xEdges, scaleX);
+                if ~isempty(sStruct), statsData{end+1} = sStruct; end %#ok<AGROW>
             end
 
-            % Histogram X
+            % Marginal histograms
             if strcmp(scaleX, 'log'), normX = 'probability'; else, normX = 'pdf'; end
             plot_hist([], xG, 'hAx', data.hAxHistX, 'bins', xEdges, 'c', cG, ...
-                'scale', scaleX, 'orient', 'vertical', 'norm', normX, ...
-                'flgKDE', true, 'flgStat', false);
-
-            % Histogram Y (Horizontal)
+                'scale', scaleX, 'orient', 'vertical', 'norm', normX, 'flgKDE', true, 'flgStat', false);
             if strcmp(scaleY, 'log'), normY = 'probability'; else, normY = 'pdf'; end
             plot_hist([], yG, 'hAx', data.hAxHistY, 'bins', yEdges, 'c', cG, ...
-                'scale', scaleY, 'orient', 'horizontal', 'norm', normY, ...
-                'flgKDE', true, 'flgStat', false);
+                'scale', scaleY, 'orient', 'horizontal', 'norm', normY, 'flgKDE', true, 'flgStat', false);
         end
 
-        % Plotting Loop (Pass 2: Error Bars on TOP)
+        % Pass 2: error bars on top
         if isDisc
             for k = 1:length(statsData)
                 s = statsData{k};
-
-                % Filter NaNs
                 valid = ~isnan(s.meds);
                 if ~any(valid), continue; end
-
-                % Err bar color (darker)
                 errColor = max(0, s.color * 0.7);
-
                 hErr = errorbar(data.hAxScatter, s.centers(valid), s.meds(valid), ...
-                    s.neg(valid), s.pos(valid), ...
-                    'Color', errColor, 'LineWidth', 2, 'LineStyle', '-', ...
-                    'Marker', 'o', 'MarkerSize', 6, 'MarkerFaceColor', errColor, ...
-                    'CapSize', 0);
-
-                % Hide from legend
+                    s.neg(valid), s.pos(valid), 'Color', errColor, 'LineWidth', 2, ...
+                    'LineStyle', '-', 'Marker', 'o', 'MarkerSize', 6, ...
+                    'MarkerFaceColor', errColor, 'CapSize', 0);
                 hErr.Annotation.LegendInformation.IconDisplayStyle = 'off';
             end
         end
 
-        % Labels & Aesthetics
         xlabel(data.hAxScatter, xName, 'Interpreter', 'none');
         ylabel(data.hAxScatter, yName, 'Interpreter', 'none');
-
         if isGrpActive
             legend(data.hAxScatter, 'Location', 'best', 'Interpreter', 'tex');
         end
 
-        % Equality Line
         if isLinked
-            % Re-plot equality line since we cleared axes
             data.hEquality = plot(data.hAxScatter, xLim, xLim, 'k--', 'LineWidth', 1, ...
                 'HitTest', 'off', 'PickableParts', 'none', 'HandleVisibility', 'off');
         end
 
-        % Apply Padding and Set Limits
         applyPaddedLimits(data.hAxScatter, xLim, yLim, scaleX, scaleY);
-
         grid(data.hAxScatter, 'on');
-        data.hAxHistX.XAxis.Visible = 'off';
-        data.hAxHistX.YAxis.Visible = 'off';
-        data.hAxHistY.XAxis.Visible = 'off';
-        data.hAxHistY.YAxis.Visible = 'off';
+        data.hAxHistX.XAxis.Visible = 'off'; data.hAxHistX.YAxis.Visible = 'off';
+        data.hAxHistY.XAxis.Visible = 'off'; data.hAxHistY.YAxis.Visible = 'off';
 
+        drawnow;
         linkaxes([data.hAxScatter, data.hAxHistX], 'x');
 
         hold(data.hAxScatter, 'off');
         hold(data.hAxHistX, 'off');
         hold(data.hAxHistY, 'off');
 
-        % Update UI State
-        if isGrpActive
-            set(data.btnSelect, 'Enable', 'on', 'String', 'Select Group');
-            set(data.btnSelectDot, 'Enable', 'on', 'String', 'Select Dot');
-        else
-            set(data.btnSelect, 'Enable', 'off', 'String', 'Select Group');
-            set(data.btnSelectDot, 'Enable', 'off', 'String', 'Select Dot');
-        end
-        
-        % Save State (including fitHandles)
+        data.btnSelect.Enable = matlab.lang.OnOffSwitchState(isGrpActive);
+        data.btnSelectDot.Enable = matlab.lang.OnOffSwitchState(isGrpActive);
+
         hContainer.UserData = data;
     end
 
-% --- Helper: Limit Calculation ---
+% --- Helper: limit calculation ---
     function lims = calcLimits(vec, scaleType)
         if strcmp(scaleType, 'log')
             v = vec(~isnan(vec) & ~isinf(vec) & vec > 0);
@@ -764,141 +411,85 @@ onUpdatePlot(hContainer, []);
             v = vec(~isnan(vec) & ~isinf(vec));
             if isempty(v), lims = [0 1]; else, lims = [min(v), max(v)]; end
         end
-    end % EOF calcLimits
+    end
 
-% --- Helper: Apply Padding ---
+% --- Helper: apply padded limits ---
     function applyPaddedLimits(ax, xL, yL, sX, sY)
-        % X
         if strcmp(sX, 'log')
             logMin = log10(xL(1)); logMax = log10(xL(2));
-            span = logMax - logMin; if span==0, span=1; end
+            span = logMax - logMin; if span == 0, span = 1; end
             xlim(ax, [10^(logMin - 0.05*span), 10^(logMax + 0.05*span)]);
         else
-            span = diff(xL); if span==0, span=1; end
+            span = diff(xL); if span == 0, span = 1; end
             xlim(ax, [xL(1) - 0.05*span, xL(2) + 0.05*span]);
         end
-        % Y
         if strcmp(sY, 'log')
             logMin = log10(yL(1)); logMax = log10(yL(2));
-            span = logMax - logMin; if span==0, span=1; end
+            span = logMax - logMin; if span == 0, span = 1; end
             ylim(ax, [10^(logMin - 0.05*span), 10^(logMax + 0.05*span)]);
         else
-            span = diff(yL); if span==0, span=1; end
+            span = diff(yL); if span == 0, span = 1; end
             ylim(ax, [yL(1) - 0.05*span, yL(2) + 0.05*span]);
         end
-    end % EOF applyPaddedLimits
+    end
 
-% --- Helper: Binned Stats Calculation ---
+% --- Helper: binned stats ---
     function sStruct = calcBinnedStats(xG, yG, cG, isAdapt, isPrct, xEdges, scaleX)
-        % CALCBINNEDSTATS Calculates binned statistics (median, error bars).
-        %
-        %   Can use fixed edges (xEdges) or adaptive binning based on
-        %   percentiles.
-
         sStruct = [];
         if isempty(xG) || isempty(yG), return; end
-
-        % Data filtering
-        % We already filtered loop-wise, but good to be safe if reusing
         valid = ~isnan(xG) & ~isnan(yG);
-        xG = xG(valid);
-        yG = yG(valid);
+        xG = xG(valid); yG = yG(valid);
         if isempty(xG), return; end
 
-        % 1. Strategy Setup
         if isAdapt
-            % --- Adaptive: Edges based on quantiles ---
-            % 16 bins for adaptive (0:100 linspace)
             pcts  = linspace(0, 100, 16);
             edges = unique(prctile(xG, pcts));
-
             if length(edges) < 2, return; end
-
-            % Discretize
-            binIdx = discretize(xG, edges);
-
-            % We will iterate over the bins that actually exist
+            binIdx     = discretize(xG, edges);
             uBins      = unique(binIdx(~isnan(binIdx)))';
             nBinSlots  = length(uBins);
-
-            % For adaptive, we must calculate centers from data
-            useDataCtr = true;
-            preCenters = [];
-
+            useDataCtr = true; preCenters = [];
         else
-            % --- Fixed: Uniform/Log Edges ---
-            edges = xEdges;
-
-            % Discretize
+            edges  = xEdges;
             binIdx = discretize(xG, edges);
-
-            % Pre-calculate centers
             if strcmp(scaleX, 'log')
                 logEdges   = log10(edges);
                 logCenters = (logEdges(1:end-1) + logEdges(2:end)) / 2;
-                preCenters = 10.^logCenters;
+                preCenters = 10 .^ logCenters;
             else
                 preCenters = (edges(1:end-1) + edges(2:end)) / 2;
             end
-
-            % We iterate over ALL defined bins for fixed timeline
             uBins      = 1:length(preCenters);
             nBinSlots  = length(uBins);
             useDataCtr = false;
         end
 
-        % 2. Calculate Stats Loop
-        bMeds = nan(1, nBinSlots);
-        bLow  = nan(1, nBinSlots);
-        bHigh = nan(1, nBinSlots);
-        bCtrs = nan(1, nBinSlots);
-
+        bMeds = nan(1, nBinSlots); bLow = nan(1, nBinSlots);
+        bHigh = nan(1, nBinSlots); bCtrs = nan(1, nBinSlots);
         hasData = false;
 
         for iB = 1:nBinSlots
             currBinIdx = uBins(iB);
-
-            % Identify points in bin
             inBin = (binIdx == currBinIdx);
-            nIn   = sum(inBin);
-
-            if nIn >= 5
+            if sum(inBin) >= 5
                 hasData = true;
-
-                % Y-Stats
-                % Y-Stats
                 ySub = yG(inBin);
-                
                 if isPrct
-                    % Request: If Pressed (Checked) -> Mean +/- SEM
-                    mu  = mean(ySub, 'omitnan');
-                    sd  = std(ySub, 'omitnan');
-                    nn  = sum(~isnan(ySub));
-                    sem = sd / sqrt(nn);
-                    
-                    bLow(iB)  = mu - sem;
-                    bMeds(iB) = mu;
-                    bHigh(iB) = mu + sem;
+                    mu = mean(ySub, 'omitnan'); sd = std(ySub, 'omitnan');
+                    sem = sd / sqrt(sum(~isnan(ySub)));
+                    bLow(iB) = mu - sem; bMeds(iB) = mu; bHigh(iB) = mu + sem;
                 else
-                    % Default (Unchecked) -> Percentiles
-                    p = prctile(ySub, [10, 50, 90]);
-    
-                    bLow(iB)  = p(1);
-                    bMeds(iB) = p(2);
-                    bHigh(iB) = p(3);
+                    pp = prctile(ySub, [10, 50, 90]);
+                    bLow(iB) = pp(1); bMeds(iB) = pp(2); bHigh(iB) = pp(3);
                 end
-
-                % X-Center
                 if useDataCtr
-                    xSub      = xG(inBin);
-                    bCtrs(iB) = median(xSub, 'omitnan');
+                    bCtrs(iB) = median(xG(inBin), 'omitnan');
                 else
                     bCtrs(iB) = preCenters(currBinIdx);
                 end
             end
         end
 
-        % 3. Package Result
         if hasData
             sStruct.centers = bCtrs;
             sStruct.meds    = bMeds;
@@ -906,82 +497,49 @@ onUpdatePlot(hContainer, []);
             sStruct.pos     = bHigh - bMeds;
             sStruct.color   = cG;
         end
+    end
 
-    end % EOF calcBinnedStats
+%% ========================================================================
+%  SELECTION
+%  ========================================================================
 
     function onSelectRegion(~, ~)
-        % Polygon selection tool
         data = hContainer.UserData;
-        ax   = data.hAxScatter;
-        roi  = drawpolygon(ax);
-
-        if isempty(roi.Position)
-            delete(roi); return;
-        end
-
-        % Process
+        roi = drawpolygon(data.hAxScatter);
+        if isempty(roi.Position), delete(roi); return; end
         processSelection(hContainer, data, roi, false);
     end
 
     function onSelectDot(~, ~)
-        % Single dot selection tool
         data = hContainer.UserData;
-        ax   = data.hAxScatter;
-
-        % Clear previous
+        ax = data.hAxScatter;
         delete(findobj(ax, 'Type', 'images.roi.Point'));
-
         hPoint = drawpoint(ax, 'Label', 'Target');
         if isempty(hPoint.Position), delete(hPoint); return; end
-
-        % Snap & Listen
         snapToData(hPoint, data);
-
-        addlistener(hPoint, 'ROIClicked', ...
-            @(roiSrc, evt) onDotDoubleClick(roiSrc, evt, hContainer));
-        addlistener(hPoint, 'MovingROI', ...
-            @(roiSrc, evt) snapToData(roiSrc, data));
-
+        addlistener(hPoint, 'ROIClicked', @(roiSrc, evt) onDotDoubleClick(roiSrc, evt, hContainer));
+        addlistener(hPoint, 'MovingROI', @(roiSrc, evt) snapToData(roiSrc, hContainer.UserData));
         title(ax, 'Double-click to assign group. Drag to browse traces.', 'Color', 'r');
     end
 
     function snapToData(hPoint, data)
-        % Snaps the ROI point to the nearest data point.
         pos = hPoint.Position;
-
-        idxX  = get(data.ddX, 'Value');
-        idxY  = get(data.ddY, 'Value');
-        xName = data.numericVars{idxX};
-        yName = data.numericVars{idxY};
-
-        xData = data.tbl.(xName);
-        yData = data.tbl.(yName);
-
-        % Normalized Distance Calculation (to handle different axis scales)
-        ax    = data.hAxScatter;
-        xlims = ax.XLim;
-        ylims = ax.YLim;
-
+        xData = data.tbl.(data.ddX.Value);
+        yData = data.tbl.(data.ddY.Value);
+        ax = data.hAxScatter;
+        xlims = ax.XLim; ylims = ax.YLim;
         xNorm = (xData - xlims(1)) / diff(xlims);
         yNorm = (yData - ylims(1)) / diff(ylims);
         pNorm = [(pos(1)-xlims(1))/diff(xlims), (pos(2)-ylims(1))/diff(ylims)];
-
-        distSq      = (xNorm - pNorm(1)).^2 + (yNorm - pNorm(2)).^2;
+        distSq = (xNorm - pNorm(1)).^2 + (yNorm - pNorm(2)).^2;
         [~, minIdx] = min(distSq);
-
         newPos = [xData(minIdx), yData(minIdx)];
-
-        % Update Position
         if sum((hPoint.Position - newPos).^2) > 1e-10
             hPoint.Position = newPos;
         end
-
         hPoint.UserData = minIdx;
-
-        % Trigger Selection Callback (for browsing)
         inPoints = false(height(data.tbl), 1);
         inPoints(minIdx) = true;
-
         if isfield(data, 'selCbk') && ~isempty(data.selCbk)
             data.selCbk(inPoints);
         end
@@ -991,58 +549,38 @@ onUpdatePlot(hContainer, []);
         if strcmp(evt.SelectionType, 'double')
             data = hContainer.UserData;
             idx  = hPoint.UserData;
-
-            % Select this point and open assignment dialog
             processSelectionIdx(hContainer, data, idx);
-
             delete(hPoint);
             title(data.hAxScatter, '');
         end
     end
 
     function processSelection(src, data, roi, isSinglePoint)
-        idxX  = get(data.ddX, 'Value');
-        idxY  = get(data.ddY, 'Value');
-        xName = data.numericVars{idxX};
-        yName = data.numericVars{idxY};
-
-        xData = data.tbl.(xName);
-        yData = data.tbl.(yName);
-
-        inPoints  = inpolygon(xData, yData, roi.Position(:,1), roi.Position(:,2));
+        xData = data.tbl.(data.ddX.Value);
+        yData = data.tbl.(data.ddY.Value);
+        inPoints = inpolygon(xData, yData, roi.Position(:,1), roi.Position(:,2));
         nSelected = sum(inPoints);
-
         if nSelected == 0
-            msgbox('No points selected.', 'Selection');
-            delete(roi);
-            return;
+            tblgui.notify(hContainer, 'No points selected.', 'info');
+            delete(roi); return;
         end
-
         if isSinglePoint && ~isempty(data.selCbk)
             data.selCbk(inPoints);
         end
-
         assignGroup(src, data, inPoints, nSelected);
         delete(roi);
     end
 
     function processSelectionIdx(src, data, idx)
-        inPoints      = false(height(data.tbl), 1);
+        inPoints = false(height(data.tbl), 1);
         inPoints(idx) = true;
-
-        if ~isempty(data.selCbk)
-            data.selCbk(inPoints);
-        end
-
+        if ~isempty(data.selCbk), data.selCbk(inPoints); end
         assignGroup(src, data, inPoints, 1);
     end
 
-    function assignGroup(src, data, inPoints, nSelected)
-        % Opens a dialog to assign selected points to a group.
-        idxGrp   = get(data.ddGrp, 'Value');
-        grpItems = get(data.ddGrp, 'String');
-        grpName  = grpItems{idxGrp};
-
+    function assignGroup(~, data, inPoints, nSelected)
+        grpName = data.ddGrp.Value;
+        if strcmp(grpName, 'None'), return; end
         currentGrpCol = data.tbl.(grpName);
 
         if iscategorical(currentGrpCol)
@@ -1053,134 +591,91 @@ onUpdatePlot(hContainer, []);
             cats = cellstr(unique(string(currentGrpCol)));
         end
 
-        % Size the list box to its content. The default listdlg size is a
-        % tall, mostly-empty box in which the few options are easy to miss.
-        listH = min(320, max(60, 22 * numel(cats) + 24));
-        [indx, tf] = listdlg('PromptString', sprintf('Assign %d points to:', nSelected), ...
-            'Name', 'Assign Group', ...
-            'SelectionMode', 'single', ...
-            'ListSize', [220, listH], ...
-            'ListString', cellstr(cats));
+        selectedCat = tblgui.chooseDialog(hContainer, ...
+            sprintf('Assign %d points to:', nSelected), cats);
+        if isempty(selectedCat), return; end
 
-        if tf
-            selectedCat = cats{indx};
-
-            % Update Table
-            if iscategorical(currentGrpCol)
-                data.tbl.(grpName)(inPoints) = selectedCat;
-            elseif islogical(currentGrpCol)
-                val = strcmpi(selectedCat, 'true');
-                data.tbl.(grpName)(inPoints) = val;
-            else
-                data.tbl.(grpName)(inPoints) = selectedCat;
-            end
-
-            hContainer.UserData = data;
-            onUpdatePlot(src, []);
-            fprintf('Updated %d points.\n', nSelected);
+        if iscategorical(currentGrpCol)
+            data.tbl.(grpName)(inPoints) = selectedCat;
+        elseif islogical(currentGrpCol)
+            data.tbl.(grpName)(inPoints) = strcmpi(selectedCat, 'true');
+        else
+            data.tbl.(grpName)(inPoints) = selectedCat;
         end
+
+        hContainer.UserData = data;
+        onUpdatePlot(hContainer, []);
+        fprintf('Updated %d points.\n', nSelected);
     end
 
     function onSaveTable(~, ~)
         data = hContainer.UserData;
         assignin('base', 'fetTbl_mod', data.tbl);
-        msgbox('Table saved to workspace as "fetTbl_mod".', 'Saved');
+        tblgui.notify(hContainer, 'Table saved to workspace as "fetTbl_mod".', 'success');
+    end
+
+%% ========================================================================
+%  EXTERNAL SETTERS (host coordination)
+%  ========================================================================
+
+    function highlightPoints(indices)
+        data = hContainer.UserData;
+        if isnumeric(indices)
+            tmp = false(height(data.tbl), 1); tmp(indices) = true; indices = tmp;
+        end
+        if ~isempty(data.hHighlight), delete(data.hHighlight(isgraphics(data.hHighlight))); end
+        data.hHighlight = [];
+        if any(indices)
+            xData = data.tbl.(data.ddX.Value);
+            yData = data.tbl.(data.ddY.Value);
+            data.hHighlight = plot(data.hAxScatter, xData(indices), yData(indices), ...
+                'o', 'MarkerSize', 12, 'LineWidth', 2, 'Color', [1 0 1], ...
+                'HandleVisibility', 'off', 'HitTest', 'off', 'PickableParts', 'none');
+        end
+        hContainer.UserData = data;
     end
 
     function setGroupVar(varName, activeCats)
-        % External setter for group variable and filters
         data = hContainer.UserData;
-        grpItems = get(data.ddGrp, 'String');
-        idx = find(strcmp(grpItems, varName));
-
+        if ~ismember(varName, data.ddGrp.Items), return; end
         needsUpdate = false;
-
-        % 1. Change Variable
-        if ~isempty(idx) && idx ~= get(data.ddGrp, 'Value')
-            set(data.ddGrp, 'Value', idx);
+        if ~strcmp(data.ddGrp.Value, varName)
+            data.ddGrp.Value = varName;
             populateCheckboxes(data);
-            data = hContainer.UserData; % Reload
+            data = hContainer.UserData;
             needsUpdate = true;
         end
-
-        % 2. Apply Filters
-        if exist('activeCats', 'var') && ~isempty(data.chkGrp)
-            for i = 1:length(data.chkGrp)
-                catStr = get(data.chkGrp(i), 'String');
-                val    = ismember(catStr, activeCats);
-                if get(data.chkGrp(i), 'Value') ~= val
-                    set(data.chkGrp(i), 'Value', val);
+        if nargin > 1 && ~isempty(data.chkGrp)
+            for i = 1:numel(data.chkGrp)
+                val = ismember(data.chkGrp(i).Text, activeCats);
+                if data.chkGrp(i).Value ~= val
+                    data.chkGrp(i).Value = val;
                     needsUpdate = true;
                 end
             end
         end
-
-        if needsUpdate
-            onUpdatePlot(hContainer, []);
-        end
+        if needsUpdate, onUpdatePlot(hContainer, []); end
     end
 
     function setXYVars(xName, yName)
-        % External setter for X and Y variables
         data = hContainer.UserData;
-
-        idxX = find(strcmp(data.numericVars, xName));
-        idxY = find(strcmp(data.numericVars, yName));
-
-        if isempty(idxX) || isempty(idxY)
-            warning('Variables %s or %s not found in numericVars.', xName, yName);
-            return;
-        end
-
-        currX = get(data.ddX, 'Value');
-        currY = get(data.ddY, 'Value');
         needsUpdate = false;
-
-        if idxX ~= currX
-            set(data.ddX, 'Value', idxX);
-            needsUpdate = true;
+        if ismember(xName, data.ddX.Items) && ~strcmp(data.ddX.Value, xName)
+            data.ddX.Value = xName; needsUpdate = true;
         end
-        if idxY ~= currY
-            set(data.ddY, 'Value', idxY);
-            needsUpdate = true;
+        if ismember(yName, data.ddY.Items) && ~strcmp(data.ddY.Value, yName)
+            data.ddY.Value = yName; needsUpdate = true;
         end
-
-        if needsUpdate
-            onUpdatePlot(hContainer, []);
-        end
+        if needsUpdate, onUpdatePlot(hContainer, []); end
     end
 
-    function highlightPoints(indices)
-        % External function to highlight points with a halo
-        data = hContainer.UserData;
+end
 
-        if isfield(data, 'hHighlight') && ~isempty(data.hHighlight)
-            delete(data.hHighlight);
-        end
-        data.hHighlight = [];
-
-        idxX  = get(data.ddX, 'Value');
-        idxY  = get(data.ddY, 'Value');
-        xName = data.numericVars{idxX};
-        yName = data.numericVars{idxY};
-
-        xData = data.tbl.(xName);
-        yData = data.tbl.(yName);
-
-        selX = xData(indices);
-        selY = yData(indices);
-
-        if isempty(selX), return; end
-
-        hold(data.hAxScatter, 'on');
-        data.hAxHighlight = plot(data.hAxScatter, selX, selY, 'o', ...
-            'Color', 'r', 'LineWidth', 2, 'MarkerSize', 10, ...
-            'PickableParts', 'none', 'HitTest', 'off', ...
-            'DisplayName', 'Selected');
-        hold(data.hAxScatter, 'off');
-
-        data.hHighlight = data.hAxHighlight; % Fix naming
-        hContainer.UserData = data;
-    end
-
+function out = mapChoice(in, pairs, default)
+% Map an input choice (case-insensitive) to a dropdown item; '' -> default.
+out = default;
+if isempty(in), return; end
+for i = 1:size(pairs, 1)
+    if strcmpi(in, pairs{i, 1}), out = pairs{i, 2}; return; end
+end
 end

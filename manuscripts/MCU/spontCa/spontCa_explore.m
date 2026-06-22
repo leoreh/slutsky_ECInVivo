@@ -22,30 +22,17 @@ function hFig = spontCa_explore(tblEvent, tblCell, fs, varargin)
 %       P2 X-Metric  : Cyto-axis metric on Panel 2
 %       P2 Y-Metric  : Mito-axis metric on Panel 2
 %
-%   Pair filter:
-%       Event level. Filters tblEvent by the upstream `paired` boolean
-%       set by spontCa2_metrics. 'paired' keeps paired==true,
-%       'unpaired' keeps paired==false, 'all' keeps everything.
-%       Cell level. Re-aggregates per-cell metrics from the filtered
-%       event set by calling spontCa2_metrics(mode='cellOnly'). Results
-%       cached per mode for the lifetime of the figure. Cell pairs
-%       themselves are not filtered; only the per-cell aggregates shift.
+%   Built on the shared graphics/+tblgui layer (uifigure); embeds
+%   tblGUI_scatHist into the two panels.
 %
 %   INPUTS
 %       tblEvent - (table) event-level table from spontCa2_metrics. Must
 %                  carry `paired` and `pairIdx`.
 %       tblCell  - (table) cell-level aggregate from spontCa2_metrics.
-%       fs       - (scalar Hz) sampling rate. Used for cell-level
-%                  re-aggregation on pair-filter change.
+%       fs       - (scalar Hz) sampling rate.
 %
 %   OPTIONAL KEY-VALUE PAIRS
-%       'level'       - 'event' (default) | 'cell'
-%       'compartment' - 'cyto'  (default) | 'mito'
-%       'pairFilter'  - 'all'   (default) | 'paired' | 'unpaired'
-%       'xMetric'     - initial Panel-2 X metric. Default 'amp'.
-%       'yMetric'     - initial Panel-2 Y metric. Default 'amp'.
-%       'clr'         - 2x3 RGB for genotype groups.
-%       'figPos'      - [x y w h] figure position.
+%       'level'/'compartment'/'pairFilter'/'xMetric'/'yMetric'/'clr'/'figPos'.
 %
 %   See also TBLGUI_SCATHIST, MCU_SPONTCA, SPONTCA2_METRICS.
 
@@ -82,22 +69,23 @@ end
 %  FIGURE
 %  ========================================================================
 
-hFig = figure('Name', 'spontCa explore', 'NumberTitle', 'off', ...
-    'Color', 'w', 'Position', p.Results.figPos, 'MenuBar', 'none', ...
-    'ToolBar', 'figure');
+hFig = uifigure('Name', 'spontCa explore', 'Position', p.Results.figPos);
 
-ctrlH = 0.06;
-hPnlCtrl = uipanel('Parent', hFig, 'BorderType', 'none', ...
-    'Units', 'normalized', 'Position', [0, 1 - ctrlH, 1, ctrlH], ...
-    'BackgroundColor', get(hFig, 'Color'));
+gMain = uigridlayout(hFig, [2, 1], 'RowHeight', {38, '1x'}, ...
+    'Padding', [4 4 4 4], 'RowSpacing', 4);
 
-gap = 0.005;
-hPnlLeft  = uipanel('Parent', hFig, 'BorderType', 'none', ...
-    'Units', 'normalized', 'Position', [0, 0, 0.5 - gap, 1 - ctrlH], ...
-    'BackgroundColor', get(hFig, 'Color'));
-hPnlRight = uipanel('Parent', hFig, 'BorderType', 'none', ...
-    'Units', 'normalized', 'Position', [0.5 + gap, 0, 0.5 - gap, 1 - ctrlH], ...
-    'BackgroundColor', get(hFig, 'Color'));
+gCtrl = uigridlayout(gMain, [1, 11], ...
+    'ColumnWidth', {40, 75, 95, 70, 35, 85, 45, 95, 45, 95, '1x'}, ...
+    'Padding', [2 2 2 2], 'ColumnSpacing', 4);
+gCtrl.Layout.Row = 1;
+
+gPanels = uigridlayout(gMain, [1, 2], 'ColumnWidth', {'1x', '1x'}, ...
+    'Padding', [0 0 0 0], 'ColumnSpacing', 6);
+gPanels.Layout.Row = 2;
+hPnlLeft  = uipanel(gPanels, 'BorderType', 'none');
+hPnlLeft.Layout.Column = 1;
+hPnlRight = uipanel(gPanels, 'BorderType', 'none');
+hPnlRight.Layout.Column = 2;
 
 
 %% ========================================================================
@@ -111,74 +99,33 @@ state.fs           = fs;
 state.clr          = clr;
 state.hPnlLeft     = hPnlLeft;
 state.hPnlRight    = hPnlRight;
-state.levelOpts    = {'event', 'cell'};
-state.compOpts     = {'cyto',  'mito'};
-state.pairOpts     = {'all',   'paired', 'unpaired'};
 state.cellTblCache = struct('all', tblCell, 'paired', [], 'unpaired', []);
 
-yRow = 0.25; rowH = 0.5;
+% ItemsData carry the lowercase option keys, so dropdown .Value reads return
+% them directly (no index bookkeeping).
+uilabel(gCtrl, 'Text', 'Level:', 'FontWeight', 'bold', 'HorizontalAlignment', 'right');
+state.ddLevel = uidropdown(gCtrl, 'Items', {'Event', 'Cell'}, ...
+    'ItemsData', {'event', 'cell'}, 'ValueChangedFcn', @(~, ~) onLevelChange(hFig));
 
-% Level
-uicontrol('Parent', hPnlCtrl, 'Style', 'text', 'String', 'Level:', ...
-    'Units', 'normalized', 'Position', [0.01, yRow, 0.04, rowH], ...
-    'HorizontalAlignment', 'right', 'FontWeight', 'bold', ...
-    'BackgroundColor', get(hFig, 'Color'));
-state.ddLevel = uicontrol('Parent', hPnlCtrl, 'Style', 'popupmenu', ...
-    'String', {'Event', 'Cell'}, 'Units', 'normalized', ...
-    'Position', [0.06, yRow, 0.06, rowH], ...
-    'Callback', @(s, e) onLevelChange(hFig));
+uilabel(gCtrl, 'Text', 'Compartment:', 'FontWeight', 'bold', 'HorizontalAlignment', 'right');
+state.ddComp = uidropdown(gCtrl, 'Items', {'Cyto', 'Mito'}, ...
+    'ItemsData', {'cyto', 'mito'}, 'ValueChangedFcn', @(~, ~) onCompChange(hFig));
 
-% Compartment
-uicontrol('Parent', hPnlCtrl, 'Style', 'text', 'String', 'Compartment:', ...
-    'Units', 'normalized', 'Position', [0.13, yRow, 0.07, rowH], ...
-    'HorizontalAlignment', 'right', 'FontWeight', 'bold', ...
-    'BackgroundColor', get(hFig, 'Color'));
-state.ddComp = uicontrol('Parent', hPnlCtrl, 'Style', 'popupmenu', ...
-    'String', {'Cyto', 'Mito'}, 'Units', 'normalized', ...
-    'Position', [0.21, yRow, 0.06, rowH], ...
-    'Callback', @(s, e) onCompChange(hFig));
+uilabel(gCtrl, 'Text', 'Pair:', 'FontWeight', 'bold', 'HorizontalAlignment', 'right');
+state.ddPair = uidropdown(gCtrl, 'Items', {'All', 'Paired', 'Unpaired'}, ...
+    'ItemsData', {'all', 'paired', 'unpaired'}, 'ValueChangedFcn', @(~, ~) onPairChange(hFig));
 
-% Pair filter
-uicontrol('Parent', hPnlCtrl, 'Style', 'text', 'String', 'Pair:', ...
-    'Units', 'normalized', 'Position', [0.28, yRow, 0.04, rowH], ...
-    'HorizontalAlignment', 'right', 'FontWeight', 'bold', ...
-    'BackgroundColor', get(hFig, 'Color'));
-state.ddPair = uicontrol('Parent', hPnlCtrl, 'Style', 'popupmenu', ...
-    'String', {'All', 'Paired', 'Unpaired'}, 'Units', 'normalized', ...
-    'Position', [0.33, yRow, 0.07, rowH], ...
-    'Callback', @(s, e) onPairChange(hFig));
+uilabel(gCtrl, 'Text', 'P2 X:', 'FontWeight', 'bold', 'HorizontalAlignment', 'right');
+state.ddXMetric = uidropdown(gCtrl, 'Items', {' '}, 'ValueChangedFcn', @(~, ~) onMetricChange(hFig));
 
-% Panel 2 X-metric
-uicontrol('Parent', hPnlCtrl, 'Style', 'text', 'String', 'P2 X:', ...
-    'Units', 'normalized', 'Position', [0.41, yRow, 0.04, rowH], ...
-    'HorizontalAlignment', 'right', 'FontWeight', 'bold', ...
-    'BackgroundColor', get(hFig, 'Color'), ...
-    'TooltipString', 'Cyto-axis metric on Panel 2');
-state.ddXMetric = uicontrol('Parent', hPnlCtrl, 'Style', 'popupmenu', ...
-    'String', {' '}, 'Units', 'normalized', ...
-    'Position', [0.46, yRow, 0.09, rowH], ...
-    'Callback', @(s, e) onMetricChange(hFig));
+uilabel(gCtrl, 'Text', 'P2 Y:', 'FontWeight', 'bold', 'HorizontalAlignment', 'right');
+state.ddYMetric = uidropdown(gCtrl, 'Items', {' '}, 'ValueChangedFcn', @(~, ~) onMetricChange(hFig));
 
-% Panel 2 Y-metric
-uicontrol('Parent', hPnlCtrl, 'Style', 'text', 'String', 'P2 Y:', ...
-    'Units', 'normalized', 'Position', [0.56, yRow, 0.04, rowH], ...
-    'HorizontalAlignment', 'right', 'FontWeight', 'bold', ...
-    'BackgroundColor', get(hFig, 'Color'), ...
-    'TooltipString', 'Mito-axis metric on Panel 2');
-state.ddYMetric = uicontrol('Parent', hPnlCtrl, 'Style', 'popupmenu', ...
-    'String', {' '}, 'Units', 'normalized', ...
-    'Position', [0.61, yRow, 0.09, rowH], ...
-    'Callback', @(s, e) onMetricChange(hFig));
+state.hStatus = uilabel(gCtrl, 'Text', '', 'FontWeight', 'bold');
 
-% Status
-state.hStatus = uicontrol('Parent', hPnlCtrl, 'Style', 'text', 'String', '', ...
-    'Units', 'normalized', 'Position', [0.71, yRow, 0.28, rowH], ...
-    'HorizontalAlignment', 'left', 'FontWeight', 'bold', ...
-    'BackgroundColor', get(hFig, 'Color'));
-
-set(state.ddLevel, 'Value', find(strcmpi(p.Results.level,       state.levelOpts)));
-set(state.ddComp,  'Value', find(strcmpi(p.Results.compartment, state.compOpts)));
-set(state.ddPair,  'Value', find(strcmpi(p.Results.pairFilter,  state.pairOpts)));
+state.ddLevel.Value = lower(p.Results.level);
+state.ddComp.Value  = lower(p.Results.compartment);
+state.ddPair.Value  = lower(p.Results.pairFilter);
 
 state.pendingX = char(p.Results.xMetric);
 state.pendingY = char(p.Results.yMetric);
@@ -218,14 +165,14 @@ function refreshPanels(hFig, which)
 % which: 'all' | 'panel1' | 'panel2'
 
     state    = hFig.UserData;
-    level    = state.levelOpts{get(state.ddLevel, 'Value')};
-    comp     = state.compOpts {get(state.ddComp,  'Value')};
-    pairMode = state.pairOpts {get(state.ddPair,  'Value')};
+    level    = state.ddLevel.Value;
+    comp     = state.ddComp.Value;
+    pairMode = state.ddPair.Value;
 
-    % Resolve current source tables. Panel 1 uses the filter-aware
-    % source. Panel 2 at event level always uses the full tblEvent so
-    % pairIdx values (absolute row indices) resolve correctly; at cell
-    % level it uses the filter-aware cell table.
+    % Resolve current source tables. Panel 1 uses the filter-aware source.
+    % Panel 2 at event level always uses the full tblEvent so pairIdx values
+    % (absolute row indices) resolve correctly; at cell level it uses the
+    % filter-aware cell table.
     if strcmpi(level, 'event')
         srcEvent = applyPairFilter(state.tblEvent, pairMode);
         srcCell  = [];
@@ -235,7 +182,6 @@ function refreshPanels(hFig, which)
         state    = hFig.UserData;   % refresh after possible cache write
     end
 
-    % Refresh metric option lists on full rebuilds.
     if strcmpi(which, 'all')
         if strcmpi(level, 'event')
             populateMetricLists(hFig, state.tblEvent);
@@ -294,30 +240,29 @@ function refreshPanels(hFig, which)
         n2 = height(state.hPnlRight.UserData.tbl);
     end
 
-    set(state.hStatus, 'String', sprintf( ...
+    state.hStatus.Text = sprintf( ...
         'Level: %s | Comp: %s | Pair: %s | P2: cyto.%s vs mito.%s | n1=%d  n2=%d', ...
-        level, comp, pairMode, xMetric, yMetric, n1, n2));
+        level, comp, pairMode, xMetric, yMetric, n1, n2);
 
     hFig.UserData = state;
 end
 
 
 function populateMetricLists(hFig, src)
-% Both X-metric and Y-metric dropdowns share the same numeric-metric
-% list. Preserves the current selection if still available, else falls
-% back to pendingX / pendingY (used on first render), 'amp', or first.
+% Both X-metric and Y-metric dropdowns share the same numeric-metric list.
+% Preserves the current selection if still available, else pendingX/pendingY
+% (first render), 'amp', or first.
     state   = hFig.UserData;
     metrics = listMetrics(src);
 
     for ddField = {'ddXMetric', 'ddYMetric'}
         dd = state.(ddField{1});
-        items = get(dd, 'String');
         current = '';
-        if iscell(items) && ~isempty(items) && get(dd, 'Value') <= numel(items)
-            current = items{get(dd, 'Value')};
+        if iscell(dd.Items) && ~isempty(dd.Items)
+            current = dd.Value;
         end
-        if strcmpi(ddField{1}, 'ddXMetric'),  pending = state.pendingX;
-        else,                                   pending = state.pendingY;
+        if strcmpi(ddField{1}, 'ddXMetric'), pending = state.pendingX;
+        else,                                pending = state.pendingY;
         end
 
         if ismember(current, metrics)
@@ -329,7 +274,8 @@ function populateMetricLists(hFig, src)
         else
             pick = metrics{1};
         end
-        set(dd, 'String', metrics, 'Value', find(strcmp(metrics, pick), 1));
+        dd.Items = metrics;
+        dd.Value = pick;
     end
 
     state.pendingX = '';
@@ -344,8 +290,8 @@ end
 
 function snap = readPanelState(hPanel)
 % Snap the embedded widget's current selections (X/Y/group/scales/fit).
-% xs/ys default to 'log' before the first render so initial display
-% uses log scales; once the widget exists, the user's choice is carried.
+% xs/ys default to 'log' before the first render so initial display uses log
+% scales; once the widget exists, the user's choice is carried.
     snap = struct('x', '', 'y', '', 'g', '', 'xs', 'log', 'ys', 'log', 'ft', '');
     if ~isgraphics(hPanel), return; end
     d = hPanel.UserData;
@@ -353,15 +299,13 @@ function snap = readPanelState(hPanel)
         return;
     end
     try
-        snap.x = d.numericVars{get(d.ddX, 'Value')};
-        snap.y = d.numericVars{get(d.ddY, 'Value')};
-        items  = get(d.ddGrp, 'String');
-        snap.g = items{get(d.ddGrp, 'Value')};
+        snap.x  = d.ddX.Value;
+        snap.y  = d.ddY.Value;
+        snap.g  = d.ddGrp.Value;
         if strcmp(snap.g, 'None'), snap.g = ''; end
-
-        xs = get(d.ddXScale, 'String'); snap.xs = xs{get(d.ddXScale, 'Value')};
-        ys = get(d.ddYScale, 'String'); snap.ys = ys{get(d.ddYScale, 'Value')};
-        ft = get(d.ddFit,    'String'); snap.ft = ft{get(d.ddFit,    'Value')};
+        snap.xs = d.ddXScale.Value;
+        snap.ys = d.ddYScale.Value;
+        snap.ft = d.ddFit.Value;
     catch
         snap = struct('x', '', 'y', '', 'g', '', 'xs', 'log', 'ys', 'log', 'ft', '');
     end
@@ -392,8 +336,8 @@ function v = pickOne(carried, fallback, allowed)
 end
 
 function defXY = pickDefaultsPanel1(~)
-% Non-pair defaults so unpaired events (NaN pairAmp / pairFlux under
-% mutual NN) still appear in the scatter.
+% Non-pair defaults so unpaired events (NaN pairAmp / pairFlux under mutual
+% NN) still appear in the scatter.
     defXY = struct('x', 'amp', 'y', 'flux');
 end
 
@@ -403,12 +347,10 @@ function excl = idColsToHide()
 end
 
 function m = pickMetric(dd)
-    items = get(dd, 'String');
-    val   = get(dd, 'Value');
-    if iscell(items) && val >= 1 && val <= numel(items)
-        m = items{val};
-    else
+    if isempty(dd.Items) || (numel(dd.Items) == 1 && strcmp(dd.Items{1}, ' '))
         m = '';
+    else
+        m = dd.Value;
     end
 end
 
@@ -429,10 +371,7 @@ function evt = applyPairFilter(tblEvent, mode)
 end
 
 function tbl = getCellTbl(hFig, mode)
-% Lazy cache of cell-level aggregates per pair-filter mode. 'all' is
-% seeded at init from the input tblCell. 'paired' and 'unpaired' are
-% computed on first access via spontCa2_metrics(mode='cellOnly') on the
-% filtered event set.
+% Lazy cache of cell-level aggregates per pair-filter mode.
     state = hFig.UserData;
     if isfield(state.cellTblCache, mode) && ~isempty(state.cellTblCache.(mode))
         tbl = state.cellTblCache.(mode);
@@ -451,8 +390,6 @@ end
 %  ========================================================================
 
 function metrics = listMetrics(src)
-% Numeric columns on src minus identifiers and the trace blob. Both
-% Panel-2 X and Y dropdowns populate from this list.
     cols  = src.Properties.VariableNames;
     isNum = varfun(@isnumeric, src, 'OutputFormat', 'uniform');
     skip  = [idColsToHide(), {'compartment'}];
@@ -461,8 +398,6 @@ function metrics = listMetrics(src)
 end
 
 function tbl1 = prepPanel1(srcEvent, srcCell, level, comp)
-% Filter source table to the requested compartment. At event level the
-% source is already pair-filtered upstream in refreshPanels.
     if strcmpi(level, 'event')
         src = srcEvent;
     else
@@ -479,15 +414,6 @@ end
 function tbl2 = prepPanel2(fullEvent, srcCell, level, xMetric, yMetric)
 % Wide layout for cross-compartment scatter. X = Cyto.<xMetric>,
 % Y = Mito.<yMetric>.
-%
-% Event level: pass the FULL event table (state.tblEvent), not the
-% pair-filtered subset. pairIdx values are absolute row indices into
-% the original tblEvent and would not resolve against a subset. Panel
-% 2 at event level is the paired-events view by construction.
-%
-% Cell level: srcCell is the (filter-aware) cell table; cyto and mito
-% rows are joined by sbjID.
-
     if strcmpi(level, 'event')
         focal      = find(fullEvent.compartment == 'Cyto' & fullEvent.paired);
         partnerIdx = fullEvent.pairIdx(focal);
