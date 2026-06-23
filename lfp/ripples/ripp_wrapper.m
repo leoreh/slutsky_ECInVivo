@@ -15,7 +15,7 @@ function ripp = ripp_wrapper(varargin)
 %       7.  Spiking: Analyzes SU/MU modulation and generates PETHs (ripp_spks, ripp_spkPeth).
 %       8.  Phasing: Calculates Spike-LFP coupling (spklfp_phase).
 %       9.  Quality Assurance: Filters events based on spiking gain (optional).
-%       10. Visualization: Runs the interactive GUI (ripp_gui) and saves plots.
+%       10. Visualization: Runs the curation GUI (gui_curate, preset 'Ripples').
 %
 %   INPUTS:
 %       varargin - Parameter/Value pairs:
@@ -55,7 +55,7 @@ function ripp = ripp_wrapper(varargin)
 %
 %   DEPENDENCIES:
 %       ripp_sigPrep, ripp_times, ripp_params, ripp_maps, ripp_states,
-%       ripp_spks, ripp_spkPeth, ripp_plotSpks, spklfp_phase, ripp_gui.
+%       ripp_spks, ripp_spkPeth, ripp_plotSpks, spklfp_phase, gui_curate.
 %
 %   HISTORY:
 %       Updated: 23 Jan 2026
@@ -424,6 +424,17 @@ if flgPlot
 
 end
 
+% Curation GUI (replaces the inline ripp_gui viewer). File-based: loads
+% <basename>.ripp.mat (the Ripples preset) and recomputes the display signals.
+if flgPlot
+    if isfile(files.ripp)
+        if verbose, fprintf('[RIPP]: Launching curation GUI...\n'); end
+        gui_curate(basepath, 'preset', 'Ripples');
+    elseif verbose
+        fprintf('[RIPP]: No %s on disk; set flgSave=true to curate.\n', [basename, '.ripp.mat']);
+    end
+end
+
 if verbose, fprintf('[RIPP]: Pipeline Completed for %s.\n', basename); end
 
 
@@ -596,11 +607,8 @@ end
 
 % GUI
 % -------------------------------------------------------------------------
-if flgPlot
-    if verbose, fprintf('[RIPP]: Launching Detection GUI...\n'); end
-    ripp_gui(ripp.times, ripp.peakTime, rippSig, muTimes, fs, thr, emg, ...
-        'basepath', basepath);
-end
+% Curation moved post-save to gui_curate (launched at the end of the
+% pipeline); the old inline ripp_gui viewer is retired.
 
 % Neuroscope Saving
 % -------------------------------------------------------------------------

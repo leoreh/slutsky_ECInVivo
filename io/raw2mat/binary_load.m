@@ -175,10 +175,11 @@ nChunks = size(chunks, 1);
 if nChunks == 1
     chunkSamples = chunks(1, 2) - chunks(1, 1) + 1;
     data = LoadChunk(f, nCh, ch, chunkSamples, precision, skipSamples);
-    
+
     % Apply bit2uv conversion
-    data = double(data) * bit2uv; 
-else 
+    data = double(data) * bit2uv;
+    samplesCnt = size(data, 1);     % define for the post-read assertion below
+else
     
     % Preallocate data matrix with the file's precision.
     data = zeros(nSamples, numel(ch), precision);

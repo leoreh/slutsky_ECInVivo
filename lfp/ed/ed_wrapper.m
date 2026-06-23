@@ -11,7 +11,7 @@ function ed = ed_wrapper(varargin)
 %          (ed_reject_emg), label state (ed_states).
 %       3. Seed acceptance from quality masks (idxQA); never delete events.
 %       4. Convert times to absolute, optionally save <basename>.ed.mat.
-%       5. Optionally launch the curation GUI (ed_gui).
+%       5. Optionally launch the curation GUI (gui_curate, preset 'EDs').
 %       If <basename>.ed.mat already exists and flgForce is false, detection
 %       is skipped and the stored result is loaded straight into the GUI
 %       (the cheap re-curate path).
@@ -49,7 +49,7 @@ function ed = ed_wrapper(varargin)
 %
 %   DEPENDENCIES:
 %       basepaths2vars, ed_sigLoad, ed_detect, ed_params, ed_reject_emg,
-%       ed_states, ed_rate, ed_gui.
+%       ed_states, ed_rate, gui_curate.
 %
 %   HISTORY:
 %       Created: 22 Jun 2026
@@ -207,8 +207,12 @@ end
 %  ========================================================================
 
 if flgPlot
-    if verbose, fprintf('[ED]: Launching curation GUI (%d events)\n', numel(ed.pos)); end
-    ed_gui(basepath, ed, sSig, 'specAdapter', specAdapter, 'basename', basename);
+    if isfile(edFile)
+        if verbose, fprintf('[ED]: Launching curation GUI (%d events)\n', numel(ed.pos)); end
+        gui_curate(basepath, 'preset', 'EDs', 'basename', basename);
+    elseif verbose
+        fprintf('[ED]: No %s on disk; set flgSave=true to curate.\n', [basename, '.ed.mat']);
+    end
 end
 
 if verbose, fprintf('[ED]: Done (%s).\n', basename); end

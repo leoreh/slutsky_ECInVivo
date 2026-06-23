@@ -418,11 +418,15 @@ basepath = basepaths{1};
 % Signals (loaded once; sSig/specAdapter are full-session for the GUI)
 [sig, emg, emgRms, fs, specAdapter, sSig] = ed_sigLoad(basepath);
 
-ed = ed_wrapper('basepath', basepath, 'flgSave', false);
+ed = ed_wrapper('basepath', basepath, 'flgSave', true, 'flgPlot', false);  % save ed.mat for the EDs preset; suppress its auto-GUI
 
 tic
-ed_gui(basepath, ed, sSig, 'specAdapter', specAdapter);
+gui_curate(basepath, 'preset', 'EDs');
 toc
+
+
+gui_curate(basepath, 'preset', 'Ripples');
+
 
 tic
 AccuSleep_viewer(sSig, [], [])

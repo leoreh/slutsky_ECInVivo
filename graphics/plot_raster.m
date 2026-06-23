@@ -21,6 +21,7 @@ function [hAx, hPlt] = plot_raster(spktimes, varargin)
 %                     'spkDur'       : (num) Duration of spike line (s) {0.001}
 %                     'xLim'         : (vec) [min max] x-axis limits
 %                     'flgLbls'      : (log) Add labels {true}
+%                     'tickDir'      : (char) 'in'|'out'|'none' {'out'}
 %
 %   OUTPUTS:
 %       hAx         - (axes) Handle to the axes.
@@ -42,6 +43,7 @@ addParameter(p, 'spkDur', 0.001, @isnumeric);
 addParameter(p, 'lineHeight', 1, @isnumeric);
 addParameter(p, 'xLim', [], @isnumeric);
 addParameter(p, 'flgLbls', true, @islogical);
+addParameter(p, 'tickDir', 'out', @(x) any(validatestring(x, {'in', 'out', 'none'})));
 
 parse(p, spktimes, varargin{:});
 hAx         = p.Results.hAx;
@@ -53,6 +55,7 @@ markerSz    = p.Results.markerSz;
 spkDur      = p.Results.spkDur;
 xLim        = p.Results.xLim;
 flgLbls     = p.Results.flgLbls;
+tickDir     = p.Results.tickDir;
 
 
 %% ========================================================================
@@ -191,7 +194,7 @@ end
 %  ========================================================================
 
 set(hAx, 'YDir', 'normal');
-set(hAx, 'TickDir', 'out');
+set(hAx, 'TickDir', tickDir);
 
 if ~isempty(xLim)
     xlim(hAx, xLim);

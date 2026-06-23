@@ -77,8 +77,10 @@ h.refresh = @(idx, total, accepted, statusText) refreshPanel(h, idx, total, acce
 end     % MAIN
 
 % ------------------------------------------------------------------------
-function refreshPanel(h, idx, total, accepted, statusText)
-% sync the index field, total, accept/reject color cue, and status line
+function refreshPanel(h, idx, total, accepted, statusText) %#ok<INUSD>
+% sync the index field + total. The accept/reject state is shown in the plot
+% panels themselves, so no status prefix is added here; statusText is shown as
+% given (the host may pass '' for none).
 if ~isvalid(h.idx), return; end
 total = max(0, round(total));
 h.idx.Limits = [1, max(1, total)];
@@ -87,16 +89,8 @@ if total > 0
 end
 h.total.Text = sprintf('/ %d', total);
 if nargin < 5 || isempty(statusText), statusText = ''; end
-if total == 0
-    h.status.Text = statusText;
-    h.status.FontColor = [0.3 0.3 0.3];
-elseif accepted
-    h.status.Text = sprintf('[ACCEPTED]   %s', statusText);
-    h.status.FontColor = h.clrAccept;
-else
-    h.status.Text = sprintf('[REJECTED]   %s', statusText);
-    h.status.FontColor = h.clrReject;
-end
+h.status.Text = statusText;
+h.status.FontColor = [0.3 0.3 0.3];
 end
 
 % ------------------------------------------------------------------------
