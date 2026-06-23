@@ -453,3 +453,5 @@ tblBrst.genotype = reordercats(tblBrst.genotype, ...
 
 % Compare (switch yVar in the GUI for frBurst, br, bSize, etc.)
 tblGUI_bar(tblBrst, 'yVar', 'pBurst', 'xVar', 'genotype', 'grpVar', 'unitType');
+
+

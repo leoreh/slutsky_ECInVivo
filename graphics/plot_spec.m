@@ -27,7 +27,7 @@ p = inputParser;
 addParameter(p, 'basepath', pwd, @ischar)
 addParameter(p, 'ch', 1, @isnumeric)
 addParameter(p, 'logfreq', false, @islogical)
-addParameter(p, 'saveFig', true, @islogical)
+addParameter(p, 'saveFig', true, @(x) islogical(x) || ischar(x))
 addParameter(p, 'xtime', 3600, @isnumeric)
 addParameter(p, 'axh', [])
 
@@ -72,10 +72,18 @@ for ich = 1 : nch
     
     s = spec.s(:, :, ch(ich));
 
-    % take a sample of the spectrogram to initialize the colormap
-    sampleBins = randperm(length(tspec), round(length(tspec) / 5));
+    % take a sample of the spectrogram to initialize the colormap (robust to
+    % short inputs and to degenerate / non-finite ranges)
+    nSamp = min(length(tspec), max(1, round(length(tspec) / 5)));
+    sampleBins = randperm(length(tspec), nSamp);
     specSample = reshape(s(sampleBins, :), 1, []);
     cLimit = prctile(specSample, [2 94]);
+    if numel(cLimit) < 2 || ~all(isfinite(cLimit)) || cLimit(1) >= cLimit(2)
+        cLimit = [min(s(:)), max(s(:))];
+        if ~all(isfinite(cLimit)) || cLimit(1) >= cLimit(2)
+            cLimit = [0 1];
+        end
+    end
     
     imagesc(axh(ich), tspec, freq, s', cLimit);
     colormap(axh(ich), AccuSleep_colormap());
@@ -94,18 +102,19 @@ end
 if length(axh) > 1
     linkaxes(axh, 'x')
 end
-axis tight
+axis(axh, 'tight')
 
-% save
-if saveFig
-    
+% save (only when this function created its own figure; when an axis handle
+% is supplied there is no figure to save and we must not call gca/savefig)
+if saveFig && exist('fh', 'var')
+
     if ischar(saveFig)
         basepath = saveFig;
     end
-    
+
     [~, basename] = fileparts(basepath);
     figpath = fullfile(basepath, 'graphics');
-    mkdir(figpath)
+    if ~exist(figpath, 'dir'), mkdir(figpath); end
     figname = fullfile(figpath, sprintf('%s_spec', basename));
     savefig(fh, figname)
 end

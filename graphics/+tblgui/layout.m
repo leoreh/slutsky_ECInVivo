@@ -36,6 +36,7 @@ gl = uigridlayout(parent, [1, 2], 'ColumnWidth', colW, 'RowHeight', {'1x'}, ...
 % Control column: scrollable controls on top, fixed action area at the bottom.
 gCol = uigridlayout(gl, [2, 1], 'RowHeight', {'1x', 'fit'}, ...
     'Padding', 0, 'RowSpacing', 4);
+gCol.Layout.Row = 1;
 gCol.Layout.Column = cCtrl;
 
 gCtrl = uigridlayout(gCol, [1, 1], 'RowHeight', {'fit'}, 'ColumnWidth', {'1x'}, ...
@@ -47,6 +48,7 @@ gActions = uigridlayout(gCol, [1, 1], 'RowHeight', {'fit'}, 'ColumnWidth', {'1x'
 gActions.Layout.Row = 2;
 
 gPlot = uigridlayout(gl, [1, 1], 'Padding', 0);
+gPlot.Layout.Row = 1;
 gPlot.Layout.Column = cPlot;
 
 end     % EOF

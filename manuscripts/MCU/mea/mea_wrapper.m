@@ -150,7 +150,7 @@ end
 %  ========================================================================
 
 presets = {'time', 'steadyState', 'frNet', 'rcv', 'spktimes'};
-[tbl, xVec, basepaths, v] = mcu_tblMea('presets', presets([1]));
+[tbl, xVec, basepaths, v] = mcu_tblMea('presets', presets([1, 5]));
 
 tblLme = tbl;
 

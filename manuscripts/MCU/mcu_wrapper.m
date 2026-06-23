@@ -402,3 +402,28 @@ tblLme.dim = dim([1 : 9, 11])';
 tblGUI_scatHist(tblLme, 'xVar', 'dim', 'yVar', 'Rcv', 'grpVar', 'genotype');
 
 
+
+
+
+
+
+%% ========================================================================
+%  CAG:MCU-KO - BURSTINESS COMPARISON
+%  ========================================================================
+
+basepaths = unique([mcu_basepaths('wt_bsl'), mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl')]);
+
+basepath = basepaths{1};
+
+% Signals (loaded once; sSig/specAdapter are full-session for the GUI)
+[sig, emg, emgRms, fs, specAdapter, sSig] = ed_sigLoad(basepath);
+
+ed = ed_wrapper('basepath', basepath, 'flgSave', false);
+
+tic
+ed_gui(basepath, ed, sSig, 'specAdapter', specAdapter);
+toc
+
+tic
+AccuSleep_viewer(sSig, [], [])
+toc
