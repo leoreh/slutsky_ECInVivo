@@ -162,9 +162,9 @@ if ischar(eegData) || isempty(eegData)
     end
         
     % load channels and average
-    eegData = binary_load(eegData, 'duration', diff(sigWin),...
+    eegData = double(binary_load(eegData, 'duration', diff(sigWin),...
         'fs', eegFs, 'nCh', eegNchans, 'start', sigWin(1),...
-        'ch', eegCh, 'downsample', 1);
+        'ch', eegCh, 'downsample', 1));
     if size(eegData, 2) > 1
         eegData = mean(eegData, 2);
     end
@@ -182,9 +182,9 @@ if ischar(emgData) || isempty(emgData)
         end
     end
         
-    emgData = binary_load(emgData, 'duration', diff(sigWin),...
+    emgData = double(binary_load(emgData, 'duration', diff(sigWin),...
         'fs', emgFs, 'nCh', emgNchans, 'start', sigWin(1),...
-        'ch', emgCh, 'downsample', 1);        
+        'ch', emgCh, 'downsample', 1));        
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
