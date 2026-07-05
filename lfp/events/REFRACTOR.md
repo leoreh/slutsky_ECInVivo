@@ -37,26 +37,31 @@ peri-event spike maps now live inside the spikes file.
 |--------------------|----------------------|--------------------|-------------------|
 | Events (curation)  | `.ripp.mat`          | `.ed.mat`          | wrapper           |
 | LFP maps           | `.rippMaps.mat`      | `.edMaps.mat`      | `evt_maps`        |
-| Spikes: stats+PETH | `.rippSpks.mat`      | `.edSpks.mat`      | `evt_spkAnalysis` |
+| Spikes: stats+PETH | `.rippSpks.mat`      | `.edSpks.mat`      | `evt_spks`        |
+| Spike raster (3D)  | `.rippSpkMaps.mat`   | (in `.edSpks`)     | `evt_spks`        |
 | Per-bout states    | `.rippStates.mat`    | `.edStates.mat`    | `evt_states`      |
 | Phase coupling     | `.rippSpkLfp.mat`    | —                  | `spklfp_phase`    |
 
-`rippSpks`/`edSpks` carry per-unit scalar stats, the per-unit normalized PETH
-(`.peth` + `.tstamps`), and the 3D maps (`.maps.su`/`.maps.mu`, each `.evt/.ctrl`).
-Per-event population PETHs (RS/FS/MU) are **computed on demand** from the 3D via
-`evt_pethPop` — never precomputed or saved.
+`rippSpks`/`edSpks` carry per-unit scalar stats + the per-unit PETH (`.peth`, 2D
+per-unit average) + `.tstamps`. The 3D raster (`.su`/`.mu`, each `.evt/.ctrl`) is
+split into its own light-vs-heavy file — `rippSpkMaps` for ripples (so the
+manuscript loader stays light); ED still carries it inline in `.edSpks.maps`
+(pending the ED pass). Per-event population PETHs (RS/FS/MU) are **computed on
+demand** from the 3D via `evt_pethPop` — never precomputed or saved.
 
 ## Shared layer (`lfp/events/`)
 
 Event-agnostic; both wrappers call these with modality-specific inputs.
 
 **Spikes.** Each wrapper's spike section is one prep call + one analysis call:
-- `evt_spkPrep(spikes, spktimes, units, win, sigDur, fsSpk)` → window-relative
-  single-unit times, one pooled MUA vector, and unit types (empty when absent).
-- `evt_spkAnalysis(spkTimes, muTimes, evtTimes, ctrlTimes, peakTime, ...)` → one
-  struct: per-unit stats + per-event population metrics (`.events`), 3D PETH maps
-  (`.maps.su/.mu`), and the per-unit normalized PETH (`.peth`/`.tstamps`). It
-  orchestrates `evt_spks` (`winFxd` param) + `evt_spkPeth` + `evt_pethNorm`.
+- `evt_spkPrep(v, win, sigDur, fsSpk)` → window-relative single-unit times, one
+  pooled MUA vector, and unit types (empty when absent; guards the fields of the
+  loader struct `v` internally).
+- `evt_spks(spkTimes, muTimes, evtTimes, ctrlTimes, peakTime, ...)` → one struct:
+  per-unit stats + per-event population metrics (`.events`), 3D raster maps
+  (`.maps.su/.mu`), and the per-unit PETH (`.peth`/`.tstamps`). The spike entry
+  point; orchestrates `evt_spksParams` (per-unit scalar stats, `winFxd` param) +
+  `evt_spkPeth` + `evt_pethNorm`.
 - `evt_pethNorm` (smooth + z-score against control; kernel from the PETH time
   base) and `evt_pethPop` (per-event population PETH from the 3D) are the reused
   reduction helpers. `evt_viewSpks` launches the shared interactive viewers.

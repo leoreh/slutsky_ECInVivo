@@ -54,7 +54,7 @@ function ed = ed_wrapper(varargin)
 %
 %   DEPENDENCIES:
 %       basepaths2vars, ed_sigLoad, ed_detect, ed_params, ed_reject_emg,
-%       evt_spkPrep, evt_states, evt_ctrlTimes, evt_maps, evt_spkAnalysis,
+%       evt_spkPrep, evt_states, evt_ctrlTimes, evt_maps, evt_spks,
 %       evt_plotSpks, evt_viewSpks, evt_rate, gui_curate.
 %
 %   HISTORY:
@@ -151,11 +151,7 @@ fsSpk = fs;
 if ~isempty(session) && isfield(session, 'extracellular') && isfield(session.extracellular, 'sr')
     fsSpk = session.extracellular.sr;
 end
-spikesIn = []; if isfield(v, 'spikes'), spikesIn = v.spikes; end
-spktimesIn = []; if isfield(v, 'spktimes'), spktimesIn = v.spktimes; end
-unitsIn = []; if isfield(v, 'units'), unitsIn = v.units; end
-[spkTimes, muTimes, uType] = evt_spkPrep(spikesIn, spktimesIn, unitsIn, ...
-    win, sigDur, fsSpk);
+[spkTimes, muTimes, uType] = evt_spkPrep(v, win, sigDur, fsSpk);
 hasSpikes = ~isempty(spkTimes);
 
 %% ========================================================================
@@ -226,7 +222,7 @@ else
     edSpks = struct(); flgEdSpks = false;
     if hasSpikes && numel(ed.pos) > 0
         flgEdSpks = true;
-        edSpks = evt_spkAnalysis(spkTimes, muTimes, ed.times, ed.ctrlTimes, ...
+        edSpks = evt_spks(spkTimes, muTimes, ed.times, ed.ctrlTimes, ...
             ed.peakTime, 'unitType', uType, 'mapDur', mapDur, 'winFxd', 0.050);
 
         % Move per-discharge population metrics onto the ed struct

@@ -14,7 +14,7 @@ function evt_viewSpks(evtMaps, evtSpks, uType, state, varargin)
 %
 %   INPUTS:
 %       evtMaps  - (Struct) LFP maps with per-event fields + .tstamps.
-%       evtSpks  - (Struct) Consolidated spike results (from evt_spkAnalysis),
+%       evtSpks  - (Struct) Consolidated spike results (from evt_spks),
 %                           carrying .peth, .tstamps, .maps.su/.mu. [] to skip
 %                           the spike viewers (e.g. no sorted spikes).
 %       uType    - (Cat)    [N_units x 1] Unit types, or [].

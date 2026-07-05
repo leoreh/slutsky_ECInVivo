@@ -15,7 +15,7 @@ function hFig = evt_plotSpks(evtSpks, varargin)
 %           - Modulation Scatter Plot (Baseline FR vs Event FR).
 %
 %   INPUTS:
-%       evtSpks    - (Struct) Consolidated spike results from evt_spkAnalysis:
+%       evtSpks    - (Struct) Consolidated spike results from evt_spks:
 %                     per-unit fields (.frEvt, .frCtrl, ...), .tstamps, and the
 %                     3D maps .maps.su / .maps.mu (each with .evt/.ctrl).
 %       varargin    - Parameter/Value pairs:
