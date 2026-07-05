@@ -30,8 +30,9 @@ function ripp = ripp_wrapper(varargin)
 %           'zMet'       - (Char) Z-scoring method ('adaptive', 'nrem'). Default: 'nrem'.
 %           'mapDur'     - (Vec)  Window for PETH/Maps [pre post] (s). Default: [-0.05 0.05].
 %           'bit2uv'     - (Num)  Conversion factor. Auto-detects Intan/OpenEphys if empty.
-%           'flgPlot'    - (Log)  Generate summary plots? Default: true.
+%           'flgPlot'    - (Log)  Generate summary plots + viewers? Default: true.
 %           'flgSave'    - (Log)  Save output .mat files? Default: false.
+%           'flgCurate'  - (Log)  Launch the curation GUI (gui_curate)? Default: false.
 %           'verbose'    - (Log)  Print progress steps? Default: true.
 %           'steps'      - (Char) Execution mode: 'all', 'spks', 'phase'.
 %                                 'all': Run full pipeline (default).
@@ -74,6 +75,7 @@ addParameter(p, 'passband', [80 250], @isnumeric);
 addParameter(p, 'detectMet', 3, @isnumeric);
 addParameter(p, 'flgPlot', true, @islogical);
 addParameter(p, 'flgSave', false, @islogical);
+addParameter(p, 'flgCurate', false, @islogical);
 addParameter(p, 'bit2uv', [], @isnumeric);
 addParameter(p, 'zMet', 'nrem', @ischar);
 addParameter(p, 'mapDur', [-0.1 0.1], @isnumeric);
@@ -86,6 +88,7 @@ basepath    = p.Results.basepath;
 win         = p.Results.win;
 flgPlot     = p.Results.flgPlot;
 flgSave     = p.Results.flgSave;
+flgCurate   = p.Results.flgCurate;
 mapDur      = p.Results.mapDur;
 verbose     = p.Results.verbose;
 steps       = p.Results.steps;
@@ -455,7 +458,7 @@ end
 
 % Curation GUI (replaces the inline ripp_gui viewer). File-based: loads
 % <basename>.ripp.mat (the Ripples preset) and recomputes the display signals.
-if flgPlot
+if flgCurate
     if isfile(files.ripp)
         if verbose, fprintf('[RIPP]: Launching curation GUI...\n'); end
         gui_curate(basepath, 'preset', 'Ripples');

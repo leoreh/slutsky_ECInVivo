@@ -36,7 +36,7 @@ function [stateIdx, evtStates] = evt_states(rippTimes, peakTimes, boutTimes, var
 p = inputParser;
 addRequired(p, 'rippTimes', @isnumeric);
 addRequired(p, 'peakTimes', @isnumeric);
-addRequired(p, 'boutTimes', @iscell);
+addRequired(p, 'boutTimes', @(x) iscell(x) || isempty(x));
 addParameter(p, 'basepath', pwd, @ischar);
 addParameter(p, 'flgPlot', true, @islogical);
 addParameter(p, 'flgSave', true, @islogical);
@@ -46,6 +46,7 @@ parse(p, rippTimes, peakTimes, boutTimes, varargin{:});
 rippTimes = p.Results.rippTimes;
 peakTimes = p.Results.peakTimes;
 boutTimes = p.Results.boutTimes;
+if isempty(boutTimes), boutTimes = {}; end   % [] -> {} : no states, all events undefined
 basepath = p.Results.basepath;
 flgPlot = p.Results.flgPlot;
 flgSave = p.Results.flgSave;
@@ -133,8 +134,12 @@ for iState = 1:nStates
         'VariableNames', {'Rate', 'Density', 'Duration', 'State', 'Start', 'End'});
 end
 
-% Combine all states into one master table
-evtStates = vertcat(tblState{:});
+% Combine all states into one master table (empty when there are no bouts)
+if isempty(tblState)
+    evtStates = table();
+else
+    evtStates = vertcat(tblState{:});
+end
 
 % =========================================================================
 %  OUTPUT & SAVING
@@ -150,7 +155,7 @@ end
 % =========================================================================
 %  PLOTTING
 %  ========================================================================
-if flgPlot
+if flgPlot && ~isempty(evtStates)
 
     fh = figure('Name', [basename '_' name 'States'], 'NumberTitle', 'off');
     tiledlayout(2, 4, 'Padding', 'compact', 'TileSpacing', 'compact');

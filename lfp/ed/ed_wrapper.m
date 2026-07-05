@@ -41,8 +41,9 @@ function ed = ed_wrapper(varargin)
 %       'minAmpQA'   - (Num)  Amplitude floor for QA. {[]}
 %       'binsize'    - (Num)  Bin width for evt_rate [s]. {60}
 %       'flgRate'    - (Log)  Compute (and, with flgPlot, plot) evt_rate? {false}
-%       'flgPlot'    - (Log)  Launch the curation GUI? {true}
-%       'flgSave'    - (Log)  Save <basename>.ed.mat (+ edStates)? {false}
+%       'flgPlot'    - (Log)  Generate summary figures + viewers? {true}
+%       'flgSave'    - (Log)  Save <basename>.ed.mat (+ artefacts)? {false}
+%       'flgCurate'  - (Log)  Launch the curation GUI (gui_curate)? {false}
 %       'flgForce'   - (Log)  Re-detect even if <basename>.ed.mat exists? {false}
 %       'verbose'    - (Log)  Print progress? {true}
 %
@@ -86,6 +87,7 @@ addParameter(p, 'binsize', 60, @isnumeric);
 addParameter(p, 'flgRate', false, @islogical);
 addParameter(p, 'flgPlot', true, @islogical);
 addParameter(p, 'flgSave', false, @islogical);
+addParameter(p, 'flgCurate', false, @islogical);
 addParameter(p, 'flgForce', false, @islogical);
 addParameter(p, 'verbose', true, @islogical);
 
@@ -94,6 +96,7 @@ basepath  = p.Results.basepath;
 win       = p.Results.win;
 flgPlot   = p.Results.flgPlot;
 flgSave   = p.Results.flgSave;
+flgCurate = p.Results.flgCurate;
 flgForce  = p.Results.flgForce;
 flgRate   = p.Results.flgRate;
 verbose   = p.Results.verbose;
@@ -285,7 +288,7 @@ end
 %  CURATION GUI
 %  ========================================================================
 
-if flgPlot
+if flgCurate
     if isfile(edFile)
         if verbose, fprintf('[ED]: Launching curation GUI (%d events)\n', numel(ed.pos)); end
         gui_curate(basepath, 'preset', 'EDs', 'basename', basename);
