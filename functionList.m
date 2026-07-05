@@ -125,7 +125,7 @@ sSig = load([basename, '.sleep_sig.mat']);
 
 % call for acceleration
 sSig = as_prepSig([basename, '.lfp'], acc.mag,...
-    'eegCh', [9 : 12], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
+    'eegCh', [1 : 4], 'emgCh', [], 'saveVar', true, 'emgNchans', [],...
     'eegNchans', nchans, 'inspectSig', false, 'forceLoad', true,...
     'eegFs', 1250, 'emgFs', 1250, 'eegCf', [], 'emgCf', [10 450], 'fs', 1250);
 
@@ -136,7 +136,7 @@ sSig = as_prepSig([basename, '.lfp'], [basename, '.emg.dat'],...
 
 % manually create labels
 labelsmanfile = [basename, '.sleep_labelsMan.mat'];
-AccuSleep_viewer(sSig, labels, [])
+AccuSleep_viewer(sSig, labels, labelsmanfile)
 
 % classify with a network
 netfile = 'D:\Code\slutsky_ECInVivo\lfp\SleepStates\AccuSleep\trainedNetworks\net_230212_103132.mat';

@@ -1,95 +1,156 @@
-%function [xml, rxml] = LoadXml(FileBase)
+function [xml, rxml] = LoadXml(fbasename, varargin)
+% LOADXML  Parse a NeuroScope / ndManager .xml into a LoadPar-compatible struct.
 %
-% loads the xml file using xmltools (have to have it in the path)
-% rxml returns it's original layout - very messy structure but contains all
-% the xml file contents.
-% xml - is the ouput structure which is backwards compatible to LoadPar
-% output, so you can use it instead ..also loads some usefull stuff -
-% Anatomoical groups with Skips , Spike electrode groups
-% more can be added later (e.g. parameters of the process scripts)
-% this script is written for xml version 1.1 .. older version doesn't work.
-% additions are welcome
-
-function [xml, rxml] = LoadXml(fbasename,varargin)
+% Native replacement for the previous xmltools-based parser: uses MATLAB's
+% built-in xmlread (DOM) instead of the hand-rolled xmltools, so it is no
+% longer sensitive to tag formatting (multi-attribute tags, etc.). The output
+% struct is field-for-field identical to the legacy LoadXml and remains
+% backwards compatible with LoadPar-style downstream code.
+%
+% INPUT
+%   fbasename   path to the .xml (with or without the .xml extension)
+%
+% OUTPUT
+%   xml         struct with:
+%                 .FileName, .Date
+%                 .nBits .nChannels .SampleRate .SampleTime .VoltageRange
+%                 .Amplification .Offset .lfpSampleRate
+%                 .AnatGrps(g).Channels/.Skip     (anatomical groups)
+%                 .SpkGrps(g).Channels/.nSamples/.PeakSample/.nFeatures
+%                 .nElecGps .ElecGp{g}            (spike groups, if present)
+%                 .HiPassFreq                     (if a process_mhipass program exists)
+%   rxml        the raw parsed DOM document (kept for signature compatibility)
+%
+% Channel numbers are 0-based, matching the xml (callers add 1 where needed).
 
 xml = struct;
 
-xmli = strfind(fbasename,'.xml');
-if isempty(xmli)
-   fbasename = [fbasename '.xml'];
+if ~contains(fbasename, '.xml')
+    fbasename = [fbasename '.xml'];
 end
-rxml = xmltools(fbasename);
 
-rxml = rxml.child(2);
+rxml = xmlread(fbasename);
+root = rxml.getDocumentElement;          % <parameters>
 
-% from this level all children are the different parameters fields
 xml.FileName = fbasename;
 
-for i=1:length(rxml.child)
+% general info
+gi = getChild(root, 'generalInfo');
+if ~isempty(gi)
+    d = getChild(gi, 'date');
+    if ~isempty(d), xml.Date = nodeText(d); end
+end
 
-    switch lower(rxml.child(i).tag)
-        
-        case 'generalinfo'
-            xml.Date = rxml.child(i).child(1).value; % date of xml file creation?
+% acquisition system
+acq = getChild(root, 'acquisitionSystem');
+if ~isempty(acq)
+    xml.nBits         = getNum(acq, 'nBits');
+    xml.nChannels     = getNum(acq, 'nChannels');
+    xml.SampleRate    = getNum(acq, 'samplingRate');
+    xml.SampleTime    = 1e6 / xml.SampleRate;   % backwards compatible
+    xml.VoltageRange  = getNum(acq, 'voltageRange');
+    xml.Amplification = getNum(acq, 'amplification');
+    xml.Offset        = getNum(acq, 'offset');
+end
 
-        case 'acquisitionsystem'
-            xml.nBits = str2num(rxml.child(i).child(1).value); % number of bits of the file
-            xml.nChannels = str2num(rxml.child(i).child(2).value);
-            xml.SampleRate = str2num(rxml.child(i).child(3).value);
-            xml.SampleTime = 1e6/xml.SampleRate; %to make backwards compatible
-            xml.VoltageRange = str2num(rxml.child(i).child(4).value);
-            xml.Amplification = str2num(rxml.child(i).child(5).value);
-            xml.Offset =  str2num(rxml.child(i).child(6).value);
-            
-        case 'fieldpotentials'
-            xml.lfpSampleRate = str2num(rxml.child(i).child.value);
-            
-        case 'anatomicaldescription'
-            tmp = rxml.child(i).child.child;
-            for grpI =1:length(tmp)
-                for chI=1:length(tmp(grpI).child)
-                    xml.AnatGrps(grpI).Channels(chI) = str2num(tmp(grpI).child(chI).value);
-                    xml.AnatGrps(grpI).Skip(chI) = str2num(tmp(grpI).child(chI).attribs.value);
-                end
-            end
-            
-        case 'spikedetection'
-            if ~isempty(rxml.child(i).child)
-                tmp =rxml.child(i).child.child;
-                for grpI =1:length(tmp)
-                    for chI=1:length(tmp(grpI).child(1).child)
-                        xml.SpkGrps(grpI).Channels(chI) = str2num(tmp(grpI).child(1).child(chI).value);
-                    end
-                    if length(tmp(grpI).child)>1
-                        xml.SpkGrps(grpI).nSamples = str2num(tmp(grpI).child(2).value);
-                        xml.SpkGrps(grpI).PeakSample = str2num(tmp(grpI).child(3).value);
-                        xml.SpkGrps(grpI).nFeatures = str2num(tmp(grpI).child(4).value);
-                    end
-                    %backwards compatibility
-                    xml.nElecGps = length(tmp);
-                    xml.ElecGp{grpI} = xml.SpkGrps(grpI).Channels;
-                end
-            else
-                xml.nElecGps = 0;
-            end
+% field potentials (lfp sampling rate)
+fp = getChild(root, 'fieldPotentials');
+if ~isempty(fp)
+    xml.lfpSampleRate = getNum(fp, 'lfpSamplingRate');
+end
 
-
-        case 'programs'
-            tmp = rxml.child(i).child;
-            for i=1:length(tmp)
-                if strcmp(tmp(i).child(1).value,'process_mhipass')
-                    for j=1:length(tmp(i).child(2).child )
-                        if strcmp(tmp(i).child(2).child(j).child(1).value,'frequency')
-                            xml.HiPassFreq = str2num(tmp(i).child(2).child(j).child(2).value);
-                            break
-                        end
-                    end
-                end
-            end
+% anatomical groups (with per-channel skip flag)
+ad = getChild(root, 'anatomicalDescription');
+if ~isempty(ad)
+    groups = getChildren(getChild(ad, 'channelGroups'), 'group');
+    for g = 1:numel(groups)
+        chans = getChildren(groups{g}, 'channel');
+        for c = 1:numel(chans)
+            xml.AnatGrps(g).Channels(c) = str2double(nodeText(chans{c}));
+            xml.AnatGrps(g).Skip(c)     = str2double(char(chans{c}.getAttribute('skip')));
+        end
     end
+end
 
+% spike groups
+sd = getChild(root, 'spikeDetection');
+if ~isempty(sd)
+    groups = getChildren(getChild(sd, 'channelGroups'), 'group');
+    if isempty(groups)
+        xml.nElecGps = 0;
+    else
+        for g = 1:numel(groups)
+            chans = getChildren(getChild(groups{g}, 'channels'), 'channel');
+            for c = 1:numel(chans)
+                xml.SpkGrps(g).Channels(c) = str2double(nodeText(chans{c}));
+            end
+            if ~isempty(getChild(groups{g}, 'nSamples'))
+                xml.SpkGrps(g).nSamples   = getNum(groups{g}, 'nSamples');
+                xml.SpkGrps(g).PeakSample = getNum(groups{g}, 'peakSampleIndex');
+                xml.SpkGrps(g).nFeatures  = getNum(groups{g}, 'nFeatures');
+            end
+            xml.nElecGps  = numel(groups);          % backwards compatibility
+            xml.ElecGp{g} = xml.SpkGrps(g).Channels;
+        end
+    end
+end
+
+% high-pass frequency from a process_mhipass program
+pr = getChild(root, 'programs');
+if ~isempty(pr)
+    programs = getChildren(pr, 'program');
+    for p = 1:numel(programs)
+        nm = getChild(programs{p}, 'name');
+        if ~isempty(nm) && strcmp(nodeText(nm), 'process_mhipass')
+            params = getChildren(getChild(programs{p}, 'parameters'), 'parameter');
+            for q = 1:numel(params)
+                pn = getChild(params{q}, 'name');
+                if ~isempty(pn) && strcmp(nodeText(pn), 'frequency')
+                    xml.HiPassFreq = str2double(nodeText(getChild(params{q}, 'value')));
+                    break
+                end
+            end
+        end
+    end
+end
 
 end
 
+% ------------------------------------------------------------------------
+function e = getChild(node, tag)
+% first direct child element named tag, or [] if none
+e = [];
+if isempty(node), return; end
+ch = node.getChildNodes;
+for k = 0:ch.getLength - 1
+    c = ch.item(k);
+    if c.getNodeType == 1 && strcmp(char(c.getNodeName), tag)   % 1 = ELEMENT_NODE
+        e = c; return
+    end
+end
+end
 
-% general recursive parsing will have to wait.
+function es = getChildren(node, tag)
+% all direct child elements named tag, as a cell array
+es = {};
+if isempty(node), return; end
+ch = node.getChildNodes;
+for k = 0:ch.getLength - 1
+    c = ch.item(k);
+    if c.getNodeType == 1 && strcmp(char(c.getNodeName), tag)
+        es{end+1} = c; %#ok<AGROW>
+    end
+end
+end
+
+function t = nodeText(e)
+% trimmed text content of a leaf element
+t = strtrim(char(e.getTextContent));
+end
+
+function v = getNum(parent, tag)
+% numeric value of the first child element named tag ([] if absent)
+e = getChild(parent, tag);
+if isempty(e), v = []; return; end
+v = str2double(nodeText(e));
+end

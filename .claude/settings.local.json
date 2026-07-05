@@ -2,7 +2,15 @@
   "permissions": {
     "allow": [
       "Bash(find \"/d/OneDrive - Tel-Aviv University/Obsi_Vaults/Obsi_Research\" -iname \"*compensation*\" -type f 2>/dev/null | head -20)",
-      "Bash(xargs wc -l)"
+      "Bash(xargs wc -l)",
+      "Bash(grep -i \".m$\")",
+      "Bash(grep -v \"//\")",
+      "Bash(grep -n \"ed\\\\\\\\..*=\" lfp/ed/ed_wrapper.m)",
+      "Bash(grep -n \"\\\\\\\\bspikes\\\\\\\\.times\\\\|sSig\\\\\\\\.fs\\\\|sSig\\\\\\\\.eeg\\\\|sSig\\\\\\\\.emg\" graphics/ed_gui.m)",
+      "Bash(grep -E \"\\\\\\\\.\\(pos|amp|ampZ|times|peakTime|dur|width10|state|accepted|emgZ|emgRms|idxQA\\)\" lfp/ed/ed_*.m)",
+      "Bash(grep \"\\\\\\\\s=\\\\\\\\s\")",
+      "Bash(grep -E \"\\\\.m$\")",
+      "Bash(xargs grep -l \"plot_hypnogram\\\\|labels2bouts\\\\|bouts2labels\")"
     ]
   }
 }

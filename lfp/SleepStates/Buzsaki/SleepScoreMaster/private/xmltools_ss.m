@@ -221,6 +221,7 @@ while ~eot & ~isempty(udeblank(deblank(str)))
 	new_tag = new_tag(1:end-1);
       end
     else
+      f_beg   = f_beg(1);   % strfind returns every space; split name/attribs on the first only
       new_attribs = new_tag(f_beg+1:end);
       if eot
 	new_attribs = new_attribs(1:end-1);
