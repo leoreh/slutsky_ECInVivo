@@ -9,7 +9,8 @@ function ed = ed_wrapper(varargin)
 %       1. Load session + sleep_states; load signals once (ed_sigLoad).
 %       2. Detect (ed_detect), characterise (ed_params), score EMG
 %          (ed_reject_emg), label state (ed_states).
-%       3. Seed acceptance from quality masks (idxQA); never delete events.
+%       3. Filter by automatic QA (EMG + optional amp/dur); seed .accepted
+%          all-true on the survivors (no .idxQA kept).
 %       4. Convert times to absolute, optionally save <basename>.ed.mat.
 %       5. Optionally launch the curation GUI (gui_curate, preset 'EDs').
 %       If <basename>.ed.mat already exists and flgForce is false, detection
@@ -163,19 +164,21 @@ else
         ed.state = categorical(nan(nEvt, 1));
     end
 
-    % Quality masks -> seed acceptance (never delete)
-    if isempty(p.Results.durLim)
-        ed.idxQA.dur = true(nEvt, 1);
-    else
-        ed.idxQA.dur = ed.dur >= p.Results.durLim(1) & ed.dur <= p.Results.durLim(2);
+    % Automatic QA as a FILTER: build the pass mask (EMG from ed_reject_emg,
+    % plus optional amplitude / duration gates), drop the failures, and seed
+    % acceptance all-true on the survivors. The per-criterion breakdown is
+    % applied then discarded (no .idxQA stored) - mirrors the ripple pipeline
+    % so only accepted candidates plus the curation mask persist on disk.
+    qaPass = ed.idxQA.emg(:);
+    if ~isempty(p.Results.durLim)
+        qaPass = qaPass & ed.dur(:) >= p.Results.durLim(1) ...
+                        & ed.dur(:) <= p.Results.durLim(2);
     end
-    if isempty(p.Results.minAmpQA)
-        ed.idxQA.amp = true(nEvt, 1);
-    else
-        ed.idxQA.amp = ed.amp >= p.Results.minAmpQA;
+    if ~isempty(p.Results.minAmpQA)
+        qaPass = qaPass & ed.amp(:) >= p.Results.minAmpQA;
     end
-    ed.idxQA.auto = ed.idxQA.emg & ed.idxQA.amp & ed.idxQA.dur;
-    ed.accepted = ed.idxQA.auto(:);
+    ed = ed_filterEvents(ed, qaPass);
+    ed.accepted = true(numel(ed.pos), 1);
 
     % Absolute times (events live in the full-session frame the GUI shows)
     ed.times    = ed.times + win(1);
@@ -216,4 +219,24 @@ end
 
 if verbose, fprintf('[ED]: Done (%s).\n', basename); end
 
+end     % EOF
+
+
+%% ========================================================================
+%  HELPER: ED_FILTEREVENTS
+%  ========================================================================
+function ed = ed_filterEvents(ed, keep)
+% Subset every per-event field of the ed struct by the logical KEEP mask and
+% drop the transient .idxQA breakdown. Per-event fields are those whose first
+% dimension equals the event count; scalar / struct fields (.info) are left.
+keep = logical(keep(:));
+nEvt = numel(keep);
+fn = fieldnames(ed);
+for iF = 1:numel(fn)
+    f = ed.(fn{iF});
+    if (isnumeric(f) || islogical(f) || iscategorical(f)) && size(f, 1) == nEvt
+        ed.(fn{iF}) = f(keep, :);
+    end
+end
+if isfield(ed, 'idxQA'), ed = rmfield(ed, 'idxQA'); end
 end     % EOF

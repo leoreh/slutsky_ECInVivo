@@ -217,6 +217,10 @@ if doDetect
     rippMaps = ripp_maps(rippSig, ripp.peakTime, fs, 'mapDur', mapDur, ...
         'flgSave', false);
 
+    % Seed curation acceptance: all QA-passed events start accepted, so the
+    % saved <basename>.ripp.mat is self-describing (gui_curate reads .accepted).
+    ripp.accepted = true(size(ripp.times, 1), 1);
+
 else
     if verbose, fprintf('[RIPP]: Skipping Detection (loading from file)...\n'); end
     if isfield(v, 'ripp'), ripp = v.ripp; end
@@ -621,10 +625,10 @@ else
 end
 [idxQA, met] = ripp_qa(ripp.times, nremTimes, muTimes, emg, ripp.state, fs);
 
-% Store
+% Store QA metrics per event (the boolean idxQA breakdown is applied as a
+% filter below, not stored - only accepted candidates + the mask persist).
 ripp.emg = met.emg;
 ripp.spkGain = met.gain;
-ripp.idxQA = idxQA;
 
 % Select "Good" Ripples
 idxGood = idxQA.good;
