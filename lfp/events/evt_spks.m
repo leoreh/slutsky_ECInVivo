@@ -1,7 +1,7 @@
-function rippSpks = ripp_spks(spkTimes, rippTimes, ctrlTimes, peakTime, varargin)
-% RIPP_SPKS Analyzes spiking rate modulation during ripples.
+function evtSpks = evt_spks(spkTimes, rippTimes, ctrlTimes, peakTime, varargin)
+% EVT_SPKS Analyzes spiking rate modulation during ripples.
 %
-%   rippSpks = RIPP_SPKS(spkTimes, rippTimes, ctrlTimes, peakTime, varargin)
+%   evtSpks = EVT_SPKS(spkTimes, rippTimes, ctrlTimes, peakTime, varargin)
 %
 %   SUMMARY:
 %       Calculates scalar modulation metrics comparing Ripple vs Control periods.
@@ -23,7 +23,7 @@ function rippSpks = ripp_spks(spkTimes, rippTimes, ctrlTimes, peakTime, varargin
 %           'unitType' - (Cat)  [N_units x 1] Categorical array of unit types.
 %
 %   OUTPUTS:
-%       rippSpks    - (Struct) Stats structure with [N_units x 1] fields.
+%       evtSpks    - (Struct) Stats structure with [N_units x 1] fields.
 %
 %   HISTORY:
 %       Updated: 26 Jan 2026
@@ -40,18 +40,19 @@ addRequired(p, 'peakTime', @isnumeric);
 addParameter(p, 'basepath', pwd, @ischar);
 addParameter(p, 'flgSave', true, @islogical);
 addParameter(p, 'unitType', [], @(x) iscategorical(x) || iscell(x));
+addParameter(p, 'winFxd', 0.020, @(x) isnumeric(x) && isscalar(x) && x > 0);
 parse(p, spkTimes, rippTimes, ctrlTimes, peakTime, varargin{:});
 
 basepath  = p.Results.basepath;
 flgSave   = p.Results.flgSave;
 peakTime  = p.Results.peakTime;
 unitType  = p.Results.unitType;
+winFxd    = p.Results.winFxd;
 
 [~, basename] = fileparts(basepath);
-savefile = fullfile(basepath, [basename, '.rippSpks.mat']);
+savefile = fullfile(basepath, [basename, '.evtSpks.mat']);
 
-% Fixed window for asym / com
-winFxd = 0.020;
+% Fixed window for asym / com (winFxd param; default 0.020 s matches ripples)
 
 % =========================================================================
 %  FR METRICS
@@ -203,7 +204,7 @@ else
 end
 
 % Initialize Events Structure
-rippSpks.events = struct();
+evtSpks.events = struct();
 
 % Loop
 for iIter = 1:length(iterNames)
@@ -214,7 +215,7 @@ for iIter = 1:length(iterNames)
 
     % --- Rank & Timing ---
     subSpks = spkTimes(currMask);
-    [subMean, subVar, subFirst, subLate] = ripp_rankOrder(subSpks, rippTimes);
+    [subMean, subVar, subFirst, subLate] = evt_rankOrder(subSpks, rippTimes);
 
     % Fill Global Arrays
     rankMean(currMask)   = subMean;
@@ -271,9 +272,9 @@ for iIter = 1:length(iterNames)
 
     % --- Store Results ---
     fn = matlab.lang.makeValidName(currName);
-    rippSpks.events.(fn).frac = currFrac;
-    rippSpks.events.(fn).asym = currAsym';
-    rippSpks.events.(fn).com  = currCom;
+    evtSpks.events.(fn).frac = currFrac;
+    evtSpks.events.(fn).asym = currAsym';
+    evtSpks.events.(fn).com  = currCom;
 end
 
 
@@ -283,31 +284,31 @@ end
 % =========================================================================
 
 % Pack results
-rippSpks.cRipp     = cRipp;
-rippSpks.frRipp    = frRipp;
-rippSpks.frRand    = frRand;
-rippSpks.frZ       = frZ;
-rippSpks.frMod     = frMod;
-rippSpks.pFire     = pFire;
-rippSpks.frActive  = frActive;
-rippSpks.cActive   = cActive;
-rippSpks.pVal      = pVal;
-rippSpks.h0        = h0;
-rippSpks.rankMean  = rankMean;
-rippSpks.rankVar   = rankVar;
-rippSpks.com       = com;
+evtSpks.cRipp     = cRipp;
+evtSpks.frRipp    = frRipp;
+evtSpks.frRand    = frRand;
+evtSpks.frZ       = frZ;
+evtSpks.frMod     = frMod;
+evtSpks.pFire     = pFire;
+evtSpks.frActive  = frActive;
+evtSpks.cActive   = cActive;
+evtSpks.pVal      = pVal;
+evtSpks.h0        = h0;
+evtSpks.rankMean  = rankMean;
+evtSpks.rankVar   = rankVar;
+evtSpks.com       = com;
 
-rippSpks.frPre    = frPre;
-rippSpks.frPost   = frPost;
-rippSpks.asym = asym;
+evtSpks.frPre    = frPre;
+evtSpks.frPost   = frPost;
+evtSpks.asym = asym;
 
 % Export Times
-rippSpks.times.first = timesFirst;
-rippSpks.times.late  = timesLate;
+evtSpks.times.first = timesFirst;
+evtSpks.times.late  = timesLate;
 
 % Save
 if flgSave
-    save(savefile, 'rippSpks', '-v7.3');
+    save(savefile, 'evtSpks', '-v7.3');
 end
 
 end     % EOF

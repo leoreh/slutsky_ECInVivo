@@ -1,7 +1,7 @@
-function rippMaps = ripp_maps(rippSig, peakTime, fs, varargin)
-% RIPP_MAPS Generates Peri-Event Time Histograms (PETH) for LFP signals.
+function evtMaps = evt_maps(rippSig, peakTime, fs, varargin)
+% EVT_MAPS Generates Peri-Event Time Histograms (PETH) for LFP signals.
 %
-%   rippMaps = RIPP_MAPS(rippSig, peakTime, fs, varargin)
+%   evtMaps = EVT_MAPS(rippSig, peakTime, fs, varargin)
 %
 %   SUMMARY:
 %       Extracts windowed signal traces around ripple peaks.
@@ -19,7 +19,7 @@ function rippMaps = ripp_maps(rippSig, peakTime, fs, varargin)
 %           'flgSave'  - (Log)  Save output to .mat file? (Default: true).
 %
 %   OUTPUTS:
-%       rippMaps    - (Struct) Contains [N_events x N_samples] matrix for each field.
+%       evtMaps    - (Struct) Contains [N_events x N_samples] matrix for each field.
 %                       .tstamps - Relative time vector for the window.
 %                       .lfp, .filt, .amp, etc.
 %
@@ -49,13 +49,13 @@ flgSave = p.Results.flgSave;
 %  VECTORIZED EXTRACTION
 % =========================================================================
 [~, basename] = fileparts(basepath);
-mapFile = fullfile(basepath, [basename, '.rippMaps.mat']);
+mapFile = fullfile(basepath, [basename, '.evtMaps.mat']);
 
 % Create a relative window vector
 winSamps = round(mapDur(1)*fs) : round(mapDur(2)*fs);
 
-rippMaps = struct();
-rippMaps.tstamps = winSamps / fs;
+evtMaps = struct();
+evtMaps.tstamps = winSamps / fs;
 nSamps = length(rippSig.lfp);
 
 % Convert peak times to samples
@@ -91,14 +91,14 @@ for iFld = 1:length(fields)
         rawMap(~validMask) = NaN;
     end
 
-    rippMaps.(fn) = rawMap;
+    evtMaps.(fn) = rawMap;
 end
 
 % =========================================================================
 %  SAVE
 % =========================================================================
 if flgSave
-    save(mapFile, 'rippMaps', '-v7.3');
+    save(mapFile, 'evtMaps', '-v7.3');
 end
 
 end

@@ -1,7 +1,7 @@
-function hFig = ripp_plotSpks(rippSpks, spkPeth, varargin)
-% RIPP_PLOTSPKS Visualizes ripple-modulated spiking activity.
+function hFig = evt_plotSpks(rippSpks, spkPeth, varargin)
+% EVT_PLOTSPKS Visualizes ripple-modulated spiking activity.
 %
-%   hFig = RIPP_PLOTSPKS(rippSpks, spkPeth, varargin)
+%   hFig = EVT_PLOTSPKS(rippSpks, spkPeth, varargin)
 %
 %   SUMMARY:
 %       Generates a comprehensive summary figure:
@@ -43,10 +43,12 @@ addRequired(p, 'rippSpks', @isstruct);
 addRequired(p, 'spkPeth', @isstruct);
 addParameter(p, 'basepath', pwd, @ischar);
 addParameter(p, 'flgSaveFig', true, @islogical);
+addParameter(p, 'name', 'evt', @ischar);
 parse(p, rippSpks, spkPeth, varargin{:});
 
 basepath = p.Results.basepath;
 flgSaveFig = p.Results.flgSaveFig;
+name = p.Results.name;
 
 %% ========================================================================
 %  VALIDATE
@@ -56,11 +58,11 @@ subs = {'mu', 'su'};
 flds = {'ripp', 'ctrl', 'tstamps'};
 for iSub = 1:numel(subs)
     if ~isfield(spkPeth, subs{iSub})
-        error('ripp_plotSpks:missingField', 'spkPeth.%s is missing.', subs{iSub});
+        error('evt_plotSpks:missingField', 'spkPeth.%s is missing.', subs{iSub});
     end
     for iFld = 1:numel(flds)
         if ~isfield(spkPeth.(subs{iSub}), flds{iFld})
-            error('ripp_plotSpks:missingField', ...
+            error('evt_plotSpks:missingField', ...
                 'spkPeth.%s.%s is missing.', subs{iSub}, flds{iFld});
         end
     end
@@ -92,13 +94,13 @@ if isfile(unitsFile)
                 fprintf('[RIPP]: Loaded unit types: %d RS, %d FS.\n', ...
                     sum(idxRS), sum(idxFS));
             else
-                warning('ripp_plotSpks:unitMismatch', ...
+                warning('evt_plotSpks:unitMismatch', ...
                     'units.type length (%d) ~= nUnits (%d); skipping type split.', ...
                     numel(uType), nUnits);
             end
         end
     catch ME
-        warning('ripp_plotSpks:unitsLoad', ...
+        warning('evt_plotSpks:unitsLoad', ...
             'Failed to load units file: %s', ME.message);
     end
 end
@@ -314,7 +316,7 @@ if flgSaveFig
         end
     end
 
-    figFile = fullfile(figDir, [basename, '_ripp_spks.png']);
+    figFile = fullfile(figDir, [basename, '_', name, '_spks.png']);
     try
         exportgraphics(hFig, figFile, 'Resolution', 300);
     catch

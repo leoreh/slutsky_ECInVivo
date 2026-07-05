@@ -8,7 +8,7 @@ function ed = ed_wrapper(varargin)
 %       ripples pipeline, struct-based, no class):
 %       1. Load session + sleep_states; load signals once (ed_sigLoad).
 %       2. Detect (ed_detect), characterise (ed_params), score EMG
-%          (ed_reject_emg), label state (ed_states).
+%          (ed_reject_emg), label state (evt_states).
 %       3. Filter by automatic QA (EMG + optional amp/dur); seed .accepted
 %          all-true on the survivors (no .idxQA kept).
 %       4. Convert times to absolute, optionally save <basename>.ed.mat.
@@ -36,8 +36,8 @@ function ed = ed_wrapper(varargin)
 %       'thrRms'     - (Num)  emg_rms pass threshold. {75th pct}
 %       'durLim'     - (Vec)  [min max] half-amp width for QA (ms). {[]}
 %       'minAmpQA'   - (Num)  Amplitude floor for QA. {[]}
-%       'binsize'    - (Num)  Bin width for ed_rate [s]. {60}
-%       'flgRate'    - (Log)  Compute (and, with flgPlot, plot) ed_rate? {false}
+%       'binsize'    - (Num)  Bin width for evt_rate [s]. {60}
+%       'flgRate'    - (Log)  Compute (and, with flgPlot, plot) evt_rate? {false}
 %       'flgPlot'    - (Log)  Launch the curation GUI? {true}
 %       'flgSave'    - (Log)  Save <basename>.ed.mat (+ edStates)? {false}
 %       'flgForce'   - (Log)  Re-detect even if <basename>.ed.mat exists? {false}
@@ -50,7 +50,7 @@ function ed = ed_wrapper(varargin)
 %
 %   DEPENDENCIES:
 %       basepaths2vars, ed_sigLoad, ed_detect, ed_params, ed_reject_emg,
-%       ed_states, ed_rate, gui_curate.
+%       evt_states, evt_rate, gui_curate.
 %
 %   HISTORY:
 %       Created: 22 Jun 2026
@@ -159,7 +159,8 @@ else
     % State assignment (relative frame, before absolute conversion)
     nEvt = numel(ed.pos);
     if ~isempty(boutTimes) && nEvt > 0
-        [ed.state, ~] = ed_states(ed, boutTimes, 'basepath', basepath, 'flgSave', flgSave);
+        [ed.state, ~] = evt_states(ed.times, ed.peakTime, boutTimes, ...
+            'basepath', basepath, 'flgSave', flgSave, 'flgPlot', false, 'name', 'ed');
     else
         ed.state = categorical(nan(nEvt, 1));
     end
@@ -193,7 +194,7 @@ else
 
     % Optional rate
     if flgRate
-        ed.rate = ed_rate(ed, 'binsize', p.Results.binsize, ...
+        ed.rate = evt_rate(ed, 'binsize', p.Results.binsize, ...
             'flgPlot', flgPlot, 'basepath', basepath);
     end
 

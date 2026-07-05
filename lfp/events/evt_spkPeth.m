@@ -1,7 +1,7 @@
-function maps = ripp_spkPeth(spkTimes, peakTimes, ctrlTimes, varargin)
-% RIPP_SPKPETH Generates Per-Event Time Histograms (PETH) for spikes.
+function maps = evt_spkPeth(spkTimes, peakTimes, ctrlTimes, varargin)
+% EVT_SPKPETH Generates Per-Event Time Histograms (PETH) for spikes.
 %
-%   maps = RIPP_SPKPETH(spkTimes, peakTimes, ctrlTimes, varargin)
+%   maps = EVT_SPKPETH(spkTimes, peakTimes, ctrlTimes, varargin)
 %
 %   SUMMARY:
 %       Calculates 3D Spike Maps (Unit x Event x Time) for both Ripple and Control events.
@@ -48,7 +48,7 @@ flgSave = p.Results.flgSave;
 %  SETUP
 %  ========================================================================
 [~, basename] = fileparts(basepath);
-savefile = fullfile(basepath, [basename, '.rippSpkMaps.mat']);
+savefile = fullfile(basepath, [basename, '.evtSpkPeth.mat']);
 
 nUnits = length(spkTimes);
 nRipples = length(peakTimes);

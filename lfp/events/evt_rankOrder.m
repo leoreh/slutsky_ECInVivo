@@ -1,5 +1,5 @@
-function [rankMean, rankVar, timesFirst, timesLate] = ripp_rankOrder(spkTimes, rippTimes)
-% RIPP_RANKORDER Calculates the normalized temporal rank of units within
+function [rankMean, rankVar, timesFirst, timesLate] = evt_rankOrder(spkTimes, rippTimes)
+% EVT_RANKORDER Calculates the normalized temporal rank of units within
 % ripples.
 %
 %   INPUTS:

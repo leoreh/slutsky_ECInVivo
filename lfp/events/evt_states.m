@@ -1,7 +1,7 @@
-function [stateIdx, rippStates] = ripp_states(rippTimes, peakTimes, boutTimes, varargin)
-% RIPP_STATES Classifies ripples by vigilance state and computes bout statistics.
+function [stateIdx, evtStates] = evt_states(rippTimes, peakTimes, boutTimes, varargin)
+% EVT_STATES Classifies ripples by vigilance state and computes bout statistics.
 %
-%   [stateIdx, rippStates] = RIPP_STATES(rippTimes, peakTimes, boutTimes, varargin)
+%   [stateIdx, evtStates] = EVT_STATES(rippTimes, peakTimes, boutTimes, varargin)
 %
 %   SUMMARY:
 %       1. Assigns a vigilance state to each ripple based on its peak time.
@@ -17,11 +17,11 @@ function [stateIdx, rippStates] = ripp_states(rippTimes, peakTimes, boutTimes, v
 %       varargin    - Parameter/Value pairs:
 %           'basepath' - (Char) Save location. (Default: pwd).
 %           'flgPlot'  - (Log)  Generate summary figures? (Default: true).
-%           'flgSave'  - (Log)  Save .rippStates.mat? (Default: true).
+%           'flgSave'  - (Log)  Save .evtStates.mat? (Default: true).
 %
 %   OUTPUTS:
 %       stateIdx    - (Cat)   [N_ripples x 1] Categorical array of states.
-%       rippStates  - (Table) Summary table with rows per bout:
+%       evtStates  - (Table) Summary table with rows per bout:
 %                             [Rate, Density, Duration, State, Start, End].
 %
 %   DEPENDENCIES:
@@ -40,6 +40,7 @@ addRequired(p, 'boutTimes', @iscell);
 addParameter(p, 'basepath', pwd, @ischar);
 addParameter(p, 'flgPlot', true, @islogical);
 addParameter(p, 'flgSave', true, @islogical);
+addParameter(p, 'name', 'evt', @ischar);
 parse(p, rippTimes, peakTimes, boutTimes, varargin{:});
 
 rippTimes = p.Results.rippTimes;
@@ -48,12 +49,13 @@ boutTimes = p.Results.boutTimes;
 basepath = p.Results.basepath;
 flgPlot = p.Results.flgPlot;
 flgSave = p.Results.flgSave;
+name = p.Results.name;
 
 % =========================================================================
 %  PREP
 %  ========================================================================
 [~, basename] = fileparts(basepath);
-savefile = fullfile(basepath, [basename, '.rippStates.mat']);
+savefile = fullfile(basepath, [basename, '.', name, 'States.mat']);
 
 nStates = length(boutTimes);
 nRipples = length(peakTimes);
@@ -132,14 +134,17 @@ for iState = 1:nStates
 end
 
 % Combine all states into one master table
-rippStates = vertcat(tblState{:});
+evtStates = vertcat(tblState{:});
 
 % =========================================================================
 %  OUTPUT & SAVING
 %  ========================================================================
 
 if flgSave
-    save(savefile, 'rippStates', '-v7.3');
+    % save the bout table under the modality-named variable so existing
+    % readers (e.g. mcu_tblVivo expects 'evtStates') keep working
+    outStruct.([name, 'States']) = evtStates;
+    save(savefile, '-struct', 'outStruct', '-v7.3');
 end
 
 % =========================================================================
@@ -147,10 +152,10 @@ end
 %  ========================================================================
 if flgPlot
 
-    fh = figure('Name', [basename '_rippleStates'], 'NumberTitle', 'off');
+    fh = figure('Name', [basename '_' name 'States'], 'NumberTitle', 'off');
     tiledlayout(2, 4, 'Padding', 'compact', 'TileSpacing', 'compact');
 
-    T = rippStates;
+    T = evtStates;
     plotColors = vertcat(colors{:});
 
     % Rate vs Time
@@ -194,7 +199,7 @@ if flgPlot
 
     figDir = fullfile(basepath, 'graphics');
     if ~exist(figDir, 'dir'), mkdir(figDir); end
-    saveas(fh, fullfile(figDir, [basename '_ripp_states.png']));
+    saveas(fh, fullfile(figDir, [basename '_' name '_states.png']));
 end
 
 end

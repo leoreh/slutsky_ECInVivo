@@ -1,7 +1,7 @@
-function ctrlTimes = ripp_ctrlTimes(rippTimes, varargin)
-% RIPP_CTRLTIMES Generates matched-duration control intervals.
+function ctrlTimes = evt_ctrlTimes(rippTimes, varargin)
+% EVT_CTRLTIMES Generates matched-duration control intervals.
 %
-%   ctrlTimes = RIPP_CTRLTIMES(rippTimes, varargin)
+%   ctrlTimes = EVT_CTRLTIMES(rippTimes, varargin)
 %
 %   SUMMARY:
 %       Identifies non-ripple intervals of identical duration to the detected ripples.

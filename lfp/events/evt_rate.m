@@ -1,7 +1,7 @@
-function edRate = ed_rate(ed, varargin)
-% ED_RATE Epileptiform-discharge rate over time.
+function edRate = evt_rate(ed, varargin)
+% EVT_RATE Epileptiform-discharge rate over time.
 %
-%   edRate = ED_RATE(ed, varargin)
+%   edRate = EVT_RATE(ed, varargin)
 %
 %   SUMMARY:
 %       Bins accepted discharge peak times into a rate time series via
