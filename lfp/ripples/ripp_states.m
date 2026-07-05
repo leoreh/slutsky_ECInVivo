@@ -25,7 +25,7 @@ function [stateIdx, rippStates] = ripp_states(rippTimes, peakTimes, boutTimes, v
 %                             [Rate, Density, Duration, State, Start, End].
 %
 %   DEPENDENCIES:
-%       basepaths2vars, InIntervals, as_loadConfig.
+%       intervals, as_loadConfig.
 %
 %   HISTORY:
 %       Updated: 23 Jan 2026
@@ -52,7 +52,6 @@ flgSave = p.Results.flgSave;
 % =========================================================================
 %  PREP
 %  ========================================================================
-cd(basepath);
 [~, basename] = fileparts(basepath);
 savefile = fullfile(basepath, [basename, '.rippStates.mat']);
 

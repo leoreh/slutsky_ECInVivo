@@ -94,9 +94,9 @@ switch sigSource
 
     case 'lfp'
         % Escape hatch: detect on a raw LFP channel instead of sSig.eeg.
-        warning('ed_sigLoad:bit2uv', ...
-            ['binary_load applies bit2uv twice (effective bit2uv^2); ', ...
-             'verify the scaling of the ''lfp'' source against sSig.eeg.']);
+        % binary_load applies bit2uv once, so sigAll is in uV; its absolute
+        % scale may differ from sSig.eeg, but detection is z-scored so this
+        % affects only reported amplitude units, not which events are found.
         if isempty(session)
             v = basepaths2vars('basepaths', {basepath}, 'vars', {'session'});
             session = v.session;

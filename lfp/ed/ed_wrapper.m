@@ -96,7 +96,6 @@ verbose   = p.Results.verbose;
 %% ========================================================================
 %  SETUP
 %  ========================================================================
-cd(basepath);
 basename = p.Results.basename;
 if isempty(basename)
     [~, basename] = fileparts(basepath);

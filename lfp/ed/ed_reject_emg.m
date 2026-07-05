@@ -68,41 +68,49 @@ ed.emgRms = nan(nEvents, 1);
 switch method
     case 'zscore'
         if isempty(emg)
-            error('ed_reject_emg:noEmg', 'Pass an EMG trace for method ''zscore''.')
-        end
-        emg = emg(:);
-        winSamp  = max(1, round(fs * p.Results.winSec));
-        baseSamp = max(1, round(fs * p.Results.baselineSec));
-        emgAbs = abs(emg);
-        emgMu  = movmean(emgAbs, baseSamp);
-        emgSd  = movstd(emgAbs, baseSamp);
-        emgSd(emgSd == 0) = eps;
+            warning('ed_reject_emg:noEmg', ...
+                'No EMG trace for method ''zscore''; skipping EMG QA (all pass).');
+            pass   = true(nEvents, 1);
+            thrMsg = 'skipped (no emg)';
+        else
+            emg = emg(:);
+            winSamp  = max(1, round(fs * p.Results.winSec));
+            baseSamp = max(1, round(fs * p.Results.baselineSec));
+            emgAbs = abs(emg);
+            emgMu  = movmean(emgAbs, baseSamp);
+            emgSd  = movstd(emgAbs, baseSamp);
+            emgSd(emgSd == 0) = eps;
 
-        peakEmg = zeros(nEvents, 1);
-        for iEv = 1:nEvents
-            seg = emgAbs(max(1, pos(iEv) - winSamp) : min(numel(emgAbs), pos(iEv) + winSamp));
-            peakEmg(iEv) = max(seg);
+            peakEmg = zeros(nEvents, 1);
+            for iEv = 1:nEvents
+                seg = emgAbs(max(1, pos(iEv) - winSamp) : min(numel(emgAbs), pos(iEv) + winSamp));
+                peakEmg(iEv) = max(seg);
+            end
+            score   = (peakEmg - emgMu(pos)) ./ emgSd(pos);
+            ed.emgZ = score;
+            pass    = score <= p.Results.thrZ;
+            thrMsg  = sprintf('thrZ=%g', p.Results.thrZ);
         end
-        score   = (peakEmg - emgMu(pos)) ./ emgSd(pos);
-        ed.emgZ = score;
-        pass    = score <= p.Results.thrZ;
-        thrMsg  = sprintf('thrZ=%g', p.Results.thrZ);
 
     case 'emg_rms'
         emgRms = p.Results.emgRms(:);
         if isempty(emgRms)
-            error('ed_reject_emg:noRms', 'Pass emgRms (e.g. sSig.emg_rms) for method ''emg_rms''.')
-        end
-        if isempty(p.Results.thrRms)
-            thrRms = prctile(emgRms, 75);
+            warning('ed_reject_emg:noRms', ...
+                'No emg_rms for method ''emg_rms''; skipping EMG QA (all pass).');
+            pass   = true(nEvents, 1);
+            thrMsg = 'skipped (no emg_rms)';
         else
-            thrRms = p.Results.thrRms;
+            if isempty(p.Results.thrRms)
+                thrRms = prctile(emgRms, 75);
+            else
+                thrRms = p.Results.thrRms;
+            end
+            eventSec  = (pos - 1) / fs;
+            score     = interp1((1:numel(emgRms))', emgRms, eventSec, 'nearest', 'extrap');
+            ed.emgRms = score;
+            pass      = score <= thrRms;
+            thrMsg    = sprintf('thrRms=%.3f', thrRms);
         end
-        eventSec  = (pos - 1) / fs;
-        score     = interp1((1:numel(emgRms))', emgRms, eventSec, 'nearest', 'extrap');
-        ed.emgRms = score;
-        pass      = score <= thrRms;
-        thrMsg    = sprintf('thrRms=%.3f', thrRms);
 end
 
 %% ========================================================================

@@ -121,22 +121,34 @@ switch zMet
         sigma(sigma < stdFloor) = stdFloor;
 
     case 'nrem'
-        % Global Mean/Std from NREM epochs only
-
+        % Global Mean/Std from NREM epochs only. Falls back to 'adaptive'
+        % when no NREM samples are available (missing / empty sleep states),
+        % so detection still runs on sessions without vigilance scoring.
         mask = false(size(baseSignal));
-        nremSamp = round(nremTimes * fs) + 1;
-        nSamples = length(baseSignal);
-
-        for iBout = 1:size(nremSamp, 1)
-            idxStart = max(1, nremSamp(iBout, 1));
-            idxEnd = min(nSamples, nremSamp(iBout, 2));
-            if idxStart <= idxEnd
-                mask(idxStart:idxEnd) = true;
+        if ~isempty(nremTimes)
+            nremSamp = round(nremTimes * fs) + 1;
+            nSamples = length(baseSignal);
+            for iBout = 1:size(nremSamp, 1)
+                idxStart = max(1, nremSamp(iBout, 1));
+                idxEnd = min(nSamples, nremSamp(iBout, 2));
+                if idxStart <= idxEnd
+                    mask(idxStart:idxEnd) = true;
+                end
             end
         end
 
-        mu = mean(baseSignal(mask), 'omitnan');
-        sigma = std(baseSignal(mask), 'omitnan');
+        if any(mask)
+            mu = mean(baseSignal(mask), 'omitnan');
+            sigma = std(baseSignal(mask), 'omitnan');
+        else
+            warning('ripp_sigPrep:noNrem', ...
+                'No NREM samples for ''nrem'' z-scoring; falling back to ''adaptive''.');
+            movLen = round(10 * fs);
+            mu = movmean(baseSignal, movLen);
+            sigma = movstd(baseSignal, movLen);
+            stdFloor = 1e-6 * mean(sigma, 'omitnan');
+            sigma(sigma < stdFloor) = stdFloor;
+        end
 
     otherwise
         error('Unknown zMet: %s', zMet);

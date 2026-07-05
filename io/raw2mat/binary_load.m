@@ -36,7 +36,7 @@ function data = binary_load(filename, varargin)
 % OUTPUT
 %   data        - matrix (nSamples x numel(ch)) of loaded data.
 %                 The data type is `double`.
-%                 The data is scaled by the `bit2uv` factor *twice*.
+%                 The data is scaled by the `bit2uv` factor once.
 %
 % Based on bz_LoadBinary by Michaël Zugaro (2004-2011) and DLevenstein (2016).
 

@@ -98,7 +98,6 @@ doPhase  = ismember(steps, {'all', 'phase'});
 %% ========================================================================
 %  SETUP
 %  ========================================================================
-cd(basepath);
 [~, basename] = fileparts(basepath);
 
 if verbose, fprintf('[RIPP]: Starting pipeline for %s...\n', basename); end
@@ -116,7 +115,6 @@ v = basepaths2vars('basepaths', {basepath}, 'vars', vars);
 % Session Parameters
 fs      = v.session.extracellular.srLfp;
 fsSpk   = v.session.extracellular.sr;
-uType   = v.units.type;
 
 if isinf(win(2))
     sigDur = Inf;
@@ -124,18 +122,44 @@ else
     sigDur = win(2) - win(1);
 end
 
-% Prepare Multi-Unit (MU) Spike Times
-% Flatten all units into a single sorted vector for MUA analysis
-muTimes = cellfun(@(x) x / fsSpk, v.spktimes, 'uni', false);
-muTimes = cellfun(@(x) x - win(1), muTimes, 'Uni', false);
-muTimes = cellfun(@(x) x(x >= 0 & x <= sigDur), muTimes, 'Uni', false);
-muTimes = {sort(vertcat(muTimes{:}))};
+% Unit classification (optional). Absent on sessions without spike sorting;
+% analyses that split by cell type fall back to a single "Global" group.
+hasUnits = isfield(v, 'units') && isfield(v.units, 'type');
+if hasUnits
+    uType = v.units.type;
+else
+    uType = [];
+end
 
-% Prepare Single-Unit (SU) Spike Times
-spkTimes = v.spikes.times;
-spkTimes = cellfun(@(x) x - win(1), spkTimes, 'Uni', false);
-spkTimes = cellfun(@(x) x(x >= 0 & x <= sigDur), spkTimes, 'Uni', false);
-nUnits = length(spkTimes);
+% Prepare Multi-Unit (MU) Spike Times (optional). Flatten all units into a
+% single sorted vector for MUA analysis / QA spike-gain.
+if isfield(v, 'spktimes') && ~isempty(v.spktimes)
+    muTimes = cellfun(@(x) x / fsSpk, v.spktimes, 'uni', false);
+    muTimes = cellfun(@(x) x - win(1), muTimes, 'Uni', false);
+    muTimes = cellfun(@(x) x(x >= 0 & x <= sigDur), muTimes, 'Uni', false);
+    muTimes = {sort(vertcat(muTimes{:}))};
+else
+    muTimes = {[]};     % empty MUA -> QA spike-gain criterion is skipped
+end
+
+% Prepare Single-Unit (SU) Spike Times (optional). Missing on sessions
+% without sorted spikes; spike-based analyses are skipped downstream.
+hasSpikes = isfield(v, 'spikes') && isfield(v.spikes, 'times') ...
+    && ~isempty(v.spikes.times);
+if hasSpikes
+    spkTimes = v.spikes.times;
+    spkTimes = cellfun(@(x) x - win(1), spkTimes, 'Uni', false);
+    spkTimes = cellfun(@(x) x(x >= 0 & x <= sigDur), spkTimes, 'Uni', false);
+    nUnits = length(spkTimes);
+else
+    spkTimes = {};
+    nUnits = 0;
+    if verbose, fprintf('[RIPP]: No sorted spikes; skipping spike analyses.\n'); end
+end
+
+% Gate spike-dependent steps on data availability
+doSpks  = doSpks  && hasSpikes;
+doPhase = doPhase && hasSpikes;
 
 % Prepare Bout Times
 try
@@ -395,33 +419,31 @@ end
 %  PLOT
 %  ========================================================================
 
-% Plot spikes
-if flgPlot
+% Plot spikes (requires the spike analyses to have run)
+if flgPlot && doSpks
     if verbose, fprintf('[RIPP]: Generating Summary Plot...\n'); end
     ripp_plotSpks(rippSpks, rippPeth, ...
         'basepath', basepath, ...
         'flgSaveFig', true);
-end
 
-if flgPlot
+    % Interactive per-ripple / per-unit map viewers (exploratory; guarded
+    % so a missing cell-type PETH does not abort the pipeline).
+    try
+        tblMap = struct2table(rmfield(rippMaps, {'tstamps', 'peth'}));
+        if isfield(rippMaps, 'peth')
+            if isfield(rippMaps.peth, 'RS'), tblMap.pethRs = rippMaps.peth.RS; end
+            if isfield(rippMaps.peth, 'FS'), tblMap.pethFs = rippMaps.peth.FS; end
+            if isfield(rippMaps.peth, 'MU'), tblMap.pethMu = rippMaps.peth.MU; end
+        end
+        tblGUI_xy(rippMaps.tstamps, tblMap, 'yVar', 'z', 'grpVar', 'states');
 
-    % Per Ripple Map
-    tblMap = struct2table(rmfield(rippMaps, {'tstamps', 'peth'}));
-
-    % Add PETH
-    tblMap.pethRs = rippMaps.peth.RS;
-    tblMap.pethFs = rippMaps.peth.FS;
-    tblMap.pethMu = rippMaps.peth.MU;
-
-    % Plot
-    tblGUI_xy(rippMaps.tstamps, tblMap, 'yVar', 'z', 'grpVar', 'states');
-
-    % Per Unit Map
-    tblUnit = table();
-    tblUnit.unitType = uType;
-    tblUnit.peth = rippSpks.peth;
-    tblGUI_xy(rippPeth.su.tstamps, tblUnit, 'yVar', 'peth', 'grpVar', 'states');
-
+        tblUnit = table();
+        tblUnit.unitType = uType;
+        tblUnit.peth = rippSpks.peth;
+        tblGUI_xy(rippPeth.su.tstamps, tblUnit, 'yVar', 'peth', 'grpVar', 'states');
+    catch ME
+        warning('ripp_wrapper:mapGUI', 'Skipped map viewers: %s', ME.message);
+    end
 end
 
 % Curation GUI (replaces the inline ripp_gui viewer). File-based: loads
@@ -547,22 +569,31 @@ flgPlot = params.flgPlot;
 flgSave = params.flgSave;
 verbose = params.verbose;
 
-% Load EMG
-% -------------------------------------------------------------------------
+% Load EMG (optional). Missing sleep_sig / emg simply disables the EMG QA
+% criterion rather than aborting detection.
 if verbose, fprintf('[RIPP]: Loading EMG...\n'); end
-load(fullfile(basepath, [basename, '.sleep_sig.mat']), 'emg');
-
-% Trim EMG
-s1 = round(win(1) * fs) + 1;
-if isinf(win(2))
-    emg = emg(s1:end);
-else
-    s2 = min(length(emg), round(win(2) * fs));
-    emg = emg(s1:s2);
+emg = [];
+sigFile = fullfile(basepath, [basename, '.sleep_sig.mat']);
+if isfile(sigFile)
+    S = load(sigFile, 'emg');
+    if isfield(S, 'emg'), emg = S.emg(:); end
 end
 
-if length(emg) ~= length(rippSig.lfp)
-    error('EMG and LFP do not fit')
+% Trim EMG to the analysis window and check it aligns with the LFP
+if ~isempty(emg)
+    s1 = round(win(1) * fs) + 1;
+    if isinf(win(2))
+        emg = emg(s1:end);
+    else
+        s2 = min(length(emg), round(win(2) * fs));
+        emg = emg(s1:s2);
+    end
+    if length(emg) ~= length(rippSig.lfp)
+        warning('ripp_wrapper:emgFit', ...
+            'EMG (%d) and LFP (%d) lengths differ; skipping EMG QA.', ...
+            length(emg), length(rippSig.lfp));
+        emg = [];
+    end
 end
 
 
@@ -581,8 +612,14 @@ ripp.state = ripp_states(ripp.times, ripp.peakTime, boutTimes, ...
     'flgPlot', false, ...
     'flgSave', false);
 
-% Quality Assurance
-[idxQA, met] = ripp_qa(ripp.times, boutTimes{4}, muTimes, emg, ripp.state, fs);
+% Quality Assurance. NREM baseline for EMG comes from the 4th bout cell by
+% convention; missing states leave it empty so the EMG/state criteria relax.
+if numel(boutTimes) >= 4
+    nremTimes = boutTimes{4};
+else
+    nremTimes = [];
+end
+[idxQA, met] = ripp_qa(ripp.times, nremTimes, muTimes, emg, ripp.state, fs);
 
 % Store
 ripp.emg = met.emg;
@@ -701,62 +738,74 @@ function [idxQA, met] = ripp_qa(rippTimes, nremTimes, muTimes, emg, rippState, f
 
 % EMG Analysis
 % -------------------------------------------------------------------------
-emgAbs = abs(emg);
+% Skipped (all events pass) when no EMG or no NREM baseline is available.
 nRipp = size(rippTimes, 1);
-rippEmg = nan(nRipp, 1);
+rippEmgZ = nan(nRipp, 1);
+idxEmg = true(nRipp, 1);
 
-for iRipp = 1:nRipp
-    bStart = max(1, round(rippTimes(iRipp,1) * fs));
-    bEnd = min(length(emg), round(rippTimes(iRipp,2) * fs));
-    rippEmg(iRipp) = mean(emgAbs(bStart : bEnd));
-end
+if ~isempty(emg) && ~isempty(nremTimes)
+    emgAbs = abs(emg);
+    rippEmg = nan(nRipp, 1);
+    for iRipp = 1:nRipp
+        bStart = max(1, round(rippTimes(iRipp,1) * fs));
+        bEnd = min(length(emg), round(rippTimes(iRipp,2) * fs));
+        rippEmg(iRipp) = mean(emgAbs(bStart : bEnd));
+    end
 
-% NREM Baseline
-nremMask = false(size(emg));
-if ~isempty(nremTimes)
+    % NREM Baseline
+    nremMask = false(size(emg));
     for iBout = 1:size(nremTimes, 1)
         bStart = max(1, round(nremTimes(iBout,1) * fs));
         bEnd = min(length(emg), round(nremTimes(iBout,2) * fs));
         nremMask(bStart : bEnd) = true;
     end
-end
-nremAmp = emgAbs(nremMask);
+    nremAmp = emgAbs(nremMask);
 
-% Z-Score
-if ~isempty(nremAmp)
-    rippEmgZ = (rippEmg - mean(nremAmp, 'omitnan')) / std(nremAmp, 'omitnan');
-else
-    rippEmgZ = nan(size(rippEmg));
+    % Z-Score against the NREM baseline
+    if ~isempty(nremAmp)
+        rippEmgZ = (rippEmg - mean(nremAmp, 'omitnan')) / std(nremAmp, 'omitnan');
+        idxEmg = rippEmgZ < 2;
+    end
 end
-
-idxEmg = rippEmgZ < 2;
 
 % Spike Gain
 % -------------------------------------------------------------------------
-% Generate control intervals locally
-ctrlTimes = ripp_ctrlTimes(rippTimes);
+% Skipped (all events pass) when no multi-unit spikes are available.
+spkGain = nan(nRipp, 1);
+idxGain = true(nRipp, 1);
 
-% Calculate Rates
-% muTimes is expected to be {vector}
-rippRates = times2rate(muTimes, 'winCalc', rippTimes, 'binsize', Inf);
-ctrlRates = times2rate(muTimes, 'winCalc', ctrlTimes, 'binsize', Inf);
+muEmpty = isempty(muTimes) || all(cellfun(@isempty, muTimes));
+if ~muEmpty
+    % Generate control intervals locally
+    ctrlTimes = ripp_ctrlTimes(rippTimes);
 
-% Gain = (Ripple Rate - Mean Control) / Std Control
-muCtrl = mean(ctrlRates, 'all', 'omitnan');
-sdCtrl = std(ctrlRates, [], 'all', 'omitnan');
-if sdCtrl == 0, sdCtrl = 1; end
+    % Calculate Rates (muTimes is expected to be {vector})
+    rippRates = times2rate(muTimes, 'winCalc', rippTimes, 'binsize', Inf);
+    ctrlRates = times2rate(muTimes, 'winCalc', ctrlTimes, 'binsize', Inf);
 
-spkGain = (rippRates - muCtrl) ./ sdCtrl;
-% Ensure gain is column vector for consistency
-if size(spkGain, 2) > size(spkGain, 1), spkGain = spkGain'; end
+    % Gain = (Ripple Rate - Mean Control) / Std Control
+    muCtrl = mean(ctrlRates, 'all', 'omitnan');
+    sdCtrl = std(ctrlRates, [], 'all', 'omitnan');
+    if sdCtrl == 0, sdCtrl = 1; end
 
-idxGain = spkGain > 0;
+    spkGain = (rippRates - muCtrl) ./ sdCtrl;
+    % Ensure gain is column vector for consistency
+    if size(spkGain, 2) > size(spkGain, 1), spkGain = spkGain'; end
+
+    idxGain = spkGain > 0;
+end
 
 % States
 % -------------------------------------------------------------------------
-% Valid states
+% Keep events in valid vigilance states. When no states are assigned at all
+% (all undefined), the criterion is skipped so unlabelled sessions pass.
 validStates = {'QWAKE', 'LSLEEP', 'NREM'};
-idxState = ismember(rippState, validStates);
+if iscategorical(rippState) && all(isundefined(rippState))
+    idxState = true(nRipp, 1);
+else
+    idxState = ismember(rippState, validStates);
+    idxState = idxState(:);
+end
 
 % Combine
 % -------------------------------------------------------------------------
