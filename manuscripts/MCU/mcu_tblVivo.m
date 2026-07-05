@@ -90,12 +90,12 @@ end
 if ismember('rippSpks', presets)
     vars = [vars, 'rippSpks', 'rippSpkLfp'];
     spkType = '';
-    varMap.frRipp = ['rippSpks.', spkType, '.frRipp'];
-    varMap.frRand = ['rippSpks.', spkType, '.frRand'];
+    varMap.frRipp = ['rippSpks.', spkType, '.frEvt'];
+    varMap.frRand = ['rippSpks.', spkType, '.frCtrl'];
     varMap.frZ = ['rippSpks.', spkType, '.frZ'];
     varMap.frMod = ['rippSpks.', spkType, '.frMod'];
     varMap.pFire = ['rippSpks.', spkType, '.pFire'];
-    varMap.cRipp = ['rippSpks.', spkType, '.cRipp'];
+    varMap.cRipp = ['rippSpks.', spkType, '.cEvt'];
     varMap.rankMean = ['rippSpks.', spkType, '.rankMean'];
     varMap.rankVar = ['rippSpks.', spkType, '.rankVar'];
     varMap.frActive = ['rippSpks.', spkType, '.frActive'];

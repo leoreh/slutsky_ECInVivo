@@ -4,12 +4,12 @@ function maps = evt_spkPeth(spkTimes, peakTimes, ctrlTimes, varargin)
 %   maps = EVT_SPKPETH(spkTimes, peakTimes, ctrlTimes, varargin)
 %
 %   SUMMARY:
-%       Calculates 3D Spike Maps (Unit x Event x Time) for both Ripple and Control events.
+%       Calculates 3D Spike Maps (Unit x Event x Time) for both Event and Control events.
 %       Uses fast vectorized binning (discretize/accumarray) for efficiency.
 %
 %   INPUTS:
 %       spkTimes    - (Cell) {N_units x 1} Spike times [s].
-%       peakTimes   - (Vec)  [N x 1] Ripple peak times [s] (Alignment Point).
+%       peakTimes   - (Vec)  [N x 1] Event peak times [s] (Alignment Point).
 %       ctrlTimes   - (Mat)  [N x 2] Control start/end [s]. (Aligned to center).
 %       varargin    - Parameter/Value pairs:
 %           'mapDur'   - (Vec)  Window [pre post] in seconds. (Default: [-0.05 0.05]).
@@ -18,7 +18,7 @@ function maps = evt_spkPeth(spkTimes, peakTimes, ctrlTimes, varargin)
 %
 %   OUTPUTS:
 %       maps        - (Struct) PETH Structure:
-%           .ripp      - (N_units x N_ripples  x N_bins) Spike count map.
+%           .ripp      - (N_units x N_events  x N_bins) Spike count map.
 %           .ctrl      - (N_units x N_controls x N_bins) Spike count map.
 %           .tstamps   - (Vec) Time vector for the x-axis.
 %
@@ -51,7 +51,7 @@ flgSave = p.Results.flgSave;
 savefile = fullfile(basepath, [basename, '.evtSpkPeth.mat']);
 
 nUnits = length(spkTimes);
-nRipples = length(peakTimes);
+nEvents = length(peakTimes);
 nControls = size(ctrlTimes, 1);
 
 % Define Time Bins
@@ -68,7 +68,7 @@ ctrlCenters = mean(ctrlTimes, 2);
 
 % Initialize Output
 maps = struct();
-maps.ripp = zeros(nUnits, nRipples, nBins);
+maps.ripp = zeros(nUnits, nEvents, nBins);
 maps.ctrl = zeros(nUnits, nControls, nBins);
 maps.tstamps = timeBins;
 
@@ -83,7 +83,7 @@ for iUnit = 1:nUnits
         continue;
     end
 
-    % Ripple Map
+    % Event Map
     maps.ripp(iUnit, :, :) = sync_spksMap(unitSpks, peakTimes, mapDur, edges);
 
     % Control Map

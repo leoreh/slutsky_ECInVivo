@@ -280,7 +280,7 @@ else
     % Spike-modulation summary figure (parity with ripples)
     if flgPlot && flgEdSpks
         evt_plotSpks(edSpks, edPeth, 'basepath', basepath, ...
-            'flgSaveFig', true, 'name', 'ed');
+            'flgSaveFig', true, 'name', 'ed', 'lbl', 'ED');
     end
 end
 

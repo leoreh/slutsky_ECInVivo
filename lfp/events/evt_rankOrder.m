@@ -1,16 +1,16 @@
-function [rankMean, rankVar, timesFirst, timesLate] = evt_rankOrder(spkTimes, rippTimes)
+function [rankMean, rankVar, timesFirst, timesLate] = evt_rankOrder(spkTimes, evtTimes)
 % EVT_RANKORDER Calculates the normalized temporal rank of units within
-% ripples.
+% events.
 %
 %   INPUTS:
 %       spkTimes      - (Cell) {N_units x 1} Spike times [s].
-%       rippTimes     - (Mat)  [N_ripp x 2] Ripple start/end times [s].
+%       evtTimes     - (Mat)  [N_ripp x 2] Event start/end times [s].
 %
 %   OUTPUTS:
 %       rankMean      - (Vec)  [N_units x 1] Mean normalized rank (0=Leader, 1=Follower).
 %       rankVar       - (Vec)  [N_units x 1] Variance of rank order.
-%       timesFirst    - (Cell) {N_units x 1} First spike in each ripple per unit.
-%       timesLate     - (Cell) {N_units x 1} Subsequent spikes in each ripple per unit.
+%       timesFirst    - (Cell) {N_units x 1} First spike in each event per unit.
+%       timesLate     - (Cell) {N_units x 1} Subsequent spikes in each event per unit.
 %
 %   HISTORY:
 %       Updated: 26 Jan 2026
@@ -42,30 +42,30 @@ if isempty(allSpks)
     return;
 end
 
-% Map Spikes to Ripples
+% Map Spikes to Events
 % Create edges for discretize: [Start1, End1, Start2, End2, ...]
-rippEdges = reshape(rippTimes', [], 1);
-binIdx    = discretize(allSpks, rippEdges);
+evtEdges = reshape(evtTimes', [], 1);
+binIdx    = discretize(allSpks, evtEdges);
 
-% Keep only spikes inside ripple intervals (odd bins)
-inRipp = mod(binIdx, 2) == 1;
+% Keep only spikes inside event intervals (odd bins)
+inEvt = mod(binIdx, 2) == 1;
 
-relSpks  = allSpks(inRipp);
-relUnits = allUnits(inRipp);
-relRipp  = (binIdx(inRipp) + 1) / 2; % Convert bin index to Ripple ID
+relSpks  = allSpks(inEvt);
+relUnits = allUnits(inEvt);
+relEvt  = (binIdx(inEvt) + 1) / 2; % Convert bin index to Event ID
 
-% Identify First Spike per Unit per Ripple
-% Sort by RippleID then Timestamp
-[~, sortIdx] = sortrows([relRipp, relSpks]);
-srtdRipp  = relRipp(sortIdx);
+% Identify First Spike per Unit per Event
+% Sort by EventID then Timestamp
+[~, sortIdx] = sortrows([relEvt, relSpks]);
+srtdEvt  = relEvt(sortIdx);
 srtdUnits = relUnits(sortIdx);
 srtdSpks  = relSpks(sortIdx);
 
-% Unique rows of [RippleID, UnitID] will return the first occurrence (lowest time)
-[~, firstIdx] = unique([srtdRipp, srtdUnits], 'rows', 'first');
+% Unique rows of [EventID, UnitID] will return the first occurrence (lowest time)
+[~, firstIdx] = unique([srtdEvt, srtdUnits], 'rows', 'first');
 
 % Extract First Spikes
-partRipp  = srtdRipp(firstIdx);
+partEvt  = srtdEvt(firstIdx);
 partUnits = srtdUnits(firstIdx);
 partTimes = srtdSpks(firstIdx);
 
@@ -95,26 +95,26 @@ timesLate  = cellfun(@sort, timesLate,  'UniformOutput', false);
 %  RANK CALCULATION
 % =========================================================================
 
-% Sort participants by RippleID (primary) and Time (secondary)
-[~, rankSortIdx] = sortrows([partRipp, partTimes]);
-partRipp  = partRipp(rankSortIdx);
+% Sort participants by EventID (primary) and Time (secondary)
+[~, rankSortIdx] = sortrows([partEvt, partTimes]);
+partEvt  = partEvt(rankSortIdx);
 partUnits = partUnits(rankSortIdx);
 
-% Get number of participants per ripple
-[~, ~, ic] = unique(partRipp);
+% Get number of participants per event
+[~, ~, ic] = unique(partEvt);
 countsPerRipp = accumarray(ic, 1);
 
-% Calculate Rank (1-based index within each ripple group)
-% Find start index of each ripple group in the sorted list
-[~, grpStartIdx] = unique(partRipp, 'first');
+% Calculate Rank (1-based index within each event group)
+% Find start index of each event group in the sorted list
+[~, grpStartIdx] = unique(partEvt, 'first');
 
 % Expand group start index to every element
 startIndices = grpStartIdx(ic);
 
 % Rank = current_index - start_index + 1
-ranks = (1:length(partRipp))' - startIndices + 1;
+ranks = (1:length(partEvt))' - startIndices + 1;
 
-% Default to 0.5 (neutral) for single-participant ripples to avoid NaN
+% Default to 0.5 (neutral) for single-participant events to avoid NaN
 scores = ones(size(ranks)) * 0.5;
 
 % Normalized Rank (0 to 1) -> (Rank - 1) / (Count - 1)

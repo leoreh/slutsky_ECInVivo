@@ -1,17 +1,17 @@
-function evtMaps = evt_maps(rippSig, peakTime, fs, varargin)
+function evtMaps = evt_maps(evtSig, peakTime, fs, varargin)
 % EVT_MAPS Generates Peri-Event Time Histograms (PETH) for LFP signals.
 %
-%   evtMaps = EVT_MAPS(rippSig, peakTime, fs, varargin)
+%   evtMaps = EVT_MAPS(evtSig, peakTime, fs, varargin)
 %
 %   SUMMARY:
-%       Extracts windowed signal traces around ripple peaks.
+%       Extracts windowed signal traces around event peaks.
 %       Uses high-performance vectorized indexing to extract all events simultaneously.
 %       Handles edge cases (start/end of recording) by padding with NaNs.
 %
 %   INPUTS:
-%       rippSig     - (Struct) Structure with signal fields (.lfp, .filt, .amp, etc.).
+%       evtSig     - (Struct) Structure with signal fields (.lfp, .filt, .amp, etc.).
 %                              All vector fields matching LFP length will be mapped.
-%       peakTime    - (Vec)    [N x 1] Times of ripple peaks [s].
+%       peakTime    - (Vec)    [N x 1] Times of event peaks [s].
 %       fs          - (Num)    Sampling frequency [Hz].
 %       varargin    - Parameter/Value pairs:
 %           'mapDur'   - (Vec)  Window size [pre post] in seconds. (Default: [-0.05 0.05]).
@@ -33,13 +33,13 @@ function evtMaps = evt_maps(rippSig, peakTime, fs, varargin)
 %  ARGUMENTS
 % =========================================================================
 p = inputParser;
-addRequired(p, 'rippSig', @isstruct);
+addRequired(p, 'evtSig', @isstruct);
 addRequired(p, 'peakTime', @isnumeric);
 addRequired(p, 'fs', @isnumeric);
 addParameter(p, 'mapDur', [-0.05 0.05], @isnumeric);
 addParameter(p, 'basepath', pwd, @ischar);
 addParameter(p, 'flgSave', true, @islogical);
-parse(p, rippSig, peakTime, fs, varargin{:});
+parse(p, evtSig, peakTime, fs, varargin{:});
 
 mapDur = p.Results.mapDur;
 basepath = p.Results.basepath;
@@ -56,25 +56,25 @@ winSamps = round(mapDur(1)*fs) : round(mapDur(2)*fs);
 
 evtMaps = struct();
 evtMaps.tstamps = winSamps / fs;
-nSamps = length(rippSig.lfp);
+nSamps = length(evtSig.lfp);
 
 % Convert peak times to samples
 peakSamps = round(peakTime * fs) + 1;
 
 % 4. Broadcast to create Full Index Matrix
-% Creates indices for EVERY sample of EVERY ripple in one step: [nEvents x nWindowSize]
+% Creates indices for EVERY sample of EVERY event in one step: [nEvents x nWindowSize]
 idxMat = peakSamps + winSamps;
 
-% Handle Edge Cases (Ripples at very start/end of recording)
+% Handle Edge Cases (Events at very start/end of recording)
 % We set invalid indices to 1 temporarily and then NaN them out later
 validMask = (idxMat >= 1) & (idxMat <= nSamps);
 idxMat(~validMask) = 1;
 
 % 5. Extract Maps per Field
-fields = fieldnames(rippSig);
+fields = fieldnames(evtSig);
 for iFld = 1:length(fields)
     fn = fields{iFld};
-    signal = rippSig.(fn);
+    signal = evtSig.(fn);
 
     % Skip if signal dimension doesn't match LFP (e.g. metadata fields)
     if ~isvector(signal) || length(signal) ~= nSamps

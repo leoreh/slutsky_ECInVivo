@@ -1,22 +1,22 @@
-function hFig = evt_plotSpks(rippSpks, spkPeth, varargin)
-% EVT_PLOTSPKS Visualizes ripple-modulated spiking activity.
+function hFig = evt_plotSpks(evtSpks, spkPeth, varargin)
+% EVT_PLOTSPKS Visualizes event-modulated spiking activity.
 %
-%   hFig = EVT_PLOTSPKS(rippSpks, spkPeth, varargin)
+%   hFig = EVT_PLOTSPKS(evtSpks, spkPeth, varargin)
 %
 %   SUMMARY:
 %       Generates a comprehensive summary figure:
 %       Row 1 (MUA):
 %           - PETH Heatmap (Events x Time).
-%           - Mean Rates (Ripple vs Control) with SEM shading.
+%           - Mean Rates (Event vs Control) with SEM shading.
 %           - Spike Count Probability Distribution.
 %       Row 2 (SUA):
 %           - Normalized PETH Heatmap (Units x Time) sorted by peak latency.
 %           - Population Mean Response (Split by Cell Type if available).
-%           - Modulation Scatter Plot (Baseline FR vs Ripple FR).
+%           - Modulation Scatter Plot (Baseline FR vs Event FR).
 %
 %   INPUTS:
-%       rippSpks    - (Struct) Stats from ripp_spks.m. Flat struct with
-%                     per-unit fields (.frRipp, .frRand, ...).
+%       evtSpks    - (Struct) Stats from ripp_spks.m. Flat struct with
+%                     per-unit fields (.frEvt, .frCtrl, ...).
 %       spkPeth     - (Struct) Maps from ripp_spkPeth.m, grouped as:
 %                     .mu / .su, each with .ripp/.ctrl/.tstamps.
 %       varargin    - Parameter/Value pairs:
@@ -31,7 +31,7 @@ function hFig = evt_plotSpks(rippSpks, spkPeth, varargin)
 %
 %   HISTORY:
 %       Jan 2026 - Created.
-%       Jul 2026 - Dropped PlotColorMap dependency; fixed rippSpks.mu/.su
+%       Jul 2026 - Dropped PlotColorMap dependency; fixed evtSpks.mu/.su
 %                  field access; hardened maps handling and saving.
 %
 
@@ -39,16 +39,18 @@ function hFig = evt_plotSpks(rippSpks, spkPeth, varargin)
 %  ARGUMENTS
 %  ========================================================================
 p = inputParser;
-addRequired(p, 'rippSpks', @isstruct);
+addRequired(p, 'evtSpks', @isstruct);
 addRequired(p, 'spkPeth', @isstruct);
 addParameter(p, 'basepath', pwd, @ischar);
 addParameter(p, 'flgSaveFig', true, @islogical);
 addParameter(p, 'name', 'evt', @ischar);
-parse(p, rippSpks, spkPeth, varargin{:});
+addParameter(p, 'lbl', 'Event', @ischar);
+parse(p, evtSpks, spkPeth, varargin{:});
 
 basepath = p.Results.basepath;
 flgSaveFig = p.Results.flgSaveFig;
 name = p.Results.name;
+lbl = p.Results.lbl;
 
 %% ========================================================================
 %  VALIDATE
@@ -110,16 +112,16 @@ end
 %  ========================================================================
 
 % Colors
-clrRipp = [0 0 0];          % Black
+clrEvt = [0 0 0];          % Black
 clrCtrl = [0.5 0.5 0.5];    % Gray
 clrRS   = [0 0 1];          % Blue
 clrFS   = [1 0 0];          % Red
 
-hFig = figure('Name', [basename '_rippSpks'], 'Color', 'w', ...
+hFig = figure('Name', [basename '_evtSpks'], 'Color', 'w', ...
     'Units', 'normalized', 'Position', [0.1 0.1 0.6 0.8]);
 
 tl = tiledlayout(hFig, 2, 3, 'Padding', 'compact', 'TileSpacing', 'compact');
-title(tl, [basename ' - Ripple Modulation'], 'Interpreter', 'none');
+title(tl, [basename ' - ' lbl ' Modulation'], 'Interpreter', 'none');
 
 %% ========================================================================
 %  MUA (Row 1)
@@ -133,7 +135,7 @@ rData = collapseUnit(muMaps.ripp);
 cData = collapseUnit(muMaps.ctrl);
 nEvents = size(rData, 1);
 
-% PETH Map (Ripples)
+% PETH Map (Events)
 % ---------------------
 hAx = nexttile(tl);
 if nEvents == 0
@@ -153,12 +155,12 @@ title(hAx, sprintf('MUA PETH (n=%d)', nEvents));
 ylabel(hAx, 'Event #');
 xlabel(hAx, 'Time (s)');
 
-% Mean Rates (Ripple vs Control)
+% Mean Rates (Event vs Control)
 % ---------------------------------
 hAx = nexttile(tl); hold(hAx, 'on');
 
 plot_stdShade('hAx', hAx, 'dataMat', rData, 'xVal', tVec, ...
-    'clr', clrRipp, 'alpha', 0.2);
+    'clr', clrEvt, 'alpha', 0.2);
 plot_stdShade('hAx', hAx, 'dataMat', cData, 'xVal', tVec, ...
     'clr', clrCtrl, 'alpha', 0.2);
 
@@ -166,7 +168,7 @@ axis(hAx, 'tight');
 xlabel(hAx, 'Time (s)');
 ylabel(hAx, 'Spikes / Bin');
 title(hAx, 'MUA Mean Response');
-legend(hAx, {'Ripple', 'Control'}, 'Location', 'best', 'Box', 'off');
+legend(hAx, {lbl, 'Control'}, 'Location', 'best', 'Box', 'off');
 
 % Spiking Probability Distribution
 % -----------------------------------
@@ -177,7 +179,7 @@ rCounts = sum(rData, 2);
 cCounts = sum(cData, 2);
 
 histogram(hAx, rCounts, 'Normalization', 'probability', ...
-    'DisplayStyle', 'stairs', 'EdgeColor', clrRipp, 'LineWidth', 2);
+    'DisplayStyle', 'stairs', 'EdgeColor', clrEvt, 'LineWidth', 2);
 histogram(hAx, cCounts, 'Normalization', 'probability', ...
     'DisplayStyle', 'stairs', 'EdgeColor', clrCtrl, 'LineWidth', 2);
 
@@ -194,7 +196,7 @@ suMaps = spkPeth.su;
 tVec = suMaps.tstamps(:)';
 nBins = size(suMaps.ripp, 3);
 
-% Mean PETH across ripples: [nUnits x nEvents x nBins] -> [nUnits x nBins]
+% Mean PETH across events: [nUnits x nEvents x nBins] -> [nUnits x nBins]
 % (reshape rather than squeeze to stay valid when nUnits == 1)
 meanPeth = reshape(mean(suMaps.ripp, 2, 'omitnan'), nUnits, nBins);
 
@@ -241,7 +243,7 @@ if flgUnits
 elseif nUnits > 0
     % Plot all if no types
     plot_stdShade('hAx', hAx, 'dataMat', normPeth, 'xVal', tVec, ...
-        'clr', clrRipp, 'alpha', 0.2);
+        'clr', clrEvt, 'alpha', 0.2);
     legend(hAx, {sprintf('All Units (n=%d)', nUnits)}, ...
         'Location', 'best', 'Box', 'off');
 end
@@ -251,16 +253,16 @@ xlabel(hAx, 'Time (s)');
 ylabel(hAx, 'Norm. Firing Rate');
 title(hAx, 'SUA Mean Response');
 
-% Modulation Scatter (Ripple vs Baseline FR)
+% Modulation Scatter (Event vs Baseline FR)
 % ---------------------------------------------
 hAx = nexttile(tl); hold(hAx, 'on');
 
-if isfield(rippSpks, 'frRipp') && isfield(rippSpks, 'frRand')
-    frRipp = rippSpks.frRipp(:);
-    frRand = rippSpks.frRand(:);
+if isfield(evtSpks, 'frEvt') && isfield(evtSpks, 'frCtrl')
+    frEvt = evtSpks.frEvt(:);
+    frCtrl = evtSpks.frCtrl(:);
 
     % Log-axis limits from positive, finite rates only
-    posFR = [frRipp; frRand];
+    posFR = [frEvt; frCtrl];
     posFR = posFR(isfinite(posFR) & posFR > 0);
     if isempty(posFR)
         minVal = 0.01; maxVal = 1;
@@ -274,18 +276,18 @@ if isfield(rippSpks, 'frRipp') && isfield(rippSpks, 'frRand')
     plot(hAx, [minVal maxVal], [minVal maxVal], 'k--');
 
     % Only split by type when the vectors align with the unit indices
-    flgSplit = flgUnits && numel(frRipp) == nUnits;
+    flgSplit = flgUnits && numel(frEvt) == nUnits;
     if flgSplit
         if any(idxRS)
-            scatter(hAx, frRand(idxRS), frRipp(idxRS), 20, clrRS, 'filled', ...
+            scatter(hAx, frCtrl(idxRS), frEvt(idxRS), 20, clrRS, 'filled', ...
                 'MarkerFaceAlpha', 0.6);
         end
         if any(idxFS)
-            scatter(hAx, frRand(idxFS), frRipp(idxFS), 20, clrFS, 'filled', ...
+            scatter(hAx, frCtrl(idxFS), frEvt(idxFS), 20, clrFS, 'filled', ...
                 'MarkerFaceAlpha', 0.6);
         end
     else
-        scatter(hAx, frRand, frRipp, 20, clrRipp, 'filled', 'MarkerFaceAlpha', 0.6);
+        scatter(hAx, frCtrl, frEvt, 20, clrEvt, 'filled', 'MarkerFaceAlpha', 0.6);
     end
 
     set(hAx, 'XScale', 'log', 'YScale', 'log');
@@ -296,7 +298,7 @@ else
 end
 
 xlabel(hAx, 'Baseline FR (Hz)');
-ylabel(hAx, 'Ripple FR (Hz)');
+ylabel(hAx, [lbl ' FR (Hz)']);
 title(hAx, 'Rate Modulation');
 
 %% ========================================================================

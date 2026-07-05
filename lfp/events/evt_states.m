@@ -1,17 +1,17 @@
-function [stateIdx, evtStates] = evt_states(rippTimes, peakTimes, boutTimes, varargin)
-% EVT_STATES Classifies ripples by vigilance state and computes bout statistics.
+function [stateIdx, evtStates] = evt_states(evtTimes, peakTimes, boutTimes, varargin)
+% EVT_STATES Classifies events by vigilance state and computes bout statistics.
 %
-%   [stateIdx, evtStates] = EVT_STATES(rippTimes, peakTimes, boutTimes, varargin)
+%   [stateIdx, evtStates] = EVT_STATES(evtTimes, peakTimes, boutTimes, varargin)
 %
 %   SUMMARY:
-%       1. Assigns a vigilance state to each ripple based on its peak time.
-%       2. Calculates Ripple Rate (Hz) and Density (duration/duration) for
+%       1. Assigns a vigilance state to each event based on its peak time.
+%       2. Calculates Event Rate (Hz) and Density (duration/duration) for
 %          every individual sleep bout.
 %       3. Aggregates this into a summary table.
 %
 %   INPUTS:
-%       rippTimes   - (Mat)  [N x 2] Ripple start/end times [s].
-%       peakTimes   - (Vec)  [N x 1] Ripple peak times [s].
+%       evtTimes   - (Mat)  [N x 2] Event start/end times [s].
+%       peakTimes   - (Vec)  [N x 1] Event peak times [s].
 %       boutTimes   - (Cell) {N_states x 1} Cell array of [Start End] matrices.
 %                            Typically {Wake, NREM, REM, ...}.
 %       varargin    - Parameter/Value pairs:
@@ -20,7 +20,7 @@ function [stateIdx, evtStates] = evt_states(rippTimes, peakTimes, boutTimes, var
 %           'flgSave'  - (Log)  Save .evtStates.mat? (Default: true).
 %
 %   OUTPUTS:
-%       stateIdx    - (Cat)   [N_ripples x 1] Categorical array of states.
+%       stateIdx    - (Cat)   [N_events x 1] Categorical array of states.
 %       evtStates  - (Table) Summary table with rows per bout:
 %                             [Rate, Density, Duration, State, Start, End].
 %
@@ -34,16 +34,17 @@ function [stateIdx, evtStates] = evt_states(rippTimes, peakTimes, boutTimes, var
 %  ARGUMENTS
 %  ========================================================================
 p = inputParser;
-addRequired(p, 'rippTimes', @isnumeric);
+addRequired(p, 'evtTimes', @isnumeric);
 addRequired(p, 'peakTimes', @isnumeric);
 addRequired(p, 'boutTimes', @(x) iscell(x) || isempty(x));
 addParameter(p, 'basepath', pwd, @ischar);
 addParameter(p, 'flgPlot', true, @islogical);
 addParameter(p, 'flgSave', true, @islogical);
 addParameter(p, 'name', 'evt', @ischar);
-parse(p, rippTimes, peakTimes, boutTimes, varargin{:});
+addParameter(p, 'lbl', 'Event', @ischar);
+parse(p, evtTimes, peakTimes, boutTimes, varargin{:});
 
-rippTimes = p.Results.rippTimes;
+evtTimes = p.Results.evtTimes;
 peakTimes = p.Results.peakTimes;
 boutTimes = p.Results.boutTimes;
 if isempty(boutTimes), boutTimes = {}; end   % [] -> {} : no states, all events undefined
@@ -51,6 +52,7 @@ basepath = p.Results.basepath;
 flgPlot = p.Results.flgPlot;
 flgSave = p.Results.flgSave;
 name = p.Results.name;
+lbl = p.Results.lbl;
 
 % =========================================================================
 %  PREP
@@ -59,10 +61,10 @@ name = p.Results.name;
 savefile = fullfile(basepath, [basename, '.', name, 'States.mat']);
 
 nStates = length(boutTimes);
-nRipples = length(peakTimes);
+nEvents = length(peakTimes);
 
 % Initialize Categorical Index
-stateIdx = categorical(nan(nRipples, 1));
+stateIdx = categorical(nan(nEvents, 1));
 
 % Load State Config (Colors/Names)
 try
@@ -84,7 +86,7 @@ end
 %  CALCULATION (PER BOUT)
 %  ========================================================================
 
-rippDur = rippTimes(:,2) - rippTimes(:,1);
+evtDur = evtTimes(:,2) - evtTimes(:,1);
 tblState = cell(nStates, 1);
 stateCounts = zeros(nStates, 1);
 
@@ -97,7 +99,7 @@ for iState = 1:nStates
         continue;
     end
 
-    % Map ripples to bouts for this state (Categorical Assignment)
+    % Map events to bouts for this state (Categorical Assignment)
     if ~isempty(bouts)
         inState = intervals(bouts).contains(peakTimes);
         stateIdx(inState) = stateNames{iState};
@@ -114,16 +116,16 @@ for iState = 1:nStates
         tStart = bouts(iBout, 1);
         tEnd   = bouts(iBout, 2);
 
-        % Find ripples in this specific bout
+        % Find events in this specific bout
         idxBout = peakTimes >= tStart & peakTimes <= tEnd;
 
         count = sum(idxBout);
-        durSum = sum(rippDur(idxBout));
+        durSum = sum(evtDur(idxBout));
 
         % Rate (Hz) = Count / Bout Duration
         rate(iBout) = count / boutDur(iBout);
 
-        % Density (fraction) = Total Ripple Duration / Bout Duration
+        % Density (fraction) = Total Event Duration / Bout Duration
         density(iBout) = durSum / boutDur(iBout);
     end
 
@@ -166,13 +168,13 @@ if flgPlot && ~isempty(evtStates)
     % Rate vs Time
     nexttile([1, 2]); hold on;
     gscatter(T.Start / 3600, T.Rate, T.State, plotColors, '.', 10, 'off');
-    xlabel('Time (h)'); ylabel('Rate (Hz)'); title('Ripple Rate');
+    xlabel('Time (h)'); ylabel('Rate (Hz)'); title([lbl ' Rate']);
     axis tight;
 
     % Density vs Time
     nexttile([1, 2]); hold on;
     gscatter(T.Start / 3600, T.Density, T.State, plotColors, '.', 10, 'off');
-    xlabel('Time (h)'); ylabel('Density (s/s)'); title('Ripple Density');
+    xlabel('Time (h)'); ylabel('Density (s/s)'); title([lbl ' Density']);
     axis tight;
 
     % Rate vs Duration (Check for short-bout bias)
@@ -197,10 +199,10 @@ if flgPlot && ~isempty(evtStates)
         end
 
         legend(stateNames, 'Location', 'bestoutside');
-        title('Ripple Count Distribution');
+        title([lbl ' Count Distribution']);
     end
 
-    sgtitle([basename ' - Ripple States'], 'Interpreter', 'none');
+    sgtitle([basename ' - ' lbl ' States'], 'Interpreter', 'none');
 
     figDir = fullfile(basepath, 'graphics');
     if ~exist(figDir, 'dir'), mkdir(figDir); end
