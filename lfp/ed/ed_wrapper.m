@@ -8,9 +8,9 @@ function ed = ed_wrapper(varargin)
 %       ripples pipeline, struct-based, no class):
 %       1. Load session + sleep_states; load signals once (ed_sigLoad).
 %       2. Detect (ed_detect), characterise (ed_params), score EMG
-%          (ed_reject_emg), label state (evt_states).
-%       3. Filter by automatic QA (EMG + optional amp/dur); seed .accepted
-%          all-true on the survivors (no .idxQA kept).
+%          (evt_emgScore), label state (evt_states).
+%       3. Filter by automatic QA (evt_qa: EMG + optional amp/dur; no state
+%          criterion); seed .accepted all-true on the survivors (no .idxQA kept).
 %       4. Parity analyses (shared evt_* layer): matched control intervals,
 %          LFP maps, and MUA/SU spike modulation + PETH around discharges.
 %       5. Convert times to absolute; optionally save .ed / .edMaps / .edSpks
@@ -34,14 +34,10 @@ function ed = ed_wrapper(varargin)
 %       'lowThr'     - (Num)  Twin-peak merge trough (signal units). {0.2}
 %       'minAmp'     - (Num)  Absolute amplitude floor at detection. {[]}
 %       'marg'       - (Num)  Feature clip half-window [s]. {0.05}
-%       'emgMethod'  - (Char) 'zscore' (default) | 'emg_rms'.
-%       'thrZ'       - (Num)  EMG z-score pass threshold. {3}
-%       'thrRms'     - (Num)  emg_rms pass threshold. {75th pct}
+%       'thrZ'       - (Num)  EMG z-score pass threshold for QA. {3}
 %       'durLim'     - (Vec)  [min max] half-amp width for QA (ms). {[]}
 %       'minAmpQA'   - (Num)  Amplitude floor for QA. {[]}
-%       'binsize'    - (Num)  Bin width for evt_rate [s]. {60}
-%       'flgRate'    - (Log)  Compute (and, with flgPlot, plot) evt_rate? {false}
-%       'flgPlot'    - (Log)  Generate summary figures + viewers? {true}
+%       'flgPlot'    - (Log)  Generate the summary figure? {true}
 %       'flgSave'    - (Log)  Save <basename>.ed.mat (+ artefacts)? {false}
 %       'flgCurate'  - (Log)  Launch the curation GUI (gui_curate)? {false}
 %       'flgForce'   - (Log)  Re-detect even if <basename>.ed.mat exists? {false}
@@ -53,9 +49,9 @@ function ed = ed_wrapper(varargin)
 %                     by the GUI; this return is the pre-curation struct.
 %
 %   DEPENDENCIES:
-%       basepaths2vars, ed_sigLoad, ed_detect, ed_params, ed_reject_emg,
+%       basepaths2vars, ed_sigLoad, ed_detect, ed_params, evt_emgScore, evt_qa,
 %       evt_spkPrep, evt_states, evt_ctrlTimes, evt_maps, evt_spks,
-%       evt_plotSpks, evt_viewSpks, evt_rate, gui_curate.
+%       evt_plotSpks, gui_curate.
 %
 %   HISTORY:
 %       Created: 22 Jun 2026
@@ -78,13 +74,9 @@ addParameter(p, 'ampWin', 0.015, @isnumeric);
 addParameter(p, 'lowThr', 0.2, @isnumeric);
 addParameter(p, 'minAmp', [], @isnumeric);
 addParameter(p, 'marg', 0.05, @isnumeric);
-addParameter(p, 'emgMethod', 'zscore', @ischar);
 addParameter(p, 'thrZ', 3, @isnumeric);
-addParameter(p, 'thrRms', [], @isnumeric);
 addParameter(p, 'durLim', [], @isnumeric);
 addParameter(p, 'minAmpQA', [], @isnumeric);
-addParameter(p, 'binsize', 60, @isnumeric);
-addParameter(p, 'flgRate', false, @islogical);
 addParameter(p, 'flgPlot', true, @islogical);
 addParameter(p, 'flgSave', false, @islogical);
 addParameter(p, 'flgCurate', false, @islogical);
@@ -98,7 +90,6 @@ flgPlot   = p.Results.flgPlot;
 flgSave   = p.Results.flgSave;
 flgCurate = p.Results.flgCurate;
 flgForce  = p.Results.flgForce;
-flgRate   = p.Results.flgRate;
 verbose   = p.Results.verbose;
 
 %% ========================================================================
@@ -119,7 +110,7 @@ session = [];
 if isfield(v, 'session'), session = v.session; end
 
 % Signals (loaded once; sSig/specAdapter are full-session for the GUI)
-[sig, emg, emgRms, fs, specAdapter, sSig] = ed_sigLoad(basepath, ...
+[sig, emg, ~, fs, specAdapter, sSig] = ed_sigLoad(basepath, ...
     'sigSource', p.Results.sigSource, 'win', win, 'session', session, ...
     'basename', basename, 'edCh', p.Results.edCh, 'bit2uv', p.Results.bit2uv);
 
@@ -174,14 +165,6 @@ else
     % Per-event features
     ed = ed_params(sig, ed, 'marg', p.Results.marg);
 
-    % EMG scoring
-    if strcmpi(p.Results.emgMethod, 'zscore')
-        ed = ed_reject_emg(ed, emg, fs, 'method', 'zscore', 'thrZ', p.Results.thrZ);
-    else
-        ed = ed_reject_emg(ed, [], fs, 'method', 'emg_rms', ...
-            'emgRms', emgRms, 'thrRms', p.Results.thrRms);
-    end
-
     % State assignment (relative frame, before absolute conversion)
     nEvt = numel(ed.pos);
     if ~isempty(boutTimes) && nEvt > 0
@@ -191,23 +174,30 @@ else
         ed.state = categorical(nan(nEvt, 1));
     end
 
-    % Automatic QA as a FILTER: build the pass mask (EMG from ed_reject_emg,
-    % plus optional amplitude / duration gates), drop the failures, and seed
-    % acceptance all-true on the survivors. The per-criterion breakdown is
-    % applied then discarded (no .idxQA stored) - mirrors the ripple pipeline
-    % so only accepted candidates plus the curation mask persist on disk.
-    qaPass = ed.idxQA.emg(:);
+    % QA metrics: EMG (mean event EMG vs the valid-state baseline; whole
+    % recording when states are absent). Amplitude / duration gates optional.
+    edWin = 0.05;   % EMG measurement half-window around each peak [s]
+    edWins = [ed.peakTime(:) - edWin, ed.peakTime(:) + edWin];
+    ed.emgZ = evt_emgScore(emg, edWins, fs, 'baselineTimes', vldTimes);
+
+    metrics = ed.emgZ;
+    ranges  = {[-Inf, p.Results.thrZ]};
+    names   = {'emg'};
     if ~isempty(p.Results.durLim)
-        qaPass = qaPass & ed.dur(:) >= p.Results.durLim(1) ...
-                        & ed.dur(:) <= p.Results.durLim(2);
+        metrics(:, end+1) = ed.dur(:);
+        ranges{end+1} = p.Results.durLim;          % [min max]
+        names{end+1}  = 'dur';
     end
     if ~isempty(p.Results.minAmpQA)
-        qaPass = qaPass & ed.amp(:) >= p.Results.minAmpQA;
+        metrics(:, end+1) = ed.amp(:);
+        ranges{end+1} = [p.Results.minAmpQA, Inf];
+        names{end+1}  = 'amp';
     end
-    % Subset every per-event field by the pass mask; drop the transient .idxQA
-    % breakdown. Numeric / logical / categorical fields whose first dimension
-    % is the event count are the per-event ones; .info and signals are left.
-    keep = logical(qaPass(:));
+
+    % QA filter (no state criterion for EDs). Subset every per-event field by
+    % the pass mask, drop any transient .idxQA, and seed acceptance all-true;
+    % only accepted candidates + the curation mask persist on disk.
+    keep = evt_qa(ed.peakTime, 'metrics', metrics, 'ranges', ranges, 'names', names);
     fn = fieldnames(ed);
     for iF = 1:numel(fn)
         f = ed.(fn{iF});
@@ -253,12 +243,6 @@ else
     ed.info.win       = win;
     ed.info.runtime   = datetime('now');
 
-    % Optional rate
-    if flgRate
-        ed.rate = evt_rate(ed, 'binsize', p.Results.binsize, ...
-            'flgPlot', flgPlot, 'basepath', basepath);
-    end
-
     % Save (event struct + parity artefacts)
     if flgSave
         if verbose, fprintf('[ED]: Saving %s\n', [basename, '.ed.mat']); end
@@ -277,15 +261,10 @@ else
         end
     end
 
-    % Spike-modulation summary figure + interactive viewers (parity with
-    % ripples, from the shared layer)
+    % Spike-modulation summary figure (parity with ripples)
     if flgPlot && flgEdSpks
         evt_plotSpks(edSpks, 'basepath', basepath, ...
             'flgSaveFig', true, 'name', 'ed', 'lbl', 'ED');
-
-        edState = [];
-        if isfield(ed, 'state'), edState = ed.state; end
-        evt_viewSpks(edMaps, edSpks, uType, edState, 'mapYVar', 'lfp');
     end
 end
 

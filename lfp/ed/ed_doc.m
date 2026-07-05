@@ -26,28 +26,26 @@
 %               characterize -> QA filter -> parity analyses -> save / plot /
 %               curate.
 % ed_sigLoad    Loads the detection signal (EEG sSig.eeg, or a raw LFP channel),
-%               the EMG (z-score and RMS forms), a spectrogram adapter, and the
-%               full-session sSig for the curation GUI.
+%               the EMG trace, a spectrogram adapter, and the full-session sSig
+%               for the curation GUI.
 % ed_detect     Detection. Flags sharp transients where the signal crosses a
 %               moving-baseline z-score threshold, merging twin peaks and
 %               enforcing a refractory window.
 % ed_params     Per-event features: amplitude (.amp), z-scored amplitude
 %               (.ampZ), half-amplitude width (.dur), and 10%-width (.width10).
-% ed_reject_emg QA scoring: flags high-EMG events by z-score or emg_rms, writing
-%               the .idxQA.emg mask that ed_wrapper filters on.
 %
 % Shared event layer (lfp/events), called by ed_wrapper:
 % evt_spkPrep   Window-relative single-unit + pooled-MUA spike times, unit types.
 % evt_ctrlTimes Duration-matched control intervals drawn from valid states.
+% evt_qa        Combines QA criteria (metric thresholds; no state criterion for
+%               EDs) into one pass mask; ed_wrapper drops the failures.
+% evt_emgScore  Per-event EMG z-score vs a baseline window (the ED QA metric).
 % evt_states    Per-event vigilance state, plus the per-bout rate/density table.
 % evt_maps      Per-event signal maps around each discharge peak.
 % evt_spks      Spike entry point: per-unit stats + per-event population metrics
 %               + 3D raster + per-unit PETH (orchestrates evt_spksParams,
 %               evt_spkPeth, evt_pethNorm).
 % evt_plotSpks  Spike-modulation summary figure.
-% evt_viewSpks  Interactive map / PETH viewers; population PETH on demand
-%               (evt_pethPop) from the 3D raster.
-% evt_rate      Optional discharge-rate time series (flgRate).
 % gui_curate    Manual curation; reads and writes the .ed.mat .accepted mask.
 %
 % # Outputs  (<basename>.<var>.mat, written when flgSave = true)

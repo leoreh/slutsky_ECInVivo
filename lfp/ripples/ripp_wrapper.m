@@ -9,8 +9,8 @@ function ripp = ripp_wrapper(varargin)
 %       1.  Setup: load session data; prepare spike times (evt_spkPrep).
 %       2.  Signal: load the ripple LFP channel; filter + envelope + z-score
 %           (ripp_sigPrep).
-%       3.  Detect: threshold candidates (ripp_times); prelim state (evt_states);
-%           QA filter (ripp_qa); Neuroscope export (ripp2ns).
+%       3.  Detect: threshold candidates (ripp_times); QA filter on state /
+%           EMG / spike-gain (evt_qa); Neuroscope export (ripp2ns).
 %       4.  Characterize: matched controls (evt_ctrlTimes); vigilance state
 %           (evt_states); per-event params (ripp_params); LFP maps (evt_maps).
 %       5.  Spiking: SU/MU modulation stats + PETHs, one call (evt_spks).
@@ -24,6 +24,7 @@ function ripp = ripp_wrapper(varargin)
 %                                 If empty, tries to load from session tags.
 %           'thr'        - (Vec)  Detection thresholds [start, peak, cont, max, min_cont].
 %           'limDur'     - (Vec)  Duration limits [min, max, inter, min_cont_dur] (ms).
+%           'thrEmg'     - (Num)  EMG z-score pass threshold for QA. Default: 2.
 %           'win'        - (Vec)  Time window to analyze [start end] (s). Default: [0 Inf].
 %           'passband'   - (Vec)  Filtering frequency band [min max] (Hz). Default: [80 250].
 %           'detectMet'  - (Num)  Detection method ID (see ripp_sigPrep). Default: 3.
@@ -57,9 +58,10 @@ function ripp = ripp_wrapper(varargin)
 %       basename.rippSpkLfp.mat   - spike-LFP phase coupling
 %
 %   DEPENDENCIES:
-%       ripp_sigPrep, ripp_times, ripp_qa, ripp_params, ripp2ns, spklfp_phase,
-%       gui_curate; and the shared event layer (lfp/events): evt_spkPrep,
-%       evt_states, evt_ctrlTimes, evt_maps, evt_spks, evt_plotSpks, evt_viewSpks.
+%       ripp_sigPrep, ripp_times, ripp_params, ripp2ns, spklfp_phase, gui_curate;
+%       and the shared event layer (lfp/events): evt_spkPrep, evt_emgScore,
+%       evt_spkGain, evt_qa, evt_states, evt_ctrlTimes, evt_maps, evt_spks,
+%       evt_plotSpks.
 %
 %   HISTORY:
 %       Updated: 05 Jul 2026 (linear structure; algorithms in files; split
@@ -73,6 +75,7 @@ addParameter(p, 'basepath', pwd, @ischar);
 addParameter(p, 'rippCh', [], @isnumeric);
 addParameter(p, 'thr', [1, 3.5, 2, 200, 50], @isnumeric);
 addParameter(p, 'limDur', [15, 300, 20, 10], @isnumeric);
+addParameter(p, 'thrEmg', 2, @isnumeric);
 addParameter(p, 'win', [0, Inf], @isnumeric);
 addParameter(p, 'passband', [80 250], @isnumeric);
 addParameter(p, 'detectMet', 3, @isnumeric);
@@ -90,6 +93,7 @@ basepath  = p.Results.basepath;
 rippCh    = p.Results.rippCh;
 thr       = p.Results.thr;
 limDur    = p.Results.limDur;
+thrEmg    = p.Results.thrEmg;
 win       = p.Results.win;
 passband  = p.Results.passband;
 detectMet = p.Results.detectMet;
@@ -198,7 +202,7 @@ if doLoad
 end
 
 %% ========================================================================
-%  DETECT  (threshold -> prelim state -> QA filter -> Neuroscope)
+%  DETECT  (threshold -> QA filter -> Neuroscope)
 %  ========================================================================
 if doDetect
 
@@ -229,24 +233,28 @@ if doDetect
     if verbose, fprintf('[RIPP]: Thresholding candidate events...\n'); end
     ripp = ripp_times(rippSig, fs, 'thr', thr, 'limDur', limDur);
 
-    % Prelim state (feeds the state QA criterion)
-    ripp.state = evt_states(ripp.times, ripp.peakTime, boutTimes, ...
-        'basepath', basepath, 'flgPlot', false, 'flgSave', false);
+    % QA metrics: EMG (event EMG vs the NREM baseline) + MUA spike-gain.
+    ripp.emg = evt_emgScore(emg, ripp.times, fs, 'baselineTimes', nremTimes);
+    ripp.spkGain = evt_spkGain(muTimes, ripp.times);
 
-    % Quality assurance -> pass mask + per-event metrics
-    [idxQA, met] = ripp_qa(ripp.times, nremTimes, muTimes, emg, ripp.state, fs);
-    ripp.emg = met.emg;
-    ripp.spkGain = met.gain;
+    % QA filter: keep events in valid vigilance states (inTimes), with low EMG
+    % and positive spike-gain. Each criterion is skipped when its data is absent
+    % (empty inTimes or a NaN metric -> pass).
+    idxGood = evt_qa(ripp.peakTime, ...
+        'inTimes', vldTimes, ...
+        'metrics', [ripp.emg, ripp.spkGain], ...
+        'ranges', {[-Inf, thrEmg], [0, Inf]}, ...
+        'names', {'emg', 'gain'});
     if verbose
-        fprintf('[RIPP]: QA kept %d / %d events.\n', sum(idxQA.good), numel(idxQA.good));
+        fprintf('[RIPP]: QA kept %d / %d events.\n', sum(idxGood), numel(idxGood));
     end
 
     % Filter every per-event field by the QA mask (drop the failures)
     fnames = fieldnames(ripp);
     for iField = 1:numel(fnames)
         fn = fnames{iField};
-        if size(ripp.(fn), 1) == numel(idxQA.good)
-            ripp.(fn) = ripp.(fn)(idxQA.good, :);
+        if size(ripp.(fn), 1) == numel(idxGood)
+            ripp.(fn) = ripp.(fn)(idxGood, :);
         end
     end
 
@@ -342,11 +350,6 @@ if flgPlot && doSpks
     if verbose, fprintf('[RIPP]: Generating summary plot...\n'); end
     evt_plotSpks(rippSpks, 'basepath', basepath, 'flgSaveFig', true, ...
         'name', 'ripp', 'lbl', 'Ripple');
-
-    % Interactive map / PETH viewers (population PETH on demand from the 3D).
-    evtState = [];
-    if isfield(ripp, 'state'), evtState = ripp.state; end
-    evt_viewSpks(rippMaps, rippSpks, uType, evtState, 'mapYVar', 'z');
 end
 
 %% ========================================================================

@@ -63,14 +63,21 @@ Event-agnostic; both wrappers call these with modality-specific inputs.
   point; orchestrates `evt_spksParams` (per-unit scalar stats, `winFxd` param) +
   `evt_spkPeth` + `evt_pethNorm`.
 - `evt_pethNorm` (smooth + z-score against control; kernel from the PETH time
-  base) and `evt_pethPop` (per-event population PETH from the 3D) are the reused
-  reduction helpers. `evt_viewSpks` launches the shared interactive viewers.
+  base) and `evt_pethPop` (per-event population PETH from the 3D, on demand) are
+  the reduction helpers.
 
-**Events / maps / rate.** `evt_states`, `evt_ctrlTimes`, `evt_maps`, `evt_rate`,
-`evt_rankOrder`, `evt_plotSpks`. `evt_states` / `evt_plotSpks` take a `name` param
-that sets the saved filename/variable/figure (`'ripp'` or `'ed'`), preserving
-downstream readers (e.g. `mcu_tblVivo` expects the variable `rippStates`), and a
-`lbl` param that labels titles/legends (`'Ripple'` / `'ED'`).
+**QA.** `evt_qa` combines optional criteria into one pass mask — time
+inclusion/exclusion (`inTimes`/`exTimes`) plus per-event metric ranges, all
+skipped when absent. The metrics are computed by the caller — `evt_emgScore`
+(event EMG z vs a baseline window) and `evt_spkGain` (MUA gain z) — and the
+thresholds are passed in, so each wrapper picks its own criteria (ripples: state
++ EMG + gain; ED: EMG only).
+
+**Events / maps.** `evt_states`, `evt_ctrlTimes`, `evt_maps`, `evt_rankOrder`,
+`evt_plotSpks`. `evt_states` / `evt_plotSpks` take a `name` param that sets the
+saved filename/variable/figure (`'ripp'` or `'ed'`), preserving downstream
+readers (e.g. `mcu_tblVivo` expects the variable `rippStates`), and a `lbl` param
+that labels titles/legends (`'Ripple'` / `'ED'`).
 
 ## Modality-specific (deliberately not shared)
 
@@ -91,8 +98,6 @@ EMG / NREM relax the corresponding QA criteria; `'nrem'` z-scoring falls back to
 
 ## Deferred / notes
 
-- `ripp_qa` stays embedded in `ripp_wrapper` (ED uses its own `ed_reject_emg`);
-  extract a shared `evt_qa` only if a third consumer appears.
 - ED detection quality is unvalidated; the ED maps/PETH double as a detection
   read-out to inform a future tuning pass.
 - Not migrated by request: `lfp/+IED`, `reduct_displayer` (owned elsewhere).

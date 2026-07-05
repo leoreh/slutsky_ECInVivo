@@ -26,9 +26,6 @@
 %               Also called by the curation GUI to redraw ripple signals.
 % ripp_times    Thresholds the z-scored signal (start / peak / continuation
 %               thresholds, duration limits, event merging) into candidates.
-% ripp_qa       Returns a pass mask from three criteria — vigilance state, MUA
-%               spike-gain, and EMG — each skipped when its data is absent.
-%               ripp_wrapper drops the failures.
 % ripp_params   Per-event features from the analytic signal: duration,
 %               amplitude, frequency, energy, skewness.
 % ripp2ns       Exports events to Neuroscope .evt files for external inspection.
@@ -36,14 +33,16 @@
 % Shared event layer (lfp/events), called by ripp_wrapper:
 % evt_spkPrep   Window-relative single-unit + pooled-MUA spike times, unit types.
 % evt_ctrlTimes Duration-matched control intervals drawn from valid states.
+% evt_qa        Combines QA criteria (state inclusion + metric thresholds) into
+%               one pass mask; ripp_wrapper drops the failures.
+% evt_emgScore  Per-event EMG z-score vs a baseline window (a QA metric).
+% evt_spkGain   Per-event MUA spike-gain z-score (a QA metric).
 % evt_states    Per-event vigilance state, plus the per-bout rate/density table.
 % evt_maps      Per-event LFP maps around each ripple peak.
 % evt_spks      Spike entry point: per-unit stats + per-event population metrics
 %               + 3D raster + per-unit PETH (orchestrates evt_spksParams,
 %               evt_spkPeth, evt_pethNorm).
 % evt_plotSpks  Spike-modulation summary figure.
-% evt_viewSpks  Interactive map / PETH viewers; population PETH computed on
-%               demand (evt_pethPop) from the 3D raster.
 % spklfp_phase  Spike-LFP phase coupling.
 % gui_curate    Manual curation; reads and writes the .ripp.mat .accepted mask.
 %
