@@ -11,8 +11,8 @@ function ripp = ripp_wrapper(varargin)
 %       3.  Detection: Identifies candidate events based on thresholds (ripp_times).
 %       4.  Parameterization: Calculates stats like Amp/Freq/Energy (ripp_params).
 %       5.  Maps: Generates peri-event LFP maps (evt_maps).
-%       6.  States: Classifies events by vigilance state (ripp_states).
-%       7.  Spiking: Analyzes SU/MU modulation and generates PETHs (ripp_spks, evt_spkPeth).
+%       6.  States: Classifies events by vigilance state (evt_states).
+%       7.  Spiking: Analyzes SU/MU modulation and generates PETHs (evt_spks, evt_spkPeth).
 %       8.  Phasing: Calculates Spike-LFP coupling (spklfp_phase).
 %       9.  Quality Assurance: Filters events based on spiking gain (optional).
 %       10. Visualization: Runs the curation GUI (gui_curate, preset 'Ripples').
@@ -54,8 +54,9 @@ function ripp = ripp_wrapper(varargin)
 %       basename.rippSpkLfp.mat
 %
 %   DEPENDENCIES:
-%       ripp_sigPrep, ripp_times, ripp_params, evt_maps, ripp_states,
-%       ripp_spks, evt_spkPeth, ripp_plotSpks, spklfp_phase, gui_curate.
+%       ripp_sigPrep, ripp_times, ripp_params, spklfp_phase, gui_curate,
+%       and the shared event layer (lfp/events): evt_states, evt_ctrlTimes,
+%       evt_maps, evt_spks, evt_spkPeth, evt_rankOrder, evt_plotSpks.
 %
 %   HISTORY:
 %       Updated: 23 Jan 2026
