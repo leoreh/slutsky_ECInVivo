@@ -39,7 +39,7 @@ addRequired(p, 'ctrlTimes', @isnumeric);
 addRequired(p, 'peakTime', @isnumeric);
 addParameter(p, 'basepath', pwd, @ischar);
 addParameter(p, 'flgSave', true, @islogical);
-addParameter(p, 'unitType', [], @(x) iscategorical(x) || iscell(x));
+addParameter(p, 'unitType', [], @(x) iscategorical(x) || iscell(x) || isempty(x));
 addParameter(p, 'winFxd', 0.020, @(x) isnumeric(x) && isscalar(x) && x > 0);
 parse(p, spkTimes, evtTimes, ctrlTimes, peakTime, varargin{:});
 
@@ -184,8 +184,6 @@ asym(frSum < eps) = NaN;
 % Initialize Output Containers
 rankMean   = nan(nUnits, 1);
 rankVar    = nan(nUnits, 1);
-timesFirst = cell(nUnits, 1);
-timesLate  = cell(nUnits, 1);
 
 % Prepare Iteration (Global vs Types)
 if isempty(unitType)
@@ -213,15 +211,13 @@ for iIter = 1:length(iterNames)
 
     if sum(currMask) == 0, continue; end
 
-    % --- Rank & Timing ---
+    % --- Rank ---
     subSpks = spkTimes(currMask);
-    [subMean, subVar, subFirst, subLate] = evt_rankOrder(subSpks, evtTimes);
+    [subMean, subVar] = evt_rankOrder(subSpks, evtTimes);
 
     % Fill Global Arrays
     rankMean(currMask)   = subMean;
     rankVar(currMask)    = subVar;
-    timesFirst(currMask) = subFirst;
-    timesLate(currMask)  = subLate;
 
     % --- Population Stats (Per Event) ---
 
@@ -301,10 +297,6 @@ evtSpks.com       = com;
 evtSpks.frPre    = frPre;
 evtSpks.frPost   = frPost;
 evtSpks.asym = asym;
-
-% Export Times
-evtSpks.times.first = timesFirst;
-evtSpks.times.late  = timesLate;
 
 % Save
 if flgSave

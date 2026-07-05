@@ -18,7 +18,7 @@ function maps = evt_spkPeth(spkTimes, peakTimes, ctrlTimes, varargin)
 %
 %   OUTPUTS:
 %       maps        - (Struct) PETH Structure:
-%           .ripp      - (N_units x N_events  x N_bins) Spike count map.
+%           .evt       - (N_units x N_events  x N_bins) Spike count map.
 %           .ctrl      - (N_units x N_controls x N_bins) Spike count map.
 %           .tstamps   - (Vec) Time vector for the x-axis.
 %
@@ -68,7 +68,7 @@ ctrlCenters = mean(ctrlTimes, 2);
 
 % Initialize Output
 maps = struct();
-maps.ripp = zeros(nUnits, nEvents, nBins);
+maps.evt = zeros(nUnits, nEvents, nBins);
 maps.ctrl = zeros(nUnits, nControls, nBins);
 maps.tstamps = timeBins;
 
@@ -84,7 +84,7 @@ for iUnit = 1:nUnits
     end
 
     % Event Map
-    maps.ripp(iUnit, :, :) = sync_spksMap(unitSpks, peakTimes, mapDur, edges);
+    maps.evt(iUnit, :, :) = sync_spksMap(unitSpks, peakTimes, mapDur, edges);
 
     % Control Map
     maps.ctrl(iUnit, :, :) = sync_spksMap(unitSpks, ctrlCenters, mapDur, edges);
@@ -95,9 +95,6 @@ end
 %  ========================================================================
 if flgSave
     save(savefile, 'maps', '-v7.3');
-    if flgSave
-        save(savefile, 'maps', '-v7.3');
-    end
 end
 
 end

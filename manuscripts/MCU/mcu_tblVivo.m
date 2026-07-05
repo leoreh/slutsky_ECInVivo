@@ -136,9 +136,8 @@ if ismember('rippMaps', presets)
     varMap.t_amp        = 'rippMaps.amp';
     varMap.t_freq       = 'rippMaps.freq';
     varMap.t_z          = 'rippMaps.z';
-    varMap.pethRs       = 'rippMaps.peth.RS';
-    varMap.pethFs       = 'rippMaps.peth.FS';
-    varMap.pethMu       = 'rippMaps.peth.MU';
+    % population PETH (RS/FS/MU) is no longer precomputed here; derive it on
+    % demand from rippSpks.maps via evt_pethPop when a table needs it.
 end
 
 if ismember('rippStates', presets)

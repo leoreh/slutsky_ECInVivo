@@ -14,7 +14,7 @@ function ed = ed_wrapper(varargin)
 %       4. Parity analyses (shared evt_* layer): matched control intervals,
 %          LFP maps, and MUA/SU spike modulation + PETH around discharges.
 %       5. Convert times to absolute; optionally save .ed / .edMaps /
-%          .edSpks / .edPeth .mat.
+%          .edSpks (per-unit stats + 3D PETH, consolidated).
 %       6. Optionally launch the curation GUI (gui_curate, preset 'EDs').
 %       If <basename>.ed.mat already exists and flgForce is false, detection
 %       is skipped and the stored result is loaded straight into the GUI
@@ -54,8 +54,8 @@ function ed = ed_wrapper(varargin)
 %
 %   DEPENDENCIES:
 %       basepaths2vars, ed_sigLoad, ed_detect, ed_params, ed_reject_emg,
-%       evt_states, evt_ctrlTimes, evt_maps, evt_spks, evt_spkPeth,
-%       evt_plotSpks, evt_rate, gui_curate.
+%       evt_spkPrep, evt_states, evt_ctrlTimes, evt_maps, evt_spkAnalysis,
+%       evt_plotSpks, evt_viewSpks, evt_rate, gui_curate.
 %
 %   HISTORY:
 %       Created: 22 Jun 2026
@@ -143,30 +143,20 @@ if ~isempty(boutTimes) && numel(boutTimes) >= 4
     vldTimes = vertcat(boutTimes{2}, boutTimes{3}, boutTimes{4});
 end
 
-% Spikes (optional) for the parity analyses. Shifted to the window-relative
-% frame and clipped, exactly like the ripple pipeline; absent on sessions
-% without sorted spikes (the spike analyses are then skipped).
+% Spikes (optional) for the parity analyses, prepared by the shared layer
+% (identical treatment to the ripple pipeline): window-relative single-unit
+% times, one pooled MUA vector, and unit types. Absent on sessions without
+% sorted spikes, in which case the spike analyses are skipped.
 fsSpk = fs;
 if ~isempty(session) && isfield(session, 'extracellular') && isfield(session.extracellular, 'sr')
     fsSpk = session.extracellular.sr;
 end
-uType = [];
-if isfield(v, 'units') && isfield(v.units, 'type'), uType = v.units.type; end
-hasSpikes = isfield(v, 'spikes') && isfield(v.spikes, 'times') && ~isempty(v.spikes.times);
-if hasSpikes
-    spkTimes = cellfun(@(x) x - win(1), v.spikes.times, 'uni', false);
-    spkTimes = cellfun(@(x) x(x >= 0 & x <= sigDur), spkTimes, 'uni', false);
-else
-    spkTimes = {};
-end
-if isfield(v, 'spktimes') && ~isempty(v.spktimes)
-    muTimes = cellfun(@(x) x / fsSpk, v.spktimes, 'uni', false);
-    muTimes = cellfun(@(x) x - win(1), muTimes, 'uni', false);
-    muTimes = cellfun(@(x) x(x >= 0 & x <= sigDur), muTimes, 'uni', false);
-    muTimes = {sort(vertcat(muTimes{:}))};
-else
-    muTimes = {[]};
-end
+spikesIn = []; if isfield(v, 'spikes'), spikesIn = v.spikes; end
+spktimesIn = []; if isfield(v, 'spktimes'), spktimesIn = v.spktimes; end
+unitsIn = []; if isfield(v, 'units'), unitsIn = v.units; end
+[spkTimes, muTimes, uType] = evt_spkPrep(spikesIn, spktimesIn, unitsIn, ...
+    win, sigDur, fsSpk);
+hasSpikes = ~isempty(spkTimes);
 
 %% ========================================================================
 %  DETECT OR LOAD
@@ -231,21 +221,17 @@ else
     edMaps = evt_maps(struct('lfp', sig(:)), ed.peakTime, fs, ...
         'mapDur', mapDur, 'flgSave', false);
 
-    % MUA / single-unit spike modulation and PETH (only when spikes exist)
-    edSpks = struct(); edPeth = struct(); flgEdSpks = false;
+    % MUA / single-unit spike modulation + PETH (only when spikes exist),
+    % consolidated into one struct by the shared layer.
+    edSpks = struct(); flgEdSpks = false;
     if hasSpikes && numel(ed.pos) > 0
         flgEdSpks = true;
-        edSpks = evt_spks(spkTimes, ed.times, ed.ctrlTimes, ed.peakTime, ...
-            'unitType', uType, 'winFxd', 0.050, 'flgSave', false);
-        edPeth.su = evt_spkPeth(spkTimes, ed.peakTime, ed.ctrlTimes, ...
-            'mapDur', mapDur, 'flgSave', false);
-        edPeth.mu = evt_spkPeth(muTimes, ed.peakTime, ed.ctrlTimes, ...
-            'mapDur', mapDur, 'flgSave', false);
+        edSpks = evt_spkAnalysis(spkTimes, muTimes, ed.times, ed.ctrlTimes, ...
+            ed.peakTime, 'unitType', uType, 'mapDur', mapDur, 'winFxd', 0.050);
 
         % Move per-discharge population metrics onto the ed struct
         ed.spks = edSpks.events;
         edSpks = rmfield(edSpks, 'events');
-        if isfield(edSpks, 'times'), edSpks = rmfield(edSpks, 'times'); end
     end
 
     % Absolute times (events live in the full-session frame the GUI shows)
@@ -273,14 +259,18 @@ else
         save(fullfile(basepath, [basename, '.edMaps.mat']), 'edMaps', '-v7.3');
         if flgEdSpks
             save(fullfile(basepath, [basename, '.edSpks.mat']), 'edSpks', '-v7.3');
-            save(fullfile(basepath, [basename, '.edPeth.mat']), 'edPeth', '-v7.3');
         end
     end
 
-    % Spike-modulation summary figure (parity with ripples)
+    % Spike-modulation summary figure + interactive viewers (parity with
+    % ripples, from the shared layer)
     if flgPlot && flgEdSpks
-        evt_plotSpks(edSpks, edPeth, 'basepath', basepath, ...
+        evt_plotSpks(edSpks, 'basepath', basepath, ...
             'flgSaveFig', true, 'name', 'ed', 'lbl', 'ED');
+
+        edState = [];
+        if isfield(ed, 'state'), edState = ed.state; end
+        evt_viewSpks(edMaps, edSpks, uType, edState, 'mapYVar', 'lfp');
     end
 end
 

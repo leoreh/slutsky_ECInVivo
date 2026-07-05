@@ -12,7 +12,7 @@ function ripp = ripp_wrapper(varargin)
 %       4.  Parameterization: Calculates stats like Amp/Freq/Energy (ripp_params).
 %       5.  Maps: Generates peri-event LFP maps (evt_maps).
 %       6.  States: Classifies events by vigilance state (evt_states).
-%       7.  Spiking: Analyzes SU/MU modulation and generates PETHs (evt_spks, evt_spkPeth).
+%       7.  Spiking: SU/MU modulation stats + PETHs, one call (evt_spkAnalysis).
 %       8.  Phasing: Calculates Spike-LFP coupling (spklfp_phase).
 %       9.  Quality Assurance: Filters events based on spiking gain (optional).
 %       10. Visualization: Runs the curation GUI (gui_curate, preset 'Ripples').
@@ -48,16 +48,16 @@ function ripp = ripp_wrapper(varargin)
 %           .spkGain     - MUA gain per event.
 %
 %   files saved (if flgSave=true):
-%       basename.ripp.mat
-%       basename.rippStates.mat
-%       basename.rippSpks.mat
-%       basename.rippPeth.mat
-%       basename.rippSpkLfp.mat
+%       basename.ripp.mat        - events + per-event population metrics
+%       basename.rippStates.mat  - per-bout rate/density table
+%       basename.rippMaps.mat    - per-event LFP maps (always producible)
+%       basename.rippSpks.mat    - per-unit spike stats + 3D PETH (spike-only)
+%       basename.rippSpkLfp.mat  - spike-LFP phase coupling
 %
 %   DEPENDENCIES:
 %       ripp_sigPrep, ripp_times, ripp_params, spklfp_phase, gui_curate,
-%       and the shared event layer (lfp/events): evt_states, evt_ctrlTimes,
-%       evt_maps, evt_spks, evt_spkPeth, evt_rankOrder, evt_plotSpks.
+%       and the shared event layer (lfp/events): evt_spkPrep, evt_states,
+%       evt_ctrlTimes, evt_maps, evt_spkAnalysis, evt_plotSpks, evt_viewSpks.
 %
 %   HISTORY:
 %       Updated: 23 Jan 2026
@@ -126,39 +126,18 @@ else
     sigDur = win(2) - win(1);
 end
 
-% Unit classification (optional). Absent on sessions without spike sorting;
-% analyses that split by cell type fall back to a single "Global" group.
-hasUnits = isfield(v, 'units') && isfield(v.units, 'type');
-if hasUnits
-    uType = v.units.type;
-else
-    uType = [];
-end
-
-% Prepare Multi-Unit (MU) Spike Times (optional). Flatten all units into a
-% single sorted vector for MUA analysis / QA spike-gain.
-if isfield(v, 'spktimes') && ~isempty(v.spktimes)
-    muTimes = cellfun(@(x) x / fsSpk, v.spktimes, 'uni', false);
-    muTimes = cellfun(@(x) x - win(1), muTimes, 'Uni', false);
-    muTimes = cellfun(@(x) x(x >= 0 & x <= sigDur), muTimes, 'Uni', false);
-    muTimes = {sort(vertcat(muTimes{:}))};
-else
-    muTimes = {[]};     % empty MUA -> QA spike-gain criterion is skipped
-end
-
-% Prepare Single-Unit (SU) Spike Times (optional). Missing on sessions
-% without sorted spikes; spike-based analyses are skipped downstream.
-hasSpikes = isfield(v, 'spikes') && isfield(v.spikes, 'times') ...
-    && ~isempty(v.spikes.times);
-if hasSpikes
-    spkTimes = v.spikes.times;
-    spkTimes = cellfun(@(x) x - win(1), spkTimes, 'Uni', false);
-    spkTimes = cellfun(@(x) x(x >= 0 & x <= sigDur), spkTimes, 'Uni', false);
-    nUnits = length(spkTimes);
-else
-    spkTimes = {};
-    nUnits = 0;
-    if verbose, fprintf('[RIPP]: No sorted spikes; skipping spike analyses.\n'); end
+% Spike preparation (shared layer): window-relative single-unit times, one
+% pooled MUA vector (for QA spike-gain), and unit types. Absent data yields
+% empty outputs, so the cell-type split falls back to "Global" and the
+% spike analyses simply skip.
+spikesIn = []; if isfield(v, 'spikes'), spikesIn = v.spikes; end
+spktimesIn = []; if isfield(v, 'spktimes'), spktimesIn = v.spktimes; end
+unitsIn = []; if isfield(v, 'units'), unitsIn = v.units; end
+[spkTimes, muTimes, uType] = evt_spkPrep(spikesIn, spktimesIn, unitsIn, ...
+    win, sigDur, fsSpk);
+hasSpikes = ~isempty(spkTimes);
+if ~hasSpikes && verbose
+    fprintf('[RIPP]: No sorted spikes; skipping spike analyses.\n');
 end
 
 % Gate spike-dependent steps on data availability
@@ -183,7 +162,6 @@ end
 files.ripp      = fullfile(basepath, [basename, '.ripp.mat']);
 files.maps      = fullfile(basepath, [basename, '.rippMaps.mat']);
 files.spks      = fullfile(basepath, [basename, '.rippSpks.mat']);
-files.peth      = fullfile(basepath, [basename, '.rippPeth.mat']);
 files.phase     = fullfile(basepath, [basename, '.rippSpkLfp.mat']);
 
 
@@ -238,44 +216,15 @@ end
 %  SPIKE STATS
 %  ========================================================================
 if doSpks
-    if verbose, fprintf('[RIPP]: Calculating Spike Stats...\n'); end
+    if verbose, fprintf('[RIPP]: Analyzing spikes...\n'); end
 
-    % Firing Metrics
-    rippSpks = evt_spks(spkTimes, ...
-        ripp.times, ...
-        ripp.ctrlTimes, ...
-        ripp.peakTime, ...
-        'unitType', uType, ...
-        'flgSave', false);
+    % Consolidated spike analysis: per-unit stats, per-event population
+    % metrics, 3D PETH maps, and per-unit normalized PETH (one struct).
+    rippSpks = evt_spkAnalysis(spkTimes, muTimes, ...
+        ripp.times, ripp.ctrlTimes, ripp.peakTime, ...
+        'unitType', uType, 'mapDur', mapDur);
 
-    % Analyze single and burst FR metrics
-    if isfield(v, 'brst')
-
-        % Prepare single and burst spktimes
-        brstTimes = v.brst.spktimes';
-        brstTimes = cellfun(@(x) x - win(1), brstTimes, 'Uni', false);
-        brstTimes = cellfun(@(x) x(x >= 0 & x <= sigDur), brstTimes, 'Uni', false);
-
-        singleTimes = cell(1, nUnits);
-        for iUnit = 1:nUnits
-            singleTimes{iUnit} = setdiff(spkTimes{iUnit}, brstTimes{iUnit});
-        end
-
-        % Run ripp_spks
-        rippSpks.burst = evt_spks(brstTimes, ...
-            ripp.times, ...
-            ripp.ctrlTimes, ...
-            ripp.peakTime, ...
-            'flgSave', false);
-
-        rippSpks.single = evt_spks(singleTimes, ...
-            ripp.times, ...
-            ripp.ctrlTimes, ...
-            ripp.peakTime, ...
-            'flgSave', false);
-    end
-
-    % Add per ripple spike metrics to ripp struct
+    % Move per-ripple population metrics onto the ripp struct
     ripp.spks = rippSpks.events;
     rippSpks = rmfield(rippSpks, 'events');
 end
@@ -286,113 +235,12 @@ end
 %  ========================================================================
 
 if doPhase
-
-    % SPK-LFP
-    % All Spikes
     if verbose, fprintf('[RIPP]: Calculating Spk-LFP Phase...\n'); end
     spkLfp = spklfp_phase(rippSig.filt, spkTimes, fs, ...
         'lfpTimes', ripp.times, ...
         'nPerms', 0);
-
-    % % First Spikes
-    % spkLfp.first = spklfp_phase(rippSig.filt, rippSpks.times.first, fs, ...
-    %     'lfpTimes', ripp.times, ...
-    %     'nPerms', 0);
-    %
-    % % Late Spikes
-    % spkLfp.late = spklfp_phase(rippSig.filt, rippSpks.times.late, fs, ...
-    %     'lfpTimes', ripp.times, ...
-    %     'nPerms', 0);
 end
 
-% Remove times cell arrays after using them for phase coupling
-if exist('rippSpks', 'var') && isfield(rippSpks, 'times')
-    rippSpks = rmfield(rippSpks, 'times');
-end
-
-
-%% ========================================================================
-%  SPIKES PETH
-%  ========================================================================
-if doSpks
-    if verbose, fprintf('[RIPP]: Generating Spike PETHs...\n'); end
-
-    % PETH
-    rippPeth.su = evt_spkPeth(spkTimes, ripp.peakTime, ripp.ctrlTimes, ...
-        'flgSave', false, ...
-        'mapDur', mapDur);
-    rippPeth.mu = evt_spkPeth(muTimes, ripp.peakTime, ripp.ctrlTimes, ...
-        'flgSave', false, ...
-        'mapDur', mapDur);
-
-    tstamps = rippPeth.su.tstamps;
-
-    % Smoothing Kernel
-    dt = mode(diff(tstamps));
-    sigma = 0.001;
-    nSteps = ceil(3*sigma / dt);
-    kRng = (-nSteps : nSteps) * dt;
-    kd = normpdf(kRng, 0, sigma);
-    kd = kd / sum(kd);
-
-    % Unit PETH
-    % ---------------------------------------------------------------------
-    % Mean PETH across ripples (Units x Bins)
-    pethSU = squeeze(mean(rippPeth.su.ripp, 2, 'omitnan'));
-
-    % Control Statistics
-    ctrlPeth = squeeze(mean(rippPeth.su.ctrl, 2, 'omitnan')); % (Units x Bins)
-
-    % Calculate
-    pethZ = peth_norm(pethSU, ctrlPeth, kd);
-
-    % Add to rippSpks
-    rippSpks.peth = pethZ;
-    rippSpks.tstamps = tstamps;
-
-    % Population PETH
-    % ---------------------------------------------------------------------
-    popTypes = {'RS', 'FS'};
-    for iType = 1:length(popTypes)
-        currType = popTypes{iType};
-        idxType = uType == currType;
-
-        if sum(idxType) == 0
-            continue;
-        end
-
-        % Raw Population PETH (Ripples x Bins)
-        % Sum spikes across units, divide by N units
-        subRipp = rippPeth.su.ripp(idxType, :, :); % (Units x Ripples x Bins)
-        popRipp = squeeze(sum(subRipp, 1)) ./ sum(idxType);
-
-        % Control Statistics (Scalar)
-        subCtrl = rippPeth.su.ctrl(idxType, :, :); % (Units x Controls x Bins)
-        popCtrl = squeeze(sum(subCtrl, 1)) ./ sum(idxType); % (Controls x Bins)
-
-        meanPopCtrl = mean(popCtrl, 1, 'omitnan'); % (1 x Bins)
-
-        % Calculate
-        pethZ = peth_norm(popRipp, meanPopCtrl, kd);
-
-        % Store
-        rippMaps.peth.(currType) = pethZ;
-    end
-
-    % MU PETH
-    % ---------------------------------------------------------------------
-    popRipp = squeeze(rippPeth.mu.ripp); % (Ripples x Bins)
-
-    % Control Statistics
-    popCtrl = squeeze(rippPeth.mu.ctrl); % (Controls x Bins)
-    meanPopCtrl = mean(popCtrl, 1, 'omitnan'); % (1 x Bins)
-
-    % Calculate
-    pethZ = peth_norm(popRipp, meanPopCtrl, kd);
-
-    % Store
-    rippMaps.peth.MU = pethZ;
-end
 
 %% ========================================================================
 %  SAVE
@@ -411,10 +259,9 @@ if flgSave
         save(files.maps, 'rippMaps', '-v7.3');
     end
 
-    % SPKS
+    % SPKS (per-unit stats + 3D PETH, consolidated into one file)
     if doSpks
         save(files.spks, 'rippSpks', '-v7.3');
-        save(files.peth, 'rippPeth', '-v7.3');
     end
 
     % PHASE
@@ -432,30 +279,17 @@ end
 % Plot spikes (requires the spike analyses to have run)
 if flgPlot && doSpks
     if verbose, fprintf('[RIPP]: Generating Summary Plot...\n'); end
-    evt_plotSpks(rippSpks, rippPeth, ...
+    evt_plotSpks(rippSpks, ...
         'basepath', basepath, ...
         'flgSaveFig', true, ...
         'name', 'ripp', ...
         'lbl', 'Ripple');
 
-    % Interactive per-ripple / per-unit map viewers (exploratory; guarded
-    % so a missing cell-type PETH does not abort the pipeline).
-    try
-        tblMap = struct2table(rmfield(rippMaps, {'tstamps', 'peth'}));
-        if isfield(rippMaps, 'peth')
-            if isfield(rippMaps.peth, 'RS'), tblMap.pethRs = rippMaps.peth.RS; end
-            if isfield(rippMaps.peth, 'FS'), tblMap.pethFs = rippMaps.peth.FS; end
-            if isfield(rippMaps.peth, 'MU'), tblMap.pethMu = rippMaps.peth.MU; end
-        end
-        tblGUI_xy(rippMaps.tstamps, tblMap, 'yVar', 'z', 'grpVar', 'states');
-
-        tblUnit = table();
-        tblUnit.unitType = uType;
-        tblUnit.peth = rippSpks.peth;
-        tblGUI_xy(rippPeth.su.tstamps, tblUnit, 'yVar', 'peth', 'grpVar', 'states');
-    catch ME
-        warning('ripp_wrapper:mapGUI', 'Skipped map viewers: %s', ME.message);
-    end
+    % Interactive map / PETH viewers (shared layer; population PETH computed
+    % on demand from the 3D maps in rippSpks).
+    evtState = [];
+    if isfield(ripp, 'state'), evtState = ripp.state; end
+    evt_viewSpks(rippMaps, rippSpks, uType, evtState, 'mapYVar', 'z');
 end
 
 % Curation GUI (replaces the inline ripp_gui viewer). File-based: loads
@@ -672,52 +506,6 @@ if flgSave
 
     ripp2ns(rippSamps, peakSamps, 'basepath', basepath);
 end
-end
-
-
-%% ========================================================================
-%  HELPER: PETH_NORM
-%  ========================================================================
-
-function pethZ = peth_norm(pethRaw, refData, kd)
-% peth_norm Helper function to calculate smooth, normalized PETH stats.
-%
-%   pethZ = peth_norm(pethRaw, refData, kd)
-%
-%   INPUTS:
-%       pethRaw - (M x N) Raw PETH matrix (units/events x bins).
-%       refData - (M x N) or (1 x N) Reference PETH data.
-%       kd      - (1 x K) Smoothing kernel.
-%
-%   OUTPUTS:
-%       pethZ   - (M x N) Z-scored PETH.
-
-% Edge Effect Correction Vector
-% Normalized kernel convolution with unity vector reveals boundary loss
-nBins = size(pethRaw, 2);
-kCorr = conv(ones(1, nBins), kd, 'same');
-
-% Smooth Target
-pethSmooth = conv2(pethRaw, kd, 'same') ./ kCorr;
-
-% Reference
-if size(refData, 1) == size(pethRaw, 1) && size(refData, 1) > 1
-    % Unit-wise normalization (Reference is Units x Bins)
-    refMean = mean(refData, 2, 'omitnan'); % (Units x 1)
-    refSd = std(refData, [], 2, 'omitnan'); % (Units x 1)
-else
-    % Independent Reference (e.g. Population Mean Vector 1 x Bins)
-    refMean = mean(refData, 'all', 'omitnan');
-    refSd = std(refData, [], 'all', 'omitnan');
-end
-
-if any(refSd == 0)
-    refSd(refSd == 0) = 1;
-end
-
-% Z-Score (Control Rates)
-pethZ = (pethSmooth - refMean) ./ refSd;
-
 end
 
 

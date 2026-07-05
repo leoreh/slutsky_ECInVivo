@@ -1,7 +1,7 @@
-function hFig = evt_plotSpks(evtSpks, spkPeth, varargin)
+function hFig = evt_plotSpks(evtSpks, varargin)
 % EVT_PLOTSPKS Visualizes event-modulated spiking activity.
 %
-%   hFig = EVT_PLOTSPKS(evtSpks, spkPeth, varargin)
+%   hFig = EVT_PLOTSPKS(evtSpks, varargin)
 %
 %   SUMMARY:
 %       Generates a comprehensive summary figure:
@@ -15,13 +15,14 @@ function hFig = evt_plotSpks(evtSpks, spkPeth, varargin)
 %           - Modulation Scatter Plot (Baseline FR vs Event FR).
 %
 %   INPUTS:
-%       evtSpks    - (Struct) Stats from ripp_spks.m. Flat struct with
-%                     per-unit fields (.frEvt, .frCtrl, ...).
-%       spkPeth     - (Struct) Maps from ripp_spkPeth.m, grouped as:
-%                     .mu / .su, each with .ripp/.ctrl/.tstamps.
+%       evtSpks    - (Struct) Consolidated spike results from evt_spkAnalysis:
+%                     per-unit fields (.frEvt, .frCtrl, ...), .tstamps, and the
+%                     3D maps .maps.su / .maps.mu (each with .evt/.ctrl).
 %       varargin    - Parameter/Value pairs:
 %           'basepath'   - (Char) Save location.
 %           'flgSaveFig' - (Log)  Save generated figure? (Default: true).
+%           'name'       - (Char) Modality tag for the filename. (Default: 'evt').
+%           'lbl'        - (Char) Display label for titles/legends. (Default: 'Event').
 %
 %   OUTPUTS:
 %       hFig        - (handle) Figure handle.
@@ -31,8 +32,8 @@ function hFig = evt_plotSpks(evtSpks, spkPeth, varargin)
 %
 %   HISTORY:
 %       Jan 2026 - Created.
-%       Jul 2026 - Dropped PlotColorMap dependency; fixed evtSpks.mu/.su
-%                  field access; hardened maps handling and saving.
+%       Jul 2026 - Dropped PlotColorMap dependency; hardened maps handling.
+%       Jul 2026 - Reads the consolidated evtSpks struct (3D maps in .maps).
 %
 
 %% ========================================================================
@@ -40,12 +41,11 @@ function hFig = evt_plotSpks(evtSpks, spkPeth, varargin)
 %  ========================================================================
 p = inputParser;
 addRequired(p, 'evtSpks', @isstruct);
-addRequired(p, 'spkPeth', @isstruct);
 addParameter(p, 'basepath', pwd, @ischar);
 addParameter(p, 'flgSaveFig', true, @islogical);
 addParameter(p, 'name', 'evt', @ischar);
 addParameter(p, 'lbl', 'Event', @ischar);
-parse(p, evtSpks, spkPeth, varargin{:});
+parse(p, evtSpks, varargin{:});
 
 basepath = p.Results.basepath;
 flgSaveFig = p.Results.flgSaveFig;
@@ -55,17 +55,20 @@ lbl = p.Results.lbl;
 %% ========================================================================
 %  VALIDATE
 %  ========================================================================
-% spkPeth must carry .mu and .su, each with .ripp/.ctrl/.tstamps.
+% evtSpks must carry .tstamps and .maps.{mu,su}, each with .evt/.ctrl.
+if ~isfield(evtSpks, 'maps') || ~isfield(evtSpks, 'tstamps')
+    error('evt_plotSpks:missingField', 'evtSpks.maps / evtSpks.tstamps missing.');
+end
 subs = {'mu', 'su'};
-flds = {'ripp', 'ctrl', 'tstamps'};
+flds = {'evt', 'ctrl'};
 for iSub = 1:numel(subs)
-    if ~isfield(spkPeth, subs{iSub})
-        error('evt_plotSpks:missingField', 'spkPeth.%s is missing.', subs{iSub});
+    if ~isfield(evtSpks.maps, subs{iSub})
+        error('evt_plotSpks:missingField', 'evtSpks.maps.%s is missing.', subs{iSub});
     end
     for iFld = 1:numel(flds)
-        if ~isfield(spkPeth.(subs{iSub}), flds{iFld})
+        if ~isfield(evtSpks.maps.(subs{iSub}), flds{iFld})
             error('evt_plotSpks:missingField', ...
-                'spkPeth.%s.%s is missing.', subs{iSub}, flds{iFld});
+                'evtSpks.maps.%s.%s is missing.', subs{iSub}, flds{iFld});
         end
     end
 end
@@ -76,7 +79,7 @@ end
 [~, basename] = fileparts(basepath);
 
 % Number of single units (rows of the SUA map)
-nUnits = size(spkPeth.su.ripp, 1);
+nUnits = size(evtSpks.maps.su.evt, 1);
 
 % Load unit classification (if available and consistent with nUnits)
 unitsFile = fullfile(basepath, [basename, '.units.mat']);
@@ -93,7 +96,7 @@ if isfile(unitsFile)
                 flgUnits = true;
                 idxRS = uType == 'RS';
                 idxFS = uType == 'FS';
-                fprintf('[RIPP]: Loaded unit types: %d RS, %d FS.\n', ...
+                fprintf('[evt_plotSpks]: Unit types: %d RS, %d FS.\n', ...
                     sum(idxRS), sum(idxFS));
             else
                 warning('evt_plotSpks:unitMismatch', ...
@@ -127,11 +130,11 @@ title(tl, [basename ' - ' lbl ' Modulation'], 'Interpreter', 'none');
 %  MUA (Row 1)
 %  ========================================================================
 
-muMaps = spkPeth.mu;
-tVec = muMaps.tstamps(:)';
+muMaps = evtSpks.maps.mu;
+tVec = evtSpks.tstamps(:)';
 
 % Collapse the singleton unit dimension: [1 x nEvents x nBins] -> [nEvents x nBins]
-rData = collapseUnit(muMaps.ripp);
+rData = collapseUnit(muMaps.evt);
 cData = collapseUnit(muMaps.ctrl);
 nEvents = size(rData, 1);
 
@@ -192,13 +195,13 @@ axis(hAx, 'tight');
 %  SUA (Row 2)
 %  ========================================================================
 
-suMaps = spkPeth.su;
-tVec = suMaps.tstamps(:)';
-nBins = size(suMaps.ripp, 3);
+suMaps = evtSpks.maps.su;
+tVec = evtSpks.tstamps(:)';
+nBins = size(suMaps.evt, 3);
 
 % Mean PETH across events: [nUnits x nEvents x nBins] -> [nUnits x nBins]
 % (reshape rather than squeeze to stay valid when nUnits == 1)
-meanPeth = reshape(mean(suMaps.ripp, 2, 'omitnan'), nUnits, nBins);
+meanPeth = reshape(mean(suMaps.evt, 2, 'omitnan'), nUnits, nBins);
 
 % Normalize by per-unit peak (guard zero / all-NaN units)
 peakRates = max(meanPeth, [], 2);

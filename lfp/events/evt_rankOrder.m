@@ -1,19 +1,17 @@
-function [rankMean, rankVar, timesFirst, timesLate] = evt_rankOrder(spkTimes, evtTimes)
+function [rankMean, rankVar] = evt_rankOrder(spkTimes, evtTimes)
 % EVT_RANKORDER Calculates the normalized temporal rank of units within
 % events.
 %
 %   INPUTS:
 %       spkTimes      - (Cell) {N_units x 1} Spike times [s].
-%       evtTimes     - (Mat)  [N_ripp x 2] Event start/end times [s].
+%       evtTimes     - (Mat)  [N_evt x 2] Event start/end times [s].
 %
 %   OUTPUTS:
 %       rankMean      - (Vec)  [N_units x 1] Mean normalized rank (0=Leader, 1=Follower).
 %       rankVar       - (Vec)  [N_units x 1] Variance of rank order.
-%       timesFirst    - (Cell) {N_units x 1} First spike in each event per unit.
-%       timesLate     - (Cell) {N_units x 1} Subsequent spikes in each event per unit.
 %
 %   HISTORY:
-%       Updated: 26 Jan 2026
+%       Updated: 05 Jul 2026 (dropped legacy first/late spike outputs).
 %
 
 % =========================================================================
@@ -25,8 +23,6 @@ nUnits = length(spkTimes);
 % Prepare Outputs
 rankMean = nan(nUnits, 1);
 rankVar  = nan(nUnits, 1);
-timesFirst = cell(nUnits, 1);
-timesLate  = cell(nUnits, 1);
 
 % Flatten Spike Times for Vectorized Ops
 allSpks  = [];
@@ -64,32 +60,10 @@ srtdSpks  = relSpks(sortIdx);
 % Unique rows of [EventID, UnitID] will return the first occurrence (lowest time)
 [~, firstIdx] = unique([srtdEvt, srtdUnits], 'rows', 'first');
 
-% Extract First Spikes
+% Extract First Spikes (the rank participants)
 partEvt  = srtdEvt(firstIdx);
 partUnits = srtdUnits(firstIdx);
 partTimes = srtdSpks(firstIdx);
-
-% Extract Late Spikes
-lateMask = true(size(srtdSpks));
-lateMask(firstIdx) = false;
-
-lateUnits = srtdUnits(lateMask);
-lateTimes = srtdSpks(lateMask);
-
-% Pack Spike Times Outputs
-% Re-accumulate into cells
-for iSpk = 1:length(partTimes)
-    uid = partUnits(iSpk);
-    timesFirst{uid} = [timesFirst{uid}; partTimes(iSpk)];
-end
-for iSpk = 1:length(lateTimes)
-    uid = lateUnits(iSpk);
-    timesLate{uid} = [timesLate{uid}; lateTimes(iSpk)];
-end
-
-% Ensure sorted
-timesFirst = cellfun(@sort, timesFirst, 'UniformOutput', false);
-timesLate  = cellfun(@sort, timesLate,  'UniformOutput', false);
 
 % =========================================================================
 %  RANK CALCULATION

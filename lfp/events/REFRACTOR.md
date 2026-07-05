@@ -29,23 +29,43 @@ stored. Ripple metric columns: `.amp .freq .freqEvent .energy .dur .skew .emg
 
 ## File layout (parallel by construction)
 
-| Concern           | Ripples              | ED                 | Producer      |
-|-------------------|----------------------|--------------------|---------------|
-| Events (curation) | `.ripp.mat`          | `.ed.mat`          | wrapper       |
-| LFP maps          | `.rippMaps.mat`      | `.edMaps.mat`      | `evt_maps`    |
-| Spike modulation  | `.rippSpks.mat`      | `.edSpks.mat`      | `evt_spks`    |
-| Spike PETH        | `.rippPeth.mat`      | `.edPeth.mat`      | `evt_spkPeth` |
-| Per-bout states   | `.rippStates.mat`    | `.edStates.mat`    | `evt_states`  |
-| Phase coupling    | `.rippSpkLfp.mat`    | —                  | `spklfp_phase`|
+Split **by dependency**: maps need only the LFP (always producible), spikes need
+sorted units (skipped when absent). The old separate PETH file is gone — the 3D
+peri-event spike maps now live inside the spikes file.
+
+| Concern            | Ripples              | ED                 | Producer          |
+|--------------------|----------------------|--------------------|-------------------|
+| Events (curation)  | `.ripp.mat`          | `.ed.mat`          | wrapper           |
+| LFP maps           | `.rippMaps.mat`      | `.edMaps.mat`      | `evt_maps`        |
+| Spikes: stats+PETH | `.rippSpks.mat`      | `.edSpks.mat`      | `evt_spkAnalysis` |
+| Per-bout states    | `.rippStates.mat`    | `.edStates.mat`    | `evt_states`      |
+| Phase coupling     | `.rippSpkLfp.mat`    | —                  | `spklfp_phase`    |
+
+`rippSpks`/`edSpks` carry per-unit scalar stats, the per-unit normalized PETH
+(`.peth` + `.tstamps`), and the 3D maps (`.maps.su`/`.maps.mu`, each `.evt/.ctrl`).
+Per-event population PETHs (RS/FS/MU) are **computed on demand** from the 3D via
+`evt_pethPop` — never precomputed or saved.
 
 ## Shared layer (`lfp/events/`)
 
-Event-agnostic; both wrappers call these with modality-specific inputs:
-`evt_states`, `evt_ctrlTimes`, `evt_maps`, `evt_spks` (`winFxd` param),
-`evt_spkPeth`, `evt_rankOrder`, `evt_rate`, `evt_plotSpks`. `evt_states` /
-`evt_plotSpks` take a `name` param that sets the saved filename/variable/figure
-(`'ripp'` or `'ed'`), preserving downstream readers (e.g. `mcu_tblVivo` expects
-the variable `rippStates`).
+Event-agnostic; both wrappers call these with modality-specific inputs.
+
+**Spikes.** Each wrapper's spike section is one prep call + one analysis call:
+- `evt_spkPrep(spikes, spktimes, units, win, sigDur, fsSpk)` → window-relative
+  single-unit times, one pooled MUA vector, and unit types (empty when absent).
+- `evt_spkAnalysis(spkTimes, muTimes, evtTimes, ctrlTimes, peakTime, ...)` → one
+  struct: per-unit stats + per-event population metrics (`.events`), 3D PETH maps
+  (`.maps.su/.mu`), and the per-unit normalized PETH (`.peth`/`.tstamps`). It
+  orchestrates `evt_spks` (`winFxd` param) + `evt_spkPeth` + `evt_pethNorm`.
+- `evt_pethNorm` (smooth + z-score against control; kernel from the PETH time
+  base) and `evt_pethPop` (per-event population PETH from the 3D) are the reused
+  reduction helpers. `evt_viewSpks` launches the shared interactive viewers.
+
+**Events / maps / rate.** `evt_states`, `evt_ctrlTimes`, `evt_maps`, `evt_rate`,
+`evt_rankOrder`, `evt_plotSpks`. `evt_states` / `evt_plotSpks` take a `name` param
+that sets the saved filename/variable/figure (`'ripp'` or `'ed'`), preserving
+downstream readers (e.g. `mcu_tblVivo` expects the variable `rippStates`), and a
+`lbl` param that labels titles/legends (`'Ripple'` / `'ED'`).
 
 ## Modality-specific (deliberately not shared)
 
@@ -66,11 +86,8 @@ EMG / NREM relax the corresponding QA criteria; `'nrem'` z-scoring falls back to
 
 ## Deferred / notes
 
-- `ripp_qa` and `peth_norm` remain embedded in `ripp_wrapper` (ED uses its own
-  `ed_reject_emg` QA and `evt_plotSpks` self-normalizes, so a shared `evt_qa` /
-  `evt_pethNorm` was not required). Extract them if a second consumer appears.
-- Some internal variable names inside the moved `evt_*` functions still read
-  `ripp*` (cosmetic; the function names and interfaces are generic).
-- ED detection quality is unvalidated; the new ED maps/PETH double as a
-  detection read-out to inform a future tuning pass.
+- `ripp_qa` stays embedded in `ripp_wrapper` (ED uses its own `ed_reject_emg`);
+  extract a shared `evt_qa` only if a third consumer appears.
+- ED detection quality is unvalidated; the ED maps/PETH double as a detection
+  read-out to inform a future tuning pass.
 - Not migrated by request: `lfp/+IED`, `reduct_displayer` (owned elsewhere).
