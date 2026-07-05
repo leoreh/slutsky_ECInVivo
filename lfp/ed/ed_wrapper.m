@@ -13,8 +13,8 @@ function ed = ed_wrapper(varargin)
 %          all-true on the survivors (no .idxQA kept).
 %       4. Parity analyses (shared evt_* layer): matched control intervals,
 %          LFP maps, and MUA/SU spike modulation + PETH around discharges.
-%       5. Convert times to absolute; optionally save .ed / .edMaps /
-%          .edSpks (per-unit stats + 3D PETH, consolidated).
+%       5. Convert times to absolute; optionally save .ed / .edMaps / .edSpks
+%          (per-unit stats + PETH, light) / .edSpkMaps (3D raster, heavy).
 %       6. Optionally launch the curation GUI (gui_curate, preset 'EDs').
 %       If <basename>.ed.mat already exists and flgForce is false, detection
 %       is skipped and the stored result is loaded straight into the GUI
@@ -204,7 +204,18 @@ else
     if ~isempty(p.Results.minAmpQA)
         qaPass = qaPass & ed.amp(:) >= p.Results.minAmpQA;
     end
-    ed = ed_filterEvents(ed, qaPass);
+    % Subset every per-event field by the pass mask; drop the transient .idxQA
+    % breakdown. Numeric / logical / categorical fields whose first dimension
+    % is the event count are the per-event ones; .info and signals are left.
+    keep = logical(qaPass(:));
+    fn = fieldnames(ed);
+    for iF = 1:numel(fn)
+        f = ed.(fn{iF});
+        if (isnumeric(f) || islogical(f) || iscategorical(f)) && size(f, 1) == numel(keep)
+            ed.(fn{iF}) = f(keep, :);
+        end
+    end
+    if isfield(ed, 'idxQA'), ed = rmfield(ed, 'idxQA'); end
     ed.accepted = true(numel(ed.pos), 1);
 
     % ==== Parity analyses (relative frame, mirroring the ripple pipeline) ====
@@ -254,7 +265,15 @@ else
         save(edFile, 'ed', '-v7.3');
         save(fullfile(basepath, [basename, '.edMaps.mat']), 'edMaps', '-v7.3');
         if flgEdSpks
-            save(fullfile(basepath, [basename, '.edSpks.mat']), 'edSpks', '-v7.3');
+            % Split the spike outputs: heavy 3D raster in its own file, light
+            % per-unit stats + PETH in edSpks (mirrors the ripple pipeline).
+            edSpkMaps = edSpks.maps;            % .su/.mu, each .evt/.ctrl
+            edSpkMaps.tstamps = edSpks.tstamps;
+            save(fullfile(basepath, [basename, '.edSpkMaps.mat']), 'edSpkMaps', '-v7.3');
+
+            % Write edSpks without the raster; keep the in-memory copy for plots.
+            spksOut = struct('edSpks', rmfield(edSpks, 'maps'));
+            save(fullfile(basepath, [basename, '.edSpks.mat']), '-struct', 'spksOut', '-v7.3');
         end
     end
 
@@ -285,24 +304,4 @@ end
 
 if verbose, fprintf('[ED]: Done (%s).\n', basename); end
 
-end     % EOF
-
-
-%% ========================================================================
-%  HELPER: ED_FILTEREVENTS
-%  ========================================================================
-function ed = ed_filterEvents(ed, keep)
-% Subset every per-event field of the ed struct by the logical KEEP mask and
-% drop the transient .idxQA breakdown. Per-event fields are those whose first
-% dimension equals the event count; scalar / struct fields (.info) are left.
-keep = logical(keep(:));
-nEvt = numel(keep);
-fn = fieldnames(ed);
-for iF = 1:numel(fn)
-    f = ed.(fn{iF});
-    if (isnumeric(f) || islogical(f) || iscategorical(f)) && size(f, 1) == nEvt
-        ed.(fn{iF}) = f(keep, :);
-    end
-end
-if isfield(ed, 'idxQA'), ed = rmfield(ed, 'idxQA'); end
 end     % EOF

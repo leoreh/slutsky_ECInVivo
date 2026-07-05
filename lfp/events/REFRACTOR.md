@@ -38,16 +38,16 @@ peri-event spike maps now live inside the spikes file.
 | Events (curation)  | `.ripp.mat`          | `.ed.mat`          | wrapper           |
 | LFP maps           | `.rippMaps.mat`      | `.edMaps.mat`      | `evt_maps`        |
 | Spikes: stats+PETH | `.rippSpks.mat`      | `.edSpks.mat`      | `evt_spks`        |
-| Spike raster (3D)  | `.rippSpkMaps.mat`   | (in `.edSpks`)     | `evt_spks`        |
+| Spike raster (3D)  | `.rippSpkMaps.mat`   | `.edSpkMaps.mat`   | `evt_spks`        |
 | Per-bout states    | `.rippStates.mat`    | `.edStates.mat`    | `evt_states`      |
 | Phase coupling     | `.rippSpkLfp.mat`    | —                  | `spklfp_phase`    |
 
 `rippSpks`/`edSpks` carry per-unit scalar stats + the per-unit PETH (`.peth`, 2D
 per-unit average) + `.tstamps`. The 3D raster (`.su`/`.mu`, each `.evt/.ctrl`) is
-split into its own light-vs-heavy file — `rippSpkMaps` for ripples (so the
-manuscript loader stays light); ED still carries it inline in `.edSpks.maps`
-(pending the ED pass). Per-event population PETHs (RS/FS/MU) are **computed on
-demand** from the 3D via `evt_pethPop` — never precomputed or saved.
+split into its own heavy file (`rippSpkMaps` / `edSpkMaps`) so the light spikes
+file — which the manuscript loads hot — stays small. Per-event population PETHs
+(RS/FS/MU) are **computed on demand** from the 3D via `evt_pethPop` — never
+precomputed or saved.
 
 ## Shared layer (`lfp/events/`)
 
