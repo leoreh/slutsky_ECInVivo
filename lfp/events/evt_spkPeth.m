@@ -147,6 +147,7 @@ spkInEvt = endIdx(validWin) - startIdx(validWin) + 1;
 
 % 2. Create an event ID vector matching the spikes
 evtIds = repelem(validWin, spkInEvt);
+evtIds = evtIds(:);     % force column (repelem of a scalar validWin returns a row)
 
 % 3. Extract the spikes
 % We create a list of indices to grab from spikeTimes
@@ -175,6 +176,6 @@ finalEvtIds = evtIds(validBin);
 finalBins = bins(validBin);
 
 if ~isempty(finalEvtIds)
-    syncMap = accumarray([finalEvtIds, finalBins], 1, [nEvents, nBinsMap]);
+    syncMap = accumarray([finalEvtIds(:), finalBins(:)], 1, [nEvents, nBinsMap]);
 end
 end
