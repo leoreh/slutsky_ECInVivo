@@ -15,9 +15,9 @@ function ripp = ripp_times(rippSig, fs, varargin)
 %           'thr'    - (Vec) Thresholds [Start, Peak, Cont, Max, Min_Cont].
 %                            1: Start Trigger   (Z > thr)
 %                            2: Peak Threshold  (Z > thr)
-%                            3: Continuity Thr  (Z > thr) - must stay above this for...
+%                            3: Continuity Thr  (Z > thr) - stay above.
 %                            4: Max Threshold   (Z < thr) - artifact rejection.
-%                            5: Min Cont Duration (ms) - time detection must obey Thr3.
+%                            5: Min Cont Duration (ms) - obeys Thr3.
 %           'limDur' - (Vec) Duration limits [Min, Max, Inter, MinCont] (ms).
 %                            1: Min Event Duration [15]
 %                            2: Max Event Duration [300]
@@ -74,8 +74,9 @@ limDur_Samples = round(limDur / 1000 * fs);
 %  ========================================================================
 % 1. Initial Bout Detection
 % Find all intervals where signal exceeds Start Threshold (Thr 1)
-eventSamples = binary2bouts('vec', rippSig.z > thr(1), 'minDur', limDur_Samples(1),...
-    'maxDur', limDur_Samples(2), 'interDur', limDur_Samples(3));
+eventSamples = binary2bouts('vec', rippSig.z > thr(1), ...
+    'minDur', limDur_Samples(1), 'maxDur', limDur_Samples(2), ...
+    'interDur', limDur_Samples(3));
 nEvents = size(eventSamples, 1);
 
 idxDiscard = false(nEvents, 1);
@@ -124,7 +125,7 @@ eventSamples(idxDiscard, :) = [];
 
 % Check for Empty Results
 
-% (Unused stats are cleared implicitly by not returning them, but we keep the logic consistent)
+% (Unused stats are dropped by not returning them; logic kept consistent.)
 nEvents = size(eventSamples, 1);
 
 if nEvents == 0

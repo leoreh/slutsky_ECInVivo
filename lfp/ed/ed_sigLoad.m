@@ -30,10 +30,11 @@ function [sig, emg, emgRms, fs, specAdapter, sSig] = ed_sigLoad(basepath, vararg
 %       sSig        - (Struct) The full sleep_sig struct (for the GUI).
 %
 %   DEPENDENCIES:
-%       binary_load, basepaths2vars (only for the 'lfp' source).
+%       evt_loadCh, basepaths2vars (only for the 'lfp' source).
 %
 %   HISTORY:
 %       Created: 22 Jun 2026
+%       Updated: 260706 (lfp branch via the shared evt_loadCh).
 
 %% ========================================================================
 %  ARGUMENTS
@@ -93,37 +94,24 @@ switch sigSource
         sigAll = sSig.eeg(:);
 
     case 'lfp'
-        % Escape hatch: detect on a raw LFP channel instead of sSig.eeg.
-        % binary_load applies bit2uv once, so sigAll is in uV; its absolute
+        % Escape hatch: detect on a raw LFP channel instead of sSig.eeg. The
         % scale may differ from sSig.eeg, but detection is z-scored so this
         % affects only reported amplitude units, not which events are found.
         if isempty(session)
             v = basepaths2vars('basepaths', {basepath}, 'vars', {'session'});
             session = v.session;
         end
+
+        % Keep the srLfp-vs-sSig.fs alignment check here (EMG / spec stay at
+        % sSig.fs); the shared loader reads the whole channel (windowed below).
         fsLfp = session.extracellular.srLfp;
         if abs(fsLfp - fs) > 1
             warning('ed_sigLoad:fsMismatch', ...
-                'srLfp (%g) differs from sSig.fs (%g); EMG/spec may misalign.', fsLfp, fs);
+                ['srLfp (%g) differs from sSig.fs (%g); ', ...
+                'EMG/spec may misalign.'], fsLfp, fs);
         end
-        fs = fsLfp;
-        nChans = session.extracellular.nChannels;
-        bit2uv = p.Results.bit2uv;
-        if isempty(bit2uv)
-            if round(session.extracellular.sr) == 24414
-                bit2uv = 1;        % TDT
-            else
-                bit2uv = 0.195;    % Intan
-            end
-        end
-        fname = fullfile(basepath, [basename, '.lfp']);
-        sigAll = double(binary_load(fname, 'duration', Inf, 'fs', fs, ...
-            'nCh', nChans, 'start', 0, 'ch', p.Results.edCh, ...
-            'downsample', 1, 'bit2uv', bit2uv));
-        if size(sigAll, 2) > 1
-            sigAll = mean(sigAll, 2);
-        end
-        sigAll = sigAll(:);
+        [sigAll, fs] = evt_loadCh(basepath, basename, session, ...
+            p.Results.edCh, [0 Inf], p.Results.bit2uv);
 end
 
 %% ========================================================================

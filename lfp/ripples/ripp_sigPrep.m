@@ -22,8 +22,8 @@ function rippSig = ripp_sigPrep(lfp, fs, varargin)
 %           'passband'  - (Vec) Filtering range [min max] (Hz).
 %           'zMet'      - (Char) Normalization method:
 %                           'adaptive' : Moving average/std (10s window).
-%                           'nrem'     : Global mean/std derived from NREM epochs.
-%           'nremTimes' - (Mat) [N x 2] NREM start/end times (Required for 'nrem').
+%                           'nrem'     : Global mean/std from NREM epochs.
+%           'nremTimes' - (Mat) [N x 2] NREM start/end times (for 'nrem').
 %
 %   OUTPUTS:
 %       rippSig     - (Struct) Processed signals:
@@ -142,7 +142,8 @@ switch zMet
             sigma = std(baseSignal(mask), 'omitnan');
         else
             warning('ripp_sigPrep:noNrem', ...
-                'No NREM samples for ''nrem'' z-scoring; falling back to ''adaptive''.');
+                ['No NREM samples for ''nrem'' z-scoring; ', ...
+                'falling back to ''adaptive''.']);
             movLen = round(10 * fs);
             mu = movmean(baseSignal, movLen);
             sigma = movstd(baseSignal, movLen);

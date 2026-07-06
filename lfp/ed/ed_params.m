@@ -9,19 +9,20 @@ function ed = ed_params(sig, ed, varargin)
 %       amplitude is measured peak-to-baseline (local moving mean), and the
 %       half- and 10%-amplitude widths are found by threshold crossings on a
 %       clip centred on the peak. The event extent (.times) is defined as
-%       peakTime +/- dur/2 so it slots into ripp_states / rate code.
+%       peakTime +/- dur/2 so it slots into evt_states / rate code.
 %
 %   INPUTS:
 %       sig         - (Vec) Same signal passed to ed_detect.
 %       ed          - (Struct) Output of ed_detect (requires .pos, .info.fs).
 %       varargin    - Parameter/Value pairs:
-%           'marg'       - (Num) Half-window clipped around each peak [s]. {0.05}
+%           'marg'       - (Num) Feature clip half-window [s]. {0.05}
 %           'ampBaseWin' - (Num) Moving-mean window for the amplitude
 %                                baseline [s]. {1}
 %
 %   OUTPUTS:
 %       ed          - (Struct) With added fields:
-%           .peakTime - (N x 1) Peak time [s] (relative; wrapper shifts to absolute).
+%           .peakTime - (N x 1) Peak time [s] (relative frame; the
+%                       wrapper shifts it to absolute).
 %           .times    - (N x 2) Event start/end [s] = peakTime +/- dur/2.
 %           .dur      - (N x 1) Half-amplitude width [ms].
 %           .width10  - (N x 1) 10%-amplitude width [ms].

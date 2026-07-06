@@ -27,6 +27,9 @@ function evtSpks = evt_spksParams(spkTimes, evtTimes, ctrlTimes, peakTime, varar
 %   OUTPUTS:
 %       evtSpks    - (Struct) Stats structure with [N_units x 1] fields.
 %
+%   DEPENDENCIES:
+%       evt_rankOrder; signrank, ranksum (Statistics Toolbox).
+%
 %   HISTORY:
 %       Updated: 26 Jan 2026
 %

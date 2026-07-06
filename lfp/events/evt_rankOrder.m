@@ -1,17 +1,29 @@
 function [rankMean, rankVar] = evt_rankOrder(spkTimes, evtTimes)
-% EVT_RANKORDER Calculates the normalized temporal rank of units within
-% events.
+% EVT_RANKORDER Normalized temporal rank of units within events.
+%
+%   [rankMean, rankVar] = EVT_RANKORDER(spkTimes, evtTimes)
+%
+%   SUMMARY:
+%       For each unit, computes its average normalized temporal rank within
+%       events (0 = leader, fires early; 1 = follower, fires late) and the
+%       variance of that rank across events. Takes each unit's first spike per
+%       event, ranks the participating units within the event, and normalizes
+%       the rank to [0 1].
 %
 %   INPUTS:
-%       spkTimes      - (Cell) {N_units x 1} Spike times [s].
-%       evtTimes     - (Mat)  [N_evt x 2] Event start/end times [s].
+%       spkTimes  - (Cell) {N_units x 1} Spike times [s].
+%       evtTimes  - (Mat)  [N_evt x 2] Event start / end times [s].
 %
 %   OUTPUTS:
-%       rankMean      - (Vec)  [N_units x 1] Mean normalized rank (0=Leader, 1=Follower).
-%       rankVar       - (Vec)  [N_units x 1] Variance of rank order.
+%       rankMean  - (Vec)  [N_units x 1] Mean rank (0=lead, 1=follow).
+%       rankVar   - (Vec)  [N_units x 1] Variance of the rank order.
+%
+%   DEPENDENCIES:
+%       None.
 %
 %   HISTORY:
 %       Updated: 05 Jul 2026 (dropped legacy first/late spike outputs).
+%       Updated: 06 Jul 2026 (help block to house format).
 %
 
 % =========================================================================

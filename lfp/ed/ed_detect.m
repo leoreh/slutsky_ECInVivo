@@ -20,7 +20,7 @@ function ed = ed_detect(sig, fs, varargin)
 %           'thrDir'   - (Char) 'positive' | 'negative' | 'both'. {'both'}
 %           'baseWin'  - (Num) Moving baseline window for mu/sigma [s]. {5}
 %           'interDur' - (Num) Refractory / burst-merge window [s]. {0.025}
-%           'ampWin'   - (Num) Half-window for the peak-to-peak gate [s]. {0.015}
+%           'ampWin'   - (Num) Peak-to-peak gate half-window [s]. {0.015}
 %           'lowThr'   - (Num) Trough threshold (signal units) for the
 %                              twin-peak merge rule. {0.2}
 %           'minAmp'   - (Num) Optional absolute amplitude floor (signal
@@ -29,7 +29,7 @@ function ed = ed_detect(sig, fs, varargin)
 %   OUTPUTS:
 %       ed          - (Struct) Partial detection result:
 %           .pos     - (N x 1) Peak sample index into SIG (1-based).
-%           .amp     - (N x 1) Peak-to-peak amplitude in +/-ampWin (signal units).
+%           .amp     - (N x 1) Peak-to-peak amplitude in +/-ampWin.
 %           .ampZ    - (N x 1) Local moving z-score at the peak.
 %           .info    - (Struct) Detection parameters used.
 %
@@ -46,7 +46,8 @@ p = inputParser;
 addRequired(p, 'sig', @isnumeric);
 addRequired(p, 'fs', @isnumeric);
 addParameter(p, 'thr', 7, @(x) isnumeric(x) && isscalar(x) && x > 0);
-addParameter(p, 'thrDir', 'both', @(x) any(strcmpi(x, {'positive', 'negative', 'both'})));
+addParameter(p, 'thrDir', 'both', ...
+    @(x) any(strcmpi(x, {'positive', 'negative', 'both'})));
 addParameter(p, 'baseWin', 5, @(x) isnumeric(x) && isscalar(x) && x > 0);
 addParameter(p, 'interDur', 0.025, @(x) isnumeric(x) && isscalar(x) && x > 0);
 addParameter(p, 'ampWin', 0.015, @(x) isnumeric(x) && isscalar(x) && x > 0);
