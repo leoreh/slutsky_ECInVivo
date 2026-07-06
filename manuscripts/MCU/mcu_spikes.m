@@ -30,8 +30,8 @@ idxGrp = tblLme.genotype == 'Control';
 idxGrp = tblLme.genotype == 'MCU-KO';
 
 % Plots
-tblGUI_scatHist(tblLme(:, :), 'xVar', 'fr', 'yVar', 'pBurst', 'grpVar', 'genotype')
-tblGUI_bar(tblLme);
+guiTbl_scatHist(tblLme(:, :), 'xVar', 'fr', 'yVar', 'pBurst', 'grpVar', 'genotype')
+guiTbl_bar(tblLme);
 
 
 %% ========================================================================
@@ -57,7 +57,7 @@ frml = [varRsp, ' ~ genotype * day + (day|sbjID)'];
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLme, frml, 'dist', 'logit-normal');
 
 % Plot
-hFig = tblGUI_bar(tblLme, 'yVar', varRsp, 'xVar', 'day', 'grpVar', 'genotype');
+hFig = guiTbl_bar(tblLme, 'yVar', varRsp, 'xVar', 'day', 'grpVar', 'genotype');
 
 
 % Prism
@@ -85,7 +85,7 @@ frml = [varRsp, ' ~ genotype + (1|sbjID)'];
 
 
 % Plot
-hFig = tblGUI_bar(tblLme, 'yVar', varRsp, 'xVar', 'genotype');
+hFig = guiTbl_bar(tblLme, 'yVar', varRsp, 'xVar', 'genotype');
 
 % Prism
 [prismMat] = tbl2prism(tblLme, 'yVar', varRsp, 'grpVar', 'genotype');
@@ -126,7 +126,7 @@ tblPlot = tbl_tNorm(tblPlot, 'varsInc', 'FRt', 'varsGrp', 'sbjID', ...
     'flgGeom', false, 'floorVal', floorVal);
 
 % Plot (Log Scale)
-hFig = tblGUI_xy(tAxis, tblPlot, 'yVar', 'FRt', 'tileVar', 'genotype', 'grpVar', 'sbjID');
+hFig = guiTbl_xy(tAxis, tblPlot, 'yVar', 'FRt', 'tileVar', 'genotype', 'grpVar', 'sbjID');
 
 % Grab to prism
 idxUnits = tblPlot.unitType == 'RS' & tblPlot.genotype == 'Control';
@@ -171,7 +171,7 @@ for iBin = 1 : nBins
 end
 tblPlot.FRt_bins = FRt_bins;
 
-hFig = tblGUI_xy(tBinCents, tblPlot, 'yVar', 'FRt', 'tileVar', 'genotype');
+hFig = guiTbl_xy(tBinCents, tblPlot, 'yVar', 'FRt', 'tileVar', 'genotype');
 
 
 miceID = unique(tblPlot.sbjID);
@@ -316,6 +316,6 @@ tblWide.dSngl = log(tblWide.frSingle_BAC3 ./ tblWide.frSingle_BSL);
 
 
 % Plot
-tblGUI_bar(tblWide, 'xVar', 'genotype', 'yVar', 'dBrst');
-tblGUI_scatHist(tblWide, 'xVar', 'dSngl', 'yVar', 'dBrst', 'grpVar', 'genotype');
+guiTbl_bar(tblWide, 'xVar', 'genotype', 'yVar', 'dBrst');
+guiTbl_scatHist(tblWide, 'xVar', 'dSngl', 'yVar', 'dBrst', 'grpVar', 'genotype');
 

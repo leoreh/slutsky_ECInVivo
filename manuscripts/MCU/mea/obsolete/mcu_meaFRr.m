@@ -104,15 +104,15 @@ end
 % -------------------------------------------------------------------------
 % PLOTS
 guiVars = {'Name', 'Group', 'UnitID', 'frt', 'btRate', 'btDur', 'btFreq', 'btIBI', 'btFrac'};
-tblGUI_xy(xVec, tbl(:, guiVars));
+guiTbl_xy(xVec, tbl(:, guiVars));
 
 guiVars = {'Name', 'Group', 'uRcv', 'UnitID', 'bRate', 'bDur', 'bSpks', 'bFreq', 'bIBI', 'bFrac', 'fr', 'frSs', 'spkDfct', 'rcvTime'};
-tblGUI_scatHist(tbl(:, guiVars), 'xVar', 'bFrac', 'yVar', 'rcvTime', 'grpVar', 'Group');
+guiTbl_scatHist(tbl(:, guiVars), 'xVar', 'bFrac', 'yVar', 'rcvTime', 'grpVar', 'Group');
 
-tblGUI_bar(tbl(:, guiVars), 'yVar', 'bFrac', 'xVar', 'Group');
+guiTbl_bar(tbl(:, guiVars), 'yVar', 'bFrac', 'xVar', 'Group');
 
 guiVars = {'Name', 'Group', 'UnitID', 'spktimes'};
-tblGUI_raster(tbl(:, guiVars), 'grpVar', 'Name', 'grpVal', 'ctrl1')
+guiTbl_raster(tbl(:, guiVars), 'grpVar', 'Name', 'grpVal', 'ctrl1')
 
 % SAVE FOR APP
 % save("C:\Users\User\Downloads\tbl", 'tbl');
@@ -373,7 +373,7 @@ varsInc = {'frBsl', 'BSpks', 'pertDepth',...
 
 
 % GUI
-hFig = tblGUI_scatHist(lData, 'xVar', 'Bspks', 'yVar', 'rcvTime', ...
+hFig = guiTbl_scatHist(lData, 'xVar', 'Bspks', 'yVar', 'rcvTime', ...
     'grpVar', 'Group');
 
 

@@ -1,7 +1,7 @@
-function hFig = tblGUI_xy(xVec, dataTbl, varargin)
-% TBLGUI_XY Interactive visualization of Table variables against a vector.
+function hFig = guiTbl_xy(xVec, dataTbl, varargin)
+% GUITBL_XY Interactive visualization of Table variables against a vector.
 %
-%   hFig = tblGUI_xy(xVec, dataTbl, varargin) plots column 'yVar' from 'dataTbl'
+%   hFig = guiTbl_xy(xVec, dataTbl, varargin) plots column 'yVar' from 'dataTbl'
 %   against 'xVec'.
 %   - "Y Var": Select which variable to plot on Y-axis.
 %   - "Plot By": Splits data into separate tiles (subplots).
@@ -19,9 +19,9 @@ function hFig = tblGUI_xy(xVec, dataTbl, varargin)
 %       'SelectionCallback'/'GroupByCallback' (function_handle) host coordination.
 %       'xLbl'             (char/str) X-axis label.
 %
-%   Built on the shared graphics/+tblgui layer (uifigure + uigridlayout).
+%   Built on the shared graphics/gui layer (uifigure + uigridlayout).
 %
-%   See also: TBLGUI_SCATHIST
+%   See also: GUITBL_SCATHIST
 
 %% ========================================================================
 %  ARGUMENTS
@@ -49,7 +49,7 @@ xLbl = p.Results.xLbl;
 
 % Find all variables that match xVec dimensions (potential Y vars). This is
 % specific to xy (matches a numeric matrix column or a cell of vectors to the
-% length of xVec), so it stays local rather than using tblgui.classifyVars.
+% length of xVec), so it stays local rather than using gui_classifyVars.
 xLen = length(xVec);
 yVars = {};
 varNames = dataTbl.Properties.VariableNames;
@@ -80,7 +80,7 @@ end
 %  ========================================================================
 
 % Grouping/tiling variables (categorical / string / logical), 'None' first.
-[~, catVars] = tblgui.classifyVars(dataTbl);
+[~, catVars] = gui_classifyVars(dataTbl);
 catVars = [{'None'}, catVars];
 
 % Figure Setup
@@ -115,7 +115,7 @@ guiData.xLbl = xLbl;
 %  LAYOUT
 %  ========================================================================
 
-[~, gPlot, gCtrl] = tblgui.layout(hContainer, 'CtrlWidth', 190);
+[~, gPlot, gCtrl] = gui_layout(hContainer, 'CtrlWidth', 190);
 
 % Plot side: a panel hosts the tiledlayout (tiledlayout cannot parent directly
 % into a uigridlayout cell).
@@ -125,22 +125,22 @@ guiData.hLayout = tiledlayout(guiData.hPanelRight, 'flow', ...
 
 % Controls
 valY = find(strcmp(yVars, yVar), 1);
-guiData.ddYVar = tblgui.labeledControl(gCtrl, 'dropdown', 'Y Variable:', ...
+guiData.ddYVar = gui_labeledControl(gCtrl, 'dropdown', 'Y Variable:', ...
     'Items', yVars, 'Value', yVars{max(valY, 1)}, 'ValueChangedFcn', @onYVarChange);
 
-guiData.ddPlotBy = tblgui.labeledControl(gCtrl, 'dropdown', 'Plot By (Tiles):', ...
+guiData.ddPlotBy = gui_labeledControl(gCtrl, 'dropdown', 'Plot By (Tiles):', ...
     'Items', catVars, 'Value', pickCat(catVars, initialTileVar), ...
     'ValueChangedFcn', @onPlotByChange);
-guiData.pnlPlotBy = tblgui.labeledControl(gCtrl, 'panel', '', 'RowHeight', '1x');
+guiData.pnlPlotBy = gui_labeledControl(gCtrl, 'panel', '', 'RowHeight', '1x');
 
-guiData.ddGrpBy = tblgui.labeledControl(gCtrl, 'dropdown', 'Group By (Colors):', ...
+guiData.ddGrpBy = gui_labeledControl(gCtrl, 'dropdown', 'Group By (Colors):', ...
     'Items', catVars, 'Value', pickCat(catVars, initialGrpVar), ...
     'ValueChangedFcn', @onGrpByChange);
-guiData.pnlGrpBy = tblgui.labeledControl(gCtrl, 'panel', '', 'RowHeight', '1x');
+guiData.pnlGrpBy = gui_labeledControl(gCtrl, 'panel', '', 'RowHeight', '1x');
 
-guiData.ddDispersion = tblgui.labeledControl(gCtrl, 'dropdown', 'Dispersion:', ...
+guiData.ddDispersion = gui_labeledControl(gCtrl, 'dropdown', 'Dispersion:', ...
     'Items', {'Traces', 'Spread', 'None'}, 'Value', 'Spread', 'ValueChangedFcn', @onUpdatePlot);
-guiData.ddStatType = tblgui.labeledControl(gCtrl, 'dropdown', '', ...
+guiData.ddStatType = gui_labeledControl(gCtrl, 'dropdown', '', ...
     'Items', {'Arithmetic', 'Geometric', 'Median'}, 'ValueChangedFcn', @onUpdatePlot);
 
 hContainer.UserData = guiData;
@@ -180,7 +180,7 @@ onUpdatePlot(hContainer, []);
         hContainer.UserData = data;
 
         if ~isempty(data.grpCbk)
-            [~, allCats] = tblgui.selectedCats(data.chkGrpBy);
+            [~, allCats] = gui_selectedCats(data.chkGrpBy);
             data.grpCbk(data.ddGrpBy.Value, allCats, hContainer);
         end
         onUpdatePlot(hContainer, []);
@@ -190,7 +190,7 @@ onUpdatePlot(hContainer, []);
         data = hContainer.UserData;
         onUpdatePlot(hContainer, []);
         if ~isempty(data.grpCbk)
-            activeCats = tblgui.selectedCats(data.chkGrpBy);
+            activeCats = gui_selectedCats(data.chkGrpBy);
             data.grpCbk(data.ddGrpBy.Value, activeCats, hContainer);
         end
     end
@@ -202,8 +202,8 @@ onUpdatePlot(hContainer, []);
             delete(allchild(pnl));
             chk = gobjects(0);
         else
-            cats = tblgui.catList(hContainer.UserData.dataTbl.(varName));
-            chk = tblgui.filterPanel(pnl, cats, @onFilterChange);
+            cats = gui_catList(hContainer.UserData.dataTbl.(varName));
+            chk = gui_filterPanel(pnl, cats, @onFilterChange);
         end
     end
 
@@ -215,9 +215,9 @@ onUpdatePlot(hContainer, []);
         if strcmp(varPB, 'None')
             catsPB = {'All'};
         else
-            catsPB = tblgui.selectedCats(data.chkPlotBy);
+            catsPB = gui_selectedCats(data.chkPlotBy);
             if isempty(catsPB)
-                tblgui.notify(hContainer, 'Select at least one "Plot By" category.', 'info');
+                gui_notify(hContainer, 'Select at least one "Plot By" category.', 'info');
                 return;
             end
         end
@@ -235,15 +235,15 @@ onUpdatePlot(hContainer, []);
             catsGB = {'All'};
             allCatsGB = {'All'};
         else
-            [catsGB, allCatsGB] = tblgui.selectedCats(data.chkGrpBy);
+            [catsGB, allCatsGB] = gui_selectedCats(data.chkGrpBy);
             if isempty(catsGB)
-                tblgui.notify(hContainer, 'Select at least one "Group By" category.', 'info');
+                gui_notify(hContainer, 'Select at least one "Group By" category.', 'info');
                 return;
             end
         end
 
         % Stable group colors over the full category list
-        [fullClr, idxOf] = tblgui.groupColors(allCatsGB);
+        [fullClr, idxOf] = gui_groupColors(allCatsGB);
 
         if ~ismember(data.yVar, data.dataTbl.Properties.VariableNames)
             warning('Selected variable %s not in table. Resetting.', data.yVar);
@@ -321,9 +321,9 @@ onUpdatePlot(hContainer, []);
 
                 % Central tendency and bounds
                 if strcmpi(method, 'Geometric')
-                    [mData, lowerBound, upperBound] = tblgui.groupStat(subY, method, 'Floor', floorVal);
+                    [mData, lowerBound, upperBound] = gui_groupStat(subY, method, 'Floor', floorVal);
                 else
-                    [mData, lowerBound, upperBound] = tblgui.groupStat(subY, method);
+                    [mData, lowerBound, upperBound] = gui_groupStat(subY, method);
                 end
 
                 % Shade (SEM / CI)

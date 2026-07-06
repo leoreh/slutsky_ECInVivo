@@ -134,11 +134,11 @@ end
 
 % Plot Results
 % yVar = 'caMito_LR';
-% tblGUI_scatHist(tbl, 'grpVar', 'genotype', 'yVar', yVar);
+% guiTbl_scatHist(tbl, 'grpVar', 'genotype', 'yVar', yVar);
 
 % experiments = categories(tbl.sbjID);
 % idxExp = tbl.sbjID == experiments(2);
-% tblGUI_xy(xVec, tbl, 'tileVar', 'genotype', 'yVar', 'caMito');
+% guiTbl_xy(xVec, tbl, 'tileVar', 'genotype', 'yVar', 'caMito');
 
 
 

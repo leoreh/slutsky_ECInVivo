@@ -1,7 +1,7 @@
-function notify(parent, msg, kind)
-% TBLGUI.NOTIFY  Alert dialog for uifigure GUIs (replaces msgbox / errordlg).
+function gui_notify(parent, msg, kind)
+% GUI_NOTIFY  Alert dialog for uifigure GUIs (replaces msgbox / errordlg).
 %
-%   tblgui.notify(parent, msg) shows an information alert on the uifigure that
+%   gui_notify(parent, msg) shows an information alert on the uifigure that
 %   owns PARENT. kind (optional): 'info' (default) | 'warning' | 'error' |
 %   'success'.
 

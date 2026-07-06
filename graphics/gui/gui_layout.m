@@ -1,12 +1,12 @@
-function [gl, gPlot, gCtrl, gActions] = layout(parent, varargin)
-% TBLGUI.LAYOUT  Standard two-column GUI scaffold (controls | plot).
+function [gl, gPlot, gCtrl, gActions] = gui_layout(parent, varargin)
+% GUI_LAYOUT  Standard two-column GUI scaffold (controls | plot).
 %
-%   [gl, gPlot, gCtrl, gActions] = tblgui.layout(parent) builds a 1x2
+%   [gl, gPlot, gCtrl, gActions] = gui_layout(parent) builds a 1x2
 %   uigridlayout inside PARENT and returns:
 %       gl        the top-level grid
 %       gPlot     the plot-side cell (host a uiaxes, nested grid, or tiledlayout)
 %       gCtrl     a scrollable vertical grid for stacked controls
-%                 (append rows with tblgui.labeledControl)
+%                 (append rows with gui_labeledControl)
 %       gActions  a fixed grid pinned at the bottom of the control column for
 %                 action buttons (e.g. Select / Save / "Push Units"), so they
 %                 never collide with the scrollable controls above

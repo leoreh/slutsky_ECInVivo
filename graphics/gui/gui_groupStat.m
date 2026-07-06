@@ -1,11 +1,11 @@
-function [m, lo, hi] = groupStat(vals, statType, varargin)
-% TBLGUI.GROUPSTAT  Central tendency and error bounds, computed down dim 1.
+function [m, lo, hi] = gui_groupStat(vals, statType, varargin)
+% GUI_GROUPSTAT  Central tendency and error bounds, computed down dim 1.
 %
-%   [m, lo, hi] = tblgui.groupStat(vals, statType) treats the rows of VALS as
+%   [m, lo, hi] = gui_groupStat(vals, statType) treats the rows of VALS as
 %   observations and returns the center M and the absolute lower / upper
 %   bounds LO / HI (1 x size(vals,2)). VALS may be a column vector (scalar
-%   per group, as in tblGUI_bar) or a matrix (one value per x-sample, as in
-%   tblGUI_xy).
+%   per group, as in guiTbl_bar) or a matrix (one value per x-sample, as in
+%   guiTbl_xy).
 %
 %   statType (case-insensitive):
 %       'Arithmetic'  mean +/- SEM
@@ -14,7 +14,7 @@ function [m, lo, hi] = groupStat(vals, statType, varargin)
 %
 %   Name-value:
 %       'Floor'  for Geometric, clamp values up to this floor instead of
-%                dropping non-positive ones. {[]} (drop, matching tblGUI_bar)
+%                dropping non-positive ones. {[]} (drop, matching guiTbl_bar)
 %
 %   Callers convert to whatever they need: error-bar half-widths are
 %   (m - lo) and (hi - m); a shaded band uses lo and hi directly.

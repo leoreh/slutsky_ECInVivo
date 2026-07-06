@@ -198,12 +198,12 @@ tblPlot(clipIdx, :) = [];
 
 spk2ca_gui(tblPlot, Kd, n, Vmax)
 
-tblGUI_scatHist(tblPlot);
+guiTbl_scatHist(tblPlot);
 
 
 % Mito traces
 uIdx = randperm(size(tblPlot, 1), 10);
-tblGUI_xy(tBins, tblPlot(:, :));
+guiTbl_xy(tBins, tblPlot(:, :));
 
 figure;
 x = tblPlot.frt_rcv;
@@ -239,7 +239,7 @@ for i = 1:numel(vars)
 end
 
 % Visualize
-tblGUI_xy(tBins, tblRatio);
+guiTbl_xy(tBins, tblRatio);
 
 
 

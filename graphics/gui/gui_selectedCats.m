@@ -1,7 +1,7 @@
-function [active, allCats] = selectedCats(chk)
-% TBLGUI.SELECTEDCATS  Checked category labels from a row of checkboxes.
+function [active, allCats] = gui_selectedCats(chk)
+% GUI_SELECTEDCATS  Checked category labels from a row of checkboxes.
 %
-%   [active, allCats] = tblgui.selectedCats(chk) takes an array of checkbox
+%   [active, allCats] = gui_selectedCats(chk) takes an array of checkbox
 %   handles and returns ACTIVE (cellstr of the checked labels) and ALLCATS
 %   (cellstr of every label, regardless of state). ALLCATS gives callers the
 %   full, stable category ordering used for color assignment and broadcasts.

@@ -79,7 +79,7 @@ basepaths = [mcu_basepaths('wt'), mcu_basepaths('mcu')];
 utypes_gui('basepaths', basepaths, 'tAxis', tAxis, 'tblUnit', tblUnit)
 
 
-hFig = tblGUI_xy(tAxis, tblUnit);
+hFig = guiTbl_xy(tAxis, tblUnit);
 
 % Grab to prism
 idxUnits = tblUnit.UnitType == 'FS' & tblUnit.genotype == 'Control';
@@ -100,7 +100,7 @@ basepaths = [mcu_basepaths('wt_bsl'), mcu_basepaths('mcu_bsl')];
 
 % Interactive viewer: tiles = unit type, colors = genotype.
 % Uses 'Spread' dispersion with arithmetic mean + SEM by default.
-hFig = tblGUI_xy(xAcg.narrow, tblAcg, ...
+hFig = guiTbl_xy(xAcg.narrow, tblAcg, ...
     'yVar',    'acg_narrow', ...
     'tileVar', 'unitType', ...
     'grpVar',  'genotype', ...

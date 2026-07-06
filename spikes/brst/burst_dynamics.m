@@ -206,7 +206,7 @@ end
 
 if flgPlot
     tbl = struct2table(rmfield(dyn, 'time'));
-    tblGUI_xy(dyn.time, tbl, 'yVar', 'br');
+    guiTbl_xy(dyn.time, tbl, 'yVar', 'br');
 end
 
 

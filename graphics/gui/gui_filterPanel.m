@@ -1,7 +1,7 @@
-function chk = filterPanel(parent, cats, cb, varargin)
-% TBLGUI.FILTERPANEL  Build a column of category checkboxes in a container.
+function chk = gui_filterPanel(parent, cats, cb, varargin)
+% GUI_FILTERPANEL  Build a column of category checkboxes in a container.
 %
-%   chk = tblgui.filterPanel(parent, cats, cb) clears PARENT (a uipanel or
+%   chk = gui_filterPanel(parent, cats, cb) clears PARENT (a uipanel or
 %   other uifigure container) and fills it with one uicheckbox per category
 %   in CATS (cellstr), each wired to the ValueChanged callback CB. Returns the
 %   checkbox handles (1 x nCats, gobjects when empty). The checkboxes live in

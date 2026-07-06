@@ -15,7 +15,7 @@
 % Power).
 %
 % Dependencies: effSize_d, effSize_tost, effSize_pwr (utilities/),
-% tblGUI_bar (graphics/).
+% guiTbl_bar (graphics/).
 
 
 %% ========================================================================
@@ -116,23 +116,23 @@ tblDI = tblDI(keep, :);
 
 
 %% ========================================================================
-%  SANITY PLOTS (tblGUI_bar)
+%  SANITY PLOTS (guiTbl_bar)
 %  ========================================================================
 
 if flgPlot
     % Object DI x Subfield, grouped by Genotype
-    tblGUI_bar(tblDI(tblDI.Task == 'Object', :), ...
+    guiTbl_bar(tblDI(tblDI.Task == 'Object', :), ...
         'yVar', 'DI', 'xVar', 'Subfield', 'grpVar', 'Genotype');
     set(gcf, 'Name', 'DI - Object');
 
     % Social Habituation Index x Subfield, grouped by Genotype
-    tblGUI_bar(tblDI(tblDI.Task == 'Social', :), ...
+    guiTbl_bar(tblDI(tblDI.Task == 'Social', :), ...
         'yVar', 'HI', 'xVar', 'Subfield', 'grpVar', 'Genotype');
     set(gcf, 'Name', 'HI - Social');
 
     % Total exploration time (gross-engagement check; flags locomotor or
     % motivational confounds before they enter the index interpretation)
-    tblGUI_bar(tblDI, 'yVar', 'T_total', 'xVar', 'Subfield', 'grpVar', 'Genotype');
+    guiTbl_bar(tblDI, 'yVar', 'T_total', 'xVar', 'Subfield', 'grpVar', 'Genotype');
     set(gcf, 'Name', 'Total exploration');
 end
 

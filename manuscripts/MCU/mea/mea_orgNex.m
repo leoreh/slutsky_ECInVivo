@@ -120,14 +120,14 @@ if flgPlot
     tbl.wv = mea.wv;
 
     % plot fr
-    tblGUI_xy(tVec, tbl, 'yVar', 'fr', 'grpVar', 'unitID', 'xLbl', 'Time (s)');
+    guiTbl_xy(tVec, tbl, 'yVar', 'fr', 'grpVar', 'unitID', 'xLbl', 'Time (s)');
 
     % plot wv
     tWv = (0:size(mea.wv, 2)-1) / mea.info.fs * 1000;
-    tblGUI_xy(tWv, tbl, 'yVar', 'wv', 'xLbl', 'Time (ms)');
+    guiTbl_xy(tWv, tbl, 'yVar', 'wv', 'xLbl', 'Time (ms)');
 
     % plot raster
-    tblGUI_raster(tbl, 'timesVar', 'spktimes');
+    guiTbl_raster(tbl, 'timesVar', 'spktimes');
     
 end
 

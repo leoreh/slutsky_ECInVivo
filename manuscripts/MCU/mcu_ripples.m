@@ -21,8 +21,7 @@ for iFile = 1 : nFiles
         'win', [0 12] * 3600, ...
         'rippCh', [], ...
         'flgPlot', true, ...
-        'flgSave', true, ...
-        'steps', 'all');
+        'flgSave', true);
     toc
 end
 
@@ -58,8 +57,8 @@ tblStates = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
 tblPlot = tblStates(tblStates.State == 'NREM', :);
 tblPlot = tblStates;
 
-tblGUI_bar(tblPlot, 'xVar', 'genotype', 'yVar', 'Density');
-tblGUI_scatHist(tblPlot, 'xVar', 'Density', 'yVar', 'Rate', 'grpVar', 'genotype');
+guiTbl_bar(tblPlot, 'xVar', 'genotype', 'yVar', 'Density');
+guiTbl_scatHist(tblPlot, 'xVar', 'Density', 'yVar', 'Rate', 'grpVar', 'genotype');
 
 % Run LME
 frml = 'Density ~ (Duration + Rate) * genotype + (1|sbjID)';
@@ -87,16 +86,16 @@ tblTrans = tbl_trans(tblPlot, 'varsInc', {'bRoy'}, 'logBase', 10);
 tblPlot.bRoy_trans = tblTrans.bRoy;
 
 % Plot
-tblGUI_bar(tblPlot, 'xVar', 'genotype', 'yVar', 'frZ');
-tblGUI_scatHist(tblPlot, 'xVar', 'asym', 'yVar', 'bRoy', 'grpVar', 'genotype');
-tblGUI_xy(xVec, tbl, 'grpVar', 'genotype');
+guiTbl_bar(tblPlot, 'xVar', 'genotype', 'yVar', 'frZ');
+guiTbl_scatHist(tblPlot, 'xVar', 'asym', 'yVar', 'bRoy', 'grpVar', 'genotype');
+guiTbl_xy(xVec, tbl, 'grpVar', 'genotype');
 
 tblPlot.burstClu = tblPlot.pBurst > 0.25;
 tblPlot.pethNorm = normalize(tblPlot.peth, 2, "norm");
 tblPlot.pethCumSum = normalize(cumsum(tblPlot.peth, 2), 2, "range");
 tblPlot.pethCumSum = cumsum(tblPlot.peth, 2) ./ sum(tblPlot.peth, 2);
 
-tblGUI_xy(xVec, tblPlot, 'grpVar', 'genotype', 'yVar', 'pethCumSum');
+guiTbl_xy(xVec, tblPlot, 'grpVar', 'genotype', 'yVar', 'pethCumSum');
 xlim([-0.05, 0.05])
 
 % LME
@@ -153,8 +152,8 @@ presets = {'ripp'};
 tblRipp = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
 
 % Plot
-tblGUI_bar(tblRipp, 'xVar', 'genotype', 'yVar', 'dur');
-tblGUI_scatHist(tblRipp, 'xVar', 'dur', 'yVar', 'amp', 'grpVar', 'genotype');
+guiTbl_bar(tblRipp, 'xVar', 'genotype', 'yVar', 'dur');
+guiTbl_scatHist(tblRipp, 'xVar', 'dur', 'yVar', 'amp', 'grpVar', 'genotype');
 
 % Summary
 % tblSum = groupsummary(tblRipp, {'genotype', 'sbjID'}, 'mean', ...
@@ -183,7 +182,7 @@ presets = {'rippMaps'};
 [tblMaps, ~, ~, xVec] = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
 
 % Plot
-tblGUI_xy(xVec, tblMaps, 'yVar', 't_lfp', 'grpVar', 'genotype');
+guiTbl_xy(xVec, tblMaps, 'yVar', 't_lfp', 'grpVar', 'genotype');
 
 % To prism
 yVar = 't_freq';

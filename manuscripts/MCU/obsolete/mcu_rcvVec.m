@@ -92,7 +92,7 @@ tbl.pBspk_trans = tblTrans.pBspk;
 tbl.ss_pBspk_trans = tblTrans.ss_pBspk;
 tbl.frSs = tbl.ss_fr;
 
-% tblGUI_scatHist(tbl, 'xVar', 'pBspk_BSL', 'yVar', 'fr_BAC3', 'grpVar', 'Group');
+% guiTbl_scatHist(tbl, 'xVar', 'pBspk_BSL', 'yVar', 'fr_BAC3', 'grpVar', 'Group');
 
 
 %% ========================================================================
@@ -123,8 +123,8 @@ hFig = mcu_rcvRes(tbl);
 
 
 
-% tblGUI_scatHist(tbl, 'xVar', 'pBspk_trans', 'yVar', 'dBrst_rel', 'grpVar', 'Group');
-% tblGUI_bar(tbl, 'yVar', 'pBspk', 'xVar', 'Group');
+% guiTbl_scatHist(tbl, 'xVar', 'pBspk_trans', 'yVar', 'dBrst_rel', 'grpVar', 'Group');
+% guiTbl_bar(tbl, 'yVar', 'pBspk', 'xVar', 'Group');
 
 
 %% ========================================================================

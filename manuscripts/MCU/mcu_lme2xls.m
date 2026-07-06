@@ -43,9 +43,9 @@ if flgPlot
     pdRes = lme_lsmeans(lmeMdl, {'amp', 'genotype'}, 'transParams', lmeInfo.transParams, ...
         'hAx', hAx);
 
-    tblGUI_bar(tblCell, 'yVar', 'amp', 'xVar', 'compartment', 'grpVar', 'genotype');
-    tblGUI_bar(tblCell, 'yVar', 'rate', 'xVar', 'compartment', 'grpVar', 'genotype');
-    tblGUI_scatHist(tblEvent(tblEvent.compartment == 'Cyto' & tblEvent.paired, :), ...
+    guiTbl_bar(tblCell, 'yVar', 'amp', 'xVar', 'compartment', 'grpVar', 'genotype');
+    guiTbl_bar(tblCell, 'yVar', 'rate', 'xVar', 'compartment', 'grpVar', 'genotype');
+    guiTbl_scatHist(tblEvent(tblEvent.compartment == 'Cyto' & tblEvent.paired, :), ...
         'xVar', 'amp', 'yVar', 'pairAmp', 'grpVar', 'genotype');
 end
 
@@ -99,8 +99,8 @@ lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName, 
     'tblInfo', tblInfo{tblIdx}, 'dataSet', dataSet{tblIdx}, 'tblPnls', tblPnls{tblIdx})
 
 if flgPlot
-    tblGUI_bar(tblMea, 'yVar', 'pBurst', 'xVar', 'genotype');
-    tblGUI_scatHist(tblMea, 'xVar', 'fr', 'yVar', 'br', 'grpVar', 'genotype');
+    guiTbl_bar(tblMea, 'yVar', 'pBurst', 'xVar', 'genotype');
+    guiTbl_scatHist(tblMea, 'xVar', 'fr', 'yVar', 'br', 'grpVar', 'genotype');
 end
 
 
@@ -133,8 +133,8 @@ lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName, 
     'tblInfo', tblInfo{tblIdx}, 'dataSet', dataSet{tblIdx}, 'tblPnls', tblPnls{tblIdx})
 
 if flgPlot
-    tblGUI_bar(tblLme, 'yVar', 'pBurst', 'xVar', 'genotype');
-    tblGUI_scatHist(tblLme, 'xVar', 'fr', 'yVar', 'br', 'grpVar', 'genotype');
+    guiTbl_bar(tblLme, 'yVar', 'pBurst', 'xVar', 'genotype');
+    guiTbl_scatHist(tblLme, 'xVar', 'fr', 'yVar', 'br', 'grpVar', 'genotype');
 end
 
 
@@ -168,8 +168,8 @@ if flgPlot
         'hAx', hAx, 'xLims', {[0, 1], []});
     hAx = nexttile; pdRes = lme_lsmeans(lmeMdl, {'fr', 'genotype'}, 'transParams', lmeInfo.transParams, ...
         'hAx', hAx); 
-    tblGUI_xy(xVec, tblRipp, 'grpVar', 'genotype');
-    tblGUI_scatHist(tblRipp, 'grpVar', 'genotype');
+    guiTbl_xy(xVec, tblRipp, 'grpVar', 'genotype');
+    guiTbl_scatHist(tblRipp, 'grpVar', 'genotype');
 end
 
 
@@ -235,7 +235,7 @@ lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName, 
     'tblInfo', tblInfo{tblIdx}, 'dataSet', dataSet{tblIdx}, 'tblPnls', tblPnls{tblIdx})
 
 if flgPlot
-    tblGUI_bar(tblLme, 'yVar', 'pBurst', 'xVar', 'genotype');
+    guiTbl_bar(tblLme, 'yVar', 'pBurst', 'xVar', 'genotype');
 end
 
 %% ========================================================================
@@ -307,7 +307,7 @@ lme_save(sheetNames{tblIdx}, lmeTbls, 'pathName', pathName, 'xlsName', xlsName, 
     'tblInfo', tblInfo{tblIdx}, 'dataSet', dataSet{tblIdx}, 'tblPnls', tblPnls{tblIdx})
 
 if flgPlot
-    tblGUI_scatHist(tblMea, 'grpVar', 'genotype');
+    guiTbl_scatHist(tblMea, 'grpVar', 'genotype');
 end
 
 

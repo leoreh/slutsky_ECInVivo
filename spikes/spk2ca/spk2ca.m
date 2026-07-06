@@ -158,7 +158,7 @@ if flgPlot
     tbl = struct2table(rmfield(ca, {'time', 'params'}));
     tbl.UID = categorical([1 : size(tbl.mito, 1)])';
     tbl.mitoN = log10(tbl.mito + eps);
-    tblGUI_xy(ca.time, tbl, 'yVar', 'mito');
+    guiTbl_xy(ca.time, tbl, 'yVar', 'mito');
 end
 
 if flgSave
@@ -177,7 +177,7 @@ end     % EOF
 function plot_spkVmito(st, tBins, edges, cyto, mito, uid)
 % PLOT_SPKVMITO Plots bin-wise spiking parameters vs mito/cyto signals.
 %
-%   Derives Rate, MinISI, and CV for each bin and launches tblGUI_scatHist.
+%   Derives Rate, MinISI, and CV for each bin and launches guiTbl_scatHist.
 
 nBins = length(tBins);
 
@@ -217,7 +217,7 @@ tbl.Mito   = mito(:);
 
 % Launch GUI
 % We set 'Mito' as the default Y variable, and 'Rate' as X.
-hFig = tblGUI_scatHist(tbl, 'xVar', 'Rate', 'yVar', 'Mito');
+hFig = guiTbl_scatHist(tbl, 'xVar', 'Rate', 'yVar', 'Mito');
 set(hFig, 'Name', sprintf('Unit %d Spk vs Mito', uid));
 
 end

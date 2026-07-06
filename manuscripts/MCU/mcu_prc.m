@@ -73,7 +73,7 @@ cfgLme.dist = 'Normal';
 sum(isnan(tblLme.PRC))
 
 % Plot
-hFig = tblGUI_bar(tblLme, 'yVar', varRsp, 'xVar', 'genotype');
+hFig = guiTbl_bar(tblLme, 'yVar', varRsp, 'xVar', 'genotype');
 
 % Prism
 [prismMat] = tbl2prism(tblLme, 'yVar', varRsp, 'grpVar', 'genotype');
@@ -136,7 +136,7 @@ cfgLme.dist = 'Normal';
 [lmeStats, lmeMdl] = lme_analyse(tbl, frml, cfgLme);
 
 % Plot
-hFig = tblGUI_bar(tbl, 'yVar', varRsp, 'xVar', 'genotype');
+hFig = guiTbl_bar(tbl, 'yVar', varRsp, 'xVar', 'genotype');
 
 % Prism
 prismMat = tbl2prism(tbl, 'yVar', 'prc', 'grpVar', 'genotype');

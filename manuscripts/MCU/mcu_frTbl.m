@@ -117,7 +117,7 @@ end
 
 if flgPlot
 
-    tblGUI_xy(tAxis, tblUnit, 'yVar', 'FRt');
+    guiTbl_xy(tAxis, tblUnit, 'yVar', 'FRt');
 
 end
 

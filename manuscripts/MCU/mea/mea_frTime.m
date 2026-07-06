@@ -2,7 +2,7 @@
 %  MEA FIRING RATE OVER TIME (WRAPPER)
 %  ========================================================================
 %  Script to load MEA data, cluster units by baseline firing rate, normalize
-%  temporal dynamics, and visualize using tblGUI_xy.
+%  temporal dynamics, and visualize using guiTbl_xy.
 
 % Load
 [tbl, xVec, basepaths, v] = mcu_tblMea('presets', {'time', 'rcv', 'steadyState'});
@@ -86,7 +86,7 @@ tblPlot = tbl_tNorm(tblPlot, 'varsInc', tVars, 'winNorm', winNorm, ...
 %  PLOT
 %  ========================================================================
 
-tblGUI_xy(xVec, tblPlot, ...
+guiTbl_xy(xVec, tblPlot, ...
     'yVar', 't_fr', ...
     'grpVar', 'cluLbl', ...    % Group lines by Cluster
     'tileVar', 'genotype', ...    % Separate tiles by Group (Control vs KO)
@@ -156,7 +156,7 @@ end
 % disp('Table aggregated by Name. Rows:');
 % disp(height(tblPlot));
 % 
-% tblGUI_xy(xVec, tblPlot, ...
+% guiTbl_xy(xVec, tblPlot, ...
 %     'yVar', 't_fr', ...
 %     'grpVar', 'cluLbl', ...    % Group lines by Cluster
 %     'tileVar', 'genotype', ...    % Separate tiles by Group (Control vs KO)

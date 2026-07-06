@@ -1,7 +1,7 @@
-function hFig = tblGUI_bar(tbl, varargin)
-% TBLGUI_BAR Interactive bar plot with grouping and error bars.
+function hFig = guiTbl_bar(tbl, varargin)
+% GUITBL_BAR Interactive bar plot with grouping and error bars.
 %
-%   hFig = tblGUI_bar(tbl, ...) opens a GUI to visualize the table 'tbl'
+%   hFig = guiTbl_bar(tbl, ...) opens a GUI to visualize the table 'tbl'
 %   as a bar chart.
 %
 %   INPUT:
@@ -16,9 +16,9 @@ function hFig = tblGUI_bar(tbl, varargin)
 %       'Parent'      (handle) Parent container (a uifigure or a uifigure
 %                     container such as a uipanel / uigridlayout cell).
 %
-%   Built on the shared graphics/+tblgui layer (uifigure + uigridlayout).
+%   Built on the shared graphics/gui layer (uifigure + uigridlayout).
 %
-%   See also: TBLGUI_SCATHIST, TBLGUI_XY
+%   See also: GUITBL_SCATHIST, GUITBL_XY
 
 %% ========================================================================
 %  ARGUMENTS
@@ -41,7 +41,7 @@ hParent = p.Results.Parent;
 
 modeIn = lower(char(string(p.Results.mode)));
 if ~ismember(modeIn, {'bar', 'points'})
-    warning('tblGUI_bar:invalidMode', ...
+    warning('guiTbl_bar:invalidMode', ...
         'Invalid mode ''%s''; falling back to ''bar''.', modeIn);
     modeIn = 'bar';
 end
@@ -52,7 +52,7 @@ end
 
 % Numeric (Y) and categorical (X / Group) variables, sorted for the menus.
 % 'vector' keeps only scalar-per-row numerics (bars aggregate one value/row).
-[numericVars, catVars] = tblgui.classifyVars(tbl, 'SortNames', true, 'Shape', 'vector');
+[numericVars, catVars] = gui_classifyVars(tbl, 'SortNames', true, 'Shape', 'vector');
 
 if isempty(numericVars)
     error('Input table must contain at least one numeric variable.');
@@ -95,26 +95,26 @@ guiData.chkGrp = gobjects(0);
 %  LAYOUT
 %  ========================================================================
 
-[~, gPlot, gCtrl] = tblgui.layout(hContainer, 'CtrlWidth', 210);
+[~, gPlot, gCtrl] = gui_layout(hContainer, 'CtrlWidth', 210);
 guiData.hAx = uiaxes(gPlot);
 
 % Controls (stacked in the scrollable control column)
-guiData.ddY = tblgui.labeledControl(gCtrl, 'dropdown', 'Y Variable (Numeric):', ...
+guiData.ddY = gui_labeledControl(gCtrl, 'dropdown', 'Y Variable (Numeric):', ...
     'Items', numericVars, 'Value', curY, 'ValueChangedFcn', @onUpdatePlot);
-guiData.ddX = tblgui.labeledControl(gCtrl, 'dropdown', 'X Variable (Cat):', ...
+guiData.ddX = gui_labeledControl(gCtrl, 'dropdown', 'X Variable (Cat):', ...
     'Items', catVars, 'Value', curX, 'ValueChangedFcn', @onUpdatePlot);
-guiData.ddGrp = tblgui.labeledControl(gCtrl, 'dropdown', 'Group Variable (Cat):', ...
+guiData.ddGrp = gui_labeledControl(gCtrl, 'dropdown', 'Group Variable (Cat):', ...
     'Items', grpVars, 'Value', curGrp, 'ValueChangedFcn', @onGrpChange);
-guiData.ddStatType = tblgui.labeledControl(gCtrl, 'dropdown', 'Statistic:', ...
+guiData.ddStatType = gui_labeledControl(gCtrl, 'dropdown', 'Statistic:', ...
     'Items', {'Arithmetic', 'Geometric', 'Median'}, 'ValueChangedFcn', @onUpdatePlot);
 
 modeIsPoints = strcmp(modeIn, 'points');
 if modeIsPoints, tgLabel = 'Mode: Points'; else, tgLabel = 'Mode: Bars'; end
-guiData.tgMode = tblgui.labeledControl(gCtrl, 'toggle', '', ...
+guiData.tgMode = gui_labeledControl(gCtrl, 'toggle', '', ...
     'Text', tgLabel, 'Value', modeIsPoints, 'ValueChangedFcn', @onModeToggle);
 
-tblgui.labeledControl(gCtrl, 'label', 'Groups:');
-guiData.pnlGrp = tblgui.labeledControl(gCtrl, 'panel', '', 'RowHeight', '1x');
+gui_labeledControl(gCtrl, 'label', 'Groups:');
+guiData.pnlGrp = gui_labeledControl(gCtrl, 'panel', '', 'RowHeight', '1x');
 
 hContainer.UserData = guiData;
 
@@ -145,9 +145,9 @@ onGrpChange(hContainer, []);
         if hasGrp
             grpData = tblIn.(grpName);
             if ~iscategorical(grpData), grpData = categorical(grpData); end
-            allGcats = tblgui.catList(grpData);     % full (unfiltered) order
+            allGcats = gui_catList(grpData);     % full (unfiltered) order
             if ~isempty(data.chkGrp)
-                active = tblgui.selectedCats(data.chkGrp);
+                active = gui_selectedCats(data.chkGrp);
                 gCats = intersect(allGcats, active, 'stable');
             else
                 gCats = allGcats;
@@ -161,7 +161,7 @@ onGrpChange(hContainer, []);
         statType = data.ddStatType.Value;
 
         % Per-group colors, stable by full category list
-        [fullClr, idxOf] = tblgui.groupColors(allGcats);
+        [fullClr, idxOf] = gui_groupColors(allGcats);
         clrMat = zeros(max(numel(gCats), 1), 3);
         for iG = 1:numel(gCats)
             clrMat(iG, :) = fullClr(idxOf(gCats{iG}), :);
@@ -186,7 +186,7 @@ onGrpChange(hContainer, []);
 
                 if ~isempty(vals)
                     valsByCell{iX, iG} = vals;
-                    [m, lo, hi] = tblgui.groupStat(vals, statType);
+                    [m, lo, hi] = gui_groupStat(vals, statType);
                     meanMat(iX, iG) = m;
                     errLMat(iX, iG) = m - lo;
                     errHMat(iX, iG) = hi - m;
@@ -327,8 +327,8 @@ onGrpChange(hContainer, []);
             delete(allchild(data.pnlGrp));
             data.chkGrp = gobjects(0);
         else
-            cats = tblgui.catList(data.tbl.(grpName));
-            data.chkGrp = tblgui.filterPanel(data.pnlGrp, cats, @onFilterChange);
+            cats = gui_catList(data.tbl.(grpName));
+            data.chkGrp = gui_filterPanel(data.pnlGrp, cats, @onFilterChange);
         end
         hContainer.UserData = data;
         onUpdatePlot();

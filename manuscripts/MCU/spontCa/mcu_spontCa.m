@@ -79,7 +79,7 @@ load(fullfile(spDir, 'cache', 'spontCa_tbl.mat'), 'tblCell', 'tblEvent', 'fs');
 
 spontCa_explore(tblEvent, tblCell, fs);
 
-% tblGUI_bar(tblEvent, 'yVar', 'fluxRate', 'xVar', 'compartment', 'grpVar', 'genotype');
+% guiTbl_bar(tblEvent, 'yVar', 'fluxRate', 'xVar', 'compartment', 'grpVar', 'genotype');
 
 
 
@@ -240,7 +240,7 @@ disp(mdlEvt.Coefficients);
     'dist', 'binomial', 'flgPlot', false, 'verbose', true);
 
 
-% tblGUI_bar(pfRows, 'yVar', 'pairFrac', 'xVar', 'compartment', 'grpVar', 'genotype');
+% guiTbl_bar(pfRows, 'yVar', 'pairFrac', 'xVar', 'compartment', 'grpVar', 'genotype');
 
 
 

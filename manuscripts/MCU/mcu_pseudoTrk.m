@@ -146,4 +146,4 @@ tbl.dFr_abs = (tbl.ss_fr - tbl.fr);
 
 hFig = mcu_rcvSpace(tbl);
 
-% tblGUI_scatHist(tbl, 'xVar', 'pBurst', 'yVar', 'ss_frBurst', 'grpVar', 'genotype');
+% guiTbl_scatHist(tbl, 'xVar', 'pBurst', 'yVar', 'ss_frBurst', 'grpVar', 'genotype');

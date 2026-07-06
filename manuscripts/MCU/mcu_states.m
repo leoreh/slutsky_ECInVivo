@@ -56,7 +56,7 @@ varOrder = {'genotype', 'sbjID', 'fileID', 'unitID', 'State'};
 tblSs = movevars(tblSs, varOrder, 'Before', 1);
 
 % Plot
-hFig = tblGUI_bar(tblSs, 'yVar', 'BoutLen', 'xVar', 'State', 'GrpVar', 'genotype');
+hFig = guiTbl_bar(tblSs, 'yVar', 'BoutLen', 'xVar', 'State', 'GrpVar', 'genotype');
 
 
 
@@ -139,7 +139,7 @@ varOrder = {'genotype', 'sbjID', 'fileID', 'unitID', 'State'};
 tblSs = movevars(tblSs, varOrder, 'Before', 1);
 
 % Plot
-hFig = tblGUI_bar(tblSs, 'yVar', 'StatePrct', 'xVar', 'State', 'GrpVar', 'genotype');
+hFig = guiTbl_bar(tblSs, 'yVar', 'StatePrct', 'xVar', 'State', 'GrpVar', 'genotype');
 
 
 

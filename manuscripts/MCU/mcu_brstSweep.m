@@ -261,7 +261,7 @@ title('Percent Zeros');
 
 
 
-% tblGUI_bar(tblVivo, 'yVar', 'pBurst', 'xVar', 'genotype');
+% guiTbl_bar(tblVivo, 'yVar', 'pBurst', 'xVar', 'genotype');
 
 
 
@@ -383,4 +383,4 @@ end
 fprintf('[BRST_SWEEP] Correlation analysis complete.\n');
 
 
-% tblGUI_scatHist(tblCorr, 'xVar', 'pBurst', 'yVar', 'funcon_fish', 'grpVar', 'genotype');
+% guiTbl_scatHist(tblCorr, 'xVar', 'pBurst', 'yVar', 'funcon_fish', 'grpVar', 'genotype');

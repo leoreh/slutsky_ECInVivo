@@ -1,10 +1,10 @@
-function h = eventPanel(parent, api)
-% TBLGUI.EVENTPANEL  Compact, swappable event-curation stepper.
+function h = gui_eventPanel(parent, api)
+% GUI_EVENTPANEL  Compact, swappable event-curation stepper.
 %
-%   h = tblgui.eventPanel(parent, api) builds a self-contained control block
+%   h = gui_eventPanel(parent, api) builds a self-contained control block
 %   for stepping through and triaging a list of events: an event-index field
 %   (+ "/ N"), Prev/Next, Accept/Reject, Save, and a status line. It is meant
-%   to drop into the pinned action area of tblgui.layout (or any uifigure
+%   to drop into the pinned action area of gui_layout (or any uifigure
 %   container) so different event types (EDs, ripples, states) can swap the
 %   same widget without touching the host viewer.
 %
@@ -30,7 +30,7 @@ function h = eventPanel(parent, api)
 %       23 Jun 2026 - created for the ED curation GUI redesign
 
 narginchk(2, 2)
-if ~isstruct(api), error('tblgui:eventPanel:api', 'api must be a struct of callbacks'); end
+if ~isstruct(api), error('gui_eventPanel:api', 'api must be a struct of callbacks'); end
 
 clrA = [0.10 0.55 0.10];
 clrR = [0.65 0.15 0.15];
@@ -42,6 +42,7 @@ g = uigridlayout(parent, [5, 2], ...
 
 % row 1: event index + total
 hIdx = uieditfield(g, 'numeric', 'Limits', [1, Inf], 'RoundFractionalValues', 'on', ...
+    'ValueDisplayFormat', '%.0f', ...              % plain integer (not 1.244e+04)
     'Value', 1, 'ValueChangedFcn', @(s, ~) safecall(api, 'setIdx', round(s.Value)));
 hIdx.Layout.Row = 1; hIdx.Layout.Column = 1;
 hTot = uilabel(g, 'Text', '/ 0', 'VerticalAlignment', 'center');

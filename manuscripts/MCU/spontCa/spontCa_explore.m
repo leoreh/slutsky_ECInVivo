@@ -3,7 +3,7 @@ function hFig = spontCa_explore(tblEvent, tblCell, fs, varargin)
 %
 %   hFig = spontCa_explore(tblEvent, tblCell, fs, ...) opens a figure
 %   with a thin top control bar driving two side-by-side
-%   tblGUI_scatHist widgets.
+%   guiTbl_scatHist widgets.
 %
 %       Panel 1 (left)  : within-compartment scatter+hist. X / Y / group
 %                         pickers live inside the inner widget.
@@ -22,8 +22,8 @@ function hFig = spontCa_explore(tblEvent, tblCell, fs, varargin)
 %       P2 X-Metric  : Cyto-axis metric on Panel 2
 %       P2 Y-Metric  : Mito-axis metric on Panel 2
 %
-%   Built on the shared graphics/+tblgui layer (uifigure); embeds
-%   tblGUI_scatHist into the two panels.
+%   Built on the shared graphics/gui layer (uifigure); embeds
+%   guiTbl_scatHist into the two panels.
 %
 %   INPUTS
 %       tblEvent - (table) event-level table from spontCa2_metrics. Must
@@ -34,7 +34,7 @@ function hFig = spontCa_explore(tblEvent, tblCell, fs, varargin)
 %   OPTIONAL KEY-VALUE PAIRS
 %       'level'/'compartment'/'pairFilter'/'xMetric'/'yMetric'/'clr'/'figPos'.
 %
-%   See also TBLGUI_SCATHIST, MCU_SPONTCA, SPONTCA2_METRICS.
+%   See also GUITBL_SCATHIST, MCU_SPONTCA, SPONTCA2_METRICS.
 
 
 %% ========================================================================
@@ -204,7 +204,7 @@ function refreshPanels(hFig, which)
         [x1, y1, g1] = pickXYG(tbl1, snap.x, snap.y, snap.g, defXY1, excl1);
 
         delete(allchild(state.hPnlLeft));
-        tblGUI_scatHist(tbl1, ...
+        guiTbl_scatHist(tbl1, ...
             'Parent', state.hPnlLeft, ...
             'xVar', x1, 'yVar', y1, 'grpVar', g1, ...
             'xScale', snap.xs, 'yScale', snap.ys, 'fitType', snap.ft, ...
@@ -229,7 +229,7 @@ function refreshPanels(hFig, which)
         [x2, y2, g2] = pickXYG(tbl2, snap.x, snap.y, snap.g, defXY2, excl2);
 
         delete(allchild(state.hPnlRight));
-        tblGUI_scatHist(tbl2, ...
+        guiTbl_scatHist(tbl2, ...
             'Parent', state.hPnlRight, ...
             'xVar', x2, 'yVar', y2, 'grpVar', g2, ...
             'xScale', snap.xs, 'yScale', snap.ys, 'fitType', snap.ft, ...

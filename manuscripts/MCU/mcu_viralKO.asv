@@ -53,7 +53,34 @@ for iFile = 1 : nFiles
     % Burst statistics
     stats = burst_stats(burst, spktimes, 'winCalc', [], 'flgSave', true);
 
+    % Ripples
+    ripp = ripp_wrapper('basepath', pwd, ...
+        'win', [0 12] * 3600, ...
+        'rippCh', [], ...
+        'flgPlot', true, ...
+        'flgSave', true, ...
+        'steps', 'all');
+    
+    % Epileptiform discharges
+    ed = ed_wrapper('basepath', basepath, ...
+        'flgSave', true, ...
+        'flgPlot', true, ...
+        'flgForce', true);  
+
+
 end
+
+
+[cfgData, cfgGui] = curate_presets('ripp')
+
+gui_curate(pwd)                              % auto-detect, opens
+p = curate_presets(); cfgData = p(1).cfgData;     % read the panels
+c.emg.height = 1.0;                         % edit one
+c.emg2 = curate_panel('trace','bottom','sleep_sig:emg');   % add one
+gui_curate(bp, 'cfgData', c);               % open the edited panels
+help curate_doc                             % the 11-step walkthrough, updated
+
+[cfgData, gui] = curate_materialize(cfgData, basepath)
 
 
 %% ========================================================================
@@ -165,3 +192,6 @@ gui_curate(basepath);
 tic
 AccuSleep_viewer(sSig, [], [])
 toc
+
+
+

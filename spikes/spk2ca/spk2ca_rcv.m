@@ -19,7 +19,7 @@ function [tbl, hFig] = spk2ca_rcv(v, varargin)
 %                     stats (scalar cols).
 %       hFig        - (handle) Figure handle of the plot.
 %
-%   See also: SPK2CA, TBLGUI_SCATHIST, MEA_TBL
+%   See also: SPK2CA, GUITBL_SCATHIST, MEA_TBL
 
 %% ========================================================================
 %  ARGUMENTS
@@ -256,7 +256,7 @@ if flgPlot
     % X: Log Ratio of Firing Rate
     % Y: Log Ratio of Mitochondrial Ca Accumulation
 
-    hFig = tblGUI_scatHist(tbl, ...
+    hFig = guiTbl_scatHist(tbl, ...
         'xVar', 'Rate_LogRatio', ...
         'yVar', 'Mito_LogRatio', ...
         'grpVar', 'Group');

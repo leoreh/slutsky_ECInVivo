@@ -3,8 +3,8 @@ function hFig = utypes_gui(varargin)
 % UTYPES_GUI Interactive visualization of unit types.
 %
 % Three coordinated uifigure windows (scatter + traces + waveforms) that
-% share selection and grouping. The scatter embeds tblGUI_scatHist; the
-% traces and waveforms embed tblGUI_xy. A "Push Units" button (added to the
+% share selection and grouping. The scatter embeds guiTbl_scatHist; the
+% traces and waveforms embed guiTbl_xy. A "Push Units" button (added to the
 % scatter window's action area) saves the curated unit types via utypes_push.
 %
 % INPUT (Optional Key-Value Pairs):
@@ -83,7 +83,7 @@ cbkGrp  = @(varName, activeCats, src) onGroupChange(varName, activeCats, src);
 
 % --- WINDOW 1: SCATTER ---
 hTabScat = uifigure('Name', 'Scatter Plot', 'Position', posScat);
-hFigScat = tblGUI_scatHist(tblUnit, ...
+hFigScat = guiTbl_scatHist(tblUnit, ...
     'xVar', xVar, 'yVar', yVar, 'szVar', szVar, 'grpVar', grpVar, ...
     'clr', clr, 'alpha', dotAlpha, ...
     'Parent', hTabScat, 'SelectionCallback', cbkScat, 'GroupByCallback', cbkGrp);
@@ -92,7 +92,7 @@ hFigScat = tblGUI_scatHist(tblUnit, ...
 if ~isempty(tAxis)
     hTabTraces = uifigure('Name', 'Traces', 'Position', posTrace);
     cbkTrace = @(indices) onSelect(indices, 'traces');
-    hFigTrace = tblGUI_xy(tAxis, tblUnit, 'Parent', hTabTraces, 'yVar', [], ...
+    hFigTrace = guiTbl_xy(tAxis, tblUnit, 'Parent', hTabTraces, 'yVar', [], ...
         'SelectionCallback', cbkTrace, 'GroupByCallback', cbkGrp);
 end
 
@@ -100,7 +100,7 @@ end
 if ismember('Waveform', tblUnit.Properties.VariableNames)
     hTabWv = uifigure('Name', 'Waveforms', 'Position', posWv);
     cbkWv = @(indices) onSelect(indices, 'waveforms');
-    hFigWv = tblGUI_xy(tWv, tblUnit, 'Parent', hTabWv, 'yVar', 'Waveform', ...
+    hFigWv = guiTbl_xy(tWv, tblUnit, 'Parent', hTabWv, 'yVar', 'Waveform', ...
         'SelectionCallback', cbkWv, 'GroupByCallback', cbkGrp);
 end
 
@@ -109,9 +109,9 @@ end
 %  ========================================================================
 
 % Add "Push Units" to the scatter window's reserved action area (so it never
-% collides with tblGUI_scatHist's own Select / Save buttons).
+% collides with guiTbl_scatHist's own Select / Save buttons).
 dScat = hFigScat.UserData;
-tblgui.labeledControl(dScat.gActions, 'button', '', 'Text', 'Push Units', ...
+gui_labeledControl(dScat.gActions, 'button', '', 'Text', 'Push Units', ...
     'ButtonPushedFcn', @(~, ~) onPushUnits(basepaths, hFigScat));
 
 hFig = hFigScat;
@@ -119,7 +119,7 @@ guiReady = true;
 
 % Initial cross-window sync to the scatter's grouping
 try
-    [~, allCats] = tblgui.selectedCats(dScat.chkGrp);
+    [~, allCats] = gui_selectedCats(dScat.chkGrp);
     onGroupChange(dScat.ddGrp.Value, allCats, hFigScat);
 catch
 end
@@ -167,8 +167,8 @@ function onPushUnits(basepaths, hContainer)
 data = hContainer.UserData;
 if isfield(data, 'tbl')
     utypes_push(basepaths, data.tbl);
-    tblgui.notify(hContainer, 'Units saved successfully!', 'success');
+    gui_notify(hContainer, 'Units saved successfully!', 'success');
 else
-    tblgui.notify(hContainer, 'Could not retrieve table data from GUI.', 'error');
+    gui_notify(hContainer, 'Could not retrieve table data from GUI.', 'error');
 end
 end

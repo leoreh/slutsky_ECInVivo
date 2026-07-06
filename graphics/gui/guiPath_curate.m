@@ -1,17 +1,17 @@
-function hFig = gui_curate(basepath, varargin)
-% GUI_CURATE General-purpose event-curation viewer (EDs, ripples, ...).
+function [hFig, cfgData] = guiPath_curate(basepath, varargin)
+% GUIPATH_CURATE General-purpose event-curation viewer (EDs, ripples, ...).
 %
-%   hFig = GUI_CURATE(basepath, varargin)
+%   hFig = GUIPATH_CURATE(basepath, varargin)
 %
 %   SUMMARY:
-%       Single-session signal viewer on uifigure, built on the +tblgui helper
-%       layer. It is modality-agnostic: an "event" is just a peak time (with
+%       Single-session signal viewer on uifigure, built on the shared gui_
+%       helpers. It is modality-agnostic: an "event" is just a peak time (with
 %       optional start/stop and an accepted flag), and any 1-D signal can be a
 %       panel. What differs between modalities (which file to load, which
 %       signals to show, the default layout, where to save) is captured by a
 %       PRESET. A Preset dropdown (EDs, Ripples, ...) loads the relevant file
 %       and applies that preset's default view; switching presets reloads.
-%       Presets live in curate_presets.m (one entry per modality).
+%       Presets live in guiPath_presets.m (one entry per modality).
 %
 %       Plot area: a stack of PANELS in two regions separated by a thin divider:
 %           Top (wide)   - full-session overview (drawn once; x-range zoomable).
@@ -43,55 +43,52 @@ function hFig = gui_curate(basepath, varargin)
 %           scroll over a region  zoom that region (by pointer position)
 %
 %   INPUTS:
-%       basepath    - (Char) Session directory.
+%       basepath    - (Char) Session directory. Defaults to pwd.
 %       varargin    - Parameter/Value pairs:
-%           'preset'   - (Char) Initial preset name (see curate_presets). If
+%           'preset'   - (Char) Initial preset name (see guiPath_presets). If
 %                        empty, auto-detected from the files present.
-%           'inputs'   - (Struct array) Bypass presets with explicit inputs
-%                        (each: .name .type [.data .fs .ylim .clr .label .height
-%                        .defRegion .defOrder]). Pairs with 'panels'/'saveFcn'.
-%           'panels'   - (Struct array) Each: .source .region (custom path).
-%           'saveFcn'  - (Fcn) @(accepted) persistence for the custom path.
-%           'winPlot'  - (Num) Bottom-window full width [s] (custom path). {1.0}
+%           'cfgData'  - (Struct) Panels, flat: one field per panel (see
+%                        guiPath_panel). Bypasses presets. See guiPath_doc.
+%           'cfgGui'   - (Struct) Behaviour for a cfgData: .mode .win .save.
+%                        Anything absent is derived from cfgData.
 %           'basename' - (Char) Override (defaults to the folder name).
 %           'Visible'  - (Char) 'on' (default) | 'off' (headless).
 %
 %   OUTPUT:
 %       hFig        - (uifigure) Handle to the viewer window.
+%       cfgData     - (Struct) The full panels (data loaded), for a fast reopen.
+%                     The live version is also in hFig.UserData.cfgData.
 %
 %   DEPENDENCIES:
-%       curate_presets, tblgui.layout / labeledControl / eventPanel / notify /
-%       chooseDialog, plot_spec, plot_hypnogram (style 'strip'), plot_raster.
+%       guiPath_presets, guiPath_load, guiPath_panel; gui_layout,
+%       gui_labeledControl, gui_eventPanel, gui_notify, gui_chooseDialog;
+%       plot_spec, plot_hypnogram, plot_raster.
 %
 %   HISTORY:
 %       Created:  22 Jun 2026 (as ed_gui).
-%       Renamed:  23 Jun 2026 -> gui_curate; ed/sSig dependency removed; Preset
-%                               dropdown + curate_presets registry; events are
-%                               generic (peak + optional start/stop + accepted).
+%       Renamed:  23 Jun 2026; ed/sSig dependency removed; Preset dropdown +
+%                 preset registry; events are generic (peak + start/stop).
+%       Renamed:  06 Jul 2026 -> guiPath_curate; moved to graphics/gui; the
+%                 shared GUI package flattened to gui_* helpers.
 
 %% ========================================================================
 %  ARGUMENTS
 %  ========================================================================
+if nargin < 1 || isempty(basepath), basepath = pwd; end   % default to the current folder
 p = inputParser;
 addRequired(p, 'basepath', @ischar);
 addParameter(p, 'preset', '', @ischar);
-addParameter(p, 'inputs', [], @(x) isempty(x) || isstruct(x));
-addParameter(p, 'panels', [], @(x) isempty(x) || isstruct(x));
-addParameter(p, 'events', [], @(x) isempty(x) || isnumeric(x) || isstruct(x));
-addParameter(p, 'saveFcn', [], @(x) isempty(x) || isa(x, 'function_handle'));
-addParameter(p, 'winPlot', 1.0, @(x) isnumeric(x) && isscalar(x) && x > 0);
+addParameter(p, 'cfgData', [], @(x) isempty(x) || isstruct(x));
+addParameter(p, 'cfgGui', [], @(x) isempty(x) || isstruct(x));
 addParameter(p, 'basename', '', @ischar);
 addParameter(p, 'Visible', 'on', @(x) any(strcmpi(char(x), {'on', 'off'})));
 
 parse(p, basepath, varargin{:});
-basepath    = p.Results.basepath;
-presetArg   = p.Results.preset;
-inputsParam = p.Results.inputs;
-panelsParam = p.Results.panels;
-eventsParam = p.Results.events;
-saveFcn     = p.Results.saveFcn;
-winPlot     = p.Results.winPlot;
-vis         = char(p.Results.Visible);
+basepath   = p.Results.basepath;
+presetArg  = p.Results.preset;
+cfgDataArg = p.Results.cfgData;
+cfgGuiArg  = p.Results.cfgGui;
+vis        = char(p.Results.Visible);
 
 basename = p.Results.basename;
 if isempty(basename)
@@ -101,17 +98,32 @@ end
 %% ========================================================================
 %  RESOLVE INITIAL CONFIG (preset or explicit inputs)
 %  ========================================================================
-presets = curate_presets();
+presets = guiPath_presets();    % {name, file} list for dropdown + auto-detect
 
-if ~isempty(inputsParam) || ~isempty(eventsParam)
+% pick the panels (cfgData) + behaviour (cfgGui): an explicit cfgData, else the
+% named / auto-detected preset, else an empty template
+if ~isempty(cfgDataArg)
     presetName = 'Custom';
-    inp = normalizeInputs(inputsParam);                 % [] -> empty struct array
-    if ~isempty(eventsParam), inp = [inp, makeEventInputStruct(eventsParam, 'Events')]; end
-    config = struct('inputs', {inp}, 'panels', {panelsParam}, 'saveFcn', saveFcn, 'winPlot', winPlot);
+    cfgData = cfgDataArg;
+    if ~isempty(cfgGuiArg), cfgGui = cfgGuiArg; else, cfgGui = struct(); end
 else
     presetName = resolvePreset(presetArg, presets, basepath, basename);
-    config = loadPresetConfig(presets, presetName, basepath, basename, winPlot, []);
+    if isempty(presetName), presetName = 'template'; end
+    [cfgData, cfgGui] = guiPath_presets(presetName);
+    presetName = cfgGui.name;
 end
+
+% load the data (skips panels that already carry it), then finalize behaviour and
+% adapt to the internal render config. ctx carries basename + a within-session cache
+ctx = guiPath_ctx(basepath, basename);
+try
+    cfgData = guiPath_load(cfgData, basepath, ctx);
+catch ME
+    warning('guiPath_curate:load', 'load failed (%s); opening empty.', ME.message);
+    cfgData = struct();
+end
+cfgGui = finalizeGui(cfgGui, cfgData);
+config = cfgDataToConfig(cfgData, cfgGui, basepath, basename);
 
 %% ========================================================================
 %  STATE
@@ -121,14 +133,17 @@ d.basepath   = basepath;
 d.basename   = basename;
 d.presets    = presets;
 d.presetName = presetName;
+d.ctx        = ctx;            % basename + within-session file cache
+d.cfgData    = cfgData;        % the live, full panels (returned for a fast reopen)
+d.cfgGui     = cfgGui;
 d.clrAccept  = [0.10 0.55 0.10];
 d.clrReject  = [0.65 0.15 0.15];
 d.unit       = struct('wide', 'hr', 'narrow', 's');   % per-region x-axis units
 d.hInd       = gobjects(0);
 d.hCenter    = gobjects(0);
 d.dirty      = false;
-d.win        = winPlot;
-d.winDefault = winPlot;
+d.win        = cfgGui.win;
+d.winDefault = cfgGui.win;
 d.saveFcn    = [];
 d = applyConfig(d, config);    % sets inputs, events, panels, saveFcn, t0, win
 
@@ -142,38 +157,25 @@ hFig = uifigure('Name', sprintf('%s - Curate: %s', basename, presetName), ...
     'Position', [50, 50, 1320, 820], 'Visible', 'off', ...
     'WindowKeyPressFcn', @onKey, 'WindowScrollWheelFcn', @onScroll);
 
-[~, gPlot, gCtrl, gActions] = tblgui.layout(hFig, 'CtrlWidth', 240, 'CtrlSide', 'left');
+[~, gPlot, gCtrl, gActions] = gui_layout(hFig, 'CtrlWidth', 240, 'CtrlSide', 'left');
 
 % --- Controls: preset ---
-tblgui.labeledControl(gCtrl, 'label', 'PRESET', 'FontWeight', 'bold');
-d.hPresetDD = tblgui.labeledControl(gCtrl, 'dropdown', '', ...
+gui_labeledControl(gCtrl, 'label', 'PRESET', 'FontWeight', 'bold');
+d.hPresetDD = gui_labeledControl(gCtrl, 'dropdown', '', ...
     'Items', presetItems(presets, presetName), 'Value', presetName, ...
     'ValueChangedFcn', @(s, ~) loadPreset(s.Value));
 
-% --- Controls: load events / signals from the base workspace ---
-% Events: an Nx1 [peak], Nx2 [start stop], or Nx3 [start peak stop] matrix.
-% Signal: a numeric vector + the fs you type. Both are grabbed by variable name.
-tblgui.labeledControl(gCtrl, 'label', 'LOAD (base workspace)', 'FontWeight', 'bold');
-hL = tblgui.labeledControl(gCtrl, 'panel', '', 'RowHeight', 86);
-gL = uigridlayout(hL, [3, 2], 'RowHeight', {'fit', 'fit', 'fit'}, ...
-    'ColumnWidth', {'1x', '1x'}, 'Padding', 2, 'RowSpacing', 2, 'ColumnSpacing', 4);
-d.hWsVar = uieditfield(gL, 'text', 'Placeholder', 'variable name');
-d.hWsVar.Layout.Row = 1; d.hWsVar.Layout.Column = [1, 2];
-lblFs = uilabel(gL, 'Text', 'fs (Hz)');
-lblFs.Layout.Row = 2; lblFs.Layout.Column = 1;
-d.hWsFs = uieditfield(gL, 'numeric', 'Value', 1250, 'Limits', [eps, Inf]);
-d.hWsFs.Layout.Row = 2; d.hWsFs.Layout.Column = 2;
-d.hWsEventsBtn = uibutton(gL, 'Text', 'Events', 'ButtonPushedFcn', @(~,~) onLoadWsEvents());
-d.hWsEventsBtn.Layout.Row = 3; d.hWsEventsBtn.Layout.Column = 1;
-d.hWsSignalBtn = uibutton(gL, 'Text', 'Signal', 'ButtonPushedFcn', @(~,~) onLoadWsSignal());
-d.hWsSignalBtn.Layout.Row = 3; d.hWsSignalBtn.Layout.Column = 2;
+% --- Controls: unified Load (opens a progressive dialog; nothing else lives
+% here permanently). The dialog reveals inputs as you choose type + source. ---
+gui_labeledControl(gCtrl, 'label', 'LOAD', 'FontWeight', 'bold');
+gui_labeledControl(gCtrl, 'button', '', 'Text', 'Load...', 'ButtonPushedFcn', @(~, ~) onLoadUnified());
 
 % --- Controls: layout configuration (per region) ---
 if strcmp(d.cfgRegion, 'wide'), nInitCfg = numel(d.wideP); else, nInitCfg = numel(d.narrowP); end
-tblgui.labeledControl(gCtrl, 'label', 'LAYOUT', 'FontWeight', 'bold');
+gui_labeledControl(gCtrl, 'label', 'LAYOUT', 'FontWeight', 'bold');
 
 % Region dropdown and # Panels side by side.
-hRP = tblgui.labeledControl(gCtrl, 'panel', '', 'RowHeight', 56);
+hRP = gui_labeledControl(gCtrl, 'panel', '', 'RowHeight', 56);
 gRP = uigridlayout(hRP, [2, 2], 'RowHeight', {'fit', 'fit'}, ...
     'ColumnWidth', {'1x', '1x'}, 'Padding', 2, 'RowSpacing', 2, 'ColumnSpacing', 4);
 lblR = uilabel(gRP, 'Text', 'Region', 'FontWeight', 'bold');
@@ -187,13 +189,13 @@ d.hPanelsN = uieditfield(gRP, 'numeric', 'Limits', [1, 6], 'RoundFractionalValue
     'Value', max(1, nInitCfg), 'ValueChangedFcn', @onPanelsN);
 d.hPanelsN.Layout.Row = 2; d.hPanelsN.Layout.Column = 2;
 
-hSrcPanel  = tblgui.labeledControl(gCtrl, 'panel', 'Panels', 'RowHeight', 160);
+hSrcPanel  = gui_labeledControl(gCtrl, 'panel', 'Panels', 'RowHeight', 160);
 d.hSrcGrid = uigridlayout(hSrcPanel, [1, 1], 'Padding', 2, 'RowSpacing', 3, ...
     'ColumnWidth', {'1x'}, 'Scrollable', 'on');
 
 % --- Controls: view (t0 / window in seconds; per-region x-unit) ---
-tblgui.labeledControl(gCtrl, 'label', 'VIEW', 'FontWeight', 'bold');
-hVF = tblgui.labeledControl(gCtrl, 'panel', '', 'RowHeight', 84);
+gui_labeledControl(gCtrl, 'label', 'VIEW', 'FontWeight', 'bold');
+hVF = gui_labeledControl(gCtrl, 'panel', '', 'RowHeight', 84);
 gVF = uigridlayout(hVF, [3, 2], 'RowHeight', {'fit', 'fit', 'fit'}, ...
     'ColumnWidth', {'1x', '1x'}, 'Padding', 2, 'RowSpacing', 2, 'ColumnSpacing', 4);
 lblT0 = uilabel(gVF, 'Text', 't0 (s)', 'FontWeight', 'bold');
@@ -212,20 +214,19 @@ d.hUnit = uidropdown(gVF, 'Items', {'ms', 's', 'min', 'hr'}, 'Value', d.unit.(d.
     'ValueChangedFcn', @onUnit);
 d.hUnit.Layout.Row = 3; d.hUnit.Layout.Column = 2;
 
-hZ = tblgui.labeledControl(gCtrl, 'panel', '', 'RowHeight', 30);
+hZ = gui_labeledControl(gCtrl, 'panel', '', 'RowHeight', 30);
 gZ = uigridlayout(hZ, [1, 2], 'ColumnWidth', {'1x', '1x'}, 'Padding', 2, 'ColumnSpacing', 4);
 bZi = uibutton(gZ, 'Text', 'Zoom In (+)',  'ButtonPushedFcn', @(~,~) zoomActive(1/1.5));
 bZi.Layout.Column = 1;
 bZo = uibutton(gZ, 'Text', 'Zoom Out (-)', 'ButtonPushedFcn', @(~,~) zoomActive(1.5));
 bZo.Layout.Column = 2;
-tblgui.labeledControl(gCtrl, 'button', '', 'Text', 'Reset (0)', 'ButtonPushedFcn', @(~,~) resetActive());
-tblgui.labeledControl(gCtrl, 'spacer', '');
+gui_labeledControl(gCtrl, 'button', '', 'Text', 'Reset (0)', 'ButtonPushedFcn', @(~,~) resetActive());
+gui_labeledControl(gCtrl, 'spacer', '');
 
-% --- Event module (always present; shows "/ 0" when a view has no events) ---
-api = struct('prev', @() navStep(-1), 'next', @() navStep(1), ...
-    'accept', @() setAccept(true), 'reject', @() setAccept(false), ...
-    'save', @() onSave(), 'setIdx', @(v) setIdx(v));
-d.ev = tblgui.eventPanel(gActions, api);
+% --- Action widget: gui_eventPanel (events) or gui_statePanel (states).
+% Rebuilt by buildActionWidget when a preset switch changes the curation mode.
+d.gActions = gActions;
+d = buildActionWidget(d);
 
 % --- Plot area: one tiledlayout holding every panel ---
 d.hPanel = uipanel(gPlot, 'BorderType', 'none');
@@ -260,29 +261,37 @@ hFig.Visible = vis;
     function loadPreset(name)
         data = hFig.UserData;
         if strcmp(name, data.presetName), return; end
+        prevMode = data.mode;
         if ~any(strcmp(name, {data.presets.name}))   % 'Custom'/'ws:...'/unknown
             data.hPresetDD.Value = data.presetName; return;
         end
         % offer to save unsaved curation before switching
         if data.dirty
-            sel = tblgui.chooseDialog(hFig, 'Unsaved curation. Save before switching?', ...
+            sel = gui_chooseDialog(hFig, 'Unsaved curation. Save before switching?', ...
                 {'Save', 'Discard'});
             if isempty(sel), data.hPresetDD.Value = data.presetName; return; end
             if strcmp(sel, 'Save'), onSave(); data = hFig.UserData; end
         end
-        dlg = busyOn(sprintf('Loading %s...', name));   % already-loaded signals are reused
+        dlg = busyOn(sprintf('Loading %s...', name));   % panels already loaded are reused
         try
-            cfg = loadPresetConfig(data.presets, name, data.basepath, data.basename, ...
-                data.winDefault, data.pool);
+            % reuse already-loaded panels from the live cfgData, load only the rest
+            [newData, newGui] = guiPath_presets(name, data.cfgData);
+            newData = guiPath_load(newData, data.basepath, data.ctx);
+            newGui  = finalizeGui(newGui, newData);
+            config  = cfgDataToConfig(newData, newGui, data.basepath, data.basename);
         catch ME
             busyOff(dlg);
-            tblgui.notify(hFig, sprintf('Preset "%s" failed: %s', name, ME.message), 'error');
+            gui_notify(hFig, sprintf('Preset "%s" failed: %s', name, ME.message), 'error');
             data.hPresetDD.Value = data.presetName; hFig.UserData = data; return;
         end
-        data = applyConfig(data, cfg);
-        data.presetName = name;
+        data.cfgData = newData; data.cfgGui = newGui;
+        data = applyConfig(data, config);
+        if ~strcmp(prevMode, data.mode)
+            data = buildActionWidget(data);   % swap event <-> state widget
+        end
+        data.presetName = newGui.name;
         data.dirty = false;
-        hFig.Name = sprintf('%s - Curate: %s', data.basename, name);
+        hFig.Name = sprintf('%s - Curate: %s', data.basename, data.presetName);
         hFig.UserData = data;
         data.hRegionDD.Value = regDisp(data.cfgRegion);
         data.hPanelsN.Value  = max(1, numel(data.(regField(data.cfgRegion))));
@@ -292,6 +301,25 @@ hFig.Visible = vis;
         populateSrc(hFig);
         refreshEvent(hFig);
         busyOff(dlg);
+    end
+
+    function data = buildActionWidget(data)
+        % (re)build the pinned action widget for the current mode:
+        % gui_statePanel for states, gui_eventPanel for events. Removes prior.
+        if isfield(data, 'ev') && ~isempty(data.ev) && ...
+                isfield(data.ev, 'grid') && isvalid(data.ev.grid)
+            delete(data.ev.grid);
+        end
+        if strcmp(data.mode, 'states')
+            apiS = struct('prev', @() navStep(-1), 'next', @() navStep(1), ...
+                'assign', @(k) assignState(k), 'save', @() onSave(), 'setIdx', @(v) setIdx(v));
+            data.ev = gui_statePanel(data.gActions, apiS, data.stateNames, data.stateColors);
+        else
+            api = struct('prev', @() navStep(-1), 'next', @() navStep(1), ...
+                'accept', @() setAccept(true), 'reject', @() setAccept(false), ...
+                'save', @() onSave(), 'setIdx', @(v) setIdx(v));
+            data.ev = gui_eventPanel(data.gActions, api);
+        end
     end
 
     % busy indicator around slow work (preset load / signal prep)
@@ -310,6 +338,8 @@ hFig.Visible = vis;
     % set the active event set (from the workspace) while keeping the signal pool
     function setEvents(evInput, sv, label)
         data = hFig.UserData;
+        prevMode = data.mode;
+        data.mode = 'events';
         ev = normalizeInputs(evInput);
         data.inputs   = [data.pool, ev(1)];
         data.saveFcn  = sv;
@@ -326,44 +356,153 @@ hFig.Visible = vis;
         if ~any(strcmp(label, items)), data.hPresetDD.Items = [items, {label}]; end
         data.hPresetDD.Value = label;
         hFig.Name = sprintf('%s - Curate: %s', data.basename, label);
+        if ~strcmp(prevMode, data.mode)
+            data = buildActionWidget(data);   % swap state -> event widget
+        end
         hFig.UserData = data;
         rebuildPlot();
         populateSrc(hFig);
         refreshEvent(hFig);
     end
 
-    function onLoadWsEvents()
+    function onLoadUnified()
+        % open the progressive Load dialog, then integrate the chosen source via
+        % loadCore (the same address machinery as the presets). The dialog owns
+        % the type/source/placement choices; here we only wire the save target.
         data = hFig.UserData;
-        name = strtrim(data.hWsVar.Value);
-        if isempty(name), tblgui.notify(hFig, 'Enter a base workspace variable name.', 'warning'); return; end
-        try, M = evalin('base', name); catch, tblgui.notify(hFig, sprintf('No base variable "%s".', name), 'error'); return; end
-        try, evd = eventsFromMatrix(M); catch ME, tblgui.notify(hFig, ME.message, 'error'); return; end
-        evInput = struct('name', 'eventTicks', 'type', 'eventTicks', 'data', evd, 'label', name);
-        sv = @(acc) assignin('base', [name, '_accepted'], logical(acc(:)));
-        setEvents(evInput, sv, ['ws:' name]);
-        tblgui.notify(hFig, sprintf('Loaded %d events from "%s"; Save writes %s_accepted to base.', ...
-            numel(evd.peakTime), name, name), 'success');
+        sel = gui_loadDialog(hFig, data.basepath);
+        if isempty(sel), return; end
+        switch sel.from
+            case 'ws',  src = ['ws:', sel.value];  label = sel.value;
+            case 'bin', src = ['bin:', sel.value]; label = ['ch ', sel.value];
+            otherwise,  src = sel.value; label = sel.var;      % file: inline value
+        end
+        saveFcn = [];
+        if strcmp(sel.type, 'eventTicks')
+            if strcmp(sel.from, 'ws')
+                saveFcn = @(acc) assignin('base', matlab.lang.makeValidName([sel.var, '_accepted']), logical(acc(:)));
+            elseif strcmp(sel.from, 'file')
+                saveFcn = @(acc) saveVarToFile(sel.file, [sel.var, '_accepted'], logical(acc(:)));
+            end
+        elseif strcmp(sel.type, 'stateStrip')
+            saveFcn = @(lb) saveLabelsFlow(fullfile(data.basepath, [data.basename, '.sleep_labelsMan.mat']), lb);
+        end
+        switch sel.type
+            case 'eventTicks', loadNm = 'eventTicks';
+            case 'stateStrip', loadNm = 'states';
+            otherwise,         loadNm = matlab.lang.makeValidName(label);
+        end
+        % single-wrap src so an inline cell/array value (a File source) lands in
+        % ONE struct, not a struct array (the classic struct(...,cell,...) trap)
+        loadCore(struct('src', {src}, 'type', sel.type, 'region', sel.region, 'fs', sel.fs, ...
+            'name', loadNm, 'label', label, 'saveFcn', saveFcn));
     end
 
-    function onLoadWsSignal()
+    function loadCore(p)
+        % load the one declared source (same path as presets) and integrate it: a
+        % signal joins the pool + a new panel; events / states become the active
+        % curation target. The loaded panel is also recorded in data.cfgData.
         data = hFig.UserData;
-        name = strtrim(data.hWsVar.Value);
-        if isempty(name), tblgui.notify(hFig, 'Enter a base workspace variable name.', 'warning'); return; end
-        try, v = evalin('base', name); catch, tblgui.notify(hFig, sprintf('No base variable "%s".', name), 'error'); return; end
-        if ~isnumeric(v) || ~isvector(v) || numel(v) < 2
-            tblgui.notify(hFig, 'Signal must be a numeric vector.', 'error'); return;
+        ps = guiPath_panel(p.type, p.region, p.src, 'name', p.name, 'label', p.label, 'fs', p.fs);
+        one = struct('item', ps);                    % a one-panel flat cfgData
+        try
+            one = guiPath_load(one, data.basepath, data.ctx);
+        catch ME
+            gui_notify(hFig, sprintf('Load failed: %s', ME.message), 'error'); return;
         end
-        fsv = data.hWsFs.Value;
-        tr = normalizeInputs(struct('name', name, 'type', 'trace', 'data', double(v(:)), ...
-            'fs', fsv, 'ylim', prctile(double(v(:)), [0.1, 99.9]), 'label', name));
-        data.pool = mergePool(data.pool, tr);
-        evIx = find(strcmp({data.inputs.type}, 'eventTicks'), 1);
+        if isempty(fieldnames(one))                  % the panel was dropped (load failed)
+            gui_notify(hFig, 'Could not load that source (check the value / type).', 'error'); return;
+        end
+        inp = recFromPanel(one.item);                % the loaded panel -> an input
+        reg = regAlias(one.item.region);             % 'wide' / 'narrow'
+        % capture what the message needs BEFORE the integrate call: 'inp' is a
+        % shared nested-scope variable that rebuildPlot -> drawPanel reassigns
+        itype = inp.type; iname = inp.name;
+        % integrate + render inside a guard: a bad source must notify, never crash
+        try
+            switch itype
+                case 'eventTicks'
+                    nEv = numel(inp.data.peakTime);
+                    setEvents(inp, p.saveFcn, p.label);
+                    gui_notify(hFig, sprintf('Loaded %d events from "%s".', nEv, p.label), 'success');
+                case 'stateStrip'
+                    nLab = numel(inp.data.labels);
+                    setStatesTarget(inp, p.saveFcn, p.label, data.winDefault, reg);
+                    gui_notify(hFig, sprintf('Loaded %d state epochs from "%s".', nLab, p.label), 'success');
+                otherwise
+                    placeSignal(inp, reg);
+                    gui_notify(hFig, sprintf('Loaded "%s" into the %s.', iname, regDisp(reg)), 'success');
+            end
+            d2 = hFig.UserData;                      % record the panel for the round-trip
+            d2.cfgData.(matlab.lang.makeValidName(iname)) = one.item;
+            hFig.UserData = d2;
+        catch ME
+            gui_notify(hFig, sprintf('Could not display "%s": %s', iname, ME.message), 'error');
+        end
+    end
+
+    function placeSignal(inp, reg)
+        % add a signal input to the persistent pool (unique name) and open a panel
+        % for it in the chosen region, preserving any active curation target
+        data = hFig.UserData;
+        base = inp.name; nm = base; k = 1;
+        while ~isempty(data.pool) && any(strcmp(nm, {data.pool.name}))
+            k = k + 1; nm = sprintf('%s_%d', base, k);
+        end
+        inp.name = nm; inp.defRegion = reg;
+        data.pool = mergePool(data.pool, inp);
+        evIx = find(ismember({data.inputs.type}, {'eventTicks', 'stateStrip'}), 1);
         if ~isempty(evIx), data.inputs = [data.pool, data.inputs(evIx)]; else, data.inputs = data.pool; end
         data.Tend_s = max(eps, computeTend(data.inputs));
+        pn = makePanel(nm, reg, data.inputs);
+        if strcmp(reg, 'wide'), data.wideP = [data.wideP, pn]; else, data.narrowP = [data.narrowP, pn]; end
         hFig.UserData = data;
+        rebuildPlot();
         populateSrc(hFig);
-        tblgui.notify(hFig, sprintf('Loaded "%s" (%d samp @ %g Hz). Pick it in a panel dropdown.', ...
-            name, numel(v), fsv), 'success');
+    end
+
+    function setStatesTarget(inp, sv, label, winPlot, reg)
+        % make a stateStrip input the active curation target (states mode); the
+        % sibling of setEvents. Adds one strip panel in the chosen region.
+        data = hFig.UserData;
+        prevMode = data.mode;
+        data.mode = 'states';
+        strip = normalizeInputs(inp);
+        data.inputs = [data.pool, strip(1)];
+        data.saveFcn = sv;
+        data.presetName = label;
+        data.dirty = false;
+        if ~isempty(winPlot), data.win = winPlot; data.winDefault = winPlot; end
+        data.Tend_s = max(eps, computeTend(data.inputs));
+        [data.labels, epochT, data.epochLen, data.nstates, data.stateNames, data.stateColors] = extractStates(data.inputs);
+        nEp = numel(data.labels);
+        data.ed = struct('peakTime', epochT(:));
+        data.accepted = true(max(0, nEp), 1);
+        data.nEvents = nEp; data.hasEvents = nEp > 0;
+        data.currIdx = 1;
+        if data.hasEvents && data.nEvents > 0, data.t0 = data.ed.peakTime(1); else, data.t0 = data.Tend_s / 2; end
+        if ~any(strcmp({data.wideP.source}, strip(1).name)) && ~any(strcmp({data.narrowP.source}, strip(1).name))
+            pn = makePanel(strip(1).name, reg, data.inputs);
+            if strcmp(reg, 'wide'), data.wideP = [data.wideP, pn]; else, data.narrowP = [data.narrowP, pn]; end
+        end
+        items = data.hPresetDD.Items;
+        if ~any(strcmp(label, items)), data.hPresetDD.Items = [items, {label}]; end
+        data.hPresetDD.Value = label;
+        hFig.Name = sprintf('%s - Curate: %s', data.basename, label);
+        if ~strcmp(prevMode, data.mode)
+            data = buildActionWidget(data);          % swap event -> state widget
+        end
+        hFig.UserData = data;
+        rebuildPlot();
+        populateSrc(hFig);
+        refreshEvent(hFig);
+    end
+
+    function saveLabelsFlow(file, labels)
+        % Load-flow states save: AccuSleep-compatible labels vector, backed up
+        backup_file(file);
+        labels = labels(:);
+        save(file, 'labels');
     end
 
 %% ========================================================================
@@ -435,10 +574,7 @@ hFig.Visible = vis;
             title(ax, ''); ylabel(ax, pn.label);
             set(get(ax, 'YLabel'), 'Color', [0.15 0.15 0.15]);
             ax.XLim = [a, b] / xf;
-            data.hInd(i) = xregion(ax, a/xf, a/xf + eps, 'FaceColor', [0 0.2 0.8], ...
-                'FaceAlpha', 0.15, 'HandleVisibility', 'off');
-            data.hCenter(i) = xline(ax, 0, 'Color', [0 0.25 0.9], ...
-                'LineWidth', 1.25, 'HandleVisibility', 'off');
+            [data.hInd(i), data.hCenter(i)] = addCursor(ax);
             mute(ax);
         end
         fig.UserData = data;
@@ -458,10 +594,7 @@ hFig.Visible = vis;
                 ylabel(ax, data.wideP(i).label);
                 set(get(ax, 'YLabel'), 'Color', [0.15 0.15 0.15]);
                 ax.XLim = [0, data.Tend_s] / xf;
-                data.hInd(i) = xregion(ax, 0, eps, 'FaceColor', [0 0.2 0.8], ...
-                    'FaceAlpha', 0.15, 'HandleVisibility', 'off');
-                data.hCenter(i) = xline(ax, 0, 'Color', [0 0.25 0.9], ...
-                    'LineWidth', 1.25, 'HandleVisibility', 'off');
+                [data.hInd(i), data.hCenter(i)] = addCursor(ax);
                 mute(ax);
             end
         end
@@ -489,7 +622,7 @@ hFig.Visible = vis;
             cla(ax); hold(ax, 'on');
             drawPanel(data, ax, pn.source, ws, we, xf);
             if showEv
-                xline(ax, eventMarks(data.ed, ev) / xf, '--b', 'HandleVisibility', 'off');
+                xline(ax, eventMarks(data.ed, ev) / xf, '--b');
             end
             ax.XLim = [ws, we] / xf;
             ylabel(ax, pn.label);
@@ -510,8 +643,17 @@ hFig.Visible = vis;
             case 'spec',       drawSpec(ax, inp, xf);
             case 'hypnogram',  drawHypno(ax, inp, xf);
             case 'eventTicks', if data.hasEvents, drawTicks(ax, data, xf); end
+            case 'stateStrip', drawStateStrip(ax, data, xf);
             case 'raster',     drawRaster(ax, inp, a, b, xf);
         end
+    end
+
+    function [hI, hC] = addCursor(ax)
+        % overview cursor line (t0) + window band. Left with default
+        % HandleVisibility so the next cla clears them (no stale-overlay pileup);
+        % updateMarker repositions them in place between redraws.
+        hI = xregion(ax, 0, eps, 'FaceColor', [0 0.2 0.8], 'FaceAlpha', 0.15);
+        hC = xline(ax, 0, 'Color', [0 0.25 0.9], 'LineWidth', 1.25);
     end
 
     function updateMarker(fig)
@@ -529,10 +671,15 @@ hFig.Visible = vis;
     end
 
     function refreshEvent(fig)
-        % event module shows index / total only; accept-reject is read off the
-        % plot panels, so no status text is set here
+        % sync the action widget: index / total (+ current state in states mode).
+        % accept-reject is read off the plot panels, so no status text there
         data = fig.UserData;
         if isempty(data.ev), return; end
+        if strcmp(data.mode, 'states')
+            if data.nEvents == 0, data.ev.refresh(0, 0, []); return; end
+            data.ev.refresh(data.currIdx, data.nEvents, data.labels(data.currIdx));
+            return;
+        end
         if ~data.hasEvents || data.nEvents == 0
             data.ev.refresh(0, 0, false, '');
             return;
@@ -545,10 +692,22 @@ hFig.Visible = vis;
 %  ========================================================================
 
     function navStep(step)
+        % step to the next (step>0) or previous (step<0) event RELATIVE TO the
+        % current view t0. When t0 sits on an event this is simply +/-1; after a
+        % free click it continues from wherever the view now is. Events are
+        % chronological (peakTime ascending), so index order tracks time order.
         data = hFig.UserData;
         if ~data.hasEvents || data.nEvents == 0, return; end
-        data.currIdx = min(max(1, data.currIdx + step), data.nEvents);
-        data.t0 = data.ed.peakTime(data.currIdx);
+        pk = data.ed.peakTime;
+        if step > 0
+            idx = find(pk > data.t0, 1, 'first');
+            if isempty(idx), idx = data.nEvents; end        % already past the last
+        else
+            idx = find(pk < data.t0, 1, 'last');
+            if isempty(idx), idx = 1; end                   % already before the first
+        end
+        data.currIdx = idx;
+        data.t0 = pk(idx);
         hFig.UserData = data;
         renderNarrow(hFig); updateMarker(hFig); refreshEvent(hFig);
     end
@@ -563,15 +722,25 @@ hFig.Visible = vis;
     end
 
     function jumpToTime(tSec)
-        % free move: set t0, re-centre the Bottom, leave currIdx untouched
+        % click / t0 edit: move the Bottom to tSec and re-anchor the event cursor
+        % so arrow-stepping continues from here. States snap the view onto the
+        % epoch (the epoch IS the position); events keep t0 where you clicked but
+        % point the cursor at the nearest event.
         data = hFig.UserData;
-        data.t0 = min(max(0, tSec), data.Tend_s);
+        tSec = min(max(0, tSec), data.Tend_s);
+        if data.hasEvents && data.nEvents > 0
+            [~, idx] = min(abs(data.ed.peakTime - tSec));
+            data.currIdx = idx;
+            if strcmp(data.mode, 'states'), tSec = data.ed.peakTime(idx); end
+        end
+        data.t0 = tSec;
         hFig.UserData = data;
-        renderNarrow(hFig); updateMarker(hFig);
+        renderNarrow(hFig); updateMarker(hFig); refreshEvent(hFig);
     end
 
     function setAccept(tf)
         data = hFig.UserData;
+        if ~strcmp(data.mode, 'events'), return; end
         if ~data.hasEvents || data.nEvents == 0, return; end
         data.accepted(data.currIdx) = tf;
         data.dirty = true;
@@ -582,6 +751,60 @@ hFig.Visible = vis;
         else
             renderNarrow(hFig); refreshEvent(hFig);
         end
+    end
+
+    function assignState(stateVal)
+        % states mode: set the current epoch's label, recolour, auto-advance
+        data = hFig.UserData;
+        if ~strcmp(data.mode, 'states') || data.nEvents == 0, return; end
+        stateVal = round(stateVal);
+        if stateVal < 1 || stateVal > data.nstates + 1, return; end   % N+1 = undefined
+        data.labels(data.currIdx) = stateVal;
+        data.dirty = true;
+        hFig.UserData = data;
+        renderStateStrip(hFig);           % recolour Top state strip
+        if data.currIdx < data.nEvents
+            navStep(1);                   % auto-advance (re-renders Bottom + markers)
+        else
+            renderNarrow(hFig); refreshEvent(hFig);
+        end
+    end
+
+    function jumpNextUndefined()
+        % states mode: jump to the next epoch whose label is undefined (> N)
+        data = hFig.UserData;
+        if ~strcmp(data.mode, 'states') || data.nEvents == 0, return; end
+        rel = find(data.labels((data.currIdx + 1):end) > data.nstates, 1);
+        if isempty(rel)
+            nxt = find(data.labels > data.nstates, 1);      % wrap to first
+            if isempty(nxt), gui_notify(hFig, 'No undefined epochs.', 'info'); return; end
+        else
+            nxt = data.currIdx + rel;
+        end
+        setIdx(nxt);
+    end
+
+    function renderStateStrip(fig)
+        % recolour the Top state strip after a label change (mirror of
+        % renderTicksPanel): redraw the strip, restore its cursor + window
+        % markers; the Bottom is refreshed by the auto-advance / caller
+        data = fig.UserData;
+        xf = unitSec(data.unit.wide);
+        for i = 1:numel(data.wideP)
+            if isStrip(data, data.wideP(i).source)
+                ax = data.wideP(i).ax;
+                cla(ax); hold(ax, 'on');
+                drawStateStrip(ax, data, xf);
+                ylabel(ax, data.wideP(i).label);
+                set(get(ax, 'YLabel'), 'Color', [0.15 0.15 0.15]);
+                ax.XLim = [0, data.Tend_s] / xf;
+                [data.hInd(i), data.hCenter(i)] = addCursor(ax);
+                mute(ax);
+            end
+        end
+        fig.UserData = data;
+        hideOuterXTicks(data.axWide, ['Time (' data.unit.wide ')'], 'bottom');
+        updateMarker(fig);
     end
 
     function onEditT0(src, ~)
@@ -661,9 +884,37 @@ hFig.Visible = vis;
 %  INPUT (keyboard / scroll / click)
 %  ========================================================================
 
+    function tf = isEditingField()
+        % true while a numeric/text edit field holds focus, so the figure-level
+        % keyboard shortcuts stand down and the field receives the keystrokes
+        co = hFig.CurrentObject;
+        tf = ~isempty(co) && ...
+            (isa(co, 'matlab.ui.control.NumericEditField') || ...
+             isa(co, 'matlab.ui.control.EditField'));
+    end
+
     function onKey(~, evt)
+        if isEditingField(), return; end   % typing in a field: let it keep the key
         if any(strcmpi(evt.Modifier, 'control')) && strcmpi(evt.Key, 's')
             onSave(); return;
+        end
+        data = hFig.UserData;
+        if strcmp(data.mode, 'states')
+            switch evt.Key
+                case {'rightarrow', 'uparrow'},   navStep(1);
+                case {'leftarrow', 'downarrow'},  navStep(-1);
+                case {'1', '2', '3', '4', '5', '6', '7', '8', '9'}
+                    assignState(str2double(evt.Key));
+                case {'numpad1', 'numpad2', 'numpad3', 'numpad4', 'numpad5', ...
+                        'numpad6', 'numpad7', 'numpad8', 'numpad9'}
+                    assignState(str2double(evt.Key(end)));
+                case 'x',                    assignState(data.nstates + 1);
+                case 'n',                    jumpNextUndefined();
+                case {'equal', 'add'},       zoomActive(1 / 1.5);
+                case {'hyphen', 'subtract'}, zoomActive(1.5);
+                case {'0', 'numpad0'},       resetActive();
+            end
+            return;
         end
         switch evt.Key
             case 'leftarrow',  navStep(-1);
@@ -710,6 +961,8 @@ hFig.Visible = vis;
         for k = 1:numel(data.axWide),   armAxis(data.axWide(k),   'wide');   end
         for k = 1:numel(data.axNarrow), armAxis(data.axNarrow(k), 'narrow'); end
         data.jumpToTimeFcn = @jumpToTime;       % exposed for hosts / tests
+        data.loadCoreFcn   = @loadCore;         % exposed for tests (drives the Load flow)
+        data.loadPresetFcn = @loadPreset;       % exposed for tests (drives a preset switch)
         fig.UserData = data;
     end
 
@@ -744,6 +997,10 @@ hFig.Visible = vis;
         cur = numel(pArr);
         if n > cur
             opts = availSources(data.inputs);
+            if isempty(opts)
+                gui_notify(hFig, 'Load a signal or events first (no sources to show).', 'warning');
+                src.Value = max(1, cur); return;
+            end
             for i = cur + 1:n
                 pArr(i) = makePanel(opts{1}, region, data.inputs);
             end
@@ -810,22 +1067,30 @@ hFig.Visible = vis;
 
     function onSave()
         data = hFig.UserData;
-        if ~data.hasEvents, return; end
         if isempty(data.saveFcn)
-            tblgui.notify(hFig, 'No save target for this view.', 'warning');
+            gui_notify(hFig, 'No save target for this view.', 'warning');
             return;
         end
+        if strcmp(data.mode, 'states')
+            if data.nEvents == 0, return; end
+            data.saveFcn(data.labels(:));
+            data.dirty = false;
+            hFig.UserData = data;
+            gui_notify(hFig, sprintf('Saved %d epoch labels.', data.nEvents), 'success');
+            return;
+        end
+        if ~data.hasEvents, return; end
         data.saveFcn(data.accepted(:));
         data.dirty = false;
         hFig.UserData = data;
-        tblgui.notify(hFig, sprintf('Saved %d accepted / %d events.', ...
+        gui_notify(hFig, sprintf('Saved %d accepted / %d events.', ...
             sum(data.accepted), data.nEvents), 'success');
     end
 
     function onClose()
         data = hFig.UserData;
         if isfield(data, 'dirty') && data.dirty
-            sel = tblgui.chooseDialog(hFig, 'Unsaved curation. Save before closing?', ...
+            sel = gui_chooseDialog(hFig, 'Unsaved curation. Save before closing?', ...
                 {'Save and close', 'Close without saving'});
             if isempty(sel), return; end
             if strcmp(sel, 'Save and close'), onSave(); end
@@ -840,30 +1105,86 @@ end     % MAIN
 %  ========================================================================
 
 function name = resolvePreset(arg, presets, basepath, basename)
-% chosen preset, else the first preset whose file exists, else the first
+% chosen preset, else the first preset whose file exists, else '' (empty ->
+% the caller opens an empty Custom view; guiPath_curate never requires a file)
 names = {presets.name};
 if ~isempty(arg)
     ix = find(strcmpi(arg, names), 1);
     if ~isempty(ix), name = names{ix}; return; end
 end
 for i = 1:numel(presets)
-    if isfile(fullfile(basepath, [basename, '.', presets(i).var, '.mat']))
+    if isfile(fullfile(basepath, [basename, '.', presets(i).file, '.mat']))
         name = presets(i).name; return;
     end
 end
-name = presets(1).name;
+name = '';
 end
 
-function config = loadPresetConfig(presets, name, basepath, basename, winDefault, pool)
-ix = find(strcmp({presets.name}, name), 1);
-if isempty(ix), error('gui_curate:preset', 'unknown preset "%s"', name); end
-config = presets(ix).load(basepath, basename, pool);
-if ~isfield(config, 'inputs') || isempty(config.inputs)
-    error('gui_curate:preset', 'preset "%s" returned no inputs', name);
+function g = finalizeGui(g, cfgData)
+% fill any cfgGui field the caller left out: mode from the target panel, window
+% from the mode, name/file/save to safe defaults
+if ~isfield(g, 'name') || isempty(g.name), g.name = 'Custom'; end
+if ~isfield(g, 'file'), g.file = ''; end
+if ~isfield(g, 'mode') || isempty(g.mode)
+    g.mode = 'events';
+    fns = fieldnames(cfgData);
+    for i = 1:numel(fns)
+        if strcmp(cfgData.(fns{i}).type, 'stateStrip'), g.mode = 'states'; break; end
+    end
 end
-if ~isfield(config, 'panels'),  config.panels  = []; end
-if ~isfield(config, 'saveFcn'), config.saveFcn = []; end
-if ~isfield(config, 'winPlot') || isempty(config.winPlot), config.winPlot = winDefault; end
+if ~isfield(g, 'win') || isempty(g.win)
+    if strcmp(g.mode, 'states'), g.win = 10; else, g.win = 1; end
+end
+if ~isfield(g, 'save'), g.save = ''; end
+end
+
+function fn = resolveSave(save, mode, basepath, basename, cfgData)
+% turn a cfgGui.save spec into a save handle: a function handle is used as is;
+% states write labels to sleep_labelsMan; an events token writes the accepted
+% mask to <basename>.<token>.mat (or a 'ws:VAR' target to a base variable)
+if isa(save, 'function_handle'), fn = save; return; end
+if strcmp(mode, 'states')
+    fn = @(labels) saveLabels(fullfile(basepath, [basename, '.sleep_labelsMan.mat']), labels);
+    return;
+end
+if ischar(save) && ~isempty(save) && ~strcmp(save, 'labelsMan'), tok = save; else, tok = targetToken(cfgData); end
+fn = [];
+if isempty(tok), return; end
+if any(tok == ':')
+    ci = find(tok == ':', 1);
+    if strcmp(tok(1:ci - 1), 'ws')
+        vn = tok(ci + 1:end);
+        fn = @(acc) assignin('base', matlab.lang.makeValidName([vn, '_accepted']), logical(acc(:)));
+    end
+    return;
+end
+file = fullfile(basepath, [basename, '.', tok, '.mat']);
+if isfile(file), fn = @(acc) saveAccepted(file, tok, acc); end
+end
+
+function tok = targetToken(cfgData)
+% the src token of the eventTicks target ('ed' / 'ripp' / a 'ws:VAR' address)
+tok = '';
+fns = fieldnames(cfgData);
+for i = 1:numel(fns)
+    p = cfgData.(fns{i});
+    if strcmp(p.type, 'eventTicks') && ischar(p.src) && ~isempty(p.src), tok = p.src; return; end
+end
+end
+
+function saveAccepted(file, varName, accepted)
+% back up the file, then set <var>.accepted and write all variables back
+backup_file(file);
+S = load(file);
+S.(varName).accepted = logical(accepted(:));
+save(file, '-struct', 'S', '-v7.3');
+end
+
+function saveLabels(file, labels)
+% AccuSleep-compatible manual labels: back up any existing file, write the vector
+backup_file(file);
+labels = labels(:);
+save(file, 'labels');
 end
 
 function items = presetItems(presets, presetName)
@@ -877,7 +1198,9 @@ function d = applyConfig(d, config)
 % the active event set. d.inputs = pool + active events, so every loaded signal
 % stays available regardless of which preset is active.
 allIn = normalizeInputs(config.inputs);
-isEvt = strcmp({allIn.type}, 'eventTicks');
+% the curation TARGET (eventTicks or stateStrip) is the active set; everything
+% else is a signal that goes to the persistent pool
+isEvt = strcmp({allIn.type}, 'eventTicks') | strcmp({allIn.type}, 'stateStrip');
 sigIn = allIn(~isEvt);
 evtIn = allIn(isEvt);
 if ~isfield(d, 'pool') || isempty(d.pool)
@@ -893,7 +1216,19 @@ if isfield(config, 'winPlot') && ~isempty(config.winPlot)
 end
 d.Tend_s = max(eps, computeTend(d.inputs));
 
-[d.ed, d.accepted, d.nEvents, d.hasEvents] = extractEvents(d.inputs);
+d.mode = 'events';
+if isfield(config, 'mode') && ~isempty(config.mode), d.mode = config.mode; end
+if strcmp(d.mode, 'states')
+    % epochs navigate as "events" (t0 steps by epoch); labels are the target
+    [d.labels, epochT, d.epochLen, d.nstates, d.stateNames, d.stateColors] = extractStates(d.inputs);
+    nEp = numel(d.labels);
+    d.ed = struct('peakTime', epochT(:));
+    d.accepted = true(max(0, nEp), 1);      % unused in states mode
+    d.nEvents = nEp; d.hasEvents = nEp > 0;
+else
+    [d.ed, d.accepted, d.nEvents, d.hasEvents] = extractEvents(d.inputs);
+    d.labels = []; d.epochLen = 1; d.nstates = 0; d.stateNames = {}; d.stateColors = {};
+end
 d.currIdx = 1;
 if d.hasEvents && d.nEvents > 0, d.t0 = d.ed.peakTime(1); else, d.t0 = d.Tend_s / 2; end
 
@@ -901,6 +1236,52 @@ panels = normalizePanels(config, d.inputs);
 d.wideP   = panels(strcmp({panels.region}, 'wide'));
 d.narrowP = panels(strcmp({panels.region}, 'narrow'));
 if isempty(d.wideP) && ~isempty(d.narrowP), d.cfgRegion = 'narrow'; else, d.cfgRegion = 'wide'; end
+end
+
+function config = cfgDataToConfig(cfgData, cfgGui, basepath, basename)
+% adapt the flat, full cfgData into the internal render config: inputs deduped by
+% panel name (a top+bottom pair shares one loaded input) + a {source,region} panel
+% per field in stacking order. Behaviour (mode / win) comes from cfgGui; the save
+% handle is resolved from cfgGui.save + the session location.
+fns = fieldnames(cfgData);
+recs = {}; names = {}; P = {};
+for i = 1:numel(fns)
+    pc = cfgData.(fns{i});
+    nm = pick(pc, 'name', fns{i});
+    if ~any(strcmp(nm, names))
+        recs{end + 1} = panelToRec(pc, nm, i);                        %#ok<AGROW>
+        names{end + 1} = nm;                                          %#ok<AGROW>
+    end
+    P{end + 1} = struct('source', nm, 'region', regAlias(pc.region)); %#ok<AGROW>
+end
+if isempty(recs), inputs = normalizeInputs([]); else, inputs = normalizeInputs([recs{:}]); end
+if isempty(P), panels = []; else, panels = [P{:}]; end
+saveFcn = resolveSave(cfgGui.save, cfgGui.mode, basepath, basename, cfgData);
+config = struct('inputs', {inputs}, 'panels', {panels}, ...
+    'saveFcn', saveFcn, 'winPlot', cfgGui.win, 'mode', cfgGui.mode);
+end
+
+function inp = recFromPanel(pc)
+% one normalized input from a single enriched panel (the Load-dialog path)
+inp = normalizeInputs(panelToRec(pc, pick(pc, 'name', 'item'), 99));
+end
+
+function rec = panelToRec(pc, nm, order)
+% a pre-normalization input record from an enriched panel. data single-wrapped so
+% a cell payload (raster / hypnogram) stays in one field.
+rec = struct('name', nm, 'type', pc.type, 'data', {pick(pc, 'data', [])}, ...
+    'fs', pick(pc, 'fs', NaN), 'ylim', pick(pc, 'ylim', []), 'clr', pick(pc, 'clr', 'k'), ...
+    'label', pick(pc, 'label', ''), 'height', pick(pc, 'height', 1), ...
+    'defRegion', regAlias(pc.region), 'defOrder', order);
+end
+
+function r = regAlias(region)
+% user-facing top/bottom -> internal wide/narrow (both accepted)
+switch lower(region)
+    case {'top', 'wide'},      r = 'wide';
+    case {'bottom', 'narrow'}, r = 'narrow';
+    otherwise, r = region;
+end
 end
 
 function [ed, accepted, nEv, has] = extractEvents(inputs)
@@ -916,6 +1297,30 @@ if isfield(data, 'accepted') && numel(data.accepted) == nEv
     accepted = logical(data.accepted(:));
 else
     accepted = true(nEv, 1);
+end
+end
+
+function [labels, epochT, epochLen, nstates, names, colors] = extractStates(inputs)
+% pull the stateStrip input's data into the live state-scoring state
+labels = []; epochT = []; epochLen = 1; nstates = 0; names = {}; colors = {};
+ix = find(strcmp({inputs.type}, 'stateStrip'), 1);
+if isempty(ix), return; end
+D = inputs(ix).data;
+if ~isstruct(D) || ~isfield(D, 'labels') || isempty(D.labels), return; end
+labels = double(D.labels(:));
+nEp = numel(labels);
+if isfield(D, 'epochT') && numel(D.epochT) == nEp
+    epochT = double(D.epochT(:));
+else
+    epochT = (0:nEp - 1)';
+end
+if nEp > 1, epochLen = median(diff(epochT)); end
+if isfield(D, 'names')  && ~isempty(D.names),  names  = D.names;  end
+if isfield(D, 'colors') && ~isempty(D.colors), colors = D.colors; end
+if isfield(D, 'nstates') && ~isempty(D.nstates)
+    nstates = D.nstates;
+else
+    nstates = max(1, numel(names));
 end
 end
 
@@ -946,27 +1351,16 @@ panels = filterAvail(panels, inputs);
 panels = addAxField(panels);
 end
 
-function ev = eventsFromMatrix(M)
-% Nx1 [peak], Nx2 [start stop], or Nx3 [start peak stop] -> events struct
-if ~isnumeric(M) || isempty(M)
-    error('gui_curate:events', 'events must be a non-empty numeric matrix');
-end
-M = double(M);
-if isvector(M)
-    ev = struct('peakTime', M(:));
-elseif size(M, 2) == 3
-    ev = struct('peakTime', M(:, 2), 'times', [M(:, 1), M(:, 3)]);
-elseif size(M, 2) == 2
-    ev = struct('peakTime', mean(M, 2), 'times', M);
+function saveVarToFile(file, varName, value)
+% back up the file (if present) then write value under varName, preserving any
+% other variables already in the file
+backup_file(file);
+tmp = struct(varName, value);
+if isfile(file)
+    save(file, '-struct', 'tmp', '-append');
 else
-    error('gui_curate:events', 'events matrix must be Nx1, Nx2, or Nx3');
+    save(file, '-struct', 'tmp');
 end
-end
-
-function ev = makeEventInputStruct(eventsData, label)
-% a normalized eventTicks input from a matrix (Nx1/2/3) or an events struct
-if isnumeric(eventsData), evd = eventsFromMatrix(eventsData); else, evd = eventsData; end
-ev = normalizeInputs(struct('name', 'eventTicks', 'type', 'eventTicks', 'data', evd, 'label', label));
 end
 
 function pool = mergePool(pool, sigIn)
@@ -987,7 +1381,7 @@ function drawTrace(ax, inp, a, b, xf)
 sig = inp.data; fs = inp.fs;
 s1 = max(1, floor(a * fs) + 1);
 s2 = min(numel(sig), ceil(b * fs) + 1);
-if s2 < s1, s2 = s1; end
+if s2 < s1, return; end          % window outside this signal's extent -> nothing to draw
 rng = s1:s2;
 t = ((rng - 1) / fs) / xf;
 np = numel(rng); maxPts = 20000;
@@ -997,7 +1391,10 @@ if np > maxPts
 else
     plot(ax, t, sig(rng), 'Color', inp.clr);
 end
-if ~isempty(inp.ylim), ax.YLim = inp.ylim; end
+% only a valid, increasing, finite range (a flat / NaN signal gives lo==hi)
+if numel(inp.ylim) == 2 && all(isfinite(inp.ylim)) && inp.ylim(2) > inp.ylim(1)
+    ax.YLim = inp.ylim;
+end
 end
 
 function drawSpec(ax, inp, xf)
@@ -1030,7 +1427,42 @@ if isempty(x), return; end
 x = x(:)';
 X = [x; x; nan(1, numel(x))];
 Y = repmat([0; 1; NaN], 1, numel(x));
-line(ax, X(:), Y(:), 'Color', clr, 'HandleVisibility', 'off');
+line(ax, X(:), Y(:), 'Color', clr);
+end
+
+function drawStateStrip(ax, data, xf)
+% per-epoch coloured label strip drawn as one truecolor image (fast to redraw).
+% epoch centres come from the navigation vector (ed.peakTime), labels from
+% data.labels; undefined (> nstates) render gray.
+if isempty(data.labels) || ~isfield(data.ed, 'peakTime'), return; end
+T = data.ed.peakTime(:)';
+L = data.labels(:)';
+n = min(numel(T), numel(L));
+if n == 0, return; end
+T = T(1:n); L = L(1:n);
+cmap = stateCmap(data);
+Lc = min(max(round(L), 1), size(cmap, 1));
+cdata = reshape(cmap(Lc, :), [1, n, 3]);
+if n == 1, xl = [T(1) - 0.5, T(1) + 0.5]; else, xl = [T(1), T(end)]; end
+image(ax, 'XData', xl / xf, 'YData', [0, 1], 'CData', cdata);
+ax.YLim = [0, 1]; ax.YTick = [];
+end
+
+function cmap = stateCmap(data)
+% (nstates+1) x 3 state colormap; the extra row (undefined) is gray
+ns = max(1, data.nstates);
+cmap = repmat([0.6 0.6 0.6], ns + 1, 1);
+C = data.stateColors;
+for i = 1:min(ns, numel(C))
+    c = C{i};
+    if numel(c) >= 3, cmap(i, :) = c(1:3); end
+end
+end
+
+function tf = isStrip(data, source)
+% true if the panel source names a stateStrip input
+inp = getInput(data.inputs, source);
+tf = ~isempty(inp) && strcmp(inp.type, 'stateStrip');
 end
 
 %% ========================================================================
@@ -1043,42 +1475,30 @@ b = struct('name', '', 'type', '', 'data', [], 'fs', NaN, 'ylim', [], ...
 end
 
 function out = normalizeInputs(in)
-% fill defaults on an inputs struct array (requires .name .type)
+% fill defaults on an inputs struct array (requires .name .type). Per-type
+% appearance is set upstream by guiPath_panel, so these are generic fallbacks only.
 n = numel(in);
 out = repmat(blankInput(), 1, n);
 for i = 1:n
     s = in(i);
-    if ~isfield(s, 'name') || isempty(s.name), error('gui_curate:inputs', 'input %d needs a name', i); end
-    if ~isfield(s, 'type') || isempty(s.type), error('gui_curate:inputs', 'input %d needs a type', i); end
-    td = typeDefaults(s.type);
+    if ~isfield(s, 'name') || isempty(s.name), error('guiPath_curate:inputs', 'input %d needs a name', i); end
+    if ~isfield(s, 'type') || isempty(s.type), error('guiPath_curate:inputs', 'input %d needs a type', i); end
     out(i).name      = s.name;
     out(i).type      = s.type;
     out(i).data      = pick(s, 'data', []);
     out(i).fs        = pick(s, 'fs', NaN);
     out(i).ylim      = pick(s, 'ylim', []);
     out(i).clr       = pick(s, 'clr', 'k');
-    out(i).label     = pick(s, 'label', td.label);
+    out(i).label     = pick(s, 'label', '');
     if isempty(out(i).label), out(i).label = s.name; end
-    out(i).height    = pick(s, 'height', td.height);
-    out(i).defRegion = pick(s, 'defRegion', td.defRegion);
-    out(i).defOrder  = pick(s, 'defOrder', td.defOrder);
+    out(i).height    = pick(s, 'height', 1);
+    out(i).defRegion = pick(s, 'defRegion', 'narrow');
+    out(i).defOrder  = pick(s, 'defOrder', 99);
 end
 end
 
 function v = pick(s, f, dflt)
 if isfield(s, f) && ~isempty(s.(f)), v = s.(f); else, v = dflt; end
-end
-
-function td = typeDefaults(type)
-% per-type fallback height / label / default region / stacking order
-switch type
-    case 'spec',       td = struct('height', 1.4,  'label', 'Freq (Hz)', 'defRegion', 'wide',   'defOrder', 20);
-    case 'hypnogram',  td = struct('height', 0.28, 'label', 'State',     'defRegion', 'wide',   'defOrder', 10);
-    case 'eventTicks', td = struct('height', 0.28, 'label', 'Events',    'defRegion', 'wide',   'defOrder', 40);
-    case 'raster',     td = struct('height', 1.2,  'label', 'Units',     'defRegion', 'narrow', 'defOrder', 60);
-    case 'trace',      td = struct('height', 1.0,  'label', '',          'defRegion', 'narrow', 'defOrder', 50);
-    otherwise,         td = struct('height', 1.0,  'label', '',          'defRegion', 'narrow', 'defOrder', 99);
-end
 end
 
 function T = computeTend(inputs)
@@ -1110,6 +1530,10 @@ for i = 1:numel(inputs)
                 elseif isfield(inp.data, 'peakTime') && ~isempty(inp.data.peakTime)
                     T = max(T, max(inp.data.peakTime(:)));
                 end
+            end
+        case 'stateStrip'
+            if isstruct(inp.data) && isfield(inp.data, 'epochT') && ~isempty(inp.data.epochT)
+                T = max(T, max(inp.data.epochT(:)));
             end
     end
 end

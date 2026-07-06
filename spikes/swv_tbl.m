@@ -104,7 +104,7 @@ xVal = linspace(-0.75, 0.8, 32);
 %  ========================================================================
 
 if flgPlot
-    hFig = tblGUI_xy(xVal, tblWv, 'yVar', 'Waveform');
+    hFig = guiTbl_xy(xVal, tblWv, 'yVar', 'Waveform');
 end
 
 end     % EOF

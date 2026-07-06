@@ -3,7 +3,7 @@ function hFig = spk2ca_gui(tbl, Kd, n, Vmax)
 %
 %   Controls the interactive scatter plot of Baseline vs Steady-State.
 %   Kd / n / Vmax dropdowns switch the displayed variable pair. Built on the
-%   shared graphics/+tblgui layer (uifigure); embeds tblGUI_scatHist.
+%   shared graphics/gui layer (uifigure); embeds guiTbl_scatHist.
 
 % Figure
 hFig = uifigure('Name', 'Sweep Explorer', 'Position', [100, 100, 1200, 800]);
@@ -38,7 +38,7 @@ plotPanel.Layout.Row = 2;
 [xVar, yVar] = get_varnames(Kd(1), n(1), Vmax{1});
 
 % Launch embedded scatter GUI. Its state (setters, axes) lives on plotPanel.
-tblGUI_scatHist(tbl, 'Parent', plotPanel, 'xVar', xVar, 'yVar', yVar, 'grpVar', 'Group');
+guiTbl_scatHist(tbl, 'Parent', plotPanel, 'xVar', xVar, 'yVar', yVar, 'grpVar', 'Group');
 hAxScat = plotPanel.UserData.hAxScatter;
 update_title(Kd(1), n(1), Vmax{1});
 

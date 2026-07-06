@@ -164,13 +164,13 @@ tblLme.pBurst_trans = tblTrans.pBurst;
 %  ========================================================================
 
 
-tblGUI_xy(xVec, tbl);
+guiTbl_xy(xVec, tbl);
 
-tblGUI_scatHist(tblLme, 'xVar', 'fr', 'yVar', 'pBSpk_trans', 'grpVar', 'genotype');
+guiTbl_scatHist(tblLme, 'xVar', 'fr', 'yVar', 'pBSpk_trans', 'grpVar', 'genotype');
 
-tblGUI_bar(tbl, 'yVar', 'pBurst', 'xVar', 'genotype');
+guiTbl_bar(tbl, 'yVar', 'pBurst', 'xVar', 'genotype');
 
-tblGUI_raster(tbl, 'grpVar', 'sbjID', 'grpVal', 'mcu-ko2')
+guiTbl_raster(tbl, 'grpVar', 'sbjID', 'grpVal', 'mcu-ko2')
 
 
 %% ========================================================================
@@ -189,7 +189,7 @@ frml = [varRsp, ' ~ genotype * fr + (1|sbjID)'];
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLme, frml, 'dist', 'logit-normal');
 
 % Plot
-hFig = tblGUI_bar(tblLme, 'yVar', varRsp, 'xVar', 'genotype');
+hFig = guiTbl_bar(tblLme, 'yVar', varRsp, 'xVar', 'genotype');
 
 % Prism
 [prismMat] = tbl2prism(tblLme, 'yVar', varRsp, 'grpVar', 'genotype');
@@ -237,7 +237,7 @@ tblLme = groupsummary(tblLme, {'sbjID', 'genotype'}, 'mean', ...
 tblLme(:, "GroupCount") = [];
 tblLme.Properties.VariableNames = varsTbl;
 
-tblGUI_scatHist(tblLme, 'xVar', 'dim', 'yVar', 'Rcv', 'grpVar', 'genotype');
+guiTbl_scatHist(tblLme, 'xVar', 'dim', 'yVar', 'Rcv', 'grpVar', 'genotype');
 
 
 %% ========================================================================
@@ -252,7 +252,7 @@ presets = {'spktimes'};
 timeLim = [0, 4800];
 
 % Raster — Control (change grpVal to 'MCU-KO' for knockouts)
-tblGUI_raster(tbl, 'brstVar', 'brstTimes', 'timeLim', timeLim, ...
+guiTbl_raster(tbl, 'brstVar', 'brstTimes', 'timeLim', timeLim, ...
     'grpVar', 'genotype', 'grpVal', 'Control');
 
 

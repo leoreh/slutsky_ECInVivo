@@ -3,7 +3,7 @@ function mea_compRcv(tbl, varsInc, winCalc)
 %
 % SUMMARY:
 % This function calculates the mean for each row in tbl.varsInc during
-% two specified time windows (winCalc) and uses tblGUI_scatHist to plot
+% two specified time windows (winCalc) and uses guiTbl_scatHist to plot
 % the relationship between the two windows.
 %
 % INPUT (Required):
@@ -21,9 +21,9 @@ function mea_compRcv(tbl, varsInc, winCalc)
 %   mea_compRcv(myTbl, {'FR', 'BurstRate'}, win);
 %
 % DEPENDENCIES:
-%   tblGUI_scatHist
+%   guiTbl_scatHist
 %
-%   See also: TBLGUI_SCATHIST, TBL_TNORM
+%   See also: GUITBL_SCATHIST, TBL_TNORM
 
 %% ========================================================================
 %  ARGUMENTS
@@ -107,7 +107,7 @@ xDefault = plotVars{1, 1};
 yDefault = plotVars{1, 2};
 
 % Launch GUI
-hFig = tblGUI_scatHist(tblOut, ...
+hFig = guiTbl_scatHist(tblOut, ...
     'xVar', xDefault, ...
     'yVar', yDefault, ...
     'grpVar', 'Group');

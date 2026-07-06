@@ -1,8 +1,8 @@
-function h = labeledControl(grid, kind, labelText, varargin)
-% TBLGUI.LABELEDCONTROL  Append a control (optionally label + control) to a
+function h = gui_labeledControl(grid, kind, labelText, varargin)
+% GUI_LABELEDCONTROL  Append a control (optionally label + control) to a
 % one-column vertical uigridlayout, growing the grid by a row per element.
 %
-%   h = tblgui.labeledControl(grid, kind, labelText, ...) adds an optional
+%   h = gui_labeledControl(grid, kind, labelText, ...) adds an optional
 %   bold label row (when labelText is non-empty) followed by the control, and
 %   returns the control handle. It hides the legacy-to-uifigure component
 %   mapping so callers never name uidropdown / uibutton / uieditfield etc.
@@ -15,7 +15,7 @@ function h = labeledControl(grid, kind, labelText, varargin)
 %       'toggle'   uibutton('state', ...)
 %       'edit'     uieditfield('text')
 %       'editnum'  uieditfield('numeric')
-%       'panel'    uipanel (BorderType none) - e.g. a container for filterPanel
+%       'panel'    uipanel (BorderType none) - e.g. holds a gui_filterPanel
 %       'spacer'   an empty '1x' row that pushes preceding rows to the top
 %
 %   Name-value:
@@ -57,7 +57,7 @@ switch lower(kind)
     case 'editnum',  h = uieditfield(grid, 'numeric', varargin{:});
     case 'panel',    h = uipanel(grid, 'BorderType', 'none', varargin{:});
     otherwise
-        error('tblgui:labeledControl:kind', 'Unknown kind "%s".', kind);
+        error('gui_labeledControl:kind', 'Unknown kind "%s".', kind);
 end
 h.Layout.Row = r;
 h.Layout.Column = 1;

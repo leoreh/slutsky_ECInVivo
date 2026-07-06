@@ -1,7 +1,7 @@
-function hFig = tblGUI_raster(dataTbl, varargin)
-% TBLGUI_RASTER Interactive raster plot for Table variables.
+function hFig = guiTbl_raster(dataTbl, varargin)
+% GUITBL_RASTER Interactive raster plot for Table variables.
 %
-%   hFig = TBLGUI_RASTER(dataTbl, ...) plots spike rasters from 'dataTbl'.
+%   hFig = GUITBL_RASTER(dataTbl, ...) plots spike rasters from 'dataTbl'.
 %   A single raster panel shows all spikes (black) with optional burst
 %   spike overlay (red). Navigation uses editable boxes for the display
 %   window center and width.
@@ -20,9 +20,9 @@ function hFig = tblGUI_raster(dataTbl, varargin)
 %   OUTPUT:
 %       hFig      (handle) Figure handle.
 %
-%   Built on the shared graphics/+tblgui layer (uifigure + uigridlayout).
+%   Built on the shared graphics/gui layer (uifigure + uigridlayout).
 %
-%   See also: PLOT_RASTER, TBLGUI_XY, TBLGUI_RASTER_EXPORT
+%   See also: PLOT_RASTER, GUITBL_XY, GUITBL_RASTEREXPORT
 
 %% ========================================================================
 %  ARGUMENTS
@@ -65,7 +65,7 @@ end
 %  INITIALIZATION
 %  ========================================================================
 
-[~, catVars] = tblgui.classifyVars(dataTbl);
+[~, catVars] = gui_classifyVars(dataTbl);
 catVars = [{'None'}, catVars];
 
 if ~isempty(initialGrpVar) && ismember(initialGrpVar, catVars)
@@ -109,31 +109,31 @@ guiData.renderData     = struct();
 %  LAYOUT
 %  ========================================================================
 
-[~, gPlot, gCtrl, gActions] = tblgui.layout(hContainer, 'CtrlWidth', 200);
+[~, gPlot, gCtrl, gActions] = gui_layout(hContainer, 'CtrlWidth', 200);
 guiData.hAx = uiaxes(gPlot);
 
 % Navigation (kept compact at the top)
-tblgui.labeledControl(gCtrl, 'label', 'Navigation:');
-guiData.edCenter = tblgui.labeledControl(gCtrl, 'editnum', 'Center (s):', ...
+gui_labeledControl(gCtrl, 'label', 'Navigation:');
+guiData.edCenter = gui_labeledControl(gCtrl, 'editnum', 'Center (s):', ...
     'Value', round(guiData.winCenter, 1), 'ValueChangedFcn', @onNavChange);
-guiData.edWindow = tblgui.labeledControl(gCtrl, 'editnum', 'Window (s):', ...
+guiData.edWindow = gui_labeledControl(gCtrl, 'editnum', 'Window (s):', ...
     'Value', round(guiData.winWidth, 1), 'ValueChangedFcn', @onNavChange);
 
-stepPanel = tblgui.labeledControl(gCtrl, 'panel', '', 'RowHeight', 32);
+stepPanel = gui_labeledControl(gCtrl, 'panel', '', 'RowHeight', 32);
 gStep = uigridlayout(stepPanel, [1, 2], 'Padding', [0 0 0 0], 'ColumnSpacing', 4);
 uibutton(gStep, 'Text', '<', 'ButtonPushedFcn', @(~, ~) onStep(-1));
 uibutton(gStep, 'Text', '>', 'ButtonPushedFcn', @(~, ~) onStep(1));
 
-tblgui.labeledControl(gCtrl, 'button', '', 'Text', 'Show All', 'ButtonPushedFcn', @onShowAll);
+gui_labeledControl(gCtrl, 'button', '', 'Text', 'Show All', 'ButtonPushedFcn', @onShowAll);
 
 % Filter (expands to fill remaining control-column space)
-guiData.ddGrpBy = tblgui.labeledControl(gCtrl, 'dropdown', 'Filter By:', ...
+guiData.ddGrpBy = gui_labeledControl(gCtrl, 'dropdown', 'Filter By:', ...
     'Items', catVars, 'Value', grpVar, 'ValueChangedFcn', @onGrpByChange);
-guiData.pnlGrpBy = tblgui.labeledControl(gCtrl, 'panel', '', 'RowHeight', '1x');
+guiData.pnlGrpBy = gui_labeledControl(gCtrl, 'panel', '', 'RowHeight', '1x');
 
 % Export pinned at the bottom
 uibutton(gActions, 'Text', 'Export', 'FontWeight', 'bold', ...
-    'ButtonPushedFcn', @(~, ~) tblGUI_raster_export(hContainer));
+    'ButtonPushedFcn', @(~, ~) guiTbl_rasterExport(hContainer));
 
 hContainer.UserData = guiData;
 onGrpByChange(hContainer, []);
@@ -149,7 +149,7 @@ onGrpByChange(hContainer, []);
             delete(allchild(data.pnlGrpBy));
             data.chkGrpBy = gobjects(0);
         else
-            cats = tblgui.catList(data.dataTbl.(varName));
+            cats = gui_catList(data.dataTbl.(varName));
             % Initial selection from grpVal (once)
             if ~isempty(data.initialGrpVal)
                 initVal = ismember(string(cats), string(data.initialGrpVal));
@@ -161,7 +161,7 @@ onGrpByChange(hContainer, []);
             else
                 initVal = true(size(cats));
             end
-            data.chkGrpBy = tblgui.filterPanel(data.pnlGrpBy, cats, @onFilterChange, ...
+            data.chkGrpBy = gui_filterPanel(data.pnlGrpBy, cats, @onFilterChange, ...
                 'InitVal', initVal);
         end
         hContainer.UserData = data;
@@ -203,7 +203,7 @@ onGrpByChange(hContainer, []);
         if strcmp(varName, 'None') || isempty(data.chkGrpBy)
             data.activeIndices = true(height(data.dataTbl), 1);
         else
-            selCats = tblgui.selectedCats(data.chkGrpBy);
+            selCats = gui_selectedCats(data.chkGrpBy);
             raw = data.dataTbl.(varName);
             if islogical(raw) || ~iscategorical(raw), raw = categorical(raw); end
             data.activeIndices = ismember(string(raw), selCats);
@@ -263,7 +263,7 @@ onGrpByChange(hContainer, []);
         xlabel(data.hAx, 'Time (s)', 'FontName', 'Arial', 'FontSize', 12);
         ylabel(data.hAx, 'Unit No.', 'FontName', 'Arial', 'FontSize', 12);
 
-        % Cache render data for tblGUI_raster_export
+        % Cache render data for guiTbl_rasterExport
         rd.spikes  = spikes;
         rd.xLo     = xLo;
         rd.xHi     = xHi;

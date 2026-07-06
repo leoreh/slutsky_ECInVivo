@@ -53,7 +53,29 @@ for iFile = 1 : nFiles
     % Burst statistics
     stats = burst_stats(burst, spktimes, 'winCalc', [], 'flgSave', true);
 
+    % Ripples
+    ripp = ripp_wrapper('basepath', pwd, ...
+        'win', [0 12] * 3600, ...
+        'rippCh', [], ...
+        'flgPlot', true, ...
+        'flgSave', true);
+    
+    % Epileptiform discharges
+    ed = ed_wrapper('basepath', basepath, ...
+        'flgSave', true, ...
+        'flgPlot', true, ...
+        'flgForce', true);  
+
+
 end
+
+
+[cfgData, cfgGui] = guiPath_presets('ripp');
+cfgData = guiPath_load(cfgData);
+[hFig, cfgData] = guiPath_curate(basepath, 'cfgData', cfgData, 'cfgGui', cfgGui);
+
+hFig.UserData.cfgData
+
 
 
 %% ========================================================================
@@ -133,7 +155,7 @@ tblBrst.genotype = reordercats(tblBrst.genotype, ...
     {'Control', 'MCU-KO', 'CAG:MCU-KO'});
 
 % Compare (switch yVar in the GUI for frBurst, br, bSize, etc.)
-tblGUI_bar(tblBrst, 'yVar', 'pBurst', 'xVar', 'genotype', 'grpVar', 'unitType');
+guiTbl_bar(tblBrst, 'yVar', 'pBurst', 'xVar', 'genotype', 'grpVar', 'unitType');
 
 
 
@@ -155,13 +177,16 @@ basepath = basepaths{4};
 ed = ed_wrapper('basepath', basepath, 'flgSave', true, 'flgPlot', false);  % save ed.mat for the EDs preset; suppress its auto-GUI
 
 tic
-gui_curate(basepath, 'preset', 'EDs');
+guiPath_curate(basepath, 'preset', 'EDs');
 toc
 
 
-gui_curate(basepath);
+guiPath_curate(basepath);
 
 
 tic
 AccuSleep_viewer(sSig, [], [])
 toc
+
+
+

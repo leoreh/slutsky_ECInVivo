@@ -38,7 +38,7 @@ Post-fit utilities. `lme_lsmeans(mdl, vars, ...)` evaluates predictions on a gri
 
 Tidy export: `lme_mdl2tbls(mdl, stats, info)` packs coefficients/ANOVA/effects into a struct array of Title+Table pairs. `lme_save(sheet, tbls, ...)` writes them with metadata rows to one Excel sheet.
 
-GUI-style visualizations: `tblGUI_bar`, `tblGUI_scatHist`, `tblGUI_xy` launch interactive widgets over any table with categorical/numeric variables (useful for triaging without writing new plot code).
+GUI-style visualizations: `guiTbl_bar`, `guiTbl_scatHist`, `guiTbl_xy` launch interactive widgets over any table with categorical/numeric variables (useful for triaging without writing new plot code).
 
 ## Orthogonal regression caveat
 

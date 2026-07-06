@@ -1,7 +1,7 @@
-function hFig = tblGUI_scatHist(tbl, varargin)
-% TBLGUI_SCATHIST Interactive scatter plot with marginal histograms and grouping.
+function hFig = guiTbl_scatHist(tbl, varargin)
+% GUITBL_SCATHIST Interactive scatter plot with marginal histograms and grouping.
 %
-%   tblGUI_scatHist(tbl, ...) opens a GUI to visualize the table 'tbl'.
+%   guiTbl_scatHist(tbl, ...) opens a GUI to visualize the table 'tbl'.
 %   Allows dynamic variable selection, grouping, and interactive point
 %   selection (lasso a region, or drag a point and double-click to assign).
 %
@@ -17,9 +17,9 @@ function hFig = tblGUI_scatHist(tbl, varargin)
 %       'SelectionCallback'/'GroupByCallback' - (func) host coordination.
 %       'xScale'/'yScale'/'fitType' - (char) initial scale / fit.
 %
-%   Built on the shared graphics/+tblgui layer (uifigure + uigridlayout).
+%   Built on the shared graphics/gui layer (uifigure + uigridlayout).
 %
-%   See also: LME_ANALYSE, TBLGUI_XY
+%   See also: LME_ANALYSE, GUITBL_XY
 
 %% ========================================================================
 %  ARGUMENTS
@@ -59,7 +59,7 @@ grpVarIn    = p.Results.grpVar;
 %  ========================================================================
 
 % Scalar-per-row numerics for X/Y/Size (exclude id columns and matrices).
-[numericVars, catVars] = tblgui.classifyVars(tbl, 'Shape', 'vector', 'Exclude', varsExclude);
+[numericVars, catVars] = gui_classifyVars(tbl, 'Shape', 'vector', 'Exclude', varsExclude);
 catVars = setdiff(catVars, varsExclude, 'stable');
 
 if isempty(numericVars)
@@ -113,7 +113,7 @@ guiData.pointHandles = [];
 %  LAYOUT
 %  ========================================================================
 
-[~, gPlot, gCtrl, gActions] = tblgui.layout(hContainer, 'CtrlWidth', 230);
+[~, gPlot, gCtrl, gActions] = gui_layout(hContainer, 'CtrlWidth', 230);
 
 % Plot area: 2x2 grid -> top histogram (X), scatter, right histogram (Y).
 gScat = uigridlayout(gPlot, [2, 2], 'RowHeight', {'1x', '3.5x'}, ...
@@ -123,35 +123,35 @@ guiData.hAxScatter = uiaxes(gScat); guiData.hAxScatter.Layout.Row = 2; guiData.h
 guiData.hAxHistY = uiaxes(gScat);   guiData.hAxHistY.Layout.Row = 2; guiData.hAxHistY.Layout.Column = 2;
 
 % Controls (stacked in the scrollable control column)
-guiData.ddX = tblgui.labeledControl(gCtrl, 'dropdown', 'X Variable:', ...
+guiData.ddX = gui_labeledControl(gCtrl, 'dropdown', 'X Variable:', ...
     'Items', numericVars, 'Value', curX, 'ValueChangedFcn', @onUpdatePlot);
-guiData.ddXScale = tblgui.labeledControl(gCtrl, 'dropdown', 'X Scale:', ...
+guiData.ddXScale = gui_labeledControl(gCtrl, 'dropdown', 'X Scale:', ...
     'Items', {'Linear', 'Log'}, 'Value', xScale0, 'ValueChangedFcn', @onUpdatePlot);
-guiData.ddY = tblgui.labeledControl(gCtrl, 'dropdown', 'Y Variable:', ...
+guiData.ddY = gui_labeledControl(gCtrl, 'dropdown', 'Y Variable:', ...
     'Items', numericVars, 'Value', curY, 'ValueChangedFcn', @onUpdatePlot);
-guiData.ddYScale = tblgui.labeledControl(gCtrl, 'dropdown', 'Y Scale:', ...
+guiData.ddYScale = gui_labeledControl(gCtrl, 'dropdown', 'Y Scale:', ...
     'Items', {'Linear', 'Log', 'X-Linked'}, 'Value', yScale0, 'ValueChangedFcn', @onUpdatePlot);
-guiData.chkDisc = tblgui.labeledControl(gCtrl, 'checkbox', '', ...
+guiData.chkDisc = gui_labeledControl(gCtrl, 'checkbox', '', ...
     'Text', 'Discretize (binned)', 'ValueChangedFcn', @onUpdatePlot);
-guiData.chkAdapt = tblgui.labeledControl(gCtrl, 'checkbox', '', ...
+guiData.chkAdapt = gui_labeledControl(gCtrl, 'checkbox', '', ...
     'Text', 'Adaptive bins', 'ValueChangedFcn', @onUpdatePlot);
-guiData.chkPrct = tblgui.labeledControl(gCtrl, 'checkbox', '', ...
+guiData.chkPrct = gui_labeledControl(gCtrl, 'checkbox', '', ...
     'Text', 'Bins: Mean +/- SEM', 'ValueChangedFcn', @onUpdatePlot);
-guiData.ddFit = tblgui.labeledControl(gCtrl, 'dropdown', 'Fit:', ...
+guiData.ddFit = gui_labeledControl(gCtrl, 'dropdown', 'Fit:', ...
     'Items', {'None', 'Linear', 'Ortho'}, 'Value', fit0, 'ValueChangedFcn', @onUpdatePlot);
-guiData.ddSize = tblgui.labeledControl(gCtrl, 'dropdown', 'Size:', ...
+guiData.ddSize = gui_labeledControl(gCtrl, 'dropdown', 'Size:', ...
     'Items', [{'None'}, numericVars], 'Value', curSize, 'ValueChangedFcn', @onUpdatePlot);
-guiData.ddGrp = tblgui.labeledControl(gCtrl, 'dropdown', 'Group:', ...
+guiData.ddGrp = gui_labeledControl(gCtrl, 'dropdown', 'Group:', ...
     'Items', [{'None'}, catVars], 'Value', curGrp, 'ValueChangedFcn', @onGrpChange);
-tblgui.labeledControl(gCtrl, 'label', 'Filter:');
-guiData.pnlGrp = tblgui.labeledControl(gCtrl, 'panel', '', 'RowHeight', '1x');
+gui_labeledControl(gCtrl, 'label', 'Filter:');
+guiData.pnlGrp = gui_labeledControl(gCtrl, 'panel', '', 'RowHeight', '1x');
 
 % Action buttons (pinned at the bottom; hosts may append here, e.g. utypes_gui)
-guiData.btnSelect = tblgui.labeledControl(gActions, 'button', '', ...
+guiData.btnSelect = gui_labeledControl(gActions, 'button', '', ...
     'Text', 'Select Group', 'ButtonPushedFcn', @onSelectRegion);
-guiData.btnSelectDot = tblgui.labeledControl(gActions, 'button', '', ...
+guiData.btnSelectDot = gui_labeledControl(gActions, 'button', '', ...
     'Text', 'Select Dot', 'ButtonPushedFcn', @onSelectDot);
-guiData.btnSave = tblgui.labeledControl(gActions, 'button', '', ...
+guiData.btnSave = gui_labeledControl(gActions, 'button', '', ...
     'Text', 'Save Table to Workspace', 'ButtonPushedFcn', @onSaveTable);
 guiData.gActions = gActions;
 
@@ -170,7 +170,7 @@ onUpdatePlot(hContainer, []);
         populateCheckboxes(data);
         data = hContainer.UserData;
         if ~isempty(data.grpCbk)
-            [~, allCats] = tblgui.selectedCats(data.chkGrp);
+            [~, allCats] = gui_selectedCats(data.chkGrp);
             data.grpCbk(data.ddGrp.Value, allCats, hContainer);
         end
         onUpdatePlot(hContainer, []);
@@ -180,7 +180,7 @@ onUpdatePlot(hContainer, []);
         data = hContainer.UserData;
         onUpdatePlot(hContainer, []);
         if ~isempty(data.grpCbk)
-            activeCats = tblgui.selectedCats(data.chkGrp);
+            activeCats = gui_selectedCats(data.chkGrp);
             data.grpCbk(data.ddGrp.Value, activeCats, hContainer);
         end
     end
@@ -191,8 +191,8 @@ onUpdatePlot(hContainer, []);
             delete(allchild(data.pnlGrp));
             data.chkGrp = gobjects(0);
         else
-            cats = tblgui.catList(data.tbl.(grpName));
-            data.chkGrp = tblgui.filterPanel(data.pnlGrp, cats, @onFilterChange);
+            cats = gui_catList(data.tbl.(grpName));
+            data.chkGrp = gui_filterPanel(data.pnlGrp, cats, @onFilterChange);
         end
         hContainer.UserData = data;
     end
@@ -235,12 +235,12 @@ onUpdatePlot(hContainer, []);
             if islogical(rawGrp) || ~iscategorical(rawGrp), rawGrp = categorical(rawGrp); end
             groups = rawGrp;
 
-            fullCatList = tblgui.catList(rawGrp);            % present categories
-            [baseColors, idxOf] = tblgui.groupColors(fullCatList, 'BaseColors', data.defClr);
+            fullCatList = gui_catList(rawGrp);            % present categories
+            [baseColors, idxOf] = gui_groupColors(fullCatList, 'BaseColors', data.defClr);
 
             % Iterate over checkbox-selected categories (color stays stable)
             if ~isempty(data.chkGrp)
-                active = tblgui.selectedCats(data.chkGrp);
+                active = gui_selectedCats(data.chkGrp);
                 grpLabels = intersect(fullCatList, active, 'stable');
             else
                 grpLabels = fullCatList;
@@ -561,7 +561,7 @@ onUpdatePlot(hContainer, []);
         inPoints = inpolygon(xData, yData, roi.Position(:,1), roi.Position(:,2));
         nSelected = sum(inPoints);
         if nSelected == 0
-            tblgui.notify(hContainer, 'No points selected.', 'info');
+            gui_notify(hContainer, 'No points selected.', 'info');
             delete(roi); return;
         end
         if isSinglePoint && ~isempty(data.selCbk)
@@ -591,7 +591,7 @@ onUpdatePlot(hContainer, []);
             cats = cellstr(unique(string(currentGrpCol)));
         end
 
-        selectedCat = tblgui.chooseDialog(hContainer, ...
+        selectedCat = gui_chooseDialog(hContainer, ...
             sprintf('Assign %d points to:', nSelected), cats);
         if isempty(selectedCat), return; end
 
@@ -611,7 +611,7 @@ onUpdatePlot(hContainer, []);
     function onSaveTable(~, ~)
         data = hContainer.UserData;
         assignin('base', 'fetTbl_mod', data.tbl);
-        tblgui.notify(hContainer, 'Table saved to workspace as "fetTbl_mod".', 'success');
+        gui_notify(hContainer, 'Table saved to workspace as "fetTbl_mod".', 'success');
     end
 
 %% ========================================================================

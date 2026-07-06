@@ -173,4 +173,4 @@ fprintf('Saved %d cells, %d events to %s\n', ...
 % restrict claims to slope/ratio analyses. F0 is populated by
 % spontCa_loadXls when flgRaw=true (median of raw F per cell).
 
-tblGUI_bar(tblCell, 'yVar', 'F0', 'xVar', 'compartment', 'grpVar', 'genotype');
+guiTbl_bar(tblCell, 'yVar', 'F0', 'xVar', 'compartment', 'grpVar', 'genotype');

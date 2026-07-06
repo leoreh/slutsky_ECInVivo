@@ -85,9 +85,9 @@ tblPlot = tbl_trans(tblPlot, 'varsInc', {'bRoy'}, 'logBase', 10, 'verbose', true
 uIdx = tblPlot.unitType == 'RS';
 tblPlot = tblPlot(uIdx, :);
 
-tblGUI_bar(tblPlot, 'xVar', 'genotype', 'yVar', 'funcon');
+guiTbl_bar(tblPlot, 'xVar', 'genotype', 'yVar', 'funcon');
 
-tblGUI_scatHist(tblPlot, 'xVar', 'pBurst', 'yVar', 'funcon_fish', 'grpVar', 'genotype');
+guiTbl_scatHist(tblPlot, 'xVar', 'pBurst', 'yVar', 'funcon_fish', 'grpVar', 'genotype');
 
 
 
@@ -140,8 +140,8 @@ tblVivo.pBurst_trans = tblTrans.pBurst;
 tblVivo = tbl_trans(tblVivo, 'flg0', true, 'verbose', true);
 
 % Plot
-tblGUI_bar(tblVivo, 'xVar', 'genotype', 'yVar', 'fr');
-tblGUI_scatHist(tblVivo, 'xVar', 'pBurst', 'yVar', 'fr', 'grpVar', 'genotype');
+guiTbl_bar(tblVivo, 'xVar', 'genotype', 'yVar', 'fr');
+guiTbl_scatHist(tblVivo, 'xVar', 'pBurst', 'yVar', 'fr', 'grpVar', 'genotype');
 
 
 %% ========================================================================
@@ -163,7 +163,7 @@ varsNew = regexprep(varsNew, '(.*)_BAC3$', 'ss_$1');
 tblPlot.Properties.VariableNames = varsNew;
 
 % Plot
-tblGUI_scatHist(tblPlot, 'xVar', 'ss_frBurst', 'yVar', 'ss_frSingle', 'grpVar', 'genotype');
+guiTbl_scatHist(tblPlot, 'xVar', 'ss_frBurst', 'yVar', 'ss_frSingle', 'grpVar', 'genotype');
 
 % LME
 varRsp = 'ss_frBurst';
@@ -208,7 +208,7 @@ tblSum.dFr_abs = (tblSum.ss_fr - tblSum.fr);
 tblSum.dFr_prct = tblSum.dFr_abs * 100;
 
 
-tblGUI_scatHist(tblSum, 'xVar', 'dBrst_rel', 'yVar', 'dSngl_rel', 'grpVar', 'genotype');
+guiTbl_scatHist(tblSum, 'xVar', 'dBrst_rel', 'yVar', 'dSngl_rel', 'grpVar', 'genotype');
 
 tblSum(:, {'genotype', 'dBrst_rel', 'dSngl_rel'})
 
@@ -321,7 +321,7 @@ tbl = movevars(tbl, {'genotype', 'sbjID', 'fileID'}, 'Before', 1);
 tbl = tbl_trans(tbl, 'varsInc', {'pBurst'}, 'logBase', 'logit');
 
 % Visualize
-tblGUI_scatHist(tbl, 'xVar', 'mfr', 'yVar', 'dim', 'grpVar', 'genotype');
+guiTbl_scatHist(tbl, 'xVar', 'mfr', 'yVar', 'dim', 'grpVar', 'genotype');
 
 % Analysis
 frml = 'dim ~ (funcon + mfr + pBurst) * genotype + (1|sbjID)';
@@ -399,7 +399,7 @@ end
 
 tblLme.dim = dim([1 : 9, 11])';
 
-tblGUI_scatHist(tblLme, 'xVar', 'dim', 'yVar', 'Rcv', 'grpVar', 'genotype');
+guiTbl_scatHist(tblLme, 'xVar', 'dim', 'yVar', 'Rcv', 'grpVar', 'genotype');
 
 
 

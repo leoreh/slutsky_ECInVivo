@@ -1,7 +1,7 @@
-function [clrMat, idxOf] = groupColors(fullCats, varargin)
-% TBLGUI.GROUPCOLORS  Stable per-category colors.
+function [clrMat, idxOf] = gui_groupColors(fullCats, varargin)
+% GUI_GROUPCOLORS  Stable per-category colors.
 %
-%   [clrMat, idxOf] = tblgui.groupColors(fullCats) returns an N x 3 color
+%   [clrMat, idxOf] = gui_groupColors(fullCats) returns an N x 3 color
 %   matrix for the full (unfiltered) category list FULLCATS, plus a function
 %   idxOf(name) that maps a category label to its row in CLRMAT. Looking up
 %   colors by name keeps a category's color fixed as other categories are

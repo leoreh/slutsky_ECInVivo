@@ -1,10 +1,10 @@
-function tblGUI_raster_export(figH)
-% TBLGUI_RASTER_EXPORT  Save a publication-quality vector figure of the current raster view.
+function guiTbl_rasterExport(figH)
+% GUITBL_RASTEREXPORT  Save a publication-quality vector figure of the current raster view.
 %
-%   TBLGUI_RASTER_EXPORT(figH)
+%   GUITBL_RASTEREXPORT(figH)
 %
 %   SUMMARY:
-%       Reads the render data cached in the tblGUI_raster figure's
+%       Reads the render data cached in the guiTbl_raster figure's
 %       UserData, reconstructs the raster in a clean figure with no UI
 %       components, places the axis at an exact centimeter position, and
 %       exports as both PDF and EPS.
@@ -22,7 +22,7 @@ function tblGUI_raster_export(figH)
 %       Axis labels  : 12 pt
 %
 %   INPUTS:
-%       figH  - (Handle) Figure handle returned by tblGUI_raster.
+%       figH  - (Handle) Figure handle returned by guiTbl_raster.
 %
 %   OUTPUTS (written to current directory):
 %       raster_export.pdf
@@ -42,7 +42,7 @@ data = figH.UserData;
 rd   = data.renderData;
 
 if isempty(fieldnames(rd))
-    warning('[TBLGUI_RASTER_EXPORT]: No render data found. Plot must be drawn first.');
+    warning('[GUITBL_RASTEREXPORT]: No render data found. Plot must be drawn first.');
     return;
 end
 
@@ -121,6 +121,6 @@ fileEPS = fullfile(pwd, 'raster_export.eps');
 exportgraphics(hExpFig, filePDF, 'ContentType', 'vector', 'BackgroundColor', 'white');
 exportgraphics(hExpFig, fileEPS, 'ContentType', 'vector', 'BackgroundColor', 'white');
 
-fprintf('[TBLGUI_RASTER_EXPORT]: Saved to:\n   %s\n   %s\n', filePDF, fileEPS);
+fprintf('[GUITBL_RASTEREXPORT]: Saved to:\n   %s\n   %s\n', filePDF, fileEPS);
 
 end     % EOF

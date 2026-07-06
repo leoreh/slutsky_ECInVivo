@@ -1,7 +1,7 @@
-function sel = chooseDialog(parent, prompt, options)
-% TBLGUI.CHOOSEDIALOG  Pick one option (DPI-robust listdlg replacement).
+function sel = gui_chooseDialog(parent, prompt, options)
+% GUI_CHOOSEDIALOG  Pick one option (DPI-robust listdlg replacement).
 %
-%   sel = tblgui.chooseDialog(parent, prompt, options) returns the chosen
+%   sel = gui_chooseDialog(parent, prompt, options) returns the chosen
 %   option (char) or '' if cancelled. For up to four options it uses
 %   uiconfirm (button choice); for more it shows a small modal uifigure with
 %   a dropdown. Both render correctly regardless of display scaling, unlike

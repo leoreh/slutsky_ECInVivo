@@ -72,8 +72,8 @@ frml = 'sDelta ~ bDelta * genotype + (1|sbjID)';
     'dist', 'normal', 'verbose', true);
 
 
-% tblGUI_scatHist(tbl, 'xVar', 'pBurst_trans', 'yVar', 'bGain', 'grpVar', 'genotype');
-% tblGUI_bar(tbl, 'yVar', 'pBurst', 'xVar', 'genotype');
+% guiTbl_scatHist(tbl, 'xVar', 'pBurst_trans', 'yVar', 'bGain', 'grpVar', 'genotype');
+% guiTbl_bar(tbl, 'yVar', 'pBurst', 'xVar', 'genotype');
 
 %% ========================================================================
 %  RESIDUAL ANALYSIS

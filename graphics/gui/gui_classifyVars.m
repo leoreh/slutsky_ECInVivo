@@ -1,7 +1,7 @@
-function [numVars, catVars] = classifyVars(tbl, varargin)
-% TBLGUI.CLASSIFYVARS  Split table variable names into numeric and categorical.
+function [numVars, catVars] = gui_classifyVars(tbl, varargin)
+% GUI_CLASSIFYVARS  Split table variable names into numeric and categorical.
 %
-%   [numVars, catVars] = tblgui.classifyVars(tbl) returns cellstr lists of
+%   [numVars, catVars] = gui_classifyVars(tbl) returns cellstr lists of
 %   the numeric variable names and the categorical-like (categorical /
 %   string / logical) variable names of TBL.
 %
@@ -14,7 +14,7 @@ function [numVars, catVars] = classifyVars(tbl, varargin)
 %                    'vector' to exclude matrix columns (e.g. traces, ACGs).
 %
 %   This is the single source for the numeric-vs-categorical split that was
-%   previously duplicated across the tblGUI_* family.
+%   previously duplicated across the guiTbl_* family.
 
 p = inputParser;
 addParameter(p, 'Exclude', {}, @(x) ischar(x) || isstring(x) || iscellstr(x));
