@@ -266,6 +266,10 @@ for iFile = 1 : length(idxFiles)
         xlim([14 14.8])
     end
 
+    % Axis inner area: exactly 3.5 × 3.5 cm (excludes labels and ticks)
+    set(hAx, 'Units', 'centimeters');
+    hAx.Position(3:4) = [3.5, 3.5];
+
     % Typography: Arial, tick labels 10 pt, axis labels 12 pt
     set(hAx, 'FontName', 'Arial', 'FontSize', 10);
     xlabel(hAx, 'Time (s)', 'FontName', 'Arial', 'FontSize', 12);
