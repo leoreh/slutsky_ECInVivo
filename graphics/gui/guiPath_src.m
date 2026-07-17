@@ -154,10 +154,18 @@ ctx.cache('sleepsig') = ss;
 end
 
 function [val, meta] = loadBinCh(chSpec, ctx)
-% one (or a few) channel(s) from a binary, averaged if several. The file is
-% <basename>.lfp by default, or the path given after '>' in the spec (e.g.
-% '5>D:\rec\sess.dat'). nCh / fs / bit2uv come from <basename>.session.mat.
-meta = struct('fs', NaN, 'kind', 'bin');
+% the requested channel(s) of a binary, as a native [nSamples x nCh] matrix.
+% The file is <basename>.lfp by default, or the path after '>' in the spec
+% (e.g. '5>D:\rec\sess.dat'); nCh / fs come from <basename>.session.mat.
+%
+% Returns EVERY requested channel, unaveraged and in the file's native class
+% (int16 for an .lfp), so a stack panel gets its columns and the whole channel
+% costs a quarter of what a double would. The caller decides what to do with
+% the columns: guiPath_load averages them for a 'trace' and keeps them for
+% 'traces'. Native means raw ADC counts, not microvolts - fine here, since the
+% GUI reads shape, and the ripple / ED presets take physical units from their
+% own loaders (fn:ripple.*, fn:edLfp), not from bin:.
+meta = struct('fs', NaN, 'kind', 'bin', 'ch', []);
 gi = find(chSpec == '>', 1);
 if isempty(gi)
     chStr = chSpec; binFile = fullfile(ctx.basepath, [ctx.basename, '.lfp']);
@@ -169,12 +177,10 @@ if isempty(ch), error('guiPath_src:bin', 'bad binary channel spec "%s"', chSpec)
 session = getSession(ctx);
 nCh = session.extracellular.nChannels;
 fs  = session.extracellular.srLfp;
-if round(session.extracellular.sr) == 24414, bit2uv = 1; else, bit2uv = 0.195; end
-lfp = double(binary_load(binFile, 'duration', Inf, ...
-    'fs', fs, 'nCh', nCh, 'start', 0, 'ch', ch, 'downsample', 1, 'bit2uv', bit2uv));
-if size(lfp, 2) > 1, lfp = mean(lfp, 2); end
-val = lfp(:);
+val = binary_load(binFile, 'duration', Inf, 'fs', fs, 'nCh', nCh, ...
+    'start', 0, 'ch', ch, 'downsample', 1, 'outClass', 'native');
 meta.fs = fs;
+meta.ch = ch(:)';
 end
 
 function session = getSession(ctx)

@@ -1,6 +1,6 @@
 function [cfgData, cfgGui] = guiPath_presets(varargin)
 
-% Returns a curation preset (panels and behaviour) for guiPath_curate.
+% Returns a curation preset (panels and behaviour) for guiPath.
 %
 % EXAMPLES
 % - [cfgRipp, cfgGui] = guiPath_presets('ripp')
@@ -15,7 +15,7 @@ function [cfgData, cfgGui] = guiPath_presets(varargin)
 %
 % - list = guiPath_presets()
 %   returns the preset list as a struct array with fields {name, file}.
-%   guiPath_curate uses it for the dropdown and file auto-detection.
+%   guiPath uses it for the dropdown and file auto-detection.
 %
 % INPUTS
 % - name            <char>(opt) which preset to build. Case-insensitive.
@@ -30,7 +30,7 @@ function [cfgData, cfgGui] = guiPath_presets(varargin)
 % OUTPUTS
 % - cfgData         <struct> one field per panel. See guiPath_panel for a
 %                   panel's fields.
-% - cfgGui          <struct> the behaviour guiPath_curate needs, with fields:
+% - cfgGui          <struct> the behaviour guiPath needs, with fields:
 %                       .name  display name.
 %                       .file  session file token.
 %                       .mode  'events' | 'states'.
@@ -40,7 +40,7 @@ function [cfgData, cfgGui] = guiPath_presets(varargin)
 % - list            <struct> preset list with fields {name, file}.
 %
 % SEE ALSO
-% - guiPath_curate
+% - guiPath
 % - guiPath_panel
 % - guiPath_load
 % - guiPath_src
@@ -53,13 +53,17 @@ function [cfgData, cfgGui] = guiPath_presets(varargin)
 %                   no bundled registry of data.
 % - 260706          dropped the handle registry for an explicit switch.
 % - 260706          renamed to guiPath_presets; GUI package flattened to gui_*.
+% - 260716          ripp: raw LFP and EMG clip at their own percentile rather
+%                   than the 0.1 default, which artifacts were setting.
+% - 260716          ripp: the single raw LFP replaced by a stacked-shank traces
+%                   panel (fn:rippStack) for the depth profile.
 
 
 %% ========================================================================
 %  ARGUMENTS
 %  ========================================================================
 
-% Enumeration: with no name, return the preset list {name, file}. guiPath_curate
+% Enumeration: with no name, return the preset list {name, file}. guiPath
 % uses it for the dropdown and to auto-detect which preset's file exists.
 % Keep this list in sync with the switch below.
 if nargin < 1
@@ -161,7 +165,9 @@ function c = cfg_ed()
 
 c = struct();
 
-% top region: state, spectrogram, EMG RMS, event ticks
+% top region: state, spectrogram, EMG RMS, event ticks. The event strip is the
+% bottom panel, so it carries the region's Time axis (hours); its y is just the
+% horizontal label (no y-ticks).
 c.hypT = guiPath_panel('hypnogram', 'top', 'sleep_states:ss.bouts.times', ...
     'name', 'hypnogram', 'label', 'State');
 
@@ -170,7 +176,7 @@ c.spec = guiPath_panel('spec', 'top', 'fn:spec');
 c.emgRms = guiPath_panel('trace', 'top', 'sleep_sig:emg_rms', 'fs', 1, ...
     'label', 'EMG RMS', 'height', 0.7, 'ylim', 'full');
 
-c.evt = guiPath_panel('eventTicks', 'top', 'ed', 'name', 'eventTicks', ...
+c.evt = guiPath_panel('eventTicks', 'top', 'ed', 'name', 'ed', ...
     'label', 'Events');
 
 % bottom region: LFP (the channel ED was detected on, via ed.info), EMG,
@@ -195,7 +201,9 @@ function c = cfg_ripp()
 
 c = struct();
 
-% top region: state, spectrogram, EMG RMS, ripple ticks
+% top region: state, spectrogram, EMG RMS, ripple ticks. The tick strip is the
+% bottom panel, so it carries the region's Time axis (hours); its y is just the
+% horizontal label (no y-ticks).
 c.hypT = guiPath_panel('hypnogram', 'top', 'sleep_states:ss.bouts.times', ...
     'name', 'hypnogram', 'label', 'State');
 
@@ -204,18 +212,31 @@ c.spec = guiPath_panel('spec', 'top', 'fn:spec');
 c.emgRms = guiPath_panel('trace', 'top', 'sleep_sig:emg_rms', 'fs', 1, ...
     'label', 'EMG RMS', 'height', 0.7, 'ylim', 'full');
 
-c.evt = guiPath_panel('eventTicks', 'top', 'ripp', 'name', 'eventTicks', ...
+c.evt = guiPath_panel('eventTicks', 'top', 'ripp', 'name', 'ripp', ...
     'label', 'Ripples');
 
-% bottom region: ripple LFP, filtered LFP, EMG, unit raster
-c.rippleLfp = guiPath_panel('trace', 'bottom', 'fn:ripple.lfp', ...
-    'label', 'LFP', 'height', 1.2);
+% bottom region: the shank around the ripple channel (raw, stacked), the
+% filtered detection channel, EMG, unit raster.
+%
+% The stack is the main change: rather than one averaged raw trace it shows the
+% ripple-tagged channels (channelTags.Ripple) separately, so their morphology
+% can be compared during curation. It replaces the old single raw 'LFP' panel,
+% whose channel is one row of this stack. To go back to the single trace, swap
+% fn:rippStack ('traces') for fn:ripple.lfp ('trace', 'ylim', 0.5).
+%
+% The filtered trace stays a single 'trace' at the default percentile. In the
+% ripple band the extreme samples ARE the ripples (the largest thing in it), so
+% clipping harder would clip the very events being judged; its 0.1 span is
+% about +/-140 uV, which a ripple already fills usefully. EMG clips at 1 (its
+% 0.1 tails are movement artifact that otherwise flattens the trace).
+c.rippStack = guiPath_panel('traces', 'bottom', 'fn:rippStack', ...
+    'label', 'LFP', 'height', 2.0);
 
 c.rippleFilt = guiPath_panel('trace', 'bottom', 'fn:ripple.filt', ...
     'label', 'Filtered LFP', 'height', 1.0);
 
 c.emg = guiPath_panel('trace', 'bottom', 'sleep_sig:emg', 'label', 'EMG', ...
-    'height', 0.8);
+    'height', 0.8, 'ylim', 1);
 
 c.raster = guiPath_panel('raster', 'bottom', 'spikes:spikes.times', ...
     'label', 'Units');

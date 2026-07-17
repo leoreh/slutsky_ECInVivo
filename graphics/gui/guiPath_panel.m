@@ -1,5 +1,5 @@
 function p = guiPath_panel(type, region, src, varargin)
-% GUIPATH_PANEL Build one panel entry for a guiPath_curate cfgData.
+% GUIPATH_PANEL Build one panel entry for a guiPath cfgData.
 %
 %   p = GUIPATH_PANEL(type, region, src, Name, Value, ...) returns a struct that
 %   declares a single panel: WHAT it is (type), WHERE it sits (region) and WHERE
@@ -10,9 +10,11 @@ function p = guiPath_panel(type, region, src, varargin)
 %   is added later, by guiPath_load.
 %
 %   INPUTS:
-%       type    - (Char) 'trace' | 'spec' | 'hypnogram' | 'raster' | 'eventTicks'
-%                        | 'stateStrip'. eventTicks/stateStrip mark the curation
-%                        target (they set the mode; there is at most one).
+%       type    - (Char) 'trace' | 'traces' | 'spec' | 'hypnogram' | 'raster' |
+%                        'eventTicks' | 'stateStrip'. trace is one signal;
+%                        traces is a vertical stack of binary channels (src must
+%                        be a bin: address). eventTicks/stateStrip mark the
+%                        curation target (they set the mode; there is at most one).
 %       region  - (Char) 'top' | 'bottom' (aliases: 'wide' | 'narrow').
 %       src     - (Char | value) address for guiPath_src, a computed 'fn:...'
 %                 source, or an inline value.
@@ -23,15 +25,19 @@ function p = guiPath_panel(type, region, src, varargin)
 %                             not carry one (ws / bin sources).
 %           'height' (Num)    relative panel height.
 %           'clr'    (ColorSpec) trace colour.
-%           'ylim'   (2-vec | 'prc' | 'full') y-limits; 'prc' = 0.1-99.9 pct
-%                             (default for traces), 'full' / [] = autoscale.
+%           'ylim'   (2-vec | scalar | 'prc' | 'full') y-limits. A 2-vec is
+%                             absolute. A scalar p clips to the [p, 100-p]
+%                             percentile (0 <= p < 50); raise it when a trace
+%                             looks thin. 'prc' takes the default percentile
+%                             and is what traces get when unset. 'full' / []
+%                             autoscale. See resolveYlim in guiPath_load.
 %           'label'  (Char)   panel y-label.
 %           'order'  (Num)    override stacking order within the region.
 %
 %   OUTPUT:
 %       p       - (Struct) one panel entry (guiPath_load fills .data / .fs later).
 %
-%   See also guiPath_load, guiPath_src, guiPath_presets, guiPath_curate, guiPath_doc.
+%   See also guiPath_load, guiPath_src, guiPath_presets, guiPath, guiPath_doc.
 %
 %   HISTORY:
 %       Created: 05 Jul 2026 - declarative redesign (panel constructor).
@@ -66,6 +72,7 @@ switch type
     case 'stateStrip', td = struct('height', 0.5,  'label', 'State',     'order', 15);
     case 'raster',     td = struct('height', 1.2,  'label', 'Units',     'order', 60);
     case 'trace',      td = struct('height', 1.0,  'label', '',          'order', 50);
+    case 'traces',     td = struct('height', 2.5,  'label', 'LFP',       'order', 50);
     otherwise,         td = struct('height', 1.0,  'label', '',          'order', 99);
 end
 end

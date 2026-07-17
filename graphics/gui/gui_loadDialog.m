@@ -1,5 +1,5 @@
 function sel = gui_loadDialog(parent, basepath)
-% GUI_LOADDIALOG  Progressive "Load data" dialog for guiPath_curate.
+% GUI_LOADDIALOG  Progressive "Load data" dialog for guiPath.
 %
 %   sel = gui_loadDialog(parent, basepath) opens a small always-on-top
 %   dialog that reveals inputs as the user chooses, and returns a selection
@@ -10,7 +10,8 @@ function sel = gui_loadDialog(parent, basepath)
 %   shows only for a raw trace; a Top/Bottom placement only for a signal.
 %
 %   OUTPUT sel (fields):
-%       .type   'trace' | 'spec' | 'hypnogram' | 'raster' | 'eventTicks' | 'stateStrip'
+%       .type   'trace' | 'traces' | 'spec' | 'hypnogram' | 'raster' |
+%               'eventTicks' | 'stateStrip'  (traces is binary-only)
 %       .from   'ws' | 'file' | 'bin'
 %       .value  for ws  -> the variable name (optionally var.field) [char]
 %               for bin -> the channel spec (e.g. '5' or '[5 6 7]')  [char]
@@ -20,10 +21,10 @@ function sel = gui_loadDialog(parent, basepath)
 %       .fs     sampling rate [Hz] for a trace, else []
 %       .region 'top' | 'bottom'
 %
-%   The host (guiPath_curate.onLoadUnified) turns sel into a loadCore call. Curation
+%   The host (guiPath.onLoadUnified) turns sel into a loadCore call. Curation
 %   types (events / states) cannot come from a binary channel.
 %
-%   See also guiPath_curate, guiPath_load, gui_chooseDialog.
+%   See also guiPath, guiPath_load, gui_chooseDialog.
 %
 %   HISTORY:
 %       05 Jul 2026 - progressive Load dialog (replaces the always-on Load fields).
@@ -37,7 +38,12 @@ sel = [];
 st = struct('file', '', 'fileVars', {{}}, 'session', [], 'binFile', '');   % captured by callbacks
 dyn = struct();
 
-d = uifigure('Name', 'Load data', 'Position', [100, 100, 400, 300]);
+% One size, named once: the height must clear the tallest arrangement, which is
+% Trace + Binary channel (the dynamic panel is 3 rows there, not 1). At 300 the
+% button row fell off the bottom.
+dlgW = 400; dlgH = 380;
+
+d = uifigure('Name', 'Load data', 'Position', [100, 100, dlgW, dlgH]);
 % kept 'normal', NOT 'modal': a modal uifigure's input grab can outlive the
 % window during teardown and collide with the alert the caller shows next,
 % leaving the main figure frozen. uiwait already blocks the caller's code.
@@ -45,7 +51,7 @@ try, d.WindowStyle = 'alwaysontop'; catch, end
 host = ancestor(parent, 'figure');
 if ~isempty(host) && isvalid(host)                          % centre over the host
     pr = host.Position;
-    d.Position = [pr(1) + (pr(3) - 400) / 2, pr(2) + (pr(4) - 300) / 2, 400, 300];
+    d.Position = [pr(1) + (pr(3) - dlgW) / 2, pr(2) + (pr(4) - dlgH) / 2, dlgW, dlgH];
 else
     movegui(d, 'center');
 end
@@ -55,7 +61,7 @@ gl = uigridlayout(d, [6, 2], 'RowHeight', {'fit', 'fit', 'fit', 'fit', 'fit', 'f
     'ColumnWidth', {110, '1x'}, 'Padding', 12, 'RowSpacing', 8, 'ColumnSpacing', 6);
 
 lt = uilabel(gl, 'Text', 'Type', 'FontWeight', 'bold'); lt.Layout.Row = 1; lt.Layout.Column = 1;
-ddType = uidropdown(gl, 'Items', {'Trace', 'Spectrogram', 'Hypnogram', 'Raster', 'Events', 'States'}, ...
+ddType = uidropdown(gl, 'Items', {'Trace', 'Traces', 'Spectrogram', 'Hypnogram', 'Raster', 'Events', 'States'}, ...
     'ValueChangedFcn', @(~, ~) onType());
 ddType.Layout.Row = 1; ddType.Layout.Column = 2;
 
@@ -88,9 +94,19 @@ drawnow;                               % the caller's next alert never races it
 % =====================================================================
     function onType()
         isCur = any(strcmp(ddType.Value, {'Events', 'States'}));
-        keepItems(ddFrom, ifelse(isCur, {'Workspace', 'File'}, {'Workspace', 'File', 'Binary channel'}));
-        setRow(lfs, edFs, strcmp(ddType.Value, 'Trace'));   % fs only for a raw trace
-        setRow(lreg, ddReg, ~isCur);                        % placement only for a signal
+        isTraces = strcmp(ddType.Value, 'Traces');
+        isTrace  = any(strcmp(ddType.Value, {'Trace', 'Traces'}));
+        % a stack is binary-only (it needs the channel columns); curation types
+        % cannot come from a binary; everything else takes any source.
+        if isTraces
+            keepItems(ddFrom, {'Binary channel'});
+        elseif isCur
+            keepItems(ddFrom, {'Workspace', 'File'});
+        else
+            keepItems(ddFrom, {'Workspace', 'File', 'Binary channel'});
+        end
+        setRow(lfs, edFs, isTrace);          % fs for one trace or a stack
+        setRow(lreg, ddReg, ~isCur);         % placement only for a signal
         onFrom();
     end
 
@@ -165,7 +181,7 @@ drawnow;                               % the caller's next alert never races it
     function onOk()
         s = struct('type', typeCode(ddType.Value), 'from', '', 'value', [], ...
             'var', '', 'file', '', 'fs', [], 'region', lower(ddReg.Value));
-        if strcmp(ddType.Value, 'Trace'), s.fs = edFs.Value; end
+        if any(strcmp(ddType.Value, {'Trace', 'Traces'})), s.fs = edFs.Value; end
         switch ddFrom.Value
             case 'Workspace'
                 nm = strtrim(dyn.wsVar.Value);
@@ -232,13 +248,10 @@ function s = fileShort(f)
 if isempty(f), s = '(none)'; else, [~, n, e] = fileparts(f); s = [n, e]; end
 end
 
-function out = ifelse(tf, a, b)
-if tf, out = a; else, out = b; end
-end
-
 function t = typeCode(label)
 switch label
     case 'Trace',       t = 'trace';
+    case 'Traces',      t = 'traces';
     case 'Spectrogram', t = 'spec';
     case 'Hypnogram',   t = 'hypnogram';
     case 'Raster',      t = 'raster';

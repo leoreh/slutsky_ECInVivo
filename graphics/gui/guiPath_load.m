@@ -4,7 +4,7 @@ function cfgData = guiPath_load(cfgData, basepath, ctx)
 %   cfgData = GUIPATH_LOAD(cfgData, basepath) reads the address (src) of every
 %   panel in the flat cfgData and writes the loaded data back INTO that panel
 %   (.data, .fs, resolved .ylim). A panel that ALREADY has data is left untouched,
-%   so a cfgData carried over from another preset (or from a running guiPath_curate)
+%   so a cfgData carried over from another preset (or from a running guiPath)
 %   is only topped up, not reloaded. A panel whose address fails to load is
 %   dropped. The returned cfgData is the same struct, now "full".
 %
@@ -18,7 +18,7 @@ function cfgData = guiPath_load(cfgData, basepath, ctx)
 %       guiPath_src, guiPath_ctx, guiPath_panel; as_loadConfig, basepaths2vars,
 %       binary_load, ripp_sigPrep (for computed 'fn:' sources).
 %
-%   See also guiPath_presets, guiPath_panel, guiPath_src, guiPath_curate, guiPath_doc.
+%   See also guiPath_presets, guiPath_panel, guiPath_src, guiPath, guiPath_doc.
 %
 %   HISTORY:
 %       Created: 05 Jul 2026 - the loader (was guiPath_load); loads data
@@ -72,10 +72,30 @@ function p = loadPanel(p, ctx)
 % resolve the panel's address into .data (+ .fs, resolved .ylim)
 switch p.type
     case 'trace'
+        % one signal, as a double column. Only a bin: address that named several
+        % channels is a matrix to average (its long-standing behaviour); any
+        % other 2-D data is a single signal that happens to be a row - flatten
+        % it, do not average across it (averaging a [1 x N] row was the bug that
+        % turned emg_rms into one scalar).
         [val, meta] = resolveData(p.src, ctx);
-        p.data = double(val(:));
+        val = double(val);
+        if isfield(meta, 'kind') && strcmp(meta.kind, 'bin') && size(val, 2) > 1
+            val = mean(val, 2);
+        end
+        p.data = val(:);
         if isempty(p.fs), p.fs = meta.fs; end
         p.ylim = resolveYlim(p.ylim, p.data);
+
+    case 'traces'
+        % a vertical stack: keep every channel, in its native class (int16 for
+        % an .lfp), so N channels of a long session stay affordable. The draw
+        % cuts and casts only the window slice. chInfo holds the fixed display
+        % stats (spacing, per-channel baseline, labels), computed once from the
+        % whole signal so the stack neither shifts nor rescales between windows.
+        [val, meta] = resolveData(p.src, ctx);
+        p.data = val;                              % [nSamples x nCh], native
+        if isempty(p.fs), p.fs = meta.fs; end
+        p.chInfo = traceStack(val, meta);
 
     case 'spec'
         p.data = resolveData(p.src, ctx);          % adapter struct .s/.freq/.tstamps
@@ -136,6 +156,7 @@ if ischar(src) && numel(src) >= 3 && strcmp(src(1:3), 'fn:')
     r = computed(nm, ctx);
     val = resolvePath(r.val, path);
     meta = struct('fs', r.fs, 'kind', 'fn');
+    if isfield(r, 'ch'), meta.ch = r.ch; end    % channel labels for a traces panel
 else
     [val, meta] = guiPath_src(src, ctx);
 end
@@ -158,11 +179,7 @@ switch name
         nCh = session.extracellular.nChannels;
         fs  = session.extracellular.srLfp;
         if round(session.extracellular.sr) == 24414, bit2uv = 1; else, bit2uv = 0.195; end
-        if isfield(session, 'channelTags') && isfield(session.channelTags, 'Ripple')
-            rippCh = session.channelTags.Ripple;
-        else
-            rippCh = 1;
-        end
+        rippCh = evt_rippCh(ctx.basepath, ctx.basename, session);
         lfp = double(binary_load(fullfile(ctx.basepath, [ctx.basename, '.lfp']), 'duration', Inf, ...
             'fs', fs, 'nCh', nCh, 'start', 0, 'ch', rippCh, 'downsample', 1, 'bit2uv', bit2uv));
         if size(lfp, 2) > 1, lfp = mean(lfp, 2); end
@@ -177,6 +194,16 @@ switch name
         end
         rs = ripp_sigPrep(lfp, fs, 'passband', passband, 'zMet', 'adaptive');
         r = struct('val', rs, 'fs', fs);
+
+    case 'rippStack'
+        % the channels to stack for ripple curation = the channel(s) the ripple
+        % pipeline detected on (ripp.info.rippCh, via evt_rippCh), shown
+        % separately rather than averaged as detection does, so their morphology
+        % can be compared. Follows the ripple output, not the session tag.
+        ch = evt_rippCh(ctx.basepath, ctx.basename);
+        ch = ch(:)';
+        [val, meta] = guiPath_src(sprintf('bin:%s', mat2str(ch)), ctx);
+        r = struct('val', val, 'fs', meta.fs, 'ch', meta.ch);
 
     case 'edLfp'
         % the LFP the EDs preset shows = the channel ED detection ran on, read
@@ -211,19 +238,60 @@ end
 % =========================================================================
 
 function yl = resolveYlim(spc, data)
-% 'prc' -> 0.1-99.9 percentile clip; 'full' / [] -> autoscale; numeric -> as-is.
+% Resolve a panel's ylim spec against its data:
+%       [lo hi]     absolute limits, taken as given
+%       <scalar> p  percentile clip to [p, 100-p]; 0 <= p < 50, 0 = full range
+%       'prc'       percentile clip at prcDflt
+%       'full', []  autoscale
+%
+% The percentile is what controls how much of the axis a trace fills, and a
+% wide clip is what makes a trace look thin: at 0.1 a lone artifact sets the
+% range and the signal collapses toward the midline. Raising p trades a few
+% clipped extremes for amplitude on everything else, so a preset that cares
+% about waveform shape should pass its own p rather than take the default.
+%
 % The percentile is estimated on a subsample (~1e5 points) rather than the whole
 % signal: on a full-session trace the clip is visually identical but the sort is
 % ~orders of magnitude cheaper (a full-session prctile is ~1.5 s; this is ~5 ms).
-% A degenerate range (flat / NaN signal) is dropped so the axis autoscales.
+% A degenerate range (flat / NaN signal, or p >= 50) is dropped so the axis
+% autoscales.
+prcDflt = 0.1;
+
 if isnumeric(spc) && numel(spc) == 2, yl = spc; return; end
 yl = [];
-if ischar(spc) && strcmp(spc, 'prc') && ~isempty(data)
-    n = numel(data);
-    if n > 2e5, s = double(data(1:ceil(n / 1e5):end)); else, s = double(data(:)); end
-    yl = prctile(s, [0.1, 99.9]);
-    if numel(yl) ~= 2 || ~all(isfinite(yl)) || yl(2) <= yl(1), yl = []; end
+
+prc = [];
+if ischar(spc) && strcmp(spc, 'prc'),  prc = prcDflt; end
+if isnumeric(spc) && isscalar(spc),    prc = spc;     end
+if isempty(prc) || isempty(data), return; end
+
+n = numel(data);
+if n > 2e5, s = double(data(1:ceil(n / 1e5):end)); else, s = double(data(:)); end
+yl = prctile(s, [prc, 100 - prc]);
+if numel(yl) ~= 2 || ~all(isfinite(yl)) || yl(2) <= yl(1), yl = []; end
 end
+
+function info = traceStack(val, meta)
+% fixed display stats for a channel stack, from a subsample of the whole signal:
+%   .spacing  vertical gap between channels (data units)
+%   .base     per-channel baseline (median), subtracted so each channel is
+%             centred on its own row regardless of DC offset
+%   .labels   channel numbers for the y-axis
+% Computed once and held for the panel's life so the stack neither drifts nor
+% rescales as the window moves. Spacing is robust (MAD-based) so one large
+% channel does not blow the stack apart; 6 SD clears ordinary excursions while
+% keeping the channels close enough to compare.
+nCh = size(val, 2);
+nr  = size(val, 1);
+if nr > 2e5, s = double(val(1:ceil(nr / 1e5):end, :)); else, s = double(val); end
+base = median(s, 1);
+sd = median(abs(s - base), 1) / 0.6745;            % per-channel robust SD
+sp = 6 * median(sd(isfinite(sd)));
+if isempty(sp) || ~isfinite(sp) || sp <= 0, sp = 1; end
+if isfield(meta, 'ch') && numel(meta.ch) == nCh, labels = meta.ch(:)';
+else,                                             labels = 1:nCh;
+end
+info = struct('spacing', sp, 'base', base(:)', 'labels', labels);
 end
 
 function boutHr = toHoursCell(bt, ctx)

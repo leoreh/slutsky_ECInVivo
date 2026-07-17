@@ -1,18 +1,19 @@
 function guiPath_doc()
 
-% Walk through the guiPath_curate curation framework end to end.
+% Walk through the guiPath curation framework end to end.
 %
 % This file is documentation you can run: every code line below is a call you
 % can paste. guiPath_doc itself does nothing. Read it top to bottom, or type
 % help guiPath_doc . Start with CONCEPTS for the ideas, WALKTHROUGH for a live
 % session, REFERENCE for the field lists.
 %
-% The framework shows one session's signals and lets you curate a single
-% target: an event list (accept / reject each event), or a state label per
-% epoch. Everything rests on one split. WHAT to show is a declarative
-% description you build and edit; HOW to fetch and draw it is the framework's
-% job. You describe panels and addresses; guiPath_load and guiPath_curate do the
-% loading and drawing.
+% The framework shows one session's signals. Several event / state sets can be
+% loaded at once; the CURATE selector picks which one is the editable target -
+% accept / reject each event, or a state label per epoch - or None, to only
+% view. PRESET picks the arrangement (which panels), independently of CURATE.
+% Everything rests on one split. WHAT to show is a declarative description you
+% build and edit; HOW to fetch and draw it is the framework's job. You describe
+% panels and addresses; guiPath_load and guiPath do the loading and drawing.
 %
 %
 % CONCEPTS
@@ -21,9 +22,9 @@ function guiPath_doc()
 %   - cfgData   the panels: what is shown, and the one target you curate. A
 %               flat struct, one field per panel. This is what you edit.
 %   - cfgGui    the behaviour: display name, session file, mode, window width,
-%               save target. Everything guiPath_curate needs beyond the panels.
+%               save target. Everything guiPath needs beyond the panels.
 %   guiPath_presets(name) returns both. guiPath_load fills data into cfgData.
-%   guiPath_curate draws them.
+%   guiPath draws them.
 %
 %   The panel is the atomic unit, one self-describing struct from guiPath_panel.
 %   It states WHAT it is (type), WHERE it sits (region), and WHERE its data
@@ -42,13 +43,16 @@ function guiPath_doc()
 %   panel (.data, .fs, a resolved .ylim), returning the same struct now full. A
 %   panel that already carries data is skipped, so topping up a config is cheap.
 %
-%   The target sets the mode. At most one panel is the curation target, and its
-%   type chooses what you do.
-%   - an eventTicks panel gives events mode: accept or reject each event.
-%   - a stateStrip panel gives states mode: assign a state to each epoch.
-%   With no target panel the viewer is read-only. A hypnogram and a stateStrip
-%   both draw a coloured state strip, but a hypnogram is read-only context
-%   (committed bouts) and only a stateStrip is a target.
+%   CURATE picks the editable target. Several event / state sets can be loaded
+%   (a preset brings one; Load... adds more) and all are drawn at once; the
+%   CURATE selector chooses which single one you edit, and its type sets the
+%   mode:
+%   - an eventTicks set gives events mode: accept or reject each event.
+%   - a stateStrip set gives states mode: assign a state to each epoch.
+%   - None gives view mode: no target, Prev / Next just steps the window.
+%   A hypnogram and a stateStrip both draw a coloured state strip, but a
+%   hypnogram is always read-only context (committed bouts); a stateStrip can be
+%   the target.
 %
 %
 % CONCEPTS: ctx, the session cache
@@ -84,7 +88,7 @@ function guiPath_doc()
 %     file read happen once. Two panels with different addresses into the same
 %     file ('sleep_sig:emg' and 'sleep_sig:emg_rms') share the one cached read.
 %
-%   Use case, a preset switch. guiPath_curate builds one ctx when it opens and keeps
+%   Use case, a preset switch. guiPath builds one ctx when it opens and keeps
 %   it for the whole session (in hFig.UserData.ctx). Switching EDs -> Ripples
 %   calls guiPath_load again with the SAME ctx. The panels shared by both presets
 %   (hypnogram, spectrogram, EMG, EMG RMS, unit raster) are already cached, so
@@ -102,14 +106,14 @@ function guiPath_doc()
 %
 % WALKTHROUGH
 %
-%   Set a session. guiPath_curate takes a basepath and derives basename from it;
+%   Set a session. guiPath takes a basepath and derives basename from it;
 %   with no argument it uses the current folder (pwd).
 %       basepath = 'D:\Data\lh100\lh100_220413_111004';
 %       [~, basename] = fileparts(basepath);
 %
 %   1. Open a session. A preset is auto-detected from the files present.
-%       guiPath_curate(basepath);
-%       guiPath_curate(basepath, 'preset', 'States');       % force one by name
+%       guiPath(basepath);
+%       guiPath(basepath, 'preset', 'States');       % force one by name
 %
 %   2. Get a preset's panels and behaviour.
 %       [cfgData, cfgGui] = guiPath_presets('EDs');   % Ripples States template
@@ -129,21 +133,21 @@ function guiPath_doc()
 %
 %   5. Open your own config. A slim cfgData (no data) is loaded for you; omit
 %      cfgGui and it is derived from the panels.
-%       guiPath_curate(basepath, 'cfgData', cfgData, 'cfgGui', cfgGui);
+%       guiPath(basepath, 'cfgData', cfgData, 'cfgGui', cfgGui);
 %
 %   6. Edit or add a panel. guiPath_panel(type, region, address) builds one; its
 %      field position sets its stacking order in the region.
 %       cfgData.emg.height = 1.0;
 %       cfgData.emg2 = guiPath_panel('trace', 'bottom', 'sleep_sig:emg', ...
 %           'label', 'EMG 2');
-%       guiPath_curate(basepath, 'cfgData', cfgData);
+%       guiPath(basepath, 'cfgData', cfgData);
 %
 %   7. Build from a blank template.
 %       [cfgData, cfgGui] = guiPath_presets('template');  % empty cfgData
 %       cfgData.spec = guiPath_panel('spec',  'top',    'fn:spec');
 %       cfgData.eeg  = guiPath_panel('trace', 'bottom', 'sleep_sig:eeg', ...
 %           'height', 1.2);
-%       guiPath_curate(basepath, 'cfgData', cfgData);
+%       guiPath(basepath, 'cfgData', cfgData);
 %
 %   8. Set the target. Exactly one eventTicks or stateStrip panel is curated.
 %      To curate EDs from ed.mat:
@@ -159,10 +163,10 @@ function guiPath_doc()
 %       cfgData = guiPath_load(cfgData, basepath, ctx);
 %      (Inside the viewer, the Preset dropdown does this with the session ctx.)
 %
-%   10. Reopen fast. guiPath_curate returns the full cfgData; the live one (with
+%   10. Reopen fast. guiPath returns the full cfgData; the live one (with
 %       anything loaded through the GUI) is in hFig.UserData.cfgData.
-%       [hFig, cfgData] = guiPath_curate(basepath, 'preset', 'EDs');
-%       guiPath_curate(basepath, 'cfgData', cfgData);    % data already in hand
+%       [hFig, cfgData] = guiPath(basepath, 'preset', 'EDs');
+%       guiPath(basepath, 'cfgData', cfgData);    % data already in hand
 %
 %   11. Load one more source while the viewer is open. Click Load..., pick a
 %       Type, then a Source (Workspace, File, or Binary channel). No call.
@@ -173,8 +177,10 @@ function guiPath_doc()
 %
 % REFERENCE
 %
-%   Panel types (the draw function follows the type).
+%   Panel types (the draw function follows the type; all live in guiPath_draw).
 %   - trace        a 1-D signal.
+%   - traces       a vertical stack of binary channels (a bin: source; kept in
+%                  the file's native int16 and sliced per window, not averaged).
 %   - spec         a spectrogram (adapter struct .s / .freq / .tstamps).
 %   - hypnogram    read-only sleep-state strip (bout times).
 %   - raster       spike raster (cell of spike-time vectors [s]).
@@ -190,7 +196,10 @@ function guiPath_doc()
 %   - label     y-axis label.
 %   - height    relative panel height.
 %   - clr       trace colour.
-%   - ylim      'prc' (0.1-99.9 pct clip, the trace default) | 'full' | [lo hi].
+%   - ylim      [lo hi] absolute | p, a scalar clipping to the [p, 100-p]
+%               percentile (0 <= p < 50; raise it when a trace looks thin) |
+%               'prc', the default percentile, which is what a trace gets when
+%               unset | 'full' or [] to autoscale.
 %   After guiPath_load a panel also carries .data and .fs.
 %
 %   Address grammar (src), resolved by guiPath_src unless noted.
@@ -218,12 +227,15 @@ function guiPath_doc()
 %               <basename>.<token>.mat; 'labelsMan' writes state labels into
 %               <basename>.sleep_labelsMan.mat.
 %
-%   Files.
-%   - guiPath_curate.m   the viewer: figure, layout, navigation, save, Load.
+%   Files. The family is one entry point plus its parts: guiPath is the tool,
+%   every guiPath_* beside it is an internal of that tool. (Contrast guiTbl_*,
+%   where each file is a separate tool.)
+%   - guiPath.m          the viewer: figure, layout, navigation, save, Load.
 %   - guiPath_presets.m  name -> [cfgData, cfgGui]; per-modality builders.
 %   - guiPath_panel.m    builds one panel entry (with per-type defaults).
 %   - guiPath_src.m      resolves one address to raw data.
 %   - guiPath_load.m     fills data into a cfgData (skips loaded panels).
+%   - guiPath_draw.m     draws one panel; the dispatch on panel type.
 %   - guiPath_ctx.m      the session location + file cache.
 %   - gui_loadDialog.m   the progressive Load dialog.
 %   - gui_eventPanel.m   the accept / reject stepper (events mode).
@@ -231,16 +243,19 @@ function guiPath_doc()
 %
 %
 % SEE ALSO
-% - guiPath_curate
+% - guiPath
 % - guiPath_presets
 % - guiPath_panel
 % - guiPath_load
 % - guiPath_src
+% - guiPath_draw
 % - guiPath_ctx
 %
 % HISTORY
 % - 260705          created (declarative guiPath_presets / guiPath_load redesign).
 % - 260706          rewritten: concepts + a ctx section, tighter walkthrough.
 % - 260706          renamed to guiPath_doc; shared GUI package flattened to gui_*.
+% - 260716          guiPath_curate renamed to guiPath; the draw functions
+%                   extracted to guiPath_draw; ylim takes a scalar percentile.
 
 end

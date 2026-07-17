@@ -23,7 +23,7 @@ function h = gui_statePanel(parent, api, names, colors)
 %   current epoch's state (curLabel is the integer label; > N reads "undefined").
 %
 %   HISTORY:
-%       05 Jul 2026 - created for guiPath_curate state-label curation.
+%       05 Jul 2026 - created for guiPath state-label curation.
 
 narginchk(2, 4)
 if ~isstruct(api), error('gui_statePanel:api', 'api must be a struct of callbacks'); end
