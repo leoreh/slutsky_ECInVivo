@@ -23,7 +23,7 @@ fprintf('== test_guiPath ==\n');
 inp = uinput('eventTicks');
 inp.name = 'ripp'; inp.clr = [0 0.2 0.8];
 inp.data = struct('peakTime', [10; 20; 30; 40; 50]);
-data = struct('curate', 'ripp', 'accepted', logical([1; 1; 0; 1; 0]), 'clrEvt', [0 0.2 0.8]);
+data = struct('curate', 'ripp', 'accepted', logical([1; 1; 0; 1; 0]));
 f = figure('Visible', 'off'); ax = axes(f); hold(ax, 'on');
 guiPath_draw(ax, inp, data, 0, 60, 1);
 L = findobj(ax, 'Type', 'line');
@@ -176,23 +176,52 @@ assert(any(strcmp('ripp2', di.hCurateDD.Items)) && any(strcmp('None', di.hCurate
     'curate: selector missing None / ripp2');
 fprintf('  ok  two event sets loaded, CURATE lists both + None\n');
 
-% both sets mark the Bottom window at once: put t0 on a shared peak (ripp2 =
-% ripp + 0.01 s, both inside one ripple window) and look for a blue (curated
-% ripp) AND an orange (ripp2) vertical line across a Bottom panel.
-di.jumpToTimeFcn(di.ed.peakTime(1));
-axN = hFig.UserData.narrowP(1).ax;
-hasBlue   = ~isempty(findobj(axN, 'Type', 'line', 'Color', [0.00 0.20 0.80]));
-hasOrange = ~isempty(findobj(axN, 'Type', 'line', 'Color', [0.85 0.33 0.10]));
-assert(hasBlue && hasOrange, 'window marks: both sets should mark the Bottom window');
-fprintf('  ok  both event sets mark the Bottom window (blue + orange)\n');
+% curating a set auto-adds its Bottom lines panel, which is an OVERLAY: it sits
+% in narrowP but takes NO tile (its .ax is empty) and draws across the signals.
+jb = find(strcmp({di.narrowP.source}, 'ripp'), 1);
+assert(~isempty(jb), 'overlay: curating ripp should add a Bottom ripp panel');
+assert(~isgraphics(di.narrowP(jb).ax), 'overlay: a lines panel must take no tile');
+assert(numel(di.axNarrow) == sum(arrayfun(@(p) isgraphics(p.ax), di.narrowP)), ...
+    'overlay: tiled axes must match the non-overlay panels');
+fprintf('  ok  Bottom lines panel is an overlay (no tile)\n');
 
-% CURATE elects the other set, then None (view only, target cleared)
+% only Bottom lines-panels mark the window: ripp (curated, auto-added) marks;
+% ripp2 does not until it is a Bottom panel too. Curate ripp2 - its lines panel
+% is added and ripp's persists, so now BOTH mark: blue (ripp) + orange (ripp2).
+di.jumpToTimeFcn(di.ed.peakTime(1));
+assert(isempty(findobj(hFig.UserData.axNarrow(1), 'Type', 'line', 'Color', [0.85 0.33 0.10])), ...
+    'window marks: ripp2 must not mark until it is a Bottom panel');
 di.setCurateFcn('ripp2');
 assert(strcmp(hFig.UserData.curate, 'ripp2'), 'curate: switch to ripp2 failed');
-di.setCurateFcn('');
+dm = hFig.UserData; dm.jumpToTimeFcn(dm.ed.peakTime(1));
+axN = hFig.UserData.axNarrow(1);
+hasBlue   = ~isempty(findobj(axN, 'Type', 'line', 'Color', [0.00 0.20 0.80]));
+hasOrange = ~isempty(findobj(axN, 'Type', 'line', 'Color', [0.85 0.33 0.10]));
+assert(hasBlue && hasOrange, 'window marks: both Bottom sets should mark (blue + orange)');
+fprintf('  ok  window marks follow the Bottom list (ripp + ripp2)\n');
+
+% Ops render override: switch the CURATED set's Bottom lines to a strip. It now
+% takes a tile AND its spanning lines are gone - "ticks" must clear the lines,
+% including the current-event emphasis (part of the lines, not an always-on
+% cursor). ripp (still a lines panel) keeps marking; ripp2 (strip) does not.
+dm = hFig.UserData;
+jr = find(strcmp({dm.narrowP.source}, 'ripp2'), 1);
+dm.narrowP(jr).render = 'strip';
+hFig.UserData = dm; dm.rebuildFcn();
+dm = hFig.UserData; dm.jumpToTimeFcn(dm.ed.peakTime(1));
+assert(isgraphics(hFig.UserData.narrowP(jr).ax), ...
+    'ops: render=strip should give the panel a tile');
+assert(isempty(findobj(hFig.UserData.axNarrow(1), 'Type', 'line', 'Color', [0.85 0.33 0.10])), ...
+    'ops: ticks must clear the set''s spanning lines (incl. the emphasis)');
+assert(~isempty(findobj(hFig.UserData.axNarrow(1), 'Type', 'line', 'Color', [0.00 0.20 0.80])), ...
+    'ops: another set still shown as lines must keep marking');
+fprintf('  ok  Ops ticks clears the lines (tile + no spanning marks)\n');
+
+% None: view only, target cleared
+hFig.UserData.setCurateFcn('');
 assert(isempty(hFig.UserData.curate) && strcmp(hFig.UserData.hCurateDD.Value, 'None'), ...
     'curate: None should clear the target');
-fprintf('  ok  CURATE switch to other set + None\n');
+fprintf('  ok  CURATE None clears the target\n');
 
 % None is a real view mode: tick strips STAY drawn (not blanked by the old
 % single-target guard), and Prev/Next step the window itself.

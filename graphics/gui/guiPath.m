@@ -110,6 +110,16 @@ function [hFig, cfgData] = guiPath(basepath, varargin)
 %                   what is loaded, so the panel list and CURATE keep every
 %                   loaded signal / set; the target is set on first open only.
 %                   PRESET (arrangement) and CURATE (target) are independent.
+% - 260717          event sets are panel-list entries rendered by region: a
+%                   Top entry is a tick strip, a Bottom entry is spanning
+%                   lines - an OVERLAY that takes no tile and draws across the
+%                   region's signals - so a set marks the window exactly when
+%                   it is in the Bottom list. CURATE auto-adds its target's
+%                   panels if missing (event: ticks + lines; state: strip top
+%                   + bottom), never touching the rest. A 4th per-panel Ops
+%                   button opens type-specific options; for a Bottom event set
+%                   it overrides lines <-> ticks, the seam where future options
+%                   (a spectrogram's log-frequency scale, etc.) will land.
 
 %% ========================================================================
 %  ARGUMENTS
@@ -176,7 +186,6 @@ d.presetName = presetName;
 d.ctx        = ctx;            % basename + within-session file cache
 d.cfgData    = cfgData;        % the live, full panels (returned for a fast reopen)
 d.cfgGui     = cfgGui;
-d.clrEvt     = [0 0.2 0.8];    % one blue for every event mark (top ticks + Bottom lines)
 d.unit       = struct('wide', 'hr', 'narrow', 's');   % per-region x-axis units
 d.hInd       = gobjects(0);
 d.hCenter    = gobjects(0);
@@ -226,8 +235,9 @@ gui_labeledControl(gCtrl, 'button', '', 'Text', 'Load...', 'ButtonPushedFcn', @(
 
 % --- Controls: panel list for the active region. The region is set by clicking
 % a panel (no dropdown); the header shows which one is being edited. Each row is
-% a source dropdown with up / down (reorder) and X (delete); an Add row appends
-% one. There is no panel-count field - the list IS the layout. ---
+% a source dropdown with up / down (reorder), X (delete), and Ops (type-specific
+% options, e.g. a Bottom event set's lines <-> ticks); an Add row appends one.
+% There is no panel-count field - the list IS the layout. ---
 d.hPanelsLbl = gui_labeledControl(gCtrl, 'label', ...
     ['Panels (' regDisp(d.cfgRegion) ')'], 'FontWeight', 'bold');
 hSrcPanel  = gui_labeledControl(gCtrl, 'panel', '', 'RowHeight', 180);
@@ -398,26 +408,33 @@ hFig.Visible = vis;
 
     function setCurate(target)
         % switch the editable target to the set named TARGET ('' = None): write
-        % the outgoing set's edits back into its input, mirror the incoming set
-        % into the live working state, swap the action widget if the mode flips,
-        % then recolour the strips and redraw the window.
+        % the outgoing set's edits back, mirror the incoming set into the live
+        % state, swap the action widget if the mode flips, add the incoming set's
+        % curation panels if missing (ticks/lines, or a state strip), then redraw.
         data = hFig.UserData;
         data = writeBackCurate(data);
         prevMode = data.mode;
+        nBefore = numel(data.wideP) + numel(data.narrowP);
         data.curate  = target;
         data.currIdx = 1;
         data = syncCurate(data);
+        data = ensureCurateShown(data);
         if data.hasEvents && data.nEvents > 0, data.t0 = data.ed.peakTime(1); end
         data.dirty = false;
         if ~strcmp(prevMode, data.mode)
             data = buildActionWidget(data);   % events <-> states <-> view
         end
+        added = (numel(data.wideP) + numel(data.narrowP)) > nBefore;
         hFig.UserData = data;
         updateTitle(hFig);
         refreshCurateDD(hFig);
-        renderCurationStrips(hFig);           % recolour outgoing + incoming strips
-        renderNarrow(hFig);                   % window marks + emphasis
-        updateMarker(hFig);
+        if added
+            rebuildPlot(); populateSrc(hFig);   % new panels -> full relayout
+        else
+            renderCurationStrips(hFig);         % recolour outgoing + incoming strips
+            renderNarrow(hFig);                 % window marks + emphasis
+            updateMarker(hFig);
+        end
         refreshEvent(hFig);
     end
 
@@ -556,13 +573,16 @@ hFig.Visible = vis;
         % (re)build the tiledlayout from dd.wideP / dd.narrowP. Per-panel heights
         % become integer row spans; a 1-row black tile divides the regions; a
         % blank gap above the divider holds the Top region's x-axis, which prints
-        % on its bottom panel. A larger K makes the divider proportionally
-        % thinner while preserving the panel ratios.
+        % on its bottom panel. A Bottom event set shown as "lines" is an OVERLAY:
+        % it takes no tile and draws across the region's tiled panels (see
+        % drawBottomOverlay), so only tiled panels consume rows.
         if isfield(dd, 'tl') && ~isempty(dd.tl) && isvalid(dd.tl), delete(dd.tl); end
         K = 20;
-        nW = numel(dd.wideP); nN = numel(dd.narrowP);
+        nW = numel(dd.wideP);
+        tiledN = find(arrayfun(@(p) ~isOverlay(p, dd.inputs), dd.narrowP));
+        nN = numel(tiledN);
         wSpans = ones(1, nW); for i = 1:nW, wSpans(i) = max(1, round(dd.wideP(i).height * K)); end
-        nSpans = ones(1, nN); for i = 1:nN, nSpans(i) = max(1, round(dd.narrowP(i).height * K)); end
+        nSpans = ones(1, nN); for j = 1:nN, nSpans(j) = max(1, round(dd.narrowP(tiledN(j)).height * K)); end
         hasDiv = nW > 0 && nN > 0;
         base = sum(wSpans) + sum(nSpans) + hasDiv;
         xgap = 0;                          % blank rows for the Top x-tick labels
@@ -592,10 +612,12 @@ hFig.Visible = vis;
             dd.divider = dax;
         end
 
+        for i = 1:numel(dd.narrowP), dd.narrowP(i).ax = gobjects(1); end   % overlays: no tile
         dd.axNarrow = gobjects(1, nN);
-        for i = 1:nN
-            ax = nexttile(tl, r, [nSpans(i), 1]); r = r + nSpans(i);
-            dd.narrowP(i).ax = ax; dd.axNarrow(i) = ax;
+        for j = 1:nN
+            i = tiledN(j);
+            ax = nexttile(tl, r, [nSpans(j), 1]); r = r + nSpans(j);
+            dd.narrowP(i).ax = ax; dd.axNarrow(j) = ax;
         end
     end
 
@@ -639,9 +661,10 @@ hFig.Visible = vis;
 
     function renderNarrow(fig)
         % Bottom window [t0 +/- win/2], x in the Bottom's unit; redrawn as t0 or
-        % win changes (the Top is untouched, only its markers move). Every event
-        % set draws its in-window marks (its own colour); the curated set's
-        % current event is emphasised (peak solid, start / stop dashed).
+        % win changes (the Top is untouched, only its markers move). Signals draw
+        % into their tiles; each Bottom "lines" set then overlays its in-window
+        % marks across every tiled axis (drawBottomOverlay), and the curated set's
+        % current event is emphasised.
         data = fig.UserData;
         if isempty(data.narrowP), return; end
         xf = unitSec(data.unit.narrow);
@@ -651,10 +674,12 @@ hFig.Visible = vis;
         if we > data.Tend_s,  ws = ws - (we - data.Tend_s); we = data.Tend_s; end
         ws = max(0, ws);
         for i = 1:numel(data.narrowP)
-            pn = data.narrowP(i); ax = pn.ax;
+            pn = data.narrowP(i);
+            if isOverlay(pn, data.inputs), continue; end   % overlays draw below, no tile
+            ax = pn.ax;
             cla(ax); hold(ax, 'on');
             drawPanel(data, ax, pn.source, ws, we, xf);
-            drawWindowMarks(ax, data, ws, we, xf);
+            drawBottomOverlay(ax, data, ws, we, xf);
             ax.XLim = [ws, we] / xf;
             styleYLabel(ax, pn.label, pn.source, data.inputs);
             mute(ax);
@@ -1083,6 +1108,7 @@ hFig.Visible = vis;
         data.loadCoreFcn   = @loadCore;         % exposed for tests (drives the Load flow)
         data.loadPresetFcn = @loadPreset;       % exposed for tests (drives a preset switch)
         data.setCurateFcn  = @setCurate;        % exposed for tests (drives a curate switch)
+        data.rebuildFcn    = @rebuildPlot;      % exposed for tests (relayout after a panel edit)
         fig.UserData = data;
     end
 
@@ -1154,37 +1180,69 @@ hFig.Visible = vis;
         pArr(k).source = src.Value;
         pArr(k).label  = inp.label;
         pArr(k).height = inp.height;
+        pArr(k).render = '';             % a new source picks its own default look
         data.(f) = pArr;
         hFig.UserData = data;
-        rebuildPlot();
+        rebuildPlot(); populateSrc(hFig);
+    end
+
+    function onOps(k)
+        % per-panel options (the 4th button); contents depend on the panel type.
+        % For a Bottom event set it toggles lines <-> ticks - the seam where
+        % type-specific options (e.g. a spectrogram's log-frequency scale) land.
+        data = hFig.UserData;
+        f = regField(data.cfgRegion);
+        pArr = data.(f);
+        if k < 1 || k > numel(pArr), return; end
+        inp = getInput(data.inputs, pArr(k).source);
+        if isempty(inp), return; end
+        switch inp.type
+            case 'eventTicks'
+                if ~strcmp(pArr(k).region, 'narrow')
+                    gui_notify(hFig, 'A Top event set shows as ticks.', 'info'); return;
+                end
+                sel = gui_chooseDialog(hFig, ...
+                    sprintf('Show "%s" in the window as:', inp.name), {'Lines', 'Ticks'});
+                if isempty(sel), return; end
+                if strcmp(sel, 'Lines'), pArr(k).render = 'lines'; else, pArr(k).render = 'strip'; end
+                data.(f) = pArr; hFig.UserData = data;
+                rebuildPlot(); populateSrc(hFig);
+            otherwise
+                gui_notify(hFig, sprintf('No options for a %s panel yet.', inp.type), 'info');
+        end
     end
 
     function populateSrc(fig)
         % rebuild the active region's panel list: a row per panel (source
-        % dropdown + up / down / X), then an Add row.
+        % dropdown + up / down / X / Ops), then an Add row. Ops opens type-
+        % specific options; up / down are disabled for a lines overlay, which has
+        % no stack position to reorder.
         data = fig.UserData;
         pArr = data.(regField(data.cfgRegion));
         g = data.hSrcGrid;
         delete(g.Children);
         nP = numel(pArr);
         g.RowHeight = repmat({'fit'}, 1, nP + 1);
-        g.ColumnWidth = {'1x', 22, 22, 22};
+        g.ColumnWidth = {'1x', 22, 22, 22, 22};
         opts = availSources(data.inputs);
         for k = 1:nP
             val = pArr(k).source;
             if ~any(strcmp(val, opts)), val = opts{1}; end
+            ovl = isOverlay(pArr(k), data.inputs);
             dd = uidropdown(g, 'Items', opts, 'Value', val, ...
                 'ValueChangedFcn', @(s, ~) onSrcChange(k, s));
             dd.Layout.Row = k; dd.Layout.Column = 1;
             bU = uibutton(g, 'Text', char(9650), 'ButtonPushedFcn', @(~, ~) movePanel(k, -1));
-            bU.Layout.Row = k; bU.Layout.Column = 2; bU.Enable = tf2e(k > 1);
+            bU.Layout.Row = k; bU.Layout.Column = 2; bU.Enable = tf2e(k > 1 && ~ovl);
             bD = uibutton(g, 'Text', char(9660), 'ButtonPushedFcn', @(~, ~) movePanel(k, +1));
-            bD.Layout.Row = k; bD.Layout.Column = 3; bD.Enable = tf2e(k < nP);
+            bD.Layout.Row = k; bD.Layout.Column = 3; bD.Enable = tf2e(k < nP && ~ovl);
             bX = uibutton(g, 'Text', 'X', 'ButtonPushedFcn', @(~, ~) removePanel(k));
             bX.Layout.Row = k; bX.Layout.Column = 4; bX.Enable = tf2e(nP > 1);
+            bO = uibutton(g, 'Text', char(9881), 'ButtonPushedFcn', @(~, ~) onOps(k));
+            bO.Layout.Row = k; bO.Layout.Column = 5;
         end
         bA = uibutton(g, 'Text', 'Add', 'ButtonPushedFcn', @(~, ~) addPanel());
-        bA.Layout.Row = nP + 1; bA.Layout.Column = [1, 4];
+        bA.Layout.Row = nP + 1; bA.Layout.Column = [1, 5];
     end
 
     function rebuildPlot()
@@ -1413,6 +1471,7 @@ if d.hasEvents && d.nEvents > 0, d.t0 = d.ed.peakTime(1); else, d.t0 = d.Tend_s 
 panels = normalizePanels(config, d.inputs);
 d.wideP   = panels(strcmp({panels.region}, 'wide'));
 d.narrowP = panels(strcmp({panels.region}, 'narrow'));
+d = ensureCurateShown(d);   % add the curated set's ticks / lines if the preset omits them
 if isempty(d.wideP) && ~isempty(d.narrowP), d.cfgRegion = 'narrow'; else, d.cfgRegion = 'wide'; end
 end
 
@@ -1465,6 +1524,26 @@ if strcmp(d.inputs(ix).type, 'stateStrip')
     d.inputs(ix).data.labels = d.labels(:);
 elseif d.nEvents > 0
     d.inputs(ix).data.accepted = logical(d.accepted(:));
+end
+end
+
+function d = ensureCurateShown(d)
+% add the panels a curated set needs, if MISSING - never removing, reordering,
+% or touching the rest of the arrangement. An event target gets ticks (Top) +
+% lines (Bottom); a state target gets the editable strip (Top + Bottom).
+% makePanel reads the representation from type + region, so both share one path.
+ix = curateIx(d);
+if isempty(ix), return; end
+nm = d.inputs(ix).name;
+d = ensurePanel(d, 'wide', nm);
+d = ensurePanel(d, 'narrow', nm);
+end
+
+function d = ensurePanel(d, region, source)
+% append a panel for SOURCE in REGION unless one is already there
+f = regField(region);
+if isempty(d.(f)) || ~any(strcmp({d.(f).source}, source))
+    d.(f) = [d.(f), makePanel(source, region, d.inputs)];
 end
 end
 
@@ -1592,34 +1671,32 @@ else
 end
 end
 
-function drawWindowMarks(ax, data, ws, we, xf)
-% overlay, on a Bottom signal panel, the in-window marks of every event set in
-% its own colour (one NaN-separated line per set, so the object count is set-
-% bounded, not event-bounded, and the marks filter to [ws, we] first). The
-% curated set's current event is then emphasised on top (peak solid, start /
-% stop dashed). State sets never mark (they stay the coloured strip).
+function drawBottomOverlay(ax, data, ws, we, xf)
+% overlay, on a Bottom signal axis, the in-window marks of each event set placed
+% as a Bottom "lines" panel - each its own colour, one NaN-separated line, marks
+% filtered to [ws, we] first. A set marks the window exactly when it is a Bottom
+% lines-panel, so switching it to "ticks" or removing it clears its lines. The
+% curated set's current event is emphasised on top of ITS lines (peak solid,
+% start / stop dashed) - part of its lines, so ticks/remove clear that too.
 yl = ax.YLim;
-for k = 1:numel(data.inputs)
-    inp = data.inputs(k);
-    if ~strcmp(inp.type, 'eventTicks'), continue; end
-    if ~isstruct(inp.data) || ~isfield(inp.data, 'peakTime'), continue; end
+for i = 1:numel(data.narrowP)
+    pn = data.narrowP(i);
+    if ~isOverlay(pn, data.inputs), continue; end
+    inp = getInput(data.inputs, pn.source);
+    if isempty(inp) || ~isstruct(inp.data) || ~isfield(inp.data, 'peakTime'), continue; end
     pk = inp.data.peakTime(:);
-    if strcmp(inp.name, data.curate)
+    isCur = strcmp(inp.name, data.curate);
+    if isCur
         if numel(data.accepted) == numel(pk), pk = pk(data.accepted); end
     elseif isfield(inp.data, 'accepted') && numel(inp.data.accepted) == numel(pk)
         pk = pk(logical(inp.data.accepted));
     end
-    inWin = pk(pk >= ws & pk <= we);
-    drawSpanLines(ax, inWin / xf, yl, inp.clr);
-end
-% emphasise the curated set's current event
-if data.hasEvents && data.nEvents > 0 && strcmp(data.mode, 'events')
-    ev = data.currIdx;
-    if data.ed.peakTime(ev) >= ws && data.ed.peakTime(ev) <= we
-        cix = curateIx(data);
-        clr = data.clrEvt;
-        if ~isempty(cix), clr = data.inputs(cix).clr; end
-        drawEventMarks(ax, eventMarks(data.ed, ev) / xf, clr);
+    drawSpanLines(ax, pk(pk >= ws & pk <= we) / xf, yl, inp.clr);
+    if isCur && strcmp(data.mode, 'events') && data.hasEvents && data.nEvents > 0
+        ev = data.currIdx;
+        if data.ed.peakTime(ev) >= ws && data.ed.peakTime(ev) <= we
+            drawEventMarks(ax, eventMarks(data.ed, ev) / xf, inp.clr);
+        end
     end
 end
 end
@@ -1703,7 +1780,7 @@ end
 
 function clr = evtPalette(k)
 % distinct event-set colours, cycled past the end
-P = [0.00 0.20 0.80;      % blue   (matches d.clrEvt / the single-set look)
+P = [0.00 0.20 0.80;      % blue   (the single-set look, unchanged)
      0.85 0.33 0.10;      % orange
      0.20 0.60 0.20;      % green
      0.55 0.20 0.60;      % purple
@@ -1908,7 +1985,8 @@ end
 function panels = addAxField(panels)
 % guarantee an .ax field on every entry (and on an empty array)
 if isempty(panels)
-    panels = struct('source', {}, 'region', {}, 'height', {}, 'label', {}, 'ax', {});
+    panels = struct('source', {}, 'region', {}, 'height', {}, 'label', {}, ...
+        'render', {}, 'ax', {});
     return;
 end
 for i = 1:numel(panels)
@@ -1917,13 +1995,24 @@ end
 end
 
 function pn = makePanel(name, region, inputs)
+% .render '' means "by type/region": an eventTicks panel is a tick strip in the
+% Top and a spanning-lines OVERLAY in the Bottom; 'strip'/'lines' override that
+% (set from the Ops button). Other types ignore it (always tiled).
 inp = getInput(inputs, name);
-if isempty(inp)
-    pn = struct('source', name, 'region', region, 'height', 1, 'label', name, 'ax', gobjects(1));
-else
-    pn = struct('source', name, 'region', region, 'height', inp.height, ...
-        'label', inp.label, 'ax', gobjects(1));
+if isempty(inp), h = 1; lbl = name; else, h = inp.height; lbl = inp.label; end
+pn = struct('source', name, 'region', region, 'height', h, 'label', lbl, ...
+    'render', '', 'ax', gobjects(1));
 end
+
+function tf = isOverlay(panel, inputs)
+% true if the panel draws as spanning lines across the region's tiled panels
+% (so it takes no tile of its own) rather than a stacked row. Only a Bottom
+% event set does this; the .render override forces strip/lines either way.
+inp = getInput(inputs, panel.source);
+if isempty(inp) || ~strcmp(inp.type, 'eventTicks'), tf = false; return; end
+if ~strcmp(panel.region, 'narrow'), tf = false; return; end   % overlays: Bottom only
+r = ''; if isfield(panel, 'render'), r = panel.render; end
+tf = ~strcmp(r, 'strip');                                      % auto / 'lines' -> overlay
 end
 
 function s = availSources(inputs)

@@ -184,7 +184,10 @@ function guiPath_doc()
 %   - spec         a spectrogram (adapter struct .s / .freq / .tstamps).
 %   - hypnogram    read-only sleep-state strip (bout times).
 %   - raster       spike raster (cell of spike-time vectors [s]).
-%   - eventTicks   event marks; a curation target (events mode).
+%   - eventTicks   event marks: a tick strip in the Top, spanning lines across
+%                  the signals in the Bottom (an overlay, so it takes no tile).
+%                  A curation target (events mode); the Ops button overrides the
+%                  Bottom look (lines <-> ticks).
 %   - stateStrip   editable per-epoch label strip; a target (states mode).
 %
 %   Panel fields (guiPath_panel).
