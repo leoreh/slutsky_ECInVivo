@@ -57,13 +57,10 @@ elseif isstruct(s)
     end
 end
 
-% initialize other params
-session.channelTags.Bad.channels = [];
-
 % load existing basename.session.mat file if exist
 [~, basename, ~] = fileparts(basepath);
 sessionName = fullfile(basepath, [basename, '.session.mat']);
-if exist(sessionName, 'file')
+if exist(sessionName, 'file') 
     sprintf('loading %s', sessionName)
     load(sessionName)
     if ~forceL
@@ -76,6 +73,19 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % standard params
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% channelTags
+if ~isfield(session, 'channelTags')
+    session.channelTags = [];
+end
+session.channelTags = [];
+if ~isfield(session.channelTags, 'Bad')
+    session.channelTags.Bad.channels = [];
+end
+if ~isfield(session.channelTags, 'Ripple')
+    session.channelTags.Ripple.channels = [];
+end
+
 % Assumes file structure: animal/experiment/
 pathPieces = regexp(basepath, filesep, 'split');
 

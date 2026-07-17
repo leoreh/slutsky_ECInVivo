@@ -47,15 +47,23 @@ for ipath = 1 : npaths
     cd(filepath)
 
     for ifile = 1:length(vars)
-        filename = dir(['*', vars{ifile}, '*.mat']);
+        % Match <basename>.<var>.mat exactly, then fall back to
+        % <basename>.<var>*.mat (e.g. a '.cellinfo' infix). The leading dot is
+        % what keeps a loose substring from grabbing AccuSleep_states.mat when
+        % vars{ifile} = 'sleep_states'. On a tie the shortest name wins.
+        filename = dir(['*.', vars{ifile}, '.mat']);
+        if isempty(filename)
+            filename = dir(['*.', vars{ifile}, '*.mat']);
+        end
 
-        if length(filename) > 1
-            if flgPrnt, warning('Multiple files with the name %s. Using first one %s.', vars{ifile}, filename(1).name); end
-            filename = filename(1).name;
-        elseif isempty(filename)
+        if isempty(filename)
             if flgPrnt, warning('No %s file in %s, skipping...', vars{ifile}, filepath), end
             v(ipath).(vars{ifile}) = [];
             continue
+        elseif length(filename) > 1
+            [~, iShort] = min(cellfun(@length, {filename.name}));
+            if flgPrnt, warning('Multiple %s files; using %s.', vars{ifile}, filename(iShort).name); end
+            filename = filename(iShort).name;
         else
             filename = filename(1).name;
         end

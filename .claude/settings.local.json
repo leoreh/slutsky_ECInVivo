@@ -10,7 +10,11 @@
       "Bash(grep -E \"\\\\\\\\.\\(pos|amp|ampZ|times|peakTime|dur|width10|state|accepted|emgZ|emgRms|idxQA\\)\" lfp/ed/ed_*.m)",
       "Bash(grep \"\\\\\\\\s=\\\\\\\\s\")",
       "Bash(grep -E \"\\\\.m$\")",
-      "Bash(xargs grep -l \"plot_hypnogram\\\\|labels2bouts\\\\|bouts2labels\")"
+      "Bash(xargs grep -l \"plot_hypnogram\\\\|labels2bouts\\\\|bouts2labels\")",
+      "Read(//d/Code/slutsky_lab/**)",
+      "Bash(matlab -batch \"addpath\\('D:/Code/slutsky_lab/dev/refactor'\\); build_inventory\")",
+      "Bash(awk '-F|' '/^\\\\| `/ { m=$4; u=$5; s=$6; gsub\\(/ /,\"\",m\\); gsub\\(/ /,\"\",u\\); gsub\\(/ /,\"\",s\\); if\\(m==\"\" && u==\"\" && s==\"✓\"\\) c++ } END{print c+0}' /d/Code/slutsky_lab/DELETION_INVENTORY.md)",
+      "Bash(grep -c '^| `' /d/Code/slutsky_lab/DELETION_INVENTORY.md)"
     ]
   }
 }

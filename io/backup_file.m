@@ -20,7 +20,7 @@ function bkPath = backup_file(file, varargin)
 %       bkPath   - (Char) Path of the backup copy, or '' if FILE was absent.
 %
 %   HISTORY:
-%       05 Jul 2026 - factored from spontCa_writeEvents for guiPath_curate saves.
+%       05 Jul 2026 - factored from spontCa_writeEvents for guiPath saves.
 
 p = inputParser;
 addRequired(p, 'file', @(x) ischar(x) || isstring(x));

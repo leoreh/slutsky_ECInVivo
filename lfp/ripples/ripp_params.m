@@ -12,17 +12,22 @@ function ripp = ripp_params(rippSig, ripp)
 %       4. Event Frequency: Average freq over detection duration (Hz).
 %       5. Total Energy: Sum of squared filtered signal (Integrated Power).
 %       6. Skewness: Center of Mass of the envelope relative to peak (in ms).
+%       7. Peak Frequency: Spectral peak of the whitened event PSD (Hz). The
+%          Hilbert instantaneous frequency (.freq/.freqEvent) is biased LOW by
+%          the 1/f slope; .freqPeak removes the aperiodic tilt and reports the
+%          true oscillation frequency. Additive - the Hilbert measures are kept.
 %
 %   INPUTS:
-%       rippSig     - (Struct) Signal structure (requires .filt, .amp, .freq).
+%       rippSig     - (Struct) Signal structure (requires .lfp, .filt, .amp, .freq).
 %       ripp        - (Struct) Event structure with .times and .peakTime.
 %                              Must contain .info.fs.
 %
 %   OUTPUTS:
 %       ripp        - (Struct) Updated structure with new fields:
 %                       .amp       (N x 1) [uV]
-%                       .freq      (N x 1) [Hz] (Fixed window)
-%                       .freqEvent (N x 1) [Hz] (Full Duration)
+%                       .freq      (N x 1) [Hz] (Fixed window, Hilbert)
+%                       .freqEvent (N x 1) [Hz] (Full Duration, Hilbert)
+%                       .freqPeak  (N x 1) [Hz] (Whitened spectral peak)
 %                       .energy    (N x 1) [uV^2]
 %                       .dur       (N x 1) [ms]
 %                       .skew      (N x 1) [ms]
@@ -32,6 +37,8 @@ function ripp = ripp_params(rippSig, ripp)
 %
 %   HISTORY:
 %       Updated: 23 Jan 2026
+%       Updated: 260716 (add .freqPeak, the 1/f-corrected ripple frequency;
+%                the Hilbert .freq is biased low by the aperiodic slope).
 
 %% ========================================================================
 %  ARGUMENTS & SETUP
@@ -45,9 +52,13 @@ nSamples = length(rippSig.filt);
 ripp.amp = nan(nEvents, 1);
 ripp.freq = nan(nEvents, 1);
 ripp.freqEvent = nan(nEvents, 1);
+ripp.freqPeak = nan(nEvents, 1);
 ripp.energy = nan(nEvents, 1);
 ripp.dur = nan(nEvents, 1);
 ripp.skew = nan(nEvents, 1);
+
+% Whitened-peak window (fixed, symmetric about the peak)
+nPeakWin = round(0.064 * fs);
 
 % Convert Times to Samples (1-based indexing)
 % We use max/min to ensure we don't index outside the signal bounds
@@ -83,9 +94,14 @@ for iEvent = 1:nEvents
     % Instantaneous amplitude of the envelope at the exact peak index
     ripp.amp(iEvent) = rippSig.amp(peakSamps(iEvent));
 
-    % Mean Frequency (Hz)
+    % Mean Frequency (Hz) - Hilbert instantaneous (biased low by 1/f)
     ripp.freq(iEvent) = mean(rippSig.freq(idxFxd), 'omitnan');
     ripp.freqEvent(iEvent) = mean(rippSig.freq(idxDtct), 'omitnan');
+
+    % Peak Frequency (Hz) - whitened event-PSD peak (1/f-corrected)
+    idxPk = (peakSamps(iEvent) - nPeakWin) : (peakSamps(iEvent) + nPeakWin);
+    idxPk = idxPk(idxPk >= 1 & idxPk <= nSamples);
+    ripp.freqPeak(iEvent) = ripp_freqPeak(rippSig.lfp(idxPk), fs);
 
     % Total Energy (uV^2)
     ripp.energy(iEvent) = sum(rippSig.filt(idxDtct) .^ 2, 'omitnan');
@@ -100,3 +116,36 @@ for iEvent = 1:nEvents
 end
 
 end     % EOF
+
+
+% =========================================================================
+%  LOCAL: whitened event-PSD peak frequency
+% =========================================================================
+function f0 = ripp_freqPeak(seg, fs)
+% Peak frequency of one event's spectrum after removing the 1/f background.
+% Fits a power law (log-log line) to the aperiodic part - the fit range
+% brackets the ripple band but excludes it (30-500 Hz minus 70-260 Hz) so the
+% oscillation does not pull the slope - divides it out, and returns the
+% residual peak inside 70-260 Hz. This is the honest ripple frequency; the
+% Hilbert instantaneous estimate rides the 1/f slope downward.
+
+seg = seg(:);
+if numel(seg) < 16, f0 = NaN; return; end
+
+nf  = 512;
+fAx = (0:nf/2)' * fs / nf;
+ps  = abs(fft(detrend(seg) .* hann(numel(seg)), nf)) .^ 2;
+ps  = ps(1:nf/2+1);
+
+fitBand = (fAx >= 30 & fAx <= 500) & ~(fAx >= 70 & fAx <= 260) & fAx > 0;
+if nnz(fitBand) < 4, f0 = NaN; return; end
+
+pf   = polyfit(log(fAx(fitBand)), log(ps(fitBand) + eps), 1);
+whit = ps ./ exp(polyval(pf, log(max(fAx, 1))));
+
+rippBand = fAx >= 70 & fAx <= 260;
+fRipp    = fAx(rippBand);
+[~, im]  = max(whit(rippBand));
+f0       = fRipp(im);
+
+end

@@ -33,6 +33,30 @@ for iFile = 1 : nFiles
     [~, basename] = fileparts(basepath);
     cd(basepath)
 
+    session = CE_sessionTemplate(pwd, 'viaGUI', false,...
+        'forceDef', true, 'forceL', true, 'saveVar', true);
+    basepath = session.general.basePath;
+    nchans = session.extracellular.nChannels;
+    fs = session.extracellular.sr;
+    spkgrp = session.extracellular.spikeGroups.channels;
+    [~, basename] = fileparts(basepath);
+    
+    % Sleep Signal
+    sSig = as_prepSig([basename, '.lfp'], [basename, '.emg.dat'],...
+        'eegCh', [1 : 4], 'emgCh', 1, 'saveVar', true, 'emgNchans', 4, 'eegNchans', 12,...
+        'inspectSig', false, 'forceLoad', true, 'eegFs', 1250, 'emgFs', 3051.76,...
+        'emgCf', [80 450]);
+    
+    labelsmanfile = [basename, '.sleep_labelsMan.mat'];
+    AccuSleep_viewer(sSig, labels, labelsmanfile)
+    
+    % classify with a network
+    netfile = 'D:\Code\slutsky_ECInVivo\lfp\SleepStates\AccuSleep\trainedNetworks\net_230212_103132.mat';
+    calData = [];
+    ss = as_classify(sSig, 'basepath', basepath, 'inspectLabels', false,...
+        'saveVar', true, 'forceA', true, 'netfile', netfile,...
+        'graphics', true, 'calData', calData);
+
     % spktimes
     spktimes = v(iFile).spikes.times;
 
@@ -56,9 +80,11 @@ for iFile = 1 : nFiles
     % Ripples
     ripp = ripp_wrapper('basepath', pwd, ...
         'win', [0 12] * 3600, ...
-        'rippCh', [], ...
+        'rippCh', [1 : 4], ...
         'flgPlot', true, ...
-        'flgSave', true);
+        'flgSave', true, ...
+        'flgNS', true, ...
+        'flgForce', false);
     
     % Epileptiform discharges
     ed = ed_wrapper('basepath', basepath, ...
@@ -70,11 +96,10 @@ for iFile = 1 : nFiles
 end
 
 
-[cfgData, cfgGui] = guiPath_presets('ripp');
+[cfgData, cfgGui] = guiPath_presets('ed');
 cfgData = guiPath_load(cfgData);
-[hFig, cfgData] = guiPath_curate(basepath, 'cfgData', cfgData, 'cfgGui', cfgGui);
+[hFig, cfgData] = guiPath(basepath, 'cfgData', cfgData, 'cfgGui', cfgGui);
 
-hFig.UserData.cfgData
 
 
 
@@ -169,7 +194,7 @@ guiTbl_bar(tblBrst, 'yVar', 'pBurst', 'xVar', 'genotype', 'grpVar', 'unitType');
 
 basepaths = unique([mcu_basepaths('wt_bsl'), mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl')]);
 
-basepath = basepaths{4};
+basepath = basepaths{3};
 
 % Signals (loaded once; sSig/specAdapter are full-session for the GUI)
 [sig, emg, emgRms, fs, specAdapter, sSig] = ed_sigLoad(basepath);
@@ -177,11 +202,11 @@ basepath = basepaths{4};
 ed = ed_wrapper('basepath', basepath, 'flgSave', true, 'flgPlot', false);  % save ed.mat for the EDs preset; suppress its auto-GUI
 
 tic
-guiPath_curate(basepath, 'preset', 'EDs');
+guiPath(basepath, 'preset', 'EDs');
 toc
 
 
-guiPath_curate(basepath);
+guiPath(basepath);
 
 
 tic

@@ -18,7 +18,10 @@ function ripp = ripp_wrapper(varargin)
 %             (evt_states), per-event params (ripp_params), LFP maps (evt_maps).
 %          d. Spiking: SU/MU modulation + PETH (evt_spks); phase (spklfp_phase).
 %          e. Convert to absolute time, populate .info, save, plot.
-%       3. Optionally launch the curation GUI (guiPath_curate, 'Ripples').
+%       3. Optionally export a NeuroScope event file (evt2ns). This sits
+%          outside the detect-or-load branch, so re-running on a curated
+%          session refreshes the export against the stored .accepted mask.
+%       4. Optionally launch the curation GUI (guiPath, 'Ripples').
 %
 %   INPUTS (Parameter/Value):
 %       'basepath'   - (Char) Session directory. {pwd}
@@ -34,6 +37,7 @@ function ripp = ripp_wrapper(varargin)
 %       'bit2uv'     - (Num)  Conversion factor. {auto: TDT vs Intan}
 %       'flgPlot'    - (Log)  Generate the summary figure? {true}
 %       'flgSave'    - (Log)  Save output .mat files? {false}
+%       'flgNS'      - (Log)  Write the NeuroScope event file? {false}
 %       'flgCurate'  - (Log)  Launch the curation GUI? {false}
 %       'flgForce'   - (Log)  Re-detect even if .ripp.mat exists? {false}
 %       'verbose'    - (Log)  Print progress? {true}
@@ -52,17 +56,26 @@ function ripp = ripp_wrapper(varargin)
 %       basename.rippSpkMaps.mat - 3D spike raster [unit x event x bin] (heavy)
 %       basename.rippSpkLfp.mat  - spike-LFP phase coupling
 %
+%   FILES SAVED (when flgNS = true; independent of flgSave):
+%       basename.rip.evt         - NeuroScope events (start / peak / stop marks)
+%       The lone output tagged 'rip' rather than the pipeline's 'ripp':
+%       NeuroScope loads an event file only when the id is exactly three
+%       characters, and refuses the file otherwise. See evt2ns.
+%
 %   DEPENDENCIES:
 %       ripp_sigLoad, ripp_sigPrep, ripp_times, ripp_params, spklfp_phase,
-%       guiPath_curate; and the shared event layer (lfp/events): evt_files,
+%       guiPath; and the shared event layer (lfp/events): evt_files,
 %       evt_pickCh, evt_spkPrep, evt_boutTimes, evt_emgScore, evt_spkGain,
 %       evt_qa, evt_subset, evt_ctrlTimes, evt_states, evt_maps, evt_spks,
-%       evt_saveSpks, evt_plotSpks.
+%       evt_saveSpks, evt_plotSpks, evt2ns.
 %
 %   HISTORY:
 %       Updated: 260706 (flgForce-only re-run mirroring ed_wrapper; shared spine
 %                via evt_* helpers; populate .info; drop the steps modes and the
 %                Neuroscope export).
+%       Updated: 260715 (restore the Neuroscope export as flgNS, now a .evt file
+%                via evt2ns, placed after detect-or-load so it can be refreshed
+%                post-curation).
 
 %% ========================================================================
 %  ARGUMENTS
@@ -82,6 +95,7 @@ addParameter(p, 'mapDur', [-0.1 0.1], @isnumeric);
 addParameter(p, 'bit2uv', [], @isnumeric);
 addParameter(p, 'flgPlot', true, @islogical);
 addParameter(p, 'flgSave', false, @islogical);
+addParameter(p, 'flgNS', false, @islogical);
 addParameter(p, 'flgCurate', false, @islogical);
 addParameter(p, 'flgForce', false, @islogical);
 addParameter(p, 'verbose', true, @islogical);
@@ -100,6 +114,7 @@ mapDur    = p.Results.mapDur;
 bit2uv    = p.Results.bit2uv;
 flgPlot   = p.Results.flgPlot;
 flgSave   = p.Results.flgSave;
+flgNS     = p.Results.flgNS;
 flgCurate = p.Results.flgCurate;
 flgForce  = p.Results.flgForce;
 verbose   = p.Results.verbose;
@@ -178,7 +193,7 @@ else
     rippMaps = evt_maps(rippSig, ripp.peakTime, fs, ...
         'mapDur', mapDur, 'flgSave', false);
 
-    % Seed curation acceptance (guiPath_curate reads .accepted)
+    % Seed curation acceptance (guiPath reads .accepted)
     ripp.accepted = true(size(ripp.times, 1), 1);
 
     % ---- Spiking (SU/MU modulation + PETH; phase) -----------------------
@@ -229,12 +244,32 @@ else
 end
 
 %% ========================================================================
+%  NEUROSCOPE
+%  ========================================================================
+% Both branches leave ripp in absolute time, so the export reads the same on a
+% fresh detection (.accepted all-true) and on a re-run over a curated session
+% (the GUI's mask) - rejected events stay in the file under their own palette
+% entry. A .ripp.mat predating the canonical schema carries no .accepted; an
+% empty mask there labels every event as accepted rather than erroring.
+if flgNS
+    if verbose, fprintf('[RIPP]: Writing NeuroScope events...\n'); end
+    accepted = [];
+    if isfield(ripp, 'accepted'), accepted = ripp.accepted; end
+
+    % 'rip', not 'ripp': NeuroScope rejects an event id that is not exactly
+    % three characters, so this one file cannot follow the pipeline's tag.
+    evt2ns(ripp.times, ripp.peakTime, 'basepath', basepath, ...
+        'basename', basename, 'fileTag', 'rip', 'lbl', 'Ripple', ...
+        'accepted', accepted);
+end
+
+%% ========================================================================
 %  CURATE
 %  ========================================================================
 if flgCurate
     if isfile(files.evt)
         if verbose, fprintf('[RIPP]: Launching curation GUI...\n'); end
-        guiPath_curate(basepath, 'preset', 'Ripples', 'basename', basename);
+        guiPath(basepath, 'preset', 'Ripples', 'basename', basename);
     elseif verbose
         fprintf('[RIPP]: No %s.ripp.mat; set flgSave=true to curate.\n', ...
             basename);

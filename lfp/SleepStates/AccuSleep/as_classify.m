@@ -34,6 +34,7 @@ function ss = as_classify(sSig, varargin)
 % 19 apr 21     separated prepSig
 % 29 nov 21     add minDur and interDur
 % 06 jan 22     cleaned and implemented sSig
+% 15 jul 26     ss from manual labels alone if calibration fails
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -136,18 +137,27 @@ if isempty(calData)
     fprintf('done.\n')
 end
 
-% classify recording
-fprintf('classifying... ')
-[labels_net, netScores] = AccuSleep_classify(sSig.spec,...
-    sSig.spec_freq, sSig.emg_rms, calData, net);
+% classify recording. createCalibrationData returns empty if not all states
+% are labeled, in which case the net cannot run and labels remain as
+% manually scored
+if isempty(calData)
+    warning('no calibration; ss based on manual labels alone')
+    labels_net = [];
+    netScores = [];
 
-% insert munual labels to final results. this is because
-% AccuSleep_classify doesn't allow for 'only overwrite undefind' as in the
-% gui
-labels = labels_net;
-manIdx = find(labels_man < nstates + 1);
-labels(manIdx) = labels_man(manIdx);
-fprintf('done.\n')
+else
+    fprintf('classifying... ')
+    [labels_net, netScores] = AccuSleep_classify(sSig.spec,...
+        sSig.spec_freq, sSig.emg_rms, calData, net);
+
+    % insert munual labels to final results. this is because
+    % AccuSleep_classify doesn't allow for 'only overwrite undefind' as in
+    % the gui
+    labels = labels_net;
+    manIdx = find(labels_man < nstates + 1);
+    labels(manIdx) = labels_man(manIdx);
+    fprintf('done.\n')
+end
 
 % remove labels of uncertainty
 
@@ -186,7 +196,7 @@ end
 
 if graphics
     % confusion matrix (relative to manual labels)
-    if any(labels_man ~= nstates + 2)
+    if ~isempty(labels_net) && any(labels_man ~= nstates + 2)
         [ss.netPrecision, ss.netRecall] = as_cm(labels_man, labels_net, netScores);
     end
     

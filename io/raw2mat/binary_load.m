@@ -32,11 +32,17 @@ function data = binary_load(filename, varargin)
 %                   - Else if `round(fs) == 24414` (e.g., common TDT sampling rate), `bit2uv` is set to 1.
 %                   - Else if 'bit2uv' is explicitly passed as a non-empty scalar, that value is used.
 %                   - Else (if 'bit2uv' is not provided by the user), it defaults to 0.195.
+%   outClass    - char array, class of the returned data (default: 'double').
+%                   - 'double': scale by bit2uv and return double microvolts.
+%                   - 'native': return the file's own samples in their stored
+%                     class (e.g. int16), UNSCALED. bit2uv is ignored, so the
+%                     values are raw ADC counts, not microvolts. Use this only
+%                     for display or when memory matters.
 %
 % OUTPUT
 %   data        - matrix (nSamples x numel(ch)) of loaded data.
-%                 The data type is `double`.
-%                 The data is scaled by the `bit2uv` factor once.
+%                 'double' (the default): double, scaled by bit2uv once.
+%                 'native': the file's stored class (e.g. int16), unscaled.
 %
 % Based on bz_LoadBinary by Michaël Zugaro (2004-2011) and DLevenstein (2016).
 
@@ -60,6 +66,7 @@ addParameter(p, 'precision', 'int16', @(x) ischar(x) || isstring(x));
 addParameter(p, 'skip', 0, @(x) isnumeric(x) && isscalar(x) && isreal(x) && mod(x,1)==0 && x >= 0);
 addParameter(p, 'downsample', 1, @(x) isnumeric(x) && isscalar(x) && isreal(x) && mod(x,1)==0 && x >= 1);
 addParameter(p, 'bit2uv', 0.195, @(x) isnumeric(x) && (isscalar(x) || isempty(x)));
+addParameter(p, 'outClass', 'double', @(x) any(strcmpi(x, {'double', 'native'})));
 
 parse(p, filename, varargin{:});
 
@@ -76,6 +83,7 @@ precision = char(p.Results.precision);
 skip = p.Results.skip;
 downsample = p.Results.downsample;
 bit2uv = p.Results.bit2uv;
+outClass = lower(char(p.Results.outClass));
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Preparations
@@ -176,24 +184,35 @@ if nChunks == 1
     chunkSamples = chunks(1, 2) - chunks(1, 1) + 1;
     data = LoadChunk(f, nCh, ch, chunkSamples, precision, skipSamples);
 
-    % Apply bit2uv conversion
-    data = double(data) * bit2uv;
+    % Scale to double microvolts, or (native) keep the file's own samples
+    if ~strcmp(outClass, 'native')
+        data = double(data) * bit2uv;
+    end
     samplesCnt = size(data, 1);     % define for the post-read assertion below
 else
-    
-    % Preallocate data matrix with the file's precision.
-    data = zeros(nSamples, numel(ch), precision);
+
+    % Preallocate in the OUTPUT class, not the file's: 'double' -> double so the
+    % scaled microvolts are exact; 'native' -> the file precision so the raw
+    % samples pass through. (Preallocating in the file precision, as this path
+    % once did, cast the scaled double back to int16 on assignment - silently
+    % rounding every value to whole microvolts for any read over one chunk.)
+    if strcmp(outClass, 'native'), outPrec = precision; else, outPrec = 'double'; end
+    data = zeros(nSamples, numel(ch), outPrec);
     samplesCnt = 0;
 
     for iChunk = 1:nChunks
-        chunkSamples = chunks(iChunk, 2) - chunks(iChunk, 1) + 1;   
+        chunkSamples = chunks(iChunk, 2) - chunks(iChunk, 1) + 1;
 
         chunkData = LoadChunk(f, nCh, ch, chunkSamples, precision, skipSamples);
-   
+
         idxStart = samplesCnt + 1;
         idxEnd = samplesCnt + chunkSamples;
-        
-        data(idxStart : idxEnd, :) = double(chunkData) * bit2uv;
+
+        if strcmp(outClass, 'native')
+            data(idxStart : idxEnd, :) = chunkData;
+        else
+            data(idxStart : idxEnd, :) = double(chunkData) * bit2uv;
+        end
         samplesCnt = idxEnd;
         
         % The condition 'chunkSamples < chunkSamples' is always false.

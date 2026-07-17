@@ -18,13 +18,13 @@ function ed = ed_wrapper(varargin)
 %             (evt_states), LFP maps (evt_maps).
 %          d. Spiking: SU/MU modulation + PETH (evt_spks).
 %          e. Convert to absolute time, populate .info, save, plot.
-%       3. Optionally launch the curation GUI (guiPath_curate, preset 'EDs').
+%       3. Optionally launch the curation GUI (guiPath, preset 'EDs').
 %
 %   INPUTS (Parameter/Value):
 %       'basepath'   - (Char) Session directory. {pwd}
 %       'win'        - (Vec)  Analysis window [start end] (s). {[0 Inf]}
 %       'sigSource'  - (Char) 'lfp' (raw channel, default) | 'eeg' (sSig.eeg).
-%       'edCh'       - (Num)  Channel for 'lfp'. {channelTags.Ripple}
+%       'edCh'       - (Num)  Channel for 'lfp'. {ripp.info.rippCh}
 %       'bit2uv'     - (Num)  Conversion for the 'lfp' source. {auto}
 %       'thr'        - (Num)  Z-score detection threshold. {7}
 %       'thrDir'     - (Char) 'positive' | 'negative' | 'both'. {'both'}
@@ -59,8 +59,8 @@ function ed = ed_wrapper(varargin)
 %       basename.edSpkMaps.mat  - 3D spike raster [unit x event x bin] (heavy)
 %
 %   DEPENDENCIES:
-%       ed_sigLoad, ed_detect, ed_params, guiPath_curate, basepaths2vars; and
-%       the shared event layer (lfp/events): evt_files, evt_pickCh, evt_spkPrep,
+%       ed_sigLoad, ed_detect, ed_params, guiPath, basepaths2vars; and
+%       the shared event layer (lfp/events): evt_files, evt_rippCh, evt_spkPrep,
 %       evt_boutTimes, evt_emgScore, evt_qa, evt_subset, evt_ctrlTimes,
 %       evt_states, evt_maps, evt_spks, evt_saveSpks, evt_plotSpks.
 %
@@ -167,10 +167,12 @@ if isfile(files.evt) && ~flgForce
 
 else
     % ---- Signal ---------------------------------------------------------
-    % Detect on the ripple-tagged channel so the ED signal is the same LFP as
-    % the ripples pipeline (only for the 'lfp' source; 'eeg' ignores edCh).
+    % Detect on the ripple channel so the ED signal is the same LFP as the
+    % ripples pipeline. The channel is read from the ripple output
+    % (ripp.info.rippCh via evt_rippCh), not the session tag (only for the
+    % 'lfp' source; 'eeg' ignores edCh).
     if strcmp(sigSource, 'lfp') && isempty(edCh)
-        edCh = evt_pickCh(session);
+        edCh = evt_rippCh(basepath, basename, session);
     end
     if verbose, fprintf('[ED]: Loading signal...\n'); end
     [sig, emg, ~, fs] = ed_sigLoad(basepath, 'sigSource', sigSource, ...
@@ -277,7 +279,7 @@ if flgCurate
             fprintf('[ED]: Launching curation GUI (%d events)\n', ...
                 numel(ed.pos));
         end
-        guiPath_curate(basepath, 'preset', 'EDs', 'basename', basename);
+        guiPath(basepath, 'preset', 'EDs', 'basename', basename);
     elseif verbose
         fprintf('[ED]: No %s.ed.mat on disk; set flgSave=true to curate.\n', ...
             basename);

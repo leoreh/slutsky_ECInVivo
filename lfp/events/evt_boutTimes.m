@@ -38,9 +38,7 @@ function [boutTimes, vldTimes, nremTimes] = evt_boutTimes(v, win, sigDur)
 boutTimes = {};
 if isfield(v, 'ss') && isfield(v.ss, 'bouts') && isfield(v.ss.bouts, 'times')
     boutTimes = v.ss.bouts.times;
-    boutTimes = cellfun(@(x) x - win(1), boutTimes, 'uni', false);
-    boutTimes = cellfun(@(x) x(x(:, 2) > 0 & x(:, 1) < sigDur, :), ...
-        boutTimes, 'uni', false);
+    boutTimes = cellfun(@(x) clipBout(x, win(1), sigDur), boutTimes, 'uni', false);
 else
     warning('evt_boutTimes:noStates', ...
         'sleep_states not found; events left unlabelled.');
@@ -55,4 +53,19 @@ if numel(boutTimes) >= 4
     nremTimes = boutTimes{4};
 end
 
+end     % MAIN
+
+
+% =========================================================================
+%  LOCALS
+% =========================================================================
+function y = clipBout(x, winStart, sigDur)
+% shift one state's [n x 2] bouts into the window frame and clip to it; an
+% empty or malformed state (no bouts) yields a 0 x 2, so it drops out cleanly
+if isempty(x) || size(x, 2) < 2
+    y = zeros(0, 2);
+    return;
+end
+x = x - winStart;
+y = x(x(:, 2) > 0 & x(:, 1) < sigDur, :);
 end     % EOF

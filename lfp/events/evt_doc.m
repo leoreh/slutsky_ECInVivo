@@ -3,7 +3,7 @@
 % Two detection pipelines — sharp-wave ripples (lfp/ripples) and epileptiform
 % discharges (lfp/ed) — run in parallel on a shared, event-agnostic layer
 % (lfp/events, the evt_* functions) and hand a common curation-ready struct to
-% the GUI (guiPath_curate). One session runs end to end through a wrapper; every
+% the GUI (guiPath). One session runs end to end through a wrapper; every
 % result is a <basename>.<var>.mat file. This file is the shared-design
 % reference for both pipelines.
 %
@@ -61,8 +61,9 @@
 %               evt_spkPeth, evt_pethNorm, evt_pethPop, evt_rankOrder).
 % evt_saveSpks  Split the spike result into a light stats file + heavy raster.
 % evt_plotSpks  Spike-modulation summary figure.
-% evt2ns        Export events to NeuroScope .res/.clu (unwired utility).
-% guiPath_curate Manual curation; reads and writes the .accepted mask.
+% evt2ns        Export events to a NeuroScope .evt file (start / peak / stop
+%               marks, labelled by acceptance). Ripples wire it via flgNS.
+% guiPath Manual curation; reads and writes the .accepted mask.
 %
 % # Modality-specific (deliberately not shared)
 %
