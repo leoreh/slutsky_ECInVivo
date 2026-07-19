@@ -20,7 +20,7 @@ function [thrCal, nf] = ripp_noiseFloor(lfp, fs, method, varargin)
 %   INPUTS:
 %       lfp      - <vec>    raw detection-channel LFP (microvolts).
 %       fs       - <num>    sampling frequency (Hz).
-%       method   - <struct> one ripp_screenMethods element; uses .passband,
+%       method   - <struct> one ripp_methods element; uses .passband,
 %                           .detectMet, .thr (the gap between start and peak
 %                           thresholds is preserved).
 %       varargin - Parameter/Value:

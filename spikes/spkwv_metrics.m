@@ -61,6 +61,7 @@ function swv = spkwv_metrics(varargin)
 %   29 dec 21 LH      Added time to repolarization
 %   10 feb 23 LH      Handle cases where minimum is at end of wv
 %   Aug 2024          Updated documentation and streamlined code
+%   19 jul 26 LH      Replaced fieldtrip's nearest with min(abs(.))
 %
 % TO DO:
 % complex spike index (McHugh 1996), defined as percentage of first lag
@@ -253,9 +254,10 @@ for iunit = 1 : nunits
 
     % time for repolarization (Ardid et al., J. Neurosci., 2015;
     % https://github.com/LofNaDI). this fails for most of our
-    % cells.
+    % cells. index of the tail sample closest to decayVal (was
+    % fieldtrip's nearest, which is not on the path).
     decayVal = maxVal_post - 0.25 * tpAmp(iunit);
-    rtau_idx = nearest(w(imax_post + 1 : end), decayVal);
+    [~, rtau_idx] = min(abs(w(imax_post + 1 : end) - decayVal));
     if ~isempty(rtau_idx)
         rtau(iunit) = x_time(imax_post + rtau_idx) - x_time(imax_post);
     end

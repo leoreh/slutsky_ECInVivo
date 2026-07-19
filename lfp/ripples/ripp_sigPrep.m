@@ -23,12 +23,7 @@ function rippSig = ripp_sigPrep(lfp, fs, varargin)
 %           'zMet'      - (Char) Normalization method:
 %                           'adaptive' : Moving average/std (10s window).
 %                           'nrem'     : Global mean/std from NREM epochs.
-%                           'nremBg'   : NREM mean/std with candidate ripples
-%                                        removed (signal-independent baseline;
-%                                        keeps a real group rate difference from
-%                                        being normalized away). Falls back to
-%                                        'adaptive' when NREM is absent.
-%           'nremTimes' - (Mat) [N x 2] NREM start/end times (for 'nrem'/'nremBg').
+%           'nremTimes' - (Mat) [N x 2] NREM start/end times (for 'nrem').
 %
 %   OUTPUTS:
 %       rippSig     - (Struct) Processed signals:
@@ -148,55 +143,6 @@ switch zMet
         else
             warning('ripp_sigPrep:noNrem', ...
                 ['No NREM samples for ''nrem'' z-scoring; ', ...
-                'falling back to ''adaptive''.']);
-            movLen = round(10 * fs);
-            mu = movmean(baseSignal, movLen);
-            sigma = movstd(baseSignal, movLen);
-            stdFloor = 1e-6 * mean(sigma, 'omitnan');
-            sigma(sigma < stdFloor) = stdFloor;
-        end
-
-    case 'nremBg'
-        % Signal-INDEPENDENT baseline: NREM background with the candidate
-        % ripples removed. The plain 'nrem' baseline includes the ripples, so
-        % its SD scales with ripple power - which inflates the threshold in a
-        % high-ripple animal and can normalize away a genuine group difference
-        % in ripple rate. Referencing the noise floor (ripples excluded) makes
-        % the threshold depend on the background only, so a real group effect
-        % survives. Use this to test whether per-animal z-scoring is hiding an
-        % effect (see the detection review, P3). Falls back like 'nrem'.
-        mask = false(size(baseSignal));
-        nSamples = length(baseSignal);
-        if ~isempty(nremTimes)
-            nremSamp = round(nremTimes * fs) + 1;
-            for iBout = 1:size(nremSamp, 1)
-                idxStart = max(1, nremSamp(iBout, 1));
-                idxEnd = min(nSamples, nremSamp(iBout, 2));
-                if idxStart <= idxEnd
-                    mask(idxStart:idxEnd) = true;
-                end
-            end
-        end
-
-        if any(mask)
-            mu0 = mean(baseSignal(mask), 'omitnan');
-            sd0 = std(baseSignal(mask), 'omitnan');
-            if sd0 == 0, sd0 = 1; end
-
-            % Drop supra-threshold samples (candidate ripples), dilated +/-25 ms,
-            % then re-estimate the baseline on what remains.
-            isEvt  = (baseSignal - mu0) / sd0 > 2;
-            isEvt  = movmax(double(isEvt), round(0.050 * fs)) > 0;
-            bgMask = mask & ~isEvt;
-            if nnz(bgMask) < 0.1 * nnz(mask)    % too little left -> keep all NREM
-                bgMask = mask;
-            end
-            mu    = mean(baseSignal(bgMask), 'omitnan');
-            sigma = std(baseSignal(bgMask), 'omitnan');
-            if sigma == 0, sigma = 1; end
-        else
-            warning('ripp_sigPrep:noNrem', ...
-                ['No NREM samples for ''nremBg'' z-scoring; ', ...
                 'falling back to ''adaptive''.']);
             movLen = round(10 * fs);
             mu = movmean(baseSignal, movLen);

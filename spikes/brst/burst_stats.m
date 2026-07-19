@@ -18,10 +18,10 @@ function stats = burst_stats(burst, spktimes, varargin)
 %       stats       - (struct) Burst statistics structure.
 %                     Fields are matrices of size [nUnits x nWin]:
 %                     .bN         : Number of bursts
-%                     .br  : Burst event rate (Hz) (Count / Window Duration)
-%                     .fr      : Total firing rate (Hz)
-%                     .frBurst     : Burst spike firing rate (Hz)
-%                     .frSingle     : Single spike firing rate (Hz)
+%                     .br         : Burst event rate (Hz) (Count / Window Duration)
+%                     .fr         : Total firing rate (Hz)
+%                     .frBurst    : Burst spike firing rate (Hz)
+%                     .frSingle   : Single spike firing rate (Hz)
 %                     .dur        : Mean burst duration (s)
 %                     .freq       : Mean intra-burst frequency (Hz)
 %                     .ibi        : Mean inter-burst interval (s)

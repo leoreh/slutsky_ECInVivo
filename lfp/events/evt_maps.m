@@ -15,8 +15,6 @@ function evtMaps = evt_maps(evtSig, peakTime, fs, varargin)
 %       fs          - (Num)    Sampling frequency [Hz].
 %       varargin    - Parameter/Value pairs:
 %           'mapDur'   - (Vec)  Window size [pre post] in seconds. (Default: [-0.05 0.05]).
-%           'basepath' - (Char) Save location. (Default: pwd).
-%           'flgSave'  - (Log)  Save output to .mat file? (Default: true).
 %
 %   OUTPUTS:
 %       evtMaps    - (Struct) Contains [N_events x N_samples] matrix for each field.
@@ -28,6 +26,8 @@ function evtMaps = evt_maps(evtSig, peakTime, fs, varargin)
 %
 %   HISTORY:
 %       Updated: 23 Jan 2026
+%       Updated: 260719 (strip the vestigial basepath/flgSave save block; no
+%                caller triggered it and the wrappers save the maps themselves).
 
 % =========================================================================
 %  ARGUMENTS
@@ -37,19 +37,13 @@ addRequired(p, 'evtSig', @isstruct);
 addRequired(p, 'peakTime', @isnumeric);
 addRequired(p, 'fs', @isnumeric);
 addParameter(p, 'mapDur', [-0.05 0.05], @isnumeric);
-addParameter(p, 'basepath', pwd, @ischar);
-addParameter(p, 'flgSave', true, @islogical);
 parse(p, evtSig, peakTime, fs, varargin{:});
 
 mapDur = p.Results.mapDur;
-basepath = p.Results.basepath;
-flgSave = p.Results.flgSave;
 
 % =========================================================================
 %  VECTORIZED EXTRACTION
 % =========================================================================
-[~, basename] = fileparts(basepath);
-mapFile = fullfile(basepath, [basename, '.evtMaps.mat']);
 
 % Create a relative window vector
 winSamps = round(mapDur(1)*fs) : round(mapDur(2)*fs);
@@ -92,13 +86,6 @@ for iFld = 1:length(fields)
     end
 
     evtMaps.(fn) = rawMap;
-end
-
-% =========================================================================
-%  SAVE
-% =========================================================================
-if flgSave
-    save(mapFile, 'evtMaps', '-v7.3');
 end
 
 end

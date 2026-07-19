@@ -23,10 +23,10 @@ function guiPath_doc()
 %               reusable I/O layer - the same var_load / var_fetch serve any
 %               pipeline, not just the GUI.
 %   - guiMap    the arrangement: .panels (one view panel per field, see
-%               guiPath_panel) plus behaviour (.name .mode .win .save). A panel
-%               says WHAT it is (type), WHERE it sits (region) and WHICH data it
-%               draws (var, a varMap field). This is what you edit and save.
-%   guiPath_presets(name, basepath) returns both. guiPath draws them.
+%               guiPath_panel) plus behaviour (.name .base .mode .win .save). A
+%               panel says WHAT it is (type), WHERE it sits (region) and WHICH
+%               data it draws (var, a varMap field). This is what you save.
+%   guiPath_preset(name, basepath) returns both. guiPath draws them.
 %
 %   Data and view are joined by name. A panel's .var picks a varMap field;
 %   SEVERAL panels may name one field. That is how a hypnogram shows top and
@@ -60,6 +60,57 @@ function guiPath_doc()
 %   A hypnogram and a stateStrip both draw a coloured state strip, but a
 %   hypnogram is always read-only context (committed bouts); a stateStrip can be
 %   the target.
+%
+%
+% CONCEPTS: a preset is a file
+%
+%   Each preset is one MATLAB file in graphics/gui/presets, preset_<token>.m,
+%   that returns the two maps for a session:
+%
+%       function [varMap, guiMap] = preset_ripp(ctx)
+%
+%   The file IS the preset. Its token is what the PRESET selector shows, what
+%   'preset' matches, and - when <basename>.<token>.mat exists - what
+%   auto-detection picks. Adding a preset means adding a file; nothing else
+%   knows the list (guiPath_preset scans the folder).
+%
+%   Every preset file has two halves, marked by banners:
+%       DATA (varMap)   var_recipe calls - WHAT is loaded.
+%       VIEW (guiMap)   guiPath_panel calls - HOW it is shown.
+%   A guiMap always needs a varMap: a panel names a var, and a panel naming a
+%   var the varMap does not have is dropped when the view is built. That is why
+%   a preset returns BOTH halves, and why an arrangement cannot stand alone.
+%
+%   Save rewrites the VIEW half, never the DATA half. Arrange a session in the
+%   GUI (add / delete / reorder panels, set an amplitude, switch a Bottom event
+%   set to ticks), press Save next to the PRESET selector, and name it:
+%   - a name already in the list UPDATES that preset in place. Its recipes,
+%     hand edits and local resolvers are kept; only the guiMap block is
+%     replaced. This is how a modality's default arrangement is changed - press
+%     Save, type ripp.
+%   - a new name CREATES a preset whose data half calls the current one:
+%
+%       varMap = preset_ripp(ctx);
+%       guiMap = struct('panels', struct(), 'base', 'ripp', ...);
+%       guiMap.panels.spec = guiPath_panel('spec', 'top', 'spec');
+%
+%   Why a new preset calls rather than copies. Ripple and ED presets resolve
+%   session-specific values - the detection channel, its bit2uv scaling, the
+%   passband - when they are built. Writing THIS session's resolved numbers into
+%   the file would quietly show the wrong channels on the next session, so the
+%   file re-runs its base instead. Same reason for a trace's y-limits: what is
+%   saved is the declared 'prc' / 'full', not the numbers this session resolved.
+%
+%   Two things to know.
+%   - To change what a preset LOADS, edit the DATA half by hand; Save will not
+%     touch it. In a created preset that means replacing the one call with your
+%     own var_recipe lines.
+%   - A panel over something added with Load... has no recipe in the preset, so
+%     it cannot be written; Save says which ones will be missing.
+%
+%   Renaming a preset means renaming its FILE and its function line together.
+%   guiPath_preset refuses a file whose declared name does not match it - a
+%   half-rename would otherwise make a created preset call itself.
 %
 %
 % CONCEPTS: ctx, the session cache
@@ -104,13 +155,14 @@ function guiPath_doc()
 %
 %   1. Open a session. A preset is auto-detected from the files present.
 %       guiPath(basepath);
-%       guiPath(basepath, 'preset', 'States');       % force one by name
+%       guiPath(basepath, 'preset', 'sleep_states');  % force one by token
 %
 %   2. Get a preset's data + arrangement.
-%       [varMap, guiMap] = guiPath_presets('EDs', basepath);   % Ripples States
+%       [varMap, guiMap] = guiPath_preset('ed', basepath);   % ripp sleep_states
 %       fieldnames(varMap)'          % the signals / sets
 %       fieldnames(guiMap.panels)'   % the panels, in stacking order
-%       guiPath_presets()            % the preset list {name, file}
+%       guiPath_preset()             % the available tokens
+%       edit preset_ed               % the file itself
 %
 %   3. Read one field's recipe and one panel.
 %       varMap.spec                  % a matfield recipe (the spectrogram)
@@ -151,14 +203,20 @@ function guiPath_doc()
 %
 %   9. Reopen fast. guiPath returns the loaded varMap; the live one (with
 %      anything loaded through the GUI) is in hFig.UserData.varMap / .guiMap.
-%       [hFig, varMap, guiMap] = guiPath(basepath, 'preset', 'EDs');
+%       [hFig, varMap, guiMap] = guiPath(basepath, 'preset', 'ed');
 %       guiPath(basepath, 'varMap', varMap, 'guiMap', guiMap);  % data in hand
 %
 %   10. Load one more source while the viewer is open. Click Load..., pick a
 %       Type, then a Source (Workspace, File, or Binary channel). No call.
 %
-%   11. Save. Ctrl+S, or the Save button, writes to guiMap.save. Each save first
-%       backs up any existing file (backup_file).
+%   11. Keep an arrangement. Arrange the panels, press Save beside the PRESET
+%       selector, and name it: an existing name replaces that preset's
+%       arrangement, a new name creates one over the same data (see CONCEPTS: a
+%       preset is a file). Either is then in the selector, for every session.
+%       guiPath_presetSave('ripp', guiMap);        % the same, from code
+%
+%   12. Save curation. Ctrl+S, or the action panel's Save, writes to
+%       guiMap.save. Each save first backs up any existing file (backup_file).
 %
 %
 % REFERENCE
@@ -188,6 +246,11 @@ function guiPath_doc()
 %               percentile (0 <= p < 50; raise it when a trace looks thin) |
 %               'prc', the default percentile, which a trace gets when unset |
 %               'full' or [] to autoscale.
+%   - render    how a type that has a choice draws HERE: a Bottom event set is
+%               'lines' (spanning, no tile) or 'strip' (a tick lane). '' = by
+%               type + region. This is what the Ops button sets.
+%   - yAdjust   amplitude factor for a trace / traces / spec, as shift+scroll
+%               sets it live. 1 = as loaded.
 %
 %   Recipe grammar (var_recipe). Resolution is fetch (by kind) -> transform
 %   chain -> dot-path.
@@ -209,7 +272,11 @@ function guiPath_doc()
 %   A bare 'file.path' string is shorthand for a matvar read.
 %
 %   guiMap behaviour.
-%   - name      display name.
+%   - name      the preset token; set by guiPath_preset from the file name.
+%   - base      which preset supplies the recipes: itself for a preset whose
+%               data half is its own, the called token for a created one, ''
+%               for a hand-built varMap (which can update an existing preset's
+%               arrangement, but cannot create a new preset).
 %   - mode      'events' | 'states' (derived from the target if omitted).
 %   - win       window width [s].
 %   - save      target token ('ed' | 'ripp' | 'labelsMan'), '', or a save(x)
@@ -220,7 +287,9 @@ function guiPath_doc()
 %   Files. The family is one entry point plus its parts. The data layer (io/) is
 %   shared, not GUI-specific.
 %   - guiPath.m          the viewer: figure, layout, navigation, save, Load.
-%   - guiPath_presets.m  name -> [varMap, guiMap]; per-modality builders.
+%   - presets/           one preset_<token>.m per preset; the whole list.
+%   - guiPath_preset.m   finds and calls one; no arg -> the available tokens.
+%   - guiPath_presetSave.m  writes a live arrangement into a preset file.
 %   - guiPath_panel.m    builds one view panel (with per-type defaults).
 %   - guiPath_shape.m    shapes a raw value into a drawn input, by type.
 %   - guiPath_draw.m     draws one panel; the dispatch on panel type.
@@ -235,7 +304,8 @@ function guiPath_doc()
 %
 % SEE ALSO
 % - guiPath
-% - guiPath_presets
+% - guiPath_preset
+% - guiPath_presetSave
 % - guiPath_panel
 % - guiPath_shape
 % - var_recipe
@@ -250,5 +320,8 @@ function guiPath_doc()
 % - 260719          data / view split onto one reusable loader: varMap (recipes,
 %                   io/var_load) + guiMap (view panels); the address grammar and
 %                   guiPath_load / guiPath_src / guiPath_ctx are gone.
+% - 260719          presets became one file each (presets/preset_<token>.m,
+%                   found by guiPath_preset); Save writes the live arrangement
+%                   over a base preset's data (guiPath_presetSave).
 
 end

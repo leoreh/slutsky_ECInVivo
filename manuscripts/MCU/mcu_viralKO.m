@@ -76,82 +76,40 @@ for iFile = 1 : nFiles
     % 
     % % Burst statistics
     % stats = burst_stats(burst, spktimes, 'winCalc', [], 'flgSave', true);
-
-    % Ripples
-    load([basename, '.sleep_sig.mat'], 'info');
-    ripp = ripp_wrapper('basepath', pwd, ...
-        'win', [0 12] * 3600, ...
-        'rippCh', info.eegCh, ...
-        'flgPlot', true, ...
-        'flgSave', true, ...
-        'flgNS', true, ...
-        'flgForce', true);
     
-    % Epileptiform discharges
-    ed = ed_wrapper('basepath', basepath, ...
-        'flgSave', true, ...
-        'flgPlot', false, ...
-        'flgForce', true);  
+    % spike wave metrics
+    swv = spkwv_metrics('basepath', basepath, 'flgSave', true,...
+        'flgForce', true);
+
+    % % Ripples
+    % load([basename, '.sleep_sig.mat'], 'info');
+    % ripp = ripp_wrapper('basepath', pwd, ...
+    %     'win', [0 12] * 3600, ...
+    %     'rippCh', info.eegCh, ...
+    %     'flgPlot', true, ...
+    %     'flgSave', true, ...
+    %     'flgNS', true, ...
+    %     'flgForce', true);
+    % 
+    % % Epileptiform discharges
+    % ed = ed_wrapper('basepath', basepath, ...
+    %     'flgSave', true, ...
+    %     'flgPlot', false, ...
+    %     'flgForce', true);  
 
 
 end
 
 
-[hFig, varMap, guiMap] = guiPath(basepath, 'preset', 'Ripples');
+guiPath(pwd, 'preset', 'ripp');
 
 
 
+% Unit Class: GMM classification, then manual curation in the GUI
+fetSelect = {'Asym', 'Hpk', 'TP'};
+tblUnit = utypes_classify('basepaths', basepaths, 'fetSelect', fetSelect, ...
+    'rsPrior', 0.97, 'regVal', 0.01, 'flgPlot', true);
 
-%% ========================================================================
-%  CAG:MCU-KO - CLASSIFICATION
-%  ========================================================================
-% Assign RS / FS unit types and write units.mat. Two methods, toggled by flgCE:
-%   flgCE = false : my pipeline. utypes_classify (GMM on waveform features)
-%                   opens utypes_gui. Inspect the scatter / waveforms, reassign
-%                   points, then click "Push Units" to save units.mat.
-%   flgCE = true  : fall back to CellExplorer putativeCellType (Pyramidal -> RS,
-%                   Narrow Interneuron -> FS, anything else -> Other).
-
-flgCE = true;
-
-basepaths = mcu_basepaths('ra');
-nFiles = length(basepaths);
-
-if ~flgCE
-
-    % My pipeline: GMM classification, then manual curation in the GUI
-    fetSelect = {'Asym', 'Hpk', 'TP'};
-    tblUnit = utypes_classify('basepaths', basepaths, 'fetSelect', fetSelect, ...
-        'rsPrior', 0.97, 'regVal', 0.01, 'flgPlot', true);
-
-else
-
-    % Fallback: CellExplorer putativeCellType
-    v = basepaths2vars('basepaths', basepaths, 'vars', {'cell_metrics'});
-
-    for iFile = 1 : nFiles
-
-        % file
-        basepath = basepaths{iFile};
-        [~, basename] = fileparts(basepath);
-
-        % Unit types from CellExplorer
-        ctype = v(iFile).cell_metrics.putativeCellType(:);
-        nUnits = numel(ctype);
-        typeNum = zeros(nUnits, 1);                                  % Other
-        typeNum(contains(ctype, 'Pyramidal'))          = 1;         % RS
-        typeNum(contains(ctype, 'Narrow Interneuron')) = 2;         % FS
-
-        units = struct();
-        units.clean = false(2, nUnits);
-        units.clean(1, :) = (typeNum == 1)';
-        units.clean(2, :) = (typeNum == 2)';
-        units.type = categorical(typeNum, [0, 1, 2], {'Other', 'RS', 'FS'});
-        units.date = datetime('now');
-        save(fullfile(basepath, [basename, '.units.mat']), 'units')
-
-    end
-end
 
 
 %% ========================================================================
@@ -182,35 +140,6 @@ tblBrst.genotype = reordercats(tblBrst.genotype, ...
 guiTbl_bar(tblBrst, 'yVar', 'pBurst', 'xVar', 'genotype', 'grpVar', 'unitType');
 
 
-
-
-
-
-
-%% ========================================================================
-%  TEST GUI
-%  ========================================================================
-
-basepaths = unique([mcu_basepaths('wt_bsl'), mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl')]);
-
-basepath = basepaths{3};
-
-% Signals (loaded once; sSig/specAdapter are full-session for the GUI)
-[sig, emg, emgRms, fs, specAdapter, sSig] = ed_sigLoad(basepath);
-
-ed = ed_wrapper('basepath', basepath, 'flgSave', true, 'flgPlot', false);  % save ed.mat for the EDs preset; suppress its auto-GUI
-
-tic
-guiPath(basepath, 'preset', 'EDs');
-toc
-
-
-guiPath(basepath);
-
-
-tic
-AccuSleep_viewer(sSig, [], [])
-toc
 
 
 

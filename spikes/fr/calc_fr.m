@@ -21,7 +21,7 @@ function fr = calc_fr(spktimes, varargin)
 %               Gaussian kernel (GK) impleneted by multiple-pass MA. {[]}.
 %   btimes      cell array of n x 2 time indices of states. if empty will
 %               try to load from sleep_states.mat. this can be used for
-%               states defined only by emg
+%               states defined only by emg.
 %   forceA      logical. force analysis even if struct file exists {true}
 %   graphics    logical. plot figure {true}.
 %   saveVar     logical / char. save variable {true}. if char then variable

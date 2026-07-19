@@ -6,7 +6,8 @@ function [hFig, varMap, guiMap] = guiPath(basepath, varargin)
 % and an accepted flag), and any 1-D signal can be a panel. Two things are
 % chosen independently, by two dropdowns:
 %   PRESET  the arrangement - which file to load, which signals to show, the
-%           default layout - one per modality in guiPath_presets.
+%           default layout - one MATLAB file each in graphics/gui/presets.
+%           Save writes the current arrangement as a new one (guiPath_preset).
 %   CURATE  which loaded event / state set is the editable target, or None (view
 %           only: Prev / Next then step the window itself). Several event sets
 %           can be loaded at once (Load...); everything loaded stays available
@@ -44,21 +45,22 @@ function [hFig, varMap, guiMap] = guiPath(basepath, varargin)
 % - guiPath(basepath)
 %   auto-detects the preset from the files present in basepath.
 %
-% - guiPath(basepath, 'preset', 'Ripples')
-%   forces a preset by name.
+% - guiPath(basepath, 'preset', 'ripp')
+%   forces a preset by its token (the preset_<token>.m file).
 %
-% - [hFig, varMap, guiMap] = guiPath(basepath, 'preset', 'EDs');
+% - [hFig, varMap, guiMap] = guiPath(basepath, 'preset', 'ed');
 %   guiPath(basepath, 'varMap', varMap, 'guiMap', guiMap)
 %   reopens fast: the returned varMap already carries the loaded data.
 %
 % INPUTS
 % - basepath        <char>(opt) session directory. {pwd}
-% - preset          <char>(opt) initial preset name, see guiPath_presets.
+% - preset          <char>(opt) initial preset token, see guiPath_preset.
 %                   Auto-detected from the files present when empty.
 % - varMap          <struct>(opt) data: name -> recipe (see var_recipe), or an
-%                   already-loaded map. Bypasses presets. See guiPath_doc.
-% - guiMap          <struct>(opt) arrangement for a varMap: .panels + .mode
-%                   .win .save. Anything absent is derived.
+%                   already-loaded map. Bypasses presets, and cannot be saved
+%                   as one (no preset file rebuilds it). See guiPath_doc.
+% - guiMap          <struct>(opt) arrangement for a varMap: .panels + .name
+%                   .mode .win .save. Anything absent is derived.
 % - basename        <char>(opt) override. {the folder name}
 % - Visible         <char>(opt) 'on' | 'off' for headless. {'on'}
 %
@@ -70,7 +72,8 @@ function [hFig, varMap, guiMap] = guiPath(basepath, varargin)
 %
 % SEE ALSO
 % - guiPath_doc
-% - guiPath_presets
+% - guiPath_preset
+% - guiPath_presetSave
 % - guiPath_panel
 % - var_recipe
 % - var_load
@@ -127,6 +130,10 @@ function [hFig, varMap, guiMap] = guiPath(basepath, varargin)
 %                   / guiPath_ctx and cfgData / cfgGui are gone; mapsToConfig
 %                   lands the two maps into the runtime, per-type shaping in
 %                   guiPath_shape.
+% - 260719          presets became one file each (graphics/gui/presets), found
+%                   by guiPath_preset; Save writes the live arrangement as a
+%                   new one (guiPath_presetSave). A preset is named by its file
+%                   token ('ripp'), which is also what auto-detection matches.
 
 %% ========================================================================
 %  ARGUMENTS
@@ -155,21 +162,27 @@ end
 %% ========================================================================
 %  RESOLVE INITIAL CONFIG (preset or explicit inputs)
 %  ========================================================================
-presets = guiPath_presets();    % {name, file} list for dropdown + auto-detect
+presets = guiPath_preset();     % available tokens, for dropdown + auto-detect
 
 % pick the data (varMap) + arrangement (guiMap): an explicit varMap, else the
-% named / auto-detected preset, else an empty template. ctx carries the basename
+% named / auto-detected preset, else an empty view. ctx carries the basename
 % and a within-session file cache, shared by the preset resolvers and the loader.
 ctx = var_ctx(basepath, basename);
 if ~isempty(varMapArg)
-    presetName = 'Custom';
     varMap = varMapArg;
     if ~isempty(guiMapArg), guiMap = guiMapArg; else, guiMap = struct('panels', struct()); end
+    presetName = 'Custom';
+    if isfield(guiMap, 'name') && ~isempty(guiMap.name)
+        presetName = guiMap.name;
+    end
+    guiMap.base = '';   % hand-built recipes: no preset file can rebuild them
 else
     presetName = resolvePreset(presetArg, presets, basepath, basename);
-    if isempty(presetName), presetName = 'template'; end
-    [varMap, guiMap] = guiPath_presets(presetName, basepath, basename, ctx);
-    presetName = guiMap.name;
+    if isempty(presetName)
+        presetName = 'Custom'; varMap = struct(); guiMap = struct();
+    else
+        [varMap, guiMap] = guiPath_preset(presetName, ctx);
+    end
 end
 
 % load the data (skips entries that already carry it), finalize behaviour, and
@@ -193,7 +206,8 @@ d.presets    = presets;
 d.presetName = presetName;
 d.ctx        = ctx;            % basename + within-session file cache
 d.varMap     = varMap;         % the live, loaded data (returned for a fast reopen)
-d.guiMap     = guiMap;         % the live arrangement + behaviour
+d.guiMap     = guiMap;         % the arrangement as the preset declared it
+d.baseVars   = fieldnames(varMap);   % what the preset supplies (vs Load...)
 d.unit       = struct('wide', 'hr', 'narrow', 's');   % per-region x-axis units
 d.hInd       = gobjects(0);
 d.hCenter    = gobjects(0);
@@ -219,22 +233,29 @@ hFig = uifigure('Name', sprintf('%s - Curate: %s', basename, presetName), ...
 [~, gPlot, gCtrl, gActions] = gui_layout(hFig, 'CtrlWidth', 240, 'CtrlSide', 'left');
 
 % --- Controls: PRESET (arrangement) + CURATE (target). Two label + dropdown
-% rows. PRESET loads a modality's signal set + panel layout; CURATE picks which
-% loaded event / state set is the editable target (None = view only). The two
-% are independent: you can curate one set while other sets stay visible. ---
+% rows. PRESET loads a modality's signal set + panel layout - picking one IS
+% loading it, so there is no Load button, only Save, which writes the current
+% arrangement as a new preset file. CURATE picks which loaded event / state set
+% is the editable target (None = view only). The two are independent: you can
+% curate one set while other sets stay visible. ---
 hPC = gui_labeledControl(gCtrl, 'panel', '', 'RowHeight', 64);
-gPC = uigridlayout(hPC, [2, 2], 'RowHeight', {'fit', 'fit'}, ...
-    'ColumnWidth', {'fit', '1x'}, 'Padding', 2, 'RowSpacing', 4, 'ColumnSpacing', 6);
+gPC = uigridlayout(hPC, [2, 3], 'RowHeight', {'fit', 'fit'}, ...
+    'ColumnWidth', {'fit', '1x', 44}, 'Padding', 2, 'RowSpacing', 4, ...
+    'ColumnSpacing', 6);
 lblP = uilabel(gPC, 'Text', 'PRESET', 'FontWeight', 'bold');
 lblP.Layout.Row = 1; lblP.Layout.Column = 1;
 d.hPresetDD = uidropdown(gPC, 'Items', presetItems(presets, presetName), ...
     'Value', presetName, 'ValueChangedFcn', @(s, ~) loadPreset(s.Value));
 d.hPresetDD.Layout.Row = 1; d.hPresetDD.Layout.Column = 2;
+bPS = uibutton(gPC, 'Text', 'Save', 'Tooltip', ...
+    'Save the current arrangement as a preset file', ...
+    'ButtonPushedFcn', @(~, ~) onSavePreset());
+bPS.Layout.Row = 1; bPS.Layout.Column = 3;
 lblC = uilabel(gPC, 'Text', 'CURATE', 'FontWeight', 'bold');
 lblC.Layout.Row = 2; lblC.Layout.Column = 1;
 d.hCurateDD = uidropdown(gPC, 'Items', curateItems(d), ...
     'Value', curateDisp(d), 'ValueChangedFcn', @(s, ~) onCurateSel(s.Value));
-d.hCurateDD.Layout.Row = 2; d.hCurateDD.Layout.Column = 2;
+d.hCurateDD.Layout.Row = 2; d.hCurateDD.Layout.Column = [2, 3];
 
 % --- Controls: unified Load (opens a progressive dialog; nothing else lives
 % here permanently). The dialog reveals inputs as you choose type + source. ---
@@ -322,7 +343,7 @@ hFig.Visible = vis;
         data = hFig.UserData;
         if strcmp(name, data.presetName), return; end
         prevMode = data.mode;
-        if ~any(strcmp(name, {data.presets.name}))   % 'Custom'/'ws:...'/unknown
+        if ~any(strcmp(name, data.presets))          % 'Custom' / unknown token
             data.hPresetDD.Value = data.presetName; return;
         end
         % offer to save unsaved curation before switching
@@ -336,7 +357,7 @@ hFig.Visible = vis;
         try
             % build the preset's data + arrangement; the shared ctx reuses files
             % already read, so a preset switch re-fetches from cache, not disk
-            [newMap, newGui] = guiPath_presets(name, data.basepath, data.basename, data.ctx);
+            [newMap, newGui] = guiPath_preset(name, data.ctx);
             newGui = finalizeGui(newGui);
             newMap = var_load(newMap, data.basepath, data.ctx);
             config = mapsToConfig(newMap, newGui, data.basepath, data.basename);
@@ -346,6 +367,7 @@ hFig.Visible = vis;
             data.hPresetDD.Value = data.presetName; hFig.UserData = data; return;
         end
         data.varMap = newMap; data.guiMap = newGui;
+        data.baseVars = fieldnames(newMap);
         data = applyConfig(data, config);     % merges inputs, keeps the curate target
         if ~strcmp(prevMode, data.mode)
             data = buildActionWidget(data);   % swap event <-> state <-> view widget
@@ -362,6 +384,54 @@ hFig.Visible = vis;
         populateSrc(hFig);
         refreshEvent(hFig);
         busyOff(dlg);
+    end
+
+    function onSavePreset()
+        % write the live arrangement into a preset file. Naming an existing
+        % preset updates it in place - its recipes are untouched, only its
+        % arrangement is replaced; a new name creates a preset over the current
+        % one's data. guiPath_presetSave owns both rules.
+        %
+        % ONE dialog, never a chain: a second window opened while the first is
+        % still closing blocks it, and the session hangs. So the preset list and
+        % what a known name does are said in the prompt, not in a confirm.
+        data = hFig.UserData;
+        prompt = sprintf(['Save the arrangement as preset:\n\nExisting: %s', ...
+            '\n\nA known name replaces that preset''s arrangement, keeping ', ...
+            'its data (the file is backed up).'], strjoin(data.presets, ', '));
+        nm = gui_inputDialog(hFig, prompt, data.presetName);
+        if isempty(nm), return; end
+
+        gm = currentGuiMap(data);
+        updated = any(strcmp(nm, data.presets));
+        try
+            guiPath_presetSave(nm, gm);
+        catch ME
+            gui_notify(hFig, sprintf('Save failed: %s', ME.message), 'error');
+            return;
+        end
+        gm.name = nm;
+        if updated, gm.base = nm; end     % the file now carries its own recipes
+        data.guiMap     = gm;
+        data.presetName = nm;
+        data.presets    = guiPath_preset();
+        data.hPresetDD.Items = presetItems(data.presets, nm);
+        data.hPresetDD.Value = nm;
+        hFig.UserData = data;
+        updateTitle(hFig);
+
+        % a panel over something Load... added has no recipe in the preset, so
+        % it is dropped when the file is next opened - say so now rather than
+        % letting it vanish quietly
+        verb = 'Saved'; if updated, verb = 'Updated'; end
+        gone = setdiff(panelVars(gm), data.baseVars, 'stable');
+        if isempty(gone)
+            gui_notify(hFig, sprintf('%s preset "%s".', verb, nm), 'success');
+        else
+            gui_notify(hFig, sprintf(['%s "%s", but %s came from Load... ', ...
+                'and has no recipe in it - add one to the file to keep ', ...
+                'those panels.'], verb, nm, strjoin(gone, ', ')), 'warning');
+        end
     end
 
     function data = buildActionWidget(data)
@@ -1116,6 +1186,7 @@ hFig.Visible = vis;
         data.jumpToTimeFcn = @jumpToTime;       % exposed for hosts / tests
         data.loadCoreFcn   = @loadCore;         % exposed for tests (drives the Load flow)
         data.loadPresetFcn = @loadPreset;       % exposed for tests (drives a preset switch)
+        data.guiMapFcn     = @currentGuiMap;    % exposed for tests (live view)
         data.setCurateFcn  = @setCurate;        % exposed for tests (drives a curate switch)
         data.rebuildFcn    = @rebuildPlot;      % exposed for tests (relayout after a panel edit)
         fig.UserData = data;
@@ -1315,16 +1386,16 @@ end     % MAIN
 %  ========================================================================
 
 function name = resolvePreset(arg, presets, basepath, basename)
-% chosen preset, else the first preset whose file exists, else '' (empty ->
-% the caller opens an empty Custom view; guiPath never requires a file)
-names = {presets.name};
+% the chosen preset, else the first whose file exists (a preset's token IS its
+% .mat token: 'ripp' <-> <basename>.ripp.mat), else '' (empty -> the caller
+% opens an empty Custom view; guiPath never requires a file)
 if ~isempty(arg)
-    ix = find(strcmpi(arg, names), 1);
-    if ~isempty(ix), name = names{ix}; return; end
+    ix = find(strcmpi(arg, presets), 1);
+    if ~isempty(ix), name = presets{ix}; return; end
 end
 for i = 1:numel(presets)
-    if isfile(fullfile(basepath, [basename, '.', presets(i).file, '.mat']))
-        name = presets(i).name; return;
+    if isfile(fullfile(basepath, [basename, '.', presets{i}, '.mat']))
+        name = presets{i}; return;
     end
 end
 name = '';
@@ -1332,9 +1403,11 @@ end
 
 function g = finalizeGui(g)
 % fill any guiMap field the caller left out: panels, mode from the target panel,
-% window from the mode, name/save to safe defaults
+% window from the mode, name/base/save to safe defaults. Applied to every guiMap
+% whatever its source (a preset file, a caller's struct, the live arrangement).
 if ~isfield(g, 'panels') || ~isstruct(g.panels), g.panels = struct(); end
 if ~isfield(g, 'name') || isempty(g.name), g.name = 'Custom'; end
+if ~isfield(g, 'base'), g.base = ''; end   % which preset supplies the recipes
 if ~isfield(g, 'mode') || isempty(g.mode)
     g.mode = 'events';
     fns = fieldnames(g.panels);
@@ -1346,6 +1419,64 @@ if ~isfield(g, 'win') || isempty(g.win)
     if strcmp(g.mode, 'states'), g.win = 10; else, g.win = 1; end
 end
 if ~isfield(g, 'save'), g.save = ''; end
+end
+
+function gm = currentGuiMap(d)
+% the LIVE arrangement as a guiMap, ready for guiPath_presetSave: behaviour from
+% the loaded preset, panels in their current order from the two region lists
+% (which the panel list adds to, reorders and deletes). clr and ylim are taken
+% from the preset's declared panel rather than the runtime input - the runtime
+% copies were resolved against THIS session's data (a percentile becomes numeric
+% limits) and would not transfer to the next one.
+gm = d.guiMap;
+gm.win    = d.win;
+gm.panels = struct();
+for region = {'wide', 'narrow'}
+    reg  = region{1};
+    pArr = d.(regField(reg));
+    for k = 1 : numel(pArr)
+        inp = getInput(d.inputs, pArr(k).source);
+        if isempty(inp), continue; end
+        pan = guiPath_panel(inp.type, lower(regDisp(reg)), pArr(k).source, ...
+            'label', pArr(k).label, 'height', pArr(k).height, ...
+            'render', pArr(k).render, 'yAdjust', inp.yAdjust);
+        dec = declaredPanel(d.guiMap, pArr(k).source);
+        if ~isempty(dec)
+            pan.clr  = pick(dec, 'clr', pan.clr);
+            pan.ylim = pick(dec, 'ylim', pan.ylim);
+        end
+        gm.panels.(uniqueField(gm.panels, pArr(k).source)) = pan;
+    end
+end
+end
+
+function pan = declaredPanel(guiMap, var)
+% the preset's panel for VAR, if it declared one; [] otherwise
+pan = [];
+fns = fieldnames(guiMap.panels);
+for iPan = 1 : numel(fns)
+    if strcmp(guiMap.panels.(fns{iPan}).var, var)
+        pan = guiMap.panels.(fns{iPan}); return;
+    end
+end
+end
+
+function f = uniqueField(panels, var)
+% VAR as a panel field name, suffixed when it is already taken (a var drawn in
+% both regions needs one field per panel)
+base = matlab.lang.makeValidName(var);
+f = base; k = 1;
+while isfield(panels, f)
+    k = k + 1; f = sprintf('%s_%d', base, k);
+end
+end
+
+function v = panelVars(guiMap)
+% the distinct vars a guiMap's panels draw
+fns = fieldnames(guiMap.panels);
+v = cell(1, numel(fns));
+for iPan = 1 : numel(fns), v{iPan} = guiMap.panels.(fns{iPan}).var; end
+v = unique(v, 'stable');
 end
 
 function fn = resolveSave(guiMap, basepath, basename)
@@ -1395,8 +1526,10 @@ save(file, 'labels');
 end
 
 function items = presetItems(presets, presetName)
-items = {presets.name};
-if strcmp(presetName, 'Custom'), items = [{'Custom'}, items]; end
+% the PRESET selector's items: every available token, plus the current name when
+% it is not one (a Custom view opened from an explicit varMap)
+items = presets;
+if ~any(strcmp(presetName, items)), items = [{presetName}, items]; end
 end
 
 function items = curateItems(data)
@@ -1570,7 +1703,9 @@ for i = 1:numel(panelFns)
         recs{end + 1} = buildInput(varMap.(v), pan, v, nstates);      %#ok<AGROW>
         seen{end + 1} = v;                                            %#ok<AGROW>
     end
-    P{end + 1} = struct('source', v, 'region', regAlias(pan.region)); %#ok<AGROW>
+    P{end + 1} = struct('source', v, 'region', regAlias(pan.region), ...
+        'height', pan.height, 'label', pan.label, ...
+        'render', pick(pan, 'render', ''));            %#ok<AGROW>
 end
 if isempty(recs), inputs = normalizeInputs([]); else, inputs = [recs{:}]; end
 if isempty(P), panels = []; else, panels = [P{:}]; end
@@ -1586,7 +1721,8 @@ function inp = buildInput(entry, pan, name, nstates)
 inp = struct('name', name, 'type', pan.type, ...
     'data', {pick(entry, 'data', [])}, 'fs', pick(entry, 'fs', NaN), ...
     'labels', {pick(entry, 'labels', [])}, 'ylim', pan.ylim, 'clr', pan.clr, ...
-    'label', pan.label, 'height', pan.height, 'defRegion', regAlias(pan.region));
+    'label', pan.label, 'height', pan.height, ...
+    'defRegion', regAlias(pan.region), 'yAdjust', pick(pan, 'yAdjust', 1));
 inp = guiPath_shape(inp, nstates);
 inp = normalizeInputs(inp);
 end
@@ -1733,7 +1869,7 @@ else
     for i = 1:numel(cp)
         reg = 'narrow';
         if isfield(cp, 'region') && ~isempty(cp(i).region), reg = cp(i).region; end
-        P{i} = makePanel(cp(i).source, reg, inputs);
+        P{i} = makePanel(cp(i).source, reg, inputs, cp(i));
     end
     panels = [P{:}];
 end
@@ -2029,14 +2165,18 @@ for i = 1:numel(panels)
 end
 end
 
-function pn = makePanel(name, region, inputs)
+function pn = makePanel(name, region, inputs, ovr)
 % .render '' means "by type/region": an eventTicks panel is a tick strip in the
 % Top and a spanning-lines OVERLAY in the Bottom; 'strip'/'lines' override that
-% (set from the Ops button). Other types ignore it (always tiled).
+% (set from the Ops button, or declared by the preset). Other types ignore it
+% (always tiled). OVR, when given, is the view a guiMap panel asked for; what it
+% leaves empty falls back to the input's.
+if nargin < 4, ovr = struct(); end
 inp = getInput(inputs, name);
 if isempty(inp), h = 1; lbl = name; else, h = inp.height; lbl = inp.label; end
-pn = struct('source', name, 'region', region, 'height', h, 'label', lbl, ...
-    'render', '', 'ax', gobjects(1));
+pn = struct('source', name, 'region', region, ...
+    'height', pick(ovr, 'height', h), 'label', pick(ovr, 'label', lbl), ...
+    'render', pick(ovr, 'render', ''), 'ax', gobjects(1));
 end
 
 function tf = isOverlay(panel, inputs)

@@ -18,6 +18,8 @@ function [stateIdx, evtStates] = evt_states(evtTimes, peakTimes, boutTimes, vara
 %           'basepath' - (Char) Save location. (Default: pwd).
 %           'flgPlot'  - (Log)  Generate summary figures? (Default: true).
 %           'flgSave'  - (Log)  Save .evtStates.mat? (Default: true).
+%           'accepted' - (Log)  [N x 1] mask; Rate/Density count only accepted
+%                              events, while stateIdx still labels all. {all}
 %
 %   OUTPUTS:
 %       stateIdx    - (Cat)   [N_events x 1] Categorical array of states.
@@ -40,6 +42,7 @@ addRequired(p, 'boutTimes', @(x) iscell(x) || isempty(x));
 addParameter(p, 'basepath', pwd, @ischar);
 addParameter(p, 'flgPlot', true, @islogical);
 addParameter(p, 'flgSave', true, @islogical);
+addParameter(p, 'accepted', [], @(x) isempty(x) || islogical(x) || isnumeric(x));
 addParameter(p, 'name', 'evt', @ischar);
 addParameter(p, 'lbl', 'Event', @ischar);
 parse(p, evtTimes, peakTimes, boutTimes, varargin{:});
@@ -62,6 +65,14 @@ savefile = fullfile(basepath, [basename, '.', name, 'States.mat']);
 
 nStates = length(boutTimes);
 nEvents = length(peakTimes);
+
+% Acceptance mask: Rate/Density count only accepted events (default all)
+accepted = p.Results.accepted;
+if isempty(accepted)
+    accepted = true(nEvents, 1);
+else
+    accepted = logical(accepted(:));
+end
 
 % Initialize Categorical Index
 stateIdx = categorical(nan(nEvents, 1));
@@ -103,7 +114,7 @@ for iState = 1:nStates
     if ~isempty(bouts)
         inState = intervals(bouts).contains(peakTimes);
         stateIdx(inState) = stateNames{iState};
-        stateCounts(iState) = sum(inState);
+        stateCounts(iState) = sum(inState & accepted);
     end
 
     % Pre-allocate vectors for this state
@@ -116,8 +127,8 @@ for iState = 1:nStates
         tStart = bouts(iBout, 1);
         tEnd   = bouts(iBout, 2);
 
-        % Find events in this specific bout
-        idxBout = peakTimes >= tStart & peakTimes <= tEnd;
+        % Find accepted events in this specific bout
+        idxBout = peakTimes >= tStart & peakTimes <= tEnd & accepted;
 
         count = sum(idxBout);
         durSum = sum(evtDur(idxBout));

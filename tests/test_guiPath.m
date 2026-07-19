@@ -5,13 +5,14 @@ function test_guiPath(sessionPath)
 %   test_guiPath(sessionPath) also opens the viewer on a real session and
 %   checks the end-to-end path (int16 stack, tick lanes, amplitude, region).
 %
-%   The unit checks call guiPath_draw and guiPath_load directly, which the
-%   draw-layer extraction and the declarative loader are what make possible;
+%   The unit checks call guiPath_draw and guiPath_shape directly, which the
+%   draw-layer extraction and the data / view split are what make possible;
 %   the integration checks need a session with a <basename>.ripp.mat and a
 %   <basename>.lfp, so they are skipped when no path is given or found.
 %
 %   HISTORY:
 %       260716 - created alongside the traces / amplitude / region work.
+%       260719 - presets addressed by file token (ripp, sleep_states).
 
 if nargin < 1, sessionPath = ''; end
 fprintf('== test_guiPath ==\n');
@@ -76,7 +77,7 @@ if isempty(sessionPath) || ~isfolder(sessionPath)
     return;
 end
 
-hFig = guiPath(sessionPath, 'preset', 'Ripples', 'Visible', 'off');
+hFig = guiPath(sessionPath, 'preset', 'ripp', 'Visible', 'off');
 d = hFig.UserData;
 assert(d.nEvents > 0, 'integration: no events loaded');
 
@@ -240,7 +241,7 @@ fprintf('  ok  view mode: ticks kept, Next steps the window\n');
 % the arrangement, not what is loaded). After Ripples -> States, CURATE lists
 % ripp AND states AND ripp2; the panel dropdown keeps a Ripples-only signal; and
 % the switch does NOT change the target (independent - still None from above).
-hFig.UserData.loadPresetFcn('States');
+hFig.UserData.loadPresetFcn('sleep_states');
 ds = hFig.UserData;
 cur = ds.hCurateDD.Items;
 assert(all(cellfun(@(n) any(strcmp(n, cur)), {'ripp', 'ripp2', 'states'})), ...

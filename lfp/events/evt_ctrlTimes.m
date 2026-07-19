@@ -68,6 +68,12 @@ end
 nEvt = size(evtTimes, 1);
 evtDur = evtTimes(:, 2) - evtTimes(:, 1);
 
+% No events -> no controls (guards min(evtDur) and the gap logic below)
+if nEvt == 0
+    ctrlTimes = zeros(0, 2);
+    return;
+end
+
 %% ========================================================================
 %  FIND AVAILABLE GAPS 
 %  ========================================================================
@@ -112,7 +118,7 @@ end
 
 % Crop to Recording Limits
 excl(excl(:, 1) < 0, 1) = 0;
-excl(excl(:, 2) > recDur, 1) = recDur;
+excl(excl(:, 2) > recDur, 2) = recDur;
 
 % Fast Merge of Overlapping Exclusions
 % Identifies continuous blocks of "unavailable" time.
@@ -196,8 +202,6 @@ end
 %  ========================================================================
 
 if flgPlot
-
-    hFig = figure;
 
     % Events
     nEvt = size(evtTimes, 1);

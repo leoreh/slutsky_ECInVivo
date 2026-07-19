@@ -44,13 +44,16 @@ else
         'sleep_states not found; events left unlabelled.');
 end
 
-% Valid-state and NREM sets need the canonical 4-state layout; extract them
-% from the already-clipped bouts so both stay inside the windowed signal.
+% Valid-state and NREM sets follow the canonical AccuSleep state order
+% (1 = WAKE, 2 = QWAKE, 3 = LSLEEP, 4 = NREM, ...): vldTimes stacks the non-WAKE
+% sleep states (2/3/4) for control matching; nremTimes is NREM (state 4), the
+% ripple z-scoring and QA baseline. Both require the full 4-state layout.
 vldTimes  = [];
 nremTimes = [];
 if numel(boutTimes) >= 4
-    vldTimes  = vertcat(boutTimes{2}, boutTimes{3}, boutTimes{4});
-    nremTimes = boutTimes{4};
+    iNrem     = 4;
+    vldTimes  = vertcat(boutTimes{2}, boutTimes{3}, boutTimes{iNrem});
+    nremTimes = boutTimes{iNrem};
 end
 
 end     % MAIN

@@ -27,7 +27,7 @@ function hFig = ripp_screenGui(res, varargin)
 %       hFig - <handle> the guiPath figure.
 %
 %   DEPENDENCIES:
-%       guiPath, guiPath_presets, guiPath_panel.
+%       guiPath, guiPath_preset, guiPath_panel.
 %
 %   HISTORY:
 %       260716 detection-review parameter screen.
@@ -52,7 +52,7 @@ nM    = numel(names);
 %  ========================================================================
 
 if isempty(mouse)
-    iCur = max(1, find(strcmp(names, 'current'), 1));
+    iCur = max(1, find(strcmp(names, 'default'), 1));
     iAlt = find(strcmp(names, 'fooof'), 1);
     if isempty(iAlt), iAlt = min(2, nM); end
     dis = zeros(1, numel(res.sbjID));
@@ -71,7 +71,7 @@ basepath = res.basepaths{mouse};
 %  RIPPLE CONTEXT FROM THE PRESET, MINUS ITS SINGLE EVENTS PANEL
 %  ========================================================================
 
-[varMap, guiMap] = guiPath_presets('ripp', basepath);
+[varMap, guiMap] = guiPath_preset('ripp', basepath);
 if isfield(varMap, 'ripp'),       varMap = rmfield(varMap, 'ripp'); end
 if isfield(guiMap.panels, 'evt'), guiMap.panels = rmfield(guiMap.panels, 'evt'); end
 
@@ -83,13 +83,14 @@ if isfield(guiMap.panels, 'evt'), guiMap.panels = rmfield(guiMap.panels, 'evt');
 % input shows in both regions. A method with no events is skipped.
 
 for iMethod = 1:nM
-    peakT = res.pk{mouse, iMethod}(:);
-    if isempty(peakT)
+    rp = res.detect{iMethod}(mouse).ripp;
+    if isempty(rp) || ~any(rp.accepted)
         continue;
     end
-    ev = struct('peakTime', peakT, ...
-        'times', res.detect{iMethod}(mouse).ripp.times, ...
-        'accepted', true(numel(peakT), 1));
+    acc = rp.accepted;
+    ev = struct('peakTime', rp.peakTime(acc), ...
+        'times', rp.times(acc, :), ...
+        'accepted', true(sum(acc), 1));
     fld = matlab.lang.makeValidName(names{iMethod});
     varMap.(fld) = var_recipe('value', 'data', ev);
     guiMap.panels.([fld, '_top']) = guiPath_panel('eventTicks', 'top', fld, ...

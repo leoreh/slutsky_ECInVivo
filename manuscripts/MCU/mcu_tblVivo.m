@@ -136,8 +136,8 @@ if ismember('rippMaps', presets)
     varMap.t_amp        = 'rippMaps.amp';
     varMap.t_freq       = 'rippMaps.freq';
     varMap.t_z          = 'rippMaps.z';
-    % population PETH (RS/FS/MU) is not precomputed; derive it on demand from
-    % the 3D raster in rippSpkMaps.mat via evt_pethPop when a table needs it.
+    % population PETH (RS/FS/MU) is not precomputed here; the 3D raster in
+    % rippSpkMaps.mat can supply a per-type PETH if a table later needs it.
 end
 
 if ismember('rippStates', presets)
@@ -198,10 +198,23 @@ if ismember('frNet', presets)
 end
 
 % Post-process ripp states
-if ismember('rippStates', presets) 
+if ismember('rippStates', presets)
     for iFile = 1:length(v)
         badIdx = ismember(v(iFile).rippStates.State, {'WAKE', 'N/REM', 'REM'});
         v(iFile).rippStates(badIdx, :) = [];
+    end
+end
+
+% Post-process ripp: keep only accepted events. QA now MARKS events via
+% .accepted (NREM/valid state, low EMG, above the MUA-gain gate) rather than
+% removing them, so the per-event table is filtered here. Old .ripp.mat files
+% without .accepted are left untouched (they already hold only the survivors).
+if ismember('ripp', presets)
+    for iFile = 1:length(v)
+        if isfield(v(iFile), 'ripp') && isstruct(v(iFile).ripp) ...
+                && isfield(v(iFile).ripp, 'accepted')
+            v(iFile).ripp = evt_subset(v(iFile).ripp, v(iFile).ripp.accepted);
+        end
     end
 end
 

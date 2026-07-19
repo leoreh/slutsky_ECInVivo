@@ -59,8 +59,8 @@ function ed = ed_wrapper(varargin)
 %       basename.edSpkMaps.mat  - 3D spike raster [unit x event x bin] (heavy)
 %
 %   DEPENDENCIES:
-%       ed_sigLoad, ed_detect, ed_params, guiPath, basepaths2vars; and
-%       the shared event layer (lfp/events): evt_files, evt_rippCh, evt_spkPrep,
+%       ed_sigLoad, ed_detect, ed_params, ripp_pickCh, guiPath, basepaths2vars;
+%       and the shared event layer (lfp/events): evt_files, evt_spkPrep,
 %       evt_boutTimes, evt_emgScore, evt_qa, evt_subset, evt_ctrlTimes,
 %       evt_states, evt_maps, evt_spks, evt_saveSpks, evt_plotSpks.
 %
@@ -169,10 +169,10 @@ else
     % ---- Signal ---------------------------------------------------------
     % Detect on the ripple channel so the ED signal is the same LFP as the
     % ripples pipeline. The channel is read from the ripple output
-    % (ripp.info.rippCh via evt_rippCh), not the session tag (only for the
+    % (ripp.info.rippCh via ripp_pickCh), not the session tag (only for the
     % 'lfp' source; 'eeg' ignores edCh).
     if strcmp(sigSource, 'lfp') && isempty(edCh)
-        edCh = evt_rippCh(basepath, basename, session);
+        edCh = ripp_pickCh(basepath, 'basename', basename, 'session', session);
     end
     if verbose, fprintf('[ED]: Loading signal...\n'); end
     [sig, emg, ~, fs] = ed_sigLoad(basepath, 'sigSource', sigSource, ...
@@ -228,8 +228,7 @@ else
     end
 
     if verbose, fprintf('[ED]: Generating signal maps...\n'); end
-    edMaps = evt_maps(struct('lfp', sig(:)), ed.peakTime, fs, ...
-        'mapDur', mapDur, 'flgSave', false);
+    edMaps = evt_maps(struct('lfp', sig(:)), ed.peakTime, fs, 'mapDur', mapDur);
 
     % ---- Spiking (SU/MU modulation + PETH) ------------------------------
     hasSpks = hasSpikes && nEvt > 0;

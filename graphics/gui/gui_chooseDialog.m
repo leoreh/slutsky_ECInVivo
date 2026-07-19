@@ -25,10 +25,12 @@ if numel(options) <= 4
     return;
 end
 
-% Many options: modal dropdown dialog.
+% Many options: a dropdown dialog. Deliberately NOT WindowStyle 'modal' - an
+% app-modal uifigure blocks every other MATLAB window, so if the caller opens a
+% dialog of its own while this one is still being destroyed the two block each
+% other and the session hangs. uiwait already stops the caller.
 d = uifigure('Name', 'Assign', 'Position', [100, 100, 300, 150]);
-d.WindowStyle = 'modal';
-cleaner = onCleanup(@() delete(d(isvalid(d))));
+cleaner = onCleanup(@() delete(d(isvalid(d))));   % error path only
 movegui(d, 'center');
 
 gl = uigridlayout(d, [3, 2], 'RowHeight', {'fit', 'fit', 'fit'}, ...
@@ -53,6 +55,11 @@ uiwait(d);
 if accepted && isvalid(d)
     sel = dd.Value;
 end
+
+% take the window down here, not on the way out of the workspace: the caller
+% may open its next dialog immediately
+delete(d(isvalid(d)));
+drawnow;
 
     function onOk()
         accepted = true;

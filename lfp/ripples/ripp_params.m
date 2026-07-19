@@ -28,6 +28,9 @@ function ripp = ripp_params(rippSig, ripp)
 %                       .freq      (N x 1) [Hz] (Fixed window, Hilbert)
 %                       .freqEvent (N x 1) [Hz] (Full Duration, Hilbert)
 %                       .freqPeak  (N x 1) [Hz] (Whitened spectral peak)
+%                       .peakProm  (N x 1) [ratio] (Whitened peak height above
+%                                  the 1/f background; ~1 for a broadband
+%                                  transient, >>1 for a true ripple)
 %                       .energy    (N x 1) [uV^2]
 %                       .dur       (N x 1) [ms]
 %                       .skew      (N x 1) [ms]
@@ -53,6 +56,7 @@ ripp.amp = nan(nEvents, 1);
 ripp.freq = nan(nEvents, 1);
 ripp.freqEvent = nan(nEvents, 1);
 ripp.freqPeak = nan(nEvents, 1);
+ripp.peakProm = nan(nEvents, 1);
 ripp.energy = nan(nEvents, 1);
 ripp.dur = nan(nEvents, 1);
 ripp.skew = nan(nEvents, 1);
@@ -101,7 +105,8 @@ for iEvent = 1:nEvents
     % Peak Frequency (Hz) - whitened event-PSD peak (1/f-corrected)
     idxPk = (peakSamps(iEvent) - nPeakWin) : (peakSamps(iEvent) + nPeakWin);
     idxPk = idxPk(idxPk >= 1 & idxPk <= nSamples);
-    ripp.freqPeak(iEvent) = ripp_freqPeak(rippSig.lfp(idxPk), fs);
+    [ripp.freqPeak(iEvent), ripp.peakProm(iEvent)] = ...
+        ripp_freqPeak(rippSig.lfp(idxPk), fs);
 
     % Total Energy (uV^2)
     ripp.energy(iEvent) = sum(rippSig.filt(idxDtct) .^ 2, 'omitnan');
@@ -121,15 +126,18 @@ end     % EOF
 % =========================================================================
 %  LOCAL: whitened event-PSD peak frequency
 % =========================================================================
-function f0 = ripp_freqPeak(seg, fs)
-% Peak frequency of one event's spectrum after removing the 1/f background.
-% Fits a power law (log-log line) to the aperiodic part - the fit range
-% brackets the ripple band but excludes it (30-500 Hz minus 70-260 Hz) so the
-% oscillation does not pull the slope - divides it out, and returns the
-% residual peak inside 70-260 Hz. This is the honest ripple frequency; the
-% Hilbert instantaneous estimate rides the 1/f slope downward.
+function [f0, prom] = ripp_freqPeak(seg, fs)
+% Peak frequency AND prominence of one event's spectrum after removing the 1/f
+% background. Fits a power law (log-log line) to the aperiodic part - the fit
+% range brackets the ripple band but excludes it (30-500 Hz minus 70-260 Hz) so
+% the oscillation does not pull the slope - divides it out, and returns the
+% residual peak inside 70-260 Hz (f0, the honest ripple frequency; the Hilbert
+% estimate rides the 1/f down) together with its height above the background
+% (prom): ~1 when the event is a broadband transient with no real oscillation,
+% >>1 when a narrowband ripple stands above the 1/f floor.
 
 seg = seg(:);
+prom = NaN;
 if numel(seg) < 16, f0 = NaN; return; end
 
 nf  = 512;
@@ -145,7 +153,7 @@ whit = ps ./ exp(polyval(pf, log(max(fAx, 1))));
 
 rippBand = fAx >= 70 & fAx <= 260;
 fRipp    = fAx(rippBand);
-[~, im]  = max(whit(rippBand));
-f0       = fRipp(im);
+[prom, im] = max(whit(rippBand));
+f0         = fRipp(im);
 
 end

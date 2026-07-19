@@ -58,7 +58,7 @@
 % evt_maps      Per-event signal maps around each event peak.
 % evt_spks      Spike entry point: per-unit stats + per-event population metrics
 %               + 3D raster + per-unit PETH (orchestrates evt_spksParams,
-%               evt_spkPeth, evt_pethNorm, evt_pethPop, evt_rankOrder).
+%               evt_spkPeth, evt_pethNorm, evt_rankOrder).
 % evt_saveSpks  Split the spike result into a light stats file + heavy raster.
 % evt_plotSpks  Spike-modulation summary figure.
 % evt2ns        Export events to a NeuroScope .evt file (start / peak / stop
@@ -67,12 +67,15 @@
 %
 % # Modality-specific (deliberately not shared)
 %
-% Ripples: ripp_sigLoad (channel + EMG), ripp_sigPrep (filter + envelope +
-%   z-score), ripp_times (threshold candidates), ripp_params (frequency /
-%   energy / skew), spklfp_phase (spike-LFP coupling).
+% Ripples: ripp_pickCh (detection channel), ripp_sigLoad (channel + EMG),
+%   ripp_sigPrep (filter + envelope + z-score), ripp_times (threshold
+%   candidates), ripp_params (frequency / energy / skew), ripp_detect (the
+%   shared detect -> params -> maps -> QA core), spklfp_phase (spike-LFP).
+% QA marks .accepted (ripples, never removed) or subsets (ED); mcu_tblVivo
+%   filters .accepted for the per-event ripple table.
 % ED: ed_sigLoad (EEG or LFP channel + EMG), ed_detect (moving-z transients),
 %   ed_params (half- / 10%-amplitude widths).
-% The channel loaders share evt_pickCh (ripple-tagged channel) and evt_loadCh
+% The channel loaders share ripp_pickCh (the ripple channel) and evt_loadCh
 % (binary .lfp read + averaging + bit2uv autodetect).
 %
 % # Outputs  (<basename>.<var>.mat, written when flgSave = true)
@@ -87,8 +90,8 @@
 %
 % The light spikes file (.rippSpks / .edSpks) carries per-unit scalar stats +
 % the per-unit PETH + tstamps; the manuscript loads it hot. The 3D raster is
-% split into its own heavy file. Per-event population PETHs are computed on
-% demand from the raster via evt_pethPop — never precomputed or saved.
+% split into its own heavy file. A per-type population PETH is not precomputed;
+% derive it from the 3D raster if a table ever needs it.
 %
 % # Robustness
 %

@@ -18,7 +18,7 @@ function [lfp, emg, fs] = ripp_sigLoad(basepath, varargin)
 %           'win'      - (Vec)    Window [start end] (s). {[0 Inf]}
 %           'session'  - (Struct) Session metadata (loaded if empty).
 %           'basename' - (Char)   File stem. {folder name}
-%           'rippCh'   - (Num)    Detection channel. {channelTags.Ripple}
+%           'rippCh'   - (Num)    Detection channel. {ripp.info.rippCh or best}
 %           'bit2uv'   - (Num)    Conversion factor. {auto}
 %
 %   OUTPUTS:
@@ -27,7 +27,7 @@ function [lfp, emg, fs] = ripp_sigLoad(basepath, varargin)
 %       fs       - (Num) LFP sampling frequency [Hz].
 %
 %   DEPENDENCIES:
-%       evt_pickCh, evt_loadCh, basepaths2vars (only when session is empty).
+%       ripp_pickCh, evt_loadCh, basepaths2vars (only when session is empty).
 %
 %   HISTORY:
 %       Created: 260706 (parity with ed_sigLoad; via the shared loader).
@@ -65,7 +65,8 @@ end
 %  RIPPLE CHANNEL
 %  ========================================================================
 if isempty(rippCh)
-    rippCh = evt_pickCh(session);
+    rippCh = ripp_pickCh(basepath, 'basename', basename, 'session', session, ...
+        'win', win);
 end
 [lfp, fs] = evt_loadCh(basepath, basename, session, rippCh, win, bit2uv);
 

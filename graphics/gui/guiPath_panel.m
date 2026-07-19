@@ -26,30 +26,41 @@ function p = guiPath_panel(type, region, var, varargin)
 %                   absolute; a scalar p clips to the [p, 100-p] percentile
 %                   (0 <= p < 50); 'prc' is the default percentile (what a trace
 %                   gets unset); 'full' / [] autoscale. See guiPath_shape.
+% - render          <char> how the type draws here, when it has a choice: a
+%                   Bottom event set is 'lines' (spanning, no tile of its own)
+%                   or 'strip' (a tick lane). '' (default) = by type + region.
+% - yAdjust         <num>  amplitude factor for trace / traces / spec, as set
+%                   live by shift+scroll. Default 1.
 %
 % OUTPUTS
-% - p               <struct> .type .region .var .height .label .clr .ylim.
+% - p               <struct> .type .region .var .height .label .clr .ylim
+%                   .render .yAdjust.
 %
 % SEE ALSO
-% - var_recipe, guiPath_presets, guiPath_shape, guiPath, guiPath_doc.
+% - var_recipe, guiPath_preset, guiPath_shape, guiPath, guiPath_doc.
 %
 % HISTORY
 % - 260719          view panel over a varMap entry (was a fused src+view+data
 %                   panel; recipe moved to var_recipe, loading to var_load).
+% - 260719          render + yAdjust added, so a saved preset keeps a Bottom
+%                   set's lines / ticks choice and the amplitude it was given.
 
 td = typeDefaults(type);
 p = struct('type', type, 'region', region, 'var', var, ...
-    'height', td.height, 'label', td.label, 'clr', 'k', 'ylim', []);
+    'height', td.height, 'label', td.label, 'clr', 'k', 'ylim', [], ...
+    'render', '', 'yAdjust', 1);
 if strcmp(type, 'trace'), p.ylim = 'prc'; end     % traces auto-percentile unless set
 
 for iArg = 1 : 2 : numel(varargin)
     key = varargin{iArg};
     v   = varargin{iArg + 1};
     switch lower(key)
-        case 'height', p.height = v;
-        case 'label',  p.label  = v;
-        case 'clr',    p.clr    = v;
-        case 'ylim',   p.ylim   = v;
+        case 'height',  p.height  = v;
+        case 'label',   p.label   = v;
+        case 'clr',     p.clr     = v;
+        case 'ylim',    p.ylim    = v;
+        case 'render',  p.render  = v;
+        case 'yadjust', p.yAdjust = v;
         otherwise, error('guiPath_panel:arg', 'unknown option "%s"', key);
     end
 end
