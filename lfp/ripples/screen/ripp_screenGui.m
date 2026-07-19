@@ -1,56 +1,64 @@
 function hFig = ripp_screenGui(res, varargin)
-% RIPP_SCREENGUI Inspect where detection methods disagree, in one guiPath window.
+% RIPP_SCREENGUI Compare methods' ripple events in one guiPath window.
 %
 %   hFig = RIPP_SCREENGUI(res, varargin)
 %
-%   Opens guiPath over one session (default: the one where methods disagree
-%   most) with the usual ripple context plus a raster panel that shows every
-%   method's ripple peaks as its own row - all methods side by side in one
-%   window. One method is the steppable target so the bottom window can walk
-%   event to event. Saving is a no-op, so <basename>.ripp.mat is never touched.
-%
-%   The per-method peak times come straight from res.pk{mouse, method}, so
-%   adding, dropping, or reordering a row is a one-line edit - no digging
-%   through res.detect. guiPath itself is unchanged.
-%
-%   LIMITATION: the rows share one colour. guiPath's raster paints the whole
-%   panel one colour and eventTicks only ever shows the single target, so
-%   per-method colours would need a change inside the gui (drawRaster /
-%   plot_raster), which this deliberately does not touch.
+%   SUMMARY:
+%       Opens guiPath over one session with the ripple context (stacked-shank
+%       LFP, filtered trace, EMG, unit raster, hypnogram, spectrogram) and every
+%       method's detected events overlaid, each in its own colour: a tick strip
+%       per method in the overview and colour-matched marks over the LFP. Uses
+%       guiPath's multi-set support - each method is one event SET (a top tick
+%       strip and a bottom overlay that share a name), so guiPath assigns the
+%       colours and lists the methods under CURATE, and all methods sit side by
+%       side in one window. Pick a method from CURATE to step its events
+%       (arrows) with the others still overlaid; CURATE = None just steps the
+%       window. Nothing is saved - the save target is neutralised, so
+%       <basename>.ripp.mat is never touched.
 %
 %   INPUTS:
-%       res      - <struct> ripp_screen output (needs .pk, .methods, .sbjID).
+%       res      - <struct> ripp_screen output (needs .pk, .detect, .methods,
+%                           .basepaths, .sbjID).
 %       varargin - Parameter/Value:
-%           'mouse'  - <num>  mouse index into res. {max disagreement}
-%           'target' - <char> method name used as the steppable target. {'narrow'}
+%           'mouse'   - <num>  mouse index into res. {max disagreement}
+%           'Visible' - <char> 'on' | 'off' for headless / scripted use. {'on'}
 %
 %   OUTPUT:
 %       hFig - <handle> the guiPath figure.
 %
 %   DEPENDENCIES:
-%       guiPath, guiPath_presets.
+%       guiPath, guiPath_presets, guiPath_panel.
 %
 %   HISTORY:
 %       260716 detection-review parameter screen.
+%       260717 rewritten onto guiPath's multi-set events (one set per method).
+
+%% ========================================================================
+%  ARGUMENTS
+%  ========================================================================
 
 p = inputParser;
 addParameter(p, 'mouse', [], @(x) isempty(x) || isscalar(x));
-addParameter(p, 'target', 'narrow', @ischar);
+addParameter(p, 'Visible', 'on', @(x) any(strcmpi(char(x), {'on', 'off'})));
 parse(p, varargin{:});
-mouse  = p.Results.mouse;
-target = p.Results.target;
+mouse = p.Results.mouse;
+vis   = char(p.Results.Visible);
 
 names = {res.methods.name};
 nM    = numel(names);
 
-%% ---- pick the mouse where 'current' and 'narrow' disagree most ----
+%% ========================================================================
+%  PICK THE MOUSE WHERE THE METHODS DISAGREE MOST
+%  ========================================================================
+
 if isempty(mouse)
     iCur = max(1, find(strcmp(names, 'current'), 1));
-    iNar = find(strcmp(names, 'narrow'), 1);
-    if isempty(iNar), iNar = min(2, nM); end
+    iAlt = find(strcmp(names, 'fooof'), 1);
+    if isempty(iAlt), iAlt = min(2, nM); end
     dis = zeros(1, numel(res.sbjID));
     for iMouse = 1:numel(res.sbjID)
-        a = res.pk{iMouse, iCur}; b = res.pk{iMouse, iNar};
+        a = res.pk{iMouse, iCur};
+        b = res.pk{iMouse, iAlt};
         dis(iMouse) = nUnmatched(a, b, 0.03) + nUnmatched(b, a, 0.03);
     end
     [~, mouse] = max(dis);
@@ -59,26 +67,44 @@ if isempty(mouse)
 end
 basepath = res.basepaths{mouse};
 
-%% ---- context panels from the ripp preset, minus its curation target ----
-cfgData = guiPath_presets('ripp');
-if isfield(cfgData, 'evt'), cfgData = rmfield(cfgData, 'evt'); end
+%% ========================================================================
+%  RIPPLE CONTEXT FROM THE PRESET, MINUS ITS SINGLE EVENTS PANEL
+%  ========================================================================
 
-%% ---- one raster row per method (peaks straight from res.pk) ----
-cfgData.methods = mkPanel('raster', 'bottom', '', 1.5, res.pk(mouse, :));
-cfgData.methods.label = ['Methods top-down: ' strjoin(names, ' / ')];
+[varMap, guiMap] = guiPath_presets('ripp', basepath);
+if isfield(varMap, 'ripp'),       varMap = rmfield(varMap, 'ripp'); end
+if isfield(guiMap.panels, 'evt'), guiMap.panels = rmfield(guiMap.panels, 'evt'); end
 
-%% ---- steppable target: one method's events (pre-loaded, not the .mat) ----
-iTgt = find(strcmp(names, target), 1);
-if isempty(iTgt), iTgt = min(2, nM); end
-tgt = res.detect{iTgt}(mouse).ripp;
-evtData = struct('peakTime', tgt.peakTime(:), 'times', tgt.times, ...
-    'accepted', true(numel(tgt.peakTime), 1));
-cfgData.evt = mkPanel('eventTicks', 'top', ['Stepper: ' names{iTgt}], 1, evtData);
+%% ========================================================================
+%  ONE EVENT SET PER METHOD (own colour, top strip + bottom overlay)
+%  ========================================================================
+% Each method is a guiPath event set: a varMap entry (the events, inline) drawn
+% by a top tick strip and a bottom overlay that share its var, so one coloured
+% input shows in both regions. A method with no events is skipped.
 
-%% ---- launch, save disabled ----
-cfgGui = struct('name', 'Screen', 'file', '', 'mode', 'events', ...
-    'win', 0.4, 'save', @(x) []);
-hFig = guiPath(basepath, 'cfgData', cfgData, 'cfgGui', cfgGui);
+for iMethod = 1:nM
+    peakT = res.pk{mouse, iMethod}(:);
+    if isempty(peakT)
+        continue;
+    end
+    ev = struct('peakTime', peakT, ...
+        'times', res.detect{iMethod}(mouse).ripp.times, ...
+        'accepted', true(numel(peakT), 1));
+    fld = matlab.lang.makeValidName(names{iMethod});
+    varMap.(fld) = var_recipe('value', 'data', ev);
+    guiMap.panels.([fld, '_top']) = guiPath_panel('eventTicks', 'top', fld, ...
+        'label', names{iMethod});
+    guiMap.panels.([fld, '_bot']) = guiPath_panel('eventTicks', 'bottom', fld, ...
+        'label', names{iMethod});
+end
+
+%% ========================================================================
+%  LAUNCH; NO CURATION WRITES
+%  ========================================================================
+
+guiMap.name = 'Screen';
+guiMap.save = '';               % neutralise the preset's 'ripp' save target
+hFig = guiPath(basepath, 'varMap', varMap, 'guiMap', guiMap, 'Visible', vis);
 
 end     % EOF
 
@@ -92,17 +118,10 @@ n = 0;
 if isempty(a), return; end
 if isempty(b), n = numel(a); return; end
 b = sort(b(:));
-for i = 1:numel(a)
-    [~, j] = min(abs(b - a(i)));
-    if abs(b(j) - a(i)) > tol, n = n + 1; end
+for iVal = 1:numel(a)
+    [~, iNear] = min(abs(b - a(iVal)));
+    if abs(b(iNear) - a(iVal)) > tol
+        n = n + 1;
+    end
 end
-end
-
-% -------------------------------------------------------------------------
-function pnl = mkPanel(type, region, label, height, data)
-% minimal panel struct guiPath_load accepts; .data preset -> not reloaded.
-% {data} wraps the payload so struct() stays scalar even when data is a cell.
-pnl = struct('type', type, 'region', region, 'src', [], 'name', label, ...
-    'fs', NaN, 'height', height, 'clr', 'k', 'label', label, ...
-    'order', 99, 'ylim', [], 'data', {data});
 end

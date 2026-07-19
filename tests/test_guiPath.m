@@ -61,12 +61,12 @@ assert(abs(a2 - 2*a1) < 1e-6, 'stack amp: gain=2 should double the drawn deflect
 close(f);
 fprintf('  ok  stack amplitude (gain, fixed limits)\n');
 
-% 3. resolveYlim (via guiPath_load): a scalar percentile clips tighter than prc.
+% 3. ylim resolution (via guiPath_shape): a scalar percentile clips tighter
+% than prc.
 rng(0); s = randn(2e5, 1); s(1000) = 500;   % one artifact
-c = struct('a', guiPath_panel('trace', 'bottom', s, 'fs', 1250, 'ylim', 'prc'), ...
-           'b', guiPath_panel('trace', 'bottom', s, 'fs', 1250, 'ylim', 5));
-c = guiPath_load(c, pwd);
-assert(diff(c.b.ylim) < diff(c.a.ylim), 'resolveYlim: scalar 5 should clip tighter than 0.1');
+a = guiPath_shape(struct('type', 'trace', 'data', s, 'fs', 1250, 'ylim', 'prc', 'labels', []));
+b = guiPath_shape(struct('type', 'trace', 'data', s, 'fs', 1250, 'ylim', 5,     'labels', []));
+assert(diff(b.ylim) < diff(a.ylim), 'resolveYlim: scalar 5 should clip tighter than 0.1');
 fprintf('  ok  scalar percentile ylim\n');
 
 %% ----------------------------------------------------------- integration
@@ -164,10 +164,8 @@ fprintf('  ok  panel list add / reorder / delete\n');
 % other. A second set (loaded inline) must not steal curation from 'ripp'.
 d = hFig.UserData;
 ev2 = struct('peakTime', d.ed.peakTime(1:min(5, d.nEvents)) + 0.01);
-p2 = struct('type', 'eventTicks', 'region', 'top', 'fs', [], ...
-    'name', 'ripp2', 'label', 'ripp2', 'saveFcn', []);
-p2.src = ev2;
-d.loadCoreFcn(p2);
+d.loadCoreFcn(var_recipe('value', 'data', ev2), 'eventTicks', 'top', ...
+    'ripp2', 'ripp2', [], []);
 di = hFig.UserData;
 assert(sum(strcmp({di.inputs.type}, 'eventTicks')) == 2, ...
     'curate: expected two event sets after Load');

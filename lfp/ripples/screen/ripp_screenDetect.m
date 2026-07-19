@@ -1,56 +1,69 @@
-function [ripp, rippStates, meta] = ripp_screenDetect(basepath, method, varargin)
-% RIPP_SCREENDETECT Run one detection method on one session slice (light path).
+function [det, meta] = ripp_screenDetect(basepath, methods, varargin)
+% RIPP_SCREENDETECT Run every method on one session slice (load once).
 %
-%   [ripp, rippStates, meta] = RIPP_SCREENDETECT(basepath, method, varargin)
+%   [det, meta] = RIPP_SCREENDETECT(basepath, methods, varargin)
 %
 %   SUMMARY:
-%       The detection half of the screen. Runs the existing ripple pipeline
-%       pieces - signal load, prep, threshold, per-event params, state labels -
-%       for a single method (from ripp_screenMethods) over a window, and stops
-%       before the heavy spike/map/phase steps. Writes NOTHING (evt_states is
-%       called with flgSave=false), so the canonical <basename>.ripp.mat is
-%       never touched. Also scores each event against multi-unit spiking (MUA)
-%       as a label-free detector-quality metric.
+%       The detection half of the screen, for one session. Loads the signals
+%       once, prepares the filtered detection signal once per unique signal
+%       configuration (chMode, passband, detectMet, zMet), and then runs every
+%       method on the shared signal. Methods that differ only in the threshold
+%       therefore reuse the same filtered trace instead of reloading and
+%       refiltering. Runs the existing pieces (ripp_sigLoad, ripp_sigPrep,
+%       ripp_times, ripp_params, evt_states) and stops before the heavy
+%       spike/map/phase steps. Writes NOTHING - evt_states is called with
+%       flgSave=false, so <basename>.ripp.mat is never touched. Scores each
+%       event against multi-unit spiking (MUA) as a label-free quality metric.
+%       A method with .calibThr replaces its fixed peak threshold with one set
+%       to the 1/f noise floor (ripp_noiseFloor).
 %
 %   INPUTS:
-%       basepath - (Char)   session directory.
-%       method   - (Struct) one element of ripp_screenMethods().
+%       basepath - <char>   session directory.
+%       methods  - <struct> ripp_screenMethods() array.
 %       varargin - Parameter/Value:
-%           'win'     - (Vec)    window [start end] (s). {[0 Inf]}
-%           'v'       - (Struct) pre-loaded basepaths2vars struct (session,
+%           'win'     - <vec>    window [start end] (s). {[0 3*3600]}
+%           'v'       - <struct> pre-loaded basepaths2vars (session,
 %                                sleep_states, spikes). Loaded if empty.
-%           'verbose' - (Log)    print progress. {false}
+%           'verbose' - <log>    print progress. {false}
 %
 %   OUTPUTS:
-%       ripp       - (Struct) events + per-event params (.times .peakTime .amp
-%                             .freq .freqEvent .freqPeak .energy .dur .skew
-%                             .state .accepted .muaZ .info). Times ABSOLUTE.
-%       rippStates - (Table)  per-bout rate/density (evt_states 2nd output).
-%       meta       - (Struct) .rippCh .fs .win .nEvents .rateHz .muaPos .method.
+%       det  - <struct> [1 x nMethod] with .ripp (events + per-event params,
+%                       absolute times), .rippStates (evt_states bout table),
+%                       .name.
+%       meta - <struct> [1 x nMethod] with .name .rippCh .fs .win .nEvents
+%                       .rateHz .muaPos .thrPk .chi (chi/thrPk NaN unless
+%                       calibrated).
 %
 %   DEPENDENCIES:
-%       basepaths2vars, evt_boutTimes, ripp_sigLoad, ripp_sigPrep, ripp_times,
-%       ripp_params, evt_states, binary_load, filterLFP.
+%       basepaths2vars, evt_boutTimes, evt_rippCh, ripp_sigLoad, ripp_sigPrep,
+%       ripp_times, ripp_params, ripp_noiseFloor, evt_states, binary_load,
+%       filterLFP.
 %
 %   HISTORY:
-%       Created: 260716 (detection-review parameter screen).
+%       260716 detection-review parameter screen.
+%       260717 load once; cache prepared signal across methods; calibThr path.
 
-%% ---- arguments ----
+%% ========================================================================
+%  ARGUMENTS
+%  ========================================================================
+
 p = inputParser;
 addRequired(p, 'basepath', @ischar);
-addRequired(p, 'method', @isstruct);
-addParameter(p, 'win', [0 Inf], @isnumeric);
+addRequired(p, 'methods', @isstruct);
+addParameter(p, 'win', [0 3 * 3600], @isnumeric);
 addParameter(p, 'v', [], @(x) isempty(x) || isstruct(x));
 addParameter(p, 'verbose', false, @islogical);
-parse(p, basepath, method, varargin{:});
+parse(p, basepath, methods, varargin{:});
 win     = p.Results.win;
 v       = p.Results.v;
 verbose = p.Results.verbose;
 [~, basename] = fileparts(basepath);
+nM = numel(methods);
 
-%% ---- session + optional data ----
-% basepaths2vars now matches each file by its dotted name, so 'sleep_states'
-% no longer picks up AccuSleep_states.mat (see io/basepaths2vars.m).
+%% ========================================================================
+%  SESSION + CONTEXT (loaded once)
+%  ========================================================================
+
 if isempty(v)
     v = basepaths2vars('basepaths', {basepath}, ...
         'vars', {'session', 'sleep_states', 'spikes'});
@@ -58,58 +71,103 @@ end
 ses = v.session;
 fs  = ses.extracellular.srLfp;
 nCh = ses.extracellular.nChannels;
-if round(ses.extracellular.sr) == 24414, b2u = 1; else, b2u = 0.195; end
-if isinf(win(2)), win(2) = ses.extracellular.nSamples / fs; end
+if round(ses.extracellular.sr) == 24414
+    b2u = 1;
+else
+    b2u = 0.195;
+end
+if isinf(win(2))
+    win(2) = ses.extracellular.nSamples / fs;
+end
 sigDur = win(2) - win(1);
 
 % window-relative bout / NREM times (empty degrades gracefully downstream)
 [boutTimes, ~, nremTimes] = evt_boutTimes(v, win, sigDur);
 
-%% ---- detection channel ----
-switch method.chMode
-    case 'tag'
-        rippCh = evt_pickChSafe(ses);           % averaged by ripp_sigLoad
-    case 'best'
-        rippCh = bestRippCh(basepath, basename, win, nremTimes, fs, nCh, b2u);
-    otherwise
-        error('ripp_screenDetect:chMode', 'unknown chMode "%s"', method.chMode);
-end
-
-%% ---- light detection path ----
-if verbose, fprintf('[SCREEN] %s / %s : ch %s\n', basename, ...
-        method.name, mat2str(rippCh)); end
-[lfp, ~, fs] = ripp_sigLoad(basepath, 'win', win, 'session', ses, ...
-    'basename', basename, 'rippCh', rippCh, 'bit2uv', []);
-rippSig = ripp_sigPrep(lfp, fs, 'detectMet', method.detectMet, ...
-    'passband', method.passband, 'zMet', method.zMet, 'nremTimes', nremTimes);
-ripp = ripp_times(rippSig, fs, 'thr', method.thr, 'limDur', method.limDur);
-ripp = ripp_params(rippSig, ripp);
-[ripp.state, rippStates] = evt_states(ripp.times, ripp.peakTime, boutTimes, ...
-    'basepath', basepath, 'flgPlot', false, 'flgSave', false, ...
-    'name', 'ripp', 'lbl', 'Ripple');
-ripp.accepted = true(size(ripp.times, 1), 1);
-
-%% ---- MUA convergence (label-free detector quality) ----
+% multi-unit spike train, windowed (empty if no spikes)
 mua = [];
 if isfield(v, 'spikes') && isfield(v.spikes, 'times')
     mua = sort(vertcat(v.spikes.times{:})) - win(1);
     mua = mua(mua > 0 & mua < sigDur);
 end
-ripp.muaZ = muaGain(mua, ripp.peakTime, nremTimes, sigDur);
 
-%% ---- absolute time + provenance ----
-ripp.times    = ripp.times + win(1);
-ripp.peakTime = ripp.peakTime + win(1);
-ripp.info.basename = basename;
-ripp.info.rippCh   = rippCh;
-ripp.info.passband = method.passband;
-ripp.info.zMet     = method.zMet;
-ripp.info.method   = method.name;
-ripp.info.win      = win;
+%% ========================================================================
+%  DETECT (shared signal per config, threshold per method)
+%  ========================================================================
 
-meta = struct('rippCh', rippCh, 'fs', fs, 'win', win, ...
-    'nEvents', size(ripp.times, 1), 'rateHz', size(ripp.times, 1) / sigDur, ...
-    'muaPos', mean(ripp.muaZ > 1), 'method', method.name);
+det  = struct('ripp', cell(1, nM), 'rippStates', cell(1, nM), 'name', cell(1, nM));
+meta = struct('name', cell(1, nM), 'rippCh', cell(1, nM), 'fs', cell(1, nM), ...
+    'win', cell(1, nM), 'nEvents', cell(1, nM), 'rateHz', cell(1, nM), ...
+    'muaPos', cell(1, nM), 'thrPk', cell(1, nM), 'chi', cell(1, nM));
+
+sigCache = struct();
+for iMethod = 1:nM
+    method = methods(iMethod);
+
+    % prepare the filtered signal once per unique configuration
+    key = cfgKey(method);
+    if ~isfield(sigCache, key)
+        rippCh = pickChannel(method, basepath, basename, ses, win, ...
+            nremTimes, fs, nCh, b2u);
+        lfp = ripp_sigLoad(basepath, 'win', win, 'session', ses, ...
+            'basename', basename, 'rippCh', rippCh, 'bit2uv', []);
+        c.sig = ripp_sigPrep(lfp, fs, 'detectMet', method.detectMet, ...
+            'passband', method.passband, 'zMet', method.zMet, ...
+            'nremTimes', nremTimes);
+        c.rippCh = rippCh;
+        sigCache.(key) = c;
+    end
+    c = sigCache.(key);
+
+    if verbose
+        fprintf('[SCREEN] %s / %s : ch %s\n', basename, method.name, ...
+            mat2str(c.rippCh));
+    end
+
+    % threshold: fixed, or calibrated to the 1/f noise floor
+    thr = method.thr;
+    chi = NaN;
+    if method.calibThr
+        [thrPk, nf] = ripp_noiseFloor(c.sig.lfp, fs, method, ...
+            'nremTimes', nremTimes, 'targetFP', method.targetFP);
+        thr(2) = thrPk;
+        thr(1) = max(0.5, thrPk - (method.thr(2) - method.thr(1)));
+        chi = nf.chi;
+    end
+
+    % detect + per-event params + state labels + MUA convergence
+    ripp = ripp_times(c.sig, fs, 'thr', thr, 'limDur', method.limDur);
+    ripp = ripp_params(c.sig, ripp);
+    [ripp.state, rippStates] = evt_states(ripp.times, ripp.peakTime, ...
+        boutTimes, 'basepath', basepath, 'flgPlot', false, ...
+        'flgSave', false, 'name', 'ripp', 'lbl', 'Ripple');
+    ripp.accepted = true(size(ripp.times, 1), 1);
+    ripp.muaZ = muaGain(mua, ripp.peakTime, nremTimes, sigDur);
+
+    % absolute time + provenance
+    ripp.times     = ripp.times + win(1);
+    ripp.peakTime  = ripp.peakTime + win(1);
+    ripp.info.basename = basename;
+    ripp.info.rippCh   = c.rippCh;
+    ripp.info.passband = method.passband;
+    ripp.info.method   = method.name;
+    ripp.info.thr      = thr;
+    ripp.info.win      = win;
+
+    det(iMethod).ripp       = ripp;
+    det(iMethod).rippStates = rippStates;
+    det(iMethod).name       = method.name;
+
+    meta(iMethod).name    = method.name;
+    meta(iMethod).rippCh  = c.rippCh;
+    meta(iMethod).fs      = fs;
+    meta(iMethod).win     = win;
+    meta(iMethod).nEvents = size(ripp.times, 1);
+    meta(iMethod).rateHz  = size(ripp.times, 1) / sigDur;
+    meta(iMethod).muaPos  = mean(ripp.muaZ > 1);
+    meta(iMethod).thrPk   = thr(2);
+    meta(iMethod).chi     = chi;
+end
 
 end     % EOF
 
@@ -117,11 +175,23 @@ end     % EOF
 % =========================================================================
 %  LOCALS
 % =========================================================================
-function ch = evt_pickChSafe(ses)
-ch = 1;
-if isfield(ses, 'channelTags') && isfield(ses.channelTags, 'Ripple') ...
-        && ~isempty(ses.channelTags.Ripple)
-    ch = ses.channelTags.Ripple;
+function key = cfgKey(method)
+% signal-config identity: methods with the same key share one prepared signal
+key = matlab.lang.makeValidName(sprintf('%s_%s_%d_%s', method.chMode, ...
+    num2str(method.passband), method.detectMet, method.zMet));
+end
+
+% -------------------------------------------------------------------------
+function rippCh = pickChannel(method, basepath, basename, ses, win, ...
+    nremTimes, fs, nCh, b2u)
+% detection channel per chMode: the ripple tag, or the best NREM channel
+switch method.chMode
+    case 'tag'
+        rippCh = evt_rippCh(basepath, basename, ses);
+    case 'best'
+        rippCh = bestRippCh(basepath, basename, win, nremTimes, fs, nCh, b2u);
+    otherwise
+        error('ripp_screenDetect:chMode', 'unknown chMode "%s"', method.chMode);
 end
 end
 
@@ -140,10 +210,11 @@ dur = min(120, pT(2) - pT(1));
 probe = double(binary_load(lfpFile, 'fs', fs, 'nCh', nCh, ...
     'start', pT(1), 'duration', dur, 'ch', 1:nCh, 'bit2uv', b2u));
 rmsCh = zeros(1, nCh);
-for c = 1:nCh
-    fb = filterLFP(probe(:, c), 'fs', fs, 'type', 'butter', 'dataOnly', true, ...
-        'order', 5, 'passband', [120 220], 'graphics', false);
-    rmsCh(c) = rms(fb);
+for iCh = 1:nCh
+    fb = filterLFP(probe(:, iCh), 'fs', fs, 'type', 'butter', ...
+        'dataOnly', true, 'order', 5, 'passband', [120 220], ...
+        'graphics', false);
+    rmsCh(iCh) = rms(fb);
 end
 [~, ch] = max(rmsCh);
 end
@@ -154,7 +225,7 @@ function z = muaGain(mua, peakTime, nremTimes, sigDur)
 z = nan(numel(peakTime), 1);
 if isempty(mua), return; end
 half  = 0.025;
-edges = (0 : 2*half : sigDur)';
+edges = (0 : 2 * half : sigDur)';
 cnt   = histcounts(mua, edges)';
 bc    = edges(1:end-1) + half;
 
@@ -163,8 +234,8 @@ if isempty(nremTimes)
     nremBin = true(numel(cnt), 1);
 else
     nremBin = false(numel(cnt), 1);
-    for i = 1:size(nremTimes, 1)
-        nremBin(bc >= nremTimes(i, 1) & bc <= nremTimes(i, 2)) = true;
+    for iBout = 1:size(nremTimes, 1)
+        nremBin(bc >= nremTimes(iBout, 1) & bc <= nremTimes(iBout, 2)) = true;
     end
     if ~any(nremBin), nremBin = true(numel(cnt), 1); end
 end
@@ -172,8 +243,8 @@ mu = mean(cnt(nremBin), 'omitnan');
 sd = std(cnt(nremBin), 'omitnan');
 if sd == 0, sd = 1; end
 
-for i = 1:numel(peakTime)
-    n = sum(mua >= peakTime(i) - half & mua < peakTime(i) + half);
-    z(i) = (n - mu) / sd;
+for iEvt = 1:numel(peakTime)
+    n = sum(mua >= peakTime(iEvt) - half & mua < peakTime(iEvt) + half);
+    z(iEvt) = (n - mu) / sd;
 end
 end

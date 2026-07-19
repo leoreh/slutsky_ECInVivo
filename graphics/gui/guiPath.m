@@ -1,4 +1,4 @@
-function [hFig, cfgData] = guiPath(basepath, varargin)
+function [hFig, varMap, guiMap] = guiPath(basepath, varargin)
 
 % Opens a single-session signal viewer for curating events or scoring states.
 %
@@ -21,8 +21,8 @@ function [hFig, cfgData] = guiPath(basepath, varargin)
 %       Bottom (narrow) a window around the cursor t0; redrawn as t0 moves.
 % All panels share one tiledlayout, so every plot box shares a left gutter and
 % width. The Top prints its x-axis just above the divider, the Bottom at the
-% very bottom. Panel types, addresses and the cfgData contract are documented
-% in guiPath_doc; the draw function per type lives in guiPath_draw.
+% very bottom. Panel types and the varMap (data) / guiMap (view) contract are
+% documented in guiPath_doc; the draw function per type lives in guiPath_draw.
 %
 % INTERACTION
 % - Left / Right            previous / next event (or the window, in view mode)
@@ -47,32 +47,33 @@ function [hFig, cfgData] = guiPath(basepath, varargin)
 % - guiPath(basepath, 'preset', 'Ripples')
 %   forces a preset by name.
 %
-% - [hFig, cfgData] = guiPath(basepath, 'preset', 'EDs');
-%   guiPath(basepath, 'cfgData', cfgData)
-%   reopens fast: the returned cfgData already carries the loaded data.
+% - [hFig, varMap, guiMap] = guiPath(basepath, 'preset', 'EDs');
+%   guiPath(basepath, 'varMap', varMap, 'guiMap', guiMap)
+%   reopens fast: the returned varMap already carries the loaded data.
 %
 % INPUTS
 % - basepath        <char>(opt) session directory. {pwd}
 % - preset          <char>(opt) initial preset name, see guiPath_presets.
 %                   Auto-detected from the files present when empty.
-% - cfgData         <struct>(opt) panels, flat: one field per panel, see
-%                   guiPath_panel. Bypasses presets. See guiPath_doc.
-% - cfgGui          <struct>(opt) behaviour for a cfgData: .mode .win .save.
-%                   Anything absent is derived from cfgData.
+% - varMap          <struct>(opt) data: name -> recipe (see var_recipe), or an
+%                   already-loaded map. Bypasses presets. See guiPath_doc.
+% - guiMap          <struct>(opt) arrangement for a varMap: .panels + .mode
+%                   .win .save. Anything absent is derived.
 % - basename        <char>(opt) override. {the folder name}
 % - Visible         <char>(opt) 'on' | 'off' for headless. {'on'}
 %
 % OUTPUTS
 % - hFig            <uifigure> handle to the viewer window.
-% - cfgData         <struct> the full panels, data loaded, for a fast reopen.
-%                   The live version is also in hFig.UserData.cfgData.
+% - varMap          <struct> the loaded data, for a fast reopen.
+% - guiMap          <struct> the arrangement + behaviour. The live versions are
+%                   also in hFig.UserData.varMap / .guiMap.
 %
 % SEE ALSO
 % - guiPath_doc
 % - guiPath_presets
 % - guiPath_panel
-% - guiPath_load
-% - guiPath_src
+% - var_recipe
+% - var_load
 % - guiPath_draw
 %
 % HISTORY
@@ -120,6 +121,12 @@ function [hFig, cfgData] = guiPath(basepath, varargin)
 %                   button opens type-specific options; for a Bottom event set
 %                   it overrides lines <-> ticks, the seam where future options
 %                   (a spectrogram's log-frequency scale, etc.) will land.
+% - 260719          data / view split onto one reusable loader: a preset is a
+%                   varMap (recipes, filled by io/var_load) + a guiMap (view
+%                   panels). The old address grammar, guiPath_load / guiPath_src
+%                   / guiPath_ctx and cfgData / cfgGui are gone; mapsToConfig
+%                   lands the two maps into the runtime, per-type shaping in
+%                   guiPath_shape.
 
 %% ========================================================================
 %  ARGUMENTS
@@ -128,16 +135,16 @@ if nargin < 1 || isempty(basepath), basepath = pwd; end   % default to the curre
 p = inputParser;
 addRequired(p, 'basepath', @ischar);
 addParameter(p, 'preset', '', @ischar);
-addParameter(p, 'cfgData', [], @(x) isempty(x) || isstruct(x));
-addParameter(p, 'cfgGui', [], @(x) isempty(x) || isstruct(x));
+addParameter(p, 'varMap', [], @(x) isempty(x) || isstruct(x));
+addParameter(p, 'guiMap', [], @(x) isempty(x) || isstruct(x));
 addParameter(p, 'basename', '', @ischar);
 addParameter(p, 'Visible', 'on', @(x) any(strcmpi(char(x), {'on', 'off'})));
 
 parse(p, basepath, varargin{:});
 basepath   = p.Results.basepath;
 presetArg  = p.Results.preset;
-cfgDataArg = p.Results.cfgData;
-cfgGuiArg  = p.Results.cfgGui;
+varMapArg  = p.Results.varMap;
+guiMapArg  = p.Results.guiMap;
 vis        = char(p.Results.Visible);
 
 basename = p.Results.basename;
@@ -150,30 +157,31 @@ end
 %  ========================================================================
 presets = guiPath_presets();    % {name, file} list for dropdown + auto-detect
 
-% pick the panels (cfgData) + behaviour (cfgGui): an explicit cfgData, else the
-% named / auto-detected preset, else an empty template
-if ~isempty(cfgDataArg)
+% pick the data (varMap) + arrangement (guiMap): an explicit varMap, else the
+% named / auto-detected preset, else an empty template. ctx carries the basename
+% and a within-session file cache, shared by the preset resolvers and the loader.
+ctx = var_ctx(basepath, basename);
+if ~isempty(varMapArg)
     presetName = 'Custom';
-    cfgData = cfgDataArg;
-    if ~isempty(cfgGuiArg), cfgGui = cfgGuiArg; else, cfgGui = struct(); end
+    varMap = varMapArg;
+    if ~isempty(guiMapArg), guiMap = guiMapArg; else, guiMap = struct('panels', struct()); end
 else
     presetName = resolvePreset(presetArg, presets, basepath, basename);
     if isempty(presetName), presetName = 'template'; end
-    [cfgData, cfgGui] = guiPath_presets(presetName);
-    presetName = cfgGui.name;
+    [varMap, guiMap] = guiPath_presets(presetName, basepath, basename, ctx);
+    presetName = guiMap.name;
 end
 
-% load the data (skips panels that already carry it), then finalize behaviour and
-% adapt to the internal render config. ctx carries basename + a within-session cache
-ctx = guiPath_ctx(basepath, basename);
+% load the data (skips entries that already carry it), finalize behaviour, and
+% adapt to the internal render config
+guiMap = finalizeGui(guiMap);
 try
-    cfgData = guiPath_load(cfgData, basepath, ctx);
+    varMap = var_load(varMap, basepath, ctx);
 catch ME
     warning('guiPath:load', 'load failed (%s); opening empty.', ME.message);
-    cfgData = struct();
+    varMap = struct();
 end
-cfgGui = finalizeGui(cfgGui, cfgData);
-config = cfgDataToConfig(cfgData, cfgGui, basepath, basename);
+config = mapsToConfig(varMap, guiMap, basepath, basename);
 
 %% ========================================================================
 %  STATE
@@ -184,16 +192,16 @@ d.basename   = basename;
 d.presets    = presets;
 d.presetName = presetName;
 d.ctx        = ctx;            % basename + within-session file cache
-d.cfgData    = cfgData;        % the live, full panels (returned for a fast reopen)
-d.cfgGui     = cfgGui;
+d.varMap     = varMap;         % the live, loaded data (returned for a fast reopen)
+d.guiMap     = guiMap;         % the live arrangement + behaviour
 d.unit       = struct('wide', 'hr', 'narrow', 's');   % per-region x-axis units
 d.hInd       = gobjects(0);
 d.hCenter    = gobjects(0);
 d.dirty      = false;
 d.modShift   = false;         % Shift held? (tracked for shift+scroll amplitude)
 d.activeSrc  = '';            % last-clicked panel source (shift+/-/0 target)
-d.win        = cfgGui.win;
-d.winDefault = cfgGui.win;
+d.win        = guiMap.win;
+d.winDefault = guiMap.win;
 d.saveFcn    = [];
 d = applyConfig(d, config);    % sets inputs, events, panels, saveFcn, t0, win
 
@@ -326,17 +334,18 @@ hFig.Visible = vis;
         end
         dlg = busyOn(sprintf('Loading %s...', name));   % panels already loaded are reused
         try
-            % reuse already-loaded panels from the live cfgData, load only the rest
-            [newData, newGui] = guiPath_presets(name, data.cfgData);
-            newData = guiPath_load(newData, data.basepath, data.ctx);
-            newGui  = finalizeGui(newGui, newData);
-            config  = cfgDataToConfig(newData, newGui, data.basepath, data.basename);
+            % build the preset's data + arrangement; the shared ctx reuses files
+            % already read, so a preset switch re-fetches from cache, not disk
+            [newMap, newGui] = guiPath_presets(name, data.basepath, data.basename, data.ctx);
+            newGui = finalizeGui(newGui);
+            newMap = var_load(newMap, data.basepath, data.ctx);
+            config = mapsToConfig(newMap, newGui, data.basepath, data.basename);
         catch ME
             busyOff(dlg);
             gui_notify(hFig, sprintf('Preset "%s" failed: %s', name, ME.message), 'error');
             data.hPresetDD.Value = data.presetName; hFig.UserData = data; return;
         end
-        data.cfgData = newData; data.cfgGui = newGui;
+        data.varMap = newMap; data.guiMap = newGui;
         data = applyConfig(data, config);     % merges inputs, keeps the curate target
         if ~strcmp(prevMode, data.mode)
             data = buildActionWidget(data);   % swap event <-> state <-> view widget
@@ -439,16 +448,23 @@ hFig.Visible = vis;
     end
 
     function onLoadUnified()
-        % open the progressive Load dialog, then integrate the chosen source via
-        % loadCore (the same address machinery as the presets). The dialog owns
-        % the type/source/placement choices; here we only wire the save target.
+        % open the progressive Load dialog, turn the chosen source into a recipe
+        % (the same grammar as the presets), then integrate it via loadCore. The
+        % dialog owns the type/source/placement; here we build the recipe + save.
         data = hFig.UserData;
         sel = gui_loadDialog(hFig, data.basepath);
         if isempty(sel), return; end
         switch sel.from
-            case 'ws',  src = ['ws:', sel.value];  label = sel.value;
-            case 'bin', src = ['bin:', sel.value]; label = ['ch ', sel.value];
-            otherwise,  src = sel.value; label = sel.var;      % file: inline value
+            case 'ws'
+                [vn, pth] = splitDot(sel.value);
+                recipe = var_recipe('ws', 'var', vn, 'path', pth);
+                label  = sel.value;
+            case 'bin'
+                recipe = binRecipe(sel.value);
+                label  = ['ch ', sel.value];
+            otherwise
+                recipe = var_recipe('value', 'data', sel.value);   % file: inline value
+                label  = sel.var;
         end
         saveFcn = [];
         if strcmp(sel.type, 'eventTicks')
@@ -458,55 +474,54 @@ hFig.Visible = vis;
                 saveFcn = @(acc) saveVarToFile(sel.file, [sel.var, '_accepted'], logical(acc(:)));
             end
         elseif strcmp(sel.type, 'stateStrip')
-            saveFcn = @(lb) saveLabelsFlow(fullfile(data.basepath, [data.basename, '.sleep_labelsMan.mat']), lb);
+            saveFcn = @(lb) saveLabels(fullfile(data.basepath, [data.basename, '.sleep_labelsMan.mat']), lb);
         end
         % name the set from its source so it reads clearly in CURATE (a collision
         % with an existing set is made unique in addCurationSet)
         loadNm = matlab.lang.makeValidName(label);
-        % single-wrap src so an inline cell/array value (a File source) lands in
-        % ONE struct, not a struct array (the classic struct(...,cell,...) trap)
-        loadCore(struct('src', {src}, 'type', sel.type, 'region', sel.region, 'fs', sel.fs, ...
-            'name', loadNm, 'label', label, 'saveFcn', saveFcn));
+        loadCore(recipe, sel.type, sel.region, loadNm, label, sel.fs, saveFcn);
     end
 
-    function loadCore(p)
-        % load the one declared source (same path as presets) and integrate it: a
-        % signal joins d.inputs + a new panel; an event / state set joins as a Top
-        % strip and is listed in CURATE (curated only if none is yet). The loaded
-        % panel is also recorded in data.cfgData for a fast reopen.
+    function loadCore(recipe, type, region, name, label, fs, saveFcn)
+        % fetch the one recipe (same loader as the presets), shape it, and
+        % integrate: a signal joins d.inputs + a new panel; an event / state set
+        % joins as a Top strip listed in CURATE (curated only if none is yet). The
+        % loaded entry + its panel are recorded for a fast reopen.
         data = hFig.UserData;
-        ps = guiPath_panel(p.type, p.region, p.src, 'name', p.name, 'label', p.label, 'fs', p.fs);
-        one = struct('item', ps);                    % a one-panel flat cfgData
         try
-            one = guiPath_load(one, data.basepath, data.ctx);
+            [raw, rfs] = var_fetch(recipe, data.ctx);
         catch ME
             gui_notify(hFig, sprintf('Load failed: %s', ME.message), 'error'); return;
         end
-        if isempty(fieldnames(one))                  % the panel was dropped (load failed)
-            gui_notify(hFig, 'Could not load that source (check the value / type).', 'error'); return;
+        if ~isempty(fs), rfs = fs; end
+        entry = struct('data', {raw}, 'fs', rfs, 'labels', {[]});
+        pan = guiPath_panel(type, region, name, 'label', label);
+        try
+            inp = buildInput(entry, pan, name, []);
+        catch ME
+            gui_notify(hFig, sprintf('Could not display "%s": %s', name, ME.message), 'error');
+            return;
         end
-        inp = recFromPanel(one.item);                % the loaded panel -> an input
-        reg = regAlias(one.item.region);             % 'wide' / 'narrow'
-        % capture what the message needs BEFORE the integrate call: 'inp' is a
-        % shared nested-scope variable that rebuildPlot -> drawPanel reassigns
-        itype = inp.type; iname = inp.name;
-        % integrate + render inside a guard: a bad source must notify, never crash
+        reg = regAlias(region); itype = inp.type; iname = inp.name;
         try
             switch itype
                 case 'eventTicks'
-                    nEv = numel(inp.data.peakTime);
-                    addCurationSet(inp, p.saveFcn);
-                    gui_notify(hFig, sprintf('Loaded %d events from "%s".', nEv, p.label), 'success');
+                    addCurationSet(inp, saveFcn);
+                    gui_notify(hFig, sprintf('Loaded %d events from "%s".', ...
+                        numel(inp.data.peakTime), label), 'success');
                 case 'stateStrip'
-                    nLab = numel(inp.data.labels);
-                    addCurationSet(inp, p.saveFcn);
-                    gui_notify(hFig, sprintf('Loaded %d state epochs from "%s".', nLab, p.label), 'success');
+                    addCurationSet(inp, saveFcn);
+                    gui_notify(hFig, sprintf('Loaded %d state epochs from "%s".', ...
+                        numel(inp.data.labels), label), 'success');
                 otherwise
                     placeSignal(inp, reg);
                     gui_notify(hFig, sprintf('Loaded "%s" into the %s.', iname, regDisp(reg)), 'success');
             end
-            d2 = hFig.UserData;                      % record the panel for the round-trip
-            d2.cfgData.(matlab.lang.makeValidName(iname)) = one.item;
+            % record the loaded entry (a recipe with data) + its panel for reopen
+            d2 = hFig.UserData;
+            key = matlab.lang.makeValidName(iname);
+            d2.varMap.(key) = mergeRecipeData(recipe, raw, rfs);
+            d2.guiMap.panels.(key) = guiPath_panel(type, region, key, 'label', label);
             hFig.UserData = d2;
         catch ME
             gui_notify(hFig, sprintf('Could not display "%s": %s', iname, ME.message), 'error');
@@ -558,12 +573,6 @@ hFig.Visible = vis;
         refreshEvent(hFig);
     end
 
-    function saveLabelsFlow(file, labels)
-        % Load-flow states save: AccuSleep-compatible labels vector, backed up
-        backup_file(file);
-        labels = labels(:);
-        save(file, 'labels');
-    end
 
 %% ========================================================================
 %  PLOT CONSTRUCTION (single tiledlayout)
@@ -1321,16 +1330,16 @@ end
 name = '';
 end
 
-function g = finalizeGui(g, cfgData)
-% fill any cfgGui field the caller left out: mode from the target panel, window
-% from the mode, name/file/save to safe defaults
+function g = finalizeGui(g)
+% fill any guiMap field the caller left out: panels, mode from the target panel,
+% window from the mode, name/save to safe defaults
+if ~isfield(g, 'panels') || ~isstruct(g.panels), g.panels = struct(); end
 if ~isfield(g, 'name') || isempty(g.name), g.name = 'Custom'; end
-if ~isfield(g, 'file'), g.file = ''; end
 if ~isfield(g, 'mode') || isempty(g.mode)
     g.mode = 'events';
-    fns = fieldnames(cfgData);
+    fns = fieldnames(g.panels);
     for i = 1:numel(fns)
-        if strcmp(cfgData.(fns{i}).type, 'stateStrip'), g.mode = 'states'; break; end
+        if strcmp(g.panels.(fns{i}).type, 'stateStrip'), g.mode = 'states'; break; end
     end
 end
 if ~isfield(g, 'win') || isempty(g.win)
@@ -1339,37 +1348,34 @@ end
 if ~isfield(g, 'save'), g.save = ''; end
 end
 
-function fn = resolveSave(save, mode, basepath, basename, cfgData)
-% turn a cfgGui.save spec into a save handle: a function handle is used as is;
+function fn = resolveSave(guiMap, basepath, basename)
+% turn a guiMap.save spec into a save handle: a function handle is used as is;
 % states write labels to sleep_labelsMan; an events token writes the accepted
-% mask to <basename>.<token>.mat (or a 'ws:VAR' target to a base variable)
+% mask to <basename>.<token>.mat
+save = guiMap.save;
 if isa(save, 'function_handle'), fn = save; return; end
-if strcmp(mode, 'states')
+if strcmp(guiMap.mode, 'states')
     fn = @(labels) saveLabels(fullfile(basepath, [basename, '.sleep_labelsMan.mat']), labels);
     return;
 end
-if ischar(save) && ~isempty(save) && ~strcmp(save, 'labelsMan'), tok = save; else, tok = targetToken(cfgData); end
+if ischar(save) && ~isempty(save) && ~strcmp(save, 'labelsMan')
+    tok = save;
+else
+    tok = targetToken(guiMap);
+end
 fn = [];
 if isempty(tok), return; end
-if any(tok == ':')
-    ci = find(tok == ':', 1);
-    if strcmp(tok(1:ci - 1), 'ws')
-        vn = tok(ci + 1:end);
-        fn = @(acc) assignin('base', matlab.lang.makeValidName([vn, '_accepted']), logical(acc(:)));
-    end
-    return;
-end
 file = fullfile(basepath, [basename, '.', tok, '.mat']);
 if isfile(file), fn = @(acc) saveAccepted(file, tok, acc); end
 end
 
-function tok = targetToken(cfgData)
-% the src token of the eventTicks target ('ed' / 'ripp' / a 'ws:VAR' address)
+function tok = targetToken(guiMap)
+% the var of the eventTicks target ('ed' / 'ripp'), which is also its file token
 tok = '';
-fns = fieldnames(cfgData);
+fns = fieldnames(guiMap.panels);
 for i = 1:numel(fns)
-    p = cfgData.(fns{i});
-    if strcmp(p.type, 'eventTicks') && ischar(p.src) && ~isempty(p.src), tok = p.src; return; end
+    p = guiMap.panels.(fns{i});
+    if strcmp(p.type, 'eventTicks') && ~isempty(p.var), tok = p.var; return; end
 end
 end
 
@@ -1485,7 +1491,7 @@ if isempty(ix)
     d.mode = 'view'; d.saveFcn = [];   % None: browse the window, no editable target
     d.ed = struct('peakTime', []); d.accepted = logical([]);
     d.nEvents = 0; d.hasEvents = false;
-    d.labels = []; d.epochLen = 1; d.nstates = 0; d.stateNames = {}; d.stateColors = {};
+    d.labels = []; d.nstates = 0; d.stateNames = {}; d.stateColors = {};
     d.currIdx = 1;
     return;
 end
@@ -1493,7 +1499,7 @@ inp = d.inputs(ix);
 d.saveFcn = inp.saveFcn;
 if strcmp(inp.type, 'stateStrip')
     d.mode = 'states';
-    [d.labels, epochT, d.epochLen, d.nstates, d.stateNames, d.stateColors] = ...
+    [d.labels, epochT, d.nstates, d.stateNames, d.stateColors] = ...
         stateFromData(inp.data);
     nEp = numel(d.labels);
     d.ed = struct('peakTime', epochT(:));
@@ -1502,7 +1508,7 @@ if strcmp(inp.type, 'stateStrip')
 else
     d.mode = 'events';
     [d.ed, d.accepted, d.nEvents, d.hasEvents] = eventFromData(inp.data);
-    d.labels = []; d.epochLen = 1; d.nstates = 0; d.stateNames = {}; d.stateColors = {};
+    d.labels = []; d.nstates = 0; d.stateNames = {}; d.stateColors = {};
 end
 if ~isfield(d, 'currIdx') || isempty(d.currIdx) || d.currIdx < 1, d.currIdx = 1; end
 d.currIdx = min(d.currIdx, max(1, d.nEvents));
@@ -1547,42 +1553,48 @@ if isempty(d.(f)) || ~any(strcmp({d.(f).source}, source))
 end
 end
 
-function config = cfgDataToConfig(cfgData, cfgGui, basepath, basename)
-% adapt the flat, full cfgData into the internal render config: inputs deduped by
-% panel name (a top+bottom pair shares one loaded input) + a {source,region} panel
-% per field in stacking order. Behaviour (mode / win) comes from cfgGui; the save
-% handle is resolved from cfgGui.save + the session location.
-fns = fieldnames(cfgData);
-recs = {}; names = {}; P = {};
-for i = 1:numel(fns)
-    pc = cfgData.(fns{i});
-    nm = pick(pc, 'name', fns{i});
-    if ~any(strcmp(nm, names))
-        recs{end + 1} = panelToRec(pc, nm, i);                        %#ok<AGROW>
-        names{end + 1} = nm;                                          %#ok<AGROW>
+function config = mapsToConfig(varMap, guiMap, basepath, basename)
+% adapt a loaded varMap (data) + guiMap (view) into the internal render config:
+% one input per referenced var (its raw data shaped by the panel type) + a
+% {source, region} panel per guiMap panel, in stacking order. A var named by two
+% panels (a top + bottom pair) yields ONE input. The save handle comes from the
+% guiMap's target + the session location.
+panelFns = fieldnames(guiMap.panels);
+nstates  = [];                                   % filled only if a hypnogram needs it
+recs = {}; seen = {}; P = {};
+for i = 1:numel(panelFns)
+    pan = guiMap.panels.(panelFns{i});
+    v = pan.var;
+    if isfield(varMap, v) && ~any(strcmp(v, seen))
+        if isempty(nstates) && strcmp(pan.type, 'hypnogram'), nstates = stateCount(); end
+        recs{end + 1} = buildInput(varMap.(v), pan, v, nstates);      %#ok<AGROW>
+        seen{end + 1} = v;                                            %#ok<AGROW>
     end
-    P{end + 1} = struct('source', nm, 'region', regAlias(pc.region)); %#ok<AGROW>
+    P{end + 1} = struct('source', v, 'region', regAlias(pan.region)); %#ok<AGROW>
 end
-if isempty(recs), inputs = normalizeInputs([]); else, inputs = normalizeInputs([recs{:}]); end
+if isempty(recs), inputs = normalizeInputs([]); else, inputs = [recs{:}]; end
 if isempty(P), panels = []; else, panels = [P{:}]; end
-saveFcn = resolveSave(cfgGui.save, cfgGui.mode, basepath, basename, cfgData);
+saveFcn = resolveSave(guiMap, basepath, basename);
 config = struct('inputs', {inputs}, 'panels', {panels}, ...
-    'saveFcn', saveFcn, 'winPlot', cfgGui.win, 'mode', cfgGui.mode);
+    'saveFcn', saveFcn, 'winPlot', guiMap.win);
 end
 
-function inp = recFromPanel(pc)
-% one normalized input from a single enriched panel (the Load-dialog path)
-inp = normalizeInputs(panelToRec(pc, pick(pc, 'name', 'item'), 99));
+function inp = buildInput(entry, pan, name, nstates)
+% one normalized, shaped input from a loaded varMap entry + its view panel. data
+% single-wrapped so a cell payload (raster / hypnogram) stays in one field; the
+% raw value is shaped for its type (guiPath_shape) before normalization.
+inp = struct('name', name, 'type', pan.type, ...
+    'data', {pick(entry, 'data', [])}, 'fs', pick(entry, 'fs', NaN), ...
+    'labels', {pick(entry, 'labels', [])}, 'ylim', pan.ylim, 'clr', pan.clr, ...
+    'label', pan.label, 'height', pan.height, 'defRegion', regAlias(pan.region));
+inp = guiPath_shape(inp, nstates);
+inp = normalizeInputs(inp);
 end
 
-function rec = panelToRec(pc, nm, order)
-% a pre-normalization input record from an enriched panel. data single-wrapped so
-% a cell payload (raster / hypnogram) stays in one field.
-rec = struct('name', nm, 'type', pc.type, 'data', {pick(pc, 'data', [])}, ...
-    'fs', pick(pc, 'fs', NaN), 'ylim', pick(pc, 'ylim', []), 'clr', pick(pc, 'clr', 'k'), ...
-    'label', pick(pc, 'label', ''), 'height', pick(pc, 'height', 1), ...
-    'defRegion', regAlias(pc.region), 'defOrder', order, ...
-    'chInfo', {pick(pc, 'chInfo', [])}, 'yAdjust', pick(pc, 'yAdjust', 1));
+function n = stateCount()
+% state count for a hypnogram's cell padding
+c = as_loadConfig();
+n = c.nstates;
 end
 
 function r = regAlias(region)
@@ -1631,9 +1643,9 @@ v = data.ed.state(data.currIdx);
 if ismissing(v), s = 'State: undefined'; else, s = ['State: ', char(string(v))]; end
 end
 
-function [labels, epochT, epochLen, nstates, names, colors] = stateFromData(D)
+function [labels, epochT, nstates, names, colors] = stateFromData(D)
 % the live state-scoring state from a stateStrip set's data struct
-labels = []; epochT = []; epochLen = 1; nstates = 0; names = {}; colors = {};
+labels = []; epochT = []; nstates = 0; names = {}; colors = {};
 if ~isstruct(D) || ~isfield(D, 'labels') || isempty(D.labels), return; end
 labels = double(D.labels(:));
 nEp = numel(labels);
@@ -1642,7 +1654,6 @@ if isfield(D, 'epochT') && numel(D.epochT) == nEp
 else
     epochT = (0:nEp - 1)';
 end
-if nEp > 1, epochLen = median(diff(epochT)); end
 if isfield(D, 'names')  && ~isempty(D.names),  names  = D.names;  end
 if isfield(D, 'colors') && ~isempty(D.colors), colors = D.colors; end
 if isfield(D, 'nstates') && ~isempty(D.nstates)
@@ -1830,6 +1841,30 @@ end
 
 function v = pick(s, f, dflt)
 if isfield(s, f) && ~isempty(s.(f)), v = s.(f); else, v = dflt; end
+end
+
+function [head, tail] = splitDot(str)
+% first dotted token vs the remainder: 'ripp.peakTime' -> 'ripp', 'peakTime'
+di = find(str == '.', 1);
+if isempty(di), head = str; tail = ''; else, head = str(1:di - 1); tail = str(di + 1:end); end
+end
+
+function recipe = binRecipe(chSpec)
+% a Load-dialog binary spec ('CH' or 'CH>FILE') -> a native bin recipe
+gi = find(chSpec == '>', 1);
+if isempty(gi), chStr = chSpec; file = 'lfp';
+else,          chStr = chSpec(1:gi - 1); file = strtrim(chSpec(gi + 1:end));
+end
+ch = str2num(chStr); %#ok<ST2NM>  (accepts '12' or '[1 2 3]')
+recipe = var_recipe('bin', 'file', file, 'ch', ch, 'outClass', 'native');
+end
+
+function entry = mergeRecipeData(recipe, data, fs)
+% a recipe with its loaded value attached (an already-filled varMap entry)
+entry = recipe;
+entry.data   = data;
+entry.fs     = fs;
+entry.labels = [];
 end
 
 function out = ternary(tf, a, b)

@@ -74,8 +74,8 @@ termsFixed = filter_terms(termsFixed, varRmv, isInteractionRmv);
 
 newVarsRand = {};
 
-for i = 1:numel(varsRand)
-    rTerm = varsRand{i}; % e.g. '(pBspk|Name)'
+for iVar = 1:numel(varsRand)
+    rTerm = varsRand{iVar}; % e.g. '(pBspk|Name)'
 
     % Strip outer parentheses
     cleanTerm = regexprep(rTerm, '^\(|\)$', '');

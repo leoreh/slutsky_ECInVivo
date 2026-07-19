@@ -97,7 +97,9 @@ for iFile = 1 : nFiles
 end
 
 
-[hFig, varMap, guiMap] = guiPath(basepath, 'preset', 'Ripples');
+[cfgData, cfgGui] = guiPath_presets('ripp');
+cfgData = guiPath_load(cfgData);
+[hFig, cfgData] = guiPath(basepath, 'cfgData', cfgData, 'cfgGui', cfgGui);
 
 
 

@@ -1,78 +1,74 @@
-function p = guiPath_panel(type, region, src, varargin)
-% GUIPATH_PANEL Build one panel entry for a guiPath cfgData.
+function p = guiPath_panel(type, region, var, varargin)
+
+% Build one view panel for a guiPath guiMap.
 %
-%   p = GUIPATH_PANEL(type, region, src, Name, Value, ...) returns a struct that
-%   declares a single panel: WHAT it is (type), WHERE it sits (region) and WHERE
-%   its data lives (src, an address for guiPath_src). A cfgData is a flat struct
-%   with one such entry per field (field name = panel name); the field order is
-%   the stacking order within a region. The per-type appearance defaults (height,
-%   label, order) are filled here, so a panel is self-describing; only the data
-%   is added later, by guiPath_load.
+% A guiMap is the arrangement half of a preset: a flat struct with one panel per
+% field (field order = stacking order within a region). A panel says WHAT it is
+% (type), WHERE it sits (region) and WHICH data it draws (var, the name of a
+% varMap entry) - never the data itself. Several panels may name one var (a
+% top + bottom pair shares a single loaded input); that is how one signal shows
+% in two places without loading it twice.
 %
-%   INPUTS:
-%       type    - (Char) 'trace' | 'traces' | 'spec' | 'hypnogram' | 'raster' |
-%                        'eventTicks' | 'stateStrip'. trace is one signal;
-%                        traces is a vertical stack of binary channels (src must
-%                        be a bin: address). eventTicks/stateStrip mark the
-%                        curation target (they set the mode; there is at most one).
-%       region  - (Char) 'top' | 'bottom' (aliases: 'wide' | 'narrow').
-%       src     - (Char | value) address for guiPath_src, a computed 'fn:...'
-%                 source, or an inline value.
-%       Name/Value (all optional; override the per-type default):
-%           'name'   (Char)   input identity; panels that share a name share one
-%                             loaded input. Defaults to the cfgData field name.
-%           'fs'     (Num)    sampling rate [Hz] for a trace whose address does
-%                             not carry one (ws / bin sources).
-%           'height' (Num)    relative panel height.
-%           'clr'    (ColorSpec) trace colour.
-%           'ylim'   (2-vec | scalar | 'prc' | 'full') y-limits. A 2-vec is
-%                             absolute. A scalar p clips to the [p, 100-p]
-%                             percentile (0 <= p < 50); raise it when a trace
-%                             looks thin. 'prc' takes the default percentile
-%                             and is what traces get when unset. 'full' / []
-%                             autoscale. See resolveYlim in guiPath_load.
-%           'label'  (Char)   panel y-label.
-%           'order'  (Num)    override stacking order within the region.
+% The data half is a varMap (see var_recipe); var_load fills it. The two are
+% joined by name at open time (see guiPath > mapsToConfig).
 %
-%   OUTPUT:
-%       p       - (Struct) one panel entry (guiPath_load fills .data / .fs later).
+% INPUTS
+% - type            <char> 'trace' | 'traces' | 'spec' | 'hypnogram' |
+%                   'raster' | 'eventTicks' | 'stateStrip'.
+% - region          <char> 'top' | 'bottom' (aliases 'wide' | 'narrow').
+% - var             <char> the varMap entry this panel draws.
 %
-%   See also guiPath_load, guiPath_src, guiPath_presets, guiPath, guiPath_doc.
+% NAME-VALUE (optional; override the per-type default)
+% - height          <num>  relative panel height.
+% - label           <char> panel y-label.
+% - clr             <ColorSpec> trace / tick colour.
+% - ylim            <2-vec | scalar | 'prc' | 'full'> y-limits. A 2-vec is
+%                   absolute; a scalar p clips to the [p, 100-p] percentile
+%                   (0 <= p < 50); 'prc' is the default percentile (what a trace
+%                   gets unset); 'full' / [] autoscale. See guiPath_shape.
 %
-%   HISTORY:
-%       Created: 05 Jul 2026 - declarative redesign (panel constructor).
-%       Updated: 05 Jul 2026 - per-type defaults folded in (was curate_typeDefaults).
+% OUTPUTS
+% - p               <struct> .type .region .var .height .label .clr .ylim.
+%
+% SEE ALSO
+% - var_recipe, guiPath_presets, guiPath_shape, guiPath, guiPath_doc.
+%
+% HISTORY
+% - 260719          view panel over a varMap entry (was a fused src+view+data
+%                   panel; recipe moved to var_recipe, loading to var_load).
 
 td = typeDefaults(type);
-p = struct('type', type, 'region', region, 'src', {src}, 'name', '', ...
-    'fs', [], 'height', td.height, 'clr', 'k', 'ylim', [], 'label', td.label, 'order', td.order);
-if strcmp(type, 'trace'), p.ylim = 'prc'; end     % traces auto-percentile unless overridden
+p = struct('type', type, 'region', region, 'var', var, ...
+    'height', td.height, 'label', td.label, 'clr', 'k', 'ylim', []);
+if strcmp(type, 'trace'), p.ylim = 'prc'; end     % traces auto-percentile unless set
 
-for i = 1:2:numel(varargin)
-    key = varargin{i}; v = varargin{i + 1};
+for iArg = 1 : 2 : numel(varargin)
+    key = varargin{iArg};
+    v   = varargin{iArg + 1};
     switch lower(key)
-        case 'name',   p.name   = v;
-        case 'fs',     p.fs     = v;
         case 'height', p.height = v;
+        case 'label',  p.label  = v;
         case 'clr',    p.clr    = v;
         case 'ylim',   p.ylim   = v;
-        case 'label',  p.label  = v;
-        case 'order',  p.order  = v;
         otherwise, error('guiPath_panel:arg', 'unknown option "%s"', key);
     end
 end
+
 end
 
+
 function td = typeDefaults(type)
-% per-panel-type fallback height / label / stacking order
+% per-panel-type fallback height / label
 switch type
-    case 'spec',       td = struct('height', 1.4,  'label', 'Freq (Hz)', 'order', 20);
-    case 'hypnogram',  td = struct('height', 0.28, 'label', 'State',     'order', 10);
-    case 'eventTicks', td = struct('height', 0.28, 'label', 'Events',    'order', 40);
-    case 'stateStrip', td = struct('height', 0.5,  'label', 'State',     'order', 15);
-    case 'raster',     td = struct('height', 1.2,  'label', 'Units',     'order', 60);
-    case 'trace',      td = struct('height', 1.0,  'label', '',          'order', 50);
-    case 'traces',     td = struct('height', 2.5,  'label', 'LFP',       'order', 50);
-    otherwise,         td = struct('height', 1.0,  'label', '',          'order', 99);
+    case 'spec',       td = struct('height', 1.4,  'label', 'Freq (Hz)');
+    case 'hypnogram',  td = struct('height', 0.28, 'label', 'State');
+    case 'eventTicks', td = struct('height', 0.28, 'label', 'Events');
+    case 'stateStrip', td = struct('height', 0.5,  'label', 'State');
+    case 'raster',     td = struct('height', 1.2,  'label', 'Units');
+    case 'trace',      td = struct('height', 1.0,  'label', '');
+    case 'traces',     td = struct('height', 2.5,  'label', 'LFP');
+    otherwise,         td = struct('height', 1.0,  'label', '');
 end
 end
+
+% EOF

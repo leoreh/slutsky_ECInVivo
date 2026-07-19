@@ -29,17 +29,6 @@ end
 
 
 
-%
-% funcon = [];
-% for iFile = 1 : nFiles
-%     basepath = basepaths{iFile};
-%     cd(basepath)
-%     [~, basename] = fileparts(basepath);
-%
-%     load([basename, '.rippSpks.mat'])
-%     cc = fr_corr(rippSpks.su.rippRates, 'nShuffles', 50, 'flgPlot', false);
-%     funcon = [funcon; cc.shuffle.funcon];
-% end
 
 
 %% ========================================================================
