@@ -18,9 +18,12 @@
 %
 % # Entry points
 %
-% ripp_wrapper  Ripple orchestrator. Reads top-to-bottom: setup -> detect-or-
-%               load -> curate. Detects on one hippocampal LFP channel.
-% ed_wrapper    ED orchestrator, same skeleton. Detects EEG or LFP.
+% ripp_wrapper  Ripple orchestrator: chains the three ripple stages for the
+%               batch case - ripp_detect (features) -> ripp_curate (the .accepted
+%               gate) -> ripp_analyze (spikes/phase/maps on accepted). Each stage
+%               is also a standalone function, so a session can stop after detect
+%               for manual curation in ripp_curate's GUI, then run ripp_analyze.
+% ed_wrapper    ED orchestrator, one pass. Detects EEG or LFP.
 %
 % Re-run model (both): if <basename>.<name>.mat exists and flgForce is false,
 % the stored result is loaded and handed to the GUI (the cheap re-curate path);
@@ -37,10 +40,14 @@
 %   .accepted  [N x 1]  logical curation mask (seeded all-true post-QA)
 %   .ctrlTimes [N x 2]  matched control intervals (analysis)
 %   .info      struct   detection params, fs, basename, win, runtime
-% Ripple metric columns: .amp .freq .freqEvent .energy .dur .skew .emg .spkGain.
+% Ripple metric columns: .amp .freq .freqEvent .freqPeak .peakProm .energy .dur
+%                        .skew .emg .spkGain.
 % ED metric columns:     .amp .ampZ .dur .width10 .emgZ.
-% Automatic QA runs as a filter at detection (evt_qa + evt_subset): only
-% survivors are saved and .accepted starts all-true; curation flips it.
+% QA differs by modality. Ripples MARK, never remove: ripp_detect seeds
+% .accepted all-true, and ripp_gate turns a filter spec (states + metric ranges)
+% into .accepted - ripp_curate applies it headless (the automatic gate) or in a
+% GUI (per-mouse). ED still FILTERS at detection (evt_qa + evt_subset): only
+% survivors are saved and ED's .accepted starts all-true.
 %
 % # Shared layer (lfp/events)
 %
@@ -50,8 +57,8 @@
 % evt_boutTimes Window-relative bout times + valid-state + NREM baseline sets.
 % evt_emgScore  Per-event EMG z vs a baseline window (a QA metric).
 % evt_spkGain   Per-event MUA spike-gain z (a QA metric; ripples).
-% evt_qa        Combine QA criteria (state inclusion + metric ranges) into one
-%               pass mask; the wrapper drops the failures via evt_subset.
+% evt_qa        Combine QA criteria into one pass mask - now ED's removal filter
+%               (via evt_subset). The ripple path uses ripp_gate (mark) instead.
 % evt_subset    Subset every per-event field by a logical mask.
 % evt_ctrlTimes Duration-matched control intervals from valid states.
 % evt_states    Per-event vigilance state + the per-bout rate/density table.
@@ -69,8 +76,10 @@
 %
 % Ripples: ripp_pickCh (detection channel), ripp_sigLoad (channel + EMG),
 %   ripp_sigPrep (filter + envelope + z-score), ripp_times (threshold
-%   candidates), ripp_params (frequency / energy / skew), ripp_detect (the
-%   shared detect -> params -> maps -> QA core), spklfp_phase (spike-LFP).
+%   candidates), ripp_params (frequency / energy / skew), ripp_detect (stage 1:
+%   detect + features), ripp_gate (the filter-spec -> .accepted engine),
+%   ripp_curate (stage 2: apply the gate headless or in a GUI), ripp_analyze
+%   (stage 3: spikes/phase/maps on accepted), spklfp_phase (spike-LFP).
 % QA marks .accepted (ripples, never removed) or subsets (ED); mcu_tblVivo
 %   filters .accepted for the per-event ripple table.
 % ED: ed_sigLoad (EEG or LFP channel + EMG), ed_detect (moving-z transients),

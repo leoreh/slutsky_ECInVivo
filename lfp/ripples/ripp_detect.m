@@ -4,16 +4,15 @@ function [ripp, aux] = ripp_detect(basepath, varargin)
 %   [ripp, aux] = RIPP_DETECT(basepath, varargin)
 %
 %   SUMMARY:
-%       The shared detection core of the ripple pipeline, used by both
-%       ripp_wrapper (which adds spikes, saving, plotting, curation) and
-%       ripp_screen (which sweeps methods). For one met it loads and prepares the
-%       signal (or reuses an injected one), detects candidate events, measures
-%       per-event params, LFP maps, and the QA metrics (EMG, MUA gain), labels
-%       vigilance state, and sets the per-event acceptance mask. QA MARKS, it does
-%       not remove: every detected event stays in the struct with an .accepted
-%       flag, so a gate threshold can be re-screened from the saved metrics and
-%       wake events remain inspectable. Times are window-relative; the caller
-%       shifts to absolute. Nothing is written to disk.
+%       The detect stage of the ripple pipeline (stage 1 of detect -> curate ->
+%       analyze), used by ripp_wrapper and ripp_screen. For one met it loads and
+%       prepares the signal (or reuses an injected one), detects candidate events,
+%       and measures every per-event feature: ripple params, the QA metrics
+%       (EMG z, MUA gain), and the vigilance-state label. It does NOT
+%       decide acceptance - .accepted is seeded all-true and the QA gate is a
+%       separate stage (ripp_gate / ripp_curate) applied to the saved struct, so
+%       the same detection feeds any per-mouse curation. Times are window-relative;
+%       the caller shifts to absolute. Nothing is written to disk.
 %
 %   INPUTS:
 %       basepath - <char> session directory.
@@ -26,25 +25,25 @@ function [ripp, aux] = ripp_detect(basepath, varargin)
 %           'sig'     - <struct> injected signal bundle (.rippSig .emg .fs
 %                                .rippCh) to skip load+prep; reuse across methods
 %                                that share a signal config. {built here}
-%           'mapDur'  - <vec>    LFP map window [pre post] (s). {[-0.1 0.1]}
 %           'verbose' - <log>    print progress. {false}
 %
 %   OUTPUTS:
 %       ripp - <struct> window-relative events + per-event fields (.times
 %                       .peakTime .state .accepted .emg .spkGain .ctrlTimes,
-%                       ripple params, partial .info). ALL detected events; use
-%                       .accepted for analysis.
-%       aux  - <struct> .rippMaps .rippStates (accepted-based rate table) .sig
-%                       (signal bundle, reuse across methods) .spkTimes .muTimes
-%                       .uType .boutTimes .vldTimes .nremTimes .fs .rippCh.
+%                       ripple params, partial .info). ALL detected events;
+%                       .accepted is seeded all-true (gate in ripp_curate).
+%       aux  - <struct> .sig (signal bundle, reuse across methods) .spkTimes
+%                       .muTimes .uType .fs .rippCh (reused by ripp_analyze).
 %
 %   DEPENDENCIES:
 %       basepaths2vars, ripp_methods, evt_spkPrep, evt_boutTimes, ripp_pickCh,
 %       ripp_sigLoad, ripp_sigPrep, ripp_noiseFloor, ripp_times, ripp_params,
-%       evt_maps, evt_emgScore, evt_spkGain, evt_ctrlTimes, evt_states, evt_qa.
+%       evt_emgScore, evt_spkGain, evt_ctrlTimes, evt_states.
 %
 %   HISTORY:
 %       260719 factored out of ripp_wrapper as the shared detection core.
+%       260719b split: detect computes features only; the QA gate moved to
+%               ripp_gate/ripp_curate (accepted seeded all-true here).
 
 %% ========================================================================
 %  ARGUMENTS
@@ -57,7 +56,6 @@ addParameter(p, 'win', [0 Inf], @isnumeric);
 addParameter(p, 'v', [], @(x) isempty(x) || isstruct(x));
 addParameter(p, 'rippCh', [], @isnumeric);
 addParameter(p, 'sig', [], @(x) isempty(x) || isstruct(x));
-addParameter(p, 'mapDur', [-0.1 0.1], @isnumeric);
 addParameter(p, 'verbose', false, @islogical);
 parse(p, basepath, varargin{:});
 met     = p.Results.met;
@@ -65,7 +63,6 @@ win     = p.Results.win;
 v       = p.Results.v;
 rippCh  = p.Results.rippCh;
 sig     = p.Results.sig;
-mapDur  = p.Results.mapDur;
 verbose = p.Results.verbose;
 [~, basename] = fileparts(basepath);
 
@@ -124,27 +121,26 @@ if met.calibThr
 end
 ripp = ripp_times(rippSig, fs, 'thr', thr, 'limDur', met.limDur);
 ripp = ripp_params(rippSig, ripp);
-rippMaps = evt_maps(rippSig, ripp.peakTime, fs, 'mapDur', mapDur);
 
 %% ========================================================================
-%  QA METRICS + ACCEPTANCE (mark, do not remove)
+%  QA METRICS + STATE LABEL (curation is a separate stage)
 %  ========================================================================
+% Detection computes the per-event QA metrics and the state label; it does NOT
+% decide acceptance. The gate (state + metric ranges -> accepted) is applied to
+% the saved struct by ripp_gate / ripp_curate, so one detection serves any
+% per-mouse curation.
 
 ripp.emg       = evt_emgScore(emg, ripp.times, fs, 'baselineTimes', nremTimes);
 ripp.spkGain   = evt_spkGain(muTimes, ripp.times);
 ripp.ctrlTimes = evt_ctrlTimes(ripp.times, 'vldTimes', vldTimes, 'flgPlot', false);
 
-% accepted = in-state (NREM or valid) AND low EMG AND above the MUA-gain gate
-if met.nremOnly, inTimes = nremTimes; else, inTimes = vldTimes; end
-ripp.accepted = evt_qa(ripp.peakTime, 'inTimes', inTimes, ...
-    'metrics', [ripp.emg, ripp.spkGain], ...
-    'ranges', {[-Inf, met.thrEmg], [met.gainThr, Inf]}, ...
-    'names', {'emg', 'gain'});
-
-% vigilance state per event (all events); rate/density over accepted only
-[ripp.state, rippStates] = evt_states(ripp.times, ripp.peakTime, boutTimes, ...
-    'accepted', ripp.accepted, 'basepath', basepath, ...
+% per-event vigilance-state label (all events); the bout rate/density table is a
+% post-curation product built by ripp_curate from the accepted mask
+ripp.state = evt_states(ripp.times, ripp.peakTime, boutTimes, ...
     'flgSave', false, 'flgPlot', false, 'name', 'ripp', 'lbl', 'Ripple');
+
+% seed accepted all-true; the gate runs downstream
+ripp.accepted = true(numel(ripp.peakTime), 1);
 
 if verbose
     fprintf('[RIPP_DETECT] %s : %d events, %d accepted (%.0f%%)\n', ...
@@ -164,15 +160,10 @@ ripp.info.thr       = thr;
 ripp.info.chi       = chi;
 ripp.info.met       = met.name;
 
-aux.rippMaps   = rippMaps;
-aux.rippStates = rippStates;
 aux.sig        = sig;
 aux.spkTimes   = spkTimes;
 aux.muTimes    = muTimes;
 aux.uType      = uType;
-aux.boutTimes  = boutTimes;
-aux.vldTimes   = vldTimes;
-aux.nremTimes  = nremTimes;
 aux.fs         = fs;
 aux.rippCh     = rippCh;
 

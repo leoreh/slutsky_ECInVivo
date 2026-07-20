@@ -207,14 +207,14 @@ switch dataPreset
         % nan pad each session to the max number of units
         nunits = [];
         for isession = 1 : nsessions
-            datasz(isession, :) = size(v(isession).fr.strd);
+            datasz(isession, :) = size(v(isession).fr.rate);
             units = v(isession).units.clean;
             nunits(isession, :) = [sum(units(1, :)), sum(units(2, :))];
-            v(isession).rs = v(isession).fr.strd(units(1, :), :);
-            v(isession).fs = v(isession).fr.strd(units(2, :), :);
+            v(isession).rs = v(isession).fr.rate(units(1, :), :);
+            v(isession).fs = v(isession).fr.rate(units(2, :), :);
         end
         for isession = 1 : nsessions
-            v(isession).data = [v(isession).fr.strd;...
+            v(isession).data = [v(isession).fr.rate;...
                 nan(max(datasz(:, 1)) - datasz(isession, 1),...
                 datasz(isession, 2))];
             v(isession).rs = [v(isession).rs;...

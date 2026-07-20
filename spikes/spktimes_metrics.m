@@ -1,326 +1,345 @@
-function st = spktimes_metrics(varargin)
+function [st, stInfo] = spktimes_metrics(spktimes, bouts, varargin)
+% SPKTIMES_METRICS Computes spike timing metrics inside one interval set.
+%
+%   [st, stInfo] = SPKTIMES_METRICS(spktimes, bouts, varargin)
+%
+%   SUMMARY:
+%       Burstiness and irregularity metrics derived from the autocorrelogram
+%       and the ISI distribution. Based in part on calc_ACG_metrics from cell
+%       explorer. Two ACGs are computed: narrow (100 ms, 0.5 ms bins) and
+%       wide (1 s, 1 ms bins).
+%
+%       The function takes ONE interval set and returns ONE value per unit.
+%       Conditioning on states, days or epochs is done by spk_byCond, which
+%       calls this repeatedly and labels the rows.
+%
+%       The intervals are treated as disjoint segments, not as a mask:
+%
+%       - ISIs are formed only between spikes of the same bout. Masking the
+%         train and taking diff invents one interval per bout boundary.
+%       - Bouts are pushed apart on a padded timeline before the ACG, so no
+%         spike pair from different bouts can land inside the lag window.
+%       - Each ACG lag is normalised by the number of spikes that had room
+%         for a partner at that lag (nEff), not by the total spike count. A
+%         spike near a bout edge cannot contribute at long lags; without this
+%         a state made of short bouts shows a depressed acg baseline and an
+%         inflated burst index purely from bout geometry.
+%
+%   INPUTS:
+%       spktimes - (Cell)  {nUnits x 1} of spike times [s].
+%       bouts    - (Mat)   [nBouts x 2] interval set [s]. Overlapping rows
+%                          are consolidated. Pass [0 Inf] for the whole
+%                          recording.
+%       varargin - Parameter/Value pairs:
+%           'fs'       - (Num)  Sampling frequency [Hz], for CCG. {20000}
+%           'minSpks'  - (Num)  Metrics stay nan below this count. {100}
+%           'basepath' - (Char) Recording path. {pwd}
+%           'flgSave'  - (Log)  Save <basename>.st_metrics.mat. {false}.
+%                               Off by default because the filename does not
+%                               vary with bouts: saving from inside a
+%                               spk_byCond map would leave only the last
+%                               condition behind, wearing the whole-session
+%                               name.
+%
+%   OUTPUTS:
+%       st       - (Struct) Every field is [nUnits x ...] so the struct can
+%                           go straight to struct2table:
+%                    .nSpks     [nUnits x 1] spikes inside the bouts
+%                    .dur       [nUnits x 1] total bout duration [s]
+%                    .doublets  [nUnits x 1]
+%                    .royer     [nUnits x 1]
+%                    .royer2    [nUnits x 1]
+%                    .lidor     [nUnits x 1]
+%                    .mizuseki  [nUnits x 1]
+%                    .cv        [nUnits x 1]
+%                    .lv        [nUnits x 1]
+%                    .acgNarrow [nUnits x nLagNarrow]
+%                    .acgWide   [nUnits x nLagWide]
+%       stInfo   - (Struct) Lag vectors [s] and parameters. Kept out of st so
+%                           st stays table-able; folded back in on save.
+%
+%   DEPENDENCIES:
+%       CCG, intervals.
+%
+%   HISTORY:
+%       241121    LH
+%       260719    one interval set in, one value out; segment-aware isi and
+%                 acg; dropped the triple-exponential fit, lvr and cv2.
+%
+%   See also: SPK_BYCOND, BURST_STATS
 
-%  calculate spike timing metrics from ACG and ISI histogram. based in part
-%  on calc_ACG_metrics from cell explorer. metrics include:
-%  busrtIndex_Royer2012, Mizuseki2012, Doublets. calculates two ACGs:
-%  narrow (100ms, 0.5ms bins) and wide (1s, 1ms bins)
+%% ========================================================================
+%  ARGUMENTS
+%  ========================================================================
 
-% INPUT:
-%   spktimes        cell of spike times in s. 
-%   fs              numeric. sampling frequency. 
-%   sunits          numeric vec. indices of selected units for calculation
-%                   {[]}.
-%   bins            cell array of n x 2 mats of intervals.
-%                   metrices will be calculated for each cell by limiting
-%                   spktimes to the intervals. can be for example
-%                   ss.boutTimes. must be the same units as spikes.times
-%                   (e.g. [s])
-%   basepath        path to recording
-%   flgSave         logical. save variables (update spikes and save su)
-%   flgForce        logical. force analysis even if struct file exists
-%                   {false}
-%   flgAll          logical. analyse all parameters (slow) {true}
-%
-% OUTPUT:
-%   st              struct
-%
-% DEPENDENCIES:
-%   CCG
-%
-% TO DO LIST:
-%   rmv dependency on spikes struct and cell explorer
-%   add metric from Miura et al., j. neurosci., 2007
-%
-% 24 nov 21 LH
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% arguments
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 p = inputParser;
-addOptional(p, 'spktimes', []);
-addOptional(p, 'fs', [], @isnumeric);
-addOptional(p, 'sunits', []);
-addOptional(p, 'bins', {[0 Inf]});
-addOptional(p, 'basepath', pwd, @ischar);
-addOptional(p, 'flgSave', true, @islogical);
-addOptional(p, 'flgForce', false, @islogical);
-addOptional(p, 'flgAll', true, @islogical);
+addRequired(p, 'spktimes', @iscell);
+addRequired(p, 'bouts', @isnumeric);
+addParameter(p, 'fs', 20000, @isnumeric);
+addParameter(p, 'minSpks', 100, @isnumeric);
+addParameter(p, 'basepath', pwd, @ischar);
+addParameter(p, 'flgSave', false, @islogical);
 
-parse(p, varargin{:})
-spktimes    = p.Results.spktimes;
-fs          = p.Results.fs;
-sunits      = p.Results.sunits;
-bins        = p.Results.bins;
-basepath    = p.Results.basepath;
-flgSave     = p.Results.flgSave;
-flgForce    = p.Results.flgForce;
-flgAll      = p.Results.flgAll;
+parse(p, spktimes, bouts, varargin{:});
+bouts    = p.Results.bouts;
+fs       = p.Results.fs;
+minSpks  = p.Results.minSpks;
+basepath = p.Results.basepath;
+flgSave  = p.Results.flgSave;
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% preparations
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% file names
-[~, basename] = fileparts(basepath);
-stFile = fullfile(basepath, [basename, '.st_metrics.mat']);
-spkFile = [basename '.spikes.cellinfo.mat'];
-sessionFile = [basename, '.session.mat'];
+%% ========================================================================
+%  PREPARATIONS
+%  ========================================================================
 
-% check if already analyzed 
-if exist(stFile, 'file') && ~flgForce
-    load(stFile)
-    return
+% acg geometry. narrow resolves the refractory shoulder, wide reaches the
+% 200-300 ms baseline that the royer index is normalised against
+bnszNarrow = 0.0005;
+durNarrow  = 0.1;
+bnszWide   = 0.001;
+durWide    = 1;
+
+nUnits = numel(spktimes);
+
+% an open bout is clipped to the last spike, so nEff below measures real
+% recorded time rather than an infinite tail
+if isempty(bouts), bouts = [0, Inf]; end
+tMax = max(cellfun(@(x) max([0; x(:)]), spktimes));
+bouts(isinf(bouts)) = tMax;
+
+% consolidate so the bouts are sorted and disjoint; discretize below relies
+% on one monotonic edge vector
+bouts = intervals(bouts);
+bouts = bouts.consolidate();
+bouts = bouts.ints;
+
+durBout = bouts(:, 2) - bouts(:, 1);
+durTot  = sum(durBout);
+edges   = reshape(bouts', [], 1);
+
+% lag vectors, matching CCG's own geometry
+halfNarrow = round(durNarrow / bnszNarrow / 2);
+halfWide   = round(durWide / bnszWide / 2);
+tNarrow    = (-halfNarrow : halfNarrow)' * bnszNarrow;
+tWide      = (-halfWide : halfWide)' * bnszWide;
+
+% initialize. nSpks and dur are always filled, so a unit that fails the
+% count threshold reads as under-exposed rather than silently missing
+st.nSpks     = zeros(nUnits, 1);
+st.dur       = repmat(durTot, nUnits, 1);
+st.doublets  = nan(nUnits, 1);
+st.royer     = nan(nUnits, 1);
+st.royer2    = nan(nUnits, 1);
+st.lidor     = nan(nUnits, 1);
+st.mizuseki  = nan(nUnits, 1);
+st.cv        = nan(nUnits, 1);
+st.lv        = nan(nUnits, 1);
+st.acgNarrow = nan(nUnits, numel(tNarrow));
+st.acgWide   = nan(nUnits, numel(tWide));
+
+
+%% ========================================================================
+%  RESTRICT AND CORRELATE
+%  ========================================================================
+
+% isi per unit, nan wherever the pair straddles a bout boundary
+isiCell = cell(nUnits, 1);
+
+for iUnit = 1 : nUnits
+
+    % assign each spike to a bout. an odd bin index means inside a bout, an
+    % even one means the gap between two, nan means outside the set
+    spkT = sort(spktimes{iUnit}(:));
+    iBin = discretize(spkT, edges);
+    inBout = ~isnan(iBin) & mod(iBin, 2) == 1;
+
+    spkT    = spkT(inBout);
+    boutIdx = (iBin(inBout) + 1) / 2;
+    nSpks   = numel(spkT);
+
+    st.nSpks(iUnit) = nSpks;
+    if nSpks < minSpks
+        continue
+    end
+
+    % isis, with cross-bout pairs marked rather than removed so that lv can
+    % still tell which isis were consecutive in the original train
+    isiAll = diff(spkT);
+    isiAll(boutIdx(1 : end - 1) ~= boutIdx(2 : end)) = NaN;
+    isiCell{iUnit} = isiAll;
+
+    % push the bouts apart so the gap between any two exceeds the widest lag
+    % window, then correlate the whole train in one call
+    pad = durWide;
+    offset = [0; cumsum(durBout(1 : end - 1) + pad)];
+    tPad = spkT - bouts(boutIdx, 1) + offset(boutIdx);
+
+    acgN = CCG(tPad, ones(nSpks, 1), 'binSize', bnszNarrow, ...
+        'duration', durNarrow, 'norm', 'counts', 'Fs', 1 / fs);
+    acgW = CCG(tPad, ones(nSpks, 1), 'binSize', bnszWide, ...
+        'duration', durWide, 'norm', 'counts', 'Fs', 1 / fs);
+
+    % rate normalisation, with the edge correction
+    dLeft  = spkT - bouts(boutIdx, 1);
+    dRight = bouts(boutIdx, 2) - spkT;
+
+    st.acgNarrow(iUnit, :) = acgN(:)' ./ ...
+        (nEffLag(dLeft, dRight, tNarrow) * bnszNarrow);
+    st.acgWide(iUnit, :) = acgW(:)' ./ ...
+        (nEffLag(dLeft, dRight, tWide) * bnszWide);
 end
 
-% load spikes if empty
-if isempty(spktimes)
-    if exist(spkFile, 'file')
-        load(spkFile)
+
+%% ========================================================================
+%  METRICS
+%  ========================================================================
+
+% bin offsets from the zero-lag bin. integers rather than lag comparisons so
+% the windows cannot drift on a float rounding
+iZeroN = halfNarrow + 1;
+iZeroW = halfWide + 1;
+
+% royer divides by the 200-300 ms baseline, which can be zero for a sparse
+% unit. one pseudocount, half the smallest positive baseline in the
+% population, keeps the ratio finite without inventing structure
+bslAll = mean(st.acgWide(:, iZeroW + 200 : iZeroW + 300), 2, 'omitnan');
+pseudoCnt = min(bslAll(bslAll > 0));
+if isempty(pseudoCnt)
+    pseudoCnt = 1;
+end
+pseudoCnt = pseudoCnt / 2;
+
+for iUnit = 1 : nUnits
+
+    if st.nSpks(iUnit) < minSpks
+        continue
+    end
+
+    acgN   = st.acgNarrow(iUnit, :);
+    acgW   = st.acgWide(iUnit, :);
+    isiAll = isiCell{iUnit};
+
+    % burstiness ---------------------------------------------------------
+
+    % doublets: peak of the 2.5-8 ms bins over the mean of the 8-11.5 ms bins
+    st.doublets(iUnit) = max(acgN(iZeroN + 5 : iZeroN + 16)) / ...
+        mean(acgN(iZeroN + 16 : iZeroN + 23));
+
+    % royer 2012: mean of the 3-5 ms bins over the mean of 200-300 ms
+    brstMean = mean(acgW(iZeroW + 3 : iZeroW + 5));
+    bslMean  = mean(acgW(iZeroW + 200 : iZeroW + 300));
+    if bslMean <= 0
+        st.royer(iUnit) = (brstMean + pseudoCnt) / (bslMean + pseudoCnt);
     else
-        error('spikes file does not exist, input spktimes')
+        st.royer(iUnit) = brstMean / bslMean;
     end
-    spktimes = spikes.times;
-end
 
-if isempty(bins)
-    bins = [0 Inf];
-end
-if ~iscell(bins)
-    bins = {bins};
-end
-
-% selected untis
-if isempty(sunits)
-    sunits = 1 : length(spktimes);
-end
-
-% load session info for fs
-if exist(sessionFile, 'file')
-    load(sessionFile)
-end
-if isempty(fs)
-    if exist('session', 'var')
-        fs = session.extracellular.sr;
+    % royer2: peak of 0-10 ms against the 40-50 ms baseline, normalised by
+    % whichever of the two is larger so the index stays bounded
+    brstPeak = max(acgW(iZeroW : iZeroW + 10));
+    bslPeak  = mean(acgW(iZeroW + 40 : iZeroW + 50));
+    if brstPeak > bslPeak
+        st.royer2(iUnit) = (brstPeak - bslPeak) / brstPeak;
     else
-        fs = 20000;
+        st.royer2(iUnit) = (brstPeak - bslPeak) / bslPeak;
     end
-end
 
-% acg params
-st.info.runtime = datetime("now");
-st.info.bins = bins;
-st.info.acg_wide_bins = 500;
-st.info.acg_wide_bnsz = 0.001;
-st.info.acg_wide_dur = 1;
-st.info.acg_narrow_bins = 100;
-st.info.acg_narrow_bnsz = 0.0005;
-st.info.acg_narrow_dur = 0.1;
+    % lidor: 2-10 ms against 35-50 ms as a contrast index
+    brstSum = sum(acgN(iZeroN + 5 : iZeroN + 19));
+    bslSum  = sum(acgN(iZeroN + 71 : iZeroN + 99));
+    st.lidor(iUnit) = (brstSum - bslSum) / (brstSum + bslSum);
 
-% spk params
-nunits = length(sunits);
-nbins = length(bins);
-minSpkThr = 100;
+    % mizuseki 2011: fraction of spikes flanked by an isi below 6 ms on
+    % either side. a cross-bout isi is inf, so a bout boundary can neither
+    % create a burst spike nor hide one
+    isiNbr = [inf; isiAll; inf];
+    isiNbr(isnan(isiNbr)) = inf;
+    st.mizuseki(iUnit) = mean(isiNbr(1 : end - 1) < 0.006 | ...
+        isiNbr(2 : end) < 0.006);
 
-% initialize
-st.acg_wide     = nan(nunits, st.info.acg_wide_dur / st.info.acg_wide_bnsz + 1, nbins);
-st.acg_narrow   = nan(nunits, st.info.acg_narrow_dur / st.info.acg_narrow_bnsz + 1, nbins);
-st.doublets     = nan(nunits, nbins);
-st.royer        = nan(nunits, nbins);
-st.royer2       = nan(nunits, nbins);
-st.lidor        = nan(nunits, nbins);
-st.mizuseki     = nan(nunits, nbins);
-st.cv           = nan(nunits, nbins);
-st.cv2          = nan(nunits, nbins);
-st.lv           = nan(nunits, nbins);
-st.lvr          = nan(nunits, nbins);
-if flgAll
-    st.tau_rise     = nan(nunits, nbins);
-    st.tau_burst    = nan(nunits, nbins);
-    st.acg_refrac   = nan(nunits, nbins);
-end
+    % firing irregularity ------------------------------------------------
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% calc
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% Pre-calculate interval objects for efficiency
-binObjs = cellfun(@intervals, bins, 'UniformOutput', false);
-
-% First, calculate all ACGs
-for iunit = 1 : length(sunits)
-    for ibin = 1 : length(bins)
-            
-        % limit spktimes to window
-        spkIdx = binObjs{ibin}.contains(spktimes{sunits(iunit)});
-        st_unit = spktimes{sunits(iunit)}(spkIdx);
-        nspks = length(st_unit);
-        
-        if nspks < minSpkThr
-            continue
-        end
-        
-        % acg
-        [st.acg_wide(iunit, :, ibin), st.info.acg_wide_tstamps] = CCG(st_unit,...
-            ones(size(st_unit)), 'binSize', st.info.acg_wide_bnsz,...
-            'duration', st.info.acg_wide_dur, 'norm', 'rate', 'Fs', 1 / fs);
-        
-        [st.acg_narrow(iunit, :, ibin), st.info.acg_narrow_tstamps] = CCG(st_unit,...
-            ones(size(st_unit)), 'binSize', st.info.acg_narrow_bnsz,...
-            'duration', st.info.acg_narrow_dur, 'norm', 'rate', 'Fs', 1 / fs);
+    % cv: shinomoto 2003. the cross-bout isis are gone, so this is now the
+    % within-state dispersion rather than the gap structure between bouts
+    isi = isiAll(~isnan(isiAll));
+    if numel(isi) < 2
+        continue
     end
+    st.cv(iUnit) = std(isi) / mean(isi);
+
+    % lv: shinomoto 2003, kobayashi 2019. local, so a pair drops out unless
+    % both isis were consecutive and inside the same bout
+    isi1 = isiAll(1 : end - 1);
+    isi2 = isiAll(2 : end);
+    lvTerm = 3 * (isi1 - isi2).^2 ./ (isi1 + isi2).^2;
+    st.lv(iUnit) = mean(lvTerm, 'omitnan');
 end
 
-% Calculate pseudocounts for Royer metric (once per bin)
-pseudocounts = nan(1, nbins);
-for ibin = 1 : nbins
-    % Find minimum positive baseline across all units for this bin
-    bslAll = squeeze(mean(st.acg_wide(:, st.info.acg_wide_bins + 1 + 200 : st.info.acg_wide_bins + 1 + 300, ibin), 2));
-    bslPos = min(bslAll(bslAll > 0));
-    if isempty(bslPos)
-        bslPos = 1; % fallback if no positive baselines found
-    end
-    pseudocounts(ibin) = bslPos / 2;
-end
 
-% Now calculate all metrics from the pre-calculated ACGs
-for iunit = 1 : length(sunits)
-    for ibin = 1 : length(bins)
-            
-        % limit spktimes to window
-        spkIdx = binObjs{ibin}.contains(spktimes{sunits(iunit)});
-        st_unit = spktimes{sunits(iunit)}(spkIdx);
-        nspks = length(st_unit);
-        isi = diff(st_unit);
-        nisi = length(isi);
-        
-        if nspks < minSpkThr
-            continue
-        end
-        
-        % burstiness ------------------------------------------------------
-        
-        % doublets: max bin count from 2.5-8ms normalized by the average number
-        % of spikes in the 8-11.5ms bins
-        st.doublets(iunit, ibin) = max(st.acg_narrow(iunit, st.info.acg_narrow_bins + 1 + 5 : st.info.acg_narrow_bins + 1 + 16, ibin)) /...
-            mean(st.acg_narrow(iunit, st.info.acg_narrow_bins + 1 + 16 : st.info.acg_narrow_bins + 1 + 23, ibin));
-        
-        % royer 2012: average number of spikes in the 3-5 ms bins divided by the
-        % average number of spikes in the 200-300 ms bins
-        burst_mean = mean(st.acg_wide(iunit, st.info.acg_wide_bins + 1 + 3 : st.info.acg_wide_bins + 1 + 5, ibin));
-        baseline_mean = mean(st.acg_wide(iunit, st.info.acg_wide_bins + 1 + 200 : st.info.acg_wide_bins + 1 + 300, ibin));
-        
-        % Use pre-calculated pseudocount to avoid Inf/NaN
-        if baseline_mean <= 0
-            st.royer(iunit, ibin) = (burst_mean + pseudocounts(ibin)) / (baseline_mean + pseudocounts(ibin));
-        else
-            st.royer(iunit, ibin) = burst_mean / baseline_mean;
-        end
-        
-        % royer2: max(0:10) / mean(40:50) normalized
-        peakbrst = max(st.acg_wide(iunit, st.info.acg_wide_bins + 1 :...
-            st.info.acg_wide_bins + 1 + 10, ibin));
-        basebrst = mean(st.acg_wide(iunit, st.info.acg_wide_bins + 1 + 40 :...
-            st.info.acg_wide_bins + 1 + 50, ibin));
-        if peakbrst > basebrst
-            st.royer2(iunit, ibin) = (peakbrst - basebrst) / peakbrst;
-        else
-            st.royer2(iunit, ibin) = (peakbrst - basebrst) / basebrst;
-        end        
+%% ========================================================================
+%  FINALIZE
+%  ========================================================================
 
-        % lidor: sum of spikes in 2-10 ms normalized to sum in 35-50
-        t1 = find(st.info.acg_narrow_tstamps > 0.002 & st.info.acg_narrow_tstamps < 0.01);
-        t2 = find(st.info.acg_narrow_tstamps > 0.035 & st.info.acg_narrow_tstamps < 0.05);
-        burst_temp = sum(st.acg_narrow(iunit, t1, ibin));
-        bl_temp = sum(st.acg_narrow(iunit, t2, ibin));
-        st.lidor(iunit, ibin) = (burst_temp - bl_temp) ./ (burst_temp + bl_temp);
-        
-        % Mizuseki 2011: fraction of spikes with a ISI for following or preceding
-        % spikes < 0.006
-        burst_temp = zeros(1, length(st_unit) - 1);
-        for ispk = 2 : length(st_unit) - 1
-            burst_temp(ispk) = any(diff(st_unit(ispk - 1 : ispk + 1)) < 0.006);
-        end
-        st.mizuseki(iunit, ibin) = sum(burst_temp > 0) / length(burst_temp);
-        
-        % firing irregularity ---------------------------------------------
-        
-        % Cv (coefficient of variation): Shinomoto 2003. note that when
-        % calculated for boutTimes, this is terribly biased due to large
-        % ISI's between bouts
-        st.cv(iunit, ibin) = std(isi) / mean(isi);
-        
-        % Cv2 (local cv): Holt 1996, taken from CE
-        cv2_temp = 2 * abs(isi(1 : end - 1) - isi(2 : end)) ./...
-            (isi(1 : end - 1) + isi(2 : end));
-        st.cv2(iunit, ibin) = mean(cv2_temp(cv2_temp < 1.95));
-        
-        % Lv: Shinomoto 2003 and Kobayashi 2019.
-        lv_term = 0;
-        for ispk = 1 : nisi - 1
-            diff_term = 3 * (isi(ispk) - isi(ispk + 1))^2;
-            sum_term = (isi(ispk) + isi(ispk + 1))^2;
-            lv_term = lv_term + diff_term / sum_term;
-        end
-        st.lv(iunit, ibin) = lv_term / (nisi - 1);
-        
-        % LvR: Shinomoto 2009
-        ref = 0.005;                    % refractory constant [s]
-        lv_term = 0;
-        for ispk = 1 : nisi - 1
-            ccorr_term = 4 * isi(ispk) * isi(ispk + 1);
-            sum_term = isi(ispk) + isi(ispk + 1);
-            left_term = 1 - ccorr_term / (sum_term ^ 2);
-            right_term = 1 + (4 * ref) / sum_term;
-            lv_term = lv_term + left_term * right_term;
-        end
-        st.lvr(iunit, ibin) = 3 / (nisi - 1) * lv_term;
-        
-        if flgAll
-            % fit triple exponential to acg. adapted from CE (fit_ACG.m).
-            % requires the Curve Fitting Toolbox. no idea whats going on here
-            g = fittype('max(c*(exp(-(x-f)/a)-d*exp(-(x-f)/b))+h*exp(-(x-f)/g)+e,0)',...
-                'dependent',{'y'},'independent',{'x'},...
-                'coefficients',{'a','b','c','d','e','f','g','h'});
-            a0 = [20, 1, 30, 2, 0.5, 5, 1.5, 2];
-            lb = [1, 0.1, 0, 0, -30, 0, 0.1, 0];
-            ub = [500, 50, 500, 15, 50, 20, 5, 100];
-            offset = 101;
-            x = ([1 : 100] / 2)';
-            [f0, ~] = fit(x, st.acg_narrow(iunit, x * 2 + offset, ibin),...
-                g, 'StartPoint', a0, 'Lower', lb, 'Upper', ub);
-            fit_params = coeffvalues(f0);
-            st.tau_rise(iunit, ibin) = fit_params(2);
-            st.tau_burst(iunit, ibin) = fit_params(7);
-            st.acg_refrac(iunit, ibin) = fit_params(6);
-        end
-    end
-end
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% save
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+stInfo.bouts      = bouts;
+stInfo.dur        = durTot;
+stInfo.tNarrow    = tNarrow;
+stInfo.tWide      = tWide;
+stInfo.bnszNarrow = bnszNarrow;
+stInfo.bnszWide   = bnszWide;
+stInfo.minSpks    = minSpks;
+stInfo.fs         = fs;
+stInfo.runtime    = datetime("now");
 
 if flgSave
-    
-    save(stFile, 'st')
+    [~, basename] = fileparts(basepath);
+    stFile = fullfile(basepath, [basename, '.st_metrics.mat']);
+    backup_file(stFile);
 
-    % update cell metrics
-    cmName = [basename, '.cell_metrics.cellinfo.mat'];
-    if exist(cmName, 'file')
-        load(cmName)
-        cell_metrics.st_doublets    = st.doublets;
-        cell_metrics.st_royer       = st.royer;
-        cell_metrics.st_royer2      = st.royer2;
-        cell_metrics.st_lidor       = st.lidor;
-        cell_metrics.st_mizuseki    = st.mizuseki;
-        cell_metrics.st_cv          = st.cv;
-        cell_metrics.st_cv2         = st.cv2;
-        cell_metrics.st_lv          = st.lv;
-        cell_metrics.st_lvr         = st.lvr;
-        save(cmName, 'cell_metrics')
-    end
+    % one variable per file, named st, so that basepaths2vars keeps
+    % resolving 'st_metrics' to v(i).st
+    sVar.st = st;
+    sVar.st.info = stInfo;
+    save(stFile, '-struct', 'sVar')
 end
 
-end
+end     % MAIN
 
-% EOF
+
+%% ========================================================================
+%  LOCALS
+%  ========================================================================
+
+function nEff = nEffLag(dLeft, dRight, tLag)
+% Number of reference spikes with room for a partner at each lag. At lag tau
+% only a spike at least |tau| from the relevant bout edge could have had one;
+% counting every spike instead tapers the correlogram toward long lags in
+% proportion to how short the bouts are.
+
+tLag = tLag(:)';
+nEff = nan(1, numel(tLag));
+
+% lags run ascending and symmetric about zero. the negative side is mirrored
+% so that both threshold vectors ascend, as histcounts edges must
+iPos = tLag >= 0;
+nEff(iPos)  = cntAtLeast(dRight, tLag(iPos));
+nEff(~iPos) = flip(cntAtLeast(dLeft, flip(-tLag(~iPos))));
+
+% a lag no spike can reach carries no information; nan keeps it out of the
+% metrics instead of dividing by zero
+nEff(nEff == 0) = NaN;
+
+end     % nEffLag
+
+
+function n = cntAtLeast(d, thr)
+% Count elements of d that are >= each threshold. thr must ascend. Sentinel
+% edges bracket the data so that histcounts sees a finite, strictly
+% increasing edge vector and every element lands in exactly one bin.
+
+lo = min([d(:); thr(:)]) - 1;
+hi = max([d(:); thr(:)]) + 1;
+
+n = numel(d) - cumsum(histcounts(d, [lo, thr, hi]));
+n = n(1 : end - 1);
+
+end     % EOF

@@ -266,9 +266,10 @@ function guiPath_doc()
 %               'outClass','native').
 %   - ws        a base-workspace variable + path (the Load dialog).
 %   - value     an already-materialized value, used inline.
-%   - transform ops run after the fetch: eegSub, emg, emgRms, spec, rippPrep.
-%               var_recipe('bin','file','lfp','ch',ch, ...
-%               'transform',{{'rippPrep',{[80 250]}}},'path','filt').
+%   - transform ops run after the fetch: eegSub, emg, emgRms, spec, bandpass,
+%               rippPrep (the full detection prep; bandpass is the .filt half
+%               alone). var_recipe('bin','file','lfp','ch',ch, ...
+%               'transform',{{'bandpass',{[80 250]}}}).
 %   A bare 'file.path' string is shorthand for a matvar read.
 %
 %   guiMap behaviour.

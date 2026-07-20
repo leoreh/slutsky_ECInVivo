@@ -7,7 +7,6 @@ function plot_FRtime_session(varargin)
 %   basepath        recording session {pwd}
 %   units           numeric 2 x n of indices of units to plot
 %   saveFig         logical {true}
-%   dataType        char. plot 'strd' or 'norm'.
 %                   boundries specified by each row. 1st row RS 2nd row FS
 %   muFlag          logical. plot multi unit (sr) activity even if fr
 %                   exists {false}
@@ -20,7 +19,6 @@ addParameter(p, 'basepath', pwd);
 addParameter(p, 'units', []);
 addParameter(p, 'saveFig', true, @islogical);
 addParameter(p, 'grp', [], @islogical);
-addParameter(p, 'dataType', 'strd', @ischar);
 addParameter(p, 'muFlag', false, @islogical);
 
 parse(p, varargin{:})
@@ -28,7 +26,6 @@ basepath    = p.Results.basepath;
 units       = p.Results.units;
 saveFig     = p.Results.saveFig;
 grp         = p.Results.grp;
-dataType    = p.Results.dataType;
 muFlag      = p.Results.muFlag;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -62,7 +59,7 @@ end
 if isempty(fr) || muFlag
     xidx = sr.tstamps / 60 / 60;
 else
-    xidx = fr.tstamps / 60 / 60;
+    xidx = fr.t / 60 / 60;
 end
 
 % idx of block tranisition (dashed lines)
@@ -76,18 +73,12 @@ end
 % units
 if ~isempty(fr)
     if isempty(units)
-        units = selectUnits('basepath', basepath, 'grp', [], 'saveVar', false,...
-            'forceA', false, 'graphics', false);
-        units = [units.rs; units.fs];
+        load(fullfile(basepath, [basename, '.units.mat']), 'units');
+        units = units.clean;
     end
 end
 
-switch dataType
-    case 'norm'
-        ytxt = 'Norm Firing Rate';
-    case 'strd'
-        ytxt = 'Firing Rate [Hz]';
-end
+ytxt = 'Firing Rate [Hz]';
 
 unitChar = {'RS', 'FS'};
 unitClr = {'b', 'r'};
@@ -102,7 +93,7 @@ fh = figure;
 title(basename)
 
 if isempty(fr) | muFlag
-    yLimit = ceil([0 max(max(sr.(dataType)(grp, :)))]);
+    yLimit = ceil([0 max(max(sr.strd(grp, :)))]);
     hold on
     plot(xidx, sr.strd(grp, :)', 'LineWidth', 1)
     plot([tidx'; tidx'], yLimit, '--k', 'LineWidth', 1)
@@ -124,7 +115,7 @@ else
         end
         title(basename)
         hold on
-        ph = plot(xidx, fr.(dataType)(units(iunit, :), :),...
+        ph = plot(xidx, fr.rate(units(iunit, :), :),...
             unitClr{iunit}, 'LineWidth', 1);
         alphaIdx = linspace(1, 0.2, length(ph));
         clrIdx = linspace(0.2, 0.6, length(ph));
@@ -148,7 +139,7 @@ else
     % mean per cell class on a linear scale
     sb3 = subplot(3, 1, 3);
     hold on
-    data = fr.(dataType)(units(1, :), :);
+    data = fr.rate(units(1, :), :);
     data(~isfinite(data)) = nan;
     data = mean(data, 1, 'omitnan');
     plot(xidx, data, 'b', 'LineWidth', 2)
@@ -156,17 +147,14 @@ else
     ylim([0 5])
     yticks([0 : 5])
 
-    % create 2 axes if raw fr
-    if strcmp(dataType, 'strd')
-        ylabel(['RS ' ytxt])
-        yyaxis right
-        ylabel(['FS ' ytxt])
-        ax = gca;
-        set(ax.YAxis(1), 'color', 'b')
-        set(ax.YAxis(2), 'color', 'r')
-    end
+    ylabel(['RS ' ytxt])
+    yyaxis right
+    ylabel(['FS ' ytxt])
+    ax = gca;
+    set(ax.YAxis(1), 'color', 'b')
+    set(ax.YAxis(2), 'color', 'r')
 
-    data = fr.(dataType)(units(2, :), :);
+    data = fr.rate(units(2, :), :);
     data(~isfinite(data)) = nan;
     data = mean(data, 1, 'omitnan');
     plot(xidx, data, 'r', 'LineWidth', 2)

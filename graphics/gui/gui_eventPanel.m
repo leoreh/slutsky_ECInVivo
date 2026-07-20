@@ -15,6 +15,8 @@ function h = gui_eventPanel(parent, api)
 %       api.reject()      - reject the current event
 %       api.save()        - persist the curation
 %       api.setIdx(v)     - jump to 1-based event index v
+%       api.navToggle(tf) - restrict stepping to accepted events (optional; when
+%                           wired, an "Accepted only" checkbox is shown)
 %   Any missing field is simply ignored (the control becomes a no-op), so a
 %   host can wire only the callbacks it needs.
 %
@@ -35,8 +37,12 @@ if ~isstruct(api), error('gui_eventPanel:api', 'api must be a struct of callback
 clrA = [0.10 0.55 0.10];
 clrR = [0.65 0.15 0.15];
 
-g = uigridlayout(parent, [5, 2], ...
-    'RowHeight', {'fit', 'fit', 'fit', 'fit', 'fit'}, ...
+% an "Accepted only" toggle is shown only when the host wires api.navToggle
+hasNav = isfield(api, 'navToggle') && ~isempty(api.navToggle);
+nRow = 5 + hasNav;
+
+g = uigridlayout(parent, [nRow, 2], ...
+    'RowHeight', repmat({'fit'}, 1, nRow), ...
     'ColumnWidth', {'1x', '1x'}, ...
     'Padding', 4, 'RowSpacing', 4, 'ColumnSpacing', 4);
 
@@ -66,13 +72,21 @@ bRej.Layout.Row = 3; bRej.Layout.Column = 2;
 bSave = uibutton(g, 'Text', 'Save (Ctrl+S)', 'ButtonPushedFcn', @(~, ~) safecall(api, 'save'));
 bSave.Layout.Row = 4; bSave.Layout.Column = [1, 2];
 
-% row 5: status (spans both columns)
+% row 5 (optional): restrict stepping to accepted events
+hNav = gobjects(0);
+if hasNav
+    hNav = uicheckbox(g, 'Text', 'Accepted only', 'Value', true, ...
+        'ValueChangedFcn', @(s, ~) safecall(api, 'navToggle', s.Value));
+    hNav.Layout.Row = 5; hNav.Layout.Column = [1, 2];
+end
+
+% last row: status (spans both columns)
 hStat = uilabel(g, 'Text', '', 'WordWrap', 'on', 'FontColor', [0.3 0.3 0.3]);
-hStat.Layout.Row = 5; hStat.Layout.Column = [1, 2];
+hStat.Layout.Row = nRow; hStat.Layout.Column = [1, 2];
 
 h = struct('grid', g, 'idx', hIdx, 'total', hTot, ...
     'accept', bAcc, 'reject', bRej, 'save', bSave, 'status', hStat, ...
-    'clrAccept', clrA, 'clrReject', clrR);
+    'navOnly', hNav, 'clrAccept', clrA, 'clrReject', clrR);
 h.refresh = @(idx, total, accepted, statusText) refreshPanel(h, idx, total, accepted, statusText);
 
 end     % MAIN

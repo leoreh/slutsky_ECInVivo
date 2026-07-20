@@ -292,8 +292,16 @@ elseif strcmp(queryStr, 'mea_mk801')
         };
 
 
+elseif strcmp(queryStr, 'bsl3')
+
+    % Three-genotype baseline set: Control, MCU-KO and the viral CAG cohort.
+    % Baseline only - the CAG mice have no BAC days
+    basepaths = [mcu_basepaths('wt_bsl'), mcu_basepaths('mcu_bsl'), ...
+        mcu_basepaths('ra')];
+
 elseif strcmp(queryStr, 'ra')
 
+    % CAG-MCU-KO cohort - acute viral KO under the CAG promotor
     basepaths = {...
         'E:\Data\RA\raMCU1\raMCU1_080621_0930',...
         'E:\Data\RA\raMCU2\raMCU2_080621_0930',...

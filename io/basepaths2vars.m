@@ -55,6 +55,13 @@ for ipath = 1 : npaths
         if isempty(filename)
             filename = dir(['*.', vars{ifile}, '*.mat']);
         end
+        if isempty(filename)
+            % last resort, for names where the token is an infix rather than
+            % a dot-delimited field: 'rcv' -> <basename>.frRcv.mat, 'stats'
+            % -> <basename>.burstStats.mat. this was the only pattern before
+            % the dot was introduced, and the mea files still rely on it.
+            filename = dir(['*', vars{ifile}, '*.mat']);
+        end
 
         if isempty(filename)
             if flgPrnt, warning('No %s file in %s, skipping...', vars{ifile}, filepath), end

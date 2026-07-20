@@ -210,7 +210,7 @@ tblPnls{tblIdx} = '4C';
 
 tblLme = tblVivo; tblLme(tblLme.sbjID == 'lh137', :) = [];
 frml = 'fr ~ genotype * day + (day|sbjID)';
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblVivo, frml, 'dist', 'gamma');
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblLme, frml, 'dist', 'gamma');
 lmeStats = lme_postHoc(lmeMdl, 'contrasts', [1 : 9, 12, 15, 17 : 19]);
 lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
 

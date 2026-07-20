@@ -18,8 +18,9 @@ function recipe = var_recipe(kind, varargin)
 % - var_recipe('bin', 'file','lfp', 'ch',[5 6 7 8], 'average',true)
 %   channels 5-8 of <basename>.lfp, averaged to one trace.
 % - var_recipe('bin', 'file','lfp', 'ch',rippCh, 'bit2uv',0.195, ...
-%       'transform',{'rippPrep',{[80 250]}}, 'path','filt')
-%   the ripple channel, filtered by ripp_sigPrep, then its .filt field.
+%       'transform',{'bandpass',{[80 250]}})
+%   the ripple channel, band-passed to the ripple band ('rippPrep' instead runs
+%   the full detection prep and returns its struct, e.g. with 'path','z').
 %
 % INPUTS
 % - kind            <char> 'matvar' | 'matfield' | 'bin' | 'ws' | 'value'.

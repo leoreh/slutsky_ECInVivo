@@ -26,7 +26,7 @@ for iMouse = 1 : nmice
         fr = v(iPath).fr;
         units = v(iPath).units;
         uIdx = units.clean(iUnit, :);
-        yData{iPath} = fr.strd(uIdx, :);                             
+        yData{iPath} = fr.rate(uIdx, :);                             
     end
     yData = cell2padmat(yData, 2);
     

@@ -109,6 +109,18 @@ varsTbl = unique([varsFxd(:); varsIntr(:); varsGrp(:); {varResp}]);
 % Truncate Table
 lmeTbl = tbl(:, varsTbl);
 
+% Drop empty categories. A categorical predictor carrying a level with no
+% observations - the usual result of subsetting a table (one day, one
+% genotype) - gives a rank deficient design and fitlme / fitglme error out
+% with "design matrix X must be of full column rank". Levels that are
+% present are untouched and grouping variables fit identically either way,
+% so this only removes a failure mode.
+for iVar = 1 : numel(varsTbl)
+    if iscategorical(lmeTbl.(varsTbl{iVar}))
+        lmeTbl.(varsTbl{iVar}) = removecats(lmeTbl.(varsTbl{iVar}));
+    end
+end
+
 % Identify numeric/continuous predictors (exclude categorical)
 isNum = cellfun(@(x) isnumeric(lmeTbl.(x)) && ~iscategorical(lmeTbl.(x)), varsTbl);
 varsNum = varsTbl(isNum);

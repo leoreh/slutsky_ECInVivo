@@ -1,41 +1,63 @@
 function stats = burst_stats(burst, spktimes, varargin)
-% BURST_STATS Calculates burst statistics per unit for each time window.
+% BURST_STATS Calculates burst statistics per unit for each condition.
 %
-%   stats = BURST_STATS(BRST, SPKTIMES, ...) calculates summary statistics
-%   (e.g., burst rate, duration, spikes per burst) for bursts detected by
-%   burst_detect, within specified time windows.
+%   stats = BURST_STATS(burst, spktimes, ...)
+%
+%   SUMMARY:
+%       Summary statistics (burst rate, duration, spikes per burst, the
+%       burst / single decomposition of firing rate) for bursts detected by
+%       burst_detect, restricted to time windows.
+%
+%       Each output column is one condition. By default every row of winCalc
+%       is a condition of its own, which is how the MEA pipeline gets its
+%       BSL / Acute / SS columns. With flgPool the rows are instead the bouts
+%       of a single condition (e.g. every NREM bout) and collapse to one
+%       column - that is the form spk_byCond calls, since it supplies the
+%       label and stacks the conditions as rows.
 %
 %   INPUTS:
-%       burst        - (struct) Output from burst_detect.m (must contain .times, etc.)
-%       spktimes    - (cell) Spike times per unit (e.g., {unit1, unit2}).
-%       varargin    - (param/value) Optional parameters:
-%                     'winCalc'  : (num) [M x 2] matrix of time windows.
-%                                  Default: [0, max(spktimes)].
-%                     'basepath' : (char) Base path for saving {pwd}
-%                     'flgSave'  : (log) Save result as stats struct {false}
+%       burst    - (Struct) Output of burst_detect (.times, .size, .dur,
+%                           .freq, .ibi).
+%       spktimes - (Cell)   {nUnits x 1} of spike times [s].
+%       varargin - Parameter/Value pairs:
+%           'winCalc'  - (Mat)  [nWin x 2] time windows [s].
+%                               {[0, max(spktimes)]}
+%           'flgPool'  - (Log)  Treat every row of winCalc as one condition
+%                               and return a single column. {false}
+%           'basepath' - (Char) Save location. {pwd}
+%           'flgSave'  - (Log)  Save <basename>.burstStats.mat. {false}
 %
 %   OUTPUTS:
-%       stats       - (struct) Burst statistics structure.
-%                     Fields are matrices of size [nUnits x nWin]:
-%                     .bN         : Number of bursts
-%                     .br         : Burst event rate (Hz) (Count / Window Duration)
-%                     .fr         : Total firing rate (Hz)
-%                     .frBurst    : Burst spike firing rate (Hz)
-%                     .frSingle   : Single spike firing rate (Hz)
-%                     .dur        : Mean burst duration (s)
-%                     .freq       : Mean intra-burst frequency (Hz)
-%                     .ibi        : Mean inter-burst interval (s)
-%                     .bSize      : Mean spikes per burst
-%                     .pBurst      : Probability of spikes in bursts (0-1)
-%                     .winCalc    : The time windows used [nWin x 2]
+%       stats    - (Struct) Fields are [nUnits x nCol]:
+%                    .bN       Number of bursts
+%                    .br       Burst event rate [Hz]
+%                    .fr       Total firing rate [Hz]
+%                    .frBurst  Burst spike firing rate [Hz]
+%                    .frSingle Single spike firing rate [Hz]
+%                    .dur      Mean burst duration [s]
+%                    .freq     Mean intra-burst frequency [Hz]
+%                    .ibi      Mean inter-burst interval [s]
+%                    .bSize    Mean spikes per burst
+%                    .pBurst   Fraction of spikes in bursts
 %
 %   NOTES:
-%       - Bursts are assigned to a window based on their START time.
-%       - IBI statistics for a window are the mean of the IBIs of bursts
-%         starting in that window. (IBI is the interval preceding the burst).
-%       - If no bursts occur in a window, count/rate/pBspk are 0, others NaN.
+%       - A burst counts toward a condition only if it lies wholly inside a
+%         single window of it, so a burst straddling a bout edge is dropped
+%         rather than split.
+%       - IBI is the gap preceding a burst. It belongs to the condition only
+%         when the previous burst sits in the same window; otherwise the gap
+%         spans time the condition excludes. The first burst of a window
+%         therefore never contributes an IBI.
+%       - Rates carry a 1/wDur floor, the rate of a single event over the
+%         window, so a silent unit is bounded away from zero on a log scale.
 %
-%   See also: BURST_DETECT, BURST_DYNAMICS
+%   DEPENDENCIES:
+%       intervals, backup_file.
+%
+%   HISTORY:
+%       260719    flgPool added; ibi restricted to same-window pairs.
+%
+%   See also: BURST_DETECT, BURST_DYNAMICS, SPK_BYCOND
 
 %% ========================================================================
 %  ARGUMENTS
@@ -45,11 +67,13 @@ p = inputParser;
 addRequired(p, 'burst', @isstruct);
 addRequired(p, 'spktimes', @iscell);
 addParameter(p, 'winCalc', [], @isnumeric);
+addParameter(p, 'flgPool', false, @islogical);
 addParameter(p, 'basepath', pwd, @ischar);
 addParameter(p, 'flgSave', false, @islogical);
 
 parse(p, burst, spktimes, varargin{:});
 winCalc  = p.Results.winCalc;
+flgPool  = p.Results.flgPool;
 basepath = p.Results.basepath;
 flgSave  = p.Results.flgSave;
 
@@ -60,37 +84,51 @@ flgSave  = p.Results.flgSave;
 
 nUnits = length(burst.times);
 
-% Handle winCalc
 if isempty(winCalc)
-    % Determine max time from spktimes
     maxTime = max(cellfun(@(x) max([0; x(:)]), spktimes));
     winCalc = [0, maxTime];
 end
 
-nWin = size(winCalc, 1);
+% pooled bouts arrive unordered and may touch; consolidating them keeps the
+% edge vector below strictly monotonic, which is what discretize needs
+if flgPool
+    winCalc = winCalc(winCalc(:, 2) > winCalc(:, 1), :);
+    winCalc = intervals(winCalc);
+    winCalc = winCalc.consolidate();
+    winCalc = winCalc.ints;
+end
 
-% Initialize Output Matrices [nUnits x nWin]
-stats.bN        = zeros(nUnits, nWin);
-stats.br = zeros(nUnits, nWin);
-stats.fr     = zeros(nUnits, nWin);
-stats.frBurst    = zeros(nUnits, nWin);
-stats.frSingle    = zeros(nUnits, nWin);
-stats.pBurst     = zeros(nUnits, nWin);
-stats.bSize     = nan(nUnits, nWin);
-stats.dur       = nan(nUnits, nWin);
-stats.freq      = nan(nUnits, nWin);
-stats.ibi       = nan(nUnits, nWin);
+nWin = size(winCalc, 1);
+if flgPool
+    winGrp = {1 : nWin};
+else
+    winGrp = num2cell(1 : nWin);
+end
+nCol = numel(winGrp);
+
+% Initialize output matrices [nUnits x nCol]
+stats.bN       = zeros(nUnits, nCol);
+stats.br       = zeros(nUnits, nCol);
+stats.fr       = zeros(nUnits, nCol);
+stats.frBurst  = zeros(nUnits, nCol);
+stats.frSingle = zeros(nUnits, nCol);
+stats.pBurst   = zeros(nUnits, nCol);
+stats.bSize    = nan(nUnits, nCol);
+stats.dur      = nan(nUnits, nCol);
+stats.freq     = nan(nUnits, nCol);
+stats.ibi      = nan(nUnits, nCol);
 
 % Info
 stats.info.input   = p.Results;
 stats.info.winCalc = winCalc;
+stats.info.flgPool = flgPool;
 
 
 %% ========================================================================
 %  COMPUTE LOOP
 %  ========================================================================
 
-for iUnit = 1:nUnits
+for iUnit = 1 : nUnits
 
     % Access burst properties
     times = burst.times{iUnit};
@@ -98,9 +136,8 @@ for iUnit = 1:nUnits
     dur   = burst.dur{iUnit};
     freq  = burst.freq{iUnit};
     ibi   = burst.ibi{iUnit};
-    st = spktimes{iUnit};
+    st    = spktimes{iUnit};
 
-    % Count bursts fully contained in window.
     if isempty(times)
         bStart = [];
         bEnd   = [];
@@ -109,55 +146,61 @@ for iUnit = 1:nUnits
         bEnd   = times(:, 2);
     end
 
-    for iWin = 1:nWin
-        wStart = winCalc(iWin, 1);
-        wEnd   = winCalc(iWin, 2);
-        wDur   = wEnd - wStart;
+    for iCol = 1 : nCol
 
-        % Count Bursts Fully Contained in Window
-        bIdx = (bStart >= wStart) & (bEnd <= wEnd);
+        win   = winCalc(winGrp{iCol}, :);
+        wDur  = sum(win(:, 2) - win(:, 1));
+        edges = reshape(win', [], 1);
+
+        % membership by edge search: an odd bin index means inside a window
+        % of this condition, an even one the gap between two
+        iB1 = discretize(bStart, edges);
+        iB2 = discretize(bEnd, edges);
+        bIdx = ~isnan(iB1) & iB1 == iB2 & mod(iB1, 2) == 1;
 
         % Floor of detection (1 event per window)
         c = 1 / wDur;
 
-        % Count & Event Rate
+        % Count & event rate
         nb = sum(bIdx);
-        stats.bN(iUnit, iWin) = nb;
-        stats.br(iUnit, iWin) = (nb / wDur) + c;
+        stats.bN(iUnit, iCol) = nb;
+        stats.br(iUnit, iCol) = (nb / wDur) + c;
 
-        % Structural Means
+        % Structural means
         if nb > 0
-            stats.bSize(iUnit, iWin)   = mean(nBspk(bIdx));
-            stats.dur(iUnit, iWin)     = mean(dur(bIdx));
-            stats.freq(iUnit, iWin)    = mean(freq(bIdx));
-            stats.ibi(iUnit, iWin)     = mean(ibi(bIdx), 'omitnan');
+            stats.bSize(iUnit, iCol) = mean(nBspk(bIdx));
+            stats.dur(iUnit, iCol)   = mean(dur(bIdx));
+            stats.freq(iUnit, iCol)  = mean(freq(bIdx));
+
+            % the preceding burst must share the window, else the gap
+            % crosses time this condition excludes
+            iPrev = [NaN; iB1(1 : end - 1)];
+            ibiIdx = bIdx & iPrev == iB1;
+            stats.ibi(iUnit, iCol) = mean(ibi(ibiIdx), 'omitnan');
         end
 
-        % Firing Rates & Partitioning
-        % Spikes in window
-        stIdx = (st >= wStart) & (st <= wEnd);
-        nst = sum(stIdx);
+        % Firing rates & partitioning
+        iS = discretize(st, edges);
+        nst = sum(~isnan(iS) & mod(iS, 2) == 1);
 
         frRawTot = nst / wDur;
-        stats.fr(iUnit, iWin) = frRawTot + c;
+        stats.fr(iUnit, iCol) = frRawTot + c;
 
         if nst > 0
-            % Count spikes from bursts fully contained in window
-            % Since burst is fully contained, all its spikes are in window.
+            % a burst is wholly inside the window, so all of its spikes are
             bSpks = sum(nBspk(bIdx));
             frBspk = bSpks / wDur;
 
-            stats.frBurst(iUnit, iWin) = frBspk + c;
-            stats.pBurst(iUnit, iWin)  = bSpks / nst;
+            stats.frBurst(iUnit, iCol) = frBspk + c;
+            stats.pBurst(iUnit, iCol)  = bSpks / nst;
         else
             frBspk = 0;
-            stats.frBurst(iUnit, iWin) = 0 + c;
-            stats.pBurst(iUnit, iWin)  = NaN;
+            stats.frBurst(iUnit, iCol) = 0 + c;
+            stats.pBurst(iUnit, iCol)  = NaN;
         end
 
-        % Single Spike Rate
-        stats.frSingle(iUnit, iWin) = (frRawTot - frBspk) + c;
-
+        % Single spike rate
+        stats.frSingle(iUnit, iCol) = (frRawTot - frBspk) + c;
     end
 end
 
@@ -169,6 +212,7 @@ end
 if flgSave
     [~, basename] = fileparts(basepath);
     fname = fullfile(basepath, [basename, '.burstStats.mat']);
+    backup_file(fname);
     save(fname, 'stats');
 end
 

@@ -137,14 +137,14 @@ for ifile = 1 : nfiles
     [~, basename] = fileparts(basepath);
 
     % time stamps
-    tstamps = v(ifile).fr.tstamps;
+    tstamps = v(ifile).fr.t;
 
     clear drft2
     for sunit = 1 : 2       % rs / fs
 
         % select units
         unitIdx = find(v(ifile).units.clean(sunit, :));
-        fr_mat = v(ifile).fr.strd(unitIdx, :);
+        fr_mat = v(ifile).fr.rate(unitIdx, :);
         nunits = length(unitIdx);
 
         % calc drift for increasing number of units

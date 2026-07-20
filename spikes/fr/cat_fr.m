@@ -40,7 +40,7 @@ binsize = v(1).fr.info.binsize;
 recIdx_last = round(max([1, seconds(t_recStart(end) - t_expStart) / binsize]));
 
 % Determine experiment end from the length of the fr of the last file
-[~, nBins_last] = size(v(end).fr.strd);
+[~, nBins_last] = size(v(end).fr.rate);
 expLen = recIdx_last + nBins_last - 1;
 
 %% ========================================================================
@@ -51,7 +51,7 @@ frMat_chunks = {};
 
 for iPath = 1 : nPaths
 
-    currFr = v(iPath).fr.strd; % Assumes [nUnits x nBins]
+    currFr = v(iPath).fr.rate; % Assumes [nUnits x nBins]
     [nUnits, nBinsRec] = size(currFr);
 
     % Calculate Start Index for this session in the global matrix

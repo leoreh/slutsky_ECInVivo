@@ -3,9 +3,9 @@
 
 
 %% ========================================================================
-%  CAG:MCU-KO - METRICS (st & bursts)
+%  CAG-MCU-KO - METRICS (st & bursts)
 %  ========================================================================
-% Three MCU-KO recordings (CAG cohort, 'ra' path key; TDT, fs ~24.4 kHz).
+% Five MCU-KO recordings (CAG cohort, 'ra' path key; TDT, fs ~24.4 kHz).
 % Spike timing metrics, bursts and burst stats, computed with the same params
 % as the wt / mcu pipeline (see mcu_wrapper). Unit classification is handled
 % separately in the next section.
@@ -113,33 +113,22 @@ tblUnit = utypes_classify('basepaths', basepaths, 'fetSelect', fetSelect, ...
 
 
 %% ========================================================================
-%  CAG:MCU-KO - BURSTINESS COMPARISON
+%  CAG-MCU-KO - BURSTINESS COMPARISON
 %  ========================================================================
-% Compare baseline burstiness of the three CAG:MCU-KO mice against the wt and
-% mcu baseline groups. RS units only; CAG:MCU-KO is kept as its own group.
+% Compare baseline burstiness of the CAG-MCU-KO mice against the wt and mcu
+% baseline groups. The cohort is registered in mcu_cfg (cfg.miceCAG), so
+% mcu_tblVivo labels the genotypes itself - no post hoc addcats.
 
-% CAG:MCU-KO group
-basepaths = mcu_basepaths('ra');
-tblCag = mcu_tblVivo('basepaths', basepaths, 'presets', {'burst'}, ...
-    'flgClean', false);
-tblCag.genotype = addcats(tblCag.genotype, {'CAG:MCU-KO'});
-tblCag.genotype(:) = 'CAG:MCU-KO';
+basepaths = mcu_basepaths('bsl3');
+tblVivo = mcu_tblVivo('basepaths', basepaths, 'presets', {'burst'}, ...
+    'flgClean', true);
 
-% Reference baseline groups (wt and mcu)
-basepathsRef = [mcu_basepaths('wt_bsl'), mcu_basepaths('mcu_bsl')];
-tblRef = mcu_tblVivo('basepaths', basepathsRef, 'presets', {'burst'}, ...
-    'flgClean', false);
-tblRef.genotype = addcats(tblRef.genotype, {'CAG:MCU-KO'});
-
-% Combine
-tblBrst = [tblRef; tblCag];
-tblBrst.genotype = reordercats(tblBrst.genotype, ...
-    {'Control', 'MCU-KO', 'CAG:MCU-KO'});
+frml = 'pBurst ~ genotype * fr + (1|sbjID)';
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblVivo, frml, 'dist', 'logit-normal');
 
 % Compare (switch yVar in the GUI for frBurst, br, bSize, etc.)
-guiTbl_bar(tblBrst, 'yVar', 'pBurst', 'xVar', 'genotype', 'grpVar', 'unitType');
+guiTbl_bar(tblVivo, 'yVar', 'pBurst', 'xVar', 'genotype', 'grpVar', 'unitType');
 
 
-
-
-
+tblVivo = mcu_tblVivo('basepaths', basepaths, 'presets', {'spkStates'}, ...
+    'flgClean', true);

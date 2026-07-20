@@ -36,10 +36,10 @@ for g = 1:numel(mice_ids)
         binsize = 60; % sec
         hour = 60^2 / binsize;
         winBL = [1 Inf];
-        fr = calc_fr(spktms, 'graphics', false, ...
-            'binsize', binsize, 'saveVar', false, 'smet', 'MA', 'winBL', winBL);
+        fr = spk_rate(spktms, ...
+            'binsize', binsize, 'flgSave', false, 'smet', 'MA', 'winBL', winBL);
 
-        rates = fr.strd;
+        rates = fr.rate;
         rates = rates(units.fs',:);
 
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

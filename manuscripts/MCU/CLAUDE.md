@@ -16,7 +16,15 @@ In vivo stats are `[nUnits x nDays]` across BSL, BAC_ON, BAC1, BAC2, BAC3, BAC_O
 
 MEA presets: `steadyState` (ss_* columns from idxCol=3), `acute` (ac_* from idxCol=2), `time` (t_* dynamics aligned to perturbation onset via `mea_tAlign`), `spktimes` (raw spike + burst times), `frNet` (dim, mcc, funcon, funcon_fish from `frNet.corr`), `rcv` (full recovery metrics: rcvBsl, rcvGain, rcvWork, rcvDiff, pertDepth, spkDfct, uPert, uRcv).
 
-In vivo presets: `swv` (waveform metrics), `burst` (burst stats matching MEA fields), `spktimes`, `prc` (phase-response curve), `frNet`, `rippSpks` (per-unit SWR spike metrics — frRipp, frMod, pFire, com, asym, rankMean), `ripp` (per-event SWR properties; note this REPLACES varMap wholesale), `rippMaps` (event-aligned LFP and PETHs), `rippStates` (rate by brain state), `acg` (narrow + wide autocorrelograms).
+In vivo presets: `swv` (waveform metrics), `burst` (burst stats matching MEA fields), `spktimes`, `prc` (phase-response curve), `frNet`, `rippSpks` (per-unit SWR spike metrics — frRipp, frMod, pFire, com, asym, rankMean), `ripp` (per-event SWR properties; note this REPLACES varMap wholesale), `rippMaps` (event-aligned LFP and PETHs), `rippStates` (rate by brain state), `acg` (narrow + wide autocorrelograms), `spkStates` (per-unit metrics split by vigilance state; REPLACES varMap wholesale).
+
+## State-conditioned spiking
+
+Vigilance state is a *row* factor, never a trailing matrix dimension. A metric function takes one interval set `bouts [n x 2]` and returns `[nUnits x 1]` per field; `spk_byCond(fcn, bouts, lbls)` maps it over labelled interval sets and stacks a long table with `uid` and `state` columns. The same call takes time chunks or drug epochs — only `bouts`/`lbls` change.
+
+`spk_states(basepath)` is the per-session producer. It writes `<basename>.stStates.mat` (ACG/ISI metrics from `spktimes_metrics`) and `<basename>.brstStates.mat` (rate/burst metrics from `burst_stats` with `flgPool=true`) as separate files, so each family is computed and loaded independently. Both share the row order (unit × state, state-major), which is why the `spkStates` preset maps them into one varMap without a join; `mcu_tblVivo` asserts the keys agree and rebuilds `unitID` from `uid` so `(1|unitID)` still groups states of the same unit. `ss.info.names` runs one longer than `ss.bouts.times` (trailing `BIN`), and `spk_states` truncates it. Every row carries `nSpks` and `durState` — REM bouts are short, so filter on exposure before reading a state effect.
+
+Segment awareness lives in the metric, not the caller: ISIs never cross a bout, and ACG lags are divided by `nEff(tau)`, the count of spikes with room for a partner at that lag. Restricting spikes and then calling `diff` — what the old `bins` argument did — inflated `cv` by up to 3.8x on a state made of short bouts.
 
 Both loaders accept `basepaths` and `v` (pre-loaded) to avoid re-reading disk. `mcu_tblMea` runs outlier removal by default (`flgOtl=true`): drops non-perturbed units (`~uPert`) and then drops units with `|Pearson residual| > 3` from `ss_fr ~ frBurst + frSingle + (1|sbjID)`, fit per-genotype. `mcu_tblVivo` has `flgClean=true` that drops FS + Other unit types and drops BAC_ON/BAC_OFF/WASH days.
 
@@ -24,7 +32,13 @@ Default basepaths come from `mcu_basepaths(queryStr)` — a string-keyed path re
 
 ## Config (mcu_cfg)
 
-Genotype labels `{Control, MCU-KO}` (`cfg.lbl.grp`). Day labels `{BSL, BAC_ON, BAC1, BAC2, BAC3, BAC_OFF, WASH}` (`cfg.lbl.day`). Unit-type labels `{RS, FS, Other}`. Control mice: `lh96, lh100, lh107, lh119, lh122, lh123, lh126, lh142`. MCU-KO mice: `lh132, lh133, lh134, lh136, lh137, lh140`. Core vars always loaded: `{fr, units, st_metrics}`.
+Genotype labels `{Control, MCU-KO, CAG-MCU-KO}` (`cfg.lbl.grp`), one color row each in `cfg.clr.grp`. Day labels `{BSL, BAC_ON, BAC1, BAC2, BAC3, BAC_OFF, WASH}` (`cfg.lbl.day`). Unit-type labels `{RS, FS, Other}`. Control mice (`cfg.miceWT`): `lh96, lh100, lh107, lh119, lh122, lh123, lh126, lh142`. MCU-KO mice (`cfg.miceMCU`): `lh132, lh133, lh134, lh136, lh137, lh140`. CAG-MCU-KO mice (`cfg.miceCAG`): `raMCU1–raMCU5` — acute viral KO under the CAG promotor, baseline recordings only, one session per mouse. Core vars always loaded: `{fr, units, st_metrics}`.
+
+`mcu_geno(sbjID)` is the single subject → genotype mapper (used by `mcu_tblVivo` and `ripp_screen`). It keeps only genotypes actually present and warns on a subject registered in no cohort — that case used to fall through to Control silently, which mislabelled all 165 viral-KO units as controls.
+
+Genotype labels must not contain `:` or `_`. `lme_postHoc` splits coefficient names on `:` (interaction) and `_` (factor_level), so a label carrying either is rendered as a bogus term — the earlier `CAG:MCU-KO` came out as `(Control vs CAG) * MCU-KO` in the supp tables.
+
+The CAG cohort is opt-in, not a default basepath. It has baseline only, so any `~ genotype * day` model including it is rank deficient and `fitlme` hard-errors. Use `mcu_basepaths('bsl3')` (= `wt_bsl + mcu_bsl + ra`) for three-genotype baseline comparisons; `mcu_tblVivo` defaults stay two-genotype so Table S6 keeps working.
 
 ## Analysis stack
 
@@ -55,6 +69,8 @@ The proportional-allocation β ≈ 0.4 reported in Figure 4H and Table S8 Model 
 ## Conventions and gotchas
 
 Log-ratio convention: MATLAB `log` is natural log. Gains are ln ratios: `bGain = log(ss_frBurst / frBurst)`, `sGain = log(ss_frSingle / frSingle)`, `frGain = log(ss_fr / fr)`. `pBurst` is on [0,1] and is logit-transformed before LME entry via `tbl_trans(..., 'logBase', 'logit')`. Stored as `pBurst_trans` alongside the raw value.
+
+Empty categorical levels. `fitlme` / `fitglme` reject a fixed-effect predictor holding a declared-but-absent level with `design matrix X must be of full column rank` — the usual trigger is subsetting a table (`tbl(tbl.day == 'BAC3', :)`). `lme_analyse` now calls `removecats` on every categorical model variable after truncating the table. Levels that are present are untouched, and grouping variables fit identically with or without empty levels (verified: same logLik, same estimates), so this only removes a failure mode. Tables built outside `lme_analyse` still need their own `removecats`.
 
 Auto-transform risk. `lme_analyse` applies log10 to any numeric predictor with `skewness > 2` (default `skewThr`) and z-scores every continuous predictor unless `flgStnd=false`. If you pre-compute a log-transformed predictor and then pass it, inspect `lmeInfo.transParams.varsTrans.<var>.logBase` to confirm no double-log. Pass a `transTemplate` to override.
 

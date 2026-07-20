@@ -9,6 +9,10 @@ function chk = gui_filterPanel(parent, cats, cb, varargin)
 %
 %   Name-value:
 %       'InitVal'  logical/numeric vector of initial checked states {all true}
+%
+%   Sizing: a checkbox row is 22 px with 2 px spacing inside 4 px of padding, so
+%   a container of 24 * nCats + 4 px shows the whole list without scrolling. A
+%   caller that knows its category count can size its panel from that.
 
 p = inputParser;
 addParameter(p, 'InitVal', [], @(x) isempty(x) || islogical(x) || isnumeric(x));

@@ -10,7 +10,7 @@ function res = ripp_screen(varargin)
 %       First, a compact quality comparison per method: how many events are
 %       accepted, their rate, the whitened ripple frequency, and the calibrated
 %       threshold. Second, a per-event table of the ACCEPTED NREM events tagged
-%       by genotype (Control, MCU-KO, CAG:MCU-KO), fit with the manuscript's LME
+%       by genotype (mcu_geno: Control, MCU-KO, CAG-MCU-KO), fit with the LME
 %       (amp/freq/dur ~ genotype) per method and handed to guiTbl_bar. Nothing is
 %       written to a data folder; the results struct is saved once to the
 %       manuscript Results directory. Feed res to ripp_screenGui to eyeball where
@@ -35,7 +35,7 @@ function res = ripp_screen(varargin)
 %
 %   DEPENDENCIES:
 %       mcu_basepaths, mcu_cfg, basepaths2vars, ripp_methods, ripp_detect,
-%       lme_analyse, guiTbl_bar.
+%       ripp_gate, lme_analyse, guiTbl_bar.
 %
 %   HISTORY:
 %       260716 detection-review parameter screen.
@@ -64,7 +64,6 @@ flgLme    = p.Results.flgLme;
 flgPlot   = p.Results.flgPlot;
 verbose   = p.Results.verbose;
 
-cfg = mcu_cfg;
 if isempty(basepaths)
     basepaths = [mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl'), ...
         mcu_basepaths('ra')];
@@ -75,7 +74,8 @@ if isempty(savepath)
 end
 nMice = numel(basepaths);
 nM    = numel(methods);
-genoLvl = {'Control', 'MCU-KO', 'CAG:MCU-KO'};
+cfg = mcu_cfg;
+genoLvl = cfg.lbl.grp;
 
 %% ========================================================================
 %  DETECT (mice x methods; each session loaded once, signal reused)
@@ -93,7 +93,7 @@ meta = repmat(emptyMeta(), nMice, nM);
 for iMouse = 1:nMice
     [~, basename] = fileparts(basepaths{iMouse});
     sbjID{iMouse} = strtok(basename, '_');
-    geno{iMouse}  = assignGeno(sbjID{iMouse}, cfg);
+    geno{iMouse}  = char(mcu_geno(sbjID(iMouse)));
     if verbose
         fprintf('[SCREEN] mouse %d/%d: %s (%s)\n', iMouse, nMice, ...
             sbjID{iMouse}, geno{iMouse});
@@ -123,6 +123,9 @@ for iMouse = 1:nMice
             continue;
         end
         if ~isfield(sigCache, key), sigCache.(key) = aux.sig; end
+
+        % apply the method's QA gate (detect now seeds accepted all-true)
+        ripp.accepted = ripp_gate(ripp, met.qa);
 
         % absolute time so ripp_screenGui overlays on the session
         ripp.times    = ripp.times + win(1);
@@ -169,7 +172,8 @@ for iMouse = 1:nMice
 end
 
 tbl = table(amp, dur, freq, freqPeak, peakProm, gain, ...
-    categorical(methodC), categorical(sbjC), categorical(genoC, genoLvl), ...
+    categorical(methodC), categorical(sbjC), ...
+    removecats(categorical(genoC, genoLvl)), ...
     'VariableNames', {'amp', 'dur', 'freq', 'freqPeak', 'peakProm', 'gain', ...
     'method', 'sbjID', 'genotype'});
 res.tbl = tbl;
@@ -266,18 +270,6 @@ function m = emptyMeta()
 % a meta row for a mouse that was skipped or failed
 m = struct('name', '', 'rippCh', [], 'nAcc', NaN, 'rateHz', NaN, ...
     'thrPk', NaN, 'chi', NaN);
-end
-
-% -------------------------------------------------------------------------
-function g = assignGeno(sbjID, cfg)
-% genotype from subject id: raMCU = acute viral KO, else the manuscript split
-if startsWith(sbjID, 'raMCU')
-    g = 'CAG:MCU-KO';
-elseif ismember(sbjID, cfg.miceMCU)
-    g = 'MCU-KO';
-else
-    g = 'Control';
-end
 end
 
 % -------------------------------------------------------------------------

@@ -55,8 +55,8 @@ for ifile = 1 : nfiles
         timepnt = Inf;
     end
     winBL = [0 timepnt];
-    fr = calc_fr(spikes.times, 'basepath', basepath,...
-        'graphics', true, 'binsize', 60, 'saveVar', true, 'forceA', true,...
+    fr = spk_rate(spikes.times, 'basepath', basepath,...
+        'binsize', 60, 'flgSave', true,...
         'smet', 'none', 'winBL', winBL, 'winCalc', [0, Inf]);
 
 
@@ -66,8 +66,8 @@ for ifile = 1 : nfiles
         'vis', 'on', 'spkgrp', spkgrp);
 
     % spike timing metrics
-    st = spktimes_metrics('spikes', spikes, 'sunits', [],...
-        'bins', [0 Inf], 'forceA', true, 'saveVar', true, 'fullA', false);
+    st = spktimes_metrics(spikes.times, [0 Inf],...
+        'basepath', basepath, 'flgSave', true);
 
 
 end

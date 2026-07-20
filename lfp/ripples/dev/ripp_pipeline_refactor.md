@@ -124,12 +124,68 @@ ED keeps its own (removal-based) flow; only verify it still runs.
   accepted count turns over, so the margin is kept small. `ripp_detect` picks up
   the default automatically, so `.spkGain`/`accepted` now include the shoulder.
 - `ripp_gateFig` (static, buggy rho panel, re-ran the whole detect chain,
-  unclear counts) replaced by `ripp_gateGui`: an interactive gate built on
-  `guiTbl_xy` (kept vs removed mean +/- spread), live MUA-gain / EMG / prominence
-  threshold fields, and a running kept/removed count. Takes the in-memory
-  `[ripp, aux]` from `ripp_detect` (the saved `.rippMaps.mat` holds accepted
-  events only, so a kept-vs-removed view needs the all-events `aux.rippMaps`),
-  else detects once. Writes nothing. Verified: checkcode clean, headless build +
-  threshold change on lh100. `.gainThr` in `ripp_methods` now points here.
+  unclear counts) replaced by `ripp_gateGui`: an interactive gate on `guiTbl_xy`
+  (kept vs removed mean +/- spread), live MUA-gain / EMG / prominence thresholds,
+  running counts. [Superseded 260719c: folded into `ripp_curate`, which loads
+  `ripp.mat` + reloads the signal from disk for the waveform view; `ripp_gateGui`
+  and the in-memory `aux.rippMaps` path are gone.]
 - `.peakProm` (whitened ripple-band peak height above the 1/f floor, in
   `ripp_params`) is a reported property and a GUI knob, not part of `accepted`.
+
+## Addendum (260719c) — detect / curate / analyze split; evt_qa retired from ripples
+
+Post-detection bulk curation drove a clean three-stage split, one `met.qa` filter
+spec throughout:
+- `ripp_detect` (stage 1): signal -> events + every per-event feature (params,
+  maps, emg, spkGain, state label). Seeds `accepted` all-true; makes NO QA
+  decision and runs no spikes.
+- `ripp_gate(ripp, qa)`: the QA engine - state membership + per-metric `[lo hi]`
+  ranges -> mask (permissive NaN/empty). Absorbs `evt_qa`'s ripple role; verified
+  identical to `evt_qa` on lh100 (0/9371 disagree).
+- `ripp_curate(basepath)` (stage 2): headless (`flgGui=false`) applies `met.qa`,
+  saves `accepted` + `info.qa`, rebuilds `rippStates` (the automatic gate). GUI
+  seeds from the same spec - state checkboxes + metric thresholds recompute the
+  kept/removed split live (per-state counts + kept-vs-removed waveform); Save
+  backs up then writes. Replaces `ripp_gateFig`/`ripp_gateGui`.
+- `ripp_analyze(basepath)` (stage 3): `evt_spks` + phase + accepted-subset maps on
+  the accepted events ONLY (aux fast-path in batch, disk reload standalone). Runs
+  post-curation, so no product is stale; folds `.spks` into `ripp.mat`.
+- `ripp_wrapper`: thin chain detect -> curate(headless) -> analyze for batch;
+  `flgCurate` opens the GUI and stops (curate, then run `ripp_analyze`). Backs up
+  `ripp.mat` before a forced re-detect. Same signature; `mcu_ripples` unaffected.
+- `met.qa` = {`states` [2 3 4], `ranges` .emg [-Inf 2] .spkGain [0 Inf]};
+  `thrEmg`/`gainThr`/`nremOnly` retired. `ripp_screen` applies `ripp_gate` per method.
+
+`evt_qa` retired from the ripple path (kept only as ED's removal filter until ED is
+migrated). No `acceptedAuto` field - "reset to default" re-applies `met.qa`
+(deterministic); backups cover accidents. State filter is categorical, so an
+under-scored mouse (empty valid states) rejects all by state unless `qa.states=[]`
+- the honest behaviour the old `evt_qa` empty-inTimes=keep-all masked.
+
+Verified on lh100 (win 3 h): detect 8905/all-true -> curate 1670 (WAKE 0/4889
+excluded) -> analyze on 1670, whole chain 16 s; `rippMaps`=1670 rows, `rippStates`
+from mask; GUI builds with per-state counts + waveform; disk re-gate 1670 -> 647
+(NREM, gain>=1) -> 1670 (reset). checkcode clean.
+
+## Follow-ups (post adversarial review + user testing)
+
+Adversarial review (18 agents, find->verify) + user GUI testing drove:
+- **Fail-safe products.** Re-curation left accepted-aligned products (`.spks`,
+  rippMaps/rippSpks/phase) stale vs the new mask. Now `ripp_curate` strips `.spks`
+  and calls `ripp_invalidate` (new shared helper) to delete the stale products on
+  a mask change; a fresh `ripp_detect` also invalidates (flgStates=true). So the
+  disk state is always consistent: after detect only `ripp.mat`; after curate
+  `+ rippStates`; after analyze the rest. The batch skips curate's invalidation
+  (`flgInvalidate=false`) since analyze overwrites next. Verified on lh100.
+- **`(unscored)` state control.** The categorical state filter dropped
+  <undefined>-state events (peak in an unscored gap) even with all named states
+  checked (lh107: 1570; lh100: 1313). The GUI now shows an explicit "(unscored)"
+  checkbox + count; `qa.unscored` (ripp_gate) keeps those events. All-unchecked
+  still rejects all by state (sentinel).
+- **guiTbl_xy popup.** Its init ran `onUpdatePlot` before the Group By filter was
+  populated, firing a spurious "select a category" alert on every build - which
+  `ripp_curate`'s recreate-on-change re-triggered constantly. Fixed at the root:
+  populate both filter panels before the first plot (helps every caller).
+- **`ripp_wrapper` `flgDetectOnly`** (+ `mcu_ripples` staged: loop1 detect all,
+  loop2 curate+guiPath per mouse, loop3 analyze all) + `ripp_analyze` backup +
+  dead `aux.rippMaps`/bout fields removed.

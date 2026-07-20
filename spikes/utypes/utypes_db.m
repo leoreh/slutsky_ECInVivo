@@ -105,9 +105,9 @@ if flgAnalyze
 
         % firing rate
         if isempty(v(iPath).fr) || ~isempty(setdiff(fieldnames(v(refIdx).fr), fieldnames(v(iPath).fr)))
-            fr = calc_fr(v(iPath).spikes.times, 'basepath', basepath,...
-                'graphics', false, 'binsize', 60, 'saveVar', flgSave,...
-                'smet', 'GK', 'winBL', [0, Inf], 'winCalc', [0, Inf], 'forceA', true);
+            fr = spk_rate(v(iPath).spikes.times, 'basepath', basepath,...
+                'binsize', 60, 'flgSave', flgSave,...
+                'smet', 'GK', 'winBL', [0, Inf], 'winCalc', [0, Inf]);
         end
 
         % waveform metrices
@@ -117,8 +117,8 @@ if flgAnalyze
 
         % Spike timing metrics
         if isempty(v(iPath).st) || ~isempty(setdiff(fieldnames(v(refIdx).st), fieldnames(v(iPath).st)))
-            st = spktimes_metrics('spktimes', v(iPath).spikes.times, 'sunits', [],...
-                'bins', {[0, Inf]}, 'flgForce', true, 'flgSave', flgSave, 'flgAll', false);
+            st = spktimes_metrics(v(iPath).spikes.times, [0, Inf],...
+                'basepath', basepath, 'flgSave', flgSave);
         end
 
     end

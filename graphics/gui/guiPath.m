@@ -18,7 +18,9 @@ function [hFig, varMap, guiMap] = guiPath(basepath, varargin)
 %           arrangement only, not the target.
 %
 % Panels stack in two regions separated by a thin divider:
-%       Top (wide)      full-session overview; drawn once, x-range zoomable.
+%       Top (wide)      context overview; drawn once over the session, then
+%                       panned as a fixed-width window that follows t0 - zoom
+%                       sets the width, full width shows the whole session.
 %       Bottom (narrow) a window around the cursor t0; redrawn as t0 moves.
 % All panels share one tiledlayout, so every plot box shares a left gutter and
 % width. The Top prints its x-axis just above the divider, the Bottom at the
@@ -134,6 +136,18 @@ function [hFig, varMap, guiMap] = guiPath(basepath, varargin)
 %                   by guiPath_preset; Save writes the live arrangement as a
 %                   new one (guiPath_presetSave). A preset is named by its file
 %                   token ('ripp'), which is also what auto-detection matches.
+% - 260720b         shift+scroll / shift+/-/0 work over the Top again: the guard
+%                   meant to skip a Bottom overlay's missing axis used isvalid,
+%                   which is TRUE for a gobjects placeholder, so srcAtPointer hit
+%                   getpixelposition on it and threw for any pointer position not
+%                   already matched in the Bottom - i.e. the whole Top. One
+%                   predicate (hasAx) now owns that test.
+% - 260720          the Top follows t0 like the Bottom: it is a fixed-width
+%                   window (zoom sets the width; full width is the session
+%                   overview) that re-centres on the event on every move - so
+%                   accept / reject and arrow-stepping keep its zoom and hold the
+%                   cursor in view (updateMarker pans it, no redraw). The Window
+%                   box + X-units both target the active (last-clicked) region.
 
 %% ========================================================================
 %  ARGUMENTS
@@ -216,6 +230,8 @@ d.modShift   = false;         % Shift held? (tracked for shift+scroll amplitude)
 d.activeSrc  = '';            % last-clicked panel source (shift+/-/0 target)
 d.win        = guiMap.win;
 d.winDefault = guiMap.win;
+d.winWide    = [];             % Top follow-window width [s]; set once Tend is known
+d.navAccepted = true;          % events mode: step only through accepted events
 d.saveFcn    = [];
 d = applyConfig(d, config);    % sets inputs, events, panels, saveFcn, t0, win
 
@@ -286,6 +302,8 @@ d.hT0 = uieditfield(gVF, 'numeric', 'Limits', [0, Inf], 'ValueDisplayFormat', '%
     'Value', d.t0, 'ValueChangedFcn', @onEditT0);
 d.hT0.Layout.Row = 2; d.hT0.Layout.Column = 1;
 d.hWin = uieditfield(gVF, 'numeric', 'Limits', [0.02, Inf], 'Value', d.win, ...
+    'ValueDisplayFormat', '%.2f', ...
+    'Tooltip', 'Width of the active region''s window (Top or Bottom)', ...
     'ValueChangedFcn', @onEditWin);
 d.hWin.Layout.Row = 2; d.hWin.Layout.Column = 2;
 lblU = uilabel(gVF, 'Text', 'X units', 'FontWeight', 'bold');
@@ -314,6 +332,7 @@ d = buildPlot(d);
 
 hFig.UserData = d;
 updateTitle(hFig);
+syncWinField(d);               % Window box shows the active region's width
 
 %% ========================================================================
 %  INITIAL RENDER (Bottom first for faster reveal, then Top overview)
@@ -379,7 +398,7 @@ hFig.Visible = vis;
         refreshCurateDD(hFig);
         data.hPanelsLbl.Text = ['Panels (' regDisp(data.cfgRegion) ')'];
         data.hUnit.Value     = data.unit.(data.cfgRegion);
-        data.hWin.Value      = data.win;
+        syncWinField(data);
         rebuildPlot();
         populateSrc(hFig);
         refreshEvent(hFig);
@@ -451,8 +470,13 @@ hFig.Visible = vis;
         else
             api = struct('prev', @() navStep(-1), 'next', @() navStep(1), ...
                 'accept', @() setAccept(true), 'reject', @() setAccept(false), ...
-                'save', @() onSave(), 'setIdx', @(v) setIdx(v));
+                'save', @() onSave(), 'setIdx', @(v) setIdx(v), ...
+                'navToggle', @(tf) onNavToggle(tf));
             data.ev = gui_eventPanel(data.gActions, api);
+            if isfield(data.ev, 'navOnly') && ~isempty(data.ev.navOnly) && ...
+                    isvalid(data.ev.navOnly)
+                data.ev.navOnly.Value = data.navAccepted;   % keep the toggle in sync
+            end
         end
     end
 
@@ -747,11 +771,7 @@ hFig.Visible = vis;
         data = fig.UserData;
         if isempty(data.narrowP), return; end
         xf = unitSec(data.unit.narrow);
-        ws = data.t0 - data.win / 2;
-        we = data.t0 + data.win / 2;
-        if ws < 0,            we = we - ws;              ws = 0; end
-        if we > data.Tend_s,  ws = ws - (we - data.Tend_s); we = data.Tend_s; end
-        ws = max(0, ws);
+        [ws, we] = winBounds(data.t0, data.win, data.Tend_s);
         for i = 1:numel(data.narrowP)
             pn = data.narrowP(i);
             if isOverlay(pn, data.inputs), continue; end   % overlays draw below, no tile
@@ -786,7 +806,9 @@ hFig.Visible = vis;
     end
 
     function updateMarker(fig)
-        % move the Top cursor line (t0) + window band (the Bottom window)
+        % move the Top cursor line (t0) + window band (the Bottom window), and
+        % pan the Top so it follows t0 at its own width (a view change, not a
+        % redraw; a full width leaves the whole-session overview in place)
         data = fig.UserData;
         xf = unitSec(data.unit.wide);
         c  = data.t0 / xf;
@@ -797,6 +819,10 @@ hFig.Visible = vis;
             if isvalid(data.hCenter(k)), data.hCenter(k).Value = c;     end
         end
         if isfield(data, 'hT0') && isvalid(data.hT0), data.hT0.Value = data.t0; end
+        [tws, twe] = winBounds(data.t0, topWidth(data), data.Tend_s);
+        for k = 1:numel(data.axWide)
+            if isvalid(data.axWide(k)), xlim(data.axWide(k), [tws, twe] / xf); end
+        end
     end
 
     function refreshEvent(fig)
@@ -818,7 +844,11 @@ hFig.Visible = vis;
             data.ev.refresh(0, 0, false, '');
             return;
         end
-        data.ev.refresh(data.currIdx, data.nEvents, data.accepted(data.currIdx), ...
+        % index / total count within the navigable set (accepted-only or all)
+        sel = navIndices(data);
+        pos = find(sel == data.currIdx, 1);
+        if isempty(pos), pos = min(data.currIdx, numel(sel)); end
+        data.ev.refresh(pos, numel(sel), data.accepted(data.currIdx), ...
             evtStatus(data));
     end
 
@@ -831,18 +861,38 @@ hFig.Visible = vis;
         % current view t0. When t0 sits on an event this is simply +/-1; after a
         % free click it continues from wherever the view now is. Events are
         % chronological (peakTime ascending), so index order tracks time order.
+        % With "Accepted only" on, rejected events are skipped (navIndices).
         data = hFig.UserData;
         if ~data.hasEvents || data.nEvents == 0, return; end
-        pk = data.ed.peakTime;
+        pk  = data.ed.peakTime;
+        sel = navIndices(data);
+        if isempty(sel), return; end
         if step > 0
-            idx = find(pk > data.t0, 1, 'first');
-            if isempty(idx), idx = data.nEvents; end        % already past the last
+            cand = sel(pk(sel) > data.t0);
+            if isempty(cand), idx = sel(end); else, idx = cand(1); end
         else
-            idx = find(pk < data.t0, 1, 'last');
-            if isempty(idx), idx = 1; end                   % already before the first
+            cand = sel(pk(sel) < data.t0);
+            if isempty(cand), idx = sel(1); else, idx = cand(end); end
         end
         data.currIdx = idx;
         data.t0 = pk(idx);
+        hFig.UserData = data;
+        renderNarrow(hFig); updateMarker(hFig); refreshEvent(hFig);
+    end
+
+    function onNavToggle(tf)
+        % "Accepted only" checkbox: restrict stepping to accepted events. Snap the
+        % cursor onto the navigable set so the view is never left on a skipped one.
+        data = hFig.UserData;
+        data.navAccepted = logical(tf);
+        if strcmp(data.mode, 'events') && data.nEvents > 0
+            sel = navIndices(data);
+            if ~isempty(sel) && ~ismember(data.currIdx, sel)
+                [~, k] = min(abs(sel - data.currIdx));
+                data.currIdx = sel(k);
+                data.t0 = data.ed.peakTime(data.currIdx);
+            end
+        end
         hFig.UserData = data;
         renderNarrow(hFig); updateMarker(hFig); refreshEvent(hFig);
     end
@@ -858,9 +908,14 @@ hFig.Visible = vis;
     end
 
     function setIdx(v)
+        % jump to the v-th navigable event (v counts within the accepted set when
+        % "Accepted only" is on, else the full list).
         data = hFig.UserData;
         if ~data.hasEvents || data.nEvents == 0, return; end
-        data.currIdx = min(max(1, round(v)), data.nEvents);
+        sel = navIndices(data);
+        if isempty(sel), return; end
+        k = min(max(1, round(v)), numel(sel));
+        data.currIdx = sel(k);
         data.t0 = data.ed.peakTime(data.currIdx);
         hFig.UserData = data;
         renderNarrow(hFig); updateMarker(hFig); refreshEvent(hFig);
@@ -874,9 +929,12 @@ hFig.Visible = vis;
         data = hFig.UserData;
         tSec = min(max(0, tSec), data.Tend_s);
         if data.hasEvents && data.nEvents > 0
-            [~, idx] = min(abs(data.ed.peakTime - tSec));
-            data.currIdx = idx;
-            if strcmp(data.mode, 'states'), tSec = data.ed.peakTime(idx); end
+            sel = navIndices(data);
+            if ~isempty(sel)
+                [~, k] = min(abs(data.ed.peakTime(sel) - tSec));
+                data.currIdx = sel(k);
+                if strcmp(data.mode, 'states'), tSec = data.ed.peakTime(data.currIdx); end
+            end
         end
         data.t0 = tSec;
         hFig.UserData = data;
@@ -934,10 +992,17 @@ hFig.Visible = vis;
     end
 
     function onEditWin(src, ~)
+        % set the ACTIVE region's window width: the Top follow-window (winWide)
+        % or the Bottom window (win). Mirrors the per-region X-units dropdown.
         data = hFig.UserData;
-        data.win = max(0.02, src.Value);
-        hFig.UserData = data;
-        renderNarrow(hFig); updateMarker(hFig);
+        w = min(max(0.02, src.Value), data.Tend_s);
+        if strcmp(data.cfgRegion, 'wide')
+            data.winWide = w; hFig.UserData = data;
+            syncWinField(data); updateMarker(hFig);
+        else
+            data.win = w; hFig.UserData = data;
+            syncWinField(data); renderNarrow(hFig); updateMarker(hFig);
+        end
     end
 
     function onUnit(src, ~)
@@ -957,7 +1022,7 @@ hFig.Visible = vis;
 
     function zoomActive(f)
         data = hFig.UserData;
-        if strcmp(data.cfgRegion, 'wide'), zoomTop(f, []); else, zoomWin(f); end
+        if strcmp(data.cfgRegion, 'wide'), zoomTop(f); else, zoomWin(f); end
     end
 
     function resetActive()
@@ -965,40 +1030,39 @@ hFig.Visible = vis;
         if strcmp(data.cfgRegion, 'wide'), resetOverview(); else, resetWin(); end
     end
 
-    function zoomTop(f, centerDisp)
-        % scale the Top x-range by f (f<1 zooms in) about centerDisp (display
-        % units); default centre is t0
+    function zoomTop(f)
+        % scale the Top follow-window WIDTH by f (f<1 zooms in), centred on t0.
+        % The width persists and the Top re-centres on each event (updateMarker),
+        % so a Top zoom is kept across navigation; full width is the overview.
         data = hFig.UserData;
-        if isempty(data.axWide), return; end
-        ax = data.axWide(1);
-        xl = xlim(ax);
-        xf = unitSec(data.unit.wide);
-        if isempty(centerDisp), c = data.t0 / xf; else, c = centerDisp; end
-        if ~isfinite(c) || c < xl(1) || c > xl(2), c = mean(xl); end
-        lo = max(0, c - (c - xl(1)) * f);
-        hi = min(data.Tend_s / xf, c + (xl(2) - c) * f);
-        if hi > lo, xlim(ax, [lo, hi]); end
+        data.winWide = min(max(0.02, topWidth(data) * f), data.Tend_s);
+        hFig.UserData = data;
+        syncWinField(data);
+        updateMarker(hFig);
     end
 
     function zoomWin(f)
         data = hFig.UserData;
         data.win = min(max(0.02, data.win * f), data.Tend_s);
         hFig.UserData = data;
-        data.hWin.Value = data.win;
+        syncWinField(data);
         renderNarrow(hFig); updateMarker(hFig);
     end
 
     function resetOverview()
+        % Top back to the whole-session overview (full width)
         data = hFig.UserData;
-        if isempty(data.axWide), return; end
-        xlim(data.axWide(1), [0, data.Tend_s / unitSec(data.unit.wide)]);
+        data.winWide = data.Tend_s;
+        hFig.UserData = data;
+        syncWinField(data);
+        updateMarker(hFig);
     end
 
     function resetWin()
         data = hFig.UserData;
         data.win = data.winDefault;
         hFig.UserData = data;
-        data.hWin.Value = data.win;
+        syncWinField(data);
         renderNarrow(hFig); updateMarker(hFig);
     end
 
@@ -1085,7 +1149,7 @@ hFig.Visible = vis;
         if ~isempty(data.axNarrow) && pointerOver(data.axNarrow, cp)
             zoomWin(f);
         elseif ~isempty(data.axWide) && pointerOver(data.axWide, cp)
-            zoomTop(f, data.axWide(1).CurrentPoint(1, 1));
+            zoomTop(f);
         end
     end
 
@@ -1208,8 +1272,8 @@ hFig.Visible = vis;
     function setActiveRegion(region)
         % make one region active (set by clicking a panel): update the Panels
         % header + the controls that read the region (the panel list, the
-        % x-unit). Guarded so a click within the already-active region does
-        % nothing (the rebuild is not free).
+        % x-unit, the Window width). Guarded so a click within the already-active
+        % region does nothing (the rebuild is not free).
         data = hFig.UserData;
         if strcmp(data.cfgRegion, region), return; end
         data.cfgRegion = region;
@@ -1217,6 +1281,7 @@ hFig.Visible = vis;
         data.hPanelsLbl.Text = ['Panels (' regDisp(region) ')'];
         populateSrc(hFig);
         data.hUnit.Value = data.unit.(region);
+        syncWinField(data);
     end
 
     % --- panel-list edits: each mutates the active region's panel array, then
@@ -1598,6 +1663,7 @@ if isfield(config, 'winPlot') && ~isempty(config.winPlot)
     d.win = config.winPlot; d.winDefault = config.winPlot;
 end
 d.Tend_s = max(eps, computeTend(d.inputs));
+d.winWide = d.Tend_s;   % Top opens (and re-opens on a preset switch) full-session
 
 % target auto-selects the preset's set ONLY on the first open; a preset switch
 % keeps whatever is being curated (independent of the arrangement)
@@ -1645,6 +1711,11 @@ else
 end
 if ~isfield(d, 'currIdx') || isempty(d.currIdx) || d.currIdx < 1, d.currIdx = 1; end
 d.currIdx = min(d.currIdx, max(1, d.nEvents));
+% with "Accepted only" on, start on an accepted event
+if strcmp(d.mode, 'events') && d.nEvents > 0
+    sel = navIndices(d);
+    if ~isempty(sel) && ~ismember(d.currIdx, sel), d.currIdx = sel(1); end
+end
 end
 
 function ix = curateIx(d)
@@ -1767,16 +1838,24 @@ end
 end
 
 function s = evtStatus(data)
-% status line for the event stepper: the current event's vigilance state. The
-% event list carries .state when it came from ripp / ed (evt_states writes it);
-% a bare times vector does not, and then the line stays empty.
+% status line for the event stepper: whether the current event is accepted.
 s = '';
-if ~isstruct(data.ed) || ~isfield(data.ed, 'state') || isempty(data.ed.state)
+if ~strcmp(data.mode, 'events') || ~data.hasEvents || data.nEvents == 0
     return;
 end
-if data.currIdx < 1 || data.currIdx > numel(data.ed.state), return; end
-v = data.ed.state(data.currIdx);
-if ismissing(v), s = 'State: undefined'; else, s = ['State: ', char(string(v))]; end
+if data.currIdx < 1 || data.currIdx > numel(data.accepted), return; end
+if data.accepted(data.currIdx), s = 'Accepted'; else, s = 'Rejected'; end
+end
+
+function ix = navIndices(data)
+% the event indices navigation may land on: the accepted set when "Accepted
+% only" is on (events mode, a matching mask, at least one accepted), else all.
+if strcmp(data.mode, 'events') && isfield(data, 'navAccepted') && data.navAccepted ...
+        && numel(data.accepted) == data.nEvents && any(data.accepted)
+    ix = find(data.accepted(:));
+else
+    ix = (1:data.nEvents)';
+end
 end
 
 function [labels, epochT, nstates, names, colors] = stateFromData(D)
@@ -2026,13 +2105,22 @@ else
 end
 end
 
+function tf = hasAx(ax)
+% does this panel own a real axis? A Bottom "lines" overlay takes no tile, so its
+% .ax keeps the gobjects placeholder buildPlot initialised it with. isvalid() is
+% TRUE for that placeholder - it is a live MATLAB object, just not a graphics one
+% - so isvalid cannot separate the two and anything that then calls
+% getpixelposition on it throws. isgraphics is the test that actually holds.
+tf = isscalar(ax) && isgraphics(ax);
+end
+
 function src = panelSrcFromAx(data, ax)
 % the source name of the panel drawn into axis ax (either region), '' if none
 src = '';
 for fld = {'wideP', 'narrowP'}
     P = data.(fld{1});
     for i = 1:numel(P)
-        if isvalid(P(i).ax) && P(i).ax == ax, src = P(i).source; return; end
+        if hasAx(P(i).ax) && P(i).ax == ax, src = P(i).source; return; end
     end
 end
 end
@@ -2060,13 +2148,16 @@ end
 end
 
 function src = srcAtPointer(data, cp)
-% the source of the panel (either region) whose pixel rect holds the pointer cp
+% the source of the panel (either region) whose pixel rect holds the pointer cp.
+% The Bottom list is walked first, and it is the one that can hold an overlay
+% with no axis - so a pointer anywhere in the Top only resolves once that entry
+% has been skipped properly (see hasAx).
 src = '';
 for fld = {'narrowP', 'wideP'}
     P = data.(fld{1});
     for i = 1:numel(P)
         ax = P(i).ax;
-        if ~isvalid(ax), continue; end
+        if ~hasAx(ax), continue; end
         r = getpixelposition(ax, true);
         if cp(1) >= r(1) && cp(1) <= r(1) + r(3) && ...
                 cp(2) >= r(2) && cp(2) <= r(2) + r(4)
@@ -2202,6 +2293,38 @@ end
 
 function f = regField(region)
 if strcmp(region, 'wide'), f = 'wideP'; else, f = 'narrowP'; end
+end
+
+function [ws, we] = winBounds(t0, w, Tend)
+% a window of width w centred on t0, shifted to stay within [0, Tend] (so a
+% centred event near an edge keeps the full width). Shared by the Bottom window
+% and the Top follow-window.
+ws = t0 - w / 2;
+we = t0 + w / 2;
+if ws < 0,    we = we - ws;          ws = 0; end
+if we > Tend, ws = ws - (we - Tend); we = Tend; end
+ws = max(0, ws);
+end
+
+function w = topWidth(data)
+% the Top follow-window width [s]: the stored winWide, defaulting to (and never
+% exceeding) the whole session, so the Top is the overview until it is zoomed in.
+w = data.Tend_s;
+if isfield(data, 'winWide') && ~isempty(data.winWide) && isfinite(data.winWide)
+    w = min(data.winWide, data.Tend_s);
+end
+w = max(w, 0.02);
+end
+
+function syncWinField(data)
+% point the Window box at the ACTIVE region's width - the Top follow-window
+% (winWide) or the Bottom window (win) - mirroring how X-units follows the region.
+if ~isfield(data, 'hWin') || ~isvalid(data.hWin), return; end
+if strcmp(data.cfgRegion, 'wide')
+    data.hWin.Value = topWidth(data);
+else
+    data.hWin.Value = data.win;
+end
 end
 
 function xf = unitSec(unit)

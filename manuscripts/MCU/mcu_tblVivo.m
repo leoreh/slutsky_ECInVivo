@@ -13,6 +13,14 @@ function [tbl, basepaths, v, xVec] = mcu_tblVivo(varargin)
 % OUTPUT:
 %   Tbl          (table) Unit table with metadata.
 %
+% GENOTYPE:
+%   Assigned by mcu_geno from the cohort lists in mcu_cfg, so any cohort is
+%   picked up automatically once registered there. The default basepaths
+%   stay Control + MCU-KO on purpose: the viral cohort (mcu_basepaths('ra'),
+%   baseline only) has no BAC days, so including it by default would make
+%   'y ~ genotype * day' rank deficient and fitlme would error. Ask for it
+%   explicitly - mcu_basepaths('bsl3') is the three-genotype baseline set.
+%
 
 %% ========================================================================
 %  ARGUMENTS
@@ -129,7 +137,10 @@ if ismember('ripp', presets)
 end
 
 if ismember('rippMaps', presets)
-    vars = [vars, 'rippMaps'];
+    % rippMaps holds one row per DETECTED event (a detection product, row-
+    % aligned to ripp), so ripp is loaded alongside it and the accepted mask is
+    % applied post-load - the same rule the 'ripp' preset follows.
+    vars = unique([vars, {'rippMaps', 'ripp'}], 'stable');
     varMap = struct();
     varMap.t_lfp        = 'rippMaps.lfp';
     varMap.t_filt       = 'rippMaps.filt';
@@ -150,11 +161,37 @@ if ismember('rippStates', presets)
 end
 
 if ismember('acg', presets)
-    % acg_narrow: narrow autocorrelogram (100 ms, 0.5 ms bins).
+    % acgNarrow: narrow autocorrelogram (100 ms, 0.5 ms bins).
     % st_metrics is already in cfg.vars; xVec is extracted post-load.
-    varMap.acg_narrow = 'st.acg_narrow';
-    varMap.acg_wide = 'st.acg_wide';
+    varMap.acgNarrow = 'st.acgNarrow';
+    varMap.acgWide = 'st.acgWide';
 
+end
+
+if ismember('spkStates', presets)
+    % State-resolved metrics. Each analysis keeps its own file, so only the
+    % ones asked for are computed and loaded, but both were produced by
+    % spk_byCond from the same bouts and therefore share the row order
+    % (unit x state) and need no join. uid must map first: v2tbl takes the
+    % row count from the first mapped variable.
+    vars = {'units', 'stStates', 'brstStates'};
+    varMap = struct();
+    varMap.uid      = 'stStates.uid';
+    varMap.state    = 'stStates.state';
+    varMap.nSpks    = 'stStates.nSpks';
+    varMap.durState = 'stStates.dur';
+    varMap.bRoy     = 'stStates.royer';
+    varMap.bMiz     = 'stStates.mizuseki';
+    varMap.cv       = 'stStates.cv';
+    varMap.lv       = 'stStates.lv';
+    varMap.fr       = 'brstStates.fr';
+    varMap.br       = 'brstStates.br';
+    varMap.bDur     = 'brstStates.dur';
+    varMap.pBurst   = 'brstStates.pBurst';
+    varMap.bSize    = 'brstStates.bSize';
+    varMap.frBurst  = 'brstStates.frBurst';
+    varMap.frSingle = 'brstStates.frSingle';
+    varMap.unitType = 'units.typeExp';
 end
 
 %% ========================================================================
@@ -205,6 +242,34 @@ if ismember('rippStates', presets)
     end
 end
 
+% Post-process rippMaps: keep only accepted events. The file is a DETECTION
+% product - one row per detected event, row-aligned to ripp - so the mask is
+% applied here, exactly as for the per-event ripp table below. This must run
+% BEFORE that block, which replaces v.ripp with its accepted subset and so
+% shortens .accepted. A file predating the convention (already accepted-only)
+% fails the length check and is left alone.
+if ismember('rippMaps', presets)
+    for iFile = 1:length(v)
+        if ~isfield(v(iFile), 'ripp') || ~isstruct(v(iFile).ripp) || ...
+                ~isfield(v(iFile).ripp, 'accepted')
+            continue;
+        end
+        acc = logical(v(iFile).ripp.accepted(:));
+        mp = v(iFile).rippMaps;
+        if ~isstruct(mp) || ~isfield(mp, 'lfp') || size(mp.lfp, 1) ~= numel(acc)
+            continue;
+        end
+        fldMap = fieldnames(mp);
+        for iFld = 1:numel(fldMap)
+            if ~strcmp(fldMap{iFld}, 'tstamps') && ...
+                    size(mp.(fldMap{iFld}), 1) == numel(acc)
+                mp.(fldMap{iFld}) = mp.(fldMap{iFld})(acc, :);
+            end
+        end
+        v(iFile).rippMaps = mp;
+    end
+end
+
 % Post-process ripp: keep only accepted events. QA now MARKS events via
 % .accepted (NREM/valid state, low EMG, above the MUA-gain gate) rather than
 % removing them, so the per-event table is filtered here. Old .ripp.mat files
@@ -228,8 +293,28 @@ end
 
 % Extract xVec for ACG (lag axis in ms, same for every recording)
 if ismember('acg', presets)
-    xVec.narrow = v(1).st.info.acg_narrow_tstamps * 1000;   % [s] → [ms]
-    xVec.wide = v(1).st.info.acg_wide_tstamps * 1000;   % [s] → [ms]
+    xVec.narrow = v(1).st.info.tNarrow * 1000;   % [s] → [ms]
+    xVec.wide = v(1).st.info.tWide * 1000;   % [s] → [ms]
+end
+
+% Post-process spkStates: the state tables hold one row per unit x state,
+% stacked state-major, so a per-unit vector repeats once per state present
+if ismember('spkStates', presets)
+    for iFile = 1:length(v)
+        if isempty(v(iFile).stStates) || isempty(v(iFile).units)
+            continue;
+        end
+        nType = numel(v(iFile).units.type);
+        nRep = height(v(iFile).stStates) / nType;
+        v(iFile).units.typeExp = repmat(v(iFile).units.type(:), nRep, 1);
+
+        % the two tables are mapped into one varMap without a join, which
+        % is only sound while their keys agree row for row
+        assert(isequal(v(iFile).stStates.uid, v(iFile).brstStates.uid) && ...
+            isequal(v(iFile).stStates.state, v(iFile).brstStates.state), ...
+            'spkStates:keyMismatch', ...
+            'stStates and brstStates rows disagree in %s', basepaths{iFile});
+    end
 end
 
 %% ========================================================================
@@ -246,15 +331,23 @@ tagFiles.fileID = fileNames;
 tbl = v2tbl('v', v, 'varMap', varMap, 'tagAll',...
     struct(), 'tagFiles', tagFiles, 'idxCol', []);
 
+% v2tbl numbers rows, not units. with one row per unit x state that hands
+% every state its own unitID and (1|unitID) silently stops grouping the
+% repeated measure, so rebuild the id from the uid the state table carries
+if ismember('spkStates', presets)
+    tbl.unitID = findgroups(tbl.fileID, tbl.uid);
+    tbl.uid = [];
+end
+
 
 %% ========================================================================
 %  PROCESS METADATA
 %  ========================================================================
 
-% Group metadata
-tbl.genotype = ones(height(tbl), 1) * 1;
-tbl.genotype(ismember(tbl.sbjID, cfg.miceMCU), :) = 2;
-tbl.genotype = categorical(tbl.genotype, [1, 2], cfg.lbl.grp);
+% Group metadata. mcu_geno holds the cohort lookup and keeps only the
+% genotypes present, so category order (and thus the reference level) is
+% canonical without a reordercats call
+tbl.genotype = mcu_geno(tbl.sbjID);
 
 % Day metadata
 fileTbl = unique(tbl(:, {'sbjID', 'fileID'}), 'rows');
@@ -274,7 +367,6 @@ end
 tbl = movevars(tbl, varOrder, 'Before', 1);
 
 % Assert category order
-tbl.genotype = reordercats(tbl.genotype, cfg.lbl.grp);
 tbl.day = reordercats(tbl.day, cfg.lbl.day);
 tbl.unitID = categorical(tbl.unitID);
 if any(contains(tblVars, "unitType"))

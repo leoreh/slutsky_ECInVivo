@@ -19,6 +19,12 @@ function hFig = guiTbl_xy(xVec, dataTbl, varargin)
 %       'SelectionCallback'/'GroupByCallback' (function_handle) host coordination.
 %       'xLbl'             (char/str) X-axis label.
 %
+%   HOST HOOKS (function handles on the container's UserData):
+%       setDataFcn(newTbl)   swap the plotted rows, keeping the current view -
+%                            Y / Plot By / Group By and their ticked categories.
+%                            For a host whose data changes with every control.
+%       setGroupVarFcn, highlightFcn.
+%
 %   Built on the shared graphics/gui layer (uifigure + uigridlayout).
 %
 %   See also: GUITBL_SCATHIST
@@ -107,6 +113,7 @@ guiData.tileInfo = [];
 guiData.hlHandles = [];
 guiData.highlightFcn = @highlightTraces;
 guiData.setGroupVarFcn = @setGroupVar;
+guiData.setDataFcn = @setData;
 guiData.selCbk = selCbk;
 guiData.grpCbk = grpCbk;
 guiData.xLbl = xLbl;
@@ -145,9 +152,17 @@ guiData.ddStatType = gui_labeledControl(gCtrl, 'dropdown', '', ...
 
 hContainer.UserData = guiData;
 
-% Initial State
-onPlotByChange(hContainer, []);
-onGrpByChange(hContainer, []);
+% Initial state: populate both filter panels, then plot once. Doing it via
+% onPlotByChange/onGrpByChange would run onUpdatePlot while the Group By filter
+% is still empty, firing a spurious "select a category" notice on every build.
+guiData = hContainer.UserData;
+guiData.chkPlotBy = populateFilter(guiData.ddPlotBy, guiData.pnlPlotBy);
+guiData.chkGrpBy  = populateFilter(guiData.ddGrpBy, guiData.pnlGrpBy);
+hContainer.UserData = guiData;
+if ~isempty(guiData.grpCbk)
+    [~, allCats] = gui_selectedCats(guiData.chkGrpBy);
+    guiData.grpCbk(guiData.ddGrpBy.Value, allCats, hContainer);
+end
 onUpdatePlot(hContainer, []);
 
 %% ========================================================================
@@ -428,6 +443,48 @@ onUpdatePlot(hContainer, []);
         catch ME
             warning(ME.identifier, '%s', ME.message);
         end
+    end
+
+    function setData(newTbl)
+        % Replace the plotted rows, keeping the current view - Y variable, Plot
+        % By / Group By selections and which of their categories are ticked. A
+        % host whose data changes with every control (e.g. a live kept/removed
+        % flag) calls this instead of rebuilding the widget, which would reset
+        % those selections on every keystroke.
+        data = hContainer.UserData;
+        data.dataTbl = newTbl;
+        hContainer.UserData = data;
+        data.chkPlotBy = syncFilter(data.ddPlotBy, data.pnlPlotBy, data.chkPlotBy);
+        data.chkGrpBy  = syncFilter(data.ddGrpBy,  data.pnlGrpBy,  data.chkGrpBy);
+        hContainer.UserData = data;
+        onUpdatePlot(hContainer, []);
+    end
+
+    function chk = syncFilter(dd, pnl, chkOld)
+        % Reconcile one filter panel with the current data: rebuilt only when the
+        % set of present categories actually changed, carrying over what was
+        % ticked (a category that appears starts ticked). gui_catList lists only
+        % categories with rows, so a group that empties out and later returns
+        % must be re-offered - hence the reconcile rather than a plain redraw.
+        if strcmp(dd.Value, 'None')
+            delete(allchild(pnl)); chk = gobjects(0); return;
+        end
+        cats = gui_catList(hContainer.UserData.dataTbl.(dd.Value));
+        chkOld = chkOld(isgraphics(chkOld));
+        prev = {}; vals = [];
+        if ~isempty(chkOld)
+            prev = arrayfun(@(h) {h.Text}, chkOld);
+            vals = arrayfun(@(h) logical(h.Value), chkOld);
+        end
+        if isequal(prev(:)', cats(:)')
+            chk = chkOld; return;                  % unchanged -> keep the ticks
+        end
+        initVal = true(1, numel(cats));
+        for k = 1 : numel(cats)
+            ix = find(strcmp(cats{k}, prev), 1);
+            if ~isempty(ix), initVal(k) = vals(ix); end
+        end
+        chk = gui_filterPanel(pnl, cats, @onFilterChange, 'InitVal', initVal);
     end
 
     function setGroupVar(varName, activeCats)

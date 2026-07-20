@@ -22,9 +22,9 @@ for iPath = 1 : nPaths
     [~, basename] = fileparts(basepath);
     cd(basepath)
     
-    fr = calc_fr(spikes.times, 'basepath', basepath,...
-        'graphics', false, 'binsize', 60, 'saveVar', true,...
-        'smet', 'GK', 'winBL', [0, Inf], 'winCalc', [0, Inf], 'forceA', true);
+    fr = spk_rate(spikes.times, 'basepath', basepath,...
+        'binsize', 60, 'flgSave', true,...
+        'smet', 'GK', 'winBL', [0, Inf], 'winCalc', [0, Inf]);
 
     % waveform metrices
     % swv = spkwv_metrics('basepath', basepath, 'flgSave', true, 'flgForce', true);
@@ -91,7 +91,7 @@ frMat = tblUnit.FRt(idxUnits, :)';
 %  ========================================================================
 
 % Load unit table with narrow ACG traces.
-%   acg_narrow (nunits x 201): auto-correlogram at 0.5 ms resolution,
+%   acgNarrow (nunits x 201): auto-correlogram at 0.5 ms resolution,
 %   computed over the full recording duration (bins = [0 Inf]).
 %   xAcg (1 x 201): lag axis in milliseconds, centered at 0.
 basepaths = [mcu_basepaths('wt_bsl'), mcu_basepaths('mcu_bsl')];
@@ -101,24 +101,24 @@ basepaths = [mcu_basepaths('wt_bsl'), mcu_basepaths('mcu_bsl')];
 % Interactive viewer: tiles = unit type, colors = genotype.
 % Uses 'Spread' dispersion with arithmetic mean + SEM by default.
 hFig = guiTbl_xy(xAcg.narrow, tblAcg, ...
-    'yVar',    'acg_narrow', ...
+    'yVar',    'acgNarrow', ...
     'tileVar', 'unitType', ...
     'grpVar',  'genotype', ...
     'xLbl',    'Lag [ms]');
 
 
-tblAcg.acg_narrow(tblAcg.genotype == 'Control')
+tblAcg.acgNarrow(tblAcg.genotype == 'Control')
 
-prismTbl = groupsummary(tblAcg, "Group", {'mean', 'std'}, 'acg_narrow');
+prismTbl = groupsummary(tblAcg, "Group", {'mean', 'std'}, 'acgNarrow');
 
 % 1. Extract Data for Control (Row 1)
-mean_ctrl = prismTbl.mean_acg_narrow(1, :)'; % Transpose to column
-std_ctrl  = prismTbl.std_acg_narrow(1, :)';
+mean_ctrl = prismTbl.mean_acgNarrow(1, :)'; % Transpose to column
+std_ctrl  = prismTbl.std_acgNarrow(1, :)';
 n_ctrl    = ones(size(mean_ctrl)) * prismTbl.GroupCount(1); % Fill column with N
 
 % 2. Extract Data for MCU-KO (Row 2)
-mean_ko = prismTbl.mean_acg_narrow(2, :)';
-std_ko  = prismTbl.std_acg_narrow(2, :)';
+mean_ko = prismTbl.mean_acgNarrow(2, :)';
+std_ko  = prismTbl.std_acgNarrow(2, :)';
 n_ko    = ones(size(mean_ko)) * prismTbl.GroupCount(2);
 
 % 3. Combine into the 6-column Prism format

@@ -6,28 +6,40 @@
 
 
 %% ========================================================================
-%  ANALYZE
+%  ANALYZE (staged: detect -> curate -> analyze)
 %  ========================================================================
+% The ripple pipeline runs in three separable stages so each session can be
+% manually curated between detection and the heavy spike/phase/map analysis.
+% Run the loops in order; loop 2 is manual, one mouse at a time.
 
-basepaths = [mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl')];
-nFiles = length(basepaths);
+basepaths = [mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl'), ...
+    mcu_basepaths('ra')];
+nFiles = numel(basepaths);
+met = ripp_methods('default');          % detection + default QA filter (met.qa)
 
+% Loop 1 - DETECT 
 for iFile = 1 : nFiles
-    basepath = basepaths{iFile};
-    cd(basepath)
-    [~, basename] = fileparts(basepath);
-    tic
-    ripp = ripp_wrapper('basepath', pwd, ...
-        'win', [0 Inf], ...
-        'rippCh', [5 : 7], ...
-        'flgPlot', false, ...
-        'flgSave', true, ...
-        'flgNS', true, ...
-        'flgForce', true);
-    toc
+    ripp_wrapper('basepath', basepaths{iFile}, 'met', met, 'win', [0 Inf], ...
+        'flgSave', true, 'flgForce', true, 'flgDetectOnly', true, ...
+        'rippCh', []);
 end
 
-guiPath(pwd, 'preset', 'ripp');
+% Loop 2 - CURATE + INSPECT 
+iFile = 1;
+ripp_curate(basepaths{iFile}); % bulk curation GUI
+
+% first open (slow) 
+[~, vm, gm] = guiPath(basepaths{iFile}, 'preset', 'ripp');
+
+% reopen (fast)
+vm.ripp.data = []; % the ONLY entry re-read
+guiPath(basepaths{iFile}, 'varMap', vm, 'guiMap', gm);
+
+
+% Loop 3 - ANALYZE 
+for iFile = 1 : nFiles
+    ripp_analyze('basepath', basepaths{iFile}, 'flgPlot', false);
+end
 
 
 

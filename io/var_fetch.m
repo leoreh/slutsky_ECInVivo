@@ -20,8 +20,8 @@ function [data, fs, meta] = var_fetch(recipe, ctx)
 % - meta            <struct> .kind and .labels (channel numbers, for a bin).
 %
 % DEPENDENCIES
-% - binary_load, basepaths2vars (fetch); processEMG, calc_spec, ripp_sigPrep,
-%   iosr.dsp.sincFilter (transforms).
+% - binary_load, basepaths2vars (fetch); processEMG, calc_spec, filterLFP,
+%   ripp_sigPrep, evt_emgScore, iosr.dsp.sincFilter (transforms).
 %
 % HISTORY
 % - 260719          created (unified var_* I/O layer; absorbs guiPath_src and
@@ -163,15 +163,48 @@ switch op
     case 'emgRms'
         data = processEMG(data(:), fs, 1);
         fs   = 1;
+    case 'emgScore'
+        [data, fs] = tfEmgScore(data, fs, args);
     case 'spec'
         data = calc_spec('sig', double(data(:)), 'fs', fs, 'graphics', false, ...
             'saveVar', false, 'force', true, args{:});
         fs = NaN;
+    case 'bandpass'
+        data = tfBandpass(data, fs, args);
     case 'rippPrep'
         [data, fs] = tfRippPrep(data, fs, args);
     otherwise
         error('var_fetch:transform', 'unknown transform "%s"', op);
 end
+end
+
+
+function sig = tfBandpass(sig, fs, args)
+% band-pass a trace for display: the same filterLFP call ripp_sigPrep makes for
+% its .filt, and nothing else. A viewer drawing the filtered trace never shows
+% the hilbert envelope, the detection signal or the z-score, and over a whole
+% session those dominate - 16.5 s vs 3.7 s on a 24 h channel, same samples out.
+passband = args{1};
+sig = filterLFP(double(sig(:)), 'fs', fs, 'type', 'butter', 'dataOnly', true, ...
+    'order', 5, 'passband', passband, 'graphics', false);
+end
+
+
+function [z, fsOut] = tfEmgScore(sig, fs, args)
+% the per-event EMG score (evt_emgScore) evaluated on a regular grid, so a
+% viewer draws the very quantity the event gate thresholds: the y-value of this
+% trace IS the number typed into the curation GUI. Windows of winSec, centred on
+% each output sample, tile the recording. evt_emgScore standardizes against
+% per-sample baseline statistics - which do not depend on the windows being
+% scored - so the grid and the events land on one scale with nothing carried
+% between them. Pass the same baseline the detector used (its NREM bouts).
+[baselineTimes, winSec] = deal(args{:});
+sig  = double(sig(:));
+nWin = floor(numel(sig) / fs / winSec);
+tCtr = (0 : nWin - 1)' * winSec;              % sample i sits at (i-1)/fsOut
+z    = evt_emgScore(sig, [tCtr - winSec / 2, tCtr + winSec / 2], fs, ...
+    'baselineTimes', baselineTimes);
+fsOut = 1 / winSec;
 end
 
 

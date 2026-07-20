@@ -138,11 +138,11 @@ if manCur
         spktimes{cnt} = res(cluidx) / fs;
         cnt = cnt + 1;
     end
-    fr = calc_fr(spktimes, 'basepath', basepath,...
-    'graphics', false, 'binsize', 60, 'saveVar', false,...
-    'smet', 'none', 'winBL', [0, Inf], 'winCalc', [0, Inf]);   
+    fr = spk_rate(spktimes, 'basepath', basepath,...
+    'binsize', 60, 'flgSave', false,...
+    'smet', 'none', 'winBL', [0, Inf], 'winCalc', [0, Inf]);
     fh = figure;
-    plot(fr.tstamps / 60 / 60, mean(fr.strd))
+    plot(fr.t / 60 / 60, mean(fr.rate))
 
 end
 
