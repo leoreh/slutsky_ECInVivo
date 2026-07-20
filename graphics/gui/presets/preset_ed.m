@@ -16,13 +16,15 @@ function [varMap, guiMap] = preset_ed(ctx)
 %
 % OUTPUTS
 % - varMap          <struct> name -> recipe.
-% - guiMap          <struct> .panels + .mode .win .save.
+% - guiMap          <struct> .panels + .mode .win.
 %
 % SEE ALSO
-% - guiPath_preset, var_recipe, guiPath_panel, guiPath_doc.
+% - guiPath_preset, var_recipe, guiPath_panel, guiPath_doc, stateSet.
 %
 % HISTORY
 % - 260719          split out of guiPath_presets (one file per preset).
+% - 260720          the state context is the shared, curatable stateSet (was a
+%                   read-only hypnogram over ss.bouts.times).
 
 
 %% ========================================================================
@@ -30,8 +32,7 @@ function [varMap, guiMap] = preset_ed(ctx)
 %  ========================================================================
 % the sleep context every modality shows on top, then the EDs + units
 varMap = struct();
-varMap.hyp    = var_recipe('matvar', 'file', 'sleep_states', 'var', 'ss', ...
-    'path', 'bouts.times');
+varMap.states = var_recipe('value', 'data', stateSet(ctx));
 varMap.spec   = var_recipe('matfield', 'file', 'sleep_sig', ...
     'field', {'spec', 'spec_freq', 'spec_tstamps'});
 varMap.emgRms = var_recipe('matfield', 'file', 'sleep_sig', ...
@@ -56,8 +57,8 @@ end
 %  VIEW (guiMap)
 %  ========================================================================
 % Top: state, spectrogram, EMG RMS, event ticks. Bottom: LFP, EMG, units, state
-guiMap = struct('panels', struct(), 'mode', 'events', 'win', 1, 'save', 'ed');
-guiMap.panels.hypT   = guiPath_panel('hypnogram', 'top', 'hyp', ...
+guiMap = struct('panels', struct(), 'mode', 'events', 'win', 1);
+guiMap.panels.stripT = guiPath_panel('stateStrip', 'top', 'states', ...
     'label', 'State');
 guiMap.panels.spec   = guiPath_panel('spec', 'top', 'spec');
 guiMap.panels.emgRms = guiPath_panel('trace', 'top', 'emgRms', ...
@@ -70,7 +71,7 @@ guiMap.panels.emg    = guiPath_panel('trace', 'bottom', 'emg', ...
     'label', 'EMG', 'height', 0.8);
 guiMap.panels.raster = guiPath_panel('raster', 'bottom', 'raster', ...
     'label', 'Units');
-guiMap.panels.hypB   = guiPath_panel('hypnogram', 'bottom', 'hyp', ...
+guiMap.panels.stripB = guiPath_panel('stateStrip', 'bottom', 'states', ...
     'label', 'State');
 
 end

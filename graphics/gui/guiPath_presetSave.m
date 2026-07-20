@@ -26,7 +26,7 @@ function file = guiPath_presetSave(name, guiMap)
 % INPUTS
 % - name            <char> preset token; must be a valid MATLAB name. An
 %                   existing one is updated, a new one is created.
-% - guiMap          <struct> .panels + .mode .win .save, and .base (which
+% - guiMap          <struct> .panels + .mode .win, and .base (which
 %                   preset supplies the recipes) when NAME is new. Panel options
 %                   matching the guiPath_panel default are left out; ones that
 %                   cannot be written as a literal are dropped.
@@ -44,6 +44,8 @@ function file = guiPath_presetSave(name, guiMap)
 % - 260719          created (Save preset in the guiPath control column).
 % - 260719          an existing preset is updated in place (view half only);
 %                   the inherit call is now only for a new preset.
+% - 260720          .save is no longer written: where a curation set saves now
+%                   follows the set, not the preset (guiPath > resolveSave).
 
 
 %% ========================================================================
@@ -147,7 +149,7 @@ L = { ...
     '%', ...
     '% OUTPUTS', ...
     '% - varMap          <struct> name -> recipe.', ...
-    '% - guiMap          <struct> .panels + .mode .win .save.', ...
+    '% - guiMap          <struct> .panels + .mode .win.', ...
     '%', ...
     '% SEE ALSO', ...
     '% - guiPath_preset, guiPath_presetSave, guiPath_panel, guiPath_doc.', ...
@@ -165,8 +167,7 @@ function L = viewBlock(guiMap, base)
 L = banner('%%', 'VIEW (guiMap)');
 
 opts = [{sprintf('%s, %s', lit('base'), lit(base))}, ...
-    behaviourOpt(guiMap, 'mode'), behaviourOpt(guiMap, 'win'), ...
-    behaviourOpt(guiMap, 'save')];
+    behaviourOpt(guiMap, 'mode'), behaviourOpt(guiMap, 'win')];
 L{end + 1} = wrapCall('guiMap = struct(''panels'', struct()', opts);
 
 fns = fieldnames(guiMap.panels);
@@ -185,7 +186,7 @@ end
 
 function opt = behaviourOpt(guiMap, fld)
 % one 'name, value' pair for the guiMap struct call, or nothing when the field
-% is absent or not writable as a literal (a save handle, say)
+% is absent or not writable as a literal
 
 opt = {};
 if ~isfield(guiMap, fld) || isempty(guiMap.(fld)), return; end

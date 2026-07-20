@@ -72,7 +72,7 @@ d = struct('name', 'default', 'chMode', 'tag', 'passband', [80 250], ...
 
 % the default QA filter (the ripp_gate spec): valid states, low EMG, MUA gate
 d.qa = struct('states', [1 2 3 4 5 6 7]);
-d.qa.ranges = struct('emg', [-Inf Inf], 'spkGain', [-Inf Inf]);
+d.qa.ranges = struct('emg', [-Inf 1], 'spkGain', [1 Inf]);
 
 switch preset
     case 'default'

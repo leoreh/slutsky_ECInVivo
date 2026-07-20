@@ -16,10 +16,10 @@ function [varMap, guiMap] = preset_ripp(ctx)
 %
 % OUTPUTS
 % - varMap          <struct> name -> recipe.
-% - guiMap          <struct> .panels + .mode .win .save.
+% - guiMap          <struct> .panels + .mode .win.
 %
 % SEE ALSO
-% - guiPath_preset, var_recipe, guiPath_panel, guiPath_doc.
+% - guiPath_preset, var_recipe, guiPath_panel, guiPath_doc, stateSet.
 %
 % HISTORY
 % - 260719          split out of guiPath_presets (one file per preset).
@@ -29,6 +29,8 @@ function [varMap, guiMap] = preset_ripp(ctx)
 %                   (evt_emgScore on a regular grid) instead of AccuSleep's
 %                   emg_rms, on fixed y-limits, so a curation threshold is
 %                   readable off the trace. Other presets keep emg_rms.
+% - 260720c         the state context is the shared, curatable stateSet (was a
+%                   read-only hypnogram over ss.bouts.times).
 
 
 %% ========================================================================
@@ -36,8 +38,7 @@ function [varMap, guiMap] = preset_ripp(ctx)
 %  ========================================================================
 % the sleep context every modality shows on top, then the ripples + units
 varMap = struct();
-varMap.hyp    = var_recipe('matvar', 'file', 'sleep_states', 'var', 'ss', ...
-    'path', 'bouts.times');
+varMap.states = var_recipe('value', 'data', stateSet(ctx));
 varMap.spec   = var_recipe('matfield', 'file', 'sleep_sig', ...
     'field', {'spec', 'spec_freq', 'spec_tstamps'});
 % The overview EMG is the ripple gate's own metric, not AccuSleep's log-RMS: the
@@ -73,8 +74,8 @@ varMap.rippFilt  = var_recipe('bin', 'file', 'lfp', ...
 %  VIEW (guiMap)
 %  ========================================================================
 guiMap = struct('panels', struct(), ...
-    'base', 'ripp', 'mode', 'events', 'win', 1, 'save', 'ripp');
-guiMap.panels.hyp = guiPath_panel('hypnogram', 'top', 'hyp');
+    'base', 'ripp', 'mode', 'events', 'win', 1);
+guiMap.panels.states = guiPath_panel('stateStrip', 'top', 'states');
 guiMap.panels.spec = guiPath_panel('spec', 'top', 'spec');
 % absolute y-limits, not autoscale: a fixed scale is the whole point here, so
 % the same height means the same score in every mouse. 0 is the resting NREM

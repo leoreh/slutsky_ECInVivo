@@ -1,18 +1,16 @@
-function inp = guiPath_shape(inp, nstates)
+function inp = guiPath_shape(inp)
 
 % Shape a raw varMap value into the drawn input, dispatched on the panel type.
 %
 % The loader (var_load) is view-blind: it returns raw .data / .fs. This is the
-% view half - it turns that raw value into exactly what guiPath_draw expects:
-% event / state structs, an hours-cell hypnogram, a channel stack's display
-% stats, a resolved y-limit. Called once per input when a preset lands, not on
-% every redraw. A stateStrip arrives already composed (by the states preset),
-% so it passes through.
+% view half - it turns that raw value into exactly what guiPath_draw expects: an
+% events struct, a channel stack's display stats, a resolved y-limit. Called
+% once per input when a preset lands, not on every redraw. A stateStrip arrives
+% already composed (see stateSet), so it passes through.
 %
 % INPUTS
 % - inp             <struct> a partial input record with .type, raw .data, .fs,
 %                   .labels (bin channel numbers) and .ylim (a spec, for a trace).
-% - nstates         <num>(opt) state count, to pad a hypnogram's cell.
 %
 % OUTPUTS
 % - inp             <struct> .data shaped, .fs adjusted, .chInfo set (traces),
@@ -24,8 +22,8 @@ function inp = guiPath_shape(inp, nstates)
 % HISTORY
 % - 260719          created (per-type shaping, moved verbatim from guiPath_load
 %                   when var_load became the single, view-blind loader).
-
-if nargin < 2, nstates = []; end
+% - 260720          the hypnogram case (and its nstates argument) gone with the
+%                   type; stateStrip is the one state panel.
 
 switch inp.type
     case 'trace'
@@ -39,10 +37,6 @@ switch inp.type
         inp.data = specAdapter(inp.data);
         inp.fs   = NaN;
 
-    case 'hypnogram'
-        inp.data = toHoursCell(inp.data, nstates);
-        inp.fs   = NaN;
-
     case 'raster'
         spk = inp.data;
         if ~iscell(spk), spk = {spk(:)}; end
@@ -54,7 +48,7 @@ switch inp.type
         inp.fs   = NaN;
 
     case 'stateStrip'
-        % already composed by the states preset (an inline strip struct)
+        % already composed, by stateSet (an inline strip struct)
 
     otherwise
         error('guiPath_shape:type', 'unknown panel type "%s"', inp.type);
@@ -120,21 +114,6 @@ function adapter = specAdapter(raw)
 % the {s, freq, tstamps} plot_spec adapter from the raw sleep_sig spec fields
 adapter = struct('s', raw.spec, 'freq', raw.spec_freq(:), ...
     'tstamps', raw.spec_tstamps(:));
-end
-
-
-function boutHr = toHoursCell(bt, nstates)
-% sleep-state bouts (seconds cell) -> hours cell of length nstates
-if ~iscell(bt), bt = {bt}; end
-if isempty(nstates), nstates = numel(bt); end
-boutHr = cell(1, nstates);
-for iState = 1 : nstates
-    if iState <= numel(bt) && ~isempty(bt{iState})
-        boutHr{iState} = bt{iState} / 3600;
-    else
-        boutHr{iState} = zeros(0, 2);
-    end
-end
 end
 
 

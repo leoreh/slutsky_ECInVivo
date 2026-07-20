@@ -62,7 +62,7 @@ function [hFig, varMap, guiMap] = guiPath(basepath, varargin)
 %                   already-loaded map. Bypasses presets, and cannot be saved
 %                   as one (no preset file rebuilds it). See guiPath_doc.
 % - guiMap          <struct>(opt) arrangement for a varMap: .panels + .name
-%                   .mode .win .save. Anything absent is derived.
+%                   .mode .win. Anything absent is derived.
 % - basename        <char>(opt) override. {the folder name}
 % - Visible         <char>(opt) 'on' | 'off' for headless. {'on'}
 %
@@ -148,6 +148,16 @@ function [hFig, varMap, guiMap] = guiPath(basepath, varargin)
 %                   accept / reject and arrow-stepping keep its zoom and hold the
 %                   cursor in view (updateMarker pans it, no redraw). The Window
 %                   box + X-units both target the active (last-clicked) region.
+% - 260720c         one state panel: the read-only 'hypnogram' type is gone and
+%                   every preset shows the same curatable 'stateStrip', built by
+%                   presets/stateSet from ss.labels. Two rules follow from a
+%                   state strip being in every preset. Which set a preset OPENS
+%                   on is the first panel of the type its MODE curates
+%                   (targetVar) - "first of either type" would have made states
+%                   the ripple preset's target. And where a set SAVES is a
+%                   property of the set, not of the preset (resolveSave on
+%                   type + var), so states can be rescored from any preset;
+%                   guiMap.save, which said it per preset, is gone.
 
 %% ========================================================================
 %  ARGUMENTS
@@ -568,7 +578,7 @@ hFig.Visible = vis;
                 saveFcn = @(acc) saveVarToFile(sel.file, [sel.var, '_accepted'], logical(acc(:)));
             end
         elseif strcmp(sel.type, 'stateStrip')
-            saveFcn = @(lb) saveLabels(fullfile(data.basepath, [data.basename, '.sleep_labelsMan.mat']), lb);
+            saveFcn = resolveSave(sel.type, '', data.basepath, data.basename);
         end
         % name the set from its source so it reads clearly in CURATE (a collision
         % with an existing set is made unique in addCurationSet)
@@ -591,7 +601,7 @@ hFig.Visible = vis;
         entry = struct('data', {raw}, 'fs', rfs, 'labels', {[]});
         pan = guiPath_panel(type, region, name, 'label', label);
         try
-            inp = buildInput(entry, pan, name, []);
+            inp = buildInput(entry, pan, name);
         catch ME
             gui_notify(hFig, sprintf('Could not display "%s": %s', name, ME.message), 'error');
             return;
@@ -1468,7 +1478,7 @@ end
 
 function g = finalizeGui(g)
 % fill any guiMap field the caller left out: panels, mode from the target panel,
-% window from the mode, name/base/save to safe defaults. Applied to every guiMap
+% window from the mode, name/base to safe defaults. Applied to every guiMap
 % whatever its source (a preset file, a caller's struct, the live arrangement).
 if ~isfield(g, 'panels') || ~isstruct(g.panels), g.panels = struct(); end
 if ~isfield(g, 'name') || isempty(g.name), g.name = 'Custom'; end
@@ -1483,7 +1493,6 @@ end
 if ~isfield(g, 'win') || isempty(g.win)
     if strcmp(g.mode, 'states'), g.win = 10; else, g.win = 1; end
 end
-if ~isfield(g, 'save'), g.save = ''; end
 end
 
 function gm = currentGuiMap(d)
@@ -1544,34 +1553,38 @@ for iPan = 1 : numel(fns), v{iPan} = guiMap.panels.(fns{iPan}).var; end
 v = unique(v, 'stable');
 end
 
-function fn = resolveSave(guiMap, basepath, basename)
-% turn a guiMap.save spec into a save handle: a function handle is used as is;
-% states write labels to sleep_labelsMan; an events token writes the accepted
-% mask to <basename>.<token>.mat
-save = guiMap.save;
-if isa(save, 'function_handle'), fn = save; return; end
-if strcmp(guiMap.mode, 'states')
-    fn = @(labels) saveLabels(fullfile(basepath, [basename, '.sleep_labelsMan.mat']), labels);
-    return;
-end
-if ischar(save) && ~isempty(save) && ~strcmp(save, 'labelsMan')
-    tok = save;
-else
-    tok = targetToken(guiMap);
-end
+function fn = resolveSave(type, var, basepath, basename)
+% where a curation set writes: a state strip its labels to
+% <basename>.sleep_labelsMan.mat, an event set its accepted mask into the file
+% its var names (<basename>.ripp.mat). Keyed on the SET, not on the preset that
+% shows it, so a set saves the same way whichever preset elects it - that is
+% what lets states be rescored from the ripple or ED preset. [] = nothing to
+% write to (an event file that is not there).
 fn = [];
-if isempty(tok), return; end
-file = fullfile(basepath, [basename, '.', tok, '.mat']);
-if isfile(file), fn = @(acc) saveAccepted(file, tok, acc); end
+switch type
+    case 'stateStrip'
+        file = fullfile(basepath, [basename, '.sleep_labelsMan.mat']);
+        fn = @(labels) saveLabels(file, labels);
+    case 'eventTicks'
+        if isempty(var), return; end
+        file = fullfile(basepath, [basename, '.', var, '.mat']);
+        if isfile(file), fn = @(acc) saveAccepted(file, var, acc); end
+end
 end
 
-function tok = targetToken(guiMap)
-% the var of the eventTicks target ('ed' / 'ripp'), which is also its file token
-tok = '';
+function v = targetVar(guiMap)
+% the var of the preset's curation target: the first panel of the type its MODE
+% curates ('states' -> stateStrip, else eventTicks). Keyed on the mode, not on
+% "the first panel of either type", because every preset shows a state strip -
+% the ripple preset's would otherwise be elected over its ripples. For events
+% the var is also the file token ('ed' / 'ripp').
+want = 'eventTicks';
+if strcmp(guiMap.mode, 'states'), want = 'stateStrip'; end
+v = '';
 fns = fieldnames(guiMap.panels);
-for i = 1:numel(fns)
-    p = guiMap.panels.(fns{i});
-    if strcmp(p.type, 'eventTicks') && ~isempty(p.var), tok = p.var; return; end
+for iPan = 1 : numel(fns)
+    p = guiMap.panels.(fns{iPan});
+    if strcmp(p.type, want) && ~isempty(p.var), v = p.var; return; end
 end
 end
 
@@ -1643,14 +1656,7 @@ function d = applyConfig(d, config)
 % (d.curate) is chosen only on the first open; a later preset switch leaves it
 % alone - PRESET (arrangement) and CURATE (target) are independent.
 newInputs = normalizeInputs(config.inputs);
-% pin the preset's resolved save handle onto its own target set
-if isfield(config, 'saveFcn') && ~isempty(config.saveFcn)
-    tix = find(ismember({newInputs.type}, {'eventTicks', 'stateStrip'}), 1);
-    if ~isempty(tix), newInputs(tix).saveFcn = config.saveFcn; end
-end
-presetTarget = '';
-tix = find(ismember({newInputs.type}, {'eventTicks', 'stateStrip'}), 1);
-if ~isempty(tix), presetTarget = newInputs(tix).name; end
+presetTarget = pick(config, 'target', '');   % which set the preset OPENS on
 
 firstOpen = ~isfield(d, 'curate');
 if ~isfield(d, 'inputs') || isempty(d.inputs)
@@ -1761,18 +1767,18 @@ function config = mapsToConfig(varMap, guiMap, basepath, basename)
 % adapt a loaded varMap (data) + guiMap (view) into the internal render config:
 % one input per referenced var (its raw data shaped by the panel type) + a
 % {source, region} panel per guiMap panel, in stacking order. A var named by two
-% panels (a top + bottom pair) yields ONE input. The save handle comes from the
-% guiMap's target + the session location.
+% panels (a top + bottom pair) yields ONE input. Each curation set carries its
+% own save handle (resolveSave); config.target is the one the preset opens on.
 panelFns = fieldnames(guiMap.panels);
-nstates  = [];                                   % filled only if a hypnogram needs it
 recs = {}; seen = {}; P = {};
 for i = 1:numel(panelFns)
     pan = guiMap.panels.(panelFns{i});
     v = pan.var;
     if isfield(varMap, v) && ~any(strcmp(v, seen))
-        if isempty(nstates) && strcmp(pan.type, 'hypnogram'), nstates = stateCount(); end
-        recs{end + 1} = buildInput(varMap.(v), pan, v, nstates);      %#ok<AGROW>
-        seen{end + 1} = v;                                            %#ok<AGROW>
+        inp = buildInput(varMap.(v), pan, v);
+        inp.saveFcn = resolveSave(pan.type, v, basepath, basename);
+        recs{end + 1} = inp;                                   %#ok<AGROW>
+        seen{end + 1} = v;                                     %#ok<AGROW>
     end
     P{end + 1} = struct('source', v, 'region', regAlias(pan.region), ...
         'height', pan.height, 'label', pan.label, ...
@@ -1780,28 +1786,21 @@ for i = 1:numel(panelFns)
 end
 if isempty(recs), inputs = normalizeInputs([]); else, inputs = [recs{:}]; end
 if isempty(P), panels = []; else, panels = [P{:}]; end
-saveFcn = resolveSave(guiMap, basepath, basename);
 config = struct('inputs', {inputs}, 'panels', {panels}, ...
-    'saveFcn', saveFcn, 'winPlot', guiMap.win);
+    'target', targetVar(guiMap), 'winPlot', guiMap.win);
 end
 
-function inp = buildInput(entry, pan, name, nstates)
+function inp = buildInput(entry, pan, name)
 % one normalized, shaped input from a loaded varMap entry + its view panel. data
-% single-wrapped so a cell payload (raster / hypnogram) stays in one field; the
-% raw value is shaped for its type (guiPath_shape) before normalization.
+% single-wrapped so a cell payload (a raster's spike times) stays in one field;
+% the raw value is shaped for its type (guiPath_shape) before normalization.
 inp = struct('name', name, 'type', pan.type, ...
     'data', {pick(entry, 'data', [])}, 'fs', pick(entry, 'fs', NaN), ...
     'labels', {pick(entry, 'labels', [])}, 'ylim', pan.ylim, 'clr', pan.clr, ...
     'label', pan.label, 'height', pan.height, ...
     'defRegion', regAlias(pan.region), 'yAdjust', pick(pan, 'yAdjust', 1));
-inp = guiPath_shape(inp, nstates);
+inp = guiPath_shape(inp);
 inp = normalizeInputs(inp);
-end
-
-function n = stateCount()
-% state count for a hypnogram's cell padding
-c = as_loadConfig();
-n = c.nstates;
 end
 
 function r = regAlias(region)
@@ -1859,7 +1858,11 @@ end
 end
 
 function [labels, epochT, nstates, names, colors] = stateFromData(D)
-% the live state-scoring state from a stateStrip set's data struct
+% the live state-scoring state from a stateStrip set's data struct. nstates is
+% the number of ASSIGNABLE labels - the name count - so undefined (nstates + 1)
+% is one past the last name. AccuSleep's own cfg.nstates is 6 but it ships 7
+% names (BIN is the 7th) and marks unscored epochs 8, so counting names is what
+% makes the Undef button write a code the pipeline reads back as unscored.
 labels = []; epochT = []; nstates = 0; names = {}; colors = {};
 if ~isstruct(D) || ~isfield(D, 'labels') || isempty(D.labels), return; end
 labels = double(D.labels(:));
@@ -1871,11 +1874,7 @@ else
 end
 if isfield(D, 'names')  && ~isempty(D.names),  names  = D.names;  end
 if isfield(D, 'colors') && ~isempty(D.colors), colors = D.colors; end
-if isfield(D, 'nstates') && ~isempty(D.nstates)
-    nstates = D.nstates;
-else
-    nstates = max(1, numel(names));
-end
+nstates = max(1, numel(names));
 end
 
 function x = eventMarks(ed, ev)
@@ -2093,9 +2092,9 @@ end
 
 function styleYLabel(ax, txt, source, inputs)
 % a panel's y-label: muted and compact. A thin marker strip (eventTicks /
-% stateStrip / hypnogram) gets a HORIZONTAL label so its short name sits within
-% the strip's height instead of a vertical label overflowing into the neighbour
-% panels; a tall signal panel keeps the usual vertical label.
+% stateStrip) gets a HORIZONTAL label so its short name sits within the strip's
+% height instead of a vertical label overflowing into the neighbour panels; a
+% tall signal panel keeps the usual vertical label.
 inp = getInput(inputs, source);
 if ~isempty(inp) && isStripType(inp.type)
     ylabel(ax, txt, 'Color', [0.15 0.15 0.15], 'FontSize', 9, 'Rotation', 0, ...
@@ -2183,10 +2182,6 @@ for i = 1:numel(inputs)
             if isstruct(inp.data) && isfield(inp.data, 'tstamps') && ~isempty(inp.data.tstamps)
                 T = max(T, max(inp.data.tstamps(:)));
             end
-        case 'hypnogram'
-            for s = 1:numel(inp.data)
-                if ~isempty(inp.data{s}), T = max(T, max(inp.data{s}(:)) * 3600); end
-            end
         case 'raster'
             for u = 1:numel(inp.data)
                 if ~isempty(inp.data{u}), T = max(T, max(inp.data{u})); end
@@ -2218,7 +2213,8 @@ end
 
 function panels = defaultPanels(inputs)
 % fallback layout (custom path with no panels): each input in its default
-% region, ordered by defOrder; a hypnogram is also added to the narrow region
+% region, ordered by defOrder. The curated set gets its second region from
+% ensureCurateShown, so nothing is special-cased here.
 P = {};
 for region = {'wide', 'narrow'}
     reg = region{1};
@@ -2229,10 +2225,6 @@ for region = {'wide', 'narrow'}
     for k = 1:numel(sel)
         P{end + 1} = makePanel(inputs(sel(k)).name, reg, inputs); %#ok<AGROW>
     end
-end
-h = find(strcmp({inputs.type}, 'hypnogram'), 1);
-if ~isempty(h) && ~strcmp(inputs(h).defRegion, 'narrow')
-    P{end + 1} = makePanel(inputs(h).name, 'narrow', inputs);
 end
 panels = [P{:}];
 end
@@ -2359,7 +2351,7 @@ end
 function tf = isStripType(type)
 % a thin marker / label strip: gets a horizontal y-label (styleYLabel) and no
 % y-ticks, but still carries the x-axis when it is a region's bottom panel
-tf = any(strcmp(type, {'eventTicks', 'stateStrip', 'hypnogram'}));
+tf = any(strcmp(type, {'eventTicks', 'stateStrip'}));
 end
 
 function mute(ax)

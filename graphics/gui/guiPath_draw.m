@@ -39,12 +39,13 @@ function guiPath_draw(ax, inp, data, a, b, xf)
 % - 260716          extracted from guiPath's PANEL DRAW block, unchanged, so
 %                   the entry point stops growing and a new panel type has a
 %                   file of its own to land in.
+% - 260720          drawHypno gone: stateStrip is the one state panel, so a
+%                   state strip is curatable wherever it is shown.
 
 switch inp.type
     case 'trace',      drawTrace(ax, inp, a, b, xf);
     case 'traces',     drawTraces(ax, inp, a, b, xf);
     case 'spec',       drawSpec(ax, inp, xf);
-    case 'hypnogram',  drawHypno(ax, inp, xf);
     case 'eventTicks', drawTicks(ax, inp, data, xf);
     case 'stateStrip', drawStateStrip(ax, inp, data, xf);
     case 'raster',     drawRaster(ax, inp, a, b, xf);
@@ -143,13 +144,6 @@ if ya ~= 1 && numel(ax.CLim) == 2 && diff(ax.CLim) > 0
 end
 end
 
-function drawHypno(ax, inp, xf)
-% bout times arrive in hours; convert to display units. Pin sstates to the
-% number of bout-cells provided so the strip is independent of cfg.nstates.
-bt = cellfun(@(x) x * 3600 / xf, inp.data, 'uni', false);
-plot_hypnogram('boutTimes', bt, 'sstates', 1:numel(bt), 'style', 'strip', 'hAx', ax);
-end
-
 function drawRaster(ax, inp, a, b, xf)
 % inward ticks so the unit numbers stay but no tick marks protrude left
 spk = cellfun(@(s) s(s >= a & s <= b) / xf, inp.data, 'uni', false);
@@ -192,8 +186,8 @@ end
 function drawStateStrip(ax, inp, data, xf)
 % per-epoch coloured label strip drawn as one truecolor image (fast to redraw).
 % the curated strip reads the live labels + epoch centres; any other state set
-% is read-only, drawn from its own loaded data. undefined (> nstates) render
-% gray.
+% is read-only, drawn from its own loaded data. ns is the number of assignable
+% states (the name count); undefined is one past it, and renders gray.
 if isfield(data, 'curate') && strcmp(inp.name, data.curate)
     T = data.ed.peakTime(:)'; L = data.labels(:)';
     ns = data.nstates; colors = data.stateColors;
@@ -201,14 +195,8 @@ else
     D = inp.data;
     if ~isstruct(D) || ~isfield(D, 'labels') || isempty(D.labels), return; end
     T = D.epochT(:)'; L = D.labels(:)';
-    if isfield(D, 'nstates') && ~isempty(D.nstates)
-        ns = D.nstates;
-    elseif isfield(D, 'names') && ~isempty(D.names)
-        ns = numel(D.names);
-    else
-        ns = max(1, max(L));
-    end
-    if isfield(D, 'colors'), colors = D.colors; else, colors = {}; end
+    colors = {}; if isfield(D, 'colors'), colors = D.colors; end
+    ns = max(1, numel(colors));
 end
 n = min(numel(T), numel(L));
 if n == 0, return; end

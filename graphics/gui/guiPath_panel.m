@@ -13,8 +13,8 @@ function p = guiPath_panel(type, region, var, varargin)
 % joined by name at open time (see guiPath > mapsToConfig).
 %
 % INPUTS
-% - type            <char> 'trace' | 'traces' | 'spec' | 'hypnogram' |
-%                   'raster' | 'eventTicks' | 'stateStrip'.
+% - type            <char> 'trace' | 'traces' | 'spec' | 'raster' |
+%                   'eventTicks' | 'stateStrip'.
 % - region          <char> 'top' | 'bottom' (aliases 'wide' | 'narrow').
 % - var             <char> the varMap entry this panel draws.
 %
@@ -44,6 +44,8 @@ function p = guiPath_panel(type, region, var, varargin)
 %                   panel; recipe moved to var_recipe, loading to var_load).
 % - 260719          render + yAdjust added, so a saved preset keeps a Bottom
 %                   set's lines / ticks choice and the amplitude it was given.
+% - 260720          the read-only 'hypnogram' type is gone; 'stateStrip' is the
+%                   one state panel, at the hypnogram's height.
 
 td = typeDefaults(type);
 p = struct('type', type, 'region', region, 'var', var, ...
@@ -72,9 +74,8 @@ function td = typeDefaults(type)
 % per-panel-type fallback height / label
 switch type
     case 'spec',       td = struct('height', 1.4,  'label', 'Freq (Hz)');
-    case 'hypnogram',  td = struct('height', 0.28, 'label', 'State');
     case 'eventTicks', td = struct('height', 0.28, 'label', 'Events');
-    case 'stateStrip', td = struct('height', 0.5,  'label', 'State');
+    case 'stateStrip', td = struct('height', 0.28, 'label', 'State');
     case 'raster',     td = struct('height', 1.2,  'label', 'Units');
     case 'trace',      td = struct('height', 1.0,  'label', '');
     case 'traces',     td = struct('height', 2.5,  'label', 'LFP');

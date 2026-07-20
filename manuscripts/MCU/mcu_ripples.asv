@@ -18,29 +18,28 @@ nFiles = numel(basepaths);
 met = ripp_methods('default');          % detection + default QA filter (met.qa)
 
 % Loop 1 - DETECT 
-for iFile = 1 : nFiles
+for iFile = 7 : nFiles
     ripp_wrapper('basepath', basepaths{iFile}, 'met', met, 'win', [0 Inf], ...
         'flgSave', true, 'flgForce', true, 'flgDetectOnly', true, ...
         'rippCh', []);
 end
 
 % Loop 2 - CURATE + INSPECT 
-iFile = 1;
-ripp_curate(basepaths{iFile}, 'qa', met.qa); % bulk curation GUI
+iFile = 2;
+ripp_curate(basepaths{iFile}); % bulk curation GUI
+guiPath(basepaths{iFile}, 'preset', 'ripp'); % fine inspection
 
-% first open (slow) 
+% first open for the file 
 [~, vm, gm] = guiPath(basepaths{iFile}, 'preset', 'ripp');
 
-% reopen (fast)
+% after curating, reopen fast:
 vm.ripp.data = []; % the ONLY entry re-read
 guiPath(basepaths{iFile}, 'varMap', vm, 'guiMap', gm);
 
 
 % Loop 3 - ANALYZE 
-for iFile = 2 : nFiles
-    ripp_curate(basepaths{iFile}, 'qa', met.qa, 'flgGui', false); % bulk curation GUI
-
-    ripp_analyze(basepaths{iFile}, 'flgPlot', false);
+for iFile = 1 : nFiles
+    ripp_analyze('basepath', basepaths{iFile}, 'flgPlot', false);
 end
 
 

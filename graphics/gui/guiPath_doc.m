@@ -23,13 +23,13 @@ function guiPath_doc()
 %               reusable I/O layer - the same var_load / var_fetch serve any
 %               pipeline, not just the GUI.
 %   - guiMap    the arrangement: .panels (one view panel per field, see
-%               guiPath_panel) plus behaviour (.name .base .mode .win .save). A
+%               guiPath_panel) plus behaviour (.name .base .mode .win). A
 %               panel says WHAT it is (type), WHERE it sits (region) and WHICH
 %               data it draws (var, a varMap field). This is what you save.
 %   guiPath_preset(name, basepath) returns both. guiPath draws them.
 %
 %   Data and view are joined by name. A panel's .var picks a varMap field;
-%   SEVERAL panels may name one field. That is how a hypnogram shows top and
+%   SEVERAL panels may name one field. That is how a state strip shows top and
 %   bottom from a single load, and how an event set shows as Top ticks plus a
 %   Bottom overlay - one datum, many views, no duplication.
 %
@@ -47,8 +47,8 @@ function guiPath_doc()
 %
 %   Loader is view-blind; the view shapes. var_load / var_fetch return the raw
 %   value. guiPath_shape then turns it into what a panel draws: an events struct,
-%   an hours-cell hypnogram, a channel stack's stats, a resolved y-limit. This
-%   happens once, when a preset lands (see mapsToConfig in guiPath).
+%   a channel stack's stats, a resolved y-limit. This happens once, when a
+%   preset lands (see mapsToConfig in guiPath).
 %
 %   CURATE picks the editable target. Several event / state sets can be loaded
 %   (a preset brings one; Load... adds more) and all are drawn at once; the
@@ -57,9 +57,10 @@ function guiPath_doc()
 %   - an eventTicks set gives events mode: accept or reject each event.
 %   - a stateStrip set gives states mode: assign a state to each epoch.
 %   - None gives view mode: no target, Prev / Next just steps the window.
-%   A hypnogram and a stateStrip both draw a coloured state strip, but a
-%   hypnogram is always read-only context (committed bouts); a stateStrip can be
-%   the target.
+%   Every preset shows the session's state strip as context, so states can be
+%   rescored from any of them - pick states in CURATE. Which set a preset OPENS
+%   on is its .mode: 'states' elects the state strip, anything else the first
+%   event set (guiPath > targetVar).
 %
 %
 % CONCEPTS: a preset is a file
@@ -120,10 +121,10 @@ function guiPath_doc()
 %   cache (.cache) shared by every recipe resolved during the load.
 %
 %   The problem it solves. Many fields read from the same file. In the EDs preset
-%   the hypnogram, spectrogram, EMG and EMG RMS all come out of the assembled
-%   sleep signals (sleep_sig.mat, an expensive read). The cache stores each file
-%   the first time it is read and returns the stored copy on every later hit, so
-%   a given file is read at most once per ctx.
+%   the state strip's epoch times, the spectrogram, EMG and EMG RMS all come out
+%   of the assembled sleep signals (sleep_sig.mat, an expensive read). The cache
+%   stores each file the first time it is read and returns the stored copy on
+%   every later hit, so a given file is read at most once per ctx.
 %
 %   The mechanism (worth understanding, because MATLAB makes it surprising). A
 %   struct is a value: passing it into a function copies it, and writes inside
@@ -195,11 +196,11 @@ function guiPath_doc()
 %           'eeg',  guiPath_panel('trace', 'bottom', 'eeg', 'height', 1.2)));
 %       guiPath(basepath, 'varMap', varMap, 'guiMap', guiMap);
 %
-%   8. Set the target. Exactly one eventTicks or stateStrip panel is curated.
-%      To curate EDs from ed.mat:
+%   8. Set the target. Exactly one eventTicks or stateStrip panel is curated;
+%      guiMap.mode picks which type. To curate EDs from ed.mat:
 %       varMap.ed = var_recipe('matvar', 'file', 'ed');
 %       guiMap.panels.evt = guiPath_panel('eventTicks', 'top', 'ed');
-%      guiMap.save then says where the result is written (see REFERENCE).
+%      Where it is written follows the set, not the preset (see REFERENCE).
 %
 %   9. Reopen fast. guiPath returns the loaded varMap; the live one (with
 %      anything loaded through the GUI) is in hFig.UserData.varMap / .guiMap.
@@ -215,8 +216,9 @@ function guiPath_doc()
 %       preset is a file). Either is then in the selector, for every session.
 %       guiPath_presetSave('ripp', guiMap);        % the same, from code
 %
-%   12. Save curation. Ctrl+S, or the action panel's Save, writes to
-%       guiMap.save. Each save first backs up any existing file (backup_file).
+%   12. Save curation. Ctrl+S, or the action panel's Save, writes the CURATED
+%       set to its own target (see REFERENCE). Each save first backs up any
+%       existing file (backup_file).
 %
 %
 % REFERENCE
@@ -226,19 +228,21 @@ function guiPath_doc()
 %   - traces       a vertical stack of binary channels (a bin recipe kept native
 %                  int16 and sliced per window, not averaged).
 %   - spec         a spectrogram (adapter struct .s / .freq / .tstamps).
-%   - hypnogram    read-only sleep-state strip (bout times).
 %   - raster       spike raster (cell of spike-time vectors [s]).
 %   - eventTicks   event marks: a tick strip in the Top, spanning lines across
 %                  the signals in the Bottom (an overlay, so it takes no tile).
 %                  A curation target (events mode); the Ops button overrides the
 %                  Bottom look (lines <-> ticks).
-%   - stateStrip   editable per-epoch label strip; a target (states mode).
+%   - stateStrip   per-epoch label strip (.labels .epochT .names .colors, as
+%                  presets/stateSet builds it); a target (states mode). The one
+%                  state panel - every preset shows it, so it is context and
+%                  editable target at once.
 %
 %   Panel fields (guiPath_panel).
-%   - type      one of the seven above.
+%   - type      one of the six above.
 %   - region    'top' (full-session overview) | 'bottom' (moving window).
 %   - var       the varMap field this panel draws. Panels sharing a var share
-%               one loaded input, so a hypnogram can appear top and bottom.
+%               one loaded input, so a state strip can appear top and bottom.
 %   - label     y-axis label.
 %   - height    relative panel height.
 %   - clr       trace / tick colour.
@@ -278,17 +282,23 @@ function guiPath_doc()
 %               data half is its own, the called token for a created one, ''
 %               for a hand-built varMap (which can update an existing preset's
 %               arrangement, but cannot create a new preset).
-%   - mode      'events' | 'states' (derived from the target if omitted).
+%   - mode      'events' | 'states'. Which set the preset OPENS on: the first
+%               panel of the type the mode curates. Derived from the panels if
+%               omitted (a stateStrip anywhere makes it 'states').
 %   - win       window width [s].
-%   - save      target token ('ed' | 'ripp' | 'labelsMan'), '', or a save(x)
-%               handle. 'ed' / 'ripp' write the accepted mask into
-%               <basename>.<token>.mat; 'labelsMan' writes state labels into
-%               <basename>.sleep_labelsMan.mat.
+%
+%   Where curation is written is NOT a guiMap field - it follows the SET, so a
+%   set saves the same way whichever preset elects it (guiPath > resolveSave).
+%   An eventTicks set writes its accepted mask into the file its var names
+%   (<basename>.ripp.mat); a stateStrip set writes its labels into
+%   <basename>.sleep_labelsMan.mat.
 %
 %   Files. The family is one entry point plus its parts. The data layer (io/) is
 %   shared, not GUI-specific.
 %   - guiPath.m          the viewer: figure, layout, navigation, save, Load.
-%   - presets/           one preset_<token>.m per preset; the whole list.
+%   - presets/           one preset_<token>.m per preset; the whole list. Also
+%                        stateSet.m, the state set they share (AccuSleep
+%                        knowledge lives with the presets, not the framework).
 %   - guiPath_preset.m   finds and calls one; no arg -> the available tokens.
 %   - guiPath_presetSave.m  writes a live arrangement into a preset file.
 %   - guiPath_panel.m    builds one view panel (with per-type defaults).
@@ -324,5 +334,8 @@ function guiPath_doc()
 % - 260719          presets became one file each (presets/preset_<token>.m,
 %                   found by guiPath_preset); Save writes the live arrangement
 %                   over a base preset's data (guiPath_presetSave).
+% - 260720          one state panel: 'hypnogram' is gone and every preset shows
+%                   the curatable 'stateStrip' from presets/stateSet. guiMap
+%                   .save with it - a set's save target follows the set.
 
 end

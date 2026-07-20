@@ -10,8 +10,8 @@ function sel = gui_loadDialog(parent, basepath)
 %   shows only for a raw trace; a Top/Bottom placement only for a signal.
 %
 %   OUTPUT sel (fields):
-%       .type   'trace' | 'traces' | 'spec' | 'hypnogram' | 'raster' |
-%               'eventTicks' | 'stateStrip'  (traces is binary-only)
+%       .type   'trace' | 'traces' | 'spec' | 'raster' | 'eventTicks' |
+%               'stateStrip'  (traces is binary-only)
 %       .from   'ws' | 'file' | 'bin'
 %       .value  for ws  -> the variable name (optionally var.field) [char]
 %               for bin -> the channel spec (e.g. '5' or '[5 6 7]')  [char]
@@ -30,6 +30,8 @@ function sel = gui_loadDialog(parent, basepath)
 %       05 Jul 2026 - progressive Load dialog (replaces the always-on Load fields).
 %       05 Jul 2026 - dropped WindowStyle 'modal' (its input grab could outlive
 %                     teardown and freeze the host); explicit delete + drawnow.
+%       20 Jul 2026 - Hypnogram dropped from the type list; States is the one
+%                     state panel, and it is curatable.
 
 narginchk(1, 2);
 if nargin < 2, basepath = ''; end
@@ -61,8 +63,8 @@ gl = uigridlayout(d, [6, 2], 'RowHeight', {'fit', 'fit', 'fit', 'fit', 'fit', 'f
     'ColumnWidth', {110, '1x'}, 'Padding', 12, 'RowSpacing', 8, 'ColumnSpacing', 6);
 
 lt = uilabel(gl, 'Text', 'Type', 'FontWeight', 'bold'); lt.Layout.Row = 1; lt.Layout.Column = 1;
-ddType = uidropdown(gl, 'Items', {'Trace', 'Traces', 'Spectrogram', 'Hypnogram', 'Raster', 'Events', 'States'}, ...
-    'ValueChangedFcn', @(~, ~) onType());
+ddType = uidropdown(gl, 'Items', {'Trace', 'Traces', 'Spectrogram', ...
+    'Raster', 'Events', 'States'}, 'ValueChangedFcn', @(~, ~) onType());
 ddType.Layout.Row = 1; ddType.Layout.Column = 2;
 
 lf = uilabel(gl, 'Text', 'Source', 'FontWeight', 'bold'); lf.Layout.Row = 2; lf.Layout.Column = 1;
@@ -253,7 +255,6 @@ switch label
     case 'Trace',       t = 'trace';
     case 'Traces',      t = 'traces';
     case 'Spectrogram', t = 'spec';
-    case 'Hypnogram',   t = 'hypnogram';
     case 'Raster',      t = 'raster';
     case 'Events',      t = 'eventTicks';
     case 'States',      t = 'stateStrip';

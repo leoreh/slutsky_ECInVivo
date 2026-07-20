@@ -13,6 +13,8 @@ function test_guiPath(sessionPath)
 %   HISTORY:
 %       260716 - created alongside the traces / amplitude / region work.
 %       260719 - presets addressed by file token (ripp, sleep_states).
+%       260720 - the state strip is context in every preset; checks that it is
+%                scored and that it does not steal an event preset's target.
 
 if nargin < 1, sessionPath = ''; end
 fprintf('== test_guiPath ==\n');
@@ -80,6 +82,21 @@ end
 hFig = guiPath(sessionPath, 'preset', 'ripp', 'Visible', 'off');
 d = hFig.UserData;
 assert(d.nEvents > 0, 'integration: no events loaded');
+
+% the state strip is CONTEXT in an event preset: loaded and drawn, but the
+% target stays the event set (targetVar keys on the mode, not on "the first
+% curation panel"). Its labels are the session's scored states - reading
+% sleep_labelsMan alone would leave a classified session almost all undefined.
+js = find(strcmp({d.inputs.type}, 'stateStrip'), 1);
+assert(~isempty(js), 'states: an event preset should show the state strip');
+assert(strcmp(d.curate, 'ripp') && strcmp(d.mode, 'events'), ...
+    'states: the state strip must not steal an event preset''s target');
+sLab = d.inputs(js).data.labels;
+scored = mean(sLab <= numel(d.inputs(js).data.names));
+assert(scored > 0.5, ['states: only %.0f%% of epochs scored - the strip ', ...
+    'is reading the manual layer instead of ss.labels'], 100 * scored);
+fprintf('  ok  state strip is context (%.0f%% scored), target stays ripp\n', ...
+    100 * scored);
 
 % stack is int16 in memory, labelled with real channels, drawn one line / ch
 ix = find(strcmp({d.inputs.type}, 'traces'), 1);
