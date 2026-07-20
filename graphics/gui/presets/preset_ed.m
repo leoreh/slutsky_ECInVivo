@@ -25,11 +25,12 @@ function [varMap, guiMap] = preset_ed(ctx)
 % - 260719          split out of guiPath_presets (one file per preset).
 % - 260720          the state context is the shared, curatable stateSet (was a
 %                   read-only hypnogram over ss.bouts.times).
-% - 260720b         follows the rebuilt ED pipeline: ed.info.sigSource became
-%                   ed.info.chMode ('eeg' | 'ripp'), and the Bottom now carries
-%                   the detection band-pass alongside the raw trace, because
-%                   that filtered trace is what ed_detect thresholds - a
-%                   candidate that looks unconvincing raw is judged on it.
+% - 260720b         follows the rebuilt ED pipeline: the Bottom now carries the
+%                   detection band-pass alongside the raw trace, because that
+%                   filtered trace is what ed_detect thresholds - a candidate
+%                   that looks unconvincing raw is judged on it.
+% - 260721          ED detection reads one auto-picked .lfp channel, so the
+%                   chMode branch and the sleep_sig eeg fallback are gone.
 
 
 %% ========================================================================
@@ -52,21 +53,14 @@ varMap.ed     = var_recipe('matvar', 'file', 'ed');
 varMap.raster = var_recipe('matvar', 'file', 'spikes', 'var', 'spikes', ...
     'path', 'times');
 
-% the LFP this preset shows = the signal ED detection ran on (from ed.info):
-% chMode 'ripp' -> that raw channel; 'eeg' (the default) -> sSig.eeg. The
-% filtered twin is the same signal through the detection band-pass, which is
-% the trace ed_detect actually thresholds.
-[edMode, edCh, edBand] = edSigSource(ctx);
-if strcmpi(edMode, 'ripp') && ~isempty(edCh)
-    varMap.lfp = var_recipe('bin', 'file', 'lfp', 'ch', edCh(:)', ...
-        'average', true, 'outClass', 'native');
-    varMap.edFilt = var_recipe('bin', 'file', 'lfp', 'ch', edCh(:)', ...
-        'average', true, 'transform', {'bandpass', {edBand}});
-else
-    varMap.lfp = var_recipe('matfield', 'file', 'sleep_sig', 'field', 'eeg');
-    varMap.edFilt = var_recipe('matfield', 'file', 'sleep_sig', ...
-        'field', 'eeg', 'transform', {'bandpass', {edBand}});
-end
+% the LFP this preset shows = the channel ED detection ran on (ed.info.edCh).
+% The filtered twin is the same channel through the detection band-pass, which
+% is the trace ed_detect actually thresholds.
+[edCh, edBand] = edSigSource(ctx);
+varMap.lfp = var_recipe('bin', 'file', 'lfp', 'ch', edCh(:)', ...
+    'average', true, 'outClass', 'native');
+varMap.edFilt = var_recipe('bin', 'file', 'lfp', 'ch', edCh(:)', ...
+    'average', true, 'transform', {'bandpass', {edBand}});
 
 
 %% ========================================================================
@@ -95,18 +89,17 @@ end
 %  SESSION RESOLVERS (read via the shared ctx cache)
 % =========================================================================
 
-function [mode, ch, band] = edSigSource(ctx)
-% ed.info chMode / edCh / passband - which signal ED detection ran on, and the
-% band it thresholded. Defaults match ed_methods, so the preset still opens on
-% a session detected before these fields existed.
-mode = 'eeg'; ch = []; band = [10 100];
+function [ch, band] = edSigSource(ctx)
+% ed.info edCh / passband - the channel ED detection ran on and the band it
+% thresholded. Defaults match ed_methods, so the preset still opens on a
+% session whose ed.mat predates these fields.
+ch = 1; band = [60 150];
 try
     ed = var_fetch(var_recipe('matvar', 'file', 'ed'), ctx);
     if isfield(ed, 'info')
-        if isfield(ed.info, 'chMode') && ~isempty(ed.info.chMode)
-            mode = ed.info.chMode;
+        if isfield(ed.info, 'edCh') && ~isempty(ed.info.edCh)
+            ch = ed.info.edCh;
         end
-        if isfield(ed.info, 'edCh'), ch = ed.info.edCh; end
         if isfield(ed.info, 'passband') && ~isempty(ed.info.passband)
             band = ed.info.passband;
         end

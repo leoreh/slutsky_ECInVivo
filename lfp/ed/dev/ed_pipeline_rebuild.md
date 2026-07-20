@@ -72,36 +72,131 @@ rejects — informative but not decisive, because the complex is biphasic and th
 largest excursion is sometimes the negative notch. Polarity is therefore
 reported as the sign of `.amp` and never gated.
 
+## The channel (260721 rebuild)
+
+Detection reads ONE auto-picked raw `.lfp` channel (`ed_pickCh`); the `sleep_sig`
+eeg branch and `met.chMode` are gone. Every session in the MCU cohort has a
+binary `.lfp` and a `session.mat`, so the fallback earned nothing. The EA cohort
+has neither and is no longer runnable.
+
+**Ground truth for the picker** (`ed_chSweep.m`): the real detector run on EVERY
+neural channel of raMCU3/4/5, each scored by the AUC with which `fastZ`
+separates the curated discharges. AUC varies hugely across channels of one
+probe — 0.78 to 0.96 in raMCU3 — so the choice matters.
+
+Two candidate criteria were refuted before the shipped one:
+
+| criterion | raMCU3 | raMCU4 | raMCU5 | verdict |
+|---|---|---|---|---|
+| `p99.9 / background` | rank 3 | rank 6 | rank 6 | normalising rewards the quietest, usually marginal, channel |
+| kurtosis | rank 3 | rank 6 | rank 6 | same failure |
+| fewest candidates | AUC 0.810 | — | 0.978 | corr(−xRate, AUC) = **−0.69** in raMCU3: few crossings means the discharge itself barely crosses |
+
+Shipped: **drop channels whose crossing rate is a Tukey outlier, then take the
+largest transients** (`prctile(|filt|, 99.9)`). Step 1 exists because raMCU5's
+ch12 produced 13457 candidates where every other channel gave 4760–6495 — a
+broken electrode, not a better one.
+
+| mouse | pick | its AUC | best possible | worst |
+|---|---|---|---|---|
+| raMCU3 | ch 14 | 0.957 | 0.960 | 0.780 |
+| raMCU4 | ch 7 | **0.986** | 0.986 | 0.880 |
+| raMCU5 | ch 3 | 0.978 | 0.983 | 0.951 |
+
+**Averaging channels was tested and refuted.** A discharge appears on every
+channel at once, so averaging looked like a matched filter for it. Measured
+(`ed_sigSweep.m`), the mean of all neural channels is *worse* — AUC 0.862 vs
+0.957 in raMCU3, 0.892 vs 0.986 in raMCU4. One channel wins.
+
 ## Shipped defaults
 
-Detection: `chMode 'eeg'`, `passband [60 150]`, `thr 8`, `limDur [4 200 40] ms`,
-polarity-blind.
+Detection: `passband [60 150]`, `thr 8`, `limDur [4 200 40] ms`, polarity-blind,
+on one auto-picked channel.
 
-Gate: `fastZ ≥ 15`, `posZ ≥ 5`, `isoZ ≥ 20` — each near the 5th percentile of the
-curated discharges (18, 8, 17), keeping 43 of 47.
+Noise filter (`met.qa`): `fastZ ≥ 15`, `isoZ ≥ 20`. **`posZ` was dropped from the
+gate.** It required the event to rise above its pre-event baseline, which
+encodes the shape of the discharges in three mice; polarity is layer-dependent
+(Maslarova et al. report a sharp negative spike in the dendritic layers and a
+positive slow wave in the pyramidal layer for the *same* event), and only 66% of
+the curated discharges were positive-going. It is still measured and reported.
 
-**The gate produces the set worth REVIEWING, not the answer.** It leaves 15–80
-events on a CAG mouse — the ~100 that gets curated down to ~20 — and single
-digits on a control. The per-event pass in `guiPath` is the final word.
+Clustering (`met.clust`): `win [-0.05 0.05]`, `nPC 6`, `nClust 12`, plus the
+scalar measures.
 
-`emg` is computed and is a knob, but is not bounded: once the three criteria are
-applied it removed nothing measurable.
+`emg` is gone entirely — nothing read it once the shape criteria were applied.
+
+## Cluster curation: what it does and does not do
+
+`ed_clustSweep.m` sweeps window × normalisation × features × count on the three
+curated mice, scored by the events you must review to find 80% of the
+discharges, taking clusters in order of discharge density.
+
+- **Scalar features are decisive.** Eleven of the top twelve configurations use
+  waveform components *plus* `fastZ isoZ posZ amp dur`; shape alone is worse
+  everywhere.
+- **A longer window wins**, against the paper's 10–50 ms: ±50 and ±100 ms beat
+  ±15 and ±25 by roughly threefold in review load. A discharge and a sharp wave
+  differ most in the DECAY, which a ±15 ms window cannot see.
+- **Unit-peak normalisation wins**, against the paper's absolute amplitudes. The
+  pool spans two orders of magnitude and the largest events take the principal
+  components with them. Scale returns through the ranked scalars.
+- **A fixed count beats BIC**, which settled on ~7 where 12 measured better on
+  every mouse. BIC maximises likelihood, which is not the objective.
+
+**Honest limits.** No single cluster holds all the discharges — they spread over
+two to four, so several boxes get ticked. Best-cluster purity tops out around
+70–88%, and the 80% figure is 80%, not 100%. This makes curation a handful of
+decisions instead of hundreds; it does not make it exact. A mouse whose result
+matters still deserves the per-event pass in `guiPath`.
+
+## End-to-end, whole cohort (`ed_verify.m`, ~8 s per session)
+
+| session | grp | ch | candidates | pool | recall | review |
+|---|---|---|---|---|---|---|
+| lh100 | WT | 9 | 9531 | **16** | — | — |
+| lh107 | WT | 14 | 355 | 9 | — | — |
+| lh119 | WT | 2 | 1673 | 8 | — | — |
+| lh122 | WT | 2 | 1432 | **239** | — | — |
+| lh126 | WT | 15 | 1283 | 4 | — | — |
+| lh132 | MCU-KO | 2 | 3388 | 12 | — | — |
+| lh133 | MCU-KO | 5 | 1014 | 4 | — | — |
+| lh134 | MCU-KO | 8 | 46 | 6 | — | — |
+| lh136 | MCU-KO | 15 | 1820 | 5 | — | — |
+| lh137 | MCU-KO | 15 | 5706 | 12 | — | — |
+| lh140 | MCU-KO | 2 | 10931 | 32 | — | — |
+| raMCU1 | CAG | 6 | 1219 | 25 | — | — |
+| raMCU2 | CAG | 5 | 4917 | 147 | — | — |
+| raMCU3 | CAG | 14 | 8533 | 292 | 80% | **18** |
+| raMCU4 | CAG | 7 | 2984 | 75 | 89% | **20** |
+| raMCU5 | CAG | 3 | 4760 | 490 | 94% | **18** |
+
+Review load is ~20 events per mouse regardless of pool size, which is the point.
+Controls land in the single digits to low tens and are rejected wholesale.
+
+The channel picker also fixed lh100 without being asked: it used to yield 236
+through the filter on the artifact-heavy channel, and yields 16 on the one it
+picks now.
 
 ## Architecture
 
-`ed_detect` → `ed_curate` → `guiPath`, plus `ed_tbl`. Detect writes nothing and
-seeds `.accepted` all-true; the gate is a separate stage over the saved struct;
-curation MARKS and never removes; a save backs the file up first.
+`ed_detect` → `ed_curate` → `ed_tbl`, with `guiPath` as an optional per-event
+pass. Detect writes nothing and seeds `.accepted` all-true; the filter and the
+clustering are a separate stage over the saved struct; curation MARKS and never
+removes; a save backs the file up first.
 
 | file | role |
 |---|---|
-| `ed_methods` | the met config: every knob + the default `.qa` spec |
-| `ed_sigLoad` | detection signal + EMG, windowed (`chMode` 'eeg' \| 'ripp') |
+| `ed_methods` | the met config: detection, `.qa` noise filter, `.clust` |
+| `ed_pickCh` | the detection channel (outlier reject, then largest transients) |
+| `ed_sigLoad` | one raw `.lfp` channel, windowed |
 | `ed_detect` | stage 1: signal prep, candidates, every per-event feature |
 | `ed_params` | the features |
-| `ed_curate` | stage 2: the gate, headless or a bulk-threshold GUI |
+| `ed_clust` | PCA + GMM over waveform shape; pure, no I/O |
+| `ed_curate` | stage 2: filter, cluster, accept whole types |
 | `ed_wrapper` | the thin chain |
 | `ed_tbl` | counts and rates per session × state |
+
+`tests/test_edCurate.m` covers `ed_clust` and the GUI on a synthetic session.
 
 `ripp_gate` moved to `lfp/events/evt_gate.m` and is shared with the ripple
 pipeline. `evt_qa` was deleted (`ed_wrapper` was its only caller). `evt_states`
@@ -188,12 +283,19 @@ No population burst is visible at the event itself (raMCU5: zero spikes in
 
 ## Open
 
-- **`posZ` encodes the raMCU3/4/5 shape** and is the criterion most likely to
-  be wrong. Polarity is only 66% positive among curated discharges, is
-  layer-dependent, and the curated set came from the old detector's proposals.
-- **raMCU4 runs high** (~80 through the gate, vs 15 and 45 in raMCU3/raMCU5).
-- **lh100 has an artifact-heavy channel** — saturation steps of 10–25k that no
-  physiological criterion should have to handle. Worth checking the recording.
-- **raMCU1 and raMCU2 are uncurated**, so their counts are unvalidated.
-- The gate rests on 47 discharges from 3 mice. It is a starting point per mouse,
-  not a constant.
+- **lh122 yields a pool of 239** where every other control gives 4–32. Either
+  that channel is bad or the mouse has something; look before trusting its
+  count.
+- **raMCU1 and raMCU2 are uncurated.** raMCU1's pool is 25 and raMCU2's is 147,
+  and their discharges are the ones that do NOT match the raMCU3/4/5 shape.
+  They are the reason the shape criterion was removed, and they are still the
+  test of whether that was enough.
+- **The curated set is 47 discharges from 3 mice**, all proposed by the OLD
+  detector, so recall against it is recall against a biased sample. It is the
+  only ground truth there is.
+- **Clustering does not isolate a single discharge cluster.** Best-cluster
+  recall is 39–70%; the discharges spread over two to four clusters. The review
+  load is ~20 events per mouse, not zero.
+- The suppression measure (`ed_units.m`) is evidence, deliberately kept out of
+  the pipeline. It is drawn in `ed_curate` as a per-cluster panel and gates
+  nothing.

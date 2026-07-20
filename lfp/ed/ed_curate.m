@@ -1,47 +1,46 @@
 function [ed, hFig] = ed_curate(basepath, varargin)
-% ED_CURATE Post-detection QA gate for EDs: headless or interactive (stage 2).
+% ED_CURATE Curate discharges by waveform TYPE, not one event at a time.
 %
 %   [ed, hFig] = ED_CURATE(basepath, varargin)
 %
 %   SUMMARY:
-%       Stage 2 of the ED pipeline. Loads <basename>.ed.mat and sets the
-%       per-event .accepted mask from a QA filter - per-metric [lo hi] ranges.
-%       The gate itself is evt_gate, shared with the ripple pipeline; this is
-%       the two ways to drive it:
+%       Stage 2 of the ED pipeline. Loads <basename>.ed.mat, applies met.qa as
+%       a noise filter, groups what survives into waveform clusters (ed_clust),
+%       and lets you accept whole clusters. Saving writes .accepted, .clustId
+%       and the choice into ed.info.
 %
-%       - Headless (flgGui = false): apply the spec, save .accepted and the
-%         spec in ed.info.qa, rebuild the per-bout rate table. The automatic
-%         gate, so a batch run needs no human.
-%       - Interactive (default): the same spec as thresholds. The counts and
-%         the kept-vs-removed mean waveform, tiled by state, update live as you
-%         move them. Three knobs carry the decision - is it sharp (fastZ), does
-%         it go up (posZ), does it stand alone (isoZ) - and EMG is there for a
-%         session where movement artifact is the problem.
+%       Why clusters. A 24 h recording proposes thousands of candidates and
+%       holds a few dozen discharges. Judging that one event at a time is a day
+%       of work; judging it by a MEAN waveform is worse than useless, because
+%       an average over discharges, sharp waves and step artifacts is a curve
+%       that is none of them - which is exactly how the discharges got buried
+%       when this pipeline was first calibrated. Split by shape first and every
+%       tile shows a real waveform, with a median and an IQR band rather than a
+%       mean, so one outlier cannot set the picture.
 %
-%       Read the waveform view knowing what it is: a MEAN. It only shows the
-%       discharge shape once the kept set is mostly discharges. If the counts
-%       are in the hundreds the average is whatever the bulk happens to be, and
-%       the tile says nothing - raise fastZ until the count is plausible for a
-%       day of recording (tens), then judge the shape.
+%       Nothing here knows what a discharge looks like. The clustering is blind
+%       and you name the clusters, so a mouse whose discharges differ from the
+%       raMCU3/4/5 shape still gets them in a cluster of their own - which is
+%       the whole point, since polarity and sharpness are layer-dependent.
 %
-%       This is the BULK pass, and it is what makes the per-event pass
-%       possible: detection is permissive by design and a 24 h recording yields
-%       thousands of candidates, far too many to step through one at a time.
-%       Set the thresholds here, then walk the survivors in guiPath.
+%       The MUA row is CONTEXT, never a criterion. A discharge is followed by a
+%       prolonged drop in population firing (0.18-0.62 of baseline in the
+%       curated mice, versus ~1.0 for artifacts and ripples - see
+%       dev/ed_pipeline_rebuild.md), so it is a useful second opinion on a
+%       cluster you are unsure about. It is drawn when spikes exist and
+%       silently skipped when they do not; nothing depends on it.
 %
-%       Nothing is destroyed - a rejected event keeps its row with .accepted =
-%       false, and Reset restores the default spec. Saving touches only
-%       .accepted, ed.info.qa and edStates, and backs the file up first. There
-%       is no invalidation step as ripples have: edMaps holds one row per
-%       DETECTED event and is row-aligned to ed, so a mask cannot stale it.
+%       Headless (flgGui = false) applies only the noise filter, for a batch
+%       run that has no human. That mask is NOT an answer - it is the pool the
+%       GUI sorts.
 %
 %   INPUTS:
 %       basepath - <char> session directory (must hold <basename>.ed.mat).
 %       varargin - Parameter/Value:
 %           'basename' - <char>   file stem. {folder name}
-%           'qa'       - <struct> filter spec (see ed_methods '.qa').
-%                                 {ed_methods('default').qa}
-%           'flgGui'   - <log>    open the GUI (true) or apply headless.{true}
+%           'met'      - <struct> config; reads .qa and .clust.
+%                                 {ed_methods('default')}
+%           'flgGui'   - <log>    open the GUI (true) or filter headless.{true}
 %           'Visible'  - <char>   'on' | 'off', for headless GUI tests. {'on'}
 %           'verbose'  - <log>    print progress? {true}
 %
@@ -50,15 +49,16 @@ function [ed, hFig] = ed_curate(basepath, varargin)
 %       hFig - <handle> the GUI figure ([] when headless).
 %
 %   DEPENDENCIES:
-%       evt_files, evt_gate, ed_methods, evt_states, evt_boutTimes,
-%       basepaths2vars, backup_file; GUI: gui_layout, gui_labeledControl,
-%       gui_notify, guiTbl_xy.
+%       evt_files, evt_gate, evt_states, evt_boutTimes, evt_spkPrep,
+%       ed_methods, ed_clust, basepaths2vars, backup_file; GUI: gui_layout,
+%       gui_labeledControl, gui_notify.
 %
 %   HISTORY:
-%       260720 created as the ED twin of ripp_curate, replacing the destructive
-%              evt_qa + evt_subset filter the old ed_wrapper ran at detection.
-%              No state filter: ED asks how discharges distribute over states,
-%              so restricting them is a question for ed_tbl, not for curation.
+%       260720 created as the ED twin of ripp_curate (threshold knobs over a
+%              kept-vs-removed mean waveform).
+%       260721 rebuilt around waveform clustering. The knobs are gone: they
+%              asked the human to express "which shape is a discharge" as three
+%              numbers, which is the wrong question put the wrong way round.
 
 %% ========================================================================
 %  ARGUMENTS + LOAD
@@ -66,19 +66,19 @@ function [ed, hFig] = ed_curate(basepath, varargin)
 p = inputParser;
 addRequired(p, 'basepath', @ischar);
 addParameter(p, 'basename', '', @ischar);
-addParameter(p, 'qa', [], @(x) isempty(x) || isstruct(x));
+addParameter(p, 'met', [], @(x) isempty(x) || isstruct(x));
 addParameter(p, 'flgGui', true, @islogical);
 addParameter(p, 'Visible', 'on', @(x) any(strcmpi(char(x), {'on', 'off'})));
 addParameter(p, 'verbose', true, @islogical);
 parse(p, basepath, varargin{:});
-qa      = p.Results.qa;
+met     = p.Results.met;
 flgGui  = p.Results.flgGui;
 vis     = char(p.Results.Visible);
 verbose = p.Results.verbose;
 
 basename = p.Results.basename;
 if isempty(basename), [~, basename] = fileparts(basepath); end
-if isempty(qa), qa = ed_methods('default').qa; end
+if isempty(met), met = ed_methods('default'); end
 
 files = evt_files(basepath, basename, 'ed');
 if ~isfile(files.evt)
@@ -89,16 +89,18 @@ S  = load(files.evt, 'ed');
 ed = S.ed;
 hFig = [];
 
+pool = evt_gate(ed, met.qa);            % the noise filter
+
 %% ========================================================================
 %  HEADLESS
 %  ========================================================================
 if ~flgGui
-    ed.accepted = evt_gate(ed, qa);
-    saveCurated(files.evt, ed.accepted, qa);
-    buildStates(basepath, basename, ed, ed.accepted);
+    ed.accepted = pool;
+    saveCurated(files.evt, pool, nan(numel(pool), 1), [], met.qa);
+    buildStates(basepath, basename, ed, pool);
     if verbose
-        fprintf('[ED_CURATE] %s : %d / %d accepted (headless)\n', ...
-            basename, nnz(ed.accepted), numel(ed.accepted));
+        fprintf('[ED_CURATE] %s : %d / %d pass the noise filter\n', ...
+            basename, nnz(pool), numel(pool));
     end
     return;
 end
@@ -106,48 +108,38 @@ end
 %% ========================================================================
 %  GUI
 %  ========================================================================
-hFig = uifigure('Name', ['ED curation: ' basename], ...
-    'Position', [80 80 1500 850], 'Visible', vis);
-[~, gPlot, gCtrl, gActions] = gui_layout(hFig, 'CtrlWidth', 250);
-
-dflt = specDefaults(qa);
 st = struct();
-st.edFast = gui_labeledControl(gCtrl, 'editnum', 'sharp  fastZ >=', ...
-    'Value', dflt.fastZ, 'ValueChangedFcn', @(~,~) refresh(hFig));
-st.edPos = gui_labeledControl(gCtrl, 'editnum', 'upward posZ >=', ...
-    'Value', dflt.posZ, 'ValueChangedFcn', @(~,~) refresh(hFig));
-st.edIso = gui_labeledControl(gCtrl, 'editnum', 'alone  isoZ >=', ...
-    'Value', dflt.isoZ, 'ValueChangedFcn', @(~,~) refresh(hFig));
-st.edEmg = gui_labeledControl(gCtrl, 'editnum', 'EMG <=', ...
-    'Value', dflt.emg, 'ValueChangedFcn', @(~,~) refresh(hFig));
-st.lblCount = gui_labeledControl(gCtrl, 'label', '');
-
-gui_labeledControl(gActions, 'button', '', 'Text', 'Reset to default', ...
-    'ButtonPushedFcn', @(~,~) onReset(hFig));
-gui_labeledControl(gActions, 'button', '', 'Text', 'Save', ...
-    'ButtonPushedFcn', @(~,~) doSave(hFig));
-
-st.hPanel   = uipanel(gPlot, 'BorderType', 'none');
 st.ed       = ed;
-st.qa0      = qa;
+st.met      = met;
 st.files    = files;
 st.basepath = basepath;
 st.basename = basename;
-st.accepted = ed.accepted;
-st.stateCol = plotState(ed.state);      % tiling variable; fixed for the session
+st.pool     = pool;
+[st.wv, st.tst] = loadMaps(files.maps, ed);
+st.mua      = loadMua(basepath, ed);
 
-% the waveform view is best-effort: without the detect-stage maps the
-% thresholds still work, they just have no picture behind them
-st.maps = [];
-st.xt   = [];
-try
-    [st.maps, st.xt] = loadMaps(files.maps, ed);
-catch ME
-    warning('ed_curate:maps', 'waveform view disabled (%s)', ME.message);
-end
+hFig = uifigure('Name', ['ED curation: ' basename], ...
+    'Position', [60 60 1600 800], 'Visible', vis);
+[~, gPlot, gCtrl, gActions] = gui_layout(hFig, 'CtrlWidth', 230);
 
+st.lblPool = gui_labeledControl(gCtrl, 'label', ...
+    sprintf('%d of %d pass the filter', nnz(pool), numel(pool)));
+st.edK = gui_labeledControl(gCtrl, 'editnum', 'clusters', ...
+    'Value', met.clust.nClust);
+gui_labeledControl(gCtrl, 'button', '', 'Text', 'Re-cluster', ...
+    'ButtonPushedFcn', @(~,~) onCluster(hFig));
+st.gClust = gui_labeledControl(gCtrl, 'panel', 'accept as discharge', ...
+    'RowHeight', '1x');
+st.lblKeep = gui_labeledControl(gCtrl, 'label', '');
+
+gui_labeledControl(gActions, 'button', '', 'Text', 'Save', ...
+    'ButtonPushedFcn', @(~,~) doSave(hFig));
+
+st.gPlot = uigridlayout(gPlot, [1 1], 'Padding', 0);
+st.chk = gobjects(0);
 hFig.UserData = st;
-refresh(hFig);
+
+onCluster(hFig);
 
 end     % EOF
 
@@ -155,102 +147,242 @@ end     % EOF
 % =========================================================================
 %  GUI CALLBACKS
 % =========================================================================
-function refresh(hFig)
-% Recompute accepted from the current thresholds; redraw counts + waveform.
+function onCluster(hFig)
+% Cluster the pool, then rebuild the checkbox list and the tiles.
 st = hFig.UserData;
-st.accepted = evt_gate(st.ed, buildSpec(st));
+c = st.met.clust;
+
+k = st.edK.Value;
+if k < 2, k = c.nClust; end
+
+iPool = find(st.pool);
+[cid, cInfo] = ed_clust(st.wv(iPool, :), st.tst, 'win', c.win, ...
+    'nPC', c.nPC, 'nClust', k, 'scalar', scalarFeat(st.ed, iPool));
+
+st.iPool  = iPool;
+st.cid    = cid;
+st.nClust = cInfo.nClust;
 hFig.UserData = st;
 
-st.lblCount.Text = sprintf('kept %d / %d', nnz(st.accepted), ...
-    numel(st.accepted));
-
-% Only the kept / removed flag changes as a threshold moves, so the widget is
-% updated in place - rebuilding it would reset the Y / tile / group selections
-% on every keystroke.
-if ~isempty(st.maps)
-    status = repmat("removed", numel(st.accepted), 1);
-    status(st.accepted) = "kept";
-    tbl = table(st.maps.lfp, categorical(status, {'removed', 'kept'}), ...
-        st.stateCol, 'VariableNames', {'lfp', 'status', 'state'});
-
-    ud = st.hPanel.UserData;
-    if isstruct(ud) && isfield(ud, 'setDataFcn')
-        ud.setDataFcn(tbl);
-    else
-        guiTbl_xy(st.xt, tbl, 'Parent', st.hPanel, 'yVar', 'lfp', ...
-            'tileVar', 'state', 'grpVar', 'status', 'xLbl', 'time (ms)');
-    end
+% a pool too small to hold types at all - a control mouse, usually. Say so
+% rather than drawing an empty grid; Save still writes an all-false mask.
+if st.nClust == 0
+    delete(st.gClust.Children);
+    delete(st.gPlot.Children);
+    st.chk = gobjects(0);
+    st.ax  = gobjects(0);
+    hFig.UserData = st;
+    st.lblKeep.Text = sprintf('%d events: too few to cluster', numel(iPool));
+    return;
 end
 
-end     % refresh
+st.edK.Value = cInfo.nClust;
+hFig.UserData = st;
+
+buildChecks(hFig);
+drawTiles(hFig);
+
+end     % onCluster
 
 
-function onReset(hFig)
-% Restore the thresholds to the default spec.
+function buildChecks(hFig)
+% One checkbox per cluster, labelled with its size.
 st = hFig.UserData;
-dflt = specDefaults(st.qa0);
-st.edFast.Value = dflt.fastZ;
-st.edPos.Value  = dflt.posZ;
-st.edIso.Value  = dflt.isoZ;
-st.edEmg.Value  = dflt.emg;
-refresh(hFig);
+delete(st.gClust.Children);
+g = uigridlayout(st.gClust, [st.nClust + 1, 1], 'Padding', 2, ...
+    'RowHeight', repmat({'fit'}, 1, st.nClust + 1), 'RowSpacing', 1);
 
-end     % onReset
+st.chk = gobjects(st.nClust, 1);
+for iK = 1 : st.nClust
+    st.chk(iK) = uicheckbox(g, 'Value', false, 'Text', ...
+        sprintf('%d   (n = %d)', iK, nnz(st.cid == iK)), ...
+        'ValueChangedFcn', @(~,~) onPick(hFig));
+end
+hFig.UserData = st;
+
+end     % buildChecks
+
+
+function onPick(hFig)
+% A cluster was ticked: recolour its tile and update the count.
+st = hFig.UserData;
+sel = arrayfun(@(h) h.Value, st.chk);
+for iK = 1 : st.nClust
+    if isgraphics(st.ax(iK))
+        st.ax(iK).Color = tileColor(sel(iK));
+    end
+end
+st.lblKeep.Text = sprintf('accepted: %d events', ...
+    nnz(ismember(st.cid, find(sel))));
+
+end     % onPick
 
 
 function doSave(hFig)
-% Persist accepted + the spec, and rebuild the per-bout rate table.
+% Persist the mask, the labels and which clusters were chosen.
 st = hFig.UserData;
-saveCurated(st.files.evt, st.accepted, buildSpec(st));
-buildStates(st.basepath, st.basename, st.ed, st.accepted);
-gui_notify(hFig, sprintf('Saved: %d / %d accepted (+ edStates)', ...
-    nnz(st.accepted), numel(st.accepted)), 'success');
+sel = find(arrayfun(@(h) h.Value, st.chk));
+sel = sel(:)';
+
+accepted = false(numel(st.pool), 1);
+accepted(st.iPool(ismember(st.cid, sel))) = true;
+clustId = nan(numel(st.pool), 1);
+clustId(st.iPool) = st.cid;
+
+saveCurated(st.files.evt, accepted, clustId, sel, st.met.qa);
+buildStates(st.basepath, st.basename, st.ed, accepted);
+gui_notify(hFig, sprintf('Saved: %d accepted from %d clusters (+ edStates)', ...
+    nnz(accepted), numel(sel)), 'success');
 
 end     % doSave
 
 
 % =========================================================================
-%  SPEC <-> CONTROLS
+%  DRAWING
 % =========================================================================
-function qa = buildSpec(st)
-qa.ranges = struct('fastZ', [st.edFast.Value, Inf], ...
-    'posZ', [st.edPos.Value, Inf], ...
-    'isoZ', [st.edIso.Value, Inf], ...
-    'emg', [-Inf, st.edEmg.Value]);
+function drawTiles(hFig)
+% One column per cluster: median waveform + IQR band on top, peri-event MUA
+% below when spikes exist.
+st = hFig.UserData;
+delete(st.gPlot.Children);
 
-end     % buildSpec
+hasMua = st.mua.ok;
+nRow = 1 + hasMua;
+g = uigridlayout(st.gPlot, [nRow, st.nClust], 'Padding', 4, ...
+    'RowHeight', repmat({'1x'}, 1, nRow));
 
+st.ax = gobjects(st.nClust, 1);
+for iK = 1 : st.nClust
+    inK = st.cid == iK;
+    ax = uiaxes(g); hold(ax, 'on');
+    st.ax(iK) = ax;
 
-function d = specDefaults(qa)
-% The control values a spec implies; an absent bound is an open one.
-d = struct('fastZ', -Inf, 'posZ', -Inf, 'isoZ', -Inf, 'emg', Inf);
-if ~isfield(qa, 'ranges'), return; end
-lo = {'fastZ', 'posZ', 'isoZ'};
-for iFld = 1 : numel(lo)
-    if isfield(qa.ranges, lo{iFld}), d.(lo{iFld}) = qa.ranges.(lo{iFld})(1); end
+    W = double(st.wv(st.iPool(inK), :));
+    q = prctile(W, [25 50 75], 1);
+    fill(ax, [st.tst, fliplr(st.tst)] * 1000, [q(1, :), fliplr(q(3, :))], ...
+        [0.3 0.3 0.3], 'FaceAlpha', 0.25, 'EdgeColor', 'none');
+    plot(ax, st.tst * 1000, q(2, :), 'k', 'LineWidth', 1.5);
+    xline(ax, 0, ':');
+    title(ax, sprintf('%d  (n = %d)', iK, nnz(inK)), 'FontSize', 9);
+    ax.Color = tileColor(false);
+    if iK == 1, ylabel(ax, 'LFP (uV)'); end
+    xlim(ax, [-100 100]);
+
+    if hasMua
+        axM = uiaxes(g); hold(axM, 'on');
+        r = muaRate(st.mua, st.ed.peakTime(st.iPool(inK)));
+        plot(axM, st.mua.ctrs * 1000, r, 'Color', [0 0.4 0.8], ...
+            'LineWidth', 1.2);
+        yline(axM, 1, ':'); xline(axM, 0, ':');
+        xlim(axM, [-400 400]); ylim(axM, [0 2]);
+        if iK == 1, ylabel(axM, 'MUA / baseline'); end
+        xlabel(axM, 'time (ms)');
+    else
+        xlabel(ax, 'time (ms)');
+    end
 end
-if isfield(qa.ranges, 'emg'), d.emg = qa.ranges.emg(2); end
+hFig.UserData = st;
+onPick(hFig);
 
-end     % specDefaults
+end     % drawTiles
+
+
+function c = tileColor(isSel)
+if isSel, c = [0.87 0.95 0.87]; else, c = [1 1 1]; end
+end
+
+
+% =========================================================================
+%  DATA
+% =========================================================================
+function [wv, tst] = loadMaps(file, ed)
+% Per-event waveforms behind the clustering and the tiles.
+if ~isfile(file)
+    error('ed_curate:noMaps', ...
+        'no edMaps file; re-run detection with flgSave.');
+end
+S = load(file, 'edMaps');
+if size(S.edMaps.lfp, 1) ~= numel(ed.peakTime)
+    error('ed_curate:staleMaps', ...
+        'edMaps does not match the event list; re-run detection.');
+end
+wv  = S.edMaps.lfp;
+tst = S.edMaps.tstamps;
+
+end     % loadMaps
+
+
+function mua = loadMua(basepath, ed)
+% Pooled multi-unit times + the psth bins. Empty when there are no spikes,
+% which is not an error - the MUA row is context, not a criterion.
+BIN = 0.020; HALF = 0.5;
+mua = struct('ok', false, 't', [], 'ctrs', [], 'edges', []);
+
+v = basepaths2vars('basepaths', {basepath}, ...
+    'vars', {'spikes', 'spktimes', 'session'}, 'flgPrnt', false);
+if ~isfield(v, 'session') || ~isstruct(v.session) ...
+        || ~isfield(v.session, 'extracellular')
+    return;
+end
+fsSpk = v.session.extracellular.sr;
+[~, muTimes] = evt_spkPrep(v, [0 Inf], ed.info.sigDur, fsSpk);
+if isempty(muTimes) || isempty(muTimes{1}), return; end
+
+mua.t     = muTimes{1};
+mua.edges = -HALF : BIN : HALF;
+mua.ctrs  = mua.edges(1 : end - 1) + BIN / 2;
+mua.ok    = true;
+
+end     % loadMua
+
+
+function r = muaRate(mua, peakTime)
+% Peri-event multi-unit rate, over its own baseline. Binary search per event
+% keeps this instant even with a million spikes.
+BASE = [-0.5 -0.2];
+cnt = zeros(1, numel(mua.ctrs));
+lo = discretize(peakTime + mua.edges(1), [-inf; mua.t(:); inf]);
+hi = discretize(peakTime + mua.edges(end), [-inf; mua.t(:); inf]);
+for iE = 1 : numel(peakTime)
+    if isnan(lo(iE)) || hi(iE) <= lo(iE), continue, end
+    d = mua.t(lo(iE) : min(hi(iE) - 1, numel(mua.t))) - peakTime(iE);
+    cnt = cnt + histcounts(d, mua.edges);
+end
+r = cnt / max(1, numel(peakTime));
+bl = mean(r(mua.ctrs >= BASE(1) & mua.ctrs <= BASE(2)));
+if bl > 0, r = r / bl; else, r = nan(size(r)); end
+
+end     % muaRate
+
+
+function s = scalarFeat(ed, idx)
+% The per-event shape measures that join the waveform components. They are
+% shape descriptors already computed, so withholding them from the clustering
+% would only throw information away.
+s = [ed.fastZ(idx), ed.isoZ(idx), ed.posZ(idx), ed.amp(idx), ed.dur(idx)];
+
+end     % scalarFeat
 
 
 % =========================================================================
 %  PERSISTENCE
 % =========================================================================
-function saveCurated(file, accepted, qa)
-% Back up, then overwrite .accepted + .info.qa in the saved struct.
+function saveCurated(file, accepted, clustId, sel, qa)
+% Back up, then overwrite the mask + the labels in the saved struct.
 backup_file(file);
 S = load(file);
-S.ed.accepted = logical(accepted(:));
-S.ed.info.qa  = qa;
+S.ed.accepted    = logical(accepted(:));
+S.ed.clustId     = clustId(:);
+S.ed.info.qa     = qa;
+S.ed.info.clustSel = sel;
 save(file, '-struct', 'S', '-v7.3');
 
 end     % saveCurated
 
 
 function buildStates(basepath, basename, ed, accepted)
-% Rebuild + save the per-bout rate / density table for the current mask (cheap;
-% no signal). Skips silently when sleep states are unavailable.
+% Rebuild + save the per-bout rate table for the current mask (cheap; no
+% signal). Skips silently when sleep states are unavailable.
 win = ed.info.win;
 w0  = win(1);
 if ~isfinite(w0), w0 = 0; end
@@ -267,46 +399,3 @@ evt_states(ed.times - w0, ed.peakTime - w0, boutTimes, ...
     'name', 'ed', 'lbl', 'ED');
 
 end     % buildStates
-
-
-% =========================================================================
-%  WAVEFORMS
-% =========================================================================
-function s = plotState(state)
-% ed.state as a tiling variable: <undefined> is promoted to its own 'unscored'
-% level. A categorical comparison never matches <undefined>, so without this the
-% unscored events would get no tile and vanish from the view without a word.
-s = removecats(state(:));
-if any(isundefined(s))
-    s = addcats(s, {'unscored'});
-    s(isundefined(s)) = 'unscored';
-end
-
-end     % plotState
-
-
-function [maps, xt] = loadMaps(file, ed)
-% The per-event LFP maps behind the waveform view, cropped to DISPDUR. A file
-% that no longer matches the event list is refused rather than silently drawing
-% the wrong waveforms.
-DISPDUR = [-0.1 0.1];
-if ~isfile(file)
-    error('no edMaps file; re-run detection with flgSave');
-end
-S = load(file, 'edMaps');
-if ~isfield(S, 'edMaps') || size(S.edMaps.lfp, 1) ~= numel(ed.peakTime)
-    error('edMaps does not match the event list; re-run detection');
-end
-
-maps = S.edMaps;
-keep = maps.tstamps >= DISPDUR(1) & maps.tstamps <= DISPDUR(2);
-fn = fieldnames(maps);
-for iFld = 1 : numel(fn)
-    if ~strcmp(fn{iFld}, 'tstamps') && size(maps.(fn{iFld}), 2) == numel(keep)
-        maps.(fn{iFld}) = maps.(fn{iFld})(:, keep);
-    end
-end
-maps.tstamps = maps.tstamps(keep);
-xt = maps.tstamps * 1000;               % ms
-
-end     % loadMaps

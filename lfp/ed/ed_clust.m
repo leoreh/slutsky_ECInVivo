@@ -1,0 +1,167 @@
+function [clustId, cInfo] = ed_clust(wv, tstamps, varargin)
+% ED_CLUST Group candidate waveforms into shape types (PCA -> GMM).
+%
+%   [clustId, cInfo] = ED_CLUST(wv, tstamps, varargin)
+%
+%   SUMMARY:
+%       Sorts a session's candidates by the shape of their LFP waveform, so
+%       curation becomes a handful of decisions about TYPES instead of hundreds
+%       about events.
+%
+%       It exists because a mean waveform lies. Average a set that holds
+%       discharges, sharp waves and step artifacts and you get a curve that is
+%       none of them, which is exactly how the discharges got buried the first
+%       time this pipeline was calibrated. Split the set into shape clusters
+%       first and each cluster's median is a real shape.
+%
+%       Deliberately NOT a classifier. It does not know which cluster is the
+%       discharge - it only makes that question askable, and a human answers it
+%       in ed_curate. Nothing here encodes the raMCU3/4/5 waveform, so a mouse
+%       whose discharges look different still gets them in a cluster of their
+%       own.
+%
+%       Preprocessing, every step measured on the 47 curated discharges
+%       (dev/ed_clustSweep.m sweeps window x normalisation x features x count,
+%       scored by how many events you must review to find 80% of them):
+%
+%         DETREND over the window, which removes the slow deflection the event
+%           happens to sit on.
+%         NORMALISE each waveform to unit peak. Maslarova et al. 2025 keep
+%           absolute amplitude for ripple-versus-IED, but that is a different
+%           contrast: here the pool spans two orders of magnitude and the few
+%           largest events take the principal components with them. Scale is
+%           not lost - it comes back through the scalar measures below, ranked,
+%           where it cannot dominate.
+%         WINDOW +-50 ms, wider than their 10-50 ms. Also a different
+%           contrast: a discharge and a sharp wave differ most in the DECAY (a
+%           discharge is back to baseline in 50-100 ms, a sharp wave takes
+%           300+), and a +-15 ms window cannot see it. Measured, +-50 and +-100
+%           ms both beat +-15 and +-25 by a factor of three in review load.
+%
+%       Cluster count is fixed rather than chosen by BIC. BIC maximises
+%       likelihood, which is not the objective - it settled on ~7 where 12
+%       measured better on every mouse. The GUI knob is the right way to change
+%       it, which is why this is cheap and stateless.
+%
+%   INPUTS:
+%       wv       - <mat>  [nEv x nSamp] per-event waveforms (edMaps.lfp).
+%       tstamps  - <vec>  [1 x nSamp] window time base (s), from edMaps.
+%       varargin - Parameter/Value:
+%           'win'    - <vec> waveform window to cluster on (s). {[-0.05 0.05]}
+%           'nPC'    - <num> principal components kept. {6}
+%           'nClust' - <num> cluster count. {12}
+%           'scalar' - <mat> [nEv x nFeat] extra per-event measures to cluster
+%                            on alongside the shape components. Each is
+%                            rank-normalised, so a heavy-tailed one cannot
+%                            dominate the geometry. Passing them measured
+%                            better than shape alone on every mouse and every
+%                            window, so the pipeline always does. {[]}
+%
+%   OUTPUTS:
+%       clustId  - <vec>    [nEv x 1] cluster index, ordered so 1 is the
+%                           largest cluster. NaN for an all-NaN row (an event
+%                           too near a recording edge to have a waveform).
+%       cInfo    - <struct> .nClust .score [nEv x nDim] .explained - what was
+%                           fit, for the GUI and the record.
+%
+%   DEPENDENCIES:
+%       pca, fitgmdist (Statistics and Machine Learning Toolbox).
+%
+%   HISTORY:
+%       260721 created, replacing the threshold-knob curation. See
+%              dev/ed_pipeline_rebuild.md.
+
+%% ========================================================================
+%  ARGUMENTS
+%  ========================================================================
+p = inputParser;
+addRequired(p, 'wv', @isnumeric);
+addRequired(p, 'tstamps', @isnumeric);
+addParameter(p, 'win', [-0.05 0.05], @isnumeric);
+addParameter(p, 'nPC', 6, @isnumeric);
+addParameter(p, 'nClust', 12, @isnumeric);
+addParameter(p, 'scalar', [], @isnumeric);
+parse(p, wv, tstamps, varargin{:});
+win    = p.Results.win;
+nPC    = p.Results.nPC;
+nClust = p.Results.nClust;
+scalar = p.Results.scalar;
+
+nEv = size(wv, 1);
+clustId = nan(nEv, 1);
+cInfo = struct('nClust', 0, 'score', [], 'explained', []);
+
+%% ========================================================================
+%  FEATURES
+%  ========================================================================
+iWin = tstamps >= win(1) & tstamps <= win(2);
+X = double(wv(:, iWin));
+
+% an event at a recording edge has a NaN waveform and cannot be clustered;
+% it keeps a NaN label and the caller treats that as its own group
+iOk = all(isfinite(X), 2);
+if ~isempty(scalar)
+    iOk = iOk & all(isfinite(scalar), 2);
+end
+% below this a "type" is not a meaningful thing to fit, and the caller treats
+% an all-NaN labelling as "too few to cluster"
+MINEV = 20;
+X = X(iOk, :);
+if size(X, 1) < MINEV || size(X, 2) < 3
+    return;
+end
+
+X = detrend(X', 'linear')';         % per-event, over the window
+pk = max(abs(X), [], 2);
+pk(pk == 0) = 1;
+X = X ./ pk;                        % unit peak; scale returns via `scalar`
+
+% detrending costs two degrees of freedom, so X is rank-deficient by
+% construction and pca says so on every call; the warning is expected, not a
+% symptom
+ws = warning('off', 'stats:pca:ColRankDefX');
+oc = onCleanup(@() warning(ws));    % restored when the function exits
+nPC = min(nPC, min(size(X)) - 1);
+[~, score, ~, ~, explained] = pca(X, 'NumComponents', nPC);
+
+% Scalar measures join the shape components on a comparable footing: rank
+% first (fastZ and amp are heavy-tailed, and a raw one would set the metric by
+% itself), then scale to the spread of the leading component.
+if ~isempty(scalar)
+    S = scalar(iOk, :);
+    S = (tiedrank(S) - 0.5) ./ size(S, 1);
+    score = [score, (S - 0.5) * std(score(:, 1)) * 2];
+end
+
+% a GMM needs comfortably more events than dimensions; on a small pool keep
+% only the leading features rather than failing
+nDim = max(2, min(size(score, 2), floor(size(score, 1) / 5)));
+score = score(:, 1 : nDim);
+
+%% ========================================================================
+%  CLUSTER
+%  ========================================================================
+% diagonal covariance and a regularisation floor: the clusters that matter are
+% small (a discharge type can be a dozen events among hundreds), and a full
+% covariance on a dozen points in 6 dimensions is singular.
+gmOpt = {'CovarianceType', 'diagonal', 'RegularizationValue', 1e-6, ...
+    'Replicates', 5, 'Options', statset('MaxIter', 500)};
+
+nClust = max(2, min(nClust, floor(size(score, 1) / 3)));
+gm = fitgmdist(score, nClust, gmOpt{:});
+lbl = cluster(gm, score);
+
+% relabel by size, largest first, so a cluster index means something stable
+% across a re-run and the GUI lists the bulk before the rare shapes
+cnt = accumarray(lbl, 1, [nClust, 1]);
+[~, ord] = sort(cnt, 'descend');
+remap = zeros(nClust, 1);
+remap(ord) = 1 : nClust;
+clustId(iOk) = remap(lbl);
+
+cInfo.nClust    = nClust;
+cInfo.score     = nan(nEv, size(score, 2));
+cInfo.score(iOk, :) = score;
+cInfo.explained = explained(1 : min(nPC, numel(explained)));
+
+end     % EOF

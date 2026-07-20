@@ -115,6 +115,7 @@ for iB = 1 : numel(out)
     if iB == 1, ylabel('pop rate / baseline'); end
     legend('Location', 'northeast', 'Box', 'off', 'FontSize', 7);
 end
-title(tl, 'Peri-event population firing (discharge = burst then prolonged suppression)');
+title(tl, ['Peri-event population firing ', ...
+    '(discharge = burst then prolonged suppression)']);
 exportgraphics(fh, fullfile(DEVDIR, 'ed_units.png'), 'Resolution', 110);
 fprintf('\nsaved ed_units.png\n');

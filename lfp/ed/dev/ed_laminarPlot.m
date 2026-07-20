@@ -58,7 +58,8 @@ for iB = 1 : numel(res)
         strjoin(compose('%d:%.0f', ch(:), ampCh(:)'), '  '));
 end
 
-title(tl, 'Mean ED waveform per channel (red = channels averaged for detection)');
+title(tl, ['Mean ED waveform per channel ', ...
+    '(red = channels averaged for detection)']);
 exportgraphics(fh, fullfile(DEVDIR, 'ed_laminar.png'), 'Resolution', 110);
 fprintf('\nsaved ed_laminar.png\n');
 

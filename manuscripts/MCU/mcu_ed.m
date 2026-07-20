@@ -1,14 +1,22 @@
-% MCU_ED  Epileptiform discharges: detect -> curate -> count by state.
+% MCU_ED  Epileptiform discharges: detect -> curate by cluster -> count.
 %
 % A scratch pad, not a function. Run a section at a time. The pipeline itself is
 % in lfp/ed; see lfp/ed/dev/ed_pipeline_rebuild.md for how every default was
 % measured, and evt_doc for how the ED and ripple pipelines share their spine.
 %
-% The shape mirrors mcu_ripples: loop 1 detects every session, loop 2 is manual
-% and one mouse at a time, and the last sections read the result. Detection is
-% permissive (thousands of candidates on a 24 h recording); the gate is what
-% cuts that to the tens a day of recording should hold, and the per-event pass
-% is the final word.
+% The shape mirrors mcu_ripples: loop 1 detects every session unattended, loop 2
+% is manual and one mouse at a time, and the last sections read the result.
+%
+% What curation is now. Detection is permissive and proposes thousands of
+% candidates on a 24 h recording. met.qa cuts that to a POOL of a few hundred by
+% asking only what no discharge can fail - is it sharp, does it stand alone -
+% and ed_curate groups the pool by waveform shape so you accept whole TYPES.
+% Nothing in the pipeline encodes what a discharge looks like; you do, per
+% mouse, by ticking clusters.
+%
+% Requires a binary <basename>.lfp and a session.mat: detection reads one
+% auto-picked raw channel (ed_pickCh). The EA cohort has neither and is no
+% longer runnable here.
 %
 % CAUTION: raMCU3 / raMCU4 / raMCU5 hold hand-curated masks. Re-detecting them
 % overwrites the mask (the old file goes to bkup/ first, and the curated peak
@@ -19,17 +27,17 @@
 %% ========================================================================
 %  DETECT  (loop 1: every session, unattended)
 %  ========================================================================
-% ~12 s per 24 h session. Writes <basename>.ed.mat (all candidates + metrics),
-% .edMaps.mat (one waveform per candidate) and, via the headless gate,
-% .edStates.mat. flgForce backs up any existing file before overwriting, so a
-% mask you already curated is recoverable from bkup/.
+% ~20 s per 24 h session, most of it the channel probe. Writes
+% <basename>.ed.mat (all candidates + metrics), .edMaps.mat (one waveform per
+% candidate) and, via the headless filter, .edStates.mat. flgForce backs up any
+% existing file first, so a mask you already curated is recoverable from bkup/.
 
 basepaths = [mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl'), ...
     mcu_basepaths('ra')];
 nFiles = numel(basepaths);
-met = ed_methods('default');        % detection + default QA filter (met.qa)
+met = ed_methods('default');
 
-for iFile = 1 : 11
+for iFile = 1 : nFiles
     ed_wrapper('basepath', basepaths{iFile}, 'met', met, 'win', [0 Inf], ...
         'flgSave', true, 'flgForce', true);
 end
@@ -38,37 +46,32 @@ end
 %% ========================================================================
 %  CURATE  (loop 2: manual, one mouse at a time)
 %  ========================================================================
-% Two passes. The first sets four thresholds over ALL candidates at once
-% and shows the kept-vs-removed mean waveform per state; the second steps
-% the survivors one by one. Doing the second without the first means
-% walking thousands of events.
+% Tick the clusters whose median waveform is a discharge, then Save. Reading
+% the tiles:
+%   - a discharge is a sharp complex ~20-30 ms wide on flat background, back to
+%     baseline within 50-100 ms. It may be positive-going or negative-going;
+%     polarity depends on which layer the electrode sits in, so do NOT reject a
+%     cluster for having the "wrong" sign.
+%   - an ordinary sharp wave is a slow monophasic negative excursion peaking
+%     ~40 ms out and decaying over 300+ ms. This is the bulk of the pool.
+%   - a step artifact drops and never returns.
+%   - the MUA row is a second opinion, not a criterion: a discharge cluster
+%     usually shows firing falling well below baseline for 50-300 ms after the
+%     event, while artifacts and ripples sit flat at 1.
+% 'clusters' re-runs with a different count. More clusters means finer types
+% and more boxes; 12 measured best, but a mouse with a big pool may want more.
 
-iFile = 16;
+iFile = 12;
 
-% pass 1 - bulk. Move a threshold, watch the waveform split, press Save.
-ed_curate(basepaths{iFile}, 'qa', met.qa);
+ed_curate(basepaths{iFile}, 'met', met);
 
-% pass 2 - per event. Up / Down accept-reject, Left / Right step, Ctrl+S save.
+% optional per-event pass over what you accepted, for a mouse you are unsure
+% about. Up / Down accept-reject, Left / Right step, Ctrl+S save.
 [~, vm, gm] = guiPath(basepaths{iFile}, 'preset', 'ed');
 
 % reopen fast (the signals stay loaded; only the events are re-read)
 vm.ed.data = [];
 guiPath(basepaths{iFile}, 'varMap', vm, 'guiMap', gm);
-
-
-%% ========================================================================
-%  RE-GATE  (optional: apply one spec to every session, no re-detection)
-%  ========================================================================
-% Curation is separable from detection, so a threshold can be revisited across
-% the cohort in seconds. This OVERWRITES the per-mouse masks set in the GUI -
-% run it before the manual pass, not after.
-
-qa = met.qa;
-qa.ranges.fastZ = [25 Inf];         % e.g. demand a sharper transient
-
-for iFile = 1 : nFiles
-    ed_curate(basepaths{iFile}, 'qa', qa, 'flgGui', false);
-end
 
 
 %% ========================================================================
@@ -102,50 +105,36 @@ frml = 'edRate ~ state * genotype + (1|sbjID)';
 
 
 %% ========================================================================
-%  SANITY: WHAT DID THE GATE KEEP?
+%  SANITY: WHAT DID YOU ACCEPT?
 %  ========================================================================
 % Worth one look per cohort. Only the CAG-MCU-KO (raMCU) mice are expected to
 % carry discharges, and only a few dozen per 24 h; a control or an MCU-KO mouse
 % landing anywhere near that is a signal to look at the channel, not a result.
 
-iFile = 1;
+iFile = 12;
 [~, basename] = fileparts(basepaths{iFile});
 load(fullfile(basepaths{iFile}, [basename, '.ed.mat']), 'ed');
 
 acc = ed.accepted;
-fprintf('%s: %d / %d accepted\n', basename, nnz(acc), numel(acc));
-fprintf('  fastZ %.1f | posZ %.1f | amp %.0f | dur %.1f ms | emg %.2f\n', ...
-    median(ed.fastZ(acc), 'omitnan'), median(ed.posZ(acc), 'omitnan'), ...
-    median(ed.amp(acc), 'omitnan'), median(ed.dur(acc), 'omitnan'), ...
-    median(ed.emg(acc), 'omitnan'));
+fprintf('%s: ch %d, %d accepted of %d candidates (clusters %s)\n', ...
+    basename, ed.info.edCh, nnz(acc), numel(acc), mat2str(ed.info.clustSel));
+fprintf('  fastZ %.1f | isoZ %.1f | posZ %.1f | amp %.0f | dur %.1f ms\n', ...
+    median(ed.fastZ(acc), 'omitnan'), median(ed.isoZ(acc), 'omitnan'), ...
+    median(ed.posZ(acc), 'omitnan'), median(ed.amp(acc), 'omitnan'), ...
+    median(ed.dur(acc), 'omitnan'));
 
-% the two gate metrics against each other. Discharges sit in the upper right;
-% slow deflections are low on fastZ, step artifacts low on posZ
-tblEvt = table(ed.fastZ, ed.posZ, ed.amp, ed.dur, ed.emg, ...
+% where the accepted clusters sit against the rest. posZ is REPORTED, never
+% gated - a discharge may be either polarity - so expect accepted events on
+% both sides of zero if the electrode sits near a reversal.
+tblEvt = table(ed.fastZ, ed.isoZ, ed.posZ, ed.amp, ed.dur, ...
     categorical(acc, [false true], {'removed', 'kept'}), ...
-    'VariableNames', {'fastZ', 'posZ', 'amp', 'dur', 'emg', 'status'});
+    'VariableNames', {'fastZ', 'isoZ', 'posZ', 'amp', 'dur', 'status'});
 guiTbl_scatHist(tblEvt, 'xVar', 'fastZ', 'yVar', 'posZ', 'grpVar', 'status');
 
-
-%% ========================================================================
-%  THE EA COHORT  (epileptic mice; flat folder, no session.mat / sleep_states)
-%  ========================================================================
-% Several recordings share one directory and the stem does not follow it, so
-% every entry point takes an explicit basename. With no sleep scoring the events
-% are left unlabelled, ed_tbl returns only the 'ALL' row, and guiPath drops the
-% state strip - the rest of the pipeline is unchanged.
-
-eaPath  = 'D:\Data\EA';
-eaNames = {'220611_0750', '220615_0801', '220824_0906'};
-
-for iFile = 1 : numel(eaNames)
-    ed_wrapper('basepath', eaPath, 'basename', eaNames{iFile}, 'met', met, ...
-        'flgSave', true, 'flgForce', true);
-end
-
-ed_curate(eaPath, 'basename', eaNames{1}, 'qa', met.qa);
-guiPath(eaPath, 'basename', eaNames{1}, 'preset', 'ed');
-
-tblEA = ed_tbl(repmat({eaPath}, 1, numel(eaNames)), eaNames);
-
-% EOF
+% and the waveforms of what you kept, by cluster
+load(fullfile(basepaths{iFile}, [basename, '.edMaps.mat']), 'edMaps');
+tblWv = table(edMaps.lfp, categorical(ed.clustId), ...
+    categorical(acc, [false true], {'removed', 'kept'}), ...
+    'VariableNames', {'lfp', 'cluster', 'status'});
+guiTbl_xy(edMaps.tstamps * 1000, tblWv(acc, :), 'yVar', 'lfp', ...
+    'tileVar', 'cluster', 'xLbl', 'time (ms)');

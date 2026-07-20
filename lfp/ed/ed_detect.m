@@ -37,14 +37,14 @@ function [ed, aux] = ed_detect(basepath, varargin)
 %
 %   OUTPUTS:
 %       ed  - <struct> window-relative candidates + per-event fields (.times
-%                      .peakTime .pos .bouts .fastZ .posZ .amp .dur .emg
+%                      .peakTime .pos .bouts .fastZ .posZ .isoZ .amp .dur
 %                      .state .accepted, partial .info).
 %       aux - <struct> .edSig .fs .edCh - the prepared signal, so the caller can
 %                      build the per-event maps without reloading.
 %
 %   DEPENDENCIES:
 %       basepaths2vars, ed_methods, ed_sigLoad, ed_params, filterLFP,
-%       binary2bouts, evt_boutTimes, evt_emgScore, evt_states.
+%       binary2bouts, evt_boutTimes, evt_states.
 %
 %   HISTORY:
 %       Created: 260622 (as a signal-in / events-out detector).
@@ -52,7 +52,10 @@ function [ed, aux] = ed_detect(basepath, varargin)
 %       Updated: 260721 (detection band moved from 10-100 Hz to 60-150 Hz after
 %                curated discharges showed the two are not separable below
 %                ~30 Hz; the block-wise baseline and the ring features went
-%                with it. See dev/ed_pipeline_rebuild.md.)
+%                with it.)
+%       Updated: 260721b (one auto-picked raw .lfp channel, so met.chMode is
+%                gone; the EMG metric went with it, unread once the shape
+%                criteria were applied. See dev/ed_pipeline_rebuild.md.)
 
 %% ========================================================================
 %  ARGUMENTS
@@ -78,20 +81,16 @@ if isempty(met), met = ed_methods('default'); end
 %% ========================================================================
 %  SIGNAL + CONTEXT
 %  ========================================================================
-% session may be absent on a minimal (sleep_sig only) layout, so it is guarded;
-% the 'eeg' channel mode needs none of it
-
 v = basepaths2vars('basepaths', {basepath}, ...
     'vars', {'session', 'sleep_states'});
-session = [];
-if isfield(v, 'session'), session = v.session; end
 
 if isinf(win(2)), winDur = Inf; else, winDur = win(2) - win(1); end
 boutTimes = evt_boutTimes(v, win, winDur);
 
 if verbose, fprintf('[ED_DETECT] %s : loading signal...\n', basename); end
-[raw, emg, fs, edCh] = ed_sigLoad(basepath, 'basename', basename, ...
-    'chMode', met.chMode, 'edCh', edCh, 'win', win, 'session', session);
+[raw, fs, edCh] = ed_sigLoad(basepath, 'basename', basename, ...
+    'edCh', edCh, 'win', win, 'session', v.session, ...
+    'passband', met.passband);
 
 edSig = sigPrep(raw, fs, met);
 
@@ -125,11 +124,6 @@ if verbose, fprintf('[ED_DETECT] %s : %d candidates\n', basename, nEv); end
 
 ed = ed_params(edSig, ed);
 
-% EMG over a fixed window about the peak: a discharge is a point event, so a
-% 6 ms and a 40 ms one are scored against the same amount of muscle signal
-ed.emg = evt_emgScore(emg, [ed.peakTime - 0.02, ed.peakTime + 0.02], fs, ...
-    'baselineTimes', []);
-
 % per-event state label; the per-bout rate table is a post-curation product
 ed.state = evt_states(ed.times, ed.peakTime, boutTimes, ...
     'flgSave', false, 'flgPlot', false, 'name', 'ed', 'lbl', 'ED');
@@ -141,7 +135,6 @@ ed.accepted = true(nEv, 1);         % the gate runs downstream
 %  ========================================================================
 ed.info.sigDur   = numel(raw) / fs;
 ed.info.met      = met.name;
-ed.info.chMode   = met.chMode;
 ed.info.edCh     = edCh;
 ed.info.passband = met.passband;
 ed.info.thr      = met.thr;
