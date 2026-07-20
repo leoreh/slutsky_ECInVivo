@@ -24,7 +24,8 @@ function [varMap, guiMap] = preset_sleep_states(ctx)
 % HISTORY
 % - 260719          split out of guiPath_presets (one file per preset).
 % - 260720          the strip comes from the shared stateSet (was composed
-%                   here, from sleep_labelsMan alone).
+%                   here, from sleep_labelsMan alone). An unscored session
+%                   errors here - the strip is this preset's whole point.
 
 
 %% ========================================================================
@@ -38,7 +39,15 @@ varMap.emgRms = var_recipe('matfield', 'file', 'sleep_sig', ...
     'field', 'emg_rms', 'fs', 1);
 varMap.eeg    = var_recipe('matfield', 'file', 'sleep_sig', 'field', 'eeg');
 varMap.emg    = var_recipe('matfield', 'file', 'sleep_sig', 'field', 'emg');
-varMap.states = var_recipe('value', 'data', stateSet(ctx));
+% here the strip is the point, not context: without it there is nothing to
+% score, so say so rather than opening a viewer with no target (the event
+% presets, where states are only context, just leave the entry out)
+sSet = stateSet(ctx);
+if isempty(sSet)
+    error('preset_sleep_states:noStates', ...
+        'no sleep scoring in %s - run as_classify first', ctx.basename);
+end
+varMap.states = var_recipe('value', 'data', sSet);
 
 
 %% ========================================================================

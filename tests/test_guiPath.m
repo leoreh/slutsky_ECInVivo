@@ -15,6 +15,7 @@ function test_guiPath(sessionPath)
 %       260719 - presets addressed by file token (ripp, sleep_states).
 %       260720 - the state strip is context in every preset; checks that it is
 %                scored and that it does not steal an event preset's target.
+%                The EMG check follows the ripples preset to emgScore.
 
 if nargin < 1, sessionPath = ''; end
 fprintf('== test_guiPath ==\n');
@@ -109,12 +110,14 @@ fprintf('  ok  int16 stack, channels %s\n', mat2str(q.chInfo.labels));
 % Tend is the session length, not nCh x it
 assert(d.Tend_s < 48*3600, 'integration: Tend inflated (computeTend counted the matrix)');
 
-% a row-vector signal (emg_rms) stays a full time series, not averaged to one
-% scalar (the bin-averaging must fire only for a bin: matrix)
-je = find(strcmp({d.inputs.name}, 'emgRms'), 1);
+% a 1-D matfield signal stays a full time series, not averaged to one scalar
+% (the bin-averaging must fire only for a bin: matrix). The ripples preset's
+% overview EMG is emgScore; it was emgRms until 260720b.
+je = find(strcmp({d.inputs.name}, 'emgScore'), 1);
 assert(~isempty(je) && numel(d.inputs(je).data) > 1000, ...
-    'integration: emg_rms collapsed to a scalar (trace-averaging misfired)');
-fprintf('  ok  emg_rms is a full trace (%d samples)\n', numel(d.inputs(je).data));
+    'integration: the EMG trace collapsed (trace-averaging misfired)');
+fprintf('  ok  emgScore is a full trace (%d samples)\n', ...
+    numel(d.inputs(je).data));
 
 % event ticks: one full-height blue line, no y-ticks (the Ripples set is 'ripp')
 jt = find(strcmp({d.wideP.source}, 'ripp'), 1);

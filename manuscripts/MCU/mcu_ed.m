@@ -6,8 +6,13 @@
 %
 % The shape mirrors mcu_ripples: loop 1 detects every session, loop 2 is manual
 % and one mouse at a time, and the last sections read the result. Detection is
-% deliberately permissive (thousands of candidates on a 24 h recording), so the
-% curation pass is not optional - it is where the operating point is chosen.
+% permissive (thousands of candidates on a 24 h recording); the gate is what
+% cuts that to the tens a day of recording should hold, and the per-event pass
+% is the final word.
+%
+% CAUTION: raMCU3 / raMCU4 / raMCU5 hold hand-curated masks. Re-detecting them
+% overwrites the mask (the old file goes to bkup/ first, and the curated peak
+% times are also kept in lfp/ed/dev/ed_curatedTimes.mat).
 
 
 
@@ -24,7 +29,7 @@ basepaths = [mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl'), ...
 nFiles = numel(basepaths);
 met = ed_methods('default');        % detection + default QA filter (met.qa)
 
-for iFile = 12 : nFiles
+for iFile = 1 : 11
     ed_wrapper('basepath', basepaths{iFile}, 'met', met, 'win', [0 Inf], ...
         'flgSave', true, 'flgForce', true);
 end
@@ -38,7 +43,7 @@ end
 % the survivors one by one. Doing the second without the first means
 % walking thousands of events.
 
-iFile = 15;
+iFile = 16;
 
 % pass 1 - bulk. Move a threshold, watch the waveform split, press Save.
 ed_curate(basepaths{iFile}, 'qa', met.qa);
@@ -59,7 +64,7 @@ guiPath(basepaths{iFile}, 'varMap', vm, 'guiMap', gm);
 % run it before the manual pass, not after.
 
 qa = met.qa;
-qa.ranges.ampG = [10 Inf];          % e.g. tighten the amplitude criterion
+qa.ranges.fastZ = [25 Inf];         % e.g. demand a sharper transient
 
 for iFile = 1 : nFiles
     ed_curate(basepaths{iFile}, 'qa', qa, 'flgGui', false);
@@ -99,9 +104,9 @@ frml = 'edRate ~ state * genotype + (1|sbjID)';
 %% ========================================================================
 %  SANITY: WHAT DID THE GATE KEEP?
 %  ========================================================================
-% Worth one look per cohort. A non-epileptic mouse should land near a few tens
-% of events; lh132 currently returns an epileptic-range rate, which is either
-% real or a bad channel.
+% Worth one look per cohort. Only the CAG-MCU-KO (raMCU) mice are expected to
+% carry discharges, and only a few dozen per 24 h; a control or an MCU-KO mouse
+% landing anywhere near that is a signal to look at the channel, not a result.
 
 iFile = 1;
 [~, basename] = fileparts(basepaths{iFile});
@@ -109,16 +114,17 @@ load(fullfile(basepaths{iFile}, [basename, '.ed.mat']), 'ed');
 
 acc = ed.accepted;
 fprintf('%s: %d / %d accepted\n', basename, nnz(acc), numel(acc));
-fprintf('  ampG %.1f | ampZ %.1f | hfRatio %.2f | dur %.1f ms | emg %.2f\n', ...
-    median(ed.ampG(acc), 'omitnan'), median(ed.ampZ(acc), 'omitnan'), ...
-    median(ed.hfRatio(acc), 'omitnan'), median(ed.dur(acc), 'omitnan'), ...
+fprintf('  fastZ %.1f | posZ %.1f | amp %.0f | dur %.1f ms | emg %.2f\n', ...
+    median(ed.fastZ(acc), 'omitnan'), median(ed.posZ(acc), 'omitnan'), ...
+    median(ed.amp(acc), 'omitnan'), median(ed.dur(acc), 'omitnan'), ...
     median(ed.emg(acc), 'omitnan'));
 
-% the four metrics against each other, kept vs removed
-tblEvt = table(ed.ampG, ed.ampZ, ed.hfRatio, ed.emg, ed.dur, ...
+% the two gate metrics against each other. Discharges sit in the upper right;
+% slow deflections are low on fastZ, step artifacts low on posZ
+tblEvt = table(ed.fastZ, ed.posZ, ed.amp, ed.dur, ed.emg, ...
     categorical(acc, [false true], {'removed', 'kept'}), ...
-    'VariableNames', {'ampG', 'ampZ', 'hfRatio', 'emg', 'dur', 'status'});
-guiTbl_scatHist(tblEvt, 'xVar', 'ampG', 'yVar', 'hfRatio', 'grpVar', 'status');
+    'VariableNames', {'fastZ', 'posZ', 'amp', 'dur', 'emg', 'status'});
+guiTbl_scatHist(tblEvt, 'xVar', 'fastZ', 'yVar', 'posZ', 'grpVar', 'status');
 
 
 %% ========================================================================

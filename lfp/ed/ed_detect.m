@@ -12,13 +12,19 @@ function [ed, aux] = ed_detect(basepath, varargin)
 %       detection feeds any per-mouse curation. Times are window-relative; the
 %       caller shifts to absolute. Nothing is written to disk.
 %
-%       The detection statistic is the band-passed trace over ONE robust scale
-%       for the whole recording (median absolute deviation, on a stride). Band-
-%       passing is what makes a single threshold mean the same thing in every
-%       vigilance state: on the raw trace the NREM delta amplitude dominates the
-%       variance, so a raw threshold is really a slow-wave detector. A robust
-%       scale is what keeps a discharge from raising its own threshold, which
-%       the previous moving mean / SD baseline did.
+%       Detection runs on 60-150 Hz because a discharge is defined by being
+%       SHARP, not by being large. The obvious choice - a band around the
+%       deflection itself, say 10-100 Hz - fails, and fails in a way worth
+%       recording: in the slow band a discharge and an ordinary hippocampal
+%       sharp wave are not separable at all (AUC 0.54 against curated labels),
+%       so a detector built there proposes thousands of normal deflections and
+%       buries the few real discharges. Above 60 Hz the same events separate
+%       almost perfectly (AUC 0.99). The band also sits above 50 Hz mains and
+%       is kept below the very high frequencies where EMG dominates.
+%
+%       Detection is polarity-blind and deliberately permissive: it thresholds
+%       |filt|, so a candidate costs one row while a missed discharge is gone
+%       for good. Shape is the gate's job (ed_params .posZ), not detection's.
 %
 %   INPUTS:
 %       basepath - <char> session directory.
@@ -31,8 +37,8 @@ function [ed, aux] = ed_detect(basepath, varargin)
 %
 %   OUTPUTS:
 %       ed  - <struct> window-relative candidates + per-event fields (.times
-%                      .peakTime .pos .bouts .amp .ampG .ampZ .hfRatio .dur
-%                      .emg .state .accepted, partial .info).
+%                      .peakTime .pos .bouts .fastZ .posZ .amp .dur .emg
+%                      .state .accepted, partial .info).
 %       aux - <struct> .edSig .fs .edCh - the prepared signal, so the caller can
 %                      build the per-event maps without reloading.
 %
@@ -42,10 +48,11 @@ function [ed, aux] = ed_detect(basepath, varargin)
 %
 %   HISTORY:
 %       Created: 260622 (as a signal-in / events-out detector).
-%       Updated: 260720 (stage 1 of the staged pipeline. The moving mean / SD
-%                z-score, the DC-dependent amplitude gate and the hand-rolled
-%                crossing merge are gone. A block-wise baseline was tried and
-%                dropped: it cost 45 lines and changed no result.)
+%       Updated: 260720 (stage 1 of the staged pipeline).
+%       Updated: 260721 (detection band moved from 10-100 Hz to 60-150 Hz after
+%                curated discharges showed the two are not separable below
+%                ~30 Hz; the block-wise baseline and the ring features went
+%                with it. See dev/ed_pipeline_rebuild.md.)
 
 %% ========================================================================
 %  ARGUMENTS
@@ -100,9 +107,6 @@ bouts = binary2bouts('vec', edSig.z > met.thr, 'minDur', limSamp(1), ...
     'maxDur', limSamp(2), 'interDur', limSamp(3));
 if isempty(bouts), bouts = zeros(0, 2); end
 
-% peak = the largest deflection of the band-passed trace inside the candidate,
-% by MAGNITUDE, so a negative-going discharge is localised as well as a positive
-% one (discharges in this preparation are predominantly negative)
 nEv = size(bouts, 1);
 pos = zeros(nEv, 1);
 for iEv = 1 : nEv
@@ -123,7 +127,7 @@ ed = ed_params(edSig, ed);
 
 % EMG over a fixed window about the peak: a discharge is a point event, so a
 % 6 ms and a 40 ms one are scored against the same amount of muscle signal
-ed.emg = evt_emgScore(emg, [ed.peakTime - 0.025, ed.peakTime + 0.025], fs, ...
+ed.emg = evt_emgScore(emg, [ed.peakTime - 0.02, ed.peakTime + 0.02], fs, ...
     'baselineTimes', []);
 
 % per-event state label; the per-bout rate table is a post-curation product
@@ -140,7 +144,6 @@ ed.info.met      = met.name;
 ed.info.chMode   = met.chMode;
 ed.info.edCh     = edCh;
 ed.info.passband = met.passband;
-ed.info.hfBand   = met.hfBand;
 ed.info.thr      = met.thr;
 ed.info.limDur   = met.limDur;
 
@@ -153,36 +156,35 @@ end     % EOF
 %  LOCAL
 % =========================================================================
 function edSig = sigPrep(raw, fs, met)
-% Band-limit the trace and normalise it by one robust scale.
+% Band-limit the trace and set the two scales the features are measured in.
 %
-% .filt is the discharge band and .hf a supra-physiological band no discharge
-% reaches, which ed_params turns into the .hfRatio contamination metric. Both
-% are kept unsmoothed: a window wide enough to steady a threshold crossing also
-% halves the peak of a sharp discharge, which cost a third of the confirmed
+% Both scales are one median absolute deviation over the whole recording, taken
+% on a stride - a median and a MAD are stable under decimation, and a fixed
+% stride keeps the value reproducible run to run. A recording-wide scale (not a
+% moving one) is deliberate: it does not adapt away the very quiet background a
+% discharge stands out from, and a robust estimator means the discharges
+% themselves cannot inflate the scale that measures them.
+%
+% .filt is left unsmoothed. A window wide enough to steady a threshold crossing
+% also halves the peak of a sharp transient, which cost a third of the confirmed
 % discharges when it was tried.
 raw = double(raw(:));
-
-% keep the HF band below Nyquist; a lower-rate session simply gets a narrower
-% one rather than a filter-design error
-hfBand = met.hfBand;
-hfBand(2) = min(hfBand(2), 0.95 * fs / 2);
+stride = max(1, floor(numel(raw) / 2e6));
 
 edSig.lfp  = raw;
 edSig.filt = filterLFP(raw, 'fs', fs, 'type', 'butter', 'dataOnly', true, ...
     'order', 3, 'passband', met.passband, 'graphics', false);
-if hfBand(1) < hfBand(2)
-    edSig.hf = filterLFP(raw, 'fs', fs, 'type', 'butter', 'dataOnly', true, ...
-        'order', 3, 'passband', hfBand, 'graphics', false);
-else
-    edSig.hf = nan(size(raw));
-end
 
-% one scale for the recording, on a stride - a median and a MAD are stable under
-% decimation, and a fixed stride keeps the value reproducible run to run
-sub = edSig.filt(1 : max(1, floor(numel(raw) / 2e6)) : end);
-scl = 1.4826 * median(abs(sub - median(sub)));
-if ~isfinite(scl) || scl <= 0, scl = 1; end
-
-edSig.z = abs(edSig.filt) / scl;
+edSig.sclFast = robustScale(edSig.filt(1 : stride : end));
+edSig.sclRaw  = robustScale(raw(1 : stride : end));
+edSig.z = abs(edSig.filt) / edSig.sclFast;
 
 end     % sigPrep
+
+
+function s = robustScale(x)
+% Median absolute deviation, scaled to a standard deviation; 1 if degenerate.
+s = 1.4826 * median(abs(x - median(x)));
+if ~isfinite(s) || s <= 0, s = 1; end
+
+end     % robustScale

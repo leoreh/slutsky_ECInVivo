@@ -44,7 +44,8 @@ function sSet = stateSet(ctx)
 % signals and its events.
 sSet = [];
 try
-    ss = var_fetch(var_recipe('matvar', 'file', 'sleep_states', 'var', 'ss'), ctx);
+    ss = var_fetch(var_recipe('matvar', 'file', 'sleep_states', ...
+        'var', 'ss'), ctx);
     epochT = var_fetch(var_recipe('matfield', 'file', 'sleep_sig', ...
         'field', 'spec_tstamps'), ctx);
 catch

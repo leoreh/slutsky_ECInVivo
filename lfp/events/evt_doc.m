@@ -47,7 +47,7 @@
 %   .info      struct   detection params, fs, basename, win, runtime
 % Ripple metric columns: .amp .freq .freqEvent .freqPeak .peakProm .energy .dur
 %                        .skew .emg .spkGain.
-% ED metric columns:     .amp .ampG .ampZ .hfRatio .dur .pol .emg.
+% ED metric columns:     .fastZ .posZ .amp .dur .emg.
 % QA is now the same on both sides: MARK, never remove. The detect stage seeds
 % .accepted all-true and evt_gate turns a filter spec (states + per-metric
 % [lo hi] ranges) into the mask, which the curate stage applies headless (the

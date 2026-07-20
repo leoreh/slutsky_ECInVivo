@@ -12,9 +12,17 @@ function [ed, hFig] = ed_curate(basepath, varargin)
 %       - Headless (flgGui = false): apply the spec, save .accepted and the
 %         spec in ed.info.qa, rebuild the per-bout rate table. The automatic
 %         gate, so a batch run needs no human.
-%       - Interactive (default): the same spec as four thresholds. The counts
-%         and the kept-vs-removed mean waveform, tiled by state, update live as
-%         you move them.
+%       - Interactive (default): the same spec as thresholds. The counts and
+%         the kept-vs-removed mean waveform, tiled by state, update live as you
+%         move them. Three knobs carry the decision - is it sharp (fastZ), does
+%         it go up (posZ), does it stand alone (isoZ) - and EMG is there for a
+%         session where movement artifact is the problem.
+%
+%       Read the waveform view knowing what it is: a MEAN. It only shows the
+%       discharge shape once the kept set is mostly discharges. If the counts
+%       are in the hundreds the average is whatever the bulk happens to be, and
+%       the tile says nothing - raise fastZ until the count is plausible for a
+%       day of recording (tens), then judge the shape.
 %
 %       This is the BULK pass, and it is what makes the per-event pass
 %       possible: detection is permissive by design and a 24 h recording yields
@@ -104,12 +112,12 @@ hFig = uifigure('Name', ['ED curation: ' basename], ...
 
 dflt = specDefaults(qa);
 st = struct();
-st.edAmpG = gui_labeledControl(gCtrl, 'editnum', 'global ampG >=', ...
-    'Value', dflt.ampG, 'ValueChangedFcn', @(~,~) refresh(hFig));
-st.edAmpZ = gui_labeledControl(gCtrl, 'editnum', 'local ampZ >=', ...
-    'Value', dflt.ampZ, 'ValueChangedFcn', @(~,~) refresh(hFig));
-st.edHf = gui_labeledControl(gCtrl, 'editnum', 'hfRatio <=', ...
-    'Value', dflt.hfRatio, 'ValueChangedFcn', @(~,~) refresh(hFig));
+st.edFast = gui_labeledControl(gCtrl, 'editnum', 'sharp  fastZ >=', ...
+    'Value', dflt.fastZ, 'ValueChangedFcn', @(~,~) refresh(hFig));
+st.edPos = gui_labeledControl(gCtrl, 'editnum', 'upward posZ >=', ...
+    'Value', dflt.posZ, 'ValueChangedFcn', @(~,~) refresh(hFig));
+st.edIso = gui_labeledControl(gCtrl, 'editnum', 'alone  isoZ >=', ...
+    'Value', dflt.isoZ, 'ValueChangedFcn', @(~,~) refresh(hFig));
 st.edEmg = gui_labeledControl(gCtrl, 'editnum', 'EMG <=', ...
     'Value', dflt.emg, 'ValueChangedFcn', @(~,~) refresh(hFig));
 st.lblCount = gui_labeledControl(gCtrl, 'label', '');
@@ -181,9 +189,9 @@ function onReset(hFig)
 % Restore the thresholds to the default spec.
 st = hFig.UserData;
 dflt = specDefaults(st.qa0);
-st.edAmpG.Value = dflt.ampG;
-st.edAmpZ.Value = dflt.ampZ;
-st.edHf.Value   = dflt.hfRatio;
+st.edFast.Value = dflt.fastZ;
+st.edPos.Value  = dflt.posZ;
+st.edIso.Value  = dflt.isoZ;
 st.edEmg.Value  = dflt.emg;
 refresh(hFig);
 
@@ -205,9 +213,9 @@ end     % doSave
 %  SPEC <-> CONTROLS
 % =========================================================================
 function qa = buildSpec(st)
-qa.ranges = struct('ampG', [st.edAmpG.Value, Inf], ...
-    'ampZ', [st.edAmpZ.Value, Inf], ...
-    'hfRatio', [-Inf, st.edHf.Value], ...
+qa.ranges = struct('fastZ', [st.edFast.Value, Inf], ...
+    'posZ', [st.edPos.Value, Inf], ...
+    'isoZ', [st.edIso.Value, Inf], ...
     'emg', [-Inf, st.edEmg.Value]);
 
 end     % buildSpec
@@ -215,16 +223,13 @@ end     % buildSpec
 
 function d = specDefaults(qa)
 % The control values a spec implies; an absent bound is an open one.
-d = struct('ampG', -Inf, 'ampZ', -Inf, 'hfRatio', Inf, 'emg', Inf);
+d = struct('fastZ', -Inf, 'posZ', -Inf, 'isoZ', -Inf, 'emg', Inf);
 if ~isfield(qa, 'ranges'), return; end
-lo = {'ampG', 'ampZ'};
+lo = {'fastZ', 'posZ', 'isoZ'};
 for iFld = 1 : numel(lo)
     if isfield(qa.ranges, lo{iFld}), d.(lo{iFld}) = qa.ranges.(lo{iFld})(1); end
 end
-hi = {'hfRatio', 'emg'};
-for iFld = 1 : numel(hi)
-    if isfield(qa.ranges, hi{iFld}), d.(hi{iFld}) = qa.ranges.(hi{iFld})(2); end
-end
+if isfield(qa.ranges, 'emg'), d.emg = qa.ranges.emg(2); end
 
 end     % specDefaults
 

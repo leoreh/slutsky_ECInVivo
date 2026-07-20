@@ -72,21 +72,25 @@ end
 %% ========================================================================
 %  VIEW (guiMap)
 %  ========================================================================
-guiMap = struct('panels', struct(), 'base', 'ed', 'mode', 'events', 'win', 0.3);
-guiMap.panels.states = guiPath_panel('stateStrip', 'top', 'states');
-guiMap.panels.spec = guiPath_panel('spec', 'top', 'spec');
+% Top: state, spectrogram, EMG RMS, event ticks. Bottom: LFP, EMG, units, state
+guiMap = struct('panels', struct(), 'mode', 'events', 'win', 1);
+guiMap.panels.stripT = guiPath_panel('stateStrip', 'top', 'states', ...
+    'label', 'State');
+guiMap.panels.spec   = guiPath_panel('spec', 'top', 'spec');
 guiMap.panels.emgRms = guiPath_panel('trace', 'top', 'emgRms', ...
-    'height', 0.7, 'label', 'EMG RMS', 'ylim', 'full');
-guiMap.panels.ed = guiPath_panel('eventTicks', 'top', 'ed');
-guiMap.panels.lfp = guiPath_panel('trace', 'bottom', 'lfp', ...
-    'height', 1.2, 'label', 'LFP', 'yAdjust', 0.512);
+    'label', 'EMG RMS', 'height', 0.7, 'ylim', 'full');
+guiMap.panels.evt    = guiPath_panel('eventTicks', 'top', 'ed', ...
+    'label', 'Events');
+guiMap.panels.lfp    = guiPath_panel('trace', 'bottom', 'lfp', ...
+    'label', 'LFP', 'height', 1.2);
 guiMap.panels.edFilt = guiPath_panel('trace', 'bottom', 'edFilt', ...
     'label', 'Filtered LFP');
-guiMap.panels.emg = guiPath_panel('trace', 'bottom', 'emg', ...
-    'height', 0.8, 'label', 'EMG');
-guiMap.panels.raster = guiPath_panel('raster', 'bottom', 'raster');
-guiMap.panels.states_2 = guiPath_panel('stateStrip', 'bottom', 'states');
-guiMap.panels.ed_2 = guiPath_panel('eventTicks', 'bottom', 'ed');
+guiMap.panels.emg    = guiPath_panel('trace', 'bottom', 'emg', ...
+    'label', 'EMG', 'height', 0.8);
+guiMap.panels.raster = guiPath_panel('raster', 'bottom', 'raster', ...
+    'label', 'Units');
+guiMap.panels.stripB = guiPath_panel('stateStrip', 'bottom', 'states', ...
+    'label', 'State');
 
 end
 
@@ -116,4 +120,3 @@ end
 end
 
 % EOF
-
