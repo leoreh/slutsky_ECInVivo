@@ -51,13 +51,13 @@ function ripp = ripp_wrapper(varargin)
 %       basename.rippSpkLfp.mat  - spike-LFP phase coupling (analyze)
 %
 %   DEPENDENCIES:
-%       ripp_methods, ripp_detect, ripp_curate, ripp_analyze, ripp_gate,
+%       ripp_methods, ripp_detect, ripp_curate, ripp_analyze, evt_gate,
 %       evt_files, evt_maps, evt2ns, backup_file, ripp_invalidate.
 %
 %   HISTORY:
 %       Updated: 260719 (met-driven; detect core factored to ripp_detect).
 %       Updated: 260719b (split into detect -> curate -> analyze stages; QA gate
-%                moved to ripp_curate/ripp_gate; heavy analysis runs post-curation
+%                moved to ripp_curate/evt_gate; heavy analysis runs post-curation
 %                on the accepted set only).
 %       Updated: 260720 (rippMaps written here at detect, over ALL events and
 %                row-aligned to ripp, so the curation GUI reads it instead of
@@ -157,7 +157,7 @@ if fresh
         S = load(files.evt, 'ripp');            % reload the curated mask
         ripp = S.ripp;
     else
-        ripp.accepted = ripp_gate(ripp, met.qa);    % in-memory preview
+        ripp.accepted = evt_gate(ripp, met.qa);    % in-memory preview
     end
 end
 

@@ -1,202 +1,188 @@
-function ed = ed_detect(sig, fs, varargin)
-% ED_DETECT Detect epileptiform discharges via a moving z-score threshold.
+function [ed, aux] = ed_detect(basepath, varargin)
+% ED_DETECT Detect + characterise epileptiform discharges; writes nothing.
 %
-%   ed = ED_DETECT(sig, fs, varargin)
+%   [ed, aux] = ED_DETECT(basepath, varargin)
 %
 %   SUMMARY:
-%       Detects sharp epileptiform discharges (EDs) on a single signal using
-%       a local (moving-window) z-score. Crossings of the z-threshold are
-%       localised to the peak deflection, merged within a refractory window,
-%       de-duplicated, and gated by a peak-to-peak amplitude criterion.
-%       Cleaned port of the core of IED.detect_move_z (LdM), with every
-%       constant exposed and the legacy 'negative' direction fixed.
+%       Stage 1 of the ED pipeline (detect -> curate), mirroring ripp_detect.
+%       Loads the signal, band-passes it, thresholds the result into candidates,
+%       and measures every per-event feature (ed_params, plus EMG and the
+%       vigilance state). It makes NO acceptance decision - .accepted is seeded
+%       all-true and the gate is a separate stage over the saved struct, so one
+%       detection feeds any per-mouse curation. Times are window-relative; the
+%       caller shifts to absolute. Nothing is written to disk.
+%
+%       The detection statistic is the band-passed trace over ONE robust scale
+%       for the whole recording (median absolute deviation, on a stride). Band-
+%       passing is what makes a single threshold mean the same thing in every
+%       vigilance state: on the raw trace the NREM delta amplitude dominates the
+%       variance, so a raw threshold is really a slow-wave detector. A robust
+%       scale is what keeps a discharge from raising its own threshold, which
+%       the previous moving mean / SD baseline did.
 %
 %   INPUTS:
-%       sig         - (Vec) Signal for detection (e.g. sSig.eeg).
-%       fs          - (Num) Sampling frequency [Hz].
-%       varargin    - Parameter/Value pairs:
-%           'thr'      - (Num) Z-score threshold for the moving-z crossing
-%                              and the amplitude gate. {7}
-%           'thrDir'   - (Char) 'positive' | 'negative' | 'both'. {'both'}
-%           'baseWin'  - (Num) Moving baseline window for mu/sigma [s]. {5}
-%           'interDur' - (Num) Refractory / burst-merge window [s]. {0.025}
-%           'ampWin'   - (Num) Peak-to-peak gate half-window [s]. {0.015}
-%           'lowThr'   - (Num) Trough threshold (signal units) for the
-%                              twin-peak merge rule. {0.2}
-%           'minAmp'   - (Num) Optional absolute amplitude floor (signal
-%                              units), applied on top of the z gate. {[]}
+%       basepath - <char> session directory.
+%       varargin - Parameter/Value:
+%           'basename' - <char>   file stem. {folder name}
+%           'met'      - <struct> one ed_methods() config. {ed_methods}
+%           'win'      - <vec>    window [start end] (s). {[0 Inf]}
+%           'edCh'     - <num>    explicit channel for met.chMode 'ripp'. {[]}
+%           'verbose'  - <log>    print progress. {false}
 %
 %   OUTPUTS:
-%       ed          - (Struct) Partial detection result:
-%           .pos     - (N x 1) Peak sample index into SIG (1-based).
-%           .amp     - (N x 1) Peak-to-peak amplitude in +/-ampWin.
-%           .ampZ    - (N x 1) Local moving z-score at the peak.
-%           .info    - (Struct) Detection parameters used.
+%       ed  - <struct> window-relative candidates + per-event fields (.times
+%                      .peakTime .pos .bouts .amp .ampG .ampZ .hfRatio .dur
+%                      .emg .state .accepted, partial .info).
+%       aux - <struct> .edSig .fs .edCh - the prepared signal, so the caller can
+%                      build the per-event maps without reloading.
 %
 %   DEPENDENCIES:
-%       peak2peak (Signal Processing Toolbox).
+%       basepaths2vars, ed_methods, ed_sigLoad, ed_params, filterLFP,
+%       binary2bouts, evt_boutTimes, evt_emgScore, evt_states.
 %
 %   HISTORY:
-%       Created: 22 Jun 2026
+%       Created: 260622 (as a signal-in / events-out detector).
+%       Updated: 260720 (stage 1 of the staged pipeline. The moving mean / SD
+%                z-score, the DC-dependent amplitude gate and the hand-rolled
+%                crossing merge are gone. A block-wise baseline was tried and
+%                dropped: it cost 45 lines and changed no result.)
 
 %% ========================================================================
 %  ARGUMENTS
 %  ========================================================================
 p = inputParser;
-addRequired(p, 'sig', @isnumeric);
-addRequired(p, 'fs', @isnumeric);
-addParameter(p, 'thr', 7, @(x) isnumeric(x) && isscalar(x) && x > 0);
-addParameter(p, 'thrDir', 'both', ...
-    @(x) any(strcmpi(x, {'positive', 'negative', 'both'})));
-addParameter(p, 'baseWin', 5, @(x) isnumeric(x) && isscalar(x) && x > 0);
-addParameter(p, 'interDur', 0.025, @(x) isnumeric(x) && isscalar(x) && x > 0);
-addParameter(p, 'ampWin', 0.015, @(x) isnumeric(x) && isscalar(x) && x > 0);
-addParameter(p, 'lowThr', 0.2, @(x) isnumeric(x) && isscalar(x));
-addParameter(p, 'minAmp', [], @(x) isempty(x) || (isnumeric(x) && isscalar(x)));
+addRequired(p, 'basepath', @ischar);
+addParameter(p, 'basename', '', @ischar);
+addParameter(p, 'met', [], @(x) isempty(x) || isstruct(x));
+addParameter(p, 'win', [0 Inf], @isnumeric);
+addParameter(p, 'edCh', [], @isnumeric);
+addParameter(p, 'verbose', false, @islogical);
+parse(p, basepath, varargin{:});
 
-parse(p, sig, fs, varargin{:});
-sig         = p.Results.sig(:);
-fs          = p.Results.fs;
-thr         = p.Results.thr;
-thrDir      = lower(p.Results.thrDir);
-baseWin     = p.Results.baseWin;
-interDur    = round(p.Results.interDur * fs);   % samples
-ampWin      = round(p.Results.ampWin * fs);     % samples
-lowThr      = p.Results.lowThr;
-minAmp      = p.Results.minAmp;
+met     = p.Results.met;
+win     = p.Results.win;
+edCh    = p.Results.edCh;
+verbose = p.Results.verbose;
+
+basename = p.Results.basename;
+if isempty(basename), [~, basename] = fileparts(basepath); end
+if isempty(met), met = ed_methods('default'); end
 
 %% ========================================================================
-%  SETUP
+%  SIGNAL + CONTEXT
 %  ========================================================================
+% session may be absent on a minimal (sleep_sig only) layout, so it is guarded;
+% the 'eeg' channel mode needs none of it
 
-ed = struct();
-ed.pos = [];
-ed.amp = [];
-ed.ampZ = [];
-ed.info.fs       = fs;
-ed.info.thr      = thr;
-ed.info.thrDir   = thrDir;
-ed.info.baseWin  = baseWin;
-ed.info.interDur = p.Results.interDur;
-ed.info.ampWin   = p.Results.ampWin;
-ed.info.lowThr   = lowThr;
-ed.info.minAmp   = minAmp;
-ed.info.nDetected = 0;
+v = basepaths2vars('basepaths', {basepath}, ...
+    'vars', {'session', 'sleep_states'});
+session = [];
+if isfield(v, 'session'), session = v.session; end
+
+if isinf(win(2)), winDur = Inf; else, winDur = win(2) - win(1); end
+boutTimes = evt_boutTimes(v, win, winDur);
+
+if verbose, fprintf('[ED_DETECT] %s : loading signal...\n', basename); end
+[raw, emg, fs, edCh] = ed_sigLoad(basepath, 'basename', basename, ...
+    'chMode', met.chMode, 'edCh', edCh, 'win', win, 'session', session);
+
+edSig = sigPrep(raw, fs, met);
 
 %% ========================================================================
-%  MOVING Z-SCORE
+%  CANDIDATES
 %  ========================================================================
+% One binary2bouts call replaces the old chain of pairwise crossing merges,
+% uniquetol de-duplication and the twin-peak rule, each of which could delete an
+% event because of an unrelated neighbour.
 
-calcWin  = round(baseWin * fs);
-sigMu    = movmean(sig, calcWin);
-sigSigma = movstd(sig, calcWin);
-sigSigma(sigSigma == 0) = eps;
-localZ = (sig - sigMu) ./ sigSigma;
-localZ(~isfinite(localZ)) = 0;
+limSamp = round(met.limDur / 1000 * fs);
+bouts = binary2bouts('vec', edSig.z > met.thr, 'minDur', limSamp(1), ...
+    'maxDur', limSamp(2), 'interDur', limSamp(3));
+if isempty(bouts), bouts = zeros(0, 2); end
 
-% Threshold. NOTE: the legacy 'negative' branch used (localZ < thr) which is
-% almost always true; corrected here to (localZ < -thr).
-switch thrDir
-    case 'positive'
-        thresholded = localZ > thr;
-    case 'negative'
-        thresholded = localZ < -thr;
-    case 'both'
-        thresholded = (localZ > thr) | (localZ < -thr);
+% peak = the largest deflection of the band-passed trace inside the candidate,
+% by MAGNITUDE, so a negative-going discharge is localised as well as a positive
+% one (discharges in this preparation are predominantly negative)
+nEv = size(bouts, 1);
+pos = zeros(nEv, 1);
+for iEv = 1 : nEv
+    idx = bouts(iEv, 1) : bouts(iEv, 2);
+    [~, iRel] = max(abs(edSig.filt(idx)));
+    pos(iEv) = bouts(iEv, 1) + iRel - 1;
 end
-thresholded = thresholded(:);
-cross = find([0; diff(thresholded) > 0]);
 
-% Return early if nothing crosses
-if isempty(cross)
-    fprintf('ed_detect: no discharges detected\n');
-    return
-end
+ed = struct('pos', pos, 'bouts', bouts);
+ed.info.fs = fs;
 
 %% ========================================================================
-%  LOCALISE TO PEAK
+%  PER-EVENT FEATURES  (curation is a separate stage)
 %  ========================================================================
+if verbose, fprintf('[ED_DETECT] %s : %d candidates\n', basename, nEv); end
 
-% Merge crossings closer than interDur/2 samples. This caps the maximum
-% burst rate; the half-interDur keeps the later peak search valid.
-ii = find(diff(cross) < interDur / 2);
-while ~isempty(ii)
-    cross(ii + 1) = [];
-    ii = find(diff(cross) < interDur / 2);
-end
+ed = ed_params(edSig, ed);
 
-% Adjust each crossing to the local max / min by magnitude (handles biphasic
-% deflections) and drop crossings whose window runs off the signal edge.
-nCross  = numel(cross);
-peakVal = zeros(nCross, 1);
-pos     = zeros(nCross, 1);
-rmEdge  = false(nCross, 1);
-for iC = 1:nCross
-    if cross(iC) + interDur > numel(sig) || cross(iC) - interDur < 1
-        rmEdge(iC) = true;
-        continue
-    end
-    seg = sig(cross(iC) - interDur : cross(iC) + interDur);
-    [vMax, pMax] = max(seg);
-    [vMin, pMin] = min(seg);
-    if abs(vMax) >= abs(vMin)
-        peakVal(iC) = vMax; relPos = pMax;
-    else
-        peakVal(iC) = vMin; relPos = pMin;
-    end
-    pos(iC) = cross(iC) - interDur + relPos - 1;
-end
-peakVal(rmEdge) = [];
-pos(rmEdge) = [];
+% EMG over a fixed window about the peak: a discharge is a point event, so a
+% 6 ms and a 40 ms one are scored against the same amount of muscle signal
+ed.emg = evt_emgScore(emg, [ed.peakTime - 0.025, ed.peakTime + 0.025], fs, ...
+    'baselineTimes', []);
 
-% Overlapping windows can yield equal / out-of-order positions; collapse them
-[pos, idxU] = uniquetol(pos, interDur, 'DataScale', 1);
-peakVal = peakVal(idxU);
+% per-event state label; the per-bout rate table is a post-curation product
+ed.state = evt_states(ed.times, ed.peakTime, boutTimes, ...
+    'flgSave', false, 'flgPlot', false, 'name', 'ed', 'lbl', 'ED');
 
-% Twin-peak merge: if the signal between two peaks never returns below lowThr,
-% keep only the larger of the pair (a refractory rule by amplitude).
-rmIdx = [];
-for iP = 1:numel(pos) - 1
-    if min(sig(pos(iP):pos(iP + 1))) > lowThr
-        rmIdx = [rmIdx; iP + (peakVal(iP) > peakVal(iP + 1))]; %#ok<AGROW>
-    end
-end
-rmIdx = unique(rmIdx);
-pos(rmIdx) = [];
-peakVal(rmIdx) = [];
-fprintf('ed_detect: %d discharges after detection\n', numel(pos));
+ed.accepted = true(nEv, 1);         % the gate runs downstream
 
 %% ========================================================================
-%  AMPLITUDE GATE
+%  PROVENANCE (partial; the wrapper finalises to absolute time)
 %  ========================================================================
+ed.info.sigDur   = numel(raw) / fs;
+ed.info.met      = met.name;
+ed.info.chMode   = met.chMode;
+ed.info.edCh     = edCh;
+ed.info.passband = met.passband;
+ed.info.hfBand   = met.hfBand;
+ed.info.thr      = met.thr;
+ed.info.limDur   = met.limDur;
 
-% Peak-to-peak amplitude in a narrow window must exceed the local threshold
-% (thr local-SDs above the local mean), and an optional absolute floor.
-thrAmp = thr .* sigSigma + sigMu;
-nPos   = numel(pos);
-amp    = zeros(nPos, 1);
-rmAmp  = false(nPos, 1);
-for iP = 1:nPos
-    w1 = max(1, pos(iP) - ampWin);
-    w2 = min(numel(sig), pos(iP) + ampWin);
-    amp(iP) = peak2peak(sig(w1:w2));
-    if amp(iP) < thrAmp(pos(iP))
-        rmAmp(iP) = true;
-    elseif ~isempty(minAmp) && amp(iP) < minAmp
-        rmAmp(iP) = true;
-    end
-end
-pos(rmAmp) = [];
-amp(rmAmp) = [];
-fprintf('ed_detect: %d discharges after amplitude gate\n', numel(pos));
-
-%% ========================================================================
-%  ORGANISE OUTPUT
-%  ========================================================================
-
-ed.pos  = pos(:);
-ed.amp  = amp(:);
-ed.ampZ = localZ(ed.pos);
-ed.info.nDetected = numel(ed.pos);
+aux = struct('edSig', edSig, 'fs', fs, 'edCh', edCh);
 
 end     % EOF
+
+
+% =========================================================================
+%  LOCAL
+% =========================================================================
+function edSig = sigPrep(raw, fs, met)
+% Band-limit the trace and normalise it by one robust scale.
+%
+% .filt is the discharge band and .hf a supra-physiological band no discharge
+% reaches, which ed_params turns into the .hfRatio contamination metric. Both
+% are kept unsmoothed: a window wide enough to steady a threshold crossing also
+% halves the peak of a sharp discharge, which cost a third of the confirmed
+% discharges when it was tried.
+raw = double(raw(:));
+
+% keep the HF band below Nyquist; a lower-rate session simply gets a narrower
+% one rather than a filter-design error
+hfBand = met.hfBand;
+hfBand(2) = min(hfBand(2), 0.95 * fs / 2);
+
+edSig.lfp  = raw;
+edSig.filt = filterLFP(raw, 'fs', fs, 'type', 'butter', 'dataOnly', true, ...
+    'order', 3, 'passband', met.passband, 'graphics', false);
+if hfBand(1) < hfBand(2)
+    edSig.hf = filterLFP(raw, 'fs', fs, 'type', 'butter', 'dataOnly', true, ...
+        'order', 3, 'passband', hfBand, 'graphics', false);
+else
+    edSig.hf = nan(size(raw));
+end
+
+% one scale for the recording, on a stride - a median and a MAD are stable under
+% decimation, and a fixed stride keeps the value reproducible run to run
+sub = edSig.filt(1 : max(1, floor(numel(raw) / 2e6)) : end);
+scl = 1.4826 * median(abs(sub - median(sub)));
+if ~isfinite(scl) || scl <= 0, scl = 1; end
+
+edSig.z = abs(edSig.filt) / scl;
+
+end     % sigPrep

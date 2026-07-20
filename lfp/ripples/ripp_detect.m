@@ -10,7 +10,7 @@ function [ripp, aux] = ripp_detect(basepath, varargin)
 %       and measures every per-event feature: ripple params, the QA metrics
 %       (EMG z, MUA gain), and the vigilance-state label. It does NOT
 %       decide acceptance - .accepted is seeded all-true and the QA gate is a
-%       separate stage (ripp_gate / ripp_curate) applied to the saved struct, so
+%       separate stage (evt_gate / ripp_curate) applied to the saved struct, so
 %       the same detection feeds any per-mouse curation. Times are window-relative;
 %       the caller shifts to absolute. Nothing is written to disk.
 %
@@ -43,7 +43,7 @@ function [ripp, aux] = ripp_detect(basepath, varargin)
 %   HISTORY:
 %       260719 factored out of ripp_wrapper as the shared detection core.
 %       260719b split: detect computes features only; the QA gate moved to
-%               ripp_gate/ripp_curate (accepted seeded all-true here).
+%               evt_gate/ripp_curate (accepted seeded all-true here).
 
 %% ========================================================================
 %  ARGUMENTS
@@ -127,7 +127,7 @@ ripp = ripp_params(rippSig, ripp);
 %  ========================================================================
 % Detection computes the per-event QA metrics and the state label; it does NOT
 % decide acceptance. The gate (state + metric ranges -> accepted) is applied to
-% the saved struct by ripp_gate / ripp_curate, so one detection serves any
+% the saved struct by evt_gate / ripp_curate, so one detection serves any
 % per-mouse curation.
 
 ripp.emg       = evt_emgScore(emg, ripp.times, fs, 'baselineTimes', nremTimes);

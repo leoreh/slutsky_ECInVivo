@@ -45,14 +45,12 @@ end
 
 
 
-
-
-
 %% ========================================================================
 %  RATE & DENSITY (STATE-DEPENDENT)
 %  ========================================================================
 
-basepaths = [mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl')];
+basepaths = [mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl'), ...
+    mcu_basepaths('ra')];
 nFiles = length(basepaths);
 
 % RIPPLE STATES
@@ -156,9 +154,10 @@ prismMat = [mean(tblPlot{prismIdx, yVar}, 1, 'omitnan')', ...
 
 presets = {'ripp'};
 tblRipp = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
+tblPlot = tblRipp(tblRipp.state == 'NREM', :);
 
 % Plot
-guiTbl_bar(tblRipp, 'xVar', 'genotype', 'yVar', 'dur');
+guiTbl_bar(tblPlot, 'xVar', 'genotype', 'yVar', 'dur');
 guiTbl_scatHist(tblRipp, 'xVar', 'dur', 'yVar', 'amp', 'grpVar', 'genotype');
 
 % Summary

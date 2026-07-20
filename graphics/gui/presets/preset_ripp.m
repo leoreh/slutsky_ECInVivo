@@ -38,7 +38,12 @@ function [varMap, guiMap] = preset_ripp(ctx)
 %  ========================================================================
 % the sleep context every modality shows on top, then the ripples + units
 varMap = struct();
-varMap.states = var_recipe('value', 'data', stateSet(ctx));
+% the state strip is omitted on a session with no sleep scoring; guiPath then
+% drops the panels naming it, so the preset still opens on its signals
+sSet = stateSet(ctx);
+if ~isempty(sSet)
+    varMap.states = var_recipe('value', 'data', sSet);
+end
 varMap.spec   = var_recipe('matfield', 'file', 'sleep_sig', ...
     'field', {'spec', 'spec_freq', 'spec_tstamps'});
 % The overview EMG is the ripple gate's own metric, not AccuSleep's log-RMS: the

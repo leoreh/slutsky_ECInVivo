@@ -7,7 +7,7 @@ function [ripp, hFig] = ripp_curate(basepath, varargin)
 %       The curation stage of the ripple pipeline (detect -> curate -> analyze).
 %       It loads the saved <basename>.ripp.mat and sets the per-event .accepted
 %       mask from a QA filter - which vigilance states to keep and per-metric
-%       [lo hi] ranges (EMG, MUA gain, ...). The gate itself is ripp_gate; this
+%       [lo hi] ranges (EMG, MUA gain, ...). The gate itself is evt_gate; this
 %       function is the two ways to drive it:
 %
 %       - Headless (flgGui = false): apply the given qa spec, save .accepted (and
@@ -51,7 +51,7 @@ function [ripp, hFig] = ripp_curate(basepath, varargin)
 %       hFig - <handle> the GUI figure ([] when headless).
 %
 %   DEPENDENCIES:
-%       evt_files, ripp_gate, ripp_methods, backup_file, ripp_invalidate,
+%       evt_files, evt_gate, ripp_methods, backup_file, ripp_invalidate,
 %       evt_states, evt_boutTimes, basepaths2vars; GUI: gui_layout,
 %       gui_labeledControl, gui_filterPanel, gui_selectedCats, guiTbl_xy,
 %       ripp_sigLoad, ripp_sigPrep, evt_maps, as_loadConfig.
@@ -104,7 +104,7 @@ hFig = [];
 %  ========================================================================
 
 if ~flgGui
-    ripp.accepted = ripp_gate(ripp, qa);
+    ripp.accepted = evt_gate(ripp, qa);
     changed = saveCurated(files.evt, ripp.accepted, qa);
     buildStates(basepath, ripp, ripp.accepted);
     if changed && flgInval
@@ -197,7 +197,7 @@ function refresh(hFig)
 % Recompute accepted from the current controls; redraw counts + waveform.
 st = hFig.UserData;
 qa = buildSpec(st);
-st.accepted = ripp_gate(st.ripp, qa);
+st.accepted = evt_gate(st.ripp, qa);
 hFig.UserData = st;
 
 % overall count; the per-state split is read off each tile's legend
@@ -288,7 +288,7 @@ function qa = buildSpec(st)
 % Read the current controls into a qa filter spec. The "(unscored)" pseudo-state
 % maps to qa.unscored (keep <undefined> events); the rest are real state labels.
 % Guard the all-unchecked case: with real states present but none checked, keep
-% NO real state - a sentinel that matches no event - rather than ripp_gate's
+% NO real state - a sentinel that matches no event - rather than evt_gate's
 % []="any state" escape hatch that would silently keep every state.
 sel = gui_selectedCats(st.chkState);
 qa.unscored = ismember('(unscored)', sel);

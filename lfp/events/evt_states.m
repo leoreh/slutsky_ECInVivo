@@ -20,6 +20,7 @@ function [stateIdx, evtStates] = evt_states(evtTimes, peakTimes, boutTimes, vara
 %           'flgSave'  - (Log)  Save .evtStates.mat? (Default: true).
 %           'accepted' - (Log)  [N x 1] mask; Rate/Density count only accepted
 %                              events, while stateIdx still labels all. {all}
+%           'basename' - (Char) File stem for the saved table. {folder name}
 %
 %   OUTPUTS:
 %       stateIdx    - (Cat)   [N_events x 1] Categorical array of states.
@@ -45,6 +46,7 @@ addParameter(p, 'flgSave', true, @islogical);
 addParameter(p, 'accepted', [], @(x) isempty(x) || islogical(x) || isnumeric(x));
 addParameter(p, 'name', 'evt', @ischar);
 addParameter(p, 'lbl', 'Event', @ischar);
+addParameter(p, 'basename', '', @ischar);
 parse(p, evtTimes, peakTimes, boutTimes, varargin{:});
 
 evtTimes = p.Results.evtTimes;
@@ -60,7 +62,13 @@ lbl = p.Results.lbl;
 % =========================================================================
 %  PREP
 %  ========================================================================
-[~, basename] = fileparts(basepath);
+% basename normally follows the folder, but several recordings can share one
+% directory (the EA cohort), in which case the caller passes it explicitly -
+% otherwise every session in the folder would overwrite one <folder>.States file
+basename = p.Results.basename;
+if isempty(basename)
+    [~, basename] = fileparts(basepath);
+end
 savefile = fullfile(basepath, [basename, '.', name, 'States.mat']);
 
 nStates = length(boutTimes);

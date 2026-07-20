@@ -22,7 +22,8 @@ function sSet = stateSet(ctx)
 % - ctx             <struct> var_ctx: basepath, basename, shared file cache.
 %
 % OUTPUTS
-% - sSet            <struct> .labels .epochT .names .colors.
+% - sSet            <struct> .labels .epochT .names .colors, or [] when the
+%                   session holds no sleep scoring.
 %
 % SEE ALSO
 % - guiPath_panel, guiPath_draw, var_recipe, as_classify.
@@ -31,10 +32,27 @@ function sSet = stateSet(ctx)
 % - 260720          created; one state set for every preset (ripp / ed drew a
 %                   read-only hypnogram from ss.bouts.times while the states
 %                   preset composed its own strip from sleep_labelsMan).
+% - 260720b         returns [] instead of throwing on an unscored session. A
+%                   preset resolves its session values while it is BUILT, not
+%                   while it loads, so an error here took the whole preset down
+%                   before var_load could drop the entry.
 
-ss = var_fetch(var_recipe('matvar', 'file', 'sleep_states', 'var', 'ss'), ctx);
-epochT = var_fetch(var_recipe('matfield', 'file', 'sleep_sig', ...
-    'field', 'spec_tstamps'), ctx);
+% A session that was never sleep-scored has no state set to show. Returning
+% empty rather than throwing is what lets a preset open on it at all: the
+% caller omits the varMap entry and guiPath drops the panels that name it, so
+% an unscored recording (the EA cohort has no sleep_states) still opens on its
+% signals and its events.
+sSet = [];
+try
+    ss = var_fetch(var_recipe('matvar', 'file', 'sleep_states', 'var', 'ss'), ctx);
+    epochT = var_fetch(var_recipe('matfield', 'file', 'sleep_sig', ...
+        'field', 'spec_tstamps'), ctx);
+catch
+    return
+end
+if ~isstruct(ss) || ~isfield(ss, 'info') || ~isfield(ss, 'labels')
+    return
+end
 
 names  = ss.info.names(:)';
 colors = ss.info.colors(:)';

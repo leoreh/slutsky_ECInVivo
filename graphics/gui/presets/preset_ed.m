@@ -25,6 +25,11 @@ function [varMap, guiMap] = preset_ed(ctx)
 % - 260719          split out of guiPath_presets (one file per preset).
 % - 260720          the state context is the shared, curatable stateSet (was a
 %                   read-only hypnogram over ss.bouts.times).
+% - 260720b         follows the rebuilt ED pipeline: ed.info.sigSource became
+%                   ed.info.chMode ('eeg' | 'ripp'), and the Bottom now carries
+%                   the detection band-pass alongside the raw trace, because
+%                   that filtered trace is what ed_detect thresholds - a
+%                   candidate that looks unconvincing raw is judged on it.
 
 
 %% ========================================================================
@@ -32,7 +37,12 @@ function [varMap, guiMap] = preset_ed(ctx)
 %  ========================================================================
 % the sleep context every modality shows on top, then the EDs + units
 varMap = struct();
-varMap.states = var_recipe('value', 'data', stateSet(ctx));
+% the state strip is omitted on a session with no sleep scoring; guiPath then
+% drops the panels naming it, so the preset still opens on its signals
+sSet = stateSet(ctx);
+if ~isempty(sSet)
+    varMap.states = var_recipe('value', 'data', sSet);
+end
 varMap.spec   = var_recipe('matfield', 'file', 'sleep_sig', ...
     'field', {'spec', 'spec_freq', 'spec_tstamps'});
 varMap.emgRms = var_recipe('matfield', 'file', 'sleep_sig', ...
@@ -42,14 +52,20 @@ varMap.ed     = var_recipe('matvar', 'file', 'ed');
 varMap.raster = var_recipe('matvar', 'file', 'spikes', 'var', 'spikes', ...
     'path', 'times');
 
-% the LFP this preset shows = the channel ED detection ran on (from ed.info):
-% an 'lfp' source -> that raw channel; 'eeg' (the default) -> sSig.eeg
-[edSrc, edCh] = edSigSource(ctx);
-if strcmpi(edSrc, 'lfp') && ~isempty(edCh)
+% the LFP this preset shows = the signal ED detection ran on (from ed.info):
+% chMode 'ripp' -> that raw channel; 'eeg' (the default) -> sSig.eeg. The
+% filtered twin is the same signal through the detection band-pass, which is
+% the trace ed_detect actually thresholds.
+[edMode, edCh, edBand] = edSigSource(ctx);
+if strcmpi(edMode, 'ripp') && ~isempty(edCh)
     varMap.lfp = var_recipe('bin', 'file', 'lfp', 'ch', edCh(:)', ...
         'average', true, 'outClass', 'native');
+    varMap.edFilt = var_recipe('bin', 'file', 'lfp', 'ch', edCh(:)', ...
+        'average', true, 'transform', {'bandpass', {edBand}});
 else
     varMap.lfp = var_recipe('matfield', 'file', 'sleep_sig', 'field', 'eeg');
+    varMap.edFilt = var_recipe('matfield', 'file', 'sleep_sig', ...
+        'field', 'eeg', 'transform', {'bandpass', {edBand}});
 end
 
 
@@ -67,6 +83,8 @@ guiMap.panels.evt    = guiPath_panel('eventTicks', 'top', 'ed', ...
     'label', 'Events');
 guiMap.panels.lfp    = guiPath_panel('trace', 'bottom', 'lfp', ...
     'label', 'LFP', 'height', 1.2);
+guiMap.panels.edFilt = guiPath_panel('trace', 'bottom', 'edFilt', ...
+    'label', 'Filtered LFP');
 guiMap.panels.emg    = guiPath_panel('trace', 'bottom', 'emg', ...
     'label', 'EMG', 'height', 0.8);
 guiMap.panels.raster = guiPath_panel('raster', 'bottom', 'raster', ...
@@ -81,16 +99,21 @@ end
 %  SESSION RESOLVERS (read via the shared ctx cache)
 % =========================================================================
 
-function [src, ch] = edSigSource(ctx)
-% ed.info.sigSource / edCh (which channel ED detection ran on)
-src = 'eeg'; ch = [];
+function [mode, ch, band] = edSigSource(ctx)
+% ed.info chMode / edCh / passband - which signal ED detection ran on, and the
+% band it thresholded. Defaults match ed_methods, so the preset still opens on
+% a session detected before these fields existed.
+mode = 'eeg'; ch = []; band = [10 100];
 try
     ed = var_fetch(var_recipe('matvar', 'file', 'ed'), ctx);
     if isfield(ed, 'info')
-        if isfield(ed.info, 'sigSource') && ~isempty(ed.info.sigSource)
-            src = ed.info.sigSource;
+        if isfield(ed.info, 'chMode') && ~isempty(ed.info.chMode)
+            mode = ed.info.chMode;
         end
         if isfield(ed.info, 'edCh'), ch = ed.info.edCh; end
+        if isfield(ed.info, 'passband') && ~isempty(ed.info.passband)
+            band = ed.info.passband;
+        end
     end
 catch
 end

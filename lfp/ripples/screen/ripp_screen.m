@@ -35,7 +35,7 @@ function res = ripp_screen(varargin)
 %
 %   DEPENDENCIES:
 %       mcu_basepaths, mcu_cfg, basepaths2vars, ripp_methods, ripp_detect,
-%       ripp_gate, lme_analyse, guiTbl_bar.
+%       evt_gate, lme_analyse, guiTbl_bar.
 %
 %   HISTORY:
 %       260716 detection-review parameter screen.
@@ -125,7 +125,7 @@ for iMouse = 1:nMice
         if ~isfield(sigCache, key), sigCache.(key) = aux.sig; end
 
         % apply the method's QA gate (detect now seeds accepted all-true)
-        ripp.accepted = ripp_gate(ripp, met.qa);
+        ripp.accepted = evt_gate(ripp, met.qa);
 
         % absolute time so ripp_screenGui overlays on the session
         ripp.times    = ripp.times + win(1);
