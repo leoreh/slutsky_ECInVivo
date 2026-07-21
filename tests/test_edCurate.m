@@ -348,6 +348,44 @@ tc.verifyEqual(st2.edK.Value, 0, 'the count box stopped being auto');
 end
 
 
+function test_curateStateRejectionIsReversible(tc)
+% Leore's case: set a state aside to protect it while deleting clusters of
+% other states, then bring it back. State used to reach the fit through the
+% accepted mask, which made it a one-way door - the events lost their labels,
+% an unlabelled event cannot be accepted, and the fit runs over the accepted.
+% Re-ticking the state did nothing, and pressing Re-cluster again did not
+% rescue it either.
+[~, hFig] = ed_curate(tc.TestData.dir, 'basename', tc.TestData.name, ...
+    'flgGui', true, 'Visible', 'off');
+tc.addTeardown(@() close(hFig, 'force'));
+
+% the fixture has one state, so "protect it" means the whole pool
+st = hFig.UserData;
+nAll = nnz(st.pool);
+st.chkState(1).Value = false;
+st.chkState(1).ValueChangedFcn([], []);
+st.chk(1).Value = false;
+st.chk(1).ValueChangedFcn([], []);
+findall(hFig, 'Type', 'uibutton', 'Text', 'Re-cluster').ButtonPushedFcn([], []);
+tc.verifyEqual(nnz(hFig.UserData.pool), 0, 'the state still reached the fit');
+
+% bring it back: the tick alone cannot label anything, but it must say so...
+st = hFig.UserData;
+st.chkState(1).Value = true;
+st.chkState(1).ValueChangedFcn([], []);
+tc.verifySubstring(hFig.UserData.lblKeep.Text, 'unsorted', ...
+    'no sign that the re-ticked events still need a fit');
+
+% ... and one Re-cluster must restore them, minus the shape that was rejected
+findall(hFig, 'Type', 'uibutton', 'Text', 'Re-cluster').ButtonPushedFcn([], []);
+st = hFig.UserData;
+tc.verifyGreaterThan(nnz(st.pool), 0, 'the state never came back');
+tc.verifyEqual(nnz(st.acc), nnz(st.pool));
+tc.verifyLessThan(nnz(st.pool), nAll, ...
+    'the sticky shape rejection was lost along the way');
+end
+
+
 function test_curateResetWidensAgain(tc)
 % Re-cluster only narrows, so Reset must restore the whole gate pool.
 [~, hFig] = ed_curate(tc.TestData.dir, 'basename', tc.TestData.name, ...

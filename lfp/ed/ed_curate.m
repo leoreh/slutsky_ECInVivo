@@ -21,10 +21,14 @@ function [ed, hFig] = ed_curate(basepath, varargin)
 %       TICKED: curation here is REJECTION, so everything the filter passed is
 %       accepted until you rule something out.
 %           clusters  which waveform types are discharges. Untick one whose
-%                     median waveform is a sharp wave, a step or noise.
+%                     median waveform is a sharp wave, a step or noise. A shape
+%                     rejection STICKS across a Re-cluster - undo it with
+%                     'Reset to filter'.
 %           states    which vigilance states count. Untick one to drop a
 %                     stretch of the recording wholesale (movement artifact in
-%                     WAKE, say) without touching the shape decision.
+%                     WAKE, say) without touching the shape decision. State is
+%                     a SCOPE, not a verdict: re-tick it and its events are
+%                     eligible again on the next Re-cluster.
 %
 %       SHOW (dropdown): 'both' | 'accepted' | 'removed'. Chooses which rows
 %       reach the plot and nothing else - it cannot change the mask.
@@ -67,6 +71,13 @@ function [ed, hFig] = ed_curate(basepath, varargin)
 %   HISTORY:
 %       260720 created as the ED twin of ripp_curate (threshold knobs over a
 %              kept-vs-removed mean waveform).
+%       260721b shape rejections became sticky and state rejections reversible.
+%              State used to reach the fit through the accepted mask, which
+%              made it a one-way door: unticking REM dropped its events from
+%              the fit, so they lost their labels, and an unlabelled event
+%              cannot be accepted - which is what a Re-cluster fits over. There
+%              was no way back short of Reset, which discards every cluster
+%              judgement made so far.
 %       260721 rebuilt on waveform clustering: accept TYPES, not events. The
 %              view is guiTbl_xy, which already does tiles, grouping and a
 %              median-with-spread trace, so one pivotable view replaces two
@@ -168,7 +179,9 @@ st.hPanel = uipanel(gPlot, 'BorderType', 'none');
 st.chk    = gobjects(0);
 st.cid    = nan(numel(ed.peakTime), 1);
 st.nClust = 0;
-st.acc    = true(numel(ed.peakTime), 1);    % nothing rejected yet
+st.acc    = true(numel(ed.peakTime), 1);
+st.gate   = false(numel(ed.peakTime), 1);   % set by the first fit / restore
+st.rej    = false(numel(ed.peakTime), 1);   % sticky shape rejections
 hFig.UserData = st;
 
 buildStateChecks(hFig, prevStates(ed));
@@ -197,24 +210,40 @@ end     % onKnob
 function onCluster(hFig, flgReset)
 % Fit waveform clusters over the pool and adopt the result.
 %
-% Re-cluster fits only what is CURRENTLY ACCEPTED, intersected with the
-% thresholds so the knobs still bite. Having thrown out WAKE, or a cluster of
-% step artifacts, you do not want the groups spent describing events already
-% rejected - you want them over what is left, which splits the survivors finer
-% each round. The accepted SET does not move: the input IS what was accepted,
-% and every new cluster starts ticked, so a rejection lives in the input rather
-% than in the tick pattern. Carrying the old ticks over would be wrong anyway -
-% the partition is new, so index 3 no longer means what it did.
+% Re-cluster fits what is left after the thresholds, the SHAPE rejections and
+% the state scope. Having thrown out a cluster of step artifacts, you do not
+% want the groups spent describing events already rejected - you want them over
+% what is left, which splits the survivors finer each round. The accepted SET
+% does not move: every new cluster starts ticked, so a rejection lives in the
+% input rather than in the tick pattern. Carrying the old ticks over would be
+% wrong anyway - the partition is new, so index 3 no longer means what it did.
 %
-% Because it only ever narrows, FLGRESET goes back to the whole pool the
-% thresholds imply; without it a mis-click would be unrecoverable short of
-% reopening the session.
+% THE TWO KINDS OF REJECTION BEHAVE DIFFERENTLY, and they have to.
+%   SHAPE (a cluster untick) is STICKY, recorded in st.rej. Refitting strips
+%     the labels of the events it drops, and an unlabelled event is
+%     indistinguishable from one that was never judged - so without this record
+%     a rejected cluster would walk straight back in on the next round.
+%   STATE (a state untick) is NOT sticky. It is a scope, flipped back and forth
+%     while working, so re-ticking a state makes its events eligible again and
+%     the next Re-cluster gives them labels. It used to feed the fit through
+%     the accepted mask, which made it a one-way door: out of the fit meant no
+%     label, no label meant not accepted, and not accepted meant it could never
+%     re-enter the fit.
+%
+% FLGRESET clears the shape rejections and goes back to the whole gate; without
+% it a mis-click would be unrecoverable short of reopening the session. It does
+% not touch the state scope, which is live either way.
 st = hFig.UserData;
 c  = st.met.clust;
+[~, sel, states] = acceptMask(st);
 
-gate = evt_gate(st.ed, buildSpec(st));
-st.pool = gate;
-if ~flgReset, st.pool = gate & st.acc; end
+st.gate = evt_gate(st.ed, buildSpec(st));
+if flgReset
+    st.rej = false(size(st.rej));
+else
+    st.rej = st.rej | (~isnan(st.cid) & ~ismember(st.cid, sel));
+end
+st.pool = st.gate & ~st.rej & ismember(st.state(:), states);
 iPool = find(st.pool);
 
 k = st.edK.Value;
@@ -236,7 +265,7 @@ end
 hFig.UserData = st;
 
 adoptClust(hFig, 1 : st.nClust, ...
-    sprintf('gate %d | clustered %d -> %d groups', nnz(gate), ...
+    sprintf('gate %d | clustered %d -> %d groups', nnz(st.gate), ...
     numel(iPool), st.nClust));
 
 end     % onCluster
@@ -266,6 +295,15 @@ end
 dflt = specDefaults(ed.info.qa);
 st.edFast.Value = dflt.fastZ;
 st.edIso.Value  = dflt.isoZ;
+st.gate = evt_gate(st.ed, buildSpec(st));
+
+% Rebuild the shape rejections the saved partition implies: an event the gate
+% passed and the saved state scope included, yet which carries no label, was
+% dropped by a cluster untick in some earlier round. Without this a reopen
+% would quietly undo the refinement and offer those events again.
+scope = prevStates(ed);
+if ~iscell(scope), scope = st.stateCats; end
+st.rej = st.gate & isnan(st.cid) & ismember(st.state(:), scope);
 hFig.UserData = st;
 
 adoptClust(hFig, sel, sprintf('restored: %d clustered -> %d groups', ...
@@ -318,12 +356,21 @@ function refresh(hFig)
 % by name. So even a re-cluster keeps whatever view the user set, which
 % rebuilding would throw away on every press.
 st = hFig.UserData;
-accepted = acceptMask(st);
-st.acc = accepted;              % what a Re-cluster will be fitted over
+[accepted, ~, states] = acceptMask(st);
+st.acc = accepted;
 hFig.UserData = st;
 
+% An event needs a label to be accepted, so re-ticking a state cannot bring
+% its events back on its own - they left the last fit and have none. Say so,
+% rather than letting the tick look like it did nothing.
 st.lblKeep.Text = sprintf('accepted: %d of %d', nnz(accepted), ...
     numel(accepted));
+nPend = nnz(st.gate & ~st.rej & isnan(st.cid) & ...
+    ismember(st.state(:), states));
+if nPend > 0
+    st.lblKeep.Text = sprintf('%s  |  %d unsorted - press Re-cluster', ...
+        st.lblKeep.Text, nPend);
+end
 
 switch st.ddShow.Value
     case 'accepted', iRow = find(accepted);

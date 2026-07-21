@@ -183,12 +183,37 @@ inspect what you rejected without changing what you kept.
   artifact in WAKE — without touching the shape decision.
 - SHOW is a dropdown: `both | accepted | removed`. Rows drawn, nothing else.
 
-**Re-cluster fits only the ACCEPTED events** (intersected with the thresholds),
-so rejecting then re-clustering is a refinement loop. The accepted set does not
-change when you press it. `Reset to filter` undoes the narrowing. `ed_clust`
-also seeds its RNG (restored on exit), so the same pool and count give the same
-partition — without that, `fitgmdist`'s random starts reshuffled the very
-groups the user had just judged.
+**Re-cluster fits what survives the thresholds, the shape rejections and the
+state scope**, so rejecting then re-clustering is a refinement loop. The
+accepted set does not change when you press it. `Reset to filter` undoes the
+narrowing. `ed_clust` also seeds its RNG (restored on exit), so the same pool
+and count give the same partition — without that, `fitgmdist`'s random starts
+reshuffled the very groups the user had just judged.
+
+**The two rejections are not the same kind of thing, and conflating them made
+state a one-way door.** The fit set was `gate & accepted`, which is circular:
+refitting strips the labels of the events it drops, an unlabelled event cannot
+be accepted, and the fit runs over the accepted. So unticking REM to protect it
+during cluster surgery removed its events permanently — re-ticking the box did
+nothing, and pressing Re-cluster again could not rescue them either, because
+they were no longer accepted. The only way out was `Reset to filter`, which
+discards every cluster judgement made so far. Measured on raMCU4: 31 REM
+events, 0 recoverable.
+
+The fix separates them by lifetime:
+
+| | sticky? | why |
+|---|---|---|
+| shape (cluster untick) | yes, `st.rej` | a refit strips the label, so without a record the rejected cluster walks back in |
+| state (state untick) | no | a scope the user flips while working; it must be reversible |
+
+The fit set is now `gate & ~st.rej & stateTicked`. Re-ticking a state makes its
+events eligible again, and one Re-cluster gives them labels — on raMCU4, 28 of
+31 REM events return, the other 3 having also been in a shape-rejected cluster.
+Acceptance still requires a label, so the tick alone cannot restore them; the
+count line says `N unsorted - press Re-cluster` rather than appearing to do
+nothing. A reopen rebuilds `st.rej` from the saved partition (gated, in the
+saved state scope, yet unlabelled), so the refinement survives a save.
 
 **Reopening resumes** the saved labels, ticks, state selection and thresholds
 rather than re-fitting. The saved labels are the partition that was judged; a
