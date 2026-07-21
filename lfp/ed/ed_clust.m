@@ -150,6 +150,27 @@ oc = onCleanup(@() warning(ws));    % restored when the function exits
 nPC = min(nPC, min(size(X)) - 1);
 [~, score, ~, ~, explained] = pca(X, 'NumComponents', nPC);
 
+% SIZE, back as one explicit axis. Normalisation strips it from the waveform so
+% the components can describe shape; wSize decides how much it then counts.
+%
+% On a LOG scale, because size is judged as a RATIO - a 3400 uV event against a
+% 1000 uV one is the same kind of difference as 340 against 100, and the eye
+% reads it that way while curating. The scalar block below does carry .amp, but
+% ranked (it is heavy-tailed), and a rank keeps only the ORDER: an event 3x
+% larger than its neighbour and one 1.05x larger are the same distance apart.
+% That is why raising amplitude's weight through the scalars could never work.
+%
+% Scaled to the spread of the leading shape component, so wSize = 1 means size
+% counts for as much as the dominant shape axis and 0 restores shape-only.
+%
+% It sits BEFORE the scalars because a scarce-dimension pool truncates from the
+% right (see nDim): shape first, then size, then the derived measures.
+if wSize > 0 && std(sz) > 0
+    L = log10(max(sz, eps));
+    L = (L - mean(L)) / max(std(L), eps);
+    score = [score, L * std(score(:, 1)) * wSize];
+end
+
 % Scalar measures join the shape components on a comparable footing: rank
 % first (fastZ and amp are heavy-tailed, and a raw one would set the metric by
 % itself), then scale to the spread of the leading component.
@@ -169,24 +190,6 @@ if ~isempty(scalar)
     end
     S = (tiedrank(S) - 0.5) ./ size(S, 1);
     score = [score, (S - 0.5) * std(score(:, 1)) * 2];
-end
-
-% SIZE, back as one explicit axis. Normalisation strips it from the waveform so
-% the components can describe shape; wSize decides how much it then counts.
-%
-% On a LOG scale, because size is judged as a RATIO - a 3400 uV event against a
-% 1000 uV one is the same kind of difference as 340 against 100, and the eye
-% reads it that way while curating. The scalar block does carry .amp, but ranked
-% (it is heavy-tailed), and a rank keeps only the ORDER: an event 3x larger than
-% its neighbour and one 1.05x larger are the same distance apart. That is why
-% raising amplitude's weight through the scalars could never work.
-%
-% Scaled to the spread of the leading shape component, so wSize = 1 means size
-% counts for as much as the dominant shape axis and 0 restores shape-only.
-if wSize > 0 && std(sz) > 0
-    L = log10(max(sz, eps));
-    L = (L - mean(L)) / max(std(L), eps);
-    score = [score, L * std(score(:, 1)) * wSize];
 end
 
 % a GMM needs comfortably more events than dimensions; on a small pool keep
