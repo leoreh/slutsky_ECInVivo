@@ -371,11 +371,45 @@ judged as a ratio. Measured over the three curated mice (`ed_sizeSweep.m`):
 | 0 | 2.1 | 71% | 268 |
 | 0.5–4 | 1.9 | 75% | 210 |
 
-Better on all three, and **identical for every non-zero weight** — a
-diagonal-covariance GMM re-fits each component's variance per dimension, so a
-global rescaling of one feature barely moves the partition. So it is on/off,
-not a dial. Shipped at 1, and there is no GUI knob for it because there is
-nothing to tune and no losing setting to offer.
+**On/off, not a dial — verified on labels, not on summary metrics.** Agreement
+with the `wSize = 1` partition on raMCU4's gated pool (n = 1697): `wSize` 0.25,
+0.5, 1, 2, 4 and 8 all give **100.0% identical labels**, while `wSize = 0`
+agrees on only 10.9%. A diagonal-covariance GMM re-fits each component's
+variance per dimension, so a global rescaling of one feature cannot move the
+partition. Shipped at 1, with no GUI knob: there is nothing to tune.
+
+### How far the wSize evidence actually goes
+
+Leore pushed on this and was right to. The recommendation was measured on the
+**gated** pool. Repeating it on **all candidates** (`audit`, no gate at all):
+
+| mouse | set | n | eta² log-amp by cluster | within-cluster amp ratio |
+|---|---|---|---|---|
+| raMCU4 | gated | 1697 | 0.64 → **0.80** | 1.6 → **1.4** |
+| raMCU4 | all cand | 2984 | 0.65 → **0.76** | 1.6 → 1.7 ✗ |
+| raMCU5 | gated | 2749 | 0.62 → **0.72** | 2.7 → **2.3** |
+| raMCU5 | all cand | 4760 | 0.69 → 0.65 ✗ | 2.3 → **2.1** |
+
+(arrow = `wSize` 0 → 1.) On the gated pool both metrics improve for both mice.
+Ungated, they disagree and one reverses in each mouse. So the effect is real at
+the operating point — the pipeline only ever clusters the gated pool, and the
+gate above is Leore's current `fastZ ≥ 7, isoZ ≥ 8` — but it is **not robust to
+the gate setting**, and the earlier "better on all three metrics" overstated it.
+The third of those metrics (recall, review load) rests on the 47 curated events
+and should be read as the weakest of the three.
+
+### What rests on what
+
+Worth keeping straight, because the 47 curated events are a biased sample from
+an old detector and three mice:
+
+| resting on the FULL POOL (thousands) | resting on the 47 CURATED |
+|---|---|
+| alignment offset spread, 32–43% >4 ms | recall / review-load in every sweep |
+| cluster medians doubling after refinement | polarity mixed within a mouse |
+| `wSize` eta² and amplitude ratio | detrend `edge` vs `full` being unresolvable |
+| `wSize` magnitude being inert | |
+| the ~2× within-cluster amplitude floor | |
 
 **But it does not deliver amplitude-homogeneous clusters, and nothing will.**
 Bounding the space on raMCU5: shape only 2.7, shape+size 2.3, dropping to 2 PCs
