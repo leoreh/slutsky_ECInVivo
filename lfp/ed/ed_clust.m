@@ -137,14 +137,13 @@ if ~isempty(scalar)
     % half-amplitude crossing was found, which is ~16% of candidates, and
     % dropping those would make them unclusterable and therefore permanently
     % unacceptable in the GUI. The waveform is what drives the grouping, so an
-    % absent scalar is set to its column median - neutral in the ranking.
+    % absent scalar takes its column median - neutral in the ranking.
     for iCol = 1 : size(S, 2)
         bad = ~isfinite(S(:, iCol));
-        if all(bad)
-            S(:, iCol) = 0;
-        elseif any(bad)
-            S(bad, iCol) = median(S(~bad, iCol));
-        end
+        if ~any(bad), continue; end
+        fill = median(S(~bad, iCol));
+        if ~isfinite(fill), fill = 0; end    % the whole column is missing
+        S(bad, iCol) = fill;
     end
     S = (tiedrank(S) - 0.5) ./ size(S, 1);
     score = [score, (S - 0.5) * std(score(:, 1)) * 2];

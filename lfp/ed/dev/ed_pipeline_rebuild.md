@@ -113,15 +113,17 @@ channel at once, so averaging looked like a matched filter for it. Measured
 Detection: `passband [60 150]`, `thr 8`, `limDur [4 200 40] ms`, polarity-blind,
 on one auto-picked channel.
 
-Noise filter (`met.qa`): `fastZ ≥ 15`, `isoZ ≥ 20`. **`posZ` was dropped from the
-gate.** It required the event to rise above its pre-event baseline, which
-encodes the shape of the discharges in three mice; polarity is layer-dependent
-(Maslarova et al. report a sharp negative spike in the dendritic layers and a
-positive slow wave in the pyramidal layer for the *same* event), and only 66% of
-the curated discharges were positive-going. It is still measured and reported.
+Noise filter (`met.qa`): `fastZ ≥ 5`, `isoZ ≥ 5` — loosened by Leore from the
+15 / 20 the sweep chose, which is what forced the cluster count to scale (below).
+**`posZ` was dropped from the gate.** It required the event to rise above its
+pre-event baseline, which encodes the shape of the discharges in three mice;
+polarity is layer-dependent (Maslarova et al. report a sharp negative spike in
+the dendritic layers and a positive slow wave in the pyramidal layer for the
+*same* event), and only 66% of the curated discharges were positive-going. It is
+still measured and reported.
 
-Clustering (`met.clust`): `win [-0.05 0.05]`, `nPC 6`, `nClust 12`, plus the
-scalar measures.
+Clustering (`met.clust`): `win [-0.05 0.05]`, `nPC 6`, `nClust []` (auto:
+0.65·√n), plus the scalar measures.
 
 `emg` is gone entirely — nothing read it once the shape criteria were applied.
 
@@ -174,10 +176,11 @@ suppression window cannot share with a ±100 ms waveform.
 inspect what you rejected without changing what you kept.
 
 - ACCEPT is checkboxes: which clusters, and which states. An event is accepted
-  when its cluster AND its state are ticked. Clusters start unticked (nothing
-  is a discharge until you say so); states start ticked, and are there to drop
-  a stretch of recording wholesale — movement artifact in WAKE — without
-  touching the shape decision.
+  when its cluster AND its state are ticked. Both lists start **ticked** —
+  curation is rejection, because the eye is much better at spotting the two or
+  three tiles that are obviously not discharges than at confirming the ten that
+  are. States are there to drop a stretch of recording wholesale — movement
+  artifact in WAKE — without touching the shape decision.
 - SHOW is a dropdown: `both | accepted | removed`. Rows drawn, nothing else.
 
 **Re-cluster fits only the ACCEPTED events** (intersected with the thresholds),
@@ -208,6 +211,15 @@ purity against the curated discharges:
 
 So `nClust` empty now means **0.65·√n**, which picks 60 / 34 / 42 for those
 pools and 11–14 for the old strict ones, where a fixed 12 had measured best.
+
+This is what makes the refinement loop work, and it is fragile in one specific
+way. The GUI used to write the resolved count back into its `clusters (0 =
+auto)` box, which reads as helpful — it shows what auto chose — but it turns
+auto into a fixed number after the first fit. Measured on raMCU4: open at 2698
+events → 34 groups; reject two clusters and WAKE → 512 accepted; `Re-cluster`
+then split those 512 into **34** groups again instead of 15. The box now holds
+what the user *asked* for and the label reports what came *back*; regression
+test `test_curateAutoCountFollowsPool`.
 
 Caveat worth keeping in view: purity is estimated from 10–19 curated events per
 mouse, so individual cells above are noisy. What is robust is the direction —
@@ -294,10 +306,21 @@ passing QA as valid; an fs mix-up scoring EMG at the wrong rate; and a stale
 ## Simplification pass
 
 Measured, then removed as earning nothing: a block-wise robust baseline (45
-lines; changed no result versus one recording-wide scale), `.pol` (now the sign
-of `.amp`), and the state filter in curation (ED asks how discharges distribute
-over states, so restricting them is a question for `ed_tbl`). Also dropped as
-unrequested: `flgNS`, `flgDetectOnly`, `mapDur`, `flgAll`.
+lines; changed no result versus one recording-wide scale) and `.pol` (now the
+sign of `.amp`). Also dropped as unrequested: `flgNS`, `flgDetectOnly`,
+`mapDur`, `flgAll`. The state filter was removed from the *detection* gate on
+the same grounds — ED asks how discharges distribute over states, so
+restricting them there is a question for `ed_tbl` — but came back in curation
+as an acceptance criterion, which is a different job: dropping a stretch of
+recording, not defining an event.
+
+A second pass over `ed_curate` (260721) cut it from 620 to 530 lines with no
+behaviour change: `buildChecks` merged into the adopt step it was the tail of;
+`selectedClusters`/`selectedStates`/`scalarFeat` folded into their one or two
+call sites; the `selRestore` field, whose lifetime was a single call, became an
+argument; guards on `chkState` that could never fire removed; a six-entry
+same-day HISTORY collapsed into the one design it converged on. The auto-count
+defect above was found by that pass, not by the tests.
 
 ## The detection signal is not comparable across mice
 
@@ -374,5 +397,6 @@ No population burst is visible at the event itself (raMCU5: zero spikes in
   recall is 39–70%; the discharges spread over two to four clusters. The review
   load is ~20 events per mouse, not zero.
 - The suppression measure (`ed_units.m`) is evidence, deliberately kept out of
-  the pipeline. It is drawn in `ed_curate` as a per-cluster panel and gates
-  nothing.
+  the pipeline. It is not in `ed_curate` at all — the peri-event MUA panel was
+  dropped (too few events per cluster to read, and it cannot share an x-axis
+  with the waveform), so nothing in the pipeline reads or gates on it.

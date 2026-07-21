@@ -324,6 +324,30 @@ tc.verifyEqual(nnz(st2.acc), nAcc, 'the accepted set moved');
 end
 
 
+function test_curateAutoCountFollowsPool(tc)
+% On auto, a refinement round must re-scale the count to the NARROWED pool.
+% The resolved count must therefore never be written into the box - that would
+% turn "0 = auto" into a fixed number after the first fit, and the refinement
+% loop would keep splitting a shrinking pool into as many groups as the pool
+% it came from.
+[~, hFig] = ed_curate(tc.TestData.dir, 'basename', tc.TestData.name, ...
+    'flgGui', true, 'Visible', 'off');
+tc.addTeardown(@() close(hFig, 'force'));
+
+st = hFig.UserData;
+tc.verifyEqual(st.edK.Value, 0, 'the count box left auto after the first fit');
+
+st.chk(1).Value = false;
+st.chk(1).ValueChangedFcn([], []);
+findall(hFig, 'Type', 'uibutton', 'Text', 'Re-cluster').ButtonPushedFcn([], []);
+
+st2 = hFig.UserData;
+tc.verifyEqual(st2.nClust, round(0.65 * sqrt(nnz(st2.pool))), ...
+    'the count did not re-scale to the narrowed pool');
+tc.verifyEqual(st2.edK.Value, 0, 'the count box stopped being auto');
+end
+
+
 function test_curateResetWidensAgain(tc)
 % Re-cluster only narrows, so Reset must restore the whole gate pool.
 [~, hFig] = ed_curate(tc.TestData.dir, 'basename', tc.TestData.name, ...
