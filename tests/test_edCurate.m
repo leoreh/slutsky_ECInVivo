@@ -229,7 +229,10 @@ tc.verifyTrue(ismember('cluster', ud.ddPlotBy.Items));
 tc.verifyTrue(ismember('state', ud.ddPlotBy.Items));
 tc.verifyTrue(ismember('status', ud.ddGrpBy.Items));
 tc.verifyEqual(ud.yVar, 'lfp');
-tc.verifyEqual(height(ud.dataTbl), numel(hFig.UserData.cid));
+% the view opens on 'accepted', so it holds the accepted rows - not every
+% event. Asserting numel(cid) would only pass while the shipped gate happens
+% to let the whole fixture through, which is a tuning value.
+tc.verifyEqual(height(ud.dataTbl), nnz(hFig.UserData.acc));
 end
 
 

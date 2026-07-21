@@ -121,7 +121,11 @@ hFig = [];
 if ~flgGui
     pool = evt_gate(ed, met.qa);
     ed.accepted = pool;
-    saveCurated(files.evt, pool, nan(numel(pool), 1), [], met.qa, {});
+    % [] and not {}: prevStates reads a CELL as an explicit selection, so an
+    % empty one means "every state was rejected". The headless gate makes no
+    % state choice at all, and writing {} here made the GUI open with every
+    % state box unticked.
+    saveCurated(files.evt, pool, nan(numel(pool), 1), [], met.qa, []);
     buildStates(basepath, basename, ed, pool);
     if verbose
         fprintf('[ED_CURATE] %s : %d / %d pass the filter\n', ...

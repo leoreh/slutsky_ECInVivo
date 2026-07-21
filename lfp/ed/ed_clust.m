@@ -90,7 +90,7 @@ function [clustId, cInfo] = ed_clust(wv, tstamps, varargin)
 %                           fit, for the GUI and the record.
 %
 %   DEPENDENCIES:
-%       pca, fitgmdist (Statistics and Machine Learning Toolbox).
+%       evt_detrend; pca, fitgmdist (Statistics and Machine Learning Toolbox).
 %
 %   HISTORY:
 %       260721 created, replacing the threshold-knob curation. See
@@ -139,7 +139,7 @@ if size(X, 1) < MINEV || size(X, 2) < 3
     return;
 end
 
-X = detrendWv(X, tstamps(iWin), flgDt);
+X = evt_detrend(X, tstamps(iWin), flgDt);
 [X, sz] = normWv(X, flgNorm);
 
 % detrending costs two degrees of freedom, so X is rank-deficient by
@@ -239,35 +239,6 @@ end     % EOF
 % =========================================================================
 %  LOCAL
 % =========================================================================
-function X = detrendWv(X, t, met)
-% Remove a per-event linear baseline, so an event riding on a slow deflection
-% is described by its own shape.
-%
-%   'edge' fits the line on the FLANKS only - the samples beyond half the
-%          window - so the event cannot tilt the baseline it is measured
-%          against. This is the snipFromBinary convention.
-%   'full' fits it over the whole window, the event included. Cheaper to say
-%          and wrong in a specific way: a large asymmetric deflection drags
-%          the line, and it drags it in a direction that depends on the
-%          event's own polarity and asymmetry, so the residual tilt is
-%          correlated with the shape being measured.
-if strcmp(met, 'none'), return; end
-
-t = t(:);
-if strcmp(met, 'edge')
-    iFit = abs(t) >= 0.5 * max(abs(t));
-    if nnz(iFit) < 3, iFit = true(size(t)); end
-else
-    iFit = true(size(t));
-end
-
-t = t - mean(t(iFit));
-A = [t(iFit), ones(nnz(iFit), 1)];
-X = X - ([t, ones(numel(t), 1)] * (A \ X(:, iFit)'))';
-
-end     % detrendWv
-
-
 function [X, sz] = normWv(X, met)
 % Put every event on a comparable scale, so the components describe SHAPE and
 % not size. The pool spans two orders of magnitude, and unnormalised the few
