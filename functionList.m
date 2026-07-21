@@ -174,9 +174,11 @@ spec = calc_spec('sig', [], 'fs', 1250, 'graphics', true, 'saveVar', true,...
 plot_spec(spec, 'ch', [1 : 4], 'logfreq', true, 'saveFig', false,...
     'axh', [])
 
-% get spectrogram outliers
-otl = get_otlSpec('basepath', pwd, 'saveVar', true,...
-    'flgForce', false, 'graphics', true);
+% get artifact epochs, and feed them to the state bouts so every analysis that
+% reads the states skips the contamination
+sig = load([basename, '.sleep_sig.mat'], 'eeg', 'fs');
+otl = lfp_artifacts(sig.eeg, sig.fs, 'flgPlot', true);
+ss.bouts = as_bouts('labels', ss.labels, 'otl', otl);
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

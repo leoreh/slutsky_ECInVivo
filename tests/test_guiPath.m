@@ -183,8 +183,11 @@ fprintf('  ok  panel list add / reorder / delete\n');
 
 % two event sets at once; CURATE elects one (or None) without disturbing the
 % other. A second set (loaded inline) must not steal curation from 'ripp'.
+% seeded just after ACCEPTED ripples, not the first raw ones: a rejected event
+% draws no mark, so seeding from raw peaks made the window-mark checks below
+% depend on the session's acceptance rate.
 d = hFig.UserData;
-ev2 = struct('peakTime', d.ed.peakTime(1:min(5, d.nEvents)) + 0.01);
+ev2 = struct('peakTime', d.ed.peakTime(find(d.accepted, 5)) + 0.01);
 d.loadCoreFcn(var_recipe('value', 'data', ev2), 'eventTicks', 'top', ...
     'ripp2', 'ripp2', [], []);
 di = hFig.UserData;

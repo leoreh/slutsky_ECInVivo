@@ -25,6 +25,12 @@ function met = ripp_methods(preset)
 %       .passband  - <vec>  band-pass [lo hi] (Hz).
 %       .detectMet - <num>  ripp_sigPrep detection signal (3 = TEO).
 %       .zMet      - <char> ripp_sigPrep threshold reference ('nrem').
+%       .otlThr    - <num>  gross-artifact threshold in robust SDs (lfp_artifacts).
+%                           Flagged samples are dropped from the 'nrem' baseline
+%                           only - never from detection. One constant for every
+%                           mouse; it self-scales, landing ~1-5 mV. 8 sits on a
+%                           plateau (8-12): below 6 the mask reaches real events,
+%                           above 15 it stops catching movement steps.
 %       .thr       - <vec>  ripp_times thresholds [start peak cont max minCont].
 %       .limDur    - <vec>  ripp_times duration limits [min max inter minCont] (ms).
 %       .calibThr  - <log>  replace the fixed peak threshold with one calibrated
@@ -66,7 +72,7 @@ if nargin < 1 || isempty(preset), preset = 'default'; end
 
 % the shipping configuration (detection)
 d = struct('name', 'default', 'chMode', 'tag', 'passband', [80 250], ...
-    'detectMet', 3, 'zMet', 'nrem', ...
+    'detectMet', 3, 'zMet', 'nrem', 'otlThr', 8, ...
     'thr', [1 3.5 2 200 50], 'limDur', [15 300 20 10], ...
     'calibThr', false, 'targetFP', 0.05);
 

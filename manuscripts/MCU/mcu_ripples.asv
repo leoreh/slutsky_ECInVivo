@@ -18,32 +18,35 @@ nFiles = numel(basepaths);
 met = ripp_methods('default');          % detection + default QA filter (met.qa)
 
 % Loop 1 - DETECT 
-for iFile = 7 : nFiles
+for iFile = 1 : nFiles
     ripp_wrapper('basepath', basepaths{iFile}, 'met', met, 'win', [0 Inf], ...
         'flgSave', true, 'flgForce', true, 'flgDetectOnly', true, ...
         'rippCh', []);
 end
 
 % Loop 2 - CURATE + INSPECT 
-iFile = 2;
-ripp_curate(basepaths{iFile}); % bulk curation GUI
-guiPath(basepaths{iFile}, 'preset', 'ripp'); % fine inspection
+iFile = 1;
+ripp_curate(basepaths{iFile}, 'qa', met.qa); % bulk curation GUI
 
-% first open for the file 
+% first open (slow) 
 [~, vm, gm] = guiPath(basepaths{iFile}, 'preset', 'ripp');
 
-% after curating, reopen fast:
+% reopen (fast)
 vm.ripp.data = []; % the ONLY entry re-read
 guiPath(basepaths{iFile}, 'varMap', vm, 'guiMap', gm);
 
 
 % Loop 3 - ANALYZE 
-for iFile = 1 : nFiles
-    ripp_analyze('basepath', basepaths{iFile}, 'flgPlot', false);
+for iFile = 2 : nFiles
+    ripp_wrapper('basepath', basepaths{iFile}, 'met', met, 'win', [0 Inf], ...
+        'flgSave', true, 'flgForce', true, 'flgDetectOnly', true, ...
+        'rippCh', []);
+    
+    ripp_curate(basepaths{iFile}, 'qa', met.qa, 'flgGui', false); % bulk curation GUI
+
+    ripp_analyze(basepaths{iFile}, 'flgPlot', false);
+
 end
-
-
-
 
 
 
@@ -51,7 +54,8 @@ end
 %  RATE & DENSITY (STATE-DEPENDENT)
 %  ========================================================================
 
-basepaths = [mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl')];
+basepaths = [mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl'), ...
+    mcu_basepaths('ra')];
 nFiles = length(basepaths);
 
 % RIPPLE STATES
@@ -155,9 +159,10 @@ prismMat = [mean(tblPlot{prismIdx, yVar}, 1, 'omitnan')', ...
 
 presets = {'ripp'};
 tblRipp = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
+tblPlot = tblRipp(tblRipp.state == 'NREM', :);
 
 % Plot
-guiTbl_bar(tblRipp, 'xVar', 'genotype', 'yVar', 'dur');
+guiTbl_bar(tblPlot, 'xVar', 'genotype', 'yVar', 'dur');
 guiTbl_scatHist(tblRipp, 'xVar', 'dur', 'yVar', 'amp', 'grpVar', 'genotype');
 
 % Summary

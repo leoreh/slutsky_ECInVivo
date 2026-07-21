@@ -112,9 +112,13 @@ else
 
     lfp = ripp_sigLoad(basepath, 'win', win, 'session', v.session, ...
         'basename', basename, 'rippCh', ripp.info.rippCh, 'bit2uv', []);
+    % rebuild the detection signal exactly as detection did, artifact mask
+    % included; a pre-260720 ripp.mat carries no otlThr, hence the default
+    otlThr = 8;
+    if isfield(ripp.info, 'otlThr'), otlThr = ripp.info.otlThr; end
     rippSig = ripp_sigPrep(lfp, fs, 'detectMet', ripp.info.detectMet, ...
         'passband', ripp.info.passband, 'zMet', ripp.info.zMet, ...
-        'nremTimes', nremTimes);
+        'nremTimes', nremTimes, 'otlThr', otlThr);
 end
 
 % window-relative times for the accepted events (signal starts at w0)

@@ -24,6 +24,8 @@ function rippSig = ripp_sigPrep(lfp, fs, varargin)
 %                           'adaptive' : Moving average/std (10s window).
 %                           'nrem'     : Global mean/std from NREM epochs.
 %           'nremTimes' - (Mat) [N x 2] NREM start/end times (for 'nrem').
+%           'otlThr'    - (Num) Artifact threshold in robust SDs, excluded from
+%                           the 'nrem' baseline (lfp_artifacts). Inf / 0 disables.
 %
 %   OUTPUTS:
 %       rippSig     - (Struct) Processed signals:
@@ -32,12 +34,19 @@ function rippSig = ripp_sigPrep(lfp, fs, varargin)
 %           .amp        - Amplitude envelope (Hilbert).
 %           .freq       - Instantaneous frequency (Hilbert).
 %           .z          - Final Z-scored detection signal.
+%           .otl        - Artifact summary ('nrem' only): what was kept out of
+%                         the baseline. No per-sample vector (it is huge).
 %
 %   DEPENDENCIES:
-%       filterLFP
+%       filterLFP, lfp_artifacts
 %
 %   HISTORY:
 %       Updated: 23 Jan 2026
+%       260720 gross artifacts excluded from the 'nrem' baseline. They are
+%              catastrophic there and nowhere else: the detection signal is
+%              quadratic in voltage, so its variance is quartic, and one CAG
+%              session had 0.8% of NREM carrying 94% of that variance - a 4x
+%              inflated sigma that suppressed its detection ~35-fold.
 
 % Parameters
 p = inputParser;
@@ -47,12 +56,14 @@ addParameter(p, 'detectMet', 3, @isnumeric);
 addParameter(p, 'passband', [100 300], @isnumeric);
 addParameter(p, 'zMet', 'adaptive', @ischar);
 addParameter(p, 'nremTimes', [], @isnumeric);
+addParameter(p, 'otlThr', 8, @isnumeric);
 parse(p, lfp, fs, varargin{:});
 
 detectMet = p.Results.detectMet;
 passband = p.Results.passband;
 zMet = p.Results.zMet;
 nremTimes = p.Results.nremTimes;
+otlThr = p.Results.otlThr;
 
 % Filter LFP for detection
 % 1. Filter LFP
@@ -135,6 +146,20 @@ switch zMet
                     mask(idxStart:idxEnd) = true;
                 end
             end
+        end
+
+        % Keep gross artifacts out of the baseline. This estimate is the one
+        % place they do real damage: baseSignal is quadratic in voltage, so its
+        % variance is quartic, and a step tens of times a ripple's height can
+        % set sigma single-handedly. An inflated sigma shrinks every genuine
+        % ripple's z, so the detector MISSES ripples. The exclusion is confined
+        % to the BASELINE - detection still searches these samples, and thr /
+        % limDur are untouched, so nothing here can invent an event.
+        if isfinite(otlThr) && otlThr > 0 && any(mask)
+            otl = lfp_artifacts(rippSig.lfp, fs, 'thrFactor', otlThr, 'mask', mask);
+            maskClean = mask & ~otl.boolean;
+            if any(maskClean), mask = maskClean; end
+            rippSig.otl = rmfield(otl, 'boolean');   % provenance, not the vector
         end
 
         if any(mask)

@@ -73,8 +73,11 @@ labels(emg_rms < emgThr) = 2;
 % create state bouts
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% no artifact removal here: it used to come from get_otlSpec reading pwd, which
+% flagged ~0.1% of a recording and is retired. To exclude artifacts, compute
+% lfp_artifacts on the signal of interest and pass it as 'otl'.
 bouts = as_bouts('labels', labels,...
-    'minDur', minDur, 'interDur', interDur, 'flgOtl', true,...
+    'minDur', minDur, 'interDur', interDur,...
     'sstates', [1, 2], 'graphics', false);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

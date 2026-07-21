@@ -98,7 +98,8 @@ if isempty(sig)
     [lfp, emg, fs] = ripp_sigLoad(basepath, 'win', win, 'session', v.session, ...
         'basename', basename, 'rippCh', rippCh, 'bit2uv', []);
     rippSig = ripp_sigPrep(lfp, fs, 'detectMet', met.detectMet, ...
-        'passband', met.passband, 'zMet', met.zMet, 'nremTimes', nremTimes);
+        'passband', met.passband, 'zMet', met.zMet, 'nremTimes', nremTimes, ...
+        'otlThr', met.otlThr);
     sig = struct('rippSig', rippSig, 'emg', emg, 'fs', fs, 'rippCh', rippCh);
 end
 rippSig = sig.rippSig;
@@ -156,6 +157,7 @@ ripp.info.rippCh    = rippCh;
 ripp.info.passband  = met.passband;
 ripp.info.detectMet = met.detectMet;
 ripp.info.zMet      = met.zMet;
+ripp.info.otlThr    = met.otlThr;
 ripp.info.thr       = thr;
 ripp.info.chi       = chi;
 ripp.info.met       = met.name;

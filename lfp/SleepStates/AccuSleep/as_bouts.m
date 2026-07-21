@@ -22,18 +22,28 @@ function bouts = as_bouts(varargin)
 %                   will change the bout [789 810] to [790 808]. 
 %                   this is to assure that the previous and next state do
 %                   not influence the current state
-%   flgOtl          logical. remove spectrogram outliers. see get_OtlSpec.m
+%   otl             struct from lfp_artifacts, or [] to keep every epoch. Its
+%                   .epoch / .epochBouts are subtracted from the state bouts and
+%                   marked 'bin' in the labels, so any later analysis that reads
+%                   the states skips the contamination. Assumes one epoch per
+%                   label (lfp_artifacts default epochLen = 1 s). The caller
+%                   supplies it - as_bouts does no file I/O of its own.
 %   graphics        logical
-% 
+%
 % OUTPUT
 %
 % DEPENDENCIES
-% 
+%
 % TO DO LIST
 %
 % 12 jan 22 LH      updates:
 % 26 mar 24             flgOtl
 % 25 dec 25             separates flgEmg to as_emg
+% 20 jul 26             flgOtl -> otl. The artifact struct is passed in rather
+%                       than fetched from pwd via get_otlSpec (retired: it read
+%                       the wrong signal, at the wrong resolution, and applied a
+%                       relative criterion that flags a fixed share of ANY
+%                       recording). See lfp_artifacts.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % arguments
@@ -47,7 +57,7 @@ addOptional(p, 'sstates', [], @isnumeric);
 addOptional(p, 'timewins', [], @isnumeric);
 addOptional(p, 'nwins', 1, @isnumeric);
 addOptional(p, 'confMarg', [], @isnumeric);
-addOptional(p, 'flgOtl', false, @islogical);
+addOptional(p, 'otl', [], @(x) isempty(x) || isstruct(x));
 addOptional(p, 'graphics', false, @islogical);
 
 parse(p, varargin{:})
@@ -58,7 +68,7 @@ sstates         = p.Results.sstates;
 timewins        = p.Results.timewins;
 nwins           = p.Results.nwins;
 confMarg        = p.Results.confMarg;
-flgOtl          = p.Results.flgOtl;
+otl             = p.Results.otl;
 graphics        = p.Results.graphics;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -99,7 +109,6 @@ end
 if isempty(timewins)
     timewins = n2chunks('n', length(labels), 'nchunks', nwins);
 end
-nwins = size(timewins, 1);
 winlen = diff(timewins');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -130,35 +139,25 @@ end
 labels = bouts2labels(btimes, 'cellOrdr', stateOrdr, 'nlabels', length(labelsOrig));
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% spectrogram outliers
+% artifacts
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% remove spectrogram outliers from labels. this step benifits psd / spec
-% analysis but can distort vigilance states bout analysis
+% remove artifact epochs from labels. this step benifits psd / spec analysis
+% but can distort vigilance states bout analysis - bouts.timesOrig keeps the
+% untouched version for anything that measures sleep architecture.
+%
+% The EPOCH fields are used here, not the padded sample mask: a label IS an
+% epoch, and what ruins a spectrogram window is the deflection inside it, not
+% the recovery that follows. Padding belongs to variance / baseline estimates
+% (see lfp_artifacts, ripp_sigPrep) and would condemn neighbours for no reason.
 
-otl = [];
-if flgOtl
-    
-    % get outliers
-    otl = get_otlSpec('basepath', pwd, 'saveVar', true,...
-        'flgForce', false, 'graphics', false);
-    
-    % subtract outlier bouts from state bouts 
-    for iwin = 1 : nwins
-        for istate = 1 : length(btOrig)
-            if ~isempty(btOrig{istate})
-                btimes{iwin, istate} = SubtractIntervals(btOrig{istate}, otl.bouts);
-
-                % re-apply min duration criterion
-                boutLen = btimes{iwin, istate}(:, 2) - btimes{iwin, istate}(:, 1);
-                badIdx = boutLen < minDur(istate);
-                btimes{iwin, istate}(badIdx, :) = [];
-            end
-        end
-    end
-
-    % mark outliers as 'bin' state in labels
-    labels(otl.boolean) = nstates + 1;
-
+% Marking the labels is the whole operation. The bouts are rebuilt from them
+% immediately below, and a 'bin' epoch belongs to no state, so it drops out of
+% every state's bouts with minDur re-applied. An earlier version also subtracted
+% the artifact intervals from btimes directly, which the rebuild then discarded -
+% and did so through SubtractIntervals, a function this repo does not contain, so
+% that path threw the moment it was enabled.
+if ~isempty(otl)
+    labels(otlIdx(otl, labels)) = nstates + 1;
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -181,7 +180,7 @@ end
 % labels
 labels = bouts2labels(btimes, 'cellOrdr', stateOrdr, 'nlabels', length(labelsOrig));
 if ~isempty(otl)
-    labels(otl.boolean) = nstates + 1;
+    labels(otlIdx(otl, labels)) = nstates + 1;
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -308,5 +307,18 @@ for iwin = 1 : nwins
         bt{iwin, istate} = bt{iwin, istate} + timewins(iwin, 1) - 1;
     end
 end
+
+end
+
+
+function ix = otlIdx(otl, labels)
+
+% artifact epochs as indices into the label vector, clipped to its length. One
+% label per epoch is assumed (lfp_artifacts epochLen = 1 s). A length mismatch
+% can only arise from the signal and the scoring ending at different samples, so
+% the tail is dropped rather than guessed at.
+
+ix = find(otl.epoch);
+ix = ix(ix <= numel(labels));
 
 end

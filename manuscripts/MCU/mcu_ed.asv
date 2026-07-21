@@ -61,7 +61,7 @@ end
 % 'clusters' re-runs with a different count. More clusters means finer types
 % and more boxes; 12 measured best, but a mouse with a big pool may want more.
 
-iFile = 12;
+iFile = 1;
 
 ed_curate(basepaths{iFile});
 
@@ -104,4 +104,37 @@ frml = 'edRate ~ state * genotype + (1|sbjID)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblState, frml);
 
 
+%% ========================================================================
+%  SANITY: WHAT DID YOU ACCEPT?
+%  ========================================================================
+% Worth one look per cohort. Only the CAG-MCU-KO (raMCU) mice are expected to
+% carry discharges, and only a few dozen per 24 h; a control or an MCU-KO mouse
+% landing anywhere near that is a signal to look at the channel, not a result.
 
+iFile = 12;
+[~, basename] = fileparts(basepaths{iFile});
+load(fullfile(basepaths{iFile}, [basename, '.ed.mat']), 'ed');
+
+acc = ed.accepted;
+fprintf('%s: ch %d, %d accepted of %d candidates (clusters %s)\n', ...
+    basename, ed.info.edCh, nnz(acc), numel(acc), mat2str(ed.info.clustSel));
+fprintf('  fastZ %.1f | isoZ %.1f | posZ %.1f | amp %.0f | dur %.1f ms\n', ...
+    median(ed.fastZ(acc), 'omitnan'), median(ed.isoZ(acc), 'omitnan'), ...
+    median(ed.posZ(acc), 'omitnan'), median(ed.amp(acc), 'omitnan'), ...
+    median(ed.dur(acc), 'omitnan'));
+
+% where the accepted clusters sit against the rest. posZ is REPORTED, never
+% gated - a discharge may be either polarity - so expect accepted events on
+% both sides of zero if the electrode sits near a reversal.
+tblEvt = table(ed.fastZ, ed.isoZ, ed.posZ, ed.amp, ed.dur, ...
+    categorical(acc, [false true], {'removed', 'kept'}), ...
+    'VariableNames', {'fastZ', 'isoZ', 'posZ', 'amp', 'dur', 'status'});
+guiTbl_scatHist(tblEvt, 'xVar', 'fastZ', 'yVar', 'posZ', 'grpVar', 'status');
+
+% and the waveforms of what you kept, by cluster
+load(fullfile(basepaths{iFile}, [basename, '.edMaps.mat']), 'edMaps');
+tblWv = table(edMaps.lfp, categorical(ed.clustId), ...
+    categorical(acc, [false true], {'removed', 'kept'}), ...
+    'VariableNames', {'lfp', 'cluster', 'status'});
+guiTbl_xy(edMaps.tstamps * 1000, tblWv(acc, :), 'yVar', 'lfp', ...
+    'tileVar', 'cluster', 'xLbl', 'time (ms)');

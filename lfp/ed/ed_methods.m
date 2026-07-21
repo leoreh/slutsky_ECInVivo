@@ -67,7 +67,7 @@ switch preset
         % Set near the 5th percentile of the curated discharges, so they are
         % permissive by construction: what survives is the set worth SORTING,
         % not the set worth reporting.
-        met.qa.ranges = struct('fastZ', [7 Inf], 'isoZ', [8 Inf]);
+        met.qa.ranges = struct('fastZ', [10 Inf], 'isoZ', [5 Inf]);
 
         % Waveform clustering (ed_clust). Swept against the curated discharges
         % in dev/ed_clustSweep.m and dev/ed_winSweep.m. nClust empty scales the

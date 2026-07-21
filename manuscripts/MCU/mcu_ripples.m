@@ -38,6 +38,10 @@ guiPath(basepaths{iFile}, 'varMap', vm, 'guiMap', gm);
 
 % Loop 3 - ANALYZE 
 for iFile = 2 : nFiles
+    ripp_wrapper('basepath', basepaths{iFile}, 'met', met, 'win', [0 Inf], ...
+        'flgSave', true, 'flgForce', true, 'flgDetectOnly', true, ...
+        'rippCh', []);
+    
     ripp_curate(basepaths{iFile}, 'qa', met.qa, 'flgGui', false); % bulk curation GUI
 
     ripp_analyze(basepaths{iFile}, 'flgPlot', false);
