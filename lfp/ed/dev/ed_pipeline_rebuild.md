@@ -352,6 +352,45 @@ back the size that normalisation strips, since four of the five measures grow
 with amplitude. Spearman against |amp| gives `fastZ` 0.56–0.65 and the rest
 0.18–0.51 — correlated, not redundant. Not acted on.
 
+## Size belongs in the clustering, but it will not make clusters uniform
+
+Leore's objection: amplitude carries most of the variance, he uses it when
+curating by hand, and no setting made the clustering respect it. He was right
+about the second part, and the reason is specific. `.amp` reaches the
+clustering through the scalar block, which is **rank**-normalised because it is
+heavy-tailed — and a rank keeps the ORDER while discarding the RATIO. An event
+3× larger than its neighbour and one 1.05× larger end up the same distance
+apart. No weight on that feature could ever express "three times larger".
+
+`ed_clust` now takes `wSize`: log10 of the size that `norm` divided out, as one
+explicit axis scaled to the leading shape component. Log, because size is
+judged as a ratio. Measured over the three curated mice (`ed_sizeSweep.m`):
+
+| wSize | within-cluster amp ratio | best-cluster recall | review load |
+|---|---|---|---|
+| 0 | 2.1 | 71% | 268 |
+| 0.5–4 | 1.9 | 75% | 210 |
+
+Better on all three, and **identical for every non-zero weight** — a
+diagonal-covariance GMM re-fits each component's variance per dimension, so a
+global rescaling of one feature barely moves the partition. So it is on/off,
+not a dial. Shipped at 1, and there is no GUI knob for it because there is
+nothing to tune and no losing setting to offer.
+
+**But it does not deliver amplitude-homogeneous clusters, and nothing will.**
+Bounding the space on raMCU5: shape only 2.7, shape+size 2.3, dropping to 2 PCs
+so size dominates 1.9, size left in the waveform entirely (`norm none`) 2.2.
+The within-cluster amplitude range never falls below about 2×, because
+amplitude here is **continuous** — there are no discrete size classes to find,
+and any k puts a ~2× span in every group. Separating "the big ones" is
+therefore a threshold, not a cluster: the `fastZ` knob already does it, and
+`.amp` is available to the gate if a direct one is wanted.
+
+Practical note that came out of the same figure: judging a partition from the
+per-STATE view is misleading when a state is thin. Leore's REM tile showed
+clusters at n = 1, 2, 1 and 7 out of pools in the thousands. Judge clusters in
+the per-cluster view; use the state view to ask how a cluster distributes.
+
 ## End-to-end, whole cohort (`ed_verify.m`, ~8 s per session)
 
 | session | grp | ch | candidates | pool | recall | review |

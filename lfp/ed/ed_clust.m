@@ -70,6 +70,11 @@ function [clustId, cInfo] = ed_clust(wv, tstamps, varargin)
 %                            baseline), 'none'. {'edge'}
 %           'norm'   - <char> per-event scaling: 'peak' (unit peak, L-inf),
 %                            'l2', 'none'. {'peak'}
+%           'wSize'  - <num>  weight of log10(size) as an extra axis, in units
+%                            of the leading shape component's spread. 0 is
+%                            shape only. Effectively on/off - a diagonal GMM
+%                            re-fits variance per dimension, so the value
+%                            barely changes the partition. {0}
 %           'scalar' - <mat> [nEv x nFeat] extra per-event measures to cluster
 %                            on alongside the shape components. Each is
 %                            rank-normalised, so a heavy-tailed one cannot
@@ -103,6 +108,7 @@ addParameter(p, 'nClust', [], @isnumeric);
 addParameter(p, 'scalar', [], @isnumeric);
 addParameter(p, 'detrend', 'edge', @ischar);
 addParameter(p, 'norm', 'peak', @ischar);
+addParameter(p, 'wSize', 0, @isnumeric);
 parse(p, wv, tstamps, varargin{:});
 win     = p.Results.win;
 nPC     = p.Results.nPC;
@@ -110,6 +116,7 @@ nClust  = p.Results.nClust;
 scalar  = p.Results.scalar;
 flgDt   = lower(p.Results.detrend);
 flgNorm = lower(p.Results.norm);
+wSize   = p.Results.wSize;
 
 nEv = size(wv, 1);
 clustId = nan(nEv, 1);
@@ -133,7 +140,7 @@ if size(X, 1) < MINEV || size(X, 2) < 3
 end
 
 X = detrendWv(X, tstamps(iWin), flgDt);
-X = normWv(X, flgNorm);
+[X, sz] = normWv(X, flgNorm);
 
 % detrending costs two degrees of freedom, so X is rank-deficient by
 % construction and pca says so on every call; the warning is expected, not a
@@ -162,6 +169,24 @@ if ~isempty(scalar)
     end
     S = (tiedrank(S) - 0.5) ./ size(S, 1);
     score = [score, (S - 0.5) * std(score(:, 1)) * 2];
+end
+
+% SIZE, back as one explicit axis. Normalisation strips it from the waveform so
+% the components can describe shape; wSize decides how much it then counts.
+%
+% On a LOG scale, because size is judged as a RATIO - a 3400 uV event against a
+% 1000 uV one is the same kind of difference as 340 against 100, and the eye
+% reads it that way while curating. The scalar block does carry .amp, but ranked
+% (it is heavy-tailed), and a rank keeps only the ORDER: an event 3x larger than
+% its neighbour and one 1.05x larger are the same distance apart. That is why
+% raising amplitude's weight through the scalars could never work.
+%
+% Scaled to the spread of the leading shape component, so wSize = 1 means size
+% counts for as much as the dominant shape axis and 0 restores shape-only.
+if wSize > 0 && std(sz) > 0
+    L = log10(max(sz, eps));
+    L = (L - mean(L)) / max(std(L), eps);
+    score = [score, L * std(score(:, 1)) * wSize];
 end
 
 % a GMM needs comfortably more events than dimensions; on a small pool keep
@@ -240,7 +265,7 @@ X = X - ([t, ones(numel(t), 1)] * (A \ X(:, iFit)'))';
 end     % detrendWv
 
 
-function X = normWv(X, met)
+function [X, sz] = normWv(X, met)
 % Put every event on a comparable scale, so the components describe SHAPE and
 % not size. The pool spans two orders of magnitude, and unnormalised the few
 % largest events take the principal components with them. Scale is not lost -
@@ -252,13 +277,14 @@ function X = normWv(X, met)
 %          a slow event look smaller.
 switch met
     case 'none'
+        sz = ones(size(X, 1), 1);
         return
     case 'l2'
-        s = vecnorm(X, 2, 2);
+        sz = vecnorm(X, 2, 2);
     otherwise
-        s = max(abs(X), [], 2);
+        sz = max(abs(X), [], 2);
 end
-s(s == 0) = 1;
-X = X ./ s;
+sz(sz == 0) = 1;
+X = X ./ sz;
 
 end     % normWv

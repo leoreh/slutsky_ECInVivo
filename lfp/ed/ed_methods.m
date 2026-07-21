@@ -67,7 +67,7 @@ switch preset
         % Set near the 5th percentile of the curated discharges, so they are
         % permissive by construction: what survives is the set worth SORTING,
         % not the set worth reporting.
-        met.qa.ranges = struct('fastZ', [5 Inf], 'isoZ', [5 Inf]);
+        met.qa.ranges = struct('fastZ', [7 Inf], 'isoZ', [8 Inf]);
 
         % Waveform clustering (ed_clust). Swept against the curated discharges
         % in dev/ed_clustSweep.m and dev/ed_winSweep.m. nClust empty scales the
@@ -81,8 +81,14 @@ switch preset
         % the window, so with events of unequal duration it trades amplitude
         % for length in a way unit peak does not. dev/ed_alignSweep.m could not
         % separate the options on 47 curated discharges - see ed_clust.
-        met.clust = struct('win', [-0.05 0.05], 'nPC', 6, 'nClust', [], ...
-            'detrend', 'edge', 'norm', 'peak');
+        % .wSize puts log10(size) back as one explicit axis after .norm has
+        % stripped it from the waveform. On measures as better than off on
+        % every metric (dev/ed_sizeSweep.m); the VALUE barely matters, because
+        % a diagonal-covariance GMM re-fits each component's variance per
+        % dimension, so 0.5 and 4 give the same partition. It is on/off, not a
+        % dial - which is why there is no knob for it in the GUI.
+        met.clust = struct('win', [-0.05 0.05], 'nPC', 6, 'nClust', 12, ...
+            'detrend', 'edge', 'norm', 'peak', 'wSize', 1);
 
     otherwise
         error('ed_methods:preset', 'unknown preset "%s"', preset);
