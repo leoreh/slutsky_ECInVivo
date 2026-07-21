@@ -266,6 +266,16 @@ if ~isempty(iPool)
         'detrend', c.detrend, 'norm', c.norm, 'wSize', c.wSize);
     st.cid(iPool) = cid;
     st.nClust = cInfo.nClust;
+
+    % ed_clust refuses a pool too small to hold TYPES and returns no labels.
+    % An unlabelled event cannot be accepted, so a refinement that worked -
+    % one that narrowed the pool down to the handful of events worth keeping -
+    % would throw every one of them away, with Reset the only way back. Below
+    % that floor the honest answer is one group, not none.
+    if st.nClust == 0
+        st.cid(iPool) = 1;
+        st.nClust = 1;
+    end
 end
 hFig.UserData = st;
 
@@ -474,7 +484,7 @@ end     % acceptMask
 function buildStateChecks(hFig, keepCats)
 % One checkbox per vigilance state. Built ONCE - the states of a session do not
 % change - so these ticks survive every re-cluster. KEEPCATS restores a saved
-% selection; [] (never curated) means all ticked, an empty CELL means none.
+% selection; empty means none was saved, and everything starts ticked.
 st = hFig.UserData;
 cats = categories(removecats(st.state));
 
@@ -482,7 +492,7 @@ g = uigridlayout(st.gState, [numel(cats), 1], 'Padding', 2, ...
     'RowHeight', repmat({'fit'}, 1, numel(cats)), 'RowSpacing', 1);
 st.chkState = gobjects(numel(cats), 1);
 for iCat = 1 : numel(cats)
-    val = ~iscell(keepCats) || ismember(cats{iCat}, keepCats);
+    val = isempty(keepCats) || ismember(cats{iCat}, keepCats);
     st.chkState(iCat) = uicheckbox(g, 'Value', val, 'Text', ...
         sprintf('%s  (n = %d)', cats{iCat}, nnz(st.state == cats{iCat})), ...
         'ValueChangedFcn', @(~,~) refresh(hFig));
@@ -542,13 +552,18 @@ end     % loadMaps
 
 
 function cats = prevStates(ed)
-% The state selection a previous session saved: a cellstr when one exists, []
-% when none does. The distinction matters - an empty CELL means "every state
-% was rejected", which is not the same as "never curated".
-cats = [];
+% The state selection a previous session saved, or {} when there is none.
+%
+% An EMPTY saved selection counts as none. It would otherwise mean "every state
+% was rejected", which restores a GUI that accepts nothing and offers no clue
+% why - and that is exactly what a file written by the headless gate, or by any
+% session that unticked its last state, used to look like. The case it gives up
+% on (deliberately saving a curation that keeps nothing) is not worth the one
+% it breaks.
+cats = {};
 if isfield(ed, 'info') && isfield(ed.info, 'clustStates') ...
         && iscell(ed.info.clustStates)
-    cats = ed.info.clustStates;
+    cats = ed.info.clustStates(:)';
 end
 
 end     % prevStates

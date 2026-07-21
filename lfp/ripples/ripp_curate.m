@@ -51,10 +51,11 @@ function [ripp, hFig] = ripp_curate(basepath, varargin)
 %       hFig - <handle> the GUI figure ([] when headless).
 %
 %   DEPENDENCIES:
-%       evt_files, evt_gate, ripp_methods, backup_file, ripp_invalidate,
-%       evt_states, evt_boutTimes, basepaths2vars; GUI: gui_layout,
-%       gui_labeledControl, gui_filterPanel, gui_selectedCats, guiTbl_xy,
-%       ripp_sigLoad, ripp_sigPrep, evt_maps, as_loadConfig.
+%       evt_files, evt_gate, evt_detrend, ripp_methods, backup_file,
+%       ripp_invalidate, evt_states, evt_boutTimes, basepaths2vars;
+%       GUI: gui_layout, gui_labeledControl, gui_filterPanel,
+%       gui_selectedCats, guiTbl_xy, ripp_sigLoad, ripp_sigPrep, evt_maps,
+%       as_loadConfig.
 %
 %   HISTORY:
 %       260719b the curation stage; absorbs evt_qa's ripple role (headless gate)
@@ -394,6 +395,14 @@ function [maps, xt] = loadMaps(basepath, basename, ripp)
 % normally a file read - a second or so instead of the full signal load + prep.
 % A session detected before that convention, or one whose file no longer matches
 % the event list, falls back to rebuilding from the signal.
+%
+% The LFP is DETRENDED per event before the crop, and the order matters.
+% evt_detrend fits its baseline on the flanks of whatever window it is given;
+% on the SAVED map those flanks are far enough out to be background, while on
+% the ±60 ms display crop they would still be inside the sharp wave and the
+% detrend would eat a slice of it. Every event rides on its own drift, so
+% without this the kept-vs-removed averages differ partly by whatever the
+% drifts happened to do.
 dispDur = [-0.06 0.06];
 nEv = numel(ripp.peakTime);
 
@@ -402,6 +411,8 @@ if isfile(files.maps)
     S = load(files.maps, 'rippMaps');
     if isfield(S, 'rippMaps') && isfield(S.rippMaps, 'lfp') && ...
             size(S.rippMaps.lfp, 1) == nEv
+        S.rippMaps.lfp = evt_detrend(double(S.rippMaps.lfp), ...
+            S.rippMaps.tstamps);
         [maps, xt] = cropMaps(S.rippMaps, dispDur);
         return;
     end
@@ -421,11 +432,18 @@ if ~isfinite(w0), w0 = 0; end
 [~, ~, nremTimes] = evt_boutTimes(v, win, sigDur);
 lfp = ripp_sigLoad(basepath, 'win', win, 'session', v.session, ...
     'basename', basename, 'rippCh', ripp.info.rippCh, 'bit2uv', []);
+% rebuild the detection signal exactly as detection did, artifact mask included;
+% a pre-260720 ripp.mat carries no otlThr, hence the default
+otlThr = 8;
+if isfield(ripp.info, 'otlThr'), otlThr = ripp.info.otlThr; end
 rippSig = ripp_sigPrep(lfp, fs, 'detectMet', ripp.info.detectMet, ...
     'passband', ripp.info.passband, 'zMet', ripp.info.zMet, ...
-    'nremTimes', nremTimes);
+    'nremTimes', nremTimes, 'otlThr', otlThr);
 
+% rebuilt at the display width, so the detrend has only these flanks to work
+% with - see the note above; a session with a saved rippMaps gets the better one
 maps = evt_maps(rippSig, ripp.peakTime - w0, fs, 'mapDur', dispDur);
+maps.lfp = evt_detrend(double(maps.lfp), maps.tstamps);
 xt = maps.tstamps * 1000;               % ms
 
 end     % loadMaps

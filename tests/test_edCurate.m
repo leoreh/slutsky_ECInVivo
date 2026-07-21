@@ -256,8 +256,10 @@ end
 
 
 function test_curateSmallPool(tc)
-% A pool too small to cluster must not error: no checkboxes, no tiles, and a
-% Save that writes an all-false mask.
+% A pool too small for ed_clust to find TYPES becomes one group, not none.
+% Returning none would leave every event unlabelled, and an unlabelled event
+% cannot be accepted - so narrowing down to the handful worth keeping used to
+% discard them all.
 S = load(fullfile(tc.TestData.dir, 'edtest.ed.mat'), 'ed');
 ed = S.ed;
 ed.fastZ(:) = 0;                    % nothing passes the noise filter
@@ -271,13 +273,16 @@ copyfile(fullfile(tc.TestData.dir, 'edtest.edMaps.mat'), ...
     'flgGui', true, 'Visible', 'off');
 tc.addTeardown(@() close(hFig, 'force'));
 
-tc.verifyEqual(hFig.UserData.nClust, 0);
-tc.verifyEmpty(hFig.UserData.chk);
+st = hFig.UserData;
+tc.verifyEqual(st.nClust, 1);
+tc.verifyEqual(numel(st.chk), 1);
+tc.verifyEqual(nnz(st.pool), 12);
 
 btn = findall(hFig, 'Type', 'uibutton', 'Text', 'Save');
 btn.ButtonPushedFcn([], []);
 S2 = load(fullfile(tc.TestData.dir, 'edsmall.ed.mat'), 'ed');
-tc.verifyEqual(nnz(S2.ed.accepted), 0);
+tc.verifyEqual(nnz(S2.ed.accepted), 12, ...
+    'a sub-floor pool was discarded instead of kept as one group');
 end
 
 
@@ -635,19 +640,88 @@ end
 
 
 function test_curateResumesStateSelection(tc)
-% The state ticks must survive a reopen too.
-[~, h1] = ed_curate(tc.TestData.dir, 'basename', tc.TestData.name, ...
+% The state ticks must survive a reopen. Needs TWO states: with one, unticking
+% it saves an empty selection, which is deliberately read as "none saved".
+nm = twoStateFixture(tc);
+[~, h1] = ed_curate(tc.TestData.dir, 'basename', nm, ...
     'flgGui', true, 'Visible', 'off');
+tc.verifyEqual(numel(h1.UserData.chkState), 2);
 h1.UserData.chkState(1).Value = false;
 h1.UserData.chkState(1).ValueChangedFcn([], []);
 findall(h1, 'Type', 'uibutton', 'Text', 'Save').ButtonPushedFcn([], []);
 close(h1, 'force');
 
-[~, h2] = ed_curate(tc.TestData.dir, 'basename', tc.TestData.name, ...
+[~, h2] = ed_curate(tc.TestData.dir, 'basename', nm, ...
     'flgGui', true, 'Visible', 'off');
 tc.addTeardown(@() close(h2, 'force'));
 tc.verifyFalse(h2.UserData.chkState(1).Value, ...
     'state selection was not restored');
+tc.verifyTrue(h2.UserData.chkState(2).Value, 'the kept state came back off');
+end
+
+
+function test_curateStatesDefaultTicked(tc)
+% Every state box must open TICKED. The headless gate used to leave
+% info.clustStates = {}, which was read as "every state was rejected", so any
+% GUI opened after an ed_wrapper run came up accepting nothing.
+met = ed_methods('default');
+ed_curate(tc.TestData.dir, 'basename', tc.TestData.name, 'met', met, ...
+    'flgGui', false, 'verbose', false);
+
+[~, hFig] = ed_curate(tc.TestData.dir, 'basename', tc.TestData.name, ...
+    'flgGui', true, 'Visible', 'off');
+tc.addTeardown(@() close(hFig, 'force'));
+tc.verifyTrue(all(arrayfun(@(h) h.Value, hFig.UserData.chkState)), ...
+    'states opened unticked after a headless gate');
+
+% and an explicitly empty saved selection must be read the same way
+S = load(fullfile(tc.TestData.dir, 'edtest.ed.mat'), 'ed');
+ed = S.ed; ed.info.clustStates = {};
+save(fullfile(tc.TestData.dir, 'edempty.ed.mat'), 'ed', '-v7.3');
+copyfile(fullfile(tc.TestData.dir, 'edtest.edMaps.mat'), ...
+    fullfile(tc.TestData.dir, 'edempty.edMaps.mat'));
+[~, h2] = ed_curate(tc.TestData.dir, 'basename', 'edempty', ...
+    'flgGui', true, 'Visible', 'off');
+tc.addTeardown(@() close(h2, 'force'));
+tc.verifyTrue(all(arrayfun(@(h) h.Value, h2.UserData.chkState)));
+end
+
+
+function test_curateTinyPoolKeepsOneGroup(tc)
+% Refining down to a handful of events must not throw them away. ed_clust
+% refuses a pool too small to hold types and returns no labels; an unlabelled
+% event cannot be accepted, so the GUI has to keep them as one group.
+[~, hFig] = ed_curate(tc.TestData.dir, 'basename', tc.TestData.name, ...
+    'flgGui', true, 'Visible', 'off');
+tc.addTeardown(@() close(hFig, 'force'));
+
+% narrow to well under ed_clust's minimum, then refine
+st = hFig.UserData;
+amp = st.ed.fastZ;
+st.edFast.Value = prctile(amp, 96);          % a dozen events or so
+findall(hFig, 'Type', 'uibutton', ...
+    'Text', 'Reset to filter').ButtonPushedFcn([], []);
+
+st = hFig.UserData;
+tc.verifyGreaterThan(nnz(st.pool), 0, 'the threshold left nothing to test');
+tc.verifyLessThan(nnz(st.pool), 20, 'pool is not below the clustering floor');
+tc.verifyEqual(st.nClust, 1, 'a sub-floor pool did not collapse to one group');
+tc.verifyEqual(nnz(st.acc), nnz(st.pool), ...
+    'refining to a handful of events rejected all of them');
+end
+
+
+function nm = twoStateFixture(tc)
+% The fixture with its events split over two vigilance states.
+S = load(fullfile(tc.TestData.dir, 'edtest.ed.mat'), 'ed');
+ed = S.ed;
+lbl = repmat({'NREM'}, numel(ed.peakTime), 1);
+lbl(1 : 2 : end) = {'WAKE'};
+ed.state = categorical(lbl);
+nm = 'edstates';
+save(fullfile(tc.TestData.dir, [nm '.ed.mat']), 'ed', '-v7.3');
+copyfile(fullfile(tc.TestData.dir, 'edtest.edMaps.mat'), ...
+    fullfile(tc.TestData.dir, [nm '.edMaps.mat']));
 end
 
 
