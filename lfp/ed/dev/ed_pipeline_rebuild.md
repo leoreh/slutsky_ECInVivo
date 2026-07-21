@@ -170,6 +170,22 @@ The MUA row was removed rather than kept as a Y variable: a dozen events per
 cluster is too few to read, and `guiTbl_xy` takes one x-axis, which a ±500 ms
 suppression window cannot share with a ±100 ms waveform.
 
+**Accept and view are separate controls.** Mixing them meant you could not
+inspect what you rejected without changing what you kept.
+
+- ACCEPT is checkboxes: which clusters, and which states. An event is accepted
+  when its cluster AND its state are ticked. Clusters start unticked (nothing
+  is a discharge until you say so); states start ticked, and are there to drop
+  a stretch of recording wholesale — movement artifact in WAKE — without
+  touching the shape decision.
+- SHOW is a dropdown: `both | accepted | removed`. Rows drawn, nothing else.
+
+**Re-cluster keeps the ticked clusters** when the count is unchanged, and
+clears them with a notice when it changes, because index 3 of 12 is not index
+3 of 8. `ed_clust` also seeds its RNG (restored on exit), so the same pool and
+count give the same partition — without that, `fitgmdist`'s random starts
+reshuffled the very groups the user had just judged.
+
 Cost, measured on the biggest session (lh100, 9531 events): 6.5 s to build the
 view once, **1.1 s per interaction** thereafter, because the widget is fed rows
 through `setDataFcn` instead of being rebuilt. That is also why a re-cluster

@@ -147,6 +147,13 @@ score = score(:, 1 : nDim);
 gmOpt = {'CovarianceType', 'diagonal', 'RegularizationValue', 1e-6, ...
     'Replicates', 5, 'Options', statset('MaxIter', 500)};
 
+% Fixed seed, restored on exit. fitgmdist starts from random centres, so
+% without this the same pool and the same count give a different partition
+% every call - and in the curation GUI that means pressing Re-cluster without
+% changing anything reshuffles the groups the user just judged.
+sRng = rng(0, 'twister');
+ocRng = onCleanup(@() rng(sRng));
+
 nClust = max(2, min(nClust, floor(size(score, 1) / 3)));
 gm = fitgmdist(score, nClust, gmOpt{:});
 lbl = cluster(gm, score);

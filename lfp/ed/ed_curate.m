@@ -22,21 +22,38 @@ function [ed, hFig] = ed_curate(basepath, varargin)
 %       raMCU3/4/5 shape still gets them in a cluster of their own - which is
 %       the point, since polarity and sharpness are layer-dependent.
 %
-%       THE VIEW IS THE WHOLE TABLE, not a fixed picture. It is guiTbl_xy over
-%       every detected event, carrying four variables you can pivot on:
+%       WHAT IS ACCEPTED AND WHAT IS SHOWN ARE SEPARATE CONTROLS, deliberately.
+%       Mixing them means you cannot inspect the events you rejected without
+%       rejecting or accepting something by accident.
+%
+%       ACCEPT (checkboxes, left):
+%           clusters  which waveform types are discharges. None to begin with.
+%           states    which vigilance states count. All to begin with; untick
+%                     one to drop a stretch of the recording wholesale, e.g.
+%                     movement artifact in WAKE, without touching the shape
+%                     decision.
+%       An event is accepted when its cluster AND its state are ticked. That
+%       is the mask Save writes.
+%
+%       SHOW (dropdown, left): 'both' | 'accepted' | 'removed'. Chooses which
+%       rows reach the plot and nothing else - it cannot change the mask.
+%
+%       THE VIEW ITSELF is guiTbl_xy over those rows, carrying four variables
+%       you can pivot on:
 %           lfp      the waveform (Y)
 %           cluster  shape group, or 'out' for events the filter dropped
 %           state    vigilance state at the peak
-%           status   kept / removed under the current cluster choice
+%           status   accepted / removed under the current choice
 %       So "Plot By (Tiles)" switches between a per-CLUSTER and a per-STATE
-%       view, "Group By (Colors)" overlays the other, and Dispersion +
-%       Median give a robust central trace rather than a mean. Ticking
-%       categories in either panel shows or hides them.
+%       view, "Group By (Colors)" overlays the other, and Dispersion + Median
+%       give a robust central trace rather than a mean.
 %
-%       The two thresholds are live knobs again. They set the pool, and the
-%       pool is what gets clustered, so changing one only takes effect on
-%       Re-cluster - the label updates immediately so you can see the size you
-%       are choosing before paying for the fit.
+%       The two thresholds are live knobs. They set the pool, and the pool is
+%       what gets clustered, so changing one takes effect on Re-cluster - the
+%       label updates immediately so you can see the size you are choosing
+%       before paying for the fit. Re-cluster KEEPS the ticked clusters when
+%       the count is unchanged; when the count changes it clears them and says
+%       so, because index 3 of 12 and index 3 of 8 are not the same group.
 %
 %       Headless (flgGui = false) applies only the thresholds, for a batch run
 %       that has no human. That mask is NOT an answer - it is the pool.
@@ -71,6 +88,11 @@ function [ed, hFig] = ed_curate(basepath, varargin)
 %              The peri-event MUA panel went with them: a dozen events per
 %              cluster is too few to read, and it shared no time axis with the
 %              waveforms.
+%       260721c accept and view split apart. Re-cluster used to silently clear
+%              the accepted clusters; state became an acceptance criterion of
+%              its own rather than only a way to tile; and which rows are drawn
+%              moved to its own dropdown, so looking at what you rejected can
+%              no longer change what you kept.
 
 %% ========================================================================
 %  ARGUMENTS + LOAD
@@ -142,9 +164,20 @@ st.edK = gui_labeledControl(gCtrl, 'editnum', 'clusters', ...
 st.lblPool = gui_labeledControl(gCtrl, 'label', '');
 gui_labeledControl(gCtrl, 'button', '', 'Text', 'Re-cluster', ...
     'ButtonPushedFcn', @(~,~) onCluster(hFig));
-st.gClust = gui_labeledControl(gCtrl, 'panel', 'accept as discharge', ...
+
+% ACCEPT: a discharge is a cluster AND a state. Clusters start unticked
+% (nothing is a discharge until you say so); states start ticked (a state is
+% excluded only to reject something like movement artifact in WAKE).
+st.gClust = gui_labeledControl(gCtrl, 'panel', 'accept clusters', ...
     'RowHeight', '1x');
+st.gState = gui_labeledControl(gCtrl, 'panel', 'accept states', ...
+    'RowHeight', 'fit');
 st.lblKeep = gui_labeledControl(gCtrl, 'label', '');
+
+% VIEW: independent of the above. Which rows reach the plot, nothing else.
+st.ddShow = gui_labeledControl(gCtrl, 'dropdown', 'show', ...
+    'Items', {'both', 'accepted', 'removed'}, 'Value', 'both', ...
+    'ValueChangedFcn', @(~,~) refresh(hFig));
 
 gui_labeledControl(gActions, 'button', '', 'Text', 'Save', ...
     'ButtonPushedFcn', @(~,~) doSave(hFig));
@@ -152,8 +185,10 @@ gui_labeledControl(gActions, 'button', '', 'Text', 'Save', ...
 st.hPanel = uipanel(gPlot, 'BorderType', 'none');
 st.chk    = gobjects(0);
 st.cid    = nan(numel(ed.peakTime), 1);
+st.nClust = 0;
 hFig.UserData = st;
 
+buildStateChecks(hFig);
 onCluster(hFig);
 
 end     % EOF
@@ -186,6 +221,10 @@ iPool = find(st.pool);
 k = st.edK.Value;
 if k < 2, k = c.nClust; end
 
+% what was ticked, so a re-cluster does not silently discard the work
+selWas = selectedClusters(st);
+kWas   = st.nClust;
+
 st.cid = nan(numel(st.pool), 1);
 nClust = 0;
 if ~isempty(iPool)
@@ -196,8 +235,21 @@ if ~isempty(iPool)
 end
 st.nClust = nClust;
 if nClust > 0, st.edK.Value = nClust; end
-st.lblPool.Text = sprintf('pool %d / %d  ->  %d clusters', ...
-    numel(iPool), numel(st.pool), nClust);
+
+% Ticks carry over only when the cluster COUNT is unchanged. Clusters are
+% relabelled by size, so index 3 of 12 is still roughly index 3 of 12 after a
+% small pool change - but it is nothing like index 3 of 8, and carrying a tick
+% across a different partition would accept events nobody looked at.
+keepSel = kWas == nClust && nClust > 0;
+st.selRestore = [];
+note = '';
+if keepSel
+    st.selRestore = selWas;
+elseif ~isempty(selWas)
+    note = ' (count changed, ticks cleared)';
+end
+st.lblPool.Text = sprintf('pool %d / %d -> %d clusters%s', ...
+    numel(iPool), numel(st.pool), nClust, note);
 hFig.UserData = st;
 
 buildChecks(hFig);
@@ -207,8 +259,9 @@ end     % onCluster
 
 
 function buildChecks(hFig)
-% One checkbox per cluster, labelled with its size. A pool too small to hold
-% types (ed_clust returns nothing) simply gets none.
+% One checkbox per cluster, labelled with its size, restoring what was ticked
+% when the count did not change. A pool too small to hold types (ed_clust
+% returns nothing) simply gets none.
 st = hFig.UserData;
 delete(st.gClust.Children);
 st.chk = gobjects(0);
@@ -219,14 +272,34 @@ if st.nClust > 0
         'RowSpacing', 1, 'Scrollable', 'on');
     st.chk = gobjects(st.nClust, 1);
     for iK = 1 : st.nClust
-        st.chk(iK) = uicheckbox(g, 'Value', false, 'Text', ...
-            sprintf('%d   (n = %d)', iK, nnz(st.cid == iK)), ...
-            'ValueChangedFcn', @(~,~) refresh(hFig, false));
+        st.chk(iK) = uicheckbox(g, 'Value', ismember(iK, st.selRestore), ...
+            'Text', sprintf('%d   (n = %d)', iK, nnz(st.cid == iK)), ...
+            'ValueChangedFcn', @(~,~) refresh(hFig));
     end
 end
 hFig.UserData = st;
 
 end     % buildChecks
+
+
+function buildStateChecks(hFig)
+% One checkbox per vigilance state, all ticked. Built ONCE - the states of a
+% session do not change - so these ticks survive every re-cluster.
+st = hFig.UserData;
+cats = categories(removecats(st.state));
+
+g = uigridlayout(st.gState, [numel(cats), 1], 'Padding', 2, ...
+    'RowHeight', repmat({'fit'}, 1, numel(cats)), 'RowSpacing', 1);
+st.chkState = gobjects(numel(cats), 1);
+for iCat = 1 : numel(cats)
+    st.chkState(iCat) = uicheckbox(g, 'Value', true, 'Text', ...
+        sprintf('%s  (n = %d)', cats{iCat}, nnz(st.state == cats{iCat})), ...
+        'ValueChangedFcn', @(~,~) refresh(hFig));
+end
+st.stateCats = cats;
+hFig.UserData = st;
+
+end     % buildStateChecks
 
 
 function refresh(hFig)
@@ -238,16 +311,24 @@ function refresh(hFig)
 % reconciles by name. So even a re-cluster keeps whatever view the user set,
 % which rebuilding would throw away on every press.
 st = hFig.UserData;
-sel = selectedClusters(st);
-accepted = ismember(st.cid, sel);
+accepted = acceptMask(st);
 
-st.lblKeep.Text = sprintf('accepted: %d events', nnz(accepted));
-tbl = viewTable(st, accepted);
+st.lblKeep.Text = sprintf('accepted: %d of %d', nnz(accepted), ...
+    numel(accepted));
+
+% the SHOW dropdown chooses rows to draw and nothing else - it cannot change
+% what is accepted, which is the whole point of separating the two
+switch st.ddShow.Value
+    case 'accepted', iRow = find(accepted);
+    case 'removed',  iRow = find(~accepted);
+    otherwise,       iRow = (1 : numel(accepted))';
+end
+tbl = viewTable(st, accepted, iRow);
 
 ud = st.hPanel.UserData;
 if isstruct(ud) && isfield(ud, 'setDataFcn')
     ud.setDataFcn(tbl);
-else
+elseif ~isempty(iRow)
     guiTbl_xy(st.tst * 1000, tbl, 'Parent', st.hPanel, 'yVar', 'lfp', ...
         'tileVar', 'cluster', 'grpVar', 'status', 'xLbl', 'time (ms)');
 end
@@ -255,11 +336,26 @@ end
 end     % refresh
 
 
+function accepted = acceptMask(st)
+% An event is a discharge if its CLUSTER is ticked AND its STATE is ticked.
+% Clusters say which shape; states are there to drop a whole stretch of the
+% recording - movement artifact in WAKE, say - without touching the shape
+% decision. Both default so that nothing is accepted until a cluster is
+% ticked, and no state is excluded unless you exclude it.
+accepted = ismember(st.cid, selectedClusters(st));
+if isfield(st, 'chkState') && ~isempty(st.chkState)
+    keepCat = st.stateCats(arrayfun(@(h) h.Value, st.chkState));
+    accepted = accepted & ismember(st.state(:), keepCat);
+end
+
+end     % acceptMask
+
+
 function doSave(hFig)
 % Persist the mask, the labels and which clusters were chosen.
 st = hFig.UserData;
 sel = selectedClusters(st);
-accepted = ismember(st.cid, sel);
+accepted = acceptMask(st);
 
 saveCurated(st.files.evt, accepted, st.cid, sel, buildSpec(st));
 buildStates(st.basepath, st.basename, st.ed, accepted);
@@ -272,18 +368,18 @@ end     % doSave
 % =========================================================================
 %  VIEW TABLE
 % =========================================================================
-function tbl = viewTable(st, accepted)
-% Every detected event, with the three things worth pivoting on. Events the
-% filter dropped are kept as cluster 'out' rather than hidden, so the per-state
-% view still shows what detection proposed.
+function tbl = viewTable(st, accepted, iRow)
+% The rows IROW asks for, with the three things worth pivoting on. Events the
+% filter dropped keep the cluster label 'out' rather than being hidden, so a
+% per-state view still shows what detection proposed.
 lbl = [{'out'}, arrayfun(@(k) sprintf('%d', k), 1 : st.nClust, ...
     'uni', false)];
 idx = st.cid;
 idx(isnan(idx)) = 0;
 clust = categorical(idx, 0 : st.nClust, lbl);
 
-tbl = table(st.wv, clust, st.state, ...
-    categorical(accepted, [false true], {'removed', 'kept'}), ...
+tbl = table(st.wv(iRow, :), clust(iRow), st.state(iRow), ...
+    categorical(accepted(iRow), [false true], {'removed', 'kept'}), ...
     'VariableNames', {'lfp', 'cluster', 'state', 'status'});
 
 end     % viewTable

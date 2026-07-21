@@ -264,3 +264,106 @@ btn.ButtonPushedFcn([], []);
 S2 = load(fullfile(tc.TestData.dir, 'edsmall.ed.mat'), 'ed');
 tc.verifyEqual(nnz(S2.ed.accepted), 0);
 end
+
+
+function test_curateRecusterKeepsTicks(tc)
+% Re-clustering at the SAME count must keep the accepted clusters. This is the
+% bug that made the first design unusable.
+[~, hFig] = ed_curate(tc.TestData.dir, 'basename', tc.TestData.name, ...
+    'flgGui', true, 'Visible', 'off');
+tc.addTeardown(@() close(hFig, 'force'));
+
+st = hFig.UserData;
+st.chk(1).Value = true;
+st.chk(2).Value = true;
+kWas = st.nClust;
+
+btn = findall(hFig, 'Type', 'uibutton', 'Text', 'Re-cluster');
+btn.ButtonPushedFcn([], []);
+
+st2 = hFig.UserData;
+tc.verifyEqual(st2.nClust, kWas);
+tc.verifyTrue(st2.chk(1).Value, 'cluster 1 tick lost on re-cluster');
+tc.verifyTrue(st2.chk(2).Value, 'cluster 2 tick lost on re-cluster');
+end
+
+
+function test_curateRecusterClearsOnCountChange(tc)
+% Changing the count must clear the ticks - index 3 of 12 is not index 3 of 8.
+[~, hFig] = ed_curate(tc.TestData.dir, 'basename', tc.TestData.name, ...
+    'flgGui', true, 'Visible', 'off');
+tc.addTeardown(@() close(hFig, 'force'));
+
+hFig.UserData.chk(1).Value = true;
+hFig.UserData.edK.Value = 5;
+btn = findall(hFig, 'Type', 'uibutton', 'Text', 'Re-cluster');
+btn.ButtonPushedFcn([], []);
+
+st = hFig.UserData;
+tc.verifyEqual(st.nClust, 5);
+tc.verifyFalse(any(arrayfun(@(h) h.Value, st.chk)));
+tc.verifySubstring(st.lblPool.Text, 'ticks cleared');
+end
+
+
+function test_curateStateGatesAcceptance(tc)
+% Unticking a state must remove its events from the mask without touching the
+% cluster choice.
+[~, hFig] = ed_curate(tc.TestData.dir, 'basename', tc.TestData.name, ...
+    'flgGui', true, 'Visible', 'off');
+tc.addTeardown(@() close(hFig, 'force'));
+
+st = hFig.UserData;
+st.chk(1).Value = true;
+st.chk(1).ValueChangedFcn([], []);
+nWith = nnz(ismember(st.cid, 1));
+tc.verifyGreaterThan(nWith, 0);
+
+st.chkState(1).Value = false;       % the fixture has one state only
+st.chkState(1).ValueChangedFcn([], []);
+
+btn = findall(hFig, 'Type', 'uibutton', 'Text', 'Save');
+btn.ButtonPushedFcn([], []);
+S = load(fullfile(tc.TestData.dir, 'edtest.ed.mat'), 'ed');
+tc.verifyEqual(nnz(S.ed.accepted), 0, ...
+    'unticking the only state should accept nothing');
+tc.verifyTrue(hFig.UserData.chk(1).Value, 'cluster tick disturbed');
+end
+
+
+function test_curateShowDoesNotChangeMask(tc)
+% The show dropdown must move rows only. Cycling it cannot alter what Save
+% writes - that separation is the point of having it.
+[~, hFig] = ed_curate(tc.TestData.dir, 'basename', tc.TestData.name, ...
+    'flgGui', true, 'Visible', 'off');
+tc.addTeardown(@() close(hFig, 'force'));
+
+st = hFig.UserData;
+st.chk(1).Value = true;
+st.chk(1).ValueChangedFcn([], []);
+nExpect = nnz(ismember(st.cid, 1));
+
+for v = {'accepted', 'removed', 'both'}
+    st.ddShow.Value = v{1};
+    st.ddShow.ValueChangedFcn([], []);
+end
+
+btn = findall(hFig, 'Type', 'uibutton', 'Text', 'Save');
+btn.ButtonPushedFcn([], []);
+S = load(fullfile(tc.TestData.dir, 'edtest.ed.mat'), 'ed');
+tc.verifyEqual(nnz(S.ed.accepted), nExpect);
+end
+
+
+function test_clustDeterministic(tc)
+% The same pool and count must give the same partition, so pressing
+% Re-cluster without changing anything is a no-op rather than a reshuffle.
+a = ed_clust(tc.TestData.wv, tc.TestData.tst, 'nClust', 8);
+b = ed_clust(tc.TestData.wv, tc.TestData.tst, 'nClust', 8);
+tc.verifyEqual(a, b, 'clustering is not reproducible');
+
+% and it must not leave the global RNG stream disturbed
+rng(42); r1 = rand();
+rng(42); ed_clust(tc.TestData.wv, tc.TestData.tst, 'nClust', 4); r2 = rand();
+tc.verifyEqual(r1, r2, 'ed_clust leaked its RNG seed to the caller');
+end
