@@ -67,12 +67,14 @@ switch preset
         % Set near the 5th percentile of the curated discharges, so they are
         % permissive by construction: what survives is the set worth SORTING,
         % not the set worth reporting.
-        met.qa.ranges = struct('fastZ', [15 Inf], 'isoZ', [20 Inf]);
+        met.qa.ranges = struct('fastZ', [5 Inf], 'isoZ', [5 Inf]);
 
-        % Waveform clustering (ed_clust). Every value swept against the
-        % curated discharges in dev/ed_clustSweep.m; the GUI overrides nClust
-        % per session, which is the expected way to use it.
-        met.clust = struct('win', [-0.05 0.05], 'nPC', 6, 'nClust', 12);
+        % Waveform clustering (ed_clust). Swept against the curated discharges
+        % in dev/ed_clustSweep.m and dev/ed_winSweep.m. nClust empty scales the
+        % count with the pool (0.65*sqrt(n)) - a fixed count cannot span a pool
+        % of 75 and one of 8500, and 12 groups over 8500 leaves every group a
+        % mixture. The GUI overrides it per session.
+        met.clust = struct('win', [-0.05 0.05], 'nPC', 6, 'nClust', []);
 
     otherwise
         error('ed_methods:preset', 'unknown preset "%s"', preset);

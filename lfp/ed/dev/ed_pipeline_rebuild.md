@@ -180,11 +180,46 @@ inspect what you rejected without changing what you kept.
   touching the shape decision.
 - SHOW is a dropdown: `both | accepted | removed`. Rows drawn, nothing else.
 
-**Re-cluster keeps the ticked clusters** when the count is unchanged, and
-clears them with a notice when it changes, because index 3 of 12 is not index
-3 of 8. `ed_clust` also seeds its RNG (restored on exit), so the same pool and
-count give the same partition — without that, `fitgmdist`'s random starts
-reshuffled the very groups the user had just judged.
+**Re-cluster fits only the ACCEPTED events** (intersected with the thresholds),
+so rejecting then re-clustering is a refinement loop. The accepted set does not
+change when you press it. `Reset to filter` undoes the narrowing. `ed_clust`
+also seeds its RNG (restored on exit), so the same pool and count give the same
+partition — without that, `fitgmdist`'s random starts reshuffled the very
+groups the user had just judged.
+
+**Reopening resumes** the saved labels, ticks, state selection and thresholds
+rather than re-fitting. The saved labels are the partition that was judged; a
+re-fit would return a different one and leave the ticks pointing at groups
+nobody looked at. A restore that does not line up with the event list is
+refused, so a re-detection falls through to a fresh clustering.
+
+## The cluster count has to scale with the pool
+
+The filter was later loosened (`fastZ ≥ 5`, `isoZ ≥ 5`), which took a pool from
+75–490 to 2700–8500 — and a fixed 12 groups over 8500 events leaves every group
+a mixture. Re-measured at the loose filter (`ed_winSweep.m`), best-cluster
+purity against the curated discharges:
+
+| mouse | pool | k=12 | k=20 | k=30 | k=45 | k=60 |
+|---|---|---|---|---|---|---|
+| raMCU3 | 8460 | 3% | 6% | 7% | 14% | **80%** |
+| raMCU4 | 2698 | 11% | 40% | **73%** | 39% | 35% |
+| raMCU5 | 4158 | 7% | 13% | 50% | **71%** | 50% |
+
+So `nClust` empty now means **0.65·√n**, which picks 60 / 34 / 42 for those
+pools and 11–14 for the old strict ones, where a fixed 12 had measured best.
+
+Caveat worth keeping in view: purity is estimated from 10–19 curated events per
+mouse, so individual cells above are noisy. What is robust is the direction —
+k=12 is too small at these pool sizes on every mouse.
+
+**The window is not the problem.** Swept at the loose filter, best review load
+per window: ±10 ms 4.8%, ±20 ms 6.8%, ±30 ms 5.7%, **±50 ms 3.8%**, ±100 ms
+4.6%. No penalty for the wider window; ±50 still wins.
+
+Dropping `.amp` from the scalar set ('shape') beat keeping it (3.8% vs 4.5%),
+and dropping the scalars entirely was far worse (13.7%) — confirming again that
+they carry real information.
 
 Cost, measured on the biggest session (lh100, 9531 events): 6.5 s to build the
 view once, **1.1 s per interaction** thereafter, because the widget is fed rows

@@ -38,10 +38,16 @@ function [clustId, cInfo] = ed_clust(wv, tstamps, varargin)
 %           300+), and a +-15 ms window cannot see it. Measured, +-50 and +-100
 %           ms both beat +-15 and +-25 by a factor of three in review load.
 %
-%       Cluster count is fixed rather than chosen by BIC. BIC maximises
-%       likelihood, which is not the objective - it settled on ~7 where 12
-%       measured better on every mouse. The GUI knob is the right way to change
-%       it, which is why this is cheap and stateless.
+%       Cluster count SCALES WITH THE POOL by default: k = 0.65*sqrt(n),
+%       clamped. A fixed count cannot work across the range this sees - a pool
+%       is 75 events under a strict filter and 8500 under a loose one, and 12
+%       groups over 8500 leaves each one a mixture. Measured on raMCU3 (pool
+%       8460, 10 curated discharges), the best cluster goes from 3% pure at
+%       k=12 to 80% pure at k=60; the rule picks 60. On the old strict pools it
+%       picks 11-14, which is where a fixed 12 had measured best.
+%
+%       Chosen over BIC, which maximises likelihood - not the objective - and
+%       settled on ~7 everywhere.
 %
 %   INPUTS:
 %       wv       - <mat>  [nEv x nSamp] per-event waveforms (edMaps.lfp).
@@ -49,7 +55,8 @@ function [clustId, cInfo] = ed_clust(wv, tstamps, varargin)
 %       varargin - Parameter/Value:
 %           'win'    - <vec> waveform window to cluster on (s). {[-0.05 0.05]}
 %           'nPC'    - <num> principal components kept. {6}
-%           'nClust' - <num> cluster count. {12}
+%           'nClust' - <num> cluster count; empty scales it with the pool.
+%                            {[]}
 %           'scalar' - <mat> [nEv x nFeat] extra per-event measures to cluster
 %                            on alongside the shape components. Each is
 %                            rank-normalised, so a heavy-tailed one cannot
@@ -79,7 +86,7 @@ addRequired(p, 'wv', @isnumeric);
 addRequired(p, 'tstamps', @isnumeric);
 addParameter(p, 'win', [-0.05 0.05], @isnumeric);
 addParameter(p, 'nPC', 6, @isnumeric);
-addParameter(p, 'nClust', 12, @isnumeric);
+addParameter(p, 'nClust', [], @isnumeric);
 addParameter(p, 'scalar', [], @isnumeric);
 parse(p, wv, tstamps, varargin{:});
 win    = p.Results.win;
@@ -164,6 +171,9 @@ gmOpt = {'CovarianceType', 'diagonal', 'RegularizationValue', 1e-6, ...
 sRng = rng(0, 'twister');
 ocRng = onCleanup(@() rng(sRng));
 
+if isempty(nClust)
+    nClust = round(0.65 * sqrt(size(score, 1)));
+end
 nClust = max(2, min(nClust, floor(size(score, 1) / 3)));
 gm = fitgmdist(score, nClust, gmOpt{:});
 lbl = cluster(gm, score);

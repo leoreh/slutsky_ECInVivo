@@ -8,6 +8,10 @@ function tests = test_edCurate
 %       plus noise - so the clustering and the GUI can be exercised without
 %       touching a real recording or a curated mask.
 %
+%       The fixture is rebuilt PER TEST, in its own directory. ed_curate
+%       resumes a saved curation, so a test that presses Save would otherwise
+%       decide what the next test opens into.
+%
 %       Run with: runtests('test_edCurate')
 %
 %   HISTORY:
@@ -20,7 +24,7 @@ end
 %% ========================================================================
 %  FIXTURE
 %  ========================================================================
-function setupOnce(tc)
+function setup(tc)
 rng(7);
 nA = 60; nB = 40; nN = 100;         % sharp, slow, noise
 fs = 1250;
@@ -58,8 +62,7 @@ ed.info = struct('fs', fs, 'sigDur', 3600, 'win', [0 Inf], 'edCh', 1, ...
 
 edMaps = struct('tstamps', tst, 'lfp', single(wv), 'filt', single(wv));
 
-tc.TestData.dir = fullfile(tempdir, 'edtest');
-if isfolder(tc.TestData.dir), rmdir(tc.TestData.dir, 's'); end
+tc.TestData.dir = tempname;
 mkdir(tc.TestData.dir);
 tc.TestData.name = 'edtest';
 save(fullfile(tc.TestData.dir, 'edtest.ed.mat'), 'ed', '-v7.3');
@@ -71,7 +74,7 @@ tc.TestData.truth = [ones(nA, 1); 2 * ones(nB, 1); 3 * ones(nN, 1)];
 end
 
 
-function teardownOnce(tc)
+function teardown(tc)
 close all force
 try
     rmdir(tc.TestData.dir, 's');    % a lingering matfile lock is not a failure
@@ -102,11 +105,17 @@ tc.verifyGreaterThan(mean(cid(truth == 2) == domB), 0.7);
 end
 
 
-function test_clustDefaultK(tc)
-% The default count applies without being named, and is reported back.
+function test_clustDefaultKScalesWithPool(tc)
+% The default count must scale with the pool: a fixed one cannot span a pool
+% of 75 and one of 8500. Rule is 0.65*sqrt(n).
 [cid, cInfo] = ed_clust(tc.TestData.wv, tc.TestData.tst);
-tc.verifyEqual(cInfo.nClust, 12);
+tc.verifyEqual(cInfo.nClust, round(0.65 * sqrt(size(tc.TestData.wv, 1))));
 tc.verifyEqual(max(cid), cInfo.nClust);
+
+% ... and a bigger pool must get more groups
+big = repmat(tc.TestData.wv, 6, 1);
+[~, ciBig] = ed_clust(big, tc.TestData.tst);
+tc.verifyGreaterThan(ciBig.nClust, cInfo.nClust);
 end
 
 
@@ -499,4 +508,67 @@ for iLn = 1 : numel(ln)
         m(nm) = ln(iLn).Color;
     end
 end
+end
+
+
+function test_curateResumesSavedCuration(tc)
+% Reopening must resume: the same labels, the same accepted clusters and
+% states, the same thresholds - not a fresh clustering.
+[~, h1] = ed_curate(tc.TestData.dir, 'basename', tc.TestData.name, ...
+    'flgGui', true, 'Visible', 'off');
+st1 = h1.UserData;
+st1.chk(1).Value = false;
+st1.chk(3).Value = false;
+st1.chk(3).ValueChangedFcn([], []);
+cidWas = st1.cid;
+nAcc   = nnz(h1.UserData.acc);
+findall(h1, 'Type', 'uibutton', 'Text', 'Save').ButtonPushedFcn([], []);
+close(h1, 'force');
+
+[~, h2] = ed_curate(tc.TestData.dir, 'basename', tc.TestData.name, ...
+    'flgGui', true, 'Visible', 'off');
+tc.addTeardown(@() close(h2, 'force'));
+st2 = h2.UserData;
+
+tc.verifyEqual(st2.cid, cidWas, 'labels were not restored');
+tc.verifyEqual(nnz(st2.acc), nAcc, 'accepted set was not restored');
+tc.verifyFalse(st2.chk(1).Value, 'cluster 1 came back ticked');
+tc.verifyFalse(st2.chk(3).Value, 'cluster 3 came back ticked');
+tc.verifySubstring(st2.lblPool.Text, 'restored');
+end
+
+
+function test_curateResumesStateSelection(tc)
+% The state ticks must survive a reopen too.
+[~, h1] = ed_curate(tc.TestData.dir, 'basename', tc.TestData.name, ...
+    'flgGui', true, 'Visible', 'off');
+h1.UserData.chkState(1).Value = false;
+h1.UserData.chkState(1).ValueChangedFcn([], []);
+findall(h1, 'Type', 'uibutton', 'Text', 'Save').ButtonPushedFcn([], []);
+close(h1, 'force');
+
+[~, h2] = ed_curate(tc.TestData.dir, 'basename', tc.TestData.name, ...
+    'flgGui', true, 'Visible', 'off');
+tc.addTeardown(@() close(h2, 'force'));
+tc.verifyFalse(h2.UserData.chkState(1).Value, ...
+    'state selection was not restored');
+end
+
+
+function test_curateRefusesStaleLabels(tc)
+% Labels from a different event list must be refused, not drawn against the
+% wrong events - a re-detection has to fall through to a fresh clustering.
+S = load(fullfile(tc.TestData.dir, 'edtest.ed.mat'), 'ed');
+ed = S.ed;
+ed.clustId = (1 : 5)';              % wrong length
+ed.info.clustSel = 1;
+save(fullfile(tc.TestData.dir, 'edstale.ed.mat'), 'ed', '-v7.3');
+copyfile(fullfile(tc.TestData.dir, 'edtest.edMaps.mat'), ...
+    fullfile(tc.TestData.dir, 'edstale.edMaps.mat'));
+
+[~, hFig] = ed_curate(tc.TestData.dir, 'basename', 'edstale', ...
+    'flgGui', true, 'Visible', 'off');
+tc.addTeardown(@() close(hFig, 'force'));
+tc.verifyEqual(numel(hFig.UserData.cid), numel(ed.peakTime));
+tc.verifyGreaterThan(hFig.UserData.nClust, 1);
 end
