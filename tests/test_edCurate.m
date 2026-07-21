@@ -181,7 +181,8 @@ tc.addTeardown(@() close(hFig, 'force'));
 st = hFig.UserData;
 tc.verifyGreaterThan(st.nClust, 1);
 tc.verifyEqual(numel(st.chk), st.nClust);
-tc.verifyEqual(numel(st.cid), nnz(st.pool));
+tc.verifyEqual(nnz(~isnan(st.cid)), nnz(st.pool));
+tc.verifyEqual(numel(st.cid), numel(st.pool));
 end
 
 
@@ -195,7 +196,6 @@ st = hFig.UserData;
 st.chk(1).Value = true;
 nExpect = nnz(st.cid == 1);
 
-hFig.UserData.chk(1).Value = true;
 btn = findall(hFig, 'Type', 'uibutton', 'Text', 'Save');
 btn.ButtonPushedFcn([], []);
 
@@ -203,6 +203,40 @@ S = load(fullfile(tc.TestData.dir, 'edtest.ed.mat'), 'ed');
 tc.verifyEqual(nnz(S.ed.accepted), nExpect);
 tc.verifyEqual(S.ed.info.clustSel, 1);
 tc.verifyEqual(numel(S.ed.clustId), numel(S.ed.accepted));
+end
+
+
+function test_curateViewPivots(tc)
+% The hosted guiTbl_xy must offer BOTH cluster and state as tile variables,
+% and lfp as the Y variable - that is the pivot the GUI exists to give.
+[~, hFig] = ed_curate(tc.TestData.dir, 'basename', tc.TestData.name, ...
+    'flgGui', true, 'Visible', 'off');
+tc.addTeardown(@() close(hFig, 'force'));
+
+ud = hFig.UserData.hPanel.UserData;
+tc.verifyTrue(isfield(ud, 'setDataFcn'));
+tc.verifyTrue(ismember('cluster', ud.ddPlotBy.Items));
+tc.verifyTrue(ismember('state', ud.ddPlotBy.Items));
+tc.verifyTrue(ismember('status', ud.ddGrpBy.Items));
+tc.verifyEqual(ud.yVar, 'lfp');
+tc.verifyEqual(height(ud.dataTbl), numel(hFig.UserData.cid));
+end
+
+
+function test_curateKnobsChangePool(tc)
+% Raising a threshold must shrink the pool on Re-cluster, and the view must
+% follow. The knob alone only updates the label.
+[~, hFig] = ed_curate(tc.TestData.dir, 'basename', tc.TestData.name, ...
+    'flgGui', true, 'Visible', 'off');
+tc.addTeardown(@() close(hFig, 'force'));
+
+n0 = nnz(hFig.UserData.pool);
+hFig.UserData.edFast.Value = 28;
+btn = findall(hFig, 'Type', 'uibutton', 'Text', 'Re-cluster');
+btn.ButtonPushedFcn([], []);
+
+tc.verifyLessThan(nnz(hFig.UserData.pool), n0);
+tc.verifyEqual(nnz(~isnan(hFig.UserData.cid)), nnz(hFig.UserData.pool));
 end
 
 

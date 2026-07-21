@@ -149,6 +149,32 @@ two to four, so several boxes get ticked. Best-cluster purity tops out around
 decisions instead of hundreds; it does not make it exact. A mouse whose result
 matters still deserves the per-event pass in `guiPath`.
 
+## The curation GUI is one pivotable view, not two fixed ones
+
+First attempt drew its own per-cluster tiles (median + IQR) with a peri-event
+MUA row, and dropped the threshold knobs. That was wrong three ways, and Leore
+caught all three:
+
+- **The knobs are needed.** They set the pool, and the pool is what gets
+  clustered. They are back, and take effect on `Re-cluster` — the label updates
+  live so you can see the pool size before paying for the fit.
+- **The per-state view was lost.** It is back, and now it is the *same* view:
+  `guiTbl_xy` over a table of every detected event carrying `lfp`, `cluster`,
+  `state`, `status`, so "Plot By (Tiles)" pivots between per-cluster and
+  per-state and "Group By (Colors)" overlays the other.
+- **Hand-drawn tiles were a reinvention.** `guiTbl_xy` already does tiles,
+  grouping, per-category show/hide, and a Dispersion + Median trace — which is
+  the robust central waveform the hand-drawn version existed to provide.
+
+The MUA row was removed rather than kept as a Y variable: a dozen events per
+cluster is too few to read, and `guiTbl_xy` takes one x-axis, which a ±500 ms
+suppression window cannot share with a ±100 ms waveform.
+
+Cost, measured on the biggest session (lh100, 9531 events): 6.5 s to build the
+view once, **1.1 s per interaction** thereafter, because the widget is fed rows
+through `setDataFcn` instead of being rebuilt. That is also why a re-cluster
+keeps whatever pivot the user set.
+
 ## End-to-end, whole cohort (`ed_verify.m`, ~8 s per session)
 
 | session | grp | ch | candidates | pool | recall | review |
