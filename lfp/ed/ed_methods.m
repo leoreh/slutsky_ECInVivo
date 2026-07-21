@@ -74,7 +74,15 @@ switch preset
         % count with the pool (0.65*sqrt(n)) - a fixed count cannot span a pool
         % of 75 and one of 8500, and 12 groups over 8500 leaves every group a
         % mixture. The GUI overrides it per session.
-        met.clust = struct('win', [-0.05 0.05], 'nPC', 6, 'nClust', []);
+        %
+        % .detrend and .norm decide what the components describe. They live
+        % here rather than inside ed_clust because a ripple pipeline reusing
+        % this curation would want its own answer: L2 divides by the norm over
+        % the window, so with events of unequal duration it trades amplitude
+        % for length in a way unit peak does not. dev/ed_alignSweep.m could not
+        % separate the options on 47 curated discharges - see ed_clust.
+        met.clust = struct('win', [-0.05 0.05], 'nPC', 6, 'nClust', [], ...
+            'detrend', 'edge', 'norm', 'peak');
 
     otherwise
         error('ed_methods:preset', 'unknown preset "%s"', preset);

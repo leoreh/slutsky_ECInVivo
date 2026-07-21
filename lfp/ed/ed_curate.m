@@ -258,7 +258,8 @@ if ~isempty(iPool)
     scalar = [st.ed.fastZ(iPool), st.ed.isoZ(iPool), st.ed.posZ(iPool), ...
         st.ed.amp(iPool), st.ed.dur(iPool)];
     [cid, cInfo] = ed_clust(st.wv(iPool, :), st.tst, 'win', c.win, ...
-        'nPC', c.nPC, 'nClust', k, 'scalar', scalar);
+        'nPC', c.nPC, 'nClust', k, 'scalar', scalar, ...
+        'detrend', c.detrend, 'norm', c.norm);
     st.cid(iPool) = cid;
     st.nClust = cInfo.nClust;
 end

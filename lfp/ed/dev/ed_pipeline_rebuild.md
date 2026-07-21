@@ -263,6 +263,70 @@ view once, **1.1 s per interaction** thereafter, because the widget is fed rows
 through `setDataFcn` instead of being rebuilt. That is also why a re-cluster
 keeps whatever pivot the user set.
 
+## Baseline, alignment and normalisation (`ed_alignSweep.m`)
+
+Three preprocessing questions, and the honest headline is that **this ground
+truth cannot answer two of them.**
+
+**First, the control that makes the rest readable.** Events you must review to
+reach 80% of the curated discharges:
+
+| mouse | pool | ranked by \|amp\| | by `fastZ` | random | best clustering |
+|---|---|---|---|---|---|
+| raMCU3 | 8460 | 1412 | 310 | 6252 | **38** |
+| raMCU4 | 2698 | 53 | 43 | 2194 | **24** |
+| raMCU5 | 4158 | 1562 | 201 | 3337 | **21** |
+
+Clustering beats the best single scalar by 8–40× and random by two orders of
+magnitude. So the metric is *not* saturated by amplitude — a worry worth
+testing, because the curated set came from an amplitude-biased detector, and
+because "no normalisation" scored well in the sweep, which is what pure
+amplitude sorting would look like. Refuted.
+
+**But the preprocessing options do not separate.** 18 configurations
+(alignment × detrend × normalisation) × 3 mice × 3 counts. Aggregating by
+mean-of-per-mouse-best puts `raw|none|none` first and the shipped
+`filt|full|peak` mid-table; aggregating by min-over-configs reverses the
+alignment verdict entirely (`filt` 28 vs `raw` 37). A ranking that flips with
+the aggregation is noise. With 10–19 curated events per mouse and a GMM whose
+partition is chaotic under small perturbations, this sweep cannot rank them.
+
+So `detrend` moved to **`edge`** on the argument rather than the score: fitting
+the baseline over the whole window lets a large asymmetric event tilt the line
+it is measured against, by an amount that depends on its own polarity and
+asymmetry — a distortion correlated with the shape being measured. Fitting on
+the flanks costs ~half the samples for the slope estimate and removes the bias.
+It is also what `snipFromBinary` has done for spike waveforms since 2020.
+`norm` stays at unit peak; there is no argument strong enough to move it and no
+measurement to force it. Both are now `met.clust` fields, because a ripple
+pipeline reusing this curation will want its own answer — L2 divides by the
+norm over the window, so with events of unequal duration it trades amplitude
+against length in a way unit peak does not.
+
+**Polarity is mixed WITHIN a mouse**, which settles a question the clustering
+cannot. Curated discharges by sign of `.amp`:
+
+| mouse | curated | positive | negative |
+|---|---|---|---|
+| raMCU3 | 10 | 10 | 0 |
+| raMCU4 | 19 | 13 | 6 |
+| raMCU5 | 18 | 11 | 7 |
+
+One channel, one layer, one session — and a third of the hand-labelled
+discharges in two of the three mice go the other way. So polarity is not a
+clean type boundary here, and a sign-blind representation is worth testing
+later. It is not the between-layer effect Maslarova describe; that one cannot
+apply within a single channel.
+
+**Alignment is a few ms off, and the offset depends on polarity.** Detection
+puts t = 0 at max|filt|, the peak of the 60–150 Hz trace. The raw extremum
+(after the flanks-fitted baseline is removed) sits 1.6–4.0 ms away in the pool
+median, and the positive and negative medians differ — e.g. raMCU5 curated
++9.6 ms for upward events against 0 for downward, on n = 11 and 7. Real, small,
+and unresolvable by the sweep. Not changed: moving alignment to the raw
+extremum redefines `.peakTime` and invalidates every saved detection, which is
+a large price for an effect this size and this poorly measured.
+
 ## End-to-end, whole cohort (`ed_verify.m`, ~8 s per session)
 
 | session | grp | ch | candidates | pool | recall | review |

@@ -24,8 +24,15 @@ function [clustId, cInfo] = ed_clust(wv, tstamps, varargin)
 %       (dev/ed_clustSweep.m sweeps window x normalisation x features x count,
 %       scored by how many events you must review to find 80% of them):
 %
-%         DETREND over the window, which removes the slow deflection the event
-%           happens to sit on.
+%         DETREND, fitting the line on the FLANKS, which removes the slow
+%           deflection the event happens to sit on without letting the event
+%           tilt its own baseline. Fitting over the whole window instead leaves
+%           a residual tilt that depends on the event's polarity and asymmetry
+%           - a distortion correlated with the very shape being measured. The
+%           47 curated discharges cannot separate the two (dev/ed_alignSweep.m:
+%           the ranking flips with how the sweep is aggregated), so this one is
+%           chosen on the argument, not the score. It is also the convention
+%           snipFromBinary has used for spike waveforms since 2020.
 %         NORMALISE each waveform to unit peak. Maslarova et al. 2025 keep
 %           absolute amplitude for ripple-versus-IED, but that is a different
 %           contrast: here the pool spans two orders of magnitude and the few
@@ -57,6 +64,12 @@ function [clustId, cInfo] = ed_clust(wv, tstamps, varargin)
 %           'nPC'    - <num> principal components kept. {6}
 %           'nClust' - <num> cluster count; empty scales it with the pool.
 %                            {[]}
+%           'detrend'- <char> per-event baseline removal: 'edge' fits the line
+%                            on the flanks only, 'full' over the whole window
+%                            (the event included, so it tilts its own
+%                            baseline), 'none'. {'edge'}
+%           'norm'   - <char> per-event scaling: 'peak' (unit peak, L-inf),
+%                            'l2', 'none'. {'peak'}
 %           'scalar' - <mat> [nEv x nFeat] extra per-event measures to cluster
 %                            on alongside the shape components. Each is
 %                            rank-normalised, so a heavy-tailed one cannot
@@ -88,11 +101,15 @@ addParameter(p, 'win', [-0.05 0.05], @isnumeric);
 addParameter(p, 'nPC', 6, @isnumeric);
 addParameter(p, 'nClust', [], @isnumeric);
 addParameter(p, 'scalar', [], @isnumeric);
+addParameter(p, 'detrend', 'edge', @ischar);
+addParameter(p, 'norm', 'peak', @ischar);
 parse(p, wv, tstamps, varargin{:});
-win    = p.Results.win;
-nPC    = p.Results.nPC;
-nClust = p.Results.nClust;
-scalar = p.Results.scalar;
+win     = p.Results.win;
+nPC     = p.Results.nPC;
+nClust  = p.Results.nClust;
+scalar  = p.Results.scalar;
+flgDt   = lower(p.Results.detrend);
+flgNorm = lower(p.Results.norm);
 
 nEv = size(wv, 1);
 clustId = nan(nEv, 1);
@@ -115,10 +132,8 @@ if size(X, 1) < MINEV || size(X, 2) < 3
     return;
 end
 
-X = detrend(X', 'linear')';         % per-event, over the window
-pk = max(abs(X), [], 2);
-pk(pk == 0) = 1;
-X = X ./ pk;                        % unit peak; scale returns via `scalar`
+X = detrendWv(X, tstamps(iWin), flgDt);
+X = normWv(X, flgNorm);
 
 % detrending costs two degrees of freedom, so X is rank-deficient by
 % construction and pca says so on every call; the warning is expected, not a
@@ -191,3 +206,59 @@ cInfo.score(iOk, :) = score;
 cInfo.explained = explained(1 : min(nPC, numel(explained)));
 
 end     % EOF
+
+
+% =========================================================================
+%  LOCAL
+% =========================================================================
+function X = detrendWv(X, t, met)
+% Remove a per-event linear baseline, so an event riding on a slow deflection
+% is described by its own shape.
+%
+%   'edge' fits the line on the FLANKS only - the samples beyond half the
+%          window - so the event cannot tilt the baseline it is measured
+%          against. This is the snipFromBinary convention.
+%   'full' fits it over the whole window, the event included. Cheaper to say
+%          and wrong in a specific way: a large asymmetric deflection drags
+%          the line, and it drags it in a direction that depends on the
+%          event's own polarity and asymmetry, so the residual tilt is
+%          correlated with the shape being measured.
+if strcmp(met, 'none'), return; end
+
+t = t(:);
+if strcmp(met, 'edge')
+    iFit = abs(t) >= 0.5 * max(abs(t));
+    if nnz(iFit) < 3, iFit = true(size(t)); end
+else
+    iFit = true(size(t));
+end
+
+t = t - mean(t(iFit));
+A = [t(iFit), ones(nnz(iFit), 1)];
+X = X - ([t, ones(numel(t), 1)] * (A \ X(:, iFit)'))';
+
+end     % detrendWv
+
+
+function X = normWv(X, met)
+% Put every event on a comparable scale, so the components describe SHAPE and
+% not size. The pool spans two orders of magnitude, and unnormalised the few
+% largest events take the principal components with them. Scale is not lost -
+% it returns through the ranked scalar measures.
+%
+%   'peak' divides by max|x| (L-inf). One noisy sample sets the whole scale.
+%   'l2'   divides by the norm over the window, which no single sample can
+%          dominate - but which a long tail inflates, so a wider window makes
+%          a slow event look smaller.
+switch met
+    case 'none'
+        return
+    case 'l2'
+        s = vecnorm(X, 2, 2);
+    otherwise
+        s = max(abs(X), [], 2);
+end
+s(s == 0) = 1;
+X = X ./ s;
+
+end     % normWv
