@@ -1,53 +1,20 @@
 function [ed, hFig] = ed_curate(basepath, varargin)
-% ED_CURATE Curate discharges by waveform TYPE, over an adjustable filter.
+% ED_CURATE Curate discharges by waveform TYPE (stage 2).
 %
 %   [ed, hFig] = ED_CURATE(basepath, varargin)
 %
 %   SUMMARY:
-%       Stage 2 of the ED pipeline. Loads <basename>.ed.mat, applies the two
-%       noise thresholds as a POOL, groups the pool into waveform clusters
-%       (ed_clust) and lets you accept whole clusters. Saving writes .accepted,
-%       .clustId and the choice into ed.info.
+%       Loads <basename>.ed.mat and its per-event waveforms, applies met.qa as
+%       a POOL, groups the pool into waveform clusters, and lets you accept
+%       whole clusters. The GUI itself is evt_curate, shared with the ripple
+%       pipeline; everything here is loading.
 %
 %       A 24 h recording proposes thousands of candidates and holds a few dozen
-%       discharges, so the unit of curation here is a TYPE, not an event.
+%       discharges, so the unit of curation is a TYPE, not an event. Read
+%       evt_curate for what the controls do.
 %
-%       WHAT IS ACCEPTED AND WHAT IS SHOWN ARE SEPARATE CONTROLS. Mixing them
-%       means you cannot inspect the events you rejected without rejecting or
-%       accepting something by accident.
-%
-%       ACCEPT (checkboxes). An event is accepted when its CLUSTER and its
-%       STATE are both ticked - that is the mask Save writes. Both lists start
-%       TICKED: curation here is REJECTION, so everything the filter passed is
-%       accepted until you rule something out.
-%           clusters  which waveform types are discharges. Untick one whose
-%                     median waveform is a sharp wave, a step or noise. A shape
-%                     rejection STICKS across a Re-cluster - undo it with
-%                     'Reset to filter'.
-%           states    which vigilance states count. Untick one to drop a
-%                     stretch of the recording wholesale (movement artifact in
-%                     WAKE, say) without touching the shape decision. State is
-%                     a SCOPE, not a verdict: re-tick it and its events are
-%                     eligible again on the next Re-cluster.
-%
-%       SHOW (dropdown): 'both' | 'accepted' | 'removed'. Chooses which rows
-%       reach the plot and nothing else - it cannot change the mask.
-%
-%       THE VIEW is guiTbl_xy over those rows, carrying four variables to pivot
-%       on: lfp (the waveform, Y), cluster, state and status. So "Plot By
-%       (Tiles)" switches between a per-CLUSTER and a per-STATE view, "Group By
-%       (Colors)" overlays the other, and Dispersion + Median give a robust
-%       central trace rather than a mean.
-%
-%       The two thresholds are live knobs: the label updates as you type, so a
-%       pool can be sized before paying for a fit. Reject then Re-cluster is a
-%       refinement loop (see onCluster), and reopening resumes the saved
-%       curation rather than clustering afresh (see restoreSaved). The cluster
-%       count follows the pool unless the box overrides it (0 = auto), so a
-%       refinement round over a narrowed pool gets fewer, tighter groups.
-%
-%       Headless (flgGui = false) applies only the thresholds, for a batch run
-%       that has no human. That mask is NOT an answer - it is the pool.
+%       Headless (flgGui = false) applies only met.qa, for a batch run that has
+%       no human. That mask is NOT an answer - it is the pool.
 %
 %   INPUTS:
 %       basepath - <char> session directory (must hold <basename>.ed.mat).
@@ -60,31 +27,23 @@ function [ed, hFig] = ed_curate(basepath, varargin)
 %           'verbose'  - <log>    print progress? {true}
 %
 %   OUTPUTS:
-%       ed   - <struct> the loaded events (headless: with .accepted updated).
+%       ed   - <struct> the loaded events, with .accepted as of the call.
 %       hFig - <handle> the GUI figure ([] when headless).
 %
 %   DEPENDENCIES:
-%       evt_files, evt_gate, evt_states, evt_boutTimes, ed_methods, ed_clust,
-%       basepaths2vars, backup_file; GUI: gui_layout, gui_labeledControl,
-%       gui_notify, guiTbl_xy.
+%       evt_files, evt_curate, ed_methods.
 %
 %   HISTORY:
 %       260720 created as the ED twin of ripp_curate (threshold knobs over a
 %              kept-vs-removed mean waveform).
+%       260721 rebuilt on waveform clustering: accept TYPES, not events.
 %       260721b shape rejections became sticky and state rejections reversible.
-%              State used to reach the fit through the accepted mask, which
-%              made it a one-way door: unticking REM dropped its events from
-%              the fit, so they lost their labels, and an unlabelled event
-%              cannot be accepted - which is what a Re-cluster fits over. There
-%              was no way back short of Reset, which discards every cluster
-%              judgement made so far.
-%       260721 rebuilt on waveform clustering: accept TYPES, not events. The
-%              view is guiTbl_xy, which already does tiles, grouping and a
-%              median-with-spread trace, so one pivotable view replaces two
-%              hand-drawn ones. Accept and view became separate controls, every
-%              cluster starts accepted, Re-cluster refines by fitting only the
-%              accepted events, and reopening resumes the saved curation. See
-%              dev/ed_pipeline_rebuild.md.
+%       260722 the GUI moved to lfp/events/evt_curate and is now shared with the
+%              ripple pipeline; this file is the ED loader over it. Two things
+%              changed in the move: the vigilance-state scope is recorded in
+%              info.qa (info.clustStates is still READ, for files saved before
+%              this), and the filtered trace joins the raw one as a second Y
+%              option in the view.
 
 %% ========================================================================
 %  ARGUMENTS + LOAD
@@ -99,7 +58,6 @@ addParameter(p, 'verbose', true, @islogical);
 parse(p, basepath, varargin{:});
 met     = p.Results.met;
 flgGui  = p.Results.flgGui;
-vis     = char(p.Results.Visible);
 verbose = p.Results.verbose;
 
 basename = p.Results.basename;
@@ -113,429 +71,43 @@ if ~isfile(files.evt)
 end
 S  = load(files.evt, 'ed');
 ed = S.ed;
-hFig = [];
+
+cfg = struct('met', met, 'file', files.evt, 'var', 'ed', ...
+    'basepath', basepath, 'basename', basename, 'lbl', 'ED', ...
+    'flgGui', flgGui, 'Visible', char(p.Results.Visible), 'onSaved', []);
 
 %% ========================================================================
-%  HEADLESS
+%  CURATE
 %  ========================================================================
-if ~flgGui
-    pool = evt_gate(ed, met.qa);
-    ed.accepted = pool;
-    % [] and not {}: prevStates reads a CELL as an explicit selection, so an
-    % empty one means "every state was rejected". The headless gate makes no
-    % state choice at all, and writing {} here made the GUI open with every
-    % state box unticked.
-    saveCurated(files.evt, pool, nan(numel(pool), 1), [], met.qa, []);
-    buildStates(basepath, basename, ed, pool);
-    if verbose
-        fprintf('[ED_CURATE] %s : %d / %d pass the filter\n', ...
-            basename, nnz(pool), numel(pool));
-    end
-    return;
+% Waveforms are the clustering's whole input, so they are loaded only when
+% there is a human to look at them.
+wv = struct();
+tst = [];
+if flgGui
+    [wv, tst] = loadMaps(files.maps, ed);
 end
 
-%% ========================================================================
-%  GUI
-%  ========================================================================
-st = struct();
-st.ed       = ed;
-st.met      = met;
-st.files    = files;
-st.basepath = basepath;
-st.basename = basename;
-st.state    = plotState(ed);
-[st.wv, st.tst] = loadMaps(files.maps, ed);
+[ed.accepted, hFig] = evt_curate(ed, wv, tst, cfg);
 
-hFig = uifigure('Name', ['ED curation: ' basename], ...
-    'Position', [60 60 1600 850], 'Visible', vis);
-[~, gPlot, gCtrl, gActions] = gui_layout(hFig, 'CtrlWidth', 240);
-
-dflt = specDefaults(met.qa);
-st.edFast = gui_labeledControl(gCtrl, 'editnum', 'sharp  fastZ >=', ...
-    'Value', dflt.fastZ, 'ValueChangedFcn', @(~,~) onKnob(hFig));
-st.edIso = gui_labeledControl(gCtrl, 'editnum', 'alone  isoZ >=', ...
-    'Value', dflt.isoZ, 'ValueChangedFcn', @(~,~) onKnob(hFig));
-kInit = met.clust.nClust;
-if isempty(kInit), kInit = 0; end       % 0 = scale with the pool
-st.edK = gui_labeledControl(gCtrl, 'editnum', 'clusters (0 = auto)', ...
-    'Value', kInit);
-st.lblPool = gui_labeledControl(gCtrl, 'label', '');
-gui_labeledControl(gCtrl, 'button', '', 'Text', 'Re-cluster', ...
-    'ButtonPushedFcn', @(~,~) onCluster(hFig, false));
-gui_labeledControl(gCtrl, 'button', '', 'Text', 'Reset to filter', ...
-    'ButtonPushedFcn', @(~,~) onCluster(hFig, true));
-
-st.gClust = gui_labeledControl(gCtrl, 'panel', 'accept clusters', ...
-    'RowHeight', '1x');
-st.gState = gui_labeledControl(gCtrl, 'panel', 'accept states', ...
-    'RowHeight', 'fit');
-st.lblKeep = gui_labeledControl(gCtrl, 'label', '');
-
-% independent of the above: which rows reach the plot, nothing else
-st.ddShow = gui_labeledControl(gCtrl, 'dropdown', 'show', ...
-    'Items', {'both', 'accepted', 'removed'}, 'Value', 'accepted', ...
-    'ValueChangedFcn', @(~,~) refresh(hFig));
-
-gui_labeledControl(gActions, 'button', '', 'Text', 'Save', ...
-    'ButtonPushedFcn', @(~,~) doSave(hFig));
-
-st.hPanel = uipanel(gPlot, 'BorderType', 'none');
-st.chk    = gobjects(0);
-st.cid    = nan(numel(ed.peakTime), 1);
-st.nClust = 0;
-st.acc    = true(numel(ed.peakTime), 1);
-st.gate   = false(numel(ed.peakTime), 1);   % set by the first fit / restore
-st.rej    = false(numel(ed.peakTime), 1);   % sticky shape rejections
-hFig.UserData = st;
-
-buildStateChecks(hFig, prevStates(ed));
-if ~restoreSaved(hFig, ed)
-    onCluster(hFig, true);
+if verbose
+    how = 'headless';
+    if flgGui, how = 'GUI'; end
+    fprintf('[ED_CURATE] %s : %d / %d accepted (%s)\n', basename, ...
+        nnz(ed.accepted), numel(ed.accepted), how);
 end
 
 end     % EOF
 
 
 % =========================================================================
-%  GUI CALLBACKS
-% =========================================================================
-function onKnob(hFig)
-% A threshold moved: show the pool it implies. The clustering is NOT redone -
-% a fit over a few hundred events is not something to run on every keystroke,
-% and the point of the knob is to choose a pool size before paying for it.
-st = hFig.UserData;
-gate = evt_gate(st.ed, buildSpec(st));
-st.lblPool.Text = sprintf('gate %d | %d accepted  (press Re-cluster)', ...
-    nnz(gate), nnz(gate & st.acc));
-
-end     % onKnob
-
-
-function onCluster(hFig, flgReset)
-% Fit waveform clusters over the pool and adopt the result.
-%
-% Re-cluster fits what is left after the thresholds, the SHAPE rejections and
-% the state scope. Having thrown out a cluster of step artifacts, you do not
-% want the groups spent describing events already rejected - you want them over
-% what is left, which splits the survivors finer each round. The accepted SET
-% does not move: every new cluster starts ticked, so a rejection lives in the
-% input rather than in the tick pattern. Carrying the old ticks over would be
-% wrong anyway - the partition is new, so index 3 no longer means what it did.
-%
-% THE TWO KINDS OF REJECTION BEHAVE DIFFERENTLY, and they have to.
-%   SHAPE (a cluster untick) is STICKY, recorded in st.rej. Refitting strips
-%     the labels of the events it drops, and an unlabelled event is
-%     indistinguishable from one that was never judged - so without this record
-%     a rejected cluster would walk straight back in on the next round.
-%   STATE (a state untick) is NOT sticky. It is a scope, flipped back and forth
-%     while working, so re-ticking a state makes its events eligible again and
-%     the next Re-cluster gives them labels. It used to feed the fit through
-%     the accepted mask, which made it a one-way door: out of the fit meant no
-%     label, no label meant not accepted, and not accepted meant it could never
-%     re-enter the fit.
-%
-% FLGRESET clears the shape rejections and goes back to the whole gate; without
-% it a mis-click would be unrecoverable short of reopening the session. It does
-% not touch the state scope, which is live either way.
-st = hFig.UserData;
-c  = st.met.clust;
-[~, sel, states] = acceptMask(st);
-
-st.gate = evt_gate(st.ed, buildSpec(st));
-if flgReset
-    st.rej = false(size(st.rej));
-else
-    st.rej = st.rej | (~isnan(st.cid) & ~ismember(st.cid, sel));
-end
-st.pool = st.gate & ~st.rej & ismember(st.state(:), states);
-iPool = find(st.pool);
-
-k = st.edK.Value;
-if k < 2, k = c.nClust; end     % 0 in the box, or an empty default: auto
-
-st.cid = nan(numel(st.pool), 1);
-st.nClust = 0;
-if ~isempty(iPool)
-    % the per-event measures join the waveform components: they are shape
-    % descriptors already computed, so withholding them from the clustering
-    % would only throw information away
-    scalar = [st.ed.fastZ(iPool), st.ed.isoZ(iPool), st.ed.posZ(iPool), ...
-        st.ed.amp(iPool), st.ed.dur(iPool)];
-    [cid, cInfo] = ed_clust(st.wv(iPool, :), st.tst, 'win', c.win, ...
-        'nPC', c.nPC, 'nClust', k, 'scalar', scalar, ...
-        'detrend', c.detrend, 'norm', c.norm, 'wSize', c.wSize);
-    st.cid(iPool) = cid;
-    st.nClust = cInfo.nClust;
-
-    % ed_clust refuses a pool too small to hold TYPES and returns no labels.
-    % An unlabelled event cannot be accepted, so a refinement that worked -
-    % one that narrowed the pool down to the handful of events worth keeping -
-    % would throw every one of them away, with Reset the only way back. Below
-    % that floor the honest answer is one group, not none.
-    if st.nClust == 0
-        st.cid(iPool) = 1;
-        st.nClust = 1;
-    end
-end
-hFig.UserData = st;
-
-adoptClust(hFig, 1 : st.nClust, ...
-    sprintf('gate %d | clustered %d -> %d groups', nnz(st.gate), ...
-    numel(iPool), st.nClust));
-
-end     % onCluster
-
-
-function ok = restoreSaved(hFig, ed)
-% Put back the partition and the choices a previous session saved, instead of
-% clustering afresh. The saved labels ARE the partition that was judged: a
-% re-fit would cost a fit and hand back a different one, leaving the ticks
-% pointing at groups nobody looked at. Anything that no longer lines up with
-% the event list is refused, so a re-detection falls through to a fresh fit
-% rather than drawing labels that belong to other events.
-ok = isfield(ed, 'clustId') && numel(ed.clustId) == numel(ed.peakTime) ...
-    && ~all(isnan(ed.clustId));
-if ~ok, return; end
-
-st = hFig.UserData;
-st.cid    = ed.clustId(:);
-st.pool   = ~isnan(st.cid);
-st.nClust = max(st.cid);
-
-sel = 1 : st.nClust;
-if isfield(ed.info, 'clustSel') && ~isempty(ed.info.clustSel)
-    sel = ed.info.clustSel;
-end
-
-dflt = specDefaults(ed.info.qa);
-st.edFast.Value = dflt.fastZ;
-st.edIso.Value  = dflt.isoZ;
-st.gate = evt_gate(st.ed, buildSpec(st));
-
-% Rebuild the shape rejections the saved partition implies: an event the gate
-% passed and the saved state scope included, yet which carries no label, was
-% dropped by a cluster untick in some earlier round. Without this a reopen
-% would quietly undo the refinement and offer those events again.
-scope = prevStates(ed);
-if ~iscell(scope), scope = st.stateCats; end
-st.rej = st.gate & isnan(st.cid) & ismember(st.state(:), scope);
-hFig.UserData = st;
-
-adoptClust(hFig, sel, sprintf('restored: %d clustered -> %d groups', ...
-    nnz(st.pool), st.nClust));
-
-end     % restoreSaved
-
-
-function adoptClust(hFig, sel, msg)
-% Take on the labelling now in UserData: report it, rebuild the cluster
-% checkboxes with SEL ticked, and redraw. Shared by a fresh fit and a restore,
-% which differ only in where the labels came from.
-%
-% The count box is NOT touched. It holds the count the user ASKED for, and the
-% label reports the count that came back - writing the resolved count into the
-% box would turn "0 = auto" into a fixed number after the first fit, so a
-% refinement round over a narrowed pool would keep splitting it into as many
-% groups as the pool it came from.
-st = hFig.UserData;
-st.lblPool.Text = msg;
-
-% one checkbox per cluster, labelled with its size. A pool too small to hold
-% types (ed_clust returns no labels) simply gets none.
-delete(st.gClust.Children);
-st.chk = gobjects(0);
-if st.nClust > 0
-    g = uigridlayout(st.gClust, [st.nClust + 1, 1], 'Padding', 2, ...
-        'RowHeight', [repmat({'fit'}, 1, st.nClust), {'1x'}], ...
-        'RowSpacing', 1, 'Scrollable', 'on');
-    st.chk = gobjects(st.nClust, 1);
-    for iK = 1 : st.nClust
-        st.chk(iK) = uicheckbox(g, 'Value', ismember(iK, sel), ...
-            'Text', sprintf('%d   (n = %d)', iK, nnz(st.cid == iK)), ...
-            'ValueChangedFcn', @(~,~) refresh(hFig));
-    end
-end
-hFig.UserData = st;
-
-refresh(hFig);
-
-end     % adoptClust
-
-
-function refresh(hFig)
-% Recompute the accepted mask and push the chosen rows to the view.
-%
-% The widget is built ONCE and fed rows thereafter. guiTbl_xy freezes its Y and
-% Plot By / Group By item lists at construction, and the variable NAMES never
-% change here - only the cluster categories do, which its setDataFcn reconciles
-% by name. So even a re-cluster keeps whatever view the user set, which
-% rebuilding would throw away on every press.
-st = hFig.UserData;
-[accepted, ~, states] = acceptMask(st);
-st.acc = accepted;
-hFig.UserData = st;
-
-% An event needs a label to be accepted, so re-ticking a state cannot bring
-% its events back on its own - they left the last fit and have none. Say so,
-% rather than letting the tick look like it did nothing.
-st.lblKeep.Text = sprintf('accepted: %d of %d', nnz(accepted), ...
-    numel(accepted));
-nPend = nnz(st.gate & ~st.rej & isnan(st.cid) & ...
-    ismember(st.state(:), states));
-if nPend > 0
-    st.lblKeep.Text = sprintf('%s  |  %d unsorted - press Re-cluster', ...
-        st.lblKeep.Text, nPend);
-end
-
-switch st.ddShow.Value
-    case 'accepted', iRow = find(accepted);
-    case 'removed',  iRow = find(~accepted);
-    otherwise,       iRow = (1 : numel(accepted))';
-end
-tbl = viewTable(st, accepted, iRow);
-
-ud = st.hPanel.UserData;
-if isstruct(ud) && isfield(ud, 'setDataFcn')
-    ud.setDataFcn(tbl);
-elseif ~isempty(iRow)
-    % first call. An empty table has no categories to build the filter panels
-    % from, so the widget waits until there is something to draw.
-    % the map is cut wider than this on purpose - the 50-100 ms flank is where
-    % a discharge separates from a sharp wave, and it is kept in the file - but
-    % the view opens on the clustering window, which is where the decisions are
-    % made. Zoom out to see the rest.
-    guiTbl_xy(st.tst * 1000, tbl, 'Parent', st.hPanel, 'yVar', 'lfp', ...
-        'tileVar', 'state', 'grpVar', 'cluster', 'xLbl', 'time (ms)', ...
-        'xLim', st.met.clust.win * 1000);
-end
-
-end     % refresh
-
-
-function doSave(hFig)
-% Persist the mask plus everything needed to resume it.
-st = hFig.UserData;
-[accepted, sel, states] = acceptMask(st);
-
-saveCurated(st.files.evt, accepted, st.cid, sel, buildSpec(st), states);
-buildStates(st.basepath, st.basename, st.ed, accepted);
-gui_notify(hFig, sprintf('Saved: %d events from %d clusters (+ edStates)', ...
-    nnz(accepted), numel(sel)), 'success');
-
-end     % doSave
-
-
-% =========================================================================
-%  VIEW
-% =========================================================================
-function tbl = viewTable(st, accepted, iRow)
-% The rows IROW asks for, with the three things worth pivoting on. Events the
-% filter dropped keep the cluster label 'out' rather than being hidden, so a
-% per-state view still shows what detection proposed.
-idx = st.cid;
-idx(isnan(idx)) = 0;
-clust = categorical(idx, 0 : st.nClust, ...
-    [{'out'}, cellstr(string(1 : st.nClust))]);
-
-tbl = table(st.wv(iRow, :), clust(iRow), st.state(iRow), ...
-    categorical(accepted(iRow), [false true], {'removed', 'kept'}), ...
-    'VariableNames', {'lfp', 'cluster', 'state', 'status'});
-
-end     % viewTable
-
-
-function s = plotState(ed)
-% ed.state as a tiling variable: <undefined> is promoted to its own 'unscored'
-% level. A categorical comparison never matches <undefined>, so without this
-% the unscored events would get no tile and vanish from the view without a
-% word. A session that was never scored has no .state at all.
-if ~isfield(ed, 'state') || isempty(ed.state)
-    s = categorical(repmat({'unscored'}, numel(ed.peakTime), 1));
-    return;
-end
-s = removecats(ed.state(:));
-if any(isundefined(s))
-    s = addcats(s, {'unscored'});
-    s(isundefined(s)) = 'unscored';
-end
-
-end     % plotState
-
-
-% =========================================================================
-%  CONTROLS
-% =========================================================================
-function [accepted, sel, states] = acceptMask(st)
-% An event is a discharge if its CLUSTER is ticked AND its STATE is ticked.
-% Clusters say which shape; states are there to drop a whole stretch of the
-% recording - movement artifact in WAKE, say - without touching the shape
-% decision. Both start ticked, so the mask begins as the whole pool and
-% curation removes from it. SEL and STATES come back with the mask because
-% Save records the choice as well as its result; deriving them apart is how
-% the two drift.
-sel    = find(ticked(st.chk));
-states = st.stateCats(ticked(st.chkState));
-states = states(:)';
-accepted = ismember(st.cid, sel) & ismember(st.state(:), states);
-
-end     % acceptMask
-
-
-function buildStateChecks(hFig, keepCats)
-% One checkbox per vigilance state. Built ONCE - the states of a session do not
-% change - so these ticks survive every re-cluster. KEEPCATS restores a saved
-% selection; empty means none was saved, and everything starts ticked.
-st = hFig.UserData;
-cats = categories(removecats(st.state));
-
-g = uigridlayout(st.gState, [numel(cats), 1], 'Padding', 2, ...
-    'RowHeight', repmat({'fit'}, 1, numel(cats)), 'RowSpacing', 1);
-st.chkState = gobjects(numel(cats), 1);
-for iCat = 1 : numel(cats)
-    val = isempty(keepCats) || ismember(cats{iCat}, keepCats);
-    st.chkState(iCat) = uicheckbox(g, 'Value', val, 'Text', ...
-        sprintf('%s  (n = %d)', cats{iCat}, nnz(st.state == cats{iCat})), ...
-        'ValueChangedFcn', @(~,~) refresh(hFig));
-end
-st.stateCats = cats;
-hFig.UserData = st;
-
-end     % buildStateChecks
-
-
-function tf = ticked(h)
-% Which checkboxes of an array are ticked, as a logical row.
-tf = false(1, numel(h));
-for iChk = 1 : numel(h)
-    tf(iChk) = h(iChk).Value;
-end
-
-end     % ticked
-
-
-function qa = buildSpec(st)
-% The filter spec the two knobs currently describe.
-qa.ranges = struct('fastZ', [st.edFast.Value, Inf], ...
-    'isoZ', [st.edIso.Value, Inf]);
-
-end     % buildSpec
-
-
-function d = specDefaults(qa)
-% The knob values a spec implies; an absent bound is an open one.
-d = struct('fastZ', -Inf, 'isoZ', -Inf);
-if ~isfield(qa, 'ranges'), return; end
-if isfield(qa.ranges, 'fastZ'), d.fastZ = qa.ranges.fastZ(1); end
-if isfield(qa.ranges, 'isoZ'),  d.isoZ  = qa.ranges.isoZ(1);  end
-
-end     % specDefaults
-
-
-% =========================================================================
-%  DATA
+%  LOCAL
 % =========================================================================
 function [wv, tst] = loadMaps(file, ed)
-% Per-event waveforms behind the clustering and the view.
+% Per-event waveforms behind the clustering and the view. Passed whole: the
+% flanks beyond the clustering window are where a discharge separates from a
+% sharp wave, and the view opens on met.clust.win with the rest a zoom away.
+% Unlike the ripple loader this does not detrend - evt_clust detrends its own
+% window, and nothing here crops away the flanks it needs.
 if ~isfile(file)
     error('ed_curate:noMaps', ...
         'no edMaps file; re-run detection with flgSave.');
@@ -545,63 +117,11 @@ if size(S.edMaps.lfp, 1) ~= numel(ed.peakTime)
     error('ed_curate:staleMaps', ...
         'edMaps does not match the event list; re-run detection.');
 end
-wv  = double(S.edMaps.lfp);
+
 tst = S.edMaps.tstamps;
+wv = struct('lfp', double(S.edMaps.lfp));
+if isfield(S.edMaps, 'filt')
+    wv.filt = double(S.edMaps.filt);
+end
 
 end     % loadMaps
-
-
-function cats = prevStates(ed)
-% The state selection a previous session saved, or {} when there is none.
-%
-% An EMPTY saved selection counts as none. It would otherwise mean "every state
-% was rejected", which restores a GUI that accepts nothing and offers no clue
-% why - and that is exactly what a file written by the headless gate, or by any
-% session that unticked its last state, used to look like. The case it gives up
-% on (deliberately saving a curation that keeps nothing) is not worth the one
-% it breaks.
-cats = {};
-if isfield(ed, 'info') && isfield(ed.info, 'clustStates') ...
-        && iscell(ed.info.clustStates)
-    cats = ed.info.clustStates(:)';
-end
-
-end     % prevStates
-
-
-% =========================================================================
-%  PERSISTENCE
-% =========================================================================
-function saveCurated(file, accepted, clustId, sel, qa, states)
-% Back up, then overwrite the mask + everything needed to resume: the labels,
-% which clusters and states were accepted, and the thresholds behind them.
-backup_file(file);
-S = load(file);
-S.ed.accepted         = logical(accepted(:));
-S.ed.clustId          = clustId(:);
-S.ed.info.qa          = qa;
-S.ed.info.clustSel    = sel;
-S.ed.info.clustStates = states;
-save(file, '-struct', 'S', '-v7.3');
-
-end     % saveCurated
-
-
-function buildStates(basepath, basename, ed, accepted)
-% Rebuild + save the per-bout rate table for the current mask (cheap; no
-% signal). Skips silently when sleep states are unavailable.
-win = ed.info.win;
-w0  = win(1);
-if ~isfinite(w0), w0 = 0; end
-
-v = basepaths2vars('basepaths', {basepath}, 'vars', {'sleep_states'});
-boutTimes = evt_boutTimes(v, win, win(2) - win(1));
-if isempty(boutTimes)
-    return;
-end
-evt_states(ed.times - w0, ed.peakTime - w0, boutTimes, ...
-    'accepted', logical(accepted(:)), 'basepath', basepath, ...
-    'basename', basename, 'flgSave', true, 'flgPlot', false, ...
-    'name', 'ed', 'lbl', 'ED');
-
-end     % buildStates

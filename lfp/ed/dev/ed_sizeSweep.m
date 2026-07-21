@@ -7,7 +7,7 @@
 % its RANK, which keeps the order and throws away the ratio. So no setting of
 % the current parameters can express "three times larger".
 %
-% ed_clust now takes wSize: log10(size) as one explicit axis, scaled to the
+% evt_clust now takes wSize: log10(size) as one explicit axis, scaled to the
 % spread of the leading shape component. wSize = 0 is shape-only (the shipped
 % behaviour), 1 means size counts as much as the dominant shape axis.
 %
@@ -63,7 +63,7 @@ fprintf('\n%-8s %6s | %6s %6s %6s %6s\n', 'mouse', 'wSize', 'ampRat', ...
 res = [];
 for iB = 1 : numel(D)
     for iW = 1 : numel(WS)
-        cid = ed_clust(D(iB).wv, D(iB).tst, 'win', met.clust.win, ...
+        cid = evt_clust(D(iB).wv, D(iB).tst, 'win', met.clust.win, ...
             'nPC', met.clust.nPC, 'nClust', met.clust.nClust, ...
             'scalar', D(iB).sc, 'detrend', met.clust.detrend, ...
             'norm', met.clust.norm, 'wSize', WS(iW));

@@ -136,7 +136,7 @@ end
 if flgCurate
     if isfile(files.evt)
         if verbose, fprintf('[RIPP]: Opening curation GUI...\n'); end
-        ripp_curate(basepath, 'basename', basename, 'qa', met.qa);
+        ripp_curate(basepath, 'basename', basename, 'met', met);
         if verbose
             fprintf(['[RIPP]: curate + save in the GUI, then run ' ...
                 'ripp_analyze(''%s'').\n'], basepath);
@@ -152,7 +152,7 @@ if fresh
     if flgSave
         % headless gate; analyze runs next and overwrites the products, so no
         % need to invalidate them here
-        ripp_curate(basepath, 'basename', basename, 'qa', met.qa, ...
+        ripp_curate(basepath, 'basename', basename, 'met', met, ...
             'flgGui', false, 'flgInvalidate', false, 'verbose', verbose);
         S = load(files.evt, 'ripp');            % reload the curated mask
         ripp = S.ripp;

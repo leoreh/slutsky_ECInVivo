@@ -26,7 +26,7 @@ end
 
 % Loop 2 - CURATE + INSPECT 
 iFile = 1;
-ripp_curate(basepaths{iFile}, 'qa', met.qa); % bulk curation GUI
+ripp_curate(basepaths{iFile}, 'met', met); % bulk curation GUI
 
 % first open (slow) 
 [~, vm, gm] = guiPath(basepaths{iFile}, 'preset', 'ripp');
@@ -42,7 +42,7 @@ for iFile = 2 : nFiles
         'flgSave', true, 'flgForce', true, 'flgDetectOnly', true, ...
         'rippCh', []);
     
-    ripp_curate(basepaths{iFile}, 'qa', met.qa, 'flgGui', false); % bulk curation GUI
+    ripp_curate(basepaths{iFile}, 'met', met, 'flgGui', false); % bulk curation GUI
 
     ripp_analyze(basepaths{iFile}, 'flgPlot', false);
 end

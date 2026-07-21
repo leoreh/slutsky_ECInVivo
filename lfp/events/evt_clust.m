@@ -1,28 +1,28 @@
-function [clustId, cInfo] = ed_clust(wv, tstamps, varargin)
-% ED_CLUST Group candidate waveforms into shape types (PCA -> GMM).
+function [clustId, cInfo] = evt_clust(wv, tstamps, varargin)
+% EVT_CLUST Group event waveforms into shape types (PCA -> GMM).
 %
-%   [clustId, cInfo] = ED_CLUST(wv, tstamps, varargin)
+%   [clustId, cInfo] = EVT_CLUST(wv, tstamps, varargin)
 %
 %   SUMMARY:
-%       Sorts a session's candidates by the shape of their LFP waveform, so
-%       curation becomes a handful of decisions about TYPES instead of hundreds
-%       about events.
+%       Sorts a session's events by the shape of their LFP waveform, so
+%       curation becomes a handful of decisions about TYPES instead of
+%       thousands about events. Shared by both event pipelines (evt_curate).
 %
 %       It exists because a mean waveform lies. Average a set that holds
 %       discharges, sharp waves and step artifacts and you get a curve that is
 %       none of them, which is exactly how the discharges got buried the first
-%       time this pipeline was calibrated. Split the set into shape clusters
+%       time the ED pipeline was calibrated. Split the set into shape clusters
 %       first and each cluster's median is a real shape.
 %
 %       Deliberately NOT a classifier. It does not know which cluster is the
-%       discharge - it only makes that question askable, and a human answers it
-%       in ed_curate. Nothing here encodes the raMCU3/4/5 waveform, so a mouse
-%       whose discharges look different still gets them in a cluster of their
-%       own.
+%       event of interest - it only makes that question askable, and a human
+%       answers it in evt_curate. Nothing here encodes a particular waveform,
+%       so a mouse whose events look different still gets them in a cluster of
+%       their own.
 %
 %       Preprocessing, every step measured on the 47 curated discharges
-%       (dev/ed_clustSweep.m sweeps window x normalisation x features x count,
-%       scored by how many events you must review to find 80% of them):
+%       (lfp/ed/dev/ed_clustSweep.m sweeps window x normalisation x features x
+%       count, scored by how many events you must review to find 80% of them):
 %
 %         DETREND, fitting the line on the FLANKS, which removes the slow
 %           deflection the event happens to sit on without letting the event
@@ -35,35 +35,46 @@ function [clustId, cInfo] = ed_clust(wv, tstamps, varargin)
 %           snipFromBinary has used for spike waveforms since 2020.
 %         NORMALISE each waveform to unit peak. Maslarova et al. 2025 keep
 %           absolute amplitude for ripple-versus-IED, but that is a different
-%           contrast: here the pool spans two orders of magnitude and the few
+%           contrast: an ED pool spans two orders of magnitude and the few
 %           largest events take the principal components with them. Scale is
-%           not lost - it comes back through the scalar measures below, ranked,
-%           where it cannot dominate.
-%         WINDOW +-50 ms, wider than their 10-50 ms. Also a different
-%           contrast: a discharge and a sharp wave differ most in the DECAY (a
-%           discharge is back to baseline in 50-100 ms, a sharp wave takes
-%           300+), and a +-15 ms window cannot see it. Measured, +-50 and +-100
-%           ms both beat +-15 and +-25 by a factor of three in review load.
+%           not lost - it comes back through .wSize and the scalar measures.
+%         WINDOW is the caller's (met.clust.win), because the shapes being told
+%           apart differ per pipeline. A discharge separates from a sharp wave
+%           in the DECAY, which needs +-50 ms; a ripple separates from a step
+%           artifact in the oscillation itself, which is over in +-30 ms.
 %
-%       Cluster count SCALES WITH THE POOL by default: k = 0.65*sqrt(n),
-%       clamped. A fixed count cannot work across the range this sees - a pool
-%       is 75 events under a strict filter and 8500 under a loose one, and 12
-%       groups over 8500 leaves each one a mixture. Measured on raMCU3 (pool
-%       8460, 10 curated discharges), the best cluster goes from 3% pure at
-%       k=12 to 80% pure at k=60; the rule picks 60. On the old strict pools it
-%       picks 11-14, which is where a fixed 12 had measured best.
+%       Cluster count SCALES WITH THE POOL when nClust is empty:
+%       k = 0.65*sqrt(n), clamped. A fixed count cannot work across the range
+%       an ED pool sees - 75 events under a strict filter and 8500 under a
+%       loose one, and 12 groups over 8500 leaves each one a mixture. Measured
+%       on raMCU3 (pool 8460, 10 curated discharges), the best cluster goes
+%       from 3% pure at k=12 to 80% pure at k=60; the rule picks 60. Chosen
+%       over BIC, which maximises likelihood - not the objective - and settled
+%       on ~7 everywhere.
 %
-%       Chosen over BIC, which maximises likelihood - not the objective - and
-%       settled on ~7 everywhere.
+%       A RIPPLE pool is a different problem and passes an explicit count. Its
+%       contaminant is a whole population rather than a rare shape, so a coarse
+%       partition suffices, and the sqrt rule over 30k events would ask a human
+%       to read 110 tiles.
+%
+%       NFIT bounds the cost. Both the PCA basis and the mixture are estimates
+%       of the pool's shape, and an estimate does not improve once the sample
+%       is large: fitting on nFit events and then PROJECTING and ASSIGNING all
+%       of them gives the same partition for a fraction of the work. A 30k-event
+%       ripple pool is minutes of fitgmdist at full size and seconds at 8000.
+%       Empty = fit on everything, which is the ED default and leaves that
+%       pipeline's partition bit-identical.
 %
 %   INPUTS:
-%       wv       - <mat>  [nEv x nSamp] per-event waveforms (edMaps.lfp).
-%       tstamps  - <vec>  [1 x nSamp] window time base (s), from edMaps.
+%       wv       - <mat>  [nEv x nSamp] per-event waveforms (evtMaps.lfp).
+%       tstamps  - <vec>  [1 x nSamp] window time base (s), from evt_maps.
 %       varargin - Parameter/Value:
 %           'win'    - <vec> waveform window to cluster on (s). {[-0.05 0.05]}
 %           'nPC'    - <num> principal components kept. {6}
 %           'nClust' - <num> cluster count; empty scales it with the pool.
 %                            {[]}
+%           'nFit'   - <num> events the PCA + GMM are fit on (drawn at random,
+%                            deterministically); empty fits on all. {[]}
 %           'detrend'- <char> per-event baseline removal: 'edge' fits the line
 %                            on the flanks only, 'full' over the whole window
 %                            (the event included, so it tilts its own
@@ -86,15 +97,19 @@ function [clustId, cInfo] = ed_clust(wv, tstamps, varargin)
 %       clustId  - <vec>    [nEv x 1] cluster index, ordered so 1 is the
 %                           largest cluster. NaN for an all-NaN row (an event
 %                           too near a recording edge to have a waveform).
-%       cInfo    - <struct> .nClust .score [nEv x nDim] .explained - what was
-%                           fit, for the GUI and the record.
+%       cInfo    - <struct> .nClust .score [nEv x nDim] .explained .nFit -
+%                           what was fit, for the GUI and the record.
 %
 %   DEPENDENCIES:
 %       evt_detrend; pca, fitgmdist (Statistics and Machine Learning Toolbox).
 %
 %   HISTORY:
-%       260721 created, replacing the threshold-knob curation. See
-%              dev/ed_pipeline_rebuild.md.
+%       260721 created as lfp/ed/ed_clust, replacing threshold-knob curation.
+%              See lfp/ed/dev/ed_pipeline_rebuild.md.
+%       260722 moved to lfp/events as evt_clust and shared with the ripple
+%              pipeline (the body was already event-agnostic; the same move
+%              ripp_gate -> evt_gate made). Gained 'nFit', because a ripple
+%              pool is 5-20x an ED pool and fitgmdist is superlinear in it.
 
 %% ========================================================================
 %  ARGUMENTS
@@ -105,6 +120,7 @@ addRequired(p, 'tstamps', @isnumeric);
 addParameter(p, 'win', [-0.05 0.05], @isnumeric);
 addParameter(p, 'nPC', 6, @isnumeric);
 addParameter(p, 'nClust', [], @isnumeric);
+addParameter(p, 'nFit', [], @isnumeric);
 addParameter(p, 'scalar', [], @isnumeric);
 addParameter(p, 'detrend', 'edge', @ischar);
 addParameter(p, 'norm', 'peak', @ischar);
@@ -113,6 +129,7 @@ parse(p, wv, tstamps, varargin{:});
 win     = p.Results.win;
 nPC     = p.Results.nPC;
 nClust  = p.Results.nClust;
+nFit    = p.Results.nFit;
 scalar  = p.Results.scalar;
 flgDt   = lower(p.Results.detrend);
 flgNorm = lower(p.Results.norm);
@@ -120,7 +137,7 @@ wSize   = p.Results.wSize;
 
 nEv = size(wv, 1);
 clustId = nan(nEv, 1);
-cInfo = struct('nClust', 0, 'score', [], 'explained', []);
+cInfo = struct('nClust', 0, 'score', [], 'explained', [], 'nFit', 0);
 
 %% ========================================================================
 %  FEATURES
@@ -142,13 +159,35 @@ end
 X = evt_detrend(X, tstamps(iWin), flgDt);
 [X, sz] = normWv(X, flgNorm);
 
+% Fixed seed, restored on exit. Both the fit subsample and fitgmdist's random
+% starts draw from it, so the same pool and count give the same partition every
+% call - in the curation GUI, pressing Re-cluster without changing anything must
+% be a no-op rather than a reshuffle of the groups just judged. With nFit empty
+% nothing is drawn here, so the stream fitgmdist sees is untouched.
+sRng = rng(0, 'twister');
+ocRng = onCleanup(@() rng(sRng));
+
+% The rows the estimates are fit on. Everything else is projected and assigned,
+% which is O(n) rather than O(n * k * iter).
+% A cap below MINEV is read as NO cap, not as "fit on 20 events": a caller
+% asking for a fit smaller than the floor a fit needs has misconfigured it, and
+% silently estimating a 20-cluster mixture from 20 events would return a
+% partition that looks fine and means nothing.
+nOk = size(X, 1);
+iFit = (1 : nOk)';
+if ~isempty(nFit) && isfinite(nFit) && nFit >= MINEV && nFit < nOk
+    iFit = sort(randperm(nOk, round(nFit)))';
+end
+nF = numel(iFit);
+
 % detrending costs two degrees of freedom, so X is rank-deficient by
 % construction and pca says so on every call; the warning is expected, not a
 % symptom
 ws = warning('off', 'stats:pca:ColRankDefX');
 oc = onCleanup(@() warning(ws));    % restored when the function exits
-nPC = min(nPC, min(size(X)) - 1);
-[~, score, ~, ~, explained] = pca(X, 'NumComponents', nPC);
+nPC = min(nPC, min(nF, size(X, 2)) - 1);
+[coeff, ~, ~, ~, explained, mu] = pca(X(iFit, :), 'NumComponents', nPC);
+score = (X - mu) * coeff;           % identical to pca's own score when nF = nOk
 
 % SIZE, back as one explicit axis. Normalisation strips it from the waveform so
 % the components can describe shape; wSize decides how much it then counts.
@@ -173,11 +212,13 @@ end
 
 % Scalar measures join the shape components on a comparable footing: rank
 % first (fastZ and amp are heavy-tailed, and a raw one would set the metric by
-% itself), then scale to the spread of the leading component.
+% itself), then scale to the spread of the leading component. Ranked over ALL
+% events, not the fit subsample, so a projected event lands on the same axis as
+% a fitted one.
 if ~isempty(scalar)
     S = scalar(iOk, :);
     % A missing measure must not exile the event: .dur is NaN whenever no
-    % half-amplitude crossing was found, which is ~16% of candidates, and
+    % half-amplitude crossing was found, which is ~16% of ED candidates, and
     % dropping those would make them unclusterable and therefore permanently
     % unacceptable in the GUI. The waveform is what drives the grouping, so an
     % absent scalar takes its column median - neutral in the ranking.
@@ -193,8 +234,9 @@ if ~isempty(scalar)
 end
 
 % a GMM needs comfortably more events than dimensions; on a small pool keep
-% only the leading features rather than failing
-nDim = max(2, min(size(score, 2), floor(size(score, 1) / 5)));
+% only the leading features rather than failing. Sized on the FIT set, which is
+% what the mixture actually sees.
+nDim = max(2, min(size(score, 2), floor(nF / 5)));
 score = score(:, 1 : nDim);
 
 %% ========================================================================
@@ -206,18 +248,11 @@ score = score(:, 1 : nDim);
 gmOpt = {'CovarianceType', 'diagonal', 'RegularizationValue', 1e-6, ...
     'Replicates', 5, 'Options', statset('MaxIter', 500)};
 
-% Fixed seed, restored on exit. fitgmdist starts from random centres, so
-% without this the same pool and the same count give a different partition
-% every call - and in the curation GUI that means pressing Re-cluster without
-% changing anything reshuffles the groups the user just judged.
-sRng = rng(0, 'twister');
-ocRng = onCleanup(@() rng(sRng));
-
 if isempty(nClust)
-    nClust = round(0.65 * sqrt(size(score, 1)));
+    nClust = round(0.65 * sqrt(nOk));
 end
-nClust = max(2, min(nClust, floor(size(score, 1) / 3)));
-gm = fitgmdist(score, nClust, gmOpt{:});
+nClust = max(2, min(nClust, floor(nF / 3)));
+gm = fitgmdist(score(iFit, :), nClust, gmOpt{:});
 lbl = cluster(gm, score);
 
 % relabel by size, largest first, so a cluster index means something stable
@@ -232,6 +267,7 @@ cInfo.nClust    = nClust;
 cInfo.score     = nan(nEv, size(score, 2));
 cInfo.score(iOk, :) = score;
 cInfo.explained = explained(1 : min(nPC, numel(explained)));
+cInfo.nFit      = nF;
 
 end     % EOF
 
@@ -241,9 +277,9 @@ end     % EOF
 % =========================================================================
 function [X, sz] = normWv(X, met)
 % Put every event on a comparable scale, so the components describe SHAPE and
-% not size. The pool spans two orders of magnitude, and unnormalised the few
+% not size. An ED pool spans two orders of magnitude, and unnormalised the few
 % largest events take the principal components with them. Scale is not lost -
-% it returns through the ranked scalar measures.
+% it returns through .wSize and the ranked scalar measures.
 %
 %   'peak' divides by max|x| (L-inf). One noisy sample sets the whole scale.
 %   'l2'   divides by the norm over the window, which no single sample can

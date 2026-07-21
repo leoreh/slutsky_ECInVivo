@@ -13,7 +13,7 @@ function met = ed_methods(preset)
 %           discharge is gone for good.
 %         .qa is a NOISE FILTER, not a definition. It asks only the two
 %           questions no discharge can fail: is it sharp, does it stand alone.
-%           Its job is to hand ed_clust a few hundred events instead of a few
+%           Its job is to hand evt_clust a few hundred events instead of a few
 %           thousand.
 %         .clust groups the survivors by waveform shape, and a human names the
 %           groups in ed_curate. That is where "is this a discharge" is
@@ -37,7 +37,12 @@ function met = ed_methods(preset)
 %       .limDur   - <vec>  [min max inter] candidate durations (ms).
 %       .qa       - <struct> .ranges: per-metric [lo hi], one field per ed
 %                          per-event field. NaN or an absent metric passes.
-%       .clust    - <struct> ed_clust arguments: .win .nPC .nClust.
+%       .clust    - <struct> evt_clust arguments (.win .nPC .nClust .nFit
+%                          .detrend .norm .wSize), plus .scalar - the per-event
+%                          fields that join the shape components - and .nView,
+%                          the per-cluster row cap for the curation view. Both
+%                          caps are off here: an ED pool is small enough to fit
+%                          and to draw whole.
 %
 %   INPUTS:
 %       preset - <char> 'default'. {default}
@@ -52,6 +57,10 @@ function met = ed_methods(preset)
 %       260721b chMode gone (detection reads one auto-picked .lfp channel);
 %              posZ dropped from the gate; .clust added. See
 %              dev/ed_pipeline_rebuild.md.
+%       260722 .clust gained .scalar (the per-event fields that join the shape,
+%              named here instead of in ed_curate), plus .nFit and .nView - the
+%              cost caps evt_curate needs at ripple scale and this pipeline does
+%              not.
 
 if nargin < 1 || isempty(preset), preset = 'default'; end
 
@@ -69,18 +78,18 @@ switch preset
         % not the set worth reporting.
         met.qa.ranges = struct('fastZ', [10 Inf], 'isoZ', [5 Inf]);
 
-        % Waveform clustering (ed_clust). Swept against the curated discharges
+        % Waveform clustering (evt_clust). Swept against the curated discharges
         % in dev/ed_clustSweep.m and dev/ed_winSweep.m. nClust empty scales the
         % count with the pool (0.65*sqrt(n)) - a fixed count cannot span a pool
         % of 75 and one of 8500, and 12 groups over 8500 leaves every group a
         % mixture. The GUI overrides it per session.
         %
         % .detrend and .norm decide what the components describe. They live
-        % here rather than inside ed_clust because a ripple pipeline reusing
+        % here rather than inside evt_clust because the ripple pipeline reusing
         % this curation would want its own answer: L2 divides by the norm over
         % the window, so with events of unequal duration it trades amplitude
         % for length in a way unit peak does not. dev/ed_alignSweep.m could not
-        % separate the options on 47 curated discharges - see ed_clust.
+        % separate the options on 47 curated discharges - see evt_clust.
         % .wSize puts log10(size) back as one explicit axis after .norm has
         % stripped it from the waveform. On measures as better than off on
         % every metric (dev/ed_sizeSweep.m); the VALUE barely matters, because
@@ -88,7 +97,13 @@ switch preset
         % dimension, so 0.5 and 4 give the same partition. It is on/off, not a
         % dial - which is why there is no knob for it in the GUI.
         met.clust = struct('win', [-0.05 0.05], 'nPC', 6, 'nClust', 12, ...
-            'detrend', 'edge', 'norm', 'peak', 'wSize', 1);
+            'detrend', 'edge', 'norm', 'peak', 'wSize', 1, ...
+            'nFit', [], 'nView', Inf);
+
+        % The per-event measures that join the shape components. They are
+        % shape descriptors already computed, so withholding them from the
+        % clustering would only throw information away.
+        met.clust.scalar = {'fastZ', 'isoZ', 'posZ', 'amp', 'dur'};
 
     otherwise
         error('ed_methods:preset', 'unknown preset "%s"', preset);

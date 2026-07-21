@@ -467,12 +467,23 @@ removes; a save backs the file up first.
 | `ed_sigLoad` | one raw `.lfp` channel, windowed |
 | `ed_detect` | stage 1: signal prep, candidates, every per-event feature |
 | `ed_params` | the features |
-| `ed_clust` | PCA + GMM over waveform shape; pure, no I/O |
-| `ed_curate` | stage 2: filter, cluster, accept whole types |
+| `evt_clust` | PCA + GMM over waveform shape; pure, no I/O (was `ed_clust`) |
+| `evt_curate` | the cluster-curation GUI, shared with the ripple pipeline |
+| `ed_curate` | stage 2: load the events + maps, hand them to `evt_curate` |
 | `ed_wrapper` | the thin chain |
 | `ed_tbl` | counts and rates per session × state |
 
-`tests/test_edCurate.m` covers `ed_clust` and the GUI on a synthetic session.
+`tests/test_edCurate.m` covers `evt_clust` and the GUI on a synthetic session.
+
+On 260722 this GUI was lifted whole into `lfp/events/evt_curate.m` and given to
+the ripple pipeline, which had thousands of events and a threshold-knob curator
+that could not see shape. `ed_curate` and `ripp_curate` are now loaders over it.
+Three things became generic in the move: the metric knobs are BUILT FROM
+`met.qa.ranges` instead of named in code, the waveforms are an INPUT rather than
+a file the GUI knows how to find, and the state scope is recorded in the saved
+`info.qa` (`info.clustStates` is still read, never written). `met.clust` gained
+`.scalar` (the per-event fields joining the shape), `.nFit` and `.nView`; the
+ED defaults leave both caps off, so its partition is unchanged.
 
 `ripp_gate` moved to `lfp/events/evt_gate.m` and is shared with the ripple
 pipeline. `evt_qa` was deleted (`ed_wrapper` was its only caller). `evt_states`

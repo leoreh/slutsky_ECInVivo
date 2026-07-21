@@ -1,5 +1,5 @@
 function tests = test_edCurate
-% TEST_EDCURATE Unit tests for ed_clust and the ed_curate cluster GUI.
+% TEST_EDCURATE Unit tests for evt_clust and the ed_curate cluster GUI.
 %
 %   tests = TEST_EDCURATE
 %
@@ -88,7 +88,7 @@ end
 %  ========================================================================
 function test_clustSeparatesFamilies(tc)
 % The two planted waveform families must not land in one cluster.
-cid = ed_clust(tc.TestData.wv, tc.TestData.tst, 'nClust', 3);
+cid = evt_clust(tc.TestData.wv, tc.TestData.tst, 'nClust', 3);
 
 tc.verifyEqual(numel(cid), size(tc.TestData.wv, 1));
 tc.verifyTrue(all(ismember(cid, 1 : 3)));
@@ -108,20 +108,20 @@ end
 function test_clustDefaultKScalesWithPool(tc)
 % The default count must scale with the pool: a fixed one cannot span a pool
 % of 75 and one of 8500. Rule is 0.65*sqrt(n).
-[cid, cInfo] = ed_clust(tc.TestData.wv, tc.TestData.tst);
+[cid, cInfo] = evt_clust(tc.TestData.wv, tc.TestData.tst);
 tc.verifyEqual(cInfo.nClust, round(0.65 * sqrt(size(tc.TestData.wv, 1))));
 tc.verifyEqual(max(cid), cInfo.nClust);
 
 % ... and a bigger pool must get more groups
 big = repmat(tc.TestData.wv, 6, 1);
-[~, ciBig] = ed_clust(big, tc.TestData.tst);
+[~, ciBig] = evt_clust(big, tc.TestData.tst);
 tc.verifyGreaterThan(ciBig.nClust, cInfo.nClust);
 end
 
 
 function test_clustCapsKToPoolSize(tc)
 % A count larger than the pool can support must be capped, not error.
-[cid, cInfo] = ed_clust(tc.TestData.wv(1 : 30, :), tc.TestData.tst, ...
+[cid, cInfo] = evt_clust(tc.TestData.wv(1 : 30, :), tc.TestData.tst, ...
     'nClust', 12);
 tc.verifyLessThanOrEqual(cInfo.nClust, 10);
 tc.verifyGreaterThanOrEqual(cInfo.nClust, 2);
@@ -132,7 +132,7 @@ end
 function test_clustTooFewEvents(tc)
 % Below the minimum, every label is NaN rather than a meaningless fit. The
 % GUI reads that as "too few to cluster".
-[cid, cInfo] = ed_clust(tc.TestData.wv(1 : 15, :), tc.TestData.tst);
+[cid, cInfo] = evt_clust(tc.TestData.wv(1 : 15, :), tc.TestData.tst);
 tc.verifyEqual(cInfo.nClust, 0);
 tc.verifyTrue(all(isnan(cid)));
 end
@@ -140,7 +140,7 @@ end
 
 function test_clustLabelsBySize(tc)
 % Cluster 1 must be the largest, so an index means the same thing on a re-run.
-cid = ed_clust(tc.TestData.wv, tc.TestData.tst, 'nClust', 4);
+cid = evt_clust(tc.TestData.wv, tc.TestData.tst, 'nClust', 4);
 cnt = accumarray(cid(~isnan(cid)), 1);
 tc.verifyEqual(cnt, sort(cnt, 'descend'), ...
     'clusters are not ordered by size');
@@ -152,7 +152,7 @@ function test_clustNanWaveform(tc)
 % not poison the fit.
 wv = tc.TestData.wv;
 wv(1, :) = NaN;
-cid = ed_clust(wv, tc.TestData.tst, 'nClust', 3);
+cid = evt_clust(wv, tc.TestData.tst, 'nClust', 3);
 tc.verifyTrue(isnan(cid(1)));
 tc.verifyFalse(any(isnan(cid(2 : end))));
 end
@@ -161,7 +161,7 @@ end
 function test_clustScalarFeatures(tc)
 % Scalar measures must be accepted and must not break the labelling.
 S = [tc.TestData.wv(:, 1), max(tc.TestData.wv, [], 2)];
-cid = ed_clust(tc.TestData.wv, tc.TestData.tst, 'nClust', 3, 'scalar', S);
+cid = evt_clust(tc.TestData.wv, tc.TestData.tst, 'nClust', 3, 'scalar', S);
 tc.verifyTrue(all(ismember(cid, 1 : 3)));
 end
 
@@ -244,19 +244,20 @@ function test_curateKnobsChangePool(tc)
 tc.addTeardown(@() close(hFig, 'force'));
 
 n0 = nnz(hFig.UserData.pool);
-hFig.UserData.edFast.Value = 28;
+hKnob = knobOf(hFig, 'fastZ');
+hKnob.Value = 28;
 btn = findall(hFig, 'Type', 'uibutton', 'Text', 'Re-cluster');
 btn.ButtonPushedFcn([], []);
 
 tc.verifyLessThan(nnz(hFig.UserData.pool), n0);
 tc.verifyEqual(nnz(~isnan(hFig.UserData.cid)), nnz(hFig.UserData.pool));
-tc.verifyTrue(all(hFig.UserData.pool <= evt_gate(hFig.UserData.ed, ...
+tc.verifyTrue(all(hFig.UserData.pool <= evt_gate(hFig.UserData.evt, ...
     struct('ranges', struct('fastZ', [28 Inf], 'isoZ', [-Inf Inf])))));
 end
 
 
 function test_curateSmallPool(tc)
-% A pool too small for ed_clust to find TYPES becomes one group, not none.
+% A pool too small for evt_clust to find TYPES becomes one group, not none.
 % Returning none would leave every event unlabelled, and an unlabelled event
 % cannot be accepted - so narrowing down to the handful worth keeping used to
 % discard them all.
@@ -502,14 +503,14 @@ end
 function test_clustDeterministic(tc)
 % The same pool and count must give the same partition, so pressing
 % Re-cluster without changing anything is a no-op rather than a reshuffle.
-a = ed_clust(tc.TestData.wv, tc.TestData.tst, 'nClust', 8);
-b = ed_clust(tc.TestData.wv, tc.TestData.tst, 'nClust', 8);
+a = evt_clust(tc.TestData.wv, tc.TestData.tst, 'nClust', 8);
+b = evt_clust(tc.TestData.wv, tc.TestData.tst, 'nClust', 8);
 tc.verifyEqual(a, b, 'clustering is not reproducible');
 
 % and it must not leave the global RNG stream disturbed
 rng(42); r1 = rand();
-rng(42); ed_clust(tc.TestData.wv, tc.TestData.tst, 'nClust', 4); r2 = rand();
-tc.verifyEqual(r1, r2, 'ed_clust leaked its RNG seed to the caller');
+rng(42); evt_clust(tc.TestData.wv, tc.TestData.tst, 'nClust', 4); r2 = rand();
+tc.verifyEqual(r1, r2, 'evt_clust leaked its RNG seed to the caller');
 end
 
 
@@ -519,7 +520,7 @@ function test_clustNanScalarStillClusters(tc)
 % and an exiled event can never be accepted in the GUI.
 S = [tc.TestData.wv(:, 1), max(tc.TestData.wv, [], 2)];
 S(1 : 20, 2) = NaN;
-cid = ed_clust(tc.TestData.wv, tc.TestData.tst, 'nClust', 6, 'scalar', S);
+cid = evt_clust(tc.TestData.wv, tc.TestData.tst, 'nClust', 6, 'scalar', S);
 tc.verifyFalse(any(isnan(cid)), 'NaN scalar dropped events from clustering');
 end
 
@@ -688,17 +689,18 @@ end
 
 
 function test_curateTinyPoolKeepsOneGroup(tc)
-% Refining down to a handful of events must not throw them away. ed_clust
+% Refining down to a handful of events must not throw them away. evt_clust
 % refuses a pool too small to hold types and returns no labels; an unlabelled
 % event cannot be accepted, so the GUI has to keep them as one group.
 [~, hFig] = ed_curate(tc.TestData.dir, 'basename', tc.TestData.name, ...
     'flgGui', true, 'Visible', 'off');
 tc.addTeardown(@() close(hFig, 'force'));
 
-% narrow to well under ed_clust's minimum, then refine
+% narrow to well under evt_clust's minimum, then refine
 st = hFig.UserData;
-amp = st.ed.fastZ;
-st.edFast.Value = prctile(amp, 96);          % a dozen events or so
+amp = st.evt.fastZ;
+hKnob = knobOf(hFig, 'fastZ');
+hKnob.Value = prctile(amp, 96);      % a dozen events or so
 findall(hFig, 'Type', 'uibutton', ...
     'Text', 'Reset to filter').ButtonPushedFcn([], []);
 
@@ -741,4 +743,14 @@ copyfile(fullfile(tc.TestData.dir, 'edtest.edMaps.mat'), ...
 tc.addTeardown(@() close(hFig, 'force'));
 tc.verifyEqual(numel(hFig.UserData.cid), numel(ed.peakTime));
 tc.verifyGreaterThan(hFig.UserData.nClust, 1);
+end
+
+
+function h = knobOf(hFig, fld)
+% The metric edit box for FLD. evt_curate builds one knob per finite bound in
+% met.qa.ranges rather than naming metrics in code, so a test looks its box up
+% by the metric it belongs to.
+st = hFig.UserData;
+iK = find(strcmp({st.knob.fld}, fld), 1);
+h = st.knob(iK).h;
 end

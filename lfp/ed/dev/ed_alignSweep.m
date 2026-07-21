@@ -3,7 +3,7 @@
 % Three questions, all of them about what the waveform looks like BEFORE the
 % components are taken:
 %
-%   DETREND. ed_clust fits its linear baseline over the whole window, the event
+%   DETREND. evt_clust fits its linear baseline over the whole window, the event
 %     included, so a large asymmetric deflection tilts the line it is measured
 %     against - and tilts it by an amount that depends on the event's own
 %     polarity and asymmetry. snipFromBinary fits on the flanks instead. Does
@@ -112,7 +112,7 @@ for iB = 1 : numel(D)
         for iD = 1 : numel(DT)
             for iN = 1 : numel(NM)
                 for iK = 1 : numel(KS)
-                    cid = ed_clust(wv, tst, 'win', met.clust.win, ...
+                    cid = evt_clust(wv, tst, 'win', met.clust.win, ...
                         'nPC', met.clust.nPC, 'nClust', KS(iK), ...
                         'scalar', D(iB).sc, 'detrend', DT{iD}, ...
                         'norm', NM{iN});

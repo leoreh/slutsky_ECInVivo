@@ -1,95 +1,92 @@
 function [ripp, hFig] = ripp_curate(basepath, varargin)
-% RIPP_CURATE Post-detection QA gate for ripples: headless or interactive (stage 2).
+% RIPP_CURATE Curate ripples by waveform TYPE (stage 2).
 %
 %   [ripp, hFig] = RIPP_CURATE(basepath, varargin)
 %
 %   SUMMARY:
 %       The curation stage of the ripple pipeline (detect -> curate -> analyze).
-%       It loads the saved <basename>.ripp.mat and sets the per-event .accepted
-%       mask from a QA filter - which vigilance states to keep and per-metric
-%       [lo hi] ranges (EMG, MUA gain, ...). The gate itself is evt_gate; this
-%       function is the two ways to drive it:
+%       It loads <basename>.ripp.mat and its per-event waveforms, applies
+%       met.qa as a POOL, groups the pool into waveform clusters, and lets a
+%       human accept or reject whole shapes. The GUI itself is evt_curate,
+%       shared with the ED pipeline; everything here is loading and the two
+%       ways to drive it:
 %
-%       - Headless (flgGui = false): apply the given qa spec, save .accepted (and
-%         the spec in ripp.info.qa) back to ripp.mat, and rebuild the per-bout
-%         rate/density table. This is the automatic gate - it replaces the old
-%         evt_qa call, so a batch run needs no human.
+%       - Headless (flgGui = false): apply met.qa, save .accepted (and the spec
+%         in ripp.info.qa) back to ripp.mat, rebuild rippStates and clear the
+%         stale analyze products. This is the automatic gate - a batch run needs
+%         no human, and no waveforms are loaded.
 %
-%       - Interactive (flgGui = true, default): a GUI seeded from the same qa
-%         spec. State checkboxes and metric thresholds recompute the kept/removed
-%         split live - counts per state and the kept-vs-removed mean waveform
-%         update as you move them - so a mouse can be curated by its own
-%         judgement (states differ in scoring quality between mice). Save writes
-%         the same way. Nothing is destroyed: rejected events keep their row with
-%         .accepted = false, and Reset restores the default spec.
+%       - Interactive (flgGui = true, default): the cluster GUI. Read
+%         evt_curate for what the controls do.
 %
-%       Saving only touches .accepted, ripp.info.qa, and rippStates (all cheap
-%       and derived from the mask), and backs the file up first. The heavy
-%       products (spikes, phase, averaged maps) are the analyze stage, run AFTER
-%       curation on the accepted set - so they are never stale against the mask.
+%       WHY SHAPES AND NOT THRESHOLDS. The metric gate cannot see what an event
+%       looks like. It removes what is loud in the EMG and what nothing fires
+%       during, and that is all it can do - a step artifact with quiet muscle
+%       and a bystander burst passes every threshold there is. Blind waveform
+%       clustering separates a population of steps from a population of ripples
+%       in one decision, which is what a session with movement artifact needs,
+%       and it costs a dozen judgements instead of twenty thousand.
+%
+%       WHAT IS CLUSTERED is the raw LFP around the peak; the band-passed trace
+%       rides along as a second Y option, because whether a cluster actually
+%       oscillates is usually the thing that settles it. A ripple separates from
+%       a transient inside +-30 ms (met.clust.win), which is why the window is
+%       narrower than the ED pipeline's +-50 ms - there, the DECAY is the tell.
 %
 %   INPUTS:
 %       basepath - <char> session directory (must hold <basename>.ripp.mat).
 %       varargin - Parameter/Value:
 %           'basename' - <char>   file stem. {folder name}
-%           'qa'       - <struct> filter spec (see ripp_methods '.qa'); the
-%                                 headless gate and the GUI's initial state.
-%                                 {ripp_methods('default').qa}
-%           'flgGui'   - <log>    open the GUI (true) or apply headless (false).
-%                                 {true}
+%           'met'      - <struct> config; reads .qa and .clust.
+%                                 {ripp_methods('default')}
+%           'flgGui'   - <log>    open the GUI (true) or gate headless. {true}
 %           'flgInvalidate' - <log> when the mask changes, delete the stale
-%                                 accepted-aligned analyze products (rippMaps /
-%                                 rippSpks / rippSpkMaps / rippSpkLfp) so they
-%                                 cannot be read stale before ripp_analyze reruns.
-%                                 The batch turns this off (analyze overwrites
-%                                 them next). {true}
+%                                 accepted-aligned analyze products (rippSpks /
+%                                 rippSpkMaps / rippSpkLfp) so they cannot be
+%                                 read stale before ripp_analyze reruns. The
+%                                 batch turns this off (analyze overwrites them
+%                                 next). {true}
 %           'Visible'  - <char>   'on' | 'off' for headless GUI tests. {'on'}
 %           'verbose'  - <log>    print progress? {true}
 %
 %   OUTPUTS:
-%       ripp - <struct> the loaded events (headless: with .accepted updated).
+%       ripp - <struct> the loaded events, with .accepted as of the call.
 %       hFig - <handle> the GUI figure ([] when headless).
 %
 %   DEPENDENCIES:
-%       evt_files, evt_gate, evt_detrend, ripp_methods, backup_file,
-%       ripp_invalidate, evt_states, evt_boutTimes, basepaths2vars;
-%       GUI: gui_layout, gui_labeledControl, gui_filterPanel,
-%       gui_selectedCats, guiTbl_xy, ripp_sigLoad, ripp_sigPrep, evt_maps,
-%       as_loadConfig.
+%       evt_files, evt_curate, evt_detrend, ripp_methods, ripp_invalidate;
+%       maps rebuild: basepaths2vars, evt_boutTimes, ripp_sigLoad,
+%       ripp_sigPrep, evt_maps.
 %
 %   HISTORY:
-%       260719b the curation stage; absorbs evt_qa's ripple role (headless gate)
-%               and evolves ripp_gateGui into a disk-based bulk curator.
-%       260720  waveform view tiled by state (one panel per state, kept vs
-%               removed overlaid), so a threshold's effect is read per state.
-%               The per-state count lines are gone - each tile's legend carries
-%               them - and the state filter is sized to its list, not scrolled.
-%       260720b the waveform maps are READ from the detect-stage rippMaps
-%               (all events) instead of rebuilt from the signal; a session
-%               without a matching file still falls back to rebuilding.
+%       260719b the curation stage; absorbed evt_qa's ripple role.
+%       260720  waveform view tiled by state; maps READ from rippMaps.
+%       260722  rebuilt on waveform clustering, sharing evt_curate with the ED
+%               pipeline - accept TYPES, not threshold values. The threshold
+%               knobs are now generated from met.qa.ranges, so the gate is
+%               described once (ripp_methods) instead of twice. 'qa' became
+%               'met', because clustering needs met.clust.
 
 %% ========================================================================
 %  ARGUMENTS + LOAD
 %  ========================================================================
-
 p = inputParser;
 addRequired(p, 'basepath', @ischar);
 addParameter(p, 'basename', '', @ischar);
-addParameter(p, 'qa', [], @(x) isempty(x) || isstruct(x));
+addParameter(p, 'met', [], @(x) isempty(x) || isstruct(x));
 addParameter(p, 'flgGui', true, @islogical);
 addParameter(p, 'flgInvalidate', true, @islogical);
 addParameter(p, 'Visible', 'on', @(x) any(strcmpi(char(x), {'on', 'off'})));
 addParameter(p, 'verbose', true, @islogical);
 parse(p, basepath, varargin{:});
-qa       = p.Results.qa;
+met      = p.Results.met;
 flgGui   = p.Results.flgGui;
 flgInval = p.Results.flgInvalidate;
-vis      = char(p.Results.Visible);
 verbose  = p.Results.verbose;
 
 basename = p.Results.basename;
 if isempty(basename), [~, basename] = fileparts(basepath); end
-if isempty(qa), met = ripp_methods('default'); qa = met.qa; end
+if isempty(met), met = ripp_methods('default'); end
 
 files = evt_files(basepath, basename, 'ripp');
 if ~isfile(files.evt)
@@ -98,326 +95,116 @@ if ~isfile(files.evt)
 end
 S = load(files.evt, 'ripp');
 ripp = S.ripp;
-hFig = [];
+
+cfg = struct('met', met, 'file', files.evt, 'var', 'ripp', ...
+    'basepath', basepath, 'basename', basename, 'lbl', 'Ripple', ...
+    'flgGui', flgGui, 'Visible', char(p.Results.Visible), ...
+    'onSaved', @(changed) invalidate(changed, flgInval, basepath, basename, ...
+    verbose));
 
 %% ========================================================================
-%  HEADLESS: apply the gate, save, rebuild states
+%  CURATE
 %  ========================================================================
-
-if ~flgGui
-    ripp.accepted = evt_gate(ripp, qa);
-    changed = saveCurated(files.evt, ripp.accepted, qa);
-    buildStates(basepath, ripp, ripp.accepted);
-    if changed && flgInval
-        nDel = ripp_invalidate(basepath, basename);
-        if verbose && nDel > 0
-            fprintf(['[RIPP_CURATE] %s : removed %d stale analyze product(s); ' ...
-                'rerun ripp_analyze\n'], basename, nDel);
-        end
-    end
-    if verbose
-        fprintf('[RIPP_CURATE] %s : %d / %d accepted (headless)\n', ...
-            basename, nnz(ripp.accepted), numel(ripp.accepted));
-    end
-    return;
+% Waveforms are the clustering's whole input, so they are loaded only when
+% there is a human to look at them - the headless gate is a batch operation and
+% must not pay for a 50 MB read it has no use for.
+wv = struct();
+tst = [];
+if flgGui
+    [wv, tst] = loadMaps(basepath, basename, ripp, files.maps);
 end
 
-%% ========================================================================
-%  GUI: state filter + metric thresholds -> live kept/removed
-%  ========================================================================
+[ripp.accepted, hFig] = evt_curate(ripp, wv, tst, cfg);
 
-% all-events LFP maps for the waveform view (best-effort; disabled if no signal)
-st = struct();
-st.maps = [];
-st.xt = [];
-try
-    [st.maps, st.xt] = loadMaps(basepath, basename, ripp);
-catch ME
-    warning('ripp_curate:maps', 'waveform view disabled (%s)', ME.message);
+% Only headless has a final answer to report. In the GUI this mask is the seed
+% the window opened on, and printing it as a result would be a lie the moment
+% the user ticks anything.
+if verbose && ~flgGui
+    fprintf('[RIPP_CURATE] %s : %d / %d accepted (headless)\n', basename, ...
+        nnz(ripp.accepted), numel(ripp.accepted));
 end
-
-hFig = uifigure('Name', ['Ripple curation: ' basename], ...
-    'Position', [80 80 1500 850], 'Visible', vis);
-[~, gPlot, gCtrl, gActions] = gui_layout(hFig, 'CtrlWidth', 250);
-
-% present states, plus an explicit "(unscored)" entry for events whose peak
-% falls in no scored bout (state <undefined>) - so they are visible and can be
-% kept or dropped, rather than silently excluded by the categorical filter
-realCats  = categories(removecats(ripp.state));
-stateCats = realCats;
-if any(isundefined(ripp.state))
-    stateCats = [realCats(:); {'(unscored)'}];
-end
-defNames  = specStateNames(qa);           % default-checked (real states only)
-initState = ismember(stateCats, defNames);
-dflt      = specDefaults(qa);
-
-% sized to the state list so it never scrolls (gui_filterPanel lays out 22 px
-% per checkbox + 2 px spacing, inside 4 px of padding)
-pnlState = gui_labeledControl(gCtrl, 'panel', 'Keep states:', ...
-    'RowHeight', 24 * numel(stateCats) + 4);
-st.chkState = gui_filterPanel(pnlState, stateCats, @(~,~) refresh(hFig), ...
-    'InitVal', initState);
-
-st.edGain = gui_labeledControl(gCtrl, 'editnum', 'MUA gain >=', ...
-    'Value', dflt.gain, 'ValueChangedFcn', @(~,~) refresh(hFig));
-st.edEmg = gui_labeledControl(gCtrl, 'editnum', 'EMG <=', ...
-    'Value', dflt.emg, 'ValueChangedFcn', @(~,~) refresh(hFig));
-st.edProm = gui_labeledControl(gCtrl, 'editnum', 'prominence >=', ...
-    'Value', dflt.prom, 'ValueChangedFcn', @(~,~) refresh(hFig));
-
-st.lblCount = gui_labeledControl(gCtrl, 'label', '');
-
-gui_labeledControl(gActions, 'button', '', 'Text', 'Reset to default', ...
-    'ButtonPushedFcn', @(~,~) onReset(hFig));
-gui_labeledControl(gActions, 'button', '', 'Text', 'Save', ...
-    'ButtonPushedFcn', @(~,~) doSave(hFig));
-
-st.hPanel = uipanel(gPlot, 'BorderType', 'none');
-
-st.ripp      = ripp;
-st.qa0       = qa;
-st.files     = files;
-st.basepath  = basepath;
-st.basename  = basename;
-st.realStates = realCats;
-st.flgInval  = flgInval;
-st.accepted  = ripp.accepted;
-st.stateCol  = plotState(ripp.state);   % tiling variable; fixed for the session
-hFig.UserData = st;
-
-refresh(hFig);
 
 end     % EOF
 
 
 % =========================================================================
-%  GUI CALLBACKS
+%  LOCAL
 % =========================================================================
-function refresh(hFig)
-% Recompute accepted from the current controls; redraw counts + waveform.
-st = hFig.UserData;
-qa = buildSpec(st);
-st.accepted = evt_gate(st.ripp, qa);
-hFig.UserData = st;
-
-% overall count; the per-state split is read off each tile's legend
-st.lblCount.Text = sprintf('kept %d / %d', nnz(st.accepted), numel(st.accepted));
-
-% kept-vs-removed waveform, one tile per state. Only the kept/removed flag
-% changes as a threshold moves, so the widget is updated in place - rebuilding
-% it would reset the Y / tile / group selections on every keystroke.
-if ~isempty(st.maps)
-    tbl = curateTbl(st);
-    ud = st.hPanel.UserData;
-    if isstruct(ud) && isfield(ud, 'setDataFcn')
-        ud.setDataFcn(tbl);
-    else
-        guiTbl_xy(st.xt, tbl, 'Parent', st.hPanel, 'yVar', 'lfp', ...
-            'tileVar', 'state', 'grpVar', 'status', 'xLbl', 'time (ms)');
-    end
+function msg = invalidate(changed, flgInval, basepath, basename, verbose)
+% Drop the analyze products a moved mask has staled. Returns what to say about
+% it, which evt_curate appends to the GUI's save notification ('' = nothing to
+% say); printed as well, because the headless path has no notification and
+% ripp_invalidate itself deletes silently.
+msg = '';
+if ~changed || ~flgInval, return; end
+nDel = ripp_invalidate(basepath, basename);
+if nDel > 0
+    msg = sprintf('Removed %d stale product(s) - rerun ripp_analyze.', nDel);
+    if verbose, fprintf('[RIPP_CURATE] %s\n', msg); end
 end
 
-end     % refresh
+end     % invalidate
 
 
-function tbl = curateTbl(st)
-% One row per detected event: its LFP waveform, whether the current filter keeps
-% it (the group), and the state it falls in (the tile).
-status = repmat("removed", numel(st.accepted), 1);
-status(st.accepted) = "kept";
-status = categorical(status, {'removed', 'kept'});
-tbl = table(st.maps.lfp, status, st.stateCol, ...
-    'VariableNames', {'lfp', 'status', 'state'});
-
-end     % curateTbl
-
-
-function s = plotState(state)
-% ripp.state as a tiling variable: <undefined> is promoted to its own 'unscored'
-% level. A categorical comparison never matches <undefined>, so without this the
-% unscored events would get no tile and vanish from the view without a word.
-s = removecats(state(:));
-if any(isundefined(s))
-    s = addcats(s, {'unscored'});
-    s(isundefined(s)) = 'unscored';
-end
-
-end     % plotState
-
-
-function onReset(hFig)
-% Restore the controls (states + thresholds) to the default qa spec.
-st = hFig.UserData;
-dflt = specDefaults(st.qa0);
-st.edGain.Value = dflt.gain;
-st.edEmg.Value  = dflt.emg;
-st.edProm.Value = dflt.prom;
-defNames = specStateNames(st.qa0);
-for iChk = 1:numel(st.chkState)
-    st.chkState(iChk).Value = ismember(st.chkState(iChk).Text, defNames);
-end
-refresh(hFig);
-
-end     % onReset
-
-
-function doSave(hFig)
-% Persist accepted + the spec, and rebuild the per-bout rate/density table.
-st = hFig.UserData;
-qa = buildSpec(st);
-changed = saveCurated(st.files.evt, st.accepted, qa);
-buildStates(st.basepath, st.ripp, st.accepted);
-msg = sprintf('Saved: %d / %d accepted (+ rippStates)', ...
-    nnz(st.accepted), numel(st.accepted));
-if changed && st.flgInval
-    nDel = ripp_invalidate(st.basepath, st.basename);
-    if nDel > 0
-        msg = sprintf('%s. Removed %d stale product(s) - rerun ripp_analyze.', ...
-            msg, nDel);
-    end
-end
-gui_notify(hFig, msg, 'success');
-
-end     % doSave
-
-
-% =========================================================================
-%  SPEC <-> CONTROLS
-% =========================================================================
-function qa = buildSpec(st)
-% Read the current controls into a qa filter spec. The "(unscored)" pseudo-state
-% maps to qa.unscored (keep <undefined> events); the rest are real state labels.
-% Guard the all-unchecked case: with real states present but none checked, keep
-% NO real state - a sentinel that matches no event - rather than evt_gate's
-% []="any state" escape hatch that would silently keep every state.
-sel = gui_selectedCats(st.chkState);
-qa.unscored = ismember('(unscored)', sel);
-realSel = setdiff(sel, {'(unscored)'}, 'stable');
-if isempty(realSel) && ~isempty(st.realStates)
-    realSel = {'<none>'};
-end
-qa.states = realSel;
-qa.ranges = struct('spkGain', [st.edGain.Value, Inf], ...
-    'emg', [-Inf, st.edEmg.Value], ...
-    'peakProm', [st.edProm.Value, Inf]);
-
-end     % buildSpec
-
-
-function d = specDefaults(qa)
-% Pull the control default values (gain/emg/prom) out of a qa spec.
-d.gain = -Inf;
-d.emg  = Inf;
-d.prom = -Inf;
-if isfield(qa, 'ranges')
-    if isfield(qa.ranges, 'spkGain'),  d.gain = qa.ranges.spkGain(1); end
-    if isfield(qa.ranges, 'emg'),      d.emg  = qa.ranges.emg(2);     end
-    if isfield(qa.ranges, 'peakProm'), d.prom = qa.ranges.peakProm(1); end
-end
-
-end     % specDefaults
-
-
-function names = specStateNames(qa)
-% Default-checked state labels from a qa spec (indices resolved via config).
-names = {};
-if ~isfield(qa, 'states') || isempty(qa.states)
-    return;
-end
-if isnumeric(qa.states)
-    cfg = as_loadConfig([]);
-    idx = qa.states(qa.states >= 1 & qa.states <= numel(cfg.names));
-    names = cfg.names(idx);
-else
-    names = cellstr(qa.states);
-end
-
-end     % specStateNames
-
-
-% =========================================================================
-%  PERSISTENCE
-% =========================================================================
-function changed = saveCurated(file, accepted, qa)
-% Back up, then overwrite .accepted + .info.qa in the saved struct, and strip a
-% now-stale accepted-aligned .spks (ripp_analyze rebuilds it). Returns whether
-% the mask actually changed vs what is on disk.
-backup_file(file);
-S = load(file);
-accepted = logical(accepted(:));
-changed = ~isfield(S.ripp, 'accepted') || ...
-    ~isequal(logical(S.ripp.accepted(:)), accepted);
-S.ripp.accepted = accepted;
-if isfield(S.ripp, 'spks')
-    S.ripp = rmfield(S.ripp, 'spks');   % accepted-aligned; rebuilt by ripp_analyze
-end
-if ~isfield(S.ripp, 'info') || ~isstruct(S.ripp.info)
-    S.ripp.info = struct();
-end
-S.ripp.info.qa = qa;
-save(file, '-struct', 'S', '-v7.3');
-
-end     % saveCurated
-
-
-function buildStates(basepath, ripp, accepted)
-% Rebuild + save the per-bout rate/density table for the current mask (cheap;
-% no signal or spikes). Skips silently when sleep states are unavailable.
-win = [0 Inf];
-if isfield(ripp, 'info') && isfield(ripp.info, 'win'), win = ripp.info.win; end
-
-v = basepaths2vars('basepaths', {basepath}, 'vars', {'session', 'sleep_states'});
-fs = v.session.extracellular.srLfp;
-if isinf(win(2)), win(2) = v.session.extracellular.nSamples / fs; end
-sigDur = win(2) - win(1);
-w0 = win(1);
-if ~isfinite(w0), w0 = 0; end
-
-boutTimes = evt_boutTimes(v, win, sigDur);
-if isempty(boutTimes)
-    return;                     % no scoring -> no rate/density table
-end
-evt_states(ripp.times - w0, ripp.peakTime - w0, boutTimes, ...
-    'accepted', logical(accepted(:)), 'basepath', basepath, ...
-    'flgSave', true, 'flgPlot', false, 'name', 'ripp', 'lbl', 'Ripple');
-
-end     % buildStates
-
-
-% =========================================================================
-%  WAVEFORM MAPS (all events; loaded once for the GUI)
-% =========================================================================
-function [maps, xt] = loadMaps(basepath, basename, ripp)
-% The per-event LFP maps behind the waveform view, cropped to DISPDUR.
+function [wv, tst] = loadMaps(basepath, basename, ripp, fileMaps)
+% Per-event waveforms behind the clustering and the view: the raw LFP and the
+% band-passed trace, detrended, cropped to DISPDUR.
+%
+% DETREND BEFORE CROP. evt_detrend fits its baseline on the flanks of whatever
+% window it is handed, and on a +-60 ms crop the flanks are still inside the
+% sharp wave - so the line would be fitted on the event itself. The saved map is
+% +-100 ms, wide enough for the flanks to be baseline.
 %
 % Detection writes rippMaps over ALL detected events (ripp_wrapper), so this is
-% normally a file read - a second or so instead of the full signal load + prep.
-% A session detected before that convention, or one whose file no longer matches
-% the event list, falls back to rebuilding from the signal.
-%
-% The LFP is DETRENDED per event before the crop, and the order matters.
-% evt_detrend fits its baseline on the flanks of whatever window it is given;
-% on the SAVED map those flanks are far enough out to be background, while on
-% the ±60 ms display crop they would still be inside the sharp wave and the
-% detrend would eat a slice of it. Every event rides on its own drift, so
-% without this the kept-vs-removed averages differ partly by whatever the
-% drifts happened to do.
+% normally a file read. A session detected before that convention, or one whose
+% file no longer matches the event list, falls back to rebuilding the detection
+% signal exactly as detection did.
 dispDur = [-0.06 0.06];
-nEv = numel(ripp.peakTime);
+FLDS = {'lfp', 'filt'};             % clustered on the first, both viewable
 
-files = evt_files(basepath, basename, 'ripp');
-if isfile(files.maps)
-    S = load(files.maps, 'rippMaps');
-    if isfield(S, 'rippMaps') && isfield(S.rippMaps, 'lfp') && ...
-            size(S.rippMaps.lfp, 1) == nEv
-        S.rippMaps.lfp = evt_detrend(double(S.rippMaps.lfp), ...
-            S.rippMaps.tstamps);
-        [maps, xt] = cropMaps(S.rippMaps, dispDur);
-        return;
-    end
+maps = readMaps(fileMaps, numel(ripp.peakTime));
+if isempty(maps)
+    maps = rebuildMaps(basepath, basename, ripp, dispDur);
 end
 
+tst = maps.tstamps;
+keep = tst >= dispDur(1) & tst <= dispDur(2);
+wv = struct();
+for iFld = 1 : numel(FLDS)
+    if ~isfield(maps, FLDS{iFld}), continue; end
+    % kept SINGLE, as the file stores them: 100k events x 151 samples x two
+    % traces is 137 MB single and 274 MB double, and nothing downstream needs
+    % the precision - evt_clust casts its own window and guiTbl_xy plots either
+    m = evt_detrend(double(maps.(FLDS{iFld})), tst);
+    wv.(FLDS{iFld}) = single(m(:, keep));
+    clear m                 % 215 MB, before the next field allocates its own
+end
+tst = tst(keep);
+if isempty(fieldnames(wv))
+    error('ripp_curate:noMaps', ...
+        'rippMaps carries no lfp; re-run detection with flgSave.');
+end
+
+end     % loadMaps
+
+
+function maps = readMaps(file, nEv)
+% The saved maps, or [] when they are absent or belong to other events.
+maps = [];
+if ~isfile(file), return; end
+S = load(file, 'rippMaps');
+if ~isfield(S, 'rippMaps') || ~isfield(S.rippMaps, 'lfp'), return; end
+if size(S.rippMaps.lfp, 1) ~= nEv, return; end
+maps = S.rippMaps;
+
+end     % readMaps
+
+
+function maps = rebuildMaps(basepath, basename, ripp, dispDur)
+% Rebuild the detection signal exactly as detection did, then cut the maps from
+% it. The window is the recording frame ripp.info.win, so the absolute event
+% times line up with the signal. Cut twice DISPDUR so evt_detrend still has
+% flanks outside the event to fit on.
 win = [0 Inf];
 if isfield(ripp, 'info') && isfield(ripp.info, 'win'), win = ripp.info.win; end
 
@@ -425,14 +212,12 @@ v = basepaths2vars('basepaths', {basepath}, ...
     'vars', {'session', 'sleep_states'});
 fs = v.session.extracellular.srLfp;
 if isinf(win(2)), win(2) = v.session.extracellular.nSamples / fs; end
-sigDur = win(2) - win(1);
 w0 = win(1);
 if ~isfinite(w0), w0 = 0; end
 
-[~, ~, nremTimes] = evt_boutTimes(v, win, sigDur);
+[~, ~, nremTimes] = evt_boutTimes(v, win, win(2) - win(1));
 lfp = ripp_sigLoad(basepath, 'win', win, 'session', v.session, ...
     'basename', basename, 'rippCh', ripp.info.rippCh, 'bit2uv', []);
-% rebuild the detection signal exactly as detection did, artifact mask included;
 % a pre-260720 ripp.mat carries no otlThr, hence the default
 otlThr = 8;
 if isfield(ripp.info, 'otlThr'), otlThr = ripp.info.otlThr; end
@@ -440,27 +225,6 @@ rippSig = ripp_sigPrep(lfp, fs, 'detectMet', ripp.info.detectMet, ...
     'passband', ripp.info.passband, 'zMet', ripp.info.zMet, ...
     'nremTimes', nremTimes, 'otlThr', otlThr);
 
-% rebuilt at the display width, so the detrend has only these flanks to work
-% with - see the note above; a session with a saved rippMaps gets the better one
-maps = evt_maps(rippSig, ripp.peakTime - w0, fs, 'mapDur', dispDur);
-maps.lfp = evt_detrend(double(maps.lfp), maps.tstamps);
-xt = maps.tstamps * 1000;               % ms
+maps = evt_maps(rippSig, ripp.peakTime - w0, fs, 'mapDur', 2 * dispDur);
 
-end     % loadMaps
-
-
-function [maps, xt] = cropMaps(maps, dur)
-% Keep the columns within DUR. The saved maps span the analyze window, which is
-% wider than the view needs; cropping is a column index, not a recomputation.
-keep = maps.tstamps >= dur(1) & maps.tstamps <= dur(2);
-fn = fieldnames(maps);
-for iFld = 1 : numel(fn)
-    if strcmp(fn{iFld}, 'tstamps'), continue; end
-    if isnumeric(maps.(fn{iFld})) && size(maps.(fn{iFld}), 2) == numel(keep)
-        maps.(fn{iFld}) = maps.(fn{iFld})(:, keep);
-    end
-end
-maps.tstamps = maps.tstamps(keep);
-xt = maps.tstamps * 1000;               % ms
-
-end     % cropMaps
+end     % rebuildMaps

@@ -5,7 +5,7 @@ function wv = evt_detrend(wv, tstamps, met)
 %
 %   SUMMARY:
 %       One implementation of "take the slow drift out of each snippet",
-%       shared by the clustering (ed_clust) and by anything plotting an
+%       shared by the clustering (evt_clust) and by anything plotting an
 %       average waveform.
 %
 %       Why an average needs it. Every event sits on its own slow deflection,
@@ -16,7 +16,7 @@ function wv = evt_detrend(wv, tstamps, met)
 %       construction.
 %
 %       This does NOT normalise. Amplitude is the thing a plotted average is
-%       usually reporting, so it is left alone; ed_clust normalises separately
+%       usually reporting, so it is left alone; evt_clust normalises separately
 %       and only for the shape components.
 %
 %       'edge' fits the line on the FLANKS - the samples beyond half the
@@ -37,7 +37,7 @@ function wv = evt_detrend(wv, tstamps, met)
 %                        NaN rather than poisoning the fit for the rest.
 %
 %   HISTORY:
-%       260721 promoted out of ed_clust so a plotted average and the clustering
+%       260721 promoted out of evt_clust so a plotted average and the clustering
 %              cannot drift apart. See lfp/ed/dev/ed_pipeline_rebuild.md.
 
 if nargin < 3 || isempty(met), met = 'edge'; end
