@@ -18,6 +18,9 @@ function hFig = guiTbl_xy(xVec, dataTbl, varargin)
 %       'Parent'           (handle) uifigure or uifigure container.
 %       'SelectionCallback'/'GroupByCallback' (function_handle) host coordination.
 %       'xLbl'             (char/str) X-axis label.
+%       'xLim'             (vec) [lo hi] x limits, re-applied on every redraw.
+%                          For a host whose data is wider than the range worth
+%                          showing. Empty leaves the axes tight to the data.
 %
 %   HOST HOOKS (function handles on the container's UserData):
 %       setDataFcn(newTbl)   swap the plotted rows, keeping the current view -
@@ -42,6 +45,7 @@ addParameter(p, 'SelectionCallback', [], @(x) isempty(x) || isa(x, 'function_han
 addParameter(p, 'Parent', [], @(x) isempty(x) || isgraphics(x));
 addParameter(p, 'GroupByCallback', [], @(x) isempty(x) || isa(x, 'function_handle'));
 addParameter(p, 'xLbl', 'Time / X', @(x) ischar(x) || isstring(x));
+addParameter(p, 'xLim', [], @(x) isempty(x) || (isnumeric(x) && numel(x) == 2));
 parse(p, varargin{:});
 
 initialYVar = p.Results.yVar;
@@ -52,6 +56,7 @@ hParent = p.Results.Parent;
 selCbk = p.Results.SelectionCallback;
 grpCbk = p.Results.GroupByCallback;
 xLbl = p.Results.xLbl;
+xLimit = p.Results.xLim;
 
 % Legend corner. Fixed, deliberately not 'Location','best': 'best' re-picks
 % the least-obstructed corner on every redraw, so in a live widget the legend
@@ -124,6 +129,7 @@ guiData.setDataFcn = @setData;
 guiData.selCbk = selCbk;
 guiData.grpCbk = grpCbk;
 guiData.xLbl = xLbl;
+guiData.xLim = xLimit;
 
 %% ========================================================================
 %  LAYOUT
@@ -374,6 +380,11 @@ onUpdatePlot(hContainer, []);
             grid(hAx, 'on');
             title(hAx, catTile, 'Interpreter', 'none');
             axis(hAx, 'tight');
+            % a host may hold a wider x than it wants shown - e.g. an event
+            % map cut wider than the window worth looking at. Set after 'tight'
+            % so it overrides, and re-set on every redraw so a re-cluster does
+            % not spring the view back to the full record.
+            if ~isempty(data.xLim), xlim(hAx, data.xLim); end
             if hasData && ~isinf(tileMeanMin) && ~isinf(tileMeanMax)
                 yRange = tileMeanMax - tileMeanMin;
                 if yRange == 0, yRange = 1; end

@@ -390,8 +390,13 @@ if isstruct(ud) && isfield(ud, 'setDataFcn')
 elseif ~isempty(iRow)
     % first call. An empty table has no categories to build the filter panels
     % from, so the widget waits until there is something to draw.
+    % the map is cut wider than this on purpose - the 50-100 ms flank is where
+    % a discharge separates from a sharp wave, and it is kept in the file - but
+    % the view opens on the clustering window, which is where the decisions are
+    % made. Zoom out to see the rest.
     guiTbl_xy(st.tst * 1000, tbl, 'Parent', st.hPanel, 'yVar', 'lfp', ...
-        'tileVar', 'state', 'grpVar', 'cluster', 'xLbl', 'time (ms)');
+        'tileVar', 'state', 'grpVar', 'cluster', 'xLbl', 'time (ms)', ...
+        'xLim', st.met.clust.win * 1000);
 end
 
 end     % refresh
