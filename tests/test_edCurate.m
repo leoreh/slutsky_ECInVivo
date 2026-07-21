@@ -535,6 +535,32 @@ end
 end
 
 
+function test_curateLegendPinnedBottomLeft(tc)
+% The legend must not move. guiTbl_xy asked for 'Location','best', which
+% re-picks the least-obstructed corner on every redraw - so a re-cluster hopped
+% the legend onto the waveform it had been avoiding a moment earlier.
+[~, hFig] = ed_curate(tc.TestData.dir, 'basename', tc.TestData.name, ...
+    'flgGui', true, 'Visible', 'off');
+tc.addTeardown(@() close(hFig, 'force'));
+
+loc = legendLocs(hFig);
+tc.verifyNotEmpty(loc, 'no legend was drawn');
+tc.verifyTrue(all(strcmp(loc, 'southwest')), ...
+    'legend did not open in the bottom-left corner');
+
+findall(hFig, 'Type', 'uibutton', 'Text', 'Re-cluster').ButtonPushedFcn([], []);
+tc.verifyTrue(all(strcmp(legendLocs(hFig), 'southwest')), ...
+    'legend moved on re-cluster');
+end
+
+
+function loc = legendLocs(hFig)
+% Corner of every legend currently drawn.
+lg = findall(hFig, 'Type', 'legend');
+loc = arrayfun(@(h) char(h.Location), lg, 'uni', false);
+end
+
+
 function test_curateResumesSavedCuration(tc)
 % Reopening must resume: the same labels, the same accepted clusters and
 % states, the same thresholds - not a fresh clustering.

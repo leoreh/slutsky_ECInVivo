@@ -53,6 +53,13 @@ selCbk = p.Results.SelectionCallback;
 grpCbk = p.Results.GroupByCallback;
 xLbl = p.Results.xLbl;
 
+% Legend corner. Fixed, deliberately not 'Location','best': 'best' re-picks
+% the least-obstructed corner on every redraw, so in a live widget the legend
+% hops between corners as the rows change and lands on the trace it was
+% avoiding a moment ago. A legend the eye can find beats one that is optimally
+% placed per frame.
+legLoc = 'southwest';
+
 % Find all variables that match xVec dimensions (potential Y vars). This is
 % specific to xy (matches a numeric matrix column or a cell of vectors to the
 % length of xVec), so it stays local rather than using gui_classifyVars.
@@ -373,7 +380,7 @@ onUpdatePlot(hContainer, []);
                 ylim(hAx, [tileMeanMin - 0.1*yRange, tileMeanMax + 0.1*yRange]);
             end
             if ~strcmp(varGB, 'None')
-                legend(hAx, 'Location', 'best', 'Interpreter', 'none');
+                legend(hAx, 'Location', legLoc, 'Interpreter', 'none');
             end
             hold(hAx, 'off');
         end
@@ -429,7 +436,11 @@ onUpdatePlot(hContainer, []);
             h = plot(ti.hAx, data.xVec, subY', 'Color', [1 1 0 0.7], 'LineWidth', 1.5, unitIDArg{:});
             data.hlHandles = [data.hlHandles; h];
             hold(ti.hAx, 'off');
-            legend(ti.hAx, 'show');
+            % same corner as the grouped legend above: with Group By 'None'
+            % there is no legend yet, and 'show' would create one at the
+            % northeast default
+            hLeg = legend(ti.hAx, 'show');
+            hLeg.Location = legLoc;
         end
         hContainer.UserData = data;
     end
