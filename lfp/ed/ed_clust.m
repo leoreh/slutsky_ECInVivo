@@ -100,9 +100,6 @@ X = double(wv(:, iWin));
 % an event at a recording edge has a NaN waveform and cannot be clustered;
 % it keeps a NaN label and the caller treats that as its own group
 iOk = all(isfinite(X), 2);
-if ~isempty(scalar)
-    iOk = iOk & all(isfinite(scalar), 2);
-end
 % below this a "type" is not a meaningful thing to fit, and the caller treats
 % an all-NaN labelling as "too few to cluster"
 MINEV = 20;
@@ -129,6 +126,19 @@ nPC = min(nPC, min(size(X)) - 1);
 % itself), then scale to the spread of the leading component.
 if ~isempty(scalar)
     S = scalar(iOk, :);
+    % A missing measure must not exile the event: .dur is NaN whenever no
+    % half-amplitude crossing was found, which is ~16% of candidates, and
+    % dropping those would make them unclusterable and therefore permanently
+    % unacceptable in the GUI. The waveform is what drives the grouping, so an
+    % absent scalar is set to its column median - neutral in the ranking.
+    for iCol = 1 : size(S, 2)
+        bad = ~isfinite(S(:, iCol));
+        if all(bad)
+            S(:, iCol) = 0;
+        elseif any(bad)
+            S(bad, iCol) = median(S(~bad, iCol));
+        end
+    end
     S = (tiedrank(S) - 0.5) ./ size(S, 1);
     score = [score, (S - 0.5) * std(score(:, 1)) * 2];
 end

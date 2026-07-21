@@ -193,6 +193,7 @@ function test_curateSaveAcceptsClusters(tc)
 tc.addTeardown(@() close(hFig, 'force'));
 
 st = hFig.UserData;
+arrayfun(@(h) set(h, 'Value', false), st.chk);
 st.chk(1).Value = true;
 nExpect = nnz(st.cid == 1);
 
@@ -288,21 +289,37 @@ tc.verifyTrue(st2.chk(2).Value, 'cluster 2 tick lost on re-cluster');
 end
 
 
-function test_curateRecusterClearsOnCountChange(tc)
-% Changing the count must clear the ticks - index 3 of 12 is not index 3 of 8.
+function test_curateRecusterResetsOnCountChange(tc)
+% Changing the count cannot carry ticks - index 3 of 12 is not index 3 of 8 -
+% so it returns to the default, which is all accepted.
 [~, hFig] = ed_curate(tc.TestData.dir, 'basename', tc.TestData.name, ...
     'flgGui', true, 'Visible', 'off');
 tc.addTeardown(@() close(hFig, 'force'));
 
-hFig.UserData.chk(1).Value = true;
+arrayfun(@(h) set(h, 'Value', false), hFig.UserData.chk);
 hFig.UserData.edK.Value = 5;
 btn = findall(hFig, 'Type', 'uibutton', 'Text', 'Re-cluster');
 btn.ButtonPushedFcn([], []);
 
 st = hFig.UserData;
 tc.verifyEqual(st.nClust, 5);
-tc.verifyFalse(any(arrayfun(@(h) h.Value, st.chk)));
-tc.verifySubstring(st.lblPool.Text, 'ticks cleared');
+tc.verifyTrue(all(arrayfun(@(h) h.Value, st.chk)));
+tc.verifySubstring(st.lblPool.Text, 'all accepted again');
+end
+
+
+function test_curateDefaultAcceptsAll(tc)
+% Curation is rejection: every cluster starts ticked, so the mask opens as the
+% whole pool.
+[~, hFig] = ed_curate(tc.TestData.dir, 'basename', tc.TestData.name, ...
+    'flgGui', true, 'Visible', 'off');
+tc.addTeardown(@() close(hFig, 'force'));
+
+st = hFig.UserData;
+tc.verifyTrue(all(arrayfun(@(h) h.Value, st.chk)), ...
+    'clusters do not start accepted');
+tc.verifyTrue(all(arrayfun(@(h) h.Value, st.chkState)));
+tc.verifySubstring(st.lblKeep.Text, sprintf('%d of', nnz(st.pool)));
 end
 
 
@@ -314,10 +331,7 @@ function test_curateStateGatesAcceptance(tc)
 tc.addTeardown(@() close(hFig, 'force'));
 
 st = hFig.UserData;
-st.chk(1).Value = true;
-st.chk(1).ValueChangedFcn([], []);
-nWith = nnz(ismember(st.cid, 1));
-tc.verifyGreaterThan(nWith, 0);
+tc.verifyGreaterThan(nnz(st.pool), 0);
 
 st.chkState(1).Value = false;       % the fixture has one state only
 st.chkState(1).ValueChangedFcn([], []);
@@ -327,7 +341,8 @@ btn.ButtonPushedFcn([], []);
 S = load(fullfile(tc.TestData.dir, 'edtest.ed.mat'), 'ed');
 tc.verifyEqual(nnz(S.ed.accepted), 0, ...
     'unticking the only state should accept nothing');
-tc.verifyTrue(hFig.UserData.chk(1).Value, 'cluster tick disturbed');
+tc.verifyTrue(all(arrayfun(@(h) h.Value, hFig.UserData.chk)), ...
+    'cluster ticks disturbed by the state control');
 end
 
 
@@ -339,6 +354,7 @@ function test_curateShowDoesNotChangeMask(tc)
 tc.addTeardown(@() close(hFig, 'force'));
 
 st = hFig.UserData;
+arrayfun(@(h) set(h, 'Value', false), st.chk);
 st.chk(1).Value = true;
 st.chk(1).ValueChangedFcn([], []);
 nExpect = nnz(ismember(st.cid, 1));
@@ -366,4 +382,32 @@ tc.verifyEqual(a, b, 'clustering is not reproducible');
 rng(42); r1 = rand();
 rng(42); ed_clust(tc.TestData.wv, tc.TestData.tst, 'nClust', 4); r2 = rand();
 tc.verifyEqual(r1, r2, 'ed_clust leaked its RNG seed to the caller');
+end
+
+
+function test_clustNanScalarStillClusters(tc)
+% A NaN in a scalar measure must not exile the event. ed_params leaves .dur
+% NaN whenever no half-amplitude crossing is found (~16% of real candidates),
+% and an exiled event can never be accepted in the GUI.
+S = [tc.TestData.wv(:, 1), max(tc.TestData.wv, [], 2)];
+S(1 : 20, 2) = NaN;
+cid = ed_clust(tc.TestData.wv, tc.TestData.tst, 'nClust', 6, 'scalar', S);
+tc.verifyFalse(any(isnan(cid)), 'NaN scalar dropped events from clustering');
+end
+
+
+function test_curateAcceptsWholePoolByDefault(tc)
+% With every cluster and state ticked, the mask must be exactly the pool -
+% no event may be silently unreachable.
+[~, hFig] = ed_curate(tc.TestData.dir, 'basename', tc.TestData.name, ...
+    'flgGui', true, 'Visible', 'off');
+tc.addTeardown(@() close(hFig, 'force'));
+
+btn = findall(hFig, 'Type', 'uibutton', 'Text', 'Save');
+btn.ButtonPushedFcn([], []);
+
+st = hFig.UserData;
+S = load(fullfile(tc.TestData.dir, 'edtest.ed.mat'), 'ed');
+tc.verifyEqual(nnz(S.ed.accepted), nnz(st.pool), ...
+    'default mask does not cover the whole pool');
 end

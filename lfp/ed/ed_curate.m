@@ -26,12 +26,14 @@ function [ed, hFig] = ed_curate(basepath, varargin)
 %       Mixing them means you cannot inspect the events you rejected without
 %       rejecting or accepting something by accident.
 %
-%       ACCEPT (checkboxes, left):
-%           clusters  which waveform types are discharges. None to begin with.
-%           states    which vigilance states count. All to begin with; untick
-%                     one to drop a stretch of the recording wholesale, e.g.
-%                     movement artifact in WAKE, without touching the shape
-%                     decision.
+%       ACCEPT (checkboxes, left). Both start TICKED: curation here is
+%       REJECTION, so everything the filter passed is accepted until you rule
+%       something out.
+%           clusters  which waveform types are discharges. Untick one whose
+%                     median waveform is a sharp wave, a step or noise.
+%           states    which vigilance states count. Untick one to drop a
+%                     stretch of the recording wholesale, e.g. movement
+%                     artifact in WAKE, without touching the shape decision.
 %       An event is accepted when its cluster AND its state are ticked. That
 %       is the mask Save writes.
 %
@@ -51,9 +53,10 @@ function [ed, hFig] = ed_curate(basepath, varargin)
 %       The two thresholds are live knobs. They set the pool, and the pool is
 %       what gets clustered, so changing one takes effect on Re-cluster - the
 %       label updates immediately so you can see the size you are choosing
-%       before paying for the fit. Re-cluster KEEPS the ticked clusters when
-%       the count is unchanged; when the count changes it clears them and says
-%       so, because index 3 of 12 and index 3 of 8 are not the same group.
+%       before paying for the fit. Re-cluster KEEPS your cluster ticks when the
+%       count is unchanged; when the count changes it returns them to the
+%       default and says so, because index 3 of 12 and index 3 of 8 are not the
+%       same group.
 %
 %       Headless (flgGui = false) applies only the thresholds, for a batch run
 %       that has no human. That mask is NOT an answer - it is the pool.
@@ -93,6 +96,9 @@ function [ed, hFig] = ed_curate(basepath, varargin)
 %              its own rather than only a way to tile; and which rows are drawn
 %              moved to its own dropdown, so looking at what you rejected can
 %              no longer change what you kept.
+%       260721d clusters start ACCEPTED. Curation is rejection: the eye is much
+%              better at spotting the two or three tiles that are obviously not
+%              discharges than at confirming the ten that are.
 
 %% ========================================================================
 %  ARGUMENTS + LOAD
@@ -165,9 +171,10 @@ st.lblPool = gui_labeledControl(gCtrl, 'label', '');
 gui_labeledControl(gCtrl, 'button', '', 'Text', 'Re-cluster', ...
     'ButtonPushedFcn', @(~,~) onCluster(hFig));
 
-% ACCEPT: a discharge is a cluster AND a state. Clusters start unticked
-% (nothing is a discharge until you say so); states start ticked (a state is
-% excluded only to reject something like movement artifact in WAKE).
+% ACCEPT: a discharge is a cluster AND a state. Both start TICKED - curation
+% here is rejection, so the pool is accepted until you rule a shape or a state
+% out. Untick a cluster whose median waveform is not a discharge, or a state
+% carrying something like movement artifact in WAKE.
 st.gClust = gui_labeledControl(gCtrl, 'panel', 'accept clusters', ...
     'RowHeight', '1x');
 st.gState = gui_labeledControl(gCtrl, 'panel', 'accept states', ...
@@ -236,17 +243,19 @@ end
 st.nClust = nClust;
 if nClust > 0, st.edK.Value = nClust; end
 
-% Ticks carry over only when the cluster COUNT is unchanged. Clusters are
-% relabelled by size, so index 3 of 12 is still roughly index 3 of 12 after a
-% small pool change - but it is nothing like index 3 of 8, and carrying a tick
-% across a different partition would accept events nobody looked at.
-keepSel = kWas == nClust && nClust > 0;
-st.selRestore = [];
+% Which clusters are ticked after the rebuild. Everything is accepted by
+% DEFAULT - you curate by rejecting the clusters that are not discharges - so
+% a fresh clustering starts fully ticked. A re-cluster at the same count keeps
+% your choices; at a different count it cannot, because index 3 of 12 is not
+% index 3 of 8, so it returns to the default.
 note = '';
-if keepSel
+if kWas == nClust && nClust > 0
     st.selRestore = selWas;
-elseif ~isempty(selWas)
-    note = ' (count changed, ticks cleared)';
+else
+    st.selRestore = 1 : nClust;
+    if kWas > 0 && nClust > 0
+        note = ' (count changed, all accepted again)';
+    end
 end
 st.lblPool.Text = sprintf('pool %d / %d -> %d clusters%s', ...
     numel(iPool), numel(st.pool), nClust, note);
@@ -330,7 +339,7 @@ if isstruct(ud) && isfield(ud, 'setDataFcn')
     ud.setDataFcn(tbl);
 elseif ~isempty(iRow)
     guiTbl_xy(st.tst * 1000, tbl, 'Parent', st.hPanel, 'yVar', 'lfp', ...
-        'tileVar', 'cluster', 'grpVar', 'status', 'xLbl', 'time (ms)');
+        'tileVar', 'state', 'grpVar', 'cluster', 'xLbl', 'time (ms)');
 end
 
 end     % refresh
@@ -340,8 +349,8 @@ function accepted = acceptMask(st)
 % An event is a discharge if its CLUSTER is ticked AND its STATE is ticked.
 % Clusters say which shape; states are there to drop a whole stretch of the
 % recording - movement artifact in WAKE, say - without touching the shape
-% decision. Both default so that nothing is accepted until a cluster is
-% ticked, and no state is excluded unless you exclude it.
+% decision. Both start ticked, so the mask begins as the whole pool and
+% curation removes from it.
 accepted = ismember(st.cid, selectedClusters(st));
 if isfield(st, 'chkState') && ~isempty(st.chkState)
     keepCat = st.stateCats(arrayfun(@(h) h.Value, st.chkState));
