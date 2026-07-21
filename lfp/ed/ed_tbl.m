@@ -11,10 +11,15 @@ function tbl = ed_tbl(basepaths, basenames)
 %       drops straight into an LME with state fixed and sbjID grouping.
 %
 %       Counts are over ACCEPTED events, and exposure is the summed duration of
-%       that state's scored bouts, so a rate is events per hour OF THAT STATE. A
-%       state that was scored but held no discharge still gets a row with
+%       that state's scored bouts, so a rate is events per MINUTE OF THAT STATE.
+%       A state that was scored but held no discharge still gets a row with
 %       nEd = 0, which is the row a rate model needs and the one a naive count
 %       silently drops.
+%
+%       The mouse is the unit. One row per session x state means each mouse
+%       contributes one number per state, which is the level genotype was
+%       assigned at - pooling events across mice would weight a long recording
+%       or a busy mouse as if it were more animals.
 %
 %       Each session also gets a row with state 'ALL': every accepted event over
 %       the whole analysis window. It is NOT the sum of the state rows - an
@@ -34,8 +39,8 @@ function tbl = ed_tbl(basepaths, basenames)
 %           .basename - (Cat) session stem.
 %           .state    - (Cat) vigilance state, or 'ALL'.
 %           .nEd      - (Num) accepted discharges in that state.
-%           .durState - (Num) scored duration of that state [h].
-%           .edRate   - (Num) nEd / durState [events / h].
+%           .durState - (Num) scored duration of that state [min].
+%           .edRate   - (Num) nEd / durState [events / min].
 %
 %   DEPENDENCIES:
 %       basepaths2vars, evt_boutTimes, evt_files, get_mname.
@@ -43,6 +48,10 @@ function tbl = ed_tbl(basepaths, basenames)
 %   HISTORY:
 %       260720 created with the staged ED pipeline; the cross-session product
 %              the pipeline exists to produce.
+%       260721 rates moved from per hour to per MINUTE, with durState to match.
+%              Discharges are counted in dozens per 24 h, so per-hour numbers
+%              are small and per-minute ones smaller - but one unit throughout
+%              beats two, and per minute is what the figures report.
 
 if nargin < 1 || isempty(basepaths), basepaths = {pwd}; end
 if nargin < 2 || isempty(basenames)
@@ -87,12 +96,12 @@ for iPath = 1 : numel(basepaths)
 
     for iSt = 1 : nSt
         state(iSt) = v.ss.info.names{iSt};
-        durSt(iSt) = sum(diff(boutTimes{iSt}, 1, 2)) / 3600;
+        durSt(iSt) = sum(diff(boutTimes{iSt}, 1, 2)) / 60;
         nEd(iSt)   = sum(acc & ed.state == state(iSt));
     end
     state(end) = "ALL";
     nEd(end)   = sum(acc);
-    durSt(end) = ed.info.sigDur / 3600;
+    durSt(end) = ed.info.sigDur / 60;
 
     keep = durSt > 0;                   % a state never scored gets no row
     rows{iPath} = table( ...

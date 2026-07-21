@@ -75,25 +75,57 @@ guiPath(basepaths{iFile}, 'varMap', vm, 'guiMap', gm);
 
 
 %% ========================================================================
-%  COUNTS BY STATE
+%  RATE BY STATE  (the reported number)
 %  ========================================================================
-% One row per session x state. 'ALL' is every accepted event over the whole
-% recording and is NOT the sum of the state rows - an event whose peak falls in
-% an unscored gap belongs to no state, so the gap between them reads how
-% completely the session was scored.
+% One row per session x state, so ONE NUMBER PER MOUSE PER STATE: accepted
+% discharges divided by that state's scored exposure, in events per minute.
+% The mouse is the unit genotype was assigned at, so it is the unit that
+% enters the figure and the model - pooling events across mice would let a
+% long recording or a busy animal count as several.
+%
+% 'ALL' is every accepted event over the whole recording and is NOT the sum of
+% the state rows: an event whose peak falls in an unscored gap belongs to no
+% state, so the gap between them reads how completely the session was scored.
 
 tblEd = ed_tbl(basepaths);
-
 tblEd.genotype = mcu_geno(tblEd.sbjID);
 
 % whole-session burden per mouse
 tblAll = tblEd(tblEd.state == 'ALL', :);
 guiTbl_bar(tblAll, 'xVar', 'genotype', 'yVar', 'edRate');
 
-% state dependence (drop ALL, and states with little exposure). lme_analyse
-% drops empty categorical levels itself, so no removecats is needed here.
-tblState = tblEd(tblEd.state ~= 'ALL' & tblEd.durState > 0.5, :);
+% state dependence. Drop ALL, and drop states with too little exposure to give
+% a stable rate - a REM bout total of two minutes turns one event into 0.5/min.
+% lme_analyse drops empty categorical levels itself, so no removecats here.
+tblState = tblEd(tblEd.state ~= 'ALL' & tblEd.durState > 30, :);
 guiTbl_bar(tblState, 'xVar', 'state', 'yVar', 'edRate', 'grpVar', 'genotype');
+
+% -> PRISM, grouped layout: row per state, column per genotype, one subcolumn
+% per mouse. Padded to the widest genotype, so blanks are missing mice.
+%
+% flgSort false keeps the CATEGORY order instead of sorting alphabetically,
+% which is the only way the columns come out Control / MCU-KO / CAG-MCU-KO
+% rather than CAG first. Same for the state rows, hence the reorder.
+tblState.state = removecats(tblState.state);
+ssCfg = as_loadConfig([]);              % WAKE QWAKE LSLEEP NREM REM ...
+tblState.state = reordercats(tblState.state, ...
+    intersect(ssCfg.names, categories(tblState.state), 'stable'));
+
+tbl2prism(tblState, 'yVar', 'edRate', 'grpVar', 'genotype', ...
+    'rowVar', 'state', 'flgSort', false);
+
+% counts per mouse, same layout - the denominator-free number to report
+% alongside the rate. Copy one, paste, then run the other.
+tbl2prism(tblState, 'yVar', 'nEd', 'grpVar', 'genotype', ...
+    'rowVar', 'state', 'flgSort', false);
+
+% CHECK BEFORE MODELLING. If the discharges are confined to the CAG cohort,
+% every Control and MCU-KO rate is 0 and the interaction below is fit against
+% two columns of zeros: the p-values are not wrong so much as meaningless, and
+% a presence/absence test (any discharge at all, Fisher) is the honest claim.
+% This prints, per genotype, how many mice carry any discharge at all.
+disp(varfun(@(x) [nnz(x > 0), numel(x)], tblAll, ...
+    'GroupingVariables', 'genotype', 'InputVariables', 'edRate'));
 
 % Modelled as a rate, with a floor on exposure. The statistically cleaner form
 % is a count model with log(durState) as an OFFSET - a state carrying 20 min of
@@ -102,6 +134,27 @@ guiTbl_bar(tblState, 'xVar', 'state', 'yVar', 'edRate', 'grpVar', 'genotype');
 % the blunt stand-in; check it before reading a REM effect.
 frml = 'edRate ~ state * genotype + (1|sbjID)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblState, frml);
+
+
+%% ========================================================================
+%  WAVEFORM PER MOUSE
+%  ========================================================================
+% One row per ACCEPTED event, carrying its detrended snippet. Tile by genotype
+% and group by mouse (or the reverse) and the legend gives the event count per
+% group - which is the per-mouse n, read off the same figure that shows whether
+% the waveforms agree.
+%
+% Detrended, not normalised: amplitude is real here and worth seeing. Set
+% Dispersion to Spread and Stat to Median for a robust central trace.
+
+[tblWv, tstamps] = ed_wvTbl(basepaths);
+tblWv.genotype = mcu_geno(tblWv.sbjID);
+
+guiTbl_xy(tstamps * 1000, tblWv, 'yVar', 'lfp', 'tileVar', 'genotype', ...
+    'grpVar', 'sbjID', 'xLbl', 'time (ms)', 'xLim', [-50 50]);
+
+% counts per mouse as a table, if the legend is not enough
+tblN = groupsummary(tblWv, {'genotype', 'sbjID'});
 
 
 
