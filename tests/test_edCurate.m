@@ -411,3 +411,48 @@ S = load(fullfile(tc.TestData.dir, 'edtest.ed.mat'), 'ed');
 tc.verifyEqual(nnz(S.ed.accepted), nnz(st.pool), ...
     'default mask does not cover the whole pool');
 end
+
+
+function test_curateColorsStableUnderFiltering(tc)
+% Rejecting a cluster removes it from the view; the colours of the clusters
+% that remain must not move. guiTbl_xy sizes its palette by the category list
+% it is handed and looks colours up BY POSITION in that list, so a list built
+% from the categories currently present recolours everything each time rows
+% are filtered out.
+[~, hFig] = ed_curate(tc.TestData.dir, 'basename', tc.TestData.name, ...
+    'flgGui', true, 'Visible', 'off');
+tc.addTeardown(@() close(hFig, 'force'));
+
+st = hFig.UserData;
+st.ddShow.Value = 'accepted';           % so a rejection empties a category
+st.ddShow.ValueChangedFcn([], []);
+
+clrBefore = tileColors(st.hPanel.UserData);
+
+% reject a MIDDLE cluster. Removing the last one proves nothing - lines()
+% cycles a fixed palette, so only categories AFTER the gap shift position.
+iDrop = 2;
+st.chk(iDrop).Value = false;
+st.chk(iDrop).ValueChangedFcn([], []);
+clrAfter = tileColors(st.hPanel.UserData);
+
+shared = intersect(clrBefore.keys, clrAfter.keys);
+tc.verifyNotEmpty(shared);
+for iCat = 1 : numel(shared)
+    tc.verifyEqual(clrAfter(shared{iCat}), clrBefore(shared{iCat}), ...
+        'AbsTol', 1e-9, sprintf('colour of "%s" moved', shared{iCat}));
+end
+end
+
+
+function m = tileColors(ud)
+% category name -> RGB, as guiTbl_xy currently draws it.
+m = containers.Map();
+ln = findall(ud.hLayout, 'Type', 'line', 'LineWidth', 2);
+for iLn = 1 : numel(ln)
+    nm = ln(iLn).DisplayName;
+    if ~isempty(nm) && ~isKey(m, nm)
+        m(nm) = ln(iLn).Color;
+    end
+end
+end

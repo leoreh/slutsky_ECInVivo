@@ -257,8 +257,12 @@ onUpdatePlot(hContainer, []);
             end
         end
 
-        % Stable group colors over the full category list
-        [fullClr, idxOf] = gui_groupColors(allCatsGB);
+        % Stable group colors over the column's DECLARED categories, not the
+        % ones currently present. gui_groupColors looks a color up by name,
+        % but it SIZES the palette by the list it is given - so basing that
+        % list on what is in the data recolors every remaining group whenever
+        % rows are filtered out. Declared categories do not move.
+        [fullClr, idxOf] = gui_groupColors(colorCats(data, varGB, allCatsGB));
 
         if ~ismember(data.yVar, data.dataTbl.Properties.VariableNames)
             warning('Selected variable %s not in table. Resetting.', data.yVar);
@@ -520,5 +524,25 @@ function val = pickCat(catVars, requested)
 val = 'None';
 if ~isempty(requested) && ismember(char(requested), catVars)
     val = char(requested);
+end
+end
+
+
+function cats = colorCats(data, varGB, fallback)
+% The category list the color palette is built over. A categorical column
+% carries its DECLARED levels whatever rows are present, which is what keeps a
+% group's color fixed while others are filtered out. A string or logical
+% column has no such list, so it falls back to the ticked categories - a host
+% that needs stable colors there should hand over a categorical.
+cats = fallback;
+if strcmp(varGB, 'None') || ~ismember(varGB, ...
+        data.dataTbl.Properties.VariableNames)
+    return;
+end
+col = data.dataTbl.(varGB);
+if iscategorical(col)
+    cats = categories(col);
+elseif islogical(col)
+    cats = categories(categorical(col));
 end
 end
