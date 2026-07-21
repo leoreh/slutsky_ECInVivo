@@ -114,6 +114,17 @@ for iEv = 1 : nEv
     pos(iEv) = bouts(iEv, 1) + iRel - 1;
 end
 
+% The candidate is found on the filtered trace, but max|filt| is the point of
+% maximum high-frequency energy, not the deflection's extremum: a 60-150 Hz
+% band rings with a 7-17 ms period, so the peak lands on whichever lobe was
+% largest. The median offset is ~0, which is exactly why this hid - the SPREAD
+% is the damage. A third of candidates sit more than 4 ms off, so every event
+% is aligned to a different phase of the same ringing: cluster averages come
+% out smeared, carry a spurious notch at t = 0, and one shape splits across
+% clusters by which lobe it happened to catch. Refining to the raw extremum
+% doubles the amplitude of the cluster medians (dev/ed_alignDiag.m).
+pos = refinePos(pos, edSig.lfp, fs, met.passband(1));
+
 ed = struct('pos', pos, 'bouts', bouts);
 ed.info.fs = fs;
 
@@ -173,6 +184,38 @@ edSig.sclRaw  = robustScale(raw(1 : stride : end));
 edSig.z = abs(edSig.filt) / edSig.sclFast;
 
 end     % sigPrep
+
+
+function pos = refinePos(pos, raw, fs, fLo)
+% Move each peak to the extremum of the RAW trace near it.
+%
+% The search half-window is half the period of the band's low cutoff - the
+% largest offset the ringing can produce - so it follows the passband instead
+% of being a number to keep in step with it. The baseline comes from the FLANKS
+% of a wider window, or a slow deflection underneath would set the extremum
+% rather than the event.
+FLANK = 0.050;                      % half-window whose flanks fix the baseline
+
+nS = max(1, round(fs / (2 * fLo)));
+nF = round(FLANK * fs);
+t  = (-nF : nF)' / fs;
+iEdge = abs(t) >= 0.5 * FLANK;
+A = [t(iEdge), ones(nnz(iEdge), 1)];
+B = [t, ones(numel(t), 1)];
+iCore = abs(t) <= nS / fs;
+
+for iEv = 1 : numel(pos)
+    p = pos(iEv);
+    if p - nF < 1 || p + nF > numel(raw)
+        continue                    % no room for the baseline flanks
+    end
+    seg = raw(p - nF : p + nF);
+    seg = seg - B * (A \ seg(iEdge));
+    [~, iPk] = max(abs(seg(iCore)));
+    pos(iEv) = p - nS + iPk - 1;
+end
+
+end     % refinePos
 
 
 function s = robustScale(x)

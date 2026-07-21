@@ -318,14 +318,39 @@ clean type boundary here, and a sign-blind representation is worth testing
 later. It is not the between-layer effect Maslarova describe; that one cannot
 apply within a single channel.
 
-**Alignment is a few ms off, and the offset depends on polarity.** Detection
-puts t = 0 at max|filt|, the peak of the 60–150 Hz trace. The raw extremum
-(after the flanks-fitted baseline is removed) sits 1.6–4.0 ms away in the pool
-median, and the positive and negative medians differ — e.g. raMCU5 curated
-+9.6 ms for upward events against 0 for downward, on n = 11 and 7. Real, small,
-and unresolvable by the sweep. Not changed: moving alignment to the raw
-extremum redefines `.peakTime` and invalidates every saved detection, which is
-a large price for an effect this size and this poorly measured.
+**Alignment: I read this wrong the first time, and it was the biggest defect in
+the pipeline.** Detection put t = 0 at max|filt|, the peak of the 60–150 Hz
+trace. I measured the *median* offset to the raw extremum — 1.6–4.0 ms — called
+it too small to justify redefining `.peakTime`, and moved on.
+
+The median is the wrong statistic. It is ~0 by construction, which is exactly
+why this hid. The **spread** is the damage: 32–43% of candidates sat more than
+4 ms from their own extremum (`ed_alignDiag.m`). A 60–150 Hz band rings with a
+7–17 ms period, so max|filt| lands on whichever lobe happened to be largest,
+and every event ends up aligned to a different phase of the same ringing.
+
+Leore caught it from a cluster average: a NOTCH at t = 0, a local maximum, with
+the real trough 6 ms later — in every cluster, in every state. That is the
+ringing imprinted on the mean.
+
+Fixed in `ed_detect`: after the candidate is found on the filtered trace, the
+peak is refined to the extremum of the RAW trace within half the period of the
+band's low cutoff (so the window follows the passband), against a baseline
+fitted on the flanks of a ±50 ms window. Effects:
+
+- residual offset >4 ms falls from 32–43% to 15–22%
+- cluster medians roughly DOUBLE in amplitude — raMCU3 −300 → −640, raMCU4
+  +450 → +1150 — because the averages were smearing across the misalignment
+- every cluster median now peaks at t = 0 with no notch (`ed_alignFixed.png`)
+- all curated discharges are still recovered: 10/10, 19/19, 18/18
+
+**This invalidates saved detections**: `.peakTime` moves by up to half a period
+and every feature is recomputed around the new sample. Re-run `ed_detect`.
+
+A weaker hypothesis, tested and mostly refuted: that the scalar block hands
+back the size that normalisation strips, since four of the five measures grow
+with amplitude. Spearman against |amp| gives `fastZ` 0.56–0.65 and the rest
+0.18–0.51 — correlated, not redundant. Not acted on.
 
 ## End-to-end, whole cohort (`ed_verify.m`, ~8 s per session)
 

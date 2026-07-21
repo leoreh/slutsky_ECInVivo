@@ -330,8 +330,13 @@ function test_curateAutoCountFollowsPool(tc)
 % turn "0 = auto" into a fixed number after the first fit, and the refinement
 % loop would keep splitting a shrinking pool into as many groups as the pool
 % it came from.
+%
+% Auto is requested explicitly rather than taken from the shipped met: the
+% default count is a tuning knob and this test is about the mechanism.
+met = ed_methods('default');
+met.clust.nClust = [];
 [~, hFig] = ed_curate(tc.TestData.dir, 'basename', tc.TestData.name, ...
-    'flgGui', true, 'Visible', 'off');
+    'met', met, 'flgGui', true, 'Visible', 'off');
 tc.addTeardown(@() close(hFig, 'force'));
 
 st = hFig.UserData;
