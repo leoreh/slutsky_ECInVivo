@@ -238,6 +238,8 @@ btn.ButtonPushedFcn([], []);
 
 tc.verifyLessThan(nnz(hFig.UserData.pool), n0);
 tc.verifyEqual(nnz(~isnan(hFig.UserData.cid)), nnz(hFig.UserData.pool));
+tc.verifyTrue(all(hFig.UserData.pool <= evt_gate(hFig.UserData.ed, ...
+    struct('ranges', struct('fastZ', [28 Inf], 'isoZ', [-Inf Inf])))));
 end
 
 
@@ -289,22 +291,64 @@ tc.verifyTrue(st2.chk(2).Value, 'cluster 2 tick lost on re-cluster');
 end
 
 
-function test_curateRecusterResetsOnCountChange(tc)
-% Changing the count cannot carry ticks - index 3 of 12 is not index 3 of 8 -
-% so it returns to the default, which is all accepted.
+function test_curateRecusterFitsAcceptedOnly(tc)
+% Rejecting then re-clustering must fit ONLY what is still accepted, and must
+% not change the accepted set - that is the refinement loop.
 [~, hFig] = ed_curate(tc.TestData.dir, 'basename', tc.TestData.name, ...
     'flgGui', true, 'Visible', 'off');
 tc.addTeardown(@() close(hFig, 'force'));
 
-arrayfun(@(h) set(h, 'Value', false), hFig.UserData.chk);
-hFig.UserData.edK.Value = 5;
+st = hFig.UserData;
+st.chk(1).Value = false;
+st.chk(1).ValueChangedFcn([], []);
+nAcc = nnz(hFig.UserData.acc);
+tc.verifyLessThan(nAcc, nnz(st.pool));
+
 btn = findall(hFig, 'Type', 'uibutton', 'Text', 'Re-cluster');
 btn.ButtonPushedFcn([], []);
 
+st2 = hFig.UserData;
+tc.verifyEqual(nnz(st2.pool), nAcc, 'clustered set is not the accepted set');
+tc.verifyTrue(all(arrayfun(@(h) h.Value, st2.chk)), ...
+    'every cluster of an accepted-only fit should start ticked');
+tc.verifyEqual(nnz(st2.acc), nAcc, 'the accepted set moved');
+end
+
+
+function test_curateResetWidensAgain(tc)
+% Re-cluster only narrows, so Reset must restore the whole gate pool.
+[~, hFig] = ed_curate(tc.TestData.dir, 'basename', tc.TestData.name, ...
+    'flgGui', true, 'Visible', 'off');
+tc.addTeardown(@() close(hFig, 'force'));
+
+nPool0 = nnz(hFig.UserData.pool);
 st = hFig.UserData;
-tc.verifyEqual(st.nClust, 5);
-tc.verifyTrue(all(arrayfun(@(h) h.Value, st.chk)));
-tc.verifySubstring(st.lblPool.Text, 'all accepted again');
+st.chk(1).Value = false;
+st.chk(1).ValueChangedFcn([], []);
+findall(hFig, 'Type', 'uibutton', 'Text', 'Re-cluster').ButtonPushedFcn([], []);
+tc.verifyLessThan(nnz(hFig.UserData.pool), nPool0);
+
+findall(hFig, 'Type', 'uibutton', ...
+    'Text', 'Reset to filter').ButtonPushedFcn([], []);
+tc.verifyEqual(nnz(hFig.UserData.pool), nPool0, 'Reset did not widen');
+tc.verifyTrue(all(arrayfun(@(h) h.Value, hFig.UserData.chk)));
+end
+
+
+function test_curateStateRejectionNarrowsCluster(tc)
+% The case Leore asked for: untick a state, press Re-cluster, and the fit must
+% exclude that state's events.
+[~, hFig] = ed_curate(tc.TestData.dir, 'basename', tc.TestData.name, ...
+    'flgGui', true, 'Visible', 'off');
+tc.addTeardown(@() close(hFig, 'force'));
+
+st = hFig.UserData;
+st.chkState(1).Value = false;       % the fixture has one state only
+st.chkState(1).ValueChangedFcn([], []);
+findall(hFig, 'Type', 'uibutton', 'Text', 'Re-cluster').ButtonPushedFcn([], []);
+
+tc.verifyEqual(nnz(hFig.UserData.pool), 0, ...
+    'a rejected state still reached the clustering');
 end
 
 

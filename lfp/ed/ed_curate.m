@@ -50,13 +50,21 @@ function [ed, hFig] = ed_curate(basepath, varargin)
 %       view, "Group By (Colors)" overlays the other, and Dispersion + Median
 %       give a robust central trace rather than a mean.
 %
-%       The two thresholds are live knobs. They set the pool, and the pool is
-%       what gets clustered, so changing one takes effect on Re-cluster - the
-%       label updates immediately so you can see the size you are choosing
-%       before paying for the fit. Re-cluster KEEPS your cluster ticks when the
-%       count is unchanged; when the count changes it returns them to the
-%       default and says so, because index 3 of 12 and index 3 of 8 are not the
-%       same group.
+%       REJECT THEN RE-CLUSTER IS A REFINEMENT LOOP. Re-cluster fits only the
+%       events currently ACCEPTED (intersected with the thresholds, so the
+%       knobs still bite). Having thrown out WAKE, or a cluster of step
+%       artifacts, you do not want twelve groups spent describing events you
+%       already rejected - you want twelve groups over what is left, which
+%       splits the survivors finer each round. The accepted SET does not change
+%       when you press it: the input is what you had accepted, and every new
+%       cluster starts ticked.
+%
+%       Because it only narrows, 'Reset to filter' goes back to the whole pool
+%       the two thresholds imply. Without it a mis-click would be
+%       unrecoverable short of reopening the session.
+%
+%       The two thresholds are live knobs; the label updates as you type so you
+%       can see the size you are choosing before paying for a fit.
 %
 %       Headless (flgGui = false) applies only the thresholds, for a batch run
 %       that has no human. That mask is NOT an answer - it is the pool.
@@ -99,6 +107,10 @@ function [ed, hFig] = ed_curate(basepath, varargin)
 %       260721d clusters start ACCEPTED. Curation is rejection: the eye is much
 %              better at spotting the two or three tiles that are obviously not
 %              discharges than at confirming the ten that are.
+%       260721e Re-cluster fits the ACCEPTED events, not the whole pool, so
+%              rejecting and re-clustering refines: the groups no longer get
+%              spent describing events already thrown out. 'Reset to filter'
+%              undoes the narrowing.
 
 %% ========================================================================
 %  ARGUMENTS + LOAD
@@ -169,7 +181,9 @@ st.edK = gui_labeledControl(gCtrl, 'editnum', 'clusters', ...
     'Value', met.clust.nClust);
 st.lblPool = gui_labeledControl(gCtrl, 'label', '');
 gui_labeledControl(gCtrl, 'button', '', 'Text', 'Re-cluster', ...
-    'ButtonPushedFcn', @(~,~) onCluster(hFig));
+    'ButtonPushedFcn', @(~,~) onCluster(hFig, false));
+gui_labeledControl(gCtrl, 'button', '', 'Text', 'Reset to filter', ...
+    'ButtonPushedFcn', @(~,~) onCluster(hFig, true));
 
 % ACCEPT: a discharge is a cluster AND a state. Both start TICKED - curation
 % here is rejection, so the pool is accepted until you rule a shape or a state
@@ -183,7 +197,7 @@ st.lblKeep = gui_labeledControl(gCtrl, 'label', '');
 
 % VIEW: independent of the above. Which rows reach the plot, nothing else.
 st.ddShow = gui_labeledControl(gCtrl, 'dropdown', 'show', ...
-    'Items', {'both', 'accepted', 'removed'}, 'Value', 'both', ...
+    'Items', {'both', 'accepted', 'removed'}, 'Value', 'accepted', ...
     'ValueChangedFcn', @(~,~) refresh(hFig));
 
 gui_labeledControl(gActions, 'button', '', 'Text', 'Save', ...
@@ -193,10 +207,11 @@ st.hPanel = uipanel(gPlot, 'BorderType', 'none');
 st.chk    = gobjects(0);
 st.cid    = nan(numel(ed.peakTime), 1);
 st.nClust = 0;
+st.acc    = true(numel(ed.peakTime), 1);    % nothing rejected yet
 hFig.UserData = st;
 
 buildStateChecks(hFig);
-onCluster(hFig);
+onCluster(hFig, true);
 
 end     % EOF
 
@@ -209,28 +224,38 @@ function onKnob(hFig)
 % a fit over a few hundred events is not something to run on every keystroke,
 % and the point of the knob is to choose a pool size before paying for it.
 st = hFig.UserData;
-pool = evt_gate(st.ed, buildSpec(st));
-st.lblPool.Text = sprintf('pool %d / %d  (press Re-cluster)', ...
-    nnz(pool), numel(pool));
+gate = evt_gate(st.ed, buildSpec(st));
+st.lblPool.Text = sprintf('gate %d | %d accepted  (press Re-cluster)', ...
+    nnz(gate), nnz(gate & st.acc));
 
 end     % onKnob
 
 
-function onCluster(hFig)
-% Apply the thresholds, cluster the pool, rebuild the checkbox list and the
-% view.
+function onCluster(hFig, flgReset)
+% Cluster, and rebuild the checkbox list and the view.
+%
+% Re-cluster fits only what is CURRENTLY ACCEPTED (intersected with the
+% thresholds, so the knobs still bite). That is the useful move: having thrown
+% out WAKE, or a cluster of step artifacts, you do not want twelve groups spent
+% describing events you already rejected - you want twelve groups over what is
+% left. Rejecting then re-clustering is therefore a refinement loop.
+%
+% It only ever narrows, so 'Reset to filter' goes back to the whole pool the
+% thresholds imply. Without it a mis-click would be unrecoverable short of
+% reopening the session.
 st = hFig.UserData;
 c  = st.met.clust;
 
-st.pool = evt_gate(st.ed, buildSpec(st));
+gate = evt_gate(st.ed, buildSpec(st));
+if flgReset
+    st.pool = gate;
+else
+    st.pool = gate & st.acc;
+end
 iPool = find(st.pool);
 
 k = st.edK.Value;
 if k < 2, k = c.nClust; end
-
-% what was ticked, so a re-cluster does not silently discard the work
-selWas = selectedClusters(st);
-kWas   = st.nClust;
 
 st.cid = nan(numel(st.pool), 1);
 nClust = 0;
@@ -243,22 +268,14 @@ end
 st.nClust = nClust;
 if nClust > 0, st.edK.Value = nClust; end
 
-% Which clusters are ticked after the rebuild. Everything is accepted by
-% DEFAULT - you curate by rejecting the clusters that are not discharges - so
-% a fresh clustering starts fully ticked. A re-cluster at the same count keeps
-% your choices; at a different count it cannot, because index 3 of 12 is not
-% index 3 of 8, so it returns to the default.
-note = '';
-if kWas == nClust && nClust > 0
-    st.selRestore = selWas;
-else
-    st.selRestore = 1 : nClust;
-    if kWas > 0 && nClust > 0
-        note = ' (count changed, all accepted again)';
-    end
-end
-st.lblPool.Text = sprintf('pool %d / %d -> %d clusters%s', ...
-    numel(iPool), numel(st.pool), nClust, note);
+% Every cluster starts ticked. Carrying the old ticks over would be wrong
+% twice: the partition is new, so index 3 no longer means what it did, and
+% the input is BY CONSTRUCTION the set that was already accepted - so the
+% accepted set is unchanged by the re-cluster, which is the property that
+% matters. Rejections live in the input, not in the tick pattern.
+st.selRestore = 1 : nClust;
+st.lblPool.Text = sprintf('gate %d | clustered %d -> %d groups', ...
+    nnz(gate), numel(iPool), nClust);
 hFig.UserData = st;
 
 buildChecks(hFig);
@@ -321,6 +338,8 @@ function refresh(hFig)
 % which rebuilding would throw away on every press.
 st = hFig.UserData;
 accepted = acceptMask(st);
+st.acc = accepted;              % what a Re-cluster will be fitted over
+hFig.UserData = st;
 
 st.lblKeep.Text = sprintf('accepted: %d of %d', nnz(accepted), ...
     numel(accepted));
