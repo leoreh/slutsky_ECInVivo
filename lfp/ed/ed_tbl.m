@@ -21,6 +21,11 @@ function tbl = ed_tbl(basepaths, basenames)
 %       assigned at - pooling events across mice would weight a long recording
 %       or a busy mouse as if it were more animals.
 %
+%       States are MERGED for reporting (evt_stateMerge): QWAKE joins WAKE and
+%       LSLEEP joins NREM. The scoring on disk is untouched. Counts and
+%       exposures are pooled before the division, so a merged rate is the
+%       pooled count over the pooled time.
+%
 %       Each session also gets a row with state 'ALL': every accepted event over
 %       the whole analysis window. It is NOT the sum of the state rows - an
 %       event whose peak falls in an unscored gap belongs to no state - and the
@@ -37,13 +42,14 @@ function tbl = ed_tbl(basepaths, basenames)
 %       tbl - (Table) One row per session x state:
 %           .sbjID    - (Cat) mouse id (get_mname).
 %           .basename - (Cat) session stem.
-%           .state    - (Cat) vigilance state, or 'ALL'.
+%           .state    - (Cat) vigilance state (merged), or 'ALL'.
 %           .nEd      - (Num) accepted discharges in that state.
 %           .durState - (Num) scored duration of that state [min].
 %           .edRate   - (Num) nEd / durState [events / min].
 %
 %   DEPENDENCIES:
-%       basepaths2vars, evt_boutTimes, evt_files, get_mname.
+%       basepaths2vars, evt_boutTimes, evt_files, evt_stateMerge,
+%       get_mname.
 %
 %   HISTORY:
 %       260720 created with the staged ED pipeline; the cross-session product
@@ -52,6 +58,7 @@ function tbl = ed_tbl(basepaths, basenames)
 %              Discharges are counted in dozens per 24 h, so per-hour numbers
 %              are small and per-minute ones smaller - but one unit throughout
 %              beats two, and per minute is what the figures report.
+%       260721b QWAKE and LSLEEP merged into WAKE and NREM for reporting.
 
 if nargin < 1 || isempty(basepaths), basepaths = {pwd}; end
 if nargin < 2 || isempty(basenames)
@@ -102,6 +109,15 @@ for iPath = 1 : numel(basepaths)
     state(end) = "ALL";
     nEd(end)   = sum(acc);
     durSt(end) = ed.info.sigDur / 60;
+
+    % QWAKE -> WAKE, LSLEEP -> NREM. Counts and exposures are summed BEFORE the
+    % division: a merged rate is the pooled count over the pooled time, not the
+    % mean of the two rates, which would weight 20 min of LSLEEP as heavily as
+    % 8 h of NREM.
+    state = evt_stateMerge(state);
+    [state, ~, iSt] = unique(state, 'stable');
+    nEd   = accumarray(iSt, nEd);
+    durSt = accumarray(iSt, durSt);
 
     keep = durSt > 0;                   % a state never scored gets no row
     rows{iPath} = table( ...

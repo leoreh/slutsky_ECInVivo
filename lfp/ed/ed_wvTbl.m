@@ -32,11 +32,12 @@ function [tbl, tstamps] = ed_wvTbl(basepaths, varargin)
 %           .lfp      - (Num) [1 x nSamp] the waveform, as a matrix column.
 %           .sbjID    - (Cat) mouse id.
 %           .basename - (Cat) session stem.
-%           .state    - (Cat) vigilance state at the peak ('unscored' if none).
+%           .state    - (Cat) vigilance state at the peak, merged as in
+%                       ed_tbl ('unscored' if the peak is in no bout).
 %       tstamps - (Vec) [1 x nSamp] window time base (s), shared by all rows.
 %
 %   DEPENDENCIES:
-%       evt_files, evt_detrend, get_mname.
+%       evt_files, evt_detrend, evt_stateMerge, get_mname.
 %
 %   HISTORY:
 %       260721 created for the per-mouse waveform view in mcu_ed.
@@ -115,5 +116,6 @@ if any(isundefined(s))
     s = addcats(s, {'unscored'});
     s(isundefined(s)) = 'unscored';
 end
+s = evt_stateMerge(s);          % QWAKE -> WAKE, LSLEEP -> NREM
 
 end     % evtState

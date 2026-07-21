@@ -86,6 +86,13 @@ guiPath(basepaths{iFile}, 'varMap', vm, 'guiMap', gm);
 % 'ALL' is every accepted event over the whole recording and is NOT the sum of
 % the state rows: an event whose peak falls in an unscored gap belongs to no
 % state, so the gap between them reads how completely the session was scored.
+%
+% States are merged for reporting (evt_stateMerge): QWAKE into WAKE, LSLEEP
+% into NREM. The scoring on disk is untouched. In the lh cohort those two carry
+% 38-121 min each, so the merge is not cosmetic - it moves WAKE and NREM
+% exposure by roughly 20%. N/REM survives as its own row and usually falls
+% below the exposure floor below; merge it too if you would rather it did not
+% appear at all.
 
 tblEd = ed_tbl(basepaths);
 tblEd.genotype = mcu_geno(tblEd.sbjID);
