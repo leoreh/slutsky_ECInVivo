@@ -61,7 +61,7 @@ end
 % 'clusters' re-runs with a different count. More clusters means finer types
 % and more boxes; 12 measured best, but a mouse with a big pool may want more.
 
-iFile = 8;
+iFile = 6;
 
 ed_curate(basepaths{iFile});
 
@@ -162,7 +162,7 @@ frml = 'edRate ~ state * genotype + (1|sbjID)';
 % recording layer. Force it with 'align','trough'|'peak', or 'none' to see the
 % detection alignment.
 
-[tblWv, tstamps] = ed_wvTbl(basepaths);
+[tblWv, tstamps] = ed_wvTbl(basepaths, 'align', 'trough');
 tblWv.genotype = mcu_geno(tblWv.sbjID);
 
 guiTbl_xy(tstamps * 1000, tblWv, 'yVar', 'lfp', 'tileVar', 'genotype', ...
@@ -170,6 +170,16 @@ guiTbl_xy(tstamps * 1000, tblWv, 'yVar', 'lfp', 'tileVar', 'genotype', ...
 
 % counts per mouse as a table, if the legend is not enough
 tblN = groupsummary(tblWv, {'genotype', 'sbjID'});
+
+% -> PRISM, ONE XY block per genotype: X = time, one column per mouse carrying
+% Mean / SD / N (across that mouse's events) at each time point. In Prism make
+% an XY table, Format Data Table -> "Enter and plot error... Mean, SD, N", and
+% paste - the pasted block's first row is the mouse names, one over each triple.
+% wv2prism copies the level named in 'copy'; re-run with the next to paste it
+% into its own graph. Same detrended, trough-aligned waveforms as the GUI above.
+wvBlocks = wv2prism(tblWv, tstamps * 1000, 'grpVar', 'sbjID', ...
+    'splitVar', 'genotype', 'xLbl', 'time (ms)', 'xLim', [-50 50], ...
+    'copy', 'CAG-MCU-KO');
 
 
 
