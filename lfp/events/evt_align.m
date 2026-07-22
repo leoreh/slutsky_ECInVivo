@@ -1,4 +1,4 @@
-function [wv, shift] = evt_align(wv, tstamps, met, win)
+function [wv, shift, met] = evt_align(wv, tstamps, met, win)
 % EVT_ALIGN Shift event waveforms so a chosen extremum sits at t = 0.
 %
 %   [wv, shift] = EVT_ALIGN(wv, tstamps, met, win)
@@ -30,7 +30,22 @@ function [wv, shift] = evt_align(wv, tstamps, met, win)
 %       met     - <char> feature to centre on:
 %                        'trough'   the minimum (negative-going event).
 %                        'peak'     the maximum.
-%                        'extremum' the largest absolute value.
+%                        'extremum' the largest absolute value, per event.
+%                        'auto'     ONE choice for the whole set: the polarity
+%                                   MOST events have. Each event's own biggest
+%                                   swing (positive or negative) is one vote;
+%                                   the majority wins, ties go to trough.
+%                                   Polarity is a property of the electrode's
+%                                   layer, so it is shared by a session's
+%                                   events - decided once here, not per event,
+%                                   which 'extremum' does and which lets noise
+%                                   flip a near-flat event's sign. A VOTE, not
+%                                   the sign of the mean waveform: a few large
+%                                   opposite-going events inflate the mean's
+%                                   other lobe and flip it (on raMCU4 the mean
+%                                   reads peak while 28 of 35 events are
+%                                   troughs, which the vote and the median
+%                                   waveform both get right).
 %                        'none'     leave the rows as they are.
 %                        {'trough'}
 %       win     - <num>  search half-window around t = 0 (s): the feature is
@@ -41,9 +56,12 @@ function [wv, shift] = evt_align(wv, tstamps, met, win)
 %       wv      - <mat>  [nEv x nSamp] shifted; an all-NaN row is left as is.
 %       shift   - <vec>  [nEv x 1] samples each row moved (0 for 'none' and for
 %                        rows with no finite sample in the window).
+%       met     - <char> the feature actually used, so 'auto' reports whether
+%                        it resolved to 'peak' or 'trough'.
 %
 %   HISTORY:
 %       260722 created for the per-mouse discharge average in ed_wvTbl.
+%       260722b 'auto' picks the polarity from the average waveform.
 
 if nargin < 3 || isempty(met), met = 'trough'; end
 if nargin < 4 || isempty(win), win = 0.01; end
@@ -56,6 +74,21 @@ if strcmp(met, 'none'), return; end
 t = tstamps(:)';
 [~, iCtr] = min(abs(t));            % sample nearest t = 0
 inWin = abs(t) <= win;
+
+% resolve 'auto' ONCE: the polarity the majority of events actually have. Each
+% event's biggest swing inside the window is one vote for peak or trough. A
+% vote, not the sign of the MEAN waveform, because a few large opposite-going
+% events inflate the mean's other lobe and flip it - on raMCU4 the mean reads
+% peak while 28 of 35 events are troughs.
+if strcmp(met, 'auto')
+    seg = wv;
+    seg(:, ~inWin) = NaN;
+    [~, iMx] = max(abs(seg), [], 2);
+    val = wv(sub2ind(size(wv), (1 : nEv)', iMx));
+    val = val(isfinite(val));       % drop all-NaN edge rows
+    met = 'trough';
+    if sum(val > 0) > sum(val < 0), met = 'peak'; end
+end
 
 for iEv = 1 : nEv
     row = wv(iEv, :);

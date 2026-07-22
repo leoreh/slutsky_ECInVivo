@@ -61,7 +61,7 @@ end
 % 'clusters' re-runs with a different count. More clusters means finer types
 % and more boxes; 12 measured best, but a mouse with a big pool may want more.
 
-iFile = 12;
+iFile = 8;
 
 ed_curate(basepaths{iFile});
 
@@ -154,11 +154,13 @@ frml = 'edRate ~ state * genotype + (1|sbjID)';
 % Detrended, not normalised: amplitude is real here and worth seeing. Set
 % Dispersion to Spread and Stat to Median for a robust central trace.
 %
-% Aligned to the TROUGH by default (ed_wvTbl 'align'). Detection centres each
-% event on its largest absolute swing, so some sit on the peak and some on the
-% trough and the average smears - trough-aligning deepens it and sharpens t=0.
-% Pass 'align','none' to see the detection alignment, or 'peak' for a mouse
-% whose discharges are upward-going.
+% Aligned per session (ed_wvTbl 'align', default 'auto'). Detection centres
+% each event on its largest absolute swing, so some sit on the peak and some on
+% the trough and the average smears; aligning every event to one feature
+% sharpens t=0. 'auto' picks that feature from each mouse's OWN average - trough
+% for a negative mouse, peak for a positive one - since polarity depends on the
+% recording layer. Force it with 'align','trough'|'peak', or 'none' to see the
+% detection alignment.
 
 [tblWv, tstamps] = ed_wvTbl(basepaths);
 tblWv.genotype = mcu_geno(tblWv.sbjID);

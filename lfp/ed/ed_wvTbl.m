@@ -17,14 +17,18 @@ function [tbl, tstamps] = ed_wvTbl(basepaths, varargin)
 %       happened to do. Amplitude is left alone because it is usually the thing
 %       the average is reporting (see evt_detrend).
 %
-%       They are also ALIGNED, by default to their trough (evt_align). Detection
-%       centres on the largest ABSOLUTE excursion, so in a biphasic discharge
-%       some rows sit on their positive peak and others on their negative
-%       trough - and the average of that mix is smeared with a notch at t = 0.
-%       Fixing every row to the trough lines them up. It is a shift within the
-%       snippet, not a re-read, and it assumes a trough exists: right for these
-%       negative-going discharges, wrong for a genuinely positive one, so it is
-%       a per-call choice ('align', 'none' to keep detection's alignment).
+%       They are also ALIGNED (evt_align). Detection centres on the largest
+%       ABSOLUTE excursion, so in a biphasic discharge some rows sit on their
+%       positive peak and others on their negative trough - and the average of
+%       that mix is smeared with a notch at t = 0. Fixing every row to the same
+%       feature lines them up; it is a shift within the snippet, not a re-read.
+%
+%       The polarity is chosen PER SESSION, by default from the average
+%       waveform ('auto'): a mouse whose mean discharge swings negative aligns
+%       to the trough, one that swings positive to the peak. Polarity depends
+%       on which layer the electrode sits in, so it is a per-mouse property and
+%       this reads it off the data rather than assuming it. Force it with
+%       'align', 'trough' | 'peak', or 'none' to keep detection's alignment.
 %
 %       A session with no accepted events contributes no rows, which is the
 %       honest answer for a mouse that has no discharges - unlike ed_tbl, where
@@ -35,8 +39,8 @@ function [tbl, tstamps] = ed_wvTbl(basepaths, varargin)
 %       varargin  - Parameter/Value:
 %           'basenames' - (Cell) File stems. {folder names}
 %           'detrend'   - (Char) evt_detrend method, or 'none'. {'edge'}
-%           'align'     - (Char) evt_align feature: 'trough' | 'peak' |
-%                                'extremum' | 'none'. {'trough'}
+%           'align'     - (Char) evt_align feature: 'auto' | 'trough' |
+%                                'peak' | 'extremum' | 'none'. {'auto'}
 %           'alignWin'  - (Num)  evt_align search half-window (s). {0.01}
 %
 %   OUTPUTS:
@@ -53,14 +57,16 @@ function [tbl, tstamps] = ed_wvTbl(basepaths, varargin)
 %
 %   HISTORY:
 %       260721 created for the per-mouse waveform view in mcu_ed.
-%       260722 trough alignment (evt_align), so the per-mouse averages stop
-%              smearing where detection centred some events on the peak.
+%       260722 alignment (evt_align), so the per-mouse averages stop smearing
+%              where detection centred some events on the peak. Polarity is
+%              'auto' per session - trough for a negative mouse, peak for a
+%              positive one - since it depends on the recording layer.
 
 p = inputParser;
 addRequired(p, 'basepaths', @iscell);
 addParameter(p, 'basenames', {}, @iscell);
 addParameter(p, 'detrend', 'edge', @ischar);
-addParameter(p, 'align', 'trough', @ischar);
+addParameter(p, 'align', 'auto', @ischar);
 addParameter(p, 'alignWin', 0.01, @isnumeric);
 parse(p, basepaths, varargin{:});
 basenames = p.Results.basenames;
