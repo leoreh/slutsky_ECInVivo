@@ -1,216 +1,239 @@
-
-
-
-
-
+% MCU_RIPPLES  SWR figures for the MCU manuscript (three genotypes).
+%
+% Each figure gets its own section. A section (1) builds the table with an
+% mcu_tblVivo preset, (2) opens it in a table GUI for inspection, (3) writes
+% a Prism-ready block to the clipboard - raw replicates via tbl2prism, or
+% Mean/SD/N via tbl2prismSum - and (4) runs the matching LME, as in
+% mcu_lme2xls. Sections run independently.
+%
+% NREM only. The curation state scope is NREM (ripp_methods qa.states), so
+% .accepted is NREM-confined, and the 'ripp' / 'rippMaps' / 'rippStates'
+% presets return the accepted subset - every metric below is already NREM.
+%
+% Cohort. mcu_basepaths('bsl3_ripp') = Control (ripple-curated WT sessions),
+% MCU-KO (germline), CAG-MCU-KO (viral). One baseline session per mouse.
 
 
 %% ========================================================================
-%  ANALYZE (staged: detect -> curate -> analyze)
+%  PIPELINE (detect -> curate -> analyze)
 %  ========================================================================
-% The ripple pipeline runs in three separable stages so each session can be
-% manually curated between detection and the heavy spike/phase/map analysis.
-% Run the loops in order; loop 2 is manual, one mouse at a time.
+% Three separable stages so each session can be curated by hand between
+% detection and the heavy spike/phase analysis. Loop 2 is manual, one mouse
+% at a time; loops 1 and 3 are batch.
 
-basepaths = [mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl'), ...
-    mcu_basepaths('ra')];
+basepaths = mcu_basepaths('bsl3_ripp');
 nFiles = numel(basepaths);
 met = ripp_methods('default');          % detection + default QA filter (met.qa)
 
-% Loop 1 - DETECT 
+% Loop 1 - DETECT
 for iFile = 1 : nFiles
     ripp_wrapper('basepath', basepaths{iFile}, 'met', met, 'win', [0 Inf], ...
         'flgSave', true, 'flgForce', true, 'flgDetectOnly', true, ...
         'rippCh', []);
 end
 
-% Loop 2 - CURATE + INSPECT 
-iFile = 1;
-ripp_curate(basepaths{iFile}, 'met', met); % bulk curation GUI
+% Loop 2 - CURATE + INSPECT
+iFile = 16;
+ripp_curate(basepaths{iFile}, 'met', met);          % bulk curation GUI
 
-% first open (slow) 
-[~, vm, gm] = guiPath(basepaths{iFile}, 'preset', 'ripp');
+[~, vm, gm] = guiPath(basepaths{iFile}, 'preset', 'ripp');     % first open (slow)
+vm.ripp.data = [];                                             % the ONLY entry re-read
+guiPath(basepaths{iFile}, 'varMap', vm, 'guiMap', gm);         % reopen (fast)
 
-% reopen (fast)
-vm.ripp.data = []; % the ONLY entry re-read
-guiPath(basepaths{iFile}, 'varMap', vm, 'guiMap', gm);
-
-
-% Loop 3 - ANALYZE 
-for iFile = 2 : nFiles
-    ripp_wrapper('basepath', basepaths{iFile}, 'met', met, 'win', [0 Inf], ...
-        'flgSave', true, 'flgForce', true, 'flgDetectOnly', true, ...
-        'rippCh', []);
-    
-    ripp_curate(basepaths{iFile}, 'met', met, 'flgGui', false); % bulk curation GUI
-
+% Loop 3 - ANALYZE
+for iFile = 13 : nFiles
     ripp_analyze(basepaths{iFile}, 'flgPlot', false);
 end
 
 
+%% ========================================================================
+%  SWR PROPERTIES (freq, amp, dur)
+%  ========================================================================
+% Per-event frequency, amplitude and duration across all NREM SWRs. Two
+% views: every event (bars + Mean/SD/N), and one average per mouse (points).
+
+basepaths = mcu_basepaths('bsl3_ripp');
+tblRipp = mcu_tblVivo('basepaths', basepaths, 'presets', {'ripp'});
+
+% All events - GUI + Prism (Mean/SD/N)
+guiTbl_bar(tblRipp, 'xVar', 'genotype', 'yVar', 'freq', 'grpVar', 'sbjID');
+prismFreq = tbl2prismSum(tblRipp, 'yVar', 'freq');
+prismAmp  = tbl2prismSum(tblRipp, 'yVar', 'amp');
+prismDur  = tbl2prismSum(tblRipp, 'yVar', 'dur');
+
+tblRipp.amp(tblRipp.genotype == 'CAG-MCU-KO');
+
+% One average per mouse - GUI (points) + Prism (raw)
+tblMouse = groupsummary(tblRipp, {'genotype', 'sbjID'}, 'mean', ...
+    {'freq', 'amp', 'dur'});
+guiTbl_bar(tblMouse, 'xVar', 'genotype', 'yVar', 'mean_freq', 'mode', 'points');
+prismFreqMouse = tbl2prism(tblMouse, 'yVar', 'mean_freq', 'grpVar', 'genotype');
+prismAmpMouse  = tbl2prism(tblMouse, 'yVar', 'mean_amp',  'grpVar', 'genotype');
+prismDurMouse  = tbl2prism(tblMouse, 'yVar', 'mean_dur',  'grpVar', 'genotype');
+
+% LME (events, mouse as random effect) - matches Table S5
+frml = 'freq ~ genotype + (1|sbjID)';
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblRipp, frml, 'dist', 'normal');
+
+frml = 'amp ~ genotype + (1|sbjID)';
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblRipp, frml, 'dist', 'log-normal');
+
+frml = 'dur ~ genotype + (1|sbjID)';
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblRipp, frml, 'dist', 'log-normal');
+
 
 %% ========================================================================
-%  RATE & DENSITY (STATE-DEPENDENT)
+%  SWR RATE (per mouse)
 %  ========================================================================
+% Rate = number of NREM SWRs / total NREM duration, one value per mouse.
+% rippStates is per-bout (Rate = count / boutDuration), so pool bouts:
+% total events = sum(Rate .* Duration), total time = sum(Duration).
 
-basepaths = [mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl'), ...
-    mcu_basepaths('ra')];
-nFiles = length(basepaths);
+basepaths = mcu_basepaths('bsl3_ripp');
+tblStates = mcu_tblVivo('basepaths', basepaths, 'presets', {'rippStates'});
+nrem = tblStates(tblStates.State == 'NREM', :);
 
-% RIPPLE STATES
-presets = {'rippStates'};
-tblStates = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
+nrem.nEvt = nrem.Rate .* nrem.Duration;             % events per bout
+tblRate = groupsummary(nrem, {'genotype', 'sbjID'}, 'sum', {'nEvt', 'Duration'});
+tblRate.rate = tblRate.sum_nEvt ./ tblRate.sum_Duration;    % Hz
+tblRate.genotype = removecats(tblRate.genotype);
 
-% NREM Only
+% GUI (points) + Prism (raw)
+guiTbl_bar(tblRate, 'xVar', 'genotype', 'yVar', 'rate', 'mode', 'points');
+prismRate = tbl2prism(tblRate, 'yVar', 'rate', 'grpVar', 'genotype');
+
+% Stat: one value per mouse -> one-way genotype comparison (OLS = ANOVA)
+mdlRate = fitlm(tblRate, 'rate ~ genotype');
+anova(mdlRate)                                      % omnibus genotype effect
+mdlRate.Coefficients                                % pairwise vs Control
+
+
+%% ========================================================================
+%  SWR WAVEFORM & FIRING
+%  ========================================================================
+% LFP waveform and the normalised peri-SWR firing rate of RS units. Two Prism
+% exports: a group sheet averaged across events (Mean/SD/N over time), and one
+% XY block per genotype where each mouse carries its own Mean/SD/N - overlay the
+% per-mouse traces to show the between-mouse spread (<20 mice, mcu_ed style).
+
+basepaths = mcu_basepaths('bsl3_ripp');
+
+% LFP waveform (per-event maps)
+[tblMaps, ~, ~, xMaps] = mcu_tblVivo('basepaths', basepaths, 'presets', {'rippMaps'});
+guiTbl_xy(xMaps, tblMaps, 'yVar', 't_lfp', 'grpVar', 'genotype');
+prismLfp = tbl2prismSum(tblMaps, 'yVar', 't_lfp', 'xVec', xMaps);
+prismLfp(:, 1) = prismLfp(:, 1) * 1000;
+
+% Firing rate, normalised per unit (per-unit peri-SWR PETH)
+[tblSpk, ~, ~, xSpk] = mcu_tblVivo('basepaths', basepaths, ...
+    'presets', {'rippSpks'}, 'flgClean', true);
+tblSpk.pethNorm = normalize(tblSpk.peth, 2, 'norm');
+guiTbl_xy(xSpk, tblSpk, 'yVar', 'pethNorm', 'grpVar', 'genotype');
+prismFr = tbl2prismSum(tblSpk, 'yVar', 'pethNorm', 'xVec', xSpk);
+prismFr(:, 1) = prismFr(:, 1) * 1000;
+
+% Overlaid per mouse, one Prism XY block per genotype (each mouse a Mean/SD/N
+% triple across its own events) - <20 mice, so show the spread directly rather
+% than average it away, as in mcu_ed. Tile by genotype and colour by mouse to
+% inspect the overlay; wv2prism copies the 'copy' level, re-run with the next
+% genotype (or paste wvLfp(iGrp).str).
+guiTbl_xy(xMaps * 1000, tblMaps, 'yVar', 't_lfp', 'tileVar', 'genotype', ...
+    'grpVar', 'sbjID', 'xLbl', 'time (ms)');
+wvLfp = wv2prism(tblMaps, xMaps * 1000, 'yVar', 't_lfp', 'grpVar', 'sbjID', ...
+    'splitVar', 'genotype', 'xLbl', 'time (ms)', 'copy', 'CAG-MCU-KO');
+
+% FR is already normalised (unitless), so scale 1 - not wv2prism's uV->mV default.
+guiTbl_xy(xSpk * 1000, tblSpk, 'yVar', 'pethNorm', 'tileVar', 'genotype', ...
+    'grpVar', 'sbjID', 'xLbl', 'time (ms)');
+    wvFr = wv2prism(tblSpk, xSpk * 1000, 'yVar', 'pethNorm', 'grpVar', 'sbjID', ...
+        'splitVar', 'genotype', 'xLbl', 'time (ms)', 'scale', 1, 'copy', 'CAG-MCU-KO');
+
+
+%% ========================================================================
+%  SWR DISTRIBUTIONS
+%  ========================================================================
+% Per-event distributions across all NREM SWRs. The scatter GUI shows the
+% joint plot with marginal histograms; switch X/Y in the dropdowns to view
+% amp, freq (instantaneous Hilbert) and freqPeak (1/f-corrected). Prism gets
+% the raw replicates per genotype for its own histograms.
+
+basepaths = mcu_basepaths('bsl3_ripp');
+tblRipp = mcu_tblVivo('basepaths', basepaths, 'presets', {'ripp'});
+
+guiTbl_scatHist(tblRipp, 'xVar', 'freq', 'yVar', 'amp', 'grpVar', 'genotype');
+
+prismDistAmp      = tbl2prism(tblRipp, 'yVar', 'amp',      'grpVar', 'genotype');
+prismDistFreq     = tbl2prism(tblRipp, 'yVar', 'freq',     'grpVar', 'genotype');
+prismDistFreqPeak = tbl2prism(tblRipp, 'yVar', 'freqPeak', 'grpVar', 'genotype');
+
+
+%% ========================================================================
+%  SPIKE ORGANIZATION DURING SWR
+%  ========================================================================
+% Timing of RS spikes within the SWR (center of mass, com), and whether it
+% tracks firing rate and burstiness. Matches Table S4; the LS-means panel is
+% the Spike-CoM vs P_burst figure.
+
+basepaths = mcu_basepaths('bsl3_ripp');
+[tblRipp, ~, ~, xVec] = mcu_tblVivo('basepaths', basepaths, ...
+    'presets', {'rippSpks', 'burst'}, 'flgClean', true);
+tblTrans = tbl_trans(tblRipp, 'varsInc', {'pBurst'}, 'logBase', 'logit');
+tblRipp.pBurst_trans = tblTrans.pBurst;
+
+% GUI
+guiTbl_scatHist(tblRipp, 'xVar', 'pBurst', 'yVar', 'com', 'grpVar', 'genotype');
+guiTbl_xy(xVec, tblRipp, 'yVar', 'peth', 'grpVar', 'genotype');
+
+% LME (genotype only, then adjusted for fr + burstiness)
+frml = 'com ~ genotype + (1|sbjID)';
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblRipp, frml, 'dist', 'normal', 'flgStnd', false);
+lmeTbls = lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo);
+
+frml = 'com ~ (fr + pBurst) + genotype + (1|sbjID)';
+[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblRipp, frml, 'dist', 'normal', 'flgStnd', false);
+lmeTbls = [lmeTbls, lme_mdl2tbls(lmeMdl, lmeStats, lmeInfo)];
+
+% Partial dependence: predicted com vs P_burst, then vs fr
+hFig = figure;
+hAx = nexttile;
+pdBurst = lme_lsmeans(lmeMdl, {'pBurst', 'genotype'}, ...
+    'transParams', lmeInfo.transParams, 'hAx', hAx, 'xLims', {[0, 1], []});
+hAx = nexttile;
+pdFr = lme_lsmeans(lmeMdl, {'fr', 'genotype'}, ...
+    'transParams', lmeInfo.transParams, 'hAx', hAx);
+set(hAx, 'XScale', 'log')
+
+% Prism: the predicted curves live in pdBurst / pdFr (genotype, grid,
+% com_pred, com_lower, com_upper). Raw com per mouse for the points plot.
+tblComMouse = groupsummary(tblRipp, {'genotype', 'sbjID'}, 'mean', 'com');
+prismCom = tbl2prism(tblComMouse, 'yVar', 'mean_com', 'grpVar', 'genotype');
+
+prismDistCom      = tbl2prism(tblRipp, 'yVar', 'com',      'grpVar', 'genotype');
+
+
+%% ========================================================================
+%  STATE DEPENDENCE (exploratory)
+%  ========================================================================
+% Per-bout SWR rate and density by vigilance state. Kept for reference; the
+% short-bout bias here is why the rate figure above pools to one value per
+% mouse instead.
+
+basepaths = mcu_basepaths('bsl3_ripp');
+tblStates = mcu_tblVivo('basepaths', basepaths, 'presets', {'rippStates'});
 tblPlot = tblStates(tblStates.State == 'NREM', :);
-tblPlot = tblStates;
 
-guiTbl_bar(tblPlot, 'xVar', 'genotype', 'yVar', 'Density');
-guiTbl_scatHist(tblPlot, 'xVar', 'Density', 'yVar', 'Rate', 'grpVar', 'genotype');
+guiTbl_bar(tblPlot, 'xVar', 'genotype', 'yVar', 'Rate');
+guiTbl_scatHist(tblPlot, 'xVar', 'Duration', 'yVar', 'Rate', 'grpVar', 'genotype');
 
-% Run LME
-frml = 'Density ~ (Duration + Rate) * genotype + (1|sbjID)';
+frml = 'Rate ~ genotype + (1|sbjID)';
 [lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblPlot, frml);
 
 
-
 %% ========================================================================
-%  RIPP SPIKES
+%  SPIKE-PHASE POLAR (legacy)
 %  ========================================================================
-
-presets = {'rippSpks', 'burst'};
-[tbl, ~, ~, xVec] = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
-
-% Select
-tblPlot = tbl;
-tblPlot = tbl(tbl.unitType == 'RS', :);
-% tblPlot(tblPlot.sbjID == 'lh137', :) = [];
-% tblPlot.sbjID = removecats(tblPlot.sbjID, {'lh137'});
-
-% Add logit pBurst
-tblTrans = tbl_trans(tblPlot, 'varsInc', {'pBurst'}, 'logBase', 'logit');
-tblPlot.pBurst_trans = tblTrans.pBurst;
-tblTrans = tbl_trans(tblPlot, 'varsInc', {'bRoy'}, 'logBase', 10);
-tblPlot.bRoy_trans = tblTrans.bRoy;
-
-% Plot
-guiTbl_bar(tblPlot, 'xVar', 'genotype', 'yVar', 'frZ');
-guiTbl_scatHist(tblPlot, 'xVar', 'asym', 'yVar', 'bRoy', 'grpVar', 'genotype');
-guiTbl_xy(xVec, tbl, 'grpVar', 'genotype');
-
-tblPlot.burstClu = tblPlot.pBurst > 0.25;
-tblPlot.pethNorm = normalize(tblPlot.peth, 2, "norm");
-tblPlot.pethCumSum = normalize(cumsum(tblPlot.peth, 2), 2, "range");
-tblPlot.pethCumSum = cumsum(tblPlot.peth, 2) ./ sum(tblPlot.peth, 2);
-
-guiTbl_xy(xVec, tblPlot, 'grpVar', 'genotype', 'yVar', 'pethCumSum');
-xlim([-0.05, 0.05])
-
-% LME
-xVar = 'pBurst';
-frml = sprintf('com ~ (fr + %s) + genotype + (1|sbjID)', xVar);
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblPlot, frml, 'dist', 'normal');
-
-% Partial Dependence
-hFig = figure;
-hAx = nexttile;
-vars = {xVar, 'genotype'};
-[pdRes, hFig] = lme_lsmeans(lmeMdl, vars, 'transParams', lmeInfo.transParams, ...
-    'hAx', hAx, 'xLims', {[0, 1], []});
-
-hAx = nexttile;
-xVar = 'fr';
-vars = {xVar, 'genotype'};
-[pdRes, hFig] = lme_lsmeans(lmeMdl, vars, 'transParams', lmeInfo.transParams, ...
-    'hAx', hAx);
-set(hAx, 'XScale', 'log')
-
-% To Prism
-grpIdx = pdRes.genotype == "MCU-KO";
-[pdRes(grpIdx, {xVar}), ...
-    pdRes(grpIdx, {'com_pred', 'com_upper', 'com_lower'})]
-
-ylim([-2.5, 0.5])
-set(gca,'XScale','log')
-
-
-% Summary
-tblSum = groupsummary(tblPlot, {'genotype', 'sbjID'}, 'mean', ...
-    vartype("numeric"));
-
-% To Prism (Metrics)
-prismMat = tbl2prism(tblPlot, 'yVar', 'com', 'grpVar', 'genotype');
-mean(prismMat, 1, 'omitnan');
-
-% To prism (Time)
-yVar = 'pethNorm';
-grpIdx = tblPlot.genotype == 'MCU-KO';
-prismIdx = grpIdx;
-nUnits = sum(prismIdx);
-prismMat = [mean(tblPlot{prismIdx, yVar}, 1, 'omitnan')', ...
-    std(tblPlot{prismIdx, yVar}, [], 1, 'omitnan')', ...
-    repmat(nUnits, length(xVec), 1)];
-
-
-%% ========================================================================
-%  RIPPLE PARAMS
-%  ========================================================================
-
-presets = {'ripp'};
-tblRipp = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
-tblPlot = tblRipp(tblRipp.state == 'NREM', :);
-
-% Plot
-guiTbl_bar(tblPlot, 'xVar', 'genotype', 'yVar', 'dur');
-guiTbl_scatHist(tblRipp, 'xVar', 'dur', 'yVar', 'amp', 'grpVar', 'genotype');
-
-% Summary
-% tblSum = groupsummary(tblRipp, {'genotype', 'sbjID'}, 'mean', ...
-%     vartype("numeric"))
-% tblBsl = tblVivo(tblVivo.day == 'BSL', :);
-% tblSum = groupsummary(tblBsl, {'genotype', 'sbjID'}, 'mean', ...
-%     vartype("numeric"))
-
-% LME
-frml = 'dur ~ (freq + amp + com) * genotype + (1|sbjID)';
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblRipp, frml);
-
-frml = 'dur ~ genotype + (1|sbjID)';
-[lmeMdl, lmeStats, lmeInfo] = lme_analyse(tblRipp, frml);
-
-% To Prism (Metrics)
-prismMat = tbl2prism(tblRipp, 'yVar', 'freq', 'grpVar', 'genotype');
-mean(prismMat, 1, 'omitnan');
-
-
-%% ========================================================================
-%  RIPPLE MAPS
-%  ========================================================================
-
-presets = {'rippMaps'};
-[tblMaps, ~, ~, xVec] = mcu_tblVivo('basepaths', basepaths, 'presets', presets);
-
-% Plot
-guiTbl_xy(xVec, tblMaps, 'yVar', 't_lfp', 'grpVar', 'genotype');
-
-% To prism
-yVar = 't_freq';
-grpIdx = tblMaps.genotype == 'Control';
-nRipp = height(tblMaps(grpIdx, :));
-prismMat = [mean(tblMaps{grpIdx, yVar}, 1, 'omitnan')', ...
-    std(tblMaps{grpIdx, yVar}, [], 1, 'omitnan')', ...
-    repmat(nRipp, length(xVec), 1)];
-
-
-
-
-
-
-
-
-%% ========================================================================
-%  POLAR PLOT
-%  ========================================================================
+% Spike-LFP phase coupling per unit, coloured by genotype. Legacy view -
+% expects a preloaded tblLme (from ripp_screen) with Theta/MRL/pVal and cfg.
 
 % Figure Parameters
 hFig = figure;
@@ -253,11 +276,11 @@ fname = ['Ripp~SpkPolar_', txtUnit{iUnit}];
 lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat'});
 
 
-
-
 %% ========================================================================
-%  RATE-PHASE MAP
+%  RATE-PHASE MAP (legacy)
 %  ========================================================================
+% Mean firing rate as a function of LFP phase and power, averaged across
+% significant units. Legacy view - expects preloaded v{iGrp} and tblLme.
 
 % Select
 flgCbar = false;
@@ -292,7 +315,6 @@ prctSgn(iGrp, iUnit) = sum(idxUnit & idxSgn) / sum(idxUnit) * 100;
 % LFP phase (x-axis) and LFP power (y-axis). The phase axis is duplicated
 % (0 to 4*pi) to visualize cyclic nature. A cosine wave is overlaid as a phase reference.
 
-
 [hFig, hAx] = plot_axSize('szOnly', false);
 
 mapAvg = mean(mapData(:, :, idxMap), 3, 'omitnan'); % Average rate map across units.
@@ -325,12 +347,3 @@ plot_axSize('hFig', hFig, 'szOnly', false, 'axWidth', 232, 'axHeight', 300);
 % Save
 fname = ['Ripp~SpkPhaseMap_', cfg.lbl.grp{iGrp}, '_', cfg.lbl.unit{iUnit}];
 lme_save('hFig', hFig, 'fname', fname, 'frmt', {'svg', 'mat'});
-
-
-
-
-
-
-
-
-

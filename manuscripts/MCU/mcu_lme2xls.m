@@ -167,7 +167,7 @@ if flgPlot
     hAx = nexttile; pdRes = lme_lsmeans(lmeMdl, {'pBurst', 'genotype'}, 'transParams', lmeInfo.transParams, ...
         'hAx', hAx, 'xLims', {[0, 1], []});
     hAx = nexttile; pdRes = lme_lsmeans(lmeMdl, {'fr', 'genotype'}, 'transParams', lmeInfo.transParams, ...
-        'hAx', hAx); 
+        'hAx', hAx); set(gca, 'XScale', 'log')
     guiTbl_xy(xVec, tblRipp, 'grpVar', 'genotype');
     guiTbl_scatHist(tblRipp, 'grpVar', 'genotype');
 end

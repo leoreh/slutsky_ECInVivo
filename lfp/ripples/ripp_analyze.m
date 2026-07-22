@@ -75,6 +75,11 @@ files.phase = fullfile(basepath, [basename, '.rippSpkLfp.mat']);
 
 S = load(files.evt, 'ripp');
 ripp = S.ripp;
+
+% Trust the curation mask. NREM confinement lives in the curation state scope
+% (ripp_methods qa.states = NREM), so .accepted is already NREM-only and stays
+% reproducible from the saved clusters - analyze must NOT mutate it, or a
+% reopened ripp_curate would rebuild a mask that disagrees with disk.
 acc = ripp.accepted;
 
 if ~any(acc)

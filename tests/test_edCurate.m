@@ -138,12 +138,20 @@ tc.verifyTrue(all(isnan(cid)));
 end
 
 
-function test_clustLabelsBySize(tc)
-% Cluster 1 must be the largest, so an index means the same thing on a re-run.
-cid = evt_clust(tc.TestData.wv, tc.TestData.tst, 'nClust', 4);
-cnt = accumarray(cid(~isnan(cid)), 1);
-tc.verifyEqual(cnt, sort(cnt, 'descend'), ...
-    'clusters are not ordered by size');
+function test_clustLabelsByHeight(tc)
+% Cluster 1 must be the tallest (largest median peak), so the GUI can lay the
+% clusters on an amplitude continuum and an index means the same thing on a
+% re-run. Peak is measured exactly as evt_clust does it - over the clustering
+% window, after the same detrend.
+win = [-0.05 0.05];
+cid = evt_clust(tc.TestData.wv, tc.TestData.tst, 'nClust', 4, 'win', win);
+iWin = tc.TestData.tst >= win(1) & tc.TestData.tst <= win(2);
+pk = max(abs(evt_detrend(double(tc.TestData.wv(:, iWin)), ...
+    tc.TestData.tst(iWin))), [], 2);
+ok = ~isnan(cid);
+h = accumarray(cid(ok), pk(ok), [], @median);
+tc.verifyEqual(h, sort(h, 'descend'), 'AbsTol', 1e-9, ...
+    'clusters are not ordered tallest-first');
 end
 
 

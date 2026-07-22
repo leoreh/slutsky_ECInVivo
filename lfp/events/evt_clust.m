@@ -95,8 +95,9 @@ function [clustId, cInfo] = evt_clust(wv, tstamps, varargin)
 %
 %   OUTPUTS:
 %       clustId  - <vec>    [nEv x 1] cluster index, ordered so 1 is the
-%                           largest cluster. NaN for an all-NaN row (an event
-%                           too near a recording edge to have a waveform).
+%                           TALLEST cluster (largest median peak height). NaN
+%                           for an all-NaN row (an event too near a recording
+%                           edge to have a waveform).
 %       cInfo    - <struct> .nClust .score [nEv x nDim] .explained .nFit -
 %                           what was fit, for the GUI and the record.
 %
@@ -110,6 +111,8 @@ function [clustId, cInfo] = evt_clust(wv, tstamps, varargin)
 %              pipeline (the body was already event-agnostic; the same move
 %              ripp_gate -> evt_gate made). Gained 'nFit', because a ripple
 %              pool is 5-20x an ED pool and fitgmdist is superlinear in it.
+%       260722b clusters ordered by peak height, not population size, so the
+%              curation GUI can lay them on an amplitude continuum.
 
 %% ========================================================================
 %  ARGUMENTS
@@ -157,6 +160,7 @@ if size(X, 1) < MINEV || size(X, 2) < 3
 end
 
 X = evt_detrend(X, tstamps(iWin), flgDt);
+pk = max(abs(X), [], 2);            % peak height, for ordering the clusters
 [X, sz] = normWv(X, flgNorm);
 
 % Fixed seed, restored on exit. Both the fit subsample and fitgmdist's random
@@ -255,10 +259,13 @@ nClust = max(2, min(nClust, floor(nF / 3)));
 gm = fitgmdist(score(iFit, :), nClust, gmOpt{:});
 lbl = cluster(gm, score);
 
-% relabel by size, largest first, so a cluster index means something stable
-% across a re-run and the GUI lists the bulk before the rare shapes
-cnt = accumarray(lbl, 1, [nClust, 1]);
-[~, ord] = sort(cnt, 'descend');
+% relabel by peak height, tallest first, so the GUI lists and tiles the
+% clusters on a scannable amplitude continuum instead of by arbitrary
+% population size - the tall step artifacts a ripple pool carries then sit
+% together at the top, next to the tall genuine ripples. The order is a display
+% convenience only; a saved partition keeps its own labels regardless.
+h = accumarray(lbl, pk, [nClust, 1], @median);
+[~, ord] = sort(h, 'descend');
 remap = zeros(nClust, 1);
 remap(ord) = 1 : nClust;
 clustId(iOk) = remap(lbl);

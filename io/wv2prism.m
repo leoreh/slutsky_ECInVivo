@@ -32,6 +32,10 @@ function blocks = wv2prism(tbl, xVec, varargin)
 %                          in ms. Length must match the waveform width.
 %       varargin - Parameter/Value:
 %           'yVar'     - (Char) waveform column. {'lfp'}
+%           'scale'    - (Num)  multiply the waveforms by this before
+%                               summarising. The default 1/1000 converts the LFP
+%                               from uV to mV (wv2prism's origin); pass 1 for
+%                               data that is already unitless (a normalised PETH).
 %           'grpVar'   - (Char) column -> data columns (one mouse each).
 %                               {'sbjID'}
 %           'splitVar' - (Char) column -> one block each (one per genotype).
@@ -62,6 +66,7 @@ p = inputParser;
 addRequired(p, 'tbl', @istable);
 addRequired(p, 'xVec', @isnumeric);
 addParameter(p, 'yVar', 'lfp', @ischar);
+addParameter(p, 'scale', 1/1000, @(x) isnumeric(x) && isscalar(x));
 addParameter(p, 'grpVar', 'sbjID', @ischar);
 addParameter(p, 'splitVar', '', @ischar);
 addParameter(p, 'xLbl', 'x', @ischar);
@@ -71,6 +76,7 @@ addParameter(p, 'flgSort', true, @islogical);
 addParameter(p, 'flgClip', true, @islogical);
 parse(p, tbl, xVec, varargin{:});
 yVar     = p.Results.yVar;
+scale    = p.Results.scale;
 grpVar   = p.Results.grpVar;
 splitVar = p.Results.splitVar;
 xLbl     = p.Results.xLbl;
@@ -113,7 +119,7 @@ for iL = 1 : numel(levels)
     sd = nan(nS, numel(mice));
     nn = zeros(nS, numel(mice));
     for iM = 1 : numel(mice)
-        W = double(sub.(yVar)(grpOf == iM, iKeep));
+        W = double(sub.(yVar)(grpOf == iM, iKeep)) * scale; % uV->mV by default
         mu(:, iM) = mean(W, 1, 'omitnan');
         sd(:, iM) = std(W, 0, 1, 'omitnan');
         nn(:, iM) = sum(isfinite(W), 1);

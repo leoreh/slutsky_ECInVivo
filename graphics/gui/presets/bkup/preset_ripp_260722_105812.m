@@ -78,11 +78,16 @@ varMap.rippFilt  = var_recipe('bin', 'file', 'lfp', ...
 %% ========================================================================
 %  VIEW (guiMap)
 %  ========================================================================
-guiMap = struct('panels', struct(), 'base', 'ripp', 'mode', 'events', 'win', 1);
+guiMap = struct('panels', struct(), ...
+    'base', 'ripp', 'mode', 'events', 'win', 1);
 guiMap.panels.states = guiPath_panel('stateStrip', 'top', 'states');
 guiMap.panels.spec = guiPath_panel('spec', 'top', 'spec');
+% absolute y-limits, not autoscale: a fixed scale is the whole point here, so
+% the same height means the same score in every mouse. 0 is the resting NREM
+% level and the WAKE/NREM boundary sits near 1. Shift+scroll (or shift +/-/0)
+% over the panel widens or tightens this about its centre for a closer look.
 guiMap.panels.emgScore = guiPath_panel('trace', 'top', 'emgScore', ...
-    'height', 0.7, 'label', 'EMG score', 'ylim', [-2 6]);
+    'height', 0.7, 'label', 'EMG score', 'ylim', [-2, 6]);
 guiMap.panels.ripp = guiPath_panel('eventTicks', 'top', 'ripp', ...
     'label', 'Ripples');
 guiMap.panels.rippStack = guiPath_panel('traces', 'bottom', 'rippStack', ...
@@ -94,7 +99,6 @@ guiMap.panels.emg = guiPath_panel('trace', 'bottom', 'emg', ...
 guiMap.panels.raster = guiPath_panel('raster', 'bottom', 'raster');
 guiMap.panels.ripp_2 = guiPath_panel('eventTicks', 'bottom', 'ripp', ...
     'label', 'Ripples');
-guiMap.panels.states_2 = guiPath_panel('stateStrip', 'bottom', 'states');
 
 end
 
@@ -147,5 +151,4 @@ if ~isfinite(w) || w <= 0, w = 0.05; end
 end
 
 % EOF
-
 

@@ -53,23 +53,15 @@ flgSort = p.Results.flgSort;
 %  PREPARE LABELS
 %  ========================================================================
 
-% Get Group Columns (e.g., WT, KO)
-uGrps = unique(tbl.(grpVar));
-if flgSort && exist('natsort', 'file')
-    uGrps = string(natsort(cellstr(string(uGrps))));
-else
-    uGrps = string(uGrps);
-end
+% Get Group Columns (e.g., WT, KO). A categorical keeps its declared level
+% order (e.g. Control, MCU-KO, CAG-MCU-KO), matching the GUIs and
+% tbl2prismSum; anything else is natsorted.
+uGrps = orderLevels(tbl.(grpVar), flgSort);
 nGrps = length(uGrps);
 
 % Get Row Labels (e.g., RS, FS) if applicable
 if ~isempty(rowVar)
-    uRows = unique(tbl.(rowVar));
-    if flgSort && exist('natsort', 'file')
-        uRows = string(natsort(cellstr(string(uRows))));
-    else
-        uRows = string(uRows);
-    end
+    uRows = orderLevels(tbl.(rowVar), flgSort);
     nRows = length(uRows);
     isTwoWay = true;
 else
@@ -195,6 +187,22 @@ if flgClip
     fprintf('Copied to clipboard.\n');
 end
 
+end
+
+%% ========================================================================
+%  HELPERS
+%  ========================================================================
+
+function u = orderLevels(col, flgSort)
+% Unique group labels as a string vector. Categoricals keep their declared
+% level order (only present levels); everything else is natsorted.
+if iscategorical(col)
+    u = string(categories(removecats(col)));
+elseif flgSort && exist('natsort', 'file')
+    u = string(natsort(cellstr(string(unique(col)))));
+else
+    u = string(unique(col));
+end
 end
 
 % EOF

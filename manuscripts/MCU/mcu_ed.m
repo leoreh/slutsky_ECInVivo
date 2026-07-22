@@ -179,7 +179,7 @@ tblN = groupsummary(tblWv, {'genotype', 'sbjID'});
 % into its own graph. Same detrended, trough-aligned waveforms as the GUI above.
 wvBlocks = wv2prism(tblWv, tstamps * 1000, 'grpVar', 'sbjID', ...
     'splitVar', 'genotype', 'xLbl', 'time (ms)', 'xLim', [-50 50], ...
-    'copy', 'CAG-MCU-KO');
+    'copy', 'Control');
 
 
 

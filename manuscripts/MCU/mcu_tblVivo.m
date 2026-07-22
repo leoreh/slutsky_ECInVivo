@@ -125,8 +125,9 @@ if ismember('ripp', presets)
     varMap = struct();
     varMap.dur          = 'ripp.dur';
     varMap.amp          = 'ripp.amp';
-    varMap.freq         = 'ripp.freq';
-    varMap.freqEvent    = 'ripp.freqEvent';
+    varMap.freq         = 'ripp.freq';         % Hilbert, fixed window
+    varMap.freqEvent    = 'ripp.freqEvent';    % Hilbert, full duration
+    varMap.freqPeak     = 'ripp.freqPeak';     % whitened spectral peak (1/f-corrected)
     varMap.energy       = 'ripp.energy';
     varMap.state        = 'ripp.state';
     varMap.spkGain      = 'ripp.spkGain';

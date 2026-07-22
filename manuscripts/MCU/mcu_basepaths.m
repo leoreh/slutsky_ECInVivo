@@ -299,6 +299,13 @@ elseif strcmp(queryStr, 'bsl3')
     basepaths = [mcu_basepaths('wt_bsl'), mcu_basepaths('mcu_bsl'), ...
         mcu_basepaths('ra')];
 
+elseif strcmp(queryStr, 'bsl3_ripp')
+
+    % Three-genotype baseline set for the SWR analysis: Control uses the
+    % ripple-curated WT sessions (wt_bsl_ripp), not the firing-rate WT set.
+    basepaths = [mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl'), ...
+        mcu_basepaths('ra')];
+
 elseif strcmp(queryStr, 'ra')
 
     % CAG-MCU-KO cohort - acute viral KO under the CAG promotor

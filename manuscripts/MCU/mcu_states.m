@@ -1,169 +1,94 @@
-
-
-
-
-%% ========================================================================
-%  BOUT ANALYSIS (Baseline)
-%  ========================================================================
-
-% Files
-basepaths = [mcu_basepaths('wt_bsl'), mcu_basepaths('wt_bsl_ripp'),...
-    mcu_basepaths('mcu_bsl')];
-basepaths = natsort(unique(basepaths));
-
-% Load
-vars = {'sleep_states'};
-v = basepaths2vars('basepaths', basepaths, 'vars', vars);
-
-% Config
-cfg = mcu_cfg();
-cfg.lbl.states = v(1).ss.info.names;
-clear varMap
-varMap.BoutLen = 'bouts.blen';
-sStates = [1, 4, 5];
-
-% Pre-process: extract bout length per state
-for iState = sStates
-    for iFile = 1:length(basepaths)
-        v(iFile).ss.bouts.blen = v(iFile).ss.bouts.boutLen{iState};
-    end
-
-    % TABLE
-
-    % Metadata
-    tagFiles = struct();
-    tagFiles.sbjID = get_mname(basepaths);
-    [~, fileNames] = fileparts(basepaths);
-    tagFiles.fileID = fileNames;
-    tagAll.State = cfg.lbl.states{iState};
-
-    % Table
-    tbl = v2tbl('v', [v(:).ss], 'varMap', varMap, 'tagAll',...
-        tagAll, 'tagFiles', tagFiles, 'idxCol', []);
-
-    % Group
-    tbl.genotype = ones(height(tbl), 1) * 1;
-    tbl.genotype(ismember(tbl.sbjID, cfg.miceMCU), :) = 2;
-    tbl.genotype = categorical(tbl.genotype, [1, 2], cfg.lbl.grp);
-
-    tblCell{iState} = tbl;
-end
-
-tblSs = vertcat(tblCell{:});
-
-% Reorder columns
-varOrder = {'genotype', 'sbjID', 'fileID', 'unitID', 'State'};
-tblSs = movevars(tblSs, varOrder, 'Before', 1);
-
-% Plot
-hFig = guiTbl_bar(tblSs, 'yVar', 'BoutLen', 'xVar', 'State', 'GrpVar', 'genotype');
-
-
-
-% -------------------------------------------------------------------------
-% LME
-
-% Formula
-frml = 'BoutLen ~ genotype * State + (1|sbjID)';
-
-% Check best model
-% statsPark = lme_parkTest(tblSs, frml)
-% statsDist = lme_compareDists(tblSs, frml)
-
-% Run LME
-% Comparison reveals InverseGaussian
-cfgLme.dist = 'InverseGaussian';
-cfgLme.contrasts = [1 : 9];
-[lmeStats, lmeMdl] = lme_analyse(tblSs, frml, cfgLme);
-
-
-% Prism
-idxRow = tblSs.State == 'WAKE';
-prismMat = tbl2prism(tblSs(idxRow, :), 'yVar', 'BoutLen');
-
-
-
-
+% MCU_STATES  Time spent in each vigilance state per mouse (baseline).
+%
+% A scratch pad, not a function. Run the section, then copy each Prism block.
+%
+% Baseline sessions across the three genotypes (same set as mcu_ed): one point
+% per mouse per state. AccuSleep scores six states; for reporting they are
+% collapsed by MERGE below - the one knob in this file. Two numbers per state:
+% absolute time (hours) and percent of the recording.
 
 
 %% ========================================================================
-%  STATE DURATION (Baseline)
+%  TIME IN STATE  (baseline, one point per mouse x state)
 %  ========================================================================
+% ss.bouts already holds, per raw state and over the whole recording, both the
+% total scored seconds (totDur) and that state's share of the recording
+% (prctDur, one shared denominator). Merging is therefore a grouped SUM -
+% additive, unlike a rate - so a merged state's time is the summed time of its
+% parts and its percent the summed percent. This is why evt_stateMerge, which
+% merges an event's state LABEL for a rate, is not used here.
+%
+% MERGE: fieldname = reported state, value = the raw AccuSleep states summed
+% into it. This is the only thing to edit. Raw names are WAKE QWAKE LSLEEP NREM
+% REM N/REM (v(1).ss.info.names). Examples:
+%   - keep quiet wake apart : give it its own field, merge.QWAKE = {'QWAKE'},
+%                             and drop 'QWAKE' from merge.WAKE.
+%   - pool the small states : merge.Other = {'QWAKE', 'LSLEEP', 'N/REM'}.
+% A raw state named in no field simply does not appear, and the percentages sum
+% to under 100 by that much - as they already do for unscored / artifact time.
 
-% Files
-basepaths = [mcu_basepaths('wt_bsl'), mcu_basepaths('wt_bsl_ripp'),...
-    mcu_basepaths('mcu_bsl')];
-basepaths = natsort(unique(basepaths));
+% Files - baseline, three genotypes (as in mcu_ed)
+basepaths = [mcu_basepaths('wt_bsl_ripp'), mcu_basepaths('mcu_bsl'), ...
+    mcu_basepaths('ra')];
 
-% Load
-vars = {'sleep_states'};
-v = basepaths2vars('basepaths', basepaths, 'vars', vars);
+% Load scored states
+v = basepaths2vars('basepaths', basepaths, 'vars', {'sleep_states'});
 
-% Config
-cfg = mcu_cfg();
-cfg.lbl.states = v(1).ss.info.names;
-clear varMap
-varMap.StatePrct = 'bouts.StatePrct';
-sStates = [1, 4, 5];
+% Reporting states and their constituents
+merge = struct();
+merge.WAKE = {'WAKE', 'QWAKE'};
+merge.NREM = {'NREM', 'LSLEEP'};
+merge.REM  = {'REM', 'N/REM'};
 
-% Pre-process
-for iState = sStates
-    
-    for iFile = 1:length(basepaths)
-        v(iFile).ss.bouts.StatePrct = v(iFile).ss.bouts.prctDur(1, iState);
-    end
-
-    % Metadata
-    tagFiles = struct();
-    tagFiles.sbjID = get_mname(basepaths);
-    [~, fileNames] = fileparts(basepaths);
-    tagFiles.fileID = fileNames;
-    tagAll.State = cfg.lbl.states{iState};
-
-    % Table
-    tbl = v2tbl('v', [v(:).ss], 'varMap', varMap, 'tagAll',...
-        tagAll, 'tagFiles', tagFiles, 'idxCol', iState);
-
-    % Group
-    tbl.genotype = ones(height(tbl), 1) * 1;
-    tbl.genotype(ismember(tbl.sbjID, cfg.miceMCU), :) = 2;
-    tbl.genotype = categorical(tbl.genotype, [1, 2], cfg.lbl.grp);
-
-    tblCell{iState} = tbl;
+% Guard: a mistyped raw name would silently drop that state's time
+rawNames  = v(1).ss.info.names(1 : size(v(1).ss.bouts.totDur, 2));
+mergeVals = struct2cell(merge);
+tokens    = [mergeVals{:}];
+bad       = tokens(~ismember(tokens, rawNames));
+if ~isempty(bad)
+    warning('mcu_states:badState', 'merge names not in ss.info.names: %s', ...
+        strjoin(unique(bad), ', '));
 end
 
-tblSs = vertcat(tblCell{:});
+% Build tidy table: one row per session x reported state
+rptStates = fieldnames(merge);
+mnames    = get_mname(basepaths);
+rows      = cell(numel(basepaths), 1);
+for iFile = 1 : numel(basepaths)
 
-% Reorder columns
-varOrder = {'genotype', 'sbjID', 'fileID', 'unitID', 'State'};
-tblSs = movevars(tblSs, varOrder, 'Before', 1);
+    bouts  = v(iFile).ss.bouts;
+    nState = size(bouts.totDur, 2);
+    names  = v(iFile).ss.info.names(1 : nState);        % drop trailing BIN
+    totDur = bouts.totDur(1, :);                         % [s] per raw state
+    prcDur = bouts.prctDur(1, :);                        % [%] of recording
 
-% Plot
-hFig = guiTbl_bar(tblSs, 'yVar', 'StatePrct', 'xVar', 'State', 'GrpVar', 'genotype');
+    durAbs = zeros(numel(rptStates), 1);
+    durPct = zeros(numel(rptStates), 1);
+    for iRpt = 1 : numel(rptStates)
+        idx = ismember(names, merge.(rptStates{iRpt}));
+        durAbs(iRpt) = sum(totDur(idx)) / 3600;          % -> hours (/60=min)
+        durPct(iRpt) = sum(prcDur(idx));                 % of recording
+    end
 
+    rows{iFile} = table( ...
+        repmat(categorical(mnames(iFile)), numel(rptStates), 1), ...
+        categorical(rptStates, rptStates), durAbs, durPct, ...
+        'VariableNames', {'sbjID', 'state', 'durAbs', 'durPct'});
+end
+tbl = vertcat(rows{:});
+tbl.genotype = mcu_geno(tbl.sbjID);
 
+% Quick look (optional triage)
+guiTbl_bar(tbl, 'xVar', 'state', 'yVar', 'durPct', 'grpVar', 'genotype');
 
-% -------------------------------------------------------------------------
-% LME
+% -> PRISM, grouped layout: row per state, column per genotype, one subcolumn
+% per mouse. flgSort false keeps the category order, so columns come out
+% Control / MCU-KO / CAG-MCU-KO and rows in the merge order above. Copy one,
+% paste into Prism, then run the other.
+tbl2prism(tbl, 'yVar', 'durAbs', 'grpVar', 'genotype', ...
+    'rowVar', 'state', 'flgSort', false);       % absolute [h]
 
-% Formula
-frml = 'StatePrct ~ genotype * State + (1|sbjID)';
+tbl2prism(tbl, 'yVar', 'durPct', 'grpVar', 'genotype', ...
+    'rowVar', 'state', 'flgSort', false);       % percent of recording
 
-% Check best model
-% statsPark = lme_parkTest(tblSs, frml)
-% statsDist = lme_compareDists(tblSs, frml)
-
-% Run LME
-% Comparison reveals InverseGaussian
-cfgLme.dist = 'Gamma';
-cfgLme.contrasts = [1 : 9];
-[lmeStats, lmeMdl] = lme_analyse(tblSs, frml, cfgLme);
-
-
-% Prism
-idxRow = tblSs.State == 'REM';
-prismMat = tbl2prism(tblSs(idxRow, :), 'yVar', 'StatePrct');
-
-
-
-
+% EOF

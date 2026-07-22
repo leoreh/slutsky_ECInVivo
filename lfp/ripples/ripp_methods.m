@@ -44,11 +44,14 @@ function met = ripp_methods(preset)
 %       .qa        - <struct> the NOISE FILTER that sizes the pool handed to
 %                            the clustering, and the mask an UNCURATED session
 %                            falls back to (applied by evt_gate):
-%           .states - <vec>  vigilance-state indices to keep (AccuSleep order
-%                            1=WAKE 2=QWAKE 3=LSLEEP 4=NREM 5=REM 6=N/REM
+%           .states - <cellstr|vec> vigilance states to keep, as labels
+%                            ({'NREM'}, the default) or AccuSleep indices
+%                            (1=WAKE 2=QWAKE 3=LSLEEP 4=NREM 5=REM 6=N/REM
 %                            7=BIN); [] = any state. In the GUI this is a SCOPE,
 %                            not a verdict - the state boxes start from this
-%                            list and can be flipped back and forth.
+%                            list and can be flipped back and forth. It confines
+%                            the analysis to NREM at curation time, so .accepted
+%                            never has to be narrowed later.
 %           .ranges - <struct> per-event metric ranges [lo hi], one field per
 %                            ripp per-event field. An event passes a metric if
 %                            its value is inside the range or NaN (metric
@@ -84,6 +87,12 @@ function met = ripp_methods(preset)
 %       260722 .clust added: curation became waveform clustering (ripp_curate ->
 %              evt_curate), so .qa stopped being the answer and became the noise
 %              filter that sizes the pool handed to it.
+%       260722b qa.states narrowed from all-states to {'NREM'}. The mask the GUI
+%              reloads is rebuilt from the saved clusters and state scope, so
+%              ripp_analyze forcing NREM into .accepted afterwards made the two
+%              disagree on reopen. Confining to NREM here instead keeps .accepted
+%              reproducible and drops the analyze pass (supersedes the 260720
+%              "every state kept" note).
 
 if nargin < 1 || isempty(preset), preset = 'default'; end
 
@@ -97,8 +106,15 @@ d = struct('name', 'default', 'chMode', 'tag', 'passband', [80 250], ...
 % blind to the other's failure mode and neither describing a shape:
 %   emg      quiet muscle -> not a movement transient
 %   spkGain  units fired  -> not a bystander deflection
-% Every state is kept; the GUI's state boxes start from this list.
-d.qa = struct('states', [1 2 3 4 5 6 7]);
+% NREM only: SWRs are analysed in NREM, so the state SCOPE (and the uncurated
+% fallback mask) starts on NREM - the GUI's NREM box opens ticked, the rest
+% unticked but present. This keeps .accepted NREM-confined at the curation
+% stage, so it stays reproducible from the saved clusters and ripp_analyze
+% needs no separate NREM pass. Tick another box to widen a session's scope.
+% A label (not an index) so it cannot drift with the AccuSleep numbering, and
+% it matches how the GUI saves the scope back.
+d.qa = struct();
+d.qa.states = {'NREM'};
 d.qa.ranges = struct('emg', [-Inf 1], 'spkGain', [1 Inf]);
 
 % Waveform clustering (evt_clust), the stage that decides what a ripple is.
@@ -119,10 +135,11 @@ d.qa.ranges = struct('emg', [-Inf 1], 'spkGain', [1 Inf]);
 % projected and assigned, and the view is handed at most 300 rows per cluster.
 % Neither touches the mask - every event is labelled, and the counts on the
 % checkboxes are the true ones.
-d.clust = struct('win', [-0.03 0.03], 'nPC', 6, 'nClust', 20, ...
+d.clust = struct('win', [-0.03 0.03], 'nPC', 6, 'nClust', 12, ...
     'detrend', 'edge', 'norm', 'peak', 'wSize', 1, ...
     'nFit', 8000, 'nView', 300);
-d.clust.scalar = {'peakProm', 'freqPeak', 'amp', 'dur', 'emg', 'spkGain'};
+% d.clust.scalar = {'peakProm', 'freqPeak', 'amp', 'dur', 'emg', 'spkGain'};
+d.clust.scalar = {'peakProm', 'freqPeak', 'amp', 'dur'};
 
 switch preset
     case 'default'

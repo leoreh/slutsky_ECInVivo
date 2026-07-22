@@ -315,7 +315,8 @@ function test_autoCountReachesTheRule(tc)
 % opened on. The label says "0 = auto"; it has to be true.
 [~, hFig] = openGui(tc);
 st = hFig.UserData;
-tc.verifyEqual(st.edK.Value, 20, 'the box did not open on the shipped count');
+tc.verifyEqual(st.edK.Value, ripp_methods('default').clust.nClust, ...
+    'the box did not open on the shipped count');
 
 st.edK.Value = 0;
 press(hFig, 'Re-cluster');
