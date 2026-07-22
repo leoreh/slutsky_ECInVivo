@@ -17,6 +17,15 @@ function [tbl, tstamps] = ed_wvTbl(basepaths, varargin)
 %       happened to do. Amplitude is left alone because it is usually the thing
 %       the average is reporting (see evt_detrend).
 %
+%       They are also ALIGNED, by default to their trough (evt_align). Detection
+%       centres on the largest ABSOLUTE excursion, so in a biphasic discharge
+%       some rows sit on their positive peak and others on their negative
+%       trough - and the average of that mix is smeared with a notch at t = 0.
+%       Fixing every row to the trough lines them up. It is a shift within the
+%       snippet, not a re-read, and it assumes a trough exists: right for these
+%       negative-going discharges, wrong for a genuinely positive one, so it is
+%       a per-call choice ('align', 'none' to keep detection's alignment).
+%
 %       A session with no accepted events contributes no rows, which is the
 %       honest answer for a mouse that has no discharges - unlike ed_tbl, where
 %       a zero-count row is exactly what the rate model needs.
@@ -26,6 +35,9 @@ function [tbl, tstamps] = ed_wvTbl(basepaths, varargin)
 %       varargin  - Parameter/Value:
 %           'basenames' - (Cell) File stems. {folder names}
 %           'detrend'   - (Char) evt_detrend method, or 'none'. {'edge'}
+%           'align'     - (Char) evt_align feature: 'trough' | 'peak' |
+%                                'extremum' | 'none'. {'trough'}
+%           'alignWin'  - (Num)  evt_align search half-window (s). {0.01}
 %
 %   OUTPUTS:
 %       tbl     - (Table) One row per accepted event:
@@ -37,18 +49,24 @@ function [tbl, tstamps] = ed_wvTbl(basepaths, varargin)
 %       tstamps - (Vec) [1 x nSamp] window time base (s), shared by all rows.
 %
 %   DEPENDENCIES:
-%       evt_files, evt_detrend, evt_stateMerge, get_mname.
+%       evt_files, evt_detrend, evt_align, evt_stateMerge, get_mname.
 %
 %   HISTORY:
 %       260721 created for the per-mouse waveform view in mcu_ed.
+%       260722 trough alignment (evt_align), so the per-mouse averages stop
+%              smearing where detection centred some events on the peak.
 
 p = inputParser;
 addRequired(p, 'basepaths', @iscell);
 addParameter(p, 'basenames', {}, @iscell);
 addParameter(p, 'detrend', 'edge', @ischar);
+addParameter(p, 'align', 'trough', @ischar);
+addParameter(p, 'alignWin', 0.01, @isnumeric);
 parse(p, basepaths, varargin{:});
 basenames = p.Results.basenames;
 flgDt     = p.Results.detrend;
+flgAlign  = p.Results.align;
+alignWin  = p.Results.alignWin;
 
 if isempty(basenames)
     [~, basenames] = cellfun(@fileparts, basepaths, 'uni', false);
@@ -83,7 +101,10 @@ for iPath = 1 : numel(basepaths)
     acc = logical(ed.accepted(:));
     if ~any(acc), continue; end
 
+    % detrend first, then align: evt_align finds the trough on a baseline it
+    % can trust, and the shift does not disturb the flanks the detrend used
     wv = evt_detrend(double(M.edMaps.lfp(acc, :)), tstamps, flgDt);
+    wv = evt_align(wv, tstamps, flgAlign, alignWin);
 
     sbj = mnames{iPath};
     if ~contains(basenames{iPath}, sbj), sbj = basenames{iPath}; end

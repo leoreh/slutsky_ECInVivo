@@ -153,6 +153,12 @@ frml = 'edRate ~ state * genotype + (1|sbjID)';
 %
 % Detrended, not normalised: amplitude is real here and worth seeing. Set
 % Dispersion to Spread and Stat to Median for a robust central trace.
+%
+% Aligned to the TROUGH by default (ed_wvTbl 'align'). Detection centres each
+% event on its largest absolute swing, so some sit on the peak and some on the
+% trough and the average smears - trough-aligning deepens it and sharpens t=0.
+% Pass 'align','none' to see the detection alignment, or 'peak' for a mouse
+% whose discharges are upward-going.
 
 [tblWv, tstamps] = ed_wvTbl(basepaths);
 tblWv.genotype = mcu_geno(tblWv.sbjID);
