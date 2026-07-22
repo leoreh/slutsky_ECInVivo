@@ -31,6 +31,9 @@ function [varMap, guiMap] = preset_ed(ctx)
 %                   that looks unconvincing raw is judged on it.
 % - 260721          ED detection reads one auto-picked .lfp channel, so the
 %                   chMode branch and the sleep_sig eeg fallback are gone.
+% - 260722          the LFP + filtered traces carry bit2uv, so the panels show
+%                   microvolts like the saved edMaps - a 'native' recipe showed
+%                   raw ADC, ~5x larger than the same event in ed_wvTbl.
 
 
 %% ========================================================================
@@ -53,14 +56,20 @@ varMap.ed     = var_recipe('matvar', 'file', 'ed');
 varMap.raster = var_recipe('matvar', 'file', 'spikes', 'var', 'spikes', ...
     'path', 'times');
 
-% the LFP this preset shows = the channel ED detection ran on (ed.info.edCh).
-% The filtered twin is the same channel through the detection band-pass, which
-% is the trace ed_detect actually thresholds.
+% the LFP this preset shows = the channel ED detection ran on (ed.info.edCh),
+% in the SAME UNITS. Detection (evt_loadCh) scales the raw .lfp to microvolts
+% by bit2uv, and the saved edMaps - hence the summary waveforms in ed_wvTbl -
+% are in uV. binary_load defaults an empty bit2uv to 1, so a 'native' or a
+% plain 'double' recipe here would show raw ADC counts instead: ~5x larger,
+% which is the mismatch between one event here and in the summary. Passing the
+% same factor keeps both in uV. The filtered twin is the same channel through
+% the detection band-pass, which is the trace ed_detect actually thresholds.
 [edCh, edBand] = edSigSource(ctx);
+b2u = edBit2uv(ctx);
 varMap.lfp = var_recipe('bin', 'file', 'lfp', 'ch', edCh(:)', ...
-    'average', true, 'outClass', 'native');
+    'average', true, 'bit2uv', b2u);
 varMap.edFilt = var_recipe('bin', 'file', 'lfp', 'ch', edCh(:)', ...
-    'average', true, 'transform', {'bandpass', {edBand}});
+    'average', true, 'bit2uv', b2u, 'transform', {'bandpass', {edBand}});
 
 
 %% ========================================================================
@@ -104,6 +113,20 @@ try
             band = ed.info.passband;
         end
     end
+catch
+end
+end
+
+
+function b2u = edBit2uv(ctx)
+% The raw-to-microvolt factor detection used, so this preset shows the same
+% units as the saved maps. Mirrors evt_loadCh: TDT (24414 Hz acquisition) is
+% already in uV, Intan is 0.195 uV/bit. Falls back to the Intan value, which
+% is the cohort here, if the session cannot be read.
+b2u = 0.195;
+try
+    s = var_fetch(var_recipe('matvar', 'file', 'session'), ctx);
+    if round(s.extracellular.sr) == 24414, b2u = 1; end
 catch
 end
 end
